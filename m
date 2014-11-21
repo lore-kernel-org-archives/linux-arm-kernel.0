@@ -1,83 +1,30 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 21 Nov 2014 13:19:21 -0500 (EST)
-Subject: [PATCH] ARM: allow modules outside of bl range
-In-Reply-To: <1416585326-3838-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1416585326-3838-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.11.1411211307410.11690@knanqh.ubzr>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Fri, 21 Nov 2014 10:25:48 -0800
+Subject: [PATCH 3/3] regulator: rpm: add support for RPM-controller SMB208
+In-Reply-To: <20141121181332.GY3815@sirena.org.uk>
+References: <1416512485-7292-1-git-send-email-joshc@codeaurora.org>
+ <1416512485-7292-4-git-send-email-joshc@codeaurora.org>
+ <20141121181332.GY3815@sirena.org.uk>
+Message-ID: <CAJAp7OhY2pz+ppjbYRrjZ2E3Bn9NM54dfs1=xoqxd5tG5e3WaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Nov 2014, Ard Biesheuvel wrote:
+On Fri, Nov 21, 2014 at 10:13 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, Nov 20, 2014 at 01:41:25PM -0600, Josh Cartwright wrote:
+>> The IPQ8064 reference boards make use of SMB208 regulators which are
+>> controlled by RPM.  Implement support for these regulators in the RPM
+>> regulator driver.
+>
+> I'm missing both patches 1-3 and the cover letter, what's the story
+> with the series - are there interdependencies?
 
-> Loading modules far away from the kernel in memory is problematic
-> because the 'bl' instruction only has limited reach, and modules are not
-> built with PLTs. Instead of using the -mlong-calls option (which affects
-> all compiler emitted bl instructions, but not the ones in assembler),
-> this patch allocates some additional space at module load time, and
-> populates it with PLT like entries when encountering relocations that
-> are out of reach.
-> 
-> This should work with all relocations against symbols exported by the
-> kernel, including those resulting from GCC generated function calls for
-> ftrace etc.
-> 
-> The module memory needs increase by about 5% on average, regardless of
-> whether any PLT entries were actually emitted. However, due to the page
-> based rounding that occurs when allocating module memory, the typical
-> memory footprint increase is negligible.
-> 
-> This is largely based on the ia64 implementation.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Hi Mark,
 
-[...]
+There are no new dependencies introduced here, patch 1 and 2 are DT
+and mfd additions. So you can apply this patch independently in your
+tree.
 
-> +static u32 get_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
-> +{
-> +	struct plt_entries *plt, *plt_end;
-> +	int c, *count;
-> +
-> +	if (in_init(mod, loc)) {
-> +		plt = (void *)mod->arch.init_plt->sh_addr;
-> +		plt_end = (void *)plt + mod->arch.init_plt->sh_size;
-> +		count = &mod->arch.init_plt_count;
-> +	} else {
-> +		plt = (void *)mod->arch.core_plt->sh_addr;
-> +		plt_end = (void *)plt + mod->arch.core_plt->sh_size;
-> +		count = &mod->arch.core_plt_count;
-> +	}
-> +
-> +	/* Look for an existing entry pointing to 'val' */
-> +	for (c = *count; plt < plt_end; c -= PLT_ENT_COUNT, plt++) {
-> +		int i;
-> +
-> +		if (!c) {
-> +			/* Populate a new set of entries */
-> +			*plt = (struct plt_entries){
-> +				{ [0 ... PLT_ENT_COUNT - 1] = PLT_ENT_LDR, },
-> +				{ val, }
-> +			};
-> +			++*count;
-> +			return (u32)plt->ldr;
-> +		}
-> +		for (i = 0; i < PLT_ENT_COUNT; i++) {
-> +			if (!plt->lit[i]) {
-> +				plt->lit[i] = val;
-> +				++*count;
-> +			}
-> +			if (plt->lit[i] == val)
-> +				return (u32)&plt->ldr[i];
-> +		}
-> +	}
-> +	BUG();
-> +	return 0;
+Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-You shouldn't need a return here as this is unreachable code.
-
-Also I'd suggest creating a kconfig option allowing for this extra code 
-and the possible memory overhead to be configured out if someone really 
-doesn't want it.  Judicious usage of IS_ENABLED() in the code is 
-sufficient to have it all compiled out when not configured.
-
-
-Nicolas
+Regards,
+Bjorn
