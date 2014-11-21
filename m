@@ -1,45 +1,95 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Fri, 21 Nov 2014 09:19:30 -0800
-Subject: [GIT PULL 2/3] ARM: keystone: config updates for 3.19
-In-Reply-To: <201411201314.49184.arnd@arndb.de>
-References: <1415843982-5739-1-git-send-email-ssantosh@kernel.org>
- <1415843982-5739-2-git-send-email-ssantosh@kernel.org>
- <201411201314.49184.arnd@arndb.de>
-Message-ID: <546F7422.5070707@oracle.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 21 Nov 2014 10:20:18 -0700
+Subject: [PATCH 00/10] Save MSI chip in pci_sys_data
+In-Reply-To: <20141112042359.GK28161@google.com>
+References: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
+ <20141112042359.GK28161@google.com>
+Message-ID: <20141121172018.GA6578@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2014 4:14 AM, Arnd Bergmann wrote:
-> On Thursday 13 November 2014, Santosh Shilimkar wrote:
->> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
->>
->>    Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc
->>
->> for you to fetch changes up to 97ef1af9b275924406556bfaec528a3e9e2980c7:
->>
->>    ARM: keystone: defconfig: add options to enable PCI controller (2014-11-04 10:29:39 -0800)
->>
->> ----------------------------------------------------------------
->> Keystone config updates for 3.19
->>
->>          - Enable PCIE controller and related options
->>          - Enable MDIO and ethernet phy options
->>          - Enable DSP IRQCHIP option
->
-> Pulled into next/defconfig.
->
-Thanks Arnd !!
+[+cc Marc]
 
-> Can you send an update so we also enable all of this in multi_v7_defconfig?
->
-Yep. I am planning to sync up the multi_v7_defconfig since there are
-quite a few new options have been enabled after my last sync up.
+On Tue, Nov 11, 2014 at 09:23:59PM -0700, Bjorn Helgaas wrote:
+> On Mon, Oct 27, 2014 at 03:48:37PM +0800, Yijing Wang wrote:
+> > Now PCI host bridge drivers in arm associate MSI chip and
+> > PCI bus by adding .add_bus(), and assign MSI chip pointer
+> > to every PCI bus. Associating MSI chip and every PCI bus
+> > is not necessary. All PCI busses under same PCI host brdige
+> > share the same MSI chip. So saving MSI chip in pci_sys_data
+> > is a better solution, it make PCI host bridge drivers clean.
+> > Because we still need to provide arch spec pcibios_msi_controller()
+> > to extract MSI controller pointer, a better solution is to
+> > refactor PCI host bridge, make a generic pci_host_bridge, and
+> > save common info like PCI domain number, MSI chip, resources
+> > in it. We will do that work in another series as soon.
+> > 
+> > To Bjorn: Because struct msi_chip defined in struct hw_pci and pci_sys_data
+> > is under the #ifdef CONFIG_PCI_MSI, if we use if(IS_ENABLED(CONFIG_PCI_MSI))
+> > in PCI host bridge drivers, it will cause build errors when the CONFIG_PCI_MSI
+> > is off. So I keep #ifdef CONFIG_PCI_MSI in this series.
+> > 
+> > Yijing Wang (10):
+> >   MSI: Rename msi_chip to msi_controller for better readability
+> >   PCI/MSI: Introduce weak pcibios_msi_controller()
+> >   arm/MSI: Save MSI controller in pci_sys_data
+> >   PCI: tegra: Save MSI controller in pci_sys_data
+> >   PCI: designware: Save MSI controller in pci_sys_data
+> >   PCI: rcar: Save MSI controller in pci_sys_data
+> >   PCI: mvebu: Save MSI controller in pci_sys_data
+> >   PCI: xilinx: Save MSI controller in pci_sys_data
+> >   arm/PCI: Clean unused pcibios_add_bus() and pcibios_remove_bus()
+> >   PCI/MSI: Remove useless bus->msi assignment
+> > 
+> >  arch/arm/include/asm/mach/pci.h     |   10 +++++---
+> >  arch/arm/kernel/bios32.c            |   28 ++++++++++--------------
+> >  drivers/irqchip/irq-armada-370-xp.c |   22 +++++++++---------
+> >  drivers/of/of_pci.c                 |   40 +++++++++++++++++-----------------
+> >  drivers/pci/host/pci-keystone-dw.c  |    4 +-
+> >  drivers/pci/host/pci-keystone.h     |    2 +-
+> >  drivers/pci/host/pci-mvebu.c        |   14 ++++-------
+> >  drivers/pci/host/pci-tegra.c        |   37 +++++++++++++-------------------
+> >  drivers/pci/host/pcie-designware.c  |   25 +++++++--------------
+> >  drivers/pci/host/pcie-designware.h  |    2 +-
+> >  drivers/pci/host/pcie-rcar.c        |   37 +++++++++++++-------------------
+> >  drivers/pci/host/pcie-xilinx.c      |   27 +++++++----------------
+> >  drivers/pci/msi.c                   |   22 ++++++++++++++-----
+> >  drivers/pci/probe.c                 |    1 -
+> >  include/linux/msi.h                 |    6 ++--
+> >  include/linux/of_pci.h              |   14 ++++++------
+> >  include/linux/pci.h                 |    2 +-
+> >  17 files changed, 132 insertions(+), 161 deletions(-)
+> > 
+> 
+> Applied to pci/msi for v3.19, thanks.
 
-Will do that after this merge window.
+I reworked this series slightly to:
 
-Regards,
-Santosh
+  - Change pci_msi_controller() and pcibios_msi_controller() from taking a
+    pci_bus * to taking a pci_dev *.  This is so the interface allows
+    per-device MSI controllers.  I don't think there's any reason to assume
+    all devices on a bus have to have the same controller.
+
+  - Drop the last patch ("PCI/MSI: Remove useless bus->msi assignment")
+    because it broke Marc's follow-on patches.
+
+I updated pci/msi, but I haven't put it in my "next" branch yet because I
+want confirmation from Fengguang's autobuilder that I didn't break
+anything.
+
+Current status of my tree:
+
+    6cf00af0ae15 [1] pci/msi (contains this rework)
+    149792795d2b [2] next (does *not* contain this rework)
+
+Thomas, if pci/msi looks good to you, feel free to pull it into your tree.
+The only change you should need to make is to change the parameters to
+pci_msi_controller() and pcibios_msi_controller().
+
+Just FYI, I'm leaving on vacation for a week, so I won't be able to fix any
+issues until Dec 1.
+
+Bjorn
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=next&id=6cf00af0ae15
+[2] https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=next&id=149792795d2b
