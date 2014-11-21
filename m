@@ -1,184 +1,51 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Nov 2014 17:00:04 +0100
-Subject: [PATCHv3 07/16] bus: mvebu-mbus: provide a mechanism to save SDRAM
- window configuration
-In-Reply-To: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1416585613-2113-8-git-send-email-thomas.petazzoni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 17:08:08 +0100
+Subject: [PATCH resend 2/4] ARM: dts: sunxi: unify APB1 clock
+In-Reply-To: <4114168.zuylrCsruj@wuerfel>
+References: <1415245232-20585-1-git-send-email-wens@csie.org>
+ <20141121142903.GD4752@lukather> <4114168.zuylrCsruj@wuerfel>
+Message-ID: <2400552.aBVIZmJhTh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Marvell EBU platforms, when doing suspend/resume, the SDRAM window
-configuration must be saved on suspend, and restored on
-resume. However, it needs to be restored on resume *before*
-re-entering the kernel, because the SDRAM window configuration defines
-the layout of the memory. For this reason, it cannot simply be done in
-the ->suspend() and ->resume() hooks of the mvebu-mbus driver.
+On Friday 21 November 2014 15:35:57 Arnd Bergmann wrote:
+> On Friday 21 November 2014 15:29:03 Maxime Ripard wrote:
+> > On Fri, Nov 21, 2014 at 12:57:02PM +0100, Arnd Bergmann wrote:
+> > > On Thursday 20 November 2014 14:04:01 Kevin Hilman wrote:
+> > > > Chen-Yu Tsai <wens@csie.org> writes:
+> > > > 
+> > > > > From: Emilio L?pez <emilio@elopez.com.ar>
+> > > > >
+> > > > > With the new factors infrastructure in place, we can unify apb1 and
+> > > > > apb1_mux as a single clock now.
+> > > > >
+> > > > > Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> > > > > [wens at csie.org: Change apb1 node label to "apb1"; reword commit title]
+> > > > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > > > 
+> > > > Boot breakage in arm-soc/for-next on sun4i-a10-cubieboard and
+> > > > sun7i-a20-cubieboard2[1] was bisected down to this patch[1].
+> > > > 
+> > > > Reverting $SUBJECT on top of arm-soc gets things booting again.
+> > > > 
+> > > 
+> > > As this looks like it was intended as a cleanup without functional
+> > > changes, I would go ahead and revert it in next/dt.
+> > > 
+> > > Any objections?
+> > 
+> > Yeah, you'd break linux-next as well doing so, as the clock driver now
+> > requires this from the DT.
+> > 
+> > I can merge it through the clock tree though if you prefer it that
+> > way.
+> 
+> Do you know why this commit breaks booting then?
+> 
 
-Instead, it needs to be restored by the bootloader "boot info"
-mechanism used when resuming. This mechanism allows the kernel to
-define a list of (address, value) pairs when suspending, that the
-bootloader will restore on resume before jumping back into the kernel.
+I have now reverted the entire branch, to get things working again.
 
-This commit therefore adds a new function to the mvebu-mbus driver,
-called mvebu_mbus_save_cpu_target(), which will be called by the
-platform code to make the mvebu-mbus driver save the SDRAM window
-configuration in a way that can be understood by the bootloader "boot
-info" mechanism.
+Please send a new pull request once you have a version that you 
+have actually tested.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/bus/mvebu-mbus.c | 56 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mbus.h     |  1 +
- 2 files changed, 57 insertions(+)
-
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index e8c1593..eb7682d 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -110,6 +110,8 @@ struct mvebu_mbus_soc_data {
- 	bool has_mbus_bridge;
- 	unsigned int (*win_cfg_offset)(const int win);
- 	void (*setup_cpu_target)(struct mvebu_mbus_state *s);
-+	int (*save_cpu_target)(struct mvebu_mbus_state *s,
-+			       u32 *store_addr);
- 	int (*show_cpu_target)(struct mvebu_mbus_state *s,
- 			       struct seq_file *seq, void *v);
- };
-@@ -128,6 +130,7 @@ struct mvebu_mbus_state {
- 	void __iomem *mbuswins_base;
- 	void __iomem *sdramwins_base;
- 	void __iomem *mbusbridge_base;
-+	phys_addr_t sdramwins_phys_base;
- 	struct dentry *debugfs_root;
- 	struct dentry *debugfs_sdram;
- 	struct dentry *debugfs_devs;
-@@ -541,6 +544,28 @@ mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
- 	mvebu_mbus_dram_info.num_cs = cs;
- }
- 
-+static int
-+mvebu_mbus_default_save_cpu_target(struct mvebu_mbus_state *mbus,
-+				   u32 *store_addr)
-+{
-+	int i;
-+
-+	for (i = 0; i < 4; i++) {
-+		u32 base = readl(mbus->sdramwins_base + DDR_BASE_CS_OFF(i));
-+		u32 size = readl(mbus->sdramwins_base + DDR_SIZE_CS_OFF(i));
-+
-+		writel(mbus->sdramwins_phys_base + DDR_BASE_CS_OFF(i),
-+		       store_addr++);
-+		writel(base, store_addr++);
-+		writel(mbus->sdramwins_phys_base + DDR_SIZE_CS_OFF(i),
-+		       store_addr++);
-+		writel(size, store_addr++);
-+	}
-+
-+	/* We've written 16 words to the store address */
-+	return 16;
-+}
-+
- static void __init
- mvebu_mbus_dove_setup_cpu_target(struct mvebu_mbus_state *mbus)
- {
-@@ -571,11 +596,35 @@ mvebu_mbus_dove_setup_cpu_target(struct mvebu_mbus_state *mbus)
- 	mvebu_mbus_dram_info.num_cs = cs;
- }
- 
-+static int
-+mvebu_mbus_dove_save_cpu_target(struct mvebu_mbus_state *mbus,
-+				u32 *store_addr)
-+{
-+	int i;
-+
-+	for (i = 0; i < 2; i++) {
-+		u32 map = readl(mbus->sdramwins_base + DOVE_DDR_BASE_CS_OFF(i));
-+
-+		writel(mbus->sdramwins_phys_base + DOVE_DDR_BASE_CS_OFF(i),
-+		       store_addr++);
-+		writel(map, store_addr++);
-+	}
-+
-+	/* We've written 4 words to the store address */
-+	return 4;
-+}
-+
-+int mvebu_mbus_save_cpu_target(u32 *store_addr)
-+{
-+	return mbus_state.soc->save_cpu_target(&mbus_state, store_addr);
-+}
-+
- static const struct mvebu_mbus_soc_data armada_370_xp_mbus_data = {
- 	.num_wins            = 20,
- 	.num_remappable_wins = 8,
- 	.has_mbus_bridge     = true,
- 	.win_cfg_offset      = armada_370_xp_mbus_win_offset,
-+	.save_cpu_target     = mvebu_mbus_default_save_cpu_target,
- 	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
- 	.show_cpu_target     = mvebu_sdram_debug_show_orion,
- };
-@@ -584,6 +633,7 @@ static const struct mvebu_mbus_soc_data kirkwood_mbus_data = {
- 	.num_wins            = 8,
- 	.num_remappable_wins = 4,
- 	.win_cfg_offset      = orion_mbus_win_offset,
-+	.save_cpu_target     = mvebu_mbus_default_save_cpu_target,
- 	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
- 	.show_cpu_target     = mvebu_sdram_debug_show_orion,
- };
-@@ -592,6 +642,7 @@ static const struct mvebu_mbus_soc_data dove_mbus_data = {
- 	.num_wins            = 8,
- 	.num_remappable_wins = 4,
- 	.win_cfg_offset      = orion_mbus_win_offset,
-+	.save_cpu_target     = mvebu_mbus_dove_save_cpu_target,
- 	.setup_cpu_target    = mvebu_mbus_dove_setup_cpu_target,
- 	.show_cpu_target     = mvebu_sdram_debug_show_dove,
- };
-@@ -604,6 +655,7 @@ static const struct mvebu_mbus_soc_data orion5x_4win_mbus_data = {
- 	.num_wins            = 8,
- 	.num_remappable_wins = 4,
- 	.win_cfg_offset      = orion_mbus_win_offset,
-+	.save_cpu_target     = mvebu_mbus_default_save_cpu_target,
- 	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
- 	.show_cpu_target     = mvebu_sdram_debug_show_orion,
- };
-@@ -612,6 +664,7 @@ static const struct mvebu_mbus_soc_data orion5x_2win_mbus_data = {
- 	.num_wins            = 8,
- 	.num_remappable_wins = 2,
- 	.win_cfg_offset      = orion_mbus_win_offset,
-+	.save_cpu_target     = mvebu_mbus_default_save_cpu_target,
- 	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
- 	.show_cpu_target     = mvebu_sdram_debug_show_orion,
- };
-@@ -620,6 +673,7 @@ static const struct mvebu_mbus_soc_data mv78xx0_mbus_data = {
- 	.num_wins            = 14,
- 	.num_remappable_wins = 8,
- 	.win_cfg_offset      = mv78xx0_mbus_win_offset,
-+	.save_cpu_target     = mvebu_mbus_default_save_cpu_target,
- 	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
- 	.show_cpu_target     = mvebu_sdram_debug_show_orion,
- };
-@@ -804,6 +858,8 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
- 		return -ENOMEM;
- 	}
- 
-+	mbus->sdramwins_phys_base = sdramwins_phys_base;
-+
- 	if (mbusbridge_phys_base) {
- 		mbus->mbusbridge_base = ioremap(mbusbridge_phys_base,
- 						mbusbridge_size);
-diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index 550c88f..611b69f 100644
---- a/include/linux/mbus.h
-+++ b/include/linux/mbus.h
-@@ -61,6 +61,7 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
- }
- #endif
- 
-+int mvebu_mbus_save_cpu_target(u32 *store_addr);
- void mvebu_mbus_get_pcie_mem_aperture(struct resource *res);
- void mvebu_mbus_get_pcie_io_aperture(struct resource *res);
- int mvebu_mbus_add_window_remap_by_id(unsigned int target,
--- 
-2.1.0
+	Arnd
