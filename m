@@ -1,156 +1,67 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Nov 2014 17:00:02 +0100
-Subject: [PATCHv3 05/16] gpio: mvebu: add suspend/resume support
+Date: Fri, 21 Nov 2014 17:00:11 +0100
+Subject: [PATCHv3 14/16] ARM: mvebu: add suspend/resume DT information for
+ Armada XP GP
 In-Reply-To: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1416585613-2113-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1416585613-2113-15-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the implementation of ->suspend() and ->resume()
-platform_driver hooks in order to save and restore the state of the
-GPIO configuration. In order to achieve that, additional fields are
-added to the mvebu_gpio_chip structure.
+This commit improves the Armada XP GP Device Tree description to
+describe the 3 GPIOs that are used to connect the SoC to the PIC
+micro-controller that we talk to shutdown the SoC when entering
+suspend to RAM.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: linux-gpio at vger.kernel.org
-Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/gpio/gpio-mvebu.c | 99 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 99 insertions(+)
+ arch/arm/boot/dts/armada-xp-gp.dts | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-index 418e386..dd5545c 100644
---- a/drivers/gpio/gpio-mvebu.c
-+++ b/drivers/gpio/gpio-mvebu.c
-@@ -83,6 +83,14 @@ struct mvebu_gpio_chip {
- 	int		   irqbase;
- 	struct irq_domain *domain;
- 	int                soc_variant;
-+
-+	/* Used to preserve GPIO registers accross suspend/resume */
-+	u32                out_reg;
-+	u32                io_conf_reg;
-+	u32                blink_en_reg;
-+	u32                in_pol_reg;
-+	u32                edge_mask_regs[4];
-+	u32                level_mask_regs[4];
- };
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 0478c55..ea86736 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -23,6 +23,7 @@
+  */
  
- /*
-@@ -554,6 +562,93 @@ static const struct of_device_id mvebu_gpio_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, mvebu_gpio_of_match);
+ /dts-v1/;
++#include <dt-bindings/gpio/gpio.h>
+ #include "armada-xp-mv78460.dtsi"
  
-+static int mvebu_gpio_suspend(struct platform_device *pdev, pm_message_t state)
-+{
-+	struct mvebu_gpio_chip *mvchip = platform_get_drvdata(pdev);
-+	int i;
-+
-+	mvchip->out_reg = readl(mvebu_gpioreg_out(mvchip));
-+	mvchip->io_conf_reg = readl(mvebu_gpioreg_io_conf(mvchip));
-+	mvchip->blink_en_reg = readl(mvebu_gpioreg_blink(mvchip));
-+	mvchip->in_pol_reg = readl(mvebu_gpioreg_in_pol(mvchip));
-+
-+	switch (mvchip->soc_variant) {
-+	case MVEBU_GPIO_SOC_VARIANT_ORION:
-+		mvchip->edge_mask_regs[0] =
-+			readl(mvchip->membase + GPIO_EDGE_MASK_OFF);
-+		mvchip->level_mask_regs[0] =
-+			readl(mvchip->membase + GPIO_LEVEL_MASK_OFF);
-+		break;
-+	case MVEBU_GPIO_SOC_VARIANT_MV78200:
-+		for (i = 0; i < 2; i++) {
-+			mvchip->edge_mask_regs[i] =
-+				readl(mvchip->membase +
-+				      GPIO_EDGE_MASK_MV78200_OFF(i));
-+			mvchip->level_mask_regs[i] =
-+				readl(mvchip->membase +
-+				      GPIO_LEVEL_MASK_MV78200_OFF(i));
-+		}
-+		break;
-+	case MVEBU_GPIO_SOC_VARIANT_ARMADAXP:
-+		for (i = 0; i < 4; i++) {
-+			mvchip->edge_mask_regs[i] =
-+				readl(mvchip->membase +
-+				      GPIO_EDGE_MASK_ARMADAXP_OFF(i));
-+			mvchip->level_mask_regs[i] =
-+				readl(mvchip->membase +
-+				      GPIO_LEVEL_MASK_ARMADAXP_OFF(i));
-+		}
-+		break;
-+	default:
-+		BUG();
-+	}
-+
-+	return 0;
-+}
-+
-+static int mvebu_gpio_resume(struct platform_device *pdev)
-+{
-+	struct mvebu_gpio_chip *mvchip = platform_get_drvdata(pdev);
-+	int i;
-+
-+	writel(mvchip->out_reg, mvebu_gpioreg_out(mvchip));
-+	writel(mvchip->io_conf_reg, mvebu_gpioreg_io_conf(mvchip));
-+	writel(mvchip->blink_en_reg, mvebu_gpioreg_blink(mvchip));
-+	writel(mvchip->in_pol_reg, mvebu_gpioreg_in_pol(mvchip));
-+
-+	switch (mvchip->soc_variant) {
-+	case MVEBU_GPIO_SOC_VARIANT_ORION:
-+		writel(mvchip->edge_mask_regs[0],
-+		       mvchip->membase + GPIO_EDGE_MASK_OFF);
-+		writel(mvchip->level_mask_regs[0],
-+		       mvchip->membase + GPIO_LEVEL_MASK_OFF);
-+		break;
-+	case MVEBU_GPIO_SOC_VARIANT_MV78200:
-+		for (i = 0; i < 2; i++) {
-+			writel(mvchip->edge_mask_regs[i],
-+			       mvchip->membase + GPIO_EDGE_MASK_MV78200_OFF(i));
-+			writel(mvchip->level_mask_regs[i],
-+			       mvchip->membase +
-+			       GPIO_LEVEL_MASK_MV78200_OFF(i));
-+		}
-+		break;
-+	case MVEBU_GPIO_SOC_VARIANT_ARMADAXP:
-+		for (i = 0; i < 4; i++) {
-+			writel(mvchip->edge_mask_regs[i],
-+			       mvchip->membase +
-+			       GPIO_EDGE_MASK_ARMADAXP_OFF(i));
-+			writel(mvchip->level_mask_regs[i],
-+			       mvchip->membase +
-+			       GPIO_LEVEL_MASK_ARMADAXP_OFF(i));
-+		}
-+		break;
-+	default:
-+		BUG();
-+	}
-+
-+	return 0;
-+}
-+
- static int mvebu_gpio_probe(struct platform_device *pdev)
- {
- 	struct mvebu_gpio_chip *mvchip;
-@@ -577,6 +672,8 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
- 	if (!mvchip)
- 		return -ENOMEM;
+ / {
+@@ -48,6 +49,14 @@
+ 		      <0x00000001 0x00000000 0x00000001 0x00000000>;
+ 	};
  
-+	platform_set_drvdata(pdev, mvchip);
++	cpus {
++		pm_pic {
++			ctrl-gpios = <&gpio0 16 GPIO_ACTIVE_LOW>,
++				     <&gpio0 17 GPIO_ACTIVE_LOW>,
++				     <&gpio0 18 GPIO_ACTIVE_LOW>;
++		};
++	};
 +
- 	if (of_property_read_u32(pdev->dev.of_node, "ngpios", &ngpios)) {
- 		dev_err(&pdev->dev, "Missing ngpios OF property\n");
- 		return -ENODEV;
-@@ -735,5 +832,7 @@ static struct platform_driver mvebu_gpio_driver = {
- 		.of_match_table = mvebu_gpio_of_match,
- 	},
- 	.probe		= mvebu_gpio_probe,
-+	.suspend        = mvebu_gpio_suspend,
-+	.resume         = mvebu_gpio_resume,
- };
- module_platform_driver(mvebu_gpio_driver);
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+ 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+@@ -115,7 +124,15 @@
+ 			serial@12300 {
+ 				status = "okay";
+ 			};
+-
++			pinctrl {
++				pinctrl-0 = <&pic_pins>;
++				pinctrl-names = "default";
++				pic_pins: pic-pins-0 {
++					marvell,pins = "mpp16", "mpp17",
++						       "mpp18";
++					marvell,function = "gpio";
++				};
++			};
+ 			sata at a0000 {
+ 				nr-ports = <2>;
+ 				status = "okay";
 -- 
 2.1.0
