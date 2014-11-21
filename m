@@ -1,84 +1,69 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 21 Nov 2014 23:36:07 +0800
-Subject: [PATCH v7 2/4] ARM: mediatek: Add sysirq interrupt polarity
- support
-In-Reply-To: <20141119180448.GD12851@leverpostej>
-References: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>
- <1416406451-4578-3-git-send-email-yingjoe.chen@mediatek.com>
- <20141119180448.GD12851@leverpostej>
-Message-ID: <1416584167.24971.9.camel@mtksdaap41>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 21 Nov 2014 16:58:47 +0100
+Subject: [PATCH] opp: convert dev_warn() to dev_dbg() for duplicate OPPs
+In-Reply-To: <CAKohpoknu=V_wscVPWLdZO8xEGY6CVMNXuP4F76GNABnm9K4dQ@mail.gmail.com>
+References: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
+ <1714555.tu97zMrOn0@vostro.rjw.lan>
+ <CAKohpoknu=V_wscVPWLdZO8xEGY6CVMNXuP4F76GNABnm9K4dQ@mail.gmail.com>
+Message-ID: <5171628.FRGslOuEb6@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-
-On Wed, 2014-11-19 at 18:04 +0000, Mark Rutland wrote:
-> On Wed, Nov 19, 2014 at 02:14:09PM +0000, Yingjoe Chen wrote:
-> > +	if (type == IRQ_TYPE_LEVEL_LOW || type == IRQ_TYPE_EDGE_FALLING) {
-> > +		if (type == IRQ_TYPE_LEVEL_LOW)
-> > +			type = IRQ_TYPE_LEVEL_HIGH;
-> > +		else
-> > +			type = IRQ_TYPE_EDGE_RISING;
-> > +		value |= (1 << offset);
-> > +	} else
-> > +		value &= ~(1 << offset);
+On Wednesday, November 19, 2014 01:16:24 PM Viresh Kumar wrote:
+> On 19 November 2014 02:21, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Tuesday, November 18, 2014 08:38:14 AM Viresh Kumar wrote:
 > 
-> Nit: if one branch of an if statements is bracketed, both branches
-> should be. Please bracket the else case.
-
-OK, will change in next version.
-
-> > +	writel(value, chip_data->intpol_base + reg_index * 4);
-> > +
-> > +	data = data->parent_data;
-> > +	ret = data->chip->irq_set_type(data, type);
-> > +	spin_unlock_irqrestore(&chip_data->lock, flags);
-> > +	return ret;
-> > +}
-> > +
-> > +static struct irq_chip mtk_sysirq_chip = {
-> > +	.name			= "MT_SYSIRQ",
-> > +	.irq_mask		= irq_chip_mask_parent,
-> > +	.irq_unmask		= irq_chip_unmask_parent,
-> > +	.irq_eoi		= irq_chip_eoi_parent,
-> > +	.irq_set_type		= mtk_sysirq_set_type,
-> > +	.irq_retrigger		= irq_chip_retrigger_hierarchy,
-> > +	.irq_set_affinity	= irq_chip_set_affinity_parent,
-> > +};
-> > +
-> > +static int mtk_sysirq_domain_xlate(struct irq_domain *d,
-> > +				   struct device_node *controller,
-> > +				   const u32 *intspec, unsigned int intsize,
-> > +				   unsigned long *out_hwirq,
-> > +				   unsigned int *out_type)
-> > +{
-> > +	if (intsize < 3)
-> > +		return -EINVAL;
-> > +
-> > +	/* sysirq doesn't support PPI */
-> > +	if (intspec[0])
-> > +		return -EINVAL;
-> > +
-> > +	*out_hwirq = intspec[1];
-> > +	*out_type = intspec[2] & IRQ_TYPE_SENSE_MASK;
+> >> We are allowing addition of duplicate OPPs as a standard thing right now
+> >> as cpufreq drivers don't get rid of the OPPs they create with DT. So, that
+> >> shouldn't complain, isn't it ?
+> >
+> > Is cpufreq the only user of OPP?  I thought there were other users, so what
+> > about them?
 > 
-> All of this is very strongly tied to the GIC, but the binding made it
-> sound like this was more generic (it didn't specify the number of cells
-> or their meaning). It doesn't look like we validate that this is
-> attached to a GIC.
+> Probably of CPU OPPs, but I am not sure. Obviously dev OPPs can be used
+> by others.
 > 
-> Do we expect this to only ever be attached to a GICv2?
+> > I'm not sure about that.  If they aren't useful for anything after
+> > that, what's the benefit of keeping them around?
 > 
-> It would be nice to either make this generic or to describe the format
-> in the binding.
+> I don't think they are of any use once the driver is gone, unless the driver is
+> inserted again.
+> 
+> So, this is what we can do to distinguish DT OPPs with other dynamic ones:
+> 
+> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+> index 490e9db..7e25f01 100644
+> --- a/drivers/base/power/opp.c
+> +++ b/drivers/base/power/opp.c
+> @@ -49,6 +49,7 @@
+>   *             are protected by the dev_opp_list_lock for integrity.
+>   *             IMPORTANT: the opp nodes should be maintained in increasing
+>   *             order.
+> + * @from_dt:   created from static DT entries.
 
-This expect the parent to use the same interrupt cells format as GIC.
-I'll fix the binding to make this more clear.
+What about @dynamic instead of @from_dt?  That may apply to more use cases if
+need be.
 
-> Also, surely you expect intsize == 3 if you expect a GICv2? Likewise in
-> mtk_sysirq_domain_alloc.
+>   * @available: true/false - marks if this OPP as available or not
+>   * @rate:      Frequency in hertz
+>   * @u_volt:    Nominal voltage in microvolts corresponding to this OPP
+> @@ -61,6 +62,7 @@ struct dev_pm_opp {
+>         struct list_head node;
+> 
+>         bool available;
+> +       bool from_dt;
+>         unsigned long rate;
+>         unsigned long u_volt;
+> 
+> 
+> 
+> Does this look fine? I can then write of_free_opp_table(), opposite of
+> of_init_opp_table().
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-OK, will change that in next version.
-
-Joe.C
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
