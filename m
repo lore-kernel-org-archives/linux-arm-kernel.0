@@ -1,86 +1,73 @@
-From: thunder.leizhen@huawei.com (leizhen)
-Date: Fri, 21 Nov 2014 10:59:21 +0800
-Subject: [PATCH 1/1] iommu/arm-smmu: forbid userspace IO devices access
- memory through SMMU by default
-In-Reply-To: <20141120135339.GM19126@arm.com>
-References: <1416477421-1288-1-git-send-email-thunder.leizhen@huawei.com>
- <20141120101340.GC19126@arm.com> <546DE3A5.4030500@huawei.com>
- <20141120135339.GM19126@arm.com>
-Message-ID: <546EAA89.4000704@huawei.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Thu, 20 Nov 2014 21:06:54 -0600
+Subject: [PATCH] irqdomain: Fix NULL pointer dererence in
+ irq_domain_free_irqs_parent
+In-Reply-To: <546EA823.8030401@linux.intel.com>
+References: <1416531745-24661-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <alpine.DEB.2.11.1411210219370.6439@nanos> <546E9E8E.5000303@amd.com>
+ <546EA823.8030401@linux.intel.com>
+Message-ID: <546EAC4E.9050808@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/20 21:53, Will Deacon wrote:
-> On Thu, Nov 20, 2014 at 12:50:45PM +0000, leizhen wrote:
->> On 2014/11/20 18:13, Will Deacon wrote:
->>> On Thu, Nov 20, 2014 at 09:57:01AM +0000, Zhen Lei wrote:
->>>> It's dangerous to set pte with ARM_SMMU_PTE_AP_UNPRIV. A hacker can use any
->>>> devices running at userspace to access the memory which originally mapped for
->>>> kernel devices, suppose they have the same StreamID. The userspace devices
->>>> should through vfio to dynamic create mapping.
+
+
+On 11/20/2014 08:49 PM, Jiang Liu wrote:
+>
+>
+> On 2014/11/21 10:08, Suravee Suthikulpanit wrote:
+>> On 11/20/2014 07:32 PM, Thomas Gleixner wrote:
+>>> On Thu, 20 Nov 2014, suravee.suthikulpanit at amd.com wrote:
+>>>> This patch checks if the parent domain is NULL before recursively
+>>>> freeing
+>>>> irqs in the parent domains.
 >>>
->>> I don't fully understand the problem here. vfio will create a set of private
->>> page tables for the container, so I can't see why the privilege really
->>> matters, given that the whole thing is sandboxed anyway.
+>>> Which is nonsense, because if the thing has not been allocated in the
+>>> first place, then it cannot explode in the free path magically, except
+>>> there is a missing check in the allocation path error handling.
+>>>
+>>> And that's obviously not the case simply because this originates from:
+>>>> [<fffffe0000449278>] pci_disable_msix+0x40/0x50
+>>>
 >>
->> Suppose DMA-0 can be running both at kernel space and user space. And kernel
->> APP use DMA-0 to access the lowest 4G(physical memory address range: 0~4G,
->> because some old DMA devices can only output 32bit address, and phys_to_dma() in
->> arch/arm64/include/asm/dma-mapping.h take iova and pa as the same). We can use
->> bypass mode or create mapping iova=pa for the lowest 4G. Now, the user APP can
->> use DMA-0 to access all the lowest 4G(may contain kernel information and user APP
->> originally access prohibitted).
-> 
-> What's a kernel APP? Is DMA-0 some sort of device? How is it running at both
-> kernel and userspace?
-
-The APP running at kernel mode, like a driver. DMA-0 is not a really device, just for
-easier to communicate. Yes, a device can not running at both kernel and userspace. It
-emits either PRIV or UNPRIV attribute. But if there two devices with the same StreamID,
-one running at kernel and the other running at userspace, that's possible.
-
-> 
->> Through vfio, the user APP can only create mapping for the physical memory which
->> it can access through cpu. That's the memory which belong to the user APP, vfio
->> should check this.
-> 
-> Yes, so there is no issue when using VFIO.
-> 
->> And now, arm64 have not support vfio. I don't know how to deal with: a iommu_group
->> used by both user devices(through vfio) and kernel devices. They may specify the same
->> iova but different pa or diffrent attributes. Maybe we should not support this scene.
->> But if all(iova,pa,attr) is the same, we can simply add ARM_SMMU_PTE_AP_UNPRIV in PTE to
->> satisfy vfio requirment.
-> 
-> arm64 does support VFIO. Please check the patches queued for 3.19.
-
-Ok, thank you for your imformation.
-
-> 
->>> Furthermore, if we change the default to PRIV, then it will break for any
->>> devices wired to emit unprivileged transactions only.
+>> Thomas,
 >>
->> if so, it's the problem of hardware. I think.
-> 
-> If you have a device that emits the same streamid for privileged and
-> unprivileged transactions, then I think you have the problem of hardware :)
-> 
+>> In this case, I have the following irq domain hierarchy:
+>>
+>> [GIC] -- [GICv2m] -- [MSI]
+>>
+>> which recursively calling the freeing function:
+>>
+>> In GIC domain, it currently defines the struct irq_domain_ops.free() with :
+>>    --> irq_domain_free_irqs_top()
+>>      |--> irq_domain_free_irqs_common()
+>>        |--> irq_domain_free_irq_parent()
+>>          |--> irq_domain_free_irqs_recursive()
+>>
+>> and there is no check before passing the NULL domain->parent into the
+>> irq_domain_free_irqs_recursive(), which causes the error.
+>>
+>> Since the GIC is the top most domain, it does not have parent domain.
+>> So, I'm not sure what is missing from the allocation path error
+>> handling, as you mentioned.
+> Hi Thomas,
+> 	We have had a discussion about this issue in another thread.
+> Originally irq_domain_free_irqs_common() is designed to be used by
+> irqdomains with parent. But there are desires to reuse it to support
+> irqdomains without parent too for code reduction.
+> So I suggest to change irq_domain_free_irqs_common() instead of
+> irq_domain_free_irqs_parent() because caller of
+> irq_domain_free_irqs_parent() should guarantee current domain do have
+> a parent.
+> I'm preparing a patch for this:)
+> Regards!
+> Gerry
 
-As I mentioned above. There maybe two devices: one emits PRIV and the other emits UNPRIV.
+Thanks Gerry and Thomas.
 
-My originally meaning: If a device selected running at kernel, it should only emits PRIV.
-But if a device selected running at kernel and emits UNPRIV, that's a hardware problem.
-Because now arm-smmu driver are only support device running at kernel, so we only need set PRIV.
-If user APP through vfio to create mapping, the PTE is set at UNPRIV. Otherwise, PRIV/UNPRIV in
-smmu have no meaning.
+Suravee
 
-Now, many devices are mem-mapped, the register space of devices(running at kernel) should user
-access prohibitted. I will check whether it ensured by hardware or OS later.
-
-> The right way to solve this would be to add a new IOMMU_PRIV flag (I think
-> this was discussed in the past) which can be passed to iommu_map.
-> 
-> Will
-> 
-> .
-> 
+>>
+>> Thanks,
+>>
+>> Suravee
