@@ -1,74 +1,85 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 21 Nov 2014 23:27:38 +0000
-Subject: [RFC 0/2] Qualcomm RPM sleep states
-In-Reply-To: <546FC674.1070005@codeaurora.org>
-References: <546FC674.1070005@codeaurora.org>
-Message-ID: <20141121232738.GP3815@sirena.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 22 Nov 2014 07:31:56 +0800
+Subject: [PATCH] mmc: dw_mmc: fix card read threshold for PIO mode
+In-Reply-To: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
+References: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20141121233155.GC11253@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 03:10:44PM -0800, Stephen Boyd wrote:
-> On 11/10/2014 02:52 PM, Bjorn Andersson wrote:
+Seungwon, Jaehoon,
 
-I don't seem to have been CCed on earlier messages here, or perhaps the
-lack of obvious relevance (like mention of regulators) caused me not to
-read the mails so I'm missing a *lot* of context.
+On Fri, Nov 21, 2014 at 02:39:10PM +0800, Shawn Guo wrote:
+> Commit f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
+> introduces a regression for use case where PIO mode is used, i.e.
+> CONFIG_MMC_DW_IDMAC is not disabled.  It stops kernel from booting
 
-> > Further more, these resources are shared
-> > with peripherals in the system; e.g. LDO12 on PM8941 is used to clock the CPU
-> > and WiFi/BT PLLs as well as providing power to the display in our devices. So
-> > the suspend functionality in the regulator framework doesn't cut it.
+s/not disabled/disabled
 
-> Furthermore, we can trigger a transition to the sleep set during idle
-> paths so suspend definitely won't cut it.
+> like below.
 
-Honestly I'm not really sure what support the above is talking about...
-the regulator API has support for setting the configuration the
-regulator has when we are in suspend but it doesn't have any real
-support for entering or leaving such a mode which appears to be what is
-being discussed.
+For understanding the problem better, can you guys please to test the
+dw_mmc driver on Samsung platforms with CONFIG_MMC_DW_IDMAC disabled.
+I'm wondering this is a problem specific to my platform or a common one.
 
-> So the CPU really wants to only be voting for the HFPLL regulator
-> supplies in the active set. This way, if we're not using the HFPLLs
-> (i.e. the CPUs are all running off the global PLL), then we can disable
-> the regulator in the active set (RPM code only caches sleep set so we
-> won't be doing unnecessary flushes in the idle/suspend path). The clock
-> driver will make sure to turn off the HFPLLs before we go into a sleep
-> state that would trigger a switch from active to sleep set (commonly
-> referred to as RPM notification). It very well could be that there are
-> other consumers of the same regulator, but that doesn't matter to the
-> CPU clock driver because it only cares about the active set. Now you may
-> ask why can't the CPU clock driver disable the regulator when the HFPLL
-> is disabled? We don't do that in this case because a) it causes more RPM
-> communication overhead and b) we will be in atomic context when the
-> HFPLL is disabled during idle/suspend and the regulator APIs are
-> sleeping calls. In the non-idle/suspend path we will disable the regulator.
+Shawn
 
-I'm afraid the above is making very little sense to me.  What is
-"voting" and how is it different to "enabling", "notification" or
-"flushing"?
-
-> Also the active/sleep sets are about more than just on/off state. We may
-> have a situation where the active set voltage (or some other attribute
-> like current, mode, etc.) is different than the sleep set voltage. For
-
-In a regulator API context if we are talking about suspend it's expected
-that all properties may vary in suspend.
-
-> example, the CPU is supplied by a digital logic regulator that is shared
-> with other digital logic in the SoC (GPU, wifi, etc.). The CPU may
-> require some high voltage, but the GPU only needs some lower voltage.
-> The suspend/idle code relies on the fact that the GPU is voting on the
-> active+sleep regulator while the CPU is voting on the active only
-> regulator so that the RPM can automatically switch between high voltage
-> and low voltage when the CPU notifies the RPM that it's gone idle (or
-> the CPU wakes up).
-
-Again I'm not following this at all, sorry.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/baed5af0/attachment.sig>
+> 
+> dw_mmc 9408000.dwmmc: fifo-depth property not found, using value of FIFOTH register as default
+> dw_mmc 9408000.dwmmc: Using PIO mode.
+> dw_mmc 9408000.dwmmc: Version ID is 210a
+> dw_mmc 9408000.dwmmc: DW MMC controller at irq 72, 32 bit host data width, 32 deep fifo
+> dw_mmc 9408000.dwmmc: 1 slots initialized
+> ...
+> Waiting for root device /dev/mmcblk0p2...
+> mmc_host mmc0: Bus speed (slot 0) = 52000000Hz (slot req 50000000Hz, actual 26000000HZ div = 1)
+> mmc0: new high speed SDHC card at address b368
+> mmcblk0: mmc0:b368 AF UD 3.84 GiB
+> 
+> Rather than clearing read threshold bits, the best thing that function
+> dw_mci_ctrl_rd_thld() should do is leaving the bits untouched, in case
+> that card read threshold setup is not needed.
+> 
+> The patch fixes the regression by changing dw_mci_ctrl_rd_thld() a bit
+> to do nothing in case card read threshold bits setup is not needed.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Fixes: f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
+> Cc: <stable@vger.kernel.org> # 3.13+
+> ---
+>  drivers/mmc/host/dw_mmc.c | 7 ++-----
+>  1 file changed, 2 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 69f0cc68d5b2..52c04ba69970 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -628,13 +628,13 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
+>  
+>  	if (host->timing != MMC_TIMING_MMC_HS200 &&
+>  	    host->timing != MMC_TIMING_UHS_SDR104)
+> -		goto disable;
+> +		return;
+>  
+>  	blksz_depth = blksz / (1 << host->data_shift);
+>  	fifo_depth = host->fifo_depth;
+>  
+>  	if (blksz_depth > fifo_depth)
+> -		goto disable;
+> +		return;
+>  
+>  	/*
+>  	 * If (blksz_depth) >= (fifo_depth >> 1), should be 'thld_size <= blksz'
+> @@ -644,9 +644,6 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
+>  	thld_size = blksz;
+>  	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(thld_size, 1));
+>  	return;
+> -
+> -disable:
+> -	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(0, 0));
+>  }
+>  
+>  static int dw_mci_submit_data_dma(struct dw_mci *host, struct mmc_data *data)
+> -- 
+> 1.9.1
+> 
