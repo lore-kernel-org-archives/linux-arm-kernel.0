@@ -1,69 +1,37 @@
-From: wangyijing0307@gmail.com (Yijing Wang)
-Date: Fri, 21 Nov 2014 20:04:53 +0800
-Subject: Removal of bus->msi assignment breaks MSI with stacked domains
-In-Reply-To: <546F140B.1050607@arm.com>
-References: <546E1771.4030201@arm.com> <546E93DC.8010902@huawei.com>
- <alpine.DEB.2.11.1411210233250.6439@nanos> <546F140B.1050607@arm.com>
-Message-ID: <546F2A65.30002@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 21 Nov 2014 13:06:18 +0100
+Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc for
+ vqmmc
+In-Reply-To: <5464152E.7040209@rock-chips.com>
+References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>
+ <1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>
+ <CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
+ <CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>
+ <5464152E.7040209@rock-chips.com>
+Message-ID: <CAPDyKFrzGfDew0eLLEcA+_iS_mo-O2bFU58fjirfXXA8AJ9UYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[...]
 
-? 2014/11/21 18:29, Marc Zyngier ??:
-> Hi Thomas,
->
-> On 21/11/14 01:46, Thomas Gleixner wrote:
->> On Fri, 21 Nov 2014, Yijing Wang wrote:
->>> On 2014/11/21 0:31, Marc Zyngier wrote:
->>>> Bjorn, Yijing,
->>>>
->>>> I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
->>>> bus->msi assignment) completely breaks MSI on arm64 when using the new
->>>> MSI stacked domain:
->>> Sorry, this is my first part to refactor MSI related code, now how
->>> to get pci msi_controller depends arch
->>> functions(pcibios_msi_controller() or arch_setup_msi_irq()), we are
->>> working on generic pci_host_bridge, after that, we could eventually
->>> eliminate MSI arch functions and find pci dev 's msi controller by
->>> pci_host_bridge->get_msi_controller().
->> The main question is why you think that pci_host_bridge is the proper
->> place to store that information.
->>
->> On x86 we have DMAR units associated to a single device. Each DMAR
->> unit is a seperate MSI irq domain.
->>
->> Can you guarantee that the pci_host_bridge is the right point to
->> provide the association of the device to the irq domain?
->>
->> So the real question is:
->>
->>     What is the association level requirement to properly identify the
->>     irqdomain for a specific device on any given architecture with and
->>     without IOMMU, interrupt redirection etc.
->>
->> To be honest: I don't know.
->>
->> My gut feeling tells me that it's at the device level, but I really
->> leave that decision to the experts in that field.
-> Given the above requirement (single device associated to DMAR), I can
-> see two possibilities:
-> - we represent DMAR as a single PCI bus: feels a bit artificial
-> - we move the MSI domain to the device, as you suggested.
->
-> The second one seems a lot more attractive to me. What I don't
-> completely see is how the host bridge has all required the knowledge.
+> Sure
+> If the first card is sd2.0 since startup, dw_mci_switch_voltage will not be called,
 
-Hmmm, maybe I'm in the wrong direction,  I need to think more about it.
+That can't be right. mmc_power_up() should trigger
+dw_mci_switch_voltage() to be invoked.
 
-Thanks!
-Yijing.
+> and card can be identified. But if UHS card is pulgged in first, the vqmmc will be down to 1.8v.
+>
+> when sd2.0 card is pulgged in, mmc core will call dw_mci_switch_voltage to change vqmmc to 3.3v
+> (MMC_SINGLE_VOTAGE_330). So vqmmc will be set 2.7v, if we request 2.7-3.6v.
+>
+> But vmmc is always 3.3v,becuase it be set min_volt = max_volt = 3.3v in dt tables.
+>
+> So the result:
+> vmmc = 3.3v and vqmmc = 2.7v, and sd2.0 card is failed to identify in my test.
 
+Hmm. I wonder why it works the first time? Could it be that your
+regulator have voltage ramp up time that isn't properly considered?
 
->
-> Also, it is not clear to me what is the advantage of getting rid of the
-> MSI controller. By doing so, we loose an important part of the topology
-> information (the irq domain is another level of abstraction).
->
-> Thanks,
->
-> 	M.
+Kind regards
+Uffe
