@@ -1,73 +1,64 @@
-From: myron.stowe@gmail.com (Myron Stowe)
-Date: Thu, 20 Nov 2014 21:00:17 -0700
-Subject: [PATCH 6/6] pci, acpi: Share ACPI PCI config space accessors.
-In-Reply-To: <20141120222650.GC7987@google.com>
-References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
- <1416413091-13452-7-git-send-email-tomasz.nowicki@linaro.org>
- <2360791.Aj7tQ0nCJ3@wuerfel> <20141120222650.GC7987@google.com>
-Message-ID: <CAL-B5D3MqUa-=bzebo12DbZfczss2-MdGwQ8WKTbFH8H2AENXg@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 21 Nov 2014 13:09:46 +0900
+Subject: [PATCH] ARM: shmobile: r8a7790 CCI configuration
+Message-ID: <1416542986-26846-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 3:26 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Wed, Nov 19, 2014 at 05:19:20PM +0100, Arnd Bergmann wrote:
->> On Wednesday 19 November 2014 17:04:51 Tomasz Nowicki wrote:
->> > +/*
->> > + * raw_pci_read/write - ACPI PCI config space accessors.
->> > + *
->> > + * ACPI spec defines MMCFG as the way we can access PCI config space,
->> > + * so let MMCFG be default (__weak).
->> > + *
->> > + * If platform needs more fancy stuff, should provides its own implementation.
->> > + */
->> > +int __weak raw_pci_read(unsigned int domain, unsigned int bus,
->> > +                       unsigned int devfn, int reg, int len, u32 *val)
->> > +{
->> > +       return pci_mmcfg_read(domain, bus, devfn, reg, len, val);
->> > +}
->> > +
->> > +int __weak raw_pci_write(unsigned int domain, unsigned int bus,
->> > +                        unsigned int devfn, int reg, int len, u32 val)
->> > +{
->> > +       return pci_mmcfg_write(domain, bus, devfn, reg, len, val);
->> > +}
->> > +
->> >
->>
->> I think it would be better to avoid __weak functions here, as they tend
->> to be hard to follow when trying to understand the code.
->
-> That's interesting.  I would have said exactly the opposite -- I think the
-> extra Kconfiggery is harder to follow than weak/strong functions :)
->
-> But consistency is better than my personal opinion.  Is there a consensus
-> that we should use the Kconfig strategy instead of __weak?
+From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
 
-I too find weak/strong functions easier to follow than "Kconfiggery" (nice term
-invention there).
+Add the settings of CCI-400 for enabling ca15/ca7 snoop on r8a7790.
+Needed to configure the CCI boot cluster port regardless of MCPM.
 
->
->> How about using a Kconfig symbol like this:
->>
->> #ifdef CONFIG_ARCH_RAW_PCI_READWRITE
->> int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
->>                  int reg, int len, u32 *val);
->> int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
->>                   int reg, int len, u32 val);
->> #else
->> static inline int raw_pci_read(unsigned int domain, unsigned int bus,
->>                              unsigned int devfn, int reg, int len, u32 *val)
->> {
->>       return pci_mmcfg_read(domain, bus, devfn, reg, len, val);
->> }
->>
->> static inline int raw_pci_write(unsigned int domain, unsigned int bus,
->>                                       unsigned int devfn, int reg, int len, u32 val)
->> {
->>        return pci_mmcfg_write(domain, bus, devfn, reg, len, val);
->> }
->> #endif
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/smp-r8a7790.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
+index 9c3da13..e909091 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7790.c
++++ b/arch/arm/mach-shmobile/smp-r8a7790.c
+@@ -25,6 +25,12 @@
+ #include "pm-rcar.h"
+ #include "r8a7790.h"
+ 
++#define CCI_BASE	0xf0090000
++#define CCI_SLAVE3	0x4000
++#define CCI_SLAVE4	0x5000
++#define CCI_SNOOP	0x0000
++#define CCI_STATUS	0x000c
++
+ static struct rcar_sysc_ch r8a7790_ca15_scu = {
+ 	.chan_offs = 0x180, /* PWRSR5 .. PWRER5 */
+ 	.isr_bit = 12, /* CA15-SCU */
+@@ -48,6 +54,8 @@ static struct rcar_apmu_config r8a7790_apmu_config[] = {
+ 
+ static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
+ {
++	void __iomem *p;
++
+ 	/* let APMU code install data related to shmobile_boot_vector */
+ 	shmobile_smp_apmu_prepare_cpus(max_cpus,
+ 				       r8a7790_apmu_config,
+@@ -57,6 +65,16 @@ static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
+ 	r8a7790_pm_init();
+ 	rcar_sysc_power_up(&r8a7790_ca15_scu);
+ 	rcar_sysc_power_up(&r8a7790_ca7_scu);
++
++	/* enable snoop and DVM */
++	p = ioremap_nocache(CCI_BASE, 0x8000);
++	writel_relaxed(readl_relaxed(p + CCI_SLAVE3 + CCI_SNOOP) | 0x3,
++		p + CCI_SLAVE3 + CCI_SNOOP);    /* ca15 */
++	writel_relaxed(readl_relaxed(p + CCI_SLAVE4 + CCI_SNOOP) | 0x3,
++		p + CCI_SLAVE4 + CCI_SNOOP);    /* ca7 */
++	while (__raw_readl(p + CCI_STATUS));
++	/* wait for pending bit low */
++	iounmap(p);
+ }
+ 
+ struct smp_operations r8a7790_smp_ops __initdata = {
+-- 
+2.1.1
