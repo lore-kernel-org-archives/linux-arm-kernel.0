@@ -1,44 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Nov 2014 15:35:57 +0100
-Subject: [PATCH resend 2/4] ARM: dts: sunxi: unify APB1 clock
-In-Reply-To: <20141121142903.GD4752@lukather>
-References: <1415245232-20585-1-git-send-email-wens@csie.org>
- <7205141.lqhF7e2PeF@wuerfel> <20141121142903.GD4752@lukather>
-Message-ID: <4114168.zuylrCsruj@wuerfel>
+From: Suravee.Suthikulpanit@amd.com (Suthikulpanit, Suravee)
+Date: Fri, 21 Nov 2014 14:40:14 +0000
+Subject: [PATCH V3] arm64: amd-seattle: Adding device tree for AMD
+ Seattle platform
+In-Reply-To: <546F36D3.4090008@arm.com>
+Message-ID: <D0955C2B.9B22%suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 November 2014 15:29:03 Maxime Ripard wrote:
-> On Fri, Nov 21, 2014 at 12:57:02PM +0100, Arnd Bergmann wrote:
-> > On Thursday 20 November 2014 14:04:01 Kevin Hilman wrote:
-> > > Chen-Yu Tsai <wens@csie.org> writes:
-> > > 
-> > > > From: Emilio L?pez <emilio@elopez.com.ar>
-> > > >
-> > > > With the new factors infrastructure in place, we can unify apb1 and
-> > > > apb1_mux as a single clock now.
-> > > >
-> > > > Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> > > > [wens at csie.org: Change apb1 node label to "apb1"; reword commit title]
-> > > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > > 
-> > > Boot breakage in arm-soc/for-next on sun4i-a10-cubieboard and
-> > > sun7i-a20-cubieboard2[1] was bisected down to this patch[1].
-> > > 
-> > > Reverting $SUBJECT on top of arm-soc gets things booting again.
-> > > 
-> > 
-> > As this looks like it was intended as a cleanup without functional
-> > changes, I would go ahead and revert it in next/dt.
-> > 
-> > Any objections?
-> 
-> Yeah, you'd break linux-next as well doing so, as the clock driver now
-> requires this from the DT.
-> 
-> I can merge it through the clock tree though if you prefer it that
-> way.
 
-Do you know why this commit breaks booting then?
 
-	Arnd
+On 11/21/14, 19:57, "Marc Zyngier" <marc.zyngier@arm.com> wrote:
+
+>>+	gic: interrupt-controller at e1101000 {
+>>+		compatible = "arm,gic-400", "arm,cortex-a15-gic";
+>>+		interrupt-controller;
+>>+		#interrupt-cells = <3>;
+>>+		#address-cells = <2>;
+>>+		#size-cells = <2>;
+>>+		reg = <0x0 0xe1110000 0 0x1000>,
+>>+		      <0x0 0xe112f000 0 0x2000>,
+>>+		      <0x0 0xe1140000 0 0x10000>,
+>>+		      <0x0 0xe1160000 0 0x10000>;
+>>+		interrupts = <1 8 0xf04>;
+>
+>Are you sure about this one? ARM systems usually have this wired on PPI9
+>(interrupt 25)...
+>
+>Thanks,
+>
+>	M.
+
+I think you might be right. GIC-400 TRM says that this is should be 25,
+and used 
+for virtual maintenance interrupts. How can I verify this in Linux? KVM?
+
+Thanks,
+
+Suravee
