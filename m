@@ -1,65 +1,147 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 21 Nov 2014 09:46:11 +0100
-Subject: Removal of bus->msi assignment breaks MSI with stacked domains
-In-Reply-To: <546E9DF0.5010002@huawei.com>
-References: <546E1771.4030201@arm.com> <546E93DC.8010902@huawei.com>
- <alpine.DEB.2.11.1411210233250.6439@nanos> <546E9DF0.5010002@huawei.com>
-Message-ID: <1416559571.2423.1.camel@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 21 Nov 2014 09:49:33 +0100
+Subject: [PATCH 3/9] clk: sunxi: Add prcm mod0 clock driver
+In-Reply-To: <1416498928-1300-4-git-send-email-hdegoede@redhat.com>
+References: <1416498928-1300-1-git-send-email-hdegoede@redhat.com>
+ <1416498928-1300-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141121084933.GL24143@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 21.11.2014, 10:05 +0800 schrieb Yijing Wang:
-> On 2014/11/21 9:46, Thomas Gleixner wrote:
-> > On Fri, 21 Nov 2014, Yijing Wang wrote:
-> >> On 2014/11/21 0:31, Marc Zyngier wrote:
-> >>> Bjorn, Yijing,
-> >>>
-> >>> I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
-> >>> bus->msi assignment) completely breaks MSI on arm64 when using the new
-> >>> MSI stacked domain:
-> >>
-> >> Sorry, this is my first part to refactor MSI related code, now how
-> >> to get pci msi_controller depends arch
-> >> functions(pcibios_msi_controller() or arch_setup_msi_irq()), we are
-> >> working on generic pci_host_bridge, after that, we could eventually
-> >> eliminate MSI arch functions and find pci dev 's msi controller by
-> >> pci_host_bridge->get_msi_controller().
-> > 
-> > The main question is why you think that pci_host_bridge is the proper
-> > place to store that information.
-> > 
-> > On x86 we have DMAR units associated to a single device. Each DMAR
-> > unit is a seperate MSI irq domain. 
-> > 
-> > Can you guarantee that the pci_host_bridge is the right point to
-> > provide the association of the device to the irq domain?
-> > 
-> > So the real question is:
-> > 
-> >    What is the association level requirement to properly identify the
-> >    irqdomain for a specific device on any given architecture with and
-> >    without IOMMU, interrupt redirection etc.
-> > 
-> > To be honest: I don't know.
-> > 
-> > My gut feeling tells me that it's at the device level, but I really
-> > leave that decision to the experts in that field.
-> 
-> I choose the pci_host_bridge to place the .get_msi_ctrl() ops, because
-> I think how to associate pci_dev and msi_controller is platform specific,
-> and we could initialize pci_host_bridge in platform pci host drivers to
-> avoid call platform specific functions when we scan or setup a pci device.
-> 
-I'm in favor of having the irqdomain attached to struct device even.
-Please keep in mind that going forward PCI will not be the only bus
-using MSI. Also having it attached to the device allows you to find the
-the domain by just walking up the chain of parent devices until you find
-one with an attached domain. A host bridge isn't different in that
-regard from any other device. This should work for all platforms AFAICS.
+Hi,
 
-Regards,
-Lucas
+On Thu, Nov 20, 2014 at 04:55:22PM +0100, Hans de Goede wrote:
+> Add a driver for mod0 clocks found in the prcm. Currently there is only
+> one mod0 clocks in the prcm, the ir clock.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+>  drivers/clk/sunxi/Makefile                        |  2 +-
+>  drivers/clk/sunxi/clk-sun6i-prcm-mod0.c           | 63 +++++++++++++++++++++++
+>  drivers/mfd/sun6i-prcm.c                          | 14 +++++
+>  4 files changed, 79 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/clk/sunxi/clk-sun6i-prcm-mod0.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index ed116df..342c75a 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -56,6 +56,7 @@ Required properties:
+>  	"allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
+>  	"allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
+>  	"allwinner,sun6i-a31-usb-clk" - for usb gates + resets on A31
+> +	"allwinner,sun6i-a31-ir-clk" - for the ir clock on A31
+>  
+>  Required properties for all clocks:
+>  - reg : shall be the control register address for the clock.
+> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> index 7ddc2b5..daf8b1c 100644
+> --- a/drivers/clk/sunxi/Makefile
+> +++ b/drivers/clk/sunxi/Makefile
+> @@ -10,4 +10,4 @@ obj-y += clk-sun8i-mbus.o
+>  
+>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
+>  	clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
+> -	clk-sun8i-apb0.o
+> +	clk-sun8i-apb0.o clk-sun6i-prcm-mod0.o
+> diff --git a/drivers/clk/sunxi/clk-sun6i-prcm-mod0.c b/drivers/clk/sunxi/clk-sun6i-prcm-mod0.c
+> new file mode 100644
+> index 0000000..e80f18e
+> --- /dev/null
+> +++ b/drivers/clk/sunxi/clk-sun6i-prcm-mod0.c
+> @@ -0,0 +1,63 @@
+> +/*
+> + * Allwinner A31 PRCM mod0 clock driver
+> + *
+> + * Copyright (C) 2014 Hans de Goede <hdegoede@redhat.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include "clk-factors.h"
+> +#include "clk-mod0.h"
+> +
+> +static const struct of_device_id sun6i_a31_prcm_mod0_clk_dt_ids[] = {
+> +	{ .compatible = "allwinner,sun6i-a31-ir-clk" },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static DEFINE_SPINLOCK(sun6i_prcm_mod0_lock);
+> +
+> +static int sun6i_a31_prcm_mod0_clk_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct resource *r;
+> +	void __iomem *reg;
+> +
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	reg = devm_ioremap_resource(&pdev->dev, r);
+> +	if (IS_ERR(reg))
+> +		return PTR_ERR(reg);
+> +
+> +	sunxi_factors_register(np, &sun4i_a10_mod0_data,
+> +			       &sun6i_prcm_mod0_lock, reg);
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver sun6i_a31_prcm_mod0_clk_driver = {
+> +	.driver = {
+> +		.name = "sun6i-a31-prcm-mod0-clk",
+> +		.of_match_table = sun6i_a31_prcm_mod0_clk_dt_ids,
+> +	},
+> +	.probe = sun6i_a31_prcm_mod0_clk_probe,
+> +};
+> +module_platform_driver(sun6i_a31_prcm_mod0_clk_driver);
+> +
+> +MODULE_DESCRIPTION("Allwinner A31 PRCM mod0 clock driver");
+> +MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
+> +MODULE_LICENSE("GPL");
+
+I don't think this is the right approach, mainly for two reasons: the
+compatible shouldn't change, and you're basically duplicating code
+there.
+
+I understand that you need the new compatible in order to avoid a
+double probing: one by CLK_OF_DECLARE, and one by the usual mechanism,
+and that also implies the second reason.
+
+However, as those are not critical clocks that need to be here early
+at boot, you can also fix this by turning the mod0 driver into a
+platform driver itself. The compatible will be kept, the driver will
+be the same.
+
+The only thing we need to pay attention to is how "client" drivers
+react when they cannot grab their clock. They should return
+-EPROBE_DEFER, but that remains to be checked.
+
+Maxime
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/ae9cf821/attachment-0001.sig>
