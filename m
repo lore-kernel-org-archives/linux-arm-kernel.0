@@ -1,69 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Nov 2014 11:36:18 +0000
-Subject: For the problem when using swiotlb
-In-Reply-To: <2310899.ejrSzj6BIr@wuerfel>
-References: <5469E26B.2010905@huawei.com> <3918100.vD6471iH9k@wuerfel>
- <20141121110609.GC19783@e104818-lin.cambridge.arm.com>
- <2310899.ejrSzj6BIr@wuerfel>
-Message-ID: <20141121113618.GD19783@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 12:42:12 +0100
+Subject: [GIT PULL] ARM: BCM5301X: SoC changes for v3.19
+In-Reply-To: <546E52E9.3040301@hauke-m.de>
+References: <546298D9.7080800@hauke-m.de> <201411201027.22360.arnd@arndb.de>
+ <546E52E9.3040301@hauke-m.de>
+Message-ID: <2449000.zVL0dbsxYm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 11:26:45AM +0000, Arnd Bergmann wrote:
-> On Friday 21 November 2014 11:06:10 Catalin Marinas wrote:
-> > On Wed, Nov 19, 2014 at 03:56:42PM +0000, Arnd Bergmann wrote:
-> > > On Wednesday 19 November 2014 15:46:35 Catalin Marinas wrote:
-> > > > Going back to original topic, the dma_supported() function on arm64
-> > > > calls swiotlb_dma_supported() which actually checks whether the swiotlb
-> > > > bounce buffer is within the dma mask. This transparent bouncing (unlike
-> > > > arm32 where it needs to be explicit) is not always optimal, though
-> > > > required for 32-bit only devices on a 64-bit system. The problem is when
-> > > > the driver is 64-bit capable but forgets to call
-> > > > dma_set_mask_and_coherent() (that's not the only question I got about
-> > > > running out of swiotlb buffers).
-> > > 
-> > > I think it would be nice to warn once per device that starts using the
-> > > swiotlb. Really all 32-bit DMA masters should have a proper IOMMU
-> > > attached.
-> > 
-> > It would be nice to have a dev_warn_once().
-> > 
-> > I think it makes sense on arm64 to avoid swiotlb bounce buffers for
-> > coherent allocations altogether. The __dma_alloc_coherent() function
-> > already checks coherent_dma_mask and sets GFP_DMA accordingly. If we
-> > have a device that cannot even cope with a 32-bit ZONE_DMA, we should
-> > just not support DMA at all on it (without an IOMMU). The arm32
-> > __dma_supported() has a similar check.
+On Thursday 20 November 2014 21:45:29 Hauke Mehrtens wrote:
+> On 11/20/2014 10:27 AM, Arnd Bergmann wrote:
+> > - The pull request is based on -rc4, but I see no strong reason why you did
+> >   that. It helps us a lot of all pull requests in a branch are based off
+> >   the same -rc, so please have them based on -rc1 by default or explain why
+> >   you picked something else in the tag description.
 > 
-> If we ever encounter this case, we may have to add a smaller ZONE_DMA
-> and use ZONE_DMA32 for the normal dma allocations.
+> I just thought that I should base it on a recent -rc, so I took -rc4, I
+> can rebase it on rc1 if you like, I do not depend on any new stuff.
 
-Traditionally on x86 I think ZONE_DMA was for ISA and ZONE_DMA32 had to
-cover the 32-bit physical address space. On arm64 we don't expect ISA,
-so we only use ZONE_DMA (which is 4G, similar to IA-64, sparc). We had
-ZONE_DMA32 originally but it broke swiotlb which assumes ZONE_DMA for
-its bounce buffer.
+No, you should base on the oldest -rc that works for you to avoid backmerges.
+When I start the next/soc branch from -rc1 and I pull in a branch that
+is based on -rc4, 'git request-pull' can no longer figure out what the
+base changeset was and I have to manually edit the pull request.
 
-> > Swiotlb is still required for the streaming DMA since we get bouncing
-> > for pages allocated outside the driver control (e.g. VFS layer which
-> > doesn't care about GFP_DMA), hoping a 16M bounce buffer would be enough.
-> > 
-> > Ding seems to imply that CMA fixes the problem, which means that the
-> > issue is indeed coherent allocations.
+> > If you want, I can just cherry-pick the two patches from your branch into
+> > the next/soc branch so you don't have to rebase it this time.
 > 
-> I wonder what's going on here, since swiotlb_alloc_coherent() actually
-> tries a regular __get_free_pages(flags, order) first, and when ZONE_DMA
-> is set here, it just work without using the pool.
+> That would be nice.
+> 
 
-As long as coherent_dma_mask is sufficient for ZONE_DMA. I have no idea
-what this mask is set to in Ding's case (but I've seen the problem
-previously with an out of tree driver where coherent_dma_mask was some
-random number; so better reporting here would help).
+I've cherry-picked the first one, but the "BCM5301X: select GPIOLIB as
+optional" change no longer applies: as part of Scott's "ARM: mach-bcm:
+Consolidate currently supported IPROC SoCs", bcm5301x now selects
+ARCH_IPROC, which already uses ARCH_REQUIRE_GPIOLIB.
 
-There could be another case where dma_pfn_offset is required but let's
-wait for some more info from Ding (ZONE_DMA is 32-bit from the start of
-RAM which could be 40-bit like on Seattle, so basically such devices
-would need to set dma_pfn_offset).
+Let me know if that is a problem.
 
--- 
-Catalin
+	Arnd
