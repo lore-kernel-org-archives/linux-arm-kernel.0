@@ -1,85 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Nov 2014 10:00:35 +0000
-Subject: Removal of bus->msi assignment breaks MSI with stacked domains
-In-Reply-To: <546E9B60.9070706@huawei.com>
-References: <546E1771.4030201@arm.com> <20141120215353.GA7987@google.com>
- <alpine.DEB.2.11.1411202355060.6439@nanos> <546E9B60.9070706@huawei.com>
-Message-ID: <546F0D43.4020307@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 21 Nov 2014 11:04:36 +0100
+Subject: [PATCH resend 2/4] ARM: dts: sunxi: unify APB1 clock
+In-Reply-To: <7h1toxr0ku.fsf@deeprootsystems.com>
+References: <1415245232-20585-1-git-send-email-wens@csie.org>
+ <1415245232-20585-3-git-send-email-wens@csie.org>
+ <7h1toxr0ku.fsf@deeprootsystems.com>
+Message-ID: <20141121100436.GB4752@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yijing,
+On Thu, Nov 20, 2014 at 02:04:01PM -0800, Kevin Hilman wrote:
+> Chen-Yu Tsai <wens@csie.org> writes:
+> 
+> > From: Emilio L?pez <emilio@elopez.com.ar>
+> >
+> > With the new factors infrastructure in place, we can unify apb1 and
+> > apb1_mux as a single clock now.
+> >
+> > Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> > [wens at csie.org: Change apb1 node label to "apb1"; reword commit title]
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> 
+> Boot breakage in arm-soc/for-next on sun4i-a10-cubieboard and
+> sun7i-a20-cubieboard2[1] was bisected down to this patch[1].
+> 
+> Reverting $SUBJECT on top of arm-soc gets things booting again.
 
-On 21/11/14 01:54, Yijing Wang wrote:
->>> Thomas, let me know if you want to do that.  I suppose we could add a new
->>> patch to add it back, but that would leave bisection broken for the
->>> interval between c167caf8d174 and the patch that adds it back.
->>
->> Fortunately my irq/irqdomain branch is not immutable yet. So we have
->> no problem at that point. I can rebase on your branch until tomorrow
->> night. Or just rebase on mainline and we sort out the merge conflicts
->> later, i.e. delegate them to Linus so his job of pulling stuff gets
->> not completely boring.
-> 
-> Hi Thomas, sorry for my introducing the broken.
-> 
->>
->> What I'm more worried about is whether this intended change is going
->> to inflict a problem on Jiangs intention to deduce the MSI irq domain
->> from the device, which we really need for making DMAR work w/o going
->> through loops and hoops.
->>
->> I have limited knowledge about the actual scope of iommu (DMAR) units
->> versus device/bus/host-controllers, so I would appreciate a proper
->> explanation for that from you or Jiang or both.
-> 
-> In my personal opinion, if it's not necessary, we should not put stuff
-> into pci_dev or pci_bus. If we plan to save msi_controller in pci_bus or
-> pci_dev.
-> I have a proposal, I would be appreciated if you could give some comments.
-> First we refactor pci_host_bridge to make a generic
-> pci_host_bridge, then we could save pci domain in it to eliminate
-> arch specific functions. I aslo wanted to save msi_controller as
-> pci domain, but now Jiang refactor hierarchy irq domain, and
-> pci devices under the same pci host bridge may need to associate
-> to different msi_controllers.
-> 
-> So I want to associate a msi_controller finding ops with generic pci_host_bridge,
-> then every pci device could find its msi_controller/irq_domain by a
-> common function
-> 
-> E.g
-> 
-> struct msi_controller *pci_msi_controller(struct pci_dev *pdev)
-> {
-> 	struct msi_controller *ctrl;
-> 	struct pci_host_bridge *host = find_pci_host_bridge(pdev->bus);
-> 	if (host && host->pci_get_msi_controller)
-> 		ctrl = pci_host_bridge->pci_get_msi_controller(struct pci_dev *pdev);
-> 
-> 	return ctrl;	
-> }
-> 
-> If I miss something, please let me know, thanks.
+I guess this is because arm-soc's doesn't have linux-next's
+93746e70be83a3f113134a16065957b324af50f7
 
-That feels slightly convoluted for something that should be a very
-simple operation. Does this mean you're trying to represent a situation
-where:
-- a single host bridge has multiple MSI controllers,
-- this bridge serves multiple busses,
-- devices on the same bus can talk to different MSI controllers?
+Which also explains why linux-next still boots.
 
-That would be the only case where the current way we pass the
-msi_controller around wouldn't work.
+Maxime
 
-If that's what you're trying to do, I can see how this work, but I'd
-suggest you put that infrastructure in place before tearing down the
-existing one. This means being having support at the host-bridge level
-and reasonable defaults for the non-complicated case where bus->msi is
-exactly what you want.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/260f3bd9/attachment.sig>
