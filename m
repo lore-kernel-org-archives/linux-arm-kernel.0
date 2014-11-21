@@ -1,69 +1,94 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Nov 2014 12:50:53 +0100
-Subject: [GIT PULL] ARM: BCM5301X: SoC changes for v3.19
-In-Reply-To: <546E53A3.3050005@openwrt.org>
-References: <546298D9.7080800@hauke-m.de> <546E52E9.3040301@hauke-m.de>
- <546E53A3.3050005@openwrt.org>
-Message-ID: <8711128.k3FfmmMqrE@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 21 Nov 2014 12:53:49 +0100
+Subject: [GIT PULL 1/4] ARM: tegra: IOMMU support for v3.19
+Message-ID: <1416570832-6220-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 November 2014 12:48:35 Florian Fainelli wrote:
-> On 11/20/2014 12:45 PM, Hauke Mehrtens wrote:
-> > On 11/20/2014 10:27 AM, Arnd Bergmann wrote:
-> >> On Wednesday 12 November 2014, Hauke Mehrtens wrote:
-> >>> ----------------------------------------------------------------
-> >>> ARM: BCM5301X: SoC: two patches for the SoC part
-> >>>
-> >>> These patches were all send to the arm list and I haven't got any
-> >>> negative responses.
-> >>>
-> >>> ----------------------------------------------------------------
-> >>> Hauke Mehrtens (1):
-> >>>       ARM: BCM5301X: fix early serial console
-> >>>
-> >>> Rafa? Mi?ecki (1):
-> >>>       ARM: BCM5301X: select GPIOLIB as optional
-> >>
-> >> Hi Hauke and Florian,
-> >>
-> >> sorry for the late reply. The patches are both good and I want to merge them,
-> >> but I have two problems with your pull request:
-> >>
-> >> - I'm unsure about who is sending us patches for mach-bcm. I was under the
-> >>   assumption that Florian would now handle all of them and pick up your
-> >>   patches to forward them to arm at kernel.org together with the other mach-bcm
-> >>   platforms. I'd much rather get only patches from one person per platform
-> >>   directory, though we can have multiple people if that's what you all want.
-> > 
-> > I talked to Florian and he suggested me that I should send patches
-> > directly to you. There could be some stuff shared with the other network
-> > SoCs, there is nothing shared with the mobile SoCs.
-> > We thought that it would be easier for us (Florian and me) if you pull
-> > directly from me.
-> 
-> Absolutely, I did it differently for the Cygnus SoC to help Scott with
-> his initial submission, but in the future, I would rather have Hauke,
-> Scott and myself send separate pull requests, leaving you with just
-> potential conflicts for arch/arm/mach-bcm/{Makefile,Kconfig}.
-> 
-> If this model is not desirable, I have no problems aggregating all
-> mach-bcm changes to appropriate pull requests, whether that means
-> pulling from Hauke and Scott directly, or compiling pull requests myself
-> as long as you guys CC me on your patches.
+From: Thierry Reding <treding@nvidia.com>
 
-My preference is definitely to get fewer pull requests, and to get them
-from fewer people. There are so many details that each maintainer needs
-to know about to make the arm-soc workflow efficient, I mainly want to
-avoid teaching more people about it. I've also discussed this with Lee
-Jones yesterday, since he just took over maintenance for bcm2835.
+Hi ARM SoC maintainers,
 
-We now have between five and seven platforms (depending how you count)
-under mach-bcm that are mostly unrelated, so I can understand the desire
-to keep them maintained separately on your end. From my perspective,
-these are all 'small' platforms in the sense that I get very few patches
-for each one, but they occasionally conflict on Makefile or Kconfig
-changes, and I'd appreciate these all to be consolidated in common
-pull requests.
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-	Arnd
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.19-iommu
+
+for you to fetch changes up to a2257374a4bdc936896262382530921b4953c4cd:
+
+  memory: Add NVIDIA Tegra memory controller support (2014-11-21 10:14:36 +0100)
+
+While preparing these pull requests I noticed that there will be two
+tiny conflicts in drivers/memory/tegra-smmu.c between this pull request
+and Joerg's IOMMU tree (iommu_ops.map_sg) as well as the driver core
+tree (device_driver.owner). They are fairly trivial to resolve so I
+didn't see a reason to delay this any further, but if this causes any
+problems please let me know if there's anything I can do to help sort
+them out.
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+ARM: tegra: IOMMU support for v3.19
+
+This adds the driver pieces required for IOMMU support on Tegra30,
+Tegra114 and Tegra124.
+
+----------------------------------------------------------------
+Thierry Reding (5):
+      clk: tegra: Implement memory-controller clock
+      amba: Add Kconfig file
+      ARM: tegra: Move AHB Kconfig to drivers/amba
+      of: Add NVIDIA Tegra memory controller binding
+      memory: Add NVIDIA Tegra memory controller support
+
+ .../memory-controllers/nvidia,tegra-mc.txt         |   36 +
+ arch/arm/Kconfig                                   |    3 -
+ arch/arm/mach-tegra/Kconfig                        |    9 +-
+ arch/arm64/Kconfig                                 |    3 -
+ drivers/Kconfig                                    |    2 +
+ drivers/amba/Kconfig                               |   14 +
+ drivers/clk/tegra/clk-divider.c                    |   13 +
+ drivers/clk/tegra/clk-tegra114.c                   |    7 +-
+ drivers/clk/tegra/clk-tegra124.c                   |    7 +-
+ drivers/clk/tegra/clk-tegra20.c                    |    8 +-
+ drivers/clk/tegra/clk-tegra30.c                    |    7 +-
+ drivers/clk/tegra/clk.h                            |    2 +
+ drivers/iommu/Kconfig                              |   12 +-
+ drivers/iommu/tegra-smmu.c                         | 1602 +++++++-------------
+ drivers/memory/Kconfig                             |   12 +-
+ drivers/memory/Makefile                            |    3 +-
+ drivers/memory/tegra/Kconfig                       |    7 +
+ drivers/memory/tegra/Makefile                      |    7 +
+ drivers/memory/tegra/mc.c                          |  301 ++++
+ drivers/memory/tegra/mc.h                          |   53 +
+ drivers/memory/tegra/tegra114.c                    |  948 ++++++++++++
+ drivers/memory/tegra/tegra124.c                    |  995 ++++++++++++
+ drivers/memory/tegra/tegra30.c                     |  970 ++++++++++++
+ drivers/memory/tegra30-mc.c                        |  378 -----
+ include/dt-bindings/clock/tegra114-car.h           |    2 +-
+ include/dt-bindings/clock/tegra124-car.h           |    2 +-
+ include/dt-bindings/clock/tegra20-car.h            |    2 +-
+ include/dt-bindings/memory/tegra114-mc.h           |   25 +
+ include/dt-bindings/memory/tegra124-mc.h           |   31 +
+ include/dt-bindings/memory/tegra30-mc.h            |   24 +
+ include/soc/tegra/mc.h                             |  107 ++
+ 31 files changed, 4088 insertions(+), 1504 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/nvidia,tegra-mc.txt
+ create mode 100644 drivers/amba/Kconfig
+ create mode 100644 drivers/memory/tegra/Kconfig
+ create mode 100644 drivers/memory/tegra/Makefile
+ create mode 100644 drivers/memory/tegra/mc.c
+ create mode 100644 drivers/memory/tegra/mc.h
+ create mode 100644 drivers/memory/tegra/tegra114.c
+ create mode 100644 drivers/memory/tegra/tegra124.c
+ create mode 100644 drivers/memory/tegra/tegra30.c
+ delete mode 100644 drivers/memory/tegra30-mc.c
+ create mode 100644 include/dt-bindings/memory/tegra114-mc.h
+ create mode 100644 include/dt-bindings/memory/tegra124-mc.h
+ create mode 100644 include/dt-bindings/memory/tegra30-mc.h
+ create mode 100644 include/soc/tegra/mc.h
