@@ -1,64 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Nov 2014 13:09:46 +0900
-Subject: [PATCH] ARM: shmobile: r8a7790 CCI configuration
-Message-ID: <1416542986-26846-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 21 Nov 2014 13:27:07 +0900
+Subject: [PATCH/RFC] ARM: shmobile: dts: Add common file for MSIOF1
+Message-ID: <1416544027-5680-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
 
-Add the settings of CCI-400 for enabling ca15/ca7 snoop on r8a7790.
-Needed to configure the CCI boot cluster port regardless of MCPM.
+The R-Car Gen 2 SoCs have MSIOF1 interfaces however they
+are not exposed on any boards currently supported in mainline.
 
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Signed-off-by: Magnus Damm <damm@opensource.se>
+The purpose of r8a77xx-msiof1.dtsi is to be included
+in a dts file if MSIOF1 is exposed by some means.
+
+Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+[horms: Reworked into a separate dtsi file]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-r8a7790.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/r8a77xx-msiof1.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a77xx-msiof1.dtsi
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
-index 9c3da13..e909091 100644
---- a/arch/arm/mach-shmobile/smp-r8a7790.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7790.c
-@@ -25,6 +25,12 @@
- #include "pm-rcar.h"
- #include "r8a7790.h"
- 
-+#define CCI_BASE	0xf0090000
-+#define CCI_SLAVE3	0x4000
-+#define CCI_SLAVE4	0x5000
-+#define CCI_SNOOP	0x0000
-+#define CCI_STATUS	0x000c
+diff --git a/arch/arm/boot/dts/r8a77xx-msiof1.dtsi b/arch/arm/boot/dts/r8a77xx-msiof1.dtsi
+new file mode 100644
+index 0000000..04f91b8
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a77xx-msiof1.dtsi
+@@ -0,0 +1,24 @@
++/*
++ * Common file enabling MMSIOF1 on Renesas R-Car boards
++ *
++ * Copyright (C) 2014 Renesas Electronics Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
- static struct rcar_sysc_ch r8a7790_ca15_scu = {
- 	.chan_offs = 0x180, /* PWRSR5 .. PWRER5 */
- 	.isr_bit = 12, /* CA15-SCU */
-@@ -48,6 +54,8 @@ static struct rcar_apmu_config r8a7790_apmu_config[] = {
- 
- static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
- {
-+	void __iomem *p;
++&pfc {
++	msiof1_pins: spi2 {
++		renesas,groups = "msiof1_clk_c", "msiof1_sync_c", "msiof1_rx_c",
++				 "msiof1_tx_c";
++		renesas,function = "msiof1";
++	};
++};
 +
- 	/* let APMU code install data related to shmobile_boot_vector */
- 	shmobile_smp_apmu_prepare_cpus(max_cpus,
- 				       r8a7790_apmu_config,
-@@ -57,6 +65,16 @@ static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
- 	r8a7790_pm_init();
- 	rcar_sysc_power_up(&r8a7790_ca15_scu);
- 	rcar_sysc_power_up(&r8a7790_ca7_scu);
++&msiof1 {
++	pinctrl-0 = <&msiof1_pins>;
++	pinctrl-names = "default";
 +
-+	/* enable snoop and DVM */
-+	p = ioremap_nocache(CCI_BASE, 0x8000);
-+	writel_relaxed(readl_relaxed(p + CCI_SLAVE3 + CCI_SNOOP) | 0x3,
-+		p + CCI_SLAVE3 + CCI_SNOOP);    /* ca15 */
-+	writel_relaxed(readl_relaxed(p + CCI_SLAVE4 + CCI_SNOOP) | 0x3,
-+		p + CCI_SLAVE4 + CCI_SNOOP);    /* ca7 */
-+	while (__raw_readl(p + CCI_STATUS));
-+	/* wait for pending bit low */
-+	iounmap(p);
- }
- 
- struct smp_operations r8a7790_smp_ops __initdata = {
++	status = "okay";
++};
 -- 
 2.1.1
