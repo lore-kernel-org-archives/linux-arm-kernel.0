@@ -1,190 +1,84 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 21 Nov 2014 15:52:03 +0530
-Subject: [PATCH v5 2/2] ARM: EXYNOS: Remove i2c sys configuration related code
-In-Reply-To: <1416565323-24899-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1416565323-24899-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1416565323-24899-3-git-send-email-pankaj.dubey@samsung.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 21 Nov 2014 19:30:50 +0900
+Subject: [PATCH] mmc: dw_mmc: fix card read threshold for PIO mode
+In-Reply-To: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
+References: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <546F145A.9050900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As all these code has been moved into i2c driver, now we can
-safely remove them from machine files.
+Hi, Shawn.
 
-CC: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/mach-exynos/exynos.c           |   39 ++-----------------------------
- arch/arm/mach-exynos/include/mach/map.h |    3 ---
- arch/arm/mach-exynos/pm.c               |    3 ++-
- arch/arm/mach-exynos/regs-sys.h         |   22 -----------------
- arch/arm/mach-exynos/suspend.c          |    7 ------
- 5 files changed, 4 insertions(+), 70 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/regs-sys.h
+On 11/21/2014 03:39 PM, Shawn Guo wrote:
+> Commit f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
+> introduces a regression for use case where PIO mode is used, i.e.
+> CONFIG_MMC_DW_IDMAC is not disabled.  It stops kernel from booting
+> like below.
+> 
+> dw_mmc 9408000.dwmmc: fifo-depth property not found, using value of FIFOTH register as default
+> dw_mmc 9408000.dwmmc: Using PIO mode.
+> dw_mmc 9408000.dwmmc: Version ID is 210a
+> dw_mmc 9408000.dwmmc: DW MMC controller at irq 72, 32 bit host data width, 32 deep fifo
+> dw_mmc 9408000.dwmmc: 1 slots initialized
+> ...
+> Waiting for root device /dev/mmcblk0p2...
+> mmc_host mmc0: Bus speed (slot 0) = 52000000Hz (slot req 50000000Hz, actual 26000000HZ div = 1)
+> mmc0: new high speed SDHC card at address b368
+> mmcblk0: mmc0:b368 AF UD 3.84 GiB
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 8f638ad..69b3887 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -27,20 +27,16 @@
- #include <asm/mach/map.h>
- #include <asm/memory.h>
- 
-+#include <mach/map.h>
-+
- #include "common.h"
- #include "mfc.h"
- #include "regs-pmu.h"
--#include "regs-sys.h"
- 
- void __iomem *pmu_base_addr;
- 
- static struct map_desc exynos4_iodesc[] __initdata = {
- 	{
--		.virtual	= (unsigned long)S3C_VA_SYS,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSCON),
--		.length		= SZ_64K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= (unsigned long)S5P_VA_SROMC,
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_SROMC),
- 		.length		= SZ_4K,
-@@ -70,11 +66,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
- 
- static struct map_desc exynos5_iodesc[] __initdata = {
- 	{
--		.virtual	= (unsigned long)S3C_VA_SYS,
--		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSCON),
--		.length		= SZ_64K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= (unsigned long)S5P_VA_SROMC,
- 		.pfn		= __phys_to_pfn(EXYNOS5_PA_SROMC),
- 		.length		= SZ_4K,
-@@ -235,32 +226,6 @@ static void __init exynos_init_irq(void)
- 
- static void __init exynos_dt_machine_init(void)
- {
--	struct device_node *i2c_np;
--	const char *i2c_compat = "samsung,s3c2440-i2c";
--	unsigned int tmp;
--	int id;
--
--	/*
--	 * Exynos5's legacy i2c controller and new high speed i2c
--	 * controller have muxed interrupt sources. By default the
--	 * interrupts for 4-channel HS-I2C controller are enabled.
--	 * If node for first four channels of legacy i2c controller
--	 * are available then re-configure the interrupts via the
--	 * system register.
--	 */
--	if (soc_is_exynos5()) {
--		for_each_compatible_node(i2c_np, NULL, i2c_compat) {
--			if (of_device_is_available(i2c_np)) {
--				id = of_alias_get_id(i2c_np, "i2c");
--				if (id < 4) {
--					tmp = readl(EXYNOS5_SYS_I2C_CFG);
--					writel(tmp & ~(0x1 << id),
--							EXYNOS5_SYS_I2C_CFG);
--				}
--			}
--		}
--	}
--
- 	/*
- 	 * This is called from smp_prepare_cpus if we've built for SMP, but
- 	 * we still need to set it up for PM and firmware ops if not.
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 1ad3f49..de3ae59 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -24,9 +24,6 @@
- 
- #define EXYNOS_PA_CHIPID		0x10000000
- 
--#define EXYNOS4_PA_SYSCON		0x10010000
--#define EXYNOS5_PA_SYSCON		0x10050100
--
- #define EXYNOS4_PA_CMU			0x10030000
- #define EXYNOS5_PA_CMU			0x10010000
- 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 86f3ecd..dfc8594 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -23,12 +23,13 @@
- #include <asm/smp_scu.h>
- #include <asm/suspend.h>
- 
-+#include <mach/map.h>
-+
- #include <plat/pm-common.h>
- 
- #include "common.h"
- #include "exynos-pmu.h"
- #include "regs-pmu.h"
--#include "regs-sys.h"
- 
- static inline void __iomem *exynos_boot_vector_addr(void)
- {
-diff --git a/arch/arm/mach-exynos/regs-sys.h b/arch/arm/mach-exynos/regs-sys.h
-deleted file mode 100644
-index 84332b0..0000000
---- a/arch/arm/mach-exynos/regs-sys.h
-+++ /dev/null
-@@ -1,22 +0,0 @@
--/*
-- * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-- *             http://www.samsung.com
-- *
-- * EXYNOS - system register definition
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __ASM_ARCH_REGS_SYS_H
--#define __ASM_ARCH_REGS_SYS_H __FILE__
--
--#include <mach/map.h>
--
--#define S5P_SYSREG(x)                          (S3C_VA_SYS + (x))
--
--/* For EXYNOS5 */
--#define EXYNOS5_SYS_I2C_CFG                    S5P_SYSREG(0x0234)
--
--#endif /* __ASM_ARCH_REGS_SYS_H */
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index f8e7dcd..342797b 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -34,7 +34,6 @@
- 
- #include "common.h"
- #include "regs-pmu.h"
--#include "regs-sys.h"
- #include "exynos-pmu.h"
- 
- #define S5P_CHECK_SLEEP 0x00000BAD
-@@ -53,10 +52,6 @@ struct exynos_wkup_irq {
- 	u32 mask;
- };
- 
--static struct sleep_save exynos5_sys_save[] = {
--	SAVE_ITEM(EXYNOS5_SYS_I2C_CFG),
--};
--
- static struct sleep_save exynos_core_save[] = {
- 	/* SROM side */
- 	SAVE_ITEM(S5P_SROM_BW),
-@@ -497,8 +492,6 @@ static const struct exynos_pm_data exynos5250_pm_data = {
- 	.wkup_irq	= exynos5250_wkup_irq,
- 	.wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
- 	.release_ret_regs = exynos_release_ret_regs,
--	.extra_save	= exynos5_sys_save,
--	.num_extra_save	= ARRAY_SIZE(exynos5_sys_save),
- 	.pm_suspend	= exynos_pm_suspend,
- 	.pm_resume	= exynos_pm_resume,
- 	.pm_prepare	= exynos_pm_prepare,
--- 
-1.7.9.5
+Stopping at here? I didn't know what's difference before applied your patch.
+Clearing Card-read threshold value at every time would be caused that stop kernel?
+Just wonder it.
+
+> 
+> Rather than clearing read threshold bits, the best thing that function
+> dw_mci_ctrl_rd_thld() should do is leaving the bits untouched, in case
+> that card read threshold setup is not needed.
+> 
+> The patch fixes the regression by changing dw_mci_ctrl_rd_thld() a bit
+> to do nothing in case card read threshold bits setup is not needed.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Fixes: f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
+> Cc: <stable@vger.kernel.org> # 3.13+
+> ---
+>  drivers/mmc/host/dw_mmc.c | 7 ++-----
+>  1 file changed, 2 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 69f0cc68d5b2..52c04ba69970 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -628,13 +628,13 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
+>  
+>  	if (host->timing != MMC_TIMING_MMC_HS200 &&
+>  	    host->timing != MMC_TIMING_UHS_SDR104)
+> -		goto disable;
+> +		return;
+>  
+>  	blksz_depth = blksz / (1 << host->data_shift);
+>  	fifo_depth = host->fifo_depth;
+>  
+>  	if (blksz_depth > fifo_depth)
+> -		goto disable;
+> +		return;
+>  
+>  	/*
+>  	 * If (blksz_depth) >= (fifo_depth >> 1), should be 'thld_size <= blksz'
+> @@ -644,9 +644,6 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
+>  	thld_size = blksz;
+>  	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(thld_size, 1));
+>  	return;
+
+Then "return" could be also removed.
+
+Best Regards,
+Jaehoon Chung
+
+> -
+> -disable:
+> -	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(0, 0));
+>  }
+>  
+>  static int dw_mci_submit_data_dma(struct dw_mci *host, struct mmc_data *data)
+> 
