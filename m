@@ -1,79 +1,600 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 21 Nov 2014 15:43:54 -0800
-Subject: [RFC 0/2] Qualcomm RPM sleep states
-In-Reply-To: <20141121232738.GP3815@sirena.org.uk>
-References: <546FC674.1070005@codeaurora.org>
- <20141121232738.GP3815@sirena.org.uk>
-Message-ID: <546FCE3A.1000005@codeaurora.org>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sat, 22 Nov 2014 00:45:56 +0100
+Subject: [PATCHv6 04/10] arm: mvebu: move Armada 370/XP pinctrl node
+ definition armada-370-xp.dtsi
+In-Reply-To: <cover.1416613429.git.arno@natisbad.org>
+References: <cover.1416613429.git.arno@natisbad.org>
+Message-ID: <b54eb45e5242728aace3ce8aef2eae4251f8dea3.1416613429.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2014 03:27 PM, Mark Brown wrote:
-> On Fri, Nov 21, 2014 at 03:10:44PM -0800, Stephen Boyd wrote:
->> On 11/10/2014 02:52 PM, Bjorn Andersson wrote:
-> I don't seem to have been CCed on earlier messages here, or perhaps the
-> lack of obvious relevance (like mention of regulators) caused me not to
-> read the mails so I'm missing a *lot* of context.
 
-This mail has been lingering in my inbox for weeks just haven't gotten
-around to replying.
+What was done by Sebastian in 264a05e19bf5 ("ARM: mvebu: armada-xp:
+Add node alias to pinctrl and add base address") and 01c434225ee6
+("ARM: mvebu: armada-xp: Use pinctrl node alias") can also be done for
+Armada 370, i.e.
 
-This sleep set/active set stuff has to do with more than just
-regulators. It applies to any resource that the RPM provides, but
-regulators are a primary use case so you're on Cc and it would be great
-if you fully understood the regulator aspect here.
+ - Rename Armada 370 pinctrl node to pin-ctrl with its address encoded
+ - Add a node alias to access the pinctrl node easily.
+ - use the newly available alias in existing Armada 370 .dts files
 
->
->
->> So the CPU really wants to only be voting for the HFPLL regulator
->> supplies in the active set. This way, if we're not using the HFPLLs
->> (i.e. the CPUs are all running off the global PLL), then we can disable
->> the regulator in the active set (RPM code only caches sleep set so we
->> won't be doing unnecessary flushes in the idle/suspend path). The clock
->> driver will make sure to turn off the HFPLLs before we go into a sleep
->> state that would trigger a switch from active to sleep set (commonly
->> referred to as RPM notification). It very well could be that there are
->> other consumers of the same regulator, but that doesn't matter to the
->> CPU clock driver because it only cares about the active set. Now you may
->> ask why can't the CPU clock driver disable the regulator when the HFPLL
->> is disabled? We don't do that in this case because a) it causes more RPM
->> communication overhead and b) we will be in atomic context when the
->> HFPLL is disabled during idle/suspend and the regulator APIs are
->> sleeping calls. In the non-idle/suspend path we will disable the regulator.
-> I'm afraid the above is making very little sense to me.  What is
-> "voting" and how is it different to "enabling", "notification" or
-> "flushing"?
+We can even go a bit further by putting the pinctrl node definition in
+armada-370-xp.dtsi, with only its reg property defined. This allows us
+to then also use the newly defined node alias in armada-xp.dtsi,
+armada-370.dtsi.
 
-The regulators are shared between multiple "masters" in the SoC. So the
-CPUs that are running linux only "vote" on attributes of regulators and
-then another processor that isn't running linux (called RPM) aggregates
-the request from Linux along with other "masters" like wifi, modem, etc.
-and then changes something for that regulator like voltage,
-enable/disable, etc. We also have some hardware next to our CPUs that
-notifies the RPM when we transition into or out of idle/suspend (it's
-called an SPM). This is the notification part. Flushing has to do with
-batching up multiple RPM sleep set requests and sending them before we
-enter idle/suspend.
+Suggested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Suggested-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+ arch/arm/boot/dts/armada-370-db.dts            |  48 +++++-----
+ arch/arm/boot/dts/armada-370-mirabox.dts       |  25 ++---
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts |  84 ++++++++---------
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts |  64 ++++++-------
+ arch/arm/boot/dts/armada-370-rd.dts            |  24 ++---
+ arch/arm/boot/dts/armada-370-xp.dtsi           |   4 +
+ arch/arm/boot/dts/armada-370.dtsi              | 121 ++++++++++++-------------
+ arch/arm/boot/dts/armada-xp.dtsi               |  72 +++++++--------
+ 8 files changed, 222 insertions(+), 220 deletions(-)
 
->
->> Also the active/sleep sets are about more than just on/off state. We may
->> have a situation where the active set voltage (or some other attribute
->> like current, mode, etc.) is different than the sleep set voltage. For
-> In a regulator API context if we are talking about suspend it's expected
-> that all properties may vary in suspend.
->
->> example, the CPU is supplied by a digital logic regulator that is shared
->> with other digital logic in the SoC (GPU, wifi, etc.). The CPU may
->> require some high voltage, but the GPU only needs some lower voltage.
->> The suspend/idle code relies on the fact that the GPU is voting on the
->> active+sleep regulator while the CPU is voting on the active only
->> regulator so that the RPM can automatically switch between high voltage
->> and low voltage when the CPU notifies the RPM that it's gone idle (or
->> the CPU wakes up).
-> Again I'm not following this at all, sorry.
-
-Hopefully it's clear now. If not I can clarify further.
-
+diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+index a495e5821ab8..29f1c8c0369f 100644
+--- a/arch/arm/boot/dts/armada-370-db.dts
++++ b/arch/arm/boot/dts/armada-370-db.dts
+@@ -102,30 +102,6 @@
+ 				broken-cd;
+ 			};
+ 
+-			pinctrl {
+-				/*
+-				 * These pins might be muxed as I2S by
+-				 * the bootloader, but it conflicts
+-				 * with the real I2S pins that are
+-				 * muxed using i2s_pins. We must mux
+-				 * those pins to a function other than
+-				 * I2S.
+-				 */
+-				pinctrl-0 = <&hog_pins1 &hog_pins2>;
+-				pinctrl-names = "default";
+-
+-				hog_pins1: hog-pins1 {
+-					marvell,pins = "mpp6",  "mpp8", "mpp10",
+-						       "mpp12", "mpp13";
+-					marvell,function = "gpio";
+-				};
+-
+-				hog_pins2: hog-pins2 {
+-					marvell,pins = "mpp5", "mpp7", "mpp9";
+-					marvell,function = "gpo";
+-				};
+-			};
+-
+ 			usb at 50000 {
+ 				status = "okay";
+ 			};
+@@ -181,3 +157,27 @@
+ 	      compatible = "linux,spdif-dir";
+ 	};
+ };
++
++&pinctrl {
++	/*
++	 * These pins might be muxed as I2S by
++	 * the bootloader, but it conflicts
++	 * with the real I2S pins that are
++	 * muxed using i2s_pins. We must mux
++	 * those pins to a function other than
++	 * I2S.
++	 */
++	pinctrl-0 = <&hog_pins1 &hog_pins2>;
++	pinctrl-names = "default";
++
++	hog_pins1: hog-pins1 {
++		marvell,pins = "mpp6",  "mpp8", "mpp10",
++			       "mpp12", "mpp13";
++		marvell,function = "gpio";
++	};
++
++	hog_pins2: hog-pins2 {
++		marvell,pins = "mpp5", "mpp7", "mpp9";
++		marvell,function = "gpo";
++	};
++};
+diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+index 2b6d24e0d1e8..e1b0eb6b091f 100644
+--- a/arch/arm/boot/dts/armada-370-mirabox.dts
++++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+@@ -54,18 +54,6 @@
+ 				status = "okay";
+ 			};
+ 
+-			pinctrl {
+-				pwr_led_pin: pwr-led-pin {
+-					marvell,pins = "mpp63";
+-					marvell,function = "gpo";
+-				};
+-
+-				stat_led_pins: stat-led-pins {
+-					marvell,pins = "mpp64", "mpp65";
+-					marvell,function = "gpio";
+-				};
+-			};
+-
+ 			gpio_leds {
+ 				compatible = "gpio-leds";
+ 				pinctrl-names = "default";
+@@ -169,3 +157,16 @@
+ 		};
+ 	};
+ };
++
++&pinctrl {
++	pwr_led_pin: pwr-led-pin {
++		marvell,pins = "mpp63";
++		marvell,function = "gpo";
++	};
++
++	stat_led_pins: stat-led-pins {
++		marvell,pins = "mpp64", "mpp65";
++		marvell,function = "gpio";
++	};
++};
++
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+index 1e38628f4060..4e24932c6e30 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+@@ -59,48 +59,6 @@
+ 				status = "okay";
+ 			};
+ 
+-			pinctrl {
+-				power_led_pin: power-led-pin {
+-					marvell,pins = "mpp57";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata1_led_pin: sata1-led-pin {
+-					marvell,pins = "mpp15";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata2_led_pin: sata2-led-pin {
+-					marvell,pins = "mpp14";
+-					marvell,function = "gpio";
+-				};
+-
+-				backup_led_pin: backup-led-pin {
+-					marvell,pins = "mpp56";
+-					marvell,function = "gpio";
+-				};
+-
+-				backup_button_pin: backup-button-pin {
+-					marvell,pins = "mpp58";
+-					marvell,function = "gpio";
+-				};
+-
+-				power_button_pin: power-button-pin {
+-					marvell,pins = "mpp62";
+-					marvell,function = "gpio";
+-				};
+-
+-				reset_button_pin: reset-button-pin {
+-					marvell,pins = "mpp6";
+-					marvell,function = "gpio";
+-				};
+-
+-				poweroff: poweroff {
+-					marvell,pins = "mpp8";
+-					marvell,function = "gpio";
+-				};
+-			};
+-
+ 			mdio {
+ 				pinctrl-0 = <&mdio_pins>;
+ 				pinctrl-names = "default";
+@@ -257,3 +215,45 @@
+ 		gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+ 	};
+ };
++
++&pinctrl {
++	power_led_pin: power-led-pin {
++		marvell,pins = "mpp57";
++		marvell,function = "gpio";
++	};
++
++	sata1_led_pin: sata1-led-pin {
++		marvell,pins = "mpp15";
++		marvell,function = "gpio";
++	};
++
++	sata2_led_pin: sata2-led-pin {
++		marvell,pins = "mpp14";
++		marvell,function = "gpio";
++	};
++
++	backup_led_pin: backup-led-pin {
++		marvell,pins = "mpp56";
++		marvell,function = "gpio";
++	};
++
++	backup_button_pin: backup-button-pin {
++		marvell,pins = "mpp58";
++		marvell,function = "gpio";
++	};
++
++	power_button_pin: power-button-pin {
++		marvell,pins = "mpp62";
++		marvell,function = "gpio";
++	};
++
++	reset_button_pin: reset-button-pin {
++		marvell,pins = "mpp6";
++		marvell,function = "gpio";
++	};
++
++	poweroff: poweroff {
++		marvell,pins = "mpp8";
++		marvell,function = "gpio";
++	};
++};
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+index c2f414bb9aba..30586e47986a 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+@@ -53,38 +53,6 @@
+ 				status = "okay";
+ 			};
+ 
+-			pinctrl {
+-				poweroff: poweroff {
+-					marvell,pins = "mpp60";
+-					marvell,function = "gpio";
+-				};
+-
+-				backup_button_pin: backup-button-pin {
+-					marvell,pins = "mpp52";
+-					marvell,function = "gpio";
+-				};
+-
+-				power_button_pin: power-button-pin {
+-					marvell,pins = "mpp62";
+-					marvell,function = "gpio";
+-				};
+-
+-				backup_led_pin: backup-led-pin {
+-					marvell,pins = "mpp63";
+-					marvell,function = "gpo";
+-				};
+-
+-				power_led_pin: power-led-pin {
+-					marvell,pins = "mpp64";
+-					marvell,function = "gpio";
+-				};
+-
+-				reset_button_pin: reset-button-pin {
+-					marvell,pins = "mpp65";
+-					marvell,function = "gpio";
+-				};
+-			};
+-
+ 			mdio {
+ 				pinctrl-0 = <&mdio_pins>;
+ 				pinctrl-names = "default";
+@@ -269,3 +237,35 @@
+ 		gpios = <&gpio1 28 GPIO_ACTIVE_LOW>;
+ 	};
+ };
++
++&pinctrl {
++	poweroff: poweroff {
++		marvell,pins = "mpp60";
++		marvell,function = "gpio";
++	};
++
++	backup_button_pin: backup-button-pin {
++		marvell,pins = "mpp52";
++		marvell,function = "gpio";
++	};
++
++	power_button_pin: power-button-pin {
++		marvell,pins = "mpp62";
++		marvell,function = "gpio";
++	};
++
++	backup_led_pin: backup-led-pin {
++		marvell,pins = "mpp63";
++		marvell,function = "gpo";
++	};
++
++	power_led_pin: power-led-pin {
++		marvell,pins = "mpp64";
++		marvell,function = "gpio";
++	};
++
++	reset_button_pin: reset-button-pin {
++		marvell,pins = "mpp65";
++		marvell,function = "gpio";
++	};
++};
+diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+index f57a8f841498..f427c8109813 100644
+--- a/arch/arm/boot/dts/armada-370-rd.dts
++++ b/arch/arm/boot/dts/armada-370-rd.dts
+@@ -59,18 +59,6 @@
+ 		};
+ 
+ 		internal-regs {
+-			pinctrl {
+-				fan_pins: fan-pins {
+-					marvell,pins = "mpp8";
+-					marvell,function = "gpio";
+-				};
+-
+-				led_pins: led-pins {
+-					marvell,pins = "mpp32";
+-					marvell,function = "gpio";
+-				};
+-			};
+-
+ 			serial at 12000 {
+ 				status = "okay";
+ 			};
+@@ -174,3 +162,15 @@
+ 		};
+ 	};
+  };
++
++&pinctrl {
++	fan_pins: fan-pins {
++		marvell,pins = "mpp8";
++		marvell,function = "gpio";
++	};
++
++	led_pins: led-pins {
++		marvell,pins = "mpp32";
++		marvell,function = "gpio";
++	};
++};
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 2be9723bcdf3..b48fa8ae4196 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -171,6 +171,10 @@
+ 				status = "disabled";
+ 			};
+ 
++			pinctrl: pin-ctrl at 18000 {
++				reg = <0x18000 0x38>;
++			};
++
+ 			coredivclk: corediv-clock at 18740 {
+ 				compatible = "marvell,armada-370-corediv-clock";
+ 				reg = <0x18740 0xc>;
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 7851942e244a..90e1286d414f 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -112,67 +112,6 @@
+ 				reg = <0x18200 0x100>;
+ 			};
+ 
+-			pinctrl {
+-				compatible = "marvell,mv88f6710-pinctrl";
+-				reg = <0x18000 0x38>;
+-
+-				sdio_pins1: sdio-pins1 {
+-					marvell,pins = "mpp9",  "mpp11", "mpp12",
+-							"mpp13", "mpp14", "mpp15";
+-					marvell,function = "sd0";
+-				};
+-
+-				sdio_pins2: sdio-pins2 {
+-					marvell,pins = "mpp47", "mpp48", "mpp49",
+-							"mpp50", "mpp51", "mpp52";
+-					marvell,function = "sd0";
+-				};
+-
+-				sdio_pins3: sdio-pins3 {
+-					marvell,pins = "mpp48", "mpp49", "mpp50",
+-							"mpp51", "mpp52", "mpp53";
+-					marvell,function = "sd0";
+-				};
+-
+-				i2c0_pins: i2c0-pins {
+-					marvell,pins = "mpp2", "mpp3";
+-					marvell,function = "i2c0";
+-				};
+-
+-				i2s_pins1: i2s-pins1 {
+-					marvell,pins = "mpp5", "mpp6", "mpp7",
+-						       "mpp8", "mpp9", "mpp10",
+-						       "mpp12", "mpp13";
+-					marvell,function = "audio";
+-				};
+-
+-				i2s_pins2: i2s-pins2 {
+-					marvell,pins = "mpp49", "mpp47", "mpp50",
+-						       "mpp59", "mpp57", "mpp61",
+-						       "mpp62", "mpp60", "mpp58";
+-					marvell,function = "audio";
+-				};
+-
+-				mdio_pins: mdio-pins {
+-					marvell,pins = "mpp17", "mpp18";
+-					marvell,function = "ge";
+-				};
+-
+-				ge0_rgmii_pins: ge0-rgmii-pins {
+-					marvell,pins = "mpp5", "mpp6", "mpp7", "mpp8",
+-						       "mpp9", "mpp10", "mpp11", "mpp12",
+-						       "mpp13", "mpp14", "mpp15", "mpp16";
+-					marvell,function = "ge0";
+-				};
+-
+-				ge1_rgmii_pins: ge1-rgmii-pins {
+-					marvell,pins = "mpp19", "mpp20", "mpp21", "mpp22",
+-						       "mpp23", "mpp24", "mpp25", "mpp26",
+-						       "mpp27", "mpp28", "mpp29", "mpp30";
+-					marvell,function = "ge1";
+-				};
+-			};
+-
+ 			gpio0: gpio at 18100 {
+ 				compatible = "marvell,orion-gpio";
+ 				reg = <0x18100 0x40>;
+@@ -306,3 +245,63 @@
+ 		};
+ 	};
+ };
++
++&pinctrl {
++	compatible = "marvell,mv88f6710-pinctrl";
++
++	sdio_pins1: sdio-pins1 {
++		marvell,pins = "mpp9",  "mpp11", "mpp12",
++				"mpp13", "mpp14", "mpp15";
++		marvell,function = "sd0";
++	};
++
++	sdio_pins2: sdio-pins2 {
++		marvell,pins = "mpp47", "mpp48", "mpp49",
++				"mpp50", "mpp51", "mpp52";
++		marvell,function = "sd0";
++	};
++
++	sdio_pins3: sdio-pins3 {
++		marvell,pins = "mpp48", "mpp49", "mpp50",
++				"mpp51", "mpp52", "mpp53";
++		marvell,function = "sd0";
++	};
++
++	i2c0_pins: i2c0-pins {
++		marvell,pins = "mpp2", "mpp3";
++		marvell,function = "i2c0";
++	};
++
++	i2s_pins1: i2s-pins1 {
++		marvell,pins = "mpp5", "mpp6", "mpp7",
++			       "mpp8", "mpp9", "mpp10",
++			       "mpp12", "mpp13";
++		marvell,function = "audio";
++	};
++
++	i2s_pins2: i2s-pins2 {
++		marvell,pins = "mpp49", "mpp47", "mpp50",
++			       "mpp59", "mpp57", "mpp61",
++			       "mpp62", "mpp60", "mpp58";
++		marvell,function = "audio";
++	};
++
++	mdio_pins: mdio-pins {
++		marvell,pins = "mpp17", "mpp18";
++		marvell,function = "ge";
++	};
++
++	ge0_rgmii_pins: ge0-rgmii-pins {
++		marvell,pins = "mpp5", "mpp6", "mpp7", "mpp8",
++			       "mpp9", "mpp10", "mpp11", "mpp12",
++			       "mpp13", "mpp14", "mpp15", "mpp16";
++		marvell,function = "ge0";
++	};
++
++	ge1_rgmii_pins: ge1-rgmii-pins {
++		marvell,pins = "mpp19", "mpp20", "mpp21", "mpp22",
++			       "mpp23", "mpp24", "mpp25", "mpp26",
++			       "mpp27", "mpp28", "mpp29", "mpp30";
++		marvell,function = "ge1";
++	};
++};
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index e4ba27ef109b..b59a83cf2f26 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -73,43 +73,6 @@
+ 				status = "disabled";
+ 			};
+ 
+-			pinctrl: pin-ctrl at 18000 {
+-				reg = <0x18000 0x38>;
+-
+-				pmx_ge0_gmii: pmx-ge0-gmii {
+-					marvell,pins =
+-					     "mpp0",  "mpp1",  "mpp2",  "mpp3",
+-					     "mpp4",  "mpp5",  "mpp6",  "mpp7",
+-					     "mpp8",  "mpp9",  "mpp10", "mpp11",
+-					     "mpp12", "mpp13", "mpp14", "mpp15",
+-					     "mpp16", "mpp17", "mpp18", "mpp19",
+-					     "mpp20", "mpp21", "mpp22", "mpp23";
+-					marvell,function = "ge0";
+-				};
+-
+-				pmx_ge0_rgmii: pmx-ge0-rgmii {
+-					marvell,pins =
+-					     "mpp0", "mpp1", "mpp2", "mpp3",
+-					     "mpp4", "mpp5", "mpp6", "mpp7",
+-					     "mpp8", "mpp9", "mpp10", "mpp11";
+-					marvell,function = "ge0";
+-				};
+-
+-				pmx_ge1_rgmii: pmx-ge1-rgmii {
+-					marvell,pins =
+-					     "mpp12", "mpp13", "mpp14", "mpp15",
+-					     "mpp16", "mpp17", "mpp18", "mpp19",
+-					     "mpp20", "mpp21", "mpp22", "mpp23";
+-					marvell,function = "ge1";
+-				};
+-
+-				sdio_pins: sdio-pins {
+-					marvell,pins = "mpp30", "mpp31", "mpp32",
+-						       "mpp33", "mpp34", "mpp35";
+-					marvell,function = "sd0";
+-				};
+-			};
+-
+ 			system-controller at 18200 {
+ 				compatible = "marvell,armada-370-xp-system-controller";
+ 				reg = <0x18200 0x500>;
+@@ -238,3 +201,38 @@
+ 		};
+ 	};
+ };
++
++&pinctrl {
++	pmx_ge0_gmii: pmx-ge0-gmii {
++		marvell,pins =
++		     "mpp0",  "mpp1",  "mpp2",  "mpp3",
++		     "mpp4",  "mpp5",  "mpp6",  "mpp7",
++		     "mpp8",  "mpp9",  "mpp10", "mpp11",
++		     "mpp12", "mpp13", "mpp14", "mpp15",
++		     "mpp16", "mpp17", "mpp18", "mpp19",
++		     "mpp20", "mpp21", "mpp22", "mpp23";
++		marvell,function = "ge0";
++	};
++
++	pmx_ge0_rgmii: pmx-ge0-rgmii {
++		marvell,pins =
++		     "mpp0", "mpp1", "mpp2", "mpp3",
++		     "mpp4", "mpp5", "mpp6", "mpp7",
++		     "mpp8", "mpp9", "mpp10", "mpp11";
++		marvell,function = "ge0";
++	};
++
++	pmx_ge1_rgmii: pmx-ge1-rgmii {
++		marvell,pins =
++		     "mpp12", "mpp13", "mpp14", "mpp15",
++		     "mpp16", "mpp17", "mpp18", "mpp19",
++		     "mpp20", "mpp21", "mpp22", "mpp23";
++		marvell,function = "ge1";
++	};
++
++	sdio_pins: sdio-pins {
++		marvell,pins = "mpp30", "mpp31", "mpp32",
++			       "mpp33", "mpp34", "mpp35";
++		marvell,function = "sd0";
++	};
++};
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.1.1
