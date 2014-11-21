@@ -1,59 +1,41 @@
 From: johan@kernel.org (Johan Hovold)
-Date: Fri, 21 Nov 2014 11:59:51 +0100
-Subject: [PATCH v4 1/2] of: Rename "poweroff-source" property to
- "system-power-controller"
-In-Reply-To: <1415885699-1465-2-git-send-email-user@radxa>
-References: <1415885699-1465-1-git-send-email-user@radxa>
- <1415885699-1465-2-git-send-email-user@radxa>
-Message-ID: <20141121105951.GA20679@localhost>
+Date: Fri, 21 Nov 2014 12:00:16 +0100
+Subject: [PATCH] Revert "mfd: tps65910: Convert ti,
+ system-power-controller DT property to poweroff-source"
+In-Reply-To: <20141121105951.GA20679@localhost>
+References: <20141121105951.GA20679@localhost>
+Message-ID: <1416567616-10582-1-git-send-email-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 01:34:58PM +0000, Auto Configured wrote:
-> From: Romain Perier <romain.perier@gmail.com>
-> 
-> It reverts commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
-> As discussed on the mailing list, it makes more sense to rename back to the
-> old established property name, without the vendor prefix. Problem being that
-> the word "source" usually tends to be used for inputs and that is out of control
-> of the OS. The poweroff capability is an output which simply turns the
-> system-power off. Also, this property might be used by drivers which power-off
-> the system and power back on subsequent RTC alarms. This seems to suggest to
-> remove "poweroff" from the property name and to choose "system-power-controller"
-> as the more generic name. This patchs adds the required renaming changes and
-> defines an helper function which is compatible with both properties, the old one
-> which was only used by tps65910 and the new one without vendor-prefix.
-
-Now this is a bit of a mess.
-
-There's a commit in the mfd tree, 25f833c1171d ("mfd: tps65910: Convert
+This reverts commit 25f833c1171d ("mfd: tps65910: Convert
 ti,system-power-controller DT property to poweroff-source"), which
-breaks all dts using tps65910 since these are never updated to the now
-retracted property name ("poweroff-source").
+switched to a new device-tree property name for configuring the device
+as a power-off controller, but failed to update the affected device-tree
+sources and neither provided backward compatibility with the old
+property name.
 
-This one should simply be reverted ASAP.
+This fixes broken power-off functionality for all boards relying on
+tps65910 to power off the system.
 
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> ---
->  .../bindings/power/{poweroff.txt => power-controller.txt}        | 0
->  .../devicetree/bindings/regulator/act8865-regulator.txt          | 4 ++--
->  drivers/mfd/tps65910.c                                           | 9 ++++++++-
->  drivers/regulator/act8865-regulator.c                            | 2 +-
->  include/linux/of.h                                               | 6 +++---
->  5 files changed, 14 insertions(+), 7 deletions(-)
+Signed-off-by: Johan Hovold <johan@kernel.org>
+---
+ drivers/mfd/tps65910.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Romain, what tree is this patch against? The changes to the tps65910
-driver appears not to even be in the regulator tree, yet you asked Mark
-to merge this. And the MFD maintainer is not even on CC.
-
-Let's fix the breakage by reverting the offending commit in mfd. Then the
-new standard name can be introduced in regulator alone (e.g. this patch
-without the tps65910 bits) as nothing outside of regulator should be
-using the new power-off feature (or binding) for act8865. Then other
-drivers and dts can be converted to use the new property name (while
-retaining backwards compatibility) for 3.20.
-
-[ We should probably also consider adding an "of_device_is_" prefix to
-the helper name for consistency. ]
-
-Johan
+diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
+index b8dca8a0db41..7612d89850dd 100644
+--- a/drivers/mfd/tps65910.c
++++ b/drivers/mfd/tps65910.c
+@@ -423,7 +423,8 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
+ 
+ 	board_info->irq = client->irq;
+ 	board_info->irq_base = -1;
+-	board_info->pm_off = of_system_has_poweroff_source(np);
++	board_info->pm_off = of_property_read_bool(np,
++			"ti,system-power-controller");
+ 
+ 	return board_info;
+ }
+-- 
+2.0.4
