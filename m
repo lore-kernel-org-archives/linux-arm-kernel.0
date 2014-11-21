@@ -1,51 +1,50 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 21 Nov 2014 09:22:36 +0800
-Subject: Removal of bus->msi assignment breaks MSI with stacked domains
-In-Reply-To: <546E1771.4030201@arm.com>
-References: <546E1771.4030201@arm.com>
-Message-ID: <546E93DC.8010902@huawei.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 20 Nov 2014 17:30:53 -0800
+Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <CAMuHMdVXGPu7x706NxqO3rn3KuRbPbD_ZQsJtDH4Hf31AaRR+Q@mail.gmail.com>
+ (Geert Uytterhoeven's message of "Thu, 20 Nov 2014 22:54:07 +0100")
+References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
+ <1709760.E0jX3Myv0h@wuerfel> <546C7FDD.7030906@ti.com>
+ <2900095.WIocOu7ue2@wuerfel>
+ <CAPDyKFqeZ3YU2OEN4tCOdcQ0pAho67Q8U_eCEOroG9aS0mp+-Q@mail.gmail.com>
+ <546DD87B.3080806@ti.com>
+ <CAPDyKFrBhZyqozM98_4pPdW0EMFt5W6VX1X7cz6Z=yNhW4vYTA@mail.gmail.com>
+ <CAMuHMdWtHT7QX3Kpa-GCLa49ToGODwjnNVgfxDzJzcM-FU1ffg@mail.gmail.com>
+ <546E0970.5090301@ti.com> <7hh9xtr5ac.fsf@deeprootsystems.com>
+ <CAMuHMdV7zASj8_NtLRir1VubXEKTkq0vBGMXeYXDACu8UC2tZA@mail.gmail.com>
+ <7hbno1r1af.fsf@deeprootsystems.com>
+ <CAMuHMdVXGPu7x706NxqO3rn3KuRbPbD_ZQsJtDH4Hf31AaRR+Q@mail.gmail.com>
+Message-ID: <7hppchpcfm.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/21 0:31, Marc Zyngier wrote:
-> Bjorn, Yijing,
-> 
-> I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
-> bus->msi assignment) completely breaks MSI on arm64 when using the new
-> MSI stacked domain:
+Geert Uytterhoeven <geert@linux-m68k.org> writes:
 
-Sorry, this is my first part to refactor MSI related code, now
-how to get pci msi_controller depends arch functions(pcibios_msi_controller() or
-arch_setup_msi_irq()), we are working on generic pci_host_bridge, after that,
-we could eventually eliminate MSI arch functions and find pci dev 's msi controller
-by pci_host_bridge->get_msi_controller().
+> On Thu, Nov 20, 2014 at 10:48 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>>>> So what exactly are we talking about with "PM" clocks, and why are they
+>>>> "special" when it comes to PM domains?  IOW, why are the clocks to be
+>>>> managed during PM domain transitions for a given device any different
+>>>> than the clocks that need to be managed for a runtime suspend/resume (or
+>>>> system suspend/resume) sequence for the same device?
+>>>
+>>> (Speaking for my case, shmobile)
+>>>
+>>> They're not. The clocks to be managed during PM domain transitions are the
+>>> same as the clocks that need to be managed for a runtime suspend/resume
+>>> (or system suspend/resume) sequence.
+>>>
+>>> The special thing is that this is more a platform than a driver thing: the same
+>>> module may have a "PM/functional" clock (that is documented to enable/disable
+>>> the module) on one Soc, but noet on another.
+>>
+>> So why isn't the presence or absence of the clock described in the .dtsi
+>> for the SoC instead of being handled by special PM domain logic?
+>
+> It is. Cfr. the presence/absence of clocks for renesas,rcar-gpio nodes.
 
-Marc, could you tell me what pci host driver in your test platform ?
+Hmm, OK, Good.  
 
-> 
-> This patch relies on architectures to implement either
-> pcibios_msi_controller() or arch_setup_msi_irq(). It turns out that with
-> stacked domains, none of this is actually necessary, as long as you can
-> access to the msi_controller.
-> 
-> And everything was fine until this patch came around (and managed to
-> test on a system where the PCI devices are not directly attached to the
-> root bus). Of course, everything now breaks, as we cannot get to the MSI
-> controller (which contains the domain we allocate the MSIs from).
-> 
-> In short, this patch breaks an important feature on which arm64 relies,
-> and I believe this patch should be reverted ASAP.
+So now I'm confused about why the PM domain has to do anything special
+if the presence/absence of the clocks is already handled by the DT.
 
-Bjorn, could you help to revert this patch ?
-
-
-> 
-> Thanks,
-> 
-> 	M.
-> 
-
-
--- 
-Thanks!
-Yijing
+Kevin
