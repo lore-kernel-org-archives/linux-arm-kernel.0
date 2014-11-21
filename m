@@ -1,147 +1,65 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Fri, 21 Nov 2014 09:58:51 +0530
-Subject: [PATCH v5 2/2] ARM: EXYNOS: PMU: move restart code into pmu driver
-In-Reply-To: <1416307650-15162-3-git-send-email-pankaj.dubey@samsung.com>
-References: <1416307650-15162-1-git-send-email-pankaj.dubey@samsung.com>
- <1416307650-15162-3-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAFp+6iHz=1Jug7F_LgohcVLfXzsG2FGvck7_jPx+txZkOpLbqA@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 21 Nov 2014 13:45:32 +0900
+Subject: [PATCH/RFC] ARM: shmobile: dts: Add common file for MSIOF1
+In-Reply-To: <1416544027-5680-1-git-send-email-horms+renesas@verge.net.au>
+References: <1416544027-5680-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CANqRtoRxd64yoXQaPbR-euRtT6MX9AnasF32sK6B_EKoE30fJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+Hi Simon,
 
+On Fri, Nov 21, 2014 at 1:27 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+>
+> The R-Car Gen 2 SoCs have MSIOF1 interfaces however they
+> are not exposed on any boards currently supported in mainline.
 
-On Tue, Nov 18, 2014 at 4:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> Let's register restart handler from PMU driver for restart
-> functionality. So that we can remove restart hooks from
-> machine specific file, and thus moving ahead when PMU moved
-> to driver folder, this functionality can be reused for ARM64
-> based Exynos SoC's.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Acked-by: Guenter Roeck <linux@roeck-us.net>
-> ---
+Ok, but that's the same as many other devices on R-Car Gen2 SoCs no?
+Basically the SoC contains a hardware block but it is not used on the
+actual board. I wonder what made MSIOF1 a target for sudden code
+consolidation?
 
-Tested on Exynos5800 peach-pi board with linux-samsung/for-next.
-Reboot works as expected mutiple times.
+> The purpose of r8a77xx-msiof1.dtsi is to be included
+> in a dts file if MSIOF1 is exposed by some means.
 
-Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
+Judging by the file name this seems to be a board specific property
+made generic somehow.
 
->  arch/arm/mach-exynos/common.h |    1 -
->  arch/arm/mach-exynos/exynos.c |    6 ------
->  arch/arm/mach-exynos/pmu.c    |   23 +++++++++++++++++++++++
->  3 files changed, 23 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index 431be1b..865f878 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -12,7 +12,6 @@
->  #ifndef __ARCH_ARM_MACH_EXYNOS_COMMON_H
->  #define __ARCH_ARM_MACH_EXYNOS_COMMON_H
->
-> -#include <linux/reboot.h>
->  #include <linux/of.h>
->
->  #define EXYNOS3250_SOC_ID      0xE3472000
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index 8f995b7..c13d083 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -87,11 +87,6 @@ static struct map_desc exynos5_iodesc[] __initdata = {
->         },
->  };
->
-> -static void exynos_restart(enum reboot_mode mode, const char *cmd)
-> -{
-> -       __raw_writel(0x1, pmu_base_addr + EXYNOS_SWRESET);
-> -}
-> -
->  static struct platform_device exynos_cpuidle = {
->         .name              = "exynos_cpuidle",
->  #ifdef CONFIG_ARM_EXYNOS_CPUIDLE
-> @@ -316,7 +311,6 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
->         .init_machine   = exynos_dt_machine_init,
->         .init_late      = exynos_init_late,
->         .dt_compat      = exynos_dt_compat,
-> -       .restart        = exynos_restart,
->         .reserve        = exynos_reserve,
->         .dt_fixup       = exynos_dt_fixup,
->  MACHINE_END
-> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-> index 6c8a76d..e4c3512 100644
-> --- a/arch/arm/mach-exynos/pmu.c
-> +++ b/arch/arm/mach-exynos/pmu.c
-> @@ -11,8 +11,11 @@
->
->  #include <linux/io.h>
->  #include <linux/of.h>
-> +#include <linux/of_address.h>
->  #include <linux/platform_device.h>
->  #include <linux/delay.h>
-> +#include <linux/notifier.h>
-> +#include <linux/reboot.h>
->
->
->  #include "exynos-pmu.h"
-> @@ -716,6 +719,13 @@ static void exynos5420_pmu_init(void)
->         pr_info("EXYNOS5420 PMU initialized\n");
->  }
->
-> +static int pmu_restart_notify(struct notifier_block *this,
-> +               unsigned long code, void *unused)
-> +{
-> +       pmu_raw_writel(0x1, EXYNOS_SWRESET);
-> +
-> +       return NOTIFY_DONE;
-> +}
->
->  static const struct exynos_pmu_data exynos4210_pmu_data = {
->         .pmu_config     = exynos4210_pmu_config,
-> @@ -765,11 +775,20 @@ static const struct of_device_id exynos_pmu_of_device_ids[] = {
->         { /*sentinel*/ },
->  };
->
-> +/*
-> + * Exynos PMU restart notifier, handles restart functionality
-> + */
-> +static struct notifier_block pmu_restart_handler = {
-> +       .notifier_call = pmu_restart_notify,
-> +       .priority = 128,
+> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> [horms: Reworked into a separate dtsi file]
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+[snip]
+
+> +&pfc {
+> +       msiof1_pins: spi2 {
+> +               renesas,groups = "msiof1_clk_c", "msiof1_sync_c", "msiof1_rx_c",
+> +                                "msiof1_tx_c";
+> +               renesas,function = "msiof1";
+> +       };
 > +};
 > +
->  static int exynos_pmu_probe(struct platform_device *pdev)
->  {
->         const struct of_device_id *match;
->         struct device *dev = &pdev->dev;
->         struct resource *res;
-> +       int ret;
->
->         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->         pmu_base_addr = devm_ioremap_resource(dev, res);
-> @@ -794,6 +813,10 @@ static int exynos_pmu_probe(struct platform_device *pdev)
->
->         platform_set_drvdata(pdev, pmu_context);
->
-> +       ret = register_restart_handler(&pmu_restart_handler);
-> +       if (ret)
-> +               dev_warn(dev, "can't register restart handler err=%d\n", ret);
+> +&msiof1 {
+> +       pinctrl-0 = <&msiof1_pins>;
+> +       pinctrl-names = "default";
 > +
->         dev_dbg(dev, "Exynos PMU Driver probe done\n");
->         return 0;
->  }
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +       status = "okay";
+> +};
 
+The DTS above only works on boards that are using the "C" set of pins
+for the MSIOF1. Other configurations will not work. It also assumes
+that all SoC code is using the same strings for the PFC which may or
+may not be true.
 
+Does some common policy for the Linux kernel exist about how to break
+out board specific device support in DTS? If so we should follow it.
 
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+If not, from my conservative view point this patch looks like over
+doing code sharing with increased overhead and no apparent upside
+except more complex dependencies.
+
+Thanks,
+
+/ magnus
