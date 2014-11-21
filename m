@@ -1,150 +1,215 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 21 Nov 2014 15:16:24 +0100
-Subject: [PATCH 2/3] i2c: slave-eeprom: add eeprom simulator driver
-In-Reply-To: <20141121071941.GK27002@pengutronix.de>
-References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
- <1416326695-13083-3-git-send-email-wsa@the-dreams.de>
- <20141121071941.GK27002@pengutronix.de>
-Message-ID: <20141121141624.GT27002@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 15:26:46 +0100
+Subject: [PATCH 7/9] dt: mb86s7x: add dt files for MB86S7x evbs
+In-Reply-To: <1416487126-25509-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1416487126-25509-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <2581182.ZW92kSfUJp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 08:19:41AM +0100, Uwe Kleine-K?nig wrote:
-> Hello Wolfram,
-> 
-> this mail is thematically more a reply to patch 1 and maybe just serves
-> my understanding of the slave support.
-> 
-> On Tue, Nov 18, 2014 at 05:04:54PM +0100, Wolfram Sang wrote:
-> > From: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> > 
-> > The first user of the i2c-slave interface is an eeprom simulator. It is
-> > a shared memory which can be accessed by the remote master via I2C and
-> > locally via sysfs.
-> > 
-> > Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> > ---
-> > 
-> > Changes since RFC:
-> > * fix build error for modules
-> > * don't hardcode size
-> > * add boundary checks for sysfs access
-> > * use a spinlock
-> > * s/at24s/eeprom/g
-> > * add some docs
-> > * clean up exit paths
-> > * use size-variable instead of driver_data
-> > 
-> >  drivers/i2c/Kconfig            |  10 +++
-> >  drivers/i2c/Makefile           |   1 +
-> >  drivers/i2c/i2c-slave-eeprom.c | 170 +++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 181 insertions(+)
-> >  create mode 100644 drivers/i2c/i2c-slave-eeprom.c
-> > 
-> > diff --git a/drivers/i2c/Kconfig b/drivers/i2c/Kconfig
-> > index b51a402752c4..8c9e619f3026 100644
-> > --- a/drivers/i2c/Kconfig
-> > +++ b/drivers/i2c/Kconfig
-> > @@ -110,6 +110,16 @@ config I2C_STUB
-> >  
-> >  	  If you don't know what to do here, definitely say N.
-> >  
-> > +config I2C_SLAVE
-> > +	bool "I2C slave support"
-> > +
-> > +if I2C_SLAVE
-> > +
-> > +config I2C_SLAVE_EEPROM
-> > +	tristate "I2C eeprom slave driver"
-> > +
-> > +endif
-> > +
-> >  config I2C_DEBUG_CORE
-> >  	bool "I2C Core debugging messages"
-> >  	help
-> > diff --git a/drivers/i2c/Makefile b/drivers/i2c/Makefile
-> > index 1722f50f2473..45095b3d16a9 100644
-> > --- a/drivers/i2c/Makefile
-> > +++ b/drivers/i2c/Makefile
-> > @@ -9,6 +9,7 @@ obj-$(CONFIG_I2C_CHARDEV)	+= i2c-dev.o
-> >  obj-$(CONFIG_I2C_MUX)		+= i2c-mux.o
-> >  obj-y				+= algos/ busses/ muxes/
-> >  obj-$(CONFIG_I2C_STUB)		+= i2c-stub.o
-> > +obj-$(CONFIG_I2C_SLAVE_EEPROM)	+= i2c-slave-eeprom.o
-> >  
-> >  ccflags-$(CONFIG_I2C_DEBUG_CORE) := -DDEBUG
-> >  CFLAGS_i2c-core.o := -Wno-deprecated-declarations
-> > diff --git a/drivers/i2c/i2c-slave-eeprom.c b/drivers/i2c/i2c-slave-eeprom.c
-> > new file mode 100644
-> > index 000000000000..6631400b5f02
-> > --- /dev/null
-> > +++ b/drivers/i2c/i2c-slave-eeprom.c
-> > @@ -0,0 +1,170 @@
-> > +/*
-> > + * I2C slave mode EEPROM simulator
-> > + *
-> > + * Copyright (C) 2014 by Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
-> > + * Copyright (C) 2014 by Renesas Electronics Corporation
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify it
-> > + * under the terms of the GNU General Public License as published by the
-> > + * Free Software Foundation; version 2 of the License.
-> > + *
-> > + * Because most IP blocks can only detect one I2C slave address anyhow, this
-> > + * driver does not support simulating EEPROM types which take more than one
-> > + * address. It is prepared to simulate bigger EEPROMs with an internal 16 bit
-> > + * pointer, yet implementation is deferred until the need actually arises.
-> > + */
-> > +
-> > +#include <linux/i2c.h>
-> > +#include <linux/init.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/spinlock.h>
-> > +#include <linux/sysfs.h>
-> > +
-> > +struct eeprom_data {
-> > +	struct bin_attribute bin;
-> > +	bool first_write;
-> > +	spinlock_t buffer_lock;
-> > +	u8 buffer_idx;
-> > +	u8 buffer[];
-> > +};
-> > +
-> > +static int i2c_slave_eeprom_slave_cb(struct i2c_client *client,
-> > +				     enum i2c_slave_event event, u8 *val)
-> > +{
-> > +	struct eeprom_data *eeprom = i2c_get_clientdata(client);
-> > +
-> > +	switch (event) {
-> > +	case I2C_SLAVE_REQ_WRITE_END:
-> > +		if (eeprom->first_write) {
-> > +			eeprom->buffer_idx = *val;
-> > +			eeprom->first_write = false;
-> > +		} else {
-> > +			spin_lock(&eeprom->buffer_lock);
-> > +			eeprom->buffer[eeprom->buffer_idx++] = *val;
-> > +			spin_unlock(&eeprom->buffer_lock);
-> > +		}
-> > +		break;
-> > +
-> > +	case I2C_SLAVE_REQ_READ_START:
-> > +		spin_lock(&eeprom->buffer_lock);
-> > +		*val = eeprom->buffer[eeprom->buffer_idx];
-> > +		spin_unlock(&eeprom->buffer_lock);
-> > +		break;
-> > +
-> > +	case I2C_SLAVE_REQ_READ_END:
-> > +		eeprom->buffer_idx++;
-> You don't check here for buffer_idx >= ARRAY_SIZE(buffer)?
-> Ditto in the I2C_SLAVE_REQ_WRITE_END case.
-I just noticed that buffer_idx is an u8, so it overflows at 255+1. So
-the probe routine should error out if size is bigger than 256.
+On Thursday 20 November 2014 20:38:46 Vincent Yang wrote:
+> diff --git a/arch/arm/boot/dts/mb86s70eb.dts b/arch/arm/boot/dts/mb86s70eb.dts
+> new file mode 100644
+> index 0000000..a19c72f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mb86s70eb.dts
+> @@ -0,0 +1,52 @@
+> +/*
+> + * Copyright (C) 2013-2014 FUJITSU SEMICONDUCTOR LIMITED
+> + * Copyright (C) 2014 Linaro Ltd.
+> + *
+> + * This program is free software: you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation, version 2 of the License.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "mb86s70.dtsi"
+> +
+> +/ {
+> +	model = "Fujitsu MB86S70 EVB";
+> +	compatible = "fujitsu,mb86s70-evb";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0 0x80000000 0x80000000>, <0x08 0x80000000 0x80000000>;
+> +
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "loglevel=8 console=ttyS0,115200 root=/dev/mmcblk1p1 rootfstype=ext4 rootwait rw";
+> +		linux,initrd-start = <0xc0000000>;
+> +		linux,initrd-end =   <0xc0800000>;
+> +	};
 
-Best regards
-Uwe
+The initrd parameters seem misplaced here, they should be set by the
+boot loader. The loglevel=8 seems to be for debugging only, better
+remove that.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> +        vccq_sdhci1: regulator at 0 {
+> +                compatible = "regulator-gpio";
+> +                regulator-name = "SDHCI1 VccQ";
+> +                regulator-min-microvolt = <1800000>;
+> +                regulator-max-microvolt = <3300000>;
+> +                gpios = <&gpio0 7 0>;
+> +                gpios-states = <1>;
+> +                states = <3300000 1
+> +                          1800000 0>;
+> +        };
+
+This looks whitespace damaged, have you used checkpatch.pl to check your
+patch before submitting?
+
+> +	sdhci1: sdio at 36600000 {
+
+I think the node name should be 'mmc'
+
+> +		compatible = "fujitsu,mb86s70-sdh30";
+> +		reg = <0 0x36600000 0x1000>;
+> +		interrupts = <0 172 0x4>,
+> +			     <0 173 0x4>;
+> +		voltage-ranges = <1800 1800>, <3300 3300>;
+> +		bus-width = <4>;
+> +		clocks = <&clk_main_c_0>, <&clk_main_d_0>;
+> +		clock-names = "iface", "core";
+> +		vqmmc-supply = <&vccq_sdhci1>;
+> +	};
+> +};
+
+Better move the actual node into the main dtsi file for the chip that
+contains it, and add a 'status="disabled" property, then just
+do this here:
+
+	&sdhci1 {
+		status = "ok";
+	};
+
+It probably makes sense to also leave the bus-width and voltage-ranges
+properties in the per-board file if they are specific to the attached
+device rather than the controller.
+
+> diff --git a/arch/arm/boot/dts/mb86s73eb.dts b/arch/arm/boot/dts/mb86s73eb.dts
+> new file mode 100644
+> index 0000000..2bb55a3
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mb86s73eb.dts
+
+Some comments for this file.
+
+> diff --git a/arch/arm/boot/dts/mb86s7x.dtsi b/arch/arm/boot/dts/mb86s7x.dtsi
+> new file mode 100644
+> index 0000000..50dcf04
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mb86s7x.dtsi
+> @@ -0,0 +1,595 @@
+> +/*
+> + * Copyright (C) 2013-2014 FUJITSU SEMICONDUCTOR LIMITED
+> + * Copyright (C) 2014 Linaro Ltd.
+> + *
+> + * This program is free software: you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation, version 2 of the License.
+> + */
+> +
+> +#include "skeleton.dtsi"
+> +#include <dt-bindings/clock/mb86s70-clk.h>
+> +
+> +/ {
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <1>;
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +		serial2 = &uart2;
+> +	};
+
+Please move the aliases into the per-board file as well, some other
+boards might not support all the uarts and should only list the
+ones that have a connector.
+> +	/**
+> +	 * The UngatedCLK is the source of 8 maskable clock ports
+> +	 * as well as having its own output port which can't be masked.
+> +	 */
+> +	clocks {
+> +		clk_alw_0_0: clk_alw_0_0 {
+> +			compatible = "fujitsu,mb86s70-clk";
+> +			#clock-cells = <0>;
+> +			cntrlr = <MB86S70_CRG11_ALW>;
+> +			domain = <0>;
+> +			port = <0>;
+> +		};
+> +
+> +		clk_alw_0_1: clk_alw_0_1 {
+> +			compatible = "fujitsu,mb86s70-clk";
+> +			#clock-cells = <0>;
+> +			cntrlr = <MB86S70_CRG11_ALW>;
+> +			domain = <0>;
+> +			port = <1>;
+> +		};
+
+This seems weird: rather than have one clock controller node per
+clock source, why not just have one node with #clock-cells = <3>?
+
+Your controller seems perfectly capable of this, and you even
+put the numbers in the label. It would be much more straightforward
+to do
+
+	clocks = <&clk_alw 0 1>;
+
+than 
+
+	clocks = <&clk_alw_0_1>;
+
+here. Possibly even
+
+	clocks = <&clk MB86S70_CRG11_ALW 0 1>;
+
+with #clock-cells = <3>
+
+> +
+> +	timer0: timer at 31080000 {
+> +		compatible = "arm,sp804", "arm,primecell";
+> +		reg = <0 0x31080000 0x1000>;
+> +		interrupts = <0 324 4>,
+> +			     <0 325 4>;
+> +		clocks = <&clk_alw_6_8>;
+> +		clock-names = "apb_pclk";
+> +	};
+> +
+> +	timer1: archtimer {
+> +		compatible = "arm,armv7-timer";
+> +		clock-frequency = <125000000>;
+> +		interrupts = <1 13 0xf08>,
+> +			     <1 14 0xf08>,
+> +			     <1 11 0xf08>,
+> +			     <1 10 0xf08>;
+> +	};
+
+Inconsistent node names: please call the archtimer node 'timer'
+as well, like the other one.
+
+The label is free-form though, so you can just use 'archtimer:'
+ther if you need to reference it.
+
+> +	sdhci0: emmc at 300c0000 {
+> +		compatible = "fujitsu,mb86s70-sdh30";
+> +		reg = <0 0x300c0000 0x1000>;
+> +		interrupts = <0 164 0x4>,
+> +			     <0 165 0x4>;
+> +		voltage-ranges = <1800 1800>, <3300 3300>;
+> +		bus-width = <8>;
+> +		clocks = <&clk_alw_c_0>, <&clk_alw_b_0>;
+> +		clock-names = "iface", "core";
+> +	};
+> +};
+
+Maybe also leave this as disabled in the base dtsi file and move the
+status="ok" property and the bus width into the per-board file.
+
+Also change the node name to mmc.
+
+	Arnd
