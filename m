@@ -1,67 +1,24 @@
-From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
-Date: Fri, 21 Nov 2014 09:18:45 +0800
-Subject: [PATCH 6/9] mmc: sdhci: host: add new f_sdh30
-In-Reply-To: <CAL_JsqKe_NA_mQ1MVMntXMjFGP6nGvnpWb8gvBEzRZuZ+aMf1g@mail.gmail.com>
-References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1416487081-25467-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <CAL_JsqKDVgpBBW7j1skOU4moF0tvh1j6Fm6jaE5JoP04OU07uw@mail.gmail.com>
- <CAOEd-H0_YGHobKu08pMr3A4EpqBdtpBcCZu5PoVY_SZ=GBg-3w@mail.gmail.com>
- <CAL_JsqKe_NA_mQ1MVMntXMjFGP6nGvnpWb8gvBEzRZuZ+aMf1g@mail.gmail.com>
-Message-ID: <CAOEd-H097p4mQ-L0NxReFpNADG2ymqpvg5jgiWG4W5G+3H-vcw@mail.gmail.com>
+From: shijie.huang@intel.com (Huang Shijie)
+Date: Fri, 21 Nov 2014 09:19:28 +0800
+Subject: [PATCH v4 0/4] mtd: nand: gpmi: add proper raw access support
+In-Reply-To: <20141120092336.GE3212@norris-Latitude-E6410>
+References: <1413794777-32220-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20141120092336.GE3212@norris-Latitude-E6410>
+Message-ID: <20141121011928.GB28861@shldeISGChi005.sh.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-21 2:18 GMT+08:00 Rob Herring <robherring2@gmail.com>:
-> On Thu, Nov 20, 2014 at 10:59 AM, Vincent Yang
-> <vincent.yang.fujitsu@gmail.com> wrote:
->> 2014-11-20 23:22 GMT+08:00 Rob Herring <robherring2@gmail.com>:
->>> On Thu, Nov 20, 2014 at 6:38 AM, Vincent Yang
->>> <vincent.yang.fujitsu@gmail.com> wrote:
->>>> This patch adds new host controller driver for
->>>> Fujitsu SDHCI controller f_sdh30.
->>>>
->>>> Signed-off-by: Andy Green <andy.green@linaro.org>
->>>> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
->>>> Signed-off-by: Tetsuya Takinishi <t.takinishi@jp.fujitsu.com>
->>>> ---
->>>>  .../devicetree/bindings/mmc/sdhci-fujitsu.txt      |  35 +++
->>>>  drivers/mmc/host/Kconfig                           |   9 +
->>>>  drivers/mmc/host/Makefile                          |   1 +
->>>>  drivers/mmc/host/sdhci_f_sdh30.c                   | 319 +++++++++++++++++++++
->>>>  4 files changed, 364 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
->>>>  create mode 100644 drivers/mmc/host/sdhci_f_sdh30.c
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt b/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
->>>> new file mode 100644
->>>> index 0000000..a1e0b64
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
->>>> @@ -0,0 +1,35 @@
->>>> +* Fujitsu SDHCI controller
->>>> +
->>>> +This file documents differences between the core properties in mmc.txt
->>>> +and the properties used by the sdhci_f_sdh30 driver.
->>>> +
->>>> +Required properties:
->>>> +- compatible: "fujitsu,mb86s70-sdh30"
->>>
->>> It would be nice to have sdhci in the name to indicate it is an SDHCI
->>> controller.
->>
->> Yes, we will update it to "fujitsu,sdhci-f-sdh30"
->> Thanks for your review!
->
-> Not really what I had in mind as you are then dropping the chip name.
-> Perhaps "fujitsu,mb86s70-sdhci-3.0". Is 3.0 the SD spec version or IP
-> version? If the former, I think I'd drop it as IIRC that is available
-> in a register.
+On Thu, Nov 20, 2014 at 01:23:36AM -0800, Brian Norris wrote:
+> On Mon, Oct 20, 2014 at 10:46:13AM +0200, Boris Brezillon wrote:
+> > This series provides an implementation for raw accesses taking care of
+> > hidding the specific layout used by the GPMI controller.
+> > 
+> > I also updated the nand_ecc_ctrl struct documentation to clearly state that
+> > specific layouts should be hidden when accessing the NAND chip in raw mode.
+> 
+> Can I get any ack's, tested-by's, or reviewed-by's?
+> 
+I will add my tested-by in the Boris's next release.
 
-We will update it to "fujitsu,mb86s70-sdhci-3.0" as you suggest
-because 3.0 is IP version
-Thanks for your review!
-
-Vincent
-
->
-> Rob
+thanks
+Huang Shijie
