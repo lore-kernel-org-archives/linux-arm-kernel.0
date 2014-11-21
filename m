@@ -1,72 +1,94 @@
-From: hsweeten@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 21 Nov 2014 10:23:42 -0700
-Subject: [PATCH] arm: ep93xx: add dma_masks for the M2P and M2M DMA controllers
-Message-ID: <1416590622-7765-1-git-send-email-hsweeten@visionengravers.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 21 Nov 2014 10:31:10 -0700
+Subject: Removal of bus->msi assignment breaks MSI with stacked domains
+In-Reply-To: <546E9B60.9070706@huawei.com>
+References: <546E1771.4030201@arm.com> <20141120215353.GA7987@google.com>
+ <alpine.DEB.2.11.1411202355060.6439@nanos>
+ <546E9B60.9070706@huawei.com>
+Message-ID: <20141121173110.GB6578@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dma_mask and coherent_dma_mask need to be set or DMA memory allocations
-will fail with error messages like this:
+On Fri, Nov 21, 2014 at 09:54:40AM +0800, Yijing Wang wrote:
+> >> Thomas, let me know if you want to do that.  I suppose we could add a new
+> >> patch to add it back, but that would leave bisection broken for the
+> >> interval between c167caf8d174 and the patch that adds it back.
+> > 
+> > Fortunately my irq/irqdomain branch is not immutable yet. So we have
+> > no problem at that point. I can rebase on your branch until tomorrow
+> > night. Or just rebase on mainline and we sort out the merge conflicts
+> > later, i.e. delegate them to Linus so his job of pulling stuff gets
+> > not completely boring.
+> 
+> Hi Thomas, sorry for my introducing the broken.
+> 
+> > 
+> > What I'm more worried about is whether this intended change is going
+> > to inflict a problem on Jiangs intention to deduce the MSI irq domain
+> > from the device, which we really need for making DMAR work w/o going
+> > through loops and hoops.
+> > 
+> > I have limited knowledge about the actual scope of iommu (DMAR) units
+> > versus device/bus/host-controllers, so I would appreciate a proper
+> > explanation for that from you or Jiang or both.
+> 
+> In my personal opinion, if it's not necessary, we should not put stuff
+> into pci_dev or pci_bus. If we plan to save msi_controller in pci_bus or
+> pci_dev.
+> I have a proposal, I would be appreciated if you could give some comments.
+> First we refactor pci_host_bridge to make a generic
+> pci_host_bridge, then we could save pci domain in it to eliminate
+> arch specific functions. I aslo wanted to save msi_controller as
+> pci domain, but now Jiang refactor hierarchy irq domain, and
+> pci devices under the same pci host bridge may need to associate
+> to different msi_controllers.
 
-  ep93xx-dma ep93xx-dma-m2p: coherent DMA mask is unset
+I think this is getting ahead of ourselves.  Let's make small steps.
 
-  ep93xx-dma ep93xx-dma-m2m: coherent DMA mask is unset
+We currently have the msi_controller pointer in struct pci_bus.  That was
+there even before your series.  Your series added pci_msi_controller(),
+and I reworked it so it looks like this:
 
-Add the missing information to the ep93xx-dma-m2p and ep93xx-dma-m2m
-devices.
+    static struct msi_controller *pci_msi_controller(struct pci_dev *dev)
+    {
+	   struct msi_controller *msi_ctrl = dev->bus->msi;
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Reported-by: Jeremy Moles <cubicool@gmail.com>
-Tested-by: Alexander Sverdlin <subaparts@yandex.ru>
-Cc: Ryan Mallon <rmallon@gmail.com>
----
-This fixes a problem with the sound/soc/cirrus/edb93xx.c driver not loading
-and fixes the sound on these tested boards:
+	   if (msi_ctrl)
+		   return msi_ctrl;
 
-  EDB9315A (like)  - tested by Jeremy Moles
-  EDB9302 (like)   - tested by Alexander Sverdlin
-  EDB9307A (stock) - tested by H Hartley Sweeten
+	   return pcibios_msi_controller(dev);
+    }
 
- arch/arm/mach-ep93xx/dma.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+So now your series basically just removes the ARM add_bus() and
+remove_bus() methods and gets the MSI controller info from the ARM
+pci_sys_data struct instead of from pci_bus.  Of course, that assumes that
+on ARM, all devices under a host bridge have the same MSI controller.  That
+seems like an unwarranted assumption, but if you want to do it for ARM,
+that's fine with me.
 
-diff --git a/arch/arm/mach-ep93xx/dma.c b/arch/arm/mach-ep93xx/dma.c
-index d8bfd02..88a4c9b 100644
---- a/arch/arm/mach-ep93xx/dma.c
-+++ b/arch/arm/mach-ep93xx/dma.c
-@@ -66,11 +66,15 @@ static struct ep93xx_dma_platform_data ep93xx_dma_m2p_data = {
- 	.num_channels		= ARRAY_SIZE(ep93xx_dma_m2p_channels),
- };
- 
-+static u64 ep93xx_dma_m2p_mask = DMA_BIT_MASK(32);
-+
- static struct platform_device ep93xx_dma_m2p_device = {
- 	.name			= "ep93xx-dma-m2p",
- 	.id			= -1,
- 	.dev			= {
--		.platform_data	= &ep93xx_dma_m2p_data,
-+		.platform_data		= &ep93xx_dma_m2p_data,
-+		.dma_mask		= &ep93xx_dma_m2p_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
- 	},
- };
- 
-@@ -93,11 +97,15 @@ static struct ep93xx_dma_platform_data ep93xx_dma_m2m_data = {
- 	.num_channels		= ARRAY_SIZE(ep93xx_dma_m2m_channels),
- };
- 
-+static u64 ep93xx_dma_m2m_mask = DMA_BIT_MASK(32);
-+
- static struct platform_device ep93xx_dma_m2m_device = {
- 	.name			= "ep93xx-dma-m2m",
- 	.id			= -1,
- 	.dev			= {
--		.platform_data	= &ep93xx_dma_m2m_data,
-+		.platform_data		= &ep93xx_dma_m2m_data,
-+		.dma_mask		= &ep93xx_dma_m2m_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
- 	},
- };
- 
--- 
-2.0.3
+> So I want to associate a msi_controller finding ops with generic pci_host_bridge,
+> then every pci device could find its msi_controller/irq_domain by a
+> common function
+> 
+> E.g
+> 
+> struct msi_controller *pci_msi_controller(struct pci_dev *pdev)
+> {
+> 	struct msi_controller *ctrl;
+> 	struct pci_host_bridge *host = find_pci_host_bridge(pdev->bus);
+> 	if (host && host->pci_get_msi_controller)
+> 		ctrl = pci_host_bridge->pci_get_msi_controller(struct pci_dev *pdev);
+> 
+> 	return ctrl;	
+> }
+
+You can do this for ARM if you want (and your series already accomplishes
+the same effect, though implemented differently).  But I don't think this
+is appropriate for the PCI core.
+
+For anybody who is on this thread but not the original, I reworked the
+series slightly, see [1].
+
+Bjorn
+
+[1] http://lkml.kernel.org/r/20141121172018.GA6578 at google.com
