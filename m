@@ -1,27 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Nov 2014 11:57:28 +0100
-Subject: [PATCH] ARM: shmobile: r8a7790 CCI configuration
-In-Reply-To: <1416542986-26846-1-git-send-email-horms+renesas@verge.net.au>
-References: <1416542986-26846-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <3843244.eEnPgu6iEl@wuerfel>
+From: johan@kernel.org (Johan Hovold)
+Date: Fri, 21 Nov 2014 11:59:51 +0100
+Subject: [PATCH v4 1/2] of: Rename "poweroff-source" property to
+ "system-power-controller"
+In-Reply-To: <1415885699-1465-2-git-send-email-user@radxa>
+References: <1415885699-1465-1-git-send-email-user@radxa>
+ <1415885699-1465-2-git-send-email-user@radxa>
+Message-ID: <20141121105951.GA20679@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 November 2014 13:09:46 Simon Horman wrote:
-> +       writel_relaxed(readl_relaxed(p + CCI_SLAVE4 + CCI_SNOOP) | 0x3,
-> +               p + CCI_SLAVE4 + CCI_SNOOP);    /* ca7 */
-> +       while (__raw_readl(p + CCI_STATUS));
-> +       /* wait for pending bit low */
+On Thu, Nov 13, 2014 at 01:34:58PM +0000, Auto Configured wrote:
+> From: Romain Perier <romain.perier@gmail.com>
 > 
+> It reverts commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
+> As discussed on the mailing list, it makes more sense to rename back to the
+> old established property name, without the vendor prefix. Problem being that
+> the word "source" usually tends to be used for inputs and that is out of control
+> of the OS. The poweroff capability is an output which simply turns the
+> system-power off. Also, this property might be used by drivers which power-off
+> the system and power back on subsequent RTC alarms. This seems to suggest to
+> remove "poweroff" from the property name and to choose "system-power-controller"
+> as the more generic name. This patchs adds the required renaming changes and
+> defines an helper function which is compatible with both properties, the old one
+> which was only used by tps65910 and the new one without vendor-prefix.
 
-Why are you using __raw_readl for the last access? I would make that
-readl_relaxed() like the other ones for consistency.
+Now this is a bit of a mess.
 
-Also, a better way to express waiting for the register read is to
-put the ';' on the next line, or add a cpu_relax() statement:
+There's a commit in the mfd tree, 25f833c1171d ("mfd: tps65910: Convert
+ti,system-power-controller DT property to poweroff-source"), which
+breaks all dts using tps65910 since these are never updated to the now
+retracted property name ("poweroff-source").
 
-	while (readl_relaxed(p + CCI_STATUS))
-		cpu_relax();
+This one should simply be reverted ASAP.
 
+> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+> ---
+>  .../bindings/power/{poweroff.txt => power-controller.txt}        | 0
+>  .../devicetree/bindings/regulator/act8865-regulator.txt          | 4 ++--
+>  drivers/mfd/tps65910.c                                           | 9 ++++++++-
+>  drivers/regulator/act8865-regulator.c                            | 2 +-
+>  include/linux/of.h                                               | 6 +++---
+>  5 files changed, 14 insertions(+), 7 deletions(-)
 
-	Arnd
+Romain, what tree is this patch against? The changes to the tps65910
+driver appears not to even be in the regulator tree, yet you asked Mark
+to merge this. And the MFD maintainer is not even on CC.
+
+Let's fix the breakage by reverting the offending commit in mfd. Then the
+new standard name can be introduced in regulator alone (e.g. this patch
+without the tps65910 bits) as nothing outside of regulator should be
+using the new power-off feature (or binding) for act8865. Then other
+drivers and dts can be converted to use the new property name (while
+retaining backwards compatibility) for 3.20.
+
+[ We should probably also consider adding an "of_device_is_" prefix to
+the helper name for consistency. ]
+
+Johan
