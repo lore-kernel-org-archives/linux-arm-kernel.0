@@ -1,16 +1,28 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 21 Nov 2014 12:30:58 +0100
-Subject: [GIT PULL] iommu/arm-smmu: updates for 3.19
-In-Reply-To: <20141119190006.GL15985@arm.com>
-References: <20141119190006.GL15985@arm.com>
-Message-ID: <20141121113058.GF3762@8bytes.org>
+From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
+Date: Fri, 21 Nov 2014 12:32:43 +0100
+Subject: [RFC PATCH] serial: mxs-auart: Take missing uart port locks
+In-Reply-To: <546DB194.40902@i2se.com>
+References: <1416322001-28491-1-git-send-email-j.uzycki@elproma.com.pl>
+ <546DB194.40902@i2se.com>
+Message-ID: <546F22DB.3060703@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 07:00:06PM +0000, Will Deacon wrote:
-> Please can you pull these ARM SMMU changes for 3.19? As well as the
-> usual driver updates (enabling support for the new NESTING attribute),
-> there are also the IOMMU_NOEXEC patches from Antonios, which includes
-> a fix for a resulting compiler warning in the AMD IOMMU driver.
 
-Pulled, thanks Will.
+Hi Stefan,
+
+W dniu 2014-11-20 o 10:17, Stefan Wahren pisze:
+>
+> Am 18.11.2014 um 15:46 schrieb Janusz Uzycki:
+>> The patch adds missing spin-locks and allows to change termios
+>> settings during tx.
+>> The patch also fixes direct call its enable_ms() according to
+>> commit d41510ce2f07
+>> ("serial: Take uart port lock for direct *_enable_ms()")
+> i think it's better to separate it in different patches.
+
+OK, I separated them. I will send the patch again in near future but now I'm
+waiting for more comments/tests.
+
+thanks,
+Janusz
