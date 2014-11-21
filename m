@@ -1,39 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 21 Nov 2014 08:18:22 -0800
-Subject: [PATCH 3/3] drivers: bus: Move omap gpmc code to live under
- drivers
-In-Reply-To: <3449576.YFhSXUYQOn@wuerfel>
-References: <1416522501-14999-1-git-send-email-tony@atomide.com>
- <1416522501-14999-4-git-send-email-tony@atomide.com>
- <546F0299.1070508@ti.com> <3449576.YFhSXUYQOn@wuerfel>
-Message-ID: <20141121161821.GS7046@atomide.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 21 Nov 2014 16:24:25 +0000
+Subject: [PATCH v2 0/2] arm+arm64: perf: Prevent wraparound during overflow
+In-Reply-To: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
+References: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1416587067-3220-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [141121 03:17]:
-> On Friday 21 November 2014 11:15:05 Roger Quadros wrote:
-> > On 11/21/2014 12:28 AM, Tony Lindgren wrote:
-> > > Just move to drivers as further clean-up can now happen there
-> > > finally.
-> 
-> Awesome!
-> 
-> > >  arch/arm/mach-omap2/Kconfig                           | 1 +
-> > >  arch/arm/mach-omap2/Makefile                          | 2 +-
-> > >  drivers/bus/Kconfig                                   | 3 +++
-> > >  drivers/bus/Makefile                                  | 3 ++-
-> > >  arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c | 0
-> > >  5 files changed, 7 insertions(+), 2 deletions(-)
-> > >  rename arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c (100%)
-> > 
-> > Should we move it to drivers/memory/ instead?
-> > TI_AEMIF driver lives there. This is similar to OMAP-GPMC for but for
-> > Davinci and Keystone platforms.
-> 
-> Agreed, using drivers/memory sounds better.
+This patchset fixes problems on arm and arm64 when the PMU counters wrap
+around and become larger than the value originally programmed into them.
 
-Good point, I forgot we have separate drivers/memory and drivers/bus.
+The problem was observed and fixed on arm but the perf code is,
+rather to my surprise, sufficiently similar on arm64 that the fix still
+makes sense there too.
 
-Regards,
+v2:
 
-Tony
+* Remove the redundant cast to s64 (Will Deacon).
+
+
+Daniel Thompson (2):
+  arm: perf: Prevent wraparound during overflow
+  arm64: perf: Prevent wraparound during overflow
+
+ arch/arm/kernel/perf_event.c   | 10 ++++++++--
+ arch/arm64/kernel/perf_event.c | 10 ++++++++--
+ 2 files changed, 16 insertions(+), 4 deletions(-)
+
+--
+1.9.3
