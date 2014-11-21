@@ -1,69 +1,81 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 21 Nov 2014 14:39:10 +0800
-Subject: [PATCH] mmc: dw_mmc: fix card read threshold for PIO mode
-Message-ID: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 21 Nov 2014 08:02:21 +0100
+Subject: [PATCH] i2c: at91: introduce probe deferring
+In-Reply-To: <20141119101403.GE3639@ldesroches-Latitude-E6320>
+References: <1415972879-26509-1-git-send-email-ludovic.desroches@atmel.com>
+ <20141119091647.GB1439@katana> <5216790.dAh2H6iKq8@wuerfel>
+ <20141119101403.GE3639@ldesroches-Latitude-E6320>
+Message-ID: <20141121070221.GE1480@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
-introduces a regression for use case where PIO mode is used, i.e.
-CONFIG_MMC_DW_IDMAC is not disabled.  It stops kernel from booting
-like below.
+On Wed, Nov 19, 2014 at 11:14:03AM +0100, Ludovic Desroches wrote:
+> On Wed, Nov 19, 2014 at 10:47:15AM +0100, Arnd Bergmann wrote:
+> > On Wednesday 19 November 2014 10:16:47 Wolfram Sang wrote:
+> > > On Fri, Nov 14, 2014 at 02:47:59PM +0100, Ludovic Desroches wrote:
+> > > > Return probe defer if requesting a dma channel without a dma controller probed.
+> > > > 
+> > > > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > > > ---
+> > > >  drivers/i2c/busses/i2c-at91.c | 22 ++++++++++++++++------
+> > > >  1 file changed, 16 insertions(+), 6 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> > > > index 77fb647..df3f4c4 100644
+> > > > --- a/drivers/i2c/busses/i2c-at91.c
+> > > > +++ b/drivers/i2c/busses/i2c-at91.c
+> > > > @@ -679,14 +679,21 @@ static int at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
+> > > >  	dma_cap_zero(mask);
+> > > >  	dma_cap_set(DMA_SLAVE, mask);
+> > > >  
+> > > > -	dma->chan_tx = dma_request_slave_channel_compat(mask, filter, pdata,
+> > > > -							dev->dev, "tx");
+> > > > -	if (!dma->chan_tx) {
+> > > > +	dma->chan_tx = dma_request_slave_channel_reason(dev->dev, "tx");
+> > > 
+> > > Will it cause regressions if you drop the compat-version of requesting
+> > > a channel?
+> > 
+> > I got curious about this, since the patch looks obviously wrong, but
+> > actually it's ok. However the entire DMA support for non-DT platforms
+> > can be dropped in this driver, see patch below
+> > 
+> > > > +	if (IS_ERR(dma->chan_tx)) {
+> > > > +		ret = PTR_ERR(dma->chan_tx);
+> > > > +		if (ret == -EPROBE_DEFER) {
+> > > > +			dev_warn(dev->dev, "no DMA channel available at the moment\n");
+> > > 
+> > > I'd say drop this warning. The core usually prints when deferred probing
+> > > takes place.
+> > 
+> > Definitely yes.
+> > 
+> > 	Arnd
+> > 8<---
+> > [PATCH] i2c: at91: remove legacy DMA supoprt
+> > 
+> > Since at91sam9g45 is now DT-only, all DMA capable users of this driver are
+> > using the DT case, and the legacy support can be removed. While at it, fix
+> > the deferred probe case.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-dw_mmc 9408000.dwmmc: fifo-depth property not found, using value of FIFOTH register as default
-dw_mmc 9408000.dwmmc: Using PIO mode.
-dw_mmc 9408000.dwmmc: Version ID is 210a
-dw_mmc 9408000.dwmmc: DW MMC controller at irq 72, 32 bit host data width, 32 deep fifo
-dw_mmc 9408000.dwmmc: 1 slots initialized
-...
-Waiting for root device /dev/mmcblk0p2...
-mmc_host mmc0: Bus speed (slot 0) = 52000000Hz (slot req 50000000Hz, actual 26000000HZ div = 1)
-mmc0: new high speed SDHC card at address b368
-mmcblk0: mmc0:b368 AF UD 3.84 GiB
+Thanks for this cleanup, yet I'd really appreciate a build test at
+least.
 
-Rather than clearing read threshold bits, the best thing that function
-dw_mci_ctrl_rd_thld() should do is leaving the bits untouched, in case
-that card read threshold setup is not needed.
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-The patch fixes the regression by changing dw_mci_ctrl_rd_thld() a bit
-to do nothing in case card read threshold bits setup is not needed.
+>From you, I had even hoped for a quick runtime test. Would that be
+possible for future patches?
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Fixes: f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
-Cc: <stable@vger.kernel.org> # 3.13+
----
- drivers/mmc/host/dw_mmc.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+Thanks,
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 69f0cc68d5b2..52c04ba69970 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -628,13 +628,13 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
- 
- 	if (host->timing != MMC_TIMING_MMC_HS200 &&
- 	    host->timing != MMC_TIMING_UHS_SDR104)
--		goto disable;
-+		return;
- 
- 	blksz_depth = blksz / (1 << host->data_shift);
- 	fifo_depth = host->fifo_depth;
- 
- 	if (blksz_depth > fifo_depth)
--		goto disable;
-+		return;
- 
- 	/*
- 	 * If (blksz_depth) >= (fifo_depth >> 1), should be 'thld_size <= blksz'
-@@ -644,9 +644,6 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
- 	thld_size = blksz;
- 	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(thld_size, 1));
- 	return;
--
--disable:
--	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(0, 0));
- }
- 
- static int dw_mci_submit_data_dma(struct dw_mci *host, struct mmc_data *data)
--- 
-1.9.1
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/3afced22/attachment.sig>
