@@ -1,51 +1,68 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Fri, 21 Nov 2014 23:16:18 +0900
-Subject: [GIT PULL 4/5] Samsung 2nd round of DT updates for v3.19
-Message-ID: <546F4932.2070702@kernel.org>
+Date: Fri, 21 Nov 2014 23:16:27 +0900
+Subject: [GIT PULL 5/5] Samsung exynos updates for v3.19
+Message-ID: <546F493B.50605@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit e540920cf21c2764047b8a6ddaeaa0683624e46e:
+The following changes since commit b5d841a2bfce65881d518e3c27437c530460f1c4:
 
-  ARM: dts: add CPU nodes for Exynos4 SoCs (2014-10-21 00:12:42 +0900)
+  Merge branch 'v3.19-next/non-critical-fixes' into
+v3.19-next/mach-exynos (2014-11-21 22:49:27 +0900)
 
 are available in the git repository at:
 
+
   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-dt-2
+tags/samsung-exynos-v3.19
 
-for you to fetch changes up to a427d15062ac46a00a22d2f0b9d05093c18ff2f1:
+for you to fetch changes up to c645a598f99768e6cc82129081458dfdd0c273b7:
 
-  ARM: dts: Add micro SD card SDHCI node for exynos4412-trats
-(2014-11-07 08:28:24 +0900)
-
-----------------------------------------------------------------
-Samsung 2nd DT updates for v3.19
-
-- add micro SD card SDHCI node for exynos4412-trats
-- add exynos4415 DT
-- add exynos3250-rinato DT and sleep mode support
-
-Note: based on previous tags/samsung-dt for v3.19
+  ARM: EXYNOS: Call regulator core suspend prepare and finish functions
+(2014-11-21 22:49:47 +0900)
 
 ----------------------------------------------------------------
-Chanwoo Choi (4):
-      ARM: dts: Add board dts file for exynos3250-rinato
-      ARM: dts: Add sleep mode pin configuration for exynos3250-rinato
-      ARM: dts: Add sleep mode of regulator for exynos3250-rinato
-      ARM: dts: Add dts files for exynos4415 SoC
+Samsung exynos updates in arch/arm/mach-exynos/ for v3.19
 
-Krzysztof Kozlowski (1):
-      ARM: dts: Add micro SD card SDHCI node for exynos4412-trats
+- add SOC_EXYNOS4415 config to be used in audio driver
+- add support platform driver for exynos PMU
+- move PMU specific definitions from common.h to exynos-pmu.h
+- for exynos5420, add support PMU and Suspend-to-RAM
+  use MCPM call backs and call regulator core suspend prepare
+  and finish functions
 
- arch/arm/boot/dts/Makefile                |   3 +-
- arch/arm/boot/dts/exynos3250-pinctrl.dtsi |  16 +
- arch/arm/boot/dts/exynos3250-rinato.dts   | 686
-++++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos4412-trats2.dts   |  10 +
- arch/arm/boot/dts/exynos4415-pinctrl.dtsi | 573 +++++++++++++++++++++++++
- arch/arm/boot/dts/exynos4415.dtsi         | 604 ++++++++++++++++++++++++++
- 6 files changed, 1891 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/exynos3250-rinato.dts
- create mode 100644 arch/arm/boot/dts/exynos4415-pinctrl.dtsi
- create mode 100644 arch/arm/boot/dts/exynos4415.dtsi
+NOTE:
+including v3.19-next/non-critical-fixes, v3.19-next/cleanup-samsung
+and v3.19-next/pm-samsung-2 branches
+
+----------------------------------------------------------------
+Abhilash Kesavan (2):
+      ARM: EXYNOS: Add PMU support for exynos5420
+      ARM: EXYNOS: Use MCPM call-backs to support S2R on exynos5420
+
+Chanwoo Choi (1):
+      ARM: EXYNOS: Add support for exynos4415 SoC
+
+Javier Martinez Canillas (1):
+      ARM: EXYNOS: Call regulator core suspend prepare and finish functions
+
+Pankaj Dubey (2):
+      ARM: EXYNOS: Add platform driver support for Exynos PMU
+      ARM: EXYNOS: Move PMU specific definitions from common.h
+
+Vikas Sajjan (1):
+      ARM: EXYNOS: Add Suspend-to-RAM support for exynos5420
+
+ arch/arm/mach-exynos/Kconfig       |   6 +
+ arch/arm/mach-exynos/common.h      |  17 --
+ arch/arm/mach-exynos/exynos-pmu.h  |  24 ++
+ arch/arm/mach-exynos/exynos.c      |   2 +
+ arch/arm/mach-exynos/mcpm-exynos.c |  32 ++-
+ arch/arm/mach-exynos/platsmp.c     |  12 +
+ arch/arm/mach-exynos/pm.c          |   1 +
+ arch/arm/mach-exynos/pmu.c         | 478
++++++++++++++++++++++++++++++++++----
+ arch/arm/mach-exynos/regs-pmu.h    | 227 ++++++++++++++++++
+ arch/arm/mach-exynos/suspend.c     | 220 ++++++++++++++++-
+ 10 files changed, 944 insertions(+), 75 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/exynos-pmu.h
