@@ -1,93 +1,45 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 21 Nov 2014 17:18:28 +0000
-Subject: [PATCH v3 2/3] ARM: kprobes: collects stack consumption for
- store instructions
-In-Reply-To: <1416551731-50777-3-git-send-email-wangnan0@huawei.com>
-References: <1416551731-50777-1-git-send-email-wangnan0@huawei.com>
- <1416551731-50777-3-git-send-email-wangnan0@huawei.com>
-Message-ID: <1416590308.1827.3.camel@linaro.org>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Fri, 21 Nov 2014 09:19:30 -0800
+Subject: [GIT PULL 2/3] ARM: keystone: config updates for 3.19
+In-Reply-To: <201411201314.49184.arnd@arndb.de>
+References: <1415843982-5739-1-git-send-email-ssantosh@kernel.org>
+ <1415843982-5739-2-git-send-email-ssantosh@kernel.org>
+ <201411201314.49184.arnd@arndb.de>
+Message-ID: <546F7422.5070707@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-11-21 at 14:35 +0800, Wang Nan wrote:
-> This patch uses the previously introduced checker functionality on
-> store instructions to record their stack consumption information to
-> arch_probes_insn.
-> 
-> Signed-off-by: Wang Nan <wangnan0@huawei.com>
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> Reviewed-by: Jon Medhurst <tixy@linaro.org>
-> 
-> ---
+On 11/20/2014 4:14 AM, Arnd Bergmann wrote:
+> On Thursday 13 November 2014, Santosh Shilimkar wrote:
+>> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+>>
+>>    Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc
+>>
+>> for you to fetch changes up to 97ef1af9b275924406556bfaec528a3e9e2980c7:
+>>
+>>    ARM: keystone: defconfig: add options to enable PCI controller (2014-11-04 10:29:39 -0800)
+>>
+>> ----------------------------------------------------------------
+>> Keystone config updates for 3.19
+>>
+>>          - Enable PCIE controller and related options
+>>          - Enable MDIO and ethernet phy options
+>>          - Enable DSP IRQCHIP option
+>
+> Pulled into next/defconfig.
+>
+Thanks Arnd !!
 
-During testing of these patches I found a couple of bugs in the 32-bit
-thumb instruction decoding...
+> Can you send an update so we also enable all of this in multi_v7_defconfig?
+>
+Yep. I am planning to sync up the multi_v7_defconfig since there are
+quite a few new options have been enabled after my last sync up.
 
-[...]
-> +static enum probes_insn __kprobes t32_check_stack(probes_opcode_t insn,
-> +		struct arch_probes_insn *asi,
-> +		const struct decode_header *h)
-> +{
-> +	/*
-> +	 * PROBES_T32_LDMSTM, PROBES_T32_LDRDSTRD and PROBES_T32_LDRSTR
-> +	 * may get here. Simply mark all normal insns as STACK_USE_NONE.
-> +	 */
-> +	static const union decode_item table[] = {
-> +
-> +		/*
-> +		 * First, filter out all ldr insns to make our life easier.
-> +		 * Following load insns may come here:
-> +		 * LDM, LDRD, LDR.
-> +		 * In T32 encoding, bit 20 is enough for distinguishing
-> +		 * load and store. All load insns have this bit set, when
-> +		 * all store insns have this bit clear.
-> +		 */
-> +		DECODE_CUSTOM	(0x00100000, 0x00100000, STACK_USE_NONE),
-> +
-> +		/*
-> +		 * Mark all 'STR{,B,H}, Rt, [Rn, Rm]' as STACK_USE_UNKNOWN
-> +		 * if Rn or Rm is SP. T32 doesn't encode STRD.
-> +		 */
-> +		/*                                    | Rn | Rt |         | Rm |*/
-> +		/* STR (register)	1111 1000 0100 xxxx xxxx 0000 00xx xxxx */
-> +		/* STRB (register)	1111 1000 0000 xxxx xxxx 0000 00xx xxxx */
-> +		/* STRH (register)	1111 1000 0010 xxxx xxxx 0000 00xx xxxx */
-> +		/* INVALID INSN		1111 1000 0110 xxxx xxxx 0000 00xx xxxx */
-> +		/* By Introducing INVALID INSN, bit 21 and 22 can be ignored. */
-> +		DECODE_OR	(0xff9f0fc0, 0xf80d0000),
-> +		DECODE_CUSTOM	(0xff900fcf, 0xf800000d, STACK_USE_UNKNOWN),
-> +
-> +
-> +		/*                                    | Rn | Rt | PUW|   imm8  |*/
-> +		/* STR (imm 8)		1111 1000 0100 xxxx xxxx 110x xxxx xxxx */
-> +		/* STRB (imm 8)		1111 1000 0000 xxxx xxxx 110x xxxx xxxx */
-> +		/* STRH (imm 8)		1111 1000 0010 xxxx xxxx 110x xxxx xxxx */
-> +		/* INVALID INSN		1111 1000 0110 xxxx xxxx 110x xxxx xxxx */
-> +		/* Only consider U == 0 and P == 1: strx rx, [sp, #-<imm>] */
-> +		DECODE_CUSTOM	(0xff9f0e00, 0xf80d0c00, STACK_USE_FIXED_0XX),
-> +
-> +		/* For STR{,B,H} (imm 12), offset is always positive, so ignore them. */
-> +
-> +		/*                              P U W | Rn | Rt | Rt2|   imm8  |*/
-> +		/* STRD (immediate)	1110 1001 01x0 1101 xxxx xxxx xxxx xxxx */
-> +		/* Only consider U == 0 and P == 1 */
-> +		DECODE_CUSTOM	(0xffdf0000, 0xe94d0000, STACK_USE_FIXED_0XX),
+Will do that after this merge window.
 
-For the encoding of LDRD, the 8 bit immediate value is the number of
-words not bytes and so needs multiplying by 4. This will need an
-additional enum and function to handle that.
-
-
-> +
-> +		/*                                    | Rn | */
-> +		/* STMDB		1110 1001 00x0 1101 xxxx xxxx xxxx xxxx */
-> +		DECODE_CUSTOM	(0xffdf0000, 0xe94d0000, STACK_USE_STMDX),
-
-The match value is incorrect (the same as used for LDRD), this should
-be 
-
-		DECODE_CUSTOM	(0xffdf0000, 0xe90d0000, STACK_USE_STMDX),
-
-
--- 
-Tixy
+Regards,
+Santosh
