@@ -1,169 +1,105 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 21 Nov 2014 10:13:10 +0100
-Subject: [PATCH 3/9] clk: sunxi: Add prcm mod0 clock driver
-In-Reply-To: <20141121084933.GL24143@lukather>
-References: <1416498928-1300-1-git-send-email-hdegoede@redhat.com>
- <1416498928-1300-4-git-send-email-hdegoede@redhat.com>
- <20141121084933.GL24143@lukather>
-Message-ID: <546F0226.2040700@redhat.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 21 Nov 2014 11:15:05 +0200
+Subject: [PATCH 3/3] drivers: bus: Move omap gpmc code to live under
+ drivers
+In-Reply-To: <1416522501-14999-4-git-send-email-tony@atomide.com>
+References: <1416522501-14999-1-git-send-email-tony@atomide.com>
+ <1416522501-14999-4-git-send-email-tony@atomide.com>
+Message-ID: <546F0299.1070508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Tony,
 
-On 11/21/2014 09:49 AM, Maxime Ripard wrote:
-> Hi,
+On 11/21/2014 12:28 AM, Tony Lindgren wrote:
+> Just move to drivers as further clean-up can now happen there
+> finally.
 > 
-> On Thu, Nov 20, 2014 at 04:55:22PM +0100, Hans de Goede wrote:
->> Add a driver for mod0 clocks found in the prcm. Currently there is only
->> one mod0 clocks in the prcm, the ir clock.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
->>  drivers/clk/sunxi/Makefile                        |  2 +-
->>  drivers/clk/sunxi/clk-sun6i-prcm-mod0.c           | 63 +++++++++++++++++++++++
->>  drivers/mfd/sun6i-prcm.c                          | 14 +++++
->>  4 files changed, 79 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/clk/sunxi/clk-sun6i-prcm-mod0.c
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> index ed116df..342c75a 100644
->> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> @@ -56,6 +56,7 @@ Required properties:
->>  	"allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
->>  	"allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
->>  	"allwinner,sun6i-a31-usb-clk" - for usb gates + resets on A31
->> +	"allwinner,sun6i-a31-ir-clk" - for the ir clock on A31
->>  
->>  Required properties for all clocks:
->>  - reg : shall be the control register address for the clock.
->> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
->> index 7ddc2b5..daf8b1c 100644
->> --- a/drivers/clk/sunxi/Makefile
->> +++ b/drivers/clk/sunxi/Makefile
->> @@ -10,4 +10,4 @@ obj-y += clk-sun8i-mbus.o
->>  
->>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
->>  	clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
->> -	clk-sun8i-apb0.o
->> +	clk-sun8i-apb0.o clk-sun6i-prcm-mod0.o
->> diff --git a/drivers/clk/sunxi/clk-sun6i-prcm-mod0.c b/drivers/clk/sunxi/clk-sun6i-prcm-mod0.c
->> new file mode 100644
->> index 0000000..e80f18e
->> --- /dev/null
->> +++ b/drivers/clk/sunxi/clk-sun6i-prcm-mod0.c
->> @@ -0,0 +1,63 @@
->> +/*
->> + * Allwinner A31 PRCM mod0 clock driver
->> + *
->> + * Copyright (C) 2014 Hans de Goede <hdegoede@redhat.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/clkdev.h>
->> +#include <linux/module.h>
->> +#include <linux/of_address.h>
->> +#include <linux/platform_device.h>
->> +
->> +#include "clk-factors.h"
->> +#include "clk-mod0.h"
->> +
->> +static const struct of_device_id sun6i_a31_prcm_mod0_clk_dt_ids[] = {
->> +	{ .compatible = "allwinner,sun6i-a31-ir-clk" },
->> +	{ /* sentinel */ }
->> +};
->> +
->> +static DEFINE_SPINLOCK(sun6i_prcm_mod0_lock);
->> +
->> +static int sun6i_a31_prcm_mod0_clk_probe(struct platform_device *pdev)
->> +{
->> +	struct device_node *np = pdev->dev.of_node;
->> +	struct resource *r;
->> +	void __iomem *reg;
->> +
->> +	if (!np)
->> +		return -ENODEV;
->> +
->> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	reg = devm_ioremap_resource(&pdev->dev, r);
->> +	if (IS_ERR(reg))
->> +		return PTR_ERR(reg);
->> +
->> +	sunxi_factors_register(np, &sun4i_a10_mod0_data,
->> +			       &sun6i_prcm_mod0_lock, reg);
->> +	return 0;
->> +}
->> +
->> +static struct platform_driver sun6i_a31_prcm_mod0_clk_driver = {
->> +	.driver = {
->> +		.name = "sun6i-a31-prcm-mod0-clk",
->> +		.of_match_table = sun6i_a31_prcm_mod0_clk_dt_ids,
->> +	},
->> +	.probe = sun6i_a31_prcm_mod0_clk_probe,
->> +};
->> +module_platform_driver(sun6i_a31_prcm_mod0_clk_driver);
->> +
->> +MODULE_DESCRIPTION("Allwinner A31 PRCM mod0 clock driver");
->> +MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
->> +MODULE_LICENSE("GPL");
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/Kconfig                           | 1 +
+>  arch/arm/mach-omap2/Makefile                          | 2 +-
+>  drivers/bus/Kconfig                                   | 3 +++
+>  drivers/bus/Makefile                                  | 3 ++-
+>  arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c | 0
+>  5 files changed, 7 insertions(+), 2 deletions(-)
+>  rename arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c (100%)
+
+Should we move it to drivers/memory/ instead?
+TI_AEMIF driver lives there. This is similar to OMAP-GPMC for but for
+Davinci and Keystone platforms.
+
 > 
-> I don't think this is the right approach, mainly for two reasons: the
-> compatible shouldn't change, and you're basically duplicating code
-> there.
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index f4d06ae..3021901 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -80,6 +80,7 @@ config ARCH_OMAP2PLUS
+>  	select GENERIC_IRQ_CHIP
+>  	select MACH_OMAP_GENERIC
+>  	select OMAP_DM_TIMER
+> +	select OMAP_GPMC
+>  	select PINCTRL
+>  	select SOC_BUS
+>  	select TI_PRIV_EDMA
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 3e824f8..bd85741 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -6,7 +6,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+>  	-I$(srctree)/arch/arm/plat-omap/include
+>  
+>  # Common support
+> -obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o gpmc.o timer.o pm.o \
+> +obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o timer.o pm.o \
+>  	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o omap_hwmod.o \
+>  	 omap_device.o sram.o drm.o
+>  
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index 603eb1b..09aacc8 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -27,6 +27,9 @@ config MVEBU_MBUS
+>  	  Driver needed for the MBus configuration on Marvell EBU SoCs
+>  	  (Kirkwood, Dove, Orion5x, MV78XX0 and Armada 370/XP).
+>  
+> +config OMAP_GPMC
+> +	bool
+> +
+
+Description? I had put this from a similar patch that I created earlier
+
++	 This driver is for the General Purpose Memory Controller (GPMC)
++	 present on Texas Instruments SoCs (e.g. OMAP2+). GPMC allows
++	 interfacing to a variety of asynchronous as well as synchronous
++	 memory drives like NOR, NAND, OneNAND, SRAM.
++
+
+
+cheers,
+-roger
+
+>  config OMAP_OCP2SCP
+>  	tristate "OMAP OCP2SCP DRIVER"
+>  	depends on ARCH_OMAP2PLUS
+> diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+> index 2973c18..96e77dd 100644
+> --- a/drivers/bus/Makefile
+> +++ b/drivers/bus/Makefile
+> @@ -5,7 +5,8 @@
+>  obj-$(CONFIG_BRCMSTB_GISB_ARB)	+= brcmstb_gisb.o
+>  obj-$(CONFIG_IMX_WEIM)	+= imx-weim.o
+>  obj-$(CONFIG_MVEBU_MBUS) += mvebu-mbus.o
+> -obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
+> +
+> +obj-$(CONFIG_OMAP_GPMC)		+= omap-gpmc.o
+>  
+>  # Interconnect bus driver for OMAP SoCs.
+>  obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/drivers/bus/omap-gpmc.c
+> similarity index 100%
+> rename from arch/arm/mach-omap2/gpmc.c
+> rename to drivers/bus/omap-gpmc.c
 > 
-> I understand that you need the new compatible in order to avoid a
-> double probing: one by CLK_OF_DECLARE, and one by the usual mechanism,
-> and that also implies the second reason.
-
-Not only for that, we need a new compatible also because the mfd framework
-needs a separate compatible per sub-node as that is how it finds nodes
-to attach to the platform devices, so we need a new compatible anyways,
-with your make the mod0 clock driver a platform driver solution we could
-use:
-
-	compatible = "allwinner,sun6i-a31-ir-clk", "allwinner,sun4i-a10-mod0-clk";
-
-To work around this, but there are other problems, your make mod0clk a
-platform driver solution cannot work because the clocks node in the dtsi
-is not simple-bus compatible, so no platform-devs will be instantiated for
-the clocks there.
-
-Besides the compatible (which as said we need a separate one anyways),
-your other worry is code duplication, but I've avoided that as much
-as possible already, the new drivers/clk/sunxi/clk-sun6i-prcm-mod0.c is
-just a very thin wrapper, waying in with all of 63 lines including
-16 lines GPL header.
-
-So sorry, I disagree I believe that this is the best solution.
-
-> However, as those are not critical clocks that need to be here early
-> at boot, you can also fix this by turning the mod0 driver into a
-> platform driver itself. The compatible will be kept, the driver will
-> be the same.
-> 
-> The only thing we need to pay attention to is how "client" drivers
-> react when they cannot grab their clock. They should return
-> -EPROBE_DEFER, but that remains to be checked.
-
--EPROBE_DEFER is yet another reason to not make mod0-clk a platform
-driver. Yes drivers should be able to handle this, but it is a pain,
-and the more we use it the more pain it is. Also it makes booting a lot
-slower as any driver using a mod0 clk now, will not complete its probe
-until all the other drivers are done probing and the late_initcall
-which starts the deferred-probe wq runs.
-
-Regards,
-
-Hans
