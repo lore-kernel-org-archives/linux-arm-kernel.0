@@ -1,98 +1,62 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Fri, 21 Nov 2014 20:45:44 +0100
-Subject: [PATCHv5 05/10] arm: mvebu: define and use common Armada 370 SPI
+Date: Fri, 21 Nov 2014 20:45:59 +0100
+Subject: [PATCHv5 07/10] arm: mvebu: define and use common Armada XP UART2/3
  pinctrl settings
 In-Reply-To: <cover.1416598536.git.arno@natisbad.org>
 References: <cover.1416598536.git.arno@natisbad.org>
-Message-ID: <a0eb580b7cc0f7cf39f1a69f0cc5747bded66300.1416598537.git.arno@natisbad.org>
+Message-ID: <31e3c46bf4794c08aae4e92099c840c792f19c3b.1416598537.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-This patch defines common Armada 370 pinctrl settings for spi0 and spi1
-interfaces:
+This patch defines common Armada XP pinctrl settings for uart2 and
+uart3 interfaces (uart0 and uart1 rx/tx do not rely on MPP):
 
- spi0: MPP33-36 as default, MPP32,63-65 as available alternate config
- spi1: MPP49-52 as default
-
-Currently, the Armada 370 DB .dts file has no explicit pinctrl info
-for the spi0 interface used to access the flash on the board. The
-patch fixes that by also adding explicit pinctrl info (MPP32,63-65)
-for this SPI interface.
-
-Note: this patch has the potential to break out-of-tree users w/o
-specific pinctrl settings for their spi interfaces if the default
-above does not match their config.
+ uart2: MPP42-43 as default
+ uart3: MPP44-45 as default
 
 Suggested-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- arch/arm/boot/dts/armada-370-db.dts |  2 ++
- arch/arm/boot/dts/armada-370.dtsi   | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 34 insertions(+)
+ arch/arm/boot/dts/armada-xp.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 29f1c8c0369f..f688ab4202e3 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -111,6 +111,8 @@
- 			};
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index b59a83cf2f26..7cefb9b6d27c 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -55,6 +55,8 @@
  
- 			spi0: spi at 10600 {
-+				pinctrl-0 = <&spi0_pins2>;
+ 			uart2: serial at 12200 {
+ 				compatible = "snps,dw-apb-uart";
++				pinctrl-0 = <&uart2_pins>;
 +				pinctrl-names = "default";
- 				status = "okay";
+ 				reg = <0x12200 0x100>;
+ 				reg-shift = <2>;
+ 				interrupts = <43>;
+@@ -65,6 +67,8 @@
  
- 				spi-flash at 0 {
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 90e1286d414f..f1284ae0cddd 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -197,6 +197,20 @@
- 				status = "disabled";
- 			};
- 
-+			/*
-+			 * Default SPI pinctrl setting, can be overwritten on
-+			 * board level if a different configuration is used.
-+			 */
-+			spi0: spi at 10600 {
-+				pinctrl-0 = <&spi0_pins1>;
+ 			uart3: serial at 12300 {
+ 				compatible = "snps,dw-apb-uart";
++				pinctrl-0 = <&uart3_pins>;
 +				pinctrl-names = "default";
-+			};
+ 				reg = <0x12300 0x100>;
+ 				reg-shift = <2>;
+ 				interrupts = <44>;
+@@ -235,4 +239,14 @@
+ 			       "mpp33", "mpp34", "mpp35";
+ 		marvell,function = "sd0";
+ 	};
 +
-+			spi1: spi at 10680 {
-+				pinctrl-0 = <&spi1_pins>;
-+				pinctrl-names = "default";
-+			};
-+
- 			usb at 50000 {
- 				clocks = <&coreclk 0>;
- 			};
-@@ -249,6 +263,24 @@
- &pinctrl {
- 	compatible = "marvell,mv88f6710-pinctrl";
- 
-+	spi0_pins1: spi0-pins1 {
-+		marvell,pins = "mpp33", "mpp34",
-+			       "mpp35", "mpp36";
-+		marvell,function = "spi0";
++	uart2_pins: uart2-pins {
++		marvell,pins = "mpp42", "mpp43";
++		marvell,function = "uart2";
 +	};
 +
-+	spi0_pins2: spi0_pins2 {
-+		marvell,pins = "mpp32", "mpp63",
-+			       "mpp64", "mpp65";
-+		marvell,function = "spi0";
++	uart3_pins: uart3-pins {
++		marvell,pins = "mpp44", "mpp45";
++		marvell,function = "uart3";
 +	};
-+
-+	spi1_pins: spi1-pins {
-+		marvell,pins = "mpp49", "mpp50",
-+			       "mpp51", "mpp52";
-+		marvell,function = "spi1";
-+	};
-+
- 	sdio_pins1: sdio-pins1 {
- 		marvell,pins = "mpp9",  "mpp11", "mpp12",
- 				"mpp13", "mpp14", "mpp15";
+ };
 -- 
 2.1.1
