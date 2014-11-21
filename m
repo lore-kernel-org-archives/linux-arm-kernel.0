@@ -1,68 +1,150 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Fri, 21 Nov 2014 23:16:27 +0900
-Subject: [GIT PULL 5/5] Samsung exynos updates for v3.19
-Message-ID: <546F493B.50605@kernel.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 21 Nov 2014 15:16:24 +0100
+Subject: [PATCH 2/3] i2c: slave-eeprom: add eeprom simulator driver
+In-Reply-To: <20141121071941.GK27002@pengutronix.de>
+References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+ <1416326695-13083-3-git-send-email-wsa@the-dreams.de>
+ <20141121071941.GK27002@pengutronix.de>
+Message-ID: <20141121141624.GT27002@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b5d841a2bfce65881d518e3c27437c530460f1c4:
+On Fri, Nov 21, 2014 at 08:19:41AM +0100, Uwe Kleine-K?nig wrote:
+> Hello Wolfram,
+> 
+> this mail is thematically more a reply to patch 1 and maybe just serves
+> my understanding of the slave support.
+> 
+> On Tue, Nov 18, 2014 at 05:04:54PM +0100, Wolfram Sang wrote:
+> > From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > 
+> > The first user of the i2c-slave interface is an eeprom simulator. It is
+> > a shared memory which can be accessed by the remote master via I2C and
+> > locally via sysfs.
+> > 
+> > Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > ---
+> > 
+> > Changes since RFC:
+> > * fix build error for modules
+> > * don't hardcode size
+> > * add boundary checks for sysfs access
+> > * use a spinlock
+> > * s/at24s/eeprom/g
+> > * add some docs
+> > * clean up exit paths
+> > * use size-variable instead of driver_data
+> > 
+> >  drivers/i2c/Kconfig            |  10 +++
+> >  drivers/i2c/Makefile           |   1 +
+> >  drivers/i2c/i2c-slave-eeprom.c | 170 +++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 181 insertions(+)
+> >  create mode 100644 drivers/i2c/i2c-slave-eeprom.c
+> > 
+> > diff --git a/drivers/i2c/Kconfig b/drivers/i2c/Kconfig
+> > index b51a402752c4..8c9e619f3026 100644
+> > --- a/drivers/i2c/Kconfig
+> > +++ b/drivers/i2c/Kconfig
+> > @@ -110,6 +110,16 @@ config I2C_STUB
+> >  
+> >  	  If you don't know what to do here, definitely say N.
+> >  
+> > +config I2C_SLAVE
+> > +	bool "I2C slave support"
+> > +
+> > +if I2C_SLAVE
+> > +
+> > +config I2C_SLAVE_EEPROM
+> > +	tristate "I2C eeprom slave driver"
+> > +
+> > +endif
+> > +
+> >  config I2C_DEBUG_CORE
+> >  	bool "I2C Core debugging messages"
+> >  	help
+> > diff --git a/drivers/i2c/Makefile b/drivers/i2c/Makefile
+> > index 1722f50f2473..45095b3d16a9 100644
+> > --- a/drivers/i2c/Makefile
+> > +++ b/drivers/i2c/Makefile
+> > @@ -9,6 +9,7 @@ obj-$(CONFIG_I2C_CHARDEV)	+= i2c-dev.o
+> >  obj-$(CONFIG_I2C_MUX)		+= i2c-mux.o
+> >  obj-y				+= algos/ busses/ muxes/
+> >  obj-$(CONFIG_I2C_STUB)		+= i2c-stub.o
+> > +obj-$(CONFIG_I2C_SLAVE_EEPROM)	+= i2c-slave-eeprom.o
+> >  
+> >  ccflags-$(CONFIG_I2C_DEBUG_CORE) := -DDEBUG
+> >  CFLAGS_i2c-core.o := -Wno-deprecated-declarations
+> > diff --git a/drivers/i2c/i2c-slave-eeprom.c b/drivers/i2c/i2c-slave-eeprom.c
+> > new file mode 100644
+> > index 000000000000..6631400b5f02
+> > --- /dev/null
+> > +++ b/drivers/i2c/i2c-slave-eeprom.c
+> > @@ -0,0 +1,170 @@
+> > +/*
+> > + * I2C slave mode EEPROM simulator
+> > + *
+> > + * Copyright (C) 2014 by Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
+> > + * Copyright (C) 2014 by Renesas Electronics Corporation
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify it
+> > + * under the terms of the GNU General Public License as published by the
+> > + * Free Software Foundation; version 2 of the License.
+> > + *
+> > + * Because most IP blocks can only detect one I2C slave address anyhow, this
+> > + * driver does not support simulating EEPROM types which take more than one
+> > + * address. It is prepared to simulate bigger EEPROMs with an internal 16 bit
+> > + * pointer, yet implementation is deferred until the need actually arises.
+> > + */
+> > +
+> > +#include <linux/i2c.h>
+> > +#include <linux/init.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/spinlock.h>
+> > +#include <linux/sysfs.h>
+> > +
+> > +struct eeprom_data {
+> > +	struct bin_attribute bin;
+> > +	bool first_write;
+> > +	spinlock_t buffer_lock;
+> > +	u8 buffer_idx;
+> > +	u8 buffer[];
+> > +};
+> > +
+> > +static int i2c_slave_eeprom_slave_cb(struct i2c_client *client,
+> > +				     enum i2c_slave_event event, u8 *val)
+> > +{
+> > +	struct eeprom_data *eeprom = i2c_get_clientdata(client);
+> > +
+> > +	switch (event) {
+> > +	case I2C_SLAVE_REQ_WRITE_END:
+> > +		if (eeprom->first_write) {
+> > +			eeprom->buffer_idx = *val;
+> > +			eeprom->first_write = false;
+> > +		} else {
+> > +			spin_lock(&eeprom->buffer_lock);
+> > +			eeprom->buffer[eeprom->buffer_idx++] = *val;
+> > +			spin_unlock(&eeprom->buffer_lock);
+> > +		}
+> > +		break;
+> > +
+> > +	case I2C_SLAVE_REQ_READ_START:
+> > +		spin_lock(&eeprom->buffer_lock);
+> > +		*val = eeprom->buffer[eeprom->buffer_idx];
+> > +		spin_unlock(&eeprom->buffer_lock);
+> > +		break;
+> > +
+> > +	case I2C_SLAVE_REQ_READ_END:
+> > +		eeprom->buffer_idx++;
+> You don't check here for buffer_idx >= ARRAY_SIZE(buffer)?
+> Ditto in the I2C_SLAVE_REQ_WRITE_END case.
+I just noticed that buffer_idx is an u8, so it overflows at 255+1. So
+the probe routine should error out if size is bigger than 256.
 
-  Merge branch 'v3.19-next/non-critical-fixes' into
-v3.19-next/mach-exynos (2014-11-21 22:49:27 +0900)
+Best regards
+Uwe
 
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-exynos-v3.19
-
-for you to fetch changes up to c645a598f99768e6cc82129081458dfdd0c273b7:
-
-  ARM: EXYNOS: Call regulator core suspend prepare and finish functions
-(2014-11-21 22:49:47 +0900)
-
-----------------------------------------------------------------
-Samsung exynos updates in arch/arm/mach-exynos/ for v3.19
-
-- add SOC_EXYNOS4415 config to be used in audio driver
-- add support platform driver for exynos PMU
-- move PMU specific definitions from common.h to exynos-pmu.h
-- for exynos5420, add support PMU and Suspend-to-RAM
-  use MCPM call backs and call regulator core suspend prepare
-  and finish functions
-
-NOTE:
-including v3.19-next/non-critical-fixes, v3.19-next/cleanup-samsung
-and v3.19-next/pm-samsung-2 branches
-
-----------------------------------------------------------------
-Abhilash Kesavan (2):
-      ARM: EXYNOS: Add PMU support for exynos5420
-      ARM: EXYNOS: Use MCPM call-backs to support S2R on exynos5420
-
-Chanwoo Choi (1):
-      ARM: EXYNOS: Add support for exynos4415 SoC
-
-Javier Martinez Canillas (1):
-      ARM: EXYNOS: Call regulator core suspend prepare and finish functions
-
-Pankaj Dubey (2):
-      ARM: EXYNOS: Add platform driver support for Exynos PMU
-      ARM: EXYNOS: Move PMU specific definitions from common.h
-
-Vikas Sajjan (1):
-      ARM: EXYNOS: Add Suspend-to-RAM support for exynos5420
-
- arch/arm/mach-exynos/Kconfig       |   6 +
- arch/arm/mach-exynos/common.h      |  17 --
- arch/arm/mach-exynos/exynos-pmu.h  |  24 ++
- arch/arm/mach-exynos/exynos.c      |   2 +
- arch/arm/mach-exynos/mcpm-exynos.c |  32 ++-
- arch/arm/mach-exynos/platsmp.c     |  12 +
- arch/arm/mach-exynos/pm.c          |   1 +
- arch/arm/mach-exynos/pmu.c         | 478
-+++++++++++++++++++++++++++++++++----
- arch/arm/mach-exynos/regs-pmu.h    | 227 ++++++++++++++++++
- arch/arm/mach-exynos/suspend.c     | 220 ++++++++++++++++-
- 10 files changed, 944 insertions(+), 75 deletions(-)
- create mode 100644 arch/arm/mach-exynos/exynos-pmu.h
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
