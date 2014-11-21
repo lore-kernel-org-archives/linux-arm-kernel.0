@@ -1,38 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Nov 2014 12:04:43 +0100
-Subject: [PATCH 2/2] arm: socfpga: Set share override bit of the l2 cache
- controller
-In-Reply-To: <1416546280-12068-2-git-send-email-dinguyen@opensource.altera.com>
-References: <1416546280-12068-1-git-send-email-dinguyen@opensource.altera.com>
- <1416546280-12068-2-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <2156186.zs80uXCLAf@wuerfel>
+Date: Fri, 21 Nov 2014 12:05:56 +0100
+Subject: linux-next: manual merge of the driver-core tree with the arm-soc
+ tree
+In-Reply-To: <20141121164131.0190e0ab@canb.auug.org.au>
+References: <20141121164131.0190e0ab@canb.auug.org.au>
+Message-ID: <5291580.tnIkyRiF2h@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 November 2014 23:04:40 dinguyen at opensource.altera.com wrote:
+On Friday 21 November 2014 16:41:31 Stephen Rothwell wrote:
+> --- a/drivers/bus/omap_l3_noc.c
+> +++ b/drivers/bus/omap_l3_noc.c
+> @@@ -358,8 -300,6 +358,7 @@@ static struct platform_driver omap_l3_d
+>         .probe          = omap_l3_probe,
+>         .driver         = {
+>                 .name           = "omap_l3_noc",
+> -               .owner          = THIS_MODULE,
+>  +              .pm             = L3_DEV_PM_OPS,
+>                 .of_match_table = of_match_ptr(l3_noc_match),
+>         },
+>   };
 > 
-> ---
->  arch/arm/mach-socfpga/socfpga.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-> index 13b1858..afc009f 100644
-> --- a/arch/arm/mach-socfpga/socfpga.c
-> +++ b/arch/arm/mach-socfpga/socfpga.c
-> @@ -105,7 +105,8 @@ static const char *altera_dt_match[] = {
->  
->  DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
->         .l2c_aux_val    = L310_AUX_CTRL_DATA_PREFETCH |
-> -                         L310_AUX_CTRL_INSTR_PREFETCH,
-> +                         L310_AUX_CTRL_INSTR_PREFETCH |
-> +                         L2C_AUX_CTRL_SHARED_OVERRIDE,
->         .l2c_aux_mask   = ~0,
->         .smp            = smp_ops(socfpga_smp_ops),
->         .map_io         = socfpga_map_io,
 
-Hi Dinh,
-
-Please do this by putting the appropriate proterties into the
-l2x0 DT node instead.
+Thanks, looks good.
 
 	Arnd
