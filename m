@@ -1,57 +1,23 @@
-From: Suravee.Suthikulpanit@amd.com (Suthikulpanit, Suravee)
-Date: Fri, 21 Nov 2014 16:25:55 +0000
-Subject: [PATCH V3] arm64: amd-seattle: Adding device tree for AMD
- Seattle platform
-In-Reply-To: <546F50BD.8070501@arm.com>
-Message-ID: <D09577B0.9B9B%suravee.suthikulpanit@amd.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 21 Nov 2014 17:27:28 +0100
+Subject: [GIT PULL] arm: pxa: pxa for v3.19
+In-Reply-To: <201411201018.11773.arnd@arndb.de> (Arnd Bergmann's message of
+ "Thu, 20 Nov 2014 10:18:11 +0100")
+References: <87bnoevq1b.fsf@free.fr> <4686660.cI7P5U9Kgy@wuerfel>
+ <874mtu7q50.fsf@free.fr> <201411201018.11773.arnd@arndb.de>
+Message-ID: <87zjbk5xjj.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Arnd Bergmann <arnd@arndb.de> writes:
 
-
-On 11/21/14, 21:48, "Marc Zyngier" <marc.zyngier@arm.com> wrote:
-
->On 21/11/14 14:40, Suthikulpanit, Suravee wrote:
->> 
->> 
->> On 11/21/14, 19:57, "Marc Zyngier" <marc.zyngier@arm.com> wrote:
->> 
->>>> +	gic: interrupt-controller at e1101000 {
->>>> +		compatible = "arm,gic-400", "arm,cortex-a15-gic";
->>>> +		interrupt-controller;
->>>> +		#interrupt-cells = <3>;
->>>> +		#address-cells = <2>;
->>>> +		#size-cells = <2>;
->>>> +		reg = <0x0 0xe1110000 0 0x1000>,
->>>> +		      <0x0 0xe112f000 0 0x2000>,
->>>> +		      <0x0 0xe1140000 0 0x10000>,
->>>> +		      <0x0 0xe1160000 0 0x10000>;
->>>> +		interrupts = <1 8 0xf04>;
->>>
->>> Are you sure about this one? ARM systems usually have this wired on
->>>PPI9
->>> (interrupt 25)...
->>>
->>> Thanks,
->>>
->>> 	M.
->> 
->> I think you might be right. GIC-400 TRM says that this is should be
->> 25, and used for virtual maintenance interrupts. How can I verify
->> this in Linux? KVM?
+> On Wednesday 19 November 2014, Robert Jarzmik wrote:
 >
->KVM is one way, but you'll never see the interrupt firing (we kill the
->interrupt while in HYP, before the kernel gets a chance to see it).
->
->If you effectively have GIC400 on this system, then I know for sure this
->is interrupt 25.
+> On a minor note, the text from the tag is what ends up in the merge commit
+> log, I've edited it slightly to remove the 'Hello Arnd, Kevin, Olof,'.
+Got it. I'll amend that in my next pull request.
 
-I?ll make the change. Thanks for clarification.
+Cheers.
 
-Suravee
->
->Thanks,
->
->	M.
->-- 
->Jazz is not dead. It just smells funny...
+-- 
+Robert
