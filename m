@@ -1,62 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Nov 2014 17:21:07 +0000
-Subject: [PATCH 3/3] arm/arm64: KVM: vgic: Fix error code in kvm_vgic_create()
-In-Reply-To: <1416590467-6044-1-git-send-email-marc.zyngier@arm.com>
-References: <1416590467-6044-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1416590467-6044-4-git-send-email-marc.zyngier@arm.com>
+From: hsweeten@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 21 Nov 2014 10:23:42 -0700
+Subject: [PATCH] arm: ep93xx: add dma_masks for the M2P and M2M DMA controllers
+Message-ID: <1416590622-7765-1-git-send-email-hsweeten@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+The dma_mask and coherent_dma_mask need to be set or DMA memory allocations
+will fail with error messages like this:
 
-If we detect another vCPU is running we just exit and return 0 as if we
-succesfully created the VGIC, but the VGIC wouldn't actual be created.
+  ep93xx-dma ep93xx-dma-m2p: coherent DMA mask is unset
 
-This shouldn't break in-kernel behavior because the kernel will not
-observe the failed the attempt to create the VGIC, but userspace could
-be rightfully confused.
+  ep93xx-dma ep93xx-dma-m2m: coherent DMA mask is unset
 
-Cc: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Add the missing information to the ep93xx-dma-m2p and ep93xx-dma-m2m
+devices.
+
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Reported-by: Jeremy Moles <cubicool@gmail.com>
+Tested-by: Alexander Sverdlin <subaparts@yandex.ru>
+Cc: Ryan Mallon <rmallon@gmail.com>
 ---
- virt/kvm/arm/vgic.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+This fixes a problem with the sound/soc/cirrus/edb93xx.c driver not loading
+and fixes the sound on these tested boards:
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 3aaca49..aacdb59 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1933,7 +1933,7 @@ out:
+  EDB9315A (like)  - tested by Jeremy Moles
+  EDB9302 (like)   - tested by Alexander Sverdlin
+  EDB9307A (stock) - tested by H Hartley Sweeten
+
+ arch/arm/mach-ep93xx/dma.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-ep93xx/dma.c b/arch/arm/mach-ep93xx/dma.c
+index d8bfd02..88a4c9b 100644
+--- a/arch/arm/mach-ep93xx/dma.c
++++ b/arch/arm/mach-ep93xx/dma.c
+@@ -66,11 +66,15 @@ static struct ep93xx_dma_platform_data ep93xx_dma_m2p_data = {
+ 	.num_channels		= ARRAY_SIZE(ep93xx_dma_m2p_channels),
+ };
  
- int kvm_vgic_create(struct kvm *kvm)
- {
--	int i, vcpu_lock_idx = -1, ret = 0;
-+	int i, vcpu_lock_idx = -1, ret;
- 	struct kvm_vcpu *vcpu;
++static u64 ep93xx_dma_m2p_mask = DMA_BIT_MASK(32);
++
+ static struct platform_device ep93xx_dma_m2p_device = {
+ 	.name			= "ep93xx-dma-m2p",
+ 	.id			= -1,
+ 	.dev			= {
+-		.platform_data	= &ep93xx_dma_m2p_data,
++		.platform_data		= &ep93xx_dma_m2p_data,
++		.dma_mask		= &ep93xx_dma_m2p_mask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
+ 	},
+ };
  
- 	mutex_lock(&kvm->lock);
-@@ -1948,6 +1948,7 @@ int kvm_vgic_create(struct kvm *kvm)
- 	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
- 	 * that no other VCPUs are run while we create the vgic.
- 	 */
-+	ret = -EBUSY;
- 	kvm_for_each_vcpu(i, vcpu, kvm) {
- 		if (!mutex_trylock(&vcpu->mutex))
- 			goto out_unlock;
-@@ -1955,11 +1956,10 @@ int kvm_vgic_create(struct kvm *kvm)
- 	}
+@@ -93,11 +97,15 @@ static struct ep93xx_dma_platform_data ep93xx_dma_m2m_data = {
+ 	.num_channels		= ARRAY_SIZE(ep93xx_dma_m2m_channels),
+ };
  
- 	kvm_for_each_vcpu(i, vcpu, kvm) {
--		if (vcpu->arch.has_run_once) {
--			ret = -EBUSY;
-+		if (vcpu->arch.has_run_once)
- 			goto out_unlock;
--		}
- 	}
-+	ret = 0;
++static u64 ep93xx_dma_m2m_mask = DMA_BIT_MASK(32);
++
+ static struct platform_device ep93xx_dma_m2m_device = {
+ 	.name			= "ep93xx-dma-m2m",
+ 	.id			= -1,
+ 	.dev			= {
+-		.platform_data	= &ep93xx_dma_m2m_data,
++		.platform_data		= &ep93xx_dma_m2m_data,
++		.dma_mask		= &ep93xx_dma_m2m_mask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
+ 	},
+ };
  
- 	spin_lock_init(&kvm->arch.vgic.lock);
- 	kvm->arch.vgic.in_kernel = true;
 -- 
-2.1.3
+2.0.3
