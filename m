@@ -1,133 +1,72 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 21 Nov 2014 16:31:31 +0000
-Subject: [PATCH v9 10/13] xen/arm/arm64: introduce
- xen_arch_need_swiotlb
-In-Reply-To: <1415792454-23161-10-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1411121130020.26318@kaball.uk.xensource.com>
- <1415792454-23161-10-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <alpine.DEB.2.02.1411211617090.2675@kaball.uk.xensource.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 21 Nov 2014 22:06:51 +0530
+Subject: [PATCH 4/9] clk: Add clock driver for mb86s7x
+In-Reply-To: <2147877.AXJukoovHQ@wuerfel>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <2396055.pBuh1YtUHT@wuerfel>
+ <CAJe_ZhcxHnoUeBUk3w=_xyk5oMAuena9RjDnyRvzLtV2=LpQxw@mail.gmail.com>
+ <2147877.AXJukoovHQ@wuerfel>
+Message-ID: <CAJe_Zhdg0tRx1SiACpCci3B2XaCxECGvkE7D=fne6vch4Bhk-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Nov 2014, Stefano Stabellini wrote:
-> Introduce an arch specific function to find out whether a particular dma
-> mapping operation needs to bounce on the swiotlb buffer.
-> 
-> On ARM and ARM64, if the page involved is a foreign page and the device
-> is not coherent, we need to bounce because at unmap time we cannot
-> execute any required cache maintenance operations (we don't know how to
-> find the pfn from the mfn).
-> 
-> No change of behaviour for x86.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Reviewed-by: David Vrabel <david.vrabel@citrix.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Ian Campbell <ian.campbell@citrix.com>
-> Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+On 21 November 2014 20:04, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 21 November 2014 18:52:47 Jassi Brar wrote:
+>> On 21 November 2014 18:33, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Thursday 20 November 2014 20:36:15 Vincent Yang wrote:
+>> >> +#define __DTS_MB86S70_CLK_H
+>> >> +
+>> >> +#define MB86S70_CRG11_ALW      0
+>> >> +#define MB86S70_CRG11_DDR3     1
+>> >> +#define MB86S70_CRG11_MAIN     2
+>> >> +#define MB86S70_CRG11_CA15     3
+>> >> +#define MB86S70_CRG11_HDMI     4
+>> >> +#define MB86S70_CRG11_DPHY     5
+>> >> +
+>> >> +#define MB86S70_CRG11_UNGPRT   8
+>> >>
+>> >
+>> > The clock driver doesn't seem to use those macros at all, how does the
+>> > driver know which clock you are referring to?
+>> >
+>> That was just an attempt to make a bit verbose the controller
+>> instance. Instead of specifying controller:=4, it reads better
+>> controller:=MB86S70_CRG11_HDMI in the clock DT nodes. The clock driver
+>> simply fills in controller+domain+port of the given clock into mailbox
+>> payload.
+>
+> See my other comments on the clock nodes. If these are hardware properties,
+> just leave them as numbers in the DT, the header files are only used to
+> establish an interface between the binding and the driver in case there
+> is no sensible way to express which one you have.
+>
+OK, I'll hardcode numbers there.
 
-I am thinking of asking a backport of this patch to 3.16+
+>> Only MB86S70_CRG11_UNGPRT is marked to mean one special (non-maskable)
+>> port on the controller, which the clock driver does make use of.
+>
+> Is this the actual port number that is known to be non-maskable?
+>
+Yes the clock comes out of the controller and is also the parent of
+other 8 independently maskable clock ports of the domain.
+ The firmware on remote master, lets say, don't wanna be bothered by
+the clock topology. Even for set-rate the onus is on Linux to request
+only appropriate rates at appropriate times so that other devices are
+not messed up.
 
-The catch is that is_device_dma_coherent is not available on older
-kernels, so I'll have to change the arm implementation of
-xen_arch_need_swiotlb to:
+> How about adding a property to the clock node to mark the logical
+> controller nonmaskable (in case you go for #clock-cells=2)?
+>
+> For the #clock-cells=3 case, you should probably just hardcode this
+> in the driver based on the compatible string.
+>
+The SoC has 6 controllers, each controller has 16domains and each
+domain has 8+1 ports. Instead of 864 clocks, we wanted to populate
+only clocks that some device actually use (some clocks seem unused in
+this patchset but we have users that will be upstreamed later).
+The remote f/w can't manage inter-dependencies and expect Linux to
+send only appropriate requests on port basis, so we populate ports as
+tiny independent clock controllers with single clock output.
 
-+bool xen_arch_need_swiotlb(struct device *dev,
-+			   unsigned long pfn,
-+			   unsigned long mfn)
-+{
-+	return pfn != mfn;
-+}
-+
-
-It is going to make things slower but it is going to fix the issue with
-cache flushing buffers for non-coherent devices.
-
-Konrad, are you OK with that?
-
-
-> Changes in v6:
-> - fix ts.
-> 
-> Changes in v5:
-> - fix indentation.
-> ---
->  arch/arm/include/asm/xen/page.h |    4 ++++
->  arch/arm/xen/mm.c               |    7 +++++++
->  arch/x86/include/asm/xen/page.h |    7 +++++++
->  drivers/xen/swiotlb-xen.c       |    5 ++++-
->  4 files changed, 22 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-> index 135c24a..68c739b 100644
-> --- a/arch/arm/include/asm/xen/page.h
-> +++ b/arch/arm/include/asm/xen/page.h
-> @@ -107,4 +107,8 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
->  #define xen_remap(cookie, size) ioremap_cache((cookie), (size))
->  #define xen_unmap(cookie) iounmap((cookie))
->  
-> +bool xen_arch_need_swiotlb(struct device *dev,
-> +			   unsigned long pfn,
-> +			   unsigned long mfn);
-> +
->  #endif /* _ASM_ARM_XEN_PAGE_H */
-> diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
-> index ab700e1..28ebf3e 100644
-> --- a/arch/arm/xen/mm.c
-> +++ b/arch/arm/xen/mm.c
-> @@ -100,6 +100,13 @@ void __xen_dma_sync_single_for_device(struct device *hwdev,
->  	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
->  }
->  
-> +bool xen_arch_need_swiotlb(struct device *dev,
-> +			   unsigned long pfn,
-> +			   unsigned long mfn)
-> +{
-> +	return ((pfn != mfn) && !is_device_dma_coherent(dev));
-> +}
-> +
->  int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
->  				 unsigned int address_bits,
->  				 dma_addr_t *dma_handle)
-> diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
-> index c949923..f58ef6c 100644
-> --- a/arch/x86/include/asm/xen/page.h
-> +++ b/arch/x86/include/asm/xen/page.h
-> @@ -236,4 +236,11 @@ void make_lowmem_page_readwrite(void *vaddr);
->  #define xen_remap(cookie, size) ioremap((cookie), (size));
->  #define xen_unmap(cookie) iounmap((cookie))
->  
-> +static inline bool xen_arch_need_swiotlb(struct device *dev,
-> +					 unsigned long pfn,
-> +					 unsigned long mfn)
-> +{
-> +	return false;
-> +}
-> +
->  #endif /* _ASM_X86_XEN_PAGE_H */
-> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-> index ad2c5eb..3725ee4 100644
-> --- a/drivers/xen/swiotlb-xen.c
-> +++ b/drivers/xen/swiotlb-xen.c
-> @@ -399,7 +399,9 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
->  	 * buffering it.
->  	 */
->  	if (dma_capable(dev, dev_addr, size) &&
-> -	    !range_straddles_page_boundary(phys, size) && !swiotlb_force) {
-> +	    !range_straddles_page_boundary(phys, size) &&
-> +		!xen_arch_need_swiotlb(dev, PFN_DOWN(phys), PFN_DOWN(dev_addr)) &&
-> +		!swiotlb_force) {
->  		/* we are not interested in the dma_addr returned by
->  		 * xen_dma_map_page, only in the potential cache flushes executed
->  		 * by the function. */
-> @@ -557,6 +559,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
->  		dma_addr_t dev_addr = xen_phys_to_bus(paddr);
->  
->  		if (swiotlb_force ||
-> +		    xen_arch_need_swiotlb(hwdev, PFN_DOWN(paddr), PFN_DOWN(dev_addr)) ||
->  		    !dma_capable(hwdev, dev_addr, sg->length) ||
->  		    range_straddles_page_boundary(paddr, sg->length)) {
->  			phys_addr_t map = swiotlb_tbl_map_single(hwdev,
-> -- 
-> 1.7.10.4
-> 
+Thanks
+Jassi
