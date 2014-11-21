@@ -1,118 +1,42 @@
-From: kernellwp@gmail.com (Wanpeng Li)
-Date: Fri, 21 Nov 2014 13:36:12 +0800
-Subject: [PATCH v6 4/6] sched: get CPU's usage statistic
-In-Reply-To: <CAKfTPtCzVRY4q184nqHSL7zFh1CvF009p8q8EPFCZxDFMx9TeQ@mail.gmail.com>
-References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
- <1411488485-10025-5-git-send-email-vincent.guittot@linaro.org>
- <54246791.9050101@arm.com>
- <CAKfTPtCzVRY4q184nqHSL7zFh1CvF009p8q8EPFCZxDFMx9TeQ@mail.gmail.com>
-Message-ID: <546ECF4C.2040304@gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 21 Nov 2014 16:41:31 +1100
+Subject: linux-next: manual merge of the driver-core tree with the arm-soc tree
+Message-ID: <20141121164131.0190e0ab@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
-On 9/26/14, 8:17 PM, Vincent Guittot wrote:
-> On 25 September 2014 21:05, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
->> On 23/09/14 17:08, Vincent Guittot wrote:
->>> Monitor the usage level of each group of each sched_domain level. The usage is
->>> the amount of cpu_capacity that is currently used on a CPU or group of CPUs.
->>> We use the utilization_load_avg to evaluate the usage level of each group.
->>>
->>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->>> ---
->>>   kernel/sched/fair.c | 13 +++++++++++++
->>>   1 file changed, 13 insertions(+)
->>>
->>> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
->>> index 2cf153d..4097e3f 100644
->>> --- a/kernel/sched/fair.c
->>> +++ b/kernel/sched/fair.c
->>> @@ -4523,6 +4523,17 @@ static int select_idle_sibling(struct task_struct *p, int target)
->>>        return target;
->>>   }
->>>
->>> +static int get_cpu_usage(int cpu)
->>> +{
->>> +     unsigned long usage = cpu_rq(cpu)->cfs.utilization_load_avg;
->>> +     unsigned long capacity = capacity_orig_of(cpu);
->>> +
->>> +     if (usage >= SCHED_LOAD_SCALE)
->>> +             return capacity + 1;
->> Why you are returning rq->cpu_capacity_orig + 1 (1025) in case
->> utilization_load_avg is greater or equal than 1024 and not usage or
->> (usage * capacity) >> SCHED_LOAD_SHIFT too?
-> The usage can't be higher than the full capacity of the CPU because
-> it's about the running time on this CPU. Nevertheless, usage can be
-> higher than SCHED_LOAD_SCALE because of unfortunate rounding in
-> avg_period and running_load_avg or just after migrating tasks until
-> the average stabilizes with the new running time.
->
->> In case the weight of a sched group is greater than 1, you might loose
->> the information that the whole sched group is over-utilized too.
-> that's exactly for sched_group with more than 1 CPU that we need to
-> cap the usage of a CPU to 100%. Otherwise, the group could be seen as
-> overloaded (CPU0 usage at 121% + CPU1 usage at 80%) whereas CPU1 has
-> 20% of available capacity
->
->> You add up the individual cpu usage values for a group by
->> sgs->group_usage += get_cpu_usage(i) in update_sg_lb_stats and later use
->> sgs->group_usage in group_is_overloaded to compare it against
->> sgs->group_capacity (taking imbalance_pct into consideration).
->>
->>> +
->>> +     return (usage * capacity) >> SCHED_LOAD_SHIFT;
->> Nit-pick: Since you're multiplying by a capacity value
->> (rq->cpu_capacity_orig) you should shift by SCHED_CAPACITY_SHIFT.
-> we want to compare the output of the function with some capacity
-> figures so i think that >> SCHED_LOAD_SHIFT is the right operation.
+Hi Greg,
 
-Could you explain more why '>> SCHED_LOAD_SHIFT' instead of '>> 
-SCHED_CAPACITY_SHIFT'?
+Today's linux-next merge of the driver-core tree got a conflict in
+drivers/bus/omap_l3_noc.c between commit 61b43d4e919e ("bus:
+omap_l3_noc: Add resume hook to restore context") from the arm-soc tree
+and commit 571b8c6adb1b ("bus: drop owner assignment from
+platform_drivers") from the driver-core tree.
 
-Regards,
-Wanpeng Li
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
->
->> Just to make sure: You do this scaling of usage by cpu_capacity_orig
->> here only to cater for the fact that cpu_capacity_orig might be uarch
->> scaled (by arch_scale_cpu_capacity, !SMT) in update_cpu_capacity while
-> I do this for any system with CPUs that have an original capacity that
-> is different from SCHED_CAPACITY_SCALE so it's for both uArch and SMT.
->
->> utilization_load_avg is currently not.
->> We don't even uArch scale on ARM TC2 big.LITTLE platform in mainline
->> today due to the missing clock-frequency property in the device tree.
-> sorry i don't catch your point
->
->> I think it's hard for people to grasp that your patch-set takes uArch
->> scaling of capacity into consideration but not frequency scaling of
->> capacity (via arch_scale_freq_capacity, not used at the moment).
->>
->>> +}
->>> +
->>>   /*
->>>    * select_task_rq_fair: Select target runqueue for the waking task in domains
->>>    * that have the 'sd_flag' flag set. In practice, this is SD_BALANCE_WAKE,
->>> @@ -5663,6 +5674,7 @@ struct sg_lb_stats {
->>>        unsigned long sum_weighted_load; /* Weighted load of group's tasks */
->>>        unsigned long load_per_task;
->>>        unsigned long group_capacity;
->>> +     unsigned long group_usage; /* Total usage of the group */
->>>        unsigned int sum_nr_running; /* Nr tasks running in the group */
->>>        unsigned int group_capacity_factor;
->>>        unsigned int idle_cpus;
->>> @@ -6037,6 +6049,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
->>>                        load = source_load(i, load_idx);
->>>
->>>                sgs->group_load += load;
->>> +             sgs->group_usage += get_cpu_usage(i);
->>>                sgs->sum_nr_running += rq->cfs.h_nr_running;
->>>
->>>                if (rq->nr_running > 1)
->>>
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/bus/omap_l3_noc.c
+index 17d86595951c,1ff1863415c5..000000000000
+--- a/drivers/bus/omap_l3_noc.c
++++ b/drivers/bus/omap_l3_noc.c
+@@@ -358,8 -300,6 +358,7 @@@ static struct platform_driver omap_l3_d
+  	.probe		= omap_l3_probe,
+  	.driver		= {
+  		.name		= "omap_l3_noc",
+- 		.owner		= THIS_MODULE,
+ +		.pm		= L3_DEV_PM_OPS,
+  		.of_match_table = of_match_ptr(l3_noc_match),
+  	},
+  };
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/ed4a5a9c/attachment.sig>
