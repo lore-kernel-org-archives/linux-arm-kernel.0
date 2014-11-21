@@ -1,111 +1,77 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Nov 2014 12:58:05 -0800
-Subject: [PATCH v4] clocksource: arch_timer: Fix code to use physical
- timers when requested
-In-Reply-To: <20141120165849.GF5447@e104818-lin.cambridge.arm.com>
-References: <1412753937-29343-1-git-send-email-sonnyrao@chromium.org>
- <20141120161013.GB5447@e104818-lin.cambridge.arm.com>
- <CAD=FV=UmTErYnnVMeXCZzHX_kNzM6LHkxXMwRvnxahNQpuqguw@mail.gmail.com>
- <20141120165849.GF5447@e104818-lin.cambridge.arm.com>
-Message-ID: <CAOesGMjkreCUv1YSRYmaJfz0+9qcOU2=9qvKEjLqmxMAajqoRw@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 21 Nov 2014 13:04:03 -0800
+Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc for
+ vqmmc
+In-Reply-To: <CAD=FV=Ve1TY4+8quq1=18A1YOFvOWuFGrBmHLwMCwdWBSqzxOw@mail.gmail.com>
+References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>
+ <1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>
+ <CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
+ <CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>
+ <5464152E.7040209@rock-chips.com>
+ <CAPDyKFrzGfDew0eLLEcA+_iS_mo-O2bFU58fjirfXXA8AJ9UYQ@mail.gmail.com>
+ <CAD=FV=Ve1TY4+8quq1=18A1YOFvOWuFGrBmHLwMCwdWBSqzxOw@mail.gmail.com>
+Message-ID: <CAD=FV=UJT5zBkcj2a03Y_RWxad9+Pu83G_z79Xzzn74V=eRqww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 8:58 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> Doug,
+Hi,
+
+On Fri, Nov 21, 2014 at 9:42 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Ulf,
 >
-> On Thu, Nov 20, 2014 at 04:24:09PM +0000, Doug Anderson wrote:
->> On Thu, Nov 20, 2014 at 8:10 AM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->> > On Wed, Oct 08, 2014 at 08:38:57AM +0100, Sonny Rao wrote:
->> >> This is a bug fix for using physical arch timers when
->> >> the arch_timer_use_virtual boolean is false.  It restores the
->> >> arch_counter_get_cntpct() function after removal in
->> >>
->> >> 0d651e4e "clocksource: arch_timer: use virtual counters"
->> >>
->> >> We need this on certain ARMv7 systems which are architected like this:
->> >>
->> >> * The firmware doesn't know and doesn't care about hypervisor mode and
->> >>   we don't want to add the complexity of hypervisor there.
->> >>
->> >> * The firmware isn't involved in SMP bringup or resume.
->> >>
->> >> * The ARCH timer come up with an uninitialized offset between the
->> >>   virtual and physical counters.  Each core gets a different random
->> >>   offset.
->> >>
->> >> * The device boots in "Secure SVC" mode.
->> >>
->> >> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
->> >>   CNTHCTL.PL1PCTEN (both default to 1 at reset)
->> >>
->> >> One example of such as system is RK3288 where it is much simpler to
->> >> use the physical counter since there's nobody managing the offset and
->> >> each time a core goes down and comes back up it will get reinitialized
->> >> to some other random value.
->> >>
->> >> Fixes: 0d651e4e65e9 ("clocksource: arch_timer: use virtual counters")
->> >> Cc: stable at vger.kernel.org
->> >> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
->> >> Acked-by: Olof Johansson <olof@lixom.net>
->> > [...]
->> >> --- a/arch/arm64/include/asm/arch_timer.h
->> >> +++ b/arch/arm64/include/asm/arch_timer.h
->> >> @@ -135,6 +135,16 @@ static inline void arch_timer_evtstrm_enable(int divider)
->> >>  #endif
->> >>  }
->> >>
->> >> +static inline u64 arch_counter_get_cntpct(void)
->> >> +{
->> >> +     u64 cval;
->> >> +
->> >> +     isb();
->> >> +     asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
->> >> +
->> >> +     return cval;
->> >> +}
->> >
->> > Sorry but I have to NAK the arm64 changes here. If the firmware is
->> > broken and does not initialise CNTVOFF properly, please fix it (at least
->> > on ARMv8 hardware). Also, on arm64 the vdso gettimeofday()
->> > implementation relies on using the virtual counter, so correct
->> > initialisation of CNTVOFF is essential.
+> On Fri, Nov 21, 2014 at 4:06 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> [...]
 >>
->> Sonny's patch here just makes it so that we honor the global variable.
->> My patch at <https://patchwork.kernel.org/patch/5051881/> is the one
->> that allows the global variable to be set.  You can see in that patch
->> that it's impossible for the variable to be set on ARM64.
+>>> Sure
+>>> If the first card is sd2.0 since startup, dw_mci_switch_voltage will not be called,
+>>
+>> That can't be right. mmc_power_up() should trigger
+>> dw_mci_switch_voltage() to be invoked.
 >
-> It just gives people ideas ;), thinking they only need to remove
-> IS_ENABLED(CONFIG_ARM) in your patch and get this working on arm64.
+> Hmmm, I think you're right.  Addy: can you double check if it's only
+> the 2nd card for you?  I was thinking that if a regulator is currently
+> 3.3V and you request 2.7 - 3.3V the regulator framework will treat
+> that as a noop.  ...but that definitely doesn't appear to be the case.
+> When I boot up the first time even with no SD card plugged in, I see
+> this at bootup:
 >
->> In previous discussions it was agreed that on ARM64 psci (or something
->> similar) was a requirement anyway and that gave us a way to get the
->> firmware involved again if we ever need to bring down a processor and
->> bring it back up in the kernel.  PSCI is not a requirement for ARM32.
->> There are systems that don't get the firmware involved when a
->> processor loses state (like if it is powered off and powered on again,
->> maybe for suspend/resume) and there was pushback against the kernel
->> itself transitioning into monitor mode to init CNTVOFF in these cases.
->> People agreed a month ago that these two patches were a reasonable
->> approach for ARM32.
+> [    3.042234] vccio_sd: 1800 <--> 3300 mV at 3300 mV
 >
-> I'm not complaining about about arm32 here, just the arm64
-> implementation. If you want to avoid #ifdefs in the arch timer driver,
-> what about, for arm64, defining something like:
+> ...showing that it started at 3.3V.  Then I see:
 >
-> static inline u64 arch_counter_get_cntpct(void)
-> {
->         /*
->          * AArch64 kernel and user space mandate the use of CNTVCT.
->          */
->         BUG();
->         return 0;
-> }
+> $ grep "" /sys/class/regulator/regulator.16/{name,microvolts}
+> /sys/class/regulator/regulator.16/name:vccio_sd
+> /sys/class/regulator/regulator.16/microvolts:2700000
+>
+> ...so it is certainly getting changed even with no card plugged in.
+>
+>
+> BTW: I don't actually have one of these failing cards--all of mine
+> work.  Addy, do you know the make and model of the card you have that
+> fails?
 
-Seems like a reasonable approach to me.
+Just as a bit of a followup, I did some more digging...
+
+1. It looks as if we now have a bit of "opposite" logic for vmmc vs.
+vqmmc.  In mmc_power_up() I see that it sets the initial voltage as:
+
+  host->ios.vdd = fls(ocr) - 1;
+
+That actually means that we're going to pick the maximum voltage for
+vmmc (of the supported voltages).  For vqmmc dw_mmc is using the
+regulator framework which (as described in my previous message) will
+pick the minimum.
+
+2. Several people I've talked to have expressed concerns that our
+minimum value is 2.7V.  Apparently that's really on the edge and makes
+EEs a little nervous.  The quick sample of cards sitting on my desk
+shows that they seem to claim 0x00ff8000, which doesn't include 2.7V.
 
 
--Olof
+Both of the above make me feel like dw_mmc should try its best to pick
+a value for vqmmc that is closest to the value of vmmc (and >= 2.7V).
+That also happens to make us work exactly like hosts where vmmc and
+vqmmc are supplied by the same supply.
+
+
+-Doug
