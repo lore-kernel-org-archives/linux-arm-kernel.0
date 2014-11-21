@@ -1,133 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 21 Nov 2014 12:15:03 +0100
-Subject: [PATCH 1/9] clk: sunxi: Give sunxi_factors_register a registers
- parameter
-In-Reply-To: <546EFB83.1020806@redhat.com>
-References: <1416498928-1300-1-git-send-email-hdegoede@redhat.com>
- <1416498928-1300-2-git-send-email-hdegoede@redhat.com>
- <20141121083555.GK24143@lukather> <546EFB83.1020806@redhat.com>
-Message-ID: <20141121111503.GC4752@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 12:26:45 +0100
+Subject: For the problem when using swiotlb
+In-Reply-To: <20141121110609.GC19783@e104818-lin.cambridge.arm.com>
+References: <5469E26B.2010905@huawei.com> <3918100.vD6471iH9k@wuerfel>
+ <20141121110609.GC19783@e104818-lin.cambridge.arm.com>
+Message-ID: <2310899.ejrSzj6BIr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 09:44:51AM +0100, Hans de Goede wrote:
-> Hi,
+On Friday 21 November 2014 11:06:10 Catalin Marinas wrote:
+> On Wed, Nov 19, 2014 at 03:56:42PM +0000, Arnd Bergmann wrote:
+> > On Wednesday 19 November 2014 15:46:35 Catalin Marinas wrote:
+> > > Going back to original topic, the dma_supported() function on arm64
+> > > calls swiotlb_dma_supported() which actually checks whether the swiotlb
+> > > bounce buffer is within the dma mask. This transparent bouncing (unlike
+> > > arm32 where it needs to be explicit) is not always optimal, though
+> > > required for 32-bit only devices on a 64-bit system. The problem is when
+> > > the driver is 64-bit capable but forgets to call
+> > > dma_set_mask_and_coherent() (that's not the only question I got about
+> > > running out of swiotlb buffers).
+> > 
+> > I think it would be nice to warn once per device that starts using the
+> > swiotlb. Really all 32-bit DMA masters should have a proper IOMMU
+> > attached.
 > 
-> On 11/21/2014 09:35 AM, Maxime Ripard wrote:
-> > Hi Hans,
-> > 
-> > On Thu, Nov 20, 2014 at 04:55:20PM +0100, Hans de Goede wrote:
-> >> Before this commit sunxi_factors_register uses of_iomap(node, 0) to get
-> >> the clk registers. The sun6i prcm has factor clocks, for which we want to
-> >> use sunxi_factors_register, but of_iomap(node, 0) does not work for the prcm
-> >> factor clocks, because the prcm uses the mfd framework, so the registers
-> >> are not part of the dt-node, instead they are added to the platform_device,
-> >> as platform_device resources.
-> >>
-> >> This commit makes getting the registers the callers duty, so that
-> >> sunxi_factors_register can be used with mfd instantiated platform device too.
-> >>
-> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> > 
-> > Funny, I was thinking of doing exactly the same thing for MMC clocks :)
-> > 
-> >> ---
-> >>  drivers/clk/sunxi/clk-factors.c    | 10 ++++------
-> >>  drivers/clk/sunxi/clk-factors.h    |  7 ++++---
-> >>  drivers/clk/sunxi/clk-mod0.c       |  6 ++++--
-> >>  drivers/clk/sunxi/clk-sun8i-mbus.c |  2 +-
-> >>  drivers/clk/sunxi/clk-sunxi.c      |  3 ++-
-> >>  5 files changed, 15 insertions(+), 13 deletions(-)
-> >>
-> >> diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-> >> index f83ba09..fc4f4b5 100644
-> >> --- a/drivers/clk/sunxi/clk-factors.c
-> >> +++ b/drivers/clk/sunxi/clk-factors.c
-> >> @@ -156,9 +156,10 @@ static const struct clk_ops clk_factors_ops = {
-> >>  	.set_rate = clk_factors_set_rate,
-> >>  };
-> >>  
-> >> -struct clk * __init sunxi_factors_register(struct device_node *node,
-> >> -					   const struct factors_data *data,
-> >> -					   spinlock_t *lock)
-> >> +struct clk *sunxi_factors_register(struct device_node *node,
-> >> +				   const struct factors_data *data,
-> >> +				   spinlock_t *lock,
-> >> +				   void __iomem *reg)
-> >>  {
-> >>  	struct clk *clk;
-> >>  	struct clk_factors *factors;
-> >> @@ -168,11 +169,8 @@ struct clk * __init sunxi_factors_register(struct device_node *node,
-> >>  	struct clk_hw *mux_hw = NULL;
-> >>  	const char *clk_name = node->name;
-> >>  	const char *parents[FACTORS_MAX_PARENTS];
-> >> -	void __iomem *reg;
-> >>  	int i = 0;
-> >>  
-> >> -	reg = of_iomap(node, 0);
-> >> -
-> >>  	/* if we have a mux, we will have >1 parents */
-> >>  	while (i < FACTORS_MAX_PARENTS &&
-> >>  	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
-> >> diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
-> >> index 9913840..1f5526d 100644
-> >> --- a/drivers/clk/sunxi/clk-factors.h
-> >> +++ b/drivers/clk/sunxi/clk-factors.h
-> >> @@ -37,8 +37,9 @@ struct clk_factors {
-> >>  	spinlock_t *lock;
-> >>  };
-> >>  
-> >> -struct clk * __init sunxi_factors_register(struct device_node *node,
-> >> -					   const struct factors_data *data,
-> >> -					   spinlock_t *lock);
-> >> +struct clk *sunxi_factors_register(struct device_node *node,
-> >> +				   const struct factors_data *data,
-> >> +				   spinlock_t *lock,
-> >> +				   void __iomem *reg);
-> > 
-> > Why are you dropping the __init there?
+> It would be nice to have a dev_warn_once().
 > 
-> Because it is going to be used from mfd instantiation, so from a platform_dev
-> probe function which is not __init.
+> I think it makes sense on arm64 to avoid swiotlb bounce buffers for
+> coherent allocations altogether. The __dma_alloc_coherent() function
+> already checks coherent_dma_mask and sets GFP_DMA accordingly. If we
+> have a device that cannot even cope with a 32-bit ZONE_DMA, we should
+> just not support DMA at all on it (without an IOMMU). The arm32
+> __dma_supported() has a similar check.
 
-Ah right. Mentionning it in the commit log would be nice.
+If we ever encounter this case, we may have to add a smaller ZONE_DMA
+and use ZONE_DMA32 for the normal dma allocations.
 
+> Swiotlb is still required for the streaming DMA since we get bouncing
+> for pages allocated outside the driver control (e.g. VFS layer which
+> doesn't care about GFP_DMA), hoping a 16M bounce buffer would be enough.
 > 
-> > 
-> >>  
-> >>  #endif
-> >> diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
-> >> index 4a56385..9530833 100644
-> >> --- a/drivers/clk/sunxi/clk-mod0.c
-> >> +++ b/drivers/clk/sunxi/clk-mod0.c
-> >> @@ -78,7 +78,8 @@ static DEFINE_SPINLOCK(sun4i_a10_mod0_lock);
-> >>  
-> >>  static void __init sun4i_a10_mod0_setup(struct device_node *node)
-> >>  {
-> >> -	sunxi_factors_register(node, &sun4i_a10_mod0_data, &sun4i_a10_mod0_lock);
-> >> +	sunxi_factors_register(node, &sun4i_a10_mod0_data,
-> >> +			       &sun4i_a10_mod0_lock, of_iomap(node, 0));
-> > 
-> > As of_iomap can fail, I'd rather check the returned value before
-> > calling sunxi_factors_register.
-> > 
-> > I know it wasn't done before, but it's the right thing to do, as it
-> > would lead to an instant crash if that fails.
-> 
-> Ok, I'll wait for you to review the rest of the series and then do a v2 of the
-> patch-set with this fixed (as time permits).
+> Ding seems to imply that CMA fixes the problem, which means that the
+> issue is indeed coherent allocations.
 
-Thanks!
-Maxime
+I wonder what's going on here, since swiotlb_alloc_coherent() actually
+tries a regular __get_free_pages(flags, order) first, and when ZONE_DMA
+is set here, it just work without using the pool.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/157b6862/attachment.sig>
+	Arnd
