@@ -1,53 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Nov 2014 13:27:56 +0100
-Subject: For the problem when using swiotlb
-In-Reply-To: <20141121113618.GD19783@e104818-lin.cambridge.arm.com>
-References: <5469E26B.2010905@huawei.com> <2310899.ejrSzj6BIr@wuerfel>
- <20141121113618.GD19783@e104818-lin.cambridge.arm.com>
-Message-ID: <3361735.Hm5JJchlei@wuerfel>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 21 Nov 2014 21:29:58 +0900
+Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc for
+ vqmmc
+In-Reply-To: <CAPDyKFrzGfDew0eLLEcA+_iS_mo-O2bFU58fjirfXXA8AJ9UYQ@mail.gmail.com>
+References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>
+ <1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>
+ <CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
+ <CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>
+ <5464152E.7040209@rock-chips.com>
+ <CAPDyKFrzGfDew0eLLEcA+_iS_mo-O2bFU58fjirfXXA8AJ9UYQ@mail.gmail.com>
+Message-ID: <546F3046.30209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 November 2014 11:36:18 Catalin Marinas wrote:
-> On Fri, Nov 21, 2014 at 11:26:45AM +0000, Arnd Bergmann wrote:
-> > On Friday 21 November 2014 11:06:10 Catalin Marinas wrote:
-> > > On Wed, Nov 19, 2014 at 03:56:42PM +0000, Arnd Bergmann wrote:
-> > > > On Wednesday 19 November 2014 15:46:35 Catalin Marinas wrote:
-> > > > > Going back to original topic, the dma_supported() function on arm64
-> > > > > calls swiotlb_dma_supported() which actually checks whether the swiotlb
-> > > > > bounce buffer is within the dma mask. This transparent bouncing (unlike
-> > > > > arm32 where it needs to be explicit) is not always optimal, though
-> > > > > required for 32-bit only devices on a 64-bit system. The problem is when
-> > > > > the driver is 64-bit capable but forgets to call
-> > > > > dma_set_mask_and_coherent() (that's not the only question I got about
-> > > > > running out of swiotlb buffers).
-> > > > 
-> > > > I think it would be nice to warn once per device that starts using the
-> > > > swiotlb. Really all 32-bit DMA masters should have a proper IOMMU
-> > > > attached.
-> > > 
-> > > It would be nice to have a dev_warn_once().
-> > > 
-> > > I think it makes sense on arm64 to avoid swiotlb bounce buffers for
-> > > coherent allocations altogether. The __dma_alloc_coherent() function
-> > > already checks coherent_dma_mask and sets GFP_DMA accordingly. If we
-> > > have a device that cannot even cope with a 32-bit ZONE_DMA, we should
-> > > just not support DMA at all on it (without an IOMMU). The arm32
-> > > __dma_supported() has a similar check.
-> > 
-> > If we ever encounter this case, we may have to add a smaller ZONE_DMA
-> > and use ZONE_DMA32 for the normal dma allocations.
+On 11/21/2014 09:06 PM, Ulf Hansson wrote:
+> [...]
 > 
-> Traditionally on x86 I think ZONE_DMA was for ISA and ZONE_DMA32 had to
-> cover the 32-bit physical address space. On arm64 we don't expect ISA,
-> so we only use ZONE_DMA (which is 4G, similar to IA-64, sparc). We had
-> ZONE_DMA32 originally but it broke swiotlb which assumes ZONE_DMA for
-> its bounce buffer.
+>> Sure
+>> If the first card is sd2.0 since startup, dw_mci_switch_voltage will not be called,
+> 
+> That can't be right. mmc_power_up() should trigger
+> dw_mci_switch_voltage() to be invoked.
 
-Right, I'm just saying that we might encounter some broken hardware
-that needs e.g. a 31-bit dma mask for one device, and we decide that
-this chip is important enough that we have to support it.
+Since dw_mci_switch_voltage() is invoked, voltage is changed from 1.8v to 2.7v (minimum value 2.7-3.6v), isn't?
 
-We can of course hope that this won't happen.
+> 
+>> and card can be identified. But if UHS card is pulgged in first, the vqmmc will be down to 1.8v.
+>>
+>> when sd2.0 card is pulgged in, mmc core will call dw_mci_switch_voltage to change vqmmc to 3.3v
+>> (MMC_SINGLE_VOTAGE_330). So vqmmc will be set 2.7v, if we request 2.7-3.6v.
+>>
+>> But vmmc is always 3.3v,becuase it be set min_volt = max_volt = 3.3v in dt tables.
 
-	Arnd
+vmmc is fixed voltage?
+
+>>
+>> So the result:
+>> vmmc = 3.3v and vqmmc = 2.7v, and sd2.0 card is failed to identify in my test.
+> 
+> Hmm. I wonder why it works the first time? Could it be that your
+> regulator have voltage ramp up time that isn't properly considered?
+
+if oscilloscope can use, can we know more exactly?
+
+Best Regards,
+Jaehoon Chung
+> 
+> Kind regards
+> Uffe
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
