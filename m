@@ -1,38 +1,83 @@
-From: johannes.pointner@gmail.com (Johannes Pointner)
-Date: Fri, 21 Nov 2014 19:17:18 +0100
-Subject: [PATCH v4 3/6] mfd: ti_am335x_tscadc: Remove unwanted
- reg_se_cache save
-In-Reply-To: <546F5C27.7040004@ti.com>
-References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
- <1415941651-28962-4-git-send-email-vigneshr@ti.com>
- <20141118143005.GF24004@x1> <20141118171240.GB3003@dtor-ws>
- <546DF2F0.9080405@ti.com>
- <20141120144028.GB5809@localhost.localdomain>
- <546F2BA4.4000808@ti.com>
- <20141121131036.GA18931@localhost.localdomain>
- <CAJKbBDDVTA+=priRu7sCD=vHrC8AUg4DM3kycuGrqbpF-5FGAA@mail.gmail.com>
- <546F5C27.7040004@ti.com>
-Message-ID: <CAJKbBDD=eYmU=LuViwLPNV=kYCziDQgKjL07bT7og4vsj0Ee7A@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 21 Nov 2014 13:19:21 -0500 (EST)
+Subject: [PATCH] ARM: allow modules outside of bl range
+In-Reply-To: <1416585326-3838-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1416585326-3838-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.11.1411211307410.11690@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before the patches were also jumps but I thought it is something
-Vignesh should know. Maybe there is some fix for that too?
-As Richard also noted, it would be nice if ti could let us know how to
-get the delay values right. By trial and error is IMHO not the best
-way.
-For the testing I used 3.16.7.
+On Fri, 21 Nov 2014, Ard Biesheuvel wrote:
+
+> Loading modules far away from the kernel in memory is problematic
+> because the 'bl' instruction only has limited reach, and modules are not
+> built with PLTs. Instead of using the -mlong-calls option (which affects
+> all compiler emitted bl instructions, but not the ones in assembler),
+> this patch allocates some additional space at module load time, and
+> populates it with PLT like entries when encountering relocations that
+> are out of reach.
+> 
+> This should work with all relocations against symbols exported by the
+> kernel, including those resulting from GCC generated function calls for
+> ftrace etc.
+> 
+> The module memory needs increase by about 5% on average, regardless of
+> whether any PLT entries were actually emitted. However, due to the page
+> based rounding that occurs when allocating module memory, the typical
+> memory footprint increase is negligible.
+> 
+> This is largely based on the ia64 implementation.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+[...]
+
+> +static u32 get_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+> +{
+> +	struct plt_entries *plt, *plt_end;
+> +	int c, *count;
+> +
+> +	if (in_init(mod, loc)) {
+> +		plt = (void *)mod->arch.init_plt->sh_addr;
+> +		plt_end = (void *)plt + mod->arch.init_plt->sh_size;
+> +		count = &mod->arch.init_plt_count;
+> +	} else {
+> +		plt = (void *)mod->arch.core_plt->sh_addr;
+> +		plt_end = (void *)plt + mod->arch.core_plt->sh_size;
+> +		count = &mod->arch.core_plt_count;
+> +	}
+> +
+> +	/* Look for an existing entry pointing to 'val' */
+> +	for (c = *count; plt < plt_end; c -= PLT_ENT_COUNT, plt++) {
+> +		int i;
+> +
+> +		if (!c) {
+> +			/* Populate a new set of entries */
+> +			*plt = (struct plt_entries){
+> +				{ [0 ... PLT_ENT_COUNT - 1] = PLT_ENT_LDR, },
+> +				{ val, }
+> +			};
+> +			++*count;
+> +			return (u32)plt->ldr;
+> +		}
+> +		for (i = 0; i < PLT_ENT_COUNT; i++) {
+> +			if (!plt->lit[i]) {
+> +				plt->lit[i] = val;
+> +				++*count;
+> +			}
+> +			if (plt->lit[i] == val)
+> +				return (u32)&plt->ldr[i];
+> +		}
+> +	}
+> +	BUG();
+> +	return 0;
+
+You shouldn't need a return here as this is unreachable code.
+
+Also I'd suggest creating a kconfig option allowing for this extra code 
+and the possible memory overhead to be configured out if someone really 
+doesn't want it.  Judicious usage of IS_ENABLED() in the code is 
+sufficient to have it all compiled out when not configured.
 
 
-2014-11-21 16:37 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
-> On Friday 21 November 2014 08:41 PM, Johannes Pointner wrote:
->> I tested version 4 of the patch series on a custom design and I saw
->> also the jumps as described by Richard. I played a little with the
->> sample delay and it got better but I couldn't completely remove the
->> jumps.
->
-> And before the patches were applied, there were no jumps at all? Which
-> kernel are you using for testing?
->
-> Thanks,
-> Sekhar
+Nicolas
