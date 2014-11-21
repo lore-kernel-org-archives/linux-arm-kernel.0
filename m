@@ -1,28 +1,33 @@
-From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Fri, 21 Nov 2014 12:32:43 +0100
-Subject: [RFC PATCH] serial: mxs-auart: Take missing uart port locks
-In-Reply-To: <546DB194.40902@i2se.com>
-References: <1416322001-28491-1-git-send-email-j.uzycki@elproma.com.pl>
- <546DB194.40902@i2se.com>
-Message-ID: <546F22DB.3060703@elproma.com.pl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 12:33:02 +0100
+Subject: [PATCH arm-soc/next/soc] bus: brcmstb_gisb: resolve section
+ mismatch
+In-Reply-To: <1416507286-14083-1-git-send-email-f.fainelli@gmail.com>
+References: <1416507286-14083-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <2543744.XWzdaCUefE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday 20 November 2014 10:14:46 Florian Fainelli wrote:
+> _code in
+> brcmstb_gisb_arb_probe() which now calls a function annotated with __init, so
+> this one must also be annotated with __init.
+> 
+> In order to avoid introducing another section mismatch, call
+> platform_driver_probe() manually and remove the .probe assignment from
+> brcmstb_gisb_arb_driver, this is very similar to what
+> drivers/pci/host/pci-imx6.c does since we basically have the same constraints
+> here.
+> 
+> Fixes: f1bee783dd37 ("bus: brcmstb_gisb: register the fault code hook")
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+> Arnd, Olof,
+> 
+> This patch resolves a section mismatch found in the arm-soc tree in the
+> next/soc branch which merged my two previous GISB patches.
+> 
 
-Hi Stefan,
+Applied to next/drivers, thanks a lot!
 
-W dniu 2014-11-20 o 10:17, Stefan Wahren pisze:
->
-> Am 18.11.2014 um 15:46 schrieb Janusz Uzycki:
->> The patch adds missing spin-locks and allows to change termios
->> settings during tx.
->> The patch also fixes direct call its enable_ms() according to
->> commit d41510ce2f07
->> ("serial: Take uart port lock for direct *_enable_ms()")
-> i think it's better to separate it in different patches.
-
-OK, I separated them. I will send the patch again in near future but now I'm
-waiting for more comments/tests.
-
-thanks,
-Janusz
+	Arnd
