@@ -1,34 +1,156 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Nov 2014 12:15:09 +0100
-Subject: [PATCH 3/3] drivers: bus: Move omap gpmc code to live under
- drivers
-In-Reply-To: <546F0299.1070508@ti.com>
-References: <1416522501-14999-1-git-send-email-tony@atomide.com>
- <1416522501-14999-4-git-send-email-tony@atomide.com>
- <546F0299.1070508@ti.com>
-Message-ID: <3449576.YFhSXUYQOn@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 21 Nov 2014 12:17:00 +0100
+Subject: [PATCH] mmc: sdhci-sirf: add sirf tuning function (cmd 19)
+In-Reply-To: <CAGsJ_4xzQJ-v7mM8_gD299EN=Hb9aShY5HcR6R8XyEwXB+Ofzg@mail.gmail.com>
+References: <1415720864-3936-1-git-send-email-21cnbao@gmail.com>
+ <CAPDyKFopdcLXVCuoifd7K8NaRY4UXDbDmNJvyFeUQZs62or9Ag@mail.gmail.com>
+ <CAGsJ_4yOCwt1YYd6UuAXjeO2iWhQB4XtouyriX1YsK7BnyNNLA@mail.gmail.com>
+ <CAPDyKFprzeMS7Di7XUYTeZx-WE2UT+zmNKZM_8kHYhOLSoTfLQ@mail.gmail.com>
+ <CAGsJ_4xzQJ-v7mM8_gD299EN=Hb9aShY5HcR6R8XyEwXB+Ofzg@mail.gmail.com>
+Message-ID: <CAPDyKFoE=7ZDcfwS7jofV5a+aXU5KjY6+5da0_maebTD+qtSJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 November 2014 11:15:05 Roger Quadros wrote:
-> On 11/21/2014 12:28 AM, Tony Lindgren wrote:
-> > Just move to drivers as further clean-up can now happen there
-> > finally.
+On 20 November 2014 10:25, Barry Song <21cnbao@gmail.com> wrote:
+>>>> These piece of code, which sends the tuning command don't belong in
+>>>> the host driver. Instead I would like this to be handled from a helper
+>>>> function from the mmc core.
+>>>>
+>>>> I realize that there already a few existing host drivers that
+>>>> implemented similar code and I don't like it. We should convert them
+>>>> to use a common helper function from the core instead.
+>>> yes. that is fine.
+>>>
+>>> our engineering is currently very busy and might have no time to
+>>> handle this for this moment.
+>>> do you think we can move your requirement to a new refine task of next
+>>> window after you pick up this in this window?
+>>
+>> No.
+>>
+>> You don't have to adopt the other host drivers at this point, only to
+>> fix yours accordingly. The rest we can take care of later.
+>>
+>
+> Uffe, how do you think about we provide a core-level function at first:
 
-Awesome!
+That's exactly what I had in mind. :-) Please resend as a separate patch.
 
-> >  arch/arm/mach-omap2/Kconfig                           | 1 +
-> >  arch/arm/mach-omap2/Makefile                          | 2 +-
-> >  drivers/bus/Kconfig                                   | 3 +++
-> >  drivers/bus/Makefile                                  | 3 ++-
-> >  arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c | 0
-> >  5 files changed, 7 insertions(+), 2 deletions(-)
-> >  rename arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c (100%)
-> 
-> Should we move it to drivers/memory/ instead?
-> TI_AEMIF driver lives there. This is similar to OMAP-GPMC for but for
-> Davinci and Keystone platforms.
+Kind regards
+Uffe
 
-Agreed, using drivers/memory sounds better.
-
-	Arnd
+>
+>
+> From 3f47dfd577ef3ff8c41dbb44d71d383a9e620ada Mon Sep 17 00:00:00 2001
+> From: Minda Chen <Minda.Chen@csr.com>
+> Date: Thu, 20 Nov 2014 10:42:41 +0800
+> Subject: [PATCH] mmc: ops: Add mmc_send_tuning function
+>
+> According to the SD card spec, Add a manual
+> tuning command function for SDR104/HS200
+> Sending command 19 or command 21 to read data
+> and compare with the tunning block.
+>
+> Change-Id: Ic481b78b1e247c88942788ff0d10746779f672c0
+> Signed-off-by: Minda Chen <Minda.Chen@csr.com>
+> ---
+>  drivers/mmc/core/mmc_ops.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mmc/core.h   |  1 +
+>  2 files changed, 66 insertions(+)
+>
+> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> index 7911e05..ecc7789 100644
+> --- a/drivers/mmc/core/mmc_ops.c
+> +++ b/drivers/mmc/core/mmc_ops.c
+> @@ -543,6 +543,71 @@ int mmc_switch(struct mmc_card *card, u8 set, u8
+> index, u8 value,
+>  }
+>  EXPORT_SYMBOL_GPL(mmc_switch);
+>
+> +int mmc_send_tuning(struct mmc_card *card, u32 opcode)
+> +{
+> + struct mmc_request mrq = {NULL};
+> + struct mmc_command cmd = {0};
+> + struct mmc_data data = {0};
+> + struct scatterlist sg;
+> + struct mmc_host *mmc = card->host;
+> + struct mmc_ios *ios = &mmc->ios;
+> + const u8 *tuning_block_pattern;
+> + int size, err = 0;
+> + u8 *data_buf;
+> +
+> + if (opcode == MMC_SEND_TUNING_BLOCK_HS200) {
+> + if (ios->bus_width == MMC_BUS_WIDTH_8) {
+> + tuning_block_pattern = tuning_blk_pattern_8bit;
+> + size = sizeof(tuning_blk_pattern_8bit);
+> + } else if (ios->bus_width == MMC_BUS_WIDTH_4) {
+> + tuning_block_pattern = tuning_blk_pattern_4bit;
+> + size = sizeof(tuning_blk_pattern_4bit);
+> + } else
+> + return -EINVAL;
+> + } else if (opcode == MMC_SEND_TUNING_BLOCK) {
+> + tuning_block_pattern = tuning_blk_pattern_4bit;
+> + size = sizeof(tuning_blk_pattern_4bit);
+> + } else
+> + return -EINVAL;
+> +
+> + data_buf = kmalloc(size, GFP_KERNEL);
+> + if (!data_buf)
+> + return -ENOMEM;
+> +
+> + mrq.cmd = &cmd;
+> + mrq.data = &data;
+> +
+> + cmd.opcode = opcode;
+> + cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
+> +
+> + data.blksz = size;
+> + data.blocks = 1;
+> + data.flags = MMC_DATA_READ;
+> +
+> + mmc_set_data_timeout(&data, card);
+> + sg_init_one(&sg, data_buf, size);
+> + memset(data_buf, 0, size);
+> + mmc_wait_for_req(mmc, &mrq);
+> +
+> + if (cmd.error) {
+> + err = cmd.error;
+> + goto out;
+> + }
+> +
+> + if (data.error) {
+> + err = data.error;
+> + goto out;
+> + }
+> +
+> + if (memcmp(data_buf, tuning_block_pattern, size))
+> + err = -EIO;
+> +
+> +out:
+> + kfree(data_buf);
+> + return err;
+> +}
+> +EXPORT_SYMBOL_GPL(mmc_send_tuning);
+> +
+>  static int
+>  mmc_send_bus_test(struct mmc_card *card, struct mmc_host *host, u8 opcode,
+>    u8 len)
+> diff --git a/include/linux/mmc/core.h b/include/linux/mmc/core.h
+> index f206e29..82a0119 100644
+> --- a/include/linux/mmc/core.h
+> +++ b/include/linux/mmc/core.h
+> @@ -154,6 +154,7 @@ extern void mmc_start_bkops(struct mmc_card *card,
+> bool from_exception);
+>  extern int __mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int, bool,
+>   bool, bool);
+>  extern int mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int);
+> +extern int mmc_send_tuning(struct mmc_card *, u32);
+>  extern int mmc_send_ext_csd(struct mmc_card *card, u8 *ext_csd);
+>
+>  #define MMC_ERASE_ARG 0x00000000
+> --
+> 1.9.1
+>
+>
+>> Br
+>> Uffe
