@@ -1,129 +1,62 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Nov 2014 17:21:05 +0000
-Subject: [PATCH 1/3] arm64: KVM: fix unmapping with 48-bit VAs
+Date: Fri, 21 Nov 2014 17:21:07 +0000
+Subject: [PATCH 3/3] arm/arm64: KVM: vgic: Fix error code in kvm_vgic_create()
 In-Reply-To: <1416590467-6044-1-git-send-email-marc.zyngier@arm.com>
 References: <1416590467-6044-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1416590467-6044-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1416590467-6044-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Currently if using a 48-bit VA, tearing down the hyp page tables (which
-can happen in the absence of a GICH or GICV resource) results in the
-rather nasty splat below, evidently becasue we access a table that
-doesn't actually exist.
+If we detect another vCPU is running we just exit and return 0 as if we
+succesfully created the VGIC, but the VGIC wouldn't actual be created.
 
-Commit 38f791a4e499792e (arm64: KVM: Implement 48 VA support for KVM EL2
-and Stage-2) added a pgd_none check to __create_hyp_mappings to account
-for the additional level of tables, but didn't add a corresponding check
-to unmap_range, and this seems to be the source of the problem.
+This shouldn't break in-kernel behavior because the kernel will not
+observe the failed the attempt to create the VGIC, but userspace could
+be rightfully confused.
 
-This patch adds the missing pgd_none check, ensuring we don't try to
-access tables that don't exist.
-
-Original splat below:
-
-kvm [1]: Using HYP init bounce page @83fe94a000
-kvm [1]: Cannot obtain GICH resource
-Unable to handle kernel paging request at virtual address ffff7f7fff000000
-pgd = ffff800000770000
-[ffff7f7fff000000] *pgd=0000000000000000
-Internal error: Oops: 96000004 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 1 PID: 1 Comm: swapper/0 Not tainted 3.18.0-rc2+ #89
-task: ffff8003eb500000 ti: ffff8003eb45c000 task.ti: ffff8003eb45c000
-PC is at unmap_range+0x120/0x580
-LR is at free_hyp_pgds+0xac/0xe4
-pc : [<ffff80000009b768>] lr : [<ffff80000009cad8>] pstate: 80000045
-sp : ffff8003eb45fbf0
-x29: ffff8003eb45fbf0 x28: ffff800000736000
-x27: ffff800000735000 x26: ffff7f7fff000000
-x25: 0000000040000000 x24: ffff8000006f5000
-x23: 0000000000000000 x22: 0000007fffffffff
-x21: 0000800000000000 x20: 0000008000000000
-x19: 0000000000000000 x18: ffff800000648000
-x17: ffff800000537228 x16: 0000000000000000
-x15: 000000000000001f x14: 0000000000000000
-x13: 0000000000000001 x12: 0000000000000020
-x11: 0000000000000062 x10: 0000000000000006
-x9 : 0000000000000000 x8 : 0000000000000063
-x7 : 0000000000000018 x6 : 00000003ff000000
-x5 : ffff800000744188 x4 : 0000000000000001
-x3 : 0000000040000000 x2 : ffff800000000000
-x1 : 0000007fffffffff x0 : 000000003fffffff
-
-Process swapper/0 (pid: 1, stack limit = 0xffff8003eb45c058)
-Stack: (0xffff8003eb45fbf0 to 0xffff8003eb460000)
-fbe0:                                     eb45fcb0 ffff8003 0009cad8 ffff8000
-fc00: 00000000 00000080 00736140 ffff8000 00736000 ffff8000 00000000 00007c80
-fc20: 00000000 00000080 006f5000 ffff8000 00000000 00000080 00743000 ffff8000
-fc40: 00735000 ffff8000 006d3030 ffff8000 006fe7b8 ffff8000 00000000 00000080
-fc60: ffffffff 0000007f fdac1000 ffff8003 fd94b000 ffff8003 fda47000 ffff8003
-fc80: 00502b40 ffff8000 ff000000 ffff7f7f fdec6000 00008003 fdac1630 ffff8003
-fca0: eb45fcb0 ffff8003 ffffffff 0000007f eb45fd00 ffff8003 0009b378 ffff8000
-fcc0: ffffffea 00000000 006fe000 ffff8000 00736728 ffff8000 00736120 ffff8000
-fce0: 00000040 00000000 00743000 ffff8000 006fe7b8 ffff8000 0050cd48 00000000
-fd00: eb45fd60 ffff8003 00096070 ffff8000 006f06e0 ffff8000 006f06e0 ffff8000
-fd20: fd948b40 ffff8003 0009a320 ffff8000 00000000 00000000 00000000 00000000
-fd40: 00000ae0 00000000 006aa25c ffff8000 eb45fd60 ffff8003 0017ca44 00000002
-fd60: eb45fdc0 ffff8003 0009a33c ffff8000 006f06e0 ffff8000 006f06e0 ffff8000
-fd80: fd948b40 ffff8003 0009a320 ffff8000 00000000 00000000 00735000 ffff8000
-fda0: 006d3090 ffff8000 006aa25c ffff8000 00735000 ffff8000 006d3030 ffff8000
-fdc0: eb45fdd0 ffff8003 000814c0 ffff8000 eb45fe50 ffff8003 006aaac4 ffff8000
-fde0: 006ddd90 ffff8000 00000006 00000000 006d3000 ffff8000 00000095 00000000
-fe00: 006a1e90 ffff8000 00735000 ffff8000 006d3000 ffff8000 006aa25c ffff8000
-fe20: 00735000 ffff8000 006d3030 ffff8000 eb45fe50 ffff8003 006fac68 ffff8000
-fe40: 00000006 00000006 fe293ee6 ffff8003 eb45feb0 ffff8003 004f8ee8 ffff8000
-fe60: 004f8ed4 ffff8000 00735000 ffff8000 00000000 00000000 00000000 00000000
-fe80: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-fea0: 00000000 00000000 00000000 00000000 00000000 00000000 000843d0 ffff8000
-fec0: 004f8ed4 ffff8000 00000000 00000000 00000000 00000000 00000000 00000000
-fee0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-ff00: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-ff20: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-ff40: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-ff60: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-ff80: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-ffa0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000005 00000000
-ffe0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-Call trace:
-[<ffff80000009b768>] unmap_range+0x120/0x580
-[<ffff80000009cad4>] free_hyp_pgds+0xa8/0xe4
-[<ffff80000009b374>] kvm_arch_init+0x268/0x44c
-[<ffff80000009606c>] kvm_init+0x24/0x260
-[<ffff80000009a338>] arm_init+0x18/0x24
-[<ffff8000000814bc>] do_one_initcall+0x88/0x1a0
-[<ffff8000006aaac0>] kernel_init_freeable+0x148/0x1e8
-[<ffff8000004f8ee4>] kernel_init+0x10/0xd4
-Code: 8b000263 92628479 d1000720 eb01001f (f9400340)
----[ end trace 3bc230562e926fa4 ]---
-Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Jungseok Lee <jungseoklee85@gmail.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/mmu.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 57a403a..79d3fbf 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -197,7 +197,8 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
- 	pgd = pgdp + pgd_index(addr);
- 	do {
- 		next = kvm_pgd_addr_end(addr, end);
--		unmap_puds(kvm, pgd, addr, next);
-+		if (!pgd_none(*pgd))
-+			unmap_puds(kvm, pgd, addr, next);
- 	} while (pgd++, addr = next, addr != end);
- }
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 3aaca49..aacdb59 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1933,7 +1933,7 @@ out:
  
+ int kvm_vgic_create(struct kvm *kvm)
+ {
+-	int i, vcpu_lock_idx = -1, ret = 0;
++	int i, vcpu_lock_idx = -1, ret;
+ 	struct kvm_vcpu *vcpu;
+ 
+ 	mutex_lock(&kvm->lock);
+@@ -1948,6 +1948,7 @@ int kvm_vgic_create(struct kvm *kvm)
+ 	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
+ 	 * that no other VCPUs are run while we create the vgic.
+ 	 */
++	ret = -EBUSY;
+ 	kvm_for_each_vcpu(i, vcpu, kvm) {
+ 		if (!mutex_trylock(&vcpu->mutex))
+ 			goto out_unlock;
+@@ -1955,11 +1956,10 @@ int kvm_vgic_create(struct kvm *kvm)
+ 	}
+ 
+ 	kvm_for_each_vcpu(i, vcpu, kvm) {
+-		if (vcpu->arch.has_run_once) {
+-			ret = -EBUSY;
++		if (vcpu->arch.has_run_once)
+ 			goto out_unlock;
+-		}
+ 	}
++	ret = 0;
+ 
+ 	spin_lock_init(&kvm->arch.vgic.lock);
+ 	kvm->arch.vgic.in_kernel = true;
 -- 
 2.1.3
