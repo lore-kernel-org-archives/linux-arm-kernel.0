@@ -1,52 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 21 Nov 2014 09:26:20 +0100
-Subject: [PATCH 5/9] rc: sunxi-cir: Add support for the larger fifo found
- on sun5i and sun6i
-In-Reply-To: <20141120142856.16b6562d@recife.lan>
-References: <1416498928-1300-1-git-send-email-hdegoede@redhat.com>
- <1416498928-1300-6-git-send-email-hdegoede@redhat.com>
- <20141120142856.16b6562d@recife.lan>
-Message-ID: <20141121082620.GJ24143@lukather>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 21 Nov 2014 16:37:55 +0800
+Subject: [GIT PULL] ARM: imx: SoC updates for 3.19
+In-Reply-To: <201411201730.04562.arnd@arndb.de>
+References: <20141119070306.GF27759@dragon> <201411201730.04562.arnd@arndb.de>
+Message-ID: <CAAQ0ZWS_=o6WrAmDbdfMDxdceMJkG0k5h_i3SqoXDOVLkcSS-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+Hi Arnd,
 
-On Thu, Nov 20, 2014 at 02:28:56PM -0200, Mauro Carvalho Chehab wrote:
-> Em Thu, 20 Nov 2014 16:55:24 +0100
-> Hans de Goede <hdegoede@redhat.com> escreveu:
-> 
-> > Add support for the larger fifo found on sun5i and sun6i, having a separate
-> > compatible for the ir found on sun5i & sun6i also is useful if we ever want
-> > to add ir transmit support, because the sun5i & sun6i version do not have
-> > transmit support.
-> > 
-> > Note this commits also adds checking for the end-of-packet interrupt flag
-> > (which was already enabled), as the fifo-data-available interrupt flag only
-> > gets set when the trigger-level is exceeded. So far we've been getting away
-> > with not doing this because of the low trigger-level, but this is something
-> > which we should have done since day one.
-> > 
-> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> 
-> As this is meant to be merged via some other tree:
-> 
-> Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+On Fri, Nov 21, 2014 at 12:30 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The changes all look good, but could you please send them again based on
+> v3.18-rc1? I'm trying to avoid back-merges from upstream into the next
+> branches.
 
-I think merging it through your tree would be just fine.
+The imx/cleanup branch can simply be based on v3.18-rc1.  But I choose
+to base imx/soc on a latest -rc to resolve a conflict between commit
+410ba8d4a0da (ARM: imx: clk-vf610: get input clocks from assigned
+clocks) and c72c553249bb (ARM: imx: clk-vf610: define PLL's clock
+tree).  The former one is currently sits on imx/soc branch, and the
+latter landed on -rc4 as a fix.  I think we can handle it in either
+way of the following two.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+1. Drop commit 410ba8d4a0da (ARM: imx: clk-vf610: get input clocks
+from assigned clocks) from imx/soc branch and send it as a fix for
+3.18 right way.
 
-Maxime
+2. Keep 410ba8d4a0da on imx/soc and leave the merge conflict to Linus.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/be1a19cd/attachment.sig>
+What's your preference?
+
+>
+> Also, note that we've started splitting out defconfig changes into
+> a separate topic branch. Since you are rebasing anyway, please send
+> the defconfig change as a separate patch or pull request and also
+> update multi_v7_defconfig in the same way.
+
+Okay, to keep it simple, I will squashed the defconfig updates into
+one patch and send it to you.
+
+Shawn
