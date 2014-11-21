@@ -1,64 +1,113 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Nov 2014 15:43:19 +0100
-Subject: [PATCH] ARM: common: edma: edma_pm_resume may be unused
-In-Reply-To: <20141121133350.GR27002@pengutronix.de>
-References: <4363971.teBOlf16kG@wuerfel>
- <20141121133350.GR27002@pengutronix.de>
-Message-ID: <2597671.WV5SL4xIWh@wuerfel>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 21 Nov 2014 22:46:41 +0800
+Subject: [PATCH] mmc: core: add core-level function for sending tuning commands
+Message-ID: <1416581201-9851-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 November 2014 14:33:50 Uwe Kleine-K?nig wrote:
-> Hello Arnd,
-> 
-> On Fri, Nov 21, 2014 at 11:52:51AM +0100, Arnd Bergmann wrote:
-> > The recently introduced resume hook in the edma driver
-> > is not referenced when CONFIG_PM_SLEEP is not set, which
-> > results in a compile warning in keystone_defconfig builds.
-> > 
-> > This adds an appropriate #ifdef.
-> > 
-> > Cc: Nishanth Menon <nm@ti.com>
-> > Cc: Daniel Mack <zonque@gmail.com>
-> > Cc: Joel Fernandes <joelf@ti.com>
-> > Cc: Sekhar Nori <nsekhar@ti.com>
-> > Fixes: a2b1175131: ("ARM: common: edma: add suspend resume hook")
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> > I'm applying this as the obvious fixup on top of the next/drivers
-> > branch.
-> > 
-> > diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> > index 24a2857f2285..5662a872689b 100644
-> > --- a/arch/arm/common/edma.c
-> > +++ b/arch/arm/common/edma.c
-> > @@ -1810,6 +1810,7 @@ static int edma_probe(struct platform_device *pdev)
-> >       return 0;
-> >  }
-> >  
-> > +#ifdef CONFIG_PM_SLEEP
-> >  static int edma_pm_resume(struct device *dev)
-> What about
-> 
-> -static int edma_pm_resume(struct device *dev)
-> +static int __maybe_unused edma_pm_resume(struct device *dev)
-> 
+From: Minda Chen <Minda.Chen@csr.com>
 
-That would be a little nicer, but I wouldn't go back and change my commit
-now for it, since I've already committed it.
+According to the SD card spec, Add a manual tuning command function
+for SDR104/HS200 by sending command 19 or command 21 to read data
+and compare with the tuning block pattern.
 
-What I'd really want to see is a change to the macro to something like
+this patch will help to decrease some platform private codes in
+SDHCI platform_execute_tuning() callbacks.
 
-#define SET_LATE_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
-        .suspend_late  = IS_ENABLED(CONFIG_PM_SLEEP) ? suspend_fn : NULL, \
-        .resume_early  = IS_ENABLED(CONFIG_PM_SLEEP) ? resume_fn  : NULL, \
-        .freeze_late   = IS_ENABLED(CONFIG_PM_SLEEP) ? suspend_fn : NULL, \
-        .thaw_early    = IS_ENABLED(CONFIG_PM_SLEEP) ? resume_fn  : NULL, \
-        .poweroff_late = IS_ENABLED(CONFIG_PM_SLEEP) ? suspend_fn : NULL, \
-        .restore_early = IS_ENABLED(CONFIG_PM_SLEEP) ? resume_fn  : NULL,
+Signed-off-by: Minda Chen <Minda.Chen@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/mmc/core/mmc_ops.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mmc/core.h   |  1 +
+ 2 files changed, 66 insertions(+)
 
-so we can stop doing this for every other driver. Unfortunately we haven't
-been able to come up with a way to define the macro that works unless you
-remove all the existing #ifdef for the suspend functions first.
-
-	Arnd
+diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+index 7911e05..ecc7789 100644
+--- a/drivers/mmc/core/mmc_ops.c
++++ b/drivers/mmc/core/mmc_ops.c
+@@ -543,6 +543,71 @@ int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+ }
+ EXPORT_SYMBOL_GPL(mmc_switch);
+ 
++int mmc_send_tuning(struct mmc_card *card, u32 opcode)
++{
++	struct mmc_request mrq = {NULL};
++	struct mmc_command cmd = {0};
++	struct mmc_data data = {0};
++	struct scatterlist sg;
++	struct mmc_host *mmc = card->host;
++	struct mmc_ios *ios = &mmc->ios;
++	const u8 *tuning_block_pattern;
++	int size, err = 0;
++	u8 *data_buf;
++
++	if (opcode == MMC_SEND_TUNING_BLOCK_HS200) {
++		if (ios->bus_width == MMC_BUS_WIDTH_8) {
++			tuning_block_pattern = tuning_blk_pattern_8bit;
++			size = sizeof(tuning_blk_pattern_8bit);
++		} else if (ios->bus_width == MMC_BUS_WIDTH_4) {
++			tuning_block_pattern = tuning_blk_pattern_4bit;
++			size = sizeof(tuning_blk_pattern_4bit);
++		} else
++			return -EINVAL;
++	} else if (opcode == MMC_SEND_TUNING_BLOCK) {
++		tuning_block_pattern = tuning_blk_pattern_4bit;
++		size = sizeof(tuning_blk_pattern_4bit);
++	} else
++		return -EINVAL;
++
++	data_buf = kmalloc(size, GFP_KERNEL);
++	if (!data_buf)
++		return -ENOMEM;
++
++	mrq.cmd = &cmd;
++	mrq.data = &data;
++
++	cmd.opcode = opcode;
++	cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
++
++	data.blksz = size;
++	data.blocks = 1;
++	data.flags = MMC_DATA_READ;
++
++	mmc_set_data_timeout(&data, card);
++	sg_init_one(&sg, data_buf, size);
++	memset(data_buf, 0, size);
++	mmc_wait_for_req(mmc, &mrq);
++
++	if (cmd.error) {
++		err = cmd.error;
++		goto out;
++	}
++
++	if (data.error) {
++		err = data.error;
++		goto out;
++	}
++
++	if (memcmp(data_buf, tuning_block_pattern, size))
++		err = -EIO;
++
++out:
++	kfree(data_buf);
++	return err;
++}
++EXPORT_SYMBOL_GPL(mmc_send_tuning);
++
+ static int
+ mmc_send_bus_test(struct mmc_card *card, struct mmc_host *host, u8 opcode,
+ 		  u8 len)
+diff --git a/include/linux/mmc/core.h b/include/linux/mmc/core.h
+index f206e29..82a0119 100644
+--- a/include/linux/mmc/core.h
++++ b/include/linux/mmc/core.h
+@@ -154,6 +154,7 @@ extern void mmc_start_bkops(struct mmc_card *card, bool from_exception);
+ extern int __mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int, bool,
+ 			bool, bool);
+ extern int mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int);
++extern int mmc_send_tuning(struct mmc_card *, u32);
+ extern int mmc_send_ext_csd(struct mmc_card *card, u8 *ext_csd);
+ 
+ #define MMC_ERASE_ARG		0x00000000
+-- 
+2.1.1
