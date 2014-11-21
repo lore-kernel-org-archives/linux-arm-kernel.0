@@ -1,22 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Nov 2014 13:04:55 +0100
-Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC Updates for v3.19
-In-Reply-To: <cover.1416531087.git.horms+renesas@verge.net.au>
-References: <cover.1416531087.git.horms+renesas@verge.net.au>
-Message-ID: <2054582.inXZlPphl8@wuerfel>
+From: wangyijing0307@gmail.com (Yijing Wang)
+Date: Fri, 21 Nov 2014 20:04:53 +0800
+Subject: Removal of bus->msi assignment breaks MSI with stacked domains
+In-Reply-To: <546F140B.1050607@arm.com>
+References: <546E1771.4030201@arm.com> <546E93DC.8010902@huawei.com>
+ <alpine.DEB.2.11.1411210233250.6439@nanos> <546F140B.1050607@arm.com>
+Message-ID: <546F2A65.30002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 November 2014 09:55:16 Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these fourth round of Renesas ARM based SoC updates for v3.19.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-soc3-for-v3.19,
-> which I have already sent a pull-request for.
-> 
 
-Pulled into next/soc, thanks!
+? 2014/11/21 18:29, Marc Zyngier ??:
+> Hi Thomas,
+>
+> On 21/11/14 01:46, Thomas Gleixner wrote:
+>> On Fri, 21 Nov 2014, Yijing Wang wrote:
+>>> On 2014/11/21 0:31, Marc Zyngier wrote:
+>>>> Bjorn, Yijing,
+>>>>
+>>>> I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
+>>>> bus->msi assignment) completely breaks MSI on arm64 when using the new
+>>>> MSI stacked domain:
+>>> Sorry, this is my first part to refactor MSI related code, now how
+>>> to get pci msi_controller depends arch
+>>> functions(pcibios_msi_controller() or arch_setup_msi_irq()), we are
+>>> working on generic pci_host_bridge, after that, we could eventually
+>>> eliminate MSI arch functions and find pci dev 's msi controller by
+>>> pci_host_bridge->get_msi_controller().
+>> The main question is why you think that pci_host_bridge is the proper
+>> place to store that information.
+>>
+>> On x86 we have DMAR units associated to a single device. Each DMAR
+>> unit is a seperate MSI irq domain.
+>>
+>> Can you guarantee that the pci_host_bridge is the right point to
+>> provide the association of the device to the irq domain?
+>>
+>> So the real question is:
+>>
+>>     What is the association level requirement to properly identify the
+>>     irqdomain for a specific device on any given architecture with and
+>>     without IOMMU, interrupt redirection etc.
+>>
+>> To be honest: I don't know.
+>>
+>> My gut feeling tells me that it's at the device level, but I really
+>> leave that decision to the experts in that field.
+> Given the above requirement (single device associated to DMAR), I can
+> see two possibilities:
+> - we represent DMAR as a single PCI bus: feels a bit artificial
+> - we move the MSI domain to the device, as you suggested.
+>
+> The second one seems a lot more attractive to me. What I don't
+> completely see is how the host bridge has all required the knowledge.
 
-	Arnd
+Hmmm, maybe I'm in the wrong direction,  I need to think more about it.
+
+Thanks!
+Yijing.
+
+
+>
+> Also, it is not clear to me what is the advantage of getting rid of the
+> MSI controller. By doing so, we loose an important part of the topology
+> information (the irq domain is another level of abstraction).
+>
+> Thanks,
+>
+> 	M.
