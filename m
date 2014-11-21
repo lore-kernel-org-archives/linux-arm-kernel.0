@@ -1,37 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Nov 2014 10:11:02 +0000
-Subject: Removal of bus->msi assignment breaks MSI with stacked domains
-In-Reply-To: <546E93DC.8010902@huawei.com>
-References: <546E1771.4030201@arm.com> <546E93DC.8010902@huawei.com>
-Message-ID: <546F0FB6.3050404@arm.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Fri, 21 Nov 2014 11:12:39 +0100
+Subject: [PATCH 1/1] thermal: Exynos: Deletion of unnecessary checks before
+ two function calls
+In-Reply-To: <5317A59D.4@users.sourceforge.net>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net>
+Message-ID: <546F1017.5080403@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/11/14 01:22, Yijing Wang wrote:
-> On 2014/11/21 0:31, Marc Zyngier wrote:
->> Bjorn, Yijing,
->>
->> I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
->> bus->msi assignment) completely breaks MSI on arm64 when using the new
->> MSI stacked domain:
-> 
-> Sorry, this is my first part to refactor MSI related code, now
-> how to get pci msi_controller depends arch functions(pcibios_msi_controller() or
-> arch_setup_msi_irq()), we are working on generic pci_host_bridge, after that,
-> we could eventually eliminate MSI arch functions and find pci dev 's msi controller
-> by pci_host_bridge->get_msi_controller().
-> 
-> Marc, could you tell me what pci host driver in your test platform ?
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Fri, 21 Nov 2014 11:06:33 +0100
 
-I'm using pci-host-generic (with a couple of patches to help it fit the
-new "generic pci" infrastructure).
+The functions cpufreq_cooling_unregister() and thermal_zone_device_unregister()
+test whether their argument is NULL and then return immediately.
+Thus the test around the call is not needed.
 
-This lives at:
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-irq/arm64-pci
+This issue was detected by using the Coccinelle software.
 
-Thanks,
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/thermal/samsung/exynos_thermal_common.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-	M.
+diff --git a/drivers/thermal/samsung/exynos_thermal_common.c b/drivers/thermal/samsung/exynos_thermal_common.c
+index 3f5ad25..1cbb9d0 100644
+--- a/drivers/thermal/samsung/exynos_thermal_common.c
++++ b/drivers/thermal/samsung/exynos_thermal_common.c
+@@ -417,12 +417,10 @@ void exynos_unregister_thermal(struct thermal_sensor_conf *sensor_conf)
+ 
+ 	th_zone = sensor_conf->pzone_data;
+ 
+-	if (th_zone->therm_dev)
+-		thermal_zone_device_unregister(th_zone->therm_dev);
++	thermal_zone_device_unregister(th_zone->therm_dev);
+ 
+ 	for (i = 0; i < th_zone->cool_dev_size; i++) {
+-		if (th_zone->cool_dev[i])
+-			cpufreq_cooling_unregister(th_zone->cool_dev[i]);
++		cpufreq_cooling_unregister(th_zone->cool_dev[i]);
+ 	}
+ 
+ 	dev_info(sensor_conf->dev,
 -- 
-Jazz is not dead. It just smells funny...
+2.1.3
