@@ -1,118 +1,65 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 21 Nov 2014 09:44:51 +0100
-Subject: [PATCH 1/9] clk: sunxi: Give sunxi_factors_register a registers
- parameter
-In-Reply-To: <20141121083555.GK24143@lukather>
-References: <1416498928-1300-1-git-send-email-hdegoede@redhat.com>
- <1416498928-1300-2-git-send-email-hdegoede@redhat.com>
- <20141121083555.GK24143@lukather>
-Message-ID: <546EFB83.1020806@redhat.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 21 Nov 2014 09:46:11 +0100
+Subject: Removal of bus->msi assignment breaks MSI with stacked domains
+In-Reply-To: <546E9DF0.5010002@huawei.com>
+References: <546E1771.4030201@arm.com> <546E93DC.8010902@huawei.com>
+ <alpine.DEB.2.11.1411210233250.6439@nanos> <546E9DF0.5010002@huawei.com>
+Message-ID: <1416559571.2423.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 11/21/2014 09:35 AM, Maxime Ripard wrote:
-> Hi Hans,
+Am Freitag, den 21.11.2014, 10:05 +0800 schrieb Yijing Wang:
+> On 2014/11/21 9:46, Thomas Gleixner wrote:
+> > On Fri, 21 Nov 2014, Yijing Wang wrote:
+> >> On 2014/11/21 0:31, Marc Zyngier wrote:
+> >>> Bjorn, Yijing,
+> >>>
+> >>> I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
+> >>> bus->msi assignment) completely breaks MSI on arm64 when using the new
+> >>> MSI stacked domain:
+> >>
+> >> Sorry, this is my first part to refactor MSI related code, now how
+> >> to get pci msi_controller depends arch
+> >> functions(pcibios_msi_controller() or arch_setup_msi_irq()), we are
+> >> working on generic pci_host_bridge, after that, we could eventually
+> >> eliminate MSI arch functions and find pci dev 's msi controller by
+> >> pci_host_bridge->get_msi_controller().
+> > 
+> > The main question is why you think that pci_host_bridge is the proper
+> > place to store that information.
+> > 
+> > On x86 we have DMAR units associated to a single device. Each DMAR
+> > unit is a seperate MSI irq domain. 
+> > 
+> > Can you guarantee that the pci_host_bridge is the right point to
+> > provide the association of the device to the irq domain?
+> > 
+> > So the real question is:
+> > 
+> >    What is the association level requirement to properly identify the
+> >    irqdomain for a specific device on any given architecture with and
+> >    without IOMMU, interrupt redirection etc.
+> > 
+> > To be honest: I don't know.
+> > 
+> > My gut feeling tells me that it's at the device level, but I really
+> > leave that decision to the experts in that field.
 > 
-> On Thu, Nov 20, 2014 at 04:55:20PM +0100, Hans de Goede wrote:
->> Before this commit sunxi_factors_register uses of_iomap(node, 0) to get
->> the clk registers. The sun6i prcm has factor clocks, for which we want to
->> use sunxi_factors_register, but of_iomap(node, 0) does not work for the prcm
->> factor clocks, because the prcm uses the mfd framework, so the registers
->> are not part of the dt-node, instead they are added to the platform_device,
->> as platform_device resources.
->>
->> This commit makes getting the registers the callers duty, so that
->> sunxi_factors_register can be used with mfd instantiated platform device too.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> I choose the pci_host_bridge to place the .get_msi_ctrl() ops, because
+> I think how to associate pci_dev and msi_controller is platform specific,
+> and we could initialize pci_host_bridge in platform pci host drivers to
+> avoid call platform specific functions when we scan or setup a pci device.
 > 
-> Funny, I was thinking of doing exactly the same thing for MMC clocks :)
-> 
->> ---
->>  drivers/clk/sunxi/clk-factors.c    | 10 ++++------
->>  drivers/clk/sunxi/clk-factors.h    |  7 ++++---
->>  drivers/clk/sunxi/clk-mod0.c       |  6 ++++--
->>  drivers/clk/sunxi/clk-sun8i-mbus.c |  2 +-
->>  drivers/clk/sunxi/clk-sunxi.c      |  3 ++-
->>  5 files changed, 15 insertions(+), 13 deletions(-)
->>
->> diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
->> index f83ba09..fc4f4b5 100644
->> --- a/drivers/clk/sunxi/clk-factors.c
->> +++ b/drivers/clk/sunxi/clk-factors.c
->> @@ -156,9 +156,10 @@ static const struct clk_ops clk_factors_ops = {
->>  	.set_rate = clk_factors_set_rate,
->>  };
->>  
->> -struct clk * __init sunxi_factors_register(struct device_node *node,
->> -					   const struct factors_data *data,
->> -					   spinlock_t *lock)
->> +struct clk *sunxi_factors_register(struct device_node *node,
->> +				   const struct factors_data *data,
->> +				   spinlock_t *lock,
->> +				   void __iomem *reg)
->>  {
->>  	struct clk *clk;
->>  	struct clk_factors *factors;
->> @@ -168,11 +169,8 @@ struct clk * __init sunxi_factors_register(struct device_node *node,
->>  	struct clk_hw *mux_hw = NULL;
->>  	const char *clk_name = node->name;
->>  	const char *parents[FACTORS_MAX_PARENTS];
->> -	void __iomem *reg;
->>  	int i = 0;
->>  
->> -	reg = of_iomap(node, 0);
->> -
->>  	/* if we have a mux, we will have >1 parents */
->>  	while (i < FACTORS_MAX_PARENTS &&
->>  	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
->> diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
->> index 9913840..1f5526d 100644
->> --- a/drivers/clk/sunxi/clk-factors.h
->> +++ b/drivers/clk/sunxi/clk-factors.h
->> @@ -37,8 +37,9 @@ struct clk_factors {
->>  	spinlock_t *lock;
->>  };
->>  
->> -struct clk * __init sunxi_factors_register(struct device_node *node,
->> -					   const struct factors_data *data,
->> -					   spinlock_t *lock);
->> +struct clk *sunxi_factors_register(struct device_node *node,
->> +				   const struct factors_data *data,
->> +				   spinlock_t *lock,
->> +				   void __iomem *reg);
-> 
-> Why are you dropping the __init there?
-
-Because it is going to be used from mfd instantiation, so from a platform_dev
-probe function which is not __init.
-
-> 
->>  
->>  #endif
->> diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
->> index 4a56385..9530833 100644
->> --- a/drivers/clk/sunxi/clk-mod0.c
->> +++ b/drivers/clk/sunxi/clk-mod0.c
->> @@ -78,7 +78,8 @@ static DEFINE_SPINLOCK(sun4i_a10_mod0_lock);
->>  
->>  static void __init sun4i_a10_mod0_setup(struct device_node *node)
->>  {
->> -	sunxi_factors_register(node, &sun4i_a10_mod0_data, &sun4i_a10_mod0_lock);
->> +	sunxi_factors_register(node, &sun4i_a10_mod0_data,
->> +			       &sun4i_a10_mod0_lock, of_iomap(node, 0));
-> 
-> As of_iomap can fail, I'd rather check the returned value before
-> calling sunxi_factors_register.
-> 
-> I know it wasn't done before, but it's the right thing to do, as it
-> would lead to an instant crash if that fails.
-
-Ok, I'll wait for you to review the rest of the series and then do a v2 of the
-patch-set with this fixed (as time permits).
+I'm in favor of having the irqdomain attached to struct device even.
+Please keep in mind that going forward PCI will not be the only bus
+using MSI. Also having it attached to the device allows you to find the
+the domain by just walking up the chain of parent devices until you find
+one with an attached domain. A host bridge isn't different in that
+regard from any other device. This should work for all platforms AFAICS.
 
 Regards,
+Lucas
 
-Hans
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
