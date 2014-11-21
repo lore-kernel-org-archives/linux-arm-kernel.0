@@ -1,63 +1,39 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 21 Nov 2014 18:09:27 +0100
-Subject: arm: pxa: CPU_PXA27x?
-In-Reply-To: <87vbm85wjs.fsf@free.fr>
-References: <1416566627.6958.16.camel@x220> <87vbm85wjs.fsf@free.fr>
-Message-ID: <1416589767.1114.9.camel@x220>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 18:09:34 +0100
+Subject: [PATCH 7/9] dt: mb86s7x: add dt files for MB86S7x evbs
+In-Reply-To: <CAJe_ZhfJBftYd7oYNqUsgZsVZS8ccRA5XngJ=msRnt7RSE+C2Q@mail.gmail.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <2581182.ZW92kSfUJp@wuerfel>
+ <CAJe_ZhfJBftYd7oYNqUsgZsVZS8ccRA5XngJ=msRnt7RSE+C2Q@mail.gmail.com>
+Message-ID: <6351620.x1OFSWlVbH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-11-21 at 17:48 +0100, Robert Jarzmik wrote:
-> Paul Bolle <pebolle@tiscali.nl> writes:
-> > Your commit 03ec7fe70c5c ("arm: pxa: add pxa27x device-tree support") is
-> > included in today's linux-next (ie, next-20141121). It adds a select
-> > statement for CPU_PXA27x. But there's no Kconfig symbol CPU_PXA27x.
-> Ah yes, you're perfectly right, CPU_PXA27x was not the one, it was PXA27x, sic
-> ..
-> 
+On Friday 21 November 2014 22:19:43 Jassi Brar wrote:
 > >
-> > Why is that select needed? For what it's worth: __cpu_is_pxa27x()
-> > compiles to something interesting if CONFIG_PXA27x is defined.
-> You mean "is not defined", right ?
+> > This seems weird: rather than have one clock controller node per
+> > clock source, why not just have one node with #clock-cells = >?
+> >
+> > Your controller seems perfectly capable of this, and you even
+> > put the numbers in the label. It would be much more straightforward
+> > to do
+> >
+> >         clocks = <&clk_alw 0 1>;
+> >
+> > than
+> >
+> >         clocks = <&clk_alw_0_1>;
+> >
+> > here. Possibly even
+> >
+> >         clocks = <&clk MB86S70_CRG11_ALW 0 1>;
+> >
+> > with #clock-cells = >
+> >
+> Is there a way to compact the dtsi and yet populate only clocks that
+> are actually ever used (instead of 6x16x9)?
 
-Perhaps I was ambiguous. This referred to these lines in
-arch/arm/mach-pxa/include/mach/hardware.h:
-    #ifdef CONFIG_PXA27x
-    #define __cpu_is_pxa27x(id)                             \
-            ({                                              \
-                    unsigned int _id = (id) >> 4 & 0xfff;   \
-                    _id == 0x411;                           \
-            })
-    #else
-    #define __cpu_is_pxa27x(id)     (0)
-    #endif
+I believe the clock driver just wouldn't create the clocks until
+a device driver requests them.
 
-But you needed PXA27x anyway, so this seems moot now.
-
-> That (CONFIG_PXA27x) select is needed because without it the arm cpu
-> architecture is not selected, ie. CONFIG_CPU_XSCALE is not set. And this in turn
-> is needed to choose the basic arm operations like TLB handling, cache handling,
-> etc ... You cannot compile a single platform kernel without this.
-> 
-> As a poor excuse, I hadn't seen this because this resulted from a poor merge
-> resolution which brought in both "select PXA27x" and "select CPU_PXA27x".
-
-Stuff happens. Would my patch have been included you might have seen the
-warning and this thread wouldn't exist.
-
-> > In https://lkml.org/lkml/2014/9/30/578 I proposed a patch that emits a
-> > warning in cases like this. Like _all_ Kconfig related patches I've seen
-> > flying by lately it appears to be dropped in /dev/null. What's going on?
-> For that one I don't know.
-
-Here I'm dragging you into a discussion about something that's been
-bugging me for a while now. Hence the addresses that have nothing to do
-with pxa in Cc:.
-
-> Ah, and yes I'll send an update patch to remove the "select CPU_PXA27x", thanks
-> for noticing this.
-
-Great!
-
-
-Paul Bolle
+	Arnd
