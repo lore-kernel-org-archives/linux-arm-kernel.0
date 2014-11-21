@@ -1,87 +1,159 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Nov 2014 09:33:05 +0000
-Subject: Removal of bus->msi assignment breaks MSI with stacked domains
-In-Reply-To: <CAErSpo5UOUnPbsvAJX4kCeuKnPVLyRfq6k0FJPpS2W-5ALwisQ@mail.gmail.com>
-References: <546E1771.4030201@arm.com> <20141120215353.GA7987@google.com>
- <alpine.DEB.2.11.1411202355060.6439@nanos>
- <CAErSpo5UOUnPbsvAJX4kCeuKnPVLyRfq6k0FJPpS2W-5ALwisQ@mail.gmail.com>
-Message-ID: <546F06D1.30308@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Nov 2014 09:35:10 +0000
+Subject: For the problem when using swiotlb
+In-Reply-To: <2522857.bNQToYpBNt@wuerfel>
+References: <5469E26B.2010905@huawei.com> <1535751.CcvIi3DN4F@wuerfel>
+ <546D58B1.60108@huawei.com> <2522857.bNQToYpBNt@wuerfel>
+Message-ID: <20141121093509.GA19783@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
-On 20/11/14 23:30, Bjorn Helgaas wrote:
-> On Thu, Nov 20, 2014 at 4:10 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
->> On Thu, 20 Nov 2014, Bjorn Helgaas wrote:
->>> On Thu, Nov 20, 2014 at 04:31:45PM +0000, Marc Zyngier wrote:
->>>> Bjorn, Yijing,
->>>>
->>>> I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
->>>> bus->msi assignment) completely breaks MSI on arm64 when using the new
->>>> MSI stacked domain:
->>>>
->>>> This patch relies on architectures to implement either
->>>> pcibios_msi_controller() or arch_setup_msi_irq(). It turns out that with
->>>> stacked domains, none of this is actually necessary, as long as you can
->>>> access to the msi_controller.
->>>>
->>>> And everything was fine until this patch came around (and managed to
->>>> test on a system where the PCI devices are not directly attached to the
->>>> root bus). Of course, everything now breaks, as we cannot get to the MSI
->>>> controller (which contains the domain we allocate the MSIs from).
->>>>
->>>> In short, this patch breaks an important feature on which arm64 relies,
->>>> and I believe this patch should be reverted ASAP.
->>>
->>> I'm happy to revert it from pci/msi, but I think Thomas has already pulled
->>> it into his branch, so he'd have to drop it, too.
->>>
->>> Thomas, let me know if you want to do that.  I suppose we could add a new
->>> patch to add it back, but that would leave bisection broken for the
->>> interval between c167caf8d174 and the patch that adds it back.
->>
->> Fortunately my irq/irqdomain branch is not immutable yet. So we have
->> no problem at that point. I can rebase on your branch until tomorrow
->> night. Or just rebase on mainline and we sort out the merge conflicts
->> later, i.e. delegate them to Linus so his job of pulling stuff gets
->> not completely boring.
->>
->> What I'm more worried about is whether this intended change is going
->> to inflict a problem on Jiangs intention to deduce the MSI irq domain
->> from the device, which we really need for making DMAR work w/o going
->> through loops and hoops.
->>
->> I have limited knowledge about the actual scope of iommu (DMAR) units
->> versus device/bus/host-controllers, so I would appreciate a proper
->> explanation for that from you or Jiang or both.
->>
->> My guts feeling tells me that anything less granular than the bus
->> level is wrong and according to my limited knowledge Intel even has
->> DMARs which are assigned to a single device it's even more wrong. So
->> the proper change would be not to push it from bus to something above
->> the bus, but instead make it a per device property.
+On Thu, Nov 20, 2014 at 07:40:00AM +0000, Arnd Bergmann wrote:
+> On Thursday 20 November 2014 10:57:53 Ding Tianhong wrote:
+> > On 2014/11/19 16:45, Arnd Bergmann wrote:
+> > > On Wednesday 19 November 2014 11:17:15 Ding Tianhong wrote:
+> > >> On 2014/11/18 2:09, Catalin Marinas wrote:
+> > >>> On Mon, Nov 17, 2014 at 12:18:42PM +0000, Arnd Bergmann wrote:
+> > >> Thanks everyone, I think I found the way to fix it, need to enable DMA_CMA, to reserve a big memory
+> > >> for CMA and set coherent mask for dev, then dma_alloc and dma_mapping will not use the swiotlb until
+> > >> the memory out of mask or swiotlb_force is enabled.
+> > >>
+> > >> If I still understand uncorrectly, please inform me.
+> > > 
+> > > Please do not use CMA to work around the problem, but fix the underlying bug
+> > > instead.
+> > > 
+> > > The driver should call 'dma_set_mask_and_coherent()' with the appropriate
+> > > dma mask, and check whether that succeeded. However, the code implementing
+> > > dma_set_mask_and_coherent on arm64 also needs to be changed to look up
+> > > the dma-ranges property (see of_dma_configure()), and check if the mask
+> > > is possible.
+> > > 
+> > The dma_pfn_offset looks only support arm32, but my platform is
+> > aarch64 and I check the latest kernel version, I think the dma-rangs
+> > still could not work for aarch64, so maybe we should add
+> > dma_pfn_offset for aarch64 first.
 > 
-> I'm not an expert, so hopefully Jiang and Marc will clarify this.
-> 
-> My understanding is that Intel VT-d can do MSI remapping on a
-> per-function basis, so I agree that pci_msi_controller() should
-> probably take a pci_dev instead of a pci_bus.  I think Yijing's series
-> only has one caller, which has the pci_dev, so that should be an easy
-> change.
-> 
-> Marc, does c167caf8d174 break arm64 by itself?  Or does the breakage
-> happen later on, after adding more stacked domain stuff?  If the
-> former, we should definitely revert c167caf8d174 to preserve
-> bisectability, independent of how we fix the pci_msi_controller()
-> interface.
+> I didn't mean the dma_pfn_offset. The problem is that the of_dma_configure
+> code currently doesn't look at the mask. As I explained in my reply to
+> Catalin, it should set the mask to the size of the dma-ranges if that is
+> 32-bit or smaller, and dma_set_mask should look at the same dma-ranges
+> property to decide what to set the mask to when a driver asks for a
+> mask larger than 64-bit.
 
-The breakage only happens once we'll add the MSI controller drivers that
-are actively using the stacked domain code (GICv2m and GICv3 ITS). That
-should give us some flexibility to tweak things.
+But this wouldn't help Ding's case, here the driver needs to set the
+wider DMA mask.
 
-Thanks,
+Anyway, back to your point, to make sure I understand what you meant (I
+can send a proper patch with log afterwards):
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1e0e4671dd25..d6a4b4619174 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -120,6 +120,9 @@ config HAVE_GENERIC_RCU_GUP
+ config ARCH_DMA_ADDR_T_64BIT
+ 	def_bool y
+ 
++config ARCH_HAS_DMA_SET_COHERENT_MASK
++	def_bool y
++
+ config NEED_DMA_MAP_STATE
+ 	def_bool y
+ 
+diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+index adeae3f6f0fc..92dcd251e549 100644
+--- a/arch/arm64/include/asm/dma-mapping.h
++++ b/arch/arm64/include/asm/dma-mapping.h
+@@ -18,6 +18,7 @@
+ 
+ #ifdef __KERNEL__
+ 
++#include <linux/of_address.h>
+ #include <linux/types.h>
+ #include <linux/vmalloc.h>
+ 
+@@ -88,11 +89,24 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
+ {
+ 	if (!dev->dma_mask || !dma_supported(dev, mask))
+ 		return -EIO;
++	/* if asking for bigger dma mask, limit it to the bus dma ranges */
++	if (mask > *dev->dma_mask)
++		mask &= of_dma_get_range_mask(dev);
+ 	*dev->dma_mask = mask;
+ 
+ 	return 0;
+ }
+ 
++static inline int dma_set_coherent_mask(struct device *dev, u64 mask)
++{
++	if (!dma_supported(dev, mask))
++		return -EIO;
++	if (mask > dev->coherent_dma_mask)
++		mask &= of_dma_get_range_mask(dev);
++	dev->coherent_dma_mask = mask;
++	return 0;
++}
++
+ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+ {
+ 	if (!dev->dma_mask)
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index afdb78299f61..89c04abdf9bb 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -1,5 +1,6 @@
+ 
+ #include <linux/device.h>
++#include <linux/dma-mapping.h>
+ #include <linux/io.h>
+ #include <linux/ioport.h>
+ #include <linux/module.h>
+@@ -979,6 +980,19 @@ out:
+ }
+ EXPORT_SYMBOL_GPL(of_dma_get_range);
+ 
++u64 of_dma_get_range_mask(struct device *dev)
++{
++	u64 dma_addr, paddr, size;
++
++	/* no dma mask limiting if no of_node or no dma-ranges property */
++	if (!dev->of_node ||
++	    of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size) < 0)
++		return DMA_BIT_MASK(64);
++
++	return DMA_BIT_MASK(ilog2(size));
++}
++EXPORT_SYMBOL_GPL(of_dma_get_range_mask);
++
+ /**
+  * of_dma_is_coherent - Check if device is coherent
+  * @np:	device node
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 3b64d0bf5bba..50d1ac4739e6 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -200,6 +200,10 @@ static void of_dma_configure(struct device *dev)
+ 	/* DMA ranges found. Calculate and set dma_pfn_offset */
+ 	dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
+ 	dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
++
++	/* limit the coherent_dma_mask to the dma-ranges size property */
++	if (size < (1ULL << 32))
++		dev->coherent_dma_mask = DMA_BIT_MASK(ilog2(size));
+ }
+ 
+ /**
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index 8cb14eb393d6..fffb1a49a1a7 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -55,6 +55,8 @@ extern struct of_pci_range *of_pci_range_parser_one(
+ 					struct of_pci_range *range);
+ extern int of_dma_get_range(struct device_node *np, u64 *dma_addr,
+ 				u64 *paddr, u64 *size);
++extern u64 of_dma_get_range_mask(struct device *dev);
++
+ extern bool of_dma_is_coherent(struct device_node *np);
+ #else /* CONFIG_OF_ADDRESS */
+ static inline struct device_node *of_find_matching_node_by_address(
