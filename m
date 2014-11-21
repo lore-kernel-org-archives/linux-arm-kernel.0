@@ -1,79 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Nov 2014 09:54:45 +0900
-Subject: [PATCH 19/29] ARM: shmobile: sh73a0 dtsi: Add SoC-specific IIC
- compatible properties
-In-Reply-To: <cover.1416476366.git.horms+renesas@verge.net.au>
-References: <cover.1416476366.git.horms+renesas@verge.net.au>
-Message-ID: <dd4dc874d16b87944e6803f41dc9477c3c6f09d6.1416476366.git.horms+renesas@verge.net.au>
+Date: Fri, 21 Nov 2014 09:55:08 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Cleanups for v3.19
+Message-ID: <cover.1416530979.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-The IIC nodes used the generic compatible properties only.
-This causes the driver to fail when using Standard Speed, as the
-operational clock is driven by the 104 MHz HP clock:
+Please consider these second round of Renesas ARM based SoC cleanups for v3.19.
 
-    i2c-sh_mobile e6820000.i2c: timing values out of range: L/H=0x208/0x1bf
-    i2c-sh_mobile: probe of e6820000.i2c failed with error -22
+This pull request is based on the previous round of
+such requests, tagged as renesas-soc-cleanups-for-v3.19,
+which I have already sent a pull-request for.
 
-Add the SoC-specific compatible property to fix this.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/sh73a0.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+The following changes since commit dac95365dc2683df55c4e221e2f669a056863307:
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 030a592..d8def5a 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -138,7 +138,7 @@
- 	i2c0: i2c at e6820000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-sh73a0", "renesas,rmobile-iic";
- 		reg = <0xe6820000 0x425>;
- 		interrupts = <0 167 IRQ_TYPE_LEVEL_HIGH
- 			      0 168 IRQ_TYPE_LEVEL_HIGH
-@@ -150,7 +150,7 @@
- 	i2c1: i2c@e6822000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-sh73a0", "renesas,rmobile-iic";
- 		reg = <0xe6822000 0x425>;
- 		interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH
- 			      0 52 IRQ_TYPE_LEVEL_HIGH
-@@ -162,7 +162,7 @@
- 	i2c2: i2c@e6824000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-sh73a0", "renesas,rmobile-iic";
- 		reg = <0xe6824000 0x425>;
- 		interrupts = <0 171 IRQ_TYPE_LEVEL_HIGH
- 			      0 172 IRQ_TYPE_LEVEL_HIGH
-@@ -174,7 +174,7 @@
- 	i2c3: i2c@e6826000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-sh73a0", "renesas,rmobile-iic";
- 		reg = <0xe6826000 0x425>;
- 		interrupts = <0 183 IRQ_TYPE_LEVEL_HIGH
- 			      0 184 IRQ_TYPE_LEVEL_HIGH
-@@ -186,7 +186,7 @@
- 	i2c4: i2c@e6828000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-sh73a0", "renesas,rmobile-iic";
- 		reg = <0xe6828000 0x425>;
- 		interrupts = <0 187 IRQ_TYPE_LEVEL_HIGH
- 			      0 188 IRQ_TYPE_LEVEL_HIGH
--- 
-2.1.1
+  ARM: shmobile: sh73a0: Remove wrapper sh73a0_init_delay() (2014-10-24 13:07:01 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-cleanups2-for-v3.19
+
+for you to fetch changes up to 3e940958ed3625187704f41129801800f70c2169:
+
+  ARM: shmobile: r8a7779: Spelling/grammar s/entity/identity/, s/map/mapping/ (2014-11-17 10:35:07 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Cleanups for v3.19
+
+* Spelling and grammar fixes
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      ARM: shmobile: sh73a0: Spelling/grammar s/entity map/identity mapping/
+      ARM: shmobile: sh7372: Spelling/grammar s/entity map/identity mapping/
+      ARM: shmobile: r8a7779: Spelling/grammar s/entity/identity/, s/map/mapping/
+
+ arch/arm/mach-shmobile/setup-r8a7779.c | 6 +++---
+ arch/arm/mach-shmobile/setup-sh7372.c  | 2 +-
+ arch/arm/mach-shmobile/setup-sh73a0.c  | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
