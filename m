@@ -1,114 +1,52 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Nov 2014 17:00:10 +0100
-Subject: [PATCHv3 13/16] ARM: mvebu: synchronize secondary CPU clocks on resume
+Date: Fri, 21 Nov 2014 17:00:09 +0100
+Subject: [PATCHv3 12/16] ARM: mvebu: make sure MMU is disabled in
+ armada_370_xp_cpu_resume
 In-Reply-To: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1416585613-2113-14-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1416585613-2113-13-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada XP has multiple cores clocked by independent clocks. The
-SMP startup code contains a function called set_secondary_cpus_clock()
-called in armada_xp_smp_prepare_cpus() to ensure the clocks of the
-secondary CPUs match the clock of the boot CPU.
+The armada_370_xp_cpu_resume() until now was used only as the function
+called by the SoC when returning from a deep idle state (as used in
+cpuidle, or when the CPU is brought offline using CPU hotplug).
 
-With the introduction of suspend/resume, this operation is no longer
-needed when booting the system, but also when existing the suspend to
-RAM state. Therefore this commit reworks a bit the logic: instead of
-configuring the clock of all secondary CPUs in
-armada_xp_smp_prepare_cpus(), we do it on a per-secondary CPU basis in
-armada_xp_boot_secondary(), as this function gets called when existing
-suspend to RAM for each secondary CPU.
-
-Since the function now only takes care of one CPU, we rename it from
-set_secondary_cpus_clock() to set_secondary_cpu_clock(), and it looses
-its __init marker, as it is now used beyond the system initialization.
-
-Note that we can't use smp_processor_id() directly, because when
-exiting from suspend to RAM, the code is apparently executed with
-preemption enabled, so smp_processor_id() is not happy (prints a
-warning). We therefore switch to using get_cpu()/put_cpu(), even
-though we pretty much have the guarantee that the code starting the
-secondary CPUs is going to run on the boot CPU and will not be
-migrated.
+However, it is now also used when exiting the suspend to RAM state. In
+this case, it is the bootloader that calls back into this function,
+with the MMU left enabled by the BootROM. Having the MMU enabled when
+entering this function confuses the kerrnel because we are not using
+the kernel page tables at this point, but in other mvebu functions we
+use the information on whether the MMU is enabled or not to find out
+whether we should talk to the coherency fabric using a physical
+address or a virtual address. To fix that, we simply disable the MMU
+when entering this function, so that the kernel is in an expected
+situation.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/platsmp.c | 31 +++++++++++++++----------------
- 1 file changed, 15 insertions(+), 16 deletions(-)
+ arch/arm/mach-mvebu/pmsu_ll.S | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index 895dc37..e65e69a 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -33,7 +33,7 @@
- #define AXP_BOOTROM_BASE 0xfff00000
- #define AXP_BOOTROM_SIZE 0x100000
- 
--static struct clk *__init get_cpu_clk(int cpu)
-+static struct clk *get_cpu_clk(int cpu)
- {
- 	struct clk *cpu_clk;
- 	struct device_node *np = of_get_cpu_node(cpu, NULL);
-@@ -46,29 +46,28 @@ static struct clk *__init get_cpu_clk(int cpu)
- 	return cpu_clk;
- }
- 
--static void __init set_secondary_cpus_clock(void)
-+static void set_secondary_cpu_clock(unsigned int cpu)
- {
--	int thiscpu, cpu;
-+	int thiscpu;
- 	unsigned long rate;
- 	struct clk *cpu_clk;
- 
--	thiscpu = smp_processor_id();
-+	thiscpu = get_cpu();
-+
- 	cpu_clk = get_cpu_clk(thiscpu);
- 	if (!cpu_clk)
--		return;
-+		goto out;
- 	clk_prepare_enable(cpu_clk);
- 	rate = clk_get_rate(cpu_clk);
- 
--	/* set all the other CPU clk to the same rate than the boot CPU */
--	for_each_possible_cpu(cpu) {
--		if (cpu == thiscpu)
--			continue;
--		cpu_clk = get_cpu_clk(cpu);
--		if (!cpu_clk)
--			return;
--		clk_set_rate(cpu_clk, rate);
--		clk_prepare_enable(cpu_clk);
--	}
-+	cpu_clk = get_cpu_clk(cpu);
-+	if (!cpu_clk)
-+		goto out;
-+	clk_set_rate(cpu_clk, rate);
-+	clk_prepare_enable(cpu_clk);
-+
-+out:
-+	put_cpu();
- }
- 
- static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
-@@ -78,6 +77,7 @@ static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	pr_info("Booting CPU %d\n", cpu);
- 
- 	hw_cpu = cpu_logical_map(cpu);
-+	set_secondary_cpu_clock(hw_cpu);
- 	mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_xp_secondary_startup);
- 
- 	/*
-@@ -126,7 +126,6 @@ static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
- 	struct resource res;
- 	int err;
- 
--	set_secondary_cpus_clock();
- 	flush_cache_all();
- 	set_cpu_coherent();
- 
+diff --git a/arch/arm/mach-mvebu/pmsu_ll.S b/arch/arm/mach-mvebu/pmsu_ll.S
+index a945756..ae7e6b0 100644
+--- a/arch/arm/mach-mvebu/pmsu_ll.S
++++ b/arch/arm/mach-mvebu/pmsu_ll.S
+@@ -18,6 +18,14 @@
+  */
+ ENTRY(armada_370_xp_cpu_resume)
+ ARM_BE8(setend	be )			@ go BE8 if entered LE
++	/*
++	 * Disable the MMU that might have been enabled in BootROM if
++	 * this code is used in the resume path of a suspend/resume
++	 * cycle.
++	 */
++	mrc	p15, 0, r1, c1, c0, 0
++	bic	r1, #1
++	mcr	p15, 0, r1, c1, c0, 0
+ 	bl	ll_add_cpu_to_smp_group
+ 	bl	ll_enable_coherency
+ 	b	cpu_resume
 -- 
 2.1.0
