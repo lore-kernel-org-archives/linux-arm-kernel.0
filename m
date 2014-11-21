@@ -1,76 +1,116 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri, 21 Nov 2014 13:50:38 -0800
-Subject: [PATCHv6 1/8] arm64: Treat handle_arch_irq as a function pointer
+Date: Fri, 21 Nov 2014 13:50:40 -0800
+Subject: [PATCHv6 3/8] arm64: Move cpu_resume into the text section
 In-Reply-To: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
 References: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1416606645-25633-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1416606645-25633-4-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-handle_arch_irq isn't actually text, it's just a function pointer.
-It doesn't need to be stored in the text section and doing so
-causes problesm if we ever want to make the kernel text read only.
-Declare handle_arch_irq as a proper function pointer stored in
-the data section.
+The function cpu_resume currently lives in the .data section.
+There's no reason for it to be there since we can use relative
+instructions without a problem. Move a few cpu_resume data
+structures out of the assembly file so the .data annotation
+can be dropped completely and cpu_resume ends up in the read
+only text section.
 
 Reviewed-by: Kees Cook <keescook@chromium.org>
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Tested-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Tested-by: Kees Cook <keescook@chromium.org>
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- arch/arm64/include/asm/irq.h | 1 -
- arch/arm64/kernel/entry.S    | 6 ++----
- arch/arm64/kernel/irq.c      | 2 ++
- 3 files changed, 4 insertions(+), 5 deletions(-)
+v6: Dropped the last bit of cruft after cpu_resume
+---
+ arch/arm64/kernel/sleep.S   | 36 ++++++------------------------------
+ arch/arm64/kernel/suspend.c |  4 ++--
+ 2 files changed, 8 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-index e1f7ecd..1eebf5b 100644
---- a/arch/arm64/include/asm/irq.h
-+++ b/arch/arm64/include/asm/irq.h
-@@ -3,7 +3,6 @@
+diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+index a564b44..ede186c 100644
+--- a/arch/arm64/kernel/sleep.S
++++ b/arch/arm64/kernel/sleep.S
+@@ -147,14 +147,12 @@ cpu_resume_after_mmu:
+ 	ret
+ ENDPROC(cpu_resume_after_mmu)
  
- #include <asm-generic/irq.h>
- 
--extern void (*handle_arch_irq)(struct pt_regs *);
- extern void migrate_irqs(void);
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 726b910..ee27f39 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -168,7 +168,8 @@ tsk	.req	x28		// current thread_info
-  * Interrupt handling.
-  */
- 	.macro	irq_handler
--	ldr	x1, handle_arch_irq
-+	adrp	x1, handle_arch_irq
-+	ldr	x1, [x1, #:lo12:handle_arch_irq]
- 	mov	x0, sp
- 	blr	x1
- 	.endm
-@@ -695,6 +696,3 @@ ENTRY(sys_rt_sigreturn_wrapper)
- 	mov	x0, sp
- 	b	sys_rt_sigreturn
- ENDPROC(sys_rt_sigreturn_wrapper)
+-	.data
+ ENTRY(cpu_resume)
+ 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
+ #ifdef CONFIG_SMP
+ 	mrs	x1, mpidr_el1
+-	adr	x4, mpidr_hash_ptr
+-	ldr	x5, [x4]
+-	add	x8, x4, x5		// x8 = struct mpidr_hash phys address
++	adrp	x8, mpidr_hash
++	add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
+         /* retrieve mpidr_hash members to compute the hash */
+ 	ldr	x2, [x8, #MPIDR_HASH_MASK]
+ 	ldp	w3, w4, [x8, #MPIDR_HASH_SHIFTS]
+@@ -164,14 +162,15 @@ ENTRY(cpu_resume)
+ #else
+ 	mov	x7, xzr
+ #endif
+-	adr	x0, sleep_save_sp
++	adrp	x0, sleep_save_sp
++	add	x0, x0, #:lo12:sleep_save_sp
+ 	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
+ 	ldr	x0, [x0, x7, lsl #3]
+ 	/* load sp from context */
+ 	ldr	x2, [x0, #CPU_CTX_SP]
+-	adr	x1, sleep_idmap_phys
++	adrp	x1, sleep_idmap_phys
+ 	/* load physical address of identity map page table in x1 */
+-	ldr	x1, [x1]
++	ldr	x1, [x1, #:lo12:sleep_idmap_phys]
+ 	mov	sp, x2
+ 	/*
+ 	 * cpu_do_resume expects x0 to contain context physical address
+@@ -180,26 +179,3 @@ ENTRY(cpu_resume)
+ 	bl	cpu_do_resume		// PC relative jump, MMU off
+ 	b	cpu_resume_mmu		// Resume MMU, never returns
+ ENDPROC(cpu_resume)
 -
--ENTRY(handle_arch_irq)
+-	.align 3
+-mpidr_hash_ptr:
+-	/*
+-	 * offset of mpidr_hash symbol from current location
+-	 * used to obtain run-time mpidr_hash address with MMU off
+-         */
+-	.quad	mpidr_hash - .
+-/*
+- * physical address of identity mapped page tables
+- */
+-	.type	sleep_idmap_phys, #object
+-ENTRY(sleep_idmap_phys)
 -	.quad	0
-diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-index 071a6ec..240b75c 100644
---- a/arch/arm64/kernel/irq.c
-+++ b/arch/arm64/kernel/irq.c
-@@ -40,6 +40,8 @@ int arch_show_interrupts(struct seq_file *p, int prec)
- 	return 0;
+-/*
+- * struct sleep_save_sp {
+- *	phys_addr_t *save_ptr_stash;
+- *	phys_addr_t save_ptr_stash_phys;
+- * };
+- */
+-	.type	sleep_save_sp, #object
+-ENTRY(sleep_save_sp)
+-	.space	SLEEP_SAVE_SP_SZ	// struct sleep_save_sp
+diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+index 13ad4db..3771b72 100644
+--- a/arch/arm64/kernel/suspend.c
++++ b/arch/arm64/kernel/suspend.c
+@@ -126,8 +126,8 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 	return ret;
  }
  
-+void (*handle_arch_irq)(struct pt_regs *) = NULL;
-+
- void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
+-extern struct sleep_save_sp sleep_save_sp;
+-extern phys_addr_t sleep_idmap_phys;
++struct sleep_save_sp sleep_save_sp;
++phys_addr_t sleep_idmap_phys;
+ 
+ static int __init cpu_suspend_init(void)
  {
- 	if (handle_arch_irq)
 -- 
 Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
