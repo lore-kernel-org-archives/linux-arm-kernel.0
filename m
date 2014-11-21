@@ -1,36 +1,52 @@
-From: zhichang.yuan@linaro.org (zhichang.yuan at linaro.org)
-Date: Fri, 21 Nov 2014 16:27:40 +0800
-Subject: [PATCH] arm64:mm: free the useless initial page table
-Message-ID: <1416558460-7257-1-git-send-email-zhichang.yuan@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 21 Nov 2014 09:26:20 +0100
+Subject: [PATCH 5/9] rc: sunxi-cir: Add support for the larger fifo found
+ on sun5i and sun6i
+In-Reply-To: <20141120142856.16b6562d@recife.lan>
+References: <1416498928-1300-1-git-send-email-hdegoede@redhat.com>
+ <1416498928-1300-6-git-send-email-hdegoede@redhat.com>
+ <20141120142856.16b6562d@recife.lan>
+Message-ID: <20141121082620.GJ24143@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "zhichang.yuan" <zhichang.yuan@linaro.org>
+Hi Mauro,
 
-For 64K page system, after mapping a PMD section, the corresponding initial
-page table is not needed any more. That page can be freed.
+On Thu, Nov 20, 2014 at 02:28:56PM -0200, Mauro Carvalho Chehab wrote:
+> Em Thu, 20 Nov 2014 16:55:24 +0100
+> Hans de Goede <hdegoede@redhat.com> escreveu:
+> 
+> > Add support for the larger fifo found on sun5i and sun6i, having a separate
+> > compatible for the ir found on sun5i & sun6i also is useful if we ever want
+> > to add ir transmit support, because the sun5i & sun6i version do not have
+> > transmit support.
+> > 
+> > Note this commits also adds checking for the end-of-packet interrupt flag
+> > (which was already enabled), as the fifo-data-available interrupt flag only
+> > gets set when the trigger-level is exceeded. So far we've been getting away
+> > with not doing this because of the low trigger-level, but this is something
+> > which we should have done since day one.
+> > 
+> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> 
+> As this is meant to be merged via some other tree:
+> 
+> Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
----
- arch/arm64/mm/mmu.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+I think merging it through your tree would be just fine.
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index f4f8b50..12a336b 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -191,8 +191,11 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- 			 * Check for previous table entries created during
- 			 * boot (__create_page_tables) and flush them.
- 			 */
--			if (!pmd_none(old_pmd))
-+			if (!pmd_none(old_pmd)) {
- 				flush_tlb_all();
-+				if (pmd_table(old_pmd))
-+					memblock_free(pte_pfn(pmd_pte(old_pmd)) << PAGE_SHIFT, PAGE_SIZE);
-+			}
- 		} else {
- 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
- 				       prot_pte);
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/be1a19cd/attachment.sig>
