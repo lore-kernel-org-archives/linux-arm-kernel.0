@@ -1,42 +1,118 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 21 Nov 2014 16:37:55 +0800
-Subject: [GIT PULL] ARM: imx: SoC updates for 3.19
-In-Reply-To: <201411201730.04562.arnd@arndb.de>
-References: <20141119070306.GF27759@dragon> <201411201730.04562.arnd@arndb.de>
-Message-ID: <CAAQ0ZWS_=o6WrAmDbdfMDxdceMJkG0k5h_i3SqoXDOVLkcSS-w@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 21 Nov 2014 09:35:55 +0100
+Subject: [PATCH 1/9] clk: sunxi: Give sunxi_factors_register a registers
+ parameter
+In-Reply-To: <1416498928-1300-2-git-send-email-hdegoede@redhat.com>
+References: <1416498928-1300-1-git-send-email-hdegoede@redhat.com>
+ <1416498928-1300-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141121083555.GK24143@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Hans,
 
-On Fri, Nov 21, 2014 at 12:30 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The changes all look good, but could you please send them again based on
-> v3.18-rc1? I'm trying to avoid back-merges from upstream into the next
-> branches.
+On Thu, Nov 20, 2014 at 04:55:20PM +0100, Hans de Goede wrote:
+> Before this commit sunxi_factors_register uses of_iomap(node, 0) to get
+> the clk registers. The sun6i prcm has factor clocks, for which we want to
+> use sunxi_factors_register, but of_iomap(node, 0) does not work for the prcm
+> factor clocks, because the prcm uses the mfd framework, so the registers
+> are not part of the dt-node, instead they are added to the platform_device,
+> as platform_device resources.
+> 
+> This commit makes getting the registers the callers duty, so that
+> sunxi_factors_register can be used with mfd instantiated platform device too.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-The imx/cleanup branch can simply be based on v3.18-rc1.  But I choose
-to base imx/soc on a latest -rc to resolve a conflict between commit
-410ba8d4a0da (ARM: imx: clk-vf610: get input clocks from assigned
-clocks) and c72c553249bb (ARM: imx: clk-vf610: define PLL's clock
-tree).  The former one is currently sits on imx/soc branch, and the
-latter landed on -rc4 as a fix.  I think we can handle it in either
-way of the following two.
+Funny, I was thinking of doing exactly the same thing for MMC clocks :)
 
-1. Drop commit 410ba8d4a0da (ARM: imx: clk-vf610: get input clocks
-from assigned clocks) from imx/soc branch and send it as a fix for
-3.18 right way.
+> ---
+>  drivers/clk/sunxi/clk-factors.c    | 10 ++++------
+>  drivers/clk/sunxi/clk-factors.h    |  7 ++++---
+>  drivers/clk/sunxi/clk-mod0.c       |  6 ++++--
+>  drivers/clk/sunxi/clk-sun8i-mbus.c |  2 +-
+>  drivers/clk/sunxi/clk-sunxi.c      |  3 ++-
+>  5 files changed, 15 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+> index f83ba09..fc4f4b5 100644
+> --- a/drivers/clk/sunxi/clk-factors.c
+> +++ b/drivers/clk/sunxi/clk-factors.c
+> @@ -156,9 +156,10 @@ static const struct clk_ops clk_factors_ops = {
+>  	.set_rate = clk_factors_set_rate,
+>  };
+>  
+> -struct clk * __init sunxi_factors_register(struct device_node *node,
+> -					   const struct factors_data *data,
+> -					   spinlock_t *lock)
+> +struct clk *sunxi_factors_register(struct device_node *node,
+> +				   const struct factors_data *data,
+> +				   spinlock_t *lock,
+> +				   void __iomem *reg)
+>  {
+>  	struct clk *clk;
+>  	struct clk_factors *factors;
+> @@ -168,11 +169,8 @@ struct clk * __init sunxi_factors_register(struct device_node *node,
+>  	struct clk_hw *mux_hw = NULL;
+>  	const char *clk_name = node->name;
+>  	const char *parents[FACTORS_MAX_PARENTS];
+> -	void __iomem *reg;
+>  	int i = 0;
+>  
+> -	reg = of_iomap(node, 0);
+> -
+>  	/* if we have a mux, we will have >1 parents */
+>  	while (i < FACTORS_MAX_PARENTS &&
+>  	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
+> diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
+> index 9913840..1f5526d 100644
+> --- a/drivers/clk/sunxi/clk-factors.h
+> +++ b/drivers/clk/sunxi/clk-factors.h
+> @@ -37,8 +37,9 @@ struct clk_factors {
+>  	spinlock_t *lock;
+>  };
+>  
+> -struct clk * __init sunxi_factors_register(struct device_node *node,
+> -					   const struct factors_data *data,
+> -					   spinlock_t *lock);
+> +struct clk *sunxi_factors_register(struct device_node *node,
+> +				   const struct factors_data *data,
+> +				   spinlock_t *lock,
+> +				   void __iomem *reg);
 
-2. Keep 410ba8d4a0da on imx/soc and leave the merge conflict to Linus.
+Why are you dropping the __init there?
 
-What's your preference?
+>  
+>  #endif
+> diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+> index 4a56385..9530833 100644
+> --- a/drivers/clk/sunxi/clk-mod0.c
+> +++ b/drivers/clk/sunxi/clk-mod0.c
+> @@ -78,7 +78,8 @@ static DEFINE_SPINLOCK(sun4i_a10_mod0_lock);
+>  
+>  static void __init sun4i_a10_mod0_setup(struct device_node *node)
+>  {
+> -	sunxi_factors_register(node, &sun4i_a10_mod0_data, &sun4i_a10_mod0_lock);
+> +	sunxi_factors_register(node, &sun4i_a10_mod0_data,
+> +			       &sun4i_a10_mod0_lock, of_iomap(node, 0));
 
->
-> Also, note that we've started splitting out defconfig changes into
-> a separate topic branch. Since you are rebasing anyway, please send
-> the defconfig change as a separate patch or pull request and also
-> update multi_v7_defconfig in the same way.
+As of_iomap can fail, I'd rather check the returned value before
+calling sunxi_factors_register.
 
-Okay, to keep it simple, I will squashed the defconfig updates into
-one patch and send it to you.
+I know it wasn't done before, but it's the right thing to do, as it
+would lead to an instant crash if that fails.
 
-Shawn
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/c32f1a95/attachment-0001.sig>
