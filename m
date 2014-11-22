@@ -1,50 +1,125 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat, 22 Nov 2014 21:51:20 +0400
-Subject: [PATCH V2 3/5] usb: gadget: pxa25x_udc: prepare/unprepare clocks
- in pxa-ssp
-In-Reply-To: <87h9xr3z35.fsf@free.fr>
-References: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
- <1416236863-20898-3-git-send-email-dbaryshkov@gmail.com>
- <878uj98y5v.fsf@free.fr>
- <CALT56yMCJ4R6KN2BUW61YaUz2bb6s_aJteKYBSVmvRPKacKCLw@mail.gmail.com>
- <CALT56yO8tktrXo0rfRd91AtXBE4F5vYfYjm9AL+7dcoam6Oq9Q@mail.gmail.com>
- <87egsz6ija.fsf@free.fr> <87sihb49vm.fsf@free.fr>
- <CALT56yMVjRC4YhWsc9d_i0mVrHyv8XV=Sw2op=xsdR5izv1tHg@mail.gmail.com>
- <87lhn340i1.fsf@free.fr>
- <CALT56yP1OGWQd5i+H+4uFkZD4AqdtF7J1+Lme76UgLgVfycQ4w@mail.gmail.com>
- <87h9xr3z35.fsf@free.fr>
-Message-ID: <CALT56yMUQDZV5=dn_Hm7jNS5NQXj7ewXcB2LsGvTbCOuoio7JQ@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 22 Nov 2014 19:12:29 +0100
+Subject: [PATCH 2/3] i2c: slave-eeprom: add eeprom simulator driver
+In-Reply-To: <CAOY=C6FSXWn2AKn9gp0oU69U8VkkyJAE7MMUTZsToy0P_Tf6AA@mail.gmail.com>
+References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+ <1416326695-13083-3-git-send-email-wsa@the-dreams.de>
+ <CAOY=C6FSXWn2AKn9gp0oU69U8VkkyJAE7MMUTZsToy0P_Tf6AA@mail.gmail.com>
+Message-ID: <20141122181229.GB9698@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-22 20:49 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
-> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
->
->> Hello,
->>
->> 2014-11-22 20:18 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
->>> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
->>>
->>>> 2014-11-22 16:56 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
->>>>> Robert Jarzmik <robert.jarzmik@free.fr> writes:
->>>>>> Okay, now my ADSL line is repaired, thank you Mr farmer "I drive a tractor but I
->>>>>> don't care about telephone posts", I'll fetch your changes and make a
->>>>>> test. Let's say I schedule this for saturday.
->>>>>
->>>>> Removed people from the list for the tests aspect.
->>>>>
->>>>> Well, my lubbock board seem to raise several interrupts in the linux kernel, all
->>>>> the LUBBOCK_IRQ interrupts multiplexed on GPIO0 actually, amongst which are the
->>>>> 2 interrupts for the UDC.
->>> Arg, what I meant to write was "seem to *never* raise several interrupts".
->>
->> Understood. Just to make me sure - does the upstream kernel work?
-> Nope, that's the current situation with the upstream kernel.
+Hi,
 
-Next point would be (from my POV) to make sure that
-lubbock_unmask_irq() is called
-and works as expected.
+Please quote only relevant parts of the message (like I did). This
+improves readability a lot.
 
--- 
-With best wishes
-Dmitry
+> > +static int i2c_slave_eeprom_slave_cb(struct i2c_client *client,
+> > +                                    enum i2c_slave_event event, u8 *val)
+> > +{
+> > +       struct eeprom_data *eeprom = i2c_get_clientdata(client);
+> > +
+> > +       switch (event) {
+> > +       case I2C_SLAVE_REQ_WRITE_END:
+> > +               if (eeprom->first_write) {
+> > +                       eeprom->buffer_idx = *val;
+> > +                       eeprom->first_write = false;
+> > +               } else {
+> > +                       spin_lock(&eeprom->buffer_lock);
+> > +                       eeprom->buffer[eeprom->buffer_idx++] = *val;
+> > +                       spin_unlock(&eeprom->buffer_lock);
+> > +               }
+> > +               break;
+> > +
+> > +       case I2C_SLAVE_REQ_READ_START:
+> > +               spin_lock(&eeprom->buffer_lock);
+> > +               *val = eeprom->buffer[eeprom->buffer_idx];
+> > +               spin_unlock(&eeprom->buffer_lock);
+> > +               break;
+> > +
+> > +       case I2C_SLAVE_REQ_READ_END:
+> > +               eeprom->buffer_idx++;
+> > +               break;
+> > +
+> > +       case I2C_SLAVE_STOP:
+> > +               eeprom->first_write = true;
+> > +               break;
+> > +
+> > +       default:
+> > +               break;
+> > +       }
+> > +
+> > +       return 0;
+> > +}
+> 
+> 
+> Would it make sense to have:
+> WRITE_START
+> WRITE_NEXT
+> WRITE_STOP
+> WRITE_REPEAT_START
+> READ_START
+> READ_NEXT
+> READ_STOP
+> READ_REPEAT_START
+> 
+> Some devices may want different behavior for subsequent
+> reads when they are separate transactions, compared to
+> a single larger transaction.
+
+This can all be handled with I2C_SLAVE_STOP.
+
+> e.g. a single transaction may wraparound inside a >8bit
+> register (e.g. for 16bit: msb, lsb, msb, lsb, ...), but step
+> to the next register when a separate read/write is issued.
+> Alternatively, a WRITE/READ_NEXT may be implemented
+> more efficiently. This may not matter for current systems
+> compared to the low-frequency bus, but who knows what
+> IoT devices may bring to the table.
+
+Let's start simple until we have more use cases. WRITE_NEXT may be
+useful when you have an internal u8 pointer to be set before actually
+sending data, but already less useful if this is u16. Also, slaves may
+decide to handle stops at unexpected places differently. Furthermore, my
+feeling is that slave drivers will be more robust if they handle those
+simple primitives properly.
+
+What I could imagine, though, is that somewhen the eeprom simulator will
+be able to get data via other means than the shared memory, maybe via
+some callback. Then, the callback really only has to deal with "read
+this byte" or "write that byte" while for the outer world we have a
+proper well-known EEPROM like I2C interface.
+
+That being said, the list of I2C_SLAVE_* events is extensible, of
+course. Though, I rather see low-level stuff there like "General Call
+Adress received".
+
+> 
+> Also, behavior may be different for repeat start versus
+> stop/start, although a repeat start could be a start
+> without a previous stop as well...
+
+IMO a repeated start is to ensure that two messages arrive at the slave
+without interruption from another master. I can't think why a slave
+should know which type of start that was. In fact, if it does that would
+raise an eyebrow for me. Do you have an example?
+
+> Of course, if an I2C adapter cannot distinguish these
+> events, this is probably a futile attempt at adding
+> semantics that will silently break depending on the
+> actual hardware/driver used.
+
+That as well. I have not seen an I2C adapter which could provide this
+information so far.
+
+Thanks,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141122/81e94b8d/attachment.sig>
