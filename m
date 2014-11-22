@@ -1,34 +1,30 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Nov 2014 22:37:44 -0500
-Subject: [PATCH v2] ARM: mvebu: fix ordering in Armada 370 .dtsi
-In-Reply-To: <20141114204333.GS27002@pengutronix.de>
-References: <1415993776-3469-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20141114204333.GS27002@pengutronix.de>
-Message-ID: <20141122033744.GS22670@titan.lakedaemon.net>
+Date: Fri, 21 Nov 2014 23:12:19 -0500
+Subject: [PATCH] ARM: dts: dove: add DT LCD controllers
+In-Reply-To: <E1Xr3Ur-0005Qx-Fx@rmk-PC.arm.linux.org.uk>
+References: <E1Xr3Ur-0005Qx-Fx@rmk-PC.arm.linux.org.uk>
+Message-ID: <20141122041219.GT22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 09:43:33PM +0100, Uwe Kleine-K?nig wrote:
-> Commit a095b1c78a35 ("ARM: mvebu: sort DT nodes by address")
-> missed placing the system-controller in the correct order.                                                                                                               
+On Wed, Nov 19, 2014 at 11:32:29AM +0000, Russell King wrote:
+> Add the DT fragment for the Marvell Dove LCD controllers.
 > 
-> Fixes: a095b1c78a35 ("ARM: mvebu: sort DT nodes by address")
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
-> Hello Andrew,
+> The documentation for this binding was submitted previously as part of
+> the code which parses this - v3.17-rc1~82^2~32^2~2.
 > 
-> I guess your question concerning overlapping ranges doesn't stop this
-> patch from being useful, does it?
-> 
-> Also thanks for the suggested wording which I nearly took as is.
-> 
-> Best regards
-> Uwe
-> 
->  arch/arm/boot/dts/armada-370.dtsi | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
+>  arch/arm/boot/dts/dove.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
 
-Applied to mvebu/dt with Andrew's Ack.
+hmmm... this was already applied:
+
+  087b04701111e ARM: dts: dove: add DT LCD controllers
+
+>From here:
+
+  https://lkml.kernel.org/r/E1XAKGS-0004WE-8h at rmk-PC.arm.linux.org.uk
 
 thx,
 
