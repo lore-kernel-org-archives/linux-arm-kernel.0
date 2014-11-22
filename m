@@ -1,49 +1,39 @@
 From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Sat, 22 Nov 2014 16:21:40 +0100
-Subject: [PATCH v3 2/4] spi: meson: Add device tree bindings documentation for
- SPIFC
+Date: Sat, 22 Nov 2014 16:21:42 +0100
+Subject: [PATCH v3 4/4] ARM: dts: meson: add node for SPIFC
 In-Reply-To: <1416669702-7841-1-git-send-email-b.galvani@gmail.com>
 References: <1416669702-7841-1-git-send-email-b.galvani@gmail.com>
-Message-ID: <1416669702-7841-3-git-send-email-b.galvani@gmail.com>
+Message-ID: <1416669702-7841-5-git-send-email-b.galvani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds documentation of device tree bindings for the Amlogic Meson
-SPIFC (SPI Flash Controller).
+This adds a node for the SPI Flash Controller to the Amlogic Meson
+DTS.
 
 Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+Acked-by: Mark Brown <broonie@kernel.org>
 ---
- .../devicetree/bindings/spi/spi-meson.txt          | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-meson.txt
+ arch/arm/boot/dts/meson.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-meson.txt b/Documentation/devicetree/bindings/spi/spi-meson.txt
-new file mode 100644
-index 0000000..bb52a86
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi-meson.txt
-@@ -0,0 +1,22 @@
-+Amlogic Meson SPI controllers
+diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
+index b91e430..e26d37a 100644
+--- a/arch/arm/boot/dts/meson.dtsi
++++ b/arch/arm/boot/dts/meson.dtsi
+@@ -135,5 +135,14 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 		};
 +
-+* SPIFC (SPI Flash Controller)
-+
-+The Meson SPIFC is a controller optimized for communication with SPI
-+NOR memories, without DMA support and a 64-byte unified transmit /
-+receive buffer.
-+
-+Required properties:
-+ - compatible: should be "amlogic,meson6-spifc"
-+ - reg: physical base address and length of the controller registers
-+ - clocks: phandle of the input clock for the baud rate generator
-+ - #address-cells: should be 1
-+ - #size-cells: should be 0
-+
-+	spi at c1108c80 {
-+		compatible = "amlogic,meson6-spifc";
-+		reg = <0xc1108c80 0x80>;
-+		clocks = <&clk81>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
++		spifc: spi at c1108c80 {
++			compatible = "amlogic,meson6-spifc";
++			reg = <0xc1108c80 0x80>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			clocks = <&clk81>;
++			status = "disabled";
++		};
+ 	};
+ }; /* end of / */
 -- 
 1.9.1
