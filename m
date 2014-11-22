@@ -1,24 +1,42 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 22 Nov 2014 21:02:54 +0100
-Subject: [PATCH v2 3/3] KVM: arm/arm64: Enable Dirty Page logging for ARMv8
-In-Reply-To: <1416039550-28125-4-git-send-email-m.smarduch@samsung.com>
-References: <1416039550-28125-1-git-send-email-m.smarduch@samsung.com>
- <1416039550-28125-4-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20141122200254.GS3401@cbox>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Sat, 22 Nov 2014 21:26:20 +0100
+Subject: [PATCH v2 1/5] ARM: dts: exynos5410: Clean up SMDK5410 indentation
+In-Reply-To: <1416687984-3546-1-git-send-email-afaerber@suse.de>
+References: <1416687984-3546-1-git-send-email-afaerber@suse.de>
+Message-ID: <1416687984-3546-2-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 15, 2014 at 12:19:10AM -0800, m.smarduch at samsung.com wrote:
-> From: Mario Smarduch <m.smarduch@samsung.com>
-> 
-> This patch enables ARMv8 ditry page logging support. Plugs ARMv8 into generic
-> layer through Kconfig symbol, and drops earlier ARM64 constraints to enable
-> logging at architecture layer.
-> 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+The UART status properties are indented one level too deep, and we want
+to derive a device tree for the ODROID-XU. Fix this before it propagates.
 
-Just reminding you again of what I said in the previous thread (think
-that was before you sent this out), that you need to handle the pud_huge
-case in arch/arm/kvm/mmu.c for ARMv8 here.
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+v1 -> v2: Unchanged
 
--Christoffer
+ arch/arm/boot/dts/exynos5410-smdk5410.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+index be3e02530b42..cebeaab3abec 100644
+--- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
++++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+@@ -62,13 +62,13 @@
+ };
+ 
+ &uart0 {
+-		status = "okay";
++	status = "okay";
+ };
+ 
+ &uart1 {
+-		status = "okay";
++	status = "okay";
+ };
+ 
+ &uart2 {
+-		status = "okay";
++	status = "okay";
+ };
+-- 
+2.1.2
