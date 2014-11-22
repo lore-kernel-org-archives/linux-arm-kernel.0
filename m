@@ -1,35 +1,35 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 22 Nov 2014 09:48:10 +0900
-Subject: [PATCH v4 1/2] i2c: s3c2410: Handle i2c sys_cfg register in i2c
- driver
-In-Reply-To: <20141121164726.GA1426@katana>
-References: <1414656270-8048-1-git-send-email-pankaj.dubey@samsung.com>
- <1414656270-8048-2-git-send-email-pankaj.dubey@samsung.com>
- <20141121072545.GG1480@katana> <546F1140.4050709@samsung.com>
- <20141121164726.GA1426@katana>
-Message-ID: <019101d005ed$fd3d5eb0$f7b81c10$@kernel.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 21 Nov 2014 19:50:50 -0500
+Subject: [PATCHv3 09/16] ARM: mvebu: implement suspend/resume support
+ for Armada XP
+In-Reply-To: <20141121172031.GC20238@lunn.ch>
+References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1416585613-2113-10-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20141121164142.GB20238@lunn.ch>
+ <20141121175957.6ef4f26d@free-electrons.com>
+ <20141121172031.GC20238@lunn.ch>
+Message-ID: <20141122005050.GK22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram Sang wrote:
+On Fri, Nov 21, 2014 at 06:20:31PM +0100, Andrew Lunn wrote:
+> > > Hi Thomas
+> > > 
+> > > Is this a well defined mechanism supported by mainline uboot, barebox
+> > > etc. Or is it some Marvell extension to their uboot?
+> > 
+> > As far as I know, it is a Marvell extension to their "binary header",
+> > so it's done even before U-Boot starts.
 > 
-Hi Wolfram,
-
-> > >I usually don't take DTS patches. They should go via arm-soc. Please say
-> > >so if there are reasons I should take them.
-> >
-> > I CC'ed to you because same patch contains changes in i2c driver.
+> Ah, O.K. So i miss understood what you meant by bootloader. It is the
+> first stage boot loader as part of the BootROM that does this.
 > 
-> Yes, those should absolutely go via my I2C tree. You need to make a
-> seperate patch out of the dts changes which then also should go via
-> samsung-soc, unless Kukjin says he really wants to go the via I2C. But I
-> guess the latter will just create merge conflicts.
+> If i've got this wrong, probably others will as well. So could you
+> make the comments talk about BootROM bootloader?
 
-Hmm...I think, Pankaj needs to submit separated patches 1) driver change, 2) dt
-change and then 3) remove change. And 2nd and 3rd changes should be handed in
-Samsung tree together after landing 1) change in -next.
+No need to respin just for this, I'll quote Thomas' explanation in the
+commit log.
 
-Of course, 1) change should be handled in i2c tree ;)
+thx,
 
-Thanks,
-Kukjin
+Jason.
