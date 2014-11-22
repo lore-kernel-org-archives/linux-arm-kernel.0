@@ -1,46 +1,104 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Nov 2014 21:51:11 -0500
-Subject: [PATCH v3 0/5] Minor fixes for Marvell Armada 38x SoC.
-In-Reply-To: <1415980652-7429-1-git-send-email-mw@semihalf.com>
-References: <1415980652-7429-1-git-send-email-mw@semihalf.com>
-Message-ID: <20141122025111.GQ22670@titan.lakedaemon.net>
+From: wangyijing0307@gmail.com (Yijing Wang)
+Date: Sat, 22 Nov 2014 10:58:05 +0800
+Subject: [PATCH 00/10] Save MSI chip in pci_sys_data
+In-Reply-To: <20141121172018.GA6578@google.com>
+References: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
+ <20141112042359.GK28161@google.com> <20141121172018.GA6578@google.com>
+Message-ID: <546FFBBD.8060909@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 04:57:27PM +0100, Marcin Wojtas wrote:
-> Hello,
-> 
-> It seems that my server at work is not properly configured to be accepted by
-> LAKML. Now everything should be ok.
-> 
-> Changes from v2:
-> * Add 'Acked-by: Andrew Lunn <andrew@lunn.ch>' information to the commit logs
-> 
-> Changes from v1:
-> * Improve commit log with better justification for changing ethernet
->   aliases format in Armada 38x Device Tree
-> 
-> This patchset adds minor fixes for Armada 38x SoC around SDHCI interface. It
-> also enables usage of I2C char-device and adjusts ethernet aliases for
-> bootloader's needs. Any feedback is welcome.
-> 
-> 
-> Marcin Wojtas (5):
->   ARM: mvebu: re-enable SDHCI driver for Armada 38x SoC in v7 defconfig
->   ARM: mvebu: enable no-1-8-v flag for Armada 385 DB SDHCI interface
->   ARM: mvebu: remove clock-frequency from Armada 38x SDHCI Device Tree
->     node
->   ARM: mvebu: adjust ethernet aliases according to U-Boot requirements
->     for A38x
->   ARM: mvebu: enable i2c device in mvebu_v7_defconfig
-> 
->  arch/arm/boot/dts/armada-385-db.dts | 2 +-
->  arch/arm/boot/dts/armada-38x.dtsi   | 6 +++---
->  arch/arm/configs/mvebu_v7_defconfig | 2 ++
->  3 files changed, 6 insertions(+), 4 deletions(-)
 
-Patches 1 and 5 applied to mvebu/defconfig, 2-4 applied to mvebu/dt.
+? 2014/11/22 1:20, Bjorn Helgaas ??:
+> [+cc Marc]
+>
+> On Tue, Nov 11, 2014 at 09:23:59PM -0700, Bjorn Helgaas wrote:
+>> On Mon, Oct 27, 2014 at 03:48:37PM +0800, Yijing Wang wrote:
+>>> Now PCI host bridge drivers in arm associate MSI chip and
+>>> PCI bus by adding .add_bus(), and assign MSI chip pointer
+>>> to every PCI bus. Associating MSI chip and every PCI bus
+>>> is not necessary. All PCI busses under same PCI host brdige
+>>> share the same MSI chip. So saving MSI chip in pci_sys_data
+>>> is a better solution, it make PCI host bridge drivers clean.
+>>> Because we still need to provide arch spec pcibios_msi_controller()
+>>> to extract MSI controller pointer, a better solution is to
+>>> refactor PCI host bridge, make a generic pci_host_bridge, and
+>>> save common info like PCI domain number, MSI chip, resources
+>>> in it. We will do that work in another series as soon.
+>>>
+>>> To Bjorn: Because struct msi_chip defined in struct hw_pci and pci_sys_data
+>>> is under the #ifdef CONFIG_PCI_MSI, if we use if(IS_ENABLED(CONFIG_PCI_MSI))
+>>> in PCI host bridge drivers, it will cause build errors when the CONFIG_PCI_MSI
+>>> is off. So I keep #ifdef CONFIG_PCI_MSI in this series.
+>>>
+>>> Yijing Wang (10):
+>>>    MSI: Rename msi_chip to msi_controller for better readability
+>>>    PCI/MSI: Introduce weak pcibios_msi_controller()
+>>>    arm/MSI: Save MSI controller in pci_sys_data
+>>>    PCI: tegra: Save MSI controller in pci_sys_data
+>>>    PCI: designware: Save MSI controller in pci_sys_data
+>>>    PCI: rcar: Save MSI controller in pci_sys_data
+>>>    PCI: mvebu: Save MSI controller in pci_sys_data
+>>>    PCI: xilinx: Save MSI controller in pci_sys_data
+>>>    arm/PCI: Clean unused pcibios_add_bus() and pcibios_remove_bus()
+>>>    PCI/MSI: Remove useless bus->msi assignment
+>>>
+>>>   arch/arm/include/asm/mach/pci.h     |   10 +++++---
+>>>   arch/arm/kernel/bios32.c            |   28 ++++++++++--------------
+>>>   drivers/irqchip/irq-armada-370-xp.c |   22 +++++++++---------
+>>>   drivers/of/of_pci.c                 |   40 +++++++++++++++++-----------------
+>>>   drivers/pci/host/pci-keystone-dw.c  |    4 +-
+>>>   drivers/pci/host/pci-keystone.h     |    2 +-
+>>>   drivers/pci/host/pci-mvebu.c        |   14 ++++-------
+>>>   drivers/pci/host/pci-tegra.c        |   37 +++++++++++++-------------------
+>>>   drivers/pci/host/pcie-designware.c  |   25 +++++++--------------
+>>>   drivers/pci/host/pcie-designware.h  |    2 +-
+>>>   drivers/pci/host/pcie-rcar.c        |   37 +++++++++++++-------------------
+>>>   drivers/pci/host/pcie-xilinx.c      |   27 +++++++----------------
+>>>   drivers/pci/msi.c                   |   22 ++++++++++++++-----
+>>>   drivers/pci/probe.c                 |    1 -
+>>>   include/linux/msi.h                 |    6 ++--
+>>>   include/linux/of_pci.h              |   14 ++++++------
+>>>   include/linux/pci.h                 |    2 +-
+>>>   17 files changed, 132 insertions(+), 161 deletions(-)
+>>>
+>> Applied to pci/msi for v3.19, thanks.
+> I reworked this series slightly to:
+>
+>    - Change pci_msi_controller() and pcibios_msi_controller() from taking a
+>      pci_bus * to taking a pci_dev *.  This is so the interface allows
+>      per-device MSI controllers.  I don't think there's any reason to assume
+>      all devices on a bus have to have the same controller.
+>
+>    - Drop the last patch ("PCI/MSI: Remove useless bus->msi assignment")
+>      because it broke Marc's follow-on patches.
+>
+> I updated pci/msi, but I haven't put it in my "next" branch yet because I
+> want confirmation from Fengguang's autobuilder that I didn't break
+> anything.
+>
+> Current status of my tree:
+>
+>      6cf00af0ae15 [1] pci/msi (contains this rework)
+>      149792795d2b [2] next (does *not* contain this rework)
+>
+> Thomas, if pci/msi looks good to you, feel free to pull it into your tree.
+> The only change you should need to make is to change the parameters to
+> pci_msi_controller() and pcibios_msi_controller().
+>
+> Just FYI, I'm leaving on vacation for a week, so I won't be able to fix any
+> issues until Dec 1.
 
-thx,
+Hi Bjorn, thanks very much for your improvement for this series.
+It looks good to me. :)
 
-Jason.
+>
+> Bjorn
+>
+> [1] https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=next&id=6cf00af0ae15
+> [2] https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=next&id=149792795d2b
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
