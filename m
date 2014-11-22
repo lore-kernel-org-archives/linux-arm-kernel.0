@@ -1,73 +1,45 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Nov 2014 21:40:52 -0500
-Subject: [PATCH v2 0/4] Hot plug support for the Armada 38x SoCs
-In-Reply-To: <1414669184-16785-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1414669184-16785-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20141122024052.GP22670@titan.lakedaemon.net>
+Date: Fri, 21 Nov 2014 21:51:11 -0500
+Subject: [PATCH v3 0/5] Minor fixes for Marvell Armada 38x SoC.
+In-Reply-To: <1415980652-7429-1-git-send-email-mw@semihalf.com>
+References: <1415980652-7429-1-git-send-email-mw@semihalf.com>
+Message-ID: <20141122025111.GQ22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 12:39:40PM +0100, Gregory CLEMENT wrote:
-> Hi,
+On Fri, Nov 14, 2014 at 04:57:27PM +0100, Marcin Wojtas wrote:
+> Hello,
 > 
-> This patch set is the second version of the series adding the hot plug
-> and also kexec support for the Armada 38x Socs.
+> It seems that my server at work is not properly configured to be accepted by
+> LAKML. Now everything should be ok.
 > 
-> If nobody object we could push them in linux-next.
+> Changes from v2:
+> * Add 'Acked-by: Andrew Lunn <andrew@lunn.ch>' information to the commit logs
 > 
-> The first patch was done in order to have the same code between Armada
-> XP and the Cortex A9 based mvebu SoCs. In order to ensure the the
-> backward compatibility for the device tree, it is only a preliminary
-> work for it.
+> Changes from v1:
+> * Improve commit log with better justification for changing ethernet
+>   aliases format in Armada 38x Device Tree
 > 
-> The second patch moves the SCU power up sequence in a dedicated
-> assembly function. It was done in order to reuse it in the 3rd patch.
+> This patchset adds minor fixes for Armada 38x SoC around SDHCI interface. It
+> also enables usage of I2C char-device and adjusts ethernet aliases for
+> bootloader's needs. Any feedback is welcome.
 > 
-> The third patch fixes the secondary startup for the cortex A9 mvebu
-> SoC. Indeed, the initial code was written with the assumption the SCU
-> will be always power on, which is not only true especially in the
-> kexec case.
 > 
-> These 2 patches may worth to be pushed to the stable kernel.
+> Marcin Wojtas (5):
+>   ARM: mvebu: re-enable SDHCI driver for Armada 38x SoC in v7 defconfig
+>   ARM: mvebu: enable no-1-8-v flag for Armada 385 DB SDHCI interface
+>   ARM: mvebu: remove clock-frequency from Armada 38x SDHCI Device Tree
+>     node
+>   ARM: mvebu: adjust ethernet aliases according to U-Boot requirements
+>     for A38x
+>   ARM: mvebu: enable i2c device in mvebu_v7_defconfig
 > 
-> Then the last patch adds the CPU hotplug support for Armada 38x. I
-> tested the hotplug using the /sys/devices/system/cpu/cpu1/online
-> virtual file.  I also tested the kexec feature and managed to switch
-> to a new kernel using kexec.
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> Changelog:
-> 
-> v1 -> v2:
-> 
-> - Fix typo and improve the comment explaining why we need to keep the
->   .smp filed in the 1st patch.
-> 
-> - Add a prefix to the function power_up_scu function to keep it
->   private and not "pollute" the global namespace.
-> 
-> Gregory CLEMENT (4):
->   ARM: mvebu: Clean-up the Armada XP support
->   ARM: mvebu: Move SCU power up in a function
->   ARM: mvebu: Fix the secondary startup for Cortex A9 SoC
->   ARM: mvebu: Implement the CPU hotplug support for the Armada 38x SoCs
-> 
->  arch/arm/mach-mvebu/armada-370-xp.h |  6 -----
->  arch/arm/mach-mvebu/board-v7.c      |  5 ++++
->  arch/arm/mach-mvebu/coherency.c     |  1 -
->  arch/arm/mach-mvebu/cpu-reset.c     |  1 -
->  arch/arm/mach-mvebu/headsmp-a9.S    |  1 +
->  arch/arm/mach-mvebu/platsmp-a9.c    | 53 +++++++++++++++++++++++++++++++++++--
->  arch/arm/mach-mvebu/platsmp.c       |  2 ++
->  arch/arm/mach-mvebu/pmsu.c          |  3 +--
->  arch/arm/mach-mvebu/pmsu.h          |  2 ++
->  arch/arm/mach-mvebu/pmsu_ll.S       | 20 +++++++++-----
->  10 files changed, 75 insertions(+), 19 deletions(-)
+>  arch/arm/boot/dts/armada-385-db.dts | 2 +-
+>  arch/arm/boot/dts/armada-38x.dtsi   | 6 +++---
+>  arch/arm/configs/mvebu_v7_defconfig | 2 ++
+>  3 files changed, 6 insertions(+), 4 deletions(-)
 
-Applied to mvebu/soc with Thomas' Reviewed-by and Tested-by.
+Patches 1 and 5 applied to mvebu/defconfig, 2-4 applied to mvebu/dt.
 
 thx,
 
