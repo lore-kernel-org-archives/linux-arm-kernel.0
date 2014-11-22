@@ -1,29 +1,41 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Nov 2014 21:59:46 -0500
-Subject: [PATCH] ARM: mvebu: add MTD_BLOCK to mvebu_v7_defconfig
-In-Reply-To: <1415873489-22446-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1415873489-22446-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20141122025946.GR22670@titan.lakedaemon.net>
+From: klightspeed@killerwolves.net (Ben Peddell)
+Date: Sat, 22 Nov 2014 13:10:21 +1000
+Subject: [PATCHv6 10/10] arm: mvebu: add .dts file for Synology DS414
+In-Reply-To: <5b678d6d1f2f42f4bf0d087878b9d8024d463ea7.1416613429.git.arno@natisbad.org>
+References: <cover.1416613429.git.arno@natisbad.org>
+ <5b678d6d1f2f42f4bf0d087878b9d8024d463ea7.1416613429.git.arno@natisbad.org>
+Message-ID: <546FFE9D.2000502@killerwolves.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 11:11:29AM +0100, Thomas Petazzoni wrote:
-> Since many (most?) mvebu platforms have NAND or SPI flashes, it makes
-> sense to have CONFIG_MTD_BLOCK=y in mvebu_v7_defconfig. The vast
-> majority of the other ARM defconfigs have it enabled, including
-> mvebu_v5_defconfig.
+On 22/11/14 09:46, Arnaud Ebalard wrote:
+> +
+> +	syno_id_bit0_pin: syno-id-bit0-pin {
+> +		marvell,pins = "mpp26";
+> +		marvell,function = "gpio";
+> +	};
+> +
+> +	pmx_syno_id_bit1: syno-id-bit1-pin {
+> +		marvell,pins = "mpp28";
+> +		marvell,function = "gpio";
+> +	};
+> +
+> +	pmx_syno_id_bit2: syno-id-bit2-pin {
+> +		marvell,pins = "mpp29";
+> +		marvell,function = "gpio";
+> +	};
+> +
+> +	pmx_fan1_alarm: fan1-alarm-pin {
+> +		marvell,pins = "mpp33";
+> +		marvell,function = "gpio";
+> +	};
+
+It looks like you forgot to replace pmx_* with *_pin here.
+
+> +
+> +	fan2_alarm_pin: fan2-alarm-pin {
+> +		marvell,pins = "mpp32";
+> +		marvell,function = "gpio";
+> +	};
+> +};
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-> Patch based on mvebu/defconfig
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/configs/mvebu_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-
-Applied to mvebu/defconfig with Andrew's Ack.
-
-thx,
-
-Jason.
