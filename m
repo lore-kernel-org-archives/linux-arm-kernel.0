@@ -1,35 +1,49 @@
 From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Sat, 22 Nov 2014 16:21:39 +0100
-Subject: [PATCH v3 1/4] spi: core: Add spi_transfer_is_last() helper
+Date: Sat, 22 Nov 2014 16:21:40 +0100
+Subject: [PATCH v3 2/4] spi: meson: Add device tree bindings documentation for
+ SPIFC
 In-Reply-To: <1416669702-7841-1-git-send-email-b.galvani@gmail.com>
 References: <1416669702-7841-1-git-send-email-b.galvani@gmail.com>
-Message-ID: <1416669702-7841-2-git-send-email-b.galvani@gmail.com>
+Message-ID: <1416669702-7841-3-git-send-email-b.galvani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the function spi_transfer_is_last() which can be used by
-drivers to know whether a given transfer is the last one in the
-current message.
+This adds documentation of device tree bindings for the Amlogic Meson
+SPIFC (SPI Flash Controller).
 
 Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
 ---
- include/linux/spi/spi.h | 6 ++++++
- 1 file changed, 6 insertions(+)
+ .../devicetree/bindings/spi/spi-meson.txt          | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-meson.txt
 
-diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
-index 46d188a..a6ef2a8 100644
---- a/include/linux/spi/spi.h
-+++ b/include/linux/spi/spi.h
-@@ -1049,4 +1049,10 @@ spi_unregister_device(struct spi_device *spi)
- extern const struct spi_device_id *
- spi_get_device_id(const struct spi_device *sdev);
- 
-+static inline bool
-+spi_transfer_is_last(struct spi_master *master, struct spi_transfer *xfer)
-+{
-+	return list_is_last(&xfer->transfer_list, &master->cur_msg->transfers);
-+}
+diff --git a/Documentation/devicetree/bindings/spi/spi-meson.txt b/Documentation/devicetree/bindings/spi/spi-meson.txt
+new file mode 100644
+index 0000000..bb52a86
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/spi-meson.txt
+@@ -0,0 +1,22 @@
++Amlogic Meson SPI controllers
 +
- #endif /* __LINUX_SPI_H */
++* SPIFC (SPI Flash Controller)
++
++The Meson SPIFC is a controller optimized for communication with SPI
++NOR memories, without DMA support and a 64-byte unified transmit /
++receive buffer.
++
++Required properties:
++ - compatible: should be "amlogic,meson6-spifc"
++ - reg: physical base address and length of the controller registers
++ - clocks: phandle of the input clock for the baud rate generator
++ - #address-cells: should be 1
++ - #size-cells: should be 0
++
++	spi at c1108c80 {
++		compatible = "amlogic,meson6-spifc";
++		reg = <0xc1108c80 0x80>;
++		clocks = <&clk81>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
 -- 
 1.9.1
