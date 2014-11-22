@@ -1,76 +1,128 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 22 Nov 2014 08:35:15 +0100
-Subject: [PATCH resend 2/4] ARM: dts: sunxi: unify APB1 clock
-In-Reply-To: <2400552.aBVIZmJhTh@wuerfel>
-References: <1415245232-20585-1-git-send-email-wens@csie.org>
- <20141121142903.GD4752@lukather> <4114168.zuylrCsruj@wuerfel>
- <2400552.aBVIZmJhTh@wuerfel>
-Message-ID: <20141122073515.GJ4752@lukather>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Sat, 22 Nov 2014 13:15:56 +0530
+Subject: [PATCH] thermal: exynos: add optional sclk support
+Message-ID: <1416642356-8694-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Exynos7 has a special clock required for the functional operation
+of the TMU that is not present in earlier SoCs. Add support for
+this optional clock and update the binding documentation.
 
-On Fri, Nov 21, 2014 at 05:08:08PM +0100, Arnd Bergmann wrote:
-> On Friday 21 November 2014 15:35:57 Arnd Bergmann wrote:
-> > On Friday 21 November 2014 15:29:03 Maxime Ripard wrote:
-> > > On Fri, Nov 21, 2014 at 12:57:02PM +0100, Arnd Bergmann wrote:
-> > > > On Thursday 20 November 2014 14:04:01 Kevin Hilman wrote:
-> > > > > Chen-Yu Tsai <wens@csie.org> writes:
-> > > > > 
-> > > > > > From: Emilio L?pez <emilio@elopez.com.ar>
-> > > > > >
-> > > > > > With the new factors infrastructure in place, we can unify apb1 and
-> > > > > > apb1_mux as a single clock now.
-> > > > > >
-> > > > > > Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> > > > > > [wens at csie.org: Change apb1 node label to "apb1"; reword commit title]
-> > > > > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > > > > 
-> > > > > Boot breakage in arm-soc/for-next on sun4i-a10-cubieboard and
-> > > > > sun7i-a20-cubieboard2[1] was bisected down to this patch[1].
-> > > > > 
-> > > > > Reverting $SUBJECT on top of arm-soc gets things booting again.
-> > > > > 
-> > > > 
-> > > > As this looks like it was intended as a cleanup without functional
-> > > > changes, I would go ahead and revert it in next/dt.
-> > > > 
-> > > > Any objections?
-> > > 
-> > > Yeah, you'd break linux-next as well doing so, as the clock driver now
-> > > requires this from the DT.
-> > > 
-> > > I can merge it through the clock tree though if you prefer it that
-> > > way.
-> > 
-> > Do you know why this commit breaks booting then?
-> > 
-> 
-> I have now reverted the entire branch, to get things working again.
-> 
-> Please send a new pull request once you have a version that you 
-> have actually tested.
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+This patch was earlier part of the series adding TMU support for
+Exynos7 [1]. It has been split out as it does not impact the on-going
+consolidation in the exynos tmu driver and can be considered
+independently.
 
-This was tested and working. And again, the linux-next proves it.
+ .../devicetree/bindings/thermal/exynos-thermal.txt |    3 +++
+ drivers/thermal/samsung/exynos_tmu.c               |   27 ++++++++++++++++----
+ 2 files changed, 25 insertions(+), 5 deletions(-)
 
-I know very well why it doesn't work, and it's actually expected: some
-clock was refactored, the DT needed to be changed, only half of it was
-merged through arm-soc.
-
-It really is just because one part got through arm-soc, the other
-through the clock tree, nothing more.
-
-Maxime
-
+diff --git a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+index ae738f5..2393eac 100644
+--- a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+@@ -32,10 +32,13 @@
+ - clocks : The main clocks for TMU device
+ 	-- 1. operational clock for TMU channel
+ 	-- 2. optional clock to access the shared registers of TMU channel
++	-- 3. optional special clock for functional operation
+ - clock-names : Thermal system clock name
+ 	-- "tmu_apbif" operational clock for current TMU channel
+ 	-- "tmu_triminfo_apbif" clock to access the shared triminfo register
+ 		for current TMU channel
++	-- "tmu_sclk" clock for functional operation of the current TMU
++		channel
+ - vtmu-supply: This entry is optional and provides the regulator node supplying
+ 		voltage to TMU. If needed this entry can be placed inside
+ 		board/platform specific dts file.
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index d44d91d..6627937 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -128,6 +128,7 @@
+  * @lock: lock to implement synchronization.
+  * @clk: pointer to the clock structure.
+  * @clk_sec: pointer to the clock structure for accessing the base_second.
++ * @sclk: pointer to the clock structure for accessing the tmu special clk.
+  * @temp_error1: fused value of the first point trim.
+  * @temp_error2: fused value of the second point trim.
+  * @regulator: pointer to the TMU regulator structure.
+@@ -147,7 +148,7 @@ struct exynos_tmu_data {
+ 	enum soc_type soc;
+ 	struct work_struct irq_work;
+ 	struct mutex lock;
+-	struct clk *clk, *clk_sec;
++	struct clk *clk, *clk_sec, *sclk;
+ 	u8 temp_error1, temp_error2;
+ 	struct regulator *regulator;
+ 	struct thermal_sensor_conf *reg_conf;
+@@ -883,10 +884,21 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+ 		goto err_clk_sec;
+ 	}
+ 
++	data->sclk = devm_clk_get(&pdev->dev, "tmu_sclk");
++	if (IS_ERR(data->sclk)) {
++		dev_err(&pdev->dev, "Failed to get optional special clock\n");
++	} else {
++		ret = clk_prepare_enable(data->sclk);
++		if (ret) {
++			dev_err(&pdev->dev, "Failed to enable special clock\n");
++			goto err_clk;
++		}
++	}
++
+ 	ret = exynos_tmu_initialize(pdev);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to initialize TMU\n");
+-		goto err_clk;
++		goto err_sclk;
+ 	}
+ 
+ 	exynos_tmu_control(pdev, true);
+@@ -896,7 +908,7 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+ 				sizeof(struct thermal_sensor_conf), GFP_KERNEL);
+ 	if (!sensor_conf) {
+ 		ret = -ENOMEM;
+-		goto err_clk;
++		goto err_sclk;
+ 	}
+ 	sprintf(sensor_conf->name, "therm_zone%d", data->id);
+ 	sensor_conf->read_temperature = (int (*)(void *))exynos_tmu_read;
+@@ -928,7 +940,7 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+ 	ret = exynos_register_thermal(sensor_conf);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to register thermal interface\n");
+-		goto err_clk;
++		goto err_sclk;
+ 	}
+ 	data->reg_conf = sensor_conf;
+ 
+@@ -936,10 +948,13 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+ 		IRQF_TRIGGER_RISING | IRQF_SHARED, dev_name(&pdev->dev), data);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to request irq: %d\n", data->irq);
+-		goto err_clk;
++		goto err_sclk;
+ 	}
+ 
+ 	return 0;
++err_sclk:
++	if (!IS_ERR(data->sclk))
++		clk_disable_unprepare(data->sclk);
+ err_clk:
+ 	clk_unprepare(data->clk);
+ err_clk_sec:
+@@ -956,6 +971,8 @@ static int exynos_tmu_remove(struct platform_device *pdev)
+ 
+ 	exynos_tmu_control(pdev, false);
+ 
++	if (!IS_ERR(data->sclk))
++		clk_disable_unprepare(data->sclk);
+ 	clk_unprepare(data->clk);
+ 	if (!IS_ERR(data->clk_sec))
+ 		clk_unprepare(data->clk_sec);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141122/c90a5c94/attachment.sig>
+1.7.9.5
