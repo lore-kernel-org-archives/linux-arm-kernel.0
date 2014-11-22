@@ -1,71 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 22 Nov 2014 21:56:48 +0100
-Subject: [PATCHv3 09/16] ARM: mvebu: implement suspend/resume support
- for Armada XP
-In-Reply-To: <20141121172031.GC20238@lunn.ch>
-References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1416585613-2113-10-git-send-email-thomas.petazzoni@free-electrons.com>
- <20141121164142.GB20238@lunn.ch>
- <20141121175957.6ef4f26d@free-electrons.com>
- <20141121172031.GC20238@lunn.ch>
-Message-ID: <20141122215648.771225f2@free-electrons.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 22 Nov 2014 22:08:44 +0100
+Subject: [GIT PULL] temporarily disable rk3288-smp
+Message-ID: <13624879.qYkvC9sWa4@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+Hi Arnd, Olof,
 
-On Fri, 21 Nov 2014 18:20:31 +0100, Andrew Lunn wrote:
-> > > Hi Thomas
-> > > 
-> > > Is this a well defined mechanism supported by mainline uboot, barebox
-> > > etc. Or is it some Marvell extension to their uboot?
-> > 
-> > As far as I know, it is a Marvell extension to their "binary header",
-> > so it's done even before U-Boot starts.
-> 
-> Ah, O.K. So i miss understood what you meant by bootloader. It is the
-> first stage boot loader as part of the BootROM that does this.
-> 
-> If i've got this wrong, probably others will as well. So could you
-> make the comments talk about BootROM bootloader?
+it looks like not all bootloaders like the recently introduced
+rk3288-smp-support. Uninitialized CNTVOFF registers of the
+architected timer produce rcu stalls on some boards.
 
-No, it is not the BootROM that does this. It is the binary header,
-which is something different.
+Both Olof and Kevin were affected by this. On Kevin's board
+we could simply upgrade u-boot to a version behaving correctly
+while Olof's board uses coreboot where no fix for this exists
+currently. Also as far as I know Olof's board is the only one
+in circulation using coreboot, but it would still be nice to keep
+the boot tests working for the time being.
 
-Essentially, the boot process is the following:
+There exist an alternative approach for solving issues like this
+consisting of
+- clocksource: arch_timer: Fix code to use physical timers when requested [0]
+- clocksource: arch_timer: Allow the device tree to specify uninitialized timer registers [1]
 
- * BootROM runs. This one cannot be changed, it is set in stone in the
-   chip.
 
- * It locates a bootable image from some media, and looks at its
-   header. Its header can contain several sections, some describing
-   some (address, value) pairs to write some values to some registers
-   (this was used on Kirkwood to configure the memory controller, for
-   example). Some other sections can contain binary code that will get
-   executed on the SoC, this is what is called a "binary header". It
-   gets executed before U-Boot starts, but it's really a piece of
-   software that can be changed.
+So to keep Olof's boottests working, disable the rk3288-smp until this
+gets sorted. Interested parties with a working bootloader can of course
+always simply re-insert the enable-method to have working smp.
 
- * Then it loads and runs U-Boot.
 
-The "binary header" is currently the piece of code that we extract
-using the kwbimage tool from existing U-Boot images to build working
-Barebox images, since we haven't yet written the equivalent code in
-Barebox land.
+[0] https://patchwork.kernel.org/patch/5051901/
+[1] https://patchwork.kernel.org/patch/5051881/
 
-So, the specification of where the "resume informations" is located and
-how this information is organized is purely defined by software that
-can potentially be changed, not by the BootROM. Though that if we
-decided to use a different protocol, we would basically have a
-suspend/resume in the kernel that would not work with any Marvell
-platform  that uses the default bootloader.
 
-I hope that this clarifies how things are working.
+The following changes since commit efb66e93d13da5a7b11b3a8dbb24a6fb29141752:
 
-Best regards,
+  ARM: dts: rockchip: enable PWM on Radxa Rock (2014-11-15 21:16:30 +0100)
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.19-rockchip-dts3
+
+for you to fetch changes up to b77d43943ea83997c6c37b8831d1561981d499c5:
+
+  ARM: dts: rockchip: temporarily disable smp on rk3288 (2014-11-22 16:23:28 +0100)
+
+----------------------------------------------------------------
+Disable smp again on rk3288 temporarily to make Olof's boottest
+run again, until the patches for using the physical architected
+timers got accepted.
+
+----------------------------------------------------------------
+Heiko Stuebner (1):
+      ARM: dts: rockchip: temporarily disable smp on rk3288
+
+ arch/arm/boot/dts/rk3288.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
