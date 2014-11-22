@@ -1,18 +1,20 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 21 Nov 2014 16:25:34 -0800
-Subject: [PATCH v3 2/2] ARM: dts: AM43xx: add tscadc DT entries for
- am437x-evm and am43x-epos-evm
-In-Reply-To: <1416564862-23056-3-git-send-email-vigneshr@ti.com>
-References: <1416564862-23056-1-git-send-email-vigneshr@ti.com>
- <1416564862-23056-3-git-send-email-vigneshr@ti.com>
-Message-ID: <20141122002533.GK7046@atomide.com>
+Date: Fri, 21 Nov 2014 16:31:54 -0800
+Subject: [PATCH 05/10] arm: omap: omap2plus_defconfig: enable ECAP and
+ EHRPWM
+In-Reply-To: <1416334028-7766-5-git-send-email-balbi@ti.com>
+References: <1416334028-7766-1-git-send-email-balbi@ti.com>
+ <1416334028-7766-5-git-send-email-balbi@ti.com>
+Message-ID: <20141122003154.GL7046@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vignesh R <vigneshr@ti.com> [141121 02:18]:
-> This patch adds tscadc DT entries for am437x-gp-evm
-> and am43x-epos-evm.
+* Felipe Balbi <balbi@ti.com> [141118 10:08]:
+> Many of AM335x and AM437x hook backlight to
+> one of these two devices. By enabling their
+> drivers we make sure pwm-backlight can do
+> its thing.
 
-Applying into omap-for-v3.19/dt-v2 thanks.
+Applying patches 1 - 5 to omap-for-v3.19/soc thanks.
 
 Tony
