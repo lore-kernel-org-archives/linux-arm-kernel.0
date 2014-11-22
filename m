@@ -1,36 +1,33 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Sat, 22 Nov 2014 19:08:57 +0800
-Subject: [PATCH v1] ARM/ARM64: support KVM_IOEVENTFD
-In-Reply-To: <546F36DE.5060004@linaro.org>
-References: <1416374181-28415-1-git-send-email-ming.lei@canonical.com>
- <546F36DE.5060004@linaro.org>
-Message-ID: <CACVXFVMXmqfwm75rLc==Gh5h1TTU-FqDq4TZmXu1AiU9dK0gNg@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 22 Nov 2014 13:18:27 +0100
+Subject: IRQ #0 broken on ARM
+In-Reply-To: <CAL_JsqL50EAmcrM=mcLRwa0OwnhnnXx6ZFzkgfybfQ49ROn7zA@mail.gmail.com>
+ (Rob Herring's message of "Fri, 21 Nov 2014 16:27:35 -0600")
+References: <CALT56yPs-SSssff1waj81CRQfER4ZKKR=B1jOXVL-aBChicSjg@mail.gmail.com>
+ <87zjbk966i.fsf@approximate.cambridge.arm.com>
+ <20141121110135.GS4042@n2100.arm.linux.org.uk>
+ <546F1F45.7080103@arm.com> <87egsw5jen.fsf@free.fr>
+ <CAL_JsqL50EAmcrM=mcLRwa0OwnhnnXx6ZFzkgfybfQ49ROn7zA@mail.gmail.com>
+Message-ID: <871tov5sz0.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Rob Herring <robherring2@gmail.com> writes:
 
-Thanks for your FYI.
-
-On Fri, Nov 21, 2014 at 8:58 PM, Eric Auger <eric.auger@linaro.org> wrote:
-> Hi Ming,
+>>  #ifdef CONFIG_PXA_HAVE_ISA_IRQS
 >
-> for your information there is a series written by Antonios (added in CC)
-> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-March/008416.html
-> exactly on the same topic.
+> You can get rid of this ifdef and kconfig symbol. It is only used here.
+Right.
+
+>> -#define PXA_IRQ(x)     (PXA_ISA_IRQ_NUM + (x))
+>> +#define PXA_IRQ(x)     (16 + (x))
 >
-> The thread was reactivated by Nikolay latterly on Nov (see
-> http://www.gossamer-threads.com/lists/linux/kernel/1886716?page=last).
->
+> Perhaps use NR_IRQS_LEGACY here.
+Ah yes, good idea.
 
-Looks google didn't tell me the above, :-(
+I'll sent a proper patch next time, not an attached piece of code.
 
-> I am also convinced we must progress on ioeventfd topic concurrently
+Cheers.
 
-Yes, hope both two can be merged soon.
-
-> with irqfd one. What starting point do we use then for further comments?
-
-Please ignore this one and follow previous thread.
-
-Thanks,
+-- 
+Robert
