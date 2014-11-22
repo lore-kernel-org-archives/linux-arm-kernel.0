@@ -1,82 +1,86 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 22 Nov 2014 10:20:43 +0100
-Subject: [PATCH v4 6/7] ARM: mvebu: add PHY support to the dts for the
- USB controllers on Armada 375
-In-Reply-To: <20141122020811.GO22670@titan.lakedaemon.net>
-References: <1415879269-29711-1-git-send-email-gregory.clement@free-electrons.com>
- <1415879269-29711-7-git-send-email-gregory.clement@free-electrons.com>
- <20141122020811.GO22670@titan.lakedaemon.net>
-Message-ID: <5470556B.6080608@free-electrons.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Sat, 22 Nov 2014 11:00:35 +0100
+Subject: [PATCH 1/1] ARM: OMAP2: Deletion of unnecessary checks before three
+ function calls
+In-Reply-To: <5317A59D.4@users.sourceforge.net>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net>
+Message-ID: <54705EC3.90708@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Sat, 22 Nov 2014 10:50:33 +0100
 
-On 22/11/2014 03:08, Jason Cooper wrote:
-> On Thu, Nov 13, 2014 at 12:47:48PM +0100, Gregory CLEMENT wrote:
->> Now that the USB cluster node has been added, use it as a PHY provider
->> for the USB controller linked to it: the first EHCI and the xHCI.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  arch/arm/boot/dts/armada-375.dtsi | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
->> index 8f45cf5d2a50..f344ec420c95 100644
->> --- a/arch/arm/boot/dts/armada-375.dtsi
->> +++ b/arch/arm/boot/dts/armada-375.dtsi
->> @@ -14,6 +14,7 @@
->>  #include "skeleton.dtsi"
->>  #include <dt-bindings/interrupt-controller/arm-gic.h>
->>  #include <dt-bindings/interrupt-controller/irq.h>
->> +#include <dt-bindings/phy/phy.h>
-> 
-> Odd.  The previous patch in this series simply adds a line to phy.h,
-> however, I get the following error during 'make dtbs':
-> 
-> ########
->   DTC     arch/arm/boot/dts/armada-375-db.dtb
-> In file included from arch/arm/boot/dts/armada-375-db.dts:17:0:arch/arm/boot/dts/armada-375.dtsi:17:33:
-> fatal error: dt-bindings/phy/phy.h: No such file or directory
->  #include <dt-bindings/phy/phy.h>
->                                  ^
-> compilation terminated.
-> scripts/Makefile.lib:282: recipe for target 'arch/arm/boot/dts/armada-37 5-db.dtb' failed
-> ########
-> 
-> mvebu/dt is based on v3.18-rc1.  Is there a missing dependency
-> somewhere?  Perhaps we should let Kishon take the whole series and
-> handle the (hopefully trivial) merge conflict?
+The functions clk_disable(), of_node_put() and omap_device_delete() test
+whether their argument is NULL and then return immediately.
+Thus the test around the call is not needed.
 
-Actually Kishon asked me to use the dt-bindings/phy/phy.h file which
-was introduced by the patch "phy: Add PHY header file for DT x Driver
-defines". So indeed I had to have a dependency on the phy_dt_header
-branch (which is based on v3.18-rc4 and have only this single commit).
-The git tree is located at
-git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git
+This issue was detected by using the Coccinelle software.
 
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ arch/arm/mach-omap2/omap_device.c | 3 +--
+ arch/arm/mach-omap2/omap_hwmod.c  | 3 +--
+ arch/arm/mach-omap2/timer.c       | 3 +--
+ 3 files changed, 3 insertions(+), 6 deletions(-)
 
-Maybe we could add this branch in mvebu as a dependency as it is done
-on arm-soc. I suggest this because I would prefer that we continue to
-be the only ones to merge the device tree files in order to reduce the
-merge conflict.
-
-Thanks,
-
-Gregory
-
-
-
-> 
-> thx,
-> 
-> Jason.
-> 
-
-
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index d22c30d..5108859 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -199,8 +199,7 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
+ 
+ 	switch (event) {
+ 	case BUS_NOTIFY_DEL_DEVICE:
+-		if (pdev->archdata.od)
+-			omap_device_delete(pdev->archdata.od);
++		omap_device_delete(pdev->archdata.od);
+ 		break;
+ 	case BUS_NOTIFY_ADD_DEVICE:
+ 		if (pdev->dev.of_node)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 9e91a4e..e2406c4 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -917,8 +917,7 @@ static int _disable_clocks(struct omap_hwmod *oh)
+ 
+ 	pr_debug("omap_hwmod: %s: disabling clocks\n", oh->name);
+ 
+-	if (oh->_clk)
+-		clk_disable(oh->_clk);
++	clk_disable(oh->_clk);
+ 
+ 	p = oh->slave_ports.next;
+ 
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 43d03fb..5b428a0 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -205,8 +205,7 @@ static void __init omap_dmtimer_init(void)
+ 	/* If we are a secure device, remove any secure timer nodes */
+ 	if ((omap_type() != OMAP2_DEVICE_TYPE_GP)) {
+ 		np = omap_get_timer_dt(omap_timer_match, "ti,timer-secure");
+-		if (np)
+-			of_node_put(np);
++		of_node_put(np);
+ 	}
+ }
+ 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.3
