@@ -1,63 +1,71 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sat, 22 Nov 2014 21:26:24 +0100
-Subject: [PATCH v2 5/5] ARM: dts: exynos5410: Add ODROID-XU LEDs
-In-Reply-To: <1416687984-3546-1-git-send-email-afaerber@suse.de>
-References: <1416687984-3546-1-git-send-email-afaerber@suse.de>
-Message-ID: <1416687984-3546-6-git-send-email-afaerber@suse.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 22 Nov 2014 21:56:48 +0100
+Subject: [PATCHv3 09/16] ARM: mvebu: implement suspend/resume support
+ for Armada XP
+In-Reply-To: <20141121172031.GC20238@lunn.ch>
+References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1416585613-2113-10-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20141121164142.GB20238@lunn.ch>
+ <20141121175957.6ef4f26d@free-electrons.com>
+ <20141121172031.GC20238@lunn.ch>
+Message-ID: <20141122215648.771225f2@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Hakjoo Kim <ruppi.kim@hardkernel.com>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
-v1 -> v2:
-* Filled in Sob from Hakjoo Kim
+Dear Andrew Lunn,
 
- arch/arm/boot/dts/exynos5410-odroidxu.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+On Fri, 21 Nov 2014 18:20:31 +0100, Andrew Lunn wrote:
+> > > Hi Thomas
+> > > 
+> > > Is this a well defined mechanism supported by mainline uboot, barebox
+> > > etc. Or is it some Marvell extension to their uboot?
+> > 
+> > As far as I know, it is a Marvell extension to their "binary header",
+> > so it's done even before U-Boot starts.
+> 
+> Ah, O.K. So i miss understood what you meant by bootloader. It is the
+> first stage boot loader as part of the BootROM that does this.
+> 
+> If i've got this wrong, probably others will as well. So could you
+> make the comments talk about BootROM bootloader?
 
-diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-index 97310bb727e2..b02cd3ab7b38 100644
---- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
-+++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-@@ -15,6 +15,7 @@
- 
- /dts-v1/;
- #include "exynos5410.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- / {
- 	model = "ODROID-XU based on EXYNOS5410";
- 	compatible = "hardkernel,odroid-xu", "samsung,exynos5410", "samsung,exynos5";
-@@ -39,6 +40,30 @@
- 		reg = <0x02037000 0x1000>;
- 	};
- 
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		blue {
-+			label = "blue:heartbeat";
-+			gpios = <&gpb2 2 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		green {
-+			label = "green:activity";
-+			gpios = <&gpb2 1 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "mmc0";
-+		};
-+
-+		red {
-+			label = "red:activity";
-+			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "mmc1";
-+		};
-+	};
- };
- 
- &mmc_0 {
+No, it is not the BootROM that does this. It is the binary header,
+which is something different.
+
+Essentially, the boot process is the following:
+
+ * BootROM runs. This one cannot be changed, it is set in stone in the
+   chip.
+
+ * It locates a bootable image from some media, and looks at its
+   header. Its header can contain several sections, some describing
+   some (address, value) pairs to write some values to some registers
+   (this was used on Kirkwood to configure the memory controller, for
+   example). Some other sections can contain binary code that will get
+   executed on the SoC, this is what is called a "binary header". It
+   gets executed before U-Boot starts, but it's really a piece of
+   software that can be changed.
+
+ * Then it loads and runs U-Boot.
+
+The "binary header" is currently the piece of code that we extract
+using the kwbimage tool from existing U-Boot images to build working
+Barebox images, since we haven't yet written the equivalent code in
+Barebox land.
+
+So, the specification of where the "resume informations" is located and
+how this information is organized is purely defined by software that
+can potentially be changed, not by the BootROM. Though that if we
+decided to use a different protocol, we would basically have a
+suspend/resume in the kernel that would not work with any Marvell
+platform  that uses the default bootloader.
+
+I hope that this clarifies how things are working.
+
+Best regards,
+
+Thomas
 -- 
-2.1.2
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
