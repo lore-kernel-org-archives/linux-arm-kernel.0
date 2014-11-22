@@ -1,52 +1,46 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Sat, 22 Nov 2014 08:25:01 +0100
-Subject: [PATCH v3 0/5] Minor fixes for Marvell Armada 38x SoC.
-In-Reply-To: <20141122025111.GQ22670@titan.lakedaemon.net>
-References: <1415980652-7429-1-git-send-email-mw@semihalf.com>
- <20141122025111.GQ22670@titan.lakedaemon.net>
-Message-ID: <CAPv3WKdi+K+k6kGBEqBhMqnL3hoo9Y_OaybhBERi+EwBrQX4vA@mail.gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sat, 22 Nov 2014 08:41:10 +0100
+Subject: [PATCHv6 10/10] arm: mvebu: add .dts file for Synology DS414
+In-Reply-To: <546FFE9D.2000502@killerwolves.net> (Ben Peddell's message of
+ "Sat, 22 Nov 2014 13:10:21 +1000")
+References: <cover.1416613429.git.arno@natisbad.org>
+ <5b678d6d1f2f42f4bf0d087878b9d8024d463ea7.1416613429.git.arno@natisbad.org>
+ <546FFE9D.2000502@killerwolves.net>
+Message-ID: <87sihbfzs9.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks!
+Hi Ben,
 
-Marcin
+Ben Peddell <klightspeed@killerwolves.net> writes:
 
-2014-11-22 3:51 GMT+01:00 Jason Cooper <jason@lakedaemon.net>:
-> On Fri, Nov 14, 2014 at 04:57:27PM +0100, Marcin Wojtas wrote:
->> Hello,
->>
->> It seems that my server at work is not properly configured to be accepted by
->> LAKML. Now everything should be ok.
->>
->> Changes from v2:
->> * Add 'Acked-by: Andrew Lunn <andrew@lunn.ch>' information to the commit logs
->>
->> Changes from v1:
->> * Improve commit log with better justification for changing ethernet
->>   aliases format in Armada 38x Device Tree
->>
->> This patchset adds minor fixes for Armada 38x SoC around SDHCI interface. It
->> also enables usage of I2C char-device and adjusts ethernet aliases for
->> bootloader's needs. Any feedback is welcome.
->>
->>
->> Marcin Wojtas (5):
->>   ARM: mvebu: re-enable SDHCI driver for Armada 38x SoC in v7 defconfig
->>   ARM: mvebu: enable no-1-8-v flag for Armada 385 DB SDHCI interface
->>   ARM: mvebu: remove clock-frequency from Armada 38x SDHCI Device Tree
->>     node
->>   ARM: mvebu: adjust ethernet aliases according to U-Boot requirements
->>     for A38x
->>   ARM: mvebu: enable i2c device in mvebu_v7_defconfig
->>
->>  arch/arm/boot/dts/armada-385-db.dts | 2 +-
->>  arch/arm/boot/dts/armada-38x.dtsi   | 6 +++---
->>  arch/arm/configs/mvebu_v7_defconfig | 2 ++
->>  3 files changed, 6 insertions(+), 4 deletions(-)
+> On 22/11/14 09:46, Arnaud Ebalard wrote:
+>> +
+>> +	syno_id_bit0_pin: syno-id-bit0-pin {
+>> +		marvell,pins = "mpp26";
+>> +		marvell,function = "gpio";
+>> +	};
+>> +
+>> +	pmx_syno_id_bit1: syno-id-bit1-pin {
+>> +		marvell,pins = "mpp28";
+>> +		marvell,function = "gpio";
+>> +	};
+>> +
+>> +	pmx_syno_id_bit2: syno-id-bit2-pin {
+>> +		marvell,pins = "mpp29";
+>> +		marvell,function = "gpio";
+>> +	};
+>> +
+>> +	pmx_fan1_alarm: fan1-alarm-pin {
+>> +		marvell,pins = "mpp33";
+>> +		marvell,function = "gpio";
+>> +	};
 >
-> Patches 1 and 5 applied to mvebu/defconfig, 2-4 applied to mvebu/dt.
->
-> thx,
->
-> Jason.
+> It looks like you forgot to replace pmx_* with *_pin here.
+
+Indeed. Weird it went unnoticed during compilation. Thanks for
+pointing it, Ben.
+
+Cheers,
+
+a+
