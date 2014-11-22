@@ -1,10 +1,11 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 22 Nov 2014 11:39:03 +0900
-Subject: [RESEND PATCH 1/2] ARM: dts: exynos4x12: Device tree node
- definition for TMU on Exynos4x12
-In-Reply-To: <1416474343-1283-1-git-send-email-l.majewski@samsung.com>
+Date: Sat, 22 Nov 2014 11:40:00 +0900
+Subject: [RESEND PATCH 2/2] ARM: dts: exynos4412-trats2: Enable TMU support
+ at Trats2
+In-Reply-To: <1416474343-1283-2-git-send-email-l.majewski@samsung.com>
 References: <1416474343-1283-1-git-send-email-l.majewski@samsung.com>
-Message-ID: <035001d005fd$7abac670$70305350$@kernel.org>
+ <1416474343-1283-2-git-send-email-l.majewski@samsung.com>
+Message-ID: <035701d005fd$9ca13620$d5e3a260$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,44 +13,35 @@ Lukasz Majewski wrote:
 > 
 + Bart, Tomasz and MLs
 
-Hi Lukasz,
+Will apply.
 
-Please post including MLs, even resending.
-
-Will apply for v3.19, and just note that you asked me to apply this for 3.18
-in personal talk but I couldn't see any requirements for fixes-3.18. If I'm
-missing something, please let me know.
-
-Thanks,
+Thanks
 Kukjin
 
-> The TMU device tree node definition for Exynos4x12 family of SoCs.
+> This patch enables support for TMU at Exynos4412 based Trats2 board.
 > 
 > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
 > Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 > Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
 > ---
->  arch/arm/boot/dts/exynos4x12.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-> index 861bb91..2e9f1f7 100644
-> --- a/arch/arm/boot/dts/exynos4x12.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-> @@ -271,4 +271,14 @@
->  		compatible = "samsung,exynos4x12-usb2-phy";
->  		samsung,sysreg-phandle = <&sys_reg>;
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index 5e066cd..121430d 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -551,6 +551,11 @@
+>  		status = "okay";
 >  	};
-> +
+> 
 > +	tmu at 100C0000 {
-> +		compatible = "samsung,exynos4412-tmu";
-> +		interrupt-parent = <&combiner>;
-> +		interrupts = <2 4>;
-> +		reg = <0x100C0000 0x100>;
-> +		clocks = <&clock 383>;
-> +		clock-names = "tmu_apbif";
-> +		status = "disabled";
+> +		vtmu-supply = <&ldo10_reg>;
+> +		status = "okay";
 > +	};
->  };
+> +
+>  	i2c_ak8975: i2c-gpio-0 {
+>  		compatible = "i2c-gpio";
+>  		gpios = <&gpy2 4 0>, <&gpy2 5 0>;
 > --
 > 2.0.0.rc2
