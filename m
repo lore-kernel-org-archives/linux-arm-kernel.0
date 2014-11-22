@@ -1,64 +1,55 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 22 Nov 2014 11:27:09 +0900
-Subject: [PATCH v5] ARM: EXYNOS: add Exynos3250 PMU support
-In-Reply-To: <4728982.ETBlJctOKU@amdc1032>
-References: <4728982.ETBlJctOKU@amdc1032>
-Message-ID: <02fb01d005fb$d105c1d0$73114570$@kernel.org>
+Date: Sat, 22 Nov 2014 11:39:03 +0900
+Subject: [RESEND PATCH 1/2] ARM: dts: exynos4x12: Device tree node
+ definition for TMU on Exynos4x12
+In-Reply-To: <1416474343-1283-1-git-send-email-l.majewski@samsung.com>
+References: <1416474343-1283-1-git-send-email-l.majewski@samsung.com>
+Message-ID: <035001d005fd$7abac670$70305350$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartlomiej Zolnierkiewicz wrote:
+Lukasz Majewski wrote:
 > 
-> This patch prepares the PMU code for the future:
-> - suspend/resume (S2R) support
-> - cpuidle AFTR/W-AFTR modes support
-> on Exynos3250.
-> 
-> Cc: Vikas Sajjan <vikas.sajjan@samsung.com>
-> Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
-> v5:
-> - added Reviewed-by tag from Pankaj Dubey
-> - fixed form -> from typo
-> 
-> v4:
-> - rebased on top of next-20141114 branch of linux-next kernel tree
->   (it also applies fine to for-next branch of linux-samsung.git)
-> - removed writing to undocumented CORE2 and CORE3 related registers
-> - fixed values used for EXYNOS3_[G3D,LCD]_SYS_PWR_REG registers
-> - added defines for values used for EXYNOS3_*_DURATION registers
-> - removed redundat pr_info("EXYNOS3250 PMU Initialize\n")
-> 
-> v3:
-> - rebased on top of for-next branch of linux-samsung.git and
->   [PATCH v7] mfd: syscon: Decouple syscon interface from platform devices
->   (https://lkml.org/lkml/2014/9/30/156)
->   [PATCH v9 0/2] ARM: Exynos: Convert PMU implementation into a platform driver
->   (https://lkml.org/lkml/2014/10/6/89)
->   [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
->   (http://www.spinics.net/lists/arm-kernel/msg368207.html)
-> 
-> v2:
-> - rebased on top of next-20140708 and
->   http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32410.html
->   http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg33660.html
->   http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg33675.html
-> 
->   this patch also applies fine after/before Exynos5800 PMU support:
->   http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg33835.html
-> 
->  arch/arm/mach-exynos/pmu.c      | 167 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-exynos/regs-pmu.h | 128 ++++++++++++++++++++++++++++++
->  2 files changed, 295 insertions(+)
++ Bart, Tomasz and MLs
 
-Looks good to me, I think each SoC specific pm features would be handled in
-each file like cpufreq though...maybe next time? :-)
+Hi Lukasz,
 
-BTW, I need to sort out pmu related changes from Pankaj, Amit and you. If
-anything is required, I'll let you know.
+Please post including MLs, even resending.
+
+Will apply for v3.19, and just note that you asked me to apply this for 3.18
+in personal talk but I couldn't see any requirements for fixes-3.18. If I'm
+missing something, please let me know.
 
 Thanks,
 Kukjin
+
+> The TMU device tree node definition for Exynos4x12 family of SoCs.
+> 
+> Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
+> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+> ---
+>  arch/arm/boot/dts/exynos4x12.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+> index 861bb91..2e9f1f7 100644
+> --- a/arch/arm/boot/dts/exynos4x12.dtsi
+> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
+> @@ -271,4 +271,14 @@
+>  		compatible = "samsung,exynos4x12-usb2-phy";
+>  		samsung,sysreg-phandle = <&sys_reg>;
+>  	};
+> +
+> +	tmu at 100C0000 {
+> +		compatible = "samsung,exynos4412-tmu";
+> +		interrupt-parent = <&combiner>;
+> +		interrupts = <2 4>;
+> +		reg = <0x100C0000 0x100>;
+> +		clocks = <&clock 383>;
+> +		clock-names = "tmu_apbif";
+> +		status = "disabled";
+> +	};
+>  };
+> --
+> 2.0.0.rc2
