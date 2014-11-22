@@ -1,28 +1,45 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 22 Nov 2014 23:33:18 +0900
-Subject: [PATCH 1/4] ARM: dts: Add usb3503 pinctrl to exynos5250-spring
-In-Reply-To: <546CCC89.1040502@collabora.co.uk>
-References: <1416412585-10809-1-git-send-email-afaerber@suse.de>
- <1416412585-10809-2-git-send-email-afaerber@suse.de>
- <546CCC89.1040502@collabora.co.uk>
-Message-ID: <54709EAE.6020203@kernel.org>
+Date: Sat, 22 Nov 2014 23:40:51 +0900
+Subject: [PATCH] ARM: dts: Specify Odroid X2/U3 audio clock parents and
+ rates
+In-Reply-To: <546CBA09.8070308@samsung.com>
+References: <1410360223-18363-1-git-send-email-s.nawrocki@samsung.com>
+ <5432C5C5.7020206@samsung.com> <007701cfe1d1$3f4c1940$bde44bc0$@kernel.org>
+ <546CBA09.8070308@samsung.com>
+Message-ID: <5470A073.7030203@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/14 01:59, Javier Martinez Canillas wrote:
-> Hello Andreas,
+On 11/20/14 00:40, Sylwester Nawrocki wrote:
+> On 07/10/14 03:51, Kukjin Kim wrote:
+>>>> On 10/09/14 16:43, Sylwester Nawrocki wrote:
+>>>>>> This ensures the core and the audio subsystem clocks are configured
+>>>>>> properly, as expected by the sound machine driver. These bits are
+>>>>>> missing to obtain proper audio sample rates in kernel v3.17, where
+>>>>>> audio support for Odroid X2/U3 was first added.
+>>>>>>
+>>>>>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>>>>> ---
+>>>>>> It would be good to have it applied as a fix for v3.17.
+>>>>
+>>>> Anything happened to this patch ? I can't see it neither in Linus' nor
+>>>> -next tree. And we are already at 3.18 merge window.
+>>>>
+>> Hi Sylwester,
+>>
+>> Sorry about that. I'll queue this one into fixes for -3.18 and stable maybe
+>> +3.17 only if stable-3.17 is available...
 > 
-> On 11/19/2014 04:56 PM, Andreas F?rber wrote:
->> Reported-by: Doug Anderson <dianders@chromium.org>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> Kukjin,
 > 
-> Even though the patch is simple and is true that the subject explains
-> the change, I think that is always good to have a commit message anyways.
+> You didn't forget about this patch, did you ?
+> It's been over 2 months since I've sent it and sound on Odroid X2/U3
+> is still broken as it was then. Please send the patch upstream.
 > 
-> Patch looks good to me though:
-> 
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> 
-Applied this series, thanks.
+Sylwester,
 
-- Kukjin
+I've applied this just now and if required, we need to send out to
+stable tree as well...sorry for that.
+
+Thanks,
+Kukjin
