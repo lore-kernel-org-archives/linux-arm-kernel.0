@@ -1,124 +1,36 @@
-From: js07.lee@gmail.com (Jungseung Lee)
-Date: Sat, 22 Nov 2014 19:42:36 +0900
-Subject: [PATCH v1] arm: Support for the PXN CPU feature on ARMv7
-Message-ID: <1416652956-24207-1-git-send-email-js07.lee@gmail.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Sat, 22 Nov 2014 19:08:57 +0800
+Subject: [PATCH v1] ARM/ARM64: support KVM_IOEVENTFD
+In-Reply-To: <546F36DE.5060004@linaro.org>
+References: <1416374181-28415-1-git-send-email-ming.lei@canonical.com>
+ <546F36DE.5060004@linaro.org>
+Message-ID: <CACVXFVMXmqfwm75rLc==Gh5h1TTU-FqDq4TZmXu1AiU9dK0gNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modern ARMv7-A/R cores optionally implement below new
-hardware feature:
+Hi Eric,
 
-- PXN:
-Privileged execute-never(PXN) is a security feature. PXN bit
-determines whether the processor can execute software from
-the region. This is effective solution against ret2usr attack.
-On an implementation that does not include the LPAE, PXN is
-optionally supported.
+Thanks for your FYI.
 
-This patch set PXN bit on user page table for preventing
-user code execution with privilege mode.
+On Fri, Nov 21, 2014 at 8:58 PM, Eric Auger <eric.auger@linaro.org> wrote:
+> Hi Ming,
+>
+> for your information there is a series written by Antonios (added in CC)
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-March/008416.html
+> exactly on the same topic.
+>
+> The thread was reactivated by Nikolay latterly on Nov (see
+> http://www.gossamer-threads.com/lists/linux/kernel/1886716?page=last).
+>
 
-Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
----
-Changes in v1:
-	Define cpu_has_classic_pxn().
-	Set PXN bit at the PTE directly under LPAE.
+Looks google didn't tell me the above, :-(
 
- arch/arm/include/asm/pgalloc.h              | 20 +++++++++++++++++++-
- arch/arm/include/asm/pgtable-2level-hwdef.h |  2 ++
- arch/arm/include/asm/pgtable-3level-hwdef.h |  1 +
- arch/arm/include/asm/pgtable.h              |  3 +++
- 4 files changed, 25 insertions(+), 1 deletion(-)
+> I am also convinced we must progress on ioeventfd topic concurrently
 
-diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index 78a7793..e63c633 100644
---- a/arch/arm/include/asm/pgalloc.h
-+++ b/arch/arm/include/asm/pgalloc.h
-@@ -17,6 +17,7 @@
- #include <asm/processor.h>
- #include <asm/cacheflush.h>
- #include <asm/tlbflush.h>
-+#include <asm/cputype.h>
- 
- #define check_pgt_cache()		do { } while (0)
- 
-@@ -25,6 +26,19 @@
- #define _PAGE_USER_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_USER))
- #define _PAGE_KERNEL_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_KERNEL))
- 
-+static inline bool cpu_has_classic_pxn(void)
-+{
-+#ifdef CONFIG_CPU_V7
-+	unsigned int vmsa;
-+
-+	/* LPAE implies atomic ldrd/strd instructions */
-+	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-+	if (vmsa == 4)
-+		return 1;
-+#endif
-+	return 0;
-+}
-+
- #ifdef CONFIG_ARM_LPAE
- 
- static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
-@@ -157,7 +171,11 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
- static inline void
- pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
- {
--	__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
-+	if (cpu_has_classic_pxn())
-+		__pmd_populate(pmdp, page_to_phys(ptep),
-+				_PAGE_USER_TABLE | PMD_PXNTABLE);
-+	else
-+		__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
- }
- #define pmd_pgtable(pmd) pmd_page(pmd)
- 
-diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
-index 5cfba15..5e68278 100644
---- a/arch/arm/include/asm/pgtable-2level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
-@@ -20,12 +20,14 @@
- #define PMD_TYPE_FAULT		(_AT(pmdval_t, 0) << 0)
- #define PMD_TYPE_TABLE		(_AT(pmdval_t, 1) << 0)
- #define PMD_TYPE_SECT		(_AT(pmdval_t, 2) << 0)
-+#define PMD_PXNTABLE		(_AT(pmdval_t, 1) << 2)     /* v7 */
- #define PMD_BIT4		(_AT(pmdval_t, 1) << 4)
- #define PMD_DOMAIN(x)		(_AT(pmdval_t, (x)) << 5)
- #define PMD_PROTECTION		(_AT(pmdval_t, 1) << 9)		/* v5 */
- /*
-  *   - section
-  */
-+#define PMD_SECT_PXN    (_AT(pmdval_t, 1) << 0)     /* v7 */
- #define PMD_SECT_BUFFERABLE	(_AT(pmdval_t, 1) << 2)
- #define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
- #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 4)		/* v6 */
-diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
-index 9fd61c7..f8f1cff 100644
---- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-@@ -76,6 +76,7 @@
- #define PTE_EXT_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
- #define PTE_EXT_AF		(_AT(pteval_t, 1) << 10)	/* Access Flag */
- #define PTE_EXT_NG		(_AT(pteval_t, 1) << 11)	/* nG */
-+#define PTE_EXT_PXN		(_AT(pteval_t, 1) << 53)	/* PXN */
- #define PTE_EXT_XN		(_AT(pteval_t, 1) << 54)	/* XN */
- 
- /*
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 3b30062..04db03c 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -247,6 +247,9 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
- 		if (!pte_special(pteval))
- 			__sync_icache_dcache(pteval);
- 		ext |= PTE_EXT_NG;
-+#ifdef CONFIG_ARM_LPAE
-+		ext |= PTE_EXT_PXN;
-+#endif
- 	}
- 
- 	set_pte_ext(ptep, pteval, ext);
--- 
-1.9.1
+Yes, hope both two can be merged soon.
+
+> with irqfd one. What starting point do we use then for further comments?
+
+Please ignore this one and follow previous thread.
+
+Thanks,
