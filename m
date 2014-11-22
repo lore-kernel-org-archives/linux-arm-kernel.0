@@ -1,6 +1,6 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sat, 22 Nov 2014 11:00:35 +0100
-Subject: [PATCH 1/1] ARM: OMAP2: Deletion of unnecessary checks before three
+Date: Sat, 22 Nov 2014 11:40:38 +0100
+Subject: [PATCH 1/1] ARM-kernel: Deletion of unnecessary checks before two
  function calls
 In-Reply-To: <5317A59D.4@users.sourceforge.net>
 References: <5307CAA2.8060406@users.sourceforge.net>
@@ -20,67 +20,49 @@ References: <5307CAA2.8060406@users.sourceforge.net>
  <530DD06F.4090703@users.sourceforge.net>
  <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
  <5317A59D.4@users.sourceforge.net>
-Message-ID: <54705EC3.90708@users.sourceforge.net>
+Message-ID: <54706826.7060403@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sat, 22 Nov 2014 10:50:33 +0100
+Date: Sat, 22 Nov 2014 11:33:16 +0100
 
-The functions clk_disable(), of_node_put() and omap_device_delete() test
-whether their argument is NULL and then return immediately.
-Thus the test around the call is not needed.
+The functions smp_set_ops() and unwind_table_del() test whether their argument
+is NULL and then return immediately. Thus the test around the call is not needed.
 
 This issue was detected by using the Coccinelle software.
 
 Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- arch/arm/mach-omap2/omap_device.c | 3 +--
- arch/arm/mach-omap2/omap_hwmod.c  | 3 +--
- arch/arm/mach-omap2/timer.c       | 3 +--
- 3 files changed, 3 insertions(+), 6 deletions(-)
+ arch/arm/kernel/module.c | 3 +--
+ arch/arm/kernel/setup.c  | 2 +-
+ 2 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index d22c30d..5108859 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -199,8 +199,7 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 6a4dffe..3dffad1 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -350,7 +350,6 @@ module_arch_cleanup(struct module *mod)
+ 	int i;
  
- 	switch (event) {
- 	case BUS_NOTIFY_DEL_DEVICE:
--		if (pdev->archdata.od)
--			omap_device_delete(pdev->archdata.od);
-+		omap_device_delete(pdev->archdata.od);
- 		break;
- 	case BUS_NOTIFY_ADD_DEVICE:
- 		if (pdev->dev.of_node)
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 9e91a4e..e2406c4 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -917,8 +917,7 @@ static int _disable_clocks(struct omap_hwmod *oh)
- 
- 	pr_debug("omap_hwmod: %s: disabling clocks\n", oh->name);
- 
--	if (oh->_clk)
--		clk_disable(oh->_clk);
-+	clk_disable(oh->_clk);
- 
- 	p = oh->slave_ports.next;
- 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 43d03fb..5b428a0 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -205,8 +205,7 @@ static void __init omap_dmtimer_init(void)
- 	/* If we are a secure device, remove any secure timer nodes */
- 	if ((omap_type() != OMAP2_DEVICE_TYPE_GP)) {
- 		np = omap_get_timer_dt(omap_timer_match, "ti,timer-secure");
--		if (np)
--			of_node_put(np);
-+		of_node_put(np);
- 	}
+ 	for (i = 0; i < ARM_SEC_MAX; i++)
+-		if (mod->arch.unwind[i])
+-			unwind_table_del(mod->arch.unwind[i]);
++		unwind_table_del(mod->arch.unwind[i]);
+ #endif
  }
- 
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 84db893d..a7018a2 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -929,7 +929,7 @@ void __init setup_arch(char **cmdline_p)
+ 		if (!mdesc->smp_init || !mdesc->smp_init()) {
+ 			if (psci_smp_available())
+ 				smp_set_ops(&psci_smp_ops);
+-			else if (mdesc->smp)
++			else
+ 				smp_set_ops(mdesc->smp);
+ 		}
+ 		smp_init_cpus();
 -- 
 2.1.3
