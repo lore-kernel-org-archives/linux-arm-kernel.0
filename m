@@ -1,128 +1,70 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Sat, 22 Nov 2014 13:15:56 +0530
-Subject: [PATCH] thermal: exynos: add optional sclk support
-Message-ID: <1416642356-8694-1-git-send-email-a.kesavan@samsung.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sat, 22 Nov 2014 09:13:33 +0100
+Subject: [PATCHv6 00/10] arm: mvebu: add Synology DS213j and DS414 .dts
+ files
+References: <cover.1416613429.git.arno@natisbad.org>
+ <20141122045430.GU22670@titan.lakedaemon.net>
+Message-ID: <87h9xrfyaa.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos7 has a special clock required for the functional operation
-of the TMU that is not present in earlier SoCs. Add support for
-this optional clock and update the binding documentation.
+Hi Jason,
 
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
----
-This patch was earlier part of the series adding TMU support for
-Exynos7 [1]. It has been split out as it does not impact the on-going
-consolidation in the exynos tmu driver and can be considered
-independently.
+Sorry for the trouble w/ my patches. I'll try and avoid such issues in
+the future.
 
- .../devicetree/bindings/thermal/exynos-thermal.txt |    3 +++
- drivers/thermal/samsung/exynos_tmu.c               |   27 ++++++++++++++++----
- 2 files changed, 25 insertions(+), 5 deletions(-)
+Jason Cooper <jason@lakedaemon.net> writes:
 
-diff --git a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
-index ae738f5..2393eac 100644
---- a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
-@@ -32,10 +32,13 @@
- - clocks : The main clocks for TMU device
- 	-- 1. operational clock for TMU channel
- 	-- 2. optional clock to access the shared registers of TMU channel
-+	-- 3. optional special clock for functional operation
- - clock-names : Thermal system clock name
- 	-- "tmu_apbif" operational clock for current TMU channel
- 	-- "tmu_triminfo_apbif" clock to access the shared triminfo register
- 		for current TMU channel
-+	-- "tmu_sclk" clock for functional operation of the current TMU
-+		channel
- - vtmu-supply: This entry is optional and provides the regulator node supplying
- 		voltage to TMU. If needed this entry can be placed inside
- 		board/platform specific dts file.
-diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index d44d91d..6627937 100644
---- a/drivers/thermal/samsung/exynos_tmu.c
-+++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -128,6 +128,7 @@
-  * @lock: lock to implement synchronization.
-  * @clk: pointer to the clock structure.
-  * @clk_sec: pointer to the clock structure for accessing the base_second.
-+ * @sclk: pointer to the clock structure for accessing the tmu special clk.
-  * @temp_error1: fused value of the first point trim.
-  * @temp_error2: fused value of the second point trim.
-  * @regulator: pointer to the TMU regulator structure.
-@@ -147,7 +148,7 @@ struct exynos_tmu_data {
- 	enum soc_type soc;
- 	struct work_struct irq_work;
- 	struct mutex lock;
--	struct clk *clk, *clk_sec;
-+	struct clk *clk, *clk_sec, *sclk;
- 	u8 temp_error1, temp_error2;
- 	struct regulator *regulator;
- 	struct thermal_sensor_conf *reg_conf;
-@@ -883,10 +884,21 @@ static int exynos_tmu_probe(struct platform_device *pdev)
- 		goto err_clk_sec;
- 	}
- 
-+	data->sclk = devm_clk_get(&pdev->dev, "tmu_sclk");
-+	if (IS_ERR(data->sclk)) {
-+		dev_err(&pdev->dev, "Failed to get optional special clock\n");
-+	} else {
-+		ret = clk_prepare_enable(data->sclk);
-+		if (ret) {
-+			dev_err(&pdev->dev, "Failed to enable special clock\n");
-+			goto err_clk;
-+		}
-+	}
-+
- 	ret = exynos_tmu_initialize(pdev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to initialize TMU\n");
--		goto err_clk;
-+		goto err_sclk;
- 	}
- 
- 	exynos_tmu_control(pdev, true);
-@@ -896,7 +908,7 @@ static int exynos_tmu_probe(struct platform_device *pdev)
- 				sizeof(struct thermal_sensor_conf), GFP_KERNEL);
- 	if (!sensor_conf) {
- 		ret = -ENOMEM;
--		goto err_clk;
-+		goto err_sclk;
- 	}
- 	sprintf(sensor_conf->name, "therm_zone%d", data->id);
- 	sensor_conf->read_temperature = (int (*)(void *))exynos_tmu_read;
-@@ -928,7 +940,7 @@ static int exynos_tmu_probe(struct platform_device *pdev)
- 	ret = exynos_register_thermal(sensor_conf);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to register thermal interface\n");
--		goto err_clk;
-+		goto err_sclk;
- 	}
- 	data->reg_conf = sensor_conf;
- 
-@@ -936,10 +948,13 @@ static int exynos_tmu_probe(struct platform_device *pdev)
- 		IRQF_TRIGGER_RISING | IRQF_SHARED, dev_name(&pdev->dev), data);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to request irq: %d\n", data->irq);
--		goto err_clk;
-+		goto err_sclk;
- 	}
- 
- 	return 0;
-+err_sclk:
-+	if (!IS_ERR(data->sclk))
-+		clk_disable_unprepare(data->sclk);
- err_clk:
- 	clk_unprepare(data->clk);
- err_clk_sec:
-@@ -956,6 +971,8 @@ static int exynos_tmu_remove(struct platform_device *pdev)
- 
- 	exynos_tmu_control(pdev, false);
- 
-+	if (!IS_ERR(data->sclk))
-+		clk_disable_unprepare(data->sclk);
- 	clk_unprepare(data->clk);
- 	if (!IS_ERR(data->clk_sec))
- 		clk_unprepare(data->clk_sec);
--- 
-1.7.9.5
+>> Arnaud Ebalard (10):
+>
+> These three patches had trouble:
+>
+>>   arm: mvebu: move Armada 370/XP pinctrl node definition armada-370-xp.dtsi
+>
+> armada-370-db needed to be hand-jammed.  Please double-check that it
+> went through correctly.  The error was something about missing repository
+> info.  Usually that means the patch was based on something weird...
+
+After pushing v2, Sebastian's pointed there was some of the patches I
+had which he had already done and were sitting in your mvebu/dt banch.
+So I rebased my whole series on your mvebu/dt but used mvebu-dt-3.19
+at some point, which was behind the tip, i.e. had not the following
+patches:
+
+commit ab1e85372168892387dd1ac171158fc8c3119be4 <- your tip
+commit ad6a1b445bdc19199933051840a53fdd30b8f961
+commit ebf50c9651ff28341b76e78c531592d7d3489bc6
+commit 5e949f0c79917f3fd8512a3b66b0c861e03ec5a6
+commit 9ef90cbb0860d3434fdc4bf9674adca1b762f95e
+commit a6b334514be27aec1bf31c7673c2f55bd6fbd3e6
+commit b4607572ef86b288a856b9df410ea593c5371dec
+commit f5ed9ccc4c2dc275a13b765c88fa13211f60b57f <- mvebu-dt-3.19
+
+
+>>   arm: mvebu: define and use common Armada 370 UART pinctrl settings
+>
+> Same here, 'patch -Np1 <...patch' went fine, though.  Please double
+> check.
+
+I will take a thorough look today at what you currently have in your
+tree (and more specifically regarding DS414) and do more tests on both
+NAS next week.
+
+>>   arm: mvebu: add .dts file for Synology DS414
+>
+> This broke the build :(  I did s/ge[01]_rgmii_pins/pmx_ge[01]_rgmii/ to
+> fix the issue.  Did you run 'make dtbs' before you sent?
+
+Each series was compiled and tested on the DS213j because DS414 is
+painful to handle (SAR issue pointed in the .dts file which requires
+unplugging/plugging the USB/serial + longer time to boot). The thing is
+when I merged the two development tres I had for the DS213j and DS414, I
+used the DS213j config ... which did not have CONFIG_MACH_ARMADA_XP.
+
+Again, my apologies for the trouble and manual handling.
+
+> At any rate, whole series applied to mvebu/dt.
+
+Thanks,
+
+a+
