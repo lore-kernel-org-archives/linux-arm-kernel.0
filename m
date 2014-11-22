@@ -1,67 +1,49 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Nov 2014 20:56:06 -0500
-Subject: [PATCHv3 0/5] ARM: mvebu: no I/O coherency on non-SMP and
- related updates
-In-Reply-To: <1415871540-20302-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1415871540-20302-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20141122015606.GN22670@titan.lakedaemon.net>
+Date: Fri, 21 Nov 2014 21:08:11 -0500
+Subject: [PATCH v4 6/7] ARM: mvebu: add PHY support to the dts for the
+ USB controllers on Armada 375
+In-Reply-To: <1415879269-29711-7-git-send-email-gregory.clement@free-electrons.com>
+References: <1415879269-29711-1-git-send-email-gregory.clement@free-electrons.com>
+ <1415879269-29711-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20141122020811.GO22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On Thu, Nov 13, 2014 at 12:47:48PM +0100, Gregory CLEMENT wrote:
+> Now that the USB cluster node has been added, use it as a PHY provider
+> for the USB controller linked to it: the first EHCI and the xHCI.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-375.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+> index 8f45cf5d2a50..f344ec420c95 100644
+> --- a/arch/arm/boot/dts/armada-375.dtsi
+> +++ b/arch/arm/boot/dts/armada-375.dtsi
+> @@ -14,6 +14,7 @@
+>  #include "skeleton.dtsi"
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/phy/phy.h>
 
-On Thu, Nov 13, 2014 at 10:38:55AM +0100, Thomas Petazzoni wrote:
-> Hello,
-> 
-> This series makes a number of updates to the I/O coherency code of
-> Marvell EBU platforms.
-> 
-> Changes since v2:
-> 
->  - Drop patch "ARM: mvebu: add missing of_node_put() call in
->    coherency.c" since it was merged.
-> 
->  - Update "make the coherency_ll.S functions work with no coherency
->    fabric" to use "reteq <reg>" instead of "moveq pc, <reg>", as
->    suggested by Gr?gory Clement.
-> 
->  - Update the comment in "disable I/O coherency on non-SMP situations
->    on Armada 370/375/38x/XP" to give more details about what would be
->    needed to get HW I/O coherency working on Armada 370, as suggested
->    by Jason Cooper.
-> 
->  - Added Acked-by from Gr?gory Clement as appropriate.
-> 
->  - Added one patch to drop the Armada 375 Z1 workaround for I/O
->    coherency, which removes a significant chunk of code from
->    coherency.c.
-> 
->  - Added two patches doing minor cleanup/updates to coherency.c
-> 
-> Changes since v1:
-> 
->  - Rebased on top of v3.18-rc2.
->  - Added some Fixes:/Cc: tags on the last patch to get it merged into
->    the stable tree, as it fixes a real DT reference count leak.
-> 
-> Best regards,
-> 
-> Thomas Petazzoni
-> 
-> Thomas Petazzoni (5):
->   ARM: mvebu: make the coherency_ll.S functions work with no coherency
->     fabric
->   ARM: mvebu: disable I/O coherency on non-SMP situations on Armada
->     370/375/38x/XP
->   ARM: mvebu: remove unused register offset definition
->   ARM: mvebu: remove Armada 375 Z1 workaround for I/O coherency
->   ARM: mvebu: update comments in coherency.c
-> 
->  arch/arm/mach-mvebu/coherency.c    | 220 ++++++-------------------------------
->  arch/arm/mach-mvebu/coherency_ll.S |  21 +++-
->  2 files changed, 55 insertions(+), 186 deletions(-)
+Odd.  The previous patch in this series simply adds a line to phy.h,
+however, I get the following error during 'make dtbs':
 
-Whole series applied to mvebu/soc with a dependency on mvebu/fixes.
+########
+  DTC     arch/arm/boot/dts/armada-375-db.dtb
+In file included from arch/arm/boot/dts/armada-375-db.dts:17:0:arch/arm/boot/dts/armada-375.dtsi:17:33:
+fatal error: dt-bindings/phy/phy.h: No such file or directory
+ #include <dt-bindings/phy/phy.h>
+                                 ^
+compilation terminated.
+scripts/Makefile.lib:282: recipe for target 'arch/arm/boot/dts/armada-37 5-db.dtb' failed
+########
+
+mvebu/dt is based on v3.18-rc1.  Is there a missing dependency
+somewhere?  Perhaps we should let Kishon take the whole series and
+handle the (hopefully trivial) merge conflict?
 
 thx,
 
