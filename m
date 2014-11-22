@@ -1,54 +1,50 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 22 Nov 2014 15:39:19 +0100
-Subject: [PATCH 6/6] dmaengine: ste_dma40: fix error return code
-In-Reply-To: <1416667159-9808-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1416667159-9808-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1416667159-9808-7-git-send-email-Julia.Lawall@lip6.fr>
+Date: Sat, 22 Nov 2014 15:56:47 +0100
+Subject: [PATCH] usb: dwc3: return error code from the most recent call
+Message-ID: <1416668207-10770-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Return a negative error code on failure.
+Copy-paste error from the previous block of error handling code.
 
 A simplified version of the semantic match that finds this problem is as
 follows: (http://coccinelle.lip6.fr/)
 
 // <smpl>
 @@
-identifier ret; expression e1,e2;
+expression e,e1;
 @@
+
+if (IS_ERR(e)) {
+  ...
 (
-if (\(ret < 0\|ret != 0\))
- { ... return ret; }
+  ret = PTR_ERR(e);
 |
-ret = 0
+*  ret = PTR_ERR(e1);
 )
-... when != ret = e1
-    when != &ret
-*if(...)
-{
-  ... when != ret = e2
-      when forall
- return ret;
+  ...
+  return ret;
 }
 // </smpl>
 
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- drivers/dma/ste_dma40.c |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/usb/dwc3/dwc3-st.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 7de218c..c62d26b 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -3432,6 +3432,7 @@ static int __init d40_lcla_allocate(struct d40_base *base)
+diff --git a/drivers/usb/dwc3/dwc3-st.c b/drivers/usb/dwc3/dwc3-st.c
+index c7602b5..4a1a543 100644
+--- a/drivers/usb/dwc3/dwc3-st.c
++++ b/drivers/usb/dwc3/dwc3-st.c
+@@ -243,7 +243,7 @@ static int st_dwc3_probe(struct platform_device *pdev)
+ 	dwc3_data->rstc_rst = devm_reset_control_get(dev, "softreset");
+ 	if (IS_ERR(dwc3_data->rstc_rst)) {
+ 		dev_err(&pdev->dev, "could not get reset controller\n");
+-		ret = PTR_ERR(dwc3_data->rstc_pwrdn);
++		ret = PTR_ERR(dwc3_data->rstc_rst);
+ 		goto undo_powerdown;
+ 	}
  
- 			d40_err(base->dev, "Failed to allocate %d pages.\n",
- 				base->lcla_pool.pages);
-+			ret = -ENOMEM;
- 
- 			for (j = 0; j < i; j++)
- 				free_pages(page_list[j], base->lcla_pool.pages);
