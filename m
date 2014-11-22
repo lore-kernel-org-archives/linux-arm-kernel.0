@@ -1,36 +1,59 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat, 22 Nov 2014 19:44:10 +0400
-Subject: [PATCH V2 3/5] usb: gadget: pxa25x_udc: prepare/unprepare clocks
- in pxa-ssp
-In-Reply-To: <87sihb49vm.fsf@free.fr>
-References: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
- <1416236863-20898-3-git-send-email-dbaryshkov@gmail.com>
- <878uj98y5v.fsf@free.fr>
- <CALT56yMCJ4R6KN2BUW61YaUz2bb6s_aJteKYBSVmvRPKacKCLw@mail.gmail.com>
- <CALT56yO8tktrXo0rfRd91AtXBE4F5vYfYjm9AL+7dcoam6Oq9Q@mail.gmail.com>
- <87egsz6ija.fsf@free.fr> <87sihb49vm.fsf@free.fr>
-Message-ID: <CALT56yMVjRC4YhWsc9d_i0mVrHyv8XV=Sw2op=xsdR5izv1tHg@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Sat, 22 Nov 2014 08:06:45 -0800
+Subject: [PATCH 3/7] pinctrl: pinconf-generic: Allow driver to specify DT
+ params
+In-Reply-To: <1416555331.28873.8.camel@mm-sol.com>
+References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1415041531-15520-4-git-send-email-soren.brinkmann@xilinx.com>
+ <CACRpkdYfj2ydLQ4q_FKwXo73jzNsvj9u2Aem9EiuEw-OCvurrg@mail.gmail.com>
+ <1416300621.30131.6.camel@mm-sol.com>
+ <995406b8e0244c63a3ef8e58314e81f6@BL2FFO11FD037.protection.gbl>
+ <1416383379.30131.14.camel@mm-sol.com>
+ <84517404cda34124930ec838a639f538@BL2FFO11FD030.protection.gbl>
+ <1416470777.28873.1.camel@mm-sol.com>
+ <7e2f4984733343fdb4ea51cf7eb4c339@BY2FFO11FD046.protection.gbl>
+ <1416555331.28873.8.camel@mm-sol.com>
+Message-ID: <0c3dad3ce852435fba127e8436f0e30f@BN1BFFO11FD047.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-22 16:56 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
-> Robert Jarzmik <robert.jarzmik@free.fr> writes:
->> Okay, now my ADSL line is repaired, thank you Mr farmer "I drive a tractor but I
->> don't care about telephone posts", I'll fetch your changes and make a
->> test. Let's say I schedule this for saturday.
->
-> Removed people from the list for the tests aspect.
->
-> Well, my lubbock board seem to raise several interrupts in the linux kernel, all
-> the LUBBOCK_IRQ interrupts multiplexed on GPIO0 actually, amongst which are the
-> 2 interrupts for the UDC.
+Hi Ivan,
 
-This looks normal - GPIO0 is connected to an interrupt pin of the CPLD.
-lubbock_init_irq function should be setting up a chained handler for the GPIO0.
-And that chained handler (lubbock_irq_handler) should further decode which
-IRQ bit is set. Do you see the handler being called? Can you print the (pending)
-variable in the handler?
+On Fri, 2014-11-21 at 09:35AM +0200, Ivan T. Ivanov wrote:
+> 
+> On Thu, 2014-11-20 at 08:22 -0800, S?ren Brinkmann wrote:
+> > 
+> > 
+> > Also, I hope all my changes here don't break the current behavior. So,
+> > those 27 driver should still be able to do what they currently do. But I
+> > hope they could migrated over to use the generic bindings only in the
+> > longer term, so that these custom properties disappear.
+> > 
+> > > > The pinctrl driver just assembles
+> > > > some data structure that has the information regarding custom properties
+> > > > and the core handles the rest.
+> > > 
+> > > Yup, that is nice. What will be really nice if it also handle custom,
+> > > "function", "groups" and "pins" properties. Otherwise most of the drivers
+> > > will not be able to benefit from this.
+> > 
+> > Why would you still need those? 
+> 
+> I don't need them :-). The point was that still majority of the drivers
+> will have custom parsing functions. It would be nice if we could fix
+> that too. I do understand that using custom "pins", "functions"... is
+> something which is deprecated, but if core parsing functions allow
+> passing custom strings for above purposes, in a similar way as your
+> proposal, it will be easier for those drivers to migrate, I believe.
 
--- 
-With best wishes
-Dmitry
+This does sound much more like a feature request than a fundamental
+problem with the implementation, now. And like Laurent's feature
+request, I'd like to turn this down. Otherwise this just gets hold up by
+feature requests blocking pinctrl-zynq.
+I think the interesting questions are:
+1. Does it break any current user?
+2. Is there anything fundamentally preventing adding your feature at
+some later time as part of such a migration you describe?
+
+	Thanks,
+	S?ren
