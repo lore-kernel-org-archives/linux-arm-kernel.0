@@ -1,46 +1,76 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sat, 22 Nov 2014 08:41:10 +0100
-Subject: [PATCHv6 10/10] arm: mvebu: add .dts file for Synology DS414
-In-Reply-To: <546FFE9D.2000502@killerwolves.net> (Ben Peddell's message of
- "Sat, 22 Nov 2014 13:10:21 +1000")
-References: <cover.1416613429.git.arno@natisbad.org>
- <5b678d6d1f2f42f4bf0d087878b9d8024d463ea7.1416613429.git.arno@natisbad.org>
- <546FFE9D.2000502@killerwolves.net>
-Message-ID: <87sihbfzs9.fsf@natisbad.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 22 Nov 2014 08:35:15 +0100
+Subject: [PATCH resend 2/4] ARM: dts: sunxi: unify APB1 clock
+In-Reply-To: <2400552.aBVIZmJhTh@wuerfel>
+References: <1415245232-20585-1-git-send-email-wens@csie.org>
+ <20141121142903.GD4752@lukather> <4114168.zuylrCsruj@wuerfel>
+ <2400552.aBVIZmJhTh@wuerfel>
+Message-ID: <20141122073515.GJ4752@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Arnd,
 
-Ben Peddell <klightspeed@killerwolves.net> writes:
+On Fri, Nov 21, 2014 at 05:08:08PM +0100, Arnd Bergmann wrote:
+> On Friday 21 November 2014 15:35:57 Arnd Bergmann wrote:
+> > On Friday 21 November 2014 15:29:03 Maxime Ripard wrote:
+> > > On Fri, Nov 21, 2014 at 12:57:02PM +0100, Arnd Bergmann wrote:
+> > > > On Thursday 20 November 2014 14:04:01 Kevin Hilman wrote:
+> > > > > Chen-Yu Tsai <wens@csie.org> writes:
+> > > > > 
+> > > > > > From: Emilio L?pez <emilio@elopez.com.ar>
+> > > > > >
+> > > > > > With the new factors infrastructure in place, we can unify apb1 and
+> > > > > > apb1_mux as a single clock now.
+> > > > > >
+> > > > > > Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> > > > > > [wens at csie.org: Change apb1 node label to "apb1"; reword commit title]
+> > > > > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > > > > 
+> > > > > Boot breakage in arm-soc/for-next on sun4i-a10-cubieboard and
+> > > > > sun7i-a20-cubieboard2[1] was bisected down to this patch[1].
+> > > > > 
+> > > > > Reverting $SUBJECT on top of arm-soc gets things booting again.
+> > > > > 
+> > > > 
+> > > > As this looks like it was intended as a cleanup without functional
+> > > > changes, I would go ahead and revert it in next/dt.
+> > > > 
+> > > > Any objections?
+> > > 
+> > > Yeah, you'd break linux-next as well doing so, as the clock driver now
+> > > requires this from the DT.
+> > > 
+> > > I can merge it through the clock tree though if you prefer it that
+> > > way.
+> > 
+> > Do you know why this commit breaks booting then?
+> > 
+> 
+> I have now reverted the entire branch, to get things working again.
+> 
+> Please send a new pull request once you have a version that you 
+> have actually tested.
 
-> On 22/11/14 09:46, Arnaud Ebalard wrote:
->> +
->> +	syno_id_bit0_pin: syno-id-bit0-pin {
->> +		marvell,pins = "mpp26";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	pmx_syno_id_bit1: syno-id-bit1-pin {
->> +		marvell,pins = "mpp28";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	pmx_syno_id_bit2: syno-id-bit2-pin {
->> +		marvell,pins = "mpp29";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	pmx_fan1_alarm: fan1-alarm-pin {
->> +		marvell,pins = "mpp33";
->> +		marvell,function = "gpio";
->> +	};
->
-> It looks like you forgot to replace pmx_* with *_pin here.
+This was tested and working. And again, the linux-next proves it.
 
-Indeed. Weird it went unnoticed during compilation. Thanks for
-pointing it, Ben.
+I know very well why it doesn't work, and it's actually expected: some
+clock was refactored, the DT needed to be changed, only half of it was
+merged through arm-soc.
 
-Cheers,
+It really is just because one part got through arm-soc, the other
+through the clock tree, nothing more.
 
-a+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141122/c90a5c94/attachment.sig>
