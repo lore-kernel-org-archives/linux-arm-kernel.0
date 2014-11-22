@@ -1,31 +1,105 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Nov 2014 23:12:19 -0500
-Subject: [PATCH] ARM: dts: dove: add DT LCD controllers
-In-Reply-To: <E1Xr3Ur-0005Qx-Fx@rmk-PC.arm.linux.org.uk>
-References: <E1Xr3Ur-0005Qx-Fx@rmk-PC.arm.linux.org.uk>
-Message-ID: <20141122041219.GT22670@titan.lakedaemon.net>
+From: wangyijing0307@gmail.com (Yijing Wang)
+Date: Sat, 22 Nov 2014 12:13:06 +0800
+Subject: Removal of bus->msi assignment breaks MSI with stacked domains
+In-Reply-To: <20141121173110.GB6578@google.com>
+References: <546E1771.4030201@arm.com> <20141120215353.GA7987@google.com>
+ <alpine.DEB.2.11.1411202355060.6439@nanos> <546E9B60.9070706@huawei.com>
+ <20141121173110.GB6578@google.com>
+Message-ID: <54700D52.9050109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 11:32:29AM +0000, Russell King wrote:
-> Add the DT fragment for the Marvell Dove LCD controllers.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> The documentation for this binding was submitted previously as part of
-> the code which parses this - v3.17-rc1~82^2~32^2~2.
-> 
->  arch/arm/boot/dts/dove.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
 
-hmmm... this was already applied:
+? 2014/11/22 1:31, Bjorn Helgaas ??:
+> On Fri, Nov 21, 2014 at 09:54:40AM +0800, Yijing Wang wrote:
+>>>> Thomas, let me know if you want to do that.  I suppose we could add a new
+>>>> patch to add it back, but that would leave bisection broken for the
+>>>> interval between c167caf8d174 and the patch that adds it back.
+>>> Fortunately my irq/irqdomain branch is not immutable yet. So we have
+>>> no problem at that point. I can rebase on your branch until tomorrow
+>>> night. Or just rebase on mainline and we sort out the merge conflicts
+>>> later, i.e. delegate them to Linus so his job of pulling stuff gets
+>>> not completely boring.
+>> Hi Thomas, sorry for my introducing the broken.
+>>
+>>> What I'm more worried about is whether this intended change is going
+>>> to inflict a problem on Jiangs intention to deduce the MSI irq domain
+>>> from the device, which we really need for making DMAR work w/o going
+>>> through loops and hoops.
+>>>
+>>> I have limited knowledge about the actual scope of iommu (DMAR) units
+>>> versus device/bus/host-controllers, so I would appreciate a proper
+>>> explanation for that from you or Jiang or both.
+>> In my personal opinion, if it's not necessary, we should not put stuff
+>> into pci_dev or pci_bus. If we plan to save msi_controller in pci_bus or
+>> pci_dev.
+>> I have a proposal, I would be appreciated if you could give some comments.
+>> First we refactor pci_host_bridge to make a generic
+>> pci_host_bridge, then we could save pci domain in it to eliminate
+>> arch specific functions. I aslo wanted to save msi_controller as
+>> pci domain, but now Jiang refactor hierarchy irq domain, and
+>> pci devices under the same pci host bridge may need to associate
+>> to different msi_controllers.
+> I think this is getting ahead of ourselves.  Let's make small steps.
+>
+> We currently have the msi_controller pointer in struct pci_bus.  That was
+> there even before your series.  Your series added pci_msi_controller(),
+> and I reworked it so it looks like this:
+>
+>      static struct msi_controller *pci_msi_controller(struct pci_dev *dev)
+>      {
+> 	   struct msi_controller *msi_ctrl = dev->bus->msi;
+>
+> 	   if (msi_ctrl)
+> 		   return msi_ctrl;
+>
+> 	   return pcibios_msi_controller(dev);
+>      }
+>
+> So now your series basically just removes the ARM add_bus() and
+> remove_bus() methods and gets the MSI controller info from the ARM
+> pci_sys_data struct instead of from pci_bus.  Of course, that assumes that
+> on ARM, all devices under a host bridge have the same MSI controller.  That
+> seems like an unwarranted assumption, but if you want to do it for ARM,
+> that's fine with me.
 
-  087b04701111e ARM: dts: dove: add DT LCD controllers
+Agree, we could use pci_msi_controller() to find msi_controller for 
+pci_dev before a
+better common way found.
 
->From here:
+>
+>> So I want to associate a msi_controller finding ops with generic pci_host_bridge,
+>> then every pci device could find its msi_controller/irq_domain by a
+>> common function
+>>
+>> E.g
+>>
+>> struct msi_controller *pci_msi_controller(struct pci_dev *pdev)
+>> {
+>> 	struct msi_controller *ctrl;
+>> 	struct pci_host_bridge *host = find_pci_host_bridge(pdev->bus);
+>> 	if (host && host->pci_get_msi_controller)
+>> 		ctrl = pci_host_bridge->pci_get_msi_controller(struct pci_dev *pdev);
+>>
+>> 	return ctrl;	
+>> }
+> You can do this for ARM if you want (and your series already accomplishes
+> the same effect, though implemented differently).  But I don't think this
+> is appropriate for the PCI core.
 
-  https://lkml.kernel.org/r/E1XAKGS-0004WE-8h at rmk-PC.arm.linux.org.uk
+OK. We need a better solution, not only for arm, also need to consider 
+arm64 and
+other platforms.
 
-thx,
-
-Jason.
+>
+> For anybody who is on this thread but not the original, I reworked the
+> series slightly, see [1].
+>
+> Bjorn
+>
+> [1] http://lkml.kernel.org/r/20141121172018.GA6578 at google.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
