@@ -1,34 +1,91 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Nov 2014 10:58:23 +0100
-Subject: [PATCH v4 05/19] arm/arm64: KVM: introduce per-VM ops
-In-Reply-To: <1415959683-26027-6-git-send-email-andre.przywara@arm.com>
-References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
- <1415959683-26027-6-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141123095823.GV3401@cbox>
+From: kernellwp@gmail.com (Wanpeng Li)
+Date: Sun, 23 Nov 2014 18:25:57 +0800
+Subject: [PATCH v4 01/12] sched: fix imbalance flag reset
+In-Reply-To: <1406569906-9763-2-git-send-email-vincent.guittot@linaro.org>
+References: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
+ <1406569906-9763-2-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <5471B635.3050006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 10:07:49AM +0000, Andre Przywara wrote:
-> Currently we only have one virtual GIC model supported, so all guests
-> use the same emulation code. With the addition of another model we
-> end up with different guests using potentially different vGIC models,
-> so we have to split up some functions to be per VM.
-> Introduce a vgic_vm_ops struct to hold function pointers for those
-> functions that are different and provide the necessary code to
-> initialize them.
-> Also split up the kvm_vgic_init() function to separate out VGIC model
-> specific functionality into a separate function, which will later be
-> different for a GICv3 model.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog v3...v4:
-> - add accessor functions for vm_ops members
-> - introduce init_vgic_model() to differentiate between guest GIC models
-> - simplify vgic_v2_init_emulation() 
-> - help debugging by hinting on handle_mmio codeflow in comment
-> 
-That helped a lot as this patch goes, thanks for reworking the function
-pointers and init sequence:
+Hi Vincent,
+On 7/29/14, 1:51 AM, Vincent Guittot wrote:
+> The imbalance flag can stay set whereas there is no imbalance.
+>
+> Let assume that we have 3 tasks that run on a dual cores /dual cluster system.
+> We will have some idle load balance which are triggered during tick.
+> Unfortunately, the tick is also used to queue background work so we can reach
+> the situation where short work has been queued on a CPU which already runs a
+> task. The load balance will detect this imbalance (2 tasks on 1 CPU and an idle
+> CPU) and will try to pull the waiting task on the idle CPU. The waiting task is
+> a worker thread that is pinned on a CPU so an imbalance due to pinned task is
+> detected and the imbalance flag is set.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+The waiting task is the third task or one the '2 tasks on 1 CPU' ?
+
+Regards,
+Wanpeng Li
+
+> Then, we will not be able to clear the flag because we have at most 1 task on
+> each CPU but the imbalance flag will trig to useless active load balance
+> between the idle CPU and the busy CPU.
+>
+> We need to reset of the imbalance flag as soon as we have reached a balanced
+> state. If all tasks are pinned, we don't consider that as a balanced state and
+> let the imbalance flag set.
+>
+> Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> ---
+>   kernel/sched/fair.c | 23 +++++++++++++++++++----
+>   1 file changed, 19 insertions(+), 4 deletions(-)
+>
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index 923fe32..7eb9126 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -6672,10 +6672,8 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+>   		if (sd_parent) {
+>   			int *group_imbalance = &sd_parent->groups->sgc->imbalance;
+>   
+> -			if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0) {
+> +			if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0)
+>   				*group_imbalance = 1;
+> -			} else if (*group_imbalance)
+> -				*group_imbalance = 0;
+>   		}
+>   
+>   		/* All tasks on this runqueue were pinned by CPU affinity */
+> @@ -6686,7 +6684,7 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+>   				env.loop_break = sched_nr_migrate_break;
+>   				goto redo;
+>   			}
+> -			goto out_balanced;
+> +			goto out_all_pinned;
+>   		}
+>   	}
+>   
+> @@ -6760,6 +6758,23 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+>   	goto out;
+>   
+>   out_balanced:
+> +	/*
+> +	 * We reach balance although we may have faced some affinity
+> +	 * constraints. Clear the imbalance flag if it was set.
+> +	 */
+> +	if (sd_parent) {
+> +		int *group_imbalance = &sd_parent->groups->sgc->imbalance;
+> +
+> +		if (*group_imbalance)
+> +			*group_imbalance = 0;
+> +	}
+> +
+> +out_all_pinned:
+> +	/*
+> +	 * We reach balance because all tasks are pinned at this level so
+> +	 * we can't migrate them. Let the imbalance flag set so parent level
+> +	 * can try to migrate them.
+> +	 */
+>   	schedstat_inc(sd, lb_balanced[idle]);
+>   
+>   	sd->nr_balance_failed = 0;
