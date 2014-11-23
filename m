@@ -1,62 +1,42 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 23 Nov 2014 11:36:28 +0100 (CET)
-Subject: [Patch irqdomain: Enhance irq_domain_free_irqs_common() to
- support parentless irqdomain
-In-Reply-To: <alpine.DEB.2.11.1411231132160.6439@nanos>
-References: <1416540206-18103-1-git-send-email-jiang.liu@linux.intel.com>
- <alpine.DEB.2.11.1411231132160.6439@nanos>
-Message-ID: <alpine.DEB.2.11.1411231135190.6439@nanos>
+From: carlo@caione.org (Carlo Caione)
+Date: Sun, 23 Nov 2014 12:48:31 +0100
+Subject: [PATCH RESEND 0/3] ARM: Meson6: enable SMP
+In-Reply-To: <1415982353-9293-1-git-send-email-carlo@caione.org>
+References: <1415982353-9293-1-git-send-email-carlo@caione.org>
+Message-ID: <CAOQ7t2amsAvD_O6XO_jF9NRhAAWrG+_URKNytmY-6aUE+wchnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 23 Nov 2014, Thomas Gleixner wrote:
+On Fri, Nov 14, 2014 at 5:25 PM, Carlo Caione <carlo@caione.org> wrote:
+> Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
+> pieces to boot the secondary CPU.
+>
+> ---
+>
+> This is a resend of a patchset already submitted a while ago
+> http://www.spinics.net/lists/arm-kernel/msg366787.html
+>
+> Carlo Caione (3):
+>   ARM: Meson6: docs: document bindings
+>   ARM: Meson6: Add SMP support for Amlogic Meson6
+>   ARM: Meson6: enable SMP in DTS/DTSI
+>
+>  .../bindings/arm/meson/amlogic,meson6-cpuconfig    | 16 +++++
+>  .../bindings/arm/meson/amlogic,meson6-smp          | 26 +++++++
+>  arch/arm/boot/dts/meson.dtsi                       |  5 ++
+>  arch/arm/boot/dts/meson6.dtsi                      |  6 ++
+>  arch/arm/mach-meson/Kconfig                        |  1 +
+>  arch/arm/mach-meson/Makefile                       |  1 +
+>  arch/arm/mach-meson/headsmp.S                      |  7 ++
+>  arch/arm/mach-meson/platsmp.c                      | 80 ++++++++++++++++++++++
+>  8 files changed, 142 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/meson/amlogic,meson6-cpuconfig
+>  create mode 100644 Documentation/devicetree/bindings/arm/meson/amlogic,meson6-smp
+>  create mode 100644 arch/arm/mach-meson/headsmp.S
+>  create mode 100644 arch/arm/mach-meson/platsmp.c
 
-> On Fri, 21 Nov 2014, Jiang Liu wrote:
-> 
-> > Originally irq_domain_free_irqs_common() is designed to be used by
-> > irqdomains with parent. But there are desires to reuse for parentless
-> > irqdomains for code reduction.
-> > So check domain->parent before invoking irq_domain_free_irqs_parent().
-> > 
-> > Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> > ---
-> > Hi Thomas,
-> > 	This patch applies to tip/irq/irqdomain, it helps to reduce code
-> > size on ARM. Seems we still have chance to merge it into tip/irq/irqdomain:)
-> > Regards!
-> > Gerry
-> > ---
-> >  kernel/irq/irqdomain.c |    3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> > index 029acf11efed..0449d2869e17 100644
-> > --- a/kernel/irq/irqdomain.c
-> > +++ b/kernel/irq/irqdomain.c
-> > @@ -975,7 +975,8 @@ void irq_domain_free_irqs_common(struct irq_domain *domain, unsigned int virq,
-> >  		if (irq_data)
-> >  			irq_domain_reset_irq_data(irq_data);
-> >  	}
-> > -	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
-> > +	if (domain->parent)
-> > +		irq_domain_free_irqs_parent(domain, virq, nr_irqs);
-> 
-> irq_domain_free_irqs_parent()
-> {
-> 	if (domain->parent && domain->parent->ops->free)
-> 	   	...
-> }
-> 
-> So the above is redundant and does not change anything.
+Ping
 
-Except that this function gets replaced later in the series and drops
-the parent check.
 
-Though we should not put the conditionals on the call sites. We want
-the functions handle it.
-
-/me goes fixing.
-
-Thanks,
-
-	tglx
+-- 
+Carlo Caione
