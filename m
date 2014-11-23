@@ -1,52 +1,73 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 23 Nov 2014 17:35:54 +0100
-Subject: [GIT PULL] Allwinner SimpleFB support for 3.19
-Message-ID: <20141123163554.GA5788@lukather>
+Date: Sun, 23 Nov 2014 17:40:47 +0100
+Subject: [GIT PULL] Allwinner clocks changes for 3.19
+Message-ID: <20141123164047.GA7599@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+Hi Mike,
 
-Please pull the following patches that enable simplefb on most of the
-Allwinner SoCs, allowing to finaly be able to have support for a video
-display using simplefb as a temp solution.
+Here is a bunch of clocks changes to merge for 3.19.
+
+It might be followed by another pull request as there is a few
+developments that might be ready by the opening of the merge window,
+but it should be most of it.
 
 Thanks,
 Maxime
 
-The following changes since commit 109588fd214c930ce6561997250f0eea456a8f7b:
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-  ARM: dts: sun6i: Add ethernet support to M9 board (2014-11-23 17:00:25 +0100)
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git sunxi-simplefb-for-3.19
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clocks-for-3.19
 
-for you to fetch changes up to a9f8cda32a3acc3150755fe973f7fa1867a7a5d6:
+for you to fetch changes up to c1ec51603053260b138fc98e2ed18a5a9bea4515:
 
-  ARM: dts: sunxi: Update simplefb nodes so that u-boot can find them (2014-11-23 17:21:52 +0100)
-
-----------------------------------------------------------------
-Allwinner simple frambuffer support
-
-This enables the simple framebuffer on all the supported Allwinner SoCs (but
-the A80). That allows to have at last a video display usable by using the
-framebuffer the firmware might have set up.
+  clk: sunxi: gmac-tx-clk mux is not a CLK_MUX_INDEX_BIT mux (2014-11-23 17:02:57 +0100)
 
 ----------------------------------------------------------------
-Hans de Goede (6):
-      ARM: dts: sun4i: Add simplefb node
-      ARM: dts: sun5i: Add simplefb node
-      ARM: dts: sun6i: Add simplefb node
-      ARM: dts: sun7i: Add simplefb node
-      ARM: dts: sunxi: Add de_be0 clk parent pll to simplefb node
-      ARM: dts: sunxi: Update simplefb nodes so that u-boot can find them
+Allwinner Clocks additions for 3.19
 
- arch/arm/boot/dts/sun4i-a10.dtsi  | 14 ++++++++++++++
- arch/arm/boot/dts/sun5i-a10s.dtsi | 14 ++++++++++++++
- arch/arm/boot/dts/sun6i-a31.dtsi  | 12 ++++++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi  | 14 ++++++++++++++
- 4 files changed, 54 insertions(+)
+A few patches that should go through the clock tree, mostly fixes, cleanups,
+and new clocks additions to start to support the A80.
+
+----------------------------------------------------------------
+Chen-Yu Tsai (7):
+      clk: sunxi: make factors clock mux mask configurable
+      clk: sunxi: Add support for A80 basic bus clocks
+      clk: sunxi: Add support for bus clock gates on Allwinner A80 SoC
+      ARM: dts: sunxi: Use sun4i-a10-apb1-clk for sun6i/sun8i apb2 clocks.
+      clk: sunxi: Removed unused/incorrect sun6i-a31-apb2-clk driver
+      clk: sunxi: Specify number of child clocks for divs clocks
+      clk: sunxi: Implement A31 PLL6 as a divs clock for 2x output
+
+Emilio L?pez (2):
+      clk: sunxi: unify APB1 clock
+      ARM: dts: sunxi: unify APB1 clock
+
+Hans de Goede (1):
+      clk: sunxi: gmac-tx-clk mux is not a CLK_MUX_INDEX_BIT mux
+
+ Documentation/devicetree/bindings/clock/sunxi.txt |  31 ++-
+ arch/arm/boot/dts/sun4i-a10.dtsi                  |  12 +-
+ arch/arm/boot/dts/sun5i-a10s.dtsi                 |  12 +-
+ arch/arm/boot/dts/sun5i-a13.dtsi                  |  12 +-
+ arch/arm/boot/dts/sun6i-a31.dtsi                  |  12 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi                  |  12 +-
+ arch/arm/boot/dts/sun8i-a23.dtsi                  |  12 +-
+ drivers/clk/sunxi/Makefile                        |   1 +
+ drivers/clk/sunxi/clk-a20-gmac.c                  |   7 +-
+ drivers/clk/sunxi/clk-factors.c                   |   2 +-
+ drivers/clk/sunxi/clk-factors.h                   |   3 +-
+ drivers/clk/sunxi/clk-mod0.c                      |   1 +
+ drivers/clk/sunxi/clk-sun8i-mbus.c                |   1 +
+ drivers/clk/sunxi/clk-sun9i-core.c                | 271 ++++++++++++++++++++++
+ drivers/clk/sunxi/clk-sunxi.c                     |  85 ++++---
+ 15 files changed, 380 insertions(+), 94 deletions(-)
+ create mode 100644 drivers/clk/sunxi/clk-sun9i-core.c
 
 -- 
 Maxime Ripard, Free Electrons
@@ -58,4 +79,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141123/84e5783b/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141123/e8523388/attachment.sig>
