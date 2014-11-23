@@ -1,50 +1,118 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Sun, 23 Nov 2014 19:35:54 +0100
-Subject: [PATCH v3 2/8] KVM: arm64: Enable the KVM-VFIO device
+Date: Sun, 23 Nov 2014 19:35:56 +0100
+Subject: [PATCH v3 4/8] KVM: kvm-vfio: User API for IRQ forwarding
 In-Reply-To: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
 References: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1416767760-14487-3-git-send-email-eric.auger@linaro.org>
+Message-ID: <1416767760-14487-5-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Used by KVM-enabled VFIO-based device passthrough support in QEMU.
+This patch adds and document a new KVM_DEV_VFIO_DEVICE group
+and 2 device attributes: KVM_DEV_VFIO_DEVICE_FORWARD_IRQ,
+KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ. The purpose is to be able
+to set a VFIO device IRQ as forwarded or not forwarded.
+the command takes as argument a handle to a new struct named
+kvm_arch_forwarded_irq.
 
-Signed-off-by: Joel Schopp <joel.schopp@amd.com>
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
-Extracted from [RFC PATCH] arm64: KVM: add irqfd support
-http://www.spinics.net/lists/kvm-arm/msg10798.html
----
- arch/arm64/kvm/Kconfig  | 1 +
- arch/arm64/kvm/Makefile | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+v2 -> v3:
+- rework vfio kvm device documentation
+- reword commit message and title
+- add subindex in kvm_arch_forwarded_irq to be closer to VFIO API
+- forwarding state can only be changed with VFIO IRQ signaling is off
 
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 09c25c2..2edf926 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -26,6 +26,7 @@ config KVM
- 	select KVM_ARM_HOST
- 	select KVM_ARM_VGIC
- 	select KVM_ARM_TIMER
-+	select KVM_VFIO
- 	select HAVE_KVM_EVENTFD
- 	---help---
- 	  Support hosting virtualized guest machines.
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 2e6b827..81ed091 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -11,7 +11,7 @@ ARM=../../../arch/arm/kvm
+v1 -> v2:
+- struct kvm_arch_forwarded_irq moved from arch/arm/include/uapi/asm/kvm.h
+  to include/uapi/linux/kvm.h
+  also irq_index renamed into index and guest_irq renamed into gsi
+- ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
+---
+ Documentation/virtual/kvm/devices/vfio.txt | 34 ++++++++++++++++++++++++------
+ include/uapi/linux/kvm.h                   | 10 +++++++++
+ 2 files changed, 38 insertions(+), 6 deletions(-)
+
+diff --git a/Documentation/virtual/kvm/devices/vfio.txt b/Documentation/virtual/kvm/devices/vfio.txt
+index ef51740..f7aff29 100644
+--- a/Documentation/virtual/kvm/devices/vfio.txt
++++ b/Documentation/virtual/kvm/devices/vfio.txt
+@@ -4,15 +4,24 @@ VFIO virtual device
+ Device types supported:
+   KVM_DEV_TYPE_VFIO
  
- obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
+-Only one VFIO instance may be created per VM.  The created device
+-tracks VFIO groups in use by the VM and features of those groups
+-important to the correctness and acceleration of the VM.  As groups
+-are enabled and disabled for use by the VM, KVM should be updated
+-about their presence.  When registered with KVM, a reference to the
+-VFIO-group is held by KVM.
++Only one VFIO instance may be created per VM.
++
++The created device tracks VFIO groups in use by the VM and features
++of those groups important to the correctness and acceleration of
++the VM.  As groups are enabled and disabled for use by the VM, KVM
++should be updated about their presence.  When registered with KVM,
++a reference to the VFIO-group is held by KVM.
++
++The device also tracks & enable VFIO device forwarded IRQs, if any.
++A physical forwarded IRQ is directly completed by the guest. This
++requires HW support in the interrupt controller which must be able
++to automatically complete the physical IRQ when it detects the guest
++has completed the corresponding virtual IRQ. The modality sometimes
++is named direct EOI.
  
--kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
+ Groups:
+   KVM_DEV_VFIO_GROUP
++  KVM_DEV_VFIO_DEVICE
  
+ KVM_DEV_VFIO_GROUP attributes:
+   KVM_DEV_VFIO_GROUP_ADD: Add a VFIO group to VFIO-KVM device tracking
+@@ -20,3 +29,16 @@ KVM_DEV_VFIO_GROUP attributes:
+ 
+ For each, kvm_device_attr.addr points to an int32_t file descriptor
+ for the VFIO group.
++
++KVM_DEV_VFIO_DEVICE attributes:
++  KVM_DEV_VFIO_DEVICE_FORWARD_IRQ: set a VFIO device IRQ as forwarded
++  KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ: set a VFIO device IRQ as not forwarded
++
++For each, kvm_device_attr.addr points to a kvm_arch_forwarded_irq struct.
++
++The forwarded state can only be changed when the VFIO signaling mechanism
++for this physical IRQ is not set. In other words, forwarding must be
++activated before VFIO_DEVICE_SET_IRQS has been called to trigger the IRQ
++or associate an eventfd to it. Unforwarding can only be called while the
++signaling has been disabled with VFIO_DEVICE_SET_IRQS. If this condition is
++not satisfied, the command returns an -EBUSY.
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 6076882..a269a42 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -946,6 +946,9 @@ struct kvm_device_attr {
+ #define  KVM_DEV_VFIO_GROUP			1
+ #define   KVM_DEV_VFIO_GROUP_ADD			1
+ #define   KVM_DEV_VFIO_GROUP_DEL			2
++#define  KVM_DEV_VFIO_DEVICE			2
++#define   KVM_DEV_VFIO_DEVICE_FORWARD_IRQ			1
++#define   KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ			2
+ 
+ enum kvm_device_type {
+ 	KVM_DEV_TYPE_FSL_MPIC_20	= 1,
+@@ -963,6 +966,13 @@ enum kvm_device_type {
+ 	KVM_DEV_TYPE_MAX,
+ };
+ 
++struct kvm_arch_forwarded_irq {
++	__u32 fd; /* file desciptor of the VFIO device */
++	__u32 index; /* VFIO device IRQ index */
++	__u32 subindex; /* VFIO device IRQ subindex */
++	__u32 gsi; /* gsi, ie. virtual IRQ number */
++};
++
+ /*
+  * ioctls for VM fds
+  */
 -- 
 1.9.1
