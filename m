@@ -1,102 +1,79 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 23 Nov 2014 22:41:06 +0100
-Subject: [PATCH v4] clocksource: arch_timer: Allow the device tree to
- specify uninitialized timer registers
-In-Reply-To: <CAD=FV=VhaMo4fNide3a2S6jdLiq2pyOqY3hmx7ai0iDTPxCsPA@mail.gmail.com>
-References: <1412753627-28287-1-git-send-email-sonnyrao@chromium.org>
- <CAD=FV=VhaMo4fNide3a2S6jdLiq2pyOqY3hmx7ai0iDTPxCsPA@mail.gmail.com>
-Message-ID: <54725472.7010804@linaro.org>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Mon, 24 Nov 2014 03:36:13 +0530
+Subject: [PATCH] mmc: dw_mmc: fix card read threshold for PIO mode
+In-Reply-To: <20141123153012.GH11253@dragon>
+References: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
+ <20141121233155.GC11253@dragon>
+ <CAGOxZ51DPL+6HTSG6yeCqqRxtq7XBuWki7gdB-ieamVUKixCDQ@mail.gmail.com>
+ <20141123153012.GH11253@dragon>
+Message-ID: <CAGOxZ50+k3Z5gHrRasveM=7V+GS+1dRmcz0u5WSyo=XBE9iT3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2014 12:01 AM, Doug Anderson wrote:
-> Daniel,
->
-> On Wed, Oct 8, 2014 at 12:33 AM, Sonny Rao <sonnyrao@chromium.org> wrote:
->> From: Doug Anderson <dianders@chromium.org>
->>
->> Some 32-bit (ARMv7) systems are architected like this:
->>
->> * The firmware doesn't know and doesn't care about hypervisor mode and
->>    we don't want to add the complexity of hypervisor there.
->>
->> * The firmware isn't involved in SMP bringup or resume.
->>
->> * The ARCH timer come up with an uninitialized offset (CNTVOFF)
->>    between the virtual and physical counters.  Each core gets a
->>    different random offset.
->>
->> * The device boots in "Secure SVC" mode.
->>
->> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
->>    CNTHCTL.PL1PCTEN (both default to 1 at reset)
->>
->> On systems like the above, it doesn't make sense to use the virtual
->> counter.  There's nobody managing the offset and each time a core goes
->> down and comes back up it will get reinitialized to some other random
->> value.
->>
->> This adds an optional property which can inform the kernel of this
->> situation, and firmware is free to remove the property if it is going
->> to initialize the CNTVOFF registers when each CPU comes out of reset.
->>
->> Currently, the best course of action in this case is to use the
->> physical timer, which is why it is important that CNTHCTL hasn't been
->> changed from its reset value and it's a reasonable assumption given
->> that the firmware has never entered HYP mode.
->>
->> Note that it's been said that on ARMv8 systems the firmware and
->> kernel really can't be architected as described above.  That means
->> using the physical timer like this really only makes sense for ARMv7
->> systems.
->>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
->> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
->> ---
->> Changes in v2:
->> - Add "#ifdef CONFIG_ARM" as per Will Deacon
->>
->> Changes in v3:
->> - change property name to arm,cntvoff-not-fw-configured and specify
->>    that the value of CNTHCTL.PL1PC(T)EN must still be the reset value
->>    of 1 as per Mark Rutland
->>
->> Changes in v4:
->> - change property name to arm,cpu-registers-not-fw-configured and
->>    specify that all cpu registers must have architected reset values
->>    per Mark Rutland
->> - change from "#ifdef CONFIG_ARM" to "if (IS_ENABLED(CONFIG_ARM))" per
->>    Arnd Bergmann
->> ---
->>   Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
->>   drivers/clocksource/arm_arch_timer.c                 | 8 ++++++++
->>   2 files changed, 16 insertions(+)
->
-> Do you know what the status of this patch is?  This patch and Sonny's
-> patch at <https://patchwork.kernel.org/patch/5051901/> are needed on
-> Rockchip rk3288 for some specific things:
->
-> 1. To make SMP happy with coreboot.
->
-> 2. To (I assume) make SMP happy after S2R (no matter which firmware is
-> used since I don't think anyone has PSCI for rk3288).
->
-> ...we still need a DTS entry atop these patches, but that's trivial to
-> add once these land.
+Hi Shawn,
 
-Hi Doug,
+On Sun, Nov 23, 2014 at 9:00 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Hi Alim,
+>
+> On Sat, Nov 22, 2014 at 06:56:46PM +0530, Alim Akhtar wrote:
+>> Hi Shawn,
+>>
+>> On Sat, Nov 22, 2014 at 5:01 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> > Seungwon, Jaehoon,
+>> >
+>> > On Fri, Nov 21, 2014 at 02:39:10PM +0800, Shawn Guo wrote:
+>> >> Commit f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
+>> >> introduces a regression for use case where PIO mode is used, i.e.
+>> >> CONFIG_MMC_DW_IDMAC is not disabled.  It stops kernel from booting
+>> >
+>> > s/not disabled/disabled
+>> >
+>> >> like below.
+>> >
+>> > For understanding the problem better, can you guys please to test the
+>> > dw_mmc driver on Samsung platforms with CONFIG_MMC_DW_IDMAC disabled.
+>> > I'm wondering this is a problem specific to my platform or a common one.
+>> >
+>> I tested PIO mode on exynos5800-peach-pi board with Ulf's -next
+>> branch, and it works fine.
+>> To confirm PIO mode works, I ran iozone and it gave  low performance
+>> number (as expected) then IDMA mode.
+>
+> Thanks a lot for testing and confirming that it works on exynos.
+>
+>>
+>> One thing to note, is your controller version is 210a, so not sure if
+>> something more in missing from driver.
+>
+> Unfortunately, I do not have the reference manual for the hardware I'm
+> running so far.  But from the kernel log, the controller version is
+> 210a.  What do you mean by "something more in missing from driver"?
+> The driver has any limitation for any particular controller versions?
+>
+For that you need to check dw_mmc data book for 210a version. Sorry I
+don't have it.
 
-sounds like I forgot it. Thanks for the heads up.
+> One thing I need to check with hardware vendor is whether register
+> CDTHRCTL is available on my dwmmc controller.  From my testing, even
+> reading this register every time dw_mci_submit_data() is called causes
+> problem for me.
+>
+yes, your guess is right, did you tested with ulf's -next branch?
+Recently patch [1] is merged, that most likely to solve your platform
+issue. Have a try.
 
-Applied for 3.19.
+[1] http://www.spinics.net/lists/stable/msg69884.html
 
-   -- Daniel
+>> Also from log its looks like you card clock is 26Mhz, did you tried
+>> running at 52Mhz?
+>
+> I did not.  But it's unlikely the problem of clock frequency from what
+> I've seen.
+>
+> Shawn
+
 
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards,
+Alim
