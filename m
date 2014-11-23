@@ -1,55 +1,87 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 23 Nov 2014 13:54:41 +0100
-Subject: [PATCH 3/5] ARM: sunxi: Add "allwinner,sun6i-a31s" to mach-sunxi
+Date: Sun, 23 Nov 2014 13:54:39 +0100
+Subject: [PATCH 1/5] pinctrl: sun6i: Add some missing functions,
+ fix i2c3 muxing
 In-Reply-To: <1416747283-13489-1-git-send-email-hdegoede@redhat.com>
 References: <1416747283-13489-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1416747283-13489-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1416747283-13489-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So fat the A31s is 100% compatible with the A31, still lets do the same
-as what we've done for the A13 / A10s and give it its own compatible string,
-in case need to differentiate later.
+While working on pinctrl for the A31s, I noticed that function 4 of
+PA15 - PA18 was missing, add these.
+
+I also noticed that i2c3 sck / sda got assigned to PB5 & PB6, this should
+be PB4 & PB5, fix this as well.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/mach-sunxi/platsmp.c | 3 ++-
- arch/arm/mach-sunxi/sunxi.c   | 1 +
- drivers/clk/sunxi/clk-sunxi.c | 1 +
- 3 files changed, 4 insertions(+), 1 deletion(-)
+ drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-sunxi/platsmp.c b/arch/arm/mach-sunxi/platsmp.c
-index c53077b..8601491 100644
---- a/arch/arm/mach-sunxi/platsmp.c
-+++ b/arch/arm/mach-sunxi/platsmp.c
-@@ -120,4 +120,5 @@ struct smp_operations sun6i_smp_ops __initdata = {
- 	.smp_prepare_cpus	= sun6i_smp_prepare_cpus,
- 	.smp_boot_secondary	= sun6i_smp_boot_secondary,
- };
--CPU_METHOD_OF_DECLARE(sun6i_smp, "allwinner,sun6i-a31", &sun6i_smp_ops);
-+CPU_METHOD_OF_DECLARE(sun6i_a31_smp, "allwinner,sun6i-a31", &sun6i_smp_ops);
-+CPU_METHOD_OF_DECLARE(sun6i_a31s_smp, "allwinner,sun6i-a31s", &sun6i_smp_ops);
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index d7598ae..2d9ca5b 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -29,6 +29,7 @@ MACHINE_END
- 
- static const char * const sun6i_board_dt_compat[] = {
- 	"allwinner,sun6i-a31",
-+	"allwinner,sun6i-a31s",
- 	NULL,
- };
- 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index f19e0f9..3577f4c 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -1200,4 +1200,5 @@ static void __init sun6i_init_clocks(struct device_node *node)
- 			  ARRAY_SIZE(sun6i_critical_clocks));
- }
- CLK_OF_DECLARE(sun6i_a31_clk_init, "allwinner,sun6i-a31", sun6i_init_clocks);
-+CLK_OF_DECLARE(sun6i_a31s_clk_init, "allwinner,sun6i-a31s", sun6i_init_clocks);
- CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+index a2b4b85..fb19e15 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+@@ -134,24 +134,28 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD4 */
+ 		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D15 */
++		  SUNXI_FUNCTION(0x4, "clk_a_out"),
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 15)),	/* PA_EINT15 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 16),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD5 */
+ 		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D16 */
++		  SUNXI_FUNCTION(0x4, "dmic"),		/* CLK */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 16)),	/* PA_EINT16 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 17),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD6 */
+ 		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D17 */
++		  SUNXI_FUNCTION(0x4, "dmic"),		/* DIN */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 17)),	/* PA_EINT17 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 18),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD7 */
+ 		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D18 */
++		  SUNXI_FUNCTION(0x4, "clk_b_out"),
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 18)),	/* PA_EINT18 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 19),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+@@ -207,6 +211,7 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "gmac"),		/* MDC */
+ 		  SUNXI_FUNCTION(0x3, "lcd1"),		/* HSYNC */
++		  SUNXI_FUNCTION(0x4, "clk_c_out"),
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 26)),	/* PA_EINT26 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 27),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+@@ -242,20 +247,20 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DO1 */
+ 		  SUNXI_FUNCTION(0x3, "uart3"),		/* RTS */
++		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SCK */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 4)),	/* PB_EINT4 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 5),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DO2 */
+ 		  SUNXI_FUNCTION(0x3, "uart3"),		/* TX */
+-		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SCK */
++		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SDA */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 5)),	/* PB_EINT5 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 6),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DO3 */
+ 		  SUNXI_FUNCTION(0x3, "uart3"),		/* RX */
+-		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SDA */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 6)),	/* PB_EINT6 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 7),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
 -- 
 2.1.0
