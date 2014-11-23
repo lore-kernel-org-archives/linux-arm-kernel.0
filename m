@@ -1,20 +1,67 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Nov 2014 14:27:27 +0100
-Subject: [PATCH v4 11/19] arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
-In-Reply-To: <1415959683-26027-12-git-send-email-andre.przywara@arm.com>
-References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
- <1415959683-26027-12-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141123132727.GX3401@cbox>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Sun, 23 Nov 2014 21:28:25 +0800
+Subject: [Patch irqdomain: Enhance irq_domain_free_irqs_common() to support
+ parentless irqdomain
+In-Reply-To: <alpine.DEB.2.11.1411231135190.6439@nanos>
+References: <1416540206-18103-1-git-send-email-jiang.liu@linux.intel.com>
+ <alpine.DEB.2.11.1411231132160.6439@nanos>
+ <alpine.DEB.2.11.1411231135190.6439@nanos>
+Message-ID: <5471E0F9.7080003@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 10:07:55AM +0000, Andre Przywara wrote:
-> vgic_set_attr() and vgic_get_attr() contain both code specific for
-> the emulated GIC as well as code for the userland facing, generic
-> part of the GIC.
-> Split the guest GIC facing code of from the generic part to allow
-> easier splitting later.
+On 2014/11/23 18:36, Thomas Gleixner wrote:
+> On Sun, 23 Nov 2014, Thomas Gleixner wrote:
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> On Fri, 21 Nov 2014, Jiang Liu wrote:
+>>
+>>> Originally irq_domain_free_irqs_common() is designed to be used by
+>>> irqdomains with parent. But there are desires to reuse for parentless
+>>> irqdomains for code reduction.
+>>> So check domain->parent before invoking irq_domain_free_irqs_parent().
+>>>
+>>> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+>>> ---
+>>> Hi Thomas,
+>>> 	This patch applies to tip/irq/irqdomain, it helps to reduce code
+>>> size on ARM. Seems we still have chance to merge it into tip/irq/irqdomain:)
+>>> Regards!
+>>> Gerry
+>>> ---
+>>>  kernel/irq/irqdomain.c |    3 ++-
+>>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+>>> index 029acf11efed..0449d2869e17 100644
+>>> --- a/kernel/irq/irqdomain.c
+>>> +++ b/kernel/irq/irqdomain.c
+>>> @@ -975,7 +975,8 @@ void irq_domain_free_irqs_common(struct irq_domain *domain, unsigned int virq,
+>>>  		if (irq_data)
+>>>  			irq_domain_reset_irq_data(irq_data);
+>>>  	}
+>>> -	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
+>>> +	if (domain->parent)
+>>> +		irq_domain_free_irqs_parent(domain, virq, nr_irqs);
+>>
+>> irq_domain_free_irqs_parent()
+>> {
+>> 	if (domain->parent && domain->parent->ops->free)
+>> 	   	...
+>> }
+>>
+>> So the above is redundant and does not change anything.
+> 
+> Except that this function gets replaced later in the series and drops
+> the parent check.
+> 
+> Though we should not put the conditionals on the call sites. We want
+> the functions handle it.
+> 
+> /me goes fixing.
+Thanks, Thomas!
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> Thanks,
+> 
+> 	tglx
+> 
