@@ -1,145 +1,96 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Sun, 23 Nov 2014 19:12:51 +0100
-Subject: [RFC 2/4] KVM: arm: vgic: add forwarded irq rbtree lock
+Date: Sun, 23 Nov 2014 19:12:52 +0100
+Subject: [RFC 3/4] KVM: arm: vgic: cleanup forwarded IRQs on destroy
 In-Reply-To: <1416766373-13569-1-git-send-email-eric.auger@linaro.org>
 References: <1416766373-13569-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1416766373-13569-3-git-send-email-eric.auger@linaro.org>
+Message-ID: <1416766373-13569-4-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a lock related to the rb tree manipulation. The rb tree can be
-searched in one thread (irqfd handler for instance) and map/unmap
-may happen in another.
+When the VGIC is destroyed it must take care of
+- restoring the forwarded IRQs in non forwarded state,
+- deactivating the IRQ in case the guest left without doing it
+- cleaning nodes of the phys_map rbtree
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-
 ---
+ virt/kvm/arm/vgic.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-v2 -> v3:
-re-arrange lock sequence in vgic_map_phys_irq
----
- include/kvm/arm_vgic.h |  1 +
- virt/kvm/arm/vgic.c    | 56 ++++++++++++++++++++++++++++++++++++--------------
- 2 files changed, 42 insertions(+), 15 deletions(-)
-
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index ea31ac6..9b3290b 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -220,6 +220,7 @@ struct vgic_dist {
- 	unsigned long		*irq_pending_on_cpu;
- 
- 	struct rb_root		irq_phys_map;
-+	spinlock_t			rb_tree_lock;
- #endif
- };
- 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 5484e3d..f592219 100644
+index f592219..21419ac 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1750,9 +1750,22 @@ static struct rb_root *vgic_get_irq_phys_map(struct kvm_vcpu *vcpu,
+@@ -32,6 +32,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_mmu.h>
++#include <linux/spinlock.h>
  
- int vgic_map_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq)
- {
--	struct rb_root *root = vgic_get_irq_phys_map(vcpu, virt_irq);
--	struct rb_node **new = &root->rb_node, *parent = NULL;
-+	struct rb_root *root;
-+	struct rb_node **new, *parent = NULL;
- 	struct irq_phys_map *new_map;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+
-+	root = vgic_get_irq_phys_map(vcpu, virt_irq);
-+	new = &root->rb_node;
-+
-+	new_map = kzalloc(sizeof(*new_map), GFP_KERNEL);
-+	if (!new_map)
-+		return -ENOMEM;
-+
-+	new_map->virt_irq = virt_irq;
-+	new_map->phys_irq = phys_irq;
-+
-+	spin_lock(&dist->rb_tree_lock);
+ /*
+  * How the whole thing works (courtesy of Christoffer Dall):
+@@ -102,6 +103,8 @@ static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
+ static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
+ static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++static void vgic_clean_irq_phys_map(struct kvm_vcpu *vcpu,
++				    struct rb_root *root);
  
- 	/* Boilerplate rb_tree code */
- 	while (*new) {
-@@ -1764,19 +1777,16 @@ int vgic_map_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq)
- 			new = &(*new)->rb_left;
- 		else if (this->virt_irq > virt_irq)
- 			new = &(*new)->rb_right;
--		else
-+		else {
-+			kfree(new_map);
-+			spin_unlock(&dist->rb_tree_lock);
- 			return -EEXIST;
-+		}
- 	}
- 
--	new_map = kzalloc(sizeof(*new_map), GFP_KERNEL);
--	if (!new_map)
--		return -ENOMEM;
--
--	new_map->virt_irq = virt_irq;
--	new_map->phys_irq = phys_irq;
--
- 	rb_link_node(&new_map->node, parent, new);
- 	rb_insert_color(&new_map->node, root);
-+	spin_unlock(&dist->rb_tree_lock);
- 
- 	return 0;
+ static const struct vgic_ops *vgic_ops;
+ static const struct vgic_params *vgic;
+@@ -1813,6 +1816,36 @@ static struct irq_phys_map *vgic_irq_map_search(struct kvm_vcpu *vcpu,
+ 	return NULL;
  }
-@@ -1805,24 +1815,39 @@ static struct irq_phys_map *vgic_irq_map_search(struct kvm_vcpu *vcpu,
  
++static void vgic_clean_irq_phys_map(struct kvm_vcpu *vcpu,
++				    struct rb_root *root)
++{
++	unsigned long flags;
++
++	while (1) {
++		struct rb_node *node = rb_first(root);
++		struct irq_phys_map *map;
++		struct irq_desc *desc;
++		struct irq_data *d;
++		struct irq_chip *chip;
++
++		if (!node)
++			break;
++
++		map = container_of(node, struct irq_phys_map, node);
++		desc = irq_to_desc(map->phys_irq);
++
++		raw_spin_lock_irqsave(&desc->lock, flags);
++		d = &desc->irq_data;
++		chip = desc->irq_data.chip;
++		irqd_clr_irq_forwarded(d);
++		chip->irq_eoi(d);
++		raw_spin_unlock_irqrestore(&desc->lock, flags);
++
++		rb_erase(node, root);
++		kfree(map);
++	}
++}
++
  int vgic_get_phys_irq(struct kvm_vcpu *vcpu, int virt_irq)
  {
--	struct irq_phys_map *map = vgic_irq_map_search(vcpu, virt_irq);
-+	struct irq_phys_map *map;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	int ret;
-+
-+	spin_lock(&dist->rb_tree_lock);
-+	map = vgic_irq_map_search(vcpu, virt_irq);
- 
- 	if (map)
--		return map->phys_irq;
-+		ret = map->phys_irq;
-+	else
-+		ret =  -ENOENT;
-+
-+	spin_unlock(&dist->rb_tree_lock);
-+	return ret;
- 
--	return -ENOENT;
- }
- 
- int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq)
+ 	struct irq_phys_map *map;
+@@ -1855,6 +1888,7 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
  {
--	struct irq_phys_map *map = vgic_irq_map_search(vcpu, virt_irq);
-+	struct irq_phys_map *map;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 
++	vgic_clean_irq_phys_map(vcpu, &vgic_cpu->irq_phys_map);
+ 	kfree(vgic_cpu->pending_shared);
+ 	kfree(vgic_cpu->vgic_irq_lr_map);
+ 	vgic_cpu->pending_shared = NULL;
+@@ -1920,6 +1954,8 @@ void kvm_vgic_destroy(struct kvm *kvm)
+ 	kvm_for_each_vcpu(i, vcpu, kvm)
+ 		kvm_vgic_vcpu_destroy(vcpu);
+ 
++	vgic_clean_irq_phys_map(vcpu, &dist->irq_phys_map);
 +
-+	spin_lock(&dist->rb_tree_lock);
-+
-+	map = vgic_irq_map_search(vcpu, virt_irq);
- 
- 	if (map && map->phys_irq == phys_irq) {
- 		rb_erase(&map->node, vgic_get_irq_phys_map(vcpu, virt_irq));
- 		kfree(map);
-+		spin_unlock(&dist->rb_tree_lock);
- 		return 0;
- 	}
--
-+	spin_unlock(&dist->rb_tree_lock);
- 	return -ENOENT;
- }
- 
-@@ -2078,6 +2103,7 @@ int kvm_vgic_create(struct kvm *kvm)
- 	}
- 
- 	spin_lock_init(&kvm->arch.vgic.lock);
-+	spin_lock_init(&kvm->arch.vgic.rb_tree_lock);
- 	kvm->arch.vgic.in_kernel = true;
- 	kvm->arch.vgic.vctrl_base = vgic->vctrl_base;
- 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+ 	vgic_free_bitmap(&dist->irq_enabled);
+ 	vgic_free_bitmap(&dist->irq_level);
+ 	vgic_free_bitmap(&dist->irq_pending);
 -- 
 1.9.1
