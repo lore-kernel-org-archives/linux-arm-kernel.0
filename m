@@ -1,54 +1,50 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Sun, 23 Nov 2014 17:20:32 +0100
-Subject: [PATCH v1] ARM: dts: rockchip: Update LEDs to work with the last
- leds-gpio driver on radxarock
-In-Reply-To: <1416759575-774-1-git-send-email-romain.perier@gmail.com>
-References: <1416759575-774-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <CABgxDoLwqYttcPYc+Wth3B17P=e2cbV8G=hqbRfWx+PVTiAPig@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 23 Nov 2014 19:23:02 +0300
+Subject: [PATCH] Add support for SCCB devices into PXA27x I2C controller
+In-Reply-To: <54711397.9060601@tul.cz>
+References: <54711397.9060601@tul.cz>
+Message-ID: <547209E6.9010905@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-See https://www.kernel.org/doc/Documentation/leds/leds-class.txt for
-LEDs device naming
+Hello.
 
-2014-11-23 17:19 GMT+01:00 Romain Perier <romain.perier@gmail.com>:
-> The leds-gpio driver recently switched to the device property API. The device_node
-> name is no longer retrieved if the "label" devicetree property is not found.
-> In this case the driver tries to create entries with (null) name in
-> /sys/class/leds, which is wrong and generates backtrace as several gpio_leds have
-> the same name. Also renamed subnode "yellow" to "blue" to match the last
-> schematics updates.
->
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+On 11/23/2014 1:52 AM, Petr Cvek wrote:
+
+> Add support for SCCB devices into PXA27x I2C controller.
+
+> Fix generated START but no STOP for message without I2C_M_NOSTART flag. Add
+> support for I2C_M_IGNORE_NAK flag.
+
+> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 > ---
->  arch/arm/boot/dts/rk3188-radxarock.dts | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
+>   drivers/i2c/busses/i2c-pxa.c | 22 ++++++++++++++++------
+>   1 file changed, 16 insertions(+), 6 deletions(-)
+
+> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+> index be671f7..adad044 100644
+> --- a/drivers/i2c/busses/i2c-pxa.c
+> +++ b/drivers/i2c/busses/i2c-pxa.c
+> @@ -885,7 +885,14 @@ static void i2c_pxa_irq_txempty(struct pxa_i2c *i2c, u32
+> isr)
+>           return; /* ignore */
+>       }
 >
-> diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
-> index 6eb62c0..9a09579 100644
-> --- a/arch/arm/boot/dts/rk3188-radxarock.dts
-> +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-> @@ -43,16 +43,19 @@
->                 compatible = "gpio-leds";
->
->                 green {
-> +                       label = "rock:green:user1";
->                         gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
->                         default-state = "off";
->                 };
->
-> -               yellow {
-> +               blue {
-> +                       label = "rock:blue:user2";
->                         gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
->                         default-state = "off";
->                 };
->
->                 sleep {
-> +                       label = "rock:red:power";
->                         gpios = <&gpio0 15 0>;
->                         default-state = "off";
->                 };
-> --
-> 1.9.1
->
+> -    if (isr & ISR_BED) {
+> +    /*
+
+    Your patch has tabs replaces by spaces; probably your email agent's work. :-)
+
+> +     * Ignore NAK when flag I2C_M_IGNORE_NAK is present,
+> +     * this enables use of SCCB devices
+> +     */
+> +    if ((isr & ISR_BED) &&
+> +        (!((i2c->msg->flags & I2C_M_IGNORE_NAK) &&
+> +            (isr & ISR_ACKNAK)))) {
+> +
+
+   This empty line is not needed.
+
+[...]
+
+WBR, Sergei
