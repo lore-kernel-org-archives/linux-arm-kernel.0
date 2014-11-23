@@ -1,13 +1,13 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 23 Nov 2014 14:38:12 +0100
-Subject: [PATCH v2 6/9] ARM: dts: sun6i: Add ir_clk node
+Date: Sun, 23 Nov 2014 14:38:14 +0100
+Subject: [PATCH v2 8/9] ARM: dts: sun6i: Add pinmux settings for the ir pins
 In-Reply-To: <1416749895-25013-1-git-send-email-hdegoede@redhat.com>
 References: <1416749895-25013-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1416749895-25013-7-git-send-email-hdegoede@redhat.com>
+Message-ID: <1416749895-25013-9-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an ir_clk sub-node to the prcm node.
+Add pinmux settings for the ir receive pin of the A31.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
@@ -15,22 +15,22 @@ Signed-off-by: Hans de Goede <hdegoede@redhat.com>
  1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index a01b215..4aa628b 100644
+index d33e758..90b7537 100644
 --- a/arch/arm/boot/dts/sun6i-a31.dtsi
 +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -882,6 +882,13 @@
- 						"apb0_i2c";
- 			};
- 
-+			ir_clk: ir_clk {
-+				#clock-cells = <0>;
-+				compatible = "allwinner,sun6i-a31-ir-clk";
-+				clocks = <&osc32k>, <&osc24M>;
-+				clock-output-names = "ir";
-+			};
+@@ -922,6 +922,13 @@
+ 			#interrupt-cells = <2>;
+ 			#size-cells = <0>;
+ 			#gpio-cells = <3>;
 +
- 			apb0_rst: apb0_rst {
- 				compatible = "allwinner,sun6i-a31-clock-reset";
- 				#reset-cells = <1>;
++			ir_pins_a: ir at 0 {
++				allwinner,pins = "PL4";
++				allwinner,function = "s_ir";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
+ 		};
+ 	};
+ };
 -- 
 2.1.0
