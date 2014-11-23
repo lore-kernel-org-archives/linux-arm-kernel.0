@@ -1,78 +1,100 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 23 Nov 2014 12:33:20 +0800
-Subject: [PATCH v4 1/6] clk: sunxi: Specify number of child clocks for divs
- clocks
-In-Reply-To: <1416717205-15406-1-git-send-email-wens@csie.org>
-References: <1416717205-15406-1-git-send-email-wens@csie.org>
-Message-ID: <1416717205-15406-2-git-send-email-wens@csie.org>
+Date: Sun, 23 Nov 2014 12:33:19 +0800
+Subject: [PATCH v4 0/6] clk: sun6i: Unify AHB1 clock and fix rate calculation
+Message-ID: <1416717205-15406-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently sunxi_divs_clk_setup assumes the number of child clocks
-to be the same as the number of clock-output-names, and a maximum
-of SUNXI_DIVS_MAX_QTY child clocks.
+Hi everyone,
 
-On sun6i, PLL6 only has 1 child clock, but the parent would be used
-as well, thereby also having it's own clock-output-names entry. This
-results in an extra bogus clock being registered.
+This is v4 of the sun6i AHB1 clock unification series. This series
+unifies the mux and divider parts of the AHB1 clock found on sun6i
+and sun8i, while also adding support for the pre-divider on the
+PLL6 input.
 
-This patch adds an entry for the number of child clocks alongside
-the data structures for them.
+The rate calculation logic must factor in which parent it is using to
+calculate the rate, to decide whether to use the pre-divider or not.
+This is beyond the original factors clk design in sunxi. To avoid
+feature bloat, this is implemented as a seperate composite clk.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/clk/sunxi/clk-sunxi.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+The new clock driver is registered with a separate OF_CLK_DECLARE.
+As it shares its register with the APB1 div clock, thus shares the same
+spinlock, it cannot reside in a separate file.
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 46d98e3..d469493 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -906,6 +906,7 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
- 
- struct divs_data {
- 	const struct factors_data *factors; /* data for the factor clock */
-+	int ndivs; /* number of children */
- 	struct {
- 		u8 fixed; /* is it a fixed divisor? if not... */
- 		struct clk_div_table *table; /* is it a table based divisor? */
-@@ -925,6 +926,7 @@ static struct clk_div_table pll6_sata_tbl[] = {
- 
- static const struct divs_data pll5_divs_data __initconst = {
- 	.factors = &sun4i_pll5_data,
-+	.ndivs = 2,
- 	.div = {
- 		{ .shift = 0, .pow = 0, }, /* M, DDR */
- 		{ .shift = 16, .pow = 1, }, /* P, other */
-@@ -933,6 +935,7 @@ static const struct divs_data pll5_divs_data __initconst = {
- 
- static const struct divs_data pll6_divs_data __initconst = {
- 	.factors = &sun4i_pll6_data,
-+	.ndivs = 2,
- 	.div = {
- 		{ .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
- 		{ .fixed = 2 }, /* P, other */
-@@ -963,7 +966,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
- 	struct clk_fixed_factor *fix_factor;
- 	struct clk_divider *divider;
- 	void __iomem *reg;
--	int i = 0;
-+	int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
- 	int flags, clkflags;
- 
- 	/* Set up factor clock that we will be dividing */
-@@ -986,7 +989,11 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
- 	 * our RAM clock! */
- 	clkflags = !strcmp("pll5", parent) ? 0 : CLK_SET_RATE_PARENT;
- 
--	for (i = 0; i < SUNXI_DIVS_MAX_QTY; i++) {
-+	/* if number of children known, use it */
-+	if (data->ndivs)
-+		ndivs = data->ndivs;
-+
-+	for (i = 0; i < ndivs; i++) {
- 		if (of_property_read_string_index(node, "clock-output-names",
- 						  i, &clk_name) != 0)
- 			break;
+This series also fixes up the PLL6 clock. Those patches were merged
+and are included for completeness.
+
+Changes since v3:
+
+  - Moved AHB1 clock driver to the front of clk-sunxi.c
+
+Changes since v2:
+
+  - Rebased onto the following patches
+
+    clk: sunxi: Removed unused/incorrect sun6i-a31-apb2-clk driver
+    ARM: dts: sunxi: Use sun4i-a10-apb1-clk for sun6i/sun8i apb2 clocks.
+    ARM: dts: sunxi: unify APB1 clock
+    clk: sunxi: unify APB1 clock
+    ARM: dts: sun6i: Re-parent ahb1_mux to pll6 as required by dma controller
+
+  - Dropped
+
+    ARM: dts: sun6i: Add required ahb1 clock parent and rates for dma controller
+
+    as it is superseded by the re-parent patch from above.
+
+  - Expand clock bindings to include output names for PLL6
+
+  - Use of_io_request_and_map
+
+  - Drop ahb1 rate setting in DTS
+
+  - Whitespace and comment style cleanups
+
+Changes since v1:
+
+  - Dropped "clk: sunxi: Add post clk divider for factor clocks"
+
+  - Added "clk: sunxi: Specify number of child clocks for divs clocks"
+
+  - Reworked the PLL6 clock into a divs clock with 2 outputs.
+    This matches the style of PLL6 on the other sunxi platforms.
+
+  - Dropped "dmaengine: sun6i: Remove obsolete clk muxing code".
+    Already merged.
+
+The contents of this series are as follows:
+
+Patch 1 makes the number of outputs on divs clocks configurable.
+
+Patch 2 changes PLL6 into a divs clock with 2 outputs, 1 the normal PLL6
+and 1 at double the clock rate. This patch also fixes rate calculation
+error, due to one of the factor values starting from 1, instead of 0.
+
+Patch 3 updates the DT with the new multiple output PLL6.
+
+Patch 4 adds the unified AHB1 clock driver.
+
+Patch 5 and 6 unify the AHB1 clock nodes on sun6i and sun8i respectively.
+
+
+Cheers
+ChenYu
+
+Chen-Yu Tsai (6):
+  clk: sunxi: Specify number of child clocks for divs clocks
+  clk: sunxi: Implement A31 PLL6 as a divs clock for 2x output
+  ARM: sun6i: DT: Add PLL6 multiple outputs
+  clk: sunxi: unify sun6i AHB1 clock with proper PLL6 pre-divider
+  ARM: dts: sun6i: Unify ahb1 clock nodes
+  ARM: dts: sun8i: Unify ahb1 clock nodes
+
+ Documentation/devicetree/bindings/clock/sunxi.txt |  21 +-
+ arch/arm/boot/dts/sun6i-a31.dtsi                  |  40 ++--
+ arch/arm/boot/dts/sun8i-a23.dtsi                  |  12 +-
+ drivers/clk/sunxi/clk-sunxi.c                     | 247 ++++++++++++++++++++--
+ 4 files changed, 269 insertions(+), 51 deletions(-)
+
 -- 
 2.1.3
