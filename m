@@ -1,46 +1,50 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Sun, 23 Nov 2014 19:35:53 +0100
-Subject: [PATCH v3 1/8] KVM: arm: Enable the KVM-VFIO device
+Date: Sun, 23 Nov 2014 19:35:55 +0100
+Subject: [PATCH v3 3/8] VFIO: platform: forwarded state tested when selecting
+ IRQ handler
 In-Reply-To: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
 References: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1416767760-14487-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <1416767760-14487-4-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kim Phillips <kim.phillips@linaro.org>
+In case the IRQ is forwarded, the VFIO platform IRQ handler does not
+need to disable the IRQ anymore.
 
-Used by KVM-enabled VFIO-based device passthrough support in QEMU.
+When setting the IRQ handler we now also test the forwarded state. In
+case the IRQ is forwarded we select the edge handler (no automaske).
 
-Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+
 ---
- arch/arm/kvm/Kconfig  | 1 +
- arch/arm/kvm/Makefile | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index e519a40..aace254 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -24,6 +24,7 @@ config KVM
- 	select KVM_MMIO
- 	select KVM_ARM_HOST
- 	depends on ARM_VIRT_EXT && ARM_LPAE
-+	select KVM_VFIO
- 	select HAVE_KVM_EVENTFD
- 	---help---
- 	  Support hosting virtualized guest machines. You will also
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index 859db09..ea1fa76 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
- AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
+v2 -> v3:
+- forwarded state was tested in the handler. Now the forwarded state
+  is tested before setting the handler. This definitively limits
+  the dynamics of forwarded state changes but I don't think there is
+  a use case where we need to be able to change the state at any time.
+---
+ drivers/vfio/platform/vfio_platform_irq.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+index 08d400e..61a2920 100644
+--- a/drivers/vfio/platform/vfio_platform_irq.c
++++ b/drivers/vfio/platform/vfio_platform_irq.c
+@@ -230,8 +230,13 @@ static int vfio_platform_set_irq_trigger(struct vfio_platform_device *vdev,
+ {
+ 	struct vfio_platform_irq *irq = &vdev->irqs[index];
+ 	irq_handler_t handler;
++	struct irq_data *d;
++	bool is_forwarded;
  
- KVM := ../../../virt/kvm
--kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
-+kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
- 
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+-	if (vdev->irqs[index].flags & VFIO_IRQ_INFO_MASKABLE)
++	d = irq_get_irq_data(irq->hwirq);
++	is_forwarded = irqd_irq_forwarded(d);
++
++	if ((vdev->irqs[index].flags & VFIO_IRQ_INFO_MASKABLE) && !is_forwarded)
+ 		handler = vfio_maskable_irq_handler;
+ 	else
+ 		handler = vfio_irq_handler;
 -- 
 1.9.1
