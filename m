@@ -1,79 +1,67 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Mon, 24 Nov 2014 03:36:13 +0530
-Subject: [PATCH] mmc: dw_mmc: fix card read threshold for PIO mode
-In-Reply-To: <20141123153012.GH11253@dragon>
-References: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
- <20141121233155.GC11253@dragon>
- <CAGOxZ51DPL+6HTSG6yeCqqRxtq7XBuWki7gdB-ieamVUKixCDQ@mail.gmail.com>
- <20141123153012.GH11253@dragon>
-Message-ID: <CAGOxZ50+k3Z5gHrRasveM=7V+GS+1dRmcz0u5WSyo=XBE9iT3g@mail.gmail.com>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Sun, 23 Nov 2014 23:21:22 +0100
+Subject: [PATCH v2] Add support for SCCB devices into PXA27x I2C controller
+In-Reply-To: <20141123083112.GA1932@katana>
+References: <54711397.9060601@tul.cz> <20141123083112.GA1932@katana>
+Message-ID: <54725DE2.9090800@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+I'm sorry for spacing, I didn't realize thunderbird automatically replaces tabs with spaces. Now it should be OK. 
 
-On Sun, Nov 23, 2014 at 9:00 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Hi Alim,
->
-> On Sat, Nov 22, 2014 at 06:56:46PM +0530, Alim Akhtar wrote:
->> Hi Shawn,
->>
->> On Sat, Nov 22, 2014 at 5:01 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->> > Seungwon, Jaehoon,
->> >
->> > On Fri, Nov 21, 2014 at 02:39:10PM +0800, Shawn Guo wrote:
->> >> Commit f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
->> >> introduces a regression for use case where PIO mode is used, i.e.
->> >> CONFIG_MMC_DW_IDMAC is not disabled.  It stops kernel from booting
->> >
->> > s/not disabled/disabled
->> >
->> >> like below.
->> >
->> > For understanding the problem better, can you guys please to test the
->> > dw_mmc driver on Samsung platforms with CONFIG_MMC_DW_IDMAC disabled.
->> > I'm wondering this is a problem specific to my platform or a common one.
->> >
->> I tested PIO mode on exynos5800-peach-pi board with Ulf's -next
->> branch, and it works fine.
->> To confirm PIO mode works, I ran iozone and it gave  low performance
->> number (as expected) then IDMA mode.
->
-> Thanks a lot for testing and confirming that it works on exynos.
->
->>
->> One thing to note, is your controller version is 210a, so not sure if
->> something more in missing from driver.
->
-> Unfortunately, I do not have the reference manual for the hardware I'm
-> running so far.  But from the kernel log, the controller version is
-> 210a.  What do you mean by "something more in missing from driver"?
-> The driver has any limitation for any particular controller versions?
->
-For that you need to check dw_mmc data book for 210a version. Sorry I
-don't have it.
+I created this patch by fixing both I2C controller and SCCB device, so it seems I incorrectly used I2C_M_NOSTART instead I2C_M_STOP. Problem with I2C_M_STOP is that it causes bus freeze when using userspace utility "i2cget" on SCCB device (unfreeze can be done with i2c-pxa module reload). But this can be probably repaired in i2cget.
 
-> One thing I need to check with hardware vendor is whether register
-> CDTHRCTL is available on my dwmmc controller.  From my testing, even
-> reading this register every time dw_mci_submit_data() is called causes
-> problem for me.
->
-yes, your guess is right, did you tested with ulf's -next branch?
-Recently patch [1] is merged, that most likely to solve your platform
-issue. Have a try.
+Patched kernel was from vanilla 3.18.0-rc5 commit fc14f9c1272f62c3e8d01300f52467c0d9af50f9
 
-[1] http://www.spinics.net/lists/stable/msg69884.html
+Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+---
+ drivers/i2c/busses/i2c-pxa.c | 19 ++++++++++++-------
+ 1 file changed, 12 insertions(+), 7 deletions(-)
 
->> Also from log its looks like you card clock is 26Mhz, did you tried
->> running at 52Mhz?
->
-> I did not.  But it's unlikely the problem of clock frequency from what
-> I've seen.
->
-> Shawn
-
-
-
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index be671f7..f80df8f 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -885,7 +885,9 @@ static void i2c_pxa_irq_txempty(struct pxa_i2c *i2c, u32 isr)
+ 		return; /* ignore */
+ 	}
+ 
+-	if (isr & ISR_BED) {
++	if ((isr & ISR_BED) &&
++		(!((i2c->msg->flags & I2C_M_IGNORE_NAK) &&
++			(isr & ISR_ACKNAK)))) {
+ 		int ret = BUS_ERROR;
+ 
+ 		/*
+@@ -919,12 +921,14 @@ static void i2c_pxa_irq_txempty(struct pxa_i2c *i2c, u32 isr)
+ 		icr |= ICR_ALDIE | ICR_TB;
+ 
+ 		/*
+-		 * If this is the last byte of the last message, send
+-		 * a STOP.
++		 * If this is the last byte of the last message or last byte
++		 * of any message with I2C_M_STOP (e.g. SCCB), send a STOP.
+ 		 */
+-		if (i2c->msg_ptr == i2c->msg->len &&
+-		    i2c->msg_idx == i2c->msg_num - 1)
+-			icr |= ICR_STOP;
++		if ((i2c->msg_ptr == i2c->msg->len) &&
++			((i2c->msg->flags & I2C_M_STOP) ||
++			(i2c->msg_idx == i2c->msg_num - 1)))
++				icr |= ICR_STOP;
++
+ 	} else if (i2c->msg_idx < i2c->msg_num - 1) {
+ 		/*
+ 		 * Next segment of the message.
+@@ -1071,7 +1075,8 @@ static int i2c_pxa_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num
+ 
+ static u32 i2c_pxa_functionality(struct i2c_adapter *adap)
+ {
+-	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
++	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL |
++		I2C_FUNC_PROTOCOL_MANGLING | I2C_FUNC_NOSTART;
+ }
+ 
+ static const struct i2c_algorithm i2c_pxa_algorithm = {
 -- 
-Regards,
-Alim
+1.7.12.1
