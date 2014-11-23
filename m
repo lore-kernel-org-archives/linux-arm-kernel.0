@@ -1,105 +1,145 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Sun, 23 Nov 2014 19:12:50 +0100
-Subject: [RFC 1/4] KVM: arm: vgic: fix state machine for forwarded IRQ
+Date: Sun, 23 Nov 2014 19:12:51 +0100
+Subject: [RFC 2/4] KVM: arm: vgic: add forwarded irq rbtree lock
 In-Reply-To: <1416766373-13569-1-git-send-email-eric.auger@linaro.org>
 References: <1416766373-13569-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1416766373-13569-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <1416766373-13569-3-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix multiple injection of level sensitive forwarded IRQs.
-With current code, the second injection fails since the state bitmaps
-are not reset (process_maintenance is not called anymore).
-
-New implementation follows those principles:
-- A forwarded IRQ only can be sampled when it is pending
-- when queueing the IRQ (programming the LR), the pending state is removed
-  as for edge sensitive IRQs
-- an injection of a forwarded IRQ is considered always valid since
-  coming from the HW and level always is 1.
+Add a lock related to the rb tree manipulation. The rb tree can be
+searched in one thread (irqfd handler for instance) and map/unmap
+may happen in another.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
 v2 -> v3:
-- integration in new vgic_can_sample_irq
-- remove the pending state when programming the LR
-
-v1 -> v2:
-- fix vgic state bypass in vgic_queue_hwirq
-
-Conflicts:
-	virt/kvm/arm/vgic.c
+re-arrange lock sequence in vgic_map_phys_irq
 ---
- virt/kvm/arm/vgic.c | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+ include/kvm/arm_vgic.h |  1 +
+ virt/kvm/arm/vgic.c    | 56 ++++++++++++++++++++++++++++++++++++--------------
+ 2 files changed, 42 insertions(+), 15 deletions(-)
 
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index ea31ac6..9b3290b 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -220,6 +220,7 @@ struct vgic_dist {
+ 	unsigned long		*irq_pending_on_cpu;
+ 
+ 	struct rb_root		irq_phys_map;
++	spinlock_t			rb_tree_lock;
+ #endif
+ };
+ 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index ccb3801..5484e3d 100644
+index 5484e3d..f592219 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -360,7 +360,10 @@ static void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
+@@ -1750,9 +1750,22 @@ static struct rb_root *vgic_get_irq_phys_map(struct kvm_vcpu *vcpu,
  
- static bool vgic_can_sample_irq(struct kvm_vcpu *vcpu, int irq)
+ int vgic_map_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq)
  {
--	return vgic_irq_is_edge(vcpu, irq) || !vgic_irq_is_queued(vcpu, irq);
-+	bool is_forwarded =  (vgic_get_phys_irq(vcpu, irq) >= 0);
+-	struct rb_root *root = vgic_get_irq_phys_map(vcpu, virt_irq);
+-	struct rb_node **new = &root->rb_node, *parent = NULL;
++	struct rb_root *root;
++	struct rb_node **new, *parent = NULL;
+ 	struct irq_phys_map *new_map;
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
 +
-+	return vgic_irq_is_edge(vcpu, irq) || !vgic_irq_is_queued(vcpu, irq) ||
-+		(is_forwarded && vgic_dist_irq_is_pending(vcpu, irq));
++	root = vgic_get_irq_phys_map(vcpu, virt_irq);
++	new = &root->rb_node;
++
++	new_map = kzalloc(sizeof(*new_map), GFP_KERNEL);
++	if (!new_map)
++		return -ENOMEM;
++
++	new_map->virt_irq = virt_irq;
++	new_map->phys_irq = phys_irq;
++
++	spin_lock(&dist->rb_tree_lock);
+ 
+ 	/* Boilerplate rb_tree code */
+ 	while (*new) {
+@@ -1764,19 +1777,16 @@ int vgic_map_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq)
+ 			new = &(*new)->rb_left;
+ 		else if (this->virt_irq > virt_irq)
+ 			new = &(*new)->rb_right;
+-		else
++		else {
++			kfree(new_map);
++			spin_unlock(&dist->rb_tree_lock);
+ 			return -EEXIST;
++		}
+ 	}
+ 
+-	new_map = kzalloc(sizeof(*new_map), GFP_KERNEL);
+-	if (!new_map)
+-		return -ENOMEM;
+-
+-	new_map->virt_irq = virt_irq;
+-	new_map->phys_irq = phys_irq;
+-
+ 	rb_link_node(&new_map->node, parent, new);
+ 	rb_insert_color(&new_map->node, root);
++	spin_unlock(&dist->rb_tree_lock);
+ 
+ 	return 0;
+ }
+@@ -1805,24 +1815,39 @@ static struct irq_phys_map *vgic_irq_map_search(struct kvm_vcpu *vcpu,
+ 
+ int vgic_get_phys_irq(struct kvm_vcpu *vcpu, int virt_irq)
+ {
+-	struct irq_phys_map *map = vgic_irq_map_search(vcpu, virt_irq);
++	struct irq_phys_map *map;
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	int ret;
++
++	spin_lock(&dist->rb_tree_lock);
++	map = vgic_irq_map_search(vcpu, virt_irq);
+ 
+ 	if (map)
+-		return map->phys_irq;
++		ret = map->phys_irq;
++	else
++		ret =  -ENOENT;
++
++	spin_unlock(&dist->rb_tree_lock);
++	return ret;
+ 
+-	return -ENOENT;
  }
  
- static u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
-@@ -1295,6 +1298,7 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	struct vgic_lr vlr;
- 	int lr;
-+	bool is_forwarded =  (vgic_get_phys_irq(vcpu, irq) >= 0);
- 
- 	/* Sanitize the input... */
- 	BUG_ON(sgi_source_id & ~7);
-@@ -1330,7 +1334,7 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
- 	vlr.irq = irq;
- 	vlr.source = sgi_source_id;
- 	vlr.state = LR_STATE_PENDING;
--	if (!vgic_irq_is_edge(vcpu, irq))
-+	if (!vgic_irq_is_edge(vcpu, irq) && !is_forwarded)
- 		vlr.state |= LR_EOI_INT;
- 
- 	vgic_set_lr(vcpu, lr, vlr);
-@@ -1371,11 +1375,12 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
- 
- static bool vgic_queue_hwirq(struct kvm_vcpu *vcpu, int irq)
+ int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq)
  {
-+	bool is_forwarded = (vgic_get_phys_irq(vcpu, irq) >= 0);
- 	if (!vgic_can_sample_irq(vcpu, irq))
- 		return true; /* level interrupt, already queued */
- 
- 	if (vgic_queue_irq(vcpu, 0, irq)) {
--		if (vgic_irq_is_edge(vcpu, irq)) {
-+		if (vgic_irq_is_edge(vcpu, irq) || is_forwarded) {
- 			vgic_dist_irq_clear_pending(vcpu, irq);
- 			vgic_cpu_irq_clear(vcpu, irq);
- 		} else {
-@@ -1636,14 +1641,17 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
- 	int edge_triggered, level_triggered;
- 	int enabled;
- 	bool ret = true;
-+	bool is_forwarded;
- 
- 	spin_lock(&dist->lock);
- 
- 	vcpu = kvm_get_vcpu(kvm, cpuid);
-+	is_forwarded = (vgic_get_phys_irq(vcpu, irq_num) >= 0);
+-	struct irq_phys_map *map = vgic_irq_map_search(vcpu, virt_irq);
++	struct irq_phys_map *map;
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
 +
- 	edge_triggered = vgic_irq_is_edge(vcpu, irq_num);
- 	level_triggered = !edge_triggered;
++	spin_lock(&dist->rb_tree_lock);
++
++	map = vgic_irq_map_search(vcpu, virt_irq);
  
--	if (!vgic_validate_injection(vcpu, irq_num, level)) {
-+	if (!vgic_validate_injection(vcpu, irq_num, level) && !is_forwarded) {
- 		ret = false;
- 		goto out;
+ 	if (map && map->phys_irq == phys_irq) {
+ 		rb_erase(&map->node, vgic_get_irq_phys_map(vcpu, virt_irq));
+ 		kfree(map);
++		spin_unlock(&dist->rb_tree_lock);
+ 		return 0;
  	}
+-
++	spin_unlock(&dist->rb_tree_lock);
+ 	return -ENOENT;
+ }
+ 
+@@ -2078,6 +2103,7 @@ int kvm_vgic_create(struct kvm *kvm)
+ 	}
+ 
+ 	spin_lock_init(&kvm->arch.vgic.lock);
++	spin_lock_init(&kvm->arch.vgic.rb_tree_lock);
+ 	kvm->arch.vgic.in_kernel = true;
+ 	kvm->arch.vgic.vctrl_base = vgic->vctrl_base;
+ 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
 -- 
 1.9.1
