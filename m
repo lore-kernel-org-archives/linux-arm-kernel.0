@@ -1,171 +1,114 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 23 Nov 2014 14:38:07 +0100
-Subject: [PATCH v2 1/9] clk: sunxi: Give sunxi_factors_register a registers
- parameter
+Date: Sun, 23 Nov 2014 14:38:10 +0100
+Subject: [PATCH v2 4/9] rc: sunxi-cir: Add support for an optional reset
+ controller
 In-Reply-To: <1416749895-25013-1-git-send-email-hdegoede@redhat.com>
 References: <1416749895-25013-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1416749895-25013-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1416749895-25013-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before this commit sunxi_factors_register uses of_iomap(node, 0) to get
-the clk registers. The sun6i prcm has factor clocks, for which we want to
-use sunxi_factors_register, but of_iomap(node, 0) does not work for the prcm
-factor clocks, because the prcm uses the mfd framework, so the registers
-are not part of the dt-node, instead they are added to the platform_device,
-as platform_device resources.
-
-This commit makes getting the registers the callers duty, so that
-sunxi_factors_register can be used with mfd instantiated platform device too.
-
-While at it also add error checking to the of_iomap calls.
-
-This commit also drops the __init function from sunxi_factors_register since
-platform driver probe functions are not __init.
+On sun6i the cir block is attached to the reset controller, add support
+for de-asserting the reset if a reset controller is specified in dt.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi/clk-factors.c    | 10 ++++------
- drivers/clk/sunxi/clk-factors.h    |  7 ++++---
- drivers/clk/sunxi/clk-mod0.c       | 24 ++++++++++++++++++++++--
- drivers/clk/sunxi/clk-sun8i-mbus.c | 13 +++++++++++--
- drivers/clk/sunxi/clk-sunxi.c      | 11 ++++++++++-
- 5 files changed, 51 insertions(+), 14 deletions(-)
+ .../devicetree/bindings/media/sunxi-ir.txt         |  2 ++
+ drivers/media/rc/sunxi-cir.c                       | 25 ++++++++++++++++++++--
+ 2 files changed, 25 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-index f83ba09..fc4f4b5 100644
---- a/drivers/clk/sunxi/clk-factors.c
-+++ b/drivers/clk/sunxi/clk-factors.c
-@@ -156,9 +156,10 @@ static const struct clk_ops clk_factors_ops = {
- 	.set_rate = clk_factors_set_rate,
+diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt b/Documentation/devicetree/bindings/media/sunxi-ir.txt
+index 23dd5ad..6b70b9b 100644
+--- a/Documentation/devicetree/bindings/media/sunxi-ir.txt
++++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
+@@ -10,6 +10,7 @@ Required properties:
+ 
+ Optional properties:
+ - linux,rc-map-name : Remote control map name.
++- resets : phandle + reset specifier pair
+ 
+ Example:
+ 
+@@ -17,6 +18,7 @@ ir0: ir at 01c21800 {
+ 	compatible = "allwinner,sun4i-a10-ir";
+ 	clocks = <&apb0_gates 6>, <&ir0_clk>;
+ 	clock-names = "apb", "ir";
++	resets = <&apb0_rst 1>;
+ 	interrupts = <0 5 1>;
+ 	reg = <0x01C21800 0x40>;
+ 	linux,rc-map-name = "rc-rc6-mce";
+diff --git a/drivers/media/rc/sunxi-cir.c b/drivers/media/rc/sunxi-cir.c
+index bcee8e1..895fb65 100644
+--- a/drivers/media/rc/sunxi-cir.c
++++ b/drivers/media/rc/sunxi-cir.c
+@@ -23,6 +23,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/module.h>
+ #include <linux/of_platform.h>
++#include <linux/reset.h>
+ #include <media/rc-core.h>
+ 
+ #define SUNXI_IR_DEV "sunxi-ir"
+@@ -95,6 +96,7 @@ struct sunxi_ir {
+ 	int             irq;
+ 	struct clk      *clk;
+ 	struct clk      *apb_clk;
++	struct reset_control *rst;
+ 	const char      *map_name;
  };
  
--struct clk * __init sunxi_factors_register(struct device_node *node,
--					   const struct factors_data *data,
--					   spinlock_t *lock)
-+struct clk *sunxi_factors_register(struct device_node *node,
-+				   const struct factors_data *data,
-+				   spinlock_t *lock,
-+				   void __iomem *reg)
- {
- 	struct clk *clk;
- 	struct clk_factors *factors;
-@@ -168,11 +169,8 @@ struct clk * __init sunxi_factors_register(struct device_node *node,
- 	struct clk_hw *mux_hw = NULL;
- 	const char *clk_name = node->name;
- 	const char *parents[FACTORS_MAX_PARENTS];
--	void __iomem *reg;
- 	int i = 0;
+@@ -166,15 +168,29 @@ static int sunxi_ir_probe(struct platform_device *pdev)
+ 		return PTR_ERR(ir->clk);
+ 	}
  
--	reg = of_iomap(node, 0);
--
- 	/* if we have a mux, we will have >1 parents */
- 	while (i < FACTORS_MAX_PARENTS &&
- 	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
-diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
-index 9913840..1f5526d 100644
---- a/drivers/clk/sunxi/clk-factors.h
-+++ b/drivers/clk/sunxi/clk-factors.h
-@@ -37,8 +37,9 @@ struct clk_factors {
- 	spinlock_t *lock;
- };
- 
--struct clk * __init sunxi_factors_register(struct device_node *node,
--					   const struct factors_data *data,
--					   spinlock_t *lock);
-+struct clk *sunxi_factors_register(struct device_node *node,
-+				   const struct factors_data *data,
-+				   spinlock_t *lock,
-+				   void __iomem *reg);
- 
- #endif
-diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
-index 4a56385..5fb1f7e 100644
---- a/drivers/clk/sunxi/clk-mod0.c
-+++ b/drivers/clk/sunxi/clk-mod0.c
-@@ -78,7 +78,17 @@ static DEFINE_SPINLOCK(sun4i_a10_mod0_lock);
- 
- static void __init sun4i_a10_mod0_setup(struct device_node *node)
- {
--	sunxi_factors_register(node, &sun4i_a10_mod0_data, &sun4i_a10_mod0_lock);
-+	void __iomem *reg;
-+
-+	reg = of_iomap(node, 0);
-+	if (!reg) {
-+		pr_err("Could not get registers for mod0-clk: %s\n",
-+		       node->name);
-+		return;
++	/* Reset (optional) */
++	ir->rst = devm_reset_control_get_optional(dev, NULL);
++	if (IS_ERR(ir->rst)) {
++		ret = PTR_ERR(ir->rst);
++		if (ret == -EPROBE_DEFER)
++			return ret;
++		ir->rst = NULL;
++	} else {
++		ret = reset_control_deassert(ir->rst);
++		if (ret)
++			return ret;
 +	}
 +
-+	sunxi_factors_register(node, &sun4i_a10_mod0_data,
-+			       &sun4i_a10_mod0_lock, reg);
+ 	ret = clk_set_rate(ir->clk, SUNXI_IR_BASE_CLK);
+ 	if (ret) {
+ 		dev_err(dev, "set ir base clock failed!\n");
+-		return ret;
++		goto exit_reset_assert;
+ 	}
+ 
+ 	if (clk_prepare_enable(ir->apb_clk)) {
+ 		dev_err(dev, "try to enable apb_ir_clk failed\n");
+-		return -EINVAL;
++		ret = -EINVAL;
++		goto exit_reset_assert;
+ 	}
+ 
+ 	if (clk_prepare_enable(ir->clk)) {
+@@ -271,6 +287,9 @@ exit_clkdisable_clk:
+ 	clk_disable_unprepare(ir->clk);
+ exit_clkdisable_apb_clk:
+ 	clk_disable_unprepare(ir->apb_clk);
++exit_reset_assert:
++	if (ir->rst)
++		reset_control_assert(ir->rst);
+ 
+ 	return ret;
  }
- CLK_OF_DECLARE(sun4i_a10_mod0, "allwinner,sun4i-a10-mod0-clk", sun4i_a10_mod0_setup);
+@@ -282,6 +301,8 @@ static int sunxi_ir_remove(struct platform_device *pdev)
  
-@@ -86,7 +96,17 @@ static DEFINE_SPINLOCK(sun5i_a13_mbus_lock);
+ 	clk_disable_unprepare(ir->clk);
+ 	clk_disable_unprepare(ir->apb_clk);
++	if (ir->rst)
++		reset_control_assert(ir->rst);
  
- static void __init sun5i_a13_mbus_setup(struct device_node *node)
- {
--	struct clk *mbus = sunxi_factors_register(node, &sun4i_a10_mod0_data, &sun5i_a13_mbus_lock);
-+	struct clk *mbus;
-+	void __iomem *reg;
-+
-+	reg = of_iomap(node, 0);
-+	if (!reg) {
-+		pr_err("Could not get registers for a13-mbus-clk\n");
-+		return;
-+	}
-+
-+	mbus = sunxi_factors_register(node, &sun4i_a10_mod0_data,
-+				      &sun5i_a13_mbus_lock, reg);
- 
- 	/* The MBUS clocks needs to be always enabled */
- 	__clk_get(mbus);
-diff --git a/drivers/clk/sunxi/clk-sun8i-mbus.c b/drivers/clk/sunxi/clk-sun8i-mbus.c
-index 8e49b44..c0629ff 100644
---- a/drivers/clk/sunxi/clk-sun8i-mbus.c
-+++ b/drivers/clk/sunxi/clk-sun8i-mbus.c
-@@ -68,8 +68,17 @@ static DEFINE_SPINLOCK(sun8i_a23_mbus_lock);
- 
- static void __init sun8i_a23_mbus_setup(struct device_node *node)
- {
--	struct clk *mbus = sunxi_factors_register(node, &sun8i_a23_mbus_data,
--						  &sun8i_a23_mbus_lock);
-+	struct clk *mbus;
-+	void __iomem *reg;
-+
-+	reg = of_iomap(node, 0);
-+	if (!reg) {
-+		pr_err("Could not get registers for a23-mbus-clk\n");
-+		return;
-+	}
-+
-+	mbus = sunxi_factors_register(node, &sun8i_a23_mbus_data,
-+				      &sun8i_a23_mbus_lock, reg);
- 
- 	/* The MBUS clocks needs to be always enabled */
- 	__clk_get(mbus);
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index b1f66ad..6062a3e 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -521,7 +521,16 @@ static const struct factors_data sun7i_a20_out_data __initconst = {
- static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
- 						   const struct factors_data *data)
- {
--	return sunxi_factors_register(node, data, &clk_lock);
-+	void __iomem *reg;
-+
-+	reg = of_iomap(node, 0);
-+	if (!reg) {
-+		pr_err("Could not get registers for factors-clk: %s\n",
-+		       node->name);
-+		return NULL;
-+	}
-+
-+	return sunxi_factors_register(node, data, &clk_lock, reg);
- }
- 
- 
+ 	spin_lock_irqsave(&ir->ir_lock, flags);
+ 	/* disable IR IRQ */
 -- 
 2.1.0
