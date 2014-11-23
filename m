@@ -1,62 +1,135 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sun, 23 Nov 2014 20:02:57 +0100
-Subject: [PATCH] ARM: dts: meson: enable Ethernet controller
-In-Reply-To: <1416758928-12640-1-git-send-email-b.galvani@gmail.com>
-References: <1416758928-12640-1-git-send-email-b.galvani@gmail.com>
-Message-ID: <CAOQ7t2ZZn9J-b9Vw0rpq7GSSSXRPcpK8FA2nxj4S9U319cwm9w@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 23 Nov 2014 21:20:08 +0100
+Subject: [PATCH 2/3] i2c: slave-eeprom: add eeprom simulator driver
+In-Reply-To: <20141122182630.GD9698@katana>
+References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+ <1416326695-13083-3-git-send-email-wsa@the-dreams.de>
+ <20141121071941.GK27002@pengutronix.de>
+ <20141122182630.GD9698@katana>
+Message-ID: <20141123202008.GE4431@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 23, 2014 at 5:08 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
-> Add a node for the Ethernet controller to Meson DTS file and
-> enable it on the Geniatech ATV1200 board.
->
-> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
-> ---
->  arch/arm/boot/dts/meson.dtsi         | 11 +++++++++++
->  arch/arm/boot/dts/meson6-atv1200.dts |  4 ++++
->  2 files changed, 15 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
-> index 03bcff8..4704b95 100644
-> --- a/arch/arm/boot/dts/meson.dtsi
-> +++ b/arch/arm/boot/dts/meson.dtsi
-> @@ -143,5 +143,16 @@
->                         #size-cells = <0>;
->                         status = "disabled";
->                 };
-> +
-> +               ethmac: ethernet at c9410000 {
-> +                       compatible = "amlogic,meson6-dwmac", "snps,dwmac";
-> +                       reg = <0xc9410000 0x10000
-> +                              0xc1108108 0x4>;
-> +                       interrupts = <0 8 1>;
-> +                       interrupt-names = "macirq";
-> +                       clocks = <&clk81>;
-> +                       clock-names = "stmmaceth";
-> +                       status = "disabled";
-> +               };
->         };
->  }; /* end of / */
-> diff --git a/arch/arm/boot/dts/meson6-atv1200.dts b/arch/arm/boot/dts/meson6-atv1200.dts
-> index d7d351a..1237faa 100644
-> --- a/arch/arm/boot/dts/meson6-atv1200.dts
-> +++ b/arch/arm/boot/dts/meson6-atv1200.dts
-> @@ -64,3 +64,7 @@
->  &uart_AO {
->         status = "okay";
->  };
-> +
-> +&ethmac {
-> +       status = "okay";
-> +};
-> --
-> 1.9.1
->
+Hello Wolfram,
 
-Tested-by: Carlo Caione <carlo@caione.org>
+On Sat, Nov 22, 2014 at 07:26:30PM +0100, Wolfram Sang wrote:
+> 
+> > this mail is thematically more a reply to patch 1 and maybe just serves
+> > my understanding of the slave support.
+> 
+> Sure. This shows how badly needed the documentation is :)
+> 
+> ...
+> > > +		break;
+> > > +
+> > > +	case I2C_SLAVE_STOP:
+> > > +		eeprom->first_write = true;
+> > > +		break;
+> > > +
+> > > +	default:
+> > > +		break;
+> > > +	}
+> > > +
+> > > +	return 0;
+> > > +}
+> > This is the most interesting function here because it uses the new
+> > interface, the functions below are only to update and show the simulated
+> > eeprom contents and driver boilerplate, right?
+> 
+> Yes.
+> 
+> > When the eeprom driver is probed and the adapter driver notices a read
+> > request for the respective i2c address, this callback is called with
+> > event=I2C_SLAVE_REQ_READ_START. Returning 0 here and provide the first
+> > byte to send make the adapter ack the read request and send the data
+> > provided. If something != 0 is returned a NAK is sent?
+> 
+> We only send NAK on write requests (I use read/write from the master
+I don't understand this. Who is "we" in this case? 
 
-Thanks,
+> perspective). Then, we have to say if the received byte was successfully
+> processed. When reading, the master has to ack the successful reception
+> of the byte.
+Right, I got this wrong in my question. On a read request (as seen from
+the master) the master has to ack.
+ 
+> > How is the next byte requested from the slave driver? I assume with two
+> > additional calls to the callback, first with
+> > event=I2C_SLAVE_REQ_READ_END, then event=I2C_SLAVE_REQ_READ_START once
+> > more. Would it make sense to reduce this to a single call? Does the
+> > driver at READ_END time already know if its write got acked? If so, how?
+> 
+> No single call. I had this first, but my experiments showed that it is
+> important for the EEPROM driver to only increase the internal pointer
+> when the byte was ACKed. Otherwise, I was off-by-one.
+Sure, the driver has to know how his read response was received by the
+master. But assuming I understand your abstraction right there is some
+redundancy. There are only three cases on a read request (well plus error
+handling):
+
+ - master sends ACK, reads next byte
+   in this case the slave must provide another word
+   In your abstraction this implies
+     callback(I2C_SLAVE_REQ_READ_END); <-- this is redundant
+     callback(I2C_SLAVE_REQ_READ_START);
+
+ - master sends ACK, then P or Sr
+     callback(I2C_SLAVE_REQ_READ_END);
+     maybe callback(I2C_SLAVE_STOP)
+
+ - master sends NACK
+   in this case the message ends and the master has to send Sr or P.
+   In your case this results in:
+     nothing for the NACK?
+     maybe callback(I2C_SLAVE_STOP)
+
+The situations where the slave has to react are:
+
+ - slave was addressed with R
+   input: address
+   output: NAK or (ACK + data byte)
+ - slave was addressed with #W:
+   input: address
+   output: NAK or ACK
+ - data sent by slave-transmitter was acked
+   output: next data byte (maybe unused because master sends Sr or P)
+ - data sent by slave-transmitter was nacked
+   output: void (unless we want to support IGNORE_NAK :-)
+ - slave received a data byte (write)
+   input: data
+   output: NAK or ACK
+
+This looks like a better model in my eyes. In this model the slave
+driver doesn't even need to be informed about P. Not entirely sure about
+"data sent by slave-transmitter was nacked".
+
+> Ideally, I2C_SLAVE_REQ_READ_END should be used when the master ACKed the
+> byte, right. However, the rcar hardware doesn't have an interrupt for
+> this, so I imply that the start of a new read request ends the old one.
+> I probably should add a comment for that.
+> 
+> > This means that for each byte the callback is called. Would it make
+> > sense to make the API more flexible and allow the slave driver to return
+> > a buffer? This would remove some callback overhead and might allow to
+> > let the adapter driver make use of its DMA mechanism.
+> 
+> For DMA, I haven't seen DMA slave support yet. Makes sense to me, we
+haha, there is only a single slave driver yet and you're the author.
+
+> wouldn't know the transfer size, since the master can send a stop
+> anytime. This makes possible gains of using a buffer also speculative.
+> Also, I2C is still a low-bandwith bus, so usually we have a high number
+> of small transfers.
+> 
+> For now, I'd skip this idea. As I said in another thread, we need more
+> use cases. If the need arises, we can come up with something. I don't
+> think the current design prevents such an addition?
+It would change the API, but starting to get experience with byte
+banging is probably OK.
+
+Best regards
+Uwe
 
 -- 
-Carlo Caione
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
