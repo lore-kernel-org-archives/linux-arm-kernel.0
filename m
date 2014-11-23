@@ -1,50 +1,61 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 23 Nov 2014 11:33:31 +0100 (CET)
+Date: Sun, 23 Nov 2014 11:36:28 +0100 (CET)
 Subject: [Patch irqdomain: Enhance irq_domain_free_irqs_common() to
  support parentless irqdomain
-In-Reply-To: <1416540206-18103-1-git-send-email-jiang.liu@linux.intel.com>
+In-Reply-To: <alpine.DEB.2.11.1411231132160.6439@nanos>
 References: <1416540206-18103-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <alpine.DEB.2.11.1411231132160.6439@nanos>
+ <alpine.DEB.2.11.1411231132160.6439@nanos>
+Message-ID: <alpine.DEB.2.11.1411231135190.6439@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Nov 2014, Jiang Liu wrote:
+On Sun, 23 Nov 2014, Thomas Gleixner wrote:
 
-> Originally irq_domain_free_irqs_common() is designed to be used by
-> irqdomains with parent. But there are desires to reuse for parentless
-> irqdomains for code reduction.
-> So check domain->parent before invoking irq_domain_free_irqs_parent().
+> On Fri, 21 Nov 2014, Jiang Liu wrote:
 > 
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> ---
-> Hi Thomas,
-> 	This patch applies to tip/irq/irqdomain, it helps to reduce code
-> size on ARM. Seems we still have chance to merge it into tip/irq/irqdomain:)
-> Regards!
-> Gerry
-> ---
->  kernel/irq/irqdomain.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> > Originally irq_domain_free_irqs_common() is designed to be used by
+> > irqdomains with parent. But there are desires to reuse for parentless
+> > irqdomains for code reduction.
+> > So check domain->parent before invoking irq_domain_free_irqs_parent().
+> > 
+> > Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> > ---
+> > Hi Thomas,
+> > 	This patch applies to tip/irq/irqdomain, it helps to reduce code
+> > size on ARM. Seems we still have chance to merge it into tip/irq/irqdomain:)
+> > Regards!
+> > Gerry
+> > ---
+> >  kernel/irq/irqdomain.c |    3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> > index 029acf11efed..0449d2869e17 100644
+> > --- a/kernel/irq/irqdomain.c
+> > +++ b/kernel/irq/irqdomain.c
+> > @@ -975,7 +975,8 @@ void irq_domain_free_irqs_common(struct irq_domain *domain, unsigned int virq,
+> >  		if (irq_data)
+> >  			irq_domain_reset_irq_data(irq_data);
+> >  	}
+> > -	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
+> > +	if (domain->parent)
+> > +		irq_domain_free_irqs_parent(domain, virq, nr_irqs);
 > 
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index 029acf11efed..0449d2869e17 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -975,7 +975,8 @@ void irq_domain_free_irqs_common(struct irq_domain *domain, unsigned int virq,
->  		if (irq_data)
->  			irq_domain_reset_irq_data(irq_data);
->  	}
-> -	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
-> +	if (domain->parent)
-> +		irq_domain_free_irqs_parent(domain, virq, nr_irqs);
+> irq_domain_free_irqs_parent()
+> {
+> 	if (domain->parent && domain->parent->ops->free)
+> 	   	...
+> }
+> 
+> So the above is redundant and does not change anything.
 
-irq_domain_free_irqs_parent()
-{
-	if (domain->parent && domain->parent->ops->free)
-	   	...
-}
+Except that this function gets replaced later in the series and drops
+the parent check.
 
-So the above is redundant and does not change anything.
+Though we should not put the conditionals on the call sites. We want
+the functions handle it.
+
+/me goes fixing.
 
 Thanks,
 
