@@ -1,100 +1,136 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 23 Nov 2014 10:37:04 -0800
-Subject: [GIT PULL] ARM: SoC fixes for -rc6
-Message-ID: <20141123183704.GA10523@quad.lixom.net>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Sun, 23 Nov 2014 19:35:52 +0100
+Subject: [PATCH v3 0/8] KVM-VFIO IRQ forward control
+Message-ID: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+This series proposes an integration of "ARM: Forwarding physical
+interrupts to a guest VM" (http://lwn.net/Articles/603514/) in
+KVM.
 
-The following changes since commit fc14f9c1272f62c3e8d01300f52467c0d9af50f9:
+It enables to transform a VFIO platform driver IRQ into a forwarded
+IRQ.
 
-  Linux 3.18-rc5 (2014-11-16 16:36:20 -0800)
+When a physical IRQ is forwarded (to a guest), the host does not
+deactivates this latter. Completion ownership is transferred to the
+guest. When the guest deactivates the associated virtual IRQ,
+the interrupt controler automatically completes the physical IRQ.
+Obviously this requires some dedicated HW support in the interrupt
+controler.
 
-are available in the git repository at:
+The direct benefit is that, for a level sensitive IRQ, it avoids a
+VM exit on forwarded IRQ completion.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-for-rc6
+When the IRQ is forwarded, the VFIO platform driver does not need to
+mask the physical IRQ anymore before signaling the eventfd. Indeed
+genirq lowers the running priority, enabling other physical IRQ to hit
+except that one.
 
-for you to fetch changes up to 49e41938f8a53d01d1c5d133a038acb9650008f9:
+Besides, the injection still is based on irqfd triggering. The only
+impact on irqfd process is resamplefd is not called anymore on
+virtual IRQ completion since this latter becomes "transparent".
 
-  ARM: multi_v7_defconfig: fix failure setting CPU voltage by enabling dependent I2C controller (2014-11-19 09:35:17 -0800)
+The current integration is based on an extension of the KVM-VFIO
+device, previously used by KVM to interact with VFIO groups. The
+patch series now enables KVM to directly interact with a VFIO
+platform device. The VFIO external API was extended for that purpose.
 
-----------------------------------------------------------------
-ARM: SoC fixes for 3.18-rc6
+Th KVM-VFIO device can get/put the vfio platform device, check its
+integrity and type, get the IRQ number associated to an IRQ index.
 
-A collection of fixes this week:
+The IRQ forward programming is architecture specific (virtual interrupt
+controller programming basically). However the whole infrastructure is
+kept generic.
 
-- A set of clock fixes for shmobile platforms
-- A fix for tegra that moves serial port labels to be per board.
-  We're choosing to merge this for 3.18 because the labels will start
-  being parsed in 3.19, and without this change serial port numbers that
-  used to be stable since the dawn of time will change numbers.
-- A few other DT tweaks for Tegra.
-- A fix for multi_v7_defconfig that makes it stop spewing cpufreq errors on
-  Arndale (Exynos).
+from a user point of view, the functionality is provided through a
+new KVM-VFIO group named KVM_DEV_VFIO_DEVICE and 2 associated
+attributes:
+- KVM_DEV_VFIO_DEVICE_FORWARD_IRQ,
+- KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ.
 
-----------------------------------------------------------------
-Alexandre Courbot (2):
-      ARM: tegra: Remove eMMC vmmc property for roth/tn7
-      ARM: tegra: roth: Fix SD card VDD_IO regulator
+The capability can be checked with KVM_HAS_DEVICE_ATTR.
 
-Arnd Bergmann (5):
-      Merge tag 'sunxi-fixes-for-3.18' of git://git.kernel.org/.../mripard/linux into fixes
-      Merge tag 'renesas-soc-fixes-for-v3.18' of git://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'renesas-dt-fixes-for-v3.18' of git://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'renesas-clock-fixes-for-v3.18' of git://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'tegra-for-3.18-fixes-for-rc5' of git://git.kernel.org/.../tegra/linux into fixes
+Forwarding must be activated before VFIO signaling mechanism is set
+using VFIO_DEVICE_SET_IRQS and unset while the signaling is disabled.
 
-Chen-Yu Tsai (1):
-      ARM: dts: sun6i: Re-parent ahb1_mux to pll6 as required by dma controller
+---
 
-Geert Uytterhoeven (4):
-      ARM: shmobile: r8a7740 legacy: Add missing INTCA clock for irqpin module
-      ARM: shmobile: r8a7740 legacy: Correct IIC0 parent clock
-      ARM: shmobile: r8a7740 dtsi: Correct IIC0 parent clock
-      ARM: shmobile: kzm9g legacy: Set i2c clks_per_count to 2
+This patch series has the following dependencies:
+- "ARM: Forwarding physical interrupts to a guest VM"
+  (http://lwn.net/Articles/603514/)
+- [PATCH v9 00/19] VFIO support for platform and AMBA devices on ARM
+  (http://www.spinics.net/lists/kvm-arm/msg11745.html)
+- [PATCH v2 0/6] vfio: type1: support for ARM SMMUS with VFIO_IOMMU_TYPE1
+  (http://www.spinics.net/lists/kvm-arm/msg11738.html)
 
-Lucas Stach (1):
-      ARM: tegra: Add serial port labels to Tegra124 DT
+Integrated pieces can be found at
+ssh://git.linaro.org/people/eric.auger/linux.git
+on branch irqfd_integ_v8
 
-Olof Johansson (1):
-      ARM: dts: tegra: move serial aliases to per-board
+This was was tested on Calxeda Midway, assigning the xgmac main IRQ.
 
-Shinobu Uehara (2):
-      ARM: shmobile: r8a7790: Fix SD3CKCR address
-      ARM: shmobile: r8a7790: Fix SD3CKCR address to device tree
+v2 -> v3:
+- kvm_fwd_irq_action enum replaced by a bool (KVM_VFIO_IRQ_CLEANUP does not
+  exist anymore)
+- a new struct local to vfio.c was introduced to wrap kvm_fw_irq and make it
+  linkable: kvm_vfio_fwd_irq_node
+- kvm_fwd_irq now is self-contained (includes struct vfio_device *)
+- a single list of kvm_vfio_fwd_irq_irq_node is used instead of having
+  a list of devices and a list of forward irq per device. Having 2 lists
+  brought extra complexity.
+- the VFIO device ref counter is incremented each time a new IRQ is forwarded.
+  It is not attempted anymore to hold a single reference whatever the number
+  of forwarded IRQs.
+- subindex added on top of index to be closer to VFIO API
+- platform device check moved in the arm specific implementation
+- enable the KVM-VFIO device for arm64
+- forwarded state change only can happen while the VFIO IRQ handler is not
+  set; in other words, when the VFIO IRQ signaling is not set.
 
-Tyler Baker (1):
-      ARM: multi_v7_defconfig: fix failure setting CPU voltage by enabling dependent I2C controller
+v1 -> v2:
+- forward control is moved from architecture specific file into generic
+  vfio.c module.
+  only kvm_arch_set_fwd_state remains architecture specific
+- integrate Kim's patch which enables KVM-VFIO for ARM
+- fix vgic state bypass in vgic_queue_hwirq
+- struct kvm_arch_forwarded_irq moved from arch/arm/include/uapi/asm/kvm.h
+  to include/uapi/linux/kvm.h
+  also irq_index renamed into index and guest_irq renamed into gsi
+- ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
+- vfio_external_get_base_device renamed into vfio_external_base_device
+- vfio_external_get_type removed
+- kvm_vfio_external_get_base_device renamed into kvm_vfio_external_base_device
+- __KVM_HAVE_ARCH_KVM_VFIO renamed into __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
 
- arch/arm/boot/dts/r8a7740.dtsi                |  2 +-
- arch/arm/boot/dts/r8a7790.dtsi                |  4 ++--
- arch/arm/boot/dts/sun6i-a31.dtsi              |  4 ++++
- arch/arm/boot/dts/tegra114-dalmore.dts        |  1 +
- arch/arm/boot/dts/tegra114-roth.dts           |  9 +++++----
- arch/arm/boot/dts/tegra114-tn7.dts            |  5 ++++-
- arch/arm/boot/dts/tegra114.dtsi               |  7 -------
- arch/arm/boot/dts/tegra124-jetson-tk1.dts     |  1 +
- arch/arm/boot/dts/tegra124-nyan-big.dts       |  1 +
- arch/arm/boot/dts/tegra124-venice2.dts        |  1 +
- arch/arm/boot/dts/tegra124.dtsi               |  8 ++++----
- arch/arm/boot/dts/tegra20-harmony.dts         |  1 +
- arch/arm/boot/dts/tegra20-iris-512.dts        |  5 +++++
- arch/arm/boot/dts/tegra20-medcom-wide.dts     |  4 ++++
- arch/arm/boot/dts/tegra20-paz00.dts           |  2 ++
- arch/arm/boot/dts/tegra20-seaboard.dts        |  1 +
- arch/arm/boot/dts/tegra20-tamonten.dtsi       |  1 +
- arch/arm/boot/dts/tegra20-trimslice.dts       |  1 +
- arch/arm/boot/dts/tegra20-ventana.dts         |  1 +
- arch/arm/boot/dts/tegra20-whistler.dts        |  1 +
- arch/arm/boot/dts/tegra20.dtsi                |  8 --------
- arch/arm/boot/dts/tegra30-apalis-eval.dts     |  4 ++++
- arch/arm/boot/dts/tegra30-beaver.dts          |  1 +
- arch/arm/boot/dts/tegra30-cardhu.dtsi         |  2 ++
- arch/arm/boot/dts/tegra30-colibri-eval-v3.dts |  3 +++
- arch/arm/boot/dts/tegra30.dtsi                |  8 --------
- arch/arm/configs/multi_v7_defconfig           |  1 +
- arch/arm/mach-shmobile/clock-r8a7740.c        |  9 +++++++--
- arch/arm/mach-shmobile/clock-r8a7790.c        |  2 +-
- arch/arm/mach-shmobile/setup-sh73a0.c         | 20 ++++++++++++++++++++
- 30 files changed, 80 insertions(+), 38 deletions(-)
+
+Eric Auger (7):
+  KVM: arm64: Enable the KVM-VFIO device
+  VFIO: platform: forwarded state tested when selecting IRQ handler
+  KVM: kvm-vfio: User API for IRQ forwarding
+  VFIO: External user API device helpers
+  KVM: kvm-vfio: wrapper to VFIO external API device helpers
+  KVM: kvm-vfio: generic forwarding control
+  KVM: arm: kvm-vfio: forwarding control
+
+Kim Phillips (1):
+  KVM: arm: Enable the KVM-VFIO device
+
+ Documentation/virtual/kvm/devices/vfio.txt |  34 +++-
+ arch/arm/include/asm/kvm_host.h            |   7 +
+ arch/arm/kvm/Kconfig                       |   1 +
+ arch/arm/kvm/Makefile                      |   4 +-
+ arch/arm/kvm/kvm_vfio_arm.c                | 101 ++++++++++
+ arch/arm64/kvm/Kconfig                     |   1 +
+ arch/arm64/kvm/Makefile                    |   2 +-
+ drivers/vfio/platform/vfio_platform_irq.c  |   7 +-
+ drivers/vfio/vfio.c                        |  24 +++
+ include/linux/kvm_host.h                   |  28 +++
+ include/linux/vfio.h                       |   3 +
+ include/uapi/linux/kvm.h                   |  10 +
+ virt/kvm/vfio.c                            | 294 ++++++++++++++++++++++++++++-
+ 13 files changed, 503 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/kvm/kvm_vfio_arm.c
+
+-- 
+1.9.1
