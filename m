@@ -1,31 +1,56 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Sun, 23 Nov 2014 11:41:58 +0200
-Subject: [PATCH 0/4] ARM: dts: sbc-t3x: add audio and TV out support
-Message-ID: <1416735722-26167-1-git-send-email-lifshitz@compulab.co.il>
+Date: Sun, 23 Nov 2014 11:42:01 +0200
+Subject: [PATCH 3/4] ARM: dts: sbc-t3x: add TV out display alias
+In-Reply-To: <1416735722-26167-1-git-send-email-lifshitz@compulab.co.il>
+References: <1416735722-26167-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1416735722-26167-4-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for more SBC-T3x single board computers features:
+Add display alias for TV out.
 
-* Audio on CM-T3x30
-* TV out on CM-T3x
-
-This patch set adds missing I2C1 pinmux required for CM-T3x EEPROM and 
-CM-T3x30 audio support.
-
-Dmitry Lifshitz (4):
-  ARM: dts: cm-t3x: add I2C1 pinmux
-  ARM: dts: cm-t3x: add TV out support
-  ARM: dts: sbc-t3x: add TV out display alias
-  ARM: dts: sbc-t3x30: add audio support
-
- arch/arm/boot/dts/omap3-cm-t3x.dtsi   |   48 +++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-cm-t3x30.dtsi |   18 ++++++++++++
- arch/arm/boot/dts/omap3-sb-t35.dtsi   |   16 +++++++++++
+Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+---
  arch/arm/boot/dts/omap3-sbc-t3517.dts |    1 +
  arch/arm/boot/dts/omap3-sbc-t3530.dts |    1 +
  arch/arm/boot/dts/omap3-sbc-t3730.dts |    1 +
- 6 files changed, 85 insertions(+), 0 deletions(-)
+ 3 files changed, 3 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/boot/dts/omap3-sbc-t3517.dts b/arch/arm/boot/dts/omap3-sbc-t3517.dts
+index 4ec5d86..1798653 100644
+--- a/arch/arm/boot/dts/omap3-sbc-t3517.dts
++++ b/arch/arm/boot/dts/omap3-sbc-t3517.dts
+@@ -11,6 +11,7 @@
+ 
+ 	aliases {
+ 		display0 = &dvi0;
++		display1 = &tv0;
+ 	};
+ 
+ 	/* Only one GPMC smsc9220 on SBC-T3517, CM-T3517 uses am35x Ethernet */
+diff --git a/arch/arm/boot/dts/omap3-sbc-t3530.dts b/arch/arm/boot/dts/omap3-sbc-t3530.dts
+index 8dfc1df..c994f0f 100644
+--- a/arch/arm/boot/dts/omap3-sbc-t3530.dts
++++ b/arch/arm/boot/dts/omap3-sbc-t3530.dts
+@@ -11,6 +11,7 @@
+ 
+ 	aliases {
+ 		display0 = &dvi0;
++		display1 = &tv0;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/omap3-sbc-t3730.dts b/arch/arm/boot/dts/omap3-sbc-t3730.dts
+index 6b69864..5bdddf2 100644
+--- a/arch/arm/boot/dts/omap3-sbc-t3730.dts
++++ b/arch/arm/boot/dts/omap3-sbc-t3730.dts
+@@ -11,6 +11,7 @@
+ 
+ 	aliases {
+ 		display0 = &dvi0;
++		display1 = &tv0;
+ 	};
+ };
+ 
 -- 
 1.7.5.4
