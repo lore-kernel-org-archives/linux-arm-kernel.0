@@ -1,46 +1,34 @@
-From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Sun, 23 Nov 2014 11:41:59 +0200
-Subject: [PATCH 1/4] ARM: dts: cm-t3x: add I2C1 pinmux
-In-Reply-To: <1416735722-26167-1-git-send-email-lifshitz@compulab.co.il>
-References: <1416735722-26167-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1416735722-26167-2-git-send-email-lifshitz@compulab.co.il>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 23 Nov 2014 10:58:23 +0100
+Subject: [PATCH v4 05/19] arm/arm64: KVM: introduce per-VM ops
+In-Reply-To: <1415959683-26027-6-git-send-email-andre.przywara@arm.com>
+References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
+ <1415959683-26027-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <20141123095823.GV3401@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing I2C1 pinmux setup.
+On Fri, Nov 14, 2014 at 10:07:49AM +0000, Andre Przywara wrote:
+> Currently we only have one virtual GIC model supported, so all guests
+> use the same emulation code. With the addition of another model we
+> end up with different guests using potentially different vGIC models,
+> so we have to split up some functions to be per VM.
+> Introduce a vgic_vm_ops struct to hold function pointers for those
+> functions that are different and provide the necessary code to
+> initialize them.
+> Also split up the kvm_vgic_init() function to separate out VGIC model
+> specific functionality into a separate function, which will later be
+> different for a GICv3 model.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Changelog v3...v4:
+> - add accessor functions for vm_ops members
+> - introduce init_vgic_model() to differentiate between guest GIC models
+> - simplify vgic_v2_init_emulation() 
+> - help debugging by hinting on handle_mmio codeflow in comment
+> 
+That helped a lot as this patch goes, thanks for reworking the function
+pointers and init sequence:
 
-Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
----
- arch/arm/boot/dts/omap3-cm-t3x.dtsi |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-index 3a98ce1..620a3f4 100644
---- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-+++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-@@ -137,6 +137,13 @@
- 			OMAP3_CORE1_IOPAD(0x21ce, PIN_INPUT_PULLDOWN | MUX_MODE0) /* mcspi1_cs0 */
- 		>;
- 	};
-+
-+	i2c1_pins: pinmux_i2c1_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x21ba, PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_scl */
-+			OMAP3_CORE1_IOPAD(0x21bc, PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_sda */
-+		>;
-+	};
- };
- 
- &uart3 {
-@@ -155,6 +162,9 @@
- };
- 
- &i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+
- 	clock-frequency = <400000>;
- 
- 	at24 at 50 {
--- 
-1.7.5.4
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
