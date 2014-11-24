@@ -1,130 +1,116 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Nov 2014 19:28:16 +0000
-Subject: [PATCHv2] arm64: add support to dump the kernel page tables
-In-Reply-To: <1416262710-7798-1-git-send-email-lauraa@codeaurora.org>
-References: <1416262710-7798-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20141124192815.GC28207@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 24 Nov 2014 19:31:44 +0000
+Subject: [PATCH v7 1/4] irqchip: gic: Support hierarchy irq domain.
+In-Reply-To: <1416585081.24971.15.camel@mtksdaap41>
+References: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>	
+ <1416406451-4578-2-git-send-email-yingjoe.chen@mediatek.com>	
+ <87h9xvaz2p.fsf@approximate.cambridge.arm.com>	
+ <546D6D62.4030005@linux.intel.com>	
+ <87wq6q9odi.fsf@approximate.cambridge.arm.com>
+ <1416585081.24971.15.camel@mtksdaap41>
+Message-ID: <547387A0.4000808@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
-
-On Mon, Nov 17, 2014 at 10:18:30PM +0000, Laura Abbott wrote:
-> In a similar manner to arm, it's useful to be able to dump the page
-> tables to verify permissions and memory types. Add a debugfs file
-> to check the page tables.
+On 21/11/14 15:51, Yingjoe Chen wrote:
 > 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
-> v2: Addressed comments from Mark Rutland. Made the logic a bit more
-> consistent between functions. Now tested on 4K and 64K pages.
-> ---
->  arch/arm64/Kconfig.debug |  12 ++
->  arch/arm64/mm/Makefile   |   1 +
->  arch/arm64/mm/dump.c     | 358 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 371 insertions(+)
->  create mode 100644 arch/arm64/mm/dump.c
+> Hi,
+> 
+> On Thu, 2014-11-20 at 10:07 +0000, Marc Zyngier wrote:
+>> On Thu, Nov 20 2014 at  4:26:10 am GMT, Jiang Liu <jiang.liu@linux.intel.com> wrote:
+>>
+>> Hi Jiang,
+>>
+>>> On 2014/11/20 1:18, Marc Zyngier wrote:
+>>>> Hi Yingjoe,
+>>>>
+>>>> On Wed, Nov 19 2014 at 2:14:08 pm GMT, Yingjoe Chen
+>>>> <yingjoe.chen@mediatek.com> wrote:
+>>>>> +
+>>>>> +static const struct irq_domain_ops gic_irq_domain_hierarchy_ops = {
+>>>>> +	.xlate = gic_irq_domain_xlate,
+>>>>> +	.alloc = gic_irq_domain_alloc,
+>>>>> +	.free = irq_domain_free_irqs_top,
+>>>>
+>>>> I'm convinced that irq_domain_free_irqs_top is the wrong function to
+>>>> call here, because you're calling it from the bottom, not the top-level
+>>>> (it has no parent).
+>>>>
+>>>> I cannot verify this with your code as I don't a working platform with
+>>>> GICv2m, but if I enable something similar on GICv3, it dies a very
+>>>> painful way:
+>>>>
+>>>> Unable to handle kernel NULL pointer dereference at virtual address 00000018
+>>>> pgd = ffffffc03d059000
+>>>> [00000018] *pgd=0000000081356003, *pud=0000000081356003, *pmd=0000000000000000
+>>>> Internal error: Oops: 96000006 [#1] SMP
+>>>> Modules linked in:
+>>>> CPU: 4 PID: 1052 Comm: sh Not tainted 3.18.0-rc4+ #3311
+>>>> task: ffffffc03e320000 ti: ffffffc001390000 task.ti: ffffffc001390000
+>>>> PC is at irq_domain_free_irqs_recursive+0x1c/0x80
+>>>> LR is at irq_domain_free_irqs_common+0x88/0x9c
+>>>> pc : [<ffffffc0000ed790>] lr : [<ffffffc0000ede20>] pstate: 60000145
+>>>> [...]
+>>>> [<ffffffc0000ed790>] irq_domain_free_irqs_recursive+0x1c/0x80
+>>>> [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
+>>>> [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c  <-- gic_domain.free()
+>>>> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
+>>>> [<ffffffc0000ee468>] irq_domain_free_irqs_parent+0x14/0x20
+>>>> [<ffffffc0003500b8>] its_irq_domain_free+0xc8/0x250
+>>>> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
+>>>> [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
+>>>> [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c
+>>>> [<ffffffc0000ef518>] msi_domain_free+0x70/0x88
+>>>> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
+>>>> [<ffffffc0000ee3ac>] irq_domain_free_irqs+0x108/0x17c
+>>>> [<ffffffc0000efb68>] msi_domain_free_irqs+0x28/0x4c
+>>>> [<ffffffc000369cac>] free_msi_irqs+0xb4/0x1c0
+>>>> [<ffffffc00036adec>] pci_disable_msix+0x3c/0x4c
+>>>> [...]
+>>>>
+>>>> and I cannot see how this could work on the standard GIC either.
+>>>>
+>>>> Thomas, Jiang: could you please confirm or infirm my suspicions? My
+>>>> understanding is that irq_domain_free_irqs_top can only be called from
+>>>> the top-level domain.
+>>> Hi Marc,
+>>> 	It indicates that irq_domain_free_irqs_top() is not a good name.
+>>> We have:
+>>> 1) irq_domain_set_hwirq_and_chip() to set irq_chip and chip_data
+>>> 2) irq_domain_set_info() to set irq_chip, chip_data, flow_handler and
+>>>    handler_data;
+>>> 3) irq_domain_reset_irq_data() resets irq_chip and chip_data.
+>>> 4) irq_domain_free_irqs_common() resets irq_chip, chip_data and calls
+>>>    parent domain's domain_ops.free() callback.
+>>> 5) irq_domain_free_irqs_top() resets irq_chip, chip_data, flow handler,
+>>>    handler_data and call parent domain's domain_ops.free() callback.
+>>
+>> Yes, and this "call parent domain's free callback" is where the problem
+>> lies. Here, it is called from the innermost domain, with no parent.
+>>
+>>> So there two possible improvements here:
+>>> 1) Rename irq_domain_free_irqs_top() with better name, any suggestions?
+>>>    It's named as is because it's always called by the outer-most
+>>>    irqdomains on x86.
+>>> 2) Change irq_domain_free_irqs_common() and irq_domain_free_irqs_top()
+>>>    to call parent domain's domain_ops.free() callback only if parent
+>>>    exists. By this way, they could be used for inner-most irqdomains.
+>>> If OK, I will respin a version 4 patch set based on tip/irq/irqdomain.
+>>> Thoughts?
+>>
+>> Checking the parent is probably a safe solution (this is not a hot path
+>> anyway). I don't care much about the name though, and I the only thing I
+>> can think of is irq_domain_free_irqs_reset_flow, which looks so bad it's
+>> not even funny. I'll let the matter rest in your capable hands! ;-)
+> 
+> I've applied Jiang's "irqdomain: Enhance irq_domain_free_irqs_common()
+> to support parentless irqdomain" patch and it did fix the crash.
 
-[...]
-
-> +static struct pg_level pg_level[] = {
-> +	{
-> +	}, { /* pgd */
-> +		.bits	= pte_bits,
-> +		.num	= ARRAY_SIZE(pte_bits),
-> +	}, { /* pud */
-> +		.bits	= pte_bits,
-> +		.num	= ARRAY_SIZE(pte_bits),
-> +	}, { /* pmd */
-> +		.bits	= section_bits,
-> +		.num	= ARRAY_SIZE(section_bits),
-> +	}, { /* pte */
-> +		.bits	= pte_bits,
-> +		.num	= ARRAY_SIZE(pte_bits),
-> +	},
-> +};
-
-Can't we have section mappings in puds? We have a pud_sect() check in
-walk_pud, so I would have expected puds to use section_bits as well
-(perhaps pgds too, which I believe the architecture allows for block
-mappings in some configurations).
-
-That said, the section and pte bits are the same at the moment, so we
-could just use the same bits at all levels for now, and introduce
-section_bits if required in future.
-
-[...]
-
-> +static void walk_pud(struct pg_state *st, pgd_t *pgd, unsigned long start)
-> +{
-> +	pud_t *pud = pud_offset(pgd, 0);
-> +	unsigned long addr;
-> +	unsigned i;
-> +
-> +	for (i = 0; i < PTRS_PER_PUD; i++, pud++) {
-> +		addr = start + i * PUD_SIZE;
-> +		if (pud_none(*pud) || pud_sect(*pud) || pud_bad(*pud))
-> +			note_page(st, addr, 2, pud_val(*pud));
-> +		else
-> +			walk_pmd(st, pud, addr);
-> +	}
-> +}
-> +
-> +static unsigned long normalize_addr(unsigned long u)
-> +{
-> +	return u | LOWEST_ADDR;
-> +}
-> +
-> +static void walk_pgd(struct pg_state *st, pgd_t *pgd, unsigned long start)
-> +{
-> +	unsigned i;
-> +	unsigned long addr;
-> +
-> +	for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
-> +		addr = normalize_addr(start + i * PGDIR_SIZE);
-
-Could we get rid of normalize_addr, and pass in LOWEST_ADDR from
-ptdump_show? Then this could be:
-
-		addr = start + i * PGD_SIZE;
-
-Which would make it look like the other walk_* functions, and it would
-mean the that start parameter would be the actual start address.
-
-Similarly we could pass in the init_mm rather than and use pgd_offset on
-that, as we do in show_pte (in mm/fault.c).
-
-> +		if (pgd_none(*pgd) || pgd_bad(*pgd))
-> +			note_page(st, addr, 1, pgd_val(*pgd));
-> +		else
-> +			walk_pud(st, pgd, addr);
-> +	}
-> +}
-> +
-> +static int ptdump_show(struct seq_file *m, void *v)
-> +{
-> +	struct pg_state st;
-> +
-> +	memset(&st, 0, sizeof(st));
-> +	st.seq = m;
-> +	st.marker = address_markers;
-
-If you change this to:
-
-struct pg_state st = {
-	.seq = m,
-	.marker = address_markers,
-};
-
-The other fields will be initialized to zero without the need for an
-explicit memset.
-
-Otherwise this looks good to me. Thanks for slogging through this so
-far!
-
-With those changes:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Excellent.  I think this is pretty much getting there now. Any chance
+you could repost this series with the various fixes?
 
 Thanks,
-Mark.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
