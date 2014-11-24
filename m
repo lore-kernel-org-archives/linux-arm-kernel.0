@@ -1,101 +1,64 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 24 Nov 2014 10:11:57 -0500 (EST)
-Subject: [PATCH v2 1/2] ARM: handle interworking and out-of-range
- relocations separately
-In-Reply-To: <1416833706-27043-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1416833706-27043-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.11.1411241011150.11690@knanqh.ubzr>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Mon, 24 Nov 2014 23:14:27 +0800
+Subject: [PATCH v7 4/4] dt-bindings: add bindings for mediatek sysirq
+In-Reply-To: <20141119180724.GE12851@leverpostej>
+References: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1416406451-4578-5-git-send-email-yingjoe.chen@mediatek.com>
+ <20141119180724.GE12851@leverpostej>
+Message-ID: <1416842067.28838.20.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Nov 2014, Ard Biesheuvel wrote:
 
-> Currently, interworking calls on module boundaries are not supported,
-> and are handled by the same error handling code path as non-interworking
-> calls whose targets are simply out of range.
-> 
-> Before modifying the handling of those out-of-range jump and call
-> relocations in a subsequent patch, move the handling of interworking
-> restrictions out of it.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Hi Mark,
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+On Wed, 2014-11-19 at 18:07 +0000, Mark Rutland wrote:
+> On Wed, Nov 19, 2014 at 02:14:11PM +0000, Yingjoe Chen wrote:
+> > Add binding documentation for Mediatek SoC SYSIRQ.
+> > 
+> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> > ---
+> >  .../bindings/arm/mediatek/mediatek,sysirq.txt      | 26 ++++++++++++++++++++++
+> >  1 file changed, 26 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+> > new file mode 100644
+> > index 0000000..8669536
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+> > @@ -0,0 +1,26 @@
+> > +Mediatek 65xx/81xx sysirq
+> > +
+> > +Mediatek SOCs sysirq support controllable irq inverter for each GIC SPI
+> > +interrupt.
+> > +
+> > +Required properties:
+> > +- compatible: should be one of:
+> > +	"mediatek,mt8135-sysirq"
+> > +	"mediatek,mt8127-sysirq"
+> > +	"mediatek,mt6589-sysirq"
+> > +	"mediatek,mt6582-sysirq"
+> > +	"mediatek,mt6577-sysirq"
+> > +- interrupt-controller : Identifies the node as an interrupt controller
+> > +- #interrupt-cells : Must use the same cells/format as parent controller.
+> > +- interrupt-parent: phandle of irq domain parent for sysirq.
+> 
+> I'm concerned that this sounds very general while the binding assumes
+> the GICv2 interrupt-specifier format. Either the driver needs to become
+> more general, or this needs to be tightened up.
+> 
+> It's also odd to say "irq domain parent", as that's purely a Linux
+> construct and has nothing to do with the HW.
 
-> ---
->  arch/arm/kernel/module.c | 38 ++++++++++++++++++++++++--------------
->  1 file changed, 24 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-> index 6a4dffefd357..16804df4857c 100644
-> --- a/arch/arm/kernel/module.c
-> +++ b/arch/arm/kernel/module.c
-> @@ -98,14 +98,19 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
->  		case R_ARM_PC24:
->  		case R_ARM_CALL:
->  		case R_ARM_JUMP24:
-> +			if (sym->st_value & 3) {
-> +				pr_err("%s: section %u reloc %u sym '%s': unsupported interworking call (ARM -> Thumb)\n",
-> +				       module->name, relindex, i, symname);
-> +				return -ENOEXEC;
-> +			}
-> +
->  			offset = __mem_to_opcode_arm(*(u32 *)loc);
->  			offset = (offset & 0x00ffffff) << 2;
->  			if (offset & 0x02000000)
->  				offset -= 0x04000000;
->  
->  			offset += sym->st_value - loc;
-> -			if (offset & 3 ||
-> -			    offset <= (s32)0xfe000000 ||
-> +			if (offset <= (s32)0xfe000000 ||
->  			    offset >= (s32)0x02000000) {
->  				pr_err("%s: section %u reloc %u sym '%s': relocation %u out of range (%#lx -> %#x)\n",
->  				       module->name, relindex, i, symname,
-> @@ -155,6 +160,22 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
->  #ifdef CONFIG_THUMB2_KERNEL
->  		case R_ARM_THM_CALL:
->  		case R_ARM_THM_JUMP24:
-> +			/*
-> +			 * For function symbols, only Thumb addresses are
-> +			 * allowed (no interworking).
-> +			 *
-> +			 * For non-function symbols, the destination
-> +			 * has no specific ARM/Thumb disposition, so
-> +			 * the branch is resolved under the assumption
-> +			 * that interworking is not required.
-> +			 */
-> +			if (ELF32_ST_TYPE(sym->st_info) == STT_FUNC &&
-> +			    !(sym->st_value & 1)) {
-> +				pr_err("%s: section %u reloc %u sym '%s': unsupported interworking call (Thumb -> ARM)\n",
-> +				       module->name, relindex, i, symname);
-> +				return -ENOEXEC;
-> +			}
-> +
->  			upper = __mem_to_opcode_thumb16(*(u16 *)loc);
->  			lower = __mem_to_opcode_thumb16(*(u16 *)(loc + 2));
->  
-> @@ -182,18 +203,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
->  				offset -= 0x02000000;
->  			offset += sym->st_value - loc;
->  
-> -			/*
-> -			 * For function symbols, only Thumb addresses are
-> -			 * allowed (no interworking).
-> -			 *
-> -			 * For non-function symbols, the destination
-> -			 * has no specific ARM/Thumb disposition, so
-> -			 * the branch is resolved under the assumption
-> -			 * that interworking is not required.
-> -			 */
-> -			if ((ELF32_ST_TYPE(sym->st_info) == STT_FUNC &&
-> -				!(offset & 1)) ||
-> -			    offset <= (s32)0xff000000 ||
-> +			if (offset <= (s32)0xff000000 ||
->  			    offset >= (s32)0x01000000) {
->  				pr_err("%s: section %u reloc %u sym '%s': relocation %u out of range (%#lx -> %#x)\n",
->  				       module->name, relindex, i, symname,
-> -- 
-> 1.8.3.2
-> 
-> 
+The implementation expect the parent to use the same interrupt-cells
+format as GIC. Based on the block diagram in the cover-letter, we could
+say GIC is the irq parent of sysirq. So I'm planning to change to this,
+hope this is OK.
+
+- #interrupt-cells : Use the same format as specified by GIC in
+  Documentation/devicetree/bindings/arm/gic.txt
+- interrupt-parent: phandle of irq parent for sysirq. The parent must
+  use the same interrupt-cells format as GIC.
+
+Joe.C
