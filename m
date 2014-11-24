@@ -1,65 +1,72 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 24 Nov 2014 23:16:12 +0100
-Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-In-Reply-To: <CAOMZO5DZSxeTC9fKYXk6XBAG-03qW+TM_8HS_3M8Mkbd-iEdzg@mail.gmail.com>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <201406182220.22818@pali>
- <CAOMZO5DZSxeTC9fKYXk6XBAG-03qW+TM_8HS_3M8Mkbd-iEdzg@mail.gmail.com>
-Message-ID: <201411242316.12215@pali>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 24 Nov 2014 23:18:22 +0100
+Subject: [PATCH] ARM: pxa: arbitrarily set first interrupt number
+Message-ID: <1416867502-6877-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 June 2014 23:53:00 Fabio Estevam wrote:
-> On Wed, Jun 18, 2014 at 5:20 PM, Pali Roh?r <pali.rohar@gmail.com> wrote:
-> > So how to read Revision and Serial number in DT based
-> > kernel?
-> 
-> $ cat /sys/bus/soc/devices/soc0/soc_id
-> i.MX6SX
-> 
-> $ cat /sys/bus/soc/devices/soc0/revision
-> 1.0
-> 
-> $ cat /sys/bus/soc/devices/soc0/machine
-> Freescale i.MX6 SoloX SDB Board
+As IRQ0, the legacy timer interrupt  should not be used as an interrupt
+number, shift the interrupts by a fixed number.
 
-This does *not* working with DT based boot!
+As we had in a special case a shift of 16 when ISA bus was used on a
+PXA, use that value as the first interrupt number, regardless of ISA or
+not.
 
-$ cat /sys/bus/soc/devices/soc0/soc_id
-cat: can't open '/sys/bus/soc/devices/soc0/soc_id': No such file or directory
-$ cat /sys/bus/soc/devices/soc0/revision 
-ES3.1
-$ cat /sys/bus/soc/devices/soc0/machine 
-OMAP3430/3530
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/mach-pxa/Kconfig             | 5 -----
+ arch/arm/mach-pxa/include/mach/irqs.h | 9 ++-------
+ 2 files changed, 2 insertions(+), 12 deletions(-)
 
-
-Here is output from *non* DT based boot:
-
-# busybox cat /proc/cpuinfo 
-processor       : 0
-model name      : ARMv7 Processor rev 3 (v7l)
-Features        : swp half thumb fastmult vfp edsp thumbee neon 
-vfpv3 tls vfpd32 
-CPU implementer : 0x41
-CPU architecture: 7
-CPU variant     : 0x2
-CPU part        : 0xc08
-CPU revision    : 3
-
-Hardware        : Nokia RX-51 board
-Revision        : 0012
-Serial          : 0000000000000000
-
-
-As you can see in those files are totally *different* values.
-
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index e6690a4..bfca4ead 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -73,14 +73,12 @@ config ARCH_VIPER
+ 	select I2C_GPIO if I2C=y
+ 	select ISA
+ 	select PXA25x
+-	select PXA_HAVE_ISA_IRQS
+ 
+ config MACH_ARCOM_ZEUS
+ 	bool "Arcom/Eurotech ZEUS SBC"
+ 	select ARCOM_PCMCIA
+ 	select ISA
+ 	select PXA27x
+-	select PXA_HAVE_ISA_IRQS
+ 
+ config MACH_BALLOON3
+ 	bool "Balloon 3 board"
+@@ -680,9 +678,6 @@ config SHARPSL_PM_MAX1111
+ 	select SPI
+ 	select SPI_MASTER
+ 
+-config PXA_HAVE_ISA_IRQS
+-	bool
+-
+ config PXA310_ULPI
+ 	bool
+ 
+diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
+index 48c2fd8..83e04d4 100644
+--- a/arch/arm/mach-pxa/include/mach/irqs.h
++++ b/arch/arm/mach-pxa/include/mach/irqs.h
+@@ -12,14 +12,9 @@
+ #ifndef __ASM_MACH_IRQS_H
+ #define __ASM_MACH_IRQS_H
+ 
+-#ifdef CONFIG_PXA_HAVE_ISA_IRQS
+-#define PXA_ISA_IRQ(x)	(x)
+-#define PXA_ISA_IRQ_NUM	(16)
+-#else
+-#define PXA_ISA_IRQ_NUM	(0)
+-#endif
++#include <asm/irq.h>
+ 
+-#define PXA_IRQ(x)	(PXA_ISA_IRQ_NUM + (x))
++#define PXA_IRQ(x)	(NR_IRQS_LEGACY + (x))
+ 
+ #define IRQ_SSP3	PXA_IRQ(0)	/* SSP3 service request */
+ #define IRQ_MSL		PXA_IRQ(1)	/* MSL Interface interrupt */
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/835bc0cb/attachment.sig>
+2.1.0
