@@ -1,76 +1,101 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon, 24 Nov 2014 22:23:58 +0000
-Subject: [PATCH] of: support passing console options with stdout-path
-Message-ID: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Mon, 24 Nov 2014 23:25:45 +0100
+Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+In-Reply-To: <20140905135816.GE20164@leverpostej>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <201409051552.05447@pali> <20140905135816.GE20164@leverpostej>
+Message-ID: <201411242325.45574@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support specifying console options (like with console=ttyXN,<options>)
-by appending them to the stdout-path property after a separating ':'.
+On Friday 05 September 2014 15:58:16 Mark Rutland wrote:
+> On Fri, Sep 05, 2014 at 02:52:05PM +0100, Pali Roh?r wrote:
+> > On Friday 05 September 2014 15:45:42 Mark Rutland wrote:
+> > > On Fri, Sep 05, 2014 at 12:38:40PM +0100, Pali Roh?r wrote:
+> > > > On Wednesday 18 June 2014 18:54:24 Pali Roh?r wrote:
+> > > > > Machine name from board description is some generic
+> > > > > name on DT kernel. DT provides machine name property
+> > > > > which is specific for board, so use it instead
+> > > > > generic one when possible.
+> > > > > 
+> > > > > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+> > > > > ---
+> > > > > 
+> > > > >  arch/arm/kernel/setup.c |    7 +++++--
+> > > > >  1 file changed, 5 insertions(+), 2 deletions(-)
+> > > > > 
+> > > > > diff --git a/arch/arm/kernel/setup.c
+> > > > > b/arch/arm/kernel/setup.c index 8a16ee5..fbc7b4f
+> > > > > 100644 --- a/arch/arm/kernel/setup.c
+> > > > > +++ b/arch/arm/kernel/setup.c
+> > > > > @@ -875,10 +875,13 @@ void __init setup_arch(char
+> > > > > **cmdline_p)
+> > > > > 
+> > > > >  	setup_processor();
+> > > > >  	mdesc = setup_machine_fdt(__atags_pointer);
+> > > > > 
+> > > > > -	if (!mdesc)
+> > > > > +	if (mdesc)
+> > > > > +		machine_name = of_flat_dt_get_machine_name();
+> > > > > +	else
+> > > > > 
+> > > > >  		mdesc = setup_machine_tags(__atags_pointer,
+> > > > > 
+> > > > > __machine_arch_type); machine_desc = mdesc;
+> > > > > -	machine_name = mdesc->name;
+> > > > > +	if (!machine_name)
+> > > > > +		machine_name = mdesc->name;
+> > > > > 
+> > > > >  	if (mdesc->reboot_mode != REBOOT_HARD)
+> > > > >  	
+> > > > >  		reboot_mode = mdesc->reboot_mode;
+> > > > 
+> > > > So, do you really want to break userspace which reading
+> > > > file /proc/cpuinfo (after migration from boardcode -->
+> > > > DT)?
+> > > 
+> > > You have no guarantee model name in the DT == the name in
+> > > a board file anyhow, and trying to force that is wrong.
+> > > So further to Russell's reply, I must NAK this from a DT
+> > > perspective.
+> > > 
+> > > Realistically your userspace is already broken if relying
+> > > on such things. You built something that only ever worked
+> > > for a particular arbitrary string. So it was already
+> > > broken for every other board, and there was never any
+> > > guarantee that new boards where your userspace could have
+> > > worked would share the same name.
+> > > 
+> > > You're trying to fix the wrong side of the equation.
+> > > 
+> > > Mark.
+> > 
+> > So what is your suggestion for identifing board (name/type)
+> > which will work with any kernel (and will not be broken
+> > again by kernel later)?
+> 
+> Without knowing your use case I have no idea if that's even a
+> sane thing to do.
+> 
+> Mark.
 
-Example:
-	stdout-path = "uart0:115200";
+Read information which was previously (non DT boot) in file: 
+/proc/cpuinfo
 
-This patch also modifies of_find_node_by_path() to match only the
-portion of the path before a ':'.
+Hardware        : Nokia RX-51 board
+Revision        : 0012
+Serial          : 0000000000000000
 
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
----
- drivers/of/base.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+Userspace applications using them for identifying on which device 
+and hw revisions are running.
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 3823edf..89c6b33 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -37,6 +37,7 @@ EXPORT_SYMBOL(of_allnodes);
- struct device_node *of_chosen;
- struct device_node *of_aliases;
- struct device_node *of_stdout;
-+static char *of_stdout_options;
- 
- struct kset *of_kset;
- 
-@@ -703,6 +704,8 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
- 	if (!len)
- 		return NULL;
- 
-+	len = strchrnul(path, ':') - path;
-+
- 	__for_each_child_of_node(parent, child) {
- 		const char *name = strrchr(child->full_name, '/');
- 		if (WARN(!name, "malformed device_node %s\n", child->full_name))
-@@ -747,6 +750,8 @@ struct device_node *of_find_node_by_path(const char *path)
- 		if (!of_aliases)
- 			return NULL;
- 
-+		len = strchrnul(path, ':') - path;
-+
- 		for_each_property_of_node(of_aliases, pp) {
- 			if (strlen(pp->name) == len && !strncmp(pp->name, path, len)) {
- 				np = of_find_node_by_path(pp->value);
-@@ -1830,8 +1835,12 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
- 			name = of_get_property(of_chosen, "linux,stdout-path", NULL);
- 		if (IS_ENABLED(CONFIG_PPC) && !name)
- 			name = of_get_property(of_aliases, "stdout", NULL);
--		if (name)
-+		if (name) {
- 			of_stdout = of_find_node_by_path(name);
-+			of_stdout_options = strchr(name, ':');
-+			if (of_stdout_options != NULL)
-+				of_stdout_options++;
-+		}
- 	}
- 
- 	if (!of_aliases)
-@@ -1957,7 +1966,7 @@ bool of_console_check(struct device_node *dn, char *name, int index)
- {
- 	if (!dn || dn != of_stdout || console_set_on_cmdline)
- 		return false;
--	return !add_preferred_console(name, index, NULL);
-+	return !add_preferred_console(name, index, of_stdout_options);
- }
- EXPORT_SYMBOL_GPL(of_console_check);
- 
 -- 
-1.9.1
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/cf51288a/attachment.sig>
