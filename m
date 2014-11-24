@@ -1,62 +1,75 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Mon, 24 Nov 2014 10:52:17 +0200
-Subject: [PATCH 3/7] pinctrl: pinconf-generic: Allow driver to specify
- DT params
-In-Reply-To: <0c3dad3ce852435fba127e8436f0e30f@BN1BFFO11FD047.protection.gbl>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
- <1415041531-15520-4-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkdYfj2ydLQ4q_FKwXo73jzNsvj9u2Aem9EiuEw-OCvurrg@mail.gmail.com>
- <1416300621.30131.6.camel@mm-sol.com>
- <995406b8e0244c63a3ef8e58314e81f6@BL2FFO11FD037.protection.gbl>
- <1416383379.30131.14.camel@mm-sol.com>
- <84517404cda34124930ec838a639f538@BL2FFO11FD030.protection.gbl>
- <1416470777.28873.1.camel@mm-sol.com>
- <7e2f4984733343fdb4ea51cf7eb4c339@BY2FFO11FD046.protection.gbl>
- <1416555331.28873.8.camel@mm-sol.com>
- <0c3dad3ce852435fba127e8436f0e30f@BN1BFFO11FD047.protection.gbl>
-Message-ID: <1416819137.6253.9.camel@mm-sol.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 24 Nov 2014 14:17:45 +0530
+Subject: [PATCH v6 0/2] Remove i2c sys_cfg register configuration from
+ mach-exynos
+Message-ID: <1416818867-29156-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series is removing i2c sys_cfg register configuration settings from
+mach-exynos. All such configuration can be done into i2c driver.
+So added new property to hold phandle of SYSREG into i2c device nodes.
+This will help in removing static mapping of SYS registers.
 
-On Sat, 2014-11-22 at 08:06 -0800, S?ren Brinkmann wrote:
-> Hi Ivan,
-> 
-> On Fri, 2014-11-21 at 09:35AM +0200, Ivan T. Ivanov wrote:
-> > On Thu, 2014-11-20 at 08:22 -0800, S?ren Brinkmann wrote:
-> > > 
-> > > Also, I hope all my changes here don't break the current behavior. So,
-> > > those 27 driver should still be able to do what they currently do. But I
-> > > hope they could migrated over to use the generic bindings only in the
-> > > longer term, so that these custom properties disappear.
-> > > 
-> > > > > The pinctrl driver just assembles
-> > > > > some data structure that has the information regarding custom properties
-> > > > > and the core handles the rest.
-> > > > 
-> > > > Yup, that is nice. What will be really nice if it also handle custom,
-> > > > "function", "groups" and "pins" properties. Otherwise most of the drivers
-> > > > will not be able to benefit from this.
-> > > 
-> > > Why would you still need those?
-> > 
-> > I don't need them :-). The point was that still majority of the drivers
-> > will have custom parsing functions. It would be nice if we could fix
-> > that too. I do understand that using custom "pins", "functions"... is
-> > something which is deprecated, but if core parsing functions allow
-> > passing custom strings for above purposes, in a similar way as your
-> > proposal, it will be easier for those drivers to migrate, I believe.
-> 
-> This does sound much more like a feature request than a fundamental
-> problem with the implementation, now. And like Laurent's feature
-> request, I'd like to turn this down. Otherwise this just gets hold up by
-> feature requests blocking pinctrl-zynq.
-> I think the interesting questions are:
-> 1. Does it break any current user?
-> 2. Is there anything fundamentally preventing adding your feature at
-> some later time as part of such a migration you describe?
+This series is based on latest kgene/for-next. 
 
-Well, as I said, this is just my opinion. Is up to Linus to decide.
+This patch series requires following change in i2c driver which has been separated
+from this patch series and posted separately here [1]
 
-Regards,
-Ivan
+https://patchwork.kernel.org/patch/5363981/
+
+Revision V5 of these patches can related discussion can be found here.
+
+http://www.spinics.net/lists/linux-samsung-soc/msg39326.html
+
+This patch and patch [1] has been tested on kgene/for-next for S2R on Exynos5250 based
+SMDK5250 board and it's working well.
+
+
+Changes since v5:
+ - Rebased on latest kgene/for-next (SHA-ID: 4059421c38d24f2f7e06778c8ee6da4ca9abb4b7)
+ - Separated changes in i2c-s3c2410.c file and posted as separate patch.
+
+Changes since v4:
+ - Rebased on latest kgene/for-next (SHA-ID: 7552917ad948acad6c689d49604f93f725145173)
+ - Addressed Wolfram Sang's review comments.
+
+Change since v3:
+ - Rebased on latest kgene/for-next (SHA-ID: 2b5fa1d5dabb9af8f2da4f380bea8684f9b96f59)
+ - This series consist of only two patches from v3 [1] (v3[1/6] and v3[2/6]).
+ - Addressed Tomasz Figa and Wolfram Sang's comments.
+ - Updated i2c DT binding information.
+
+Changes since v2:
+ - Reorganized patches as suggested by Tomasz Figa.
+ - Addressed review comments of Tomasz Figa in i2c-s3c2410.c file.
+
+Changes since v1:
+ - Added patch to move i2c interrupt re-configuration code from exynos.c
+   to i2c driver, as suggested by Arnd.
+ - After above patch only user of SYS_I2C_CFG register is pm.c so moving
+   save/restore of this register also into i2c driver.
+ - Spiltted up exynos4 and exynos5 machine descriptors to get rid from
+   soc_is_exynos4/exynos5 kind of macros, as suggested by Arnd.
+ - Changed location of chipid driver to "drivers/soc".
+ - Added drivers/base/soc.c provided infrastructure to make SoC specific 
+   information avaible to user space via sysfs entry, as suggested by Arnd.
+
+
+Pankaj Dubey (2):
+  i2c: s3c2410: add Sysreg phandle to i2c device nodes
+  ARM: EXYNOS: Remove i2c sys configuration related code
+
+ .../devicetree/bindings/i2c/i2c-s3c2410.txt        |    1 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |    4 ++
+ arch/arm/boot/dts/exynos5420.dtsi                  |    4 ++
+ arch/arm/mach-exynos/exynos.c                      |   39 +-------------------
+ arch/arm/mach-exynos/include/mach/map.h            |    3 --
+ arch/arm/mach-exynos/pm.c                          |    3 +-
+ arch/arm/mach-exynos/regs-sys.h                    |   22 -----------
+ arch/arm/mach-exynos/suspend.c                     |    7 ----
+ 8 files changed, 13 insertions(+), 70 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/regs-sys.h
+
+-- 
+1.7.9.5
