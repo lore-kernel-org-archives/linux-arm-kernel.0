@@ -1,538 +1,578 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 25 Nov 2014 00:20:50 +0100
-Subject: [PATCH v8 1/4] ARM: rockchip: add suspend and resume for RK3288
-In-Reply-To: <1416051910-16730-2-git-send-email-zyw@rock-chips.com>
-References: <1416051910-16730-1-git-send-email-zyw@rock-chips.com>
- <1416051910-16730-2-git-send-email-zyw@rock-chips.com>
-Message-ID: <708464816.ZORhtdDuUb@diego>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 24 Nov 2014 17:31:14 -0600
+Subject: [PATCH v4] mailbox/omap: adapt to the new mailbox framework
+In-Reply-To: <CAJe_ZhcfYuoJcVE=Kc4mYOasrnGor1OEjfaN7CQVH=2s1Xmr-A@mail.gmail.com>
+References: <1415055950-64090-1-git-send-email-s-anna@ti.com>
+ <CAJe_ZhcfYuoJcVE=Kc4mYOasrnGor1OEjfaN7CQVH=2s1Xmr-A@mail.gmail.com>
+Message-ID: <5473BFC2.5090203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Hi Jassi,
 
-Am Samstag, 15. November 2014, 19:45:07 schrieb Chris Zhong:
-> It's a basic version of suspend and resume for rockchip,
-> it only support RK3288 now.
+On 11/24/2014 03:54 AM, Jassi Brar wrote:
+> On 4 November 2014 at 04:35, Suman Anna <s-anna@ti.com> wrote:
+>> The OMAP mailbox driver and its existing clients (remoteproc
+>> for OMAP4+) are adapted to use the generic mailbox framework.
+>>
+>> The main changes for the adaptation are:
+>>   - The tasklet used for Tx is replaced with the state machine from
+>>     the generic mailbox framework. The workqueue used for processing
+>>     the received messages stays intact for minimizing the effects on
+>>     the OMAP mailbox clients.
+>>   - The existing exported client API, omap_mbox_get, omap_mbox_put and
+>>     omap_mbox_send_msg are deleted, as the framework provides equivalent
+>>     functionality. A OMAP-specific omap_mbox_request_channel is added
+>>     though to support non-DT way of requesting mailboxes.
+>>   - The OMAP mailbox driver is integrated with the mailbox framework
+>>     through the proper implementations of mbox_chan_ops, except for
+>>     .last_tx_done and .peek_data. The OMAP mailbox driver does not need
+>>     these ops, as it is completely interrupt driven.
+>>   - The OMAP mailbox driver uses a custom of_xlate controller ops that
+>>     allows phandles for the pargs specifier instead of indexing to avoid
+>>     any channel registration order dependencies.
+>>   - The new framework does not support multiple clients operating on a
+>>     single channel, so the reference counting logic is simplified.
+>>   - The remoteproc driver (current client) is adapted to use the new API.
+>>     The notifier callbacks used within this client is replaced with the
+>>     regular callbacks from the newer framework.
+>>   - The exported OMAP mailbox API are limited to omap_mbox_save_ctx,
+>>     omap_mbox_restore_ctx, omap_mbox_enable_irq & omap_mbox_disable_irq,
+>>     with the signature modified to take in the new mbox_chan handle instead
+>>     of the OMAP specific omap_mbox handle. The first 2 will be removed when
+>>     the OMAP mailbox driver is adapted to runtime_pm. The other exported
+>>     API omap_mbox_request_channel will be removed once existing legacy
+>>     users are converted to DT.
+>>
+>> Cc: Jassi Brar <jassisinghbrar@gmail.com>
+>> Cc: Ohad Ben-Cohen <ohad@wizery.com>
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> ---
+>> v3->v4: No code changes, switched the example to use the DSP node instead of
+>> WkupM3 in the bindings document & minor commit description changes. Other than
+>> that, this is a repost of the driver adaptation patch [1] from the OMAP Mailbox
+>> framework adaptation series [2]. This patch is intended for the 3.19 merge window,
+>> all the dependent patches in [2] are merged as of 3.18-rc2. The DTS patch in [2]
+>> will be posted separately.
+>>
+>> [1] http://marc.info/?l=linux-omap&m=141038453917790&w=2
+>> [2] http://marc.info/?l=linux-omap&m=141038447817775&w=2
+>>
+>>  .../devicetree/bindings/mailbox/omap-mailbox.txt   |  23 ++
+>>  drivers/mailbox/omap-mailbox.c                     | 346 ++++++++++++---------
+>>  drivers/remoteproc/omap_remoteproc.c               |  51 +--
+>>  include/linux/omap-mailbox.h                       |  16 +-
+>>  4 files changed, 256 insertions(+), 180 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+>> index 48edc4b..d1a0433 100644
+>> --- a/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+>> +++ b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+>> @@ -43,6 +43,9 @@ Required properties:
+>>                         device. The format is dependent on which interrupt
+>>                         controller the OMAP device uses
+>>  - ti,hwmods:           Name of the hwmod associated with the mailbox
+>> +- #mbox-cells:         Common mailbox binding property to identify the number
+>> +                       of cells required for the mailbox specifier. Should be
+>> +                       1
+>>  - ti,mbox-num-users:   Number of targets (processor devices) that the mailbox
+>>                         device can interrupt
+>>  - ti,mbox-num-fifos:   Number of h/w fifo queues within the mailbox IP block
+>> @@ -72,6 +75,18 @@ data that represent the following:
+>>      Cell #3 (usr_id)  - mailbox user id for identifying the interrupt line
+>>                          associated with generating a tx/rx fifo interrupt.
+>>
+>> +Mailbox Users:
+>> +==============
+>> +A device needing to communicate with a target processor device should specify
+>> +them using the common mailbox binding properties, "mboxes" and the optional
+>> +"mbox-names" (please see Documentation/devicetree/bindings/mailbox/mailbox.txt
+>> +for details). Each value of the mboxes property should contain a phandle to the
+>> +mailbox controller device node and an args specifier that will be the phandle to
+>> +the intended sub-mailbox child node to be used for communication. The equivalent
+>> +"mbox-names" property value can be used to give a name to the communication channel
+>> +to be used by the client user.
+>> +
+>> +
+>>  Example:
+>>  --------
+>>
+>> @@ -81,6 +96,7 @@ mailbox: mailbox at 4a0f4000 {
+>>         reg = <0x4a0f4000 0x200>;
+>>         interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+>>         ti,hwmods = "mailbox";
+>> +       #mbox-cells = <1>;
+>>         ti,mbox-num-users = <3>;
+>>         ti,mbox-num-fifos = <8>;
+>>         mbox_ipu: mbox_ipu {
+>> @@ -93,12 +109,19 @@ mailbox: mailbox at 4a0f4000 {
+>>         };
+>>  };
+>>
+>> +dsp {
+>> +       ...
+>> +       mboxes = <&mailbox &mbox_dsp>;
+>> +       ...
+>> +};
+>> +
+>>  /* AM33xx */
+>>  mailbox: mailbox at 480C8000 {
+>>         compatible = "ti,omap4-mailbox";
+>>         reg = <0x480C8000 0x200>;
+>>         interrupts = <77>;
+>>         ti,hwmods = "mailbox";
+>> +       #mbox-cells = <1>;
+>>         ti,mbox-num-users = <4>;
+>>         ti,mbox-num-fifos = <8>;
+>>         mbox_wkupm3: wkup_m3 {
+>> diff --git a/drivers/mailbox/omap-mailbox.c b/drivers/mailbox/omap-mailbox.c
+>> index bcc7ee1..66b83ca 100644
+>> --- a/drivers/mailbox/omap-mailbox.c
+>> +++ b/drivers/mailbox/omap-mailbox.c
+>> @@ -29,13 +29,14 @@
+>>  #include <linux/slab.h>
+>>  #include <linux/kfifo.h>
+>>  #include <linux/err.h>
+>> -#include <linux/notifier.h>
+>>  #include <linux/module.h>
+>>  #include <linux/of_device.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/pm_runtime.h>
+>>  #include <linux/platform_data/mailbox-omap.h>
+>>  #include <linux/omap-mailbox.h>
+>> +#include <linux/mailbox_controller.h>
+>> +#include <linux/mailbox_client.h>
+>>
+>>  #define MAILBOX_REVISION               0x000
+>>  #define MAILBOX_MESSAGE(m)             (0x040 + 4 * (m))
+>> @@ -80,7 +81,6 @@ struct omap_mbox_queue {
+>>         spinlock_t              lock;
+>>         struct kfifo            fifo;
+>>         struct work_struct      work;
+>> -       struct tasklet_struct   tasklet;
+>>         struct omap_mbox        *mbox;
+>>         bool full;
+>>  };
+>> @@ -92,6 +92,7 @@ struct omap_mbox_device {
+>>         u32 num_users;
+>>         u32 num_fifos;
+>>         struct omap_mbox **mboxes;
+>> +       struct mbox_controller controller;
+>>         struct list_head elem;
+>>  };
+>>
+>> @@ -110,15 +111,14 @@ struct omap_mbox_fifo_info {
+>>  struct omap_mbox {
+>>         const char              *name;
+>>         int                     irq;
+>> -       struct omap_mbox_queue  *txq, *rxq;
+>> +       struct omap_mbox_queue  *rxq;
+>>         struct device           *dev;
+>>         struct omap_mbox_device *parent;
+>>         struct omap_mbox_fifo   tx_fifo;
+>>         struct omap_mbox_fifo   rx_fifo;
+>>         u32                     ctx[OMAP4_MBOX_NR_REGS];
+>>         u32                     intr_type;
+>> -       int                     use_count;
+>> -       struct blocking_notifier_head   notifier;
+>> +       struct mbox_chan        *chan;
+>>  };
+>>
+>>  /* global variables for the mailbox devices */
+>> @@ -129,6 +129,14 @@ static unsigned int mbox_kfifo_size = CONFIG_OMAP_MBOX_KFIFO_SIZE;
+>>  module_param(mbox_kfifo_size, uint, S_IRUGO);
+>>  MODULE_PARM_DESC(mbox_kfifo_size, "Size of omap's mailbox kfifo (bytes)");
+>>
+>> +static struct omap_mbox *mbox_chan_to_omap_mbox(struct mbox_chan *chan)
+>> +{
+>> +       if (!chan || !chan->con_priv)
+>> +               return NULL;
+>> +
+>> +       return (struct omap_mbox *)chan->con_priv;
+>> +}
+>> +
+>>  static inline
+>>  unsigned int mbox_read_reg(struct omap_mbox_device *mdev, size_t ofs)
+>>  {
+>> @@ -194,41 +202,14 @@ static int is_mbox_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
+>>         return (int)(enable & status & bit);
+>>  }
+>>
+>> -/*
+>> - * message sender
+>> - */
+>> -int omap_mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg)
+>> -{
+>> -       struct omap_mbox_queue *mq = mbox->txq;
+>> -       int ret = 0, len;
+>> -
+>> -       spin_lock_bh(&mq->lock);
+>> -
+>> -       if (kfifo_avail(&mq->fifo) < sizeof(msg)) {
+>> -               ret = -ENOMEM;
+>> -               goto out;
+>> -       }
+>> -
+>> -       if (kfifo_is_empty(&mq->fifo) && !mbox_fifo_full(mbox)) {
+>> -               mbox_fifo_write(mbox, msg);
+>> -               goto out;
+>> -       }
+>> -
+>> -       len = kfifo_in(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
+>> -       WARN_ON(len != sizeof(msg));
+>> -
+>> -       tasklet_schedule(&mbox->txq->tasklet);
+>> -
+>> -out:
+>> -       spin_unlock_bh(&mq->lock);
+>> -       return ret;
+>> -}
+>> -EXPORT_SYMBOL(omap_mbox_msg_send);
+>> -
+>> -void omap_mbox_save_ctx(struct omap_mbox *mbox)
+>> +void omap_mbox_save_ctx(struct mbox_chan *chan)
+>>  {
+>>         int i;
+>>         int nr_regs;
+>> +       struct omap_mbox *mbox = mbox_chan_to_omap_mbox(chan);
+>> +
+>> +       if (WARN_ON(!mbox))
+>> +               return;
+>>
+>>         if (mbox->intr_type)
+>>                 nr_regs = OMAP4_MBOX_NR_REGS;
+>> @@ -243,10 +224,14 @@ void omap_mbox_save_ctx(struct omap_mbox *mbox)
+>>  }
+>>  EXPORT_SYMBOL(omap_mbox_save_ctx);
+>>
+>> -void omap_mbox_restore_ctx(struct omap_mbox *mbox)
+>> +void omap_mbox_restore_ctx(struct mbox_chan *chan)
+>>  {
+>>         int i;
+>>         int nr_regs;
+>> +       struct omap_mbox *mbox = mbox_chan_to_omap_mbox(chan);
+>> +
+>> +       if (WARN_ON(!mbox))
+>> +               return;
+>>
+>>         if (mbox->intr_type)
+>>                 nr_regs = OMAP4_MBOX_NR_REGS;
+>> @@ -254,14 +239,13 @@ void omap_mbox_restore_ctx(struct omap_mbox *mbox)
+>>                 nr_regs = MBOX_NR_REGS;
+>>         for (i = 0; i < nr_regs; i++) {
+>>                 mbox_write_reg(mbox->parent, mbox->ctx[i], i * sizeof(u32));
+>> -
+>>                 dev_dbg(mbox->dev, "%s: [%02x] %08x\n", __func__,
+>>                         i, mbox->ctx[i]);
+>>         }
+>>  }
+>>  EXPORT_SYMBOL(omap_mbox_restore_ctx);
+>>
+>> -void omap_mbox_enable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
+>> +static void _omap_mbox_enable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
+>>  {
+>>         u32 l;
+>>         struct omap_mbox_fifo *fifo = (irq == IRQ_TX) ?
+>> @@ -273,9 +257,8 @@ void omap_mbox_enable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
+>>         l |= bit;
+>>         mbox_write_reg(mbox->parent, l, irqenable);
+>>  }
+>> -EXPORT_SYMBOL(omap_mbox_enable_irq);
+>>
+>> -void omap_mbox_disable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
+>> +static void _omap_mbox_disable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
+>>  {
+>>         struct omap_mbox_fifo *fifo = (irq == IRQ_TX) ?
+>>                                 &mbox->tx_fifo : &mbox->rx_fifo;
+>> @@ -291,28 +274,28 @@ void omap_mbox_disable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
+>>
+>>         mbox_write_reg(mbox->parent, bit, irqdisable);
+>>  }
+>> -EXPORT_SYMBOL(omap_mbox_disable_irq);
+>>
+>> -static void mbox_tx_tasklet(unsigned long tx_data)
+>> +void omap_mbox_enable_irq(struct mbox_chan *chan, omap_mbox_irq_t irq)
+>>  {
+>> -       struct omap_mbox *mbox = (struct omap_mbox *)tx_data;
+>> -       struct omap_mbox_queue *mq = mbox->txq;
+>> -       mbox_msg_t msg;
+>> -       int ret;
+>> +       struct omap_mbox *mbox = mbox_chan_to_omap_mbox(chan);
+>>
+>> -       while (kfifo_len(&mq->fifo)) {
+>> -               if (mbox_fifo_full(mbox)) {
+>> -                       omap_mbox_enable_irq(mbox, IRQ_TX);
+>> -                       break;
+>> -               }
+>> +       if (WARN_ON(!mbox))
+>> +               return;
+>>
+>> -               ret = kfifo_out(&mq->fifo, (unsigned char *)&msg,
+>> -                                                               sizeof(msg));
+>> -               WARN_ON(ret != sizeof(msg));
+>> +       _omap_mbox_enable_irq(mbox, irq);
+>> +}
+>> +EXPORT_SYMBOL(omap_mbox_enable_irq);
+>>
+>> -               mbox_fifo_write(mbox, msg);
+>> -       }
+>> +void omap_mbox_disable_irq(struct mbox_chan *chan, omap_mbox_irq_t irq)
+>> +{
+>> +       struct omap_mbox *mbox = mbox_chan_to_omap_mbox(chan);
+>> +
+>> +       if (WARN_ON(!mbox))
+>> +               return;
+>> +
+>> +       _omap_mbox_disable_irq(mbox, irq);
+>>  }
+>> +EXPORT_SYMBOL(omap_mbox_disable_irq);
+>>
+>>  /*
+>>   * Message receiver(workqueue)
+>> @@ -328,12 +311,11 @@ static void mbox_rx_work(struct work_struct *work)
+>>                 len = kfifo_out(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
+>>                 WARN_ON(len != sizeof(msg));
+>>
+>> -               blocking_notifier_call_chain(&mq->mbox->notifier, len,
+>> -                                                               (void *)msg);
+>> +               mbox_chan_received_data(mq->mbox->chan, (void *)msg);
+>>                 spin_lock_irq(&mq->lock);
+>>                 if (mq->full) {
+>>                         mq->full = false;
+>> -                       omap_mbox_enable_irq(mq->mbox, IRQ_RX);
+>> +                       _omap_mbox_enable_irq(mq->mbox, IRQ_RX);
+>>                 }
+>>                 spin_unlock_irq(&mq->lock);
+>>         }
+>> @@ -344,9 +326,9 @@ static void mbox_rx_work(struct work_struct *work)
+>>   */
+>>  static void __mbox_tx_interrupt(struct omap_mbox *mbox)
+>>  {
+>> -       omap_mbox_disable_irq(mbox, IRQ_TX);
+>> +       _omap_mbox_disable_irq(mbox, IRQ_TX);
+>>         ack_mbox_irq(mbox, IRQ_TX);
+>> -       tasklet_schedule(&mbox->txq->tasklet);
+>> +       mbox_chan_txdone(mbox->chan, 0);
+>>  }
+>>
+>>  static void __mbox_rx_interrupt(struct omap_mbox *mbox)
+>> @@ -357,7 +339,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
+>>
+>>         while (!mbox_fifo_empty(mbox)) {
+>>                 if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
+>> -                       omap_mbox_disable_irq(mbox, IRQ_RX);
+>> +                       _omap_mbox_disable_irq(mbox, IRQ_RX);
+>>                         mq->full = true;
+>>                         goto nomem;
+>>                 }
+>> @@ -388,11 +370,13 @@ static irqreturn_t mbox_interrupt(int irq, void *p)
+>>  }
+>>
+>>  static struct omap_mbox_queue *mbox_queue_alloc(struct omap_mbox *mbox,
+>> -                                       void (*work) (struct work_struct *),
+>> -                                       void (*tasklet)(unsigned long))
+>> +                                       void (*work)(struct work_struct *))
+>>  {
+>>         struct omap_mbox_queue *mq;
+>>
+>> +       if (!work)
+>> +               return NULL;
+>> +
+>>         mq = kzalloc(sizeof(struct omap_mbox_queue), GFP_KERNEL);
+>>         if (!mq)
+>>                 return NULL;
+>> @@ -402,12 +386,9 @@ static struct omap_mbox_queue *mbox_queue_alloc(struct omap_mbox *mbox,
+>>         if (kfifo_alloc(&mq->fifo, mbox_kfifo_size, GFP_KERNEL))
+>>                 goto error;
+>>
+>> -       if (work)
+>> -               INIT_WORK(&mq->work, work);
+>> -
+>> -       if (tasklet)
+>> -               tasklet_init(&mq->tasklet, tasklet, (unsigned long)mbox);
+>> +       INIT_WORK(&mq->work, work);
+>>         return mq;
+>> +
+>>  error:
+>>         kfree(mq);
+>>         return NULL;
+>> @@ -423,71 +404,35 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
+>>  {
+>>         int ret = 0;
+>>         struct omap_mbox_queue *mq;
+>> -       struct omap_mbox_device *mdev = mbox->parent;
+>>
+>> -       mutex_lock(&mdev->cfg_lock);
+>> -       ret = pm_runtime_get_sync(mdev->dev);
+>> -       if (unlikely(ret < 0))
+>> -               goto fail_startup;
+>> -
+>> -       if (!mbox->use_count++) {
+>> -               mq = mbox_queue_alloc(mbox, NULL, mbox_tx_tasklet);
+>> -               if (!mq) {
+>> -                       ret = -ENOMEM;
+>> -                       goto fail_alloc_txq;
+>> -               }
+>> -               mbox->txq = mq;
+>> +       mq = mbox_queue_alloc(mbox, mbox_rx_work);
+>> +       if (!mq)
+>> +               return -ENOMEM;
+>> +       mbox->rxq = mq;
+>> +       mq->mbox = mbox;
+>> +
+>> +       ret = request_irq(mbox->irq, mbox_interrupt, IRQF_SHARED,
+>> +                         mbox->name, mbox);
+>> +       if (unlikely(ret)) {
+>> +               pr_err("failed to register mailbox interrupt:%d\n", ret);
+>> +               goto fail_request_irq;
+>> +       }
+>>
+>> -               mq = mbox_queue_alloc(mbox, mbox_rx_work, NULL);
+>> -               if (!mq) {
+>> -                       ret = -ENOMEM;
+>> -                       goto fail_alloc_rxq;
+>> -               }
+>> -               mbox->rxq = mq;
+>> -               mq->mbox = mbox;
+>> -               ret = request_irq(mbox->irq, mbox_interrupt, IRQF_SHARED,
+>> -                                                       mbox->name, mbox);
+>> -               if (unlikely(ret)) {
+>> -                       pr_err("failed to register mailbox interrupt:%d\n",
+>> -                                                                       ret);
+>> -                       goto fail_request_irq;
+>> -               }
+>> +       _omap_mbox_enable_irq(mbox, IRQ_RX);
+>>
+>> -               omap_mbox_enable_irq(mbox, IRQ_RX);
+>> -       }
+>> -       mutex_unlock(&mdev->cfg_lock);
+>>         return 0;
+>>
+>>  fail_request_irq:
+>>         mbox_queue_free(mbox->rxq);
+>> -fail_alloc_rxq:
+>> -       mbox_queue_free(mbox->txq);
+>> -fail_alloc_txq:
+>> -       pm_runtime_put_sync(mdev->dev);
+>> -       mbox->use_count--;
+>> -fail_startup:
+>> -       mutex_unlock(&mdev->cfg_lock);
+>>         return ret;
+>>  }
+>>
+>>  static void omap_mbox_fini(struct omap_mbox *mbox)
+>>  {
+>> -       struct omap_mbox_device *mdev = mbox->parent;
+>> -
+>> -       mutex_lock(&mdev->cfg_lock);
+>> -
+>> -       if (!--mbox->use_count) {
+>> -               omap_mbox_disable_irq(mbox, IRQ_RX);
+>> -               free_irq(mbox->irq, mbox);
+>> -               tasklet_kill(&mbox->txq->tasklet);
+>> -               flush_work(&mbox->rxq->work);
+>> -               mbox_queue_free(mbox->txq);
+>> -               mbox_queue_free(mbox->rxq);
+>> -       }
+>> -
+>> -       pm_runtime_put_sync(mdev->dev);
+>> -
+>> -       mutex_unlock(&mdev->cfg_lock);
+>> +       _omap_mbox_disable_irq(mbox, IRQ_RX);
+>> +       free_irq(mbox->irq, mbox);
+>> +       flush_work(&mbox->rxq->work);
+>> +       mbox_queue_free(mbox->rxq);
+>>  }
+>>
+>>  static struct omap_mbox *omap_mbox_device_find(struct omap_mbox_device *mdev,
+>> @@ -509,42 +454,55 @@ static struct omap_mbox *omap_mbox_device_find(struct omap_mbox_device *mdev,
+>>         return mbox;
+>>  }
+>>
+>> -struct omap_mbox *omap_mbox_get(const char *name, struct notifier_block *nb)
+>> +struct mbox_chan *omap_mbox_request_channel(struct mbox_client *cl,
+>> +                                           const char *chan_name)
+>>  {
+>> +       struct device *dev = cl->dev;
+>>         struct omap_mbox *mbox = NULL;
+>>         struct omap_mbox_device *mdev;
+>> +       struct mbox_chan *chan;
+>> +       unsigned long flags;
+>>         int ret;
+>>
+>> +       if (!dev)
+>> +               return ERR_PTR(-ENODEV);
+>> +
+>> +       if (dev->of_node) {
+>> +               pr_err("%s: please use mbox_request_channel(), this API is supported only for OMAP non-DT usage\n",
+>> +                      __func__);
+>> +               return ERR_PTR(-ENODEV);
+>> +       }
+>> +
+>>         mutex_lock(&omap_mbox_devices_lock);
+>>         list_for_each_entry(mdev, &omap_mbox_devices, elem) {
+>> -               mbox = omap_mbox_device_find(mdev, name);
+>> +               mbox = omap_mbox_device_find(mdev, chan_name);
+>>                 if (mbox)
+>>                         break;
+>>         }
+>>         mutex_unlock(&omap_mbox_devices_lock);
+>>
+>> -       if (!mbox)
+>> +       if (!mbox || !mbox->chan)
+>>                 return ERR_PTR(-ENOENT);
+>>
+>> -       if (nb)
+>> -               blocking_notifier_chain_register(&mbox->notifier, nb);
+>> +       chan = mbox->chan;
+>> +       spin_lock_irqsave(&chan->lock, flags);
+>> +       chan->msg_free = 0;
+>> +       chan->msg_count = 0;
+>> +       chan->active_req = NULL;
+>> +       chan->cl = cl;
+>> +       init_completion(&chan->tx_complete);
+>> +       spin_unlock_irqrestore(&chan->lock, flags);
+>>
+>> -       ret = omap_mbox_startup(mbox);
+>> +       ret = chan->mbox->ops->startup(chan);
+>>         if (ret) {
+>> -               blocking_notifier_chain_unregister(&mbox->notifier, nb);
+>> -               return ERR_PTR(-ENODEV);
+>> +               pr_err("Unable to startup the chan (%d)\n", ret);
+>> +               mbox_free_channel(chan);
+>> +               chan = ERR_PTR(ret);
+>>         }
+>>
+>> -       return mbox;
+>> -}
+>> -EXPORT_SYMBOL(omap_mbox_get);
+>> -
+>> -void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb)
+>> -{
+>> -       blocking_notifier_chain_unregister(&mbox->notifier, nb);
+>> -       omap_mbox_fini(mbox);
+>> +       return chan;
+>>  }
+>> -EXPORT_SYMBOL(omap_mbox_put);
+>> +EXPORT_SYMBOL(omap_mbox_request_channel);
+>>
+> Why not mbox_request_channel()?
+> And what about other 4 exports - omap_mbox_{save_ctx, restore_ctx,
+> enable_irq & disable_irq} ?
 
-please fold in both in the two patches from Doug
-https://chromium-review.googlesource.com/#/c/231181/
-https://chromium-review.googlesource.com/#/c/231182/
+Please see the last bullet item in the patch description. It is gonna
+take couple of kernel versions before the OMAP remoteproc is converted
+to DT, so until then we need some of the API as a stop-gap, but the plan
+is to remove most of them eventually.
 
-as they make the code nicer to read :-)
+The enable_irq and disable_irq variants will be needed by our WkupM3 IPC
+driver (needed to achieve PM suspend/resume on TI AM335x/AM437x SoCs)
+for flow control. You can look at the usage in an earlier version [1],
+and that series is being reworked now but would still require these. It
+had also been used by TI DSP/Bridge driver, but that is no longer
+relevant as that driver has been deleted in 3.17.
 
+regards
+Suman
 
-But overall, this looks quite nice now. I've found some small nits inside - 
-some of them are already also addressed by Dougs patches.
-
-
-> Signed-off-by: Tony Xie <xxx@rock-chips.com>
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Tested-by: Doug Anderson <dianders@chromium.org>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> 
-> ---
-
-[...]
-
-> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
-> new file mode 100644
-> index 0000000..e059b84
-> --- /dev/null
-> +++ b/arch/arm/mach-rockchip/pm.c
-> @@ -0,0 +1,264 @@
-> +/*
-> + * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
-> + * Author: Tony Xie <tony.xie@rock-chips.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-> for + * more details.
-> + *
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/regmap.h>
-> +#include <linux/suspend.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/regulator/machine.h>
-> +
-> +#include <asm/cacheflush.h>
-> +#include <asm/tlbflush.h>
-> +#include <asm/suspend.h>
-> +
-> +#include "pm.h"
-> +
-> +/* These enum are option of low power mode */
-> +enum {
-> +	ROCKCHIP_ARM_OFF_LOGIC_NORMAL = 0,
-> +	ROCKCHIP_ARM_OFF_LOGIC_DEEP = 1,
-> +};
-> +
-> +struct rockchip_pm_device_id {
-> +	const char *compatible;
-> +	const struct platform_suspend_ops *ops;
-> +	int (*init)(void);
-> +};
-> +
-> +static void __iomem *rk3288_bootram_base;
-> +static phys_addr_t rk3288_bootram_phy;
-> +
-> +static struct regmap *pmu_regmap;
-> +static struct regmap *sgrf_regmap;
-> +
-> +static u32 rk3288_pmu_pwr_mode_con;
-> +static u32 rk3288_sgrf_soc_con0;
-> +
-> +static inline u32 rk3288_l2_config(void)
-> +{
-> +	u32 l2ctlr;
-> +
-> +	asm("mrc p15, 1, %0, c9, c0, 2" : "=r" (l2ctlr));
-> +	return l2ctlr;
-> +}
-> +
-> +static void rk3288_config_bootdata(void)
-> +{
-> +	rkpm_bootdata_cpusp = rk3288_bootram_phy + (SZ_4K - 8);
-> +	rkpm_bootdata_cpu_code = virt_to_phys(cpu_resume);
-> +
-> +	rkpm_bootdata_l2ctlr_f  = 1;
-> +	rkpm_bootdata_l2ctlr = rk3288_l2_config();
-> +}
-> +
-> +static void rk3288_slp_mode_set(int level)
-> +{
-> +	u32 mode_set, mode_set1;
-> +
-> +	regmap_read(sgrf_regmap, RK3288_SGRF_SOC_CON0, &rk3288_sgrf_soc_con0);
-> +
-> +	regmap_read(pmu_regmap, RK3288_PMU_PWRMODE_CON,
-> +		    &rk3288_pmu_pwr_mode_con);
-> +
-> +	/* set bit 8 so that system will resume to FAST_BOOT_ADDR */
-> +	regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
-> +		     SGRF_FAST_BOOT_EN | SGRF_FAST_BOOT_EN_WRITE);
-> +
-> +	/* booting address of resuming system is from this register value */
-> +	regmap_write(sgrf_regmap, RK3288_SGRF_FAST_BOOT_ADDR,
-> +		     rk3288_bootram_phy);
-> +
-> +	regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
-> +		     PMU_ARMINT_WAKEUP_EN);
-> +
-> +	mode_set = BIT(PMU_GLOBAL_INT_DISABLE) | BIT(PMU_L2FLUSH_EN) |
-> +		   BIT(PMU_SREF0_ENTER_EN) | BIT(PMU_SREF1_ENTER_EN) |
-> +		   BIT(PMU_DDR0_GATING_EN) | BIT(PMU_DDR1_GATING_EN) |
-> +		   BIT(PMU_PWR_MODE_EN) | BIT(PMU_CHIP_PD_EN) |
-> +		   BIT(PMU_SCU_EN);
-> +
-> +	mode_set1 = BIT(PMU_CLR_CORE) | BIT(PMU_CLR_CPUP);
-> +
-> +	if (level == ROCKCHIP_ARM_OFF_LOGIC_DEEP) {
-> +		/* arm off, logic deep sleep */
-> +		mode_set |= BIT(PMU_BUS_PD_EN) |
-> +			    BIT(PMU_DDR1IO_RET_EN) | BIT(PMU_DDR0IO_RET_EN) |
-> +			    BIT(PMU_OSC_24M_DIS) | BIT(PMU_PMU_USE_LF) |
-> +			    BIT(PMU_ALIVE_USE_LF) | BIT(PMU_PLL_PD_EN);
-> +
-> +		mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
-> +			     BIT(PMU_CLR_PERI) | BIT(PMU_CLR_DMA);
-> +	} else {
-> +		/*
-> +		 * arm off, logic normal
-> +		 * if pmu_clk_core_src_gate_en is not set,
-> +		 * wakeup will be error
-> +		 */
-> +		mode_set |= BIT(PMU_CLK_CORE_SRC_GATE_EN);
-> +	}
-> +
-> +	regmap_write(pmu_regmap, RK3288_PMU_PWRMODE_CON, mode_set);
-> +	regmap_write(pmu_regmap, RK3288_PMU_PWRMODE_CON1, mode_set1);
-> +}
-> +
-> +static void rk3288_slp_mode_set_resume(void)
-> +{
-> +	regmap_write(pmu_regmap, RK3288_PMU_PWRMODE_CON,
-> +		     rk3288_pmu_pwr_mode_con);
-> +
-> +	regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
-> +		     rk3288_sgrf_soc_con0 | SGRF_FAST_BOOT_EN_WRITE);
-> +}
-> +
-> +static int rockchip_lpmode_enter(unsigned long arg)
-> +{
-> +	flush_cache_all();
-> +
-> +	cpu_do_idle();
-> +
-> +	pr_info("Failed to suspend the system\n");
-
-I guess this should be a pr_err. Also could you try for a format like
-	pr_err("%s: Failed to suspend\n", __func__);
-
-This way it at least gives an indication where is failed ... often this 
-shortens the time spent searching for the place of origin :-)
-
-> +
-> +	return 1;
-> +}
-> +
-> +static int rk3288_suspend_enter(suspend_state_t state)
-> +{
-> +	local_fiq_disable();
-> +
-> +	rk3288_slp_mode_set(ROCKCHIP_ARM_OFF_LOGIC_NORMAL);
-> +
-> +	cpu_suspend(0, rockchip_lpmode_enter);
-> +
-> +	rk3288_slp_mode_set_resume();
-> +
-> +	local_fiq_enable();
-> +
-> +	return 0;
-> +}
-> +
-> +static int rk3288_suspend_prepare(void)
-> +{
-> +	return regulator_suspend_prepare(PM_SUSPEND_MEM);
-> +}
-> +
-> +static void rk3288_suspend_finish(void)
-> +{
-> +	if (regulator_suspend_finish())
-> +		pr_warn("suspend finish failed\n");
-
-pr_err and the format containing the function name
-
-> +}
-> +
-> +static int rk3288_suspend_iomap(void)
-> +{
-> +	struct device_node *node;
-> +	struct resource res;
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3288-pmu-sram");
-> +	if (!node) {
-> +		pr_err("%s: could not find bootram dt node\n", __func__);
-> +		return -1;
-
-	return -ENODEV;
-
-> +	}
-> +
-> +	rk3288_bootram_base = of_iomap(node, 0);
-> +	if (!rk3288_bootram_base) {
-> +		pr_err("%s: could not map bootram base\n", __func__);
-> +		return -1;
-
-	return -ENOMEM;
-
-> +	}
-> +
-> +	if (of_address_to_resource(node, 0, &res)) {
-> +		pr_err("%s: could not get bootram phy addr\n", __func__);
-> +		return -1;
-> +	}
-
-ret = of_address_to_resource(node, 0, &res)
-if (ret) {
-	pr_err("%s: could not get bootram phy addr\n", __func__);
-	return ret;
-}
-
-
-> +
-> +	rk3288_bootram_phy = res.start;
-> +
-> +	rk3288_config_bootdata();
-> +
-> +	/* copy resume code and data to bootsram */
-> +	memcpy(rk3288_bootram_base, rockchip_slp_cpu_resume,
-> +	       rk3288_bootram_sz);
-> +
-> +	return 0;
-> +}
-> +
-> +static int rk3288_suspend_init(void)
-> +{
-> +	int ret;
-> +
-> +	pmu_regmap = syscon_regmap_lookup_by_compatible(
-> +				"rockchip,rk3288-pmu");
-> +
-> +	if (IS_ERR(pmu_regmap)) {
-> +		pr_err("%s: could not find pmu regmap\n", __func__);
-> +		return -1;
-
-	return PTR_ERR(pmu_regmap);
-
-
-> +	}
-> +
-> +	sgrf_regmap = syscon_regmap_lookup_by_compatible(
-> +				"rockchip,rk3288-sgrf");
-> +
-> +	if (IS_ERR(sgrf_regmap)) {
-> +		pr_err("%s: could not find sgrf regmap\n", __func__);
-> +		return -1;
-
-	return PTR_ERR(sgrf_regmap);
-
-
-> +	}
-> +
-> +	ret = rk3288_suspend_iomap();
-> +
-> +	return ret;
-> +}
-> +
-> +static const struct platform_suspend_ops rk3288_suspend_ops = {
-> +	.enter   = rk3288_suspend_enter,
-> +	.valid   = suspend_valid_only_mem,
-> +	.prepare = rk3288_suspend_prepare,
-> +	.finish  = rk3288_suspend_finish,
-> +};
-> +
-> +static const struct rockchip_pm_device_id rockchip_pm_dt_match[]
-> __initconst = { +	{
-> +		.compatible = "rockchip,rk3288",
-> +		.ops = &rk3288_suspend_ops,
-> +		.init = rk3288_suspend_init,
-> +	},
-> +	{ /* sentinel */ },
-> +};
-> +
-> +void __init rockchip_suspend_init(void)
-> +{
-> +	const struct rockchip_pm_device_id *matches =
-> +		rockchip_pm_dt_match;
-> +
-> +	while (matches->compatible && matches->ops) {
-> +		if (of_machine_is_compatible(matches->compatible))
-> +			break;
-> +		matches++;
-> +	}
-> +
-> +	if (!matches->compatible || !matches->ops) {
-> +		pr_err("%s:there is not a machine matched\n", __func__);
-> +		return;
-> +	}
-> +
-> +	if (matches->init) {
-> +		if (matches->init()) {
-> +			pr_err("%s: matches init error\n", __func__);
-> +			return;
-> +		}
-> +	}
-> +
-> +	suspend_set_ops(matches->ops);
-> +}
-> diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
-> new file mode 100644
-> index 0000000..99722d0
-> --- /dev/null
-> +++ b/arch/arm/mach-rockchip/pm.h
-> @@ -0,0 +1,99 @@
-> +/*
-> + * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
-> + * Author: Tony Xie <tony.xie@rock-chips.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-> for + * more details.
-> + */
-> +
-> +#ifndef __MACH_ROCKCHIP_PM_H
-> +#define __MACH_ROCKCHIP_PM_H
-> +
-> +extern unsigned long rkpm_bootdata_cpusp;
-> +extern unsigned long rkpm_bootdata_cpu_code;
-> +extern unsigned long rkpm_bootdata_l2ctlr_f;
-> +extern unsigned long rkpm_bootdata_l2ctlr;
-> +extern unsigned long rkpm_bootdata_ddr_code;
-> +extern unsigned long rkpm_bootdata_ddr_data;
-> +extern unsigned long rk3288_bootram_sz;
-> +
-> +void rockchip_slp_cpu_resume(void);
-> +void __init rockchip_suspend_init(void);
-> +
-> +/****** following is rk3288 defined **********/
-> +#define RK3288_PMU_WAKEUP_CFG0          0x00
-> +#define RK3288_PMU_WAKEUP_CFG1          0x04
-> +#define RK3288_PMU_PWRMODE_CON          0x18
-> +#define RK3288_PMU_OSC_CNT              0x20
-> +#define RK3288_PMU_PLL_CNT              0x24
-> +#define RK3288_PMU_STABL_CNT            0x28
-> +#define RK3288_PMU_DDR0IO_PWRON_CNT     0x2c
-> +#define RK3288_PMU_DDR1IO_PWRON_CNT     0x30
-> +#define RK3288_PMU_CORE_PWRDWN_CNT      0x34
-> +#define RK3288_PMU_CORE_PWRUP_CNT       0x38
-> +#define RK3288_PMU_GPU_PWRDWN_CNT       0x3c
-> +#define RK3288_PMU_GPU_PWRUP_CNT        0x40
-> +#define RK3288_PMU_WAKEUP_RST_CLR_CNT   0x44
-> +#define RK3288_PMU_PWRMODE_CON1         0x90
-> +
-> +#define RK3288_SGRF_SOC_CON0            (0x0000)
-> +#define RK3288_SGRF_FAST_BOOT_ADDR      (0x0120)
-> +#define SGRF_FAST_BOOT_EN		BIT(8)
-> +#define SGRF_FAST_BOOT_EN_WRITE		BIT(24)
-> +
-> +#define RK3288_CRU_MODE_CON (0x50)
-> +#define RK3288_CRU_SEL0_CON (0x60)
-> +#define RK3288_CRU_SEL1_CON (0x64)
-> +#define RK3288_CRU_SEL10_CON (0x88)
-> +#define RK3288_CRU_SEL33_CON (0xe4)
-> +#define RK3288_CRU_SEL37_CON (0xf4)
-> +
-> +/* PMU_WAKEUP_CFG1 bits */
-> +#define PMU_ARMINT_WAKEUP_EN BIT(0)
-> +
-> +enum rk3288_pwr_mode_con {
-> +	PMU_PWR_MODE_EN = 0,
-> +	PMU_CLK_CORE_SRC_GATE_EN,
-> +	PMU_GLOBAL_INT_DISABLE,
-> +	PMU_L2FLUSH_EN,
-> +	PMU_BUS_PD_EN,
-> +	PMU_A12_0_PD_EN,
-> +	PMU_SCU_EN,
-> +	PMU_PLL_PD_EN,
-> +	PMU_CHIP_PD_EN, /* POWER OFF PIN ENABLE */
-> +	PMU_PWROFF_COMB,
-> +	PMU_ALIVE_USE_LF,
-> +	PMU_PMU_USE_LF,
-> +	PMU_OSC_24M_DIS,
-> +	PMU_INPUT_CLAMP_EN,
-> +	PMU_WAKEUP_RESET_EN,
-> +	PMU_SREF0_ENTER_EN,
-> +	PMU_SREF1_ENTER_EN,
-> +	PMU_DDR0IO_RET_EN,
-> +	PMU_DDR1IO_RET_EN,
-> +	PMU_DDR0_GATING_EN,
-> +	PMU_DDR1_GATING_EN,
-> +	PMU_DDR0IO_RET_DE_REQ,
-> +	PMU_DDR1IO_RET_DE_REQ
-> +};
-> +
-> +enum rk3288_pwr_mode_con1 {
-> +	PMU_CLR_BUS = 0,
-> +	PMU_CLR_CORE,
-> +	PMU_CLR_CPUP,
-> +	PMU_CLR_ALIVE,
-> +	PMU_CLR_DMA,
-> +	PMU_CLR_PERI,
-> +	PMU_CLR_GPU,
-> +	PMU_CLR_VIDEO,
-> +	PMU_CLR_HEVC,
-> +	PMU_CLR_VIO,
-> +};
-> +
-> +#endif /* __MACH_ROCKCHIP_PM_H */
-> diff --git a/arch/arm/mach-rockchip/rockchip.c
-> b/arch/arm/mach-rockchip/rockchip.c index d226b71..2b68a1a 100644
-> --- a/arch/arm/mach-rockchip/rockchip.c
-> +++ b/arch/arm/mach-rockchip/rockchip.c
-> @@ -23,9 +23,11 @@
->  #include <asm/mach/map.h>
->  #include <asm/hardware/cache-l2x0.h>
->  #include "core.h"
-> +#include "pm.h"
-> 
->  static void __init rockchip_dt_init(void)
->  {
-> +	rockchip_suspend_init();
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->  	platform_device_register_simple("cpufreq-dt", 0, NULL, 0);
->  }
-> diff --git a/arch/arm/mach-rockchip/sleep.S b/arch/arm/mach-rockchip/sleep.S
-> new file mode 100644
-> index 0000000..2eec9a3
-> --- /dev/null
-> +++ b/arch/arm/mach-rockchip/sleep.S
-> @@ -0,0 +1,73 @@
-> +/*
-> + * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
-> + * Author: Tony Xie <tony.xie@rock-chips.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-> for + * more details.
-> + *
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <asm/assembler.h>
-> +#include <asm/memory.h>
-> +
-> +.data
-> +/*
-> + * this code will be copied from
-> + * ddr to sram for system resumeing.
-> + * so it is ".data section".
-> + */
-> +.align
-> +
-> +ENTRY(rockchip_slp_cpu_resume)
-> +	setmode	PSR_I_BIT | PSR_F_BIT | SVC_MODE, r1  @ set svc, irqs off
-> +	mrc	p15, 0, r1, c0, c0, 5
-> +	and	r1, r1, #0xf
-> +	cmp	r1, #0
-> +	/* olny cpu0 can continue to run, the others is halt here */
-> +	beq	cpu0run
-> +secondary_loop:
-> +	wfe
-> +	b	secondary_loop
-> +cpu0run:
-> +	ldr	r3, rkpm_bootdata_l2ctlr_f
-> +	cmp	r3, #0
-> +	beq	sp_set
-> +	ldr	r3, rkpm_bootdata_l2ctlr
-> +	mcr	p15, 1, r3, c9, c0, 2
-> +sp_set:
-> +	ldr	sp, rkpm_bootdata_cpusp
-> +	ldr	r1, rkpm_bootdata_cpu_code
-> +	bx	r1
-> +ENDPROC(rockchip_slp_cpu_resume)
-> +
-> +/* Parameters filled in by the kernel */
-> +
-> +/* Flag for whether to restore L2CTLR on resume */
-> +	.global rkpm_bootdata_l2ctlr_f
-> +rkpm_bootdata_l2ctlr_f:
-> +	.long 0
-> +
-> +/* Saved L2CTLR to restore on resume */
-> +	.global rkpm_bootdata_l2ctlr
-> +rkpm_bootdata_l2ctlr:
-> +	.long 0
-> +
-> +/* CPU resume SP addr */
-> +	.globl rkpm_bootdata_cpusp
-> +rkpm_bootdata_cpusp:
-> +	.long 0
-> +
-> +/* CPU resume function (physical address) */
-> +	.globl rkpm_bootdata_cpu_code
-> +rkpm_bootdata_cpu_code:
-> +	.long 0
-> +
-> +ENTRY(rk3288_bootram_sz)
-> +        .word   . - rockchip_slp_cpu_resume
+[1] http://marc.info/?l=linux-omap&m=140504747716092&w=2
