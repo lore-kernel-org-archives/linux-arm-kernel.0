@@ -1,71 +1,56 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 24 Nov 2014 17:46:34 +0530
-Subject: [PATCH v4 0/6] Touchscreen performance related fixes
-In-Reply-To: <20141124115116.GA14997@linutronix.de>
-References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
- <20141124115116.GA14997@linutronix.de>
-Message-ID: <547321A2.6010207@ti.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Mon, 24 Nov 2014 13:28:18 +0100
+Subject: [PATCH v2 3/3] ARM: tegra: Add Tegra124 ACTMON support
+In-Reply-To: <1416832111-367-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1416832111-367-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1416832111-367-4-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add device node for the ACTMON block to the Tegra124 device tree.
 
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-On Monday 24 November 2014 05:21 PM, Sebastian Andrzej Siewior wrote:
-> * Vignesh R | 2014-11-14 10:37:25 [+0530]:
-> 
->> This series of patches fix TSC defects related to lag in touchscreen
->> performance and cursor jump at touch release. The lag was result of
->> udelay in TSC interrupt handler. Cursor jump due to false pen-up event.
->> The patches implement Advisory 1.0.31 in silicon errata of am335x-evm
-> am335x not -evm. The am335x-evm is a board (with its own advisory
-> document) built around the SoC.
-> 
-> Just testing the v4. I can use now IIO and touchscren at the same time.
-> back at v1 I reported that it does not work, this has been fixed now.
-> I had it running for a few minutes, now I see one of WARN_ON() beeing
-> triggered (I've cut a few numbers so don't wonder about PID 2 and so on):
-> 
-> |dmesg |grep WARNING | wc -l
-> |10
-> | dmesg |grep WARNING
-> |[306.257995] WARNING: CPU: 0 PID: 97 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
-> |[365.469591] WARNING: CPU: 0 PID: 58 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
-> |[379.255904] WARNING: CPU: 0 PID: 24 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
-> |[426.230505] WARNING: CPU: 0 PID: 35 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
-> |[435.654091] WARNING: CPU: 0 PID: 28 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
-> |[438.897519] WARNING: CPU: 0 PID: 91 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
-> |[525.720193] WARNING: CPU: 0 PID: 88 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
-> |[527.644770] WARNING: CPU: 0 PID: 38 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
-> |[557.218349] WARNING: CPU: 0 PID: 56 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
-> |[610.077274] WARNING: CPU: 0 PID: 2 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
-> 
-> The complete trace:
-> 
-> |[610.110692] CPU: 0 PID: 4422 Comm: cat Tainted: G        W      3.18.0-rc6+ #1745
-> |[610.118577] [<c00138ec>] (unwind_backtrace) from [<c0011544>] (show_stack+0x10/0x14)
-> |[610.126772] [<c0011544>] (show_stack) from [<c003c9b0>] (warn_slowpath_common+0x68/0x88)
-> |[610.135313] [<c003c9b0>] (warn_slowpath_common) from [<c003c9ec>] (warn_slowpath_null+0x1c/0x24)
-> |[610.144586] [<c003c9ec>] (warn_slowpath_null) from [<bf00569c>] (am335x_tsc_se_set_once+0xf8/0x104 [ti_am335x_tscadc])
-> |[610.155886] [<bf00569c>] (am335x_tsc_se_set_once [ti_am335x_tscadc]) from [<bf067494>] (tiadc_read_raw+0xbc/0x190 [ti_am335x_adc])
-> |[610.168326] [<bf067494>] (tiadc_read_raw [ti_am335x_adc]) from [<bf02dccc>] (iio_read_channel_info+0x9c/0xa4 [industrialio])
-> |[610.180191] [<bf02dccc>] (iio_read_channel_info [industrialio]) from [<c02a42d4>] (dev_attr_show+0x1c/0x48)
-> |[610.190477] [<c02a42d4>] (dev_attr_show) from [<c013d544>] (sysfs_kf_seq_show+0x8c/0x110)
-> |[610.199108] [<c013d544>] (sysfs_kf_seq_show) from [<c013c1c8>] (kernfs_seq_show+0x24/0x28)
-> |[610.207833] [<c013c1c8>] (kernfs_seq_show) from [<c0102658>] (seq_read+0x1b4/0x47c)
-> |[610.215922] [<c0102658>] (seq_read) from [<c00e6700>] (vfs_read+0x8c/0x148)
-> |[610.223269] [<c00e6700>] (vfs_read) from [<c00e67fc>] (SyS_read+0x40/0x8c)
-> |[610.230525] [<c00e67fc>] (SyS_read) from [<c000e640>] (ret_fast_syscall+0x0/0x30)
-> 
-> Could you please look at that one? (I tested it on am335x-evm btw).
+---
 
-I have tried running both IIO and TSC at the same time. But I have never
-seen WARN_ON() even after running for close to 30 min. Can you send me
-the exact script, so that it will be easy to reproduce?
+v2:     * Add operating-points property
+---
+ arch/arm/boot/dts/tegra124.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-Regards
-Vignesh
-
-
-> 
-> Sebastian
-> 
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index dfc476b..8b19f4c 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -215,6 +215,29 @@
+ 		reg = <0x0 0x60007000 0x0 0x1000>;
+ 	};
+ 
++	actmon at 0,6000c800 {
++		compatible = "nvidia,tegra124-actmon";
++		reg = <0x0 0x6000c800 0x0 0x400>;
++		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA124_CLK_ACTMON>,
++			 <&tegra_car TEGRA124_CLK_EMC>;
++		clock-names = "actmon", "emc";
++		resets = <&tegra_car 119>;
++		reset-names = "actmon";
++		operating-points = <
++			/* KHz	uV */
++			/* TODO: Add more points below 102 MHz */
++			102000	800000
++			204000	800000
++			300000	820000
++			396000	850000
++			528000	880000
++			600000	910000
++			792000	980000
++			924000	1010000
++		>;
++	};
++
+ 	gpio: gpio at 0,6000d000 {
+ 		compatible = "nvidia,tegra124-gpio", "nvidia,tegra30-gpio";
+ 		reg = <0x0 0x6000d000 0x0 0x1000>;
+-- 
+1.9.3
