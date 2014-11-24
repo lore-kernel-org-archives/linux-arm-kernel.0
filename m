@@ -1,185 +1,122 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 24 Nov 2014 16:18:12 -0400
-Subject: [PATCH v19 0/5] Rockchip soc thermal driver
-In-Reply-To: <1416805142-27304-1-git-send-email-caesar.wang@rock-chips.com>
-References: <1416805142-27304-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <20141124201807.GA20404@developer>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 24 Nov 2014 20:36:32 +0000
+Subject: [PATCH 3.18-rc3 v8 1/4] irqchip: gic: Make gic_raise_softirq()
+ FIQ-safe
+In-Reply-To: <alpine.DEB.2.11.1411241928300.6439@nanos>
+References: <1415183260-6389-1-git-send-email-daniel.thompson@linaro.org>
+ <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <1415968543-29469-2-git-send-email-daniel.thompson@linaro.org>
+ <alpine.DEB.2.11.1411241918090.6439@nanos>
+ <alpine.DEB.2.11.1411241928300.6439@nanos>
+Message-ID: <547396D0.5030309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Caesar,
+On 24/11/14 18:48, Thomas Gleixner wrote:
+> On Mon, 24 Nov 2014, Thomas Gleixner wrote:
+>> On Fri, 14 Nov 2014, Daniel Thompson wrote:
+>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>>> index 38493ff28fa5..0db62a6f1ee3 100644
+>>> --- a/drivers/irqchip/irq-gic.c
+>>> +++ b/drivers/irqchip/irq-gic.c
+>>> @@ -73,6 +73,13 @@ struct gic_chip_data {
+>>>  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+>>>  
+>>>  /*
+>>> + * This lock may be locked for reading by FIQ handlers. Thus although
+>>> + * read locking may be used liberally, write locking must only take
+>>> + * place only when local FIQ handling is disabled.
+>>> + */
+>>> +static DEFINE_RWLOCK(fiq_safe_cpu_map_lock);
+>>> +
+>>> +/*
+>>>   * The GIC mapping of CPU interfaces does not necessarily match
+>>>   * the logical CPU numbering.  Let's use a mapping as returned
+>>>   * by the GIC itself.
+>>> @@ -624,7 +631,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>>>  	int cpu;
+>>>  	unsigned long flags, map = 0;
+>>>  
+>>> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+>>> +	read_lock_irqsave(&fiq_safe_cpu_map_lock, flags);
+>>
+>> Just for the record:
+>>
+>> You might have noticed that you replace a raw lock with a non raw
+>> one. That's not an issue on mainline, but that pretty much renders
+>> that code broken for RT.
+>>   
+>> Surely nothing I worry too much about given the current state of RT.
+> 
+> And having a second thought here. Looking at the protection scope
+> independent of the spin vs. rw lock
+> 
+> gic_raise_softirq()
+> 
+> 	lock();
+> 
+> 	/* Does not need any protection */
+> 	for_each_cpu(cpu, mask)
+>                 map |= gic_cpu_map[cpu];
+> 
+> 	/*
+> 	 * Can be outside the lock region as well as it makes sure
+> 	 * that previous writes (usually the IPI data) are visible
+> 	 * before the write to the SOFTINT register.
+> 	 */
+> 	 dmb(ishst);
+> 
+> 	/* Why needs this protection? */
+> 	write(map, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT));
 
-On Mon, Nov 24, 2014 at 12:58:57PM +0800, Caesar Wang wrote:
-> This series patchs tested on rk3288 SDK board and pinky-v1,v2 board.
-> I believe the driver can be used on the rk3288-evb board.
-> 
-> Add this driver, The system will shutdown when
-> the thermal temperture over 100C.If for some reason we are unable to
-> shut it down in orderly fashion (kernel is stuck holding a lock or similar)
-> then hardware will reset it.
-> 
-> The patchs 1/5,2/5 can applay Eduardo's Branch
-> git://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git	
-> [branch "next-kernel"]
-> 	remote = origin
-> 	merge = refs/heads/next
-> 
+If gic_cpu_map changed value during the execution of this function then
+this could raise an IPI on the wrong CPU.
 
-I applied your patches 1 and 2 in my -linus branch, and luckily will be
-accepted for 3.19.
+Most of the rest of this mail is explaining how this could happen.
 
-Thanks.
+> 	unlock();
+> 
+> gic_migrate_target()
+> 
+> 	....
+> 	lock();
 
+Also:   Value of gic_cpu_map is updated.
+
+> 	/* Migrate all peripheral interrupts */
 > 
-> The patchs 3/5,4/5,5/5 can apply Heiko's Branch 
-> https://github.com/mmind/linux-rockchip.git
+> 	unlock();
+
+Also:   /* Migrate all IPIs pending on the old core */
+
+> So what's the point of that protection?
+> 
+> gic_raise_softirq() is used to send IPIs, which are PPIs on the target
+> CPUs so they are not affected from the migration of the peripheral
+> interrupts at all.
+> 
+> The write to the SOFTINT register in gic_migrate_target() is not
+> inside the lock region. So what's serialized by the lock in
+> gic_raise_softirq() at all?
+
+At the point that gic_migrate_target() takes the lock it knows that no
+further IPIs can be submitted.
+
+Once the gic_cpu_map is updated we can permit new IPIs to be submitted
+because these will be routed to the correct core.
+
+As a result we don't actually need to hold the lock to migrate the
+pending IPIs since we know that no new IPIs can possibly be sent to the
+wrong core.
+
+> Either I'm missing something really important here or this locking
+> exercise in gic_raise_softirq() and therefor the rwlock conversion is
+> completely pointless.
+
+I did want to remove the lock too. However when I reviewed this code I
+concluded the lock was still required. Without it I think it is possible
+for gic_raise_softirq() to raise an IPI on the old core *after* the code
+to migrate pending IPIs has been run.
 
 
-For 3 - 5 you can add my:
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
-
-Cheers,
-
-Eduardo Valentin
-
-> [branch "3.19-armsoc/dts"]
-> 	remote = origin
-> 	merge = refs/heads/wip/v3.19-armsoc/dts
-> 
-> Changes in v19:
-> 	- update driver to fit Eduardo new API design.
-> 	https://patchwork.kernel.org/patch/5329801/
-> 
-> Changes in v18:
-> 	* address comments from Eduardo Valentin and Dmitry Torokhov.
-> 	- we need reset tsadc-controller before enable tsadc auto mode,
-> 	  when we add the thermal function in coreboot,we always enable tsadc controller.
-> 	  So we need reset tsadc-controller to avoid the TSADC is abnormal.
-> 	- put the document behind the driver.
-> 	- Tested on pinky1,2,jeffy board,we will fix cooling-map temperature from 80C to 70C,
-> 	  critical temperature from 100C to 90C.
-> 
-> Changes in v17:
-> 	* address comments from Heiko Stubner and .
-> 	- rename the tshut property
-> 	- the critiacal temperature only indeed 100C when add the cooling map,
-> 	  it's for the more secure,fix the temperature from 120C to 100C.
-> 
-> Changes in v16:
-> 	* address comments from Dmitry Torokhov.
-> 	- add thermal->chip->control(thermal->regs, false) in remove()
-> 	- adjust TSHUT in resume().
-> 
-> Changes in v15:
-> 	* address comments from Dmitry Torokhov.
-> 	- enable TSHUT move into rk_tsadcv2_tshut_temp().
-> 	- drop the id argument in rk_tsadcv2_control().
-> 
-> Changes in v14:
-> 	* address comments from Dmitry Torokhov.
-> 	- adjust-alarm-rate-depending-on-clock.
-> 	- 0001-rockchip-thermal-do-not-register-cpufreq-cooling-dev.
-> 
-> Changes in v13:
-> 	- add cooling-maps for cpu-thermal.
-> 	- put tshut polarity in device tree.
-> 
-> Changes in v12:
-> 	* address comments from Dmitry Torokhov and Vladimir Zapolskiy.
-> 	- split-sensor-handling.
-> 	- rename-rockchip_tsadc_platform_data.
-> 
-> Changes in v11:
-> 	* address comments from Vladimir Zapolskiy.
-> 	- fix cpufreq_cooling_unregister() to put in correct position.
-> 	- fix "data->chn",at least can get valid Tsensor temp.
-> 
-> Changes in v10:
-> 	* address comments from Doug Anderson.
-> 	- fix TSHUT polarity,ensure support TSHUT.
-> 	- add the decription for rk_tsadcv2_initialize().
-> 
-> Changes in v9:
-> 	* address comments from Dmitry Torokhov.
-> 	- fix some style be defined
-> 	- remove some unused code.
-> 	- clk_disable_unprepare->clk_disable in suspend()
-> 
-> Changes in v8:
-> 	* address comments from Dmitry Torokhov and Doug Anderson.
-> 	- add three Teperture Sensors.
-> 	- support CRU and GPIO reset chip.
-> 	- rename rk3xxx-cpu-thermal.dtsi as rk3288-thermal.dtsi
-> 	- alarm-temp via set_trips() callback
-> 	- remove "reset-gpios"
-> 
-> Changes in v7:
-> 	- fix get data->clk=0 when in probe() function.
-> 	- fix some style code.
-> 	- modify dts,main add rk3xxx-cpu-thermal.dtsi
-> 
-> Changes in v6:
-> 	* address comments from Tomeu Vizoso.
-> 	- use thermal's generic framework.
-> 
-> Changes in v5:
-> 	* address comments from Eduardo Valentin,rui.zhang and Heiko Stubner:
-> 	- with BIT() macro
-> 	- manage clocks in suspend/resume.
-> 	- license is fixed as GPLv2.
-> 	- #include "thermal_core.h"->#include <linux/thermal.h>
-> 	- use the generic trip-points.the hw-shut-temp isn't generic trip-points.
-> 	- The method of binding and unbinding be fixed.
-> 	- The pin-name tsadc->otp_out
-> 
-> Changes in v4:
-> 	* address comments from Jonathan Cameron,huangtao and zhaoyifeng:
-> 	- this series thermal driver still be put in driver/thermal/
-> 	- modify the thermal driver description.
-> 
-> Changes in v3:(add dts configure)
-> 	* address comments from Dmitry Torokhov and Arnd Bergmann:
-> 	- fix clock-names in rockchip-thermal.txt
-> 	- remove rockchip_thermal_control() in rockchip_set_mode()
-> 	- fix some code style.
-> 	- add dts configure.
-> 
-> Changes in v2:
-> 	* address comments from Heiko Stubner:
-> 	- fix dt-bindings in rockchip-thermal.txt
-> 	- remove Author mark
-> 	- rename TSADC_XXX->TSADCV2_XXX,it eill ready to merge compatible other SoCs.
-> 	- fix a identation
-> 	- remove clk_set_rate(),it's no necessary.
-> 	- fix the SIMPLE_DEV_PM_OPS() function  style.
-> 
-> Caesar Wang (5):
->   thermal: rockchip: add driver for thermal
->   dt-bindings: document Rockchip thermal
->   ARM: dts: add RK3288 Thermal data
->   ARM: dts: add main Thermal info to rk3288
->   ARM: dts: enable Thermal on rk3288-evb board
-> 
->  .../bindings/thermal/rockchip-thermal.txt          |  45 ++
->  arch/arm/boot/dts/rk3288-evb.dtsi                  |   5 +
->  arch/arm/boot/dts/rk3288-thermal.dtsi              |  58 ++
->  arch/arm/boot/dts/rk3288.dtsi                      |  23 +
->  drivers/thermal/Kconfig                            |   9 +
->  drivers/thermal/Makefile                           |   1 +
->  drivers/thermal/rockchip_thermal.c                 | 628 +++++++++++++++++++++
->  7 files changed, 769 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->  create mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
->  create mode 100644 drivers/thermal/rockchip_thermal.c
-> 
-> -- 
-> 1.9.1
-> 
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/eaeb8f3f/attachment-0001.sig>
+Daniel.
