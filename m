@@ -1,93 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Nov 2014 07:28:37 -0800
-Subject: linux-next: manual merge of the v4l-dvb tree with the arm-soc tree
-In-Reply-To: <20141124132214.2f756b6a@canb.auug.org.au>
-References: <20141124132214.2f756b6a@canb.auug.org.au>
-Message-ID: <20141124152836.GA2817@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 24 Nov 2014 15:32:41 +0000
+Subject: [PATCH v3 06/13] irqchip: GICv3: ITS: LPI allocator
+In-Reply-To: <5473476E.5070305@linux.intel.com>
+References: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
+ <1416839720-18400-7-git-send-email-marc.zyngier@arm.com>
+ <5473476E.5070305@linux.intel.com>
+Message-ID: <54734F99.7000609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Rothwell <sfr@canb.auug.org.au> [141123 18:24]:
-> Hi Mauro,
+On 24/11/14 14:57, Jiang Liu wrote:
 > 
-> Today's linux-next merge of the v4l-dvb tree got a conflict in
-> arch/arm/mach-omap2/devices.c between commit e7e42b9d2a7f ("ARM:
-> OMAP4+: Remove unused omap_l3_noc platform init") from the arm-soc tree
-> and commit 1b65729a186b ("[media] mach-omap2: remove deprecated
-> VIDEO_OMAP2 support") from the v4l-dvb tree.
 > 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+> On 2014/11/24 22:35, Marc Zyngier wrote:
+>> LPIs are the type of interrupts that are used by the ITS. Given
+>> the size of the namespace (anywhere between 16 and 32bit), interrupt
+>> IDs are allocated in chunks of 32.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3-its.c | 103 +++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 103 insertions(+)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index d24bebd..4154a16 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -586,3 +586,106 @@ static struct irq_chip its_irq_chip = {
+>>  	.irq_eoi		= its_eoi_irq,
+>>  	.irq_set_affinity	= its_set_affinity,
+>>  };
+>> +
+>> +/*
+>> + * How we allocate LPIs:
+>> + *
+>> + * The GIC has id_bits bits for interrupt identifiers. From there, we
+>> + * must subtract 8192 which are reserved for SGIs/PPIs/SPIs. Then, as
+>> + * we allocate LPIs by chunks of 32, we can shift the whole thing by 5
+>> + * bits to the right.
+> Just curious, why 32? sizeof(long) is 4 on ARM64?
 
-Oops, that's a self-inflicted merge conflict, sorry. I should have
-waited a bit longer on the removal of the now unnecessary l3_init.
+No, sizeof(long) == 8, as on any sane 64bit architecture.
 
-Anyways, the resolution is correct thanks.
+There are two reasons for this:
+- the ID space is rather large (at least 16 bits, possibly 32 bits), so
+we're trying not to allocate the whole bitmap in one go.
+- 32 is the maximum a MSI-capable device can request. Allocating 32
+interrupts in one go makes sure that these interrupts are contiguous and
+satisfy the MSI requirements.
 
-Regards,
+Hope this helps,
 
-Tony
-
-> diff --cc arch/arm/mach-omap2/devices.c
-> index 492ef1607115,1b623a06cdcd..000000000000
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-> @@@ -67,28 -67,40 +67,6 @@@ static int __init omap3_l3_init(void
->   }
->   omap_postcore_initcall(omap3_l3_init);
->   
-> - #if defined(CONFIG_VIDEO_OMAP2) || defined(CONFIG_VIDEO_OMAP2_MODULE)
->  -static int __init omap4_l3_init(void)
->  -{
->  -	int i;
->  -	struct omap_hwmod *oh[3];
->  -	struct platform_device *pdev;
->  -	char oh_name[L3_MODULES_MAX_LEN];
-> --
-> - static struct resource omap2cam_resources[] = {
-> - 	{
-> - 		.start		= OMAP24XX_CAMERA_BASE,
-> - 		.end		= OMAP24XX_CAMERA_BASE + 0xfff,
-> - 		.flags		= IORESOURCE_MEM,
-> - 	},
-> - 	{
-> - 		.start		= 24 + OMAP_INTC_START,
-> - 		.flags		= IORESOURCE_IRQ,
->  -	/* If dtb is there, the devices will be created dynamically */
->  -	if (of_have_populated_dt())
->  -		return -ENODEV;
->  -
->  -	/*
->  -	 * To avoid code running on other OMAPs in
->  -	 * multi-omap builds
->  -	 */
->  -	if (!cpu_is_omap44xx() && !soc_is_omap54xx())
->  -		return -ENODEV;
->  -
->  -	for (i = 0; i < L3_MODULES; i++) {
->  -		snprintf(oh_name, L3_MODULES_MAX_LEN, "l3_main_%d", i+1);
->  -
->  -		oh[i] = omap_hwmod_lookup(oh_name);
->  -		if (!(oh[i]))
->  -			pr_err("could not look up %s\n", oh_name);
-> --	}
-> - };
-> --
-> - static struct platform_device omap2cam_device = {
-> - 	.name		= "omap24xxcam",
-> - 	.id		= -1,
-> - 	.num_resources	= ARRAY_SIZE(omap2cam_resources),
-> - 	.resource	= omap2cam_resources,
-> - };
-> - #endif
->  -	pdev = omap_device_build_ss("omap_l3_noc", 0, oh, 3, NULL, 0);
->  -
->  -	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
->  -
->  -	return PTR_RET(pdev);
->  -}
->  -omap_postcore_initcall(omap4_l3_init);
-> --
->   #if defined(CONFIG_IOMMU_API)
->   
->   #include <linux/platform_data/iommu-omap.h>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
