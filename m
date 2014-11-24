@@ -1,35 +1,181 @@
-From: kernellwp@gmail.com (Wanpeng Li)
-Date: Mon, 24 Nov 2014 08:34:11 +0800
-Subject: [PATCH v2 09/11] sched: test the cpu's capacity in wake affine
-In-Reply-To: <CAKfTPtAvFEmAmPMQsEN-=ftudQwd0fHOxq4MRs3HDyHYjLPGZQ@mail.gmail.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-10-git-send-email-vincent.guittot@linaro.org>
- <20140528105855.GR30445@twins.programming.kicks-ass.net>
- <CAKfTPtAvFEmAmPMQsEN-=ftudQwd0fHOxq4MRs3HDyHYjLPGZQ@mail.gmail.com>
-Message-ID: <54727D03.4090909@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 24 Nov 2014 02:27:04 +0100
+Subject: [PATCH v5 02/18] ACPI / table: Add new function to get table
+ entries
+In-Reply-To: <1413553034-20956-3-git-send-email-hanjun.guo@linaro.org>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1413553034-20956-3-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <2764417.DLFalXXngC@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
-On 5/28/14, 7:15 PM, Vincent Guittot wrote:
-> On 28 May 2014 12:58, Peter Zijlstra <peterz@infradead.org> wrote:
->> On Fri, May 23, 2014 at 05:53:03PM +0200, Vincent Guittot wrote:
-[snip]
->> Now I'm only struggling to understand the rationale for this, its got
->> LLC in there somewhere, but I'm failing to comprehend.
-> Ah.. i have probably overestimated the fact that wake_affine was only
-> done at MC or SMT level but after reading more deeply the glags
-> configuration of all  sched_domain level , my assumption is not true.
+On Friday, October 17, 2014 09:36:58 PM Hanjun Guo wrote:
+> From: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> 
+> The acpi_table_parse() function has a callback that
+> passes a pointer to a table_header. Add a new function
+> which takes this pointer and parses its entries. This
+> eliminates the need to re-traverse all the tables for
+> each call. e.g. as in acpi_table_parse_madt() which is
+> normally called after acpi_table_parse().
+> 
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  drivers/acpi/tables.c |   67 ++++++++++++++++++++++++++++++++++---------------
+>  include/linux/acpi.h  |    4 +++
+>  2 files changed, 51 insertions(+), 20 deletions(-)
+> 
+> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+> index 6d5a6cd..21ae521 100644
+> --- a/drivers/acpi/tables.c
+> +++ b/drivers/acpi/tables.c
+> @@ -192,17 +192,14 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>  
+>  
+>  int __init
+> -acpi_table_parse_entries(char *id,
+> -			     unsigned long table_size,
+> -			     int entry_id,
+> -			     acpi_tbl_entry_handler handler,
+> -			     unsigned int max_entries)
+> +acpi_parse_entries(unsigned long table_size,
+> +		acpi_tbl_entry_handler handler,
+> +		struct acpi_table_header *table_header,
+> +		int entry_id, unsigned int max_entries)
+>  {
+> -	struct acpi_table_header *table_header = NULL;
+>  	struct acpi_subtable_header *entry;
+> -	unsigned int count = 0;
+> +	int count = 0;
+>  	unsigned long table_end;
+> -	acpi_size tbl_size;
+>  
+>  	if (acpi_disabled)
+>  		return -ENODEV;
+> @@ -210,13 +207,11 @@ acpi_table_parse_entries(char *id,
+>  	if (!handler)
+>  		return -EINVAL;
+>  
+> -	if (strncmp(id, ACPI_SIG_MADT, 4) == 0)
+> -		acpi_get_table_with_size(id, acpi_apic_instance, &table_header, &tbl_size);
+> -	else
+> -		acpi_get_table_with_size(id, 0, &table_header, &tbl_size);
+> +	if (!table_size)
+> +		return -EINVAL;
+>  
+>  	if (!table_header) {
+> -		pr_warn("%4.4s not present\n", id);
+> +		pr_warn("Table header not present\n");
 
-What's level the wake_affine should happen?
+The message doesn't make sense any more if the table signature is not printed.
 
-Regards,
-Wanpeng Li
+>  		return -ENODEV;
+>  	}
+>  
+> @@ -232,30 +227,62 @@ acpi_table_parse_entries(char *id,
+>  		if (entry->type == entry_id
+>  		    && (!max_entries || count++ < max_entries))
+>  			if (handler(entry, table_end))
+> -				goto err;
+> +				return -EINVAL;
+>  
+>  		/*
+>  		 * If entry->length is 0, break from this loop to avoid
+>  		 * infinite loop.
+>  		 */
+>  		if (entry->length == 0) {
+> -			pr_err("[%4.4s:0x%02x] Invalid zero length\n", id, entry_id);
+> -			goto err;
+> +			pr_err("[0x%02x] Invalid zero length\n", entry_id);
 
-> So I need to test sd flag to make sure that their share their cache at
-> this level
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Same here.
+
+> +			return -EINVAL;
+>  		}
+>  
+>  		entry = (struct acpi_subtable_header *)
+>  		    ((unsigned long)entry + entry->length);
+>  	}
+> +
+>  	if (max_entries && count > max_entries) {
+>  		pr_warn("[%4.4s:0x%02x] ignored %i entries of %i found\n",
+> -			id, entry_id, count - max_entries, count);
+> +			table_header->signature, entry_id, count - max_entries,
+> +			count);
+>  	}
+>  
+> -	early_acpi_os_unmap_memory((char *)table_header, tbl_size);
+>  	return count;
+> -err:
+> +}
+> +
+> +int __init
+> +acpi_table_parse_entries(char *id,
+> +			 unsigned long table_size,
+> +			 int entry_id,
+> +			 acpi_tbl_entry_handler handler,
+> +			 unsigned int max_entries)
+> +{
+> +	struct acpi_table_header *table_header = NULL;
+> +	acpi_size tbl_size;
+> +	int count;
+> +
+> +	if (acpi_disabled)
+> +		return -ENODEV;
+> +
+> +	if (!handler)
+> +		return -EINVAL;
+> +
+> +	if (strncmp(id, ACPI_SIG_MADT, 4) == 0)
+> +		acpi_get_table_with_size(id, acpi_apic_instance, &table_header, &tbl_size);
+> +	else
+> +		acpi_get_table_with_size(id, 0, &table_header, &tbl_size);
+
+
+	u32 instance = 0;
+
+	if (!strncmp(id, ACPI_SIG_MADT, 4))
+		instance = acpi_apic_instance;
+
+	acpi_get_table_with_size(id, instance, &table_header, &tbl_size);
+
+Pretty please.
+
+> +
+> +	if (!table_header) {
+> +		pr_warn("%4.4s not present\n", id);
+> +		return -ENODEV;
+> +	}
+> +
+> +	count = acpi_parse_entries(table_size, handler, table_header,
+> +			entry_id, max_entries);
+> +
+>  	early_acpi_os_unmap_memory((char *)table_header, tbl_size);
+> -	return -EINVAL;
+> +	return count;
+>  }
+>  
+>  int __init
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 807cbc4..36d5012 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -123,6 +123,10 @@ int acpi_numa_init (void);
+>  
+>  int acpi_table_init (void);
+>  int acpi_table_parse(char *id, acpi_tbl_table_handler handler);
+> +int __init acpi_parse_entries(unsigned long table_size,
+> +			      acpi_tbl_entry_handler handler,
+> +			      struct acpi_table_header *table_header,
+> +			      int entry_id, unsigned int max_entries);
+>  int __init acpi_table_parse_entries(char *id, unsigned long table_size,
+>  				    int entry_id,
+>  				    acpi_tbl_entry_handler handler,
+> 
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
