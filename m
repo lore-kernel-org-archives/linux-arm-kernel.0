@@ -1,45 +1,62 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Mon, 24 Nov 2014 17:34:46 +0000
-Subject: [PATCH v9 01/10] sched: add utilization_avg_contrib
-In-Reply-To: <CAKfTPtBDd6JXuK4THkqs4eoEHG+-VYfhFR6nUe2vrqvGWG08Yw@mail.gmail.com>
-References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
- <1415033687-23294-2-git-send-email-vincent.guittot@linaro.org>
- <20141121123453.GB23177@e105550-lin.cambridge.arm.com>
- <CAKfTPtBDd6JXuK4THkqs4eoEHG+-VYfhFR6nUe2vrqvGWG08Yw@mail.gmail.com>
-Message-ID: <20141124173446.GN23177@e105550-lin.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 24 Nov 2014 18:36:57 +0100
+Subject: [PATCH] ARM: PJ4: allow building in Thumb-2 mode
+In-Reply-To: <4653047.WBmUTsHC57@wuerfel>
+References: <1416830200-11114-1-git-send-email-ard.biesheuvel@linaro.org>
+ <2078609.NLHB18YoOo@wuerfel>
+ <CAKv+Gu_YuHbO7+jusczcJTHF8fM4pF1z2h55BZK0mrHK702z_A@mail.gmail.com>
+ <4653047.WBmUTsHC57@wuerfel>
+Message-ID: <54736CB9.1090307@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 02:04:15PM +0000, Vincent Guittot wrote:
-> On 21 November 2014 at 13:34, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> > Should the subject mention that the patch adds utilization tracking?
-> > Maybe: 'sched: Add utilization tracking' ?
-> >
-> >
-> > On Mon, Nov 03, 2014 at 04:54:38PM +0000, Vincent Guittot wrote:
-> >> Add new statistics which reflect the average time a task is running on the CPU
-> >> and the sum of these running time of the tasks on a runqueue. The latter is
-> >> named utilization_load_avg.
-> >>
-> >> This patch is based on the usage metric that was proposed in the 1st
-> >> versions of the per-entity load tracking patchset by Paul Turner
-> >
-> > Should we do ourselves and anybody else who feels like going through the
-> > pain of understanding the load-tracking code a favor and drop the use of
-> > the term 'usage' and use 'utilization' everywhere instead? 'usage' isn't
-> > clearly defined anywhere.
-> >
-> > Referring to 'usage' here in the reference to original patch is fine,
-> > but I suggest that we remove it from the code and comment on subsequent
-> > patches unless there is a very good reason to keep it.
-> 
-> As discussed with Peter, we use usage when the task's utilization has
-> been scaled by the capacity.
-> 
-> IIRC from one of our discussion, dietmar should prepare a patchset to
-> rename and aligned variables and field.
+Hi Arnd,
 
-I read this as we stick with usage while utilization is scaled by
-capacity and potentially drop it again when adding uarch invariance so
-the scaling goes away. Or rename it before if we find a better name for
-it.
+On 24/11/2014 18:17, Arnd Bergmann wrote:
+> On Monday 24 November 2014 16:34:47 Ard Biesheuvel wrote:
+>> On 24 November 2014 at 16:29, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> On Monday 24 November 2014 12:56:40 Ard Biesheuvel wrote:
+>>>> Two files that get included when building the multi_v7_defconfig target
+>>>> fail to build when selecting THUMB2_KERNEL for this configuration.
+>>>>
+>>>> In both cases, we can just build the file as ARM code, as none of its
+>>>> symbols are exported to modules, so there are no interworking concerns.
+>>>> In the iwmmxt.S case, add ENDPROC() declarations so the symbols are
+>>>> annotated as functions, resulting in the linker to emit the appropriate
+>>>> mode switches.
+>>>>
+>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>
+>>> Ah, very nice. I tried this before, but my version didn't actually
+>>> work, presumably because I didn't know about the ENDPROC() stuff.
+>>>
+>>> Have you tested this on a machine that has IWMMXT enabled?
+>>>
+>>
+>> No, I don't have access to such a machine, unfortunately.
+> 
+> Adding a few mvebu folks to Cc, maybe one of them can test your patch.
+
+Actually even it is a feature of the PJ4 machine non of the mvebu machines
+currently use it. I only see this configuration enabled for the pxa family.
+So I think you would have more feedback with the pxa maintainers/owners.
+
+Gregory
+
+> It's also possible that Olof or Kevin have a PJ4 machine with iwmmxt 
+> in their boot farms.
+> 
+> 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
