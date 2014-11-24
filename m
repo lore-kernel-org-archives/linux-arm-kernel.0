@@ -1,81 +1,92 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Mon, 24 Nov 2014 07:46:08 +0530
-Subject: [PATCH v5 1/2] clk: samsung: exynos5440: move restart code into
- clock driver
-In-Reply-To: <02a801d005f9$45839030$d08ab090$@kernel.org>
-References: <1416307650-15162-1-git-send-email-pankaj.dubey@samsung.com>
- <1416307650-15162-2-git-send-email-pankaj.dubey@samsung.com>
- <546B62F3.3030807@samsung.com>
- <000901d003aa$3490e8a0$9db2b9e0$@samsung.com>
- <546E2968.1070800@samsung.com> <546F1436.4020101@samsung.com>
- <02a801d005f9$45839030$d08ab090$@kernel.org>
-Message-ID: <CADGdYn71_tnN+HPnuTvkHCpLun2yzy2m=A70iai0Jp0Bp8SayQ@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 24 Nov 2014 13:22:14 +1100
+Subject: linux-next: manual merge of the v4l-dvb tree with the arm-soc tree
+Message-ID: <20141124132214.2f756b6a@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 22, 2014 at 7:38 AM, Kukjin Kim <kgene@kernel.org> wrote:
-> Pankaj Dubey wrote:
->>
->> Hi Kukjin,
->>
-> Hi,
->
->> On Thursday 20 November 2014 11:18 PM, Sylwester Nawrocki wrote:
->> > On 19/11/14 04:37, Pankaj Dubey wrote:
->> >>>>
->> >>>>>> +static int exynos5440_clk_restart_notify(struct notifier_block *this,
->> >>>>>> +              unsigned long code, void *unused)
->> >>>>>> +{
->> >>>>>> +      u32 val, status;
->> >>>>>> +
->> >>>>>> +      status = readl_relaxed(reg_base + 0xbc);
->> >>>>>> +      val = readl_relaxed(reg_base + 0xcc);
->> >>>>>> +      val = (val & 0xffff0000) | (status & 0xffff);
->> >>>>>> +      writel_relaxed(val, reg_base + 0xcc);
->> >>>>
->> >>>> Can we have macro definitions for these 0xcc, 0xbc address offsets ?
->> >>>> I must say I couldn't find them documented in any Exynos datasheet I've
->> >> got though.
->> >>>>
->> >>
->> >> I also wished this, but I could not find them documented.
->> >> So I tried to keep logic of original code as it is, just changed location.
->> >> I would also like to mention that I have not tested this on exynos5440 as I
->> >> do not have
->> >> one with me. I believe if it was working at its original place in
->> >> exynos_restart it should work
->> >> here also. Other patch (2/2) I have verified on Exynos3250 board and its
->> >> working well.
->> >
->> > I think it's best to merge both patches in that series through
->> > the arm-soc tree, since applying them not in order may cause some
->> > breakage. Thus I'd let Kukjin take this patch set into his tree.
->> >
->> > For both patches:
->> > Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> >
-> Sylwester, thanks for your ack.
->
->>
->> Will you please take this series into your tree.
->>
-> + Amit Daniel
->
-> Yeah, this series looks good to me and I'm looking at this series with Amit's
-> moving pmu.c into drivers/. Maybe I need to ask Amit to respin the series on
-> top of this? If required, I'll reply.
+Hi Mauro,
 
-I was ready to post pmu v4 version with Russell suggested changes so i
-rebased and posted v4 series
-on top of this 2 patch.
+Today's linux-next merge of the v4l-dvb tree got a conflict in
+arch/arm/mach-omap2/devices.c between commit e7e42b9d2a7f ("ARM:
+OMAP4+: Remove unused omap_l3_noc platform init") from the arm-soc tree
+and commit 1b65729a186b ("[media] mach-omap2: remove deprecated
+VIDEO_OMAP2 support") from the v4l-dvb tree.
 
-Regards,
-Amit D
->
-> Thanks,
-> Kukjin
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-omap2/devices.c
+index 492ef1607115,1b623a06cdcd..000000000000
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@@ -67,28 -67,40 +67,6 @@@ static int __init omap3_l3_init(void
+  }
+  omap_postcore_initcall(omap3_l3_init);
+  
+- #if defined(CONFIG_VIDEO_OMAP2) || defined(CONFIG_VIDEO_OMAP2_MODULE)
+ -static int __init omap4_l3_init(void)
+ -{
+ -	int i;
+ -	struct omap_hwmod *oh[3];
+ -	struct platform_device *pdev;
+ -	char oh_name[L3_MODULES_MAX_LEN];
+--
+- static struct resource omap2cam_resources[] = {
+- 	{
+- 		.start		= OMAP24XX_CAMERA_BASE,
+- 		.end		= OMAP24XX_CAMERA_BASE + 0xfff,
+- 		.flags		= IORESOURCE_MEM,
+- 	},
+- 	{
+- 		.start		= 24 + OMAP_INTC_START,
+- 		.flags		= IORESOURCE_IRQ,
+ -	/* If dtb is there, the devices will be created dynamically */
+ -	if (of_have_populated_dt())
+ -		return -ENODEV;
+ -
+ -	/*
+ -	 * To avoid code running on other OMAPs in
+ -	 * multi-omap builds
+ -	 */
+ -	if (!cpu_is_omap44xx() && !soc_is_omap54xx())
+ -		return -ENODEV;
+ -
+ -	for (i = 0; i < L3_MODULES; i++) {
+ -		snprintf(oh_name, L3_MODULES_MAX_LEN, "l3_main_%d", i+1);
+ -
+ -		oh[i] = omap_hwmod_lookup(oh_name);
+ -		if (!(oh[i]))
+ -			pr_err("could not look up %s\n", oh_name);
+--	}
+- };
+--
+- static struct platform_device omap2cam_device = {
+- 	.name		= "omap24xxcam",
+- 	.id		= -1,
+- 	.num_resources	= ARRAY_SIZE(omap2cam_resources),
+- 	.resource	= omap2cam_resources,
+- };
+- #endif
+ -	pdev = omap_device_build_ss("omap_l3_noc", 0, oh, 3, NULL, 0);
+ -
+ -	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
+ -
+ -	return PTR_RET(pdev);
+ -}
+ -omap_postcore_initcall(omap4_l3_init);
+--
+  #if defined(CONFIG_IOMMU_API)
+  
+  #include <linux/platform_data/iommu-omap.h>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/0c4e081f/attachment.sig>
