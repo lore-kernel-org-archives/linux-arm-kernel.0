@@ -1,200 +1,185 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Mon, 24 Nov 2014 12:14:52 -0800
-Subject: [PATCH RESEND v8] iopoll: Introduce memory-mapped IO polling macros
-Message-ID: <1416860092-11620-1-git-send-email-mitchelh@codeaurora.org>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Mon, 24 Nov 2014 16:18:12 -0400
+Subject: [PATCH v19 0/5] Rockchip soc thermal driver
+In-Reply-To: <1416805142-27304-1-git-send-email-caesar.wang@rock-chips.com>
+References: <1416805142-27304-1-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <20141124201807.GA20404@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matt Wagantall <mattw@codeaurora.org>
+Hello Caesar,
 
-It is sometimes necessary to poll a memory-mapped register until its value
-satisfies some condition. Introduce a family of convenience macros that do
-this. Tight-looping, sleeping, and timing out can all be accomplished using
-these macros.
+On Mon, Nov 24, 2014 at 12:58:57PM +0800, Caesar Wang wrote:
+> This series patchs tested on rk3288 SDK board and pinky-v1,v2 board.
+> I believe the driver can be used on the rk3288-evb board.
+> 
+> Add this driver, The system will shutdown when
+> the thermal temperture over 100C.If for some reason we are unable to
+> shut it down in orderly fashion (kernel is stuck holding a lock or similar)
+> then hardware will reset it.
+> 
+> The patchs 1/5,2/5 can applay Eduardo's Branch
+> git://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git	
+> [branch "next-kernel"]
+> 	remote = origin
+> 	merge = refs/heads/next
+> 
 
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
----
-This patch was originally part of a series [1] for adding support for IOMMU
-address translations through an ARM SMMU hardware register.  The other
-patch in the series (the one that actually uses these macros and implements
-said hardware address translations) was Ack'd by the driver maintainer
-there (Will Deacon) so I've pulled this patch out to avoid resending an
-already Ack'd patch over and over again.
+I applied your patches 1 and 2 in my -linus branch, and luckily will be
+accepted for 3.19.
 
-In short, please see [1] for previous discussion and the first user of
-these macros.
+Thanks.
 
-This patch has been resent previously here [2], here [3], and here [4] on
-2014-10-30, 2014-11-06, and 2014-11-17, respectively.  It has not changed
-since [2] and has not received any comments since [1] on 2014-10-19.
-Thanks to everyone who has taken a look at this.
-
-[1] http://thread.gmane.org/gmane.linux.kernel.iommu/7140
-[2] http://thread.gmane.org/gmane.linux.kernel/1818213
-[3] http://thread.gmane.org/gmane.linux.kernel/1823422
-[4] http://thread.gmane.org/gmane.linux.kernel.iommu/7394
+> 
+> The patchs 3/5,4/5,5/5 can apply Heiko's Branch 
+> https://github.com/mmind/linux-rockchip.git
 
 
-Changes since v7:
-  - sorted helper macros by size (b, w, l, q)
-  - removed some of the more esoteric (or flat-out bogus) helper macros
----
- include/linux/iopoll.h | 140 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 140 insertions(+)
- create mode 100644 include/linux/iopoll.h
+For 3 - 5 you can add my:
+Acked-by: Eduardo Valentin <edubezval@gmail.com>
 
-diff --git a/include/linux/iopoll.h b/include/linux/iopoll.h
-new file mode 100644
-index 0000000000..bd161dae2d
---- /dev/null
-+++ b/include/linux/iopoll.h
-@@ -0,0 +1,140 @@
-+/*
-+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef _LINUX_IOPOLL_H
-+#define _LINUX_IOPOLL_H
-+
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/hrtimer.h>
-+#include <linux/delay.h>
-+#include <linux/errno.h>
-+#include <linux/io.h>
-+
-+/**
-+ * readx_poll_timeout - Periodically poll an address until a condition is met or a timeout occurs
-+ * @op: accessor function (takes @addr as its only argument)
-+ * @addr: Address to poll
-+ * @val: Variable to read the value into
-+ * @cond: Break condition (usually involving @val)
-+ * @sleep_us: Maximum time to sleep between reads in us (0 tight-loops)
-+ * @timeout_us: Timeout in us, 0 means never timeout
-+ *
-+ * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
-+ * case, the last read value at @addr is stored in @val. Must not
-+ * be called from atomic context if sleep_us or timeout_us are used.
-+ *
-+ * When available, you'll probably want to use one of the specialized
-+ * macros defined below rather than this macro directly.
-+ */
-+#define readx_poll_timeout(op, addr, val, cond, sleep_us, timeout_us)	\
-+({ \
-+	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
-+	might_sleep_if(sleep_us); \
-+	for (;;) { \
-+		(val) = op(addr); \
-+		if (cond) \
-+			break; \
-+		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
-+			(val) = op(addr); \
-+			break; \
-+		} \
-+		if (sleep_us) \
-+			usleep_range((sleep_us >> 2) + 1, sleep_us); \
-+	} \
-+	(cond) ? 0 : -ETIMEDOUT; \
-+})
-+
-+/**
-+ * readx_poll_timeout_atomic - Periodically poll an address until a condition is met or a timeout occurs
-+ * @op: accessor function (takes @addr as its only argument)
-+ * @addr: Address to poll
-+ * @val: Variable to read the value into
-+ * @cond: Break condition (usually involving @val)
-+ * @delay_us: Time to udelay between reads in us (0 tight-loops)
-+ * @timeout_us: Timeout in us, 0 means never timeout
-+ *
-+ * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
-+ * case, the last read value at @addr is stored in @val.
-+ *
-+ * When available, you'll probably want to use one of the specialized
-+ * macros defined below rather than this macro directly.
-+ */
-+#define readx_poll_timeout_atomic(op, addr, val, cond, delay_us, timeout_us) \
-+({ \
-+	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
-+	for (;;) { \
-+		(val) = op(addr); \
-+		if (cond) \
-+			break; \
-+		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
-+			(val) = op(addr); \
-+			break; \
-+		} \
-+		if (delay_us) \
-+			udelay(delay_us);	\
-+	} \
-+	(cond) ? 0 : -ETIMEDOUT; \
-+})
-+
-+
-+#define readb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readb, addr, val, cond, delay_us, timeout_us)
-+
-+#define readb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readb, addr, val, cond, delay_us, timeout_us)
-+
-+#define readw_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readw, addr, val, cond, delay_us, timeout_us)
-+
-+#define readw_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readw, addr, val, cond, delay_us, timeout_us)
-+
-+#define readl_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readl, addr, val, cond, delay_us, timeout_us)
-+
-+#define readl_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readl, addr, val, cond, delay_us, timeout_us)
-+
-+#define readq_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readq, addr, val, cond, delay_us, timeout_us)
-+
-+#define readq_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readq, addr, val, cond, delay_us, timeout_us)
-+
-+#define readb_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readb_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readb_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readb_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readw_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readw_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readw_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readw_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readl_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readl_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readl_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readl_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readq_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readq_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readq_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readq_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#endif /* _LINUX_IOPOLL_H */
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Cheers,
+
+Eduardo Valentin
+
+> [branch "3.19-armsoc/dts"]
+> 	remote = origin
+> 	merge = refs/heads/wip/v3.19-armsoc/dts
+> 
+> Changes in v19:
+> 	- update driver to fit Eduardo new API design.
+> 	https://patchwork.kernel.org/patch/5329801/
+> 
+> Changes in v18:
+> 	* address comments from Eduardo Valentin and Dmitry Torokhov.
+> 	- we need reset tsadc-controller before enable tsadc auto mode,
+> 	  when we add the thermal function in coreboot,we always enable tsadc controller.
+> 	  So we need reset tsadc-controller to avoid the TSADC is abnormal.
+> 	- put the document behind the driver.
+> 	- Tested on pinky1,2,jeffy board,we will fix cooling-map temperature from 80C to 70C,
+> 	  critical temperature from 100C to 90C.
+> 
+> Changes in v17:
+> 	* address comments from Heiko Stubner and .
+> 	- rename the tshut property
+> 	- the critiacal temperature only indeed 100C when add the cooling map,
+> 	  it's for the more secure,fix the temperature from 120C to 100C.
+> 
+> Changes in v16:
+> 	* address comments from Dmitry Torokhov.
+> 	- add thermal->chip->control(thermal->regs, false) in remove()
+> 	- adjust TSHUT in resume().
+> 
+> Changes in v15:
+> 	* address comments from Dmitry Torokhov.
+> 	- enable TSHUT move into rk_tsadcv2_tshut_temp().
+> 	- drop the id argument in rk_tsadcv2_control().
+> 
+> Changes in v14:
+> 	* address comments from Dmitry Torokhov.
+> 	- adjust-alarm-rate-depending-on-clock.
+> 	- 0001-rockchip-thermal-do-not-register-cpufreq-cooling-dev.
+> 
+> Changes in v13:
+> 	- add cooling-maps for cpu-thermal.
+> 	- put tshut polarity in device tree.
+> 
+> Changes in v12:
+> 	* address comments from Dmitry Torokhov and Vladimir Zapolskiy.
+> 	- split-sensor-handling.
+> 	- rename-rockchip_tsadc_platform_data.
+> 
+> Changes in v11:
+> 	* address comments from Vladimir Zapolskiy.
+> 	- fix cpufreq_cooling_unregister() to put in correct position.
+> 	- fix "data->chn",at least can get valid Tsensor temp.
+> 
+> Changes in v10:
+> 	* address comments from Doug Anderson.
+> 	- fix TSHUT polarity,ensure support TSHUT.
+> 	- add the decription for rk_tsadcv2_initialize().
+> 
+> Changes in v9:
+> 	* address comments from Dmitry Torokhov.
+> 	- fix some style be defined
+> 	- remove some unused code.
+> 	- clk_disable_unprepare->clk_disable in suspend()
+> 
+> Changes in v8:
+> 	* address comments from Dmitry Torokhov and Doug Anderson.
+> 	- add three Teperture Sensors.
+> 	- support CRU and GPIO reset chip.
+> 	- rename rk3xxx-cpu-thermal.dtsi as rk3288-thermal.dtsi
+> 	- alarm-temp via set_trips() callback
+> 	- remove "reset-gpios"
+> 
+> Changes in v7:
+> 	- fix get data->clk=0 when in probe() function.
+> 	- fix some style code.
+> 	- modify dts,main add rk3xxx-cpu-thermal.dtsi
+> 
+> Changes in v6:
+> 	* address comments from Tomeu Vizoso.
+> 	- use thermal's generic framework.
+> 
+> Changes in v5:
+> 	* address comments from Eduardo Valentin,rui.zhang and Heiko Stubner:
+> 	- with BIT() macro
+> 	- manage clocks in suspend/resume.
+> 	- license is fixed as GPLv2.
+> 	- #include "thermal_core.h"->#include <linux/thermal.h>
+> 	- use the generic trip-points.the hw-shut-temp isn't generic trip-points.
+> 	- The method of binding and unbinding be fixed.
+> 	- The pin-name tsadc->otp_out
+> 
+> Changes in v4:
+> 	* address comments from Jonathan Cameron,huangtao and zhaoyifeng:
+> 	- this series thermal driver still be put in driver/thermal/
+> 	- modify the thermal driver description.
+> 
+> Changes in v3:(add dts configure)
+> 	* address comments from Dmitry Torokhov and Arnd Bergmann:
+> 	- fix clock-names in rockchip-thermal.txt
+> 	- remove rockchip_thermal_control() in rockchip_set_mode()
+> 	- fix some code style.
+> 	- add dts configure.
+> 
+> Changes in v2:
+> 	* address comments from Heiko Stubner:
+> 	- fix dt-bindings in rockchip-thermal.txt
+> 	- remove Author mark
+> 	- rename TSADC_XXX->TSADCV2_XXX,it eill ready to merge compatible other SoCs.
+> 	- fix a identation
+> 	- remove clk_set_rate(),it's no necessary.
+> 	- fix the SIMPLE_DEV_PM_OPS() function  style.
+> 
+> Caesar Wang (5):
+>   thermal: rockchip: add driver for thermal
+>   dt-bindings: document Rockchip thermal
+>   ARM: dts: add RK3288 Thermal data
+>   ARM: dts: add main Thermal info to rk3288
+>   ARM: dts: enable Thermal on rk3288-evb board
+> 
+>  .../bindings/thermal/rockchip-thermal.txt          |  45 ++
+>  arch/arm/boot/dts/rk3288-evb.dtsi                  |   5 +
+>  arch/arm/boot/dts/rk3288-thermal.dtsi              |  58 ++
+>  arch/arm/boot/dts/rk3288.dtsi                      |  23 +
+>  drivers/thermal/Kconfig                            |   9 +
+>  drivers/thermal/Makefile                           |   1 +
+>  drivers/thermal/rockchip_thermal.c                 | 628 +++++++++++++++++++++
+>  7 files changed, 769 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>  create mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
+>  create mode 100644 drivers/thermal/rockchip_thermal.c
+> 
+> -- 
+> 1.9.1
+> 
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/eaeb8f3f/attachment-0001.sig>
