@@ -1,50 +1,62 @@
-From: xerofoify@gmail.com (nick)
-Date: Mon, 24 Nov 2014 14:36:11 -0500
-Subject: [PATCH] drivers:block Remove unneeded Fix me message in xsyace.c
-In-Reply-To: <08ea34761ecd4d5a8bc814d1d42c9b61@BN1AFFO11FD048.protection.gbl>
-References: <1416857108-2618-1-git-send-email-xerofoify@gmail.com>
- <fd1c5863660447cfb2b959e80d42c27c@BN1AFFO11FD018.protection.gbl>
- <08ea34761ecd4d5a8bc814d1d42c9b61@BN1AFFO11FD048.protection.gbl>
-Message-ID: <547388AB.9050103@gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 24 Nov 2014 11:51:05 -0800
+Subject: [PATCH] ARM: exynos_defconfig: disable CONFIG_EXYNOS5420_MCPM;
+ not stable
+In-Reply-To: <7hegtaq26c.fsf@deeprootsystems.com>
+References: <1414796382-5447-1-git-send-email-khilman@kernel.org>
+ <000e01cffb39$5ef0a2d0$1cd1e870$@kernel.org>
+ <7hegtaq26c.fsf@deeprootsystems.com>
+Message-ID: <CAMAWPa-mLAFL7v8hHA5R-eBzpMFK-E-xcvjoV8Bn6tTwgP53Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Soren,
-If you want me to change it I would be glad, I wasn't sure what to write to be honest but if you have
-a better message in mind please let me known.
-Cheers Nick 
+Kukjin,
 
-On 14-11-24 02:33 PM, S?ren Brinkmann wrote:
-> On Mon, 2014-11-24 at 08:31PM +0100, Michal Simek wrote:
->> On 11/24/2014 08:25 PM, Nicholas Krause wrote:
->>> Removes unneeded FIXME message related to using a hard coded value for ACE_BUS_WIDTH
->>> due to it needing to be 8 bits, this is wrong as this function here needs all 16 bits
->>> of the bus width and not just the lower or higher 16 depending on the machine's bit
->>> order.
+On Mon, Nov 10, 2014 at 11:35 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Kukjin Kim <kgene@kernel.org> writes:
+>
+>> Kevin Hilman wrote:
 >>>
->>> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+>>> From: Kevin Hilman <khilman@linaro.org>
+>>>
+>>> The option CONFIG_EXYNOS5420_MCPM is causing imprecise external aborts
+>>> during boot testing, causing various userspace startup failures.
+>>>
+>>> Disable until it has gotten more testing.
+>>>
+>>> Cc: Kukjin Kim <kgene.kim@samsung.com>,
+>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>,
+>>> Cc: Sachin Kamat <sachin.kamat@samsung.com>,
+>>> Cc: Doug Anderson <dianders@chromium.org>,
+>>> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>,
+>>> Cc: Tushar Behera <tushar.behera@linaro.org>,
+>>> Cc: stable at vger.kernel.org # v3.17+
+>>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
 >>> ---
->>>  drivers/block/xsysace.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>> This has been reported by a few people[1], but not investigated or fixed, so it's
+>>> time to disable this feature until it can be fixed.
 >>>
->>> diff --git a/drivers/block/xsysace.c b/drivers/block/xsysace.c
->>> index c4328d9..1b807ed 100644
->>> --- a/drivers/block/xsysace.c
->>> +++ b/drivers/block/xsysace.c
->>> @@ -1152,7 +1152,7 @@ static void ace_free(struct device *dev)
->>>  static int ace_probe(struct platform_device *dev)
->>>  {
->>>  	resource_size_t physaddr = 0;
->>> -	int bus_width = ACE_BUS_WIDTH_16; /* FIXME: should not be hard coded */
->>> +	int bus_width = ACE_BUS_WIDTH_16;
->>>  	u32 id = dev->id;
->>>  	int irq = 0;
->>>  	int i;
->>>
+>> Hi Kevin,
 >>
->> Reviewed-by: Michal Simek <michal.simek@xilinx.com>
-> 
-> I find the commit message rather misleading, but the change is OK.
-> 
-> 	S?ren
-> 
+>> Yeah I agree with your opinion.
+>>
+>> But as you can see my tree, I've queued regarding mcpm patches for 3.19 will
+>> be shown in -next in this weekend.
+>
+> Which of the recently queued patches are expected to address the
+> imprecise abort issue?  I'd be happy to test them out.
+
+Exynos5 MCPM is still broken in linux-next and still causing an imprecise abort.
+
+What is the status of $SUBJECT patch?
+
+>> Anyway let me apply this into -fixes and
+>> then let's enable after test its functionality in -next in a couple of days.
+>
+> Yes, I think this needs to be applied until these aborts are understood
+> and fixed.
+
+Is anyone at Samsung actually looking into these MCPM issues?
+
+Kevin
