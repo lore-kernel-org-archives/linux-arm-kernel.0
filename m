@@ -1,51 +1,115 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 24 Nov 2014 14:23:12 +0100
-Subject: [PATCH v2 09/11] sched: test the cpu's capacity in wake affine
-In-Reply-To: <54727D03.4090909@gmail.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-10-git-send-email-vincent.guittot@linaro.org>
- <20140528105855.GR30445@twins.programming.kicks-ass.net>
- <CAKfTPtAvFEmAmPMQsEN-=ftudQwd0fHOxq4MRs3HDyHYjLPGZQ@mail.gmail.com>
- <54727D03.4090909@gmail.com>
-Message-ID: <CAKfTPtARJwLXqUaKaTf5wNFK_gMEk8GiY3qerY2oSk=zrZx=tw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 24 Nov 2014 14:29:30 +0100
+Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc for
+ vqmmc
+In-Reply-To: <CAD=FV=UJT5zBkcj2a03Y_RWxad9+Pu83G_z79Xzzn74V=eRqww@mail.gmail.com>
+References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>
+ <1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>
+ <CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
+ <CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>
+ <5464152E.7040209@rock-chips.com>
+ <CAPDyKFrzGfDew0eLLEcA+_iS_mo-O2bFU58fjirfXXA8AJ9UYQ@mail.gmail.com>
+ <CAD=FV=Ve1TY4+8quq1=18A1YOFvOWuFGrBmHLwMCwdWBSqzxOw@mail.gmail.com>
+ <CAD=FV=UJT5zBkcj2a03Y_RWxad9+Pu83G_z79Xzzn74V=eRqww@mail.gmail.com>
+Message-ID: <CAPDyKFqt4rrwi940KAPyPONpjixK1730QmHEsN27V97jyHH+Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 November 2014 at 01:34, Wanpeng Li <kernellwp@gmail.com> wrote:
-> Hi Vincent,
-> On 5/28/14, 7:15 PM, Vincent Guittot wrote:
+On 21 November 2014 at 22:04, Doug Anderson <dianders@chromium.org> wrote:
+> Hi,
+>
+> On Fri, Nov 21, 2014 at 9:42 AM, Doug Anderson <dianders@chromium.org> wrote:
+>> Ulf,
 >>
->> On 28 May 2014 12:58, Peter Zijlstra <peterz@infradead.org> wrote:
+>> On Fri, Nov 21, 2014 at 4:06 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> [...]
 >>>
->>> On Fri, May 23, 2014 at 05:53:03PM +0200, Vincent Guittot wrote:
->
-> [snip]
+>>>> Sure
+>>>> If the first card is sd2.0 since startup, dw_mci_switch_voltage will not be called,
 >>>
->>> Now I'm only struggling to understand the rationale for this, its got
->>> LLC in there somewhere, but I'm failing to comprehend.
+>>> That can't be right. mmc_power_up() should trigger
+>>> dw_mci_switch_voltage() to be invoked.
 >>
->> Ah.. i have probably overestimated the fact that wake_affine was only
->> done at MC or SMT level but after reading more deeply the glags
->> configuration of all  sched_domain level , my assumption is not true.
+>> Hmmm, I think you're right.  Addy: can you double check if it's only
+>> the 2nd card for you?  I was thinking that if a regulator is currently
+>> 3.3V and you request 2.7 - 3.3V the regulator framework will treat
+>> that as a noop.  ...but that definitely doesn't appear to be the case.
+>> When I boot up the first time even with no SD card plugged in, I see
+>> this at bootup:
+>>
+>> [    3.042234] vccio_sd: 1800 <--> 3300 mV at 3300 mV
+>>
+>> ...showing that it started at 3.3V.  Then I see:
+>>
+>> $ grep "" /sys/class/regulator/regulator.16/{name,microvolts}
+>> /sys/class/regulator/regulator.16/name:vccio_sd
+>> /sys/class/regulator/regulator.16/microvolts:2700000
+>>
+>> ...so it is certainly getting changed even with no card plugged in.
+>>
+>>
+>> BTW: I don't actually have one of these failing cards--all of mine
+>> work.  Addy, do you know the make and model of the card you have that
+>> fails?
 >
+> Just as a bit of a followup, I did some more digging...
 >
-> What's level the wake_affine should happen?
+> 1. It looks as if we now have a bit of "opposite" logic for vmmc vs.
+> vqmmc.  In mmc_power_up() I see that it sets the initial voltage as:
+>
+>   host->ios.vdd = fls(ocr) - 1;
 
-In 1st version of this patch, it was proposed to test the cpu_capacity
-of idle CPU only if they were sharing their cache
+That's because we would like to supports as many cards as possible.
+The policy is based upon that some cards may not support lower
+voltages, but most will support higher.
 
-Regards,
-Vincent
 >
-> Regards,
-> Wanpeng Li
+> That actually means that we're going to pick the maximum voltage for
+> vmmc (of the supported voltages).  For vqmmc dw_mmc is using the
+> regulator framework which (as described in my previous message) will
+> pick the minimum.
+
+Correct. I have thought this has been inside spec and choosing the
+lower value would be preferred to lower power consumption. Maybe we
+needs to re-visit this one more time.
+
+Here are some of the interesting sections in the eMMC spec:
+10.3.3 Power supply Voltages
+"The VCCQ must be defined at equal to or less than VCC".
+
+10.5 Bus signal levels
+Push-pull mode:
+Voh = 0.75 * VCCQ. (Do note, its VCCQ not VCC).
+
+Summary eMMC: VCCQ must be less and VCC, we should be inside spec.
+
+>From SD spec:
+6.6.1 Threshold Level for High Voltage Range
+Voh = 0.75 * VDD.
+
+In worst case scenario, VDD = 3.6V and VIO = 2.7V. That gives as the
+factor of 0.75, thus we are inside spec but without margins.
+
 >
->> So I need to test sd flag to make sure that their share their cache at
->> this level
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
+> 2. Several people I've talked to have expressed concerns that our
+> minimum value is 2.7V.  Apparently that's really on the edge and makes
+> EEs a little nervous.  The quick sample of cards sitting on my desk
+> shows that they seem to claim 0x00ff8000, which doesn't include 2.7V.
+
+0x00ff8000 states what values of VDD levels the device supports. Not VIO.
+
 >
 >
+> Both of the above make me feel like dw_mmc should try its best to pick
+> a value for vqmmc that is closest to the value of vmmc (and >= 2.7V).
+> That also happens to make us work exactly like hosts where vmmc and
+> vqmmc are supplied by the same supply.
+
+I do see your point. And I agree that it would be nice to achieve
+something like this.
+
+The question is how to do this. For sure, we need to involve the mmc
+core to handle this correctly.
+
+Kind regards
+Uffe
