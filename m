@@ -1,99 +1,34 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Nov 2014 14:35:09 +0000
-Subject: [PATCH v3 02/13] irqchip: GICv3: Convert to domain hierarchy
+Date: Mon, 24 Nov 2014 14:35:08 +0000
+Subject: [PATCH v3 01/13] arm64: PCI/MSI: Use asm-generic/msi.h
 In-Reply-To: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
 References: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1416839720-18400-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1416839720-18400-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to start supporting stacked domains, convert the GICv3
-code base to the new domain hierarchy framework, which mostly
-amounts to supporting the new alloc/free callbacks.
+In order to support CONFIG_GENERIC_MSI_IRQ_DOMAIN, we need to
+define msi_alloc_info_t. As the generic version exposed in
+asm-generic/msi.h is perfectly convenient, import this file
+as asm/msi.h.
 
+Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/Kconfig      |  1 +
- drivers/irqchip/irq-gic-v3.c | 42 +++++++++++++++++++++++++++++++++++++-----
- 2 files changed, 38 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/Kbuild | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index b21f12f..4631685 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -14,6 +14,7 @@ config ARM_GIC_V3
- 	bool
- 	select IRQ_DOMAIN
- 	select MULTI_IRQ_HANDLER
-+	select IRQ_DOMAIN_HIERARCHY
- 
- config ARM_NVIC
- 	bool
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index aa17ae8..4cb355a 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -594,14 +594,14 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
- 	/* PPIs */
- 	if (hw < 32) {
- 		irq_set_percpu_devid(irq);
--		irq_set_chip_and_handler(irq, &gic_chip,
--					 handle_percpu_devid_irq);
-+		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
-+				    handle_percpu_devid_irq, NULL, NULL);
- 		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
- 	}
- 	/* SPIs */
- 	if (hw >= 32 && hw < gic_data.irq_nr) {
--		irq_set_chip_and_handler(irq, &gic_chip,
--					 handle_fasteoi_irq);
-+		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
-+				    handle_fasteoi_irq, NULL, NULL);
- 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
- 	}
- 	irq_set_chip_data(irq, d->host_data);
-@@ -633,9 +633,41 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
- 	return 0;
- }
- 
-+static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+				unsigned int nr_irqs, void *arg)
-+{
-+	int i, ret;
-+	irq_hw_number_t hwirq;
-+	unsigned int type = IRQ_TYPE_NONE;
-+	struct of_phandle_args *irq_data = arg;
-+
-+	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
-+				   irq_data->args_count, &hwirq, &type);
-+	if (ret)
-+		return ret;
-+
-+	for (i = 0; i < nr_irqs; i++)
-+		gic_irq_domain_map(domain, virq + i, hwirq + i);
-+
-+	return 0;
-+}
-+
-+static void gic_irq_domain_free(struct irq_domain *domain, unsigned int virq,
-+				unsigned int nr_irqs)
-+{
-+	int i;
-+
-+	for (i = 0; i < nr_irqs; i++) {
-+		struct irq_data *d = irq_domain_get_irq_data(domain, virq + i);
-+		irq_set_handler(virq + i, NULL);
-+		irq_domain_reset_irq_data(d);
-+	}
-+}
-+
- static const struct irq_domain_ops gic_irq_domain_ops = {
--	.map = gic_irq_domain_map,
- 	.xlate = gic_irq_domain_xlate,
-+	.alloc = gic_irq_domain_alloc,
-+	.free = gic_irq_domain_free,
- };
- 
- static int __init gic_of_init(struct device_node *node, struct device_node *parent)
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index dc770bd..e315bd8 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -28,6 +28,7 @@ generic-y += local64.h
+ generic-y += mcs_spinlock.h
+ generic-y += mman.h
+ generic-y += msgbuf.h
++generic-y += msi.h
+ generic-y += mutex.h
+ generic-y += pci.h
+ generic-y += pci-bridge.h
 -- 
 2.1.3
