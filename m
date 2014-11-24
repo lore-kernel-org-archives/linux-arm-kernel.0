@@ -1,102 +1,22 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Mon, 24 Nov 2014 17:05:02 +0000
-Subject: [PATCH v9 05/10] sched: make scale_rt invariant with frequency
-In-Reply-To: <CAKfTPtAo3PzZ=-KtH-YS2nf9R9srMGAUJ2A2qkHrsPZmj18-Jw@mail.gmail.com>
-References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
- <1415033687-23294-6-git-send-email-vincent.guittot@linaro.org>
- <20141121123559.GF23177@e105550-lin.cambridge.arm.com>
- <CAKfTPtAo3PzZ=-KtH-YS2nf9R9srMGAUJ2A2qkHrsPZmj18-Jw@mail.gmail.com>
-Message-ID: <20141124170502.GK23177@e105550-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 24 Nov 2014 17:04:09 +0000
+Subject: [PATCH] ASoC: rt5631: Fixing compilation warning when DT is
+ disabled
+In-Reply-To: <1416828162-8216-1-git-send-email-krishna.md@samsung.com>
+References: <1416828162-8216-1-git-send-email-krishna.md@samsung.com>
+Message-ID: <20141124170409.GF7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 02:24:00PM +0000, Vincent Guittot wrote:
-> On 21 November 2014 at 13:35, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> > On Mon, Nov 03, 2014 at 04:54:42PM +0000, Vincent Guittot wrote:
-> 
-> [snip]
-> 
-> >> The average running time of RT tasks is used to estimate the remaining compute
-> >> @@ -5801,19 +5801,12 @@ static unsigned long scale_rt_capacity(int cpu)
-> >>
-> >>       total = sched_avg_period() + delta;
-> >>
-> >> -     if (unlikely(total < avg)) {
-> >> -             /* Ensures that capacity won't end up being negative */
-> >> -             available = 0;
-> >> -     } else {
-> >> -             available = total - avg;
-> >> -     }
-> >> +     used = div_u64(avg, total);
-> >
-> > I haven't looked through all the details of the rt avg tracking, but if
-> > 'used' is in the range [0..SCHED_CAPACITY_SCALE], I believe it should
-> > work. Is it guaranteed that total > 0 so we don't get division by zero?
-> 
-> static inline u64 sched_avg_period(void)
-> {
-> return (u64)sysctl_sched_time_avg * NSEC_PER_MSEC / 2;
-> }
->
+On Mon, Nov 24, 2014 at 04:52:42PM +0530, Krishna Mohan Dani wrote:
+> Fixes the following compilation warning:
+> Warning: 'rt5631_i2c_dt_ids' defined but not used - when DT is not used.
 
-I see.
-
-> >
-> > It does get a slightly more complicated if we want to figure out the
-> > available capacity at the current frequency (current < max) later. Say,
-> > rt eats 25% of the compute capacity, but the current frequency is only
-> > 50%. In that case get:
-> >
-> > curr_avail_capacity = (arch_scale_cpu_capacity() *
-> >   (arch_scale_freq_capacity() - (SCHED_SCALE_CAPACITY - scale_rt_capacity())))
-> >   >> SCHED_CAPACITY_SHIFT
-> 
-> You don't have to be so complicated but simply need to do:
-> curr_avail_capacity for CFS = (capacity_of(CPU) *
-> arch_scale_freq_capacity())  >> SCHED_CAPACITY_SHIFT
-> 
-> capacity_of(CPU) = 600 is the max available capacity for CFS tasks
-> once we have removed the 25% of capacity that is used by RT tasks
-> arch_scale_freq_capacity = 512 because we currently run at 50% of max freq
-> 
-> so curr_avail_capacity for CFS = 300
-
-I don't think that is correct. It is at least not what I had in mind.
-
-capacity_orig_of(cpu) = 800, we run at 50% frequency which means:
-
-curr_capacity = capacity_orig_of(cpu) * arch_scale_freq_capacity()
-                  >> SCHED_CAPACITY_SHIFT
-              = 400
-
-So the total capacity at the current frequency (50%) is 400, without
-considering RT. scale_rt_capacity() is frequency invariant, so it takes
-away capacity_orig_of(cpu) - capacity_of(cpu) = 200 worth of capacity
-for RT.  We need to subtract that from the current capacity to get the
-available capacity at the current frequency.
-
-curr_available_capacity = curr_capacity - (capacity_orig_of(cpu) -
-capacity_of(cpu)) = 200
-
-In other words, 800 is the max capacity, we are currently running at 50%
-frequency, which gives us 400. RT takes away 25% of 800
-(frequency-invariant) from the 400, which leaves us with 200 left for
-CFS tasks at the current frequency.
-
-In your calculations you subtract the RT load before computing the
-current capacity using arch_scale_freq_capacity(), where I think it
-should be done after. You find the amount spare capacity you would have
-at the maximum frequency when RT has been subtracted and then scale the
-result by frequency which means indirectly scaling the RT load
-contribution again (the rt avg has already been scaled). So instead of
-taking away 200 of the 400 (current capacity @ 50% frequency), it only
-takes away 100 which isn't right.
-
-scale_rt_capacity() is frequency-invariant, so if the RT load is 50% and
-the frequency is 50%, there are no spare cycles left.
-curr_avail_capacity should be 0. But using your expression above you
-would get capacity_of(cpu) = 400 after removing RT,
-arch_scale_freq_capacity = 512 and you get 200. I don't think that is
-right.
-
-Morten
+This doesn't apply, please check and resend.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/2ab4a5e3/attachment.sig>
