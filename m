@@ -1,41 +1,102 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 24 Nov 2014 12:54:10 +0100
-Subject: [PATCH 0/4] mmc: sdhci: adding support for a new Fujitsu sdhci IP
-In-Reply-To: <CAOEd-H2qbWgaauX=phfFk8HQqHk9gff3m_uoZqc+4Gbc6LZ-Lg@mail.gmail.com>
-References: <1416531100-26707-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <CAPDyKFqZyUT+sARZQ2ncusttDWn31uQf_H2eTtHOSCs2c8yO4A@mail.gmail.com>
- <CAOEd-H2qbWgaauX=phfFk8HQqHk9gff3m_uoZqc+4Gbc6LZ-Lg@mail.gmail.com>
-Message-ID: <CAPDyKFruGDj5z5+i6FLT2YHhKPvY6wFE98dBQYsJroCNST_fyw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 24 Nov 2014 12:56:40 +0100
+Subject: [PATCH] ARM: PJ4: allow building in Thumb-2 mode
+Message-ID: <1416830200-11114-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 November 2014 at 11:45, Vincent Yang
-<vincent.yang.fujitsu@gmail.com> wrote:
-> 2014-11-24 17:54 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
->> On 21 November 2014 at 01:51, Vincent Yang
->> <vincent.yang.fujitsu@gmail.com> wrote:
->>> Hello,
->>>
->>>   Fujitsu have an sdhci IP which is implemented in a SoC we're
->>> adding to mainline, the most recent series for that was sent
->>> here:
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304522.html
->>>
->>>   These patches are against v3.18-rc5 mainline and tested on
->>> v3.18-rc5 integration tree.
->>>
->>>   We welcome any comment and advice about how to make any
->>> improvements or better align them with upstream.
->>
->> Apparently, there's a dependency between this patchset and the upper
->> one you refereed to. That's a problem.
->
-> This patchset does not require anything from the upper one I refereed to.
+Two files that get included when building the multi_v7_defconfig target
+fail to build when selecting THUMB2_KERNEL for this configuration.
 
-No, but the upper depends on this patchset.
+In both cases, we can just build the file as ARM code, as none of its
+symbols are exported to modules, so there are no interworking concerns.
+In the iwmmxt.S case, add ENDPROC() declarations so the symbols are
+annotated as functions, resulting in the linker to emit the appropriate
+mode switches.
 
-Why can't you send the mmc patches separately in one patchset? That's
-would be easier to handle and review.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/kernel/Makefile |  1 +
+ arch/arm/kernel/iwmmxt.S | 13 +++++++++++++
+ 2 files changed, 14 insertions(+)
 
-Kind regards
-Uffe
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 4c5d1a5982dd..575a5e424b0a 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -85,6 +85,7 @@ obj-$(CONFIG_CPU_PJ4B)		+= pj4-cp0.o
+ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+ obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o
+ obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o perf_event_cpu.o
++CFLAGS_pj4-cp0.o		:= -marm
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+ obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
+ 
+diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
+index ad58e565fe98..49fadbda8c63 100644
+--- a/arch/arm/kernel/iwmmxt.S
++++ b/arch/arm/kernel/iwmmxt.S
+@@ -58,6 +58,7 @@
+ #define MMX_SIZE		(0x98)
+ 
+ 	.text
++	.arm
+ 
+ /*
+  * Lazy switching of Concan coprocessor context
+@@ -182,6 +183,8 @@ concan_load:
+ 	tmcr	wCon, r2
+ 	ret	lr
+ 
++ENDPROC(iwmmxt_task_enable)
++
+ /*
+  * Back up Concan regs to save area and disable access to them
+  * (mainly for gdb or sleep mode usage)
+@@ -232,6 +235,8 @@ ENTRY(iwmmxt_task_disable)
+ 1:	msr	cpsr_c, ip			@ restore interrupt mode
+ 	ldmfd	sp!, {r4, pc}
+ 
++ENDPROC(iwmmxt_task_disable)
++
+ /*
+  * Copy Concan state to given memory address
+  *
+@@ -268,6 +273,8 @@ ENTRY(iwmmxt_task_copy)
+ 	msr	cpsr_c, ip			@ restore interrupt mode
+ 	ret	r3
+ 
++ENDPROC(iwmmxt_task_copy)
++
+ /*
+  * Restore Concan state from given memory address
+  *
+@@ -304,6 +311,8 @@ ENTRY(iwmmxt_task_restore)
+ 	msr	cpsr_c, ip			@ restore interrupt mode
+ 	ret	r3
+ 
++ENDPROC(iwmmxt_task_restore)
++
+ /*
+  * Concan handling on task switch
+  *
+@@ -335,6 +344,8 @@ ENTRY(iwmmxt_task_switch)
+ 	mrc	p15, 0, r1, c2, c0, 0
+ 	sub	pc, lr, r1, lsr #32		@ cpwait and return
+ 
++ENDPROC(iwmmxt_task_switch)
++
+ /*
+  * Remove Concan ownership of given task
+  *
+@@ -353,6 +364,8 @@ ENTRY(iwmmxt_task_release)
+ 	msr	cpsr_c, r2			@ restore interrupts
+ 	ret	lr
+ 
++ENDPROC(iwmmxt_task_release)
++
+ 	.data
+ concan_owner:
+ 	.word	0
+-- 
+1.8.3.2
