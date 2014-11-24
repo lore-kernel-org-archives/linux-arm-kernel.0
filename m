@@ -1,104 +1,48 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 24 Nov 2014 15:51:40 +0100
-Subject: [PATCH v5 02/18] ACPI / table: Add new function to get table
- entries
-In-Reply-To: <5473109A.2070704@linaro.org>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <2764417.DLFalXXngC@vostro.rjw.lan> <5473109A.2070704@linaro.org>
-Message-ID: <1581499.U8906vqSiO@vostro.rjw.lan>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 24 Nov 2014 14:32:08 +0000
+Subject: [PATCH] arm64:mm: free the useless initial page table
+In-Reply-To: <1416558460-7257-1-git-send-email-zhichang.yuan@linaro.org>
+References: <1416558460-7257-1-git-send-email-zhichang.yuan@linaro.org>
+Message-ID: <20141124143208.GE15872@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 24, 2014 07:03:54 PM Hanjun Guo wrote:
-> On 2014-11-24 9:27, Rafael J. Wysocki wrote:
-> > On Friday, October 17, 2014 09:36:58 PM Hanjun Guo wrote:
-> >> From: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> >>
-> >> The acpi_table_parse() function has a callback that
-> >> passes a pointer to a table_header. Add a new function
-> >> which takes this pointer and parses its entries. This
-> >> eliminates the need to re-traverse all the tables for
-> >> each call. e.g. as in acpi_table_parse_madt() which is
-> >> normally called after acpi_table_parse().
-> >>
-> >> Acked-by: Grant Likely <grant.likely@linaro.org>
-> >> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> >> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >> ---
-> >>  drivers/acpi/tables.c |   67 ++++++++++++++++++++++++++++++++++---------------
-> >>  include/linux/acpi.h  |    4 +++
-> >>  2 files changed, 51 insertions(+), 20 deletions(-)
-> >>
-> >> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-> >> index 6d5a6cd..21ae521 100644
-> >> --- a/drivers/acpi/tables.c
-> >> +++ b/drivers/acpi/tables.c
-> >> @@ -192,17 +192,14 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
-> >>  
-> >>  
-> >>  int __init
-> >> -acpi_table_parse_entries(char *id,
-> >> -			     unsigned long table_size,
-> >> -			     int entry_id,
-> >> -			     acpi_tbl_entry_handler handler,
-> >> -			     unsigned int max_entries)
-> >> +acpi_parse_entries(unsigned long table_size,
-> >> +		acpi_tbl_entry_handler handler,
-> >> +		struct acpi_table_header *table_header,
-> >> +		int entry_id, unsigned int max_entries)
-> >>  {
-> >> -	struct acpi_table_header *table_header = NULL;
-> >>  	struct acpi_subtable_header *entry;
-> >> -	unsigned int count = 0;
-> >> +	int count = 0;
-> >>  	unsigned long table_end;
-> >> -	acpi_size tbl_size;
-> >>  
-> >>  	if (acpi_disabled)
-> >>  		return -ENODEV;
-> >> @@ -210,13 +207,11 @@ acpi_table_parse_entries(char *id,
-> >>  	if (!handler)
-> >>  		return -EINVAL;
-> >>  
-> >> -	if (strncmp(id, ACPI_SIG_MADT, 4) == 0)
-> >> -		acpi_get_table_with_size(id, acpi_apic_instance, &table_header, &tbl_size);
-> >> -	else
-> >> -		acpi_get_table_with_size(id, 0, &table_header, &tbl_size);
-> >> +	if (!table_size)
-> >> +		return -EINVAL;
-> >>  
-> >>  	if (!table_header) {
-> >> -		pr_warn("%4.4s not present\n", id);
-> >> +		pr_warn("Table header not present\n");
-> > 
-> > The message doesn't make sense any more if the table signature is not printed.
-> > 
-> >>  		return -ENODEV;
-> >>  	}
-> >>  
-> >> @@ -232,30 +227,62 @@ acpi_table_parse_entries(char *id,
-> >>  		if (entry->type == entry_id
-> >>  		    && (!max_entries || count++ < max_entries))
-> >>  			if (handler(entry, table_end))
-> >> -				goto err;
-> >> +				return -EINVAL;
-> >>  
-> >>  		/*
-> >>  		 * If entry->length is 0, break from this loop to avoid
-> >>  		 * infinite loop.
-> >>  		 */
-> >>  		if (entry->length == 0) {
-> >> -			pr_err("[%4.4s:0x%02x] Invalid zero length\n", id, entry_id);
-> >> -			goto err;
-> >> +			pr_err("[0x%02x] Invalid zero length\n", entry_id);
-> > 
-> > Same here.
+On Fri, Nov 21, 2014 at 08:27:40AM +0000, zhichang.yuan at linaro.org wrote:
+> From: "zhichang.yuan" <zhichang.yuan@linaro.org>
 > 
-> How about remove the message and return directly?
+> For 64K page system, after mapping a PMD section, the corresponding initial
+> page table is not needed any more. That page can be freed.
+> 
+> Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
+> ---
+>  arch/arm64/mm/mmu.c |    5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index f4f8b50..12a336b 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -191,8 +191,11 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+>  			 * Check for previous table entries created during
+>  			 * boot (__create_page_tables) and flush them.
+>  			 */
+> -			if (!pmd_none(old_pmd))
+> +			if (!pmd_none(old_pmd)) {
+>  				flush_tlb_all();
+> +				if (pmd_table(old_pmd))
+> +					memblock_free(pte_pfn(pmd_pte(old_pmd)) << PAGE_SHIFT, PAGE_SIZE);
+> +			}
 
-We could do that, but for what reason?  Is the message not useful?
+For consistency with alloc_init_pud(), could you do:
+
+	phys_addr_t table = __pa(pte_offset(&old_pmd, 0));
+	memblock_free(table, PAGE_SIZE);
+
+Since you are at this, for alloc_init_pud() could you please move the
+flush_tlb_all() before memblock_free()? Theoretical problem really but
+it's nice for consistency.
+
+Thanks.
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Catalin
