@@ -1,31 +1,112 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 25 Nov 2014 02:05:30 +0300
-Subject: [PATCH V2 0/6] ARM: sa1100: use clock api to get cpu freq in fb and
- pcmcia drivers
-Message-ID: <1416870336-30114-1-git-send-email-dbaryshkov@gmail.com>
+Date: Tue, 25 Nov 2014 02:05:31 +0300
+Subject: [PATCH V2 1/6] ARM: sa1100: add cpu clock
+In-Reply-To: <1416870336-30114-1-git-send-email-dbaryshkov@gmail.com>
+References: <1416870336-30114-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1416870336-30114-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Changes since V1:
-- reorder patches to add sa1100 and sa1111 clocks before using them
-  in sa1100 pcmcia driver.
-- Fix error returns in case clk_get returns an error.
-- Call clk_prepare_enable/clk_disable_unprepare for the proper API
-  usage.]
+Both SA1100 framebuffer and PCMCIA drivers require knowledge of cpu
+frequency to correctly program timings.  Currently they receive timing
+information by calling cpufreq_get(0).  However if cpu frequency driver
+is not enabled (e.g. due to unsupported DRAM chip/board on sa1110)
+cpufreq_get(0) returns 0, causing incorrect timings to be programmed.
 
-On SA-1100 framebuffer and PCMCIA drivers make use of cpufreq_get(0)
-function call to determine the cpu frequency. Russell's commit
-1937f5b91833e2e8e53bcc821fc7a5fbe6ccb9b5 (ARM: fix sa1100 build) fixed
-the build issues, but broke two devices (Collie and Jornada720). For
-those two boards the cpufreq code gets compiled but is not enabled (as
-board files do not provide timing information for the CPUFREQ driver).
-Thus cpufreq_get(0) returns incorrect value and incorrect timings get
-programmed into the hardware.
+Add cpu clock returning cpu frequency, to be used by sa11x0 fb and
+pcmcia drivers.
 
-PXA2xx (the very similar platform) uses Clock API to determine CPU
-frequency both in framebuffer and PCMCIA drivers. These patches make
-similar changes to StrongARM drivers.
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ arch/arm/mach-sa1100/clock.c | 41 ++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 34 insertions(+), 7 deletions(-)
 
---
-With best wishes
-Dmitry
+diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
+index 9fa6a99..53f750d 100644
+--- a/arch/arm/mach-sa1100/clock.c
++++ b/arch/arm/mach-sa1100/clock.c
+@@ -15,10 +15,12 @@
+ #include <linux/clkdev.h>
+ 
+ #include <mach/hardware.h>
++#include <mach/generic.h>
+ 
+ struct clkops {
+ 	void			(*enable)(struct clk *);
+ 	void			(*disable)(struct clk *);
++	unsigned long		(*get_rate)(struct clk *);
+ };
+ 
+ struct clk {
+@@ -33,13 +35,6 @@ struct clk clk_##_name = {				\
+ 
+ static DEFINE_SPINLOCK(clocks_lock);
+ 
+-/* Dummy clk routine to build generic kernel parts that may be using them */
+-unsigned long clk_get_rate(struct clk *clk)
+-{
+-	return 0;
+-}
+-EXPORT_SYMBOL(clk_get_rate);
+-
+ static void clk_gpio27_enable(struct clk *clk)
+ {
+ 	/*
+@@ -58,6 +53,19 @@ static void clk_gpio27_disable(struct clk *clk)
+ 	GAFR &= ~GPIO_32_768kHz;
+ }
+ 
++static void clk_cpu_enable(struct clk *clk)
++{
++}
++
++static void clk_cpu_disable(struct clk *clk)
++{
++}
++
++static unsigned long clk_cpu_get_rate(struct clk *clk)
++{
++	return sa11x0_getspeed(0) * 1000;
++}
++
+ int clk_enable(struct clk *clk)
+ {
+ 	unsigned long flags;
+@@ -87,16 +95,35 @@ void clk_disable(struct clk *clk)
+ }
+ EXPORT_SYMBOL(clk_disable);
+ 
++unsigned long clk_get_rate(struct clk *clk)
++{
++	if (clk && clk->ops && clk->ops->get_rate)
++		return clk->ops->get_rate(clk);
++
++	return 0;
++}
++EXPORT_SYMBOL(clk_get_rate);
++
+ const struct clkops clk_gpio27_ops = {
+ 	.enable		= clk_gpio27_enable,
+ 	.disable	= clk_gpio27_disable,
+ };
+ 
++const struct clkops clk_cpu_ops = {
++	.enable		= clk_cpu_enable,
++	.disable	= clk_cpu_disable,
++	.get_rate	= clk_cpu_get_rate,
++};
++
+ static DEFINE_CLK(gpio27, &clk_gpio27_ops);
+ 
++static DEFINE_CLK(cpu, &clk_cpu_ops);
++
+ static struct clk_lookup sa11xx_clkregs[] = {
+ 	CLKDEV_INIT("sa1111.0", NULL, &clk_gpio27),
+ 	CLKDEV_INIT("sa1100-rtc", NULL, NULL),
++	CLKDEV_INIT("sa11x0-fb", NULL, &clk_cpu),
++	CLKDEV_INIT("sa11x0-pcmcia", NULL, &clk_cpu),
+ };
+ 
+ static int __init sa11xx_clk_init(void)
+-- 
+2.1.3
