@@ -1,31 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 24 Nov 2014 08:25:09 +0800
-Subject: [PATCH] mmc: dw_mmc: fix card read threshold for PIO mode
-In-Reply-To: <CAGOxZ50+k3Z5gHrRasveM=7V+GS+1dRmcz0u5WSyo=XBE9iT3g@mail.gmail.com>
-References: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
- <20141121233155.GC11253@dragon>
- <CAGOxZ51DPL+6HTSG6yeCqqRxtq7XBuWki7gdB-ieamVUKixCDQ@mail.gmail.com>
- <20141123153012.GH11253@dragon>
- <CAGOxZ50+k3Z5gHrRasveM=7V+GS+1dRmcz0u5WSyo=XBE9iT3g@mail.gmail.com>
-Message-ID: <20141124002508.GI11253@dragon>
+From: kernellwp@gmail.com (Wanpeng Li)
+Date: Mon, 24 Nov 2014 08:34:11 +0800
+Subject: [PATCH v2 09/11] sched: test the cpu's capacity in wake affine
+In-Reply-To: <CAKfTPtAvFEmAmPMQsEN-=ftudQwd0fHOxq4MRs3HDyHYjLPGZQ@mail.gmail.com>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-10-git-send-email-vincent.guittot@linaro.org>
+ <20140528105855.GR30445@twins.programming.kicks-ass.net>
+ <CAKfTPtAvFEmAmPMQsEN-=ftudQwd0fHOxq4MRs3HDyHYjLPGZQ@mail.gmail.com>
+Message-ID: <54727D03.4090909@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 03:36:13AM +0530, Alim Akhtar wrote:
-> Hi Shawn,
-> 
-> On Sun, Nov 23, 2014 at 9:00 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > One thing I need to check with hardware vendor is whether register
-> > CDTHRCTL is available on my dwmmc controller.  From my testing, even
-> > reading this register every time dw_mci_submit_data() is called causes
-> > problem for me.
-> >
-> yes, your guess is right, did you tested with ulf's -next branch?
-> Recently patch [1] is merged, that most likely to solve your platform
-> issue. Have a try.
-> 
-> [1] http://www.spinics.net/lists/stable/msg69884.html
+Hi Vincent,
+On 5/28/14, 7:15 PM, Vincent Guittot wrote:
+> On 28 May 2014 12:58, Peter Zijlstra <peterz@infradead.org> wrote:
+>> On Fri, May 23, 2014 at 05:53:03PM +0200, Vincent Guittot wrote:
+[snip]
+>> Now I'm only struggling to understand the rationale for this, its got
+>> LLC in there somewhere, but I'm failing to comprehend.
+> Ah.. i have probably overestimated the fact that wake_affine was only
+> done at MC or SMT level but after reading more deeply the glags
+> configuration of all  sched_domain level , my assumption is not true.
 
-Yeah, the patch fixes my problem.  Thanks a lot for the pointer, Alim.
+What's level the wake_affine should happen?
 
-Shawn
+Regards,
+Wanpeng Li
+
+> So I need to test sd flag to make sure that their share their cache at
+> this level
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
