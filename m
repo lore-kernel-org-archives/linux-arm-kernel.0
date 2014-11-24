@@ -1,21 +1,39 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Mon, 24 Nov 2014 15:39:11 +0000
-Subject: [PATCH v9 02/10] sched: Track group sched_entity usage
- contributions
-In-Reply-To: <CAKfTPtBZWDSWVYQ9VE8=rsnsb2kLyUAsc5d_bvcypXE2JgarYQ@mail.gmail.com>
-References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
- <1415033687-23294-3-git-send-email-vincent.guittot@linaro.org>
- <20141121123509.GC23177@e105550-lin.cambridge.arm.com>
- <CAKfTPtBZWDSWVYQ9VE8=rsnsb2kLyUAsc5d_bvcypXE2JgarYQ@mail.gmail.com>
-Message-ID: <20141124153911.GJ23177@e105550-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 24 Nov 2014 07:44:04 -0800
+Subject: [PATCH 3/3] memory: gpmc: Move omap gpmc code to live under
+ drivers
+In-Reply-To: <547301AB.9040905@ti.com>
+References: <1416594856-15201-1-git-send-email-tony@atomide.com>
+ <1416594856-15201-4-git-send-email-tony@atomide.com>
+ <547301AB.9040905@ti.com>
+Message-ID: <20141124154403.GB2817@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 02:04:21PM +0000, Vincent Guittot wrote:
-> On 21 November 2014 at 13:35, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> > What happened to the update of se->avg.utilization_avg_contrib in
-> > __synchronize_entity_decay()? It seems to have disapperead after v7.
+* Roger Quadros <rogerq@ti.com> [141124 02:02]:
+> On 11/21/2014 08:34 PM, Tony Lindgren wrote:
+> > --- a/drivers/memory/Kconfig
+> > +++ b/drivers/memory/Kconfig
+> > @@ -41,6 +41,14 @@ config TI_EMIF
+> >  	  parameters and other settings during frequency, voltage and
+> >  	  temperature changes
+> >  
+> > +config OMAP_GPMC
+> > +	bool
 > 
-> It was moved in patch 1 where it is is right place
+> We should depend on ARCH_OMAP2PLUS. Other platforms won't benefit
+> anything from this driver.
 
-Ahh... I missed that :)
+We can't do that yet until we have sorted out the remaining platform
+data issues with arch/arm/mach-omap2/*gpmc*.c files.
+
+So OMAP_GPMC is currently a silent Kconfig option that does not show
+up as the description after the bool is not there, we select
+OMAP_GPMC automatically based on ARCH_OMAP2PLUS.
+
+Once we have the remaining legacy code issues sorted out, we can
+make this into just a regular device driver.
+
+Regards,
+
+Tony
