@@ -1,58 +1,45 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 24 Nov 2014 15:45:45 +0100
-Subject: [PATCH v9 10/10] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <20141121123733.GI23177@e105550-lin.cambridge.arm.com>
-References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
- <1415033687-23294-11-git-send-email-vincent.guittot@linaro.org>
- <20141121123733.GI23177@e105550-lin.cambridge.arm.com>
-Message-ID: <CAKfTPtC9tew3wzoWfyxOWJR8MtpL+jjwWoA9Lkpk4opVUEXcxQ@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 24 Nov 2014 15:46:19 +0100
+Subject: [PATCH RESEND 0/3] ARM: Meson6: enable SMP
+In-Reply-To: <283984248.2HBkCzgaiV@wuerfel>
+References: <1415982353-9293-1-git-send-email-carlo@caione.org>
+ <CAOQ7t2amsAvD_O6XO_jF9NRhAAWrG+_URKNytmY-6aUE+wchnA@mail.gmail.com>
+ <283984248.2HBkCzgaiV@wuerfel>
+Message-ID: <CAOQ7t2b+i7Vrx3NMtEkOPVT5MXw6M2AT+bGR8=JuvNf2OBTXZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 November 2014 at 13:37, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> On Mon, Nov 03, 2014 at 04:54:47PM +0000, Vincent Guittot wrote:
-
+On Mon, Nov 24, 2014 at 3:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 23 November 2014 12:48:31 Carlo Caione wrote:
+>> On Fri, Nov 14, 2014 at 5:25 PM, Carlo Caione <carlo@caione.org> wrote:
+>> > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
+>> > pieces to boot the secondary CPU.
+>> >
+>> > ---
+>> >
+>> > This is a resend of a patchset already submitted a while ago
+>> > http://www.spinics.net/lists/arm-kernel/msg366787.html
+>> >
 >>
->> +     /*
->> +      * The dst_cpu is idle and the src_cpu CPU has only 1 CFS task.
->> +      * It's worth migrating the task if the src_cpu's capacity is reduced
->> +      * because of other sched_class or IRQs whereas capacity stays
->> +      * available on dst_cpu.
->> +      */
->> +     if ((env->idle != CPU_NOT_IDLE) &&
->> +                     (env->src_rq->cfs.h_nr_running == 1)) {
->> +             unsigned long src_eff_capacity, dst_eff_capacity;
->> +
->> +             dst_eff_capacity = 100;
->> +             dst_eff_capacity *= capacity_of(env->dst_cpu);
->> +             dst_eff_capacity *= capacity_orig_of(env->src_cpu);
->> +
->> +             src_eff_capacity = sd->imbalance_pct;
->> +             src_eff_capacity *= capacity_of(env->src_cpu);
->> +             src_eff_capacity *= capacity_orig_of(env->dst_cpu);
+>> Ping
 >
-> Do we need to scale by capacity_orig? Shouldn't the absolute capacity be
-> better?
+> Hi Carlo,
 >
-> if (capacity_of(env->src) * sd->imbalance_pct < capacity_of(env->dst) *
-> 100) ?
+> Is this for arm-soc? I guess from the contents that it is, but you had
+> 10 people in 'To', and you don't say in the introductory mail what
+> you would like to happen with these patches.
+>
+> When you send something for inclusion in arm-soc, please always send
+> it 'To: arm at kernel.org' with everyone else on Cc instead of To,
+> and be explicit with whether you think the contents are ready to
+> be merged or whether you would like to see more review.
 
-we don't want to compare absolute capacity between CPUs but to compare
-the reduction of their capacity because we want to choose the CPU
-which is less used  by RT tasks or irq
+Hi Arnd,
+my ping was because I haven't received any feedback on the patchset.
+Taking the silence as an ACK I'll take the patches in my repo to pull
+to arm-soc within the next pull request.
 
-Regards,
-Vincent
->
-> Isn't it the absolute available capacity that matters? For SMP
-> capacity_orig is the same and cancels out and doesn't change anything.
-> For big.LITTLE we would rather have the task run on a big where rt/irq
-> eats 30% than a little cpu where rq/irq eats 5%, assuming big capacity
-> is much bigger than little capacity so the absolute available capacity
-> (~cycles/time) is larger on the big cpu.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Thanks,
+
+-- 
+Carlo Caione
