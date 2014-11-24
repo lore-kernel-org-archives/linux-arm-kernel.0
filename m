@@ -1,10 +1,10 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 24 Nov 2014 10:33:34 +0000
+Date: Mon, 24 Nov 2014 10:38:12 +0000
 Subject: [PATCH 1/3] mfd: devicetree: qcom_rpm: document IPQ8064 resources
 In-Reply-To: <1416512485-7292-2-git-send-email-joshc@codeaurora.org>
 References: <1416512485-7292-1-git-send-email-joshc@codeaurora.org>
  <1416512485-7292-2-git-send-email-joshc@codeaurora.org>
-Message-ID: <20141124103334.GF4241@x1>
+Message-ID: <20141124103812.GG4241@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,9 +19,9 @@ On Thu, 20 Nov 2014, Josh Cartwright wrote:
 >  include/dt-bindings/mfd/qcom-rpm.h                 | 6 ++++++
 >  2 files changed, 11 insertions(+), 1 deletion(-)
 
-What do you want me to do with this patch?  I'm guessing the other
-patches in the set depend on these new defines?  I can't even check
-because you've only send me 2 of the 3 patches in the set.
+For my own reference:
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
 > diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
 > index 4264021..6d4e3ec 100644
