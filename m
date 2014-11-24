@@ -1,325 +1,98 @@
-From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Mon, 24 Nov 2014 18:34:13 +0530
-Subject: [PATCH RFC v2 09/12] drivers: soc: pm_domain: Modify the parent clocks
- bindings
-In-Reply-To: <1416834256-11225-1-git-send-email-amit.daniel@samsung.com>
-References: <1416833572-6880-1-git-send-email-amit.daniel@samsung.com>
- <1416834256-11225-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <1416834256-11225-9-git-send-email-amit.daniel@samsung.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 24 Nov 2014 14:20:08 +0100
+Subject: [PATCH v4 0/5] exynos: Move pmu driver to driver/soc folder and
+ add exynos7 support
+In-Reply-To: <1416794775-1605-1-git-send-email-amit.daniel@samsung.com>
+References: <1416794775-1605-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <36336460.BrNftCFaUT@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the parent clock bindings to make it more generic.
-The current bindings limits the transient parent clocks to just one
-clock as "oscclk". This patch extends it to allow any clock as
-intermediate parent clock.
-The reparent clock sets are of form tclkX, pclkX, clkX where X:0-9.
-Because of this change only exynos5420 SoC DT bindings are affected.
-The complete example is shown in the DT documentation section.
 
-Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
----
- .../bindings/arm/exynos/power_domain.txt           |   18 +-
- drivers/soc/samsung/pm_domains.c                   |  199 +++++++++++++-------
- 2 files changed, 145 insertions(+), 72 deletions(-)
+Hi,
 
-diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-index 0160bdc..8d913b9 100644
---- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-+++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-@@ -13,17 +13,17 @@ Required Properties:
- 
- Optional Properties:
- - compatible: This is a second compatible name and gives the complete Power
--	Domain name like "samsung,exynos7-pd-mfc".
--- clocks: List of clock handles. The parent clocks of the input clocks to the
--	devices in this power domain are set to oscclk before power gating
-+	Domain name like "samsung,exynos7-pd-mfc"
-+- pd-parent-clocks: List of clock handles. The parent clocks of the input clocks to
-+	the devices in this power domain are set to tclk before power gating
- 	and restored back after powering on a domain. This is required for
- 	all domains which are powered on and off and not required for unused
- 	domains.
--- clock-names: The following clocks can be specified:
--	- oscclk: Oscillator clock.
-+- pd-parent-clock-names: The following clocks can be specified:
-+	- tclkN: Transient/Temporary parent clock.
- 	- pclkN, clkN: Pairs of parent of input clock and input clock to the
--		devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
--		are supported currently.
-+	devices in this power domain.
-+	Maximum of 10 sets (N = 0 to 9) are supported.
- - parents: phandle of parent power domains.
- 
- Node of a device using power domains must have a samsung,power-domain property
-@@ -40,9 +40,9 @@ Example:
- 	mfc_pd: power-domain at 10044060 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10044060 0x20>;
--		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_SW_ACLK333>,
-+		pd-parent-clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_SW_ACLK333>,
- 			<&clock CLK_MOUT_USER_ACLK333>;
--		clock-names = "oscclk", "pclk0", "clk0";
-+		pd-parent-clock-names = "tclk0", "pclk0", "clk0";
- 		#power-domain-cells = <0>;
- 	};
- 
-diff --git a/drivers/soc/samsung/pm_domains.c b/drivers/soc/samsung/pm_domains.c
-index 89e2fd5..96196f8 100644
---- a/drivers/soc/samsung/pm_domains.c
-+++ b/drivers/soc/samsung/pm_domains.c
-@@ -24,11 +24,18 @@
- #include <linux/sched.h>
- #include <linux/soc/samsung/exynos-pmu.h>
- 
--#define MAX_CLK_PER_DOMAIN	4
-+#define MAX_CLK_PER_DOMAIN	30
- #define MAX_PARENT_POWER_DOMAIN	10
- 
- static struct exynos_pmu_pd_ops *pd_ops;
- 
-+struct clk_parent_list {
-+	struct clk **clks;
-+	struct clk **parent_clks;
-+	struct clk **trans_clks;
-+	unsigned int count;
-+};
-+
- /*
-  * Exynos specific wrapper around the generic power domain
-  */
-@@ -37,65 +44,152 @@ struct exynos_pm_domain {
- 	char const *name;
- 	bool is_off;
- 	struct generic_pm_domain pd;
--	struct clk *oscclk;
--	struct clk *clk[MAX_CLK_PER_DOMAIN];
--	struct clk *pclk[MAX_CLK_PER_DOMAIN];
-+	struct clk_parent_list *clk_parent;
- };
- 
--static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
-+static struct clk *exynos_pd_clk_get(struct device_node *np,
-+			char *initial_property,	char *clk_name)
- {
--	struct exynos_pm_domain *pd;
--	void __iomem *base;
--	int ret = 0;
-+	struct of_phandle_args clkspec;
-+	struct clk *clk;
-+	int rc, index;
-+	char name[32];
-+
-+	sprintf(name, "%s-clock-names", initial_property);
-+	index = of_property_match_string(np, name, clk_name);
-+	if (index < 0)
-+		return ERR_PTR(-EINVAL);
-+
-+	sprintf(name, "%s-clocks", initial_property);
-+
-+	rc = of_parse_phandle_with_args(np, name, "#clock-cells", index,
-+					&clkspec);
-+	if (rc)
-+		return ERR_PTR(rc);
-+
-+	clk = of_clk_get_from_provider(&clkspec);
-+	of_node_put(clkspec.np);
-+	return clk;
-+}
- 
--	pd = container_of(domain, struct exynos_pm_domain, pd);
--	base = pd->base;
-+static int pd_init_parent_clocks(struct platform_device *pdev,
-+		struct device_node *np, struct exynos_pm_domain *pd)
-+{
-+	struct clk_parent_list *list;
-+	char clk_name[8];
-+	int count, i;
-+	struct clk *clk = ERR_PTR(-ENOENT);
-+
-+	list = devm_kzalloc(&pdev->dev, sizeof(*list), GFP_KERNEL);
-+	if (!list)
-+		return -ENOMEM;
-+
-+	pd->clk_parent = list;
-+
-+	/*
-+	 * Each clock re-parenting data set contains 3 elements- tclkX, pclkX
-+	 * and clkX, where X can vary between 0-9.
-+	 */
-+	count = of_property_count_strings(np, "pd-parent-clock-names");
-+	if (!count || (count % 3) || count > MAX_CLK_PER_DOMAIN)
-+		return -EINVAL;
- 
--	/* Set oscclk before powering off a domain*/
--	if (!power_on) {
--		int i;
-+	list->count = count / 3;
-+
-+	list->clks = devm_kzalloc(&pdev->dev,
-+			sizeof(*list->clks) * list->count, GFP_KERNEL);
-+	if (!list->clks)
-+		return -ENOMEM;
-+
-+	list->parent_clks = devm_kzalloc(&pdev->dev,
-+			sizeof(*list->parent_clks) * list->count, GFP_KERNEL);
-+	if (!list->parent_clks)
-+		return -ENOMEM;
-+
-+	list->trans_clks = devm_kzalloc(&pdev->dev,
-+			sizeof(*list->trans_clks) * list->count, GFP_KERNEL);
-+	if (!list->trans_clks)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < list->count; i++) {
-+		snprintf(clk_name, sizeof(clk_name), "tclk%d", i);
-+		clk = exynos_pd_clk_get(np, "pd-parent", clk_name);
-+		if (IS_ERR(clk)) {
-+			dev_err(&pdev->dev, "%s clock not found\n", clk_name);
-+			return -EINVAL;
-+		}
-+		list->trans_clks[i] = clk;
- 
--		for (i = 0; i < MAX_CLK_PER_DOMAIN; i++) {
--			if (IS_ERR(pd->clk[i]))
--				break;
--			if (clk_set_parent(pd->clk[i], pd->oscclk))
--				pr_err("%s: error setting oscclk as parent to clock %d\n",
--						pd->name, i);
-+		snprintf(clk_name, sizeof(clk_name), "pclk%d", i);
-+		clk = exynos_pd_clk_get(np, "pd-parent", clk_name);
-+		if (IS_ERR(clk)) {
-+			dev_err(&pdev->dev, "%s clock not found\n", clk_name);
-+			return -EINVAL;
- 		}
-+		list->parent_clks[i] = clk;
-+
-+		snprintf(clk_name, sizeof(clk_name), "clk%d", i);
-+		clk = exynos_pd_clk_get(np, "pd-parent", clk_name);
-+		if (IS_ERR(clk)) {
-+			dev_err(&pdev->dev, "%s clock not found\n", clk_name);
-+			return -EINVAL;
-+		}
-+		list->clks[i] = clk;
- 	}
-+	dev_info(&pdev->dev, "pd parent clocks initialised\n");
-+	return 0;
-+}
- 
--	if (power_on)
--		ret = pd_ops->pd_on(domain->name, base);
--	else
--		ret = pd_ops->pd_off(domain->name, base);
-+static void exynos_pd_post_poweron(struct exynos_pm_domain *pd)
-+{
-+	struct clk_parent_list *p_list;
-+	int i;
- 
--	if (ret)
--		return ret;
-+	p_list = pd->clk_parent;
-+	if (!p_list)
-+		return;
- 
--	/* Restore clocks after powering on a domain*/
--	if (power_on) {
--		int i;
-+	/* Set the parents clocks correctly */
-+	for (i = 0; i < p_list->count; i++)
-+		clk_set_parent(p_list->clks[i], p_list->parent_clks[i]);
-+}
- 
--		for (i = 0; i < MAX_CLK_PER_DOMAIN; i++) {
--			if (IS_ERR(pd->clk[i]))
--				break;
--			if (clk_set_parent(pd->clk[i], pd->pclk[i]))
--				pr_err("%s: error setting parent to clock%d\n",
--						pd->name, i);
--		}
--	}
-+static void exynos_pd_poweroff_prepare(struct exynos_pm_domain *pd)
-+{
-+	struct clk_parent_list *p_list;
-+	int i;
- 
--	return ret;
-+	p_list = pd->clk_parent;
-+	if (!p_list)
-+		return;
-+
-+	/* Reparent the clocks to the transient clocks before power off */
-+	for (i = 0; i < p_list->count; i++)
-+		clk_set_parent(p_list->clks[i], p_list->trans_clks[i]);
- }
- 
- static int exynos_pd_power_on(struct generic_pm_domain *domain)
- {
--	return exynos_pd_power(domain, true);
-+	int ret = 0;
-+	struct exynos_pm_domain *pd;
-+
-+	pd = container_of(domain, struct exynos_pm_domain, pd);
-+	ret = pd_ops->pd_on(domain->name, pd->base);
-+	if (ret)
-+		return ret;
-+	exynos_pd_post_poweron(pd);
-+	return ret;
- }
- 
- static int exynos_pd_power_off(struct generic_pm_domain *domain)
- {
--	return exynos_pd_power(domain, false);
-+	int ret = 0;
-+	struct exynos_pm_domain *pd;
-+
-+	pd = container_of(domain, struct exynos_pm_domain, pd);
-+	exynos_pd_poweroff_prepare(pd);
-+	ret = pd_ops->pd_off(domain->name, pd->base);
-+	return ret;
- }
- 
- static int exynos_power_domain_probe(struct platform_device *pdev)
-@@ -118,7 +212,6 @@ static int exynos_power_domain_probe(struct platform_device *pdev)
- 
- 	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
- 		struct exynos_pm_domain *pd;
--		int i;
- 		bool on;
- 		const char *name;
- 
-@@ -139,30 +232,10 @@ static int exynos_power_domain_probe(struct platform_device *pdev)
- 		pd->pd.power_off = exynos_pd_power_off;
- 		pd->pd.power_on = exynos_pd_power_on;
- 
--		pd->oscclk = of_clk_get_by_name(np, "oscclk");
--		if (IS_ERR(pd->oscclk))
--			goto no_clk;
--
--		for (i = 0; i < MAX_CLK_PER_DOMAIN; i++) {
--			char clk_name[8];
--
--			snprintf(clk_name, sizeof(clk_name), "clk%d", i);
--			pd->clk[i] = of_clk_get_by_name(np, clk_name);
--			if (IS_ERR(pd->clk[i]))
--				break;
--			snprintf(clk_name, sizeof(clk_name), "pclk%d", i);
--			pd->pclk[i] = of_clk_get_by_name(np, clk_name);
--			if (IS_ERR(pd->pclk[i])) {
--				clk_put(pd->clk[i]);
--				pd->clk[i] = ERR_PTR(-EINVAL);
--				break;
--			}
--		}
--
--		if (IS_ERR(pd->clk[0]))
--			clk_put(pd->oscclk);
-+		if (of_find_property(np, "pd-parent-clocks", NULL))
-+			if (pd_init_parent_clocks(pdev, np, pd))
-+				return -EINVAL;
- 
--no_clk:
- 		on = pd_ops->pd_status(pd->base);
- 
- 		pm_genpd_init(&pd->pd, NULL, !on);
--- 
-1.7.9.5
+On Monday, November 24, 2014 07:36:10 AM Amit Daniel Kachhap wrote:
+> This patch series [1 - 5] performs,
+> 
+> 1) Moves pmu driver to driver/soc/samsung folder. This is needed as exynos7 is
+>    an arm64 based platform and hence PMU driver should be in driver folder.
+>    Some discussion happened about this in the v1 version. Finally adding it in
+>    driver/soc folder as it too SoC specific and not a general driver.
+>    Entire discussion can be found here (A).
+> 2) Add exynos7 PMU support.
+
+Some months ago (when the work on moving PMU driver out of mach-exynos
+started) I asked how much code would be shared between arm32 and arm64
+SoCs.  Now it seems that the code in question is minimal so I still
+wonder whether it is really worth to have a common driver (please note
+that in case of arm32 kernel all arm64 PMU code is just a dead code,
+similarly for arm64 kernel and arm32 PMU code).  Would it be possible
+to do the analysis of the additional source code needed vs saved code
+in the resulting binary for the case of having separate drivers?
+
+Could you also please take a look into fixing patch #4 to be compatible
+with http://lkml.iu.edu/hypermail/linux/kernel/1407.1/00298.html ?
+(It seems that just adding separate struct exynos_pmu_conf_extra for
+->pmu_config_extra shold be okay.)
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+> 3) Enables the driver for 32bit arm exynos platforms.
+> 
+> Changes from V3:
+> * Fixed Kconfig as per Russell feedback
+> * Rebased the series against Pankaj SoC restart consolidation patches (D) as per
+>   Kukjin request.
+> * Link to V3 can be found here (C)
+> 
+> Changes from V2:
+> * Added review comment changes suggested by Pankaj.
+> * Removed mfd client support in this patch series. This will be added later in
+>   the power domain patch series.
+> * Link to V2 can be found here (B)
+> 
+> Changes from V1:
+> * Move pmu driver in driver/soc/samsung folder
+> * Removed the power domain features. They will posted as a separate series.
+> * Added exynos7 PMU support.
+> * Link to v1 can be found here (A)
+> 
+> This complete patch series is rebased on Kukjin for-next tree.
+> 
+> (A) - http://www.spinics.net/lists/linux-samsung-soc/msg38442.html
+> (B) - http://www.spinics.net/lists/arm-kernel/msg375910.html
+> (C) - http://www.spinics.net/lists/linux-samsung-soc/msg39237.html 
+> (D) - http://www.spinics.net/lists/linux-samsung-soc/msg39095.html
+> 
+> Amit Daniel Kachhap (5):
+>   ARM: EXYNOS: Move pmu specific header files under "linux/soc/samsung"
+>   drivers: soc: Add support for Exynos PMU driver
+>   driver: soc: exynos-pmu: Add an API to be called after wakeup
+>   drivers: soc: exynos-pmu: Add support for Exynos7
+>   arm: exynos: Select SOC_SAMSUNG config option
+> 
+>  .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+>  arch/arm/mach-exynos/Kconfig                       |    1 +
+>  arch/arm/mach-exynos/Makefile                      |    2 +-
+>  arch/arm/mach-exynos/exynos.c                      |    2 +-
+>  arch/arm/mach-exynos/mcpm-exynos.c                 |    2 +-
+>  arch/arm/mach-exynos/platsmp.c                     |    2 +-
+>  arch/arm/mach-exynos/pm.c                          |    4 +-
+>  arch/arm/mach-exynos/suspend.c                     |    4 +-
+>  drivers/soc/Kconfig                                |    1 +
+>  drivers/soc/Makefile                               |    1 +
+>  drivers/soc/samsung/Kconfig                        |   20 +
+>  drivers/soc/samsung/Makefile                       |    1 +
+>  .../pmu.c => drivers/soc/samsung/exynos-pmu.c      |  442 +++++++++++++++++++-
+>  .../linux/soc/samsung}/exynos-pmu.h                |    1 +
+>  .../linux/soc/samsung/exynos-regs-pmu.h            |  273 ++++++++++++
+>  15 files changed, 744 insertions(+), 13 deletions(-)
+>  create mode 100644 drivers/soc/samsung/Kconfig
+>  create mode 100644 drivers/soc/samsung/Makefile
+>  rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (64%)
+>  rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (89%)
+>  rename arch/arm/mach-exynos/regs-pmu.h => include/linux/soc/samsung/exynos-regs-pmu.h (63%)
