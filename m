@@ -1,109 +1,81 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Sun, 23 Nov 2014 23:02:44 -0800
-Subject: [PATCH v5] clocksource: arch_timer: Fix code to use physical timers
- when requested
-Message-ID: <1416812564-26465-1-git-send-email-sonnyrao@chromium.org>
+From: krishna.md@samsung.com (D Krishna Mohan)
+Date: Mon, 24 Nov 2014 12:48:31 +0530
+Subject: [PATCH] ASoC: rt5631: Fixing compilation warning when DT is
+ disabled
+In-Reply-To: <20141117155617.GJ27002@pengutronix.de>
+References: <1416232589-31319-1-git-send-email-krishna.md@samsung.com>
+ <20141117155617.GJ27002@pengutronix.de>
+Message-ID: <C8902B5E8A6B4B63A3B9A732345B33AD@sisodomain.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a bug fix for using physical arch timers when
-the arch_timer_use_virtual boolean is false.  It restores the
-arch_counter_get_cntpct() function after removal in
+Attaching the patch with changes suggested by Uwe. Though there is another 
+patch which I submitted, but I leave it to Mark Brown as to which patch to 
+pick.
 
-0d651e4e "clocksource: arch_timer: use virtual counters"
+Previous patch :
+>From 80b55f898d0a31b63fd6ed3bd82c548a0559b07b Mon Sep 17 00:00:00 2001
+From: Krishna Mohan Dani <krishna.md@samsung.com>
+Date: Mon, 17 Nov 2014 19:24:46 +0530
+Subject: [PATCH 1/2] ASoC: rt5631: Fixing compilation warning when DT is
+ disabled
 
-We need this on certain ARMv7 systems which are architected like this:
+-Krishna
 
-* The firmware doesn't know and doesn't care about hypervisor mode and
-  we don't want to add the complexity of hypervisor there.
+--------------------------------------------------
+From: "UweKleine-K?nig" <u.kleine-koenig@pengutronix.de>
+Sent: Monday, November 17, 2014 9:26 PM
+To: "Krishna Mohan Dani" <krishna.md@samsung.com>
+Cc: <linux-samsung-soc@vger.kernel.org>; 
+<linux-arm-kernel@lists.infradead.org>; <alsa-devel@alsa-project.org>; 
+<broonie@kernel.org>; <kgene.kim@samsung.com>; "Claude Youn" 
+<claude.youn@gmail.com>
+Subject: Re: [PATCH] ASoC: rt5631: Fixing compilation warning when DT is 
+disabled
 
-* The firmware isn't involved in SMP bringup or resume.
-
-* The ARCH timer come up with an uninitialized offset between the
-  virtual and physical counters.  Each core gets a different random
-  offset.
-
-* The device boots in "Secure SVC" mode.
-
-* Nothing has touched the reset value of CNTHCTL.PL1PCEN or
-  CNTHCTL.PL1PCTEN (both default to 1 at reset)
-
-One example of such as system is RK3288 where it is much simpler to
-use the physical counter since there's nobody managing the offset and
-each time a core goes down and comes back up it will get reinitialized
-to some other random value.
-
-Fixes: 0d651e4e65e9 ("clocksource: arch_timer: use virtual counters")
-Cc: stable at vger.kernel.org
-Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-Acked-by: Olof Johansson <olof@lixom.net>
----
-v2: Add fixes tag to commit message, cc stable, copy Doug's
-    description of the systems which need this in commit message.
-v3: Don't change the memory-mapped physical timer/counter code
-v4: remove the memory-mapped physical counter code since it's not used
-v5: rebase and make AArch64 version of arch_counter_get_cntpct call BUG()
----
- arch/arm/include/asm/arch_timer.h    | 9 +++++++++
- arch/arm64/include/asm/arch_timer.h  | 9 +++++++++
- drivers/clocksource/arm_arch_timer.c | 5 ++++-
- 3 files changed, 22 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index 92793ba..d4ebf56 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -78,6 +78,15 @@ static inline u32 arch_timer_get_cntfrq(void)
- 	return val;
- }
- 
-+static inline u64 arch_counter_get_cntpct(void)
-+{
-+	u64 cval;
-+
-+	isb();
-+	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
-+	return cval;
-+}
-+
- static inline u64 arch_counter_get_cntvct(void)
- {
- 	u64 cval;
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index f190971..b1fa4e6 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -104,6 +104,15 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
- 	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
- }
- 
-+static inline u64 arch_counter_get_cntpct(void)
-+{
-+	/*
-+	 * AArch64 kernel and user space mandate the use of CNTVCT.
-+	 */
-+	BUG();
-+	return 0;
-+}
-+
- static inline u64 arch_counter_get_cntvct(void)
- {
- 	u64 cval;
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 43005d4..1fa2af9 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -462,7 +462,10 @@ static void __init arch_counter_register(unsigned type)
- 
- 	/* Register the CP15 based counter if we have one */
- 	if (type & ARCH_CP15_TIMER) {
--		arch_timer_read_counter = arch_counter_get_cntvct;
-+		if (arch_timer_use_virtual)
-+			arch_timer_read_counter = arch_counter_get_cntvct;
-+		else
-+			arch_timer_read_counter = arch_counter_get_cntpct;
- 	} else {
- 		arch_timer_read_counter = arch_counter_get_cntvct_mem;
- 
--- 
-2.1.0.rc2.206.gedb03e5
+> On Mon, Nov 17, 2014 at 07:26:29PM +0530, Krishna Mohan Dani wrote:
+>> Fixes the following compilation warning:
+>> Warning: 'rt5631_i2c_dt_ids' defined but not used - when DT is not used.
+>>
+>> Signed-off-by: Claude Youn <claude.youn@gmail.com>
+>> Signed-off-by: Krishna Mohan Dani <krishna.md@samsung.com>
+>> ---
+>>  sound/soc/codecs/rt5631.c |    2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/sound/soc/codecs/rt5631.c b/sound/soc/codecs/rt5631.c
+>> index 3b7d5e4..9425545 100644
+>> --- a/sound/soc/codecs/rt5631.c
+>> +++ b/sound/soc/codecs/rt5631.c
+>> @@ -1691,12 +1691,14 @@ static const struct i2c_device_id rt5631_i2c_id[] 
+>> = {
+>>  };
+>>  MODULE_DEVICE_TABLE(i2c, rt5631_i2c_id);
+>>
+>> +#ifdef CONFIG_OF
+>>  static struct of_device_id rt5631_i2c_dt_ids[] = {
+>>  { .compatible = "realtek,rt5631"},
+>>  { .compatible = "realtek,alc5631"},
+>>  { }
+>>  };
+>>  MODULE_DEVICE_TABLE(of, rt5631_i2c_dt_ids);
+>> +#endif
+>
+> An (IMHO nicer) alternative is:
+>
+> -static struct of_device_id rt5631_i2c_dt_ids[] = {
+> +static struct of_device_id rt5631_i2c_dt_ids[] __maybe_unused = {
+>
+> Best regards
+> Uwe
+>
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  | 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ASoC-rt5631-Fixing-compilation-warning-when-DT-is-di.patch
+Type: application/octet-stream
+Size: 1051 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/c50ab313/attachment.obj>
