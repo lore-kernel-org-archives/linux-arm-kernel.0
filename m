@@ -1,128 +1,52 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 24 Nov 2014 10:01:36 +0100
-Subject: [PATCH v5] clocksource: arch_timer: Fix code to use physical
- timers when requested
-In-Reply-To: <1416812564-26465-1-git-send-email-sonnyrao@chromium.org>
-References: <1416812564-26465-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <5472F3F0.8060701@linaro.org>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 24 Nov 2014 14:31:53 +0530
+Subject: [PATCH v4 1/2] i2c: s3c2410: Handle i2c sys_cfg register in i2c
+ driver
+In-Reply-To: <019101d005ed$fd3d5eb0$f7b81c10$@kernel.org>
+References: <1414656270-8048-1-git-send-email-pankaj.dubey@samsung.com>
+ <1414656270-8048-2-git-send-email-pankaj.dubey@samsung.com>
+ <20141121072545.GG1480@katana> <546F1140.4050709@samsung.com>
+ <20141121164726.GA1426@katana> <019101d005ed$fd3d5eb0$f7b81c10$@kernel.org>
+Message-ID: <5472F401.30404@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2014 08:02 AM, Sonny Rao wrote:
-> This is a bug fix for using physical arch timers when
-> the arch_timer_use_virtual boolean is false.  It restores the
-> arch_counter_get_cntpct() function after removal in
->
-> 0d651e4e "clocksource: arch_timer: use virtual counters"
->
-> We need this on certain ARMv7 systems which are architected like this:
->
-> * The firmware doesn't know and doesn't care about hypervisor mode and
->    we don't want to add the complexity of hypervisor there.
->
-> * The firmware isn't involved in SMP bringup or resume.
->
-> * The ARCH timer come up with an uninitialized offset between the
->    virtual and physical counters.  Each core gets a different random
->    offset.
->
-> * The device boots in "Secure SVC" mode.
->
-> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
->    CNTHCTL.PL1PCTEN (both default to 1 at reset)
->
-> One example of such as system is RK3288 where it is much simpler to
-> use the physical counter since there's nobody managing the offset and
-> each time a core goes down and comes back up it will get reinitialized
-> to some other random value.
->
-> Fixes: 0d651e4e65e9 ("clocksource: arch_timer: use virtual counters")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> Acked-by: Olof Johansson <olof@lixom.net>
 
 
-Catalin,
-
-are you ok with this patch ?
-
-Thanks
-   -- Daniel
-
-> ---
-> v2: Add fixes tag to commit message, cc stable, copy Doug's
->      description of the systems which need this in commit message.
-> v3: Don't change the memory-mapped physical timer/counter code
-> v4: remove the memory-mapped physical counter code since it's not used
-> v5: rebase and make AArch64 version of arch_counter_get_cntpct call BUG()
-> ---
->   arch/arm/include/asm/arch_timer.h    | 9 +++++++++
->   arch/arm64/include/asm/arch_timer.h  | 9 +++++++++
->   drivers/clocksource/arm_arch_timer.c | 5 ++++-
->   3 files changed, 22 insertions(+), 1 deletion(-)
+On Saturday 22 November 2014 06:18 AM, Kukjin Kim wrote:
+> Wolfram Sang wrote:
+>>
+> Hi Wolfram,
 >
-> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-> index 92793ba..d4ebf56 100644
-> --- a/arch/arm/include/asm/arch_timer.h
-> +++ b/arch/arm/include/asm/arch_timer.h
-> @@ -78,6 +78,15 @@ static inline u32 arch_timer_get_cntfrq(void)
->   	return val;
->   }
+>>>> I usually don't take DTS patches. They should go via arm-soc. Please say
+>>>> so if there are reasons I should take them.
+>>>
+>>> I CC'ed to you because same patch contains changes in i2c driver.
+>>
+>> Yes, those should absolutely go via my I2C tree. You need to make a
+>> seperate patch out of the dts changes which then also should go via
+>> samsung-soc, unless Kukjin says he really wants to go the via I2C. But I
+>> guess the latter will just create merge conflicts.
 >
-> +static inline u64 arch_counter_get_cntpct(void)
-> +{
-> +	u64 cval;
-> +
-> +	isb();
-> +	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
-> +	return cval;
-> +}
-> +
->   static inline u64 arch_counter_get_cntvct(void)
->   {
->   	u64 cval;
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index f190971..b1fa4e6 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -104,6 +104,15 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
->   	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
->   }
+> Hmm...I think, Pankaj needs to submit separated patches 1) driver change, 2) dt
+> change and then 3) remove change. And 2nd and 3rd changes should be handed in
+> Samsung tree together after landing 1) change in -next.
 >
-> +static inline u64 arch_counter_get_cntpct(void)
-> +{
-> +	/*
-> +	 * AArch64 kernel and user space mandate the use of CNTVCT.
-> +	 */
-> +	BUG();
-> +	return 0;
-> +}
-> +
->   static inline u64 arch_counter_get_cntvct(void)
->   {
->   	u64 cval;
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 43005d4..1fa2af9 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -462,7 +462,10 @@ static void __init arch_counter_register(unsigned type)
->
->   	/* Register the CP15 based counter if we have one */
->   	if (type & ARCH_CP15_TIMER) {
-> -		arch_timer_read_counter = arch_counter_get_cntvct;
-> +		if (arch_timer_use_virtual)
-> +			arch_timer_read_counter = arch_counter_get_cntvct;
-> +		else
-> +			arch_timer_read_counter = arch_counter_get_cntpct;
->   	} else {
->   		arch_timer_read_counter = arch_counter_get_cntvct_mem;
->
+> Of course, 1) change should be handled in i2c tree ;)
 >
 
+Thanks for review and guidance. I separated i2c driver changes and 
+posted it as v6 here [1]. DT changes and mach-exynos removal of i2c 
+settings have been posted as v6 here [2]. Please do review and if OK 
+let's get it merged.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+[1]: i2c-driver: https://patchwork.kernel.org/patch/5363981/
+[2]: mach-exynos: 
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/40155
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks,
+Pankaj Dubey
+> Thanks,
+> Kukjin
+>
+>
