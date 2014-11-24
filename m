@@ -1,82 +1,62 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 24 Nov 2014 09:49:26 +0100
-Subject: [RESEND PATCH 1/2] ARM: dts: exynos4x12: Device tree node
- definition for TMU on Exynos4x12
-In-Reply-To: <035001d005fd$7abac670$70305350$@kernel.org>
-References: <1416474343-1283-1-git-send-email-l.majewski@samsung.com>
- <035001d005fd$7abac670$70305350$@kernel.org>
-Message-ID: <20141124094926.04ffacfd@amdc2363>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Mon, 24 Nov 2014 10:52:17 +0200
+Subject: [PATCH 3/7] pinctrl: pinconf-generic: Allow driver to specify
+ DT params
+In-Reply-To: <0c3dad3ce852435fba127e8436f0e30f@BN1BFFO11FD047.protection.gbl>
+References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1415041531-15520-4-git-send-email-soren.brinkmann@xilinx.com>
+ <CACRpkdYfj2ydLQ4q_FKwXo73jzNsvj9u2Aem9EiuEw-OCvurrg@mail.gmail.com>
+ <1416300621.30131.6.camel@mm-sol.com>
+ <995406b8e0244c63a3ef8e58314e81f6@BL2FFO11FD037.protection.gbl>
+ <1416383379.30131.14.camel@mm-sol.com>
+ <84517404cda34124930ec838a639f538@BL2FFO11FD030.protection.gbl>
+ <1416470777.28873.1.camel@mm-sol.com>
+ <7e2f4984733343fdb4ea51cf7eb4c339@BY2FFO11FD046.protection.gbl>
+ <1416555331.28873.8.camel@mm-sol.com>
+ <0c3dad3ce852435fba127e8436f0e30f@BN1BFFO11FD047.protection.gbl>
+Message-ID: <1416819137.6253.9.camel@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
 
-> Lukasz Majewski wrote:
+On Sat, 2014-11-22 at 08:06 -0800, S?ren Brinkmann wrote:
+> Hi Ivan,
+> 
+> On Fri, 2014-11-21 at 09:35AM +0200, Ivan T. Ivanov wrote:
+> > On Thu, 2014-11-20 at 08:22 -0800, S?ren Brinkmann wrote:
+> > > 
+> > > Also, I hope all my changes here don't break the current behavior. So,
+> > > those 27 driver should still be able to do what they currently do. But I
+> > > hope they could migrated over to use the generic bindings only in the
+> > > longer term, so that these custom properties disappear.
+> > > 
+> > > > > The pinctrl driver just assembles
+> > > > > some data structure that has the information regarding custom properties
+> > > > > and the core handles the rest.
+> > > > 
+> > > > Yup, that is nice. What will be really nice if it also handle custom,
+> > > > "function", "groups" and "pins" properties. Otherwise most of the drivers
+> > > > will not be able to benefit from this.
+> > > 
+> > > Why would you still need those?
 > > 
-> + Bart, Tomasz and MLs
+> > I don't need them :-). The point was that still majority of the drivers
+> > will have custom parsing functions. It would be nice if we could fix
+> > that too. I do understand that using custom "pins", "functions"... is
+> > something which is deprecated, but if core parsing functions allow
+> > passing custom strings for above purposes, in a similar way as your
+> > proposal, it will be easier for those drivers to migrate, I believe.
 > 
-> Hi Lukasz,
-> 
-> Please post including MLs, even resending.
-> 
-> Will apply for v3.19, and just note that you asked me to apply this
-> for 3.18 in personal talk but I couldn't see any requirements for
-> fixes-3.18. If I'm missing something, please let me know.
+> This does sound much more like a feature request than a fundamental
+> problem with the implementation, now. And like Laurent's feature
+> request, I'd like to turn this down. Otherwise this just gets hold up by
+> feature requests blocking pinctrl-zynq.
+> I think the interesting questions are:
+> 1. Does it break any current user?
+> 2. Is there anything fundamentally preventing adding your feature at
+> some later time as part of such a migration you describe?
 
-The thing is that by default Exynos 4412 (trats2) can run with modified
-cpufreq to support SW governed overclocking (BOOST).
+Well, as I said, this is just my opinion. Is up to Linus to decide.
 
-To provide safe BOOST operation, TMU (thermal) _must_ be configured.
-Configuration is not possible when trats2 DTS lacks of those patches.
-
-So, yes there is a requirement to add those patches to v3.18 (if not
-possible please add it to v3.19).
-
-> 
-> Thanks,
-> Kukjin
-> 
-> > The TMU device tree node definition for Exynos4x12 family of SoCs.
-> > 
-> > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-> > Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/exynos4x12.dtsi | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/exynos4x12.dtsi
-> > b/arch/arm/boot/dts/exynos4x12.dtsi index 861bb91..2e9f1f7 100644
-> > --- a/arch/arm/boot/dts/exynos4x12.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-> > @@ -271,4 +271,14 @@
-> >  		compatible = "samsung,exynos4x12-usb2-phy";
-> >  		samsung,sysreg-phandle = <&sys_reg>;
-> >  	};
-> > +
-> > +	tmu at 100C0000 {
-> > +		compatible = "samsung,exynos4412-tmu";
-> > +		interrupt-parent = <&combiner>;
-> > +		interrupts = <2 4>;
-> > +		reg = <0x100C0000 0x100>;
-> > +		clocks = <&clock 383>;
-> > +		clock-names = "tmu_apbif";
-> > +		status = "disabled";
-> > +	};
-> >  };
-> > --
-> > 2.0.0.rc2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Regards,
+Ivan
