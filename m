@@ -1,56 +1,74 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Mon, 24 Nov 2014 18:20:54 +0800
-Subject: [PATCH 4/4] ARM: ls1021a: dts: Add and enable dt node for dcfb.
-In-Reply-To: <1416824454-28156-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1416824454-28156-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1416824454-28156-5-git-send-email-Li.Xiubo@freescale.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 24 Nov 2014 10:24:56 +0000
+Subject: [PATCH v4 1/2] of: Rename "poweroff-source" property to
+ "system-power-controller"
+In-Reply-To: <20141121105951.GA20679@localhost>
+References: <1415885699-1465-1-git-send-email-user@radxa>
+ <1415885699-1465-2-git-send-email-user@radxa>
+ <20141121105951.GA20679@localhost>
+Message-ID: <20141124102456.GE4241@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On LS1021A TWR board, the TFT LCD panel is WQVGA "480x272", and
-the bpp is 24.
+On Fri, 21 Nov 2014, Johan Hovold wrote:
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
----
- arch/arm/boot/dts/ls1021a-twr.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+> On Thu, Nov 13, 2014 at 01:34:58PM +0000, Auto Configured wrote:
+> > From: Romain Perier <romain.perier@gmail.com>
+> > 
+> > It reverts commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
+> > As discussed on the mailing list, it makes more sense to rename back to the
+> > old established property name, without the vendor prefix. Problem being that
+> > the word "source" usually tends to be used for inputs and that is out of control
+> > of the OS. The poweroff capability is an output which simply turns the
+> > system-power off. Also, this property might be used by drivers which power-off
+> > the system and power back on subsequent RTC alarms. This seems to suggest to
+> > remove "poweroff" from the property name and to choose "system-power-controller"
+> > as the more generic name. This patchs adds the required renaming changes and
+> > defines an helper function which is compatible with both properties, the old one
+> > which was only used by tps65910 and the new one without vendor-prefix.
+> 
+> Now this is a bit of a mess.
+> 
+> There's a commit in the mfd tree, 25f833c1171d ("mfd: tps65910: Convert
+> ti,system-power-controller DT property to poweroff-source"), which
+> breaks all dts using tps65910 since these are never updated to the now
+> retracted property name ("poweroff-source").
 
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index a2c591e..3602286 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -58,6 +58,32 @@
- 	};
- };
- 
-+&dcfb {
-+	display = <&display>;
-+	status = "okay";
-+
-+	display: display at 0 {
-+		bits-per-pixel = <24>;
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: nl4827hc19 {
-+				clock-frequency = <10870000>;
-+				hactive = <480>;
-+				vactive = <272>;
-+				hback-porch = <2>;
-+				hfront-porch = <2>;
-+				vback-porch = <2>;
-+				vfront-porch = <2>;
-+				hsync-len = <41>;
-+				vsync-len = <4>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
-+			};
-+		};
-+	};
-+};
-+
- &dspi1 {
- 	bus-num = <0>;
- 	status = "okay";
+My word!
+
+Romain, what conversation on the MLs are you talking about?
+
+> This one should simply be reverted ASAP.
+
+No need to revert, I can just remove the patch from the MFD tree.
+
+> > Signed-off-by: Romain Perier <romain.perier@gmail.com>
+> > ---
+> >  .../bindings/power/{poweroff.txt => power-controller.txt}        | 0
+> >  .../devicetree/bindings/regulator/act8865-regulator.txt          | 4 ++--
+> >  drivers/mfd/tps65910.c                                           | 9 ++++++++-
+> >  drivers/regulator/act8865-regulator.c                            | 2 +-
+> >  include/linux/of.h                                               | 6 +++---
+> >  5 files changed, 14 insertions(+), 7 deletions(-)
+> 
+> Romain, what tree is this patch against? The changes to the tps65910
+> driver appears not to even be in the regulator tree, yet you asked Mark
+> to merge this. And the MFD maintainer is not even on CC.
+> 
+> Let's fix the breakage by reverting the offending commit in mfd. Then the
+> new standard name can be introduced in regulator alone (e.g. this patch
+> without the tps65910 bits) as nothing outside of regulator should be
+> using the new power-off feature (or binding) for act8865. Then other
+> drivers and dts can be converted to use the new property name (while
+> retaining backwards compatibility) for 3.20.
+> 
+> [ We should probably also consider adding an "of_device_is_" prefix to
+> the helper name for consistency. ]
+> 
+> Johan
+
 -- 
-2.1.0.27.g96db324
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
