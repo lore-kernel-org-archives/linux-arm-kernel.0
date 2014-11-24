@@ -1,7 +1,7 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Mon, 24 Nov 2014 12:06:39 +0100
+Date: Mon, 24 Nov 2014 12:07:03 +0100
 Subject: [PATCH v4 0/2] initial suport for Alphascale ASM9260
-Message-ID: <1416827199-16224-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <1416827225-16330-1-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
