@@ -1,80 +1,91 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Nov 2014 17:01:32 +0000
-Subject: [RFC PATCH v2 3/4] arm64:thunder: Add initial dts for Cavium's
- Thunder SoC in 2 Node topology.
-In-Reply-To: <1416605010-10442-4-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1416605010-10442-4-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-Message-ID: <5473646C.2050705@arm.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Mon, 24 Nov 2014 09:02:21 -0800
+Subject: [RFC 0/2] Qualcomm RPM sleep states
+In-Reply-To: <546FC674.1070005@codeaurora.org>
+References: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <546FC674.1070005@codeaurora.org>
+Message-ID: <CAJAp7OiLwMQEYFr9xdLg=S=cAPtN+hKZq3j5iSe0oL_Qz3URwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/11/14 21:23, Ganapatrao Kulkarni wrote:
-> adding devicetree definition for Cavium's Thunder SoC in 2 Node topology.
-> 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
-> ---
->  arch/arm64/boot/dts/thunder-88xx-2n.dts  |  88 ++++
->  arch/arm64/boot/dts/thunder-88xx-2n.dtsi | 694 +++++++++++++++++++++++++++++++
->  2 files changed, 782 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/thunder-88xx-2n.dts
->  create mode 100644 arch/arm64/boot/dts/thunder-88xx-2n.dtsi
-> 
+On Fri, Nov 21, 2014 at 3:10 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> Hi Bjorn,
+>
+Hi Stephen,
 
-[...]
+Thanks for taking the time to look at my proposal.
 
-> diff --git a/arch/arm64/boot/dts/thunder-88xx-2n.dtsi b/arch/arm64/boot/dts/thunder-88xx-2n.dtsi
-> new file mode 100644
-> index 0000000..3f217b4
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/thunder-88xx-2n.dtsi
+[..]
 
-[...]
+>
+> So the CPU really wants to only be voting for the HFPLL regulator
+> supplies in the active set. This way, if we're not using the HFPLLs
+> (i.e. the CPUs are all running off the global PLL), then we can disable
+> the regulator in the active set (RPM code only caches sleep set so we
+> won't be doing unnecessary flushes in the idle/suspend path). The clock
 
-> +       timer {
-> +               compatible = "arm,armv8-timer";
-> +               interrupts = <1 13 0xff01>,
-> +                            <1 14 0xff01>,
-> +                            <1 11 0xff01>,
-> +                            <1 10 0xff01>;
-> +       };
+In the codeaurora tree the flushing is handled by a call from the Qcom PM
+driver straight into the regulator/resource driver that have a private list of
+all regulators that it goes through and pushes out requests (while in atomic
+context).
 
-These "0xff01" cells are bogus (the GICv3 binding only specifies values
-1 and 4 for respectively edge and level triggered). My hunch is that
-they should be 4, as the timers are likely to be level triggered.
+I'm not sure how to model this in a sane way...
 
-> +
-> +       soc {
-> +               compatible = "simple-bus";
-> +               #address-cells = <2>;
-> +               #size-cells = <2>;
-> +               ranges;
-> +
-> +               refclk50mhz: refclk50mhz {
-> +                       compatible = "fixed-clock";
-> +                       #clock-cells = <0>;
-> +                       clock-frequency = <50000000>;
-> +                       clock-output-names = "refclk50mhz";
-> +               };
-> +
-> +               gic0: interrupt-controller at 8010,00000000 {
-> +                       compatible = "arm,gic-v3";
-> +                       #interrupt-cells = <3>;
-> +                       #address-cells = <2>;
-> +                       #size-cells = <2>;
-> +                       #redistributor-regions = <2>;
-> +                       ranges;
-> +                       interrupt-controller;
-> +                       reg = <0x8010 0x00000000 0x0 0x010000>, /* GICD */
-> +                             <0x8010 0x80000000 0x0 0x600000>, /* GICR Node 0 */
-> +                             <0x9010 0x80000000 0x0 0x600000>; /* GICR Node 1 */
-> +                       interrupts = <1 9 0xf04>;
-> +                     };
+> driver will make sure to turn off the HFPLLs before we go into a sleep
+> state that would trigger a switch from active to sleep set (commonly
+> referred to as RPM notification). It very well could be that there are
+> other consumers of the same regulator, but that doesn't matter to the
+> CPU clock driver because it only cares about the active set. Now you may
 
-Same here.
+Okay, so CPUFREQ or a system suspend can explicitly call regulator_disable() on
+our shared regulator and in CPUIDLE we will just depend on the sleep state?
 
-Thanks,
+> ask why can't the CPU clock driver disable the regulator when the HFPLL
+> is disabled? We don't do that in this case because a) it causes more RPM
+> communication overhead and b) we will be in atomic context when the
+> HFPLL is disabled during idle/suspend and the regulator APIs are
+> sleeping calls. In the non-idle/suspend path we will disable the regulator.
+>
+> Also the active/sleep sets are about more than just on/off state. We may
+> have a situation where the active set voltage (or some other attribute
+> like current, mode, etc.) is different than the sleep set voltage. For
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+You're using the word "may" here and the code clearly would let you do this,
+the part I've been struggeling with is to backtrack the consumers to figure out
+if this is actually done.
+
+> example, the CPU is supplied by a digital logic regulator that is shared
+> with other digital logic in the SoC (GPU, wifi, etc.). The CPU may
+> require some high voltage, but the GPU only needs some lower voltage.
+> The suspend/idle code relies on the fact that the GPU is voting on the
+> active+sleep regulator while the CPU is voting on the active only
+> regulator so that the RPM can automatically switch between high voltage
+> and low voltage when the CPU notifies the RPM that it's gone idle (or
+> the CPU wakes up).
+
+Okay, so when we're hitting CPUIDLE we need to lower the voltage on the
+regulator, should I assume that this then must be raised before the CPU starts
+executing again?
+
+
+So what it boils down to is, like the codeaurora code shows, our regulator
+driver must be able to set properties on active only or both states depending
+on which regulator consumer makes the request.
+
+For the reference; the codeaurora code models this as "resources" with 2 set of
+properties, multiple regulators are then tied to the same resource, poking the
+individual sets based on properties of the regulator (active or both). So in
+essense we get multiple regulator instances per regulator hardware.
+
+
+The problem with this model is that it's circumventing the fact that the
+regulator framework doesn't support our use cases - and I don't like this.
+I think we need to sit down and discuss this more in detail, most likely with
+Mark.
+
+
+This concludes that we cannot merge my currently proposed solution, because we
+will have to redesign the DT bindings.
+
+Regards,
+Bjorn
