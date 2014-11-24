@@ -1,74 +1,116 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 24 Nov 2014 10:24:56 +0000
-Subject: [PATCH v4 1/2] of: Rename "poweroff-source" property to
- "system-power-controller"
-In-Reply-To: <20141121105951.GA20679@localhost>
-References: <1415885699-1465-1-git-send-email-user@radxa>
- <1415885699-1465-2-git-send-email-user@radxa>
- <20141121105951.GA20679@localhost>
-Message-ID: <20141124102456.GE4241@x1>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 24 Nov 2014 11:31:33 +0100
+Subject: [PATCH v4 01/12] sched: fix imbalance flag reset
+In-Reply-To: <5471B635.3050006@gmail.com>
+References: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
+ <1406569906-9763-2-git-send-email-vincent.guittot@linaro.org>
+ <5471B635.3050006@gmail.com>
+Message-ID: <CAKfTPtB_xsb0LpYu6ye0x5SK3+TcPhZ1uNioo_OtX+bjP15DsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Nov 2014, Johan Hovold wrote:
+On 23 November 2014 at 11:25, Wanpeng Li <kernellwp@gmail.com> wrote:
+> Hi Vincent,
+> On 7/29/14, 1:51 AM, Vincent Guittot wrote:
+>>
+>> The imbalance flag can stay set whereas there is no imbalance.
+>>
+>> Let assume that we have 3 tasks that run on a dual cores /dual cluster
+>> system.
+>> We will have some idle load balance which are triggered during tick.
+>> Unfortunately, the tick is also used to queue background work so we can
+>> reach
+>> the situation where short work has been queued on a CPU which already runs
+>> a
+>> task. The load balance will detect this imbalance (2 tasks on 1 CPU and an
+>> idle
+>> CPU) and will try to pull the waiting task on the idle CPU. The waiting
+>> task is
+>> a worker thread that is pinned on a CPU so an imbalance due to pinned task
+>> is
+>> detected and the imbalance flag is set.
+>
+>
+> The waiting task is the third task or one the '2 tasks on 1 CPU' ?
 
-> On Thu, Nov 13, 2014 at 01:34:58PM +0000, Auto Configured wrote:
-> > From: Romain Perier <romain.perier@gmail.com>
-> > 
-> > It reverts commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
-> > As discussed on the mailing list, it makes more sense to rename back to the
-> > old established property name, without the vendor prefix. Problem being that
-> > the word "source" usually tends to be used for inputs and that is out of control
-> > of the OS. The poweroff capability is an output which simply turns the
-> > system-power off. Also, this property might be used by drivers which power-off
-> > the system and power back on subsequent RTC alarms. This seems to suggest to
-> > remove "poweroff" from the property name and to choose "system-power-controller"
-> > as the more generic name. This patchs adds the required renaming changes and
-> > defines an helper function which is compatible with both properties, the old one
-> > which was only used by tps65910 and the new one without vendor-prefix.
-> 
-> Now this is a bit of a mess.
-> 
-> There's a commit in the mfd tree, 25f833c1171d ("mfd: tps65910: Convert
-> ti,system-power-controller DT property to poweroff-source"), which
-> breaks all dts using tps65910 since these are never updated to the now
-> retracted property name ("poweroff-source").
+The waiting task is one of the 2 tasks on 1 CPU (the worker)
 
-My word!
+Regards,
+Vincent
 
-Romain, what conversation on the MLs are you talking about?
-
-> This one should simply be reverted ASAP.
-
-No need to revert, I can just remove the patch from the MFD tree.
-
-> > Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> > ---
-> >  .../bindings/power/{poweroff.txt => power-controller.txt}        | 0
-> >  .../devicetree/bindings/regulator/act8865-regulator.txt          | 4 ++--
-> >  drivers/mfd/tps65910.c                                           | 9 ++++++++-
-> >  drivers/regulator/act8865-regulator.c                            | 2 +-
-> >  include/linux/of.h                                               | 6 +++---
-> >  5 files changed, 14 insertions(+), 7 deletions(-)
-> 
-> Romain, what tree is this patch against? The changes to the tps65910
-> driver appears not to even be in the regulator tree, yet you asked Mark
-> to merge this. And the MFD maintainer is not even on CC.
-> 
-> Let's fix the breakage by reverting the offending commit in mfd. Then the
-> new standard name can be introduced in regulator alone (e.g. this patch
-> without the tps65910 bits) as nothing outside of regulator should be
-> using the new power-off feature (or binding) for act8865. Then other
-> drivers and dts can be converted to use the new property name (while
-> retaining backwards compatibility) for 3.20.
-> 
-> [ We should probably also consider adding an "of_device_is_" prefix to
-> the helper name for consistency. ]
-> 
-> Johan
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>
+> Regards,
+> Wanpeng Li
+>
+>
+>> Then, we will not be able to clear the flag because we have at most 1 task
+>> on
+>> each CPU but the imbalance flag will trig to useless active load balance
+>> between the idle CPU and the busy CPU.
+>>
+>> We need to reset of the imbalance flag as soon as we have reached a
+>> balanced
+>> state. If all tasks are pinned, we don't consider that as a balanced state
+>> and
+>> let the imbalance flag set.
+>>
+>> Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> ---
+>>   kernel/sched/fair.c | 23 +++++++++++++++++++----
+>>   1 file changed, 19 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+>> index 923fe32..7eb9126 100644
+>> --- a/kernel/sched/fair.c
+>> +++ b/kernel/sched/fair.c
+>> @@ -6672,10 +6672,8 @@ static int load_balance(int this_cpu, struct rq
+>> *this_rq,
+>>                 if (sd_parent) {
+>>                         int *group_imbalance =
+>> &sd_parent->groups->sgc->imbalance;
+>>   -                     if ((env.flags & LBF_SOME_PINNED) && env.imbalance
+>> > 0) {
+>> +                       if ((env.flags & LBF_SOME_PINNED) && env.imbalance
+>> > 0)
+>>                                 *group_imbalance = 1;
+>> -                       } else if (*group_imbalance)
+>> -                               *group_imbalance = 0;
+>>                 }
+>>                 /* All tasks on this runqueue were pinned by CPU affinity
+>> */
+>> @@ -6686,7 +6684,7 @@ static int load_balance(int this_cpu, struct rq
+>> *this_rq,
+>>                                 env.loop_break = sched_nr_migrate_break;
+>>                                 goto redo;
+>>                         }
+>> -                       goto out_balanced;
+>> +                       goto out_all_pinned;
+>>                 }
+>>         }
+>>   @@ -6760,6 +6758,23 @@ static int load_balance(int this_cpu, struct rq
+>> *this_rq,
+>>         goto out;
+>>     out_balanced:
+>> +       /*
+>> +        * We reach balance although we may have faced some affinity
+>> +        * constraints. Clear the imbalance flag if it was set.
+>> +        */
+>> +       if (sd_parent) {
+>> +               int *group_imbalance = &sd_parent->groups->sgc->imbalance;
+>> +
+>> +               if (*group_imbalance)
+>> +                       *group_imbalance = 0;
+>> +       }
+>> +
+>> +out_all_pinned:
+>> +       /*
+>> +        * We reach balance because all tasks are pinned at this level so
+>> +        * we can't migrate them. Let the imbalance flag set so parent
+>> level
+>> +        * can try to migrate them.
+>> +        */
+>>         schedstat_inc(sd, lb_balanced[idle]);
+>>         sd->nr_balance_failed = 0;
+>
+>
