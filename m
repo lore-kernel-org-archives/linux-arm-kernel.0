@@ -1,52 +1,38 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Mon, 24 Nov 2014 17:59:53 +0530
-Subject: [PATCH 0/4] mmc: sdhci: adding support for a new Fujitsu sdhci IP
-In-Reply-To: <CAPDyKFruGDj5z5+i6FLT2YHhKPvY6wFE98dBQYsJroCNST_fyw@mail.gmail.com>
-References: <1416531100-26707-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <CAPDyKFqZyUT+sARZQ2ncusttDWn31uQf_H2eTtHOSCs2c8yO4A@mail.gmail.com>
- <CAOEd-H2qbWgaauX=phfFk8HQqHk9gff3m_uoZqc+4Gbc6LZ-Lg@mail.gmail.com>
- <CAPDyKFruGDj5z5+i6FLT2YHhKPvY6wFE98dBQYsJroCNST_fyw@mail.gmail.com>
-Message-ID: <CAJe_ZhfvMCE4vxu76j2TBFZC90=tKm+yo+-Gf1WJq5oQT5_P+g@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 24 Nov 2014 13:35:06 +0100
+Subject: [PATCH v4 0/6] Touchscreen performance related fixes
+In-Reply-To: <547321A2.6010207@ti.com>
+References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
+ <20141124115116.GA14997@linutronix.de> <547321A2.6010207@ti.com>
+Message-ID: <547325FA.6020004@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 November 2014 at 17:24, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 24 November 2014 at 11:45, Vincent Yang
-> <vincent.yang.fujitsu@gmail.com> wrote:
->> 2014-11-24 17:54 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
->>> On 21 November 2014 at 01:51, Vincent Yang
->>> <vincent.yang.fujitsu@gmail.com> wrote:
->>>> Hello,
->>>>
->>>>   Fujitsu have an sdhci IP which is implemented in a SoC we're
->>>> adding to mainline, the most recent series for that was sent
->>>> here:
->>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304522.html
->>>>
->>>>   These patches are against v3.18-rc5 mainline and tested on
->>>> v3.18-rc5 integration tree.
->>>>
->>>>   We welcome any comment and advice about how to make any
->>>> improvements or better align them with upstream.
->>>
->>> Apparently, there's a dependency between this patchset and the upper
->>> one you refereed to. That's a problem.
->>
->> This patchset does not require anything from the upper one I refereed to.
->
-> No, but the upper depends on this patchset.
->
-> Why can't you send the mmc patches separately in one patchset? That's
-> would be easier to handle and review.
->
-To be clear, the arch patchset introduces support for a new Fujitsu's
-platform and has a sdhci controller driver named sdhci_f_sdh30.c which
-will use 'general' improvements introduced by this patchset.
+On 11/24/2014 01:16 PM, Vignesh R wrote:
 
-I would think the controller driver has more dependency on ARCH than
-this patchset. IOW, sdhci_f_sdh30.c can't get upstream without arch
-patches but this patchset can without the sdhci_f_sdh30.c driver.  Is
-that not so?
+> I have tried running both IIO and TSC at the same time. But I have never
+> seen WARN_ON() even after running for close to 30 min. Can you send me
+> the exact script, so that it will be easy to reproduce?
 
-Thanks
-Jassi
+Sure thing.
+- one shell
+	evtest /dev/input/event2
+- second shell
+	./iio-test.sh
+  with:
+
+|#!/bin/sh
+|
+|while [ 1 = 1 ]
+|do
+|        cat /sys/bus/iio/devices/iio\:device0/in_voltage4_raw
+|done
+
+
+the kernel config: https://breakpoint.cc/am335x-config
+
+> 
+> Regards
+> Vignesh
+
+Sebastian
