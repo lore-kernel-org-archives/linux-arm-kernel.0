@@ -1,38 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Nov 2014 18:17:02 +0100
-Subject: [PATCH] ARM: PJ4: allow building in Thumb-2 mode
-In-Reply-To: <CAKv+Gu_YuHbO7+jusczcJTHF8fM4pF1z2h55BZK0mrHK702z_A@mail.gmail.com>
-References: <1416830200-11114-1-git-send-email-ard.biesheuvel@linaro.org>
- <2078609.NLHB18YoOo@wuerfel>
- <CAKv+Gu_YuHbO7+jusczcJTHF8fM4pF1z2h55BZK0mrHK702z_A@mail.gmail.com>
-Message-ID: <4653047.WBmUTsHC57@wuerfel>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Mon, 24 Nov 2014 09:20:07 -0800
+Subject: [PATCH V5 05/12] mailbox: Add NVIDIA Tegra XUSB mailbox driver
+In-Reply-To: <CAJe_ZhdTvZZqERttAM_o6U6MZCOjk=oXpWFPf8W=DdW1j=Nx=g@mail.gmail.com>
+References: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
+ <1416264102-1323-6-git-send-email-abrestic@chromium.org>
+ <CAJe_ZhdTvZZqERttAM_o6U6MZCOjk=oXpWFPf8W=DdW1j=Nx=g@mail.gmail.com>
+Message-ID: <CAL1qeaFpYC8C5M_eJ8N8bjDvXVu0KBuxgTcrt12az374TnZ8rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 November 2014 16:34:47 Ard Biesheuvel wrote:
-> On 24 November 2014 at 16:29, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 24 November 2014 12:56:40 Ard Biesheuvel wrote:
-> >> Two files that get included when building the multi_v7_defconfig target
-> >> fail to build when selecting THUMB2_KERNEL for this configuration.
-> >>
-> >> In both cases, we can just build the file as ARM code, as none of its
-> >> symbols are exported to modules, so there are no interworking concerns.
-> >> In the iwmmxt.S case, add ENDPROC() declarations so the symbols are
-> >> annotated as functions, resulting in the linker to emit the appropriate
-> >> mode switches.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >
-> > Ah, very nice. I tried this before, but my version didn't actually
-> > work, presumably because I didn't know about the ENDPROC() stuff.
-> >
-> > Have you tested this on a machine that has IWMMXT enabled?
-> >
-> 
-> No, I don't have access to such a machine, unfortunately.
+On Mon, Nov 24, 2014 at 12:34 AM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+> On 18 November 2014 at 04:11, Andrew Bresticker <abrestic@chromium.org> wrote:
+>
+>> +
+>> +static int tegra_xusb_mbox_send_data(struct mbox_chan *chan, void *data)
+>> +{
+>> +       struct tegra_xusb_mbox *mbox = to_tegra_mbox(chan->mbox);
+>> +       struct tegra_xusb_mbox_msg *msg = data;
+>> +       unsigned long flags;
+>> +       u32 reg, owner;
+>> +
+>> +       dev_dbg(mbox->mbox.dev, "TX message %#x:%#x\n", msg->cmd, msg->data);
+>> +
+>> +       /* ACK/NAK must be sent with the controller as the mailbox owner */
+>> +       if (msg->cmd == MBOX_CMD_ACK || msg->cmd == MBOX_CMD_NAK)
+>> +               owner = MBOX_OWNER_FW;
+>> +       else
+>> +               owner = MBOX_OWNER_SW;
+>> +
+>> +       spin_lock_irqsave(&mbox->lock, flags);
+>> +
+>> +       /* Acquire mailbox */
+>> +       if (mbox_readl(mbox, XUSB_CFG_ARU_MBOX_OWNER) != MBOX_OWNER_NONE) {
+>> +               dev_err(mbox->mbox.dev, "Mailbox not idle\n");
+>> +               goto busy;
+>> +       }
+>> +       mbox_writel(mbox, owner, XUSB_CFG_ARU_MBOX_OWNER);
+>> +       if (mbox_readl(mbox, XUSB_CFG_ARU_MBOX_OWNER) != owner) {
+>> +               dev_err(mbox->mbox.dev, "Failed to acquire mailbox");
+>> +               goto busy;
+>> +       }
+>> +
+>> +       mbox_writel(mbox, mbox_pack_msg(msg), XUSB_CFG_ARU_MBOX_DATA_IN);
+>> +       reg = mbox_readl(mbox, XUSB_CFG_ARU_MBOX_CMD);
+>> +       reg |= MBOX_INT_EN | MBOX_DEST_FALC;
+>> +       mbox_writel(mbox, reg, XUSB_CFG_ARU_MBOX_CMD);
+>> +
+>> +       spin_unlock_irqrestore(&mbox->lock, flags);
+>> +
+>> +       return 0;
+>> +busy:
+>> +       spin_unlock_irqrestore(&mbox->lock, flags);
+>> +       return -EBUSY;
+>> +}
+>> +
+>> +static int tegra_xusb_mbox_startup(struct mbox_chan *chan)
+>> +{
+>> +       return 0;
+>> +}
+>> +
+>> +static void tegra_xusb_mbox_shutdown(struct mbox_chan *chan)
+>> +{
+>> +}
+>> +
+>> +static bool tegra_xusb_mbox_last_tx_done(struct mbox_chan *chan)
+>> +{
+>> +       /*
+>> +        * Transmissions are assumed to be completed as soon as they are
+>> +        * written to the mailbox.
+>> +        */
+>> +       return true;
+>>
+> In .send_data() you you mark the channel busy by setting the
+> XUSB_CFG_ARU_MBOX_OWNER to !MBOX_OWNER_NONE, which remains so until
+> you get an IRQ. So maybe you should check for the OWNER_NONE flag in
+> .last_tx_done()?
 
-Adding a few mvebu folks to Cc, maybe one of them can test your patch.
-It's also possible that Olof or Kevin have a PJ4 machine with iwmmxt 
-in their boot farms.
-
-	Arnd
+Ah, you're right.  It does look like the controller firmware clears MBOX_OWNER.
