@@ -1,162 +1,188 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 24 Nov 2014 09:26:49 +0100
-Subject: [PATCH v6 5/6] sched: replace capacity_factor by usage
-In-Reply-To: <547128D8.6040500@gmail.com>
-References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
- <1411488485-10025-6-git-send-email-vincent.guittot@linaro.org>
- <20141002165745.GA28662@e103034-lin>
- <CAKfTPtA5XTwT0fTqXZJWWwfUQ8SfVxiqmQwSWqFKpbb1XpriRw@mail.gmail.com>
- <20141003093546.GB28662@e103034-lin>
- <CAKfTPtAA1thOXR7tRzMQrnyzuoEysqwmBP_mQ+RSh1yOAG7Jpg@mail.gmail.com>
- <547128D8.6040500@gmail.com>
-Message-ID: <CAKfTPtAwgOA0kutv7W5ZPGyzQo8vkrA=OjRz3qd0pM=62k4F+Q@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 24 Nov 2014 09:27:27 +0100
+Subject: [PATCH v3 0/8] KVM-VFIO IRQ forward control
+In-Reply-To: <E959C4978C3B6342920538CF579893F0022ADA8C@SHSMSX104.ccr.corp.intel.com>
+References: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
+ <E959C4978C3B6342920538CF579893F0022ADA8C@SHSMSX104.ccr.corp.intel.com>
+Message-ID: <5472EBEF.3070108@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 November 2014 at 01:22, Wanpeng Li <kernellwp@gmail.com> wrote:
-> Hi Vincent,
->
-> On 10/3/14, 8:50 PM, Vincent Guittot wrote:
+On 11/24/2014 09:14 AM, Wu, Feng wrote:
+> 
+> 
+>> -----Original Message-----
+>> From: Eric Auger [mailto:eric.auger at linaro.org]
+>> Sent: Monday, November 24, 2014 2:36 AM
+>> To: eric.auger at st.com; eric.auger at linaro.org; christoffer.dall at linaro.org;
+>> marc.zyngier at arm.com; linux-arm-kernel at lists.infradead.org;
+>> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org;
+>> alex.williamson at redhat.com; joel.schopp at amd.com;
+>> kim.phillips at freescale.com; paulus at samba.org; gleb at kernel.org;
+>> pbonzini at redhat.com; agraf at suse.de
+>> Cc: linux-kernel at vger.kernel.org; patches at linaro.org; will.deacon at arm.com;
+>> a.motakis at virtualopensystems.com; a.rigo at virtualopensystems.com;
+>> john.liuli at huawei.com; ming.lei at canonical.com; Wu, Feng
+>> Subject: [PATCH v3 0/8] KVM-VFIO IRQ forward control
 >>
->> On 3 October 2014 11:35, Morten Rasmussen <morten.rasmussen@arm.com>
->> wrote:
->>>
->>> On Fri, Oct 03, 2014 at 08:24:23AM +0100, Vincent Guittot wrote:
->>>>
->>>> On 2 October 2014 18:57, Morten Rasmussen <morten.rasmussen@arm.com>
->>>> wrote:
->>>>>
->>>>> On Tue, Sep 23, 2014 at 05:08:04PM +0100, Vincent Guittot wrote:
->>>>>>
->>>>>> Below are two examples to illustrate the problem that this patch
->>>>>> solves:
->>>>>>
->>>>>> 1 - capacity_factor makes the assumption that max capacity of a CPU is
->>>>>> SCHED_CAPACITY_SCALE and the load of a thread is always is
->>>>>> SCHED_LOAD_SCALE. It compares the output of these figures with the sum
->>>>>> of nr_running to decide if a group is overloaded or not.
->>>>>>
->>>>>> But if the default capacity of a CPU is less than SCHED_CAPACITY_SCALE
->>>>>> (640 as an example), a group of 3 CPUS will have a max capacity_factor
->>>>>> of 2 ( div_round_closest(3x640/1024) = 2) which means that it will be
->>>>>> seen as overloaded if we have only one task per CPU.
->>>>>
->>>>> I did some testing on TC2 which has the setup you describe above on the
->>>>> A7 cluster when the clock-frequency property is set in DT. The two A15s
->>>>> have max capacities above 1024. When using sysbench with five threads I
->>>>> still get three tasks on the two A15s and two tasks on the three A7
->>>>> leaving one cpu idle (on average).
->>>>>
->>>>> Using cpu utilization (usage) does correctly identify the A15 cluster
->>>>> as
->>>>> overloaded and it even gets as far as selecting the A15 running two
->>>>> tasks as the source cpu in load_balance(). However, load_balance()
->>>>> bails
->>>>> out without pulling the task due to calculate_imbalance() returning a
->>>>> zero imbalance. calculate_imbalance() bails out just before the hunk
->>>>> you
->>>>> changed due to comparison of the sched_group avg_loads. sgs->avg_load
->>>>> is
->>>>> basically the sum of load in the group divided by its capacity. Since
->>>>> load isn't scaled the avg_load of the overloaded A15 group is slightly
->>>>> _lower_ than the partially idle A7 group. Hence calculate_imbalance()
->>>>> bails out, which isn't what we want.
->>>>>
->>>>> I think we need to have a closer look at the imbalance calculation code
->>>>> and any other users of sgs->avg_load to get rid of all code making
->>>>> assumptions about cpu capacity.
->>>>
->>>> We already had this discussion during the review of a previous version
->>>> https://lkml.org/lkml/2014/6/3/422
->>>> and my answer has not changed; This patch is necessary to solve the 1
->>>> task per CPU issue of the HMP system but is not enough. I have a patch
->>>> for solving the imbalance calculation issue and i have planned to send
->>>> it once this patch will be in a good shape for being accepted by
->>>> Peter.
->>>>
->>>> I don't want to mix this patch and the next one because there are
->>>> addressing different problem: this one is how evaluate the capacity of
->>>> a system and detect when a group is overloaded and the next one will
->>>> handle the case when the balance of the system can't rely on the
->>>> average load figures of the group because we have a significant
->>>> capacity difference between groups. Not that i haven't specifically
->>>> mentioned HMP for the last patch because SMP system can also take
->>>> advantage of it
->>>
->>> You do mention 'big' and 'little' cores in your commit message and quote
->>> example numbers with are identical to the cpu capacities for TC2. That
+>> This series proposes an integration of "ARM: Forwarding physical
+>> interrupts to a guest VM" (http://lwn.net/Articles/603514/) in
+>> KVM.
 >>
->> By last patch, i mean the patch about imbalance that i haven't sent
->> yet, but it's not related with this patch
+>> It enables to transform a VFIO platform driver IRQ into a forwarded
+>> IRQ.
 >>
->>> lead me to believe that this patch would address the issues we see for
->>> HMP systems. But that is clearly wrong. I would suggest that you drop
+>> When a physical IRQ is forwarded (to a guest), the host does not
+>> deactivates this latter. Completion ownership is transferred to the
+>> guest. When the guest deactivates the associated virtual IRQ,
+>> the interrupt controler automatically completes the physical IRQ.
+>> Obviously this requires some dedicated HW support in the interrupt
+>> controler.
 >>
->> This patch addresses one issue: correctly detect how much capacity we
->> have and correctly detect when the group is overloaded; HMP system
->
->
-> What's the meaning of "HMP system"?
+>> The direct benefit is that, for a level sensitive IRQ, it avoids a
+>> VM exit on forwarded IRQ completion.
+>>
+>> When the IRQ is forwarded, the VFIO platform driver does not need to
+>> mask the physical IRQ anymore before signaling the eventfd. Indeed
+>> genirq lowers the running priority, enabling other physical IRQ to hit
+>> except that one.
+>>
+>> Besides, the injection still is based on irqfd triggering. The only
+>> impact on irqfd process is resamplefd is not called anymore on
+>> virtual IRQ completion since this latter becomes "transparent".
+>>
+>> The current integration is based on an extension of the KVM-VFIO
+>> device, previously used by KVM to interact with VFIO groups. The
+>> patch series now enables KVM to directly interact with a VFIO
+>> platform device. The VFIO external API was extended for that purpose.
+>>
+>> Th KVM-VFIO device can get/put the vfio platform device, check its
+>> integrity and type, get the IRQ number associated to an IRQ index.
+>>
+>> The IRQ forward programming is architecture specific (virtual interrupt
+>> controller programming basically). However the whole infrastructure is
+>> kept generic.
+>>
+>> from a user point of view, the functionality is provided through a
+>> new KVM-VFIO group named KVM_DEV_VFIO_DEVICE and 2 associated
+>> attributes:
+>> - KVM_DEV_VFIO_DEVICE_FORWARD_IRQ,
+>> - KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ.
+>>
+>> The capability can be checked with KVM_HAS_DEVICE_ATTR.
+>>
+>> Forwarding must be activated before VFIO signaling mechanism is set
+>> using VFIO_DEVICE_SET_IRQS and unset while the signaling is disabled.
+>>
+>> ---
+>>
+>> This patch series has the following dependencies:
+>> - "ARM: Forwarding physical interrupts to a guest VM"
+>>   (http://lwn.net/Articles/603514/)
+>> - [PATCH v9 00/19] VFIO support for platform and AMBA devices on ARM
+>>   (http://www.spinics.net/lists/kvm-arm/msg11745.html)
+>> - [PATCH v2 0/6] vfio: type1: support for ARM SMMUS with
+>> VFIO_IOMMU_TYPE1
+>>   (http://www.spinics.net/lists/kvm-arm/msg11738.html)
+>>
+>> Integrated pieces can be found at
+>> ssh://git.linaro.org/people/eric.auger/linux.git
+>> on branch irqfd_integ_v8
+>>
+>> This was was tested on Calxeda Midway, assigning the xgmac main IRQ.
+>>
+> 
+> Hi Eric,
+> 
+> Did you send out the latest QEMU part for this patch set, I notice that v6 of
+> The QEMU part is sent out, but seems some structure in this new version
+> has been changed, such as, struct kvm_arch_forwarded_irq (subindex is added
+> in this version), so a new patchset in QEMU is also needed.
 
-Heterogeneous Multi Processor  system are system that gathers
-processors with different micro architecture and/or different max
-frequency. The main result is that processors don't have the same
-maximum capacity and the same DMIPS/W efficiency
+Hi Feng,
 
-Regards,
-Vincent
->
-> Regards,
-> Wanpeng Li
->
->> clearly falls in this category but not only.
->> This is the only purpose of this patch and not the "1 task per CPU
->> issue" that you mentioned.
+v7 is available at:
+http://lists.gnu.org/archive/html/qemu-devel/2014-10/msg03804.html. It
+already illustrates KVM-VFIO device usage.
+
+v8 which will indeed integrate subindex addition will be delivered this
+week.
+
+Best Regards
+
+Eric
+> 
+> Thanks,
+> Feng
+> 
+> 
+>> v2 -> v3:
+>> - kvm_fwd_irq_action enum replaced by a bool (KVM_VFIO_IRQ_CLEANUP does
+>> not
+>>   exist anymore)
+>> - a new struct local to vfio.c was introduced to wrap kvm_fw_irq and make it
+>>   linkable: kvm_vfio_fwd_irq_node
+>> - kvm_fwd_irq now is self-contained (includes struct vfio_device *)
+>> - a single list of kvm_vfio_fwd_irq_irq_node is used instead of having
+>>   a list of devices and a list of forward irq per device. Having 2 lists
+>>   brought extra complexity.
+>> - the VFIO device ref counter is incremented each time a new IRQ is forwarded.
+>>   It is not attempted anymore to hold a single reference whatever the number
+>>   of forwarded IRQs.
+>> - subindex added on top of index to be closer to VFIO API
+>> - platform device check moved in the arm specific implementation
+>> - enable the KVM-VFIO device for arm64
+>> - forwarded state change only can happen while the VFIO IRQ handler is not
+>>   set; in other words, when the VFIO IRQ signaling is not set.
 >>
->> The second patch is about correctly balance the tasks on system where
->> the capacity of a group is significantly less than another group. It
->> has nothing to do in capacity computation and overload detection but
->> it will use these corrected/new metrics to make a better choice.
+>> v1 -> v2:
+>> - forward control is moved from architecture specific file into generic
+>>   vfio.c module.
+>>   only kvm_arch_set_fwd_state remains architecture specific
+>> - integrate Kim's patch which enables KVM-VFIO for ARM
+>> - fix vgic state bypass in vgic_queue_hwirq
+>> - struct kvm_arch_forwarded_irq moved from
+>> arch/arm/include/uapi/asm/kvm.h
+>>   to include/uapi/linux/kvm.h
+>>   also irq_index renamed into index and guest_irq renamed into gsi
+>> - ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
+>> - vfio_external_get_base_device renamed into vfio_external_base_device
+>> - vfio_external_get_type removed
+>> - kvm_vfio_external_get_base_device renamed into
+>> kvm_vfio_external_base_device
+>> - __KVM_HAVE_ARCH_KVM_VFIO renamed into
+>> __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
 >>
->> Then, there is the "1 task per CPU issue on HMP" that you mentioned
->> and this latter will be solved thanks to these 2 patchsets but this is
->> not the only/main target of these patchsets so i don't want to reduce
->> them into: "solve an HMP issue"
 >>
->>> mentioning big and little cores and stick to only describing cpu
->>> capacity reductions due to rt tasks and irq to avoid any confusion about
->>> the purpose of the patch. Maybe explicitly say that non-default cpu
->>> capacities (capacity_orig) isn't addressed yet.
+>> Eric Auger (7):
+>>   KVM: arm64: Enable the KVM-VFIO device
+>>   VFIO: platform: forwarded state tested when selecting IRQ handler
+>>   KVM: kvm-vfio: User API for IRQ forwarding
+>>   VFIO: External user API device helpers
+>>   KVM: kvm-vfio: wrapper to VFIO external API device helpers
+>>   KVM: kvm-vfio: generic forwarding control
+>>   KVM: arm: kvm-vfio: forwarding control
 >>
->> But they are addressed by this patchset. you just mixed various goal
->> together (see above)
+>> Kim Phillips (1):
+>>   KVM: arm: Enable the KVM-VFIO device
 >>
->>> I think the two problems you describe are very much related. This patch
->>> set is half the solution of the HMP balancing problem. We just need the
->>> last bit for avg_load and then we can add scale-invariance on top.
->>
->> i don't see the link between scale invariance and a bad load-balancing
->> choice. The fact that the current load balancer puts more tasks than
->> CPUs in a group on HMP system should not influence or break the scale
->> invariance load tracking. Isn't it ?
->>
->> Now, i could send the other patchset but i'm afraid that this will
->> generate more confusion than help in the process review.
->>
->> Regards,
->> Vincent
->>
->>> IMHO, it would be good to have all the bits and pieces for cpu capacity
->>> scaling and scaling of per-entity load-tracking on the table so we fit
->>> things together. We only have patches for parts of the solution posted
->>> so far.
->>>
->>> Morten
+>>  Documentation/virtual/kvm/devices/vfio.txt |  34 +++-
+>>  arch/arm/include/asm/kvm_host.h            |   7 +
+>>  arch/arm/kvm/Kconfig                       |   1 +
+>>  arch/arm/kvm/Makefile                      |   4 +-
+>>  arch/arm/kvm/kvm_vfio_arm.c                | 101 ++++++++++
+>>  arch/arm64/kvm/Kconfig                     |   1 +
+>>  arch/arm64/kvm/Makefile                    |   2 +-
+>>  drivers/vfio/platform/vfio_platform_irq.c  |   7 +-
+>>  drivers/vfio/vfio.c                        |  24 +++
+>>  include/linux/kvm_host.h                   |  28 +++
+>>  include/linux/vfio.h                       |   3 +
+>>  include/uapi/linux/kvm.h                   |  10 +
+>>  virt/kvm/vfio.c                            | 294
+>> ++++++++++++++++++++++++++++-
+>>  13 files changed, 503 insertions(+), 13 deletions(-)
+>>  create mode 100644 arch/arm/kvm/kvm_vfio_arm.c
 >>
 >> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
->
->
+>> 1.9.1
+> 
