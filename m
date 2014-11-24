@@ -1,30 +1,21 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 24 Nov 2014 16:34:47 +0100
-Subject: [PATCH] ARM: PJ4: allow building in Thumb-2 mode
-In-Reply-To: <2078609.NLHB18YoOo@wuerfel>
-References: <1416830200-11114-1-git-send-email-ard.biesheuvel@linaro.org>
- <2078609.NLHB18YoOo@wuerfel>
-Message-ID: <CAKv+Gu_YuHbO7+jusczcJTHF8fM4pF1z2h55BZK0mrHK702z_A@mail.gmail.com>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Mon, 24 Nov 2014 15:39:11 +0000
+Subject: [PATCH v9 02/10] sched: Track group sched_entity usage
+ contributions
+In-Reply-To: <CAKfTPtBZWDSWVYQ9VE8=rsnsb2kLyUAsc5d_bvcypXE2JgarYQ@mail.gmail.com>
+References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
+ <1415033687-23294-3-git-send-email-vincent.guittot@linaro.org>
+ <20141121123509.GC23177@e105550-lin.cambridge.arm.com>
+ <CAKfTPtBZWDSWVYQ9VE8=rsnsb2kLyUAsc5d_bvcypXE2JgarYQ@mail.gmail.com>
+Message-ID: <20141124153911.GJ23177@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 November 2014 at 16:29, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 24 November 2014 12:56:40 Ard Biesheuvel wrote:
->> Two files that get included when building the multi_v7_defconfig target
->> fail to build when selecting THUMB2_KERNEL for this configuration.
->>
->> In both cases, we can just build the file as ARM code, as none of its
->> symbols are exported to modules, so there are no interworking concerns.
->> In the iwmmxt.S case, add ENDPROC() declarations so the symbols are
->> annotated as functions, resulting in the linker to emit the appropriate
->> mode switches.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> Ah, very nice. I tried this before, but my version didn't actually
-> work, presumably because I didn't know about the ENDPROC() stuff.
->
-> Have you tested this on a machine that has IWMMXT enabled?
->
+On Mon, Nov 24, 2014 at 02:04:21PM +0000, Vincent Guittot wrote:
+> On 21 November 2014 at 13:35, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+> > What happened to the update of se->avg.utilization_avg_contrib in
+> > __synchronize_entity_decay()? It seems to have disapperead after v7.
+> 
+> It was moved in patch 1 where it is is right place
 
-No, I don't have access to such a machine, unfortunately.
+Ahh... I missed that :)
