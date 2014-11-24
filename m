@@ -1,47 +1,27 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 24 Nov 2014 01:07:38 +0100
-Subject: [PATCH] clk: rockchip: rk3288 export i2s0_clkout for use in DT
-In-Reply-To: <1416381319-31117-1-git-send-email-sonnyrao@chromium.org>
-References: <1416381319-31117-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <2905614.GvjeQFvyvc@diego>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 24 Nov 2014 11:16:34 +1100
+Subject: linux-next: manual merge of the sunxi tree with the arm-soc tree
+Message-ID: <20141124111634.1498b6c1@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sonny,
+Hi Maxime,
 
-Am Dienstag, 18. November 2014, 23:15:19 schrieb Sonny Rao:
-> This exposes the clock that comes out of the i2s block which generally
-> goes to the audio codec.
-> 
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> ---
->  drivers/clk/rockchip/clk-rk3288.c      | 3 ++-
->  include/dt-bindings/clock/rk3288-cru.h | 1 +
->  2 files changed, 3 insertions(+), 1 deletion(-)
-> 
+Today's linux-next merge of the sunxi tree got a conflict in
+arch/arm/boot/dts/sun6i-a31.dtsi between commit 123ccfcc632a ("Revert
+merge of sunxi/dt") from the arm-soc tree and commits from the sunxi
+tree.
 
-[...]
+I fixed it up (I just used the version from the sunxi tree) and can
+carry the fix as necessary (no action is required).
 
-> diff --git a/include/dt-bindings/clock/rk3288-cru.h
-> b/include/dt-bindings/clock/rk3288-cru.h index 100a08c..4acc730 100644
-> --- a/include/dt-bindings/clock/rk3288-cru.h
-> +++ b/include/dt-bindings/clock/rk3288-cru.h
-> @@ -71,6 +71,7 @@
->  #define SCLK_HDMI_CEC		110
->  #define SCLK_HEVC_CABAC		111
->  #define SCLK_HEVC_CORE		112
-> +#define SCLK_I2S0_OUT           113
-> 
->  #define DCLK_VOP0		190
->  #define DCLK_VOP1		191
-
-just to get branches right, do you plan on sending a patch using this new 
-clock-id in a devicetree file in time for 3.19 (i.e. during the next week).
-
-If you plan on doing this, we'll need a 2-patch series like Alexandru did for 
-the mmc phases [because we would need a shared branch between clk and dts 
-branches]. If not the patch can stay as it is.
-
-
-Thanks
-Heiko
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/46e25d22/attachment.sig>
