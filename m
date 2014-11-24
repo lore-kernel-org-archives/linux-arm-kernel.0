@@ -1,149 +1,90 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Nov 2014 14:35:18 +0000
-Subject: [PATCH v3 11/13] irqchip: GICv3: ITS: plug ITS init into main GICv3
- code
+Date: Mon, 24 Nov 2014 14:35:20 +0000
+Subject: [PATCH v3 13/13] irqchip: GICv3: Binding updates for ITS
 In-Reply-To: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
 References: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1416839720-18400-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1416839720-18400-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the ITS is always a subsystem if GICv3, its probing/init is
-driven by the main GICv3 code.
-
-Plug that code in (guarded by a config option).
+Add the documentation for the bindings describing the GICv3 ITS.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3.c       | 41 ++++++++++++++++++++++++++++++++------
- include/linux/irqchip/arm-gic-v3.h |  5 +++++
- 2 files changed, 40 insertions(+), 6 deletions(-)
+ Documentation/devicetree/bindings/arm/gic-v3.txt | 39 ++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 43e57da..1a146cc 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -76,9 +76,6 @@ static inline void __iomem *gic_dist_base(struct irq_data *d)
- 	if (d->hwirq <= 1023)		/* SPI -> dist_base */
- 		return gic_data.dist_base;
+diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
+index 33cd05e..ddfade4 100644
+--- a/Documentation/devicetree/bindings/arm/gic-v3.txt
++++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
+@@ -49,11 +49,29 @@ Optional
+   occupied by the redistributors. Required if more than one such
+   region is present.
  
--	if (d->hwirq >= 8192)
--		BUG();		/* LPI Detected!!! */
--
- 	return NULL;
- }
- 
-@@ -276,11 +273,11 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
- 	do {
- 		irqnr = gic_read_iar();
- 
--		if (likely(irqnr > 15 && irqnr < 1020)) {
-+		if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
- 			int err;
- 			err = handle_domain_irq(gic_data.domain, irqnr, regs);
- 			if (err) {
--				WARN_ONCE(true, "Unexpected SPI received!\n");
-+				WARN_ONCE(true, "Unexpected interrupt received!\n");
- 				gic_write_eoir(irqnr);
- 			}
- 			continue;
-@@ -393,6 +390,11 @@ static void gic_cpu_sys_reg_init(void)
- 	gic_write_grpen1(1);
- }
- 
-+static int gic_dist_supports_lpis(void)
-+{
-+	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS);
-+}
++Sub-nodes:
 +
- static void gic_cpu_init(void)
- {
- 	void __iomem *rbase;
-@@ -407,6 +409,10 @@ static void gic_cpu_init(void)
- 
- 	gic_cpu_config(rbase, gic_redist_wait_for_rwp);
- 
-+	/* Give LPIs a spin */
-+	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
-+		its_cpu_init();
++GICv3 has one or more Interrupt Translation Services (ITS) that are
++used to route Message Signalled Interrupts (MSI) to the CPUs.
 +
- 	/* initialise system registers */
- 	gic_cpu_sys_reg_init();
- }
-@@ -593,12 +599,21 @@ static struct irq_chip gic_chip = {
- 	.irq_set_affinity	= gic_set_affinity,
- };
- 
-+#define GIC_ID_NR		(1U << gic_data.rdists.id_bits)
++These nodes must have the following properties:
++- compatible : Should at least contain  "arm,gic-v3-its".
++- msi-controller : Boolean property. Identifies the node as an MSI controller
++- reg: Specifies the base physical address and size of the ITS
++  registers.
 +
- static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
- 			      irq_hw_number_t hw)
- {
- 	/* SGIs are private to the core kernel */
- 	if (hw < 16)
- 		return -EPERM;
-+	/* Nothing here */
-+	if (hw >= gic_data.irq_nr && hw < 8192)
-+		return -EPERM;
-+	/* Off limits */
-+	if (hw >= GIC_ID_NR)
-+		return -EPERM;
++The main GIC node must contain the appropriate #address-cells,
++#size-cells and ranges properties for the reg property of all ITS
++nodes.
 +
- 	/* PPIs */
- 	if (hw < 32) {
- 		irq_set_percpu_devid(irq);
-@@ -612,7 +627,15 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
- 				    handle_fasteoi_irq, NULL, NULL);
- 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
- 	}
--	irq_set_chip_data(irq, d->host_data);
-+	/* LPIs */
-+	if (hw >= 8192 && hw < GIC_ID_NR) {
-+		if (!gic_dist_supports_lpis())
-+			return -EPERM;
-+		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
-+				    handle_fasteoi_irq, NULL, NULL);
-+		set_irq_flags(irq, IRQF_VALID);
-+	}
+ Examples:
+ 
+ 	gic: interrupt-controller at 2cf00000 {
+ 		compatible = "arm,gic-v3";
+ 		#interrupt-cells = <3>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
+ 		interrupt-controller;
+ 		reg = <0x0 0x2f000000 0 0x10000>,	// GICD
+ 		      <0x0 0x2f100000 0 0x200000>,	// GICR
+@@ -61,11 +79,20 @@ Examples:
+ 		      <0x0 0x2c010000 0 0x2000>,	// GICH
+ 		      <0x0 0x2c020000 0 0x2000>;	// GICV
+ 		interrupts = <1 9 4>;
 +
- 	return 0;
- }
++		gic-its at 2c200000 {
++			compatible = "arm,gic-v3-its";
++			msi-controller;
++			reg = <0x0 0x2c200000 0 0x200000>;
++		};
+ 	};
  
-@@ -633,6 +656,9 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
- 	case 1:			/* PPI */
- 		*out_hwirq = intspec[1] + 16;
- 		break;
-+	case GIC_IRQ_TYPE_LPI:	/* LPI */
-+		*out_hwirq = intspec[1];
-+		break;
- 	default:
- 		return -EINVAL;
- 	}
-@@ -759,6 +785,9 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
- 
- 	set_handle_irq(gic_handle_irq);
- 
-+	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
-+		its_init(node, &gic_data.rdists, gic_data.domain);
+ 	gic: interrupt-controller at 2c010000 {
+ 		compatible = "arm,gic-v3";
+ 		#interrupt-cells = <3>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
+ 		interrupt-controller;
+ 		redistributor-stride = <0x0 0x40000>;	// 256kB stride
+ 		#redistributor-regions = <2>;
+@@ -76,4 +103,16 @@ Examples:
+ 		      <0x0 0x2c060000 0 0x2000>,	// GICH
+ 		      <0x0 0x2c080000 0 0x2000>;	// GICV
+ 		interrupts = <1 9 4>;
 +
- 	gic_smp_init();
- 	gic_dist_init();
- 	gic_cpu_init();
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 0ed30d7..1e8b0cf 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -318,6 +318,11 @@ static inline void gic_write_eoir(u64 irq)
- 	isb();
- }
- 
-+struct irq_domain;
-+int its_cpu_init(void);
-+int its_init(struct device_node *node, struct rdists *rdists,
-+	     struct irq_domain *domain);
++		gic-its at 2c200000 {
++			compatible = "arm,gic-v3-its";
++			msi-controller;
++			reg = <0x0 0x2c200000 0 0x200000>;
++		};
 +
- #endif
- 
- #endif
++		gic-its at 2c400000 {
++			compatible = "arm,gic-v3-its";
++			msi-controller;
++			reg = <0x0 0x2c400000 0 0x200000>;
++		};
+ 	};
 -- 
 2.1.3
