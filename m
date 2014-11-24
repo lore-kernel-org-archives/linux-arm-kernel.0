@@ -1,38 +1,51 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 24 Nov 2014 13:35:06 +0100
-Subject: [PATCH v4 0/6] Touchscreen performance related fixes
-In-Reply-To: <547321A2.6010207@ti.com>
-References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
- <20141124115116.GA14997@linutronix.de> <547321A2.6010207@ti.com>
-Message-ID: <547325FA.6020004@linutronix.de>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Mon, 24 Nov 2014 13:28:15 +0100
+Subject: [PATCH v2 0/3] Add support for Tegra Activity Monitor
+Message-ID: <1416832111-367-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2014 01:16 PM, Vignesh R wrote:
+Hello,
 
-> I have tried running both IIO and TSC at the same time. But I have never
-> seen WARN_ON() even after running for close to 30 min. Can you send me
-> the exact script, so that it will be easy to reproduce?
+in this v2 I have made the driver use devfreq. It works just as fine as the
+previous revision, but it's almost 200 lines more of code for not that much
+gain.
 
-Sure thing.
-- one shell
-	evtest /dev/input/event2
-- second shell
-	./iio-test.sh
-  with:
+Though I don't see much point in using devfreq, I think it's probably better
+than an ad-hoc driver because in the future I hope that devfreq will gain
+functionality that will be of use (PM_QOS_MEMORY_BANDWIDTH support, for
+example).
 
-|#!/bin/sh
-|
-|while [ 1 = 1 ]
-|do
-|        cat /sys/bus/iio/devices/iio\:device0/in_voltage4_raw
-|done
+These patches implement support for setting the rate of the EMC clock based on
+stats collected from the ACTMON, a piece of hw in the Tegra124 that counts
+memory accesses (among others).
 
+It depends on the following in-flight patches:
 
-the kernel config: https://breakpoint.cc/am335x-config
+* EMC driver: http://thread.gmane.org/gmane.linux.drivers.devicetree/99304
+* CPUFreq driver: http://thread.gmane.org/gmane.linux.kernel/1812962
 
-> 
-> Regards
-> Vignesh
+I have pushed a branch here for testing:
 
-Sebastian
+http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=actmon-v2
+
+Regards,
+
+Tomeu
+
+Tomeu Vizoso (3):
+  of: Add binding for NVIDIA Tegra ACTMON node
+  PM / devfreq: tegra: add devfreq driver for Tegra Activity Monitor
+  ARM: tegra: Add Tegra124 ACTMON support
+
+ .../devicetree/bindings/arm/tegra/actmon.txt       |  38 ++
+ arch/arm/boot/dts/tegra124.dtsi                    |  23 +
+ drivers/devfreq/Kconfig                            |  10 +
+ drivers/devfreq/Makefile                           |   1 +
+ drivers/devfreq/tegra-devfreq.c                    | 718 +++++++++++++++++++++
+ 5 files changed, 790 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/tegra/actmon.txt
+ create mode 100644 drivers/devfreq/tegra-devfreq.c
+
+-- 
+1.9.3
