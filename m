@@ -1,67 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Nov 2014 11:50:28 +0100
-Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <546F8B39.1080106@ti.com>
-References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
- <CAMuHMdU6G35SP-P7bt6RJQk59CrGcKE2XM4N3o8Dv3qxZU7gxA@mail.gmail.com>
- <546F8B39.1080106@ti.com>
-Message-ID: <2997659.fTX2lvxXfH@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 24 Nov 2014 10:54:36 +0000
+Subject: [RFC 0/4] vgic additions for forwarded irq
+In-Reply-To: <20141124105037.GL3401@cbox>
+References: <1416766373-13569-1-git-send-email-eric.auger@linaro.org>
+ <20141124105037.GL3401@cbox>
+Message-ID: <54730E6C.1040708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 November 2014 20:58:01 Grygorii Strashko wrote:
-> Hi Kevin,
-> On 11/21/2014 10:06 AM, Geert Uytterhoeven wrote:
-> > On Fri, Nov 21, 2014 at 2:30 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> >> Geert Uytterhoeven <geert@linux-m68k.org> writes:
-> >>
-> >> So now I'm confused about why the PM domain has to do anything special
-> >> if the presence/absence of the clocks is already handled by the DT.
-> > 
-> > Just adding a clock property to a device node in DT doesn't enable the clock
-> > automatically, nor make it runtime-managed automatically.
-> > Compare this to e.g. pinctrl, where adding pinctrl properties to DT does enable
-> > them automatically, without the driver for the device having to care about it.
-> >
-> > Drivers interfacing external hardware typically do care about clocks, as they
-> > have to program clock generators for the external hardware interface (e.g.
-> > driving spi or i2c buses at specific frequencies).
+On 24/11/14 10:50, Christoffer Dall wrote:
+> On Sun, Nov 23, 2014 at 07:12:49PM +0100, Eric Auger wrote:
+>> This series applies on top of "ARM: Forwarding physical
+>> interrupts to a guest VM" (http://lwn.net/Articles/603514/)
+>> series.
+> 
+> Marc and Eric,
+> 
+> Does it make sense to review and look at these patches given the current
+> state of the forwarding patches, or should we wait until Marc respins
+> that series?
 
-But is this a property of the driver or of the device? If this is true
-independent of the driver implementation, I don't see a problem with 
-the approach of linking to a power-domain that automatically manages
-all clocks for the devices that need this, and requires the driver to
-manage them itself when there are any clocks that can't be handled
-with the generic clk-power-domain implementation.
- 
-> 
-> In non-DT case, we have possibility to divide clocks on "fck" and "opt"
-> (The way it can be done is not convenient, but it is - .con_id).
-> 
-> For DT-case - no way now. Also, PM domains are not physically present on
-> Keystone 2 and GPD was selected as glue layer to integrate DT, pm_clk and
-> PM runtime all together (one big-fat-global PM domain :).
-> 
-> So, I was able to find only following way to define "fck" clocks in DT:
-> 	clocks = <&papllclk>, <&clkcpgmac>, <&chipclk12>;
-> 	clock-names = "clk_pa", "clk_cpgmac", "cpsw_cpts_rft_clk";
-> 	fck-clocks = <&papllclk>, <&clkcpgmac>;
-> As you can see - this will lead to data duplication in DT (
-> 
-> Any propositions are welcome?
-> 
-> Unfortunately, It seems that if we would not able to find DT solution
-> then there will be following ways to move forward:
-> - "remove the power domain proxy from your drivers and use the clocks directly" 
-> ((c) Arnd Bergmann).
-> [As possibility - It can be allowed to use clk_pm APIs by drivers]
-> - continue using platform specific implementations.
+I'm still in the process of respining all of this (we've had a few
+iterations with tglx, but I got sidetracked with the ITS/v2m/MSI side of
+things).
 
-Could the driver maybe identify the clocks that it wants to manage itself
-to the pm-domain code? If it's safe for a device to have the clock turned
-on at the default rate before loading the driver, any device that is connected
-to the simple clk-pm-domain code could have all its clocks start out as
-owned by the pm-domain, but then claim the clocks it needs to reprogram for
-itself and take them out of the pmdomain.
+I'll get back onto this this week. Hopefully.
 
-	Arnd
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
