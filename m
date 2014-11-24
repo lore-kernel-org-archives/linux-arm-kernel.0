@@ -1,54 +1,74 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Sun, 23 Nov 2014 18:08:05 -0800
-Subject: [PATCH] clk: rockchip: rk3288 export i2s0_clkout for use in DT
-In-Reply-To: <2905614.GvjeQFvyvc@diego>
-References: <1416381319-31117-1-git-send-email-sonnyrao@chromium.org>
- <2905614.GvjeQFvyvc@diego>
-Message-ID: <CAPz6YkXSdTode-eu=HuMR1H8x9APi=xOQA+_4D6K4yXEThLQ5g@mail.gmail.com>
+From: amit.daniel@samsung.com (Amit Daniel Kachhap)
+Date: Mon, 24 Nov 2014 07:36:10 +0530
+Subject: [PATCH v4 0/5] exynos: Move pmu driver to driver/soc folder and add
+ exynos7 support
+Message-ID: <1416794775-1605-1-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 23, 2014 at 4:07 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Hi Sonny,
->
-> Am Dienstag, 18. November 2014, 23:15:19 schrieb Sonny Rao:
->> This exposes the clock that comes out of the i2s block which generally
->> goes to the audio codec.
->>
->> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
->> ---
->>  drivers/clk/rockchip/clk-rk3288.c      | 3 ++-
->>  include/dt-bindings/clock/rk3288-cru.h | 1 +
->>  2 files changed, 3 insertions(+), 1 deletion(-)
->>
->
-> [...]
->
->> diff --git a/include/dt-bindings/clock/rk3288-cru.h
->> b/include/dt-bindings/clock/rk3288-cru.h index 100a08c..4acc730 100644
->> --- a/include/dt-bindings/clock/rk3288-cru.h
->> +++ b/include/dt-bindings/clock/rk3288-cru.h
->> @@ -71,6 +71,7 @@
->>  #define SCLK_HDMI_CEC                110
->>  #define SCLK_HEVC_CABAC              111
->>  #define SCLK_HEVC_CORE               112
->> +#define SCLK_I2S0_OUT           113
->>
->>  #define DCLK_VOP0            190
->>  #define DCLK_VOP1            191
->
-> just to get branches right, do you plan on sending a patch using this new
-> clock-id in a devicetree file in time for 3.19 (i.e. during the next week).
->
-> If you plan on doing this, we'll need a 2-patch series like Alexandru did for
-> the mmc phases [because we would need a shared branch between clk and dts
-> branches]. If not the patch can stay as it is.
->
+This patch series [1 - 5] performs,
 
-Hi, I'm not planning on sending anything with this new clock in the
-immediate future, so I think you can take it as is.  Eventually, we
-will submit something that uses it for the audio codec on Pinky using
-simple-card but I don't have that ready yet.  Thanks!
+1) Moves pmu driver to driver/soc/samsung folder. This is needed as exynos7 is
+   an arm64 based platform and hence PMU driver should be in driver folder.
+   Some discussion happened about this in the v1 version. Finally adding it in
+   driver/soc folder as it too SoC specific and not a general driver.
+   Entire discussion can be found here (A).
+2) Add exynos7 PMU support.
+3) Enables the driver for 32bit arm exynos platforms.
 
-> Thanks
-> Heiko
+Changes from V3:
+* Fixed Kconfig as per Russell feedback
+* Rebased the series against Pankaj SoC restart consolidation patches (D) as per
+  Kukjin request.
+* Link to V3 can be found here (C)
+
+Changes from V2:
+* Added review comment changes suggested by Pankaj.
+* Removed mfd client support in this patch series. This will be added later in
+  the power domain patch series.
+* Link to V2 can be found here (B)
+
+Changes from V1:
+* Move pmu driver in driver/soc/samsung folder
+* Removed the power domain features. They will posted as a separate series.
+* Added exynos7 PMU support.
+* Link to v1 can be found here (A)
+
+This complete patch series is rebased on Kukjin for-next tree.
+
+(A) - http://www.spinics.net/lists/linux-samsung-soc/msg38442.html
+(B) - http://www.spinics.net/lists/arm-kernel/msg375910.html
+(C) - http://www.spinics.net/lists/linux-samsung-soc/msg39237.html 
+(D) - http://www.spinics.net/lists/linux-samsung-soc/msg39095.html
+
+Amit Daniel Kachhap (5):
+  ARM: EXYNOS: Move pmu specific header files under "linux/soc/samsung"
+  drivers: soc: Add support for Exynos PMU driver
+  driver: soc: exynos-pmu: Add an API to be called after wakeup
+  drivers: soc: exynos-pmu: Add support for Exynos7
+  arm: exynos: Select SOC_SAMSUNG config option
+
+ .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+ arch/arm/mach-exynos/Kconfig                       |    1 +
+ arch/arm/mach-exynos/Makefile                      |    2 +-
+ arch/arm/mach-exynos/exynos.c                      |    2 +-
+ arch/arm/mach-exynos/mcpm-exynos.c                 |    2 +-
+ arch/arm/mach-exynos/platsmp.c                     |    2 +-
+ arch/arm/mach-exynos/pm.c                          |    4 +-
+ arch/arm/mach-exynos/suspend.c                     |    4 +-
+ drivers/soc/Kconfig                                |    1 +
+ drivers/soc/Makefile                               |    1 +
+ drivers/soc/samsung/Kconfig                        |   20 +
+ drivers/soc/samsung/Makefile                       |    1 +
+ .../pmu.c => drivers/soc/samsung/exynos-pmu.c      |  442 +++++++++++++++++++-
+ .../linux/soc/samsung}/exynos-pmu.h                |    1 +
+ .../linux/soc/samsung/exynos-regs-pmu.h            |  273 ++++++++++++
+ 15 files changed, 744 insertions(+), 13 deletions(-)
+ create mode 100644 drivers/soc/samsung/Kconfig
+ create mode 100644 drivers/soc/samsung/Makefile
+ rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (64%)
+ rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (89%)
+ rename arch/arm/mach-exynos/regs-pmu.h => include/linux/soc/samsung/exynos-regs-pmu.h (63%)
+
+-- 
+1.7.9.5
