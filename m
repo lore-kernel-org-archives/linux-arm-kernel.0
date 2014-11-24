@@ -1,51 +1,34 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 24 Nov 2014 13:28:15 +0100
-Subject: [PATCH v2 0/3] Add support for Tegra Activity Monitor
-Message-ID: <1416832111-367-1-git-send-email-tomeu.vizoso@collabora.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 24 Nov 2014 13:52:46 +0100
+Subject: [PATCH] arm/arm64: vgic: Remove unreachable irq_clear_pending
+In-Reply-To: <54731EBB.5080707@arm.com>
+References: <1416822116-9044-1-git-send-email-christoffer.dall@linaro.org>
+ <54731EBB.5080707@arm.com>
+Message-ID: <20141124125246.GN3401@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Nov 24, 2014 at 12:04:11PM +0000, Andre Przywara wrote:
+> Hej Christoffer,
+> 
+> On 24/11/14 09:41, Christoffer Dall wrote:
+> > When 'injecting' an edge-triggered interrupt with a falling edge we
+> > shouldn't clear the pending state on the distributor.  In fact, we
+> > don't, because the check in vgic_validate_injection would prevent us
+> > from ever reaching this bit of code.
+> > 
+> > Remove the unreachable snippet.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> Acked-by: Andre Przywara <andre.przywara@arm.com>
+> 
+> I agree on this. Would it make sense to rewrite this function a bit to
+> make it more clearer what happens? I find the nesting of the
+> if-statements counter-intuitive: I'd prefer to first differentiate
+> between level and edge triggered and then only check the actual level in
+> the level-triggered branch. Not sure if it's worth the fuss, though.
+> 
+I disagree, and it's not ;)
 
-in this v2 I have made the driver use devfreq. It works just as fine as the
-previous revision, but it's almost 200 lines more of code for not that much
-gain.
-
-Though I don't see much point in using devfreq, I think it's probably better
-than an ad-hoc driver because in the future I hope that devfreq will gain
-functionality that will be of use (PM_QOS_MEMORY_BANDWIDTH support, for
-example).
-
-These patches implement support for setting the rate of the EMC clock based on
-stats collected from the ACTMON, a piece of hw in the Tegra124 that counts
-memory accesses (among others).
-
-It depends on the following in-flight patches:
-
-* EMC driver: http://thread.gmane.org/gmane.linux.drivers.devicetree/99304
-* CPUFreq driver: http://thread.gmane.org/gmane.linux.kernel/1812962
-
-I have pushed a branch here for testing:
-
-http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=actmon-v2
-
-Regards,
-
-Tomeu
-
-Tomeu Vizoso (3):
-  of: Add binding for NVIDIA Tegra ACTMON node
-  PM / devfreq: tegra: add devfreq driver for Tegra Activity Monitor
-  ARM: tegra: Add Tegra124 ACTMON support
-
- .../devicetree/bindings/arm/tegra/actmon.txt       |  38 ++
- arch/arm/boot/dts/tegra124.dtsi                    |  23 +
- drivers/devfreq/Kconfig                            |  10 +
- drivers/devfreq/Makefile                           |   1 +
- drivers/devfreq/tegra-devfreq.c                    | 718 +++++++++++++++++++++
- 5 files changed, 790 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/tegra/actmon.txt
- create mode 100644 drivers/devfreq/tegra-devfreq.c
-
--- 
-1.9.3
+-Christoffer
