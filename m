@@ -1,121 +1,120 @@
-From: linyongting@gmail.com (Lin Yongting)
-Date: Mon, 24 Nov 2014 21:45:56 +0800
-Subject: [PATCH] ARM: Add unwinding support for memmove function
-Message-ID: <1416836757-30547-1-git-send-email-linyongting@gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 24 Nov 2014 13:50:27 +0000
+Subject: [PATCH v4 04/19] arm/arm64: KVM: wrap 64 bit MMIO accesses with
+ two 32 bit ones
+In-Reply-To: <20141123094253.GU3401@cbox>
+References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
+ <1415959683-26027-5-git-send-email-andre.przywara@arm.com>
+ <20141123094253.GU3401@cbox>
+Message-ID: <547337A3.8090103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The memmove function never had unwinding annotations added.
-Currently, when accessing invalid pointer by memmove occurs the
-backtrace shown will stop at memmove or some completely unrelated
-function. Add unwinding annotations in hopes of getting a more
-useful backtrace in following cases:
-1. die on accessing invalid pointer by memmove
-2. kprobe trapped at any instruction within memmove
-3. interrupted at any instruction within memmove
+Hi Christoffer,
 
-Signed-off-by: Lin Yongting <linyongting@gmail.com>
----
- arch/arm/lib/memmove.S |   28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+On 23/11/14 09:42, Christoffer Dall wrote:
+> On Fri, Nov 14, 2014 at 10:07:48AM +0000, Andre Przywara wrote:
+>> Some GICv3 registers can and will be accessed as 64 bit registers.
+>> Currently the register handling code can only deal with 32 bit
+>> accesses, so we do two consecutive calls to cover this.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>> Changelog v3...v4:
+>> - add comment explaining little endian handling
+>>
+>>  virt/kvm/arm/vgic.c |   51 ++++++++++++++++++++++++++++++++++++++++++++++++---
+>>  1 file changed, 48 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 5eee3de..dba51e4 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -1033,6 +1033,51 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
+>>  }
+>>  
+>>  /*
+>> + * Call the respective handler function for the given range.
+>> + * We split up any 64 bit accesses into two consecutive 32 bit
+>> + * handler calls and merge the result afterwards.
+>> + * We do this in a little endian fashion regardless of the host's
+>> + * or guest's endianness, because the GIC is always LE and the rest of
+>> + * the code (vgic_reg_access) also puts it in a LE fashion already.
+>> + */
+>> +static bool call_range_handler(struct kvm_vcpu *vcpu,
+>> +			       struct kvm_exit_mmio *mmio,
+>> +			       unsigned long offset,
+>> +			       const struct mmio_range *range)
+>> +{
+>> +	u32 *data32 = (void *)mmio->data;
+>> +	struct kvm_exit_mmio mmio32;
+>> +	bool ret;
+>> +
+>> +	if (likely(mmio->len <= 4))
+>> +		return range->handle_mmio(vcpu, mmio, offset);
+>> +
+>> +	/*
+>> +	 * Any access bigger than 4 bytes (that we currently handle in KVM)
+>> +	 * is actually 8 bytes long, caused by a 64-bit access
+>> +	 */
+>> +
+>> +	mmio32.len = 4;
+>> +	mmio32.is_write = mmio->is_write;
+>> +
+>> +	mmio32.phys_addr = mmio->phys_addr + 4;
+>> +	if (mmio->is_write)
+>> +		*(u32 *)mmio32.data = data32[1];
+>> +	ret = range->handle_mmio(vcpu, &mmio32, offset + 4);
+>> +	if (!mmio->is_write)
+>> +		data32[1] = *(u32 *)mmio32.data;
+>> +
+>> +	mmio32.phys_addr = mmio->phys_addr;
+>> +	if (mmio->is_write)
+>> +		*(u32 *)mmio32.data = data32[0];
+>> +	ret |= range->handle_mmio(vcpu, &mmio32, offset);
+> 
+> nit: if handle_mmio returns multiple error codes, we will now not
+> (necessarily) be preserving either, so you may just want to do a check
+> on ret above and return early in the case of error.  Only worth it if
+> you respin anyway.
 
-diff --git a/arch/arm/lib/memmove.S b/arch/arm/lib/memmove.S
-index d1fc0c0..69a9d47 100644
---- a/arch/arm/lib/memmove.S
-+++ b/arch/arm/lib/memmove.S
-@@ -12,6 +12,7 @@
- 
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-+#include <asm/unwind.h>
- 
- 		.text
- 
-@@ -27,12 +28,17 @@
-  */
- 
- ENTRY(memmove)
-+	UNWIND(	.fnstart			)
- 
- 		subs	ip, r0, r1
- 		cmphi	r2, ip
- 		bls	memcpy
- 
- 		stmfd	sp!, {r0, r4, lr}
-+	UNWIND(	.fnend				)
-+
-+	UNWIND(	.fnstart			)
-+	UNWIND(	.save	{r0, r4, lr}		) @ in first stmfd block
- 		add	r1, r1, r2
- 		add	r0, r0, r2
- 		subs	r2, r2, #4
-@@ -45,6 +51,11 @@ ENTRY(memmove)
- 
- 1:		subs	r2, r2, #(28)
- 		stmfd	sp!, {r5 - r8}
-+	UNWIND(	.fnend				)
-+
-+	UNWIND(	.fnstart			)
-+	UNWIND(	.save	{r0, r4, lr}		)
-+	UNWIND(	.save	{r5 - r8}		) @ in second stmfd block
- 		blt	5f
- 
- 	CALGN(	ands	ip, r0, #31		)
-@@ -97,6 +108,10 @@ ENTRY(memmove)
- 	CALGN(	bcs	2b			)
- 
- 7:		ldmfd	sp!, {r5 - r8}
-+	UNWIND(	.fnend				) @ end of second stmfd block
-+
-+	UNWIND(	.fnstart			)
-+	UNWIND(	.save	{r0, r4, lr}		) @ still in first stmfd block
- 
- 8:		movs	r2, r2, lsl #31
- 		ldrneb	r3, [r1, #-1]!
-@@ -124,10 +139,13 @@ ENTRY(memmove)
- 		ldr	r3, [r1, #0]
- 		beq	17f
- 		blt	18f
-+	UNWIND(	.fnend				)
- 
- 
- 		.macro	backward_copy_shift push pull
- 
-+	UNWIND(	.fnstart			)
-+	UNWIND(	.save	{r0, r4, lr}		) @ still in first stmfd block
- 		subs	r2, r2, #28
- 		blt	14f
- 
-@@ -137,6 +155,11 @@ ENTRY(memmove)
- 	CALGN(	bcc	15f			)
- 
- 11:		stmfd	sp!, {r5 - r9}
-+	UNWIND(	.fnend				)
-+
-+	UNWIND(	.fnstart			)
-+	UNWIND(	.save	{r0, r4, lr}		)
-+	UNWIND(	.save	{r5 - r9}		) @ in new second stmfd block
- 
- 	PLD(	pld	[r1, #-4]		)
- 	PLD(	subs	r2, r2, #96		)
-@@ -171,6 +194,10 @@ ENTRY(memmove)
- 	PLD(	bge	13b			)
- 
- 		ldmfd	sp!, {r5 - r9}
-+	UNWIND(	.fnend				) @ end of the second stmfd block
-+
-+	UNWIND(	.fnstart			)
-+	UNWIND(	.save {r0, r4, lr}		) @ still in first stmfd block
- 
- 14:		ands	ip, r2, #28
- 		beq	16f
-@@ -186,6 +213,7 @@ ENTRY(memmove)
- 
- 16:		add	r1, r1, #(\pull / 8)
- 		b	8b
-+	UNWIND(	.fnend				)
- 
- 		.endm
- 
--- 
-1.7.9.5
+Mmh, if I read this correctly, the return value actually turns into
+updated_state, so technically I wouldn't call this an error code. I
+think we must not exit after the first half and also have to keep the
+OR-ing semantics of the two parts, right?
+
+Cheers,
+Andre.
+
+> 
+> Otherwise:
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+>> +	if (!mmio->is_write)
+>> +		data32[0] = *(u32 *)mmio32.data;
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +/*
+>>   * vgic_handle_mmio_range - handle an in-kernel MMIO access
+>>   * @vcpu:	pointer to the vcpu performing the access
+>>   * @run:	pointer to the kvm_run structure
+>> @@ -1063,10 +1108,10 @@ static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>  	spin_lock(&vcpu->kvm->arch.vgic.lock);
+>>  	offset -= range->base;
+>>  	if (vgic_validate_access(dist, range, offset)) {
+>> -		updated_state = range->handle_mmio(vcpu, mmio, offset);
+>> +		updated_state = call_range_handler(vcpu, mmio, offset, range);
+>>  	} else {
+>> -		vgic_reg_access(mmio, NULL, offset,
+>> -				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
+>> +		if (!mmio->is_write)
+>> +			memset(mmio->data, 0, mmio->len);
+>>  		updated_state = false;
+>>  	}
+>>  	spin_unlock(&vcpu->kvm->arch.vgic.lock);
+>> -- 
+>> 1.7.9.5
+>>
+> 
