@@ -1,30 +1,141 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 24 Nov 2014 13:41:37 +0200
-Subject: [PATCH] ARM: omap2plus_defconfig: Enable AHCI_PLATFORM driver
-Message-ID: <1416829297-12664-1-git-send-email-rogerq@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 24 Nov 2014 12:44:57 +0100
+Subject: [PATCH] mmc: core: add core-level function for sending tuning
+ commands
+In-Reply-To: <1416581201-9851-1-git-send-email-21cnbao@gmail.com>
+References: <1416581201-9851-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CAPDyKFp_BRyh_0VGQckkdo=brdYCcMN+hi=8puGD9qzG211SOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP5 and DRA7 platforms need the AHCI platform driver
-for SATA support.
+On 21 November 2014 at 15:46, Barry Song <21cnbao@gmail.com> wrote:
+> From: Minda Chen <Minda.Chen@csr.com>
+>
+> According to the SD card spec, Add a manual tuning command function
+> for SDR104/HS200 by sending command 19 or command 21 to read data
+> and compare with the tuning block pattern.
+>
+> this patch will help to decrease some platform private codes in
+> SDHCI platform_execute_tuning() callbacks.
+>
+> Signed-off-by: Minda Chen <Minda.Chen@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  drivers/mmc/core/mmc_ops.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mmc/core.h   |  1 +
+>  2 files changed, 66 insertions(+)
+>
+> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> index 7911e05..ecc7789 100644
+> --- a/drivers/mmc/core/mmc_ops.c
+> +++ b/drivers/mmc/core/mmc_ops.c
+> @@ -543,6 +543,71 @@ int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>  }
+>  EXPORT_SYMBOL_GPL(mmc_switch);
+>
+> +int mmc_send_tuning(struct mmc_card *card, u32 opcode)
+> +{
+> +       struct mmc_request mrq = {NULL};
+> +       struct mmc_command cmd = {0};
+> +       struct mmc_data data = {0};
+> +       struct scatterlist sg;
+> +       struct mmc_host *mmc = card->host;
+> +       struct mmc_ios *ios = &mmc->ios;
+> +       const u8 *tuning_block_pattern;
+> +       int size, err = 0;
+> +       u8 *data_buf;
+> +
+> +       if (opcode == MMC_SEND_TUNING_BLOCK_HS200) {
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/configs/omap2plus_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+I don't think we need to care about the opcode. Let's just check the bus_width.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 87a5c11..d75358a 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -127,6 +127,8 @@ CONFIG_SRAM=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_SCAN_ASYNC=y
-+CONFIG_ATA=y
-+CONFIG_SATA_AHCI_PLATFORM=y
- CONFIG_MD=y
- CONFIG_NETDEVICES=y
- # CONFIG_NET_VENDOR_ARC is not set
--- 
-1.8.3.2
+> +               if (ios->bus_width == MMC_BUS_WIDTH_8) {
+> +                       tuning_block_pattern = tuning_blk_pattern_8bit;
+> +                       size = sizeof(tuning_blk_pattern_8bit);
+> +               } else if (ios->bus_width == MMC_BUS_WIDTH_4) {
+> +                       tuning_block_pattern = tuning_blk_pattern_4bit;
+> +                       size = sizeof(tuning_blk_pattern_4bit);
+> +               } else
+> +                       return -EINVAL;
+> +       } else if (opcode == MMC_SEND_TUNING_BLOCK) {
+> +               tuning_block_pattern = tuning_blk_pattern_4bit;
+> +               size = sizeof(tuning_blk_pattern_4bit);
+> +       } else
+> +               return -EINVAL;
+> +
+> +       data_buf = kmalloc(size, GFP_KERNEL);
+
+You should use kzalloc() to get the zeroed buffer you want.
+
+> +       if (!data_buf)
+> +               return -ENOMEM;
+> +
+> +       mrq.cmd = &cmd;
+> +       mrq.data = &data;
+> +
+> +       cmd.opcode = opcode;
+> +       cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
+> +
+> +       data.blksz = size;
+> +       data.blocks = 1;
+> +       data.flags = MMC_DATA_READ;
+
+These needs to be assigned as well:
+
+data.sg = &sg;
+data.sg_len = 1;
+
+> +
+> +       mmc_set_data_timeout(&data, card);
+
+mmc_set_data_timeout() doesn't handle CMD21/19.
+
+The specs tells us about 40 commands should be executed within 150ms.
+I would pick a value of 150ms, just to be sure we are inside that
+range. Also, assign "data->timeout_ns" here, instead of relying on
+mmc_set_data_timeout().
+
+> +       sg_init_one(&sg, data_buf, size);
+> +       memset(data_buf, 0, size);
+> +       mmc_wait_for_req(mmc, &mrq);
+> +
+> +       if (cmd.error) {
+> +               err = cmd.error;
+> +               goto out;
+> +       }
+> +
+> +       if (data.error) {
+> +               err = data.error;
+> +               goto out;
+> +       }
+> +
+> +       if (memcmp(data_buf, tuning_block_pattern, size))
+> +               err = -EIO;
+> +
+> +out:
+> +       kfree(data_buf);
+> +       return err;
+> +}
+> +EXPORT_SYMBOL_GPL(mmc_send_tuning);
+> +
+>  static int
+>  mmc_send_bus_test(struct mmc_card *card, struct mmc_host *host, u8 opcode,
+>                   u8 len)
+> diff --git a/include/linux/mmc/core.h b/include/linux/mmc/core.h
+> index f206e29..82a0119 100644
+> --- a/include/linux/mmc/core.h
+> +++ b/include/linux/mmc/core.h
+> @@ -154,6 +154,7 @@ extern void mmc_start_bkops(struct mmc_card *card, bool from_exception);
+>  extern int __mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int, bool,
+>                         bool, bool);
+>  extern int mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int);
+> +extern int mmc_send_tuning(struct mmc_card *, u32);
+>  extern int mmc_send_ext_csd(struct mmc_card *card, u8 *ext_csd);
+>
+>  #define MMC_ERASE_ARG          0x00000000
+> --
+> 2.1.1
+>
+
+Kind regards
+Uffe
