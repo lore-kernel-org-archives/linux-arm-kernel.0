@@ -1,97 +1,56 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 24 Nov 2014 19:48:49 +0100 (CET)
-Subject: [PATCH 3.18-rc3 v8 1/4] irqchip: gic: Make gic_raise_softirq()
- FIQ-safe
-In-Reply-To: <alpine.DEB.2.11.1411241918090.6439@nanos>
-References: <1415183260-6389-1-git-send-email-daniel.thompson@linaro.org>
- <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1415968543-29469-2-git-send-email-daniel.thompson@linaro.org>
- <alpine.DEB.2.11.1411241918090.6439@nanos>
-Message-ID: <alpine.DEB.2.11.1411241928300.6439@nanos>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 24 Nov 2014 13:50:24 -0500 (EST)
+Subject: [PATCH] ARM: PJ4: allow building in Thumb-2 mode
+In-Reply-To: <CAOesGMhMU+mWVFY20SaS6SXKeJNudzPEGt2h_uc_rFJzMgXmXw@mail.gmail.com>
+References: <1416830200-11114-1-git-send-email-ard.biesheuvel@linaro.org>
+ <2078609.NLHB18YoOo@wuerfel>
+ <CAKv+Gu_YuHbO7+jusczcJTHF8fM4pF1z2h55BZK0mrHK702z_A@mail.gmail.com>
+ <4653047.WBmUTsHC57@wuerfel>
+ <CAOesGMhMU+mWVFY20SaS6SXKeJNudzPEGt2h_uc_rFJzMgXmXw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1411241346110.11690@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Nov 2014, Thomas Gleixner wrote:
-> On Fri, 14 Nov 2014, Daniel Thompson wrote:
-> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> > index 38493ff28fa5..0db62a6f1ee3 100644
-> > --- a/drivers/irqchip/irq-gic.c
-> > +++ b/drivers/irqchip/irq-gic.c
-> > @@ -73,6 +73,13 @@ struct gic_chip_data {
-> >  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
-> >  
-> >  /*
-> > + * This lock may be locked for reading by FIQ handlers. Thus although
-> > + * read locking may be used liberally, write locking must only take
-> > + * place only when local FIQ handling is disabled.
-> > + */
-> > +static DEFINE_RWLOCK(fiq_safe_cpu_map_lock);
-> > +
-> > +/*
-> >   * The GIC mapping of CPU interfaces does not necessarily match
-> >   * the logical CPU numbering.  Let's use a mapping as returned
-> >   * by the GIC itself.
-> > @@ -624,7 +631,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
-> >  	int cpu;
-> >  	unsigned long flags, map = 0;
-> >  
-> > -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
-> > +	read_lock_irqsave(&fiq_safe_cpu_map_lock, flags);
+On Mon, 24 Nov 2014, Olof Johansson wrote:
+
+> On Mon, Nov 24, 2014 at 9:17 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 24 November 2014 16:34:47 Ard Biesheuvel wrote:
+> >> On 24 November 2014 at 16:29, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > On Monday 24 November 2014 12:56:40 Ard Biesheuvel wrote:
+> >> >> Two files that get included when building the multi_v7_defconfig target
+> >> >> fail to build when selecting THUMB2_KERNEL for this configuration.
+> >> >>
+> >> >> In both cases, we can just build the file as ARM code, as none of its
+> >> >> symbols are exported to modules, so there are no interworking concerns.
+> >> >> In the iwmmxt.S case, add ENDPROC() declarations so the symbols are
+> >> >> annotated as functions, resulting in the linker to emit the appropriate
+> >> >> mode switches.
+> >> >>
+> >> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> >
+> >> > Ah, very nice. I tried this before, but my version didn't actually
+> >> > work, presumably because I didn't know about the ENDPROC() stuff.
+> >> >
+> >> > Have you tested this on a machine that has IWMMXT enabled?
+> >> >
+> >>
+> >> No, I don't have access to such a machine, unfortunately.
+> >
+> > Adding a few mvebu folks to Cc, maybe one of them can test your patch.
+> > It's also possible that Olof or Kevin have a PJ4 machine with iwmmxt
+> > in their boot farms.
 > 
-> Just for the record:
+> I have a Cubox with Dove, which does implement iWMMXt v2, based on
+> boot messages.
 > 
-> You might have noticed that you replace a raw lock with a non raw
-> one. That's not an issue on mainline, but that pretty much renders
-> that code broken for RT.
->   
-> Surely nothing I worry too much about given the current state of RT.
+> I however do not have any kind of userspace programs that make use of
+> it to test with.
 
-And having a second thought here. Looking at the protection scope
-independent of the spin vs. rw lock
+The housekeeping code will be called on task switch even if the 
+coprocessor is not involved by user space.  That's what needs testing 
+i.e. that code is still callable and doesn't crash in a Thumb2 config.  
+>From the looks of it I wouldn't see any problem... but nothing beats 
+actual testing.
 
-gic_raise_softirq()
 
-	lock();
-
-	/* Does not need any protection */
-	for_each_cpu(cpu, mask)
-                map |= gic_cpu_map[cpu];
-
-	/*
-	 * Can be outside the lock region as well as it makes sure
-	 * that previous writes (usually the IPI data) are visible
-	 * before the write to the SOFTINT register.
-	 */
-	 dmb(ishst);
-
-	/* Why needs this protection? */
-	write(map, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT));
-
-	unlock();
-
-gic_migrate_target()
-
-	....
-	lock();
-
-	/* Migrate all peripheral interrupts */
-
-	unlock();
-
-So what's the point of that protection?
-
-gic_raise_softirq() is used to send IPIs, which are PPIs on the target
-CPUs so they are not affected from the migration of the peripheral
-interrupts at all.
-
-The write to the SOFTINT register in gic_migrate_target() is not
-inside the lock region. So what's serialized by the lock in
-gic_raise_softirq() at all?
-
-Either I'm missing something really important here or this locking
-exercise in gic_raise_softirq() and therefor the rwlock conversion is
-completely pointless.
-
-Thanks,
-
-	tglx
+Nicolas
