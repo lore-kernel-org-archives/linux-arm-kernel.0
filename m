@@ -1,44 +1,65 @@
-From: robert.jarzmik@free.fr (=Robert Jarzmik)
-Date: Mon, 24 Nov 2014 23:08:15 +0100
-Subject: [PATCH] serial: pxa: hold port.lock when reporting modem line
- changes
-In-Reply-To: <1416815313-20891-1-git-send-email-dbaryshkov@gmail.com> (Dmitry
- Eremin-Solenikov's message of "Mon, 24 Nov 2014 10:48:33 +0300")
-References: <1416815313-20891-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <87389845gw.fsf@free.fr>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Mon, 24 Nov 2014 23:16:12 +0100
+Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+In-Reply-To: <CAOMZO5DZSxeTC9fKYXk6XBAG-03qW+TM_8HS_3M8Mkbd-iEdzg@mail.gmail.com>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <201406182220.22818@pali>
+ <CAOMZO5DZSxeTC9fKYXk6XBAG-03qW+TM_8HS_3M8Mkbd-iEdzg@mail.gmail.com>
+Message-ID: <201411242316.12215@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+On Wednesday 18 June 2014 23:53:00 Fabio Estevam wrote:
+> On Wed, Jun 18, 2014 at 5:20 PM, Pali Roh?r <pali.rohar@gmail.com> wrote:
+> > So how to read Revision and Serial number in DT based
+> > kernel?
+> 
+> $ cat /sys/bus/soc/devices/soc0/soc_id
+> i.MX6SX
+> 
+> $ cat /sys/bus/soc/devices/soc0/revision
+> 1.0
+> 
+> $ cat /sys/bus/soc/devices/soc0/machine
+> Freescale i.MX6 SoloX SDB Board
 
-> diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
-> index 2f4c329..b59dcb1 100644
-> --- a/drivers/tty/serial/pxa.c
-> +++ b/drivers/tty/serial/pxa.c
-> @@ -223,6 +223,7 @@ static void serial_pxa_start_tx(struct uart_port *port)
->  	}
->  }
->  
-> +/* should hold up->port.lock */
->  static inline void check_modem_status(struct uart_pxa_port *up)
->  {
->  	int status;
-> @@ -258,7 +259,9 @@ static inline irqreturn_t serial_pxa_irq(int irq, void
->  *dev_id)
-The spin_lock() should be here I think. As the spinlock price has to be paid,
-let's have the whole function under spinlock().
+This does *not* working with DT based boot!
 
->  	lsr = serial_in(up, UART_LSR);
->  	if (lsr & UART_LSR_DR)
->  		receive_chars(up, &lsr);
-> +	spin_lock(&up->port.lock);
->  	check_modem_status(up);
-> +	spin_unlock(&up->port.lock);
->  	if (lsr & UART_LSR_THRE)
->  		transmit_chars(up);
-The spin_unlock() should be there, after transmission IMO.
+$ cat /sys/bus/soc/devices/soc0/soc_id
+cat: can't open '/sys/bus/soc/devices/soc0/soc_id': No such file or directory
+$ cat /sys/bus/soc/devices/soc0/revision 
+ES3.1
+$ cat /sys/bus/soc/devices/soc0/machine 
+OMAP3430/3530
 
-Cheers.
+
+Here is output from *non* DT based boot:
+
+# busybox cat /proc/cpuinfo 
+processor       : 0
+model name      : ARMv7 Processor rev 3 (v7l)
+Features        : swp half thumb fastmult vfp edsp thumbee neon 
+vfpv3 tls vfpd32 
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x2
+CPU part        : 0xc08
+CPU revision    : 3
+
+Hardware        : Nokia RX-51 board
+Revision        : 0012
+Serial          : 0000000000000000
+
+
+As you can see in those files are totally *different* values.
 
 -- 
-Robert
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/835bc0cb/attachment.sig>
