@@ -1,336 +1,70 @@
-From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
-Date: Mon, 24 Nov 2014 15:51:17 -0600
-Subject: [PATCH V4] arm64: amd-seattle: Adding device tree for AMD Seattle
- platform
-Message-ID: <1416865877-8347-1-git-send-email-suravee.suthikulpanit@amd.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 24 Nov 2014 13:57:25 -0800
+Subject: serial: of-serial: fetch line number from DT
+In-Reply-To: <1416865299.2180.1.camel@lynxeye.de>
+References: <CAOesGMjzs=dThDv6S8Xvo+ym-XECaQhTQ8NV6t46fQZ1LoJnHw@mail.gmail.com>
+ <20141111052407.GB24727@kroah.com>
+ <CAOesGMhe8orqL6wSiouQvdM8y4N44p12n7M1opraSkAP=3ZB+A@mail.gmail.com>
+ <1416865299.2180.1.camel@lynxeye.de>
+Message-ID: <20141124215725.GA19228@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+On Mon, Nov 24, 2014 at 10:41:39PM +0100, Lucas Stach wrote:
+> Hi Greg,
+> 
+> Am Dienstag, den 11.11.2014, 08:51 -0800 schrieb Olof Johansson:
+> > On Mon, Nov 10, 2014 at 9:24 PM, Greg Kroah-Hartman
+> > <gregkh@linuxfoundation.org> wrote:
+> > > On Mon, Nov 10, 2014 at 01:34:19PM -0800, Olof Johansson wrote:
+> > >> Greg,
+> > >>
+> > >> This commit:
+> > >>
+> > >> commit 1bd8324535ec1ff44aef55c0e40b9e7d56b310fb
+> > >> Author: Lucas Stach <dev@lynxeye.de>
+> > >> Date:   Mon Nov 3 23:16:54 2014 +0100
+> > >>
+> > >>     serial: of-serial: fetch line number from DT
+> > >>
+> > >>     The general agreed way to specify a fixed line number
+> > >>     for a serial console is to provide a "serial" alias
+> > >>     in the devicetree. Start parsing this property in
+> > >>     of_serial.
+> > >>
+> > >>     Signed-off-by: Lucas Stach <dev@lynxeye.de>
+> > >>     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > >>
+> > >>
+> > >> Broke a whole lot of tegra boards in last night's -next here. In
+> > >> particular, I've been looking at tegra20-seaboard, which now doesn't
+> > >> boot with console any more.
+> > >>
+> > >> http://arm-soc.lixom.net/bootlogs/next/next-20141110/
+> > >>
+> > >> Unfortunately, tegra has for a long time been specifying the aliases
+> > >> as a fixed 1:1 mapping, but most environments rely on ttyS0 being the
+> > >> first _activated_ serial port. That's obviously going to break things
+> > >> here. :(
+> > >>
+> > >> Greg, can you please revert until we get the tegra-side fixes in for
+> > >> this, or we're in for a pretty lousy time w.r.t. bisecting problems
+> > >> across the two mergepoints?
+> > >>
+> > >> Stephen: I suppose the best way to handle this on tegra is to specify
+> > >> the aliases per-board instead of in the soc dtsi today.
+> > >>
+> > >> Apologies for not replying to the patch directly -- it was only ever
+> > >> posted to linux-serial and I don't seem to be subscribed.
+> > >
+> > > Now reverted, sorry for the problems.
+> > 
+> > No worries, it's what linux-next is for. Thanks for the revert!
+> > 
+> As 3.18-rc6 now landed the fix to avoid the regression on Tegra would
+> you please consider reapplying this patch?
 
-Initial revision of device tree for AMD Seattle platform.
+What patch?  Please resend it, AND, get everyone to agree that it's not
+going to break anything.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Signed-off-by: Thomas Lendacky <Thomas.Lendacky@amd.com>
-Signed-off-by: Joel Schopp <Joel.Schopp@amd.com>
----
-V4 Changes:
-    * Remove unnecessary smb layer and move motherbord to top level
-    * Move include dtsi to top level
-    * Remove apb_pclk from sata0 and i2c
-    * Fix GIC Virtual Maintanance Interrupt from PPI24 (8) to PPI25 (9)
-    * Add 40-bit dma-ranges for motherboard (simple-bus)
-    * Remove dma0 (pl330) entry for now since it only supports 32-bit DMA.
-      It is basically not used at the moment. It would also need SMMU
-      to allow dma remapping to 40-bit DMA range.
-    * Add phandle spi0 and spi1
-    * Hook up gpio0 pin 7 with MMC Card Detection (CD) support.
-    * Changes in pcie0 entry:
-        - Add 40-bit dma-ranges
-        - Remove interrupts property
-        - Add interrupt-map/mask property
-        - Fix PCI I/O range 
-        - Merge PCI 32-bit ranges
-        - Merge PCI 64-bit ranges
-
-NOTE: I am not add a new compatible ID for the sata0 as Rob Herring
-      suggested since there is no need at the momement, and I am trying
-      to avoid introducing ID unnecessarily.
-
- arch/arm64/Kconfig                          |   5 +
- arch/arm64/boot/dts/Makefile                |   1 +
- arch/arm64/boot/dts/amd-seattle-periph.dtsi | 156 ++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amd-seattle.dts         |  89 ++++++++++++++++
- 4 files changed, 251 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amd-seattle-periph.dtsi
- create mode 100644 arch/arm64/boot/dts/amd-seattle.dts
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 9532f8d..ddc0196 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -142,6 +142,11 @@ source "kernel/Kconfig.freezer"
- 
- menu "Platform selection"
- 
-+config ARCH_SEATTLE
-+	bool "AMD Seattle SoC Family"
-+	help
-+	  This enables support for AMD Seattle SOC Family
-+
- config ARCH_THUNDER
- 	bool "Cavium Inc. Thunder SoC Family"
- 	help
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index f8001a6..604af09 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,3 +1,4 @@
-+dtb-$(CONFIG_ARCH_SEATTLE) += amd-seattle.dtb
- dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
- dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
-diff --git a/arch/arm64/boot/dts/amd-seattle-periph.dtsi b/arch/arm64/boot/dts/amd-seattle-periph.dtsi
-new file mode 100644
-index 0000000..77f565b
---- /dev/null
-+++ b/arch/arm64/boot/dts/amd-seattle-periph.dtsi
-@@ -0,0 +1,156 @@
-+/*
-+ * DTS file for AMD Seattle Peripheral
-+ *
-+ * Copyright (C) 2014 Advanced Micro Devices, Inc.
-+ */
-+
-+/ {
-+	motherboard {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges = <0 0 0 0xe0000000 0 0x01300000>;
-+
-+		/* DDR range is 40-bit addressing */
-+		dma-ranges = <0x80 0x0 0x80 0x0 0x7f 0xffffffff>;
-+
-+		adl3clk_100mhz: clk100mhz_0 {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <100000000>;
-+			clock-output-names = "adl3clk_100mhz";
-+		};
-+
-+		ccpclk_375mhz: clk375mhz {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <375000000>;
-+			clock-output-names = "ccpclk_375mhz";
-+		};
-+
-+		sataclk_333mhz: clk333mhz {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <333000000>;
-+			clock-output-names = "sataclk_333mhz";
-+		};
-+
-+		pcieclk_500mhz: clk500mhz_0 {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <500000000>;
-+			clock-output-names = "pcieclk_500mhz";
-+		};
-+
-+		dmaclk_500mhz: clk500mhz_1 {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <500000000>;
-+			clock-output-names = "dmaclk_500mhz";
-+		};
-+
-+		miscclk_250mhz: clk250mhz_4 {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <250000000>;
-+			clock-output-names = "miscclk_250mhz";
-+		};
-+
-+		uartspiclk_100mhz: clk100mhz_1 {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <100000000>;
-+			clock-output-names = "uartspiclk_100mhz";
-+		};
-+
-+		sata0: sata at 00300000 {
-+			compatible = "snps,dwc-ahci";
-+			reg = <0 0x300000 0 0x800>;
-+			interrupts = <0 355 4>;
-+			clocks = <&sataclk_333mhz>;
-+			dma-coherent;
-+		};
-+
-+		i2c at 1000000 {
-+			compatible = "snps,designware-i2c";
-+			reg = <0 0x01000000 0 0x1000>;
-+			interrupts = <0 357 4>;
-+			clocks = <&uartspiclk_100mhz>;
-+		};
-+
-+		serial0: serial at 1010000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0 0x1010000 0 0x1000>;
-+			interrupts = <0 328 4>;
-+			clocks = <&uartspiclk_100mhz>, <&uartspiclk_100mhz>;
-+			clock-names = "uartclk", "apb_pclk";
-+		};
-+
-+		spi0: ssp at 1020000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			#gpio-cells = <2>;
-+			reg = <0 0x1020000 0 0x1000>;
-+			spi-controller;
-+			interrupts = <0 330 4>;
-+			clocks = <&uartspiclk_100mhz>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		spi1: ssp at 1030000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			#gpio-cells = <2>;
-+			reg = <0 0x1030000 0 0x1000>;
-+			spi-controller;
-+			interrupts = <0 329 4>;
-+			clocks = <&uartspiclk_100mhz>;
-+			clock-names = "apb_pclk";
-+			num-cs = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			sdcard at 0 {
-+				compatible = "mmc-spi-slot";
-+				reg = <0>;
-+				spi-max-frequency = <20000000>;
-+				voltage-ranges = <3200 3400>;
-+				gpios = <&gpio0 7 0>;
-+				interrupt-parent = <&gpio0>;
-+				interrupts = <7 3>;
-+				pl022,hierarchy = <0>;
-+				pl022,interface = <0>;
-+				pl022,com-mode = <0x0>;
-+				pl022,rx-level-trig = <0>;
-+				pl022,tx-level-trig = <0>;
-+			};
-+		};
-+
-+		gpio0: gpio at 1040000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			#gpio-cells = <2>;
-+			reg = <0 0x1040000 0 0x1000>;
-+			gpio-controller;
-+			interrupts = <0 359 4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&uartspiclk_100mhz>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio1: gpio at 1050000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			#gpio-cells = <2>;
-+			reg = <0 0x1050000 0 0x1000>;
-+			gpio-controller;
-+			interrupts = <0 358 4>;
-+			clocks = <&uartspiclk_100mhz>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		ccp: ccp at 00100000 {
-+			compatible = "amd,ccp-seattle-v1a";
-+			reg = <0 0x00100000 0 0x10000>;
-+			interrupts = <0 3 4>;
-+			dma-coherent;
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amd-seattle.dts b/arch/arm64/boot/dts/amd-seattle.dts
-new file mode 100644
-index 0000000..d5fc482
---- /dev/null
-+++ b/arch/arm64/boot/dts/amd-seattle.dts
-@@ -0,0 +1,89 @@
-+/*
-+ * DTS file for AMD Seattle
-+ *
-+ * Copyright (C) 2014 Advanced Micro Devices, Inc.
-+ */
-+
-+/dts-v1/;
-+
-+/include/ "amd-seattle-periph.dtsi"
-+
-+/ {
-+	compatible = "amd,seattle";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	chosen {
-+		stdout-path = &serial0;
-+		linux,pci-probe-only;
-+	};
-+
-+	gic: interrupt-controller at e1101000 {
-+		compatible = "arm,gic-400", "arm,cortex-a15-gic";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		reg = <0x0 0xe1110000 0 0x1000>,
-+		      <0x0 0xe112f000 0 0x2000>,
-+		      <0x0 0xe1140000 0 0x10000>,
-+		      <0x0 0xe1160000 0 0x10000>;
-+		interrupts = <1 9 0xf04>;
-+		ranges;
-+		v2m0: v2m at e1180000 {
-+			compatible = "arm,gic-v2m-frame";
-+			msi-controller;
-+			arm,msi-base-spi = <64>;
-+			arm,msi-num-spis = <256>;
-+			reg = <0x0 0xe1180000 0 0x1000>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <1 13 0xff01>,
-+			     <1 14 0xff01>,
-+			     <1 11 0xff01>,
-+			     <1 10 0xff01>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,armv8-pmuv3";
-+		interrupts = <0 7 4>,
-+			     <0 8 4>,
-+			     <0 9 4>,
-+			     <0 10 4>,
-+			     <0 11 4>,
-+			     <0 12 4>,
-+			     <0 13 4>,
-+			     <0 14 4>;
-+	};
-+
-+	pcie0: pcie-controller {
-+		compatible = "pci-host-ecam-generic";
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		#interrupt-cells = <1>;
-+		device_type = "pci";
-+		bus-range = <0 0xff>;
-+		reg = <0 0xf0000000 0 0x10000000>;
-+		msi-parent = <&v2m0>;
-+
-+		interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
-+		interrupt-map = <0x1000 0x0 0x0 0x1 &gic 0x0 0x0 0x0 0x120 0x1>,
-+				<0x1000 0x0 0x0 0x2 &gic 0x0 0x0 0x0 0x121 0x1>,
-+				<0x1000 0x0 0x0 0x3 &gic 0x0 0x0 0x0 0x122 0x1>,
-+				<0x1000 0x0 0x0 0x4 &gic 0x0 0x0 0x0 0x123 0x1>;
-+
-+		dma-coherent;
-+		dma-ranges = <0x43000000 0x80 0x0 0x80 0x0 0x7f 0xffffffff>;
-+		ranges =
-+			/* I/O Memory (size=64K) */
-+			<0x01000000 0x00 0x00000000 0x00 0xefff0000 0x00 0x00010000>,
-+			/* 32-bit MMIO (size=2G) */
-+			<0x02000000 0x00 0x40000000 0x00 0x40000000 0x00 0x80000000>,
-+			/* 64-bit MMIO (size= 124G) */
-+			<0x03000000 0x01 0x00000000 0x01 0x00000000 0x7f 0x00000000>;
-+	};
-+};
--- 
-1.9.3
+greg k-h
