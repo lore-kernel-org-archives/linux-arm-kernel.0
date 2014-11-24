@@ -1,46 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Nov 2014 16:26:10 +0100
-Subject: [PATCH v1] arm: Support for the PXN CPU feature on ARMv7
-In-Reply-To: <20141124150652.GF15872@e104818-lin.cambridge.arm.com>
-References: <1416652956-24207-1-git-send-email-js07.lee@gmail.com>
- <20141124150652.GF15872@e104818-lin.cambridge.arm.com>
-Message-ID: <2837195.5EVM7cu8cA@wuerfel>
+Date: Mon, 24 Nov 2014 16:29:42 +0100
+Subject: [PATCH] ARM: PJ4: allow building in Thumb-2 mode
+In-Reply-To: <1416830200-11114-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1416830200-11114-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <2078609.NLHB18YoOo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 November 2014 15:06:53 Catalin Marinas wrote:
-> On Sat, Nov 22, 2014 at 10:42:36AM +0000, Jungseung Lee wrote:
-> > diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-
-> In general we put the #ifdef outside the function:
+On Monday 24 November 2014 12:56:40 Ard Biesheuvel wrote:
+> Two files that get included when building the multi_v7_defconfig target
+> fail to build when selecting THUMB2_KERNEL for this configuration.
 > 
-> #if __LINUX_ARM_ARCH__ >= 7 && !defined(CONFIG_ARM_LPAE)
-> static inline bool cpu_has_classic_pxn(void)
-> {
-> 	unsigned int vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-> 	return vmsa == 4;
-> }
-> #else
-> static inline bool cpu_has_classic_pxn(void)
-> {
-> 	return false;
-> }
-> #endif
+> In both cases, we can just build the file as ARM code, as none of its
+> symbols are exported to modules, so there are no interworking concerns.
+> In the iwmmxt.S case, add ENDPROC() declarations so the symbols are
+> annotated as functions, resulting in the linker to emit the appropriate
+> mode switches.
 > 
-> I used __LINUX_ARM_ARCH__ instead of CONFIG_CPU_V7 to cope with kernel
-> images built for both v6 and v7. You could also check for
-> cpu_architecture() >= 7, though with a bit of performance impact.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Regarding the style, I think the best way to express it is
+Ah, very nice. I tried this before, but my version didn't actually
+work, presumably because I didn't know about the ENDPROC() stuff.
 
-	if (__LINUX_ARM_ARCH__ >= 7 && !IS_ENABLED(CONFIG_ARM_LPAE) && (vmsa == 4))
-		return true;
-	return false;
-
-This way you can avoid the #ifdef and still get the compile-time
-optimization.
-
-Checking for (__LINUX_ARM_ARCH__ >= 6 && cpu_architecture >= 7) would
-also make it work for a combined armv6/v7 kernel.
+Have you tested this on a machine that has IWMMXT enabled?
 
 	Arnd
