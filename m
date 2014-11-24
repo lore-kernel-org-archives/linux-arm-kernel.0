@@ -1,44 +1,99 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 24 Nov 2014 15:32:52 +0100
-Subject: FIX ME in xsysace.c
-In-Reply-To: <54731648.8010006@gmail.com>
-References: <5472B1D6.7080805@gmail.com>
- <5a8be93a4204429daf16bc8f62cdd0cd@BY2FFO11FD005.protection.gbl>
- <54731648.8010006@gmail.com>
-Message-ID: <5e95919de4e349a6a7c5261cb1e9fda5@BN1BFFO11FD012.protection.gbl>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 24 Nov 2014 14:35:09 +0000
+Subject: [PATCH v3 02/13] irqchip: GICv3: Convert to domain hierarchy
+In-Reply-To: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
+References: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1416839720-18400-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In order to start supporting stacked domains, convert the GICv3
+code base to the new domain hierarchy framework, which mostly
+amounts to supporting the new alloc/free callbacks.
 
-On 11/24/2014 12:28 PM, nick wrote:
-> 
-> 
-> On 14-11-24 02:47 AM, Michal Simek wrote:
->> Hi,
->>
->> On 11/24/2014 05:19 AM, nick wrote:
->>> Greetings Michal and others,
->>> I am wondering about the FIX ME in xsysace.c as it seems not correct due to my knowledge of most hardware protocols using a predetermined bit wide and therefore this could be hard coded. If someone can respond on if I am correct in removing this fix me it would be greatly appreciated.
->>
->> I think that will be the best to c&p that fixme which you are talking about.
->> Definitely feel free to fix whatever fixme is there and send the patch
->> for fixing it.
->>
->> Thanks,
->> Michal
->>
-> Here is the fix me.
-> int bus_width = ACE_BUS_WIDTH_16; /* FIXME: should not be hard coded */
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/Kconfig      |  1 +
+ drivers/irqchip/irq-gic-v3.c | 42 +++++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 38 insertions(+), 5 deletions(-)
 
-FIXME is totally bogus and should be removed.
-
-I expect you want to use 8bit bus mode which driver itself supports.
-This line is just default setup to 16bit mode.
-
-If you add 8-bit property to dts you are there.
-	if (of_find_property(dev->dev.of_node, "8-bit", NULL))
-		bus_width = ACE_BUS_WIDTH_8;
-
-Thanks,
-Michal
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index b21f12f..4631685 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -14,6 +14,7 @@ config ARM_GIC_V3
+ 	bool
+ 	select IRQ_DOMAIN
+ 	select MULTI_IRQ_HANDLER
++	select IRQ_DOMAIN_HIERARCHY
+ 
+ config ARM_NVIC
+ 	bool
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index aa17ae8..4cb355a 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -594,14 +594,14 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 	/* PPIs */
+ 	if (hw < 32) {
+ 		irq_set_percpu_devid(irq);
+-		irq_set_chip_and_handler(irq, &gic_chip,
+-					 handle_percpu_devid_irq);
++		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
++				    handle_percpu_devid_irq, NULL, NULL);
+ 		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
+ 	}
+ 	/* SPIs */
+ 	if (hw >= 32 && hw < gic_data.irq_nr) {
+-		irq_set_chip_and_handler(irq, &gic_chip,
+-					 handle_fasteoi_irq);
++		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
++				    handle_fasteoi_irq, NULL, NULL);
+ 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+ 	}
+ 	irq_set_chip_data(irq, d->host_data);
+@@ -633,9 +633,41 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
+ 	return 0;
+ }
+ 
++static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
++				unsigned int nr_irqs, void *arg)
++{
++	int i, ret;
++	irq_hw_number_t hwirq;
++	unsigned int type = IRQ_TYPE_NONE;
++	struct of_phandle_args *irq_data = arg;
++
++	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
++				   irq_data->args_count, &hwirq, &type);
++	if (ret)
++		return ret;
++
++	for (i = 0; i < nr_irqs; i++)
++		gic_irq_domain_map(domain, virq + i, hwirq + i);
++
++	return 0;
++}
++
++static void gic_irq_domain_free(struct irq_domain *domain, unsigned int virq,
++				unsigned int nr_irqs)
++{
++	int i;
++
++	for (i = 0; i < nr_irqs; i++) {
++		struct irq_data *d = irq_domain_get_irq_data(domain, virq + i);
++		irq_set_handler(virq + i, NULL);
++		irq_domain_reset_irq_data(d);
++	}
++}
++
+ static const struct irq_domain_ops gic_irq_domain_ops = {
+-	.map = gic_irq_domain_map,
+ 	.xlate = gic_irq_domain_xlate,
++	.alloc = gic_irq_domain_alloc,
++	.free = gic_irq_domain_free,
+ };
+ 
+ static int __init gic_of_init(struct device_node *node, struct device_node *parent)
+-- 
+2.1.3
