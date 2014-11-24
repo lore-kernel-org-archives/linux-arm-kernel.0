@@ -1,62 +1,231 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 24 Nov 2014 18:36:57 +0100
-Subject: [PATCH] ARM: PJ4: allow building in Thumb-2 mode
-In-Reply-To: <4653047.WBmUTsHC57@wuerfel>
-References: <1416830200-11114-1-git-send-email-ard.biesheuvel@linaro.org>
- <2078609.NLHB18YoOo@wuerfel>
- <CAKv+Gu_YuHbO7+jusczcJTHF8fM4pF1z2h55BZK0mrHK702z_A@mail.gmail.com>
- <4653047.WBmUTsHC57@wuerfel>
-Message-ID: <54736CB9.1090307@free-electrons.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 24 Nov 2014 17:41:07 +0000
+Subject: [PATCH v4 18/19] arm/arm64: KVM: enable kernel side of GICv3
+ emulation
+In-Reply-To: <20141124090927.GE3401@cbox>
+References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
+ <1415959683-26027-19-git-send-email-andre.przywara@arm.com>
+ <20141124090927.GE3401@cbox>
+Message-ID: <54736DB3.1040808@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+(Marc, can you comment on the last question below about the unaligned
+GICV mapping?)
 
-On 24/11/2014 18:17, Arnd Bergmann wrote:
-> On Monday 24 November 2014 16:34:47 Ard Biesheuvel wrote:
->> On 24 November 2014 at 16:29, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Monday 24 November 2014 12:56:40 Ard Biesheuvel wrote:
->>>> Two files that get included when building the multi_v7_defconfig target
->>>> fail to build when selecting THUMB2_KERNEL for this configuration.
->>>>
->>>> In both cases, we can just build the file as ARM code, as none of its
->>>> symbols are exported to modules, so there are no interworking concerns.
->>>> In the iwmmxt.S case, add ENDPROC() declarations so the symbols are
->>>> annotated as functions, resulting in the linker to emit the appropriate
->>>> mode switches.
->>>>
->>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>
->>> Ah, very nice. I tried this before, but my version didn't actually
->>> work, presumably because I didn't know about the ENDPROC() stuff.
->>>
->>> Have you tested this on a machine that has IWMMXT enabled?
->>>
+Hi Christoffer,
+
+On 24/11/14 09:09, Christoffer Dall wrote:
+> On Fri, Nov 14, 2014 at 10:08:02AM +0000, Andre Przywara wrote:
+>> With all the necessary GICv3 emulation code in place, we can now
+>> connect the code to the GICv3 backend in the kernel.
+>> The LR register handling is different depending on the emulated GIC
+>> model, so provide different implementations for each.
+>> Also allow non-v2-compatible GICv3 implementations (which don't
+>> provide MMIO regions for the virtual CPU interface in the DT), but
+>> restrict those hosts to support GICv3 guests only.
 >>
->> No, I don't have access to such a machine, unfortunately.
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>> Changelog v3...v4:
+>> - handle differences between GICv2-on-v3 and GICv3-on-v3 in existing functions
+>> - remove init_*_emul() functions
+>> - remove max_vcpus setting (done in earlier patches now)
+>> - adapt to new vgic_v<n>_init_emulation behaviour
+>>
+>>  virt/kvm/arm/vgic-v3.c |   83 ++++++++++++++++++++++++++++++++----------------
+>>  virt/kvm/arm/vgic.c    |    5 +++
+>>  2 files changed, 60 insertions(+), 28 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+>> index a04d208..4894c59 100644
+>> --- a/virt/kvm/arm/vgic-v3.c
+>> +++ b/virt/kvm/arm/vgic-v3.c
+>> @@ -34,6 +34,7 @@
+>>  #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
+>>  #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+>>  #define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
+>> +#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
+>>  
+>>  /*
+>>   * LRs are stored in reverse order in memory. make sure we index them
+>> @@ -48,12 +49,17 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+>>  	struct vgic_lr lr_desc;
+>>  	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
+>>  
+>> -	lr_desc.irq	= val & GICH_LR_VIRTUALID;
+>> -	if (lr_desc.irq <= 15)
+>> -		lr_desc.source	= (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0x7;
+>> +	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+>> +		lr_desc.irq = val & ICH_LR_VIRTUALID_MASK;
+>>  	else
+>> -		lr_desc.source = 0;
+>> -	lr_desc.state	= 0;
+>> +		lr_desc.irq = val & GICH_LR_VIRTUALID;
+>> +
+>> +	lr_desc.source = 0;
+>> +	if (lr_desc.irq <= 15 &&
+>> +	    vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
+>> +		lr_desc.source	= (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0x7;
+>> +
+>> +	lr_desc.state   = 0;
 > 
-> Adding a few mvebu folks to Cc, maybe one of them can test your patch.
-
-Actually even it is a feature of the PJ4 machine non of the mvebu machines
-currently use it. I only see this configuration enabled for the pxa family.
-So I think you would have more feedback with the pxa maintainers/owners.
-
-Gregory
-
-> It's also possible that Olof or Kevin have a PJ4 machine with iwmmxt 
-> in their boot farms.
+> super-nit-only-if-you-respin: you have a couple of tabs and extra spaces
+> in the two lines above that need to just be a single space before the
+> assignment operator on each line.
 > 
-> 	Arnd
+>>  
+>>  	if (val & ICH_LR_PENDING_BIT)
+>>  		lr_desc.state |= LR_STATE_PENDING;
+>> @@ -68,8 +74,20 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+>>  static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+>>  			   struct vgic_lr lr_desc)
+>>  {
+>> -	u64 lr_val = (((u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) |
+>> -		      lr_desc.irq);
+>> +	u64 lr_val;
+>> +
+>> +	lr_val = lr_desc.irq;
+>> +
+>> +	/*
+>> +	 * currently all guest IRQs are Group1, as Group0 would result
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I guess you couldn't guess my comment, from last time, can you please
+> begin sentences with upper-case?  (only if you re-spin).
 > 
+>> +	 * in a FIQ in the guest, which it wouldn't expect.
+>> +	 * Eventually we want to make this configurable, so we may revisit
+>> +	 * this in the future.
+>> +	 */
+>> +	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+>> +		lr_val |= ICH_LR_GROUP;
+>> +	else
+>> +		lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
+>>  
+>>  	if (lr_desc.state & LR_STATE_PENDING)
+>>  		lr_val |= ICH_LR_PENDING_BIT;
+>> @@ -154,7 +172,14 @@ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
+>>  	 */
+>>  	vgic_v3->vgic_vmcr = 0;
+>>  
+>> -	vgic_v3->vgic_sre = 0;
+>> +	/*
+>> +	 * Set the SRE_EL1 value depending on the configured
+>> +	 * emulated vGIC model.
+>> +	 */
+>> +	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+>> +		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
+> 
+> I think we left some of my questions from last round unanswered here
+> (you said you needed to go and think about it).  If the guest sets SRE=0
+> we will not currently preserve this value I think.
 
+Which is intentional, as we are following "4.4.7 Implementations with
+Fixed System Register Enables", which allows RAO/WI semantics for the
+SRE bit if the GIC implementation does not care about GICv2
+compatibility (which is what we do for the guest).
+Does that make sense or am I missing something?
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> The comment should clearly indicate that we're choosing a reset value
+> of the register for our implementation of the gic.
+> 
+> I'm fine with this change, but would like to know what the rationale
+> behind it is; wouldn't guests always initialize this value?
+> 
+>> +	else
+>> +		vgic_v3->vgic_sre = 0;
+>>  
+>>  	/* Get the show on the road... */
+>>  	vgic_v3->vgic_hcr = ICH_HCR_EN;
+>> @@ -215,28 +240,30 @@ int vgic_v3_probe(struct device_node *vgic_node,
+>>  
+>>  	gicv_idx += 3; /* Also skip GICD, GICC, GICH */
+>>  	if (of_address_to_resource(vgic_node, gicv_idx, &vcpu_res)) {
+>> -		kvm_err("Cannot obtain GICV region\n");
+>> -		ret = -ENXIO;
+>> -		goto out;
+>> -	}
+>> -
+>> -	if (!PAGE_ALIGNED(vcpu_res.start)) {
+>> -		kvm_err("GICV physical address 0x%llx not page aligned\n",
+>> -			(unsigned long long)vcpu_res.start);
+>> -		ret = -ENXIO;
+>> -		goto out;
+>> -	}
+>> -
+>> -	if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
+>> -		kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
+>> -			(unsigned long long)resource_size(&vcpu_res),
+>> -			PAGE_SIZE);
+>> -		ret = -ENXIO;
+>> -		goto out;
+>> +		kvm_info("GICv3: GICv2 emulation not available\n");
+>> +		vgic->vcpu_base = 0;
+>> +	} else {
+>> +		if (!PAGE_ALIGNED(vcpu_res.start)) {
+>> +			kvm_err("GICV physical address 0x%llx not page aligned\n",
+>> +				(unsigned long long)vcpu_res.start);
+>> +			ret = -ENXIO;
+>> +			goto out;
+> 
+> shouldn't we be allowing an emulated gicv3 using the system registers in
+> this case then?
+
+I guess not. If we have a GICV address that is not passing those tests,
+we should warn the user about it instead of unexpectedly restricting the
+virtualization capabilities, right?
+If the user desperately wants to use GIC virtualization despite having
+the odd mapping, he could remove the GICC/GICH/GICV at all from the DTB.
+
+Marc, any thoughts?
+
+Cheers,
+Andre.
+
+>> +		}
+>> +
+>> +		if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
+>> +			kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
+>> +				(unsigned long long)resource_size(&vcpu_res),
+>> +				PAGE_SIZE);
+>> +			ret = -ENXIO;
+>> +			goto out;
+> 
+> ditto?
+> 
+>> +		}
+>> +
+>> +		vgic->vcpu_base = vcpu_res.start;
+>> +		kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+>> +					KVM_DEV_TYPE_ARM_VGIC_V2);
+>>  	}
+>> -	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
+>> +	kvm_register_device_ops(&kvm_arm_vgic_v3_ops, KVM_DEV_TYPE_ARM_VGIC_V3);
+>>  
+>> -	vgic->vcpu_base = vcpu_res.start;
+>>  	vgic->vctrl_base = NULL;
+>>  	vgic->type = VGIC_V3;
+>>  	vgic->max_hw_vcpus = KVM_MAX_VCPUS;
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index b7de0f8..1dbaeb5 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -1577,6 +1577,11 @@ static int init_vgic_model(struct kvm *kvm, int type)
+>>  	case KVM_DEV_TYPE_ARM_VGIC_V2:
+>>  		ret = vgic_v2_init_emulation(kvm);
+>>  		break;
+>> +#ifdef CONFIG_ARM_GIC_V3
+>> +	case KVM_DEV_TYPE_ARM_VGIC_V3:
+>> +		ret = vgic_v3_init_emulation(kvm);
+>> +		break;
+>> +#endif
+>>  	default:
+>>  		ret = -ENODEV;
+>>  		break;
+>> -- 
+>> 1.7.9.5
+>>
+> 
+> Thanks,
+> -Christoffer
+> 
