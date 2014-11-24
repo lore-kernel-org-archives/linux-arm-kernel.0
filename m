@@ -1,33 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Nov 2014 10:54:36 +0000
-Subject: [RFC 0/4] vgic additions for forwarded irq
-In-Reply-To: <20141124105037.GL3401@cbox>
-References: <1416766373-13569-1-git-send-email-eric.auger@linaro.org>
- <20141124105037.GL3401@cbox>
-Message-ID: <54730E6C.1040708@arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 24 Nov 2014 19:57:47 +0900
+Subject: [PATCHv3 0/3] ARM: dts: add the support of Exynos3250-based Monk board
+Message-ID: <1416826670-29438-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/11/14 10:50, Christoffer Dall wrote:
-> On Sun, Nov 23, 2014 at 07:12:49PM +0100, Eric Auger wrote:
->> This series applies on top of "ARM: Forwarding physical
->> interrupts to a guest VM" (http://lwn.net/Articles/603514/)
->> series.
-> 
-> Marc and Eric,
-> 
-> Does it make sense to review and look at these patches given the current
-> state of the forwarding patches, or should we wait until Marc respins
-> that series?
+This patchset adds the support of Exynos3250-based Monk board and Exynos-based
+boards compatible string and description to remove build warning. Also, this
+patchset includes a patch which remove unused dt node for command line in
+Exynos3250-based Rinato dts file.
 
-I'm still in the process of respining all of this (we've had a few
-iterations with tglx, but I got sidetracked with the ITS/v2m/MSI side of
-things).
+Changes from v2:
+- Include new patches by Chanwoo Choi with following patch[1]
+  [1] http://www.spinics.net/lists/arm-kernel/msg368443.html
 
-I'll get back onto this this week. Hopefully.
+Changes from v1:
+- Fix minor issue
 
-Thanks,
+Chanwoo Choi (2):
+  ARM: exynos: Add Exynos-based boards compatible string and description
+  ARM: dts: Remove unused command line from Exynos3250-based Rinato board
 
-	M.
+Youngjun Cho (1):
+  ARM: dts: add board dts file for Exynos3250-based Monk board
+
+ .../devicetree/bindings/arm/samsung-boards.txt     |  19 +-
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/exynos3250-monk.dts              | 579 +++++++++++++++++++++
+ arch/arm/boot/dts/exynos3250-rinato.dts            |   4 -
+ 4 files changed, 595 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos3250-monk.dts
+
 -- 
-Jazz is not dead. It just smells funny...
+1.8.5.5
