@@ -1,52 +1,109 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 24 Nov 2014 14:31:53 +0530
-Subject: [PATCH v4 1/2] i2c: s3c2410: Handle i2c sys_cfg register in i2c
- driver
-In-Reply-To: <019101d005ed$fd3d5eb0$f7b81c10$@kernel.org>
-References: <1414656270-8048-1-git-send-email-pankaj.dubey@samsung.com>
- <1414656270-8048-2-git-send-email-pankaj.dubey@samsung.com>
- <20141121072545.GG1480@katana> <546F1140.4050709@samsung.com>
- <20141121164726.GA1426@katana> <019101d005ed$fd3d5eb0$f7b81c10$@kernel.org>
-Message-ID: <5472F401.30404@samsung.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 24 Nov 2014 10:04:14 +0100
+Subject: [PATCH v3 0/3] Make Armada 375 use the reference clock when
+ possible
+In-Reply-To: <20141119104535.GB8973@spo001.leaseweb.nl>
+References: <1415107293-19258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <546C6226.5000900@linaro.org> <20141119104535.GB8973@spo001.leaseweb.nl>
+Message-ID: <5472F48E.40802@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Saturday 22 November 2014 06:18 AM, Kukjin Kim wrote:
-> Wolfram Sang wrote:
->>
-> Hi Wolfram,
+On 11/19/2014 11:45 AM, Wim Van Sebroeck wrote:
+> Hi Daniel,
 >
->>>> I usually don't take DTS patches. They should go via arm-soc. Please say
->>>> so if there are reasons I should take them.
+> I'll review before the weekend and will let you know something.
+> But everything through one tree is fine by me.
+
+Hi Wim,
+
+did you have time to review this patchset ? I would like to send my PR 
+for tglx as soon as possible.
+
+Thanks
+   -- Daniel
+
+>
+> Kind regards,
+> Wim.
+>
+>> On 11/04/2014 02:21 PM, Ezequiel Garcia wrote:
+>>> Hi Daniel, Wim:
 >>>
->>> I CC'ed to you because same patch contains changes in i2c driver.
+>>> Seems we are ready to merge these, unless some objection raises. Do you
+>>> think
+>>> you can take the patches through your trees?
 >>
->> Yes, those should absolutely go via my I2C tree. You need to make a
->> seperate patch out of the dts changes which then also should go via
->> samsung-soc, unless Kukjin says he really wants to go the via I2C. But I
->> guess the latter will just create merge conflicts.
->
-> Hmm...I think, Pankaj needs to submit separated patches 1) driver change, 2) dt
-> change and then 3) remove change. And 2nd and 3rd changes should be handed in
-> Samsung tree together after landing 1) change in -next.
->
-> Of course, 1) change should be handled in i2c tree ;)
->
+>> Hi Wim,
+>>
+>> I can take through my tree the entire patchset if you want but I need
+>> your blessing for the watchdog part.
+>>
+>> Thanks
+>>    -- Daniel
+>>
+>>> Changes from v2:
+>>>
+>>>    * Fix messed up empty lines, as suggested by Thomas Petazzoni.
+>>>
+>>> Changes from v1:
+>>>
+>>>    * Make the A375 timer and watchdog devicetree binding match the hardware
+>>>      and require the two available clocks: core and reference clock.
+>>>
+>>> This series adds support for the 25 MHz reference clock available on
+>>> Armada 375 SoC to be used on the timer and watchdog drivers. It is
+>>> similar to the one present in Armada XP SoC.
+>>>
+>>> Given we initially had access to only a very early SoC revision (A375 Z1)
+>>> and due to a hardware issue, the timer and watchdog support was originally
+>>> submitted to use the core clock.
+>>>
+>>> Now that the A0 SoC revision is out, we can fix this and use the reference
+>>> clock. The reason for this change is that the core clock is subject to the
+>>> SSCG (Spread Spectrum Clock Generator), so boards where SSCG is enabled
+>>> exhibit a very large timer drift.
+>>>
+>>> Notice that this change will produce unpleseant results on A375 Z1, given
+>>> the
+>>> reference 25 MHz clock doesn't work properly on that SoC revision.
+>>>
+>>> But since the Z1 revision is not supported by the recently submitted A375
+>>> network driver (mvpp2), and therefore nobody is expected to run mainline
+>>> (if there are users at all of this early revision), the support will be
+>>> dropped entirely in a near future.
+>>>
+>>> To prevent any compatibility issues when booting with an older devicetree,
+>>> this series provides proper fall backs in each case.
+>>>
+>>> The series applies on v3.18-rc2.
+>>>
+>>> Ezequiel Garcia (3):
+>>>    clocksource: armada-370-xp: Add missing clock enable
+>>>    watchdog: orion: Use the reference clock on Armada 375 SoC
+>>>    clocksource: armada-370-xp: Use the reference clock on A375 SoC
+>>>
+>>>   .../bindings/timer/marvell,armada-370-xp-timer.txt |  9 +++--
+>>>   .../devicetree/bindings/watchdog/marvel.txt        | 13 +++++++
+>>>   drivers/clocksource/time-armada-370-xp.c           | 30 ++++++++++++++++
+>>>   drivers/watchdog/orion_wdt.c                       | 42
+>>>   +++++++++++++++++++++-
+>>>   4 files changed, 90 insertions(+), 4 deletions(-)
+>>>
+>>
+>>
+>> --
+>>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>>
+>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+>> <http://twitter.com/#!/linaroorg> Twitter |
+>> <http://www.linaro.org/linaro-blog/> Blog
+>>
 
-Thanks for review and guidance. I separated i2c driver changes and 
-posted it as v6 here [1]. DT changes and mach-exynos removal of i2c 
-settings have been posted as v6 here [2]. Please do review and if OK 
-let's get it merged.
 
-[1]: i2c-driver: https://patchwork.kernel.org/patch/5363981/
-[2]: mach-exynos: 
-http://comments.gmane.org/gmane.linux.kernel.samsung-soc/40155
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Thanks,
-Pankaj Dubey
-> Thanks,
-> Kukjin
->
->
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
