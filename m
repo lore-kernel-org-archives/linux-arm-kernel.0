@@ -1,62 +1,200 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Nov 2014 21:12:09 +0100
-Subject: For the problem when using swiotlb
-In-Reply-To: <20141121180925.GG19783@e104818-lin.cambridge.arm.com>
-References: <5469E26B.2010905@huawei.com> <20141121175118.GA10451@localhost>
- <20141121180925.GG19783@e104818-lin.cambridge.arm.com>
-Message-ID: <2166613.l2i4mdmtLA@wuerfel>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Mon, 24 Nov 2014 12:14:52 -0800
+Subject: [PATCH RESEND v8] iopoll: Introduce memory-mapped IO polling macros
+Message-ID: <1416860092-11620-1-git-send-email-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 November 2014 18:09:25 Catalin Marinas wrote:
-> On Fri, Nov 21, 2014 at 05:51:19PM +0000, Catalin Marinas wrote:
-> > On Fri, Nov 21, 2014 at 05:04:28PM +0000, Arnd Bergmann wrote:
-> > > On Friday 21 November 2014 16:57:09 Catalin Marinas wrote:
-> > > > There is a scenario where smaller mask would work on arm64. For example
-> > > > Juno, you can have 2GB of RAM in the 32-bit phys range (starting at
-> > > > 0x80000000). A device with 31-bit mask and a dma_pfn_offset of
-> > > > 0x80000000 would still work (there isn't any but just as an example). So
-> > > > the check in dma_alloc_coherent() would be something like:
-> > > > 
-> > > > 	phys_to_dma(top of ZONE_DMA) - dma_pfn_offset <= coherent_dma_mask
-> > > > 
-> > > > (or assuming RAM starts at 0 and ignoring dma_pfn_offset for now)
-> > > > 
-> > > > If the condition above fails, dma_alloc_coherent() would no longer fall
-> > > > back to swiotlb but issue a dev_warn() and return NULL.
-> > > 
-> > > Ah, that looks like it should work on all architectures, very nice.
-> > > How about checking this condition, and then printing a small warning
-> > > (dev_warn, not WARN_ON) and setting the dma_mask pointer to NULL?
-> > 
-> > I would not add the above ZONE_DMA check to of_dma_configure(). For
-> > example on arm64, we may not support a small coherent_dma_mask but the
-> > same value for dma_mask could be fine via swiotlb bouncing (or IOMMU).
-> > However, that's an arch-specific decision. Maybe after the above setting
-> > of dev->coherent_dma_mask in of_dma_configure(), we could add:
-> > 
+From: Matt Wagantall <mattw@codeaurora.org>
 
-You seem to implement the opposite:
+It is sometimes necessary to poll a memory-mapped register until its value
+satisfies some condition. Introduce a family of convenience macros that do
+this. Tight-looping, sleeping, and timing out can all be accomplished using
+these macros.
 
-> +	/*
-> +	 * If the bus dma-ranges property specifies a size smaller than 4GB,
-> +	 * the device would not be capable of accessing the whole 32-bit
-> +	 * space, so reduce the default coherent_dma_mask accordingly.
-> +	 */
-> +	if (size && size < (1ULL << 32))
-> +		dev->coherent_dma_mask = DMA_BIT_MASK(ilog2(size));
-> +
-> +	/*
-> +	 * Set dma_mask to coherent_dma_mask by default if the architecture
-> +	 * code has not set it and DMA on such mask is supported.
-> +	 */
-> +	if (!dev->dma_mask && dma_supported(dev, dev->coherent_dma_mask))
-> +		dev->dma_mask = &dev->coherent_dma_mask;
->  }
->  
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+---
+This patch was originally part of a series [1] for adding support for IOMMU
+address translations through an ARM SMMU hardware register.  The other
+patch in the series (the one that actually uses these macros and implements
+said hardware address translations) was Ack'd by the driver maintainer
+there (Will Deacon) so I've pulled this patch out to avoid resending an
+already Ack'd patch over and over again.
 
-Here, coherent_dma_mask wouldn't work while dma_mask might be
-fine in case of swiotlb, but you set a nonzero coherent_dma_mask
-and an invalid dma_mask.
+In short, please see [1] for previous discussion and the first user of
+these macros.
 
-	Arnd
+This patch has been resent previously here [2], here [3], and here [4] on
+2014-10-30, 2014-11-06, and 2014-11-17, respectively.  It has not changed
+since [2] and has not received any comments since [1] on 2014-10-19.
+Thanks to everyone who has taken a look at this.
+
+[1] http://thread.gmane.org/gmane.linux.kernel.iommu/7140
+[2] http://thread.gmane.org/gmane.linux.kernel/1818213
+[3] http://thread.gmane.org/gmane.linux.kernel/1823422
+[4] http://thread.gmane.org/gmane.linux.kernel.iommu/7394
+
+
+Changes since v7:
+  - sorted helper macros by size (b, w, l, q)
+  - removed some of the more esoteric (or flat-out bogus) helper macros
+---
+ include/linux/iopoll.h | 140 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 140 insertions(+)
+ create mode 100644 include/linux/iopoll.h
+
+diff --git a/include/linux/iopoll.h b/include/linux/iopoll.h
+new file mode 100644
+index 0000000000..bd161dae2d
+--- /dev/null
++++ b/include/linux/iopoll.h
+@@ -0,0 +1,140 @@
++/*
++ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _LINUX_IOPOLL_H
++#define _LINUX_IOPOLL_H
++
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/hrtimer.h>
++#include <linux/delay.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++
++/**
++ * readx_poll_timeout - Periodically poll an address until a condition is met or a timeout occurs
++ * @op: accessor function (takes @addr as its only argument)
++ * @addr: Address to poll
++ * @val: Variable to read the value into
++ * @cond: Break condition (usually involving @val)
++ * @sleep_us: Maximum time to sleep between reads in us (0 tight-loops)
++ * @timeout_us: Timeout in us, 0 means never timeout
++ *
++ * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
++ * case, the last read value at @addr is stored in @val. Must not
++ * be called from atomic context if sleep_us or timeout_us are used.
++ *
++ * When available, you'll probably want to use one of the specialized
++ * macros defined below rather than this macro directly.
++ */
++#define readx_poll_timeout(op, addr, val, cond, sleep_us, timeout_us)	\
++({ \
++	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
++	might_sleep_if(sleep_us); \
++	for (;;) { \
++		(val) = op(addr); \
++		if (cond) \
++			break; \
++		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
++			(val) = op(addr); \
++			break; \
++		} \
++		if (sleep_us) \
++			usleep_range((sleep_us >> 2) + 1, sleep_us); \
++	} \
++	(cond) ? 0 : -ETIMEDOUT; \
++})
++
++/**
++ * readx_poll_timeout_atomic - Periodically poll an address until a condition is met or a timeout occurs
++ * @op: accessor function (takes @addr as its only argument)
++ * @addr: Address to poll
++ * @val: Variable to read the value into
++ * @cond: Break condition (usually involving @val)
++ * @delay_us: Time to udelay between reads in us (0 tight-loops)
++ * @timeout_us: Timeout in us, 0 means never timeout
++ *
++ * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
++ * case, the last read value at @addr is stored in @val.
++ *
++ * When available, you'll probably want to use one of the specialized
++ * macros defined below rather than this macro directly.
++ */
++#define readx_poll_timeout_atomic(op, addr, val, cond, delay_us, timeout_us) \
++({ \
++	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
++	for (;;) { \
++		(val) = op(addr); \
++		if (cond) \
++			break; \
++		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
++			(val) = op(addr); \
++			break; \
++		} \
++		if (delay_us) \
++			udelay(delay_us);	\
++	} \
++	(cond) ? 0 : -ETIMEDOUT; \
++})
++
++
++#define readb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readb, addr, val, cond, delay_us, timeout_us)
++
++#define readb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readb, addr, val, cond, delay_us, timeout_us)
++
++#define readw_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readw, addr, val, cond, delay_us, timeout_us)
++
++#define readw_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readw, addr, val, cond, delay_us, timeout_us)
++
++#define readl_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readl, addr, val, cond, delay_us, timeout_us)
++
++#define readl_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readl, addr, val, cond, delay_us, timeout_us)
++
++#define readq_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readq, addr, val, cond, delay_us, timeout_us)
++
++#define readq_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readq, addr, val, cond, delay_us, timeout_us)
++
++#define readb_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readb_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readb_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readb_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readw_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readw_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readw_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readw_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readl_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readl_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readl_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readl_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readq_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readq_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readq_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readq_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#endif /* _LINUX_IOPOLL_H */
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
