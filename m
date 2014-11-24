@@ -1,103 +1,36 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 24 Nov 2014 23:29:54 +0100
-Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-In-Reply-To: <540B2997.4070600@suse.de>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <201409051552.05447@pali> <540B2997.4070600@suse.de>
-Message-ID: <201411242329.54361@pali>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 24 Nov 2014 23:50 +0100
+Subject: [PATCH v8 0/4] This is the 1st version of suspend for RK3288.
+In-Reply-To: <1416051910-16730-1-git-send-email-zyw@rock-chips.com>
+References: <1416051910-16730-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <2829328.asIzdRTr9b@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 06 September 2014 17:34:47 Andreas F?rber wrote:
-> Am 05.09.2014 15:52, schrieb Pali Roh?r:
-> > On Friday 05 September 2014 15:45:42 Mark Rutland wrote:
-> >> On Fri, Sep 05, 2014 at 12:38:40PM +0100, Pali Roh?r wrote:
-> >>> On Wednesday 18 June 2014 18:54:24 Pali Roh?r wrote:
-> >>>> Machine name from board description is some generic name
-> >>>> on DT kernel. DT provides machine name property which is
-> >>>> specific for board, so use it instead generic one when
-> >>>> possible.
-> >>>> 
-> >>>> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> >>>> ---
-> >>>> 
-> >>>>  arch/arm/kernel/setup.c |    7 +++++--
-> >>>>  1 file changed, 5 insertions(+), 2 deletions(-)
-> >>>> 
-> >>>> diff --git a/arch/arm/kernel/setup.c
-> >>>> b/arch/arm/kernel/setup.c index 8a16ee5..fbc7b4f 100644
-> >>>> --- a/arch/arm/kernel/setup.c
-> >>>> +++ b/arch/arm/kernel/setup.c
-> >>>> @@ -875,10 +875,13 @@ void __init setup_arch(char
-> >>>> **cmdline_p)
-> >>>> 
-> >>>>  	setup_processor();
-> >>>>  	mdesc = setup_machine_fdt(__atags_pointer);
-> >>>> 
-> >>>> -	if (!mdesc)
-> >>>> +	if (mdesc)
-> >>>> +		machine_name = of_flat_dt_get_machine_name();
-> >>>> +	else
-> >>>> 
-> >>>>  		mdesc = setup_machine_tags(__atags_pointer,
-> >>>> 
-> >>>> __machine_arch_type); machine_desc = mdesc;
-> >>>> -	machine_name = mdesc->name;
-> >>>> +	if (!machine_name)
-> >>>> +		machine_name = mdesc->name;
-> >>>> 
-> >>>>  	if (mdesc->reboot_mode != REBOOT_HARD)
-> >>>>  	
-> >>>>  		reboot_mode = mdesc->reboot_mode;
-> >>> 
-> >>> So, do you really want to break userspace which reading
-> >>> file /proc/cpuinfo (after migration from boardcode -->
-> >>> DT)?
-> >> 
-> >> You have no guarantee model name in the DT == the name in a
-> >> board file anyhow, and trying to force that is wrong. So
-> >> further to Russell's reply, I must NAK this from a DT
-> >> perspective.
-> >> 
-> >> Realistically your userspace is already broken if relying
-> >> on such things. You built something that only ever worked
-> >> for a particular arbitrary string. So it was already
-> >> broken for every other board, and there was never any
-> >> guarantee that new boards where your userspace could have
-> >> worked would share the same name.
-> >> 
-> >> You're trying to fix the wrong side of the equation.
-> > 
-> > So what is your suggestion for identifing board (name/type)
-> > which will work with any kernel (and will not be broken
-> > again by kernel later)?
-> 
-> /proc/device-tree/compatible should give you a nul-separated
-> list of compatible strings for the machine. Ideally they're
-> even documented under Documentation/devicetree/bindings/arm/.
-> 
-> But as Mark said, depending on what you are actually trying to
-> distinguish in userspace, there may be better ways.
-> 
-> Regards,
-> Andreas
+Hi Chris,
 
-Ok, this is better. It at least output that device is Nokia N900 
-and not some generic omap device...
+Am Samstag, 15. November 2014, 19:45:06 schrieb Chris Zhong:
+> This suspend patch is only support cut off the power of cpu and some
+> external devices, since we still lack power_domain driver, so the other
+> power rail of rk3288 need keep power on.
+> I have tested it on rk3288-evb board, atop next-20141112. goto suspend by
+> type "echo mem > /sys/power/state", vdd_cpu is about 0mv by measuring, so
+> it can be determined in sleep mode, then press power button to wakeup it.
 
-$ cat /proc/device-tree/compatible
-nokia,omap3-n900ti,omap3430ti,omap3
+with this version my board can finally wake up again. Although it wakes 
+immediatly again. But as it wakes at all, I'm quite happy :-) .
 
-But I need also serial number and hw revisions which are reported 
-by bootloader in ATAGs.
+I remember this being mentioned before, but I don't remember what was 
+responsible for that. Was it because we only enter the light suspend mode 
+instead of the deep one or some interrupt somewhere?
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/a2955bc8/attachment-0001.sig>
+
+I've been running on top of linux-next from 20141124 with the following 
+patches applied on top of your v8 series:
+
+pinctrl: rockchip: Fix enable/disable/mask/unmask
+pinctrl: rockchip: Handle wakeup pins
+serial: 8250_dw: Handle no_console_suspend when uart loses state
+
+
+Heiko
