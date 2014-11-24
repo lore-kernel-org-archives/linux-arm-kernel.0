@@ -1,45 +1,44 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 25 Nov 2014 02:05:34 +0300
-Subject: [PATCH V2 4/6] pcmcia: soc-common: enable/disable socket clocks
+Date: Tue, 25 Nov 2014 02:05:35 +0300
+Subject: [PATCH V2 5/6] pcmcia: sa1111: provide device clock
 In-Reply-To: <1416870336-30114-1-git-send-email-dbaryshkov@gmail.com>
 References: <1416870336-30114-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1416870336-30114-5-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1416870336-30114-6-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call clk_prepare_enable() during hw_init() and clk_disable_unprepare()
-during hw_shutdown() to ensure that the clock rates returned by
-clk_get_rate() are correct.
-
-It is safe to call enable/disable functions even on NULL clock, so this
-patch will not break cases when the socket clock is not set.
+Both pxa2xx (long ago) and sa1100 (now) make use of clock device to get
+the cpu speed. Make sa1111 glue code provide clock to platform layer.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- drivers/pcmcia/soc_common.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/pcmcia/sa1111_generic.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
-index a2bc6ee..933f465 100644
---- a/drivers/pcmcia/soc_common.c
-+++ b/drivers/pcmcia/soc_common.c
-@@ -120,6 +120,8 @@ static void __soc_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt,
+diff --git a/drivers/pcmcia/sa1111_generic.c b/drivers/pcmcia/sa1111_generic.c
+index 65b02c3..7bae7e5 100644
+--- a/drivers/pcmcia/sa1111_generic.c
++++ b/drivers/pcmcia/sa1111_generic.c
+@@ -145,6 +145,12 @@ int sa1111_pcmcia_add(struct sa1111_dev *dev, struct pcmcia_low_level *ops,
+ 			return -ENOMEM;
  
- 	if (skt->ops->hw_shutdown)
- 		skt->ops->hw_shutdown(skt);
-+
-+	clk_disable_unprepare(skt->clk);
- }
+ 		s->soc.nr = ops->first + i;
++		s->soc.clk = clk_get(&dev->dev, NULL);
++		if (IS_ERR(s->soc.clk)) {
++			ret = PTR_ERR(s->soc.clk);
++			kfree(s);
++			return ret;
++		}
+ 		soc_pcmcia_init_one(&s->soc, ops, &dev->dev);
+ 		s->dev = dev;
+ 		if (s->soc.nr) {
+@@ -220,6 +226,7 @@ static int pcmcia_remove(struct sa1111_dev *dev)
+ 	for (; s; s = next) {
+ 		next = s->next;
+ 		soc_pcmcia_remove_one(&s->soc);
++		clk_put(s->soc.clk);
+ 		kfree(s);
+ 	}
  
- static void soc_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
-@@ -131,6 +133,8 @@ static int soc_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- {
- 	int ret = 0, i;
- 
-+	clk_prepare_enable(skt->clk);
-+
- 	if (skt->ops->hw_init) {
- 		ret = skt->ops->hw_init(skt);
- 		if (ret)
 -- 
 2.1.3
