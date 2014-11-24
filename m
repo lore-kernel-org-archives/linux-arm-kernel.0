@@ -1,36 +1,57 @@
 From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 24 Nov 2014 23:21:55 +0100
+Date: Mon, 24 Nov 2014 23:23:32 +0100
 Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-In-Reply-To: <20140618211038.GD558@drone.musicnaut.iki.fi>
+In-Reply-To: <20140910124615.GA466@xo-6d-61-c0.localdomain>
 References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <201406182122.29623@pali> <20140618211038.GD558@drone.musicnaut.iki.fi>
-Message-ID: <201411242321.55626@pali>
+ <20140905121316.GI30401@n2100.arm.linux.org.uk>
+ <20140910124615.GA466@xo-6d-61-c0.localdomain>
+Message-ID: <201411242323.32460@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 June 2014 23:10:39 Aaro Koskinen wrote:
-> Hi,
+On Wednesday 10 September 2014 14:46:15 Pavel Machek wrote:
+> On Fri 2014-09-05 13:13:16, Russell King - ARM Linux wrote:
+> > On Fri, Sep 05, 2014 at 01:38:40PM +0200, Pali Roh?r wrote:
+> > > On Wednesday 18 June 2014 18:54:24 Pali Roh?r wrote:
+> > > > -	if (!mdesc)
+> > > > +	if (mdesc)
+> > > > +		machine_name = of_flat_dt_get_machine_name();
+> > > > +	else
+> > > > 
+> > > >  		mdesc = setup_machine_tags(__atags_pointer,
+> > > > 
+> > > > __machine_arch_type); machine_desc = mdesc;
+> > > > -	machine_name = mdesc->name;
+> > > > +	if (!machine_name)
+> > > > +		machine_name = mdesc->name;
+> > > > 
+> > > >  	if (mdesc->reboot_mode != REBOOT_HARD)
+> > > >  	
+> > > >  		reboot_mode = mdesc->reboot_mode;
+> > > 
+> > > So, do you really want to break userspace which reading
+> > > file /proc/cpuinfo (after migration from boardcode -->
+> > > DT)?
+> > > 
+> > > I still do not see reason for that. And only this one file
+> > > is problematic...
+> > 
+> > Sorry, I just don't give a damn about your whinging about
+> > this.  I've made the situation perfectly clear.  Your patch
+> > will not be accepted.
 > 
-> On Wed, Jun 18, 2014 at 09:22:29PM +0200, Pali Roh?r wrote:
-> > So without this patch DT migration for Nokia N900 cannot be
-> > done without breaking userspace - which is not
-> > acceptable...
+> Linus made it pretty clear that regressions are not accepted.
 > 
-> I guess the fact is that the Nokia N900 proprietary userspace
-> has never worked properly with the mainline kernel without
-> severe patching, so you cannot really talk about any
-> regression. If you cannot fix those programs, you could still
-> probably emulate the old Nokia kernel's /proc/cpuinfo by
-> providing some text file and bind mounting it, no?
+> You are an arm maintainer and there is regression in n900 that
+> broke userspace.
 > 
-> A.
+> How do you solve it?
+> 									Pavel
 
-Mainline kernel (with patches for missing driver) working with 
-Maemo CSSU-Devel userspace. So there are regressions.
-
-Emulation of /proc/cpuinfo is possible if somebody provides 
-needed info. But I still do not know from *where* to read 
-machine, serial number and hw revision.
+I must agree, it is breaking userspace. Even worse DT booting 
+does not provide those old information about board which 
+bootloader set in ATAG info (and which is needed for some 
+applications).
 
 -- 
 Pali Roh?r
@@ -41,4 +62,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/aa667d0d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/32a8d5c9/attachment.sig>
