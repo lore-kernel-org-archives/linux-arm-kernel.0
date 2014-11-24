@@ -1,88 +1,112 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 24 Nov 2014 16:16:55 +0100
-Subject: [PATCH v5 03/18] ACPI / table: Count matched and successfully
- parsed entries without specifying max entries
-In-Reply-To: <5472ED90.5010803@linaro.org>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <6619034.gHDuQJ1A7y@vostro.rjw.lan> <5472ED90.5010803@linaro.org>
-Message-ID: <2301926.MWJ5MneAen@vostro.rjw.lan>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 24 Nov 2014 09:57:41 -0500 (EST)
+Subject: [PATCH] ARM: PJ4: allow building in Thumb-2 mode
+In-Reply-To: <1416830200-11114-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1416830200-11114-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.11.1411240957220.11690@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 24, 2014 09:34:24 AM Tomasz Nowicki wrote:
-> On 24.11.2014 02:45, Rafael J. Wysocki wrote:
-> > On Friday, October 17, 2014 09:36:59 PM Hanjun Guo wrote:
-> >> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> >>
-> >> It is very useful to traverse all available table entries without max
-> >> number of expected entries type. Current acpi_parse_entries()
-> >> implementation gives that feature but it does not count those entries,
-> >> it returns 0 instead, so fix it to count matched and successfully
-> >> entries and return it.
-> >
-> > Hmm.  I guess that the goal is for count to only be incremented when the
-> > condition is satisfied entirely, while without the patch it may be incremented
-> > even if that isn't the case.
+On Mon, 24 Nov 2014, Ard Biesheuvel wrote:
+
+> Two files that get included when building the multi_v7_defconfig target
+> fail to build when selecting THUMB2_KERNEL for this configuration.
 > 
-> That would be our goal if patch would look like:
-> -		    && (!max_entries || count++ < max_entries))
-> +		    && (!max_entries && count++ < max_entries)) {
-> but then we can not walk through all available entries (with max_entries==0)
-
-No, that's not what I was trying to say. :-)
-
-> >
-> > I'm not sure how that is related to the above paragraph, however.
-> >
+> In both cases, we can just build the file as ARM code, as none of its
+> symbols are exported to modules, so there are no interworking concerns.
+> In the iwmmxt.S case, add ENDPROC() declarations so the symbols are
+> annotated as functions, resulting in the linker to emit the appropriate
+> mode switches.
 > 
-> Previous changelog is not clear, let me rewrite it:
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+
+> ---
+>  arch/arm/kernel/Makefile |  1 +
+>  arch/arm/kernel/iwmmxt.S | 13 +++++++++++++
+>  2 files changed, 14 insertions(+)
 > 
-> acpi_parse_entries() allows to traverse all available table entries (aka 
-> subtables) by passing max_entries parameter equal to 0. But for that use 
-> case acpi_parse_entries() does not inform caller how many entries were 
-> matched and for how many entries handler was run against. That patch is 
-> going to fix it.
-
-Do I understand correctly that count is only ever incremented by current code
-if max_entries is different from 0?
-
-
-> >> NOTE: This change has no impact to x86 and ia64 archs since existing code
-> >> checks for error occurrence only (acpi_parse_entries(...,0) < 0).
-> >>
-> >> Acked-by: Grant Likely <grant.likely@linaro.org>
-> >> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >> ---
-> >>   drivers/acpi/tables.c |    5 ++++-
-> >>   1 file changed, 4 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-> >> index 21ae521..b18e45e 100644
-> >> --- a/drivers/acpi/tables.c
-> >> +++ b/drivers/acpi/tables.c
-> >> @@ -225,10 +225,13 @@ acpi_parse_entries(unsigned long table_size,
-> >>   	while (((unsigned long)entry) + sizeof(struct acpi_subtable_header) <
-> >>   	       table_end) {
-> >>   		if (entry->type == entry_id
-> >> -		    && (!max_entries || count++ < max_entries))
-> >> +		    && (!max_entries || count < max_entries)) {
-> >>   			if (handler(entry, table_end))
-> >>   				return -EINVAL;
-> >>
-> >> +			count++;
-> >> +		}
-> >> +
-> >>   		/*
-> >>   		 * If entry->length is 0, break from this loop to avoid
-> >>   		 * infinite loop.
-> >>
-> >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index 4c5d1a5982dd..575a5e424b0a 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -85,6 +85,7 @@ obj-$(CONFIG_CPU_PJ4B)		+= pj4-cp0.o
+>  obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+>  obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o
+>  obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o perf_event_cpu.o
+> +CFLAGS_pj4-cp0.o		:= -marm
+>  AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+>  obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
+>  
+> diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
+> index ad58e565fe98..49fadbda8c63 100644
+> --- a/arch/arm/kernel/iwmmxt.S
+> +++ b/arch/arm/kernel/iwmmxt.S
+> @@ -58,6 +58,7 @@
+>  #define MMX_SIZE		(0x98)
+>  
+>  	.text
+> +	.arm
+>  
+>  /*
+>   * Lazy switching of Concan coprocessor context
+> @@ -182,6 +183,8 @@ concan_load:
+>  	tmcr	wCon, r2
+>  	ret	lr
+>  
+> +ENDPROC(iwmmxt_task_enable)
+> +
+>  /*
+>   * Back up Concan regs to save area and disable access to them
+>   * (mainly for gdb or sleep mode usage)
+> @@ -232,6 +235,8 @@ ENTRY(iwmmxt_task_disable)
+>  1:	msr	cpsr_c, ip			@ restore interrupt mode
+>  	ldmfd	sp!, {r4, pc}
+>  
+> +ENDPROC(iwmmxt_task_disable)
+> +
+>  /*
+>   * Copy Concan state to given memory address
+>   *
+> @@ -268,6 +273,8 @@ ENTRY(iwmmxt_task_copy)
+>  	msr	cpsr_c, ip			@ restore interrupt mode
+>  	ret	r3
+>  
+> +ENDPROC(iwmmxt_task_copy)
+> +
+>  /*
+>   * Restore Concan state from given memory address
+>   *
+> @@ -304,6 +311,8 @@ ENTRY(iwmmxt_task_restore)
+>  	msr	cpsr_c, ip			@ restore interrupt mode
+>  	ret	r3
+>  
+> +ENDPROC(iwmmxt_task_restore)
+> +
+>  /*
+>   * Concan handling on task switch
+>   *
+> @@ -335,6 +344,8 @@ ENTRY(iwmmxt_task_switch)
+>  	mrc	p15, 0, r1, c2, c0, 0
+>  	sub	pc, lr, r1, lsr #32		@ cpwait and return
+>  
+> +ENDPROC(iwmmxt_task_switch)
+> +
+>  /*
+>   * Remove Concan ownership of given task
+>   *
+> @@ -353,6 +364,8 @@ ENTRY(iwmmxt_task_release)
+>  	msr	cpsr_c, r2			@ restore interrupts
+>  	ret	lr
+>  
+> +ENDPROC(iwmmxt_task_release)
+> +
+>  	.data
+>  concan_owner:
+>  	.word	0
+> -- 
+> 1.8.3.2
+> 
+> 
