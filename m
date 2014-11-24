@@ -1,93 +1,71 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 24 Nov 2014 10:56:28 +0100
-Subject: [PATCH 4/4] mmc: core: hold SD Clock before CMD11 during Signal
-In-Reply-To: <1416531100-26707-5-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1416531100-26707-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1416531100-26707-5-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <CAPDyKFrP0hBGQ8ueGMcWOej1oupaWCDT4+54OdicZ4xRmksZ3Q@mail.gmail.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Mon, 24 Nov 2014 10:59:24 +0100
+Subject: [PATCH] arm: ftrace: Adds support for ftrace operations
+In-Reply-To: <545CFAF4.8030104@traphandler.com>
+References: <1415372352-15664-1-git-send-email-jjhiblot@traphandler.com>
+ <20141107115225.72bc6cbf@gandalf.local.home>
+ <545CFAF4.8030104@traphandler.com>
+Message-ID: <CACh+v5MDFZj+NOPWdnMgNthn_DxL3nn=CZJ224vMh7hSf84o4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 November 2014 at 01:51, Vincent Yang
-<vincent.yang.fujitsu@gmail.com> wrote:
-> Voltage Switch Procedure
+2014-11-07 18:01 GMT+01:00 Jean-Jacques Hiblot <jjhiblot@traphandler.com>:
 >
-> This patch is to fix an issue found on mb86s7x platforms.
 >
-> [symptom]
-> There are some UHS-1 SD memory cards sometimes cannot be detected correctly,
-> e.g., Transcend 600x SDXC 64GB UHS-1 memory card.
-> During Signal Voltage Switch Procedure, failure to switch is indicated
-> by the card holding DAT[3:0] low.
->
-> [analysis]
-> According to SD Host Controller Simplified Specification Version 3.00
-> chapter 3.6.1, the Signal Voltage Switch Procedure should be:
-> (1) Check S18A; (2) Issue CMD11; (3) Check CMD 11 response;
-> (4) Stop providing SD clock; (5) Check DAT[3:0] should be 0000b;
-> (6) Set 1.8V Signal Enable; (7) Wait 5ms; (8) Check 1.8V Signal Enable;
-> (9) Provide SD Clock; (10) Wait 1ms; (11) Check DAT[3:0] should be 1111b;
-> (12) error handling
->
-> With CONFIG_MMC_CLKGATE=y, sometimes there is one more gating/un-gating
-> SD clock between (2) and (3). In this case, some UHS-1 SD cards will hold
-> DAT[3:0] 0000b at (11) and thus fails Signal Voltage Switch Procedure.
->
-> [solution]
-> By mmc_host_clk_hold() before CMD11, the additional gating/un-gating
-> SD clock between (2) and (3) can be prevented and thus no failure at (11).
-> It has been verified with many UHS-1 SD cards on mb86s7x platforms and
-> works correctly.
->
-> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+> On 11/07/2014 05:52 PM, Steven Rostedt wrote:
+>> On Fri,  7 Nov 2014 15:59:11 +0100
+>> Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
+>>
+>>> Hi all,
+>>>
+>>> This patch adds support for ftrace operations on the ARM architecture.
+>>> This support is needed by kgraft and possibly other ftrace-based tools.
+>>> My goal is to have kgraft working on ARM and aarch64.
+>>
+>> Can you add this to the change log of the patch. As that would be what
+>> goes into git history. Because honestly, I had no idea what you meant
+>> by "ftrace operations". If I don't understand that term, how can you
+>> expect anyone else to?
+> I'll try to come up with a clearer commit log.
+>>
+>>>
+>>> I tested this patch with a toy implementation of kgraft for ARM and basic
+>>> usage of function and function_graph tracers
+>>> It doesn't show any problem with the ftrace selftests and the tests found
+>>> today in branch ftrace/testing-mystuff of linux-trace repository
+>>> (git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-trace.git)
+>>
+>> Those tests are no where near what I have. Does this code work on the
+>> beagle bone white? If so, I can probably run my full suite on it.
+> It should work on any arm processor, It's not platform or SOC dependent
+>>
+Hi Steve,
+did you get a chance of running your tests suite on real hardware with
+this patch? I'd be really interested in the results.
 
-Thanks! Applied for next.
+Jiri,
+would you be interested in the patchs to run kgraft on ARM ? The
+modifications required in kgraft core are minimal, it's mostly
+architecture specific.
 
-Kind regards
-Uffe
+Jean-Jacques
 
-> ---
->  drivers/mmc/core/core.c | 13 ++++++++-----
->  1 file changed, 8 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-> index f26a5f1..8b9e2cfd 100644
-> --- a/drivers/mmc/core/core.c
-> +++ b/drivers/mmc/core/core.c
-> @@ -1420,18 +1420,20 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
->                 pr_warn("%s: cannot verify signal voltage switch\n",
->                         mmc_hostname(host));
->
-> +       mmc_host_clk_hold(host);
-> +
->         cmd.opcode = SD_SWITCH_VOLTAGE;
->         cmd.arg = 0;
->         cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
->
->         err = mmc_wait_for_cmd(host, &cmd, 0);
->         if (err)
-> -               return err;
-> -
-> -       if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR))
-> -               return -EIO;
-> +               goto err_command;
->
-> -       mmc_host_clk_hold(host);
-> +       if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR)) {
-> +               err = -EIO;
-> +               goto err_command;
-> +       }
->         /*
->          * The card should drive cmd and dat[0:3] low immediately
->          * after the response of cmd11, but wait 1 ms to be sure
-> @@ -1480,6 +1482,7 @@ power_cycle:
->                 mmc_power_cycle(host, ocr);
->         }
->
-> +err_command:
->         mmc_host_clk_release(host);
->
->         return err;
-> --
-> 1.9.0
->
+>> -- Steve
+>>
+>>>
+>>> Jean-Jacques Hiblot (1):
+>>>   arm: ftrace: Adds support for ftrace operations
+>>>
+>>>  arch/arm/Kconfig               |  2 ++
+>>>  arch/arm/include/asm/ftrace.h  |  3 ++
+>>>  arch/arm/kernel/entry-common.S | 68 +++++++++++++++++++++++++++++++++++++++++-
+>>>  arch/arm/kernel/ftrace.c       | 34 +++++++++++++++++++++
+>>>  4 files changed, 106 insertions(+), 1 deletion(-)
+>>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
