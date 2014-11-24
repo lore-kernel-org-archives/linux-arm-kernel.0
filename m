@@ -1,27 +1,31 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 24 Nov 2014 11:16:34 +1100
-Subject: linux-next: manual merge of the sunxi tree with the arm-soc tree
-Message-ID: <20141124111634.1498b6c1@canb.auug.org.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 24 Nov 2014 08:25:09 +0800
+Subject: [PATCH] mmc: dw_mmc: fix card read threshold for PIO mode
+In-Reply-To: <CAGOxZ50+k3Z5gHrRasveM=7V+GS+1dRmcz0u5WSyo=XBE9iT3g@mail.gmail.com>
+References: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
+ <20141121233155.GC11253@dragon>
+ <CAGOxZ51DPL+6HTSG6yeCqqRxtq7XBuWki7gdB-ieamVUKixCDQ@mail.gmail.com>
+ <20141123153012.GH11253@dragon>
+ <CAGOxZ50+k3Z5gHrRasveM=7V+GS+1dRmcz0u5WSyo=XBE9iT3g@mail.gmail.com>
+Message-ID: <20141124002508.GI11253@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Mon, Nov 24, 2014 at 03:36:13AM +0530, Alim Akhtar wrote:
+> Hi Shawn,
+> 
+> On Sun, Nov 23, 2014 at 9:00 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > One thing I need to check with hardware vendor is whether register
+> > CDTHRCTL is available on my dwmmc controller.  From my testing, even
+> > reading this register every time dw_mci_submit_data() is called causes
+> > problem for me.
+> >
+> yes, your guess is right, did you tested with ulf's -next branch?
+> Recently patch [1] is merged, that most likely to solve your platform
+> issue. Have a try.
+> 
+> [1] http://www.spinics.net/lists/stable/msg69884.html
 
-Today's linux-next merge of the sunxi tree got a conflict in
-arch/arm/boot/dts/sun6i-a31.dtsi between commit 123ccfcc632a ("Revert
-merge of sunxi/dt") from the arm-soc tree and commits from the sunxi
-tree.
+Yeah, the patch fixes my problem.  Thanks a lot for the pointer, Alim.
 
-I fixed it up (I just used the version from the sunxi tree) and can
-carry the fix as necessary (no action is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/46e25d22/attachment.sig>
+Shawn
