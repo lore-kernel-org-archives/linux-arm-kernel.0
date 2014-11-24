@@ -1,58 +1,88 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 24 Nov 2014 16:09:54 +0100
-Subject: [PATCH] opp: convert dev_warn() to dev_dbg() for duplicate OPPs
-In-Reply-To: <CAKohpomz_UiRErSsDPLWcmU4e7ocXZZu7bwCF8TvoSJupikd7A@mail.gmail.com>
-References: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
- <5171628.FRGslOuEb6@vostro.rjw.lan>
- <CAKohpomz_UiRErSsDPLWcmU4e7ocXZZu7bwCF8TvoSJupikd7A@mail.gmail.com>
-Message-ID: <42965945.ST26GKfzPz@vostro.rjw.lan>
+Date: Mon, 24 Nov 2014 16:16:55 +0100
+Subject: [PATCH v5 03/18] ACPI / table: Count matched and successfully
+ parsed entries without specifying max entries
+In-Reply-To: <5472ED90.5010803@linaro.org>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <6619034.gHDuQJ1A7y@vostro.rjw.lan> <5472ED90.5010803@linaro.org>
+Message-ID: <2301926.MWJ5MneAen@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 24, 2014 04:10:00 PM Viresh Kumar wrote:
-> On 21 November 2014 at 21:28, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > What about @dynamic instead of @from_dt?  That may apply to more use cases if
-> > need be.
+On Monday, November 24, 2014 09:34:24 AM Tomasz Nowicki wrote:
+> On 24.11.2014 02:45, Rafael J. Wysocki wrote:
+> > On Friday, October 17, 2014 09:36:59 PM Hanjun Guo wrote:
+> >> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> >>
+> >> It is very useful to traverse all available table entries without max
+> >> number of expected entries type. Current acpi_parse_entries()
+> >> implementation gives that feature but it does not count those entries,
+> >> it returns 0 instead, so fix it to count matched and successfully
+> >> entries and return it.
+> >
+> > Hmm.  I guess that the goal is for count to only be incremented when the
+> > condition is satisfied entirely, while without the patch it may be incremented
+> > even if that isn't the case.
 > 
-> @Paul: I am stuck at a point and need help on RCUs :)
-> 
-> File: drivers/base/power/opp.c
-> 
-> We are trying to remove OPPs created from static data present in DT on
-> cpufreq driver's removal (when configured as module).
-> 
-> opp core uses RCUs internally and it looks like I need to implement:
-> list_for_each_entry_safe_rcu()
-> 
-> But, I am not sure because of these:
-> http://linux.derkeiler.com/Mailing-Lists/Kernel/2005-10/6280.html
-> http://patchwork.ozlabs.org/patch/48989/
-> 
-> So, wanted to ask you if I really need that or the OPP code is
-> buggy somewhere.
-> 
-> The code removing OPPs is:
-> 
->         list_for_each_entry_rcu(opp, &dev_opp->opp_list, node) {
->                 srcu_notifier_call_chain(&dev_opp->head, OPP_EVENT_REMOVE, opp);
->                 list_del_rcu(&opp->node);
-> 
->                 kfree(opp);
->         }
-> 
-> Because we are freeing opp at the end, list_for_each_entry_rcu()
-> is trying to read the already freed opp to find opp->node.next
-> and that results in a crash.
-> 
-> What am I doing wrong ?
+> That would be our goal if patch would look like:
+> -		    && (!max_entries || count++ < max_entries))
+> +		    && (!max_entries && count++ < max_entries)) {
+> but then we can not walk through all available entries (with max_entries==0)
 
-I hope that doesn't happen under rcu_read_lock()?
+No, that's not what I was trying to say. :-)
 
-The modification needs to be done under dev_opp_list_lock in the first place
-in which case you don't need the _rcu version of list walking, so you simply
-can use list_for_each_entry_safe() here. The mutex is sufficient for the
-synchronization with other writers (if any).  The freeing, though, has to be
-deferred until all readers drop their references to the old entry.  You can
-use kfree_rcu() for that.
+> >
+> > I'm not sure how that is related to the above paragraph, however.
+> >
+> 
+> Previous changelog is not clear, let me rewrite it:
+> 
+> acpi_parse_entries() allows to traverse all available table entries (aka 
+> subtables) by passing max_entries parameter equal to 0. But for that use 
+> case acpi_parse_entries() does not inform caller how many entries were 
+> matched and for how many entries handler was run against. That patch is 
+> going to fix it.
 
-Rafael
+Do I understand correctly that count is only ever incremented by current code
+if max_entries is different from 0?
+
+
+> >> NOTE: This change has no impact to x86 and ia64 archs since existing code
+> >> checks for error occurrence only (acpi_parse_entries(...,0) < 0).
+> >>
+> >> Acked-by: Grant Likely <grant.likely@linaro.org>
+> >> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> ---
+> >>   drivers/acpi/tables.c |    5 ++++-
+> >>   1 file changed, 4 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+> >> index 21ae521..b18e45e 100644
+> >> --- a/drivers/acpi/tables.c
+> >> +++ b/drivers/acpi/tables.c
+> >> @@ -225,10 +225,13 @@ acpi_parse_entries(unsigned long table_size,
+> >>   	while (((unsigned long)entry) + sizeof(struct acpi_subtable_header) <
+> >>   	       table_end) {
+> >>   		if (entry->type == entry_id
+> >> -		    && (!max_entries || count++ < max_entries))
+> >> +		    && (!max_entries || count < max_entries)) {
+> >>   			if (handler(entry, table_end))
+> >>   				return -EINVAL;
+> >>
+> >> +			count++;
+> >> +		}
+> >> +
+> >>   		/*
+> >>   		 * If entry->length is 0, break from this loop to avoid
+> >>   		 * infinite loop.
+> >>
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
