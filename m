@@ -1,77 +1,121 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 24 Nov 2014 13:44:44 +0000
-Subject: [PATCH v11 4/6] ARM: Exynos: switch to using generic cpufreq
- driver for Exynos4210/5250/5420
-In-Reply-To: <CAKohponEHqHYCLibVc8OHN49+4YW5qw89ny4ycTBL1xN-p9qtA@mail.gmail.com>
-References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>	<1413805281-6269-2-git-send-email-thomas.ab@samsung.com>	<1413805281-6269-3-git-send-email-thomas.ab@samsung.com>	<1413805281-6269-4-git-send-email-thomas.ab@samsung.com>	<1413805281-6269-5-git-send-email-thomas.ab@samsung.com>	<546CEF61.4050105@arm.com>
- <CAKohponEHqHYCLibVc8OHN49+4YW5qw89ny4ycTBL1xN-p9qtA@mail.gmail.com>
-Message-ID: <5473364C.3010102@arm.com>
+From: linyongting@gmail.com (Lin Yongting)
+Date: Mon, 24 Nov 2014 21:45:56 +0800
+Subject: [PATCH] ARM: Add unwinding support for memmove function
+Message-ID: <1416836757-30547-1-git-send-email-linyongting@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The memmove function never had unwinding annotations added.
+Currently, when accessing invalid pointer by memmove occurs the
+backtrace shown will stop at memmove or some completely unrelated
+function. Add unwinding annotations in hopes of getting a more
+useful backtrace in following cases:
+1. die on accessing invalid pointer by memmove
+2. kprobe trapped at any instruction within memmove
+3. interrupted at any instruction within memmove
 
+Signed-off-by: Lin Yongting <linyongting@gmail.com>
+---
+ arch/arm/lib/memmove.S |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-On 20/11/14 03:48, Viresh Kumar wrote:
-> Oh, you are still alive? I thought you were about to get married :)
-> Just kidding !!
->
-> On 20 November 2014 00:58, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Sorry for raising this issue always with Exynos cpufreq drivers. IMO the
->> bindings for "arm-bL-cpufreq-dt" is broken. Currently no one is using it
->> and it's better to fix it before we have a real user of it.
->
-> Hmm, yeah if we can. I haven't found a easy way to go ahead and then
-> got caught in other activities.
->
-
-Agreed, it's not easy but needs to be fixed :)
-
->> If you look at the binding document for it[1], it has a fixme which
->> shouldn't have been there at first place. It assumes the ordering of
->> CPU's specified in the DT and the logical index allocation to them.
->
-> Ok, I believe the FIXME is a bit outdated. From the code I can see only
-> this limitation.
->
-> - For every cluster, the cpu which boots up first should carry the OPPs.
-> Otherwise there is no restriction on ordering of CPUs.
->
-
-Not entirely true, it assuming the fact that the logical index provided 
-by the OS is completely based on the ordering in the DT.
-
-> - I believe CPUs boot in the order they are present in DT except for the
-> boot CPU. So, the first node for every cluster should have it.
->
-> Correct ? Then we can update the fixme.
->
-
-No, I disagree as you trying to implicitly depend on the logic Linux 
-uses to assign logical index. It can be changed any time, and depending
-on it might break things in future which can't be fixed easily later
-especially if it's DT related.
-
->> It even breaks for hotplug especially if you hotplug-in back in
->> different order.
->
-> Hmm, I never thought about it. But yes the CPU with the OPPs should
-> be the first one to come back.
->
-
-How can you assume that ? I can write a simple test which hot-plugs out
-all the CPUs in the (esp. multi-cluster) system in ascending order of
-logical index and hot-plug back in descending order. Then the above
-logic fails.
-
->> We can work around that probably, but it's better to
->> fix the binding. I failed to grab much attention in my previous attempts
->> to address this[2]. Viresh also started a discussion more recently[3].
->
-> They are just stuck and went nowhere :(
->
-
-The platforms needing it have to get involved in such discussions to
-make any progress.
-
-Regards,
-Sudeep
+diff --git a/arch/arm/lib/memmove.S b/arch/arm/lib/memmove.S
+index d1fc0c0..69a9d47 100644
+--- a/arch/arm/lib/memmove.S
++++ b/arch/arm/lib/memmove.S
+@@ -12,6 +12,7 @@
+ 
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
++#include <asm/unwind.h>
+ 
+ 		.text
+ 
+@@ -27,12 +28,17 @@
+  */
+ 
+ ENTRY(memmove)
++	UNWIND(	.fnstart			)
+ 
+ 		subs	ip, r0, r1
+ 		cmphi	r2, ip
+ 		bls	memcpy
+ 
+ 		stmfd	sp!, {r0, r4, lr}
++	UNWIND(	.fnend				)
++
++	UNWIND(	.fnstart			)
++	UNWIND(	.save	{r0, r4, lr}		) @ in first stmfd block
+ 		add	r1, r1, r2
+ 		add	r0, r0, r2
+ 		subs	r2, r2, #4
+@@ -45,6 +51,11 @@ ENTRY(memmove)
+ 
+ 1:		subs	r2, r2, #(28)
+ 		stmfd	sp!, {r5 - r8}
++	UNWIND(	.fnend				)
++
++	UNWIND(	.fnstart			)
++	UNWIND(	.save	{r0, r4, lr}		)
++	UNWIND(	.save	{r5 - r8}		) @ in second stmfd block
+ 		blt	5f
+ 
+ 	CALGN(	ands	ip, r0, #31		)
+@@ -97,6 +108,10 @@ ENTRY(memmove)
+ 	CALGN(	bcs	2b			)
+ 
+ 7:		ldmfd	sp!, {r5 - r8}
++	UNWIND(	.fnend				) @ end of second stmfd block
++
++	UNWIND(	.fnstart			)
++	UNWIND(	.save	{r0, r4, lr}		) @ still in first stmfd block
+ 
+ 8:		movs	r2, r2, lsl #31
+ 		ldrneb	r3, [r1, #-1]!
+@@ -124,10 +139,13 @@ ENTRY(memmove)
+ 		ldr	r3, [r1, #0]
+ 		beq	17f
+ 		blt	18f
++	UNWIND(	.fnend				)
+ 
+ 
+ 		.macro	backward_copy_shift push pull
+ 
++	UNWIND(	.fnstart			)
++	UNWIND(	.save	{r0, r4, lr}		) @ still in first stmfd block
+ 		subs	r2, r2, #28
+ 		blt	14f
+ 
+@@ -137,6 +155,11 @@ ENTRY(memmove)
+ 	CALGN(	bcc	15f			)
+ 
+ 11:		stmfd	sp!, {r5 - r9}
++	UNWIND(	.fnend				)
++
++	UNWIND(	.fnstart			)
++	UNWIND(	.save	{r0, r4, lr}		)
++	UNWIND(	.save	{r5 - r9}		) @ in new second stmfd block
+ 
+ 	PLD(	pld	[r1, #-4]		)
+ 	PLD(	subs	r2, r2, #96		)
+@@ -171,6 +194,10 @@ ENTRY(memmove)
+ 	PLD(	bge	13b			)
+ 
+ 		ldmfd	sp!, {r5 - r9}
++	UNWIND(	.fnend				) @ end of the second stmfd block
++
++	UNWIND(	.fnstart			)
++	UNWIND(	.save {r0, r4, lr}		) @ still in first stmfd block
+ 
+ 14:		ands	ip, r2, #28
+ 		beq	16f
+@@ -186,6 +213,7 @@ ENTRY(memmove)
+ 
+ 16:		add	r1, r1, #(\pull / 8)
+ 		b	8b
++	UNWIND(	.fnend				)
+ 
+ 		.endm
+ 
+-- 
+1.7.9.5
