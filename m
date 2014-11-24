@@ -1,35 +1,22 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 24 Nov 2014 19:58:34 +0100
-Subject: v3.18-rc1: n900 battery discharged down to 2.97V
-In-Reply-To: <20141124183130.GA2927@amd>
-References: <20141124183130.GA2927@amd>
-Message-ID: <201411241958.34578@pali>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 24 Nov 2014 18:57:48 +0000
+Subject: [PATCH 1/2] spi: atmel: remove compat for non DT board when
+ requesting dma chan
+In-Reply-To: <1415981574-11165-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1415981574-11165-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20141124185748.GF7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 November 2014 19:31:30 Pavel Machek wrote:
-> Hi!
-> 
-> I left the machine on usb-networking for extended period of
-> time. Unfortunately, Xfce screensaver kept screen busy, and
-> kernel failed to kill the machine.
-> 
-> At the end, hardware protections worked (I guess), but result
-> is battery discharged down to 2.97V.
-> 
-> Best regards,
-> 									Pavel
+On Fri, Nov 14, 2014 at 05:12:53PM +0100, Ludovic Desroches wrote:
+> All boards with a dma controller have DT support so using
+> dma_request_slave_channel_compat is no more needed.
 
-So you need some program which will monitor battery status and 
-when battery status is empty it should turn of device.
-
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+Applied both, thanks.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/1f5f1547/attachment-0001.sig>
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/2b4dc5db/attachment.sig>
