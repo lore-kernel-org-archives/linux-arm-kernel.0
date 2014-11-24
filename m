@@ -1,75 +1,111 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 24 Nov 2014 14:17:45 +0530
-Subject: [PATCH v6 0/2] Remove i2c sys_cfg register configuration from
- mach-exynos
-Message-ID: <1416818867-29156-1-git-send-email-pankaj.dubey@samsung.com>
+Date: Mon, 24 Nov 2014 14:17:46 +0530
+Subject: [PATCH v6 1/2] i2c: s3c2410: add Sysreg phandle to i2c device nodes
+In-Reply-To: <1416818867-29156-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1416818867-29156-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1416818867-29156-2-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is removing i2c sys_cfg register configuration settings from
-mach-exynos. All such configuration can be done into i2c driver.
-So added new property to hold phandle of SYSREG into i2c device nodes.
-This will help in removing static mapping of SYS registers.
+This patch adds syscon based phandle to i2c device nodes of exynos5250
+and exynos5420. These phandles will be used to save restore i2c sysreg
+configuration register during s2r from i2c driver.
 
-This series is based on latest kgene/for-next. 
-
-This patch series requires following change in i2c driver which has been separated
-from this patch series and posted separately here [1]
-
-https://patchwork.kernel.org/patch/5363981/
-
-Revision V5 of these patches can related discussion can be found here.
-
-http://www.spinics.net/lists/linux-samsung-soc/msg39326.html
-
-This patch and patch [1] has been tested on kgene/for-next for S2R on Exynos5250 based
-SMDK5250 board and it's working well.
-
-
-Changes since v5:
- - Rebased on latest kgene/for-next (SHA-ID: 4059421c38d24f2f7e06778c8ee6da4ca9abb4b7)
- - Separated changes in i2c-s3c2410.c file and posted as separate patch.
-
-Changes since v4:
- - Rebased on latest kgene/for-next (SHA-ID: 7552917ad948acad6c689d49604f93f725145173)
- - Addressed Wolfram Sang's review comments.
-
-Change since v3:
- - Rebased on latest kgene/for-next (SHA-ID: 2b5fa1d5dabb9af8f2da4f380bea8684f9b96f59)
- - This series consist of only two patches from v3 [1] (v3[1/6] and v3[2/6]).
- - Addressed Tomasz Figa and Wolfram Sang's comments.
- - Updated i2c DT binding information.
-
-Changes since v2:
- - Reorganized patches as suggested by Tomasz Figa.
- - Addressed review comments of Tomasz Figa in i2c-s3c2410.c file.
-
-Changes since v1:
- - Added patch to move i2c interrupt re-configuration code from exynos.c
-   to i2c driver, as suggested by Arnd.
- - After above patch only user of SYS_I2C_CFG register is pm.c so moving
-   save/restore of this register also into i2c driver.
- - Spiltted up exynos4 and exynos5 machine descriptors to get rid from
-   soc_is_exynos4/exynos5 kind of macros, as suggested by Arnd.
- - Changed location of chipid driver to "drivers/soc".
- - Added drivers/base/soc.c provided infrastructure to make SoC specific 
-   information avaible to user space via sysfs entry, as suggested by Arnd.
-
-
-Pankaj Dubey (2):
-  i2c: s3c2410: add Sysreg phandle to i2c device nodes
-  ARM: EXYNOS: Remove i2c sys configuration related code
-
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Randy Dunlap <rdunlap@infradead.org>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: devicetree at vger.kernel.org
+CC: linux-doc at vger.kernel.org
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
  .../devicetree/bindings/i2c/i2c-s3c2410.txt        |    1 +
- arch/arm/boot/dts/exynos5250.dtsi                  |    4 ++
- arch/arm/boot/dts/exynos5420.dtsi                  |    4 ++
- arch/arm/mach-exynos/exynos.c                      |   39 +-------------------
- arch/arm/mach-exynos/include/mach/map.h            |    3 --
- arch/arm/mach-exynos/pm.c                          |    3 +-
- arch/arm/mach-exynos/regs-sys.h                    |   22 -----------
- arch/arm/mach-exynos/suspend.c                     |    7 ----
- 8 files changed, 13 insertions(+), 70 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/regs-sys.h
+ arch/arm/boot/dts/exynos5250.dtsi                  |    4 ++++
+ arch/arm/boot/dts/exynos5420.dtsi                  |    4 ++++
+ 3 files changed, 9 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt b/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+index 278de8e..89b3250 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+@@ -32,6 +32,7 @@ Optional properties:
+     specified, default value is 0.
+   - samsung,i2c-max-bus-freq: Desired frequency in Hz of the bus. If not
+     specified, the default value in Hz is 100000.
++  - samsung,sysreg-phandle - handle to syscon used to control the system registers
+ 
+ Example:
+ 
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 0a588b4..d45a07e 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -293,6 +293,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c0_bus>;
++		samsung,sysreg-phandle = <&sysreg_system_controller>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -306,6 +307,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c1_bus>;
++		samsung,sysreg-phandle = <&sysreg_system_controller>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -319,6 +321,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c2_bus>;
++		samsung,sysreg-phandle = <&sysreg_system_controller>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -332,6 +335,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c3_bus>;
++		samsung,sysreg-phandle = <&sysreg_system_controller>;
+ 		status = "disabled";
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 8617a03..90bf401 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -560,6 +560,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c0_bus>;
++		samsung,sysreg-phandle = <&sysreg_system_controller>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -573,6 +574,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c1_bus>;
++		samsung,sysreg-phandle = <&sysreg_system_controller>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -586,6 +588,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c2_bus>;
++		samsung,sysreg-phandle = <&sysreg_system_controller>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -599,6 +602,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c3_bus>;
++		samsung,sysreg-phandle = <&sysreg_system_controller>;
+ 		status = "disabled";
+ 	};
+ 
 -- 
 1.7.9.5
