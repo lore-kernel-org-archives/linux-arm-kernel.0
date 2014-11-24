@@ -1,55 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Nov 2014 16:20:45 +0100
-Subject: [PATCH RESEND 2/3] ARM: Meson6: Add SMP support for Amlogic Meson6
-In-Reply-To: <1415982353-9293-3-git-send-email-carlo@caione.org>
-References: <1415982353-9293-1-git-send-email-carlo@caione.org>
- <1415982353-9293-3-git-send-email-carlo@caione.org>
-Message-ID: <201411241620.45412.arnd@arndb.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 24 Nov 2014 16:14:17 +0100
+Subject: [PATCH v12 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+In-Reply-To: <1416576682-5255-1-git-send-email-thomas.ab@samsung.com>
+References: <1416576682-5255-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <54734B49.9050109@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 November 2014, Carlo Caione wrote:
+Hi All,
 
-> +static void __iomem *cpucfg_membase;
-> +static void __iomem *scu_membase;
+On 21/11/14 14:31, Thomas Abraham wrote:
+> Changes since v11:
+> - Rebased on top of git://linuxtv.org/snawrocki/samsung.git for-v3.19-exynos-clk
+> 
+> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
+> drivers and enables the use of cpufreq-dt driver for these platforms. This
+> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
+> driver.
+> 
+> This series is based on the following branch.
+> git://linuxtv.org/snawrocki/samsung.git for-v3.19-exynos-clk
+> 
+> This series depends on the following patch which can be picked from
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git samsung/dt
+> e540920cf21c (ARM: dts: add CPU nodes for Exynos4 SoCs).
+> 
+> This patch series has been tested on Exynos4210/5250/5420 based boards.
+> Tomasz Figa had plans to take this in the Samsung clock tree for v3.19
+> (http://www.spinics.net/lists/linux-samsung-soc/msg37933.html).
+> Sylwester, could you consider to merge this in your tree?
 
-I don't think you need a global scu_membase variable, you use it only in
-one function.
+This patch series has already conflicts in arch/arm/boot/dts/ with
+the arm-soc tree. It touches quite many files at arch/arm. Perhaps
+we could still have it merged through Kukjin's and arm-soc tree ?
 
-> +static DEFINE_SPINLOCK(cpu_lock);
-> +
-> +extern void meson_secondary_startup(void);
+Feel free to add for the whole series:
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-Better put the extern declaration into a header file.
-
-> +static void __init meson6_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +	struct device_node *node;
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
-> +	if (!node) {
-> +		pr_err("Missing Meson6 SCU node\n");
-> +		return;
-> +	}
-> +
-> +	scu_membase = of_iomap(node, 0);
-> +	if (!scu_membase) {
-> +		pr_err("Couln't map Meson6 SCU registers\n");
-> +		return;
-> +	}
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "amlogic,meson6-cpuconfig");
-> +	if (!node) {
-> +		pr_err("Missing Meson6 CPU config node\n");
-> +		return;
-> +	}
-
-I'm not sure about the "amlogic,meson6-cpuconfig" device node. Since this
-is just an 8-byte register range, I suspect it's actually part of a larger
-device, so you should better represent that instead. We can now have
-early "syscon" devices (in linux-next I think), so you could instead make
-this a device that is compatible with "syscon" and have the smp code
-look that up and apply an appropriate offset. Do you have an idea of
-which device this is part of?
-
-	Arnd
+-- 
+Thanks,
+Sylwester
