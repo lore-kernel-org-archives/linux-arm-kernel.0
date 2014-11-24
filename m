@@ -1,115 +1,77 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 24 Nov 2014 14:29:30 +0100
-Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc for
- vqmmc
-In-Reply-To: <CAD=FV=UJT5zBkcj2a03Y_RWxad9+Pu83G_z79Xzzn74V=eRqww@mail.gmail.com>
-References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>
- <1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>
- <CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
- <CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>
- <5464152E.7040209@rock-chips.com>
- <CAPDyKFrzGfDew0eLLEcA+_iS_mo-O2bFU58fjirfXXA8AJ9UYQ@mail.gmail.com>
- <CAD=FV=Ve1TY4+8quq1=18A1YOFvOWuFGrBmHLwMCwdWBSqzxOw@mail.gmail.com>
- <CAD=FV=UJT5zBkcj2a03Y_RWxad9+Pu83G_z79Xzzn74V=eRqww@mail.gmail.com>
-Message-ID: <CAPDyKFqt4rrwi940KAPyPONpjixK1730QmHEsN27V97jyHH+Qw@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 24 Nov 2014 13:44:44 +0000
+Subject: [PATCH v11 4/6] ARM: Exynos: switch to using generic cpufreq
+ driver for Exynos4210/5250/5420
+In-Reply-To: <CAKohponEHqHYCLibVc8OHN49+4YW5qw89ny4ycTBL1xN-p9qtA@mail.gmail.com>
+References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>	<1413805281-6269-2-git-send-email-thomas.ab@samsung.com>	<1413805281-6269-3-git-send-email-thomas.ab@samsung.com>	<1413805281-6269-4-git-send-email-thomas.ab@samsung.com>	<1413805281-6269-5-git-send-email-thomas.ab@samsung.com>	<546CEF61.4050105@arm.com>
+ <CAKohponEHqHYCLibVc8OHN49+4YW5qw89ny4ycTBL1xN-p9qtA@mail.gmail.com>
+Message-ID: <5473364C.3010102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 November 2014 at 22:04, Doug Anderson <dianders@chromium.org> wrote:
-> Hi,
+
+
+On 20/11/14 03:48, Viresh Kumar wrote:
+> Oh, you are still alive? I thought you were about to get married :)
+> Just kidding !!
 >
-> On Fri, Nov 21, 2014 at 9:42 AM, Doug Anderson <dianders@chromium.org> wrote:
->> Ulf,
->>
->> On Fri, Nov 21, 2014 at 4:06 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> [...]
->>>
->>>> Sure
->>>> If the first card is sd2.0 since startup, dw_mci_switch_voltage will not be called,
->>>
->>> That can't be right. mmc_power_up() should trigger
->>> dw_mci_switch_voltage() to be invoked.
->>
->> Hmmm, I think you're right.  Addy: can you double check if it's only
->> the 2nd card for you?  I was thinking that if a regulator is currently
->> 3.3V and you request 2.7 - 3.3V the regulator framework will treat
->> that as a noop.  ...but that definitely doesn't appear to be the case.
->> When I boot up the first time even with no SD card plugged in, I see
->> this at bootup:
->>
->> [    3.042234] vccio_sd: 1800 <--> 3300 mV at 3300 mV
->>
->> ...showing that it started at 3.3V.  Then I see:
->>
->> $ grep "" /sys/class/regulator/regulator.16/{name,microvolts}
->> /sys/class/regulator/regulator.16/name:vccio_sd
->> /sys/class/regulator/regulator.16/microvolts:2700000
->>
->> ...so it is certainly getting changed even with no card plugged in.
->>
->>
->> BTW: I don't actually have one of these failing cards--all of mine
->> work.  Addy, do you know the make and model of the card you have that
->> fails?
+> On 20 November 2014 00:58, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> Sorry for raising this issue always with Exynos cpufreq drivers. IMO the
+>> bindings for "arm-bL-cpufreq-dt" is broken. Currently no one is using it
+>> and it's better to fix it before we have a real user of it.
 >
-> Just as a bit of a followup, I did some more digging...
+> Hmm, yeah if we can. I haven't found a easy way to go ahead and then
+> got caught in other activities.
 >
-> 1. It looks as if we now have a bit of "opposite" logic for vmmc vs.
-> vqmmc.  In mmc_power_up() I see that it sets the initial voltage as:
+
+Agreed, it's not easy but needs to be fixed :)
+
+>> If you look at the binding document for it[1], it has a fixme which
+>> shouldn't have been there at first place. It assumes the ordering of
+>> CPU's specified in the DT and the logical index allocation to them.
 >
->   host->ios.vdd = fls(ocr) - 1;
-
-That's because we would like to supports as many cards as possible.
-The policy is based upon that some cards may not support lower
-voltages, but most will support higher.
-
+> Ok, I believe the FIXME is a bit outdated. From the code I can see only
+> this limitation.
 >
-> That actually means that we're going to pick the maximum voltage for
-> vmmc (of the supported voltages).  For vqmmc dw_mmc is using the
-> regulator framework which (as described in my previous message) will
-> pick the minimum.
-
-Correct. I have thought this has been inside spec and choosing the
-lower value would be preferred to lower power consumption. Maybe we
-needs to re-visit this one more time.
-
-Here are some of the interesting sections in the eMMC spec:
-10.3.3 Power supply Voltages
-"The VCCQ must be defined at equal to or less than VCC".
-
-10.5 Bus signal levels
-Push-pull mode:
-Voh = 0.75 * VCCQ. (Do note, its VCCQ not VCC).
-
-Summary eMMC: VCCQ must be less and VCC, we should be inside spec.
-
->From SD spec:
-6.6.1 Threshold Level for High Voltage Range
-Voh = 0.75 * VDD.
-
-In worst case scenario, VDD = 3.6V and VIO = 2.7V. That gives as the
-factor of 0.75, thus we are inside spec but without margins.
-
+> - For every cluster, the cpu which boots up first should carry the OPPs.
+> Otherwise there is no restriction on ordering of CPUs.
 >
-> 2. Several people I've talked to have expressed concerns that our
-> minimum value is 2.7V.  Apparently that's really on the edge and makes
-> EEs a little nervous.  The quick sample of cards sitting on my desk
-> shows that they seem to claim 0x00ff8000, which doesn't include 2.7V.
 
-0x00ff8000 states what values of VDD levels the device supports. Not VIO.
+Not entirely true, it assuming the fact that the logical index provided 
+by the OS is completely based on the ordering in the DT.
 
+> - I believe CPUs boot in the order they are present in DT except for the
+> boot CPU. So, the first node for every cluster should have it.
 >
+> Correct ? Then we can update the fixme.
 >
-> Both of the above make me feel like dw_mmc should try its best to pick
-> a value for vqmmc that is closest to the value of vmmc (and >= 2.7V).
-> That also happens to make us work exactly like hosts where vmmc and
-> vqmmc are supplied by the same supply.
 
-I do see your point. And I agree that it would be nice to achieve
-something like this.
+No, I disagree as you trying to implicitly depend on the logic Linux 
+uses to assign logical index. It can be changed any time, and depending
+on it might break things in future which can't be fixed easily later
+especially if it's DT related.
 
-The question is how to do this. For sure, we need to involve the mmc
-core to handle this correctly.
+>> It even breaks for hotplug especially if you hotplug-in back in
+>> different order.
+>
+> Hmm, I never thought about it. But yes the CPU with the OPPs should
+> be the first one to come back.
+>
 
-Kind regards
-Uffe
+How can you assume that ? I can write a simple test which hot-plugs out
+all the CPUs in the (esp. multi-cluster) system in ascending order of
+logical index and hot-plug back in descending order. Then the above
+logic fails.
+
+>> We can work around that probably, but it's better to
+>> fix the binding. I failed to grab much attention in my previous attempts
+>> to address this[2]. Viresh also started a discussion more recently[3].
+>
+> They are just stuck and went nowhere :(
+>
+
+The platforms needing it have to get involved in such discussions to
+make any progress.
+
+Regards,
+Sudeep
