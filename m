@@ -1,196 +1,106 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Nov 2014 14:35:17 +0000
-Subject: [PATCH v3 10/13] irqchip: GICv3: ITS: DT probing and initialization
+Date: Mon, 24 Nov 2014 14:35:15 +0000
+Subject: [PATCH v3 08/13] irqchip: GICv3: ITS: device allocation and
+ configuration
 In-Reply-To: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
 References: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1416839720-18400-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1416839720-18400-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the code that probes the ITS from the device tree,
-and initialize it.
+The ITS has a notion of "device" that can write to it in order to
+generate an interrupt.
+
+Conversly, the driver maintains a per-ITS list of devices, together
+with their configuration information, and uses this to configure
+the HW.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 169 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 169 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 74 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 532c6df..e9d1615 100644
+index 03f9831..d687fd4 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1231,3 +1231,172 @@ static const struct irq_domain_ops its_domain_ops = {
- 	.alloc			= its_irq_domain_alloc,
- 	.free			= its_irq_domain_free,
- };
+@@ -981,3 +981,77 @@ static void its_cpu_init_collection(void)
+ 
+ 	spin_unlock(&its_lock);
+ }
 +
-+static int its_probe(struct device_node *node, struct irq_domain *parent)
++static struct its_device *its_find_device(struct its_node *its, u32 dev_id)
 +{
-+	struct resource res;
-+	struct its_node *its;
-+	void __iomem *its_base;
-+	u32 val;
-+	u64 baser, tmp;
-+	int err;
++	struct its_device *its_dev = NULL, *tmp;
 +
-+	err = of_address_to_resource(node, 0, &res);
-+	if (err) {
-+		pr_warn("%s: no regs?\n", node->full_name);
-+		return -ENXIO;
-+	}
++	raw_spin_lock(&its->lock);
 +
-+	its_base = ioremap(res.start, resource_size(&res));
-+	if (!its_base) {
-+		pr_warn("%s: unable to map registers\n", node->full_name);
-+		return -ENOMEM;
-+	}
-+
-+	val = readl_relaxed(its_base + GITS_PIDR2) & GIC_PIDR2_ARCH_MASK;
-+	if (val != 0x30 && val != 0x40) {
-+		pr_warn("%s: no ITS detected, giving up\n", node->full_name);
-+		err = -ENODEV;
-+		goto out_unmap;
-+	}
-+
-+	pr_info("ITS: %s\n", node->full_name);
-+
-+	its = kzalloc(sizeof(*its), GFP_KERNEL);
-+	if (!its) {
-+		err = -ENOMEM;
-+		goto out_unmap;
-+	}
-+
-+	raw_spin_lock_init(&its->lock);
-+	INIT_LIST_HEAD(&its->entry);
-+	INIT_LIST_HEAD(&its->its_device_list);
-+	its->base = its_base;
-+	its->phys_base = res.start;
-+	its->msi_chip.of_node = node;
-+	its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
-+
-+	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
-+	if (!its->cmd_base) {
-+		err = -ENOMEM;
-+		goto out_free_its;
-+	}
-+	its->cmd_write = its->cmd_base;
-+
-+	err = its_alloc_tables(its);
-+	if (err)
-+		goto out_free_cmd;
-+
-+	err = its_alloc_collections(its);
-+	if (err)
-+		goto out_free_tables;
-+
-+	baser = (virt_to_phys(its->cmd_base)	|
-+		 GITS_CBASER_WaWb		|
-+		 GITS_CBASER_InnerShareable	|
-+		 (ITS_CMD_QUEUE_SZ / SZ_4K - 1)	|
-+		 GITS_CBASER_VALID);
-+
-+	writeq_relaxed(baser, its->base + GITS_CBASER);
-+	tmp = readq_relaxed(its->base + GITS_CBASER);
-+	writeq_relaxed(0, its->base + GITS_CWRITER);
-+	writel_relaxed(1, its->base + GITS_CTLR);
-+
-+	if ((tmp ^ baser) & GITS_BASER_SHAREABILITY_MASK) {
-+		pr_info("ITS: using cache flushing for cmd queue\n");
-+		its->flags |= ITS_FLAGS_CMDQ_NEEDS_FLUSHING;
-+	}
-+
-+	if (of_property_read_bool(its->msi_chip.of_node, "msi-controller")) {
-+		its->domain = irq_domain_add_tree(NULL, &its_domain_ops, its);
-+		if (!its->domain) {
-+			err = -ENOMEM;
-+			goto out_free_tables;
++	list_for_each_entry(tmp, &its->its_device_list, entry) {
++		if (tmp->device_id == dev_id) {
++			its_dev = tmp;
++			break;
 +		}
-+
-+		its->domain->parent = parent;
-+
-+		its->msi_chip.domain = pci_msi_create_irq_domain(node,
-+								 &its_pci_msi_domain_info,
-+								 its->domain);
-+		if (!its->msi_chip.domain) {
-+			err = -ENOMEM;
-+			goto out_free_domains;
-+		}
-+
-+		err = of_pci_msi_chip_add(&its->msi_chip);
-+		if (err)
-+			goto out_free_domains;
 +	}
 +
-+	spin_lock(&its_lock);
-+	list_add(&its->entry, &its_nodes);
-+	spin_unlock(&its_lock);
++	raw_spin_unlock(&its->lock);
 +
-+	return 0;
-+
-+out_free_domains:
-+	if (its->msi_chip.domain)
-+		irq_domain_remove(its->msi_chip.domain);
-+	if (its->domain)
-+		irq_domain_remove(its->domain);
-+out_free_tables:
-+	its_free_tables(its);
-+out_free_cmd:
-+	kfree(its->cmd_base);
-+out_free_its:
-+	kfree(its);
-+out_unmap:
-+	iounmap(its_base);
-+	pr_err("ITS: failed probing %s (%d)\n", node->full_name, err);
-+	return err;
++	return its_dev;
 +}
 +
-+static bool gic_rdists_supports_plpis(void)
++static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
++					    int nvecs)
 +{
-+	return !!(readl_relaxed(gic_data_rdist_rd_base() + GICR_TYPER) & GICR_TYPER_PLPIS);
++	struct its_device *dev;
++	unsigned long *lpi_map;
++	void *itt;
++	int lpi_base;
++	int nr_lpis;
++	int cpu;
++	int sz;
++
++	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
++	sz = nvecs * its->ite_size;
++	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
++	itt = kmalloc(sz, GFP_KERNEL);
++	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
++
++	if (!dev || !itt || !lpi_map) {
++		kfree(dev);
++		kfree(itt);
++		kfree(lpi_map);
++		return NULL;
++	}
++
++	dev->its = its;
++	dev->itt = itt;
++	dev->nr_ites = nvecs;
++	dev->lpi_map = lpi_map;
++	dev->lpi_base = lpi_base;
++	dev->nr_lpis = nr_lpis;
++	dev->device_id = dev_id;
++	INIT_LIST_HEAD(&dev->entry);
++
++	raw_spin_lock(&its->lock);
++	list_add(&dev->entry, &its->its_device_list);
++	raw_spin_unlock(&its->lock);
++
++	/* Bind the device to the first possible CPU */
++	cpu = cpumask_first(cpu_online_mask);
++	dev->collection = &its->collections[cpu];
++
++	/* Map device to its ITT */
++	its_send_mapd(dev, 1);
++
++	return dev;
 +}
 +
-+int its_cpu_init(void)
++static void its_free_device(struct its_device *its_dev)
 +{
-+	if (!gic_rdists_supports_plpis()) {
-+		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
-+		return -ENXIO;
-+	}
-+
-+	if (!list_empty(&its_nodes)) {
-+		its_cpu_init_lpis();
-+		its_cpu_init_collection();
-+	}
-+
-+	return 0;
-+}
-+
-+static struct of_device_id its_device_id[] = {
-+	{	.compatible	= "arm,gic-v3-its",	},
-+	{},
-+};
-+
-+int its_init(struct device_node *node, struct rdists *rdists,
-+	     struct irq_domain *parent_domain)
-+{
-+	struct device_node *np;
-+
-+	for (np = of_find_matching_node(node, its_device_id); np;
-+	     np = of_find_matching_node(np, its_device_id)) {
-+		its_probe(np, parent_domain);
-+	}
-+
-+	if (list_empty(&its_nodes)) {
-+		pr_warn("ITS: No ITS available, not enabling LPIs\n");
-+		return -ENXIO;
-+	}
-+
-+	gic_rdists = rdists;
-+	gic_root_node = node;
-+
-+	its_alloc_lpi_tables();
-+	its_lpi_init(rdists->id_bits);
-+
-+	return 0;
++	raw_spin_lock(&its_dev->its->lock);
++	list_del(&its_dev->entry);
++	raw_spin_unlock(&its_dev->its->lock);
++	kfree(its_dev->itt);
++	kfree(its_dev);
 +}
 -- 
 2.1.3
