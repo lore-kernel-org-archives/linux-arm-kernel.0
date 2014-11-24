@@ -1,188 +1,77 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 24 Nov 2014 09:27:27 +0100
-Subject: [PATCH v3 0/8] KVM-VFIO IRQ forward control
-In-Reply-To: <E959C4978C3B6342920538CF579893F0022ADA8C@SHSMSX104.ccr.corp.intel.com>
-References: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
- <E959C4978C3B6342920538CF579893F0022ADA8C@SHSMSX104.ccr.corp.intel.com>
-Message-ID: <5472EBEF.3070108@linaro.org>
+From: johannes.pointner@gmail.com (Johannes Pointner)
+Date: Mon, 24 Nov 2014 09:32:23 +0100
+Subject: [PATCH v4 3/6] mfd: ti_am335x_tscadc: Remove unwanted
+ reg_se_cache save
+In-Reply-To: <912A29987EAE174BA6CF187D7CDFA9CE26F6D664@DLEE08.ent.ti.com>
+References: <1415941651-28962-4-git-send-email-vigneshr@ti.com>
+ <20141118143005.GF24004@x1> <20141118171240.GB3003@dtor-ws>
+ <546DF2F0.9080405@ti.com>
+ <20141120144028.GB5809@localhost.localdomain>
+ <546F2BA4.4000808@ti.com>
+ <20141121131036.GA18931@localhost.localdomain>
+ <CAJKbBDDVTA+=priRu7sCD=vHrC8AUg4DM3kycuGrqbpF-5FGAA@mail.gmail.com>
+ <546F5C27.7040004@ti.com>
+ <CAJKbBDD=eYmU=LuViwLPNV=kYCziDQgKjL07bT7og4vsj0Ee7A@mail.gmail.com>
+ <20141121214005.GA4020@localhost.localdomain>
+ <912A29987EAE174BA6CF187D7CDFA9CE26F6D664@DLEE08.ent.ti.com>
+Message-ID: <CAJKbBDCSjSWfXrbJawP3peRFhEk9ZaMyPyS=bNNVvqBv2am8ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2014 09:14 AM, Wu, Feng wrote:
-> 
-> 
+2014-11-21 23:25 GMT+01:00 Griffis, Brad <bgriffis@ti.com>:
+>
 >> -----Original Message-----
->> From: Eric Auger [mailto:eric.auger at linaro.org]
->> Sent: Monday, November 24, 2014 2:36 AM
->> To: eric.auger at st.com; eric.auger at linaro.org; christoffer.dall at linaro.org;
->> marc.zyngier at arm.com; linux-arm-kernel at lists.infradead.org;
->> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org;
->> alex.williamson at redhat.com; joel.schopp at amd.com;
->> kim.phillips at freescale.com; paulus at samba.org; gleb at kernel.org;
->> pbonzini at redhat.com; agraf at suse.de
->> Cc: linux-kernel at vger.kernel.org; patches at linaro.org; will.deacon at arm.com;
->> a.motakis at virtualopensystems.com; a.rigo at virtualopensystems.com;
->> john.liuli at huawei.com; ming.lei at canonical.com; Wu, Feng
->> Subject: [PATCH v3 0/8] KVM-VFIO IRQ forward control
+>> From: Richard Cochran [mailto:richardcochran at gmail.com]
 >>
->> This series proposes an integration of "ARM: Forwarding physical
->> interrupts to a guest VM" (http://lwn.net/Articles/603514/) in
->> KVM.
->>
->> It enables to transform a VFIO platform driver IRQ into a forwarded
->> IRQ.
->>
->> When a physical IRQ is forwarded (to a guest), the host does not
->> deactivates this latter. Completion ownership is transferred to the
->> guest. When the guest deactivates the associated virtual IRQ,
->> the interrupt controler automatically completes the physical IRQ.
->> Obviously this requires some dedicated HW support in the interrupt
->> controler.
->>
->> The direct benefit is that, for a level sensitive IRQ, it avoids a
->> VM exit on forwarded IRQ completion.
->>
->> When the IRQ is forwarded, the VFIO platform driver does not need to
->> mask the physical IRQ anymore before signaling the eventfd. Indeed
->> genirq lowers the running priority, enabling other physical IRQ to hit
->> except that one.
->>
->> Besides, the injection still is based on irqfd triggering. The only
->> impact on irqfd process is resamplefd is not called anymore on
->> virtual IRQ completion since this latter becomes "transparent".
->>
->> The current integration is based on an extension of the KVM-VFIO
->> device, previously used by KVM to interact with VFIO groups. The
->> patch series now enables KVM to directly interact with a VFIO
->> platform device. The VFIO external API was extended for that purpose.
->>
->> Th KVM-VFIO device can get/put the vfio platform device, check its
->> integrity and type, get the IRQ number associated to an IRQ index.
->>
->> The IRQ forward programming is architecture specific (virtual interrupt
->> controller programming basically). However the whole infrastructure is
->> kept generic.
->>
->> from a user point of view, the functionality is provided through a
->> new KVM-VFIO group named KVM_DEV_VFIO_DEVICE and 2 associated
->> attributes:
->> - KVM_DEV_VFIO_DEVICE_FORWARD_IRQ,
->> - KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ.
->>
->> The capability can be checked with KVM_HAS_DEVICE_ATTR.
->>
->> Forwarding must be activated before VFIO signaling mechanism is set
->> using VFIO_DEVICE_SET_IRQS and unset while the signaling is disabled.
->>
->> ---
->>
->> This patch series has the following dependencies:
->> - "ARM: Forwarding physical interrupts to a guest VM"
->>   (http://lwn.net/Articles/603514/)
->> - [PATCH v9 00/19] VFIO support for platform and AMBA devices on ARM
->>   (http://www.spinics.net/lists/kvm-arm/msg11745.html)
->> - [PATCH v2 0/6] vfio: type1: support for ARM SMMUS with
->> VFIO_IOMMU_TYPE1
->>   (http://www.spinics.net/lists/kvm-arm/msg11738.html)
->>
->> Integrated pieces can be found at
->> ssh://git.linaro.org/people/eric.auger/linux.git
->> on branch irqfd_integ_v8
->>
->> This was was tested on Calxeda Midway, assigning the xgmac main IRQ.
->>
-> 
-> Hi Eric,
-> 
-> Did you send out the latest QEMU part for this patch set, I notice that v6 of
-> The QEMU part is sent out, but seems some structure in this new version
-> has been changed, such as, struct kvm_arch_forwarded_irq (subindex is added
-> in this version), so a new patchset in QEMU is also needed.
+>> On Fri, Nov 21, 2014 at 07:17:18PM +0100, Johannes Pointner wrote:
+>> > Before the patches were also jumps but I thought it is something
+>> > Vignesh should know. Maybe there is some fix for that too?
+>
+> I believe I've seen the "jumping" behavior pop up at a couple random times in my testing.  I think it relates to the hardware not properly registering a pen-up interrupt.  When that's happening can you try running ts_calibrate?  If you're not registering a pen-up event then you won't be able to advance through those touch points.  Is this behavior related to capturing ADC samples, or do you see this behavior even without capturing ADC samples?
 
-Hi Feng,
+Is it the right way to test? Because I think the ts_lib will cover
+misbehavior of the touchscreen driver.
 
-v7 is available at:
-http://lists.gnu.org/archive/html/qemu-devel/2014-10/msg03804.html. It
-already illustrates KVM-VFIO device usage.
+>
+>> > As Richard also noted, it would be nice if ti could let us know how to
+>> > get the delay values right. By trial and error is IMHO not the best
+>> > way.
+>>
+>> That is not only an opinion, it is a matter of fact. TI really dropped the ball on
+>> this one. I thought the patch series was a sign they finally were going to
+>> properly address this issue. Wrong again.
+>
+> These patches originate from work I did on TI's SDK 7.00 (3.12 kernel).  The touchscreen is working beautifully in that environment and we are putting forth significant effort to bring those improvements to the community.
+>
+> Things do not seem to be working as well with the current mainline kernel.  I've been reviewing various patches between 3.12 and the mainline to understand why it's different.  I believe I have figured this out, and I have discussions going separately with individuals that contributed those patches in order to come up with the best possible solution, i.e. we likely need a few additional changes to this patch set.
 
-v8 which will indeed integrate subindex addition will be delivered this
-week.
+Ok, then I'm looking forward for a new patch set to test. Furthermore,
+I would be interested which changes you are talking about.
 
-Best Regards
+>
+> The CHARGECONFIG delay serves precisely the same purpose as the udelay in the original code base.  How did you determine the udelay value in the first place?  I went through the effort of figuring out a way to make the delay into a HARDWARE delay instead of a software delay so that it could be removed from the ISR.  That delay time relates to "settling time" and so it's going to be dependent on your PCB.  You could hook up an oscilloscope and attempt to capture this parameter from the signals themselves.  Personally I think that's a lot more difficult than just doing a few iterations of testing.
 
-Eric
-> 
-> Thanks,
-> Feng
-> 
-> 
->> v2 -> v3:
->> - kvm_fwd_irq_action enum replaced by a bool (KVM_VFIO_IRQ_CLEANUP does
->> not
->>   exist anymore)
->> - a new struct local to vfio.c was introduced to wrap kvm_fw_irq and make it
->>   linkable: kvm_vfio_fwd_irq_node
->> - kvm_fwd_irq now is self-contained (includes struct vfio_device *)
->> - a single list of kvm_vfio_fwd_irq_irq_node is used instead of having
->>   a list of devices and a list of forward irq per device. Having 2 lists
->>   brought extra complexity.
->> - the VFIO device ref counter is incremented each time a new IRQ is forwarded.
->>   It is not attempted anymore to hold a single reference whatever the number
->>   of forwarded IRQs.
->> - subindex added on top of index to be closer to VFIO API
->> - platform device check moved in the arm specific implementation
->> - enable the KVM-VFIO device for arm64
->> - forwarded state change only can happen while the VFIO IRQ handler is not
->>   set; in other words, when the VFIO IRQ signaling is not set.
+I did measure with an oscilloscope to get the right charge delay and
+it looks fine to me. But I can't affect the jumps with the charge
+delay, the only thing that helped, was to add some sample delay. But
+it didn't solve it.
+
+>
+>> The data sheet for the TI part used to have a reference to an app-note for
+>> the touch controller.
 >>
->> v1 -> v2:
->> - forward control is moved from architecture specific file into generic
->>   vfio.c module.
->>   only kvm_arch_set_fwd_state remains architecture specific
->> - integrate Kim's patch which enables KVM-VFIO for ARM
->> - fix vgic state bypass in vgic_queue_hwirq
->> - struct kvm_arch_forwarded_irq moved from
->> arch/arm/include/uapi/asm/kvm.h
->>   to include/uapi/linux/kvm.h
->>   also irq_index renamed into index and guest_irq renamed into gsi
->> - ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
->> - vfio_external_get_base_device renamed into vfio_external_base_device
->> - vfio_external_get_type removed
->> - kvm_vfio_external_get_base_device renamed into
->> kvm_vfio_external_base_device
->> - __KVM_HAVE_ARCH_KVM_VFIO renamed into
->> __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
+>>       spruh73f page 1154
 >>
+>>       The Pen IRQ can only occur if the correct Pen Ctrl bits are high
+>>       (AFE Pen Ctrl bits 6:5 in the TSC_ADC control register) and if
+>>       the correct ground transistor biasing is set in the StepConfig
+>>       [N] Register. Refer to the application notes for the correct
+>>       settings.
 >>
->> Eric Auger (7):
->>   KVM: arm64: Enable the KVM-VFIO device
->>   VFIO: platform: forwarded state tested when selecting IRQ handler
->>   KVM: kvm-vfio: User API for IRQ forwarding
->>   VFIO: External user API device helpers
->>   KVM: kvm-vfio: wrapper to VFIO external API device helpers
->>   KVM: kvm-vfio: generic forwarding control
->>   KVM: arm: kvm-vfio: forwarding control
->>
->> Kim Phillips (1):
->>   KVM: arm: Enable the KVM-VFIO device
->>
->>  Documentation/virtual/kvm/devices/vfio.txt |  34 +++-
->>  arch/arm/include/asm/kvm_host.h            |   7 +
->>  arch/arm/kvm/Kconfig                       |   1 +
->>  arch/arm/kvm/Makefile                      |   4 +-
->>  arch/arm/kvm/kvm_vfio_arm.c                | 101 ++++++++++
->>  arch/arm64/kvm/Kconfig                     |   1 +
->>  arch/arm64/kvm/Makefile                    |   2 +-
->>  drivers/vfio/platform/vfio_platform_irq.c  |   7 +-
->>  drivers/vfio/vfio.c                        |  24 +++
->>  include/linux/kvm_host.h                   |  28 +++
->>  include/linux/vfio.h                       |   3 +
->>  include/uapi/linux/kvm.h                   |  10 +
->>  virt/kvm/vfio.c                            | 294
->> ++++++++++++++++++++++++++++-
->>  13 files changed, 503 insertions(+), 13 deletions(-)
->>  create mode 100644 arch/arm/kvm/kvm_vfio_arm.c
->>
->> --
->> 1.9.1
-> 
+>> I searched high and low for this application note. Then, the data sheet got
+>> revised.
+>
+> Such an application note does not exist, which explains why you didn't find it and why we have removed that reference from the TRM.  Sorry for your trouble.  We always strive for accurate documentation.
+
+Thanks,
+Hannes
