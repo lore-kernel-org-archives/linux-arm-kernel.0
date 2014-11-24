@@ -1,33 +1,37 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 24 Nov 2014 11:01:49 +0100
-Subject: [PATCH v4 3/6] mfd: ti_am335x_tscadc: Remove unwanted
- reg_se_cache save
-In-Reply-To: <5472F30A.1000608@linutronix.de>
-References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
- <1415941651-28962-4-git-send-email-vigneshr@ti.com>
- <20141118143005.GF24004@x1> <20141118171240.GB3003@dtor-ws>
- <546DF2F0.9080405@ti.com>
- <20141120144028.GB5809@localhost.localdomain>
- <546F2BA4.4000808@ti.com>
- <20141121131036.GA18931@localhost.localdomain>
- <5472F30A.1000608@linutronix.de>
-Message-ID: <20141124100149.GA5124@localhost.localdomain>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 24 Nov 2014 18:05:15 +0800
+Subject: [PATCH] clk: sunxi: Remove ahb1_sdram from sun6i/sun8i protected
+ clocks list
+Message-ID: <1416823515-9207-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 09:57:46AM +0100, Sebastian Andrzej Siewior wrote:
-> On 11/21/2014 02:10 PM, Richard Cochran wrote:
-> 
-> > On the BB white using the LCD4 cape and the shipped debian kernel, the
-> > cursor *does* jump away, but not as often or as far as on the custom
-> > design I was working with.
-> 
-> This sounds like the ADC is still sampling while the input data becomes
-> invalid. Usually there is a resistor on the wiper line and the
-> touchscreen manual says how much it should be at least. Could you
-> please check if this is properly installed?
+The ahb1_sdram clock gate is only used for accessing the sdram
+controller's registers over the bus. It is not used for actually clock
+the controller or the dram, hence it does not need to be protected.
 
-Wiper line? This is a four wire device.
+This also gets rid of the problem when the protected ahb1_sdram gate
+is prepared/enabled while it is still an orphan, and the operation
+is not propagated to the correct parent.
 
-Thanks,
-Richard
+This was confirmed on my A23 tablet and my A31 Hummingbird.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/clk/sunxi/clk-sunxi.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 337593c..8a38070 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -1425,7 +1425,6 @@ CLK_OF_DECLARE(sun7i_a20_clk_init, "allwinner,sun7i-a20", sun5i_init_clocks);
+ 
+ static const char *sun6i_critical_clocks[] __initdata = {
+ 	"cpu",
+-	"ahb1_sdram",
+ };
+ 
+ static void __init sun6i_init_clocks(struct device_node *node)
+-- 
+2.1.3
