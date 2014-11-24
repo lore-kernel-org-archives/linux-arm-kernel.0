@@ -1,91 +1,94 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 24 Nov 2014 08:14:35 -0800
-Subject: [PATCH] opp: convert dev_warn() to dev_dbg() for duplicate OPPs
-In-Reply-To: <42965945.ST26GKfzPz@vostro.rjw.lan>
-References: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
- <5171628.FRGslOuEb6@vostro.rjw.lan>
- <CAKohpomz_UiRErSsDPLWcmU4e7ocXZZu7bwCF8TvoSJupikd7A@mail.gmail.com>
- <42965945.ST26GKfzPz@vostro.rjw.lan>
-Message-ID: <20141124161435.GE5050@linux.vnet.ibm.com>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Mon, 24 Nov 2014 11:32:46 -0500
+Subject: [RFC PATCH v2 3/4] arm64:thunder: Add initial dts for Cavium's
+ Thunder SoC in 2 Node topology.
+In-Reply-To: <4080571.JcHDsAZ9EV@wuerfel>
+References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <1416605010-10442-4-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <4080571.JcHDsAZ9EV@wuerfel>
+Message-ID: <CAFECyb8aObzJeiL4uB+N6D83GKqJ5tgYGJJJQXRQiEqMegg3Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 04:09:54PM +0100, Rafael J. Wysocki wrote:
-> On Monday, November 24, 2014 04:10:00 PM Viresh Kumar wrote:
-> > On 21 November 2014 at 21:28, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > > What about @dynamic instead of @from_dt?  That may apply to more use cases if
-> > > need be.
-> > 
-> > @Paul: I am stuck at a point and need help on RCUs :)
-> > 
-> > File: drivers/base/power/opp.c
-> > 
-> > We are trying to remove OPPs created from static data present in DT on
-> > cpufreq driver's removal (when configured as module).
-> > 
-> > opp core uses RCUs internally and it looks like I need to implement:
-> > list_for_each_entry_safe_rcu()
-> > 
-> > But, I am not sure because of these:
-> > http://linux.derkeiler.com/Mailing-Lists/Kernel/2005-10/6280.html
-> > http://patchwork.ozlabs.org/patch/48989/
-> > 
-> > So, wanted to ask you if I really need that or the OPP code is
-> > buggy somewhere.
-> > 
-> > The code removing OPPs is:
-> > 
-> >         list_for_each_entry_rcu(opp, &dev_opp->opp_list, node) {
-> >                 srcu_notifier_call_chain(&dev_opp->head, OPP_EVENT_REMOVE, opp);
-> >                 list_del_rcu(&opp->node);
-> > 
-> >                 kfree(opp);
+On Mon, Nov 24, 2014 at 6:59 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 22 November 2014 02:53:29 Ganapatrao Kulkarni wrote:
+>> +/ {
+>> +     model = "Cavium ThunderX CN88XX board";
+>> +     compatible = "cavium,thunder-88xx";
+>
+> No wildcards in compatible strings or model names please. List the
+> exact chip that you are using.
+>
+>> +     aliases {
+>> +             serial0 = &uaa0;
+>> +             serial1 = &uaa1;
+>> +     };
+>> +
+>> +     memory at 00c00000 {
+>> +             device_type = "memory";
+>> +             reg = <0x0 0x00000000 0x0 0x80000000>;
+>> +     };
+>> +
+>> +     memory at 10000000000 {
+>> +             device_type = "memory";
+>> +             reg = <0x100 0x00000000 0x0 0x80000000>;
+>> +     };
+>> +
+>> +     numa-map {
+>> +             #address-cells = <2>;
+>> +             #size-cells = <1>;
+>> +             #node-count = <2>;
+>> +             mem-map = <0x0 0x00000000 0>,
+>> +                        <0x100 0x00000000 1>;
+>> +
+>> +               cpu-map = <0 47 0>,
+>> +                     <48 95 1>;
+>> +
+>> +             node-matrix=    <0 0 10>,
+>> +                             <0 1 20>,
+>> +                             <1 0 20>,
+>> +                             <1 1 10>;
+>
+> I don't know how much history is behind this binding. Have you looked
+> at the sPAPR way of doing this? I don't remember exactly how that is
+> done, but we'd need a good reason to discard that and implement
+> something else for arm64.
+>
+> If we create a new binding, I don't think the 'numa-map' node you
+> have here is the best solution. We already have device nodes for each
+> memory segment and each CPU in the system. Why not work with those
+> nodes directly?
 
-As Rafael says, if opp is reachable by RCU readers, you cannot just
-immediately kfree() it.  Immediately kfree()ing it like this -will-
-cause your RCU readers to see freed memory, which, as you noted, can
-cause crashes.
+The DT memory nodes don't exist in an EFI system, as the EFI memory
+map is used instead.
+Using EFI as the boot firmware doesn't require the use of ACPI for
+hardware description,
+so the EFI/DT case is one that we should support.
 
-> >         }
-> > 
-> > Because we are freeing opp at the end, list_for_each_entry_rcu()
-> > is trying to read the already freed opp to find opp->node.next
-> > and that results in a crash.
-> > 
-> > What am I doing wrong ?
-> 
-> I hope that doesn't happen under rcu_read_lock()?
-> 
-> The modification needs to be done under dev_opp_list_lock in the first place
-> in which case you don't need the _rcu version of list walking, so you simply
-> can use list_for_each_entry_safe() here. The mutex is sufficient for the
-> synchronization with other writers (if any).  The freeing, though, has to be
-> deferred until all readers drop their references to the old entry.  You can
-> use kfree_rcu() for that.
-
-Except that srcu_notifier_call_chain() involves SRCU readers.  So,
-unless I am confused, you instead need something like this:
-
-static void kfree_opp_rcu(struct rcu_head *rhp)
-{
-	struct device_opp *opp = container_of(rhp, struct device_opp, opp_list);
-
-	kfree(opp);
-}
-
-Then replace the above kfree() by:
-
-	call_srcu(&opp->rcu, kfree_opp_rcu);
-
-This will require adding the following to struct device_opp:
-
-	struct rcu_head rcu;
-
-And yes, this would be simpler if there was a kfree_srcu().  If a few
-more uses like this show up, I will create one.
-
-All that said, I do not claim to understand the OPP code, so please take
-the above suggested changes with a grain of salt.  And if you let me know
-where I am confused, I should be able to offer better suggestions.
-
-							Thanx, Paul
+>> +
+>> +     timer {
+>> +             compatible = "arm,armv8-timer";
+>> +             interrupts = <1 13 0xff01>,
+>> +                          <1 14 0xff01>,
+>> +                          <1 11 0xff01>,
+>> +                          <1 10 0xff01>;
+>> +     };
+>> +
+>> +     soc {
+>> +             compatible = "simple-bus";
+>> +             #address-cells = <2>;
+>> +             #size-cells = <2>;
+>> +             ranges;
+>> +
+>> +             refclk50mhz: refclk50mhz {
+>> +                     compatible = "fixed-clock";
+>> +                     #clock-cells = <0>;
+>> +                     clock-frequency = <50000000>;
+>> +                     clock-output-names = "refclk50mhz";
+>> +             };
+>
+> Why is the timer outside of the soc and the refclk is inside?
+> I would have expected the opposite.
+>
+>         Arnd
+>
