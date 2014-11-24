@@ -1,66 +1,91 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Mon, 24 Nov 2014 22:41:39 +0100
-Subject: serial: of-serial: fetch line number from DT
-In-Reply-To: <CAOesGMhe8orqL6wSiouQvdM8y4N44p12n7M1opraSkAP=3ZB+A@mail.gmail.com>
-References: <CAOesGMjzs=dThDv6S8Xvo+ym-XECaQhTQ8NV6t46fQZ1LoJnHw@mail.gmail.com>
- <20141111052407.GB24727@kroah.com>
- <CAOesGMhe8orqL6wSiouQvdM8y4N44p12n7M1opraSkAP=3ZB+A@mail.gmail.com>
-Message-ID: <1416865299.2180.1.camel@lynxeye.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Nov 2014 22:44:50 +0100
+Subject: [PATCH resend 2/4] ARM: dts: sunxi: unify APB1 clock
+In-Reply-To: <7ha93gmwab.fsf@deeprootsystems.com>
+References: <1415245232-20585-1-git-send-email-wens@csie.org>
+ <20141121142903.GD4752@lukather> <4114168.zuylrCsruj@wuerfel>
+ <2400552.aBVIZmJhTh@wuerfel> <20141122073515.GJ4752@lukather>
+ <7ha93gmwab.fsf@deeprootsystems.com>
+Message-ID: <20141124214450.GR4752@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hi Kevin,
 
-Am Dienstag, den 11.11.2014, 08:51 -0800 schrieb Olof Johansson:
-> On Mon, Nov 10, 2014 at 9:24 PM, Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org> wrote:
-> > On Mon, Nov 10, 2014 at 01:34:19PM -0800, Olof Johansson wrote:
-> >> Greg,
-> >>
-> >> This commit:
-> >>
-> >> commit 1bd8324535ec1ff44aef55c0e40b9e7d56b310fb
-> >> Author: Lucas Stach <dev@lynxeye.de>
-> >> Date:   Mon Nov 3 23:16:54 2014 +0100
-> >>
-> >>     serial: of-serial: fetch line number from DT
-> >>
-> >>     The general agreed way to specify a fixed line number
-> >>     for a serial console is to provide a "serial" alias
-> >>     in the devicetree. Start parsing this property in
-> >>     of_serial.
-> >>
-> >>     Signed-off-by: Lucas Stach <dev@lynxeye.de>
-> >>     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> >>
-> >>
-> >> Broke a whole lot of tegra boards in last night's -next here. In
-> >> particular, I've been looking at tegra20-seaboard, which now doesn't
-> >> boot with console any more.
-> >>
-> >> http://arm-soc.lixom.net/bootlogs/next/next-20141110/
-> >>
-> >> Unfortunately, tegra has for a long time been specifying the aliases
-> >> as a fixed 1:1 mapping, but most environments rely on ttyS0 being the
-> >> first _activated_ serial port. That's obviously going to break things
-> >> here. :(
-> >>
-> >> Greg, can you please revert until we get the tegra-side fixes in for
-> >> this, or we're in for a pretty lousy time w.r.t. bisecting problems
-> >> across the two mergepoints?
-> >>
-> >> Stephen: I suppose the best way to handle this on tegra is to specify
-> >> the aliases per-board instead of in the soc dtsi today.
-> >>
-> >> Apologies for not replying to the patch directly -- it was only ever
-> >> posted to linux-serial and I don't seem to be subscribed.
+On Mon, Nov 24, 2014 at 07:51:40AM -0800, Kevin Hilman wrote:
+> Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+> 
+> > Arnd,
 > >
-> > Now reverted, sorry for the problems.
+> > On Fri, Nov 21, 2014 at 05:08:08PM +0100, Arnd Bergmann wrote:
+> >> On Friday 21 November 2014 15:35:57 Arnd Bergmann wrote:
+> >> > On Friday 21 November 2014 15:29:03 Maxime Ripard wrote:
+> >> > > On Fri, Nov 21, 2014 at 12:57:02PM +0100, Arnd Bergmann wrote:
+> >> > > > On Thursday 20 November 2014 14:04:01 Kevin Hilman wrote:
+> >> > > > > Chen-Yu Tsai <wens@csie.org> writes:
+> >> > > > > 
+> >> > > > > > From: Emilio L?pez <emilio@elopez.com.ar>
+> >> > > > > >
+> >> > > > > > With the new factors infrastructure in place, we can unify apb1 and
+> >> > > > > > apb1_mux as a single clock now.
+> >> > > > > >
+> >> > > > > > Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> >> > > > > > [wens at csie.org: Change apb1 node label to "apb1"; reword commit title]
+> >> > > > > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> > > > > 
+> >> > > > > Boot breakage in arm-soc/for-next on sun4i-a10-cubieboard and
+> >> > > > > sun7i-a20-cubieboard2[1] was bisected down to this patch[1].
+> >> > > > > 
+> >> > > > > Reverting $SUBJECT on top of arm-soc gets things booting again.
+> >> > > > > 
+> >> > > > 
+> >> > > > As this looks like it was intended as a cleanup without functional
+> >> > > > changes, I would go ahead and revert it in next/dt.
+> >> > > > 
+> >> > > > Any objections?
+> >> > > 
+> >> > > Yeah, you'd break linux-next as well doing so, as the clock driver now
+> >> > > requires this from the DT.
+> >> > > 
+> >> > > I can merge it through the clock tree though if you prefer it that
+> >> > > way.
+> >> > 
+> >> > Do you know why this commit breaks booting then?
+> >> > 
+> >> 
+> >> I have now reverted the entire branch, to get things working again.
+> >> 
+> >> Please send a new pull request once you have a version that you 
+> >> have actually tested.
+> >
+> > This was tested and working. And again, the linux-next proves it.
+> >
+> > I know very well why it doesn't work, and it's actually expected: some
+> > clock was refactored, the DT needed to be changed, only half of it was
+> > merged through arm-soc.
+> >
+> > It really is just because one part got through arm-soc, the other
+> > through the clock tree, nothing more.
 > 
-> No worries, it's what linux-next is for. Thanks for the revert!
-> 
-As 3.18-rc6 now landed the fix to avoid the regression on Tegra would
-you please consider reapplying this patch?
+> Which branch (already in linux-next) would be needed in arm-soc/for-next
+> to resolve the dependency?
 
-Regards,
-Lucas
+It used to be part of the sunxi/for-next branch I maintain, but the
+part that would solve it has not been picked up by Mike.
+
+You can drop this pull request anyway, I just sent a new one dropping
+this patch, which will go through the clock tree.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/a7687bdb/attachment-0001.sig>
