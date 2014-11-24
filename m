@@ -1,55 +1,261 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 24 Nov 2014 18:48:52 +0100
-Subject: [PATCH] ARM: PJ4: allow building in Thumb-2 mode
-In-Reply-To: <54736CB9.1090307@free-electrons.com>
-References: <1416830200-11114-1-git-send-email-ard.biesheuvel@linaro.org>
- <2078609.NLHB18YoOo@wuerfel>
- <CAKv+Gu_YuHbO7+jusczcJTHF8fM4pF1z2h55BZK0mrHK702z_A@mail.gmail.com>
- <4653047.WBmUTsHC57@wuerfel> <54736CB9.1090307@free-electrons.com>
-Message-ID: <CAKv+Gu8tgySFMwWixX6Z84nq-Wci=DWdGhvxpmBHQ8fgQr-jmw@mail.gmail.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Mon, 24 Nov 2014 13:52:45 -0400
+Subject: [PATCH] thermal: exynos: add optional sclk support
+In-Reply-To: <CAM4voakNTe5x1Mur0J9PNbxW0XCMiXm_hfpPgHF0bKwnMbYNAw@mail.gmail.com>
+References: <1416642356-8694-1-git-send-email-a.kesavan@samsung.com>
+ <CAGTfZH1T-pRmETfQUs1Scy1TLfA_DG9fEZGY83my7WVwtujqRQ@mail.gmail.com>
+ <CAM4voa=XUrkvH7EDk+j_FPX6pB3gLCHsAjDUMQacZ4AWyNEaNQ@mail.gmail.com>
+ <20141124114845.0a03eeb4@amdc2363>
+ <CAM4voakNTe5x1Mur0J9PNbxW0XCMiXm_hfpPgHF0bKwnMbYNAw@mail.gmail.com>
+Message-ID: <20141124175242.GA1351@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 November 2014 at 18:36, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Arnd,
->
-> On 24/11/2014 18:17, Arnd Bergmann wrote:
->> On Monday 24 November 2014 16:34:47 Ard Biesheuvel wrote:
->>> On 24 November 2014 at 16:29, Arnd Bergmann <arnd@arndb.de> wrote:
->>>> On Monday 24 November 2014 12:56:40 Ard Biesheuvel wrote:
->>>>> Two files that get included when building the multi_v7_defconfig target
->>>>> fail to build when selecting THUMB2_KERNEL for this configuration.
->>>>>
->>>>> In both cases, we can just build the file as ARM code, as none of its
->>>>> symbols are exported to modules, so there are no interworking concerns.
->>>>> In the iwmmxt.S case, add ENDPROC() declarations so the symbols are
->>>>> annotated as functions, resulting in the linker to emit the appropriate
->>>>> mode switches.
->>>>>
->>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>
->>>> Ah, very nice. I tried this before, but my version didn't actually
->>>> work, presumably because I didn't know about the ENDPROC() stuff.
->>>>
->>>> Have you tested this on a machine that has IWMMXT enabled?
->>>>
->>>
->>> No, I don't have access to such a machine, unfortunately.
->>
->> Adding a few mvebu folks to Cc, maybe one of them can test your patch.
->
-> Actually even it is a feature of the PJ4 machine non of the mvebu machines
-> currently use it. I only see this configuration enabled for the pxa family.
-> So I think you would have more feedback with the pxa maintainers/owners.
->
+Hello Folks,
 
-Are you saying PJ4 should be dropped from 'default' here?
+On Mon, Nov 24, 2014 at 09:40:38PM +0530, Abhilash Kesavan wrote:
+> Hi Lukasz,
+> 
+> On Mon, Nov 24, 2014 at 4:18 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> > Hi Abhilash,
+> >
+> >> Hi Chanwoo,
+> >>
+> >> On Sun, Nov 23, 2014 at 10:21 AM, Chanwoo Choi <cwchoi00@gmail.com>
+> >> wrote:
+> >> > Hi Abhilash,
+> >> >
+> >> > On Sat, Nov 22, 2014 at 4:45 PM, Abhilash Kesavan
+> >> > <a.kesavan@samsung.com> wrote:
+> >> >> Exynos7 has a special clock required for the functional operation
+> >> >> of the TMU that is not present in earlier SoCs. Add support for
+> >> >> this optional clock and update the binding documentation.
+> >> >>
+> >> >
+> >> > Latest Exynos SoC needs the special clocks. It is different part
+> >> > from previous Exynos SoC.
+> >> > Exynos3250 must need the special clock for ADC IP like this patch.
+> >> > So, I sent the smiliar patch[1] to support SCLK as following and
+> >> > merged it.
+> >> >
+> >> > [1] https://lkml.org/lkml/2014/7/21/734
+> >>
+> >> Thanks for the link.
+> >>
+> >> >
+> >> > So, I suggest you that Exynos would use the similar method to
+> >> > support special clock
+> >> > on all of IPs for Exynos SoC.
+> >> >
+> >> >> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> >> >> ---
+> >> >> This patch was earlier part of the series adding TMU support for
+> >> >> Exynos7 [1]. It has been split out as it does not impact the
+> >> >> on-going consolidation in the exynos tmu driver and can be
+> >> >> considered independently.
+> >> >>
+> >> >>  .../devicetree/bindings/thermal/exynos-thermal.txt |    3 +++
+> >> >>  drivers/thermal/samsung/exynos_tmu.c               |   27
+> >> >> ++++++++++++++++---- 2 files changed, 25 insertions(+), 5
+> >> >> deletions(-)
+> >> >>
+> >> >> diff --git
+> >> >> a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+> >> >> b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+> >> >> index ae738f5..2393eac 100644 ---
+> >> >> a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt +++
+> >> >> b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt @@
+> >> >> -32,10 +32,13 @@
+> >> >>  - clocks : The main clocks for TMU device
+> >> >>         -- 1. operational clock for TMU channel
+> >> >>         -- 2. optional clock to access the shared registers of TMU
+> >> >> channel
+> >> >> +       -- 3. optional special clock for functional operation
+> >> >>  - clock-names : Thermal system clock name
+> >> >>         -- "tmu_apbif" operational clock for current TMU channel
+> >> >>         -- "tmu_triminfo_apbif" clock to access the shared
+> >> >> triminfo register for current TMU channel
+> >> >> +       -- "tmu_sclk" clock for functional operation of the
+> >> >> current TMU
+> >> >> +               channel
+> >> >>  - vtmu-supply: This entry is optional and provides the regulator
+> >> >> node supplying voltage to TMU. If needed this entry can be placed
+> >> >> inside board/platform specific dts file.
+> >> >> diff --git a/drivers/thermal/samsung/exynos_tmu.c
+> >> >> b/drivers/thermal/samsung/exynos_tmu.c index d44d91d..6627937
+> >> >> 100644 --- a/drivers/thermal/samsung/exynos_tmu.c
+> >> >> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> >> >> @@ -128,6 +128,7 @@
+> >> >>   * @lock: lock to implement synchronization.
+> >> >>   * @clk: pointer to the clock structure.
+> >> >>   * @clk_sec: pointer to the clock structure for accessing the
+> >> >> base_second.
+> >> >> + * @sclk: pointer to the clock structure for accessing the tmu
+> >> >> special clk.
+> >> >>   * @temp_error1: fused value of the first point trim.
+> >> >>   * @temp_error2: fused value of the second point trim.
+> >> >>   * @regulator: pointer to the TMU regulator structure.
+> >> >> @@ -147,7 +148,7 @@ struct exynos_tmu_data {
+> >> >>         enum soc_type soc;
+> >> >>         struct work_struct irq_work;
+> >> >>         struct mutex lock;
+> >> >> -       struct clk *clk, *clk_sec;
+> >> >> +       struct clk *clk, *clk_sec, *sclk;
+> >> >>         u8 temp_error1, temp_error2;
+> >> >>         struct regulator *regulator;
+> >> >>         struct thermal_sensor_conf *reg_conf;
+> >> >> @@ -883,10 +884,21 @@ static int exynos_tmu_probe(struct
+> >> >> platform_device *pdev) goto err_clk_sec;
+> >> >>         }
+> >> >>
+> >> >> +       data->sclk = devm_clk_get(&pdev->dev, "tmu_sclk");
+> >> >> +       if (IS_ERR(data->sclk)) {
+> >> >> +               dev_err(&pdev->dev, "Failed to get optional
+> >> >> special clock\n");
+> >> >
+> >> > Exynos4, Exynos3250 etc may show error message always. I think It
+> >> > is not proper. I recommend that you use additional 'needs_sclk'
+> >> > field. If 'needs_sclk' is true, tmu driver will get the special
+> >> > clock of tmu without error message.
+> >>
+> >> OK,  I'll add a per-soc field to check for sclk availability.
+> >
+> > I think that it would be enough to change dev_err() -> dev_dbg().
+> 
+> Lukasz, thanks for the review.
+> 
+> Chanwoo, are you OK with this ? If so, I will post a v2 with this and
+> the other changes you suggested.
 
-config IWMMXT
-        bool "Enable iWMMXt support"
-        depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4 || CPU_PJ4B
-        default y if PXA27x || PXA3xx || ARCH_MMP || CPU_PJ4 || CPU_PJ4B
+Is this a mandatory or a optional clk? What happens if the chip has the
+clock, but you fail to get it in this code?
 
--- 
-Ard.
+Think the rule of thumb is to at least warn the user that you are
+bailing to the defaults, because you failed to get the clock, when you
+were supposed to.
+
+Besides, warning / logging (even if it is in debugging mode) the user
+that you failed to get a clock, when the board / platform does not
+support it, sounds at least bogus for them.
+
+
+my two cents,
+
+> 
+> Abhilash
+> >
+> >>
+> >> >
+> >> > Also, How about just 'sclk' instead of 'tmu_sclk'?
+> >> > I discussed the name of 'sclk' with Arnd Bergmann on following
+> >> > patch[2]
+> >>
+> >> Sure, I'll use 'sclk' instead of 'tmu_sclk'.
+> >>
+> >> >
+> >> > [2]
+> >> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/273557.html
+> >> >
+> >> >> +       } else {
+> >> >> +               ret = clk_prepare_enable(data->sclk);
+> >> >> +               if (ret) {
+> >> >> +                       dev_err(&pdev->dev, "Failed to enable
+> >> >> special clock\n");
+> >> >> +                       goto err_clk;
+> >> >> +               }
+> >> >> +       }
+> >> >> +
+> >> >>         ret = exynos_tmu_initialize(pdev);
+> >> >>         if (ret) {
+> >> >>                 dev_err(&pdev->dev, "Failed to initialize TMU\n");
+> >> >> -               goto err_clk;
+> >> >> +               goto err_sclk;
+> >> >>         }
+> >> >>
+> >> >>         exynos_tmu_control(pdev, true);
+> >> >> @@ -896,7 +908,7 @@ static int exynos_tmu_probe(struct
+> >> >> platform_device *pdev) sizeof(struct thermal_sensor_conf),
+> >> >> GFP_KERNEL); if (!sensor_conf) {
+> >> >>                 ret = -ENOMEM;
+> >> >> -               goto err_clk;
+> >> >> +               goto err_sclk;
+> >> >>         }
+> >> >>         sprintf(sensor_conf->name, "therm_zone%d", data->id);
+> >> >>         sensor_conf->read_temperature = (int (*)(void
+> >> >> *))exynos_tmu_read; @@ -928,7 +940,7 @@ static int
+> >> >> exynos_tmu_probe(struct platform_device *pdev) ret =
+> >> >> exynos_register_thermal(sensor_conf); if (ret) {
+> >> >>                 dev_err(&pdev->dev, "Failed to register thermal
+> >> >> interface\n");
+> >> >> -               goto err_clk;
+> >> >> +               goto err_sclk;
+> >> >>         }
+> >> >>         data->reg_conf = sensor_conf;
+> >> >>
+> >> >> @@ -936,10 +948,13 @@ static int exynos_tmu_probe(struct
+> >> >> platform_device *pdev) IRQF_TRIGGER_RISING | IRQF_SHARED,
+> >> >> dev_name(&pdev->dev), data); if (ret) {
+> >> >>                 dev_err(&pdev->dev, "Failed to request irq: %d\n",
+> >> >> data->irq);
+> >> >> -               goto err_clk;
+> >> >> +               goto err_sclk;
+> >> >>         }
+> >> >>
+> >> >>         return 0;
+> >> >> +err_sclk:
+> >> >> +       if (!IS_ERR(data->sclk))
+> >> >> +               clk_disable_unprepare(data->sclk);
+> >> >
+> >> > I think IS_ERROR don't be necessary because
+> >> > clk_disalbe_unprepare check the NULL pointer of clock pointer.
+> >> >
+> >> >>  err_clk:
+> >> >>         clk_unprepare(data->clk);
+> >> >>  err_clk_sec:
+> >> >> @@ -956,6 +971,8 @@ static int exynos_tmu_remove(struct
+> >> >> platform_device *pdev)
+> >> >>
+> >> >>         exynos_tmu_control(pdev, false);
+> >> >>
+> >> >> +       if (!IS_ERR(data->sclk))
+> >> >> +               clk_disable_unprepare(data->sclk);
+> >> >
+> >> > ditto.
+> >>
+> >> Will fix.
+> >>
+> >> Thanks for the review.
+> >>
+> >> Regards,
+> >> Abhilash
+> >> >
+> >> > Best Regards,
+> >> > Chanwoo Choi
+> >> >
+> >> >>         clk_unprepare(data->clk);
+> >> >>         if (!IS_ERR(data->clk_sec))
+> >> >>                 clk_unprepare(data->clk_sec);
+> >> >> --
+> >> >> 1.7.9.5
+> >> >>
+> >> >>
+> >> >> _______________________________________________
+> >> >> linux-arm-kernel mailing list
+> >> >> linux-arm-kernel at lists.infradead.org
+> >> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> >
+> >
+> > --
+> > Best regards,
+> >
+> > Lukasz Majewski
+> >
+> > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/14448735/attachment.sig>
