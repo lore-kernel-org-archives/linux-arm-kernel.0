@@ -1,38 +1,102 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Nov 2014 18:01:58 +0100
-Subject: [RFC PATCH v2 3/4] arm64:thunder: Add initial dts for Cavium's
- Thunder SoC in 2 Node topology.
-In-Reply-To: <CAFECyb8aObzJeiL4uB+N6D83GKqJ5tgYGJJJQXRQiEqMegg3Ng@mail.gmail.com>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <4080571.JcHDsAZ9EV@wuerfel>
- <CAFECyb8aObzJeiL4uB+N6D83GKqJ5tgYGJJJQXRQiEqMegg3Ng@mail.gmail.com>
-Message-ID: <2750247.HT2ynjYizJ@wuerfel>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Mon, 24 Nov 2014 17:05:02 +0000
+Subject: [PATCH v9 05/10] sched: make scale_rt invariant with frequency
+In-Reply-To: <CAKfTPtAo3PzZ=-KtH-YS2nf9R9srMGAUJ2A2qkHrsPZmj18-Jw@mail.gmail.com>
+References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
+ <1415033687-23294-6-git-send-email-vincent.guittot@linaro.org>
+ <20141121123559.GF23177@e105550-lin.cambridge.arm.com>
+ <CAKfTPtAo3PzZ=-KtH-YS2nf9R9srMGAUJ2A2qkHrsPZmj18-Jw@mail.gmail.com>
+Message-ID: <20141124170502.GK23177@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 November 2014 11:32:46 Roy Franz wrote:
-> >
-> > I don't know how much history is behind this binding. Have you looked
-> > at the sPAPR way of doing this? I don't remember exactly how that is
-> > done, but we'd need a good reason to discard that and implement
-> > something else for arm64.
-> >
-> > If we create a new binding, I don't think the 'numa-map' node you
-> > have here is the best solution. We already have device nodes for each
-> > memory segment and each CPU in the system. Why not work with those
-> > nodes directly?
+On Mon, Nov 24, 2014 at 02:24:00PM +0000, Vincent Guittot wrote:
+> On 21 November 2014 at 13:35, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+> > On Mon, Nov 03, 2014 at 04:54:42PM +0000, Vincent Guittot wrote:
 > 
-> The DT memory nodes don't exist in an EFI system, as the EFI memory
-> map is used instead.
-> Using EFI as the boot firmware doesn't require the use of ACPI for
-> hardware description,
-> so the EFI/DT case is one that we should support.
+> [snip]
+> 
+> >> The average running time of RT tasks is used to estimate the remaining compute
+> >> @@ -5801,19 +5801,12 @@ static unsigned long scale_rt_capacity(int cpu)
+> >>
+> >>       total = sched_avg_period() + delta;
+> >>
+> >> -     if (unlikely(total < avg)) {
+> >> -             /* Ensures that capacity won't end up being negative */
+> >> -             available = 0;
+> >> -     } else {
+> >> -             available = total - avg;
+> >> -     }
+> >> +     used = div_u64(avg, total);
+> >
+> > I haven't looked through all the details of the rt avg tracking, but if
+> > 'used' is in the range [0..SCHED_CAPACITY_SCALE], I believe it should
+> > work. Is it guaranteed that total > 0 so we don't get division by zero?
+> 
+> static inline u64 sched_avg_period(void)
+> {
+> return (u64)sysctl_sched_time_avg * NSEC_PER_MSEC / 2;
+> }
+>
 
-But they /could/ exist, right? Can we just require them to be
-present in order to use NUMA features?
+I see.
 
-I don't think it's a good idea to require a new representation
-of the memory nodes in DT to make NUMA work when we already have
-one that is almost always there.
+> >
+> > It does get a slightly more complicated if we want to figure out the
+> > available capacity at the current frequency (current < max) later. Say,
+> > rt eats 25% of the compute capacity, but the current frequency is only
+> > 50%. In that case get:
+> >
+> > curr_avail_capacity = (arch_scale_cpu_capacity() *
+> >   (arch_scale_freq_capacity() - (SCHED_SCALE_CAPACITY - scale_rt_capacity())))
+> >   >> SCHED_CAPACITY_SHIFT
+> 
+> You don't have to be so complicated but simply need to do:
+> curr_avail_capacity for CFS = (capacity_of(CPU) *
+> arch_scale_freq_capacity())  >> SCHED_CAPACITY_SHIFT
+> 
+> capacity_of(CPU) = 600 is the max available capacity for CFS tasks
+> once we have removed the 25% of capacity that is used by RT tasks
+> arch_scale_freq_capacity = 512 because we currently run at 50% of max freq
+> 
+> so curr_avail_capacity for CFS = 300
 
-	Arnd
+I don't think that is correct. It is at least not what I had in mind.
+
+capacity_orig_of(cpu) = 800, we run at 50% frequency which means:
+
+curr_capacity = capacity_orig_of(cpu) * arch_scale_freq_capacity()
+                  >> SCHED_CAPACITY_SHIFT
+              = 400
+
+So the total capacity at the current frequency (50%) is 400, without
+considering RT. scale_rt_capacity() is frequency invariant, so it takes
+away capacity_orig_of(cpu) - capacity_of(cpu) = 200 worth of capacity
+for RT.  We need to subtract that from the current capacity to get the
+available capacity at the current frequency.
+
+curr_available_capacity = curr_capacity - (capacity_orig_of(cpu) -
+capacity_of(cpu)) = 200
+
+In other words, 800 is the max capacity, we are currently running at 50%
+frequency, which gives us 400. RT takes away 25% of 800
+(frequency-invariant) from the 400, which leaves us with 200 left for
+CFS tasks at the current frequency.
+
+In your calculations you subtract the RT load before computing the
+current capacity using arch_scale_freq_capacity(), where I think it
+should be done after. You find the amount spare capacity you would have
+at the maximum frequency when RT has been subtracted and then scale the
+result by frequency which means indirectly scaling the RT load
+contribution again (the rt avg has already been scaled). So instead of
+taking away 200 of the 400 (current capacity @ 50% frequency), it only
+takes away 100 which isn't right.
+
+scale_rt_capacity() is frequency-invariant, so if the RT load is 50% and
+the frequency is 50%, there are no spare cycles left.
+curr_avail_capacity should be 0. But using your expression above you
+would get capacity_of(cpu) = 400 after removing RT,
+arch_scale_freq_capacity = 512 and you get 200. I don't think that is
+right.
+
+Morten
