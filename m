@@ -1,79 +1,42 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 24 Nov 2014 09:20:07 -0800
-Subject: [PATCH V5 05/12] mailbox: Add NVIDIA Tegra XUSB mailbox driver
-In-Reply-To: <CAJe_ZhdTvZZqERttAM_o6U6MZCOjk=oXpWFPf8W=DdW1j=Nx=g@mail.gmail.com>
-References: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
- <1416264102-1323-6-git-send-email-abrestic@chromium.org>
- <CAJe_ZhdTvZZqERttAM_o6U6MZCOjk=oXpWFPf8W=DdW1j=Nx=g@mail.gmail.com>
-Message-ID: <CAL1qeaFpYC8C5M_eJ8N8bjDvXVu0KBuxgTcrt12az374TnZ8rw@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 24 Nov 2014 18:27:54 +0100
+Subject: [PATCH v2] Add support for SCCB devices into PXA27x I2C controller
+In-Reply-To: <54725DE2.9090800@tul.cz>
+References: <54711397.9060601@tul.cz> <20141123083112.GA1932@katana>
+ <54725DE2.9090800@tul.cz>
+Message-ID: <20141124172753.GA25434@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 12:34 AM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
-> On 18 November 2014 at 04:11, Andrew Bresticker <abrestic@chromium.org> wrote:
->
->> +
->> +static int tegra_xusb_mbox_send_data(struct mbox_chan *chan, void *data)
->> +{
->> +       struct tegra_xusb_mbox *mbox = to_tegra_mbox(chan->mbox);
->> +       struct tegra_xusb_mbox_msg *msg = data;
->> +       unsigned long flags;
->> +       u32 reg, owner;
->> +
->> +       dev_dbg(mbox->mbox.dev, "TX message %#x:%#x\n", msg->cmd, msg->data);
->> +
->> +       /* ACK/NAK must be sent with the controller as the mailbox owner */
->> +       if (msg->cmd == MBOX_CMD_ACK || msg->cmd == MBOX_CMD_NAK)
->> +               owner = MBOX_OWNER_FW;
->> +       else
->> +               owner = MBOX_OWNER_SW;
->> +
->> +       spin_lock_irqsave(&mbox->lock, flags);
->> +
->> +       /* Acquire mailbox */
->> +       if (mbox_readl(mbox, XUSB_CFG_ARU_MBOX_OWNER) != MBOX_OWNER_NONE) {
->> +               dev_err(mbox->mbox.dev, "Mailbox not idle\n");
->> +               goto busy;
->> +       }
->> +       mbox_writel(mbox, owner, XUSB_CFG_ARU_MBOX_OWNER);
->> +       if (mbox_readl(mbox, XUSB_CFG_ARU_MBOX_OWNER) != owner) {
->> +               dev_err(mbox->mbox.dev, "Failed to acquire mailbox");
->> +               goto busy;
->> +       }
->> +
->> +       mbox_writel(mbox, mbox_pack_msg(msg), XUSB_CFG_ARU_MBOX_DATA_IN);
->> +       reg = mbox_readl(mbox, XUSB_CFG_ARU_MBOX_CMD);
->> +       reg |= MBOX_INT_EN | MBOX_DEST_FALC;
->> +       mbox_writel(mbox, reg, XUSB_CFG_ARU_MBOX_CMD);
->> +
->> +       spin_unlock_irqrestore(&mbox->lock, flags);
->> +
->> +       return 0;
->> +busy:
->> +       spin_unlock_irqrestore(&mbox->lock, flags);
->> +       return -EBUSY;
->> +}
->> +
->> +static int tegra_xusb_mbox_startup(struct mbox_chan *chan)
->> +{
->> +       return 0;
->> +}
->> +
->> +static void tegra_xusb_mbox_shutdown(struct mbox_chan *chan)
->> +{
->> +}
->> +
->> +static bool tegra_xusb_mbox_last_tx_done(struct mbox_chan *chan)
->> +{
->> +       /*
->> +        * Transmissions are assumed to be completed as soon as they are
->> +        * written to the mailbox.
->> +        */
->> +       return true;
->>
-> In .send_data() you you mark the channel busy by setting the
-> XUSB_CFG_ARU_MBOX_OWNER to !MBOX_OWNER_NONE, which remains so until
-> you get an IRQ. So maybe you should check for the OWNER_NONE flag in
-> .last_tx_done()?
+On Sun, Nov 23, 2014 at 11:21:22PM +0100, Petr Cvek wrote:
 
-Ah, you're right.  It does look like the controller firmware clears MBOX_OWNER.
+> I created this patch by fixing both I2C controller and SCCB device, so
+> it seems I incorrectly used I2C_M_NOSTART instead I2C_M_STOP. Problem
+> with I2C_M_STOP is that it causes bus freeze when using userspace
+> utility "i2cget" on SCCB device (unfreeze can be done with i2c-pxa
+> module reload). But this can be probably repaired in i2cget.
+
+Please CC Jean Delvare, he maintains the I2C tools.
+
+> Patched kernel was from vanilla 3.18.0-rc5 commit fc14f9c1272f62c3e8d01300f52467c0d9af50f9
+
+Thanks but all these paragraphs describing the updates should have gone
+below the "---" line. Your original commit message was more apropriate
+and should have stayed.
+
+>  static u32 i2c_pxa_functionality(struct i2c_adapter *adap)
+>  {
+> -	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+> +	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL |
+> +		I2C_FUNC_PROTOCOL_MANGLING | I2C_FUNC_NOSTART;
+
+Okay, so NOSTART was previously implemented but not advertised? Please
+update the commit log to say that this will be also fixed by your patch.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/21258621/attachment.sig>
