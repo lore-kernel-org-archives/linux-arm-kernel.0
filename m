@@ -1,70 +1,54 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 24 Nov 2014 07:51:40 -0800
-Subject: [PATCH resend 2/4] ARM: dts: sunxi: unify APB1 clock
-In-Reply-To: <20141122073515.GJ4752@lukather> (Maxime Ripard's message of
- "Sat, 22 Nov 2014 08:35:15 +0100")
-References: <1415245232-20585-1-git-send-email-wens@csie.org>
- <20141121142903.GD4752@lukather> <4114168.zuylrCsruj@wuerfel>
- <2400552.aBVIZmJhTh@wuerfel> <20141122073515.GJ4752@lukather>
-Message-ID: <7ha93gmwab.fsf@deeprootsystems.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 24 Nov 2014 15:57:37 +0000
+Subject: [PATCH v1] arm: Support for the PXN CPU feature on ARMv7
+In-Reply-To: <2837195.5EVM7cu8cA@wuerfel>
+References: <1416652956-24207-1-git-send-email-js07.lee@gmail.com>
+ <20141124150652.GF15872@e104818-lin.cambridge.arm.com>
+ <2837195.5EVM7cu8cA@wuerfel>
+Message-ID: <20141124155737.GG15872@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+On Mon, Nov 24, 2014 at 03:26:10PM +0000, Arnd Bergmann wrote:
+> On Monday 24 November 2014 15:06:53 Catalin Marinas wrote:
+> > On Sat, Nov 22, 2014 at 10:42:36AM +0000, Jungseung Lee wrote:
+> > > diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
+> 
+> > In general we put the #ifdef outside the function:
+> > 
+> > #if __LINUX_ARM_ARCH__ >= 7 && !defined(CONFIG_ARM_LPAE)
+> > static inline bool cpu_has_classic_pxn(void)
+> > {
+> > 	unsigned int vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
+> > 	return vmsa == 4;
+> > }
+> > #else
+> > static inline bool cpu_has_classic_pxn(void)
+> > {
+> > 	return false;
+> > }
+> > #endif
+> > 
+> > I used __LINUX_ARM_ARCH__ instead of CONFIG_CPU_V7 to cope with kernel
+> > images built for both v6 and v7. You could also check for
+> > cpu_architecture() >= 7, though with a bit of performance impact.
+> 
+> Regarding the style, I think the best way to express it is
+> 
+> 	if (__LINUX_ARM_ARCH__ >= 7 && !IS_ENABLED(CONFIG_ARM_LPAE) && (vmsa == 4))
+> 		return true;
+> 	return false;
 
-> Arnd,
->
-> On Fri, Nov 21, 2014 at 05:08:08PM +0100, Arnd Bergmann wrote:
->> On Friday 21 November 2014 15:35:57 Arnd Bergmann wrote:
->> > On Friday 21 November 2014 15:29:03 Maxime Ripard wrote:
->> > > On Fri, Nov 21, 2014 at 12:57:02PM +0100, Arnd Bergmann wrote:
->> > > > On Thursday 20 November 2014 14:04:01 Kevin Hilman wrote:
->> > > > > Chen-Yu Tsai <wens@csie.org> writes:
->> > > > > 
->> > > > > > From: Emilio L?pez <emilio@elopez.com.ar>
->> > > > > >
->> > > > > > With the new factors infrastructure in place, we can unify apb1 and
->> > > > > > apb1_mux as a single clock now.
->> > > > > >
->> > > > > > Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->> > > > > > [wens at csie.org: Change apb1 node label to "apb1"; reword commit title]
->> > > > > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> > > > > 
->> > > > > Boot breakage in arm-soc/for-next on sun4i-a10-cubieboard and
->> > > > > sun7i-a20-cubieboard2[1] was bisected down to this patch[1].
->> > > > > 
->> > > > > Reverting $SUBJECT on top of arm-soc gets things booting again.
->> > > > > 
->> > > > 
->> > > > As this looks like it was intended as a cleanup without functional
->> > > > changes, I would go ahead and revert it in next/dt.
->> > > > 
->> > > > Any objections?
->> > > 
->> > > Yeah, you'd break linux-next as well doing so, as the clock driver now
->> > > requires this from the DT.
->> > > 
->> > > I can merge it through the clock tree though if you prefer it that
->> > > way.
->> > 
->> > Do you know why this commit breaks booting then?
->> > 
->> 
->> I have now reverted the entire branch, to get things working again.
->> 
->> Please send a new pull request once you have a version that you 
->> have actually tested.
->
-> This was tested and working. And again, the linux-next proves it.
->
-> I know very well why it doesn't work, and it's actually expected: some
-> clock was refactored, the DT needed to be changed, only half of it was
-> merged through arm-soc.
->
-> It really is just because one part got through arm-soc, the other
-> through the clock tree, nothing more.
+We want to avoid read_cpuid_ext() if pre-v7. But something along these
+lines would work.
 
-Which branch (already in linux-next) would be needed in arm-soc/for-next
-to resolve the dependency?
+> This way you can avoid the #ifdef and still get the compile-time
+> optimization.
+> 
+> Checking for (__LINUX_ARM_ARCH__ >= 6 && cpu_architecture >= 7) would
+> also make it work for a combined armv6/v7 kernel.
 
-Kevin
+Yes.
+
+-- 
+Catalin
