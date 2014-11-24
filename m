@@ -1,234 +1,131 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Nov 2014 14:35:16 +0000
-Subject: [PATCH v3 09/13] irqchip: GICv3: ITS: MSI support
+Date: Mon, 24 Nov 2014 14:35:13 +0000
+Subject: [PATCH v3 06/13] irqchip: GICv3: ITS: LPI allocator
 In-Reply-To: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
 References: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1416839720-18400-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1416839720-18400-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, the bit of code that allow us to use the ITS as a MSI controller.
-Both MSI and MSI-X are supported.
+LPIs are the type of interrupts that are used by the ITS. Given
+the size of the namespace (anywhere between 16 and 32bit), interrupt
+IDs are allocated in chunks of 32.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   | 176 +++++++++++++++++++++++++++++++++++++
- include/linux/irqchip/arm-gic-v3.h |   6 ++
- 2 files changed, 182 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 103 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 103 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index d687fd4..532c6df 100644
+index d24bebd..4154a16 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -587,12 +587,47 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 	return IRQ_SET_MASK_OK_DONE;
- }
- 
-+static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
-+{
-+	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-+	struct its_node *its;
-+	u64 addr;
-+
-+	its = its_dev->its;
-+	addr = its->phys_base + GITS_TRANSLATER;
-+
-+	msg->address_lo		= addr & ((1UL << 32) - 1);
-+	msg->address_hi		= addr >> 32;
-+	msg->data		= its_get_event_id(d);
-+}
-+
- static struct irq_chip its_irq_chip = {
- 	.name			= "ITS",
- 	.irq_mask		= its_mask_irq,
- 	.irq_unmask		= its_unmask_irq,
+@@ -586,3 +586,106 @@ static struct irq_chip its_irq_chip = {
  	.irq_eoi		= its_eoi_irq,
  	.irq_set_affinity	= its_set_affinity,
-+	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
-+};
-+
-+static void its_mask_msi_irq(struct irq_data *d)
-+{
-+	pci_msi_mask_irq(d);
-+	irq_chip_mask_parent(d);
-+}
-+
-+static void its_unmask_msi_irq(struct irq_data *d)
-+{
-+	pci_msi_unmask_irq(d);
-+	irq_chip_unmask_parent(d);
-+}
-+
-+static struct irq_chip its_msi_irq_chip = {
-+	.name			= "ITS-MSI",
-+	.irq_unmask		= its_unmask_msi_irq,
-+	.irq_mask		= its_mask_msi_irq,
-+	.irq_eoi		= irq_chip_eoi_parent,
-+	.irq_write_msi_msg	= pci_msi_domain_write_msg,
  };
- 
- /*
-@@ -1055,3 +1090,144 @@ static void its_free_device(struct its_device *its_dev)
- 	kfree(its_dev->itt);
- 	kfree(its_dev);
- }
 +
-+static int its_alloc_device_irq(struct its_device *dev, irq_hw_number_t *hwirq)
-+{
-+	int idx;
-+
-+	idx = find_first_zero_bit(dev->lpi_map, dev->nr_lpis);
-+	if (idx == dev->nr_lpis)
-+		return -ENOSPC;
-+
-+	*hwirq = dev->lpi_base + idx;
-+	set_bit(idx, dev->lpi_map);
-+
-+	/* Map the GIC irq ID to the device */
-+	its_send_mapvi(dev, *hwirq, idx);
-+
-+	return 0;
-+}
-+
-+static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
-+			   int nvec, msi_alloc_info_t *info)
-+{
-+	struct pci_dev *pdev;
-+	struct its_node *its;
-+	u32 dev_id;
-+	struct its_device *its_dev;
-+
-+	if (!dev_is_pci(dev))
-+		return -EINVAL;
-+
-+	pdev = to_pci_dev(dev);
-+	dev_id = PCI_DEVID(pdev->bus->number, pdev->devfn);
-+	its = domain->parent->host_data;
-+
-+	its_dev = its_find_device(its, dev_id);
-+	if (WARN_ON(its_dev))
-+		return -EINVAL;
-+
-+	its_dev = its_create_device(its, dev_id, nvec);
-+	if (!its_dev)
-+		return -ENOMEM;
-+
-+	dev_dbg(&pdev->dev, "ITT %d entries, %d bits\n", nvec, ilog2(nvec));
-+
-+	info->scratchpad[0].ptr = its_dev;
-+	info->scratchpad[1].ptr = dev;
-+	return 0;
-+}
-+
-+static struct msi_domain_ops its_pci_msi_ops = {
-+	.msi_prepare	= its_msi_prepare,
-+};
-+
-+static struct msi_domain_info its_pci_msi_domain_info = {
-+	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
-+		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
-+	.ops	= &its_pci_msi_ops,
-+	.chip	= &its_msi_irq_chip,
-+};
-+
-+static int its_irq_gic_domain_alloc(struct irq_domain *domain,
-+				    unsigned int virq,
-+				    irq_hw_number_t hwirq)
-+{
-+	struct of_phandle_args args;
-+
-+	args.np = domain->parent->of_node;
-+	args.args_count = 3;
-+	args.args[0] = GIC_IRQ_TYPE_LPI;
-+	args.args[1] = hwirq;
-+	args.args[2] = IRQ_TYPE_EDGE_RISING;
-+
-+	return irq_domain_alloc_irqs_parent(domain, virq, 1, &args);
-+}
-+
-+static int its_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+				unsigned int nr_irqs, void *args)
-+{
-+	msi_alloc_info_t *info = args;
-+	struct its_device *its_dev = info->scratchpad[0].ptr;
-+	irq_hw_number_t hwirq;
-+	int err;
-+	int i;
-+
-+	for (i = 0; i < nr_irqs; i++) {
-+		err = its_alloc_device_irq(its_dev, &hwirq);
-+		if (err)
-+			return err;
-+
-+		err = its_irq_gic_domain_alloc(domain, virq + i, hwirq);
-+		if (err)
-+			return err;
-+
-+		irq_domain_set_hwirq_and_chip(domain, virq + i,
-+					      hwirq, &its_irq_chip, its_dev);
-+		dev_dbg(info->scratchpad[1].ptr, "ID:%d pID:%d vID:%d\n",
-+			(int)(hwirq - its_dev->lpi_base), (int)hwirq, virq + i);
-+	}
-+
-+	return 0;
-+}
-+
-+static void its_irq_domain_free(struct irq_domain *domain, unsigned int virq,
-+				unsigned int nr_irqs)
-+{
-+	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
-+	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-+	int i;
-+
-+	for (i = 0; i < nr_irqs; i++) {
-+		struct irq_data *data = irq_domain_get_irq_data(domain,
-+								virq + i);
-+		int event = its_get_event_id(data);
-+
-+		/* Stop the delivery of interrupts */
-+		its_send_discard(its_dev, event);
-+
-+		/* Mark interrupt index as unused */
-+		clear_bit(event, its_dev->lpi_map);
-+
-+		/* Nuke the entry in the domain */
-+		irq_domain_reset_irq_data(d);
-+	}
-+
-+	/* If all interrupts have been freed, start mopping the floor */
-+	if (bitmap_empty(its_dev->lpi_map, its_dev->nr_lpis)) {
-+		its_lpi_free(its_dev->lpi_map,
-+			     its_dev->lpi_base,
-+			     its_dev->nr_lpis);
-+
-+		/* Unmap device/itt */
-+		its_send_mapd(its_dev, 0);
-+		its_free_device(its_dev);
-+	}
-+
-+	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
-+}
-+
-+static const struct irq_domain_ops its_domain_ops = {
-+	.alloc			= its_irq_domain_alloc,
-+	.free			= its_irq_domain_free,
-+};
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 21c9d70..0ed30d7 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -295,6 +295,12 @@
- 
- #include <linux/stringify.h>
- 
 +/*
-+ * We need a value to serve as a irq-type for LPIs. Choose one that will
-+ * hopefully pique the interest of the reviewer.
++ * How we allocate LPIs:
++ *
++ * The GIC has id_bits bits for interrupt identifiers. From there, we
++ * must subtract 8192 which are reserved for SGIs/PPIs/SPIs. Then, as
++ * we allocate LPIs by chunks of 32, we can shift the whole thing by 5
++ * bits to the right.
++ *
++ * This gives us (((1UL << id_bits) - 8192) >> 5) possible allocations.
 + */
-+#define GIC_IRQ_TYPE_LPI		0xa110c8ed
++#define IRQS_PER_CHUNK_SHIFT	5
++#define IRQS_PER_CHUNK		(1 << IRQS_PER_CHUNK_SHIFT)
 +
- struct rdists {
- 	struct {
- 		void __iomem	*rd_base;
++static unsigned long *lpi_bitmap;
++static u32 lpi_chunks;
++static DEFINE_SPINLOCK(lpi_lock);
++
++static int its_lpi_to_chunk(int lpi)
++{
++	return (lpi - 8192) >> IRQS_PER_CHUNK_SHIFT;
++}
++
++static int its_chunk_to_lpi(int chunk)
++{
++	return (chunk << IRQS_PER_CHUNK_SHIFT) + 8192;
++}
++
++static int its_lpi_init(u32 id_bits)
++{
++	lpi_chunks = its_lpi_to_chunk(1UL << id_bits);
++
++	lpi_bitmap = kzalloc(BITS_TO_LONGS(lpi_chunks) * sizeof(long),
++			     GFP_KERNEL);
++	if (!lpi_bitmap) {
++		lpi_chunks = 0;
++		return -ENOMEM;
++	}
++
++	pr_info("ITS: Allocated %d chunks for LPIs\n", (int)lpi_chunks);
++	return 0;
++}
++
++static unsigned long *its_lpi_alloc_chunks(int nr_irqs, int *base, int *nr_ids)
++{
++	unsigned long *bitmap = NULL;
++	int chunk_id;
++	int nr_chunks;
++	int i;
++
++	nr_chunks = DIV_ROUND_UP(nr_irqs, IRQS_PER_CHUNK);
++
++	spin_lock(&lpi_lock);
++
++	do {
++		chunk_id = bitmap_find_next_zero_area(lpi_bitmap, lpi_chunks,
++						      0, nr_chunks, 0);
++		if (chunk_id < lpi_chunks)
++			break;
++
++		nr_chunks--;
++	} while (nr_chunks > 0);
++
++	if (!nr_chunks)
++		goto out;
++
++	bitmap = kzalloc(BITS_TO_LONGS(nr_chunks * IRQS_PER_CHUNK) * sizeof (long),
++			 GFP_ATOMIC);
++	if (!bitmap)
++		goto out;
++
++	for (i = 0; i < nr_chunks; i++)
++		set_bit(chunk_id + i, lpi_bitmap);
++
++	*base = its_chunk_to_lpi(chunk_id);
++	*nr_ids = nr_chunks * IRQS_PER_CHUNK;
++
++out:
++	spin_unlock(&lpi_lock);
++
++	return bitmap;
++}
++
++static void its_lpi_free(unsigned long *bitmap, int base, int nr_ids)
++{
++	int lpi;
++
++	spin_lock(&lpi_lock);
++
++	for (lpi = base; lpi < (base + nr_ids); lpi += IRQS_PER_CHUNK) {
++		int chunk = its_lpi_to_chunk(lpi);
++		BUG_ON(chunk > lpi_chunks);
++		if (test_bit(chunk, lpi_bitmap)) {
++			clear_bit(chunk, lpi_bitmap);
++		} else {
++			pr_err("Bad LPI chunk %d\n", chunk);
++		}
++	}
++
++	spin_unlock(&lpi_lock);
++
++	kfree(bitmap);
++}
 -- 
 2.1.3
