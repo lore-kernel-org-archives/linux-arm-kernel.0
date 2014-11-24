@@ -1,64 +1,66 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Mon, 24 Nov 2014 23:14:27 +0800
-Subject: [PATCH v7 4/4] dt-bindings: add bindings for mediatek sysirq
-In-Reply-To: <20141119180724.GE12851@leverpostej>
-References: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>
- <1416406451-4578-5-git-send-email-yingjoe.chen@mediatek.com>
- <20141119180724.GE12851@leverpostej>
-Message-ID: <1416842067.28838.20.camel@mtksdaap41>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 24 Nov 2014 16:37:19 +0100
+Subject: [PATCH v5 03/18] ACPI / table: Count matched and successfully
+ parsed entries without specifying max entries
+In-Reply-To: <54734844.1070505@linaro.org>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <2301926.MWJ5MneAen@vostro.rjw.lan> <54734844.1070505@linaro.org>
+Message-ID: <1943415.qgIc2QypIM@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Mark,
-
-On Wed, 2014-11-19 at 18:07 +0000, Mark Rutland wrote:
-> On Wed, Nov 19, 2014 at 02:14:11PM +0000, Yingjoe Chen wrote:
-> > Add binding documentation for Mediatek SoC SYSIRQ.
-> > 
-> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> > ---
-> >  .../bindings/arm/mediatek/mediatek,sysirq.txt      | 26 ++++++++++++++++++++++
-> >  1 file changed, 26 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-> > new file mode 100644
-> > index 0000000..8669536
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-> > @@ -0,0 +1,26 @@
-> > +Mediatek 65xx/81xx sysirq
-> > +
-> > +Mediatek SOCs sysirq support controllable irq inverter for each GIC SPI
-> > +interrupt.
-> > +
-> > +Required properties:
-> > +- compatible: should be one of:
-> > +	"mediatek,mt8135-sysirq"
-> > +	"mediatek,mt8127-sysirq"
-> > +	"mediatek,mt6589-sysirq"
-> > +	"mediatek,mt6582-sysirq"
-> > +	"mediatek,mt6577-sysirq"
-> > +- interrupt-controller : Identifies the node as an interrupt controller
-> > +- #interrupt-cells : Must use the same cells/format as parent controller.
-> > +- interrupt-parent: phandle of irq domain parent for sysirq.
+On Monday, November 24, 2014 04:01:24 PM Tomasz Nowicki wrote:
+> On 24.11.2014 16:16, Rafael J. Wysocki wrote:
+> > On Monday, November 24, 2014 09:34:24 AM Tomasz Nowicki wrote:
+> >> On 24.11.2014 02:45, Rafael J. Wysocki wrote:
+> >>> On Friday, October 17, 2014 09:36:59 PM Hanjun Guo wrote:
+> >>>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> >>>>
+> >>>> It is very useful to traverse all available table entries without max
+> >>>> number of expected entries type. Current acpi_parse_entries()
+> >>>> implementation gives that feature but it does not count those entries,
+> >>>> it returns 0 instead, so fix it to count matched and successfully
+> >>>> entries and return it.
+> >>>
+> >>> Hmm.  I guess that the goal is for count to only be incremented when the
+> >>> condition is satisfied entirely, while without the patch it may be incremented
+> >>> even if that isn't the case.
+> >>
+> >> That would be our goal if patch would look like:
+> >> -		    && (!max_entries || count++ < max_entries))
+> >> +		    && (!max_entries && count++ < max_entries)) {
+> >> but then we can not walk through all available entries (with max_entries==0)
+> >
+> > No, that's not what I was trying to say. :-)
+> >
+> >>>
+> >>> I'm not sure how that is related to the above paragraph, however.
+> >>>
+> >>
+> >> Previous changelog is not clear, let me rewrite it:
+> >>
+> >> acpi_parse_entries() allows to traverse all available table entries (aka
+> >> subtables) by passing max_entries parameter equal to 0. But for that use
+> >> case acpi_parse_entries() does not inform caller how many entries were
+> >> matched and for how many entries handler was run against. That patch is
+> >> going to fix it.
+> >
+> > Do I understand correctly that count is only ever incremented by current code
+> > if max_entries is different from 0?
 > 
-> I'm concerned that this sounds very general while the binding assumes
-> the GICv2 interrupt-specifier format. Either the driver needs to become
-> more general, or this needs to be tightened up.
-> 
-> It's also odd to say "irq domain parent", as that's purely a Linux
-> construct and has nothing to do with the HW.
+> Right. Currently "count" is incremented only if max_entries > 0.
 
-The implementation expect the parent to use the same interrupt-cells
-format as GIC. Based on the block diagram in the cover-letter, we could
-say GIC is the irq parent of sysirq. So I'm planning to change to this,
-hope this is OK.
+So can you say that in the changelog, please?
 
-- #interrupt-cells : Use the same format as specified by GIC in
-  Documentation/devicetree/bindings/arm/gic.txt
-- interrupt-parent: phandle of irq parent for sysirq. The parent must
-  use the same interrupt-cells format as GIC.
+Something like:
 
-Joe.C
+"acpi_parse_entries() allows to traverse all available table entries (aka
+ subtables) by passing max_entries parameter equal to 0, but since its count
+ variable is only incremented if max_entries is not 0, the function always
+ returns 0 for max_entries equal to 0.  It would be more useful if it returned
+ the number of entries matched instead, so make it increment count in that
+ case too".
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
