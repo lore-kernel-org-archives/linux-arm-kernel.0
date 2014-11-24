@@ -1,84 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Nov 2014 12:59:26 +0100
-Subject: [RFC PATCH v2 3/4] arm64:thunder: Add initial dts for Cavium's
- Thunder SoC in 2 Node topology.
-In-Reply-To: <1416605010-10442-4-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1416605010-10442-4-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-Message-ID: <4080571.JcHDsAZ9EV@wuerfel>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 24 Nov 2014 12:04:11 +0000
+Subject: [PATCH] arm/arm64: vgic: Remove unreachable irq_clear_pending
+In-Reply-To: <1416822116-9044-1-git-send-email-christoffer.dall@linaro.org>
+References: <1416822116-9044-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <54731EBB.5080707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 22 November 2014 02:53:29 Ganapatrao Kulkarni wrote:
-> +/ {
-> +	model = "Cavium ThunderX CN88XX board";
-> +	compatible = "cavium,thunder-88xx";
+Hej Christoffer,
 
-No wildcards in compatible strings or model names please. List the
-exact chip that you are using.
+On 24/11/14 09:41, Christoffer Dall wrote:
+> When 'injecting' an edge-triggered interrupt with a falling edge we
+> shouldn't clear the pending state on the distributor.  In fact, we
+> don't, because the check in vgic_validate_injection would prevent us
+> from ever reaching this bit of code.
+> 
+> Remove the unreachable snippet.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-> +	aliases {
-> +		serial0 = &uaa0;
-> +		serial1 = &uaa1;
-> +	};
-> +
-> +	memory at 00c00000 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x00000000 0x0 0x80000000>;
-> +	};
-> +
-> +	memory at 10000000000 {
-> +		device_type = "memory";
-> +		reg = <0x100 0x00000000 0x0 0x80000000>;
-> +	};
-> +
-> +	numa-map {
-> +		#address-cells = <2>;
-> +		#size-cells = <1>;
-> +		#node-count = <2>;
-> +		mem-map = <0x0 0x00000000 0>,
-> +		           <0x100 0x00000000 1>;
-> +
-> +               cpu-map = <0 47 0>,
-> +			<48 95 1>;
-> +
-> +		node-matrix=    <0 0 10>,
-> +				<0 1 20>,
-> +				<1 0 20>,
-> +				<1 1 10>;
+Acked-by: Andre Przywara <andre.przywara@arm.com>
 
-I don't know how much history is behind this binding. Have you looked
-at the sPAPR way of doing this? I don't remember exactly how that is
-done, but we'd need a good reason to discard that and implement
-something else for arm64.
+I agree on this. Would it make sense to rewrite this function a bit to
+make it more clearer what happens? I find the nesting of the
+if-statements counter-intuitive: I'd prefer to first differentiate
+between level and edge triggered and then only check the actual level in
+the level-triggered branch. Not sure if it's worth the fuss, though.
 
-If we create a new binding, I don't think the 'numa-map' node you
-have here is the best solution. We already have device nodes for each
-memory segment and each CPU in the system. Why not work with those
-nodes directly?
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <1 13 0xff01>,
-> +		             <1 14 0xff01>,
-> +		             <1 11 0xff01>,
-> +		             <1 10 0xff01>;
-> +	};
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		refclk50mhz: refclk50mhz {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <50000000>;
-> +			clock-output-names = "refclk50mhz";
-> +		};
+Cheers,
+Andre.
 
-Why is the timer outside of the soc and the refclk is inside?
-I would have expected the opposite.
-
-	Arnd 
+> ---
+>  virt/kvm/arm/vgic.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 3aaca49..f45cf16 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1643,8 +1643,6 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+>  			vgic_dist_irq_clear_level(vcpu, irq_num);
+>  			if (!vgic_dist_irq_soft_pend(vcpu, irq_num))
+>  				vgic_dist_irq_clear_pending(vcpu, irq_num);
+> -		} else {
+> -			vgic_dist_irq_clear_pending(vcpu, irq_num);
+>  		}
+>  	}
+>  
+> 
