@@ -1,116 +1,79 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 24 Nov 2014 11:31:33 +0100
-Subject: [PATCH v4 01/12] sched: fix imbalance flag reset
-In-Reply-To: <5471B635.3050006@gmail.com>
-References: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
- <1406569906-9763-2-git-send-email-vincent.guittot@linaro.org>
- <5471B635.3050006@gmail.com>
-Message-ID: <CAKfTPtB_xsb0LpYu6ye0x5SK3+TcPhZ1uNioo_OtX+bjP15DsA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 24 Nov 2014 10:33:34 +0000
+Subject: [PATCH 1/3] mfd: devicetree: qcom_rpm: document IPQ8064 resources
+In-Reply-To: <1416512485-7292-2-git-send-email-joshc@codeaurora.org>
+References: <1416512485-7292-1-git-send-email-joshc@codeaurora.org>
+ <1416512485-7292-2-git-send-email-joshc@codeaurora.org>
+Message-ID: <20141124103334.GF4241@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 November 2014 at 11:25, Wanpeng Li <kernellwp@gmail.com> wrote:
-> Hi Vincent,
-> On 7/29/14, 1:51 AM, Vincent Guittot wrote:
->>
->> The imbalance flag can stay set whereas there is no imbalance.
->>
->> Let assume that we have 3 tasks that run on a dual cores /dual cluster
->> system.
->> We will have some idle load balance which are triggered during tick.
->> Unfortunately, the tick is also used to queue background work so we can
->> reach
->> the situation where short work has been queued on a CPU which already runs
->> a
->> task. The load balance will detect this imbalance (2 tasks on 1 CPU and an
->> idle
->> CPU) and will try to pull the waiting task on the idle CPU. The waiting
->> task is
->> a worker thread that is pinned on a CPU so an imbalance due to pinned task
->> is
->> detected and the imbalance flag is set.
->
->
-> The waiting task is the third task or one the '2 tasks on 1 CPU' ?
+On Thu, 20 Nov 2014, Josh Cartwright wrote:
 
-The waiting task is one of the 2 tasks on 1 CPU (the worker)
+> The IPQ8064 SoC has several RPM-controlled resources, an NSS fabrick
+> clock and four regulator resources.  Provide definitions for them.
+> 
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/qcom-rpm.txt | 6 +++++-
+>  include/dt-bindings/mfd/qcom-rpm.h                 | 6 ++++++
+>  2 files changed, 11 insertions(+), 1 deletion(-)
 
-Regards,
-Vincent
+What do you want me to do with this patch?  I'm guessing the other
+patches in the set depend on these new defines?  I can't even check
+because you've only send me 2 of the 3 patches in the set.
 
->
-> Regards,
-> Wanpeng Li
->
->
->> Then, we will not be able to clear the flag because we have at most 1 task
->> on
->> each CPU but the imbalance flag will trig to useless active load balance
->> between the idle CPU and the busy CPU.
->>
->> We need to reset of the imbalance flag as soon as we have reached a
->> balanced
->> state. If all tasks are pinned, we don't consider that as a balanced state
->> and
->> let the imbalance flag set.
->>
->> Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->> ---
->>   kernel/sched/fair.c | 23 +++++++++++++++++++----
->>   1 file changed, 19 insertions(+), 4 deletions(-)
->>
->> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
->> index 923fe32..7eb9126 100644
->> --- a/kernel/sched/fair.c
->> +++ b/kernel/sched/fair.c
->> @@ -6672,10 +6672,8 @@ static int load_balance(int this_cpu, struct rq
->> *this_rq,
->>                 if (sd_parent) {
->>                         int *group_imbalance =
->> &sd_parent->groups->sgc->imbalance;
->>   -                     if ((env.flags & LBF_SOME_PINNED) && env.imbalance
->> > 0) {
->> +                       if ((env.flags & LBF_SOME_PINNED) && env.imbalance
->> > 0)
->>                                 *group_imbalance = 1;
->> -                       } else if (*group_imbalance)
->> -                               *group_imbalance = 0;
->>                 }
->>                 /* All tasks on this runqueue were pinned by CPU affinity
->> */
->> @@ -6686,7 +6684,7 @@ static int load_balance(int this_cpu, struct rq
->> *this_rq,
->>                                 env.loop_break = sched_nr_migrate_break;
->>                                 goto redo;
->>                         }
->> -                       goto out_balanced;
->> +                       goto out_all_pinned;
->>                 }
->>         }
->>   @@ -6760,6 +6758,23 @@ static int load_balance(int this_cpu, struct rq
->> *this_rq,
->>         goto out;
->>     out_balanced:
->> +       /*
->> +        * We reach balance although we may have faced some affinity
->> +        * constraints. Clear the imbalance flag if it was set.
->> +        */
->> +       if (sd_parent) {
->> +               int *group_imbalance = &sd_parent->groups->sgc->imbalance;
->> +
->> +               if (*group_imbalance)
->> +                       *group_imbalance = 0;
->> +       }
->> +
->> +out_all_pinned:
->> +       /*
->> +        * We reach balance because all tasks are pinned at this level so
->> +        * we can't migrate them. Let the imbalance flag set so parent
->> level
->> +        * can try to migrate them.
->> +        */
->>         schedstat_inc(sd, lb_balanced[idle]);
->>         sd->nr_balance_failed = 0;
->
->
+> diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> index 4264021..6d4e3ec 100644
+> --- a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> +++ b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> @@ -12,6 +12,7 @@ frequencies.
+>  		    "qcom,rpm-apq8064"
+>  		    "qcom,rpm-msm8660"
+>  		    "qcom,rpm-msm8960"
+> +		    "qcom,rpm-ipq8064"
+>  
+>  - reg:
+>  	Usage: required
+> @@ -67,6 +68,7 @@ of valid subnodes that can operate on these resources.
+>  		    "qcom,rpm-pm8901-ftsmps"
+>  		    "qcom,rpm-pm8921-smps"
+>  		    "qcom,rpm-pm8921-ftsmps"
+> +		    "qcom,rpm-smb208"
+>  
+>  - reg:
+>  	Usage: required
+> @@ -76,7 +78,9 @@ of valid subnodes that can operate on these resources.
+>  		    QCOM_RPM_PM8058_SMPS0 - QCOM_RPM_PM8058_SMPS4,
+>  		    QCOM_RPM_PM8821_SMPS1 - QCOM_RPM_PM8821_SMPS2,
+>  		    QCOM_RPM_PM8901_SMPS0 - QCOM_RPM_PM8901_SMPS4,
+> -		    QCOM_RPM_PM8921_SMPS1 - QCOM_RPM_PM8921_SMPS8
+> +		    QCOM_RPM_PM8921_SMPS1 - QCOM_RPM_PM8921_SMPS8,
+> +		    QCOM_RPM_SMB208_S1a, QCOM_RPM_SMB208_S1b,
+> +		    QCOM_RPM_SMB208_S2a, QCOM_RPM_SMB208_S2b
+>  
+>  - bias-pull-down:
+>  	Usage: optional
+> diff --git a/include/dt-bindings/mfd/qcom-rpm.h b/include/dt-bindings/mfd/qcom-rpm.h
+> index 388a6f3..13a9d4b 100644
+> --- a/include/dt-bindings/mfd/qcom-rpm.h
+> +++ b/include/dt-bindings/mfd/qcom-rpm.h
+> @@ -141,6 +141,12 @@
+>  #define QCOM_RPM_SYS_FABRIC_MODE		131
+>  #define QCOM_RPM_USB_OTG_SWITCH			132
+>  #define QCOM_RPM_VDDMIN_GPIO			133
+> +#define QCOM_RPM_NSS_FABRIC_0_CLK		134
+> +#define QCOM_RPM_NSS_FABRIC_1_CLK		135
+> +#define QCOM_RPM_SMB208_S1a			136
+> +#define QCOM_RPM_SMB208_S1b			137
+> +#define QCOM_RPM_SMB208_S2a			138
+> +#define QCOM_RPM_SMB208_S2b			139
+>  
+>  /*
+>   * Constants used to select force mode for regulators.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
