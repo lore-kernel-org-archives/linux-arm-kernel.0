@@ -1,48 +1,43 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 24 Nov 2014 13:47:49 +0200
-Subject: [PATCH v2 1/5] video: omapdss: Add opa362 driver
-In-Reply-To: <BF6765C1-8D5C-4ABA-8796-195058C82E17@goldelico.com>
-References: <1415830247-31633-1-git-send-email-marek@goldelico.com>
- <1415830247-31633-2-git-send-email-marek@goldelico.com>
- <54649B43.1000801@ti.com>
- <9FD016B8-4EA2-4A0D-B790-6494AB449B31@goldelico.com>
- <5464DF26.2010707@ti.com>
- <BF6765C1-8D5C-4ABA-8796-195058C82E17@goldelico.com>
-Message-ID: <54731AE5.7080607@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 24 Nov 2014 14:50:20 +0300
+Subject: [PATCH v2] Fix PXA2xx sound DMA autoincrementation flags
+In-Reply-To: <5472605F.4030702@tul.cz>
+References: <54718713.1050902@tul.cz> <54720ACA.2070506@cogentembedded.com>
+ <5472605F.4030702@tul.cz>
+Message-ID: <54731B7C.4030306@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/11/14 17:10, Dr. H. Nikolaus Schaller wrote:
+Hello.
 
->> You don't need to ask. The connector calls invert_vid_out_polarity
->> before enabling the output.
-> 
-> Unfortunately it doesn?t. At least not always.
-> 
-> It does only for pdata systems but not for DT based systems:
-> 
-> 	if (!ddata->dev->of_node) {
-> 		in->ops.atv->set_type(in, ddata->connector_type);
-> 		in->ops.atv->invert_vid_out_polarity(in,
-> 			ddata->invert_polarity);
-> 	}
-> 
-> Not calling is in our case different from calling with ddata->invert_polarity == 0.
+On 11/24/2014 1:31 AM, Petr Cvek wrote:
 
-Ah, sorry, my mistake. I should've read the code more carefully =).
+> Add support for SCCB devices into PXA27x I2C controller.
 
-So, with DT only approach, those calls above are not supported. If you
-make the OPA driver DT only, you can remove those functions.
+> Fix generated START but no STOP for message without I2C_M_NOSTART flag. Add support for I2C_M_IGNORE_NAK flag.
+>
+> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+> ---
+>   sound/arm/pxa2xx-pcm-lib.c | 8 +++++++-
+>   1 file changed, 7 insertions(+), 1 deletion(-)
 
-You only need to set the invert-polarity property in the venc DT node.
+> diff --git a/sound/arm/pxa2xx-pcm-lib.c b/sound/arm/pxa2xx-pcm-lib.c
+> index a61d7a9..5d3a415 100644
+> --- a/sound/arm/pxa2xx-pcm-lib.c
+> +++ b/sound/arm/pxa2xx-pcm-lib.c
+> @@ -45,7 +45,13 @@ int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
+>   	size_t period = params_period_bytes(params);
+>   	pxa_dma_desc *dma_desc;
+>   	dma_addr_t dma_buff_phys, next_desc_phys;
+> -	u32 dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
+> +	u32 dcmd = 0;
+> +
+> +	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+> +		dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
+> +	} else {
+> +		dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
+> +	}
 
- Tomi
+    {} not needed at all here. Sorry for not complaining at once...
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/6701141c/attachment.sig>
+WBR, Sergei
