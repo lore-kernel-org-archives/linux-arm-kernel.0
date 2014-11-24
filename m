@@ -1,29 +1,67 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 24 Nov 2014 19:24:45 +0000
-Subject: [PATCH v5 0/6] Legacy instruction emulation for arm64
-In-Reply-To: <20141120163314.GE5447@e104818-lin.cambridge.arm.com> (Catalin
- Marinas's message of "Thu, 20 Nov 2014 16:33:14 +0000")
-References: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
- <20141120163314.GE5447@e104818-lin.cambridge.arm.com>
-Message-ID: <9hhr3ws5rlu.fsf@e105922-lin.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 24 Nov 2014 20:49:36 +0100
+Subject: [PATCH] ARM: PJ4: allow building in Thumb-2 mode
+In-Reply-To: <54738097.4020208@free-electrons.com>
+References: <1416830200-11114-1-git-send-email-ard.biesheuvel@linaro.org>
+ <2078609.NLHB18YoOo@wuerfel>
+ <CAKv+Gu_YuHbO7+jusczcJTHF8fM4pF1z2h55BZK0mrHK702z_A@mail.gmail.com>
+ <4653047.WBmUTsHC57@wuerfel> <54736CB9.1090307@free-electrons.com>
+ <CAKv+Gu8tgySFMwWixX6Z84nq-Wci=DWdGhvxpmBHQ8fgQr-jmw@mail.gmail.com>
+ <54738097.4020208@free-electrons.com>
+Message-ID: <CAKv+Gu9sGGh-xHBNWNPLQd+Ndoms-7XfjjtSB649fe+R0Kz-_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-Catalin Marinas <catalin.marinas@arm.com> writes:
-
-> On Tue, Nov 18, 2014 at 11:41:21AM +0000, Punit Agrawal wrote:
->> This is the fifth posting of the legacy instruction support for
->> arm64. Previous postings can be found at [1][2][3][4].
+On 24 November 2014 at 20:01, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> On 24/11/2014 18:48, Ard Biesheuvel wrote:
+>> On 24 November 2014 at 18:36, Gregory CLEMENT
+>> <gregory.clement@free-electrons.com> wrote:
+>>> Hi Arnd,
+>>>
+>>> On 24/11/2014 18:17, Arnd Bergmann wrote:
+>>>> On Monday 24 November 2014 16:34:47 Ard Biesheuvel wrote:
+>>>>> On 24 November 2014 at 16:29, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>>>> On Monday 24 November 2014 12:56:40 Ard Biesheuvel wrote:
+>>>>>>> Two files that get included when building the multi_v7_defconfig target
+>>>>>>> fail to build when selecting THUMB2_KERNEL for this configuration.
+>>>>>>>
+>>>>>>> In both cases, we can just build the file as ARM code, as none of its
+>>>>>>> symbols are exported to modules, so there are no interworking concerns.
+>>>>>>> In the iwmmxt.S case, add ENDPROC() declarations so the symbols are
+>>>>>>> annotated as functions, resulting in the linker to emit the appropriate
+>>>>>>> mode switches.
+>>>>>>>
+>>>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>>>
+>>>>>> Ah, very nice. I tried this before, but my version didn't actually
+>>>>>> work, presumably because I didn't know about the ENDPROC() stuff.
+>>>>>>
+>>>>>> Have you tested this on a machine that has IWMMXT enabled?
+>>>>>>
+>>>>>
+>>>>> No, I don't have access to such a machine, unfortunately.
+>>>>
+>>>> Adding a few mvebu folks to Cc, maybe one of them can test your patch.
+>>>
+>>> Actually even it is a feature of the PJ4 machine non of the mvebu machines
+>>> currently use it. I only see this configuration enabled for the pxa family.
+>>> So I think you would have more feedback with the pxa maintainers/owners.
+>>>
+>>
+>> Are you saying PJ4 should be dropped from 'default' here?
 >
-> The series looks good to me, I added my reviewed-by. I guess Will can
-> pick them up.
-
-Thanks for reviewing the series.
-
-Cheers,
-Punit
-
+> Not at all. I didn't find it in the configuration file, but I didn't realized
+> it was because of this "default y".
 >
-> Thanks.
+> Sorry for the noise.
+>
+
+Ah, ok.
+
+In that case, could you perhaps also test this patch on a PJ4 machine
+with multi_v7_defconfig but with CONFIG_THUMB2_KERNEL enabled?
+Olof has already done so successfully, but just to be sure.
+
+Thanks,
+Ard.
