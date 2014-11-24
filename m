@@ -1,22 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 24 Nov 2014 17:09:52 +0000
-Subject: [PATCH] ASoC: Arndale: Add machine device tree binding
- documentation for Arndale board
-In-Reply-To: <1416811911-21026-1-git-send-email-krishna.md@samsung.com>
-References: <1416811911-21026-1-git-send-email-krishna.md@samsung.com>
-Message-ID: <20141124170952.GG7712@sirena.org.uk>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Mon, 24 Nov 2014 17:16:35 +0000
+Subject: [PATCH v9 08/10] sched: replace capacity_factor by usage
+In-Reply-To: <CAKfTPtBtdnHUYjbrUiqED7Mr2d4HGB1YcyARED6Zx+rskZRsBw@mail.gmail.com>
+References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
+ <1415033687-23294-9-git-send-email-vincent.guittot@linaro.org>
+ <20141121123719.GH23177@e105550-lin.cambridge.arm.com>
+ <CAKfTPtBtdnHUYjbrUiqED7Mr2d4HGB1YcyARED6Zx+rskZRsBw@mail.gmail.com>
+Message-ID: <20141124171635.GL23177@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 12:21:51PM +0530, Krishna Mohan Dani wrote:
-> Document the device tree binding for the Arndale board based machine driver.
+On Mon, Nov 24, 2014 at 02:41:28PM +0000, Vincent Guittot wrote:
+> On 21 November 2014 at 13:37, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+> > On Mon, Nov 03, 2014 at 04:54:45PM +0000, Vincent Guittot wrote:
+> 
+> [snip]
+> 
+> >>                  */
+> >>                 if (prefer_sibling && sds->local &&
+> >> -                   sds->local_stat.group_has_free_capacity)
+> >> -                       sgs->group_capacity_factor = min(sgs->group_capacity_factor, 1U);
+> >> +                   group_has_capacity(env, &sds->local_stat) &&
+> >> +                   (sgs->sum_nr_running > 1)) {
+> >> +                       sgs->group_no_capacity = 1;
+> >> +                       sgs->group_type = group_overloaded;
+> >> +               }
+> >
+> > I'm still a bit confused about SD_PREFER_SIBLING. What is the flag
+> > supposed to do and why?
+> 
+> The goal is to spread tasks across the group even if the the latter is
+> not overloaded. for SMT level, the goal is to have 1 task per core
+> before 1 task per HW thread
 
-This is adding binding documentation but I'm not seeing the matching
-driver - please send the two together.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/41b2c449/attachment.sig>
+That makes more sense and is in line with how I understand SMT
+scheduling. So we try to have at least one task per group. Where each
+group is a domain with SD_PREFER_SIBLING.
+
+Anyway, you don't change the prefer-sibling behaviour in this patch set.
+I was just wondering how it would work for SMT balancing.
+
+Thanks,
+Morten
