@@ -1,31 +1,29 @@
-From: krishna.md@samsung.com (Krishna Mohan Dani)
-Date: Mon, 24 Nov 2014 16:52:42 +0530
-Subject: [PATCH] ASoC: rt5631: Fixing compilation warning when DT is disabled
-Message-ID: <1416828162-8216-1-git-send-email-krishna.md@samsung.com>
+From: xerofoify@gmail.com (nick)
+Date: Mon, 24 Nov 2014 06:28:08 -0500
+Subject: FIX ME in xsysace.c
+In-Reply-To: <5a8be93a4204429daf16bc8f62cdd0cd@BY2FFO11FD005.protection.gbl>
+References: <5472B1D6.7080805@gmail.com>
+ <5a8be93a4204429daf16bc8f62cdd0cd@BY2FFO11FD005.protection.gbl>
+Message-ID: <54731648.8010006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the following compilation warning:
-Warning: 'rt5631_i2c_dt_ids' defined but not used - when DT is not used.
 
-Signed-off-by: Claude Youn <claude.youn@gmail.com>
-Signed-off-by: Krishna Mohan Dani <krishna.md@samsung.com>
----
- sound/soc/codecs/rt5631.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/codecs/rt5631.c b/sound/soc/codecs/rt5631.c
-index 3b7d5e4..5c65915 100644
---- a/sound/soc/codecs/rt5631.c
-+++ b/sound/soc/codecs/rt5631.c
-@@ -1691,7 +1691,7 @@ static const struct i2c_device_id rt5631_i2c_id[] = {
- };
- MODULE_DEVICE_TABLE(i2c, rt5631_i2c_id);
- 
--static struct of_device_id rt5631_i2c_dt_ids[] = {
-+static struct of_device_id rt5631_i2c_dt_ids[] __maybe_unused = {
- 	{ .compatible = "realtek,rt5631"},
- 	{ .compatible = "realtek,alc5631"},
- 	{ }
--- 
-1.7.9.5
+On 14-11-24 02:47 AM, Michal Simek wrote:
+> Hi,
+> 
+> On 11/24/2014 05:19 AM, nick wrote:
+>> Greetings Michal and others,
+>> I am wondering about the FIX ME in xsysace.c as it seems not correct due to my knowledge of most hardware protocols using a predetermined bit wide and therefore this could be hard coded. If someone can respond on if I am correct in removing this fix me it would be greatly appreciated.
+> 
+> I think that will be the best to c&p that fixme which you are talking about.
+> Definitely feel free to fix whatever fixme is there and send the patch
+> for fixing it.
+> 
+> Thanks,
+> Michal
+> 
+Here is the fix me.
+int bus_width = ACE_BUS_WIDTH_16; /* FIXME: should not be hard coded */
+Cheers Nick
