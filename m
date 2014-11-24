@@ -1,461 +1,235 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 24 Nov 2014 16:05:51 +0000
-Subject: [PATCHv2] arm64: add support to dump the kernel page tables
-In-Reply-To: <1416262710-7798-1-git-send-email-lauraa@codeaurora.org>
-References: <1416262710-7798-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20141124160550.GA10172@linaro.org>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Mon, 24 Nov 2014 21:40:38 +0530
+Subject: [PATCH] thermal: exynos: add optional sclk support
+In-Reply-To: <20141124114845.0a03eeb4@amdc2363>
+References: <1416642356-8694-1-git-send-email-a.kesavan@samsung.com>
+ <CAGTfZH1T-pRmETfQUs1Scy1TLfA_DG9fEZGY83my7WVwtujqRQ@mail.gmail.com>
+ <CAM4voa=XUrkvH7EDk+j_FPX6pB3gLCHsAjDUMQacZ4AWyNEaNQ@mail.gmail.com>
+ <20141124114845.0a03eeb4@amdc2363>
+Message-ID: <CAM4voakNTe5x1Mur0J9PNbxW0XCMiXm_hfpPgHF0bKwnMbYNAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 02:18:30PM -0800, Laura Abbott wrote:
-> In a similar manner to arm, it's useful to be able to dump the page
-> tables to verify permissions and memory types. Add a debugfs file
-> to check the page tables.
+Hi Lukasz,
 
-Hi Laura,
-Some comments below:
+On Mon, Nov 24, 2014 at 4:18 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> Hi Abhilash,
+>
+>> Hi Chanwoo,
+>>
+>> On Sun, Nov 23, 2014 at 10:21 AM, Chanwoo Choi <cwchoi00@gmail.com>
+>> wrote:
+>> > Hi Abhilash,
+>> >
+>> > On Sat, Nov 22, 2014 at 4:45 PM, Abhilash Kesavan
+>> > <a.kesavan@samsung.com> wrote:
+>> >> Exynos7 has a special clock required for the functional operation
+>> >> of the TMU that is not present in earlier SoCs. Add support for
+>> >> this optional clock and update the binding documentation.
+>> >>
+>> >
+>> > Latest Exynos SoC needs the special clocks. It is different part
+>> > from previous Exynos SoC.
+>> > Exynos3250 must need the special clock for ADC IP like this patch.
+>> > So, I sent the smiliar patch[1] to support SCLK as following and
+>> > merged it.
+>> >
+>> > [1] https://lkml.org/lkml/2014/7/21/734
+>>
+>> Thanks for the link.
+>>
+>> >
+>> > So, I suggest you that Exynos would use the similar method to
+>> > support special clock
+>> > on all of IPs for Exynos SoC.
+>> >
+>> >> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> >> ---
+>> >> This patch was earlier part of the series adding TMU support for
+>> >> Exynos7 [1]. It has been split out as it does not impact the
+>> >> on-going consolidation in the exynos tmu driver and can be
+>> >> considered independently.
+>> >>
+>> >>  .../devicetree/bindings/thermal/exynos-thermal.txt |    3 +++
+>> >>  drivers/thermal/samsung/exynos_tmu.c               |   27
+>> >> ++++++++++++++++---- 2 files changed, 25 insertions(+), 5
+>> >> deletions(-)
+>> >>
+>> >> diff --git
+>> >> a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+>> >> b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+>> >> index ae738f5..2393eac 100644 ---
+>> >> a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt +++
+>> >> b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt @@
+>> >> -32,10 +32,13 @@
+>> >>  - clocks : The main clocks for TMU device
+>> >>         -- 1. operational clock for TMU channel
+>> >>         -- 2. optional clock to access the shared registers of TMU
+>> >> channel
+>> >> +       -- 3. optional special clock for functional operation
+>> >>  - clock-names : Thermal system clock name
+>> >>         -- "tmu_apbif" operational clock for current TMU channel
+>> >>         -- "tmu_triminfo_apbif" clock to access the shared
+>> >> triminfo register for current TMU channel
+>> >> +       -- "tmu_sclk" clock for functional operation of the
+>> >> current TMU
+>> >> +               channel
+>> >>  - vtmu-supply: This entry is optional and provides the regulator
+>> >> node supplying voltage to TMU. If needed this entry can be placed
+>> >> inside board/platform specific dts file.
+>> >> diff --git a/drivers/thermal/samsung/exynos_tmu.c
+>> >> b/drivers/thermal/samsung/exynos_tmu.c index d44d91d..6627937
+>> >> 100644 --- a/drivers/thermal/samsung/exynos_tmu.c
+>> >> +++ b/drivers/thermal/samsung/exynos_tmu.c
+>> >> @@ -128,6 +128,7 @@
+>> >>   * @lock: lock to implement synchronization.
+>> >>   * @clk: pointer to the clock structure.
+>> >>   * @clk_sec: pointer to the clock structure for accessing the
+>> >> base_second.
+>> >> + * @sclk: pointer to the clock structure for accessing the tmu
+>> >> special clk.
+>> >>   * @temp_error1: fused value of the first point trim.
+>> >>   * @temp_error2: fused value of the second point trim.
+>> >>   * @regulator: pointer to the TMU regulator structure.
+>> >> @@ -147,7 +148,7 @@ struct exynos_tmu_data {
+>> >>         enum soc_type soc;
+>> >>         struct work_struct irq_work;
+>> >>         struct mutex lock;
+>> >> -       struct clk *clk, *clk_sec;
+>> >> +       struct clk *clk, *clk_sec, *sclk;
+>> >>         u8 temp_error1, temp_error2;
+>> >>         struct regulator *regulator;
+>> >>         struct thermal_sensor_conf *reg_conf;
+>> >> @@ -883,10 +884,21 @@ static int exynos_tmu_probe(struct
+>> >> platform_device *pdev) goto err_clk_sec;
+>> >>         }
+>> >>
+>> >> +       data->sclk = devm_clk_get(&pdev->dev, "tmu_sclk");
+>> >> +       if (IS_ERR(data->sclk)) {
+>> >> +               dev_err(&pdev->dev, "Failed to get optional
+>> >> special clock\n");
+>> >
+>> > Exynos4, Exynos3250 etc may show error message always. I think It
+>> > is not proper. I recommend that you use additional 'needs_sclk'
+>> > field. If 'needs_sclk' is true, tmu driver will get the special
+>> > clock of tmu without error message.
+>>
+>> OK,  I'll add a per-soc field to check for sclk availability.
+>
+> I think that it would be enough to change dev_err() -> dev_dbg().
 
-The output looked sensible otherwise and worked well on a Juno running
-4/64KB pages and 2,3,4-levels of page table.
+Lukasz, thanks for the review.
 
-> 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
-> v2: Addressed comments from Mark Rutland. Made the logic a bit more
-> consistent between functions. Now tested on 4K and 64K pages.
-> ---
->  arch/arm64/Kconfig.debug |  12 ++
->  arch/arm64/mm/Makefile   |   1 +
->  arch/arm64/mm/dump.c     | 358 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 371 insertions(+)
->  create mode 100644 arch/arm64/mm/dump.c
-> 
-> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-> index 0a12933..5fdd6dc 100644
-> --- a/arch/arm64/Kconfig.debug
-> +++ b/arch/arm64/Kconfig.debug
-> @@ -6,6 +6,18 @@ config FRAME_POINTER
->  	bool
->  	default y
->  
-> +config ARM64_PTDUMP
-> +	bool "Export kernel pagetable layout to userspace via debugfs"
-> +	depends on DEBUG_KERNEL
-> +	select DEBUG_FS
-> +        help
-> +	  Say Y here if you want to show the kernel pagetable layout in a
-> +	  debugfs file. This information is only useful for kernel developers
-> +	  who are working in architecture specific areas of the kernel.
-> +	  It is probably not a good idea to enable this feature in a production
-> +	  kernel.
-> +	  If in doubt, say "N"
-> +
->  config STRICT_DEVMEM
->  	bool "Filter access to /dev/mem"
->  	depends on MMU
-> diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
-> index c56179e..773d37a 100644
-> --- a/arch/arm64/mm/Makefile
-> +++ b/arch/arm64/mm/Makefile
-> @@ -3,3 +3,4 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
->  				   ioremap.o mmap.o pgd.o mmu.o \
->  				   context.o proc.o pageattr.o
->  obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
-> +obj-$(CONFIG_ARM64_PTDUMP)	+= dump.o
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> new file mode 100644
-> index 0000000..57dcee4
-> --- /dev/null
-> +++ b/arch/arm64/mm/dump.c
-> @@ -0,0 +1,358 @@
-> +/*
-> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> + * Debug helper to dump the current kernel pagetables of the system
-> + * so that we can see what the various memory ranges are set to.
-> + *
-> + * Derived from x86 and arm implementation:
-> + * (C) Copyright 2008 Intel Corporation
-> + *
-> + * Author: Arjan van de Ven <arjan@linux.intel.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; version 2
-> + * of the License.
-> + */
-> +#include <linux/debugfs.h>
-> +#include <linux/fs.h>
-> +#include <linux/mm.h>
-> +#include <linux/seq_file.h>
-> +
-> +#include <asm/pgtable.h>
-> +
-> +#define LOWEST_ADDR	(UL(0xffffffffffffffff) << VA_BITS)
-> +
-> +struct addr_marker {
-> +	unsigned long start_address;
-> +	const char *name;
-> +};
-> +
-> +static struct addr_marker address_markers[] = {
-> +	{ 0,			"vmalloc() Area" },
+Chanwoo, are you OK with this ? If so, I will post a v2 with this and
+the other changes you suggested.
 
-I don't think we need a 0 placeholder as VMALLOC_START is a compile
-time constant?
-
-> +	{ VMALLOC_END,		"vmalloc() End" },
-
-The vmemmap region could be represented here, otherwise on my Juno I
-get stragglers appearing. (I had SPARSEMEM_VMEMMAP=y).
-
-> +	{ MODULES_VADDR,	"Modules" },
-
-It would be nice to have an "End Modules" here.
-(That's a matter of taste though!)
-
-> +	{ PAGE_OFFSET,		"Kernel Mapping" },
-> +	{ -1,			NULL },
-> +};
-> +
-> +struct pg_state {
-> +	struct seq_file *seq;
-> +	const struct addr_marker *marker;
-> +	unsigned long start_address;
-> +	unsigned level;
-> +	u64 current_prot;
-> +};
-> +
-> +struct prot_bits {
-> +	u64		mask;
-> +	u64		val;
-> +	const char	*set;
-> +	const char	*clear;
-> +};
-> +
-> +static const struct prot_bits pte_bits[] = {
-> +	{
-> +		.mask	= PTE_USER,
-> +		.val	= PTE_USER,
-> +		.set	= "USR",
-> +		.clear	= "   ",
-> +	}, {
-> +		.mask	= PTE_RDONLY,
-> +		.val	= PTE_RDONLY,
-> +		.set	= "ro",
-> +		.clear	= "RW",
-> +	}, {
-> +		.mask	= PTE_PXN,
-> +		.val	= PTE_PXN,
-> +		.set	= "NX",
-> +		.clear	= "x ",
-> +	}, {
-> +		.mask	= PTE_SHARED,
-> +		.val	= PTE_SHARED,
-> +		.set	= "SHD",
-> +		.clear	= "   ",
-> +	}, {
-> +		.mask	= PTE_AF,
-> +		.val	= PTE_AF,
-> +		.set	= "AF",
-> +		.clear	= "  ",
-> +	}, {
-> +		.mask	= PTE_NG,
-> +		.val	= PTE_NG,
-> +		.set	= "NG",
-> +		.clear	= "  ",
-> +	}, {
-> +		.mask	= PTE_UXN,
-> +		.val	= PTE_UXN,
-> +		.set	= "UXN",
-> +	}, {
-> +		.mask	= PTE_ATTRINDX_MASK,
-> +		.val	= PTE_ATTRINDX(MT_DEVICE_nGnRnE),
-> +		.set	= "DEVICE/nGnRnE",
-> +	}, {
-> +		.mask	= PTE_ATTRINDX_MASK,
-> +		.val	= PTE_ATTRINDX(MT_DEVICE_nGnRE),
-> +		.set	= "DEVICE/nGnRE",
-> +	}, {
-> +		.mask	= PTE_ATTRINDX_MASK,
-> +		.val	= PTE_ATTRINDX(MT_DEVICE_GRE),
-> +		.set	= "DEVICE/GRE",
-> +	}, {
-> +		.mask	= PTE_ATTRINDX_MASK,
-> +		.val	= PTE_ATTRINDX(MT_NORMAL_NC),
-> +		.set	= "MEM/BUFFERABLE",
-> +	}, {
-> +		.mask	= PTE_ATTRINDX_MASK,
-> +		.val	= PTE_ATTRINDX(MT_NORMAL),
-> +		.set	= "MEM/NORMAL",
-> +	}
-> +};
-> +
-> +static const struct prot_bits section_bits[] = {
-> +	{
-> +		.mask	= PMD_SECT_USER,
-> +		.val	= PMD_SECT_USER,
-> +		.set	= "USR",
-> +		.clear	= "   ",
-> +	}, {
-> +		.mask	= PMD_SECT_RDONLY,
-> +		.val	= PMD_SECT_RDONLY,
-> +		.set	= "ro",
-> +		.clear	= "RW",
-> +	}, {
-> +		.mask	= PMD_SECT_PXN,
-> +		.val	= PMD_SECT_PXN,
-> +		.set	= "NX",
-> +		.clear	= "x ",
-> +	}, {
-> +		.mask	= PMD_SECT_S,
-> +		.val	= PMD_SECT_S,
-> +		.set	= "SHD",
-> +		.clear	= "   ",
-> +	}, {
-> +		.mask	= PMD_SECT_AF,
-> +		.val	= PMD_SECT_AF,
-> +		.set	= "AF",
-> +		.clear	= "  ",
-> +	}, {
-> +		.mask	= PMD_SECT_NG,
-> +		.val	= PMD_SECT_NG,
-> +		.set	= "NG",
-> +		.clear	= "  ",
-> +	}, {
-> +		.mask	= PMD_SECT_UXN,
-> +		.val	= PMD_SECT_UXN,
-> +		.set	= "UXN",
-> +	}, {
-> +		.mask	= PTE_ATTRINDX_MASK,
-> +		.val	= PTE_ATTRINDX(MT_DEVICE_nGnRnE),
-> +		.set	= "DEVICE/nGnRnE",
-> +	}, {
-> +		.mask	= PTE_ATTRINDX_MASK,
-> +		.val	= PTE_ATTRINDX(MT_DEVICE_nGnRE),
-> +		.set	= "DEVICE/nGnRE",
-> +	}, {
-> +		.mask	= PTE_ATTRINDX_MASK,
-> +		.val	= PTE_ATTRINDX(MT_DEVICE_GRE),
-> +		.set	= "DEVICE/GRE",
-> +	}, {
-> +		.mask	= PTE_ATTRINDX_MASK,
-> +		.val	= PTE_ATTRINDX(MT_NORMAL_NC),
-> +		.set	= "MEM/BUFFERABLE",
-> +	}, {
-> +		.mask	= PTE_ATTRINDX_MASK,
-> +		.val	= PTE_ATTRINDX(MT_NORMAL),
-> +		.set	= "MEM/NORMAL",
-> +	}
-> +};
-> +
-> +struct pg_level {
-> +	const struct prot_bits *bits;
-> +	size_t num;
-> +	u64 mask;
-> +};
-> +
-> +static struct pg_level pg_level[] = {
-> +	{
-> +	}, { /* pgd */
-> +		.bits	= pte_bits,
-> +		.num	= ARRAY_SIZE(pte_bits),
-> +	}, { /* pud */
-> +		.bits	= pte_bits,
-> +		.num	= ARRAY_SIZE(pte_bits),
-> +	}, { /* pmd */
-> +		.bits	= section_bits,
-> +		.num	= ARRAY_SIZE(section_bits),
-> +	}, { /* pte */
-> +		.bits	= pte_bits,
-> +		.num	= ARRAY_SIZE(pte_bits),
-> +	},
-> +};
-
-When I had a look, pte_bits matched section_bits perfectly. Could we
-drop section_bits entirely and switch over to pte_bits?
-
-> +
-> +static void dump_prot(struct pg_state *st, const struct prot_bits *bits,
-> +			size_t num)
-> +{
-> +	unsigned i;
-> +
-> +	for (i = 0; i < num; i++, bits++) {
-> +		const char *s;
-> +
-> +		if ((st->current_prot & bits->mask) == bits->val)
-> +			s = bits->set;
-> +		else
-> +			s = bits->clear;
-> +
-> +		if (s)
-> +			seq_printf(st->seq, " %s", s);
-> +	}
-> +}
-> +
-> +static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
-> +				u64 val)
-> +{
-> +	static const char units[] = "KMGTPE";
-> +	u64 prot = val & pg_level[level].mask;
-> +
-> +	if (addr < LOWEST_ADDR)
-> +		return;
-> +
-> +	if (!st->level) {
-> +		st->level = level;
-> +		st->current_prot = prot;
-> +		st->start_address = addr;
-> +		seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
-> +	} else if (prot != st->current_prot || level != st->level ||
-> +		   addr >= st->marker[1].start_address) {
-> +		const char *unit = units;
-> +		unsigned long delta;
-> +
-> +		if (st->current_prot) {
-> +			seq_printf(st->seq, "0x%16lx-0x%16lx   ",
-> +				   st->start_address, addr);
-> +
-> +			delta = (addr - st->start_address) >> 10;
-> +			while (!(delta & 1023) && unit[1]) {
-> +				delta >>= 10;
-> +				unit++;
-> +			}
-> +			seq_printf(st->seq, "%9lu%c", delta, *unit);
-> +			if (pg_level[st->level].bits)
-> +				dump_prot(st, pg_level[st->level].bits,
-> +					  pg_level[st->level].num);
-> +			seq_puts(st->seq, "\n");
-> +		}
-> +
-> +		if (addr >= st->marker[1].start_address) {
-> +			st->marker++;
-> +			seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
-> +		}
-> +		st->start_address = addr;
-> +		st->current_prot = prot;
-> +		st->level = level;
-> +	}
-
-When I added "End Modules", I needed to add this here:
-	if (addr >= st->marker[1].start_address) {
-        	st->marker++;
-		seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
-	}
-
-(because it shared the same VA as "kernel mapping").
-
-> +}
-> +
-> +static void walk_pte(struct pg_state *st, pmd_t *pmd, unsigned long start)
-> +{
-> +	pte_t *pte = pte_offset_kernel(pmd, 0);
-> +	unsigned long addr;
-> +	unsigned i;
-> +
-> +	for (i = 0; i < PTRS_PER_PTE; i++, pte++) {
-> +		addr = start + i * PAGE_SIZE;
-> +		note_page(st, addr, 4, pte_val(*pte));
-> +	}
-> +}
-> +
-> +static void walk_pmd(struct pg_state *st, pud_t *pud, unsigned long start)
-> +{
-> +	pmd_t *pmd = pmd_offset(pud, 0);
-> +	unsigned long addr;
-> +	unsigned i;
-> +
-> +	for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
-> +		addr = start + i * PMD_SIZE;
-> +		if (pmd_none(*pmd) || pmd_sect(*pmd) || pmd_bad(*pmd))
-> +			note_page(st, addr, 3, pmd_val(*pmd));
-> +		else
-> +			walk_pte(st, pmd, addr);
-> +	}
-> +}
-> +
-> +static void walk_pud(struct pg_state *st, pgd_t *pgd, unsigned long start)
-> +{
-> +	pud_t *pud = pud_offset(pgd, 0);
-> +	unsigned long addr;
-> +	unsigned i;
-> +
-> +	for (i = 0; i < PTRS_PER_PUD; i++, pud++) {
-> +		addr = start + i * PUD_SIZE;
-> +		if (pud_none(*pud) || pud_sect(*pud) || pud_bad(*pud))
-> +			note_page(st, addr, 2, pud_val(*pud));
-> +		else
-> +			walk_pmd(st, pud, addr);
-> +	}
-> +}
-> +
-> +static unsigned long normalize_addr(unsigned long u)
-> +{
-> +	return u | LOWEST_ADDR;
-> +}
-> +
-> +static void walk_pgd(struct pg_state *st, pgd_t *pgd, unsigned long start)
-> +{
-> +	unsigned i;
-> +	unsigned long addr;
-> +
-> +	for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
-> +		addr = normalize_addr(start + i * PGDIR_SIZE);
-> +		if (pgd_none(*pgd) || pgd_bad(*pgd))
-> +			note_page(st, addr, 1, pgd_val(*pgd));
-> +		else
-> +			walk_pud(st, pgd, addr);
-> +	}
-> +}
-> +
-> +static int ptdump_show(struct seq_file *m, void *v)
-> +{
-> +	struct pg_state st;
-> +
-> +	memset(&st, 0, sizeof(st));
-> +	st.seq = m;
-> +	st.marker = address_markers;
-> +
-> +	walk_pgd(&st, swapper_pg_dir, 0);
-> +
-> +	note_page(&st, 0, 0, 0);
-> +	return 0;
-> +}
-> +
-> +static int ptdump_open(struct inode *inode, struct file *file)
-> +{
-> +	return single_open(file, ptdump_show, NULL);
-> +}
-> +
-> +static const struct file_operations ptdump_fops = {
-> +	.open		= ptdump_open,
-> +	.read		= seq_read,
-> +	.llseek		= seq_lseek,
-> +	.release	= single_release,
-> +};
-> +
-> +static int ptdump_init(void)
-> +{
-> +	struct dentry *pe;
-> +	unsigned i, j;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(pg_level); i++)
-> +		if (pg_level[i].bits)
-> +			for (j = 0; j < pg_level[i].num; j++)
-> +				pg_level[i].mask |= pg_level[i].bits[j].mask;
-> +
-> +	address_markers[0].start_address = VMALLOC_START;
-
-I don't think we need this.
-
-> +
-> +	pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
-> +				 &ptdump_fops);
-> +	return pe ? 0 : -ENOMEM;
-> +}
-> +device_initcall(ptdump_init);
-> -- 
-
-Cheers,
--- 
-Steve
+Abhilash
+>
+>>
+>> >
+>> > Also, How about just 'sclk' instead of 'tmu_sclk'?
+>> > I discussed the name of 'sclk' with Arnd Bergmann on following
+>> > patch[2]
+>>
+>> Sure, I'll use 'sclk' instead of 'tmu_sclk'.
+>>
+>> >
+>> > [2]
+>> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/273557.html
+>> >
+>> >> +       } else {
+>> >> +               ret = clk_prepare_enable(data->sclk);
+>> >> +               if (ret) {
+>> >> +                       dev_err(&pdev->dev, "Failed to enable
+>> >> special clock\n");
+>> >> +                       goto err_clk;
+>> >> +               }
+>> >> +       }
+>> >> +
+>> >>         ret = exynos_tmu_initialize(pdev);
+>> >>         if (ret) {
+>> >>                 dev_err(&pdev->dev, "Failed to initialize TMU\n");
+>> >> -               goto err_clk;
+>> >> +               goto err_sclk;
+>> >>         }
+>> >>
+>> >>         exynos_tmu_control(pdev, true);
+>> >> @@ -896,7 +908,7 @@ static int exynos_tmu_probe(struct
+>> >> platform_device *pdev) sizeof(struct thermal_sensor_conf),
+>> >> GFP_KERNEL); if (!sensor_conf) {
+>> >>                 ret = -ENOMEM;
+>> >> -               goto err_clk;
+>> >> +               goto err_sclk;
+>> >>         }
+>> >>         sprintf(sensor_conf->name, "therm_zone%d", data->id);
+>> >>         sensor_conf->read_temperature = (int (*)(void
+>> >> *))exynos_tmu_read; @@ -928,7 +940,7 @@ static int
+>> >> exynos_tmu_probe(struct platform_device *pdev) ret =
+>> >> exynos_register_thermal(sensor_conf); if (ret) {
+>> >>                 dev_err(&pdev->dev, "Failed to register thermal
+>> >> interface\n");
+>> >> -               goto err_clk;
+>> >> +               goto err_sclk;
+>> >>         }
+>> >>         data->reg_conf = sensor_conf;
+>> >>
+>> >> @@ -936,10 +948,13 @@ static int exynos_tmu_probe(struct
+>> >> platform_device *pdev) IRQF_TRIGGER_RISING | IRQF_SHARED,
+>> >> dev_name(&pdev->dev), data); if (ret) {
+>> >>                 dev_err(&pdev->dev, "Failed to request irq: %d\n",
+>> >> data->irq);
+>> >> -               goto err_clk;
+>> >> +               goto err_sclk;
+>> >>         }
+>> >>
+>> >>         return 0;
+>> >> +err_sclk:
+>> >> +       if (!IS_ERR(data->sclk))
+>> >> +               clk_disable_unprepare(data->sclk);
+>> >
+>> > I think IS_ERROR don't be necessary because
+>> > clk_disalbe_unprepare check the NULL pointer of clock pointer.
+>> >
+>> >>  err_clk:
+>> >>         clk_unprepare(data->clk);
+>> >>  err_clk_sec:
+>> >> @@ -956,6 +971,8 @@ static int exynos_tmu_remove(struct
+>> >> platform_device *pdev)
+>> >>
+>> >>         exynos_tmu_control(pdev, false);
+>> >>
+>> >> +       if (!IS_ERR(data->sclk))
+>> >> +               clk_disable_unprepare(data->sclk);
+>> >
+>> > ditto.
+>>
+>> Will fix.
+>>
+>> Thanks for the review.
+>>
+>> Regards,
+>> Abhilash
+>> >
+>> > Best Regards,
+>> > Chanwoo Choi
+>> >
+>> >>         clk_unprepare(data->clk);
+>> >>         if (!IS_ERR(data->clk_sec))
+>> >>                 clk_unprepare(data->clk_sec);
+>> >> --
+>> >> 1.7.9.5
+>> >>
+>> >>
+>> >> _______________________________________________
+>> >> linux-arm-kernel mailing list
+>> >> linux-arm-kernel at lists.infradead.org
+>> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
+> --
+> Best regards,
+>
+> Lukasz Majewski
+>
+> Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
