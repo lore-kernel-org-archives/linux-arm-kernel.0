@@ -1,45 +1,58 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 24 Nov 2014 15:46:19 +0100
-Subject: [PATCH RESEND 0/3] ARM: Meson6: enable SMP
-In-Reply-To: <283984248.2HBkCzgaiV@wuerfel>
-References: <1415982353-9293-1-git-send-email-carlo@caione.org>
- <CAOQ7t2amsAvD_O6XO_jF9NRhAAWrG+_URKNytmY-6aUE+wchnA@mail.gmail.com>
- <283984248.2HBkCzgaiV@wuerfel>
-Message-ID: <CAOQ7t2b+i7Vrx3NMtEkOPVT5MXw6M2AT+bGR8=JuvNf2OBTXZg@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 24 Nov 2014 16:09:54 +0100
+Subject: [PATCH] opp: convert dev_warn() to dev_dbg() for duplicate OPPs
+In-Reply-To: <CAKohpomz_UiRErSsDPLWcmU4e7ocXZZu7bwCF8TvoSJupikd7A@mail.gmail.com>
+References: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
+ <5171628.FRGslOuEb6@vostro.rjw.lan>
+ <CAKohpomz_UiRErSsDPLWcmU4e7ocXZZu7bwCF8TvoSJupikd7A@mail.gmail.com>
+Message-ID: <42965945.ST26GKfzPz@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 3:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday 23 November 2014 12:48:31 Carlo Caione wrote:
->> On Fri, Nov 14, 2014 at 5:25 PM, Carlo Caione <carlo@caione.org> wrote:
->> > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
->> > pieces to boot the secondary CPU.
->> >
->> > ---
->> >
->> > This is a resend of a patchset already submitted a while ago
->> > http://www.spinics.net/lists/arm-kernel/msg366787.html
->> >
->>
->> Ping
->
-> Hi Carlo,
->
-> Is this for arm-soc? I guess from the contents that it is, but you had
-> 10 people in 'To', and you don't say in the introductory mail what
-> you would like to happen with these patches.
->
-> When you send something for inclusion in arm-soc, please always send
-> it 'To: arm at kernel.org' with everyone else on Cc instead of To,
-> and be explicit with whether you think the contents are ready to
-> be merged or whether you would like to see more review.
+On Monday, November 24, 2014 04:10:00 PM Viresh Kumar wrote:
+> On 21 November 2014 at 21:28, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > What about @dynamic instead of @from_dt?  That may apply to more use cases if
+> > need be.
+> 
+> @Paul: I am stuck at a point and need help on RCUs :)
+> 
+> File: drivers/base/power/opp.c
+> 
+> We are trying to remove OPPs created from static data present in DT on
+> cpufreq driver's removal (when configured as module).
+> 
+> opp core uses RCUs internally and it looks like I need to implement:
+> list_for_each_entry_safe_rcu()
+> 
+> But, I am not sure because of these:
+> http://linux.derkeiler.com/Mailing-Lists/Kernel/2005-10/6280.html
+> http://patchwork.ozlabs.org/patch/48989/
+> 
+> So, wanted to ask you if I really need that or the OPP code is
+> buggy somewhere.
+> 
+> The code removing OPPs is:
+> 
+>         list_for_each_entry_rcu(opp, &dev_opp->opp_list, node) {
+>                 srcu_notifier_call_chain(&dev_opp->head, OPP_EVENT_REMOVE, opp);
+>                 list_del_rcu(&opp->node);
+> 
+>                 kfree(opp);
+>         }
+> 
+> Because we are freeing opp at the end, list_for_each_entry_rcu()
+> is trying to read the already freed opp to find opp->node.next
+> and that results in a crash.
+> 
+> What am I doing wrong ?
 
-Hi Arnd,
-my ping was because I haven't received any feedback on the patchset.
-Taking the silence as an ACK I'll take the patches in my repo to pull
-to arm-soc within the next pull request.
+I hope that doesn't happen under rcu_read_lock()?
 
-Thanks,
+The modification needs to be done under dev_opp_list_lock in the first place
+in which case you don't need the _rcu version of list walking, so you simply
+can use list_for_each_entry_safe() here. The mutex is sufficient for the
+synchronization with other writers (if any).  The freeing, though, has to be
+deferred until all readers drop their references to the old entry.  You can
+use kfree_rcu() for that.
 
--- 
-Carlo Caione
+Rafael
