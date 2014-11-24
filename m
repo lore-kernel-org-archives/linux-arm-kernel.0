@@ -1,44 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 24 Nov 2014 18:16:15 +0000
-Subject: [RFC 0/2] Qualcomm RPM sleep states
-In-Reply-To: <546FCE3A.1000005@codeaurora.org>
-References: <546FC674.1070005@codeaurora.org>
- <20141121232738.GP3815@sirena.org.uk>
- <546FCE3A.1000005@codeaurora.org>
-Message-ID: <20141124181614.GT7712@sirena.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 24 Nov 2014 19:20:07 +0100 (CET)
+Subject: [PATCH 3.18-rc3 v8 1/4] irqchip: gic: Make gic_raise_softirq()
+ FIQ-safe
+In-Reply-To: <1415968543-29469-2-git-send-email-daniel.thompson@linaro.org>
+References: <1415183260-6389-1-git-send-email-daniel.thompson@linaro.org>
+ <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <1415968543-29469-2-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <alpine.DEB.2.11.1411241918090.6439@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 03:43:54PM -0800, Stephen Boyd wrote:
-> On 11/21/2014 03:27 PM, Mark Brown wrote:
+On Fri, 14 Nov 2014, Daniel Thompson wrote:
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 38493ff28fa5..0db62a6f1ee3 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -73,6 +73,13 @@ struct gic_chip_data {
+>  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+>  
+>  /*
+> + * This lock may be locked for reading by FIQ handlers. Thus although
+> + * read locking may be used liberally, write locking must only take
+> + * place only when local FIQ handling is disabled.
+> + */
+> +static DEFINE_RWLOCK(fiq_safe_cpu_map_lock);
+> +
+> +/*
+>   * The GIC mapping of CPU interfaces does not necessarily match
+>   * the logical CPU numbering.  Let's use a mapping as returned
+>   * by the GIC itself.
+> @@ -624,7 +631,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  	int cpu;
+>  	unsigned long flags, map = 0;
+>  
+> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+> +	read_lock_irqsave(&fiq_safe_cpu_map_lock, flags);
 
-> > I'm afraid the above is making very little sense to me.  What is
-> > "voting" and how is it different to "enabling", "notification" or
-> > "flushing"?
+Just for the record:
 
-> The regulators are shared between multiple "masters" in the SoC. So the
-> CPUs that are running linux only "vote" on attributes of regulators and
-> then another processor that isn't running linux (called RPM) aggregates
-> the request from Linux along with other "masters" like wifi, modem, etc.
-> and then changes something for that regulator like voltage,
-> enable/disable, etc. We also have some hardware next to our CPUs that
-> notifies the RPM when we transition into or out of idle/suspend (it's
-> called an SPM). This is the notification part. Flushing has to do with
-> batching up multiple RPM sleep set requests and sending them before we
-> enter idle/suspend.
+You might have noticed that you replace a raw lock with a non raw
+one. That's not an issue on mainline, but that pretty much renders
+that code broken for RT.
+  
+Surely nothing I worry too much about given the current state of RT.
 
-...
+Thanks,
 
-> Hopefully it's clear now. If not I can clarify further.
-
-A bit, but I'm afraid I'm still at a loss as to what the problems and
-debate are here.  Why is this more complex than the Linux part of the
-system just saying what it wants at any given time?  It sounds like that
-has some sort of performance issue?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/0f9234ad/attachment.sig>
+	tglx
