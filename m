@@ -1,122 +1,131 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 24 Nov 2014 20:36:32 +0000
-Subject: [PATCH 3.18-rc3 v8 1/4] irqchip: gic: Make gic_raise_softirq()
- FIQ-safe
-In-Reply-To: <alpine.DEB.2.11.1411241928300.6439@nanos>
-References: <1415183260-6389-1-git-send-email-daniel.thompson@linaro.org>
- <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1415968543-29469-2-git-send-email-daniel.thompson@linaro.org>
- <alpine.DEB.2.11.1411241918090.6439@nanos>
- <alpine.DEB.2.11.1411241928300.6439@nanos>
-Message-ID: <547396D0.5030309@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 24 Nov 2014 21:40:01 +0100
+Subject: [PATCH 2/3] i2c: slave-eeprom: add eeprom simulator driver
+In-Reply-To: <20141123202008.GE4431@pengutronix.de>
+References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+ <1416326695-13083-3-git-send-email-wsa@the-dreams.de>
+ <20141121071941.GK27002@pengutronix.de>
+ <20141122182630.GD9698@katana>
+ <20141123202008.GE4431@pengutronix.de>
+Message-ID: <20141124204001.GB26751@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/11/14 18:48, Thomas Gleixner wrote:
-> On Mon, 24 Nov 2014, Thomas Gleixner wrote:
->> On Fri, 14 Nov 2014, Daniel Thompson wrote:
->>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>> index 38493ff28fa5..0db62a6f1ee3 100644
->>> --- a/drivers/irqchip/irq-gic.c
->>> +++ b/drivers/irqchip/irq-gic.c
->>> @@ -73,6 +73,13 @@ struct gic_chip_data {
->>>  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
->>>  
->>>  /*
->>> + * This lock may be locked for reading by FIQ handlers. Thus although
->>> + * read locking may be used liberally, write locking must only take
->>> + * place only when local FIQ handling is disabled.
->>> + */
->>> +static DEFINE_RWLOCK(fiq_safe_cpu_map_lock);
->>> +
->>> +/*
->>>   * The GIC mapping of CPU interfaces does not necessarily match
->>>   * the logical CPU numbering.  Let's use a mapping as returned
->>>   * by the GIC itself.
->>> @@ -624,7 +631,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->>>  	int cpu;
->>>  	unsigned long flags, map = 0;
->>>  
->>> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
->>> +	read_lock_irqsave(&fiq_safe_cpu_map_lock, flags);
->>
->> Just for the record:
->>
->> You might have noticed that you replace a raw lock with a non raw
->> one. That's not an issue on mainline, but that pretty much renders
->> that code broken for RT.
->>   
->> Surely nothing I worry too much about given the current state of RT.
+
+> > > When the eeprom driver is probed and the adapter driver notices a read
+> > > request for the respective i2c address, this callback is called with
+> > > event=I2C_SLAVE_REQ_READ_START. Returning 0 here and provide the first
+> > > byte to send make the adapter ack the read request and send the data
+> > > provided. If something != 0 is returned a NAK is sent?
+> > 
+> > We only send NAK on write requests (I use read/write from the master
+> I don't understand this. Who is "we" in this case? 
+
+We as the slave serving the request of a remote master.
+
+> > No single call. I had this first, but my experiments showed that it is
+> > important for the EEPROM driver to only increase the internal pointer
+> > when the byte was ACKed. Otherwise, I was off-by-one.
+> Sure, the driver has to know how his read response was received by the
+> master. But assuming I understand your abstraction right there is some
+> redundancy. There are only three cases on a read request (well plus error
+> handling):
 > 
-> And having a second thought here. Looking at the protection scope
-> independent of the spin vs. rw lock
+>  - master sends ACK, reads next byte
+>    in this case the slave must provide another word
+>    In your abstraction this implies
+>      callback(I2C_SLAVE_REQ_READ_END); <-- this is redundant
+
+Well, in the way that a new start of something means automatically the
+end of the previous something, like some closing html tags which can be
+left out. However, I think being explicit here isn't much of a drawback.
+You lose a little bit of performance and gain flexibility. A sensor-like
+device could decide that on READ_END it is safe to discard the old value
+and start acquiring the new one, so it will be available on next
+READ_START. Be aware that the master decides how much time there will be
+between END and START (although it will be very close in most cases).
+
+>      callback(I2C_SLAVE_REQ_READ_START);
 > 
-> gic_raise_softirq()
+>  - master sends ACK, then P or Sr
+>      callback(I2C_SLAVE_REQ_READ_END);
+>      maybe callback(I2C_SLAVE_STOP)
 > 
-> 	lock();
+>  - master sends NACK
+>    in this case the message ends and the master has to send Sr or P.
+>    In your case this results in:
+>      nothing for the NACK?
+>      maybe callback(I2C_SLAVE_STOP)
 > 
-> 	/* Does not need any protection */
-> 	for_each_cpu(cpu, mask)
->                 map |= gic_cpu_map[cpu];
+> The situations where the slave has to react are:
 > 
-> 	/*
-> 	 * Can be outside the lock region as well as it makes sure
-> 	 * that previous writes (usually the IPI data) are visible
-> 	 * before the write to the SOFTINT register.
-> 	 */
-> 	 dmb(ishst);
+>  - slave was addressed with R
+>    input: address
+>    output: NAK or (ACK + data byte)
+>  - slave was addressed with #W:
+>    input: address
+>    output: NAK or ACK
+
+On most slave IP cores I have seen so far, there is nothing to do for a
+slave driver for those two. Address recognition and sending ACK are all
+done by the hardware and you are notified of that by an interrupt. For
+the read case, you have to deliver the first byte, of course.
+
+
+>  - data sent by slave-transmitter was acked
+>    output: next data byte (maybe unused because master sends Sr or P)
+
+The driver I modified in the next patch cannot know if the master
+acked/nacked something. It just knows if the output buffer is empty or
+if a stop was signalled (which really should come after NAK from the
+master). So, we can't depend on this difference.
+
+>  - data sent by slave-transmitter was nacked
+>    output: void (unless we want to support IGNORE_NAK :-)
+
+:)
+
+>  - slave received a data byte (write)
+>    input: data
+>    output: NAK or ACK
 > 
-> 	/* Why needs this protection? */
-> 	write(map, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT));
+> This looks like a better model in my eyes. In this model the slave
+> driver doesn't even need to be informed about P. Not entirely sure about
+> "data sent by slave-transmitter was nacked".
 
-If gic_cpu_map changed value during the execution of this function then
-this could raise an IPI on the wrong CPU.
+I think we definately need a STOP notification. Devices might want to do
+something like reducing power etc after stop.
 
-Most of the rest of this mail is explaining how this could happen.
+What I like about my version is that it reflects pretty closely what
+happens on the bus. I can't currently tell what somebody could do with
+WRITE_START (precharging something?). But it feels better to me to
+directly reflect what a real slave device would see, too, for
+flexibility.
 
-> 	unlock();
 > 
-> gic_migrate_target()
-> 
-> 	....
-> 	lock();
+> > For DMA, I haven't seen DMA slave support yet. Makes sense to me, we
+> haha, there is only a single slave driver yet and you're the author.
 
-Also:   Value of gic_cpu_map is updated.
+I meant IP cores here which support DMA for slave transmissions.
 
-> 	/* Migrate all peripheral interrupts */
-> 
-> 	unlock();
+Regardings buffers: I wouldn't like all bus drivers to have code
+handling the buffer when all they have to do is to put one byte on the
+bus. So, buffer handling should go into the core then probably. So,
+there'd be still one level of indirection?
 
-Also:   /* Migrate all IPIs pending on the old core */
+Also, since we don't know when the master will collect the data, there
+is a chance it might get stale?
 
-> So what's the point of that protection?
-> 
-> gic_raise_softirq() is used to send IPIs, which are PPIs on the target
-> CPUs so they are not affected from the migration of the peripheral
-> interrupts at all.
-> 
-> The write to the SOFTINT register in gic_migrate_target() is not
-> inside the lock region. So what's serialized by the lock in
-> gic_raise_softirq() at all?
+To me that sounds like too much complexity for too litle gain. At this
+moment, at least.
 
-At the point that gic_migrate_target() takes the lock it knows that no
-further IPIs can be submitted.
+Regards,
 
-Once the gic_cpu_map is updated we can permit new IPIs to be submitted
-because these will be routed to the correct core.
-
-As a result we don't actually need to hold the lock to migrate the
-pending IPIs since we know that no new IPIs can possibly be sent to the
-wrong core.
-
-> Either I'm missing something really important here or this locking
-> exercise in gic_raise_softirq() and therefor the rwlock conversion is
-> completely pointless.
-
-I did want to remove the lock too. However when I reviewed this code I
-concluded the lock was still required. Without it I think it is possible
-for gic_raise_softirq() to raise an IPI on the old core *after* the code
-to migrate pending IPIs has been run.
-
-
-Daniel.
+   Wolfram
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/75f2a442/attachment.sig>
