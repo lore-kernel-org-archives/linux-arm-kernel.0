@@ -1,43 +1,57 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 24 Nov 2014 14:50:20 +0300
-Subject: [PATCH v2] Fix PXA2xx sound DMA autoincrementation flags
-In-Reply-To: <5472605F.4030702@tul.cz>
-References: <54718713.1050902@tul.cz> <54720ACA.2070506@cogentembedded.com>
- <5472605F.4030702@tul.cz>
-Message-ID: <54731B7C.4030306@cogentembedded.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 24 Nov 2014 12:51:16 +0100
+Subject: [PATCH v4 0/6] Touchscreen performance related fixes
+In-Reply-To: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
+References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
+Message-ID: <20141124115116.GA14997@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+* Vignesh R | 2014-11-14 10:37:25 [+0530]:
 
-On 11/24/2014 1:31 AM, Petr Cvek wrote:
+>This series of patches fix TSC defects related to lag in touchscreen
+>performance and cursor jump at touch release. The lag was result of
+>udelay in TSC interrupt handler. Cursor jump due to false pen-up event.
+>The patches implement Advisory 1.0.31 in silicon errata of am335x-evm
+am335x not -evm. The am335x-evm is a board (with its own advisory
+document) built around the SoC.
 
-> Add support for SCCB devices into PXA27x I2C controller.
+Just testing the v4. I can use now IIO and touchscren at the same time.
+back at v1 I reported that it does not work, this has been fixed now.
+I had it running for a few minutes, now I see one of WARN_ON() beeing
+triggered (I've cut a few numbers so don't wonder about PID 2 and so on):
 
-> Fix generated START but no STOP for message without I2C_M_NOSTART flag. Add support for I2C_M_IGNORE_NAK flag.
->
-> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
-> ---
->   sound/arm/pxa2xx-pcm-lib.c | 8 +++++++-
->   1 file changed, 7 insertions(+), 1 deletion(-)
+|dmesg |grep WARNING | wc -l
+|10
+| dmesg |grep WARNING
+|[306.257995] WARNING: CPU: 0 PID: 97 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
+|[365.469591] WARNING: CPU: 0 PID: 58 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
+|[379.255904] WARNING: CPU: 0 PID: 24 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
+|[426.230505] WARNING: CPU: 0 PID: 35 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
+|[435.654091] WARNING: CPU: 0 PID: 28 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
+|[438.897519] WARNING: CPU: 0 PID: 91 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
+|[525.720193] WARNING: CPU: 0 PID: 88 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
+|[527.644770] WARNING: CPU: 0 PID: 38 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
+|[557.218349] WARNING: CPU: 0 PID: 56 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
+|[610.077274] WARNING: CPU: 0 PID: 2 at mfd/ti_am335x_tscadc.c:94 am335x_tsc_se_set_once+0xf8/0x104
 
-> diff --git a/sound/arm/pxa2xx-pcm-lib.c b/sound/arm/pxa2xx-pcm-lib.c
-> index a61d7a9..5d3a415 100644
-> --- a/sound/arm/pxa2xx-pcm-lib.c
-> +++ b/sound/arm/pxa2xx-pcm-lib.c
-> @@ -45,7 +45,13 @@ int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
->   	size_t period = params_period_bytes(params);
->   	pxa_dma_desc *dma_desc;
->   	dma_addr_t dma_buff_phys, next_desc_phys;
-> -	u32 dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
-> +	u32 dcmd = 0;
-> +
-> +	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-> +		dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
-> +	} else {
-> +		dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
-> +	}
+The complete trace:
 
-    {} not needed at all here. Sorry for not complaining at once...
+|[610.110692] CPU: 0 PID: 4422 Comm: cat Tainted: G        W      3.18.0-rc6+ #1745
+|[610.118577] [<c00138ec>] (unwind_backtrace) from [<c0011544>] (show_stack+0x10/0x14)
+|[610.126772] [<c0011544>] (show_stack) from [<c003c9b0>] (warn_slowpath_common+0x68/0x88)
+|[610.135313] [<c003c9b0>] (warn_slowpath_common) from [<c003c9ec>] (warn_slowpath_null+0x1c/0x24)
+|[610.144586] [<c003c9ec>] (warn_slowpath_null) from [<bf00569c>] (am335x_tsc_se_set_once+0xf8/0x104 [ti_am335x_tscadc])
+|[610.155886] [<bf00569c>] (am335x_tsc_se_set_once [ti_am335x_tscadc]) from [<bf067494>] (tiadc_read_raw+0xbc/0x190 [ti_am335x_adc])
+|[610.168326] [<bf067494>] (tiadc_read_raw [ti_am335x_adc]) from [<bf02dccc>] (iio_read_channel_info+0x9c/0xa4 [industrialio])
+|[610.180191] [<bf02dccc>] (iio_read_channel_info [industrialio]) from [<c02a42d4>] (dev_attr_show+0x1c/0x48)
+|[610.190477] [<c02a42d4>] (dev_attr_show) from [<c013d544>] (sysfs_kf_seq_show+0x8c/0x110)
+|[610.199108] [<c013d544>] (sysfs_kf_seq_show) from [<c013c1c8>] (kernfs_seq_show+0x24/0x28)
+|[610.207833] [<c013c1c8>] (kernfs_seq_show) from [<c0102658>] (seq_read+0x1b4/0x47c)
+|[610.215922] [<c0102658>] (seq_read) from [<c00e6700>] (vfs_read+0x8c/0x148)
+|[610.223269] [<c00e6700>] (vfs_read) from [<c00e67fc>] (SyS_read+0x40/0x8c)
+|[610.230525] [<c00e67fc>] (SyS_read) from [<c000e640>] (ret_fast_syscall+0x0/0x30)
 
-WBR, Sergei
+Could you please look at that one? (I tested it on am335x-evm btw).
+
+Sebastian
