@@ -1,45 +1,110 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 24 Nov 2014 08:53:26 +0100
-Subject: [PATCH V2 3/5] usb: gadget: pxa25x_udc: prepare/unprepare clocks
- in pxa-ssp
-In-Reply-To: <CALT56yMUQDZV5=dn_Hm7jNS5NQXj7ewXcB2LsGvTbCOuoio7JQ@mail.gmail.com>
- (Dmitry Eremin-Solenikov's message of "Sat, 22 Nov 2014 21:51:20
- +0400")
-References: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
- <1416236863-20898-3-git-send-email-dbaryshkov@gmail.com>
- <878uj98y5v.fsf@free.fr>
- <CALT56yMCJ4R6KN2BUW61YaUz2bb6s_aJteKYBSVmvRPKacKCLw@mail.gmail.com>
- <CALT56yO8tktrXo0rfRd91AtXBE4F5vYfYjm9AL+7dcoam6Oq9Q@mail.gmail.com>
- <87egsz6ija.fsf@free.fr> <87sihb49vm.fsf@free.fr>
- <CALT56yMVjRC4YhWsc9d_i0mVrHyv8XV=Sw2op=xsdR5izv1tHg@mail.gmail.com>
- <87lhn340i1.fsf@free.fr>
- <CALT56yP1OGWQd5i+H+4uFkZD4AqdtF7J1+Lme76UgLgVfycQ4w@mail.gmail.com>
- <87h9xr3z35.fsf@free.fr>
- <CALT56yMUQDZV5=dn_Hm7jNS5NQXj7ewXcB2LsGvTbCOuoio7JQ@mail.gmail.com>
-Message-ID: <87d28d3uh5.fsf@free.fr>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 24 Nov 2014 15:58:58 +0800
+Subject: [PATCH v4] ARM: dts: sun8i: Add PLL6 and MBUS clock nodes
+Message-ID: <1416815938-29842-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+Now that the clock driver supports PLL6 and MBUS on sun8i correctly,
+add the corresponding clock nodes to the dtsi.
 
-> 2014-11-22 20:49 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
-> Next point would be (from my POV) to make sure that
-> lubbock_unmask_irq() is called
-> and works as expected.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-Actually the problem is probably within the CPLD.
-Irrespective of the CPLD register LUB_IRQ_MASK_EN, the GPIO0 is always low,
-indicating an interrupt all the time.
+This was originally a 2 patch series. The mbus clock driver was merged
+during the last release. This patch requires the sun6i ahb1 clk unifying
+series.
 
-The only thing that changes that is the switch SW13, which forces GPIO0 to high,
-but prevents interrupts.
+Changes since v3:
 
-Normally, GPIO0 = (SW13 | ! (LUB_IRQ_MASK_EN && LUB_IRQ_SET_CLR))
+  - Rebased onto latest sun6i ahb1 clk unify patches, using the new divs
+    clocks style pll6.
 
-This is why I don't have any interrupt, next stage will be to verify U46 and U54
-on the IO board for GPIO_INT# and USB_INT# signals ...
+---
+ arch/arm/boot/dts/sun8i-a23.dtsi | 32 ++++++++++++++++++++++++--------
+ 1 file changed, 24 insertions(+), 8 deletions(-)
 
-Cheers.
-
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+index 726b613..2fcccf0 100644
+--- a/arch/arm/boot/dts/sun8i-a23.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -110,11 +110,19 @@
+ 		};
+ 
+ 		/* dummy clock until actually implemented */
+-		pll6: pll6_clk {
++		pll5: pll5_clk {
+ 			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
+-			clock-frequency = <600000000>;
+-			clock-output-names = "pll6";
++			clock-frequency = <0>;
++			clock-output-names = "pll5";
++		};
++
++		pll6: clk at 01c20028 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun6i-a31-pll6-clk";
++			reg = <0x01c20028 0x4>;
++			clocks = <&osc24M>;
++			clock-output-names = "pll6", "pll6x2";
+ 		};
+ 
+ 		cpu: cpu_clk at 01c20050 {
+@@ -144,7 +152,7 @@
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun6i-a31-ahb1-clk";
+ 			reg = <0x01c20054 0x4>;
+-			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6>;
++			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6 0>;
+ 			clock-output-names = "ahb1";
+ 		};
+ 
+@@ -185,7 +193,7 @@
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun4i-a10-apb1-clk";
+ 			reg = <0x01c20058 0x4>;
+-			clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
++			clocks = <&osc32k>, <&osc24M>, <&pll6 0>, <&pll6 0>;
+ 			clock-output-names = "apb2";
+ 		};
+ 
+@@ -204,7 +212,7 @@
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun4i-a10-mod0-clk";
+ 			reg = <0x01c20088 0x4>;
+-			clocks = <&osc24M>, <&pll6>;
++			clocks = <&osc24M>, <&pll6 0>;
+ 			clock-output-names = "mmc0";
+ 		};
+ 
+@@ -212,7 +220,7 @@
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun4i-a10-mod0-clk";
+ 			reg = <0x01c2008c 0x4>;
+-			clocks = <&osc24M>, <&pll6>;
++			clocks = <&osc24M>, <&pll6 0>;
+ 			clock-output-names = "mmc1";
+ 		};
+ 
+@@ -220,9 +228,17 @@
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun4i-a10-mod0-clk";
+ 			reg = <0x01c20090 0x4>;
+-			clocks = <&osc24M>, <&pll6>;
++			clocks = <&osc24M>, <&pll6 0>;
+ 			clock-output-names = "mmc2";
+ 		};
++
++		mbus_clk: clk at 01c2015c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun8i-a23-mbus-clk";
++			reg = <0x01c2015c 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5>;
++			clock-output-names = "mbus";
++		};
+ 	};
+ 
+ 	soc at 01c00000 {
 -- 
-Robert
+2.1.3
