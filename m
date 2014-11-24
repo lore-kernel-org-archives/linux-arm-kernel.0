@@ -1,70 +1,45 @@
 From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Mon, 24 Nov 2014 17:30:46 +0000
-Subject: [PATCH v9 10/10] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <CAKfTPtC9tew3wzoWfyxOWJR8MtpL+jjwWoA9Lkpk4opVUEXcxQ@mail.gmail.com>
+Date: Mon, 24 Nov 2014 17:34:46 +0000
+Subject: [PATCH v9 01/10] sched: add utilization_avg_contrib
+In-Reply-To: <CAKfTPtBDd6JXuK4THkqs4eoEHG+-VYfhFR6nUe2vrqvGWG08Yw@mail.gmail.com>
 References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
- <1415033687-23294-11-git-send-email-vincent.guittot@linaro.org>
- <20141121123733.GI23177@e105550-lin.cambridge.arm.com>
- <CAKfTPtC9tew3wzoWfyxOWJR8MtpL+jjwWoA9Lkpk4opVUEXcxQ@mail.gmail.com>
-Message-ID: <20141124173046.GM23177@e105550-lin.cambridge.arm.com>
+ <1415033687-23294-2-git-send-email-vincent.guittot@linaro.org>
+ <20141121123453.GB23177@e105550-lin.cambridge.arm.com>
+ <CAKfTPtBDd6JXuK4THkqs4eoEHG+-VYfhFR6nUe2vrqvGWG08Yw@mail.gmail.com>
+Message-ID: <20141124173446.GN23177@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 02:45:45PM +0000, Vincent Guittot wrote:
-> On 21 November 2014 at 13:37, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> > On Mon, Nov 03, 2014 at 04:54:47PM +0000, Vincent Guittot wrote:
-> 
+On Mon, Nov 24, 2014 at 02:04:15PM +0000, Vincent Guittot wrote:
+> On 21 November 2014 at 13:34, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+> > Should the subject mention that the patch adds utilization tracking?
+> > Maybe: 'sched: Add utilization tracking' ?
+> >
+> >
+> > On Mon, Nov 03, 2014 at 04:54:38PM +0000, Vincent Guittot wrote:
+> >> Add new statistics which reflect the average time a task is running on the CPU
+> >> and the sum of these running time of the tasks on a runqueue. The latter is
+> >> named utilization_load_avg.
 > >>
-> >> +     /*
-> >> +      * The dst_cpu is idle and the src_cpu CPU has only 1 CFS task.
-> >> +      * It's worth migrating the task if the src_cpu's capacity is reduced
-> >> +      * because of other sched_class or IRQs whereas capacity stays
-> >> +      * available on dst_cpu.
-> >> +      */
-> >> +     if ((env->idle != CPU_NOT_IDLE) &&
-> >> +                     (env->src_rq->cfs.h_nr_running == 1)) {
-> >> +             unsigned long src_eff_capacity, dst_eff_capacity;
-> >> +
-> >> +             dst_eff_capacity = 100;
-> >> +             dst_eff_capacity *= capacity_of(env->dst_cpu);
-> >> +             dst_eff_capacity *= capacity_orig_of(env->src_cpu);
-> >> +
-> >> +             src_eff_capacity = sd->imbalance_pct;
-> >> +             src_eff_capacity *= capacity_of(env->src_cpu);
-> >> +             src_eff_capacity *= capacity_orig_of(env->dst_cpu);
+> >> This patch is based on the usage metric that was proposed in the 1st
+> >> versions of the per-entity load tracking patchset by Paul Turner
 > >
-> > Do we need to scale by capacity_orig? Shouldn't the absolute capacity be
-> > better?
+> > Should we do ourselves and anybody else who feels like going through the
+> > pain of understanding the load-tracking code a favor and drop the use of
+> > the term 'usage' and use 'utilization' everywhere instead? 'usage' isn't
+> > clearly defined anywhere.
 > >
-> > if (capacity_of(env->src) * sd->imbalance_pct < capacity_of(env->dst) *
-> > 100) ?
+> > Referring to 'usage' here in the reference to original patch is fine,
+> > but I suggest that we remove it from the code and comment on subsequent
+> > patches unless there is a very good reason to keep it.
 > 
-> we don't want to compare absolute capacity between CPUs but to compare
-> the reduction of their capacity because we want to choose the CPU
-> which is less used  by RT tasks or irq
-
-But least relative RT load doesn't necessarily mean most available
-compute capacity. 50% RT use of a capacity_orig = 1000 (capacity_of(cpu) =
-500, eff_capacity = 50%) gives better CFS throughput than 20% RT use of
-a capacity_orig = 500 (capacity_of(cpu) = 400, eff_capacity = 80%). Why pick
-the cpu with less throughput?
-
-Morten
-
+> As discussed with Peter, we use usage when the task's utilization has
+> been scaled by the capacity.
 > 
-> Regards,
-> Vincent
-> >
-> > Isn't it the absolute available capacity that matters? For SMP
-> > capacity_orig is the same and cancels out and doesn't change anything.
-> > For big.LITTLE we would rather have the task run on a big where rt/irq
-> > eats 30% than a little cpu where rq/irq eats 5%, assuming big capacity
-> > is much bigger than little capacity so the absolute available capacity
-> > (~cycles/time) is larger on the big cpu.
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
-> 
+> IIRC from one of our discussion, dietmar should prepare a patchset to
+> rename and aligned variables and field.
+
+I read this as we stick with usage while utilization is scaled by
+capacity and potentially drop it again when adding uarch invariance so
+the scaling goes away. Or rename it before if we find a better name for
+it.
