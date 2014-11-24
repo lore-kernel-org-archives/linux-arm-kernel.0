@@ -1,216 +1,112 @@
-From: feng.wu@intel.com (Wu, Feng)
-Date: Mon, 24 Nov 2014 08:34:43 +0000
-Subject: [PATCH v3 0/8] KVM-VFIO IRQ forward control
-In-Reply-To: <5472EBEF.3070108@linaro.org>
-References: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
- <E959C4978C3B6342920538CF579893F0022ADA8C@SHSMSX104.ccr.corp.intel.com>
- <5472EBEF.3070108@linaro.org>
-Message-ID: <E959C4978C3B6342920538CF579893F0022ADBB8@SHSMSX104.ccr.corp.intel.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 24 Nov 2014 14:03:38 +0530
+Subject: [PATCH v6]  i2c: s3c2410: Handle i2c sys_cfg register in i2c driver
+Message-ID: <1416818018-6684-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Let's handle i2c interrupt re-configuration in i2c driver. This will
+help us in removing some soc specific checks from machine files and
+will help in removing static iomapping of SYS register in exynos.c
+
+Also handle saving and restoring of SYS_I2C_CFG register during
+suspend and resume of i2c driver.
+
+CC: Wolfram Sang <wsa@the-dreams.de>
+CC: linux-i2c at vger.kernel.org
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+This patch is created from following patch series V5(1/2).
+
+https://patchwork.kernel.org/patch/5354131/
+
+DT and machine (mach-exynos) changes will be posted separately. 
 
 
-> -----Original Message-----
-> From: Eric Auger [mailto:eric.auger at linaro.org]
-> Sent: Monday, November 24, 2014 4:27 PM
-> To: Wu, Feng; eric.auger at st.com; christoffer.dall at linaro.org;
-> marc.zyngier at arm.com; linux-arm-kernel at lists.infradead.org;
-> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org;
-> alex.williamson at redhat.com; joel.schopp at amd.com;
-> kim.phillips at freescale.com; paulus at samba.org; gleb at kernel.org;
-> pbonzini at redhat.com; agraf at suse.de
-> Cc: linux-kernel at vger.kernel.org; patches at linaro.org; will.deacon at arm.com;
-> a.motakis at virtualopensystems.com; a.rigo at virtualopensystems.com;
-> john.liuli at huawei.com; ming.lei at canonical.com
-> Subject: Re: [PATCH v3 0/8] KVM-VFIO IRQ forward control
-> 
-> On 11/24/2014 09:14 AM, Wu, Feng wrote:
-> >
-> >
-> >> -----Original Message-----
-> >> From: Eric Auger [mailto:eric.auger at linaro.org]
-> >> Sent: Monday, November 24, 2014 2:36 AM
-> >> To: eric.auger at st.com; eric.auger at linaro.org; christoffer.dall at linaro.org;
-> >> marc.zyngier at arm.com; linux-arm-kernel at lists.infradead.org;
-> >> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org;
-> >> alex.williamson at redhat.com; joel.schopp at amd.com;
-> >> kim.phillips at freescale.com; paulus at samba.org; gleb at kernel.org;
-> >> pbonzini at redhat.com; agraf at suse.de
-> >> Cc: linux-kernel at vger.kernel.org; patches at linaro.org;
-> will.deacon at arm.com;
-> >> a.motakis at virtualopensystems.com; a.rigo at virtualopensystems.com;
-> >> john.liuli at huawei.com; ming.lei at canonical.com; Wu, Feng
-> >> Subject: [PATCH v3 0/8] KVM-VFIO IRQ forward control
-> >>
-> >> This series proposes an integration of "ARM: Forwarding physical
-> >> interrupts to a guest VM" (http://lwn.net/Articles/603514/) in
-> >> KVM.
-> >>
-> >> It enables to transform a VFIO platform driver IRQ into a forwarded
-> >> IRQ.
-> >>
-> >> When a physical IRQ is forwarded (to a guest), the host does not
-> >> deactivates this latter. Completion ownership is transferred to the
-> >> guest. When the guest deactivates the associated virtual IRQ,
-> >> the interrupt controler automatically completes the physical IRQ.
-> >> Obviously this requires some dedicated HW support in the interrupt
-> >> controler.
-> >>
-> >> The direct benefit is that, for a level sensitive IRQ, it avoids a
-> >> VM exit on forwarded IRQ completion.
-> >>
-> >> When the IRQ is forwarded, the VFIO platform driver does not need to
-> >> mask the physical IRQ anymore before signaling the eventfd. Indeed
-> >> genirq lowers the running priority, enabling other physical IRQ to hit
-> >> except that one.
-> >>
-> >> Besides, the injection still is based on irqfd triggering. The only
-> >> impact on irqfd process is resamplefd is not called anymore on
-> >> virtual IRQ completion since this latter becomes "transparent".
-> >>
-> >> The current integration is based on an extension of the KVM-VFIO
-> >> device, previously used by KVM to interact with VFIO groups. The
-> >> patch series now enables KVM to directly interact with a VFIO
-> >> platform device. The VFIO external API was extended for that purpose.
-> >>
-> >> Th KVM-VFIO device can get/put the vfio platform device, check its
-> >> integrity and type, get the IRQ number associated to an IRQ index.
-> >>
-> >> The IRQ forward programming is architecture specific (virtual interrupt
-> >> controller programming basically). However the whole infrastructure is
-> >> kept generic.
-> >>
-> >> from a user point of view, the functionality is provided through a
-> >> new KVM-VFIO group named KVM_DEV_VFIO_DEVICE and 2 associated
-> >> attributes:
-> >> - KVM_DEV_VFIO_DEVICE_FORWARD_IRQ,
-> >> - KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ.
-> >>
-> >> The capability can be checked with KVM_HAS_DEVICE_ATTR.
-> >>
-> >> Forwarding must be activated before VFIO signaling mechanism is set
-> >> using VFIO_DEVICE_SET_IRQS and unset while the signaling is disabled.
-> >>
-> >> ---
-> >>
-> >> This patch series has the following dependencies:
-> >> - "ARM: Forwarding physical interrupts to a guest VM"
-> >>   (http://lwn.net/Articles/603514/)
-> >> - [PATCH v9 00/19] VFIO support for platform and AMBA devices on ARM
-> >>   (http://www.spinics.net/lists/kvm-arm/msg11745.html)
-> >> - [PATCH v2 0/6] vfio: type1: support for ARM SMMUS with
-> >> VFIO_IOMMU_TYPE1
-> >>   (http://www.spinics.net/lists/kvm-arm/msg11738.html)
-> >>
-> >> Integrated pieces can be found at
-> >> ssh://git.linaro.org/people/eric.auger/linux.git
-> >> on branch irqfd_integ_v8
-> >>
-> >> This was was tested on Calxeda Midway, assigning the xgmac main IRQ.
-> >>
-> >
-> > Hi Eric,
-> >
-> > Did you send out the latest QEMU part for this patch set, I notice that v6 of
-> > The QEMU part is sent out, but seems some structure in this new version
-> > has been changed, such as, struct kvm_arch_forwarded_irq (subindex is
-> added
-> > in this version), so a new patchset in QEMU is also needed.
-> 
-> Hi Feng,
-> 
-> v7 is available at:
-> http://lists.gnu.org/archive/html/qemu-devel/2014-10/msg03804.html. It
-> already illustrates KVM-VFIO device usage.
-> 
-> v8 which will indeed integrate subindex addition will be delivered this
-> week.
-> 
-> Best Regards
-> 
-> Eric
+ drivers/i2c/busses/i2c-s3c2410.c |   29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-Thanks a lot for the information, Eric!
-
-Thanks,
-Feng
-
-> >
-> > Thanks,
-> > Feng
-> >
-> >
-> >> v2 -> v3:
-> >> - kvm_fwd_irq_action enum replaced by a bool (KVM_VFIO_IRQ_CLEANUP
-> does
-> >> not
-> >>   exist anymore)
-> >> - a new struct local to vfio.c was introduced to wrap kvm_fw_irq and make it
-> >>   linkable: kvm_vfio_fwd_irq_node
-> >> - kvm_fwd_irq now is self-contained (includes struct vfio_device *)
-> >> - a single list of kvm_vfio_fwd_irq_irq_node is used instead of having
-> >>   a list of devices and a list of forward irq per device. Having 2 lists
-> >>   brought extra complexity.
-> >> - the VFIO device ref counter is incremented each time a new IRQ is
-> forwarded.
-> >>   It is not attempted anymore to hold a single reference whatever the
-> number
-> >>   of forwarded IRQs.
-> >> - subindex added on top of index to be closer to VFIO API
-> >> - platform device check moved in the arm specific implementation
-> >> - enable the KVM-VFIO device for arm64
-> >> - forwarded state change only can happen while the VFIO IRQ handler is not
-> >>   set; in other words, when the VFIO IRQ signaling is not set.
-> >>
-> >> v1 -> v2:
-> >> - forward control is moved from architecture specific file into generic
-> >>   vfio.c module.
-> >>   only kvm_arch_set_fwd_state remains architecture specific
-> >> - integrate Kim's patch which enables KVM-VFIO for ARM
-> >> - fix vgic state bypass in vgic_queue_hwirq
-> >> - struct kvm_arch_forwarded_irq moved from
-> >> arch/arm/include/uapi/asm/kvm.h
-> >>   to include/uapi/linux/kvm.h
-> >>   also irq_index renamed into index and guest_irq renamed into gsi
-> >> - ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
-> >> - vfio_external_get_base_device renamed into vfio_external_base_device
-> >> - vfio_external_get_type removed
-> >> - kvm_vfio_external_get_base_device renamed into
-> >> kvm_vfio_external_base_device
-> >> - __KVM_HAVE_ARCH_KVM_VFIO renamed into
-> >> __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
-> >>
-> >>
-> >> Eric Auger (7):
-> >>   KVM: arm64: Enable the KVM-VFIO device
-> >>   VFIO: platform: forwarded state tested when selecting IRQ handler
-> >>   KVM: kvm-vfio: User API for IRQ forwarding
-> >>   VFIO: External user API device helpers
-> >>   KVM: kvm-vfio: wrapper to VFIO external API device helpers
-> >>   KVM: kvm-vfio: generic forwarding control
-> >>   KVM: arm: kvm-vfio: forwarding control
-> >>
-> >> Kim Phillips (1):
-> >>   KVM: arm: Enable the KVM-VFIO device
-> >>
-> >>  Documentation/virtual/kvm/devices/vfio.txt |  34 +++-
-> >>  arch/arm/include/asm/kvm_host.h            |   7 +
-> >>  arch/arm/kvm/Kconfig                       |   1 +
-> >>  arch/arm/kvm/Makefile                      |   4 +-
-> >>  arch/arm/kvm/kvm_vfio_arm.c                | 101 ++++++++++
-> >>  arch/arm64/kvm/Kconfig                     |   1 +
-> >>  arch/arm64/kvm/Makefile                    |   2 +-
-> >>  drivers/vfio/platform/vfio_platform_irq.c  |   7 +-
-> >>  drivers/vfio/vfio.c                        |  24 +++
-> >>  include/linux/kvm_host.h                   |  28 +++
-> >>  include/linux/vfio.h                       |   3 +
-> >>  include/uapi/linux/kvm.h                   |  10 +
-> >>  virt/kvm/vfio.c                            | 294
-> >> ++++++++++++++++++++++++++++-
-> >>  13 files changed, 503 insertions(+), 13 deletions(-)
-> >>  create mode 100644 arch/arm/kvm/kvm_vfio_arm.c
-> >>
-> >> --
-> >> 1.9.1
-> >
+diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+index 6524477..09a6bac 100644
+--- a/drivers/i2c/busses/i2c-s3c2410.c
++++ b/drivers/i2c/busses/i2c-s3c2410.c
+@@ -35,6 +35,8 @@
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
+ #include <linux/pinctrl/consumer.h>
++#include <linux/mfd/syscon.h>
++#include <linux/regmap.h>
+ 
+ #include <asm/irq.h>
+ 
+@@ -87,6 +89,9 @@
+ /* Max time to wait for bus to become idle after a xfer (in us) */
+ #define S3C2410_IDLE_TIMEOUT	5000
+ 
++/* Exynos5 Sysreg offset */
++#define EXYNOS5_SYS_I2C_CFG	0x0234
++
+ /* i2c controller state */
+ enum s3c24xx_i2c_state {
+ 	STATE_IDLE,
+@@ -123,6 +128,8 @@ struct s3c24xx_i2c {
+ #if defined(CONFIG_ARM_S3C24XX_CPUFREQ)
+ 	struct notifier_block	freq_transition;
+ #endif
++	struct regmap		*sysreg;
++	unsigned int		sys_i2c_cfg;
+ };
+ 
+ static struct platform_device_id s3c24xx_driver_ids[] = {
+@@ -1071,6 +1078,7 @@ static void
+ s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
+ {
+ 	struct s3c2410_platform_i2c *pdata = i2c->pdata;
++	int id;
+ 
+ 	if (!np)
+ 		return;
+@@ -1080,6 +1088,21 @@ s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
+ 	of_property_read_u32(np, "samsung,i2c-slave-addr", &pdata->slave_addr);
+ 	of_property_read_u32(np, "samsung,i2c-max-bus-freq",
+ 				(u32 *)&pdata->frequency);
++	/*
++	 * Exynos5's legacy i2c controller and new high speed i2c
++	 * controller have muxed interrupt sources. By default the
++	 * interrupts for 4-channel HS-I2C controller are enabled.
++	 * If nodes for first four channels of legacy i2c controller
++	 * are available then re-configure the interrupts via the
++	 * system register.
++	 */
++	id = of_alias_get_id(np, "i2c");
++	i2c->sysreg = syscon_regmap_lookup_by_phandle(np,
++			"samsung,sysreg-phandle");
++	if (IS_ERR(i2c->sysreg))
++		return;
++
++	regmap_update_bits(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, BIT(id), 0);
+ }
+ #else
+ static void
+@@ -1260,6 +1283,9 @@ static int s3c24xx_i2c_suspend_noirq(struct device *dev)
+ 
+ 	i2c->suspended = 1;
+ 
++	if (!IS_ERR(i2c->sysreg))
++		regmap_read(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, &i2c->sys_i2c_cfg);
++
+ 	return 0;
+ }
+ 
+@@ -1268,6 +1294,9 @@ static int s3c24xx_i2c_resume_noirq(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
+ 
++	if (!IS_ERR(i2c->sysreg))
++		regmap_write(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, i2c->sys_i2c_cfg);
++
+ 	clk_prepare_enable(i2c->clk);
+ 	s3c24xx_i2c_init(i2c);
+ 	clk_disable_unprepare(i2c->clk);
+-- 
+1.7.9.5
