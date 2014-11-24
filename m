@@ -1,93 +1,31 @@
 From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 24 Nov 2014 23:25:45 +0100
+Date: Mon, 24 Nov 2014 23:27:13 +0100
 Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-In-Reply-To: <20140905135816.GE20164@leverpostej>
+In-Reply-To: <CAOMZO5BtUaYbQUhidgyPBFdARsFY=uYySYqXXmFEfPL8qTBbfQ@mail.gmail.com>
 References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <201409051552.05447@pali> <20140905135816.GE20164@leverpostej>
-Message-ID: <201411242325.45574@pali>
+ <201409051552.05447@pali>
+ <CAOMZO5BtUaYbQUhidgyPBFdARsFY=uYySYqXXmFEfPL8qTBbfQ@mail.gmail.com>
+Message-ID: <201411242327.13398@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 September 2014 15:58:16 Mark Rutland wrote:
-> On Fri, Sep 05, 2014 at 02:52:05PM +0100, Pali Roh?r wrote:
-> > On Friday 05 September 2014 15:45:42 Mark Rutland wrote:
-> > > On Fri, Sep 05, 2014 at 12:38:40PM +0100, Pali Roh?r wrote:
-> > > > On Wednesday 18 June 2014 18:54:24 Pali Roh?r wrote:
-> > > > > Machine name from board description is some generic
-> > > > > name on DT kernel. DT provides machine name property
-> > > > > which is specific for board, so use it instead
-> > > > > generic one when possible.
-> > > > > 
-> > > > > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> > > > > ---
-> > > > > 
-> > > > >  arch/arm/kernel/setup.c |    7 +++++--
-> > > > >  1 file changed, 5 insertions(+), 2 deletions(-)
-> > > > > 
-> > > > > diff --git a/arch/arm/kernel/setup.c
-> > > > > b/arch/arm/kernel/setup.c index 8a16ee5..fbc7b4f
-> > > > > 100644 --- a/arch/arm/kernel/setup.c
-> > > > > +++ b/arch/arm/kernel/setup.c
-> > > > > @@ -875,10 +875,13 @@ void __init setup_arch(char
-> > > > > **cmdline_p)
-> > > > > 
-> > > > >  	setup_processor();
-> > > > >  	mdesc = setup_machine_fdt(__atags_pointer);
-> > > > > 
-> > > > > -	if (!mdesc)
-> > > > > +	if (mdesc)
-> > > > > +		machine_name = of_flat_dt_get_machine_name();
-> > > > > +	else
-> > > > > 
-> > > > >  		mdesc = setup_machine_tags(__atags_pointer,
-> > > > > 
-> > > > > __machine_arch_type); machine_desc = mdesc;
-> > > > > -	machine_name = mdesc->name;
-> > > > > +	if (!machine_name)
-> > > > > +		machine_name = mdesc->name;
-> > > > > 
-> > > > >  	if (mdesc->reboot_mode != REBOOT_HARD)
-> > > > >  	
-> > > > >  		reboot_mode = mdesc->reboot_mode;
-> > > > 
-> > > > So, do you really want to break userspace which reading
-> > > > file /proc/cpuinfo (after migration from boardcode -->
-> > > > DT)?
-> > > 
-> > > You have no guarantee model name in the DT == the name in
-> > > a board file anyhow, and trying to force that is wrong.
-> > > So further to Russell's reply, I must NAK this from a DT
-> > > perspective.
-> > > 
-> > > Realistically your userspace is already broken if relying
-> > > on such things. You built something that only ever worked
-> > > for a particular arbitrary string. So it was already
-> > > broken for every other board, and there was never any
-> > > guarantee that new boards where your userspace could have
-> > > worked would share the same name.
-> > > 
-> > > You're trying to fix the wrong side of the equation.
-> > > 
-> > > Mark.
-> > 
+On Friday 05 September 2014 15:58:34 Fabio Estevam wrote:
+> On Fri, Sep 5, 2014 at 10:52 AM, Pali Roh?r 
+<pali.rohar@gmail.com> wrote:
 > > So what is your suggestion for identifing board (name/type)
 > > which will work with any kernel (and will not be broken
 > > again by kernel later)?
 > 
-> Without knowing your use case I have no idea if that's even a
-> sane thing to do.
-> 
-> Mark.
+> $ cat /sys/bus/soc/devices/soc0/machine
+> Freescale i.MX6 Quad SABRE Smart Device Board
 
-Read information which was previously (non DT boot) in file: 
-/proc/cpuinfo
+This output is on Nokia N900 useless:
 
-Hardware        : Nokia RX-51 board
-Revision        : 0012
-Serial          : 0000000000000000
+$ cat /sys/bus/soc/devices/soc0/machine
+OMAP3430/3530
 
-Userspace applications using them for identifying on which device 
-and hw revisions are running.
+It does not specify that this is Nokia N900 (RX-51) device but 
+only some generic omap board.
 
 -- 
 Pali Roh?r
@@ -98,4 +36,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/cf51288a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/823526be/attachment.sig>
