@@ -1,27 +1,45 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 24 Nov 2014 10:48:49 +0100
-Subject: [PATCH v4 1/3] KVM: arm/arm64: unset CONFIG_HAVE_KVM_IRQCHIP
-In-Reply-To: <1416765420-12057-2-git-send-email-eric.auger@linaro.org>
-References: <1416765420-12057-1-git-send-email-eric.auger@linaro.org>
- <1416765420-12057-2-git-send-email-eric.auger@linaro.org>
-Message-ID: <20141124094849.GI3401@cbox>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 24 Nov 2014 10:54:16 +0100
+Subject: [PATCH 0/4] mmc: sdhci: adding support for a new Fujitsu sdhci IP
+In-Reply-To: <1416531100-26707-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1416531100-26707-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <CAPDyKFqZyUT+sARZQ2ncusttDWn31uQf_H2eTtHOSCs2c8yO4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 23, 2014 at 06:56:58PM +0100, Eric Auger wrote:
-> CONFIG_HAVE_KVM_IRQCHIP is needed to support IRQ routing (along
-> with irq_comm.c and irqchip.c usage). This is not the case for
-> arm/arm64 currently.
-> 
-> This patch unsets the flag for both arm and arm64.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+On 21 November 2014 at 01:51, Vincent Yang
+<vincent.yang.fujitsu@gmail.com> wrote:
+> Hello,
+>
+>   Fujitsu have an sdhci IP which is implemented in a SoC we're
+> adding to mainline, the most recent series for that was sent
+> here:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304522.html
+>
+>   These patches are against v3.18-rc5 mainline and tested on
+> v3.18-rc5 integration tree.
+>
+>   We welcome any comment and advice about how to make any
+> improvements or better align them with upstream.
 
-I don't fully understand why we used to have these and we don't need
-them anymore.  Was it just a stupid bug in the past?
+Apparently, there's a dependency between this patchset and the upper
+one you refereed to. That's a problem.
 
-Anyhow, looks reasonable:
+Preferably, try to remove the dependency and send all mmc patches to
+the mmc list. If that's not possible, you need to send these two
+patchsets as one instead.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+>
+> Thanks.
+>
+> Vincent Yang (4):
+>   mmc: sdhci: add a voltage switch callback function
+>   mmc: sdhci: add a quirk for tuning work around
+>   mmc: sdhci: add a quirk for single block transactions
+>   mmc: core: hold SD Clock before CMD11 during Signal
 
--Christoffer
+The last one I consider as a separate fix for mmc core. I will apply
+it to my mmc tree.
+
+Thanks and kind regards
+Uffe
