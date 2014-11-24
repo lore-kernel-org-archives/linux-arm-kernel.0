@@ -1,43 +1,67 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 24 Nov 2014 12:08:15 +0100
-Subject: [RFC 0/4] vgic additions for forwarded irq
-In-Reply-To: <54730E6C.1040708@arm.com>
-References: <1416766373-13569-1-git-send-email-eric.auger@linaro.org>
- <20141124105037.GL3401@cbox> <54730E6C.1040708@arm.com>
-Message-ID: <5473119F.5060707@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Nov 2014 11:09:45 +0000
+Subject: [PATCH v4 1/3] KVM: arm/arm64: unset CONFIG_HAVE_KVM_IRQCHIP
+In-Reply-To: <1416765420-12057-2-git-send-email-eric.auger@linaro.org>
+References: <1416765420-12057-1-git-send-email-eric.auger@linaro.org>
+ <1416765420-12057-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <20141124105532.GA13324@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2014 11:54 AM, Marc Zyngier wrote:
-> On 24/11/14 10:50, Christoffer Dall wrote:
->> On Sun, Nov 23, 2014 at 07:12:49PM +0100, Eric Auger wrote:
->>> This series applies on top of "ARM: Forwarding physical
->>> interrupts to a guest VM" (http://lwn.net/Articles/603514/)
->>> series.
->>
->> Marc and Eric,
->>
->> Does it make sense to review and look at these patches given the current
->> state of the forwarding patches, or should we wait until Marc respins
->> that series?
+On Sun, Nov 23, 2014 at 05:56:58PM +0000, Eric Auger wrote:
+> CONFIG_HAVE_KVM_IRQCHIP is needed to support IRQ routing (along
+> with irq_comm.c and irqchip.c usage). This is not the case for
+> arm/arm64 currently.
 > 
-> I'm still in the process of respining all of this (we've had a few
-> iterations with tglx, but I got sidetracked with the ITS/v2m/MSI side of
-> things).
-
-Hi Marc, Christoffer,
-
-for your info, I integrated with kvm-arm64/irq-forward branch prior to
-ITS integration, not with the RFC.
-
-Best Regards
-
-Eric
-
+> This patch unsets the flag for both arm and arm64.
 > 
-> I'll get back onto this this week. Hopefully.
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> ---
+
+The arm64 change is fine by me. I assume this will go via the kvm tree
+eventually?
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
+
+>  arch/arm/kvm/Kconfig   | 2 --
+>  arch/arm64/kvm/Kconfig | 1 -
+>  2 files changed, 3 deletions(-)
 > 
-> Thanks,
+> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+> index 466bd29..9f581b1 100644
+> --- a/arch/arm/kvm/Kconfig
+> +++ b/arch/arm/kvm/Kconfig
+> @@ -55,7 +55,6 @@ config KVM_ARM_MAX_VCPUS
+>  config KVM_ARM_VGIC
+>  	bool "KVM support for Virtual GIC"
+>  	depends on KVM_ARM_HOST && OF
+> -	select HAVE_KVM_IRQCHIP
+>  	default y
+>  	---help---
+>  	  Adds support for a hardware assisted, in-kernel GIC emulation.
+> @@ -63,7 +62,6 @@ config KVM_ARM_VGIC
+>  config KVM_ARM_TIMER
+>  	bool "KVM support for Architected Timers"
+>  	depends on KVM_ARM_VGIC && ARM_ARCH_TIMER
+> -	select HAVE_KVM_IRQCHIP
+>  	default y
+>  	---help---
+>  	  Adds support for the Architected Timers in virtual machines
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index 8ba85e9..279e1a0 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -50,7 +50,6 @@ config KVM_ARM_MAX_VCPUS
+>  config KVM_ARM_VGIC
+>  	bool
+>  	depends on KVM_ARM_HOST && OF
+> -	select HAVE_KVM_IRQCHIP
+>  	---help---
+>  	  Adds support for a hardware assisted, in-kernel GIC emulation.
+>  
+> -- 
+> 1.9.1
 > 
-> 	M.
 > 
