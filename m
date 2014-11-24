@@ -1,173 +1,116 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 24 Nov 2014 17:09:59 +0000
-Subject: [PATCH 3.18-rc3 v8 0/4] arm: Implement
- arch_trigger_all_cpu_backtrace
-In-Reply-To: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
-References: <1415183260-6389-1-git-send-email-daniel.thompson@linaro.org>
- <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <54736667.7080402@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 24 Nov 2014 09:09:08 -0800
+Subject: [GIT PULL 2/2] part 2 of omap dts changes for v3.19
+In-Reply-To: <pull-1416703431-245942-2>
+References: <pull-1416703431-245942>
+ <pull-1416703431-245942-2>
+Message-ID: <20141124170908.GF2817@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/14 12:35, Daniel Thompson wrote:
-> Hi Thomas, Hi Jason,
-> 
->   [Today I was *planning* to ask if patches 1 & 2 are OK for the irqchip
->   tree. However just to be on the safe side I ran some build tests and
->   they picked up something I overlooked last time. So instead of a poke
->   I've put out a new patchset instead. Just to be sure I ran some build
->   tests on the just patch 1 & 2 on their own. I couldn't find any
->   mid-series build regressions so taking just the first two patches
->   should present no problems.]
+Hi,
 
-Are there any comments on patches 1 & 2?
+Just noticed I have the signed tag missing for this one, updated pull
+request below.
 
+* Tony Lindgren <tony@atomide.com> [141122 16:47]:
+> The following changes since commit 065bd7fe50de5e6d0fd5034cbc87120a558a1219:
+> 
+>   ARM: dts: DRA7: Add aliases for all serial ports (2014-11-12 07:04:37 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap omap-for-v3.19/dt-v2
 
-Daniel.
+So please ignore the pull request above, below is an updated pull request
+with a proper tag. I've also added few more patches that I could not apply
+earlier because of pending comments.
 
-> 
-> This patchset modifies the GIC driver to allow it, on supported
-> platforms, to route IPI interrupts to FIQ and uses this feature to
-> implement arch_trigger_all_cpu_backtrace for arm.
-> 
-> On platforms not capable of supporting FIQ the signal to generate a
-> backtrace we fall back to using IRQ for propagation instead (relying on
-> a timeout to avoid wedging the CPU requesting the backtrace if other
-> CPUs are not responsive).
-> 
-> It has been tested on two systems capable of supporting grouping
-> (Freescale i.MX6 and STiH416) and two that do not (vexpress-a9 and
-> Qualcomm Snapdragon 600).
-> 
-> v8:
-> 
-> * Fixed build on arm64 causes by a spurious include file in irq-gic.c.
-> 
-> v7-2 (accidentally released twice with same number):
-> 
-> * Fixed boot regression on vexpress-a9 (reported by Russell King).
-> 
-> * Rebased on v3.18-rc3; removed one patch from set that is already
->   included in mainline.
-> 
-> * Dropped arm64/fiq.h patch from the set (still useful but not related
->   to issuing backtraces).
-> 
-> v7:
-> 
-> * Re-arranged code within the patch series to fix a regression
->   introduced midway through the series and corrected by a later patch
->   (testing by Olof's autobuilder). Tested offending patch in isolation
->   using defconfig identified by the autobuilder.
-> 
-> v6:
-> 
-> * Renamed svc_entry's call_trace argument to just trace (example code
->   from Russell King).
-> 
-> * Fixed mismatched ENDPROC() in __fiq_abt (example code from Russell
->   King).
-> 
-> * Modified usr_entry to optional avoid calling into the trace code and
->   used this in FIQ entry from usr path. Modified corresponding exit code
->   to avoid calling into trace code and the scheduler (example code from
->   Russell King).
-> 
-> * Ensured the default FIQ register state is restored when the default
->   FIQ handler is reinstalled (example code from Russell King).
-> 
-> * Renamed no_fiq_insn to dfl_fiq_insn to reflect the effect of adopting
->   a default FIQ handler.
-> 
-> * Re-instated fiq_safe_migration_lock and associated logic in
->   gic_raise_softirq(). gic_raise_softirq() is called by wake_up_klogd()
->   in the console unlock logic.
-> 
-> v5:
-> 
-> * Rebased on 3.17-rc4.
-> 
-> * Removed a spurious line from the final "glue it together" patch
->   that broke the build.
-> 
-> v4:
-> 
-> * Replaced push/pop with stmfd/ldmfd respectively (review of Nicolas
->   Pitre).
-> 
-> * Really fix bad pt_regs pointer generation in __fiq_abt.
-> 
-> * Remove fiq_safe_migration_lock and associated logic in
->   gic_raise_softirq() (review of Russell King)
-> 
-> * Restructured to introduce the default FIQ handler first, before the
->   new features (review of Russell King).
-> 
-> v3:
-> 
-> * Removed redundant header guards from arch/arm64/include/asm/fiq.h
->   (review of Catalin Marinas).
-> 
-> * Moved svc_exit_via_fiq macro to entry-header.S (review of Nicolas
->   Pitre).
-> 
-> v2:
-> 
-> * Restructured to sit nicely on a similar FYI patchset from Russell
->   King. It now effectively replaces the work in progress final patch
->   with something much more complete.
-> 
-> * Implemented (and tested) a Thumb-2 implementation of svc_exit_via_fiq
->   (review of Nicolas Pitre)
-> 
-> * Dropped the GIC group 0 workaround patch. The issue of FIQ interrupts
->   being acknowledged by the IRQ handler does still exist but should be
->   harmless because the IRQ handler will still wind up calling
->   ipi_cpu_backtrace().
-> 
-> * Removed any dependency on CONFIG_FIQ; all cpu backtrace effectively
->   becomes a platform feature (although the use of non-maskable
->   interrupts to implement it is best effort rather than guaranteed).
-> 
-> * Better comments highlighting usage of RAZ/WI registers (and parts of
->   registers) in the GIC code.
-> 
-> Changes *before* v1:
-> 
-> * This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
->   arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
->   the new structure. For historic details see:
->         https://lkml.org/lkml/2014/9/2/227
-> 
-> * Fix bug in __fiq_abt (no longer passes a bad struct pt_regs value).
->   In fixing this we also remove the useless indirection previously
->   found in the fiq_handler macro.
-> 
-> * Make default fiq handler "always on" by migrating from fiq.c to
->   traps.c and replace do_unexp_fiq with the new handler (review
->   of Russell King).
-> 
-> * Add arm64 version of fiq.h (review of Russell King)
-> 
-> * Removed conditional branching and code from irq-gic.c, this is
->   replaced by much simpler code that relies on the GIC specification's
->   heavy use of read-as-zero/write-ignored (review of Russell King)
-> 
-> 
-> Daniel Thompson (4):
->   irqchip: gic: Make gic_raise_softirq() FIQ-safe
->   irqchip: gic: Introduce plumbing for IPI FIQ
->   ARM: add basic support for on-demand backtrace of other CPUs
->   arm: smp: Handle ipi_cpu_backtrace() using FIQ (if available)
-> 
->  arch/arm/include/asm/irq.h      |   5 ++
->  arch/arm/include/asm/smp.h      |   3 +
->  arch/arm/kernel/smp.c           |  64 +++++++++++++++
->  arch/arm/kernel/traps.c         |   8 +-
->  drivers/irqchip/irq-gic.c       | 170 +++++++++++++++++++++++++++++++++++++---
->  include/linux/irqchip/arm-gic.h |   8 ++
->  6 files changed, 245 insertions(+), 13 deletions(-)
-> 
-> --
-> 1.9.3
-> 
+The following changes since commit 065bd7fe50de5e6d0fd5034cbc87120a558a1219:
+
+  ARM: dts: DRA7: Add aliases for all serial ports (2014-11-12 07:04:37 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/dt-part2-updated
+
+for you to fetch changes up to f80ecaf55b4982a888272790743dabf2c715dc10:
+
+  ARM: dts: am335x-evm: Add DCAN1 details (2014-11-24 07:56:22 -0800)
+
+----------------------------------------------------------------
+More dts changes for omaps to add support for new devices:
+
+- Add DCAN support am335x, am437x and dra7
+
+- Add devices for sb-t3x computers
+
+- Add support for NovaTech OrionLXm
+
+- Add n900 battery and si4713 support
+
+----------------------------------------------------------------
+Adam YH Lee (1):
+      ARM: dts: Gumstix DuoVero: Bind vdac regulator to hdmi node
+
+Dmitry Lifshitz (10):
+      ARM: dts: cm-t3x: cleanup comments indentation
+      ARM: dts: cm-t3x: add ADS7846 touchscreen support
+      ARM: OMAP2+: remove cm-t3x touchscreen pdata quirk
+      ARM: dts: cm-t3x: add EEPROM support
+      ARM: dts: sb-t35: add EEPROM support
+      ARM: dts: cm-t3x30: add keypad support
+      ARM: dts: cm-t3x: add I2C1 pinmux
+      ARM: dts: cm-t3x: add TV out support
+      ARM: dts: sbc-t3x: add TV out display alias
+      ARM: dts: sbc-t3x30: add audio support
+
+George McCollister (1):
+      ARM: dts: Add devicetree for NovaTech OrionLXm
+
+Lokesh Vutla (1):
+      ARM: dts: DRA7: Add node for RTC
+
+Mugunthan V N (1):
+      ARM: dts: am437x-gp: Add dcan support
+
+Roger Quadros (9):
+      ARM: dts: dra7: Add syscon regmap for CORE CONTROL area
+      ARM: dts: DRA7: Add DCAN nodes
+      ARM: dts: dra7-evm: Add CAN support
+      ARM: dts: dra72-evm: Add CAN support
+      ARM: dts: am4372: Add control module syscon node
+      ARM: dts: am4372: Add DCAN nodes
+      ARM: dts: am33xx: Add control module syscon node
+      ARM: dts: am33xx: Update DCAN nodes
+      ARM: dts: am335x-evm: Add DCAN1 details
+
+Sebastian Reichel (2):
+      ARM: dts: OMAP3-N900: add si4713 support
+      ARM: dst: OMAP3-N900: Add n900-battery support
+
+Vignesh R (1):
+      ARM: dts: AM43xx: add tscadc DT entries for am437x-evm and am43x-epos-evm
+
+ .../devicetree/bindings/arm/omap/omap.txt          |   3 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/am335x-evm.dts                   |  13 +
+ arch/arm/boot/dts/am335x-lxm.dts                   | 362 +++++++++++++++++++++
+ arch/arm/boot/dts/am33xx.dtsi                      |  25 +-
+ arch/arm/boot/dts/am4372.dtsi                      |  47 +++
+ arch/arm/boot/dts/am437x-gp-evm.dts                |  34 ++
+ arch/arm/boot/dts/am43x-epos-evm.dts               |   8 +
+ arch/arm/boot/dts/dra7-evm.dts                     |  22 ++
+ arch/arm/boot/dts/dra7.dtsi                        |  35 ++
+ arch/arm/boot/dts/dra72-evm.dts                    |  23 ++
+ arch/arm/boot/dts/omap3-cm-t3x.dtsi                | 124 ++++++-
+ arch/arm/boot/dts/omap3-cm-t3x30.dtsi              |  35 ++
+ arch/arm/boot/dts/omap3-n900.dts                   |  16 +
+ arch/arm/boot/dts/omap3-sb-t35.dtsi                |  36 ++
+ arch/arm/boot/dts/omap3-sbc-t3517.dts              |   1 +
+ arch/arm/boot/dts/omap3-sbc-t3530.dts              |   1 +
+ arch/arm/boot/dts/omap3-sbc-t3730.dts              |   1 +
+ arch/arm/boot/dts/omap4-duovero-parlor.dts         |   1 +
+ arch/arm/mach-omap2/pdata-quirks.c                 |   3 -
+ 20 files changed, 775 insertions(+), 18 deletions(-)
+ create mode 100644 arch/arm/boot/dts/am335x-lxm.dts
