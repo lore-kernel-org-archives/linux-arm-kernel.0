@@ -1,56 +1,23 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 24 Nov 2014 13:50:24 -0500 (EST)
-Subject: [PATCH] ARM: PJ4: allow building in Thumb-2 mode
-In-Reply-To: <CAOesGMhMU+mWVFY20SaS6SXKeJNudzPEGt2h_uc_rFJzMgXmXw@mail.gmail.com>
-References: <1416830200-11114-1-git-send-email-ard.biesheuvel@linaro.org>
- <2078609.NLHB18YoOo@wuerfel>
- <CAKv+Gu_YuHbO7+jusczcJTHF8fM4pF1z2h55BZK0mrHK702z_A@mail.gmail.com>
- <4653047.WBmUTsHC57@wuerfel>
- <CAOesGMhMU+mWVFY20SaS6SXKeJNudzPEGt2h_uc_rFJzMgXmXw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1411241346110.11690@knanqh.ubzr>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 24 Nov 2014 18:53:49 +0000
+Subject: [PATCH v3 1/4] spi: core: Add spi_transfer_is_last() helper
+In-Reply-To: <1416669702-7841-2-git-send-email-b.galvani@gmail.com>
+References: <1416669702-7841-1-git-send-email-b.galvani@gmail.com>
+ <1416669702-7841-2-git-send-email-b.galvani@gmail.com>
+Message-ID: <20141124185349.GC7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Nov 2014, Olof Johansson wrote:
+On Sat, Nov 22, 2014 at 04:21:39PM +0100, Beniamino Galvani wrote:
+> This adds the function spi_transfer_is_last() which can be used by
+> drivers to know whether a given transfer is the last one in the
+> current message.
 
-> On Mon, Nov 24, 2014 at 9:17 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 24 November 2014 16:34:47 Ard Biesheuvel wrote:
-> >> On 24 November 2014 at 16:29, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > On Monday 24 November 2014 12:56:40 Ard Biesheuvel wrote:
-> >> >> Two files that get included when building the multi_v7_defconfig target
-> >> >> fail to build when selecting THUMB2_KERNEL for this configuration.
-> >> >>
-> >> >> In both cases, we can just build the file as ARM code, as none of its
-> >> >> symbols are exported to modules, so there are no interworking concerns.
-> >> >> In the iwmmxt.S case, add ENDPROC() declarations so the symbols are
-> >> >> annotated as functions, resulting in the linker to emit the appropriate
-> >> >> mode switches.
-> >> >>
-> >> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> >
-> >> > Ah, very nice. I tried this before, but my version didn't actually
-> >> > work, presumably because I didn't know about the ENDPROC() stuff.
-> >> >
-> >> > Have you tested this on a machine that has IWMMXT enabled?
-> >> >
-> >>
-> >> No, I don't have access to such a machine, unfortunately.
-> >
-> > Adding a few mvebu folks to Cc, maybe one of them can test your patch.
-> > It's also possible that Olof or Kevin have a PJ4 machine with iwmmxt
-> > in their boot farms.
-> 
-> I have a Cubox with Dove, which does implement iWMMXt v2, based on
-> boot messages.
-> 
-> I however do not have any kind of userspace programs that make use of
-> it to test with.
-
-The housekeeping code will be called on task switch even if the 
-coprocessor is not involved by user space.  That's what needs testing 
-i.e. that code is still callable and doesn't crash in a Thumb2 config.  
->From the looks of it I wouldn't see any problem... but nothing beats 
-actual testing.
-
-
-Nicolas
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141124/d6850d0e/attachment.sig>
