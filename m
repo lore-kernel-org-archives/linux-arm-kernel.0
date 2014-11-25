@@ -1,86 +1,56 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Tue, 25 Nov 2014 12:28:25 +0000
-Subject: [PATCH v5 1/2] of: Rename "poweroff-source" property to
- "system-power-controller"
-In-Reply-To: <1416918506-9366-1-git-send-email-romain.perier@gmail.com>
-References: <1416918506-9366-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <1416918506-9366-2-git-send-email-romain.perier@gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 25 Nov 2014 14:32:26 +0200
+Subject: [PATCH v3 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
+ extensions
+In-Reply-To: <1416309051-26784-3-git-send-email-hdegoede@redhat.com>
+References: <1416309051-26784-1-git-send-email-hdegoede@redhat.com>
+ <1416309051-26784-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <547476DA.2030004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It reverts commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
-As discussed on the mailing list, it makes more sense to rename back to the
-old established property name, without the vendor prefix. Problem being that
-the word "source" usually tends to be used for inputs and that is out of control
-of the OS. The poweroff capability is an output which simply turns the
-system-power off. Also, this property might be used by drivers which power-off
-the system and power back on subsequent RTC alarms. This seems to suggest to
-remove "poweroff" from the property name and to choose "system-power-controller"
-as the more generic name. This patchs adds the required renaming changes and
-defines an helper function which checks if this property is set.
+On 18/11/14 13:10, Hans de Goede wrote:
+> If pre-filled framebuffer nodes are used, the firmware may need extra
+> properties to find the right node. This documents the properties to use
+> for this on sunxi platforms.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+> ---
+>  .../bindings/video/simple-framebuffer-sunxi.txt    | 33 ++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+> new file mode 100644
+> index 0000000..c46ba64
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+> @@ -0,0 +1,33 @@
+> +Sunxi specific Simple Framebuffer bindings
+> +
+> +This binding documents sunxi specific extensions to the simple-framebuffer
+> +bindings. The sunxi simplefb u-boot code relies on the devicetree containing
+> +pre-populated simplefb nodes.
+> +
+> +These extensions are intended so that u-boot can select the right node based
+> +on which pipeline is being used. As such they are solely intended for
+> +firmware / bootloader use, and the OS should ignore them.
+> +
+> +Required properties:
+> +- compatible: "allwinner,simple-framebuffer"
+> +- allwinner,pipeline, one of:
 
-Signed-off-by: Romain Perier <romain.perier@gmail.com>
----
- .../bindings/power/{poweroff.txt => power-controller.txt}           | 0
- Documentation/devicetree/bindings/regulator/act8865-regulator.txt   | 4 ++--
- drivers/regulator/act8865-regulator.c                               | 2 +-
- include/linux/of.h                                                  | 6 +++---
- 4 files changed, 6 insertions(+), 6 deletions(-)
- rename Documentation/devicetree/bindings/power/{poweroff.txt => power-controller.txt} (100%)
+Sorry my ignorance, but what's sunxi and what's allwinner? Both names
+are mixed here.
 
-diff --git a/Documentation/devicetree/bindings/power/poweroff.txt b/Documentation/devicetree/bindings/power/power-controller.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/power/poweroff.txt
-rename to Documentation/devicetree/bindings/power/power-controller.txt
-diff --git a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-index 01a5b07..dad6358 100644
---- a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-@@ -6,8 +6,8 @@ Required properties:
- - reg: I2C slave address
- 
- Optional properties:
--- poweroff-source: Telling whether or not this pmic is controlling
--  the system power. See Documentation/devicetree/bindings/power/poweroff.txt .
-+- system-power-controller: Telling whether or not this pmic is controlling
-+  the system power. See Documentation/devicetree/bindings/power/power-controller.txt .
- 
- Any standard regulator properties can be used to configure the single regulator.
- 
-diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
-index 76301ed..9eec453 100644
---- a/drivers/regulator/act8865-regulator.c
-+++ b/drivers/regulator/act8865-regulator.c
-@@ -365,7 +365,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
- 		return ret;
- 	}
- 
--	if (of_system_has_poweroff_source(dev->of_node)) {
-+	if (of_device_is_system_power_controller(dev->of_node)) {
- 		if (!pm_power_off) {
- 			act8865_i2c_client = client;
- 			act8865->off_reg = off_reg;
-diff --git a/include/linux/of.h b/include/linux/of.h
-index b81dbcf..0abdd70 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -964,14 +964,14 @@ static inline int of_changeset_update_property(struct of_changeset *ocs,
- extern int of_resolve_phandles(struct device_node *tree);
- 
- /**
-- * of_system_has_poweroff_source - Tells if poweroff-source is found for device_node
-+ * of_device_is_system_power_controller - Tells if system-power-controller is found for device_node
-  * @np: Pointer to the given device_node
-  *
-  * return true if present false otherwise
-  */
--static inline bool of_system_has_poweroff_source(const struct device_node *np)
-+static inline bool of_device_is_system_power_controller(const struct device_node *np)
- {
--	return of_property_read_bool(np, "poweroff-source");
-+	return of_property_read_bool(np, "system-power-controller");
- }
- 
- #endif /* _LINUX_OF_H */
--- 
-1.9.1
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141125/428e85c9/attachment.sig>
