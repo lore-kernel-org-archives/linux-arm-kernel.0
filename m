@@ -1,65 +1,96 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Mon, 24 Nov 2014 17:21:09 -0800
-Subject: [PATCH RESEND v8] iopoll: Introduce memory-mapped IO polling
- macros
-In-Reply-To: <94D0CD8314A33A4D9D801C0FE68B4029593C5E1F@G9W0745.americas.hpqcorp.net>
- (Robert Elliott's message of "Tue, 25 Nov 2014 00:53:19 +0000")
-References: <1416860092-11620-1-git-send-email-mitchelh@codeaurora.org>
- <94D0CD8314A33A4D9D801C0FE68B4029593C5E1F@G9W0745.americas.hpqcorp.net>
-Message-ID: <vnkwy4r0gjne.fsf@mitchelh-linux.qualcomm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 24 Nov 2014 17:34:50 -0800
+Subject: [RFC 1/2] clk: Allow overriding generic ops for clocks
+In-Reply-To: <1416842312-4405-2-git-send-email-k.kozlowski@samsung.com>
+References: <1416842312-4405-1-git-send-email-k.kozlowski@samsung.com>
+ <1416842312-4405-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20141125013450.12298.96117@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24 2014 at 04:53:19 PM, "Elliott, Robert (Server Storage)" <Elliott@hp.com> wrote:
->> -----Original Message-----
->> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
->> owner at vger.kernel.org] On Behalf Of Mitchel Humpherys
->> Sent: Monday, 24 November, 2014 2:15 PM
-> ...
->> From: Matt Wagantall <mattw@codeaurora.org>
->> 
->> It is sometimes necessary to poll a memory-mapped register until its value
->> satisfies some condition. Introduce a family of convenience macros that do
->> this. Tight-looping, sleeping, and timing out can all be accomplished
->> using these macros.
->> 
-> ...
->> +#define readx_poll_timeout(op, addr, val, cond, sleep_us, timeout_us)	\
->> +({ \
->> +	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
->> +	might_sleep_if(sleep_us); \
->> +	for (;;) { \
->> +		(val) = op(addr); \
->> +		if (cond) \
->> +			break; \
->> +		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) {
->> \
->> +			(val) = op(addr); \
->> +			break; \
->> +		} \
->> +		if (sleep_us) \
->> +			usleep_range((sleep_us >> 2) + 1, sleep_us); \
->
-> The hpsa SCSI driver used to use usleep_range in a loop like 
-> that, but we found that it caused scheduler problems during
-> boots because it uses TASK_UNINTERRUPTIBLE:
-> [    9.260668] [sched_delayed] sched: RT throttling activated
->
-> msleep() worked much better.
+Quoting Krzysztof Kozlowski (2014-11-24 07:18:31)
+> For clocks depending on some other clock domain one may want to perform
+> specific ops before actual enable/disable of gate clock. Allow such case
+> by accepting supplied ops in new exported function:
+> clk_register_gate_ops().
 
-Hmm, maybe you were just sleeping for too long?  According to
-Documentation/timers/timers-howto.txt, usleep_range is what should be
-used for non-atomic sleeps in the range [10us, 20ms].  Plus we need
-microsecond granularity anyways, so msleep wouldn't cut it.
+If you are not going to use the gate_ops, why use the gate clock at all?
+You can create a platform-specific clock type which uses the ops you
+specify.
 
-If there are any potential users of these macros that would want to
-sleep for more than 20ms I guess we could add a special case here to use
-msleep when sleep_us exceeds 20,000 or so.
+Regards,
+Mike
 
-
--Mitch
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  drivers/clk/clk-gate.c       | 16 +++++++++++++---
+>  include/linux/clk-provider.h |  5 +++++
+>  2 files changed, 18 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+> index 51fd87fb7ba6..51802af2d9e7 100644
+> --- a/drivers/clk/clk-gate.c
+> +++ b/drivers/clk/clk-gate.c
+> @@ -117,11 +117,12 @@ EXPORT_SYMBOL_GPL(clk_gate_ops);
+>   * @bit_idx: which bit in the register controls gating of this clock
+>   * @clk_gate_flags: gate-specific flags for this clock
+>   * @lock: shared register lock for this clock
+> + * @ops: clk_ops to use for this clock
+>   */
+> -struct clk *clk_register_gate(struct device *dev, const char *name,
+> +struct clk *clk_register_gate_ops(struct device *dev, const char *name,
+>                 const char *parent_name, unsigned long flags,
+>                 void __iomem *reg, u8 bit_idx,
+> -               u8 clk_gate_flags, spinlock_t *lock)
+> +               u8 clk_gate_flags, spinlock_t *lock, const struct clk_ops *ops)
+>  {
+>         struct clk_gate *gate;
+>         struct clk *clk;
+> @@ -142,7 +143,7 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+>         }
+>  
+>         init.name = name;
+> -       init.ops = &clk_gate_ops;
+> +       init.ops = ops;
+>         init.flags = flags | CLK_IS_BASIC;
+>         init.parent_names = (parent_name ? &parent_name: NULL);
+>         init.num_parents = (parent_name ? 1 : 0);
+> @@ -161,4 +162,13 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+>  
+>         return clk;
+>  }
+> +EXPORT_SYMBOL_GPL(clk_register_gate_ops);
+> +
+> +struct clk *clk_register_gate(struct device *dev, const char *name,
+> +               const char *parent_name, unsigned long flags,
+> +               void __iomem *reg, u8 bit_idx,
+> +               u8 clk_gate_flags, spinlock_t *lock)
+> +{
+> +       return clk_register_gate_ops(dev, name, parent_name, flags, reg, bit_idx, clk_gate_flags, lock, &clk_gate_ops);
+> +}
+>  EXPORT_SYMBOL_GPL(clk_register_gate);
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index be21af149f11..6cfc77a9f339 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -290,11 +290,16 @@ struct clk_gate {
+>  #define CLK_GATE_HIWORD_MASK           BIT(1)
+>  
+>  extern const struct clk_ops clk_gate_ops;
+> +struct clk *clk_register_gate_ops(struct device *dev, const char *name,
+> +               const char *parent_name, unsigned long flags,
+> +               void __iomem *reg, u8 bit_idx,
+> +               u8 clk_gate_flags, spinlock_t *lock, const struct clk_ops *ops);
+>  struct clk *clk_register_gate(struct device *dev, const char *name,
+>                 const char *parent_name, unsigned long flags,
+>                 void __iomem *reg, u8 bit_idx,
+>                 u8 clk_gate_flags, spinlock_t *lock);
+>  
+> +
+>  struct clk_div_table {
+>         unsigned int    val;
+>         unsigned int    div;
+> -- 
+> 1.9.1
+> 
