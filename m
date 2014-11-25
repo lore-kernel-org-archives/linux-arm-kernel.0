@@ -1,99 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 25 Nov 2014 10:35:04 +0000
-Subject: [PATCH] of: support passing console options with stdout-path
-In-Reply-To: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
-References: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <20141125103504.GA21525@leverpostej>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 25 Nov 2014 16:04:22 +0530
+Subject: [PATCH 7/8] exynos5440: free OPP table created during ->init()
+In-Reply-To: <cover.1416910766.git.viresh.kumar@linaro.org>
+References: <cover.1416910766.git.viresh.kumar@linaro.org>
+Message-ID: <9b6cc4ddc2010abcac88c3995ce9ee29869cc195.1416910766.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leif,
+OPP layer now supports freeing of OPPs and we should free them once they aren't
+useful anymore.
 
-On Mon, Nov 24, 2014 at 10:23:58PM +0000, Leif Lindholm wrote:
-> Support specifying console options (like with console=ttyXN,<options>)
-> by appending them to the stdout-path property after a separating ':'.
-> 
-> Example:
-> 	stdout-path = "uart0:115200";
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/cpufreq/exynos5440-cpufreq.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-I would very much like to be able to use this -- it will allow
-distributions to boot on a board without having to know _anything_ about
-the console UART until userspace is up, which would make it possible to
-have a completely generic installer image, without requiring the
-platform to provide bootargs.
-
-My only concern is that this conflates the set of kernel command line
-options for the UART wit the DT binding for it. I don't know how good
-people are at keeping those options stable, and I know they are
-currently not documented -- we would need to add a stdout-path options
-section to relevant UART bindings.
-
-Thanks,
-Mark.
-
-> 
-> This patch also modifies of_find_node_by_path() to match only the
-> portion of the path before a ':'.
-> 
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> ---
->  drivers/of/base.c | 13 +++++++++++--
->  1 file changed, 11 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 3823edf..89c6b33 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -37,6 +37,7 @@ EXPORT_SYMBOL(of_allnodes);
->  struct device_node *of_chosen;
->  struct device_node *of_aliases;
->  struct device_node *of_stdout;
-> +static char *of_stdout_options;
->  
->  struct kset *of_kset;
->  
-> @@ -703,6 +704,8 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
->  	if (!len)
->  		return NULL;
->  
-> +	len = strchrnul(path, ':') - path;
-> +
->  	__for_each_child_of_node(parent, child) {
->  		const char *name = strrchr(child->full_name, '/');
->  		if (WARN(!name, "malformed device_node %s\n", child->full_name))
-> @@ -747,6 +750,8 @@ struct device_node *of_find_node_by_path(const char *path)
->  		if (!of_aliases)
->  			return NULL;
->  
-> +		len = strchrnul(path, ':') - path;
-> +
->  		for_each_property_of_node(of_aliases, pp) {
->  			if (strlen(pp->name) == len && !strncmp(pp->name, path, len)) {
->  				np = of_find_node_by_path(pp->value);
-> @@ -1830,8 +1835,12 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
->  			name = of_get_property(of_chosen, "linux,stdout-path", NULL);
->  		if (IS_ENABLED(CONFIG_PPC) && !name)
->  			name = of_get_property(of_aliases, "stdout", NULL);
-> -		if (name)
-> +		if (name) {
->  			of_stdout = of_find_node_by_path(name);
-> +			of_stdout_options = strchr(name, ':');
-> +			if (of_stdout_options != NULL)
-> +				of_stdout_options++;
-> +		}
->  	}
->  
->  	if (!of_aliases)
-> @@ -1957,7 +1966,7 @@ bool of_console_check(struct device_node *dn, char *name, int index)
->  {
->  	if (!dn || dn != of_stdout || console_set_on_cmdline)
->  		return false;
-> -	return !add_preferred_console(name, index, NULL);
-> +	return !add_preferred_console(name, index, of_stdout_options);
->  }
->  EXPORT_SYMBOL_GPL(of_console_check);
->  
-> -- 
-> 1.9.1
-> 
-> 
+diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
+index f33f25b..27a57ed 100644
+--- a/drivers/cpufreq/exynos5440-cpufreq.c
++++ b/drivers/cpufreq/exynos5440-cpufreq.c
+@@ -371,7 +371,7 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
+ 	if (ret) {
+ 		dev_err(dvfs_info->dev,
+ 			"failed to init cpufreq table: %d\n", ret);
+-		goto err_put_node;
++		goto err_free_opp;
+ 	}
+ 	dvfs_info->freq_count = dev_pm_opp_get_opp_count(dvfs_info->dev);
+ 	exynos_sort_descend_freq_table();
+@@ -423,6 +423,8 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
+ 
+ err_free_table:
+ 	dev_pm_opp_free_cpufreq_table(dvfs_info->dev, &dvfs_info->freq_table);
++err_free_opp:
++	of_free_opp_table(dvfs_info->dev);
+ err_put_node:
+ 	of_node_put(np);
+ 	dev_err(&pdev->dev, "%s: failed initialization\n", __func__);
+@@ -433,6 +435,7 @@ static int exynos_cpufreq_remove(struct platform_device *pdev)
+ {
+ 	cpufreq_unregister_driver(&exynos_driver);
+ 	dev_pm_opp_free_cpufreq_table(dvfs_info->dev, &dvfs_info->freq_table);
++	of_free_opp_table(dvfs_info->dev);
+ 	return 0;
+ }
+ 
+-- 
+2.0.3.693.g996b0fd
