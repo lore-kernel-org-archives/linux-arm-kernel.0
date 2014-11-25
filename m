@@ -1,234 +1,140 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 25 Nov 2014 22:09:52 +0300
-Subject: [PATCH v2 8/8] ARM: sa1100: reorder IRQ handling code
+Date: Tue, 25 Nov 2014 22:09:48 +0300
+Subject: [PATCH v2 4/8] ARM: sa1100: shift IRQs by one
 In-Reply-To: <1416942592-23059-1-git-send-email-dbaryshkov@gmail.com>
 References: <1416942592-23059-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1416942592-23059-9-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1416942592-23059-5-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch just reorders functions/data inside sa1100 irq driver to be
-able to merge functions that have the same code after converting to
-irqdomains and hwirq. No real code changes.
+As IRQ0 should not be used (especially in when using irq domains), shift all
+virtual IRQ numbers by one.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-sa1100/irq.c | 155 +++++++++++++++++++--------------------------
- 1 file changed, 66 insertions(+), 89 deletions(-)
+ arch/arm/mach-sa1100/include/mach/irqs.h | 102 +++++++++++++++----------------
+ 1 file changed, 51 insertions(+), 51 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/irq.c b/arch/arm/mach-sa1100/irq.c
-index 981db98..63e2901 100644
---- a/arch/arm/mach-sa1100/irq.c
-+++ b/arch/arm/mach-sa1100/irq.c
-@@ -27,6 +27,60 @@
+diff --git a/arch/arm/mach-sa1100/include/mach/irqs.h b/arch/arm/mach-sa1100/include/mach/irqs.h
+index 3790298..de09834 100644
+--- a/arch/arm/mach-sa1100/include/mach/irqs.h
++++ b/arch/arm/mach-sa1100/include/mach/irqs.h
+@@ -8,56 +8,56 @@
+  * 2001/11/14	RMK	Cleaned up and standardised a lot of the IRQs.
+  */
  
+-#define	IRQ_GPIO0		0
+-#define	IRQ_GPIO1		1
+-#define	IRQ_GPIO2		2
+-#define	IRQ_GPIO3		3
+-#define	IRQ_GPIO4		4
+-#define	IRQ_GPIO5		5
+-#define	IRQ_GPIO6		6
+-#define	IRQ_GPIO7		7
+-#define	IRQ_GPIO8		8
+-#define	IRQ_GPIO9		9
+-#define	IRQ_GPIO10		10
+-#define	IRQ_GPIO11_27		11
+-#define	IRQ_LCD  		12	/* LCD controller           */
+-#define	IRQ_Ser0UDC		13	/* Ser. port 0 UDC          */
+-#define	IRQ_Ser1SDLC		14	/* Ser. port 1 SDLC         */
+-#define	IRQ_Ser1UART		15	/* Ser. port 1 UART         */
+-#define	IRQ_Ser2ICP		16	/* Ser. port 2 ICP          */
+-#define	IRQ_Ser3UART		17	/* Ser. port 3 UART         */
+-#define	IRQ_Ser4MCP		18	/* Ser. port 4 MCP          */
+-#define	IRQ_Ser4SSP		19	/* Ser. port 4 SSP          */
+-#define	IRQ_DMA0 		20	/* DMA controller channel 0 */
+-#define	IRQ_DMA1 		21	/* DMA controller channel 1 */
+-#define	IRQ_DMA2 		22	/* DMA controller channel 2 */
+-#define	IRQ_DMA3 		23	/* DMA controller channel 3 */
+-#define	IRQ_DMA4 		24	/* DMA controller channel 4 */
+-#define	IRQ_DMA5 		25	/* DMA controller channel 5 */
+-#define	IRQ_OST0 		26	/* OS Timer match 0         */
+-#define	IRQ_OST1 		27	/* OS Timer match 1         */
+-#define	IRQ_OST2 		28	/* OS Timer match 2         */
+-#define	IRQ_OST3 		29	/* OS Timer match 3         */
+-#define	IRQ_RTC1Hz		30	/* RTC 1 Hz clock           */
+-#define	IRQ_RTCAlrm		31	/* RTC Alarm                */
++#define	IRQ_GPIO0		1
++#define	IRQ_GPIO1		2
++#define	IRQ_GPIO2		3
++#define	IRQ_GPIO3		4
++#define	IRQ_GPIO4		5
++#define	IRQ_GPIO5		6
++#define	IRQ_GPIO6		7
++#define	IRQ_GPIO7		8
++#define	IRQ_GPIO8		9
++#define	IRQ_GPIO9		10
++#define	IRQ_GPIO10		11
++#define	IRQ_GPIO11_27		12
++#define	IRQ_LCD			13	/* LCD controller           */
++#define	IRQ_Ser0UDC		14	/* Ser. port 0 UDC          */
++#define	IRQ_Ser1SDLC		15	/* Ser. port 1 SDLC         */
++#define	IRQ_Ser1UART		16	/* Ser. port 1 UART         */
++#define	IRQ_Ser2ICP		17	/* Ser. port 2 ICP          */
++#define	IRQ_Ser3UART		18	/* Ser. port 3 UART         */
++#define	IRQ_Ser4MCP		19	/* Ser. port 4 MCP          */
++#define	IRQ_Ser4SSP		20	/* Ser. port 4 SSP          */
++#define	IRQ_DMA0		21	/* DMA controller channel 0 */
++#define	IRQ_DMA1		22	/* DMA controller channel 1 */
++#define	IRQ_DMA2		23	/* DMA controller channel 2 */
++#define	IRQ_DMA3		24	/* DMA controller channel 3 */
++#define	IRQ_DMA4		25	/* DMA controller channel 4 */
++#define	IRQ_DMA5		26	/* DMA controller channel 5 */
++#define	IRQ_OST0		27	/* OS Timer match 0         */
++#define	IRQ_OST1		28	/* OS Timer match 1         */
++#define	IRQ_OST2		29	/* OS Timer match 2         */
++#define	IRQ_OST3		30	/* OS Timer match 3         */
++#define	IRQ_RTC1Hz		31	/* RTC 1 Hz clock           */
++#define	IRQ_RTCAlrm		32	/* RTC Alarm                */
+ 
+-#define	IRQ_GPIO11		32
+-#define	IRQ_GPIO12		33
+-#define	IRQ_GPIO13		34
+-#define	IRQ_GPIO14		35
+-#define	IRQ_GPIO15		36
+-#define	IRQ_GPIO16		37
+-#define	IRQ_GPIO17		38
+-#define	IRQ_GPIO18		39
+-#define	IRQ_GPIO19		40
+-#define	IRQ_GPIO20		41
+-#define	IRQ_GPIO21		42
+-#define	IRQ_GPIO22		43
+-#define	IRQ_GPIO23		44
+-#define	IRQ_GPIO24		45
+-#define	IRQ_GPIO25		46
+-#define	IRQ_GPIO26		47
+-#define	IRQ_GPIO27		48
++#define	IRQ_GPIO11		33
++#define	IRQ_GPIO12		34
++#define	IRQ_GPIO13		35
++#define	IRQ_GPIO14		36
++#define	IRQ_GPIO15		37
++#define	IRQ_GPIO16		38
++#define	IRQ_GPIO17		39
++#define	IRQ_GPIO18		40
++#define	IRQ_GPIO19		41
++#define	IRQ_GPIO20		42
++#define	IRQ_GPIO21		43
++#define	IRQ_GPIO22		44
++#define	IRQ_GPIO23		45
++#define	IRQ_GPIO24		46
++#define	IRQ_GPIO25		47
++#define	IRQ_GPIO26		48
++#define	IRQ_GPIO27		49
  
  /*
-+ * We don't need to ACK IRQs on the SA1100 unless they're GPIOs
-+ * this is for internal IRQs i.e. from IRQ LCD to RTCAlrm.
-+ */
-+static void sa1100_mask_irq(struct irq_data *d)
-+{
-+	ICMR &= ~BIT(d->hwirq);
-+}
-+
-+static void sa1100_unmask_irq(struct irq_data *d)
-+{
-+	ICMR |= BIT(d->hwirq);
-+}
-+
-+/*
-+ * Apart form GPIOs, only the RTC alarm can be a wakeup event.
-+ */
-+static int sa1100_set_wake(struct irq_data *d, unsigned int on)
-+{
-+	if (BIT(d->hwirq) == IC_RTCAlrm) {
-+		if (on)
-+			PWER |= PWER_RTC;
-+		else
-+			PWER &= ~PWER_RTC;
-+		return 0;
-+	}
-+	return -EINVAL;
-+}
-+
-+static struct irq_chip sa1100_normal_chip = {
-+	.name		= "SC",
-+	.irq_ack	= sa1100_mask_irq,
-+	.irq_mask	= sa1100_mask_irq,
-+	.irq_unmask	= sa1100_unmask_irq,
-+	.irq_set_wake	= sa1100_set_wake,
-+};
-+
-+static int sa1100_normal_irqdomain_map(struct irq_domain *d,
-+		unsigned int irq, irq_hw_number_t hwirq)
-+{
-+	irq_set_chip_and_handler(irq, &sa1100_normal_chip,
-+				 handle_level_irq);
-+	set_irq_flags(irq, IRQF_VALID);
-+
-+	return 0;
-+}
-+
-+static struct irq_domain_ops sa1100_normal_irqdomain_ops = {
-+	.map = sa1100_normal_irqdomain_map,
-+	.xlate = irq_domain_xlate_onetwocell,
-+};
-+
-+static struct irq_domain *sa1100_normal_irqdomain;
-+
-+/*
-  * SA1100 GPIO edge detection for IRQs:
-  * IRQs are generated on Falling-Edge, Rising-Edge, or both.
-  * Use this instead of directly setting GRER/GFER.
-@@ -63,24 +117,14 @@ static int sa1100_gpio_type(struct irq_data *d, unsigned int type)
- }
+  * The next 16 interrupts are for board specific purposes.  Since
+@@ -65,8 +65,8 @@
+  * these.  If you need more, increase IRQ_BOARD_END, but keep it
+  * within sensible limits.  IRQs 49 to 64 are available.
+  */
+-#define IRQ_BOARD_START		49
+-#define IRQ_BOARD_END		65
++#define IRQ_BOARD_START		50
++#define IRQ_BOARD_END		66
  
  /*
-- * GPIO IRQs must be acknowledged.  This is for IRQs from GPIO0 to 10.
-+ * GPIO IRQs must be acknowledged.
-  */
--static void sa1100_low_gpio_ack(struct irq_data *d)
-+static void sa1100_gpio_ack(struct irq_data *d)
- {
- 	GEDR = BIT(d->hwirq);
- }
- 
--static void sa1100_low_gpio_mask(struct irq_data *d)
--{
--	ICMR &= ~BIT(d->hwirq);
--}
--
--static void sa1100_low_gpio_unmask(struct irq_data *d)
--{
--	ICMR |= BIT(d->hwirq);
--}
--
--static int sa1100_low_gpio_wake(struct irq_data *d, unsigned int on)
-+static int sa1100_gpio_wake(struct irq_data *d, unsigned int on)
- {
- 	if (on)
- 		PWER |= BIT(d->hwirq);
-@@ -89,13 +133,16 @@ static int sa1100_low_gpio_wake(struct irq_data *d, unsigned int on)
- 	return 0;
- }
- 
-+/*
-+ * This is for IRQs from 0 to 10.
-+ */
- static struct irq_chip sa1100_low_gpio_chip = {
- 	.name		= "GPIO-l",
--	.irq_ack	= sa1100_low_gpio_ack,
--	.irq_mask	= sa1100_low_gpio_mask,
--	.irq_unmask	= sa1100_low_gpio_unmask,
-+	.irq_ack	= sa1100_gpio_ack,
-+	.irq_mask	= sa1100_mask_irq,
-+	.irq_unmask	= sa1100_unmask_irq,
- 	.irq_set_type	= sa1100_gpio_type,
--	.irq_set_wake	= sa1100_low_gpio_wake,
-+	.irq_set_wake	= sa1100_gpio_wake,
- };
- 
- static int sa1100_low_gpio_irqdomain_map(struct irq_domain *d,
-@@ -151,13 +198,6 @@ sa1100_high_gpio_handler(unsigned int irq, struct irq_desc *desc)
-  * In addition, the IRQs are all collected up into one bit in the
-  * interrupt controller registers.
-  */
--static void sa1100_high_gpio_ack(struct irq_data *d)
--{
--	unsigned int mask = BIT(d->hwirq);
--
--	GEDR = mask;
--}
--
- static void sa1100_high_gpio_mask(struct irq_data *d)
- {
- 	unsigned int mask = BIT(d->hwirq);
-@@ -178,22 +218,13 @@ static void sa1100_high_gpio_unmask(struct irq_data *d)
- 	GFER = GPIO_IRQ_falling_edge & GPIO_IRQ_mask;
- }
- 
--static int sa1100_high_gpio_wake(struct irq_data *d, unsigned int on)
--{
--	if (on)
--		PWER |= BIT(d->hwirq);
--	else
--		PWER &= ~BIT(d->hwirq);
--	return 0;
--}
--
- static struct irq_chip sa1100_high_gpio_chip = {
- 	.name		= "GPIO-h",
--	.irq_ack	= sa1100_high_gpio_ack,
-+	.irq_ack	= sa1100_gpio_ack,
- 	.irq_mask	= sa1100_high_gpio_mask,
- 	.irq_unmask	= sa1100_high_gpio_unmask,
- 	.irq_set_type	= sa1100_gpio_type,
--	.irq_set_wake	= sa1100_high_gpio_wake,
-+	.irq_set_wake	= sa1100_gpio_wake,
- };
- 
- static int sa1100_high_gpio_irqdomain_map(struct irq_domain *d,
-@@ -213,60 +244,6 @@ static struct irq_domain_ops sa1100_high_gpio_irqdomain_ops = {
- 
- static struct irq_domain *sa1100_high_gpio_irqdomain;
- 
--/*
-- * We don't need to ACK IRQs on the SA1100 unless they're GPIOs
-- * this is for internal IRQs i.e. from IRQ LCD to RTCAlrm.
-- */
--static void sa1100_mask_irq(struct irq_data *d)
--{
--	ICMR &= ~BIT(d->hwirq);
--}
--
--static void sa1100_unmask_irq(struct irq_data *d)
--{
--	ICMR |= BIT(d->hwirq);
--}
--
--/*
-- * Apart form GPIOs, only the RTC alarm can be a wakeup event.
-- */
--static int sa1100_set_wake(struct irq_data *d, unsigned int on)
--{
--	if (BIT(d->hwirq) == IC_RTCAlrm) {
--		if (on)
--			PWER |= PWER_RTC;
--		else
--			PWER &= ~PWER_RTC;
--		return 0;
--	}
--	return -EINVAL;
--}
--
--static struct irq_chip sa1100_normal_chip = {
--	.name		= "SC",
--	.irq_ack	= sa1100_mask_irq,
--	.irq_mask	= sa1100_mask_irq,
--	.irq_unmask	= sa1100_unmask_irq,
--	.irq_set_wake	= sa1100_set_wake,
--};
--
--static int sa1100_normal_irqdomain_map(struct irq_domain *d,
--		unsigned int irq, irq_hw_number_t hwirq)
--{
--	irq_set_chip_and_handler(irq, &sa1100_normal_chip,
--				 handle_level_irq);
--	set_irq_flags(irq, IRQF_VALID);
--
--	return 0;
--}
--
--static struct irq_domain_ops sa1100_normal_irqdomain_ops = {
--	.map = sa1100_normal_irqdomain_map,
--	.xlate = irq_domain_xlate_onetwocell,
--};
--
--static struct irq_domain *sa1100_normal_irqdomain;
--
- static struct resource irq_resource =
- 	DEFINE_RES_MEM_NAMED(0x90050000, SZ_64K, "irqs");
- 
+  * Figure out the MAX IRQ number.
 -- 
 2.1.3
