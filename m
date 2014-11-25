@@ -1,62 +1,72 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Tue, 25 Nov 2014 15:37:26 +0800
-Subject: [PATCH v1] ARM: multi_v7_defconfig: add driver support for hix5hd2
-Message-ID: <1416901046-21091-1-git-send-email-zhangfei.gao@linaro.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 25 Nov 2014 16:42:10 +0900
+Subject: [PATCH v8 2/6] arm64: ptrace: allow tracer to skip a system call
+In-Reply-To: <20141120191738.GV19126@arm.com>
+References: <1416273038-15590-1-git-send-email-takahiro.akashi@linaro.org>
+ <1416273038-15590-3-git-send-email-takahiro.akashi@linaro.org>
+ <20141118140425.GM18842@arm.com> <546C58DB.5080204@linaro.org>
+ <20141119190601.GM15985@arm.com> <546D7860.2010300@linaro.org>
+ <20141120191738.GV19126@arm.com>
+Message-ID: <547432D2.7000909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on hix5hd2 platform with mmc, usb, network, reboot etc.
+On 11/21/2014 04:17 AM, Will Deacon wrote:
+> On Thu, Nov 20, 2014 at 05:13:04AM +0000, AKASHI Takahiro wrote:
+>> On 11/20/2014 04:06 AM, Will Deacon wrote:
+>>> On Wed, Nov 19, 2014 at 08:46:19AM +0000, AKASHI Takahiro wrote:
+>>>> Syscall(-1) will return -ENOSYS whether or not a syscallno is explicitly
+>>>> replaced with -1 by a tracer, and, in this sense, it is *skipped*.
+>>>
+>>> Ok, but now userspace sees -ENOSYS for a skipped system call in that case,
+>>> whereas it would usually see whatever the trace put in x0, right?
+>>
+>> If you don't really like this behavior, how about this patch instead of my [2/6] patch?
+>>
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index 726b910..1ef57d0 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -668,8 +668,15 @@ ENDPROC(el0_svc)
+>>            * switches, and waiting for our parent to respond.
+>>            */
+>>    __sys_trace:
+>> +       cmp     w8, #-1                         // default errno for invalid
+>> +       b.ne    1f                              // system call
+>> +       mov     x0, #-ENOSYS
+>> +       str     x0, [sp, #S_X0]
+>> +1:
+>>           mov     x0, sp
+>>           bl      syscall_trace_enter
+>> +       cmp     w0, #-1                         // skip the syscall?
+>> +       b.eq    __sys_trace_return_skipped
+>>           adr     lr, __sys_trace_return          // return address
+>>           uxtw    scno, w0                        // syscall number (possibly new)
+>>           mov     x1, sp                          // pointer to regs
+>> @@ -684,6 +691,7 @@ __sys_trace:
+>>
+>>    __sys_trace_return:
+>>           str     x0, [sp]                        // save returned x0
+>> +__sys_trace_return_skipped:
+>>           mov     x0, sp
+>>           bl      syscall_trace_exit
+>>           b       ret_to_user
+>>
+>> With this change, I believe, syscall(-1) returns -ENOSYS by default whether traced
+>> or not, and still you can change a return value when tracing.
+>> (But a drawback here is that a tracer will see -ENOSYS in x0 even at syscall entry
+>> for syscall(-1).)
+>
+> But it's exactly these drawbacks that I'm objected to. syscall(-1) shouldn't
+> be treated any differently to syscall(42) with respect to restarting,
+> exactly like x86.
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig |    7 +++++++
- 1 file changed, 7 insertions(+)
+Can you elaborate a bit more as to "restarting?"
+We can't make any assumption about the number of arguments taken by *invalid* syscall(-1)
+and so changing a value in x0 (or any other registers) doesn't make any difference.
+()
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index a72780a2afd2..930bfcbcd68e 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -10,6 +10,7 @@ CONFIG_PERF_EVENTS=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- CONFIG_PARTITION_ADVANCED=y
-+CONFIG_CMDLINE_PARTITION=y
- CONFIG_ARCH_VIRT=y
- CONFIG_ARCH_MVEBU=y
- CONFIG_MACH_ARMADA_370=y
-@@ -153,6 +154,7 @@ CONFIG_AHCI_TEGRA=y
- CONFIG_SATA_HIGHBANK=y
- CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
-+CONFIG_HIX5HD2_GMAC=y
- CONFIG_SUN4I_EMAC=y
- CONFIG_MACB=y
- CONFIG_NET_CALXEDA_XGMAC=y
-@@ -289,6 +291,8 @@ CONFIG_REGULATOR_AB8500=y
- CONFIG_REGULATOR_AS3722=y
- CONFIG_REGULATOR_BCM590XX=y
- CONFIG_REGULATOR_GPIO=y
-+CONFIG_MFD_SYSCON=y
-+CONFIG_POWER_RESET_SYSCON=y
- CONFIG_REGULATOR_MAX8907=y
- CONFIG_REGULATOR_PALMAS=y
- CONFIG_REGULATOR_S2MPS11=y
-@@ -369,6 +373,8 @@ CONFIG_MMC_OMAP_HS=y
- CONFIG_MMC_MVSDIO=y
- CONFIG_MMC_SUNXI=y
- CONFIG_MMC_DW=y
-+CONFIG_MMC_DW_IDMAC=y
-+CONFIG_MMC_DW_PLTFM=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_ROCKCHIP=y
- CONFIG_NEW_LEDS=y
-@@ -440,6 +446,7 @@ CONFIG_AK8975=y
- CONFIG_PWM=y
- CONFIG_PWM_TEGRA=y
- CONFIG_PWM_VT8500=y
-+CONFIG_PHY_HIX5HD2_SATA=y
- CONFIG_OMAP_USB2=y
- CONFIG_TI_PIPE3=y
- CONFIG_PHY_MIPHY365X=y
--- 
-1.7.9.5
+-Takahiro AKASHI
+
+> Will
+>
