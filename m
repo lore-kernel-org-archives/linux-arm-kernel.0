@@ -1,104 +1,100 @@
-From: Suravee.Suthikulpanit@amd.com (Suthikulpanit, Suravee)
-Date: Tue, 25 Nov 2014 11:46:50 +0000
-Subject: [PATCH V4] arm64: amd-seattle: Adding device tree for AMD
- Seattle platform
-In-Reply-To: <547458B9.2000805@arm.com>
-Message-ID: <D09A7217.A4E1%suravee.suthikulpanit@amd.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 25 Nov 2014 11:48:04 +0000
+Subject: [PATCH 3/9] ARM: MB86S7X: Add MCPM support
+In-Reply-To: <1416486920-25343-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1416486920-25343-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <54746C74.8020400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
 
-On 11/25/14, 17:23, "Marc Zyngier" <marc.zyngier@arm.com> wrote:
 
->Hi Suravee,
+On 20/11/14 12:35, Vincent Yang wrote:
+> The remote firmware(SCB) owns the SMP control. This MCPM driver gets
+> CPU/CLUSTER power up/down done by SCB over mailbox.
 >
->Just spotted a small issue below (looks like a recurring mistake in a
->number of DTs I've seem lately):
+> Signed-off-by: Andy Green <andy.green@linaro.org>
+> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+> Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+> ---
+>   arch/arm/mach-mb86s7x/Makefile |   2 +-
+>   arch/arm/mach-mb86s7x/mcpm.c   | 360 +++++++++++++++++++++++++++++++++++++++++
+>   arch/arm/mach-mb86s7x/smc.S    |  27 ++++
+>   3 files changed, 388 insertions(+), 1 deletion(-)
+>   create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
+>   create mode 100644 arch/arm/mach-mb86s7x/smc.S
 >
->On 24/11/14 21:51, suravee.suthikulpanit at amd.com wrote:
->> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> 
->> Initial revision of device tree for AMD Seattle platform.
->> 
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> Signed-off-by: Thomas Lendacky <Thomas.Lendacky@amd.com>
->> Signed-off-by: Joel Schopp <Joel.Schopp@amd.com>
->> ---
->> V4 Changes:
->>     * Remove unnecessary smb layer and move motherbord to top level
->>     * Move include dtsi to top level
->>     * Remove apb_pclk from sata0 and i2c
->>     * Fix GIC Virtual Maintanance Interrupt from PPI24 (8) to PPI25 (9)
->>     * Add 40-bit dma-ranges for motherboard (simple-bus)
->>     * Remove dma0 (pl330) entry for now since it only supports 32-bit
->>DMA.
->>       It is basically not used at the moment. It would also need SMMU
->>       to allow dma remapping to 40-bit DMA range.
->>     * Add phandle spi0 and spi1
->>     * Hook up gpio0 pin 7 with MMC Card Detection (CD) support.
->>     * Changes in pcie0 entry:
->>         - Add 40-bit dma-ranges
->>         - Remove interrupts property
->>         - Add interrupt-map/mask property
->>         - Fix PCI I/O range
->>         - Merge PCI 32-bit ranges
->>         - Merge PCI 64-bit ranges
->> 
->> NOTE: I am not add a new compatible ID for the sata0 as Rob Herring
->>       suggested since there is no need at the momement, and I am trying
->>       to avoid introducing ID unnecessarily.
->> 
->>  arch/arm64/Kconfig                          |   5 +
->>  arch/arm64/boot/dts/Makefile                |   1 +
->>  arch/arm64/boot/dts/amd-seattle-periph.dtsi | 156
->>++++++++++++++++++++++++++++
->>  arch/arm64/boot/dts/amd-seattle.dts         |  89 ++++++++++++++++
->>  4 files changed, 251 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/amd-seattle-periph.dtsi
->>  create mode 100644 arch/arm64/boot/dts/amd-seattle.dts
->> 
->
->[...]
->
->> diff --git a/arch/arm64/boot/dts/amd-seattle.dts
->>b/arch/arm64/boot/dts/amd-seattle.dts
->> new file mode 100644
->> index 0000000..d5fc482
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/amd-seattle.dts
->> @@ -0,0 +1,89 @@
->> +/*
->> + * DTS file for AMD Seattle
->> + *
->> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
->> + */
->> +
->> +/dts-v1/;
->> +
 
-[...] 
+[...]
 
->> +
->> +	timer {
->> +		compatible = "arm,armv8-timer";
->> +		interrupts = <1 13 0xff01>,
->> +			     <1 14 0xff01>,
->> +			     <1 11 0xff01>,
->> +			     <1 10 0xff01>;
->> +	};
->
->The Cortex-A57 TRM clearly states that these interrupts are level
->triggered.
+> +asmlinkage void mb86s70evb_outer_flush_all(void)
+> +{
+> +       outer_flush_all();
+> +}
+> +
+> +#define mb86s70evb_exit_coherency_flush(level) { \
 
-Thanks for pointing this out. I?ll fix this to <1 1X 0xff04> (4 for the
-Active-High) then.
+You are duplicating the generic macro just to add outer cache, I was
+thinking of extending the generic macro to add outer cache support, but
+IMO it might be bit tricky for below mentioned reasons.
 
-Suravee
+> +       asm volatile( \
+> +       "stmfd  sp!, {fp, ip}\n\t" \
+> +       "mrc    p15, 0, r0, c1, c0, 0   @ get SCTLR\n\t" \
+> +       "bic    r0, r0, #"__stringify(CR_C)"\n\t" \
+> +       "mcr    p15, 0, r0, c1, c0, 0   @ set SCTLR\n\t" \
+> +       "isb\n\t" \
+> +       "bl     v7_flush_dcache_"__stringify(level)"\n\t" \
+> +       "bl     mb86s70evb_outer_flush_all\n\t" \
 
->
+IIUC, this seem to be broken IMO, you are doing the outer cache flush
+unconditionally which means:
+
+1. You do this for every CPU power down(i.e. when level = louis) which
+    is incorrect.
+2. You do this for every cluster powerdown, again is that required if
+    the other cluster is active. You may have to trace last cluster in
+    the system.
+
+> diff --git a/arch/arm/mach-mb86s7x/smc.S b/arch/arm/mach-mb86s7x/smc.S
+> new file mode 100644
+> index 0000000..a14330b
+> --- /dev/null
+> +++ b/arch/arm/mach-mb86s7x/smc.S
+> @@ -0,0 +1,27 @@
+> +/*
+> + * SMC command interface to set secondary entry point
+> + * Copyright: (C) 2013-2014 Fujitsu Semiconductor Limited
+> + * Copyright: (C) 2014 Linaro Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +
+> +.arch_extension sec
+> +
+> +/* void mb86s7x_cpu_entry(unsigned long secondary_entry); */
+> +ENTRY(mb86s7x_cpu_entry)
+> +       stmfd   sp!, {r1-r11, lr}
+> +       mov r1, r0
+> +       ldr r0, =1
+> +       mrc p15, 0, r3, c1, c0, 0
+> +       mov r4, r3
+> +       and r3, #0xbfffffff
+> +       mcr p15, 0, r3, c1, c0, 0
+> +       smc #0
+
+Interesting, it looks like you have some secure entity running on your
+platform.
+1. While the CPU is powered down who is taking care of saving it's
+    state as you are doing it in the Linux itself ?
+2. Is Linux running in Secure or Non-secure mode ?
+3. Why do you need this smc call for secondary boot only ?
+
+Regards,
+Sudeep
