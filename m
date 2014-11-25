@@ -1,50 +1,99 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 25 Nov 2014 16:04:21 +0530
-Subject: [PATCH 6/8] cpufreq-dt: free OPP table created during ->init()
-In-Reply-To: <cover.1416910766.git.viresh.kumar@linaro.org>
-References: <cover.1416910766.git.viresh.kumar@linaro.org>
-Message-ID: <1ac3e8c67c7bd2a962aed6561693d16ca5cd9db9.1416910766.git.viresh.kumar@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 25 Nov 2014 10:35:04 +0000
+Subject: [PATCH] of: support passing console options with stdout-path
+In-Reply-To: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
+References: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <20141125103504.GA21525@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OPP layer now supports freeing of OPPs and we should free them once they aren't
-useful anymore.
+Hi Leif,
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/cpufreq-dt.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+On Mon, Nov 24, 2014 at 10:23:58PM +0000, Leif Lindholm wrote:
+> Support specifying console options (like with console=ttyXN,<options>)
+> by appending them to the stdout-path property after a separating ':'.
+> 
+> Example:
+> 	stdout-path = "uart0:115200";
 
-diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
-index 8cba13d..f44419c 100644
---- a/drivers/cpufreq/cpufreq-dt.c
-+++ b/drivers/cpufreq/cpufreq-dt.c
-@@ -215,7 +215,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
- 	if (!priv) {
- 		ret = -ENOMEM;
--		goto out_put_node;
-+		goto out_free_opp;
- 	}
- 
- 	of_property_read_u32(np, "voltage-tolerance", &priv->voltage_tolerance);
-@@ -310,7 +310,8 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- 	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
- out_free_priv:
- 	kfree(priv);
--out_put_node:
-+out_free_opp:
-+	of_free_opp_table(cpu_dev);
- 	of_node_put(np);
- out_put_reg_clk:
- 	clk_put(cpu_clk);
-@@ -326,6 +327,7 @@ static int cpufreq_exit(struct cpufreq_policy *policy)
- 
- 	cpufreq_cooling_unregister(priv->cdev);
- 	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
-+	of_free_opp_table(priv->cpu_dev);
- 	clk_put(policy->clk);
- 	if (!IS_ERR(priv->cpu_reg))
- 		regulator_put(priv->cpu_reg);
--- 
-2.0.3.693.g996b0fd
+I would very much like to be able to use this -- it will allow
+distributions to boot on a board without having to know _anything_ about
+the console UART until userspace is up, which would make it possible to
+have a completely generic installer image, without requiring the
+platform to provide bootargs.
+
+My only concern is that this conflates the set of kernel command line
+options for the UART wit the DT binding for it. I don't know how good
+people are at keeping those options stable, and I know they are
+currently not documented -- we would need to add a stdout-path options
+section to relevant UART bindings.
+
+Thanks,
+Mark.
+
+> 
+> This patch also modifies of_find_node_by_path() to match only the
+> portion of the path before a ':'.
+> 
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> ---
+>  drivers/of/base.c | 13 +++++++++++--
+>  1 file changed, 11 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 3823edf..89c6b33 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -37,6 +37,7 @@ EXPORT_SYMBOL(of_allnodes);
+>  struct device_node *of_chosen;
+>  struct device_node *of_aliases;
+>  struct device_node *of_stdout;
+> +static char *of_stdout_options;
+>  
+>  struct kset *of_kset;
+>  
+> @@ -703,6 +704,8 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
+>  	if (!len)
+>  		return NULL;
+>  
+> +	len = strchrnul(path, ':') - path;
+> +
+>  	__for_each_child_of_node(parent, child) {
+>  		const char *name = strrchr(child->full_name, '/');
+>  		if (WARN(!name, "malformed device_node %s\n", child->full_name))
+> @@ -747,6 +750,8 @@ struct device_node *of_find_node_by_path(const char *path)
+>  		if (!of_aliases)
+>  			return NULL;
+>  
+> +		len = strchrnul(path, ':') - path;
+> +
+>  		for_each_property_of_node(of_aliases, pp) {
+>  			if (strlen(pp->name) == len && !strncmp(pp->name, path, len)) {
+>  				np = of_find_node_by_path(pp->value);
+> @@ -1830,8 +1835,12 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
+>  			name = of_get_property(of_chosen, "linux,stdout-path", NULL);
+>  		if (IS_ENABLED(CONFIG_PPC) && !name)
+>  			name = of_get_property(of_aliases, "stdout", NULL);
+> -		if (name)
+> +		if (name) {
+>  			of_stdout = of_find_node_by_path(name);
+> +			of_stdout_options = strchr(name, ':');
+> +			if (of_stdout_options != NULL)
+> +				of_stdout_options++;
+> +		}
+>  	}
+>  
+>  	if (!of_aliases)
+> @@ -1957,7 +1966,7 @@ bool of_console_check(struct device_node *dn, char *name, int index)
+>  {
+>  	if (!dn || dn != of_stdout || console_set_on_cmdline)
+>  		return false;
+> -	return !add_preferred_console(name, index, NULL);
+> +	return !add_preferred_console(name, index, of_stdout_options);
+>  }
+>  EXPORT_SYMBOL_GPL(of_console_check);
+>  
+> -- 
+> 1.9.1
+> 
+> 
