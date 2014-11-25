@@ -1,267 +1,62 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Nov 2014 16:24:59 +0000
-Subject: [PATCH v2 2/8] irqchip: Supply new driver for STi based devices
-In-Reply-To: <1416932705-16880-1-git-send-email-lee.jones@linaro.org>
-References: <1416932705-16880-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1416932705-16880-3-git-send-email-lee.jones@linaro.org>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 25 Nov 2014 08:25:22 -0800
+Subject: [PATCH] opp: convert dev_warn() to dev_dbg() for duplicate OPPs
+In-Reply-To: <CAKohpo=dDTAV=B0CvCqD1H-QGuQ+i2w5Lfr3egpWzrvRYVNWmw@mail.gmail.com>
+References: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
+ <5171628.FRGslOuEb6@vostro.rjw.lan>
+ <CAKohpomz_UiRErSsDPLWcmU4e7ocXZZu7bwCF8TvoSJupikd7A@mail.gmail.com>
+ <42965945.ST26GKfzPz@vostro.rjw.lan>
+ <20141124161435.GE5050@linux.vnet.ibm.com>
+ <CAKohpo=dDTAV=B0CvCqD1H-QGuQ+i2w5Lfr3egpWzrvRYVNWmw@mail.gmail.com>
+Message-ID: <20141125162522.GD5050@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is used to enable System Configuration Register controlled
-External, CTI (Core Sight), PMU (Performance Management), and PL310 L2
-Cache IRQs prior to use.
+On Tue, Nov 25, 2014 at 04:07:35PM +0530, Viresh Kumar wrote:
+> On 24 November 2014 at 21:44, Paul E. McKenney
+> <paulmck@linux.vnet.ibm.com> wrote:
+> > As Rafael says, if opp is reachable by RCU readers, you cannot just
+> > immediately kfree() it.  Immediately kfree()ing it like this -will-
+> > cause your RCU readers to see freed memory, which, as you noted, can
+> > cause crashes.
+> 
+> In order to reply you at some level, I tried going through RCU documentation
+> today before replying anymore. And yes I understood this part.
+> 
+> > Except that srcu_notifier_call_chain() involves SRCU readers.  So,
+> > unless I am confused, you instead need something like this:
+> >
+> > static void kfree_opp_rcu(struct rcu_head *rhp)
+> > {
+> >         struct device_opp *opp = container_of(rhp, struct device_opp, opp_list);
+> >
+> >         kfree(opp);
+> > }
+> >
+> > Then replace the above kfree() by:
+> >
+> >         call_srcu(&opp->rcu, kfree_opp_rcu);
+> 
+> Correct. But you missed the srcu which should be the first argument here :)
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/irqchip/Kconfig  |   7 ++
- drivers/irqchip/Makefile |   1 +
- drivers/irqchip/irq-st.c | 208 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 216 insertions(+)
- create mode 100644 drivers/irqchip/irq-st.c
+Indeed I did!  ;-)
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index b21f12f..e502f15 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -93,6 +93,13 @@ config RENESAS_IRQC
- 	bool
- 	select IRQ_DOMAIN
- 
-+config ST_IRQCHIP
-+	bool
-+	select REGMAP
-+	select MFD_SYSCON
-+	help
-+	  Enables SysCfg Controlled IRQs on STi based platforms.
-+
- config TB10X_IRQC
- 	bool
- 	select IRQ_DOMAIN
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 173bb5f..293b68d 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -31,6 +31,7 @@ obj-$(CONFIG_RENESAS_IRQC)		+= irq-renesas-irqc.o
- obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
- obj-$(CONFIG_ARCH_NSPIRE)		+= irq-zevio.o
- obj-$(CONFIG_ARCH_VT8500)		+= irq-vt8500.o
-+obj-$(CONFIG_ST_IRQCHIP)		+= irq-st.o
- obj-$(CONFIG_TB10X_IRQC)		+= irq-tb10x.o
- obj-$(CONFIG_XTENSA)			+= irq-xtensa-pic.o
- obj-$(CONFIG_XTENSA_MX)			+= irq-xtensa-mx.o
-diff --git a/drivers/irqchip/irq-st.c b/drivers/irqchip/irq-st.c
-new file mode 100644
-index 0000000..181dad1
---- /dev/null
-+++ b/drivers/irqchip/irq-st.c
-@@ -0,0 +1,208 @@
-+/*
-+ *  drivers/irqchip/irq-st.c
-+ *
-+ *  Copyright (C) 2014 STMicroelectronics ? All Rights Reserved
-+ *
-+ *  Author: Lee Jones <lee.jones@linaro.org>
-+ *
-+ *  This is a re-write of Christophe Kerello's PMU driver.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq-st.h>
-+#include <linux/err.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+
-+#define STIH415_SYSCFG_642		0x0a8
-+#define STIH416_SYSCFG_7543		0x87c
-+#define STIH407_SYSCFG_5102		0x198
-+#define STID127_SYSCFG_734		0x088
-+
-+#define ST_A9_IRQ_MASK			0x001FFFFF
-+#define ST_A9_IRQ_MAX_CHANS		2
-+
-+#define ST_A9_IRQ_EN_CTI_0		BIT(0)
-+#define ST_A9_IRQ_EN_CTI_1		BIT(1)
-+#define ST_A9_IRQ_EN_PMU_0		BIT(2)
-+#define ST_A9_IRQ_EN_PMU_1		BIT(3)
-+#define ST_A9_IRQ_EN_PL310_L2		BIT(4)
-+#define ST_A9_IRQ_EN_EXT_0		BIT(5)
-+#define ST_A9_IRQ_EN_EXT_1		BIT(6)
-+#define ST_A9_IRQ_EN_EXT_2		BIT(7)
-+
-+#define ST_A9_FIQ_N_SEL(dev, chan)	(dev << (8  + (chan * 3)))
-+#define ST_A9_IRQ_N_SEL(dev, chan)	(dev << (14 + (chan * 3)))
-+#define ST_A9_EXTIRQ_INV_SEL(dev)	(dev << 20)
-+
-+struct st_irq_syscfg {
-+	struct regmap *regmap;
-+	unsigned int syscfg;
-+	unsigned int config;
-+	bool ext_inverted;
-+};
-+
-+static const struct of_device_id st_irq_syscfg_match[] = {
-+	{
-+		.compatible = "st,stih415-irq-syscfg",
-+		.data = (void *)STIH415_SYSCFG_642,
-+	},
-+	{
-+		.compatible = "st,stih416-irq-syscfg",
-+		.data = (void *)STIH416_SYSCFG_7543,
-+	},
-+	{
-+		.compatible = "st,stih407-irq-syscfg",
-+		.data = (void *)STIH407_SYSCFG_5102,
-+	},
-+	{
-+		.compatible = "st,stid127-irq-syscfg",
-+		.data = (void *)STID127_SYSCFG_734,
-+	},
-+	{}
-+};
-+
-+static int st_irq_xlate(struct platform_device *pdev,
-+			int device, int channel, bool irq)
-+{
-+	struct st_irq_syscfg *ddata = dev_get_drvdata(&pdev->dev);
-+
-+	/* Set the device enable bit. */
-+	switch (device) {
-+	case ST_IRQ_SYSCFG_EXT_0 :
-+		ddata->config |= ST_A9_IRQ_EN_EXT_0;
-+		break;
-+	case ST_IRQ_SYSCFG_EXT_1 :
-+		ddata->config |= ST_A9_IRQ_EN_EXT_1;
-+		break;
-+	case ST_IRQ_SYSCFG_EXT_2 :
-+		ddata->config |= ST_A9_IRQ_EN_EXT_2;
-+		break;
-+	case ST_IRQ_SYSCFG_CTI_0 :
-+		ddata->config |= ST_A9_IRQ_EN_CTI_0;
-+		break;
-+	case ST_IRQ_SYSCFG_CTI_1 :
-+		ddata->config |= ST_A9_IRQ_EN_CTI_1;
-+		break;
-+	case ST_IRQ_SYSCFG_PMU_0 :
-+		ddata->config |= ST_A9_IRQ_EN_PMU_0;
-+		break;
-+	case ST_IRQ_SYSCFG_PMU_1 :
-+		ddata->config |= ST_A9_IRQ_EN_PMU_1;
-+		break;
-+	case ST_IRQ_SYSCFG_pl310_L2 :
-+		ddata->config |= ST_A9_IRQ_EN_PL310_L2;
-+		break;
-+	case ST_IRQ_SYSCFG_DISABLED :
-+		return 0;
-+	default :
-+		dev_err(&pdev->dev, "Unrecognised device %d\n", device);
-+		return -EINVAL;
-+	}
-+
-+	/* Select IRQ/FIQ channel for device. */
-+	ddata->config |= irq ?
-+		ST_A9_IRQ_N_SEL(device, channel) :
-+		ST_A9_FIQ_N_SEL(device, channel);
-+
-+	return 0;
-+}
-+
-+static int st_irq_syscfg_enable(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct st_irq_syscfg *ddata = dev_get_drvdata(&pdev->dev);
-+	int channels, ret, i;
-+	u32 device, invert;
-+
-+	channels = of_property_count_u32_elems(np, "st,irq-device");
-+	if (channels != ST_A9_IRQ_MAX_CHANS) {
-+		dev_err(&pdev->dev, "st,enable-irq-device must have 2 elems\n");
-+		return -EINVAL;
-+	}
-+
-+	channels = of_property_count_u32_elems(np, "st,fiq-device");
-+	if (channels != ST_A9_IRQ_MAX_CHANS) {
-+		dev_err(&pdev->dev, "st,enable-fiq-device must have 2 elems\n");
-+		return -EINVAL;
-+	}
-+
-+	for (i = 0; i < ST_A9_IRQ_MAX_CHANS; i++) {
-+		of_property_read_u32_index(np, "st,irq-device", i, &device);
-+
-+		ret = st_irq_xlate(pdev, device, i, true);
-+		if (ret)
-+			return ret;
-+
-+		of_property_read_u32_index(np, "st,fiq-device", i, &device);
-+
-+		ret = st_irq_xlate(pdev, device, i, false);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	/* External IRQs may be inverted. */
-+	of_property_read_u32(np, "st,invert-ext", &invert);
-+	ddata->config |= ST_A9_EXTIRQ_INV_SEL(invert);
-+
-+	return regmap_update_bits(ddata->regmap, ddata->syscfg,
-+				  ST_A9_IRQ_MASK, ddata->config);
-+}
-+
-+static int st_irq_syscfg_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	const struct of_device_id *match;
-+	struct st_irq_syscfg *ddata;
-+
-+	ddata = devm_kzalloc(&pdev->dev, sizeof(*ddata), GFP_KERNEL);
-+	if (!ddata)
-+		return -ENOMEM;
-+
-+	match = of_match_device(st_irq_syscfg_match, &pdev->dev);
-+	if (!match)
-+		return -ENODEV;
-+
-+	ddata->syscfg = (unsigned int)match->data;
-+
-+	ddata->regmap = syscon_regmap_lookup_by_phandle(np, "st,syscfg");
-+	if (IS_ERR(ddata->regmap)) {
-+		dev_err(&pdev->dev, "syscfg phandle missing\n");
-+		return PTR_ERR(ddata->regmap);
-+	}
-+
-+	dev_set_drvdata(&pdev->dev, ddata);
-+
-+	return st_irq_syscfg_enable(pdev);
-+}
-+
-+static int st_irq_syscfg_resume(struct device *dev)
-+{
-+	struct st_irq_syscfg *ddata = dev_get_drvdata(dev);
-+
-+	return regmap_update_bits(ddata->regmap, ddata->syscfg,
-+				  ST_A9_IRQ_MASK, ddata->config);
-+}
-+
-+static SIMPLE_DEV_PM_OPS(st_irq_syscfg_pm_ops, NULL, st_irq_syscfg_resume);
-+
-+static struct platform_driver st_irq_syscfg_driver = {
-+	.driver = {
-+		.name = "st_irq_syscfg",
-+		.pm = &st_irq_syscfg_pm_ops,
-+		.of_match_table = st_irq_syscfg_match,
-+	},
-+	.probe = st_irq_syscfg_probe,
-+};
-+
-+static int __init st_irq_syscfg_init(void)
-+{
-+	return platform_driver_register(&st_irq_syscfg_driver);
-+}
-+core_initcall(st_irq_syscfg_init);
--- 
-1.9.1
+> > This will require adding the following to struct device_opp:
+> >
+> >         struct rcu_head rcu;
+> 
+> We were freeing struct dev_pm_opp, and so I believe you
+> wanted me to add it there? Its already there.
+
+Fair enough!
+
+> > All that said, I do not claim to understand the OPP code, so please take
+> > the above suggested changes with a grain of salt.  And if you let me know
+> > where I am confused, I should be able to offer better suggestions.
+> 
+> Thanks for your suggestions. I have sent the patch to list and cc'd you on
+> the relevant ones. Would be great if you can review the rcu part there.
+
+Done!
+
+							Thanx, Paul
