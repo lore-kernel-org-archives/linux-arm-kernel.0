@@ -1,218 +1,127 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 25 Nov 2014 11:19:26 +0800
-Subject: [PATCH] mmc: core: add core-level function for sending tuning
- commands
-In-Reply-To: <CAPDyKFp_BRyh_0VGQckkdo=brdYCcMN+hi=8puGD9qzG211SOg@mail.gmail.com>
-References: <1416581201-9851-1-git-send-email-21cnbao@gmail.com>
- <CAPDyKFp_BRyh_0VGQckkdo=brdYCcMN+hi=8puGD9qzG211SOg@mail.gmail.com>
-Message-ID: <CAGsJ_4y2BhGrykY9jxwCiSdhkW0jDQ4yQ0OawHv=09W1RgZVCg@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 24 Nov 2014 19:20:21 -0800
+Subject: [PATCH] ARM: exynos_defconfig: disable CONFIG_EXYNOS5420_MCPM;
+ not stable
+In-Reply-To: <044101d00852$3f421420$bdc63c60$@kernel.org>
+References: <1414796382-5447-1-git-send-email-khilman@kernel.org>
+ <000e01cffb39$5ef0a2d0$1cd1e870$@kernel.org>
+ <7hegtaq26c.fsf@deeprootsystems.com>
+ <CAMAWPa-mLAFL7v8hHA5R-eBzpMFK-E-xcvjoV8Bn6tTwgP53Uw@mail.gmail.com>
+ <CAOesGMhvTDN4J6AdUDHKV0Sp4NT6a4QEMUDWOayQqhhD+C4acw@mail.gmail.com>
+ <CAMAWPa-sz5jT9izEONVZR2Z4mzuivKaNHSgyR+eP13tWZ84hYw@mail.gmail.com>
+ <CAOesGMgSkJ8xkBgN7OpuDzT=ehaAd6kvbx5_tC50x78pvpkTwg@mail.gmail.com>
+ <CAOesGMh-7md4PdQX1Wvk0jO+87j+fxSvBnVD_osjNd2zQ4L43w@mail.gmail.com>
+ <044101d00852$3f421420$bdc63c60$@kernel.org>
+Message-ID: <CAMAWPa-qk0DEmPNz5LZgJq9AuGhRxuY00XwxtEikt_vh-iozVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-24 19:44 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
-> On 21 November 2014 at 15:46, Barry Song <21cnbao@gmail.com> wrote:
->> From: Minda Chen <Minda.Chen@csr.com>
+On Mon, Nov 24, 2014 at 5:50 PM, Kukjin Kim <kgene@kernel.org> wrote:
+> Olof Johansson wrote:
 >>
->> According to the SD card spec, Add a manual tuning command function
->> for SDR104/HS200 by sending command 19 or command 21 to read data
->> and compare with the tuning block pattern.
->>
->> this patch will help to decrease some platform private codes in
->> SDHCI platform_execute_tuning() callbacks.
->>
->> Signed-off-by: Minda Chen <Minda.Chen@csr.com>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> ---
->>  drivers/mmc/core/mmc_ops.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/mmc/core.h   |  1 +
->>  2 files changed, 66 insertions(+)
->>
->> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
->> index 7911e05..ecc7789 100644
->> --- a/drivers/mmc/core/mmc_ops.c
->> +++ b/drivers/mmc/core/mmc_ops.c
->> @@ -543,6 +543,71 @@ int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->>  }
->>  EXPORT_SYMBOL_GPL(mmc_switch);
->>
->> +int mmc_send_tuning(struct mmc_card *card, u32 opcode)
->> +{
->> +       struct mmc_request mrq = {NULL};
->> +       struct mmc_command cmd = {0};
->> +       struct mmc_data data = {0};
->> +       struct scatterlist sg;
->> +       struct mmc_host *mmc = card->host;
->> +       struct mmc_ios *ios = &mmc->ios;
->> +       const u8 *tuning_block_pattern;
->> +       int size, err = 0;
->> +       u8 *data_buf;
->> +
->> +       if (opcode == MMC_SEND_TUNING_BLOCK_HS200) {
->
-> I don't think we need to care about the opcode. Let's just check the bus_width.
->
->> +               if (ios->bus_width == MMC_BUS_WIDTH_8) {
->> +                       tuning_block_pattern = tuning_blk_pattern_8bit;
->> +                       size = sizeof(tuning_blk_pattern_8bit);
->> +               } else if (ios->bus_width == MMC_BUS_WIDTH_4) {
->> +                       tuning_block_pattern = tuning_blk_pattern_4bit;
->> +                       size = sizeof(tuning_blk_pattern_4bit);
->> +               } else
->> +                       return -EINVAL;
->> +       } else if (opcode == MMC_SEND_TUNING_BLOCK) {
->> +               tuning_block_pattern = tuning_blk_pattern_4bit;
->> +               size = sizeof(tuning_blk_pattern_4bit);
->> +       } else
->> +               return -EINVAL;
->> +
->> +       data_buf = kmalloc(size, GFP_KERNEL);
->
-> You should use kzalloc() to get the zeroed buffer you want.
->
->> +       if (!data_buf)
->> +               return -ENOMEM;
->> +
->> +       mrq.cmd = &cmd;
->> +       mrq.data = &data;
->> +
->> +       cmd.opcode = opcode;
->> +       cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
->> +
->> +       data.blksz = size;
->> +       data.blocks = 1;
->> +       data.flags = MMC_DATA_READ;
->
-> These needs to be assigned as well:
->
-> data.sg = &sg;
-> data.sg_len = 1;
->
->> +
->> +       mmc_set_data_timeout(&data, card);
->
-> mmc_set_data_timeout() doesn't handle CMD21/19.
->
-> The specs tells us about 40 commands should be executed within 150ms.
-> I would pick a value of 150ms, just to be sure we are inside that
-> range. Also, assign "data->timeout_ns" here, instead of relying on
-> mmc_set_data_timeout().
->
->> +       sg_init_one(&sg, data_buf, size);
->> +       memset(data_buf, 0, size);
->> +       mmc_wait_for_req(mmc, &mrq);
->> +
->> +       if (cmd.error) {
->> +               err = cmd.error;
->> +               goto out;
->> +       }
->> +
->> +       if (data.error) {
->> +               err = data.error;
->> +               goto out;
->> +       }
->> +
->> +       if (memcmp(data_buf, tuning_block_pattern, size))
->> +               err = -EIO;
->> +
->> +out:
->> +       kfree(data_buf);
->> +       return err;
->> +}
->> +EXPORT_SYMBOL_GPL(mmc_send_tuning);
->> +
->>  static int
->>  mmc_send_bus_test(struct mmc_card *card, struct mmc_host *host, u8 opcode,
->>                   u8 len)
->> diff --git a/include/linux/mmc/core.h b/include/linux/mmc/core.h
->> index f206e29..82a0119 100644
->> --- a/include/linux/mmc/core.h
->> +++ b/include/linux/mmc/core.h
->> @@ -154,6 +154,7 @@ extern void mmc_start_bkops(struct mmc_card *card, bool from_exception);
->>  extern int __mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int, bool,
->>                         bool, bool);
->>  extern int mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int);
->> +extern int mmc_send_tuning(struct mmc_card *, u32);
->>  extern int mmc_send_ext_csd(struct mmc_card *card, u8 *ext_csd);
->>
->>  #define MMC_ERASE_ARG          0x00000000
->> --
->> 2.1.1
->>
+>> On Mon, Nov 24, 2014 at 5:37 PM, Olof Johansson <olof@lixom.net> wrote:
+>> > On Mon, Nov 24, 2014 at 5:35 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>> >> On Mon, Nov 24, 2014 at 4:25 PM, Olof Johansson <olof@lixom.net> wrote:
+>> >>> On Mon, Nov 24, 2014 at 11:51 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>> >>>> Kukjin,
+>> >>>>
+>> >>>> On Mon, Nov 10, 2014 at 11:35 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>> >>>>> Kukjin Kim <kgene@kernel.org> writes:
+>> >>>>>
+>> >>>>>> Kevin Hilman wrote:
+>> >>>>>>>
+>> >>>>>>> From: Kevin Hilman <khilman@linaro.org>
+>> >>>>>>>
+>> >>>>>>> The option CONFIG_EXYNOS5420_MCPM is causing imprecise external aborts
+>> >>>>>>> during boot testing, causing various userspace startup failures.
+>> >>>>>>>
+>> >>>>>>> Disable until it has gotten more testing.
+>> >>>>>>>
+>> >>>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>,
+>> >>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>,
+>> >>>>>>> Cc: Sachin Kamat <sachin.kamat@samsung.com>,
+>> >>>>>>> Cc: Doug Anderson <dianders@chromium.org>,
+>> >>>>>>> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+>> >>>>>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>,
+>> >>>>>>> Cc: Tushar Behera <tushar.behera@linaro.org>,
+>> >>>>>>> Cc: stable at vger.kernel.org # v3.17+
+>> >>>>>>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>> >>>>>>> ---
+>> >>>>>>> This has been reported by a few people[1], but not investigated or fixed, so it's
+>> >>>>>>> time to disable this feature until it can be fixed.
+>> >>>>>>>
+>> >>>>>> Hi Kevin,
+>> >>>>>>
+>> >>>>>> Yeah I agree with your opinion.
+>> >>>>>>
+>> >>>>>> But as you can see my tree, I've queued regarding mcpm patches for 3.19 will
+>> >>>>>> be shown in -next in this weekend.
+>> >>>>>
+>> >>>>> Which of the recently queued patches are expected to address the
+>> >>>>> imprecise abort issue?  I'd be happy to test them out.
+>> >>>>
+>> >>>> Exynos5 MCPM is still broken in linux-next and still causing an imprecise abort.
+>> >>>>
+>> >>>> What is the status of $SUBJECT patch?
+>> >>>>
+>> >>>>>> Anyway let me apply this into -fixes and
+>> >>>>>> then let's enable after test its functionality in -next in a couple of days.
+>> >>>>>
+>> >>>>> Yes, I think this needs to be applied until these aborts are understood
+>> >>>>> and fixed.
+>> >>>>
+>> >>>> Is anyone at Samsung actually looking into these MCPM issues?
+>> >>>
+>> >>> Hi Kevin,
+>> >>>
+>> >>> What hardware are you having problems with? 5420 or 5422/5800?
+>> >>
+>> >> Yes.  :)
+>> >>
+>> >> exynos5420-arndale-octa:
+>> >> http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc6/arm-exynos_defconfig/boot-exynos5420-
+>> arndale-octa.html
+>> >> exynos5422-odroid-xu3:
+>> >> http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc6/arm-exynos_defconfig/boot-exynos5422-
+>> odroid-xu3.html
+>> >>
+>> >> My boot tests seem to pass fine because I have such a minimal
+>> >> userspace, but Tyler Baker reported that with a "real" userspace, he
+>> >> can't boot to a shell:
+>> >>
+>> >>   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286203.html
+>> >
+> Hmm...his report was in Sep...I think it should be fine with current -next?
 
-What about?
+No, it is still broken in linux-next (as I stated above.)
 
-546 int mmc_send_tuning(struct mmc_card *card)
-547 {
-548         struct mmc_request mrq = {NULL};
-549         struct mmc_command cmd = {0};
-550         struct mmc_data data = {0};
-551         struct scatterlist sg;
-552         struct mmc_host *mmc = card->host;
-553         struct mmc_ios *ios = &mmc->ios;
-554         const u8 *tuning_block_pattern;
-555         int size, err = 0;
-556         u8 *data_buf;
-557         u32 opcode;
-558
-559         if (ios->bus_width == MMC_BUS_WIDTH_8) {
-560                 tuning_block_pattern = tuning_blk_pattern_8bit;
-561                 size = sizeof(tuning_blk_pattern_8bit);
-562                 opcode = MMC_SEND_TUNING_BLOCK_HS200;
-563         } else if (ios->bus_width == MMC_BUS_WIDTH_4) {
-564                 tuning_block_pattern = tuning_blk_pattern_4bit;
-565                 size = sizeof(tuning_blk_pattern_4bit);
-566                 opcode = MMC_SEND_TUNING_BLOCK;
-567         } else
-568                 return -EINVAL;
-569
-570         data_buf = kzalloc(size, GFP_KERNEL);
-571         if (!data_buf)
-572                 return -ENOMEM;
-573
-574         mrq.cmd = &cmd;
-575         mrq.data = &data;
-576
-577         cmd.opcode = opcode;
-578         cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
-579
-580         data.blksz = size;
-581         data.blocks = 1;
-582         data.flags = MMC_DATA_READ;
-583
-584         /*
-585          * According to the tuning specs, Tuning process
-586          * is normally shorter 40 executions of CMD19,
-587          * and timeout value should be shorter than 150 ms
-588          */
-589         data.timeout_ns = 150 * NSEC_PER_MSEC;
-590
-591         data.sg = &sg;
-592         data.sg_len = 1;
-593         sg_init_one(&sg, data_buf, size);
-594
-595         mmc_wait_for_req(mmc, &mrq);
-596
-597         if (cmd.error) {
-598                 err = cmd.error;
-599                 goto out;
-600         }
-601
-602         if (data.error) {
-603                 err = data.error;
-604                 goto out;
-605         }
-606
-607         if (memcmp(data_buf, tuning_block_pattern, size))
-608                 err = -EIO;
-609
-610 out:
-611         kfree(data_buf);
-612         return err;
-613 }
-614 EXPORT_SYMBOL_GPL(mmc_send_tuning);
+Moreover, earlier in this thread you mentioned you were merging some
+MCPM patches that should address this, but did not respond when I
+asked which patches you thing should address this issue
 
->
-> Kind regards
-> Uffe
+> To be honest, since I don't have the exynos5420 arndale, chromebook...but smdk
+> which has different bootloader, I couldn't test it...I'll try to make a test
+> farm like you guys...
 
--barry
+Do you have some colleagues with any other 542x hardware?  I had
+assumed that linux-next was being better tested on the publicaly
+available, and widely available boards like odroid-xu3 and
+Chromebook2, but I've come to realize the hard way that that is not
+the case.  You mention your board has a different bootloader.  Do you
+suspect there's a bootloader issue on these other platforms?  If so,
+could you elaborate on possible fixes?  I'm more than willing to test
+any proposed fixes, but I'm not familiar enough yet with these SoCs to
+figure out the underlying issues alone.
+
+Until you have a working board farm, you could start having a closer
+look at the boot logs we're already producing.  Admittedly linux-next
+broken in many ways besides this one for exynos currently, but it has
+been having these imprecise aborts well before the other recent
+issues.
+
+Also, It's very possible that this issue is not even MCPM related at
+all, and MCPM is just uncovering a previously hidden bug.  It would be
+very helpful if people more familiar with this hardware and SoC would
+investigate bug reports like these.
+
+Kevin
