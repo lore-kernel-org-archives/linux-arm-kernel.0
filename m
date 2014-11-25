@@ -1,53 +1,89 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 25 Nov 2014 16:53:56 +0200
-Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <20141125140440.GF3836@n2100.arm.linux.org.uk>
-References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
- <15074721.IbfeeI3ajE@wuerfel> <54746349.3000306@ti.com>
- <2301239.aDOlWg3gEs@wuerfel> <5474846C.2000308@ti.com>
- <20141125140440.GF3836@n2100.arm.linux.org.uk>
-Message-ID: <54749804.8070400@ti.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 25 Nov 2014 22:54:15 +0800
+Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <2966212.dpWQ0OTb0A@wuerfel>
+References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <5473FDA8.6080201@huawei.com> <54744F14.60004@linaro.org>
+ <2966212.dpWQ0OTb0A@wuerfel>
+Message-ID: <54749817.2090103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Arnd,
 
-On 11/25/2014 04:04 PM, Russell King - ARM Linux wrote:
-> On Tue, Nov 25, 2014 at 03:30:20PM +0200, Grygorii Strashko wrote:
->> On 11/25/2014 02:09 PM, Arnd Bergmann wrote:
->>> It might be possible to do this implicitly if the driver calls clk_get(),
->>> basically doing clk_get() (or another call if necessary) would prevent the
->>> simple pmdomain from turning it off during suspend.
+On 2014?11?25? 19:02, Arnd Bergmann wrote:
+> On Tuesday 25 November 2014 17:42:44 Hanjun Guo wrote:
+>> On 2014-11-25 11:55, Shannon Zhao wrote:
+>>> Hi,
+>>>
+>>> On 2014/11/22 5:23, Ganapatrao Kulkarni wrote:
+>> [...]
+>>>> +==============================================================================
+>>>> +4 - Example dts
+>>>> +==============================================================================
+>>>> +
+>>>> +Example 1: 2 Node system each having 8 CPUs and a Memory.
+>>>> +
+>>>> +    numa-map {
+>>>> +            #address-cells = <2>;
+>>>> +            #size-cells = <1>;
+>>>> +            #node-count = <2>;
+>>>> +            mem-map =  <0x0 0x00000000 0>,
+>>>> +                       <0x100 0x00000000 1>;
+>>>> +
+>>>> +            cpu-map = <0 7 0>,
+>>>> +                      <8 15 1>;
+>>>
+>>> The cpu range is continuous here. But if there is a situation like below:
+>>>
+>>> 0 2 4 6 belong to node 0
+>>> 1 3 5 7 belong to node 1
+>>>
+>>> This case is very common on X86. I don't know the real situation of arm as
+>>> I don't have a hardware with 2 nodes.
+>>>
+>>> How can we generate a DTS about this situation? like below? Can be parsed?
+>>>
+>>>                cpu-map = <0 2 4 6 0>,
+>>>                          <1 3 5 7 1>;
 >>
->> Unfortunately, clk_get() will not work, because drivers still need to use it
->> to get functional clocks even if they are not going to control them explicitly.
->> For example, if it need to know clock's rate.
-> 
-> If you don't want a clock to be turned off, then clk_get() it, then
-> clk_prepare() it, and finally clk_enable() it.
-> 
-> Even if someone else gets it, the only time that a clock is turned off
-> is when _all_ users of it mutually agree that it can be turned off - by
-> every user disabling (and possibly unpreparing) it.
-> 
-> So, if the PM domain code gets a clock, prepares and enables it, then
-> a driver gets the same clock, prepares and enables it also, it won't
-> be disabled until _both_ the PM domain code _and_ the driver disable
-> and unprepare the clock.
-> 
+>> I think the binding proposed here can not cover your needs, and I think this
+>> binding is not suitable, there are some reasons.
+>>
+>>   - CPU logical ID is allocated by OS, and it depends on the order of CPU node
+>>     in the device tree, so it may be in a clean order like this patch proposed,
+>>     or it will like the order Shannon pointed out.
+>>
+>>   - Since CPU logical ID is allocated by OS, DTS file will not know these
+>>     numbers.
+>
+> Also:
+>
+> - you cannot support hierarchical NUMA topology
+>
+> - you cannot have CPU-less or memory-less nodes
+>
+> - you cannot associate I/O devices with NUMA nodes, only memory and CPU
 
-All 100% true :)
+Yes, I agree.
 
-But the question here is how prevent pm_clk domain (clock_ops.c) from
-getting the control on clock if this particular clock is optional from driver's
-perspective. So, only driver should control it. As opposite, all other clocks
-should be controlled by pm-domain (in case of GPD from .start/stop callbacks).
+>
+>> So the problem behind this is the mappings between CPUs and NUMA nodes,
+>> there is already mapping for CPU hardware ID (MPIDR) and CPU logical ID,
+>> and MPIDR will be not changed, why not using MPIDR for the mapping of
+>> NUMA node and CPU? then the mappings will be:
+>>
+>> CPU logical ID <------> CPU MPIDR <-----> NUMA node ID <-----> proximity domain
+>> (allocated by OS)      (constant)       (allocated by OS)
+>
+> No, don't hardcode ARM specifics into a common binding either. I've looked
+> at the ibm,associativity properties again, and I think we should just use
+> those, they can cover all cases and are completely independent of the
+> architecture. We should probably discuss about the property name though,
+> as using the "ibm," prefix might not be the best idea.
 
-You can find more detailed description of problem which this patch was
-created to solve here:
-https://lkml.org/lkml/2014/11/19/225
+Is there any doc/code related to this? please give me some hints and I
+will read that.
 
-Thanks for your time.
-
-regards,
--grygorii
+Thanks
+Hanjun
