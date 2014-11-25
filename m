@@ -1,130 +1,68 @@
-From: addy.ke@rock-chips.com (Addy)
-Date: Tue, 25 Nov 2014 10:38:03 +0800
-Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc
- for vqmmc
-In-Reply-To: <CAPDyKFqt4rrwi940KAPyPONpjixK1730QmHEsN27V97jyHH+Qw@mail.gmail.com>
-References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>	<1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>	<CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>	<CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>	<5464152E.7040209@rock-chips.com>	<CAPDyKFrzGfDew0eLLEcA+_iS_mo-O2bFU58fjirfXXA8AJ9UYQ@mail.gmail.com>	<CAD=FV=Ve1TY4+8quq1=18A1YOFvOWuFGrBmHLwMCwdWBSqzxOw@mail.gmail.com>	<CAD=FV=UJT5zBkcj2a03Y_RWxad9+Pu83G_z79Xzzn74V=eRqww@mail.gmail.com>
- <CAPDyKFqt4rrwi940KAPyPONpjixK1730QmHEsN27V97jyHH+Qw@mail.gmail.com>
-Message-ID: <5473EB8B.3000803@rock-chips.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 25 Nov 2014 11:44:06 +0900
+Subject: [PATCH 1/2] ARM: shmobile: sh73a0 legacy/reference: Add missing
+ INTCA0 clock for irqpin module
+In-Reply-To: <1416410820-30020-2-git-send-email-geert+renesas@glider.be>
+References: <1416410820-30020-1-git-send-email-geert+renesas@glider.be>
+ <1416410820-30020-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <20141125024405.GA21881@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 19, 2014 at 04:26:59PM +0100, Geert Uytterhoeven wrote:
+> This clock drives the irqpin controller modules.
+> Before, it was assumed enabled by the bootloader or reset state.
+> By making it available to the driver, we make sure it gets enabled when
+> needed, and allow it to be managed by system or runtime PM.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-On Fri, Nov 24, 2014 at 9:29 PM, Ulf Hansson <ulf.hansson@linaro.org> 
-wrote:
+Hi Geert,
 
-> On 21 November 2014 at 22:04, Doug Anderson <dianders@chromium.org> wrote:
->> Hi,
->>
->> On Fri, Nov 21, 2014 at 9:42 AM, Doug Anderson <dianders@chromium.org> wrote:
->>> Ulf,
->>>
->>> On Fri, Nov 21, 2014 at 4:06 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>> [...]
->>>>
->>>>> Sure
->>>>> If the first card is sd2.0 since startup, dw_mci_switch_voltage will not be called,
->>>> That can't be right. mmc_power_up() should trigger
->>>> dw_mci_switch_voltage() to be invoked.
->>> Hmmm, I think you're right.  Addy: can you double check if it's only
->>> the 2nd card for you?  I was thinking that if a regulator is currently
->>> 3.3V and you request 2.7 - 3.3V the regulator framework will treat
->>> that as a noop.  ...but that definitely doesn't appear to be the case.
->>> When I boot up the first time even with no SD card plugged in, I see
->>> this at bootup:
->>>
->>> [    3.042234] vccio_sd: 1800 <--> 3300 mV at 3300 mV
->>>
->>> ...showing that it started at 3.3V.  Then I see:
->>>
->>> $ grep "" /sys/class/regulator/regulator.16/{name,microvolts}
->>> /sys/class/regulator/regulator.16/name:vccio_sd
->>> /sys/class/regulator/regulator.16/microvolts:2700000
->>>
->>> ...so it is certainly getting changed even with no card plugged in.
->>>
->>>
->>> BTW: I don't actually have one of these failing cards--all of mine
->>> work.  Addy, do you know the make and model of the card you have that
->>> fails?
->> Just as a bit of a followup, I did some more digging...
->>
->> 1. It looks as if we now have a bit of "opposite" logic for vmmc vs.
->> vqmmc.  In mmc_power_up() I see that it sets the initial voltage as:
->>
->>    host->ios.vdd = fls(ocr) - 1;
-> That's because we would like to supports as many cards as possible.
-> The policy is based upon that some cards may not support lower
-> voltages, but most will support higher.
->
->> That actually means that we're going to pick the maximum voltage for
->> vmmc (of the supported voltages).  For vqmmc dw_mmc is using the
->> regulator framework which (as described in my previous message) will
->> pick the minimum.
-> Correct. I have thought this has been inside spec and choosing the
-> lower value would be preferred to lower power consumption. Maybe we
-> needs to re-visit this one more time.
->
-> Here are some of the interesting sections in the eMMC spec:
-> 10.3.3 Power supply Voltages
-> "The VCCQ must be defined at equal to or less than VCC".
->
-> 10.5 Bus signal levels
-> Push-pull mode:
-> Voh = 0.75 * VCCQ. (Do note, its VCCQ not VCC).
->
-> Summary eMMC: VCCQ must be less and VCC, we should be inside spec.
->
-> >From SD spec:
-> 6.6.1 Threshold Level for High Voltage Range
-> Voh = 0.75 * VDD.
->
-> In worst case scenario, VDD = 3.6V and VIO = 2.7V. That gives as the
-> factor of 0.75, thus we are inside spec but without margins.
-* From eMMC4.5 spec:
-   1. (VDDF)vcc: Supply voltage for flash memory,  which is  2.7v -- 3.3v
-   2. (VDD)vccq: Supply voltage for memory controller, which is  1.7v -- 
-1.95v  and 2,7v -- 3.6v
+should this be considered a fix?
 
-* And from RK3288 datasheet:
-   Digtial GPIO Power(SDMMC0_VDD --> vccq) is 3.0v -- 3.6v and 1.62v - 1.98v
+If so could you cook up some text describing which patch introduced
+this problem in which kernel version.
 
-So I think:
-3.3v:  (2.7v < vccq < 3.6v)   &&  (3.0v < vccq < 3.6v)  ==> (3.0v < vccq 
-< 3.6v)
-1.8v:  (1.7v < vccq < 1.95v)  && (1.62v < vccq < 1.98v) ==> (1.7v < vccq 
-< 1.95v)
-
-and (2.7v < vcc < 3.3v)
-
-* And according to our hardware engineer:
-   All of supply voltage must have +/- 10% cushion.
-
-* And we have found in some worse card that there is 200mv voltage 
-collapse when these card is insert.
-
-So I think the best resolution is that vcc and vccq is configurable int 
-dt table.
-
->> 2. Several people I've talked to have expressed concerns that our
->> minimum value is 2.7V.  Apparently that's really on the edge and makes
->> EEs a little nervous.  The quick sample of cards sitting on my desk
->> shows that they seem to claim 0x00ff8000, which doesn't include 2.7V.
-> 0x00ff8000 states what values of VDD levels the device supports. Not VIO.
->
->>
->> Both of the above make me feel like dw_mmc should try its best to pick
->> a value for vqmmc that is closest to the value of vmmc (and >= 2.7V).
->> That also happens to make us work exactly like hosts where vmmc and
->> vqmmc are supplied by the same supply.
-> I do see your point. And I agree that it would be nice to achieve
-> something like this.
->
-> The question is how to do this. For sure, we need to involve the mmc
-> core to handle this correctly.
->
-> Kind regards
-> Uffe
->
->
->
+> ---
+>  arch/arm/mach-shmobile/clock-sh73a0.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+> index 6b4c1f313cc987c1..3855fb024fdbb1ca 100644
+> --- a/arch/arm/mach-shmobile/clock-sh73a0.c
+> +++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+> @@ -553,6 +553,7 @@ enum { MSTP001,
+>  	MSTP314, MSTP313, MSTP312, MSTP311,
+>  	MSTP304, MSTP303, MSTP302, MSTP301, MSTP300,
+>  	MSTP411, MSTP410, MSTP403,
+> +	MSTP508,
+>  	MSTP_NR };
+>  
+>  #define MSTP(_parent, _reg, _bit, _flags) \
+> @@ -597,6 +598,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+>  	[MSTP411] = MSTP(&div4_clks[DIV4_HP], SMSTPCR4, 11, 0), /* IIC3 */
+>  	[MSTP410] = MSTP(&div4_clks[DIV4_HP], SMSTPCR4, 10, 0), /* IIC4 */
+>  	[MSTP403] = MSTP(&r_clk, SMSTPCR4, 3, 0), /* KEYSC */
+> +	[MSTP508] = MSTP(&div4_clks[DIV4_HP], SMSTPCR5, 8, 0), /* INTCA0 */
+>  };
+>  
+>  /* The lookups structure below includes duplicate entries for some clocks
+> @@ -677,6 +679,14 @@ static struct clk_lookup lookups[] = {
+>  	CLKDEV_DEV_ID("i2c-sh_mobile.4", &mstp_clks[MSTP410]), /* I2C4 */
+>  	CLKDEV_DEV_ID("e6828000.i2c", &mstp_clks[MSTP410]), /* I2C4 */
+>  	CLKDEV_DEV_ID("sh_keysc.0", &mstp_clks[MSTP403]), /* KEYSC */
+> +	CLKDEV_DEV_ID("renesas_intc_irqpin.0",	&mstp_clks[MSTP508]), /* INTCA0 */
+> +	CLKDEV_DEV_ID("e6900000.irqpin",	&mstp_clks[MSTP508]), /* INTCA0 */
+> +	CLKDEV_DEV_ID("renesas_intc_irqpin.1",	&mstp_clks[MSTP508]), /* INTCA0 */
+> +	CLKDEV_DEV_ID("e6900004.irqpin",	&mstp_clks[MSTP508]), /* INTCA0 */
+> +	CLKDEV_DEV_ID("renesas_intc_irqpin.2",	&mstp_clks[MSTP508]), /* INTCA0 */
+> +	CLKDEV_DEV_ID("e6900008.irqpin",	&mstp_clks[MSTP508]), /* INTCA0 */
+> +	CLKDEV_DEV_ID("renesas_intc_irqpin.3",	&mstp_clks[MSTP508]), /* INTCA0 */
+> +	CLKDEV_DEV_ID("e690000c.irqpin",	&mstp_clks[MSTP508]), /* INTCA0 */
+>  
+>  	/* ICK */
+>  	CLKDEV_ICK_ID("dsit_clk", "sh-mipi-dsi.0", &div6_clks[DIV6_DSIT]),
+> -- 
+> 1.9.1
+> 
