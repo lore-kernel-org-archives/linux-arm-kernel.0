@@ -1,63 +1,63 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 24 Nov 2014 16:02:18 -0800
-Subject: [RFC 0/2] Qualcomm RPM sleep states
-In-Reply-To: <20141124215921.GA2872@sonymobile.com>
-References: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
- <546FC674.1070005@codeaurora.org>
- <CAJAp7OiLwMQEYFr9xdLg=S=cAPtN+hKZq3j5iSe0oL_Qz3URwg@mail.gmail.com>
- <5473A0F7.10308@codeaurora.org> <20141124215921.GA2872@sonymobile.com>
-Message-ID: <5473C70A.7040705@codeaurora.org>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 25 Nov 2014 00:12:36 +0000
+Subject: [PATCH] of: support passing console options with stdout-path
+In-Reply-To: <20141124230016.GP20238@lunn.ch>
+References: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
+ <20141124230016.GP20238@lunn.ch>
+Message-ID: <20141125001236.GA2361@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2014 01:59 PM, Bjorn Andersson wrote:
-> On Mon 24 Nov 13:19 PST 2014, Stephen Boyd wrote:
->
-> [..]
->> What exactly are we circumventing? I can only guess that we're talking
->> about the aggregation logic?
->>
-> We're circumventing the fact that the regulator core doesn't have knowledge
-> about our multiple presented views of the same resource.
+On Tue, Nov 25, 2014 at 12:00:16AM +0100, Andrew Lunn wrote:
+> On Mon, Nov 24, 2014 at 10:23:58PM +0000, Leif Lindholm wrote:
+> > Support specifying console options (like with console=ttyXN,<options>)
+> > by appending them to the stdout-path property after a separating ':'.
+> > 
+> > Example:
+> > 	stdout-path = "uart0:115200";
+> > 
+> > This patch also modifies of_find_node_by_path() to match only the
+> > portion of the path before a ':'.
+> 
+> Hi Leif
+> 
+> These appears to somewhat conform to ePAPR, which says:
+> 
+>       A string that specifies the full path to the node representing
+>       the device to be used for boot console output. If the character
+>       ":" is present in the value it terminates the path.
+> 
+> So you can put any random junk after the :. However, are we going to
+> have backward/forward compatibility problems, and problems with
+> bootloaders? The current kernel code does not look for the :. So a new
+> DT blob on an old kernel will not work so well.
 
-Sorry I don't follow here. Why would the regulator framework care about
-the different views of a resource? Each regulator we make for the
-different views will reflect the request made by Linux for a particular
-set of that RPM resource. So all consumers who are using the S3 active +
-sleep set regulator will aggregate into one request. Likewise, all the
-consumers for the S3 active set regulator will aggregate into another
-request. The only thing that isn't visible is the aggregation between
-the active only and active + sleep regulators, but that can be
-determined by doing a max() of the regulators. Even then, if we consider
-that there are other masters also requesting voltages or enable/disable
-for these resources we quickly discover there are other things the
-regulator core doesn't have knowledge about, like what the actual
-voltage is or if the regulator is really off vs. Linux requesting for it
-to be off.
+I _think_ this will be less of a problem in practice than it could be
+in theory.
 
->
-> As the downstream driver shows, if we just implement the right pieces it should
-> work, i.e. give us the correct end result, but it will not be future proof nor
-> pretty. That's why I think we need to discuss how to solve it either in the
-> regulator driver or in the framework.
->
-> And based on your feedback, it looks like we would have to do something about
-> this in the framework.
+The reason this is needed is that at least several platforms have
+different baudrate settings in firmware than the default provided by
+the kernel for their UART. As a result, stdout-path becomes
+semi-useless; the only thing it gives you is the ability to get
+earlycon output without specifying a specific device (and then the
+console turns to garbage once non-earlycon is enabled).
 
-I don't see any problems with making multiple regulators for one RPM
-resource that represent the active set or active + sleep set. Everything
-could be handled in the RPM regulator driver by looking for the other
-regulators that are acting on the same RPM resource and aggregating.
-Maybe you can elaborate on what you think isn't future proof nor pretty
-about this design?
+Hence, a platform that gets along happily today without the ability to
+specify console options in stdout-path would have no pressing need to
+add it to its dt. This should permit at least a very long, soft,
+transition path.
 
-As a thought experiment, what if there really was two physical
-independent controllable regulators and a pin from the CPU to the PMIC
-toggled a mux to select between the two. Such a pin would only be
-asserted when the CPU turned off. Would you still want to expose this as
-one regulator to the kernel given that only one supply goes to the CPU
-at any given time?
+(console= on kernel command line continues to override stdout-path.)
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> More worrying, barebox does not support the : either. So there is a
+> danger your bootloader suddenly goes silent after a dt blob update.
+
+_That_ would be most unfortunate.
+
+> Would it be safer to add a new property in chosen?
+
+My preference would be not, given the above, but the important thing
+is to get the functionality in so we get rid of mandatory console=.
+
+/
+    Leif
