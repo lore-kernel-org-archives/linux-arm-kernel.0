@@ -1,116 +1,60 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 25 Nov 2014 14:36:53 +0100
-Subject: [RFC 0/2] Fix Arndale Octa/Peach Pi boot on Audio subsystem clocks
-In-Reply-To: <1416907375.5023.54.camel@AMDC1943>
-References: <1416842312-4405-1-git-send-email-k.kozlowski@samsung.com>
- <54736AD0.4070909@collabora.co.uk> <1416907375.5023.54.camel@AMDC1943>
-Message-ID: <547485F5.50600@collabora.co.uk>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 25 Nov 2014 15:38:02 +0200
+Subject: [PATCH v3 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
+ extensions
+In-Reply-To: <5474824F.8080000@redhat.com>
+References: <1416309051-26784-1-git-send-email-hdegoede@redhat.com>
+ <1416309051-26784-3-git-send-email-hdegoede@redhat.com>
+ <547476DA.2030004@ti.com> <54747B72.1050406@redhat.com>
+ <54747DCF.9010502@ti.com> <5474824F.8080000@redhat.com>
+Message-ID: <5474863A.5040801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On 25/11/14 15:21, Hans de Goede wrote:
 
-On 11/25/2014 10:22 AM, Krzysztof Kozlowski wrote:
+>> Shouldn't the compatible then be "allwinner,sunxi-simple-framebuffer",
+>> to differentiate from some other SoC Allwinner has or might create in
+>> the future? That is, presuming you're confident enough that a single
+>> compatible string covers all the current and forthcoming sunxi SoCs.
 > 
-> Hmmm, that's strange. I've looked again at your dmesg and it is little
-> different than mine (when system fails).
-> 1. Does your PMIC come up? In your dmesg:
-> [    2.687297] max77802-pmic max77802-pmic: regulator init failed for 0
-> [    2.693539] platform max77802-pmic: Driver max77802-pmic requests probe deferral
->
+> This was discussed in an earlier thread, we (Ian Campbell, Grant and me)
 
-The Peach Pit/Pi DTS define the parent input supplies for the max77802 PMIC
-regulators and these are regulators from the tps65090 PMU but the max77802
-is probed before. When the system does not fail, the probe is deferred and
-succeed later but I don't know when the system fails (more on that below).
- 
-> 2. In my case booting fails just after disabling unused clocks which is
-> quite early, my dmesg:
-> [   11.700074] input: gpio_keys as /devices/platform/gpio_keys/input/input0
-> [   11.704282] s3c-rtc 101e0000.rtc: setting system clock to 2029-01-11 19:19:17 UTC (1862853557)
-> [   11.770602] mmcblk0: mmc0:0001 M8G1WA 7.28 GiB
-> [   11.776201] mmcblk0boot0: mmc0:0001 M8G1WA partition 1 2.00 MiB
-> [   11.780968] mmcblk0boot1: mmc0:0001 M8G1WA partition 2 2.00 MiB
-> [   11.786823] mmcblk0rpmb: mmc0:0001 M8G1WA partition 3 128 KiB
-> [   11.793815]  mmcblk0: p1 p2 p3 p4
-> [   11.824165] PVDD_G3D_1V0: disabling
-> [   11.830833] PVDD_G3DS_1V0: disabling
-> [   11.837771] PVDD_HSIC_1V8: disabling
-> [   11.841172] PVDD_ABB_1V8: disabling
-> [   11.844866] PVDD_ANAIP_1V8: disabling
-> [   11.847157] usb 5-1.4: new high-speed USB device number 3 using exynos-ehci
-> [   11.848778] PVDD
+Okay. Sorry for not having time at the moment to follow the discussions
+properly. =)
+
+> decided to settle on allwinner,simple-framebuffer to make it clear that
+> these are allwinner extensions to the standard simple-framebuffer bindings,
+> and that the node otherwise is simple-framebuffer compatible.
 > 
-> In your case you have a gap here:
-> [    3.624142] platform 12d10000.adc: Driver exynos-adc requests probe deferral
-> [   24.188722] random: nonblocking pool is initialized
->
-> Could you try my patches once again but this time with enabled:
-> DEBUG_EXYNOS_UART
-> EARLY_PRINTK
-> DEBUG_S3C_UART3
-> DEBUG_LL
->
+> We were afraid that e.g. sun4i-simple-framebuffer would signal that it
+> is not a normal simple-framebuffer node, so we decided to go with just
+> the allwinner, prefix to indicate that it uses allwinner specific
+> extensions.
 
-Yes, there is a gap and I don't know why. Even after enabling all those
-config options, nothing is printed on the serial console after the exynos-adc
-probe deferral. Only that message in drivers/char/random.c is printed but
-nothing else is printed after all...
+Wouldn't
 
-> and with following change:
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 4896ae9e23da..316856e55784 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -478,7 +478,9 @@ static void clk_disable_unused_subtree(struct clk *clk)
->          * sequence.  call .disable_unused if available, otherwise fall
->          * back to .disable
->          */
-> +       pr_err("clk: checking %s\n", clk->name);
->         if (__clk_is_enabled(clk)) {
-> +               pr_err("clk: enabled %s, disabling\n", clk->name);
->                 if (clk->ops->disable_unused)
->                         clk->ops->disable_unused(clk->hw);
->                 else if (clk->ops->disable)
-> 
-> Without my patch the boot hangs:
-> [   12.230666] clk: checking dout_unipro
-> [   12.234304] clk: checking mout_unipro
-> [   12.237913] clk: checking sclk_usbd300
-> [   12.241638] clk: enabled sclk_usbd300, disabling
-> [   12.246264] clk: checking dout_usbd300
-> [   12.249992] clk: checking sclk_usbd301
-> [   12.253683] clk: enabled sclk_usbd301, disabling
-> [   12.258309] clk: checking dout_usbd301
-> [   12.262007] clk: checking sclk_maudio0
-> [   12.265728] clk: enabled sclk_maudio0, disabling
-> [   12.270355] clk: checking pcm_bus
-> 
-> because audss seems to be gated so kernel cannot access status of
-> pcm_bus clock.
->
+compatible = "allwinner,sun4i-simple-framebuffer", "simple-framebuffer";
 
-I added those printk's but clk_disable_unused() is executed after the
-exynos-adc probe function so the logs are not shown on the serial console.
+tell that it's a simple-framebuffer, with allwinner's sun4i extensions?
 
-As mentioned previously in the thread, Tushar's fix [0] works for me and with
-that patch I see the clocks disabled by clk_disable_unused_subtree() and the
-kernel is able to access pcm_bus and other audio clocks:
+I guess you can have just "allwinner,simple-framebuffer", and then if a
+new Allwinner SoC has a totally different display controller, the
+documentation would specify that this property is for that SoC, and this
+another property is for that another SoC. But isn't the compatible
+string what's supposed to use in cases like this?
 
-[    5.007368] clk: checking mout_spdif
-[    5.010908] clk: checking dout_audio0
-[    5.014566] clk: checking mout_audio0
-[    5.018208] clk: checking sclk_maudio0
-[    5.021926] clk: enabled sclk_maudio0, disabling
-[    5.026541] clk: checking pcm_bus
-[    5.029820] clk: enabled pcm_bus, disabling
-[    5.034001] clk: checking sclk_pcm
-[    5.037367] clk: enabled sclk_pcm, disabling
+And if the new SoC is not sunxi, but some totally other family, there's
+need for a new compatible string anyway, as
+"simple-framebuffer-sunxi.txt" is for sunxi only.
 
-Any ideas?
+ Tomi
 
-Best regards,
-Javier
 
-[0]: http://www.spinics.net/lists/arm-kernel/msg337970.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141125/95e89780/attachment.sig>
