@@ -1,91 +1,129 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 25 Nov 2014 10:01:59 -0800
-Subject: (bisected) Lock up on sh73a0/kzm9g on cpuidle initialization
-In-Reply-To: <CAMuHMdUjYMC8i2F9n6fWdPBOQVSohKA3ZxJJyq8h808Z9tEypw@mail.gmail.com>
-References: <CAMuHMdXaaa2t6+sH2egGacVxkAPeTUkAgwdYsOnMnEPnuLdB5Q@mail.gmail.com>
- <545BE1DE.6060900@linaro.org>
- <CAMuHMdXQr65g4He0D0ZRN923OJ2A7WNgwbiTru_1dGWnvbvCJA@mail.gmail.com>
- <CAMuHMdUjYMC8i2F9n6fWdPBOQVSohKA3ZxJJyq8h808Z9tEypw@mail.gmail.com>
-Message-ID: <20141125180159.GI5050@linux.vnet.ibm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 25 Nov 2014 18:06:57 +0000
+Subject: [PATCH 3/9] ARM: MB86S7X: Add MCPM support
+In-Reply-To: <alpine.LFD.2.11.1411251205500.11690@knanqh.ubzr>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1416486920-25343-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <alpine.LFD.2.11.1411251205500.11690@knanqh.ubzr>
+Message-ID: <5474C541.7050004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 06:49:16PM +0100, Geert Uytterhoeven wrote:
-> On Fri, Nov 7, 2014 at 8:59 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> > On Thu, Nov 6, 2014 at 10:02 PM, Daniel Lezcano
-> > <daniel.lezcano@linaro.org> wrote:
-> >> On 11/06/2014 09:38 PM, Geert Uytterhoeven wrote:
-> >>> When CONFIG_CPU_IDLE=y, the kernel locks up during cpuidle initialization
-> >>> on Renesas sh73a0/kzm9g-reference, which has a dual-core Cortex-A9.
-> >>>
-> >>> Last message is:
-> >>>
-> >>>      DMA: preallocated 256 KiB pool for atomic coherent allocations
-> >>>
-> >>> After this it's supposed to print:
-> >>>
-> >>>      cpuidle: using governor ladder
-> >>>      cpuidle: using governor menu
-> >>>
-> >>> I've bisected this to commit 442bf3aaf55a91ebfec71da46a4ee10a3c905bcc
-> >>> ("sched: Let the scheduler see CPU idle states").
-> >>>
-> >>> Reverting that commit, and commit 83a0a96a5f26d974580fd7251043ff70c8f1823d
-> >>> ("sched/fair: Leverage the idle state info when choosing the "idlest"
-> >>> cpu") which
-> >>> depends on it, fixes the problem.
-> >>>
-> >>> I saw the discussion "lockdep splat in CPU hotplug", so I enabled lockdep
-> >>> debugging, but didn't see a lockdep splat.
-> >>
-> >> Did you try the fix attached ?
-> >>
-> >> https://lkml.org/lkml/2014/10/22/722
-> >
-> > Thanks, I didn't try that.
-> >
-> > However, this patch seems to be in v3.18-rc3, so I'm already using it.
-> > Hence it doesn't fix the problem for me.
-> >
-> > On another board, with a dual Cortex-A15, the problem doesn't show up.
-> 
-> This problem (regression introduced in v3.18-rc1) is still present in v3.18-rc6.
-> 
-> I did some more investigations, and it's hanging in the call to
-> synchronize_rcu() in cpuidle_uninstall_idle_handler(), which was added in
-> commit 442bf3aaf55a91ebfec71da46a4ee10a3c905bcc.
-> More specificailly, it's blocked on the wait_for_completion(&rcu.completion)
-> in kernel/rcu/update.c:void wait_rcu_gp(call_rcu_func_t crf).
 
-You didn't disable RCU CPU stall warnings, did you?  If you did, please
-re-enable them, as the stall warning messages will likely help to debug
-this.  The soft-lockup checks can also be quite valuable.
 
-If you haven't run with CONFIG_PROVE_RCU=y, please try that.  For example,
-if you have CONFIG_PREEMPT=y and you do synchronize_rcu() from within
-an RCU read-side critical section (don't do that, it will hang!!!),
-then you will get a lockdep splat.
+On 25/11/14 17:42, Nicolas Pitre wrote:
+> On Thu, 20 Nov 2014, Vincent Yang wrote:
+>
+>> The remote firmware(SCB) owns the SMP control. This MCPM driver gets
+>> CPU/CLUSTER power up/down done by SCB over mailbox.
+>>
+>> Signed-off-by: Andy Green <andy.green@linaro.org>
+>> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+>> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+>> Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+>> ---
+>>   arch/arm/mach-mb86s7x/Makefile |   2 +-
+>>   arch/arm/mach-mb86s7x/mcpm.c   | 360 +++++++++++++++++++++++++++++++++++++++++
+>>   arch/arm/mach-mb86s7x/smc.S    |  27 ++++
+>>   3 files changed, 388 insertions(+), 1 deletion(-)
+>>   create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
+>>   create mode 100644 arch/arm/mach-mb86s7x/smc.S
+>>
+>> diff --git a/arch/arm/mach-mb86s7x/Makefile b/arch/arm/mach-mb86s7x/Makefile
+>> index 97640b6..b0fa34b 100644
+>> --- a/arch/arm/mach-mb86s7x/Makefile
+>> +++ b/arch/arm/mach-mb86s7x/Makefile
+>> @@ -1 +1 @@
+>> -obj-$(CONFIG_ARCH_MB86S7X)   += board.o
+>> +obj-$(CONFIG_ARCH_MB86S7X)   += board.o mcpm.o smc.o
+>> diff --git a/arch/arm/mach-mb86s7x/mcpm.c b/arch/arm/mach-mb86s7x/mcpm.c
+>> new file mode 100644
+>> index 0000000..bf1b50a
+>> --- /dev/null
+>> +++ b/arch/arm/mach-mb86s7x/mcpm.c
+>> @@ -0,0 +1,360 @@
+>> +/*
+>> + * arch/arm/mach-mb86s7x/mcpm.c
+>> + * Copyright:        (C) 2013-2014 Fujitsu Semiconductor Limited
+>> + * Copyright:        (C) 2014 Linaro Ltd.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/io.h>
+>> +#include <linux/pm.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/cpu_pm.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/arm-cci.h>
+>> +#include <linux/spinlock.h>
+>> +#include <linux/suspend.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/irqchip/arm-gic.h>
+>> +#include <linux/platform_device.h>
+>> +
+>> +#include <soc/mb86s7x/scb_mhu.h>
+>> +
+>> +#include <asm/mcpm.h>
+>> +#include <asm/cp15.h>
+>> +#include <asm/cputype.h>
+>> +#include <asm/suspend.h>
+>> +#include <asm/idmap.h>
+>> +
+>> +#define S7X_MAX_CLUSTER      2
+>> +#define S7X_MAX_CPU  2
+>> +
+>> +#define MHU_SHM_OFFSET               0x3800
+>> +#define WFI_COLOR_OFFSET     0x3f00
+>> +#define TRAMPOLINE_OFFSET    0x3c00
+>> +#define RESET_OFFSET         (TRAMPOLINE_OFFSET + 0x3fc)
+>> +
+>> +static arch_spinlock_t mb86s7x_pm_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+>> +static int mb86s7x_pm_use_count[S7X_MAX_CLUSTER][S7X_MAX_CPU];
+>> +extern void __iomem *mb86s7x_shm_base;
+>> +
+>> +#define AT_WFI_DO_NOTHING    0x0
+>> +#define AT_WFI_DO_SUSPEND    0x1
+>> +#define AT_WFI_DO_POWEROFF   0x2
+>> +#define AT_WFI_COLOR_MASK    0x3
+>> +
+>> +struct mb86s7x_cpu_gate {
+>> +     u32 payload_size;
+>> +     u32 cluster_class;
+>> +     u32 cluster_id;
+>> +     u32 cpu_id;
+>> +#define SCB_CPU_STATE_OFF    0x0
+>> +#define SCB_CPU_STATE_ON     0x1
+>> +#define SCB_CPU_STATE_SUSP   0x2
+>> +     u32 cpu_state;
+>> +};
+>> +
+>> +asmlinkage void mb86s70evb_outer_flush_all(void)
+>> +{
+>> +     outer_flush_all();
+>> +}
+>> +
+>> +#define mb86s70evb_exit_coherency_flush(level) { \
+>> +     asm volatile( \
+>> +     "stmfd  sp!, {fp, ip}\n\t" \
+>> +     "mrc    p15, 0, r0, c1, c0, 0   @ get SCTLR\n\t" \
+>> +     "bic    r0, r0, #"__stringify(CR_C)"\n\t" \
+>> +     "mcr    p15, 0, r0, c1, c0, 0   @ set SCTLR\n\t" \
+>> +     "isb\n\t" \
+>> +     "bl     v7_flush_dcache_"__stringify(level)"\n\t" \
+>> +     "bl     mb86s70evb_outer_flush_all\n\t" \
+>
+> This is wrong.  As mentioned already, this unconditionally flushes L2 in
+> all cases which shouldn't be necessary in the "louis" case.
+>
 
-Does any sort of system activity (keyboard, network, etc.) unstick the
-system?
+IIUC the external/outer cache needs to be flushed only if it's last
+cluster going down. It would be suboptimal to flush it when one cluster
+is going down while other is still active. So it's not always correct
+for even "all" case too.
 
-If you have tried all those things without good effect, could you please
-send along your .config and an alt-sysrq-t dump of all tasks' stacks?
-
-							Thanx, Paul
-
-> Anyone with a clue?
-> 
-> Thanks again!
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> 
+Regards,
+Sudeep
