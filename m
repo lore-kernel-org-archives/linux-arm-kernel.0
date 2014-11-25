@@ -1,66 +1,49 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Tue, 25 Nov 2014 06:05:33 +0100
-Subject: [PATCH v3] i2c-pxa: add support for SCCB devices
-In-Reply-To: <20141124172753.GA25434@katana>
-References: <54711397.9060601@tul.cz> <20141123083112.GA1932@katana>
- <54725DE2.9090800@tul.cz> <20141124172753.GA25434@katana>
-Message-ID: <54740E1D.9060508@tul.cz>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 24 Nov 2014 21:29:28 -0800
+Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc for
+ vqmmc
+In-Reply-To: <CAPDyKFqt4rrwi940KAPyPONpjixK1730QmHEsN27V97jyHH+Qw@mail.gmail.com>
+References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>
+ <1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>
+ <CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
+ <CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>
+ <5464152E.7040209@rock-chips.com>
+ <CAPDyKFrzGfDew0eLLEcA+_iS_mo-O2bFU58fjirfXXA8AJ9UYQ@mail.gmail.com>
+ <CAD=FV=Ve1TY4+8quq1=18A1YOFvOWuFGrBmHLwMCwdWBSqzxOw@mail.gmail.com>
+ <CAD=FV=UJT5zBkcj2a03Y_RWxad9+Pu83G_z79Xzzn74V=eRqww@mail.gmail.com>
+ <CAPDyKFqt4rrwi940KAPyPONpjixK1730QmHEsN27V97jyHH+Qw@mail.gmail.com>
+Message-ID: <CAD=FV=UZT91rp2rgPCh5mY5s+g8J3iOrDsHKjuXAgEqoye5goQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed missing functionality flag I2C_FUNC_NOSTART.
+Ulf,
 
-Added support for SCCB by implementing I2C_M_IGNORE_NAK and I2C_M_STOP flag and belonging functionality flag I2C_FUNC_PROTOCOL_MANGLING.
+On Mon, Nov 24, 2014 at 5:29 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> 2. Several people I've talked to have expressed concerns that our
+>> minimum value is 2.7V.  Apparently that's really on the edge and makes
+>> EEs a little nervous.  The quick sample of cards sitting on my desk
+>> shows that they seem to claim 0x00ff8000, which doesn't include 2.7V.
+>
+> 0x00ff8000 states what values of VDD levels the device supports. Not VIO.
 
-Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
----
- drivers/i2c/busses/i2c-pxa.c | 19 ++++++++++++-------
- 1 file changed, 12 insertions(+), 7 deletions(-)
+Yup, I was just pointing out that possibly others were trying to get a
+little bit of margin (not going all the way down to 2.7V) too.
 
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index be671f7..f80df8f 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -885,7 +885,9 @@ static void i2c_pxa_irq_txempty(struct pxa_i2c *i2c, u32 isr)
- 		return; /* ignore */
- 	}
- 
--	if (isr & ISR_BED) {
-+	if ((isr & ISR_BED) &&
-+		(!((i2c->msg->flags & I2C_M_IGNORE_NAK) &&
-+			(isr & ISR_ACKNAK)))) {
- 		int ret = BUS_ERROR;
- 
- 		/*
-@@ -919,12 +921,14 @@ static void i2c_pxa_irq_txempty(struct pxa_i2c *i2c, u32 isr)
- 		icr |= ICR_ALDIE | ICR_TB;
- 
- 		/*
--		 * If this is the last byte of the last message, send
--		 * a STOP.
-+		 * If this is the last byte of the last message or last byte
-+		 * of any message with I2C_M_STOP (e.g. SCCB), send a STOP.
- 		 */
--		if (i2c->msg_ptr == i2c->msg->len &&
--		    i2c->msg_idx == i2c->msg_num - 1)
--			icr |= ICR_STOP;
-+		if ((i2c->msg_ptr == i2c->msg->len) &&
-+			((i2c->msg->flags & I2C_M_STOP) ||
-+			(i2c->msg_idx == i2c->msg_num - 1)))
-+				icr |= ICR_STOP;
-+
- 	} else if (i2c->msg_idx < i2c->msg_num - 1) {
- 		/*
- 		 * Next segment of the message.
-@@ -1071,7 +1075,8 @@ static int i2c_pxa_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num
- 
- static u32 i2c_pxa_functionality(struct i2c_adapter *adap)
- {
--	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
-+	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL |
-+		I2C_FUNC_PROTOCOL_MANGLING | I2C_FUNC_NOSTART;
- }
- 
- static const struct i2c_algorithm i2c_pxa_algorithm = {
--- 
-1.7.12.1
+>> Both of the above make me feel like dw_mmc should try its best to pick
+>> a value for vqmmc that is closest to the value of vmmc (and >= 2.7V).
+>> That also happens to make us work exactly like hosts where vmmc and
+>> vqmmc are supplied by the same supply.
+>
+> I do see your point. And I agree that it would be nice to achieve
+> something like this.
+>
+> The question is how to do this. For sure, we need to involve the mmc
+> core to handle this correctly.
+
+You could add a function to the core that we could call from
+dw_mci_switch_voltage() and it would do all the work except trying to
+set the UHS register.  That would certainly make it easy.  That could
+try to set the highest voltage that is <= vmmc when we're at
+MMC_SIGNAL_VOLTAGE_330.
+
+-Doug
