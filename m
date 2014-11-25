@@ -1,153 +1,127 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 25 Nov 2014 13:59:17 -0500 (EST)
-Subject: [PATCH 3/9] ARM: MB86S7X: Add MCPM support
-In-Reply-To: <20141125184609.GA29425@e102568-lin.cambridge.arm.com>
-References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1416486920-25343-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <alpine.LFD.2.11.1411251205500.11690@knanqh.ubzr>
- <20141125184609.GA29425@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.11.1411251357230.11690@knanqh.ubzr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Nov 2014 20:00:42 +0100
+Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <CAFpQJXUjYsTiHSyHdgtN9JPWGN8CByR4VwtSMJhwkAUWA4iV9w@mail.gmail.com>
+References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <2966212.dpWQ0OTb0A@wuerfel>
+ <CAFpQJXUjYsTiHSyHdgtN9JPWGN8CByR4VwtSMJhwkAUWA4iV9w@mail.gmail.com>
+Message-ID: <2065254.jRdQcinOdg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Nov 2014, Lorenzo Pieralisi wrote:
+On Tuesday 25 November 2014 08:15:47 Ganapatrao Kulkarni wrote:
+> > No, don't hardcode ARM specifics into a common binding either. I've looked
+> > at the ibm,associativity properties again, and I think we should just use
+> > those, they can cover all cases and are completely independent of the
+> > architecture. We should probably discuss about the property name though,
+> > as using the "ibm," prefix might not be the best idea.
+>
+> We have started with new proposal, since not got enough details how
+> ibm/ppc is managing the numa using dt.
+> there is no documentation and there is no power/PAPR spec for numa in
+> public domain and there are no single dt file in arch/powerpc which
+> describes the numa. if we get any one of these details, we can align
+> to powerpc implementation.
 
-> On Tue, Nov 25, 2014 at 05:42:32PM +0000, Nicolas Pitre wrote:
-> > On Thu, 20 Nov 2014, Vincent Yang wrote:
-> > 
-> > > The remote firmware(SCB) owns the SMP control. This MCPM driver gets
-> > > CPU/CLUSTER power up/down done by SCB over mailbox.
-> > >
-> > > Signed-off-by: Andy Green <andy.green@linaro.org>
-> > > Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> > > Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
-> > > Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
-> > > ---
-> > >  arch/arm/mach-mb86s7x/Makefile |   2 +-
-> > >  arch/arm/mach-mb86s7x/mcpm.c   | 360 +++++++++++++++++++++++++++++++++++++++++
-> > >  arch/arm/mach-mb86s7x/smc.S    |  27 ++++
-> > >  3 files changed, 388 insertions(+), 1 deletion(-)
-> > >  create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
-> > >  create mode 100644 arch/arm/mach-mb86s7x/smc.S
-> > >
-> > > diff --git a/arch/arm/mach-mb86s7x/Makefile b/arch/arm/mach-mb86s7x/Makefile
-> > > index 97640b6..b0fa34b 100644
-> > > --- a/arch/arm/mach-mb86s7x/Makefile
-> > > +++ b/arch/arm/mach-mb86s7x/Makefile
-> > > @@ -1 +1 @@
-> > > -obj-$(CONFIG_ARCH_MB86S7X)   += board.o
-> > > +obj-$(CONFIG_ARCH_MB86S7X)   += board.o mcpm.o smc.o
-> > > diff --git a/arch/arm/mach-mb86s7x/mcpm.c b/arch/arm/mach-mb86s7x/mcpm.c
-> > > new file mode 100644
-> > > index 0000000..bf1b50a
-> > > --- /dev/null
-> > > +++ b/arch/arm/mach-mb86s7x/mcpm.c
-> > > @@ -0,0 +1,360 @@
-> > > +/*
-> > > + * arch/arm/mach-mb86s7x/mcpm.c
-> > > + * Copyright:        (C) 2013-2014 Fujitsu Semiconductor Limited
-> > > + * Copyright:        (C) 2014 Linaro Ltd.
-> > > + *
-> > > + * This program is free software; you can redistribute it and/or modify
-> > > + * it under the terms of the GNU General Public License version 2 as
-> > > + * published by the Free Software Foundation.
-> > > + */
-> > > +
-> > > +#include <linux/io.h>
-> > > +#include <linux/pm.h>
-> > > +#include <linux/delay.h>
-> > > +#include <linux/cpu_pm.h>
-> > > +#include <linux/kernel.h>
-> > > +#include <linux/module.h>
-> > > +#include <linux/arm-cci.h>
-> > > +#include <linux/spinlock.h>
-> > > +#include <linux/suspend.h>
-> > > +#include <linux/of_device.h>
-> > > +#include <linux/irqchip/arm-gic.h>
-> > > +#include <linux/platform_device.h>
-> > > +
-> > > +#include <soc/mb86s7x/scb_mhu.h>
-> > > +
-> > > +#include <asm/mcpm.h>
-> > > +#include <asm/cp15.h>
-> > > +#include <asm/cputype.h>
-> > > +#include <asm/suspend.h>
-> > > +#include <asm/idmap.h>
-> > > +
-> > > +#define S7X_MAX_CLUSTER      2
-> > > +#define S7X_MAX_CPU  2
-> > > +
-> > > +#define MHU_SHM_OFFSET               0x3800
-> > > +#define WFI_COLOR_OFFSET     0x3f00
-> > > +#define TRAMPOLINE_OFFSET    0x3c00
-> > > +#define RESET_OFFSET         (TRAMPOLINE_OFFSET + 0x3fc)
-> > > +
-> > > +static arch_spinlock_t mb86s7x_pm_lock = __ARCH_SPIN_LOCK_UNLOCKED;
-> > > +static int mb86s7x_pm_use_count[S7X_MAX_CLUSTER][S7X_MAX_CPU];
-> > > +extern void __iomem *mb86s7x_shm_base;
-> > > +
-> > > +#define AT_WFI_DO_NOTHING    0x0
-> > > +#define AT_WFI_DO_SUSPEND    0x1
-> > > +#define AT_WFI_DO_POWEROFF   0x2
-> > > +#define AT_WFI_COLOR_MASK    0x3
-> > > +
-> > > +struct mb86s7x_cpu_gate {
-> > > +     u32 payload_size;
-> > > +     u32 cluster_class;
-> > > +     u32 cluster_id;
-> > > +     u32 cpu_id;
-> > > +#define SCB_CPU_STATE_OFF    0x0
-> > > +#define SCB_CPU_STATE_ON     0x1
-> > > +#define SCB_CPU_STATE_SUSP   0x2
-> > > +     u32 cpu_state;
-> > > +};
-> > > +
-> > > +asmlinkage void mb86s70evb_outer_flush_all(void)
-> > > +{
-> > > +     outer_flush_all();
-> > > +}
-> > > +
-> > > +#define mb86s70evb_exit_coherency_flush(level) { \
-> > > +     asm volatile( \
-> > > +     "stmfd  sp!, {fp, ip}\n\t" \
-> > > +     "mrc    p15, 0, r0, c1, c0, 0   @ get SCTLR\n\t" \
-> > > +     "bic    r0, r0, #"__stringify(CR_C)"\n\t" \
-> > > +     "mcr    p15, 0, r0, c1, c0, 0   @ set SCTLR\n\t" \
-> > > +     "isb\n\t" \
-> > > +     "bl     v7_flush_dcache_"__stringify(level)"\n\t" \
-> > > +     "bl     mb86s70evb_outer_flush_all\n\t" \
-> > 
-> > This is wrong.  As mentioned already, this unconditionally flushes L2 in
-> > all cases which shouldn't be necessary in the "louis" case.
-> 
-> Is this a bL system with unified and architected L2s ? I think so, so
-> what's the outercache for ?
-> 
-> > Furthermore, the safety of this macro is ensured by not having any
-> > memory writes in the middle of the whole sequence.  By calling
-> > mb86s70evb_outer_flush_all() there could be the return address pushed
-> > onto the stack before calling outer_flush_all() if some tail call
-> > optimization is not applied.  And this is without saying what
-> > outer_flush_all() actually does.
-> > 
-> > Why can't you simply do this instead:
-> > 
-> >         v7_exit_coherency_flush(all);
-> >         outer_flush_all();
-> > 
-> > Of course you'll have to audit everything in the outer_flush_all() path
-> > to make sure no atomic instructions such as LDREX/STREX are invoked.
-> > Those have undefined behavior after CR_C is cleared.
-> 
-> What you are saying is correct but first of all I would like to
-> understand what outercache we are talking about here.
-> 
-> Code snippet above is fragile, as you said, and I'd rather disable
-> the outercache before executing the power down sequence (which implies
-> cache is cleaned/invalidated and quiescent before we clear the C bit)
-> if there is an outercache to be managed.
+Basically the idea is to have an "ibm,associativity" property in each
+bus or device that is node specific, and this includes all CPUs and
+memory nodes. The property contains an array of 32-bit integers that
+count the resources. Take an example of a NUMA cluster of two machines
+with four sockets and four cores each (32 cores total), a memory
+channel on each socket and one PCI host per board that is connected
+at equal speed to each socket on the board.
 
-Good question.  That opens the potential for an even simpler fix!  ;-)
+The ibm,associativity property in each PCI host, CPU or memory device
+node consequently has an array of three (board, socket, core) integers:
 
+	memory at 0,0 {
+		device_type = "memory";
+		reg = <0x0 0x0  0x4 0x0;
+		/* board 0, socket 0, no specific core */
+		ibm,asssociativity = <0 0 0xffff>;
+	};
 
-Nicolas
+	memory at 4,0 {
+		device_type = "memory";
+		reg = <0x4 0x0  0x4 0x0>;
+		/* board 0, socket 1, no specific core */
+		ibm,asssociativity = <0 1 0xffff>; 
+	};
+
+	...
+
+	memory at 1c,0 {
+		device_type = "memory";
+		reg = <0x1c 0x0  0x4 0x0>;
+		/* board 0, socket 7, no specific core */
+		ibm,asssociativity = <1 7 0xffff>; 
+	};
+
+	cpus {
+		#address-cells = <2>;
+		#size-cells = <0>;
+		cpu at 0 {
+			device_type = "cpu";
+			reg = <0 0>;
+			/* board 0, socket 0, core 0*/
+			ibm,asssociativity = <0 0 0>; 
+		};
+
+		cpu at 1 {
+			device_type = "cpu";
+			reg = <0 0>;
+			/* board 0, socket 0, core 0*/
+			ibm,asssociativity = <0 0 0>; 
+		};
+
+		...
+
+		cpu at 31 {
+			device_type = "cpu";
+			reg = <0 32>;
+			/* board 1, socket 7, core 31*/
+			ibm,asssociativity = <1 7 31>; 
+		};
+	};
+
+	pci at 100,0 {
+		device_type = "pci";
+		/* board 0 */
+		ibm,associativity = <0 0xffff 0xffff>;
+		...
+	};
+
+	pci at 200,0 {
+		device_type = "pci";
+		/* board 1 */
+		ibm,associativity = <1 0xffff 0xffff>;
+		...
+	};
+
+	ibm,associativity-reference-points = <0 1>;
+
+The "ibm,associativity-reference-points" property here indicates that index 2
+of each array is the most important NUMA boundary for the particular system,
+because the performance impact of allocating memory on the remote board 
+is more significant than the impact of using memory on a remote socket of the
+same board. Linux will consequently use the first field in the array as
+the NUMA node ID. If the link between the boards however is relatively fast,
+so you care mostly about allocating memory on the same socket, but going to
+another board isn't much worse than going to another socket on the same
+board, this would be
+
+	ibm,associativity-reference-points = <1 0>;
+
+so Linux would ignore the board ID and use the socket ID as the NUMA node
+number. The same would apply if you have only one (otherwise identical
+board, then you would get
+
+	ibm,associativity-reference-points = <1>;
+
+which means that index 0 is completely irrelevant for NUMA considerations
+and you just care about the socket ID. In this case, devices on the PCI
+bus would also not care about NUMA policy and just allocate buffers from
+anywhere, while in original example Linux would allocate DMA buffers only
+from the local board.
+
+	Arnd
