@@ -1,142 +1,123 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 25 Nov 2014 15:22:05 +0100
-Subject: [RFC 0/2] Fix Arndale Octa/Peach Pi boot on Audio subsystem clocks
-In-Reply-To: <547485F5.50600@collabora.co.uk>
-References: <1416842312-4405-1-git-send-email-k.kozlowski@samsung.com>
- <54736AD0.4070909@collabora.co.uk> <1416907375.5023.54.camel@AMDC1943>
- <547485F5.50600@collabora.co.uk>
-Message-ID: <1416925325.26128.6.camel@AMDC1943>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 25 Nov 2014 14:24:22 +0000
+Subject: [PATCH 3/9] ARM: MB86S7X: Add MCPM support
+In-Reply-To: <CAAfg0W4ntf+yRZnipO+w7beN+EsZcryXCuD1eUJo1RYQNkJ2hQ@mail.gmail.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>	<1416486920-25343-1-git-send-email-Vincent.Yang@tw.fujitsu.com>	<54746C74.8020400@arm.com>
+ <CAAfg0W4ntf+yRZnipO+w7beN+EsZcryXCuD1eUJo1RYQNkJ2hQ@mail.gmail.com>
+Message-ID: <54749116.2050307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On wto, 2014-11-25 at 14:36 +0100, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
-> 
-> On 11/25/2014 10:22 AM, Krzysztof Kozlowski wrote:
-> > 
-> > Hmmm, that's strange. I've looked again at your dmesg and it is little
-> > different than mine (when system fails).
-> > 1. Does your PMIC come up? In your dmesg:
-> > [    2.687297] max77802-pmic max77802-pmic: regulator init failed for 0
-> > [    2.693539] platform max77802-pmic: Driver max77802-pmic requests probe deferral
-> >
-> 
-> The Peach Pit/Pi DTS define the parent input supplies for the max77802 PMIC
-> regulators and these are regulators from the tps65090 PMU but the max77802
-> is probed before. When the system does not fail, the probe is deferred and
-> succeed later but I don't know when the system fails (more on that below).
-
-OK.
-
->  
-> > 2. In my case booting fails just after disabling unused clocks which is
-> > quite early, my dmesg:
-> > [   11.700074] input: gpio_keys as /devices/platform/gpio_keys/input/input0
-> > [   11.704282] s3c-rtc 101e0000.rtc: setting system clock to 2029-01-11 19:19:17 UTC (1862853557)
-> > [   11.770602] mmcblk0: mmc0:0001 M8G1WA 7.28 GiB
-> > [   11.776201] mmcblk0boot0: mmc0:0001 M8G1WA partition 1 2.00 MiB
-> > [   11.780968] mmcblk0boot1: mmc0:0001 M8G1WA partition 2 2.00 MiB
-> > [   11.786823] mmcblk0rpmb: mmc0:0001 M8G1WA partition 3 128 KiB
-> > [   11.793815]  mmcblk0: p1 p2 p3 p4
-> > [   11.824165] PVDD_G3D_1V0: disabling
-> > [   11.830833] PVDD_G3DS_1V0: disabling
-> > [   11.837771] PVDD_HSIC_1V8: disabling
-> > [   11.841172] PVDD_ABB_1V8: disabling
-> > [   11.844866] PVDD_ANAIP_1V8: disabling
-> > [   11.847157] usb 5-1.4: new high-speed USB device number 3 using exynos-ehci
-> > [   11.848778] PVDD
-> > 
-> > In your case you have a gap here:
-> > [    3.624142] platform 12d10000.adc: Driver exynos-adc requests probe deferral
-> > [   24.188722] random: nonblocking pool is initialized
-> >
-> > Could you try my patches once again but this time with enabled:
-> > DEBUG_EXYNOS_UART
-> > EARLY_PRINTK
-> > DEBUG_S3C_UART3
-> > DEBUG_LL
-> >
-> 
-> Yes, there is a gap and I don't know why. Even after enabling all those
-> config options, nothing is printed on the serial console after the exynos-adc
-> probe deferral. Only that message in drivers/char/random.c is printed but
-> nothing else is printed after all...
-
-You may try attached patch (very early printk) if you suspect that some
-logs are missing.
-
-> 
-> > and with following change:
-> > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index 4896ae9e23da..316856e55784 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -478,7 +478,9 @@ static void clk_disable_unused_subtree(struct clk *clk)
-> >          * sequence.  call .disable_unused if available, otherwise fall
-> >          * back to .disable
-> >          */
-> > +       pr_err("clk: checking %s\n", clk->name);
-> >         if (__clk_is_enabled(clk)) {
-> > +               pr_err("clk: enabled %s, disabling\n", clk->name);
-> >                 if (clk->ops->disable_unused)
-> >                         clk->ops->disable_unused(clk->hw);
-> >                 else if (clk->ops->disable)
-> > 
-> > Without my patch the boot hangs:
-> > [   12.230666] clk: checking dout_unipro
-> > [   12.234304] clk: checking mout_unipro
-> > [   12.237913] clk: checking sclk_usbd300
-> > [   12.241638] clk: enabled sclk_usbd300, disabling
-> > [   12.246264] clk: checking dout_usbd300
-> > [   12.249992] clk: checking sclk_usbd301
-> > [   12.253683] clk: enabled sclk_usbd301, disabling
-> > [   12.258309] clk: checking dout_usbd301
-> > [   12.262007] clk: checking sclk_maudio0
-> > [   12.265728] clk: enabled sclk_maudio0, disabling
-> > [   12.270355] clk: checking pcm_bus
-> > 
-> > because audss seems to be gated so kernel cannot access status of
-> > pcm_bus clock.
-> >
-> 
-> I added those printk's but clk_disable_unused() is executed after the
-> exynos-adc probe function so the logs are not shown on the serial console.
-
-So this would mean that something fails before clk_disable_unused().
-
-> As mentioned previously in the thread, Tushar's fix [0] works for me and with
-> that patch I see the clocks disabled by clk_disable_unused_subtree() and the
-> kernel is able to access pcm_bus and other audio clocks:
-> 
-> [    5.007368] clk: checking mout_spdif
-> [    5.010908] clk: checking dout_audio0
-> [    5.014566] clk: checking mout_audio0
-> [    5.018208] clk: checking sclk_maudio0
-> [    5.021926] clk: enabled sclk_maudio0, disabling
-> [    5.026541] clk: checking pcm_bus
-> [    5.029820] clk: enabled pcm_bus, disabling
-> [    5.034001] clk: checking sclk_pcm
-> [    5.037367] clk: enabled sclk_pcm, disabling
-> 
-> Any ideas?
-
-Yes, I got. On Peach board the i2s0 is enabled in DTS. Probing it could
-fail because it relies on enabling audss clocks (which cannot be
-accessed).
-
-I reproduced another hang on Arndale Octa after enabling i2s0 in DTS.
-Maybe that is the cause also on Peach.
-
-Best regards,
-Krzysztof
 
 
+On 25/11/14 13:42, Andy Green wrote:
+> On 25 November 2014 at 19:48, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>> On 20/11/14 12:35, Vincent Yang wrote:
+>>>
+>>> The remote firmware(SCB) owns the SMP control. This MCPM driver gets
+>>> CPU/CLUSTER power up/down done by SCB over mailbox.
+>>>
+>>
+>>> diff --git a/arch/arm/mach-mb86s7x/smc.S b/arch/arm/mach-mb86s7x/smc.S
+>>> new file mode 100644
+>>> index 0000000..a14330b
+>>> --- /dev/null
+>>> +++ b/arch/arm/mach-mb86s7x/smc.S
+>>> @@ -0,0 +1,27 @@
+>>> +/*
+>>> + * SMC command interface to set secondary entry point
+>>> + * Copyright: (C) 2013-2014 Fujitsu Semiconductor Limited
+>>> + * Copyright: (C) 2014 Linaro Ltd.
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + */
+>>> +
+>>> +#include <linux/linkage.h>
+>>> +
+>>> +.arch_extension sec
+>>> +
+>>> +/* void mb86s7x_cpu_entry(unsigned long secondary_entry); */
+>>> +ENTRY(mb86s7x_cpu_entry)
+>>> +       stmfd   sp!, {r1-r11, lr}
+>>> +       mov r1, r0
+>>> +       ldr r0, =1
+>>> +       mrc p15, 0, r3, c1, c0, 0
+>>> +       mov r4, r3
+>>> +       and r3, #0xbfffffff
+>>> +       mcr p15, 0, r3, c1, c0, 0
+>>> +       smc #0
+>>
+>>
+>> Interesting, it looks like you have some secure entity running on your
+>> platform.
+>
+> Yes, we have a stub "secure firmware" that implements a few critical
+> functions to allow us to operate the kernel as nonsecure.  It's part
+> of the bootloader for this platform which is also GPL'd.
+>
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 319-Very-early-printk-for-next-20141106-3.19.patch
-Type: text/x-patch
-Size: 1028 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141125/c196376b/attachment.bin>
+OK, thanks for clarifying.
+
+>> 1. While the CPU is powered down who is taking care of saving it's
+>>     state as you are doing it in the Linux itself ?
+>
+> Nothing.  The secure firmware is in a bootloader that is copied to and
+> runs from secure sram.  When the cpu is reset, he comes back up in
+> secure mode and gets initialized in the secure firmware, before
+> entering Non-secure mode and the kernel's secondary entry point.
+>
+
+So you do have live secure firmware stub on secure sram at any time,
+right ? When the CPUs are powered down especially for low power states,
+how is the secure state of the CPUs preserved ?
+
+>> 2. Is Linux running in Secure or Non-secure mode ?
+>
+> Another firmware (unfortunately not GPL) running on an on-die M3
+> informs the secure firmware on the AP whether he should set the AP cpu
+> to nonsecure or not before jumping to the kernel... basically it's
+> decided at runtime and the same kernel binary serves in both modes.
+>
+
+OK that's fine as along as you assume that kernel *always* runs in
+*non-secure* mode and never attempts any *secure access*.
+
+>> 3. Why do you need this smc call for secondary boot only ?
+>
+> The call sets the secondary entry point stored in the secure sram.
+>
+
+So IIUC, you run Linux in non-secure mode, PSCI would be more suitable
+than MCPM when you start thinking/implementing CPUIdle otherwise I think
+you will end up duplicating some logic(last man and race management)
+both in Linux as well as your secure firmware.
+
+> The bootloader heuristic is if that's unset (0), and it's what the
+
+This could be problem as when the CPU is hotplugged out, ideally it
+should be set to 0 to avoid spurious wakeup and entry into Linux.
+Yes MCPM does manage it, but IMO you are mixing up secure and non-secure
+methods which might become issue later when implementing low power
+CPU states.
+
+> bootloader decided should be regarded as the primary cpu, then we do
+> the real onetime cold boot flow, load the kernel etc.  Non-primary
+> cpus wait at WFI in the bootloader.  When the primary cpu runs the
+> code above, he sets the secondary entry point, and later starts to
+
+I assume it's not done when primary boots, but by primary cpu when
+bringing up the secondaries.
+
+> bring up the other cores who jump to the secondary entry that was set.
+>
+
+I assume primary sends IPI to wake up secondaries, but if the SGIs are
+configured as secure, then it will _not_ be delivered. If not it *might*
+work but I can't understand the need of running Linux non-secure with
+all secure access given to it.
+
+Regards,
+Sudeep
