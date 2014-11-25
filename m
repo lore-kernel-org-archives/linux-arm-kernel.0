@@ -1,47 +1,84 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 25 Nov 2014 21:10:54 +0000
-Subject: [PATCH 3.18-rc3 v9 1/5] irqchip: gic: Finer grain locking for
- gic_raise_softirq
-In-Reply-To: <alpine.LFD.2.11.1411251510231.11690@knanqh.ubzr>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
- <1416936401-5147-2-git-send-email-daniel.thompson@linaro.org>
- <5474BF19.3040707@arm.com> <alpine.LFD.2.11.1411251510231.11690@knanqh.ubzr>
-Message-ID: <5474F05E.90401@linaro.org>
+From: amstan@chromium.org (Alexandru Stan)
+Date: Tue, 25 Nov 2014 13:11:43 -0800
+Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc for
+ vqmmc
+In-Reply-To: <CAD=FV=U9Hh-OR2aGh6Q9YAwnP8AuAbQtogD=7wQxgg9XvoWTMw@mail.gmail.com>
+References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>
+ <1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>
+ <CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
+ <CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>
+ <5464152E.7040209@rock-chips.com>
+ <CAPDyKFrzGfDew0eLLEcA+_iS_mo-O2bFU58fjirfXXA8AJ9UYQ@mail.gmail.com>
+ <CAD=FV=Ve1TY4+8quq1=18A1YOFvOWuFGrBmHLwMCwdWBSqzxOw@mail.gmail.com>
+ <CAD=FV=UJT5zBkcj2a03Y_RWxad9+Pu83G_z79Xzzn74V=eRqww@mail.gmail.com>
+ <CAPDyKFqt4rrwi940KAPyPONpjixK1730QmHEsN27V97jyHH+Qw@mail.gmail.com>
+ <5473EB8B.3000803@rock-chips.com>
+ <CAD=FV=U9Hh-OR2aGh6Q9YAwnP8AuAbQtogD=7wQxgg9XvoWTMw@mail.gmail.com>
+Message-ID: <CAHNYxRwT8YeR-AUa-BVPraufLWZtEaeLdNjGBs77CfkMWVCNqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/14 20:17, Nicolas Pitre wrote:
-> On Tue, 25 Nov 2014, Marc Zyngier wrote:
-> 
->> Hi Daniel,
->>
->> On 25/11/14 17:26, Daniel Thompson wrote:
->>> irq_controller_lock is used for multiple purposes within the gic driver.
->>> Primarily it is used to make register read-modify-write sequences atomic.
->>> It is also used by gic_raise_softirq() in order that the big.LITTLE
->>> migration logic can figure out when it is safe to migrate interrupts
->>> between physical cores.
->>>
->>> The second usage of irq_controller_lock is difficult to discern when
->>> reviewing the code because the migration itself takes place outside
->>> the lock.
->>>
->>> This patch makes the second usage more explicit by splitting it out into
->>> a separate lock and providing better comments.
->>
->> While we're at it, how about an additional patch that would make this
->> lock disappear entirely when the big-little stuff is not compiled in,
->> which is likely to be the case on a lot of (dare I say most?) systems?
->> That will save expensive barriers that we definitely could do without.
-> 
-> For the record, I reviewed and ACKed a patch doing exactly that a while 
-> ago:
-> 
-> http://lkml.org/lkml/2014/8/13/486
+>From what I understand... High speed SD cards have 1.8V regulators
+inside them(sourced by vmmc (what we power the SD card with)). So in
+terms of the SD card IO pins they will either use exactly vmmc or
+1.8V. It doesn't make sense for vqmmc (the voltage we use to power the
+AP block connected to the SD cards) to be anything but exactly equal
+to vmmc or 1.8V. If vqmmc differs from vmmc(or 1.8V, depending on
+mode) by more than a little (~100-200mV), both up or down, you start
+getting leaks into the input protection diodes of the pins(either the
+AP or the SD card) which is a pretty BAD thing (you're essentially
+powering the sd card through the IO pins, or the SD card is powering
+the IO block on the AP).
 
-Well remembered! That patch had a different motivation but is very
-similar to mine... so much so I might steal bit of it.
+Alexandru Stan (amstan)
 
-I'll make sure I put Stephen on Cc: when I respin with the changes Marc
-requested.
+On Mon, Nov 24, 2014 at 9:36 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Addy,
+>
+> On Mon, Nov 24, 2014 at 6:38 PM, Addy <addy.ke@rock-chips.com> wrote:
+>>> In worst case scenario, VDD = 3.6V and VIO = 2.7V. That gives as the
+>>> factor of 0.75, thus we are inside spec but without margins.
+>>
+>> * From eMMC4.5 spec:
+>>   1. (VDDF)vcc: Supply voltage for flash memory,  which is  2.7v -- 3.3v
+>>   2. (VDD)vccq: Supply voltage for memory controller, which is  1.7v --
+>> 1.95v  and 2,7v -- 3.6v
+>>
+>> * And from RK3288 datasheet:
+>>   Digtial GPIO Power(SDMMC0_VDD --> vccq) is 3.0v -- 3.6v and 1.62v - 1.98v
+>>
+>> So I think:
+>> 3.3v:  (2.7v < vccq < 3.6v)   &&  (3.0v < vccq < 3.6v)  ==> (3.0v < vccq <
+>> 3.6v)
+>> 1.8v:  (1.7v < vccq < 1.95v)  && (1.62v < vccq < 1.98v) ==> (1.7v < vccq <
+>> 1.95v)
+>>
+>> and (2.7v < vcc < 3.3v)
+>>
+>> * And according to our hardware engineer:
+>>   All of supply voltage must have +/- 10% cushion.
+>>
+>> * And we have found in some worse card that there is 200mv voltage collapse
+>> when these card is insert.
+>>
+>> So I think the best resolution is that vcc and vccq is configurable int dt
+>> table.
+>
+> Ah, interesting.  ...so what we really need to be able to do is to say
+> that the regulator we for vqmmc have supports the ranges 3.0V - 3.3V
+> and 1.7V - 1.95V but not anything in between 1.95V ad 3.0V.  I have no
+> idea how to express that in the regulator framework.
+>
+> Technically you could take the IO Voltage Domains code (responsible
+> for choosing the 1.8V range or the 3.3V range) and have it communicate
+> the requirements to the regulator framework if you could figure out
+> how to communicate them.
+>
+>
+> ...of course if you implemented my suggestion of keeping vqmmc as the
+> highest voltage <= vmmc then maybe the whole point is moot and we
+> don't have to figure it out.  Just make sure that vmmc never goes
+> below 3.0V.
+>
+>
+> -Doug
