@@ -1,98 +1,66 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 25 Nov 2014 20:49:32 +0530
-Subject: How many frequencies would cpufreq optimally like to manage?
-In-Reply-To: <54747DFA.3040802@free.fr>
-References: <546D26AE.50601@free.fr>
- <CAOh2x==KZzq1wbQxGwsJjZW+=fBJDzcnmRoaZMh0UYH-=yBJ=g@mail.gmail.com>
- <546DF891.2050401@free.fr>
- <CAKohpomzxnCy7X+cPsVdDvi0cMRMp2Am1O-S5BeQtTr1CqBhEw@mail.gmail.com>
- <54747DFA.3040802@free.fr>
-Message-ID: <CAKohponats3ZNqaRq+2ff4Vd=iMZHVy17Vs1K+Zmc_D47Br2+A@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 25 Nov 2014 16:19:12 +0100
+Subject: [PATCH] ARM: orion: convert the irq_reg_{readl,
+ writel} calls to the new API
+Message-ID: <1416928752-24529-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 November 2014 at 18:32, Mason <mpeg.blue@free.fr> wrote:
-> As far as I can tell, on my SoC, the timer runs at 27 MHz.
-> But I have no idea how often it fires an interrupt.
+The commit "genirq: Generic chip: Change irq_reg_{readl,writel}
+arguments" modified the API. In the same tome the
+arch/arm/plat-orion/gpio.c file received a fix with the use of the old
+API: "ARM: orion: Fix for certain sequence of request_irq can cause
+irq storm". This commit fixes the use of the API.
 
-27 MHz is the freq it runs at, but we get interrupt based on the value
-programmed in the timer counter.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+Hi Jason,
 
-Look for CONFIG_HZ in your .config, that will tell you number of ticks
-you are getting per second.
+This patch fix a build error in linux-next:
 
-But cpufreq works in another level and so it doesn't depend on both
-these.
+arch/arm/plat-orion/gpio.c:509:12: error: too few arguments to function 'irq_reg_readl'
+arch/arm/plat-orion/gpio.c:511:2: error: too few arguments to function 'irq_reg_writel'
+arch/arm/plat-orion/gpio.c:523:12: error: too few arguments to function 'irq_reg_readl'
+arch/arm/plat-orion/gpio.c:525:2: error: too few arguments to function 'irq_reg_writel'
 
-Look for: /sys/devices/system/cpu/cpufreq/ondemand/sampling_rate
+But if we want to apply it on the mvebu branch we need to add a
+dependecy to "332fd7c4fef5 genirq: Generic chip: Change
+irq_reg_{readl,writel} arguments"
 
-this is the rate at which cpufreq core checks if cpu's freq require revisiting.
+Thanks,
 
-> I've been studying other cpufreq drivers, especially the OMAP driver.
-> I noticed that there is a lot of generic infrastructure that our driver
-> wasn't using, such as...
->
->   cpufreq_generic_init
->   cpufreq_generic_exit
->   cpufreq_generic_frequency_table_verify
->   cpufreq_generic_attr
->
-> I've changed our driver to use those.
+Gregory
 
-Gud.
+ arch/arm/plat-orion/gpio.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-> I'm still confused about cpufreq_generic_get.
-> This is not a typical get/put type function, right?
-
-Correct, this should return the current frequency the CPU is running at.
-
-> What is it supposed to get?
-> Apparently, the actual frequency of the 'cpu-th' CPU?
-> I see that it calls clk_get_rate(policy->clk)
-
-Yes.
-
-> This 'struct clk' is an elusive beast.
-> Where is it defined? I only run into forward declarations.
-
-Its architecture specific. What's the architecture you are working on?
-You may implement your own routine instead of cpufreq_generic_get().
-
-> On my platform, clk_get_accuracy returns -524 unconditionally,
-
-That might be an error.
-
-> and clk_prepare just returns 0.
->
-> of_clk_get and of_clk_get_by_name both return ERR_PTR(-2)
->
-> I suppose all this means I can't use this infrastructure "as-is",
-> correct? Where can I read more about it?
-
-Yes. Documentation/clk.txt.
-
-> How is the kernel supposed to know what frequency each core is running at?
-> I imagine that's what the .get method override is for?
-
-Yeah. You should be able to get some call from your architecture.
-
-> One more question (for now). Is the .get method supposed to return numbers
-> that match in freq_table, or can they be slightly different? For example,
-
-They should match.
-
-> I've defined my freq_table like this:
->
-> static struct cpufreq_frequency_table freq_table[] = {
->         { .driver_data = REG_VAL(1,0), .frequency = 999000 },
->         { .driver_data = REG_VAL(1,8), .frequency = 750000 },
->         { .driver_data = REG_VAL(2,0), .frequency = 500000 },
->         { .driver_data = REG_VAL(4,0), .frequency = 250000 },
->         { .driver_data = REG_VAL(8,0), .frequency = 125000 },
->         { .frequency = CPUFREQ_TABLE_END },
-> };
->
-> but the 3rd frequency is actually 999/2 MHz, not 500 MHz, etc.
-> Will that be a problem?
-
-Maybe, but it depends on what your ->get() returns.
+diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
+index e53fc8df7e4e..5168a52a17f9 100644
+--- a/arch/arm/plat-orion/gpio.c
++++ b/arch/arm/plat-orion/gpio.c
+@@ -506,9 +506,9 @@ static void orion_gpio_unmask_irq(struct irq_data *d)
+ 	u32 mask = d->mask;
+ 
+ 	irq_gc_lock(gc);
+-	reg_val = irq_reg_readl(gc->reg_base + ct->regs.mask);
++	reg_val = irq_reg_readl(gc, ct->regs.mask);
+ 	reg_val |= mask;
+-	irq_reg_writel(reg_val, gc->reg_base + ct->regs.mask);
++	irq_reg_writel(gc, reg_val, ct->regs.mask);
+ 	irq_gc_unlock(gc);
+ }
+ 
+@@ -520,9 +520,9 @@ static void orion_gpio_mask_irq(struct irq_data *d)
+ 	u32 reg_val;
+ 
+ 	irq_gc_lock(gc);
+-	reg_val = irq_reg_readl(gc->reg_base + ct->regs.mask);
++	reg_val = irq_reg_readl(gc, ct->regs.mask);
+ 	reg_val &= ~mask;
+-	irq_reg_writel(reg_val, gc->reg_base + ct->regs.mask);
++	irq_reg_writel(gc, reg_val, ct->regs.mask);
+ 	irq_gc_unlock(gc);
+ }
+ 
+-- 
+1.9.1
