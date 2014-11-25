@@ -1,63 +1,78 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 25 Nov 2014 00:12:36 +0000
-Subject: [PATCH] of: support passing console options with stdout-path
-In-Reply-To: <20141124230016.GP20238@lunn.ch>
-References: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
- <20141124230016.GP20238@lunn.ch>
-Message-ID: <20141125001236.GA2361@bivouac.eciton.net>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Mon, 24 Nov 2014 16:17:13 -0800
+Subject: [PATCH V6 01/12] xhci: Set shared HCD's hcd_priv in xhci_gen_setup
+In-Reply-To: <1416874644-12070-1-git-send-email-abrestic@chromium.org>
+References: <1416874644-12070-1-git-send-email-abrestic@chromium.org>
+Message-ID: <1416874644-12070-2-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 12:00:16AM +0100, Andrew Lunn wrote:
-> On Mon, Nov 24, 2014 at 10:23:58PM +0000, Leif Lindholm wrote:
-> > Support specifying console options (like with console=ttyXN,<options>)
-> > by appending them to the stdout-path property after a separating ':'.
-> > 
-> > Example:
-> > 	stdout-path = "uart0:115200";
-> > 
-> > This patch also modifies of_find_node_by_path() to match only the
-> > portion of the path before a ':'.
-> 
-> Hi Leif
-> 
-> These appears to somewhat conform to ePAPR, which says:
-> 
->       A string that specifies the full path to the node representing
->       the device to be used for boot console output. If the character
->       ":" is present in the value it terminates the path.
-> 
-> So you can put any random junk after the :. However, are we going to
-> have backward/forward compatibility problems, and problems with
-> bootloaders? The current kernel code does not look for the :. So a new
-> DT blob on an old kernel will not work so well.
+xhci_gen_setup() sets the hcd_priv field for the primary HCD, but not
+for the shared HCD, requiring xHCI host-controller drivers to set it
+between usb_create_shared_hcd() and usb_add_hcd().  There's no reason
+xhci_gen_setup() can't set the shared HCD's hcd_priv as well, so move
+that bit out of the host-controller drivers and into xhci_gen_setup().
 
-I _think_ this will be less of a problem in practice than it could be
-in theory.
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+---
+No changes from v5.
+New for v5.
+Peviously posted here: https://lkml.org/lkml/2014/10/30/726
+---
+ drivers/usb/host/xhci-pci.c  | 5 -----
+ drivers/usb/host/xhci-plat.c | 5 -----
+ drivers/usb/host/xhci.c      | 6 +++---
+ 3 files changed, 3 insertions(+), 13 deletions(-)
 
-The reason this is needed is that at least several platforms have
-different baudrate settings in firmware than the default provided by
-the kernel for their UART. As a result, stdout-path becomes
-semi-useless; the only thing it gives you is the ability to get
-earlycon output without specifying a specific device (and then the
-console turns to garbage once non-earlycon is enabled).
-
-Hence, a platform that gets along happily today without the ability to
-specify console options in stdout-path would have no pressing need to
-add it to its dt. This should permit at least a very long, soft,
-transition path.
-
-(console= on kernel command line continues to override stdout-path.)
-
-> More worrying, barebox does not support the : either. So there is a
-> danger your bootloader suddenly goes silent after a dt blob update.
-
-_That_ would be most unfortunate.
-
-> Would it be safer to add a new property in chosen?
-
-My preference would be not, given the above, but the important thing
-is to get the functionality in so we get rid of mandatory console=.
-
-/
-    Leif
+diff --git a/drivers/usb/host/xhci-pci.c b/drivers/usb/host/xhci-pci.c
+index 9a69b1f..31025e4 100644
+--- a/drivers/usb/host/xhci-pci.c
++++ b/drivers/usb/host/xhci-pci.c
+@@ -221,11 +221,6 @@ static int xhci_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
+ 		goto dealloc_usb2_hcd;
+ 	}
+ 
+-	/* Set the xHCI pointer before xhci_pci_setup() (aka hcd_driver.reset)
+-	 * is called by usb_add_hcd().
+-	 */
+-	*((struct xhci_hcd **) xhci->shared_hcd->hcd_priv) = xhci;
+-
+ 	retval = usb_add_hcd(xhci->shared_hcd, dev->irq,
+ 			IRQF_SHARED);
+ 	if (retval)
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 3d78b0c..5bc33bc 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -149,11 +149,6 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
+ 			(pdata && pdata->usb3_lpm_capable))
+ 		xhci->quirks |= XHCI_LPM_SUPPORT;
+-	/*
+-	 * Set the xHCI pointer before xhci_plat_setup() (aka hcd_driver.reset)
+-	 * is called by usb_add_hcd().
+-	 */
+-	*((struct xhci_hcd **) xhci->shared_hcd->hcd_priv) = xhci;
+ 
+ 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+ 		xhci->shared_hcd->can_do_streams = 1;
+diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+index 2a5d45b..ae05471 100644
+--- a/drivers/usb/host/xhci.c
++++ b/drivers/usb/host/xhci.c
+@@ -4843,9 +4843,9 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
+ 		 */
+ 		hcd->has_tt = 1;
+ 	} else {
+-		/* xHCI private pointer was set in xhci_pci_probe for the second
+-		 * registered roothub.
+-		 */
++		xhci = hcd_to_xhci(hcd->primary_hcd);
++		*((struct xhci_hcd **) hcd->hcd_priv) = xhci;
++
+ 		return 0;
+ 	}
+ 
+-- 
+2.1.0.rc2.206.gedb03e5
