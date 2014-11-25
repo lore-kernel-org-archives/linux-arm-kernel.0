@@ -1,116 +1,142 @@
-From: zhichang.yuan@linaro.org (zhichang.yuan)
-Date: Tue, 25 Nov 2014 22:16:07 +0800
-Subject: [RFC PATCH v1] arm64:mm: An optimization about kernel direct
- sapce mapping
-In-Reply-To: <20141124171749.GA12895@e104818-lin.cambridge.arm.com>
-References: <1416406915-10939-1-git-send-email-zhichang.yuan@linaro.org>
- <20141124171749.GA12895@e104818-lin.cambridge.arm.com>
-Message-ID: <54748F27.8020902@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 25 Nov 2014 15:22:05 +0100
+Subject: [RFC 0/2] Fix Arndale Octa/Peach Pi boot on Audio subsystem clocks
+In-Reply-To: <547485F5.50600@collabora.co.uk>
+References: <1416842312-4405-1-git-send-email-k.kozlowski@samsung.com>
+ <54736AD0.4070909@collabora.co.uk> <1416907375.5023.54.camel@AMDC1943>
+ <547485F5.50600@collabora.co.uk>
+Message-ID: <1416925325.26128.6.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On wto, 2014-11-25 at 14:36 +0100, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
+> 
+> On 11/25/2014 10:22 AM, Krzysztof Kozlowski wrote:
+> > 
+> > Hmmm, that's strange. I've looked again at your dmesg and it is little
+> > different than mine (when system fails).
+> > 1. Does your PMIC come up? In your dmesg:
+> > [    2.687297] max77802-pmic max77802-pmic: regulator init failed for 0
+> > [    2.693539] platform max77802-pmic: Driver max77802-pmic requests probe deferral
+> >
+> 
+> The Peach Pit/Pi DTS define the parent input supplies for the max77802 PMIC
+> regulators and these are regulators from the tps65090 PMU but the max77802
+> is probed before. When the system does not fail, the probe is deferred and
+> succeed later but I don't know when the system fails (more on that below).
 
-On 2014?11?25? 01:17, Catalin Marinas wrote:
-> Hi,
->
-> I'm trying to make some sense of this patch, so questions below:
->
-> On Wed, Nov 19, 2014 at 02:21:55PM +0000, zhichang.yuan at linaro.org wrote:
->> From: "zhichang.yuan" <zhichang.yuan@linaro.org>
->>
->> This patch make the processing of map_mem more common and support more
->> discrete memory layout cases.
->>
->> In current map_mem, the processing is based on two hypotheses:
->> 1) no any early page allocations occur before the first PMD or PUD regime
->> where the kernel image locate is successfully mapped;
-> No because we use the kernel load offset to infer the start of RAM
-> (PHYS_OFFSET). This would define which memory you can allocate.
-I note that the current PHYS_OFFSET is 0x8000,0000 in JUNO, 0x4000,0000 in QEMU.  I think the current
-processing like that:
-the booloader load the kernel image at (PHYS_OFFSET + TEXT_OFFSET), and vmlinux.lds.S define the VMA of image
-as (. = PAGE_OFFSET + TEXT_OFFSET). So, the starting RAM physical address, PHYS_OFFSET, correspond to
-PAGE_OFFSET now.( this is my inference, have not investigate the UEFI)
+OK.
+
+>  
+> > 2. In my case booting fails just after disabling unused clocks which is
+> > quite early, my dmesg:
+> > [   11.700074] input: gpio_keys as /devices/platform/gpio_keys/input/input0
+> > [   11.704282] s3c-rtc 101e0000.rtc: setting system clock to 2029-01-11 19:19:17 UTC (1862853557)
+> > [   11.770602] mmcblk0: mmc0:0001 M8G1WA 7.28 GiB
+> > [   11.776201] mmcblk0boot0: mmc0:0001 M8G1WA partition 1 2.00 MiB
+> > [   11.780968] mmcblk0boot1: mmc0:0001 M8G1WA partition 2 2.00 MiB
+> > [   11.786823] mmcblk0rpmb: mmc0:0001 M8G1WA partition 3 128 KiB
+> > [   11.793815]  mmcblk0: p1 p2 p3 p4
+> > [   11.824165] PVDD_G3D_1V0: disabling
+> > [   11.830833] PVDD_G3DS_1V0: disabling
+> > [   11.837771] PVDD_HSIC_1V8: disabling
+> > [   11.841172] PVDD_ABB_1V8: disabling
+> > [   11.844866] PVDD_ANAIP_1V8: disabling
+> > [   11.847157] usb 5-1.4: new high-speed USB device number 3 using exynos-ehci
+> > [   11.848778] PVDD
+> > 
+> > In your case you have a gap here:
+> > [    3.624142] platform 12d10000.adc: Driver exynos-adc requests probe deferral
+> > [   24.188722] random: nonblocking pool is initialized
+> >
+> > Could you try my patches once again but this time with enabled:
+> > DEBUG_EXYNOS_UART
+> > EARLY_PRINTK
+> > DEBUG_S3C_UART3
+> > DEBUG_LL
+> >
+> 
+> Yes, there is a gap and I don't know why. Even after enabling all those
+> config options, nothing is printed on the serial console after the exynos-adc
+> probe deferral. Only that message in drivers/char/random.c is printed but
+> nothing else is printed after all...
+
+You may try attached patch (very early printk) if you suspect that some
+logs are missing.
+
+> 
+> > and with following change:
+> > 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index 4896ae9e23da..316856e55784 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -478,7 +478,9 @@ static void clk_disable_unused_subtree(struct clk *clk)
+> >          * sequence.  call .disable_unused if available, otherwise fall
+> >          * back to .disable
+> >          */
+> > +       pr_err("clk: checking %s\n", clk->name);
+> >         if (__clk_is_enabled(clk)) {
+> > +               pr_err("clk: enabled %s, disabling\n", clk->name);
+> >                 if (clk->ops->disable_unused)
+> >                         clk->ops->disable_unused(clk->hw);
+> >                 else if (clk->ops->disable)
+> > 
+> > Without my patch the boot hangs:
+> > [   12.230666] clk: checking dout_unipro
+> > [   12.234304] clk: checking mout_unipro
+> > [   12.237913] clk: checking sclk_usbd300
+> > [   12.241638] clk: enabled sclk_usbd300, disabling
+> > [   12.246264] clk: checking dout_usbd300
+> > [   12.249992] clk: checking sclk_usbd301
+> > [   12.253683] clk: enabled sclk_usbd301, disabling
+> > [   12.258309] clk: checking dout_usbd301
+> > [   12.262007] clk: checking sclk_maudio0
+> > [   12.265728] clk: enabled sclk_maudio0, disabling
+> > [   12.270355] clk: checking pcm_bus
+> > 
+> > because audss seems to be gated so kernel cannot access status of
+> > pcm_bus clock.
+> >
+> 
+> I added those printk's but clk_disable_unused() is executed after the
+> exynos-adc probe function so the logs are not shown on the serial console.
+
+So this would mean that something fails before clk_disable_unused().
+
+> As mentioned previously in the thread, Tushar's fix [0] works for me and with
+> that patch I see the clocks disabled by clk_disable_unused_subtree() and the
+> kernel is able to access pcm_bus and other audio clocks:
+> 
+> [    5.007368] clk: checking mout_spdif
+> [    5.010908] clk: checking dout_audio0
+> [    5.014566] clk: checking mout_audio0
+> [    5.018208] clk: checking sclk_maudio0
+> [    5.021926] clk: enabled sclk_maudio0, disabling
+> [    5.026541] clk: checking pcm_bus
+> [    5.029820] clk: enabled pcm_bus, disabling
+> [    5.034001] clk: checking sclk_pcm
+> [    5.037367] clk: enabled sclk_pcm, disabling
+> 
+> Any ideas?
+
+Yes, I got. On Peach board the i2s0 is enabled in DTS. Probing it could
+fail because it relies on enabling audss clocks (which cannot be
+accessed).
+
+I reproduced another hang on Arndale Octa after enabling i2s0 in DTS.
+Maybe that is the cause also on Peach.
+
+Best regards,
+Krzysztof
 
 
-But is it possible in the future the kernel image is loaded to a memory range that is not the first memblock,
-such as :
 
-block 0: 0x100000, 0x20100000
-block 1: 0x40000000, 0x40000000
-
-Supposed the block 1 is where the kernel image locate.
-
-
-Actually, if bootloader put the kernel image at a configurable physical address named as PA, and VMA of text
-section is defined as PAGE_OFFSET + 0x100000 + PA, then PAGE_OFFSET will correspond to 0x100000.
-
-In x86, the VMA of text section is as below:
-
-#ifdef CONFIG_X86_32
-        . = LOAD_OFFSET + LOAD_PHYSICAL_ADDR;
-#else
-        . = __START_KERNEL;
-#endif
-
-LOAD_PHYSICAL_ADD is configurable. I think it can support different hardware design.
-
-
-I am not sure whether this case will happen.
-
->> 2) there are sufficient available pages in the PMD or PUD regime to satisfy
->> the need of page tables from other memory ranges mapping.
-> I don't fully understand this. Can you be more specific?
->
-Supposed this memory layout:
-
-block 0: 0x40000000, 0xc00000
-block 1: 0x60000000, 0x1f000000
-block 2: 0x80000000, 0x40000000
-
-if the end of kernel image is near to 0xc00000, it is possible no available mapped pages for other blocks
-mapping.
-
-Of-course, this is a very special case, not practical, since the memblock where the kernel image locate should
-be big enough.
-
->> The current SOC or hardware platform designs had not broken this constraint.
->> But we can make the software more versatile.
-> We need to have code readability in mind ;).
->
->> In addition, for the 4K page system, to comply with the constraint No.1, the
->> start address of some memory ranges is forced to align at PMD boundary, it
->> will make some marginal pages of that ranges are skipped to build the PTE. It
->> is not reasonable.
-> It is reasonable to ask for the start of RAM to be on a PMD (2MB)
-> boundary.
-I think the physical address where the kernel image locate can be limited on PMD boundary. But the start of
-RAM is decided by Soc or hardware platform. For example, the start of RAM only align to MB boundary.
->> This patch will relieve the system from those constraints. You can load the
->> kernel image in any memory range, the memory range can be small, can start at
->> non-alignment boundary, and so on.
-> I guess you still depend on the PAGE_OFFSET, TEXT_OFFSET, so it's not
-> random.
->
-> I'm not sure what the end goal is with this patch but my plan is to
-> entirely decouple TEXT_OFFSET from PAGE_OFFSET (with a duplicate mapping
-> for the memory covering the kernel text). This would allow us to load
-> the kernel anywhere in RAM (well, with some sane alignment to benefit
-> from section mapping) and the PHYS_OFFSET detected from DT at run-time.
-> Once that's done, I don't think your patch is necessary.
->
-> Thanks.
-
-
-I am not so clear what is the coupling between TEXT_OFFSET and PAGE_OFFSET. It seems the VMA and LMA have some
-coupling.
-
-PHYS_OFFSET + TEXT_OFFSET <------------> PAGE_OFFSET + TEXT_OFFSET.
-
-I am not sure what situation will be happened on the SOC design or application, that is the reason why i
-submit as RFC.
-If the cases i described do not need to think about or can not exist, this RFC can be skipped.
-
-
-Thanks,
--Zhichang
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 319-Very-early-printk-for-next-20141106-3.19.patch
+Type: text/x-patch
+Size: 1028 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141125/c196376b/attachment.bin>
