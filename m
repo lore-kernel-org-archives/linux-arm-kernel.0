@@ -1,47 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Nov 2014 22:09:41 +0100
-Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <2065254.jRdQcinOdg@wuerfel>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <CAFpQJXUjYsTiHSyHdgtN9JPWGN8CByR4VwtSMJhwkAUWA4iV9w@mail.gmail.com>
- <2065254.jRdQcinOdg@wuerfel>
-Message-ID: <2301278.uLKBUrWKt0@wuerfel>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 25 Nov 2014 21:10:54 +0000
+Subject: [PATCH 3.18-rc3 v9 1/5] irqchip: gic: Finer grain locking for
+ gic_raise_softirq
+In-Reply-To: <alpine.LFD.2.11.1411251510231.11690@knanqh.ubzr>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
+ <1416936401-5147-2-git-send-email-daniel.thompson@linaro.org>
+ <5474BF19.3040707@arm.com> <alpine.LFD.2.11.1411251510231.11690@knanqh.ubzr>
+Message-ID: <5474F05E.90401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 November 2014 20:00:42 Arnd Bergmann wrote:
-> On Tuesday 25 November 2014 08:15:47 Ganapatrao Kulkarni wrote:
-> > > No, don't hardcode ARM specifics into a common binding either. I've looked
-> > > at the ibm,associativity properties again, and I think we should just use
-> > > those, they can cover all cases and are completely independent of the
-> > > architecture. We should probably discuss about the property name though,
-> > > as using the "ibm," prefix might not be the best idea.
-> >
-> > We have started with new proposal, since not got enough details how
-> > ibm/ppc is managing the numa using dt.
-> > there is no documentation and there is no power/PAPR spec for numa in
-> > public domain and there are no single dt file in arch/powerpc which
-> > describes the numa. if we get any one of these details, we can align
-> > to powerpc implementation.
+On 25/11/14 20:17, Nicolas Pitre wrote:
+> On Tue, 25 Nov 2014, Marc Zyngier wrote:
 > 
-> Basically the idea is to have an "ibm,associativity" property in each
-> bus or device that is node specific, and this includes all CPUs and
-> memory nodes. ...
+>> Hi Daniel,
+>>
+>> On 25/11/14 17:26, Daniel Thompson wrote:
+>>> irq_controller_lock is used for multiple purposes within the gic driver.
+>>> Primarily it is used to make register read-modify-write sequences atomic.
+>>> It is also used by gic_raise_softirq() in order that the big.LITTLE
+>>> migration logic can figure out when it is safe to migrate interrupts
+>>> between physical cores.
+>>>
+>>> The second usage of irq_controller_lock is difficult to discern when
+>>> reviewing the code because the migration itself takes place outside
+>>> the lock.
+>>>
+>>> This patch makes the second usage more explicit by splitting it out into
+>>> a separate lock and providing better comments.
+>>
+>> While we're at it, how about an additional patch that would make this
+>> lock disappear entirely when the big-little stuff is not compiled in,
+>> which is likely to be the case on a lot of (dare I say most?) systems?
+>> That will save expensive barriers that we definitely could do without.
+> 
+> For the record, I reviewed and ACKed a patch doing exactly that a while 
+> ago:
+> 
+> http://lkml.org/lkml/2014/8/13/486
 
-I should have mentioned that the example I gave was still rather basic.
-In a larger real-world system, you have more levels of associativity,
-though not all of them are relevant for NUMA memory allocation.
-Also, when you have levels that are not just a crossbar but instead
-have multiple point-to-point connections or a ring bus, it gets more
-complex, but you can still represent it with these properties.
+Well remembered! That patch had a different motivation but is very
+similar to mine... so much so I might steal bit of it.
 
-For task placement, the associativity would also represent the
-topology within one node (SMT threads, cores, clusters, chips,
-mcms, sockets) as separate levels, and in large installations you
-would have multiple levels of memory topology (memory controllers,
-sockets, board/blade, chassis, rack, ...), which can get taken into
-account for memory allocation to find the closest node. The metric
-that you use here is how many levels within the topology are matching
-between two devices (typically memory and i/o device, or memory and cpu).
-
-	Arnd
+I'll make sure I put Stephen on Cc: when I respin with the changes Marc
+requested.
