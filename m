@@ -1,65 +1,78 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 25 Nov 2014 17:50:55 +0000
-Subject: [PATCH] iommu: Decouple iommu_map_sg from CPU page size
-Message-ID: <2d38d270a532b52f73a720572f8f085dfa08321e.1416936761.git.robin.murphy@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 25 Nov 2014 18:01:01 +0000
+Subject: [PATCH 2/9] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <CAJe_ZhciCP2VbmRtrq9d14WhfLhnC-xaitCCiW_6Yf1S-0sdUg@mail.gmail.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>	<1416486872-25301-1-git-send-email-Vincent.Yang@tw.fujitsu.com>	<54749429.9080505@arm.com>
+ <CAJe_ZhciCP2VbmRtrq9d14WhfLhnC-xaitCCiW_6Yf1S-0sdUg@mail.gmail.com>
+Message-ID: <5474C3DD.5060706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the IOMMU supports pages smaller than the CPU page size, segments
-which lie at offsets within the CPU page may be mapped based on the
-finer-grained IOMMU page boundaries. This minimises the amount of
-non-buffer memory between the CPU page boundary and the start of the
-segment which must be mapped and therefore exposed to the device, and
-brings the default iommu_map_sg implementation in line with
-iommu_map/unmap with respect to alignment.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
 
-Hi Joerg,
+On 25/11/14 16:51, Jassi Brar wrote:
+> On 25 November 2014 at 20:07, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>
+>>
+>> On 20/11/14 12:34, Vincent Yang wrote:
+>>>
+>>> Add driver for the ARM Message-Handling-Unit (MHU).
+>>>
+>>> Signed-off-by: Andy Green <andy.green@linaro.org>
+>>> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+>>> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+>>> Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+>>> ---
+>>>    .../devicetree/bindings/mailbox/arm-mhu.txt        |  33 ++++
+>>>    drivers/mailbox/Kconfig                            |   7 +
+>>>    drivers/mailbox/Makefile                           |   2 +
+>>>    drivers/mailbox/arm_mhu.c                          | 196
+>>> +++++++++++++++++++++
+>>>    4 files changed, 238 insertions(+)
+>>>    create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+>>>    create mode 100644 drivers/mailbox/arm_mhu.c
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+>>> b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+>>> new file mode 100644
+>>> index 0000000..b1b9888
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+>>> @@ -0,0 +1,33 @@
+>>> +ARM MHU Mailbox Driver
+>>> +======================
+>>> +
+>>> +The ARM's Message-Handling-Unit (MHU) is a mailbox controller that has
+>>> +3 independent channels/links to communicate with remote processor(s).
+>>
+>>
+>> I had reviewed this before and I see not all the comments are addressed.
+>> I had mentioned that you can't add support to _SECURE_ channel in Linux
+>> as you need to assume Linux runs in non-secure privilege(and I gather
+>> that's the case even on this platform from other email in the thread)
+>>
+> Please revisit the old thread. After some discussion you had
+> graciously allowed me to keep the secure channel ;)
+> [
+> ... Even though I don't like you have secure channel access in Linux, you
+> have valid reasons. In case you decide to support it ....
+> ]
 
-I noticed this whilst wiring up DMA mapping to this new API - on arm64
-we anticipate running 4k IOMMU pages with 64k CPU pages, in which case
-the alignment check ends up being unnecessarily strict.
+Agreed but based on the other email in the same thread it looks like you
+want to run the same kernel both in secure and no-secure mode on this
+platform, in which case you _have_to_assume_ it's *non-secure only* 
+always unless you come up with some DT magic.
+
+>   It seems you still don't get my point that the driver should manage
+> all channels - S & NS. If Linux is running in NS mode on a platform,
+> the DT will specify only some NS channel to be used. The controller
+> driver shouldn't be crippled just because you think Linux will never
+> be run in Secure mode.
+>
+
+Ok how do you handle that, I don't see that in the DT binding. As it
+stands, you can unconditionally try to access the secure channel and
+cause aborts if the platform is running in non-secure mode.
 
 Regards,
-Robin.
-
- drivers/iommu/iommu.c | 18 ++++++++++++++----
- 1 file changed, 14 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 08c53c5..5c4101a 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -1129,14 +1129,24 @@ size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
- {
- 	struct scatterlist *s;
- 	size_t mapped = 0;
--	unsigned int i;
-+	unsigned int i, min_pagesz;
- 	int ret;
- 
-+	if (unlikely(domain->ops->pgsize_bitmap == 0UL))
-+		return 0;
-+
-+	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
-+
- 	for_each_sg(sg, s, nents, i) {
--		phys_addr_t phys = page_to_phys(sg_page(s));
-+		phys_addr_t phys = page_to_phys(sg_page(s)) + s->offset;
- 
--		/* We are mapping on page boundarys, so offset must be 0 */
--		if (s->offset)
-+		/*
-+		 * We are mapping on IOMMU page boundaries, so offset within
-+		 * the page must be 0. However, the IOMMU may support pages
-+		 * smaller than PAGE_SIZE, so s->offset may still represent
-+		 * an offset of that boundary within the CPU page.
-+		 */
-+		if (!IS_ALIGNED(s->offset, min_pagesz))
- 			goto out_err;
- 
- 		ret = iommu_map(domain, iova + mapped, phys, s->length, prot);
--- 
-1.9.1
+Sudeep
