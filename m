@@ -1,109 +1,47 @@
-From: lautriv@coldplug.net (lautriv)
-Date: Tue, 25 Nov 2014 23:34:18 +0100
-Subject: [PATCH] mmc: wmt-sdmmc: fix unmatched release_mem_region
-In-Reply-To: <CAPDyKFqNHQUStQiRJ3Bn7JnbMn-xJ=TUaWXijJcuO9z97xcmDw@mail.gmail.com>
-References: <1415567571-6144-1-git-send-email-alchark@gmail.com>	<CAOMZO5C+O4h=f=vtLTdBZktnfVWzfeLjOQG-oecxh_c9u-QMqA@mail.gmail.com>	<545FE821.5060107@coldplug.net>	<CABjd4YxyUJi6RaGWicFeoJ7C27qhUFsAbq-nJTreACrt-voeYA@mail.gmail.com>	<546DFE83.8060900@coldplug.net>
- <CAPDyKFqNHQUStQiRJ3Bn7JnbMn-xJ=TUaWXijJcuO9z97xcmDw@mail.gmail.com>
-Message-ID: <547503EA.3030907@coldplug.net>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 26 Nov 2014 00:13:03 +0100
+Subject: [PATCH 1/3] ACPI / processor: Update the comments in processor.h
+In-Reply-To: <1414662780-2147-1-git-send-email-hanjun.guo@linaro.org>
+References: <1414662780-2147-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <2001637.yVyNT03Tcn@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2014 09:34 AM, Ulf Hansson wrote:
-> On 20 November 2014 at 15:45, lautriv <lautriv@coldplug.net> wrote:
->> From b0509e27e33326e6dccd67d8ebe67e2bdb0cfdde Mon Sep 17 00:00:00 2001
->> From: Helmut Stengele <lautriv@coldplug.net>
->> Date: Thu, 20 Nov 2014 15:27:40 +0100
->> Subject: [PATCH] mmc: wmt-sdmmc: fix unmatched release_mem_region
->>
->> Current code calls release_mem_region upon module unload
->> without requesting the region first. This patch fixes it
->> by moving to a devres-based ioremap implementation, which
->> handles requesting and releasing memory region internally.
->>
->> This also makes the error/unload paths a bit simpler.
->>
->> Signed-off-by: Helmut Stengele <lautriv@coldplug.net>
->> ---
->>
->> This is a corrected patch based on the one Alexey sent for me.
->> I sent it already but since i'm not used to send something upstream
->> it was an attached file and obviously rejected.
->> Patch is tested on bare-metal ( wm8850 ) and works like suspected.
->>
->>  drivers/mmc/host/wmt-sdmmc.c | 14 +++++---------
->>  1 file changed, 5 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
->> index 54181b4..bcaa0cc 100644
->> --- a/drivers/mmc/host/wmt-sdmmc.c
->> +++ b/drivers/mmc/host/wmt-sdmmc.c
->> @@ -759,6 +759,7 @@ static int wmt_mci_probe(struct platform_device *pdev)
->>      const struct wmt_mci_caps *wmt_caps;
->>      int ret;
->>      int regular_irq, dma_irq;
->> +    struct resource *res;
->>
->>      if (!of_id || !of_id->data) {
->>          dev_err(&pdev->dev, "Controller capabilities data missing\n");
->> @@ -813,10 +814,11 @@ static int wmt_mci_probe(struct platform_device *pdev)
->>      if (of_get_property(np, "cd-inverted", NULL))
->>          priv->cd_inverted = 1;
->>
->> -    priv->sdmmc_base = of_iomap(np, 0);
->> +    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +    priv->sdmmc_base = devm_ioremap_resource(&pdev->dev, res);
-> You should check the return value from devm_ioremap_resource() with IS_ERR().
->
->>      if (!priv->sdmmc_base) {
->>          dev_err(&pdev->dev, "Failed to map IO space\n");
-> This print can be removed, devm_ioremap_resource() handles that.
->
->> -        ret = -ENOMEM;
->> +        ret = PTR_ERR(priv->sdmmc_base);
->>          goto fail2;
->>      }
->>
->> @@ -826,7 +828,7 @@ static int wmt_mci_probe(struct platform_device *pdev)
->>      ret = request_irq(regular_irq, wmt_mci_regular_isr, 0, "sdmmc", priv);
->>      if (ret) {
->>          dev_err(&pdev->dev, "Register regular IRQ fail\n");
->> -        goto fail3;
->> +        goto fail2;
->>      }
->>
->>      ret = request_irq(dma_irq, wmt_mci_dma_isr, 0, "sdmmc", priv);
->> @@ -869,8 +871,6 @@ fail5:
->>      free_irq(dma_irq, priv);
->>  fail4:
->>      free_irq(regular_irq, priv);
->> -fail3:
->> -    iounmap(priv->sdmmc_base);
->>  fail2:
->>      mmc_free_host(mmc);
->>  fail1:
->> @@ -881,7 +881,6 @@ static int wmt_mci_remove(struct platform_device *pdev)
->>  {
->>      struct mmc_host *mmc;
->>      struct wmt_mci_priv *priv;
->> -    struct resource *res;
->>      u32 reg_tmp;
->>
->>      mmc = platform_get_drvdata(pdev);
->> @@ -909,9 +908,6 @@ static int wmt_mci_remove(struct platform_device *pdev)
->>      clk_disable_unprepare(priv->clk_sdmmc);
->>      clk_put(priv->clk_sdmmc);
->>
->> -    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> -    release_mem_region(res->start, resource_size(res));
->> -
->>      mmc_free_host(mmc);
->>
->>      dev_info(&pdev->dev, "WMT MCI device removed\n");
->> --
->> 2.1.3
->>
->>
-> Kind regards
-> Uffe
->
-Thanks for the hint, will do so. ( Sent the wrong patch by accident anyway )
+On Thursday, October 30, 2014 05:52:58 PM Hanjun Guo wrote:
+> In commit 46ba51e (ACPI / processor: Introduce ARCH_MIGHT_HAVE_ACPI_PDC),
+> acpi_processor_set_pdc() was moved to processor_pdc.c, so update
+> the comments accordingly.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Patches [2-3/3] from this set need to be rebased on top of current linux-next
+and resent, sorry about that.
+
+> ---
+>  include/acpi/processor.h |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/include/acpi/processor.h b/include/acpi/processor.h
+> index 9b9b6f2..cbb6cd3 100644
+> --- a/include/acpi/processor.h
+> +++ b/include/acpi/processor.h
+> @@ -313,11 +313,13 @@ static inline int acpi_processor_get_bios_limit(int cpu, unsigned int *limit)
+>  #endif				/* CONFIG_CPU_FREQ */
+>  
+>  /* in processor_core.c */
+> -void acpi_processor_set_pdc(acpi_handle handle);
+>  int acpi_get_apicid(acpi_handle, int type, u32 acpi_id);
+>  int acpi_map_cpuid(int apic_id, u32 acpi_id);
+>  int acpi_get_cpuid(acpi_handle, int type, u32 acpi_id);
+>  
+> +/* in processor_pdc.c */
+> +void acpi_processor_set_pdc(acpi_handle handle);
+> +
+>  /* in processor_throttling.c */
+>  int acpi_processor_tstate_has_changed(struct acpi_processor *pr);
+>  int acpi_processor_get_throttling_info(struct acpi_processor *pr);
+> 
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
