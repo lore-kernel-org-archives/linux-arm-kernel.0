@@ -1,69 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 24 Nov 2014 16:25:18 -0800
-Subject: [PATCH] ARM: exynos_defconfig: disable CONFIG_EXYNOS5420_MCPM;
- not stable
-In-Reply-To: <CAMAWPa-mLAFL7v8hHA5R-eBzpMFK-E-xcvjoV8Bn6tTwgP53Uw@mail.gmail.com>
-References: <1414796382-5447-1-git-send-email-khilman@kernel.org>
- <000e01cffb39$5ef0a2d0$1cd1e870$@kernel.org>
- <7hegtaq26c.fsf@deeprootsystems.com>
- <CAMAWPa-mLAFL7v8hHA5R-eBzpMFK-E-xcvjoV8Bn6tTwgP53Uw@mail.gmail.com>
-Message-ID: <CAOesGMhvTDN4J6AdUDHKV0Sp4NT6a4QEMUDWOayQqhhD+C4acw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 25 Nov 2014 09:33:29 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Cleanups for
+ v3.19
+In-Reply-To: <2564955.afktPI8I4q@wuerfel>
+References: <cover.1416530979.git.horms+renesas@verge.net.au>
+ <2564955.afktPI8I4q@wuerfel>
+Message-ID: <20141125003329.GK5656@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 11:51 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> Kukjin,
->
-> On Mon, Nov 10, 2014 at 11:35 AM, Kevin Hilman <khilman@kernel.org> wrote:
->> Kukjin Kim <kgene@kernel.org> writes:
->>
->>> Kevin Hilman wrote:
->>>>
->>>> From: Kevin Hilman <khilman@linaro.org>
->>>>
->>>> The option CONFIG_EXYNOS5420_MCPM is causing imprecise external aborts
->>>> during boot testing, causing various userspace startup failures.
->>>>
->>>> Disable until it has gotten more testing.
->>>>
->>>> Cc: Kukjin Kim <kgene.kim@samsung.com>,
->>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>,
->>>> Cc: Sachin Kamat <sachin.kamat@samsung.com>,
->>>> Cc: Doug Anderson <dianders@chromium.org>,
->>>> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
->>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>,
->>>> Cc: Tushar Behera <tushar.behera@linaro.org>,
->>>> Cc: stable at vger.kernel.org # v3.17+
->>>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->>>> ---
->>>> This has been reported by a few people[1], but not investigated or fixed, so it's
->>>> time to disable this feature until it can be fixed.
->>>>
->>> Hi Kevin,
->>>
->>> Yeah I agree with your opinion.
->>>
->>> But as you can see my tree, I've queued regarding mcpm patches for 3.19 will
->>> be shown in -next in this weekend.
->>
->> Which of the recently queued patches are expected to address the
->> imprecise abort issue?  I'd be happy to test them out.
->
-> Exynos5 MCPM is still broken in linux-next and still causing an imprecise abort.
->
-> What is the status of $SUBJECT patch?
->
->>> Anyway let me apply this into -fixes and
->>> then let's enable after test its functionality in -next in a couple of days.
->>
->> Yes, I think this needs to be applied until these aborts are understood
->> and fixed.
->
-> Is anyone at Samsung actually looking into these MCPM issues?
+On Fri, Nov 21, 2014 at 01:06:30PM +0100, Arnd Bergmann wrote:
+> On Friday 21 November 2014 09:55:08 Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these second round of Renesas ARM based SoC cleanups for v3.19.
+> > 
+> > This pull request is based on the previous round of
+> > such requests, tagged as renesas-soc-cleanups-for-v3.19,
+> > which I have already sent a pull-request for.
+> > 
+> 
+> Pulled into next/cleanup, thanks!
 
-Hi Kevin,
+Thanks Arnd,
 
-What hardware are you having problems with? 5420 or 5422/5800?
-
-
--Olof
+I think that means everything I asked to be pulled for v3.19 is now in :)
