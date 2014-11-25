@@ -1,82 +1,139 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 25 Nov 2014 22:09:47 +0300
-Subject: [PATCH v2 3/8] ARM: sa1100: replace irq numbers with names in irq
- driver
+Date: Tue, 25 Nov 2014 22:09:51 +0300
+Subject: [PATCH v2 7/8] ARM: sa1100: switch to hwirq usage
 In-Reply-To: <1416942592-23059-1-git-send-email-dbaryshkov@gmail.com>
 References: <1416942592-23059-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1416942592-23059-4-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1416942592-23059-8-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for further changes replace direct IRQ numbers with
-pre-defined names. This imposes no real code changes.
+Switch internally to using hardware irq numbers (hwirq). In case of GPIO
+interrupts, hwirq is equal to GPIO number. In case of system interrupts,
+hwirq is equal to interrupt number in the interrupt controller.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-sa1100/irq.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/mach-sa1100/irq.c | 37 ++++++++++++++-----------------------
+ 1 file changed, 14 insertions(+), 23 deletions(-)
 
 diff --git a/arch/arm/mach-sa1100/irq.c b/arch/arm/mach-sa1100/irq.c
-index 4a1bd5e..0b29d27 100644
+index 14a7633e..981db98 100644
 --- a/arch/arm/mach-sa1100/irq.c
 +++ b/arch/arm/mach-sa1100/irq.c
-@@ -37,14 +37,14 @@ static int GPIO_IRQ_mask = (1 << 11) - 1;
- /*
-  * To get the GPIO number from an IRQ number
-  */
--#define GPIO_11_27_IRQ(i)	((i) - 21)
-+#define GPIO_11_27_IRQ(i)	((i) + 11 - IRQ_GPIO11)
- #define GPIO11_27_MASK(irq)	(1 << GPIO_11_27_IRQ(irq))
+@@ -35,20 +35,11 @@ static int GPIO_IRQ_rising_edge;
+ static int GPIO_IRQ_falling_edge;
+ static int GPIO_IRQ_mask = (1 << 11) - 1;
  
+-/*
+- * To get the GPIO number from an IRQ number
+- */
+-#define GPIO_11_27_IRQ(i)	((i) + 11 - IRQ_GPIO11)
+-#define GPIO11_27_MASK(irq)	(1 << GPIO_11_27_IRQ(irq))
+-
  static int sa1100_gpio_type(struct irq_data *d, unsigned int type)
  {
  	unsigned int mask;
  
--	if (d->irq <= 10)
-+	if (d->irq <= IRQ_GPIO10)
- 		mask = 1 << d->irq;
- 	else
- 		mask = GPIO11_27_MASK(d->irq);
-@@ -71,7 +71,7 @@ static int sa1100_gpio_type(struct irq_data *d, unsigned int type)
- }
+-	if (d->irq <= IRQ_GPIO10)
+-		mask = 1 << d->irq;
+-	else
+-		mask = GPIO11_27_MASK(d->irq);
++	mask = BIT(d->hwirq);
  
- /*
-- * GPIO IRQs must be acknowledged.  This is for IRQs from 0 to 10.
-+ * GPIO IRQs must be acknowledged.  This is for IRQs from GPIO0 to 10.
+ 	if (type == IRQ_TYPE_PROBE) {
+ 		if ((GPIO_IRQ_rising_edge | GPIO_IRQ_falling_edge) & mask)
+@@ -76,25 +67,25 @@ static int sa1100_gpio_type(struct irq_data *d, unsigned int type)
   */
  static void sa1100_low_gpio_ack(struct irq_data *d)
  {
-@@ -189,7 +189,7 @@ static struct irq_chip sa1100_high_gpio_chip = {
+-	GEDR = (1 << d->irq);
++	GEDR = BIT(d->hwirq);
+ }
  
- /*
-  * We don't need to ACK IRQs on the SA1100 unless they're GPIOs
-- * this is for internal IRQs i.e. from 11 to 31.
-+ * this is for internal IRQs i.e. from IRQ LCD to RTCAlrm.
+ static void sa1100_low_gpio_mask(struct irq_data *d)
+ {
+-	ICMR &= ~(1 << d->irq);
++	ICMR &= ~BIT(d->hwirq);
+ }
+ 
+ static void sa1100_low_gpio_unmask(struct irq_data *d)
+ {
+-	ICMR |= 1 << d->irq;
++	ICMR |= BIT(d->hwirq);
+ }
+ 
+ static int sa1100_low_gpio_wake(struct irq_data *d, unsigned int on)
+ {
+ 	if (on)
+-		PWER |= 1 << d->irq;
++		PWER |= BIT(d->hwirq);
+ 	else
+-		PWER &= ~(1 << d->irq);
++		PWER &= ~BIT(d->hwirq);
+ 	return 0;
+ }
+ 
+@@ -162,14 +153,14 @@ sa1100_high_gpio_handler(unsigned int irq, struct irq_desc *desc)
+  */
+ static void sa1100_high_gpio_ack(struct irq_data *d)
+ {
+-	unsigned int mask = GPIO11_27_MASK(d->irq);
++	unsigned int mask = BIT(d->hwirq);
+ 
+ 	GEDR = mask;
+ }
+ 
+ static void sa1100_high_gpio_mask(struct irq_data *d)
+ {
+-	unsigned int mask = GPIO11_27_MASK(d->irq);
++	unsigned int mask = BIT(d->hwirq);
+ 
+ 	GPIO_IRQ_mask &= ~mask;
+ 
+@@ -179,7 +170,7 @@ static void sa1100_high_gpio_mask(struct irq_data *d)
+ 
+ static void sa1100_high_gpio_unmask(struct irq_data *d)
+ {
+-	unsigned int mask = GPIO11_27_MASK(d->irq);
++	unsigned int mask = BIT(d->hwirq);
+ 
+ 	GPIO_IRQ_mask |= mask;
+ 
+@@ -190,9 +181,9 @@ static void sa1100_high_gpio_unmask(struct irq_data *d)
+ static int sa1100_high_gpio_wake(struct irq_data *d, unsigned int on)
+ {
+ 	if (on)
+-		PWER |= GPIO11_27_MASK(d->irq);
++		PWER |= BIT(d->hwirq);
+ 	else
+-		PWER &= ~GPIO11_27_MASK(d->irq);
++		PWER &= ~BIT(d->hwirq);
+ 	return 0;
+ }
+ 
+@@ -228,12 +219,12 @@ static struct irq_domain *sa1100_high_gpio_irqdomain;
   */
  static void sa1100_mask_irq(struct irq_data *d)
  {
-@@ -332,19 +332,19 @@ void __init sa1100_init_irq(void)
- 	 */
- 	ICCR = 1;
+-	ICMR &= ~(1 << d->irq);
++	ICMR &= ~BIT(d->hwirq);
+ }
  
--	for (irq = 0; irq <= 10; irq++) {
-+	for (irq = IRQ_GPIO0; irq <= IRQ_GPIO10; irq++) {
- 		irq_set_chip_and_handler(irq, &sa1100_low_gpio_chip,
- 					 handle_edge_irq);
- 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
- 	}
+ static void sa1100_unmask_irq(struct irq_data *d)
+ {
+-	ICMR |= (1 << d->irq);
++	ICMR |= BIT(d->hwirq);
+ }
  
--	for (irq = 12; irq <= 31; irq++) {
-+	for (irq = IRQ_LCD; irq <= IRQ_RTCAlrm; irq++) {
- 		irq_set_chip_and_handler(irq, &sa1100_normal_chip,
- 					 handle_level_irq);
- 		set_irq_flags(irq, IRQF_VALID);
- 	}
- 
--	for (irq = 32; irq <= 48; irq++) {
-+	for (irq = IRQ_GPIO11; irq <= IRQ_GPIO27; irq++) {
- 		irq_set_chip_and_handler(irq, &sa1100_high_gpio_chip,
- 					 handle_edge_irq);
- 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+ /*
+@@ -241,7 +232,7 @@ static void sa1100_unmask_irq(struct irq_data *d)
+  */
+ static int sa1100_set_wake(struct irq_data *d, unsigned int on)
+ {
+-	if (d->irq == IRQ_RTCAlrm) {
++	if (BIT(d->hwirq) == IC_RTCAlrm) {
+ 		if (on)
+ 			PWER |= PWER_RTC;
+ 		else
 -- 
 2.1.3
