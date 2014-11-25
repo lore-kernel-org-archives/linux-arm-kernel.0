@@ -1,55 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Nov 2014 16:57:44 +0000
-Subject: [PATCH v2 3/9] clk: sunxi: Add prcm mod0 clock driver
-In-Reply-To: <1416749895-25013-4-git-send-email-hdegoede@redhat.com>
-References: <1416749895-25013-1-git-send-email-hdegoede@redhat.com>
- <1416749895-25013-4-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141125165744.GA17789@x1>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 25 Nov 2014 12:00:44 -0500 (EST)
+Subject: [PATCH 3/9] ARM: MB86S7X: Add MCPM support
+In-Reply-To: <CAAfg0W7Y=gpU_LcmSB4LW7ULnWzKPoniaPJguZuNvDzYZ6NH+A@mail.gmail.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1416486920-25343-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <54746C74.8020400@arm.com>
+ <CAAfg0W4ntf+yRZnipO+w7beN+EsZcryXCuD1eUJo1RYQNkJ2hQ@mail.gmail.com>
+ <54749116.2050307@arm.com>
+ <CAAfg0W7Y=gpU_LcmSB4LW7ULnWzKPoniaPJguZuNvDzYZ6NH+A@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1411251148390.11690@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 23 Nov 2014, Hans de Goede wrote:
+On Wed, 26 Nov 2014, Andy Green wrote:
 
-> Add a driver for mod0 clocks found in the prcm. Currently there is only
-> one mod0 clocks in the prcm, the ir clock.
+> On 25 November 2014 at 22:24, Sudeep Holla <sudeep.holla@arm.com> wrote:
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
->  drivers/clk/sunxi/Makefile                        |  2 +-
->  drivers/clk/sunxi/clk-sun6i-prcm-mod0.c           | 63 +++++++++++++++++++++++
->  drivers/mfd/sun6i-prcm.c                          | 14 +++++
->  4 files changed, 79 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/clk/sunxi/clk-sun6i-prcm-mod0.c
+> > So IIUC, you run Linux in non-secure mode, PSCI would be more suitable
+> > than MCPM when you start thinking/implementing CPUIdle otherwise I think
+> > you will end up duplicating some logic(last man and race management)
+> > both in Linux as well as your secure firmware.
+> 
+> As I mentioned our secure firmware is not what you're imagining.
+> 
+> MCPM works very well for us.  Are you saying we can't use MCPM and
+> must reimplement with PSCI on both sides?
 
-[...]
+I said it many times before: not everyone is willing to invest in the 
+complexity trap implied by the firmware model as proposed by ARM.  This 
+is a concrete example of that.  MCPM-like functionality is an order of 
+magnitude simpler to debug and maintain when implemented on the 
+easily-replaceable kernel side.
 
-> diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
-> index 283ab8d..ff1254f 100644
-> --- a/drivers/mfd/sun6i-prcm.c
-> +++ b/drivers/mfd/sun6i-prcm.c
-> @@ -41,6 +41,14 @@ static const struct resource sun6i_a31_apb0_gates_clk_res[] = {
->  	},
->  };
->  
-> +static const struct resource sun6i_a31_ir_clk_res[] = {
-> +	{
-> +		.start = 0x54,
-> +		.end = 0x57,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +};
 
-I'm not overly keen on these magic numbers (and yes, I'm well aware
-that I SoB'ed the patch which started them off).
-
-It's not a show stopper, although I'd prefer if they were fixed with a
-subsequent patch.
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Nicolas
