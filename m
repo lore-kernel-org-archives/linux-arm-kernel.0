@@ -1,22 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 25 Nov 2014 11:27:29 +0000
-Subject: [PATCH v8 1/4] irqchip: gic: Support hierarchy irq domain.
-In-Reply-To: <1416902662-19281-2-git-send-email-yingjoe.chen@mediatek.com>
-References: <1416902662-19281-1-git-send-email-yingjoe.chen@mediatek.com>
- <1416902662-19281-2-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <547467A1.8000900@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Nov 2014 11:29:05 +0000
+Subject: For the problem when using swiotlb
+In-Reply-To: <20141125105815.GB18858@e104818-lin.cambridge.arm.com>
+References: <5469E26B.2010905@huawei.com> <20141121175118.GA10451@localhost>
+ <20141121180925.GG19783@e104818-lin.cambridge.arm.com>
+ <2166613.l2i4mdmtLA@wuerfel>
+ <20141125105815.GB18858@e104818-lin.cambridge.arm.com>
+Message-ID: <20141125112905.GC3836@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/14 08:04, Yingjoe Chen wrote:
-> Add support to use gic as a parent for stacked irq domain.
-> 
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+On Tue, Nov 25, 2014 at 10:58:15AM +0000, Catalin Marinas wrote:
+> Since we don't have a coherent_dma_supported() function, we defer the
+> validity check of coherent_dma_mask to dma_alloc_coherent() (and here we
+> can remove bouncing since swiotlb has relatively small buffers).
 
-Looks good to me.
+Bouncing of coherent DMA buffers is insane; if you have to bounce them,
+they're by definition not coherent.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Think about one of the common uses of coherent DMA buffers: ring buffers,
+where both the CPU and the DMA agent write to the ring:
 
-	M.
+- CPU writes to ring, loading address and length, then writing to the
+  status word for the ring entry.
+- DMA reads the ring status word, sees it owns the entry, processes it,
+  DMA writes to the ring status word to give it back.
+
+What this means is that if you are bouncing the buffer, you are copying
+it whole-sale between the CPU visible version and the DMA visible
+version, which means that you can miss DMA updates to it.  So, bouncing
+a coherent DMA buffer is simply not an acceptable implementation for
+dma_alloc_coherent().
+
+As for validity of masks, it is defined in the DMA API documentation that
+if a DMA mask is suitable for the streaming APIs, then it is also suitable
+for the coherent APIs.  The reverse is left open, and so may not
+necessarily be true.
+
+In other words:
+
+	err = dma_set_mask(dev, mask);
+	if (err == 0)
+		assert(dma_set_coherent_mask(dev, mask) == 0);
+
+must always succeed, but reversing the two calls has no guarantee.
+
+Note that there seems to be only one driver which has different coherent
+and streaming DMA masks today:
+
+drivers/media/pci/sta2x11/sta2x11_vip.c:
+        if (dma_set_mask(&pdev->dev, DMA_BIT_MASK(26))) {
+        err = dma_set_coherent_mask(&vip->pdev->dev, DMA_BIT_MASK(29));
+
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
