@@ -1,65 +1,68 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 24 Nov 2014 16:17:15 -0800
-Subject: [PATCH V6 03/12] mailbox: Fix up error handling in
- mbox_request_channel()
+Date: Mon, 24 Nov 2014 16:17:16 -0800
+Subject: [PATCH V6 04/12] of: Add NVIDIA Tegra XUSB mailbox binding
 In-Reply-To: <1416874644-12070-1-git-send-email-abrestic@chromium.org>
 References: <1416874644-12070-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1416874644-12070-4-git-send-email-abrestic@chromium.org>
+Message-ID: <1416874644-12070-5-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benson Leung <bleung@chromium.org>
+Add device-tree bindings for the Tegra XUSB mailbox which will be used
+for communication between the Tegra xHCI controller's firmware and the
+host processor.
 
-mbox_request_channel() currently returns EBUSY in the event the controller
-is not present or if of_xlate() fails, but in neither case is EBUSY really
-appropriate.  Return EPROBE_DEFER if the controller is not yet present
-and change of_xlate() to return an ERR_PTR instead of NULL so that the
-error can be propagated back to the caller of mbox_request_channel().
-
-Signed-off-by: Benson Leung <bleung@chromium.org>
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Jassi Brar <jaswinder.singh@linaro.org>
 ---
-No changes from v5.
-New for v5.
+No changes from v3/v4/v5.
+Changes from v2:
+ - Dropped channel specifier.
+ - Added pointer to mailbox documentation.
+Changes from v1:
+ - Updated to use common mailbox bindings.
 ---
- drivers/mailbox/mailbox.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ .../bindings/mailbox/nvidia,tegra124-xusb-mbox.txt | 32 ++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
 
-diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-index afcb430..955c0a7 100644
---- a/drivers/mailbox/mailbox.c
-+++ b/drivers/mailbox/mailbox.c
-@@ -315,7 +315,7 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
- 		return ERR_PTR(-ENODEV);
- 	}
- 
--	chan = NULL;
-+	chan = ERR_PTR(-EPROBE_DEFER);
- 	list_for_each_entry(mbox, &mbox_cons, node)
- 		if (mbox->dev->of_node == spec.np) {
- 			chan = mbox->of_xlate(mbox, &spec);
-@@ -324,7 +324,12 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
- 
- 	of_node_put(spec.np);
- 
--	if (!chan || chan->cl || !try_module_get(mbox->dev->driver->owner)) {
-+	if (IS_ERR(chan)) {
-+		mutex_unlock(&con_mutex);
-+		return chan;
-+	}
+diff --git a/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt b/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
+new file mode 100644
+index 0000000..b35ea6e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
+@@ -0,0 +1,32 @@
++NVIDIA Tegra XUSB mailbox
++=========================
 +
-+	if (chan->cl || !try_module_get(mbox->dev->driver->owner)) {
- 		dev_dbg(dev, "%s: mailbox not free\n", __func__);
- 		mutex_unlock(&con_mutex);
- 		return ERR_PTR(-EBUSY);
-@@ -387,7 +392,7 @@ of_mbox_index_xlate(struct mbox_controller *mbox,
- 	int ind = sp->args[0];
- 
- 	if (ind >= mbox->num_chans)
--		return NULL;
-+		return ERR_PTR(-EINVAL);
- 
- 	return &mbox->chans[ind];
- }
++The Tegra XUSB mailbox is used by the Tegra xHCI controller's firmware to
++communicate requests to the host and PHY drivers.
++
++Refer to ./mailbox.txt for generic information about mailbox device-tree
++bindings.
++
++Required properties:
++--------------------
++ - compatible: Should be "nvidia,tegra124-xusb-mbox".
++ - reg: Address and length of the XUSB FPCI registers.
++ - interrupts: XUSB mailbox interrupt.
++ - #mbox-cells: Should be 0.  There is only one physical channel.
++
++Example:
++--------
++	xusb_mbox: mailbox at 0,70098000 {
++		compatible = "nvidia,tegra124-xusb-mbox";
++		reg = <0x0 0x70098000 0x0 0x1000>;
++		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++
++		#mbox-cells = <0>;
++	};
++
++	usb at 0,70090000 {
++		...
++		mboxes = <&xusb_mbox>;
++		mbox-names = "xusb";
++		...
++	};
 -- 
 2.1.0.rc2.206.gedb03e5
