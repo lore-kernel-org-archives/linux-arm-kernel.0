@@ -1,84 +1,126 @@
-From: amstan@chromium.org (Alexandru Stan)
-Date: Tue, 25 Nov 2014 13:11:43 -0800
-Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc for
- vqmmc
-In-Reply-To: <CAD=FV=U9Hh-OR2aGh6Q9YAwnP8AuAbQtogD=7wQxgg9XvoWTMw@mail.gmail.com>
-References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>
- <1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>
- <CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
- <CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>
- <5464152E.7040209@rock-chips.com>
- <CAPDyKFrzGfDew0eLLEcA+_iS_mo-O2bFU58fjirfXXA8AJ9UYQ@mail.gmail.com>
- <CAD=FV=Ve1TY4+8quq1=18A1YOFvOWuFGrBmHLwMCwdWBSqzxOw@mail.gmail.com>
- <CAD=FV=UJT5zBkcj2a03Y_RWxad9+Pu83G_z79Xzzn74V=eRqww@mail.gmail.com>
- <CAPDyKFqt4rrwi940KAPyPONpjixK1730QmHEsN27V97jyHH+Qw@mail.gmail.com>
- <5473EB8B.3000803@rock-chips.com>
- <CAD=FV=U9Hh-OR2aGh6Q9YAwnP8AuAbQtogD=7wQxgg9XvoWTMw@mail.gmail.com>
-Message-ID: <CAHNYxRwT8YeR-AUa-BVPraufLWZtEaeLdNjGBs77CfkMWVCNqg@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 25 Nov 2014 22:27:49 +0100
+Subject: (bisected) Lock up on sh73a0/kzm9g on cpuidle initialization
+In-Reply-To: <20141125180159.GI5050@linux.vnet.ibm.com>
+References: <CAMuHMdXaaa2t6+sH2egGacVxkAPeTUkAgwdYsOnMnEPnuLdB5Q@mail.gmail.com>
+ <545BE1DE.6060900@linaro.org>
+ <CAMuHMdXQr65g4He0D0ZRN923OJ2A7WNgwbiTru_1dGWnvbvCJA@mail.gmail.com>
+ <CAMuHMdUjYMC8i2F9n6fWdPBOQVSohKA3ZxJJyq8h808Z9tEypw@mail.gmail.com>
+ <20141125180159.GI5050@linux.vnet.ibm.com>
+Message-ID: <CAMuHMdUMpmdYe+ED=M8FVvMMWNmrs8o4WzQ-uc2nFHNdL99HNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From what I understand... High speed SD cards have 1.8V regulators
-inside them(sourced by vmmc (what we power the SD card with)). So in
-terms of the SD card IO pins they will either use exactly vmmc or
-1.8V. It doesn't make sense for vqmmc (the voltage we use to power the
-AP block connected to the SD cards) to be anything but exactly equal
-to vmmc or 1.8V. If vqmmc differs from vmmc(or 1.8V, depending on
-mode) by more than a little (~100-200mV), both up or down, you start
-getting leaks into the input protection diodes of the pins(either the
-AP or the SD card) which is a pretty BAD thing (you're essentially
-powering the sd card through the IO pins, or the SD card is powering
-the IO block on the AP).
+Hi Paul,
 
-Alexandru Stan (amstan)
+On Tue, Nov 25, 2014 at 7:01 PM, Paul E. McKenney
+<paulmck@linux.vnet.ibm.com> wrote:
+> On Tue, Nov 25, 2014 at 06:49:16PM +0100, Geert Uytterhoeven wrote:
+>> On Fri, Nov 7, 2014 at 8:59 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>> > On Thu, Nov 6, 2014 at 10:02 PM, Daniel Lezcano
+>> > <daniel.lezcano@linaro.org> wrote:
+>> >> On 11/06/2014 09:38 PM, Geert Uytterhoeven wrote:
+>> >>> When CONFIG_CPU_IDLE=y, the kernel locks up during cpuidle initialization
+>> >>> on Renesas sh73a0/kzm9g-reference, which has a dual-core Cortex-A9.
+>> >>>
+>> >>> Last message is:
+>> >>>
+>> >>>      DMA: preallocated 256 KiB pool for atomic coherent allocations
+>> >>>
+>> >>> After this it's supposed to print:
+>> >>>
+>> >>>      cpuidle: using governor ladder
+>> >>>      cpuidle: using governor menu
+>> >>>
+>> >>> I've bisected this to commit 442bf3aaf55a91ebfec71da46a4ee10a3c905bcc
+>> >>> ("sched: Let the scheduler see CPU idle states").
+>> >>>
+>> >>> Reverting that commit, and commit 83a0a96a5f26d974580fd7251043ff70c8f1823d
+>> >>> ("sched/fair: Leverage the idle state info when choosing the "idlest"
+>> >>> cpu") which
+>> >>> depends on it, fixes the problem.
+>> >>>
+>> >>> I saw the discussion "lockdep splat in CPU hotplug", so I enabled lockdep
+>> >>> debugging, but didn't see a lockdep splat.
+>> >>
+>> >> Did you try the fix attached ?
+>> >>
+>> >> https://lkml.org/lkml/2014/10/22/722
+>> >
+>> > Thanks, I didn't try that.
+>> >
+>> > However, this patch seems to be in v3.18-rc3, so I'm already using it.
+>> > Hence it doesn't fix the problem for me.
+>> >
+>> > On another board, with a dual Cortex-A15, the problem doesn't show up.
+>>
+>> This problem (regression introduced in v3.18-rc1) is still present in v3.18-rc6.
+>>
+>> I did some more investigations, and it's hanging in the call to
+>> synchronize_rcu() in cpuidle_uninstall_idle_handler(), which was added in
+>> commit 442bf3aaf55a91ebfec71da46a4ee10a3c905bcc.
+>> More specificailly, it's blocked on the wait_for_completion(&rcu.completion)
+>> in kernel/rcu/update.c:void wait_rcu_gp(call_rcu_func_t crf).
+>
+> You didn't disable RCU CPU stall warnings, did you?  If you did, please
+> re-enable them, as the stall warning messages will likely help to debug
+> this.  The soft-lockup checks can also be quite valuable.
+>
+> If you haven't run with CONFIG_PROVE_RCU=y, please try that.  For example,
+> if you have CONFIG_PREEMPT=y and you do synchronize_rcu() from within
+> an RCU read-side critical section (don't do that, it will hang!!!),
+> then you will get a lockdep splat.
+>
+> Does any sort of system activity (keyboard, network, etc.) unstick the
+> system?
 
-On Mon, Nov 24, 2014 at 9:36 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Addy,
->
-> On Mon, Nov 24, 2014 at 6:38 PM, Addy <addy.ke@rock-chips.com> wrote:
->>> In worst case scenario, VDD = 3.6V and VIO = 2.7V. That gives as the
->>> factor of 0.75, thus we are inside spec but without margins.
->>
->> * From eMMC4.5 spec:
->>   1. (VDDF)vcc: Supply voltage for flash memory,  which is  2.7v -- 3.3v
->>   2. (VDD)vccq: Supply voltage for memory controller, which is  1.7v --
->> 1.95v  and 2,7v -- 3.6v
->>
->> * And from RK3288 datasheet:
->>   Digtial GPIO Power(SDMMC0_VDD --> vccq) is 3.0v -- 3.6v and 1.62v - 1.98v
->>
->> So I think:
->> 3.3v:  (2.7v < vccq < 3.6v)   &&  (3.0v < vccq < 3.6v)  ==> (3.0v < vccq <
->> 3.6v)
->> 1.8v:  (1.7v < vccq < 1.95v)  && (1.62v < vccq < 1.98v) ==> (1.7v < vccq <
->> 1.95v)
->>
->> and (2.7v < vcc < 3.3v)
->>
->> * And according to our hardware engineer:
->>   All of supply voltage must have +/- 10% cushion.
->>
->> * And we have found in some worse card that there is 200mv voltage collapse
->> when these card is insert.
->>
->> So I think the best resolution is that vcc and vccq is configurable int dt
->> table.
->
-> Ah, interesting.  ...so what we really need to be able to do is to say
-> that the regulator we for vqmmc have supports the ranges 3.0V - 3.3V
-> and 1.7V - 1.95V but not anything in between 1.95V ad 3.0V.  I have no
-> idea how to express that in the regulator framework.
->
-> Technically you could take the IO Voltage Domains code (responsible
-> for choosing the 1.8V range or the 3.3V range) and have it communicate
-> the requirements to the regulator framework if you could figure out
-> how to communicate them.
->
->
-> ...of course if you implemented my suggestion of keeping vqmmc as the
-> highest voltage <= vmmc then maybe the whole point is moot and we
-> don't have to figure it out.  Just make sure that vmmc never goes
-> below 3.0V.
->
->
-> -Doug
+Thanks! Unfortunately none of the above helped.
+
+However, I found the culprit. It turned out to be a platform issue, not an
+issue in the generic cpu idle or RCU code. Read on below if you're
+interested in the gory details. Else just skip, and sleep well again tonight ;-)
+
+> If you have tried all those things without good effect, could you please
+> send along your .config and an alt-sysrq-t dump of all tasks' stacks?
+
+As I didn't manage to trigger a sysrq dump over the serial console,
+I just called __handle_sysrq() right before the wait_for_completion(), after
+a small delay. The dump didn't show anything suspicious. Everything
+looked the same as on the dual-core Cortex A15, where the problem
+doesn't manifest.
+
+Then I noticed the sched debug output on the A15, which was missing
+on the CA9 build. Enabling it on the A9 gave:
+
+Sched Debug Version: v0.11,
+3.18.0-rc6-kzm9g-reference-04913-gedc89a2a2059c7ff-dirty #101
+ktime                                   : 0.000000
+sched_clk                               : 0.000000
+cpu_clk                                 : 0.000000
+jiffies                                 : 4294928896
+
+Oops, time is not advancing?
+
+Dmesg also shows (early):
+
+    clocksource_of_init: no matching clocksources found
+
+and the timer is only initialized much later, after cpu idle initialization:
+
+    sh_cmt e6138000.timer: ch0: used for periodic clock events
+
+Hacking up a timer node for "arm,cortex-a9-twd-timer" in sh73a0.dtsi
+(with some "guessed" values) made it work.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
