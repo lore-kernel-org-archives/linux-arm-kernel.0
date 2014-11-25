@@ -1,114 +1,160 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 25 Nov 2014 11:38:05 +0800
-Subject: [PATCH v5 02/18] ACPI / table: Add new function to get table
- entries
-In-Reply-To: <1581499.U8906vqSiO@vostro.rjw.lan>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <2764417.DLFalXXngC@vostro.rjw.lan> <5473109A.2070704@linaro.org>
- <1581499.U8906vqSiO@vostro.rjw.lan>
-Message-ID: <5473F99D.6090505@huawei.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 25 Nov 2014 11:55:20 +0800
+Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <1416605010-10442-3-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <1416605010-10442-3-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+Message-ID: <5473FDA8.6080201@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/24 22:51, Rafael J. Wysocki wrote:
-> On Monday, November 24, 2014 07:03:54 PM Hanjun Guo wrote:
->> On 2014-11-24 9:27, Rafael J. Wysocki wrote:
->>> On Friday, October 17, 2014 09:36:58 PM Hanjun Guo wrote:
->>>> From: Ashwin Chaugule <ashwin.chaugule@linaro.org>
->>>>
->>>> The acpi_table_parse() function has a callback that
->>>> passes a pointer to a table_header. Add a new function
->>>> which takes this pointer and parses its entries. This
->>>> eliminates the need to re-traverse all the tables for
->>>> each call. e.g. as in acpi_table_parse_madt() which is
->>>> normally called after acpi_table_parse().
->>>>
->>>> Acked-by: Grant Likely <grant.likely@linaro.org>
->>>> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
->>>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>> ---
->>>>  drivers/acpi/tables.c |   67 ++++++++++++++++++++++++++++++++++---------------
->>>>  include/linux/acpi.h  |    4 +++
->>>>  2 files changed, 51 insertions(+), 20 deletions(-)
->>>>
->>>> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
->>>> index 6d5a6cd..21ae521 100644
->>>> --- a/drivers/acpi/tables.c
->>>> +++ b/drivers/acpi/tables.c
->>>> @@ -192,17 +192,14 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
->>>>  
->>>>  
->>>>  int __init
->>>> -acpi_table_parse_entries(char *id,
->>>> -			     unsigned long table_size,
->>>> -			     int entry_id,
->>>> -			     acpi_tbl_entry_handler handler,
->>>> -			     unsigned int max_entries)
->>>> +acpi_parse_entries(unsigned long table_size,
->>>> +		acpi_tbl_entry_handler handler,
->>>> +		struct acpi_table_header *table_header,
->>>> +		int entry_id, unsigned int max_entries)
->>>>  {
->>>> -	struct acpi_table_header *table_header = NULL;
->>>>  	struct acpi_subtable_header *entry;
->>>> -	unsigned int count = 0;
->>>> +	int count = 0;
->>>>  	unsigned long table_end;
->>>> -	acpi_size tbl_size;
->>>>  
->>>>  	if (acpi_disabled)
->>>>  		return -ENODEV;
->>>> @@ -210,13 +207,11 @@ acpi_table_parse_entries(char *id,
->>>>  	if (!handler)
->>>>  		return -EINVAL;
->>>>  
->>>> -	if (strncmp(id, ACPI_SIG_MADT, 4) == 0)
->>>> -		acpi_get_table_with_size(id, acpi_apic_instance, &table_header, &tbl_size);
->>>> -	else
->>>> -		acpi_get_table_with_size(id, 0, &table_header, &tbl_size);
->>>> +	if (!table_size)
->>>> +		return -EINVAL;
->>>>  
->>>>  	if (!table_header) {
->>>> -		pr_warn("%4.4s not present\n", id);
->>>> +		pr_warn("Table header not present\n");
->>> The message doesn't make sense any more if the table signature is not printed.
+Hi,
 
-For this message, since no table id is passed, and this message is printed in
-acpi_table_parse_entries() before this function is called, I think we can check
-the table_header before call this function and remove the printed message here.
+On 2014/11/22 5:23, Ganapatrao Kulkarni wrote:
+> DT bindings for numa map for memory, cores to node and
+> proximity distance matrix of nodes to each other.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
+> ---
+>  Documentation/devicetree/bindings/arm/numa.txt | 103 +++++++++++++++++++++++++
+>  1 file changed, 103 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/numa.txt b/Documentation/devicetree/bindings/arm/numa.txt
+> new file mode 100644
+> index 0000000..ec6bf2d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/numa.txt
+> @@ -0,0 +1,103 @@
+> +==============================================================================
+> +NUMA binding description.
+> +==============================================================================
+> +
+> +==============================================================================
+> +1 - Introduction
+> +==============================================================================
+> +
+> +Systems employing a Non Uniform Memory Access (NUMA) architecture contain
+> +collections of hardware resources including processors, memory, and I/O buses,
+> +that comprise what is commonly known as a ??UMA node?? Processor
+> +accesses to memory within the local NUMA node is
+> +generally faster than processor accesses to memory outside of the local
+> +NUMA node. DT defines interfaces that allow the platform to convey NUMA node
+> +topology information to OS.
+> +
+> +==============================================================================
+> +2 - numa-map node
+> +==============================================================================
+> +
+> +DT Binding for NUMA can be defined for memory and CPUs to map them to
+> +respective NUMA nodes.
+> +
+> +The DT binding can defined using numa-map node.
+> +The numa-map will have following properties to define NUMA topology.
+> +
+> +- mem-map:	This property defines the association between a range of
+> +		memory and the proximity domain/numa node to which it belongs.
+> +
+> +note: memory range address is passed using either memory node of
+> +DT or UEFI system table and should match to the address defined in mem-map.
+> +
+> +- cpu-map:	This property defines the association of range of processors
+> +		(range of cpu ids) and the proximity domain to which
+> +		the processor belongs.
+> +
+> +- node-matrix:	This table provides a matrix that describes the relative
+> +		distance (memory latency) between all System Localities.
+> +		The value of each Entry[i j distance] in node-matrix table,
+> +		where i represents a row of a matrix and j represents a
+> +		column of a matrix, indicates the relative distances
+> +		from Proximity Domain/Numa node i to every other
+> +		node j in the system (including itself).
+> +
+> +The numa-map node must contain the appropriate #address-cells,
+> +#size-cells and #node-count properties.
+> +
+> +
+> +==============================================================================
+> +4 - Example dts
+> +==============================================================================
+> +
+> +Example 1: 2 Node system each having 8 CPUs and a Memory.
+> +
+> +	numa-map {
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +		#node-count = <2>;
+> +		mem-map =  <0x0 0x00000000 0>,
+> +		           <0x100 0x00000000 1>;
+> +
+> +		cpu-map = <0 7 0>,
+> +			  <8 15 1>;
 
->>>
->>>>  		return -ENODEV;
->>>>  	}
->>>>  
->>>> @@ -232,30 +227,62 @@ acpi_table_parse_entries(char *id,
->>>>  		if (entry->type == entry_id
->>>>  		    && (!max_entries || count++ < max_entries))
->>>>  			if (handler(entry, table_end))
->>>> -				goto err;
->>>> +				return -EINVAL;
->>>>  
->>>>  		/*
->>>>  		 * If entry->length is 0, break from this loop to avoid
->>>>  		 * infinite loop.
->>>>  		 */
->>>>  		if (entry->length == 0) {
->>>> -			pr_err("[%4.4s:0x%02x] Invalid zero length\n", id, entry_id);
->>>> -			goto err;
->>>> +			pr_err("[0x%02x] Invalid zero length\n", entry_id);
+The cpu range is continuous here. But if there is a situation like below:
 
-For this one, since the table_header is valid now, we can keep it with:
+0 2 4 6 belong to node 0
+1 3 5 7 belong to node 1
 
-- pr_err("[%4.4s:0x%02x] Invalid zero length\n", id, entry_id);
-+ pr_err("[%4.4s:0x%02x] Invalid zero length\n", table_header->signature, entry_id);
+This case is very common on X86. I don't know the real situation of arm as
+I don't have a hardware with 2 nodes.
 
->>> Same here.
->> How about remove the message and return directly?
-> We could do that, but for what reason?  Is the message not useful?
+How can we generate a DTS about this situation? like below? Can be parsed?
 
-I agree with you, the message is useful I think, how about the comments above?
+		cpu-map = <0 2 4 6 0>,
+			  <1 3 5 7 1>;
 
-Thanks
-Hanjun
+Thanks,
+Shannon
+
+> +
+> +		node-matrix = <0 0 10>,
+> +			      <0 1 20>,
+> +			      <1 0 20>,
+> +			      <1 1 10>;
+> +	};
+> +
+> +Example 2: 4 Node system each having 4 CPUs and a Memory.
+> +
+> +	numa-map {
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +		#node-count = <2>;
+> +		mem-map =  <0x0 0x00000000 0>,
+> +		           <0x100 0x00000000 1>,
+> +		           <0x200 0x00000000 2>,
+> +		           <0x300 0x00000000 3>;
+> +
+> +		cpu-map = <0 7 0>,
+> +			  <8 15 1>,
+> +			  <16 23 2>,
+> +			  <24 31 3>;
+> +
+> +		node-matrix = <0 0 10>,
+> +			      <0 1 20>,
+> +			      <0 2 20>,
+> +			      <0 3 20>,
+> +			      <1 0 20>,
+> +			      <1 1 10>,
+> +			      <1 2 20>,
+> +			      <1 3 20>,
+> +			      <2 0 20>,
+> +			      <2 1 20>,
+> +			      <2 2 10>,
+> +			      <2 3 20>,
+> +			      <3 0 20>,
+> +			      <3 1 20>,
+> +			      <3 2 20>,
+> +			      <3 3 10>;
+> +	};
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+-- 
+Shannon
