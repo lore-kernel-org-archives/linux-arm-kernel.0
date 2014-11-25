@@ -1,60 +1,35 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 25 Nov 2014 20:35:25 +0900
-Subject: [RFC 2/2] clk: samsung: Fix clock disable failure because domain
- being gated
-In-Reply-To: <1416842312-4405-3-git-send-email-k.kozlowski@samsung.com>
-References: <1416842312-4405-1-git-send-email-k.kozlowski@samsung.com>
- <1416842312-4405-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CA+Ln22FTJ8AwNOq+jrA6dK=4ziGFwFT+Ofjr2zE4z=8B4f3QJw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Nov 2014 11:45:41 +0000
+Subject: [PATCH] ARM: Add unwinding support for memmove function
+In-Reply-To: <1416836757-30547-1-git-send-email-linyongting@gmail.com>
+References: <1416836757-30547-1-git-send-email-linyongting@gmail.com>
+Message-ID: <20141125114541.GE3836@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
-
-Please see my comments inline.
-
-2014-11-25 0:18 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> +static int audss_clk_gate_enable(struct clk_hw *hw)
-> +{
-> +       int ret;
+On Mon, Nov 24, 2014 at 09:45:56PM +0800, Lin Yongting wrote:
+> @@ -27,12 +28,17 @@
+>   */
+>  
+>  ENTRY(memmove)
+> +	UNWIND(	.fnstart			)
+>  
+>  		subs	ip, r0, r1
+>  		cmphi	r2, ip
+>  		bls	memcpy
+>  
+>  		stmfd	sp!, {r0, r4, lr}
+> +	UNWIND(	.fnend				)
 > +
-> +       if (!IS_ERR(pll_in))
-> +               clk_prepare_enable(pll_in);
+> +	UNWIND(	.fnstart			)
+> +	UNWIND(	.save	{r0, r4, lr}		) @ in first stmfd block
 
-Calling clk_prepare_enable() from enable() callback doesn't look like
-a good idea, because enabling is not supposed to sleep, while
-preparing might do so.
+This is pretty horrid, but I guess it's necessary due to how the unwinder
+works.  If no one has any objections, please drop it in the patch system
+and I'll queue it for the next merge window.
 
-I guess you have to pre-prepare this clock in probe and then only call
-enable here.
+Thanks.
 
-> +       ret = clk_gate_ops.enable(hw);
-> +       if (!IS_ERR(pll_in))
-> +               clk_disable_unprepare(pll_in);
-> +
-> +       return ret;
-> +}
-
-[snip]
-
-> +/* TODO: Also mux and div */
-> +const struct clk_ops audss_clk_gate_ops = {
-
-nit: static const probably?
-
-> +       .enable = audss_clk_gate_enable,
-> +       .disable = audss_clk_gate_disable,
-> +       .is_enabled = audss_clk_gate_is_enabled,
-> +};
-
-As for the approach itself, maybe you should simply register fully
-custom clocks with clk_register(), without altering
-clk_register_gate() at all and simply calling gate ops whenever
-necessary? I don't know, just a loose idea.
-
-By the way, this issue could be probably solved by integrating generic
-clocks with regmap API, since regmap-mmio can automatically control a
-clock.
-
-Best regards,
-Tomasz
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
