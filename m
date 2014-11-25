@@ -1,62 +1,68 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Tue, 25 Nov 2014 08:28:33 -0800
-Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <54749804.8070400@ti.com>
-References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
- <15074721.IbfeeI3ajE@wuerfel> <54746349.3000306@ti.com>
- <2301239.aDOlWg3gEs@wuerfel> <5474846C.2000308@ti.com>
- <20141125140440.GF3836@n2100.arm.linux.org.uk> <54749804.8070400@ti.com>
-Message-ID: <5474AE31.8080901@oracle.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 25 Nov 2014 08:32:46 -0800
+Subject: [PATCHv6 0/8] Better page protections for arm64
+In-Reply-To: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
+References: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <CAGXu5jKV-y19OSTzJDAnQw+hB4-+eHwLS=UOt2KTg9T_zhNURg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grygorii,
-
-On 11/25/2014 6:53 AM, Grygorii Strashko wrote:
-> Hi Russell,
+On Fri, Nov 21, 2014 at 1:50 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> Hi,
 >
-> On 11/25/2014 04:04 PM, Russell King - ARM Linux wrote:
->> On Tue, Nov 25, 2014 at 03:30:20PM +0200, Grygorii Strashko wrote:
->>> On 11/25/2014 02:09 PM, Arnd Bergmann wrote:
->>>> It might be possible to do this implicitly if the driver calls clk_get(),
->>>> basically doing clk_get() (or another call if necessary) would prevent the
->>>> simple pmdomain from turning it off during suspend.
->>>
->>> Unfortunately, clk_get() will not work, because drivers still need to use it
->>> to get functional clocks even if they are not going to control them explicitly.
->>> For example, if it need to know clock's rate.
->>
->> If you don't want a clock to be turned off, then clk_get() it, then
->> clk_prepare() it, and finally clk_enable() it.
->>
->> Even if someone else gets it, the only time that a clock is turned off
->> is when _all_ users of it mutually agree that it can be turned off - by
->> every user disabling (and possibly unpreparing) it.
->>
->> So, if the PM domain code gets a clock, prepares and enables it, then
->> a driver gets the same clock, prepares and enables it also, it won't
->> be disabled until _both_ the PM domain code _and_ the driver disable
->> and unprepare the clock.
->>
+> This is v6 of the series to add stricter page protections for arm64.
+> The goal is to have text be RO/NX and everything else be RW/NX.
+> The biggest change here is the addition of ioremap_exec for EFI
+> services. The series did its job and caught EFI services trying to
+> use regular RAM for code purposes.
 >
-> All 100% true :)
+> Laura Abbott (8):
+>   arm64: Treat handle_arch_irq as a function pointer
+>   arm64: Switch to adrp for loading the stub vectors
+>   arm64: Move cpu_resume into the text section
+>   arm64: Move some head.text functions to executable section
+>   arm64: Factor out fixmap initialiation from ioremap
+>   arm64: use fixmap for text patching when text is RO
+>   arm64: efi: Use ioremap_exec for code sections
+>   arm64: add better page protections to arm64
+
+Retesting this went fine. v6 continues to work well for my devices.
+
+Thanks!
+
+-Kees
+
 >
-> But the question here is how prevent pm_clk domain (clock_ops.c) from
-> getting the control on clock if this particular clock is optional from driver's
-> perspective. So, only driver should control it. As opposite, all other clocks
-> should be controlled by pm-domain (in case of GPD from .start/stop callbacks).
+>  arch/arm64/Kconfig.debug            |  23 ++
+>  arch/arm64/include/asm/cacheflush.h |   7 +
+>  arch/arm64/include/asm/fixmap.h     |   8 +-
+>  arch/arm64/include/asm/insn.h       |   2 +
+>  arch/arm64/include/asm/io.h         |   1 +
+>  arch/arm64/include/asm/irq.h        |   1 -
+>  arch/arm64/include/asm/pgtable.h    |   1 +
+>  arch/arm64/kernel/efi.c             |  12 +-
+>  arch/arm64/kernel/entry.S           |   6 +-
+>  arch/arm64/kernel/head.S            | 410 +++++++++++++++++++-----------------
+>  arch/arm64/kernel/insn.c            |  72 ++++++-
+>  arch/arm64/kernel/irq.c             |   2 +
+>  arch/arm64/kernel/jump_label.c      |   2 +-
+>  arch/arm64/kernel/setup.c           |   1 +
+>  arch/arm64/kernel/sleep.S           |  36 +---
+>  arch/arm64/kernel/suspend.c         |   4 +-
+>  arch/arm64/kernel/vmlinux.lds.S     |  18 +-
+>  arch/arm64/mm/init.c                |   1 +
+>  arch/arm64/mm/ioremap.c             |  99 ++-------
+>  arch/arm64/mm/mm.h                  |   2 +
+>  arch/arm64/mm/mmu.c                 | 405 +++++++++++++++++++++++++++++++----
+>  21 files changed, 740 insertions(+), 373 deletions(-)
 >
-I know there has been lot of back and forth, we have done on getting
-multiple clock handling and from the thread looks like we are converging
-with simple power domain approach. Since we have already made several
-different attempt to solve the problem and some how stumbled, I suggest
-you to do a new RFC with new $subject so that we can get rest of the
-folks eyes on it.
+> --
+> Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+>
 
-The reason I say that because may be just because of $subject, some
-folks might ignore the thread ;-) and later raise objections.
 
-Thanks for persisting with it.
 
-Regards,
-Santosh
+-- 
+Kees Cook
+Chrome OS Security
