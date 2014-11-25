@@ -1,140 +1,173 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 25 Nov 2014 22:09:48 +0300
-Subject: [PATCH v2 4/8] ARM: sa1100: shift IRQs by one
-In-Reply-To: <1416942592-23059-1-git-send-email-dbaryshkov@gmail.com>
-References: <1416942592-23059-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1416942592-23059-5-git-send-email-dbaryshkov@gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Tue, 25 Nov 2014 12:11:37 -0700
+Subject: [PATCH v10 00/10] cpuidle driver for QCOM SoCs: 8064, 8074, 8084
+In-Reply-To: <1416593037-27527-1-git-send-email-lina.iyer@linaro.org>
+References: <1416593037-27527-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20141125191137.GA594@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As IRQ0 should not be used (especially in when using irq domains), shift all
-virtual IRQ numbers by one.
+Any comments?
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-sa1100/include/mach/irqs.h | 102 +++++++++++++++----------------
- 1 file changed, 51 insertions(+), 51 deletions(-)
-
-diff --git a/arch/arm/mach-sa1100/include/mach/irqs.h b/arch/arm/mach-sa1100/include/mach/irqs.h
-index 3790298..de09834 100644
---- a/arch/arm/mach-sa1100/include/mach/irqs.h
-+++ b/arch/arm/mach-sa1100/include/mach/irqs.h
-@@ -8,56 +8,56 @@
-  * 2001/11/14	RMK	Cleaned up and standardised a lot of the IRQs.
-  */
- 
--#define	IRQ_GPIO0		0
--#define	IRQ_GPIO1		1
--#define	IRQ_GPIO2		2
--#define	IRQ_GPIO3		3
--#define	IRQ_GPIO4		4
--#define	IRQ_GPIO5		5
--#define	IRQ_GPIO6		6
--#define	IRQ_GPIO7		7
--#define	IRQ_GPIO8		8
--#define	IRQ_GPIO9		9
--#define	IRQ_GPIO10		10
--#define	IRQ_GPIO11_27		11
--#define	IRQ_LCD  		12	/* LCD controller           */
--#define	IRQ_Ser0UDC		13	/* Ser. port 0 UDC          */
--#define	IRQ_Ser1SDLC		14	/* Ser. port 1 SDLC         */
--#define	IRQ_Ser1UART		15	/* Ser. port 1 UART         */
--#define	IRQ_Ser2ICP		16	/* Ser. port 2 ICP          */
--#define	IRQ_Ser3UART		17	/* Ser. port 3 UART         */
--#define	IRQ_Ser4MCP		18	/* Ser. port 4 MCP          */
--#define	IRQ_Ser4SSP		19	/* Ser. port 4 SSP          */
--#define	IRQ_DMA0 		20	/* DMA controller channel 0 */
--#define	IRQ_DMA1 		21	/* DMA controller channel 1 */
--#define	IRQ_DMA2 		22	/* DMA controller channel 2 */
--#define	IRQ_DMA3 		23	/* DMA controller channel 3 */
--#define	IRQ_DMA4 		24	/* DMA controller channel 4 */
--#define	IRQ_DMA5 		25	/* DMA controller channel 5 */
--#define	IRQ_OST0 		26	/* OS Timer match 0         */
--#define	IRQ_OST1 		27	/* OS Timer match 1         */
--#define	IRQ_OST2 		28	/* OS Timer match 2         */
--#define	IRQ_OST3 		29	/* OS Timer match 3         */
--#define	IRQ_RTC1Hz		30	/* RTC 1 Hz clock           */
--#define	IRQ_RTCAlrm		31	/* RTC Alarm                */
-+#define	IRQ_GPIO0		1
-+#define	IRQ_GPIO1		2
-+#define	IRQ_GPIO2		3
-+#define	IRQ_GPIO3		4
-+#define	IRQ_GPIO4		5
-+#define	IRQ_GPIO5		6
-+#define	IRQ_GPIO6		7
-+#define	IRQ_GPIO7		8
-+#define	IRQ_GPIO8		9
-+#define	IRQ_GPIO9		10
-+#define	IRQ_GPIO10		11
-+#define	IRQ_GPIO11_27		12
-+#define	IRQ_LCD			13	/* LCD controller           */
-+#define	IRQ_Ser0UDC		14	/* Ser. port 0 UDC          */
-+#define	IRQ_Ser1SDLC		15	/* Ser. port 1 SDLC         */
-+#define	IRQ_Ser1UART		16	/* Ser. port 1 UART         */
-+#define	IRQ_Ser2ICP		17	/* Ser. port 2 ICP          */
-+#define	IRQ_Ser3UART		18	/* Ser. port 3 UART         */
-+#define	IRQ_Ser4MCP		19	/* Ser. port 4 MCP          */
-+#define	IRQ_Ser4SSP		20	/* Ser. port 4 SSP          */
-+#define	IRQ_DMA0		21	/* DMA controller channel 0 */
-+#define	IRQ_DMA1		22	/* DMA controller channel 1 */
-+#define	IRQ_DMA2		23	/* DMA controller channel 2 */
-+#define	IRQ_DMA3		24	/* DMA controller channel 3 */
-+#define	IRQ_DMA4		25	/* DMA controller channel 4 */
-+#define	IRQ_DMA5		26	/* DMA controller channel 5 */
-+#define	IRQ_OST0		27	/* OS Timer match 0         */
-+#define	IRQ_OST1		28	/* OS Timer match 1         */
-+#define	IRQ_OST2		29	/* OS Timer match 2         */
-+#define	IRQ_OST3		30	/* OS Timer match 3         */
-+#define	IRQ_RTC1Hz		31	/* RTC 1 Hz clock           */
-+#define	IRQ_RTCAlrm		32	/* RTC Alarm                */
- 
--#define	IRQ_GPIO11		32
--#define	IRQ_GPIO12		33
--#define	IRQ_GPIO13		34
--#define	IRQ_GPIO14		35
--#define	IRQ_GPIO15		36
--#define	IRQ_GPIO16		37
--#define	IRQ_GPIO17		38
--#define	IRQ_GPIO18		39
--#define	IRQ_GPIO19		40
--#define	IRQ_GPIO20		41
--#define	IRQ_GPIO21		42
--#define	IRQ_GPIO22		43
--#define	IRQ_GPIO23		44
--#define	IRQ_GPIO24		45
--#define	IRQ_GPIO25		46
--#define	IRQ_GPIO26		47
--#define	IRQ_GPIO27		48
-+#define	IRQ_GPIO11		33
-+#define	IRQ_GPIO12		34
-+#define	IRQ_GPIO13		35
-+#define	IRQ_GPIO14		36
-+#define	IRQ_GPIO15		37
-+#define	IRQ_GPIO16		38
-+#define	IRQ_GPIO17		39
-+#define	IRQ_GPIO18		40
-+#define	IRQ_GPIO19		41
-+#define	IRQ_GPIO20		42
-+#define	IRQ_GPIO21		43
-+#define	IRQ_GPIO22		44
-+#define	IRQ_GPIO23		45
-+#define	IRQ_GPIO24		46
-+#define	IRQ_GPIO25		47
-+#define	IRQ_GPIO26		48
-+#define	IRQ_GPIO27		49
- 
- /*
-  * The next 16 interrupts are for board specific purposes.  Since
-@@ -65,8 +65,8 @@
-  * these.  If you need more, increase IRQ_BOARD_END, but keep it
-  * within sensible limits.  IRQs 49 to 64 are available.
-  */
--#define IRQ_BOARD_START		49
--#define IRQ_BOARD_END		65
-+#define IRQ_BOARD_START		50
-+#define IRQ_BOARD_END		66
- 
- /*
-  * Figure out the MAX IRQ number.
--- 
-2.1.3
+On Fri, Nov 21 2014 at 11:04 -0700, Lina Iyer wrote:
+>Changes since v9:
+>[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg11714.html ]
+>- Address review comments on v9
+>Dependent patchsets -
+>        https://lkml.org/lkml/2014/8/4/767
+>        http://www.spinics.net/lists/linux-arm-msm/msg10799.html
+>        http://www.spinics.net/lists/linux-arm-msm/msg10795.html
+>
+>Changes since v8:
+>[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg11473.html ]
+>- Flatten out the file structure - merge pm.c into spm.c after discussions
+>- Add a new function to set warm boot address, in scm-boot.c
+>- Support for 8064 (New)
+>- Tested on 8074, 8084. 8064 was tested with a WIP tree
+>- Address review comments from v8
+>- Looking into possiblility of  initializing the cpuidle device for a cpu,
+>only when the corresponding spm device is probed successfully.
+>
+>Changes since v7:
+>[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg11199.html ]
+>- Address review comments
+>- Tested on 8974 but not 8084
+>- WFI renamed to Standby
+>- Update commit text with original author and link to the downstream tree
+>
+>Changes since v6:
+>[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg11012.html ]
+>- SPM device nodes merged with existing SAW DT nodes
+>- SPM register information is handled within the driver
+>- Clean up from using 'msm' to 'qcom'
+>        - Shorten some enumerations as well
+>- Review comments from v6 addressed
+>- New: Support for 8084 SoC
+>        - Not tested. I do not have a board with this SoC, but the SPM
+>        configuration should be identical for WFI and SPC
+>
+>Changes since v5:
+>[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10559.html ]
+>- Merge spm-devices.c and spm.c into one file and one patch
+>        - Simplify implementation of the driver.
+>        - Update documentation mapping the DT properties with corresponding
+>          SPM register information.
+>- Removed scm-boot changes for quad core warmboot, its has been pulled in.
+>
+>Changes since v4:
+>[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10327.html ]
+>- Update to the v8 of ARM generic idle states patches
+>- Use platform device model for cpuidle-qcom
+>- Clean up msm-pm.c to remove unnecessary include files and functions
+>- Update commit text and documentation for all idle states
+>- Remove scm-boot relocate patch from this series, submitted earlier
+>[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10518.html ]
+>
+>Changes since v3:
+>[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10288.html ]
+>- Fix CONFIG_QCOM_PM Kconfig as bool
+>- More clean ups in spm.c and spm-devices.c
+>        - Removed and re-organized data structures to make initialization simple
+>        - Remove export of sequence flush functions
+>        - Updated commit text
+>        - Comments for use of barriers.
+>- Rebase on top of 3.17-rc1
+>
+>Changes since v2:
+>[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10148.html ]
+>- Prune all the drivers to support basic WFI and power down cpuidle
+>  functionality. Remove debug code.
+>- Integrate KConfig changes into the drivers' patches.
+>- Use Lorenzo's ARM idle-states patches as the basis for reading cpuidle
+>  c-states from DT.
+>  [ http://marc.info/?l=linux-pm&m=140794514812383&w=2 ]
+>- Incorporate review comments
+>- Rebase on top of 3.16
+>
+>Changes since v1/RFC:
+>[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10065.html ]
+>- Remove hotplug from the patch series. Will submit it separately.
+>- Fix SPM drivers per the review comments
+>- Modify patch sequence to compile SPM drivers independent of msm-pm, so as to
+>  allow wfi() calls to use SPM even without SoC interface driver.
+>
+>8074/8084/8064 like any ARM SoC can do architectural clock gating, that helps save
+>on power, but not enough of leakage power.  Leakage power of the SoC can be
+>further reduced by turning off power to the core. To aid this, every core (cpu
+>and L2) is accompanied by a Sub-system Power Manager (SPM), that can be
+>configured to indicate the low power mode, the core would be put into and the
+>SPM programs the peripheral h/w accordingly to enter low power and turn off the
+>power rail to the core.
+>
+>The idle invocation hierarchy -
+>
+>CPUIDLE
+>        |
+>        cpuidle-qcom.c [CPUIdle driver]
+>        |
+>        ------> spm.c [SPM driver]
+>                |
+>                ------> scm-boot.c [SCM interface layer]
+>                        |
+>------------------------|--------------------------
+>(EL)                    Secure Monitor Code
+>                        |
+>                        |
+>                        wfi();
+>------------------------|--------------------------
+>(HW)                    [CPU] {clock gate}
+>                        |
+>                        -----> [SPM] {statemachine}
+>
+>
+>The patchset does the following -
+>
+>- Introduce the SPM driver to control power to the core
+>- Add device bindings for 8974, 8084, 8064 CPU SPM devices
+>- Add cpuidle driver for QCOM cpus, using ARM generic idle state definitions.
+>- Add device bindings for 8974, 8084, 8064 idle-states - WFI and SPC
+>
+>Thanks,
+>Lina
+>
+>Lina Iyer (10):
+>  qom: scm: Move scm-boot files to drivers/soc/qcom/ and
+>    include/soc/qcom
+>  qcom: scm: Add SCM warmboot support for quad core SoCs
+>  qcom: spm: Add Subsystem Power Manager driver
+>  arm: dts: qcom: Add power-controller device node for 8074 Krait CPUs
+>  arm: dts: qcom: Add power-controller device node for 8084 Krait CPUs
+>  arm: dts: qcom: Update power-controller device node for 8064 Krait
+>    CPUs
+>  qcom: cpuidle: Add cpuidle driver for QCOM cpus
+>  arm: dts: qcom: Add idle states device nodes for 8074
+>  arm: dts: qcom: Add idle states device nodes for 8084
+>  arm: dts: qcom: Add idle state device nodes for 8064
+>
+> .../bindings/arm/msm/qcom,idle-state.txt           |  81 +++++
+> .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  31 +-
+> arch/arm/boot/dts/qcom-apq8064.dtsi                |  37 ++-
+> arch/arm/boot/dts/qcom-apq8084.dtsi                |  46 ++-
+> arch/arm/boot/dts/qcom-msm8974.dtsi                |  46 ++-
+> arch/arm/mach-qcom/Makefile                        |   1 -
+> arch/arm/mach-qcom/platsmp.c                       |   2 +-
+> drivers/cpuidle/Kconfig.arm                        |   7 +
+> drivers/cpuidle/Makefile                           |   1 +
+> drivers/cpuidle/cpuidle-qcom.c                     |  72 +++++
+> drivers/soc/qcom/Kconfig                           |   8 +
+> drivers/soc/qcom/Makefile                          |   3 +-
+> .../arm/mach-qcom => drivers/soc/qcom}/scm-boot.c  |  33 +-
+> drivers/soc/qcom/spm.c                             | 332 +++++++++++++++++++++
+> include/soc/qcom/pm.h                              |  31 ++
+> .../arm/mach-qcom => include/soc/qcom}/scm-boot.h  |   3 +-
+> 16 files changed, 712 insertions(+), 22 deletions(-)
+> create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+> create mode 100644 drivers/cpuidle/cpuidle-qcom.c
+> rename {arch/arm/mach-qcom => drivers/soc/qcom}/scm-boot.c (63%)
+> create mode 100644 drivers/soc/qcom/spm.c
+> create mode 100644 include/soc/qcom/pm.h
+> rename {arch/arm/mach-qcom => include/soc/qcom}/scm-boot.h (91%)
+>
+>-- 
+>2.1.0
+>
