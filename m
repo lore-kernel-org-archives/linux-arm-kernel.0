@@ -1,255 +1,59 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 25 Nov 2014 16:21:00 +0100
-Subject: [PATCH v2] ARM: multi_v7_defconfig: Enable shmobile platforms
-Message-ID: <1416928860-28999-1-git-send-email-geert@linux-m68k.org>
+From: ijc@debian.org (Ian Campbell)
+Date: Tue, 25 Nov 2014 15:24:31 +0000
+Subject: [PATCH] of: support passing console options with stdout-path
+In-Reply-To: <CACxGe6v2i3iJGjK9s6HSBxV6bUwVrAtGYj=FAOb0AFEx3KVYEg@mail.gmail.com>
+References: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
+ <20141125145854.A46EDC44343@trevor.secretlab.ca>
+ <20141125151515.GG2361@bivouac.eciton.net>
+ <CACxGe6v2i3iJGjK9s6HSBxV6bUwVrAtGYj=FAOb0AFEx3KVYEg@mail.gmail.com>
+Message-ID: <1416929071.16769.1.camel@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Tue, 2014-11-25 at 15:20 +0000, Grant Likely wrote:
+> On Tue, Nov 25, 2014 at 3:15 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> > On Tue, Nov 25, 2014 at 02:58:54PM +0000, Grant Likely wrote:
+> >> > +           len = strchrnul(path, ':') - path;
+> >> > +
+> >> >             for_each_property_of_node(of_aliases, pp) {
+> >> >                     if (strlen(pp->name) == len && !strncmp(pp->name, path, len)) {
+> >> >                             np = of_find_node_by_path(pp->value);
+> >>
+> >> Can you add a testcase to drivers/of/unittests.c for this new path
+> >> parsing? Then we know it's correct!
+> >
+> > Will do.
+> >
+> >> > @@ -1830,8 +1835,12 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
+> >> >                     name = of_get_property(of_chosen, "linux,stdout-path", NULL);
+> >> >             if (IS_ENABLED(CONFIG_PPC) && !name)
+> >> >                     name = of_get_property(of_aliases, "stdout", NULL);
+> >> > -           if (name)
+> >> > +           if (name) {
+> >> >                     of_stdout = of_find_node_by_path(name);
+> >> > +                   of_stdout_options = strchr(name, ':');
+> >> > +                   if (of_stdout_options != NULL)
+> >> > +                           of_stdout_options++;
+> >> > +           }
+> >>
+> >> Not so good. The ':' should actually be a generic part of
+> >> of_find_node_by_path(), it doesn't have to be limited to stdout parsing.
+> >> There are other places that would use it. I would add a second,
+> >> optional, argument to of_find_node_by_path() that will update a pointer
+> >> to the arguments after the ':'.
+> >
+> > So, I agree this would be nicer...
+> >
+> > However, I'm counting 157 callers of this function outside of
+> > drivers/of and 43 inside. Any chance you'd let me get away with a
+> > separate of_find_extra_options_by_path()?
+> 
+> I'd rather not. It is a trivial change and can be pretty much done
+> mechanically. Something like (I think; I always have to look up the
+> sed syntax):
+> 
+> sed s/of_find_node_by_path\((.*)\)/of_find_node_by_path\(\1, NULL\)
 
-Tested on r8a7791/koelsch, r8a7740/armadillo (kexec, fails with hermit
-boot loader), and am335x/boneblack.
+Coccinelle rules for this sort of transformation...
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-  - Rebased onto next-20141125,
-  - Added r8a7740/armadillo, as this does work,
-  - Synced with recent shmobile_defconfig updates (e.g. r8a7794 support).
-
- arch/arm/configs/multi_v7_defconfig | 63 +++++++++++++++++++++++++++++++++++--
- 1 file changed, 61 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index a72780a2afd262f7..fd04176ae0e453da 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -59,6 +59,16 @@ CONFIG_MACH_SPEAR1310=y
- CONFIG_MACH_SPEAR1340=y
- CONFIG_ARCH_STI=y
- CONFIG_ARCH_EXYNOS=y
-+CONFIG_ARCH_SHMOBILE_MULTI=y
-+CONFIG_ARCH_EMEV2=y
-+CONFIG_ARCH_R7S72100=y
-+CONFIG_ARCH_R8A7740=y
-+CONFIG_ARCH_R8A7779=y
-+CONFIG_ARCH_R8A7790=y
-+CONFIG_ARCH_R8A7791=y
-+CONFIG_ARCH_R8A7794=y
-+CONFIG_MACH_LAGER=y
-+CONFIG_MACH_MARZEN=y
- CONFIG_ARCH_SUNXI=y
- CONFIG_ARCH_SIRF=y
- CONFIG_ARCH_TEGRA=y
-@@ -80,6 +90,8 @@ CONFIG_PCI=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_MVEBU=y
- CONFIG_PCI_TEGRA=y
-+CONFIG_PCI_RCAR_GEN2=y
-+CONFIG_PCI_RCAR_GEN2_PCIE=y
- CONFIG_PCIEPORTBUS=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=8
-@@ -152,6 +164,7 @@ CONFIG_AHCI_SUNXI=y
- CONFIG_AHCI_TEGRA=y
- CONFIG_SATA_HIGHBANK=y
- CONFIG_SATA_MV=y
-+CONFIG_SATA_RCAR=y
- CONFIG_NETDEVICES=y
- CONFIG_SUN4I_EMAC=y
- CONFIG_MACB=y
-@@ -161,12 +174,14 @@ CONFIG_MV643XX_ETH=y
- CONFIG_MVNETA=y
- CONFIG_KS8851=y
- CONFIG_R8169=y
-+CONFIG_SH_ETH=y
- CONFIG_SMSC911X=y
- CONFIG_STMMAC_ETH=y
- CONFIG_TI_CPSW=y
- CONFIG_XILINX_EMACLITE=y
- CONFIG_AT803X_PHY=y
- CONFIG_MARVELL_PHY=y
-+CONFIG_SMSC_PHY=y
- CONFIG_BROADCOM_PHY=y
- CONFIG_ICPLUS_PHY=y
- CONFIG_USB_PEGASUS=y
-@@ -186,13 +201,16 @@ CONFIG_KEYBOARD_CROS_EC=y
- CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ATMEL_MXT=y
-+CONFIG_TOUCHSCREEN_ST1232=y
- CONFIG_TOUCHSCREEN_STMPE=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MPU3050=y
- CONFIG_SERIO_AMBAKMI=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_EXTENDED=y
- CONFIG_SERIAL_8250_DW=y
-+CONFIG_SERIAL_8250_EM=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- CONFIG_SERIAL_MESON=y
-@@ -204,6 +222,9 @@ CONFIG_SERIAL_SIRFSOC_CONSOLE=y
- CONFIG_SERIAL_TEGRA=y
- CONFIG_SERIAL_IMX=y
- CONFIG_SERIAL_IMX_CONSOLE=y
-+CONFIG_SERIAL_SH_SCI=y
-+CONFIG_SERIAL_SH_SCI_NR_UARTS=20
-+CONFIG_SERIAL_SH_SCI_CONSOLE=y
- CONFIG_SERIAL_MSM=y
- CONFIG_SERIAL_MSM_CONSOLE=y
- CONFIG_SERIAL_VT8500=y
-@@ -223,18 +244,25 @@ CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_MUX_PINCTRL=y
- CONFIG_I2C_CADENCE=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_I2C_GPIO=y
- CONFIG_I2C_EXYNOS5=y
- CONFIG_I2C_MV64XXX=y
-+CONFIG_I2C_RIIC=y
- CONFIG_I2C_S3C2410=y
-+CONFIG_I2C_SH_MOBILE=y
- CONFIG_I2C_SIRF=y
- CONFIG_I2C_TEGRA=y
- CONFIG_I2C_ST=y
--CONFIG_SPI=y
- CONFIG_I2C_XILINX=y
-+CONFIG_I2C_RCAR=y
-+CONFIG_SPI=y
- CONFIG_SPI_CADENCE=y
- CONFIG_SPI_OMAP24XX=y
- CONFIG_SPI_ORION=y
- CONFIG_SPI_PL022=y
-+CONFIG_SPI_RSPI=y
-+CONFIG_SPI_SH_MSIOF=y
-+CONFIG_SPI_SH_HSPI=y
- CONFIG_SPI_SIRF=y
- CONFIG_SPI_SUN4I=y
- CONFIG_SPI_SUN6I=y
-@@ -249,6 +277,8 @@ CONFIG_PINCTRL_APQ8084=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_GENERIC_PLATFORM=y
- CONFIG_GPIO_DWAPB=y
-+CONFIG_GPIO_EM=y
-+CONFIG_GPIO_RCAR=y
- CONFIG_GPIO_XILINX=y
- CONFIG_GPIO_ZYNQ=y
- CONFIG_GPIO_PCA953X=y
-@@ -265,6 +295,8 @@ CONFIG_POWER_RESET_SUN6I=y
- CONFIG_SENSORS_LM90=y
- CONFIG_SENSORS_LM95245=y
- CONFIG_THERMAL=y
-+CONFIG_CPU_THERMAL=y
-+CONFIG_RCAR_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
- CONFIG_ST_THERMAL_SYSCFG=y
- CONFIG_ST_THERMAL_MEMMAP=y
-@@ -288,6 +320,7 @@ CONFIG_MFD_TPS65910=y
- CONFIG_REGULATOR_AB8500=y
- CONFIG_REGULATOR_AS3722=y
- CONFIG_REGULATOR_BCM590XX=y
-+CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MAX8907=y
- CONFIG_REGULATOR_PALMAS=y
-@@ -302,10 +335,21 @@ CONFIG_REGULATOR_TWL4030=y
- CONFIG_REGULATOR_VEXPRESS=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
-+CONFIG_MEDIA_CONTROLLER=y
-+CONFIG_VIDEO_V4L2_SUBDEV_API=y
- CONFIG_MEDIA_USB_SUPPORT=y
- CONFIG_USB_VIDEO_CLASS=y
- CONFIG_USB_GSPCA=y
-+CONFIG_V4L_PLATFORM_DRIVERS=y
-+CONFIG_SOC_CAMERA=y
-+CONFIG_SOC_CAMERA_PLATFORM=y
-+CONFIG_VIDEO_RCAR_VIN=y
-+CONFIG_V4L_MEM2MEM_DRIVERS=y
-+CONFIG_VIDEO_RENESAS_VSP1=y
-+# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
-+CONFIG_VIDEO_ADV7180=y
- CONFIG_DRM=y
-+CONFIG_DRM_RCAR_DU=y
- CONFIG_DRM_TEGRA=y
- CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_FB_ARMCLCD=y
-@@ -321,6 +365,8 @@ CONFIG_SND=y
- CONFIG_SND_DYNAMIC_MINORS=y
- CONFIG_SND_USB_AUDIO=y
- CONFIG_SND_SOC=y
-+CONFIG_SND_SOC_SH4_FSI=y
-+CONFIG_SND_SOC_RCAR=y
- CONFIG_SND_SOC_TEGRA=y
- CONFIG_SND_SOC_TEGRA_RT5640=y
- CONFIG_SND_SOC_TEGRA_WM8753=y
-@@ -328,6 +374,8 @@ CONFIG_SND_SOC_TEGRA_WM8903=y
- CONFIG_SND_SOC_TEGRA_TRIMSLICE=y
- CONFIG_SND_SOC_TEGRA_ALC5632=y
- CONFIG_SND_SOC_TEGRA_MAX98090=y
-+CONFIG_SND_SOC_AK4642=y
-+CONFIG_SND_SOC_WM8978=y
- CONFIG_USB=y
- CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_XHCI_MVEBU=y
-@@ -339,6 +387,7 @@ CONFIG_USB_ISP1760_HCD=y
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_OHCI_HCD_STI=y
- CONFIG_USB_OHCI_HCD_PLATFORM=y
-+CONFIG_USB_RENESAS_USBHS=y
- CONFIG_USB_STORAGE=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_HOST=y
-@@ -349,6 +398,10 @@ CONFIG_SAMSUNG_USB3PHY=y
- CONFIG_USB_GPIO_VBUS=y
- CONFIG_USB_ISP1301=y
- CONFIG_USB_MXS_PHY=y
-+CONFIG_USB_RCAR_PHY=y
-+CONFIG_USB_RCAR_GEN2_PHY=y
-+CONFIG_USB_GADGET=y
-+CONFIG_USB_RENESAS_USBHS_UDC=y
- CONFIG_MMC=y
- CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_MMC_ARMMMCI=y
-@@ -367,10 +420,12 @@ CONFIG_MMC_SDHCI_ST=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
- CONFIG_MMC_MVSDIO=y
--CONFIG_MMC_SUNXI=y
-+CONFIG_MMC_SDHI=y
- CONFIG_MMC_DW=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_ROCKCHIP=y
-+CONFIG_MMC_SH_MMCIF=y
-+CONFIG_MMC_SUNXI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
-@@ -397,6 +452,7 @@ CONFIG_RTC_DRV_PALMAS=y
- CONFIG_RTC_DRV_TWL4030=y
- CONFIG_RTC_DRV_TPS6586X=y
- CONFIG_RTC_DRV_TPS65910=y
-+CONFIG_RTC_DRV_S35390A=y
- CONFIG_RTC_DRV_EM3027=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_VT8500=y
-@@ -408,6 +464,8 @@ CONFIG_DMADEVICES=y
- CONFIG_DW_DMAC=y
- CONFIG_MV_XOR=y
- CONFIG_TEGRA20_APB_DMA=y
-+CONFIG_SH_DMAE=y
-+CONFIG_RCAR_AUDMAC_PP=y
- CONFIG_STE_DMA40=y
- CONFIG_SIRF_DMA=y
- CONFIG_TI_EDMA=y
-@@ -438,6 +496,7 @@ CONFIG_IIO=y
- CONFIG_XILINX_XADC=y
- CONFIG_AK8975=y
- CONFIG_PWM=y
-+CONFIG_PWM_RENESAS_TPU=y
- CONFIG_PWM_TEGRA=y
- CONFIG_PWM_VT8500=y
- CONFIG_OMAP_USB2=y
--- 
-1.9.1
+Ian.
