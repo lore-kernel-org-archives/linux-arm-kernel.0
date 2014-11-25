@@ -1,56 +1,100 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 25 Nov 2014 14:37:29 +0000
-Subject: [PATCH 2/9] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <1416486872-25301-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1416486872-25301-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <54749429.9080505@arm.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 25 Nov 2014 14:40:07 +0000
+Subject: [PATCH v5 1/2] of: Rename "poweroff-source" property to
+ "system-power-controller"
+In-Reply-To: <1416918506-9366-2-git-send-email-romain.perier@gmail.com>
+References: <1416918506-9366-1-git-send-email-romain.perier@gmail.com>
+ <1416918506-9366-2-git-send-email-romain.perier@gmail.com>
+Message-ID: <20141125144007.9904BC44343@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 25 Nov 2014 12:28:25 +0000
+, Romain Perier <romain.perier@gmail.com>
+ wrote:
+> It reverts commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
+> As discussed on the mailing list, it makes more sense to rename back to the
+> old established property name, without the vendor prefix. Problem being that
+> the word "source" usually tends to be used for inputs and that is out of control
+> of the OS. The poweroff capability is an output which simply turns the
+> system-power off. Also, this property might be used by drivers which power-off
+> the system and power back on subsequent RTC alarms. This seems to suggest to
+> remove "poweroff" from the property name and to choose "system-power-controller"
+> as the more generic name. This patchs adds the required renaming changes and
+> defines an helper function which checks if this property is set.
+> 
+> Signed-off-by: Romain Perier <romain.perier@gmail.com>
 
+For both patches:
+Acked-by: Grant Likely <grant.likely@linaro.org>
 
-On 20/11/14 12:34, Vincent Yang wrote:
-> Add driver for the ARM Message-Handling-Unit (MHU).
->
-> Signed-off-by: Andy Green <andy.green@linaro.org>
-> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
-> Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+Let me know if I need to take this series through my tree. Also, does it
+need to go into v3.18 and be backported to stable? Or just v3.19.
+
+g.
+
 > ---
->   .../devicetree/bindings/mailbox/arm-mhu.txt        |  33 ++++
->   drivers/mailbox/Kconfig                            |   7 +
->   drivers/mailbox/Makefile                           |   2 +
->   drivers/mailbox/arm_mhu.c                          | 196 +++++++++++++++++++++
->   4 files changed, 238 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
->   create mode 100644 drivers/mailbox/arm_mhu.c
->
-> diff --git a/Documentation/devicetree/bindings/mailbox/arm-mhu.txt b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
-> new file mode 100644
-> index 0000000..b1b9888
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
-> @@ -0,0 +1,33 @@
-> +ARM MHU Mailbox Driver
-> +======================
-> +
-> +The ARM's Message-Handling-Unit (MHU) is a mailbox controller that has
-> +3 independent channels/links to communicate with remote processor(s).
-
-I had reviewed this before and I see not all the comments are addressed.
-I had mentioned that you can't add support to _SECURE_ channel in Linux
-as you need to assume Linux runs in non-secure privilege(and I gather
-that's the case even on this platform from other email in the thread)
-
-> + MHU links are hardwired on a platform. A link raises interrupt for any
-> +received data. However, there is no specified way of knowing if the sent
-> +data has been read by the remote. This driver assumes the sender polls
-> +STAT register and the remote clears it after having read the data.
-
-That could be design, interrupt support could be present on some
-systems. The bindings should be flexible to add that support in future
-if needed along with necessary code.
-
-Regards,
-Sudeep
+>  .../bindings/power/{poweroff.txt => power-controller.txt}           | 0
+>  Documentation/devicetree/bindings/regulator/act8865-regulator.txt   | 4 ++--
+>  drivers/regulator/act8865-regulator.c                               | 2 +-
+>  include/linux/of.h                                                  | 6 +++---
+>  4 files changed, 6 insertions(+), 6 deletions(-)
+>  rename Documentation/devicetree/bindings/power/{poweroff.txt => power-controller.txt} (100%)
+> 
+> diff --git a/Documentation/devicetree/bindings/power/poweroff.txt b/Documentation/devicetree/bindings/power/power-controller.txt
+> similarity index 100%
+> rename from Documentation/devicetree/bindings/power/poweroff.txt
+> rename to Documentation/devicetree/bindings/power/power-controller.txt
+> diff --git a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
+> index 01a5b07..dad6358 100644
+> --- a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
+> +++ b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
+> @@ -6,8 +6,8 @@ Required properties:
+>  - reg: I2C slave address
+>  
+>  Optional properties:
+> -- poweroff-source: Telling whether or not this pmic is controlling
+> -  the system power. See Documentation/devicetree/bindings/power/poweroff.txt .
+> +- system-power-controller: Telling whether or not this pmic is controlling
+> +  the system power. See Documentation/devicetree/bindings/power/power-controller.txt .
+>  
+>  Any standard regulator properties can be used to configure the single regulator.
+>  
+> diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
+> index 76301ed..9eec453 100644
+> --- a/drivers/regulator/act8865-regulator.c
+> +++ b/drivers/regulator/act8865-regulator.c
+> @@ -365,7 +365,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
+>  		return ret;
+>  	}
+>  
+> -	if (of_system_has_poweroff_source(dev->of_node)) {
+> +	if (of_device_is_system_power_controller(dev->of_node)) {
+>  		if (!pm_power_off) {
+>  			act8865_i2c_client = client;
+>  			act8865->off_reg = off_reg;
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index b81dbcf..0abdd70 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -964,14 +964,14 @@ static inline int of_changeset_update_property(struct of_changeset *ocs,
+>  extern int of_resolve_phandles(struct device_node *tree);
+>  
+>  /**
+> - * of_system_has_poweroff_source - Tells if poweroff-source is found for device_node
+> + * of_device_is_system_power_controller - Tells if system-power-controller is found for device_node
+>   * @np: Pointer to the given device_node
+>   *
+>   * return true if present false otherwise
+>   */
+> -static inline bool of_system_has_poweroff_source(const struct device_node *np)
+> +static inline bool of_device_is_system_power_controller(const struct device_node *np)
+>  {
+> -	return of_property_read_bool(np, "poweroff-source");
+> +	return of_property_read_bool(np, "system-power-controller");
+>  }
+>  
+>  #endif /* _LINUX_OF_H */
+> -- 
+> 1.9.1
+> 
