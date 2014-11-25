@@ -1,78 +1,97 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 25 Nov 2014 13:15:55 +0000
-Subject: [RFC PATCH v4 0/8] Introduce automatic DMA configuration for
- IOMMU masters
-In-Reply-To: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
-References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
-Message-ID: <5474810B.9030102@arm.com>
+From: george.cherian@ti.com (George Cherian)
+Date: Tue, 25 Nov 2014 18:41:49 +0530
+Subject: [PATCH 13/19] usb: dwc3: core: Add DWC3 OTG specific register defines
+In-Reply-To: <1416921115-10467-1-git-send-email-george.cherian@ti.com>
+References: <1416921115-10467-1-git-send-email-george.cherian@ti.com>
+Message-ID: <1416921115-10467-14-git-send-email-george.cherian@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Add OTG reggister defines to DWC3 core.h
 
-On 14/11/14 18:56, Will Deacon wrote:
-> Hello everybody,
->
-> Here is the fourth iteration of the RFC I've previously posted here:
->
->    RFCv1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/283023.html
->    RFCv2: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/283752.html
->    RFCv3: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/287031.html
->
-> Changes since RFCv3 include:
->
->    - Drastic simplification of the data structures, so that we no longer
->      pass around lists of domains. Instead, dma-mapping is expected to
->      allocate the domain (Joerg talked about adding a get_default_domain
->      operation to iommu_ops).
->
->    - iommu_ops is used to hold the per-instance IOMMU data
->
->    - Configuration of DMA segments added to of_dma_configure
->
-> All feedback welcome.
->
+Signed-off-by: George Cherian <george.cherian@ti.com>
+---
+ drivers/usb/dwc3/core.h | 68 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
-This proposal has been really useful in getting IOMMU DMA mapping 
-running on arm64, so with the proviso that patch 6 definitely causes 
-problems, and patches 7 and 8 ported to arm64 rather than used directly, 
-for the series:
-
-Tested-by: Robin Murphy <robin.murphy@arm.com>
-
-Hopefully it's now stable enough that I can finish cleaning up my 
-hacked-up SMMU driver (oh, the rebasing pain :P)
-
-Thanks,
-Robin.
-
-> Cheers,
->
-> Will
->
-> --->8
->
-> Will Deacon (8):
->    iommu: provide early initialisation hook for IOMMU drivers
->    dma-mapping: replace set_arch_dma_coherent_ops with arch_setup_dma_ops
->    iommu: add new iommu_ops callback for adding an OF device
->    iommu: provide helper function to configure an IOMMU for an of master
->    dma-mapping: detect and configure IOMMU in of_dma_configure
->    dma-mapping: set dma segment properties in of_dma_configure
->    arm: call iommu_init before of_platform_populate
->    arm: dma-mapping: plumb our iommu mapping ops into arch_setup_dma_ops
->
->   arch/arm/include/asm/dma-mapping.h | 12 +++---
->   arch/arm/kernel/setup.c            |  2 +
->   arch/arm/mm/dma-mapping.c          | 80 ++++++++++++++++++++++++++++++++++----
->   drivers/iommu/Kconfig              |  2 +-
->   drivers/iommu/of_iommu.c           | 50 ++++++++++++++++++++++++
->   drivers/of/platform.c              | 54 +++++++++++++------------
->   include/asm-generic/vmlinux.lds.h  |  2 +
->   include/linux/amba/bus.h           |  1 +
->   include/linux/dma-mapping.h        | 13 ++++---
->   include/linux/iommu.h              |  8 ++++
->   include/linux/of_iommu.h           | 31 +++++++++++++++
->   include/linux/platform_device.h    |  2 +
->   12 files changed, 214 insertions(+), 43 deletions(-)
->
+diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
+index 7fbe736..eb2e970 100644
+--- a/drivers/usb/dwc3/core.h
++++ b/drivers/usb/dwc3/core.h
+@@ -381,6 +381,74 @@
+ #define DWC3_DEPCMD_TYPE_BULK		2
+ #define DWC3_DEPCMD_TYPE_INTR		3
+ 
++/* OTG Configuration Register */
++#define DWC3_OCFG_DISPWRCUTTOFF                (1 << 5)
++#define DWC3_OCFG_HIBDISMASK           (1 << 4)
++#define DWC3_OCFG_SFTRSTMASK           (1 << 3)
++#define DWC3_OCFG_OTGVERSION           (1 << 2)
++#define DWC3_OCFG_HNPCAP               (1 << 1)
++#define DWC3_OCFG_SRPCAP               (1 << 0)
++
++/* OTG CTL Register */
++#define DWC3_OCTL_OTG3GOERR            (1 << 7)
++#define DWC3_OCTL_PERIMODE             (1 << 6)
++#define DWC3_OCTL_PRTPWRCTL            (1 << 5)
++#define DWC3_OCTL_HNPREQ               (1 << 4)
++#define DWC3_OCTL_SESREQ               (1 << 3)
++#define DWC3_OCTL_TERMSELIDPULSE       (1 << 2)
++#define DWC3_OCTL_DEVSETHNPEN          (1 << 1)
++#define DWC3_OCTL_HOSTSETHNPEN         (1 << 0)
++
++/* OTG Event Register */
++#define DWC3_OEVT_DEVICEMODE           (1 << 31)
++#define DWC3_OEVT_XHCIRUNSTPSET                (1 << 27)
++#define DWC3_OEVT_DEVRUNSTPSET         (1 << 26)
++#define DWC3_OEVT_HIBENTRY             (1 << 25)
++#define DWC3_OEVT_IDSTSCHNG            (1 << 24)
++#define DWC3_OEVT_HRRCONFNOTIF         (1 << 23)
++#define DWC3_OEVT_HRRINITNOTIF         (1 << 22)
++#define DWC3_OEVT_ADEVIDLE             (1 << 21)
++#define DWC3_OEVT_ADEVBHOSTEND         (1 << 20)
++#define DWC3_OEVT_ADEVHOST             (1 << 19)
++#define DWC3_OEVT_ADEVHNPCHNG          (1 << 18)
++#define DWC3_OEVT_ADEVSRPDET           (1 << 17)
++#define DWC3_OEVT_ADEVSESSENDDET       (1 << 16)
++#define DWC3_OEVT_BDEVBHOSTEND         (1 << 11)
++#define DWC3_OEVT_BDEVHNPCHNG          (1 << 10)
++#define DWC3_OEVT_BDEVSESSVLDDET       (1 << 9)
++#define DWC3_OEVT_BDEVVBUSCHNG         (1 << 8)
++#define DWC3_OEVT_BSESSVLD             (1 << 3)
++#define DWC3_OEVT_HOSTNEGSTS           (1 << 2)
++#define DWC3_OEVT_SESSREQSTS           (1 << 1)
++#define DWC3_OEVT_ERR                  (1 << 0)
++
++/* OTG Event Enable Register */
++#define DWC3_OEVTEN_XHCIRUNSTPSETEN    (1 << 27)
++#define DWC3_OEVTEN_DEVRUNSTPSETEN     (1 << 26)
++#define DWC3_OEVTEN_HIBENTRYEN         (1 << 25)
++#define DWC3_OEVTEN_CONIDSTSCHNGEN     (1 << 24)
++#define DWC3_OEVTEN_HRRCONFNOTIFEN     (1 << 23)
++#define DWC3_OEVTEN_HRRINITNOTIFEN     (1 << 22)
++#define DWC3_OEVTEN_ADEVIDLEEN         (1 << 21)
++#define DWC3_OEVTEN_ADEVBHOSTENDEN     (1 << 20)
++#define DWC3_OEVTEN_ADEVHOSTEN         (1 << 19)
++#define DWC3_OEVTEN_ADEVHNPCHNGEN      (1 << 18)
++#define DWC3_OEVTEN_ADEVSRPDETEN       (1 << 17)
++#define DWC3_OEVTEN_ADEVSESSENDDETEN   (1 << 16)
++#define DWC3_OEVTEN_BDEVHOSTENDEN      (1 << 11)
++#define DWC3_OEVTEN_BDEVHNPCHNGEN      (1 << 10)
++#define DWC3_OEVTEN_BDEVSESSVLDDETEN   (1 << 9)
++#define DWC3_OEVTEN_BDEVVBUSCHNGEVNTEN (1 << 8)
++
++/* OTG Status Register */
++#define DWC3_OSTS_DEVRUNSTP            (1 << 13)
++#define DWC3_OSTS_XHCIRUNSTP           (1 << 12)
++#define DWC3_OSTS_PERIPHERALSTATE      (1 << 4)
++#define DWC3_OSTS_XHCIPORTPOWER                (1 << 3)
++#define DWC3_OSTS_BSESVLD              (1 << 2)
++#define DWC3_OSTS_VBUSVLD              (1 << 1)
++#define DWC3_OSTS_CONIDSTS             (1 << 0)
++
+ /* Structures */
+ 
+ struct dwc3_trb;
+-- 
+1.8.3.1
