@@ -1,127 +1,114 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 24 Nov 2014 19:20:21 -0800
-Subject: [PATCH] ARM: exynos_defconfig: disable CONFIG_EXYNOS5420_MCPM;
- not stable
-In-Reply-To: <044101d00852$3f421420$bdc63c60$@kernel.org>
-References: <1414796382-5447-1-git-send-email-khilman@kernel.org>
- <000e01cffb39$5ef0a2d0$1cd1e870$@kernel.org>
- <7hegtaq26c.fsf@deeprootsystems.com>
- <CAMAWPa-mLAFL7v8hHA5R-eBzpMFK-E-xcvjoV8Bn6tTwgP53Uw@mail.gmail.com>
- <CAOesGMhvTDN4J6AdUDHKV0Sp4NT6a4QEMUDWOayQqhhD+C4acw@mail.gmail.com>
- <CAMAWPa-sz5jT9izEONVZR2Z4mzuivKaNHSgyR+eP13tWZ84hYw@mail.gmail.com>
- <CAOesGMgSkJ8xkBgN7OpuDzT=ehaAd6kvbx5_tC50x78pvpkTwg@mail.gmail.com>
- <CAOesGMh-7md4PdQX1Wvk0jO+87j+fxSvBnVD_osjNd2zQ4L43w@mail.gmail.com>
- <044101d00852$3f421420$bdc63c60$@kernel.org>
-Message-ID: <CAMAWPa-qk0DEmPNz5LZgJq9AuGhRxuY00XwxtEikt_vh-iozVg@mail.gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 25 Nov 2014 11:38:05 +0800
+Subject: [PATCH v5 02/18] ACPI / table: Add new function to get table
+ entries
+In-Reply-To: <1581499.U8906vqSiO@vostro.rjw.lan>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <2764417.DLFalXXngC@vostro.rjw.lan> <5473109A.2070704@linaro.org>
+ <1581499.U8906vqSiO@vostro.rjw.lan>
+Message-ID: <5473F99D.6090505@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 5:50 PM, Kukjin Kim <kgene@kernel.org> wrote:
-> Olof Johansson wrote:
->>
->> On Mon, Nov 24, 2014 at 5:37 PM, Olof Johansson <olof@lixom.net> wrote:
->> > On Mon, Nov 24, 2014 at 5:35 PM, Kevin Hilman <khilman@kernel.org> wrote:
->> >> On Mon, Nov 24, 2014 at 4:25 PM, Olof Johansson <olof@lixom.net> wrote:
->> >>> On Mon, Nov 24, 2014 at 11:51 AM, Kevin Hilman <khilman@kernel.org> wrote:
->> >>>> Kukjin,
->> >>>>
->> >>>> On Mon, Nov 10, 2014 at 11:35 AM, Kevin Hilman <khilman@kernel.org> wrote:
->> >>>>> Kukjin Kim <kgene@kernel.org> writes:
->> >>>>>
->> >>>>>> Kevin Hilman wrote:
->> >>>>>>>
->> >>>>>>> From: Kevin Hilman <khilman@linaro.org>
->> >>>>>>>
->> >>>>>>> The option CONFIG_EXYNOS5420_MCPM is causing imprecise external aborts
->> >>>>>>> during boot testing, causing various userspace startup failures.
->> >>>>>>>
->> >>>>>>> Disable until it has gotten more testing.
->> >>>>>>>
->> >>>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>,
->> >>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>,
->> >>>>>>> Cc: Sachin Kamat <sachin.kamat@samsung.com>,
->> >>>>>>> Cc: Doug Anderson <dianders@chromium.org>,
->> >>>>>>> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
->> >>>>>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>,
->> >>>>>>> Cc: Tushar Behera <tushar.behera@linaro.org>,
->> >>>>>>> Cc: stable at vger.kernel.org # v3.17+
->> >>>>>>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->> >>>>>>> ---
->> >>>>>>> This has been reported by a few people[1], but not investigated or fixed, so it's
->> >>>>>>> time to disable this feature until it can be fixed.
->> >>>>>>>
->> >>>>>> Hi Kevin,
->> >>>>>>
->> >>>>>> Yeah I agree with your opinion.
->> >>>>>>
->> >>>>>> But as you can see my tree, I've queued regarding mcpm patches for 3.19 will
->> >>>>>> be shown in -next in this weekend.
->> >>>>>
->> >>>>> Which of the recently queued patches are expected to address the
->> >>>>> imprecise abort issue?  I'd be happy to test them out.
->> >>>>
->> >>>> Exynos5 MCPM is still broken in linux-next and still causing an imprecise abort.
->> >>>>
->> >>>> What is the status of $SUBJECT patch?
->> >>>>
->> >>>>>> Anyway let me apply this into -fixes and
->> >>>>>> then let's enable after test its functionality in -next in a couple of days.
->> >>>>>
->> >>>>> Yes, I think this needs to be applied until these aborts are understood
->> >>>>> and fixed.
->> >>>>
->> >>>> Is anyone at Samsung actually looking into these MCPM issues?
->> >>>
->> >>> Hi Kevin,
->> >>>
->> >>> What hardware are you having problems with? 5420 or 5422/5800?
->> >>
->> >> Yes.  :)
->> >>
->> >> exynos5420-arndale-octa:
->> >> http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc6/arm-exynos_defconfig/boot-exynos5420-
->> arndale-octa.html
->> >> exynos5422-odroid-xu3:
->> >> http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc6/arm-exynos_defconfig/boot-exynos5422-
->> odroid-xu3.html
->> >>
->> >> My boot tests seem to pass fine because I have such a minimal
->> >> userspace, but Tyler Baker reported that with a "real" userspace, he
->> >> can't boot to a shell:
->> >>
->> >>   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286203.html
->> >
-> Hmm...his report was in Sep...I think it should be fine with current -next?
+On 2014/11/24 22:51, Rafael J. Wysocki wrote:
+> On Monday, November 24, 2014 07:03:54 PM Hanjun Guo wrote:
+>> On 2014-11-24 9:27, Rafael J. Wysocki wrote:
+>>> On Friday, October 17, 2014 09:36:58 PM Hanjun Guo wrote:
+>>>> From: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+>>>>
+>>>> The acpi_table_parse() function has a callback that
+>>>> passes a pointer to a table_header. Add a new function
+>>>> which takes this pointer and parses its entries. This
+>>>> eliminates the need to re-traverse all the tables for
+>>>> each call. e.g. as in acpi_table_parse_madt() which is
+>>>> normally called after acpi_table_parse().
+>>>>
+>>>> Acked-by: Grant Likely <grant.likely@linaro.org>
+>>>> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+>>>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> ---
+>>>>  drivers/acpi/tables.c |   67 ++++++++++++++++++++++++++++++++++---------------
+>>>>  include/linux/acpi.h  |    4 +++
+>>>>  2 files changed, 51 insertions(+), 20 deletions(-)
+>>>>
+>>>> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+>>>> index 6d5a6cd..21ae521 100644
+>>>> --- a/drivers/acpi/tables.c
+>>>> +++ b/drivers/acpi/tables.c
+>>>> @@ -192,17 +192,14 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>>>>  
+>>>>  
+>>>>  int __init
+>>>> -acpi_table_parse_entries(char *id,
+>>>> -			     unsigned long table_size,
+>>>> -			     int entry_id,
+>>>> -			     acpi_tbl_entry_handler handler,
+>>>> -			     unsigned int max_entries)
+>>>> +acpi_parse_entries(unsigned long table_size,
+>>>> +		acpi_tbl_entry_handler handler,
+>>>> +		struct acpi_table_header *table_header,
+>>>> +		int entry_id, unsigned int max_entries)
+>>>>  {
+>>>> -	struct acpi_table_header *table_header = NULL;
+>>>>  	struct acpi_subtable_header *entry;
+>>>> -	unsigned int count = 0;
+>>>> +	int count = 0;
+>>>>  	unsigned long table_end;
+>>>> -	acpi_size tbl_size;
+>>>>  
+>>>>  	if (acpi_disabled)
+>>>>  		return -ENODEV;
+>>>> @@ -210,13 +207,11 @@ acpi_table_parse_entries(char *id,
+>>>>  	if (!handler)
+>>>>  		return -EINVAL;
+>>>>  
+>>>> -	if (strncmp(id, ACPI_SIG_MADT, 4) == 0)
+>>>> -		acpi_get_table_with_size(id, acpi_apic_instance, &table_header, &tbl_size);
+>>>> -	else
+>>>> -		acpi_get_table_with_size(id, 0, &table_header, &tbl_size);
+>>>> +	if (!table_size)
+>>>> +		return -EINVAL;
+>>>>  
+>>>>  	if (!table_header) {
+>>>> -		pr_warn("%4.4s not present\n", id);
+>>>> +		pr_warn("Table header not present\n");
+>>> The message doesn't make sense any more if the table signature is not printed.
 
-No, it is still broken in linux-next (as I stated above.)
+For this message, since no table id is passed, and this message is printed in
+acpi_table_parse_entries() before this function is called, I think we can check
+the table_header before call this function and remove the printed message here.
 
-Moreover, earlier in this thread you mentioned you were merging some
-MCPM patches that should address this, but did not respond when I
-asked which patches you thing should address this issue
+>>>
+>>>>  		return -ENODEV;
+>>>>  	}
+>>>>  
+>>>> @@ -232,30 +227,62 @@ acpi_table_parse_entries(char *id,
+>>>>  		if (entry->type == entry_id
+>>>>  		    && (!max_entries || count++ < max_entries))
+>>>>  			if (handler(entry, table_end))
+>>>> -				goto err;
+>>>> +				return -EINVAL;
+>>>>  
+>>>>  		/*
+>>>>  		 * If entry->length is 0, break from this loop to avoid
+>>>>  		 * infinite loop.
+>>>>  		 */
+>>>>  		if (entry->length == 0) {
+>>>> -			pr_err("[%4.4s:0x%02x] Invalid zero length\n", id, entry_id);
+>>>> -			goto err;
+>>>> +			pr_err("[0x%02x] Invalid zero length\n", entry_id);
 
-> To be honest, since I don't have the exynos5420 arndale, chromebook...but smdk
-> which has different bootloader, I couldn't test it...I'll try to make a test
-> farm like you guys...
+For this one, since the table_header is valid now, we can keep it with:
 
-Do you have some colleagues with any other 542x hardware?  I had
-assumed that linux-next was being better tested on the publicaly
-available, and widely available boards like odroid-xu3 and
-Chromebook2, but I've come to realize the hard way that that is not
-the case.  You mention your board has a different bootloader.  Do you
-suspect there's a bootloader issue on these other platforms?  If so,
-could you elaborate on possible fixes?  I'm more than willing to test
-any proposed fixes, but I'm not familiar enough yet with these SoCs to
-figure out the underlying issues alone.
+- pr_err("[%4.4s:0x%02x] Invalid zero length\n", id, entry_id);
++ pr_err("[%4.4s:0x%02x] Invalid zero length\n", table_header->signature, entry_id);
 
-Until you have a working board farm, you could start having a closer
-look at the boot logs we're already producing.  Admittedly linux-next
-broken in many ways besides this one for exynos currently, but it has
-been having these imprecise aborts well before the other recent
-issues.
+>>> Same here.
+>> How about remove the message and return directly?
+> We could do that, but for what reason?  Is the message not useful?
 
-Also, It's very possible that this issue is not even MCPM related at
-all, and MCPM is just uncovering a previously hidden bug.  It would be
-very helpful if people more familiar with this hardware and SoC would
-investigate bug reports like these.
+I agree with you, the message is useful I think, how about the comments above?
 
-Kevin
+Thanks
+Hanjun
