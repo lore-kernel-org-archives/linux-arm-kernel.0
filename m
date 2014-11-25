@@ -1,78 +1,68 @@
-From: george.cherian@ti.com (George Cherian)
-Date: Tue, 25 Nov 2014 18:41:53 +0530
-Subject: [PATCH 17/19] arm: dts: dra7: Add named interrupt property for dwc3
-In-Reply-To: <1416921115-10467-1-git-send-email-george.cherian@ti.com>
-References: <1416921115-10467-1-git-send-email-george.cherian@ti.com>
-Message-ID: <1416921115-10467-18-git-send-email-george.cherian@ti.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Tue, 25 Nov 2014 18:48:35 +0530
+Subject: [PATCH 0/4] mmc: sdhci: adding support for a new Fujitsu sdhci IP
+In-Reply-To: <CAPDyKFqNK51vKNmGjQzFCrGyqa9XxHPeLBG-dX3UX=0G-v0j4w@mail.gmail.com>
+References: <1416531100-26707-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <CAPDyKFqZyUT+sARZQ2ncusttDWn31uQf_H2eTtHOSCs2c8yO4A@mail.gmail.com>
+ <CAOEd-H2qbWgaauX=phfFk8HQqHk9gff3m_uoZqc+4Gbc6LZ-Lg@mail.gmail.com>
+ <CAPDyKFruGDj5z5+i6FLT2YHhKPvY6wFE98dBQYsJroCNST_fyw@mail.gmail.com>
+ <CAJe_ZhfvMCE4vxu76j2TBFZC90=tKm+yo+-Gf1WJq5oQT5_P+g@mail.gmail.com>
+ <CAPDyKFqNK51vKNmGjQzFCrGyqa9XxHPeLBG-dX3UX=0G-v0j4w@mail.gmail.com>
+Message-ID: <CAJe_Zhet8X0ocnxkEEg2bw=WW8t72Ha6UMSbAmh3ftkg8-EzUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add interrupt names so that the same can be used for OTG easily.
+On 25 November 2014 at 18:28, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 24 November 2014 at 13:29, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+>> On 24 November 2014 at 17:24, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> On 24 November 2014 at 11:45, Vincent Yang
+>>> <vincent.yang.fujitsu@gmail.com> wrote:
+>>>> 2014-11-24 17:54 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
+>>>>> On 21 November 2014 at 01:51, Vincent Yang
+>>>>> <vincent.yang.fujitsu@gmail.com> wrote:
+>>>>>> Hello,
+>>>>>>
+>>>>>>   Fujitsu have an sdhci IP which is implemented in a SoC we're
+>>>>>> adding to mainline, the most recent series for that was sent
+>>>>>> here:
+>>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304522.html
+>>>>>>
+>>>>>>   These patches are against v3.18-rc5 mainline and tested on
+>>>>>> v3.18-rc5 integration tree.
+>>>>>>
+>>>>>>   We welcome any comment and advice about how to make any
+>>>>>> improvements or better align them with upstream.
+>>>>>
+>>>>> Apparently, there's a dependency between this patchset and the upper
+>>>>> one you refereed to. That's a problem.
+>>>>
+>>>> This patchset does not require anything from the upper one I refereed to.
+>>>
+>>> No, but the upper depends on this patchset.
+>>>
+>>> Why can't you send the mmc patches separately in one patchset? That's
+>>> would be easier to handle and review.
+>>>
+>> To be clear, the arch patchset introduces support for a new Fujitsu's
+>> platform and has a sdhci controller driver named sdhci_f_sdh30.c which
+>> will use 'general' improvements introduced by this patchset.
+>>
+>> I would think the controller driver has more dependency on ARCH than
+>> this patchset. IOW, sdhci_f_sdh30.c can't get upstream without arch
+>> patches but this patchset can without the sdhci_f_sdh30.c driver.  Is
+>> that not so?
+>
+> Nope. I fail to see why there should be an ARCH dependency, there shouldn't!
+>
+> Well, I did note that to build the new driver it depended on
+> ARCH_MB86S7X. Let's just remove that, because it's not needed.
+>
+I suspected build-bots might complain for non-arm configs. And do we
+want to allow building Fujitsu controller driver even if ARCH_MB86S7X
+is not enabled?
 
-Signed-off-by: George Cherian <george.cherian@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi | 28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+Vincent, lets remove ARCH_MB86S7X dependency and include the driver in
+this patchset as Ulf wants.
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 9cc9843..78f1761 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1153,7 +1153,12 @@
- 			usb1: usb at 48890000 {
- 				compatible = "snps,dwc3";
- 				reg = <0x48890000 0x17000>;
--				interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names = "peripheral",
-+						  "host",
-+						  "otg";
- 				phys = <&usb2_phy1>, <&usb3_phy1>;
- 				phy-names = "usb2-phy", "usb3-phy";
- 				tx-fifo-resize;
-@@ -1174,7 +1179,12 @@
- 			usb2: usb at 488d0000 {
- 				compatible = "snps,dwc3";
- 				reg = <0x488d0000 0x17000>;
--				interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names = "peripheral",
-+						  "host",
-+						  "otg";
- 				phys = <&usb2_phy2>;
- 				phy-names = "usb2-phy";
- 				tx-fifo-resize;
-@@ -1197,7 +1207,12 @@
- 			usb3: usb at 48910000 {
- 				compatible = "snps,dwc3";
- 				reg = <0x48910000 0x17000>;
--				interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 344 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names = "peripheral",
-+						  "host",
-+						  "otg";
- 				tx-fifo-resize;
- 				maximum-speed = "high-speed";
- 				dr_mode = "otg";
-@@ -1217,7 +1232,12 @@
- 			usb4: usb at 48950000 {
- 				compatible = "snps,dwc3";
- 				reg = <0x48950000 0x17000>;
--				interrupts = <GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupts = <GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names = "peripheral",
-+						  "host",
-+						  "otg";
- 				tx-fifo-resize;
- 				maximum-speed = "high-speed";
- 				dr_mode = "otg";
--- 
-1.8.3.1
+Thanks,
+Jassi
