@@ -1,36 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Nov 2014 14:04:41 +0000
-Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <5474846C.2000308@ti.com>
-References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
- <15074721.IbfeeI3ajE@wuerfel> <54746349.3000306@ti.com>
- <2301239.aDOlWg3gEs@wuerfel> <5474846C.2000308@ti.com>
-Message-ID: <20141125140440.GF3836@n2100.arm.linux.org.uk>
+From: johan@kernel.org (Johan Hovold)
+Date: Tue, 25 Nov 2014 15:07:00 +0100
+Subject: [PATCH v5 1/2] of: Rename "poweroff-source" property to
+ "system-power-controller"
+In-Reply-To: <1416918506-9366-2-git-send-email-romain.perier@gmail.com>
+References: <1416918506-9366-1-git-send-email-romain.perier@gmail.com>
+ <1416918506-9366-2-git-send-email-romain.perier@gmail.com>
+Message-ID: <20141125140700.GC19910@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 03:30:20PM +0200, Grygorii Strashko wrote:
-> On 11/25/2014 02:09 PM, Arnd Bergmann wrote:
-> > It might be possible to do this implicitly if the driver calls clk_get(),
-> > basically doing clk_get() (or another call if necessary) would prevent the
-> > simple pmdomain from turning it off during suspend.
+On Tue, Nov 25, 2014 at 12:28:25PM +0000, Romain Perier wrote:
+> It reverts commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
+> As discussed on the mailing list, it makes more sense to rename back to the
+> old established property name, without the vendor prefix. Problem being that
+> the word "source" usually tends to be used for inputs and that is out of control
+> of the OS. The poweroff capability is an output which simply turns the
+> system-power off. Also, this property might be used by drivers which power-off
+> the system and power back on subsequent RTC alarms. This seems to suggest to
+> remove "poweroff" from the property name and to choose "system-power-controller"
+> as the more generic name. This patchs adds the required renaming changes and
+> defines an helper function which checks if this property is set.
 > 
-> Unfortunately, clk_get() will not work, because drivers still need to use it
-> to get functional clocks even if they are not going to control them explicitly.
-> For example, if it need to know clock's rate.
+> Signed-off-by: Romain Perier <romain.perier@gmail.com>
 
-If you don't want a clock to be turned off, then clk_get() it, then
-clk_prepare() it, and finally clk_enable() it.
+Acked-by: Johan Hovold <johan@kernel.org>
 
-Even if someone else gets it, the only time that a clock is turned off
-is when _all_ users of it mutually agree that it can be turned off - by
-every user disabling (and possibly unpreparing) it.
+Mark, this is for the regulator tree.
 
-So, if the PM domain code gets a clock, prepares and enables it, then
-a driver gets the same clock, prepares and enables it also, it won't
-be disabled until _both_ the PM domain code _and_ the driver disable
-and unprepare the clock.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Johan
