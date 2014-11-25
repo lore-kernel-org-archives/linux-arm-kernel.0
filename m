@@ -1,72 +1,109 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 25 Nov 2014 23:23:04 +0100
-Subject: (bisected) Lock up on sh73a0/kzm9g on cpuidle initialization
-In-Reply-To: <CAMuHMdUMpmdYe+ED=M8FVvMMWNmrs8o4WzQ-uc2nFHNdL99HNQ@mail.gmail.com>
-References: <CAMuHMdXaaa2t6+sH2egGacVxkAPeTUkAgwdYsOnMnEPnuLdB5Q@mail.gmail.com>	<545BE1DE.6060900@linaro.org>	<CAMuHMdXQr65g4He0D0ZRN923OJ2A7WNgwbiTru_1dGWnvbvCJA@mail.gmail.com>	<CAMuHMdUjYMC8i2F9n6fWdPBOQVSohKA3ZxJJyq8h808Z9tEypw@mail.gmail.com>	<20141125180159.GI5050@linux.vnet.ibm.com>
- <CAMuHMdUMpmdYe+ED=M8FVvMMWNmrs8o4WzQ-uc2nFHNdL99HNQ@mail.gmail.com>
-Message-ID: <54750148.207@linaro.org>
+From: lautriv@coldplug.net (lautriv)
+Date: Tue, 25 Nov 2014 23:34:18 +0100
+Subject: [PATCH] mmc: wmt-sdmmc: fix unmatched release_mem_region
+In-Reply-To: <CAPDyKFqNHQUStQiRJ3Bn7JnbMn-xJ=TUaWXijJcuO9z97xcmDw@mail.gmail.com>
+References: <1415567571-6144-1-git-send-email-alchark@gmail.com>	<CAOMZO5C+O4h=f=vtLTdBZktnfVWzfeLjOQG-oecxh_c9u-QMqA@mail.gmail.com>	<545FE821.5060107@coldplug.net>	<CABjd4YxyUJi6RaGWicFeoJ7C27qhUFsAbq-nJTreACrt-voeYA@mail.gmail.com>	<546DFE83.8060900@coldplug.net>
+ <CAPDyKFqNHQUStQiRJ3Bn7JnbMn-xJ=TUaWXijJcuO9z97xcmDw@mail.gmail.com>
+Message-ID: <547503EA.3030907@coldplug.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2014 10:27 PM, Geert Uytterhoeven wrote:
-
-[ ... ]
-
->> Does any sort of system activity (keyboard, network, etc.) unstick the
->> system?
+On 11/24/2014 09:34 AM, Ulf Hansson wrote:
+> On 20 November 2014 at 15:45, lautriv <lautriv@coldplug.net> wrote:
+>> From b0509e27e33326e6dccd67d8ebe67e2bdb0cfdde Mon Sep 17 00:00:00 2001
+>> From: Helmut Stengele <lautriv@coldplug.net>
+>> Date: Thu, 20 Nov 2014 15:27:40 +0100
+>> Subject: [PATCH] mmc: wmt-sdmmc: fix unmatched release_mem_region
+>>
+>> Current code calls release_mem_region upon module unload
+>> without requesting the region first. This patch fixes it
+>> by moving to a devres-based ioremap implementation, which
+>> handles requesting and releasing memory region internally.
+>>
+>> This also makes the error/unload paths a bit simpler.
+>>
+>> Signed-off-by: Helmut Stengele <lautriv@coldplug.net>
+>> ---
+>>
+>> This is a corrected patch based on the one Alexey sent for me.
+>> I sent it already but since i'm not used to send something upstream
+>> it was an attached file and obviously rejected.
+>> Patch is tested on bare-metal ( wm8850 ) and works like suspected.
+>>
+>>  drivers/mmc/host/wmt-sdmmc.c | 14 +++++---------
+>>  1 file changed, 5 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
+>> index 54181b4..bcaa0cc 100644
+>> --- a/drivers/mmc/host/wmt-sdmmc.c
+>> +++ b/drivers/mmc/host/wmt-sdmmc.c
+>> @@ -759,6 +759,7 @@ static int wmt_mci_probe(struct platform_device *pdev)
+>>      const struct wmt_mci_caps *wmt_caps;
+>>      int ret;
+>>      int regular_irq, dma_irq;
+>> +    struct resource *res;
+>>
+>>      if (!of_id || !of_id->data) {
+>>          dev_err(&pdev->dev, "Controller capabilities data missing\n");
+>> @@ -813,10 +814,11 @@ static int wmt_mci_probe(struct platform_device *pdev)
+>>      if (of_get_property(np, "cd-inverted", NULL))
+>>          priv->cd_inverted = 1;
+>>
+>> -    priv->sdmmc_base = of_iomap(np, 0);
+>> +    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +    priv->sdmmc_base = devm_ioremap_resource(&pdev->dev, res);
+> You should check the return value from devm_ioremap_resource() with IS_ERR().
 >
-> Thanks! Unfortunately none of the above helped.
+>>      if (!priv->sdmmc_base) {
+>>          dev_err(&pdev->dev, "Failed to map IO space\n");
+> This print can be removed, devm_ioremap_resource() handles that.
 >
-> However, I found the culprit. It turned out to be a platform issue, not an
-> issue in the generic cpu idle or RCU code. Read on below if you're
-> interested in the gory details. Else just skip, and sleep well again tonight ;-)
+>> -        ret = -ENOMEM;
+>> +        ret = PTR_ERR(priv->sdmmc_base);
+>>          goto fail2;
+>>      }
+>>
+>> @@ -826,7 +828,7 @@ static int wmt_mci_probe(struct platform_device *pdev)
+>>      ret = request_irq(regular_irq, wmt_mci_regular_isr, 0, "sdmmc", priv);
+>>      if (ret) {
+>>          dev_err(&pdev->dev, "Register regular IRQ fail\n");
+>> -        goto fail3;
+>> +        goto fail2;
+>>      }
+>>
+>>      ret = request_irq(dma_irq, wmt_mci_dma_isr, 0, "sdmmc", priv);
+>> @@ -869,8 +871,6 @@ fail5:
+>>      free_irq(dma_irq, priv);
+>>  fail4:
+>>      free_irq(regular_irq, priv);
+>> -fail3:
+>> -    iounmap(priv->sdmmc_base);
+>>  fail2:
+>>      mmc_free_host(mmc);
+>>  fail1:
+>> @@ -881,7 +881,6 @@ static int wmt_mci_remove(struct platform_device *pdev)
+>>  {
+>>      struct mmc_host *mmc;
+>>      struct wmt_mci_priv *priv;
+>> -    struct resource *res;
+>>      u32 reg_tmp;
+>>
+>>      mmc = platform_get_drvdata(pdev);
+>> @@ -909,9 +908,6 @@ static int wmt_mci_remove(struct platform_device *pdev)
+>>      clk_disable_unprepare(priv->clk_sdmmc);
+>>      clk_put(priv->clk_sdmmc);
+>>
+>> -    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> -    release_mem_region(res->start, resource_size(res));
+>> -
+>>      mmc_free_host(mmc);
+>>
+>>      dev_info(&pdev->dev, "WMT MCI device removed\n");
+>> --
+>> 2.1.3
+>>
+>>
+> Kind regards
+> Uffe
 >
->> If you have tried all those things without good effect, could you please
->> send along your .config and an alt-sysrq-t dump of all tasks' stacks?
->
-> As I didn't manage to trigger a sysrq dump over the serial console,
-> I just called __handle_sysrq() right before the wait_for_completion(), after
-> a small delay. The dump didn't show anything suspicious. Everything
-> looked the same as on the dual-core Cortex A15, where the problem
-> doesn't manifest.
->
-> Then I noticed the sched debug output on the A15, which was missing
-> on the CA9 build. Enabling it on the A9 gave:
->
-> Sched Debug Version: v0.11,
-> 3.18.0-rc6-kzm9g-reference-04913-gedc89a2a2059c7ff-dirty #101
-> ktime                                   : 0.000000
-> sched_clk                               : 0.000000
-> cpu_clk                                 : 0.000000
-> jiffies                                 : 4294928896
->
-> Oops, time is not advancing?
->
-> Dmesg also shows (early):
->
->      clocksource_of_init: no matching clocksources found
->
-> and the timer is only initialized much later, after cpu idle initialization:
->
->      sh_cmt e6138000.timer: ch0: used for periodic clock events
->
-> Hacking up a timer node for "arm,cortex-a9-twd-timer" in sh73a0.dtsi
-> (with some "guessed" values) made it work.
->
-> Thanks!
->
-> Gr{oetje,eeting}s,
-
-Hi Geert,
-
-thanks for sharing this information.
-
-   -- Daniel
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks for the hint, will do so. ( Sent the wrong patch by accident anyway )
