@@ -1,33 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Nov 2014 17:48:24 +0000
-Subject: [PATCH v3 04/13] efi: split off remapping code from
- efi_config_init()
-In-Reply-To: <20141125172419.GD3331@console-pimps.org>
-References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
- <1416315432-8534-5-git-send-email-ard.biesheuvel@linaro.org>
- <20141125172419.GD3331@console-pimps.org>
-Message-ID: <20141125174824.GJ8541@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 25 Nov 2014 18:49:16 +0100
+Subject: (bisected) Lock up on sh73a0/kzm9g on cpuidle initialization
+In-Reply-To: <CAMuHMdXQr65g4He0D0ZRN923OJ2A7WNgwbiTru_1dGWnvbvCJA@mail.gmail.com>
+References: <CAMuHMdXaaa2t6+sH2egGacVxkAPeTUkAgwdYsOnMnEPnuLdB5Q@mail.gmail.com>
+ <545BE1DE.6060900@linaro.org>
+ <CAMuHMdXQr65g4He0D0ZRN923OJ2A7WNgwbiTru_1dGWnvbvCJA@mail.gmail.com>
+Message-ID: <CAMuHMdUjYMC8i2F9n6fWdPBOQVSohKA3ZxJJyq8h808Z9tEypw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 05:24:19PM +0000, Matt Fleming wrote:
-> On Tue, 18 Nov, at 01:57:03PM, Ard Biesheuvel wrote:
-> > Split of the remapping code from efi_config_init() so that the caller
-> > can perform its own remapping. This is necessary to correctly handle
-> > virtually remapped UEFI memory regions under kexec, as efi.systab will
-> > have been updated to a virtual address.
-> > 
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  drivers/firmware/efi/efi.c | 49 +++++++++++++++++++++++++++++-----------------
-> >  include/linux/efi.h        |  2 ++
-> >  2 files changed, 33 insertions(+), 18 deletions(-)
-> 
-> Looks straight forward.
-> 
-> What tree are these going through?
+On Fri, Nov 7, 2014 at 8:59 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Thu, Nov 6, 2014 at 10:02 PM, Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+>> On 11/06/2014 09:38 PM, Geert Uytterhoeven wrote:
+>>> When CONFIG_CPU_IDLE=y, the kernel locks up during cpuidle initialization
+>>> on Renesas sh73a0/kzm9g-reference, which has a dual-core Cortex-A9.
+>>>
+>>> Last message is:
+>>>
+>>>      DMA: preallocated 256 KiB pool for atomic coherent allocations
+>>>
+>>> After this it's supposed to print:
+>>>
+>>>      cpuidle: using governor ladder
+>>>      cpuidle: using governor menu
+>>>
+>>> I've bisected this to commit 442bf3aaf55a91ebfec71da46a4ee10a3c905bcc
+>>> ("sched: Let the scheduler see CPU idle states").
+>>>
+>>> Reverting that commit, and commit 83a0a96a5f26d974580fd7251043ff70c8f1823d
+>>> ("sched/fair: Leverage the idle state info when choosing the "idlest"
+>>> cpu") which
+>>> depends on it, fixes the problem.
+>>>
+>>> I saw the discussion "lockdep splat in CPU hotplug", so I enabled lockdep
+>>> debugging, but didn't see a lockdep splat.
+>>
+>> Did you try the fix attached ?
+>>
+>> https://lkml.org/lkml/2014/10/22/722
+>
+> Thanks, I didn't try that.
+>
+> However, this patch seems to be in v3.18-rc3, so I'm already using it.
+> Hence it doesn't fix the problem for me.
+>
+> On another board, with a dual Cortex-A15, the problem doesn't show up.
 
-I think a bunch of the series is still under review, so we can probably
-decide on that nearer 3.20 based on any dependencies that crop up.
+This problem (regression introduced in v3.18-rc1) is still present in v3.18-rc6.
 
-Will
+I did some more investigations, and it's hanging in the call to
+synchronize_rcu() in cpuidle_uninstall_idle_handler(), which was added in
+commit 442bf3aaf55a91ebfec71da46a4ee10a3c905bcc.
+More specificailly, it's blocked on the wait_for_completion(&rcu.completion)
+in kernel/rcu/update.c:void wait_rcu_gp(call_rcu_func_t crf).
+
+Anyone with a clue?
+
+Thanks again!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
