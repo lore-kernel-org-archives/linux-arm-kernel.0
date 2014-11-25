@@ -1,68 +1,60 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Tue, 25 Nov 2014 18:48:35 +0530
-Subject: [PATCH 0/4] mmc: sdhci: adding support for a new Fujitsu sdhci IP
-In-Reply-To: <CAPDyKFqNK51vKNmGjQzFCrGyqa9XxHPeLBG-dX3UX=0G-v0j4w@mail.gmail.com>
-References: <1416531100-26707-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <CAPDyKFqZyUT+sARZQ2ncusttDWn31uQf_H2eTtHOSCs2c8yO4A@mail.gmail.com>
- <CAOEd-H2qbWgaauX=phfFk8HQqHk9gff3m_uoZqc+4Gbc6LZ-Lg@mail.gmail.com>
- <CAPDyKFruGDj5z5+i6FLT2YHhKPvY6wFE98dBQYsJroCNST_fyw@mail.gmail.com>
- <CAJe_ZhfvMCE4vxu76j2TBFZC90=tKm+yo+-Gf1WJq5oQT5_P+g@mail.gmail.com>
- <CAPDyKFqNK51vKNmGjQzFCrGyqa9XxHPeLBG-dX3UX=0G-v0j4w@mail.gmail.com>
-Message-ID: <CAJe_Zhet8X0ocnxkEEg2bw=WW8t72Ha6UMSbAmh3ftkg8-EzUQ@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 25 Nov 2014 14:21:19 +0100
+Subject: [PATCH v3 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
+ extensions
+In-Reply-To: <54747DCF.9010502@ti.com>
+References: <1416309051-26784-1-git-send-email-hdegoede@redhat.com>
+ <1416309051-26784-3-git-send-email-hdegoede@redhat.com>
+ <547476DA.2030004@ti.com> <54747B72.1050406@redhat.com>
+ <54747DCF.9010502@ti.com>
+Message-ID: <5474824F.8080000@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 November 2014 at 18:28, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 24 November 2014 at 13:29, Jassi Brar <jaswinder.singh@linaro.org> wrote:
->> On 24 November 2014 at 17:24, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> On 24 November 2014 at 11:45, Vincent Yang
->>> <vincent.yang.fujitsu@gmail.com> wrote:
->>>> 2014-11-24 17:54 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
->>>>> On 21 November 2014 at 01:51, Vincent Yang
->>>>> <vincent.yang.fujitsu@gmail.com> wrote:
->>>>>> Hello,
->>>>>>
->>>>>>   Fujitsu have an sdhci IP which is implemented in a SoC we're
->>>>>> adding to mainline, the most recent series for that was sent
->>>>>> here:
->>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304522.html
->>>>>>
->>>>>>   These patches are against v3.18-rc5 mainline and tested on
->>>>>> v3.18-rc5 integration tree.
->>>>>>
->>>>>>   We welcome any comment and advice about how to make any
->>>>>> improvements or better align them with upstream.
->>>>>
->>>>> Apparently, there's a dependency between this patchset and the upper
->>>>> one you refereed to. That's a problem.
->>>>
->>>> This patchset does not require anything from the upper one I refereed to.
+Hi,
+
+On 11/25/2014 02:02 PM, Tomi Valkeinen wrote:
+> On 25/11/14 14:52, Hans de Goede wrote:
+>
+>>>> +Required properties:
+>>>> +- compatible: "allwinner,simple-framebuffer"
+>>>> +- allwinner,pipeline, one of:
 >>>
->>> No, but the upper depends on this patchset.
->>>
->>> Why can't you send the mmc patches separately in one patchset? That's
->>> would be easier to handle and review.
->>>
->> To be clear, the arch patchset introduces support for a new Fujitsu's
->> platform and has a sdhci controller driver named sdhci_f_sdh30.c which
->> will use 'general' improvements introduced by this patchset.
+>>> Sorry my ignorance, but what's sunxi and what's allwinner? Both names
+>>> are mixed here.
 >>
->> I would think the controller driver has more dependency on ARCH than
->> this patchset. IOW, sdhci_f_sdh30.c can't get upstream without arch
->> patches but this patchset can without the sdhci_f_sdh30.c driver.  Is
->> that not so?
+>> sunxi is the sun#i SoCs from Allwinner, Allwinner is the manufacturer
+>> and the
+>> SoC "code" names used everywhere in the kernel for their SoCs are sun4i,
+>> sun5i,
+>> sun6i, etc. Most people refer to these SoCs as sunxi. This is also what the
+>> linux-sunxi mailinglist in the Cc is about.
+>>
+>> The official devicetree vendor prefix for Allwinner is allwinner, hence the
+>> allwinner in the compatible name, see e.g. also
+>>
+>> Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
+>>
+>> Which also uses sunxi / sun4i everywhere except in the compatible vendor
+>> prefix.
 >
-> Nope. I fail to see why there should be an ARCH dependency, there shouldn't!
+> Alright, thanks for explanation.
 >
-> Well, I did note that to build the new driver it depended on
-> ARCH_MB86S7X. Let's just remove that, because it's not needed.
->
-I suspected build-bots might complain for non-arm configs. And do we
-want to allow building Fujitsu controller driver even if ARCH_MB86S7X
-is not enabled?
+> Shouldn't the compatible then be "allwinner,sunxi-simple-framebuffer",
+> to differentiate from some other SoC Allwinner has or might create in
+> the future? That is, presuming you're confident enough that a single
+> compatible string covers all the current and forthcoming sunxi SoCs.
 
-Vincent, lets remove ARCH_MB86S7X dependency and include the driver in
-this patchset as Ulf wants.
+This was discussed in an earlier thread, we (Ian Campbell, Grant and me)
+decided to settle on allwinner,simple-framebuffer to make it clear that
+these are allwinner extensions to the standard simple-framebuffer bindings,
+and that the node otherwise is simple-framebuffer compatible.
 
-Thanks,
-Jassi
+We were afraid that e.g. sun4i-simple-framebuffer would signal that it
+is not a normal simple-framebuffer node, so we decided to go with just
+the allwinner, prefix to indicate that it uses allwinner specific
+extensions.
+
+Regards,
+
+Hans
