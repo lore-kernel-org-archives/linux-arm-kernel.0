@@ -1,101 +1,268 @@
-From: kernellwp@gmail.com (Wanpeng Li)
-Date: Tue, 25 Nov 2014 10:24:39 +0800
-Subject: [PATCH v9 05/10] sched: make scale_rt invariant with frequency
-In-Reply-To: <1415033687-23294-6-git-send-email-vincent.guittot@linaro.org>
-References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
- <1415033687-23294-6-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <5473E867.6030607@gmail.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Tue, 25 Nov 2014 08:00:50 +0530
+Subject: [PATCH] thermal: exynos: add optional sclk support
+In-Reply-To: <20141124175242.GA1351@developer>
+References: <1416642356-8694-1-git-send-email-a.kesavan@samsung.com>
+ <CAGTfZH1T-pRmETfQUs1Scy1TLfA_DG9fEZGY83my7WVwtujqRQ@mail.gmail.com>
+ <CAM4voa=XUrkvH7EDk+j_FPX6pB3gLCHsAjDUMQacZ4AWyNEaNQ@mail.gmail.com>
+ <20141124114845.0a03eeb4@amdc2363>
+ <CAM4voakNTe5x1Mur0J9PNbxW0XCMiXm_hfpPgHF0bKwnMbYNAw@mail.gmail.com>
+ <20141124175242.GA1351@developer>
+Message-ID: <CAM4voamP98hs+5Ey-qhy++HnmS0+8YLK8Fey_YCuzgBWDvzPKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
-On 11/4/14, 12:54 AM, Vincent Guittot wrote:
-> The average running time of RT tasks is used to estimate the remaining compute
-> capacity for CFS tasks. This remaining capacity is the original capacity scaled
-> down by a factor (aka scale_rt_capacity). This estimation of available capacity
-> must also be invariant with frequency scaling.
->
-> A frequency scaling factor is applied on the running time of the RT tasks for
-> computing scale_rt_capacity.
->
-> In sched_rt_avg_update, we scale the RT execution time like below:
-> rq->rt_avg += rt_delta * arch_scale_freq_capacity() >> SCHED_CAPACITY_SHIFT
->
-> Then, scale_rt_capacity can be summarized by:
-> scale_rt_capacity = SCHED_CAPACITY_SCALE -
-> 		((rq->rt_avg << SCHED_CAPACITY_SHIFT) / period)
+Hi Eduardo,
 
-The 'period' aka 'total' in the scale_rt_capacity(), why it is 
-sched_avg_period() + delta instead of sched_avg_period()?
+On Mon, Nov 24, 2014 at 11:22 PM, Eduardo Valentin <edubezval@gmail.com> wrote:
+> Hello Folks,
+>
+> On Mon, Nov 24, 2014 at 09:40:38PM +0530, Abhilash Kesavan wrote:
+>> Hi Lukasz,
+>>
+>> On Mon, Nov 24, 2014 at 4:18 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
+>> > Hi Abhilash,
+>> >
+>> >> Hi Chanwoo,
+>> >>
+>> >> On Sun, Nov 23, 2014 at 10:21 AM, Chanwoo Choi <cwchoi00@gmail.com>
+>> >> wrote:
+>> >> > Hi Abhilash,
+>> >> >
+>> >> > On Sat, Nov 22, 2014 at 4:45 PM, Abhilash Kesavan
+>> >> > <a.kesavan@samsung.com> wrote:
+>> >> >> Exynos7 has a special clock required for the functional operation
+>> >> >> of the TMU that is not present in earlier SoCs. Add support for
+>> >> >> this optional clock and update the binding documentation.
+>> >> >>
+>> >> >
+>> >> > Latest Exynos SoC needs the special clocks. It is different part
+>> >> > from previous Exynos SoC.
+>> >> > Exynos3250 must need the special clock for ADC IP like this patch.
+>> >> > So, I sent the smiliar patch[1] to support SCLK as following and
+>> >> > merged it.
+>> >> >
+>> >> > [1] https://lkml.org/lkml/2014/7/21/734
+>> >>
+>> >> Thanks for the link.
+>> >>
+>> >> >
+>> >> > So, I suggest you that Exynos would use the similar method to
+>> >> > support special clock
+>> >> > on all of IPs for Exynos SoC.
+>> >> >
+>> >> >> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> >> >> ---
+>> >> >> This patch was earlier part of the series adding TMU support for
+>> >> >> Exynos7 [1]. It has been split out as it does not impact the
+>> >> >> on-going consolidation in the exynos tmu driver and can be
+>> >> >> considered independently.
+>> >> >>
+>> >> >>  .../devicetree/bindings/thermal/exynos-thermal.txt |    3 +++
+>> >> >>  drivers/thermal/samsung/exynos_tmu.c               |   27
+>> >> >> ++++++++++++++++---- 2 files changed, 25 insertions(+), 5
+>> >> >> deletions(-)
+>> >> >>
+>> >> >> diff --git
+>> >> >> a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+>> >> >> b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+>> >> >> index ae738f5..2393eac 100644 ---
+>> >> >> a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt +++
+>> >> >> b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt @@
+>> >> >> -32,10 +32,13 @@
+>> >> >>  - clocks : The main clocks for TMU device
+>> >> >>         -- 1. operational clock for TMU channel
+>> >> >>         -- 2. optional clock to access the shared registers of TMU
+>> >> >> channel
+>> >> >> +       -- 3. optional special clock for functional operation
+>> >> >>  - clock-names : Thermal system clock name
+>> >> >>         -- "tmu_apbif" operational clock for current TMU channel
+>> >> >>         -- "tmu_triminfo_apbif" clock to access the shared
+>> >> >> triminfo register for current TMU channel
+>> >> >> +       -- "tmu_sclk" clock for functional operation of the
+>> >> >> current TMU
+>> >> >> +               channel
+>> >> >>  - vtmu-supply: This entry is optional and provides the regulator
+>> >> >> node supplying voltage to TMU. If needed this entry can be placed
+>> >> >> inside board/platform specific dts file.
+>> >> >> diff --git a/drivers/thermal/samsung/exynos_tmu.c
+>> >> >> b/drivers/thermal/samsung/exynos_tmu.c index d44d91d..6627937
+>> >> >> 100644 --- a/drivers/thermal/samsung/exynos_tmu.c
+>> >> >> +++ b/drivers/thermal/samsung/exynos_tmu.c
+>> >> >> @@ -128,6 +128,7 @@
+>> >> >>   * @lock: lock to implement synchronization.
+>> >> >>   * @clk: pointer to the clock structure.
+>> >> >>   * @clk_sec: pointer to the clock structure for accessing the
+>> >> >> base_second.
+>> >> >> + * @sclk: pointer to the clock structure for accessing the tmu
+>> >> >> special clk.
+>> >> >>   * @temp_error1: fused value of the first point trim.
+>> >> >>   * @temp_error2: fused value of the second point trim.
+>> >> >>   * @regulator: pointer to the TMU regulator structure.
+>> >> >> @@ -147,7 +148,7 @@ struct exynos_tmu_data {
+>> >> >>         enum soc_type soc;
+>> >> >>         struct work_struct irq_work;
+>> >> >>         struct mutex lock;
+>> >> >> -       struct clk *clk, *clk_sec;
+>> >> >> +       struct clk *clk, *clk_sec, *sclk;
+>> >> >>         u8 temp_error1, temp_error2;
+>> >> >>         struct regulator *regulator;
+>> >> >>         struct thermal_sensor_conf *reg_conf;
+>> >> >> @@ -883,10 +884,21 @@ static int exynos_tmu_probe(struct
+>> >> >> platform_device *pdev) goto err_clk_sec;
+>> >> >>         }
+>> >> >>
+>> >> >> +       data->sclk = devm_clk_get(&pdev->dev, "tmu_sclk");
+>> >> >> +       if (IS_ERR(data->sclk)) {
+>> >> >> +               dev_err(&pdev->dev, "Failed to get optional
+>> >> >> special clock\n");
+>> >> >
+>> >> > Exynos4, Exynos3250 etc may show error message always. I think It
+>> >> > is not proper. I recommend that you use additional 'needs_sclk'
+>> >> > field. If 'needs_sclk' is true, tmu driver will get the special
+>> >> > clock of tmu without error message.
+>> >>
+>> >> OK,  I'll add a per-soc field to check for sclk availability.
+>> >
+>> > I think that it would be enough to change dev_err() -> dev_dbg().
+>>
+>> Lukasz, thanks for the review.
+>>
+>> Chanwoo, are you OK with this ? If so, I will post a v2 with this and
+>> the other changes you suggested.
+>
+> Is this a mandatory or a optional clk? What happens if the chip has the
+> clock, but you fail to get it in this code?
+
+This is mandatory on Exynos7 but not on the older SoCs. On Exynos7 if
+this clock is disabled then the TMU will not function.
+
+>
+> Think the rule of thumb is to at least warn the user that you are
+> bailing to the defaults, because you failed to get the clock, when you
+> were supposed to.
+>
+> Besides, warning / logging (even if it is in debugging mode) the user
+> that you failed to get a clock, when the board / platform does not
+> support it, sounds at least bogus for them.
+
+So, you would rather that I go with Chanwoo's approach of adding a
+per-soc flag indicating the presence of this clock ?
 
 Regards,
-Wanpeng Li
-
+Abhilash
 >
-> We can optimize by removing right and left shift in the computation of rq->rt_avg
-> and scale_rt_capacity
 >
-> The call to arch_scale_frequency_capacity in the rt scheduling path might be
-> a concern for RT folks because I'm not sure whether we can rely on
-> arch_scale_freq_capacity to be short and efficient ?
+> my two cents,
 >
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->   kernel/sched/fair.c  | 17 +++++------------
->   kernel/sched/sched.h |  4 +++-
->   2 files changed, 8 insertions(+), 13 deletions(-)
->
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index a5039da..b37c27b 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -5785,7 +5785,7 @@ unsigned long __weak arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
->   static unsigned long scale_rt_capacity(int cpu)
->   {
->   	struct rq *rq = cpu_rq(cpu);
-> -	u64 total, available, age_stamp, avg;
-> +	u64 total, used, age_stamp, avg;
->   	s64 delta;
->   
->   	/*
-> @@ -5801,19 +5801,12 @@ static unsigned long scale_rt_capacity(int cpu)
->   
->   	total = sched_avg_period() + delta;
->   
-> -	if (unlikely(total < avg)) {
-> -		/* Ensures that capacity won't end up being negative */
-> -		available = 0;
-> -	} else {
-> -		available = total - avg;
-> -	}
-> +	used = div_u64(avg, total);
->   
-> -	if (unlikely((s64)total < SCHED_CAPACITY_SCALE))
-> -		total = SCHED_CAPACITY_SCALE;
-> +	if (likely(used < SCHED_CAPACITY_SCALE))
-> +		return SCHED_CAPACITY_SCALE - used;
->   
-> -	total >>= SCHED_CAPACITY_SHIFT;
-> -
-> -	return div_u64(available, total);
-> +	return 1;
->   }
->   
->   static void update_cpu_capacity(struct sched_domain *sd, int cpu)
-> diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
-> index c34bd11..fc5b152 100644
-> --- a/kernel/sched/sched.h
-> +++ b/kernel/sched/sched.h
-> @@ -1312,9 +1312,11 @@ static inline int hrtick_enabled(struct rq *rq)
->   
->   #ifdef CONFIG_SMP
->   extern void sched_avg_update(struct rq *rq);
-> +extern unsigned long arch_scale_freq_capacity(struct sched_domain *sd, int cpu);
-> +
->   static inline void sched_rt_avg_update(struct rq *rq, u64 rt_delta)
->   {
-> -	rq->rt_avg += rt_delta;
-> +	rq->rt_avg += rt_delta * arch_scale_freq_capacity(NULL, cpu_of(rq));
->   	sched_avg_update(rq);
->   }
->   #else
+>>
+>> Abhilash
+>> >
+>> >>
+>> >> >
+>> >> > Also, How about just 'sclk' instead of 'tmu_sclk'?
+>> >> > I discussed the name of 'sclk' with Arnd Bergmann on following
+>> >> > patch[2]
+>> >>
+>> >> Sure, I'll use 'sclk' instead of 'tmu_sclk'.
+>> >>
+>> >> >
+>> >> > [2]
+>> >> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/273557.html
+>> >> >
+>> >> >> +       } else {
+>> >> >> +               ret = clk_prepare_enable(data->sclk);
+>> >> >> +               if (ret) {
+>> >> >> +                       dev_err(&pdev->dev, "Failed to enable
+>> >> >> special clock\n");
+>> >> >> +                       goto err_clk;
+>> >> >> +               }
+>> >> >> +       }
+>> >> >> +
+>> >> >>         ret = exynos_tmu_initialize(pdev);
+>> >> >>         if (ret) {
+>> >> >>                 dev_err(&pdev->dev, "Failed to initialize TMU\n");
+>> >> >> -               goto err_clk;
+>> >> >> +               goto err_sclk;
+>> >> >>         }
+>> >> >>
+>> >> >>         exynos_tmu_control(pdev, true);
+>> >> >> @@ -896,7 +908,7 @@ static int exynos_tmu_probe(struct
+>> >> >> platform_device *pdev) sizeof(struct thermal_sensor_conf),
+>> >> >> GFP_KERNEL); if (!sensor_conf) {
+>> >> >>                 ret = -ENOMEM;
+>> >> >> -               goto err_clk;
+>> >> >> +               goto err_sclk;
+>> >> >>         }
+>> >> >>         sprintf(sensor_conf->name, "therm_zone%d", data->id);
+>> >> >>         sensor_conf->read_temperature = (int (*)(void
+>> >> >> *))exynos_tmu_read; @@ -928,7 +940,7 @@ static int
+>> >> >> exynos_tmu_probe(struct platform_device *pdev) ret =
+>> >> >> exynos_register_thermal(sensor_conf); if (ret) {
+>> >> >>                 dev_err(&pdev->dev, "Failed to register thermal
+>> >> >> interface\n");
+>> >> >> -               goto err_clk;
+>> >> >> +               goto err_sclk;
+>> >> >>         }
+>> >> >>         data->reg_conf = sensor_conf;
+>> >> >>
+>> >> >> @@ -936,10 +948,13 @@ static int exynos_tmu_probe(struct
+>> >> >> platform_device *pdev) IRQF_TRIGGER_RISING | IRQF_SHARED,
+>> >> >> dev_name(&pdev->dev), data); if (ret) {
+>> >> >>                 dev_err(&pdev->dev, "Failed to request irq: %d\n",
+>> >> >> data->irq);
+>> >> >> -               goto err_clk;
+>> >> >> +               goto err_sclk;
+>> >> >>         }
+>> >> >>
+>> >> >>         return 0;
+>> >> >> +err_sclk:
+>> >> >> +       if (!IS_ERR(data->sclk))
+>> >> >> +               clk_disable_unprepare(data->sclk);
+>> >> >
+>> >> > I think IS_ERROR don't be necessary because
+>> >> > clk_disalbe_unprepare check the NULL pointer of clock pointer.
+>> >> >
+>> >> >>  err_clk:
+>> >> >>         clk_unprepare(data->clk);
+>> >> >>  err_clk_sec:
+>> >> >> @@ -956,6 +971,8 @@ static int exynos_tmu_remove(struct
+>> >> >> platform_device *pdev)
+>> >> >>
+>> >> >>         exynos_tmu_control(pdev, false);
+>> >> >>
+>> >> >> +       if (!IS_ERR(data->sclk))
+>> >> >> +               clk_disable_unprepare(data->sclk);
+>> >> >
+>> >> > ditto.
+>> >>
+>> >> Will fix.
+>> >>
+>> >> Thanks for the review.
+>> >>
+>> >> Regards,
+>> >> Abhilash
+>> >> >
+>> >> > Best Regards,
+>> >> > Chanwoo Choi
+>> >> >
+>> >> >>         clk_unprepare(data->clk);
+>> >> >>         if (!IS_ERR(data->clk_sec))
+>> >> >>                 clk_unprepare(data->clk_sec);
+>> >> >> --
+>> >> >> 1.7.9.5
+>> >> >>
+>> >> >>
+>> >> >> _______________________________________________
+>> >> >> linux-arm-kernel mailing list
+>> >> >> linux-arm-kernel at lists.infradead.org
+>> >> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> >
+>> >
+>> >
+>> > --
+>> > Best regards,
+>> >
+>> > Lukasz Majewski
+>> >
+>> > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
