@@ -1,36 +1,122 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Nov 2014 21:57:07 +0100
-Subject: [PATCH v2 2/8] irqchip: Supply new driver for STi based devices
-In-Reply-To: <1416932705-16880-3-git-send-email-lee.jones@linaro.org>
-References: <1416932705-16880-1-git-send-email-lee.jones@linaro.org>
- <1416932705-16880-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <2433040.4NqTrOMmEE@wuerfel>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 25 Nov 2014 22:20:39 +0100
+Subject: [PATCH v5 02/18] ACPI / table: Add new function to get table
+ entries
+In-Reply-To: <5473F99D.6090505@huawei.com>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1581499.U8906vqSiO@vostro.rjw.lan> <5473F99D.6090505@huawei.com>
+Message-ID: <1591450.lUZUanAOs6@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 November 2014 16:24:59 Lee Jones wrote:
+On Tuesday, November 25, 2014 11:38:05 AM Hanjun Guo wrote:
+> On 2014/11/24 22:51, Rafael J. Wysocki wrote:
+> > On Monday, November 24, 2014 07:03:54 PM Hanjun Guo wrote:
+> >> On 2014-11-24 9:27, Rafael J. Wysocki wrote:
+> >>> On Friday, October 17, 2014 09:36:58 PM Hanjun Guo wrote:
+> >>>> From: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> >>>>
+> >>>> The acpi_table_parse() function has a callback that
+> >>>> passes a pointer to a table_header. Add a new function
+> >>>> which takes this pointer and parses its entries. This
+> >>>> eliminates the need to re-traverse all the tables for
+> >>>> each call. e.g. as in acpi_table_parse_madt() which is
+> >>>> normally called after acpi_table_parse().
+> >>>>
+> >>>> Acked-by: Grant Likely <grant.likely@linaro.org>
+> >>>> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> >>>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> >>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >>>> ---
+> >>>>  drivers/acpi/tables.c |   67 ++++++++++++++++++++++++++++++++++---------------
+> >>>>  include/linux/acpi.h  |    4 +++
+> >>>>  2 files changed, 51 insertions(+), 20 deletions(-)
+> >>>>
+> >>>> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+> >>>> index 6d5a6cd..21ae521 100644
+> >>>> --- a/drivers/acpi/tables.c
+> >>>> +++ b/drivers/acpi/tables.c
+> >>>> @@ -192,17 +192,14 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+> >>>>  
+> >>>>  
+> >>>>  int __init
+> >>>> -acpi_table_parse_entries(char *id,
+> >>>> -			     unsigned long table_size,
+> >>>> -			     int entry_id,
+> >>>> -			     acpi_tbl_entry_handler handler,
+> >>>> -			     unsigned int max_entries)
+> >>>> +acpi_parse_entries(unsigned long table_size,
+> >>>> +		acpi_tbl_entry_handler handler,
+> >>>> +		struct acpi_table_header *table_header,
+> >>>> +		int entry_id, unsigned int max_entries)
+> >>>>  {
+> >>>> -	struct acpi_table_header *table_header = NULL;
+> >>>>  	struct acpi_subtable_header *entry;
+> >>>> -	unsigned int count = 0;
+> >>>> +	int count = 0;
+> >>>>  	unsigned long table_end;
+> >>>> -	acpi_size tbl_size;
+> >>>>  
+> >>>>  	if (acpi_disabled)
+> >>>>  		return -ENODEV;
+> >>>> @@ -210,13 +207,11 @@ acpi_table_parse_entries(char *id,
+> >>>>  	if (!handler)
+> >>>>  		return -EINVAL;
+> >>>>  
+> >>>> -	if (strncmp(id, ACPI_SIG_MADT, 4) == 0)
+> >>>> -		acpi_get_table_with_size(id, acpi_apic_instance, &table_header, &tbl_size);
+> >>>> -	else
+> >>>> -		acpi_get_table_with_size(id, 0, &table_header, &tbl_size);
+> >>>> +	if (!table_size)
+> >>>> +		return -EINVAL;
+> >>>>  
+> >>>>  	if (!table_header) {
+> >>>> -		pr_warn("%4.4s not present\n", id);
+> >>>> +		pr_warn("Table header not present\n");
+> >>> The message doesn't make sense any more if the table signature is not printed.
+> 
+> For this message, since no table id is passed, and this message is printed in
+> acpi_table_parse_entries() before this function is called, I think we can check
+> the table_header before call this function and remove the printed message here.
 
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index b21f12f..e502f15 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -93,6 +93,13 @@ config RENESAS_IRQC
->  	bool
->  	select IRQ_DOMAIN
->  
-> +config ST_IRQCHIP
-> +	bool
-> +	select REGMAP
-> +	select MFD_SYSCON
-> +	help
-> +	  Enables SysCfg Controlled IRQs on STi based platforms.
-> +
+table_header needs to be checked against NULL in the caller and the message
+printed from there to my eyes.
 
-I'm confused by the purpose of this code. It's apparently a driver
-in drivers/irqchip, the Kconfig symbol contains the string IRQCHIP,
-yet it doesn't actually register an irq_chip.
+> >>>
+> >>>>  		return -ENODEV;
+> >>>>  	}
+> >>>>  
+> >>>> @@ -232,30 +227,62 @@ acpi_table_parse_entries(char *id,
+> >>>>  		if (entry->type == entry_id
+> >>>>  		    && (!max_entries || count++ < max_entries))
+> >>>>  			if (handler(entry, table_end))
+> >>>> -				goto err;
+> >>>> +				return -EINVAL;
+> >>>>  
+> >>>>  		/*
+> >>>>  		 * If entry->length is 0, break from this loop to avoid
+> >>>>  		 * infinite loop.
+> >>>>  		 */
+> >>>>  		if (entry->length == 0) {
+> >>>> -			pr_err("[%4.4s:0x%02x] Invalid zero length\n", id, entry_id);
+> >>>> -			goto err;
+> >>>> +			pr_err("[0x%02x] Invalid zero length\n", entry_id);
+> 
+> For this one, since the table_header is valid now, we can keep it with:
 
-Also, the name is a bit too generic, ST has lots of different irqchips,
-and this apparently isn't even one of them ;-)
+Fine by me.
 
-	Arnd
+> - pr_err("[%4.4s:0x%02x] Invalid zero length\n", id, entry_id);
+> + pr_err("[%4.4s:0x%02x] Invalid zero length\n", table_header->signature, entry_id);
+> 
+> >>> Same here.
+> >> How about remove the message and return directly?
+> > We could do that, but for what reason?  Is the message not useful?
+> 
+> I agree with you, the message is useful I think, how about the comments above?
+
+Please see above.
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
