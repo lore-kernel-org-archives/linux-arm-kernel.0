@@ -1,165 +1,197 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Tue, 25 Nov 2014 16:10:02 +0000
-Subject: [PATCH 4/7] KVM: arm64: guest debug, add SW break point support
+Date: Tue, 25 Nov 2014 16:10:03 +0000
+Subject: [PATCH 5/7] KVM: arm64: guest debug, add support for single-step
 In-Reply-To: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
 References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1416931805-23223-5-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1416931805-23223-6-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for SW breakpoints inserted by userspace.
-
-First we need to trap all BKPT exceptions in the hypervisor (ELS). This
-in controlled through the MDCR_EL2 register. I've added a new field to
-the vcpu structure to hold this value. There should be scope to
-rationlise this with the VCPU_DEBUG_FLAGS/KVM_ARM64_DEBUG_DIRTY_SHIFT
-manipulation in later patches.
-
-Once the exception arrives we triggers an exit from the main hypervisor
-loop to the hypervisor controller. The kvm_debug_exit_arch carries the
-address of the exception. If the controller doesn't know of breakpoint
-then we have a guest inserted breakpoint and the hypervisor needs to
-start again and deliver the exception to guest.
+This adds support for single-stepping the guest. As userspace can and
+will manipulate guest registers before restarting any tweaking of the
+registers has to occur just before control is passed back to the guest.
+Furthermore while guest debugging is in effect we need to squash the
+ability of the guest to single-step itself as we have no easy way of
+re-entering the guest after the exception has been delivered to the
+hypervisor.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 2c6386e..9383359 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2592,7 +2592,7 @@ when running. Common control bits are:
- The top 16 bits of the control field are architecture specific control
- flags which can include the following:
- 
--  - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86]
-+  - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86, arm64]
-   - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390]
-   - KVM_GUESTDBG_INJECT_DB:     inject DB type exception [x86]
-   - KVM_GUESTDBG_INJECT_BP:     inject BP type exception [x86]
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index a0ff410..48d26bb 100644
+index 48d26bb..a76daae 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -303,6 +303,9 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 					struct kvm_guest_debug *dbg)
- {
-+	/* Route debug traps to el2? */
-+	bool route_el2 = false;
-+
- 	/* If it's not enabled clear all flags */
- 	if (!(dbg->control & KVM_GUESTDBG_ENABLE)) {
- 		vcpu->guest_debug = 0;
-@@ -320,8 +323,8 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 
- 	/* Software Break Points */
- 	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP) {
--		kvm_info("SW BP support requested, not yet implemented\n");
--		return -EINVAL;
-+		kvm_info("SW BP support requested\n");
-+		route_el2 = true;
- 	}
- 
- 	/* Hardware assisted Break and Watch points */
-@@ -330,6 +333,20 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 		return -EINVAL;
- 	}
- 
-+	/* If we are going to handle any debug exceptions we need to
-+	 * set MDCE_EL2.TDE to ensure they are routed to the
-+	 * hypervisor. If userspace determines the exception was
-+	 * actually internal to the guest it needs to handle
-+	 * re-injecting the exception.
-+	 */
-+	if (route_el2) {
-+		kvm_info("routing debug exceptions");
-+		vcpu->arch.mdcr_el2 = MDCR_EL2_TDE;
-+	} else {
-+		kvm_info("not routing debug exceptions");
-+		vcpu->arch.mdcr_el2 = 0;
-+	}
-+
- 	return 0;
- }
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 2012c4b..38b0f07 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -98,6 +98,7 @@ struct kvm_vcpu_arch {
- 
- 	/* HYP configuration */
- 	u64 hcr_el2;
-+	u32 mdcr_el2;
- 
- 	/* Exception Information */
- 	struct kvm_vcpu_fault_info fault;
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 9a9fce0..8da1043 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -122,6 +122,7 @@ int main(void)
-   DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
-   DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
-   DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
-+  DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
-   DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
-   DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-   DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 34b8bd0..28dc92b 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -71,6 +71,26 @@ static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	return 1;
+@@ -38,6 +38,7 @@
+ #include <asm/tlbflush.h>
+ #include <asm/cacheflush.h>
+ #include <asm/virt.h>
++#include <asm/debug-monitors.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmu.h>
+@@ -300,6 +301,17 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+ 	kvm_arm_set_running_vcpu(NULL);
  }
  
 +/**
-+ * kvm_handle_bkpt - handle a break-point instruction
++ * kvm_arch_vcpu_ioctl_set_guest_debug - Setup guest debugging
++ * @kvm:	pointer to the KVM struct
++ * @kvm_guest_debug: the ioctl data buffer
++ *
++ * This sets up the VM for guest debugging. Care has to be taken when
++ * manipulating guest registers as these will be set/cleared by the
++ * hyper-visor controller, typically before each kvm_run event. As a
++ * result modification of the guest registers needs to take place
++ * after they have been restored in the hyp.S trampoline code.
++ */
+ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+ 					struct kvm_guest_debug *dbg)
+ {
+@@ -317,8 +329,8 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+ 
+ 	/* Single Step */
+ 	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
+-		kvm_info("SS requested, not yet implemented\n");
+-		return -EINVAL;
++		kvm_info("SS requested\n");
++		route_el2 = true;
+ 	}
+ 
+ 	/* Software Break Points */
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 8da1043..78e5ae1 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -121,6 +121,7 @@ int main(void)
+   DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
+   DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
+   DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
++  DEFINE(GUEST_DEBUG,		offsetof(struct kvm_vcpu, guest_debug));
+   DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
+   DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
+   DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 28dc92b..6def054 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -91,6 +91,25 @@ static int kvm_handle_bkpt(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return 0;
+ }
+ 
++/**
++ * kvm_handle_ss - handle single step exceptions
 + *
 + * @vcpu:	the vcpu pointer
 + *
-+ * By definition if we arrive here it's because we are routing
-+ * all SW breakpoints to the hyper-visor as some may be a result of
-+ * guest debugging. If user-space decides this particular break-point
-+ * isn't for the host to handle it can re-feed the exception to the
-+ * guest.
++ * See: ARM ARM D2.12 for the details. While the host is routing debug
++ * exceptions to it's handlers we have to suppress the ability of the
++ * guest to trigger exceptions.
 + */
-+static int kvm_handle_bkpt(struct kvm_vcpu *vcpu, struct kvm_run *run)
++static int kvm_handle_ss(struct kvm_vcpu *vcpu, struct kvm_run *run)
 +{
++	WARN_ON(!(vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP));
++
 +	run->exit_reason = KVM_EXIT_DEBUG;
-+	run->debug.arch.exit_type = KVM_DEBUG_EXIT_SW_BKPT;
++	run->debug.arch.exit_type = KVM_DEBUG_EXIT_SINGLE_STEP;
 +	run->debug.arch.address = *vcpu_pc(vcpu);
-+	kvm_info("exiting from %llx\n", run->debug.arch.address);
 +	return 0;
 +}
 +
  static exit_handle_fn arm_exit_handlers[] = {
  	[ESR_EL2_EC_WFI]	= kvm_handle_wfx,
  	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
-@@ -85,6 +105,8 @@ static exit_handle_fn arm_exit_handlers[] = {
+@@ -105,6 +124,7 @@ static exit_handle_fn arm_exit_handlers[] = {
  	[ESR_EL2_EC_SYS64]	= kvm_handle_sys_reg,
  	[ESR_EL2_EC_IABT]	= kvm_handle_guest_abort,
  	[ESR_EL2_EC_DABT]	= kvm_handle_guest_abort,
-+	[ESR_EL2_EC_BKPT32]	= kvm_handle_bkpt,
-+	[ESR_EL2_EC_BRK64]	= kvm_handle_bkpt,
++	[ESR_EL2_EC_SOFTSTP]    = kvm_handle_ss,
+ 	[ESR_EL2_EC_BKPT32]	= kvm_handle_bkpt,
+ 	[ESR_EL2_EC_BRK64]	= kvm_handle_bkpt,
  };
- 
- static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
 diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index b72aa9f..3c733ea 100644
+index 3c733ea..c0bc218 100644
 --- a/arch/arm64/kvm/hyp.S
 +++ b/arch/arm64/kvm/hyp.S
-@@ -772,6 +772,10 @@
- 	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
- 	orr	x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
+@@ -16,6 +16,7 @@
+  */
  
-+	// Any other bits (currently TDE)
-+	ldr	x3, [x0, #VCPU_MDCR_EL2]
-+	orr	x2, x2, x3
+ #include <linux/linkage.h>
++#include <linux/kvm.h>
+ 
+ #include <asm/assembler.h>
+ #include <asm/memory.h>
+@@ -168,6 +169,31 @@
+ 	// x19-x29, lr, sp*, elr*, spsr*
+ 	restore_common_regs
+ 
++	// After restoring the guest registers but before we return to the guest
++	// we may want to make some final tweaks to support guest debugging.
++	ldr	x3, [x0, #GUEST_DEBUG]
++	tbz	x3, #KVM_GUESTDBG_ENABLE_SHIFT, 2f	// No guest debug
 +
- 	// Check for KVM_ARM64_DEBUG_DIRTY, and set debug to trap
- 	// if not dirty.
- 	ldr	x3, [x0, #VCPU_DEBUG_FLAGS]
++	// x0 - preserved as VCPU ptr
++	// x1 - spsr
++	// x2 - mdscr
++	mrs	x1, spsr_el2
++	mrs 	x2, mdscr_el1
++
++	// See ARM ARM D2.12.3 The software step state machine
++	// If we are doing Single Step - set MDSCR_EL1.SS and PSTATE.SS
++	orr	x1, x1, #DBG_SPSR_SS
++	orr	x2, x2, #DBG_MDSCR_SS
++	tbnz	x3, #KVM_GUESTDBG_SINGLESTEP_SHIFT, 1f
++	// If we are not doing Single Step we want to prevent the guest doing so
++	// as otherwise we will have to deal with the re-routed exceptions as we
++	// are doing other guest debug related things
++	eor	x1, x1, #DBG_SPSR_SS
++	eor	x2, x2, #DBG_MDSCR_SS
++1:
++	msr	spsr_el2, x1
++	msr	mdscr_el1, x2
++2:
+ 	// Last bits of the 64bit state
+ 	pop	x2, x3
+ 	pop	x0, x1
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 523f476..347e5b0 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -7,6 +7,8 @@
+  * Note: you must update KVM_API_VERSION if you change this interface.
+  */
+ 
++#ifndef __ASSEMBLY__
++
+ #include <linux/types.h>
+ #include <linux/compiler.h>
+ #include <linux/ioctl.h>
+@@ -515,11 +517,6 @@ struct kvm_s390_irq {
+ 	} u;
+ };
+ 
+-/* for KVM_SET_GUEST_DEBUG */
+-
+-#define KVM_GUESTDBG_ENABLE		0x00000001
+-#define KVM_GUESTDBG_SINGLESTEP		0x00000002
+-
+ struct kvm_guest_debug {
+ 	__u32 control;
+ 	__u32 pad;
+@@ -1189,4 +1186,15 @@ struct kvm_assigned_msix_entry {
+ 	__u16 padding[3];
+ };
+ 
++#endif /* __ASSEMBLY__ */
++
++/* for KVM_SET_GUEST_DEBUG */
++
++#define KVM_GUESTDBG_ENABLE_SHIFT	0
++#define KVM_GUESTDBG_ENABLE		(1 << KVM_GUESTDBG_ENABLE_SHIFT)
++#define KVM_GUESTDBG_SINGLESTEP_SHIFT	1
++#define KVM_GUESTDBG_SINGLESTEP	(1 << KVM_GUESTDBG_SINGLESTEP_SHIFT)
++
++
++
+ #endif /* __LINUX_KVM_H */
 -- 
 2.1.3
