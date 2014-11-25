@@ -1,194 +1,354 @@
-From: linyongting@gmail.com (Lin Yongting)
-Date: Tue, 25 Nov 2014 20:23:07 +0800
-Subject: [PATCH] ARM: Add unwinding support for memory copy functions
-Message-ID: <1416918187-26016-1-git-send-email-linyongting@gmail.com>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Tue, 25 Nov 2014 20:16:56 +0800
+Subject: [PATCH v3 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC in
+ dts and Makefile
+In-Reply-To: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <Sharkl64-v3>
+ <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <1416917818-10506-4-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The memory copy functions(memcpy, __copy_from_user, __copy_to_user)
-never had unwinding annotations added. Currently, when accessing
-invalid pointer by these functions occurs the backtrace shown will
-stop at these functions or some completely unrelated function.
-Add unwinding annotations in hopes of getting a more useful backtrace
-in following cases:
-1. die on accessing invalid pointer by these functions
-2. kprobe trapped at any instruction within these functions
-3. interrupted at any instruction within these functions
+From: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
 
-Signed-off-by: Lin Yongting <linyongting@gmail.com>
+Adds the device tree support for Spreadtrum SC9836 SoC which is based on
+Sharkl64 platform.
+
+Sharkl64 platform contains the common nodes of Spreadtrum's arm64-based SoCs.
+
+Signed-off-by: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
 ---
- arch/arm/lib/copy_from_user.S |    5 +++++
- arch/arm/lib/copy_template.S  |   30 ++++++++++++++++++++++++++++++
- arch/arm/lib/copy_to_user.S   |    5 +++++
- arch/arm/lib/memcpy.S         |    5 +++++
- 4 files changed, 45 insertions(+)
+ arch/arm64/boot/dts/Makefile                  |    1 +
+ arch/arm64/boot/dts/sprd-sc9836-openphone.dts |   85 ++++++++++++++++++++
+ arch/arm64/boot/dts/sprd-sc9836.dtsi          |  103 ++++++++++++++++++++++++
+ arch/arm64/boot/dts/sprd-sharkl64.dtsi        |  105 +++++++++++++++++++++++++
+ 4 files changed, 294 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/sprd-sc9836-openphone.dts
+ create mode 100644 arch/arm64/boot/dts/sprd-sc9836.dtsi
+ create mode 100644 arch/arm64/boot/dts/sprd-sharkl64.dtsi
 
-diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
-index 66a477a..7a235b9 100644
---- a/arch/arm/lib/copy_from_user.S
-+++ b/arch/arm/lib/copy_from_user.S
-@@ -12,6 +12,7 @@
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index f8001a6..d0aff8a 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -1,4 +1,5 @@
+ dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
++dtb-$(CONFIG_ARCH_SHARKL64) += sprd-sc9836-openphone.dtb
+ dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+ dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
  
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-+#include <asm/unwind.h>
- 
- /*
-  * Prototype:
-@@ -77,6 +78,10 @@
- 	stmdb	sp!, {r0, r2, r3, \reg1, \reg2}
- 	.endm
- 
-+	.macro usave reg1 reg2
-+	UNWIND(	.save {r0, r2, r3, \reg1, \reg2}	)
-+	.endm
-+
- 	.macro exit reg1 reg2
- 	add	sp, sp, #8
- 	ldmfd	sp!, {r0, \reg1, \reg2}
-diff --git a/arch/arm/lib/copy_template.S b/arch/arm/lib/copy_template.S
-index 3bc8eb8..652e4d9 100644
---- a/arch/arm/lib/copy_template.S
-+++ b/arch/arm/lib/copy_template.S
-@@ -53,6 +53,12 @@
-  *	data as needed by the implementation including this code. Called
-  *	upon code entry.
-  *
-+ * usave reg1 reg2
+diff --git a/arch/arm64/boot/dts/sprd-sc9836-openphone.dts b/arch/arm64/boot/dts/sprd-sc9836-openphone.dts
+new file mode 100644
+index 0000000..484d714
+--- /dev/null
++++ b/arch/arm64/boot/dts/sprd-sc9836-openphone.dts
+@@ -0,0 +1,85 @@
++/*
++ * Spreadtrum SC9836 openphone board DTS file
 + *
-+ *	Unwind annotation macro is corresponding for 'enter' macro.
-+ *	It tell unwinder that preserved some provided registers on the stack
-+ *	and additional data by a prior 'enter' macro.
++ * Copyright (C) 2014, Spreadtrum Communications Inc.
 + *
-  * exit reg1 reg2
-  *
-  *	Restore registers with the values previously saved with the
-@@ -67,7 +73,12 @@
-  */
- 
- 
-+	UNWIND(	.fnstart			)
- 		enter	r4, lr
-+	UNWIND(	.fnend				)
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+	UNWIND(	.fnstart			)
-+		usave	r4, lr			  @ in first stmdb block
- 
- 		subs	r2, r2, #4
- 		blt	8f
-@@ -79,6 +90,11 @@
- 
- 1:		subs	r2, r2, #(28)
- 		stmfd	sp!, {r5 - r8}
-+	UNWIND(	.fnend				)
++/dts-v1/;
 +
-+	UNWIND(	.fnstart			)
-+		usave	r4, lr
-+	UNWIND(	.save	{r5 - r8}		) @ in second stmfd block
- 		blt	5f
- 
- 	CALGN(	ands	ip, r0, #31		)
-@@ -144,7 +160,10 @@
- 	CALGN(	bcs	2b			)
- 
- 7:		ldmfd	sp!, {r5 - r8}
-+	UNWIND(	.fnend				) @ end of second stmfd block
- 
-+	UNWIND(	.fnstart			)
-+		usave	r4, lr			  @ still in first stmdb block
- 8:		movs	r2, r2, lsl #31
- 		ldr1b	r1, r3, ne, abort=21f
- 		ldr1b	r1, r4, cs, abort=21f
-@@ -173,10 +192,13 @@
- 		ldr1w	r1, lr, abort=21f
- 		beq	17f
- 		bgt	18f
-+	UNWIND(	.fnend				)
- 
- 
- 		.macro	forward_copy_shift pull push
- 
-+	UNWIND(	.fnstart			)
-+		usave	r4, lr			  @ still in first stmdb block
- 		subs	r2, r2, #28
- 		blt	14f
- 
-@@ -187,7 +209,11 @@
- 	CALGN(	bcc	15f			)
- 
- 11:		stmfd	sp!, {r5 - r9}
-+	UNWIND(	.fnend				)
- 
-+	UNWIND(	.fnstart			)
-+		usave	r4, lr
-+	UNWIND(	.save	{r5 - r9}		) @ in new second stmfd block
- 	PLD(	pld	[r1, #0]		)
- 	PLD(	subs	r2, r2, #96		)
- 	PLD(	pld	[r1, #28]		)
-@@ -221,7 +247,10 @@
- 	PLD(	bge	13b			)
- 
- 		ldmfd	sp!, {r5 - r9}
-+	UNWIND(	.fnend				) @ end of the second stmfd block
- 
-+	UNWIND(	.fnstart			)
-+		usave	r4, lr			  @ still in first stmdb block
- 14:		ands	ip, r2, #28
- 		beq	16f
- 
-@@ -236,6 +265,7 @@
- 
- 16:		sub	r1, r1, #(\push / 8)
- 		b	8b
-+	UNWIND(	.fnend				)
- 
- 		.endm
- 
-diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
-index d066df6..a9d3db1 100644
---- a/arch/arm/lib/copy_to_user.S
-+++ b/arch/arm/lib/copy_to_user.S
-@@ -12,6 +12,7 @@
- 
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-+#include <asm/unwind.h>
- 
- /*
-  * Prototype:
-@@ -80,6 +81,10 @@
- 	stmdb	sp!, {r0, r2, r3, \reg1, \reg2}
- 	.endm
- 
-+	.macro usave reg1 reg2
-+	UNWIND(	.save {r0, r2, r3, \reg1, \reg2}	)
-+	.endm
++#include "sprd-sc9836.dtsi"
 +
- 	.macro exit reg1 reg2
- 	add	sp, sp, #8
- 	ldmfd	sp!, {r0, \reg1, \reg2}
-diff --git a/arch/arm/lib/memcpy.S b/arch/arm/lib/memcpy.S
-index a9b9e22..7797e81 100644
---- a/arch/arm/lib/memcpy.S
-+++ b/arch/arm/lib/memcpy.S
-@@ -12,6 +12,7 @@
- 
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-+#include <asm/unwind.h>
- 
- #define LDR1W_SHIFT	0
- #define STR1W_SHIFT	0
-@@ -48,6 +49,10 @@
- 	stmdb sp!, {r0, \reg1, \reg2}
- 	.endm
- 
-+	.macro usave reg1 reg2
-+	UNWIND(	.save	{r0, \reg1, \reg2}	)
-+	.endm
++/ {
++	model = "Spreadtrum,SC9836 Openphone Board";
 +
- 	.macro exit reg1 reg2
- 	ldmfd sp!, {r0, \reg1, \reg2}
- 	.endm
++	compatible = "sprd,sc9836-openphone", "sprd,sc9836";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
++	};
++
++	memory at 80000000 {
++		device_type = "memory";
++		reg = <0 0x80000000 0 0x20000000>;
++	};
++
++	chosen {
++		stdout-path = &uart0;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++};
++
++&uart3 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/sprd-sc9836.dtsi b/arch/arm64/boot/dts/sprd-sc9836.dtsi
+new file mode 100644
+index 0000000..d5fe552
+--- /dev/null
++++ b/arch/arm64/boot/dts/sprd-sc9836.dtsi
+@@ -0,0 +1,103 @@
++/*
++ * Spreadtrum SC9836 SoC DTS file
++ *
++ * Copyright (C) 2014, Spreadtrum Communications Inc.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "sprd-sharkl64.dtsi"
++
++/ {
++	compatible = "sprd,sc9836";
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x0>;
++			enable-method = "psci";
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x1>;
++			enable-method = "psci";
++		};
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x2>;
++			enable-method = "psci";
++		};
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x3>;
++			enable-method = "psci";
++		};
++	};
++
++	gic: interrupt-controller at 12001000 {
++		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		reg = <0 0x12001000 0 0x1000>,
++		      <0 0x12002000 0 0x1000>,
++		      <0 0x12004000 0 0x2000>,
++		      <0 0x12006000 0 0x2000>;
++	};
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <1 13 0xff01>,
++			     <1 14 0xff01>,
++			     <1 11 0xff01>,
++			     <1 10 0xff01>;
++		clock-frequency = <26000000>;
++	};
++};
+diff --git a/arch/arm64/boot/dts/sprd-sharkl64.dtsi b/arch/arm64/boot/dts/sprd-sharkl64.dtsi
+new file mode 100644
+index 0000000..d9ecfe9
+--- /dev/null
++++ b/arch/arm64/boot/dts/sprd-sharkl64.dtsi
+@@ -0,0 +1,105 @@
++/*
++ * Spreadtrum Sharkl64 platform DTS file
++ *
++ * Copyright (C) 2014, Spreadtrum Communications Inc.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/ {
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	soc {
++		compatible = "simple-bus";
++		reg = <0x0 0x0 0x0 0x80000000>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		ap_apb: apb at 70000000 {
++			compatible = "simple-bus";
++			reg = <0x0 0x70000000 0x0 0x10000000>;
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges;
++
++			uart0: serial at 70000000 {
++				compatible = "sprd,sc9836-uart";
++				reg = <0 0x70000000 0 0x100>;
++				interrupts = <0 2 0xf04>;
++				clocks = <&clk26mhz>;
++				status = "disabled";
++			};
++
++			uart1: serial at 70100000 {
++				compatible = "sprd,sc9836-uart";
++				reg = <0 0x70100000 0 0x100>;
++				interrupts = <0 3 0xf04>;
++				clocks = <&clk26mhz>;
++				status = "disabled";
++			};
++
++			uart2: serial at 70200000 {
++				compatible = "sprd,sc9836-uart";
++				reg = <0 0x70200000 0 0x100>;
++				interrupts = <0 2 0xf04>;
++				clocks = <&clk26mhz>;
++				status = "disabled";
++			};
++
++			uart3: serial at 70300000 {
++				compatible = "sprd,sc9836-uart";
++				reg = <0 0x70300000 0 0x100>;
++				interrupts = <0 3 0xf04>;
++				clocks = <&clk26mhz>;
++				status = "disabled";
++			};
++		};
++	};
++
++	clocks {
++		clk26mhz: clk26mhz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <26000000>;
++		};
++	};
++};
 -- 
 1.7.9.5
