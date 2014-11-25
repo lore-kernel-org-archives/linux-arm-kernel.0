@@ -1,82 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 25 Nov 2014 10:58:15 +0000
-Subject: For the problem when using swiotlb
-In-Reply-To: <2166613.l2i4mdmtLA@wuerfel>
-References: <5469E26B.2010905@huawei.com> <20141121175118.GA10451@localhost>
- <20141121180925.GG19783@e104818-lin.cambridge.arm.com>
- <2166613.l2i4mdmtLA@wuerfel>
-Message-ID: <20141125105815.GB18858@e104818-lin.cambridge.arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 25 Nov 2014 16:32:10 +0530
+Subject: [PATCH v11 4/6] ARM: Exynos: switch to using generic cpufreq
+ driver for Exynos4210/5250/5420
+In-Reply-To: <5473364C.3010102@arm.com>
+References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-2-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-3-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-4-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-5-git-send-email-thomas.ab@samsung.com>
+ <546CEF61.4050105@arm.com>
+ <CAKohponEHqHYCLibVc8OHN49+4YW5qw89ny4ycTBL1xN-p9qtA@mail.gmail.com>
+ <5473364C.3010102@arm.com>
+Message-ID: <CAKohpo=CovQ0h_7yyhPg2AVrC+SDZm3+N-_WNWZXfowKFNdrDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 08:12:09PM +0000, Arnd Bergmann wrote:
-> On Friday 21 November 2014 18:09:25 Catalin Marinas wrote:
-> > On Fri, Nov 21, 2014 at 05:51:19PM +0000, Catalin Marinas wrote:
-> > > On Fri, Nov 21, 2014 at 05:04:28PM +0000, Arnd Bergmann wrote:
-> > > > On Friday 21 November 2014 16:57:09 Catalin Marinas wrote:
-> > > > > There is a scenario where smaller mask would work on arm64. For example
-> > > > > Juno, you can have 2GB of RAM in the 32-bit phys range (starting at
-> > > > > 0x80000000). A device with 31-bit mask and a dma_pfn_offset of
-> > > > > 0x80000000 would still work (there isn't any but just as an example). So
-> > > > > the check in dma_alloc_coherent() would be something like:
-> > > > > 
-> > > > > 	phys_to_dma(top of ZONE_DMA) - dma_pfn_offset <= coherent_dma_mask
-> > > > > 
-> > > > > (or assuming RAM starts at 0 and ignoring dma_pfn_offset for now)
-> > > > > 
-> > > > > If the condition above fails, dma_alloc_coherent() would no longer fall
-> > > > > back to swiotlb but issue a dev_warn() and return NULL.
-> > > > 
-> > > > Ah, that looks like it should work on all architectures, very nice.
-> > > > How about checking this condition, and then printing a small warning
-> > > > (dev_warn, not WARN_ON) and setting the dma_mask pointer to NULL?
-> > > 
-> > > I would not add the above ZONE_DMA check to of_dma_configure(). For
-> > > example on arm64, we may not support a small coherent_dma_mask but the
-> > > same value for dma_mask could be fine via swiotlb bouncing (or IOMMU).
-> > > However, that's an arch-specific decision. Maybe after the above setting
-> > > of dev->coherent_dma_mask in of_dma_configure(), we could add:
-> 
-> You seem to implement the opposite:
+On 24 November 2014 at 19:14, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 20/11/14 03:48, Viresh Kumar wrote:
+>> - I believe CPUs boot in the order they are present in DT except for the
+>> boot CPU. So, the first node for every cluster should have it.
+>>
+>> Correct ? Then we can update the fixme.
+>>
+>
+> No, I disagree as you trying to implicitly depend on the logic Linux uses to
+> assign logical index. It can be changed any time, and depending
+> on it might break things in future which can't be fixed easily later
+> especially if it's DT related.
 
-Possibly, but I had something else in mind.
+Yeah, correct.
 
-> > +	/*
-> > +	 * If the bus dma-ranges property specifies a size smaller than 4GB,
-> > +	 * the device would not be capable of accessing the whole 32-bit
-> > +	 * space, so reduce the default coherent_dma_mask accordingly.
-> > +	 */
-> > +	if (size && size < (1ULL << 32))
-> > +		dev->coherent_dma_mask = DMA_BIT_MASK(ilog2(size));
-> > +
-> > +	/*
-> > +	 * Set dma_mask to coherent_dma_mask by default if the architecture
-> > +	 * code has not set it and DMA on such mask is supported.
-> > +	 */
-> > +	if (!dev->dma_mask && dma_supported(dev, dev->coherent_dma_mask))
-> > +		dev->dma_mask = &dev->coherent_dma_mask;
-> >  }
-> 
-> Here, coherent_dma_mask wouldn't work while dma_mask might be
-> fine in case of swiotlb, but you set a nonzero coherent_dma_mask
-> and an invalid dma_mask.
+>> Hmm, I never thought about it. But yes the CPU with the OPPs should
+>> be the first one to come back.
+>>
+>
+> How can you assume that ? I can write a simple test which hot-plugs out
+> all the CPUs in the (esp. multi-cluster) system in ascending order of
+> logical index and hot-plug back in descending order. Then the above
+> logic fails.
 
-My assumption is that dma_supported() only checks the validity of
-dma_mask (not the coherent one). On arm64 it is currently routed to
-swiotlb_dma_supported() which returns true if the swiotlb bounce buffer
-is within that mask. So if the coherent_dma_mask is enough for swiotlb
-bounce buffer, we point dma_mask to it. Otherwise, there is no way to do
-streaming DMA to such mask, hence setting it to NULL.
+What I said is: Yes the CPU with the OPPs should be the first one to come
+back, if this has to work correctly. Otherwise it will break..
 
-Since we don't have a coherent_dma_supported() function, we defer the
-validity check of coherent_dma_mask to dma_alloc_coherent() (and here we
-can remove bouncing since swiotlb has relatively small buffers).
+And you repeated the same :)
 
-There is a slight downside if dma_supported() on the default 32-bit mask
-fails, we end up with dma_mask == NULL and the driver calling
-dma_set_mask_and_coherent(64-bit) would fail to set dma_mask even though
-dma-ranges allows it. Is this a real scenario (not for arm64 where we
-allow DMA into 32-bit via ZONE_DMA)?
+> The platforms needing it have to get involved in such discussions to
+> make any progress.
 
--- 
-Catalin
+Yes there were people involved. I hope I cc'd you as well...
