@@ -1,97 +1,193 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 25 Nov 2014 02:27:28 +0100
-Subject: [PATCH] opp: convert dev_warn() to dev_dbg() for duplicate OPPs
-In-Reply-To: <20141124161435.GE5050@linux.vnet.ibm.com>
-References: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
- <42965945.ST26GKfzPz@vostro.rjw.lan>
- <20141124161435.GE5050@linux.vnet.ibm.com>
-Message-ID: <2464825.iuDYbaTYCE@vostro.rjw.lan>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 24 Nov 2014 17:09:54 -0800
+Subject: [RESEND PATCH v14 7/7] KVM: arm: page logging 2nd stage fault
+ handling
+In-Reply-To: <54738EE7.8060804@samsung.com>
+References: <1416002084-9928-1-git-send-email-m.smarduch@samsung.com>
+ <20141122195351.GP3401@cbox> <54738EE7.8060804@samsung.com>
+Message-ID: <5473D6E2.3060401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 24, 2014 08:14:35 AM Paul E. McKenney wrote:
-> On Mon, Nov 24, 2014 at 04:09:54PM +0100, Rafael J. Wysocki wrote:
-> > On Monday, November 24, 2014 04:10:00 PM Viresh Kumar wrote:
-> > > On 21 November 2014 at 21:28, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > > > What about @dynamic instead of @from_dt?  That may apply to more use cases if
-> > > > need be.
-> > > 
-> > > @Paul: I am stuck at a point and need help on RCUs :)
-> > > 
-> > > File: drivers/base/power/opp.c
-> > > 
-> > > We are trying to remove OPPs created from static data present in DT on
-> > > cpufreq driver's removal (when configured as module).
-> > > 
-> > > opp core uses RCUs internally and it looks like I need to implement:
-> > > list_for_each_entry_safe_rcu()
-> > > 
-> > > But, I am not sure because of these:
-> > > http://linux.derkeiler.com/Mailing-Lists/Kernel/2005-10/6280.html
-> > > http://patchwork.ozlabs.org/patch/48989/
-> > > 
-> > > So, wanted to ask you if I really need that or the OPP code is
-> > > buggy somewhere.
-> > > 
-> > > The code removing OPPs is:
-> > > 
-> > >         list_for_each_entry_rcu(opp, &dev_opp->opp_list, node) {
-> > >                 srcu_notifier_call_chain(&dev_opp->head, OPP_EVENT_REMOVE, opp);
-> > >                 list_del_rcu(&opp->node);
-> > > 
-> > >                 kfree(opp);
+On 11/24/2014 12:02 PM, Mario Smarduch wrote:
+> On 11/22/2014 11:53 AM, Christoffer Dall wrote:
+>> On Fri, Nov 14, 2014 at 01:54:44PM -0800, Mario Smarduch wrote:
+>>> This patch adds support for handling 2nd stage page faults during migration,
+>>> it disables faulting in huge pages, and dissolves huge pages to page tables.
+>>> In case migration is canceled huge pages are used again.
+>>>
+>>> Resending to addresse Marc's comments to simplify stage2_set_pte() handling 
+>>> of logging, and mapping device memory - flags.
+>>>
+>>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>>> ---
+>>>  arch/arm/kvm/mmu.c |   61 +++++++++++++++++++++++++++++++++++++++++++++-------
+>>>  1 file changed, 53 insertions(+), 8 deletions(-)
+>>>
+>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>>> index 8137455..d29de77 100644
+>>> --- a/arch/arm/kvm/mmu.c
+>>> +++ b/arch/arm/kvm/mmu.c
+>>> @@ -47,6 +47,18 @@ static phys_addr_t hyp_idmap_vector;
+>>>  #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+>>>  #define kvm_pud_huge(_x)	pud_huge(_x)
+>>>  
+>>> +#define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
+>>> +#define KVM_S2PTE_FLAG_LOGGING_ACTIVE	(1UL << 1)
+>>> +
+>>> +static bool kvm_get_logging_state(struct kvm_memory_slot *memslot)
+>>> +{
+>>> +#ifdef CONFIG_ARM
+>>> +	return !!memslot->dirty_bitmap;
+>>> +#else
+>>> +	return false;
+>>> +#endif
+>>> +}
+>>> +
+>>>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>>>  {
+>>>  	/*
+>>> @@ -626,10 +638,13 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+>>>  }
+>>>  
+>>>  static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>>> -			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
+>>> +			  phys_addr_t addr, const pte_t *new_pte,
+>>> +			  unsigned long flags)
+>>>  {
+>>>  	pmd_t *pmd;
+>>>  	pte_t *pte, old_pte;
+>>> +	unsigned long iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
+>>> +	unsigned long logging_active = flags & KVM_S2PTE_FLAG_LOGGING_ACTIVE;
+>>>  
+>>>  	/* Create stage-2 page table mapping - Level 1 */
+>>>  	pmd = stage2_get_pmd(kvm, cache, addr);
+>>> @@ -641,6 +656,18 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>>>  		return 0;
+>>>  	}
+>>>  
+>>> +	/*
+>>> +	 * While dirty memory logging, clear PMD entry for huge page and split
+>>> +	 * into smaller pages, to track dirty memory at page granularity.
+>>> +	 */
+>>> +	if (logging_active && kvm_pmd_huge(*pmd)) {
+>>> +		phys_addr_t ipa = pmd_pfn(*pmd) << PAGE_SHIFT;
+>>
+>> just noticed this: this is not an IPA is it?  pmd_pfn should give us the
+>> host pfn.  I think you need to manipulate @addr instead.
+>>
+>> Did I manage to confuse myself?
+> No you're right, a *bad mistake* on my part I broke it between v8 and
+> v9. Not sure how it happened absent minded cut and paste?
 > 
-> As Rafael says, if opp is reachable by RCU readers, you cannot just
-> immediately kfree() it.  Immediately kfree()ing it like this -will-
-> cause your RCU readers to see freed memory, which, as you noted, can
-> cause crashes.
-> 
-> > >         }
-> > > 
-> > > Because we are freeing opp at the end, list_for_each_entry_rcu()
-> > > is trying to read the already freed opp to find opp->node.next
-> > > and that results in a crash.
-> > > 
-> > > What am I doing wrong ?
-> > 
-> > I hope that doesn't happen under rcu_read_lock()?
-> > 
-> > The modification needs to be done under dev_opp_list_lock in the first place
-> > in which case you don't need the _rcu version of list walking, so you simply
-> > can use list_for_each_entry_safe() here. The mutex is sufficient for the
-> > synchronization with other writers (if any).  The freeing, though, has to be
-> > deferred until all readers drop their references to the old entry.  You can
-> > use kfree_rcu() for that.
-> 
-> Except that srcu_notifier_call_chain() involves SRCU readers.  So,
-> unless I am confused, you instead need something like this:
+> Also when the pmd is cleared, should that be flushed
+> to level where the pmd is visible to page table walks?
+> Or am I confusing something here?
 
-Correct, that's SRCU.  Sorry for my confusion.
+Hi Christoffer,
+   disregard question, sorry for the unnecessary traffic.
 
-
-> static void kfree_opp_rcu(struct rcu_head *rhp)
-> {
-> 	struct device_opp *opp = container_of(rhp, struct device_opp, opp_list);
 > 
-> 	kfree(opp);
-> }
+> Thanks.
+>>
+>> (Yeah, I know I said I reviewed this one already)
+>>
+>>> +
+>>> +		pmd_clear(pmd);
+>>> +		kvm_tlb_flush_vmid_ipa(kvm, ipa);
+>>> +		put_page(virt_to_page(pmd));
+>>> +	}
+>>> +
+>>>  	/* Create stage-2 page mappings - Level 2 */
+>>>  	if (pmd_none(*pmd)) {
+>>>  		if (!cache)
+>>> @@ -693,7 +720,8 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+>>>  		if (ret)
+>>>  			goto out;
+>>>  		spin_lock(&kvm->mmu_lock);
+>>> -		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
+>>> +		ret = stage2_set_pte(kvm, &cache, addr, &pte,
+>>> +						KVM_S2PTE_FLAG_IS_IOMAP);
+>>>  		spin_unlock(&kvm->mmu_lock);
+>>>  		if (ret)
+>>>  			goto out;
+>>> @@ -908,6 +936,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>  	struct vm_area_struct *vma;
+>>>  	pfn_t pfn;
+>>>  	pgprot_t mem_type = PAGE_S2;
+>>> +	unsigned long logging_active = 0;
+>>> +
+>>> +	if (kvm_get_logging_state(memslot))
+>>> +		logging_active = KVM_S2PTE_FLAG_LOGGING_ACTIVE;
+>>>  
+>>>  	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+>>>  	if (fault_status == FSC_PERM && !write_fault) {
+>>> @@ -918,7 +950,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>  	/* Let's check if we will get back a huge page backed by hugetlbfs */
+>>>  	down_read(&current->mm->mmap_sem);
+>>>  	vma = find_vma_intersection(current->mm, hva, hva + 1);
+>>> -	if (is_vm_hugetlb_page(vma)) {
+>>> +	if (is_vm_hugetlb_page(vma) && !logging_active) {
+>>>  		hugetlb = true;
+>>>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+>>>  	} else {
+>>> @@ -964,7 +996,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>  	spin_lock(&kvm->mmu_lock);
+>>>  	if (mmu_notifier_retry(kvm, mmu_seq))
+>>>  		goto out_unlock;
+>>> -	if (!hugetlb && !force_pte)
+>>> +	if (!hugetlb && !force_pte && !logging_active)
+>>>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+>>>  
+>>>  	if (hugetlb) {
+>>> @@ -978,16 +1010,21 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>  		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+>>>  	} else {
+>>>  		pte_t new_pte = pfn_pte(pfn, mem_type);
+>>> +		unsigned long flags = logging_active;
+>>> +
+>>> +		if (mem_type == PAGE_S2_DEVICE)
+>>> +			flags |= KVM_S2PTE_FLAG_IS_IOMAP;
+>>> +
+>>>  		if (writable) {
+>>>  			kvm_set_s2pte_writable(&new_pte);
+>>>  			kvm_set_pfn_dirty(pfn);
+>>>  		}
+>>>  		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
+>>> -		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
+>>> -				     mem_type == PAGE_S2_DEVICE);
+>>> +		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
+>>>  	}
+>>>  
+>>> -
+>>> +	if (write_fault)
+>>> +		mark_page_dirty(kvm, gfn);
+>>>  out_unlock:
+>>>  	spin_unlock(&kvm->mmu_lock);
+>>>  	kvm_release_pfn_clean(pfn);
+>>> @@ -1137,7 +1174,15 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
+>>>  {
+>>>  	pte_t *pte = (pte_t *)data;
+>>>  
+>>> -	stage2_set_pte(kvm, NULL, gpa, pte, false);
+>>> +	/*
+>>> +	 * We can always call stage2_set_pte with logging_active == false,
+>>
+>> this should now say without the KVM_S2PTE_FLAG_LOGGING_ACTIVE flag.
+>>
+>>> +	 * because MMU notifiers will have unmapped a huge PMD before calling
+>>> +	 * ->change_pte() (which in turn calls kvm_set_spte_hva()) and therefore
+>>> +	 * stage2_set_pte() never needs to clear out a huge PMD through this
+>>> +	 * calling path.
+>>> +	 */
+>>> +
+>>> +	stage2_set_pte(kvm, NULL, gpa, pte, 0);
+>>>  }
+>>>  
+>>>  
+>>> -- 
+>>> 1.7.9.5
+>>>
 > 
-> Then replace the above kfree() by:
-> 
-> 	call_srcu(&opp->rcu, kfree_opp_rcu);
-> 
-> This will require adding the following to struct device_opp:
-> 
-> 	struct rcu_head rcu;
-> 
-> And yes, this would be simpler if there was a kfree_srcu().  If a few
-> more uses like this show up, I will create one.
-> 
-> All that said, I do not claim to understand the OPP code, so please take
-> the above suggested changes with a grain of salt.  And if you let me know
-> where I am confused, I should be able to offer better suggestions.
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
