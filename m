@@ -1,160 +1,288 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 25 Nov 2014 11:55:20 +0800
-Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <1416605010-10442-3-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1416605010-10442-3-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-Message-ID: <5473FDA8.6080201@huawei.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Tue, 25 Nov 2014 11:59:59 +0800
+Subject: [PATCH v8 1/4] ARM: rockchip: add suspend and resume for RK3288
+In-Reply-To: <708464816.ZORhtdDuUb@diego>
+References: <1416051910-16730-1-git-send-email-zyw@rock-chips.com>
+ <1416051910-16730-2-git-send-email-zyw@rock-chips.com>
+ <708464816.ZORhtdDuUb@diego>
+Message-ID: <5473FEBF.6090300@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 2014/11/22 5:23, Ganapatrao Kulkarni wrote:
-> DT bindings for numa map for memory, cores to node and
-> proximity distance matrix of nodes to each other.
-> 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
-> ---
->  Documentation/devicetree/bindings/arm/numa.txt | 103 +++++++++++++++++++++++++
->  1 file changed, 103 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/numa.txt b/Documentation/devicetree/bindings/arm/numa.txt
-> new file mode 100644
-> index 0000000..ec6bf2d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/numa.txt
-> @@ -0,0 +1,103 @@
-> +==============================================================================
-> +NUMA binding description.
-> +==============================================================================
-> +
-> +==============================================================================
-> +1 - Introduction
-> +==============================================================================
-> +
-> +Systems employing a Non Uniform Memory Access (NUMA) architecture contain
-> +collections of hardware resources including processors, memory, and I/O buses,
-> +that comprise what is commonly known as a ??UMA node?? Processor
-> +accesses to memory within the local NUMA node is
-> +generally faster than processor accesses to memory outside of the local
-> +NUMA node. DT defines interfaces that allow the platform to convey NUMA node
-> +topology information to OS.
-> +
-> +==============================================================================
-> +2 - numa-map node
-> +==============================================================================
-> +
-> +DT Binding for NUMA can be defined for memory and CPUs to map them to
-> +respective NUMA nodes.
-> +
-> +The DT binding can defined using numa-map node.
-> +The numa-map will have following properties to define NUMA topology.
-> +
-> +- mem-map:	This property defines the association between a range of
-> +		memory and the proximity domain/numa node to which it belongs.
-> +
-> +note: memory range address is passed using either memory node of
-> +DT or UEFI system table and should match to the address defined in mem-map.
-> +
-> +- cpu-map:	This property defines the association of range of processors
-> +		(range of cpu ids) and the proximity domain to which
-> +		the processor belongs.
-> +
-> +- node-matrix:	This table provides a matrix that describes the relative
-> +		distance (memory latency) between all System Localities.
-> +		The value of each Entry[i j distance] in node-matrix table,
-> +		where i represents a row of a matrix and j represents a
-> +		column of a matrix, indicates the relative distances
-> +		from Proximity Domain/Numa node i to every other
-> +		node j in the system (including itself).
-> +
-> +The numa-map node must contain the appropriate #address-cells,
-> +#size-cells and #node-count properties.
-> +
-> +
-> +==============================================================================
-> +4 - Example dts
-> +==============================================================================
-> +
-> +Example 1: 2 Node system each having 8 CPUs and a Memory.
-> +
-> +	numa-map {
-> +		#address-cells = <2>;
-> +		#size-cells = <1>;
-> +		#node-count = <2>;
-> +		mem-map =  <0x0 0x00000000 0>,
-> +		           <0x100 0x00000000 1>;
-> +
-> +		cpu-map = <0 7 0>,
-> +			  <8 15 1>;
-
-The cpu range is continuous here. But if there is a situation like below:
-
-0 2 4 6 belong to node 0
-1 3 5 7 belong to node 1
-
-This case is very common on X86. I don't know the real situation of arm as
-I don't have a hardware with 2 nodes.
-
-How can we generate a DTS about this situation? like below? Can be parsed?
-
-		cpu-map = <0 2 4 6 0>,
-			  <1 3 5 7 1>;
-
-Thanks,
-Shannon
-
-> +
-> +		node-matrix = <0 0 10>,
-> +			      <0 1 20>,
-> +			      <1 0 20>,
-> +			      <1 1 10>;
-> +	};
-> +
-> +Example 2: 4 Node system each having 4 CPUs and a Memory.
-> +
-> +	numa-map {
-> +		#address-cells = <2>;
-> +		#size-cells = <1>;
-> +		#node-count = <2>;
-> +		mem-map =  <0x0 0x00000000 0>,
-> +		           <0x100 0x00000000 1>,
-> +		           <0x200 0x00000000 2>,
-> +		           <0x300 0x00000000 3>;
-> +
-> +		cpu-map = <0 7 0>,
-> +			  <8 15 1>,
-> +			  <16 23 2>,
-> +			  <24 31 3>;
-> +
-> +		node-matrix = <0 0 10>,
-> +			      <0 1 20>,
-> +			      <0 2 20>,
-> +			      <0 3 20>,
-> +			      <1 0 20>,
-> +			      <1 1 10>,
-> +			      <1 2 20>,
-> +			      <1 3 20>,
-> +			      <2 0 20>,
-> +			      <2 1 20>,
-> +			      <2 2 10>,
-> +			      <2 3 20>,
-> +			      <3 0 20>,
-> +			      <3 1 20>,
-> +			      <3 2 20>,
-> +			      <3 3 10>;
-> +	};
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
-
--- 
-Shannon
+On 11/25/2014 07:20 AM, Heiko St?bner wrote:
+> Hi Chris,
+>
+> Am Samstag, 15. November 2014, 19:45:07 schrieb Chris Zhong:
+>> It's a basic version of suspend and resume for rockchip,
+>> it only support RK3288 now.
+> please fold in both in the two patches from Doug
+> https://chromium-review.googlesource.com/#/c/231181/
+> https://chromium-review.googlesource.com/#/c/231182/
+>
+> as they make the code nicer to read :-)
+>
+>
+> But overall, this looks quite nice now. I've found some small nits inside -
+> some of them are already also addressed by Dougs patches.
+OK, I will merge Doug's patch to v9.
+>
+>> Signed-off-by: Tony Xie<xxx@rock-chips.com>
+>> Signed-off-by: Chris Zhong<zyw@rock-chips.com>
+>> Tested-by: Doug Anderson<dianders@chromium.org>
+>> Reviewed-by: Doug Anderson<dianders@chromium.org>
+>>
+>> ---
+> [...]
+>
+>> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+>> new file mode 100644
+>> index 0000000..e059b84
+>> --- /dev/null
+>> +++ b/arch/arm/mach-rockchip/pm.c
+>> @@ -0,0 +1,264 @@
+>> +/*
+>> + * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
+>> + * Author: Tony Xie<tony.xie@rock-chips.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms and conditions of the GNU General Public License,
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+>> for + * more details.
+>> + *
+>> + */
+>> +
+>> +#include <linux/init.h>
+>> +#include <linux/io.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/suspend.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include <linux/regulator/machine.h>
+>> +
+>> +#include <asm/cacheflush.h>
+>> +#include <asm/tlbflush.h>
+>> +#include <asm/suspend.h>
+>> +
+>> +#include "pm.h"
+>> +
+>> +/* These enum are option of low power mode */
+>> +enum {
+>> +	ROCKCHIP_ARM_OFF_LOGIC_NORMAL = 0,
+>> +	ROCKCHIP_ARM_OFF_LOGIC_DEEP = 1,
+>> +};
+>> +
+>> +struct rockchip_pm_device_id {
+>> +	const char *compatible;
+>> +	const struct platform_suspend_ops *ops;
+>> +	int (*init)(void);
+>> +};
+>> +
+>> +static void __iomem *rk3288_bootram_base;
+>> +static phys_addr_t rk3288_bootram_phy;
+>> +
+>> +static struct regmap *pmu_regmap;
+>> +static struct regmap *sgrf_regmap;
+>> +
+>> +static u32 rk3288_pmu_pwr_mode_con;
+>> +static u32 rk3288_sgrf_soc_con0;
+>> +
+>> +static inline u32 rk3288_l2_config(void)
+>> +{
+>> +	u32 l2ctlr;
+>> +
+>> +	asm("mrc p15, 1, %0, c9, c0, 2" : "=r" (l2ctlr));
+>> +	return l2ctlr;
+>> +}
+>> +
+>> +static void rk3288_config_bootdata(void)
+>> +{
+>> +	rkpm_bootdata_cpusp = rk3288_bootram_phy + (SZ_4K - 8);
+>> +	rkpm_bootdata_cpu_code = virt_to_phys(cpu_resume);
+>> +
+>> +	rkpm_bootdata_l2ctlr_f  = 1;
+>> +	rkpm_bootdata_l2ctlr = rk3288_l2_config();
+>> +}
+>> +
+>> +static void rk3288_slp_mode_set(int level)
+>> +{
+>> +	u32 mode_set, mode_set1;
+>> +
+>> +	regmap_read(sgrf_regmap, RK3288_SGRF_SOC_CON0, &rk3288_sgrf_soc_con0);
+>> +
+>> +	regmap_read(pmu_regmap, RK3288_PMU_PWRMODE_CON,
+>> +		    &rk3288_pmu_pwr_mode_con);
+>> +
+>> +	/* set bit 8 so that system will resume to FAST_BOOT_ADDR */
+>> +	regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
+>> +		     SGRF_FAST_BOOT_EN | SGRF_FAST_BOOT_EN_WRITE);
+>> +
+>> +	/* booting address of resuming system is from this register value */
+>> +	regmap_write(sgrf_regmap, RK3288_SGRF_FAST_BOOT_ADDR,
+>> +		     rk3288_bootram_phy);
+>> +
+>> +	regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
+>> +		     PMU_ARMINT_WAKEUP_EN);
+>> +
+>> +	mode_set = BIT(PMU_GLOBAL_INT_DISABLE) | BIT(PMU_L2FLUSH_EN) |
+>> +		   BIT(PMU_SREF0_ENTER_EN) | BIT(PMU_SREF1_ENTER_EN) |
+>> +		   BIT(PMU_DDR0_GATING_EN) | BIT(PMU_DDR1_GATING_EN) |
+>> +		   BIT(PMU_PWR_MODE_EN) | BIT(PMU_CHIP_PD_EN) |
+>> +		   BIT(PMU_SCU_EN);
+>> +
+>> +	mode_set1 = BIT(PMU_CLR_CORE) | BIT(PMU_CLR_CPUP);
+>> +
+>> +	if (level == ROCKCHIP_ARM_OFF_LOGIC_DEEP) {
+>> +		/* arm off, logic deep sleep */
+>> +		mode_set |= BIT(PMU_BUS_PD_EN) |
+>> +			    BIT(PMU_DDR1IO_RET_EN) | BIT(PMU_DDR0IO_RET_EN) |
+>> +			    BIT(PMU_OSC_24M_DIS) | BIT(PMU_PMU_USE_LF) |
+>> +			    BIT(PMU_ALIVE_USE_LF) | BIT(PMU_PLL_PD_EN);
+>> +
+>> +		mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
+>> +			     BIT(PMU_CLR_PERI) | BIT(PMU_CLR_DMA);
+>> +	} else {
+>> +		/*
+>> +		 * arm off, logic normal
+>> +		 * if pmu_clk_core_src_gate_en is not set,
+>> +		 * wakeup will be error
+>> +		 */
+>> +		mode_set |= BIT(PMU_CLK_CORE_SRC_GATE_EN);
+>> +	}
+>> +
+>> +	regmap_write(pmu_regmap, RK3288_PMU_PWRMODE_CON, mode_set);
+>> +	regmap_write(pmu_regmap, RK3288_PMU_PWRMODE_CON1, mode_set1);
+>> +}
+>> +
+>> +static void rk3288_slp_mode_set_resume(void)
+>> +{
+>> +	regmap_write(pmu_regmap, RK3288_PMU_PWRMODE_CON,
+>> +		     rk3288_pmu_pwr_mode_con);
+>> +
+>> +	regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
+>> +		     rk3288_sgrf_soc_con0 | SGRF_FAST_BOOT_EN_WRITE);
+>> +}
+>> +
+>> +static int rockchip_lpmode_enter(unsigned long arg)
+>> +{
+>> +	flush_cache_all();
+>> +
+>> +	cpu_do_idle();
+>> +
+>> +	pr_info("Failed to suspend the system\n");
+> I guess this should be a pr_err. Also could you try for a format like
+> 	pr_err("%s: Failed to suspend\n", __func__);
+>
+> This way it at least gives an indication where is failed ... often this
+> shortens the time spent searching for the place of origin :-)
+Done
+>
+>> +
+>> +	return 1;
+>> +}
+>> +
+>> +static int rk3288_suspend_enter(suspend_state_t state)
+>> +{
+>> +	local_fiq_disable();
+>> +
+>> +	rk3288_slp_mode_set(ROCKCHIP_ARM_OFF_LOGIC_NORMAL);
+>> +
+>> +	cpu_suspend(0, rockchip_lpmode_enter);
+>> +
+>> +	rk3288_slp_mode_set_resume();
+>> +
+>> +	local_fiq_enable();
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int rk3288_suspend_prepare(void)
+>> +{
+>> +	return regulator_suspend_prepare(PM_SUSPEND_MEM);
+>> +}
+>> +
+>> +static void rk3288_suspend_finish(void)
+>> +{
+>> +	if (regulator_suspend_finish())
+>> +		pr_warn("suspend finish failed\n");
+> pr_err and the format containing the function name
+Done
+>> +}
+>> +
+>> +static int rk3288_suspend_iomap(void)
+>> +{
+>> +	struct device_node *node;
+>> +	struct resource res;
+>> +
+>> +	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3288-pmu-sram");
+>> +	if (!node) {
+>> +		pr_err("%s: could not find bootram dt node\n", __func__);
+>> +		return -1;
+> 	return -ENODEV;
+Done
+>
+>> +	}
+>> +
+>> +	rk3288_bootram_base = of_iomap(node, 0);
+>> +	if (!rk3288_bootram_base) {
+>> +		pr_err("%s: could not map bootram base\n", __func__);
+>> +		return -1;
+> 	return -ENOMEM;
+Done
+>
+>> +	}
+>> +
+>> +	if (of_address_to_resource(node, 0, &res)) {
+>> +		pr_err("%s: could not get bootram phy addr\n", __func__);
+>> +		return -1;
+>> +	}
+> ret = of_address_to_resource(node, 0, &res)
+> if (ret) {
+> 	pr_err("%s: could not get bootram phy addr\n", __func__);
+> 	return ret;
+> }
+>
+Done
+>> +
+>> +	rk3288_bootram_phy = res.start;
+>> +
+>> +	rk3288_config_bootdata();
+>> +
+>> +	/* copy resume code and data to bootsram */
+>> +	memcpy(rk3288_bootram_base, rockchip_slp_cpu_resume,
+>> +	       rk3288_bootram_sz);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int rk3288_suspend_init(void)
+>> +{
+>> +	int ret;
+>> +
+>> +	pmu_regmap = syscon_regmap_lookup_by_compatible(
+>> +				"rockchip,rk3288-pmu");
+>> +
+>> +	if (IS_ERR(pmu_regmap)) {
+>> +		pr_err("%s: could not find pmu regmap\n", __func__);
+>> +		return -1;
+> 	return PTR_ERR(pmu_regmap);
+Done
+>
+>> +	}
+>> +
+>> +	sgrf_regmap = syscon_regmap_lookup_by_compatible(
+>> +				"rockchip,rk3288-sgrf");
+>> +
+>> +	if (IS_ERR(sgrf_regmap)) {
+>> +		pr_err("%s: could not find sgrf regmap\n", __func__);
+>> +		return -1;
+> 	return PTR_ERR(sgrf_regmap);
+>
+>
+Done
