@@ -1,67 +1,98 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Tue, 25 Nov 2014 20:16:57 +0800
-Subject: [PATCH v3 4/5] arm64: Add support for Spreadtrum's Sharkl64 Platform
- in Kconfig and defconfig
-In-Reply-To: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <Sharkl64-v3>
- <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1416917818-10506-5-git-send-email-chunyan.zhang@spreadtrum.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 25 Nov 2014 12:23:02 +0000
+Subject: For the problem when using swiotlb
+In-Reply-To: <20141125112905.GC3836@n2100.arm.linux.org.uk>
+References: <5469E26B.2010905@huawei.com> <20141121175118.GA10451@localhost>
+ <20141121180925.GG19783@e104818-lin.cambridge.arm.com>
+ <2166613.l2i4mdmtLA@wuerfel>
+ <20141125105815.GB18858@e104818-lin.cambridge.arm.com>
+ <20141125112905.GC3836@n2100.arm.linux.org.uk>
+Message-ID: <20141125122302.GC18858@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
+On Tue, Nov 25, 2014 at 11:29:05AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Nov 25, 2014 at 10:58:15AM +0000, Catalin Marinas wrote:
+> > Since we don't have a coherent_dma_supported() function, we defer the
+> > validity check of coherent_dma_mask to dma_alloc_coherent() (and here we
+> > can remove bouncing since swiotlb has relatively small buffers).
+> 
+> Bouncing of coherent DMA buffers is insane; if you have to bounce them,
+> they're by definition not coherent.
 
-Adds support for Spreadtrum's SoC Platform and its subset Sharkl64
-in the arm64 Kconfig and defconfig files.
+"Bouncing" is not a proper term here. What I meant is not using the
+swiotlb bounce buffers for the dma_alloc_coherent(). The
+swiotlb_alloc_coherent() allows this but it doesn't do any
+copying/bouncing in such scenario (it would not make sense, as you said
+below).
 
-Signed-off-by: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
----
- arch/arm64/Kconfig           |   17 +++++++++++++++++
- arch/arm64/configs/defconfig |    2 ++
- 2 files changed, 19 insertions(+)
+> Think about one of the common uses of coherent DMA buffers: ring buffers,
+> where both the CPU and the DMA agent write to the ring:
+> 
+> - CPU writes to ring, loading address and length, then writing to the
+>   status word for the ring entry.
+> - DMA reads the ring status word, sees it owns the entry, processes it,
+>   DMA writes to the ring status word to give it back.
+> 
+> What this means is that if you are bouncing the buffer, you are copying
+> it whole-sale between the CPU visible version and the DMA visible
+> version, which means that you can miss DMA updates to it.  So, bouncing
+> a coherent DMA buffer is simply not an acceptable implementation for
+> dma_alloc_coherent().
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 9532f8d..a63ec45 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -147,6 +147,23 @@ config ARCH_THUNDER
- 	help
- 	  This enables support for Cavium's Thunder Family of SoCs.
- 
-+menuconfig ARCH_SPRD
-+	bool "Spreadtrum SoC platform"
-+	depends on ARM64
-+	help
-+	  Support for Spreadtrum ARM based SoCs
-+
-+if ARCH_SPRD
-+
-+config ARCH_SHARKL64
-+	bool "Sharkl64 SoC Platform"
-+	help
-+	  Sharkl64 is a Spreadtrum's SoC Platform which is based
-+	  on ARM 64-bit processor core including
-+	    sc9836
-+
-+endif #ARCH_SPRD
-+
- config ARCH_VEXPRESS
- 	bool "ARMv8 software model (Versatile Express)"
- 	select ARCH_REQUIRE_GPIOLIB
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index dd301be..d7934a8 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -33,6 +33,8 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
- CONFIG_ARCH_THUNDER=y
-+CONFIG_ARCH_SPRD=y
-+CONFIG_ARCH_SHARKL64=y
- CONFIG_ARCH_VEXPRESS=y
- CONFIG_ARCH_XGENE=y
- CONFIG_PCI=y
+I agree, not arguing against this.
+
+> As for validity of masks, it is defined in the DMA API documentation that
+> if a DMA mask is suitable for the streaming APIs, then it is also suitable
+> for the coherent APIs.  The reverse is left open, and so may not
+> necessarily be true.
+> 
+> In other words:
+> 
+> 	err = dma_set_mask(dev, mask);
+> 	if (err == 0)
+> 		assert(dma_set_coherent_mask(dev, mask) == 0);
+> 
+> must always succeed, but reversing the two calls has no guarantee.
+
+That would succeed on arm64 currently.
+
+The problem is that swiotlb bounce buffers allow for smaller than 32-bit
+dma_mask for streaming DMA since it can do bouncing. With coherent
+allocations, we could allow the same smaller than 32-bit
+coherent_dma_mask, however allocations may fail since they fall back to
+the swiotlb reserved buffer which is relatively small.
+
+What I want to avoid is threads like this where people ask for bigger
+swiotlb buffers for coherent allocations most likely because they do the
+wrong thing with their dma masks (or dma-ranges property). If the arm64
+dma_alloc_coherent() code avoids calling swiotlb_alloc_coherent() and
+just limits itself to ZONE_DMA, we make it clear that the swiotlb
+buffers are only used for streaming DMA (bouncing).
+
+Once we avoid swiotlb buffers for coherent DMA, the problem is that even
+though your assertion above would pass, dma_alloc_coherent() may fail if
+coherent_dma_mask is smaller than the end of ZONE_DMA (and pfn offsets
+considered). Basically breaking the assumption that you mentioned above
+with regards to coherent_dma_mask suitability.
+
+I think the best we can get is for dma_supported() to ignore
+swiotlb_dma_supported() and simply check for ZONE_DMA (similar to the
+arm32 one). We guarantee that swiotlb bounce buffers are within ZONE_DMA
+already, so no need for calling swiotlb_dma_supported(). If we ever have
+devices with smaller than 32-bit mask on arm64, we will have to reduce
+ZONE_DMA.
+
+> Note that there seems to be only one driver which has different coherent
+> and streaming DMA masks today:
+> 
+> drivers/media/pci/sta2x11/sta2x11_vip.c:
+>         if (dma_set_mask(&pdev->dev, DMA_BIT_MASK(26))) {
+>         err = dma_set_coherent_mask(&vip->pdev->dev, DMA_BIT_MASK(29));
+
+This would work if we have a ZONE_DMA of 29-bit while the swiotlb bounce
+buffer within 26-bit. If we go with the above ZONE_DMA only check, we
+would need ZONE_DMA of 26-bit.
+
 -- 
-1.7.9.5
+Catalin
