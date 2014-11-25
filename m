@@ -1,53 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 25 Nov 2014 07:48:01 +0100
-Subject: [PATCHv3 08/16] clk: mvebu: add suspend/resume for gatable clocks
-In-Reply-To: <20141125060700.12298.14532@quantum>
-References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1416585613-2113-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <20141125060700.12298.14532@quantum>
-Message-ID: <20141125074801.1656b78b@free-electrons.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 25 Nov 2014 07:49:58 +0100
+Subject: [PATCH] of: support passing console options with stdout-path
+In-Reply-To: <20141124230016.GP20238@lunn.ch>
+References: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
+ <20141124230016.GP20238@lunn.ch>
+Message-ID: <20141125064958.GK30369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
-
-On Mon, 24 Nov 2014 22:07:00 -0800, Mike Turquette wrote:
-> Quoting Thomas Petazzoni (2014-11-21 08:00:05)
-> > This commit adds suspend/resume support for the gatable clock driver
-> > used on Marvell EBU platforms. When getting out of suspend, the
-> > Marvell EBU platforms go through the bootloader, which re-enables all
-> > gatable clocks. However, upon resume, the clock framework will not
-> > disable again all gatable clocks that are not used.
+On Tue, Nov 25, 2014 at 12:00:16AM +0100, Andrew Lunn wrote:
+> On Mon, Nov 24, 2014 at 10:23:58PM +0000, Leif Lindholm wrote:
+> > Support specifying console options (like with console=ttyXN,<options>)
+> > by appending them to the stdout-path property after a separating ':'.
 > > 
-> > Therefore, if the clock driver does not save/restore the state of the
-> > gatable clocks, all gatable clocks that are not claimed by any device
-> > driver will remain enabled after a resume. This is why this driver
-> > saves and restores the state of those clocks.
+> > Example:
+> > 	stdout-path = "uart0:115200";
 > > 
-> > Since clocks aren't real devices, we don't have the normal ->suspend()
-> > and ->resume() of the device model, and have to use the ->suspend()
-> > and ->resume() hooks of the syscore_ops mechanism. This mechanism has
-> > the unfortunate idea of not providing a way of passing private data,
-> > which requires us to change the driver to make the assumption that
-> > there is only once instance of the gatable clock control structure.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Cc: linux-kernel at vger.kernel.org
-> > Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > This patch also modifies of_find_node_by_path() to match only the
+> > portion of the path before a ':'.
 > 
-> Looks good to me. Which tree do you plan to take this through?
+> Hi Leif
+> 
+> These appears to somewhat conform to ePAPR, which says:
+> 
+>       A string that specifies the full path to the node representing
+>       the device to be used for boot console output. If the character
+>       ":" is present in the value it terminates the path.
+> 
+> So you can put any random junk after the :. However, are we going to
+> have backward/forward compatibility problems, and problems with
+> bootloaders? The current kernel code does not look for the :. So a new
+> DT blob on an old kernel will not work so well.
+> 
+> More worrying, barebox does not support the : either. So there is a
+> danger your bootloader suddenly goes silent after a dt blob update.
 
-I don't have any specific plans. Jason, do you have other clk changes
-for 3.19, which justify a pull request from you to Mike? Or could Mike
-just take this patch in his tree? There is no build dependency between
-this patch and the other patches in the series, so it can go through
-whatever tree.
+Since in barebox we use the upstream Kernel devicetrees it will be under
+our control when they arrive, so we can add support for that ':'
+before the new devicetrees arrive.
 
-Thanks,
+Sascha
 
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
