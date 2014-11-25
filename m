@@ -1,118 +1,153 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 25 Nov 2014 10:57:31 -0800
-Subject: [PATCHv6 7/8] arm64: efi: Use ioremap_exec for code sections
-In-Reply-To: <20141125172644.GC21525@leverpostej>
-References: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
- <1416606645-25633-8-git-send-email-lauraa@codeaurora.org>
- <20141125172644.GC21525@leverpostej>
-Message-ID: <5474D11B.5010207@codeaurora.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 25 Nov 2014 13:59:17 -0500 (EST)
+Subject: [PATCH 3/9] ARM: MB86S7X: Add MCPM support
+In-Reply-To: <20141125184609.GA29425@e102568-lin.cambridge.arm.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1416486920-25343-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <alpine.LFD.2.11.1411251205500.11690@knanqh.ubzr>
+ <20141125184609.GA29425@e102568-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.11.1411251357230.11690@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2014 9:26 AM, Mark Rutland wrote:
-> Hi Laura,
->
-> On Fri, Nov 21, 2014 at 09:50:44PM +0000, Laura Abbott wrote:
->> ioremap is not guaranteed to return memory with proper
->> execution permissions. Introduce ioremap_exec which will
->> ensure that permission bits are set as expected for EFI
->> code sections.
->>
->> Tested-by: Kees Cook <keescook@chromium.org>
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->> ---
->>   arch/arm64/include/asm/io.h      |  1 +
->>   arch/arm64/include/asm/pgtable.h |  1 +
->>   arch/arm64/kernel/efi.c          | 12 +++++++++++-
->>   arch/arm64/mm/ioremap.c          | 11 +++++++++++
->>   4 files changed, 24 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
->> index 79f1d519..7dd8465 100644
->> --- a/arch/arm64/include/asm/io.h
->> +++ b/arch/arm64/include/asm/io.h
->> @@ -230,6 +230,7 @@ extern void __memset_io(volatile void __iomem *, int, size_t);
->>   extern void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot);
->>   extern void __iounmap(volatile void __iomem *addr);
->>   extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
->> +extern void __iomem *ioremap_exec(phys_addr_t phys_addr, size_t size);
->>
->>   #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
->>   #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
->> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->> index 41a43bf..9b1d9d0 100644
->> --- a/arch/arm64/include/asm/pgtable.h
->> +++ b/arch/arm64/include/asm/pgtable.h
->> @@ -65,6 +65,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
->>   #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
->>   #define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL_NC))
->>   #define PROT_NORMAL		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL))
->> +#define PROT_NORMAL_EXEC	(PROT_DEFAULT | PTE_UXN | PTE_ATTRINDX(MT_NORMAL))
->>
->>   #define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
->>   #define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
->> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> index 95c49eb..9e41f95 100644
->> --- a/arch/arm64/kernel/efi.c
->> +++ b/arch/arm64/kernel/efi.c
->> @@ -47,6 +47,14 @@ static int __init is_normal_ram(efi_memory_desc_t *md)
->>   	return 0;
->>   }
->>
->> +static int __init is_code(efi_memory_desc_t *md)
->> +{
->> +	if (md->attribute & EFI_RUNTIME_SERVICES_CODE)
->> +		return 1;
->> +	return 0;
->> +}
->> +
->> +
->>   static void __init efi_setup_idmap(void)
->>   {
->>   	struct memblock_region *r;
->> @@ -338,7 +346,9 @@ static int __init remap_region(efi_memory_desc_t *md, void **new)
->>   	memrange_efi_to_native(&paddr, &npages);
->>   	size = npages << PAGE_SHIFT;
->>
->> -	if (is_normal_ram(md))
->> +	if (is_code(md))
->> +		vaddr = (__force u64)ioremap_exec(paddr, size);
->> +	else if (is_normal_ram(md))
->>   		vaddr = (__force u64)ioremap_cache(paddr, size);
->>   	else
->>   		vaddr = (__force u64)ioremap(paddr, size);
->
-> All of the above looks fine to me.
->
->> diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
->> index cbb99c8..b998441 100644
->> --- a/arch/arm64/mm/ioremap.c
->> +++ b/arch/arm64/mm/ioremap.c
->> @@ -103,6 +103,17 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
->>   }
->>   EXPORT_SYMBOL(ioremap_cache);
->>
->> +void __iomem *ioremap_exec(phys_addr_t phys_addr, size_t size)
->> +{
->> +	/* For normal memory we already have a cacheable mapping. */
->> +	if (pfn_valid(__phys_to_pfn(phys_addr)))
->> +		return (void __iomem *)__phys_to_virt(phys_addr);
->
-> Is this guaranteed to be executable in all cases once the stricter page
-> permissions are in force?
->
+On Tue, 25 Nov 2014, Lorenzo Pieralisi wrote:
 
-No but the updated version of the patch which adds the stricter page
-permission adds a call to update the page permissions to be executable.
-  
-> Thanks,
-> Mark.
->
+> On Tue, Nov 25, 2014 at 05:42:32PM +0000, Nicolas Pitre wrote:
+> > On Thu, 20 Nov 2014, Vincent Yang wrote:
+> > 
+> > > The remote firmware(SCB) owns the SMP control. This MCPM driver gets
+> > > CPU/CLUSTER power up/down done by SCB over mailbox.
+> > >
+> > > Signed-off-by: Andy Green <andy.green@linaro.org>
+> > > Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+> > > Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+> > > Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+> > > ---
+> > >  arch/arm/mach-mb86s7x/Makefile |   2 +-
+> > >  arch/arm/mach-mb86s7x/mcpm.c   | 360 +++++++++++++++++++++++++++++++++++++++++
+> > >  arch/arm/mach-mb86s7x/smc.S    |  27 ++++
+> > >  3 files changed, 388 insertions(+), 1 deletion(-)
+> > >  create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
+> > >  create mode 100644 arch/arm/mach-mb86s7x/smc.S
+> > >
+> > > diff --git a/arch/arm/mach-mb86s7x/Makefile b/arch/arm/mach-mb86s7x/Makefile
+> > > index 97640b6..b0fa34b 100644
+> > > --- a/arch/arm/mach-mb86s7x/Makefile
+> > > +++ b/arch/arm/mach-mb86s7x/Makefile
+> > > @@ -1 +1 @@
+> > > -obj-$(CONFIG_ARCH_MB86S7X)   += board.o
+> > > +obj-$(CONFIG_ARCH_MB86S7X)   += board.o mcpm.o smc.o
+> > > diff --git a/arch/arm/mach-mb86s7x/mcpm.c b/arch/arm/mach-mb86s7x/mcpm.c
+> > > new file mode 100644
+> > > index 0000000..bf1b50a
+> > > --- /dev/null
+> > > +++ b/arch/arm/mach-mb86s7x/mcpm.c
+> > > @@ -0,0 +1,360 @@
+> > > +/*
+> > > + * arch/arm/mach-mb86s7x/mcpm.c
+> > > + * Copyright:        (C) 2013-2014 Fujitsu Semiconductor Limited
+> > > + * Copyright:        (C) 2014 Linaro Ltd.
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or modify
+> > > + * it under the terms of the GNU General Public License version 2 as
+> > > + * published by the Free Software Foundation.
+> > > + */
+> > > +
+> > > +#include <linux/io.h>
+> > > +#include <linux/pm.h>
+> > > +#include <linux/delay.h>
+> > > +#include <linux/cpu_pm.h>
+> > > +#include <linux/kernel.h>
+> > > +#include <linux/module.h>
+> > > +#include <linux/arm-cci.h>
+> > > +#include <linux/spinlock.h>
+> > > +#include <linux/suspend.h>
+> > > +#include <linux/of_device.h>
+> > > +#include <linux/irqchip/arm-gic.h>
+> > > +#include <linux/platform_device.h>
+> > > +
+> > > +#include <soc/mb86s7x/scb_mhu.h>
+> > > +
+> > > +#include <asm/mcpm.h>
+> > > +#include <asm/cp15.h>
+> > > +#include <asm/cputype.h>
+> > > +#include <asm/suspend.h>
+> > > +#include <asm/idmap.h>
+> > > +
+> > > +#define S7X_MAX_CLUSTER      2
+> > > +#define S7X_MAX_CPU  2
+> > > +
+> > > +#define MHU_SHM_OFFSET               0x3800
+> > > +#define WFI_COLOR_OFFSET     0x3f00
+> > > +#define TRAMPOLINE_OFFSET    0x3c00
+> > > +#define RESET_OFFSET         (TRAMPOLINE_OFFSET + 0x3fc)
+> > > +
+> > > +static arch_spinlock_t mb86s7x_pm_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+> > > +static int mb86s7x_pm_use_count[S7X_MAX_CLUSTER][S7X_MAX_CPU];
+> > > +extern void __iomem *mb86s7x_shm_base;
+> > > +
+> > > +#define AT_WFI_DO_NOTHING    0x0
+> > > +#define AT_WFI_DO_SUSPEND    0x1
+> > > +#define AT_WFI_DO_POWEROFF   0x2
+> > > +#define AT_WFI_COLOR_MASK    0x3
+> > > +
+> > > +struct mb86s7x_cpu_gate {
+> > > +     u32 payload_size;
+> > > +     u32 cluster_class;
+> > > +     u32 cluster_id;
+> > > +     u32 cpu_id;
+> > > +#define SCB_CPU_STATE_OFF    0x0
+> > > +#define SCB_CPU_STATE_ON     0x1
+> > > +#define SCB_CPU_STATE_SUSP   0x2
+> > > +     u32 cpu_state;
+> > > +};
+> > > +
+> > > +asmlinkage void mb86s70evb_outer_flush_all(void)
+> > > +{
+> > > +     outer_flush_all();
+> > > +}
+> > > +
+> > > +#define mb86s70evb_exit_coherency_flush(level) { \
+> > > +     asm volatile( \
+> > > +     "stmfd  sp!, {fp, ip}\n\t" \
+> > > +     "mrc    p15, 0, r0, c1, c0, 0   @ get SCTLR\n\t" \
+> > > +     "bic    r0, r0, #"__stringify(CR_C)"\n\t" \
+> > > +     "mcr    p15, 0, r0, c1, c0, 0   @ set SCTLR\n\t" \
+> > > +     "isb\n\t" \
+> > > +     "bl     v7_flush_dcache_"__stringify(level)"\n\t" \
+> > > +     "bl     mb86s70evb_outer_flush_all\n\t" \
+> > 
+> > This is wrong.  As mentioned already, this unconditionally flushes L2 in
+> > all cases which shouldn't be necessary in the "louis" case.
+> 
+> Is this a bL system with unified and architected L2s ? I think so, so
+> what's the outercache for ?
+> 
+> > Furthermore, the safety of this macro is ensured by not having any
+> > memory writes in the middle of the whole sequence.  By calling
+> > mb86s70evb_outer_flush_all() there could be the return address pushed
+> > onto the stack before calling outer_flush_all() if some tail call
+> > optimization is not applied.  And this is without saying what
+> > outer_flush_all() actually does.
+> > 
+> > Why can't you simply do this instead:
+> > 
+> >         v7_exit_coherency_flush(all);
+> >         outer_flush_all();
+> > 
+> > Of course you'll have to audit everything in the outer_flush_all() path
+> > to make sure no atomic instructions such as LDREX/STREX are invoked.
+> > Those have undefined behavior after CR_C is cleared.
+> 
+> What you are saying is correct but first of all I would like to
+> understand what outercache we are talking about here.
+> 
+> Code snippet above is fragile, as you said, and I'd rather disable
+> the outercache before executing the power down sequence (which implies
+> cache is cleaned/invalidated and quiescent before we clear the C bit)
+> if there is an outercache to be managed.
 
-Thanks,
-Laura
+Good question.  That opens the potential for an even simpler fix!  ;-)
 
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+
+Nicolas
