@@ -1,83 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 25 Nov 2014 18:47:23 +0000
-Subject: [PATCH v11 2/2] irqchip: gicv2m: Add DT bindings for GICv2m
-In-Reply-To: <1416941243-7181-1-git-send-email-marc.zyngier@arm.com>
-References: <1416941243-7181-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1416941243-7181-3-git-send-email-marc.zyngier@arm.com>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Tue, 25 Nov 2014 10:54:00 -0800
+Subject: [PATCH] ARM: dts: rk3288: add arm,cpu-registers-not-fw-configured
+Message-ID: <1416941640-324-1-git-send-email-sonnyrao@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+This will enable use of physical arch timers on rk3288, where each
+core comes out of reset with a different virtual offset.  Using
+physical timers will help with SMP booting on coreboot and older
+u-boot and should also allow suspend-resume and cpu-hotplug to work on
+all firmwares.
 
-Update the GIC DT bindings to support GICv2m.
+Firmware which does initialize the cpu registers properly at boot and
+cpu-hotplug can remove this property from the device tree.
 
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-[maz: split DT patch from main driver, updated changelog]
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
 ---
- Documentation/devicetree/bindings/arm/gic.txt | 53 +++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ arch/arm/boot/dts/rk3288.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-index c7d2fa1..375147e 100644
---- a/Documentation/devicetree/bindings/arm/gic.txt
-+++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -96,3 +96,56 @@ Example:
- 		      <0x2c006000 0x2000>;
- 		interrupts = <1 9 0xf04>;
- 	};
-+
-+
-+* GICv2m extension for MSI/MSI-x support (Optional)
-+
-+Certain revisions of GIC-400 supports MSI/MSI-x via V2M register frame(s).
-+This is enabled by specifying v2m sub-node(s).
-+
-+Required properties:
-+
-+- compatible	    : The value here should contain "arm,gic-v2m-frame".
-+
-+- msi-controller    : Identifies the node as an MSI controller.
-+
-+- reg		    : GICv2m MSI interface register base and size
-+
-+Optional properties:
-+
-+- arm,msi-base-spi  : When the MSI_TYPER register contains an incorrect
-+  		      value, this property should contain the SPI base of
-+		      the MSI frame, overriding the HW value.
-+
-+- arm,msi-num-spis  : When the MSI_TYPER register contains an incorrect
-+  		      value, this property should contain the number of
-+		      SPIs assigned to the frame, overriding the HW value.
-+
-+Example:
-+
-+	interrupt-controller at e1101000 {
-+		compatible = "arm,gic-400";
-+		#interrupt-cells = <3>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		interrupt-controller;
-+		interrupts = <1 8 0xf04>;
-+		ranges = <0 0 0 0xe1100000 0 0x100000>;
-+		reg = <0x0 0xe1110000 0 0x01000>,
-+		      <0x0 0xe112f000 0 0x02000>,
-+		      <0x0 0xe1140000 0 0x10000>,
-+		      <0x0 0xe1160000 0 0x10000>;
-+		v2m0: v2m at 0x8000 {
-+			compatible = "arm,gic-v2m-frame";
-+			msi-controller;
-+			reg = <0x0 0x80000 0 0x1000>;
-+		};
-+
-+		....
-+
-+		v2mN: v2m at 0x9000 {
-+			compatible = "arm,gic-v2m-frame";
-+			msi-controller;
-+			reg = <0x0 0x90000 0 0x1000>;
-+		};
-+	};
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 0f50d5d..c861f52 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -139,6 +139,7 @@
+ 
+ 	timer {
+ 		compatible = "arm,armv7-timer";
++		arm,cpu-registers-not-fw-configured;
+ 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+ 			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+ 			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
 -- 
-2.1.3
+2.1.2
