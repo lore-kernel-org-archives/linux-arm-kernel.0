@@ -1,47 +1,24 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 26 Nov 2014 00:13:03 +0100
-Subject: [PATCH 1/3] ACPI / processor: Update the comments in processor.h
-In-Reply-To: <1414662780-2147-1-git-send-email-hanjun.guo@linaro.org>
-References: <1414662780-2147-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <2001637.yVyNT03Tcn@vostro.rjw.lan>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 25 Nov 2014 18:20:38 -0500
+Subject: [PATCH] arm: ftrace: Adds support for ftrace operations
+In-Reply-To: <CACh+v5MDFZj+NOPWdnMgNthn_DxL3nn=CZJ224vMh7hSf84o4Q@mail.gmail.com>
+References: <1415372352-15664-1-git-send-email-jjhiblot@traphandler.com>
+ <20141107115225.72bc6cbf@gandalf.local.home>
+ <545CFAF4.8030104@traphandler.com>
+ <CACh+v5MDFZj+NOPWdnMgNthn_DxL3nn=CZJ224vMh7hSf84o4Q@mail.gmail.com>
+Message-ID: <20141125182038.04497ec0@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, October 30, 2014 05:52:58 PM Hanjun Guo wrote:
-> In commit 46ba51e (ACPI / processor: Introduce ARCH_MIGHT_HAVE_ACPI_PDC),
-> acpi_processor_set_pdc() was moved to processor_pdc.c, so update
-> the comments accordingly.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+On Mon, 24 Nov 2014 10:59:24 +0100
+Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
 
-Patches [2-3/3] from this set need to be rebased on top of current linux-next
-and resent, sorry about that.
+> Hi Steve,
+> did you get a chance of running your tests suite on real hardware with
+> this patch? I'd be really interested in the results.
 
-> ---
->  include/acpi/processor.h |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/include/acpi/processor.h b/include/acpi/processor.h
-> index 9b9b6f2..cbb6cd3 100644
-> --- a/include/acpi/processor.h
-> +++ b/include/acpi/processor.h
-> @@ -313,11 +313,13 @@ static inline int acpi_processor_get_bios_limit(int cpu, unsigned int *limit)
->  #endif				/* CONFIG_CPU_FREQ */
->  
->  /* in processor_core.c */
-> -void acpi_processor_set_pdc(acpi_handle handle);
->  int acpi_get_apicid(acpi_handle, int type, u32 acpi_id);
->  int acpi_map_cpuid(int apic_id, u32 acpi_id);
->  int acpi_get_cpuid(acpi_handle, int type, u32 acpi_id);
->  
-> +/* in processor_pdc.c */
-> +void acpi_processor_set_pdc(acpi_handle handle);
-> +
->  /* in processor_throttling.c */
->  int acpi_processor_tstate_has_changed(struct acpi_processor *pr);
->  int acpi_processor_get_throttling_info(struct acpi_processor *pr);
-> 
+Yes I finally got it working on my beaglebone white. It passed all the
+tests that passed without it. Although I'm not sure this patch itself
+was tested as I didn't have kprobes which might use it.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+-- Steve
