@@ -1,36 +1,27 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 25 Nov 2014 16:08:54 +0100
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable shmobile platforms
-In-Reply-To: <20140910004812.GB28662@verge.net.au>
-References: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
- <20140910004812.GB28662@verge.net.au>
-Message-ID: <CAMuHMdUWg3zDTyCGKOGxmtJxAd-y7mCz_911FnSGWSAPe=CQSQ@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 25 Nov 2014 16:13:04 +0100
+Subject: [RFC 0/2] Fix Arndale Octa/Peach Pi boot on Audio subsystem clocks
+In-Reply-To: <1416927292.26128.8.camel@AMDC1943>
+References: <1416842312-4405-1-git-send-email-k.kozlowski@samsung.com>
+ <54736AD0.4070909@collabora.co.uk> <1416907375.5023.54.camel@AMDC1943>
+ <547485F5.50600@collabora.co.uk> <1416925325.26128.6.camel@AMDC1943>
+ <547497B2.3010907@collabora.co.uk> <1416927292.26128.8.camel@AMDC1943>
+Message-ID: <54749C80.3050702@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 2:48 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Aug 28, 2014 at 04:00:28PM +0200, Geert Uytterhoeven wrote:
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->> Based on next-20140828
->> For now excluding r8a7740/armadillo, as it fails to boot on armadillo
+Hello Krzysztof,
 
-Armadillo failures are an issue with the bootloader (hermit), it works when
-using kexec.
+On 11/25/2014 03:54 PM, Krzysztof Kozlowski wrote:
+> 
+> My patch only fixed the gate clocks but it didn't touched div and mux.
+> I'll prepare a v2 of it (I got some feedback) which I hope will fix both
+> cases: i2s and disabling unused clocks.
+>
 
-> r8a7794 SoC support is now queued up for v3.18.
-> So I think could also be added to multi_v7_defconfig too.
-> Let me know if you want an incremental patch.
+Perfect, I will gladly test on Peach boards once you post it.
 
-Adding r8a7794 and other recent additions to shmobile_defconfig.
+Thanks a lot for your help.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Javier
