@@ -1,30 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Nov 2014 13:52:42 +0100
-Subject: [PATCH v3 2/5] Documentation: DT: Add bindings for Spreadtrum SoC
- Platform
-In-Reply-To: <1416917818-10506-3-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1416917818-10506-3-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <2672926.PUHDU64fHa@wuerfel>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 25 Nov 2014 13:54:24 +0100
+Subject: [PATCH] of: support passing console options with stdout-path
+In-Reply-To: <20141125103504.GA21525@leverpostej>
+References: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
+ <20141125103504.GA21525@leverpostej>
+Message-ID: <20141125125424.GN14482@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 November 2014 20:16:55 Chunyan Zhang wrote:
-> diff --git a/Documentation/devicetree/bindings/serial/sprd-uart.txt b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-> new file mode 100644
-> index 0000000..54e532f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-> @@ -0,0 +1,6 @@
-> +* Spreadtrum serial UART
-> +
-> +Required properties:
-> +- compatible: must be "sprd,sc9836-uart"
-> +- reg: offset and length of the register set for the device
-> +- interrupts: exactly one interrupt specifier
+On Tue, Nov 25, 2014 at 10:35:04AM +0000, Mark Rutland wrote:
+> Hi Leif,
 > 
+> On Mon, Nov 24, 2014 at 10:23:58PM +0000, Leif Lindholm wrote:
+> > Support specifying console options (like with console=ttyXN,<options>)
+> > by appending them to the stdout-path property after a separating ':'.
+> > 
+> > Example:
+> > 	stdout-path = "uart0:115200";
+> 
+> I would very much like to be able to use this -- it will allow
+> distributions to boot on a board without having to know _anything_ about
+> the console UART until userspace is up, which would make it possible to
+> have a completely generic installer image, without requiring the
+> platform to provide bootargs.
 
-The driver uses a clock, and the dts file lists a clock
-property, so it should be documented here, either as optional
-or mandatory, and with a description what this clock refers to.
+Note there are several serial drivers that read back the console options
+from the hardware assuming it has been initialized correctly by the
+bootloader already. So when your bootloader already made some output
+on the console (which is likely) you can do that already. Of course
+this doesn't solve all problems, like if you want to use a different
+console for the kernel than for the bootloader.
+Anyway, this behaviour is very nice since the kernel always uses the
+same speed for the console as the bootloader does.
 
-	Arnd
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
