@@ -1,59 +1,68 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 25 Nov 2014 22:46:29 +0530
-Subject: [PATCH 4/8] opp: Introduce APIs to remove OPPs
-In-Reply-To: <20141125162434.GC5050@linux.vnet.ibm.com>
-References: <cover.1416910766.git.viresh.kumar@linaro.org>
- <f815d0855c1bd28d8389554176acd2620e56b3c8.1416910766.git.viresh.kumar@linaro.org>
- <20141125162434.GC5050@linux.vnet.ibm.com>
-Message-ID: <CAKohponBNOm_0_rZqbVKQSoOa81CjnKb8vcfzA6gbm1+Gxn+gg@mail.gmail.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Tue, 25 Nov 2014 01:18:06 -0400
+Subject: [PATCH] thermal: exynos: add optional sclk support
+In-Reply-To: <CAM4voamP98hs+5Ey-qhy++HnmS0+8YLK8Fey_YCuzgBWDvzPKA@mail.gmail.com>
+References: <1416642356-8694-1-git-send-email-a.kesavan@samsung.com>
+ <CAGTfZH1T-pRmETfQUs1Scy1TLfA_DG9fEZGY83my7WVwtujqRQ@mail.gmail.com>
+ <CAM4voa=XUrkvH7EDk+j_FPX6pB3gLCHsAjDUMQacZ4AWyNEaNQ@mail.gmail.com>
+ <20141124114845.0a03eeb4@amdc2363>
+ <CAM4voakNTe5x1Mur0J9PNbxW0XCMiXm_hfpPgHF0bKwnMbYNAw@mail.gmail.com>
+ <20141124175242.GA1351@developer>
+ <CAM4voamP98hs+5Ey-qhy++HnmS0+8YLK8Fey_YCuzgBWDvzPKA@mail.gmail.com>
+Message-ID: <20141125051803.GA29240@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 November 2014 at 21:54, Paul E. McKenney
-<paulmck@linux.vnet.ibm.com> wrote:
-> If the data is alway accessed under an SRCU read-side critical section,
-> then you do need call_srcu() when freeing it -- as you pointed out,
-> -with- the srcu_struct included.  ;-)
+Abhilash,
 
-:)
+Hi,
 
-> If the data is accessed under both SRCU and RCU, then things get a bit
-> more involved.
+On Tue, Nov 25, 2014 at 08:00:50AM +0530, Abhilash Kesavan wrote:
+<big cut>
 
-Yes, that is always the case here.
+> >>
+> >> Lukasz, thanks for the review.
+> >>
+> >> Chanwoo, are you OK with this ? If so, I will post a v2 with this and
+> >> the other changes you suggested.
+> >
+> > Is this a mandatory or a optional clk? What happens if the chip has the
+> > clock, but you fail to get it in this code?
+> 
+> This is mandatory on Exynos7 but not on the older SoCs. On Exynos7 if
+> this clock is disabled then the TMU will not function.
+> 
 
->> +void __dev_pm_opp_remove(struct device_opp *dev_opp, struct dev_pm_opp *opp)
->> +{
->> +     /*
->> +      * Notify the changes in the availability of the operable
->> +      * frequency/voltage list.
->> +      */
->> +     srcu_notifier_call_chain(&dev_opp->srcu_head, OPP_EVENT_REMOVE, opp);
->> +     list_del_rcu(&opp->node);
->> +     call_srcu(&dev_opp->srcu_head.srcu, &opp->rcu_head, kfree_opp_rcu);
->
-> I am guessing that opp->node is being removed from the list traversed
-> by srcu_notifier_call_chain()...  (Looks that way below.)
 
-I couldn't find any code in kernel which is registered for this notifier chain
-yet. And so don't know what that code will do. It may not traverse the list
-or it may :)
+It means, that only on Exynos7, outputing a dev_err is the right thing
+to do. On other SoCs versions, it does not make sense at all requesting
+this clock.
 
-I couldn't understand this comment of yours, sorry: (Looks that way below.)
+> >
+> > Think the rule of thumb is to at least warn the user that you are
+> > bailing to the defaults, because you failed to get the clock, when you
+> > were supposed to.
+> >
+> > Besides, warning / logging (even if it is in debugging mode) the user
+> > that you failed to get a clock, when the board / platform does not
+> > support it, sounds at least bogus for them.
+> 
+> So, you would rather that I go with Chanwoo's approach of adding a
+> per-soc flag indicating the presence of this clock ?
+> 
 
->> +
->> +     if (list_empty(&dev_opp->opp_list)) {
->
-> Does the above want to be "if (!list_empty(&dev_opp->opp_list)) {"?
+Yes.
 
-No. dev_opp contains list of all OPPs. When all OPPs are gone, we don't
-want dev_opp anymore and so freeing it.
+BR,
 
->> +             list_del_rcu(&dev_opp->node);
->> +             call_srcu(&dev_opp->srcu_head.srcu, &dev_opp->rcu_head,
->> +                       kfree_device_rcu);
->> +     }
->> +}
+Eduardo Valentin
 
-So, I am still not sure what we need to do here as we have readers with
-both rcu and srcu critical regions.
+> Regards,
+> Abhilash
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141125/975c460d/attachment.sig>
