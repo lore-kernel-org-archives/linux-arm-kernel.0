@@ -1,28 +1,126 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 25 Nov 2014 11:22:07 +0100
-Subject: [PATCH v14 0/7] KVM/arm/x86: dirty page logging for ARMv7
- (3.17.0-rc1)
-In-Reply-To: <1415930268-7674-1-git-send-email-m.smarduch@samsung.com>
-References: <1415930268-7674-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20141125102207.GB31297@cbox>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 25 Nov 2014 10:23:53 +0000
+Subject: [PATCH V4] arm64: amd-seattle: Adding device tree for AMD Seattle
+ platform
+In-Reply-To: <1416865877-8347-1-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1416865877-8347-1-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <547458B9.2000805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mario,
+Hi Suravee,
 
-On Thu, Nov 13, 2014 at 05:57:41PM -0800, Mario Smarduch wrote:
-> Patch series adds support for ARMv7 and generic dirty page logging support. 
-> As we try to move towards generic dirty page logging additional logic is moved 
-> to generic code. Initially x86, armv7 KVM_GET_DIRTY_LOG reuses generic 
-> code, shortly followed by armv8 patches.
+Just spotted a small issue below (looks like a recurring mistake in a
+number of DTs I've seem lately):
+
+On 24/11/14 21:51, suravee.suthikulpanit at amd.com wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > 
-So given the timing of this and the last-minute fixes to this series, it
-is too late to merge for 3.19.
+> Initial revision of device tree for AMD Seattle platform.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Signed-off-by: Thomas Lendacky <Thomas.Lendacky@amd.com>
+> Signed-off-by: Joel Schopp <Joel.Schopp@amd.com>
+> ---
+> V4 Changes:
+>     * Remove unnecessary smb layer and move motherbord to top level
+>     * Move include dtsi to top level
+>     * Remove apb_pclk from sata0 and i2c
+>     * Fix GIC Virtual Maintanance Interrupt from PPI24 (8) to PPI25 (9)
+>     * Add 40-bit dma-ranges for motherboard (simple-bus)
+>     * Remove dma0 (pl330) entry for now since it only supports 32-bit DMA.
+>       It is basically not used at the moment. It would also need SMMU
+>       to allow dma remapping to 40-bit DMA range.
+>     * Add phandle spi0 and spi1
+>     * Hook up gpio0 pin 7 with MMC Card Detection (CD) support.
+>     * Changes in pcie0 entry:
+>         - Add 40-bit dma-ranges
+>         - Remove interrupts property
+>         - Add interrupt-map/mask property
+>         - Fix PCI I/O range 
+>         - Merge PCI 32-bit ranges
+>         - Merge PCI 64-bit ranges
+> 
+> NOTE: I am not add a new compatible ID for the sata0 as Rob Herring
+>       suggested since there is no need at the momement, and I am trying
+>       to avoid introducing ID unnecessarily.
+> 
+>  arch/arm64/Kconfig                          |   5 +
+>  arch/arm64/boot/dts/Makefile                |   1 +
+>  arch/arm64/boot/dts/amd-seattle-periph.dtsi | 156 ++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/amd-seattle.dts         |  89 ++++++++++++++++
+>  4 files changed, 251 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/amd-seattle-periph.dtsi
+>  create mode 100644 arch/arm64/boot/dts/amd-seattle.dts
+> 
 
-I would like if we could get one complete patch series with both v7 and
-v8 support in there ready for right after the merge window closes, so
-that Marc and I can queue this early for -next and then merge it for
-3.20.
+[...]
+
+> diff --git a/arch/arm64/boot/dts/amd-seattle.dts b/arch/arm64/boot/dts/amd-seattle.dts
+> new file mode 100644
+> index 0000000..d5fc482
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/amd-seattle.dts
+> @@ -0,0 +1,89 @@
+> +/*
+> + * DTS file for AMD Seattle
+> + *
+> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +/include/ "amd-seattle-periph.dtsi"
+> +
+> +/ {
+> +	compatible = "amd,seattle";
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	chosen {
+> +		stdout-path = &serial0;
+> +		linux,pci-probe-only;
+> +	};
+> +
+> +	gic: interrupt-controller at e1101000 {
+> +		compatible = "arm,gic-400", "arm,cortex-a15-gic";
+> +		interrupt-controller;
+> +		#interrupt-cells = <3>;
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		reg = <0x0 0xe1110000 0 0x1000>,
+> +		      <0x0 0xe112f000 0 0x2000>,
+> +		      <0x0 0xe1140000 0 0x10000>,
+> +		      <0x0 0xe1160000 0 0x10000>;
+> +		interrupts = <1 9 0xf04>;
+> +		ranges;
+> +		v2m0: v2m at e1180000 {
+> +			compatible = "arm,gic-v2m-frame";
+> +			msi-controller;
+> +			arm,msi-base-spi = <64>;
+> +			arm,msi-num-spis = <256>;
+> +			reg = <0x0 0xe1180000 0 0x1000>;
+> +		};
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupts = <1 13 0xff01>,
+> +			     <1 14 0xff01>,
+> +			     <1 11 0xff01>,
+> +			     <1 10 0xff01>;
+> +	};
+
+The Cortex-A57 TRM clearly states that these interrupts are level triggered.
 
 Thanks,
--Christoffer
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
