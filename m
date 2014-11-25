@@ -1,60 +1,138 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 25 Nov 2014 11:16:40 +0100
-Subject: [PATCH 1/2] ARM: shmobile: sh73a0 legacy/reference: Add missing
- INTCA0 clock for irqpin module
-In-Reply-To: <CAMuHMdW_-Dj8x2+4RG8yGurPsc8oVZVME2UaoU+EOhrxaCQ-4Q@mail.gmail.com>
-References: <1416410820-30020-1-git-send-email-geert+renesas@glider.be>
- <1416410820-30020-2-git-send-email-geert+renesas@glider.be>
- <20141125024405.GA21881@verge.net.au>
- <CAMuHMdW_-Dj8x2+4RG8yGurPsc8oVZVME2UaoU+EOhrxaCQ-4Q@mail.gmail.com>
-Message-ID: <CAMuHMdV3D8odk0+A5KPgv0yWhFB2KsyKFac8rHm3B=SRUUQ__w@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 25 Nov 2014 11:19:23 +0100
+Subject: [PATCH v4 2/3] KVM: arm: add irqfd support
+In-Reply-To: <54735FF6.9000008@linaro.org>
+References: <1416765420-12057-1-git-send-email-eric.auger@linaro.org>
+ <1416765420-12057-3-git-send-email-eric.auger@linaro.org>
+ <20141124100040.GJ3401@cbox> <5473104D.7000305@linaro.org>
+ <CAMJs5B9SZXjaJVuCSpvmMH0f7PvutDBEudjy=BeXsFy-WeKEqA@mail.gmail.com>
+ <54735FF6.9000008@linaro.org>
+Message-ID: <20141125101923.GA31297@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 10:31 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Tue, Nov 25, 2014 at 3:44 AM, Simon Horman <horms@verge.net.au> wrote:
->> On Wed, Nov 19, 2014 at 04:26:59PM +0100, Geert Uytterhoeven wrote:
->>> This clock drives the irqpin controller modules.
->>> Before, it was assumed enabled by the bootloader or reset state.
->>> By making it available to the driver, we make sure it gets enabled when
->>> needed, and allow it to be managed by system or runtime PM.
->>>
->>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>
->> Hi Geert,
->>
->> should this be considered a fix?
->
-> In some sense this is a fix. But I don't think anyone is suffering from it.
-> Just poor guys like me who disable all MSTP clocks in early boot code,
-> to find more missing clock declarations and more drivers that don't manage
-> their clocks ;-)
->
->> If so could you cook up some text describing which patch introduced
->> this problem in which kernel version.
->
-> I guess that would be:
->
-> commit 341eb5465f67437ad37ef2f6302b581beda4614a
-> Author: Magnus Damm <damm@opensource.se>
-> Date:   Tue Feb 26 12:01:09 2013 +0900
->
->     ARM: shmobile: INTC External IRQ pin driver on sh73a0
->
-> But I don't think it's worth adding that, or do you plan to backport
-> this to LTSI?
+[Re-adding cc list]
 
-Seeing the similar fix for r8a7740 has landed in backports, I now assume
-you will ;-)
+On Mon, Nov 24, 2014 at 05:42:30PM +0100, Eric Auger wrote:
+> On 11/24/2014 04:47 PM, Christoffer Dall wrote:
+> > On Mon, Nov 24, 2014 at 12:02 PM, Eric Auger <eric.auger@linaro.org> wrote:
+> >> On 11/24/2014 11:00 AM, Christoffer Dall wrote:
+> >>> On Sun, Nov 23, 2014 at 06:56:59PM +0100, Eric Auger wrote:
+> >>>> This patch enables irqfd on arm.
+> >>>>
+> >>>> Both irqfd and resamplefd are supported. Injection is implemented
+> >>>> in vgic.c without routing.
+> >>>>
+> >>>> This patch enables CONFIG_HAVE_KVM_EVENTFD and CONFIG_HAVE_KVM_IRQFD.
+> >>>>
+> >>>> KVM_CAP_IRQFD is now advertised. KVM_CAP_IRQFD_RESAMPLE capability
+> >>>> automatically is advertised as soon as CONFIG_HAVE_KVM_IRQFD is set.
+> >>>>
+> >>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> >>>>
+> >>>> ---
 
-Gr{oetje,eeting}s,
+[...]
 
-                        Geert
+> >>>> +int kvm_set_irq(struct kvm *kvm, int irq_source_id,
+> >>>> +            u32 irq, int level, bool line_status)
+> >>>> +{
+> >>>> +    unsigned int spi = irq + VGIC_NR_PRIVATE_IRQS;
+> >>>> +
+> >>>> +    kvm_debug("irqfd sets vIRQ %d to %d\n", irq, level);
+> >>>> +
+> >>>> +    if (likely(vgic_initialized(kvm))) {
+> >>>> +            if (spi > kvm->arch.vgic.nr_irqs)
+> >>>> +                    return -EINVAL;
+> >>>> +            return kvm_vgic_inject_irq(kvm, 0, spi, level);
+> >>>> +    } else if (level && kvm_irq_has_notifier(kvm, 0, irq)) {
+> >>>> +            /*
+> >>>> +             * any IRQ injected before vgic readiness is
+> >>>> +             * ignored and the notifier, if any, is called
+> >>>> +             * immediately as if the virtual IRQ were completed
+> >>>> +             * by the guest
+> >>>> +             */
+> >>>> +            kvm_notify_acked_irq(kvm, 0, irq);
+> >>>> +            return -EAGAIN;
+> >>>
+> >>> This looks fishy, I don't fully understand which case you're catering
+> >>> towards here (the comment is hard to understand), but my gut feeling is
+> >>> that you should back out (probably with an error) if the vgic is not
+> >>> initialized when calling this function.  Setting up the routing in the
+> >>> first place should probably error out if the vgic is not available.
+> >> The issue is related to integration with QEMU and VFIO.
+> >> Currently VFIO signaling (we tell VFIO to signal the eventfd on a
+> >> peculiar physical IRQ) and irqfd setup (we tell KVM/IRQFD to handle
+> >> previous eventfd when triggered and inject a GSI) are done by QEMU
+> >> *before* the first vcpu run. so before VGIC is ready.
+> >>
+> >> Both are done in a so called QEMU machine init done notifier. It could
+> >> be done in a QEMU reset notifier but I guess the problem would be the
+> >> same. and I think the same at which QEMU initializes it is correct.
+> >>
+> >> As soon as both VFIO signaling and irqfd are setup, virtual IRQ are
+> >> likely to be injected and this is what happens on some circumstances.
+> >> This happens on the 2d QEMU run after killing the 1st QEMU session. For
+> >> some reason I guess the HW device - in my case the xgmac - was released
+> >> in such a way the IRQ wire was not reset. So as soon as VFIO driver
+> >> calls request_irq, the IRQ hits.
+> >>
+> >> I tried to change that this xgmac driver behavior but I must acknowledge
+> >> that for the time beeing I failed. I will continue investigating that.
+> >>
+> >> Indeed I might be fixing the issue at the wrong place. But anyway this
+> >> relies on the fact the assigned device driver toggled down the IRQ
+> >> properly when releasing. At the time the signaling is setup we have not
+> >> entered yet any driver reset code.
+> >>
+> > I see, it's because of the quirky way we initialize the vgic at time
+> > of running the first CPU, so user space can't really hook into the
+> > sweet spot after initializing the vgic but just before actually
+> > running guest code.
+> 
+> Yes currently irqfd generic code has no way to test if the virtual
+> interrupt controller is "ready" (KVM__IRQFD -> kvm_irqfd_assign )
+> because I guess other archs don't have the problem.
+> > 
+> > Could it be that we simply need to let user space init the vgic after
+> > creating all its vcpus and only then allow setting up the irqfd?
+> 
+> I start VFIO signaling and setup KVM_IRQFD in a QEMU machine init done
+> notifier. the vgic init then must happen before then.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+have all the vcpus that QEMU wants to create, been created by then?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> Currently the VGIC KVM device has group/attributes that allow to set
+> registers (vgic_attr_regs_access) and *partially* init the state
+> (vgic_init_maps). Enhancing that we could indeed force the vgic init
+> earlier.
+> 
+
+We would probably add a new attribute to the vgic device api if we were
+to go down that road.
+
+> > 
+> > Alternatively we can refactor the whole thing so that we don't mess
+> > with the pending state etc. directly in the vgic_update_irq function,
+> > but just sets the level state (or remember that there was an edge,
+> > hummm, maybe not) and later propagate this to the vcpus in
+> > compute_pending_for_cpu().
+> 
+> yes we could indeed record a level info very early and not do anything
+> with it until the vgic is ready. This would oblige to init the level
+> bitmap yet in another earlier stage.
+
+there's an unsolved problem that you may not have created all your data
+structures or know how many IRQs you have at this point, right?
+
+> > 
+> > What you're doing here is to continously ack and re-request the irq
+> > from the vfio driver until you are ready to receive it, is that right?
+> yes I unmask the IRQ so that it can hit again (it was deactivated by the
+> host and masked the VFIO platform driver). If I don't call the notifier
+> it will remain masked and never hit again.
+> 
+Don't you simply loose the interrupt for edge-triggered interrupts then?
+
+-Christoffer
