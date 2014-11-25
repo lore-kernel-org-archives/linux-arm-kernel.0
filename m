@@ -1,107 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 25 Nov 2014 13:37:20 +0100
-Subject: [PATCH v2 4/4] mmc: atmel-mci: use probe deferring if dma
- controller is not ready yet
-In-Reply-To: <1416584018-8561-5-git-send-email-ludovic.desroches@atmel.com>
-References: <1416584018-8561-1-git-send-email-ludovic.desroches@atmel.com>
- <1416584018-8561-5-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <CAPDyKFq-0EaGSf9Mn7aMa1s9CCP5hxqRCkKrZrAnSs-h5OFmxw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 25 Nov 2014 13:38:01 +0100
+Subject: [RFC PATCH v2 3/4] arm64:thunder: Add initial dts for Cavium's
+ Thunder SoC in 2 Node topology.
+In-Reply-To: <2750247.HT2ynjYizJ@wuerfel>
+References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <4080571.JcHDsAZ9EV@wuerfel>
+ <CAFECyb8aObzJeiL4uB+N6D83GKqJ5tgYGJJJQXRQiEqMegg3Ng@mail.gmail.com>
+ <2750247.HT2ynjYizJ@wuerfel>
+Message-ID: <CAKv+Gu-EEmj1cV-N9tAijotV9Wj9drwajkoTVnRijHLiCskywg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 November 2014 at 16:33, Ludovic Desroches
-<ludovic.desroches@atmel.com> wrote:
-> Return probe defer if requesting a dma channel without a dma controller
-> probed.
+On 24 November 2014 at 18:01, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 24 November 2014 11:32:46 Roy Franz wrote:
+>> >
+>> > I don't know how much history is behind this binding. Have you looked
+>> > at the sPAPR way of doing this? I don't remember exactly how that is
+>> > done, but we'd need a good reason to discard that and implement
+>> > something else for arm64.
+>> >
+>> > If we create a new binding, I don't think the 'numa-map' node you
+>> > have here is the best solution. We already have device nodes for each
+>> > memory segment and each CPU in the system. Why not work with those
+>> > nodes directly?
+>>
+>> The DT memory nodes don't exist in an EFI system, as the EFI memory
+>> map is used instead.
+>> Using EFI as the boot firmware doesn't require the use of ACPI for
+>> hardware description,
+>> so the EFI/DT case is one that we should support.
 >
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  drivers/mmc/host/atmel-mci.c | 46 ++++++++++++++++++++++++--------------------
->  1 file changed, 25 insertions(+), 21 deletions(-)
->
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index 28546c3..d3c269e 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -2265,29 +2265,29 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
->         mmc_free_host(slot->mmc);
->  }
->
-> -static bool atmci_configure_dma(struct atmel_mci *host)
-> +static int atmci_configure_dma(struct atmel_mci *host)
->  {
-> -       if (host == NULL)
-> -               return false;
-> +       int ret = 0;
->
-> -       host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
-> -       if (!host->dma.chan) {
-> -               dev_warn(&host->pdev->dev, "no DMA channel available\n");
-> -               return false;
-> -       } else {
-> -               dev_info(&host->pdev->dev,
-> -                                       "using %s for DMA transfers\n",
-> -                                       dma_chan_name(host->dma.chan));
-> -
-> -               host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
-> -               host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> -               host->dma_conf.src_maxburst = 1;
-> -               host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
-> -               host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> -               host->dma_conf.dst_maxburst = 1;
-> -               host->dma_conf.device_fc = false;
-> -               return true;
-> +       host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev, "rxtx");
-> +       if (IS_ERR(host->dma.chan)) {
-> +               ret = PTR_ERR(host->dma.chan);
-> +               host->dma.chan = NULL;
-> +               return ret;
-
-As minor improvement you could just do "return PTR_ERR(host->dma.chan);"
-
-Then add a check for "IS_ERR(host->dma.chan)" at those other places
-that needs it.
-
->         }
-> +
-> +       dev_info(&host->pdev->dev, "using %s for DMA transfers\n",
-> +                dma_chan_name(host->dma.chan));
-> +
-> +       host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
-> +       host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> +       host->dma_conf.src_maxburst = 1;
-> +       host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
-> +       host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> +       host->dma_conf.dst_maxburst = 1;
-> +       host->dma_conf.device_fc = false;
-> +
-> +       return ret;
->  }
->
->  /*
-> @@ -2403,7 +2403,10 @@ static int atmci_probe(struct platform_device *pdev)
->
->         /* Get MCI capabilities and set operations according to it */
->         atmci_get_cap(host);
-> -       if (atmci_configure_dma(host)) {
-> +       ret = atmci_configure_dma(host);
-> +       if (ret == -EPROBE_DEFER)
-> +               goto err_dma_probe_defer;
-> +       if (ret == 0) {
->                 host->prepare_data = &atmci_prepare_data_dma;
->                 host->submit_data = &atmci_submit_data_dma;
->                 host->stop_transfer = &atmci_stop_transfer_dma;
-> @@ -2476,6 +2479,7 @@ err_init_slot:
->         del_timer_sync(&host->timer);
->         if (host->dma.chan)
->                 dma_release_channel(host->dma.chan);
-> +err_dma_probe_defer:
->         free_irq(irq, host);
->         return ret;
->  }
-> --
-> 2.0.3
+> But they /could/ exist, right? Can we just require them to be
+> present in order to use NUMA features?
 >
 
-Kind regards
-Uffe
+Actually, currently the memory nodes are stripped from the device tree
+by the EFI stub, so the kernel will never get to see them.
+This is done more or less as a fixup, under the assumption that EFI
+systems should not have DT memory nodes in the first place.
+
+We could revisit this, of course, but it needs to be taken into
+account in this discussion.
+
+-- 
+Ard.
