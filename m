@@ -1,35 +1,65 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 24 Nov 2014 16:17:14 -0800
-Subject: [PATCH V6 02/12] mailbox: Make struct mbox_controller's ops field
- const
+Date: Mon, 24 Nov 2014 16:17:15 -0800
+Subject: [PATCH V6 03/12] mailbox: Fix up error handling in
+ mbox_request_channel()
 In-Reply-To: <1416874644-12070-1-git-send-email-abrestic@chromium.org>
 References: <1416874644-12070-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1416874644-12070-3-git-send-email-abrestic@chromium.org>
+Message-ID: <1416874644-12070-4-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mailbox controller's channel ops ought to be read-only.
+From: Benson Leung <bleung@chromium.org>
 
+mbox_request_channel() currently returns EBUSY in the event the controller
+is not present or if of_xlate() fails, but in neither case is EBUSY really
+appropriate.  Return EPROBE_DEFER if the controller is not yet present
+and change of_xlate() to return an ERR_PTR instead of NULL so that the
+error can be propagated back to the caller of mbox_request_channel().
+
+Signed-off-by: Benson Leung <bleung@chromium.org>
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 ---
 No changes from v5.
 New for v5.
 ---
- include/linux/mailbox_controller.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mailbox/mailbox.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/include/linux/mailbox_controller.h b/include/linux/mailbox_controller.h
-index d4cf96f..68c4245 100644
---- a/include/linux/mailbox_controller.h
-+++ b/include/linux/mailbox_controller.h
-@@ -72,7 +72,7 @@ struct mbox_chan_ops {
-  */
- struct mbox_controller {
- 	struct device *dev;
--	struct mbox_chan_ops *ops;
-+	const struct mbox_chan_ops *ops;
- 	struct mbox_chan *chans;
- 	int num_chans;
- 	bool txdone_irq;
+diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+index afcb430..955c0a7 100644
+--- a/drivers/mailbox/mailbox.c
++++ b/drivers/mailbox/mailbox.c
+@@ -315,7 +315,7 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
+ 		return ERR_PTR(-ENODEV);
+ 	}
+ 
+-	chan = NULL;
++	chan = ERR_PTR(-EPROBE_DEFER);
+ 	list_for_each_entry(mbox, &mbox_cons, node)
+ 		if (mbox->dev->of_node == spec.np) {
+ 			chan = mbox->of_xlate(mbox, &spec);
+@@ -324,7 +324,12 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
+ 
+ 	of_node_put(spec.np);
+ 
+-	if (!chan || chan->cl || !try_module_get(mbox->dev->driver->owner)) {
++	if (IS_ERR(chan)) {
++		mutex_unlock(&con_mutex);
++		return chan;
++	}
++
++	if (chan->cl || !try_module_get(mbox->dev->driver->owner)) {
+ 		dev_dbg(dev, "%s: mailbox not free\n", __func__);
+ 		mutex_unlock(&con_mutex);
+ 		return ERR_PTR(-EBUSY);
+@@ -387,7 +392,7 @@ of_mbox_index_xlate(struct mbox_controller *mbox,
+ 	int ind = sp->args[0];
+ 
+ 	if (ind >= mbox->num_chans)
+-		return NULL;
++		return ERR_PTR(-EINVAL);
+ 
+ 	return &mbox->chans[ind];
+ }
 -- 
 2.1.0.rc2.206.gedb03e5
