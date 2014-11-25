@@ -1,184 +1,137 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Nov 2014 14:32:47 +0000
-Subject: [PATCH v3 02/13] arm64/mm: add create_pgd_mapping() to create
- private page tables
-In-Reply-To: <1416315432-8534-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
- <1416315432-8534-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20141125143247.GE8541@arm.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 25 Nov 2014 14:35:00 +0000
+Subject: [PATCH] of: support passing console options with stdout-path
+In-Reply-To: <1416917249.32327.15.camel@debian.org>
+References: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
+ <20141125103504.GA21525@leverpostej>
+ <20141125111724.GC2361@bivouac.eciton.net>
+ <1416917249.32327.15.camel@debian.org>
+Message-ID: <20141125143500.GE2361@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 12:57:01PM +0000, Ard Biesheuvel wrote:
-> For UEFI, we need to install the memory mappings used for Runtime Services
-> in a dedicated set of page tables. Add create_pgd_mapping(), which allows
-> us to allocate and install those page table entries early.
+On Tue, Nov 25, 2014 at 12:07:29PM +0000, Ian Campbell wrote:
+> My concern is that this is Linux specific, other OSes may have different
+> ideas about how stdout options should be formatted within this property.
+> (At least I don't know of any standardisation of the 115200n8 thing --
+> I'd love to be corrected!)
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/mmu.h     |  3 +++
->  arch/arm64/include/asm/pgtable.h |  5 +++++
->  arch/arm64/mm/mmu.c              | 43 ++++++++++++++++++++--------------------
->  3 files changed, 30 insertions(+), 21 deletions(-)
-
-Looks fairly mechanical to me:
-
-  Reviewed-by: Will Deacon <will.deacon@arm.com>
-
-Will
-
-> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-> index c2f006c48bdb..5fd40c43be80 100644
-> --- a/arch/arm64/include/asm/mmu.h
-> +++ b/arch/arm64/include/asm/mmu.h
-> @@ -33,5 +33,8 @@ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
->  extern void init_mem_pgprot(void);
->  /* create an identity mapping for memory (or io if map_io is true) */
->  extern void create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io);
-> +extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-> +			       unsigned long virt, phys_addr_t size,
-> +			       pgprot_t prot);
->  
->  #endif
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 41a43bf26492..1abe4d08725b 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -264,6 +264,11 @@ static inline pmd_t pte_pmd(pte_t pte)
->  	return __pmd(pte_val(pte));
->  }
->  
-> +static inline pgprot_t mk_sect_prot(pgprot_t prot)
-> +{
-> +	return __pgprot(pgprot_val(prot) & ~PTE_TABLE_BIT);
-> +}
-> +
->  /*
->   * THP definitions.
->   */
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 83e6713143a3..4d583aa9ff4e 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -157,20 +157,10 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
->  
->  static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
->  				  unsigned long addr, unsigned long end,
-> -				  phys_addr_t phys, int map_io)
-> +				  phys_addr_t phys, pgprot_t prot)
->  {
->  	pmd_t *pmd;
->  	unsigned long next;
-> -	pmdval_t prot_sect;
-> -	pgprot_t prot_pte;
-> -
-> -	if (map_io) {
-> -		prot_sect = PROT_SECT_DEVICE_nGnRE;
-> -		prot_pte = __pgprot(PROT_DEVICE_nGnRE);
-> -	} else {
-> -		prot_sect = PROT_SECT_NORMAL_EXEC;
-> -		prot_pte = PAGE_KERNEL_EXEC;
-> -	}
->  
->  	/*
->  	 * Check for initial section mappings in the pgd/pud and remove them.
-> @@ -186,7 +176,8 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
->  		/* try section mapping first */
->  		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
->  			pmd_t old_pmd =*pmd;
-> -			set_pmd(pmd, __pmd(phys | prot_sect));
-> +			set_pmd(pmd, __pmd(phys |
-> +					   pgprot_val(mk_sect_prot(prot))));
->  			/*
->  			 * Check for previous table entries created during
->  			 * boot (__create_page_tables) and flush them.
-> @@ -195,7 +186,7 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
->  				flush_tlb_all();
->  		} else {
->  			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
-> -				       prot_pte);
-> +				       prot);
->  		}
->  		phys += next - addr;
->  	} while (pmd++, addr = next, addr != end);
-> @@ -203,7 +194,7 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
->  
->  static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
->  				  unsigned long addr, unsigned long end,
-> -				  unsigned long phys, int map_io)
-> +				  unsigned long phys, pgprot_t prot)
->  {
->  	pud_t *pud;
->  	unsigned long next;
-> @@ -221,10 +212,11 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
->  		/*
->  		 * For 4K granule only, attempt to put down a 1GB block
->  		 */
-> -		if (!map_io && (PAGE_SHIFT == 12) &&
-> +		if ((PAGE_SHIFT == 12) &&
->  		    ((addr | next | phys) & ~PUD_MASK) == 0) {
->  			pud_t old_pud = *pud;
-> -			set_pud(pud, __pud(phys | PROT_SECT_NORMAL_EXEC));
-> +			set_pud(pud, __pud(phys |
-> +					   pgprot_val(mk_sect_prot(prot))));
->  
->  			/*
->  			 * If we have an old value for a pud, it will
-> @@ -239,7 +231,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
->  				flush_tlb_all();
->  			}
->  		} else {
-> -			alloc_init_pmd(mm, pud, addr, next, phys, map_io);
-> +			alloc_init_pmd(mm, pud, addr, next, phys, prot);
->  		}
->  		phys += next - addr;
->  	} while (pud++, addr = next, addr != end);
-> @@ -251,7 +243,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
->   */
->  static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
->  				    phys_addr_t phys, unsigned long virt,
-> -				    phys_addr_t size, int map_io)
-> +				    phys_addr_t size, pgprot_t prot)
->  {
->  	unsigned long addr, length, end, next;
->  
-> @@ -261,7 +253,7 @@ static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
->  	end = addr + length;
->  	do {
->  		next = pgd_addr_end(addr, end);
-> -		alloc_init_pud(mm, pgd, addr, next, phys, map_io);
-> +		alloc_init_pud(mm, pgd, addr, next, phys, prot);
->  		phys += next - addr;
->  	} while (pgd++, addr = next, addr != end);
->  }
-> @@ -275,7 +267,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
->  		return;
->  	}
->  	__create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK), phys, virt,
-> -			 size, 0);
-> +			 size, PAGE_KERNEL_EXEC);
->  }
->  
->  void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
-> @@ -285,7 +277,16 @@ void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
->  		return;
->  	}
->  	__create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
-> -			 addr, addr, size, map_io);
-> +			 addr, addr, size,
-> +			 map_io ? __pgprot(PROT_DEVICE_nGnRE)
-> +				: PAGE_KERNEL_EXEC);
-> +}
-> +
-> +void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-> +			       unsigned long virt, phys_addr_t size,
-> +			       pgprot_t prot)
-> +{
-> +	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot);
->  }
->  
->  static void __init map_mem(void)
-> -- 
-> 1.8.3.2
+> If I were a firmware author I'd be wary of specifying a stdout-path with
+> a Linux specific suffix.
+ 
+> Search ePAPR for baud it seems that the generic serial binding includes
+> a current-speed property in 6.2.1.2. It then goes on a bit ambiguously
+> to talk about the NS16550 in 6.2.2 but I think 6.2.1.2 was intended to
+> be generic. No mention of stop-bits/parity etc though, they are assumed
+> to be set already I think
 > 
+> One thought I had was to define a dt-stdout "pseudo-console" so that
+> console=dt-stdout,115200n8 or something could be used.
+
+I'll wait for others to comment on the above.
+ 
+> Anyway I applied your patch to v3.18-rc5 and ran it on a Mustang and it
+> didn't work for some reason. I'm using:
 > 
+>         fdt set /chosen stdout-path "/soc/serial at 1c020000:115200"
+>         setenv bootargs "earlycon=uart8250,mmio32,0x1c020000 root=/dev/sda3 rw debug"
+> 
+> So I get earlycon but then no proper console. Removing earlycon just
+> makes that stop working.
+
+Right, so having debugged this a bit offline, I'm amazed I booted
+anything at all, given how badly I broke path scanning...
+Please ignore previous version - a fixed one follows:
+
+/
+	Leif
+
+>From aef87fd958902afe881720286d525e10997462b8 Mon Sep 17 00:00:00 2001
+From: Leif Lindholm <leif.lindholm@linaro.org>
+Date: Mon, 24 Nov 2014 22:23:58 +0000
+Subject: [PATCH] of: support passing console options with stdout-path
+
+Support specifying console options (like with console=ttyXN,<options>)
+by appending them to the stdout-path property after a separating ':'.
+
+Example:
+	stdout-path = "uart0:115200";
+
+This patch also modifies of_find_node_by_path() to match only the
+portion of the path before a ':'.
+
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+---
+ drivers/of/base.c |   19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 3823edf..ecd6290 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -37,6 +37,7 @@ EXPORT_SYMBOL(of_allnodes);
+ struct device_node *of_chosen;
+ struct device_node *of_aliases;
+ struct device_node *of_stdout;
++static char *of_stdout_options;
+ 
+ struct kset *of_kset;
+ 
+@@ -699,10 +700,15 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
+ {
+ 	struct device_node *child;
+ 	int len = strchrnul(path, '/') - path;
++	int term;
+ 
+ 	if (!len)
+ 		return NULL;
+ 
++	term = strchrnul(path, ':') - path;
++	if (term < len)
++		len = term;
++
+ 	__for_each_child_of_node(parent, child) {
+ 		const char *name = strrchr(child->full_name, '/');
+ 		if (WARN(!name, "malformed device_node %s\n", child->full_name))
+@@ -742,11 +748,16 @@ struct device_node *of_find_node_by_path(const char *path)
+ 	if (*path != '/') {
+ 		char *p = strchrnul(path, '/');
+ 		int len = p - path;
++		int term;
+ 
+ 		/* of_aliases must not be NULL */
+ 		if (!of_aliases)
+ 			return NULL;
+ 
++		term = strchrnul(path, ':') - path;
++		if (term < len)
++			len = term;
++
+ 		for_each_property_of_node(of_aliases, pp) {
+ 			if (strlen(pp->name) == len && !strncmp(pp->name, path, len)) {
+ 				np = of_find_node_by_path(pp->value);
+@@ -1830,8 +1841,12 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
+ 			name = of_get_property(of_chosen, "linux,stdout-path", NULL);
+ 		if (IS_ENABLED(CONFIG_PPC) && !name)
+ 			name = of_get_property(of_aliases, "stdout", NULL);
+-		if (name)
++		if (name) {
+ 			of_stdout = of_find_node_by_path(name);
++			of_stdout_options = strchr(name, ':');
++			if (of_stdout_options != NULL)
++				of_stdout_options++;
++		}
+ 	}
+ 
+ 	if (!of_aliases)
+@@ -1957,7 +1972,7 @@ bool of_console_check(struct device_node *dn, char *name, int index)
+ {
+ 	if (!dn || dn != of_stdout || console_set_on_cmdline)
+ 		return false;
+-	return !add_preferred_console(name, index, NULL);
++	return !add_preferred_console(name, index, of_stdout_options);
+ }
+ EXPORT_SYMBOL_GPL(of_console_check);
+ 
+-- 
+1.7.10.4
