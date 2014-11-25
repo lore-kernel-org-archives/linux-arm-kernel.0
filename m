@@ -1,42 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Nov 2014 13:54:24 +0100
-Subject: [PATCH] of: support passing console options with stdout-path
-In-Reply-To: <20141125103504.GA21525@leverpostej>
-References: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
- <20141125103504.GA21525@leverpostej>
-Message-ID: <20141125125424.GN14482@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Nov 2014 13:57:31 +0100
+Subject: [PATCH v3 4/5] arm64: Add support for Spreadtrum's Sharkl64
+ Platform in Kconfig and defconfig
+In-Reply-To: <1416917818-10506-5-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <1416917818-10506-5-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <3490516.nCDXzA8J8x@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 10:35:04AM +0000, Mark Rutland wrote:
-> Hi Leif,
+On Tuesday 25 November 2014 20:16:57 Chunyan Zhang wrote:
 > 
-> On Mon, Nov 24, 2014 at 10:23:58PM +0000, Leif Lindholm wrote:
-> > Support specifying console options (like with console=ttyXN,<options>)
-> > by appending them to the stdout-path property after a separating ':'.
-> > 
-> > Example:
-> > 	stdout-path = "uart0:115200";
-> 
-> I would very much like to be able to use this -- it will allow
-> distributions to boot on a board without having to know _anything_ about
-> the console UART until userspace is up, which would make it possible to
-> have a completely generic installer image, without requiring the
-> platform to provide bootargs.
+> +menuconfig ARCH_SPRD
+> +       bool "Spreadtrum SoC platform"
+> +       depends on ARM64
+> +       help
+> +         Support for Spreadtrum ARM based SoCs
+> +
+> +if ARCH_SPRD
+> +
+> +config ARCH_SHARKL64
+> +       bool "Sharkl64 SoC Platform"
+> +       help
+> +         Sharkl64 is a Spreadtrum's SoC Platform which is based
+> +         on ARM 64-bit processor core including
+> +           sc9836
+> +
+> +endif #ARCH_SPRD
+> +
 
-Note there are several serial drivers that read back the console options
-from the hardware assuming it has been initialized correctly by the
-bootloader already. So when your bootloader already made some output
-on the console (which is likely) you can do that already. Of course
-this doesn't solve all problems, like if you want to use a different
-console for the kernel than for the bootloader.
-Anyway, this behaviour is very nice since the kernel always uses the
-same speed for the console as the bootloader does.
+I don't think we need multiple levels here, it should be enough to
+have either ARCH_SPRD or ARCH_SHARKL64, because all device drivers
+are going to be optional anyway. Typically a Kconfig symbol covers
+all SoCs that are related, so if you Spreadtrum are doing both
+phone and server chips and these are designed independently, you
+would have two symbols, but if you only expect to see phone chips
+here that are all derived from the same product line, using ARCH_SPRD
+to refer to all of them should be enough.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
