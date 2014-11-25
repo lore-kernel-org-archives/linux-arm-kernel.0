@@ -1,40 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 25 Nov 2014 10:28:11 +0000
-Subject: Question:  Does dma_alloc_coherent  have problem?
-In-Reply-To: <547445F8.4070500@huawei.com>
-References: <547445F8.4070500@huawei.com>
-Message-ID: <20141125102811.GA18858@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 25 Nov 2014 10:30:34 +0000
+Subject: [PATCH v8 2/6] arm64: ptrace: allow tracer to skip a system call
+In-Reply-To: <547432D2.7000909@linaro.org>
+References: <1416273038-15590-1-git-send-email-takahiro.akashi@linaro.org>
+ <1416273038-15590-3-git-send-email-takahiro.akashi@linaro.org>
+ <20141118140425.GM18842@arm.com> <546C58DB.5080204@linaro.org>
+ <20141119190601.GM15985@arm.com> <546D7860.2010300@linaro.org>
+ <20141120191738.GV19126@arm.com> <547432D2.7000909@linaro.org>
+Message-ID: <20141125103034.GC30251@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 09:03:52AM +0000, leizhen wrote:
-> On arm64, invoke dma_alloc_coherent will indirect call swiotlb_alloc_coherent.
-> The latter function allocates memory by __get_free_pages or from swiotlb buffer,
-> then use function phys_to_dma to get iova.
+On Tue, Nov 25, 2014 at 07:42:10AM +0000, AKASHI Takahiro wrote:
+> On 11/21/2014 04:17 AM, Will Deacon wrote:
+> > On Thu, Nov 20, 2014 at 05:13:04AM +0000, AKASHI Takahiro wrote:
+> >> On 11/20/2014 04:06 AM, Will Deacon wrote:
+> >>> On Wed, Nov 19, 2014 at 08:46:19AM +0000, AKASHI Takahiro wrote:
+> >>>> Syscall(-1) will return -ENOSYS whether or not a syscallno is explicitly
+> >>>> replaced with -1 by a tracer, and, in this sense, it is *skipped*.
+> >>>
+> >>> Ok, but now userspace sees -ENOSYS for a skipped system call in that case,
+> >>> whereas it would usually see whatever the trace put in x0, right?
+> >>
+> >> If you don't really like this behavior, how about this patch instead of my [2/6] patch?
+> >>
+> >> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> >> index 726b910..1ef57d0 100644
+> >> --- a/arch/arm64/kernel/entry.S
+> >> +++ b/arch/arm64/kernel/entry.S
+> >> @@ -668,8 +668,15 @@ ENDPROC(el0_svc)
+> >>            * switches, and waiting for our parent to respond.
+> >>            */
+> >>    __sys_trace:
+> >> +       cmp     w8, #-1                         // default errno for invalid
+> >> +       b.ne    1f                              // system call
+> >> +       mov     x0, #-ENOSYS
+> >> +       str     x0, [sp, #S_X0]
+> >> +1:
+> >>           mov     x0, sp
+> >>           bl      syscall_trace_enter
+> >> +       cmp     w0, #-1                         // skip the syscall?
+> >> +       b.eq    __sys_trace_return_skipped
+> >>           adr     lr, __sys_trace_return          // return address
+> >>           uxtw    scno, w0                        // syscall number (possibly new)
+> >>           mov     x1, sp                          // pointer to regs
+> >> @@ -684,6 +691,7 @@ __sys_trace:
+> >>
+> >>    __sys_trace_return:
+> >>           str     x0, [sp]                        // save returned x0
+> >> +__sys_trace_return_skipped:
+> >>           mov     x0, sp
+> >>           bl      syscall_trace_exit
+> >>           b       ret_to_user
+> >>
+> >> With this change, I believe, syscall(-1) returns -ENOSYS by default whether traced
+> >> or not, and still you can change a return value when tracing.
+> >> (But a drawback here is that a tracer will see -ENOSYS in x0 even at syscall entry
+> >> for syscall(-1).)
+> >
+> > But it's exactly these drawbacks that I'm objected to. syscall(-1) shouldn't
+> > be treated any differently to syscall(42) with respect to restarting,
+> > exactly like x86.
 > 
-> static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-> {
-> 	return (dma_addr_t)paddr;
-> }
-> 
-> But dma_alloc_coherent have not use iommu_map or other functions to create mapping
-> between iova and pa. I known that SMMUv2 support bypass mode, so there is no problem
-> in this case. But, some device drivers need use SMMU page table to create exact mapping,
-> to enhance security.
-> 
-> And I saw that: on X86, intel_alloc_coherent manages iova address space of each iommu_group,
-> and create mapping between iova and pa when needed.
-> 
-> So, I think create mapping should be done in dma_alloc_coherent.
+> Can you elaborate a bit more as to "restarting?"
 
-The swiotlb, as the name implies, is for software tlbs. IOW, nothing to
-do with the IOMMU.
+Sorry, I meant skipping. There was another thread about syscall restarting
+at the same time I wrote that, so my mind was elsewhere!
 
-We need separate dma_ops for IOMMU which are not implemented on arm64
-yet. There were patches to make part of the arm32 dma ops generic but we
-are dropping this approach as we don't want to implement another
-allocator. It's best to use the existing drivers/iommu/iova.c, maybe
-with a few bits from intel-iommu.c made generic.
+> We can't make any assumption about the number of arguments taken by *invalid* syscall(-1)
+> and so changing a value in x0 (or any other registers) doesn't make any difference.
+> ()
 
--- 
-Catalin
+Ok, that's a fair point.
+
+Will
