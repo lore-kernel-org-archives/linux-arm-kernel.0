@@ -1,69 +1,105 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Tue, 25 Nov 2014 14:02:50 +0100
-Subject: How many frequencies would cpufreq optimally like to manage?
-In-Reply-To: <CAKohpomzxnCy7X+cPsVdDvi0cMRMp2Am1O-S5BeQtTr1CqBhEw@mail.gmail.com>
-References: <546D26AE.50601@free.fr>	<CAOh2x==KZzq1wbQxGwsJjZW+=fBJDzcnmRoaZMh0UYH-=yBJ=g@mail.gmail.com>	<546DF891.2050401@free.fr>
- <CAKohpomzxnCy7X+cPsVdDvi0cMRMp2Am1O-S5BeQtTr1CqBhEw@mail.gmail.com>
-Message-ID: <54747DFA.3040802@free.fr>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 25 Nov 2014 13:05:36 +0000
+Subject: [RFC PATCH v4 6/8] dma-mapping: set dma segment properties in
+ of_dma_configure
+In-Reply-To: <1415991397-9618-7-git-send-email-will.deacon@arm.com>
+References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
+ <1415991397-9618-7-git-send-email-will.deacon@arm.com>
+Message-ID: <54747EA0.1020001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/11/2014 04:36, Viresh Kumar wrote:
+Hi Will,
 
-> All current governors depend on background timers for their functionality.
-> These timers run at some sampling rate (in ms) and that time we change
-> CPU's frequency depending on existing load on system.. So, that might
-> not be fast enough.
+On 14/11/14 18:56, Will Deacon wrote:
+> of_dma_configure determines the size of the DMA range for a device by
+> either parsing the dma-ranges property or inspecting the coherent DMA
+> mask. This same information can be used to initialise the max segment
+> size and boundary_mask to a default value.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-As far as I can tell, on my SoC, the timer runs at 27 MHz.
-But I have no idea how often it fires an interrupt.
+Sadly, NAK on this one. After a thorough investigation and testing, 
+generic code really shouldn't be touching dma_parms like this, and I 
+have some corrupted files on my USB filesystem to prove it ;) It seems 
+it's a bad idea to effectively change the default segment size 
+universally unless you really want to go through the entire block layer 
+(and who-knows-what-else) to find and fix everything that relies on it 
+being 64k.
 
-I've been studying other cpufreq drivers, especially the OMAP driver.
-I noticed that there is a lot of generic infrastructure that our driver
-wasn't using, such as...
+Simply dropping this patch and letting the existing defaults in 
+dma_set_max_seg_size and dma_get_seg_boundary stand seems like the 
+correct action.
 
-   cpufreq_generic_init
-   cpufreq_generic_exit
-   cpufreq_generic_frequency_table_verify
-   cpufreq_generic_attr
 
-I've changed our driver to use those.
+Marek, I believe you may have some use case for this - if so, as I 
+understand it your individual drivers should be setting up their own 
+dma_parms directly, to tell the IOMMU they can handle it merging 
+scatterlists into arbitrarily long segments, without affecting the other 
+drivers that assume they'll never see >64k segments and go wrong if they 
+do (including the generic USB stack, apparently).
 
-I'm still confused about cpufreq_generic_get.
-This is not a typical get/put type function, right?
 
-What is it supposed to get?
-Apparently, the actual frequency of the 'cpu-th' CPU?
-I see that it calls clk_get_rate(policy->clk)
+Robin.
 
-This 'struct clk' is an elusive beast.
-Where is it defined? I only run into forward declarations.
-
-On my platform, clk_get_accuracy returns -524 unconditionally,
-and clk_prepare just returns 0.
-
-of_clk_get and of_clk_get_by_name both return ERR_PTR(-2)
-
-I suppose all this means I can't use this infrastructure "as-is",
-correct? Where can I read more about it?
-
-How is the kernel supposed to know what frequency each core is running at?
-I imagine that's what the .get method override is for?
-
-One more question (for now). Is the .get method supposed to return numbers
-that match in freq_table, or can they be slightly different? For example,
-I've defined my freq_table like this:
-
-static struct cpufreq_frequency_table freq_table[] = {
-	{ .driver_data = REG_VAL(1,0), .frequency = 999000 },
-	{ .driver_data = REG_VAL(1,8), .frequency = 750000 },
-	{ .driver_data = REG_VAL(2,0), .frequency = 500000 },
-	{ .driver_data = REG_VAL(4,0), .frequency = 250000 },
-	{ .driver_data = REG_VAL(8,0), .frequency = 125000 },
-	{ .frequency = CPUFREQ_TABLE_END },
-};
-
-but the 3rd frequency is actually 999/2 MHz, not 500 MHz, etc.
-Will that be a problem?
-
-Regards.
+> ---
+>   drivers/of/platform.c           | 4 ++++
+>   include/linux/amba/bus.h        | 1 +
+>   include/linux/platform_device.h | 2 ++
+>   3 files changed, 7 insertions(+)
+>
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index b89caf8c7586..0a2842d91db4 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -191,6 +191,8 @@ static void of_dma_configure(struct device *dev)
+>   		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+>   	}
+>   	dev->dma_pfn_offset = offset;
+> +	dma_set_max_seg_size(dev, size);
+> +	dma_set_seg_boundary(dev, size);
+>
+>   	coherent = of_dma_is_coherent(dev->of_node);
+>   	dev_dbg(dev, "device is%sdma coherent\n",
+> @@ -236,6 +238,7 @@ static struct platform_device *of_platform_device_create_pdata(
+>
+>   	dev->dev.bus = &platform_bus_type;
+>   	dev->dev.platform_data = platform_data;
+> +	dev->dev.dma_parms = &dev->dma_parms;
+>   	of_dma_configure(&dev->dev);
+>
+>   	if (of_device_add(dev) != 0) {
+> @@ -295,6 +298,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+>   	dev->dev.of_node = of_node_get(node);
+>   	dev->dev.parent = parent;
+>   	dev->dev.platform_data = platform_data;
+> +	dev->dev.dma_parms = &dev->dma_parms;
+>   	if (bus_id)
+>   		dev_set_name(&dev->dev, "%s", bus_id);
+>   	else
+> diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+> index c324f5700d1a..9b232eeb6c20 100644
+> --- a/include/linux/amba/bus.h
+> +++ b/include/linux/amba/bus.h
+> @@ -32,6 +32,7 @@ struct amba_device {
+>   	struct clk		*pclk;
+>   	unsigned int		periphid;
+>   	unsigned int		irq[AMBA_NR_IRQS];
+> +	struct device_dma_parameters dma_parms;
+>   };
+>
+>   struct amba_driver {
+> diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
+> index 153d303af7eb..8dc48487b34b 100644
+> --- a/include/linux/platform_device.h
+> +++ b/include/linux/platform_device.h
+> @@ -27,6 +27,8 @@ struct platform_device {
+>   	u32		num_resources;
+>   	struct resource	*resource;
+>
+> +	struct device_dma_parameters dma_parms;
+> +
+>   	const struct platform_device_id	*id_entry;
+>   	char *driver_override; /* Driver name to force a match */
+>
+>
