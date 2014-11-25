@@ -1,72 +1,55 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 25 Nov 2014 16:42:10 +0900
-Subject: [PATCH v8 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <20141120191738.GV19126@arm.com>
-References: <1416273038-15590-1-git-send-email-takahiro.akashi@linaro.org>
- <1416273038-15590-3-git-send-email-takahiro.akashi@linaro.org>
- <20141118140425.GM18842@arm.com> <546C58DB.5080204@linaro.org>
- <20141119190601.GM15985@arm.com> <546D7860.2010300@linaro.org>
- <20141120191738.GV19126@arm.com>
-Message-ID: <547432D2.7000909@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 25 Nov 2014 08:59:29 +0100
+Subject: [PATCH RFC v2 08/12] soc: samsung: pm_domain: Add support for
+ parent power domain
+In-Reply-To: <1416834256-11225-8-git-send-email-amit.daniel@samsung.com>
+References: <1416833572-6880-1-git-send-email-amit.daniel@samsung.com>
+ <1416834256-11225-1-git-send-email-amit.daniel@samsung.com>
+ <1416834256-11225-8-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CAPDyKFoBnViXQF=wDYp0x4gaOO4ht3a8KBeY6=k6_Zkkav28pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2014 04:17 AM, Will Deacon wrote:
-> On Thu, Nov 20, 2014 at 05:13:04AM +0000, AKASHI Takahiro wrote:
->> On 11/20/2014 04:06 AM, Will Deacon wrote:
->>> On Wed, Nov 19, 2014 at 08:46:19AM +0000, AKASHI Takahiro wrote:
->>>> Syscall(-1) will return -ENOSYS whether or not a syscallno is explicitly
->>>> replaced with -1 by a tracer, and, in this sense, it is *skipped*.
->>>
->>> Ok, but now userspace sees -ENOSYS for a skipped system call in that case,
->>> whereas it would usually see whatever the trace put in x0, right?
->>
->> If you don't really like this behavior, how about this patch instead of my [2/6] patch?
->>
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index 726b910..1ef57d0 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -668,8 +668,15 @@ ENDPROC(el0_svc)
->>            * switches, and waiting for our parent to respond.
->>            */
->>    __sys_trace:
->> +       cmp     w8, #-1                         // default errno for invalid
->> +       b.ne    1f                              // system call
->> +       mov     x0, #-ENOSYS
->> +       str     x0, [sp, #S_X0]
->> +1:
->>           mov     x0, sp
->>           bl      syscall_trace_enter
->> +       cmp     w0, #-1                         // skip the syscall?
->> +       b.eq    __sys_trace_return_skipped
->>           adr     lr, __sys_trace_return          // return address
->>           uxtw    scno, w0                        // syscall number (possibly new)
->>           mov     x1, sp                          // pointer to regs
->> @@ -684,6 +691,7 @@ __sys_trace:
->>
->>    __sys_trace_return:
->>           str     x0, [sp]                        // save returned x0
->> +__sys_trace_return_skipped:
->>           mov     x0, sp
->>           bl      syscall_trace_exit
->>           b       ret_to_user
->>
->> With this change, I believe, syscall(-1) returns -ENOSYS by default whether traced
->> or not, and still you can change a return value when tracing.
->> (But a drawback here is that a tracer will see -ENOSYS in x0 even at syscall entry
->> for syscall(-1).)
+On 24 November 2014 at 14:04, Amit Daniel Kachhap
+<amit.daniel@samsung.com> wrote:
+> This patch adds supports for parent power domain. This will ensure
+> invoking of parent/child power domain on/off in a correct sequence.
+> In exynos7 SOC's, power domain controllers have parent and child
+> hierarchy.
 >
-> But it's exactly these drawbacks that I'm objected to. syscall(-1) shouldn't
-> be treated any differently to syscall(42) with respect to restarting,
-> exactly like x86.
-
-Can you elaborate a bit more as to "restarting?"
-We can't make any assumption about the number of arguments taken by *invalid* syscall(-1)
-and so changing a value in x0 (or any other registers) doesn't make any difference.
-()
-
--Takahiro AKASHI
-
-> Will
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+>  .../bindings/arm/exynos/power_domain.txt           |    2 +
+>  drivers/soc/samsung/pm_domains.c                   |   43 +++++++++++++++++++-
+>  2 files changed, 44 insertions(+), 1 deletion(-)
 >
+> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> index 00ebda1..0160bdc 100644
+> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> @@ -24,6 +24,7 @@ Optional Properties:
+>         - pclkN, clkN: Pairs of parent of input clock and input clock to the
+>                 devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
+>                 are supported currently.
+> +- parents: phandle of parent power domains.
+>
+>  Node of a device using power domains must have a samsung,power-domain property
+>  defined with a phandle to respective power domain.
+> @@ -48,6 +49,7 @@ Example:
+>         mfc_pd: power-domain at 10044060 {
+>                 compatible = "samsung,exynos4210-pd", "samsung,exynos7-pd-mfc";
+>                 reg = <0x10044060 0x20>;
+> +               parents = <&pd_top>;
+>                 #power-domain-cells = <0>;
+>         };
+
+This seems like a good and generic approach to describe that a PM
+domain could have a parent. I would suggest to rename it, such it
+reflects its a PM domain binding though.
+
+So, maybe we can add this as a common DT binding for the generic PM
+domain instead of having it as Exynos specific?
+
+Kind regards
+Uffe
