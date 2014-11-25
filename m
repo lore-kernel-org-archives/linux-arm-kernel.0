@@ -1,166 +1,116 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 25 Nov 2014 17:26:36 +0000
-Subject: [PATCH 3.18-rc3 v9 0/5] arm: Implement arch_trigger_all_cpu_backtrace
-In-Reply-To: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+Date: Tue, 25 Nov 2014 17:26:38 +0000
+Subject: [PATCH 3.18-rc3 v9 2/5] irqchip: gic: Make gic_raise_softirq()
+ FIQ-safe
+In-Reply-To: <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
 References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
+ <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1416936401-5147-3-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Hi Jason,
+It is currently possible for FIQ handlers to re-enter gic_raise_softirq()
+and lock up.
 
-This patchset modifies the GIC driver to allow it, on supported
-platforms, to route IPI interrupts to FIQ and uses this feature to
-implement arch_trigger_all_cpu_backtrace for arm.
+    	gic_raise_softirq()
+	   lock(x);
+---> FIQ
+        handle_fiq()
+	   gic_raise_softirq()
+	      lock(x);		<-- Lockup
 
-On platforms not capable of supporting FIQ the signal to generate a
-backtrace we fall back to using IRQ for propagation instead (relying on
-a timeout to avoid wedging the CPU requesting the backtrace if other
-CPUs are not responsive).
+Calling printk() from a FIQ handler can trigger this problem because
+printk() raises an IPI when it needs to wake_up_klogd(). More generally,
+IPIs are the only means for FIQ handlers to safely defer work to less
+restrictive calling context so the function to raise them really needs
+to be FIQ-safe.
 
-It has been tested on two systems capable of supporting grouping
-(Freescale i.MX6 and STiH416) and two that do not (vexpress-a9 and
-Qualcomm Snapdragon 600).
+This patch fixes the problem by converting the cpu_map_migration_lock
+into a rwlock making it safe to re-enter the function.
 
-v9:
+Having made it safe to re-enter gic_raise_softirq() we no longer need to
+mask interrupts during gic_raise_softirq() because the b.L migration is
+always performed from task context.
 
-* Improved documentation and structure of initial patch (now initial
-  two patches) to make gic_raise_softirq() safe to call from FIQ
-  (Thomas Gleixner).
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic.c | 26 +++++++++++++++++++-------
+ 1 file changed, 19 insertions(+), 7 deletions(-)
 
-* Avoid masking interrupts during gic_raise_softirq(). The use of the
-  read lock makes this redundant (because we can safely re-enter the
-  function).
-
-v8:
-
-* Fixed build on arm64 causes by a spurious include file in irq-gic.c.
-
-v7-2 (accidentally released twice with same number):
-
-* Fixed boot regression on vexpress-a9 (reported by Russell King).
-
-* Rebased on v3.18-rc3; removed one patch from set that is already
-  included in mainline.
-
-* Dropped arm64/fiq.h patch from the set (still useful but not related
-  to issuing backtraces).
-
-v7:
-
-* Re-arranged code within the patch series to fix a regression
-  introduced midway through the series and corrected by a later patch
-  (testing by Olof's autobuilder). Tested offending patch in isolation
-  using defconfig identified by the autobuilder.
-
-v6:
-
-* Renamed svc_entry's call_trace argument to just trace (example code
-  from Russell King).
-
-* Fixed mismatched ENDPROC() in __fiq_abt (example code from Russell
-  King).
-
-* Modified usr_entry to optional avoid calling into the trace code and
-  used this in FIQ entry from usr path. Modified corresponding exit code
-  to avoid calling into trace code and the scheduler (example code from
-  Russell King).
-
-* Ensured the default FIQ register state is restored when the default
-  FIQ handler is reinstalled (example code from Russell King).
-
-* Renamed no_fiq_insn to dfl_fiq_insn to reflect the effect of adopting
-  a default FIQ handler.
-
-* Re-instated fiq_safe_migration_lock and associated logic in
-  gic_raise_softirq(). gic_raise_softirq() is called by wake_up_klogd()
-  in the console unlock logic.
-
-v5:
-
-* Rebased on 3.17-rc4.
-
-* Removed a spurious line from the final "glue it together" patch
-  that broke the build.
-
-v4:
-
-* Replaced push/pop with stmfd/ldmfd respectively (review of Nicolas
-  Pitre).
-
-* Really fix bad pt_regs pointer generation in __fiq_abt.
-
-* Remove fiq_safe_migration_lock and associated logic in
-  gic_raise_softirq() (review of Russell King)
-
-* Restructured to introduce the default FIQ handler first, before the
-  new features (review of Russell King).
-
-v3:
-
-* Removed redundant header guards from arch/arm64/include/asm/fiq.h
-  (review of Catalin Marinas).
-
-* Moved svc_exit_via_fiq macro to entry-header.S (review of Nicolas
-  Pitre).
-
-v2:
-
-* Restructured to sit nicely on a similar FYI patchset from Russell
-  King. It now effectively replaces the work in progress final patch
-  with something much more complete.
-
-* Implemented (and tested) a Thumb-2 implementation of svc_exit_via_fiq
-  (review of Nicolas Pitre)
-
-* Dropped the GIC group 0 workaround patch. The issue of FIQ interrupts
-  being acknowledged by the IRQ handler does still exist but should be
-  harmless because the IRQ handler will still wind up calling
-  ipi_cpu_backtrace().
-
-* Removed any dependency on CONFIG_FIQ; all cpu backtrace effectively
-  becomes a platform feature (although the use of non-maskable
-  interrupts to implement it is best effort rather than guaranteed).
-
-* Better comments highlighting usage of RAZ/WI registers (and parts of
-  registers) in the GIC code.
-
-Changes *before* v1:
-
-* This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
-  arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
-  the new structure. For historic details see:
-        https://lkml.org/lkml/2014/9/2/227
-
-* Fix bug in __fiq_abt (no longer passes a bad struct pt_regs value).
-  In fixing this we also remove the useless indirection previously
-  found in the fiq_handler macro.
-
-* Make default fiq handler "always on" by migrating from fiq.c to
-  traps.c and replace do_unexp_fiq with the new handler (review
-  of Russell King).
-
-* Add arm64 version of fiq.h (review of Russell King)
-
-* Removed conditional branching and code from irq-gic.c, this is
-  replaced by much simpler code that relies on the GIC specification's
-  heavy use of read-as-zero/write-ignored (review of Russell King)
-
-
-Daniel Thompson (5):
-  irqchip: gic: Finer grain locking for gic_raise_softirq
-  irqchip: gic: Make gic_raise_softirq() FIQ-safe
-  irqchip: gic: Introduce plumbing for IPI FIQ
-  ARM: add basic support for on-demand backtrace of other CPUs
-  arm: smp: Handle ipi_cpu_backtrace() using FIQ (if available)
-
- arch/arm/include/asm/irq.h      |   5 ++
- arch/arm/include/asm/smp.h      |   3 +
- arch/arm/kernel/smp.c           |  64 ++++++++++++++
- arch/arm/kernel/traps.c         |   8 +-
- drivers/irqchip/irq-gic.c       | 192 +++++++++++++++++++++++++++++++++++++---
- include/linux/irqchip/arm-gic.h |   8 ++
- 6 files changed, 265 insertions(+), 15 deletions(-)
-
---
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index bb4bc20573ea..a53aa11e4f17 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -75,8 +75,11 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+ /*
+  * This lock is used by the big.LITTLE migration code to ensure no
+  * IPIs can be pended on the old core after the map has been updated.
++ *
++ * This lock may be locked for reading from FIQ handlers and therefore
++ * must not be locked for writing when FIQs are enabled.
+  */
+-static DEFINE_RAW_SPINLOCK(cpu_map_migration_lock);
++static DEFINE_RWLOCK(cpu_map_migration_lock);
+ 
+ /*
+  * The GIC mapping of CPU interfaces does not necessarily match
+@@ -625,12 +628,20 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
+ #endif
+ 
+ #ifdef CONFIG_SMP
++/*
++ * Raise the specified IPI on all cpus set in mask.
++ *
++ * This function is safe to call from all calling contexts, including
++ * FIQ handlers. It relies on read locks being multiply acquirable to
++ * avoid deadlocks when the function is re-entered at different
++ * exception levels.
++ */
+ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ {
+ 	int cpu;
+-	unsigned long flags, map = 0;
++	unsigned long map = 0;
+ 
+-	raw_spin_lock_irqsave(&cpu_map_migration_lock, flags);
++	read_lock(&cpu_map_migration_lock);
+ 
+ 	/* Convert our logical CPU mask into a physical one. */
+ 	for_each_cpu(cpu, mask)
+@@ -645,7 +656,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	/* this always happens on GIC0 */
+ 	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+ 
+-	raw_spin_unlock_irqrestore(&cpu_map_migration_lock, flags);
++	read_unlock(&cpu_map_migration_lock);
+ }
+ #endif
+ 
+@@ -693,7 +704,8 @@ int gic_get_cpu_id(unsigned int cpu)
+  * Migrate all peripheral interrupts with a target matching the current CPU
+  * to the interface corresponding to @new_cpu_id.  The CPU interface mapping
+  * is also updated.  Targets to other CPU interfaces are unchanged.
+- * This must be called with IRQs locally disabled.
++ * This must be called from a task context and with IRQ and FIQ locally
++ * disabled.
+  */
+ void gic_migrate_target(unsigned int new_cpu_id)
+ {
+@@ -724,9 +736,9 @@ void gic_migrate_target(unsigned int new_cpu_id)
+ 	 * pending on the old cpu static. That means we can defer the
+ 	 * migration until after we have released the irq_controller_lock.
+ 	 */
+-	raw_spin_lock(&cpu_map_migration_lock);
++	write_lock(&cpu_map_migration_lock);
+ 	gic_cpu_map[cpu] = 1 << new_cpu_id;
+-	raw_spin_unlock(&cpu_map_migration_lock);
++	write_unlock(&cpu_map_migration_lock);
+ 
+ 	/*
+ 	 * Find all the peripheral interrupts targetting the current
+-- 
 1.9.3
