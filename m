@@ -1,89 +1,47 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 25 Nov 2014 22:54:15 +0800
-Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <2966212.dpWQ0OTb0A@wuerfel>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <5473FDA8.6080201@huawei.com> <54744F14.60004@linaro.org>
- <2966212.dpWQ0OTb0A@wuerfel>
-Message-ID: <54749817.2090103@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 25 Nov 2014 15:54:52 +0100
+Subject: [RFC 0/2] Fix Arndale Octa/Peach Pi boot on Audio subsystem clocks
+In-Reply-To: <547497B2.3010907@collabora.co.uk>
+References: <1416842312-4405-1-git-send-email-k.kozlowski@samsung.com>
+ <54736AD0.4070909@collabora.co.uk> <1416907375.5023.54.camel@AMDC1943>
+ <547485F5.50600@collabora.co.uk> <1416925325.26128.6.camel@AMDC1943>
+ <547497B2.3010907@collabora.co.uk>
+Message-ID: <1416927292.26128.8.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On wto, 2014-11-25 at 15:52 +0100, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
+> 
+> On 11/25/2014 03:22 PM, Krzysztof Kozlowski wrote:
+> >> Any ideas?
+> > 
+> > Yes, I got. On Peach board the i2s0 is enabled in DTS. Probing it could
+> > fail because it relies on enabling audss clocks (which cannot be
+> > accessed).
+> > 
+> > I reproduced another hang on Arndale Octa after enabling i2s0 in DTS.
+> > Maybe that is the cause also on Peach.
+> > 
+> 
+> You are correct, if I disable i2s0 then I see the logs from
+> clk_disable_unused_subtree() and boot hangs when accessing the adma clock:
+> 
+> clk: checking dout_fimd1
+> clk: checking mout_fimd1_final
+> clk: checking mout_fimd1
+> clk: checking mout_sclk_rpll
+> clk: checking fout_rpll
+> clk: checking adma
+> 
+> With i2s0 disabled, your series are indeed enough to make it boot again but
+> as you said enabling i2s0 in the DTS makes it hang even with your patches.
+> 
+> Thanks a lot for digging into this!
 
-On 2014?11?25? 19:02, Arnd Bergmann wrote:
-> On Tuesday 25 November 2014 17:42:44 Hanjun Guo wrote:
->> On 2014-11-25 11:55, Shannon Zhao wrote:
->>> Hi,
->>>
->>> On 2014/11/22 5:23, Ganapatrao Kulkarni wrote:
->> [...]
->>>> +==============================================================================
->>>> +4 - Example dts
->>>> +==============================================================================
->>>> +
->>>> +Example 1: 2 Node system each having 8 CPUs and a Memory.
->>>> +
->>>> +    numa-map {
->>>> +            #address-cells = <2>;
->>>> +            #size-cells = <1>;
->>>> +            #node-count = <2>;
->>>> +            mem-map =  <0x0 0x00000000 0>,
->>>> +                       <0x100 0x00000000 1>;
->>>> +
->>>> +            cpu-map = <0 7 0>,
->>>> +                      <8 15 1>;
->>>
->>> The cpu range is continuous here. But if there is a situation like below:
->>>
->>> 0 2 4 6 belong to node 0
->>> 1 3 5 7 belong to node 1
->>>
->>> This case is very common on X86. I don't know the real situation of arm as
->>> I don't have a hardware with 2 nodes.
->>>
->>> How can we generate a DTS about this situation? like below? Can be parsed?
->>>
->>>                cpu-map = <0 2 4 6 0>,
->>>                          <1 3 5 7 1>;
->>
->> I think the binding proposed here can not cover your needs, and I think this
->> binding is not suitable, there are some reasons.
->>
->>   - CPU logical ID is allocated by OS, and it depends on the order of CPU node
->>     in the device tree, so it may be in a clean order like this patch proposed,
->>     or it will like the order Shannon pointed out.
->>
->>   - Since CPU logical ID is allocated by OS, DTS file will not know these
->>     numbers.
->
-> Also:
->
-> - you cannot support hierarchical NUMA topology
->
-> - you cannot have CPU-less or memory-less nodes
->
-> - you cannot associate I/O devices with NUMA nodes, only memory and CPU
+My patch only fixed the gate clocks but it didn't touched div and mux.
+I'll prepare a v2 of it (I got some feedback) which I hope will fix both
+cases: i2s and disabling unused clocks.
 
-Yes, I agree.
-
->
->> So the problem behind this is the mappings between CPUs and NUMA nodes,
->> there is already mapping for CPU hardware ID (MPIDR) and CPU logical ID,
->> and MPIDR will be not changed, why not using MPIDR for the mapping of
->> NUMA node and CPU? then the mappings will be:
->>
->> CPU logical ID <------> CPU MPIDR <-----> NUMA node ID <-----> proximity domain
->> (allocated by OS)      (constant)       (allocated by OS)
->
-> No, don't hardcode ARM specifics into a common binding either. I've looked
-> at the ibm,associativity properties again, and I think we should just use
-> those, they can cover all cases and are completely independent of the
-> architecture. We should probably discuss about the property name though,
-> as using the "ibm," prefix might not be the best idea.
-
-Is there any doc/code related to this? please give me some hints and I
-will read that.
-
-Thanks
-Hanjun
+Best regards,
+Krzysztof
