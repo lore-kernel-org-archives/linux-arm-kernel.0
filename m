@@ -1,195 +1,132 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Tue, 25 Nov 2014 11:31:18 +0530
-Subject: [PATCH] ARM: exynos_defconfig: disable CONFIG_EXYNOS5420_MCPM;
- not stable
-In-Reply-To: <CAMAWPa-qk0DEmPNz5LZgJq9AuGhRxuY00XwxtEikt_vh-iozVg@mail.gmail.com>
-References: <1414796382-5447-1-git-send-email-khilman@kernel.org>
- <000e01cffb39$5ef0a2d0$1cd1e870$@kernel.org>
- <7hegtaq26c.fsf@deeprootsystems.com>
- <CAMAWPa-mLAFL7v8hHA5R-eBzpMFK-E-xcvjoV8Bn6tTwgP53Uw@mail.gmail.com>
- <CAOesGMhvTDN4J6AdUDHKV0Sp4NT6a4QEMUDWOayQqhhD+C4acw@mail.gmail.com>
- <CAMAWPa-sz5jT9izEONVZR2Z4mzuivKaNHSgyR+eP13tWZ84hYw@mail.gmail.com>
- <CAOesGMgSkJ8xkBgN7OpuDzT=ehaAd6kvbx5_tC50x78pvpkTwg@mail.gmail.com>
- <CAOesGMh-7md4PdQX1Wvk0jO+87j+fxSvBnVD_osjNd2zQ4L43w@mail.gmail.com>
- <044101d00852$3f421420$bdc63c60$@kernel.org>
- <CAMAWPa-qk0DEmPNz5LZgJq9AuGhRxuY00XwxtEikt_vh-iozVg@mail.gmail.com>
-Message-ID: <CAM4voa==Ram0xXTL=SnKktyRt7VFphQxBJgcf9Yi9Zio0QctHw@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 24 Nov 2014 22:07:00 -0800
+Subject: [PATCHv3 08/16] clk: mvebu: add suspend/resume for gatable clocks
+In-Reply-To: <1416585613-2113-9-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1416585613-2113-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20141125060700.12298.14532@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kevin,
+Quoting Thomas Petazzoni (2014-11-21 08:00:05)
+> This commit adds suspend/resume support for the gatable clock driver
+> used on Marvell EBU platforms. When getting out of suspend, the
+> Marvell EBU platforms go through the bootloader, which re-enables all
+> gatable clocks. However, upon resume, the clock framework will not
+> disable again all gatable clocks that are not used.
+> 
+> Therefore, if the clock driver does not save/restore the state of the
+> gatable clocks, all gatable clocks that are not claimed by any device
+> driver will remain enabled after a resume. This is why this driver
+> saves and restores the state of those clocks.
+> 
+> Since clocks aren't real devices, we don't have the normal ->suspend()
+> and ->resume() of the device model, and have to use the ->suspend()
+> and ->resume() hooks of the syscore_ops mechanism. This mechanism has
+> the unfortunate idea of not providing a way of passing private data,
+> which requires us to change the driver to make the assumption that
+> there is only once instance of the gatable clock control structure.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: linux-kernel at vger.kernel.org
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-On Tue, Nov 25, 2014 at 8:50 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> On Mon, Nov 24, 2014 at 5:50 PM, Kukjin Kim <kgene@kernel.org> wrote:
->> Olof Johansson wrote:
->>>
->>> On Mon, Nov 24, 2014 at 5:37 PM, Olof Johansson <olof@lixom.net> wrote:
->>> > On Mon, Nov 24, 2014 at 5:35 PM, Kevin Hilman <khilman@kernel.org> wrote:
->>> >> On Mon, Nov 24, 2014 at 4:25 PM, Olof Johansson <olof@lixom.net> wrote:
->>> >>> On Mon, Nov 24, 2014 at 11:51 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>> >>>> Kukjin,
->>> >>>>
->>> >>>> On Mon, Nov 10, 2014 at 11:35 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>> >>>>> Kukjin Kim <kgene@kernel.org> writes:
->>> >>>>>
->>> >>>>>> Kevin Hilman wrote:
->>> >>>>>>>
->>> >>>>>>> From: Kevin Hilman <khilman@linaro.org>
->>> >>>>>>>
->>> >>>>>>> The option CONFIG_EXYNOS5420_MCPM is causing imprecise external aborts
->>> >>>>>>> during boot testing, causing various userspace startup failures.
->>> >>>>>>>
->>> >>>>>>> Disable until it has gotten more testing.
->>> >>>>>>>
->>> >>>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>,
->>> >>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>,
->>> >>>>>>> Cc: Sachin Kamat <sachin.kamat@samsung.com>,
->>> >>>>>>> Cc: Doug Anderson <dianders@chromium.org>,
->>> >>>>>>> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
->>> >>>>>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>,
->>> >>>>>>> Cc: Tushar Behera <tushar.behera@linaro.org>,
->>> >>>>>>> Cc: stable at vger.kernel.org # v3.17+
->>> >>>>>>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->>> >>>>>>> ---
->>> >>>>>>> This has been reported by a few people[1], but not investigated or fixed, so it's
->>> >>>>>>> time to disable this feature until it can be fixed.
->>> >>>>>>>
->>> >>>>>> Hi Kevin,
->>> >>>>>>
->>> >>>>>> Yeah I agree with your opinion.
->>> >>>>>>
->>> >>>>>> But as you can see my tree, I've queued regarding mcpm patches for 3.19 will
->>> >>>>>> be shown in -next in this weekend.
->>> >>>>>
->>> >>>>> Which of the recently queued patches are expected to address the
->>> >>>>> imprecise abort issue?  I'd be happy to test them out.
->>> >>>>
->>> >>>> Exynos5 MCPM is still broken in linux-next and still causing an imprecise abort.
->>> >>>>
->>> >>>> What is the status of $SUBJECT patch?
->>> >>>>
->>> >>>>>> Anyway let me apply this into -fixes and
->>> >>>>>> then let's enable after test its functionality in -next in a couple of days.
->>> >>>>>
->>> >>>>> Yes, I think this needs to be applied until these aborts are understood
->>> >>>>> and fixed.
->>> >>>>
->>> >>>> Is anyone at Samsung actually looking into these MCPM issues?
->>> >>>
->>> >>> Hi Kevin,
->>> >>>
->>> >>> What hardware are you having problems with? 5420 or 5422/5800?
->>> >>
->>> >> Yes.  :)
->>> >>
->>> >> exynos5420-arndale-octa:
->>> >> http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc6/arm-exynos_defconfig/boot-exynos5420-
->>> arndale-octa.html
->>> >> exynos5422-odroid-xu3:
->>> >> http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc6/arm-exynos_defconfig/boot-exynos5422-
->>> odroid-xu3.html
->>> >>
->>> >> My boot tests seem to pass fine because I have such a minimal
->>> >> userspace, but Tyler Baker reported that with a "real" userspace, he
->>> >> can't boot to a shell:
->>> >>
->>> >>   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286203.html
->>> >
->> Hmm...his report was in Sep...I think it should be fine with current -next?
->
-> No, it is still broken in linux-next (as I stated above.)
->
-> Moreover, earlier in this thread you mentioned you were merging some
-> MCPM patches that should address this, but did not respond when I
-> asked which patches you thing should address this issue
->
->> To be honest, since I don't have the exynos5420 arndale, chromebook...but smdk
->> which has different bootloader, I couldn't test it...I'll try to make a test
->> farm like you guys...
->
-> Do you have some colleagues with any other 542x hardware?  I had
-> assumed that linux-next was being better tested on the publicaly
-> available, and widely available boards like odroid-xu3 and
-> Chromebook2, but I've come to realize the hard way that that is not
-
-Are you seeing this on Chromebook2 (Peach-Pi 5800) too ?
-
-> the case.  You mention your board has a different bootloader.  Do you
-> suspect there's a bootloader issue on these other platforms?  If so,
-> could you elaborate on possible fixes?  I'm more than willing to test
-> any proposed fixes, but I'm not familiar enough yet with these SoCs to
-> figure out the underlying issues alone.
->
-> Until you have a working board farm, you could start having a closer
-> look at the boot logs we're already producing.  Admittedly linux-next
-> broken in many ways besides this one for exynos currently, but it has
-> been having these imprecise aborts well before the other recent
-> issues.
->
-> Also, It's very possible that this issue is not even MCPM related at
-> all, and MCPM is just uncovering a previously hidden bug.  It would be
-> very helpful if people more familiar with this hardware and SoC would
-> investigate bug reports like these.
-
-The 3 boards I have access to (SMDK5420, Chromebook Peach-Pi and
-Chromebook Peach-Pit) work fine with MCPM enabled. I am not sure why
-it is failing only on the above mentioned boards as there is nothing
-specific to them in the MCPM back-end.
-
-I assume that when you default to platsmp (on disabling MCPM), the
-non-working boards boot all cores upto userspace without any issues ?
-
-Based on the timeline (problems started about 2.5 months back), there
-have only been a couple of changes in the 5420 MCPM back-end. Could
-you revert the following commits and check if things improve.
-
-20fe6f9 ARM: EXYNOS: Support cluster power off on exynos5420/5800
-fbb0499 ARM: 8083/1: exynos: activate the CCI on boot CPU/cluster
-using the MCPM loopback
-
-These might not revert cleanly, so instead of the above you could also
-comment the following 2 lines:
-
-
-diff --git a/arch/arm/mach-exynos/mcpm-exynos.c
-b/arch/arm/mach-exynos/mcpm-exynos.c
-index dc9a764..9a07188 100644
---- a/arch/arm/mach-exynos/mcpm-exynos.c
-+++ b/arch/arm/mach-exynos/mcpm-exynos.c
-@@ -152,7 +152,7 @@ static void exynos_power_down(void)
-                exynos_cpu_power_down(cpunr);
-
-                if (exynos_cluster_unused(cluster)) {
--                       exynos_cluster_power_down(cluster);
-+                       //exynos_cluster_power_down(cluster);
-                        last_man = true;
-                }
-        } else if (cpu_use_count[cpu][cluster] == 1) {
-@@ -356,8 +356,8 @@ static int __init exynos_mcpm_init(void)
-        ret = mcpm_platform_register(&exynos_power_ops);
-        if (!ret)
-                ret = mcpm_sync_init(exynos_pm_power_up_setup);
--       if (!ret)
--               ret = mcpm_loopback(exynos_cache_off); /* turn on the CCI */
-+       //if (!ret)
-+               //ret = mcpm_loopback(exynos_cache_off); /* turn on the CCI */
-        if (ret) {
-                iounmap(ns_sram_base_addr);
-                return ret;
-
-
-
-If you still get aborts then I suspect that the problem is with the
-bootloader configuration but am not sure. I am OK with disabling
-5420_MCPM in the default configuration in such a case. This would
-however mean that S2R also stops working by default on 5420.
+Looks good to me. Which tree do you plan to take this through?
 
 Regards,
-Abhilash
->
-> Kevin
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Mike
+
+> ---
+>  drivers/clk/mvebu/common.c | 32 ++++++++++++++++++++++++++++++--
+>  1 file changed, 30 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
+> index b7fcb46..0d4d121 100644
+> --- a/drivers/clk/mvebu/common.c
+> +++ b/drivers/clk/mvebu/common.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <linux/syscore_ops.h>
+>  
+>  #include "common.h"
+>  
+> @@ -177,14 +178,17 @@ struct clk_gating_ctrl {
+>         spinlock_t *lock;
+>         struct clk **gates;
+>         int num_gates;
+> +       void __iomem *base;
+> +       u32 saved_reg;
+>  };
+>  
+>  #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
+>  
+> +static struct clk_gating_ctrl *ctrl;
+> +
+>  static struct clk *clk_gating_get_src(
+>         struct of_phandle_args *clkspec, void *data)
+>  {
+> -       struct clk_gating_ctrl *ctrl = (struct clk_gating_ctrl *)data;
+>         int n;
+>  
+>         if (clkspec->args_count < 1)
+> @@ -199,15 +203,35 @@ static struct clk *clk_gating_get_src(
+>         return ERR_PTR(-ENODEV);
+>  }
+>  
+> +static int mvebu_clk_gating_suspend(void)
+> +{
+> +       ctrl->saved_reg = readl(ctrl->base);
+> +       return 0;
+> +}
+> +
+> +static void mvebu_clk_gating_resume(void)
+> +{
+> +       writel(ctrl->saved_reg, ctrl->base);
+> +}
+> +
+> +static struct syscore_ops clk_gate_syscore_ops = {
+> +       .suspend = mvebu_clk_gating_suspend,
+> +       .resume = mvebu_clk_gating_resume,
+> +};
+> +
+>  void __init mvebu_clk_gating_setup(struct device_node *np,
+>                                    const struct clk_gating_soc_desc *desc)
+>  {
+> -       struct clk_gating_ctrl *ctrl;
+>         struct clk *clk;
+>         void __iomem *base;
+>         const char *default_parent = NULL;
+>         int n;
+>  
+> +       if (ctrl) {
+> +               pr_err("mvebu-clk-gating: cannot instantiate more than one gatable clock device\n");
+> +               return;
+> +       }
+> +
+>         base = of_iomap(np, 0);
+>         if (WARN_ON(!base))
+>                 return;
+> @@ -225,6 +249,8 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
+>         /* lock must already be initialized */
+>         ctrl->lock = &ctrl_gating_lock;
+>  
+> +       ctrl->base = base;
+> +
+>         /* Count, allocate, and register clock gates */
+>         for (n = 0; desc[n].name;)
+>                 n++;
+> @@ -246,6 +272,8 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
+>  
+>         of_clk_add_provider(np, clk_gating_get_src, ctrl);
+>  
+> +       register_syscore_ops(&clk_gate_syscore_ops);
+> +
+>         return;
+>  gates_out:
+>         kfree(ctrl);
+> -- 
+> 2.1.0
+> 
