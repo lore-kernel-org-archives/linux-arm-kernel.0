@@ -1,59 +1,35 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Tue, 25 Nov 2014 22:52:31 +0100
-Subject: How many frequencies would cpufreq optimally like to manage?
-In-Reply-To: <CAKohponats3ZNqaRq+2ff4Vd=iMZHVy17Vs1K+Zmc_D47Br2+A@mail.gmail.com>
-References: <546D26AE.50601@free.fr>
- <CAOh2x==KZzq1wbQxGwsJjZW+=fBJDzcnmRoaZMh0UYH-=yBJ=g@mail.gmail.com>
- <546DF891.2050401@free.fr>
- <CAKohpomzxnCy7X+cPsVdDvi0cMRMp2Am1O-S5BeQtTr1CqBhEw@mail.gmail.com>
- <54747DFA.3040802@free.fr>
- <CAKohponats3ZNqaRq+2ff4Vd=iMZHVy17Vs1K+Zmc_D47Br2+A@mail.gmail.com>
-Message-ID: <5474FA1F.50603@free.fr>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Tue, 25 Nov 2014 13:57:49 -0800
+Subject: [PATCH v14 0/7] KVM/arm/x86: dirty page logging for ARMv7
+ (3.17.0-rc1)
+In-Reply-To: <20141125102207.GB31297@cbox>
+References: <1415930268-7674-1-git-send-email-m.smarduch@samsung.com>
+ <20141125102207.GB31297@cbox>
+Message-ID: <5474FB5D.8050008@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/2014 16:19, Viresh Kumar wrote:
-
-> On 25 November 2014 at 18:32, Mason <mpeg.blue@free.fr> wrote:
->
->> As far as I can tell, on my SoC, the timer runs at 27 MHz.
->> But I have no idea how often it fires an interrupt.
+On 11/25/2014 02:22 AM, Christoffer Dall wrote:
+> Hi Mario,
 > 
-> 27 MHz is the freq it runs at, but we get interrupt based on the value
-> programmed in the timer counter.
+> On Thu, Nov 13, 2014 at 05:57:41PM -0800, Mario Smarduch wrote:
+>> Patch series adds support for ARMv7 and generic dirty page logging support. 
+>> As we try to move towards generic dirty page logging additional logic is moved 
+>> to generic code. Initially x86, armv7 KVM_GET_DIRTY_LOG reuses generic 
+>> code, shortly followed by armv8 patches.
+>>
+> So given the timing of this and the last-minute fixes to this series, it
+> is too late to merge for 3.19.
 > 
-> Look for CONFIG_HZ in your .config, that will tell you number of ticks
-> you are getting per second.
+> I would like if we could get one complete patch series with both v7 and
+> v8 support in there ready for right after the merge window closes, so
+> that Marc and I can queue this early for -next and then merge it for
+> 3.20.
 > 
-> But cpufreq works in another level and so it doesn't depend on both
-> these.
-
-If I remember correctly (please correct me if I am mistaken),
-the kernel keeps a list of timers, ordered by deadline, and
-dynamically configures the system timer to fire at the next
-deadline.
-
-> Look for: /sys/devices/system/cpu/cpufreq/ondemand/sampling_rate
-> this is the rate at which cpufreq core checks if cpu's freq require revisiting.
-
-I think setting the sampling rate to 50 ms should make the
-system reactive enough to load swings?
-
->> This 'struct clk' is an elusive beast.
->> Where is it defined? I only run into forward declarations.
+> Thanks,
+> -Christoffer
 > 
-> Its architecture specific. What's the architecture you are working on?
-> You may implement your own routine instead of cpufreq_generic_get().
+Hi Christoffer,
+   got it.
 
-The SoC is made by Sigma Designs. It is based on the ARM Cortex-A9.
-
-> Yes. Documentation/clk.txt.
-
-Oh boy! platform, device tree, cpu-freq, cpuidle, clk, ... so much
-to learn, so few hours in a day.
-
-> Yeah. You should be able to get some call from your architecture.
-
-OK, I have to fix that function along with the cpufreq update.
-
-Regards.
+Thanks.
