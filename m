@@ -1,55 +1,90 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 25 Nov 2014 08:59:29 +0100
-Subject: [PATCH RFC v2 08/12] soc: samsung: pm_domain: Add support for
- parent power domain
-In-Reply-To: <1416834256-11225-8-git-send-email-amit.daniel@samsung.com>
-References: <1416833572-6880-1-git-send-email-amit.daniel@samsung.com>
- <1416834256-11225-1-git-send-email-amit.daniel@samsung.com>
- <1416834256-11225-8-git-send-email-amit.daniel@samsung.com>
-Message-ID: <CAPDyKFoBnViXQF=wDYp0x4gaOO4ht3a8KBeY6=k6_Zkkav28pQ@mail.gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 25 Nov 2014 16:04:18 +0800
+Subject: [PATCH v8 0/4] ARM: mediatek: Add support for interrupt polarity
+Message-ID: <1416902662-19281-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 November 2014 at 14:04, Amit Daniel Kachhap
-<amit.daniel@samsung.com> wrote:
-> This patch adds supports for parent power domain. This will ensure
-> invoking of parent/child power domain on/off in a correct sequence.
-> In exynos7 SOC's, power domain controllers have parent and child
-> hierarchy.
->
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> ---
->  .../bindings/arm/exynos/power_domain.txt           |    2 +
->  drivers/soc/samsung/pm_domains.c                   |   43 +++++++++++++++++++-
->  2 files changed, 44 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> index 00ebda1..0160bdc 100644
-> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> @@ -24,6 +24,7 @@ Optional Properties:
->         - pclkN, clkN: Pairs of parent of input clock and input clock to the
->                 devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
->                 are supported currently.
-> +- parents: phandle of parent power domains.
->
->  Node of a device using power domains must have a samsung,power-domain property
->  defined with a phandle to respective power domain.
-> @@ -48,6 +49,7 @@ Example:
->         mfc_pd: power-domain at 10044060 {
->                 compatible = "samsung,exynos4210-pd", "samsung,exynos7-pd-mfc";
->                 reg = <0x10044060 0x20>;
-> +               parents = <&pd_top>;
->                 #power-domain-cells = <0>;
->         };
+This series is 8th version of interrupt polarity support for MediaTek SoCs.
 
-This seems like a good and generic approach to describe that a PM
-domain could have a parent. I would suggest to rename it, such it
-reflects its a PM domain binding though.
+I rebased previous version to latest tip/irq/irqdomain, and fix issues
+raised by Marc & Mark. The interrupt & irq free work fine on mt8135 board.
 
-So, maybe we can add this as a common DT binding for the generic PM
-domain instead of having it as Exynos specific?
+Simplified block diagram for interrupt on my system:
 
-Kind regards
-Uffe
+    +-------+      +-------+
+ ---| SYSIRQ|------|ARM GIC|
+ ---|       |------|       |
+ ---|       |------|       |
+ ---|       |------|       |
+ ---|       |------|       |
+    +-------+      +-------+
+
+In device tree, interrupt-parent for other devices is sysirq, child of gic.
+This describe HW better and allow device to specify polarity as it is sent
+by the device.
+
+When using hierarchy irq domain, gic will use irq_domain_add_linear to
+create irqdomain and all interrupt numbers must come from device tree. My
+/proc/interrupts looks like this now:
+
+# cat /proc/interrupts
+           CPU0
+ 16:     149578  MT_SYSIRQ 113  mtk_timer
+ 20:       1082  MT_SYSIRQ  54  serial
+
+Changes in v8:
+ - Rebased to new tip/irq/irqdomain
+ - Update mediatek,sysirq.txt bindinds to document interrupt-cells format
+   and interrupt-parents
+ - Change interrupt-cells format check in mtk_sysirq.
+ - Minor coding style fix
+
+Changes in v7:
+ - Discussed in [1]
+ - Rebased to tip/irq/irqdomain
+ - In mtk_sysirq_domain_alloc, use copy of irq_data to workaound of_node
+   check in gic_irq_domain_xlate.
+
+Changes in v6:
+ - Discussed in [2]
+ - Rebased to tip/irq/irqdomain
+
+Changes in v5:
+ - Discussed in [3]
+ - Fix bug on mt6589 reported by Matthias
+ - Fix bug for irq_find_mapping in irq_create_of_mapping
+ - Merge Marc's change to proper handle non-DT case in gic_init_bases
+
+Changes in v4:
+ - Discussed in [4]
+ - Remove arm,hierarchy-irq-domain. When GIC is probed by DT, it will
+support hierarchy irqdomain.
+
+Changes in v3:
+ - Discussed in [5]
+ - First implementation using hierarchy irqdomain
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304119.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/302221.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/298161.html
+[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296911.html
+[5] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/293766.html
+
+Yingjoe Chen (4):
+  irqchip: gic: Support hierarchy irq domain.
+  ARM: mediatek: Add sysirq interrupt polarity support
+  ARM: mediatek: Add sysirq in mt6589/mt8135/mt8127 dtsi
+  dt-bindings: add bindings for mediatek sysirq
+
+ .../bindings/arm/mediatek/mediatek,sysirq.txt      |  28 ++++
+ arch/arm/boot/dts/mt6589.dtsi                      |  14 +-
+ arch/arm/boot/dts/mt8127.dtsi                      |  14 +-
+ arch/arm/boot/dts/mt8135.dtsi                      |  14 +-
+ drivers/irqchip/Kconfig                            |   1 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-gic.c                          |  77 +++++++---
+ drivers/irqchip/irq-mtk-sysirq.c                   | 163 +++++++++++++++++++++
+ 8 files changed, 282 insertions(+), 30 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+ create mode 100644 drivers/irqchip/irq-mtk-sysirq.c
