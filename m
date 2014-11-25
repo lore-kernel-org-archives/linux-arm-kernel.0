@@ -1,126 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 25 Nov 2014 10:23:53 +0000
-Subject: [PATCH V4] arm64: amd-seattle: Adding device tree for AMD Seattle
- platform
-In-Reply-To: <1416865877-8347-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1416865877-8347-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <547458B9.2000805@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 25 Nov 2014 10:28:11 +0000
+Subject: Question:  Does dma_alloc_coherent  have problem?
+In-Reply-To: <547445F8.4070500@huawei.com>
+References: <547445F8.4070500@huawei.com>
+Message-ID: <20141125102811.GA18858@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suravee,
-
-Just spotted a small issue below (looks like a recurring mistake in a
-number of DTs I've seem lately):
-
-On 24/11/14 21:51, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+On Tue, Nov 25, 2014 at 09:03:52AM +0000, leizhen wrote:
+> On arm64, invoke dma_alloc_coherent will indirect call swiotlb_alloc_coherent.
+> The latter function allocates memory by __get_free_pages or from swiotlb buffer,
+> then use function phys_to_dma to get iova.
 > 
-> Initial revision of device tree for AMD Seattle platform.
+> static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+> {
+> 	return (dma_addr_t)paddr;
+> }
 > 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Signed-off-by: Thomas Lendacky <Thomas.Lendacky@amd.com>
-> Signed-off-by: Joel Schopp <Joel.Schopp@amd.com>
-> ---
-> V4 Changes:
->     * Remove unnecessary smb layer and move motherbord to top level
->     * Move include dtsi to top level
->     * Remove apb_pclk from sata0 and i2c
->     * Fix GIC Virtual Maintanance Interrupt from PPI24 (8) to PPI25 (9)
->     * Add 40-bit dma-ranges for motherboard (simple-bus)
->     * Remove dma0 (pl330) entry for now since it only supports 32-bit DMA.
->       It is basically not used at the moment. It would also need SMMU
->       to allow dma remapping to 40-bit DMA range.
->     * Add phandle spi0 and spi1
->     * Hook up gpio0 pin 7 with MMC Card Detection (CD) support.
->     * Changes in pcie0 entry:
->         - Add 40-bit dma-ranges
->         - Remove interrupts property
->         - Add interrupt-map/mask property
->         - Fix PCI I/O range 
->         - Merge PCI 32-bit ranges
->         - Merge PCI 64-bit ranges
+> But dma_alloc_coherent have not use iommu_map or other functions to create mapping
+> between iova and pa. I known that SMMUv2 support bypass mode, so there is no problem
+> in this case. But, some device drivers need use SMMU page table to create exact mapping,
+> to enhance security.
 > 
-> NOTE: I am not add a new compatible ID for the sata0 as Rob Herring
->       suggested since there is no need at the momement, and I am trying
->       to avoid introducing ID unnecessarily.
+> And I saw that: on X86, intel_alloc_coherent manages iova address space of each iommu_group,
+> and create mapping between iova and pa when needed.
 > 
->  arch/arm64/Kconfig                          |   5 +
->  arch/arm64/boot/dts/Makefile                |   1 +
->  arch/arm64/boot/dts/amd-seattle-periph.dtsi | 156 ++++++++++++++++++++++++++++
->  arch/arm64/boot/dts/amd-seattle.dts         |  89 ++++++++++++++++
->  4 files changed, 251 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amd-seattle-periph.dtsi
->  create mode 100644 arch/arm64/boot/dts/amd-seattle.dts
-> 
+> So, I think create mapping should be done in dma_alloc_coherent.
 
-[...]
+The swiotlb, as the name implies, is for software tlbs. IOW, nothing to
+do with the IOMMU.
 
-> diff --git a/arch/arm64/boot/dts/amd-seattle.dts b/arch/arm64/boot/dts/amd-seattle.dts
-> new file mode 100644
-> index 0000000..d5fc482
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/amd-seattle.dts
-> @@ -0,0 +1,89 @@
-> +/*
-> + * DTS file for AMD Seattle
-> + *
-> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +/include/ "amd-seattle-periph.dtsi"
-> +
-> +/ {
-> +	compatible = "amd,seattle";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	chosen {
-> +		stdout-path = &serial0;
-> +		linux,pci-probe-only;
-> +	};
-> +
-> +	gic: interrupt-controller at e1101000 {
-> +		compatible = "arm,gic-400", "arm,cortex-a15-gic";
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		reg = <0x0 0xe1110000 0 0x1000>,
-> +		      <0x0 0xe112f000 0 0x2000>,
-> +		      <0x0 0xe1140000 0 0x10000>,
-> +		      <0x0 0xe1160000 0 0x10000>;
-> +		interrupts = <1 9 0xf04>;
-> +		ranges;
-> +		v2m0: v2m at e1180000 {
-> +			compatible = "arm,gic-v2m-frame";
-> +			msi-controller;
-> +			arm,msi-base-spi = <64>;
-> +			arm,msi-num-spis = <256>;
-> +			reg = <0x0 0xe1180000 0 0x1000>;
-> +		};
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <1 13 0xff01>,
-> +			     <1 14 0xff01>,
-> +			     <1 11 0xff01>,
-> +			     <1 10 0xff01>;
-> +	};
+We need separate dma_ops for IOMMU which are not implemented on arm64
+yet. There were patches to make part of the arm32 dma ops generic but we
+are dropping this approach as we don't want to implement another
+allocator. It's best to use the existing drivers/iommu/iova.c, maybe
+with a few bits from intel-iommu.c made generic.
 
-The Cortex-A57 TRM clearly states that these interrupts are level triggered.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
