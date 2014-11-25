@@ -1,78 +1,91 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 25 Nov 2014 18:01:01 +0000
-Subject: [PATCH 2/9] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <CAJe_ZhciCP2VbmRtrq9d14WhfLhnC-xaitCCiW_6Yf1S-0sdUg@mail.gmail.com>
-References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>	<1416486872-25301-1-git-send-email-Vincent.Yang@tw.fujitsu.com>	<54749429.9080505@arm.com>
- <CAJe_ZhciCP2VbmRtrq9d14WhfLhnC-xaitCCiW_6Yf1S-0sdUg@mail.gmail.com>
-Message-ID: <5474C3DD.5060706@arm.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 25 Nov 2014 10:01:59 -0800
+Subject: (bisected) Lock up on sh73a0/kzm9g on cpuidle initialization
+In-Reply-To: <CAMuHMdUjYMC8i2F9n6fWdPBOQVSohKA3ZxJJyq8h808Z9tEypw@mail.gmail.com>
+References: <CAMuHMdXaaa2t6+sH2egGacVxkAPeTUkAgwdYsOnMnEPnuLdB5Q@mail.gmail.com>
+ <545BE1DE.6060900@linaro.org>
+ <CAMuHMdXQr65g4He0D0ZRN923OJ2A7WNgwbiTru_1dGWnvbvCJA@mail.gmail.com>
+ <CAMuHMdUjYMC8i2F9n6fWdPBOQVSohKA3ZxJJyq8h808Z9tEypw@mail.gmail.com>
+Message-ID: <20141125180159.GI5050@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 25, 2014 at 06:49:16PM +0100, Geert Uytterhoeven wrote:
+> On Fri, Nov 7, 2014 at 8:59 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > On Thu, Nov 6, 2014 at 10:02 PM, Daniel Lezcano
+> > <daniel.lezcano@linaro.org> wrote:
+> >> On 11/06/2014 09:38 PM, Geert Uytterhoeven wrote:
+> >>> When CONFIG_CPU_IDLE=y, the kernel locks up during cpuidle initialization
+> >>> on Renesas sh73a0/kzm9g-reference, which has a dual-core Cortex-A9.
+> >>>
+> >>> Last message is:
+> >>>
+> >>>      DMA: preallocated 256 KiB pool for atomic coherent allocations
+> >>>
+> >>> After this it's supposed to print:
+> >>>
+> >>>      cpuidle: using governor ladder
+> >>>      cpuidle: using governor menu
+> >>>
+> >>> I've bisected this to commit 442bf3aaf55a91ebfec71da46a4ee10a3c905bcc
+> >>> ("sched: Let the scheduler see CPU idle states").
+> >>>
+> >>> Reverting that commit, and commit 83a0a96a5f26d974580fd7251043ff70c8f1823d
+> >>> ("sched/fair: Leverage the idle state info when choosing the "idlest"
+> >>> cpu") which
+> >>> depends on it, fixes the problem.
+> >>>
+> >>> I saw the discussion "lockdep splat in CPU hotplug", so I enabled lockdep
+> >>> debugging, but didn't see a lockdep splat.
+> >>
+> >> Did you try the fix attached ?
+> >>
+> >> https://lkml.org/lkml/2014/10/22/722
+> >
+> > Thanks, I didn't try that.
+> >
+> > However, this patch seems to be in v3.18-rc3, so I'm already using it.
+> > Hence it doesn't fix the problem for me.
+> >
+> > On another board, with a dual Cortex-A15, the problem doesn't show up.
+> 
+> This problem (regression introduced in v3.18-rc1) is still present in v3.18-rc6.
+> 
+> I did some more investigations, and it's hanging in the call to
+> synchronize_rcu() in cpuidle_uninstall_idle_handler(), which was added in
+> commit 442bf3aaf55a91ebfec71da46a4ee10a3c905bcc.
+> More specificailly, it's blocked on the wait_for_completion(&rcu.completion)
+> in kernel/rcu/update.c:void wait_rcu_gp(call_rcu_func_t crf).
 
+You didn't disable RCU CPU stall warnings, did you?  If you did, please
+re-enable them, as the stall warning messages will likely help to debug
+this.  The soft-lockup checks can also be quite valuable.
 
-On 25/11/14 16:51, Jassi Brar wrote:
-> On 25 November 2014 at 20:07, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>
->>
->> On 20/11/14 12:34, Vincent Yang wrote:
->>>
->>> Add driver for the ARM Message-Handling-Unit (MHU).
->>>
->>> Signed-off-by: Andy Green <andy.green@linaro.org>
->>> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
->>> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
->>> Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
->>> ---
->>>    .../devicetree/bindings/mailbox/arm-mhu.txt        |  33 ++++
->>>    drivers/mailbox/Kconfig                            |   7 +
->>>    drivers/mailbox/Makefile                           |   2 +
->>>    drivers/mailbox/arm_mhu.c                          | 196
->>> +++++++++++++++++++++
->>>    4 files changed, 238 insertions(+)
->>>    create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
->>>    create mode 100644 drivers/mailbox/arm_mhu.c
->>>
->>> diff --git a/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
->>> b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
->>> new file mode 100644
->>> index 0000000..b1b9888
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
->>> @@ -0,0 +1,33 @@
->>> +ARM MHU Mailbox Driver
->>> +======================
->>> +
->>> +The ARM's Message-Handling-Unit (MHU) is a mailbox controller that has
->>> +3 independent channels/links to communicate with remote processor(s).
->>
->>
->> I had reviewed this before and I see not all the comments are addressed.
->> I had mentioned that you can't add support to _SECURE_ channel in Linux
->> as you need to assume Linux runs in non-secure privilege(and I gather
->> that's the case even on this platform from other email in the thread)
->>
-> Please revisit the old thread. After some discussion you had
-> graciously allowed me to keep the secure channel ;)
-> [
-> ... Even though I don't like you have secure channel access in Linux, you
-> have valid reasons. In case you decide to support it ....
-> ]
+If you haven't run with CONFIG_PROVE_RCU=y, please try that.  For example,
+if you have CONFIG_PREEMPT=y and you do synchronize_rcu() from within
+an RCU read-side critical section (don't do that, it will hang!!!),
+then you will get a lockdep splat.
 
-Agreed but based on the other email in the same thread it looks like you
-want to run the same kernel both in secure and no-secure mode on this
-platform, in which case you _have_to_assume_ it's *non-secure only* 
-always unless you come up with some DT magic.
+Does any sort of system activity (keyboard, network, etc.) unstick the
+system?
 
->   It seems you still don't get my point that the driver should manage
-> all channels - S & NS. If Linux is running in NS mode on a platform,
-> the DT will specify only some NS channel to be used. The controller
-> driver shouldn't be crippled just because you think Linux will never
-> be run in Secure mode.
->
+If you have tried all those things without good effect, could you please
+send along your .config and an alt-sysrq-t dump of all tasks' stacks?
 
-Ok how do you handle that, I don't see that in the DT binding. As it
-stands, you can unconditionally try to access the secure channel and
-cause aborts if the platform is running in non-secure mode.
+							Thanx, Paul
 
-Regards,
-Sudeep
+> Anyone with a clue?
+> 
+> Thanks again!
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
