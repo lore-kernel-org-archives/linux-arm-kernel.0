@@ -1,48 +1,86 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 25 Nov 2014 11:57:47 -0800
-Subject: [PATCH v12 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-In-Reply-To: <7hioi4l92v.fsf@deeprootsystems.com>
-References: <1416576682-5255-1-git-send-email-thomas.ab@samsung.com>
- <7hioi4l92v.fsf@deeprootsystems.com>
-Message-ID: <CAMAWPa87AFhtFaCo3RSY_qD+1DSmvhU8idOLvYwadkk5GLwaOQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 25 Nov 2014 12:03:53 -0800
+Subject: [PATCH v3 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <1416917818-10506-6-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <Sharkl64-v3>
+ <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1416917818-10506-6-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <20141125200353.GA7653@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Tue, Nov 25, 2014 at 08:16:58PM +0800, Chunyan Zhang wrote:
+> Add a full sc9836-uart driver for SC9836 SoC which is based on the
+> spreadtrum sharkl64 platform.
+> This driver also support earlycon.
+> 
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
+> Originally-by: Lanqing Liu <lanqing.liu@spreadtrum.com>
 
-On Mon, Nov 24, 2014 at 10:58 AM, Kevin Hilman <khilman@kernel.org> wrote:
+Some objections:
 
-[...]
+> +static struct platform_driver sprd_platform_driver = {
+> +	.probe = sprd_probe,
+> +	.remove = sprd_remove,
+> +	.suspend = sprd_suspend,
+> +	.resume = sprd_resume,
+> +	.driver = {
+> +		   .name = "sprd_serial",
+> +		   .owner = THIS_MODULE,
 
-> Second, as with earlier versions of this series, I'm still seeing lots
-> of "wait_until_divider_stable: timeout in divider stablization" messages
-> coming out when running powertop.
+platform drivers don't need .owner in them anymore, it's handled by the
+driver core automatically.
 
-I found a simpler way to reproduce these messages.  If I simply use
-the userspace governor and cycle through all the A7 OPPs, I'll hit
-this message (script below[1]).  Note that I'm also using my DTS
-change that fixes the vdd_arm and vdd_kfc voltages to a voltage that
-is high enough for all the OPPs.
 
-Kevin
+> +		   .of_match_table = of_match_ptr(serial_ids),
+> +		   },
+> +};
+> +
+> +static int __init sprd_serial_init(void)
+> +{
+> +	int ret = 0;
+> +
+> +	ret = uart_register_driver(&sprd_uart_driver);
+> +	if (unlikely(ret != 0))
+> +		return ret;
 
-[1]
-#!/bin/sh
-cpu=cpu4
-reg_name=vdd_kfc
-cpu_reg=$(dirname `find /sys/class/regulator/regulator.*/ -name name
--exec grep -l $reg_name {} \;`)
-echo $cpu_reg
+NEVER use unlikely unless you can measure the difference without it.
+And even then, you better be able to justify it.  For something as dumb
+as this type of check, youare working against the complier and cpu which
+already knows that 0 is the usual response.
 
-# Cycle through frequencies (and check voltage)
-cd /sys/devices/system/cpu/$cpu/cpufreq
-echo userspace > scaling_governor
-for freq in `cat scaling_available_frequencies`; do
-  echo ${freq} > scaling_setspeed
-  echo -n "current freq: "
-  cat scaling_cur_freq
-  echo -n "current voltage: "
-  cat ${cpu_reg}/microvolts
-  sleep 1
-done
+So please remove all usages of likely/unlikely in this patch series.
+
+> +
+> +	ret = platform_driver_register(&sprd_platform_driver);
+> +	if (unlikely(ret != 0))
+> +		uart_unregister_driver(&sprd_uart_driver);
+> +
+> +	return ret;
+> +}
+> +
+> +static void __exit sprd_serial_exit(void)
+> +{
+> +	platform_driver_unregister(&sprd_platform_driver);
+> +	uart_unregister_driver(&sprd_uart_driver);
+> +}
+> +
+> +module_init(sprd_serial_init);
+> +module_exit(sprd_serial_exit);
+> +
+> +MODULE_LICENSE("GPL");
+> +MODULE_DESCRIPTION("Spreadtrum SoC serial driver series");
+> diff --git a/include/uapi/linux/serial_core.h b/include/uapi/linux/serial_core.h
+> index 16ad852..d9a8c88 100644
+> --- a/include/uapi/linux/serial_core.h
+> +++ b/include/uapi/linux/serial_core.h
+> @@ -247,4 +247,7 @@
+>  /* MESON */
+>  #define PORT_MESON	109
+>  
+> +/* SPRD SERIAL  */
+> +#define PORT_SPRD   110
+
+Please use a tab character here.
