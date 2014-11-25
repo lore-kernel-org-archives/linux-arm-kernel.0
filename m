@@ -1,50 +1,92 @@
-From: Suravee.Suthikulpanit@amd.com (Suthikulpanit, Suravee)
-Date: Tue, 25 Nov 2014 20:39:45 +0000
-Subject: [PATCH V4] arm64: amd-seattle: Adding device tree for AMD
- Seattle platform
-In-Reply-To: <2285363.CoMWhviz1f@wuerfel>
-Message-ID: <D09AF278.A61D%suravee.suthikulpanit@amd.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 25 Nov 2014 20:44:30 +0000
+Subject: [RFC 0/2] Qualcomm RPM sleep states
+In-Reply-To: <5473A0F3.6080405@codeaurora.org>
+References: <546FC674.1070005@codeaurora.org>
+ <20141121232738.GP3815@sirena.org.uk>
+ <546FCE3A.1000005@codeaurora.org>
+ <20141124181614.GT7712@sirena.org.uk>
+ <5473A0F3.6080405@codeaurora.org>
+Message-ID: <20141125204430.GN7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 24, 2014 at 01:19:47PM -0800, Stephen Boyd wrote:
+> On 11/24/2014 10:16 AM, Mark Brown wrote:
 
+> > A bit, but I'm afraid I'm still at a loss as to what the problems and
+> > debate are here.  Why is this more complex than the Linux part of the
+> > system just saying what it wants at any given time?  It sounds like that
+> > has some sort of performance issue?
 
-On 11/25/14, 18:57, "Arnd Bergmann" <arnd@arndb.de> wrote:
+I'm still quite confused here...
 
->On Monday 24 November 2014 15:51:17 suravee.suthikulpanit at amd.com wrote:
->> 
->> +	gic: interrupt-controller at e1101000 {
->> +		compatible = "arm,gic-400", "arm,cortex-a15-gic";
->> +		interrupt-controller;
->> +		#interrupt-cells = <3>;
->> +		#address-cells = <2>;
->> +		#size-cells = <2>;
->> +		reg = <0x0 0xe1110000 0 0x1000>,
->> +		      <0x0 0xe112f000 0 0x2000>,
->> +		      <0x0 0xe1140000 0 0x10000>,
->> +		      <0x0 0xe1160000 0 0x10000>;
->> +		interrupts = <1 9 0xf04>;
->> +		ranges;
->> +		v2m0: v2m at e1180000 {
->> +			compatible = "arm,gic-v2m-frame";
->> +			msi-controller;
->> +			arm,msi-base-spi = <64>;
->> +			arm,msi-num-spis = <256>;
->> +			reg = <0x0 0xe1180000 0 0x1000>;
->> +		};
->> +	};
->
->
->Having an empty ranges property in the gic seems strange, especially
->since the registers of the v2m seem to directly follow the gic's own
->registers. Could you limit the ranges to only the registers that
->are in the gic or its child devices itself?
->
->	Arnd
+> Yes, communicating with the RPM is not that fast. The sleep set could be
+> updated hundreds of times before we go idle and actually switch from the
+> active set to sleep set. One optimization is to buffer the sleep set
+> requests and send them right before we switch to the sleep set. This
+> saves on the messaging overhead for sleep sets that don't matter when
+> we're active by moving the overhead to the idle/suspend path. The hope
+> is to consolidate multiple sleep set requests into one request.
 
-Yes, I can change it to ranges = <0 0 0 0xe1100000 0 0x100000> to limit
-the range to just the GIC address range.
+Right, that's one of the obvious ones.  Though I am a bit mystified as
+to why you're needing to change these settings so often that it's a
+problem - most hardware can do this but generally the configuration when
+idle is fairly constant so it's irrelevant for performance how often we
+set these things, a lot of the time it's going to boil down to I2C
+writes so we're talking really infrequent here.  What's different about
+these systems that means that this stuff needs constant tweaking?
 
-Thanks,
+> I think the problem that Bjorn is trying to come up with a solution for
+> is how to represent the sleep set and active set in the kernel clock and
+> regulator frameworks. You can think of each RPM resource as a regulator
+> supply. Each one of those resources has an active and sleep set. In the
+> downstream vendor kernels we make two regulators for an RPM resource.
+> One regulator for the active set and one regulator for the active +
+> sleep set. We call these 'active only' and 'active + sleep' regulators
 
-Suravee
+That seems like it's a big abstraction problem.
+
+> respectively. The RPM regulator driver aggregates the active set for
+> both the regulators via a max() operation and sends that as a request to
+> the RPM. The sleep set is the same as the active set for the 'active +
+> sleep' regulator, so we just send whatever the value is that was sent
+> down via the regulator APIs on the 'active + sleep' regulator. The only
+> driver that really cares about the active only regulators is the CPU
+> clock driver. Otherwise drivers are using the active + sleep regulators
+> because their devices don't stop running when the CPU goes to idle/suspend.
+
+Hang on a minute.  What you're saying seems to be that this isn't really
+about suspend but actually about the normal operating configuration?
+That makes it a bit more understandable why one would change the
+settings a lot, I think what I'm hearing here is that the runtime state
+changes a lot for some reason and the system needs the suspend state to
+track this?
+
+I can't help but think that this all sounds like the RPM isn't mapping
+very well onto practical systems and needs revisiting in future
+versions...  for example with what I'm parsing out of the above an
+active+sleep set command or otherwise having the two modes tied together
+for some regulators would make the whole problem go away.
+
+> Maybe another solution would be to push the problem into the regulator
+> core and educate it about the two different sets. RPM resources would
+> map one-to-one with a regulator and the sleep set and active sets would
+> be selectable via the regulator_get() API or some other consumer mapping
+> method. This would allow consumers to request whatever set they care
+> about and consolidate the aggregation logic that's duplicated at the
+> consumer level and the driver level into the core.
+
+I think any duplication that's going on sounds like a consequence of
+the way this is currently implemented.  I think based on what I *think*
+you're saying the RPM driver probably ought to be hiding this and adding
+a property which makes the active and sleep sets track each other with
+normal suspend mode control otherwise.  That could potentially be done
+in the core, though the tracking would be substantial surgery.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141125/1821dd83/attachment.sig>
