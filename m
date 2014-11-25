@@ -1,122 +1,110 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 25 Nov 2014 10:04:58 +0100
-Subject: [PATCH v4 01/12] sched: fix imbalance flag reset
-In-Reply-To: <5473C37E.6030505@gmail.com>
-References: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
- <1406569906-9763-2-git-send-email-vincent.guittot@linaro.org>
- <5473C37E.6030505@gmail.com>
-Message-ID: <CAKfTPtBS6Ri-hNf+M_BGDxhpXEwWP=n0zmTi5-pdxGi0dMF6eQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 25 Nov 2014 10:07:13 +0100
+Subject: [PATCH] ARM: exynos_defconfig: disable CONFIG_EXYNOS5420_MCPM; not
+ stable
+In-Reply-To: <1416905253.5023.42.camel@AMDC1943>
+References: <1414796382-5447-1-git-send-email-khilman@kernel.org>
+ <000e01cffb39$5ef0a2d0$1cd1e870$@kernel.org>
+ <7hegtaq26c.fsf@deeprootsystems.com>
+ <CAMAWPa-mLAFL7v8hHA5R-eBzpMFK-E-xcvjoV8Bn6tTwgP53Uw@mail.gmail.com>
+ <CAOesGMhvTDN4J6AdUDHKV0Sp4NT6a4QEMUDWOayQqhhD+C4acw@mail.gmail.com>
+ <CAMAWPa-sz5jT9izEONVZR2Z4mzuivKaNHSgyR+eP13tWZ84hYw@mail.gmail.com>
+ <CAOesGMgSkJ8xkBgN7OpuDzT=ehaAd6kvbx5_tC50x78pvpkTwg@mail.gmail.com>
+ <CAOesGMh-7md4PdQX1Wvk0jO+87j+fxSvBnVD_osjNd2zQ4L43w@mail.gmail.com>
+ <044101d00852$3f421420$bdc63c60$@kernel.org>
+ <CAMAWPa-qk0DEmPNz5LZgJq9AuGhRxuY00XwxtEikt_vh-iozVg@mail.gmail.com>
+ <1416905253.5023.42.camel@AMDC1943>
+Message-ID: <1416906433.5023.46.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 November 2014 at 00:47, Wanpeng Li <kernellwp@gmail.com> wrote:
-> Hi Vincent,
-> On 7/29/14, 1:51 AM, Vincent Guittot wrote:
->>
->> The imbalance flag can stay set whereas there is no imbalance.
->>
->> Let assume that we have 3 tasks that run on a dual cores /dual cluster
->> system.
->> We will have some idle load balance which are triggered during tick.
->> Unfortunately, the tick is also used to queue background work so we can
->> reach
->> the situation where short work has been queued on a CPU which already runs
->> a
->> task. The load balance will detect this imbalance (2 tasks on 1 CPU and an
->> idle
->> CPU) and will try to pull the waiting task on the idle CPU. The waiting
->> task is
->> a worker thread that is pinned on a CPU so an imbalance due to pinned task
->> is
->> detected and the imbalance flag is set.
->> Then, we will not be able to clear the flag because we have at most 1 task
->> on
->> each CPU but the imbalance flag will trig to useless active load balance
->> between the idle CPU and the busy CPU.
->>
->> We need to reset of the imbalance flag as soon as we have reached a
->> balanced
->> state. If all tasks are pinned, we don't consider that as a balanced state
->> and
->> let the imbalance flag set.
->>
->> Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->> ---
->>   kernel/sched/fair.c | 23 +++++++++++++++++++----
->>   1 file changed, 19 insertions(+), 4 deletions(-)
->>
->> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
->> index 923fe32..7eb9126 100644
->> --- a/kernel/sched/fair.c
->> +++ b/kernel/sched/fair.c
->> @@ -6672,10 +6672,8 @@ static int load_balance(int this_cpu, struct rq
->> *this_rq,
->>                 if (sd_parent) {
->>                         int *group_imbalance =
->> &sd_parent->groups->sgc->imbalance;
->>   -                     if ((env.flags & LBF_SOME_PINNED) && env.imbalance
->> > 0) {
->> +                       if ((env.flags & LBF_SOME_PINNED) && env.imbalance
->> > 0)
->>                                 *group_imbalance = 1;
->> -                       } else if (*group_imbalance)
->> -                               *group_imbalance = 0;
->
->
-> As you mentioned above " We need to reset of the imbalance flag as soon as
-> we have reached a balanced state. " I think the codes before your patch have
-> already do this, where I miss? Great thanks for your patient. ;-)
+On wto, 2014-11-25 at 09:47 +0100, Krzysztof Kozlowski wrote:
+> On pon, 2014-11-24 at 19:20 -0800, Kevin Hilman wrote:
+> > On Mon, Nov 24, 2014 at 5:50 PM, Kukjin Kim <kgene@kernel.org> wrote:
+> > > Olof Johansson wrote:
+> > >>
+> > >> On Mon, Nov 24, 2014 at 5:37 PM, Olof Johansson <olof@lixom.net> wrote:
+> > >> > On Mon, Nov 24, 2014 at 5:35 PM, Kevin Hilman <khilman@kernel.org> wrote:
+> > >> >> On Mon, Nov 24, 2014 at 4:25 PM, Olof Johansson <olof@lixom.net> wrote:
+> > >> >>> On Mon, Nov 24, 2014 at 11:51 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> > >> >>>>
+> > >> >>>> Is anyone at Samsung actually looking into these MCPM issues?
+> > >> >>>
+> > >> >>> Hi Kevin,
+> > >> >>>
+> > >> >>> What hardware are you having problems with? 5420 or 5422/5800?
+> > >> >>
+> > >> >> Yes.  :)
+> > >> >>
+> > >> >> exynos5420-arndale-octa:
+> > >> >> http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc6/arm-exynos_defconfig/boot-exynos5420-
+> > >> arndale-octa.html
+> > >> >> exynos5422-odroid-xu3:
+> > >> >> http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc6/arm-exynos_defconfig/boot-exynos5422-
+> > >> odroid-xu3.html
+> > >> >>
+> > >> >> My boot tests seem to pass fine because I have such a minimal
+> > >> >> userspace, but Tyler Baker reported that with a "real" userspace, he
+> > >> >> can't boot to a shell:
+> > >> >>
+> > >> >>   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286203.html
+> > >> >
+> > > Hmm...his report was in Sep...I think it should be fine with current -next?
+> > 
+> > No, it is still broken in linux-next (as I stated above.)
+> > 
+> > Moreover, earlier in this thread you mentioned you were merging some
+> > MCPM patches that should address this, but did not respond when I
+> > asked which patches you thing should address this issue
+> > 
+> > > To be honest, since I don't have the exynos5420 arndale, chromebook...but smdk
+> > > which has different bootloader, I couldn't test it...I'll try to make a test
+> > > farm like you guys...
+> > 
+> > Do you have some colleagues with any other 542x hardware?  I had
+> > assumed that linux-next was being better tested on the publicaly
+> > available, and widely available boards like odroid-xu3 and
+> > Chromebook2, but I've come to realize the hard way that that is not
+> > the case.  You mention your board has a different bootloader.  Do you
+> > suspect there's a bootloader issue on these other platforms?  If so,
+> > could you elaborate on possible fixes?  I'm more than willing to test
+> > any proposed fixes, but I'm not familiar enough yet with these SoCs to
+> > figure out the underlying issues alone.
+> > 
+> > Until you have a working board farm, you could start having a closer
+> > look at the boot logs we're already producing.  Admittedly linux-next
+> > broken in many ways besides this one for exynos currently, but it has
+> > been having these imprecise aborts well before the other recent
+> > issues.
+> > 
+> > Also, It's very possible that this issue is not even MCPM related at
+> > all, and MCPM is just uncovering a previously hidden bug.  It would be
+> > very helpful if people more familiar with this hardware and SoC would
+> > investigate bug reports like these.
+> 
+> Interesting thing can be found in exynos5420.dtsi:
+> mdma1: mdma at 11C10000 {
+> 	...
+> 	/*
+> 	 * MDMA1 can support both secure and non-secure
+> 	 * AXI transactions. When this is enabled in the kernel
+> 	 * for boards that run in secure mode, we are getting
+> 	 * imprecise external aborts causing the kernel to oops.
+> 	 */
+> 	status = "disabled";
+> };
+> 
+> I am booting Arndale Octa on some other config and exynos. However with
+> or without MCPM the imprecise aborts are still present (but not fatal,
+> shell comes up).
+> 
+> My board boots also under secure firmware (I am using Linaro's ubuntu
+> image). Maybe that is the cause?
 
-The previous code was called only when busiest->nr_running > 1.  The
-background activity will be on the rq only 1 tick per few seconds and
-we will set qroup_imbalance when the background activity is on the rq.
-Then, during the next load balances, the qroup_imbalance is still set
-but we can't clear qroup_imbalance  because we have only 1 task per rq
+One update: some fatal imprecise aborts (hanging boot) happen also on
+exynos_defconfig without MCPM. It looks random... one boot fails, next
+succeeds (however also with "imprecise external abort" message but shell
+comes up).
 
-Regards,
-Vincent
-
->
-> Regards,
-> Wanpeng Li
->
->
->>                 }
->>                 /* All tasks on this runqueue were pinned by CPU affinity
->> */
->> @@ -6686,7 +6684,7 @@ static int load_balance(int this_cpu, struct rq
->> *this_rq,
->>                                 env.loop_break = sched_nr_migrate_break;
->>                                 goto redo;
->>                         }
->> -                       goto out_balanced;
->> +                       goto out_all_pinned;
->>                 }
->>         }
->>   @@ -6760,6 +6758,23 @@ static int load_balance(int this_cpu, struct rq
->> *this_rq,
->>         goto out;
->>     out_balanced:
->> +       /*
->> +        * We reach balance although we may have faced some affinity
->> +        * constraints. Clear the imbalance flag if it was set.
->> +        */
->> +       if (sd_parent) {
->> +               int *group_imbalance = &sd_parent->groups->sgc->imbalance;
->> +
->> +               if (*group_imbalance)
->> +                       *group_imbalance = 0;
->> +       }
->> +
->> +out_all_pinned:
->> +       /*
->> +        * We reach balance because all tasks are pinned at this level so
->> +        * we can't migrate them. Let the imbalance flag set so parent
->> level
->> +        * can try to migrate them.
->> +        */
->>         schedstat_inc(sd, lb_balanced[idle]);
->>         sd->nr_balance_failed = 0;
->
->
+Best regards,
+Krzysztof
