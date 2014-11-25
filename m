@@ -1,77 +1,67 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 25 Nov 2014 22:09:45 +0300
-Subject: [PATCH v2 1/8] ARM: sa1100: switch to MULTI_IRQ_HANDLER
+Date: Tue, 25 Nov 2014 22:09:46 +0300
+Subject: [PATCH v2 2/8] ARM: sa1100: drop entry-macro.S
 In-Reply-To: <1416942592-23059-1-git-send-email-dbaryshkov@gmail.com>
 References: <1416942592-23059-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1416942592-23059-2-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1416942592-23059-3-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add sa1100_handle_irq implementating handle_irq for sa1100 platform.
-It is more or less a translation of old assembly code from assembler to
-plain C. Also install this irq handler from sa1100_init_irq().
+As mach-sa1100 was converted to MULTI_IRQ_HANDLER, drop now-unused
+entry-macro.S file.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/Kconfig           |  1 +
- arch/arm/mach-sa1100/irq.c | 20 ++++++++++++++++++++
- 2 files changed, 21 insertions(+)
+ arch/arm/mach-sa1100/include/mach/entry-macro.S | 41 -------------------------
+ 1 file changed, 41 deletions(-)
+ delete mode 100644 arch/arm/mach-sa1100/include/mach/entry-macro.S
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 89c4b5c..2f3f132 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -703,6 +703,7 @@ config ARCH_SA1100
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_IDE
- 	select ISA
-+	select MULTI_IRQ_HANDLER
- 	select NEED_MACH_MEMORY_H
- 	select SPARSE_IRQ
- 	help
-diff --git a/arch/arm/mach-sa1100/irq.c b/arch/arm/mach-sa1100/irq.c
-index 2124f1fc..4a1bd5e 100644
---- a/arch/arm/mach-sa1100/irq.c
-+++ b/arch/arm/mach-sa1100/irq.c
-@@ -20,6 +20,7 @@
- #include <mach/hardware.h>
- #include <mach/irqs.h>
- #include <asm/mach/irq.h>
-+#include <asm/exception.h>
- 
- #include "generic.h"
- 
-@@ -291,6 +292,23 @@ static int __init sa1100irq_init_devicefs(void)
- 
- device_initcall(sa1100irq_init_devicefs);
- 
-+static asmlinkage void __exception_irq_entry
-+sa1100_handle_irq(struct pt_regs *regs)
-+{
-+	uint32_t icip, icmr, mask;
-+
-+	do {
-+		icip = (ICIP);
-+		icmr = (ICMR);
-+		mask = icip & icmr;
-+
-+		if (mask == 0)
-+			break;
-+
-+		handle_IRQ(ffs(mask) - 1 + IRQ_GPIO0, regs);
-+	} while (1);
-+}
-+
- void __init sa1100_init_irq(void)
- {
- 	unsigned int irq;
-@@ -338,5 +356,7 @@ void __init sa1100_init_irq(void)
- 	irq_set_chip(IRQ_GPIO11_27, &sa1100_normal_chip);
- 	irq_set_chained_handler(IRQ_GPIO11_27, sa1100_high_gpio_handler);
- 
-+	set_handle_irq(sa1100_handle_irq);
-+
- 	sa1100_init_gpio();
- }
+diff --git a/arch/arm/mach-sa1100/include/mach/entry-macro.S b/arch/arm/mach-sa1100/include/mach/entry-macro.S
+deleted file mode 100644
+index 8cf7630..0000000
+--- a/arch/arm/mach-sa1100/include/mach/entry-macro.S
++++ /dev/null
+@@ -1,41 +0,0 @@
+-/*
+- * arch/arm/mach-sa1100/include/mach/entry-macro.S
+- *
+- * Low-level IRQ helper macros for SA1100-based platforms
+- *
+- * This file is licensed under  the terms of the GNU General Public
+- * License version 2. This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-		.macro  get_irqnr_preamble, base, tmp
+-		mov	\base, #0xfa000000		@ ICIP = 0xfa050000
+-		add	\base, \base, #0x00050000
+-		.endm
+-
+-		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+-		ldr	\irqstat, [\base]		@ get irqs
+-		ldr	\irqnr, [\base, #4]		@ ICMR = 0xfa050004
+-		ands	\irqstat, \irqstat, \irqnr
+-		mov	\irqnr, #0
+-		beq	1001f
+-		tst	\irqstat, #0xff
+-		moveq	\irqstat, \irqstat, lsr #8
+-		addeq	\irqnr, \irqnr, #8
+-		tsteq	\irqstat, #0xff
+-		moveq	\irqstat, \irqstat, lsr #8
+-		addeq	\irqnr, \irqnr, #8
+-		tsteq	\irqstat, #0xff
+-		moveq	\irqstat, \irqstat, lsr #8
+-		addeq	\irqnr, \irqnr, #8
+-		tst	\irqstat, #0x0f
+-		moveq	\irqstat, \irqstat, lsr #4
+-		addeq	\irqnr, \irqnr, #4
+-		tst	\irqstat, #0x03
+-		moveq	\irqstat, \irqstat, lsr #2
+-		addeq	\irqnr, \irqnr, #2
+-		tst	\irqstat, #0x01
+-		addeqs	\irqnr, \irqnr, #1
+-1001:
+-		.endm
+-
 -- 
 2.1.3
