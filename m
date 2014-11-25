@@ -1,151 +1,104 @@
-From: Suravee.Suthikulpanit@amd.com (Suthikulpanit, Suravee)
-Date: Tue, 25 Nov 2014 08:38:09 +0000
-Subject: [PATCH V4] arm64: amd-seattle: Adding device tree for AMD
- Seattle platform
-In-Reply-To: <CAOesGMik=ZxRXFp4aEf1-zK2OvrZ9duuWWpNKRQPUN_n=T39hw@mail.gmail.com>
-Message-ID: <D09A1695.A205%suravee.suthikulpanit@amd.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 25 Nov 2014 09:47:33 +0100
+Subject: [PATCH] ARM: exynos_defconfig: disable CONFIG_EXYNOS5420_MCPM; not
+ stable
+In-Reply-To: <CAMAWPa-qk0DEmPNz5LZgJq9AuGhRxuY00XwxtEikt_vh-iozVg@mail.gmail.com>
+References: <1414796382-5447-1-git-send-email-khilman@kernel.org>
+ <000e01cffb39$5ef0a2d0$1cd1e870$@kernel.org>
+ <7hegtaq26c.fsf@deeprootsystems.com>
+ <CAMAWPa-mLAFL7v8hHA5R-eBzpMFK-E-xcvjoV8Bn6tTwgP53Uw@mail.gmail.com>
+ <CAOesGMhvTDN4J6AdUDHKV0Sp4NT6a4QEMUDWOayQqhhD+C4acw@mail.gmail.com>
+ <CAMAWPa-sz5jT9izEONVZR2Z4mzuivKaNHSgyR+eP13tWZ84hYw@mail.gmail.com>
+ <CAOesGMgSkJ8xkBgN7OpuDzT=ehaAd6kvbx5_tC50x78pvpkTwg@mail.gmail.com>
+ <CAOesGMh-7md4PdQX1Wvk0jO+87j+fxSvBnVD_osjNd2zQ4L43w@mail.gmail.com>
+ <044101d00852$3f421420$bdc63c60$@kernel.org>
+ <CAMAWPa-qk0DEmPNz5LZgJq9AuGhRxuY00XwxtEikt_vh-iozVg@mail.gmail.com>
+Message-ID: <1416905253.5023.42.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
 
-On 11/25/14, 06:09, "Olof Johansson" <olof@lixom.net> wrote:
+On pon, 2014-11-24 at 19:20 -0800, Kevin Hilman wrote:
+> On Mon, Nov 24, 2014 at 5:50 PM, Kukjin Kim <kgene@kernel.org> wrote:
+> > Olof Johansson wrote:
+> >>
+> >> On Mon, Nov 24, 2014 at 5:37 PM, Olof Johansson <olof@lixom.net> wrote:
+> >> > On Mon, Nov 24, 2014 at 5:35 PM, Kevin Hilman <khilman@kernel.org> wrote:
+> >> >> On Mon, Nov 24, 2014 at 4:25 PM, Olof Johansson <olof@lixom.net> wrote:
+> >> >>> On Mon, Nov 24, 2014 at 11:51 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> >> >>>>
+> >> >>>> Is anyone at Samsung actually looking into these MCPM issues?
+> >> >>>
+> >> >>> Hi Kevin,
+> >> >>>
+> >> >>> What hardware are you having problems with? 5420 or 5422/5800?
+> >> >>
+> >> >> Yes.  :)
+> >> >>
+> >> >> exynos5420-arndale-octa:
+> >> >> http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc6/arm-exynos_defconfig/boot-exynos5420-
+> >> arndale-octa.html
+> >> >> exynos5422-odroid-xu3:
+> >> >> http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc6/arm-exynos_defconfig/boot-exynos5422-
+> >> odroid-xu3.html
+> >> >>
+> >> >> My boot tests seem to pass fine because I have such a minimal
+> >> >> userspace, but Tyler Baker reported that with a "real" userspace, he
+> >> >> can't boot to a shell:
+> >> >>
+> >> >>   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286203.html
+> >> >
+> > Hmm...his report was in Sep...I think it should be fine with current -next?
+> 
+> No, it is still broken in linux-next (as I stated above.)
+> 
+> Moreover, earlier in this thread you mentioned you were merging some
+> MCPM patches that should address this, but did not respond when I
+> asked which patches you thing should address this issue
+> 
+> > To be honest, since I don't have the exynos5420 arndale, chromebook...but smdk
+> > which has different bootloader, I couldn't test it...I'll try to make a test
+> > farm like you guys...
+> 
+> Do you have some colleagues with any other 542x hardware?  I had
+> assumed that linux-next was being better tested on the publicaly
+> available, and widely available boards like odroid-xu3 and
+> Chromebook2, but I've come to realize the hard way that that is not
+> the case.  You mention your board has a different bootloader.  Do you
+> suspect there's a bootloader issue on these other platforms?  If so,
+> could you elaborate on possible fixes?  I'm more than willing to test
+> any proposed fixes, but I'm not familiar enough yet with these SoCs to
+> figure out the underlying issues alone.
+> 
+> Until you have a working board farm, you could start having a closer
+> look at the boot logs we're already producing.  Admittedly linux-next
+> broken in many ways besides this one for exynos currently, but it has
+> been having these imprecise aborts well before the other recent
+> issues.
+> 
+> Also, It's very possible that this issue is not even MCPM related at
+> all, and MCPM is just uncovering a previously hidden bug.  It would be
+> very helpful if people more familiar with this hardware and SoC would
+> investigate bug reports like these.
 
->Hi Suravee,
->
->Some comments below.
->
->
->On Mon, Nov 24, 2014 at 1:51 PM,  <suravee.suthikulpanit@amd.com> wrote:
->> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>
->>[...]
->> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->> index f8001a6..604af09 100644
->> --- a/arch/arm64/boot/dts/Makefile
->> +++ b/arch/arm64/boot/dts/Makefile
->> @@ -1,3 +1,4 @@
->> +dtb-$(CONFIG_ARCH_SEATTLE) += amd-seattle.dtb
->>  dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
->>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->
->For 3.19, we're moving all device tree files on arm64 int per-vendor
->subdirectories.
->
->Can you please prepare this patch to go on top of linux-next (or
->arm-soc for-next) such that it adds this file in the same place?
->
->(Alternatively, we can move it when applying, it's not a huge deal).
+Interesting thing can be found in exynos5420.dtsi:
+mdma1: mdma at 11C10000 {
+	...
+	/*
+	 * MDMA1 can support both secure and non-secure
+	 * AXI transactions. When this is enabled in the kernel
+	 * for boards that run in secure mode, we are getting
+	 * imprecise external aborts causing the kernel to oops.
+	 */
+	status = "disabled";
+};
 
-No problem. I will provide V5 based with the new directory structure.
+I am booting Arndale Octa on some other config and exynos. However with
+or without MCPM the imprecise aborts are still present (but not fatal,
+shell comes up).
 
->
->
->>  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
->> diff --git a/arch/arm64/boot/dts/amd-seattle-periph.dtsi
->>b/arch/arm64/boot/dts/amd-seattle-periph.dtsi
->> new file mode 100644
->> index 0000000..77f565b
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/amd-seattle-periph.dtsi
->> @@ -0,0 +1,156 @@
->> +/*
->> + * DTS file for AMD Seattle Peripheral
->> + *
->> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
->> + */
->> +
->> +/ {
->> +       motherboard {
->> +               compatible = "simple-bus";
->
->I'm not sure I understand this abstraction. You have a motherboard
->device node, under which you have things like the pl011 UART and SATA
->-- while those blocks really are part of SoC, aren't they? After all,
->you have the pci-e controller as part of the dts file and not the
->dtsi.
+My board boots also under secure firmware (I am using Linaro's ubuntu
+image). Maybe that is the cause?
 
-Yes, they are parts of the SoC. I will rename the entry to smb,
-and I will move the pcie under the smb.
- 
->
->Unless you have some underlying motive, it would make more sense to
->keep these at the same toplevel since the "motherboard" doesn't seem
->to be part of the hardware topology as described.
-
-I will restructure the DTS/DTSI and send out V5.
-
->[..]
->> diff --git a/arch/arm64/boot/dts/amd-seattle.dts
->>b/arch/arm64/boot/dts/amd-seattle.dts
->> new file mode 100644
->> index 0000000..d5fc482
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/amd-seattle.dts
->> @@ -0,0 +1,89 @@
->> +/*
->> + * DTS file for AMD Seattle
->> + *
->> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
->> + */
->> +
->> +/dts-v1/;
->> +
->> +/include/ "amd-seattle-periph.dtsi"
->> +
->> +/ {
->> +       compatible = "amd,seattle";
->> +       interrupt-parent = <&gic>;
->> +       #address-cells = <2>;
->> +       #size-cells = <2>;
->
->So is this the dts for a specific board? Isn't Seattle the SoC? You
->might want to have a different topmost compatible here to identify the
->board. You should also have a "model" property here to describe what
->the hardware is.
->
->(I'm guessing it's really the development board for Seattle, correct?)
-
-Yes, Seattle is an SoC, and this DTS is meant for the Seattle development
-board.
-
-I will add the model property accordingly.
-
-
->[..]
->> +
->> +       pcie0: pcie-controller {
->> +               compatible = "pci-host-ecam-generic";
->
->The controller itself should likely go in the SoC dtsi, and only
->per-board additional attributes should go here.
-
-Ok, I will move it.
-
->
->It's also common to add a status = "disabled" in the dtsi, and
->overriding in the per-system dts with status = "okay" for those IP
->blocks that are actually useful on a particular platform.
->
->So, for example, if the SoC has SATA, but a particular board does not,
->then you wouldn't enable it in the dts.
->
->Also, if you use labels for the nodes in the dts, then you can do a
->flat-format dts where you don't have to exactly duplicate the same
->hierarchy of nodes to override a property (you're already using
->labels). I.e. in this case you could then do (for a board that does
->use sata):
->
->&sata0 {
->        status = "okay";
->};
->
->in the dts (this would go at the top level of the file, not nested
->under other nodes).
-
-This is actually a great idea. Thank you for suggestions. I will adopt
-this approach in the V5.
-
-Thanks,
-
-Suravee
+Best regards,
+Krzysztof
