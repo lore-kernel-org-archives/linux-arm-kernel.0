@@ -1,65 +1,47 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 25 Nov 2014 17:42:44 +0800
-Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <5473FDA8.6080201@huawei.com>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1416605010-10442-3-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <5473FDA8.6080201@huawei.com>
-Message-ID: <54744F14.60004@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 25 Nov 2014 10:04:42 +0000
+Subject: [PATCH v2] ARM: shmobile: r8a7790 CCI configuration
+In-Reply-To: <54743D0F.5080307@bp.renesas.com>
+References: <54743D0F.5080307@bp.renesas.com>
+Message-ID: <5474543A.807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-11-25 11:55, Shannon Zhao wrote:
-> Hi,
-> 
-> On 2014/11/22 5:23, Ganapatrao Kulkarni wrote:
-[...]
->> +==============================================================================
->> +4 - Example dts
->> +==============================================================================
->> +
->> +Example 1: 2 Node system each having 8 CPUs and a Memory.
->> +
->> +	numa-map {
->> +		#address-cells = <2>;
->> +		#size-cells = <1>;
->> +		#node-count = <2>;
->> +		mem-map =  <0x0 0x00000000 0>,
->> +		           <0x100 0x00000000 1>;
->> +
->> +		cpu-map = <0 7 0>,
->> +			  <8 15 1>;
-> 
-> The cpu range is continuous here. But if there is a situation like below:
-> 
-> 0 2 4 6 belong to node 0
-> 1 3 5 7 belong to node 1
-> 
-> This case is very common on X86. I don't know the real situation of arm as
-> I don't have a hardware with 2 nodes.
-> 
-> How can we generate a DTS about this situation? like below? Can be parsed?
-> 
-> 		cpu-map = <0 2 4 6 0>,
-> 			  <1 3 5 7 1>;
 
-I think the binding proposed here can not cover your needs, and I think this
-binding is not suitable, there are some reasons.
 
- - CPU logical ID is allocated by OS, and it depends on the order of CPU node
-   in the device tree, so it may be in a clean order like this patch proposed,
-   or it will like the order Shannon pointed out.
+On 25/11/14 08:25, Gaku Inami wrote:
+> Add the settings of CCI-400 for enabling ca15/ca7 snoop on r8a7790.
+> Needed to configure the CCI boot cluster port regardless of MCPM.
+>
+> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>
+> Changes since version 1:
+> - Fix a way to wait for the register read.
+>
+>   arch/arm/mach-shmobile/smp-r8a7790.c |   19 +++++++++++++++++++
+>   1 file changed, 19 insertions(+)
+>
+> diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
+> index 9c3da13..b65d908 100644
+> --- a/arch/arm/mach-shmobile/smp-r8a7790.c
+> +++ b/arch/arm/mach-shmobile/smp-r8a7790.c
+> @@ -25,6 +25,12 @@
+>   #include "pm-rcar.h"
+>   #include "r8a7790.h"
+>
+> +#define CCI_BASE	0xf0090000
+> +#define CCI_SLAVE3	0x4000
+> +#define CCI_SLAVE4	0x5000
+> +#define CCI_SNOOP	0x0000
+> +#define CCI_STATUS	0x000c
+> +
 
- - Since CPU logical ID is allocated by OS, DTS file will not know these
-   numbers.
+I have asked the same question multiple times in the past, why are you
+not using the DT bindings and the CCI driver for this ? Why are you
+duplicating the code ? Any limitations to use them ?
 
-So the problem behind this is the mappings between CPUs and NUMA nodes,
-there is already mapping for CPU hardware ID (MPIDR) and CPU logical ID,
-and MPIDR will be not changed, why not using MPIDR for the mapping of
-NUMA node and CPU? then the mappings will be:
-
-CPU logical ID <------> CPU MPIDR <-----> NUMA node ID <-----> proximity domain
-(allocated by OS)      (constant)       (allocated by OS)
-
-Thanks
-Hanjun
+Regards,
+Sudeep
