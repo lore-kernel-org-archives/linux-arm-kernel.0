@@ -1,173 +1,162 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 25 Nov 2014 12:11:37 -0700
-Subject: [PATCH v10 00/10] cpuidle driver for QCOM SoCs: 8064, 8074, 8084
-In-Reply-To: <1416593037-27527-1-git-send-email-lina.iyer@linaro.org>
-References: <1416593037-27527-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20141125191137.GA594@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 25 Nov 2014 19:21:38 +0000
+Subject: [PATCH 3/9] ARM: MB86S7X: Add MCPM support
+In-Reply-To: <alpine.LFD.2.11.1411251357230.11690@knanqh.ubzr>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1416486920-25343-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <alpine.LFD.2.11.1411251205500.11690@knanqh.ubzr>
+ <20141125184609.GA29425@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.11.1411251357230.11690@knanqh.ubzr>
+Message-ID: <5474D6C2.7060904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any comments?
 
-On Fri, Nov 21 2014 at 11:04 -0700, Lina Iyer wrote:
->Changes since v9:
->[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg11714.html ]
->- Address review comments on v9
->Dependent patchsets -
->        https://lkml.org/lkml/2014/8/4/767
->        http://www.spinics.net/lists/linux-arm-msm/msg10799.html
->        http://www.spinics.net/lists/linux-arm-msm/msg10795.html
+
+On 25/11/14 18:59, Nicolas Pitre wrote:
+> On Tue, 25 Nov 2014, Lorenzo Pieralisi wrote:
 >
->Changes since v8:
->[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg11473.html ]
->- Flatten out the file structure - merge pm.c into spm.c after discussions
->- Add a new function to set warm boot address, in scm-boot.c
->- Support for 8064 (New)
->- Tested on 8074, 8084. 8064 was tested with a WIP tree
->- Address review comments from v8
->- Looking into possiblility of  initializing the cpuidle device for a cpu,
->only when the corresponding spm device is probed successfully.
+>> On Tue, Nov 25, 2014 at 05:42:32PM +0000, Nicolas Pitre wrote:
+>>> On Thu, 20 Nov 2014, Vincent Yang wrote:
+>>>
+>>>> The remote firmware(SCB) owns the SMP control. This MCPM driver gets
+>>>> CPU/CLUSTER power up/down done by SCB over mailbox.
+>>>>
+>>>> Signed-off-by: Andy Green <andy.green@linaro.org>
+>>>> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+>>>> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+>>>> Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+>>>> ---
+>>>>   arch/arm/mach-mb86s7x/Makefile |   2 +-
+>>>>   arch/arm/mach-mb86s7x/mcpm.c   | 360 +++++++++++++++++++++++++++++++++++++++++
+>>>>   arch/arm/mach-mb86s7x/smc.S    |  27 ++++
+>>>>   3 files changed, 388 insertions(+), 1 deletion(-)
+>>>>   create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
+>>>>   create mode 100644 arch/arm/mach-mb86s7x/smc.S
+>>>>
+>>>> diff --git a/arch/arm/mach-mb86s7x/Makefile b/arch/arm/mach-mb86s7x/Makefile
+>>>> index 97640b6..b0fa34b 100644
+>>>> --- a/arch/arm/mach-mb86s7x/Makefile
+>>>> +++ b/arch/arm/mach-mb86s7x/Makefile
+>>>> @@ -1 +1 @@
+>>>> -obj-$(CONFIG_ARCH_MB86S7X)   += board.o
+>>>> +obj-$(CONFIG_ARCH_MB86S7X)   += board.o mcpm.o smc.o
+>>>> diff --git a/arch/arm/mach-mb86s7x/mcpm.c b/arch/arm/mach-mb86s7x/mcpm.c
+>>>> new file mode 100644
+>>>> index 0000000..bf1b50a
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/mach-mb86s7x/mcpm.c
+>>>> @@ -0,0 +1,360 @@
+>>>> +/*
+>>>> + * arch/arm/mach-mb86s7x/mcpm.c
+>>>> + * Copyright:        (C) 2013-2014 Fujitsu Semiconductor Limited
+>>>> + * Copyright:        (C) 2014 Linaro Ltd.
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or modify
+>>>> + * it under the terms of the GNU General Public License version 2 as
+>>>> + * published by the Free Software Foundation.
+>>>> + */
+>>>> +
+>>>> +#include <linux/io.h>
+>>>> +#include <linux/pm.h>
+>>>> +#include <linux/delay.h>
+>>>> +#include <linux/cpu_pm.h>
+>>>> +#include <linux/kernel.h>
+>>>> +#include <linux/module.h>
+>>>> +#include <linux/arm-cci.h>
+>>>> +#include <linux/spinlock.h>
+>>>> +#include <linux/suspend.h>
+>>>> +#include <linux/of_device.h>
+>>>> +#include <linux/irqchip/arm-gic.h>
+>>>> +#include <linux/platform_device.h>
+>>>> +
+>>>> +#include <soc/mb86s7x/scb_mhu.h>
+>>>> +
+>>>> +#include <asm/mcpm.h>
+>>>> +#include <asm/cp15.h>
+>>>> +#include <asm/cputype.h>
+>>>> +#include <asm/suspend.h>
+>>>> +#include <asm/idmap.h>
+>>>> +
+>>>> +#define S7X_MAX_CLUSTER      2
+>>>> +#define S7X_MAX_CPU  2
+>>>> +
+>>>> +#define MHU_SHM_OFFSET               0x3800
+>>>> +#define WFI_COLOR_OFFSET     0x3f00
+>>>> +#define TRAMPOLINE_OFFSET    0x3c00
+>>>> +#define RESET_OFFSET         (TRAMPOLINE_OFFSET + 0x3fc)
+>>>> +
+>>>> +static arch_spinlock_t mb86s7x_pm_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+>>>> +static int mb86s7x_pm_use_count[S7X_MAX_CLUSTER][S7X_MAX_CPU];
+>>>> +extern void __iomem *mb86s7x_shm_base;
+>>>> +
+>>>> +#define AT_WFI_DO_NOTHING    0x0
+>>>> +#define AT_WFI_DO_SUSPEND    0x1
+>>>> +#define AT_WFI_DO_POWEROFF   0x2
+>>>> +#define AT_WFI_COLOR_MASK    0x3
+>>>> +
+>>>> +struct mb86s7x_cpu_gate {
+>>>> +     u32 payload_size;
+>>>> +     u32 cluster_class;
+>>>> +     u32 cluster_id;
+>>>> +     u32 cpu_id;
+>>>> +#define SCB_CPU_STATE_OFF    0x0
+>>>> +#define SCB_CPU_STATE_ON     0x1
+>>>> +#define SCB_CPU_STATE_SUSP   0x2
+>>>> +     u32 cpu_state;
+>>>> +};
+>>>> +
+>>>> +asmlinkage void mb86s70evb_outer_flush_all(void)
+>>>> +{
+>>>> +     outer_flush_all();
+>>>> +}
+>>>> +
+>>>> +#define mb86s70evb_exit_coherency_flush(level) { \
+>>>> +     asm volatile( \
+>>>> +     "stmfd  sp!, {fp, ip}\n\t" \
+>>>> +     "mrc    p15, 0, r0, c1, c0, 0   @ get SCTLR\n\t" \
+>>>> +     "bic    r0, r0, #"__stringify(CR_C)"\n\t" \
+>>>> +     "mcr    p15, 0, r0, c1, c0, 0   @ set SCTLR\n\t" \
+>>>> +     "isb\n\t" \
+>>>> +     "bl     v7_flush_dcache_"__stringify(level)"\n\t" \
+>>>> +     "bl     mb86s70evb_outer_flush_all\n\t" \
+>>>
+>>> This is wrong.  As mentioned already, this unconditionally flushes L2 in
+>>> all cases which shouldn't be necessary in the "louis" case.
+>>
+>> Is this a bL system with unified and architected L2s ? I think so, so
+>> what's the outercache for ?
+>>
+>>> Furthermore, the safety of this macro is ensured by not having any
+>>> memory writes in the middle of the whole sequence.  By calling
+>>> mb86s70evb_outer_flush_all() there could be the return address pushed
+>>> onto the stack before calling outer_flush_all() if some tail call
+>>> optimization is not applied.  And this is without saying what
+>>> outer_flush_all() actually does.
+>>>
+>>> Why can't you simply do this instead:
+>>>
+>>>          v7_exit_coherency_flush(all);
+>>>          outer_flush_all();
+>>>
+>>> Of course you'll have to audit everything in the outer_flush_all() path
+>>> to make sure no atomic instructions such as LDREX/STREX are invoked.
+>>> Those have undefined behavior after CR_C is cleared.
+>>
+>> What you are saying is correct but first of all I would like to
+>> understand what outercache we are talking about here.
+>>
+>> Code snippet above is fragile, as you said, and I'd rather disable
+>> the outercache before executing the power down sequence (which implies
+>> cache is cleaned/invalidated and quiescent before we clear the C bit)
+>> if there is an outercache to be managed.
 >
->Changes since v7:
->[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg11199.html ]
->- Address review comments
->- Tested on 8974 but not 8084
->- WFI renamed to Standby
->- Update commit text with original author and link to the downstream tree
+> Good question.  That opens the potential for an even simpler fix!  ;-)
 >
->Changes since v6:
->[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg11012.html ]
->- SPM device nodes merged with existing SAW DT nodes
->- SPM register information is handled within the driver
->- Clean up from using 'msm' to 'qcom'
->        - Shorten some enumerations as well
->- Review comments from v6 addressed
->- New: Support for 8084 SoC
->        - Not tested. I do not have a board with this SoC, but the SPM
->        configuration should be identical for WFI and SPC
->
->Changes since v5:
->[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10559.html ]
->- Merge spm-devices.c and spm.c into one file and one patch
->        - Simplify implementation of the driver.
->        - Update documentation mapping the DT properties with corresponding
->          SPM register information.
->- Removed scm-boot changes for quad core warmboot, its has been pulled in.
->
->Changes since v4:
->[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10327.html ]
->- Update to the v8 of ARM generic idle states patches
->- Use platform device model for cpuidle-qcom
->- Clean up msm-pm.c to remove unnecessary include files and functions
->- Update commit text and documentation for all idle states
->- Remove scm-boot relocate patch from this series, submitted earlier
->[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10518.html ]
->
->Changes since v3:
->[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10288.html ]
->- Fix CONFIG_QCOM_PM Kconfig as bool
->- More clean ups in spm.c and spm-devices.c
->        - Removed and re-organized data structures to make initialization simple
->        - Remove export of sequence flush functions
->        - Updated commit text
->        - Comments for use of barriers.
->- Rebase on top of 3.17-rc1
->
->Changes since v2:
->[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10148.html ]
->- Prune all the drivers to support basic WFI and power down cpuidle
->  functionality. Remove debug code.
->- Integrate KConfig changes into the drivers' patches.
->- Use Lorenzo's ARM idle-states patches as the basis for reading cpuidle
->  c-states from DT.
->  [ http://marc.info/?l=linux-pm&m=140794514812383&w=2 ]
->- Incorporate review comments
->- Rebase on top of 3.16
->
->Changes since v1/RFC:
->[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10065.html ]
->- Remove hotplug from the patch series. Will submit it separately.
->- Fix SPM drivers per the review comments
->- Modify patch sequence to compile SPM drivers independent of msm-pm, so as to
->  allow wfi() calls to use SPM even without SoC interface driver.
->
->8074/8084/8064 like any ARM SoC can do architectural clock gating, that helps save
->on power, but not enough of leakage power.  Leakage power of the SoC can be
->further reduced by turning off power to the core. To aid this, every core (cpu
->and L2) is accompanied by a Sub-system Power Manager (SPM), that can be
->configured to indicate the low power mode, the core would be put into and the
->SPM programs the peripheral h/w accordingly to enter low power and turn off the
->power rail to the core.
->
->The idle invocation hierarchy -
->
->CPUIDLE
->        |
->        cpuidle-qcom.c [CPUIdle driver]
->        |
->        ------> spm.c [SPM driver]
->                |
->                ------> scm-boot.c [SCM interface layer]
->                        |
->------------------------|--------------------------
->(EL)                    Secure Monitor Code
->                        |
->                        |
->                        wfi();
->------------------------|--------------------------
->(HW)                    [CPU] {clock gate}
->                        |
->                        -----> [SPM] {statemachine}
->
->
->The patchset does the following -
->
->- Introduce the SPM driver to control power to the core
->- Add device bindings for 8974, 8084, 8064 CPU SPM devices
->- Add cpuidle driver for QCOM cpus, using ARM generic idle state definitions.
->- Add device bindings for 8974, 8084, 8064 idle-states - WFI and SPC
->
->Thanks,
->Lina
->
->Lina Iyer (10):
->  qom: scm: Move scm-boot files to drivers/soc/qcom/ and
->    include/soc/qcom
->  qcom: scm: Add SCM warmboot support for quad core SoCs
->  qcom: spm: Add Subsystem Power Manager driver
->  arm: dts: qcom: Add power-controller device node for 8074 Krait CPUs
->  arm: dts: qcom: Add power-controller device node for 8084 Krait CPUs
->  arm: dts: qcom: Update power-controller device node for 8064 Krait
->    CPUs
->  qcom: cpuidle: Add cpuidle driver for QCOM cpus
->  arm: dts: qcom: Add idle states device nodes for 8074
->  arm: dts: qcom: Add idle states device nodes for 8084
->  arm: dts: qcom: Add idle state device nodes for 8064
->
-> .../bindings/arm/msm/qcom,idle-state.txt           |  81 +++++
-> .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  31 +-
-> arch/arm/boot/dts/qcom-apq8064.dtsi                |  37 ++-
-> arch/arm/boot/dts/qcom-apq8084.dtsi                |  46 ++-
-> arch/arm/boot/dts/qcom-msm8974.dtsi                |  46 ++-
-> arch/arm/mach-qcom/Makefile                        |   1 -
-> arch/arm/mach-qcom/platsmp.c                       |   2 +-
-> drivers/cpuidle/Kconfig.arm                        |   7 +
-> drivers/cpuidle/Makefile                           |   1 +
-> drivers/cpuidle/cpuidle-qcom.c                     |  72 +++++
-> drivers/soc/qcom/Kconfig                           |   8 +
-> drivers/soc/qcom/Makefile                          |   3 +-
-> .../arm/mach-qcom => drivers/soc/qcom}/scm-boot.c  |  33 +-
-> drivers/soc/qcom/spm.c                             | 332 +++++++++++++++++++++
-> include/soc/qcom/pm.h                              |  31 ++
-> .../arm/mach-qcom => include/soc/qcom}/scm-boot.h  |   3 +-
-> 16 files changed, 712 insertions(+), 22 deletions(-)
-> create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
-> create mode 100644 drivers/cpuidle/cpuidle-qcom.c
-> rename {arch/arm/mach-qcom => drivers/soc/qcom}/scm-boot.c (63%)
-> create mode 100644 drivers/soc/qcom/spm.c
-> create mode 100644 include/soc/qcom/pm.h
-> rename {arch/arm/mach-qcom => include/soc/qcom}/scm-boot.h (91%)
->
->-- 
->2.1.0
->
+Ah right, sorry my bad somehow I assumed this is system cache at higher
+level apart from the intra-cluster unified and architected L2 cache.
+Now checking the DT again I don't see any outer cache controller, so
+it's better to get that info.
+
+Regards,
+Sudeep
