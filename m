@@ -1,30 +1,22 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 25 Nov 2014 12:28:10 +0100
-Subject: [PATCH v2 0/4] clk: rockchip: allow adjusting pll rates on init
-In-Reply-To: <1416512333-15438-1-git-send-email-heiko@sntech.de>
-References: <1416512333-15438-1-git-send-email-heiko@sntech.de>
-Message-ID: <1753789.atZ8FgoESr@diego>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 25 Nov 2014 11:27:29 +0000
+Subject: [PATCH v8 1/4] irqchip: gic: Support hierarchy irq domain.
+In-Reply-To: <1416902662-19281-2-git-send-email-yingjoe.chen@mediatek.com>
+References: <1416902662-19281-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1416902662-19281-2-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <547467A1.8000900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 20. November 2014, 20:38:49 schrieb Heiko Stuebner:
-> It was found that some firmware versions initialized the pll rates using
-> suboptimal parameters to achieve frequencies the actual rate table contained
-> better parameters for.
+On 25/11/14 08:04, Yingjoe Chen wrote:
+> Add support to use gic as a parent for stacked irq domain.
 > 
-> Therefore this series first adds the possibility to create pll-specific
-> flags and then adds a flag to adjust the pll rate on init to the parameters
-> from the rate table.
-> 
-> changes since v1:
-> - move population of pll_mux before registering the core pll clock
->   null pointer exception in the _set_rate callback when called from init
-> 
-> Heiko Stuebner (4):
->   clk: rockchip: add ability to specify pll-specific flags
->   clk: rockchip: setup pll_mux data earlier
->   clk: rockchip: add optional sync to pll rate parameters
->   clk: rockchip: add ROCKCHIP_PLL_SYNC_RATE flag to some plls
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 
-with Mike's green-light, I've now added these to my clk branch with Kevers 
-tags added.
+Looks good to me.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
