@@ -1,115 +1,73 @@
-From: highguy@gmail.com (Stijn Devriendt)
-Date: Tue, 25 Nov 2014 23:07:38 +0100
-Subject: [PATCH 2/3] i2c: slave-eeprom: add eeprom simulator driver
-In-Reply-To: <20141122181229.GB9698@katana>
-References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
- <1416326695-13083-3-git-send-email-wsa@the-dreams.de>
- <CAOY=C6FSXWn2AKn9gp0oU69U8VkkyJAE7MMUTZsToy0P_Tf6AA@mail.gmail.com>
- <20141122181229.GB9698@katana>
-Message-ID: <CAOY=C6F6TMyeDvNneBV6K5hVjoG+qk-1Y_R3oJkEiGxhLOoQ0A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 25 Nov 2014 23:06:39 +0100
+Subject: [PATCH v4 0/6] clk: sun6i: Unify AHB1 clock and fix rate
+ calculation
+In-Reply-To: <CAGb2v660qfQEikxWnZA8EFRK+RBuK6yED+3aaLOVOEjByFhPpA@mail.gmail.com>
+References: <1416717205-15406-1-git-send-email-wens@csie.org>
+ <20141125152202.GA3949@lukather>
+ <CAGb2v660qfQEikxWnZA8EFRK+RBuK6yED+3aaLOVOEjByFhPpA@mail.gmail.com>
+Message-ID: <20141125220639.GH25249@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 22, 2014 at 7:12 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> Hi,
->
-> Please quote only relevant parts of the message (like I did). This
-> improves readability a lot.
->
+On Tue, Nov 25, 2014 at 11:38:36PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Nov 25, 2014 at 11:22 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Sun, Nov 23, 2014 at 12:33:19PM +0800, Chen-Yu Tsai wrote:
+> >> Hi everyone,
+> >>
+> >> This is v4 of the sun6i AHB1 clock unification series. This series
+> >> unifies the mux and divider parts of the AHB1 clock found on sun6i
+> >> and sun8i, while also adding support for the pre-divider on the
+> >> PLL6 input.
+> >>
+> >> The rate calculation logic must factor in which parent it is using to
+> >> calculate the rate, to decide whether to use the pre-divider or not.
+> >> This is beyond the original factors clk design in sunxi. To avoid
+> >> feature bloat, this is implemented as a seperate composite clk.
+> >>
+> >> The new clock driver is registered with a separate OF_CLK_DECLARE.
+> >> As it shares its register with the APB1 div clock, thus shares the same
+> >> spinlock, it cannot reside in a separate file.
+> >>
+> >> This series also fixes up the PLL6 clock. Those patches were merged
+> >> and are included for completeness.
+> >
+> > Please don't do that. Now, I have no idea what should be merged, and
+> > what not.
+> 
+> The first 3 have been merged:
+> 
+>   clk: sunxi: Specify number of child clocks for divs clocks
+>   clk: sunxi: Implement A31 PLL6 as a divs clock for 2x output
+>   ARM: sun6i: DT: Add PLL6 multiple outputs
+> 
+> The latter 3 have not:
+> 
+>   clk: sunxi: unify sun6i AHB1 clock with proper PLL6 pre-divider
+>   ARM: dts: sun6i: Unify ahb1 clock nodes
+>   ARM: dts: sun8i: Unify ahb1 clock nodes
+> 
+> The dts patches should probably be taken through the clock tree,
+> to avoid breaking arm-soc again? But they do depend on the third
+> patch, which you've included in the arm-soc pull request.
 
-My bad, will minimize the overhead in the future.
+Ok, thanks for the clarification.
 
->>
->> Would it make sense to have:
->> WRITE_START
->> WRITE_NEXT
->> WRITE_STOP
->> WRITE_REPEAT_START
->> READ_START
->> READ_NEXT
->> READ_STOP
->> READ_REPEAT_START
->>
->> Some devices may want different behavior for subsequent
->> reads when they are separate transactions, compared to
->> a single larger transaction.
->
-> This can all be handled with I2C_SLAVE_STOP.
->
+This will be aimed at 3.20 anyway, so it can go through both the clock
+or the arm-soc trees, and yeah, I'd lean toward the first given this
+pull request experience.
 
-I think the goal is probably better covered by Uwe's idea for
-returning a buffer. See below...
+Maxime
 
->> e.g. a single transaction may wraparound inside a >8bit
->> register (e.g. for 16bit: msb, lsb, msb, lsb, ...), but step
->> to the next register when a separate read/write is issued.
->> Alternatively, a WRITE/READ_NEXT may be implemented
->> more efficiently. This may not matter for current systems
->> compared to the low-frequency bus, but who knows what
->> IoT devices may bring to the table.
->
-> Let's start simple until we have more use cases. WRITE_NEXT may be
-> useful when you have an internal u8 pointer to be set before actually
-> sending data, but already less useful if this is u16. Also, slaves may
-> decide to handle stops at unexpected places differently. Furthermore, my
-> feeling is that slave drivers will be more robust if they handle those
-> simple primitives properly.
->
-
-I think usable semantics could be that a slave driver can indicate at any
-point during an I2C read transaction that the next X bytes should be
-returned from a buffer and for a write transaction, that the next X bytes
-should be buffered before passed on to the driver. When the transaction
-ends or the adapter reaches the end of the buffer, it indicates this to
-the driver which can then either cleanup or otherwise act accordingly.
-For the EEPROM driver, this could mean that after the address is received,
-the driver can pass the pointer + remaining size and have the adapter
-driver take care of transmit. Upon end-of-buffer, it could just handle the
-wraparound and let the adapter take care of the rest.
-
-But as you say, this can be added later on when the need arises.
-
-> What I could imagine, though, is that somewhen the eeprom simulator will
-> be able to get data via other means than the shared memory, maybe via
-> some callback. Then, the callback really only has to deal with "read
-> this byte" or "write that byte" while for the outer world we have a
-> proper well-known EEPROM like I2C interface.
->
-> That being said, the list of I2C_SLAVE_* events is extensible, of
-> course. Though, I rather see low-level stuff there like "General Call
-> Adress received".
->
->>
->> Also, behavior may be different for repeat start versus
->> stop/start, although a repeat start could be a start
->> without a previous stop as well...
->
-> IMO a repeated start is to ensure that two messages arrive at the slave
-> without interruption from another master. I can't think why a slave
-> should know which type of start that was. In fact, if it does that would
-> raise an eyebrow for me. Do you have an example?
->
-
-No, I'll have to pass on that one. Plenty of odd I2C behavior, but that's
-not one of them. You're right on repeat start, so it would be quite
-erratic behavior. But even if, it can probably be added later on.
-
->> Of course, if an I2C adapter cannot distinguish these
->> events, this is probably a futile attempt at adding
->> semantics that will silently break depending on the
->> actual hardware/driver used.
->
-> That as well. I have not seen an I2C adapter which could provide this
-> information so far.
->
-
-Just checked components we're using and stop/repeated-start both
-transition into the same state.
-
-Regards,
-Stijn
-
-> Thanks,
->
->    Wolfram
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141125/4d550bf0/attachment.sig>
