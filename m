@@ -1,32 +1,46 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 25 Nov 2014 16:24:59 +0100
-Subject: [PATCH] ARM: shmobile: kzm9g_defconfig: Update AK8975 config option
-Message-ID: <1416929099-29282-1-git-send-email-geert+renesas@glider.be>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 25 Nov 2014 16:22:02 +0100
+Subject: [PATCH v4 0/6] clk: sun6i: Unify AHB1 clock and fix rate
+ calculation
+In-Reply-To: <1416717205-15406-1-git-send-email-wens@csie.org>
+References: <1416717205-15406-1-git-send-email-wens@csie.org>
+Message-ID: <20141125152202.GA3949@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_SENSORS_AK8975 was renamed to CONFIG_AK8975 in commit
-2fc72cd8354e3e9c ("iio:magnetometer:ak8975 move driver out of staging")
-in v3.10.
+On Sun, Nov 23, 2014 at 12:33:19PM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
+> 
+> This is v4 of the sun6i AHB1 clock unification series. This series
+> unifies the mux and divider parts of the AHB1 clock found on sun6i
+> and sun8i, while also adding support for the pre-divider on the
+> PLL6 input.
+> 
+> The rate calculation logic must factor in which parent it is using to
+> calculate the rate, to decide whether to use the pre-divider or not.
+> This is beyond the original factors clk design in sunxi. To avoid
+> feature bloat, this is implemented as a seperate composite clk.
+> 
+> The new clock driver is registered with a separate OF_CLK_DECLARE.
+> As it shares its register with the APB1 div clock, thus shares the same
+> spinlock, it cannot reside in a separate file.
+> 
+> This series also fixes up the PLL6 clock. Those patches were merged
+> and are included for completeness.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/configs/kzm9g_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Please don't do that. Now, I have no idea what should be merged, and
+what not.
 
-diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
-index 8cb115d74fdf4e37..bfe568847503ff5f 100644
---- a/arch/arm/configs/kzm9g_defconfig
-+++ b/arch/arm/configs/kzm9g_defconfig
-@@ -126,8 +126,8 @@ CONFIG_DMADEVICES=y
- CONFIG_SH_DMAE=y
- CONFIG_ASYNC_TX_DMA=y
- CONFIG_STAGING=y
--CONFIG_SENSORS_AK8975=y
- CONFIG_IIO=y
-+CONFIG_AK8975=y
- # CONFIG_DNOTIFY is not set
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141125/51a19203/attachment.sig>
