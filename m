@@ -1,491 +1,440 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 25 Nov 2014 18:46:10 +0000
-Subject: [PATCH 3/9] ARM: MB86S7X: Add MCPM support
-In-Reply-To: <alpine.LFD.2.11.1411251205500.11690@knanqh.ubzr>
-References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1416486920-25343-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <alpine.LFD.2.11.1411251205500.11690@knanqh.ubzr>
-Message-ID: <20141125184609.GA29425@e102568-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 25 Nov 2014 18:47:22 +0000
+Subject: [PATCH v11 1/2] irqchip: gicv2m: Add support for ARM GICv2m MSI(-X)
+ doorbell
+In-Reply-To: <1416941243-7181-1-git-send-email-marc.zyngier@arm.com>
+References: <1416941243-7181-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1416941243-7181-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 05:42:32PM +0000, Nicolas Pitre wrote:
-> On Thu, 20 Nov 2014, Vincent Yang wrote:
-> 
-> > The remote firmware(SCB) owns the SMP control. This MCPM driver gets
-> > CPU/CLUSTER power up/down done by SCB over mailbox.
-> >
-> > Signed-off-by: Andy Green <andy.green@linaro.org>
-> > Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> > Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
-> > Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
-> > ---
-> >  arch/arm/mach-mb86s7x/Makefile |   2 +-
-> >  arch/arm/mach-mb86s7x/mcpm.c   | 360 +++++++++++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-mb86s7x/smc.S    |  27 ++++
-> >  3 files changed, 388 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
-> >  create mode 100644 arch/arm/mach-mb86s7x/smc.S
-> >
-> > diff --git a/arch/arm/mach-mb86s7x/Makefile b/arch/arm/mach-mb86s7x/Makefile
-> > index 97640b6..b0fa34b 100644
-> > --- a/arch/arm/mach-mb86s7x/Makefile
-> > +++ b/arch/arm/mach-mb86s7x/Makefile
-> > @@ -1 +1 @@
-> > -obj-$(CONFIG_ARCH_MB86S7X)   += board.o
-> > +obj-$(CONFIG_ARCH_MB86S7X)   += board.o mcpm.o smc.o
-> > diff --git a/arch/arm/mach-mb86s7x/mcpm.c b/arch/arm/mach-mb86s7x/mcpm.c
-> > new file mode 100644
-> > index 0000000..bf1b50a
-> > --- /dev/null
-> > +++ b/arch/arm/mach-mb86s7x/mcpm.c
-> > @@ -0,0 +1,360 @@
-> > +/*
-> > + * arch/arm/mach-mb86s7x/mcpm.c
-> > + * Copyright:        (C) 2013-2014 Fujitsu Semiconductor Limited
-> > + * Copyright:        (C) 2014 Linaro Ltd.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/io.h>
-> > +#include <linux/pm.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/cpu_pm.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/module.h>
-> > +#include <linux/arm-cci.h>
-> > +#include <linux/spinlock.h>
-> > +#include <linux/suspend.h>
-> > +#include <linux/of_device.h>
-> > +#include <linux/irqchip/arm-gic.h>
-> > +#include <linux/platform_device.h>
-> > +
-> > +#include <soc/mb86s7x/scb_mhu.h>
-> > +
-> > +#include <asm/mcpm.h>
-> > +#include <asm/cp15.h>
-> > +#include <asm/cputype.h>
-> > +#include <asm/suspend.h>
-> > +#include <asm/idmap.h>
-> > +
-> > +#define S7X_MAX_CLUSTER      2
-> > +#define S7X_MAX_CPU  2
-> > +
-> > +#define MHU_SHM_OFFSET               0x3800
-> > +#define WFI_COLOR_OFFSET     0x3f00
-> > +#define TRAMPOLINE_OFFSET    0x3c00
-> > +#define RESET_OFFSET         (TRAMPOLINE_OFFSET + 0x3fc)
-> > +
-> > +static arch_spinlock_t mb86s7x_pm_lock = __ARCH_SPIN_LOCK_UNLOCKED;
-> > +static int mb86s7x_pm_use_count[S7X_MAX_CLUSTER][S7X_MAX_CPU];
-> > +extern void __iomem *mb86s7x_shm_base;
-> > +
-> > +#define AT_WFI_DO_NOTHING    0x0
-> > +#define AT_WFI_DO_SUSPEND    0x1
-> > +#define AT_WFI_DO_POWEROFF   0x2
-> > +#define AT_WFI_COLOR_MASK    0x3
-> > +
-> > +struct mb86s7x_cpu_gate {
-> > +     u32 payload_size;
-> > +     u32 cluster_class;
-> > +     u32 cluster_id;
-> > +     u32 cpu_id;
-> > +#define SCB_CPU_STATE_OFF    0x0
-> > +#define SCB_CPU_STATE_ON     0x1
-> > +#define SCB_CPU_STATE_SUSP   0x2
-> > +     u32 cpu_state;
-> > +};
-> > +
-> > +asmlinkage void mb86s70evb_outer_flush_all(void)
-> > +{
-> > +     outer_flush_all();
-> > +}
-> > +
-> > +#define mb86s70evb_exit_coherency_flush(level) { \
-> > +     asm volatile( \
-> > +     "stmfd  sp!, {fp, ip}\n\t" \
-> > +     "mrc    p15, 0, r0, c1, c0, 0   @ get SCTLR\n\t" \
-> > +     "bic    r0, r0, #"__stringify(CR_C)"\n\t" \
-> > +     "mcr    p15, 0, r0, c1, c0, 0   @ set SCTLR\n\t" \
-> > +     "isb\n\t" \
-> > +     "bl     v7_flush_dcache_"__stringify(level)"\n\t" \
-> > +     "bl     mb86s70evb_outer_flush_all\n\t" \
-> 
-> This is wrong.  As mentioned already, this unconditionally flushes L2 in
-> all cases which shouldn't be necessary in the "louis" case.
+From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-Is this a bL system with unified and architected L2s ? I think so, so
-what's the outercache for ?
+ARM GICv2m specification extends GICv2 to support MSI(-X) with
+a new register frame. This allows a GICv2 based system to support
+MSI with minimal changes.
 
-> Furthermore, the safety of this macro is ensured by not having any
-> memory writes in the middle of the whole sequence.  By calling
-> mb86s70evb_outer_flush_all() there could be the return address pushed
-> onto the stack before calling outer_flush_all() if some tail call
-> optimization is not applied.  And this is without saying what
-> outer_flush_all() actually does.
-> 
-> Why can't you simply do this instead:
-> 
->         v7_exit_coherency_flush(all);
->         outer_flush_all();
-> 
-> Of course you'll have to audit everything in the outer_flush_all() path
-> to make sure no atomic instructions such as LDREX/STREX are invoked.
-> Those have undefined behavior after CR_C is cleared.
+Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+[maz: converted the driver to use stacked irq domains,
+      updated changelog]
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/Kconfig              |   1 +
+ drivers/irqchip/Kconfig         |   6 +
+ drivers/irqchip/Makefile        |   1 +
+ drivers/irqchip/irq-gic-v2m.c   | 333 ++++++++++++++++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic.c       |   4 +
+ include/linux/irqchip/arm-gic.h |   2 +
+ 6 files changed, 347 insertions(+)
+ create mode 100644 drivers/irqchip/irq-gic-v2m.c
 
-What you are saying is correct but first of all I would like to
-understand what outercache we are talking about here.
-
-Code snippet above is fragile, as you said, and I'd rather disable
-the outercache before executing the power down sequence (which implies
-cache is cleaned/invalidated and quiescent before we clear the C bit)
-if there is an outercache to be managed.
-
-Waiting in trepidation :)
-
-Lorenzo
-
-> 
-> > +     "mrc    p15, 0, r0, c1, c0, 1   @ get ACTLR\n\t" \
-> > +     "bic    r0, r0, #(1 << 6)       @ disable local coherency\n\t" \
-> > +     "mcr    p15, 0, r0, c1, c0, 1   @ set ACTLR\n\t" \
-> > +     "isb\n\t" \
-> > +     "dsb\n\t" \
-> > +     "ldmfd  sp!, {fp, ip}" \
-> > +             : : : "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", \
-> > +             "r9", "r10", "lr", "memory"); \
-> > +     }
-> > +
-> > +static void
-> > +mb86s7x_set_wficolor(unsigned clstr, unsigned cpu, unsigned clr)
-> > +{
-> > +     u8 val;
-> > +
-> > +     if (clr & ~AT_WFI_COLOR_MASK)
-> > +             return;
-> 
-> Shouldn't this be a BUG() rather than a return?
-> 
-> > +
-> > +     val = readb_relaxed(mb86s7x_shm_base
-> > +                         + WFI_COLOR_OFFSET + clstr * 2 + cpu);
-> > +     val &= ~AT_WFI_COLOR_MASK;
-> > +     val |= clr;
-> > +     writeb_relaxed(val, mb86s7x_shm_base
-> > +                    + WFI_COLOR_OFFSET + clstr * 2 + cpu);
-> > +}
-> > +
-> > +static int mb86s7x_pm_power_up(unsigned int cpu, unsigned int cluster)
-> > +{
-> > +     int ret = 0;
-> > +
-> > +     if (cluster >= S7X_MAX_CLUSTER || cpu >= S7X_MAX_CPU)
-> > +             return -EINVAL;
-> > +
-> > +     pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> > +
-> > +     local_irq_disable();
-> > +     arch_spin_lock(&mb86s7x_pm_lock);
-> > +
-> > +     mb86s7x_pm_use_count[cluster][cpu]++;
-> > +
-> > +     if (mb86s7x_pm_use_count[cluster][cpu] == 1) {
-> > +             struct mb86s7x_cpu_gate cmd;
-> > +
-> > +             arch_spin_unlock(&mb86s7x_pm_lock);
-> > +             local_irq_enable();
-> 
-> From that point onward, nothing prevents concurrent execution in
-> mb86s7x_pm_suspend() racing to call mb86s7x_set_wficolor() resulting in
-> an incoherent state depending on who wins the race.
-> 
-> > +             cmd.payload_size = sizeof(cmd);
-> > +             cmd.cluster_class = 0;
-> > +             cmd.cluster_id = cluster;
-> > +             cmd.cpu_id = cpu;
-> > +             cmd.cpu_state = SCB_CPU_STATE_ON;
-> > +
-> > +             pr_debug("%s:%d CMD Cl_Class-%u CL_ID-%u CPU_ID-%u STATE-%u}\n",
-> > +                      __func__, __LINE__, cmd.cluster_class,
-> > +                      cmd.cluster_id, cmd.cpu_id, cmd.cpu_state);
-> > +
-> > +             mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_NOTHING);
-> > +             ret = mb86s7x_send_packet(CMD_CPU_CLOCK_GATE_SET_REQ,
-> > +                                       &cmd, sizeof(cmd));
-> > +             if (ret < 0) {
-> > +                     pr_err("%s:%d failed!\n", __func__, __LINE__);
-> > +                     return ret;
-> > +             }
-> > +
-> > +             pr_debug("%s:%d REP Cl_Class-%u CL_ID-%u CPU_ID-%u STATE-%u}\n",
-> > +                      __func__, __LINE__, cmd.cluster_class,
-> > +                      cmd.cluster_id, cmd.cpu_id, cmd.cpu_state);
-> > +
-> > +             if (cmd.cpu_state != SCB_CPU_STATE_ON)
-> > +                     return -ENODEV;
-> > +     } else if (mb86s7x_pm_use_count[cluster][cpu] != 2) {
-> > +             /*
-> > +              * The only possible values are:
-> > +              * 0 = CPU down
-> > +              * 1 = CPU (still) up
-> > +              * 2 = CPU requested to be up before it had a chance
-> > +              *     to actually make itself down.
-> > +              * Any other value is a bug.
-> > +              */
-> > +             BUG();
-> > +     }
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static void mb86s7x_pm_suspend(u64 ignored)
-> > +{
-> > +     unsigned int mpidr, cpu, cluster;
-> > +     bool last_man = false, skip_wfi = false;
-> > +
-> > +     mpidr = read_cpuid_mpidr();
-> > +     cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> > +     cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> > +
-> > +     pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> > +     __mcpm_cpu_going_down(cpu, cluster);
-> > +
-> > +     arch_spin_lock(&mb86s7x_pm_lock);
-> > +     BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
-> > +
-> > +     mb86s7x_pm_use_count[cluster][cpu]--;
-> > +
-> > +     if (mb86s7x_pm_use_count[cluster][cpu] == 0) {
-> > +             if (!mb86s7x_pm_use_count[cluster][0] &&
-> > +                 !mb86s7x_pm_use_count[cluster][1])
-> > +                     last_man = true;
-> > +             mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_POWEROFF);
-> > +     } else if (mb86s7x_pm_use_count[cluster][cpu] == 1) {
-> > +             skip_wfi = true; /* Overtaken by a power up */
-> > +     } else {
-> > +             BUG();
-> > +     }
-> > +
-> > +     if (!skip_wfi)
-> > +             gic_cpu_if_down();
-> > +
-> > +     if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
-> > +             arch_spin_unlock(&mb86s7x_pm_lock);
-> > +
-> > +             if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A15) {
-> > +                     /*
-> > +                      * On the Cortex-A15 we need to disable
-> > +                      * L2 prefetching before flushing the cache.
-> > +                      */
-> > +                     asm volatile(
-> > +                     "mcr p15, 1, %0, c15, c0, 3\n\t"
-> > +                     "isb\n\t"
-> > +                     "dsb"
-> > +                     : : "r" (0x400));
-> > +             }
-> > +
-> > +             mb86s70evb_exit_coherency_flush(all);
-> > +
-> > +             cci_disable_port_by_cpu(mpidr);
-> > +
-> > +             __mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
-> > +     } else {
-> > +             arch_spin_unlock(&mb86s7x_pm_lock);
-> > +             mb86s70evb_exit_coherency_flush(louis);
-> > +     }
-> > +
-> > +     __mcpm_cpu_down(cpu, cluster);
-> > +
-> > +     /* Now we are prepared for power-down, do it: */
-> > +     if (!skip_wfi)
-> > +             wfi();
-> > +}
-> > +
-> > +static void mb86s7x_pm_power_down(void)
-> > +{
-> > +     mb86s7x_pm_suspend(0);
-> > +}
-> > +
-> > +static int mb86s7x_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
-> > +{
-> > +     struct mb86s7x_cpu_gate cmd;
-> > +     int i, ret;
-> > +
-> > +     if (cluster >= S7X_MAX_CLUSTER || cpu >= S7X_MAX_CPU)
-> > +             return 0;
-> 
-> This should return an error or BUG().
-> 
-> > +     cmd.payload_size = sizeof(cmd);
-> > +     cmd.cluster_class = 0;
-> > +     cmd.cluster_id = cluster;
-> > +     cmd.cpu_id = cpu;
-> > +     cmd.cpu_state = SCB_CPU_STATE_ON;
-> > +
-> > +     for (i = 0; i < 50; i++) {
-> > +             ret = mb86s7x_send_packet(CMD_CPU_CLOCK_GATE_GET_REQ,
-> > +                                       &cmd, sizeof(cmd));
-> > +             if (ret < 0) {
-> > +                     pr_err("%s:%d failed to get CPU status\n",
-> > +                            __func__, __LINE__);
-> > +                     return ret;
-> > +             }
-> > +
-> > +             pr_debug("%s:%d Cl_Class-%u CL_ID-%u CPU_ID-%u STATE-%u\n",
-> > +                      __func__, __LINE__,
-> > +                      cmd.cluster_class, cmd.cluster_id,
-> > +                      cmd.cpu_id, cmd.cpu_state);
-> > +
-> > +             if (cmd.cpu_state == SCB_CPU_STATE_OFF)
-> > +                     return 0;
-> > +
-> > +             msleep(20);
-> > +     }
-> > +
-> > +     return -ETIMEDOUT;
-> > +}
-> > +
-> > +static void mb86s7x_pm_powered_up(void)
-> > +{
-> > +     unsigned int mpidr, cpu, cluster;
-> > +
-> > +     mpidr = read_cpuid_mpidr();
-> > +     cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> > +     cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> > +
-> > +     arch_spin_lock(&mb86s7x_pm_lock);
-> > +     if (!mb86s7x_pm_use_count[cluster][cpu])
-> > +             mb86s7x_pm_use_count[cluster][cpu] = 1;
-> > +     arch_spin_unlock(&mb86s7x_pm_lock);
-> > +}
-> > +
-> > +static const struct mcpm_platform_ops mb86s7x_pm_power_ops = {
-> > +     .power_up               = mb86s7x_pm_power_up,
-> > +     .power_down             = mb86s7x_pm_power_down,
-> > +     .wait_for_powerdown     = mb86s7x_wait_for_powerdown,
-> > +     .suspend                = mb86s7x_pm_suspend,
-> > +     .powered_up             = mb86s7x_pm_powered_up,
-> > +};
-> > +
-> > +/*
-> > + * Enable cluster-level coherency, in preparation for turning on the MMU.
-> > + */
-> > +static void __naked mb86s7x_pm_power_up_setup(unsigned int affinity_level)
-> > +{
-> > +     asm volatile ("\n"
-> > +"    cmp     r0, #1\n"
-> > +"    bxne    lr\n"
-> > +"    b       cci_enable_port_for_self");
-> > +}
-> > +
-> > +static void __init mb86s7x_cache_off(void)
-> > +{
-> > +     if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A15) {
-> > +             /* disable L2 prefetching on the Cortex-A15 */
-> > +             asm volatile(
-> > +             "mcr    p15, 1, %0, c15, c0, 3\n\t"
-> > +             "isb\n\t"
-> > +             "dsb"
-> > +             : : "r" (0x400));
-> > +     }
-> > +     mb86s70evb_exit_coherency_flush(all);
-> > +}
-> > +
-> > +struct mb86s7x_scb_version {
-> > +     u32 payload_size;
-> > +     u32 version;
-> > +     u32 config_version;
-> > +};
-> > +
-> > +extern void mb86s7x_cpu_entry(unsigned long secondary_entry);
-> > +
-> > +static int __init mb86s7x_mcpm_init(void)
-> > +{
-> > +     unsigned int mpidr, cpu, cluster;
-> > +     struct mb86s7x_scb_version cmd;
-> > +     int ret;
-> > +
-> > +     if (!cci_probed())
-> > +             return -ENODEV;
-> > +
-> > +     mpidr = read_cpuid_mpidr();
-> > +     cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> > +     cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> > +
-> > +     pr_info("Booting on cpu_%u cluster_%u\n", cpu, cluster);
-> > +     mb86s7x_pm_use_count[cluster][cpu] = 1;
-> > +
-> > +     /* reset the wfi 'color' for primary cpu */
-> > +     mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_NOTHING);
-> > +
-> > +     /* Do SMC to set entry address for CPUs coming online */
-> > +     mb86s7x_cpu_entry(virt_to_phys(mcpm_entry_point));
-> > +
-> > +     cmd.payload_size = sizeof(cmd);
-> > +     cmd.version = 0;
-> > +     cmd.config_version = 0;
-> > +     ret = mb86s7x_send_packet(CMD_SCB_CAPABILITY_GET_REQ,
-> > +                               &cmd, sizeof(cmd));
-> > +     if (ret < 0)
-> > +             pr_err("%s:%d failed to get SCB version\n",
-> > +                    __func__, __LINE__);
-> > +
-> > +     pr_info("MB86S7x MCPM initialized: SCB version 0x%x:0x%x\n",
-> > +             cmd.version, cmd.config_version);
-> > +
-> > +     ret = mcpm_platform_register(&mb86s7x_pm_power_ops);
-> > +     if (!ret)
-> > +             ret = mcpm_sync_init(mb86s7x_pm_power_up_setup);
-> > +     if (!ret)
-> > +             ret = mcpm_loopback(mb86s7x_cache_off); /* turn on the CCI */
-> > +     mcpm_smp_set_ops();
-> > +
-> > +     return ret;
-> > +}
-> > +early_initcall(mb86s7x_mcpm_init);
-> > diff --git a/arch/arm/mach-mb86s7x/smc.S b/arch/arm/mach-mb86s7x/smc.S
-> > new file mode 100644
-> > index 0000000..a14330b
-> > --- /dev/null
-> > +++ b/arch/arm/mach-mb86s7x/smc.S
-> > @@ -0,0 +1,27 @@
-> > +/*
-> > + * SMC command interface to set secondary entry point
-> > + * Copyright: (C) 2013-2014 Fujitsu Semiconductor Limited
-> > + * Copyright: (C) 2014 Linaro Ltd.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/linkage.h>
-> > +
-> > +.arch_extension sec
-> > +
-> > +/* void mb86s7x_cpu_entry(unsigned long secondary_entry); */
-> > +ENTRY(mb86s7x_cpu_entry)
-> > +     stmfd   sp!, {r1-r11, lr}
-> > +     mov r1, r0
-> > +     ldr r0, =1
-> > +     mrc p15, 0, r3, c1, c0, 0
-> > +     mov r4, r3
-> > +     and r3, #0xbfffffff
-> > +     mcr p15, 0, r3, c1, c0, 0
-> > +     smc #0
-> > +     mcr p15, 0, r4, c1, c0, 0
-> > +     ldmfd   sp!, {r1-r11, pc}
-> > +ENDPROC(mb86s7x_cpu_entry)
-> > --
-> > 1.9.0
-> >
-> >
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9532f8d..d93bb5e 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -13,6 +13,7 @@ config ARM64
+ 	select ARM_ARCH_TIMER
+ 	select ARM_GIC
+ 	select AUDIT_ARCH_COMPAT_GENERIC
++	select ARM_GIC_V2M if PCI_MSI
+ 	select ARM_GIC_V3
+ 	select BUILDTIME_EXTABLE_SORT
+ 	select CLONE_BACKWARDS
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 7f34138..fb93974 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -8,6 +8,12 @@ config ARM_GIC
+ 	select IRQ_DOMAIN_HIERARCHY
+ 	select MULTI_IRQ_HANDLER
+ 
++config ARM_GIC_V2M
++	bool
++	depends on ARM_GIC
++	depends on PCI && PCI_MSI
++	select PCI_MSI_IRQ_DOMAIN
++
+ config GIC_NON_BANKED
+ 	bool
+ 
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 173bb5f..1fadd76 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -19,6 +19,7 @@ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sun4i.o
+ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi-nmi.o
+ obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
+ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
++obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
+ obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
+ obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+ obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
+diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+new file mode 100644
+index 0000000..fdf7065
+--- /dev/null
++++ b/drivers/irqchip/irq-gic-v2m.c
+@@ -0,0 +1,333 @@
++/*
++ * ARM GIC v2m MSI(-X) support
++ * Support for Message Signaled Interrupts for systems that
++ * implement ARM Generic Interrupt Controller: GICv2m.
++ *
++ * Copyright (C) 2014 Advanced Micro Devices, Inc.
++ * Authors: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
++ *	    Harish Kasiviswanathan <harish.kasiviswanathan@amd.com>
++ *	    Brandon Anderson <brandon.anderson@amd.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published
++ * by the Free Software Foundation.
++ */
++
++#define pr_fmt(fmt) "GICv2m: " fmt
++
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/kernel.h>
++#include <linux/of_address.h>
++#include <linux/of_pci.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++
++/*
++* MSI_TYPER:
++*     [31:26] Reserved
++*     [25:16] lowest SPI assigned to MSI
++*     [15:10] Reserved
++*     [9:0]   Numer of SPIs assigned to MSI
++*/
++#define V2M_MSI_TYPER		       0x008
++#define V2M_MSI_TYPER_BASE_SHIFT       16
++#define V2M_MSI_TYPER_BASE_MASK	       0x3FF
++#define V2M_MSI_TYPER_NUM_MASK	       0x3FF
++#define V2M_MSI_SETSPI_NS	       0x040
++#define V2M_MIN_SPI		       32
++#define V2M_MAX_SPI		       1019
++
++#define V2M_MSI_TYPER_BASE_SPI(x)      \
++	       (((x) >> V2M_MSI_TYPER_BASE_SHIFT) & V2M_MSI_TYPER_BASE_MASK)
++
++#define V2M_MSI_TYPER_NUM_SPI(x)       ((x) & V2M_MSI_TYPER_NUM_MASK)
++
++struct v2m_data {
++	spinlock_t msi_cnt_lock;
++	struct msi_controller mchip;
++	struct resource res;	/* GICv2m resource */
++	void __iomem *base;	/* GICv2m virt address */
++	u32 spi_start;		/* The SPI number that MSIs start */
++	u32 nr_spis;		/* The number of SPIs for MSIs */
++	unsigned long *bm;	/* MSI vector bitmap */
++	struct irq_domain *domain;
++};
++
++static void gicv2m_mask_msi_irq(struct irq_data *d)
++{
++	pci_msi_mask_irq(d);
++	irq_chip_mask_parent(d);
++}
++
++static void gicv2m_unmask_msi_irq(struct irq_data *d)
++{
++	pci_msi_unmask_irq(d);
++	irq_chip_unmask_parent(d);
++}
++
++static struct irq_chip gicv2m_msi_irq_chip = {
++	.name			= "MSI",
++	.irq_mask		= gicv2m_mask_msi_irq,
++	.irq_unmask		= gicv2m_unmask_msi_irq,
++	.irq_eoi		= irq_chip_eoi_parent,
++	.irq_write_msi_msg	= pci_msi_domain_write_msg,
++};
++
++static struct msi_domain_info gicv2m_msi_domain_info = {
++	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
++		   MSI_FLAG_PCI_MSIX),
++	.chip	= &gicv2m_msi_irq_chip,
++};
++
++static int gicv2m_set_affinity(struct irq_data *irq_data,
++			       const struct cpumask *mask, bool force)
++{
++	int ret;
++
++	ret = irq_chip_set_affinity_parent(irq_data, mask, force);
++	if (ret == IRQ_SET_MASK_OK)
++		ret = IRQ_SET_MASK_OK_DONE;
++
++	return ret;
++}
++
++static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
++{
++	struct v2m_data *v2m = irq_data_get_irq_chip_data(data);
++	phys_addr_t addr = v2m->res.start + V2M_MSI_SETSPI_NS;
++
++	msg->address_hi = (u32) (addr >> 32);
++	msg->address_lo = (u32) (addr);
++	msg->data = data->hwirq;
++}
++
++static struct irq_chip gicv2m_irq_chip = {
++	.name			= "GICv2m",
++	.irq_mask		= irq_chip_mask_parent,
++	.irq_unmask		= irq_chip_unmask_parent,
++	.irq_eoi		= irq_chip_eoi_parent,
++	.irq_set_affinity	= gicv2m_set_affinity,
++	.irq_compose_msi_msg	= gicv2m_compose_msi_msg,
++};
++
++static int gicv2m_irq_gic_domain_alloc(struct irq_domain *domain,
++				       unsigned int virq,
++				       irq_hw_number_t hwirq)
++{
++	struct of_phandle_args args;
++	struct irq_data *d;
++	int err;
++
++	args.np = domain->parent->of_node;
++	args.args_count = 3;
++	args.args[0] = 0;
++	args.args[1] = hwirq - 32;
++	args.args[2] = IRQ_TYPE_EDGE_RISING;
++
++	err = irq_domain_alloc_irqs_parent(domain, virq, 1, &args);
++	if (err)
++		return err;
++
++	/* Configure the interrupt line to be edge */
++	d = irq_domain_get_irq_data(domain->parent, virq);
++	d->chip->irq_set_type(d, IRQ_TYPE_EDGE_RISING);
++	return 0;
++}
++
++static void gicv2m_unalloc_msi(struct v2m_data *v2m, unsigned int hwirq)
++{
++	int pos;
++
++	pos = hwirq - v2m->spi_start;
++	if (pos < 0 || pos >= v2m->nr_spis) {
++		pr_err("Failed to teardown msi. Invalid hwirq %d\n", hwirq);
++		return;
++	}
++
++	spin_lock(&v2m->msi_cnt_lock);
++	__clear_bit(pos, v2m->bm);
++	spin_unlock(&v2m->msi_cnt_lock);
++}
++
++static int gicv2m_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
++				   unsigned int nr_irqs, void *args)
++{
++	struct v2m_data *v2m = domain->host_data;
++	int hwirq, offset, err = 0;
++
++	spin_lock(&v2m->msi_cnt_lock);
++	offset = find_first_zero_bit(v2m->bm, v2m->nr_spis);
++	if (offset < v2m->nr_spis)
++		__set_bit(offset, v2m->bm);
++	else
++		err = -ENOSPC;
++	spin_unlock(&v2m->msi_cnt_lock);
++
++	if (err)
++		return err;
++
++	hwirq = v2m->spi_start + offset;
++
++	err = gicv2m_irq_gic_domain_alloc(domain, virq, hwirq);
++	if (err) {
++		gicv2m_unalloc_msi(v2m, hwirq);
++		return err;
++	}
++
++	irq_domain_set_hwirq_and_chip(domain, virq, hwirq,
++				      &gicv2m_irq_chip, v2m);
++
++	return 0;
++}
++
++static void gicv2m_irq_domain_free(struct irq_domain *domain,
++				   unsigned int virq, unsigned int nr_irqs)
++{
++	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
++	struct v2m_data *v2m = irq_data_get_irq_chip_data(d);
++
++	BUG_ON(nr_irqs != 1);
++	gicv2m_unalloc_msi(v2m, d->hwirq);
++	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
++}
++
++static const struct irq_domain_ops gicv2m_domain_ops = {
++	.alloc			= gicv2m_irq_domain_alloc,
++	.free			= gicv2m_irq_domain_free,
++};
++
++static bool is_msi_spi_valid(u32 base, u32 num)
++{
++	if (base < V2M_MIN_SPI) {
++		pr_err("Invalid MSI base SPI (base:%u)\n", base);
++		return false;
++	}
++
++	if ((num == 0) || (base + num > V2M_MAX_SPI)) {
++		pr_err("Number of SPIs (%u) exceed maximum (%u)\n",
++		       num, V2M_MAX_SPI - V2M_MIN_SPI + 1);
++		return false;
++	}
++
++	return true;
++}
++
++static int __init gicv2m_init_one(struct device_node *node,
++				  struct irq_domain *parent)
++{
++	int ret;
++	struct v2m_data *v2m;
++
++	v2m = kzalloc(sizeof(struct v2m_data), GFP_KERNEL);
++	if (!v2m) {
++		pr_err("Failed to allocate struct v2m_data.\n");
++		return -ENOMEM;
++	}
++
++	ret = of_address_to_resource(node, 0, &v2m->res);
++	if (ret) {
++		pr_err("Failed to allocate v2m resource.\n");
++		goto err_free_v2m;
++	}
++
++	v2m->base = ioremap(v2m->res.start, resource_size(&v2m->res));
++	if (!v2m->base) {
++		pr_err("Failed to map GICv2m resource\n");
++		ret = -ENOMEM;
++		goto err_free_v2m;
++	}
++
++	if (!of_property_read_u32(node, "arm,msi-base-spi", &v2m->spi_start) &&
++	    !of_property_read_u32(node, "arm,msi-num-spis", &v2m->nr_spis)) {
++		pr_info("Overriding V2M MSI_TYPER (base:%u, num:%u)\n",
++			v2m->spi_start, v2m->nr_spis);
++	} else {
++		u32 typer = readl_relaxed(v2m->base + V2M_MSI_TYPER);
++
++		v2m->spi_start = V2M_MSI_TYPER_BASE_SPI(typer);
++		v2m->nr_spis = V2M_MSI_TYPER_NUM_SPI(typer);
++	}
++
++	if (!is_msi_spi_valid(v2m->spi_start, v2m->nr_spis)) {
++		ret = -EINVAL;
++		goto err_iounmap;
++	}
++
++	v2m->bm = kzalloc(sizeof(long) * BITS_TO_LONGS(v2m->nr_spis),
++			  GFP_KERNEL);
++	if (!v2m->bm) {
++		ret = -ENOMEM;
++		goto err_iounmap;
++	}
++
++	v2m->domain = irq_domain_add_tree(NULL, &gicv2m_domain_ops, v2m);
++	if (!v2m->domain) {
++		pr_err("Failed to create GICv2m domain\n");
++		ret = -ENOMEM;
++		goto err_free_bm;
++	}
++
++	v2m->domain->parent = parent;
++	v2m->mchip.of_node = node;
++	v2m->mchip.domain = pci_msi_create_irq_domain(node,
++						      &gicv2m_msi_domain_info,
++						      v2m->domain);
++	if (!v2m->mchip.domain) {
++		pr_err("Failed to create MSI domain\n");
++		ret = -ENOMEM;
++		goto err_free_domains;
++	}
++
++	spin_lock_init(&v2m->msi_cnt_lock);
++
++	ret = of_pci_msi_chip_add(&v2m->mchip);
++	if (ret) {
++		pr_err("Failed to add msi_chip.\n");
++		goto err_free_domains;
++	}
++
++	pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", node->name,
++		(unsigned long)v2m->res.start, (unsigned long)v2m->res.end,
++		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
++
++	return 0;
++
++err_free_domains:
++	if (v2m->mchip.domain)
++		irq_domain_remove(v2m->mchip.domain);
++	if (v2m->domain)
++		irq_domain_remove(v2m->domain);
++err_free_bm:
++	kfree(v2m->bm);
++err_iounmap:
++	iounmap(v2m->base);
++err_free_v2m:
++	kfree(v2m);
++	return ret;
++}
++
++static struct of_device_id gicv2m_device_id[] = {
++	{	.compatible	= "arm,gic-v2m-frame",	},
++	{},
++};
++
++int __init gicv2m_of_init(struct device_node *node, struct irq_domain *parent)
++{
++	int ret = 0;
++	struct device_node *child;
++
++	for (child = of_find_matching_node(node, gicv2m_device_id); child;
++	     child = of_find_matching_node(child, gicv2m_device_id)) {
++		if (!of_find_property(child, "msi-controller", NULL))
++			continue;
++
++		ret = gicv2m_init_one(child, parent);
++		if (ret) {
++			of_node_put(node);
++			break;
++		}
++	}
++
++	return ret;
++}
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index ab6069b..5a71be7 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -1066,6 +1066,10 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+ 		irq = irq_of_parse_and_map(node, 0);
+ 		gic_cascade_irq(gic_cnt, irq);
+ 	}
++
++	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
++		gicv2m_of_init(node, gic_data[gic_cnt].domain);
++
+ 	gic_cnt++;
+ 	return 0;
+ }
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 13eed92..60b09ed 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -106,6 +106,8 @@ static inline void gic_init(unsigned int nr, int start,
+ 	gic_init_bases(nr, start, dist, cpu, 0, NULL);
+ }
+ 
++int gicv2m_of_init(struct device_node *node, struct irq_domain *parent);
++
+ void gic_send_sgi(unsigned int cpu_id, unsigned int irq);
+ int gic_get_cpu_id(unsigned int cpu);
+ void gic_migrate_target(unsigned int new_cpu_id);
+-- 
+2.1.3
