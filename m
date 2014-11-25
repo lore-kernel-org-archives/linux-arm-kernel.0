@@ -1,30 +1,45 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 25 Nov 2014 21:15:45 +0100 (CET)
-Subject: [PATCH 6/8] cpufreq-dt: free OPP table created during ->init()
-In-Reply-To: <1ac3e8c67c7bd2a962aed6561693d16ca5cd9db9.1416910766.git.viresh.kumar@linaro.org>
-References: <cover.1416910766.git.viresh.kumar@linaro.org>
- <1ac3e8c67c7bd2a962aed6561693d16ca5cd9db9.1416910766.git.viresh.kumar@linaro.org>
-Message-ID: <2021992776.218020.1416946545852.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 25 Nov 2014 15:17:17 -0500 (EST)
+Subject: [PATCH 3.18-rc3 v9 1/5] irqchip: gic: Finer grain locking for
+ gic_raise_softirq
+In-Reply-To: <5474BF19.3040707@arm.com>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
+ <1416936401-5147-2-git-send-email-daniel.thompson@linaro.org>
+ <5474BF19.3040707@arm.com>
+Message-ID: <alpine.LFD.2.11.1411251510231.11690@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+On Tue, 25 Nov 2014, Marc Zyngier wrote:
 
-> Viresh Kumar <viresh.kumar@linaro.org> hat am 25. November 2014 um 11:34
-> geschrieben:
->
->
-> OPP layer now supports freeing of OPPs and we should free them once they
-> aren't
-> useful anymore.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Hi Daniel,
+> 
+> On 25/11/14 17:26, Daniel Thompson wrote:
+> > irq_controller_lock is used for multiple purposes within the gic driver.
+> > Primarily it is used to make register read-modify-write sequences atomic.
+> > It is also used by gic_raise_softirq() in order that the big.LITTLE
+> > migration logic can figure out when it is safe to migrate interrupts
+> > between physical cores.
+> > 
+> > The second usage of irq_controller_lock is difficult to discern when
+> > reviewing the code because the migration itself takes place outside
+> > the lock.
+> > 
+> > This patch makes the second usage more explicit by splitting it out into
+> > a separate lock and providing better comments.
+> 
+> While we're at it, how about an additional patch that would make this
+> lock disappear entirely when the big-little stuff is not compiled in,
+> which is likely to be the case on a lot of (dare I say most?) systems?
+> That will save expensive barriers that we definitely could do without.
 
-i applied the complete patch series to my repository and tested successfully the
-cpufreq-dt with my i.MX28 board.
+For the record, I reviewed and ACKed a patch doing exactly that a while 
+ago:
 
-Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+http://lkml.org/lkml/2014/8/13/486
 
-Thanks
+As far as I can see, no follo-ups happened.
 
-Stefan
+
+Nicolas
