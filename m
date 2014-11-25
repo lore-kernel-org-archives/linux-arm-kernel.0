@@ -1,71 +1,65 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 25 Nov 2014 18:49:16 +0100
-Subject: (bisected) Lock up on sh73a0/kzm9g on cpuidle initialization
-In-Reply-To: <CAMuHMdXQr65g4He0D0ZRN923OJ2A7WNgwbiTru_1dGWnvbvCJA@mail.gmail.com>
-References: <CAMuHMdXaaa2t6+sH2egGacVxkAPeTUkAgwdYsOnMnEPnuLdB5Q@mail.gmail.com>
- <545BE1DE.6060900@linaro.org>
- <CAMuHMdXQr65g4He0D0ZRN923OJ2A7WNgwbiTru_1dGWnvbvCJA@mail.gmail.com>
-Message-ID: <CAMuHMdUjYMC8i2F9n6fWdPBOQVSohKA3ZxJJyq8h808Z9tEypw@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 25 Nov 2014 17:50:55 +0000
+Subject: [PATCH] iommu: Decouple iommu_map_sg from CPU page size
+Message-ID: <2d38d270a532b52f73a720572f8f085dfa08321e.1416936761.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 7, 2014 at 8:59 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> On Thu, Nov 6, 2014 at 10:02 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->> On 11/06/2014 09:38 PM, Geert Uytterhoeven wrote:
->>> When CONFIG_CPU_IDLE=y, the kernel locks up during cpuidle initialization
->>> on Renesas sh73a0/kzm9g-reference, which has a dual-core Cortex-A9.
->>>
->>> Last message is:
->>>
->>>      DMA: preallocated 256 KiB pool for atomic coherent allocations
->>>
->>> After this it's supposed to print:
->>>
->>>      cpuidle: using governor ladder
->>>      cpuidle: using governor menu
->>>
->>> I've bisected this to commit 442bf3aaf55a91ebfec71da46a4ee10a3c905bcc
->>> ("sched: Let the scheduler see CPU idle states").
->>>
->>> Reverting that commit, and commit 83a0a96a5f26d974580fd7251043ff70c8f1823d
->>> ("sched/fair: Leverage the idle state info when choosing the "idlest"
->>> cpu") which
->>> depends on it, fixes the problem.
->>>
->>> I saw the discussion "lockdep splat in CPU hotplug", so I enabled lockdep
->>> debugging, but didn't see a lockdep splat.
->>
->> Did you try the fix attached ?
->>
->> https://lkml.org/lkml/2014/10/22/722
->
-> Thanks, I didn't try that.
->
-> However, this patch seems to be in v3.18-rc3, so I'm already using it.
-> Hence it doesn't fix the problem for me.
->
-> On another board, with a dual Cortex-A15, the problem doesn't show up.
+If the IOMMU supports pages smaller than the CPU page size, segments
+which lie at offsets within the CPU page may be mapped based on the
+finer-grained IOMMU page boundaries. This minimises the amount of
+non-buffer memory between the CPU page boundary and the start of the
+segment which must be mapped and therefore exposed to the device, and
+brings the default iommu_map_sg implementation in line with
+iommu_map/unmap with respect to alignment.
 
-This problem (regression introduced in v3.18-rc1) is still present in v3.18-rc6.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-I did some more investigations, and it's hanging in the call to
-synchronize_rcu() in cpuidle_uninstall_idle_handler(), which was added in
-commit 442bf3aaf55a91ebfec71da46a4ee10a3c905bcc.
-More specificailly, it's blocked on the wait_for_completion(&rcu.completion)
-in kernel/rcu/update.c:void wait_rcu_gp(call_rcu_func_t crf).
+Hi Joerg,
 
-Anyone with a clue?
+I noticed this whilst wiring up DMA mapping to this new API - on arm64
+we anticipate running 4k IOMMU pages with 64k CPU pages, in which case
+the alignment check ends up being unnecessarily strict.
 
-Thanks again!
+Regards,
+Robin.
 
-Gr{oetje,eeting}s,
+ drivers/iommu/iommu.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 08c53c5..5c4101a 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -1129,14 +1129,24 @@ size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
+ {
+ 	struct scatterlist *s;
+ 	size_t mapped = 0;
+-	unsigned int i;
++	unsigned int i, min_pagesz;
+ 	int ret;
+ 
++	if (unlikely(domain->ops->pgsize_bitmap == 0UL))
++		return 0;
++
++	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
++
+ 	for_each_sg(sg, s, nents, i) {
+-		phys_addr_t phys = page_to_phys(sg_page(s));
++		phys_addr_t phys = page_to_phys(sg_page(s)) + s->offset;
+ 
+-		/* We are mapping on page boundarys, so offset must be 0 */
+-		if (s->offset)
++		/*
++		 * We are mapping on IOMMU page boundaries, so offset within
++		 * the page must be 0. However, the IOMMU may support pages
++		 * smaller than PAGE_SIZE, so s->offset may still represent
++		 * an offset of that boundary within the CPU page.
++		 */
++		if (!IS_ALIGNED(s->offset, min_pagesz))
+ 			goto out_err;
+ 
+ 		ret = iommu_map(domain, iova + mapped, phys, s->length, prot);
+-- 
+1.9.1
