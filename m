@@ -1,38 +1,135 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 25 Nov 2014 21:02:22 +0000
-Subject: [PATCH 2/2 v2] SPI: spi-pxa2xx: SPI support for Intel Quark X1000
-In-Reply-To: <CAOesGMi5f_Kc1xA_JqiZYsbVYxaJgBXMZCe5TAxDkPQj7=o8sg@mail.gmail.com>
-References: <1412000548-9908-1-git-send-email-alvin.chen@intel.com>
- <1412000548-9908-3-git-send-email-alvin.chen@intel.com>
- <CAOesGMi5f_Kc1xA_JqiZYsbVYxaJgBXMZCe5TAxDkPQj7=o8sg@mail.gmail.com>
-Message-ID: <20141125210222.GO7712@sirena.org.uk>
+From: b08248@gmail.com (Stuart Yoder)
+Date: Tue, 25 Nov 2014 15:08:07 -0600
+Subject: [PATCH v3 10/13] irqchip: GICv3: ITS: DT probing and
+ initialization
+In-Reply-To: <1416839720-18400-11-git-send-email-marc.zyngier@arm.com>
+References: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
+ <1416839720-18400-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CALRxmdA=_aTbRM+471cSkxTtbZ=nErB+tsEBt3+6M9-zi7E5-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 12:06:41PM -0800, Olof Johansson wrote:
-> On Mon, Sep 29, 2014 at 7:22 AM, Weike Chen <alvin.chen@intel.com> wrote:
+On Mon, Nov 24, 2014 at 8:35 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Add the code that probes the ITS from the device tree,
+> and initialize it.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 169 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 169 insertions(+)
+>
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 532c6df..e9d1615 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1231,3 +1231,172 @@ static const struct irq_domain_ops its_domain_ops = {
+>         .alloc                  = its_irq_domain_alloc,
+>         .free                   = its_irq_domain_free,
+>  };
+> +
+> +static int its_probe(struct device_node *node, struct irq_domain *parent)
+> +{
+> +       struct resource res;
+> +       struct its_node *its;
+> +       void __iomem *its_base;
+> +       u32 val;
+> +       u64 baser, tmp;
+> +       int err;
+> +
+> +       err = of_address_to_resource(node, 0, &res);
+> +       if (err) {
+> +               pr_warn("%s: no regs?\n", node->full_name);
+> +               return -ENXIO;
+> +       }
+> +
+> +       its_base = ioremap(res.start, resource_size(&res));
+> +       if (!its_base) {
+> +               pr_warn("%s: unable to map registers\n", node->full_name);
+> +               return -ENOMEM;
+> +       }
+> +
+> +       val = readl_relaxed(its_base + GITS_PIDR2) & GIC_PIDR2_ARCH_MASK;
+> +       if (val != 0x30 && val != 0x40) {
+> +               pr_warn("%s: no ITS detected, giving up\n", node->full_name);
+> +               err = -ENODEV;
+> +               goto out_unmap;
+> +       }
+> +
+> +       pr_info("ITS: %s\n", node->full_name);
+> +
+> +       its = kzalloc(sizeof(*its), GFP_KERNEL);
+> +       if (!its) {
+> +               err = -ENOMEM;
+> +               goto out_unmap;
+> +       }
+> +
+> +       raw_spin_lock_init(&its->lock);
+> +       INIT_LIST_HEAD(&its->entry);
+> +       INIT_LIST_HEAD(&its->its_device_list);
+> +       its->base = its_base;
+> +       its->phys_base = res.start;
+> +       its->msi_chip.of_node = node;
+> +       its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
+> +
+> +       its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
+> +       if (!its->cmd_base) {
+> +               err = -ENOMEM;
+> +               goto out_free_its;
+> +       }
+> +       its->cmd_write = its->cmd_base;
+> +
+> +       err = its_alloc_tables(its);
+> +       if (err)
+> +               goto out_free_cmd;
+> +
+> +       err = its_alloc_collections(its);
+> +       if (err)
+> +               goto out_free_tables;
+> +
+> +       baser = (virt_to_phys(its->cmd_base)    |
+> +                GITS_CBASER_WaWb               |
+> +                GITS_CBASER_InnerShareable     |
+> +                (ITS_CMD_QUEUE_SZ / SZ_4K - 1) |
+> +                GITS_CBASER_VALID);
+> +
+> +       writeq_relaxed(baser, its->base + GITS_CBASER);
+> +       tmp = readq_relaxed(its->base + GITS_CBASER);
+> +       writeq_relaxed(0, its->base + GITS_CWRITER);
+> +       writel_relaxed(1, its->base + GITS_CTLR);
+> +
+> +       if ((tmp ^ baser) & GITS_BASER_SHAREABILITY_MASK) {
+> +               pr_info("ITS: using cache flushing for cmd queue\n");
+> +               its->flags |= ITS_FLAGS_CMDQ_NEEDS_FLUSHING;
+> +       }
+> +
+> +       if (of_property_read_bool(its->msi_chip.of_node, "msi-controller")) {
+> +               its->domain = irq_domain_add_tree(NULL, &its_domain_ops, its);
+> +               if (!its->domain) {
+> +                       err = -ENOMEM;
+> +                       goto out_free_tables;
+> +               }
+> +
+> +               its->domain->parent = parent;
+> +
+> +               its->msi_chip.domain = pci_msi_create_irq_domain(node,
+> +                                                                &its_pci_msi_domain_info,
+> +                                                                its->domain);
+> +               if (!its->msi_chip.domain) {
+> +                       err = -ENOMEM;
+> +                       goto out_free_domains;
+> +               }
+> +
+> +               err = of_pci_msi_chip_add(&its->msi_chip);
+> +               if (err)
+> +                       goto out_free_domains;
+> +       }
 
-> > This piece of work is derived from Dan O'Donovan's initial work for Intel Quark
-> > X1000 SPI enabling.
+Hi Marc,
 
-> How about build testing for other platforms that share this driver
-> when you make changes to it? This is obviously completely broken.
+We have a requirement to have both PCI and non-PCI buses use the GIC_ITS.
+Above, you have the hardcoded assumption that this is PCI.  How do 2 different
+bus types share the ITS at the same time.
 
-> Doing these constants under ifdef seems fragile at best, braindead at
-> worst. Please don't proliferate that coding style.
-
-> Mark, can you revert until Intel learns how to play well with others?
-
-Yeah.
-
-> This is from a pxa3xx-defconfig build:
-
-Ugh, why does this driver not have a COMPILE_TEST dependency?  Not that
-it'd have caught this one.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141125/74a79426/attachment-0001.sig>
+Thanks,
+Stuart Yoder
+Freescale
