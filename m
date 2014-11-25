@@ -1,118 +1,166 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 25 Nov 2014 17:26:44 +0000
-Subject: [PATCHv6 7/8] arm64: efi: Use ioremap_exec for code sections
-In-Reply-To: <1416606645-25633-8-git-send-email-lauraa@codeaurora.org>
-References: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
- <1416606645-25633-8-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20141125172644.GC21525@leverpostej>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 25 Nov 2014 17:26:36 +0000
+Subject: [PATCH 3.18-rc3 v9 0/5] arm: Implement arch_trigger_all_cpu_backtrace
+In-Reply-To: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+Hi Thomas, Hi Jason,
 
-On Fri, Nov 21, 2014 at 09:50:44PM +0000, Laura Abbott wrote:
-> ioremap is not guaranteed to return memory with proper
-> execution permissions. Introduce ioremap_exec which will
-> ensure that permission bits are set as expected for EFI
-> code sections.
-> 
-> Tested-by: Kees Cook <keescook@chromium.org>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
->  arch/arm64/include/asm/io.h      |  1 +
->  arch/arm64/include/asm/pgtable.h |  1 +
->  arch/arm64/kernel/efi.c          | 12 +++++++++++-
->  arch/arm64/mm/ioremap.c          | 11 +++++++++++
->  4 files changed, 24 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> index 79f1d519..7dd8465 100644
-> --- a/arch/arm64/include/asm/io.h
-> +++ b/arch/arm64/include/asm/io.h
-> @@ -230,6 +230,7 @@ extern void __memset_io(volatile void __iomem *, int, size_t);
->  extern void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot);
->  extern void __iounmap(volatile void __iomem *addr);
->  extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
-> +extern void __iomem *ioremap_exec(phys_addr_t phys_addr, size_t size);
->  
->  #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
->  #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 41a43bf..9b1d9d0 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -65,6 +65,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
->  #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
->  #define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL_NC))
->  #define PROT_NORMAL		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL))
-> +#define PROT_NORMAL_EXEC	(PROT_DEFAULT | PTE_UXN | PTE_ATTRINDX(MT_NORMAL))
->  
->  #define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
->  #define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 95c49eb..9e41f95 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -47,6 +47,14 @@ static int __init is_normal_ram(efi_memory_desc_t *md)
->  	return 0;
->  }
->  
-> +static int __init is_code(efi_memory_desc_t *md)
-> +{
-> +	if (md->attribute & EFI_RUNTIME_SERVICES_CODE)
-> +		return 1;
-> +	return 0;
-> +}
-> +
-> +
->  static void __init efi_setup_idmap(void)
->  {
->  	struct memblock_region *r;
-> @@ -338,7 +346,9 @@ static int __init remap_region(efi_memory_desc_t *md, void **new)
->  	memrange_efi_to_native(&paddr, &npages);
->  	size = npages << PAGE_SHIFT;
->  
-> -	if (is_normal_ram(md))
-> +	if (is_code(md))
-> +		vaddr = (__force u64)ioremap_exec(paddr, size);
-> +	else if (is_normal_ram(md))
->  		vaddr = (__force u64)ioremap_cache(paddr, size);
->  	else
->  		vaddr = (__force u64)ioremap(paddr, size);
+This patchset modifies the GIC driver to allow it, on supported
+platforms, to route IPI interrupts to FIQ and uses this feature to
+implement arch_trigger_all_cpu_backtrace for arm.
 
-All of the above looks fine to me.
+On platforms not capable of supporting FIQ the signal to generate a
+backtrace we fall back to using IRQ for propagation instead (relying on
+a timeout to avoid wedging the CPU requesting the backtrace if other
+CPUs are not responsive).
 
-> diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-> index cbb99c8..b998441 100644
-> --- a/arch/arm64/mm/ioremap.c
-> +++ b/arch/arm64/mm/ioremap.c
-> @@ -103,6 +103,17 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
->  }
->  EXPORT_SYMBOL(ioremap_cache);
->  
-> +void __iomem *ioremap_exec(phys_addr_t phys_addr, size_t size)
-> +{
-> +	/* For normal memory we already have a cacheable mapping. */
-> +	if (pfn_valid(__phys_to_pfn(phys_addr)))
-> +		return (void __iomem *)__phys_to_virt(phys_addr);
+It has been tested on two systems capable of supporting grouping
+(Freescale i.MX6 and STiH416) and two that do not (vexpress-a9 and
+Qualcomm Snapdragon 600).
 
-Is this guaranteed to be executable in all cases once the stricter page
-permissions are in force?
+v9:
 
-Thanks,
-Mark.
+* Improved documentation and structure of initial patch (now initial
+  two patches) to make gic_raise_softirq() safe to call from FIQ
+  (Thomas Gleixner).
 
-> +
-> +	return __ioremap_caller(phys_addr, size, __pgprot(PROT_NORMAL_EXEC),
-> +				__builtin_return_address(0));
-> +}
-> +EXPORT_SYMBOL(ioremap_exec);
-> +
->  /*
->   * Must be called after early_fixmap_init
->   */
-> -- 
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
-> 
-> 
+* Avoid masking interrupts during gic_raise_softirq(). The use of the
+  read lock makes this redundant (because we can safely re-enter the
+  function).
+
+v8:
+
+* Fixed build on arm64 causes by a spurious include file in irq-gic.c.
+
+v7-2 (accidentally released twice with same number):
+
+* Fixed boot regression on vexpress-a9 (reported by Russell King).
+
+* Rebased on v3.18-rc3; removed one patch from set that is already
+  included in mainline.
+
+* Dropped arm64/fiq.h patch from the set (still useful but not related
+  to issuing backtraces).
+
+v7:
+
+* Re-arranged code within the patch series to fix a regression
+  introduced midway through the series and corrected by a later patch
+  (testing by Olof's autobuilder). Tested offending patch in isolation
+  using defconfig identified by the autobuilder.
+
+v6:
+
+* Renamed svc_entry's call_trace argument to just trace (example code
+  from Russell King).
+
+* Fixed mismatched ENDPROC() in __fiq_abt (example code from Russell
+  King).
+
+* Modified usr_entry to optional avoid calling into the trace code and
+  used this in FIQ entry from usr path. Modified corresponding exit code
+  to avoid calling into trace code and the scheduler (example code from
+  Russell King).
+
+* Ensured the default FIQ register state is restored when the default
+  FIQ handler is reinstalled (example code from Russell King).
+
+* Renamed no_fiq_insn to dfl_fiq_insn to reflect the effect of adopting
+  a default FIQ handler.
+
+* Re-instated fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq(). gic_raise_softirq() is called by wake_up_klogd()
+  in the console unlock logic.
+
+v5:
+
+* Rebased on 3.17-rc4.
+
+* Removed a spurious line from the final "glue it together" patch
+  that broke the build.
+
+v4:
+
+* Replaced push/pop with stmfd/ldmfd respectively (review of Nicolas
+  Pitre).
+
+* Really fix bad pt_regs pointer generation in __fiq_abt.
+
+* Remove fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq() (review of Russell King)
+
+* Restructured to introduce the default FIQ handler first, before the
+  new features (review of Russell King).
+
+v3:
+
+* Removed redundant header guards from arch/arm64/include/asm/fiq.h
+  (review of Catalin Marinas).
+
+* Moved svc_exit_via_fiq macro to entry-header.S (review of Nicolas
+  Pitre).
+
+v2:
+
+* Restructured to sit nicely on a similar FYI patchset from Russell
+  King. It now effectively replaces the work in progress final patch
+  with something much more complete.
+
+* Implemented (and tested) a Thumb-2 implementation of svc_exit_via_fiq
+  (review of Nicolas Pitre)
+
+* Dropped the GIC group 0 workaround patch. The issue of FIQ interrupts
+  being acknowledged by the IRQ handler does still exist but should be
+  harmless because the IRQ handler will still wind up calling
+  ipi_cpu_backtrace().
+
+* Removed any dependency on CONFIG_FIQ; all cpu backtrace effectively
+  becomes a platform feature (although the use of non-maskable
+  interrupts to implement it is best effort rather than guaranteed).
+
+* Better comments highlighting usage of RAZ/WI registers (and parts of
+  registers) in the GIC code.
+
+Changes *before* v1:
+
+* This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
+  arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
+  the new structure. For historic details see:
+        https://lkml.org/lkml/2014/9/2/227
+
+* Fix bug in __fiq_abt (no longer passes a bad struct pt_regs value).
+  In fixing this we also remove the useless indirection previously
+  found in the fiq_handler macro.
+
+* Make default fiq handler "always on" by migrating from fiq.c to
+  traps.c and replace do_unexp_fiq with the new handler (review
+  of Russell King).
+
+* Add arm64 version of fiq.h (review of Russell King)
+
+* Removed conditional branching and code from irq-gic.c, this is
+  replaced by much simpler code that relies on the GIC specification's
+  heavy use of read-as-zero/write-ignored (review of Russell King)
+
+
+Daniel Thompson (5):
+  irqchip: gic: Finer grain locking for gic_raise_softirq
+  irqchip: gic: Make gic_raise_softirq() FIQ-safe
+  irqchip: gic: Introduce plumbing for IPI FIQ
+  ARM: add basic support for on-demand backtrace of other CPUs
+  arm: smp: Handle ipi_cpu_backtrace() using FIQ (if available)
+
+ arch/arm/include/asm/irq.h      |   5 ++
+ arch/arm/include/asm/smp.h      |   3 +
+ arch/arm/kernel/smp.c           |  64 ++++++++++++++
+ arch/arm/kernel/traps.c         |   8 +-
+ drivers/irqchip/irq-gic.c       | 192 +++++++++++++++++++++++++++++++++++++---
+ include/linux/irqchip/arm-gic.h |   8 ++
+ 6 files changed, 265 insertions(+), 15 deletions(-)
+
+--
+1.9.3
