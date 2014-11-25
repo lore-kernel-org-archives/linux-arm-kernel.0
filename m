@@ -1,99 +1,69 @@
-From: ijc@debian.org (Ian Campbell)
-Date: Tue, 25 Nov 2014 12:07:29 +0000
-Subject: [PATCH] of: support passing console options with stdout-path
-In-Reply-To: <20141125111724.GC2361@bivouac.eciton.net>
-References: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
- <20141125103504.GA21525@leverpostej>
- <20141125111724.GC2361@bivouac.eciton.net>
-Message-ID: <1416917249.32327.15.camel@debian.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Nov 2014 13:09:40 +0100
+Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <54746349.3000306@ti.com>
+References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
+ <15074721.IbfeeI3ajE@wuerfel> <54746349.3000306@ti.com>
+Message-ID: <2301239.aDOlWg3gEs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-11-25 at 11:17 +0000, Leif Lindholm wrote:
-> On Tue, Nov 25, 2014 at 10:35:04AM +0000, Mark Rutland wrote:
-> > On Mon, Nov 24, 2014 at 10:23:58PM +0000, Leif Lindholm wrote:
-> > > Support specifying console options (like with console=ttyXN,<options>)
-> > > by appending them to the stdout-path property after a separating ':'.
-> > > 
-> > > Example:
-> > > 	stdout-path = "uart0:115200";
+On Tuesday 25 November 2014 13:08:57 Grygorii Strashko wrote:
+> On 11/25/2014 12:33 PM, Arnd Bergmann wrote:
+> > On Monday 24 November 2014 22:44:06 Mike Turquette wrote:
+> >> Quoting Arnd Bergmann (2014-11-24 02:50:28)
+> >>>
 > > 
-> > I would very much like to be able to use this -- it will allow
-> > distributions to boot on a board without having to know _anything_ about
-> > the console UART until userspace is up, which would make it possible to
-> > have a completely generic installer image, without requiring the
-> > platform to provide bootargs.
+> > I'm not sure I even understand what you intended the example to look
+> > like, it does't parse 
 > > 
-> > My only concern is that this conflates the set of kernel command line
-> > options for the UART wit the DT binding for it. I don't know how good
-> > people are at keeping those options stable, and I know they are
-> > currently not documented -- we would need to add a stdout-path options
-> > section to relevant UART bindings.
+> > My point above was completely different, the suggestion I made was
+> > to not classify the clocks in DT at all, but to leave it all in
+> > the client driver.
 > 
-> I don't disagree.
-> 
-> Current options are fairly well defined and stable, at least for any
-> driver that uses uart_parse_options() (documented in
-> Documentation/serial/driver).
+> I slept with this idea  From one side it sounds good. Pls, Correct me if I'm wrong:
+> - there still will be "simple-pmdomain" and all devices will be attached to it by
+>    default (or as specified in DT power-domains = <&simple_pmdomain>;);
 
-My concern is that this is Linux specific, other OSes may have different
-ideas about how stdout options should be formatted within this property.
-(At least I don't know of any standardisation of the 115200n8 thing --
-I'd love to be corrected!)
+I would assume only devices that set "power-domains = <&simple_pmdomain>"
 
-If I were a firmware author I'd be wary of specifying a stdout-path with
-a Linux specific suffix.
+> - drivers will use smth. like pm_clk_remove() to remove optional clocks from pm_clk;
 
-Search ePAPR for baud it seems that the generic serial binding includes
-a current-speed property in 6.2.1.2. It then goes on a bit ambiguously
-to talk about the NS16550 in 6.2.2 but I think 6.2.1.2 was intended to
-be generic. No mention of stop-bits/parity etc though, they are assumed
-to be set already I think
+Right. Regarding the naming of the function, I would pick something other
+than remove, since the main purpose is not to have that clock abandoned
+by the pm-domain code (this is still a side-effect), but to have the
+clock put under control of the driver itself.
 
-One thought I had was to define a dt-stdout "pseudo-console" so that
-console=dt-stdout,115200n8 or something could be used.
+It might be possible to do this implicitly if the driver calls clk_get(),
+basically doing clk_get() (or another call if necessary) would prevent the
+simple pmdomain from turning it off during suspend.
 
-Anyway I applied your patch to v3.18-rc5 and ran it on a Mustang and it
-didn't work for some reason. I'm using:
+> From another side:
+> - drivers will get dependency from pm_clk;
 
-        fdt set /chosen stdout-path "/soc/serial at 1c020000:115200"
-        setenv bootargs "earlycon=uart8250,mmio32,0x1c020000 root=/dev/sda3 rw debug"
+There are three cases here:
 
-So I get earlycon but then no proper console. Removing earlycon just
-makes that stop working.
+- A device that is always used with a pm-domain, the driver doesn't
+  have to worry about it but do need the dependency on having the
+  simple-pmdomain code enabled.
 
-With:
+- A device that may or may not have clocks, but if it has them, they
+  are managed through a pm-domain. In this case, it's platform dependent
+  whether we have the dependency. We may want to prevent the device from
+  being probed if a power-domain property is present but no driver
+  for the domain.
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 89c6b33..5dc1718 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -1840,6 +1840,8 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
- 			of_stdout_options = strchr(name, ':');
- 			if (of_stdout_options != NULL)
- 				of_stdout_options++;
-+			printk(KERN_CRIT "%s: name=%s of_stdout=%p options=%s\n",
-+			       __func__, name, of_stdout, of_stdout_options);
- 		}
- 	}
- 
+- A device that uses the pm-domain on some machines but not on others:
+  this is a bit tricky, because the driver will still have to know
+  about all the clocks, although we could choose not to turn off the
+  clocks during suspend if the power-domain is not set.
 
-I can see in dmesg:
-[    0.000000] of_alias_scan: name=/soc/serial at 1c020000:115200 of_stdout=          (null) options=115200
+> - HW limitations can't be taken into account - it's possible that some clocks should
+>   not be enabled until it's allowed. And only driver know when it's allowed.
+>   Otherwise, HW state may become unspecified or wrong output can be generated.
 
-So it seems like of_find_node_by_path() is confused by the ":".
+Correct: if you have a device that you don't want to be handled by a simple
+pm-domain, then you have to connect it to a different pm-domain, e.g. one that
+manages a fixed set of clocks itself.
 
-I've not tried it but I'd have expected something more like:
-		if (name) {
-			of_stdout_options = strchr(name, ':');
-			if (of_stdout_options != NULL) {
-				*of_stdout_options = '0';
-				of_stdout_options++;
-			}
-			of_stdout = of_find_node_by_path(name);
-		}
-
-i.e. strip the options then do the patch lookup. name is const so this
-won't actually work, but something like it...
-
-Ian.
+	Arnd
