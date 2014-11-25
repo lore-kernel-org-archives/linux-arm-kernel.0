@@ -1,64 +1,69 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 25 Nov 2014 15:02:07 +0200
-Subject: [PATCH v3 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
- extensions
-In-Reply-To: <54747B72.1050406@redhat.com>
-References: <1416309051-26784-1-git-send-email-hdegoede@redhat.com>
- <1416309051-26784-3-git-send-email-hdegoede@redhat.com>
- <547476DA.2030004@ti.com> <54747B72.1050406@redhat.com>
-Message-ID: <54747DCF.9010502@ti.com>
+From: mpeg.blue@free.fr (Mason)
+Date: Tue, 25 Nov 2014 14:02:50 +0100
+Subject: How many frequencies would cpufreq optimally like to manage?
+In-Reply-To: <CAKohpomzxnCy7X+cPsVdDvi0cMRMp2Am1O-S5BeQtTr1CqBhEw@mail.gmail.com>
+References: <546D26AE.50601@free.fr>	<CAOh2x==KZzq1wbQxGwsJjZW+=fBJDzcnmRoaZMh0UYH-=yBJ=g@mail.gmail.com>	<546DF891.2050401@free.fr>
+ <CAKohpomzxnCy7X+cPsVdDvi0cMRMp2Am1O-S5BeQtTr1CqBhEw@mail.gmail.com>
+Message-ID: <54747DFA.3040802@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/14 14:52, Hans de Goede wrote:
+On 21/11/2014 04:36, Viresh Kumar wrote:
 
->>> +Required properties:
->>> +- compatible: "allwinner,simple-framebuffer"
->>> +- allwinner,pipeline, one of:
->>
->> Sorry my ignorance, but what's sunxi and what's allwinner? Both names
->> are mixed here.
-> 
-> sunxi is the sun#i SoCs from Allwinner, Allwinner is the manufacturer
-> and the
-> SoC "code" names used everywhere in the kernel for their SoCs are sun4i,
-> sun5i,
-> sun6i, etc. Most people refer to these SoCs as sunxi. This is also what the
-> linux-sunxi mailinglist in the Cc is about.
-> 
-> The official devicetree vendor prefix for Allwinner is allwinner, hence the
-> allwinner in the compatible name, see e.g. also
-> 
-> Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
-> 
-> Which also uses sunxi / sun4i everywhere except in the compatible vendor
-> prefix.
+> All current governors depend on background timers for their functionality.
+> These timers run at some sampling rate (in ms) and that time we change
+> CPU's frequency depending on existing load on system.. So, that might
+> not be fast enough.
 
-Alright, thanks for explanation.
+As far as I can tell, on my SoC, the timer runs at 27 MHz.
+But I have no idea how often it fires an interrupt.
 
-Shouldn't the compatible then be "allwinner,sunxi-simple-framebuffer",
-to differentiate from some other SoC Allwinner has or might create in
-the future? That is, presuming you're confident enough that a single
-compatible string covers all the current and forthcoming sunxi SoCs.
+I've been studying other cpufreq drivers, especially the OMAP driver.
+I noticed that there is a lot of generic infrastructure that our driver
+wasn't using, such as...
 
-Perhaps simplefb is a bit special case, but I usually feel better if the
-compatible string is defined in a more specific manner. In this case I'd
-have:
+   cpufreq_generic_init
+   cpufreq_generic_exit
+   cpufreq_generic_frequency_table_verify
+   cpufreq_generic_attr
 
-allwinner,sun4i-simple-framebuffer
-allwinner,sun5i-simple-framebuffer
-allwinner,sun6i-simple-framebuffer
+I've changed our driver to use those.
 
-so that if sun7i has totally different display controller, there would
-be no conflict.
+I'm still confused about cpufreq_generic_get.
+This is not a typical get/put type function, right?
 
- Tomi
+What is it supposed to get?
+Apparently, the actual frequency of the 'cpu-th' CPU?
+I see that it calls clk_get_rate(policy->clk)
 
+This 'struct clk' is an elusive beast.
+Where is it defined? I only run into forward declarations.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141125/352e5782/attachment-0001.sig>
+On my platform, clk_get_accuracy returns -524 unconditionally,
+and clk_prepare just returns 0.
+
+of_clk_get and of_clk_get_by_name both return ERR_PTR(-2)
+
+I suppose all this means I can't use this infrastructure "as-is",
+correct? Where can I read more about it?
+
+How is the kernel supposed to know what frequency each core is running at?
+I imagine that's what the .get method override is for?
+
+One more question (for now). Is the .get method supposed to return numbers
+that match in freq_table, or can they be slightly different? For example,
+I've defined my freq_table like this:
+
+static struct cpufreq_frequency_table freq_table[] = {
+	{ .driver_data = REG_VAL(1,0), .frequency = 999000 },
+	{ .driver_data = REG_VAL(1,8), .frequency = 750000 },
+	{ .driver_data = REG_VAL(2,0), .frequency = 500000 },
+	{ .driver_data = REG_VAL(4,0), .frequency = 250000 },
+	{ .driver_data = REG_VAL(8,0), .frequency = 125000 },
+	{ .frequency = CPUFREQ_TABLE_END },
+};
+
+but the 3rd frequency is actually 999/2 MHz, not 500 MHz, etc.
+Will that be a problem?
+
+Regards.
