@@ -1,84 +1,43 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 25 Nov 2014 17:26:41 +0000
-Subject: [PATCH 3.18-rc3 v9 5/5] arm: smp: Handle ipi_cpu_backtrace() using
- FIQ (if available)
-In-Reply-To: <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1416936401-5147-6-git-send-email-daniel.thompson@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 25 Nov 2014 17:27:24 +0000
+Subject: [RFC PATCH 0/4] Genericise the IOVA allocator
+Message-ID: <cover.1416931258.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous changes have introduced both a replacement default FIQ handler
-and an implementation of arch_trigger_all_cpu_backtrace for ARM but
-these are currently independent of each other.
+Hi all,
 
-This patch plumbs together these features making it possible, on platforms
-that support it, to trigger backtrace using FIQ.
+I've been implementing IOMMU DMA mapping for arm64, based on tidied-up
+parts of the existing arch/arm/mm/dma-mapping.c with a clear divide
+between the arch-specific parts and the general DMA-API to IOMMU-API layer
+so that that can be shared; similar to what Ritesh started before and was
+unable to complete[1], but working in the other direction.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/include/asm/smp.h | 3 +++
- arch/arm/kernel/smp.c      | 4 +++-
- arch/arm/kernel/traps.c    | 3 +++
- 3 files changed, 9 insertions(+), 1 deletion(-)
+The first part of that tidy-up involved ripping out the homebrewed IOVA
+allocator and plumbing in iova.c, necessitating the changes presented here.
+The rest is currently sat under arch/arm64 for the sake of getting it
+working quickly with minimal impact - ideally I'd move it out and port
+arch/arm before merging, but I don't know quite how impatient people are.
+Regardless of that decision, this bit stands alone, so here it is.
 
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 18f5a554134f..b076584ac0fa 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -18,6 +18,8 @@
- # error "<asm/smp.h> included in non-SMP build"
- #endif
- 
-+#define SMP_IPI_FIQ_MASK 0x0100
-+
- #define raw_smp_processor_id() (current_thread_info()->cpu)
- 
- struct seq_file;
-@@ -79,6 +81,7 @@ extern void arch_send_call_function_single_ipi(int cpu);
- extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
- extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
- 
-+extern void ipi_cpu_backtrace(struct pt_regs *regs);
- extern int register_ipi_completion(struct completion *completion, int cpu);
- 
- struct smp_operations {
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 14c594a12bef..e923843562d9 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -539,7 +539,7 @@ static void ipi_cpu_stop(unsigned int cpu)
- 		cpu_relax();
- }
- 
--static void ipi_cpu_backtrace(struct pt_regs *regs)
-+void ipi_cpu_backtrace(struct pt_regs *regs)
- {
- 	int cpu = smp_processor_id();
- 
-@@ -580,6 +580,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 	unsigned int cpu = smp_processor_id();
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
-+	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
-+
- 	if ((unsigned)ipinr < NR_IPI) {
- 		trace_ipi_entry(ipi_types[ipinr]);
- 		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 4dc45b38e56e..9eb05be9526e 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
- #ifdef CONFIG_ARM_GIC
- 	gic_handle_fiq_ipi();
- #endif
-+#ifdef CONFIG_SMP
-+	ipi_cpu_backtrace(regs);
-+#endif
- 
- 	nmi_exit();
- 
+Feel free to ignore patches 1 and 2, since I see Sakari has recently
+posted a more thorough series for that[2], that frankly looks nicer ;)
+I've merely left them in as context here.
+
+[1]:http://thread.gmane.org/gmane.linux.ports.arm.kernel/331299
+[2]:http://article.gmane.org/gmane.linux.kernel.iommu/7436
+
+Robin Murphy (4):
+  iommu: build iova.c for any IOMMU
+  iommu: consolidate IOVA allocator code
+  iommu: make IOVA domain low limit flexible
+  iommu: make IOVA domain page size explicit
+
+ drivers/iommu/Makefile      |  4 ++--
+ drivers/iommu/intel-iommu.c | 45 ++++++++++-------------------------------
+ drivers/iommu/iova.c        | 49 +++++++++++++++++++++++++++++++++++++++++----
+ include/linux/iova.h        | 41 +++++++++++++++++++++++++++++++++----
+ 4 files changed, 95 insertions(+), 44 deletions(-)
+
 -- 
-1.9.3
+1.9.1
