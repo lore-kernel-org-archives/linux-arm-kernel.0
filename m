@@ -1,60 +1,38 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 25 Nov 2014 14:21:19 +0100
-Subject: [PATCH v3 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
- extensions
-In-Reply-To: <54747DCF.9010502@ti.com>
-References: <1416309051-26784-1-git-send-email-hdegoede@redhat.com>
- <1416309051-26784-3-git-send-email-hdegoede@redhat.com>
- <547476DA.2030004@ti.com> <54747B72.1050406@redhat.com>
- <54747DCF.9010502@ti.com>
-Message-ID: <5474824F.8080000@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 25 Nov 2014 13:27:40 +0000
+Subject: [PATCH 0/3] arm64: sanity check updates
+Message-ID: <1416922063-8693-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following patches fix some issues with the sanity checks code: 
 
-On 11/25/2014 02:02 PM, Tomi Valkeinen wrote:
-> On 25/11/14 14:52, Hans de Goede wrote:
->
->>>> +Required properties:
->>>> +- compatible: "allwinner,simple-framebuffer"
->>>> +- allwinner,pipeline, one of:
->>>
->>> Sorry my ignorance, but what's sunxi and what's allwinner? Both names
->>> are mixed here.
->>
->> sunxi is the sun#i SoCs from Allwinner, Allwinner is the manufacturer
->> and the
->> SoC "code" names used everywhere in the kernel for their SoCs are sun4i,
->> sun5i,
->> sun6i, etc. Most people refer to these SoCs as sunxi. This is also what the
->> linux-sunxi mailinglist in the Cc is about.
->>
->> The official devicetree vendor prefix for Allwinner is allwinner, hence the
->> allwinner in the compatible name, see e.g. also
->>
->> Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
->>
->> Which also uses sunxi / sun4i everywhere except in the compatible vendor
->> prefix.
->
-> Alright, thanks for explanation.
->
-> Shouldn't the compatible then be "allwinner,sunxi-simple-framebuffer",
-> to differentiate from some other SoC Allwinner has or might create in
-> the future? That is, presuming you're confident enough that a single
-> compatible string covers all the current and forthcoming sunxi SoCs.
+* New revisions of Cortex-A53 differ from Cortex-A57 w.r.t.
+  ID_MMFR0.AuxReg, but as the format and use of the auxiliary registers
+  is IMPLEMENTATION DEFINED, we can safely ignore this in the kernel.
+  This difference may be of importance to hypervisors, however.
 
-This was discussed in an earlier thread, we (Ian Campbell, Grant and me)
-decided to settle on allwinner,simple-framebuffer to make it clear that
-these are allwinner extensions to the standard simple-framebuffer bindings,
-and that the node otherwise is simple-framebuffer compatible.
+* We don't sanity check ID_AA64DFR{0,1}_EL1 but rely on consistent debug
+  feature support across CPUs (at least in terms of the number of
+  watchpoints and breakpoints).
 
-We were afraid that e.g. sun4i-simple-framebuffer would signal that it
-is not a normal simple-framebuffer node, so we decided to go with just
-the allwinner, prefix to indicate that it uses allwinner specific
-extensions.
+* A missing newline in a format string leads to odd output in the case
+  of a sanity check failure.
 
-Regards,
+The series has been tested on Juno and models, and no issues have been
+seen.
 
-Hans
+Thanks,
+Mark.
+
+Mark Rutland (3):
+  arm64: sanity checks: ignore ID_MMFR0.AuxReg
+  arm64: sanity checks: add missing newline to print
+  arm64: sanity checks: add ID_AA64DFR{0,1}_EL1
+
+ arch/arm64/include/asm/cpu.h |  2 ++
+ arch/arm64/kernel/cpuinfo.c  | 20 ++++++++++++++++++--
+ 2 files changed, 20 insertions(+), 2 deletions(-)
+
+-- 
+1.9.1
