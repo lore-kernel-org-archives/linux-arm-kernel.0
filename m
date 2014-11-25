@@ -1,38 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 25 Nov 2014 22:49:47 +0100
-Subject: [PATCH] clk: sunxi: Remove ahb1_sdram from sun6i/sun8i protected
- clocks list
-In-Reply-To: <1416823515-9207-1-git-send-email-wens@csie.org>
-References: <1416823515-9207-1-git-send-email-wens@csie.org>
-Message-ID: <20141125214947.GG25249@lukather>
+From: mpeg.blue@free.fr (Mason)
+Date: Tue, 25 Nov 2014 22:52:31 +0100
+Subject: How many frequencies would cpufreq optimally like to manage?
+In-Reply-To: <CAKohponats3ZNqaRq+2ff4Vd=iMZHVy17Vs1K+Zmc_D47Br2+A@mail.gmail.com>
+References: <546D26AE.50601@free.fr>
+ <CAOh2x==KZzq1wbQxGwsJjZW+=fBJDzcnmRoaZMh0UYH-=yBJ=g@mail.gmail.com>
+ <546DF891.2050401@free.fr>
+ <CAKohpomzxnCy7X+cPsVdDvi0cMRMp2Am1O-S5BeQtTr1CqBhEw@mail.gmail.com>
+ <54747DFA.3040802@free.fr>
+ <CAKohponats3ZNqaRq+2ff4Vd=iMZHVy17Vs1K+Zmc_D47Br2+A@mail.gmail.com>
+Message-ID: <5474FA1F.50603@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 24, 2014 at 06:05:15PM +0800, Chen-Yu Tsai wrote:
-> The ahb1_sdram clock gate is only used for accessing the sdram
-> controller's registers over the bus. It is not used for actually clock
-> the controller or the dram, hence it does not need to be protected.
-> 
-> This also gets rid of the problem when the protected ahb1_sdram gate
-> is prepared/enabled while it is still an orphan, and the operation
-> is not propagated to the correct parent.
-> 
-> This was confirmed on my A23 tablet and my A31 Hummingbird.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On 25/11/2014 16:19, Viresh Kumar wrote:
 
-Queued for 3.20, thanks!
+> On 25 November 2014 at 18:32, Mason <mpeg.blue@free.fr> wrote:
+>
+>> As far as I can tell, on my SoC, the timer runs at 27 MHz.
+>> But I have no idea how often it fires an interrupt.
+> 
+> 27 MHz is the freq it runs at, but we get interrupt based on the value
+> programmed in the timer counter.
+> 
+> Look for CONFIG_HZ in your .config, that will tell you number of ticks
+> you are getting per second.
+> 
+> But cpufreq works in another level and so it doesn't depend on both
+> these.
 
-Maxime
+If I remember correctly (please correct me if I am mistaken),
+the kernel keeps a list of timers, ordered by deadline, and
+dynamically configures the system timer to fire at the next
+deadline.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141125/776e12f9/attachment.sig>
+> Look for: /sys/devices/system/cpu/cpufreq/ondemand/sampling_rate
+> this is the rate at which cpufreq core checks if cpu's freq require revisiting.
+
+I think setting the sampling rate to 50 ms should make the
+system reactive enough to load swings?
+
+>> This 'struct clk' is an elusive beast.
+>> Where is it defined? I only run into forward declarations.
+> 
+> Its architecture specific. What's the architecture you are working on?
+> You may implement your own routine instead of cpufreq_generic_get().
+
+The SoC is made by Sigma Designs. It is based on the ARM Cortex-A9.
+
+> Yes. Documentation/clk.txt.
+
+Oh boy! platform, device tree, cpu-freq, cpuidle, clk, ... so much
+to learn, so few hours in a day.
+
+> Yeah. You should be able to get some call from your architecture.
+
+OK, I have to fix that function along with the cpufreq update.
+
+Regards.
