@@ -1,49 +1,46 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 25 Nov 2014 14:44:39 +0000
-Subject: [PATCH] of: support passing console options with stdout-path
-In-Reply-To: <20141124230016.GP20238@lunn.ch>
-References: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
- <20141124230016.GP20238@lunn.ch>
-Message-ID: <20141125144439.07212C44343@trevor.secretlab.ca>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 25 Nov 2014 15:52:05 +0100
+Subject: [PATCH v5 1/2] of: Rename "poweroff-source" property to
+ "system-power-controller"
+In-Reply-To: <20141125144007.9904BC44343@trevor.secretlab.ca>
+References: <1416918506-9366-1-git-send-email-romain.perier@gmail.com>
+ <1416918506-9366-2-git-send-email-romain.perier@gmail.com>
+ <20141125144007.9904BC44343@trevor.secretlab.ca>
+Message-ID: <1745187.YOripSYQvX@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Nov 2014 00:00:16 +0100
-, Andrew Lunn <andrew@lunn.ch>
- wrote:
-> On Mon, Nov 24, 2014 at 10:23:58PM +0000, Leif Lindholm wrote:
-> > Support specifying console options (like with console=ttyXN,<options>)
-> > by appending them to the stdout-path property after a separating ':'.
+Am Dienstag, 25. November 2014, 14:40:07 schrieb Grant Likely:
+> On Tue, 25 Nov 2014 12:28:25 +0000
+> , Romain Perier <romain.perier@gmail.com>
+> 
+>  wrote:
+> > It reverts commit a4b4e0461ec5 ("of: Add standard property for poweroff
+> > capability"). As discussed on the mailing list, it makes more sense to
+> > rename back to the old established property name, without the vendor
+> > prefix. Problem being that the word "source" usually tends to be used for
+> > inputs and that is out of control of the OS. The poweroff capability is
+> > an output which simply turns the system-power off. Also, this property
+> > might be used by drivers which power-off the system and power back on
+> > subsequent RTC alarms. This seems to suggest to remove "poweroff" from
+> > the property name and to choose "system-power-controller" as the more
+> > generic name. This patchs adds the required renaming changes and defines
+> > an helper function which checks if this property is set.
 > > 
-> > Example:
-> > 	stdout-path = "uart0:115200";
-> > 
-> > This patch also modifies of_find_node_by_path() to match only the
-> > portion of the path before a ':'.
+> > Signed-off-by: Romain Perier <romain.perier@gmail.com>
 > 
-> Hi Leif
+> For both patches:
+> Acked-by: Grant Likely <grant.likely@linaro.org>
 > 
-> These appears to somewhat conform to ePAPR, which says:
-> 
->       A string that specifies the full path to the node representing
->       the device to be used for boot console output. If the character
->       ":" is present in the value it terminates the path.
-> 
-> So you can put any random junk after the :. However, are we going to
-> have backward/forward compatibility problems, and problems with
-> bootloaders? The current kernel code does not look for the :. So a new
-> DT blob on an old kernel will not work so well.
+> Let me know if I need to take this series through my tree. Also, does it
+> need to go into v3.18 and be backported to stable? Or just v3.19.
 
-For DT, we've generally not been worrying about compatibility in that
-direction.  If we've got a new firmware, we should be able to get a new
-kernel.  Nobody has really screamed bout it yet.
+The original change [that is fixed now] is only scheduled for 3.19 and in
+Mark Brown's tree [0]. So there shouldn't be anything to do for you now.
 
-> More worrying, barebox does not support the : either. So there is a
-> danger your bootloader suddenly goes silent after a dt blob update.
 
-Is barebox parsing the property? Or updating it? Or both? I've got no
-problem with this patch, but we can also support things like the
-'current-speed' property in the UART to set a default when the stdout
-path doesn't have any arguments.
+Heiko
 
-g.
+
+
+[0] https://git.kernel.org/cgit/linux/kernel/git/broonie/regulator.git/log/?h=topic/power-off
