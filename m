@@ -1,354 +1,60 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Tue, 25 Nov 2014 20:16:56 +0800
-Subject: [PATCH v3 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC in
- dts and Makefile
-In-Reply-To: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <Sharkl64-v3>
- <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1416917818-10506-4-git-send-email-chunyan.zhang@spreadtrum.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Tue, 25 Nov 2014 12:28:24 +0000
+Subject: [PATCH v5 0/2] poweroff-source DT property renaming
+Message-ID: <1416918506-9366-1-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
+The goal of this serie is to rename the property "poweroff-source" to
+"system-power-controller". After discussions, it makes more sense to rename back
+to the old established property name. This patches serie reverts
+commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
 
-Adds the device tree support for Spreadtrum SC9836 SoC which is based on
-Sharkl64 platform.
+Changes since v4:
+  - Renamed the helper function to of_device_is_system_power_controller
+  - Removed changes in tps65910, as this commit will be removed from the mfd tree
+  - Updated doc
 
-Sharkl64 platform contains the common nodes of Spreadtrum's arm64-based SoCs.
+Changes since v3:
+  - Move backward compatibility from of_is_system_power_controller to
+    tps65910, as it was only required for this driver.
 
-Signed-off-by: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
----
- arch/arm64/boot/dts/Makefile                  |    1 +
- arch/arm64/boot/dts/sprd-sc9836-openphone.dts |   85 ++++++++++++++++++++
- arch/arm64/boot/dts/sprd-sc9836.dtsi          |  103 ++++++++++++++++++++++++
- arch/arm64/boot/dts/sprd-sharkl64.dtsi        |  105 +++++++++++++++++++++++++
- 4 files changed, 294 insertions(+)
- create mode 100644 arch/arm64/boot/dts/sprd-sc9836-openphone.dts
- create mode 100644 arch/arm64/boot/dts/sprd-sc9836.dtsi
- create mode 100644 arch/arm64/boot/dts/sprd-sharkl64.dtsi
+Changes since v2:
+  - of_is_system_power_controller is inline in of.h and only supports
+    backward compatibility with device drivers which used this helper
+    (which is tps65910)
+  - Quashed all changes into a single patch (except documentation)
+  - Add a separated commit to fix typos and mispellings in documentation
 
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index f8001a6..d0aff8a 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
-+dtb-$(CONFIG_ARCH_SHARKL64) += sprd-sc9836-openphone.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
- dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
- 
-diff --git a/arch/arm64/boot/dts/sprd-sc9836-openphone.dts b/arch/arm64/boot/dts/sprd-sc9836-openphone.dts
-new file mode 100644
-index 0000000..484d714
---- /dev/null
-+++ b/arch/arm64/boot/dts/sprd-sc9836-openphone.dts
-@@ -0,0 +1,85 @@
-+/*
-+ * Spreadtrum SC9836 openphone board DTS file
-+ *
-+ * Copyright (C) 2014, Spreadtrum Communications Inc.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "sprd-sc9836.dtsi"
-+
-+/ {
-+	model = "Spreadtrum,SC9836 Openphone Board";
-+
-+	compatible = "sprd,sc9836-openphone", "sprd,sc9836";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+	};
-+
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0 0x80000000 0 0x20000000>;
-+	};
-+
-+	chosen {
-+		stdout-path = &uart0;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/sprd-sc9836.dtsi b/arch/arm64/boot/dts/sprd-sc9836.dtsi
-new file mode 100644
-index 0000000..d5fe552
---- /dev/null
-+++ b/arch/arm64/boot/dts/sprd-sc9836.dtsi
-@@ -0,0 +1,103 @@
-+/*
-+ * Spreadtrum SC9836 SoC DTS file
-+ *
-+ * Copyright (C) 2014, Spreadtrum Communications Inc.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "sprd-sharkl64.dtsi"
-+
-+/ {
-+	compatible = "sprd,sc9836";
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+		};
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+		};
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+		};
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	gic: interrupt-controller at 12001000 {
-+		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0 0x12001000 0 0x1000>,
-+		      <0 0x12002000 0 0x1000>,
-+		      <0 0x12004000 0 0x2000>,
-+		      <0 0x12006000 0 0x2000>;
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <1 13 0xff01>,
-+			     <1 14 0xff01>,
-+			     <1 11 0xff01>,
-+			     <1 10 0xff01>;
-+		clock-frequency = <26000000>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/sprd-sharkl64.dtsi b/arch/arm64/boot/dts/sprd-sharkl64.dtsi
-new file mode 100644
-index 0000000..d9ecfe9
---- /dev/null
-+++ b/arch/arm64/boot/dts/sprd-sharkl64.dtsi
-@@ -0,0 +1,105 @@
-+/*
-+ * Spreadtrum Sharkl64 platform DTS file
-+ *
-+ * Copyright (C) 2014, Spreadtrum Communications Inc.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/ {
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	soc {
-+		compatible = "simple-bus";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		ap_apb: apb at 70000000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0x70000000 0x0 0x10000000>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+
-+			uart0: serial at 70000000 {
-+				compatible = "sprd,sc9836-uart";
-+				reg = <0 0x70000000 0 0x100>;
-+				interrupts = <0 2 0xf04>;
-+				clocks = <&clk26mhz>;
-+				status = "disabled";
-+			};
-+
-+			uart1: serial at 70100000 {
-+				compatible = "sprd,sc9836-uart";
-+				reg = <0 0x70100000 0 0x100>;
-+				interrupts = <0 3 0xf04>;
-+				clocks = <&clk26mhz>;
-+				status = "disabled";
-+			};
-+
-+			uart2: serial at 70200000 {
-+				compatible = "sprd,sc9836-uart";
-+				reg = <0 0x70200000 0 0x100>;
-+				interrupts = <0 2 0xf04>;
-+				clocks = <&clk26mhz>;
-+				status = "disabled";
-+			};
-+
-+			uart3: serial at 70300000 {
-+				compatible = "sprd,sc9836-uart";
-+				reg = <0 0x70300000 0 0x100>;
-+				interrupts = <0 3 0xf04>;
-+				clocks = <&clk26mhz>;
-+				status = "disabled";
-+			};
-+		};
-+	};
-+
-+	clocks {
-+		clk26mhz: clk26mhz {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <26000000>;
-+		};
-+	};
-+};
+Changes since v1:
+
+  - The first patch defines "of_is_system_power_controller" which is compatible
+    with both "vendor,system-power-controller" and "system-power-controller"
+    properties. Also, It keeps the old helper function of_system_has_poweroff_source
+    for source compatibility until everything is renamed (in this way, bisections
+    are not broken and change is made "atomically" between each commit)
+
+    Note: the property "poweroff-source" itself is not used in dts files yet.
+    Before this patch tps65910 was broken due to missing backward compatibility
+    with "vendor,system-power-controller". As the old helper uses the new one,
+    it works again.
+
+  - act8865 and tps65910 are ported to the new helper function
+  - The last commit removes the olf helper which was only used for source compatibility
+
+Romain Perier (2):
+  of: Rename "poweroff-source" property to "system-power-controller"
+  dt-bindings: Update documentation for "system-power-controller" and
+    fix misspellings
+
+ .../devicetree/bindings/power/power-controller.txt     | 18 ++++++++++++++++++
+ Documentation/devicetree/bindings/power/poweroff.txt   | 18 ------------------
+ .../bindings/regulator/act8865-regulator.txt           |  4 ++--
+ drivers/regulator/act8865-regulator.c                  |  2 +-
+ include/linux/of.h                                     |  6 +++---
+ 5 files changed, 24 insertions(+), 24 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/power-controller.txt
+ delete mode 100644 Documentation/devicetree/bindings/power/poweroff.txt
+
 -- 
-1.7.9.5
+1.9.1
