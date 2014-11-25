@@ -1,53 +1,41 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 25 Nov 2014 11:05:41 +0800
-Subject: [GIT PULL] CSR SiRFSOC DT for 3.19
-Message-ID: <CAGsJ_4yC8bStnYx3ramD=OXA03oihUEwCgcfqsStfWx2rasMqQ@mail.gmail.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Tue, 25 Nov 2014 08:37:33 +0530
+Subject: [PATCH] spi: s3c64xx: add support for exynos7 SPI controller
+In-Reply-To: <CAAgF-BfOUSTNX=ieLihAXVXuwd3NzPHG3FpmhqZwnpQpeveDig@mail.gmail.com>
+References: <1415267509-16653-1-git-send-email-padma.v@samsung.com>
+ <20141106102636.GT8509@sirena.org.uk>
+ <CAAgF-BfGwcNzMx0meFVkJqNMTbQ4_PP1PZ3i6edOm6U3bc26_Q@mail.gmail.com>
+ <20141107101310.GA8509@sirena.org.uk>
+ <CAAgF-Bd=S7-PoA7GZoy87W9Dem3OXVhc1tL-eyWEAHvF0LPTKQ@mail.gmail.com>
+ <CAAgF-BcARoRZv=BPqQWyp6rJQQ=CE0FEUz_2vgQSpeZyLwbkBw@mail.gmail.com>
+ <CAAgF-BfOUSTNX=ieLihAXVXuwd3NzPHG3FpmhqZwnpQpeveDig@mail.gmail.com>
+Message-ID: <CAAgF-Bca7_TGW_rJo5ywLLX6hzDxESd4PAeuwyCf9hE1q3QP6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+Hi Mark,
 
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+>>> OK. I don't have provision to test on this board. I will try to test
+>>> on older boards by disabling manual mode.
+>>>
+>>
+>> I tested on exynos5420 peach-pit by enabling auto mode. I used dd
+>> command to read 1MB data from spi flash and I compared the result with
+>> manual mode. Both are same.
+>
+> I also tested this patch with Javier Martinez Canillas patches for
+> enabling spidev nodes from
+> http://www.spinics.net/lists/linux-samsung-soc/msg39057.html.
+>
+> I read 4MB flashdata from spi by enabling auto mode and compared the
+> result. They look same.
 
-are available in the git repository at:
+Do want some extra tests need to be done for this patch or is it okey?
 
-  gitolite.kernel.org:/pub/scm/linux/kernel/git/baohua/linux.git
-tags/sirf-dts-for-3.19
-
-for you to fetch changes up to 294a212faa5bf7cb48fabccec5ee13e836e29ecb:
-
-  ARM: dts: atlas6: add resets property for SPI nodes (2014-11-25
-18:46:43 +0800)
-
-----------------------------------------------------------------
-change pinmux pingroup and add some lost node/prop
-
-1. add resets properity for some nodes;
-2. change pinctrl groups for audio
-3. add PMU node
-
-----------------------------------------------------------------
-Qipan Li (1):
-      ARM: dts: atlas6: add resets property for SPI nodes
-
-Renwei Wu (2):
-      ARM: dts: prima2: add resets property for VPP nodes
-      ARM: dts: atlas6: add resets property for VPP nodes
-
-Rongjun Ying (3):
-      ARM: dts: prima2: add I2S 2ch, 6ch, nodin, mclk groups
-      ARM: dts: atlas6: add a separate pingroup for i2s mclk output
-      ARM: dts: atlas6: Add I2S external clock input pingroup
-
-Tao Huang (1):
-      ARM: dts: prima2: add resets property for GPS nodes
-
-Ye He (1):
-      ARM: dts: prima2: add node for Performance Monitor Unit
-
- arch/arm/boot/dts/atlas6.dtsi |   15 +++++++++++++++
- arch/arm/boot/dts/prima2.dtsi |   33 +++++++++++++++++++++++++++++++++
- 2 files changed, 48 insertions(+)
-
--barry
+>
+>>
+>>> Thanks
+>>> padma
+>>>
+>>
+>
