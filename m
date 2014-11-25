@@ -1,78 +1,265 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Tue, 25 Nov 2014 16:10:01 +0000
-Subject: [PATCH 3/7] KVM: arm: guest debug, add stub KVM_SET_GUEST_DEBUG ioctl
+Date: Tue, 25 Nov 2014 16:10:04 +0000
+Subject: [PATCH 6/7] KVM: arm64: re-factor hyp.S debug register code
 In-Reply-To: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
 References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1416931805-23223-4-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1416931805-23223-7-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a stub function to support the KVM_SET_GUEST_DEBUG
-ioctl. Currently any operation flag will return EINVAL. Actual
-functionality will be added with further patches.
+This is a pre-cursor to sharing the code with the guest debug support.
+This replaces the big macro that fishes data out of a fixed location
+with a more general helper macro to restore a set of debug registers. It
+uses macro substitution so it can be re-used for debug control and value
+registers. It does however rely on the debug registers being 64 bit
+aligned (as they happen to be in the hyp ABI).
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>.
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 7610eaa..2c6386e 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2570,7 +2570,7 @@ handled.
- 4.87 KVM_SET_GUEST_DEBUG
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index c0bc218..b38ce3d 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -490,65 +490,12 @@
+ 	msr	mdscr_el1,	x25
+ .endm
  
- Capability: KVM_CAP_SET_GUEST_DEBUG
--Architectures: x86, s390, ppc
-+Architectures: x86, s390, ppc, arm64
- Type: vcpu ioctl
- Parameters: struct kvm_guest_debug (in)
- Returns: 0 on success; -1 on error
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9e193c8..a0ff410 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -180,6 +180,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ARM_PSCI:
- 	case KVM_CAP_ARM_PSCI_0_2:
- 	case KVM_CAP_READONLY_MEM:
-+	case KVM_CAP_SET_GUEST_DEBUG:
- 		r = 1;
- 		break;
- 	case KVM_CAP_COALESCED_MMIO:
-@@ -302,7 +303,34 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 					struct kvm_guest_debug *dbg)
- {
--	return -EINVAL;
-+	/* If it's not enabled clear all flags */
-+	if (!(dbg->control & KVM_GUESTDBG_ENABLE)) {
-+		vcpu->guest_debug = 0;
-+		return 0;
-+	}
-+
-+	vcpu->guest_debug = dbg->control;
-+	kvm_info("%s: guest_debug is 0x%lx\n", __func__, vcpu->guest_debug);
-+
-+	/* Single Step */
-+	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-+		kvm_info("SS requested, not yet implemented\n");
-+		return -EINVAL;
-+	}
-+
-+	/* Software Break Points */
-+	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP) {
-+		kvm_info("SW BP support requested, not yet implemented\n");
-+		return -EINVAL;
-+	}
-+
-+	/* Hardware assisted Break and Watch points */
-+	if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) {
-+		kvm_info("HW BP support requested, not yet implemented\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
- }
+-.macro restore_debug
+-	// x2: base address for cpu context
+-	// x3: tmp register
+-
+-	mrs	x26, id_aa64dfr0_el1
+-	ubfx	x24, x26, #12, #4	// Extract BRPs
+-	ubfx	x25, x26, #20, #4	// Extract WRPs
+-	mov	w26, #15
+-	sub	w24, w26, w24		// How many BPs to skip
+-	sub	w25, w26, w25		// How many WPs to skip
+-
+-	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
+-
+-	adr	x26, 1f
+-	add	x26, x26, x24, lsl #2
+-	br	x26
+-1:
+-	ldr	x20, [x3, #(15 * 8)]
+-	ldr	x19, [x3, #(14 * 8)]
+-	ldr	x18, [x3, #(13 * 8)]
+-	ldr	x17, [x3, #(12 * 8)]
+-	ldr	x16, [x3, #(11 * 8)]
+-	ldr	x15, [x3, #(10 * 8)]
+-	ldr	x14, [x3, #(9 * 8)]
+-	ldr	x13, [x3, #(8 * 8)]
+-	ldr	x12, [x3, #(7 * 8)]
+-	ldr	x11, [x3, #(6 * 8)]
+-	ldr	x10, [x3, #(5 * 8)]
+-	ldr	x9, [x3, #(4 * 8)]
+-	ldr	x8, [x3, #(3 * 8)]
+-	ldr	x7, [x3, #(2 * 8)]
+-	ldr	x6, [x3, #(1 * 8)]
+-	ldr	x5, [x3, #(0 * 8)]
+-
++.macro setup_debug_registers type
++        // x3: pointer to register set
++        // x4: number of registers to copy
++        // x5..x20/x26 trashed
+ 	adr	x26, 1f
+-	add	x26, x26, x24, lsl #2
+-	br	x26
+-1:
+-	msr	dbgbcr15_el1, x20
+-	msr	dbgbcr14_el1, x19
+-	msr	dbgbcr13_el1, x18
+-	msr	dbgbcr12_el1, x17
+-	msr	dbgbcr11_el1, x16
+-	msr	dbgbcr10_el1, x15
+-	msr	dbgbcr9_el1, x14
+-	msr	dbgbcr8_el1, x13
+-	msr	dbgbcr7_el1, x12
+-	msr	dbgbcr6_el1, x11
+-	msr	dbgbcr5_el1, x10
+-	msr	dbgbcr4_el1, x9
+-	msr	dbgbcr3_el1, x8
+-	msr	dbgbcr2_el1, x7
+-	msr	dbgbcr1_el1, x6
+-	msr	dbgbcr0_el1, x5
+-
+-	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
+-
+-	adr	x26, 1f
+-	add	x26, x26, x24, lsl #2
++	add	x26, x26, x4, lsl #2
+ 	br	x26
+ 1:
+ 	ldr	x20, [x3, #(15 * 8)]
+@@ -569,116 +516,25 @@
+ 	ldr	x5, [x3, #(0 * 8)]
  
+ 	adr	x26, 1f
+-	add	x26, x26, x24, lsl #2
+-	br	x26
+-1:
+-	msr	dbgbvr15_el1, x20
+-	msr	dbgbvr14_el1, x19
+-	msr	dbgbvr13_el1, x18
+-	msr	dbgbvr12_el1, x17
+-	msr	dbgbvr11_el1, x16
+-	msr	dbgbvr10_el1, x15
+-	msr	dbgbvr9_el1, x14
+-	msr	dbgbvr8_el1, x13
+-	msr	dbgbvr7_el1, x12
+-	msr	dbgbvr6_el1, x11
+-	msr	dbgbvr5_el1, x10
+-	msr	dbgbvr4_el1, x9
+-	msr	dbgbvr3_el1, x8
+-	msr	dbgbvr2_el1, x7
+-	msr	dbgbvr1_el1, x6
+-	msr	dbgbvr0_el1, x5
+-
+-	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
+-
+-	adr	x26, 1f
+-	add	x26, x26, x25, lsl #2
++	add	x26, x26, x4, lsl #2
+ 	br	x26
+ 1:
+-	ldr	x20, [x3, #(15 * 8)]
+-	ldr	x19, [x3, #(14 * 8)]
+-	ldr	x18, [x3, #(13 * 8)]
+-	ldr	x17, [x3, #(12 * 8)]
+-	ldr	x16, [x3, #(11 * 8)]
+-	ldr	x15, [x3, #(10 * 8)]
+-	ldr	x14, [x3, #(9 * 8)]
+-	ldr	x13, [x3, #(8 * 8)]
+-	ldr	x12, [x3, #(7 * 8)]
+-	ldr	x11, [x3, #(6 * 8)]
+-	ldr	x10, [x3, #(5 * 8)]
+-	ldr	x9, [x3, #(4 * 8)]
+-	ldr	x8, [x3, #(3 * 8)]
+-	ldr	x7, [x3, #(2 * 8)]
+-	ldr	x6, [x3, #(1 * 8)]
+-	ldr	x5, [x3, #(0 * 8)]
+-
+-	adr	x26, 1f
+-	add	x26, x26, x25, lsl #2
+-	br	x26
+-1:
+-	msr	dbgwcr15_el1, x20
+-	msr	dbgwcr14_el1, x19
+-	msr	dbgwcr13_el1, x18
+-	msr	dbgwcr12_el1, x17
+-	msr	dbgwcr11_el1, x16
+-	msr	dbgwcr10_el1, x15
+-	msr	dbgwcr9_el1, x14
+-	msr	dbgwcr8_el1, x13
+-	msr	dbgwcr7_el1, x12
+-	msr	dbgwcr6_el1, x11
+-	msr	dbgwcr5_el1, x10
+-	msr	dbgwcr4_el1, x9
+-	msr	dbgwcr3_el1, x8
+-	msr	dbgwcr2_el1, x7
+-	msr	dbgwcr1_el1, x6
+-	msr	dbgwcr0_el1, x5
+-
+-	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
+-
+-	adr	x26, 1f
+-	add	x26, x26, x25, lsl #2
+-	br	x26
+-1:
+-	ldr	x20, [x3, #(15 * 8)]
+-	ldr	x19, [x3, #(14 * 8)]
+-	ldr	x18, [x3, #(13 * 8)]
+-	ldr	x17, [x3, #(12 * 8)]
+-	ldr	x16, [x3, #(11 * 8)]
+-	ldr	x15, [x3, #(10 * 8)]
+-	ldr	x14, [x3, #(9 * 8)]
+-	ldr	x13, [x3, #(8 * 8)]
+-	ldr	x12, [x3, #(7 * 8)]
+-	ldr	x11, [x3, #(6 * 8)]
+-	ldr	x10, [x3, #(5 * 8)]
+-	ldr	x9, [x3, #(4 * 8)]
+-	ldr	x8, [x3, #(3 * 8)]
+-	ldr	x7, [x3, #(2 * 8)]
+-	ldr	x6, [x3, #(1 * 8)]
+-	ldr	x5, [x3, #(0 * 8)]
+-
+-	adr	x26, 1f
+-	add	x26, x26, x25, lsl #2
+-	br	x26
+-1:
+-	msr	dbgwvr15_el1, x20
+-	msr	dbgwvr14_el1, x19
+-	msr	dbgwvr13_el1, x18
+-	msr	dbgwvr12_el1, x17
+-	msr	dbgwvr11_el1, x16
+-	msr	dbgwvr10_el1, x15
+-	msr	dbgwvr9_el1, x14
+-	msr	dbgwvr8_el1, x13
+-	msr	dbgwvr7_el1, x12
+-	msr	dbgwvr6_el1, x11
+-	msr	dbgwvr5_el1, x10
+-	msr	dbgwvr4_el1, x9
+-	msr	dbgwvr3_el1, x8
+-	msr	dbgwvr2_el1, x7
+-	msr	dbgwvr1_el1, x6
+-	msr	dbgwvr0_el1, x5
+-
+-	ldr	x21, [x2, #CPU_SYSREG_OFFSET(MDCCINT_EL1)]
+-	msr	mdccint_el1, x21
++	msr	\type\()15_el1, x20
++	msr	\type\()14_el1, x19
++	msr	\type\()13_el1, x18
++	msr	\type\()12_el1, x17
++	msr	\type\()11_el1, x16
++	msr	\type\()10_el1, x15
++	msr	\type\()9_el1, x14
++	msr	\type\()8_el1, x13
++	msr	\type\()7_el1, x12
++	msr	\type\()6_el1, x11
++	msr	\type\()5_el1, x10
++	msr	\type\()4_el1, x9
++	msr	\type\()3_el1, x8
++	msr	\type\()2_el1, x7
++	msr	\type\()1_el1, x6
++	msr	\type\()0_el1, x5
+ .endm
  
+ .macro skip_32bit_state tmp, target
+@@ -929,8 +785,34 @@ __save_debug:
+ 	save_debug
+ 	ret
+ 
++/* Restore saved guest debug state */
+ __restore_debug:
+-	restore_debug
++	// x2: base address for cpu context
++	// x3: ptr to guest registers passed to setup_debug_registers
++	// x5..x20/x26: trashed
++
++	mrs	x26, id_aa64dfr0_el1
++	ubfx	x24, x26, #12, #4	// Extract BRPs
++	ubfx	x25, x26, #20, #4	// Extract WRPs
++	mov	w26, #15
++	sub	w24, w26, w24		// How many BPs to skip
++	sub	w25, w26, w25		// How many WPs to skip
++
++	mov     x4, x24
++	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
++	setup_debug_registers dbgbcr
++	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
++	setup_debug_registers dbgbvr
++
++	mov     x4, x25
++	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
++	setup_debug_registers dbgwcr
++	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
++	setup_debug_registers dbgwvr
++
++	ldr	x21, [x2, #CPU_SYSREG_OFFSET(MDCCINT_EL1)]
++	msr	mdccint_el1, x21
++
+ 	ret
+ 
+ __save_fpsimd:
 -- 
 2.1.3
