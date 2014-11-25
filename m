@@ -1,104 +1,102 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 25 Nov 2014 09:47:33 +0100
-Subject: [PATCH] ARM: exynos_defconfig: disable CONFIG_EXYNOS5420_MCPM; not
- stable
-In-Reply-To: <CAMAWPa-qk0DEmPNz5LZgJq9AuGhRxuY00XwxtEikt_vh-iozVg@mail.gmail.com>
-References: <1414796382-5447-1-git-send-email-khilman@kernel.org>
- <000e01cffb39$5ef0a2d0$1cd1e870$@kernel.org>
- <7hegtaq26c.fsf@deeprootsystems.com>
- <CAMAWPa-mLAFL7v8hHA5R-eBzpMFK-E-xcvjoV8Bn6tTwgP53Uw@mail.gmail.com>
- <CAOesGMhvTDN4J6AdUDHKV0Sp4NT6a4QEMUDWOayQqhhD+C4acw@mail.gmail.com>
- <CAMAWPa-sz5jT9izEONVZR2Z4mzuivKaNHSgyR+eP13tWZ84hYw@mail.gmail.com>
- <CAOesGMgSkJ8xkBgN7OpuDzT=ehaAd6kvbx5_tC50x78pvpkTwg@mail.gmail.com>
- <CAOesGMh-7md4PdQX1Wvk0jO+87j+fxSvBnVD_osjNd2zQ4L43w@mail.gmail.com>
- <044101d00852$3f421420$bdc63c60$@kernel.org>
- <CAMAWPa-qk0DEmPNz5LZgJq9AuGhRxuY00XwxtEikt_vh-iozVg@mail.gmail.com>
-Message-ID: <1416905253.5023.42.camel@AMDC1943>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Tue, 25 Nov 2014 14:18:33 +0530
+Subject: [PATCH RFC v2 07/12] PM / Domains: export pm_genpd_lookup_name
+In-Reply-To: <CAPDyKFqE_qhrRs3X9s9juyPH_Zcq8vdE_amqKM3VUnMjHtL2Rg@mail.gmail.com>
+References: <1416833572-6880-1-git-send-email-amit.daniel@samsung.com>
+ <1416834256-11225-1-git-send-email-amit.daniel@samsung.com>
+ <1416834256-11225-7-git-send-email-amit.daniel@samsung.com>
+ <CAPDyKFqE_qhrRs3X9s9juyPH_Zcq8vdE_amqKM3VUnMjHtL2Rg@mail.gmail.com>
+Message-ID: <CADGdYn6fAScrpz4Va=THtC1ZgT+rYN_gQuE6NnRaCiN4NErg5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 25, 2014 at 1:05 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 24 November 2014 at 14:04, Amit Daniel Kachhap
+> <amit.daniel@samsung.com> wrote:
+>> This API may be needed to set the power domain parent/child relationship
+>> in the power domain platform driver. The parent relationship is
+>> generally set after the child power domain is registered with the power
+>> domain subsystem. In this case, pm_genpd_lookup_name API might be
+>> useful.
+>
+> I think this is a step in the wrong direction. Instead we should be
+> working on removing the "name" based APIs from genpd.
+>
+> The proper way should be to pass the PM domain as a parameter to the
+> APIs instead.
+Yes i understand but i had a special requirement for using this API
+during pd probe.
+ I cannot use hierarchy to represent parent/child pd nodes as it will
+break the existing SoC's. In my case all the PD nodes are linear. The
+parent/child relationship are established in the second pass after all
+the PD entries are registered with the help of this API.
+Although there a way that i can always keep parent PD's before the
+child PD's in DT in linear order. Will check this approach.
 
-On pon, 2014-11-24 at 19:20 -0800, Kevin Hilman wrote:
-> On Mon, Nov 24, 2014 at 5:50 PM, Kukjin Kim <kgene@kernel.org> wrote:
-> > Olof Johansson wrote:
-> >>
-> >> On Mon, Nov 24, 2014 at 5:37 PM, Olof Johansson <olof@lixom.net> wrote:
-> >> > On Mon, Nov 24, 2014 at 5:35 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> >> >> On Mon, Nov 24, 2014 at 4:25 PM, Olof Johansson <olof@lixom.net> wrote:
-> >> >>> On Mon, Nov 24, 2014 at 11:51 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> >> >>>>
-> >> >>>> Is anyone at Samsung actually looking into these MCPM issues?
-> >> >>>
-> >> >>> Hi Kevin,
-> >> >>>
-> >> >>> What hardware are you having problems with? 5420 or 5422/5800?
-> >> >>
-> >> >> Yes.  :)
-> >> >>
-> >> >> exynos5420-arndale-octa:
-> >> >> http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc6/arm-exynos_defconfig/boot-exynos5420-
-> >> arndale-octa.html
-> >> >> exynos5422-odroid-xu3:
-> >> >> http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc6/arm-exynos_defconfig/boot-exynos5422-
-> >> odroid-xu3.html
-> >> >>
-> >> >> My boot tests seem to pass fine because I have such a minimal
-> >> >> userspace, but Tyler Baker reported that with a "real" userspace, he
-> >> >> can't boot to a shell:
-> >> >>
-> >> >>   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286203.html
-> >> >
-> > Hmm...his report was in Sep...I think it should be fine with current -next?
-> 
-> No, it is still broken in linux-next (as I stated above.)
-> 
-> Moreover, earlier in this thread you mentioned you were merging some
-> MCPM patches that should address this, but did not respond when I
-> asked which patches you thing should address this issue
-> 
-> > To be honest, since I don't have the exynos5420 arndale, chromebook...but smdk
-> > which has different bootloader, I couldn't test it...I'll try to make a test
-> > farm like you guys...
-> 
-> Do you have some colleagues with any other 542x hardware?  I had
-> assumed that linux-next was being better tested on the publicaly
-> available, and widely available boards like odroid-xu3 and
-> Chromebook2, but I've come to realize the hard way that that is not
-> the case.  You mention your board has a different bootloader.  Do you
-> suspect there's a bootloader issue on these other platforms?  If so,
-> could you elaborate on possible fixes?  I'm more than willing to test
-> any proposed fixes, but I'm not familiar enough yet with these SoCs to
-> figure out the underlying issues alone.
-> 
-> Until you have a working board farm, you could start having a closer
-> look at the boot logs we're already producing.  Admittedly linux-next
-> broken in many ways besides this one for exynos currently, but it has
-> been having these imprecise aborts well before the other recent
-> issues.
-> 
-> Also, It's very possible that this issue is not even MCPM related at
-> all, and MCPM is just uncovering a previously hidden bug.  It would be
-> very helpful if people more familiar with this hardware and SoC would
-> investigate bug reports like these.
-
-Interesting thing can be found in exynos5420.dtsi:
-mdma1: mdma at 11C10000 {
-	...
-	/*
-	 * MDMA1 can support both secure and non-secure
-	 * AXI transactions. When this is enabled in the kernel
-	 * for boards that run in secure mode, we are getting
-	 * imprecise external aborts causing the kernel to oops.
-	 */
-	status = "disabled";
-};
-
-I am booting Arndale Octa on some other config and exynos. However with
-or without MCPM the imprecise aborts are still present (but not fatal,
-shell comes up).
-
-My board boots also under secure firmware (I am using Linaro's ubuntu
-image). Maybe that is the cause?
-
-Best regards,
-Krzysztof
+Regards,
+Amit
+>
+> Kind regards
+> Uffe
+>
+>>
+>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> ---
+>>  drivers/base/power/domain.c |    3 ++-
+>>  include/linux/pm_domain.h   |    7 +++++++
+>>  2 files changed, 9 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>> index fb83d4a..b0e1c2f 100644
+>> --- a/drivers/base/power/domain.c
+>> +++ b/drivers/base/power/domain.c
+>> @@ -49,7 +49,7 @@
+>>  static LIST_HEAD(gpd_list);
+>>  static DEFINE_MUTEX(gpd_list_lock);
+>>
+>> -static struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
+>> +struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
+>>  {
+>>         struct generic_pm_domain *genpd = NULL, *gpd;
+>>
+>> @@ -66,6 +66,7 @@ static struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
+>>         mutex_unlock(&gpd_list_lock);
+>>         return genpd;
+>>  }
+>> +EXPORT_SYMBOL_GPL(pm_genpd_lookup_name);
+>>
+>>  struct generic_pm_domain *dev_to_genpd(struct device *dev)
+>>  {
+>> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+>> index 2e0e06d..aedcec3 100644
+>> --- a/include/linux/pm_domain.h
+>> +++ b/include/linux/pm_domain.h
+>> @@ -150,6 +150,8 @@ extern int pm_genpd_name_poweron(const char *domain_name);
+>>
+>>  extern struct dev_power_governor simple_qos_governor;
+>>  extern struct dev_power_governor pm_domain_always_on_gov;
+>> +
+>> +extern struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name);
+>>  #else
+>>
+>>  static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
+>> @@ -221,6 +223,11 @@ static inline int pm_genpd_name_poweron(const char *domain_name)
+>>  {
+>>         return -ENOSYS;
+>>  }
+>> +static inline
+>> +struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
+>> +{
+>> +       return NULL;
+>> +}
+>>  #define simple_qos_governor NULL
+>>  #define pm_domain_always_on_gov NULL
+>>  #endif
+>> --
+>> 1.7.9.5
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
