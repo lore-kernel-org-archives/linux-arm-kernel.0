@@ -1,58 +1,93 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 25 Nov 2014 15:20:49 +0000
-Subject: [PATCH] of: support passing console options with stdout-path
-In-Reply-To: <20141125151515.GG2361@bivouac.eciton.net>
-References: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
- <20141125145854.A46EDC44343@trevor.secretlab.ca>
- <20141125151515.GG2361@bivouac.eciton.net>
-Message-ID: <CACxGe6v2i3iJGjK9s6HSBxV6bUwVrAtGYj=FAOb0AFEx3KVYEg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 25 Nov 2014 15:29:54 +0000
+Subject: [PATCH 0/6] arm64: alternatives runtime patching
+In-Reply-To: <1415980452-20366-1-git-send-email-andre.przywara@arm.com>
+References: <1415980452-20366-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20141125152954.GF8541@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 3:15 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Tue, Nov 25, 2014 at 02:58:54PM +0000, Grant Likely wrote:
->> > +           len = strchrnul(path, ':') - path;
->> > +
->> >             for_each_property_of_node(of_aliases, pp) {
->> >                     if (strlen(pp->name) == len && !strncmp(pp->name, path, len)) {
->> >                             np = of_find_node_by_path(pp->value);
->>
->> Can you add a testcase to drivers/of/unittests.c for this new path
->> parsing? Then we know it's correct!
->
-> Will do.
->
->> > @@ -1830,8 +1835,12 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
->> >                     name = of_get_property(of_chosen, "linux,stdout-path", NULL);
->> >             if (IS_ENABLED(CONFIG_PPC) && !name)
->> >                     name = of_get_property(of_aliases, "stdout", NULL);
->> > -           if (name)
->> > +           if (name) {
->> >                     of_stdout = of_find_node_by_path(name);
->> > +                   of_stdout_options = strchr(name, ':');
->> > +                   if (of_stdout_options != NULL)
->> > +                           of_stdout_options++;
->> > +           }
->>
->> Not so good. The ':' should actually be a generic part of
->> of_find_node_by_path(), it doesn't have to be limited to stdout parsing.
->> There are other places that would use it. I would add a second,
->> optional, argument to of_find_node_by_path() that will update a pointer
->> to the arguments after the ':'.
->
-> So, I agree this would be nicer...
->
-> However, I'm counting 157 callers of this function outside of
-> drivers/of and 43 inside. Any chance you'd let me get away with a
-> separate of_find_extra_options_by_path()?
+Hi Andre,
 
-I'd rather not. It is a trivial change and can be pretty much done
-mechanically. Something like (I think; I always have to look up the
-sed syntax):
+On Fri, Nov 14, 2014 at 03:54:06PM +0000, Andre Przywara wrote:
+> This series introduces alternatives runtime patching to arm64.
+> This allows to patch assembly instruction at runtime to either
+> fix hardware bugs or optimize for certain hardware features. Look
+> at patch 5/6 for an example on how to use this.
+> 
+> The code is heavily based on the x86 implementation.
+> Currently this is focussed on fixing CPU errata, but in the future
+> runtime optimizations for new CPU features are planned.
+> 
+> Patch 1/6 introduces a new cpu_hwcaps bitmap, which holds kernel
+> internal CPU feature flags. Since elf_hwcaps is also a userspace ABI,
+> I refrained from tinkering with this (tried this, gets messy).
+> 
+> Based on bits in this bitmap, in patch 2/6 we provide a macro to
+> replace (inline) assembly instructions at runtime with alternative
+> instructions. As on x86, those bits go into separate ELF sections.
+> The patching is done using stop_machine() to avoid mayhem in SMP.
+> 
+> Patch 3/6 introduces means to set cpu_hwcaps bits based on detecting
+> a certain CPU revision. Currently this is based on the architectural
+> bits in the MIDR register, but the code is flexible enough to easily
+> introduce more advanced criteria.
+> To support a heterogenous CPU setup (e.g. big.LITTLE), we scan all
+> CPUs in the system.
+> 
+> Patch 4 and 5 use the new framework to introduce workarounds for two
+> ARM-Cortex errata. Patch 4 introduces some more framework for the
+> detection, while patch 5 should be used as a blueprint for how to add
+> workarounds for CPU errata in the future.
+> 
+> Patch 6/6 finally introduces Kconfig entries for the bugs.
+> Those are meant to
+> a) document the errata and workarounds and
+> b) to allow system vendors to remove certain workarounds for custom
+> build kernels.
+> Though this shouldn't be strictly necessary, experience shows that
+> people will do b) anyway and I deem it better to provide official
+> means rather than provoking random hacks.
 
-sed s/of_find_node_by_path\((.*)\)/of_find_node_by_path\(\1, NULL\)
+I just merged this and encountered a couple of issues in my testing:
 
-If it turns out to be really painful, then I'll relent, but I'd like
-you to at least try! :-)
+  (1) If patching occurs in a section that is discarded at compile time
+      (e.g. .exit.text) then we will fail to link:
 
-g.
+      `.exit.text' referenced in section `.altinstructions' of
+      drivers/built-in.o: defined in discarded section `.exit.text' of
+      drivers/built-in.o
+
+  (2) No patching occurs for modules
+
+Please can you send me some additional patches on top of your series
+to address these problems? The first issue can easily be solved by adding
+a new Kconfig entry for the alternative framework, which causes
+ARM_EXIT_{KEEP,DISCARD} to change their definitions. The second patch
+needs a call from the module loader, in a similar manner to the SMP_ON_UP
+patching in arch/arm/.
+
+In the meantime, I've applied the diff below to keep allyesconfig happy.
+
+Thanks,
+
+Will
+
+--->8
+
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 3236727be2b9..9965ec87cbec 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -11,8 +11,9 @@
+ 
+ #include "image.h"
+ 
+-#define ARM_EXIT_KEEP(x)
+-#define ARM_EXIT_DISCARD(x)    x
++/* .exit.text needed in case of alternative patching */
++#define ARM_EXIT_KEEP(x)       x
++#define ARM_EXIT_DISCARD(x)
+ 
+ OUTPUT_ARCH(aarch64)
+ ENTRY(_text)
