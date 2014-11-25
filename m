@@ -1,49 +1,48 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 25 Nov 2014 13:55:53 -0600
-Subject: [PATCH v2 1/3] pinctrl: Add Qualcomm TLMM driver
-In-Reply-To: <1386295805-13708-2-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1386295805-13708-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1386295805-13708-2-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <CAOZdJXW_udiy6zYEUqJGqvdd5r4OuSzHk=u1f+tgZhRgoHNLCg@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 25 Nov 2014 11:57:47 -0800
+Subject: [PATCH v12 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+In-Reply-To: <7hioi4l92v.fsf@deeprootsystems.com>
+References: <1416576682-5255-1-git-send-email-thomas.ab@samsung.com>
+ <7hioi4l92v.fsf@deeprootsystems.com>
+Message-ID: <CAMAWPa87AFhtFaCo3RSY_qD+1DSmvhU8idOLvYwadkk5GLwaOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 5, 2013 at 8:10 PM, Bjorn Andersson
-<bjorn.andersson@sonymobile.com> wrote:
->
-> +static int msm_gpio_init(struct msm_pinctrl *pctrl)
-> +{
-> +       struct gpio_chip *chip;
-> +       int irq;
-> +       int ret;
-> +       int i;
-> +       int r;
-> +
-> +       chip = &pctrl->chip;
-> +       chip->base = 0;
-> +       chip->ngpio = pctrl->soc->ngpios;
+Hi Thomas,
 
-I know this patch is a year old, but I'm wondering if this line is correct.
+On Mon, Nov 24, 2014 at 10:58 AM, Kevin Hilman <khilman@kernel.org> wrote:
 
-The original version of your patch from 11/23/13 said this:
+[...]
 
-+       chip->ngpio = pctrl->soc->gpio_range->npins;
+> Second, as with earlier versions of this series, I'm still seeing lots
+> of "wait_until_divider_stable: timeout in divider stablization" messages
+> coming out when running powertop.
 
-and today, the line is this:
+I found a simpler way to reproduce these messages.  If I simply use
+the userspace governor and cycle through all the A7 OPPs, I'll hit
+this message (script below[1]).  Note that I'm also using my DTS
+change that fixes the vdd_arm and vdd_kfc voltages to a voltage that
+is high enough for all the OPPs.
 
-    unsigned ngpio = pctrl->soc->ngpios;
+Kevin
 
-I'm wondering if this line should be instead:
+[1]
+#!/bin/sh
+cpu=cpu4
+reg_name=vdd_kfc
+cpu_reg=$(dirname `find /sys/class/regulator/regulator.*/ -name name
+-exec grep -l $reg_name {} \;`)
+echo $cpu_reg
 
-    unsigned ngpio = pctrl->soc->npins;
-
-I'm confused about the difference between msm_pinctrl_soc_data.npins
-and msm_pinctrl_soc_data.ngpios.  Variable "ngpio" is used by
-gpiochip_add(), so I think it's not concerned with pin control.
-msm_pinctrl_soc_data.npins appears to be the number of GPIOs, whereas
-msm_pinctrl_soc_data.ngpios appears to be the number of pin groups.
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+# Cycle through frequencies (and check voltage)
+cd /sys/devices/system/cpu/$cpu/cpufreq
+echo userspace > scaling_governor
+for freq in `cat scaling_available_frequencies`; do
+  echo ${freq} > scaling_setspeed
+  echo -n "current freq: "
+  cat scaling_cur_freq
+  echo -n "current voltage: "
+  cat ${cpu_reg}/microvolts
+  sleep 1
+done
