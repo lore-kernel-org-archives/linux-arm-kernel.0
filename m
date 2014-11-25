@@ -1,54 +1,49 @@
-From: zhichang.yuan@linaro.org (zhichang.yuan)
-Date: Tue, 25 Nov 2014 22:41:35 +0800
-Subject: [PATCH] arm64:mm: free the useless initial page table
-In-Reply-To: <20141124143208.GE15872@e104818-lin.cambridge.arm.com>
-References: <1416558460-7257-1-git-send-email-zhichang.yuan@linaro.org>
- <20141124143208.GE15872@e104818-lin.cambridge.arm.com>
-Message-ID: <5474951F.8050809@linaro.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 25 Nov 2014 14:44:39 +0000
+Subject: [PATCH] of: support passing console options with stdout-path
+In-Reply-To: <20141124230016.GP20238@lunn.ch>
+References: <1416867838-18652-1-git-send-email-leif.lindholm@linaro.org>
+ <20141124230016.GP20238@lunn.ch>
+Message-ID: <20141125144439.07212C44343@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 25 Nov 2014 00:00:16 +0100
+, Andrew Lunn <andrew@lunn.ch>
+ wrote:
+> On Mon, Nov 24, 2014 at 10:23:58PM +0000, Leif Lindholm wrote:
+> > Support specifying console options (like with console=ttyXN,<options>)
+> > by appending them to the stdout-path property after a separating ':'.
+> > 
+> > Example:
+> > 	stdout-path = "uart0:115200";
+> > 
+> > This patch also modifies of_find_node_by_path() to match only the
+> > portion of the path before a ':'.
+> 
+> Hi Leif
+> 
+> These appears to somewhat conform to ePAPR, which says:
+> 
+>       A string that specifies the full path to the node representing
+>       the device to be used for boot console output. If the character
+>       ":" is present in the value it terminates the path.
+> 
+> So you can put any random junk after the :. However, are we going to
+> have backward/forward compatibility problems, and problems with
+> bootloaders? The current kernel code does not look for the :. So a new
+> DT blob on an old kernel will not work so well.
 
-On 2014?11?24? 22:32, Catalin Marinas wrote:
-> On Fri, Nov 21, 2014 at 08:27:40AM +0000, zhichang.yuan at linaro.org wrote:
->> From: "zhichang.yuan" <zhichang.yuan@linaro.org>
->>
->> For 64K page system, after mapping a PMD section, the corresponding initial
->> page table is not needed any more. That page can be freed.
->>
->> Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
->> ---
->>  arch/arm64/mm/mmu.c |    5 ++++-
->>  1 file changed, 4 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index f4f8b50..12a336b 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -191,8 +191,11 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
->>  			 * Check for previous table entries created during
->>  			 * boot (__create_page_tables) and flush them.
->>  			 */
->> -			if (!pmd_none(old_pmd))
->> +			if (!pmd_none(old_pmd)) {
->>  				flush_tlb_all();
->> +				if (pmd_table(old_pmd))
->> +					memblock_free(pte_pfn(pmd_pte(old_pmd)) << PAGE_SHIFT, PAGE_SIZE);
->> +			}
-> For consistency with alloc_init_pud(), could you do:
->
-> 	phys_addr_t table = __pa(pte_offset(&old_pmd, 0));
-> 	memblock_free(table, PAGE_SIZE);
-Just as Laura comments, the pte_offset will convert the PA to VA, and then convert  VA to PA. It seems to be
-verbose. That is why i use pte_pfn. Anyway, the consistency is better, i will revise it.
+For DT, we've generally not been worrying about compatibility in that
+direction.  If we've got a new firmware, we should be able to get a new
+kernel.  Nobody has really screamed bout it yet.
 
-> Since you are at this, for alloc_init_pud() could you please move the
-> flush_tlb_all() before memblock_free()? Theoretical problem really but
-> it's nice for consistency.
->
-> Thanks.
->
-As for this issue, i have a small question.  Since the new PMD entry had been set by set_pmd, why not do the
-tlb flush as soon as we can?
+> More worrying, barebox does not support the : either. So there is a
+> danger your bootloader suddenly goes silent after a dt blob update.
 
-Thanks!
+Is barebox parsing the property? Or updating it? Or both? I've got no
+problem with this patch, but we can also support things like the
+'current-speed' property in the UART to set a default when the stdout
+path doesn't have any arguments.
+
+g.
