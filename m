@@ -1,50 +1,21 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 25 Nov 2014 17:30:25 +0800
-Subject: [PATCH] media: atmel-isi: increase the burst length to improve the
- performance
-Message-ID: <1416907825-23826-1-git-send-email-josh.wu@atmel.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Tue, 25 Nov 2014 17:37:31 +0800
+Subject: [PATCH 0/2] Increase the maximum cpu frequency of rk3288
+Message-ID: <1416908253-31721-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The burst length could be BEATS_4/8/16. Before this patch, isi use default
-value BEATS_4. To imporve the performance we could set it to BEATS_16.
+The maximum cpu frequency of rk3288 can up to 1.8Ghz, but the vdd_cpu need set
+to 1.4v. I've tested these patches on rk3288 evb board.
 
-Otherwise sometime it would cause the ISI overflow error.
 
-Reported-by: Bo Shen <voice.shen@atmel.com>
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
- drivers/media/platform/soc_camera/atmel-isi.c | 2 ++
- include/media/atmel-isi.h                     | 4 ++++
- 2 files changed, 6 insertions(+)
+Chris Zhong (2):
+  ARM: dts: rockchip: change the max voltage of cpu to 1.4v
+  ARM: dts: rk3288: change the max clk of cpu to 1.8Ghz
 
-diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-index ee5650f..fda587b 100644
---- a/drivers/media/platform/soc_camera/atmel-isi.c
-+++ b/drivers/media/platform/soc_camera/atmel-isi.c
-@@ -839,6 +839,8 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
- 	if (isi->pdata.full_mode)
- 		cfg1 |= ISI_CFG1_FULL_MODE;
- 
-+	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
-+
- 	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
- 	isi_writel(isi, ISI_CFG1, cfg1);
- 
-diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
-index c2e5703..6008b09 100644
---- a/include/media/atmel-isi.h
-+++ b/include/media/atmel-isi.h
-@@ -59,6 +59,10 @@
- #define		ISI_CFG1_FRATE_DIV_MASK		(7 << 8)
- #define ISI_CFG1_DISCR				(1 << 11)
- #define ISI_CFG1_FULL_MODE			(1 << 12)
-+/* Definition for THMASK(ISI_V2) */
-+#define		ISI_CFG1_THMASK_BEATS_4		(0 << 13)
-+#define		ISI_CFG1_THMASK_BEATS_8		(1 << 13)
-+#define		ISI_CFG1_THMASK_BEATS_16	(2 << 13)
- 
- /* Bitfields in CFG2 */
- #define ISI_CFG2_GRAYSCALE			(1 << 13)
+ arch/arm/boot/dts/rk3288-evb-rk808.dts | 2 +-
+ arch/arm/boot/dts/rk3288.dtsi          | 6 ++++--
+ 2 files changed, 5 insertions(+), 3 deletions(-)
+
 -- 
 1.9.1
