@@ -1,65 +1,216 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 25 Nov 2014 07:51:07 +0100
-Subject: [PATCHv3 09/16] ARM: mvebu: implement suspend/resume support
- for Armada XP
-In-Reply-To: <20141123033603.GA9801@lunn.ch>
-References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1416585613-2113-10-git-send-email-thomas.petazzoni@free-electrons.com>
- <20141121164142.GB20238@lunn.ch>
- <20141121175957.6ef4f26d@free-electrons.com>
- <20141121172031.GC20238@lunn.ch>
- <20141122215648.771225f2@free-electrons.com>
- <20141123033603.GA9801@lunn.ch>
-Message-ID: <20141125075107.16473bf1@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 25 Nov 2014 08:30:24 +0100
+Subject: [PATCH RFC v2 06/12] driver: soc: exynos-pmu: Add exynos7 power
+ domain on/off ops
+In-Reply-To: <1416834256-11225-6-git-send-email-amit.daniel@samsung.com>
+References: <1416833572-6880-1-git-send-email-amit.daniel@samsung.com>
+ <1416834256-11225-1-git-send-email-amit.daniel@samsung.com>
+ <1416834256-11225-6-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CAPDyKFpGjeWx8LkhN9BRLEczGSehXQBAB7A_M1DtCFN9tZOtYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+On 24 November 2014 at 14:04, Amit Daniel Kachhap
+<amit.daniel@samsung.com> wrote:
+> This patch uses the restructuring done in PD handlers and adds PD
+> on/off/status handlers for exynos7. In this SoC, some extra settings
+> need to be done prior to turning on/off power domains. Some of those
+> settings are also different from different power domains so is uses
+> the power domain compatible name feature to distinguish between power
+> domains.
+>
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+>  drivers/soc/samsung/exynos-pmu.c            |  105 +++++++++++++++++++++++++++
+>  include/linux/soc/samsung/exynos-regs-pmu.h |   17 +++++
+>  2 files changed, 122 insertions(+)
+>
+> diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
+> index e690f65..b9631d5 100644
+> --- a/drivers/soc/samsung/exynos-pmu.c
+> +++ b/drivers/soc/samsung/exynos-pmu.c
+> @@ -1202,6 +1202,104 @@ static void exynos7_pmu_init(void)
+>         }
+>  }
+>
+> +static int exynos7_pd_extraconf_base(const char *pd_name)
+> +{
+> +       if (!pd_name)
+> +               return -EINVAL;
+> +
+> +       if (!strcmp("samsung,exynos7-pd-mfc", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_MFC_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-hevc", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_HEVC_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-mscl", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_MSCL_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-g2d", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_G2D_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-fsys0", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_FSYS0_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-fsys1", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_FSYS1_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-aud", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_AUD_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-disp", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_DISP_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-vpp", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_VPP_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-vpp", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_VPP_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-isp0", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_ISP0_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-isp1", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_ISP1_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-cam0", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_CAM0_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-cam1", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_CAM1_SYS_PWR_REG;
+> +       else if (!strcmp("samsung,exynos7-pd-g3d", pd_name))
+> +               return EXYNOS7_CLKRUN_CMU_CAM1_SYS_PWR_REG;
 
-On Sun, 23 Nov 2014 04:36:03 +0100, Andrew Lunn wrote:
+I think we should move away from using strings to find a matching PM
+domain. Instead we should use a enum/define pointing to the PM domain
+in an array of PM domains, or similar.
 
-> > No, it is not the BootROM that does this. It is the binary header,
-> > which is something different.
-> 
-> O.K, so this definitely needs documenting somewhere, since it is not
-> obvious. I'm not sure if it is sufficient to make this part of the
-> commit log, or if it should be documented in Documentation/power.
+The UX500 SOC initial support for PM domains is queued for 3.19 and is
+currently available in linux-next. You may want to get some
+inspiration from that approach.
 
-I can send a follow-up patch that adds a more detailed comment in
-arch/arm/mach-mvebu/pm.c maybe?
+> +
+> +       pr_err("%s: Unsupported power domain\n", pd_name);
+> +       return 0;
+> +}
+> +
+> +static int exynos7_pd_powerdown(const char *pd_name, void __iomem *pd_addr)
+> +{
 
-> > The "binary header" is currently the piece of code that we extract
-> > using the kwbimage tool from existing U-Boot images to build working
-> > Barebox images, since we haven't yet written the equivalent code in
-> > Barebox land.
-> 
-> Is it a binary blob in the uboot source tree?
+Considering the suggestion above and to move away from using strings
+like this; this function could take a pointer to the PM domain instead
+of a string and the __iomem, right!?
 
-Originally, parts of it were available in the form of source code, and
-only the code doing the DDR3 training to calculate the optimal timings
-was provided as a binary blob. However, in order to allow the U-Boot
-folks to add complete support for Armada XP, Marvell opened this part
-as well. See
-http://git.denx.de/?p=u-boot/u-boot-testing.git;a=shortlog;h=refs/heads/marvell-armada-xp-2014-09-29-spl.
+> +       int off_base = exynos7_pd_extraconf_base(pd_name);
+> +
+> +       if (!off_base)
+> +               return -EINVAL;
+> +
+> +       /* Initialise the pd extraconf registers */
+> +       pmu_raw_writel(0, off_base + EXYNOS7_CLKRUN_CMU_PD_SYS_PWR_REG);
+> +       pmu_raw_writel(0, off_base + EXYNOS7_CLKSTOP_CMU_PD_SYS_PWR_REG);
+> +       pmu_raw_writel(0, off_base + EXYNOS7_DISABLE_PLL_CMU_PD_SYS_PWR_REG);
+> +       pmu_raw_writel(0, off_base + EXYNOS7_RESET_LOGIC_PD_SYS_PWR_REG);
+> +       pmu_raw_writel(0, off_base + EXYNOS7_MEMORY_PD_SYS_PWR_REG);
+> +       pmu_raw_writel(0, off_base + EXYNOS7_RESET_CMU_PD_SYS_PWR_REG);
+> +
+> +       if (!strcmp("samsung,exynos7-pd-fsys0", pd_name) ||
+> +                       !strcmp("samsung,exynos7-pd-fsys1", pd_name))
+> +               pmu_raw_writel(1,
+> +                               off_base + EXYNOS7_RESET_SLEEP_PD_SYS_PWR_REG);
+> +
+> +       if (!strcmp("samsung,exynos7-pd-aud", pd_name)) {
+> +               pmu_raw_writel(0, EXYNOS7_PAD_RETENTION_AUD_SYS_PWR_REG);
+> +               pmu_raw_writel(0, EXYNOS7_GPIO_MODE_AUD_SYS_PWR_REG);
+> +       }
+> +
+> +       writel_relaxed((EXYNOS7_USE_PROLONGED_LOGIC_RESET |
+> +                       EXYNOS7_USE_SC_FEEDBACK), pd_addr + EXYNOS_PD_OPTION);
+> +
+> +       return 0;
+> +}
+> +
+> +static int exynos7_pd_poweron(const char *pd_name, void __iomem *pd_addr)
+> +{
+> +       if (exynos7_pd_powerdown(pd_name, pd_addr))
+> +               return -EINVAL;
+> +
+> +       return __exynos_pd_poweron_off(true, pd_name, pd_addr,
+> +                       EXYNOS7_INT_LOCAL_PWR_EN);
+> +}
+> +
+> +static int exynos7_pd_poweroff(const char *pd_name, void __iomem *pd_addr)
+> +{
+> +       if (exynos7_pd_powerdown(pd_name, pd_addr))
+> +               return -EINVAL;
+> +
+> +       return __exynos_pd_poweron_off(false, pd_name, pd_addr,
+> +                       EXYNOS7_INT_LOCAL_PWR_EN);
+> +}
+> +
+> +static bool exynos7_pd_status(void __iomem *pd_addr)
+> +{
+> +       unsigned int val;
+> +
+> +       val = readl_relaxed(pd_addr + EXYNOS_PD_STATUS) &
+> +                               EXYNOS7_INT_LOCAL_PWR_EN;
+> +       return  val ? true : false;
+> +}
+> +
+>  static struct exynos_pmu_pd_ops exynos_pd_ops = {
+>         .pd_on          = exynos_pd_poweron,
+>         .pd_off         = exynos_pd_poweroff,
+> @@ -1238,12 +1336,19 @@ static struct exynos_pmu_data exynos5420_pmu_data = {
+>         .pd_ops         = &exynos_pd_ops,
+>  };
+>
+> +static struct exynos_pmu_pd_ops exynos7_pd_ops = {
+> +       .pd_on          = exynos7_pd_poweron,
+> +       .pd_off         = exynos7_pd_poweroff,
+> +       .pd_status      = exynos7_pd_status,
+> +};
+> +
+>  static const struct exynos_pmu_data exynos7_pmu_data = {
+>         .pmu_config             = exynos7_pmu_config,
+>         .pmu_init               = exynos7_pmu_init,
+>         .pmu_config_extra       = exynos7_pmu_config_extra,
+>         .powerdown_conf         = exynos7_powerdown_conf,
+>         .powerup_conf           = exynos7_powerup_conf,
+> +       .pd_ops                 = &exynos7_pd_ops,
+>  };
+>
+>  /*
+> diff --git a/include/linux/soc/samsung/exynos-regs-pmu.h b/include/linux/soc/samsung/exynos-regs-pmu.h
+> index c61f91a..520595f 100644
+> --- a/include/linux/soc/samsung/exynos-regs-pmu.h
+> +++ b/include/linux/soc/samsung/exynos-regs-pmu.h
+> @@ -680,6 +680,8 @@ static inline unsigned int exynos_pmu_cpunr(unsigned int mpidr)
+>  #define EXYNOS7_VPP_SYS_PWR_REG                                        (0x1438)
+>  #define EXYNOS7_CLKRUN_CMU_AUD_SYS_PWR_REG                     (0x1440)
+>  #define EXYNOS7_CLKRUN_CMU_BUS0_SYS_PWR_REG                    (0x1444)
+> +#define EXYNOS7_CLKRUN_CMU_CAM0_SYS_PWR_REG                    (0x1448)
+> +#define EXYNOS7_CLKRUN_CMU_CAM1_SYS_PWR_REG                    (0x144C)
+>  #define EXYNOS7_CLKRUN_CMU_DISP_SYS_PWR_REG                    (0x1450)
+>  #define EXYNOS7_CLKRUN_CMU_FSYS0_SYS_PWR_REG                   (0x1454)
+>  #define EXYNOS7_CLKRUN_CMU_FSYS1_SYS_PWR_REG                   (0x1458)
+> @@ -824,6 +826,7 @@ static inline unsigned int exynos_pmu_cpunr(unsigned int mpidr)
+>  #define EXYNOS7_USE_STANDBYWFI                                 (0x1 << 16)
+>  #define EXYNOS7_USE_SC_FEEDBACK                                        (0x1 << 1)
+>  #define EXYNOS7_USE_SC_COUNTER                                 (0x1 << 0)
+> +#define EXYNOS7_USE_PROLONGED_LOGIC_RESET                      (0x1 << 8)
+>
+>  /* EXYNOS7_PAD_RETENTION_AUD_OPTION */
+>  #define PAD_INITIATE_WAKEUP                                    (0x1 << 28)
+> @@ -841,4 +844,18 @@ static inline unsigned int exynos_pmu_cpunr(unsigned int mpidr)
+>
+>  #define EXYNOS7_CORE_ARMCLK_STOPCTRL           (0x1000)
+>
+> +#define EXYNOS7_INT_LOCAL_PWR_EN               0xF
+> +
+> +/*
+> + * Power domain register offsets from the EXYNOS7
+> + * CLKRUN_CMU_HEVC_SYS_PWR_REG configuration register.
+> + */
+> +#define EXYNOS7_CLKRUN_CMU_PD_SYS_PWR_REG      (0x0)
+> +#define EXYNOS7_CLKSTOP_CMU_PD_SYS_PWR_REG     (0x40)
+> +#define EXYNOS7_DISABLE_PLL_CMU_PD_SYS_PWR_REG (0x80)
+> +#define EXYNOS7_RESET_LOGIC_PD_SYS_PWR_REG     (0xC0)
+> +#define EXYNOS7_MEMORY_PD_SYS_PWR_REG          (0x100)
+> +#define EXYNOS7_RESET_CMU_PD_SYS_PWR_REG       (0x140)
+> +#define EXYNOS7_RESET_SLEEP_PD_SYS_PWR_REG     (0x180)
+> +
+>  #endif /* __ASM_ARCH_REGS_PMU_H */
+> --
+> 1.7.9.5
+>
 
-> > So, the specification of where the "resume informations" is located and
-> > how this information is organized is purely defined by software that
-> > can potentially be changed, not by the BootROM. Though that if we
-> > decided to use a different protocol, we would basically have a
-> > suspend/resume in the kernel that would not work with any Marvell
-> > platform  that uses the default bootloader.
-> 
-> It also makes mainline suspend/resume dependent on Marvell not
-> changing the bootloader.
-
-Yes, absolutely. Just like the suspend/resume mechanism also depends on
-which firmware was installed in the PIC micro-controller that controls
-the power rails.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Kind regards
+Uffe
