@@ -1,57 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Nov 2014 11:29:05 +0000
-Subject: For the problem when using swiotlb
-In-Reply-To: <20141125105815.GB18858@e104818-lin.cambridge.arm.com>
-References: <5469E26B.2010905@huawei.com> <20141121175118.GA10451@localhost>
- <20141121180925.GG19783@e104818-lin.cambridge.arm.com>
- <2166613.l2i4mdmtLA@wuerfel>
- <20141125105815.GB18858@e104818-lin.cambridge.arm.com>
-Message-ID: <20141125112905.GC3836@n2100.arm.linux.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 25 Nov 2014 20:35:25 +0900
+Subject: [RFC 2/2] clk: samsung: Fix clock disable failure because domain
+ being gated
+In-Reply-To: <1416842312-4405-3-git-send-email-k.kozlowski@samsung.com>
+References: <1416842312-4405-1-git-send-email-k.kozlowski@samsung.com>
+ <1416842312-4405-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CA+Ln22FTJ8AwNOq+jrA6dK=4ziGFwFT+Ofjr2zE4z=8B4f3QJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 10:58:15AM +0000, Catalin Marinas wrote:
-> Since we don't have a coherent_dma_supported() function, we defer the
-> validity check of coherent_dma_mask to dma_alloc_coherent() (and here we
-> can remove bouncing since swiotlb has relatively small buffers).
+Hi Krzysztof,
 
-Bouncing of coherent DMA buffers is insane; if you have to bounce them,
-they're by definition not coherent.
+Please see my comments inline.
 
-Think about one of the common uses of coherent DMA buffers: ring buffers,
-where both the CPU and the DMA agent write to the ring:
+2014-11-25 0:18 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> +static int audss_clk_gate_enable(struct clk_hw *hw)
+> +{
+> +       int ret;
+> +
+> +       if (!IS_ERR(pll_in))
+> +               clk_prepare_enable(pll_in);
 
-- CPU writes to ring, loading address and length, then writing to the
-  status word for the ring entry.
-- DMA reads the ring status word, sees it owns the entry, processes it,
-  DMA writes to the ring status word to give it back.
+Calling clk_prepare_enable() from enable() callback doesn't look like
+a good idea, because enabling is not supposed to sleep, while
+preparing might do so.
 
-What this means is that if you are bouncing the buffer, you are copying
-it whole-sale between the CPU visible version and the DMA visible
-version, which means that you can miss DMA updates to it.  So, bouncing
-a coherent DMA buffer is simply not an acceptable implementation for
-dma_alloc_coherent().
+I guess you have to pre-prepare this clock in probe and then only call
+enable here.
 
-As for validity of masks, it is defined in the DMA API documentation that
-if a DMA mask is suitable for the streaming APIs, then it is also suitable
-for the coherent APIs.  The reverse is left open, and so may not
-necessarily be true.
+> +       ret = clk_gate_ops.enable(hw);
+> +       if (!IS_ERR(pll_in))
+> +               clk_disable_unprepare(pll_in);
+> +
+> +       return ret;
+> +}
 
-In other words:
+[snip]
 
-	err = dma_set_mask(dev, mask);
-	if (err == 0)
-		assert(dma_set_coherent_mask(dev, mask) == 0);
+> +/* TODO: Also mux and div */
+> +const struct clk_ops audss_clk_gate_ops = {
 
-must always succeed, but reversing the two calls has no guarantee.
+nit: static const probably?
 
-Note that there seems to be only one driver which has different coherent
-and streaming DMA masks today:
+> +       .enable = audss_clk_gate_enable,
+> +       .disable = audss_clk_gate_disable,
+> +       .is_enabled = audss_clk_gate_is_enabled,
+> +};
 
-drivers/media/pci/sta2x11/sta2x11_vip.c:
-        if (dma_set_mask(&pdev->dev, DMA_BIT_MASK(26))) {
-        err = dma_set_coherent_mask(&vip->pdev->dev, DMA_BIT_MASK(29));
+As for the approach itself, maybe you should simply register fully
+custom clocks with clk_register(), without altering
+clk_register_gate() at all and simply calling gate ops whenever
+necessary? I don't know, just a loose idea.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+By the way, this issue could be probably solved by integrating generic
+clocks with regmap API, since regmap-mmio can automatically control a
+clock.
+
+Best regards,
+Tomasz
