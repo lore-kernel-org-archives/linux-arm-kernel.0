@@ -1,167 +1,118 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Tue, 25 Nov 2014 16:10:08 +0800
-Subject: [PATCH v2] mmc: dw_mmc: add quirk for broken data transfer over scheme
-In-Reply-To: <1415970338-2637-1-git-send-email-addy.ke@rock-chips.com>
-References: <1415970338-2637-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <1416903008-4160-1-git-send-email-addy.ke@rock-chips.com>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Tue, 25 Nov 2014 13:46:54 +0530
+Subject: [PATCH v4 0/5] exynos: Move pmu driver to driver/soc folder and
+ add exynos7 support
+In-Reply-To: <36336460.BrNftCFaUT@amdc1032>
+References: <1416794775-1605-1-git-send-email-amit.daniel@samsung.com>
+ <36336460.BrNftCFaUT@amdc1032>
+Message-ID: <CADGdYn4itcB-PHqZZUoR9Xdf17MXgo0LzbPXj0fuU_GL5bqDEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add a new quirk to add a s/w timer to notify the driver
-to terminate current transfer and report a data timeout to the core,
-if DTO interrupt does NOT come within the given time.
+On Mon, Nov 24, 2014 at 6:50 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> Hi,
+>
+> On Monday, November 24, 2014 07:36:10 AM Amit Daniel Kachhap wrote:
+>> This patch series [1 - 5] performs,
+>>
+>> 1) Moves pmu driver to driver/soc/samsung folder. This is needed as exynos7 is
+>>    an arm64 based platform and hence PMU driver should be in driver folder.
+>>    Some discussion happened about this in the v1 version. Finally adding it in
+>>    driver/soc folder as it too SoC specific and not a general driver.
+>>    Entire discussion can be found here (A).
+>> 2) Add exynos7 PMU support.
+>
+> Some months ago (when the work on moving PMU driver out of mach-exynos
+> started) I asked how much code would be shared between arm32 and arm64
+> SoCs.  Now it seems that the code in question is minimal so I still
+> wonder whether it is really worth to have a common driver (please note
+> that in case of arm32 kernel all arm64 PMU code is just a dead code,
+> similarly for arm64 kernel and arm32 PMU code).  Would it be possible
+> to do the analysis of the additional source code needed vs saved code
+> in the resulting binary for the case of having separate drivers?
+yes your suggestion is good. It may done by keeping the data pmu_config[]
+arrays in .h file under CONFIG_ARM(or CONFIG_ARM64) and NULL for non required
+platforms. Keep them in 2 separate files may be confusing.
 
-dw_mmc call mmc_request_done func to finish transfer depends on
-DTO interrupt. If DTO interrupt does not come in sending data state,
-the current transfer will be blocked.
+>
+> Could you also please take a look into fixing patch #4 to be compatible
+> with http://lkml.iu.edu/hypermail/linux/kernel/1407.1/00298.html ?
+This patch makes sense. Thanks for pointing out.
+> (It seems that just adding separate struct exynos_pmu_conf_extra for
+> ->pmu_config_extra shold be okay.)
+Yes right struct exynos_pmu_conf_extra should work for exynos7.
 
-But this case really exists, when driver reads tuning data from
-card on RK3288-pink2 board. I measured waveforms by oscilloscope
-and found that card clock was always on and data lines were always
-holded high level in sending data state.
+I think both of the above optimizations may go as a separate patch.
 
-We got the reply from synopsys:
-There are two counters but both use the same value of [31:8] bits.
-Data timeout counter doesn't wait for stop clock and you should get
-DRTO even when the clock is not stopped.
-Host Starvation timeout counter is triggered with stop clock condition.
-
-This means that host should get DRTO and DTO interrupt.
-
-But we really don't get any data-related interrupt in RK3X SoCs.
-And driver can't get data transfer state, it can do nothing but wait for.
-
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
-- fix some typo.
-- remove extra timeout value (250ms).
-- remove dw_mci_dto_start_monitor func.
-- use "broken-dto" for new quirk and change Subject for it.
-
- drivers/mmc/host/dw_mmc.c  | 44 +++++++++++++++++++++++++++++++++++++++++++-
- include/linux/mmc/dw_mmc.h |  5 +++++
- 2 files changed, 48 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index b4c3044..bc09f50 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1457,6 +1457,8 @@ static void dw_mci_tasklet_func(unsigned long priv)
- 	enum dw_mci_state state;
- 	enum dw_mci_state prev_state;
- 	unsigned int err;
-+	unsigned int drto_clks;
-+	unsigned int drto_ms;
- 
- 	spin_lock(&host->lock);
- 
-@@ -1522,8 +1524,17 @@ static void dw_mci_tasklet_func(unsigned long priv)
- 			}
- 
- 			if (!test_and_clear_bit(EVENT_XFER_COMPLETE,
--						&host->pending_events))
-+						&host->pending_events)) {
-+				if (host->quirks & DW_MCI_QUIRK_BROKEN_DTO) {
-+					drto_clks = mci_readl(host, TMOUT) >> 8;
-+					drto_ms = DIV_ROUND_UP(drto_clks * 1000,
-+							       host->bus_hz);
-+
-+					mod_timer(&host->dto_timer, jiffies +
-+						msecs_to_jiffies(drto_ms));
-+				}
- 				break;
-+			}
- 
- 			set_bit(EVENT_XFER_COMPLETE, &host->completed_events);
- 
-@@ -2115,6 +2126,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
- 		}
- 
- 		if (pending & SDMMC_INT_DATA_OVER) {
-+			if (host->quirks & DW_MCI_QUIRK_BROKEN_DTO)
-+				del_timer(&host->dto_timer);
-+
- 			mci_writel(host, RINTSTS, SDMMC_INT_DATA_OVER);
- 			if (!host->data_status)
- 				host->data_status = pending;
-@@ -2502,6 +2516,28 @@ ciu_out:
- 	return ret;
- }
- 
-+static void dw_mci_dto_timer(unsigned long arg)
-+{
-+	struct dw_mci *host = (struct dw_mci *)arg;
-+
-+	switch (host->state) {
-+	case STATE_SENDING_DATA:
-+	case STATE_DATA_BUSY:
-+		/*
-+		* If DTO interrupt does NOT come in sending data state,
-+		* we should notify the driver to terminate current transfer
-+		* and report a data timeout to the core.
-+		*/
-+		host->data_status = SDMMC_INT_DRTO;
-+		set_bit(EVENT_DATA_ERROR, &host->pending_events);
-+		set_bit(EVENT_DATA_COMPLETE, &host->pending_events);
-+		tasklet_schedule(&host->tasklet);
-+		break;
-+	default:
-+		break;
-+	}
-+}
-+
- #ifdef CONFIG_OF
- static struct dw_mci_of_quirks {
- 	char *quirk;
-@@ -2513,6 +2549,9 @@ static struct dw_mci_of_quirks {
- 	}, {
- 		.quirk	= "disable-wp",
- 		.id	= DW_MCI_QUIRK_NO_WRITE_PROTECT,
-+	}, {
-+		.quirk	= "broken-dto",
-+		.id	= DW_MCI_QUIRK_BROKEN_DTO,
- 	},
- };
- 
-@@ -2654,6 +2693,9 @@ int dw_mci_probe(struct dw_mci *host)
- 
- 	spin_lock_init(&host->lock);
- 	INIT_LIST_HEAD(&host->queue);
-+	if (host->quirks & DW_MCI_QUIRK_BROKEN_DTO)
-+		setup_timer(&host->dto_timer,
-+			    dw_mci_dto_timer, (unsigned long)host);
- 
- 	/*
- 	 * Get the host data width - this assumes that HCON has been set with
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index 42b724e..ff9bd1e 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -98,6 +98,7 @@ struct mmc_data;
-  * @irq_flags: The flags to be passed to request_irq.
-  * @irq: The irq value to be passed to request_irq.
-  * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
-+ * @dto_timer: Timer for broken data transfer over scheme.
-  *
-  * Locking
-  * =======
-@@ -196,6 +197,8 @@ struct dw_mci {
- 	int			irq;
- 
- 	int			sdio_id0;
-+
-+	struct timer_list	dto_timer;
- };
- 
- /* DMA ops for Internal/External DMAC interface */
-@@ -220,6 +223,8 @@ struct dw_mci_dma_ops {
- #define DW_MCI_QUIRK_BROKEN_CARD_DETECTION	BIT(3)
- /* No write protect */
- #define DW_MCI_QUIRK_NO_WRITE_PROTECT		BIT(4)
-+/* Timer for broken data transfer over scheme */
-+#define DW_MCI_QUIRK_BROKEN_DTO			BIT(5)
- 
- /* Slot level quirks */
- /* This slot has no write protect */
--- 
-1.8.3.2
+Regards,
+Amit D
+>
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+>
+>> 3) Enables the driver for 32bit arm exynos platforms.
+>>
+>> Changes from V3:
+>> * Fixed Kconfig as per Russell feedback
+>> * Rebased the series against Pankaj SoC restart consolidation patches (D) as per
+>>   Kukjin request.
+>> * Link to V3 can be found here (C)
+>>
+>> Changes from V2:
+>> * Added review comment changes suggested by Pankaj.
+>> * Removed mfd client support in this patch series. This will be added later in
+>>   the power domain patch series.
+>> * Link to V2 can be found here (B)
+>>
+>> Changes from V1:
+>> * Move pmu driver in driver/soc/samsung folder
+>> * Removed the power domain features. They will posted as a separate series.
+>> * Added exynos7 PMU support.
+>> * Link to v1 can be found here (A)
+>>
+>> This complete patch series is rebased on Kukjin for-next tree.
+>>
+>> (A) - http://www.spinics.net/lists/linux-samsung-soc/msg38442.html
+>> (B) - http://www.spinics.net/lists/arm-kernel/msg375910.html
+>> (C) - http://www.spinics.net/lists/linux-samsung-soc/msg39237.html
+>> (D) - http://www.spinics.net/lists/linux-samsung-soc/msg39095.html
+>>
+>> Amit Daniel Kachhap (5):
+>>   ARM: EXYNOS: Move pmu specific header files under "linux/soc/samsung"
+>>   drivers: soc: Add support for Exynos PMU driver
+>>   driver: soc: exynos-pmu: Add an API to be called after wakeup
+>>   drivers: soc: exynos-pmu: Add support for Exynos7
+>>   arm: exynos: Select SOC_SAMSUNG config option
+>>
+>>  .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+>>  arch/arm/mach-exynos/Kconfig                       |    1 +
+>>  arch/arm/mach-exynos/Makefile                      |    2 +-
+>>  arch/arm/mach-exynos/exynos.c                      |    2 +-
+>>  arch/arm/mach-exynos/mcpm-exynos.c                 |    2 +-
+>>  arch/arm/mach-exynos/platsmp.c                     |    2 +-
+>>  arch/arm/mach-exynos/pm.c                          |    4 +-
+>>  arch/arm/mach-exynos/suspend.c                     |    4 +-
+>>  drivers/soc/Kconfig                                |    1 +
+>>  drivers/soc/Makefile                               |    1 +
+>>  drivers/soc/samsung/Kconfig                        |   20 +
+>>  drivers/soc/samsung/Makefile                       |    1 +
+>>  .../pmu.c => drivers/soc/samsung/exynos-pmu.c      |  442 +++++++++++++++++++-
+>>  .../linux/soc/samsung}/exynos-pmu.h                |    1 +
+>>  .../linux/soc/samsung/exynos-regs-pmu.h            |  273 ++++++++++++
+>>  15 files changed, 744 insertions(+), 13 deletions(-)
+>>  create mode 100644 drivers/soc/samsung/Kconfig
+>>  create mode 100644 drivers/soc/samsung/Makefile
+>>  rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (64%)
+>>  rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (89%)
+>>  rename arch/arm/mach-exynos/regs-pmu.h => include/linux/soc/samsung/exynos-regs-pmu.h (63%)
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
