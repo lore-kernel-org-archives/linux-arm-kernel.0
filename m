@@ -1,35 +1,50 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Nov 2014 16:25:01 +0000
-Subject: [PATCH v2 4/8] ARM: STi: STiH416: Enable Cortex-A9 PMU support
+Date: Tue, 25 Nov 2014 16:25:02 +0000
+Subject: [PATCH v2 5/8] ARM: STi: STiH416: Enable PMU IRQs
 In-Reply-To: <1416932705-16880-1-git-send-email-lee.jones@linaro.org>
 References: <1416932705-16880-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1416932705-16880-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1416932705-16880-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is ARM's generic Performance Monitoring Unit.
+This driver is used to enable System Configuration Register controlled
+External, CTI (Core Sight), PMU (Performance Management), and PL310 L2
+Cache IRQs prior to use.
+
+Here we are enabling PMU IRQs on both channels.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih416.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/stih416.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 84758d7..badefd6 100644
+index badefd6..d98ce91 100644
 --- a/arch/arm/boot/dts/stih416.dtsi
 +++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -21,6 +21,12 @@
- 		cache-level = <2>;
- 	};
+@@ -11,6 +11,7 @@
+ #include "stih416-pinctrl.dtsi"
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/reset-controller/stih416-resets.h>
++#include <dt-bindings/interrupt-controller/irq-st.h>
+ / {
+ 	L2: cache-controller {
+ 		compatible = "arm,pl310-cache";
+@@ -90,6 +91,15 @@
+ 			reg		= <0xfe4b5100 0x8>;
+ 		};
  
-+	arm-pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupt-parent = <&intc>;
-+		interrupts = <GIC_PPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+	};
++		irq-syscfg {
++			compatible    = "st,stih416-irq-syscfg";
++			st,syscfg     = <&syscfg_cpu>;
++			st,irq-device = <ST_IRQ_SYSCFG_PMU_0>,
++					<ST_IRQ_SYSCFG_PMU_1>;
++			st,fiq-device = <ST_IRQ_SYSCFG_DISABLED>,
++					<ST_IRQ_SYSCFG_DISABLED>;
++		};
 +
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+ 		serial2: serial at fed32000{
+ 			compatible	= "st,asc";
+ 			status 		= "disabled";
 -- 
 1.9.1
