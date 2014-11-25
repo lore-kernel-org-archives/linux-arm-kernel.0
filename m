@@ -1,93 +1,27 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Nov 2014 15:29:54 +0000
-Subject: [PATCH 0/6] arm64: alternatives runtime patching
-In-Reply-To: <1415980452-20366-1-git-send-email-andre.przywara@arm.com>
-References: <1415980452-20366-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141125152954.GF8541@arm.com>
+Date: Tue, 25 Nov 2014 15:33:25 +0000
+Subject: [PATCHv6 0/8] Better page protections for arm64
+In-Reply-To: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
+References: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20141125153325.GG8541@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+On Fri, Nov 21, 2014 at 09:50:37PM +0000, Laura Abbott wrote:
+> Hi,
 
-On Fri, Nov 14, 2014 at 03:54:06PM +0000, Andre Przywara wrote:
-> This series introduces alternatives runtime patching to arm64.
-> This allows to patch assembly instruction at runtime to either
-> fix hardware bugs or optimize for certain hardware features. Look
-> at patch 5/6 for an example on how to use this.
-> 
-> The code is heavily based on the x86 implementation.
-> Currently this is focussed on fixing CPU errata, but in the future
-> runtime optimizations for new CPU features are planned.
-> 
-> Patch 1/6 introduces a new cpu_hwcaps bitmap, which holds kernel
-> internal CPU feature flags. Since elf_hwcaps is also a userspace ABI,
-> I refrained from tinkering with this (tried this, gets messy).
-> 
-> Based on bits in this bitmap, in patch 2/6 we provide a macro to
-> replace (inline) assembly instructions at runtime with alternative
-> instructions. As on x86, those bits go into separate ELF sections.
-> The patching is done using stop_machine() to avoid mayhem in SMP.
-> 
-> Patch 3/6 introduces means to set cpu_hwcaps bits based on detecting
-> a certain CPU revision. Currently this is based on the architectural
-> bits in the MIDR register, but the code is flexible enough to easily
-> introduce more advanced criteria.
-> To support a heterogenous CPU setup (e.g. big.LITTLE), we scan all
-> CPUs in the system.
-> 
-> Patch 4 and 5 use the new framework to introduce workarounds for two
-> ARM-Cortex errata. Patch 4 introduces some more framework for the
-> detection, while patch 5 should be used as a blueprint for how to add
-> workarounds for CPU errata in the future.
-> 
-> Patch 6/6 finally introduces Kconfig entries for the bugs.
-> Those are meant to
-> a) document the errata and workarounds and
-> b) to allow system vendors to remove certain workarounds for custom
-> build kernels.
-> Though this shouldn't be strictly necessary, experience shows that
-> people will do b) anyway and I deem it better to provide official
-> means rather than provoking random hacks.
+Hi Laura,
 
-I just merged this and encountered a couple of issues in my testing:
+> This is v6 of the series to add stricter page protections for arm64.
+> The goal is to have text be RO/NX and everything else be RW/NX.
+> The biggest change here is the addition of ioremap_exec for EFI
+> services. The series did its job and caught EFI services trying to
+> use regular RAM for code purposes.
 
-  (1) If patching occurs in a section that is discarded at compile time
-      (e.g. .exit.text) then we will fail to link:
+I've taken patches 1-3 + 5 of this series. I appreciate that the `meat' is
+in the later parts of the series, but I think there's still some review
+needed there and it makes sense to take the independent parts first.
 
-      `.exit.text' referenced in section `.altinstructions' of
-      drivers/built-in.o: defined in discarded section `.exit.text' of
-      drivers/built-in.o
-
-  (2) No patching occurs for modules
-
-Please can you send me some additional patches on top of your series
-to address these problems? The first issue can easily be solved by adding
-a new Kconfig entry for the alternative framework, which causes
-ARM_EXIT_{KEEP,DISCARD} to change their definitions. The second patch
-needs a call from the module loader, in a similar manner to the SMP_ON_UP
-patching in arch/arm/.
-
-In the meantime, I've applied the diff below to keep allyesconfig happy.
-
-Thanks,
+Cheers,
 
 Will
-
---->8
-
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 3236727be2b9..9965ec87cbec 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -11,8 +11,9 @@
- 
- #include "image.h"
- 
--#define ARM_EXIT_KEEP(x)
--#define ARM_EXIT_DISCARD(x)    x
-+/* .exit.text needed in case of alternative patching */
-+#define ARM_EXIT_KEEP(x)       x
-+#define ARM_EXIT_DISCARD(x)
- 
- OUTPUT_ARCH(aarch64)
- ENTRY(_text)
