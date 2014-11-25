@@ -1,65 +1,72 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 25 Nov 2014 23:21:12 +0100 (CET)
-Subject: [PATCH] media: atmel-isi: increase the burst length to improve
- the performance
-In-Reply-To: <1416907825-23826-1-git-send-email-josh.wu@atmel.com>
-References: <1416907825-23826-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <Pine.LNX.4.64.1411252319430.17362@axis700.grange>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 25 Nov 2014 23:23:04 +0100
+Subject: (bisected) Lock up on sh73a0/kzm9g on cpuidle initialization
+In-Reply-To: <CAMuHMdUMpmdYe+ED=M8FVvMMWNmrs8o4WzQ-uc2nFHNdL99HNQ@mail.gmail.com>
+References: <CAMuHMdXaaa2t6+sH2egGacVxkAPeTUkAgwdYsOnMnEPnuLdB5Q@mail.gmail.com>	<545BE1DE.6060900@linaro.org>	<CAMuHMdXQr65g4He0D0ZRN923OJ2A7WNgwbiTru_1dGWnvbvCJA@mail.gmail.com>	<CAMuHMdUjYMC8i2F9n6fWdPBOQVSohKA3ZxJJyq8h808Z9tEypw@mail.gmail.com>	<20141125180159.GI5050@linux.vnet.ibm.com>
+ <CAMuHMdUMpmdYe+ED=M8FVvMMWNmrs8o4WzQ-uc2nFHNdL99HNQ@mail.gmail.com>
+Message-ID: <54750148.207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+On 11/25/2014 10:27 PM, Geert Uytterhoeven wrote:
 
-On Tue, 25 Nov 2014, Josh Wu wrote:
+[ ... ]
 
-> The burst length could be BEATS_4/8/16. Before this patch, isi use default
-> value BEATS_4. To imporve the performance we could set it to BEATS_16.
-> 
-> Otherwise sometime it would cause the ISI overflow error.
+>> Does any sort of system activity (keyboard, network, etc.) unstick the
+>> system?
+>
+> Thanks! Unfortunately none of the above helped.
+>
+> However, I found the culprit. It turned out to be a platform issue, not an
+> issue in the generic cpu idle or RCU code. Read on below if you're
+> interested in the gory details. Else just skip, and sleep well again tonight ;-)
+>
+>> If you have tried all those things without good effect, could you please
+>> send along your .config and an alt-sysrq-t dump of all tasks' stacks?
+>
+> As I didn't manage to trigger a sysrq dump over the serial console,
+> I just called __handle_sysrq() right before the wait_for_completion(), after
+> a small delay. The dump didn't show anything suspicious. Everything
+> looked the same as on the dual-core Cortex A15, where the problem
+> doesn't manifest.
+>
+> Then I noticed the sched debug output on the A15, which was missing
+> on the CA9 build. Enabling it on the A9 gave:
+>
+> Sched Debug Version: v0.11,
+> 3.18.0-rc6-kzm9g-reference-04913-gedc89a2a2059c7ff-dirty #101
+> ktime                                   : 0.000000
+> sched_clk                               : 0.000000
+> cpu_clk                                 : 0.000000
+> jiffies                                 : 4294928896
+>
+> Oops, time is not advancing?
+>
+> Dmesg also shows (early):
+>
+>      clocksource_of_init: no matching clocksources found
+>
+> and the timer is only initialized much later, after cpu idle initialization:
+>
+>      sh_cmt e6138000.timer: ch0: used for periodic clock events
+>
+> Hacking up a timer node for "arm,cortex-a9-twd-timer" in sh73a0.dtsi
+> (with some "guessed" values) made it work.
+>
+> Thanks!
+>
+> Gr{oetje,eeting}s,
 
-Without looking at datasheets - what does this bit do? Change the transfer 
-length? What happens then if the data amount isn't a multiple of the 
-transfer size?
+Hi Geert,
 
-Thanks
-Guennadi
+thanks for sharing this information.
 
-> 
-> Reported-by: Bo Shen <voice.shen@atmel.com>
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->  drivers/media/platform/soc_camera/atmel-isi.c | 2 ++
->  include/media/atmel-isi.h                     | 4 ++++
->  2 files changed, 6 insertions(+)
-> 
-> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-> index ee5650f..fda587b 100644
-> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> @@ -839,6 +839,8 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
->  	if (isi->pdata.full_mode)
->  		cfg1 |= ISI_CFG1_FULL_MODE;
->  
-> +	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
-> +
->  	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
->  	isi_writel(isi, ISI_CFG1, cfg1);
->  
-> diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
-> index c2e5703..6008b09 100644
-> --- a/include/media/atmel-isi.h
-> +++ b/include/media/atmel-isi.h
-> @@ -59,6 +59,10 @@
->  #define		ISI_CFG1_FRATE_DIV_MASK		(7 << 8)
->  #define ISI_CFG1_DISCR				(1 << 11)
->  #define ISI_CFG1_FULL_MODE			(1 << 12)
-> +/* Definition for THMASK(ISI_V2) */
-> +#define		ISI_CFG1_THMASK_BEATS_4		(0 << 13)
-> +#define		ISI_CFG1_THMASK_BEATS_8		(1 << 13)
-> +#define		ISI_CFG1_THMASK_BEATS_16	(2 << 13)
->  
->  /* Bitfields in CFG2 */
->  #define ISI_CFG2_GRAYSCALE			(1 << 13)
-> -- 
-> 1.9.1
-> 
+   -- Daniel
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
