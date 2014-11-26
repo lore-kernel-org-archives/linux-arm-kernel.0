@@ -1,49 +1,39 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 26 Nov 2014 23:32:26 +0100
-Subject: [PATCH 4/8] opp: Introduce APIs to remove OPPs
-In-Reply-To: <CAKohpomKym9dqzQDmS-7ipze4jCYDU4_UN4a36VceHuGezoiVw@mail.gmail.com>
-References: <cover.1416910766.git.viresh.kumar@linaro.org>
- <CAKohponz3MsgZNtm1i-aLx8kRRjJwUJjL=B3RE96EiivwXbF2A@mail.gmail.com>
- <CAKohpomKym9dqzQDmS-7ipze4jCYDU4_UN4a36VceHuGezoiVw@mail.gmail.com>
-Message-ID: <11530150.5svHxl9OuM@vostro.rjw.lan>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 26 Nov 2014 23:12:13 +0100
+Subject: [PATCH V2 3/5] usb: gadget: pxa25x_udc: prepare/unprepare clocks
+ in pxa-ssp
+In-Reply-To: <87d28d3uh5.fsf@free.fr> (Robert Jarzmik's message of "Mon, 24
+ Nov 2014 08:53:26 +0100")
+References: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
+ <1416236863-20898-3-git-send-email-dbaryshkov@gmail.com>
+ <878uj98y5v.fsf@free.fr>
+ <CALT56yMCJ4R6KN2BUW61YaUz2bb6s_aJteKYBSVmvRPKacKCLw@mail.gmail.com>
+ <CALT56yO8tktrXo0rfRd91AtXBE4F5vYfYjm9AL+7dcoam6Oq9Q@mail.gmail.com>
+ <87egsz6ija.fsf@free.fr> <87sihb49vm.fsf@free.fr>
+ <CALT56yMVjRC4YhWsc9d_i0mVrHyv8XV=Sw2op=xsdR5izv1tHg@mail.gmail.com>
+ <87lhn340i1.fsf@free.fr>
+ <CALT56yP1OGWQd5i+H+4uFkZD4AqdtF7J1+Lme76UgLgVfycQ4w@mail.gmail.com>
+ <87h9xr3z35.fsf@free.fr>
+ <CALT56yMUQDZV5=dn_Hm7jNS5NQXj7ewXcB2LsGvTbCOuoio7JQ@mail.gmail.com>
+ <87d28d3uh5.fsf@free.fr>
+Message-ID: <874mtl3936.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 26, 2014 02:47:47 PM Viresh Kumar wrote:
-> On 26 November 2014 at 11:59, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> > Also it looks like I should use call_srcu() with kfree_rcu() for
-> > opp_set_availability() case as well to avoid any corner cases.
-> 
-> This is the diff I would be adding to this patch:
+OK Dmitry, I pulled through, the interrupts are working back.
 
-That should work if I'm not mistaken, but I'm wondering if we could
-settle on using one RCU type for this (later, though).
+Actually one of the blockers I have is in pxa25x_udc, and it is also in your
+phy-lubbock.c. The bottom of the error is that disable_irq() is called from
+within a irq handler, and it deadlocks. A disable_irq_nosync() should be used
+...
 
-> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-> index f9d80e6..3f728cd 100644
-> --- a/drivers/base/power/opp.c
-> +++ b/drivers/base/power/opp.c
-> @@ -506,7 +506,7 @@ static void kfree_opp_rcu(struct rcu_head *head)
->         struct dev_pm_opp *opp = container_of(head, struct dev_pm_opp,
-> rcu_head);
-> 
->         pr_info("%s: opp:%p, dynamic:%d\n", __func__, opp, opp->dynamic);
-> -       kfree(opp);
-> +       kfree_rcu(opp);
->  }
-> 
->  static void kfree_device_rcu(struct rcu_head *head)
-> @@ -644,7 +644,7 @@ static int opp_set_availability(struct device
-> *dev, unsigned long freq,
-> 
->         list_replace_rcu(&opp->node, &new_opp->node);
->         mutex_unlock(&dev_opp_list_lock);
-> -       kfree_rcu(opp, rcu_head);
-> +       call_srcu(&dev_opp->srcu_head.srcu, &opp->rcu_head, kfree_opp_rcu);
-> 
->         /* Notify the change of the OPP availability */
->         if (availability_req)
+... but a better approach would be to use a threaded irq for vbus handling. I
+think that way disable_irq() can be used, no workqueue is needed anymore in
+phy-lubbock.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Would you make that change, I'll test it and review it.
+
+Cheers.
+
+--
+Robert
