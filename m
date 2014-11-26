@@ -1,172 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Nov 2014 14:57:42 +0100
-Subject: [PATCH] ARM: kbuild: Fix forced rebuild after 'make dtbs'
-In-Reply-To: <20141126005710.GE22670@titan.lakedaemon.net>
-References: <CACRpkdYmJWy1_vs0tWRA7SvkQnvbXXKqf7pHpH5b5tZ6vR+KJg@mail.gmail.com>
- <1414961549-31666-1-git-send-email-jason@lakedaemon.net>
- <5474F78F.2060906@suse.cz>
- <20141125235150.GH3836@n2100.arm.linux.org.uk>
- <20141126005710.GE22670@titan.lakedaemon.net>
-Message-ID: <CACRpkdZJoWbQeuZ4ZXGbQr0+SNG_9ZA+cQkAA0C2F9rnZDYtyQ@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 26 Nov 2014 15:59:48 +0200
+Subject: [PATCH v2 0/5] i2c: davinci improvements and fixes
+Message-ID: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 1:57 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Tue, Nov 25, 2014 at 11:51:50PM +0000, Russell King - ARM Linux wrote:
+This series contains some fixes and improvements for Davinci I2C:
+patch 1 - small improvement
+patch 2 - fixes "Bus busy" state for some case (was reported long time ago:()
 
->> I think this needs a bit more debugging to see why the whole kernel is
->> being rebuilt - the kernel build system has methods to tell you why stuff
->> is being built, which would be a good place to start.
->
-> Linus, since you were the one experiencing the regression, care to take
-> a whack at that?
+patch 3-5 - converts driver to use I2C bus recovery infrastructure and
+adds Davinci I2C bus recovery mechanizm based on using ICPFUNC registers.
+These patches are combination of two patches from Ben Gardiner [1] and
+Mike Looijmans [2] which i've reworked to use I2C bus recovery infrastructure
 
-OK this full example should be possible to repeat for anyone
-with a cross compiler, and uses a separate build dir, and yeah
-there was something fishy: the bug only appears if you specify
-CONFIG_DEBUG_SECTION_MISMATCH=y:
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/047305.html
+"[PATCH 0/6] i2c-davinci gpio pulsed SCL recovery with ICPFUNC"
+[2] https://lkml.org/lkml/2014/2/28/133
+"[PATCH] i2c-davinci: Implement a bus recovery that actually works"
 
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 u300_defconfig
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 zImage
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 zImage
+Changes in v2:
+- patch 1: error handling improved
+- patch 2: commit message updated
+- patch 4: minor comments applied
+- patch 5: added new optional DT property "ti,has-pfunc"
 
--> no rebuild, just relink
+Link on v1:
+ http://www.spinics.net/lists/linux-i2c/msg17601.html
 
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 u300_defconfig
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
+CC: Sekhar Nori <nsekhar@ti.com>
+CC: Kevin Hilman <khilman@deeprootsystems.com>
+CC: Santosh Shilimkar <ssantosh@kernel.org>
+CC: Murali Karicheri <m-karicheri2@ti.com>
 
--> no rebuild, just relink
+Grygorii Strashko (5):
+  i2c: i2c-davinci: switch to use platform_get_irq
+  i2c: davinci: query STP always when NACK is received
+  i2c: recovery: change input parameter to i2c_adapter for prepare/unprepare_recovery
+  i2c: davinci: use bus recovery infrastructure
+  i2c: davinci: use ICPFUNC to toggle I2C as gpio for bus recovery
 
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 u300_defconfig
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 zImage
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 dtbs
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 zImage
+ .../devicetree/bindings/i2c/i2c-davinci.txt        |   3 +
+ drivers/i2c/busses/i2c-davinci.c                   | 205 +++++++++++++++------
+ drivers/i2c/i2c-core.c                             |   4 +-
+ include/linux/i2c.h                                |   4 +-
+ include/linux/platform_data/i2c-davinci.h          |   1 +
+ 5 files changed, 159 insertions(+), 58 deletions(-)
 
--> no rebuild, just relink
-
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 u300_defconfig
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 dtbs
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
-
--> Rebuilds everything.
-
-This doesn't occur before the offending commit. So it only happens
-when specifying extra
-environment variables on the command line.
-
-So I can get rid of the rebuilding by making my scripts less
-strict by removing CONFIG_DEBUG_SECTION_MISMATCH=y.
-
-But is this really correct?
-
-Two last examples with more detail:
-
-make[1]: Entering directory `/home/linus/linux/build-u300'
-  CHK     include/config/kernel.release
-  GEN     ./Makefile
-  CHK     include/generated/uapi/linux/version.h
-  CHK     include/generated/utsrelease.h
-  Using .. as source for kernel
-make[2]: `include/generated/mach-types.h' is up to date.
-  CALL    ../scripts/checksyscalls.sh - due to target missing
-  CHK     include/generated/compile.h
-  Kernel: arch/arm/boot/Image is ready
-  Kernel: arch/arm/boot/zImage is ready
-make[1]: Leaving directory `/home/linus/linux/build-u300'
-
-make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y V=2
-
-make[1]: Entering directory `/home/linus/linux/build-u300'
-  CHK     include/config/kernel.release
-  GEN     ./Makefile
-  CHK     include/generated/uapi/linux/version.h
-  CHK     include/generated/utsrelease.h
-  Using .. as source for kernel
-  CC      scripts/mod/empty.o - due to command line change
-  CC      scripts/mod/devicetable-offsets.s - due to command line change
-  MKELF   scripts/mod/elfconfig.h - due to: scripts/mod/empty.o
-  HOSTCC  scripts/mod/modpost.o - due to: scripts/mod/elfconfig.h
-  HOSTCC  scripts/mod/sumversion.o - due to: scripts/mod/elfconfig.h
-  GEN     scripts/mod/devicetable-offsets.h - due to:
-scripts/mod/devicetable-offsets.s
-  HOSTCC  scripts/mod/file2alias.o - due to: scripts/mod/elfconfig.h
-scripts/mod/devicetable-offsets.h
-  HOSTLD  scripts/mod/modpost - due to: scripts/mod/modpost.o
-scripts/mod/file2alias.o scripts/mod/sumversion.o
-make[2]: `include/generated/mach-types.h' is up to date.
-  CC      kernel/bounds.s - due to command line change
-  GEN     include/generated/bounds.h - due to: kernel/bounds.s
-  CC      arch/arm/kernel/asm-offsets.s - due to: include/generated/bounds.h
-  GEN     include/generated/asm-offsets.h - due to:
-arch/arm/kernel/asm-offsets.s
-  CALL    ../scripts/checksyscalls.sh - due to target missing
-  CC      init/main.o - due to: include/generated/bounds.h
-  CC      arch/arm/common/firmware.o - due to: include/generated/bounds.h
-  CC      arch/arm/mm/dma-mapping.o - due to: include/generated/bounds.h
-  CC      arch/arm/kernel/elf.o - due to: include/generated/bounds.h
-  CC      arch/arm/mach-u300/core.o - due to: include/generated/bounds.h
-  AS      arch/arm/kernel/entry-common.o - due to:
-include/generated/asm-offsets.h
-  LD      arch/arm/common/built-in.o - due to: arch/arm/common/firmware.o
-  CHK     include/generated/compile.h
-  CC      arch/arm/kernel/irq.o - due to: include/generated/bounds.h
-  CC      arch/arm/mach-u300/dummyspichip.o - due to: include/generated/bounds.h
-  CC      init/do_mounts.o - due to: include/generated/bounds.h
-  CC      arch/arm/mm/extable.o - due to: include/generated/bounds.h
-  CC      arch/arm/kernel/opcodes.o - due to: include/generated/bounds.h
-(...)
-
-If I revert commit f4d4ffc03efc:
-
-make[1]: Entering directory `/home/linus/linux/build-u300'
-  CHK     include/config/kernel.release
-  GEN     ./Makefile
-  CHK     include/generated/uapi/linux/version.h
-  Using .. as source for kernel
-  CHK     include/generated/utsrelease.h
-make[2]: `include/generated/mach-types.h' is up to date.
-  CC      scripts/mod/empty.o - due to command line change
-  CC      scripts/mod/devicetable-offsets.s - due to command line change
-  CALL    ../scripts/checksyscalls.sh - due to target missing
-  MKELF   scripts/mod/elfconfig.h - due to: scripts/mod/empty.o
-  HOSTCC  scripts/mod/modpost.o - due to: scripts/mod/elfconfig.h
-  HOSTCC  scripts/mod/sumversion.o - due to: scripts/mod/elfconfig.h
-  GEN     scripts/mod/devicetable-offsets.h - due to:
-scripts/mod/devicetable-offsets.s
-  HOSTCC  scripts/mod/file2alias.o - due to: scripts/mod/elfconfig.h
-scripts/mod/devicetable-offsets.h
-  HOSTLD  scripts/mod/modpost - due to: scripts/mod/modpost.o
-scripts/mod/file2alias.o scripts/mod/sumversion.o
-  CHK     include/generated/compile.h
-  Kernel: arch/arm/boot/Image is ready
-  Kernel: arch/arm/boot/zImage is ready
-make[1]: Leaving directory `/home/linus/linux/build-u300'
-
-So in both cases a changed command line is detected and
-empty.o and devicetable-offsets.s is rebuilt.
-
-But after the commit the rebuild goes on to rebuild
-kernel/bounds.s which generates bounds.h which in
-turn rebuilds the whole world.
-
-I don't know why the behaviour changed like this :(
-
-Yours,
-Linus Walleij
+-- 
+1.9.1
