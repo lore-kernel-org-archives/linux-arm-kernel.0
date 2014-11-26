@@ -1,47 +1,58 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 26 Nov 2014 13:22:53 +0530
-Subject: [PATCH] ARM: EXYNOS: use u8 for val[] in struct exynos_pmu_conf
-In-Reply-To: <2379473.Yu7PYOQ3m0@amdc1032>
-References: <2379473.Yu7PYOQ3m0@amdc1032>
-Message-ID: <547586D5.2040902@samsung.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 26 Nov 2014 09:04:57 +0100
+Subject: [PATCH v2 3/9] clk: sunxi: Add prcm mod0 clock driver
+In-Reply-To: <20141125165744.GA17789@x1>
+References: <1416749895-25013-1-git-send-email-hdegoede@redhat.com>
+ <1416749895-25013-4-git-send-email-hdegoede@redhat.com>
+ <20141125165744.GA17789@x1>
+Message-ID: <547589A9.5060802@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartilomiej,
+Hi,
 
+On 11/25/2014 05:57 PM, Lee Jones wrote:
+> On Sun, 23 Nov 2014, Hans de Goede wrote:
+>
+>> Add a driver for mod0 clocks found in the prcm. Currently there is only
+>> one mod0 clocks in the prcm, the ir clock.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+>>   drivers/clk/sunxi/Makefile                        |  2 +-
+>>   drivers/clk/sunxi/clk-sun6i-prcm-mod0.c           | 63 +++++++++++++++++++++++
+>>   drivers/mfd/sun6i-prcm.c                          | 14 +++++
+>>   4 files changed, 79 insertions(+), 1 deletion(-)
+>>   create mode 100644 drivers/clk/sunxi/clk-sun6i-prcm-mod0.c
+>
+> [...]
+>
+>> diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
+>> index 283ab8d..ff1254f 100644
+>> --- a/drivers/mfd/sun6i-prcm.c
+>> +++ b/drivers/mfd/sun6i-prcm.c
+>> @@ -41,6 +41,14 @@ static const struct resource sun6i_a31_apb0_gates_clk_res[] = {
+>>   	},
+>>   };
+>>
+>> +static const struct resource sun6i_a31_ir_clk_res[] = {
+>> +	{
+>> +		.start = 0x54,
+>> +		.end = 0x57,
+>> +		.flags = IORESOURCE_MEM,
+>> +	},
+>> +};
+>
+> I'm not overly keen on these magic numbers (and yes, I'm well aware
+> that I SoB'ed the patch which started them off).
+>
+> It's not a show stopper, although I'd prefer if they were fixed with a
+> subsequent patch.
 
-On Tuesday 08 July 2014 05:33 PM, Bartlomiej Zolnierkiewicz wrote:
-> Values stored in val[] are never bigger than a byte.
->
->     text    data     bss     dec     hex filename
->     5264       4       4    5272    1498 arch/arm/mach-exynos/pmu.o.before
->     2992       4       4    3000     bb8 arch/arm/mach-exynos/pmu.o.after
->
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+These are offsets of the relevant registers inside the prcm register block,
+if not done this way, then how should they be done ?
 
-I tested this patch and it's really helpful to reduce size.
-How about resubmitting this change? As this will not get applied on 
-current tree.
+Regards,
 
-Thanks,
-Pankaj Dubey
-
-> ---
->   arch/arm/mach-exynos/common.h | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index b850db4..55ff019 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -101,7 +101,7 @@ enum sys_powerdown {
->
->   struct exynos_pmu_conf {
->   	void __iomem *reg;
-> -	unsigned int val[NUM_SYS_POWERDOWN];
-> +	u8 val[NUM_SYS_POWERDOWN];
->   };
->
->   extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
->
+Hans
