@@ -1,121 +1,107 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 26 Nov 2014 09:30:40 +0100
-Subject: [PATCH 1/5] pinctrl: sun6i: Add some missing functions, fix i2c3
- muxing
-In-Reply-To: <20141125180455.GA25249@lukather>
-References: <1416747283-13489-1-git-send-email-hdegoede@redhat.com>
- <1416747283-13489-2-git-send-email-hdegoede@redhat.com>
- <20141125180455.GA25249@lukather>
-Message-ID: <54758FB0.4010503@redhat.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Wed, 26 Nov 2014 17:33:05 +0900
+Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
+In-Reply-To: <20141120135851.GA32528@linaro.org>
+References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
+ <20141120135851.GA32528@linaro.org>
+Message-ID: <54759041.9080105@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 11/25/2014 07:04 PM, Maxime Ripard wrote:
-> Hi,
->
-> On Sun, Nov 23, 2014 at 01:54:39PM +0100, Hans de Goede wrote:
->> While working on pinctrl for the A31s, I noticed that function 4 of
->> PA15 - PA18 was missing, add these.
+(2014/11/21 0:02), Steve Capper wrote:
+> On Tue, Nov 18, 2014 at 01:32:50AM -0500, David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
 >>
->> I also noticed that i2c3 sck / sda got assigned to PB5 & PB6, this should
->> be PB4 & PB5, fix this as well.
+>> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches, first
+>> seen in October 2013.  This version attempts to address concerns raised by
+>> reviewers and also fixes problems discovered during testing, particularly during
+>> SMP testing.
 >>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c | 9 +++++++--
->>   1 file changed, 7 insertions(+), 2 deletions(-)
+>> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
+>> and return probes(kretprobes) support for ARM64.
 >>
->> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
->> index a2b4b85..fb19e15 100644
->> --- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
->> +++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
->> @@ -134,24 +134,28 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
->>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
->>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD4 */
->>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D15 */
->> +		  SUNXI_FUNCTION(0x4, "clk_a_out"),
->
-> It's called clk_out_a on the A20, I'd rather stick with the same
-> scheme here.
+>> Kprobes mechanism makes use of software breakpoint and single stepping
+>> support available in the ARM v8 kernel.
+>>
+>> Changes since v2 include:
+>>
+>> 1) Removal of NOP padding in kprobe XOL slots.  Slots are now exactly one
+>> instruction long.
+>> 2) Disabling of interrupts during execution in single-step mode.
+>> 3) Fixing of numerous problems in instruction simulation code.
+>> 4) Support for the HAVE_REGS_AND_STACK_ACCESS_API feature is added, to allow
+>> access to kprobes through debugfs.
+>> 5) kprobes is *not* enabled in defconfig.
+>> 6) Numerous complaints from checkpatch have been cleaned up, although a couple
+>> remain as removing the function pointer typedefs results in ugly code.
+> 
+> Hi David,
+> I've been playing with this on a Juno board.
+> I ran into one crash, which I'm not yet sure is an issue, but thought I
+> would flag it.
+> 
+> I opted to put a kprobe on memcpy, this is an assembler function so I
+> located it via:
+> $ nm ./vmlinux | grep \ memcpy$
+> fffffe0000408a00 T memcpy
+> 
+> Then placed a probe as follows:
+> echo "p:memcpy 0xfffffe0000408a00 %x2" > /sys/kernel/debug/tracing/kprobe_events
 
-Will fix.
+You can also do "p:memcpy memcpy %x2" > ...
 
->>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 15)),	/* PA_EINT15 */
->>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 16),
->>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
->>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD5 */
->>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D16 */
->> +		  SUNXI_FUNCTION(0x4, "dmic"),		/* CLK */
->>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 16)),	/* PA_EINT16 */
->>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 17),
->>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
->>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD6 */
->>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D17 */
->> +		  SUNXI_FUNCTION(0x4, "dmic"),		/* DIN */
->>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 17)),	/* PA_EINT17 */
->>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 18),
->>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
->>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD7 */
->>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D18 */
->> +		  SUNXI_FUNCTION(0x4, "clk_b_out"),
->>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 18)),	/* PA_EINT18 */
->>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 19),
->>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->> @@ -207,6 +211,7 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
->>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
->>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* MDC */
->>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* HSYNC */
->> +		  SUNXI_FUNCTION(0x4, "clk_c_out"),
->>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 26)),	/* PA_EINT26 */
->>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 27),
->>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->> @@ -242,20 +247,20 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
->>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
->>   		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DO1 */
->>   		  SUNXI_FUNCTION(0x3, "uart3"),		/* RTS */
->> +		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SCK */
->>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 4)),	/* PB_EINT4 */
->>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 5),
->>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
->>   		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DO2 */
->>   		  SUNXI_FUNCTION(0x3, "uart3"),		/* TX */
->> -		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SCK */
->> +		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SDA */
->>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 5)),	/* PB_EINT5 */
->>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 6),
->>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
->>   		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DO3 */
->>   		  SUNXI_FUNCTION(0x3, "uart3"),		/* RX */
->> -		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SDA */
->
-> Where did you get that info from? The datasheet still reports that
-> information.
+> 
+> I was able to cat out the /sys/kernel/debug/tracing/trace_pipe file and
+> activate the probe via:
+> echo 1 > /sys/kernel/debug/tracing/events/kprobes/enable
+> 
+> Everything worked well, and I got the expected output.
+> 
+> I then tried to record events with perf via:
+> perf record -e kprobes:memcpy -a sleep 5
+> 
+> Then I got an, easily reproducible, panic (pasted below).
 
-I assume with the datasheet you mean "A31 User Manual V1.20.pdf", which
-was last updated on September 20, 2013. I did not check that one, now I
-see where the original pinctrl code from.
+On x86, I didn't get a panic.
 
-So I've done some more digging:
+> 
+> The point of failure in the panic was:
+> fs/buffer.c:1257
+> 
+> static inline void check_irqs_on(void)
+> {
+> #ifdef irqs_disabled
+>         BUG_ON(irqs_disabled());
+> #endif
+> }
+> 
+> I will do some more digging; but I have managed to code up an ftrace
+> static probe on memcpy and record that using perf on arm64 without
+> issue.
 
-"A31 Datasheet - v1.00 (2012-12-24).pdf" also has twi3 sck / sda on pin
-PB5 / PB6 like the current pinctrl code.
+Yeah, this can be a bug related to kprobes recursive call.
+Could you do "cat /sys/kernel/debug/tracing/kprobe_profile" (before
+run perf)?
+The first digit is # of hit, and the second is # of missed (since
+recursively called).
 
-But "A31 Datasheet V1.40.pdf" which has the following in its revision log:
-"1.4 Dec 10,2013 Modify Pin Description"
+On x86, right after tracing by ftrace, we have no missed probe.
 
-Moves them to PB4 / PB5 and that is where I got this from (and was the only
-place I initially looked), I think that this is an intentional change, and
-that PB4 / PB5 are the correct pins.
+ # cat /sys/kernel/debug/tracing/kprobe_profile
+  memcpy                                                  4547               0
 
-I will ask Allwinner which is correct, so that we know for sure.
+But after tracing by perf, many missed events I could see.
 
-Regards,
+ # cat /sys/kernel/debug/tracing/kprobe_profile
+  memcpy                                                413983            7632
 
-Hans
+So I guess this can be related to the recursive call (which
+is correctly handled on x86).
+
+Thank you,
+
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
