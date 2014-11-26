@@ -1,68 +1,39 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 26 Nov 2014 16:17:06 +0000
-Subject: [PATCH 3.18-rc3 v9 5/5] arm: smp: Handle ipi_cpu_backtrace()
- using FIQ (if available)
-In-Reply-To: <20141126131210.GI3836@n2100.arm.linux.org.uk>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
- <1416936401-5147-6-git-send-email-daniel.thompson@linaro.org>
- <2744845.J3XUj2a9bM@dabox> <20141126131210.GI3836@n2100.arm.linux.org.uk>
-Message-ID: <5475FD02.3030501@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 26 Nov 2014 16:18:02 +0000
+Subject: [PATCHv6 6/8] arm64: use fixmap for text patching when text is RO
+In-Reply-To: <5474D056.2050101@codeaurora.org>
+References: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
+ <1416606645-25633-7-git-send-email-lauraa@codeaurora.org>
+ <20141125170445.GB21525@leverpostej>
+ <5474D056.2050101@codeaurora.org>
+Message-ID: <20141126161802.GB1819@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/11/14 13:12, Russell King - ARM Linux wrote:
-> On Wed, Nov 26, 2014 at 01:46:52PM +0100, Tim Sander wrote:
->> Hi Daniel
->>
->> Am Dienstag, 25. November 2014, 17:26:41 schrieb Daniel Thompson:
->>> Previous changes have introduced both a replacement default FIQ handler
->>> and an implementation of arch_trigger_all_cpu_backtrace for ARM but
->>> these are currently independent of each other.
->>>
->>> This patch plumbs together these features making it possible, on platforms
->>> that support it, to trigger backtrace using FIQ.
->> Does this ipi handler interfere in any way with set_fiq_handler?
->>
->> As far as i know there is only one FIQ handler vector so i guess there is a 
->> potential conflict. But i have not worked with IPI's so i might be completley
->> wrong.
+On Tue, Nov 25, 2014 at 06:54:14PM +0000, Laura Abbott wrote:
+> On 11/25/2014 9:04 AM, Mark Rutland wrote:
+> > Hi Laura,
+> >
+> > It looks like "early" means before we've set up the strict page
+> > permissions, though as far as I can tell the fixmap will already be
+> > available before we do any patching. Could we not always use the fixmap
+> > for patching? Then we only need the patch_{map,unmap} additions, and not
+> > the changes to distinguish the early cases.
+> >
+> >  From testing on Juno with defconfig, all of the early patches were
+> > avoidable NOP -> NOP changes as part of static key initialisation, which
+> > I think we can skip similarly to x86 (I'll send a patch shortly). All other
+> > patches were not early and went via the fixmap.
+> >
+> > Even with the avoidable NOP -> NOP patching I did not see a noticeable
+> > boot time difference from forcing the use of the fixmap.
+> >
 > 
-> First, the code in arch/arm/kernel/fiq.c should work with this new FIQ
-> code in that the new FIQ code is used as the "default" handler (as
-> opposed to the original handler which was a total no-op.)
-> 
-> Secondly, use of arch/arm/kernel/fiq.c in a SMP system is really not a
-> good idea: the FIQ registers are private to each CPU in the system, and
-> there is no infrastructure to allow fiq.c to ensure that it loads the
-> right CPU with the register information for the provided handler.
-> 
-> So, use of arch/arm/kernel/fiq.c and the IPI's use of FIQ /should/ be
-> mutually exclusive.
+> I was basing it off of the arm version which needed the early option.
+> If arm64 doesn't need it I'll drop it.
 
-Agree with the above. Just to add...
+Given that it only determines whether or not to use the fixmap, and we
+can always use the fixmap, I think we can drop it.
 
-I am currently working to get NMI features from x86 land running on top
-of the new default FIQ handler: arch_trigger_all_cpu_backtrace (with
-Russell's patch), perf, hard lockup detector, kgdb.
-
-However I don't think anything I'm doing makes it very much harder than
-it already is to use arch/arm/kernel/fiq.c . That said, other then
-setting the GIC up nicely, I am not doing anything to make it easier either.
-
-I'd like to end up somewhere where if you want the NMI features (and
-have a suitable device) you just use the default handler and it all just
-works. If you need *Fast* Interrupt reQuests, proper old school "I want
-to write an overclocked I2C slave in software" craziness and you can
-pass on the improved debug features then set_fiq_handler() is still
-there and still need extremely careful handling.
-
-The only thing I might have done to make your life worse is not provide
-the code to dynamically shunt all the debug and performance monitoring
-features back to group 1. All except the hard lockup detector will have
-logic to fall back statically. This means making it dynamic shouldn't be
-that hard. However since there is no code in the upstream kernel that
-would use the code I don't plan to go there myself.
-
-
-Daniel.
+Thanks,
+Mark.
