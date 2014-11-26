@@ -1,38 +1,83 @@
-From: uwe@kleine-koenig.org (=?windows-1252?Q?Uwe_Kleine-K=F6nig?=)
-Date: Wed, 26 Nov 2014 19:48:54 +0100
-Subject: [PATCHv1 0/6] rtc: rtc-isl12057: fixes and alarm support
-In-Reply-To: <874mtlyflf.fsf@natisbad.org>
-References: <cover.1416006090.git.arno@natisbad.org>
- <874mtlyflf.fsf@natisbad.org>
-Message-ID: <54762096.7040200@kleine-koenig.org>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Wed, 26 Nov 2014 19:57:08 +0100
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <20141126181934.GL2817@atomide.com>
+References: <20141027200008.GR2560@atomide.com> <20141126172857.GA26157@amd>
+ <20141126181934.GL2817@atomide.com>
+Message-ID: <201411261957.08860@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnaud,
-
-On 11/26/2014 07:35 PM, Arnaud Ebalard wrote:
-> I wonder if you could take a look at this series I sent providing fixes
-> (patches #1-5) and alarm support (patch #6) for ISL12057 RTC Chip. As
-> all people do for RTC patches - due to lack of feedback from maintainer
-> - I am looking for someone to review the patches (Mark, patch 6 has a
-> sticker w/ regmap-inside ;-)) and then push those upstream if they are
-> ok (Jason, you handled that part for 70e123373c05: "rtc: Add support for
-> Intersil ISL12057 I2C RTC chip" in 2013 for the same reason).
+On Wednesday 26 November 2014 19:19:35 Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [141126 09:31]:
+> > On Tue 2014-10-28 01:01:38, Aaro Koskinen wrote:
+> > > Hi,
+> > > 
+> > > On Mon, Oct 27, 2014 at 01:00:09PM -0700, Tony Lindgren 
+wrote:
+> > > > +
+> > > > +	if (!of_have_populated_dt())
+> > > > +		pr_warn("WARNING: legacy booting deprecated, please
+> > > > update to boot with .dts\n"); +
+> > > 
+> > > Maybe use WARN so that the warning is more verbose and
+> > > kernel gets tainted?
+> > 
+> > Well.. Pali still has regression where /proc/cpuinfo changes
+> > in a way that breaks existing userspace, when dt is used on
+> > N900.
+> > 
+> > And rmk was less then helpfull...
 > 
-> Note that I addressed previous comments and feedback received from Uwe
-> and also spent time to do some soldering in order to support and test
-> the last patch for both my use case (Alarm IRQ signal not routed to the
-> SoC on ReadyNAS RN102, RN104 and RN2120) and the common case.
+> Maybe Pali can try to restart that discussion? To me it seems
+> the /proc/cpuinfo should be the same as it's a user
+> interface. Sorry forgot the details of the previous
+> discussion..
 > 
-> Do not hesitate to ask if you want me to resend!
-akpm already applied the series, doesn't he?
 
-I'm about to test the patches, just fighting with my NAS to boot my
-custom kernel.
+Yes, two days ago I again wrote emails about this problem...
 
-Apart from that patches 1 - 5 can have my Ack. Didn't look deep enough
-into patch 6 yet. @akpm: No need to hurry adding them, I hope to be
-able to also provide Tested-by:-tags later today.
+E.g. one of them, see: https://lkml.org/lkml/2014/11/24/774
 
-Best regards
-Uwe
+> And with which app was that? Sorry I forgot..
+> 
+
+More applications/libraries for N900 which running on Maemo 5 
+system. Some of them are Nokia proprietary, some of them are open 
+source and some are mine.
+
+Basically problem is that non DT boot provides this info in 
+/proc/cpuinfo:
+
+Hardware        : Nokia RX-51 board
+Revision        : 0012
+
+New DT boot provides this:
+
+Hardware        : Generic OMAP3 (Flattened Device Tree)
+Revision        : 0000
+
+> It's weird that it's not been an issue for other though?
+> 
+> > Should we maybe solve that before adding backtraces to our
+> > boot messages?
+> 
+> With this warning we want to notify the people actually using
+> mainline kernel on omap3 that they should update their
+> systems. And also let us know on this list about the
+> regressions, so I think that's quite valuable.
+> 
+> Regards,
+> 
+> Tony
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141126/fc7e105c/attachment.sig>
