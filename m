@@ -1,101 +1,44 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 26 Nov 2014 14:08:14 +0100
-Subject: [PATCH 4/4] clocksource: armada-370-xp: Use the reference clock on
- A375 SoC
-In-Reply-To: <1417007294-19869-1-git-send-email-daniel.lezcano@linaro.org>
-References: <5475D044.5060607@linaro.org>
- <1417007294-19869-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1417007294-19869-4-git-send-email-daniel.lezcano@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Nov 2014 13:12:10 +0000
+Subject: [PATCH 3.18-rc3 v9 5/5] arm: smp: Handle ipi_cpu_backtrace()
+ using FIQ (if available)
+In-Reply-To: <2744845.J3XUj2a9bM@dabox>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
+ <1416936401-5147-6-git-send-email-daniel.thompson@linaro.org>
+ <2744845.J3XUj2a9bM@dabox>
+Message-ID: <20141126131210.GI3836@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+On Wed, Nov 26, 2014 at 01:46:52PM +0100, Tim Sander wrote:
+> Hi Daniel
+> 
+> Am Dienstag, 25. November 2014, 17:26:41 schrieb Daniel Thompson:
+> > Previous changes have introduced both a replacement default FIQ handler
+> > and an implementation of arch_trigger_all_cpu_backtrace for ARM but
+> > these are currently independent of each other.
+> > 
+> > This patch plumbs together these features making it possible, on platforms
+> > that support it, to trigger backtrace using FIQ.
+> Does this ipi handler interfere in any way with set_fiq_handler?
+> 
+> As far as i know there is only one FIQ handler vector so i guess there is a 
+> potential conflict. But i have not worked with IPI's so i might be completley
+> wrong.
 
-The 25 MHz reference clock has better stability so its use is preferred over the
-core clock.
+First, the code in arch/arm/kernel/fiq.c should work with this new FIQ
+code in that the new FIQ code is used as the "default" handler (as
+opposed to the original handler which was a total no-op.)
 
-This commit takes advantage of the already introduced Armada 375 devicetree
-compatible string and adds a new timer initialization. If available, the timer
-will use the reference clock (named as 'fixed'). Otherwise, it falls back to the
-previous behavior.
+Secondly, use of arch/arm/kernel/fiq.c in a SMP system is really not a
+good idea: the FIQ registers are private to each CPU in the system, and
+there is no infrastructure to allow fiq.c to ensure that it loads the
+right CPU with the register information for the provided handler.
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Wim Van Sebroeck <wim@iguana.be>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- .../bindings/timer/marvell,armada-370-xp-timer.txt |  9 ++++---
- drivers/clocksource/time-armada-370-xp.c           | 28 ++++++++++++++++++++++
- 2 files changed, 34 insertions(+), 3 deletions(-)
+So, use of arch/arm/kernel/fiq.c and the IPI's use of FIQ /should/ be
+mutually exclusive.
 
-diff --git a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-index f455182..e9c78ce 100644
---- a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-@@ -2,8 +2,10 @@ Marvell Armada 370 and Armada XP Timers
- ---------------------------------------
- 
- Required properties:
--- compatible: Should be either "marvell,armada-370-timer" or
--  "marvell,armada-xp-timer" as appropriate.
-+- compatible: Should be one of the following
-+              "marvell,armada-370-timer",
-+	      "marvell,armada-375-timer",
-+	      "marvell,armada-xp-timer".
- - interrupts: Should contain the list of Global Timer interrupts and
-   then local timer interrupts
- - reg: Should contain location and length for timers register. First
-@@ -13,7 +15,8 @@ Required properties:
- Clocks required for compatible = "marvell,armada-370-timer":
- - clocks : Must contain a single entry describing the clock input
- 
--Clocks required for compatible = "marvell,armada-xp-timer":
-+Clocks required for compatibles = "marvell,armada-xp-timer",
-+				  "marvell,armada-375-timer":
- - clocks : Must contain an entry for each entry in clock-names.
- - clock-names : Must include the following entries:
-   "nbclk" (L2/coherency fabric clock),
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index d8555f9..3a0704b 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -301,6 +301,34 @@ static void __init armada_xp_timer_init(struct device_node *np)
- CLOCKSOURCE_OF_DECLARE(armada_xp, "marvell,armada-xp-timer",
- 		       armada_xp_timer_init);
- 
-+static void __init armada_375_timer_init(struct device_node *np)
-+{
-+	struct clk *clk;
-+
-+	clk = of_clk_get_by_name(np, "fixed");
-+	if (!IS_ERR(clk)) {
-+		clk_prepare_enable(clk);
-+		timer_clk = clk_get_rate(clk);
-+	} else {
-+
-+		/*
-+		 * This fallback is required in order to retain proper
-+		 * devicetree backwards compatibility.
-+		 */
-+		clk = of_clk_get(np, 0);
-+
-+		/* Must have at least a clock */
-+		BUG_ON(IS_ERR(clk));
-+		clk_prepare_enable(clk);
-+		timer_clk = clk_get_rate(clk) / TIMER_DIVIDER;
-+		timer25Mhz = false;
-+	}
-+
-+	armada_370_xp_timer_common_init(np);
-+}
-+CLOCKSOURCE_OF_DECLARE(armada_375, "marvell,armada-375-timer",
-+		       armada_375_timer_init);
-+
- static void __init armada_370_timer_init(struct device_node *np)
- {
- 	struct clk *clk = of_clk_get(np, 0);
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
