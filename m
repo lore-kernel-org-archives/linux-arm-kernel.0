@@ -1,66 +1,30 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 26 Nov 2014 13:22:50 +0100
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Wed, 26 Nov 2014 15:25:29 +0300
 Subject: [PATCH 2/3] i2c: slave-eeprom: add eeprom simulator driver
-In-Reply-To: <CAOY=C6F6TMyeDvNneBV6K5hVjoG+qk-1Y_R3oJkEiGxhLOoQ0A@mail.gmail.com>
+In-Reply-To: <20141122181229.GB9698@katana>
 References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
  <1416326695-13083-3-git-send-email-wsa@the-dreams.de>
  <CAOY=C6FSXWn2AKn9gp0oU69U8VkkyJAE7MMUTZsToy0P_Tf6AA@mail.gmail.com>
  <20141122181229.GB9698@katana>
- <CAOY=C6F6TMyeDvNneBV6K5hVjoG+qk-1Y_R3oJkEiGxhLOoQ0A@mail.gmail.com>
-Message-ID: <20141126122250.GA4397@katana>
+Message-ID: <2A7C987F-15E0-46FD-A711-E7F5BA9893FC@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> My bad, will minimize the overhead in the future.
+22 ????. 2014 ?., ? 21:12, Wolfram Sang <wsa@the-dreams.de> ???????(?):
 
-Thanks!
+> IMO a repeated start is to ensure that two messages arrive at the slave
+> without interruption from another master. I can't think why a slave
+> should know which type of start that was. In fact, if it does that would
+> raise an eyebrow for me. Do you have an example?
 
-> I think usable semantics could be that a slave driver can indicate at any
-> point during an I2C read transaction that the next X bytes should be
-> returned from a buffer and for a write transaction, that the next X bytes
-> should be buffered before passed on to the driver. When the transaction
+It is used to implement Device ID reading.
+Not sure, that the feature is really needed for the first release.
 
-Yes, if we have something like that it should definately be that the
-slave driver offers a buffer and the bus driver may accept the buffer or
-not. Buffers should be opt-in and slave drivers will always have to
-support byte-based transactions as the ultimate fallback because this is
-how the vast majority of HW works (at least those I checked).
+See [1] "3.1.17 Device ID" chapter on page "20 of 64"
+See [2] "7.2.2 Device ID (PCA9671 ID field)" chapter
 
-That makes me really wonder if there will be a case where performance is
-so important that buffer handling is coded on top of the always needed
-byte based handling?
+[1] UM10204 I2C-bus specification and user manual (http://www.nxp.com/documents/user_manual/UM10204.pdf)
+[2] PCA9671 (http://www.nxp.com/documents/data_sheet/PCA9671.pdf)
 
-More so, I'd think most slaves will have stuff like registers. So,
-buffered writes usually won't make sense because setting bits should
-cause an action immediately. And reading bits will have the problem of
-data getting stale. I'd think this is the biggest use case of I2C.
-Except for reading an EEPROM _once_ ;)
-
-> ends or the adapter reaches the end of the buffer, it indicates this to
-> the driver which can then either cleanup or otherwise act accordingly.
-
-Or the adapter encounters an unexpected STOP. Cleanups need to handle
-interrupted transactions as well. I'd think this is a bit more error
-prone, because people would need to check a return value and compare it
-to the number of bytes they wanted. Not a show stopper, but also nothing
-I want to throw in too easily.
-
-> But as you say, this can be added later on when the need arises.
-
-I'd really say so.
-
-> Just checked components we're using and stop/repeated-start both
-> transition into the same state.
-
-Good, thanks for checking! May I ask which components you are using?
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141126/daf55b27/attachment.sig>
+Alexander.
