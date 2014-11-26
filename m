@@ -1,41 +1,49 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 26 Nov 2014 23:01:46 +0100
-Subject: [PATCH] tty: serial: serial-omap: depend on !8250_omap
-Message-ID: <1417039306-2384-1-git-send-email-bigeasy@linutronix.de>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 26 Nov 2014 23:32:26 +0100
+Subject: [PATCH 4/8] opp: Introduce APIs to remove OPPs
+In-Reply-To: <CAKohpomKym9dqzQDmS-7ipze4jCYDU4_UN4a36VceHuGezoiVw@mail.gmail.com>
+References: <cover.1416910766.git.viresh.kumar@linaro.org>
+ <CAKohponz3MsgZNtm1i-aLx8kRRjJwUJjL=B3RE96EiivwXbF2A@mail.gmail.com>
+ <CAKohpomKym9dqzQDmS-7ipze4jCYDU4_UN4a36VceHuGezoiVw@mail.gmail.com>
+Message-ID: <11530150.5svHxl9OuM@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Technically speaking this is not required. If both are enabled then the
-Maikefile order says that 8250 one wins, the second is never probed.
+On Wednesday, November 26, 2014 02:47:47 PM Viresh Kumar wrote:
+> On 26 November 2014 at 11:59, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> > Also it looks like I should use call_srcu() with kfree_rcu() for
+> > opp_set_availability() case as well to avoid any corner cases.
+> 
+> This is the diff I would be adding to this patch:
 
-If we choose to enable 8250_omap via defconfig then one might get supprised
-that his console isn't working anymore since nothing says use ttySx
-instead ttyOx.
-This patch _tries_ to bring this to the users' attention by not showing
-the serial-omap driver once the 8250 one is enabled. So the user might
-choose to use the help text which says that this driver (8250_omap)
-uses ttySx instead ttyOx.
+That should work if I'm not mistaken, but I'm wondering if we could
+settle on using one RCU type for this (later, though).
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
-This is my attempt to warn the defconfig user of the defconfig change
-(which did not yet happen). Any suggestions?
+> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+> index f9d80e6..3f728cd 100644
+> --- a/drivers/base/power/opp.c
+> +++ b/drivers/base/power/opp.c
+> @@ -506,7 +506,7 @@ static void kfree_opp_rcu(struct rcu_head *head)
+>         struct dev_pm_opp *opp = container_of(head, struct dev_pm_opp,
+> rcu_head);
+> 
+>         pr_info("%s: opp:%p, dynamic:%d\n", __func__, opp, opp->dynamic);
+> -       kfree(opp);
+> +       kfree_rcu(opp);
+>  }
+> 
+>  static void kfree_device_rcu(struct rcu_head *head)
+> @@ -644,7 +644,7 @@ static int opp_set_availability(struct device
+> *dev, unsigned long freq,
+> 
+>         list_replace_rcu(&opp->node, &new_opp->node);
+>         mutex_unlock(&dev_opp_list_lock);
+> -       kfree_rcu(opp, rcu_head);
+> +       call_srcu(&dev_opp->srcu_head.srcu, &opp->rcu_head, kfree_opp_rcu);
+> 
+>         /* Notify the change of the OPP availability */
+>         if (availability_req)
 
- drivers/tty/serial/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index e71a28b4b94e..1b1bdf946fee 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -1125,7 +1125,7 @@ config SERIAL_OF_PLATFORM
- 
- config SERIAL_OMAP
- 	tristate "OMAP serial port support"
--	depends on ARCH_OMAP2PLUS
-+	depends on ARCH_OMAP2PLUS && !SERIAL_8250_OMAP
- 	select SERIAL_CORE
- 	help
- 	  If you have a machine based on an Texas Instruments OMAP CPU you
 -- 
-2.1.3
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
