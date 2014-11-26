@@ -1,79 +1,90 @@
 From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 26 Nov 2014 15:31:22 +0100
-Subject: [PATCH 2/7] KVM: arm: guest debug, define API headers
-In-Reply-To: <1416931805-23223-3-git-send-email-alex.bennee@linaro.org>
+Date: Wed, 26 Nov 2014 15:38:56 +0100
+Subject: [PATCH 3/7] KVM: arm: guest debug, add stub KVM_SET_GUEST_DEBUG
+ ioctl
+In-Reply-To: <1416931805-23223-4-git-send-email-alex.bennee@linaro.org>
 References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
- <1416931805-23223-3-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20141126143122.GB3245@hawk.usersys.redhat.com>
+ <1416931805-23223-4-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20141126143855.GC3245@hawk.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 04:10:00PM +0000, Alex Benn?e wrote:
-> This commit defines the API headers for guest debugging. There are two
-> architecture specific debug structures:
-> 
->   - kvm_guest_debug_arch, allows us to pass in HW debug registers
->   - kvm_debug_exit_arch, signals the exact debug exit and address
-> 
-> The type of debugging being used is control by the architecture specific
-> control bits of the kvm_guest_debug->control flags in the ioctl
-> structure.
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 8e38878..de2450c 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -93,10 +93,30 @@ struct kvm_sregs {
->  struct kvm_fpu {
->  };
->  
-> +/* See ARM ARM D7.3: Debug Registers
-> + *
-> + * The control registers are stored as 64bit values as the setup code
-> + * is shared with the normal cpu context restore code in hyp.S which
-> + * is 64 bit only.
-> + */
-> +#define KVM_ARM_NDBG_REGS 16
->  struct kvm_guest_debug_arch {
-> +	__u64 dbg_bcr[KVM_ARM_NDBG_REGS];
-> +	__u64 dbg_bvr[KVM_ARM_NDBG_REGS];
-> +	__u64 dbg_wcr[KVM_ARM_NDBG_REGS];
-> +	__u64 dbg_wvr[KVM_ARM_NDBG_REGS];
->  };
->  
-> +/* Exit types which define why we did a debug exit */
-> +#define KVM_DEBUG_EXIT_ERROR		0x0
-> +#define KVM_DEBUG_EXIT_SINGLE_STEP	0x1
-> +#define KVM_DEBUG_EXIT_SW_BKPT		0x2
-> +#define KVM_DEBUG_EXIT_HW_BKPT		0x3
-> +#define KVM_DEBUG_EXIT_HW_WTPT		0x4
-> +
->  struct kvm_debug_exit_arch {
-> +	__u64 address;
-> +	__u32 exit_type;
->  };
->  
->  struct kvm_sync_regs {
-> @@ -198,4 +218,12 @@ struct kvm_arch_memory_slot {
->  
->  #endif
->  
-> +/* Architecture related debug defines - upper 16 bits of
-> + * kvm_guest_debug->control
-> + */
-> +#define KVM_GUESTDBG_USE_SW_BP_SHIFT	16
-> +#define KVM_GUESTDBG_USE_SW_BP		(1 << KVM_GUESTDBG_USE_SW_BP_SHIFT)
-> +#define KVM_GUESTDBG_USE_HW_BP_SHIFT	17
-> +#define KVM_GUESTDBG_USE_HW_BP		(1 << KVM_GUESTDBG_USE_HW_BP_SHIFT)
-> +
+On Tue, Nov 25, 2014 at 04:10:01PM +0000, Alex Benn?e wrote:
+> This commit adds a stub function to support the KVM_SET_GUEST_DEBUG
+> ioctl. Currently any operation flag will return EINVAL. Actual
+> functionality will be added with further patches.
 
-I see this are defined in arch/x86/include/uapi/asm/kvm.h,
-so you needed to reproduce them here, but shouldn't they
-be promoted to include/uapi/linux/kvm.h instead?
+Technically the stub is already there, and you're extending it to
+start looking at control flags, but still not doing anything yet.
 
->  #endif /* __ARM_KVM_H__ */
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>.
+> 
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index 7610eaa..2c6386e 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2570,7 +2570,7 @@ handled.
+>  4.87 KVM_SET_GUEST_DEBUG
+>  
+>  Capability: KVM_CAP_SET_GUEST_DEBUG
+> -Architectures: x86, s390, ppc
+> +Architectures: x86, s390, ppc, arm64
+>  Type: vcpu ioctl
+>  Parameters: struct kvm_guest_debug (in)
+>  Returns: 0 on success; -1 on error
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 9e193c8..a0ff410 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -180,6 +180,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	case KVM_CAP_ARM_PSCI:
+>  	case KVM_CAP_ARM_PSCI_0_2:
+>  	case KVM_CAP_READONLY_MEM:
+> +	case KVM_CAP_SET_GUEST_DEBUG:
+>  		r = 1;
+>  		break;
+>  	case KVM_CAP_COALESCED_MMIO:
+> @@ -302,7 +303,34 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+>  					struct kvm_guest_debug *dbg)
+>  {
+> -	return -EINVAL;
+> +	/* If it's not enabled clear all flags */
+> +	if (!(dbg->control & KVM_GUESTDBG_ENABLE)) {
+> +		vcpu->guest_debug = 0;
+> +		return 0;
+> +	}
+> +
+> +	vcpu->guest_debug = dbg->control;
+> +	kvm_info("%s: guest_debug is 0x%lx\n", __func__, vcpu->guest_debug);
+> +
+> +	/* Single Step */
+> +	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
+> +		kvm_info("SS requested, not yet implemented\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Software Break Points */
+> +	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP) {
+> +		kvm_info("SW BP support requested, not yet implemented\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Hardware assisted Break and Watch points */
+> +	if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) {
+> +		kvm_info("HW BP support requested, not yet implemented\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+>  }
+
+I guess all the kvm_info's were useful for developing this patch series,
+but do we still need them?
+
+>  
+>  
 > -- 
 > 2.1.3
 > 
