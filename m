@@ -1,38 +1,58 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 26 Nov 2014 15:38:10 -0600
-Subject: [RFC PATCH 3/3] ARM: dts: am33xx: Add wkup_m3_ipc node
+Date: Wed, 26 Nov 2014 15:39:05 -0600
+Subject: [RFC PATCH 1/3] Documentation: dt: add ti,am3352-emif bindings
 In-Reply-To: <cover.1417029919.git.d-gerlach@ti.com>
 References: <cover.1417029919.git.d-gerlach@ti.com>
-Message-ID: <4981daf0740253def2cfcf11a2994526191d9f32.1417029919.git.d-gerlach@ti.com>
+Message-ID: <8103cf8683cac55efdd690c61f44005289e62856.1417029919.git.d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add wkup_m3_ipc node for wkup_m3_ipc driver.
+Add the device tree bindings document for ti,am3352-emif which
+is used by the ti-emif-sram driver to provide low-level PM
+functionality.
 
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/boot/dts/am33xx.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ .../bindings/memory-controllers/ti/emif-sram.txt   | 31 ++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti/emif-sram.txt
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 41659df..b86d8c0 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -848,6 +848,15 @@
- 			reg = <0x48310000 0x2000>;
- 			interrupts = <111>;
- 		};
+diff --git a/Documentation/devicetree/bindings/memory-controllers/ti/emif-sram.txt b/Documentation/devicetree/bindings/memory-controllers/ti/emif-sram.txt
+new file mode 100644
+index 0000000..72d6db0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/memory-controllers/ti/emif-sram.txt
+@@ -0,0 +1,31 @@
++EMIF SRAM Driver
++=====================
 +
-+		wkup_m3_ipc: wkup_m3_ipc at 44e11324 {
-+			compatible = "ti,am3353-wkup-m3-ipc";
-+			reg = <0x44e11324 0x0024>;
-+			reg-names = "ipc_regs";
-+			interrupts = <78>;
-+			ti,rproc = <&wkup_m3>;
-+			mboxes = <&mailbox &mbox_wkupm3>;
-+		};
- 	};
- };
- 
++TI AMx3 family of devices use a similar EMIF to other TI SoCs but have
++different PM requirements. Late suspend code runs from SRAM and requires
++save and restore of EMIF context and placing the SDRAM in and out of
++self-refresh. Because of this, the ti-emif-sram driver introduces
++relocatable PM function that can run from SRAM and place the EMIF in
++the proper state for low-power mode transition.
++
++EMIF Device Node:
++====================
++A emif node is used to represent an EMIF IP instance within an SoC. The node
++must contain a phandle to an sram node so the ti-emif-sram driver can allocate
++space within the sram and copy the relocatable PM functions.
++
++Required properties:
++--------------------
++- compatible:		Should be "ti,am3352-emif" for AM33xx SoCs
++- reg:			Contains the emif register address ranges.
++- sram:			Phandle for generic sram node for the driver
++			to use to copy PM functions to.
++
++Example:
++--------
++/* AM33xx */
++emif: emif at 4c000000 {
++	compatible = "ti,am3352-emif";
++	reg =	<0x4C000000 0x1000>;
++	sram = <&ocmcram>;
++};
 -- 
 2.1.0
