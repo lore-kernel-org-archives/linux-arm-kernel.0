@@ -1,75 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 26 Nov 2014 11:36:16 +0000
-Subject: [PATCH v3 2/2] arm64: Add Juno board device tree.
-In-Reply-To: <20141126105918.GB828@e106497-lin.cambridge.arm.com>
-References: <1415727131-4572-1-git-send-email-Liviu.Dudau@arm.com>
- <1415727131-4572-3-git-send-email-Liviu.Dudau@arm.com>
- <5475ABC0.3090007@arm.com>
- <20141126105918.GB828@e106497-lin.cambridge.arm.com>
-Message-ID: <5475BB30.9080802@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 26 Nov 2014 11:37:23 +0000
+Subject: [RFC PATCH v4 6/8] dma-mapping: set dma segment properties in
+ of_dma_configure
+In-Reply-To: <54747EA0.1020001@arm.com>
+References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
+ <1415991397-9618-7-git-send-email-will.deacon@arm.com>
+ <54747EA0.1020001@arm.com>
+Message-ID: <20141126113723.GC14866@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/11/14 10:59, Liviu Dudau wrote:
-> On Wed, Nov 26, 2014 at 10:30:24AM +0000, Marc Zyngier wrote:
->> Hi Liviu,
->>
->> On 11/11/14 17:32, Liviu Dudau wrote:
->>> This adds support for ARM's Juno development board (rev 0).
->>> It enables most of the board peripherals: UART, I2C, USB, MMC and
->>> 100Mb ethernet. There is no support at the moment for clock setting
->>> and HDLCD driver which depends on it.
->>>
->>> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
->>> ---
->>>  arch/arm64/boot/dts/arm/Makefile              |   1 +
->>>  arch/arm64/boot/dts/arm/juno-clocks.dtsi      |  45 ++++++
->>>  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 129 +++++++++++++++
->>>  arch/arm64/boot/dts/arm/juno.dts              | 218 ++++++++++++++++++++++++++
->>>  4 files changed, 393 insertions(+)
->>>  create mode 100644 arch/arm64/boot/dts/arm/juno-clocks.dtsi
->>>  create mode 100644 arch/arm64/boot/dts/arm/juno-motherboard.dtsi
->>>  create mode 100644 arch/arm64/boot/dts/arm/juno.dts
->>>
->>
->> [...]
->>
->>> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
->>> new file mode 100644
->>> index 0000000..097ecc4
->>> --- /dev/null
->>> +++ b/arch/arm64/boot/dts/arm/juno.dts
->>
->> [...]
->>
->>> +       timer {
->>> +               compatible = "arm,armv8-timer";
->>> +               interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
->>> +                            <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
->>> +                            <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
->>> +                            <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>;
->>> +       };
->>
->> Sorry, I should have spotted this earlier: all these interrupts are
->> *level*, not edge. This happens to work because the GIC's config
->> register is RO for PPIs on Juno, but still...
+On Tue, Nov 25, 2014 at 01:05:36PM +0000, Robin Murphy wrote:
+> On 14/11/14 18:56, Will Deacon wrote:
+> > of_dma_configure determines the size of the DMA range for a device by
+> > either parsing the dma-ranges property or inspecting the coherent DMA
+> > mask. This same information can be used to initialise the max segment
+> > size and boundary_mask to a default value.
+> >
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> Yes, I've seen your other email to Suravee regarding interrupt triggering and I was trying to
-> find the relevant bits in Juno to tell me why I've put the info in DT this way. Maybe I *did*
-> copy-paste this part from FVP DT though.
+> Sadly, NAK on this one. After a thorough investigation and testing, 
+> generic code really shouldn't be touching dma_parms like this, and I 
+> have some corrupted files on my USB filesystem to prove it ;) It seems 
+> it's a bad idea to effectively change the default segment size 
+> universally unless you really want to go through the entire block layer 
+> (and who-knows-what-else) to find and fix everything that relies on it 
+> being 64k.
 > 
-> I will send a patch to Olof to update.
+> Simply dropping this patch and letting the existing defaults in 
+> dma_set_max_seg_size and dma_get_seg_boundary stand seems like the 
+> correct action.
+> 
+> 
+> Marek, I believe you may have some use case for this - if so, as I 
+> understand it your individual drivers should be setting up their own 
+> dma_parms directly, to tell the IOMMU they can handle it merging 
+> scatterlists into arbitrarily long segments, without affecting the other 
+> drivers that assume they'll never see >64k segments and go wrong if they 
+> do (including the generic USB stack, apparently).
 
-Yeah, looks like most (if not all) DTs in the tree are broken. Any
-chance you could write a sweeping patch to fix them all (at least for
-the ARM implementations)?
+Ok, I'll drop this patch from the series for the time being. It's certainly
+not a crucial part of the patchset and filesystem corruption is always bad.
 
-The APM and Cavium implementations also carry the same values, and I
-suppose this is a bug too, but someone with access to documentation
-should figure this out.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
