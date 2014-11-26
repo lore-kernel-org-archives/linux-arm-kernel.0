@@ -1,45 +1,134 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 26 Nov 2014 14:36:42 +0100
-Subject: n900: kernel cmdline from bootloader in DT mode
-In-Reply-To: <20141126132800.GA27610@amd>
-References: <201411261354.33652@pali> <20141126132800.GA27610@amd>
-Message-ID: <201411261436.42166@pali>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 26 Nov 2014 14:39:56 +0100
+Subject: [PATCH v2] mmc: core: add core-level function for sending tuning
+ commands
+In-Reply-To: <1416978333-3086-1-git-send-email-21cnbao@gmail.com>
+References: <1416978333-3086-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CAPDyKFp48LvM5E_vQ+T36T=aCQ+8P9ZicfG8fGtnke+tXj=qXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 November 2014 14:28:01 Pavel Machek wrote:
-> Hi!
-> 
-> > for some unknown reasons when I compile kernel for n900 in
-> > DT mode it ignore cmdline passed by bootloader. When I
-> > comment
-> > 
-> > CONFIG_ARM_APPENDED_DTB=y
-> > 
-> > then it boots into legacy board mode and cmdline is used
-> > from bootloader.
-> > 
-> > When is problem?
-> 
-> It seems to work for me, I'm booting using 0xffff, with
-> attached config.
-> 									Pavel
+On 26 November 2014 at 06:05, Barry Song <21cnbao@gmail.com> wrote:
+> From: Minda Chen <Minda.Chen@csr.com>
+>
+> According to the SD card spec, Add a manual tuning command function
+> for SDR104/HS200.
+> Sending command 19 or command 21 to read data and compare with the
+> tunning block pattern.
+>
+> This patch will help to decrease some platform private codes in SDHCI
+> platform_execute_tuning() callbacks.
+>
+> Signed-off-by: Minda Chen <Minda.Chen@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-Can you try to set some "root=something" into CONFIG_CMDLINE and 
-then add real "root=" param via 0xffff?
+Thanks! Applied for next.
 
-My problem is that I have specified ubifs mtd root in 
-CONFIG_CMDLINE and when I set correct root via bootloader (from 
-0xffff or flasher-3.5) it is ignored and used only what is 
-specified in CONFIG_CMDLINE.
+Actually it didn't apply as is, but I managed to resolve the trivial
+conflict. In future, please use my mmc tree and the next branch to
+base your patches upon.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141126/fd1e4cb7/attachment.sig>
+Kind regards
+Uffe
+
+> ---
+>  drivers/mmc/core/mmc_ops.c | 70 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mmc/core.h   |  1 +
+>  2 files changed, 71 insertions(+)
+>
+> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> index 7911e05..a897894 100644
+> --- a/drivers/mmc/core/mmc_ops.c
+> +++ b/drivers/mmc/core/mmc_ops.c
+> @@ -543,6 +543,76 @@ int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>  }
+>  EXPORT_SYMBOL_GPL(mmc_switch);
+>
+> +int mmc_send_tuning(struct mmc_card *card)
+> +{
+> +       struct mmc_request mrq = {NULL};
+> +       struct mmc_command cmd = {0};
+> +       struct mmc_data data = {0};
+> +       struct scatterlist sg;
+> +       struct mmc_host *mmc = card->host;
+> +       struct mmc_ios *ios = &mmc->ios;
+> +       const u8 *tuning_block_pattern;
+> +       int size, err = 0;
+> +       u8 *data_buf;
+> +       u32 opcode;
+> +
+> +       if (ios->bus_width == MMC_BUS_WIDTH_8) {
+> +               tuning_block_pattern = tuning_blk_pattern_8bit;
+> +               size = sizeof(tuning_blk_pattern_8bit);
+> +               opcode = MMC_SEND_TUNING_BLOCK_HS200;
+> +       } else if (ios->bus_width == MMC_BUS_WIDTH_4) {
+> +               tuning_block_pattern = tuning_blk_pattern_4bit;
+> +               size = sizeof(tuning_blk_pattern_4bit);
+> +               opcode = MMC_SEND_TUNING_BLOCK;
+> +       } else
+> +               return -EINVAL;
+> +
+> +       data_buf = kzalloc(size, GFP_KERNEL);
+> +       if (!data_buf)
+> +               return -ENOMEM;
+> +
+> +       mrq.cmd = &cmd;
+> +       mrq.data = &data;
+> +
+> +       cmd.opcode = opcode;
+> +       cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
+> +
+> +       data.blksz = size;
+> +       data.blocks = 1;
+> +       data.flags = MMC_DATA_READ;
+> +
+> +       /*
+> +        * According to the tuning specs, Tuning process
+> +        * is normally shorter 40 executions of CMD19,
+> +        * and timeout value should be shorter than 150 ms
+> +        */
+> +       data.timeout_ns = 150 * NSEC_PER_MSEC;
+> +
+> +       data.sg = &sg;
+> +       data.sg_len = 1;
+> +       sg_init_one(&sg, data_buf, size);
+> +
+> +       mmc_wait_for_req(mmc, &mrq);
+> +
+> +       if (cmd.error) {
+> +               err = cmd.error;
+> +               goto out;
+> +       }
+> +
+> +       if (data.error) {
+> +               err = data.error;
+> +               goto out;
+> +       }
+> +
+> +       if (memcmp(data_buf, tuning_block_pattern, size))
+> +               err = -EIO;
+> +
+> +out:
+> +       kfree(data_buf);
+> +       return err;
+> +}
+> +EXPORT_SYMBOL_GPL(mmc_send_tuning);
+> +
+>  static int
+>  mmc_send_bus_test(struct mmc_card *card, struct mmc_host *host, u8 opcode,
+>                   u8 len)
+> diff --git a/include/linux/mmc/core.h b/include/linux/mmc/core.h
+> index f206e29..b5c2763 100644
+> --- a/include/linux/mmc/core.h
+> +++ b/include/linux/mmc/core.h
+> @@ -154,6 +154,7 @@ extern void mmc_start_bkops(struct mmc_card *card, bool from_exception);
+>  extern int __mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int, bool,
+>                         bool, bool);
+>  extern int mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int);
+> +extern int mmc_send_tuning(struct mmc_card *);
+>  extern int mmc_send_ext_csd(struct mmc_card *card, u8 *ext_csd);
+>
+>  #define MMC_ERASE_ARG          0x00000000
+> --
+> 2.1.3
+>
