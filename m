@@ -1,75 +1,66 @@
-From: cernekee@gmail.com (Kevin Cernekee)
-Date: Tue, 25 Nov 2014 16:49:54 -0800
-Subject: [PATCH 9/9] usb: {ohci,
- ehci}-platform: Use new OF big-endian helper function
-In-Reply-To: <1416962994-27095-1-git-send-email-cernekee@gmail.com>
-References: <1416962994-27095-1-git-send-email-cernekee@gmail.com>
-Message-ID: <1416962994-27095-10-git-send-email-cernekee@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 25 Nov 2014 19:57:10 -0500
+Subject: [PATCH] ARM: kbuild: Fix forced rebuild after 'make dtbs'
+In-Reply-To: <20141125235150.GH3836@n2100.arm.linux.org.uk>
+References: <CACRpkdYmJWy1_vs0tWRA7SvkQnvbXXKqf7pHpH5b5tZ6vR+KJg@mail.gmail.com>
+ <1414961549-31666-1-git-send-email-jason@lakedaemon.net>
+ <5474F78F.2060906@suse.cz>
+ <20141125235150.GH3836@n2100.arm.linux.org.uk>
+Message-ID: <20141126005710.GE22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This handles the existing "big-endian" case, and in addition, it also does
-the right thing when "native-endian" is specified.
+On Tue, Nov 25, 2014 at 11:51:50PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Nov 25, 2014 at 10:41:35PM +0100, Michal Marek wrote:
+> > Dne 2.11.2014 v 21:52 Jason Cooper napsal(a):
+> > > After this patch:
+> > > 
+> > >   f4d4ffc03efc kbuild: dtbs_install: new make target
+> > > 
+> > > was added the kernel tree, Linus Walleij noticed that 'make dtbs' forced
+> > > a following 'make zImage' to rebuild the entire tree, even though
+> > > nothing had changed.  His report:
+> > > 
+> > >   After this patch a while back I have observed the following behaviour
+> > >   of the kernel build:
+> > > 
+> > >   make zImage
+> > >   make zImage
+> > >   -> incremental build, just relink
+> > > 
+> > >   make zImage
+> > >   make dtbs
+> > >   make zImage
+> > >   -> The whole kernel gets rebuilt
+> > > 
+> > >   So now if I happen to recompile my device trees, I suddenly want
+> > >   the entire zImage to be rebuilt to? It's by definition not changes
+> > >   that affect the kernel build :-(
+> > > 
+> > >   I noticed this because my build scripts calls make dtbs && make
+> > >   zImage, and started to rebuild absolutely everything all the time.
+> > > 
+> > > To fix this, we make only the dtbs_install target depend on the prepare
+> > > target.  It's needed to make sure KERNELVERSION is calculated prior to
+> > > installing.
+> > 
+> > If a mere 'make prepare' causes a rebuild of the whole kernel, then
+> > there is something fishy in the ARM Makefiles. However, if you only need
+> > the KERNELRELEASE variable, then you do not need to depend on prepare.
+> > The main Makefile makes sure that silentoldconfig is ran and therefore
+> > KERNELRELEASE set for all targets except make *config.
+> 
+> Running make prepare and then re-running a build doesn't rebuild anything
+> for me.  However, I always build with O=  Also works if I do a make
+> dtbs too.  So, everything seems to work as expected here.
+> 
+> I think this needs a bit more debugging to see why the whole kernel is
+> being rebuilt - the kernel build system has methods to tell you why stuff
+> is being built, which would be a good place to start.
 
-Signed-off-by: Kevin Cernekee <cernekee@gmail.com>
----
- Documentation/devicetree/bindings/usb/usb-ehci.txt | 2 ++
- Documentation/devicetree/bindings/usb/usb-ohci.txt | 2 ++
- drivers/usb/host/ehci-platform.c                   | 2 +-
- drivers/usb/host/ohci-platform.c                   | 2 +-
- 4 files changed, 6 insertions(+), 2 deletions(-)
+Linus, since you were the one experiencing the regression, care to take
+a whack at that?
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-index 43c1a4e..9505c31 100644
---- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-@@ -12,6 +12,8 @@ Optional properties:
-  - big-endian-regs : boolean, set this for hcds with big-endian registers
-  - big-endian-desc : boolean, set this for hcds with big-endian descriptors
-  - big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
-+ - native-endian : boolean, enables big-endian-regs + big-endian-desc
-+   iff the kernel was compiled for big endian
-  - clocks : a list of phandle + clock specifier pairs
-  - phys : phandle + phy specifier pair
-  - phy-names : "usb"
-diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-index 19233b7..3bb9673 100644
---- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-@@ -9,6 +9,8 @@ Optional properties:
- - big-endian-regs : boolean, set this for hcds with big-endian registers
- - big-endian-desc : boolean, set this for hcds with big-endian descriptors
- - big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
-+- native-endian : boolean, enables big-endian-regs + big-endian-desc
-+  iff the kernel was compiled for big endian
- - no-big-frame-no : boolean, set if frame_no lives in bits [15:0] of HCCA
- - num-ports : u32, to override the detected port count
- - clocks : a list of phandle + clock specifier pairs
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index 2f5b9ce..0da9d70 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -187,7 +187,7 @@ static int ehci_platform_probe(struct platform_device *dev)
- 		if (of_property_read_bool(dev->dev.of_node, "big-endian-desc"))
- 			ehci->big_endian_desc = 1;
- 
--		if (of_property_read_bool(dev->dev.of_node, "big-endian"))
-+		if (of_device_is_big_endian(dev->dev.of_node))
- 			ehci->big_endian_mmio = ehci->big_endian_desc = 1;
- 
- 		priv->phy = devm_phy_get(&dev->dev, "usb");
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index 7793c3c..029a606 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -157,7 +157,7 @@ static int ohci_platform_probe(struct platform_device *dev)
- 		if (of_property_read_bool(dev->dev.of_node, "big-endian-desc"))
- 			ohci->flags |= OHCI_QUIRK_BE_DESC;
- 
--		if (of_property_read_bool(dev->dev.of_node, "big-endian"))
-+		if (of_device_is_big_endian(dev->dev.of_node))
- 			ohci->flags |= OHCI_QUIRK_BE_MMIO | OHCI_QUIRK_BE_DESC;
- 
- 		if (of_property_read_bool(dev->dev.of_node, "no-big-frame-no"))
--- 
-2.1.0
+thx,
+
+Jason.
