@@ -1,64 +1,62 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 26 Nov 2014 10:05:11 +0100
-Subject: [PATCH 4/5] ARM: dts: sun6i: Add sun6i-a31s.dtsi
-In-Reply-To: <CAGb2v64=M37i0WVBbjOOWCrfP5tcHMr6yE+C6rPiy-sV7__qFQ@mail.gmail.com>
-References: <1416747283-13489-1-git-send-email-hdegoede@redhat.com>
- <1416747283-13489-5-git-send-email-hdegoede@redhat.com>
- <20141125181829.GC25249@lukather>
- <CAGb2v64=M37i0WVBbjOOWCrfP5tcHMr6yE+C6rPiy-sV7__qFQ@mail.gmail.com>
-Message-ID: <547597C7.5070005@redhat.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 26 Nov 2014 10:10:53 +0100
+Subject: [GIT PULL v2 2/4] ARM: tegra: Device tree changes for v3.19
+In-Reply-To: <1416570832-6220-2-git-send-email-thierry.reding@gmail.com>
+References: <1416570832-6220-2-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1416993053-3630-2-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi ARM SoC maintainers,
 
-On 11/26/2014 12:45 AM, Chen-Yu Tsai wrote:
-> On Wed, Nov 26, 2014 at 2:18 AM, Maxime Ripard
+The following changes since commit 37d21f8918f2aa2289036cc778ee188951e53288:
 
-<snip>
+  memory: Add NVIDIA Tegra memory controller support (2014-11-26 09:45:02 +0100)
 
->>> +             ahb1_gates: clk at 01c20060 {
->>> +                     #clock-cells = <1>;
->>> +                     compatible = "allwinner,sun6i-a31-ahb1-gates-clk";
->>> +                     reg = <0x01c20060 0x8>;
->>> +                     clocks = <&ahb1>;
->>> +                     clock-output-names = "ahb1_mipidsi", "ahb1_ss",
->>> +                                     "ahb1_dma", "ahb1_mmc0", "ahb1_mmc1",
->>> +                                     "ahb1_mmc2", "ahb1_mmc3", "ahb1_nand1",
->>> +                                     "ahb1_nand0", "ahb1_sdram",
->>> +                                     "ahb1_gmac", "ahb1_ts", "ahb1_hstimer",
->>> +                                     "ahb1_spi0", "ahb1_spi1", "ahb1_spi2",
->>> +                                     "ahb1_spi3", "ahb1_otg", "ahb1_ehci0",
->>> +                                     "ahb1_ehci1", "ahb1_ohci0",
->>> +                                     "ahb1_ohci1", "ahb1_ohci2", "ahb1_ve",
->>> +                                     "ahb1_lcd0", "ahb1_lcd1", "ahb1_csi",
->>> +                                     "ahb1_hdmi", "ahb1_de0", "ahb1_de1",
->>> +                                     "ahb1_fe0", "ahb1_fe1", "ahb1_mp",
->>> +                                     "ahb1_gpu", "ahb1_deu0", "ahb1_deu1",
->>> +                                     "ahb1_drc0", "ahb1_drc1";
->>> +             };
->>
->> Are the gates really identical?
->>
->> As in not even stripped down?
->
-> According to the user manuals, the AHB1 gates on the A31s don't have
-> GMAC (or EMAC in the manual) and MIPI DSI listed. Though it seems
-> a lot of A31s hardware out there actually use GMAC.
+are available in the git repository at:
 
-Hmm, interesting I was focussing on the ohci2 gate when comparing them as
-the ohci2 is not listed in the pinmux.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.19-dt-rebased
 
-The GMAC clock gate definitely actually is there, as I've an A31s based board
-with a working GMAC.
+for you to fetch changes up to 1a4a3341aef67db63b6ac46da3e40b5c5079a851:
 
-Also Allwinner has confirmed to me that the A31 and A31s are the same die, so
-there is no reason to differentiate between the 2 at this level. Either we do
-no differentiation at all, or only at the pinmux level to reflect that certain
-pins are simply just not there.
+  ARM: tegra: Enable IOMMU for display controllers on Tegra124 (2014-11-26 09:49:43 +0100)
 
-My vote goes to differentiating at the pinmux level.
+Note that this pulls in the for-3.19/iommu branch (tegra-for-3.19-iommu-
+rebased tag) to resolve the dependency between the IOMMU driver addition
+and the DT changes that include dt-bindings/memory/tegra*-mc.h headers.
 
-Regards,
+Thanks,
+Thierry
 
-Hans
+----------------------------------------------------------------
+ARM: tegra: Device tree changes for v3.19
+
+The bulk of these changes add memory controller nodes for Tegra30,
+Tegra114 and Tegra124. The memory controller implements an IOMMU that
+the display controllers are attached to. This allows them to scan out
+physically non-contiguous framebuffers and removes one of the primary
+users of CMA.
+
+The only other change adds a new MIPI pad control bank to the pin
+controller on Tegra124. The corresponding driver patch for this went
+into v3.18 as:
+
+        3ccc11f6b82c pinctrl: tegra: Add MIPI pad control
+
+----------------------------------------------------------------
+Sean Paul (1):
+      ARM: tegra: Add APB_MISC_GP as a MIPI pad control bank
+
+Thierry Reding (7):
+      Merge branch 'for-3.19/iommu' into for-3.19/dt
+      ARM: tegra: Add memory controller support for Tegra30
+      ARM: tegra: Add memory controller support for Tegra114
+      ARM: tegra: Add memory controller support for Tegra124
+      ARM: tegra: Enable IOMMU for display controllers on Tegra30
+      ARM: tegra: Enable IOMMU for display controllers on Tegra114
+      ARM: tegra: Enable IOMMU for display controllers on Tegra124
+
+ arch/arm/boot/dts/tegra114.dtsi | 23 ++++++++++++++---------
+ arch/arm/boot/dts/tegra124.dtsi | 19 ++++++++++++++++++-
+ arch/arm/boot/dts/tegra30.dtsi  | 25 +++++++++++--------------
+ 3 files changed, 43 insertions(+), 24 deletions(-)
