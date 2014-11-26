@@ -1,103 +1,115 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 26 Nov 2014 10:41:35 +0100
-Subject: [PATCH v10 02/10] qcom: scm: Add SCM warmboot support for quad
- core SoCs
-In-Reply-To: <1416593037-27527-3-git-send-email-lina.iyer@linaro.org>
-References: <1416593037-27527-1-git-send-email-lina.iyer@linaro.org>
- <1416593037-27527-3-git-send-email-lina.iyer@linaro.org>
-Message-ID: <5475A04F.9070508@linaro.org>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Wed, 26 Nov 2014 15:14:55 +0530
+Subject: [PATCH] dmaengine: pl330: Set residue in tx_status callback
+Message-ID: <1416995095-13763-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2014 07:03 PM, Lina Iyer wrote:
-> Quad core SoCs like APQ8074, APQ8064, APQ8084 need SCM support set up
-> warm boot addresses in the Secure Monitor. Extend the SCM flags to
-> support warm boot addresses for secondary cores.
->
-> We do not need to export the warmboot flags. Move them into the
-> implementation file.
->
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Fill txstate.residue with the amount of bytes remaining in the current
+transfer if the transfer is not complete.  This will be of particular
+use to i2s DMA transfers, providing more accurate hw_ptr values to ASoC.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+I had taken the code from Dylan Reid <dgreid@chromium.org> patch from the
+below link and modified according to the current dmaengine framework.
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/23007
 
-+ one comment below
+Cc: Dylan Reid <dgreid@chromium.org>
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+---
 
-> ---
->   drivers/soc/qcom/scm-boot.c | 31 +++++++++++++++++++++++++++++++
->   include/soc/qcom/scm-boot.h |  3 +--
->   2 files changed, 32 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
-> index 60ff7b4..0871659 100644
-> --- a/drivers/soc/qcom/scm-boot.c
-> +++ b/drivers/soc/qcom/scm-boot.c
-> @@ -21,6 +21,23 @@
->   #include <soc/qcom/scm.h>
->   #include <soc/qcom/scm-boot.h>
->
-> +#define SCM_FLAG_WARMBOOT_CPU0		0x04
-> +#define SCM_FLAG_WARMBOOT_CPU1		0x02
-> +#define SCM_FLAG_WARMBOOT_CPU2		0x10
-> +#define SCM_FLAG_WARMBOOT_CPU3		0x40
-> +
-> +struct scm_warmboot {
-> +	int flag;
-> +	void *entry;
-> +};
-> +
-> +static struct scm_warmboot scm_flags[] = {
-> +	{ .flag = SCM_FLAG_WARMBOOT_CPU0 },
-> +	{ .flag = SCM_FLAG_WARMBOOT_CPU1 },
-> +	{ .flag = SCM_FLAG_WARMBOOT_CPU2 },
-> +	{ .flag = SCM_FLAG_WARMBOOT_CPU3 },
-> +};
-> +
->   /*
->    * Set the cold/warm boot address for one of the CPU cores.
->    */
-> @@ -37,3 +54,17 @@ int scm_set_boot_addr(phys_addr_t addr, int flags)
->   			&cmd, sizeof(cmd), NULL, 0);
->   }
->   EXPORT_SYMBOL(scm_set_boot_addr);
-> +
-> +int scm_set_warm_boot_addr(void *entry, int cpu)
-> +{
-> +	int ret;
-> +
-> +	if (entry == scm_flags[cpu].entry)
-> +		return 0;
+This patch has been tested for audio playback on exynos5420 peach-pit.
 
-IMO, this test deserves a comment of why this is needed.
+ drivers/dma/pl330.c |   67 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 65 insertions(+), 2 deletions(-)
 
-> +
-> +	ret = scm_set_boot_addr(virt_to_phys(entry), scm_flags[cpu].flag);
-> +	if (!ret)
-> +		scm_flags[cpu].entry  = entry;
-> +
-> +	return ret;
-> +}
-> diff --git a/include/soc/qcom/scm-boot.h b/include/soc/qcom/scm-boot.h
-> index 6aabb24..529f55a 100644
-> --- a/include/soc/qcom/scm-boot.h
-> +++ b/include/soc/qcom/scm-boot.h
-> @@ -16,9 +16,8 @@
->   #define SCM_FLAG_COLDBOOT_CPU1		0x01
->   #define SCM_FLAG_COLDBOOT_CPU2		0x08
->   #define SCM_FLAG_COLDBOOT_CPU3		0x20
-> -#define SCM_FLAG_WARMBOOT_CPU0		0x04
-> -#define SCM_FLAG_WARMBOOT_CPU1		0x02
->
->   int scm_set_boot_addr(phys_addr_t addr, int flags);
-> +int scm_set_warm_boot_addr(void *entry, int cpu);
->
->   #endif
->
-
-
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index b7493d2..db880ae 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2182,11 +2182,74 @@ static void pl330_free_chan_resources(struct dma_chan *chan)
+ 	pm_runtime_put_autosuspend(pch->dmac->ddma.dev);
+ }
+ 
++static inline int
++pl330_src_addr_in_desc(struct dma_pl330_desc *desc, unsigned int sar)
++{
++	return ((desc->px.src_addr <= sar) &&
++		(sar <= (desc->px.src_addr + desc->px.bytes)));
++}
++
++static inline int
++pl330_dst_addr_in_desc(struct dma_pl330_desc *desc, unsigned int dar)
++{
++	return ((desc->px.dst_addr <= dar) &&
++		(dar <= (desc->px.dst_addr + desc->px.bytes)));
++}
++
+ static enum dma_status
+ pl330_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+ 		 struct dma_tx_state *txstate)
+ {
+-	return dma_cookie_status(chan, cookie, txstate);
++	dma_addr_t sar, dar;
++	struct dma_pl330_chan *pch = to_pchan(chan);
++	void __iomem *regs = pch->dmac->base;
++	struct pl330_thread *thrd = pch->thread;
++	struct dma_pl330_desc *desc;
++	unsigned int residue = 0;
++	unsigned long flags;
++	bool first = true;
++	dma_cookie_t first_c, current_c;
++	dma_cookie_t used;
++	enum dma_status ret;
++
++	ret = dma_cookie_status(chan, cookie, txstate);
++	if (ret == DMA_COMPLETE || !txstate)
++		return ret;
++
++	used = txstate->used;
++
++	spin_lock_irqsave(&pch->lock, flags);
++	sar = readl(regs + SA(thrd->id));
++	dar = readl(regs + DA(thrd->id));
++
++	list_for_each_entry(desc, &pch->work_list, node) {
++		if (desc->status == BUSY) {
++			current_c = desc->txd.cookie;
++			if (first) {
++				first_c = desc->txd.cookie;
++				first = false;
++			}
++
++			if (first_c < current_c)
++				residue += desc->px.bytes;
++			else {
++				if (desc->rqcfg.src_inc && pl330_src_addr_in_desc(desc, sar)) {
++					residue += desc->px.bytes;
++					residue -= sar - desc->px.src_addr;
++				} else if (desc->rqcfg.dst_inc && pl330_dst_addr_in_desc(desc, dar)) {
++					residue += desc->px.bytes;
++					residue -= dar - desc->px.dst_addr;
++				}
++			}
++		} else if (desc->status == PREP)
++			residue += desc->px.bytes;
++
++		if (desc->txd.cookie == used)
++			break;
++	}
++	spin_unlock_irqrestore(&pch->lock, flags);
++	dma_set_residue(txstate, residue);
++	return ret;
+ }
+ 
+ static void pl330_issue_pending(struct dma_chan *chan)
+@@ -2631,7 +2694,7 @@ static int pl330_dma_device_slave_caps(struct dma_chan *dchan,
+ 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	caps->cmd_pause = false;
+ 	caps->cmd_terminate = true;
+-	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
++	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
+ 
+ 	return 0;
+ }
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.4.4
