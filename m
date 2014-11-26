@@ -1,132 +1,55 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Wed, 26 Nov 2014 21:59:50 +0530
-Subject: [PATCH 3/9] ARM: MB86S7X: Add MCPM support
-In-Reply-To: <20141125184609.GA29425@e102568-lin.cambridge.arm.com>
-References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1416486920-25343-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <alpine.LFD.2.11.1411251205500.11690@knanqh.ubzr>
- <20141125184609.GA29425@e102568-lin.cambridge.arm.com>
-Message-ID: <CAJe_ZheX5KwraFMmuA+uMq95BprJVxaPSWjKd7gOjeEKLDXSdQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 26 Nov 2014 16:38:07 +0000
+Subject: [PATCH 2/9] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <CAJe_ZheKfEkdzcNE_5cpDg4qbYNLEJ=kKi+ScRf2=a8irAfnDg@mail.gmail.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>	<1416486872-25301-1-git-send-email-Vincent.Yang@tw.fujitsu.com>	<54749429.9080505@arm.com>	<CAJe_ZhciCP2VbmRtrq9d14WhfLhnC-xaitCCiW_6Yf1S-0sdUg@mail.gmail.com>	<5474C3DD.5060706@arm.com>	<CAJe_ZhfkcSv7oBfXdiW5=F0bZvv+9z3m90cXdy=O66VwZWCQnw@mail.gmail.com>	<5475DD19.9000107@arm.com>
+ <CAJe_ZheKfEkdzcNE_5cpDg4qbYNLEJ=kKi+ScRf2=a8irAfnDg@mail.gmail.com>
+Message-ID: <547601EF.7070307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 November 2014 at 00:16, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Tue, Nov 25, 2014 at 05:42:32PM +0000, Nicolas Pitre wrote:
->> On Thu, 20 Nov 2014, Vincent Yang wrote:
->>
->> > The remote firmware(SCB) owns the SMP control. This MCPM driver gets
->> > CPU/CLUSTER power up/down done by SCB over mailbox.
->> >
->> > Signed-off-by: Andy Green <andy.green@linaro.org>
->> > Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
->> > Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
->> > Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
->> > ---
->> >  arch/arm/mach-mb86s7x/Makefile |   2 +-
->> >  arch/arm/mach-mb86s7x/mcpm.c   | 360 +++++++++++++++++++++++++++++++++++++++++
->> >  arch/arm/mach-mb86s7x/smc.S    |  27 ++++
->> >  3 files changed, 388 insertions(+), 1 deletion(-)
->> >  create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
->> >  create mode 100644 arch/arm/mach-mb86s7x/smc.S
->> >
->> > diff --git a/arch/arm/mach-mb86s7x/Makefile b/arch/arm/mach-mb86s7x/Makefile
->> > index 97640b6..b0fa34b 100644
->> > --- a/arch/arm/mach-mb86s7x/Makefile
->> > +++ b/arch/arm/mach-mb86s7x/Makefile
->> > @@ -1 +1 @@
->> > -obj-$(CONFIG_ARCH_MB86S7X)   += board.o
->> > +obj-$(CONFIG_ARCH_MB86S7X)   += board.o mcpm.o smc.o
->> > diff --git a/arch/arm/mach-mb86s7x/mcpm.c b/arch/arm/mach-mb86s7x/mcpm.c
->> > new file mode 100644
->> > index 0000000..bf1b50a
->> > --- /dev/null
->> > +++ b/arch/arm/mach-mb86s7x/mcpm.c
->> > @@ -0,0 +1,360 @@
->> > +/*
->> > + * arch/arm/mach-mb86s7x/mcpm.c
->> > + * Copyright:        (C) 2013-2014 Fujitsu Semiconductor Limited
->> > + * Copyright:        (C) 2014 Linaro Ltd.
->> > + *
->> > + * This program is free software; you can redistribute it and/or modify
->> > + * it under the terms of the GNU General Public License version 2 as
->> > + * published by the Free Software Foundation.
->> > + */
->> > +
->> > +#include <linux/io.h>
->> > +#include <linux/pm.h>
->> > +#include <linux/delay.h>
->> > +#include <linux/cpu_pm.h>
->> > +#include <linux/kernel.h>
->> > +#include <linux/module.h>
->> > +#include <linux/arm-cci.h>
->> > +#include <linux/spinlock.h>
->> > +#include <linux/suspend.h>
->> > +#include <linux/of_device.h>
->> > +#include <linux/irqchip/arm-gic.h>
->> > +#include <linux/platform_device.h>
->> > +
->> > +#include <soc/mb86s7x/scb_mhu.h>
->> > +
->> > +#include <asm/mcpm.h>
->> > +#include <asm/cp15.h>
->> > +#include <asm/cputype.h>
->> > +#include <asm/suspend.h>
->> > +#include <asm/idmap.h>
->> > +
->> > +#define S7X_MAX_CLUSTER      2
->> > +#define S7X_MAX_CPU  2
->> > +
->> > +#define MHU_SHM_OFFSET               0x3800
->> > +#define WFI_COLOR_OFFSET     0x3f00
->> > +#define TRAMPOLINE_OFFSET    0x3c00
->> > +#define RESET_OFFSET         (TRAMPOLINE_OFFSET + 0x3fc)
->> > +
->> > +static arch_spinlock_t mb86s7x_pm_lock = __ARCH_SPIN_LOCK_UNLOCKED;
->> > +static int mb86s7x_pm_use_count[S7X_MAX_CLUSTER][S7X_MAX_CPU];
->> > +extern void __iomem *mb86s7x_shm_base;
->> > +
->> > +#define AT_WFI_DO_NOTHING    0x0
->> > +#define AT_WFI_DO_SUSPEND    0x1
->> > +#define AT_WFI_DO_POWEROFF   0x2
->> > +#define AT_WFI_COLOR_MASK    0x3
->> > +
->> > +struct mb86s7x_cpu_gate {
->> > +     u32 payload_size;
->> > +     u32 cluster_class;
->> > +     u32 cluster_id;
->> > +     u32 cpu_id;
->> > +#define SCB_CPU_STATE_OFF    0x0
->> > +#define SCB_CPU_STATE_ON     0x1
->> > +#define SCB_CPU_STATE_SUSP   0x2
->> > +     u32 cpu_state;
->> > +};
->> > +
->> > +asmlinkage void mb86s70evb_outer_flush_all(void)
->> > +{
->> > +     outer_flush_all();
->> > +}
->> > +
->> > +#define mb86s70evb_exit_coherency_flush(level) { \
->> > +     asm volatile( \
->> > +     "stmfd  sp!, {fp, ip}\n\t" \
->> > +     "mrc    p15, 0, r0, c1, c0, 0   @ get SCTLR\n\t" \
->> > +     "bic    r0, r0, #"__stringify(CR_C)"\n\t" \
->> > +     "mcr    p15, 0, r0, c1, c0, 0   @ set SCTLR\n\t" \
->> > +     "isb\n\t" \
->> > +     "bl     v7_flush_dcache_"__stringify(level)"\n\t" \
->> > +     "bl     mb86s70evb_outer_flush_all\n\t" \
->>
->> This is wrong.  As mentioned already, this unconditionally flushes L2 in
->> all cases which shouldn't be necessary in the "louis" case.
->
-> Is this a bL system with unified and architected L2s ? I think so, so
-> what's the outercache for ?
->
-Yes, the CA15 has 1MB and CA7 256KB L2 cache, that's it.
-This thing sneaked in via a patch from someone desperate to make
-Suspend-To-Ram (not yet submitted) work and I failed to spot it. We
-should remove the mb86s70evb_outer_flush_all()
 
-Thanks,
-Jassi
+
+On 26/11/14 16:20, Jassi Brar wrote:
+> On 26 November 2014 at 19:30, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> On 26/11/14 05:37, Jassi Brar wrote:
+>>>
+>
+>>>>>     It seems you still don't get my point that the driver should manage
+>>>>> all channels - S & NS. If Linux is running in NS mode on a platform,
+>>>>> the DT will specify only some NS channel to be used. The controller
+>>>>> driver shouldn't be crippled just because you think Linux will never
+>>>>> be run in Secure mode.
+>>>>>
+>>>>
+>>>> Ok how do you handle that, I don't see that in the DT binding. As it
+>>>> stands, you can unconditionally try to access the secure channel and
+>>>> cause aborts if the platform is running in non-secure mode.
+>>>>
+>>> No. Please look at the dtsi again ....
+>>>
+>>>           mhu: mailbox at 2b1f0000 {
+>>>                   #mbox-cells = <1>;
+>>>                   compatible = "arm,mbox-mhu";
+>>>                   reg = <0 0x2b1f0000 0x1000>;
+>>>                   interrupts = <0 36 4>, /* LP Non-Sec */
+>>>                                <0 35 4>, /* HP Non-Sec */
+>>>                                <0 37 4>; /* Secure */
+>>
+>>
+>> One possible issue I can think of(though current driver design requests
+>> irq only on channel startup, it could be moved to probe for optimization
+>> in which case you need a way to make sure secure channel or irq is not
+>> accessed)
+>>
+> As you see it is fine as such.
+
+Agreed, but assuming some driver logic. I would like to see some way of
+identifying that from DT if we adding the support for secure channel in
+the driver else I prefer not to add it unless there is a real user of
+it(which is not the case with your current patch set). That will be
+handy if there's any issue in future due to some firmware that can't be
+changed or upgraded.
+
+Regards,
+Sudeep
