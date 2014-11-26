@@ -1,65 +1,93 @@
-From: mmarek@suse.cz (Michal Marek)
-Date: Wed, 26 Nov 2014 10:39:48 +0100
-Subject: [PATCH] ARM: kbuild: Fix forced rebuild after 'make dtbs'
-In-Reply-To: <20141125235150.GH3836@n2100.arm.linux.org.uk>
-References: <CACRpkdYmJWy1_vs0tWRA7SvkQnvbXXKqf7pHpH5b5tZ6vR+KJg@mail.gmail.com>
- <1414961549-31666-1-git-send-email-jason@lakedaemon.net>
- <5474F78F.2060906@suse.cz> <20141125235150.GH3836@n2100.arm.linux.org.uk>
-Message-ID: <54759FE4.5030700@suse.cz>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 26 Nov 2014 17:39:31 +0800
+Subject: [PATCH 4/5] ARM: dts: sun6i: Add sun6i-a31s.dtsi
+In-Reply-To: <547597C7.5070005@redhat.com>
+References: <1416747283-13489-1-git-send-email-hdegoede@redhat.com>
+ <1416747283-13489-5-git-send-email-hdegoede@redhat.com>
+ <20141125181829.GC25249@lukather>
+ <CAGb2v64=M37i0WVBbjOOWCrfP5tcHMr6yE+C6rPiy-sV7__qFQ@mail.gmail.com>
+ <547597C7.5070005@redhat.com>
+Message-ID: <CAGb2v66kHvChJw=5jBXGSfGbqnr=hmC1YOyzR-N7EN=AVookLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-11-26 00:51, Russell King - ARM Linux wrote:
-> On Tue, Nov 25, 2014 at 10:41:35PM +0100, Michal Marek wrote:
->> Dne 2.11.2014 v 21:52 Jason Cooper napsal(a):
->>> After this patch:
->>>
->>>   f4d4ffc03efc kbuild: dtbs_install: new make target
->>>
->>> was added the kernel tree, Linus Walleij noticed that 'make dtbs' forced
->>> a following 'make zImage' to rebuild the entire tree, even though
->>> nothing had changed.  His report:
->>>
->>>   After this patch a while back I have observed the following behaviour
->>>   of the kernel build:
->>>
->>>   make zImage
->>>   make zImage
->>>   -> incremental build, just relink
->>>
->>>   make zImage
->>>   make dtbs
->>>   make zImage
->>>   -> The whole kernel gets rebuilt
->>>
->>>   So now if I happen to recompile my device trees, I suddenly want
->>>   the entire zImage to be rebuilt to? It's by definition not changes
->>>   that affect the kernel build :-(
->>>
->>>   I noticed this because my build scripts calls make dtbs && make
->>>   zImage, and started to rebuild absolutely everything all the time.
->>>
->>> To fix this, we make only the dtbs_install target depend on the prepare
->>> target.  It's needed to make sure KERNELVERSION is calculated prior to
->>> installing.
+Hi,
+
+On Wed, Nov 26, 2014 at 5:05 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 11/26/2014 12:45 AM, Chen-Yu Tsai wrote:
 >>
->> If a mere 'make prepare' causes a rebuild of the whole kernel, then
->> there is something fishy in the ARM Makefiles. However, if you only need
->> the KERNELRELEASE variable, then you do not need to depend on prepare.
->> The main Makefile makes sure that silentoldconfig is ran and therefore
->> KERNELRELEASE set for all targets except make *config.
-> 
-> Running make prepare and then re-running a build doesn't rebuild anything
-> for me.  However, I always build with O=  Also works if I do a make
-> dtbs too.  So, everything seems to work as expected here.
+>> On Wed, Nov 26, 2014 at 2:18 AM, Maxime Ripard
+>
+>
+> <snip>
+>
+>
+>>>> +             ahb1_gates: clk at 01c20060 {
+>>>> +                     #clock-cells = <1>;
+>>>> +                     compatible = "allwinner,sun6i-a31-ahb1-gates-clk";
+>>>> +                     reg = <0x01c20060 0x8>;
+>>>> +                     clocks = <&ahb1>;
+>>>> +                     clock-output-names = "ahb1_mipidsi", "ahb1_ss",
+>>>> +                                     "ahb1_dma", "ahb1_mmc0",
+>>>> "ahb1_mmc1",
+>>>> +                                     "ahb1_mmc2", "ahb1_mmc3",
+>>>> "ahb1_nand1",
+>>>> +                                     "ahb1_nand0", "ahb1_sdram",
+>>>> +                                     "ahb1_gmac", "ahb1_ts",
+>>>> "ahb1_hstimer",
+>>>> +                                     "ahb1_spi0", "ahb1_spi1",
+>>>> "ahb1_spi2",
+>>>> +                                     "ahb1_spi3", "ahb1_otg",
+>>>> "ahb1_ehci0",
+>>>> +                                     "ahb1_ehci1", "ahb1_ohci0",
+>>>> +                                     "ahb1_ohci1", "ahb1_ohci2",
+>>>> "ahb1_ve",
+>>>> +                                     "ahb1_lcd0", "ahb1_lcd1",
+>>>> "ahb1_csi",
+>>>> +                                     "ahb1_hdmi", "ahb1_de0",
+>>>> "ahb1_de1",
+>>>> +                                     "ahb1_fe0", "ahb1_fe1", "ahb1_mp",
+>>>> +                                     "ahb1_gpu", "ahb1_deu0",
+>>>> "ahb1_deu1",
+>>>> +                                     "ahb1_drc0", "ahb1_drc1";
+>>>> +             };
+>>>
+>>>
+>>> Are the gates really identical?
+>>>
+>>> As in not even stripped down?
+>>
+>>
+>> According to the user manuals, the AHB1 gates on the A31s don't have
+>> GMAC (or EMAC in the manual) and MIPI DSI listed. Though it seems
+>> a lot of A31s hardware out there actually use GMAC.
+>
+>
+> Hmm, interesting I was focussing on the ohci2 gate when comparing them as
+> the ohci2 is not listed in the pinmux.
+>
+> The GMAC clock gate definitely actually is there, as I've an A31s based
+> board
+> with a working GMAC.
+>
+> Also Allwinner has confirmed to me that the A31 and A31s are the same die,
+> so
+> there is no reason to differentiate between the 2 at this level. Either we
+> do
+> no differentiation at all, or only at the pinmux level to reflect that
+> certain
+> pins are simply just not there.
+>
+> My vote goes to differentiating at the pinmux level.
 
-Good :).
+I agree. Since it is confirmed the dies are the same, the hardware
+description should be the same as well, except for the external
+differences (pinmux). Only downside is a slightly bloated DTB
+containing nodes we will never use on the a31s.
+
+IIRC, Allwinner's kernel treats them as the same as well.
 
 
-> I think this needs a bit more debugging to see why the whole kernel is
-> being rebuilt - the kernel build system has methods to tell you why stuff
-> is being built, which would be a good place to start.
-
-Right, this is make V=2.
-
-Michal
+ChenYu
