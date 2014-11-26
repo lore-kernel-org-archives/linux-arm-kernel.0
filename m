@@ -1,66 +1,41 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Nov 2014 09:13:25 +0900
-Subject: [PATCH] ARM: shmobile: dts: koelsch: Fix flash partition label and
- size
-Message-ID: <1416960805-15185-1-git-send-email-horms+renesas@verge.net.au>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 25 Nov 2014 16:14:16 -0800
+Subject: [PATCH] arm64: Add FIX_HOLE to permanent fixed addresses
+Message-ID: <1416960856-2944-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the size and names of flash partitions to match the
-expectations of the loader which are as follows:
+Every other architecture with permanent fixed addresses has
+FIX_HOLE as the first entry. This seems to be designed as a
+debugging aid but there are a couple of side effects of not
+having FIX_HOLE:
 
-"loader"---0x0000_0000-0x0008_0000 [loader program (readonly)]
-"user"  ---0x0008_0000-0x0060_0000 [U-Boot + bootargs + dt + uImage (readonly)]
-"flash" ---0x0060_0000-0x0400_0000 [filesystem and free (read/write)]
+- If the first fixed address is 0, fix_to_virt -> virt_to_fix
+triggers a BUG_ON for the virtual address being equal to
+FIXADDR_TOP
+- fix_to_virt may return a value outside of FIXADDR_START
+and FIXADDR_TOP which may look like a bug to a developer.
 
-["user"'s assumed breakdown]
-U-boot+ bootargs(0x0008_0000-0x0010_0000) 512KB
-Device tree     (0x0010_0000-0x0014_0000) 256KB
-uImage          (0x0014_0000-0x0060_0000) 4.75MB
+Match up with other architectures and make everything clearer
+by adding FIX_HOLE.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
+ arch/arm64/include/asm/fixmap.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-This replaces a patch that I previously posted, "shmobile: koelsch: Fix
-flash partition label and size in device tree", which has the same aim but
-does so for an older version of the loader which to my knowledge is not
-found in the wild.
-
-I plan to post a similar patch for Lager if this one goes well.
-
-I have been informed that the flash layout should also be the same
-for Alt (which currently does not have flash in its dts file in mainline).
-
-Based on the renesas-devel-20141125-v3.18-rc6 tag of my renesas tree.
----
- arch/arm/boot/dts/r8a7791-koelsch.dts | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 990af16..9a4e714 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -451,14 +451,14 @@
- 			reg = <0x00000000 0x00080000>;
- 			read-only;
- 		};
--		partition at 80000 {
--			label = "bootenv";
--			reg = <0x00080000 0x00080000>;
-+		partition at 40000 {
-+			label = "user";
-+			reg = <0x00080000 0x00580000>;
- 			read-only;
- 		};
--		partition at 100000 {
--			label = "data";
--			reg = <0x00100000 0x03f00000>;
-+		partition at 440000 {
-+			label = "flash";
-+			reg = <0x00600000 0x03a00000>;
- 		};
- 	};
- };
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index 5f7bfe6..424a10f 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -31,6 +31,7 @@
+  *
+  */
+ enum fixed_addresses {
++	FIX_HOLE,
+ 	FIX_EARLYCON_MEM_BASE,
+ 	__end_of_permanent_fixed_addresses,
+ 
 -- 
-2.1.3
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
