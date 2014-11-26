@@ -1,50 +1,24 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 26 Nov 2014 19:01:35 -0200
-Subject: [PATCH] ARM: dts: imx: Update VPU compatible strings
-Message-ID: <1417035695-18405-1-git-send-email-festevam@gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 26 Nov 2014 14:03:54 -0700
+Subject: [PATCH v10 07/10] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <20141126175920.GB4809@red-moon>
+References: <1416593037-27527-1-git-send-email-lina.iyer@linaro.org>
+ <1416593037-27527-8-git-send-email-lina.iyer@linaro.org>
+ <20141126175920.GB4809@red-moon>
+Message-ID: <20141126210354.GF594@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Nov 26 2014 at 10:59 -0700, Lorenzo Pieralisi wrote:
+>On Fri, Nov 21, 2014 at 06:03:54PM +0000, Lina Iyer wrote:
+>> Add cpuidle driver interface to allow cpus to go into C-States. Use the
+>
+>"idle states" please.
+>
+Sorry. Done.
 
-Update the VPU compatible strings to also use "cnm,coda<model>".
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Shawn,
-
-The documentation patch for Documentation/devicetree/bindings/media/coda.txt 
-has been re-sent to the linux-media list with such updates.
-
- arch/arm/boot/dts/imx27.dtsi | 2 +-
- arch/arm/boot/dts/imx53.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 107d713..4b063b6 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -464,7 +464,7 @@
- 			};
- 
- 			coda: coda at 10023000 {
--				compatible = "fsl,imx27-vpu";
-+				compatible = "fsl,imx27-vpu", "cnm,codadx6";
- 				reg = <0x10023000 0x0200>;
- 				interrupts = <53>;
- 				clocks = <&clks IMX27_CLK_VPU_BAUD_GATE>,
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index a30bddf..132410c 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -756,7 +756,7 @@
- 			};
- 
- 			vpu: vpu at 63ff4000 {
--				compatible = "fsl,imx53-vpu";
-+				compatible = "fsl,imx53-vpu","cnm,coda7541";
- 				reg = <0x63ff4000 0x1000>;
- 				interrupts = <9>;
- 				clocks = <&clks IMX5_CLK_VPU_REFERENCE_GATE>,
--- 
-1.9.1
+>Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>--
+>To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+>the body of a message to majordomo at vger.kernel.org
+>More majordomo info at  http://vger.kernel.org/majordomo-info.html
