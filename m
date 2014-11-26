@@ -1,51 +1,79 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 26 Nov 2014 22:48:47 +0100
-Subject: [PATCH v2 2/2] of: support passing console options with
- stdout-path
-In-Reply-To: <CACxGe6tYZ8aE_TKw1cYMY5DDjpSXPSnhhAam-rG5NgdjpKJe+A@mail.gmail.com>
-References: <1417023640-23464-1-git-send-email-leif.lindholm@linaro.org>
- <1417023640-23464-3-git-send-email-leif.lindholm@linaro.org>
- <20141126183052.GH3443@lunn.ch>
- <CACxGe6tYZ8aE_TKw1cYMY5DDjpSXPSnhhAam-rG5NgdjpKJe+A@mail.gmail.com>
-Message-ID: <20141126214847.GJ3443@lunn.ch>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Wed, 26 Nov 2014 13:50:58 -0800
+Subject: [PATCH v8 0/3] Qualcomm Resource Power Manager
+Message-ID: <1417038661-30209-1-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 09:07:33PM +0000, Grant Likely wrote:
-> On Wed, Nov 26, 2014 at 6:30 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> > On Wed, Nov 26, 2014 at 05:40:40PM +0000, Leif Lindholm wrote:
-> >> Support specifying console options (like with console=ttyXN,<options>)
-> >> by appending them to the stdout-path property after a separating ':'.
-> >>
-> >> Example:
-> >>         stdout-path = "uart0:115200";
-> >
-> > Hi Leif
-> >
-> > This should be documented somewhere under
-> > Documentation/devicetree/bindings/
-> >
-> > Not sure where thought. Maybe a top level chosen.txt?
-> 
-> Actually, this one doesn't. It is already documented in ePAPR
+In order to support the SoC assisted power save features of the Qualcomm
+platform some changes are most likely needed to the regulator part of the DT
+bindings provided before.
 
-Hi Grant
+This version of the patchset carries the RPM core part, which allows us to move
+forward with merging Josh's patches [1] as well as aiding the discussion and
+development of the additional patches needed to properly implement the power
+save features being discussed.
 
-Humm, do i have an old version of ePAPR?
+It also carries the patch to the already merged regulator driver, to make it
+compile.
 
-All i see is that in Table 3-4 It says:
+[1] https://lkml.org/lkml/2014/11/20/629
 
-stdout-path O <string> A string that specifies the full path to the
-	      	       node representing the device to be used for
-	      	       boot console output. If the character ":" is
-	      	       present in the value it terminates the
-	      	       path. The value may be an alias.
+Changes since v7:
+  - Mark merged the regulator part of the previous series
+  - Removed regulator part of dt binding, for further discussions
 
-		       If the stdin-path property is not specified,
-		       stdout-path should be assumed to define the input device.
+Changes since v6:
+  - Changed filenames from qcom,rpm.{txt,h} to qcom-rpm.{txt,h}
 
-So what is before the : is defined. What comes afterwards,
-baudrate/parity/bits/flow control does not appear to the defined in
-ePAPR. Should we not document the extension being added here?
+Changes since v5:
+  - Clarified dt binding
+  - Converted regulator qcom,force-mode to enum instead of multi-boolean
+  - Remove unecessary version handshake
+  - Cleaned up naming of RPM resources between different RPM versions
+  - Updated regulator qcom,force-mode parsing
+  - Updated regulator qcom,power-mode-* parsing
+  - Cleanups in rpm driver
+  - Dropped dev_get_qcom_rpm helper function
 
-       Andrew
+Changes since v4:
+  - Moved RPM driver to mfd
+
+Changes since v3:
+  - IPC register is acquired through syscon, as it's shared with others
+
+Changes since v2:
+  - Fix copy-paste error in dt binding
+  - Correct incomplete move from mfd to soc
+  - Correct const mistake in regulator driver
+
+Changes since v1:
+  - Moved rpm driver to drivers/soc
+  - Extracted resource table structs from rpm struct, as per Srinivas request
+  - Dropped mode setting support for the regulators for now. Unsure if we need
+    it and it requires some rework from the codeaurora solution.
+  - Using set_voltage_sel instead of rolling my own "snapping", as per Marks
+    request
+  - Split regulator ops in mV, uV and swtich versions as per Marks request.
+  - Added devicetree property to enable pull down.
+
+Bjorn Andersson (3):
+  mfd: devicetree: bindings: Add Qualcomm RPM DT binding
+  mfd: qcom-rpm: Driver for the Qualcomm RPM
+  regulator: qcom-rpm: Add missing state flag in call to RPM
+
+ Documentation/devicetree/bindings/mfd/qcom-rpm.txt |  70 +++
+ drivers/mfd/Kconfig                                |  14 +
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/qcom_rpm.c                             | 581 +++++++++++++++++++++
+ drivers/regulator/qcom_rpm-regulator.c             |   1 +
+ include/dt-bindings/mfd/qcom-rpm.h                 | 154 ++++++
+ include/linux/mfd/qcom_rpm.h                       |  13 +
+ 7 files changed, 834 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+ create mode 100644 drivers/mfd/qcom_rpm.c
+ create mode 100644 include/dt-bindings/mfd/qcom-rpm.h
+ create mode 100644 include/linux/mfd/qcom_rpm.h
+
+--
+1.8.2.2
