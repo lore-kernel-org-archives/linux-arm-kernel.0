@@ -1,43 +1,66 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 25 Nov 2014 16:13:03 -0800
-Subject: [PATCH 2/2] clk: rockchip: use clock ID for DMC (memory controller)
- on rk3288
-In-Reply-To: <1416960783-25119-1-git-send-email-dianders@chromium.org>
-References: <1416960783-25119-1-git-send-email-dianders@chromium.org>
-Message-ID: <1416960783-25119-2-git-send-email-dianders@chromium.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 26 Nov 2014 09:13:25 +0900
+Subject: [PATCH] ARM: shmobile: dts: koelsch: Fix flash partition label and
+ size
+Message-ID: <1416960805-15185-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeff Chen <cym@rock-chips.com>
+Update the size and names of flash partitions to match the
+expectations of the loader which are as follows:
 
-The DMC clocks need to be turned off at runtime.  Use the newly
-assigned clock IDs to export them.
+"loader"---0x0000_0000-0x0008_0000 [loader program (readonly)]
+"user"  ---0x0008_0000-0x0060_0000 [U-Boot + bootargs + dt + uImage (readonly)]
+"flash" ---0x0060_0000-0x0400_0000 [filesystem and free (read/write)]
 
-Signed-off-by: Jeff Chen <cym@rock-chips.com>
-[dianders: split into two patches; adjusted commit msg]
-Signed-off-by: Doug Anderson <dianders@chromium.org>
+["user"'s assumed breakdown]
+U-boot+ bootargs(0x0008_0000-0x0010_0000) 512KB
+Device tree     (0x0010_0000-0x0014_0000) 256KB
+uImage          (0x0014_0000-0x0060_0000) 4.75MB
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
 ---
- drivers/clk/rockchip/clk-rk3288.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index ad8a27a..2328097 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -625,10 +625,10 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 	GATE(PCLK_TIMER, "pclk_timer", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 1, GFLAGS),
- 	GATE(PCLK_I2C0, "pclk_i2c0", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 2, GFLAGS),
- 	GATE(PCLK_I2C2, "pclk_i2c2", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 3, GFLAGS),
--	GATE(0, "pclk_ddrupctl0", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 14, GFLAGS),
--	GATE(0, "pclk_publ0", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 15, GFLAGS),
--	GATE(0, "pclk_ddrupctl1", "pclk_cpu", 0, RK3288_CLKGATE_CON(11), 0, GFLAGS),
--	GATE(0, "pclk_publ1", "pclk_cpu", 0, RK3288_CLKGATE_CON(11), 1, GFLAGS),
-+	GATE(PCLK_DDRUPCTL0, "pclk_ddrupctl0", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 14, GFLAGS),
-+	GATE(PCLK_PUBL0, "pclk_publ0", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 15, GFLAGS),
-+	GATE(PCLK_DDRUPCTL1, "pclk_ddrupctl1", "pclk_cpu", 0, RK3288_CLKGATE_CON(11), 0, GFLAGS),
-+	GATE(PCLK_PUBL1, "pclk_publ1", "pclk_cpu", 0, RK3288_CLKGATE_CON(11), 1, GFLAGS),
- 	GATE(0, "pclk_efuse_1024", "pclk_cpu", 0, RK3288_CLKGATE_CON(11), 2, GFLAGS),
- 	GATE(PCLK_TZPC, "pclk_tzpc", "pclk_cpu", 0, RK3288_CLKGATE_CON(11), 3, GFLAGS),
- 	GATE(PCLK_UART2, "pclk_uart2", "pclk_cpu", 0, RK3288_CLKGATE_CON(11), 9, GFLAGS),
+This replaces a patch that I previously posted, "shmobile: koelsch: Fix
+flash partition label and size in device tree", which has the same aim but
+does so for an older version of the loader which to my knowledge is not
+found in the wild.
+
+I plan to post a similar patch for Lager if this one goes well.
+
+I have been informed that the flash layout should also be the same
+for Alt (which currently does not have flash in its dts file in mainline).
+
+Based on the renesas-devel-20141125-v3.18-rc6 tag of my renesas tree.
+---
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 990af16..9a4e714 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -451,14 +451,14 @@
+ 			reg = <0x00000000 0x00080000>;
+ 			read-only;
+ 		};
+-		partition at 80000 {
+-			label = "bootenv";
+-			reg = <0x00080000 0x00080000>;
++		partition at 40000 {
++			label = "user";
++			reg = <0x00080000 0x00580000>;
+ 			read-only;
+ 		};
+-		partition at 100000 {
+-			label = "data";
+-			reg = <0x00100000 0x03f00000>;
++		partition at 440000 {
++			label = "flash";
++			reg = <0x00600000 0x03a00000>;
+ 		};
+ 	};
+ };
 -- 
-2.1.0.rc2.206.gedb03e5
+2.1.3
