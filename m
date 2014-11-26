@@ -1,260 +1,156 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 26 Nov 2014 15:16:52 +0800
-Subject: [PATCH resend v4 1/3] clk: sunxi: unify sun6i AHB1 clock with proper
- PLL6 pre-divider
-In-Reply-To: <1416986214-4861-1-git-send-email-wens@csie.org>
-References: <1416986214-4861-1-git-send-email-wens@csie.org>
-Message-ID: <1416986214-4861-2-git-send-email-wens@csie.org>
+From: thunder.leizhen@huawei.com (leizhen)
+Date: Wed, 26 Nov 2014 15:17:44 +0800
+Subject: [RFC PATCH 4/4] iommu: make IOVA domain page size explicit
+In-Reply-To: <3774c76c45b21820b6a6acf582b8f441b639ffe9.1416931258.git.robin.murphy@arm.com>
+References: <cover.1416931258.git.robin.murphy@arm.com>
+ <3774c76c45b21820b6a6acf582b8f441b639ffe9.1416931258.git.robin.murphy@arm.com>
+Message-ID: <54757E98.9010006@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch unifies the sun6i AHB1 clock, originally supported
-with separate mux and divider clks. It also adds support for
-the pre-divider on the PLL6 input, thus allowing the clock to
-be muxed to PLL6 with proper clock rate calculation.
+On 2014/11/26 1:27, Robin Murphy wrote:
+> Systems may contain heterogeneous IOMMUs supporting differing minimum
+> page sizes, which may also not be common with the CPU page size.
+> Thus it is practical to have an explicit notion of IOVA granularity
+> to simplify handling of mapping and allocation constraints.
+> 
+> As an initial step, move the IOVA page granularity from an implicit
+> compile-time constant to a per-domain property so we can make use
+> of it in IOVA domain context at runtime. To keep the abstraction tidy,
+> extend the little API of inline iova_* helpers to parallel some of the
+> equivalent PAGE_* macros.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/intel-iommu.c |  9 ++++++---
+>  drivers/iommu/iova.c        |  8 ++++++--
+>  include/linux/iova.h        | 35 +++++++++++++++++++++++++++++++++--
+>  3 files changed, 45 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
+> index daba0c2..d4cf6f0 100644
+> --- a/drivers/iommu/intel-iommu.c
+> +++ b/drivers/iommu/intel-iommu.c
+> @@ -1632,7 +1632,8 @@ static int dmar_init_reserved_ranges(void)
+>  	struct iova *iova;
+>  	int i;
+>  
+> -	init_iova_domain(&reserved_iova_list, IOVA_START_PFN, DMA_32BIT_PFN);
+> +	init_iova_domain(&reserved_iova_list, VTD_PAGE_SIZE, IOVA_START_PFN,
+> +			DMA_32BIT_PFN);
+>  
+>  	lockdep_set_class(&reserved_iova_list.iova_rbtree_lock,
+>  		&reserved_rbtree_key);
+> @@ -1690,7 +1691,8 @@ static int domain_init(struct dmar_domain *domain, int guest_width)
+>  	int adjust_width, agaw;
+>  	unsigned long sagaw;
+>  
+> -	init_iova_domain(&domain->iovad, IOVA_START_PFN, DMA_32BIT_PFN);
+> +	init_iova_domain(&domain->iovad, VTD_PAGE_SIZE, IOVA_START_PFN,
+> +			DMA_32BIT_PFN);
+>  	domain_reserve_special_ranges(domain);
+>  
+>  	/* calculate AGAW */
+> @@ -4163,7 +4165,8 @@ static int md_domain_init(struct dmar_domain *domain, int guest_width)
+>  {
+>  	int adjust_width;
+>  
+> -	init_iova_domain(&domain->iovad, IOVA_START_PFN, DMA_32BIT_PFN);
+> +	init_iova_domain(&domain->iovad, VTD_PAGE_SIZE, IOVA_START_PFN,
+> +			DMA_32BIT_PFN);
+>  	domain_reserve_special_ranges(domain);
+>  
+>  	/* calculate AGAW */
+> diff --git a/drivers/iommu/iova.c b/drivers/iommu/iova.c
+> index a3dbba8..9e50625 100644
+> --- a/drivers/iommu/iova.c
+> +++ b/drivers/iommu/iova.c
+> @@ -55,12 +55,16 @@ void free_iova_mem(struct iova *iova)
+>  }
+>  
+>  void
+> -init_iova_domain(struct iova_domain *iovad, unsigned long start_pfn,
+> -	unsigned long pfn_32bit)
+> +init_iova_domain(struct iova_domain *iovad, unsigned long granule,
+> +	unsigned long start_pfn, unsigned long pfn_32bit)
+>  {
+> +	/* IOMMUs must support at least the CPU page size */
+> +	BUG_ON(granule > PAGE_SIZE);
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- Documentation/devicetree/bindings/clock/sunxi.txt |   2 +-
- drivers/clk/sunxi/clk-sunxi.c                     | 208 ++++++++++++++++++++++
- 2 files changed, 209 insertions(+), 1 deletion(-)
+??? BUG_ON(granule < PAGE_SIZE);
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 67b2b99..9dc4f55 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -26,7 +26,7 @@ Required properties:
- 	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
- 	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
- 	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
--	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
-+	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
- 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
- 	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
- 	"allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 5702025..337593c 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -20,11 +20,219 @@
- #include <linux/of_address.h>
- #include <linux/reset-controller.h>
- #include <linux/spinlock.h>
-+#include <linux/log2.h>
- 
- #include "clk-factors.h"
- 
- static DEFINE_SPINLOCK(clk_lock);
- 
-+/**
-+ * sun6i_a31_ahb1_clk_setup() - Setup function for a31 ahb1 composite clk
-+ */
-+
-+#define SUN6I_AHB1_MAX_PARENTS		4
-+#define SUN6I_AHB1_MUX_PARENT_PLL6	3
-+#define SUN6I_AHB1_MUX_SHIFT		12
-+/* un-shifted mask is what mux_clk expects */
-+#define SUN6I_AHB1_MUX_MASK		0x3
-+#define SUN6I_AHB1_MUX_GET_PARENT(reg)	((reg >> SUN6I_AHB1_MUX_SHIFT) & \
-+					 SUN6I_AHB1_MUX_MASK)
-+
-+#define SUN6I_AHB1_DIV_SHIFT		4
-+#define SUN6I_AHB1_DIV_MASK		(0x3 << SUN6I_AHB1_DIV_SHIFT)
-+#define SUN6I_AHB1_DIV_GET(reg)		((reg & SUN6I_AHB1_DIV_MASK) >> \
-+						SUN6I_AHB1_DIV_SHIFT)
-+#define SUN6I_AHB1_DIV_SET(reg, div)	((reg & ~SUN6I_AHB1_DIV_MASK) | \
-+						(div << SUN6I_AHB1_DIV_SHIFT))
-+#define SUN6I_AHB1_PLL6_DIV_SHIFT	6
-+#define SUN6I_AHB1_PLL6_DIV_MASK	(0x3 << SUN6I_AHB1_PLL6_DIV_SHIFT)
-+#define SUN6I_AHB1_PLL6_DIV_GET(reg)	((reg & SUN6I_AHB1_PLL6_DIV_MASK) >> \
-+						SUN6I_AHB1_PLL6_DIV_SHIFT)
-+#define SUN6I_AHB1_PLL6_DIV_SET(reg, div) ((reg & ~SUN6I_AHB1_PLL6_DIV_MASK) | \
-+						(div << SUN6I_AHB1_PLL6_DIV_SHIFT))
-+
-+struct sun6i_ahb1_clk {
-+	struct clk_hw hw;
-+	void __iomem *reg;
-+};
-+
-+#define to_sun6i_ahb1_clk(_hw) container_of(_hw, struct sun6i_ahb1_clk, hw)
-+
-+static unsigned long sun6i_ahb1_clk_recalc_rate(struct clk_hw *hw,
-+						unsigned long parent_rate)
-+{
-+	struct sun6i_ahb1_clk *ahb1 = to_sun6i_ahb1_clk(hw);
-+	unsigned long rate;
-+	u32 reg;
-+
-+	/* Fetch the register value */
-+	reg = readl(ahb1->reg);
-+
-+	/* apply pre-divider first if parent is pll6 */
-+	if (SUN6I_AHB1_MUX_GET_PARENT(reg) == SUN6I_AHB1_MUX_PARENT_PLL6)
-+		parent_rate /= SUN6I_AHB1_PLL6_DIV_GET(reg) + 1;
-+
-+	/* clk divider */
-+	rate = parent_rate >> SUN6I_AHB1_DIV_GET(reg);
-+
-+	return rate;
-+}
-+
-+static long sun6i_ahb1_clk_round(unsigned long rate, u8 *divp, u8 *pre_divp,
-+				 u8 parent, unsigned long parent_rate)
-+{
-+	u8 div, calcp, calcm = 1;
-+
-+	/*
-+	 * clock can only divide, so we will never be able to achieve
-+	 * frequencies higher than the parent frequency
-+	 */
-+	if (parent_rate && rate > parent_rate)
-+		rate = parent_rate;
-+
-+	div = DIV_ROUND_UP(parent_rate, rate);
-+
-+	/* calculate pre-divider if parent is pll6 */
-+	if (parent == SUN6I_AHB1_MUX_PARENT_PLL6) {
-+		if (div < 4)
-+			calcp = 0;
-+		else if (div / 2 < 4)
-+			calcp = 1;
-+		else if (div / 4 < 4)
-+			calcp = 2;
-+		else
-+			calcp = 3;
-+
-+		calcm = DIV_ROUND_UP(div, 1 << calcp);
-+	} else {
-+		calcp = __roundup_pow_of_two(div);
-+		calcp = calcp > 3 ? 3 : calcp;
-+	}
-+
-+	/* we were asked to pass back divider values */
-+	if (divp) {
-+		*divp = calcp;
-+		*pre_divp = calcm - 1;
-+	}
-+
-+	return (parent_rate / calcm) >> calcp;
-+}
-+
-+static long sun6i_ahb1_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
-+					  unsigned long *best_parent_rate,
-+					  struct clk **best_parent_clk)
-+{
-+	struct clk *clk = hw->clk, *parent, *best_parent = NULL;
-+	int i, num_parents;
-+	unsigned long parent_rate, best = 0, child_rate, best_child_rate = 0;
-+
-+	/* find the parent that can help provide the fastest rate <= rate */
-+	num_parents = __clk_get_num_parents(clk);
-+	for (i = 0; i < num_parents; i++) {
-+		parent = clk_get_parent_by_index(clk, i);
-+		if (!parent)
-+			continue;
-+		if (__clk_get_flags(clk) & CLK_SET_RATE_PARENT)
-+			parent_rate = __clk_round_rate(parent, rate);
-+		else
-+			parent_rate = __clk_get_rate(parent);
-+
-+		child_rate = sun6i_ahb1_clk_round(rate, NULL, NULL, i,
-+						  parent_rate);
-+
-+		if (child_rate <= rate && child_rate > best_child_rate) {
-+			best_parent = parent;
-+			best = parent_rate;
-+			best_child_rate = child_rate;
-+		}
-+	}
-+
-+	if (best_parent)
-+		*best_parent_clk = best_parent;
-+	*best_parent_rate = best;
-+
-+	return best_child_rate;
-+}
-+
-+static int sun6i_ahb1_clk_set_rate(struct clk_hw *hw, unsigned long rate,
-+				   unsigned long parent_rate)
-+{
-+	struct sun6i_ahb1_clk *ahb1 = to_sun6i_ahb1_clk(hw);
-+	unsigned long flags;
-+	u8 div, pre_div, parent;
-+	u32 reg;
-+
-+	spin_lock_irqsave(&clk_lock, flags);
-+
-+	reg = readl(ahb1->reg);
-+
-+	/* need to know which parent is used to apply pre-divider */
-+	parent = SUN6I_AHB1_MUX_GET_PARENT(reg);
-+	sun6i_ahb1_clk_round(rate, &div, &pre_div, parent, parent_rate);
-+
-+	reg = SUN6I_AHB1_DIV_SET(reg, div);
-+	reg = SUN6I_AHB1_PLL6_DIV_SET(reg, pre_div);
-+	writel(reg, ahb1->reg);
-+
-+	spin_unlock_irqrestore(&clk_lock, flags);
-+
-+	return 0;
-+}
-+
-+static const struct clk_ops sun6i_ahb1_clk_ops = {
-+	.determine_rate	= sun6i_ahb1_clk_determine_rate,
-+	.recalc_rate	= sun6i_ahb1_clk_recalc_rate,
-+	.set_rate	= sun6i_ahb1_clk_set_rate,
-+};
-+
-+static void __init sun6i_ahb1_clk_setup(struct device_node *node)
-+{
-+	struct clk *clk;
-+	struct sun6i_ahb1_clk *ahb1;
-+	struct clk_mux *mux;
-+	const char *clk_name = node->name;
-+	const char *parents[SUN6I_AHB1_MAX_PARENTS];
-+	void __iomem *reg;
-+	int i = 0;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+
-+	/* we have a mux, we will have >1 parents */
-+	while (i < SUN6I_AHB1_MAX_PARENTS &&
-+	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
-+		i++;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
-+	ahb1 = kzalloc(sizeof(struct sun6i_ahb1_clk), GFP_KERNEL);
-+	if (!ahb1)
-+		return;
-+
-+	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
-+	if (!mux) {
-+		kfree(ahb1);
-+		return;
-+	}
-+
-+	/* set up clock properties */
-+	mux->reg = reg;
-+	mux->shift = SUN6I_AHB1_MUX_SHIFT;
-+	mux->mask = SUN6I_AHB1_MUX_MASK;
-+	mux->lock = &clk_lock;
-+	ahb1->reg = reg;
-+
-+	clk = clk_register_composite(NULL, clk_name, parents, i,
-+				     &mux->hw, &clk_mux_ops,
-+				     &ahb1->hw, &sun6i_ahb1_clk_ops,
-+				     NULL, NULL, 0);
-+
-+	if (!IS_ERR(clk)) {
-+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+		clk_register_clkdev(clk, clk_name, NULL);
-+	}
-+}
-+CLK_OF_DECLARE(sun6i_a31_ahb1, "allwinner,sun6i-a31-ahb1-clk", sun6i_ahb1_clk_setup);
-+
- /* Maximum number of parents our clocks have */
- #define SUNXI_MAX_PARENTS	5
- 
--- 
-2.1.3
+> +
+>  	spin_lock_init(&iovad->iova_rbtree_lock);
+>  	iovad->rbroot = RB_ROOT;
+>  	iovad->cached32_node = NULL;
+> +	iovad->granule = granule;
+
+Do you need to check granule is 2^n ?
+
+>  	iovad->start_pfn = start_pfn;
+>  	iovad->dma_32bit_pfn = pfn_32bit;
+>  }
+> diff --git a/include/linux/iova.h b/include/linux/iova.h
+> index 591b196..3920a19 100644
+> --- a/include/linux/iova.h
+> +++ b/include/linux/iova.h
+> @@ -28,6 +28,7 @@ struct iova_domain {
+>  	spinlock_t	iova_rbtree_lock; /* Lock to protect update of rbtree */
+>  	struct rb_root	rbroot;		/* iova domain rbtree root */
+>  	struct rb_node	*cached32_node; /* Save last alloced node */
+> +	unsigned long	granule;	/* pfn granularity for this domain */
+>  	unsigned long	start_pfn;	/* Lower limit for this domain */
+>  	unsigned long	dma_32bit_pfn;
+>  };
+> @@ -37,6 +38,36 @@ static inline unsigned long iova_size(struct iova *iova)
+>  	return iova->pfn_hi - iova->pfn_lo + 1;
+>  }
+>  
+> +static inline unsigned long iova_shift(struct iova_domain *iovad)
+> +{
+> +	return __ffs(iovad->granule);
+
+I think it's good to save the result to a struct member. If we caculate it ervertime, it's too slow.
+
+> +}
+> +
+> +static inline unsigned long iova_mask(struct iova_domain *iovad)
+> +{
+> +	return iovad->granule - 1;
+> +}
+> +
+> +static inline size_t iova_offset(struct iova_domain *iovad, dma_addr_t iova)
+> +{
+> +	return iova & iova_mask(iovad);
+> +}
+> +
+> +static inline size_t iova_align(struct iova_domain *iovad, size_t size)
+> +{
+> +	return ALIGN(size, iovad->granule);
+> +}
+> +
+> +static inline dma_addr_t iova_dma_addr(struct iova_domain *iovad, struct iova *iova)
+> +{
+> +	return (dma_addr_t)iova->pfn_lo << iova_shift(iovad);
+> +}
+> +
+> +static inline unsigned long iova_pfn(struct iova_domain *iovad, dma_addr_t iova)
+> +{
+> +	return iova >> iova_shift(iovad);
+> +}
+> +
+>  int iommu_iova_cache_init(void);
+>  void iommu_iova_cache_destroy(void);
+>  
+> @@ -50,8 +81,8 @@ struct iova *alloc_iova(struct iova_domain *iovad, unsigned long size,
+>  struct iova *reserve_iova(struct iova_domain *iovad, unsigned long pfn_lo,
+>  	unsigned long pfn_hi);
+>  void copy_reserved_iova(struct iova_domain *from, struct iova_domain *to);
+> -void init_iova_domain(struct iova_domain *iovad, unsigned long start_pfn,
+> -	unsigned long pfn_32bit);
+> +void init_iova_domain(struct iova_domain *iovad, unsigned long granule,
+> +	unsigned long start_pfn, unsigned long pfn_32bit);
+>  struct iova *find_iova(struct iova_domain *iovad, unsigned long pfn);
+>  void put_iova_domain(struct iova_domain *iovad);
+>  struct iova *split_and_remove_iova(struct iova_domain *iovad,
+> 
