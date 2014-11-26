@@ -1,44 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Nov 2014 13:12:10 +0000
-Subject: [PATCH 3.18-rc3 v9 5/5] arm: smp: Handle ipi_cpu_backtrace()
- using FIQ (if available)
-In-Reply-To: <2744845.J3XUj2a9bM@dabox>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
- <1416936401-5147-6-git-send-email-daniel.thompson@linaro.org>
- <2744845.J3XUj2a9bM@dabox>
-Message-ID: <20141126131210.GI3836@n2100.arm.linux.org.uk>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Wed, 26 Nov 2014 13:13:25 +0000
+Subject: [PATCH 2/7] KVM: arm: guest debug, define API headers
+In-Reply-To: <5474BAD8.7010307@redhat.com>
+References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
+ <1416931805-23223-3-git-send-email-alex.bennee@linaro.org>
+ <5474B6BC.2060309@redhat.com>
+ <CAFEAcA-ikeiciAh4RXpKQQ_pY9FRePxR7nEBUEjcaaxB0ZAAtA@mail.gmail.com>
+ <5474BAD8.7010307@redhat.com>
+Message-ID: <87vbm2ksui.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 01:46:52PM +0100, Tim Sander wrote:
-> Hi Daniel
-> 
-> Am Dienstag, 25. November 2014, 17:26:41 schrieb Daniel Thompson:
-> > Previous changes have introduced both a replacement default FIQ handler
-> > and an implementation of arch_trigger_all_cpu_backtrace for ARM but
-> > these are currently independent of each other.
-> > 
-> > This patch plumbs together these features making it possible, on platforms
-> > that support it, to trigger backtrace using FIQ.
-> Does this ipi handler interfere in any way with set_fiq_handler?
-> 
-> As far as i know there is only one FIQ handler vector so i guess there is a 
-> potential conflict. But i have not worked with IPI's so i might be completley
-> wrong.
 
-First, the code in arch/arm/kernel/fiq.c should work with this new FIQ
-code in that the new FIQ code is used as the "default" handler (as
-opposed to the original handler which was a total no-op.)
+Paolo Bonzini <pbonzini@redhat.com> writes:
 
-Secondly, use of arch/arm/kernel/fiq.c in a SMP system is really not a
-good idea: the FIQ registers are private to each CPU in the system, and
-there is no infrastructure to allow fiq.c to ensure that it loads the
-right CPU with the register information for the provided handler.
+> On 25/11/2014 18:13, Peter Maydell wrote:
+>> On 25 November 2014 at 17:05, Paolo Bonzini <pbonzini@redhat.com> wrote:
+>>> > So there is no register that says "this breakpoint has triggered" or
+>>> > "this watchpoint has triggered"?
+>> Nope. You take a debug exception; the syndrome register tells
+>> you if it was a bp or a wp, and if it was a wp the fault address
+>> register tells you the address being accessed (if it was a bp
+>> you know the program counter, obviously). The debugger is expected
+>> to be able to figure it out from there, if it cares.
+>
+> That's already good enough---do the KVM_DEBUG_EXIT_* constants match the
+> syndrome register, or if not why?
 
-So, use of arch/arm/kernel/fiq.c and the IPI's use of FIQ /should/ be
-mutually exclusive.
+No they don't. I did consider it at the time but I was wary of pulling
+too much over into the uapi headers wholesale. If your happy to do that
+I'll include the change in my next version.
+
+I could also rationalise the exit handlers as they all pretty much do
+the same thing (save for the exit/syndrome related info). Again I was
+keeping things nicely separated in case any particular exception needed
+excessive special case handling.
+
+Would you like those changes?
+
+>
+> Paolo
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Alex Benn?e
