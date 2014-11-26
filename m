@@ -1,261 +1,34 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 26 Nov 2014 17:53:12 +0100
-Subject: [PATCH v5 2/3] mtd: nand: gpmi: add proper raw access support
-In-Reply-To: <1417020793-3354-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1417020793-3354-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1417020793-3354-3-git-send-email-boris.brezillon@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Nov 2014 17:51:39 +0100
+Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <54753AED.3050909@huawei.com>
+References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <2966212.dpWQ0OTb0A@wuerfel> <54753AED.3050909@huawei.com>
+Message-ID: <2133591.n7Y4zNvRib@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several MTD users (either in user or kernel space) expect a valid raw
-access support to NAND chip devices.
-This is particularly true for testing tools which are often touching the
-data stored in a NAND chip in raw mode to artificially generate errors.
+On Wednesday 26 November 2014 10:29:01 Shannon Zhao wrote:
+> On 2014/11/25 19:02, Arnd Bergmann wrote:
+> > No, don't hardcode ARM specifics into a common binding either. I've looked
+> > at the ibm,associativity properties again, and I think we should just use
+> > those, they can cover all cases and are completely independent of the
+> > architecture. We should probably discuss about the property name though,
+> > as using the "ibm," prefix might not be the best idea.
+> > 
+> 
+> Yeah, I have read the relevant codes in qemu. I think the "ibm,associativity" is more scalable:-)
 
-The GPMI drivers do not implemenent raw access functions, and thus rely on
-default HW_ECC scheme implementation.
-The default implementation consider the data and OOB area as properly
-separated in their respective NAND section, which is not true for the GPMI
-controller.
-In this driver/controller some OOB data are stored at the beginning of the
-NAND data area (these data are called metadata in the driver), then ECC
-bytes are interleaved with data chunk (which is similar to the
-HW_ECC_SYNDROME scheme), and eventually the remaining bytes are used as
-OOB data.
+Ok
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 183 +++++++++++++++++++++++++++++++++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   2 +
- 2 files changed, 185 insertions(+)
+> About the prefix, my opinion is that as this is relevant with NUMA,
+> maybe we can use "numa" as the prefix.
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 959cb9b..13eb1dd 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -791,6 +791,7 @@ static void gpmi_free_dma_buffer(struct gpmi_nand_data *this)
- 					this->page_buffer_phys);
- 	kfree(this->cmd_buffer);
- 	kfree(this->data_buffer_dma);
-+	kfree(this->raw_buffer);
- 
- 	this->cmd_buffer	= NULL;
- 	this->data_buffer_dma	= NULL;
-@@ -837,6 +838,9 @@ static int gpmi_alloc_dma_buffer(struct gpmi_nand_data *this)
- 	if (!this->page_buffer_virt)
- 		goto error_alloc;
- 
-+	this->raw_buffer = kzalloc(mtd->writesize + mtd->oobsize, GFP_KERNEL);
-+	if (!this->raw_buffer)
-+		goto error_alloc;
- 
- 	/* Slice up the page buffer. */
- 	this->payload_virt = this->page_buffer_virt;
-@@ -1347,6 +1351,183 @@ gpmi_ecc_write_oob(struct mtd_info *mtd, struct nand_chip *chip, int page)
- 	return status & NAND_STATUS_FAIL ? -EIO : 0;
- }
- 
-+/*
-+ * This function reads a NAND page without involving the ECC engine (no HW
-+ * ECC correction).
-+ * The tricky part in the GPMI/BCH controller is that it stores ECC bits
-+ * inline (interleaved with payload DATA), and do not align data chunk on
-+ * byte boundaries.
-+ * We thus need to take care moving the payload data and ECC bits stored in the
-+ * page into the provided buffers, which is why we're using gpmi_move_bits.
-+ *
-+ * See set_geometry_by_ecc_info inline comments to have a full description
-+ * of the layout used by the GPMI controller.
-+ */
-+static int gpmi_ecc_read_page_raw(struct mtd_info *mtd,
-+				  struct nand_chip *chip, uint8_t *buf,
-+				  int oob_required, int page)
-+{
-+	struct gpmi_nand_data *this = chip->priv;
-+	struct bch_geometry *nfc_geo = &this->bch_geometry;
-+	int eccsize = nfc_geo->ecc_chunk_size;
-+	int eccbits = nfc_geo->ecc_strength * nfc_geo->gf_len;
-+	u8 *tmp_buf = this->raw_buffer;
-+	size_t src_bit_off;
-+	size_t oob_bit_off;
-+	size_t oob_byte_off;
-+	uint8_t *oob = chip->oob_poi;
-+	int step;
-+
-+	chip->read_buf(mtd, tmp_buf,
-+		       mtd->writesize + mtd->oobsize);
-+
-+	/*
-+	 * If required, swap the bad block marker and the data stored in the
-+	 * metadata section, so that we don't wrongly consider a block as bad.
-+	 *
-+	 * See the layout description for a detailed explanation on why this
-+	 * is needed.
-+	 */
-+	if (this->swap_block_mark) {
-+		u8 swap = tmp_buf[0];
-+
-+		tmp_buf[0] = tmp_buf[mtd->writesize];
-+		tmp_buf[mtd->writesize] = swap;
-+	}
-+
-+	/*
-+	 * Copy the metadata section into the oob buffer (this section is
-+	 * guaranteed to be aligned on a byte boundary).
-+	 */
-+	if (oob_required)
-+		memcpy(oob, tmp_buf, nfc_geo->metadata_size);
-+
-+	oob_bit_off = nfc_geo->metadata_size * 8;
-+	src_bit_off = oob_bit_off;
-+
-+	/* Extract interleaved payload data and ECC bits */
-+	for (step = 0; step < nfc_geo->ecc_chunk_count; step++) {
-+		if (buf)
-+			gpmi_move_bits(buf, step * eccsize * 8,
-+				       tmp_buf, src_bit_off,
-+				       eccsize * 8);
-+		src_bit_off += eccsize * 8;
-+
-+		/* Align last ECC block to align a byte boundary */
-+		if (step == nfc_geo->ecc_chunk_count - 1 &&
-+		    (oob_bit_off + eccbits) % 8)
-+			eccbits += 8 - ((oob_bit_off + eccbits) % 8);
-+
-+		if (oob_required)
-+			gpmi_move_bits(oob, oob_bit_off,
-+				       tmp_buf, src_bit_off,
-+				       eccbits);
-+
-+		src_bit_off += eccbits;
-+		oob_bit_off += eccbits;
-+	}
-+
-+	if (oob_required) {
-+		oob_byte_off = oob_bit_off / 8;
-+
-+		if (oob_byte_off < mtd->oobsize)
-+			memcpy(oob + oob_byte_off,
-+			       tmp_buf + mtd->writesize + oob_byte_off,
-+			       mtd->oobsize - oob_byte_off);
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-+ * This function writes a NAND page without involving the ECC engine (no HW
-+ * ECC generation).
-+ * The tricky part in the GPMI/BCH controller is that it stores ECC bits
-+ * inline (interleaved with payload DATA), and do not align data chunk on
-+ * byte boundaries.
-+ * We thus need to take care moving the OOB area at the right place in the
-+ * final page, which is why we're using gpmi_move_bits.
-+ *
-+ * See set_geometry_by_ecc_info inline comments to have a full description
-+ * of the layout used by the GPMI controller.
-+ */
-+static int gpmi_ecc_write_page_raw(struct mtd_info *mtd,
-+				   struct nand_chip *chip,
-+				   const uint8_t *buf,
-+				   int oob_required)
-+{
-+	struct gpmi_nand_data *this = chip->priv;
-+	struct bch_geometry *nfc_geo = &this->bch_geometry;
-+	int eccsize = nfc_geo->ecc_chunk_size;
-+	int eccbits = nfc_geo->ecc_strength * nfc_geo->gf_len;
-+	u8 *tmp_buf = this->raw_buffer;
-+	uint8_t *oob = chip->oob_poi;
-+	size_t dst_bit_off;
-+	size_t oob_bit_off;
-+	size_t oob_byte_off;
-+	int step;
-+
-+	/*
-+	 * Initialize all bits to 1 in case we don't have a buffer for the
-+	 * payload or oob data in order to leave unspecified bits of data
-+	 * to their initial state.
-+	 */
-+	if (!buf || !oob_required)
-+		memset(tmp_buf, 0xff, mtd->writesize + mtd->oobsize);
-+
-+	/*
-+	 * First copy the metadata section (stored in oob buffer) at the
-+	 * beginning of the page, as imposed by the GPMI layout.
-+	 */
-+	memcpy(tmp_buf, oob, nfc_geo->metadata_size);
-+	oob_bit_off = nfc_geo->metadata_size * 8;
-+	dst_bit_off = oob_bit_off;
-+
-+	/* Interleave payload data and ECC bits */
-+	for (step = 0; step < nfc_geo->ecc_chunk_count; step++) {
-+		if (buf)
-+			gpmi_move_bits(tmp_buf, dst_bit_off,
-+				       buf, step * eccsize * 8, eccsize * 8);
-+		dst_bit_off += eccsize * 8;
-+
-+		/* Align last ECC block to align a byte boundary */
-+		if (step == nfc_geo->ecc_chunk_count - 1 &&
-+		    (oob_bit_off + eccbits) % 8)
-+			eccbits += 8 - ((oob_bit_off + eccbits) % 8);
-+
-+		if (oob_required)
-+			gpmi_move_bits(tmp_buf, dst_bit_off,
-+				       oob, oob_bit_off, eccbits);
-+
-+		dst_bit_off += eccbits;
-+		oob_bit_off += eccbits;
-+	}
-+
-+	oob_byte_off = oob_bit_off / 8;
-+
-+	if (oob_required && oob_byte_off < mtd->oobsize)
-+		memcpy(tmp_buf + mtd->writesize + oob_byte_off,
-+		       oob + oob_byte_off, mtd->oobsize - oob_byte_off);
-+
-+	/*
-+	 * If required, swap the bad block marker and the first byte of the
-+	 * metadata section, so that we don't modify the bad block marker.
-+	 *
-+	 * See the layout description for a detailed explanation on why this
-+	 * is needed.
-+	 */
-+	if (this->swap_block_mark) {
-+		u8 swap = tmp_buf[0];
-+
-+		tmp_buf[0] = tmp_buf[mtd->writesize];
-+		tmp_buf[mtd->writesize] = swap;
-+	}
-+
-+	chip->write_buf(mtd, tmp_buf, mtd->writesize + mtd->oobsize);
-+
-+	return 0;
-+}
-+
- static int gpmi_block_markbad(struct mtd_info *mtd, loff_t ofs)
- {
- 	struct nand_chip *chip = mtd->priv;
-@@ -1664,6 +1845,8 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
- 	ecc->write_page	= gpmi_ecc_write_page;
- 	ecc->read_oob	= gpmi_ecc_read_oob;
- 	ecc->write_oob	= gpmi_ecc_write_oob;
-+	ecc->read_page_raw = gpmi_ecc_read_page_raw;
-+	ecc->write_page_raw = gpmi_ecc_write_page_raw;
- 	ecc->mode	= NAND_ECC_HW;
- 	ecc->size	= bch_geo->ecc_chunk_size;
- 	ecc->strength	= bch_geo->ecc_strength;
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index 17d0736..89ab5c8 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -189,6 +189,8 @@ struct gpmi_nand_data {
- 	void			*auxiliary_virt;
- 	dma_addr_t		auxiliary_phys;
- 
-+	void			*raw_buffer;
-+
- 	/* DMA channels */
- #define DMA_CHANS		8
- 	struct dma_chan		*dma_chans[DMA_CHANS];
--- 
-1.9.1
+A prefix should really be the name of a company or institution, so it could
+be "arm" or "linux", but not "numa". Would could use "numa-associativity"
+with a dash instead of a comma, but that would still be somewhat imprecise
+because the associativity property is about system topology inside of
+a NUMA domain as well, such as cores, core clusters or SMT threads that
+only share caches but not physical memory addresses.
+
+	Arnd
