@@ -1,30 +1,54 @@
-From: cernekee@gmail.com (Kevin Cernekee)
-Date: Wed, 26 Nov 2014 08:07:43 -0800
-Subject: [PATCH 9/9] usb: {ohci,ehci}-platform: Use new OF big-endian
- helper function
-In-Reply-To: <Pine.LNX.4.44L0.1411261013340.1322-100000@iolanthe.rowland.org>
-References: <1416962994-27095-10-git-send-email-cernekee@gmail.com>
- <Pine.LNX.4.44L0.1411261013340.1322-100000@iolanthe.rowland.org>
-Message-ID: <CAJiQ=7CuLA2vDpnkDysBU100R0uuUidB_ua3sZdV74vNPjV76w@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Nov 2014 17:10:08 +0100
+Subject: [PATCH 1/2] ARM: Thumb-2: infer function annotation for external ksyms
+Message-ID: <1417018209-14078-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 7:14 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
->> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
->> index 43c1a4e..9505c31 100644
->> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
->> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
->> @@ -12,6 +12,8 @@ Optional properties:
->>   - big-endian-regs : boolean, set this for hcds with big-endian registers
->>   - big-endian-desc : boolean, set this for hcds with big-endian descriptors
->>   - big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
->> + - native-endian : boolean, enables big-endian-regs + big-endian-desc
->> +   iff the kernel was compiled for big endian
->
-> Is this really a property of the hardware?  It appears to depend on the
-> kernel configuration.  As such, is it appropriate for DT?
+Commit 9a00318eadbb ("Thumb-2: Relax relocation requirements for
+non-function symbols") updated the Thumb-2 jump and call relocation
+handling so that non-function symbols with the Thumb bit (bit 0)
+cleared are not treated as A32 symbols requiring an interworking
+mode switch.
 
-Yes, the peripheral registers automatically adjust their endianness to
-match the CPU.  So if the CPU is running an LE kernel, the peripheral
-needs to be accessed in LE mode; if the CPU is running a BE kernel,
-the peripheral needs to be accessed in BE mode.
+However, since ksyms are stripped of their function annotation by
+EXPORT_SYMBOL(), this will result in A32 symbols that do require
+an interworking mode switch to be called in the wrong mode if the
+relocation is resolved across a module boundary.
+
+This patch enhances the function symbol check by including untyped
+symbols that resolve to external ksyms.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/kernel/module.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index a68040989143..6c08b2188992 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -182,13 +182,20 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			/*
+ 			 * For function symbols, only Thumb addresses are
+ 			 * allowed (no interworking).
++			 * This applies equally to untyped symbols that
++			 * resolve to external ksyms: EXPORT_SYMBOL()
++			 * strips the function annotation, but we can
++			 * infer from the relocation type that the target
++			 * must be a function.
+ 			 *
+ 			 * For non-function symbols, the destination
+ 			 * has no specific ARM/Thumb disposition, so
+ 			 * the branch is resolved under the assumption
+ 			 * that interworking is not required.
+ 			 */
+-			if (ELF32_ST_TYPE(sym->st_info) == STT_FUNC &&
++			if ((ELF32_ST_TYPE(sym->st_info) == STT_FUNC ||
++			     (ELF32_ST_TYPE(sym->st_info) == STT_NOTYPE &&
++			      sym->st_shndx == SHN_UNDEF)) &&
+ 			    !(sym->st_value & 1)) {
+ 				pr_err("%s: section %u reloc %u sym '%s': unsupported interworking call (Thumb -> ARM)\n",
+ 				       module->name, relindex, i, symname);
+-- 
+1.8.3.2
