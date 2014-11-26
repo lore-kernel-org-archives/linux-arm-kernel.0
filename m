@@ -1,58 +1,34 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 26 Nov 2014 15:27:11 -0600
-Subject: [RFC PATCH 2/3] Documentation: dt: add ti,am3353-wkup-m3 bindings
-In-Reply-To: <cover.1417029919.git.d-gerlach@ti.com>
-References: <cover.1417029919.git.d-gerlach@ti.com>
-Message-ID: <13e848f10614c0a276e54759e606210971d63fe0.1417029919.git.d-gerlach@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Nov 2014 22:32:47 +0100
+Subject: [RFC PATCH 1/2] asm-generic: io: Add exec versions of ioremap
+In-Reply-To: <cb5e9dd7bd71b13551cd3f32f28feb405ea9fcdd.1417029918.git.d-gerlach@ti.com>
+References: <cover.1417029918.git.d-gerlach@ti.com>
+ <cb5e9dd7bd71b13551cd3f32f28feb405ea9fcdd.1417029918.git.d-gerlach@ti.com>
+Message-ID: <2060921.TrTof4X6qj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device tree bindings document for ti,am3353-wkup-m3 which is
-used by the wkup_m3_rproc driver.
+On Wednesday 26 November 2014 15:14:00 Dave Gerlach wrote:
+> @@ -66,6 +66,11 @@ extern void ioport_unmap(void __iomem *);
+>  #define ioremap_wc ioremap_nocache
+>  #endif
+>  
+> +#ifndef ARCH_HAS_IOREMAP_EXEC
+> +#define ioremap_exec ioremap
+> +#define ioremap_exec_nocache ioremap_nocache
+> +#endif
+> +
+>  #ifdef CONFIG_PCI
+>  /* Destroy a virtual mapping cookie for a PCI BAR (memory or IO) */
+>  struct pci_dev;
+> 
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- .../bindings/remoteproc/wkup_m3_rproc.txt          | 32 ++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
+ioremap and ioremap_nocache are the same, and there is no
+architecture-independent interface to map an MMIO range as
+cached because a lot of architectures can't do that.
 
-diff --git a/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt b/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
-new file mode 100644
-index 0000000..4d64a23
---- /dev/null
-+++ b/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
-@@ -0,0 +1,32 @@
-+Wakeup M3 Remote Proc Driver
-+=====================
-+
-+TI AMx3 family of devices use a Cortex M3 co-processor to help with various
-+low power tasks that cannot be controlled from the MPU. The CM3 requires
-+a firmware binary to accomplish this. The wkup_m3 remoteproc driver handles
-+the loading of the firmware and booting of the CM3.
-+
-+Wkup M3 Device Node:
-+====================
-+A wkup_m3 device node is used to represent a wakeup M3 IP instance within
-+a SoC.
-+
-+Required properties:
-+--------------------
-+- compatible:		Should be "ti,am3353-wkup-m3" for AM33xx SoCs
-+- reg:			Contains the wkup_m3 register address ranges for
-+			umem and dmem.
-+- ti,hwmods:		Name of the hwmod associated with the mailbox
-+- ti,no-reset-on-init:	Reset is handled after fw has been loaded, not at
-+			init of hwmod.
-+
-+Example:
-+--------
-+/* AM33xx */
-+wkup_m3: wkup_m3 at 44d00000 {
-+	compatible = "ti,am3353-wkup-m3";
-+	reg = <0x44d00000 0x4000	/* M3 UMEM */
-+	       0x44d80000 0x2000>;	/* M3 DMEM */
-+	ti,hwmods = "wkup_m3";
-+	ti,no-reset-on-init;
-+};
--- 
-2.1.0
+Also, I think there are architectures that cannot execute
+from uncached memory, so I think adding this as a generic
+API is not a good idea.
+
+	Arnd
