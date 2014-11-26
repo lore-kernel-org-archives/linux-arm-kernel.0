@@ -1,53 +1,77 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 26 Nov 2014 10:35:15 +0900
-Subject: [PATCH] ARM: exynos: print CPU id on probe
-In-Reply-To: <1416884886-9896-1-git-send-email-olof@lixom.net>
-References: <1416884886-9896-1-git-send-email-olof@lixom.net>
-Message-ID: <060f01d00919$3aec6e30$b0c54a90$@kernel.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 25 Nov 2014 17:35:32 -0800
+Subject: [PATCH v2 5/8] dt-bindings: Add #defines for IPQ806x lpass clock
+ control
+In-Reply-To: <1416965735-10583-1-git-send-email-sboyd@codeaurora.org>
+References: <1416965735-10583-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1416965735-10583-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> 
-> It's useful to get the CPU ID/rev printed during boot sometimes, so
-> add a line with that information. Given that the fields have moved
-> within the register over time, don't try to be clever and parse it --
-> just print the raw values for now.
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
-> 
-> Kukjin, please apply if you're OK with this. Thanks!
-> 
-Yes, why not? I'll apply, I have small concerns for exynos5800 though ;)
+From: Rajendra Nayak <rnayak@codeaurora.org>
 
-Thanks,
-Kukjin
+Add defines to make more human readable numbers for the lpass
+clock controller found on IPQ806x SoCs. Also remove the PLL4
+define in gcc to avoid #define conflicts because that clock
+doesn't exist in gcc, instead it lives in lcc.
 
-> 
-> -Olof
-> 
->  arch/arm/plat-samsung/cpu.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/plat-samsung/cpu.c b/arch/arm/plat-samsung/cpu.c
-> index 360618ee39e5..71333bb61013 100644
-> --- a/arch/arm/plat-samsung/cpu.c
-> +++ b/arch/arm/plat-samsung/cpu.c
-> @@ -40,10 +40,14 @@ void __init s3c64xx_init_cpu(void)
->  	}
-> 
->  	samsung_cpu_rev = 0;
-> +
-> +	pr_info("Samsung CPU ID: 0x%08lx\n", samsung_cpu_id);
->  }
-> 
->  void __init s5p_init_cpu(void __iomem *cpuid_addr)
->  {
->  	samsung_cpu_id = __raw_readl(cpuid_addr);
->  	samsung_cpu_rev = samsung_cpu_id & 0xFF;
-> +
-> +	pr_info("Samsung CPU ID: 0x%08lx\n", samsung_cpu_id);
->  }
-> --
-> 2.0.1.473.gc4d58ca
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+[sboyd at codeaurora.org: Split off into separate patch]
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ include/dt-bindings/clock/qcom,gcc-ipq806x.h |  1 -
+ include/dt-bindings/clock/qcom,lcc-ipq806x.h | 30 ++++++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 1 deletion(-)
+ create mode 100644 include/dt-bindings/clock/qcom,lcc-ipq806x.h
+
+diff --git a/include/dt-bindings/clock/qcom,gcc-ipq806x.h b/include/dt-bindings/clock/qcom,gcc-ipq806x.h
+index b857cadb0bd4..04fb29ae30e6 100644
+--- a/include/dt-bindings/clock/qcom,gcc-ipq806x.h
++++ b/include/dt-bindings/clock/qcom,gcc-ipq806x.h
+@@ -238,7 +238,6 @@
+ #define PLL0_VOTE				221
+ #define PLL3					222
+ #define PLL3_VOTE				223
+-#define PLL4					224
+ #define PLL4_VOTE				225
+ #define PLL8					226
+ #define PLL8_VOTE				227
+diff --git a/include/dt-bindings/clock/qcom,lcc-ipq806x.h b/include/dt-bindings/clock/qcom,lcc-ipq806x.h
+new file mode 100644
+index 000000000000..4e944b85c56d
+--- /dev/null
++++ b/include/dt-bindings/clock/qcom,lcc-ipq806x.h
+@@ -0,0 +1,30 @@
++/*
++ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _DT_BINDINGS_CLK_LCC_IPQ806X_H
++#define _DT_BINDINGS_CLK_LCC_IPQ806X_H
++
++#define PLL4				0
++#define MI2S_OSR_SRC			1
++#define MI2S_OSR_CLK			2
++#define MI2S_DIV_CLK			3
++#define MI2S_BIT_DIV_CLK		4
++#define MI2S_BIT_CLK			5
++#define PCM_SRC				6
++#define PCM_CLK_OUT			7
++#define PCM_CLK				8
++#define SPDIF_SRC			9
++#define SPDIF_CLK			10
++#define AHBIX_CLK			11
++
++#endif
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
