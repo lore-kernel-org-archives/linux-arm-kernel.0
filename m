@@ -1,531 +1,85 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 26 Nov 2014 13:14:57 +0800
-Subject: [PATCH 01/19] usb: common: drd-lib: Add DRD lib for USB.
-In-Reply-To: <1416921115-10467-2-git-send-email-george.cherian@ti.com>
-References: <1416921115-10467-1-git-send-email-george.cherian@ti.com>
- <1416921115-10467-2-git-send-email-george.cherian@ti.com>
-Message-ID: <20141126051454.GA24203@shlinux2>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 26 Nov 2014 11:59:43 +0530
+Subject: [PATCH 4/8] opp: Introduce APIs to remove OPPs
+In-Reply-To: <20141125173943.GG5050@linux.vnet.ibm.com>
+References: <cover.1416910766.git.viresh.kumar@linaro.org>
+ <f815d0855c1bd28d8389554176acd2620e56b3c8.1416910766.git.viresh.kumar@linaro.org>
+ <20141125162434.GC5050@linux.vnet.ibm.com>
+ <CAKohponBNOm_0_rZqbVKQSoOa81CjnKb8vcfzA6gbm1+Gxn+gg@mail.gmail.com>
+ <20141125173943.GG5050@linux.vnet.ibm.com>
+Message-ID: <CAKohponz3MsgZNtm1i-aLx8kRRjJwUJjL=B3RE96EiivwXbF2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 06:41:37PM +0530, George Cherian wrote:
-> Add USB DRD library. This Library facilitates to
-> switch roles between HOST and Device modes.
-> 
-> A DRD should be added to the library using usb_drd_add().
-> Register the HOST and UDC using usb_drd_register_hcd/udc().
-> Un-Register the HOST and UDC using usb_drd_unregister_hcd/udc().
-> 
-> Depending on the state of IP -
-> Call the following to start/stop HOST controller
-> usb_drd_start/stop_hcd().
-> This internally calls usb_add/remove_hcd() or IP specific low level start/stop
-> defined in ll_start/stop
-> 
-> Call the following to start/stop UDC
-> usb_drd_start/stop_udc().
-> This internally calls udc_start/udc_stop() or IP specific low level start/stop
-> defined in ll_start/stop
-> 
-> Signed-off-by: George Cherian <george.cherian@ti.com>
-> ---
->  drivers/usb/Kconfig          |  15 ++
->  drivers/usb/common/Makefile  |   1 +
->  drivers/usb/common/drd-lib.c | 346 +++++++++++++++++++++++++++++++++++++++++++
->  include/linux/usb/drd.h      |  77 ++++++++++
->  4 files changed, 439 insertions(+)
->  create mode 100644 drivers/usb/common/drd-lib.c
->  create mode 100644 include/linux/usb/drd.h
-> 
-> diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
-> index ae481c3..ea0d944 100644
-> --- a/drivers/usb/Kconfig
-> +++ b/drivers/usb/Kconfig
-> @@ -34,6 +34,21 @@ config USB_COMMON
->  	default y
->  	depends on USB || USB_GADGET
->  
-> +config DRD_LIB
-> +	tristate  "DRD Library support"
-> +	default y
-> +	depends on USB && USB_GADGET
-> +	---help---
-> +	  This option adds DRD Library support for Universal Serial Bus (USB).
-> +	  DRD Library faciliatets the Role switching by HOST and DEVICE roles,
-> +	  If your hardware has a Dual Role Device.
-> +
-> +	  The DRD Library uses USB core API's to start/stop HOST controllers,
-> +	  UDC API's to start/stop DEVICE controllers, ther by enabling to
-> +	  switch roles between HOST and Device modes.
+On 25 November 2014 at 23:09, Paul E. McKenney
+<paulmck@linux.vnet.ibm.com> wrote:
+> On Tue, Nov 25, 2014 at 10:46:29PM +0530, Viresh Kumar wrote:
 
-%s/ther by/thereby
+>> I couldn't find any code in kernel which is registered for this notifier chain
+>> yet. And so don't know what that code will do. It may not traverse the list
+>> or it may :)
+>
+> I would guess that the srcu_notifier_chain_register() in
+> devfreq_register_opp_notifier() is adding to the call chain, but I
+> do not claim to understand this code.  The srcu_notifier_call_chain()
+> above is traversing it.
 
-> +
-> +	  Say N if unsure.
-> +
->  config USB_ARCH_HAS_HCD
->  	def_bool y
->  
-> diff --git a/drivers/usb/common/Makefile b/drivers/usb/common/Makefile
-> index ca2f8bd..e2c1593 100644
-> --- a/drivers/usb/common/Makefile
-> +++ b/drivers/usb/common/Makefile
-> @@ -7,3 +7,4 @@ usb-common-y			  += common.o
->  usb-common-$(CONFIG_USB_LED_TRIG) += led.o
->  
->  obj-$(CONFIG_USB_OTG_FSM) += usb-otg-fsm.o
-> +obj-$(CONFIG_DRD_LIB)       += drd-lib.o
-> diff --git a/drivers/usb/common/drd-lib.c b/drivers/usb/common/drd-lib.c
-> new file mode 100644
-> index 0000000..6159436
-> --- /dev/null
-> +++ b/drivers/usb/common/drd-lib.c
-> @@ -0,0 +1,346 @@
-> +/**
-> + * drd-lib.c - USB DRD library functions
-> + *
-> + * Copyright (C) 2014 Texas Instruments
-> + * Author: George Cherian <george.cherian@ti.com>
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2  of
-> + * the License as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/kernel.h>
-> +#include <linux/list.h>
-> +#include <linux/module.h>
-> +#include <linux/usb.h>
-> +
-> +#include <linux/usb/hcd.h>
-> +#include <linux/usb/gadget.h>
-> +#include <linux/usb/drd.h>
-> +
-> +/**
-> + * struct usb_drd - describes one dual role device
-> + * @host - the HOST controller device of this drd
-> + * @gadget - the gadget of drd
-> + * @parent - the device to the actual controller
-> + * @list - for use by the drd lib
-> + * @state - specifies the current state
-> + *
-> + * This represents the internal data structure which is used by the UDC-class
-> + * to hold information about udc driver and gadget together.
-> + */
+Actually I searched for who is calling devfreq_register_opp_notifier() and
+couldn't notice any callers. But there was one from within devfreq.c and
+that was called from exynos code..
 
-It is dual role struct, why you only talk about device?
+So yes, it is used and I was wrong. Ultimately update_devfreq() would
+be called from the notifier chain and that may try to change the freq and
+so is sleep-able.
 
-> +struct usb_drd {
-> +	struct usb_drd_host	*host;
-> +	struct usb_drd_gadget	*gadget;
-> +	struct device		*parent;
-> +	struct list_head	list;
-> +	unsigned int		state;
-> +};
-> +
-> +static LIST_HEAD(drd_list);
-> +static DEFINE_SPINLOCK(drd_lock);
-> +
-> +static struct usb_drd *usb_drd_get_dev(struct device *parent)
-> +{
-> +	struct usb_drd *drd;
-> +
-> +	spin_lock(&drd_lock);
-> +	list_for_each_entry(drd, &drd_list, list)
-> +		if (drd->parent == parent)
-> +			goto out;
-> +	drd = NULL;
-> +out:
-> +	spin_unlock(&drd_lock);
-> +
-> +	return drd;
-> +}
-> +
-> +int usb_drd_get_state(struct device *parent)
-> +{
-> +	struct usb_drd	*drd;
-> +
-> +	drd = usb_drd_get_dev(parent);
-> +	if (!drd)
-> +		return -ENODEV;
-> +
-> +	return drd->state;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_drd_get_state);
-> +
-> +int usb_drd_release(struct device *parent)
-> +{
-> +	struct usb_drd	*drd;
-> +	int ret;
-> +
-> +	spin_lock(&drd_lock);
-> +	list_for_each_entry(drd, &drd_list, list) {
-> +		if (drd->parent == parent) {
-> +			kfree(drd);
-> +			ret = 0;
-> +			goto out;
-> +		}
-> +	}
-> +	ret = -ENODEV;
-> +out:
-> +	spin_unlock(&drd_lock);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_drd_release);
-> +
-> +int usb_drd_add(struct device *parent)
-> +{
-> +	struct usb_drd	*drd;
-> +
-> +	drd = kzalloc(sizeof(*drd), GFP_KERNEL);
-> +	if (!drd)
-> +		return -ENOMEM;
-> +
-> +	spin_lock(&drd_lock);
-> +	drd->parent = parent;
-> +	list_add_tail(&drd->list, &drd_list);
-> +	drd->state = DRD_UNREGISTERED;
-> +
-> +	spin_unlock(&drd_lock);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_drd_add);
-> +
-> +int usb_drd_register_hcd(struct device *parent, struct usb_drd_host *host)
-> +{
-> +	struct usb_drd	*drd;
-> +
-> +	drd = usb_drd_get_dev(parent);
-> +	if (!drd)
-> +		return -ENODEV;
-> +
-> +	spin_lock(&drd_lock);
-> +	drd->host = host;
-> +	drd->state |= DRD_HOST_REGISTERED | DRD_HOST_ACTIVE;
-> +	spin_unlock(&drd_lock);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_drd_register_hcd);
-> +
-> +int usb_drd_unregister_hcd(struct device *parent)
-> +{
-> +	struct usb_drd	*drd;
-> +
-> +	drd = usb_drd_get_dev(parent);
-> +	if (!drd)
-> +		return -ENODEV;
-> +
-> +	spin_lock(&drd_lock);
-> +	drd->state &= ~(DRD_HOST_REGISTERED | DRD_HOST_ACTIVE);
-> +	spin_unlock(&drd_lock);
-> +	kfree(drd->host);
+>> So, I am still not sure what we need to do here as we have readers with
+>> both rcu and srcu critical regions.
+>
+> Well, the most straightforward approach from an RCU perspective would
+> be to make all the readers use the same flavor of RCU.  From Rafael's
+> earlier note, I am guessing that some of the code paths absolutely
+> require SRCU.  Of course, if all the readers use SRCU, then you can
+> simply free using SRCU.
 
-It is better to allocate and free memory at the same file, either
-both at DRD LIB APIs, or at host controller and udc driver.
+Yeah, so the update_devfreq() call surely requires SRCU.
 
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_drd_unregister_hcd);
-> +
-> +int usb_drd_start_hcd(struct device *parent)
-> +{
-> +	struct usb_drd	*drd;
-> +	struct usb_drd_setup *setup;
-> +
-> +	drd = usb_drd_get_dev(parent);
-> +	if (!drd)
-> +		return -ENODEV;
-> +
-> +	if (WARN_ON(!(drd->state & DRD_HOST_REGISTERED)))
-> +		return -EINVAL;
-> +
-> +	setup = drd->host->host_setup;
-> +	if (setup && setup->ll_start)
-> +		setup->ll_start(setup->data);
-> +
-> +	usb_add_hcd(drd->host->main_hcd,
-> +		    drd->host->hcd_irq, IRQF_SHARED);
-> +	if (drd->host->shared_hcd)
-> +		usb_add_hcd(drd->host->shared_hcd,
-> +			    drd->host->hcd_irq, IRQF_SHARED);
+> You -can- handle situations having more than one type of reader, but
+> this requires waiting for all corresponding flavors of grace period.
+> This turns out to be fairly simple in this case, for example, have your
+> kfree_opp_rcu() function invoke kfree_rcu() instead of kfree().
 
-Check return value please.
+Hmm, I see.
 
-Peter
-> +
-> +	spin_lock(&drd_lock);
-> +	drd->state |= DRD_HOST_ACTIVE;
-> +	spin_unlock(&drd_lock);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_drd_start_hcd);
-> +
-> +int usb_drd_stop_hcd(struct device *parent)
-> +{
-> +	struct usb_drd	*drd;
-> +	struct usb_drd_setup *setup;
-> +
-> +	drd = usb_drd_get_dev(parent);
-> +	if (!drd)
-> +		return -ENODEV;
-> +
-> +	if (WARN_ON(!(drd->state & DRD_HOST_ACTIVE)))
-> +		return -EINVAL;
-> +
-> +	setup = drd->host->host_setup;
-> +	if (setup && setup->ll_stop)
-> +		setup->ll_stop(setup->data);
-> +	if (drd->host->shared_hcd)
-> +		usb_remove_hcd(drd->host->shared_hcd);
-> +
-> +	usb_remove_hcd(drd->host->main_hcd);
-> +
-> +	spin_lock(&drd_lock);
-> +	drd->state = drd->state & ~DRD_HOST_ACTIVE;
-> +	spin_unlock(&drd_lock);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_drd_stop_hcd);
-> +
-> +int usb_drd_register_udc(struct device *parent, struct usb_drd_gadget *gadget)
-> +{
-> +	struct usb_drd	*drd;
-> +
-> +	drd = usb_drd_get_dev(parent);
-> +	if (!drd)
-> +		return -ENODEV;
-> +
-> +	spin_lock(&drd_lock);
-> +	drd->gadget = gadget;
-> +	drd->state |= DRD_DEVICE_REGISTERED;
-> +	if (drd->gadget->g_driver)
-> +		drd->state |= DRD_DEVICE_ACTIVE;
-> +
-> +	spin_unlock(&drd_lock);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_drd_register_udc);
-> +
-> +int usb_drd_register_udc_driver(struct device *parent,
-> +				struct usb_gadget_driver *driver)
-> +{
-> +	struct usb_drd	*drd;
-> +
-> +	drd = usb_drd_get_dev(parent);
-> +	if (!drd)
-> +		return -ENODEV;
-> +
-> +	spin_lock(&drd_lock);
-> +	drd->gadget->g_driver = driver;
-> +	drd->state |= DRD_DEVICE_ACTIVE;
-> +	spin_unlock(&drd_lock);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_drd_register_udc_driver);
-> +
-> +int usb_drd_unregister_udc(struct device *parent)
-> +{
-> +	struct usb_drd	*drd;
-> +
-> +	drd = usb_drd_get_dev(parent);
-> +	if (!drd)
-> +		return -ENODEV;
-> +
-> +	spin_lock(&drd_lock);
-> +	drd->state &= ~(DRD_DEVICE_REGISTERED | DRD_DEVICE_ACTIVE);
-> +	spin_unlock(&drd_lock);
-> +	kfree(drd->gadget->gadget_setup);
-> +	kfree(drd->gadget);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_drd_unregister_udc);
-> +
-> +int usb_drd_unregister_udc_driver(struct device *parent)
-> +{
-> +	struct usb_drd	*drd;
-> +	struct usb_drd_gadget *drd_gadget;
-> +
-> +	drd = usb_drd_get_dev(parent);
-> +	if (!drd)
-> +		return -ENODEV;
-> +	drd_gadget = drd->gadget;
-> +
-> +	spin_lock(&drd_lock);
-> +	drd->state &= ~DRD_DEVICE_ACTIVE;
-> +	drd_gadget->g_driver = NULL;
-> +	spin_unlock(&drd_lock);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_drd_unregister_udc_driver);
-> +
-> +int usb_drd_start_udc(struct device *parent)
-> +{
-> +	struct usb_drd	*drd;
-> +	struct usb_drd_gadget *drd_gadget;
-> +	struct usb_drd_setup *setup;
-> +
-> +	drd = usb_drd_get_dev(parent);
-> +	if (!drd)
-> +		return -ENODEV;
-> +
-> +	if (WARN_ON(!(drd->state & DRD_DEVICE_REGISTERED)))
-> +		return -EINVAL;
-> +
-> +	drd_gadget = drd->gadget;
-> +	setup = drd_gadget->gadget_setup;
-> +
-> +	if (setup && setup->ll_start)
-> +		setup->ll_start(setup->data);
-> +
-> +	usb_add_gadget_udc_release(parent, drd_gadget->gadget,
-> +				   setup->ll_release);
-> +	spin_lock(&drd_lock);
-> +	drd->state |= DRD_DEVICE_ACTIVE;
-> +	spin_unlock(&drd_lock);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_drd_start_udc);
-> +
-> +int usb_drd_stop_udc(struct device *parent)
-> +{
-> +	struct usb_drd	*drd;
-> +	struct usb_drd_gadget *drd_gadget;
-> +	struct usb_drd_setup *setup;
-> +
-> +	drd = usb_drd_get_dev(parent);
-> +	if (!drd)
-> +		return -ENODEV;
-> +
-> +	if (WARN_ON(!(drd->state & DRD_DEVICE_REGISTERED)))
-> +		return -EINVAL;
-> +
-> +	drd_gadget = drd->gadget;
-> +	setup = drd_gadget->gadget_setup;
-> +	if (setup && setup->ll_stop)
-> +		setup->ll_stop(setup->data);
-> +
-> +	usb_del_gadget_udc(drd_gadget->gadget);
-> +
-> +	spin_lock(&drd_lock);
-> +	drd->state = drd->state & ~DRD_DEVICE_ACTIVE;
-> +	spin_unlock(&drd_lock);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_drd_stop_udc);
-> +
-> +MODULE_DESCRIPTION("USB-DRD Library");
-> +MODULE_AUTHOR("George Cherian <george.cherian@ti.com>");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/include/linux/usb/drd.h b/include/linux/usb/drd.h
-> new file mode 100644
-> index 0000000..71c64dc
-> --- /dev/null
-> +++ b/include/linux/usb/drd.h
-> @@ -0,0 +1,77 @@
-> +#include <linux/usb/gadget.h>
-> +#include <linux/usb/otg.h>
-> +#include <linux/usb/hcd.h>
-> +
-> +struct usb_drd_setup {
-> +	int	(*ll_start)(void *);
-> +	int	(*ll_stop)(void *);
-> +	void	(*ll_release)(struct device *);
-> +	void	*data;
-> +};
-> +
-> +struct usb_drd_host {
-> +	struct usb_hcd		*main_hcd;
-> +	struct usb_hcd		*shared_hcd;
-> +	int			hcd_irq;
-> +	struct usb_drd_setup *host_setup;
-> +};
-> +
-> +struct usb_drd_gadget {
-> +	struct usb_gadget_driver *g_driver;
-> +	struct usb_gadget *gadget;
-> +	struct usb_drd_setup *gadget_setup;
-> +};
-> +
-> +#define DRD_UNREGISTERED	0x0
-> +#define DRD_DEVICE_REGISTERED	0x1
-> +#define DRD_HOST_REGISTERED	0x2
-> +#define DRD_HOST_ACTIVE		0x4
-> +#define DRD_DEVICE_ACTIVE	0x8
-> +
-> +#if IS_ENABLED(CONFIG_DRD_LIB)
-> +int usb_drd_release(struct device *parent);
-> +int usb_drd_add(struct device *parent);
-> +int usb_drd_register_udc(struct device *parent,
-> +			 struct usb_drd_gadget *gadget);
-> +int usb_drd_register_udc_driver(struct device *parent,
-> +				struct usb_gadget_driver *driver);
-> +int usb_drd_unregister_udc(struct device *parent);
-> +int usb_drd_unregister_udc_driver(struct device *parent);
-> +int usb_drd_register_hcd(struct device *parent,
-> +			 struct usb_drd_host *host);
-> +int usb_drd_unregister_hcd(struct device *parent);
-> +int usb_drd_start_hcd(struct device *parent);
-> +int usb_drd_stop_hcd(struct device *parent);
-> +int usb_drd_start_udc(struct device *parent);
-> +int usb_drd_stop_udc(struct device *parent);
-> +int usb_drd_get_state(struct device *parent);
-> +#else
-> +static inline int usb_drd_release(struct device *parent)
-> +{ return 0; }
-> +static inline int usb_drd_add(struct device *parent)
-> +{ return 0; }
-> +static inline int usb_drd_register_udc(struct device *parent,
-> +				       struct usb_drd_gadget *gadget)
-> +{ return 0; }
-> +static inline int usb_drd_register_udc_driver(struct device *parent,
-> +					      struct usb_gadget_driver *driver)
-> +{ return 0; }
-> +static inline int usb_drd_unregister_udc(struct device *parent,
-> +					 struct usb_drd_gadget *gadget)
-> +{ return 0; }
-> +static inline int usb_drd_unregister_udc_driver(struct device *parent)
-> +{ return 0; }
-> +static inline int usb_drd_register_hcd(struct device *parent,
-> +				       struct usb_drd_host *host)
-> +{ return 0; }
-> +static inline int usb_drd_unregister_hcd(struct device *parent)
-> +{ return 0; }
-> +static inline int usb_drd_stop_hcd(struct device *parent)
-> +{ return 0; }
-> +static inline int usb_drd_start_udc(struct device *parent)
-> +{ return 0; }
-> +static inline int usb_drd_stop_udc(struct device *parent)
-> +{ return 0; }
-> +static inline int usb_drd_get_state(struct device *parent)
-> +{ return 0; }
-> +#endif
-> -- 
-> 1.8.3.1
-> 
+> But I strongly recommend gaining a full understanding of the code first.
+> You can dig yourself a really deep hole really quickly by patching code
+> without understanding it!  And apologies if you really do already fully
+> understand the code, but your statement above leads me to believe that
+> you do not yet fully understand it.
 
--- 
+I wouldn't claim to know every part of these frameworks (OPP, Devfreq),
+but the maintenance of the nodes/lists is what I understand well.
 
-Best Regards,
-Peter Chen
+But yeah, I understand you are worried about. Pushing more bugs for
+solving one.
+
+>         I couldn't find any code in kernel which is registered for this
+>         notifier chain yet. And so don't know what that code will do. It
+>         may not traverse the list or it may :)
+>
+> One thing that can help internalize code (relatively) quickly is to
+> get a large piece of paper and to draw the relationships of the data
+> structures first and the relationship of the code later.  When the
+> drawing gets too messy, start over with a clean sheet of paper.
+
+Thanks for your suggestions Paul. I was able to do it without a pen
+and paper this time as it wasn't that complex. But yes this pen-paper
+things really works while working on complex stuff. I found a memory
+leak Bug in scheduling domains creation code earlier that way :)
+
+Also it looks like I should use call_srcu() with kfree_rcu() for
+opp_set_availability() case as well to avoid any corner cases.
+
+Thanks for your time and help. Really appreciate that :)
+
+--
+viresh
