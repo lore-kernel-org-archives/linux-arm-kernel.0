@@ -1,52 +1,26 @@
-From: js07.lee@gmail.com (Jungseung Lee)
-Date: Wed, 26 Nov 2014 19:05:13 +0900
-Subject: [PATCH v2] arm: Support for the PXN CPU feature on ARMv7
-In-Reply-To: <6108655.KIqtjFdn4U@wuerfel>
-References: <1416981921-19643-1-git-send-email-js07.lee@gmail.com>
- <6108655.KIqtjFdn4U@wuerfel>
-Message-ID: <CAPP0e=PGo7UGso1eHhLW3ZCt7qb3dobsax7hpxECqAZFgiSBxQ@mail.gmail.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Wed, 26 Nov 2014 11:08:43 +0100
+Subject: [PATCH v5 1/2] of: Rename "poweroff-source" property to
+ "system-power-controller"
+In-Reply-To: <20141125171234.GH7712@sirena.org.uk>
+References: <1416918506-9366-1-git-send-email-romain.perier@gmail.com>
+ <1416918506-9366-2-git-send-email-romain.perier@gmail.com>
+ <20141125144007.9904BC44343@trevor.secretlab.ca>
+ <20141125145410.GD19910@localhost>
+ <CABgxDoKUecAd00X0znkGiQncF4MwnLAM4BFV2AV_oMPF=4G7UA@mail.gmail.com>
+ <20141125171234.GH7712@sirena.org.uk>
+Message-ID: <CABgxDoJoVNxXp0qXKKofbOywvMV-=4vBnABq+y6kwgCkaFWnQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+2014-11-25 18:12 GMT+01:00 Mark Brown <broonie@kernel.org>:
+> Yeah, given the amount of often late arriving disagreement I'd rather
+> let things cook for a while unless there are a lot of people being vocal
+> about this being what we want to go with.
 
-2014-11-26 17:48 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> On Wednesday 26 November 2014 15:05:21 Jungseung Lee wrote:
->> +#if __LINUX_ARM_ARCH__ >= 6 && !defined(CONFIG_ARM_LPAE)
->> +static inline bool cpu_has_classic_pxn(void)
->> +{
->> +       static unsigned int vmsa = ~0UL;
->> +
->> +       if (cpu_architecture() != CPU_ARCH_ARMv7)
->> +               return false;
->> +       if (vmsa == 4)
->> +               return true;
->> +
->> +       vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
->> +       return vmsa == 4;
->> +}
->> +#else
->> +static inline bool cpu_has_classic_pxn(void)
->> +{
->> +       return false;
->> +}
->> +#endif
->> +
->>
->
-> As mentioned before, please turn the #ifdef into an "if (IS_ENABLED(...))" check.
->
-Actually I select the style since I thought the style is more intuitive .
-I'll turn the #ifdef into "if(...)" check.
+In other words, I need more reviews and more positives feedbacks about
+this serie (as far as people who were against the previous ones).
+For example, Feedbacks from Felipe Balbi and Lucas Stach would be welcome.
 
-> The 'if (vmsa == 4)' check above looks like it came from an earlier version
-> and is always false, so just drop that.
-vmsa is static variable and it is intended to avoid read_cpuid_ext
-call at every cpu_has_classic_pxn() calling.
-Is it confused code or read_cpuid_ext() overhead is tiny to ignore?
-Kindly let me know your suggestion..
-
->
->         Arnd
-
-Thanks!
+Thanks,
+Romain
