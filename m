@@ -1,138 +1,100 @@
-From: js07.lee@gmail.com (Jungseung Lee)
-Date: Wed, 26 Nov 2014 15:05:21 +0900
-Subject: [PATCH v2] arm: Support for the PXN CPU feature on ARMv7
-Message-ID: <1416981921-19643-1-git-send-email-js07.lee@gmail.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Wed, 26 Nov 2014 16:35:31 +1030
+Subject: CONFIG_DEBUG_SET_MODULE_RONX broken (was Re: [PATCHv2] arm64: add
+ support to dump the kernel page tables)
+In-Reply-To: <546E7748.4000603@codeaurora.org>
+References: <1416262710-7798-1-git-send-email-lauraa@codeaurora.org>
+ <CAGXu5jK7FWs2v52T2RBdKhdYcV5wGm3F4H4km9h-B15Z6S0A2Q@mail.gmail.com>
+ <546E7748.4000603@codeaurora.org>
+Message-ID: <878uiyxzro.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modern ARMv7-A/R cores optionally implement below new
-hardware feature:
+Laura Abbott <lauraa@codeaurora.org> writes:
+> (cc Rusty Russell for reference)
+>
+> On 11/19/2014 3:01 PM, Kees Cook wrote:
+>> On Mon, Nov 17, 2014 at 2:18 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+>>> In a similar manner to arm, it's useful to be able to dump the page
+>>> tables to verify permissions and memory types. Add a debugfs file
+>>> to check the page tables.
+>>>
+>>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>>
+>> This seems to behave well for me. Thanks!
+>>
+>> Tested-by: Kees Cook <keescook@chromium.org>
+>>
+>> In my configuration, though, with CONFIG_DEBUG_SET_MODULE_RONX=y, I'm
+>> only seeing RO, and no NX changes. I haven't constructed a test for
+>> the module memory behavior directly (to see if this is a page table
+>> issue or a PTDUMP reporting issue). This series I'm testing has gone
+>> through some backporting on my end, so I wanted to just double-check
+>> and see if you saw this too, or if it's specific to my environment:
+>>
+>> ---[ Modules ]---
+>> 0xffffffbffc000000-0xffffffbffc005000          20K     ro x  SHD AF
+>> UXN MEM/NORMAL
+>> 0xffffffbffc005000-0xffffffbffc007000           8K     RW x  SHD AF
+>> UXN MEM/NORMAL
+>> 0xffffffbffc00c000-0xffffffbffc00e000           8K     ro x  SHD AF
+>> UXN MEM/NORMAL
+>> 0xffffffbffc00e000-0xffffffbffc010000           8K     RW x  SHD AF
+>> UXN MEM/NORMAL
+>> ...
+>>
+>> Thanks,
+>>
+>> -Kees
+>>
+>
+> Yep, I'm seeing the same thing. We're failing the bounds check:
+>
+> if (!is_module_address(start) || !is_module_address(end - 1))
+>                  return -EINVAL;
 
-- PXN:
-Privileged execute-never(PXN) is a security feature. PXN bit
-determines whether the processor can execute software from
-the region. This is effective solution against ret2usr attack.
-On an implementation that does not include the LPAE, PXN is
-optionally supported.
+That's a weird test, but I can agree that it's now broken.  What's it for?
 
-This patch set PXN bit on user page table for preventing
-user code execution with privilege mode.
+> There are now two problems with this check
+>
+> 1) 4982223e51e8 module: set nx before marking module MODULE_STATE_COMING
+> moved around the order of when nx was set. Now we hit the mod->state ==
+> MODULE_STATE_UNFORMED in __module_address so module_address on anything
+> always returns false. I think my previous testing must have been done
+> on a branch without that patch.
+>
+> 2) It's possible for the end of the region we are trying to set as nx
+> to not be fully page size aligned. This seems to be caused by things
+> getting aligned in layout_section but becoming unaligned in layout_symtab
 
-Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
----
-Changes in v1:
-	Define cpu_has_classic_pxn().
-	Set PXN bit at the PTE directly under LPAE.
+Yes, but you only need the first change in your patch: mod->init_size
+should already be aligned (and unlike mod->core_size, we haven't
+modified it).
 
-Changes in v2:
-	change cpu_has_classic_pxn() for a combined v6/v7 kernel.
-	Set PXN bit using user_pgprot
+> diff --git a/kernel/module.c b/kernel/module.c
+> index 972151b..3791330 100644
+> --- a/kernel/module.c
+> +++ b/kernel/module.c
+> @@ -2316,10 +2316,14 @@ static void layout_symtab(struct module *mod, struct load_info *info)
+>          info->stroffs = mod->core_size = info->symoffs + ndst * sizeof(Elf_Sym);
+>          mod->core_size += strtab_size;
+>   
+> +       mod->core_size = debug_align(mod->core_size);
+> +
+>          /* Put string table section at end of init part of module. */
+>          strsect->sh_flags |= SHF_ALLOC;
+>          strsect->sh_entsize = get_offset(mod, &mod->init_size, strsect,
+>                                           info->index.str) | INIT_OFFSET_MASK;
+> +
+> +       mod->init_size = debug_align(mod->init_size);
+>          pr_debug("\t%s\n", info->secstrings + strsect->sh_name);
+>   }
+>   
+> I haven't tried a bisect to see if this is new.
+>
+> I'm kind of tempted to switch the bounds check back to
+> (addr >= MODULES_VADDR && addr < MODULES_END) unless there is a clean way to
+> fixup module.c
 
- arch/arm/include/asm/pgalloc.h              | 28 +++++++++++++++++++++++++++-
- arch/arm/include/asm/pgtable-2level-hwdef.h |  2 ++
- arch/arm/include/asm/pgtable-3level-hwdef.h |  1 +
- arch/arm/mm/mmu.c                           |  5 +++++
- 4 files changed, 35 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index 78a7793..55be4e1 100644
---- a/arch/arm/include/asm/pgalloc.h
-+++ b/arch/arm/include/asm/pgalloc.h
-@@ -17,6 +17,8 @@
- #include <asm/processor.h>
- #include <asm/cacheflush.h>
- #include <asm/tlbflush.h>
-+#include <asm/cputype.h>
-+#include <asm/system_info.h>
- 
- #define check_pgt_cache()		do { } while (0)
- 
-@@ -25,6 +27,26 @@
- #define _PAGE_USER_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_USER))
- #define _PAGE_KERNEL_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_KERNEL))
- 
-+#if __LINUX_ARM_ARCH__ >= 6 && !defined(CONFIG_ARM_LPAE)
-+static inline bool cpu_has_classic_pxn(void)
-+{
-+	static unsigned int vmsa = ~0UL;
-+
-+	if (cpu_architecture() != CPU_ARCH_ARMv7)
-+		return false;
-+	if (vmsa == 4)
-+		return true;
-+
-+	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-+	return vmsa == 4;
-+}
-+#else
-+static inline bool cpu_has_classic_pxn(void)
-+{
-+	return false;
-+}
-+#endif
-+
- #ifdef CONFIG_ARM_LPAE
- 
- static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
-@@ -157,7 +179,11 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
- static inline void
- pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
- {
--	__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
-+	pmdval_t pmdval = _PAGE_USER_TABLE;
-+
-+	if (cpu_has_classic_pxn())
-+		pmdval |= PMD_PXNTABLE;
-+	__pmd_populate(pmdp, page_to_phys(ptep), pmdval);
- }
- #define pmd_pgtable(pmd) pmd_page(pmd)
- 
-diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
-index 5cfba15..5e68278 100644
---- a/arch/arm/include/asm/pgtable-2level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
-@@ -20,12 +20,14 @@
- #define PMD_TYPE_FAULT		(_AT(pmdval_t, 0) << 0)
- #define PMD_TYPE_TABLE		(_AT(pmdval_t, 1) << 0)
- #define PMD_TYPE_SECT		(_AT(pmdval_t, 2) << 0)
-+#define PMD_PXNTABLE		(_AT(pmdval_t, 1) << 2)     /* v7 */
- #define PMD_BIT4		(_AT(pmdval_t, 1) << 4)
- #define PMD_DOMAIN(x)		(_AT(pmdval_t, (x)) << 5)
- #define PMD_PROTECTION		(_AT(pmdval_t, 1) << 9)		/* v5 */
- /*
-  *   - section
-  */
-+#define PMD_SECT_PXN    (_AT(pmdval_t, 1) << 0)     /* v7 */
- #define PMD_SECT_BUFFERABLE	(_AT(pmdval_t, 1) << 2)
- #define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
- #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 4)		/* v6 */
-diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
-index 9fd61c7..f8f1cff 100644
---- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-@@ -76,6 +76,7 @@
- #define PTE_EXT_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
- #define PTE_EXT_AF		(_AT(pteval_t, 1) << 10)	/* Access Flag */
- #define PTE_EXT_NG		(_AT(pteval_t, 1) << 11)	/* nG */
-+#define PTE_EXT_PXN		(_AT(pteval_t, 1) << 53)	/* PXN */
- #define PTE_EXT_XN		(_AT(pteval_t, 1) << 54)	/* XN */
- 
- /*
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 9f98cec..5b0a047 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -605,6 +605,11 @@ static void __init build_mem_type_table(void)
- 	}
- 	kern_pgprot |= PTE_EXT_AF;
- 	vecs_pgprot |= PTE_EXT_AF;
-+
-+	/*
-+	 * Set PXN for user mappings
-+	 */
-+	user_pgprot |= PTE_EXT_PXN;
- #endif
- 
- 	for (i = 0; i < 16; i++) {
--- 
-1.9.1
+Thanks,
+Rusty.
