@@ -1,52 +1,38 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 26 Nov 2014 20:28:53 +0100
-Subject: [PATCHv1 0/6] rtc: rtc-isl12057: fixes and alarm support
-In-Reply-To: <54762096.7040200@kleine-koenig.org> ("Uwe
- \=\?utf-8\?Q\?Kleine-K\?\= \=\?utf-8\?Q\?\=C3\=B6nig\=22's\?\=
- message of "Wed, 26 Nov 2014 19:48:54 +0100")
-References: <cover.1416006090.git.arno@natisbad.org>
- <874mtlyflf.fsf@natisbad.org> <54762096.7040200@kleine-koenig.org>
-Message-ID: <87y4qxwykq.fsf@natisbad.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 26 Nov 2014 19:27:06 +0000
+Subject: [PATCH 5/7] KVM: arm64: guest debug, add support for single-step
+In-Reply-To: <1416931805-23223-6-git-send-email-alex.bennee@linaro.org>
+References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
+ <1416931805-23223-6-git-send-email-alex.bennee@linaro.org>
+Message-ID: <CAFEAcA-cjM9yUXi6tc79UP0fBKAagtFKQgV3iAjz5DWr9yxZUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 25 November 2014 at 16:10, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> This adds support for single-stepping the guest. As userspace can and
+> will manipulate guest registers before restarting any tweaking of the
+> registers has to occur just before control is passed back to the guest.
+> Furthermore while guest debugging is in effect we need to squash the
+> ability of the guest to single-step itself as we have no easy way of
+> re-entering the guest after the exception has been delivered to the
+> hypervisor.
 
-Uwe Kleine-K?nig <uwe@kleine-koenig.org> writes:
+A corner case I don't think this patch handles: if the debugger
+tries to single step an insn which is emulated by the
+hypervisor (because it's a load/store which is trapped and
+handled as emulated mmio in userspace) then we won't
+correctly update the single-step state machine (and so we'll end
+up incorrectly stopping after the following insn rather than
+before, I think).
 
-> On 11/26/2014 07:35 PM, Arnaud Ebalard wrote:
->> I wonder if you could take a look at this series I sent providing fixes
->> (patches #1-5) and alarm support (patch #6) for ISL12057 RTC Chip. As
->> all people do for RTC patches - due to lack of feedback from maintainer
->> - I am looking for someone to review the patches (Mark, patch 6 has a
->> sticker w/ regmap-inside ;-)) and then push those upstream if they are
->> ok (Jason, you handled that part for 70e123373c05: "rtc: Add support for
->> Intersil ISL12057 I2C RTC chip" in 2013 for the same reason).
->> 
->> Note that I addressed previous comments and feedback received from Uwe
->> and also spent time to do some soldering in order to support and test
->> the last patch for both my use case (Alarm IRQ signal not routed to the
->> SoC on ReadyNAS RN102, RN104 and RN2120) and the common case.
->> 
->> Do not hesitate to ask if you want me to resend!
-> akpm already applied the series, doesn't he?
+You should be able to achieve this effect by simply always clearing
+the guest's PSTATE.SS when you advance the PC to skip the emulated
+instruction (cf the comment in the pseudocode SSAdvance() function).
 
-I am not really familiar w/ -mm tree workflow. It was not clear to me
-whether it was sitting in -mm tree waiting for reviewed-by and
-acked-by.
+I think we should also be doing this PC advance on return from
+userspace's handling of the mmio rather than before we drop back
+to userspace as we do now, but I can't remember why I think that.
+Christoffer, I don't suppose you recall, do you? I think it was
+you I had this conversation with on IRC a month or so back...
 
-> I'm about to test the patches, just fighting with my NAS to boot my
-> custom kernel.
->
-> Apart from that patches 1 - 5 can have my Ack. Didn't look deep enough
-> into patch 6 yet. @akpm: No need to hurry adding them, I hope to be
-> able to also provide Tested-by:-tags later today.
-
-I'll be happy to handle comments and possible requests for additional
-changes if needed.
-
-Cheers,
-
-a+
-
-ps: anyway, thanks Andrew!
+-- PMM
