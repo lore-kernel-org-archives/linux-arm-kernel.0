@@ -1,20 +1,32 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 26 Nov 2014 17:14:40 +0000
-Subject: [PATCH 4/7] KVM: arm64: guest debug, add SW break point support
-In-Reply-To: <20141126160720.GD3245@hawk.usersys.redhat.com>
-References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
- <1416931805-23223-5-git-send-email-alex.bennee@linaro.org>
- <20141126160720.GD3245@hawk.usersys.redhat.com>
-Message-ID: <CAFEAcA-xV80Z3j52H5yh2e+JxOo5=inZNcM54HkOa2U2rBvKhQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 26 Nov 2014 18:15:19 +0100
+Subject: [PATCH v2 2/5] i2c: davinci: query STP always when NACK is
+ received
+In-Reply-To: <5476005A.6090207@ti.com>
+References: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
+ <1417010393-30598-3-git-send-email-grygorii.strashko@ti.com>
+ <20141126155711.GL4431@pengutronix.de> <5476005A.6090207@ti.com>
+Message-ID: <20141126171519.GP4431@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 November 2014 at 16:07, Andrew Jones <drjones@redhat.com> wrote:
-> There appears to be a typo in the ARM ARM. Subsection "Software
-> Breakpoint Instruction exception" of D1.10.4 says BRK (ESR_EL2_EC_BRK64)
-> is 0x39, but the table above that has it correctly as 0x3c.
+Hello Grygorii,
 
-Thanks for pointing out this typo -- I've reported it to the
-appropriate documentation people.
+On Wed, Nov 26, 2014 at 06:31:22PM +0200, Grygorii Strashko wrote:
+> On 11/26/2014 05:57 PM, Uwe Kleine-K?nig wrote:
+> >I don't understand your use of "query" in the subject and later in the
+> >commit log. Do you mean "send"?
+> 
+> will change to "generate". Ok?
+yes that would be better understandable
 
--- PMM
+> Can I assume that you are ok with this patch in general?
+Yeah, your argument that being able to send a Sr is not sensible made
+sense to me. If Wolfram is happy with your patch so am I.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
