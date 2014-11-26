@@ -1,143 +1,44 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 26 Nov 2014 17:12:49 +0800
-Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <2065254.jRdQcinOdg@wuerfel>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <2966212.dpWQ0OTb0A@wuerfel>
- <CAFpQJXUjYsTiHSyHdgtN9JPWGN8CByR4VwtSMJhwkAUWA4iV9w@mail.gmail.com>
- <2065254.jRdQcinOdg@wuerfel>
-Message-ID: <54759991.50204@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 26 Nov 2014 14:47:47 +0530
+Subject: [PATCH 4/8] opp: Introduce APIs to remove OPPs
+In-Reply-To: <CAKohponz3MsgZNtm1i-aLx8kRRjJwUJjL=B3RE96EiivwXbF2A@mail.gmail.com>
+References: <cover.1416910766.git.viresh.kumar@linaro.org>
+ <f815d0855c1bd28d8389554176acd2620e56b3c8.1416910766.git.viresh.kumar@linaro.org>
+ <20141125162434.GC5050@linux.vnet.ibm.com>
+ <CAKohponBNOm_0_rZqbVKQSoOa81CjnKb8vcfzA6gbm1+Gxn+gg@mail.gmail.com>
+ <20141125173943.GG5050@linux.vnet.ibm.com>
+ <CAKohponz3MsgZNtm1i-aLx8kRRjJwUJjL=B3RE96EiivwXbF2A@mail.gmail.com>
+Message-ID: <CAKohpomKym9dqzQDmS-7ipze4jCYDU4_UN4a36VceHuGezoiVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-11-26 3:00, Arnd Bergmann wrote:
-> On Tuesday 25 November 2014 08:15:47 Ganapatrao Kulkarni wrote:
->>> No, don't hardcode ARM specifics into a common binding either. I've looked
->>> at the ibm,associativity properties again, and I think we should just use
->>> those, they can cover all cases and are completely independent of the
->>> architecture. We should probably discuss about the property name though,
->>> as using the "ibm," prefix might not be the best idea.
->>
->> We have started with new proposal, since not got enough details how
->> ibm/ppc is managing the numa using dt.
->> there is no documentation and there is no power/PAPR spec for numa in
->> public domain and there are no single dt file in arch/powerpc which
->> describes the numa. if we get any one of these details, we can align
->> to powerpc implementation.
-> 
-> Basically the idea is to have an "ibm,associativity" property in each
-> bus or device that is node specific, and this includes all CPUs and
-> memory nodes. The property contains an array of 32-bit integers that
-> count the resources. Take an example of a NUMA cluster of two machines
-> with four sockets and four cores each (32 cores total), a memory
-> channel on each socket and one PCI host per board that is connected
-> at equal speed to each socket on the board.
-> 
-> The ibm,associativity property in each PCI host, CPU or memory device
-> node consequently has an array of three (board, socket, core) integers:
-> 
-> 	memory at 0,0 {
-> 		device_type = "memory";
-> 		reg = <0x0 0x0  0x4 0x0;
-> 		/* board 0, socket 0, no specific core */
-> 		ibm,asssociativity = <0 0 0xffff>;
-> 	};
-> 
-> 	memory at 4,0 {
-> 		device_type = "memory";
-> 		reg = <0x4 0x0  0x4 0x0>;
-> 		/* board 0, socket 1, no specific core */
-> 		ibm,asssociativity = <0 1 0xffff>; 
-> 	};
-> 
-> 	...
-> 
-> 	memory at 1c,0 {
-> 		device_type = "memory";
-> 		reg = <0x1c 0x0  0x4 0x0>;
-> 		/* board 0, socket 7, no specific core */
-> 		ibm,asssociativity = <1 7 0xffff>; 
-> 	};
-> 
-> 	cpus {
-> 		#address-cells = <2>;
-> 		#size-cells = <0>;
-> 		cpu at 0 {
-> 			device_type = "cpu";
-> 			reg = <0 0>;
-> 			/* board 0, socket 0, core 0*/
-> 			ibm,asssociativity = <0 0 0>; 
-> 		};
-> 
-> 		cpu at 1 {
-> 			device_type = "cpu";
-> 			reg = <0 0>;
-> 			/* board 0, socket 0, core 0*/
-> 			ibm,asssociativity = <0 0 0>; 
-> 		};
-> 
-> 		...
-> 
-> 		cpu at 31 {
-> 			device_type = "cpu";
-> 			reg = <0 32>;
-> 			/* board 1, socket 7, core 31*/
-> 			ibm,asssociativity = <1 7 31>; 
-> 		};
-> 	};
-> 
-> 	pci at 100,0 {
-> 		device_type = "pci";
-> 		/* board 0 */
-> 		ibm,associativity = <0 0xffff 0xffff>;
-> 		...
-> 	};
-> 
-> 	pci at 200,0 {
-> 		device_type = "pci";
-> 		/* board 1 */
-> 		ibm,associativity = <1 0xffff 0xffff>;
-> 		...
-> 	};
-> 
-> 	ibm,associativity-reference-points = <0 1>;
-> 
-> The "ibm,associativity-reference-points" property here indicates that index 2
-> of each array is the most important NUMA boundary for the particular system,
-> because the performance impact of allocating memory on the remote board 
-> is more significant than the impact of using memory on a remote socket of the
-> same board. Linux will consequently use the first field in the array as
-> the NUMA node ID. If the link between the boards however is relatively fast,
-> so you care mostly about allocating memory on the same socket, but going to
-> another board isn't much worse than going to another socket on the same
-> board, this would be
-> 
-> 	ibm,associativity-reference-points = <1 0>;
-> 
-> so Linux would ignore the board ID and use the socket ID as the NUMA node
-> number. The same would apply if you have only one (otherwise identical
-> board, then you would get
-> 
-> 	ibm,associativity-reference-points = <1>;
-> 
-> which means that index 0 is completely irrelevant for NUMA considerations
-> and you just care about the socket ID. In this case, devices on the PCI
-> bus would also not care about NUMA policy and just allocate buffers from
-> anywhere, while in original example Linux would allocate DMA buffers only
-> from the local board.
+On 26 November 2014 at 11:59, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> Also it looks like I should use call_srcu() with kfree_rcu() for
+> opp_set_availability() case as well to avoid any corner cases.
 
-Thanks for the detail information. I have the concerns about the distance
-for NUMA nodes, does the "ibm,associativity-reference-points" property can
-represent the distance between NUMA nodes?
+This is the diff I would be adding to this patch:
 
-For example, a system with 4 sockets connected like below:
+diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+index f9d80e6..3f728cd 100644
+--- a/drivers/base/power/opp.c
++++ b/drivers/base/power/opp.c
+@@ -506,7 +506,7 @@ static void kfree_opp_rcu(struct rcu_head *head)
+        struct dev_pm_opp *opp = container_of(head, struct dev_pm_opp,
+rcu_head);
 
-Socket 0  <---->  Socket 1  <---->  Socket 2  <---->  Socket 3
+        pr_info("%s: opp:%p, dynamic:%d\n", __func__, opp, opp->dynamic);
+-       kfree(opp);
++       kfree_rcu(opp);
+ }
 
-So from socket 0 to socket 1 (maybe on the same board), it just need 1
-jump to access the memory, but from socket 0 to socket 2/3, it needs
-2/3 jumps and the *distance* relative longer. Can
-"ibm,associativity-reference-points" property cover this?
+ static void kfree_device_rcu(struct rcu_head *head)
+@@ -644,7 +644,7 @@ static int opp_set_availability(struct device
+*dev, unsigned long freq,
 
-Thanks
-Hanjun
+        list_replace_rcu(&opp->node, &new_opp->node);
+        mutex_unlock(&dev_opp_list_lock);
+-       kfree_rcu(opp, rcu_head);
++       call_srcu(&dev_opp->srcu_head.srcu, &opp->rcu_head, kfree_opp_rcu);
+
+        /* Notify the change of the OPP availability */
+        if (availability_req)
