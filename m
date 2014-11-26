@@ -1,106 +1,151 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 26 Nov 2014 17:55:31 +0000
-Subject: [PATCH 1/2] ARM: tegra: irq: fix buggy usage of irq_data irq field
-In-Reply-To: <1417024532-5777-1-git-send-email-marc.zyngier@arm.com>
-References: <1417024532-5777-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1417024532-5777-2-git-send-email-marc.zyngier@arm.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 26 Nov 2014 09:56:22 -0800
+Subject: [PATCH] ARM: exynos_defconfig: disable CONFIG_EXYNOS5420_MCPM;
+ not stable
+In-Reply-To: <CAM4voa=budowQ+vnCAQhWj95Hx+yBnRAaDrFrjkQa2ubjrRwUQ@mail.gmail.com>
+ (Abhilash Kesavan's message of "Wed, 26 Nov 2014 22:28:57 +0530")
+References: <1414796382-5447-1-git-send-email-khilman@kernel.org>
+ <000e01cffb39$5ef0a2d0$1cd1e870$@kernel.org>
+ <7hegtaq26c.fsf@deeprootsystems.com>
+ <CAMAWPa-mLAFL7v8hHA5R-eBzpMFK-E-xcvjoV8Bn6tTwgP53Uw@mail.gmail.com>
+ <CAOesGMhvTDN4J6AdUDHKV0Sp4NT6a4QEMUDWOayQqhhD+C4acw@mail.gmail.com>
+ <CAMAWPa-sz5jT9izEONVZR2Z4mzuivKaNHSgyR+eP13tWZ84hYw@mail.gmail.com>
+ <CAOesGMgSkJ8xkBgN7OpuDzT=ehaAd6kvbx5_tC50x78pvpkTwg@mail.gmail.com>
+ <CAOesGMh-7md4PdQX1Wvk0jO+87j+fxSvBnVD_osjNd2zQ4L43w@mail.gmail.com>
+ <044101d00852$3f421420$bdc63c60$@kernel.org>
+ <CAMAWPa-qk0DEmPNz5LZgJq9AuGhRxuY00XwxtEikt_vh-iozVg@mail.gmail.com>
+ <CAM4voa==Ram0xXTL=SnKktyRt7VFphQxBJgcf9Yi9Zio0QctHw@mail.gmail.com>
+ <7hvbm2ixmo.fsf@deeprootsystems.com>
+ <CAM4voa=budowQ+vnCAQhWj95Hx+yBnRAaDrFrjkQa2ubjrRwUQ@mail.gmail.com>
+Message-ID: <7hmw7dg81l.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The crazy gic_arch_extn thing that Tegra uses contains multiple
-references to the irq field in struct irq_data, and uses this
-to directly poke hardware register.
+Abhilash Kesavan <kesavan.abhilash@gmail.com> writes:
 
-But irq is the *virtual* irq number, something that has nothing
-to do with the actual HW irq (stored in the hwirq field). And once
-we put the stacked domain code in action, the whole thing explodes,
-as these two values are *very* different:
+> Hi Kevin,
+>
+> On Wed, Nov 26, 2014 at 6:30 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>> Hi Abhilash,
+>>
+>> Abhilash Kesavan <kesavan.abhilash@gmail.com> writes:
+>>
+>> [...]
+>>
+>>>>> To be honest, since I don't have the exynos5420 arndale, chromebook...but smdk
+>>>>> which has different bootloader, I couldn't test it...I'll try to make a test
+>>>>> farm like you guys...
+>>>>
+>>>> Do you have some colleagues with any other 542x hardware?  I had
+>>>> assumed that linux-next was being better tested on the publicaly
+>>>> available, and widely available boards like odroid-xu3 and
+>>>> Chromebook2, but I've come to realize the hard way that that is not
+>>>
+>>> Are you seeing this on Chromebook2 (Peach-Pi 5800) too ?
+>>
+>> No, it seems that my exynos5800-peach-pi is not having this problem,
+>> which suggests it's a bootloader setup issue.
+>>
+>>>> the case.  You mention your board has a different bootloader.  Do you
+>>>> suspect there's a bootloader issue on these other platforms?  If so,
+>>>> could you elaborate on possible fixes?  I'm more than willing to test
+>>>> any proposed fixes, but I'm not familiar enough yet with these SoCs to
+>>>> figure out the underlying issues alone.
+>>>>
+>>>> Until you have a working board farm, you could start having a closer
+>>>> look at the boot logs we're already producing.  Admittedly linux-next
+>>>> broken in many ways besides this one for exynos currently, but it has
+>>>> been having these imprecise aborts well before the other recent
+>>>> issues.
+>>>>
+>>>> Also, It's very possible that this issue is not even MCPM related at
+>>>> all, and MCPM is just uncovering a previously hidden bug.  It would be
+>>>> very helpful if people more familiar with this hardware and SoC would
+>>>> investigate bug reports like these.
+>>>
+>>> The 3 boards I have access to (SMDK5420, Chromebook Peach-Pi and
+>>> Chromebook Peach-Pit) work fine with MCPM enabled.
+>>
+>> Thanks for helping look into this.
+>>
+>>> I am not sure why
+>>> it is failing only on the above mentioned boards as there is nothing
+>>> specific to them in the MCPM back-end.
+>>>
+>>> I assume that when you default to platsmp (on disabling MCPM), the
+>>> non-working boards boot all cores upto userspace without any issues ?
+>>
+>> Nope.  With MCPM disabled:
+>>
+>>   - 5420/arndale-octa: CPU0-3 come up (A15s)
+>>   - 5422/odroid-xu3: only CPU0 (A7)
+>>   - 5800/peach-pi: only CPU0 (A15)
+>>
+>> Note that with MCPM enabled, the arndale-octa gets the same result.
+>> Peach-pi on the other hand gets all 8 CPUs, and the odroid-xu3 only gets
+>> 6/8 CPUs (see other thread on that topic.)
+>>
+>>> Based on the timeline (problems started about 2.5 months back), there
+>>> have only been a couple of changes in the 5420 MCPM back-end. Could
+>>> you revert the following commits and check if things improve.
+>>>
+>>> 20fe6f9 ARM: EXYNOS: Support cluster power off on exynos5420/5800
+>>> fbb0499 ARM: 8083/1: exynos: activate the CCI on boot CPU/cluster
+>>> using the MCPM loopback
+>>>
+>>> These might not revert cleanly, so instead of the above you could also
+>>> comment the following 2 lines:
+>>>
+>>>
+>>> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c
+>>> b/arch/arm/mach-exynos/mcpm-exynos.c
+>>> index dc9a764..9a07188 100644
+>>> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+>>> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+>>> @@ -152,7 +152,7 @@ static void exynos_power_down(void)
+>>>                 exynos_cpu_power_down(cpunr);
+>>>
+>>>                 if (exynos_cluster_unused(cluster)) {
+>>> -                       exynos_cluster_power_down(cluster);
+>>> +                       //exynos_cluster_power_down(cluster);
+>>>                         last_man = true;
+>>>                 }
+>> 2>         } else if (cpu_use_count[cpu][cluster] == 1) {
+>>> @@ -356,8 +356,8 @@ static int __init exynos_mcpm_init(void)
+>>>         ret = mcpm_platform_register(&exynos_power_ops);
+>>>         if (!ret)
+>>>                 ret = mcpm_sync_init(exynos_pm_power_up_setup);
+>>> -       if (!ret)
+>>> -               ret = mcpm_loopback(exynos_cache_off); /* turn on the CCI */
+>>> +       //if (!ret)
+>>> +               //ret = mcpm_loopback(exynos_cache_off); /* turn on the CCI */
+>>>         if (ret) {
+>>>                 iounmap(ns_sram_base_addr);
+>>>                 return ret;
+>>>
+>>>
+>>>
+>>> If you still get aborts then I suspect that the problem is with the
+>>> bootloader configuration but am not sure.
+>>
+>> Nice.  With those lines commented out, the arndale-octa is not geting
+>> imprecise aborts anymore, and this is the platform where those aborts
+>> seem to prevent booting into a full userspace (as originally reported by
+>> Tyler.)
+>>
+>> More specifically, with only the loopback call to turn off CCI commented
+>> out, the imprecise aborts go away.
+>
+> I can't see how enabling snoops for the boot cluster is causing these
+> aborts. Perhaps as Krzysztof commented it has something to do with the
+> secure firmware/tz software on these boards ? Other than there does
+> not appear to be any difference between the working/non-working
+> setups.
 
-root at bacon-fat:~# cat /proc/interrupts
-            CPU0       CPU1
- 16:      25801       2075       GIC  29  twd
- 17:          0          0       GIC  73  timer0
-112:          0          0      GPIO  58  c8000600.sdhci cd
-123:          0          0      GPIO  69  c8000200.sdhci cd
-279:       1126          0       GIC 122  serial
-281:          0          0       GIC  70  7000c000.i2c
-282:          0          0       GIC 116  7000c400.i2c
-283:          0          0       GIC 124  7000c500.i2c
-284:        300          0       GIC  85  7000d000.i2c
-[...]
+Perhaps the secure firmware is preventing the CCI to be enabled by the
+kernel, and that is causing the imprecise abort?
 
-Just replacing all instances of irq with hwirq fixes the issue.
+Is there a way to update/replace the BL1/BL2/TZ firmware blobs with
+something that is known to be working better?  
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-tegra/irq.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index da7be13..ab95f53 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -99,42 +99,42 @@ static inline void tegra_irq_write_mask(unsigned int irq, unsigned long reg)
- 
- static void tegra_mask(struct irq_data *d)
- {
--	if (d->irq < FIRST_LEGACY_IRQ)
-+	if (d->hwirq < FIRST_LEGACY_IRQ)
- 		return;
- 
--	tegra_irq_write_mask(d->irq, ICTLR_CPU_IER_CLR);
-+	tegra_irq_write_mask(d->hwirq, ICTLR_CPU_IER_CLR);
- }
- 
- static void tegra_unmask(struct irq_data *d)
- {
--	if (d->irq < FIRST_LEGACY_IRQ)
-+	if (d->hwirq < FIRST_LEGACY_IRQ)
- 		return;
- 
--	tegra_irq_write_mask(d->irq, ICTLR_CPU_IER_SET);
-+	tegra_irq_write_mask(d->hwirq, ICTLR_CPU_IER_SET);
- }
- 
- static void tegra_ack(struct irq_data *d)
- {
--	if (d->irq < FIRST_LEGACY_IRQ)
-+	if (d->hwirq < FIRST_LEGACY_IRQ)
- 		return;
- 
--	tegra_irq_write_mask(d->irq, ICTLR_CPU_IEP_FIR_CLR);
-+	tegra_irq_write_mask(d->hwirq, ICTLR_CPU_IEP_FIR_CLR);
- }
- 
- static void tegra_eoi(struct irq_data *d)
- {
--	if (d->irq < FIRST_LEGACY_IRQ)
-+	if (d->hwirq < FIRST_LEGACY_IRQ)
- 		return;
- 
--	tegra_irq_write_mask(d->irq, ICTLR_CPU_IEP_FIR_CLR);
-+	tegra_irq_write_mask(d->hwirq, ICTLR_CPU_IEP_FIR_CLR);
- }
- 
- static int tegra_retrigger(struct irq_data *d)
- {
--	if (d->irq < FIRST_LEGACY_IRQ)
-+	if (d->hwirq < FIRST_LEGACY_IRQ)
- 		return 0;
- 
--	tegra_irq_write_mask(d->irq, ICTLR_CPU_IEP_FIR_SET);
-+	tegra_irq_write_mask(d->hwirq, ICTLR_CPU_IEP_FIR_SET);
- 
- 	return 1;
- }
-@@ -142,7 +142,7 @@ static int tegra_retrigger(struct irq_data *d)
- #ifdef CONFIG_PM_SLEEP
- static int tegra_set_wake(struct irq_data *d, unsigned int enable)
- {
--	u32 irq = d->irq;
-+	u32 irq = d->hwirq;
- 	u32 index, mask;
- 
- 	if (irq < FIRST_LEGACY_IRQ ||
--- 
-2.1.3
+Kevin
