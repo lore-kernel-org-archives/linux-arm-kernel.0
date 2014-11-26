@@ -1,55 +1,83 @@
-From: thunder.leizhen@huawei.com (leizhen)
-Date: Wed, 26 Nov 2014 14:58:40 +0800
-Subject: [RFC PATCH 1/4] iommu: build iova.c for any IOMMU
-In-Reply-To: <90240865e7cc00d0f7e471605ba9d2478b81ea88.1416931258.git.robin.murphy@arm.com>
-References: <cover.1416931258.git.robin.murphy@arm.com>
- <90240865e7cc00d0f7e471605ba9d2478b81ea88.1416931258.git.robin.murphy@arm.com>
-Message-ID: <54757A20.2090609@huawei.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 26 Nov 2014 07:04:26 +0000 (UTC)
+Subject: [RFC PATCH] ARM: DRA: hwmod: RTC: Add reset function for RTC
+In-Reply-To: <5473FF68.3070805@ti.com>
+References: <1416199402-3865-1-git-send-email-lokeshvutla@ti.com>
+ <546DB513.6000104@ti.com>
+ <alpine.DEB.2.02.1411201644470.9204@utopia.booyaka.com>
+ <5473FF68.3070805@ti.com>
+Message-ID: <alpine.DEB.2.02.1411260649330.16047@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/26 1:27, Robin Murphy wrote:
-> In preparation for sharing the IOVA allocator, build it for all
-> IOMMU API users.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/Makefile | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
-> index 16edef7..9f7910b 100644
-> --- a/drivers/iommu/Makefile
-> +++ b/drivers/iommu/Makefile
-> @@ -1,4 +1,4 @@
-> -obj-$(CONFIG_IOMMU_API) += iommu.o
-> +obj-$(CONFIG_IOMMU_API) += iommu.o iova.o
+Hi Lokesh 
 
-I'm not a maintainer, so just code review comment.
+On Tue, 25 Nov 2014, Lokesh Vutla wrote:
 
-I don't known whether or not you will apply iova to all iommu drivers. But if only x86 and arm/arm64,
-it's no good to force other iommu drivers to include iova.o, because they have not used it yet.
+> Hi Paul,
+> On Thursday 20 November 2014 10:26 PM, Paul Walmsley wrote:
+> > On Thu, 20 Nov 2014, Lokesh Vutla wrote:
+> > 
+> >> On Monday 17 November 2014 10:13 AM, Lokesh Vutla wrote:
+> >>> RTC IP have kicker feature which prevents spurious writes to its registers.
+> >>> In order to write into any of the RTC registers, KICK values has te be
+> >>> written to KICK registers. Currently hwmod is updating the IDLEMODE in rtc
+> >>> sysconfig register without writing into any kick register which is a noop.
+> >>> When autoidle is allowed for rtc, interruts are not received until IDLEMODE
+> >>> is set to SIDLE_SMART_WKUP.
+> >>> Adding a reset function to unlock RTC registers so that IDLEMODE is
+> >>> updated.
+> >> Ping..!!
+> >> Is this patch acceptable?
+> > 
+> > Lokesh
+> > 
+> > 1. This looks like a fix.  Is this intended to go in as a v3.18-rc patch, 
+> > or against v3.19?  If so it would be very helpful for the maintainers if 
+> > you were to state that somewhere.
+> Yes. This is a fix, intended to go in 3.18-rc. Sorry should have
+> mentioned it.
 
-Maybe it's good to define a new config, like CONFIG_IOMMU_IOVA.
+A few questions.  Do you know when this problem started (in terms of 
+kernel versions)?
 
-config INTEL_IOMMU
-	select IOMMU_IOVA
+Also: the patch description states that this is only a problem when 
+autoidle is allowed for RTC.  What enables autoidle for RTC - the RTCSS 
+driver?  Or does hwmod wind up doing this after the RTCSS driver unlocks 
+it?
 
-config ARM_SMMU
-	select IOMMU_IOVA
+> > 2. Your patch unlocks the RTC registers, but never relocks it.  This seems 
+> > to defeat the point of the spurious write protection.  Shouldn't your 
+> > patch only unlock the RTC immediately before the hwmod code touches the 
+> > RTC registers, and then relock it immediately afterwards, per SPRUHZ6 
+> > section 23.4.3.3?  If so then the .reset function pointer is the wrong 
+> > place for this; I would suggest adding some .lock and .unlock function 
+> > pointers that are to be called before and after any register write to the 
+> > IP block.
+> Yeah I agree with you.
+> Currently rtc driver unlocks these kick registers in probe and leaves it unlocks for
+> further use.
+> But if hwmod does unlock and lock for every sysconfig write driver should also
+> implement unlock and lock for every rtc register write, which adds an extra overhead.
+> I am not sure if some one writes into rtc registers other than hwmod and driver.
+> IMO we can leave it unlocked as the driver does.
 
-obj-$(CONFIG_IOMMU_IOVA) += iova.o
+I would think that the best approach would be to set up .lock and .unlock 
+function pointers, then add a temporary hwmod flag that, if set, would 
+prevent the .lock function from ever being called.  Then once the driver 
+is fixed, that flag can be dropped.
 
->  obj-$(CONFIG_IOMMU_API) += iommu-traces.o
->  obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
->  obj-$(CONFIG_OF_IOMMU)	+= of_iommu.o
-> @@ -7,7 +7,7 @@ obj-$(CONFIG_AMD_IOMMU) += amd_iommu.o amd_iommu_init.o
->  obj-$(CONFIG_AMD_IOMMU_V2) += amd_iommu_v2.o
->  obj-$(CONFIG_ARM_SMMU) += arm-smmu.o
->  obj-$(CONFIG_DMAR_TABLE) += dmar.o
-> -obj-$(CONFIG_INTEL_IOMMU) += iova.o intel-iommu.o
-> +obj-$(CONFIG_INTEL_IOMMU) += intel-iommu.o
->  obj-$(CONFIG_IPMMU_VMSA) += ipmmu-vmsa.o
->  obj-$(CONFIG_IRQ_REMAP) += intel_irq_remapping.o irq_remapping.o
->  obj-$(CONFIG_OMAP_IOMMU) += omap-iommu.o
-> 
+> > 3. Your macros don't mention DRA7xx specifically.  Does this sequence 
+> > apply to some other TI chips, or just DRA7xx?  Please document this in a 
+> > comment above the macros, and possibly change the name of the macros to 
+> > refer to DRA7XX.
+> This sequence applies to AM43xx and AM33xx also. So made it generic.
+> Ill document it.
+
+OK but it would need more than just documentation, right?  Wouldn't the 
+hwmod data also need to be modified for AM33xx/AM43xx to add the .reset 
+function pointer?  Any reason why folks wouldn't have seen this problem on 
+AM33xx/AM43xx?
+
+
+- Paul
