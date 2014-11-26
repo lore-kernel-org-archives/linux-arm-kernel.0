@@ -1,62 +1,66 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 26 Nov 2014 10:13:39 +0200
-Subject: [PATCH v3 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
- extensions
-In-Reply-To: <5474880F.8040908@redhat.com>
-References: <1416309051-26784-1-git-send-email-hdegoede@redhat.com>
- <1416309051-26784-3-git-send-email-hdegoede@redhat.com>
- <547476DA.2030004@ti.com> <54747B72.1050406@redhat.com>
- <54747DCF.9010502@ti.com> <5474824F.8080000@redhat.com>
- <5474863A.5040801@ti.com> <5474880F.8040908@redhat.com>
-Message-ID: <54758BB3.9090008@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 26 Nov 2014 03:16:37 -0500
+Subject: [PATCH v11 0/2] irqchip: add support for GICv2m MSI controller
+In-Reply-To: <1416941243-7181-1-git-send-email-marc.zyngier@arm.com>
+References: <1416941243-7181-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20141126081637.GE22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/14 15:45, Hans de Goede wrote:
-
->> Wouldn't
->>
->> compatible = "allwinner,sun4i-simple-framebuffer", "simple-framebuffer";
->>
->> tell that it's a simple-framebuffer, with allwinner's sun4i extensions?
->>
->> I guess you can have just "allwinner,simple-framebuffer", and then if a
->> new Allwinner SoC has a totally different display controller, the
->> documentation would specify that this property is for that SoC, and this
->> another property is for that another SoC. But isn't the compatible
->> string what's supposed to use in cases like this?
+On Tue, Nov 25, 2014 at 06:47:21PM +0000, Marc Zyngier wrote:
+> GICv2m is a very simple addition to the standard GICv2 interrupt
+> controller, offering a way to convert writes from a device to a
+> "wire-like" interrupt. Basically what we need to support MSI on the
+> GIC.
 > 
-> The only soc specific thing in the binding is the pipeline property string
-> values, and we can always add new values to that, the rest is all generic,
-> as simplefb is generic.
+> The v2m widget exposes a "frame", containing a read-only register
+> describing the range of interrupts that are MSI-capable, as well as a
+> doorbell that the device can kick to generate the interrupt. All the
+> rest of the infrastructure is provided by the GIC itself (enabling,
+> routing, ack/eoi...). This makes an ideal case for stacked irq
+> domains.
+> 
+> These patches were originally written by Suravee, but I've converted
+> them to the stacked irq domains. As this turned out to be quite a
+> sizeable rewrite of the original code, please blame me for any issue
+> in this code, and not Suravee.
+> 
+> Unsurprisingly, there is quite a long dependency chain here. You need:
+> - Jiang's stacked domain patches, from tip/irq/irqdomain
+> - The first patch in my GICv3 ITS series:
+>   https://lkml.org/lkml/2014/11/24/409
+> - The first patch in Yingjoe's sysirq series:
+>   https://lkml.org/lkml/2014/11/25/130
+> 
+> For everyone's convenience, I have a branch containing all that, and
+> much more:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/v2m
+> 
+> This has been fairly heavily tested on an arm64 platform driving a
+> pair of igb interfaces.
+> 
+> From v10:
+> - Rewrote the driver to solely rely on irq domains, and not the
+> setup_irq/teardown_irq methods that were used before (similar to what
+> has been done for the GICv3 ITS).
+> 
+> Suravee Suthikulpanit (2):
+>   irqchip: gicv2m: Add support for ARM GICv2m MSI(-X) doorbell
+>   irqchip: gicv2m: Add DT bindings for GICv2m
+> 
+>  Documentation/devicetree/bindings/arm/gic.txt |  53 ++++
+>  arch/arm64/Kconfig                            |   1 +
+>  drivers/irqchip/Kconfig                       |   6 +
+>  drivers/irqchip/Makefile                      |   1 +
+>  drivers/irqchip/irq-gic-v2m.c                 | 333 ++++++++++++++++++++++++++
+>  drivers/irqchip/irq-gic.c                     |   4 +
+>  include/linux/irqchip/arm-gic.h               |   2 +
+>  7 files changed, 400 insertions(+)
+>  create mode 100644 drivers/irqchip/irq-gic-v2m.c
 
-The thing I don't understand is that the compatible string states that
-"this covers all Allwinner SoCs", even if we have no idea what kind of
-SoCs those may be. And if it covers all kinds of SoCs, then it might as
-well be fully generic, not Allwinner specific.
+Both added to irqchip/core
 
-And if it's not fully generic, then having it cover all possible
-Allwinner SoCs doesn't make sense either.
+thx,
 
-> As said Ian Campbell, Grant and me have decided on using this, and
-> currently
-> patches are already queued up for both the dts files and u-boot to use
-> this,
-> so unless there are really strong reasons to change it at this point I
-> would
-> prefer to keep this as is.
-
-Ok. Well, as I said, it does not look correct to me, but if everybody
-else agrees on it (and I see I didn't get any replies during the night),
-I'll be applying this today.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141126/1f5ca4bb/attachment.sig>
+Jason.
