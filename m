@@ -1,107 +1,86 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Thu, 27 Nov 2014 00:01:44 +0100
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141126200806.GO2817@atomide.com>
-References: <20141027200008.GR2560@atomide.com> <201411262022.03338@pali>
- <20141126200806.GO2817@atomide.com>
-Message-ID: <201411270001.44871@pali>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 26 Nov 2014 15:05:53 -0800
+Subject: [PATCH] clk: rockchip: rk3288 export i2s0_clkout for use in DT
+In-Reply-To: <13759993.X1UzQR0utx@diego>
+References: <1416381319-31117-1-git-send-email-sonnyrao@chromium.org>
+ <13759993.X1UzQR0utx@diego>
+Message-ID: <CAD=FV=W_t813jFgPgkxq7g3Bn5+MHj_t-G7=OP4xFmDnaMjF7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 November 2014 21:08:06 Tony Lindgren wrote:
-> * Pali Roh?r <pali.rohar@gmail.com> [141126 11:24]:
-> > On Wednesday 26 November 2014 20:10:28 Tony Lindgren wrote:
-> > > * Pali Roh?r <pali.rohar@gmail.com> [141126 10:59]:
-> > > > On Wednesday 26 November 2014 19:19:35 Tony Lindgren 
-wrote:
-> > > > > Maybe Pali can try to restart that discussion? To me
-> > > > > it seems the /proc/cpuinfo should be the same as it's
-> > > > > a user interface. Sorry forgot the details of the
-> > > > > previous discussion..
-> > > > 
-> > > > Yes, two days ago I again wrote emails about this
-> > > > problem...
-> > > > 
-> > > > E.g. one of them, see:
-> > > > https://lkml.org/lkml/2014/11/24/774
-> > > > 
-> > > > > And with which app was that? Sorry I forgot..
-> > > > 
-> > > > More applications/libraries for N900 which running on
-> > > > Maemo 5 system. Some of them are Nokia proprietary,
-> > > > some of them are open source and some are mine.
-> > > > 
-> > > > Basically problem is that non DT boot provides this info
-> > > > in /proc/cpuinfo:
-> > > > 
-> > > > Hardware        : Nokia RX-51 board
-> > > > Revision        : 0012
-> > > > 
-> > > > New DT boot provides this:
-> > > > 
-> > > > Hardware        : Generic OMAP3 (Flattened Device Tree)
-> > > > Revision        : 0000
-> > > 
-> > > Oh you can easily fix that by adding a n900 specific
-> > > DT_MACHINE_START entry to mach-omap2/board-generic.c.
-> > 
-> > I would like to see some solution which does not depend on
-> > distributing addition patch which will not be in mainline
-> > kernel...
-> 
-> Yes mainline of course. Maybe you misunderstood what I was
-> suggesting, maybe try the attached patch to fix the "Hardware"
-> line problem in /proc/cpuinfo?
-> 
+Heiko,
 
-With your patch I'm getting:
+On Wed, Nov 26, 2014 at 10:09 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> Hi Sonny,
+>
+> Am Dienstag, 18. November 2014, 23:15:19 schrieb Sonny Rao:
+>> This exposes the clock that comes out of the i2s block which generally
+>> goes to the audio codec.
+>>
+>> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+>> ---
+>>  drivers/clk/rockchip/clk-rk3288.c      | 3 ++-
+>>  include/dt-bindings/clock/rk3288-cru.h | 1 +
+>>  2 files changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clk/rockchip/clk-rk3288.c
+>> b/drivers/clk/rockchip/clk-rk3288.c index 2327829..8777737 100644
+>> --- a/drivers/clk/rockchip/clk-rk3288.c
+>> +++ b/drivers/clk/rockchip/clk-rk3288.c
+>> @@ -305,7 +305,8 @@ static struct rockchip_clk_branch rk3288_clk_branches[]
+>> __initdata = { RK3288_CLKGATE_CON(4), 2, GFLAGS),
+>>       MUX(0, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
+>>                       RK3288_CLKSEL_CON(4), 8, 2, MFLAGS),
+>> -     COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, CLK_SET_RATE_PARENT,
+>> +     COMPOSITE_NODIV(SCLK_I2S0_OUT, "i2s0_clkout", mux_i2s_clkout_p,
+>> +                     CLK_SET_RATE_PARENT,
+>
+> this patch fails to apply, as the current i2s_clkout definition does not have
+> the CLK_SET_RATE_PARENT yet. I'm not sure if I missed a patch somewhere but my
+> search in my inbox for _not yet handled_ patches has come up empty so far.
 
-Hardware        : Nokia RX-51 board
+I don't think it has been sent.
 
-So patch is good.
 
-> > For this problem I proposed patch (which was rejected):
-> > https://lkml.org/lkml/2014/6/18/853
-> 
-> Yes I think that should continue as a separate discussion
-> too if there are other differences in /proc/cpuinfo.
-> 
-> > Basically Hardware is used to check if application is
-> > running on Nokia N900 or not. Also entry from Hardware is
-> > appended to Web browser user agent and some internet
-> > services using it as identifier (N900 device).
-> > 
-> > > The revision entry you can populate too in pdata-quirks.c,
-> > > or maybe add something generic to populate it based on the
-> > > cmdline or a dts entry as I believe that comes from the
-> > > legacy ATAGs. I think that's just the system_rev or some
-> > > other *_rev global in the kernel.
-> > 
-> > Revision comes from bootloader (via ATAG) and it is HW
-> > revision of N900 device. It cannot be hardcoded into kernel
-> > or DTS as it it depends on HW.
-> 
-> Well for the "Revision" line problem, we could pass the
-> revision in cmdline or .dts if not passed in the legacy
-> ATAGs. It sounds like were just not copying it to system_rev
-> for DT based booting? Maybe it's just some missing
-> CONFIG_ATAG option that needs to be enabled?
-> 
-> Regards,
-> 
-> Tony
-> 
+> But having CLK_SET_RATE_PARENT there will probably cause problems anyway.
+> i2s0_clkout is sourced by either i2s_pre or xin12m. i2s_pre also is the source
+> for the core SCLK_I2S0 going to the i2s controller. So having both SCLK_I2S0
+> and (the new) SCLK_I2S0_OUT fiddling with the i2s_pre rate calls for trouble.
+>
+> So I think the i2s0_clkout should limit itself to selecting the best frequency
+> from its sources without changing i2s_pre.
 
-Yes it looks like DT code does not read Revision ATAG... I tried 
-to enable everything but always same problem...
+Probably this is my fault.  At some point I had the thought process
+that this might be a nice way to make it so that we didn't need to add
+special handling to the i2s driver.  AKA, we wouldn't need
+<https://patchwork.kernel.org/patch/5334971/>.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/a7a93e38/attachment.sig>
+See my comments on
+<https://chromium-review.googlesource.com/#/c/230347/3>.  For those
+that don't want to follow links, that would be:
+
+> An alternative that might require no code changes to the i2s driver (untested!):
+>
+> clock-names = "i2s_hclk", "i2s_clk";
+> clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0_CLKOUT>;
+> assigned-clocks = <&cru SCLK_I2S0>, <&cru SCLK_I2S0_OUT>;
+> assigned-clock-parents = <&cru SCLK_I2S0>;
+>
+> Then you'd add CLK_SET_RATE_PARENT to SCLK_I2S0_CLKOUT.
+> You might need to disable the auto-remuxing on SCLK_I2S0_CLKOUT too.
+>
+> Basically the idea is to pass the child in as the main clock and the parent will
+> get set implicitly.
+>
+> I have no idea if that's better or worse than what you have here...
+
+I'm no longer convinced that's a good idea, so we should just axe the
+CLK_SET_RATE_PARENT.
+
+
+If timing is working out well and Sonny isn't available to spin this
+right now (it's Thanksgiving holidays here in the US), I doubt he
+would mind if you fixed up the patch and submitted it.
+
+
+-Doug
