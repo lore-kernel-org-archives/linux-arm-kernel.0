@@ -1,64 +1,91 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Nov 2014 17:11:40 +0000
-Subject: [PATCHv6 4/8] arm64: Move some head.text functions to executable
- section
-In-Reply-To: <20141126163027.GC1819@leverpostej>
-References: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
- <1416606645-25633-5-git-send-email-lauraa@codeaurora.org>
- <20141126163027.GC1819@leverpostej>
-Message-ID: <20141126171140.GN14866@arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 26 Nov 2014 18:12:42 +0100
+Subject: Again about leds-pwm and pwm-mxs
+Message-ID: <20141126171242.GO4431@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 04:30:27PM +0000, Mark Rutland wrote:
-> On Fri, Nov 21, 2014 at 09:50:41PM +0000, Laura Abbott wrote:
-> > The head.text section is intended to be run at early bootup
-> > before any of the regular kernel mappings have been setup.
-> > Parts of head.text may be freed back into the buddy allocator
-> > due to TEXT_OFFSET so for security requirements this memory
-> > must not be executable. The suspend/resume/hotplug code path
-> > requires some of these head.S functions to run however which
-> > means they need to be executable. Support these conflicting
-> > requirements by moving the few head.text functions that need
-> > to be executable to the text section which has the appropriate
-> > page table permissions.
-> > 
-> > Tested-by: Kees Cook <keescook@chromium.org>
-> > Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> 
-> Other than a minor nit below this looks good to me, and I'm not seeing
-> any issues with boot, hotplug, or idle, so:
-> 
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> Tested-by: Mark Rutland <mark.rutland@arm.com>
-> 
-> Thanks for putting this together!
-> 
-> > ---
-> > v6: Dropped the latehead.text bit and just moved everything to the regular
-> > text section
-> > ---
-> >  arch/arm64/kernel/head.S | 407 ++++++++++++++++++++++++-----------------------
-> >  1 file changed, 210 insertions(+), 197 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> > index 10f5cc0..4b63d7a 100644
-> > --- a/arch/arm64/kernel/head.S
-> > +++ b/arch/arm64/kernel/head.S
-> > @@ -238,7 +238,13 @@ ENTRY(stext)
-> >         mov     x0, x22
-> >         bl      lookup_processor_type
-> >         mov     x23, x0                         // x23=current cpu_table
-> > -       cbz     x23, __error_p                  // invalid processor (x23=0)?
-> > +       /*
-> > +        *      __error_p may end up out of range for cbz if text areas
-> > +        *      are aligned up to section sizes
-> > +        */
-> 
-> Nit: We don't need to align the comment text (we don't for the comment a
-> few lines later, or any others in this file). It would be nice to keep
-> that consistent.
+Hello,
 
-Applied with this fixup.
+two years ago I addressed the issue that on i.MX28 a led connected to a
+pwm-mxs device doesn't go off when brightness is set to 0. I tried again
+later to find an acceptable solution.
+(Links to respective threads:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/282593/focus=282596)
+http://thread.gmane.org/gmane.linux.kernel/1381289
+)
 
-Will
+The technical side is well understood: The problem is that leds-pwm does
+the following:
+
+	pwm_config(led_dat->pwm, new_duty, led_dat->period);
+
+	if (new_duty == 0)
+		pwm_disable(led_dat->pwm);
+	else
+		pwm_enable(led_dat->pwm);
+
+On i.MX28 reconfiguring the duty cycle only takes effect after the
+current period is over. That means that if the previous configuration
+was duty=period (i.e. "on") the likely outcome of the above sequence
+with new_duty=0 is that setting the duty cycle to 0 is scheduled but the
+current period never ends because the clock is stopped. So the led keeps
+being on.
+
+Now we need a settlement in which way this should be fixed.
+There are several possibilities, roughly in order of my preference:
+ a) Declare the pin state after pwm_disable as undefined
+    In this case the leds-pwm driver must not call pwm_disable when
+    expecting a certain brightness (here: off).
+    A nice follow-up is then to patch the drivers that work the way the
+    leds-pwm author expected to call their equivalent of pwm_disable
+    themselves on new_duty=0.
+ b) Let pwm_config return at once, implement the waiting in a new call
+    pwm_sync() that either busy-loops or sleeps until the configuration
+    is 
+ c) Make the call to pwm_config for pwm-mxs block until the new period
+    started.
+ d) Make the call to pwm_config for pwm-mxs sleep until the new period
+    started.
+    (Not sure this works nicely because IIRC there is no irq available
+    that triggers accordingly.)
+ e) In pwm_disable detect that there is a reconfiguration pending and
+    block accordingly.
+ f) Extend the PWM-API to differentiate the two variants of pwm_config
+    E.g. make pwm_config sleep/busy-looping until the requested config is
+    active plus a new function pwm_config_schedule.
+
+Back then Sascha and Matt also prefered a). The obvious downside of a)
+is that most people expect pwm_disable implying a constant 0. The
+obvious advantage of a) is that it's the simplest alternative and also
+works best when there are board specific inverters involved or the pwm
+supports built-in inversion.
+
+b) looks quite natural to me. It could implemented simply as:
+
+	void pwm_sync(..)
+	{
+		if (driver->sync)
+			driver->sync(...)
+	}
+
+and so nothing has to be done for drivers that apply a reconfiguration
+instantly.
+
+For all alternatives from b) to f) the result of calling pwm_disable
+should be specified to yield a 0 output (maybe only iff the configured
+duty is 0?). I don't know many pwm hardware cores but this might be
+unnatural for some of them?
+
+I consider f) only a theoretical alternative because it makes life
+harder for both pwm-driver writers and consumers.
+
+It would be nice to be able to close this case finally after two years.
+How can we determine which alternative to pick? Thierry?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
