@@ -1,90 +1,47 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 26 Nov 2014 22:19:03 +0000
-Subject: [PATCH v2 1/2] of: add optional options parameter to
- of_find_node_by_path()
-In-Reply-To: <CACxGe6tQ5rWzCUcS+_fFY+rjEyua2khApAoCVKpTuJAghU=N_w@mail.gmail.com>
-References: <1417023640-23464-1-git-send-email-leif.lindholm@linaro.org>
- <1417023640-23464-2-git-send-email-leif.lindholm@linaro.org>
- <CACxGe6tQ5rWzCUcS+_fFY+rjEyua2khApAoCVKpTuJAghU=N_w@mail.gmail.com>
-Message-ID: <20141126221903.GI2361@bivouac.eciton.net>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu, 27 Nov 2014 02:19:36 +0400
+Subject: [PATCH V2 3/5] usb: gadget: pxa25x_udc: prepare/unprepare clocks
+ in pxa-ssp
+In-Reply-To: <874mtl3936.fsf@free.fr>
+References: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
+ <1416236863-20898-3-git-send-email-dbaryshkov@gmail.com>
+ <878uj98y5v.fsf@free.fr>
+ <CALT56yMCJ4R6KN2BUW61YaUz2bb6s_aJteKYBSVmvRPKacKCLw@mail.gmail.com>
+ <CALT56yO8tktrXo0rfRd91AtXBE4F5vYfYjm9AL+7dcoam6Oq9Q@mail.gmail.com>
+ <87egsz6ija.fsf@free.fr> <87sihb49vm.fsf@free.fr>
+ <CALT56yMVjRC4YhWsc9d_i0mVrHyv8XV=Sw2op=xsdR5izv1tHg@mail.gmail.com>
+ <87lhn340i1.fsf@free.fr>
+ <CALT56yP1OGWQd5i+H+4uFkZD4AqdtF7J1+Lme76UgLgVfycQ4w@mail.gmail.com>
+ <87h9xr3z35.fsf@free.fr>
+ <CALT56yMUQDZV5=dn_Hm7jNS5NQXj7ewXcB2LsGvTbCOuoio7JQ@mail.gmail.com>
+ <87d28d3uh5.fsf@free.fr> <874mtl3936.fsf@free.fr>
+Message-ID: <CALT56yMCCy6qPRQVpt=4JQ0Kd1Fr43j894TgOAPi8a2eKKve0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 09:06:33PM +0000, Grant Likely wrote:
-> On Wed, Nov 26, 2014 at 5:40 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> > Update of_find_node_by_path():
-> > 1) Ignore any part of the path beyond and including the ':' separator.
-> > 2) Set the new provided pointer argument to the beginning of the string
-> >    following the ':' separator.
-> >
-> > Coccinelle fixup using:
-> >
-> > @@
-> > expression E1;
-> > @@
-> >
-> > - of_find_node_by_path(E1)
-> > + of_find_node_by_path(E1, NULL)
-> >
-> > drivers/of/resolver.c manually updated, since spatch fails to parse
-> > it correctly.
-> >
-> > Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> 
-> Okay, so you're probably going to kill me for the next comment...
-> After actually looking at this I can see that it's going to be a hard
-> patch to merge because of conflicts. It will need to be merged at the
-> end of a merge window to catch all the users, but that will mean that
-> the important part of the patch won't be able to be queued up in
-> linux-next.
+2014-11-27 1:12 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
+> OK Dmitry, I pulled through, the interrupts are working back.
 
-Not to worry - I'll simply keep this to guilt trip you with at some
-point in the future.
+What was the problem? Hardware issues? Firmware in CPLD being of old
+revision?
 
-Seeing get_maintainer take 1m42s on a quad-i7 with the entire kernel
-tree in disk cache was nearly reward enough :)
+> Actually one of the blockers I have is in pxa25x_udc, and it is also in your
+> phy-lubbock.c. The bottom of the error is that disable_irq() is called from
+> within a irq handler, and it deadlocks. A disable_irq_nosync() should be used
+> ...
+>
+> ... but a better approach would be to use a threaded irq for vbus handling. I
+> think that way disable_irq() can be used, no workqueue is needed anymore in
+> phy-lubbock.
+>
+> Would you make that change, I'll test it and review it.
 
-> So you were right the first time around. Create a new function name
-> that adds the extra argument and make of_find_node_by_path() a static
-> inline wrapper. That way I can queue it up into linux-next immediately
-> and the cleanup across the tree can be generated and submitted at the
-> very end of the merge window.
+OK, I will take a look in a next few days.
 
-That will also make it a lot less invasive to potentially get it
-backported to debian-kernel, so we can have this support for the
-Jessie installer.
+BTW: I have also received a pxa270 board (Sophia Sandgate II, the one
+without the additional graphics accelerator), so after spending some efforts
+on bringup & bsp, I should be able to also test pxa270 code.
 
-I'll whip that up tomorrow morning.
-
-/
-    Leif
-
-> > @@ -380,7 +380,8 @@ static inline struct device_node *of_find_matching_node_and_match(
-> >         return NULL;
-> >  }
-> >
-> > -static inline struct device_node *of_find_node_by_path(const char *path)
-> > +static inline struct device_node *of_find_node_by_path(const char *path,
-> > +       char **opts)
-> 
-> const char **opts
-> 
-> >  {
-> >         return NULL;
-> >  }
-> > diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-> > index e695517..0056963 100644
-> > --- a/sound/soc/fsl/fsl_ssi.c
-> > +++ b/sound/soc/fsl/fsl_ssi.c
-> > @@ -1427,7 +1427,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
-> >          * device tree.  We also pass the address of the CPU DAI driver
-> >          * structure.
-> >          */
-> > -       sprop = of_get_property(of_find_node_by_path("/"), "compatible", NULL);
-> > +       sprop = of_get_property(of_find_node_by_path("/", NULL), "compatible", NULL);
-> >         /* Sometimes the compatible name has a "fsl," prefix, so we strip it. */
-> >         p = strrchr(sprop, ',');
-> >         if (p)
-> > --
-> > 1.7.10.4
-> >
+-- 
+With best wishes
+Dmitry
