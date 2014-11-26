@@ -1,47 +1,31 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 26 Nov 2014 13:48:32 +0100
-Subject: [PATCH v4] clocksource: arch_timer: Allow the device tree to
- specify uninitialized timer registers
-In-Reply-To: <5475C802.4050903@linaro.org>
-References: <1412753627-28287-1-git-send-email-sonnyrao@chromium.org>
- <4822206.0yqmIumDEc@diego> <5475C802.4050903@linaro.org>
-Message-ID: <11522840.iniX5CHHHk@diego>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 26 Nov 2014 13:47:17 +0100
+Subject: [PATCH v2] ARM: sa1100: improve irq handling
+In-Reply-To: <1416942592-23059-1-git-send-email-dbaryshkov@gmail.com>
+References: <1416942592-23059-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <CACRpkdYQe8PKa0Cssns_yUGrG_snuJr6zbzc7HEpXiDMXZjKTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 26. November 2014, 13:30:58 schrieb Daniel Lezcano:
-> On 11/26/2014 01:06 PM, Heiko St?bner wrote:
-> > Hi Daniel,
-> > 
-> > Am Mittwoch, 26. November 2014, 12:51:08 schrieb Daniel Lezcano:
-> >> Hi Doug, Olof,
-> >> 
-> >> IIUC, it sounds like this patch is needed from some other patches in
-> >> arm-soc. Olof was proposing to take this patch through its tree to
-> >> facilitate the integration.
-> >> 
-> >> Olof, is it this patch you were worried about ?
-> > 
-> > I think this is one of two patches in question.
-> > 
-> > "clocksource: arch_timer: Fix code to use physical timers when requested"
-> > [0] would be the second one.
-> > 
-> > And the patch for arm-soc that Olof means would be "ARM: dts: rk3288: add
-> > arm,cpu-registers-not-fw-configured" [1].
-> 
-> Ok, so IIUC, "clocksource: arch_timer: Fix code to use physical timers
-> when requested" should go via arm's tree, right ?
+On Tue, Nov 25, 2014 at 8:09 PM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
 
-If I'm reading Olof's irc-comments from yesterday correctly, that is right and 
-the 3 patches should go in together:
+> This patch series makes sa1100 platform use MULTI_IRQ_HANDLER and irq
+> domains to handle interrupts on StrongARM platform. Also virtual irq
+> numbers are changed to start from 1 rather than 0. It doesn't change
+> the way how Linux programs the hardware, only software interfaces are
+> changed.
+>
+> Changes since v1:
+> - Start IRQs from 1, freeing IRQ 0
+> - Merge identical functions in the last patch
+> - Other minor changes.
 
-- "clocksource: arch_timer: Fix code to use physical timers
-  when requested" fixes the use of physical timers in general
-- "clocksource: arch_timer: Allow the device tree to specify uninitialized
-  timer registers" allows this to be set from dt
-- "ARM: dts: rk3288: add arm,cpu-registers-not-fw-configured" enables this on
-  rk3288
+Applied all patches and tested on h3600 on top of v3.18-rc6.
 
+Works like a charm.
 
-Heiko
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
