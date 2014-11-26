@@ -1,43 +1,65 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 26 Nov 2014 19:35:39 +0100
-Subject: [PATCH resend v4 0/3] clk: sun6i: Unify AHB1 clock and fix rate
- calculation
-In-Reply-To: <1416986214-4861-1-git-send-email-wens@csie.org>
-References: <1416986214-4861-1-git-send-email-wens@csie.org>
-Message-ID: <20141126183539.GI25249@lukather>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 26 Nov 2014 13:41:20 -0500 (EST)
+Subject: [PATCH] ARM: exynos_defconfig: disable CONFIG_EXYNOS5420_MCPM;
+ not stable
+In-Reply-To: <7hmw7dg81l.fsf@deeprootsystems.com>
+References: <1414796382-5447-1-git-send-email-khilman@kernel.org>
+ <000e01cffb39$5ef0a2d0$1cd1e870$@kernel.org>
+ <7hegtaq26c.fsf@deeprootsystems.com>
+ <CAMAWPa-mLAFL7v8hHA5R-eBzpMFK-E-xcvjoV8Bn6tTwgP53Uw@mail.gmail.com>
+ <CAOesGMhvTDN4J6AdUDHKV0Sp4NT6a4QEMUDWOayQqhhD+C4acw@mail.gmail.com>
+ <CAMAWPa-sz5jT9izEONVZR2Z4mzuivKaNHSgyR+eP13tWZ84hYw@mail.gmail.com>
+ <CAOesGMgSkJ8xkBgN7OpuDzT=ehaAd6kvbx5_tC50x78pvpkTwg@mail.gmail.com>
+ <CAOesGMh-7md4PdQX1Wvk0jO+87j+fxSvBnVD_osjNd2zQ4L43w@mail.gmail.com>
+ <044101d00852$3f421420$bdc63c60$@kernel.org>
+ <CAMAWPa-qk0DEmPNz5LZgJq9AuGhRxuY00XwxtEikt_vh-iozVg@mail.gmail.com>
+ <CAM4voa==Ram0xXTL=SnKktyRt7VFphQxBJgcf9Yi9Zio0QctHw@mail.gmail.com>
+ <7hvbm2ixmo.fsf@deeprootsystems.com>
+ <CAM4voa=budowQ+vnCAQhWj95Hx+yBnRAaDrFrjkQa2ubjrRwUQ@mail.gmail.com>
+ <7hmw7dg81l.fsf@deeprootsystems.com>
+Message-ID: <alpine.LFD.2.11.1411261314310.11690@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 03:16:51PM +0800, Chen-Yu Tsai wrote:
-> Hi everyone,
-> 
-> This is a resend of v4 of the sun6i AHB1 clock unification series.
-> This includes only the 3 patches not yet merged.
-> 
-> This series unifies the mux and divider parts of the AHB1 clock found
-> on sun6i and sun8i, while also adding support for the pre-divider on the
-> PLL6 input.
-> 
-> The rate calculation logic must factor in which parent it is using to
-> calculate the rate, to decide whether to use the pre-divider or not.
-> This is beyond the original factors clk design in sunxi. To avoid
-> feature bloat, this is implemented as a separate composite clk.
-> 
-> The new clock driver is registered with a separate OF_CLK_DECLARE.
-> As it shares its register with the APB1 div clock, thus shares the same
-> spinlock, it cannot reside in a separate file.
+On Wed, 26 Nov 2014, Kevin Hilman wrote:
 
-Queued this for 3.20, thanks!
-Maxime
+> Abhilash Kesavan <kesavan.abhilash@gmail.com> writes:
+> 
+> > Hi Kevin,
+> >
+> > On Wed, Nov 26, 2014 at 6:30 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> >> [...]
+> >>
+> >> More specifically, with only the loopback call to turn off CCI commented
+> >> out, the imprecise aborts go away.
+> >
+> > I can't see how enabling snoops for the boot cluster is causing these
+> > aborts. Perhaps as Krzysztof commented it has something to do with the
+> > secure firmware/tz software on these boards ? Other than there does
+> > not appear to be any difference between the working/non-working
+> > setups.
+> 
+> Perhaps the secure firmware is preventing the CCI to be enabled by the
+> kernel, and that is causing the imprecise abort?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141126/ed6b736f/attachment.sig>
+That is well possible.
+
+Now...... if the bootloader/firmware does not let Linux deal with both 
+the CCI and caches then MCPM simply has no more purpose for this board.  
+The whole point of MCPM is actually to handle the CCI properly and the 
+most efficient way despite all the possible races and opportunities for 
+memory corruptions. And yes, this is a complex task.
+
+So there is actually two choices: the firmware let Linux take care of it 
+via the MCPM layer (easy), or the firmware has to implement it all 
+_properly_ (hard) behind an interface such as PSCI, at which point MCPM 
+should be configured out.
+
+If the firmware does not let Linux interact with the CCI _and_ does not 
+implement full MCPM-like services then the platform is broken and only a 
+firmware upgrade could fix that.  It might still be possible to boot all 
+CPUs through other means, but power management would then be severely 
+limited.
+
+
+Nicolas
