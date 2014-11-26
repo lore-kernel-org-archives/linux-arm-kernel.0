@@ -1,57 +1,57 @@
-From: gaku.inami.xw@bp.renesas.com (Gaku Inami)
-Date: Wed, 26 Nov 2014 10:25:54 +0900
-Subject: [PATCH v2] ARM: shmobile: r8a7790 CCI configuration
-In-Reply-To: <5474543A.807@arm.com>
-References: <54743D0F.5080307@bp.renesas.com> <5474543A.807@arm.com>
-Message-ID: <54752C22.7010806@bp.renesas.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 26 Nov 2014 10:31:56 +0900
+Subject: [PATCH 1/2] ARM: shmobile: sh73a0 legacy/reference: Add missing
+ INTCA0 clock for irqpin module
+In-Reply-To: <CAMuHMdV3D8odk0+A5KPgv0yWhFB2KsyKFac8rHm3B=SRUUQ__w@mail.gmail.com>
+References: <1416410820-30020-1-git-send-email-geert+renesas@glider.be>
+ <1416410820-30020-2-git-send-email-geert+renesas@glider.be>
+ <20141125024405.GA21881@verge.net.au>
+ <CAMuHMdW_-Dj8x2+4RG8yGurPsc8oVZVME2UaoU+EOhrxaCQ-4Q@mail.gmail.com>
+ <CAMuHMdV3D8odk0+A5KPgv0yWhFB2KsyKFac8rHm3B=SRUUQ__w@mail.gmail.com>
+Message-ID: <20141126013156.GE17620@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+On Tue, Nov 25, 2014 at 11:16:40AM +0100, Geert Uytterhoeven wrote:
+> On Tue, Nov 25, 2014 at 10:31 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+> > On Tue, Nov 25, 2014 at 3:44 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> On Wed, Nov 19, 2014 at 04:26:59PM +0100, Geert Uytterhoeven wrote:
+> >>> This clock drives the irqpin controller modules.
+> >>> Before, it was assumed enabled by the bootloader or reset state.
+> >>> By making it available to the driver, we make sure it gets enabled when
+> >>> needed, and allow it to be managed by system or runtime PM.
+> >>>
+> >>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >>
+> >> Hi Geert,
+> >>
+> >> should this be considered a fix?
+> >
+> > In some sense this is a fix. But I don't think anyone is suffering from it.
+> > Just poor guys like me who disable all MSTP clocks in early boot code,
+> > to find more missing clock declarations and more drivers that don't manage
+> > their clocks ;-)
+> >
+> >> If so could you cook up some text describing which patch introduced
+> >> this problem in which kernel version.
+> >
+> > I guess that would be:
+> >
+> > commit 341eb5465f67437ad37ef2f6302b581beda4614a
+> > Author: Magnus Damm <damm@opensource.se>
+> > Date:   Tue Feb 26 12:01:09 2013 +0900
+> >
+> >     ARM: shmobile: INTC External IRQ pin driver on sh73a0
+> >
+> > But I don't think it's worth adding that, or do you plan to backport
+> > this to LTSI?
 
-(2014/11/25 19:04), Sudeep Holla wrote:
->
->
-> On 25/11/14 08:25, Gaku Inami wrote:
->> Add the settings of CCI-400 for enabling ca15/ca7 snoop on r8a7790.
->> Needed to configure the CCI boot cluster port regardless of MCPM.
->>
->> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
->> Signed-off-by: Magnus Damm <damm@opensource.se>
->> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->> ---
->>
->> Changes since version 1:
->> - Fix a way to wait for the register read.
->>
->>   arch/arm/mach-shmobile/smp-r8a7790.c |   19 +++++++++++++++++++
->>   1 file changed, 19 insertions(+)
->>
->> diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
->> index 9c3da13..b65d908 100644
->> --- a/arch/arm/mach-shmobile/smp-r8a7790.c
->> +++ b/arch/arm/mach-shmobile/smp-r8a7790.c
->> @@ -25,6 +25,12 @@
->>   #include "pm-rcar.h"
->>   #include "r8a7790.h"
->>
->> +#define CCI_BASE    0xf0090000
->> +#define CCI_SLAVE3    0x4000
->> +#define CCI_SLAVE4    0x5000
->> +#define CCI_SNOOP    0x0000
->> +#define CCI_STATUS    0x000c
->> +
->
-> I have asked the same question multiple times in the past, why are you
-> not using the DT bindings and the CCI driver for this ? Why are you
-> duplicating the code ? Any limitations to use them ?
->
-Thank you for your feedback.
-I will consider to use the DT bindings and the CCI driver.
+Thanks. My main motivation for asking is that Olof asked about some
+recent patches that looked like fixes. So I am trying to be a bit
+better at breaking out fixes and documenting them appropriately.
 
-Regards,
-Inami
+> Seeing the similar fix for r8a7740 has landed in backports, I now assume
+> you will ;-)
 
-> Regards,
-> Sudeep
->
+Yes, I plan to backport this at some point.
