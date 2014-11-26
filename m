@@ -1,93 +1,103 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 26 Nov 2014 17:39:31 +0800
-Subject: [PATCH 4/5] ARM: dts: sun6i: Add sun6i-a31s.dtsi
-In-Reply-To: <547597C7.5070005@redhat.com>
-References: <1416747283-13489-1-git-send-email-hdegoede@redhat.com>
- <1416747283-13489-5-git-send-email-hdegoede@redhat.com>
- <20141125181829.GC25249@lukather>
- <CAGb2v64=M37i0WVBbjOOWCrfP5tcHMr6yE+C6rPiy-sV7__qFQ@mail.gmail.com>
- <547597C7.5070005@redhat.com>
-Message-ID: <CAGb2v66kHvChJw=5jBXGSfGbqnr=hmC1YOyzR-N7EN=AVookLA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 26 Nov 2014 10:41:35 +0100
+Subject: [PATCH v10 02/10] qcom: scm: Add SCM warmboot support for quad
+ core SoCs
+In-Reply-To: <1416593037-27527-3-git-send-email-lina.iyer@linaro.org>
+References: <1416593037-27527-1-git-send-email-lina.iyer@linaro.org>
+ <1416593037-27527-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <5475A04F.9070508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 11/21/2014 07:03 PM, Lina Iyer wrote:
+> Quad core SoCs like APQ8074, APQ8064, APQ8084 need SCM support set up
+> warm boot addresses in the Secure Monitor. Extend the SCM flags to
+> support warm boot addresses for secondary cores.
+>
+> We do not need to export the warmboot flags. Move them into the
+> implementation file.
+>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 
-On Wed, Nov 26, 2014 at 5:05 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 11/26/2014 12:45 AM, Chen-Yu Tsai wrote:
->>
->> On Wed, Nov 26, 2014 at 2:18 AM, Maxime Ripard
->
->
-> <snip>
->
->
->>>> +             ahb1_gates: clk at 01c20060 {
->>>> +                     #clock-cells = <1>;
->>>> +                     compatible = "allwinner,sun6i-a31-ahb1-gates-clk";
->>>> +                     reg = <0x01c20060 0x8>;
->>>> +                     clocks = <&ahb1>;
->>>> +                     clock-output-names = "ahb1_mipidsi", "ahb1_ss",
->>>> +                                     "ahb1_dma", "ahb1_mmc0",
->>>> "ahb1_mmc1",
->>>> +                                     "ahb1_mmc2", "ahb1_mmc3",
->>>> "ahb1_nand1",
->>>> +                                     "ahb1_nand0", "ahb1_sdram",
->>>> +                                     "ahb1_gmac", "ahb1_ts",
->>>> "ahb1_hstimer",
->>>> +                                     "ahb1_spi0", "ahb1_spi1",
->>>> "ahb1_spi2",
->>>> +                                     "ahb1_spi3", "ahb1_otg",
->>>> "ahb1_ehci0",
->>>> +                                     "ahb1_ehci1", "ahb1_ohci0",
->>>> +                                     "ahb1_ohci1", "ahb1_ohci2",
->>>> "ahb1_ve",
->>>> +                                     "ahb1_lcd0", "ahb1_lcd1",
->>>> "ahb1_csi",
->>>> +                                     "ahb1_hdmi", "ahb1_de0",
->>>> "ahb1_de1",
->>>> +                                     "ahb1_fe0", "ahb1_fe1", "ahb1_mp",
->>>> +                                     "ahb1_gpu", "ahb1_deu0",
->>>> "ahb1_deu1",
->>>> +                                     "ahb1_drc0", "ahb1_drc1";
->>>> +             };
->>>
->>>
->>> Are the gates really identical?
->>>
->>> As in not even stripped down?
->>
->>
->> According to the user manuals, the AHB1 gates on the A31s don't have
->> GMAC (or EMAC in the manual) and MIPI DSI listed. Though it seems
->> a lot of A31s hardware out there actually use GMAC.
->
->
-> Hmm, interesting I was focussing on the ohci2 gate when comparing them as
-> the ohci2 is not listed in the pinmux.
->
-> The GMAC clock gate definitely actually is there, as I've an A31s based
-> board
-> with a working GMAC.
->
-> Also Allwinner has confirmed to me that the A31 and A31s are the same die,
-> so
-> there is no reason to differentiate between the 2 at this level. Either we
-> do
-> no differentiation at all, or only at the pinmux level to reflect that
-> certain
-> pins are simply just not there.
->
-> My vote goes to differentiating at the pinmux level.
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-I agree. Since it is confirmed the dies are the same, the hardware
-description should be the same as well, except for the external
-differences (pinmux). Only downside is a slightly bloated DTB
-containing nodes we will never use on the a31s.
++ one comment below
 
-IIRC, Allwinner's kernel treats them as the same as well.
+> ---
+>   drivers/soc/qcom/scm-boot.c | 31 +++++++++++++++++++++++++++++++
+>   include/soc/qcom/scm-boot.h |  3 +--
+>   2 files changed, 32 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
+> index 60ff7b4..0871659 100644
+> --- a/drivers/soc/qcom/scm-boot.c
+> +++ b/drivers/soc/qcom/scm-boot.c
+> @@ -21,6 +21,23 @@
+>   #include <soc/qcom/scm.h>
+>   #include <soc/qcom/scm-boot.h>
+>
+> +#define SCM_FLAG_WARMBOOT_CPU0		0x04
+> +#define SCM_FLAG_WARMBOOT_CPU1		0x02
+> +#define SCM_FLAG_WARMBOOT_CPU2		0x10
+> +#define SCM_FLAG_WARMBOOT_CPU3		0x40
+> +
+> +struct scm_warmboot {
+> +	int flag;
+> +	void *entry;
+> +};
+> +
+> +static struct scm_warmboot scm_flags[] = {
+> +	{ .flag = SCM_FLAG_WARMBOOT_CPU0 },
+> +	{ .flag = SCM_FLAG_WARMBOOT_CPU1 },
+> +	{ .flag = SCM_FLAG_WARMBOOT_CPU2 },
+> +	{ .flag = SCM_FLAG_WARMBOOT_CPU3 },
+> +};
+> +
+>   /*
+>    * Set the cold/warm boot address for one of the CPU cores.
+>    */
+> @@ -37,3 +54,17 @@ int scm_set_boot_addr(phys_addr_t addr, int flags)
+>   			&cmd, sizeof(cmd), NULL, 0);
+>   }
+>   EXPORT_SYMBOL(scm_set_boot_addr);
+> +
+> +int scm_set_warm_boot_addr(void *entry, int cpu)
+> +{
+> +	int ret;
+> +
+> +	if (entry == scm_flags[cpu].entry)
+> +		return 0;
+
+IMO, this test deserves a comment of why this is needed.
+
+> +
+> +	ret = scm_set_boot_addr(virt_to_phys(entry), scm_flags[cpu].flag);
+> +	if (!ret)
+> +		scm_flags[cpu].entry  = entry;
+> +
+> +	return ret;
+> +}
+> diff --git a/include/soc/qcom/scm-boot.h b/include/soc/qcom/scm-boot.h
+> index 6aabb24..529f55a 100644
+> --- a/include/soc/qcom/scm-boot.h
+> +++ b/include/soc/qcom/scm-boot.h
+> @@ -16,9 +16,8 @@
+>   #define SCM_FLAG_COLDBOOT_CPU1		0x01
+>   #define SCM_FLAG_COLDBOOT_CPU2		0x08
+>   #define SCM_FLAG_COLDBOOT_CPU3		0x20
+> -#define SCM_FLAG_WARMBOOT_CPU0		0x04
+> -#define SCM_FLAG_WARMBOOT_CPU1		0x02
+>
+>   int scm_set_boot_addr(phys_addr_t addr, int flags);
+> +int scm_set_warm_boot_addr(void *entry, int cpu);
+>
+>   #endif
+>
 
 
-ChenYu
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
