@@ -1,76 +1,64 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 26 Nov 2014 18:10:29 +0100
-Subject: [PATCH V2] serial: pxa: hold port.lock when reporting modem line
- changes
-In-Reply-To: <1416993716-21005-1-git-send-email-dbaryshkov@gmail.com> (Dmitry
- Eremin-Solenikov's message of "Wed, 26 Nov 2014 12:21:56 +0300")
-References: <1416993716-21005-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <87egsp3n22.fsf@free.fr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 26 Nov 2014 17:11:40 +0000
+Subject: [PATCHv6 4/8] arm64: Move some head.text functions to executable
+ section
+In-Reply-To: <20141126163027.GC1819@leverpostej>
+References: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
+ <1416606645-25633-5-git-send-email-lauraa@codeaurora.org>
+ <20141126163027.GC1819@leverpostej>
+Message-ID: <20141126171140.GN14866@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+On Wed, Nov 26, 2014 at 04:30:27PM +0000, Mark Rutland wrote:
+> On Fri, Nov 21, 2014 at 09:50:41PM +0000, Laura Abbott wrote:
+> > The head.text section is intended to be run at early bootup
+> > before any of the regular kernel mappings have been setup.
+> > Parts of head.text may be freed back into the buddy allocator
+> > due to TEXT_OFFSET so for security requirements this memory
+> > must not be executable. The suspend/resume/hotplug code path
+> > requires some of these head.S functions to run however which
+> > means they need to be executable. Support these conflicting
+> > requirements by moving the few head.text functions that need
+> > to be executable to the text section which has the appropriate
+> > page table permissions.
+> > 
+> > Tested-by: Kees Cook <keescook@chromium.org>
+> > Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> 
+> Other than a minor nit below this looks good to me, and I'm not seeing
+> any issues with boot, hotplug, or idle, so:
+> 
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> Thanks for putting this together!
+> 
+> > ---
+> > v6: Dropped the latehead.text bit and just moved everything to the regular
+> > text section
+> > ---
+> >  arch/arm64/kernel/head.S | 407 ++++++++++++++++++++++++-----------------------
+> >  1 file changed, 210 insertions(+), 197 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> > index 10f5cc0..4b63d7a 100644
+> > --- a/arch/arm64/kernel/head.S
+> > +++ b/arch/arm64/kernel/head.S
+> > @@ -238,7 +238,13 @@ ENTRY(stext)
+> >         mov     x0, x22
+> >         bl      lookup_processor_type
+> >         mov     x23, x0                         // x23=current cpu_table
+> > -       cbz     x23, __error_p                  // invalid processor (x23=0)?
+> > +       /*
+> > +        *      __error_p may end up out of range for cbz if text areas
+> > +        *      are aligned up to section sizes
+> > +        */
+> 
+> Nit: We don't need to align the comment text (we don't for the comment a
+> few lines later, or any others in this file). It would be nice to keep
+> that consistent.
 
-> Both uart_handle_dcd_change() and uart_handle_cts_change() require a
-> port lock to be held and will emit a warning when lockdep is enabled.
-> Held corresponding lock.
->
-> This fixes the following warnings:
->
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 0 at drivers/tty/serial/serial_core.c:2760 uart_handle_dcd_change+0xc8/0xf8()
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper Not tainted 3.18.0-rc5+ #26
-> [<c000dff8>] (unwind_backtrace) from [<c000bc70>] (show_stack+0x10/0x14)
-> [<c000bc70>] (show_stack) from [<c00192ac>] (warn_slowpath_common+0x6c/0x8c)
-> [<c00192ac>] (warn_slowpath_common) from [<c00192e8>] (warn_slowpath_null+0x1c/0x24)
-> [<c00192e8>] (warn_slowpath_null) from [<c0182984>] (uart_handle_dcd_change+0xc8/0xf8)
-> [<c0182984>] (uart_handle_dcd_change) from [<c018625c>] (serial_pxa_irq+0x268/0x3b0)
-> [<c018625c>] (serial_pxa_irq) from [<c004d0d4>] (handle_irq_event_percpu+0x50/0x16c)
-> [<c004d0d4>] (handle_irq_event_percpu) from [<c004d22c>] (handle_irq_event+0x3c/0x5c)
-> [<c004d22c>] (handle_irq_event) from [<c004f7d0>] (handle_level_irq+0x94/0x118)
-> [<c004f7d0>] (handle_level_irq) from [<c004ca0c>] (generic_handle_irq+0x20/0x30)
-> [<c004ca0c>] (generic_handle_irq) from [<c004cbe0>] (__handle_domain_irq+0x38/0x70)
-> [<c004cbe0>] (__handle_domain_irq) from [<c00085c4>] (ichp_handle_irq+0x24/0x34)
-> [<c00085c4>] (ichp_handle_irq) from [<c000c7e4>] (__irq_svc+0x44/0x54)
-> Exception stack(0xc07c7f58 to 0xc07c7fa0)
-> 7f40:                                                       00000001 00000001
-> 7f60: 00000000 20000013 c07c6000 00000000 00000000 c07ce0a4 c07d7798 00000000
-> 7f80: c07e8fb8 0000004c 00000000 c07c7fa0 c0044798 c0009f20 20000013 ffffffff
-> [<c000c7e4>] (__irq_svc) from [<c0009f20>] (arch_cpu_idle+0x28/0x38)
-> [<c0009f20>] (arch_cpu_idle) from [<c003c974>] (cpu_startup_entry+0x1b8/0x220)
-> [<c003c974>] (cpu_startup_entry) from [<c0338c54>] (start_kernel+0x39c/0x40c)
-> ---[ end trace 4c1b7ae03f6d9d30 ]---
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 0 at drivers/tty/serial/serial_core.c:2791 uart_handle_cts_change+0xa0/0xdc()
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper Tainted: G        W      3.18.0-rc5+ #26
-> [<c000dff8>] (unwind_backtrace) from [<c000bc70>] (show_stack+0x10/0x14)
-> [<c000bc70>] (show_stack) from [<c00192ac>] (warn_slowpath_common+0x6c/0x8c)
-> [<c00192ac>] (warn_slowpath_common) from [<c00192e8>] (warn_slowpath_null+0x1c/0x24)
-> [<c00192e8>] (warn_slowpath_null) from [<c018528c>] (uart_handle_cts_change+0xa0/0xdc)
-> [<c018528c>] (uart_handle_cts_change) from [<c018624c>] (serial_pxa_irq+0x258/0x3b0)
-> [<c018624c>] (serial_pxa_irq) from [<c004d0d4>] (handle_irq_event_percpu+0x50/0x16c)
-> [<c004d0d4>] (handle_irq_event_percpu) from [<c004d22c>] (handle_irq_event+0x3c/0x5c)
-> [<c004d22c>] (handle_irq_event) from [<c004f7d0>] (handle_level_irq+0x94/0x118)
-> [<c004f7d0>] (handle_level_irq) from [<c004ca0c>] (generic_handle_irq+0x20/0x30)
-> [<c004ca0c>] (generic_handle_irq) from [<c004cbe0>] (__handle_domain_irq+0x38/0x70)
-> [<c004cbe0>] (__handle_domain_irq) from [<c00085c4>] (ichp_handle_irq+0x24/0x34)
-> [<c00085c4>] (ichp_handle_irq) from [<c000c7e4>] (__irq_svc+0x44/0x54)
-> Exception stack(0xc07c7f58 to 0xc07c7fa0)
-> 7f40:                                                       00000001 00000001
-> 7f60: 00000000 20000013 c07c6000 00000000 00000000 c07ce0a4 c07d7798 00000000
-> 7f80: c07e8fb8 0000004c 00000000 c07c7fa0 c0044798 c0009f20 20000013 ffffffff
-> [<c000c7e4>] (__irq_svc) from [<c0009f20>] (arch_cpu_idle+0x28/0x38)
-> [<c0009f20>] (arch_cpu_idle) from [<c003c974>] (cpu_startup_entry+0x1b8/0x220)
-> [<c003c974>] (cpu_startup_entry) from [<c0338c54>] (start_kernel+0x39c/0x40c)
-> ---[ end trace 4c1b7ae03f6d9d31 ]---
->
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> ---
-> [Changes since v1 - lock whole function, not just check_modem_status().]
+Applied with this fixup.
 
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
--- 
-Robert
+Will
