@@ -1,63 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 26 Nov 2014 16:30:27 +0000
-Subject: [PATCHv6 4/8] arm64: Move some head.text functions to executable
- section
-In-Reply-To: <1416606645-25633-5-git-send-email-lauraa@codeaurora.org>
-References: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
- <1416606645-25633-5-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20141126163027.GC1819@leverpostej>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 26 Nov 2014 18:31:22 +0200
+Subject: [PATCH v2 2/5] i2c: davinci: query STP always when NACK is
+ received
+In-Reply-To: <20141126155711.GL4431@pengutronix.de>
+References: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
+ <1417010393-30598-3-git-send-email-grygorii.strashko@ti.com>
+ <20141126155711.GL4431@pengutronix.de>
+Message-ID: <5476005A.6090207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+On 11/26/2014 05:57 PM, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> I don't understand your use of "query" in the subject and later in the
+> commit log. Do you mean "send"?
 
-On Fri, Nov 21, 2014 at 09:50:41PM +0000, Laura Abbott wrote:
-> The head.text section is intended to be run at early bootup
-> before any of the regular kernel mappings have been setup.
-> Parts of head.text may be freed back into the buddy allocator
-> due to TEXT_OFFSET so for security requirements this memory
-> must not be executable. The suspend/resume/hotplug code path
-> requires some of these head.S functions to run however which
-> means they need to be executable. Support these conflicting
-> requirements by moving the few head.text functions that need
-> to be executable to the text section which has the appropriate
-> page table permissions.
-> 
-> Tested-by: Kees Cook <keescook@chromium.org>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+will change to "generate". Ok?
 
-Other than a minor nit below this looks good to me, and I'm not seeing
-any issues with boot, hotplug, or idle, so:
+>
+> On Wed, Nov 26, 2014 at 03:59:50PM +0200, Grygorii Strashko wrote:
+>> According to I2C specification the NACK should be handled as folows:
+> s/folows/follows/
+ok.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
+Can I assume that you are ok with this patch in general?
 
-Thanks for putting this together!
-
-> ---
-> v6: Dropped the latehead.text bit and just moved everything to the regular
-> text section
-> ---
->  arch/arm64/kernel/head.S | 407 ++++++++++++++++++++++++-----------------------
->  1 file changed, 210 insertions(+), 197 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 10f5cc0..4b63d7a 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -238,7 +238,13 @@ ENTRY(stext)
->         mov     x0, x22
->         bl      lookup_processor_type
->         mov     x23, x0                         // x23=current cpu_table
-> -       cbz     x23, __error_p                  // invalid processor (x23=0)?
-> +       /*
-> +        *      __error_p may end up out of range for cbz if text areas
-> +        *      are aligned up to section sizes
-> +        */
-
-Nit: We don't need to align the comment text (we don't for the comment a
-few lines later, or any others in this file). It would be nice to keep
-that consistent.
-
-Thanks,
-Mark.
+regards,
+-grygorii
