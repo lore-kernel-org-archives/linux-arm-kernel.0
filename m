@@ -1,59 +1,44 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 26 Nov 2014 12:04:09 +0000
-Subject: [PATCH 2/2] MAINTAINERS: ARM Versatile Express platform
-In-Reply-To: <1416967146.8358.19.camel@perches.com>
-References: <1416939455-1814-1-git-send-email-pawel.moll@arm.com>
- <1416939455-1814-2-git-send-email-pawel.moll@arm.com>
- <20141126015452.12298.30373@quantum> <1416967146.8358.19.camel@perches.com>
-Message-ID: <1417003449.3972.1.camel@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Nov 2014 13:05:20 +0100
+Subject: [PATCH v6 0/6] ARM64: Add support for FSL's LS2085A SoC
+In-Reply-To: <1417002447-19163-1-git-send-email-bhupesh.sharma@freescale.com>
+References: <1417002447-19163-1-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <3137797.TSZb6ObLdd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-11-26 at 01:59 +0000, Joe Perches wrote:
-> On Tue, 2014-11-25 at 17:54 -0800, Mike Turquette wrote:
-> > Quoting Pawel Moll (2014-11-25 10:17:35)
-> > > This patch adds a separate section for the ARM
-> > > Versatile Express platform maintainers, listing
-> > > all different bits and bobs used by it.
-> []
-> > > diff --git a/MAINTAINERS b/MAINTAINERS
-> []
-> > > +ARM/VERSATILE EXPRESS PLATFORM
-> []
-> > > +F:     arch/arm/boot/dts/vexpress-*
-> > > +F:     arch/arm/mach-vexpress/*
-> > > +F:     drivers/bus/vexpress-config.c
-> > > +F:     drivers/clk/versatile/clk-vexpress-osc.c
-> > > +F:     drivers/clocksource/versatile.c
-> > > +F:     drivers/cpufreq/vexpress-spc-cpufreq.c
-> > > +F:     drivers/hwmon/vexpress.c
-> > > +F:     drivers/mfd/vexpress-sysreg.c
-> > > +F:     drivers/misc/vexpress-vexpress-syscfg.c
-> > > +F:     drivers/power/reset/vexpress-poweroff.c
-> > > +F:     drivers/regulator/vexpress.c
-> > > +F:     include/linux/vexpress.h
-> > >
+On Wednesday 26 November 2014 17:17:21 Bhupesh Sharma wrote:
+> This patchset adds the support for FSL's LS2085A SoC which is based on
+> ARMv8 architecture.
 > 
-> maybe
-> F:	arch/arm/boot/dts/vexpress*
+> This patchset also has patches which address DT compatible strings for
+> nodes which appear un-documented.
+> 
+> The enable-method for the CPU nodes is left for the bootloader (u-boot or UEFI)
+> to patch-up which is expected to be PSCI v0.2
 
-Ok.
+If this is a final version, please send it 'To: arm at kernel.org' with everyone
+on Cc and ask for inclusion in the next kernel.
 
-> F:	arch/arm/mach-vexpress/
+> This patchset has been tested with the following patches which add PSCI
+> v0.2 support in ARMv8 u-boot:
+> http://patchwork.ozlabs.org/patch/383556/
+> http://patchwork.ozlabs.org/patch/383555/
+> http://patchwork.ozlabs.org/patch/383557/
+> http://patchwork.ozlabs.org/patch/383558/
+> http://patchwork.ozlabs.org/patch/383559/
+> http://patchwork.ozlabs.org/patch/383560/
+> http://patchwork.ozlabs.org/patch/383561/
+> http://patchwork.ozlabs.org/patch/383562/
+> 
+> Rebased against v3.18-rc6
+> 
 
-Right, of course. Whole directory.
+When you send a pull request, please always try to base it on top of -rc1
+for practical concerns.
 
-> F:	*/*/vexpress*
+In this particular case, please base your patches on top of the
+cleanup/dts-subdirs branch of the arm-soc tree, which moves the dts
+files into per-vendor subdirectories.
 
-Cool, didn't think about multiple wildcards. 
-
-> F:	*/*/*/*vexpress*
-
-I'd keep the clk-vexpress-osc.c explicit - it's an odd one, and don't
-feel comfortable with the wildcard before vexpress.
-
-> F:	drivers/clocksource/versatile.c
-
-Thanks for the suggestion, sill spin the patch in a second.
-
-Pawel
+	Arnd
