@@ -1,67 +1,66 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 26 Nov 2014 15:59:51 +0200
-Subject: [PATCH v2 3/5] i2c: recovery: change input parameter to i2c_adapter
- for prepare/unprepare_recovery
+Date: Wed, 26 Nov 2014 15:59:50 +0200
+Subject: [PATCH v2 2/5] i2c: davinci: query STP always when NACK is received
 In-Reply-To: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
 References: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1417010393-30598-4-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1417010393-30598-3-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes type of input parameter for .prepare/unprepare_recovery()
-callbacks from struct i2c_bus_recovery_info * to struct i2c_adapter *.
-This allows to simplify implementation of these callbacks and avoid
-type conversations from i2c_bus_recovery_info to i2c_adapter.
-The i2c_bus_recovery_info can be simply retrieved from struct i2c_adapter
-which contains pointer on it.
+According to I2C specification the NACK should be handled as folows:
+"When SDA remains HIGH during this ninth clock pulse, this is defined as the Not
+Acknowledge signal. The master can then generate either a STOP condition to
+abort the transfer, or a repeated START condition to start a new transfer."
+[I2C spec Rev. 6, 3.1.6: http://www.nxp.com/documents/user_manual/UM10204.pdf]
+
+Currently the Davinci i2c driver interrupts the transfer on receipt of a
+NACK but fails to send a STOP in some situations and so makes the bus
+stuck until next I2C IP reset (idle/enable).
+
+For example, the issue will happen during SMBus read transfer which
+consists from two i2c messages write command/address and read data:
+
+S Slave Address Wr A Command Code A Sr Slave Address Rd A D1..Dn A P
+<--- write -----------------------> <--- read --------------------->
+
+The I2C client device will send NACK if it can't recognize "Command Code"
+and it's expected from I2C master to query STP in this case.
+But now, Davinci i2C driver will just exit with -EREMOTEIO and STP will
+not be queried.
+
+Hence, fix it by querying Stop condition (STP) always when NACK is received.
+
+This patch fixes Davinci I2C in the same way it was done for OMAP I2C
+commit cda2109a26eb ("i2c: omap: query STP always when NACK is received").
 
 CC: Sekhar Nori <nsekhar@ti.com>
 CC: Kevin Hilman <khilman@deeprootsystems.com>
 CC: Santosh Shilimkar <ssantosh@kernel.org>
 CC: Murali Karicheri <m-karicheri2@ti.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Reported-by: Hein Tibosch <hein_tibosch@yahoo.es>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- drivers/i2c/i2c-core.c | 4 ++--
- include/linux/i2c.h    | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/i2c/busses/i2c-davinci.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index 2f90ac6..72b6e34 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -563,7 +563,7 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
- 	int i = 0, val = 1, ret = 0;
- 
- 	if (bri->prepare_recovery)
--		bri->prepare_recovery(bri);
-+		bri->prepare_recovery(adap);
- 
- 	/*
- 	 * By this time SCL is high, as we need to give 9 falling-rising edges
-@@ -588,7 +588,7 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
+diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+index 7f54903..1990ae8 100644
+--- a/drivers/i2c/busses/i2c-davinci.c
++++ b/drivers/i2c/busses/i2c-davinci.c
+@@ -411,11 +411,9 @@ i2c_davinci_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg, int stop)
+ 	if (dev->cmd_err & DAVINCI_I2C_STR_NACK) {
+ 		if (msg->flags & I2C_M_IGNORE_NAK)
+ 			return msg->len;
+-		if (stop) {
+-			w = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
+-			w |= DAVINCI_I2C_MDR_STP;
+-			davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, w);
+-		}
++		w = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
++		w |= DAVINCI_I2C_MDR_STP;
++		davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, w);
+ 		return -EREMOTEIO;
  	}
- 
- 	if (bri->unprepare_recovery)
--		bri->unprepare_recovery(bri);
-+		bri->unprepare_recovery(adap);
- 
- 	return ret;
- }
-diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-index b556e0a..cf9380f 100644
---- a/include/linux/i2c.h
-+++ b/include/linux/i2c.h
-@@ -404,8 +404,8 @@ struct i2c_bus_recovery_info {
- 	void (*set_scl)(struct i2c_adapter *, int val);
- 	int (*get_sda)(struct i2c_adapter *);
- 
--	void (*prepare_recovery)(struct i2c_bus_recovery_info *bri);
--	void (*unprepare_recovery)(struct i2c_bus_recovery_info *bri);
-+	void (*prepare_recovery)(struct i2c_adapter *);
-+	void (*unprepare_recovery)(struct i2c_adapter *);
- 
- 	/* gpio recovery */
- 	int scl_gpio;
+ 	return -EIO;
 -- 
 1.9.1
