@@ -1,24 +1,54 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 26 Nov 2014 09:20:08 +0800
-Subject: [PATCH 1/3] ACPI / processor: Update the comments in processor.h
-In-Reply-To: <2001637.yVyNT03Tcn@vostro.rjw.lan>
-References: <1414662780-2147-1-git-send-email-hanjun.guo@linaro.org>
- <2001637.yVyNT03Tcn@vostro.rjw.lan>
-Message-ID: <54752AC8.70309@huawei.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 25 Nov 2014 17:27:38 -0800
+Subject: [PATCH 3.18-rc3 v9 1/5] irqchip: gic: Finer grain locking for
+ gic_raise_softirq
+In-Reply-To: <5474F05E.90401@linaro.org>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
+ <1416936401-5147-2-git-send-email-daniel.thompson@linaro.org>
+ <5474BF19.3040707@arm.com> <alpine.LFD.2.11.1411251510231.11690@knanqh.ubzr>
+ <5474F05E.90401@linaro.org>
+Message-ID: <54752C8A.1070006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/26 7:13, Rafael J. Wysocki wrote:
-> On Thursday, October 30, 2014 05:52:58 PM Hanjun Guo wrote:
->> In commit 46ba51e (ACPI / processor: Introduce ARCH_MIGHT_HAVE_ACPI_PDC),
->> acpi_processor_set_pdc() was moved to processor_pdc.c, so update
->> the comments accordingly.
+On 11/25/2014 01:10 PM, Daniel Thompson wrote:
+> On 25/11/14 20:17, Nicolas Pitre wrote:
+>> On Tue, 25 Nov 2014, Marc Zyngier wrote:
 >>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Patches [2-3/3] from this set need to be rebased on top of current linux-next
-> and resent, sorry about that.
+>>> Hi Daniel,
+>>>
+>>> On 25/11/14 17:26, Daniel Thompson wrote:
+>>>> irq_controller_lock is used for multiple purposes within the gic driver.
+>>>> Primarily it is used to make register read-modify-write sequences atomic.
+>>>> It is also used by gic_raise_softirq() in order that the big.LITTLE
+>>>> migration logic can figure out when it is safe to migrate interrupts
+>>>> between physical cores.
+>>>>
+>>>> The second usage of irq_controller_lock is difficult to discern when
+>>>> reviewing the code because the migration itself takes place outside
+>>>> the lock.
+>>>>
+>>>> This patch makes the second usage more explicit by splitting it out into
+>>>> a separate lock and providing better comments.
+>>> While we're at it, how about an additional patch that would make this
+>>> lock disappear entirely when the big-little stuff is not compiled in,
+>>> which is likely to be the case on a lot of (dare I say most?) systems?
+>>> That will save expensive barriers that we definitely could do without.
+>> For the record, I reviewed and ACKed a patch doing exactly that a while
+>> ago:
+>>
+>> http://lkml.org/lkml/2014/8/13/486
+> Well remembered! That patch had a different motivation but is very
+> similar to mine... so much so I might steal bit of it.
+>
+> I'll make sure I put Stephen on Cc: when I respin with the changes Marc
+> requested.
 
-No problem. I will rebase and resend today.
+I don't get a random Cc here? :-)
 
-Thanks
-Hanjun
+Anyway, yes please let's merge that patch.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
