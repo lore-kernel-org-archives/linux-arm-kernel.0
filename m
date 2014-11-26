@@ -1,103 +1,71 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Wed, 26 Nov 2014 15:34:47 -0800
-Subject: [RFC 0/2] Qualcomm RPM sleep states
-In-Reply-To: <20141125204430.GN7712@sirena.org.uk>
-References: <546FC674.1070005@codeaurora.org>
- <20141121232738.GP3815@sirena.org.uk>
- <546FCE3A.1000005@codeaurora.org>
- <20141124181614.GT7712@sirena.org.uk>
- <5473A0F3.6080405@codeaurora.org>
- <20141125204430.GN7712@sirena.org.uk>
-Message-ID: <20141126233447.GD2872@sonymobile.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Thu, 27 Nov 2014 00:38:01 +0100
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <20141126231435.GQ2817@atomide.com>
+References: <20141027200008.GR2560@atomide.com> <201411270001.44871@pali>
+ <20141126231435.GQ2817@atomide.com>
+Message-ID: <201411270038.01312@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 25 Nov 12:44 PST 2014, Mark Brown wrote:
-
-> On Mon, Nov 24, 2014 at 01:19:47PM -0800, Stephen Boyd wrote:
-> > On 11/24/2014 10:16 AM, Mark Brown wrote:
-
-[..]
-
-> > respectively. The RPM regulator driver aggregates the active set for
-> > both the regulators via a max() operation and sends that as a request to
-> > the RPM. The sleep set is the same as the active set for the 'active +
-> > sleep' regulator, so we just send whatever the value is that was sent
-> > down via the regulator APIs on the 'active + sleep' regulator. The only
-> > driver that really cares about the active only regulators is the CPU
-> > clock driver. Otherwise drivers are using the active + sleep regulators
-> > because their devices don't stop running when the CPU goes to idle/suspend.
+On Thursday 27 November 2014 00:14:36 Tony Lindgren wrote:
+> * Pali Roh?r <pali.rohar@gmail.com> [141126 15:03]:
+> > On Wednesday 26 November 2014 21:08:06 Tony Lindgren wrote:
+> > 
+> > With your patch I'm getting:
+> > 
+> > Hardware        : Nokia RX-51 board
+> > 
+> > So patch is good.
 > 
-> Hang on a minute.  What you're saying seems to be that this isn't really
-> about suspend but actually about the normal operating configuration?
-> That makes it a bit more understandable why one would change the
-> settings a lot, I think what I'm hearing here is that the runtime state
-> changes a lot for some reason and the system needs the suspend state to
-> track this?
+> Is that a Tested-by: then? :)
 > 
 
-I think it's important that we clarify that we have 2 (somewhat) diffrent
-problem on the table here:
+Yes for Hardware line you can add my:
 
-Problem 1:
-Regulators are shared between CPU PLLs and other peripherals and when we take
-the cpu to idle we need a way to let go of the CPU PLL "vote" on the regulator.
+Tested-by: Pali Roh?r <pali.rohar@gmail.com>
 
-In the case of the CPU being the only consumer I think we've come down to the
-problems being:
-* we're in atomic context
-* we don't want to waste the time of making sending out the request
-* we have hardware support for this and we want to use it(?)
-
-In the case of us having other active consumers (e.g. GPU, display or some
-peripherals) the voltage range or operating mode specified by the cpufreq
-driver might be suboptimal when we remove the cpu.
-
-I assume we don't want to handle this explicitly due to the same reasons as
-above(?)
-
-
-Problem 2:
-As we're implementing a solution for problem 1 we end up with a set of writes
-to the sleep state that are superfluous. The codeaurora solution for this is to
-buffer any writes to the sleep state and right before putting the cpu into idle
-state there's a direct call going, that flushes the buffered writes.
-
-This is "only" and optimization and I think the tricky parts are how to
-actually trigger the flush from the cpuidle driver and how to handle the smd
-communication in a sane way.
-
-> I can't help but think that this all sounds like the RPM isn't mapping
-> very well onto practical systems and needs revisiting in future
-> versions...  for example with what I'm parsing out of the above an
-> active+sleep set command or otherwise having the two modes tied together
-> for some regulators would make the whole problem go away.
+> > > > Revision comes from bootloader (via ATAG) and it is HW
+> > > > revision of N900 device. It cannot be hardcoded into
+> > > > kernel or DTS as it it depends on HW.
+> > > 
+> > > Well for the "Revision" line problem, we could pass the
+> > > revision in cmdline or .dts if not passed in the legacy
+> > > ATAGs. It sounds like were just not copying it to
+> > > system_rev for DT based booting? Maybe it's just some
+> > > missing CONFIG_ATAG option that needs to be enabled?
+> > 
+> > Yes it looks like DT code does not read Revision ATAG... I
+> > tried to enable everything but always same problem...
+> 
+> Maybe check if it shows up properly in /proc/atags or whatever
+> the interface for it was?
 > 
 
-As Stephen answered for regulators that only have the "both state" only one
-write is needed.
+With enabled CONFIG_ARM_APPENDED_DTB=y file /proc/atags is 
+missing.
 
-And if I read the docs correctly there are 4 regulators that needs this special
-handling and 29 that works just as you normally would expect.
-
-> > Maybe another solution would be to push the problem into the regulator
-> > core and educate it about the two different sets. RPM resources would
-> > map one-to-one with a regulator and the sleep set and active sets would
-> > be selectable via the regulator_get() API or some other consumer mapping
-> > method. This would allow consumers to request whatever set they care
-> > about and consolidate the aggregation logic that's duplicated at the
-> > consumer level and the driver level into the core.
+> The build_tag_list() should parse ATAG_REVISION and then
+> parse_tag_revision() should copy it to system_rev. Maybe try
+> adding some printks to see if those functions get called?
 > 
-> I think any duplication that's going on sounds like a consequence of
-> the way this is currently implemented.  I think based on what I *think*
-> you're saying the RPM driver probably ought to be hiding this and adding
-> a property which makes the active and sleep sets track each other with
-> normal suspend mode control otherwise.  That could potentially be done
-> in the core, though the tracking would be substantial surgery.
+> Regards,
+> 
+> Tony
 
-I think we should start off by hiding this in the driver, if others come
-forward needing something similar we can look at how to integrate parts of it
-into the core.
+Now I see... Problem is that build_tag_list() is called from 
+convert_to_tag_list() which is called from setup_machine_tags() 
+which is called from setup_arch() only if setup_machine_fdt() 
+call fails. And it fails for *non* DT boot. You can check this 
+chain too.
 
-Regards,
-Bjorn
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/c8e39090/attachment.sig>
