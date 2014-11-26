@@ -1,30 +1,41 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 26 Nov 2014 21:07:33 +0000
-Subject: [PATCH v2 2/2] of: support passing console options with
- stdout-path
-In-Reply-To: <20141126183052.GH3443@lunn.ch>
-References: <1417023640-23464-1-git-send-email-leif.lindholm@linaro.org>
- <1417023640-23464-3-git-send-email-leif.lindholm@linaro.org>
- <20141126183052.GH3443@lunn.ch>
-Message-ID: <CACxGe6tYZ8aE_TKw1cYMY5DDjpSXPSnhhAam-rG5NgdjpKJe+A@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 26 Nov 2014 15:13:59 -0600
+Subject: [RFC PATCH 0/2] Add ioremap_exec enhancements
+Message-ID: <cover.1417029918.git.d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 6:30 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Wed, Nov 26, 2014 at 05:40:40PM +0000, Leif Lindholm wrote:
->> Support specifying console options (like with console=ttyXN,<options>)
->> by appending them to the stdout-path property after a separating ':'.
->>
->> Example:
->>         stdout-path = "uart0:115200";
->
-> Hi Leif
->
-> This should be documented somewhere under
-> Documentation/devicetree/bindings/
->
-> Not sure where thought. Maybe a top level chosen.txt?
+Hi,
 
-Actually, this one doesn't. It is already documented in ePAPR
+Some platforms need the ability to ioremap memory for use with small
+chunks of code, like in certain PM applications that run from sram.
 
-g.
+This series provides a common way to call an arch's ioremap_exec, which
+currently only exists for ARM, so that we can use it in the generic
+sram driver in a forthcoming patch.
+
+This patch is part of a patch series split into several smaller sets
+for introducing suspend on AM335x. I plan to use it to copy several
+pieces of ASM code from an EMIF driver and the SoC PM code to run from
+SRAM on the SoC. I have pushed a branch here [1] based on v3.18-rc6
+with all required patches so that the higher level plan for these
+patches can be seen.
+
+Regards,
+Dave
+
+[1] https://github.com/dgerlach/linux-pm/tree/rfc-pm-am335x-v3.18-rc6
+
+Russ Dill (2):
+  asm-generic: io: Add exec versions of ioremap
+  lib: devres: Add exec versions of devm_ioremap_resource and friends
+
+ arch/arm/include/asm/io.h   |   2 +
+ include/asm-generic/iomap.h |   5 ++
+ include/linux/device.h      |  19 ++++++-
+ include/linux/io.h          |   9 +++-
+ lib/devres.c                | 125 ++++++++++++++++++++++++++++++++++++++++++--
+ 5 files changed, 154 insertions(+), 6 deletions(-)
+
+-- 
+2.1.0
