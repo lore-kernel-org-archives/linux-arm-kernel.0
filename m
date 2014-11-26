@@ -1,37 +1,75 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 26 Nov 2014 10:14:48 -0500 (EST)
-Subject: [PATCH 9/9] usb: {ohci,ehci}-platform: Use new OF big-endian
- helper function
-In-Reply-To: <1416962994-27095-10-git-send-email-cernekee@gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1411261013340.1322-100000@iolanthe.rowland.org>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 26 Nov 2014 08:20:03 -0700
+Subject: [PATCH v9 2/9] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <5475B724.80202@linaro.org>
+References: <1414194024-55547-1-git-send-email-lina.iyer@linaro.org>
+ <1414194024-55547-3-git-send-email-lina.iyer@linaro.org>
+ <54662622.2020307@linaro.org> <20141119174339.GA891@linaro.org>
+ <5475B724.80202@linaro.org>
+Message-ID: <20141126152003.GC594@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Nov 2014, Kevin Cernekee wrote:
+On Wed, Nov 26 2014 at 04:19 -0700, Daniel Lezcano wrote:
+>On 11/19/2014 06:43 PM, Lina Iyer wrote:
+>>On Fri, Nov 14 2014 at 08:56 -0700, Daniel Lezcano wrote:
+>>>On 10/25/2014 01:40 AM, Lina Iyer wrote:
+>>
+>
+>>>>+
+>>>>+    if ((cpu > -1) && !cpuidle_drv_init) {
+>>>>+        platform_device_register(&qcom_cpuidle_device);
+>>>>+        cpuidle_drv_init = true;
+>>>>+    }
+>>>
+>>>'cpu' is always > -1.
+>>>
+>>OK. I was hoping to use -1 for not a cpu (i.e, L2) SPM. For now, I will
+>>change.
+>>
+>>
+>>>If the 'spm_get_drv' succeed, cpu is no longer equal to -EINVAL.
+>>>Otherwise we do not reach this point because we return right after
+>>>spm_get_drv with an error.
+>>>
+>>>Adding the platform_device_register depending in a static variable is
+>>>not very nice. Why not add it explicitely in a separate init routine
+>>>we know it will be called one time (eg. at the same place than cpufreq
+>>>is) ?
+>>>
+>>We want to register the cpuidle device only if any of the SPM devices
+>>have been probed.
+>>
+>>Ideally, Stephen and I would like to register cpuidle device separately
+>>for each CPU SPM, when it is probed, so we would invoke cpuidle driver
+>>and thereby the low power modes only for those cpus. However, the
+>>complexity to do that, AFAICS, is very complex. I would need to change
+>>quite a bit of the framework and in the cpuidle driver, I may have to
+>>stray from the recommended format.
+>>
+>>Here I set up cpuidle device, when I know atleast 1 cpu is ready to
+>>allow low power modes.
+>
+>Yes, instead of using the generic cpuidle_register function, you can 
+>use the low level functions for that.
+>
+>One call to cpuidle_register_driver in a single place and then 
+>cpuidle_register_device for each spm probe.
+>
+>Wouldn't make sense ?
 
-> This handles the existing "big-endian" case, and in addition, it also does
-> the right thing when "native-endian" is specified.
-> 
-> Signed-off-by: Kevin Cernekee <cernekee@gmail.com>
-> ---
->  Documentation/devicetree/bindings/usb/usb-ehci.txt | 2 ++
->  Documentation/devicetree/bindings/usb/usb-ohci.txt | 2 ++
->  drivers/usb/host/ehci-platform.c                   | 2 +-
->  drivers/usb/host/ohci-platform.c                   | 2 +-
->  4 files changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> index 43c1a4e..9505c31 100644
-> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> @@ -12,6 +12,8 @@ Optional properties:
->   - big-endian-regs : boolean, set this for hcds with big-endian registers
->   - big-endian-desc : boolean, set this for hcds with big-endian descriptors
->   - big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
-> + - native-endian : boolean, enables big-endian-regs + big-endian-desc
-> +   iff the kernel was compiled for big endian
+Yes, but there are some assumptions if we dont use
+MULTIPLE_CPUIDLE_DRIVERS like this -
 
-Is this really a property of the hardware?  It appears to depend on the 
-kernel configuration.  As such, is it appropriate for DT?
+static void __cpuidle_driver_init(struct cpuidle_driver *drv)
+{
+        int i;
+	
+	drv->refcnt = 0; // Overwrites any cpuidle_driver_get()
 
-Alan Stern
+
+The clean way was to use MULTIPLE_CPUIDLE_DRIVERS, which seems like an
+incorrect use for this SoC.
+
+Thanks,
+Lina
