@@ -1,58 +1,86 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 26 Nov 2014 09:04:57 +0100
-Subject: [PATCH v2 3/9] clk: sunxi: Add prcm mod0 clock driver
-In-Reply-To: <20141125165744.GA17789@x1>
-References: <1416749895-25013-1-git-send-email-hdegoede@redhat.com>
- <1416749895-25013-4-git-send-email-hdegoede@redhat.com>
- <20141125165744.GA17789@x1>
-Message-ID: <547589A9.5060802@redhat.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 26 Nov 2014 03:06:36 -0500
+Subject: [PATCH v3 00/13] arm64: PCI/MSI: GICv3 ITS support (stacked
+ domain edition)
+In-Reply-To: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
+References: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20141126080636.GC22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Marc,
 
-On 11/25/2014 05:57 PM, Lee Jones wrote:
-> On Sun, 23 Nov 2014, Hans de Goede wrote:
->
->> Add a driver for mod0 clocks found in the prcm. Currently there is only
->> one mod0 clocks in the prcm, the ir clock.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
->>   drivers/clk/sunxi/Makefile                        |  2 +-
->>   drivers/clk/sunxi/clk-sun6i-prcm-mod0.c           | 63 +++++++++++++++++++++++
->>   drivers/mfd/sun6i-prcm.c                          | 14 +++++
->>   4 files changed, 79 insertions(+), 1 deletion(-)
->>   create mode 100644 drivers/clk/sunxi/clk-sun6i-prcm-mod0.c
->
-> [...]
->
->> diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
->> index 283ab8d..ff1254f 100644
->> --- a/drivers/mfd/sun6i-prcm.c
->> +++ b/drivers/mfd/sun6i-prcm.c
->> @@ -41,6 +41,14 @@ static const struct resource sun6i_a31_apb0_gates_clk_res[] = {
->>   	},
->>   };
->>
->> +static const struct resource sun6i_a31_ir_clk_res[] = {
->> +	{
->> +		.start = 0x54,
->> +		.end = 0x57,
->> +		.flags = IORESOURCE_MEM,
->> +	},
->> +};
->
-> I'm not overly keen on these magic numbers (and yes, I'm well aware
-> that I SoB'ed the patch which started them off).
->
-> It's not a show stopper, although I'd prefer if they were fixed with a
-> subsequent patch.
+On Mon, Nov 24, 2014 at 02:35:07PM +0000, Marc Zyngier wrote:
+> The GICv3 architecture provides a way to implement support for
+> MSI/MSI-X using a specific block called the ITS (Interrupt Translation
+> Service).
+> 
+> The ITS can be accurately described as "page tables for
+> interrupts". If you think this sounds scary, you're spot on. It uses a
+> set of opaque memory tables that are manipulated through commands
+> (software almost never touches the tables directly). In order to make
+> it slightly easier to digest, the code has been split into (mostly)
+> logical units.
+> 
+> To make things more fun, this relies on Jiang Liu's stacked domain
+> patch series as now merged in tip/irq/irqdomain:
+> 
+> - patch 1 imports the new asm-generic/msi.h file into arch/arm64
+> - patches 2 to 13 are the bulk of the ITS driver.
+> 
+> This has been tested on arm64 with an FVP model, and is based on
+> tip/irq/irqdomain. The whole thing is available at:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gicv3-its
+> 
+> Unless someone screams murder, I consider this to be ready for merge.
+> 
+> 	M.
+> 
+> From v2 [2]:
+> - rebased on top of the stable version of tip/irq/irqdomain
+> - use irq_domain_reset_irq_data instead of
+>   irq_domain_set_hwirq_and_chip on the free path
+> - use pci_msi_mask_irq instead of mask_msi_irq
+> - use host_data to pass the ITS structure around
+> - top-level MSI domain is now indentified by the ITS of_node
+> 
+> From v1 [1]:
+> - rebased on top of tip/irq/irqdomain
+> - dropped the arm64-specific implementation of arch_setup_msi_irqs and co.
+> - reworked the whole ITS/MSI setup to use the new MSI/PCI split
+> 
+> [1]: http://lwn.net/Articles/619788/
+> [2]: https://lkml.org/lkml/2014/11/18/825
+> 
+> Marc Zyngier (13):
+>   arm64: PCI/MSI: Use asm-generic/msi.h
+>   irqchip: GICv3: Convert to domain hierarchy
+>   irqchip: GICv3: rework redistributor structure
+>   irqchip: GICv3: ITS command queue
+>   irqchip: GICv3: ITS: irqchip implementation
+>   irqchip: GICv3: ITS: LPI allocator
+>   irqchip: GICv3: ITS: tables allocators
+>   irqchip: GICv3: ITS: device allocation and configuration
+>   irqchip: GICv3: ITS: MSI support
+>   irqchip: GICv3: ITS: DT probing and initialization
+>   irqchip: GICv3: ITS: plug ITS init into main GICv3 code
+>   irqchip: GICv3: ITS: enable compilation of the ITS driver
+>   irqchip: GICv3: Binding updates for ITS
+> 
+>  Documentation/devicetree/bindings/arm/gic-v3.txt |   39 +
+>  arch/arm64/Kconfig                               |    1 +
+>  arch/arm64/include/asm/Kbuild                    |    1 +
+>  drivers/irqchip/Kconfig                          |    5 +
+>  drivers/irqchip/Makefile                         |    1 +
+>  drivers/irqchip/irq-gic-v3-its.c                 | 1402 ++++++++++++++++++++++
+>  drivers/irqchip/irq-gic-v3.c                     |  156 ++-
+>  include/linux/irqchip/arm-gic-v3.h               |  128 ++
+>  8 files changed, 1693 insertions(+), 40 deletions(-)
+>  create mode 100644 drivers/irqchip/irq-gic-v3-its.c
 
-These are offsets of the relevant registers inside the prcm register block,
-if not done this way, then how should they be done ?
+Applied to irqchip/core with a dependency on tip/irq/irqdomain
 
-Regards,
+thx,
 
-Hans
+Jason.
