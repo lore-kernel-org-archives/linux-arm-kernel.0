@@ -1,76 +1,120 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 26 Nov 2014 00:02:23 -0500
-Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.19
-Message-ID: <20141126050222.GN22670@titan.lakedaemon.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 26 Nov 2014 13:05:33 +0800
+Subject: [PATCH v2] mmc: core: add core-level function for sending tuning
+ commands
+Message-ID: <1416978333-3086-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Folks,
+From: Minda Chen <Minda.Chen@csr.com>
 
-Nice round of changes for mvebu.  The whole stack ahs been in -next for
-several days.
+According to the SD card spec, Add a manual tuning command function
+for SDR104/HS200.
+Sending command 19 or command 21 to read data and compare with the
+tunning block pattern.
 
-This pull request has a dependency on mvebu/fixes for:
+This patch will help to decrease some platform private codes in SDHCI
+platform_execute_tuning() callbacks.
 
-  2eb04ae010a8 ARM: mvebu: add missing of_node_put() call in coherency.c
+Signed-off-by: Minda Chen <Minda.Chen@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/mmc/core/mmc_ops.c | 70 ++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mmc/core.h   |  1 +
+ 2 files changed, 71 insertions(+)
 
-Please pull.
-
-thx,
-
-Jason.
-
-
-The following changes since commit 2eb04ae010a8fb165ba7aa56e9aa8e7980887dee:
-
-  ARM: mvebu: add missing of_node_put() call in coherency.c (2014-11-07 02:56:36 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.19
-
-for you to fetch changes up to 626d686487bfd8136c4543bee7b6b2e52c33b3f8:
-
-  ARM: mvebu: Implement the CPU hotplug support for the Armada 38x SoCs (2014-11-22 02:14:38 +0000)
-
-----------------------------------------------------------------
-mvebu SoC changes for v3.19
-
- - Armada 38x
-    - Implement CPU hotplug support
-
- - Armada 375
-    - Remove Z1 stepping support (limited dist. of SoC)
-
-----------------------------------------------------------------
-Ezequiel Garcia (1):
-      ARM: mvebu: Remove thermal quirk for A375 Z1 revision
-
-Gregory CLEMENT (4):
-      ARM: mvebu: Clean-up the Armada XP support
-      ARM: mvebu: Move SCU power up in a function
-      ARM: mvebu: Fix the secondary startup for Cortex A9 SoC
-      ARM: mvebu: Implement the CPU hotplug support for the Armada 38x SoCs
-
-Jason Cooper (1):
-      Merge branch 'mvebu/fixes' into mvebu/soc
-
-Thomas Petazzoni (5):
-      ARM: mvebu: make the coherency_ll.S functions work with no coherency fabric
-      ARM: mvebu: disable I/O coherency on non-SMP situations on Armada 370/375/38x/XP
-      ARM: mvebu: remove unused register offset definition
-      ARM: mvebu: remove Armada 375 Z1 workaround for I/O coherency
-      ARM: mvebu: update comments in coherency.c
-
- arch/arm/mach-mvebu/armada-370-xp.h |   6 -
- arch/arm/mach-mvebu/board-v7.c      |  71 +-----------
- arch/arm/mach-mvebu/coherency.c     | 221 ++++++------------------------------
- arch/arm/mach-mvebu/coherency_ll.S  |  21 +++-
- arch/arm/mach-mvebu/cpu-reset.c     |   1 -
- arch/arm/mach-mvebu/headsmp-a9.S    |   1 +
- arch/arm/mach-mvebu/platsmp-a9.c    |  53 ++++++++-
- arch/arm/mach-mvebu/platsmp.c       |   2 +
- arch/arm/mach-mvebu/pmsu.c          |   3 +-
- arch/arm/mach-mvebu/pmsu.h          |   2 +
- arch/arm/mach-mvebu/pmsu_ll.S       |  20 ++--
- 11 files changed, 131 insertions(+), 270 deletions(-)
+diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+index 7911e05..a897894 100644
+--- a/drivers/mmc/core/mmc_ops.c
++++ b/drivers/mmc/core/mmc_ops.c
+@@ -543,6 +543,76 @@ int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+ }
+ EXPORT_SYMBOL_GPL(mmc_switch);
+ 
++int mmc_send_tuning(struct mmc_card *card)
++{
++	struct mmc_request mrq = {NULL};
++	struct mmc_command cmd = {0};
++	struct mmc_data data = {0};
++	struct scatterlist sg;
++	struct mmc_host *mmc = card->host;
++	struct mmc_ios *ios = &mmc->ios;
++	const u8 *tuning_block_pattern;
++	int size, err = 0;
++	u8 *data_buf;
++	u32 opcode;
++
++	if (ios->bus_width == MMC_BUS_WIDTH_8) {
++		tuning_block_pattern = tuning_blk_pattern_8bit;
++		size = sizeof(tuning_blk_pattern_8bit);
++		opcode = MMC_SEND_TUNING_BLOCK_HS200;
++	} else if (ios->bus_width == MMC_BUS_WIDTH_4) {
++		tuning_block_pattern = tuning_blk_pattern_4bit;
++		size = sizeof(tuning_blk_pattern_4bit);
++		opcode = MMC_SEND_TUNING_BLOCK;
++	} else
++		return -EINVAL;
++
++	data_buf = kzalloc(size, GFP_KERNEL);
++	if (!data_buf)
++		return -ENOMEM;
++
++	mrq.cmd = &cmd;
++	mrq.data = &data;
++
++	cmd.opcode = opcode;
++	cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
++
++	data.blksz = size;
++	data.blocks = 1;
++	data.flags = MMC_DATA_READ;
++
++	/*
++	 * According to the tuning specs, Tuning process
++	 * is normally shorter 40 executions of CMD19,
++	 * and timeout value should be shorter than 150 ms
++	 */
++	data.timeout_ns = 150 * NSEC_PER_MSEC;
++
++	data.sg = &sg;
++	data.sg_len = 1;
++	sg_init_one(&sg, data_buf, size);
++
++	mmc_wait_for_req(mmc, &mrq);
++
++	if (cmd.error) {
++		err = cmd.error;
++		goto out;
++	}
++
++	if (data.error) {
++		err = data.error;
++		goto out;
++	}
++
++	if (memcmp(data_buf, tuning_block_pattern, size))
++		err = -EIO;
++
++out:
++	kfree(data_buf);
++	return err;
++}
++EXPORT_SYMBOL_GPL(mmc_send_tuning);
++
+ static int
+ mmc_send_bus_test(struct mmc_card *card, struct mmc_host *host, u8 opcode,
+ 		  u8 len)
+diff --git a/include/linux/mmc/core.h b/include/linux/mmc/core.h
+index f206e29..b5c2763 100644
+--- a/include/linux/mmc/core.h
++++ b/include/linux/mmc/core.h
+@@ -154,6 +154,7 @@ extern void mmc_start_bkops(struct mmc_card *card, bool from_exception);
+ extern int __mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int, bool,
+ 			bool, bool);
+ extern int mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int);
++extern int mmc_send_tuning(struct mmc_card *);
+ extern int mmc_send_ext_csd(struct mmc_card *card, u8 *ext_csd);
+ 
+ #define MMC_ERASE_ARG		0x00000000
+-- 
+2.1.3
