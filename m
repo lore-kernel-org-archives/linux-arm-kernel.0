@@ -1,144 +1,115 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 25 Nov 2014 17:00:47 -0800
-Subject: [PATCH] ARM: exynos_defconfig: disable CONFIG_EXYNOS5420_MCPM;
- not stable
-In-Reply-To: <CAM4voa==Ram0xXTL=SnKktyRt7VFphQxBJgcf9Yi9Zio0QctHw@mail.gmail.com>
- (Abhilash Kesavan's message of "Tue, 25 Nov 2014 11:31:18 +0530")
-References: <1414796382-5447-1-git-send-email-khilman@kernel.org>
- <000e01cffb39$5ef0a2d0$1cd1e870$@kernel.org>
- <7hegtaq26c.fsf@deeprootsystems.com>
- <CAMAWPa-mLAFL7v8hHA5R-eBzpMFK-E-xcvjoV8Bn6tTwgP53Uw@mail.gmail.com>
- <CAOesGMhvTDN4J6AdUDHKV0Sp4NT6a4QEMUDWOayQqhhD+C4acw@mail.gmail.com>
- <CAMAWPa-sz5jT9izEONVZR2Z4mzuivKaNHSgyR+eP13tWZ84hYw@mail.gmail.com>
- <CAOesGMgSkJ8xkBgN7OpuDzT=ehaAd6kvbx5_tC50x78pvpkTwg@mail.gmail.com>
- <CAOesGMh-7md4PdQX1Wvk0jO+87j+fxSvBnVD_osjNd2zQ4L43w@mail.gmail.com>
- <044101d00852$3f421420$bdc63c60$@kernel.org>
- <CAMAWPa-qk0DEmPNz5LZgJq9AuGhRxuY00XwxtEikt_vh-iozVg@mail.gmail.com>
- <CAM4voa==Ram0xXTL=SnKktyRt7VFphQxBJgcf9Yi9Zio0QctHw@mail.gmail.com>
-Message-ID: <7hvbm2ixmo.fsf@deeprootsystems.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 25 Nov 2014 17:02:52 -0800
+Subject: [RFC 0/2] Qualcomm RPM sleep states
+In-Reply-To: <20141125204430.GN7712@sirena.org.uk>
+References: <546FC674.1070005@codeaurora.org>
+ <20141121232738.GP3815@sirena.org.uk> <546FCE3A.1000005@codeaurora.org>
+ <20141124181614.GT7712@sirena.org.uk> <5473A0F3.6080405@codeaurora.org>
+ <20141125204430.GN7712@sirena.org.uk>
+Message-ID: <547526BC.1090202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhilash,
+On 11/25/2014 12:44 PM, Mark Brown wrote:
+> On Mon, Nov 24, 2014 at 01:19:47PM -0800, Stephen Boyd wrote:
+>> On 11/24/2014 10:16 AM, Mark Brown wrote:
+>>> A bit, but I'm afraid I'm still at a loss as to what the problems and
+>>> debate are here.  Why is this more complex than the Linux part of the
+>>> system just saying what it wants at any given time?  It sounds like that
+>>> has some sort of performance issue?
+> I'm still quite confused here...
 
-Abhilash Kesavan <kesavan.abhilash@gmail.com> writes:
+Hm... hopefully it's not getting worse.
 
-[...]
-
->>> To be honest, since I don't have the exynos5420 arndale, chromebook...but smdk
->>> which has different bootloader, I couldn't test it...I'll try to make a test
->>> farm like you guys...
->>
->> Do you have some colleagues with any other 542x hardware?  I had
->> assumed that linux-next was being better tested on the publicaly
->> available, and widely available boards like odroid-xu3 and
->> Chromebook2, but I've come to realize the hard way that that is not
 >
-> Are you seeing this on Chromebook2 (Peach-Pi 5800) too ?
+>> Yes, communicating with the RPM is not that fast. The sleep set could be
+>> updated hundreds of times before we go idle and actually switch from the
+>> active set to sleep set. One optimization is to buffer the sleep set
+>> requests and send them right before we switch to the sleep set. This
+>> saves on the messaging overhead for sleep sets that don't matter when
+>> we're active by moving the overhead to the idle/suspend path. The hope
+>> is to consolidate multiple sleep set requests into one request.
+> Right, that's one of the obvious ones.  Though I am a bit mystified as
+> to why you're needing to change these settings so often that it's a
+> problem - most hardware can do this but generally the configuration when
+> idle is fairly constant so it's irrelevant for performance how often we
+> set these things, a lot of the time it's going to boil down to I2C
+> writes so we're talking really infrequent here.  What's different about
+> these systems that means that this stuff needs constant tweaking?
 
-No, it seems that my exynos5800-peach-pi is not having this problem,
-which suggests it's a bootloader setup issue.
+Yes I don't think we're constantly changing the regulators because it 
+does boil down to I2C writes or something similar, but we could be 
+modifying other resources that the RPM controls more often. For example, 
+the RPM controls some clock frequencies that eventually end up being 
+some mmio writes. We change these frequencies quite often in response to 
+CPU frequency scaling or other DCVS algorithms.
 
->> the case.  You mention your board has a different bootloader.  Do you
->> suspect there's a bootloader issue on these other platforms?  If so,
->> could you elaborate on possible fixes?  I'm more than willing to test
->> any proposed fixes, but I'm not familiar enough yet with these SoCs to
->> figure out the underlying issues alone.
->>
->> Until you have a working board farm, you could start having a closer
->> look at the boot logs we're already producing.  Admittedly linux-next
->> broken in many ways besides this one for exynos currently, but it has
->> been having these imprecise aborts well before the other recent
->> issues.
->>
->> Also, It's very possible that this issue is not even MCPM related at
->> all, and MCPM is just uncovering a previously hidden bug.  It would be
->> very helpful if people more familiar with this hardware and SoC would
->> investigate bug reports like these.
+>> I think the problem that Bjorn is trying to come up with a solution for
+>> is how to represent the sleep set and active set in the kernel clock and
+>> regulator frameworks. You can think of each RPM resource as a regulator
+>> supply. Each one of those resources has an active and sleep set. In the
+>> downstream vendor kernels we make two regulators for an RPM resource.
+>> One regulator for the active set and one regulator for the active +
+>> sleep set. We call these 'active only' and 'active + sleep' regulators
+> That seems like it's a big abstraction problem.
 >
-> The 3 boards I have access to (SMDK5420, Chromebook Peach-Pi and
-> Chromebook Peach-Pit) work fine with MCPM enabled. 
+>> respectively. The RPM regulator driver aggregates the active set for
+>> both the regulators via a max() operation and sends that as a request to
+>> the RPM. The sleep set is the same as the active set for the 'active +
+>> sleep' regulator, so we just send whatever the value is that was sent
+>> down via the regulator APIs on the 'active + sleep' regulator. The only
+>> driver that really cares about the active only regulators is the CPU
+>> clock driver. Otherwise drivers are using the active + sleep regulators
+>> because their devices don't stop running when the CPU goes to idle/suspend.
+> Hang on a minute.  What you're saying seems to be that this isn't really
+> about suspend but actually about the normal operating configuration?
+> That makes it a bit more understandable why one would change the
+> settings a lot, I think what I'm hearing here is that the runtime state
+> changes a lot for some reason and the system needs the suspend state to
+> track this?
 
-Thanks for helping look into this.
+It also matters for idle. Both suspend and idle can cause an RPM 
+notification and switch to the sleep set.
 
-> I am not sure why
-> it is failing only on the above mentioned boards as there is nothing
-> specific to them in the MCPM back-end.
 >
-> I assume that when you default to platsmp (on disabling MCPM), the
-> non-working boards boot all cores upto userspace without any issues ?
+> I can't help but think that this all sounds like the RPM isn't mapping
+> very well onto practical systems and needs revisiting in future
+> versions...  for example with what I'm parsing out of the above an
+> active+sleep set command or otherwise having the two modes tied together
+> for some regulators would make the whole problem go away.
 
-Nope.  With MCPM disabled:
+We create the 'active only' regulators for consumers that actually need 
+them. From the set of regulators on a board only a couple need this 
+treatment. I don't see how tying the two states together via an 
+active+sleep set command would make this problem go away for the cases I 
+already described before, i.e. CPU wants some voltage and other IO 
+devices want another voltage and the CPU doesn't care what the voltage 
+is when the CPU is in idle or suspend. Having a combination active + 
+sleep set command would be nice. The RPM already sort of supports this 
+by allowing you to only modify the active set. If you never modify the 
+sleep set, then the RPM just applies whatever is in the active set to 
+the sleep set. We can probably go through and figure out what resources 
+could get away with only using the active set so we can cut down on 
+sleep set requests that are always the same between active and sleep set.
 
-  - 5420/arndale-octa: CPU0-3 come up (A15s)
-  - 5422/odroid-xu3: only CPU0 (A7)
-  - 5800/peach-pi: only CPU0 (A15)
+>> Maybe another solution would be to push the problem into the regulator
+>> core and educate it about the two different sets. RPM resources would
+>> map one-to-one with a regulator and the sleep set and active sets would
+>> be selectable via the regulator_get() API or some other consumer mapping
+>> method. This would allow consumers to request whatever set they care
+>> about and consolidate the aggregation logic that's duplicated at the
+>> consumer level and the driver level into the core.
+> I think any duplication that's going on sounds like a consequence of
+> the way this is currently implemented.  I think based on what I *think*
+> you're saying the RPM driver probably ought to be hiding this and adding
+> a property which makes the active and sleep sets track each other with
+> normal suspend mode control otherwise.  That could potentially be done
+> in the core, though the tracking would be substantial surgery.
 
-Note that with MCPM enabled, the arndale-octa gets the same result.
-Peach-pi on the other hand gets all 8 CPUs, and the odroid-xu3 only gets
-6/8 CPUs (see other thread on that topic.)
+Sorry I don't follow this part. It's about more than suspend, we also 
+care about idle. I agree that pushing the concept of active vs. sleep 
+into the framework is substantial.
 
-> Based on the timeline (problems started about 2.5 months back), there
-> have only been a couple of changes in the 5420 MCPM back-end. Could
-> you revert the following commits and check if things improve.
->
-> 20fe6f9 ARM: EXYNOS: Support cluster power off on exynos5420/5800
-> fbb0499 ARM: 8083/1: exynos: activate the CCI on boot CPU/cluster
-> using the MCPM loopback
->
-> These might not revert cleanly, so instead of the above you could also
-> comment the following 2 lines:
->
->
-> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c
-> b/arch/arm/mach-exynos/mcpm-exynos.c
-> index dc9a764..9a07188 100644
-> --- a/arch/arm/mach-exynos/mcpm-exynos.c
-> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> @@ -152,7 +152,7 @@ static void exynos_power_down(void)
->                 exynos_cpu_power_down(cpunr);
->
->                 if (exynos_cluster_unused(cluster)) {
-> -                       exynos_cluster_power_down(cluster);
-> +                       //exynos_cluster_power_down(cluster);
->                         last_man = true;
->                 }
-2>         } else if (cpu_use_count[cpu][cluster] == 1) {
-> @@ -356,8 +356,8 @@ static int __init exynos_mcpm_init(void)
->         ret = mcpm_platform_register(&exynos_power_ops);
->         if (!ret)
->                 ret = mcpm_sync_init(exynos_pm_power_up_setup);
-> -       if (!ret)
-> -               ret = mcpm_loopback(exynos_cache_off); /* turn on the CCI */
-> +       //if (!ret)
-> +               //ret = mcpm_loopback(exynos_cache_off); /* turn on the CCI */
->         if (ret) {
->                 iounmap(ns_sram_base_addr);
->                 return ret;
->
->
->
-> If you still get aborts then I suspect that the problem is with the
-> bootloader configuration but am not sure. 
-
-Nice.  With those lines commented out, the arndale-octa is not geting
-imprecise aborts anymore, and this is the platform where those aborts
-seem to prevent booting into a full userspace (as originally reported by
-Tyler.)
-
-More specifically, with only the loopback call to turn off CCI commented
-out, the imprecise aborts go away.
-
-The odroid-xu3 is still getting them, but these seem to happen whether
-or not MCPM is enabled, so must a different issue related to the
-bootloader setup.
-
-> I am OK with disabling
-> 5420_MCPM in the default configuration in such a case. This would
-> however mean that S2R also stops working by default on 5420.
-
-Disabling the option isn't my first choice either, I would rather see
-this issue debugged and fixed by folks that are more familiar with MCPM
-on Exynos.
-
-Kevin
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
