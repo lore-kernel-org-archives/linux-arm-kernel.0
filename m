@@ -1,49 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 26 Nov 2014 00:38:19 -0500
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.19 (round 3)
-Message-ID: <20141126053819.GX22670@titan.lakedaemon.net>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 26 Nov 2014 11:13:56 +0530
+Subject: [PATCH v2 0/3] Some cleanup for samsung clock
+In-Reply-To: <54493A99.5000206@samsung.com>
+References: <1411976868-22209-1-git-send-email-pankaj.dubey@samsung.com>
+ <001201cfede3$c462eb90$4d28c2b0$@samsung.com> <54493A99.5000206@samsung.com>
+Message-ID: <000e01d0093c$09865270$1c92f750$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Folks,
+Hi Sylwester,
 
-This is the last round of DT changes.  I kept it out separate because I
-just applied the patches tonight.  It also has a dependency on Kishon's
-guaranteed immutable branch tag, phy-dt-header.  Which, unfortunately,
-pulls in -rc4.  Hopefully this isn't a surprise to you. :)
+On Thursday, October 23, 2014 10:58 PM, Sylwester Nawrocki Wrote:
+> To: Pankaj Dubey; linux-arm-kernel at lists.infradead.org; linux-samsung-
+> soc at vger.kernel.org; tomasz.figa at gmail.com
+> Cc: kgene.kim at samsung.com; mturquette at linaro.org; naushad at samsung.com
+> Subject: Re: [PATCH v2 0/3] Some cleanup for samsung clock
+> 
+> Hi Pankaj,
+> 
+> On 22/10/14 12:34, Pankaj Dubey wrote:
+> > It there are no comments will you please pick up this patch series.
+> 
+> I've picked up these patches and I'm planning to send a pull request to
+Mike this
+> week, including any other pending samsung clk patches.
+> Tomasz is going to be busy for few days.
+> 
 
-This is an incremental pull request from a random position on the
-mvebu/dt branch up to tags/mvebu-dt-3.19-3.
+Any update on this series? 
 
-Please pull.
-
-thx,
-
-Jason.
-
-
-The following changes since commit b3d6cfd09184dcea17f7d8e29c71fafe58bb5f00:
-
-  Merge tag 'tags/phy-dt-header' into mvebu/dt-usb_phy (2014-11-26 03:48:18 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-usb-phy-3.19-3
-
-for you to fetch changes up to 623394def7ef023aa44e338de680222cdc93c4a5:
-
-  ARM: mvebu: add PHY support to the dts for the USB controllers on Armada 375 (2014-11-26 03:55:43 +0000)
-
-----------------------------------------------------------------
-mvebu DT changes for v3.19 (round 3)
-
- - Armada 375
-    - Add PHY and USB cluster controller support
-
-----------------------------------------------------------------
-Gregory CLEMENT (2):
-      ARM: mvebu: add Device Tree description of USB cluster controller on Armada 375
-      ARM: mvebu: add PHY support to the dts for the USB controllers on Armada 375
-
- arch/arm/boot/dts/armada-375.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Thanks,
+Pankaj Dubey
+> --
+> Thanks,
+> Sylwester
