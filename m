@@ -1,65 +1,38 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 26 Nov 2014 03:16:37 -0500
-Subject: [PATCH v11 0/2] irqchip: add support for GICv2m MSI controller
-In-Reply-To: <1416941243-7181-1-git-send-email-marc.zyngier@arm.com>
-References: <1416941243-7181-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20141126081637.GE22670@titan.lakedaemon.net>
+Date: Wed, 26 Nov 2014 03:20:46 -0500
+Subject: [PATCH v2 0/3] irqchip: dw-apb-ictl:
+ IRQ_GC_MASK_CACHE_PER_TYPE and PM support
+In-Reply-To: <1415773374-4629-1-git-send-email-jszhang@marvell.com>
+References: <1415773374-4629-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20141126082046.GF22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 06:47:21PM +0000, Marc Zyngier wrote:
-> GICv2m is a very simple addition to the standard GICv2 interrupt
-> controller, offering a way to convert writes from a device to a
-> "wire-like" interrupt. Basically what we need to support MSI on the
-> GIC.
+On Wed, Nov 12, 2014 at 02:22:51PM +0800, Jisheng Zhang wrote:
+> These patches try to improve dw-apb-ictl irqchip driver a bit.
 > 
-> The v2m widget exposes a "frame", containing a read-only register
-> describing the range of interrupts that are MSI-capable, as well as a
-> doorbell that the device can kick to generate the interrupt. All the
-> rest of the infrastructure is provided by the GIC itself (enabling,
-> routing, ack/eoi...). This makes an ideal case for stacked irq
-> domains.
+> The first patch improves the performance a bit -- use the relaxed version
 > 
-> These patches were originally written by Suravee, but I've converted
-> them to the stacked irq domains. As this turned out to be quite a
-> sizeable rewrite of the original code, please blame me for any issue
-> in this code, and not Suravee.
+> The two dw-apb-ictl's irq_chip_type instances have separate mask registers, so the second patch enables IRQ_GC_MASK_CACHE_PER_TYPE.
 > 
-> Unsurprisingly, there is quite a long dependency chain here. You need:
-> - Jiang's stacked domain patches, from tip/irq/irqdomain
-> - The first patch in my GICv3 ITS series:
->   https://lkml.org/lkml/2014/11/24/409
-> - The first patch in Yingjoe's sysirq series:
->   https://lkml.org/lkml/2014/11/25/130
+> The last patch adds suspend/resume support to the driver.
 > 
-> For everyone's convenience, I have a branch containing all that, and
-> much more:
+> Tested on Marvell BG2Q-DMP board.
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/v2m
+> Changes in v2:
+>   - Add Sebastian's Acks
+>   - Update the first commit as Sebastian and Thomas suggested
+>   - Add into commit log summary of the discussion why relaxed variants can be used
 > 
-> This has been fairly heavily tested on an arm64 platform driving a
-> pair of igb interfaces.
+> Jisheng Zhang (3):
+>   irqchip: dw-apb-ictl: always use use {readl|writel}_relaxed
+>   irqchip: dw-apb-ictl: enable IRQ_GC_MASK_CACHE_PER_TYPE
+>   irqchip: dw-apb-ictl: add PM support
 > 
-> From v10:
-> - Rewrote the driver to solely rely on irq domains, and not the
-> setup_irq/teardown_irq methods that were used before (similar to what
-> has been done for the GICv3 ITS).
-> 
-> Suravee Suthikulpanit (2):
->   irqchip: gicv2m: Add support for ARM GICv2m MSI(-X) doorbell
->   irqchip: gicv2m: Add DT bindings for GICv2m
-> 
->  Documentation/devicetree/bindings/arm/gic.txt |  53 ++++
->  arch/arm64/Kconfig                            |   1 +
->  drivers/irqchip/Kconfig                       |   6 +
->  drivers/irqchip/Makefile                      |   1 +
->  drivers/irqchip/irq-gic-v2m.c                 | 333 ++++++++++++++++++++++++++
->  drivers/irqchip/irq-gic.c                     |   4 +
->  include/linux/irqchip/arm-gic.h               |   2 +
->  7 files changed, 400 insertions(+)
->  create mode 100644 drivers/irqchip/irq-gic-v2m.c
+>  drivers/irqchip/irq-dw-apb-ictl.c | 32 ++++++++++++++++++++++++++------
+>  1 file changed, 26 insertions(+), 6 deletions(-)
 
-Both added to irqchip/core
+Whole series applied to irqchip/core
 
 thx,
 
