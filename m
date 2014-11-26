@@ -1,40 +1,33 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 26 Nov 2014 18:21:38 +0100
-Subject: [PATCH v2] ARM: EXYNOS: use u8 for val[] in struct exynos_pmu_conf
-Message-ID: <1787532.9Q2MHGpzCz@amdc1032>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 26 Nov 2014 18:28:57 +0100
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <20141027230138.GB7805@drone.musicnaut.iki.fi>
+References: <20141027200008.GR2560@atomide.com>
+ <20141027230138.GB7805@drone.musicnaut.iki.fi>
+Message-ID: <20141126172857.GA26157@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Values stored in val[] are never bigger than a byte.
+On Tue 2014-10-28 01:01:38, Aaro Koskinen wrote:
+> Hi,
+> 
+> On Mon, Oct 27, 2014 at 01:00:09PM -0700, Tony Lindgren wrote:
+> > +
+> > +	if (!of_have_populated_dt())
+> > +		pr_warn("WARNING: legacy booting deprecated, please update to boot with .dts\n");
+> > +
+> 
+> Maybe use WARN so that the warning is more verbose and kernel gets tainted?
 
-   text    data     bss     dec     hex filename
-   7716    3692       8   11416    2c98 arch/arm/mach-exynos/pmu.o.before
-   5436    1908       8    7352    1cb8 arch/arm/mach-exynos/pmu.o.after
+Well.. Pali still has regression where /proc/cpuinfo changes in a way
+that breaks existing userspace, when dt is used on N900.
 
-Cc: Pankaj Dubey <pankaj.dubey@samsung.com>
-Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-v2:
-- rebased on top of next-20141126 branch of linux-next kernel tree
-  (it also applies fine to for-next branch of linux-samsung.git)
+And rmk was less then helpfull...
 
- arch/arm/mach-exynos/pmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Should we maybe solve that before adding backtraces to our boot
+messages?
 
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index ccb0120..c15761c 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -25,7 +25,7 @@
- 
- struct exynos_pmu_conf {
- 	unsigned int offset;
--	unsigned int val[NUM_SYS_POWERDOWN];
-+	u8 val[NUM_SYS_POWERDOWN];
- };
- 
- struct exynos_pmu_data {
+									Pavel
 -- 
-1.8.2.3
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
