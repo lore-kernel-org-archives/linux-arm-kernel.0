@@ -1,52 +1,218 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 25 Nov 2014 21:38:53 -0500
-Subject: [PATCH] ARM: orion: convert the irq_reg_{readl, writel} calls
- to the new API
-In-Reply-To: <7996382.czGPtzUmj4@wuerfel>
-References: <1416928752-24529-1-git-send-email-gregory.clement@free-electrons.com>
- <CAOesGMiPkmX=o6ALPYGmF9Z9iY=YQyQMgC82pGF3X+ediv7=gQ@mail.gmail.com>
- <7996382.czGPtzUmj4@wuerfel>
-Message-ID: <20141126023853.GG22670@titan.lakedaemon.net>
+From: alvin.chen@intel.com (Weike Chen)
+Date: Wed, 26 Nov 2014 02:35:09 -0800
+Subject: [PATCH 1/2 v4] SPI: spi-pxa2xx: Add helpers for regiseters' accessing
+In-Reply-To: <1416998110-4856-1-git-send-email-alvin.chen@intel.com>
+References: <1416998110-4856-1-git-send-email-alvin.chen@intel.com>
+Message-ID: <1416998110-4856-2-git-send-email-alvin.chen@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 09:59:11PM +0100, Arnd Bergmann wrote:
-> On Tuesday 25 November 2014 12:24:16 Olof Johansson wrote:
-> > On Tue, Nov 25, 2014 at 7:19 AM, Gregory CLEMENT
-> > <gregory.clement@free-electrons.com> wrote:
-> > > The commit "genirq: Generic chip: Change irq_reg_{readl,writel}
-> > > arguments" modified the API. In the same tome the
-> > > arch/arm/plat-orion/gpio.c file received a fix with the use of the old
-> > > API: "ARM: orion: Fix for certain sequence of request_irq can cause
-> > > irq storm". This commit fixes the use of the API.
-> > >
-> > > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > > ---
-> > > Hi Jason,
-> > >
-> > > This patch fix a build error in linux-next:
-> > >
-> > > arch/arm/plat-orion/gpio.c:509:12: error: too few arguments to function 'irq_reg_readl'
-> > > arch/arm/plat-orion/gpio.c:511:2: error: too few arguments to function 'irq_reg_writel'
-> > > arch/arm/plat-orion/gpio.c:523:12: error: too few arguments to function 'irq_reg_readl'
-> > > arch/arm/plat-orion/gpio.c:525:2: error: too few arguments to function 'irq_reg_writel'
-> > >
-> > > But if we want to apply it on the mvebu branch we need to add a
-> > > dependecy to "332fd7c4fef5 genirq: Generic chip: Change
-> > > irq_reg_{readl,writel} arguments"
-> > 
-> > Please take this through the same repo as the change in the prototype:
-> > 
-> > Acked-by: Olof Johansson <olof@lixom.net>
-> > 
-> 
-> As mentioned before, the problem here is that the prototype gets changed
-> in the irqchip repo, while the gpio driver only starts using this interface
-> in the mvebu repo. Both trees are owned by Jason, so he should be able
-> to find a solution though.
+There are several registers for SPI, and the registers of 'SSCR0' and 'SSCR1'
+are accessed frequently. This path is to introduce helper functions to
+simplify the accessing of 'SSCR0' and 'SSCR1'.
 
-I made myself promise not rebase mvebu/fixes.  :-)
+Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Acked-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+Signed-off-by: Weike Chen <alvin.chen@intel.com>
+---
+ drivers/spi/spi-pxa2xx.c |  107 ++++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 84 insertions(+), 23 deletions(-)
 
-thx,
-
-Jason.
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index d8a105f..770b581 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -80,6 +80,73 @@ static bool is_lpss_ssp(const struct driver_data *drv_data)
+ 	return drv_data->ssp_type == LPSS_SSP;
+ }
+ 
++static u32 pxa2xx_spi_get_ssrc1_change_mask(const struct driver_data *drv_data)
++{
++	switch (drv_data->ssp_type) {
++	default:
++		return SSCR1_CHANGE_MASK;
++	}
++}
++
++static u32
++pxa2xx_spi_get_rx_default_thre(const struct driver_data *drv_data)
++{
++	switch (drv_data->ssp_type) {
++	default:
++		return RX_THRESH_DFLT;
++	}
++}
++
++static bool pxa2xx_spi_txfifo_full(const struct driver_data *drv_data)
++{
++	void __iomem *reg = drv_data->ioaddr;
++	u32 mask;
++
++	switch (drv_data->ssp_type) {
++	default:
++		mask = SSSR_TFL_MASK;
++		break;
++	}
++
++	return (read_SSSR(reg) & mask) == mask;
++}
++
++static void pxa2xx_spi_clear_rx_thre(const struct driver_data *drv_data,
++				     u32 *sccr1_reg)
++{
++	u32 mask;
++
++	switch (drv_data->ssp_type) {
++	default:
++		mask = SSCR1_RFT;
++		break;
++	}
++	*sccr1_reg &= ~mask;
++}
++
++static void pxa2xx_spi_set_rx_thre(const struct driver_data *drv_data,
++				   u32 *sccr1_reg, u32 threshold)
++{
++	switch (drv_data->ssp_type) {
++	default:
++		*sccr1_reg |= SSCR1_RxTresh(threshold);
++		break;
++	}
++}
++
++static u32 pxa2xx_configure_sscr0(const struct driver_data *drv_data,
++				  u32 clk_div, u8 bits)
++{
++	switch (drv_data->ssp_type) {
++	default:
++		return clk_div
++			| SSCR0_Motorola
++			| SSCR0_DataSize(bits > 16 ? bits - 16 : bits)
++			| SSCR0_SSE
++			| (bits > 16 ? SSCR0_EDSS : 0);
++	}
++}
++
+ /*
+  * Read and write LPSS SSP private registers. Caller must first check that
+  * is_lpss_ssp() returns true before these can be called.
+@@ -234,7 +301,7 @@ static int null_writer(struct driver_data *drv_data)
+ 	void __iomem *reg = drv_data->ioaddr;
+ 	u8 n_bytes = drv_data->n_bytes;
+ 
+-	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
++	if (pxa2xx_spi_txfifo_full(drv_data)
+ 		|| (drv_data->tx == drv_data->tx_end))
+ 		return 0;
+ 
+@@ -262,7 +329,7 @@ static int u8_writer(struct driver_data *drv_data)
+ {
+ 	void __iomem *reg = drv_data->ioaddr;
+ 
+-	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
++	if (pxa2xx_spi_txfifo_full(drv_data)
+ 		|| (drv_data->tx == drv_data->tx_end))
+ 		return 0;
+ 
+@@ -289,7 +356,7 @@ static int u16_writer(struct driver_data *drv_data)
+ {
+ 	void __iomem *reg = drv_data->ioaddr;
+ 
+-	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
++	if (pxa2xx_spi_txfifo_full(drv_data)
+ 		|| (drv_data->tx == drv_data->tx_end))
+ 		return 0;
+ 
+@@ -316,7 +383,7 @@ static int u32_writer(struct driver_data *drv_data)
+ {
+ 	void __iomem *reg = drv_data->ioaddr;
+ 
+-	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
++	if (pxa2xx_spi_txfifo_full(drv_data)
+ 		|| (drv_data->tx == drv_data->tx_end))
+ 		return 0;
+ 
+@@ -508,8 +575,9 @@ static irqreturn_t interrupt_transfer(struct driver_data *drv_data)
+ 		 * remaining RX bytes.
+ 		 */
+ 		if (pxa25x_ssp_comp(drv_data)) {
++			u32 rx_thre;
+ 
+-			sccr1_reg &= ~SSCR1_RFT;
++			pxa2xx_spi_clear_rx_thre(drv_data, &sccr1_reg);
+ 
+ 			bytes_left = drv_data->rx_end - drv_data->rx;
+ 			switch (drv_data->n_bytes) {
+@@ -519,10 +587,11 @@ static irqreturn_t interrupt_transfer(struct driver_data *drv_data)
+ 				bytes_left >>= 1;
+ 			}
+ 
+-			if (bytes_left > RX_THRESH_DFLT)
+-				bytes_left = RX_THRESH_DFLT;
++			rx_thre = pxa2xx_spi_get_rx_default_thre(drv_data);
++			if (rx_thre > bytes_left)
++				rx_thre = bytes_left;
+ 
+-			sccr1_reg |= SSCR1_RxTresh(bytes_left);
++			pxa2xx_spi_set_rx_thre(drv_data, &sccr1_reg, rx_thre);
+ 		}
+ 		write_SSCR1(sccr1_reg, reg);
+ 	}
+@@ -613,6 +682,7 @@ static void pump_transfers(unsigned long data)
+ 	u32 cr1;
+ 	u32 dma_thresh = drv_data->cur_chip->dma_threshold;
+ 	u32 dma_burst = drv_data->cur_chip->dma_burst_size;
++	u32 change_mask = pxa2xx_spi_get_ssrc1_change_mask(drv_data);
+ 
+ 	/* Get current state information */
+ 	message = drv_data->cur_msg;
+@@ -731,11 +801,7 @@ static void pump_transfers(unsigned long data)
+ 						     "pump_transfers: DMA burst size reduced to match bits_per_word\n");
+ 		}
+ 
+-		cr0 = clk_div
+-			| SSCR0_Motorola
+-			| SSCR0_DataSize(bits > 16 ? bits - 16 : bits)
+-			| SSCR0_SSE
+-			| (bits > 16 ? SSCR0_EDSS : 0);
++		cr0 = pxa2xx_configure_sscr0(drv_data, clk_div, bits);
+ 	}
+ 
+ 	message->state = RUNNING_STATE;
+@@ -772,16 +838,15 @@ static void pump_transfers(unsigned long data)
+ 	}
+ 
+ 	/* see if we need to reload the config registers */
+-	if ((read_SSCR0(reg) != cr0)
+-		|| (read_SSCR1(reg) & SSCR1_CHANGE_MASK) !=
+-			(cr1 & SSCR1_CHANGE_MASK)) {
++	if ((read_SSCR0(reg) != cr0) ||
++	    (read_SSCR1(reg) & change_mask) != (cr1 & change_mask)) {
+ 
+ 		/* stop the SSP, and update the other bits */
+ 		write_SSCR0(cr0 & ~SSCR0_SSE, reg);
+ 		if (!pxa25x_ssp_comp(drv_data))
+ 			write_SSTO(chip->timeout, reg);
+ 		/* first set CR1 without interrupt and service enables */
+-		write_SSCR1(cr1 & SSCR1_CHANGE_MASK, reg);
++		write_SSCR1(cr1 & change_mask, reg);
+ 		/* restart the SSP */
+ 		write_SSCR0(cr0, reg);
+ 
+@@ -959,12 +1024,8 @@ static int setup(struct spi_device *spi)
+ 	clk_div = ssp_get_clk_div(drv_data, spi->max_speed_hz);
+ 	chip->speed_hz = spi->max_speed_hz;
+ 
+-	chip->cr0 = clk_div
+-			| SSCR0_Motorola
+-			| SSCR0_DataSize(spi->bits_per_word > 16 ?
+-				spi->bits_per_word - 16 : spi->bits_per_word)
+-			| SSCR0_SSE
+-			| (spi->bits_per_word > 16 ? SSCR0_EDSS : 0);
++	chip->cr0 = pxa2xx_configure_sscr0(drv_data, clk_div,
++					   spi->bits_per_word);
+ 	chip->cr1 &= ~(SSCR1_SPO | SSCR1_SPH);
+ 	chip->cr1 |= (((spi->mode & SPI_CPHA) != 0) ? SSCR1_SPH : 0)
+ 			| (((spi->mode & SPI_CPOL) != 0) ? SSCR1_SPO : 0);
+-- 
+1.7.9.5
