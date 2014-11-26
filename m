@@ -1,94 +1,34 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 26 Nov 2014 15:38:56 +0100
-Subject: [PATCH 3/7] KVM: arm: guest debug, add stub KVM_SET_GUEST_DEBUG
- ioctl
-In-Reply-To: <1416931805-23223-4-git-send-email-alex.bennee@linaro.org>
-References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
- <1416931805-23223-4-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20141126143855.GC3245@hawk.usersys.redhat.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 26 Nov 2014 14:40:55 +0000
+Subject: [PATCH 2/2] MAINTAINERS: ARM Versatile Express platform
+In-Reply-To: <2667096.evZZoH9ryD@wuerfel>
+References: <1416939455-1814-1-git-send-email-pawel.moll@arm.com>
+ <1416967146.8358.19.camel@perches.com> <1417003449.3972.1.camel@arm.com>
+ <2667096.evZZoH9ryD@wuerfel>
+Message-ID: <1417012855.3972.3.camel@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 04:10:01PM +0000, Alex Benn?e wrote:
-> This commit adds a stub function to support the KVM_SET_GUEST_DEBUG
-> ioctl. Currently any operation flag will return EINVAL. Actual
-> functionality will be added with further patches.
-
-Technically the stub is already there, and you're extending it to
-start looking at control flags, but still not doing anything yet.
-
+On Wed, 2014-11-26 at 12:17 +0000, Arnd Bergmann wrote:
+> On Wednesday 26 November 2014 12:04:09 Pawel Moll wrote:
+> > 
+> > Right, of course. Whole directory.
+> > 
+> > > F:    */*/vexpress*
+> > 
+> > Cool, didn't think about multiple wildcards. 
 > 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>.
+> Actually, I think you could even do this as
 > 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index 7610eaa..2c6386e 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -2570,7 +2570,7 @@ handled.
->  4.87 KVM_SET_GUEST_DEBUG
->  
->  Capability: KVM_CAP_SET_GUEST_DEBUG
-> -Architectures: x86, s390, ppc
-> +Architectures: x86, s390, ppc, arm64
->  Type: vcpu ioctl
->  Parameters: struct kvm_guest_debug (in)
->  Returns: 0 on success; -1 on error
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 9e193c8..a0ff410 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -180,6 +180,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->  	case KVM_CAP_ARM_PSCI:
->  	case KVM_CAP_ARM_PSCI_0_2:
->  	case KVM_CAP_READONLY_MEM:
-> +	case KVM_CAP_SET_GUEST_DEBUG:
->  		r = 1;
->  		break;
->  	case KVM_CAP_COALESCED_MMIO:
-> @@ -302,7 +303,34 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->  					struct kvm_guest_debug *dbg)
->  {
-> -	return -EINVAL;
-> +	/* If it's not enabled clear all flags */
-> +	if (!(dbg->control & KVM_GUESTDBG_ENABLE)) {
-> +		vcpu->guest_debug = 0;
-> +		return 0;
-> +	}
-> +
-> +	vcpu->guest_debug = dbg->control;
-> +	kvm_info("%s: guest_debug is 0x%lx\n", __func__, vcpu->guest_debug);
-> +
-> +	/* Single Step */
-> +	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-> +		kvm_info("SS requested, not yet implemented\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* Software Break Points */
-> +	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP) {
-> +		kvm_info("SW BP support requested, not yet implemented\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* Hardware assisted Break and Watch points */
-> +	if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) {
-> +		kvm_info("HW BP support requested, not yet implemented\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
->  }
-
-I guess all the kvm_info's were useful for developing this patch series,
-but do we still need them?
-
->  
->  
-> -- 
-> 2.1.3
+> N:	vexpress
 > 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> which would be even shorter and match most of the other entries too.
+
+If you think it's safe, fine with me. It would reduce this section to:
+
+N:	vexpress
+F:	drivers/clocksource/versatile.c
+
+I'll spin the patch again.
+
+Pawel
