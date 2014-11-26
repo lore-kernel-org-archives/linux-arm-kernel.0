@@ -1,30 +1,30 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 26 Nov 2014 18:31:22 +0200
-Subject: [PATCH v2 2/5] i2c: davinci: query STP always when NACK is
- received
-In-Reply-To: <20141126155711.GL4431@pengutronix.de>
-References: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
- <1417010393-30598-3-git-send-email-grygorii.strashko@ti.com>
- <20141126155711.GL4431@pengutronix.de>
-Message-ID: <5476005A.6090207@ti.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 26 Nov 2014 17:31:46 +0100
+Subject: [PATCH v2 0/5] Fix Arndale Octa/Peach Pi boot on Audio subsystem
+ clocks
+In-Reply-To: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
+References: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <54760072.8010307@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2014 05:57 PM, Uwe Kleine-K?nig wrote:
-> Hello,
->
-> I don't understand your use of "query" in the subject and later in the
-> commit log. Do you mean "send"?
+Hello Krzysztof,
 
-will change to "generate". Ok?
+On 11/26/2014 03:24 PM, Krzysztof Kozlowski wrote:
+> Description
+> ===========
+> This patchset tries to solve dependency between AudioSS components
+> (clocks and GPIO) and main clock controller on Exynos platform.
+> 
+> This solves boot failure of Peach Pi/Pit and Arndale Octa [1].
+> 
 
->
-> On Wed, Nov 26, 2014 at 03:59:50PM +0200, Grygorii Strashko wrote:
->> According to I2C specification the NACK should be handled as folows:
-> s/folows/follows/
-ok.
+I tested and patches #2, #3, #4 solves the boot failure I was facing.
+So for the whole series on an Exynos5420 Peach Pit:
 
-Can I assume that you are ok with this patch in general?
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-regards,
--grygorii
+Thanks a lot for solving this issue.
+
+Best regards,
+Javier
