@@ -1,66 +1,148 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 26 Nov 2014 15:59:50 +0200
-Subject: [PATCH v2 2/5] i2c: davinci: query STP always when NACK is received
+Date: Wed, 26 Nov 2014 15:59:52 +0200
+Subject: [PATCH v2 4/5] i2c: davinci: use bus recovery infrastructure
 In-Reply-To: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
 References: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1417010393-30598-3-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1417010393-30598-5-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to I2C specification the NACK should be handled as folows:
-"When SDA remains HIGH during this ninth clock pulse, this is defined as the Not
-Acknowledge signal. The master can then generate either a STOP condition to
-abort the transfer, or a repeated START condition to start a new transfer."
-[I2C spec Rev. 6, 3.1.6: http://www.nxp.com/documents/user_manual/UM10204.pdf]
+This patch converts Davinci I2C driver to use I2C bus recovery
+infrastructure, introduced by commit 5f9296ba21b3 ("i2c: Add
+bus recovery infrastructure").
 
-Currently the Davinci i2c driver interrupts the transfer on receipt of a
-NACK but fails to send a STOP in some situations and so makes the bus
-stuck until next I2C IP reset (idle/enable).
+The i2c_bus_recovery_info is configured for Davinci I2C adapter
+only in case if scl_pin is provided in platform data at least.
 
-For example, the issue will happen during SMBus read transfer which
-consists from two i2c messages write command/address and read data:
-
-S Slave Address Wr A Command Code A Sr Slave Address Rd A D1..Dn A P
-<--- write -----------------------> <--- read --------------------->
-
-The I2C client device will send NACK if it can't recognize "Command Code"
-and it's expected from I2C master to query STP in this case.
-But now, Davinci i2C driver will just exit with -EREMOTEIO and STP will
-not be queried.
-
-Hence, fix it by querying Stop condition (STP) always when NACK is received.
-
-This patch fixes Davinci I2C in the same way it was done for OMAP I2C
-commit cda2109a26eb ("i2c: omap: query STP always when NACK is received").
+As the controller must be held in reset while doing so, the
+recovery routine must re-init the controller. Since this was already
+being done after each call to i2c_recover_bus, move those calls into
+the recovery_prepare/unprepare routines and as well.
 
 CC: Sekhar Nori <nsekhar@ti.com>
 CC: Kevin Hilman <khilman@deeprootsystems.com>
 CC: Santosh Shilimkar <ssantosh@kernel.org>
 CC: Murali Karicheri <m-karicheri2@ti.com>
-Reported-by: Hein Tibosch <hein_tibosch@yahoo.es>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- drivers/i2c/busses/i2c-davinci.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ drivers/i2c/busses/i2c-davinci.c | 77 +++++++++++++++++++---------------------
+ 1 file changed, 36 insertions(+), 41 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
-index 7f54903..1990ae8 100644
+index 1990ae8..b8605b4 100644
 --- a/drivers/i2c/busses/i2c-davinci.c
 +++ b/drivers/i2c/busses/i2c-davinci.c
-@@ -411,11 +411,9 @@ i2c_davinci_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg, int stop)
- 	if (dev->cmd_err & DAVINCI_I2C_STR_NACK) {
- 		if (msg->flags & I2C_M_IGNORE_NAK)
- 			return msg->len;
--		if (stop) {
--			w = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
--			w |= DAVINCI_I2C_MDR_STP;
--			davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, w);
+@@ -133,43 +133,6 @@ static inline u16 davinci_i2c_read_reg(struct davinci_i2c_dev *i2c_dev, int reg)
+ 	return readw_relaxed(i2c_dev->base + reg);
+ }
+ 
+-/* Generate a pulse on the i2c clock pin. */
+-static void davinci_i2c_clock_pulse(unsigned int scl_pin)
+-{
+-	u16 i;
+-
+-	if (scl_pin) {
+-		/* Send high and low on the SCL line */
+-		for (i = 0; i < 9; i++) {
+-			gpio_set_value(scl_pin, 0);
+-			udelay(20);
+-			gpio_set_value(scl_pin, 1);
+-			udelay(20);
 -		}
-+		w = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
-+		w |= DAVINCI_I2C_MDR_STP;
-+		davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, w);
- 		return -EREMOTEIO;
+-	}
+-}
+-
+-/* This routine does i2c bus recovery as specified in the
+- * i2c protocol Rev. 03 section 3.16 titled "Bus clear"
+- */
+-static void davinci_i2c_recover_bus(struct davinci_i2c_dev *dev)
+-{
+-	u32 flag = 0;
+-	struct davinci_i2c_platform_data *pdata = dev->pdata;
+-
+-	dev_err(dev->dev, "initiating i2c bus recovery\n");
+-	/* Send NACK to the slave */
+-	flag = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
+-	flag |=  DAVINCI_I2C_MDR_NACK;
+-	/* write the data into mode register */
+-	davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, flag);
+-	davinci_i2c_clock_pulse(pdata->scl_pin);
+-	/* Send STOP */
+-	flag = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
+-	flag |= DAVINCI_I2C_MDR_STP;
+-	davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, flag);
+-}
+-
+ static inline void davinci_i2c_reset_ctrl(struct davinci_i2c_dev *i2c_dev,
+ 								int val)
+ {
+@@ -267,6 +230,34 @@ static int i2c_davinci_init(struct davinci_i2c_dev *dev)
+ }
+ 
+ /*
++ * This routine does i2c bus recovery by using i2c_generic_gpio_recovery
++ * which is provided by I2C Bus recovery infrastructure.
++ */
++static void davinci_i2c_prepare_recovery(struct i2c_adapter *adap)
++{
++	struct davinci_i2c_dev *dev = i2c_get_adapdata(adap);
++
++	/* Disable interrupts */
++	davinci_i2c_write_reg(dev, DAVINCI_I2C_IMR_REG, 0);
++
++	/* put I2C into reset */
++	davinci_i2c_reset_ctrl(dev, 0);
++}
++
++static void davinci_i2c_unprepare_recovery(struct i2c_adapter *adap)
++{
++	struct davinci_i2c_dev *dev = i2c_get_adapdata(adap);
++
++	i2c_davinci_init(dev);
++}
++
++static struct i2c_bus_recovery_info davinci_i2c_gpio_recovery_info = {
++	.recover_bus = i2c_generic_gpio_recovery,
++	.prepare_recovery = davinci_i2c_prepare_recovery,
++	.unprepare_recovery = davinci_i2c_unprepare_recovery,
++};
++
++/*
+  * Waiting for bus not busy
+  */
+ static int i2c_davinci_wait_bus_not_busy(struct davinci_i2c_dev *dev,
+@@ -286,8 +277,7 @@ static int i2c_davinci_wait_bus_not_busy(struct davinci_i2c_dev *dev,
+ 				return -ETIMEDOUT;
+ 			} else {
+ 				to_cnt = 0;
+-				davinci_i2c_recover_bus(dev);
+-				i2c_davinci_init(dev);
++				i2c_recover_bus(&dev->adapter);
+ 			}
+ 		}
+ 		if (allow_sleep)
+@@ -376,8 +366,7 @@ i2c_davinci_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg, int stop)
+ 						      dev->adapter.timeout);
+ 	if (r == 0) {
+ 		dev_err(dev->dev, "controller timed out\n");
+-		davinci_i2c_recover_bus(dev);
+-		i2c_davinci_init(dev);
++		i2c_recover_bus(adap);
+ 		dev->buf_len = 0;
+ 		return -ETIMEDOUT;
  	}
- 	return -EIO;
+@@ -721,6 +710,12 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ 	adap->timeout = DAVINCI_I2C_TIMEOUT;
+ 	adap->dev.of_node = pdev->dev.of_node;
+ 
++	if (dev->pdata->scl_pin) {
++		adap->bus_recovery_info = &davinci_i2c_gpio_recovery_info;
++		adap->bus_recovery_info->scl_gpio = dev->pdata->scl_pin;
++		adap->bus_recovery_info->sda_gpio = dev->pdata->sda_pin;
++	}
++
+ 	adap->nr = pdev->id;
+ 	r = i2c_add_numbered_adapter(adap);
+ 	if (r) {
 -- 
 1.9.1
