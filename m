@@ -1,34 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Nov 2014 22:32:47 +0100
-Subject: [RFC PATCH 1/2] asm-generic: io: Add exec versions of ioremap
-In-Reply-To: <cb5e9dd7bd71b13551cd3f32f28feb405ea9fcdd.1417029918.git.d-gerlach@ti.com>
-References: <cover.1417029918.git.d-gerlach@ti.com>
- <cb5e9dd7bd71b13551cd3f32f28feb405ea9fcdd.1417029918.git.d-gerlach@ti.com>
-Message-ID: <2060921.TrTof4X6qj@wuerfel>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 26 Nov 2014 15:38:08 -0600
+Subject: [RFC PATCH 1/3] Documentation: dt: add ti, am3353-wkup-m3-ipc bindings
+In-Reply-To: <cover.1417029919.git.d-gerlach@ti.com>
+References: <cover.1417029919.git.d-gerlach@ti.com>
+Message-ID: <25c3f49c4f5acb4a3180a3f3481dee467eb3a2b7.1417029919.git.d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 November 2014 15:14:00 Dave Gerlach wrote:
-> @@ -66,6 +66,11 @@ extern void ioport_unmap(void __iomem *);
->  #define ioremap_wc ioremap_nocache
->  #endif
->  
-> +#ifndef ARCH_HAS_IOREMAP_EXEC
-> +#define ioremap_exec ioremap
-> +#define ioremap_exec_nocache ioremap_nocache
-> +#endif
-> +
->  #ifdef CONFIG_PCI
->  /* Destroy a virtual mapping cookie for a PCI BAR (memory or IO) */
->  struct pci_dev;
-> 
+Add the device tree bindings document for ti,am3353-wkup-m3-ipc which
+is used by the wkup_m3_ipc driver.
 
-ioremap and ioremap_nocache are the same, and there is no
-architecture-independent interface to map an MMIO range as
-cached because a lot of architectures can't do that.
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ .../devicetree/bindings/soc/ti/wkup_m3_ipc.txt     | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
 
-Also, I think there are architectures that cannot execute
-from uncached memory, so I think adding this as a generic
-API is not a good idea.
-
-	Arnd
+diff --git a/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
+new file mode 100644
+index 0000000..ceb6acf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
+@@ -0,0 +1,41 @@
++Wakeup M3 IPC Driver
++=====================
++
++TI AMx3 family of devices use a Cortex M3 co-processor to help with various
++low power tasks that cannot be controlled from the MPU like suspend/resume
++and certain deep C-states for CPU Idle. Once the wkup_m3_ipc driver uses the
++wkup_m3_rproc driver to boot the wkup_m3, it handles communication with the
++CM3 using IPC registers present in the SoC's control module and a mailbox.
++The wkup_m3_ipc exposes an API to allow the SoC PM code to execute specific
++PM tasks.
++
++Wkup M3 Device Node:
++====================
++A wkup_m3_ipc device node is used to represent a wakeup M3 IP instance within
++an SoC. The sub-mailboxes are represented as child node of this parent node.
++
++Required properties:
++--------------------
++- compatible:		Should be "ti,am3353-wkup-m3-ipc" for AM33xx SoCs
++- reg:			Contains the wkup_m3 register address ranges for
++			ipc-regs.
++- reg-names:		Name for ipc-regs given above
++- interrupts:		Contains the interrupt information for the wkup_m3
++			interrupt that signals the MPU.
++- ti,rproc:		Phandle to the wkup_m3 rproc node so the IPC driver
++			can boot it.
++- mboxes:		Phandles used by IPC framework to get correct mbox
++			channel for communication. Must point to appropriate
++			mbox_wkupm3 child node.
++
++Example:
++--------
++/* AM33xx */
++wkup_m3_ipc: wkup_m3_ipc at 44e11324 {
++	compatible = "ti,am3353-wkup-m3-ipc";
++	reg = <0x44e11324 0x0024>;
++	reg-names = "ipc_regs";
++	interrupts = <78>;
++	ti,rproc = <&wkup_m3>;
++	mboxes = <&mailbox &mbox_wkupm3>;
++};
+-- 
+2.1.0
