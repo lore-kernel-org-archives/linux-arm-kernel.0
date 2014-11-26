@@ -1,266 +1,98 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 26 Nov 2014 15:52:31 -0600
-Subject: [RFC PATCH v5 2/4] ARM: OMAP2+: AM33XX: Add assembly code for PM
- operations
+Date: Wed, 26 Nov 2014 15:52:33 -0600
+Subject: [RFC PATCH v5 4/4] ARM: OMAP2+: AM33XX: Hookup AM33XX PM code into
+ OMAP builds
 In-Reply-To: <cover.1417038624.git.d-gerlach@ti.com>
 References: <cover.1417038624.git.d-gerlach@ti.com>
-Message-ID: <91ebad5059aeef618386c3ff311f275e4b0ec381.1417038624.git.d-gerlach@ti.com>
+Message-ID: <c5c9586aef3eb4ccddeefd0f40b20d60eeb062c8.1417038624.git.d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for suspend-resume support for AM33XX, add
-the assembly file with the code which is copied to internal
-memory (OCMC RAM) during bootup and runs from there.
+With all the requisite changes in place we can now enable basic
+PM support for AM33xx. This patch updates the various OMAP files
+to enable suspend-resume on AM33xx.
 
-As part of the low power entry (DeepSleep0 mode in AM33XX TRM),
-the code running from OCMC RAM does the following
-1. Calls routine to store the EMIF configuration
-2. Calls routine to place external memory in self-refresh
-3. Disables EMIF clock
-4. Executes WFI after writing to MPU_CLKCTRL register.
-
-If no interrupts have come, WFI execution on MPU gets registered
-as an interrupt with the WKUP-M3. WKUP-M3 takes care of disabling
-some clocks which MPU should not (L3, L4, OCMC RAM etc) and takes
-care of clockdomain and powerdomain transitions as part of the
-DeepSleep0 mode entry.
-
-In case a late interrupt comes in, WFI ends up as a NOP and MPU
-continues execution from internal memory. The 'abort path' code
-undoes whatever was done as part of the low power entry and indicates
-a suspend failure by passing a non-zero value to the cpu_resume routine.
-
-The 'resume path' code is similar to the 'abort path' with the key
-difference of MMU being enabled in the 'abort path' but being
-disabled in the 'resume path' due to MPU getting powered off.
+Because the suspend resume functionality is different on AM33xx
+than other OMAP platforms due to the need for M3 firmware and an
+IPC channel to be in place, separate PM ops are used instead of
+omap_pm_ops.
 
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/mach-omap2/sleep33xx.S | 216 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 216 insertions(+)
- create mode 100644 arch/arm/mach-omap2/sleep33xx.S
+ arch/arm/mach-omap2/Makefile | 2 ++
+ arch/arm/mach-omap2/common.h | 9 +++++++++
+ arch/arm/mach-omap2/io.c     | 1 +
+ arch/arm/mach-omap2/pm.h     | 6 ++++++
+ 4 files changed, 18 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/sleep33xx.S b/arch/arm/mach-omap2/sleep33xx.S
-new file mode 100644
-index 0000000..9399a16
---- /dev/null
-+++ b/arch/arm/mach-omap2/sleep33xx.S
-@@ -0,0 +1,216 @@
-+/*
-+ * Low level suspend code for AM33XX SoCs
-+ *
-+ * Copyright (C) 2012-2014 Texas Instruments Incorporated - http://www.ti.com/
-+ *	Vaibhav Bedia, Dave Gerlach
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index d9e9412..6d1464d 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -90,6 +90,7 @@ omap-4-5-pm-common			=  pm44xx.o omap-mpuss-lowpower.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-pm-common)
+ obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-pm-common)
+ obj-$(CONFIG_SOC_DRA7XX)		+= $(omap-4-5-pm-common)
++obj-$(CONFIG_SOC_AM33XX)		+= pm33xx.o sleep33xx.o
+ obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+ 
+ obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
+@@ -97,6 +98,7 @@ obj-$(CONFIG_POWER_AVS_OMAP_CLASS3)    += smartreflex-class3.o
+ 
+ AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
+ AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a$(plus_sec)
++AFLAGS_sleep33xx.o			:=-Wa,-march=armv7-a$(plus_sec)
+ 
+ endif
+ 
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 377eea8..64bf9a8 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -76,6 +76,15 @@ static inline int omap4_pm_init_early(void)
+ }
+ #endif
+ 
++#if defined(CONFIG_PM) && defined(CONFIG_SOC_AM33XX)
++int am33xx_pm_init(void);
++#else
++static inline int am33xx_pm_init(void)
++{
++	return 0;
++}
++#endif
 +
-+#include <linux/linkage.h>
-+#include <asm/memory.h>
-+#include <asm/assembler.h>
+ #ifdef CONFIG_OMAP_MUX
+ int omap_mux_late_init(void);
+ #else
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 03cbb16..4b7828a 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -575,6 +575,7 @@ void __init am33xx_init_early(void)
+ void __init am33xx_init_late(void)
+ {
+ 	omap_common_late_init();
++	am33xx_pm_init();
+ }
+ #endif
+ 
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 425bfcd..9e19340 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -81,6 +81,12 @@ extern unsigned int omap3_do_wfi_sz;
+ /* ... and its pointer from SRAM after copy */
+ extern void (*omap3_do_wfi_sram)(void);
+ 
++/* am33xx_do_wfi function pointer and size, for copy to SRAM */
++extern void am33xx_do_wfi(void);
++extern unsigned int am33xx_do_wfi_sz;
++extern unsigned int am33xx_resume_offset;
++extern unsigned long am33xx_emif_sram_table;
 +
-+#include "iomap.h"
-+#include "cm33xx.h"
-+
-+#define AM33XX_CM_CLKCTRL_MODULEMODE_DISABLE			0x0003
-+#define AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE			0x0002
-+
-+	.text
-+	.align 3
-+
-+ENTRY(am33xx_do_wfi)
-+	stmfd	sp!, {r4 - r11, lr}	@ save registers on stack
-+
-+	/*
-+	 * Flush all data from the L1 and L2 data cache before disabling
-+	 * SCTLR.C bit.
-+	 */
-+	ldr	r1, kernel_flush
-+	blx	r1
-+
-+	/*
-+	 * Clear the SCTLR.C bit to prevent further data cache
-+	 * allocation. Clearing SCTLR.C would make all the data accesses
-+	 * strongly ordered and would not hit the cache.
-+	 */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	bic	r0, r0, #(1 << 2)	@ Disable the C bit
-+	mcr	p15, 0, r0, c1, c0, 0
-+	isb
-+
-+	/*
-+	 * Invalidate L1 and L2 data cache.
-+	 */
-+	ldr	r1, kernel_flush
-+	blx	r1
-+
-+	ldr	r1, ti_emif_save_context
-+	blx	r1
-+
-+	ldr	r1, ti_emif_enter_sr
-+	blx	r1
-+
-+	/* Disable EMIF */
-+	ldr     r1, virt_emif_clkctrl
-+	ldr     r2, [r1]
-+	bic     r2, r2, #AM33XX_CM_CLKCTRL_MODULEMODE_DISABLE
-+	str     r2, [r1]
-+
-+	ldr	r1, virt_emif_clkctrl
-+wait_emif_disable:
-+	ldr	r2, [r1]
-+	ldr	r3, module_disabled_val
-+	cmp	r2, r3
-+	bne	wait_emif_disable
-+
-+	/*
-+	 * For the MPU WFI to be registered as an interrupt
-+	 * to WKUP_M3, MPU_CLKCTRL.MODULEMODE needs to be set
-+	 * to DISABLED
-+	 */
-+	ldr	r1, virt_mpu_clkctrl
-+	ldr	r2, [r1]
-+	bic	r2, r2, #AM33XX_CM_CLKCTRL_MODULEMODE_DISABLE
-+	str	r2, [r1]
-+
-+	/*
-+	 * Execute an ISB instruction to ensure that all of the
-+	 * CP15 register changes have been committed.
-+	 */
-+	isb
-+
-+	/*
-+	 * Execute a barrier instruction to ensure that all cache,
-+	 * TLB and branch predictor maintenance operations issued
-+	 * have completed.
-+	 */
-+	dsb
-+	dmb
-+
-+	/*
-+	 * Execute a WFI instruction and wait until the
-+	 * STANDBYWFI output is asserted to indicate that the
-+	 * CPU is in idle and low power state. CPU can specualatively
-+	 * prefetch the instructions so add NOPs after WFI. Thirteen
-+	 * NOPs as per Cortex-A8 pipeline.
-+	 */
-+	wfi
-+
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+
-+	/* We come here in case of an abort due to a late interrupt */
-+
-+	/* Set MPU_CLKCTRL.MODULEMODE back to ENABLE */
-+	ldr	r1, virt_mpu_clkctrl
-+	mov	r2, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
-+	str	r2, [r1]
-+
-+	/* Re-enable EMIF */
-+	ldr	r1, virt_emif_clkctrl
-+	mov	r2, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
-+	str	r2, [r1]
-+wait_emif_enable:
-+	ldr	r3, [r1]
-+	cmp	r2, r3
-+	bne	wait_emif_enable
-+
-+	ldr	r1, ti_emif_abort_sr
-+	blx	r1
-+
-+	/*
-+	 * Set SCTLR.C bit to allow data cache allocation
-+	 */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	orr	r0, r0, #(1 << 2)	@ Enable the C bit
-+	mcr	p15, 0, r0, c1, c0, 0
-+	isb
-+
-+	/* Let the suspend code know about the abort */
-+	mov	r0, #1
-+	ldmfd	sp!, {r4 - r11, pc}	@ restore regs and return
-+ENDPROC(am33xx_do_wfi)
-+
-+	.align
-+ENTRY(am33xx_resume_offset)
-+	.word . - am33xx_do_wfi
-+
-+ENTRY(am33xx_resume_from_deep_sleep)
-+	/* Re-enable EMIF */
-+	ldr	r0, phys_emif_clkctrl
-+	mov	r1, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
-+	str	r1, [r0]
-+wait_emif_enable1:
-+	ldr	r2, [r0]
-+	cmp	r1, r2
-+	bne	wait_emif_enable1
-+
-+	adr	sp, temp_stack
-+
-+	ldr	r1, ti_emif_restore_context
-+	blx	r1
-+
-+	ldr	r1, ti_emif_exit_sr
-+	blx	r1
-+
-+resume_to_ddr:
-+	/* We are back. Branch to the common CPU resume routine */
-+	mov	r0, #0
-+	ldr	pc, resume_addr
-+ENDPROC(am33xx_resume_from_deep_sleep)
-+
-+/*
-+ * Local variables
-+ */
-+	.align
-+resume_addr:
-+	.word	cpu_resume - PAGE_OFFSET + 0x80000000
-+kernel_flush:
-+	.word   v7_flush_dcache_all
-+virt_mpu_clkctrl:
-+	.word	AM33XX_CM_MPU_MPU_CLKCTRL
-+virt_emif_clkctrl:
-+	.word	AM33XX_CM_PER_EMIF_CLKCTRL
-+phys_emif_clkctrl:
-+	.word	(AM33XX_CM_BASE + AM33XX_CM_PER_MOD + \
-+		AM33XX_CM_PER_EMIF_CLKCTRL_OFFSET)
-+module_disabled_val:
-+	.word	0x30000
-+
-+/* DDR related defines */
-+ENTRY(am33xx_emif_sram_table)
-+ti_emif_save_context:
-+	.word	0x00000000
-+ti_emif_restore_context:
-+	.word	0x00000000
-+ti_emif_enter_sr:
-+	.word	0x00000000
-+ti_emif_exit_sr:
-+	.word	0x00000000
-+ti_emif_abort_sr:
-+	.word	0x00000000
-+	.align 3
-+	.space 64
-+temp_stack:
-+ENTRY(am33xx_do_wfi_sz)
-+	.word	. - am33xx_do_wfi
+ /* save_secure_ram_context function pointer and size, for copy to SRAM */
+ extern int save_secure_ram_context(u32 *addr);
+ extern unsigned int save_secure_ram_context_sz;
 -- 
 2.1.0
