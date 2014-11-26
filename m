@@ -1,61 +1,44 @@
-From: zhang.lyra@gmail.com (Lyra Zhang)
-Date: Wed, 26 Nov 2014 11:08:01 +0800
-Subject: [PATCH v3 4/5] arm64: Add support for Spreadtrum's Sharkl64
- Platform in Kconfig and defconfig
-In-Reply-To: <3490516.nCDXzA8J8x@wuerfel>
-References: <1416917818-10506-5-git-send-email-chunyan.zhang@spreadtrum.com>
- <3490516.nCDXzA8J8x@wuerfel>
-Message-ID: <CAAfSe-uDk-ih2tqU9a3UEzr=BZgU_=+XJm9=zWbE3J4HMOuiog@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 26 Nov 2014 11:13:48 +0800
+Subject: [PATCH v2 3/3] ARM: at91: sama5d4: Add SFR
+In-Reply-To: <1416933604-31446-3-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1416933604-31446-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1416933604-31446-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5475456C.509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-25 20:57 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+Hi, Alexandre
+
+On 11/26/2014 12:40 AM, Alexandre Belloni wrote:
+> The sama4d4 has Special Function Registers that allow to manage DDR, OHCI, EBI
+> and AIC interrupt redirection.
+
+Just a nitpick, It should be sama5d4, not sama4d4.
+
+Best Regards,
+Josh Wu
+
 >
-> On Tuesday 25 November 2014 20:16:57 Chunyan Zhang wrote:
-> >
-> > +menuconfig ARCH_SPRD
-> > +       bool "Spreadtrum SoC platform"
-> > +       depends on ARM64
-> > +       help
-> > +         Support for Spreadtrum ARM based SoCs
-> > +
-> > +if ARCH_SPRD
-> > +
-> > +config ARCH_SHARKL64
-> > +       bool "Sharkl64 SoC Platform"
-> > +       help
-> > +         Sharkl64 is a Spreadtrum's SoC Platform which is based
-> > +         on ARM 64-bit processor core including
-> > +           sc9836
-> > +
-> > +endif #ARCH_SPRD
-> > +
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/sama5d4.dtsi | 5 +++++
+>   1 file changed, 5 insertions(+)
 >
-> I don't think we need multiple levels here, it should be enough to
-> have either ARCH_SPRD or ARCH_SHARKL64, because all device drivers
-> are going to be optional anyway. Typically a Kconfig symbol covers
-> all SoCs that are related, so if you Spreadtrum are doing both
-> phone and server chips and these are designed independently, you
-> would have two symbols, but if you only expect to see phone chips
-> here that are all derived from the same product line, using ARCH_SPRD
-> to refer to all of them should be enough.
->
->         Arnd
-
-
-For now, we have only one platform(Sharkl64) based on ARM64 been
-submitted, but we're intending to add support for more our platforms
-based on ARM64 or ARM32 in the future. There are many common devices
-on these platforms, such as serial. Our idea would be that if we had a
-'menuconfig ARCH_SPRD' in the Kconfig, these common devices only need
-to depend on ARCH_SPRD in the respective Kconfig, otherwise they may
-depend on a few Kconfig symbols for every platforms which include
-these common devices.
-
-So, do you think whether we should define a menuconfig(ARCH_SPRD) in
-the Kconfig for this case ?
-
-Thanks!
-
-Best regards,
-Chunyan
+> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+> index e0157b0f075c..9e281e22d591 100644
+> --- a/arch/arm/boot/dts/sama5d4.dtsi
+> +++ b/arch/arm/boot/dts/sama5d4.dtsi
+> @@ -826,6 +826,11 @@
+>   				status = "disabled";
+>   			};
+>   
+> +			sfr: sfr at f8028000 {
+> +				compatible = "atmel,sama5d4-sfr", "syscon";
+> +				reg = <0xf8028000 0x4000>;
+> +			};
+> +
+>   			mmc1: mmc at fc000000 {
+>   				compatible = "atmel,hsmci";
+>   				reg = <0xfc000000 0x600>;
