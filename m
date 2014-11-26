@@ -1,93 +1,61 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 26 Nov 2014 10:54:48 +0800
-Subject: [PATCH] media: atmel-isi: increase the burst length to improve
- the performance
-In-Reply-To: <Pine.LNX.4.64.1411252319430.17362@axis700.grange>
-References: <1416907825-23826-1-git-send-email-josh.wu@atmel.com>
- <Pine.LNX.4.64.1411252319430.17362@axis700.grange>
-Message-ID: <547540F8.7040901@atmel.com>
+From: zhang.lyra@gmail.com (Lyra Zhang)
+Date: Wed, 26 Nov 2014 11:08:01 +0800
+Subject: [PATCH v3 4/5] arm64: Add support for Spreadtrum's Sharkl64
+ Platform in Kconfig and defconfig
+In-Reply-To: <3490516.nCDXzA8J8x@wuerfel>
+References: <1416917818-10506-5-git-send-email-chunyan.zhang@spreadtrum.com>
+ <3490516.nCDXzA8J8x@wuerfel>
+Message-ID: <CAAfSe-uDk-ih2tqU9a3UEzr=BZgU_=+XJm9=zWbE3J4HMOuiog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Gunenadi
-
-On 11/26/2014 6:21 AM, Guennadi Liakhovetski wrote:
-> Hi Josh,
+2014-11-25 20:57 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
 >
-> On Tue, 25 Nov 2014, Josh Wu wrote:
+> On Tuesday 25 November 2014 20:16:57 Chunyan Zhang wrote:
+> >
+> > +menuconfig ARCH_SPRD
+> > +       bool "Spreadtrum SoC platform"
+> > +       depends on ARM64
+> > +       help
+> > +         Support for Spreadtrum ARM based SoCs
+> > +
+> > +if ARCH_SPRD
+> > +
+> > +config ARCH_SHARKL64
+> > +       bool "Sharkl64 SoC Platform"
+> > +       help
+> > +         Sharkl64 is a Spreadtrum's SoC Platform which is based
+> > +         on ARM 64-bit processor core including
+> > +           sc9836
+> > +
+> > +endif #ARCH_SPRD
+> > +
 >
->> The burst length could be BEATS_4/8/16. Before this patch, isi use default
->> value BEATS_4. To imporve the performance we could set it to BEATS_16.
->>
->> Otherwise sometime it would cause the ISI overflow error.
-> Without looking at datasheets - what does this bit do? Change the transfer
-> length?
-Atmel ISI has two internal 32-bytes FIFOs, one for Preview, another for 
-Codec.
-This field is the threshold to trigger the FIFO transfer to AHB by DMA.
-We can set the threshold to allow 4-bytes, 8-bytes or 16-bytes for a burst.
-BEATS_4, means only allow 4-bytes in a burst.
-BEATS_8, means only allow 4-bytes and 8-bytes in a burst.
-BEATS_16, means allow 4-bytes, 8-bytes and 16-bytes in a burst.
-
-So BEATS_16 will use the DMA more efficient if has lots of data to 
-transfer. As we are allowed to use 16-bytes in a burst. That will 
-trigger less burst than BEATS_4 to transfer same amount of data.
-
-We found this patch can fix ISI FIFO overflow error when system is in a 
-situation that with a very high memory load.
-If we only allow 4-bytes in a burst, that need more burst to transfer 
-data and less effective.
-
-> What happens then if the data amount isn't a multiple of the
-> transfer size?
-
-BEATS_16 means allowed 4-bytes, 8-bytes and 16-bytes in a burst. So it 
-still can perform a 4-bytes transfer if the data is not multiple of 16.
-I think all the data transfer are aligned with 4 bytes. The DMA address 
-should be aligned with 4 bytes as well.
-
-Best Regards,
-Josh Wu
+> I don't think we need multiple levels here, it should be enough to
+> have either ARCH_SPRD or ARCH_SHARKL64, because all device drivers
+> are going to be optional anyway. Typically a Kconfig symbol covers
+> all SoCs that are related, so if you Spreadtrum are doing both
+> phone and server chips and these are designed independently, you
+> would have two symbols, but if you only expect to see phone chips
+> here that are all derived from the same product line, using ARCH_SPRD
+> to refer to all of them should be enough.
 >
-> Thanks
-> Guennadi
->
->> Reported-by: Bo Shen <voice.shen@atmel.com>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->>   drivers/media/platform/soc_camera/atmel-isi.c | 2 ++
->>   include/media/atmel-isi.h                     | 4 ++++
->>   2 files changed, 6 insertions(+)
->>
->> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
->> index ee5650f..fda587b 100644
->> --- a/drivers/media/platform/soc_camera/atmel-isi.c
->> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
->> @@ -839,6 +839,8 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
->>   	if (isi->pdata.full_mode)
->>   		cfg1 |= ISI_CFG1_FULL_MODE;
->>   
->> +	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
->> +
->>   	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
->>   	isi_writel(isi, ISI_CFG1, cfg1);
->>   
->> diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
->> index c2e5703..6008b09 100644
->> --- a/include/media/atmel-isi.h
->> +++ b/include/media/atmel-isi.h
->> @@ -59,6 +59,10 @@
->>   #define		ISI_CFG1_FRATE_DIV_MASK		(7 << 8)
->>   #define ISI_CFG1_DISCR				(1 << 11)
->>   #define ISI_CFG1_FULL_MODE			(1 << 12)
->> +/* Definition for THMASK(ISI_V2) */
->> +#define		ISI_CFG1_THMASK_BEATS_4		(0 << 13)
->> +#define		ISI_CFG1_THMASK_BEATS_8		(1 << 13)
->> +#define		ISI_CFG1_THMASK_BEATS_16	(2 << 13)
->>   
->>   /* Bitfields in CFG2 */
->>   #define ISI_CFG2_GRAYSCALE			(1 << 13)
->> -- 
->> 1.9.1
->>
+>         Arnd
+
+
+For now, we have only one platform(Sharkl64) based on ARM64 been
+submitted, but we're intending to add support for more our platforms
+based on ARM64 or ARM32 in the future. There are many common devices
+on these platforms, such as serial. Our idea would be that if we had a
+'menuconfig ARCH_SPRD' in the Kconfig, these common devices only need
+to depend on ARCH_SPRD in the respective Kconfig, otherwise they may
+depend on a few Kconfig symbols for every platforms which include
+these common devices.
+
+So, do you think whether we should define a menuconfig(ARCH_SPRD) in
+the Kconfig for this case ?
+
+Thanks!
+
+Best regards,
+Chunyan
