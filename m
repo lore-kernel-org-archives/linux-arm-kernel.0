@@ -1,83 +1,172 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Nov 2014 13:52:10 +0000
-Subject: [PATCH v3] arm: Support for the PXN CPU feature on ARMv7
-In-Reply-To: <1417008840-27591-1-git-send-email-js07.lee@gmail.com>
-References: <1417008840-27591-1-git-send-email-js07.lee@gmail.com>
-Message-ID: <20141126135210.GJ3836@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 26 Nov 2014 14:57:42 +0100
+Subject: [PATCH] ARM: kbuild: Fix forced rebuild after 'make dtbs'
+In-Reply-To: <20141126005710.GE22670@titan.lakedaemon.net>
+References: <CACRpkdYmJWy1_vs0tWRA7SvkQnvbXXKqf7pHpH5b5tZ6vR+KJg@mail.gmail.com>
+ <1414961549-31666-1-git-send-email-jason@lakedaemon.net>
+ <5474F78F.2060906@suse.cz>
+ <20141125235150.GH3836@n2100.arm.linux.org.uk>
+ <20141126005710.GE22670@titan.lakedaemon.net>
+Message-ID: <CACRpkdZJoWbQeuZ4ZXGbQr0+SNG_9ZA+cQkAA0C2F9rnZDYtyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 10:34:00PM +0900, Jungseung Lee wrote:
-> +/*
-> + * Once this call has completed the variable @vmsa is set to 'VMSA support'
-> + * in case of ARMv7.
-> + */
-> +static inline bool cpu_has_classic_pxn(void)
-> +{
-> +	if (__LINUX_ARM_ARCH__ >= 6 && !IS_ENABLED(CONFIG_ARM_LPAE)) {
-> +		static unsigned int vmsa = ~0UL;
-> +
-> +		if (cpu_architecture() != CPU_ARCH_ARMv7)
-> +			return false;
-> +		if (vmsa == 4)
-> +			return true;
-> +
-> +		vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-> +		return vmsa == 4;
-> +	} else
-> +		return false;
-> +}
+On Wed, Nov 26, 2014 at 1:57 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Tue, Nov 25, 2014 at 11:51:50PM +0000, Russell King - ARM Linux wrote:
 
-Take a moment to consider whether this should be an inline function.  It's
-rather complex, involves calling out to a function, reading a variable,
-etc...
+>> I think this needs a bit more debugging to see why the whole kernel is
+>> being rebuilt - the kernel build system has methods to tell you why stuff
+>> is being built, which would be a good place to start.
+>
+> Linus, since you were the one experiencing the regression, care to take
+> a whack at that?
 
->  static inline void
->  pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
->  {
-> -	__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
-> +	pmdval_t pmdval = _PAGE_USER_TABLE;
-> +
-> +	if (cpu_has_classic_pxn())
-> +		pmdval |= PMD_PXNTABLE;
-> +	__pmd_populate(pmdp, page_to_phys(ptep), pmdval);
->  }
->  #define pmd_pgtable(pmd) pmd_page(pmd)
+OK this full example should be possible to repeat for anyone
+with a cross compiler, and uses a separate build dir, and yeah
+there was something fishy: the bug only appears if you specify
+CONFIG_DEBUG_SECTION_MISMATCH=y:
 
-It's also used in another inline function.
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 u300_defconfig
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 zImage
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 zImage
 
-Now, consider if we did this:
+-> no rebuild, just relink
 
-extern pmdval_t user_pmd_table;
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 u300_defconfig
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
 
-static inline void
-pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
-{
-	__pmd_populate(pmdp, page_to_phys(ptep), user_pmd_table);
-}
+-> no rebuild, just relink
 
-This means that pmd_populate() only has to load the value instead, which
-is far simpler.  All the setup complexity can live in build_mem_type_table()
-which means that it only happens once, and we don't have to have checks
-in these paths to see whether we've done that.
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 u300_defconfig
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 zImage
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 dtbs
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 zImage
 
-What would also be acceptable is to have the constant tests here, so the
-compiler can eliminate the unnecessary load when we have no hope of ever
-supporting PXN:
+-> no rebuild, just relink
 
-static inline void
-pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
-{
-	pmdval_t prot;
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 u300_defconfig
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 dtbs
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
 
-	if (__LINUX_ARM_ARCH__ >= 6 && !IS_ENABLED(CONFIG_ARM_LPAE))
-		prot = user_pmd_table;
-	else
-		prot = _PAGE_USER_TABLE;
+-> Rebuilds everything.
 
-	__pmd_populate(pmdp, page_to_phys(ptep), prot);
-}
+This doesn't occur before the offending commit. So it only happens
+when specifying extra
+environment variables on the command line.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+So I can get rid of the rebuilding by making my scripts less
+strict by removing CONFIG_DEBUG_SECTION_MISMATCH=y.
+
+But is this really correct?
+
+Two last examples with more detail:
+
+make[1]: Entering directory `/home/linus/linux/build-u300'
+  CHK     include/config/kernel.release
+  GEN     ./Makefile
+  CHK     include/generated/uapi/linux/version.h
+  CHK     include/generated/utsrelease.h
+  Using .. as source for kernel
+make[2]: `include/generated/mach-types.h' is up to date.
+  CALL    ../scripts/checksyscalls.sh - due to target missing
+  CHK     include/generated/compile.h
+  Kernel: arch/arm/boot/Image is ready
+  Kernel: arch/arm/boot/zImage is ready
+make[1]: Leaving directory `/home/linus/linux/build-u300'
+
+make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y V=2
+
+make[1]: Entering directory `/home/linus/linux/build-u300'
+  CHK     include/config/kernel.release
+  GEN     ./Makefile
+  CHK     include/generated/uapi/linux/version.h
+  CHK     include/generated/utsrelease.h
+  Using .. as source for kernel
+  CC      scripts/mod/empty.o - due to command line change
+  CC      scripts/mod/devicetable-offsets.s - due to command line change
+  MKELF   scripts/mod/elfconfig.h - due to: scripts/mod/empty.o
+  HOSTCC  scripts/mod/modpost.o - due to: scripts/mod/elfconfig.h
+  HOSTCC  scripts/mod/sumversion.o - due to: scripts/mod/elfconfig.h
+  GEN     scripts/mod/devicetable-offsets.h - due to:
+scripts/mod/devicetable-offsets.s
+  HOSTCC  scripts/mod/file2alias.o - due to: scripts/mod/elfconfig.h
+scripts/mod/devicetable-offsets.h
+  HOSTLD  scripts/mod/modpost - due to: scripts/mod/modpost.o
+scripts/mod/file2alias.o scripts/mod/sumversion.o
+make[2]: `include/generated/mach-types.h' is up to date.
+  CC      kernel/bounds.s - due to command line change
+  GEN     include/generated/bounds.h - due to: kernel/bounds.s
+  CC      arch/arm/kernel/asm-offsets.s - due to: include/generated/bounds.h
+  GEN     include/generated/asm-offsets.h - due to:
+arch/arm/kernel/asm-offsets.s
+  CALL    ../scripts/checksyscalls.sh - due to target missing
+  CC      init/main.o - due to: include/generated/bounds.h
+  CC      arch/arm/common/firmware.o - due to: include/generated/bounds.h
+  CC      arch/arm/mm/dma-mapping.o - due to: include/generated/bounds.h
+  CC      arch/arm/kernel/elf.o - due to: include/generated/bounds.h
+  CC      arch/arm/mach-u300/core.o - due to: include/generated/bounds.h
+  AS      arch/arm/kernel/entry-common.o - due to:
+include/generated/asm-offsets.h
+  LD      arch/arm/common/built-in.o - due to: arch/arm/common/firmware.o
+  CHK     include/generated/compile.h
+  CC      arch/arm/kernel/irq.o - due to: include/generated/bounds.h
+  CC      arch/arm/mach-u300/dummyspichip.o - due to: include/generated/bounds.h
+  CC      init/do_mounts.o - due to: include/generated/bounds.h
+  CC      arch/arm/mm/extable.o - due to: include/generated/bounds.h
+  CC      arch/arm/kernel/opcodes.o - due to: include/generated/bounds.h
+(...)
+
+If I revert commit f4d4ffc03efc:
+
+make[1]: Entering directory `/home/linus/linux/build-u300'
+  CHK     include/config/kernel.release
+  GEN     ./Makefile
+  CHK     include/generated/uapi/linux/version.h
+  Using .. as source for kernel
+  CHK     include/generated/utsrelease.h
+make[2]: `include/generated/mach-types.h' is up to date.
+  CC      scripts/mod/empty.o - due to command line change
+  CC      scripts/mod/devicetable-offsets.s - due to command line change
+  CALL    ../scripts/checksyscalls.sh - due to target missing
+  MKELF   scripts/mod/elfconfig.h - due to: scripts/mod/empty.o
+  HOSTCC  scripts/mod/modpost.o - due to: scripts/mod/elfconfig.h
+  HOSTCC  scripts/mod/sumversion.o - due to: scripts/mod/elfconfig.h
+  GEN     scripts/mod/devicetable-offsets.h - due to:
+scripts/mod/devicetable-offsets.s
+  HOSTCC  scripts/mod/file2alias.o - due to: scripts/mod/elfconfig.h
+scripts/mod/devicetable-offsets.h
+  HOSTLD  scripts/mod/modpost - due to: scripts/mod/modpost.o
+scripts/mod/file2alias.o scripts/mod/sumversion.o
+  CHK     include/generated/compile.h
+  Kernel: arch/arm/boot/Image is ready
+  Kernel: arch/arm/boot/zImage is ready
+make[1]: Leaving directory `/home/linus/linux/build-u300'
+
+So in both cases a changed command line is detected and
+empty.o and devicetable-offsets.s is rebuilt.
+
+But after the commit the rebuild goes on to rebuild
+kernel/bounds.s which generates bounds.h which in
+turn rebuilds the whole world.
+
+I don't know why the behaviour changed like this :(
+
+Yours,
+Linus Walleij
