@@ -1,86 +1,66 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 26 Nov 2014 10:29:01 +0800
-Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <2966212.dpWQ0OTb0A@wuerfel>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <5473FDA8.6080201@huawei.com> <54744F14.60004@linaro.org>
- <2966212.dpWQ0OTb0A@wuerfel>
-Message-ID: <54753AED.3050909@huawei.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 25 Nov 2014 21:37:56 -0500
+Subject: [PATCH] ARM: orion: convert the irq_reg_{readl,writel} calls
+ to the new API
+In-Reply-To: <1416928752-24529-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1416928752-24529-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20141126023756.GF22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/25 19:02, Arnd Bergmann wrote:
-> On Tuesday 25 November 2014 17:42:44 Hanjun Guo wrote:
->> On 2014-11-25 11:55, Shannon Zhao wrote:
->>> Hi,
->>>
->>> On 2014/11/22 5:23, Ganapatrao Kulkarni wrote:
->> [...]
->>>> +==============================================================================
->>>> +4 - Example dts
->>>> +==============================================================================
->>>> +
->>>> +Example 1: 2 Node system each having 8 CPUs and a Memory.
->>>> +
->>>> +    numa-map {
->>>> +            #address-cells = <2>;
->>>> +            #size-cells = <1>;
->>>> +            #node-count = <2>;
->>>> +            mem-map =  <0x0 0x00000000 0>,
->>>> +                       <0x100 0x00000000 1>;
->>>> +
->>>> +            cpu-map = <0 7 0>,
->>>> +                      <8 15 1>;
->>>
->>> The cpu range is continuous here. But if there is a situation like below:
->>>
->>> 0 2 4 6 belong to node 0
->>> 1 3 5 7 belong to node 1
->>>
->>> This case is very common on X86. I don't know the real situation of arm as
->>> I don't have a hardware with 2 nodes.
->>>
->>> How can we generate a DTS about this situation? like below? Can be parsed?
->>>
->>>               cpu-map = <0 2 4 6 0>,
->>>                         <1 3 5 7 1>;
->>
->> I think the binding proposed here can not cover your needs, and I think this
->> binding is not suitable, there are some reasons.
->>
->>  - CPU logical ID is allocated by OS, and it depends on the order of CPU node
->>    in the device tree, so it may be in a clean order like this patch proposed,
->>    or it will like the order Shannon pointed out.
->>
->>  - Since CPU logical ID is allocated by OS, DTS file will not know these
->>    numbers.
-> 
-> Also:
-> 
-> - you cannot support hierarchical NUMA topology
-> 
-> - you cannot have CPU-less or memory-less nodes
-> 
-> - you cannot associate I/O devices with NUMA nodes, only memory and CPU
-> 
->> So the problem behind this is the mappings between CPUs and NUMA nodes,
->> there is already mapping for CPU hardware ID (MPIDR) and CPU logical ID,
->> and MPIDR will be not changed, why not using MPIDR for the mapping of
->> NUMA node and CPU? then the mappings will be:
->>
->> CPU logical ID <------> CPU MPIDR <-----> NUMA node ID <-----> proximity domain
->> (allocated by OS)      (constant)       (allocated by OS)
-> 
-> No, don't hardcode ARM specifics into a common binding either. I've looked
-> at the ibm,associativity properties again, and I think we should just use
-> those, they can cover all cases and are completely independent of the
-> architecture. We should probably discuss about the property name though,
-> as using the "ibm," prefix might not be the best idea.
-> 
+Gregory,
 
-Yeah, I have read the relevant codes in qemu. I think the "ibm,associativity" is more scalable:-)
++tglx: heads up.
 
-About the prefix, my opinion is that as this is relevant with NUMA, maybe we can use "numa" as the prefix.
+On Tue, Nov 25, 2014 at 04:19:12PM +0100, Gregory CLEMENT wrote:
+> The commit "genirq: Generic chip: Change irq_reg_{readl,writel}
+> arguments" modified the API. In the same tome the
+> arch/arm/plat-orion/gpio.c file received a fix with the use of the old
+> API: "ARM: orion: Fix for certain sequence of request_irq can cause
+> irq storm". This commit fixes the use of the API.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+> Hi Jason,
+> 
+> This patch fix a build error in linux-next:
+> 
+> arch/arm/plat-orion/gpio.c:509:12: error: too few arguments to function 'irq_reg_readl'
+> arch/arm/plat-orion/gpio.c:511:2: error: too few arguments to function 'irq_reg_writel'
+> arch/arm/plat-orion/gpio.c:523:12: error: too few arguments to function 'irq_reg_readl'
+> arch/arm/plat-orion/gpio.c:525:2: error: too few arguments to function 'irq_reg_writel'
+> 
+> But if we want to apply it on the mvebu branch we need to add a
+> dependecy to "332fd7c4fef5 genirq: Generic chip: Change
+> irq_reg_{readl,writel} arguments"
+> 
+> Thanks,
+> 
+> Gregory
+> 
+>  arch/arm/plat-orion/gpio.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 
-Thanks,
-Shannon
+Applied to irqchip/core (source of genirq API change) with a dependency
+on tags/mvebu-fixes-3.18 (in mainline since v3.18-rc5) with Olof's Ack.
+
+ThomasG, this means we'll be pulling in two patches not related to
+irqchip, but this was the least offensive path I could come up with to
+solve the issue.
+
+bisection will fail iff building legacy plat-orion code, *and* it lands between
+
+  19e1c15753d2 Merge tag 'tags/mvebu-fixes-3.18' into irqchip/core
+
+and
+
+  2f90bce7ff1f ARM: orion: convert the irq_reg_{readl,writel} calls to the new API
+
+which is a one patch window.  I hope that's tolerable. :-/
+
+
+Thanks for putting this together Gregory!
+
+thx,
+
+Jason.
