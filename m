@@ -1,53 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Nov 2014 09:58:34 +0100
-Subject: [PATCH] ARM: orion: convert the irq_reg_{readl,
- writel} calls to the new API
-In-Reply-To: <20141126023853.GG22670@titan.lakedaemon.net>
-References: <1416928752-24529-1-git-send-email-gregory.clement@free-electrons.com>
- <7996382.czGPtzUmj4@wuerfel> <20141126023853.GG22670@titan.lakedaemon.net>
-Message-ID: <2056471.vW2IU3anAt@wuerfel>
+Date: Wed, 26 Nov 2014 10:00:31 +0100
+Subject: [PATCH v3 4/5] arm64: Add support for Spreadtrum's Sharkl64
+ Platform in Kconfig and defconfig
+In-Reply-To: <CAAfSe-uoXOJ8=agCFuBnXhj7nBBTskQ=8_jMtv_SAjor2gfO2w@mail.gmail.com>
+References: <1416917818-10506-5-git-send-email-chunyan.zhang@spreadtrum.com>
+ <3490516.nCDXzA8J8x@wuerfel>
+ <CAAfSe-uoXOJ8=agCFuBnXhj7nBBTskQ=8_jMtv_SAjor2gfO2w@mail.gmail.com>
+Message-ID: <5825969.ZSdbLFRUel@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 November 2014 21:38:53 Jason Cooper wrote:
-> On Tue, Nov 25, 2014 at 09:59:11PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 25 November 2014 12:24:16 Olof Johansson wrote:
-> > > On Tue, Nov 25, 2014 at 7:19 AM, Gregory CLEMENT
-> > > <gregory.clement@free-electrons.com> wrote:
-> > > > The commit "genirq: Generic chip: Change irq_reg_{readl,writel}
-> > > > arguments" modified the API. In the same tome the
-> > > > arch/arm/plat-orion/gpio.c file received a fix with the use of the old
-> > > > API: "ARM: orion: Fix for certain sequence of request_irq can cause
-> > > > irq storm". This commit fixes the use of the API.
-> > > >
-> > > > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > > > ---
-> > > > Hi Jason,
-> > > >
-> > > > This patch fix a build error in linux-next:
-> > > >
-> > > > arch/arm/plat-orion/gpio.c:509:12: error: too few arguments to function 'irq_reg_readl'
-> > > > arch/arm/plat-orion/gpio.c:511:2: error: too few arguments to function 'irq_reg_writel'
-> > > > arch/arm/plat-orion/gpio.c:523:12: error: too few arguments to function 'irq_reg_readl'
-> > > > arch/arm/plat-orion/gpio.c:525:2: error: too few arguments to function 'irq_reg_writel'
-> > > >
-> > > > But if we want to apply it on the mvebu branch we need to add a
-> > > > dependecy to "332fd7c4fef5 genirq: Generic chip: Change
-> > > > irq_reg_{readl,writel} arguments"
-> > > 
-> > > Please take this through the same repo as the change in the prototype:
-> > > 
-> > > Acked-by: Olof Johansson <olof@lixom.net>
-> > > 
-> > 
-> > As mentioned before, the problem here is that the prototype gets changed
-> > in the irqchip repo, while the gpio driver only starts using this interface
-> > in the mvebu repo. Both trees are owned by Jason, so he should be able
-> > to find a solution though.
+On Wednesday 26 November 2014 10:32:35 Lyra Zhang wrote:
 > 
-> I made myself promise not rebase mvebu/fixes.  :-)
+> For now, we have only one platform(Sharkl64) based on ARM64 been submitted,
+> but we're intending to add support for more our platforms based on ARM64 or
+> ARM32 in the future. There are many common devices on these platforms, such
+> as serial. Our idea would be that if we had a 'menuconfig ARCH_SPRD' in the
+> Kconfig, these common devices only need to depend on ARCH_SPRD in the
+> respective Kconfig, otherwise they may depend on a few Kconfig symbols for
+> every platforms which include these common devices.
+> 
+> So, do you think whether we should define a menuconfig(ARCH_SPRD) in the
+> Kconfig for this case ?
 
-Ah, I hadn't realized that the gpio change is already in 3.18-rc, that actually
-simplifies it.
+It sounds like your other platforms are all related, so one ARCH_SPRD
+should be enough. If someone wants to build a  kernel that is only
+going to run on a particular machine, they can just turn off all the
+other drivers they don't want.
 
 	Arnd
