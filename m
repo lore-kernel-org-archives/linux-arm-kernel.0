@@ -1,134 +1,81 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 26 Nov 2014 14:39:56 +0100
-Subject: [PATCH v2] mmc: core: add core-level function for sending tuning
- commands
-In-Reply-To: <1416978333-3086-1-git-send-email-21cnbao@gmail.com>
-References: <1416978333-3086-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CAPDyKFp48LvM5E_vQ+T36T=aCQ+8P9ZicfG8fGtnke+tXj=qXQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 26 Nov 2014 13:40:55 +0000
+Subject: [RFC 0/2] Qualcomm RPM sleep states
+In-Reply-To: <547526BC.1090202@codeaurora.org>
+References: <546FC674.1070005@codeaurora.org>
+ <20141121232738.GP3815@sirena.org.uk>
+ <546FCE3A.1000005@codeaurora.org>
+ <20141124181614.GT7712@sirena.org.uk>
+ <5473A0F3.6080405@codeaurora.org>
+ <20141125204430.GN7712@sirena.org.uk>
+ <547526BC.1090202@codeaurora.org>
+Message-ID: <20141126134055.GF7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 November 2014 at 06:05, Barry Song <21cnbao@gmail.com> wrote:
-> From: Minda Chen <Minda.Chen@csr.com>
->
-> According to the SD card spec, Add a manual tuning command function
-> for SDR104/HS200.
-> Sending command 19 or command 21 to read data and compare with the
-> tunning block pattern.
->
-> This patch will help to decrease some platform private codes in SDHCI
-> platform_execute_tuning() callbacks.
->
-> Signed-off-by: Minda Chen <Minda.Chen@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+On Tue, Nov 25, 2014 at 05:02:52PM -0800, Stephen Boyd wrote:
+> On 11/25/2014 12:44 PM, Mark Brown wrote:
 
-Thanks! Applied for next.
+> >I'm still quite confused here...
 
-Actually it didn't apply as is, but I managed to resolve the trivial
-conflict. In future, please use my mmc tree and the next branch to
-base your patches upon.
+> Hm... hopefully it's not getting worse.
 
-Kind regards
-Uffe
+It is a bit, the story keeps changing a lot.
 
-> ---
->  drivers/mmc/core/mmc_ops.c | 70 ++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/mmc/core.h   |  1 +
->  2 files changed, 71 insertions(+)
->
-> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-> index 7911e05..a897894 100644
-> --- a/drivers/mmc/core/mmc_ops.c
-> +++ b/drivers/mmc/core/mmc_ops.c
-> @@ -543,6 +543,76 @@ int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->  }
->  EXPORT_SYMBOL_GPL(mmc_switch);
->
-> +int mmc_send_tuning(struct mmc_card *card)
-> +{
-> +       struct mmc_request mrq = {NULL};
-> +       struct mmc_command cmd = {0};
-> +       struct mmc_data data = {0};
-> +       struct scatterlist sg;
-> +       struct mmc_host *mmc = card->host;
-> +       struct mmc_ios *ios = &mmc->ios;
-> +       const u8 *tuning_block_pattern;
-> +       int size, err = 0;
-> +       u8 *data_buf;
-> +       u32 opcode;
-> +
-> +       if (ios->bus_width == MMC_BUS_WIDTH_8) {
-> +               tuning_block_pattern = tuning_blk_pattern_8bit;
-> +               size = sizeof(tuning_blk_pattern_8bit);
-> +               opcode = MMC_SEND_TUNING_BLOCK_HS200;
-> +       } else if (ios->bus_width == MMC_BUS_WIDTH_4) {
-> +               tuning_block_pattern = tuning_blk_pattern_4bit;
-> +               size = sizeof(tuning_blk_pattern_4bit);
-> +               opcode = MMC_SEND_TUNING_BLOCK;
-> +       } else
-> +               return -EINVAL;
-> +
-> +       data_buf = kzalloc(size, GFP_KERNEL);
-> +       if (!data_buf)
-> +               return -ENOMEM;
-> +
-> +       mrq.cmd = &cmd;
-> +       mrq.data = &data;
-> +
-> +       cmd.opcode = opcode;
-> +       cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
-> +
-> +       data.blksz = size;
-> +       data.blocks = 1;
-> +       data.flags = MMC_DATA_READ;
-> +
-> +       /*
-> +        * According to the tuning specs, Tuning process
-> +        * is normally shorter 40 executions of CMD19,
-> +        * and timeout value should be shorter than 150 ms
-> +        */
-> +       data.timeout_ns = 150 * NSEC_PER_MSEC;
-> +
-> +       data.sg = &sg;
-> +       data.sg_len = 1;
-> +       sg_init_one(&sg, data_buf, size);
-> +
-> +       mmc_wait_for_req(mmc, &mrq);
-> +
-> +       if (cmd.error) {
-> +               err = cmd.error;
-> +               goto out;
-> +       }
-> +
-> +       if (data.error) {
-> +               err = data.error;
-> +               goto out;
-> +       }
-> +
-> +       if (memcmp(data_buf, tuning_block_pattern, size))
-> +               err = -EIO;
-> +
-> +out:
-> +       kfree(data_buf);
-> +       return err;
-> +}
-> +EXPORT_SYMBOL_GPL(mmc_send_tuning);
-> +
->  static int
->  mmc_send_bus_test(struct mmc_card *card, struct mmc_host *host, u8 opcode,
->                   u8 len)
-> diff --git a/include/linux/mmc/core.h b/include/linux/mmc/core.h
-> index f206e29..b5c2763 100644
-> --- a/include/linux/mmc/core.h
-> +++ b/include/linux/mmc/core.h
-> @@ -154,6 +154,7 @@ extern void mmc_start_bkops(struct mmc_card *card, bool from_exception);
->  extern int __mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int, bool,
->                         bool, bool);
->  extern int mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int);
-> +extern int mmc_send_tuning(struct mmc_card *);
->  extern int mmc_send_ext_csd(struct mmc_card *card, u8 *ext_csd);
->
->  #define MMC_ERASE_ARG          0x00000000
-> --
-> 2.1.3
->
+> >I can't help but think that this all sounds like the RPM isn't mapping
+> >very well onto practical systems and needs revisiting in future
+> >versions...  for example with what I'm parsing out of the above an
+> >active+sleep set command or otherwise having the two modes tied together
+> >for some regulators would make the whole problem go away.
+
+> We create the 'active only' regulators for consumers that actually need
+> them. From the set of regulators on a board only a couple need this
+
+That's what I don't think is making any sense.  Creating two regulators
+for the same thing seems like bad news, at best it's going to make reuse
+harder.
+
+> treatment. I don't see how tying the two states together via an active+sleep
+> set command would make this problem go away for the cases I already
+> described before, i.e. CPU wants some voltage and other IO devices want
+> another voltage and the CPU doesn't care what the voltage is when the CPU is
+
+Not paying attention to requests from a disabled consumer seems like
+something we should be able to do in general.  
+
+> in idle or suspend. Having a combination active + sleep set command would be
+> nice. The RPM already sort of supports this by allowing you to only modify
+> the active set. If you never modify the sleep set, then the RPM just applies
+> whatever is in the active set to the sleep set. We can probably go through
+> and figure out what resources could get away with only using the active set
+> so we can cut down on sleep set requests that are always the same between
+> active and sleep set.
+
+This version is starting to sound a lot like the consumers need to be
+able to do an idle to sleep transition and change their settings when
+they enter their sleep mode.  It seems a lot like what many devices do
+now when they enter and exit runtime PM but with deferred application
+depending on other users (for regulators I'm assuming the active set
+would actually be a subset of the sleep set of valid voltages).
+
+> >I think any duplication that's going on sounds like a consequence of
+> >the way this is currently implemented.  I think based on what I *think*
+> >you're saying the RPM driver probably ought to be hiding this and adding
+> >a property which makes the active and sleep sets track each other with
+> >normal suspend mode control otherwise.  That could potentially be done
+> >in the core, though the tracking would be substantial surgery.
+
+> Sorry I don't follow this part. It's about more than suspend, we also care
+> about idle. I agree that pushing the concept of active vs. sleep into the
+> framework is substantial.
+
+That's not what it seemed like people had been talking about up until
+this most recent e-mail, you'd been talking about suspend mode.  The
+starting point was mapping onto the suspend support the regulator has.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141126/99fea7c6/attachment-0001.sig>
