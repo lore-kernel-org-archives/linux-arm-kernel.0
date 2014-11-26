@@ -1,25 +1,40 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 26 Nov 2014 17:22:26 +0100
-Subject: [PATCH 0/3] dmaengine: at_xdmac: several improvements
-Message-ID: <1417018949-24246-1-git-send-email-ludovic.desroches@atmel.com>
+Date: Wed, 26 Nov 2014 17:22:27 +0100
+Subject: [PATCH 1/3] dmaengine: at_xdmac: wait for in-progress transaction to
+ complete after pausing a channel
+In-Reply-To: <1417018949-24246-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1417018949-24246-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1417018949-24246-2-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-This series is based on Vinod's next branch plus Maxime Ripard's series:
-"[PATCH v5 00/61] dmaengine: Implement generic slave capabilities retrieval"
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/dma/at_xdmac.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Cyrille Pitchen (1):
-  dmaengine: at_xdmac: wait for in-progress transaction to complete
-    after     pausing a channel
-
-Ludovic Desroches (2):
-  dmaengine: at_xdmac: simplify channel configuration stuff
-  dmaengine: at_xdmac: allow muliple dwidths when doing slave transfers
-
- drivers/dma/at_xdmac.c | 51 ++++++++++++++++++++++++++------------------------
- 1 file changed, 27 insertions(+), 24 deletions(-)
-
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index b997d09..bc4b018 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -1136,9 +1136,14 @@ static int at_xdmac_device_pause(struct dma_chan *chan)
+ 
+ 	dev_dbg(chan2dev(chan), "%s\n", __func__);
+ 
++	if (test_and_set_bit(AT_XDMAC_CHAN_IS_PAUSED, &atchan->status))
++		return 0;
++
+ 	spin_lock_bh(&atchan->lock);
+ 	at_xdmac_write(atxdmac, AT_XDMAC_GRWS, atchan->mask);
+-	set_bit(AT_XDMAC_CHAN_IS_PAUSED, &atchan->status);
++	while (at_xdmac_chan_read(atchan, AT_XDMAC_CC)
++	       & (AT_XDMAC_CC_WRIP | AT_XDMAC_CC_RDIP))
++		cpu_relax();
+ 	spin_unlock_bh(&atchan->lock);
+ 
+ 	return 0;
 -- 
 2.0.3
