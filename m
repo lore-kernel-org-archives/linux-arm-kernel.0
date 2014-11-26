@@ -1,265 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 26 Nov 2014 14:45:37 +0000
-Subject: [PATCH v6 4/6] arm64: Add DTS support for FSL's LS2085A SoC
-In-Reply-To: <1417002447-19163-5-git-send-email-bhupesh.sharma@freescale.com>
-References: <1417002447-19163-1-git-send-email-bhupesh.sharma@freescale.com>
- <1417002447-19163-5-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <5475E791.2080202@arm.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Wed, 26 Nov 2014 14:58:16 +0000
+Subject: [PATCH 2/7] KVM: arm: guest debug, define API headers
+In-Reply-To: <20141126143122.GB3245@hawk.usersys.redhat.com>
+References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
+ <1416931805-23223-3-git-send-email-alex.bennee@linaro.org>
+ <20141126143122.GB3245@hawk.usersys.redhat.com>
+Message-ID: <87sih6knzr.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/11/14 11:47, Bhupesh Sharma wrote:
-> This patch adds the device tree support for FSL LS2085A SoC
-> based on ARMv8 architecture.
-> 
-> Following levels of DTSI/DTS files have been created for the
-> LS2085A SoC family:
-> 
-> - fsl-ls2085a.dtsi:
-> DTS-Include file for FSL LS2085A SoC.
-> 
-> - fsl-ls2085a-simu.dts:
-> DTS file for FSL LS2085a software simulator model.
-> 
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> Signed-off-by: Arnab Basu <arnab_basu@rocketmail.com>
-> Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
-> ---
->  arch/arm64/boot/dts/fsl-ls2085a-simu.dts |   65 ++++++++++++
->  arch/arm64/boot/dts/fsl-ls2085a.dtsi     |  163 ++++++++++++++++++++++++++++++
->  2 files changed, 228 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/fsl-ls2085a-simu.dts
->  create mode 100644 arch/arm64/boot/dts/fsl-ls2085a.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/fsl-ls2085a-simu.dts b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
-> new file mode 100644
-> index 0000000..82e2a6f
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
-> @@ -0,0 +1,65 @@
-> +/*
-> + * Device Tree file for Freescale LS2085a software Simulator model
-> + *
-> + * Copyright (C) 2014, Freescale Semiconductor
-> + *
-> + * Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this library; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +/include/ "fsl-ls2085a.dtsi"
-> +
-> +/ {
-> +	model = "Freescale Layerscape 2085a software Simulator model";
-> +	compatible = "fsl,ls2085a-simu", "fsl,ls2085a";
-> +
-> +	ethernet at 2210000 {
-> +		compatible = "smsc,lan91c111";
-> +		reg = <0x0 0x2210000 0x0 0x100>;
-> +		interrupts = <0 58 0x1>;
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/fsl-ls2085a.dtsi b/arch/arm64/boot/dts/fsl-ls2085a.dtsi
-> new file mode 100644
-> index 0000000..e281ceb
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/fsl-ls2085a.dtsi
-> @@ -0,0 +1,163 @@
-> +/*
-> + * Device Tree Include file for Freescale Layerscape-2085A family SoC.
-> + *
-> + * Copyright (C) 2014, Freescale Semiconductor
-> + *
-> + * Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPLv2 or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this library; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/ {
-> +	compatible = "fsl,ls2085a";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		/*
-> +		 * We expect the enable-method for cpu's to be "psci", but this
-> +		 * is dependent on the SoC FW, which will fill this in.
-> +		 *
-> +		 * Currently supported enable-method is psci v0.2
-> +		 */
-> +
-> +		/* We have 4 clusters having 2 Cortex-A57 cores each */
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x0>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x1>;
-> +		};
-> +
-> +		cpu at 100 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x100>;
-> +		};
-> +
-> +		cpu at 101 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x101>;
-> +		};
-> +
-> +		cpu at 200 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x200>;
-> +		};
-> +
-> +		cpu at 201 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x201>;
-> +		};
-> +
-> +		cpu at 300 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x300>;
-> +		};
-> +
-> +		cpu at 301 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x301>;
-> +		};
-> +	};
-> +
-> +	memory at 80000000 {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x80000000 0 0x80000000>;
-> +		      /* DRAM space - 1, size : 2 GB DRAM */
-> +	};
-> +
-> +	gic: interrupt-controller at 6000000 {
-> +		compatible = "arm,gic-v3";
-> +		reg = <0x0 0x06000000 0 0x10000>, /* GIC Dist */
-> +		      <0x0 0x06100000 0 0x100000>; /* GICR (RD_base + SGI_base) */
-> +		#interrupt-cells = <3>;
-> +		interrupt-controller;
-> +		interrupts = <1 9 0x4>;
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <1 13 0x8>, /* Physical Secure PPI, active-low */
-> +			     <1 14 0x8>, /* Physical Non-Secure PPI, active-low */
-> +			     <1 11 0x8>, /* Virtual PPI, active-low */
-> +			     <1 10 0x8>; /* Hypervisor PPI, active-low */
-> +	};
 
-Sorry, but this is still wrong. The *core* indeed outputs these signals
-as active low. But the GIC doesn't trigger on active low, only active
-high (yes, there is an inverter in the way).
+Andrew Jones <drjones@redhat.com> writes:
 
-If you look at the binding for GICv3, you'll notice that value 8 is not
-valid, only 1 or 4.
+> On Tue, Nov 25, 2014 at 04:10:00PM +0000, Alex Benn?e wrote:
+>> This commit defines the API headers for guest debugging. There are two
+>> architecture specific debug structures:
+<snip>
+>> +/* Architecture related debug defines - upper 16 bits of
+>> + * kvm_guest_debug->control
+>> + */
+>> +#define KVM_GUESTDBG_USE_SW_BP_SHIFT	16
+>> +#define KVM_GUESTDBG_USE_SW_BP		(1 << KVM_GUESTDBG_USE_SW_BP_SHIFT)
+>> +#define KVM_GUESTDBG_USE_HW_BP_SHIFT	17
+>> +#define KVM_GUESTDBG_USE_HW_BP		(1 << KVM_GUESTDBG_USE_HW_BP_SHIFT)
+>> +
+>
+> I see this are defined in arch/x86/include/uapi/asm/kvm.h,
+> so you needed to reproduce them here, but shouldn't they
+> be promoted to include/uapi/linux/kvm.h instead?
 
-All these interrupts should read "<1 x 4>".
+Well if we move them to common uapi we either restrict the $ARCH
+specific options that don't have SW/HW BKPTS (would be weird but...) or
+make them generic in the lower 16 bits (breaks API).
 
-Thanks,
+But in principle I have no objection if other don't.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Alex Benn?e
