@@ -1,99 +1,247 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 26 Nov 2014 12:21:56 +0300
-Subject: [PATCH V2] serial: pxa: hold port.lock when reporting modem line
- changes
-Message-ID: <1416993716-21005-1-git-send-email-dbaryshkov@gmail.com>
+From: krishna.md@samsung.com (Krishna Mohan Dani)
+Date: Wed, 26 Nov 2014 14:53:04 +0530
+Subject: [PATCH] ASoC: Samsung: Add arndale_rt5631 machine driver and binding
+Message-ID: <1416993784-29239-1-git-send-email-krishna.md@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both uart_handle_dcd_change() and uart_handle_cts_change() require a
-port lock to be held and will emit a warning when lockdep is enabled.
-Held corresponding lock.
+Adding machine driver to instantiate I2S based realtek's ALC5631
+sound card on Arndale board.
 
-This fixes the following warnings:
+There are other variants of Audio Daughter Cards for Arndale
+Board for which support already exists but there is no support for
+Realtek's alc5631 codec hence support for ALC5631 based machine
+driver is being added.
+This patch also documents the device tree binding for the Arndale
+board based machine driver.
 
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 0 at drivers/tty/serial/serial_core.c:2760 uart_handle_dcd_change+0xc8/0xf8()
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper Not tainted 3.18.0-rc5+ #26
-[<c000dff8>] (unwind_backtrace) from [<c000bc70>] (show_stack+0x10/0x14)
-[<c000bc70>] (show_stack) from [<c00192ac>] (warn_slowpath_common+0x6c/0x8c)
-[<c00192ac>] (warn_slowpath_common) from [<c00192e8>] (warn_slowpath_null+0x1c/0x24)
-[<c00192e8>] (warn_slowpath_null) from [<c0182984>] (uart_handle_dcd_change+0xc8/0xf8)
-[<c0182984>] (uart_handle_dcd_change) from [<c018625c>] (serial_pxa_irq+0x268/0x3b0)
-[<c018625c>] (serial_pxa_irq) from [<c004d0d4>] (handle_irq_event_percpu+0x50/0x16c)
-[<c004d0d4>] (handle_irq_event_percpu) from [<c004d22c>] (handle_irq_event+0x3c/0x5c)
-[<c004d22c>] (handle_irq_event) from [<c004f7d0>] (handle_level_irq+0x94/0x118)
-[<c004f7d0>] (handle_level_irq) from [<c004ca0c>] (generic_handle_irq+0x20/0x30)
-[<c004ca0c>] (generic_handle_irq) from [<c004cbe0>] (__handle_domain_irq+0x38/0x70)
-[<c004cbe0>] (__handle_domain_irq) from [<c00085c4>] (ichp_handle_irq+0x24/0x34)
-[<c00085c4>] (ichp_handle_irq) from [<c000c7e4>] (__irq_svc+0x44/0x54)
-Exception stack(0xc07c7f58 to 0xc07c7fa0)
-7f40:                                                       00000001 00000001
-7f60: 00000000 20000013 c07c6000 00000000 00000000 c07ce0a4 c07d7798 00000000
-7f80: c07e8fb8 0000004c 00000000 c07c7fa0 c0044798 c0009f20 20000013 ffffffff
-[<c000c7e4>] (__irq_svc) from [<c0009f20>] (arch_cpu_idle+0x28/0x38)
-[<c0009f20>] (arch_cpu_idle) from [<c003c974>] (cpu_startup_entry+0x1b8/0x220)
-[<c003c974>] (cpu_startup_entry) from [<c0338c54>] (start_kernel+0x39c/0x40c)
----[ end trace 4c1b7ae03f6d9d30 ]---
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 0 at drivers/tty/serial/serial_core.c:2791 uart_handle_cts_change+0xa0/0xdc()
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper Tainted: G        W      3.18.0-rc5+ #26
-[<c000dff8>] (unwind_backtrace) from [<c000bc70>] (show_stack+0x10/0x14)
-[<c000bc70>] (show_stack) from [<c00192ac>] (warn_slowpath_common+0x6c/0x8c)
-[<c00192ac>] (warn_slowpath_common) from [<c00192e8>] (warn_slowpath_null+0x1c/0x24)
-[<c00192e8>] (warn_slowpath_null) from [<c018528c>] (uart_handle_cts_change+0xa0/0xdc)
-[<c018528c>] (uart_handle_cts_change) from [<c018624c>] (serial_pxa_irq+0x258/0x3b0)
-[<c018624c>] (serial_pxa_irq) from [<c004d0d4>] (handle_irq_event_percpu+0x50/0x16c)
-[<c004d0d4>] (handle_irq_event_percpu) from [<c004d22c>] (handle_irq_event+0x3c/0x5c)
-[<c004d22c>] (handle_irq_event) from [<c004f7d0>] (handle_level_irq+0x94/0x118)
-[<c004f7d0>] (handle_level_irq) from [<c004ca0c>] (generic_handle_irq+0x20/0x30)
-[<c004ca0c>] (generic_handle_irq) from [<c004cbe0>] (__handle_domain_irq+0x38/0x70)
-[<c004cbe0>] (__handle_domain_irq) from [<c00085c4>] (ichp_handle_irq+0x24/0x34)
-[<c00085c4>] (ichp_handle_irq) from [<c000c7e4>] (__irq_svc+0x44/0x54)
-Exception stack(0xc07c7f58 to 0xc07c7fa0)
-7f40:                                                       00000001 00000001
-7f60: 00000000 20000013 c07c6000 00000000 00000000 c07ce0a4 c07d7798 00000000
-7f80: c07e8fb8 0000004c 00000000 c07c7fa0 c0044798 c0009f20 20000013 ffffffff
-[<c000c7e4>] (__irq_svc) from [<c0009f20>] (arch_cpu_idle+0x28/0x38)
-[<c0009f20>] (arch_cpu_idle) from [<c003c974>] (cpu_startup_entry+0x1b8/0x220)
-[<c003c974>] (cpu_startup_entry) from [<c0338c54>] (start_kernel+0x39c/0x40c)
----[ end trace 4c1b7ae03f6d9d31 ]---
-
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Signed-off-by: Claude Youn <claude.youn@gmail.com>
+Signed-off-by: Krishna Mohan Dani <krishna.md@samsung.com>
 ---
-[Changes since v1 - lock whole function, not just check_modem_status().]
+ .../devicetree/bindings/sound/arndale.txt          |   24 ++++
+ sound/soc/samsung/Kconfig                          |    6 +
+ sound/soc/samsung/Makefile                         |    2 +
+ sound/soc/samsung/arndale_rt5631.c                 |  150 ++++++++++++++++++++
+ 4 files changed, 182 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/arndale.txt
+ create mode 100644 sound/soc/samsung/arndale_rt5631.c
 
- drivers/tty/serial/pxa.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
-index 21b7d8b8..7788d53 100644
---- a/drivers/tty/serial/pxa.c
-+++ b/drivers/tty/serial/pxa.c
-@@ -223,6 +223,7 @@ static void serial_pxa_start_tx(struct uart_port *port)
- 	}
- }
+diff --git a/Documentation/devicetree/bindings/sound/arndale.txt b/Documentation/devicetree/bindings/sound/arndale.txt
+new file mode 100644
+index 0000000..0e76946
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/arndale.txt
+@@ -0,0 +1,24 @@
++Audio Binding for Arndale boards
++
++Required properties:
++- compatible : Can be the following,
++			"samsung,arndale-rt5631"
++
++- samsung,audio-cpu: The phandle of the Samsung I2S controller
++- samsung,audio-codec: The phandle of the audio codec
++
++Optional:
++- samsung,model: The name of the sound-card
++
++Arndale Boards has many audio daughter cards, one of them is
++rt5631/alc5631. Below example shows audio bindings for rt5631/
++alc5631 based codec.
++
++Example:
++
++sound {
++		compatible = "samsung,arndale-rt5631";
++
++		samsung,audio-cpu = <&i2s0>
++		samsung,audio-codec = <&rt5631>;
++};
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index 55a3869..80b5c61 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -239,3 +239,9 @@ config SND_SOC_ODROIDX2
+ 	select SND_SAMSUNG_I2S
+ 	help
+ 	  Say Y here to enable audio support for the Odroid-X2/U3.
++
++config SND_SOC_ARNDALE_RT5631_ALC5631
++        tristate "Audio support for RT5631(ALC5631) on Arndale Board"
++        depends on SND_SOC_SAMSUNG
++        select SND_SAMSUNG_I2S
++        select SND_SOC_RT5631
+diff --git a/sound/soc/samsung/Makefile b/sound/soc/samsung/Makefile
+index 91505dd..31e3dba 100644
+--- a/sound/soc/samsung/Makefile
++++ b/sound/soc/samsung/Makefile
+@@ -45,6 +45,7 @@ snd-soc-lowland-objs := lowland.o
+ snd-soc-littlemill-objs := littlemill.o
+ snd-soc-bells-objs := bells.o
+ snd-soc-odroidx2-max98090-objs := odroidx2_max98090.o
++snd-soc-arndale-rt5631-objs := arndale_rt5631.o
  
-+/* should hold up->port.lock */
- static inline void check_modem_status(struct uart_pxa_port *up)
- {
- 	int status;
-@@ -255,12 +256,14 @@ static inline irqreturn_t serial_pxa_irq(int irq, void *dev_id)
- 	iir = serial_in(up, UART_IIR);
- 	if (iir & UART_IIR_NO_INT)
- 		return IRQ_NONE;
-+	spin_lock(&up->port.lock);
- 	lsr = serial_in(up, UART_LSR);
- 	if (lsr & UART_LSR_DR)
- 		receive_chars(up, &lsr);
- 	check_modem_status(up);
- 	if (lsr & UART_LSR_THRE)
- 		transmit_chars(up);
-+	spin_unlock(&up->port.lock);
- 	return IRQ_HANDLED;
- }
- 
+ obj-$(CONFIG_SND_SOC_SAMSUNG_JIVE_WM8750) += snd-soc-jive-wm8750.o
+ obj-$(CONFIG_SND_SOC_SAMSUNG_NEO1973_WM8753) += snd-soc-neo1973-wm8753.o
+@@ -71,3 +72,4 @@ obj-$(CONFIG_SND_SOC_LOWLAND) += snd-soc-lowland.o
+ obj-$(CONFIG_SND_SOC_LITTLEMILL) += snd-soc-littlemill.o
+ obj-$(CONFIG_SND_SOC_BELLS) += snd-soc-bells.o
+ obj-$(CONFIG_SND_SOC_ODROIDX2) += snd-soc-odroidx2-max98090.o
++obj-$(CONFIG_SND_SOC_ARNDALE_RT5631_ALC5631) += snd-soc-arndale-rt5631.o
+diff --git a/sound/soc/samsung/arndale_rt5631.c b/sound/soc/samsung/arndale_rt5631.c
+new file mode 100644
+index 0000000..1e2b61c
+--- /dev/null
++++ b/sound/soc/samsung/arndale_rt5631.c
+@@ -0,0 +1,150 @@
++/*
++ *  arndale_rt5631.c
++ *
++ *  Copyright (c) 2014, Insignal Co., Ltd.
++ *
++ *  Author: Claude <claude@insginal.co.kr>
++ *
++ *  This program is free software; you can redistribute  it and/or modify it
++ *  under  the terms of  the GNU General  Public License as published by the
++ *  Free Software Foundation;  either version 2 of the  License, or (at your
++ *  option) any later version.
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/clk.h>
++
++#include <sound/soc.h>
++#include <sound/soc-dapm.h>
++#include <sound/pcm.h>
++#include <sound/pcm_params.h>
++
++#include "i2s.h"
++
++static int arndale_hw_params(struct snd_pcm_substream *substream,
++	struct snd_pcm_hw_params *params)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
++	struct snd_soc_dai *codec_dai = rtd->codec_dai;
++	int rfs, ret;
++	unsigned long rclk;
++
++	rfs = 256;
++
++	rclk = params_rate(params) * rfs;
++
++	ret = snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_CDCLK,
++					0, SND_SOC_CLOCK_OUT);
++	if (ret < 0)
++		return ret;
++
++	ret = snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_RCLKSRC_0,
++					0, SND_SOC_CLOCK_OUT);
++
++	if (ret < 0)
++		return ret;
++
++	ret = snd_soc_dai_set_sysclk(codec_dai, 0, rclk, SND_SOC_CLOCK_OUT);
++	if (ret < 0)
++		return ret;
++
++	return 0;
++}
++
++static struct snd_soc_ops arndale_ops = {
++	.hw_params = arndale_hw_params,
++};
++
++static struct snd_soc_dai_link arndale_rt5631_dai[] = {
++	{
++		.name = "RT5631 HiFi",
++		.stream_name = "Primary",
++		.codec_dai_name = "rt5631-hifi",
++		.dai_fmt = SND_SOC_DAIFMT_I2S
++			| SND_SOC_DAIFMT_NB_NF
++			| SND_SOC_DAIFMT_CBS_CFS,
++		.ops = &arndale_ops,
++	},
++};
++
++static struct snd_soc_card arndale_rt5631 = {
++	.name = "Arndale RT5631",
++	.dai_link = arndale_rt5631_dai,
++	.num_links = ARRAY_SIZE(arndale_rt5631_dai),
++};
++
++static int arndale_audio_probe(struct platform_device *pdev)
++{
++	int n, ret;
++	struct device_node *np = pdev->dev.of_node;
++	struct snd_soc_card *card = &arndale_rt5631;
++
++	card->dev = &pdev->dev;
++
++	for (n = 0; np && n < ARRAY_SIZE(arndale_rt5631_dai); n++) {
++		if (!arndale_rt5631_dai[n].cpu_dai_name) {
++			arndale_rt5631_dai[n].cpu_of_node = of_parse_phandle(np,
++					"samsung,audio-cpu", n);
++
++			if (!arndale_rt5631_dai[n].cpu_of_node) {
++				dev_err(&pdev->dev,
++				"Property 'samsung,audio-cpu' missing or invalid\n");
++				return -EINVAL;
++			}
++		}
++		if (!arndale_rt5631_dai[n].platform_name)
++			arndale_rt5631_dai[n].platform_of_node =
++					arndale_rt5631_dai[n].cpu_of_node;
++
++		arndale_rt5631_dai[n].codec_name = NULL;
++		arndale_rt5631_dai[n].codec_of_node = of_parse_phandle(np,
++					"samsung,audio-codec", n);
++		if (!arndale_rt5631_dai[0].codec_of_node) {
++			dev_err(&pdev->dev,
++			"Property 'samsung,audio-codec' missing or invalid\n");
++			return -EINVAL;
++		}
++	}
++
++	ret = devm_snd_soc_register_card(card->dev, card);
++
++	if (ret)
++		dev_err(&pdev->dev, "snd_soc_register_card() failed:%d\n", ret);
++
++	return ret;
++}
++
++static int arndale_audio_remove(struct platform_device *pdev)
++{
++	struct snd_soc_card *card = platform_get_drvdata(pdev);
++
++	snd_soc_unregister_card(card);
++
++	return 0;
++}
++
++static const struct of_device_id samsung_arndale_rt5631_of_match[] __maybe_unused = {
++	{ .compatible = "samsung,arndale-rt5631", },
++	{ .compatible = "samsung,arndale-alc5631", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, samsung_arndale_rt5631_of_match);
++
++static struct platform_driver arndale_audio_driver = {
++	.driver = {
++		.name   = "arndale-audio",
++		.owner  = THIS_MODULE,
++		.pm = &snd_soc_pm_ops,
++		.of_match_table = of_match_ptr(samsung_arndale_rt5631_of_match),
++	},
++	.probe = arndale_audio_probe,
++	.remove = arndale_audio_remove,
++};
++
++module_platform_driver(arndale_audio_driver);
++
++MODULE_AUTHOR("Claude <claude@insignal.co.kr>");
++MODULE_DESCRIPTION("ALSA SoC Driver for Arndale Board");
++MODULE_LICENSE("GPL");
 -- 
-2.1.3
+1.7.9.5
