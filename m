@@ -1,34 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 26 Nov 2014 18:14:35 +0000
-Subject: [PATCH] ASoC: rt5631: Fixing compilation warning when DT is
- disabled
-In-Reply-To: <F186754307084FE3B13FB03E93EF318A@sisodomain.com>
-References: <1416828162-8216-1-git-send-email-krishna.md@samsung.com>
- <20141124170409.GF7712@sirena.org.uk>
- <F186754307084FE3B13FB03E93EF318A@sisodomain.com>
-Message-ID: <20141126181435.GO7712@sirena.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 26 Nov 2014 10:19:35 -0800
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <20141126172857.GA26157@amd>
+References: <20141027200008.GR2560@atomide.com>
+ <20141027230138.GB7805@drone.musicnaut.iki.fi>
+ <20141126172857.GA26157@amd>
+Message-ID: <20141126181934.GL2817@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 02:26:07PM +0530, D Krishna Mohan wrote:
+* Pavel Machek <pavel@ucw.cz> [141126 09:31]:
+> On Tue 2014-10-28 01:01:38, Aaro Koskinen wrote:
+> > Hi,
+> > 
+> > On Mon, Oct 27, 2014 at 01:00:09PM -0700, Tony Lindgren wrote:
+> > > +
+> > > +	if (!of_have_populated_dt())
+> > > +		pr_warn("WARNING: legacy booting deprecated, please update to boot with .dts\n");
+> > > +
+> > 
+> > Maybe use WARN so that the warning is more verbose and kernel gets tainted?
+> 
+> Well.. Pali still has regression where /proc/cpuinfo changes in a way
+> that breaks existing userspace, when dt is used on N900.
+> 
+> And rmk was less then helpfull...
 
-> Following your suggestion I have sent a patch
-> (187024b36c635bd454c1b1587b58c9439d3a46ad on your git, branch: rt5631 )
-> using ifdef which you have already applied.
-> Since there are more suggestion asking for second (__maybe_unused) method, I
-> have sent another patch for which below is the link.
+Maybe Pali can try to restart that discussion? To me it seems the
+/proc/cpuinfo should be the same as it's a user interface. Sorry
+forgot the details of the previous discussion..
 
-> You may be applying the second patch on the already applied first patch. so
-> I request you to apply only second patch in place of first and abandon first
-> patch.
+And with which app was that? Sorry I forgot..
 
-Once something is applied in git you should always send further patches
-as incrmental updates to that, this is much easier to manage and avoids
-any potential confusion to other people looking at the tree.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141126/4e81e6db/attachment.sig>
+It's weird that it's not been an issue for other though? 
+ 
+> Should we maybe solve that before adding backtraces to our boot
+> messages?
+
+With this warning we want to notify the people actually using
+mainline kernel on omap3 that they should update their systems.
+And also let us know on this list about the regressions, so I
+think that's quite valuable.
+
+Regards,
+
+Tony
