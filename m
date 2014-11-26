@@ -1,72 +1,32 @@
 From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Wed, 26 Nov 2014 17:17:24 +0530
-Subject: [PATCH v6 3/6] Documentation: DT: Add entry for FSL Management Complex
+Date: Wed, 26 Nov 2014 17:17:26 +0530
+Subject: [PATCH v6 5/6] arm64: dts/Makefile: Add support for FSL's LS2085A
+ simulator model
 In-Reply-To: <1417002447-19163-1-git-send-email-bhupesh.sharma@freescale.com>
 References: <1417002447-19163-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1417002447-19163-4-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <1417002447-19163-6-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a devicetree binding documentation for FSL's
-Management Complex.
-
-Management Complex is a hardware resource manager that manages
-specialized hardware objects used in network-oriented packet
-processing applications
+This patch adds build support for FSL's LS2085A simulator model
+in arm64 dts Makefile.
 
 Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
-Signed-off-by: J. German Rivera <German.Rivera@freescale.com>
 ---
- .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |   40 ++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+ arch/arm64/boot/dts/Makefile |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-new file mode 100644
-index 0000000..c7a26ca
---- /dev/null
-+++ b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-@@ -0,0 +1,40 @@
-+* Freescale Management Complex
-+
-+The Freescale Management Complex (fsl-mc) is a hardware resource
-+manager that manages specialized hardware objects used in
-+network-oriented packet processing applications. After the fsl-mc
-+block is enabled, pools of hardware resources are available, such as
-+queues, buffer pools, I/O interfaces. These resources are building
-+blocks that can be used to create functional hardware objects/devices
-+such as network interfaces, crypto accelerator instances, L2 switches,
-+etc.
-+
-+Required properties:
-+
-+    - compatible
-+        Value type: <string>
-+        Definition: Must be "fsl,qoriq-mc".  A Freescale Management Complex
-+                    compatible with this binding must have Block Revision
-+                    Registers BRR1 and BRR2 at offset 0x0BF8 and 0x0BFC in
-+                    the MC control register region.
-+
-+    - reg
-+        Value type: <prop-encoded-array>
-+        Definition: A standard property.  Specifies one or two regions
-+                    defining the MC's registers:
-+
-+                       -the first region is the command portal for the
-+                        this machine and must always be present
-+
-+                       -the second region is the MC control registers. This
-+                        region may not be present in some scenarios, such
-+                        as in the device tree presented to a virtual machine.
-+
-+Example:
-+
-+        fsl_mc: fsl-mc at 80c000000 {
-+                compatible = "fsl,qoriq-mc";
-+                reg = <0x00000008 0x0c000000 0 0x40>,    /* MC portal base */
-+                      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
-+        };
-+
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index f8001a6..c3b100f 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -1,6 +1,7 @@
+ dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
+ dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+ dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
++dtb-$(CONFIG_ARCH_FSL_LS2085A) += fsl-ls2085a-simu.dtb
+ 
+ targets += dtbs
+ targets += $(dtb-y)
 -- 
 1.7.9.5
