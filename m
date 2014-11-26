@@ -1,140 +1,121 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 26 Nov 2014 09:27:50 +0100
-Subject: [PATCH v9 05/10] sched: make scale_rt invariant with frequency
-In-Reply-To: <5475628D.2080301@gmail.com>
-References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
- <1415033687-23294-6-git-send-email-vincent.guittot@linaro.org>
- <5473E867.6030607@gmail.com>
- <CAKfTPtCSJhTR2=1_g2UVxeEEKocBs+ouco4Z5SRO2oRSJ-O2mA@mail.gmail.com>
- <5475628D.2080301@gmail.com>
-Message-ID: <CAKfTPtB_SwusyQF=0L1t7fckUMKBWseXOmSoc16xqfmGO_hNLw@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 26 Nov 2014 09:30:40 +0100
+Subject: [PATCH 1/5] pinctrl: sun6i: Add some missing functions, fix i2c3
+ muxing
+In-Reply-To: <20141125180455.GA25249@lukather>
+References: <1416747283-13489-1-git-send-email-hdegoede@redhat.com>
+ <1416747283-13489-2-git-send-email-hdegoede@redhat.com>
+ <20141125180455.GA25249@lukather>
+Message-ID: <54758FB0.4010503@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 November 2014 at 06:18, Wanpeng Li <kernellwp@gmail.com> wrote:
-> Hi Vincent,
->
-> On 11/25/14, 9:52 PM, Vincent Guittot wrote:
->>
->> On 25 November 2014 at 03:24, Wanpeng Li <kernellwp@gmail.com> wrote:
->>>
->>> Hi Vincent,
->>> On 11/4/14, 12:54 AM, Vincent Guittot wrote:
->>>>
->>>> The average running time of RT tasks is used to estimate the remaining
->>>> compute
->>>> capacity for CFS tasks. This remaining capacity is the original capacity
->>>> scaled
->>>> down by a factor (aka scale_rt_capacity). This estimation of available
->>>> capacity
->>>> must also be invariant with frequency scaling.
->>>>
->>>> A frequency scaling factor is applied on the running time of the RT
->>>> tasks
->>>> for
->>>> computing scale_rt_capacity.
->>>>
->>>> In sched_rt_avg_update, we scale the RT execution time like below:
->>>> rq->rt_avg += rt_delta * arch_scale_freq_capacity() >>
->>>> SCHED_CAPACITY_SHIFT
->>>>
->>>> Then, scale_rt_capacity can be summarized by:
->>>> scale_rt_capacity = SCHED_CAPACITY_SCALE -
->>>>                  ((rq->rt_avg << SCHED_CAPACITY_SHIFT) / period)
->>>
->>>
->>> The 'period' aka 'total' in the scale_rt_capacity(), why it is
->>> sched_avg_period() + delta instead of sched_avg_period()?
->>
->> The default value of sched_avg_period is 1sec which is "long" so we
->> take into account the time consumed by RT tasks in the ongoing period
->> .
->
->
-> Do you mean 'sched_avg_period() + delta' should be replaced by 'delta' since
-> sched_avg_period() is "long"?
+Hi,
 
-No, Both are useful. sched_avg_period is useful to keep the value more
-stable across the time. Without sched_avg_period,  it will be too much
-reactive  ( especially at the beg of a period ).
-
+On 11/25/2014 07:04 PM, Maxime Ripard wrote:
+> Hi,
 >
-> Regards,
-> Wanpeng Li
->
->
+> On Sun, Nov 23, 2014 at 01:54:39PM +0100, Hans de Goede wrote:
+>> While working on pinctrl for the A31s, I noticed that function 4 of
+>> PA15 - PA18 was missing, add these.
 >>
->>> Regards,
->>> Wanpeng Li
->>>
->>>
->>>> We can optimize by removing right and left shift in the computation of
->>>> rq->rt_avg
->>>> and scale_rt_capacity
->>>>
->>>> The call to arch_scale_frequency_capacity in the rt scheduling path
->>>> might
->>>> be
->>>> a concern for RT folks because I'm not sure whether we can rely on
->>>> arch_scale_freq_capacity to be short and efficient ?
->>>>
->>>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->>>> ---
->>>>    kernel/sched/fair.c  | 17 +++++------------
->>>>    kernel/sched/sched.h |  4 +++-
->>>>    2 files changed, 8 insertions(+), 13 deletions(-)
->>>>
->>>> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
->>>> index a5039da..b37c27b 100644
->>>> --- a/kernel/sched/fair.c
->>>> +++ b/kernel/sched/fair.c
->>>> @@ -5785,7 +5785,7 @@ unsigned long __weak
->>>> arch_scale_cpu_capacity(struct
->>>> sched_domain *sd, int cpu)
->>>>    static unsigned long scale_rt_capacity(int cpu)
->>>>    {
->>>>          struct rq *rq = cpu_rq(cpu);
->>>> -       u64 total, available, age_stamp, avg;
->>>> +       u64 total, used, age_stamp, avg;
->>>>          s64 delta;
->>>>          /*
->>>> @@ -5801,19 +5801,12 @@ static unsigned long scale_rt_capacity(int cpu)
->>>>          total = sched_avg_period() + delta;
->>>>    -     if (unlikely(total < avg)) {
->>>> -               /* Ensures that capacity won't end up being negative */
->>>> -               available = 0;
->>>> -       } else {
->>>> -               available = total - avg;
->>>> -       }
->>>> +       used = div_u64(avg, total);
->>>>    -     if (unlikely((s64)total < SCHED_CAPACITY_SCALE))
->>>> -               total = SCHED_CAPACITY_SCALE;
->>>> +       if (likely(used < SCHED_CAPACITY_SCALE))
->>>> +               return SCHED_CAPACITY_SCALE - used;
->>>>    -     total >>= SCHED_CAPACITY_SHIFT;
->>>> -
->>>> -       return div_u64(available, total);
->>>> +       return 1;
->>>>    }
->>>>      static void update_cpu_capacity(struct sched_domain *sd, int cpu)
->>>> diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
->>>> index c34bd11..fc5b152 100644
->>>> --- a/kernel/sched/sched.h
->>>> +++ b/kernel/sched/sched.h
->>>> @@ -1312,9 +1312,11 @@ static inline int hrtick_enabled(struct rq *rq)
->>>>      #ifdef CONFIG_SMP
->>>>    extern void sched_avg_update(struct rq *rq);
->>>> +extern unsigned long arch_scale_freq_capacity(struct sched_domain *sd,
->>>> int cpu);
->>>> +
->>>>    static inline void sched_rt_avg_update(struct rq *rq, u64 rt_delta)
->>>>    {
->>>> -       rq->rt_avg += rt_delta;
->>>> +       rq->rt_avg += rt_delta * arch_scale_freq_capacity(NULL,
->>>> cpu_of(rq));
->>>>          sched_avg_update(rq);
->>>>    }
->>>>    #else
->>>
->>>
+>> I also noticed that i2c3 sck / sda got assigned to PB5 & PB6, this should
+>> be PB4 & PB5, fix this as well.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c | 9 +++++++--
+>>   1 file changed, 7 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+>> index a2b4b85..fb19e15 100644
+>> --- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+>> +++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+>> @@ -134,24 +134,28 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
+>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD4 */
+>>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D15 */
+>> +		  SUNXI_FUNCTION(0x4, "clk_a_out"),
 >
+> It's called clk_out_a on the A20, I'd rather stick with the same
+> scheme here.
+
+Will fix.
+
+>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 15)),	/* PA_EINT15 */
+>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 16),
+>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD5 */
+>>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D16 */
+>> +		  SUNXI_FUNCTION(0x4, "dmic"),		/* CLK */
+>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 16)),	/* PA_EINT16 */
+>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 17),
+>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD6 */
+>>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D17 */
+>> +		  SUNXI_FUNCTION(0x4, "dmic"),		/* DIN */
+>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 17)),	/* PA_EINT17 */
+>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 18),
+>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD7 */
+>>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D18 */
+>> +		  SUNXI_FUNCTION(0x4, "clk_b_out"),
+>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 18)),	/* PA_EINT18 */
+>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 19),
+>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>> @@ -207,6 +211,7 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
+>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* MDC */
+>>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* HSYNC */
+>> +		  SUNXI_FUNCTION(0x4, "clk_c_out"),
+>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 26)),	/* PA_EINT26 */
+>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 27),
+>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>> @@ -242,20 +247,20 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
+>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>   		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DO1 */
+>>   		  SUNXI_FUNCTION(0x3, "uart3"),		/* RTS */
+>> +		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SCK */
+>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 4)),	/* PB_EINT4 */
+>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 5),
+>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>   		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DO2 */
+>>   		  SUNXI_FUNCTION(0x3, "uart3"),		/* TX */
+>> -		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SCK */
+>> +		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SDA */
+>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 5)),	/* PB_EINT5 */
+>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 6),
+>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>   		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DO3 */
+>>   		  SUNXI_FUNCTION(0x3, "uart3"),		/* RX */
+>> -		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SDA */
+>
+> Where did you get that info from? The datasheet still reports that
+> information.
+
+I assume with the datasheet you mean "A31 User Manual V1.20.pdf", which
+was last updated on September 20, 2013. I did not check that one, now I
+see where the original pinctrl code from.
+
+So I've done some more digging:
+
+"A31 Datasheet - v1.00 (2012-12-24).pdf" also has twi3 sck / sda on pin
+PB5 / PB6 like the current pinctrl code.
+
+But "A31 Datasheet V1.40.pdf" which has the following in its revision log:
+"1.4 Dec 10,2013 Modify Pin Description"
+
+Moves them to PB4 / PB5 and that is where I got this from (and was the only
+place I initially looked), I think that this is an intentional change, and
+that PB4 / PB5 are the correct pins.
+
+I will ask Allwinner which is correct, so that we know for sure.
+
+Regards,
+
+Hans
