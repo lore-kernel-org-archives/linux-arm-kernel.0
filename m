@@ -1,166 +1,320 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 26 Nov 2014 17:59:07 +0100
-Subject: [PATCH v3 11/13] arm64/efi: use plain memblock API for adding and
- removing reserved RAM
-In-Reply-To: <1416583273.6398.71.camel@deneb.redhat.com>
-References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
- <1416315432-8534-12-git-send-email-ard.biesheuvel@linaro.org>
- <1416504536.6398.58.camel@deneb.redhat.com>
- <CAKv+Gu9XQWrQyPi+8=vhXWkJXtnJ+8=evNC-Z_MkWR8Wuk6Awg@mail.gmail.com>
- <1416506069.6398.64.camel@deneb.redhat.com>
- <CAKv+Gu_2kn10dh7LMbhVVYu8+LkMoN_Vxi-tnmCEcBTJ7qs_Jg@mail.gmail.com>
- <1416583273.6398.71.camel@deneb.redhat.com>
-Message-ID: <CAKv+Gu_qsx60P-CBJoK=2Efy0w3Ud3xHhBdOQ+V1FuStZRMDkg@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 26 Nov 2014 16:59:07 +0000
+Subject: [PATCH] arm: perf: Directly handle SMP platforms with one SPI
+In-Reply-To: <1416581603-30557-1-git-send-email-daniel.thompson@linaro.org>
+References: <1416581603-30557-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1417021147-20735-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 November 2014 at 16:21, Mark Salter <msalter@redhat.com> wrote:
-> On Fri, 2014-11-21 at 13:07 +0100, Ard Biesheuvel wrote:
->> On 20 November 2014 18:54, Mark Salter <msalter@redhat.com> wrote:
->> > On Thu, 2014-11-20 at 18:38 +0100, Ard Biesheuvel wrote:
->> >> On 20 November 2014 18:28, Mark Salter <msalter@redhat.com> wrote:
->> >> > On Tue, 2014-11-18 at 13:57 +0100, Ard Biesheuvel wrote:
->> >> >> diff --git a/drivers/firmware/efi/virtmap.c
->> >> >> b/drivers/firmware/efi/virtmap.c
->> >> >> index 98735fb43581..4b6a5c31629f 100644
->> >> >> --- a/drivers/firmware/efi/virtmap.c
->> >> >> +++ b/drivers/firmware/efi/virtmap.c
->> >> >> @@ -8,6 +8,7 @@
->> >> >>   */
->> >> >>
->> >> >>  #include <linux/efi.h>
->> >> >> +#include <linux/memblock.h>
->> >> >>  #include <linux/mm_types.h>
->> >> >>  #include <linux/rbtree.h>
->> >> >>  #include <linux/rwsem.h>
->> >> >> @@ -97,8 +98,15 @@ void __init efi_virtmap_init(void)
->> >> >>                 u64 paddr, npages, size;
->> >> >>                 pgprot_t prot;
->> >> >>
->> >> >> -               if (!efi_mem_is_usable_region(md))
->> >> >> +               paddr = md->phys_addr;
->> >> >> +               npages = md->num_pages;
->> >> >> +               memrange_efi_to_native(&paddr, &npages);
->> >> >> +               size = npages << PAGE_SHIFT;
->> >> >> +
->> >> >> +               if (!efi_mem_is_usable_region(md)) {
->> >> >>                         efi_register_mem_resource(md);
->> >> >> +                       memblock_remove(paddr, size);
->> >> >> +               }
->> >> >
->> >> > What exactly is the memblock_remove trying to accomplish? With it, I
->> >> > get:
->> >> >
->> >>
->> >> The idea was pfn_valid() will then return false for those pfns,
->> >> allowing us to distinguish them from memory that the kernel may be
->> >> using, primarily for /dev/mem filtering. But apparently it is causing
->> >> problems for you, so I will have to figure out if there is a better
->> >> way of addressing this.
->> >>
->> > Okay. Well I think that works for pfn_valid, but it is confusing the
->> > mem_cgroup code. I think because you end up with multiple memory regions
->> > after creating the holes. Earlier memory management code saw one memory
->> > region. And because this comes after paging_init(), all of the memory
->> > ends up in the kernel linear mapping which is something we were trying
->> > to avoid.
->> >
->>
->> I will drop the memblock_remove() then. I guess I could make the test
->> in devmem_is_allowed() do
->>
->> if (!memblock_is_memory() || memblock_is_reserved())
->>
->> instead of 'if (!pfn_valid())' so that reserved regions become
->> accessible with having to remove them.
->
-> Maybe we should add a new memblock to keep track of uefi tables.
-> The memblock_is_reserved() seems overly permissive to me.
->
+Some ARM platforms mux the PMU interrupt of every core into a single
+SPI. On such platforms if the PMU of any core except 0 raises an interrupt
+then it cannot be serviced and eventually, if you are lucky, the spurious
+irq detection might forcefully disable the interrupt.
 
-OK. So instead, I will split reserve_regions() into 2 passes:
-- first pass adds all EFI_MEMORY_WB regions (unrounded)
-- second pass one removes all reserved regions (rounded up to OS page size)
+On these SoCs it is not possible to determine which core raised the
+interrupt so workaround this issue by queuing irqwork on the other
+cores whenever the primary interrupt handler is unable to service the
+interrupt.
 
-That way, the devmem stuff should still work as well.
+The u8500 platform has an alternative workaround that dynamically alters
+the affinity of the PMU interrupt. This workaround logic is no longer
+required so the original code is removed as is the hook it relied upon.
 
-QEMU example:
+Tested on imx6q (which has fours cores/PMUs all muxed to a single SPI).
 
-Processing EFI memory map:
-  0x0000b711d000-0x0000b71dffff [Runtime Data       |RUN|  |  |  |
-|WB|WT|WC|UC]
-  0x0000bfb21000-0x0000bfb34fff [Runtime Code       |RUN|  |  |  |
-|WB|WT|WC|UC]
-  0x0000bfb35000-0x0000bfb66fff [Runtime Data       |RUN|  |  |  |
-|WB|WT|WC|UC]
-  0x0000bfb6a000-0x0000bfb6afff [Runtime Data       |RUN|  |  |  |
-|WB|WT|WC|UC]
-  0x0000bfb82000-0x0000bfb82fff [Runtime Data       |RUN|  |  |  |
-|WB|WT|WC|UC]
-  0x000004000000-0x000007ffffff [Memory Mapped I/O  |RUN|  |  |  |   |
- |  |  |UC]
-  0x000009010000-0x000009010fff [Memory Mapped I/O  |RUN|  |  |  |   |
- |  |  |UC]
-  0x000040000000-0x0000407affff [Loader Data        |   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000b71e0000-0x0000bb77efff [Conventional Memory|   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000bb77f000-0x0000bbc00fff [Boot Data          |   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000bbc01000-0x0000bbdc2fff [Conventional Memory|   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000bbdc3000-0x0000bc01ffff [Boot Data          |   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000bc020000-0x0000bfa43fff [Conventional Memory|   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000bfa44000-0x0000bfb20fff [Boot Code          |   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000407b0000-0x00005fdfffff [Conventional Memory|   |  |  |  |
-|WB|WT|WC|UC]
-  0x00005fe00000-0x00005fe0ffff [Loader Data        |   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000bfb67000-0x0000bfb69fff [Boot Data          |   |  |  |  |
-|WB|WT|WC|UC]
-  0x00005fe10000-0x0000b6337fff [Conventional Memory|   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000bfb6b000-0x0000bfb7efff [Conventional Memory|   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000bfb7f000-0x0000bfb81fff [Boot Data          |   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000b6338000-0x0000b6338fff [Loader Data        |   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000bfb83000-0x0000bfffffff [Boot Data          |   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000b6339000-0x0000b6a4bfff [Loader Code        |   |  |  |  |
-|WB|WT|WC|UC]
-  0x0000b6a4c000-0x0000b711cfff [Boot Code          |   |  |  |  |
-|WB|WT|WC|UC]
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
 
-MEMBLOCK configuration:
- memory size = 0x7fef5000 reserved size = 0x1724000
- memory.cnt  = 0x5
- memory[0x0] [0x00000040000000-0x000000b711cfff], 0x7711d000 bytes flags: 0x0
- memory[0x1] [0x000000b71e0000-0x000000bfb20fff], 0x8941000 bytes flags: 0x0
- memory[0x2] [0x000000bfb67000-0x000000bfb69fff], 0x3000 bytes flags: 0x0
- memory[0x3] [0x000000bfb6b000-0x000000bfb81fff], 0x17000 bytes flags: 0x0
- memory[0x4] [0x000000bfb83000-0x000000bfffffff], 0x47d000 bytes flags: 0x0
- reserved.cnt  = 0x4
- reserved[0x0] [0x00000040080000-0x00000040792fff], 0x713000 bytes flags: 0x0
- reserved[0x1] [0x0000005fe00000-0x0000005fe0ffff], 0x10000 bytes flags: 0x0
- reserved[0x2] [0x000000b6338000-0x000000b6338fff], 0x1000 bytes flags: 0x0
- reserved[0x3] [0x000000be800000-0x000000bf7fffff], 0x1000000 bytes flags: 0x0
-   memblock_free: [0x00000040792000-0x00000040792fff]
-__create_mapping.isra.6+0x9c/0x2ac
+Notes:
+    v2:
+     * Fixed build problems on systems without SMP.
+    
+    v1:
+     * Thanks to Lucas Stach, Russell King and Thomas Gleixner for
+       critiquing an older, completely different way to tackle the
+       same problem.
+    
 
->>
->> Are you happy with the other change in this patch, i.e., using
->> memblock_add() directly so that we don't have to deal with the
->> rounding?
->>
->
-> Yeah, I think that's okay. Everything else seems to be working fine
-> in my testing.
->
+ arch/arm/include/asm/pmu.h       |  12 ++++
+ arch/arm/kernel/perf_event.c     |  13 ++--
+ arch/arm/kernel/perf_event_cpu.c | 126 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-ux500/cpu-db8500.c |  29 ---------
+ 4 files changed, 143 insertions(+), 37 deletions(-)
 
-Cheers,
-Ard.
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index 0b648c541293..771201ff0988 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -81,6 +81,12 @@ struct pmu_hw_events {
+ 	raw_spinlock_t		pmu_lock;
+ };
+
++struct arm_pmu_work {
++	struct irq_work work;
++	struct arm_pmu *arm_pmu;
++	atomic_t ret;
++};
++
+ struct arm_pmu {
+ 	struct pmu	pmu;
+ 	cpumask_t	active_irqs;
+@@ -108,6 +114,12 @@ struct arm_pmu {
+ 	u64		max_period;
+ 	struct platform_device	*plat_device;
+ 	struct pmu_hw_events	*(*get_hw_events)(void);
++#ifdef CONFIG_SMP
++	irqreturn_t	(*handle_irq_none)(struct arm_pmu *);
++	int             single_irq;
++	struct arm_pmu_work __percpu *work;
++	atomic_t        remaining_work;
++#endif
+ };
+
+ #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index b50a770f8c99..ba67d6309e1e 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -306,22 +306,19 @@ validate_group(struct perf_event *event)
+ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ {
+ 	struct arm_pmu *armpmu;
+-	struct platform_device *plat_device;
+-	struct arm_pmu_platdata *plat;
+ 	int ret;
+ 	u64 start_clock, finish_clock;
+
+ 	if (irq_is_percpu(irq))
+ 		dev = *(void **)dev;
+ 	armpmu = dev;
+-	plat_device = armpmu->plat_device;
+-	plat = dev_get_platdata(&plat_device->dev);
+
+ 	start_clock = sched_clock();
+-	if (plat && plat->handle_irq)
+-		ret = plat->handle_irq(irq, dev, armpmu->handle_irq);
+-	else
+-		ret = armpmu->handle_irq(irq, dev);
++	ret = armpmu->handle_irq(irq, dev);
++#ifdef CONFIG_SMP
++	if (ret == IRQ_NONE && armpmu->handle_irq_none)
++		ret = armpmu->handle_irq_none(dev);
++#endif
+ 	finish_clock = sched_clock();
+
+ 	perf_sample_event_took(finish_clock - start_clock);
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index eb2c4d55666b..5605d4a4c01f 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -88,6 +88,120 @@ static void cpu_pmu_disable_percpu_irq(void *data)
+ 	disable_percpu_irq(irq);
+ }
+
++#ifdef CONFIG_SMP
++
++/*
++ * Workaround logic that is distributed to all cores if the PMU has only
++ * a single IRQ and the CPU receiving that IRQ cannot handle it. Its
++ * job is to try to service the interrupt on the current CPU. It will
++ * also enable the IRQ again if all the other CPUs have already tried to
++ * service it.
++ */
++static void cpu_pmu_do_percpu_work(struct irq_work *w)
++{
++	struct arm_pmu_work *work = container_of(w, struct arm_pmu_work, work);
++	struct arm_pmu *cpu_pmu = work->arm_pmu;
++
++	atomic_set(&work->ret,
++		   cpu_pmu->handle_irq(cpu_pmu->single_irq, cpu_pmu));
++
++	if (atomic_dec_and_test(&cpu_pmu->remaining_work))
++		enable_irq(cpu_pmu->single_irq);
++}
++
++/*
++ * This callback, which is enabled only on SMP platforms that are
++ * running with a single IRQ, is called when the PMU handler running in
++ * the current CPU cannot service the interrupt.
++ *
++ * It will disable the interrupt and distribute irqwork to all other
++ * processors in the system. Hopefully one of them will clear the
++ * interrupt...
++ */
++static irqreturn_t cpu_pmu_handle_irq_none(struct arm_pmu *cpu_pmu)
++{
++	int num_online = num_online_cpus();
++	irqreturn_t ret = IRQ_NONE;
++	int cpu, cret;
++
++	if (num_online <= 1)
++		return IRQ_NONE;
++
++	disable_irq_nosync(cpu_pmu->single_irq);
++	atomic_add(num_online, &cpu_pmu->remaining_work);
++	smp_mb__after_atomic();
++
++	for_each_online_cpu(cpu) {
++		struct arm_pmu_work *work = per_cpu_ptr(cpu_pmu->work, cpu);
++
++		if (cpu == smp_processor_id())
++			continue;
++
++		/*
++		 * We can be extremely relaxed about memory ordering
++		 * here. All we are doing is gathering information
++		 * about the past to help us give a return value that
++		 * will keep the spurious interrupt detector both happy
++		 * *and* functional. We are not shared so we can
++		 * tolerate the occasional spurious IRQ_HANDLED.
++		 */
++		cret = atomic_read(&work->ret);
++		if (cret != IRQ_NONE)
++			ret = cret;
++
++		if (!irq_work_queue_on(&work->work, cpu))
++			atomic_dec(&cpu_pmu->remaining_work);
++	}
++
++	if (atomic_dec_and_test(&cpu_pmu->remaining_work))
++		enable_irq(cpu_pmu->single_irq);
++
++	return ret;
++}
++
++static int cpu_pmu_single_irq_workaround_init(struct arm_pmu *cpu_pmu)
++{
++	struct platform_device *pmu_device = cpu_pmu->plat_device;
++	int cpu;
++
++	cpu_pmu->handle_irq_none = cpu_pmu_handle_irq_none;
++	cpu_pmu->single_irq = platform_get_irq(pmu_device, 0);
++
++	cpu_pmu->work = alloc_percpu(struct arm_pmu_work);
++	if (!cpu_pmu->work) {
++		pr_err("no memory for shared IRQ workaround\n");
++		return -ENOMEM;
++	}
++
++	for_each_possible_cpu(cpu) {
++		struct arm_pmu_work *w = per_cpu_ptr(cpu_pmu->work, cpu);
++
++		init_irq_work(&w->work, cpu_pmu_do_percpu_work);
++		w->arm_pmu = cpu_pmu;
++	}
++
++	return 0;
++}
++
++static void cpu_pmu_single_irq_workaround_term(struct arm_pmu *cpu_pmu)
++{
++	cpu_pmu->handle_irq_none = cpu_pmu_handle_irq_none;
++	free_percpu(cpu_pmu->work);
++}
++
++#else /* CONFIG_SMP */
++
++static int cpu_pmu_single_irq_workaround_init(struct arm_pmu *cpu_pmu)
++{
++	return 0;
++}
++
++static void cpu_pmu_single_irq_workaround_term(struct arm_pmu *cpu_pmu)
++{
++}
++
++#endif /* CONFIG_SMP */
++
+ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
+ {
+ 	int i, irq, irqs;
+@@ -107,6 +221,8 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
+ 			if (irq >= 0)
+ 				free_irq(irq, cpu_pmu);
+ 		}
++
++		cpu_pmu_single_irq_workaround_term(cpu_pmu);
+ 	}
+ }
+
+@@ -162,6 +278,16 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+
+ 			cpumask_set_cpu(i, &cpu_pmu->active_irqs);
+ 		}
++
++		/*
++		 * If we are running SMP and have only one interrupt source
++		 * then get ready to share that single irq among the cores.
++		 */
++		if (nr_cpu_ids > 1 && irqs == 1) {
++			err = cpu_pmu_single_irq_workaround_init(cpu_pmu);
++			if (err)
++				return err;
++		}
+ 	}
+
+ 	return 0;
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 6f63954c8bde..917774999c5c 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -12,8 +12,6 @@
+ #include <linux/init.h>
+ #include <linux/device.h>
+ #include <linux/amba/bus.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/mfd/abx500/ab8500.h>
+@@ -23,7 +21,6 @@
+ #include <linux/regulator/machine.h>
+ #include <linux/random.h>
+
+-#include <asm/pmu.h>
+ #include <asm/mach/map.h>
+
+ #include "setup.h"
+@@ -99,30 +96,6 @@ static void __init u8500_map_io(void)
+ 		iotable_init(u8500_io_desc, ARRAY_SIZE(u8500_io_desc));
+ }
+
+-/*
+- * The PMU IRQ lines of two cores are wired together into a single interrupt.
+- * Bounce the interrupt to the other core if it's not ours.
+- */
+-static irqreturn_t db8500_pmu_handler(int irq, void *dev, irq_handler_t handler)
+-{
+-	irqreturn_t ret = handler(irq, dev);
+-	int other = !smp_processor_id();
+-
+-	if (ret == IRQ_NONE && cpu_online(other))
+-		irq_set_affinity(irq, cpumask_of(other));
+-
+-	/*
+-	 * We should be able to get away with the amount of IRQ_NONEs we give,
+-	 * while still having the spurious IRQ detection code kick in if the
+-	 * interrupt really starts hitting spuriously.
+-	 */
+-	return ret;
+-}
+-
+-static struct arm_pmu_platdata db8500_pmu_platdata = {
+-	.handle_irq		= db8500_pmu_handler,
+-};
+-
+ static const char *db8500_read_soc_id(void)
+ {
+ 	void __iomem *uid = __io_address(U8500_BB_UID_BASE);
+@@ -143,8 +116,6 @@ static struct device * __init db8500_soc_device_init(void)
+ }
+
+ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+-	/* Requires call-back bindings. */
+-	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
+ 	/* Requires DMA bindings. */
+ 	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80123000,
+ 		       "ux500-msp-i2s.0", &msp0_platform_data),
+--
+1.9.3
