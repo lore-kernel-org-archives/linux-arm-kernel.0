@@ -1,110 +1,176 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 26 Nov 2014 17:23:34 +0100
-Subject: [PATCH v3 03/13] arm64: improve CONFIG_STRICT_DEVMEM handling
-In-Reply-To: <20141126093042.GA6474@darkstar.nay.redhat.com>
-References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
- <1416315432-8534-4-git-send-email-ard.biesheuvel@linaro.org>
- <20141126093042.GA6474@darkstar.nay.redhat.com>
-Message-ID: <CAKv+Gu8UyfdFhaKXNQMzuf7L3b9jDyUd4FzG1x-c7FfoxnZe=Q@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 26 Nov 2014 16:23:24 +0000
+Subject: [PATCH 3.18-rc4 v10 0/6] arm: Implement arch_trigger_all_cpu_backtrace
+In-Reply-To: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1417019010-9220-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 November 2014 at 10:30, Dave Young <dyoung@redhat.com> wrote:
-> On 11/18/14 at 01:57pm, Ard Biesheuvel wrote:
->> Improve the handling of /dev/mem mappings under CONFIG_STRICT_DEVMEM by:
->> - allowing read-only access to parts of System RAM that are not
->>   considered memory by the kernel, this is mainly intended for exposing
->>   UEFI Configuration tables to userland;
->
-> Ard, can you elabrate a bit? Are this for the acpi case because no dtb in
-> procfs?
->
+Hi Thomas, Hi Jason: Patches 1 to 4 are for you.
 
-No, that is a different issue.
+This patchset modifies the GIC driver to allow it, on supported
+platforms, to route IPI interrupts to FIQ and uses this feature to
+implement arch_trigger_all_cpu_backtrace for arm.
 
-> Anyway I also think using /dev/mem looks not a good way to expose
-> infomation to userspace.
->
+On platforms not capable of supporting FIQ the signal to generate a
+backtrace we fall back to using IRQ for propagation instead (relying on
+a timeout to avoid wedging the CPU requesting the backtrace if other
+CPUs are not responsive).
 
-This is for compatibility with existing tools like dmidecode and lshw
-that already use /dev/mem.
-However, on x86, the tables they access are in iomem resource ranges
-that are accessible under CONFIG_STRICT_DEVMEM, whereas on arm64,
-those regions are inaccessible.
+It has been tested on two systems capable of supporting grouping
+(Freescale i.MX6 and STiH416) and two that do not (vexpress-a9 and
+Qualcomm Snapdragon 600).
 
-So while our position is that using /dev/mem for *anything* is an
-awful idea, this particular patch just tries to bring arm64 in line
-with what currently existing tools expect.
+v10:
 
--- 
-Ard.
+* Add a further patch to optimize away some of the locking on systems
+  where CONFIG_BL_SWITCHER is not set (Marc Zyngier). Compiles OK with
+  exynos_defconfig (which is the only defconfig to set this option).
+
+* Whitespace fixes in patch 4. That patch previously used spaces for
+  alignment of new constants but the rest of the file used tabs.
+
+v9:
+
+* Improved documentation and structure of initial patch (now initial
+  two patches) to make gic_raise_softirq() safe to call from FIQ
+  (Thomas Gleixner).
+
+* Avoid masking interrupts during gic_raise_softirq(). The use of the
+  read lock makes this redundant (because we can safely re-enter the
+  function).
+
+v8:
+
+* Fixed build on arm64 causes by a spurious include file in irq-gic.c.
+
+v7-2 (accidentally released twice with same number):
+
+* Fixed boot regression on vexpress-a9 (reported by Russell King).
+
+* Rebased on v3.18-rc3; removed one patch from set that is already
+  included in mainline.
+
+* Dropped arm64/fiq.h patch from the set (still useful but not related
+  to issuing backtraces).
+
+v7:
+
+* Re-arranged code within the patch series to fix a regression
+  introduced midway through the series and corrected by a later patch
+  (testing by Olof's autobuilder). Tested offending patch in isolation
+  using defconfig identified by the autobuilder.
+
+v6:
+
+* Renamed svc_entry's call_trace argument to just trace (example code
+  from Russell King).
+
+* Fixed mismatched ENDPROC() in __fiq_abt (example code from Russell
+  King).
+
+* Modified usr_entry to optional avoid calling into the trace code and
+  used this in FIQ entry from usr path. Modified corresponding exit code
+  to avoid calling into trace code and the scheduler (example code from
+  Russell King).
+
+* Ensured the default FIQ register state is restored when the default
+  FIQ handler is reinstalled (example code from Russell King).
+
+* Renamed no_fiq_insn to dfl_fiq_insn to reflect the effect of adopting
+  a default FIQ handler.
+
+* Re-instated fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq(). gic_raise_softirq() is called by wake_up_klogd()
+  in the console unlock logic.
+
+v5:
+
+* Rebased on 3.17-rc4.
+
+* Removed a spurious line from the final "glue it together" patch
+  that broke the build.
+
+v4:
+
+* Replaced push/pop with stmfd/ldmfd respectively (review of Nicolas
+  Pitre).
+
+* Really fix bad pt_regs pointer generation in __fiq_abt.
+
+* Remove fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq() (review of Russell King)
+
+* Restructured to introduce the default FIQ handler first, before the
+  new features (review of Russell King).
+
+v3:
+
+* Removed redundant header guards from arch/arm64/include/asm/fiq.h
+  (review of Catalin Marinas).
+
+* Moved svc_exit_via_fiq macro to entry-header.S (review of Nicolas
+  Pitre).
+
+v2:
+
+* Restructured to sit nicely on a similar FYI patchset from Russell
+  King. It now effectively replaces the work in progress final patch
+  with something much more complete.
+
+* Implemented (and tested) a Thumb-2 implementation of svc_exit_via_fiq
+  (review of Nicolas Pitre)
+
+* Dropped the GIC group 0 workaround patch. The issue of FIQ interrupts
+  being acknowledged by the IRQ handler does still exist but should be
+  harmless because the IRQ handler will still wind up calling
+  ipi_cpu_backtrace().
+
+* Removed any dependency on CONFIG_FIQ; all cpu backtrace effectively
+  becomes a platform feature (although the use of non-maskable
+  interrupts to implement it is best effort rather than guaranteed).
+
+* Better comments highlighting usage of RAZ/WI registers (and parts of
+  registers) in the GIC code.
+
+Changes *before* v1:
+
+* This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
+  arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
+  the new structure. For historic details see:
+        https://lkml.org/lkml/2014/9/2/227
+
+* Fix bug in __fiq_abt (no longer passes a bad struct pt_regs value).
+  In fixing this we also remove the useless indirection previously
+  found in the fiq_handler macro.
+
+* Make default fiq handler "always on" by migrating from fiq.c to
+  traps.c and replace do_unexp_fiq with the new handler (review
+  of Russell King).
+
+* Add arm64 version of fiq.h (review of Russell King)
+
+* Removed conditional branching and code from irq-gic.c, this is
+  replaced by much simpler code that relies on the GIC specification's
+  heavy use of read-as-zero/write-ignored (review of Russell King)
 
 
+Daniel Thompson (6):
+  irqchip: gic: Finer grain locking for gic_raise_softirq
+  irqchip: gic: Optimize locking in gic_raise_softirq
+  irqchip: gic: Make gic_raise_softirq FIQ-safe
+  irqchip: gic: Introduce plumbing for IPI FIQ
+  ARM: add basic support for on-demand backtrace of other CPUs
+  arm: smp: Handle ipi_cpu_backtrace() using FIQ (if available)
 
->> - avoid using non-cached mappings for those parts of System RAM, as it
->>   may result in mismatched attributes.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/mm/mmap.c |  5 +++--
->>  arch/arm64/mm/mmu.c  | 15 ++++++++++++++-
->>  2 files changed, 17 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
->> index 1d73662f00ff..802cdf0df921 100644
->> --- a/arch/arm64/mm/mmap.c
->> +++ b/arch/arm64/mm/mmap.c
->> @@ -127,14 +127,15 @@ int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
->>  /*
->>   * devmem_is_allowed() checks to see if /dev/mem access to a certain address
->>   * is valid. The argument is a physical page number.  We mimic x86 here by
->> - * disallowing access to system RAM as well as device-exclusive MMIO regions.
->> + * disallowing access to system RAM that is in active use by the kernel, as
->> + * well as device-exclusive MMIO regions.
->>   * This effectively disable read()/write() on /dev/mem.
->>   */
->>  int devmem_is_allowed(unsigned long pfn)
->>  {
->>       if (iomem_is_exclusive(pfn << PAGE_SHIFT))
->>               return 0;
->> -     if (!page_is_ram(pfn))
->> +     if (!pfn_valid(pfn))
->>               return 1;
->>       return 0;
->>  }
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index 4d583aa9ff4e..93ba10838359 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -121,7 +121,7 @@ early_param("cachepolicy", early_cachepolicy);
->>  pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
->>                             unsigned long size, pgprot_t vma_prot)
->>  {
->> -     if (!pfn_valid(pfn))
->> +     if (!page_is_ram(pfn))
->>               return pgprot_noncached(vma_prot);
->>       else if (file->f_flags & O_SYNC)
->>               return pgprot_writecombine(vma_prot);
->> @@ -129,6 +129,19 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
->>  }
->>  EXPORT_SYMBOL(phys_mem_access_prot);
->>
->> +/*
->> + * This definition of phys_mem_access_prot_allowed() overrides
->> + * the __weak definition in drivers/char/mem.c
->> + */
->> +int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
->> +                              unsigned long size, pgprot_t *prot)
->> +{
->> +     /* Disallow read-write access to reserved system RAM */
->> +     if ((pgprot_val(*prot) & PTE_WRITE) && page_is_ram(pfn))
->> +             return 0;
->> +     return 1;
->> +}
->> +
->>  static void __init *early_alloc(unsigned long sz)
->>  {
->>       void *ptr = __va(memblock_alloc(sz, sz));
->> --
->> 1.8.3.2
->>
+ arch/arm/include/asm/irq.h      |   5 +
+ arch/arm/include/asm/smp.h      |   3 +
+ arch/arm/kernel/smp.c           |  64 +++++++++++++
+ arch/arm/kernel/traps.c         |   8 +-
+ drivers/irqchip/irq-gic.c       | 207 +++++++++++++++++++++++++++++++++++++---
+ include/linux/irqchip/arm-gic.h |   8 ++
+ 6 files changed, 280 insertions(+), 15 deletions(-)
+
+--
+1.9.3
