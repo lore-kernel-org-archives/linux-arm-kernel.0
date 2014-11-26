@@ -1,54 +1,36 @@
 From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Wed, 26 Nov 2014 17:17:22 +0530
-Subject: [PATCH v6 1/6] Documentation: DT: Add bindings for FSL NS16550A UART
+Date: Wed, 26 Nov 2014 17:17:23 +0530
+Subject: [PATCH v6 2/6] Documentation: DT: Add entry for FSL LS2085A SoC and
+ Simulator model
 In-Reply-To: <1417002447-19163-1-git-send-email-bhupesh.sharma@freescale.com>
 References: <1417002447-19163-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1417002447-19163-2-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <1417002447-19163-3-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch addss the device-tree documentation for Freescale's
-NS16550 UART (also called DUART).
-
-There is a specific errata fix required in FSL NS16550 UART
-which ensures that an random interrupt storm is not observed when
-a break is provided as an input to the UART.
+This patch adds a devicetree binding documentation for FSL's
+LS2085A SoC and Simulator model.
 
 Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- .../devicetree/bindings/serial/of-serial.txt       |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ Documentation/devicetree/bindings/arm/fsl.txt |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/serial/of-serial.txt b/Documentation/devicetree/bindings/serial/of-serial.txt
-index 8c4fd03..1b3220b 100644
---- a/Documentation/devicetree/bindings/serial/of-serial.txt
-+++ b/Documentation/devicetree/bindings/serial/of-serial.txt
-@@ -15,6 +15,7 @@ Required properties:
- 	- "altr,16550-FIFO64"
- 	- "altr,16550-FIFO128"
- 	- "fsl,16550-FIFO64"
-+	- "fsl,ns16550"
- 	- "serial" if the port type is unknown.
- - reg : offset and length of the register set for the device.
- - interrupts : should contain uart interrupt.
-@@ -39,6 +40,17 @@ Optional properties:
-   driver is allowed to detect support for the capability even without this
-   property.
- 
-+Note:
-+* fsl,ns16550:
-+  ------------
-+  Freescale DUART is very similar to the PC16552D (and to a
-+  pair of NS16550A), albeit with some nonstandard behavior such as
-+  erratum A-004737 (relating to incorrect BRK handling).
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index e935d7d..3b28c4d 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -74,3 +74,11 @@ Required root node properties:
+ i.MX6q generic board
+ Required root node properties:
+     - compatible = "fsl,imx6q";
 +
-+  Represents a single port that is compatible with the DUART found
-+  on many Freescale chips (examples include mpc8349, mpc8548,
-+  mpc8641d, p4080 and ls2085a).
++Freescale LS2085A SoC Device Tree Bindings
++------------------------------------------
 +
- Example:
- 
- 	uart at 80230000 {
++LS2085A ARMv8 based Simulator model
++Required root node properties:
++    - compatible = "fsl,ls2085a-simu", "fsl,ls2085a";
++
 -- 
 1.7.9.5
