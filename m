@@ -1,83 +1,96 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 26 Nov 2014 07:04:26 +0000 (UTC)
-Subject: [RFC PATCH] ARM: DRA: hwmod: RTC: Add reset function for RTC
-In-Reply-To: <5473FF68.3070805@ti.com>
-References: <1416199402-3865-1-git-send-email-lokeshvutla@ti.com>
- <546DB513.6000104@ti.com>
- <alpine.DEB.2.02.1411201644470.9204@utopia.booyaka.com>
- <5473FF68.3070805@ti.com>
-Message-ID: <alpine.DEB.2.02.1411260649330.16047@utopia.booyaka.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 26 Nov 2014 15:16:51 +0800
+Subject: [PATCH resend v4 0/3] clk: sun6i: Unify AHB1 clock and fix rate
+ calculation
+Message-ID: <1416986214-4861-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lokesh 
+Hi everyone,
 
-On Tue, 25 Nov 2014, Lokesh Vutla wrote:
+This is a resend of v4 of the sun6i AHB1 clock unification series.
+This includes only the 3 patches not yet merged.
 
-> Hi Paul,
-> On Thursday 20 November 2014 10:26 PM, Paul Walmsley wrote:
-> > On Thu, 20 Nov 2014, Lokesh Vutla wrote:
-> > 
-> >> On Monday 17 November 2014 10:13 AM, Lokesh Vutla wrote:
-> >>> RTC IP have kicker feature which prevents spurious writes to its registers.
-> >>> In order to write into any of the RTC registers, KICK values has te be
-> >>> written to KICK registers. Currently hwmod is updating the IDLEMODE in rtc
-> >>> sysconfig register without writing into any kick register which is a noop.
-> >>> When autoidle is allowed for rtc, interruts are not received until IDLEMODE
-> >>> is set to SIDLE_SMART_WKUP.
-> >>> Adding a reset function to unlock RTC registers so that IDLEMODE is
-> >>> updated.
-> >> Ping..!!
-> >> Is this patch acceptable?
-> > 
-> > Lokesh
-> > 
-> > 1. This looks like a fix.  Is this intended to go in as a v3.18-rc patch, 
-> > or against v3.19?  If so it would be very helpful for the maintainers if 
-> > you were to state that somewhere.
-> Yes. This is a fix, intended to go in 3.18-rc. Sorry should have
-> mentioned it.
+This series unifies the mux and divider parts of the AHB1 clock found
+on sun6i and sun8i, while also adding support for the pre-divider on the
+PLL6 input.
 
-A few questions.  Do you know when this problem started (in terms of 
-kernel versions)?
+The rate calculation logic must factor in which parent it is using to
+calculate the rate, to decide whether to use the pre-divider or not.
+This is beyond the original factors clk design in sunxi. To avoid
+feature bloat, this is implemented as a separate composite clk.
 
-Also: the patch description states that this is only a problem when 
-autoidle is allowed for RTC.  What enables autoidle for RTC - the RTCSS 
-driver?  Or does hwmod wind up doing this after the RTCSS driver unlocks 
-it?
-
-> > 2. Your patch unlocks the RTC registers, but never relocks it.  This seems 
-> > to defeat the point of the spurious write protection.  Shouldn't your 
-> > patch only unlock the RTC immediately before the hwmod code touches the 
-> > RTC registers, and then relock it immediately afterwards, per SPRUHZ6 
-> > section 23.4.3.3?  If so then the .reset function pointer is the wrong 
-> > place for this; I would suggest adding some .lock and .unlock function 
-> > pointers that are to be called before and after any register write to the 
-> > IP block.
-> Yeah I agree with you.
-> Currently rtc driver unlocks these kick registers in probe and leaves it unlocks for
-> further use.
-> But if hwmod does unlock and lock for every sysconfig write driver should also
-> implement unlock and lock for every rtc register write, which adds an extra overhead.
-> I am not sure if some one writes into rtc registers other than hwmod and driver.
-> IMO we can leave it unlocked as the driver does.
-
-I would think that the best approach would be to set up .lock and .unlock 
-function pointers, then add a temporary hwmod flag that, if set, would 
-prevent the .lock function from ever being called.  Then once the driver 
-is fixed, that flag can be dropped.
-
-> > 3. Your macros don't mention DRA7xx specifically.  Does this sequence 
-> > apply to some other TI chips, or just DRA7xx?  Please document this in a 
-> > comment above the macros, and possibly change the name of the macros to 
-> > refer to DRA7XX.
-> This sequence applies to AM43xx and AM33xx also. So made it generic.
-> Ill document it.
-
-OK but it would need more than just documentation, right?  Wouldn't the 
-hwmod data also need to be modified for AM33xx/AM43xx to add the .reset 
-function pointer?  Any reason why folks wouldn't have seen this problem on 
-AM33xx/AM43xx?
+The new clock driver is registered with a separate OF_CLK_DECLARE.
+As it shares its register with the APB1 div clock, thus shares the same
+spinlock, it cannot reside in a separate file.
 
 
-- Paul
+The contents of this series are as follows:
+
+Patch 1 adds the unified AHB1 clock driver.
+
+Patch 2 and 3 unify the AHB1 clock nodes on sun6i and sun8i respectively.
+
+Changes since v3:
+
+  - Moved AHB1 clock driver to the front of clk-sunxi.c
+  
+  - Dropped the following patches that were merged already:
+
+      clk: sunxi: Specify number of child clocks for divs clocks
+      clk: sunxi: Implement A31 PLL6 as a divs clock for 2x output
+      ARM: sun6i: DT: Add PLL6 multiple outputs
+
+Changes since v2:
+
+  - Rebased onto the following patches
+
+    clk: sunxi: Removed unused/incorrect sun6i-a31-apb2-clk driver
+    ARM: dts: sunxi: Use sun4i-a10-apb1-clk for sun6i/sun8i apb2 clocks.
+    ARM: dts: sunxi: unify APB1 clock
+    clk: sunxi: unify APB1 clock
+    ARM: dts: sun6i: Re-parent ahb1_mux to pll6 as required by dma controller
+
+  - Dropped
+
+    ARM: dts: sun6i: Add required ahb1 clock parent and rates for dma controller
+
+    as it is superseded by the re-parent patch from above.
+
+  - Expand clock bindings to include output names for PLL6
+
+  - Use of_io_request_and_map
+
+  - Drop ahb1 rate setting in DTS
+
+  - Whitespace and comment style cleanups
+
+Changes since v1:
+
+  - Dropped "clk: sunxi: Add post clk divider for factor clocks"
+
+  - Added "clk: sunxi: Specify number of child clocks for divs clocks"
+
+  - Reworked the PLL6 clock into a divs clock with 2 outputs.
+    This matches the style of PLL6 on the other sunxi platforms.
+
+  - Dropped "dmaengine: sun6i: Remove obsolete clk muxing code".
+    Already merged.
+
+
+Cheers
+ChenYu
+
+Chen-Yu Tsai (3):
+  clk: sunxi: unify sun6i AHB1 clock with proper PLL6 pre-divider
+  ARM: dts: sun6i: Unify ahb1 clock nodes
+  ARM: dts: sun8i: Unify ahb1 clock nodes
+
+ Documentation/devicetree/bindings/clock/sunxi.txt |   2 +-
+ arch/arm/boot/dts/sun6i-a31.dtsi                  |  14 +-
+ arch/arm/boot/dts/sun8i-a23.dtsi                  |  12 +-
+ drivers/clk/sunxi/clk-sunxi.c                     | 208 ++++++++++++++++++++++
+ 4 files changed, 214 insertions(+), 22 deletions(-)
+
+-- 
+2.1.3
