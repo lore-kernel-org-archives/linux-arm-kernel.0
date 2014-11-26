@@ -1,215 +1,30 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 26 Nov 2014 17:07:20 +0100
-Subject: [PATCH 4/7] KVM: arm64: guest debug, add SW break point support
-In-Reply-To: <1416931805-23223-5-git-send-email-alex.bennee@linaro.org>
-References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
- <1416931805-23223-5-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20141126160720.GD3245@hawk.usersys.redhat.com>
+From: cernekee@gmail.com (Kevin Cernekee)
+Date: Wed, 26 Nov 2014 08:07:43 -0800
+Subject: [PATCH 9/9] usb: {ohci,ehci}-platform: Use new OF big-endian
+ helper function
+In-Reply-To: <Pine.LNX.4.44L0.1411261013340.1322-100000@iolanthe.rowland.org>
+References: <1416962994-27095-10-git-send-email-cernekee@gmail.com>
+ <Pine.LNX.4.44L0.1411261013340.1322-100000@iolanthe.rowland.org>
+Message-ID: <CAJiQ=7CuLA2vDpnkDysBU100R0uuUidB_ua3sZdV74vNPjV76w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 04:10:02PM +0000, Alex Benn?e wrote:
-> This adds support for SW breakpoints inserted by userspace.
-> 
-> First we need to trap all BKPT exceptions in the hypervisor (ELS). This
-> in controlled through the MDCR_EL2 register. I've added a new field to
-> the vcpu structure to hold this value. There should be scope to
-> rationlise this with the VCPU_DEBUG_FLAGS/KVM_ARM64_DEBUG_DIRTY_SHIFT
-> manipulation in later patches.
+On Wed, Nov 26, 2014 at 7:14 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> index 43c1a4e..9505c31 100644
+>> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> @@ -12,6 +12,8 @@ Optional properties:
+>>   - big-endian-regs : boolean, set this for hcds with big-endian registers
+>>   - big-endian-desc : boolean, set this for hcds with big-endian descriptors
+>>   - big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
+>> + - native-endian : boolean, enables big-endian-regs + big-endian-desc
+>> +   iff the kernel was compiled for big endian
+>
+> Is this really a property of the hardware?  It appears to depend on the
+> kernel configuration.  As such, is it appropriate for DT?
 
-I think we should start using the new mdcr_el2 field everywhere we plan
-to within the same series that it is introduced. Otherwise it's hard
-to tell if we need an mdcr_el2 field, or if a more generic field would
-suffice. We can always translate bits of a more generic field to
-mdcr_el2 bits when necessary, but not the reverse.
-
-> 
-> Once the exception arrives we triggers an exit from the main hypervisor
-s/triggers/trigger/
- 
-> loop to the hypervisor controller. The kvm_debug_exit_arch carries the
-> address of the exception. If the controller doesn't know of breakpoint
-                                                             ^ a
-> then we have a guest inserted breakpoint and the hypervisor needs to
-> start again and deliver the exception to guest.
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index 2c6386e..9383359 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -2592,7 +2592,7 @@ when running. Common control bits are:
->  The top 16 bits of the control field are architecture specific control
->  flags which can include the following:
->  
-> -  - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86]
-> +  - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86, arm64]
->    - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390]
->    - KVM_GUESTDBG_INJECT_DB:     inject DB type exception [x86]
->    - KVM_GUESTDBG_INJECT_BP:     inject BP type exception [x86]
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index a0ff410..48d26bb 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -303,6 +303,9 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->  					struct kvm_guest_debug *dbg)
->  {
-> +	/* Route debug traps to el2? */
-> +	bool route_el2 = false;
-> +
->  	/* If it's not enabled clear all flags */
->  	if (!(dbg->control & KVM_GUESTDBG_ENABLE)) {
->  		vcpu->guest_debug = 0;
-> @@ -320,8 +323,8 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->  
->  	/* Software Break Points */
->  	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP) {
-> -		kvm_info("SW BP support requested, not yet implemented\n");
-> -		return -EINVAL;
-> +		kvm_info("SW BP support requested\n");
-> +		route_el2 = true;
->  	}
->  
->  	/* Hardware assisted Break and Watch points */
-> @@ -330,6 +333,20 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->  		return -EINVAL;
->  	}
->  
-> +	/* If we are going to handle any debug exceptions we need to
-> +	 * set MDCE_EL2.TDE to ensure they are routed to the
-> +	 * hypervisor. If userspace determines the exception was
-> +	 * actually internal to the guest it needs to handle
-> +	 * re-injecting the exception.
-> +	 */
-
-kernel comment blocks typically start with an empty line, e.g.
-/*
- * comment block
- */
-
-> +	if (route_el2) {
-> +		kvm_info("routing debug exceptions");
-> +		vcpu->arch.mdcr_el2 = MDCR_EL2_TDE;
-> +	} else {
-> +		kvm_info("not routing debug exceptions");
-> +		vcpu->arch.mdcr_el2 = 0;
-> +	}
-
-This looks weird because we're only managing some of the mdcr_el2 bits
-with the mdcr_el2 field. If we were managing all of them then these
-would need to be |= MDCR_EL2_TDE and &= ~SOME_MASK instead. If we never
-plan to manage all the bits, then I think that points more towards the
-need for a more generic field instead.
-
-> +
->  	return 0;
->  }
->  
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 2012c4b..38b0f07 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -98,6 +98,7 @@ struct kvm_vcpu_arch {
->  
->  	/* HYP configuration */
->  	u64 hcr_el2;
-> +	u32 mdcr_el2;
->  
->  	/* Exception Information */
->  	struct kvm_vcpu_fault_info fault;
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 9a9fce0..8da1043 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -122,6 +122,7 @@ int main(void)
->    DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
->    DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
->    DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
-> +  DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
->    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
->    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
->    DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index 34b8bd0..28dc92b 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -71,6 +71,26 @@ static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	return 1;
->  }
->  
-> +/**
-> + * kvm_handle_bkpt - handle a break-point instruction
-> + *
-> + * @vcpu:	the vcpu pointer
-
-I see you inherited this header format from kvm_handle_wfx, which
-probably left @run off the input list because it doesn't use it.
-We do use it in this handler though, so we should probably list it.
-
-> + *
-> + * By definition if we arrive here it's because we are routing
-> + * all SW breakpoints to the hyper-visor as some may be a result of
-> + * guest debugging. If user-space decides this particular break-point
-> + * isn't for the host to handle it can re-feed the exception to the
-> + * guest.
-> + */
-> +static int kvm_handle_bkpt(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> +{
-> +	run->exit_reason = KVM_EXIT_DEBUG;
-> +	run->debug.arch.exit_type = KVM_DEBUG_EXIT_SW_BKPT;
-> +	run->debug.arch.address = *vcpu_pc(vcpu);
-> +	kvm_info("exiting from %llx\n", run->debug.arch.address);
-
-*Must* get rid of this kvm_info, else log explosion shall occur.
-
-> +	return 0;
-> +}
-> +
->  static exit_handle_fn arm_exit_handlers[] = {
->  	[ESR_EL2_EC_WFI]	= kvm_handle_wfx,
->  	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
-> @@ -85,6 +105,8 @@ static exit_handle_fn arm_exit_handlers[] = {
->  	[ESR_EL2_EC_SYS64]	= kvm_handle_sys_reg,
->  	[ESR_EL2_EC_IABT]	= kvm_handle_guest_abort,
->  	[ESR_EL2_EC_DABT]	= kvm_handle_guest_abort,
-> +	[ESR_EL2_EC_BKPT32]	= kvm_handle_bkpt,
-> +	[ESR_EL2_EC_BRK64]	= kvm_handle_bkpt,
->  };
-
-There appears to be a typo in the ARM ARM. Subsection "Software
-Breakpoint Instruction exception" of D1.10.4 says BRK (ESR_EL2_EC_BRK64)
-is 0x39, but the table above that has it correctly as 0x3c. (This
-comment doesn't really have anything to do with your patch, but I
-thought I'd call it out here as I just noticed it while reading that
-section for this review.)
-
->  
->  static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index b72aa9f..3c733ea 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -772,6 +772,10 @@
->  	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
->  	orr	x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
->  
-> +	// Any other bits (currently TDE)
-> +	ldr	x3, [x0, #VCPU_MDCR_EL2]
-> +	orr	x2, x2, x3
-
-I've already commented on my opinions on only partially managing
-mdcr_el2 bits with the new field.
-
-> +
->  	// Check for KVM_ARM64_DEBUG_DIRTY, and set debug to trap
->  	// if not dirty.
->  	ldr	x3, [x0, #VCPU_DEBUG_FLAGS]
-> -- 
-> 2.1.3
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+Yes, the peripheral registers automatically adjust their endianness to
+match the CPU.  So if the CPU is running an LE kernel, the peripheral
+needs to be accessed in LE mode; if the CPU is running a BE kernel,
+the peripheral needs to be accessed in BE mode.
