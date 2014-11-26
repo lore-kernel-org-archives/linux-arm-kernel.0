@@ -1,170 +1,62 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 26 Nov 2014 15:24:17 +0100
-Subject: [PATCH v2 5/5] clk: samsung: Fix memory leak of clock gate/divider/mux
- structures
+Date: Wed, 26 Nov 2014 15:24:13 +0100
+Subject: [PATCH v2 1/5] clk: samsung: Fix double add of syscore ops after
+ driver rebind
 In-Reply-To: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
 References: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1417011857-10419-6-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1417011857-10419-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While fixing audss clock access when domain is gated (commit "clk:
-samsung: Fix clock disable failure because domain being gated") generic
-code from clk-gate/divider/mux was taken and modified.
+During driver unbind the syscore ops were not unregistered which lead to
+double add on syscore list:
 
-This generic code leaks memory allocated for internal structures (struct
-clk_gate/clk_divider/clk_mux). Fix the leak by using resourced managed
-allocations.
-
-The audss clocks are now attached to platform device.
+$ echo "3810000.audss-clock-controller" > /sys/bus/platform/drivers/exynos-audss-clk/unbind
+$ echo "3810000.audss-clock-controller" > /sys/bus/platform/drivers/exynos-audss-clk/bind
+[ 1463.044061] ------------[ cut here ]------------
+[ 1463.047255] WARNING: CPU: 0 PID: 1 at lib/list_debug.c:36 __list_add+0x8c/0xc0()
+[ 1463.054613] list_add double add: new=c06e52c0, prev=c06e52c0, next=c06d5f84.
+[ 1463.061625] Modules linked in:
+[ 1463.064623] CPU: 0 PID: 1 Comm: bash Tainted: G        W      3.18.0-rc5-next-20141121-00005-ga8fab06eab42-dirty #1022
+[ 1463.075338] [<c0014e2c>] (unwind_backtrace) from [<c0011d80>] (show_stack+0x10/0x14)
+[ 1463.083046] [<c0011d80>] (show_stack) from [<c048bb70>] (dump_stack+0x70/0xbc)
+[ 1463.090236] [<c048bb70>] (dump_stack) from [<c00233d4>] (warn_slowpath_common+0x74/0xb0)
+[ 1463.098295] [<c00233d4>] (warn_slowpath_common) from [<c00234a4>] (warn_slowpath_fmt+0x30/0x40)
+[ 1463.106962] [<c00234a4>] (warn_slowpath_fmt) from [<c020fe80>] (__list_add+0x8c/0xc0)
+[ 1463.114760] [<c020fe80>] (__list_add) from [<c0282094>] (register_syscore_ops+0x30/0x3c)
+[ 1463.122819] [<c0282094>] (register_syscore_ops) from [<c0392f20>] (exynos_audss_clk_probe+0x36c/0x460)
+[ 1463.132091] [<c0392f20>] (exynos_audss_clk_probe) from [<c0283084>] (platform_drv_probe+0x48/0xa4)
+[ 1463.141013] [<c0283084>] (platform_drv_probe) from [<c0281a14>] (driver_probe_device+0x13c/0x37c)
+[ 1463.149852] [<c0281a14>] (driver_probe_device) from [<c0280560>] (bind_store+0x90/0xe0)
+[ 1463.157822] [<c0280560>] (bind_store) from [<c027fd10>] (drv_attr_store+0x20/0x2c)
+[ 1463.165363] [<c027fd10>] (drv_attr_store) from [<c0143898>] (sysfs_kf_write+0x4c/0x50)
+[ 1463.173252] [<c0143898>] (sysfs_kf_write) from [<c0142c80>] (kernfs_fop_write+0xbc/0x198)
+[ 1463.181395] [<c0142c80>] (kernfs_fop_write) from [<c00e2be0>] (vfs_write+0xa0/0x1a8)
+[ 1463.189104] [<c00e2be0>] (vfs_write) from [<c00e2f00>] (SyS_write+0x40/0x8c)
+[ 1463.196122] [<c00e2f00>] (SyS_write) from [<c000f2a0>] (ret_fast_syscall+0x0/0x48)
+[ 1463.203655] ---[ end trace 08f6710c9bc8d8f3 ]---
+[ 1463.208244] exynos-audss-clk 3810000.audss-clock-controller: setup completed
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Fixes: 1241ef94ccc3 ("clk: samsung: register audio subsystem clocks using common clock framework")
+Cc: <stable@vger.kernel.org>
 ---
- drivers/clk/samsung/clk-exynos-audss.c | 63 ++++++++++++++--------------------
- 1 file changed, 26 insertions(+), 37 deletions(-)
+ drivers/clk/samsung/clk-exynos-audss.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
-index 9ec7de866ab4..229d54981825 100644
+index acce708ace18..7c4368e75ede 100644
 --- a/drivers/clk/samsung/clk-exynos-audss.c
 +++ b/drivers/clk/samsung/clk-exynos-audss.c
-@@ -142,8 +142,6 @@ static const struct clk_ops audss_clk_gate_ops = {
- /*
-  * A simplified copy of clk-gate.c:clk_register_gate() to mimic
-  * clk-gate behavior while using customized ops.
-- *
-- * TODO: just like clk-gate it leaks memory for struct clk_gate.
-  */
- static struct clk *audss_clk_register_gate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags, u8 bit_idx)
-@@ -153,7 +151,7 @@ static struct clk *audss_clk_register_gate(struct device *dev, const char *name,
- 	struct clk_init_data init;
+@@ -210,6 +210,10 @@ static int exynos_audss_clk_remove(struct platform_device *pdev)
+ {
+ 	int i;
  
- 	/* allocate the gate */
--	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
-+	gate = devm_kzalloc(dev, sizeof(struct clk_gate), GFP_KERNEL);
- 	if (!gate)
- 		return ERR_PTR(-ENOMEM);
- 
-@@ -172,9 +170,6 @@ static struct clk *audss_clk_register_gate(struct device *dev, const char *name,
- 
- 	clk = clk_register(dev, &gate->hw);
- 
--	if (IS_ERR(clk))
--		kfree(gate);
--
- 	return clk;
- }
- 
-@@ -238,7 +233,7 @@ static struct clk *audss_clk_register_divider(struct device *dev,
- 	struct clk_init_data init;
- 
- 	/* allocate the divider */
--	div = kzalloc(sizeof(struct clk_divider), GFP_KERNEL);
-+	div = devm_kzalloc(dev, sizeof(struct clk_divider), GFP_KERNEL);
- 	if (!div)
- 		return ERR_PTR(-ENOMEM);
- 
-@@ -260,9 +255,6 @@ static struct clk *audss_clk_register_divider(struct device *dev,
- 	/* register the clock */
- 	clk = clk_register(dev, &div->hw);
- 
--	if (IS_ERR(clk))
--		kfree(div);
--
- 	return clk;
- }
- 
-@@ -319,7 +311,7 @@ static struct clk *audss_clk_register_mux(struct device *dev, const char *name,
- 	u32 mask = BIT(width) - 1;
- 
- 	/* allocate the mux */
--	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
-+	mux = devm_kzalloc(dev, sizeof(struct clk_mux), GFP_KERNEL);
- 	if (!mux)
- 		return ERR_PTR(-ENOMEM);
- 
-@@ -340,9 +332,6 @@ static struct clk *audss_clk_register_mux(struct device *dev, const char *name,
- 
- 	clk = clk_register(dev, &mux->hw);
- 
--	if (IS_ERR(clk))
--		kfree(mux);
--
- 	return clk;
- }
- 
-@@ -398,9 +387,9 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
- 
- 	}
- 
--	clk_table[EXYNOS_MOUT_AUDSS] = audss_clk_register_mux(NULL, "mout_audss",
--				mout_audss_p, ARRAY_SIZE(mout_audss_p),
--				CLK_SET_RATE_NO_REPARENT, 0, 1);
-+	clk_table[EXYNOS_MOUT_AUDSS] = audss_clk_register_mux(&pdev->dev,
-+			"mout_audss", mout_audss_p, ARRAY_SIZE(mout_audss_p),
-+			CLK_SET_RATE_NO_REPARENT, 0, 1);
- 
- 	cdclk = devm_clk_get(&pdev->dev, "cdclk");
- 	sclk_audio = devm_clk_get(&pdev->dev, "sclk_audio");
-@@ -408,40 +397,40 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
- 		mout_i2s_p[1] = __clk_get_name(cdclk);
- 	if (!IS_ERR(sclk_audio))
- 		mout_i2s_p[2] = __clk_get_name(sclk_audio);
--	clk_table[EXYNOS_MOUT_I2S] = audss_clk_register_mux(NULL, "mout_i2s",
--				mout_i2s_p, ARRAY_SIZE(mout_i2s_p),
--				CLK_SET_RATE_NO_REPARENT, 2, 2);
-+	clk_table[EXYNOS_MOUT_I2S] = audss_clk_register_mux(&pdev->dev,
-+			"mout_i2s", mout_i2s_p, ARRAY_SIZE(mout_i2s_p),
-+			CLK_SET_RATE_NO_REPARENT, 2, 2);
- 
--	clk_table[EXYNOS_DOUT_SRP] = audss_clk_register_divider(NULL, "dout_srp",
--				"mout_audss", 0, 0, 4);
-+	clk_table[EXYNOS_DOUT_SRP] = audss_clk_register_divider(&pdev->dev,
-+			"dout_srp", "mout_audss", 0, 0, 4);
- 
--	clk_table[EXYNOS_DOUT_AUD_BUS] = audss_clk_register_divider(NULL,
-+	clk_table[EXYNOS_DOUT_AUD_BUS] = audss_clk_register_divider(&pdev->dev,
- 				"dout_aud_bus", "dout_srp", 0, 4, 4);
- 
--	clk_table[EXYNOS_DOUT_I2S] = audss_clk_register_divider(NULL, "dout_i2s",
--				"mout_i2s", 0, 8, 4);
-+	clk_table[EXYNOS_DOUT_I2S] = audss_clk_register_divider(&pdev->dev,
-+			"dout_i2s", "mout_i2s", 0, 8, 4);
- 
--	clk_table[EXYNOS_SRP_CLK] = audss_clk_register_gate(NULL, "srp_clk",
--				"dout_srp", CLK_SET_RATE_PARENT, 0);
-+	clk_table[EXYNOS_SRP_CLK] = audss_clk_register_gate(&pdev->dev,
-+			"srp_clk", "dout_srp", CLK_SET_RATE_PARENT, 0);
- 
--	clk_table[EXYNOS_I2S_BUS] = audss_clk_register_gate(NULL, "i2s_bus",
--				"dout_aud_bus", CLK_SET_RATE_PARENT, 2);
-+	clk_table[EXYNOS_I2S_BUS] = audss_clk_register_gate(&pdev->dev,
-+			"i2s_bus", "dout_aud_bus", CLK_SET_RATE_PARENT, 2);
- 
--	clk_table[EXYNOS_SCLK_I2S] = audss_clk_register_gate(NULL, "sclk_i2s",
--				"dout_i2s", CLK_SET_RATE_PARENT, 3);
-+	clk_table[EXYNOS_SCLK_I2S] = audss_clk_register_gate(&pdev->dev,
-+			"sclk_i2s", "dout_i2s", CLK_SET_RATE_PARENT, 3);
- 
--	clk_table[EXYNOS_PCM_BUS] = audss_clk_register_gate(NULL, "pcm_bus",
--				 "sclk_pcm", CLK_SET_RATE_PARENT, 4);
-+	clk_table[EXYNOS_PCM_BUS] = audss_clk_register_gate(&pdev->dev,
-+			"pcm_bus", "sclk_pcm", CLK_SET_RATE_PARENT, 4);
- 
- 	sclk_pcm_in = devm_clk_get(&pdev->dev, "sclk_pcm_in");
- 	if (!IS_ERR(sclk_pcm_in))
- 		sclk_pcm_p = __clk_get_name(sclk_pcm_in);
--	clk_table[EXYNOS_SCLK_PCM] = audss_clk_register_gate(NULL, "sclk_pcm",
--				sclk_pcm_p, CLK_SET_RATE_PARENT, 5);
-+	clk_table[EXYNOS_SCLK_PCM] = audss_clk_register_gate(&pdev->dev,
-+			"sclk_pcm", sclk_pcm_p, CLK_SET_RATE_PARENT, 5);
- 
- 	if (variant == TYPE_EXYNOS5420) {
--		clk_table[EXYNOS_ADMA] = audss_clk_register_gate(NULL, "adma",
--				"dout_srp", CLK_SET_RATE_PARENT, 9);
-+		clk_table[EXYNOS_ADMA] = audss_clk_register_gate(&pdev->dev,
-+				"adma", "dout_srp", CLK_SET_RATE_PARENT, 9);
- 	}
++#ifdef CONFIG_PM_SLEEP
++	unregister_syscore_ops(&exynos_audss_clk_syscore_ops);
++#endif
++
+ 	of_clk_del_provider(pdev->dev.of_node);
  
  	for (i = 0; i < clk_data.clk_num; i++) {
 -- 
