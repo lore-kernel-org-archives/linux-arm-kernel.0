@@ -1,31 +1,93 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Nov 2014 13:47:17 +0100
-Subject: [PATCH v2] ARM: sa1100: improve irq handling
-In-Reply-To: <1416942592-23059-1-git-send-email-dbaryshkov@gmail.com>
-References: <1416942592-23059-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <CACRpkdYQe8PKa0Cssns_yUGrG_snuJr6zbzc7HEpXiDMXZjKTA@mail.gmail.com>
+From: tim@krieglstein.org (Tim Sander)
+Date: Wed, 26 Nov 2014 13:46:52 +0100
+Subject: [PATCH 3.18-rc3 v9 5/5] arm: smp: Handle ipi_cpu_backtrace()
+ using FIQ (if available)
+In-Reply-To: <1416936401-5147-6-git-send-email-daniel.thompson@linaro.org>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
+ <1416936401-5147-6-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <2744845.J3XUj2a9bM@dabox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 8:09 PM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
+Hi Daniel
 
-> This patch series makes sa1100 platform use MULTI_IRQ_HANDLER and irq
-> domains to handle interrupts on StrongARM platform. Also virtual irq
-> numbers are changed to start from 1 rather than 0. It doesn't change
-> the way how Linux programs the hardware, only software interfaces are
-> changed.
->
-> Changes since v1:
-> - Start IRQs from 1, freeing IRQ 0
-> - Merge identical functions in the last patch
-> - Other minor changes.
+Am Dienstag, 25. November 2014, 17:26:41 schrieb Daniel Thompson:
+> Previous changes have introduced both a replacement default FIQ handler
+> and an implementation of arch_trigger_all_cpu_backtrace for ARM but
+> these are currently independent of each other.
+> 
+> This patch plumbs together these features making it possible, on platforms
+> that support it, to trigger backtrace using FIQ.
+Does this ipi handler interfere in any way with set_fiq_handler?
 
-Applied all patches and tested on h3600 on top of v3.18-rc6.
+As far as i know there is only one FIQ handler vector so i guess there is a 
+potential conflict. But i have not worked with IPI's so i might be completley
+wrong.
 
-Works like a charm.
+Regards
+Tim
 
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> ---
+>  arch/arm/include/asm/smp.h | 3 +++
+>  arch/arm/kernel/smp.c      | 4 +++-
+>  arch/arm/kernel/traps.c    | 3 +++
+>  3 files changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+> index 18f5a554134f..b076584ac0fa 100644
+> --- a/arch/arm/include/asm/smp.h
+> +++ b/arch/arm/include/asm/smp.h
+> @@ -18,6 +18,8 @@
+>  # error "<asm/smp.h> included in non-SMP build"
+>  #endif
+> 
+> +#define SMP_IPI_FIQ_MASK 0x0100
+> +
+>  #define raw_smp_processor_id() (current_thread_info()->cpu)
+> 
+>  struct seq_file;
+> @@ -79,6 +81,7 @@ extern void arch_send_call_function_single_ipi(int cpu);
+>  extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
+>  extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
+> 
+> +extern void ipi_cpu_backtrace(struct pt_regs *regs);
+>  extern int register_ipi_completion(struct completion *completion, int cpu);
+> 
+>  struct smp_operations {
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 14c594a12bef..e923843562d9 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -539,7 +539,7 @@ static void ipi_cpu_stop(unsigned int cpu)
+>  		cpu_relax();
+>  }
+> 
+> -static void ipi_cpu_backtrace(struct pt_regs *regs)
+> +void ipi_cpu_backtrace(struct pt_regs *regs)
+>  {
+>  	int cpu = smp_processor_id();
+> 
+> @@ -580,6 +580,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+>  	unsigned int cpu = smp_processor_id();
+>  	struct pt_regs *old_regs = set_irq_regs(regs);
+> 
+> +	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
+> +
+>  	if ((unsigned)ipinr < NR_IPI) {
+>  		trace_ipi_entry(ipi_types[ipinr]);
+>  		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index 4dc45b38e56e..9eb05be9526e 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry
+> handle_fiq_as_nmi(struct pt_regs *regs) #ifdef CONFIG_ARM_GIC
+>  	gic_handle_fiq_ipi();
+>  #endif
+> +#ifdef CONFIG_SMP
+> +	ipi_cpu_backtrace(regs);
+> +#endif
+> 
+>  	nmi_exit();
