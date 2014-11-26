@@ -1,47 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 26 Nov 2014 10:19:35 -0800
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141126172857.GA26157@amd>
-References: <20141027200008.GR2560@atomide.com>
- <20141027230138.GB7805@drone.musicnaut.iki.fi>
- <20141126172857.GA26157@amd>
-Message-ID: <20141126181934.GL2817@atomide.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 26 Nov 2014 10:27:11 -0800
+Subject: [PATCH v12 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+In-Reply-To: <7hioi4l92v.fsf@deeprootsystems.com> (Kevin Hilman's message of
+ "Mon, 24 Nov 2014 10:58:16 -0800")
+References: <1416576682-5255-1-git-send-email-thomas.ab@samsung.com>
+ <7hioi4l92v.fsf@deeprootsystems.com>
+Message-ID: <7hlhmxes1s.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [141126 09:31]:
-> On Tue 2014-10-28 01:01:38, Aaro Koskinen wrote:
-> > Hi,
-> > 
-> > On Mon, Oct 27, 2014 at 01:00:09PM -0700, Tony Lindgren wrote:
-> > > +
-> > > +	if (!of_have_populated_dt())
-> > > +		pr_warn("WARNING: legacy booting deprecated, please update to boot with .dts\n");
-> > > +
-> > 
-> > Maybe use WARN so that the warning is more verbose and kernel gets tainted?
-> 
-> Well.. Pali still has regression where /proc/cpuinfo changes in a way
-> that breaks existing userspace, when dt is used on N900.
-> 
-> And rmk was less then helpfull...
+Kevin Hilman <khilman@kernel.org> writes:
 
-Maybe Pali can try to restart that discussion? To me it seems the
-/proc/cpuinfo should be the same as it's a user interface. Sorry
-forgot the details of the previous discussion..
+> Hi Thomas,
+>
+> Thomas Abraham <thomas.ab@samsung.com> writes:
+>
+>> Changes since v11:
+>> - Rebased on top of git://linuxtv.org/snawrocki/samsung.git for-v3.19-exynos-clk
+>
+> Thanks for rebasing/reposting.
+>
+>> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
+>> drivers and enables the use of cpufreq-dt driver for these platforms. This
+>> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
+>> driver.
+>>
+>> This series is based on the following branch.
+>> git://linuxtv.org/snawrocki/samsung.git for-v3.19-exynos-clk
+>>
+>> This series depends on the following patch which can be picked from
+>> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git samsung/dt
+>> e540920cf21c (ARM: dts: add CPU nodes for Exynos4 SoCs).
+>>
+>> This patch series has been tested on Exynos4210/5250/5420 based boards.
+>> Tomasz Figa had plans to take this in the Samsung clock tree for v3.19
+>> (http://www.spinics.net/lists/linux-samsung-soc/msg37933.html).
+>> Sylwester, could you consider to merge this in your tree?
+>
+> I tested this on exynos5800-peach-pi, and noticed a few things.
+>
+> First, since voltage scaling is not currently supported, the CPU cluster
+> regulators (vdd_arm, and vdd_kfc) have to be set at sufficietnly high
+> voltage to support all the OPPs, otherwise things will likely hang.  I
+> think you should include something like the patch below[1] in this
+> series as well.
+>
+> Second, as with earlier versions of this series, I'm still seeing lots
+> of "wait_until_divider_stable: timeout in divider stablization" messages
+> coming out when running powertop.
 
-And with which app was that? Sorry I forgot..
+And, I just found another issue:
 
-It's weird that it's not been an issue for other though? 
- 
-> Should we maybe solve that before adding backtraces to our boot
-> messages?
+On exynos5800-peach-pi, setting the cpufreq default governor to
+performance at compile time (CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y)
+makes the kernel boot hang when the cpufreq driver is initialized.
 
-With this warning we want to notify the people actually using
-mainline kernel on omap3 that they should update their systems.
-And also let us know on this list about the regressions, so I
-think that's quite valuable.
+However, setting the compile-time default to the userspace governor, and
+then setting the performance governor via sysfs after the boot finishes
+seems to work fine.
 
-Regards,
-
-Tony
+Kevin
