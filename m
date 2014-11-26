@@ -1,54 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 25 Nov 2014 17:27:38 -0800
-Subject: [PATCH 3.18-rc3 v9 1/5] irqchip: gic: Finer grain locking for
- gic_raise_softirq
-In-Reply-To: <5474F05E.90401@linaro.org>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
- <1416936401-5147-2-git-send-email-daniel.thompson@linaro.org>
- <5474BF19.3040707@arm.com> <alpine.LFD.2.11.1411251510231.11690@knanqh.ubzr>
- <5474F05E.90401@linaro.org>
-Message-ID: <54752C8A.1070006@codeaurora.org>
+From: gaku.inami.xw@bp.renesas.com (Gaku Inami)
+Date: Wed, 26 Nov 2014 10:25:54 +0900
+Subject: [PATCH v2] ARM: shmobile: r8a7790 CCI configuration
+In-Reply-To: <5474543A.807@arm.com>
+References: <54743D0F.5080307@bp.renesas.com> <5474543A.807@arm.com>
+Message-ID: <54752C22.7010806@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2014 01:10 PM, Daniel Thompson wrote:
-> On 25/11/14 20:17, Nicolas Pitre wrote:
->> On Tue, 25 Nov 2014, Marc Zyngier wrote:
->>
->>> Hi Daniel,
->>>
->>> On 25/11/14 17:26, Daniel Thompson wrote:
->>>> irq_controller_lock is used for multiple purposes within the gic driver.
->>>> Primarily it is used to make register read-modify-write sequences atomic.
->>>> It is also used by gic_raise_softirq() in order that the big.LITTLE
->>>> migration logic can figure out when it is safe to migrate interrupts
->>>> between physical cores.
->>>>
->>>> The second usage of irq_controller_lock is difficult to discern when
->>>> reviewing the code because the migration itself takes place outside
->>>> the lock.
->>>>
->>>> This patch makes the second usage more explicit by splitting it out into
->>>> a separate lock and providing better comments.
->>> While we're at it, how about an additional patch that would make this
->>> lock disappear entirely when the big-little stuff is not compiled in,
->>> which is likely to be the case on a lot of (dare I say most?) systems?
->>> That will save expensive barriers that we definitely could do without.
->> For the record, I reviewed and ACKed a patch doing exactly that a while
->> ago:
->>
->> http://lkml.org/lkml/2014/8/13/486
-> Well remembered! That patch had a different motivation but is very
-> similar to mine... so much so I might steal bit of it.
+Hi Sudeep,
+
+(2014/11/25 19:04), Sudeep Holla wrote:
 >
-> I'll make sure I put Stephen on Cc: when I respin with the changes Marc
-> requested.
+>
+> On 25/11/14 08:25, Gaku Inami wrote:
+>> Add the settings of CCI-400 for enabling ca15/ca7 snoop on r8a7790.
+>> Needed to configure the CCI boot cluster port regardless of MCPM.
+>>
+>> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> ---
+>>
+>> Changes since version 1:
+>> - Fix a way to wait for the register read.
+>>
+>>   arch/arm/mach-shmobile/smp-r8a7790.c |   19 +++++++++++++++++++
+>>   1 file changed, 19 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
+>> index 9c3da13..b65d908 100644
+>> --- a/arch/arm/mach-shmobile/smp-r8a7790.c
+>> +++ b/arch/arm/mach-shmobile/smp-r8a7790.c
+>> @@ -25,6 +25,12 @@
+>>   #include "pm-rcar.h"
+>>   #include "r8a7790.h"
+>>
+>> +#define CCI_BASE    0xf0090000
+>> +#define CCI_SLAVE3    0x4000
+>> +#define CCI_SLAVE4    0x5000
+>> +#define CCI_SNOOP    0x0000
+>> +#define CCI_STATUS    0x000c
+>> +
+>
+> I have asked the same question multiple times in the past, why are you
+> not using the DT bindings and the CCI driver for this ? Why are you
+> duplicating the code ? Any limitations to use them ?
+>
+Thank you for your feedback.
+I will consider to use the DT bindings and the CCI driver.
 
-I don't get a random Cc here? :-)
+Regards,
+Inami
 
-Anyway, yes please let's merge that patch.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> Regards,
+> Sudeep
+>
