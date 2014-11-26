@@ -1,41 +1,96 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 26 Nov 2014 17:04:07 +0100
-Subject: [PATCH v2 5/5] i2c: davinci: use ICPFUNC to toggle I2C as gpio
- for bus recovery
-In-Reply-To: <1417010393-30598-6-git-send-email-grygorii.strashko@ti.com>
-References: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
- <1417010393-30598-6-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20141126160407.GN4431@pengutronix.de>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Wed, 26 Nov 2014 16:05:13 +0000
+Subject: [PATCH v9 04/10] sched: Make sched entity usage tracking
+ scale-invariant
+In-Reply-To: <20141121123544.GE23177@e105550-lin.cambridge.arm.com>
+References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
+ <1415033687-23294-5-git-send-email-vincent.guittot@linaro.org>
+ <20141121123544.GE23177@e105550-lin.cambridge.arm.com>
+Message-ID: <5475FA39.6090801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 21/11/14 12:35, Morten Rasmussen wrote:
+> On Mon, Nov 03, 2014 at 04:54:41PM +0000, Vincent Guittot wrote:
+>> From: Morten Rasmussen <morten.rasmussen@arm.com>
+>>
 
-On Wed, Nov 26, 2014 at 03:59:53PM +0200, Grygorii Strashko wrote:
-> Having a board where the I2C bus locks up occasionally made it clear
-> that the bus recovery in the i2c-davinci driver will only work on
-> some boards, because on regular boards, this will only toggle GPIO
-> lines that aren't muxed to the actual pins.
+Could we rename this patch to 'sched: Make usage tracking frequency
+scale-invariant'?
+
+The reason is, since we scale sched_avg::running_avg_sum according to
+the cpu frequency, not only sched_entity but also rq is affected (both
+contain sched_avg) and cfs_rq too since cfs_rq::utilization_load_avg is
+\sum (sched_entity::sched_avg::utilization_avg_contrib)
+
+And so far we're only considering frequency scale-invariance and not cpu
+(or uArch) scale-invariance for the utilization/usage related per-entity
+load tracking bits.
+
+>> Apply frequency scale-invariance correction factor to usage tracking.
 > 
-> The I2C controller on SoCs like da850 (and da830), Keystone 2 has the
-> built-in capability to bit-bang its lines by using the ICPFUNC registers
-> of the i2c controller.
-> Implement the suggested procedure by toggling SCL and checking SDA using
-> the ICPFUNC registers of the I2C controller when present. Allow platforms
-> to indicate the presence of the ICPFUNC registers with a has_pfunc platform
-> data flag and add optional DT property "ti,has-pfunc" to indicate
-> the same in DT.
-On what does it depend if this pfunc stuff works or not? Only the SoC,
-or also on some board specific properties? Given the former using the
-compatible string to detect its availability would be better. (In this
-case also sorry, didn't consider this case when requesting the property
-in the last round.)
+> s/usage/utilization/
+> 
+>> Each segment of the running_load_avg geometric series is now scaled by the
+>> current frequency so the utilization_avg_contrib of each entity will be
+> 
+> s/entity/sched_entity/
+> 
+>> invariant with frequency scaling. As a result, utilization_load_avg which is
+>> the sum of utilization_avg_contrib, becomes invariant too. So the usage level
+> 
+> s/sum of utilization_avg_contrib/sum of sched_entity
+> utilization_avg_contribs/
+> 
+> s/usage/utilization/
+> 
+>> that is returned by get_cpu_usage, stays relative to the max frequency as the
+>> cpu_capacity which is is compared against.
+> 
+> The last bit doesn't parse right. '... Maybe it is better to drop
+> the reference to get_cpu_usage which hasn't been defined yet and rewrite
+> the thing to:
+> 
+> Apply frequency scale-invariance correction factor to utilization
+> tracking. Each segment of the running_load_avg geometric series is now
 
-The patch looks ok.
+s/running_load_avg/running_avg_sum
 
-Best regards
-Uwe
+Couldn't find running_load_avg in the current code.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+What about using sched_avg::running_avg_sum instead of running_avg_sum?
+At least for me it is very complicated to distinguish the different
+per-entity load tracking data elements on the various scheduler data
+structures (like rq, se, cfs_rq) when I read per-entity load tracking
+related patch header.
+
+> scaled by the current frequency so the utilization_avg_contrib of each
+> entity will be invariant with frequency scaling. As a result,
+> utilization_load_avg which is the sum of sched_entity
+> utilization_avg_contribs becomes invariant too and is now relative to
+> the max utilization at the max frequency (=cpu_capacity).
+
+max frequency of _the_ cpu. It does not have to be the max frequency of
+the system though.
+The difference between the max. frequencies between the cpus of the
+system is part of the cpu invariant scaling ('cpu' equal to 'uarch' plus
+'max frequency in the system'). See 'clock-frequency' dtb property of
+node cpu in arch/arm/kernel/topology.c. Frequency scale invariance is
+about DVFS and this is per cpu.
+
+> 
+> I think we should add:
+> 
+> arch_scale_freq_capacity() is reintroduced to provide the frequency
+> compensation scaling factor.
+> 
+>> Then, we want the keep the load tracking values in a 32bits type, which implies
+> 
+> s/Then, we/We/
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
