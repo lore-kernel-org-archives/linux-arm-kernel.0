@@ -1,85 +1,25 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 26 Nov 2014 11:59:43 +0530
-Subject: [PATCH 4/8] opp: Introduce APIs to remove OPPs
-In-Reply-To: <20141125173943.GG5050@linux.vnet.ibm.com>
-References: <cover.1416910766.git.viresh.kumar@linaro.org>
- <f815d0855c1bd28d8389554176acd2620e56b3c8.1416910766.git.viresh.kumar@linaro.org>
- <20141125162434.GC5050@linux.vnet.ibm.com>
- <CAKohponBNOm_0_rZqbVKQSoOa81CjnKb8vcfzA6gbm1+Gxn+gg@mail.gmail.com>
- <20141125173943.GG5050@linux.vnet.ibm.com>
-Message-ID: <CAKohponz3MsgZNtm1i-aLx8kRRjJwUJjL=B3RE96EiivwXbF2A@mail.gmail.com>
+From: wangzhou.bry@gmail.com (Zhou Wang)
+Date: Wed, 26 Nov 2014 14:43:30 +0800
+Subject: [PATCH v2 0/2] ARM: hip04: add GPIO support
+Message-ID: <1416984212-619-1-git-send-email-wangzhou.bry@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 November 2014 at 23:09, Paul E. McKenney
-<paulmck@linux.vnet.ibm.com> wrote:
-> On Tue, Nov 25, 2014 at 10:46:29PM +0530, Viresh Kumar wrote:
+This series add the support for the GPIOs of Hisilicon Soc hip04. Hip04 uses
+synopsis' GPIO IP, and we use the dwapb GPIO driver here. This series add the
+corresponding dts.
 
->> I couldn't find any code in kernel which is registered for this notifier chain
->> yet. And so don't know what that code will do. It may not traverse the list
->> or it may :)
->
-> I would guess that the srcu_notifier_chain_register() in
-> devfreq_register_opp_notifier() is adding to the call chain, but I
-> do not claim to understand this code.  The srcu_notifier_call_chain()
-> above is traversing it.
+Change in v2:
+- Add select GPIO_DWAPB in arch/arm/mach-hisi/Kconfig
 
-Actually I searched for who is calling devfreq_register_opp_notifier() and
-couldn't notice any callers. But there was one from within devfreq.c and
-that was called from exynos code..
+Zhou Wang (2):
+  ARM: hip04: set ARCH_NR_GPIO to 128
+  ARM: dts: hip04: add GPIO pieces
 
-So yes, it is used and I was wrong. Ultimately update_devfreq() would
-be called from the notifier chain and that may try to change the freq and
-so is sleep-able.
+ arch/arm/Kconfig             |    1 +
+ arch/arm/boot/dts/hip04.dtsi |   75 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-hisi/Kconfig   |    1 +
+ 3 files changed, 77 insertions(+)
 
->> So, I am still not sure what we need to do here as we have readers with
->> both rcu and srcu critical regions.
->
-> Well, the most straightforward approach from an RCU perspective would
-> be to make all the readers use the same flavor of RCU.  From Rafael's
-> earlier note, I am guessing that some of the code paths absolutely
-> require SRCU.  Of course, if all the readers use SRCU, then you can
-> simply free using SRCU.
-
-Yeah, so the update_devfreq() call surely requires SRCU.
-
-> You -can- handle situations having more than one type of reader, but
-> this requires waiting for all corresponding flavors of grace period.
-> This turns out to be fairly simple in this case, for example, have your
-> kfree_opp_rcu() function invoke kfree_rcu() instead of kfree().
-
-Hmm, I see.
-
-> But I strongly recommend gaining a full understanding of the code first.
-> You can dig yourself a really deep hole really quickly by patching code
-> without understanding it!  And apologies if you really do already fully
-> understand the code, but your statement above leads me to believe that
-> you do not yet fully understand it.
-
-I wouldn't claim to know every part of these frameworks (OPP, Devfreq),
-but the maintenance of the nodes/lists is what I understand well.
-
-But yeah, I understand you are worried about. Pushing more bugs for
-solving one.
-
->         I couldn't find any code in kernel which is registered for this
->         notifier chain yet. And so don't know what that code will do. It
->         may not traverse the list or it may :)
->
-> One thing that can help internalize code (relatively) quickly is to
-> get a large piece of paper and to draw the relationships of the data
-> structures first and the relationship of the code later.  When the
-> drawing gets too messy, start over with a clean sheet of paper.
-
-Thanks for your suggestions Paul. I was able to do it without a pen
-and paper this time as it wasn't that complex. But yes this pen-paper
-things really works while working on complex stuff. I found a memory
-leak Bug in scheduling domains creation code earlier that way :)
-
-Also it looks like I should use call_srcu() with kfree_rcu() for
-opp_set_availability() case as well to avoid any corner cases.
-
-Thanks for your time and help. Really appreciate that :)
-
---
-viresh
+-- 
+1.7.9.5
