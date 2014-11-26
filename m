@@ -1,45 +1,49 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 26 Nov 2014 15:20:40 +0100
-Subject: [PATCH 1/7] KVM: add commentary for kvm_debug_exit_arch struct
-In-Reply-To: <1416931805-23223-2-git-send-email-alex.bennee@linaro.org>
-References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
- <1416931805-23223-2-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20141126142040.GA3245@hawk.usersys.redhat.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 26 Nov 2014 15:24:12 +0100
+Subject: [PATCH v2 0/5] Fix Arndale Octa/Peach Pi boot on Audio subsystem
+ clocks
+Message-ID: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 04:09:59PM +0000, Alex Benn?e wrote:
-> Bring into line with the commentary for the other structures and their
-> KVM_EXIT_* cases.
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index 6076882..523f476 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-> @@ -226,6 +226,7 @@ struct kvm_run {
->  			__u32 count;
->  			__u64 data_offset; /* relative to kvm_run start */
->  		} io;
-> +		/* KVM_EXIT_DEBUG */
->  		struct {
->  			struct kvm_debug_exit_arch arch;
->  		} debug;
-> -- 
-> 2.1.3
+Hi,
 
-Can we change this to a 'KVM: add commentary for kvm exit type data'
-patch? We're also missing
+Changes since v1
+================
+1. clocks-audss: Reimplement own clock register functions instead
+   changing clk API. Minor fixes. (after idea from Tomasz Figa)
+2. Add new patches: fix for pinctrl and minor fixes in clk-audss.
 
-/* KVM_EXIT_INTERNAL_ERROR */
+Description
+===========
+This patchset tries to solve dependency between AudioSS components
+(clocks and GPIO) and main clock controller on Exynos platform.
 
-and
+This solves boot failure of Peach Pi/Pit and Arndale Octa [1].
 
-/* KVM_EXIT_PAPR_HCALL */
+Any access to memory of audss block (like checking if clock is enabled
+or configuring GPIO) will hang if main audss clock is gated.
 
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+Tested on Arndale Octa board.
+
+[1] http://www.spinics.net/lists/linux-samsung-soc/msg39331.html
+
+Best regards,
+Krzysztof Kozlowski
+
+
+Krzysztof Kozlowski (3):
+  clk: samsung: Fix clock disable failure because domain being gated
+  pinctrl: exynos: Fix GPIO setup failure because domain clock being
+    gated
+  ARM: dts: exynos5420: Add clock for audss pinctrl
+
+ .../bindings/pinctrl/samsung-pinctrl.txt           |   6 +
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |   3 +
+ drivers/clk/samsung/clk-exynos-audss.c             | 367 +++++++++++++++++++--
+ drivers/pinctrl/samsung/pinctrl-samsung.c          | 110 +++++-
+ drivers/pinctrl/samsung/pinctrl-samsung.h          |   2 +
+ 5 files changed, 446 insertions(+), 42 deletions(-)
+
+-- 
+1.9.1
