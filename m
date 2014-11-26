@@ -1,120 +1,35 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 26 Nov 2014 13:05:33 +0800
-Subject: [PATCH v2] mmc: core: add core-level function for sending tuning
- commands
-Message-ID: <1416978333-3086-1-git-send-email-21cnbao@gmail.com>
+From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
+Date: Wed, 26 Nov 2014 05:11:21 +0000
+Subject: [PATCH v5 4/6] arm64: Add DTS support for FSL's LS2085A SoC
+In-Reply-To: <BY1PR0301MB13037E20B2B52E612A6EBC0182700@BY1PR0301MB1303.namprd03.prod.outlook.com>
+References: <BY1PR0301MB13037E20B2B52E612A6EBC0182700@BY1PR0301MB1303.namprd03.prod.outlook.com>
+Message-ID: <BY1PR0301MB1303F8B412AFF14129DA564E82700@BY1PR0301MB1303.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Minda Chen <Minda.Chen@csr.com>
+Hi Marc,
 
-According to the SD card spec, Add a manual tuning command function
-for SDR104/HS200.
-Sending command 19 or command 21 to read data and compare with the
-tunning block pattern.
+[big snip..]
 
-This patch will help to decrease some platform private codes in SDHCI
-platform_execute_tuning() callbacks.
+> 
+> > +	timer {
+> > +		compatible = "arm,armv8-timer";
+> > + interrupts = <1 13 0x1>, /* Physical Secure PPI, edge triggered */
+> > + <1 14 0x1>, /* Physical Non-Secure PPI, edge triggered */
+> > +			     <1 11 0x1>, /* Virtual PPI, edge triggered */
+> > +			     <1 10 0x1>; /* Hypervisor PPI, edge triggered */
+> 
+> Are you sure about this "edge triggered"? The A57 TRM suggests otherwise:
+> 
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0488g/way1
+> 382454511590.html
+> 
 
-Signed-off-by: Minda Chen <Minda.Chen@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/mmc/core/mmc_ops.c | 70 ++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mmc/core.h   |  1 +
- 2 files changed, 71 insertions(+)
+Actually I did read the TRM but was confused by the "edge triggered" conventions
+used by Juno ARMv8 DTSI (see [1]). I see other ARMv8 DTSI also using the "edge triggered"
+notion, so I was wondering if I am missing some A57 errata or these DTSI also need fixing.
 
-diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-index 7911e05..a897894 100644
---- a/drivers/mmc/core/mmc_ops.c
-+++ b/drivers/mmc/core/mmc_ops.c
-@@ -543,6 +543,76 @@ int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
- }
- EXPORT_SYMBOL_GPL(mmc_switch);
- 
-+int mmc_send_tuning(struct mmc_card *card)
-+{
-+	struct mmc_request mrq = {NULL};
-+	struct mmc_command cmd = {0};
-+	struct mmc_data data = {0};
-+	struct scatterlist sg;
-+	struct mmc_host *mmc = card->host;
-+	struct mmc_ios *ios = &mmc->ios;
-+	const u8 *tuning_block_pattern;
-+	int size, err = 0;
-+	u8 *data_buf;
-+	u32 opcode;
-+
-+	if (ios->bus_width == MMC_BUS_WIDTH_8) {
-+		tuning_block_pattern = tuning_blk_pattern_8bit;
-+		size = sizeof(tuning_blk_pattern_8bit);
-+		opcode = MMC_SEND_TUNING_BLOCK_HS200;
-+	} else if (ios->bus_width == MMC_BUS_WIDTH_4) {
-+		tuning_block_pattern = tuning_blk_pattern_4bit;
-+		size = sizeof(tuning_blk_pattern_4bit);
-+		opcode = MMC_SEND_TUNING_BLOCK;
-+	} else
-+		return -EINVAL;
-+
-+	data_buf = kzalloc(size, GFP_KERNEL);
-+	if (!data_buf)
-+		return -ENOMEM;
-+
-+	mrq.cmd = &cmd;
-+	mrq.data = &data;
-+
-+	cmd.opcode = opcode;
-+	cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
-+
-+	data.blksz = size;
-+	data.blocks = 1;
-+	data.flags = MMC_DATA_READ;
-+
-+	/*
-+	 * According to the tuning specs, Tuning process
-+	 * is normally shorter 40 executions of CMD19,
-+	 * and timeout value should be shorter than 150 ms
-+	 */
-+	data.timeout_ns = 150 * NSEC_PER_MSEC;
-+
-+	data.sg = &sg;
-+	data.sg_len = 1;
-+	sg_init_one(&sg, data_buf, size);
-+
-+	mmc_wait_for_req(mmc, &mrq);
-+
-+	if (cmd.error) {
-+		err = cmd.error;
-+		goto out;
-+	}
-+
-+	if (data.error) {
-+		err = data.error;
-+		goto out;
-+	}
-+
-+	if (memcmp(data_buf, tuning_block_pattern, size))
-+		err = -EIO;
-+
-+out:
-+	kfree(data_buf);
-+	return err;
-+}
-+EXPORT_SYMBOL_GPL(mmc_send_tuning);
-+
- static int
- mmc_send_bus_test(struct mmc_card *card, struct mmc_host *host, u8 opcode,
- 		  u8 len)
-diff --git a/include/linux/mmc/core.h b/include/linux/mmc/core.h
-index f206e29..b5c2763 100644
---- a/include/linux/mmc/core.h
-+++ b/include/linux/mmc/core.h
-@@ -154,6 +154,7 @@ extern void mmc_start_bkops(struct mmc_card *card, bool from_exception);
- extern int __mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int, bool,
- 			bool, bool);
- extern int mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int);
-+extern int mmc_send_tuning(struct mmc_card *);
- extern int mmc_send_ext_csd(struct mmc_card *card, u8 *ext_csd);
- 
- #define MMC_ERASE_ARG		0x00000000
--- 
-2.1.3
+[1] juno.dts https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm64/boot/dts/arm/juno.dts?id=refs/tags/next-20141125#n99
+
+Regards,
+Bhupesh
