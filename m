@@ -1,64 +1,60 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 26 Nov 2014 13:49:47 +0900
-Subject: [PATCH v9 2/6] arm64: ptrace: allow tracer to skip a system call
+Date: Wed, 26 Nov 2014 13:49:48 +0900
+Subject: [PATCH v9 3/6] asm-generic: add generic seccomp.h for secure
+ computing mode 1
 In-Reply-To: <1416977391-24231-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1416977391-24231-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1416977391-24231-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1416977391-24231-4-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If tracer modifies a syscall number to -1, this traced system call should
-be skipped with a return value specified in x0.
-This patch implements this semantics.
+Those values (__NR_seccomp_*) are used solely in secure_computing()
+to identify mode 1 system calls. If compat system calls have different
+syscall numbers, asm/seccomp.h may override them.
 
-Please note:
-* syscall entry tracing and syscall exit tracing (ftrace tracepoint and
-  audit) are always executed, if enabled, even when skipping a system call
-  (that is, -1).
-  In this way, we can avoid a potential bug where audit_syscall_entry()
-  might be called without audit_syscall_exit() at the previous system call
-  being called, that would cause OOPs in audit_syscall_entry().
-
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Kees Cook <keescook@chromium.org>
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/kernel/entry.S |   10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ include/asm-generic/seccomp.h |   30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+ create mode 100644 include/asm-generic/seccomp.h
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 726b910..946ec52 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -161,6 +161,7 @@
-  */
- sc_nr	.req	x25		// number of system calls
- scno	.req	x26		// syscall number
-+scno_w	.req	w26		// syscall number (lower 32 bits)
- stbl	.req	x27		// syscall table pointer
- tsk	.req	x28		// current thread_info
- 
-@@ -668,8 +669,14 @@ ENDPROC(el0_svc)
- 	 * switches, and waiting for our parent to respond.
- 	 */
- __sys_trace:
--	mov	x0, sp
-+	cmp     scno_w, #-1			// set default errno for
-+	b.ne	1f				// user-issued syscall(-1)
-+	mov	x0, #-ENOSYS
-+	str	x0, [sp]
-+1:	mov	x0, sp
- 	bl	syscall_trace_enter
-+	cmp	w0, #-1				// skip the syscall?
-+	b.eq	__sys_trace_return_skipped
- 	adr	lr, __sys_trace_return		// return address
- 	uxtw	scno, w0			// syscall number (possibly new)
- 	mov	x1, sp				// pointer to regs
-@@ -684,6 +691,7 @@ __sys_trace:
- 
- __sys_trace_return:
- 	str	x0, [sp]			// save returned x0
-+__sys_trace_return_skipped:
- 	mov	x0, sp
- 	bl	syscall_trace_exit
- 	b	ret_to_user
+diff --git a/include/asm-generic/seccomp.h b/include/asm-generic/seccomp.h
+new file mode 100644
+index 0000000..9fa1f65
+--- /dev/null
++++ b/include/asm-generic/seccomp.h
+@@ -0,0 +1,30 @@
++/*
++ * include/asm-generic/seccomp.h
++ *
++ * Copyright (C) 2014 Linaro Limited
++ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef _ASM_GENERIC_SECCOMP_H
++#define _ASM_GENERIC_SECCOMP_H
++
++#include <linux/unistd.h>
++
++#if defined(CONFIG_COMPAT) && !defined(__NR_seccomp_read_32)
++#define __NR_seccomp_read_32		__NR_read
++#define __NR_seccomp_write_32		__NR_write
++#define __NR_seccomp_exit_32		__NR_exit
++#define __NR_seccomp_sigreturn_32	__NR_rt_sigreturn
++#endif /* CONFIG_COMPAT && ! already defined */
++
++#define __NR_seccomp_read		__NR_read
++#define __NR_seccomp_write		__NR_write
++#define __NR_seccomp_exit		__NR_exit
++#ifndef __NR_seccomp_sigreturn
++#define __NR_seccomp_sigreturn		__NR_rt_sigreturn
++#endif
++
++#endif /* _ASM_GENERIC_SECCOMP_H */
 -- 
 1.7.9.5
