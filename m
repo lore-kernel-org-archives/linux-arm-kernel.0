@@ -1,308 +1,347 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 26 Nov 2014 13:04:51 -0200
-Subject: [PATCH v3 2/3] media: rc: add driver for Amlogic Meson IR
- remote receiver
-In-Reply-To: <1416342155-26820-3-git-send-email-b.galvani@gmail.com>
-References: <1416342155-26820-1-git-send-email-b.galvani@gmail.com>
- <1416342155-26820-3-git-send-email-b.galvani@gmail.com>
-Message-ID: <20141126130451.5789e7f9@recife.lan>
+From: tim@krieglstein.org (Tim Sander)
+Date: Wed, 26 Nov 2014 16:09:35 +0100
+Subject: [PATCH 3.18-rc3 v9 3/5] irqchip: gic: Introduce plumbing for IPI
+ FIQ
+In-Reply-To: <1416936401-5147-4-git-send-email-daniel.thompson@linaro.org>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
+ <1416936401-5147-4-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1678979.dHizJmHVtD@dabox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, 18 Nov 2014 21:22:34 +0100
-Beniamino Galvani <b.galvani@gmail.com> escreveu:
+I would be quite happy if grouping support for gic would be mainlined.
+Then only the dance to get the old gic version 1 working with fiqs would be 
+needed...
 
-> Amlogic Meson SoCs include a infrared remote control receiver that can
-> operate in two modes: "NEC" mode in which the hardware decodes frames
-> using the NEC IR protocol, and "general" mode in which the receiver
-> simply reports the duration of pulses and spaces for software
-> decoding.
+I have on comment inline below which seems as a race to me.
+
+Am Dienstag, 25. November 2014, 17:26:39 schrieb Daniel Thompson:
+> Currently it is not possible to exploit FIQ for systems with a GIC, even if
+> the systems are otherwise capable of it. This patch makes it possible
+> for IPIs to be delivered using FIQ.
 > 
-> This is a driver for the IR receiver that implements software decoding
-> of received frames.
+> To do so it modifies the register state so that normal interrupts are
+> placed in group 1 and specific IPIs are placed into group 0. It also
+> configures the controller to raise group 0 interrupts using the FIQ
+> signal. It provides a means for architecture code to define which IPIs
+> shall use FIQ and to acknowledge any IPIs that are raised.
 > 
-> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+> All GIC hardware except GICv1-without-TrustZone support provides a means
+> to group exceptions into group 0 and group 1 but the hardware
+> functionality is unavailable to the kernel when a secure monitor is
+> present because access to the grouping registers are prohibited outside
+> "secure world". However when grouping is not available (or in the case
+> of early GICv1 implementations is very hard to configure) the code to
+> change groups does not deploy and all IPIs will be raised via IRQ.
+> 
+> It has been tested and shown working on two systems capable of
+> supporting grouping (Freescale i.MX6 and STiH416). It has also been
+> tested for boot regressions on two systems that do not support grouping
+> (vexpress-a9 and Qualcomm Snapdragon 600).
+> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Tested-by: Jon Medhurst <tixy@linaro.org>
 > ---
->  MAINTAINERS                 |   1 +
->  drivers/media/rc/Kconfig    |  11 +++
->  drivers/media/rc/Makefile   |   1 +
->  drivers/media/rc/meson-ir.c | 216 ++++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 229 insertions(+)
->  create mode 100644 drivers/media/rc/meson-ir.c
+>  arch/arm/kernel/traps.c         |   5 +-
+>  drivers/irqchip/irq-gic.c       | 155
+> +++++++++++++++++++++++++++++++++++++--- include/linux/irqchip/arm-gic.h | 
+>  8 +++
+>  3 files changed, 158 insertions(+), 10 deletions(-)
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 0662378..f1bc045 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -850,6 +850,7 @@ ARM/Amlogic MesonX SoC support
->  M:	Carlo Caione <carlo@caione.org>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
-> +F:	drivers/media/rc/meson-ir.c
->  N:	meson[x68]
-
-Hmm... you're putting this driver at Carlo's maintenance shoulders.
-
-I need his ack in order to apply this patch.
-
-Regards,
-Mauro
-
->  
->  ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
-> diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
-> index 1aea732..ddfab25 100644
-> --- a/drivers/media/rc/Kconfig
-> +++ b/drivers/media/rc/Kconfig
-> @@ -223,6 +223,17 @@ config IR_FINTEK
->  	   To compile this driver as a module, choose M here: the
->  	   module will be called fintek-cir.
->  
-> +config IR_MESON
-> +	tristate "Amlogic Meson IR remote receiver"
-> +	depends on RC_CORE
-> +	depends on ARCH_MESON || COMPILE_TEST
-> +	---help---
-> +	   Say Y if you want to use the IR remote receiver available
-> +	   on Amlogic Meson SoCs.
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index 0c8b10801d36..4dc45b38e56e 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/init.h>
+>  #include <linux/sched.h>
+>  #include <linux/irq.h>
+> +#include <linux/irqchip/arm-gic.h>
+> 
+>  #include <linux/atomic.h>
+>  #include <asm/cacheflush.h>
+> @@ -479,7 +480,9 @@ asmlinkage void __exception_irq_entry
+> handle_fiq_as_nmi(struct pt_regs *regs)
+> 
+>  	nmi_enter();
+> 
+> -	/* nop. FIQ handlers for special arch/arm features can be added here. */
+> +#ifdef CONFIG_ARM_GIC
+> +	gic_handle_fiq_ipi();
+> +#endif
+> 
+>  	nmi_exit();
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index a53aa11e4f17..dfec7a4c1c64 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -39,6 +39,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/irqchip/chained_irq.h>
+>  #include <linux/irqchip/arm-gic.h>
+> +#include <linux/ratelimit.h>
+> 
+>  #include <asm/cputype.h>
+>  #include <asm/irq.h>
+> @@ -48,6 +49,10 @@
+>  #include "irq-gic-common.h"
+>  #include "irqchip.h"
+> 
+> +#ifndef SMP_IPI_FIQ_MASK
+> +#define SMP_IPI_FIQ_MASK 0
+> +#endif
 > +
-> +	   To compile this driver as a module, choose M here: the
-> +	   module will be called meson-ir.
-> +
->  config IR_NUVOTON
->  	tristate "Nuvoton w836x7hg Consumer Infrared Transceiver"
->  	depends on PNP
-> diff --git a/drivers/media/rc/Makefile b/drivers/media/rc/Makefile
-> index 8f509e0..379a5c0 100644
-> --- a/drivers/media/rc/Makefile
-> +++ b/drivers/media/rc/Makefile
-> @@ -22,6 +22,7 @@ obj-$(CONFIG_IR_IMON) += imon.o
->  obj-$(CONFIG_IR_ITE_CIR) += ite-cir.o
->  obj-$(CONFIG_IR_MCEUSB) += mceusb.o
->  obj-$(CONFIG_IR_FINTEK) += fintek-cir.o
-> +obj-$(CONFIG_IR_MESON) += meson-ir.o
->  obj-$(CONFIG_IR_NUVOTON) += nuvoton-cir.o
->  obj-$(CONFIG_IR_ENE) += ene_ir.o
->  obj-$(CONFIG_IR_REDRAT3) += redrat3.o
-> diff --git a/drivers/media/rc/meson-ir.c b/drivers/media/rc/meson-ir.c
-> new file mode 100644
-> index 0000000..fcc3b82
-> --- /dev/null
-> +++ b/drivers/media/rc/meson-ir.c
-> @@ -0,0 +1,216 @@
+>  union gic_base {
+>  	void __iomem *common_base;
+>  	void __percpu * __iomem *percpu_base;
+> @@ -333,6 +338,93 @@ static struct irq_chip gic_chip = {
+>  	.irq_set_wake		= gic_set_wake,
+>  };
+> 
 > +/*
-> + * Driver for Amlogic Meson IR remote receiver
+> + * Shift an interrupt between Group 0 and Group 1.
 > + *
-> + * Copyright (C) 2014 Beniamino Galvani <b.galvani@gmail.com>
+> + * In addition to changing the group we also modify the priority to
+> + * match what "ARM strongly recommends" for a system where no Group 1
+> + * interrupt must ever preempt a Group 0 interrupt.
 > + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+> + * If is safe to call this function on systems which do not support
+> + * grouping (it will have no effect).
 > + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/spinlock.h>
-> +
-> +#include <media/rc-core.h>
-> +
-> +#define DRIVER_NAME		"meson-ir"
-> +
-> +#define IR_DEC_LDR_ACTIVE	0x00
-> +#define IR_DEC_LDR_IDLE		0x04
-> +#define IR_DEC_LDR_REPEAT	0x08
-> +#define IR_DEC_BIT_0		0x0c
-> +#define IR_DEC_REG0		0x10
-> +#define IR_DEC_FRAME		0x14
-> +#define IR_DEC_STATUS		0x18
-> +#define IR_DEC_REG1		0x1c
-> +
-> +#define REG0_RATE_MASK		(BIT(11) - 1)
-> +
-> +#define REG1_MODE_MASK		(BIT(7) | BIT(8))
-> +#define REG1_MODE_NEC		(0 << 7)
-> +#define REG1_MODE_GENERAL	(2 << 7)
-> +
-> +#define REG1_TIME_IV_SHIFT	16
-> +#define REG1_TIME_IV_MASK	((BIT(13) - 1) << REG1_TIME_IV_SHIFT)
-> +
-> +#define REG1_IRQSEL_MASK	(BIT(2) | BIT(3))
-> +#define REG1_IRQSEL_NEC_MODE	(0 << 2)
-> +#define REG1_IRQSEL_RISE_FALL	(1 << 2)
-> +#define REG1_IRQSEL_FALL	(2 << 2)
-> +#define REG1_IRQSEL_RISE	(3 << 2)
-> +
-> +#define REG1_RESET		BIT(0)
-> +#define REG1_ENABLE		BIT(15)
-> +
-> +#define STATUS_IR_DEC_IN	BIT(8)
-> +
-> +#define MESON_TRATE		10	/* us */
-> +
-> +struct meson_ir {
-> +	void __iomem	*reg;
-> +	struct rc_dev	*rc;
-> +	int		irq;
-> +	spinlock_t	lock;
-> +};
-> +
-> +static void meson_ir_set_mask(struct meson_ir *ir, unsigned int reg,
-> +			      u32 mask, u32 value)
+> +static void gic_set_group_irq(void __iomem *base, unsigned int hwirq,
+> +				int group)
 > +{
-> +	u32 data;
+> +	unsigned int grp_reg = hwirq / 32 * 4;
+> +	u32 grp_mask = BIT(hwirq % 32);
+> +	u32 grp_val;
 > +
-> +	data = readl(ir->reg + reg);
-> +	data &= ~mask;
-> +	data |= (value & mask);
-> +	writel(data, ir->reg + reg);
+> +	unsigned int pri_reg = (hwirq / 4) * 4;
+> +	u32 pri_mask = BIT(7 + ((hwirq % 4) * 8));
+> +	u32 pri_val;
+> +
+> +	/*
+> +	 * Systems which do not support grouping will have not have
+> +	 * the EnableGrp1 bit set.
+> +	 */
+> +	if (!(GICD_ENABLE_GRP1 & readl_relaxed(base + GIC_DIST_CTRL)))
+> +		return;
+> +
+> +	raw_spin_lock(&irq_controller_lock);
+> +
+Assumption: The interrupt in question is not masked over here?
+> +	grp_val = readl_relaxed(base + GIC_DIST_IGROUP + grp_reg);
+> +	pri_val = readl_relaxed(base + GIC_DIST_PRI + pri_reg);
+> +
+> +	if (group) {
+> +		grp_val |= grp_mask;
+> +		pri_val |= pri_mask;
+> +	} else {
+> +		grp_val &= ~grp_mask;
+> +		pri_val &= ~pri_mask;
+> +	}
+> +
+> +	writel_relaxed(grp_val, base + GIC_DIST_IGROUP + grp_reg);
+If the assumption is true, then there is a race if the interrupt in question 
+hits here with undefined priority setting. Recomended workaround would be
+masking the interrupt in question.
+> +	writel_relaxed(pri_val, base + GIC_DIST_PRI + pri_reg);
+> +	raw_spin_unlock(&irq_controller_lock);
 > +}
 > +
-> +static irqreturn_t meson_ir_irq(int irqno, void *dev_id)
+> +/*
+> + * Test which group an interrupt belongs to.
+> + *
+> + * Returns 0 if the controller does not support grouping.
+> + */
+> +static int gic_get_group_irq(void __iomem *base, unsigned int hwirq)
 > +{
-> +	struct meson_ir *ir = dev_id;
-> +	u32 duration;
-> +	DEFINE_IR_RAW_EVENT(rawir);
+> +	unsigned int grp_reg = hwirq / 32 * 4;
+> +	u32 grp_val;
 > +
-> +	spin_lock(&ir->lock);
+> +	grp_val = readl_relaxed(base + GIC_DIST_IGROUP + grp_reg);
 > +
-> +	duration = readl(ir->reg + IR_DEC_REG1);
-> +	duration = (duration & REG1_TIME_IV_MASK) >> REG1_TIME_IV_SHIFT;
-> +	rawir.duration = US_TO_NS(duration * MESON_TRATE);
-> +
-> +	rawir.pulse = !!(readl(ir->reg + IR_DEC_STATUS) & STATUS_IR_DEC_IN);
-> +
-> +	ir_raw_event_store_with_filter(ir->rc, &rawir);
-> +	ir_raw_event_handle(ir->rc);
-> +
-> +	spin_unlock(&ir->lock);
-> +
-> +	return IRQ_HANDLED;
+> +	return (grp_val >> (hwirq % 32)) & 1;
 > +}
 > +
-> +static int meson_ir_probe(struct platform_device *pdev)
+> +/*
+> + * Fully acknowledge (both ack and eoi) any outstanding FIQ-based IPI,
+> + * otherwise do nothing.
+> + */
+> +void gic_handle_fiq_ipi(void)
 > +{
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *node = dev->of_node;
-> +	struct resource *res;
-> +	const char *map_name;
-> +	struct meson_ir *ir;
-> +	int ret;
+> +	struct gic_chip_data *gic = &gic_data[0];
+> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
+> +	unsigned long irqstat, irqnr;
 > +
-> +	ir = devm_kzalloc(dev, sizeof(struct meson_ir), GFP_KERNEL);
-> +	if (!ir)
-> +		return -ENOMEM;
+> +	if (WARN_ON(!in_nmi()))
+> +		return;
 > +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	ir->reg = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(ir->reg)) {
-> +		dev_err(dev, "failed to map registers\n");
-> +		return PTR_ERR(ir->reg);
+> +	while ((1u << readl_relaxed(cpu_base + GIC_CPU_HIGHPRI)) &
+> +	       SMP_IPI_FIQ_MASK) {
+> +		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
+> +		writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
+> +
+> +		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
+> +		WARN_RATELIMIT(irqnr > 16,
+> +			       "Unexpected irqnr %lu (bad prioritization?)\n",
+> +			       irqnr);
 > +	}
-> +
-> +	ir->irq = platform_get_irq(pdev, 0);
-> +	if (ir->irq < 0) {
-> +		dev_err(dev, "no irq resource\n");
-> +		return ir->irq;
-> +	}
-> +
-> +	ir->rc = rc_allocate_device();
-> +	if (!ir->rc) {
-> +		dev_err(dev, "failed to allocate rc device\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	ir->rc->priv = ir;
-> +	ir->rc->input_name = DRIVER_NAME;
-> +	ir->rc->input_phys = DRIVER_NAME "/input0";
-> +	ir->rc->input_id.bustype = BUS_HOST;
-> +	map_name = of_get_property(node, "linux,rc-map-name", NULL);
-> +	ir->rc->map_name = map_name ? map_name : RC_MAP_EMPTY;
-> +	ir->rc->dev.parent = dev;
-> +	ir->rc->driver_type = RC_DRIVER_IR_RAW;
-> +	ir->rc->allowed_protocols = RC_BIT_ALL;
-> +	ir->rc->rx_resolution = US_TO_NS(MESON_TRATE);
-> +	ir->rc->timeout = MS_TO_NS(200);
-> +	ir->rc->driver_name = DRIVER_NAME;
-> +
-> +	spin_lock_init(&ir->lock);
-> +	platform_set_drvdata(pdev, ir);
-> +
-> +	ret = rc_register_device(ir->rc);
-> +	if (ret) {
-> +		dev_err(dev, "failed to register rc device\n");
-> +		goto out_free;
-> +	}
-> +
-> +	ret = devm_request_irq(dev, ir->irq, meson_ir_irq, 0, "ir-meson", ir);
-> +	if (ret) {
-> +		dev_err(dev, "failed to request irq\n");
-> +		goto out_unreg;
-> +	}
-> +
-> +	/* Reset the decoder */
-> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_RESET, REG1_RESET);
-> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_RESET, 0);
-> +	/* Set general operation mode */
-> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_MODE_MASK, REG1_MODE_GENERAL);
-> +	/* Set rate */
-> +	meson_ir_set_mask(ir, IR_DEC_REG0, REG0_RATE_MASK, MESON_TRATE - 1);
-> +	/* IRQ on rising and falling edges */
-> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_IRQSEL_MASK,
-> +			  REG1_IRQSEL_RISE_FALL);
-> +	/* Enable the decoder */
-> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_ENABLE, REG1_ENABLE);
-> +
-> +	dev_info(dev, "receiver initialized\n");
-> +
-> +	return 0;
-> +out_unreg:
-> +	rc_unregister_device(ir->rc);
-> +	ir->rc = NULL;
-> +out_free:
-> +	rc_free_device(ir->rc);
-> +
-> +	return ret;
 > +}
 > +
-> +static int meson_ir_remove(struct platform_device *pdev)
-> +{
-> +	struct meson_ir *ir = platform_get_drvdata(pdev);
-> +	unsigned long flags;
+>  void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+>  {
+>  	if (gic_nr >= MAX_GIC_NR)
+> @@ -364,15 +456,24 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
+>  static void gic_cpu_if_up(void)
+>  {
+>  	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+> -	u32 bypass = 0;
+> +	void __iomem *dist_base = gic_data_dist_base(&gic_data[0]);
+> +	u32 ctrl = 0;
+> 
+>  	/*
+> -	* Preserve bypass disable bits to be written back later
+> -	*/
+> -	bypass = readl(cpu_base + GIC_CPU_CTRL);
+> -	bypass &= GICC_DIS_BYPASS_MASK;
+> +	 * Preserve bypass disable bits to be written back later
+> +	 */
+> +	ctrl = readl(cpu_base + GIC_CPU_CTRL);
+> +	ctrl &= GICC_DIS_BYPASS_MASK;
+> 
+> -	writel_relaxed(bypass | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
+> +	/*
+> +	 * If EnableGrp1 is set in the distributor then enable group 1
+> +	 * support for this CPU (and route group 0 interrupts to FIQ).
+> +	 */
+> +	if (GICD_ENABLE_GRP1 & readl_relaxed(dist_base + GIC_DIST_CTRL))
+> +		ctrl |= GICC_COMMON_BPR | GICC_FIQ_EN | GICC_ACK_CTL |
+> +			GICC_ENABLE_GRP1;
 > +
-> +	/* Disable the decoder */
-> +	spin_lock_irqsave(&ir->lock, flags);
-> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_ENABLE, 0);
-> +	spin_unlock_irqrestore(&ir->lock, flags);
+> +	writel_relaxed(ctrl | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
+>  }
+> 
+> 
+> @@ -396,7 +497,23 @@ static void __init gic_dist_init(struct gic_chip_data
+> *gic)
+> 
+>  	gic_dist_config(base, gic_irqs, NULL);
+> 
+> -	writel_relaxed(GICD_ENABLE, base + GIC_DIST_CTRL);
+> +	/*
+> +	 * Set EnableGrp1/EnableGrp0 (bit 1 and 0) or EnableGrp (bit 0 only,
+> +	 * bit 1 ignored) depending on current mode.
+> +	 */
+> +	writel_relaxed(GICD_ENABLE_GRP1 | GICD_ENABLE, base + GIC_DIST_CTRL);
 > +
-> +	rc_unregister_device(ir->rc);
+> +	/*
+> +	 * Set all global interrupts to be group 1 if (and only if) it
+> +	 * is possible to enable group 1 interrupts. This register is RAZ/WI
+> +	 * if not accessible or not implemented, however some GICv1 devices
+> +	 * do not implement the EnableGrp1 bit making it unsafe to set
+> +	 * this register unconditionally.
+> +	 */
+> +	if (GICD_ENABLE_GRP1 & readl_relaxed(base + GIC_DIST_CTRL))
+> +		for (i = 32; i < gic_irqs; i += 32)
+> +			writel_relaxed(0xffffffff,
+> +				       base + GIC_DIST_IGROUP + i * 4 / 32);
+>  }
+> 
+>  static void gic_cpu_init(struct gic_chip_data *gic)
+> @@ -405,6 +522,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>  	void __iomem *base = gic_data_cpu_base(gic);
+>  	unsigned int cpu_mask, cpu = smp_processor_id();
+>  	int i;
+> +	unsigned long secure_irqs, secure_irq;
+> 
+>  	/*
+>  	 * Get what the GIC says our CPU mask is.
+> @@ -423,6 +541,19 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+> 
+>  	gic_cpu_config(dist_base, NULL);
+> 
+> +	/*
+> +	 * If the distributor is configured to support interrupt grouping
+> +	 * then set any PPI and SGI interrupts not set in SMP_IPI_FIQ_MASK
+> +	 * to be group1 and ensure any remaining group 0 interrupts have
+> +	 * the right priority.
+> +	 */
+> +	if (GICD_ENABLE_GRP1 & readl_relaxed(dist_base + GIC_DIST_CTRL)) {
+> +		secure_irqs = SMP_IPI_FIQ_MASK;
+> +		writel_relaxed(~secure_irqs, dist_base + GIC_DIST_IGROUP + 0);
+> +		for_each_set_bit(secure_irq, &secure_irqs, 16)
+> +			gic_set_group_irq(dist_base, secure_irq, 0);
+> +	}
 > +
-> +	return 0;
-> +}
+>  	writel_relaxed(GICC_INT_PRI_THRESHOLD, base + GIC_CPU_PRIMASK);
+>  	gic_cpu_if_up();
+>  }
+> @@ -512,7 +643,8 @@ static void gic_dist_restore(unsigned int gic_nr)
+>  		writel_relaxed(gic_data[gic_nr].saved_spi_enable[i],
+>  			dist_base + GIC_DIST_ENABLE_SET + i * 4);
+> 
+> -	writel_relaxed(GICD_ENABLE, dist_base + GIC_DIST_CTRL);
+> +	writel_relaxed(GICD_ENABLE_GRP1 | GICD_ENABLE,
+> +		       dist_base + GIC_DIST_CTRL);
+>  }
+> 
+>  static void gic_cpu_save(unsigned int gic_nr)
+> @@ -640,6 +772,7 @@ static void gic_raise_softirq(const struct cpumask
+> *mask, unsigned int irq) {
+>  	int cpu;
+>  	unsigned long map = 0;
+> +	unsigned long softint;
+> 
+>  	read_lock(&cpu_map_migration_lock);
+> 
+> @@ -654,7 +787,11 @@ static void gic_raise_softirq(const struct cpumask
+> *mask, unsigned int irq) dmb(ishst);
+> 
+>  	/* this always happens on GIC0 */
+> -	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) +
+> GIC_DIST_SOFTINT); +	softint = map << 16 | irq;
+> +	if (gic_get_group_irq(gic_data_dist_base(&gic_data[0]), irq))
+> +		softint |= 0x8000;
+> +	writel_relaxed(softint,
+> +		       gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+> 
+>  	read_unlock(&cpu_map_migration_lock);
+>  }
+> diff --git a/include/linux/irqchip/arm-gic.h
+> b/include/linux/irqchip/arm-gic.h index 13eed92c7d24..a906fb7ac11f 100644
+> --- a/include/linux/irqchip/arm-gic.h
+> +++ b/include/linux/irqchip/arm-gic.h
+> @@ -22,6 +22,10 @@
+>  #define GIC_CPU_IDENT			0xfc
+> 
+>  #define GICC_ENABLE			0x1
+> +#define GICC_ENABLE_GRP1                0x2
+> +#define GICC_ACK_CTL                    0x4
+> +#define GICC_FIQ_EN                     0x8
+> +#define GICC_COMMON_BPR                 0x10
+>  #define GICC_INT_PRI_THRESHOLD		0xf0
+>  #define GICC_IAR_INT_ID_MASK		0x3ff
+>  #define GICC_INT_SPURIOUS		1023
+> @@ -44,6 +48,7 @@
+>  #define GIC_DIST_SGI_PENDING_SET	0xf20
+> 
+>  #define GICD_ENABLE			0x1
+> +#define GICD_ENABLE_GRP1		0x2
+>  #define GICD_DISABLE			0x0
+>  #define GICD_INT_ACTLOW_LVLTRIG		0x0
+>  #define GICD_INT_EN_CLR_X32		0xffffffff
+> @@ -117,5 +122,8 @@ static inline void __init register_routable_domain_ops
+>  {
+>  	gic_routable_irq_domain_ops = ops;
+>  }
 > +
-> +static const struct of_device_id meson_ir_match[] = {
-> +	{ .compatible = "amlogic,meson6-ir" },
-> +	{ },
-> +};
+> +void gic_handle_fiq_ipi(void);
 > +
-> +static struct platform_driver meson_ir_driver = {
-> +	.probe		= meson_ir_probe,
-> +	.remove		= meson_ir_remove,
-> +	.driver = {
-> +		.name		= DRIVER_NAME,
-> +		.of_match_table	= meson_ir_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(meson_ir_driver);
-> +
-> +MODULE_DESCRIPTION("Amlogic Meson IR remote receiver driver");
-> +MODULE_AUTHOR("Beniamino Galvani <b.galvani@gmail.com>");
-> +MODULE_LICENSE("GPL v2");
+>  #endif /* __ASSEMBLY */
+>  #endif
