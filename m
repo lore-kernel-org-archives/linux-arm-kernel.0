@@ -1,72 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Nov 2014 13:02:52 +0000
-Subject: [PATCH v9 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <1416977391-24231-3-git-send-email-takahiro.akashi@linaro.org>
-References: <1416977391-24231-1-git-send-email-takahiro.akashi@linaro.org>
- <1416977391-24231-3-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20141126130252.GI14866@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 26 Nov 2014 14:06:12 +0100
+Subject: [GIT PULL] clockevents: new material for 3.19
+Message-ID: <5475D044.5060607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 04:49:47AM +0000, AKASHI Takahiro wrote:
-> If tracer modifies a syscall number to -1, this traced system call should
-> be skipped with a return value specified in x0.
-> This patch implements this semantics.
-> 
-> Please note:
-> * syscall entry tracing and syscall exit tracing (ftrace tracepoint and
->   audit) are always executed, if enabled, even when skipping a system call
->   (that is, -1).
->   In this way, we can avoid a potential bug where audit_syscall_entry()
->   might be called without audit_syscall_exit() at the previous system call
->   being called, that would cause OOPs in audit_syscall_entry().
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/kernel/entry.S |   10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 726b910..946ec52 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -161,6 +161,7 @@
->   */
->  sc_nr	.req	x25		// number of system calls
->  scno	.req	x26		// syscall number
-> +scno_w	.req	w26		// syscall number (lower 32 bits)
->  stbl	.req	x27		// syscall table pointer
->  tsk	.req	x28		// current thread_info
->  
-> @@ -668,8 +669,14 @@ ENDPROC(el0_svc)
->  	 * switches, and waiting for our parent to respond.
->  	 */
->  __sys_trace:
-> -	mov	x0, sp
-> +	cmp     scno_w, #-1			// set default errno for
 
-I hate that we have to use scno_w, but the only alternative I can think of
-is using w8 directly, which isn't any better and doesn't work for compat.
-Ho-hum, I guess we'll stick with what you have.
+Hi Thomas,
 
-> +	b.ne	1f				// user-issued syscall(-1)
-> +	mov	x0, #-ENOSYS
-> +	str	x0, [sp]
+This pull request contains the following changes:
 
-Can you use #S_X0 here for clarity, please?
+  * Ezequiel Garcia added the missing 'clock_enabled' calls before 
+getting the clocks' rate, switched to the reference clock for both the 
+timer and the watchdog on a37, and updated the DT bindings documentation 
+accordingly
 
-> +1:	mov	x0, sp
->  	bl	syscall_trace_enter
-> +	cmp	w0, #-1				// skip the syscall?
-> +	b.eq	__sys_trace_return_skipped
->  	adr	lr, __sys_trace_return		// return address
->  	uxtw	scno, w0			// syscall number (possibly new)
->  	mov	x1, sp				// pointer to regs
-> @@ -684,6 +691,7 @@ __sys_trace:
->  
->  __sys_trace_return:
->  	str	x0, [sp]			// save returned x0
+  * Yanchang Li removed the hard coded clock rate and let use the 
+configurable one
 
-and update this guy too.
+Thanks !
 
-Will
+   -- Daniel
+
+
+The following changes since commit 867f667fb9c6734e06cc24e96fc7f06a7e772084:
+
+   Merge tag 'renesas-clocksource-for-v3.18' of 
+git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into 
+clockevents/3.18 (2014-09-29 01:59:51 +0200)
+
+are available in the git repository at:
+
+
+   http://git.linaro.org/people/daniel.lezcano/linux.git clockevents/3.19
+
+for you to fetch changes up to 4a22d9c93af1f2b2c40354c4bc59fd007f33f05e:
+
+   clocksource: armada-370-xp: Use the reference clock on A375 SoC 
+(2014-11-26 13:51:08 +0100)
+
+----------------------------------------------------------------
+Ezequiel Garcia (3):
+       clocksource: armada-370-xp: Add missing clock enable
+       watchdog: orion: Use the reference clock on Armada 375 SoC
+       clocksource: armada-370-xp: Use the reference clock on A375 SoC
+
+Yanchang Li (1):
+       clocksource: sirf: Remove hard-coded clock rate
+
+ 
+Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt 
+|  9 ++++++---
+  Documentation/devicetree/bindings/watchdog/marvel.txt 
+   | 13 +++++++++++++
+  drivers/clocksource/time-armada-370-xp.c 
+   | 30 ++++++++++++++++++++++++++++++
+  drivers/clocksource/timer-marco.c 
+   | 23 +++++++++--------------
+  drivers/watchdog/orion_wdt.c 
+   | 42 +++++++++++++++++++++++++++++++++++++++++-
+  5 files changed, 99 insertions(+), 18 deletions(-)
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
