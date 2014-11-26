@@ -1,50 +1,127 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 26 Nov 2014 13:49:01 +0100
-Subject: [PATCH 2/3] i2c: slave-eeprom: add eeprom simulator driver
-In-Reply-To: <2A7C987F-15E0-46FD-A711-E7F5BA9893FC@gmail.com>
-References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
- <1416326695-13083-3-git-send-email-wsa@the-dreams.de>
- <CAOY=C6FSXWn2AKn9gp0oU69U8VkkyJAE7MMUTZsToy0P_Tf6AA@mail.gmail.com>
- <20141122181229.GB9698@katana>
- <2A7C987F-15E0-46FD-A711-E7F5BA9893FC@gmail.com>
-Message-ID: <20141126124901.GB4397@katana>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 26 Nov 2014 13:49:42 +0100
+Subject: [PATCH v4] clocksource: arch_timer: Allow the device tree to
+ specify uninitialized timer registers
+In-Reply-To: <1412753627-28287-1-git-send-email-sonnyrao@chromium.org>
+References: <1412753627-28287-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <5475CC66.6080600@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 03:25:29PM +0300, Alexander Kochetkov wrote:
-> 
-> 22 ????. 2014 ?., ? 21:12, Wolfram Sang <wsa@the-dreams.de> ???????(?):
-> 
-> > IMO a repeated start is to ensure that two messages arrive at the slave
-> > without interruption from another master. I can't think why a slave
-> > should know which type of start that was. In fact, if it does that would
-> > raise an eyebrow for me. Do you have an example?
-> 
-> It is used to implement Device ID reading.
+On 10/08/2014 09:33 AM, Sonny Rao wrote:
+> From: Doug Anderson <dianders@chromium.org>
+>
+> Some 32-bit (ARMv7) systems are architected like this:
+>
+> * The firmware doesn't know and doesn't care about hypervisor mode and
+>    we don't want to add the complexity of hypervisor there.
+>
+> * The firmware isn't involved in SMP bringup or resume.
+>
+> * The ARCH timer come up with an uninitialized offset (CNTVOFF)
+>    between the virtual and physical counters.  Each core gets a
+>    different random offset.
+>
+> * The device boots in "Secure SVC" mode.
+>
+> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
+>    CNTHCTL.PL1PCTEN (both default to 1 at reset)
+>
+> On systems like the above, it doesn't make sense to use the virtual
+> counter.  There's nobody managing the offset and each time a core goes
+> down and comes back up it will get reinitialized to some other random
+> value.
+>
+> This adds an optional property which can inform the kernel of this
+> situation, and firmware is free to remove the property if it is going
+> to initialize the CNTVOFF registers when each CPU comes out of reset.
+>
+> Currently, the best course of action in this case is to use the
+> physical timer, which is why it is important that CNTHCTL hasn't been
+> changed from its reset value and it's a reasonable assumption given
+> that the firmware has never entered HYP mode.
+>
+> Note that it's been said that on ARMv8 systems the firmware and
+> kernel really can't be architected as described above.  That means
+> using the physical timer like this really only makes sense for ARMv7
+> systems.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-Yes and no, I'd say :) Technically, it needs repeated start. But really,
-the hardware should handle this (and I know one IP core which has
-support for it). One could try to simulate the behaviour in the bus
-driver IF a second slave address AND detection of repeated start is
-available, but I doubt this combination exists.
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Still, all the _slave driver_ needs to handle is an
-I2C_SLAVE_EVENT_DEVICE_ID which should return the apropriate value.
+I would be nice to have Catalin's ack.
 
-That being said, I have never seen querying Device ID in action.
+Thanks
 
-> Not sure, that the feature is really needed for the first release.
+   -- Daniel
 
-I am sure it is not :D
+> ---
+> Changes in v2:
+> - Add "#ifdef CONFIG_ARM" as per Will Deacon
+>
+> Changes in v3:
+> - change property name to arm,cntvoff-not-fw-configured and specify
+>    that the value of CNTHCTL.PL1PC(T)EN must still be the reset value
+>    of 1 as per Mark Rutland
+>
+> Changes in v4:
+> - change property name to arm,cpu-registers-not-fw-configured and
+>    specify that all cpu registers must have architected reset values
+>    per Mark Rutland
+> - change from "#ifdef CONFIG_ARM" to "if (IS_ENABLED(CONFIG_ARM))" per
+>    Arnd Bergmann
+> ---
+>   Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
+>   drivers/clocksource/arm_arch_timer.c                 | 8 ++++++++
+>   2 files changed, 16 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> index 37b2caf..256b4d8 100644
+> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> @@ -22,6 +22,14 @@ to deliver its interrupts via SPIs.
+>   - always-on : a boolean property. If present, the timer is powered through an
+>     always-on power domain, therefore it never loses context.
+>
+> +** Optional properties:
+> +
+> +- arm,cpu-registers-not-fw-configured : Firmware does not initialize
+> +  any of the generic timer CPU registers, which contain their
+> +  architecturally-defined reset values. Only supported for 32-bit
+> +  systems which follow the ARMv7 architected reset values.
+> +
+> +
+>   Example:
+>
+>   	timer {
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 8daf056..799139f 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -654,6 +654,14 @@ static void __init arch_timer_init(struct device_node *np)
+>   	arch_timer_detect_rate(NULL, np);
+>
+>   	/*
+> +	 * If we cannot rely on firmware initializing the timer registers then
+> +	 * we should use the physical timers instead.
+> +	 */
+> +	if (IS_ENABLED(CONFIG_ARM) &&
+> +	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
+> +			arch_timer_use_virtual = false;
+> +
+> +	/*
+>   	 * If HYP mode is available, we know that the physical timer
+>   	 * has been configured to be accessible from PL1. Use it, so
+>   	 * that a guest can use the virtual timer instead.
+>
 
-Thanks,
 
-   Wolfram
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141126/cc018256/attachment.sig>
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
