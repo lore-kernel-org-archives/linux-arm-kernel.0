@@ -1,197 +1,261 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 26 Nov 2014 17:53:11 +0100
-Subject: [PATCH v5 1/3] mtd: nand: gpmi: add gpmi_move_bits function
+Date: Wed, 26 Nov 2014 17:53:12 +0100
+Subject: [PATCH v5 2/3] mtd: nand: gpmi: add proper raw access support
 In-Reply-To: <1417020793-3354-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1417020793-3354-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1417020793-3354-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1417020793-3354-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new function to move bits (not bytes) from a memory region to
-another one.
-This function is similar to memmove except it acts at bit level.
-This function is needed to implement GPMI raw access functions, given the
-fact that ECC engine does not pad ECC bits to the next byte boundary.
+Several MTD users (either in user or kernel space) expect a valid raw
+access support to NAND chip devices.
+This is particularly true for testing tools which are often touching the
+data stored in a NAND chip in raw mode to artificially generate errors.
+
+The GPMI drivers do not implemenent raw access functions, and thus rely on
+default HW_ECC scheme implementation.
+The default implementation consider the data and OOB area as properly
+separated in their respective NAND section, which is not true for the GPMI
+controller.
+In this driver/controller some OOB data are stored at the beginning of the
+NAND data area (these data are called metadata in the driver), then ECC
+bytes are interleaved with data chunk (which is similar to the
+HW_ECC_SYNDROME scheme), and eventually the remaining bytes are used as
+OOB data.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c  | 151 +++++++++++++++++++++++++++++++++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   4 +
- 2 files changed, 155 insertions(+)
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 183 +++++++++++++++++++++++++++++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   2 +
+ 2 files changed, 185 insertions(+)
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index 87e658c..77eff0e 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -1353,3 +1353,154 @@ int gpmi_read_page(struct gpmi_nand_data *this,
- 	set_dma_type(this, DMA_FOR_READ_ECC_PAGE);
- 	return start_dma_with_bch_irq(this, desc);
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 959cb9b..13eb1dd 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -791,6 +791,7 @@ static void gpmi_free_dma_buffer(struct gpmi_nand_data *this)
+ 					this->page_buffer_phys);
+ 	kfree(this->cmd_buffer);
+ 	kfree(this->data_buffer_dma);
++	kfree(this->raw_buffer);
+ 
+ 	this->cmd_buffer	= NULL;
+ 	this->data_buffer_dma	= NULL;
+@@ -837,6 +838,9 @@ static int gpmi_alloc_dma_buffer(struct gpmi_nand_data *this)
+ 	if (!this->page_buffer_virt)
+ 		goto error_alloc;
+ 
++	this->raw_buffer = kzalloc(mtd->writesize + mtd->oobsize, GFP_KERNEL);
++	if (!this->raw_buffer)
++		goto error_alloc;
+ 
+ 	/* Slice up the page buffer. */
+ 	this->payload_virt = this->page_buffer_virt;
+@@ -1347,6 +1351,183 @@ gpmi_ecc_write_oob(struct mtd_info *mtd, struct nand_chip *chip, int page)
+ 	return status & NAND_STATUS_FAIL ? -EIO : 0;
  }
-+
-+/**
-+ * gpmi_move_bits - move bits from one memory region to another
-+ * @dst: destination buffer
-+ * @dst_bit_off: bit offset we're starting to write at
-+ * @src: source buffer
-+ * @src_bit_off: bit offset we're starting to read from
-+ * @nbits: number of bits to copy
+ 
++/*
++ * This function reads a NAND page without involving the ECC engine (no HW
++ * ECC correction).
++ * The tricky part in the GPMI/BCH controller is that it stores ECC bits
++ * inline (interleaved with payload DATA), and do not align data chunk on
++ * byte boundaries.
++ * We thus need to take care moving the payload data and ECC bits stored in the
++ * page into the provided buffers, which is why we're using gpmi_move_bits.
 + *
-+ * This functions copies bits from one memory region to another, and is used by
-+ * the GPMI driver to copy ECC sections which are not guaranteed to be byte
-+ * aligned.
-+ *
++ * See set_geometry_by_ecc_info inline comments to have a full description
++ * of the layout used by the GPMI controller.
 + */
-+void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
-+		    const u8 *src, size_t src_bit_off,
-+		    size_t nbits)
++static int gpmi_ecc_read_page_raw(struct mtd_info *mtd,
++				  struct nand_chip *chip, uint8_t *buf,
++				  int oob_required, int page)
 +{
-+	size_t i;
-+	size_t nbytes;
-+	u32 src_buffer = 0;
-+	size_t bits_in_src_buffer = 0;
++	struct gpmi_nand_data *this = chip->priv;
++	struct bch_geometry *nfc_geo = &this->bch_geometry;
++	int eccsize = nfc_geo->ecc_chunk_size;
++	int eccbits = nfc_geo->ecc_strength * nfc_geo->gf_len;
++	u8 *tmp_buf = this->raw_buffer;
++	size_t src_bit_off;
++	size_t oob_bit_off;
++	size_t oob_byte_off;
++	uint8_t *oob = chip->oob_poi;
++	int step;
 +
-+	if (!nbits)
-+		return;
-+
-+	/*
-+	 * Move src and dst pointers to the closest byte pointer and store bit
-+	 * offsets within a byte.
-+	 */
-+	src += src_bit_off / 8;
-+	src_bit_off %= 8;
-+
-+	dst += dst_bit_off / 8;
-+	dst_bit_off %= 8;
++	chip->read_buf(mtd, tmp_buf,
++		       mtd->writesize + mtd->oobsize);
 +
 +	/*
-+	 * Initialize the src_buffer value with bits available in the first
-+	 * byte of data so that we end up with a byte aligned src pointer.
++	 * If required, swap the bad block marker and the data stored in the
++	 * metadata section, so that we don't wrongly consider a block as bad.
++	 *
++	 * See the layout description for a detailed explanation on why this
++	 * is needed.
 +	 */
-+	if (src_bit_off) {
-+		src_buffer = src[0] >> src_bit_off;
-+		if (nbits >= (8 - src_bit_off)) {
-+			bits_in_src_buffer += 8 - src_bit_off;
-+		} else {
-+			src_buffer &= GENMASK(nbits - 1, 0);
-+			bits_in_src_buffer += nbits;
-+		}
-+		nbits -= bits_in_src_buffer;
-+		src++;
++	if (this->swap_block_mark) {
++		u8 swap = tmp_buf[0];
++
++		tmp_buf[0] = tmp_buf[mtd->writesize];
++		tmp_buf[mtd->writesize] = swap;
 +	}
 +
-+	/* Calculate the number of bytes that can be copied from src to dst. */
-+	nbytes = nbits / 8;
++	/*
++	 * Copy the metadata section into the oob buffer (this section is
++	 * guaranteed to be aligned on a byte boundary).
++	 */
++	if (oob_required)
++		memcpy(oob, tmp_buf, nfc_geo->metadata_size);
 +
-+	/* Try to align dst to a byte boundary. */
-+	if (dst_bit_off) {
-+		if (bits_in_src_buffer < (8 - dst_bit_off) && nbytes) {
-+			src_buffer |= src[0] << bits_in_src_buffer;
-+			bits_in_src_buffer += 8;
-+			src++;
-+			nbytes--;
-+		}
++	oob_bit_off = nfc_geo->metadata_size * 8;
++	src_bit_off = oob_bit_off;
 +
-+		if (bits_in_src_buffer >= (8 - dst_bit_off)) {
-+			dst[0] &= GENMASK(dst_bit_off - 1, 0);
-+			dst[0] |= src_buffer << dst_bit_off;
-+			src_buffer >>= (8 - dst_bit_off);
-+			bits_in_src_buffer -= (8 - dst_bit_off);
-+			dst_bit_off = 0;
-+			dst++;
-+			if (bits_in_src_buffer > 7) {
-+				bits_in_src_buffer -= 8;
-+				dst[0] = src_buffer;
-+				dst++;
-+				src_buffer >>= 8;
-+			}
-+		}
++	/* Extract interleaved payload data and ECC bits */
++	for (step = 0; step < nfc_geo->ecc_chunk_count; step++) {
++		if (buf)
++			gpmi_move_bits(buf, step * eccsize * 8,
++				       tmp_buf, src_bit_off,
++				       eccsize * 8);
++		src_bit_off += eccsize * 8;
++
++		/* Align last ECC block to align a byte boundary */
++		if (step == nfc_geo->ecc_chunk_count - 1 &&
++		    (oob_bit_off + eccbits) % 8)
++			eccbits += 8 - ((oob_bit_off + eccbits) % 8);
++
++		if (oob_required)
++			gpmi_move_bits(oob, oob_bit_off,
++				       tmp_buf, src_bit_off,
++				       eccbits);
++
++		src_bit_off += eccbits;
++		oob_bit_off += eccbits;
 +	}
 +
-+	if (!bits_in_src_buffer && !dst_bit_off) {
-+		/*
-+		 * Both src and dst pointers are byte aligned, thus we can
-+		 * just use the optimized memcpy function.
-+		 */
-+		if (nbytes)
-+			memcpy(dst, src, nbytes);
-+	} else {
-+		/*
-+		 * src buffer is not byte aligned, hence we have to copy each
-+		 * src byte to the src_buffer variable before extracting a byte
-+		 * to store in dst.
-+		 */
-+		for (i = 0; i < nbytes; i++) {
-+			src_buffer |= src[i] << bits_in_src_buffer;
-+			dst[i] = src_buffer;
-+			src_buffer >>= 8;
-+		}
-+	}
-+	/* Update dst and src pointers */
-+	dst += nbytes;
-+	src += nbytes;
++	if (oob_required) {
++		oob_byte_off = oob_bit_off / 8;
 +
-+	/*
-+	 * nbits is the number of remaining bits. It should not exceed 8 as
-+	 * we've already copied as much bytes as possible.
-+	 */
-+	nbits %= 8;
-+
-+	/*
-+	 * If there's no more bits to copy to the destination and src buffer
-+	 * was already byte aligned, then we're done.
-+	 */
-+	if (!nbits && !bits_in_src_buffer)
-+		return;
-+
-+	/* Copy the remaining bits to src_buffer */
-+	if (nbits)
-+		src_buffer |= (*src & GENMASK(nbits - 1, 0)) <<
-+			      bits_in_src_buffer;
-+	bits_in_src_buffer += nbits;
-+
-+	/*
-+	 * In case there were not enough bits to get a byte aligned dst buffer
-+	 * prepare the src_buffer variable to match the dst organization (shift
-+	 * src_buffer by dst_bit_off and retrieve the least significant bits
-+	 * from dst).
-+	 */
-+	if (dst_bit_off)
-+		src_buffer = (src_buffer << dst_bit_off) |
-+			     (*dst & GENMASK(dst_bit_off - 1, 0));
-+	bits_in_src_buffer += dst_bit_off;
-+
-+	/*
-+	 * Keep most significant bits from dst if we end up with an unaligned
-+	 * number of bits.
-+	 */
-+	nbytes = bits_in_src_buffer / 8;
-+	if (bits_in_src_buffer % 8) {
-+		src_buffer |= (dst[nbytes] &
-+			       GENMASK(7, bits_in_src_buffer % 8)) <<
-+			      (nbytes * 8);
-+		nbytes++;
++		if (oob_byte_off < mtd->oobsize)
++			memcpy(oob + oob_byte_off,
++			       tmp_buf + mtd->writesize + oob_byte_off,
++			       mtd->oobsize - oob_byte_off);
 +	}
 +
-+	/* Copy the remaining bytes to dst */
-+	for (i = 0; i < nbytes; i++) {
-+		dst[i] = src_buffer;
-+		src_buffer >>= 8;
-+	}
++	return 0;
 +}
++
++/*
++ * This function writes a NAND page without involving the ECC engine (no HW
++ * ECC generation).
++ * The tricky part in the GPMI/BCH controller is that it stores ECC bits
++ * inline (interleaved with payload DATA), and do not align data chunk on
++ * byte boundaries.
++ * We thus need to take care moving the OOB area at the right place in the
++ * final page, which is why we're using gpmi_move_bits.
++ *
++ * See set_geometry_by_ecc_info inline comments to have a full description
++ * of the layout used by the GPMI controller.
++ */
++static int gpmi_ecc_write_page_raw(struct mtd_info *mtd,
++				   struct nand_chip *chip,
++				   const uint8_t *buf,
++				   int oob_required)
++{
++	struct gpmi_nand_data *this = chip->priv;
++	struct bch_geometry *nfc_geo = &this->bch_geometry;
++	int eccsize = nfc_geo->ecc_chunk_size;
++	int eccbits = nfc_geo->ecc_strength * nfc_geo->gf_len;
++	u8 *tmp_buf = this->raw_buffer;
++	uint8_t *oob = chip->oob_poi;
++	size_t dst_bit_off;
++	size_t oob_bit_off;
++	size_t oob_byte_off;
++	int step;
++
++	/*
++	 * Initialize all bits to 1 in case we don't have a buffer for the
++	 * payload or oob data in order to leave unspecified bits of data
++	 * to their initial state.
++	 */
++	if (!buf || !oob_required)
++		memset(tmp_buf, 0xff, mtd->writesize + mtd->oobsize);
++
++	/*
++	 * First copy the metadata section (stored in oob buffer) at the
++	 * beginning of the page, as imposed by the GPMI layout.
++	 */
++	memcpy(tmp_buf, oob, nfc_geo->metadata_size);
++	oob_bit_off = nfc_geo->metadata_size * 8;
++	dst_bit_off = oob_bit_off;
++
++	/* Interleave payload data and ECC bits */
++	for (step = 0; step < nfc_geo->ecc_chunk_count; step++) {
++		if (buf)
++			gpmi_move_bits(tmp_buf, dst_bit_off,
++				       buf, step * eccsize * 8, eccsize * 8);
++		dst_bit_off += eccsize * 8;
++
++		/* Align last ECC block to align a byte boundary */
++		if (step == nfc_geo->ecc_chunk_count - 1 &&
++		    (oob_bit_off + eccbits) % 8)
++			eccbits += 8 - ((oob_bit_off + eccbits) % 8);
++
++		if (oob_required)
++			gpmi_move_bits(tmp_buf, dst_bit_off,
++				       oob, oob_bit_off, eccbits);
++
++		dst_bit_off += eccbits;
++		oob_bit_off += eccbits;
++	}
++
++	oob_byte_off = oob_bit_off / 8;
++
++	if (oob_required && oob_byte_off < mtd->oobsize)
++		memcpy(tmp_buf + mtd->writesize + oob_byte_off,
++		       oob + oob_byte_off, mtd->oobsize - oob_byte_off);
++
++	/*
++	 * If required, swap the bad block marker and the first byte of the
++	 * metadata section, so that we don't modify the bad block marker.
++	 *
++	 * See the layout description for a detailed explanation on why this
++	 * is needed.
++	 */
++	if (this->swap_block_mark) {
++		u8 swap = tmp_buf[0];
++
++		tmp_buf[0] = tmp_buf[mtd->writesize];
++		tmp_buf[mtd->writesize] = swap;
++	}
++
++	chip->write_buf(mtd, tmp_buf, mtd->writesize + mtd->oobsize);
++
++	return 0;
++}
++
+ static int gpmi_block_markbad(struct mtd_info *mtd, loff_t ofs)
+ {
+ 	struct nand_chip *chip = mtd->priv;
+@@ -1664,6 +1845,8 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
+ 	ecc->write_page	= gpmi_ecc_write_page;
+ 	ecc->read_oob	= gpmi_ecc_read_oob;
+ 	ecc->write_oob	= gpmi_ecc_write_oob;
++	ecc->read_page_raw = gpmi_ecc_read_page_raw;
++	ecc->write_page_raw = gpmi_ecc_write_page_raw;
+ 	ecc->mode	= NAND_ECC_HW;
+ 	ecc->size	= bch_geo->ecc_chunk_size;
+ 	ecc->strength	= bch_geo->ecc_strength;
 diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index 32c6ba4..17d0736 100644
+index 17d0736..89ab5c8 100644
 --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
 +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -290,6 +290,10 @@ extern int gpmi_send_page(struct gpmi_nand_data *,
- extern int gpmi_read_page(struct gpmi_nand_data *,
- 			dma_addr_t payload, dma_addr_t auxiliary);
+@@ -189,6 +189,8 @@ struct gpmi_nand_data {
+ 	void			*auxiliary_virt;
+ 	dma_addr_t		auxiliary_phys;
  
-+void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
-+		    const u8 *src, size_t src_bit_off,
-+		    size_t nbits);
++	void			*raw_buffer;
 +
- /* BCH : Status Block Completion Codes */
- #define STATUS_GOOD		0x00
- #define STATUS_ERASED		0xff
+ 	/* DMA channels */
+ #define DMA_CHANS		8
+ 	struct dma_chan		*dma_chans[DMA_CHANS];
 -- 
 1.9.1
