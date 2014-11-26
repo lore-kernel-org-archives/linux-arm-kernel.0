@@ -1,38 +1,34 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 26 Nov 2014 19:27:06 +0000
-Subject: [PATCH 5/7] KVM: arm64: guest debug, add support for single-step
-In-Reply-To: <1416931805-23223-6-git-send-email-alex.bennee@linaro.org>
-References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
- <1416931805-23223-6-git-send-email-alex.bennee@linaro.org>
-Message-ID: <CAFEAcA-cjM9yUXi6tc79UP0fBKAagtFKQgV3iAjz5DWr9yxZUQ@mail.gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 26 Nov 2014 11:31:17 -0800
+Subject: [PATCH V6 00/12] Tegra xHCI support
+In-Reply-To: <CAJe_Zhcz=WOLy0_98xRj6=i2+5MFeXQGPmYJhnpy1NfUEPJ-0w@mail.gmail.com>
+References: <1416874644-12070-1-git-send-email-abrestic@chromium.org>
+ <CAJe_Zhcz=WOLy0_98xRj6=i2+5MFeXQGPmYJhnpy1NfUEPJ-0w@mail.gmail.com>
+Message-ID: <CAL1qeaHkJhJ52jxJLic8Ey6TwA2TxLydeV995OA=Mpi8rjgnLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 November 2014 at 16:10, Alex Benn?e <alex.bennee@linaro.org> wrote:
-> This adds support for single-stepping the guest. As userspace can and
-> will manipulate guest registers before restarting any tweaking of the
-> registers has to occur just before control is passed back to the guest.
-> Furthermore while guest debugging is in effect we need to squash the
-> ability of the guest to single-step itself as we have no easy way of
-> re-entering the guest after the exception has been delivered to the
-> hypervisor.
+On Tue, Nov 25, 2014 at 5:32 AM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+> On 25 November 2014 at 05:47, Andrew Bresticker <abrestic@chromium.org> wrote:
+>> This series adds support for xHCI on NVIDIA Tegra SoCs.  This includes:
+>>  - patches 1, 2, and 3: minor cleanups for mailbox framework and xHCI,
+>>  - patches 4 and 5: adding a driver for the mailbox used to communicate
+>>    with the xHCI controller's firmware,
+>>  - patches 6 and 7: extending the XUSB pad controller driver to support
+>>    the USB PHY types (UTMI, HSIC, and USB3),
+>>  - patches 8 and 9: adding a xHCI host-controller driver, and
+>>  - patches 10, 11, and 12: updating the relevant DT files.
+>>
+>> The mailbox driver (patch 5) has a compile-time dependency on patch 2 and
+>> a run-time dependency on patch 3.  Both the PHY (patch 7) and host (patch 9)
+>> drivers have compile-time dependencies on the mailbox driver.  The host
+>> driver also has a run-time dependency on patch 1.  Because of this, this
+>> entire series should probably go through the Tegra tree.
+>>
+> Why shouldn't I pick 2 & 3 at least?
 
-A corner case I don't think this patch handles: if the debugger
-tries to single step an insn which is emulated by the
-hypervisor (because it's a load/store which is trapped and
-handled as emulated mmio in userspace) then we won't
-correctly update the single-step state machine (and so we'll end
-up incorrectly stopping after the following insn rather than
-before, I think).
-
-You should be able to achieve this effect by simply always clearing
-the guest's PSTATE.SS when you advance the PC to skip the emulated
-instruction (cf the comment in the pseudocode SSAdvance() function).
-
-I think we should also be doing this PC advance on return from
-userspace's handling of the mmio rather than before we drop back
-to userspace as we do now, but I can't remember why I think that.
-Christoffer, I don't suppose you recall, do you? I think it was
-you I had this conversation with on IRC a month or so back...
-
--- PMM
+I don't see why not.  Because of the PHY API change I'm going to have
+to re-spin the series and at this point 3.19 is looking pretty
+unlikely.  Maybe we could get a Tegra maintainer's ACK for patches 4
+and 5 so that you could take them through your tree as well for 3.19?
+(Stephen, Thierry, Alex?)
