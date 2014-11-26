@@ -1,98 +1,38 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 26 Nov 2014 15:52:33 -0600
-Subject: [RFC PATCH v5 4/4] ARM: OMAP2+: AM33XX: Hookup AM33XX PM code into
- OMAP builds
-In-Reply-To: <cover.1417038624.git.d-gerlach@ti.com>
-References: <cover.1417038624.git.d-gerlach@ti.com>
-Message-ID: <c5c9586aef3eb4ccddeefd0f40b20d60eeb062c8.1417038624.git.d-gerlach@ti.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 26 Nov 2014 22:56:48 +0100
+Subject: [PATCH] arm: omap2: rx51-peripherals: fix build warning
+In-Reply-To: <1417033655-32332-1-git-send-email-balbi@ti.com>
+References: <1417033655-32332-1-git-send-email-balbi@ti.com>
+Message-ID: <20141126215648.GA10126@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With all the requisite changes in place we can now enable basic
-PM support for AM33xx. This patch updates the various OMAP files
-to enable suspend-resume on AM33xx.
+On Wed, Nov 26, 2014 at 02:27:35PM -0600, Felipe Balbi wrote:
+> commit 68a3c04 ([media] ARM: OMAP2: RX-51: update
+> si4713 platform data) updated board-rx51-peripherals.c
+> so that si4713 could be easily used on DT boot, but
+> it ended up introducing a build warning whenever
+> si4713 isn't enabled.
+> 
+> This patches fixes that warning:
+> 
+> arch/arm/mach-omap2/board-rx51-peripherals.c:1000:36: warning: \
+> 	?rx51_si4713_platform_data? defined but not used [-Wunused-variable]
+>  static struct si4713_platform_data rx51_si4713_platform_data = {
+> 
+> Cc: Sebastian Reichel <sre@kernel.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Hans Verkuil <hans.verkuil@cisco.com>
+> Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-Because the suspend resume functionality is different on AM33xx
-than other OMAP platforms due to the need for M3 firmware and an
-IPC channel to be in place, separate PM ops are used instead of
-omap_pm_ops.
+Acked-By: Sebastian Reichel <sre@kernel.org>
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- arch/arm/mach-omap2/Makefile | 2 ++
- arch/arm/mach-omap2/common.h | 9 +++++++++
- arch/arm/mach-omap2/io.c     | 1 +
- arch/arm/mach-omap2/pm.h     | 6 ++++++
- 4 files changed, 18 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index d9e9412..6d1464d 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -90,6 +90,7 @@ omap-4-5-pm-common			=  pm44xx.o omap-mpuss-lowpower.o
- obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-pm-common)
- obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-pm-common)
- obj-$(CONFIG_SOC_DRA7XX)		+= $(omap-4-5-pm-common)
-+obj-$(CONFIG_SOC_AM33XX)		+= pm33xx.o sleep33xx.o
- obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
- 
- obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
-@@ -97,6 +98,7 @@ obj-$(CONFIG_POWER_AVS_OMAP_CLASS3)    += smartreflex-class3.o
- 
- AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
- AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a$(plus_sec)
-+AFLAGS_sleep33xx.o			:=-Wa,-march=armv7-a$(plus_sec)
- 
- endif
- 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 377eea8..64bf9a8 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -76,6 +76,15 @@ static inline int omap4_pm_init_early(void)
- }
- #endif
- 
-+#if defined(CONFIG_PM) && defined(CONFIG_SOC_AM33XX)
-+int am33xx_pm_init(void);
-+#else
-+static inline int am33xx_pm_init(void)
-+{
-+	return 0;
-+}
-+#endif
-+
- #ifdef CONFIG_OMAP_MUX
- int omap_mux_late_init(void);
- #else
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 03cbb16..4b7828a 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -575,6 +575,7 @@ void __init am33xx_init_early(void)
- void __init am33xx_init_late(void)
- {
- 	omap_common_late_init();
-+	am33xx_pm_init();
- }
- #endif
- 
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 425bfcd..9e19340 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -81,6 +81,12 @@ extern unsigned int omap3_do_wfi_sz;
- /* ... and its pointer from SRAM after copy */
- extern void (*omap3_do_wfi_sram)(void);
- 
-+/* am33xx_do_wfi function pointer and size, for copy to SRAM */
-+extern void am33xx_do_wfi(void);
-+extern unsigned int am33xx_do_wfi_sz;
-+extern unsigned int am33xx_resume_offset;
-+extern unsigned long am33xx_emif_sram_table;
-+
- /* save_secure_ram_context function pointer and size, for copy to SRAM */
- extern int save_secure_ram_context(u32 *addr);
- extern unsigned int save_secure_ram_context_sz;
--- 
-2.1.0
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141126/154769c8/attachment-0001.sig>
