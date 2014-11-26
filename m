@@ -1,406 +1,577 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 25 Nov 2014 17:35:29 -0800
-Subject: [PATCH v2 2/8] clk: divider: Make generic for usage elsewhere
+Date: Tue, 25 Nov 2014 17:35:33 -0800
+Subject: [PATCH v2 6/8] clk: qcom: Add IPQ806X LPASS clock controller (LCC)
+ driver
 In-Reply-To: <1416965735-10583-1-git-send-email-sboyd@codeaurora.org>
 References: <1416965735-10583-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1416965735-10583-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1416965735-10583-7-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some devices don't use mmio to interact with dividers. Split out the
-logic from the register read/write parts so that we can reuse the
-division logic elsewhere.
+From: Rajendra Nayak <rnayak@codeaurora.org>
 
+Add an LCC driver for IPQ806x that supports the i2s, S/PDIF, and
+pcm clocks.
+
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+[sboyd at codeaurora.org: Reworded commit text, added Kconfig
+select, fleshed out Kconfig description a bit more, added pll4
+configuration and reworked probe for it, added muxes, split out
+dt-binding file]
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clk-divider.c    | 195 ++++++++++++++++++++++++++-----------------
- include/linux/clk-provider.h |  11 +++
- 2 files changed, 130 insertions(+), 76 deletions(-)
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index 18a9de29df0e..e092f11356c6 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -30,7 +30,7 @@
+Change-Id: Idf4d008306a98d75d914c5625b46d15c6f7921b4
+---
+ drivers/clk/qcom/Kconfig       |   9 +
+ drivers/clk/qcom/Makefile      |   1 +
+ drivers/clk/qcom/gcc-ipq806x.c |  12 ++
+ drivers/clk/qcom/lcc-ipq806x.c | 473 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 495 insertions(+)
+ create mode 100644 drivers/clk/qcom/lcc-ipq806x.c
+
+diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
+index 1107351ed346..07bce5f35eee 100644
+--- a/drivers/clk/qcom/Kconfig
++++ b/drivers/clk/qcom/Kconfig
+@@ -29,6 +29,15 @@ config IPQ_GCC_806X
+ 	  Say Y if you want to use peripheral devices such as UART, SPI,
+ 	  i2c, USB, SD/eMMC, etc.
  
- #define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
- 
--#define div_mask(d)	((1 << ((d)->width)) - 1)
-+#define div_mask(width)	(BIT(width) - 1)
- 
- static unsigned int _get_table_maxdiv(const struct clk_div_table *table)
- {
-@@ -54,15 +54,16 @@ static unsigned int _get_table_mindiv(const struct clk_div_table *table)
- 	return mindiv;
- }
- 
--static unsigned int _get_maxdiv(struct clk_divider *divider)
-+static unsigned int _get_maxdiv(const struct clk_div_table *table, u8 width,
-+				unsigned long flags)
- {
--	if (divider->flags & CLK_DIVIDER_ONE_BASED)
--		return div_mask(divider);
--	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
--		return 1 << div_mask(divider);
--	if (divider->table)
--		return _get_table_maxdiv(divider->table);
--	return div_mask(divider) + 1;
-+	if (flags & CLK_DIVIDER_ONE_BASED)
-+		return div_mask(width);
-+	if (flags & CLK_DIVIDER_POWER_OF_TWO)
-+		return 1 << div_mask(width);
-+	if (table)
-+		return _get_table_maxdiv(table);
-+	return div_mask(width) + 1;
- }
- 
- static unsigned int _get_table_div(const struct clk_div_table *table,
-@@ -76,14 +77,15 @@ static unsigned int _get_table_div(const struct clk_div_table *table,
- 	return 0;
- }
- 
--static unsigned int _get_div(struct clk_divider *divider, unsigned int val)
-+static unsigned int _get_div(const struct clk_div_table *table,
-+			     unsigned int val, unsigned long flags)
- {
--	if (divider->flags & CLK_DIVIDER_ONE_BASED)
-+	if (flags & CLK_DIVIDER_ONE_BASED)
- 		return val;
--	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-+	if (flags & CLK_DIVIDER_POWER_OF_TWO)
- 		return 1 << val;
--	if (divider->table)
--		return _get_table_div(divider->table, val);
-+	if (table)
-+		return _get_table_div(table, val);
- 	return val + 1;
- }
- 
-@@ -98,29 +100,28 @@ static unsigned int _get_table_val(const struct clk_div_table *table,
- 	return 0;
- }
- 
--static unsigned int _get_val(struct clk_divider *divider, unsigned int div)
-+static unsigned int _get_val(const struct clk_div_table *table,
-+			     unsigned int div, unsigned long flags)
- {
--	if (divider->flags & CLK_DIVIDER_ONE_BASED)
-+	if (flags & CLK_DIVIDER_ONE_BASED)
- 		return div;
--	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-+	if (flags & CLK_DIVIDER_POWER_OF_TWO)
- 		return __ffs(div);
--	if (divider->table)
--		return  _get_table_val(divider->table, div);
-+	if (table)
-+		return  _get_table_val(table, div);
- 	return div - 1;
- }
- 
--static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
--		unsigned long parent_rate)
-+unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
-+				  unsigned int val,
-+				  const struct clk_div_table *table,
-+				  unsigned long flags)
- {
--	struct clk_divider *divider = to_clk_divider(hw);
--	unsigned int div, val;
--
--	val = clk_readl(divider->reg) >> divider->shift;
--	val &= div_mask(divider);
-+	unsigned int div;
- 
--	div = _get_div(divider, val);
-+	div = _get_div(table, val, flags);
- 	if (!div) {
--		WARN(!(divider->flags & CLK_DIVIDER_ALLOW_ZERO),
-+		WARN(!(flags & CLK_DIVIDER_ALLOW_ZERO),
- 			"%s: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set\n",
- 			__clk_get_name(hw->clk));
- 		return parent_rate;
-@@ -128,6 +129,20 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
- 
- 	return DIV_ROUND_UP(parent_rate, div);
- }
-+EXPORT_SYMBOL_GPL(divider_recalc_rate);
++config IPQ_LCC_806X
++	tristate "IPQ806x LPASS Clock Controller"
++	select IPQ_GCC_806X
++	depends on COMMON_CLK_QCOM
++	help
++	  Support for the LPASS clock controller on ipq806x devices.
++	  Say Y if you want to use audio devices such as i2s, pcm,
++	  S/PDIF, etc.
 +
-+static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
-+		unsigned long parent_rate)
+ config MSM_GCC_8660
+ 	tristate "MSM8660 Global Clock Controller"
+ 	depends on COMMON_CLK_QCOM
+diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
+index f5e5607f3965..13c03a8808ec 100644
+--- a/drivers/clk/qcom/Makefile
++++ b/drivers/clk/qcom/Makefile
+@@ -13,6 +13,7 @@ clk-qcom-y += reset.o
+ obj-$(CONFIG_APQ_GCC_8084) += gcc-apq8084.o
+ obj-$(CONFIG_APQ_MMCC_8084) += mmcc-apq8084.o
+ obj-$(CONFIG_IPQ_GCC_806X) += gcc-ipq806x.o
++obj-$(CONFIG_IPQ_LCC_806X) += lcc-ipq806x.o
+ obj-$(CONFIG_MSM_GCC_8660) += gcc-msm8660.o
+ obj-$(CONFIG_MSM_GCC_8960) += gcc-msm8960.o
+ obj-$(CONFIG_MSM_GCC_8974) += gcc-msm8974.o
+diff --git a/drivers/clk/qcom/gcc-ipq806x.c b/drivers/clk/qcom/gcc-ipq806x.c
+index 5cd62a709ac7..206535531b86 100644
+--- a/drivers/clk/qcom/gcc-ipq806x.c
++++ b/drivers/clk/qcom/gcc-ipq806x.c
+@@ -75,6 +75,17 @@ static struct clk_pll pll3 = {
+ 	},
+ };
+ 
++static struct clk_regmap pll4_vote = {
++	.enable_reg = 0x34c0,
++	.enable_mask = BIT(4),
++	.hw.init = &(struct clk_init_data){
++		.name = "pll4_vote",
++		.parent_names = (const char *[]){ "pll4" },
++		.num_parents = 1,
++		.ops = &clk_pll_vote_ops,
++	},
++};
++
+ static struct clk_pll pll8 = {
+ 	.l_reg = 0x3144,
+ 	.m_reg = 0x3148,
+@@ -2163,6 +2174,7 @@ static struct clk_regmap *gcc_ipq806x_clks[] = {
+ 	[PLL0] = &pll0.clkr,
+ 	[PLL0_VOTE] = &pll0_vote,
+ 	[PLL3] = &pll3.clkr,
++	[PLL4_VOTE] = &pll4_vote,
+ 	[PLL8] = &pll8.clkr,
+ 	[PLL8_VOTE] = &pll8_vote,
+ 	[PLL14] = &pll14.clkr,
+diff --git a/drivers/clk/qcom/lcc-ipq806x.c b/drivers/clk/qcom/lcc-ipq806x.c
+new file mode 100644
+index 000000000000..80a1ecf2fe69
+--- /dev/null
++++ b/drivers/clk/qcom/lcc-ipq806x.c
+@@ -0,0 +1,473 @@
++/*
++ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/bitops.h>
++#include <linux/err.h>
++#include <linux/platform_device.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/clk-provider.h>
++#include <linux/regmap.h>
++
++#include <dt-bindings/clock/qcom,lcc-ipq806x.h>
++
++#include "common.h"
++#include "clk-regmap.h"
++#include "clk-pll.h"
++#include "clk-rcg.h"
++#include "clk-branch.h"
++#include "clk-regmap-divider.h"
++#include "clk-regmap-mux.h"
++
++static struct clk_pll pll4 = {
++	.l_reg = 0x4,
++	.m_reg = 0x8,
++	.n_reg = 0xc,
++	.config_reg = 0x14,
++	.mode_reg = 0x0,
++	.status_reg = 0x18,
++	.status_bit = 16,
++	.clkr.hw.init = &(struct clk_init_data){
++		.name = "pll4",
++		.parent_names = (const char *[]){ "pxo" },
++		.num_parents = 1,
++		.ops = &clk_pll_ops,
++	},
++};
++
++static const struct pll_config pll4_config = {
++	.l = 0xf,
++	.m = 0x91,
++	.n = 0xc7,
++	.vco_val = 0x0,
++	.vco_mask = BIT(17) | BIT(16),
++	.pre_div_val = 0x0,
++	.pre_div_mask = BIT(19),
++	.post_div_val = 0x0,
++	.post_div_mask = BIT(21) | BIT(20),
++	.mn_ena_mask = BIT(22),
++	.main_output_mask = BIT(23),
++};
++
++#define P_PXO	0
++#define P_PLL4	1
++
++static const u8 lcc_pxo_pll4_map[] = {
++	[P_PXO]		= 0,
++	[P_PLL4]	= 2,
++};
++
++static const char *lcc_pxo_pll4[] = {
++	"pxo",
++	"pll4_vote",
++};
++
++static struct freq_tbl clk_tbl_aif_mi2s[] = {
++	{  1024000, P_PLL4, 4,  1,  96 },
++	{  1411200, P_PLL4, 4,  2, 139 },
++	{  1536000, P_PLL4, 4,  1,  64 },
++	{  2048000, P_PLL4, 4,  1,  48 },
++	{  2116800, P_PLL4, 4,  2,  93 },
++	{  2304000, P_PLL4, 4,  2,  85 },
++	{  2822400, P_PLL4, 4,  6, 209 },
++	{  3072000, P_PLL4, 4,  1,  32 },
++	{  3175200, P_PLL4, 4,  1,  31 },
++	{  4096000, P_PLL4, 4,  1,  24 },
++	{  4233600, P_PLL4, 4,  9, 209 },
++	{  4608000, P_PLL4, 4,  3,  64 },
++	{  5644800, P_PLL4, 4, 12, 209 },
++	{  6144000, P_PLL4, 4,  1,  16 },
++	{  6350400, P_PLL4, 4,  2,  31 },
++	{  8192000, P_PLL4, 4,  1,  12 },
++	{  8467200, P_PLL4, 4, 18, 209 },
++	{  9216000, P_PLL4, 4,  3,  32 },
++	{ 11289600, P_PLL4, 4, 24, 209 },
++	{ 12288000, P_PLL4, 4,  1,   8 },
++	{ 12700800, P_PLL4, 4, 27, 209 },
++	{ 13824000, P_PLL4, 4,  9,  64 },
++	{ 16384000, P_PLL4, 4,  1,   6 },
++	{ 16934400, P_PLL4, 4, 41, 238 },
++	{ 18432000, P_PLL4, 4,  3,  16 },
++	{ 22579200, P_PLL4, 2, 24, 209 },
++	{ 24576000, P_PLL4, 4,  1,   4 },
++	{ 27648000, P_PLL4, 4,  9,  32 },
++	{ 33868800, P_PLL4, 4, 41, 119 },
++	{ 36864000, P_PLL4, 4,  3,   8 },
++	{ 45158400, P_PLL4, 1, 24, 209 },
++	{ 49152000, P_PLL4, 4,  1,   2 },
++	{ 50803200, P_PLL4, 1, 27, 209 },
++	{ }
++};
++
++static struct clk_rcg mi2s_osr_src = {
++	.ns_reg = 0x48,
++	.md_reg = 0x4c,
++	.mn = {
++		.mnctr_en_bit = 8,
++		.mnctr_reset_bit = 7,
++		.mnctr_mode_shift = 5,
++		.n_val_shift = 24,
++		.m_val_shift = 8,
++		.width = 8,
++	},
++	.p = {
++		.pre_div_shift = 3,
++		.pre_div_width = 2,
++	},
++	.s = {
++		.src_sel_shift = 0,
++		.parent_map = lcc_pxo_pll4_map,
++	},
++	.freq_tbl = clk_tbl_aif_mi2s,
++	.clkr = {
++		.enable_reg = 0x48,
++		.enable_mask = BIT(9),
++		.hw.init = &(struct clk_init_data){
++			.name = "mi2s_osr_src",
++			.parent_names = lcc_pxo_pll4,
++			.num_parents = 2,
++			.ops = &clk_rcg_ops,
++			.flags = CLK_SET_RATE_GATE,
++		},
++	},
++};
++
++static const char *lcc_mi2s_parents[] = {
++	"mi2s_osr_src",
++};
++
++static struct clk_branch mi2s_osr_clk = {
++	.halt_reg = 0x50,
++	.halt_bit = 1,
++	.halt_check = BRANCH_HALT_ENABLE,
++	.clkr = {
++		.enable_reg = 0x48,
++		.enable_mask = BIT(17),
++		.hw.init = &(struct clk_init_data){
++			.name = "mi2s_osr_clk",
++			.parent_names = lcc_mi2s_parents,
++			.num_parents = 1,
++			.ops = &clk_branch_ops,
++			.flags = CLK_SET_RATE_PARENT,
++		},
++	},
++};
++
++static struct clk_regmap_div mi2s_div_clk = {
++	.reg = 0x48,
++	.shift = 10,
++	.width = 4,
++	.clkr = {
++		.hw.init = &(struct clk_init_data){
++			.name = "mi2s_div_clk",
++			.parent_names = lcc_mi2s_parents,
++			.num_parents = 1,
++			.ops = &clk_regmap_div_ops,
++		},
++	},
++};
++
++static struct clk_branch mi2s_bit_div_clk = {
++	.halt_reg = 0x50,
++	.halt_bit = 0,
++	.halt_check = BRANCH_HALT_ENABLE,
++	.clkr = {
++		.enable_reg = 0x48,
++		.enable_mask = BIT(15),
++		.hw.init = &(struct clk_init_data){
++			.name = "mi2s_bit_div_clk",
++			.parent_names = lcc_mi2s_parents,
++			.num_parents = 1,
++			.ops = &clk_branch_ops,
++			.flags = CLK_SET_RATE_PARENT,
++		},
++	},
++};
++
++
++static struct clk_regmap_mux mi2s_bit_clk = {
++	.reg = 0x48,
++	.shift = 14,
++	.width = 1,
++	.clkr = {
++		.hw.init = &(struct clk_init_data){
++			.name = "mi2s_bit_clk",
++			.parent_names = (const char *[]){
++				"mi2s_bit_div_clk",
++				"mi2s_codec_clk",
++			},
++			.num_parents = 2,
++			.ops = &clk_regmap_mux_closest_ops,
++			.flags = CLK_SET_RATE_PARENT,
++		},
++	},
++};
++
++static struct freq_tbl clk_tbl_pcm[] = {
++	{   64000, P_PLL4, 4, 1, 1536 },
++	{  128000, P_PLL4, 4, 1,  768 },
++	{  256000, P_PLL4, 4, 1,  384 },
++	{  512000, P_PLL4, 4, 1,  192 },
++	{ 1024000, P_PLL4, 4, 1,   96 },
++	{ 2048000, P_PLL4, 4, 1,   48 },
++	{ },
++};
++
++static struct clk_rcg pcm_src = {
++	.ns_reg = 0x54,
++	.md_reg = 0x58,
++	.mn = {
++		.mnctr_en_bit = 8,
++		.mnctr_reset_bit = 7,
++		.mnctr_mode_shift = 5,
++		.n_val_shift = 16,
++		.m_val_shift = 16,
++		.width = 16,
++	},
++	.p = {
++		.pre_div_shift = 3,
++		.pre_div_width = 2,
++	},
++	.s = {
++		.src_sel_shift = 0,
++		.parent_map = lcc_pxo_pll4_map,
++	},
++	.freq_tbl = clk_tbl_pcm,
++	.clkr = {
++		.enable_reg = 0x54,
++		.enable_mask = BIT(9),
++		.hw.init = &(struct clk_init_data){
++			.name = "pcm_src",
++			.parent_names = lcc_pxo_pll4,
++			.num_parents = 2,
++			.ops = &clk_rcg_ops,
++			.flags = CLK_SET_RATE_GATE,
++		},
++	},
++};
++
++static struct clk_branch pcm_clk_out = {
++	.halt_reg = 0x5c,
++	.halt_bit = 0,
++	.halt_check = BRANCH_HALT_ENABLE,
++	.clkr = {
++		.enable_reg = 0x54,
++		.enable_mask = BIT(11),
++		.hw.init = &(struct clk_init_data){
++			.name = "pcm_clk_out",
++			.parent_names = (const char *[]){ "pcm_src" },
++			.num_parents = 1,
++			.ops = &clk_branch_ops,
++			.flags = CLK_SET_RATE_PARENT,
++		},
++	},
++};
++
++static struct clk_regmap_mux pcm_clk = {
++	.reg = 0x54,
++	.shift = 10,
++	.width = 1,
++	.clkr = {
++		.hw.init = &(struct clk_init_data){
++			.name = "pcm_clk",
++			.parent_names = (const char *[]){
++				"pcm_clk_out",
++				"pcm_codec_clk",
++			},
++			.num_parents = 2,
++			.ops = &clk_regmap_mux_closest_ops,
++			.flags = CLK_SET_RATE_PARENT,
++		},
++	},
++};
++
++static struct freq_tbl clk_tbl_aif_osr[] = {
++	{  22050, P_PLL4, 1, 147, 20480 },
++	{  32000, P_PLL4, 1,   1,    96 },
++	{  44100, P_PLL4, 1, 147, 10240 },
++	{  48000, P_PLL4, 1,   1,    64 },
++	{  88200, P_PLL4, 1, 147,  5120 },
++	{  96000, P_PLL4, 1,   1,    32 },
++	{ 176400, P_PLL4, 1, 147,  2560 },
++	{ 192000, P_PLL4, 1,   1,    16 },
++	{ },
++};
++
++static struct clk_rcg spdif_src = {
++	.ns_reg = 0xcc,
++	.md_reg = 0xd0,
++	.mn = {
++		.mnctr_en_bit = 8,
++		.mnctr_reset_bit = 7,
++		.mnctr_mode_shift = 5,
++		.n_val_shift = 16,
++		.m_val_shift = 16,
++		.width = 8,
++	},
++	.p = {
++		.pre_div_shift = 3,
++		.pre_div_width = 2,
++	},
++	.s = {
++		.src_sel_shift = 0,
++		.parent_map = lcc_pxo_pll4_map,
++	},
++	.freq_tbl = clk_tbl_aif_osr,
++	.clkr = {
++		.enable_reg = 0xcc,
++		.enable_mask = BIT(9),
++		.hw.init = &(struct clk_init_data){
++			.name = "spdif_src",
++			.parent_names = lcc_pxo_pll4,
++			.num_parents = 2,
++			.ops = &clk_rcg_ops,
++			.flags = CLK_SET_RATE_GATE,
++		},
++	},
++};
++
++static const char *lcc_spdif_parents[] = {
++	"spdif_src",
++};
++
++static struct clk_branch spdif_clk = {
++	.halt_reg = 0xd4,
++	.halt_bit = 1,
++	.halt_check = BRANCH_HALT_ENABLE,
++	.clkr = {
++		.enable_reg = 0xcc,
++		.enable_mask = BIT(12),
++		.hw.init = &(struct clk_init_data){
++			.name = "spdif_clk",
++			.parent_names = lcc_spdif_parents,
++			.num_parents = 1,
++			.ops = &clk_branch_ops,
++			.flags = CLK_SET_RATE_PARENT,
++		},
++	},
++};
++
++static struct freq_tbl clk_tbl_ahbix[] = {
++	{ 131072, P_PLL4, 1, 1, 3 },
++	{ },
++};
++
++static struct clk_rcg ahbix_clk = {
++	.ns_reg = 0x38,
++	.md_reg = 0x3c,
++	.mn = {
++		.mnctr_en_bit = 8,
++		.mnctr_reset_bit = 7,
++		.mnctr_mode_shift = 5,
++		.n_val_shift = 24,
++		.m_val_shift = 8,
++		.width = 8,
++	},
++	.p = {
++		.pre_div_shift = 3,
++		.pre_div_width = 2,
++	},
++	.s = {
++		.src_sel_shift = 0,
++		.parent_map = lcc_pxo_pll4_map,
++	},
++	.freq_tbl = clk_tbl_ahbix,
++	.clkr = {
++		.enable_reg = 0x38,
++		.enable_mask = BIT(10), /* toggle the gfmux to select mn/pxo */
++		.hw.init = &(struct clk_init_data){
++			.name = "ahbix",
++			.parent_names = lcc_pxo_pll4,
++			.num_parents = 2,
++			.ops = &clk_rcg_ops,
++			.flags = CLK_SET_RATE_GATE,
++		},
++	},
++};
++
++static struct clk_regmap *lcc_ipq806x_clks[] = {
++	[PLL4] = &pll4.clkr,
++	[MI2S_OSR_SRC] = &mi2s_osr_src.clkr,
++	[MI2S_OSR_CLK] = &mi2s_osr_clk.clkr,
++	[MI2S_DIV_CLK] = &mi2s_div_clk.clkr,
++	[MI2S_BIT_DIV_CLK] = &mi2s_bit_div_clk.clkr,
++	[MI2S_BIT_CLK] = &mi2s_bit_clk.clkr,
++	[PCM_SRC] = &pcm_src.clkr,
++	[PCM_CLK_OUT] = &pcm_clk_out.clkr,
++	[PCM_CLK] = &pcm_clk.clkr,
++	[SPDIF_SRC] = &spdif_src.clkr,
++	[SPDIF_CLK] = &spdif_clk.clkr,
++	[AHBIX_CLK] = &ahbix_clk.clkr,
++};
++
++static const struct regmap_config lcc_ipq806x_regmap_config = {
++	.reg_bits	= 32,
++	.reg_stride	= 4,
++	.val_bits	= 32,
++	.max_register	= 0xfc,
++	.fast_io	= true,
++};
++
++static const struct qcom_cc_desc lcc_ipq806x_desc = {
++	.config = &lcc_ipq806x_regmap_config,
++	.clks = lcc_ipq806x_clks,
++	.num_clks = ARRAY_SIZE(lcc_ipq806x_clks),
++};
++
++static const struct of_device_id lcc_ipq806x_match_table[] = {
++	{ .compatible = "qcom,lcc-ipq8064" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, lcc_ipq806x_match_table);
++
++static int lcc_ipq806x_probe(struct platform_device *pdev)
 +{
-+	struct clk_divider *divider = to_clk_divider(hw);
-+	unsigned int val;
-+
-+	val = clk_readl(divider->reg) >> divider->shift;
-+	val &= div_mask(divider->width);
-+
-+	return divider_recalc_rate(hw, parent_rate, val, divider->table,
-+				   divider->flags);
-+}
- 
- /*
-  * The reverse of DIV_ROUND_UP: The maximum number which
-@@ -146,12 +161,13 @@ static bool _is_valid_table_div(const struct clk_div_table *table,
- 	return false;
- }
- 
--static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
-+static bool _is_valid_div(const struct clk_div_table *table, unsigned int div,
-+			  unsigned long flags)
- {
--	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-+	if (flags & CLK_DIVIDER_POWER_OF_TWO)
- 		return is_power_of_2(div);
--	if (divider->table)
--		return _is_valid_table_div(divider->table, div);
-+	if (table)
-+		return _is_valid_table_div(table, div);
- 	return true;
- }
- 
-@@ -191,71 +207,76 @@ static int _round_down_table(const struct clk_div_table *table, int div)
- 	return down;
- }
- 
--static int _div_round_up(struct clk_divider *divider,
--		unsigned long parent_rate, unsigned long rate)
-+static int _div_round_up(const struct clk_div_table *table,
-+			 unsigned long parent_rate, unsigned long rate,
-+			 unsigned long flags)
- {
- 	int div = DIV_ROUND_UP(parent_rate, rate);
- 
--	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-+	if (flags & CLK_DIVIDER_POWER_OF_TWO)
- 		div = __roundup_pow_of_two(div);
--	if (divider->table)
--		div = _round_up_table(divider->table, div);
-+	if (table)
-+		div = _round_up_table(table, div);
- 
- 	return div;
- }
- 
--static int _div_round_closest(struct clk_divider *divider,
--		unsigned long parent_rate, unsigned long rate)
-+static int _div_round_closest(const struct clk_div_table *table,
-+			      unsigned long parent_rate, unsigned long rate,
-+			      unsigned long flags)
- {
- 	int up, down, div;
- 
- 	up = down = div = DIV_ROUND_CLOSEST(parent_rate, rate);
- 
--	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO) {
-+	if (flags & CLK_DIVIDER_POWER_OF_TWO) {
- 		up = __roundup_pow_of_two(div);
- 		down = __rounddown_pow_of_two(div);
--	} else if (divider->table) {
--		up = _round_up_table(divider->table, div);
--		down = _round_down_table(divider->table, div);
-+	} else if (table) {
-+		up = _round_up_table(table, div);
-+		down = _round_down_table(table, div);
- 	}
- 
- 	return (up - div) <= (div - down) ? up : down;
- }
- 
--static int _div_round(struct clk_divider *divider, unsigned long parent_rate,
--		unsigned long rate)
-+static int _div_round(const struct clk_div_table *table,
-+		      unsigned long parent_rate, unsigned long rate,
-+		      unsigned long flags)
- {
--	if (divider->flags & CLK_DIVIDER_ROUND_CLOSEST)
--		return _div_round_closest(divider, parent_rate, rate);
-+	if (flags & CLK_DIVIDER_ROUND_CLOSEST)
-+		return _div_round_closest(table, parent_rate, rate, flags);
- 
--	return _div_round_up(divider, parent_rate, rate);
-+	return _div_round_up(table, parent_rate, rate, flags);
- }
- 
--static bool _is_best_div(struct clk_divider *divider,
--		unsigned long rate, unsigned long now, unsigned long best)
-+static bool _is_best_div(unsigned long rate, unsigned long now,
-+			 unsigned long best, unsigned long flags)
- {
--	if (divider->flags & CLK_DIVIDER_ROUND_CLOSEST)
-+	if (flags & CLK_DIVIDER_ROUND_CLOSEST)
- 		return abs(rate - now) < abs(rate - best);
- 
- 	return now <= rate && now > best;
- }
- 
--static int _next_div(struct clk_divider *divider, int div)
-+static int _next_div(const struct clk_div_table *table, int div,
-+		     unsigned long flags)
- {
- 	div++;
- 
--	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-+	if (flags & CLK_DIVIDER_POWER_OF_TWO)
- 		return __roundup_pow_of_two(div);
--	if (divider->table)
--		return _round_up_table(divider->table, div);
-+	if (table)
-+		return _round_up_table(table, div);
- 
- 	return div;
- }
- 
- static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
--		unsigned long *best_parent_rate)
-+			       unsigned long *best_parent_rate,
-+			       const struct clk_div_table *table, u8 width,
-+			       unsigned long flags)
- {
--	struct clk_divider *divider = to_clk_divider(hw);
- 	int i, bestdiv = 0;
- 	unsigned long parent_rate, best = 0, now, maxdiv;
- 	unsigned long parent_rate_saved = *best_parent_rate;
-@@ -263,11 +284,11 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
- 	if (!rate)
- 		rate = 1;
- 
--	maxdiv = _get_maxdiv(divider);
-+	maxdiv = _get_maxdiv(table, width, flags);
- 
- 	if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
- 		parent_rate = *best_parent_rate;
--		bestdiv = _div_round(divider, parent_rate, rate);
-+		bestdiv = _div_round(table, parent_rate, rate, flags);
- 		bestdiv = bestdiv == 0 ? 1 : bestdiv;
- 		bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
- 		return bestdiv;
-@@ -279,8 +300,8 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
- 	 */
- 	maxdiv = min(ULONG_MAX / rate, maxdiv);
- 
--	for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
--		if (!_is_valid_div(divider, i))
-+	for (i = 1; i <= maxdiv; i = _next_div(table, i, flags)) {
-+		if (!_is_valid_div(table, i, flags))
- 			continue;
- 		if (rate * i == parent_rate_saved) {
- 			/*
-@@ -294,7 +315,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
- 		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
- 				MULT_ROUND_UP(rate, i));
- 		now = DIV_ROUND_UP(parent_rate, i);
--		if (_is_best_div(divider, rate, now, best)) {
-+		if (_is_best_div(rate, now, best, flags)) {
- 			bestdiv = i;
- 			best = now;
- 			*best_parent_rate = parent_rate;
-@@ -302,48 +323,70 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
- 	}
- 
- 	if (!bestdiv) {
--		bestdiv = _get_maxdiv(divider);
-+		bestdiv = _get_maxdiv(table, width, flags);
- 		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk), 1);
- 	}
- 
- 	return bestdiv;
- }
- 
--static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
--				unsigned long *prate)
-+long divider_round_rate(struct clk_hw *hw, unsigned long rate,
-+			unsigned long *prate, const struct clk_div_table *table,
-+			u8 width, unsigned long flags)
- {
- 	int div;
--	div = clk_divider_bestdiv(hw, rate, prate);
-+
-+	div = clk_divider_bestdiv(hw, rate, prate, table, width, flags);
- 
- 	return DIV_ROUND_UP(*prate, div);
- }
-+EXPORT_SYMBOL_GPL(divider_round_rate);
- 
--static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
--				unsigned long parent_rate)
-+static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *prate)
- {
- 	struct clk_divider *divider = to_clk_divider(hw);
-+
-+	return divider_round_rate(hw, rate, prate, divider->table,
-+				  divider->width, divider->flags);
-+}
-+
-+int divider_get_val(unsigned long rate, unsigned long parent_rate,
-+		    const struct clk_div_table *table, u8 width,
-+		    unsigned long flags)
-+{
- 	unsigned int div, value;
--	unsigned long flags = 0;
--	u32 val;
- 
- 	div = DIV_ROUND_UP(parent_rate, rate);
- 
--	if (!_is_valid_div(divider, div))
-+	if (!_is_valid_div(table, div, flags))
- 		return -EINVAL;
- 
--	value = _get_val(divider, div);
-+	value = _get_val(table, div, flags);
-+
-+	return min_t(unsigned int, value, div_mask(width));
-+}
-+EXPORT_SYMBOL_GPL(divider_get_val);
-+
-+static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long parent_rate)
-+{
-+	struct clk_divider *divider = to_clk_divider(hw);
-+	unsigned int value;
-+	unsigned long flags = 0;
 +	u32 val;
- 
--	if (value > div_mask(divider))
--		value = div_mask(divider);
-+	value = divider_get_val(rate, parent_rate, divider->table,
-+				divider->width, divider->flags);
- 
- 	if (divider->lock)
- 		spin_lock_irqsave(divider->lock, flags);
- 
- 	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
--		val = div_mask(divider) << (divider->shift + 16);
-+		val = div_mask(divider->width) << (divider->shift + 16);
- 	} else {
- 		val = clk_readl(divider->reg);
--		val &= ~(div_mask(divider) << divider->shift);
-+		val &= ~(div_mask(divider->width) << divider->shift);
- 	}
- 	val |= value << divider->shift;
- 	clk_writel(val, divider->reg);
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 446faed3f79f..6e7b3a431b20 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -353,6 +353,17 @@ struct clk_divider {
- 
- extern const struct clk_ops clk_divider_ops;
- extern const struct clk_ops clk_divider_ro_ops;
++	struct regmap *regmap;
 +
-+unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
-+		unsigned int val, const struct clk_div_table *table,
-+		unsigned long flags);
-+long divider_round_rate(struct clk_hw *hw, unsigned long rate,
-+		unsigned long *prate, const struct clk_div_table *table,
-+		u8 width, unsigned long flags);
-+int divider_get_val(unsigned long rate, unsigned long parent_rate,
-+		const struct clk_div_table *table, u8 width,
-+		unsigned long flags);
++	regmap = qcom_cc_map(pdev, &lcc_ipq806x_desc);
++	if (IS_ERR(regmap))
++		return PTR_ERR(regmap);
 +
- struct clk *clk_register_divider(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
++	/* Configure the rate of PLL4 if the bootloader hasn't already */
++	val = regmap_read(regmap, 0x0, &val);
++	if (!val)
++		clk_pll_configure_sr(&pll4, regmap, &pll4_config, true);
++	/* Enable PLL4 source on the LPASS Primary PLL Mux */
++	regmap_write(regmap, 0xc4, 0x1);
++
++	return qcom_cc_really_probe(pdev, &lcc_ipq806x_desc, regmap);
++}
++
++static int lcc_ipq806x_remove(struct platform_device *pdev)
++{
++	qcom_cc_remove(pdev);
++	return 0;
++}
++
++static struct platform_driver lcc_ipq806x_driver = {
++	.probe		= lcc_ipq806x_probe,
++	.remove		= lcc_ipq806x_remove,
++	.driver		= {
++		.name	= "lcc-ipq806x",
++		.owner	= THIS_MODULE,
++		.of_match_table = lcc_ipq806x_match_table,
++	},
++};
++module_platform_driver(lcc_ipq806x_driver);
++
++MODULE_DESCRIPTION("QCOM LCC IPQ806x Driver");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:lcc-ipq806x");
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
