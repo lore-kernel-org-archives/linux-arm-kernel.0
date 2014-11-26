@@ -1,69 +1,50 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 26 Nov 2014 16:27:57 +0100
-Subject: n900: kernel cmdline from bootloader in DT mode
-In-Reply-To: <20141126152159.GA26123@amd>
-References: <201411261354.33652@pali> <201411261436.42166@pali>
- <20141126152159.GA26123@amd>
-Message-ID: <201411261627.57241@pali>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 26 Nov 2014 07:40:21 -0800
+Subject: [PATCH 2/2] MAINTAINERS: ARM Versatile Express platform
+In-Reply-To: <1417012855.3972.3.camel@arm.com>
+References: <1416939455-1814-1-git-send-email-pawel.moll@arm.com>
+ <1416967146.8358.19.camel@perches.com> <1417003449.3972.1.camel@arm.com>
+ <2667096.evZZoH9ryD@wuerfel> <1417012855.3972.3.camel@arm.com>
+Message-ID: <1417016421.19695.1.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 November 2014 16:22:00 Pavel Machek wrote:
-> On Wed 2014-11-26 14:36:42, Pali Roh?r wrote:
-> > On Wednesday 26 November 2014 14:28:01 Pavel Machek wrote:
-> > > Hi!
+On Wed, 2014-11-26 at 14:40 +0000, Pawel Moll wrote:
+> On Wed, 2014-11-26 at 12:17 +0000, Arnd Bergmann wrote:
+> > On Wednesday 26 November 2014 12:04:09 Pawel Moll wrote:
 > > > 
-> > > > for some unknown reasons when I compile kernel for n900
-> > > > in DT mode it ignore cmdline passed by bootloader. When
-> > > > I comment
-> > > > 
-> > > > CONFIG_ARM_APPENDED_DTB=y
-> > > > 
-> > > > then it boots into legacy board mode and cmdline is used
-> > > > from bootloader.
-> > > > 
-> > > > When is problem?
+> > > Right, of course. Whole directory.
 > > > 
-> > > It seems to work for me, I'm booting using 0xffff, with
-> > > attached config.
+> > > > F:    */*/vexpress*
 > > > 
-> > > 									Pavel
+> > > Cool, didn't think about multiple wildcards. 
 > > 
-> > Can you try to set some "root=something" into CONFIG_CMDLINE
-> > and then add real "root=" param via 0xffff?
+> > Actually, I think you could even do this as
 > > 
-> > My problem is that I have specified ubifs mtd root in
-> > CONFIG_CMDLINE and when I set correct root via bootloader
-> > (from 0xffff or flasher-3.5) it is ignored and used only
-> > what is specified in CONFIG_CMDLINE.
+> > N:	vexpress
+> > 
+> > which would be even shorter and match most of the other entries too.
 > 
-> CONFIG_ARM_ATAG_DTB_COMPAT=y
-> CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
-> # CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND is not set
-> CONFIG_CMDLINE="console=ttyO2,115200 console=tty"
+> If you think it's safe, fine with me. It would reduce this section to:
 > 
-> Um.. Internal commandline should be completely ignored for me.
-> 
-> Do you have
-> CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER?
-> 
-> 									Pavel
+> N:	vexpress
+> F:	drivers/clocksource/versatile.c
 
-Yes, I have:
+Yes, that's possible too, but:
 
-CONFIG_ARM_APPENDED_DTB=y
-CONFIG_ARM_ATAG_DTB_COMPAT=y
-CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
-CONFIG_CMDLINE="...."
-CONFIG_CMDLINE_FROM_BOOTLOADER=y
+from MAINTAINERS:
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141126/85a5c809/attachment.sig>
+	   scripts/get_maintainer.pl has different behavior for files that
+	   match F: pattern and matches of N: patterns.  By default,
+	   get_maintainer will not look at git log history when an F: pattern
+	   match occurs.  When an N: match occurs, git log history is used
+	   to also notify the people that have git commit signatures.
+
+I think it's better to use F: entries because
+there is a get_maintainer difference in behavior
+between N: and F: entries.
+
+An N: entry means get_maintainer will also cc
+patch submitters for these files.
+
+An F: entry will not.
