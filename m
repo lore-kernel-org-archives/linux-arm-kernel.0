@@ -1,73 +1,30 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 26 Nov 2014 21:06:33 +0000
-Subject: [PATCH v2 1/2] of: add optional options parameter to
- of_find_node_by_path()
-In-Reply-To: <1417023640-23464-2-git-send-email-leif.lindholm@linaro.org>
+Date: Wed, 26 Nov 2014 21:07:33 +0000
+Subject: [PATCH v2 2/2] of: support passing console options with
+ stdout-path
+In-Reply-To: <20141126183052.GH3443@lunn.ch>
 References: <1417023640-23464-1-git-send-email-leif.lindholm@linaro.org>
- <1417023640-23464-2-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <CACxGe6tQ5rWzCUcS+_fFY+rjEyua2khApAoCVKpTuJAghU=N_w@mail.gmail.com>
+ <1417023640-23464-3-git-send-email-leif.lindholm@linaro.org>
+ <20141126183052.GH3443@lunn.ch>
+Message-ID: <CACxGe6tYZ8aE_TKw1cYMY5DDjpSXPSnhhAam-rG5NgdjpKJe+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 5:40 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> Update of_find_node_by_path():
-> 1) Ignore any part of the path beyond and including the ':' separator.
-> 2) Set the new provided pointer argument to the beginning of the string
->    following the ':' separator.
+On Wed, Nov 26, 2014 at 6:30 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Wed, Nov 26, 2014 at 05:40:40PM +0000, Leif Lindholm wrote:
+>> Support specifying console options (like with console=ttyXN,<options>)
+>> by appending them to the stdout-path property after a separating ':'.
+>>
+>> Example:
+>>         stdout-path = "uart0:115200";
 >
-> Coccinelle fixup using:
+> Hi Leif
 >
-> @@
-> expression E1;
-> @@
+> This should be documented somewhere under
+> Documentation/devicetree/bindings/
 >
-> - of_find_node_by_path(E1)
-> + of_find_node_by_path(E1, NULL)
->
-> drivers/of/resolver.c manually updated, since spatch fails to parse
-> it correctly.
->
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> Not sure where thought. Maybe a top level chosen.txt?
 
-Okay, so you're probably going to kill me for the next comment...
-After actually looking at this I can see that it's going to be a hard
-patch to merge because of conflicts. It will need to be merged at the
-end of a merge window to catch all the users, but that will mean that
-the important part of the patch won't be able to be queued up in
-linux-next.
+Actually, this one doesn't. It is already documented in ePAPR
 
-So you were right the first time around. Create a new function name
-that adds the extra argument and make of_find_node_by_path() a static
-inline wrapper. That way I can queue it up into linux-next immediately
-and the cleanup across the tree can be generated and submitted at the
-very end of the merge window.
-
-> @@ -380,7 +380,8 @@ static inline struct device_node *of_find_matching_node_and_match(
->         return NULL;
->  }
->
-> -static inline struct device_node *of_find_node_by_path(const char *path)
-> +static inline struct device_node *of_find_node_by_path(const char *path,
-> +       char **opts)
-
-const char **opts
-
->  {
->         return NULL;
->  }
-> diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-> index e695517..0056963 100644
-> --- a/sound/soc/fsl/fsl_ssi.c
-> +++ b/sound/soc/fsl/fsl_ssi.c
-> @@ -1427,7 +1427,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
->          * device tree.  We also pass the address of the CPU DAI driver
->          * structure.
->          */
-> -       sprop = of_get_property(of_find_node_by_path("/"), "compatible", NULL);
-> +       sprop = of_get_property(of_find_node_by_path("/", NULL), "compatible", NULL);
->         /* Sometimes the compatible name has a "fsl," prefix, so we strip it. */
->         p = strrchr(sprop, ',');
->         if (p)
-> --
-> 1.7.10.4
->
+g.
