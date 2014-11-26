@@ -1,63 +1,110 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 26 Nov 2014 09:44:39 +0530
-Subject: How many frequencies would cpufreq optimally like to manage?
-In-Reply-To: <5474FA1F.50603@free.fr>
-References: <546D26AE.50601@free.fr>
- <CAOh2x==KZzq1wbQxGwsJjZW+=fBJDzcnmRoaZMh0UYH-=yBJ=g@mail.gmail.com>
- <546DF891.2050401@free.fr>
- <CAKohpomzxnCy7X+cPsVdDvi0cMRMp2Am1O-S5BeQtTr1CqBhEw@mail.gmail.com>
- <54747DFA.3040802@free.fr>
- <CAKohponats3ZNqaRq+2ff4Vd=iMZHVy17Vs1K+Zmc_D47Br2+A@mail.gmail.com>
- <5474FA1F.50603@free.fr>
-Message-ID: <CAKohpo=8NU_CyJ-ZQrfFtov3TMGT=HzcuH8F_fnyw4dv4+dvmw@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 26 Nov 2014 13:49:45 +0900
+Subject: [PATCH v9 0/6] arm64: add seccomp support
+Message-ID: <1416977391-24231-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 November 2014 at 03:22, Mason <mpeg.blue@free.fr> wrote:
-> If I remember correctly (please correct me if I am mistaken),
-> the kernel keeps a list of timers, ordered by deadline, and
-> dynamically configures the system timer to fire at the next
-> deadline.
+This patch series enables secure computing (system call filtering) on arm64,
+and contains related enhancements and bug fixes.
 
-Yes.
+  NOTE: This versions contain a workaround against possible BUG_ON() failure
+  at audit_syscall_exit(), but doesn't contain an extra optimization, as I
+  submitted for arm, of excluding syscall enter/exit tracing against invalid
+  system calls due to an issue that I reported in:
+       http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/292170.html
 
->> Look for: /sys/devices/system/cpu/cpufreq/ondemand/sampling_rate
->> this is the rate at which cpufreq core checks if cpu's freq require revisiting.
->
-> I think setting the sampling rate to 50 ms should make the
-> system reactive enough to load swings?
+The code was tested on ARMv8 fast model with 64-bit/32-bit userspace using:
+ * libseccomp v2.1.1 with modifications for arm64, especially its "live"
+   tests: No.20, 21 and 24.
+ * modified version of Kees' seccomp test for 'changing/skipping a syscall'
+   and seccomp() system call
+ * in-house tests for 'changing/skipping a system call' by tracing with
+   ptrace(SETREGSET, NT_SYSTEM_CALL) (that is, not via seccomp filter)'
+with and without audit tracing.
 
-Depends on the kind of load system is under. If load changes quite frequently
-then 50 ms can be a very big value. If it doesn't then 50 ms might be good.
-But it has to be tuned properly based on how much load the system has
-and how much power it consumes.
 
-Some information about that tuning can be found here:
-https://www.youtube.com/watch?v=he1UO__K9ao
+Changes v8 -> v9:
+* removed a restriction on syscall(-1) by setting a default errno [2/6]
 
-This is an presentation given by Mathieu Poirier (Linaro) about the work
-done on ARM's big LITTLE architecture.
+Changes v7 -> v8:
+* changed an interface of changing a syscall number from ptrace(SET_SYSCALL)
+  to ptrace(SETREGSET, NT_ARM_SYSTEM_CALL) [1/6]
+* removed IS_SKILL_SYSCALL macro [2/6]
+* clarified comments in syscall_trace_enter() [2/6]
+* changed unsigned int to compat_uint_t in compat_siginfo._sigsys [5/6]
+* moved to a new calling interface of secure_computing(void) [6/6]
 
-Slides: http://events.linuxfoundation.org/images/stories/slides/elc2013_poirier.pdf
+Changes v6 -> v7:
+* simplified the condition of checking for user-issued syscall(-1) at
+  syscall_trace_enter() [2/6]
+* defines __NR_seccomp_sigreturn only if arch-specific def doesn't exist.
+  As Kees suggests, this is necessary for x86 and others. [3/6]
+* removed "#ifdef __ARCH_SIGSYS" which is always true on arm64. [5/6]
+* changed to call syscall_trace_exit() even if secure_computing fails. [6/6]
+  In v6, syscall_trace_enter() returns RET_SYSCALL_SKIP_TRACE (== -2) and
+  skips syscall_trace_exit() to minimize the overhead, but this case can be
+  easily confused with user-issued (and invalid) syscall(-2).
+  Anyway, this is now a consistent behavior with arm and other archs.
 
->>> This 'struct clk' is an elusive beast.
->>> Where is it defined? I only run into forward declarations.
->>
->> Its architecture specific. What's the architecture you are working on?
->> You may implement your own routine instead of cpufreq_generic_get().
->
-> The SoC is made by Sigma Designs. It is based on the ARM Cortex-A9.
+Changes v5 -> v6:
+* rebased to v3.17-rc
+* changed the interface of changing/skipping a system call from re-writing
+  x8 register [v5 1/3] to using dedicated PTRACE_SET_SYSCALL command
+  [1/6, 2/6]
+  Patch [1/6] contains a checkpatch error around a switch statement, but it
+  won't be fixed as in compat_arch_ptrace().
+* added a new system call, seccomp(), for compat task [4/6]
+* added SIGSYS siginfo for compat task [5/6]
+* changed to always execute audit exit tracing to avoid OOPs [2/6, 6/6]
 
-Okay, life should be easy then. Normally there will be few programmable
-PLLs on your platform. You need to write a clock driver for them similar
-to the ones present here: drivers/clk/
+Changes v4 -> v5:
+* rebased to v3.16-rc
+* add patch [1/3] to allow ptrace to change a system call
+  (please note that this patch should be applied even without seccomp.)
 
-And then you can reuse cpufreq-dt.c cpufreq driver, which is generic enough
-for everybody :)
+Changes v3 -> v4:
+* removed the following patch and moved it to "arm64: prerequisites for
+  audit and ftrace" patchset since it is required for audit and ftrace in
+  case of !COMPAT, too.
+  "arm64: is_compat_task is defined both in asm/compat.h and linux/compat.h"
 
->> Yes. Documentation/clk.txt.
->
-> Oh boy! platform, device tree, cpu-freq, cpuidle, clk, ... so much
-> to learn, so few hours in a day.
+Changes v2 -> v3:
+* removed unnecessary 'type cast' operations [2/3]
+* check for a return value (-1) of secure_computing() explicitly [2/3]
+* aligned with the patch, "arm64: split syscall_trace() into separate
+  functions for enter/exit" [2/3]
+* changed default of CONFIG_SECCOMP to n [2/3]
 
-:)
+Changes v1 -> v2:
+* added generic seccomp.h for arm64 to utilize it [1,2/3] 
+* changed syscall_trace() to return more meaningful value (-EPERM)
+  on seccomp failure case [2/3]
+* aligned with the change in "arm64: make a single hook to syscall_trace()
+  for all syscall features" v2 [2/3]
+* removed is_compat_task() definition from compat.h [3/3]
+
+AKASHI Takahiro (6):
+  arm64: ptrace: add NT_ARM_SYSTEM_CALL regset
+  arm64: ptrace: allow tracer to skip a system call
+  asm-generic: add generic seccomp.h for secure computing mode 1
+  arm64: add seccomp syscall for compat task
+  arm64: add SIGSYS siginfo for compat task
+  arm64: add seccomp support
+
+ arch/arm64/Kconfig                |   14 +++++++++++++
+ arch/arm64/include/asm/compat.h   |    7 +++++++
+ arch/arm64/include/asm/seccomp.h  |   25 +++++++++++++++++++++++
+ arch/arm64/include/asm/unistd.h   |    3 +++
+ arch/arm64/include/asm/unistd32.h |    3 ++-
+ arch/arm64/kernel/entry.S         |   10 +++++++++-
+ arch/arm64/kernel/ptrace.c        |   40 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/signal32.c      |    6 ++++++
+ include/asm-generic/seccomp.h     |   30 ++++++++++++++++++++++++++++
+ include/uapi/linux/elf.h          |    1 +
+ 10 files changed, 137 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/include/asm/seccomp.h
+ create mode 100644 include/asm-generic/seccomp.h
+
+-- 
+1.7.9.5
