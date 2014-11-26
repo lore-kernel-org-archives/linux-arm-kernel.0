@@ -1,101 +1,129 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 26 Nov 2014 12:42:04 -0500
-Subject: [PATCH 3.18-rc4 v10 4/6] irqchip: gic: Introduce plumbing for
- IPI FIQ
-In-Reply-To: <1417019010-9220-5-git-send-email-daniel.thompson@linaro.org>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1417019010-9220-1-git-send-email-daniel.thompson@linaro.org>
- <1417019010-9220-5-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20141126174204.GK22670@titan.lakedaemon.net>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 26 Nov 2014 12:46:53 -0500
+Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
+In-Reply-To: <20141126100325.GA9157@linaro.org>
+References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
+ <20141120135851.GA32528@linaro.org> <54759041.9080105@hitachi.com>
+ <20141126100325.GA9157@linaro.org>
+Message-ID: <5476120D.9030703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+On 11/26/14 05:03, Steve Capper wrote:
+> On Wed, Nov 26, 2014 at 05:33:05PM +0900, Masami Hiramatsu wrote:
+>> (2014/11/21 0:02), Steve Capper wrote:
+>>> On Tue, Nov 18, 2014 at 01:32:50AM -0500, David Long wrote:
+>>>> From: "David A. Long" <dave.long@linaro.org>
+>>>>
+>>>> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches, first
+>>>> seen in October 2013.  This version attempts to address concerns raised by
+>>>> reviewers and also fixes problems discovered during testing, particularly during
+>>>> SMP testing.
+>>>>
+>>>> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
+>>>> and return probes(kretprobes) support for ARM64.
+>>>>
+>>>> Kprobes mechanism makes use of software breakpoint and single stepping
+>>>> support available in the ARM v8 kernel.
+>>>>
+>>>> Changes since v2 include:
+>>>>
+>>>> 1) Removal of NOP padding in kprobe XOL slots.  Slots are now exactly one
+>>>> instruction long.
+>>>> 2) Disabling of interrupts during execution in single-step mode.
+>>>> 3) Fixing of numerous problems in instruction simulation code.
+>>>> 4) Support for the HAVE_REGS_AND_STACK_ACCESS_API feature is added, to allow
+>>>> access to kprobes through debugfs.
+>>>> 5) kprobes is *not* enabled in defconfig.
+>>>> 6) Numerous complaints from checkpatch have been cleaned up, although a couple
+>>>> remain as removing the function pointer typedefs results in ugly code.
+>>>
+>>> Hi David,
+>>> I've been playing with this on a Juno board.
+>>> I ran into one crash, which I'm not yet sure is an issue, but thought I
+>>> would flag it.
+>>>
+>>> I opted to put a kprobe on memcpy, this is an assembler function so I
+>>> located it via:
+>>> $ nm ./vmlinux | grep \ memcpy$
+>>> fffffe0000408a00 T memcpy
+>>>
+>>> Then placed a probe as follows:
+>>> echo "p:memcpy 0xfffffe0000408a00 %x2" > /sys/kernel/debug/tracing/kprobe_events
+>>
+>> You can also do "p:memcpy memcpy %x2" > ...
+>
+> Thanks, that is easier :-).
+>
+>>
+>>>
+>>> I was able to cat out the /sys/kernel/debug/tracing/trace_pipe file and
+>>> activate the probe via:
+>>> echo 1 > /sys/kernel/debug/tracing/events/kprobes/enable
+>>>
+>>> Everything worked well, and I got the expected output.
+>>>
+>>> I then tried to record events with perf via:
+>>> perf record -e kprobes:memcpy -a sleep 5
+>>>
+>>> Then I got an, easily reproducible, panic (pasted below).
+>>
+>> On x86, I didn't get a panic.
+>>
+>>>
+>>> The point of failure in the panic was:
+>>> fs/buffer.c:1257
+>>>
+>>> static inline void check_irqs_on(void)
+>>> {
+>>> #ifdef irqs_disabled
+>>>          BUG_ON(irqs_disabled());
+>>> #endif
+>>> }
+>>>
+>>> I will do some more digging; but I have managed to code up an ftrace
+>>> static probe on memcpy and record that using perf on arm64 without
+>>> issue.
+>>
+>> Yeah, this can be a bug related to kprobes recursive call.
+>> Could you do "cat /sys/kernel/debug/tracing/kprobe_profile" (before
+>> run perf)?
+>> The first digit is # of hit, and the second is # of missed (since
+>> recursively called).
+>>
+>> On x86, right after tracing by ftrace, we have no missed probe.
+>>
+>>   # cat /sys/kernel/debug/tracing/kprobe_profile
+>>    memcpy                                                  4547               0
+>>
+>> But after tracing by perf, many missed events I could see.
+>>
+>>   # cat /sys/kernel/debug/tracing/kprobe_profile
+>>    memcpy                                                413983            7632
+>>
+>> So I guess this can be related to the recursive call (which
+>> is correctly handled on x86).
+>>
+>
+> Before running perf, I got the following:
+>
+>   # cat /sys/kernel/debug/tracing/kprobe_profile
+>     memcpy                                                   838               0
+>
+> Unfortunately, after the crash, I was then unable to take any other
+> measurements.
+>
+> I rebooted, set up the kprobe, then ran `./hackbench 100 process 1000',
+> to try and exacerbate things, and got the following:
+>   # cat /sys/kernel/debug/tracing/kprobe_profile
+>     memcpy                                                100677               0
+>
+> So no missed events thusfar.
+>
+> Cheers,
+>
 
-I've been a bit swamped this cycle and haven't kept as close an eye on
-this as I should have. :(  fwiw, it's looking really good.  I have one
-question below:
+So I take it from this we can conclude the problem is not reliably 
+reproducible?
 
-On Wed, Nov 26, 2014 at 04:23:28PM +0000, Daniel Thompson wrote:
-> Currently it is not possible to exploit FIQ for systems with a GIC, even if
-> the systems are otherwise capable of it. This patch makes it possible
-> for IPIs to be delivered using FIQ.
-> 
-> To do so it modifies the register state so that normal interrupts are
-> placed in group 1 and specific IPIs are placed into group 0. It also
-> configures the controller to raise group 0 interrupts using the FIQ
-> signal. It provides a means for architecture code to define which IPIs
-> shall use FIQ and to acknowledge any IPIs that are raised.
-> 
-> All GIC hardware except GICv1-without-TrustZone support provides a means
-> to group exceptions into group 0 and group 1 but the hardware
-> functionality is unavailable to the kernel when a secure monitor is
-> present because access to the grouping registers are prohibited outside
-> "secure world". However when grouping is not available (or in the case
-> of early GICv1 implementations is very hard to configure) the code to
-> change groups does not deploy and all IPIs will be raised via IRQ.
-> 
-> It has been tested and shown working on two systems capable of
-> supporting grouping (Freescale i.MX6 and STiH416). It has also been
-> tested for boot regressions on two systems that do not support grouping
-> (vexpress-a9 and Qualcomm Snapdragon 600).
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Tested-by: Jon Medhurst <tixy@linaro.org>
-> ---
->  arch/arm/kernel/traps.c         |   5 +-
->  drivers/irqchip/irq-gic.c       | 155 +++++++++++++++++++++++++++++++++++++---
->  include/linux/irqchip/arm-gic.h |   8 +++
->  3 files changed, 158 insertions(+), 10 deletions(-)
-...
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 5d72823bc5e9..978e5e48d5c1 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-...
-> +/*
-> + * Test which group an interrupt belongs to.
-> + *
-> + * Returns 0 if the controller does not support grouping.
-> + */
-> +static int gic_get_group_irq(void __iomem *base, unsigned int hwirq)
-> +{
-> +	unsigned int grp_reg = hwirq / 32 * 4;
-> +	u32 grp_val;
-> +
-> +	grp_val = readl_relaxed(base + GIC_DIST_IGROUP + grp_reg);
-> +
-> +	return (grp_val >> (hwirq % 32)) & 1;
-> +}
-...
-> @@ -669,7 +802,11 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->  	dmb(ishst);
->  
->  	/* this always happens on GIC0 */
-> -	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
-> +	softint = map << 16 | irq;
-> +	if (gic_get_group_irq(gic_data_dist_base(&gic_data[0]), irq))
-> +		softint |= 0x8000;
-> +	writel_relaxed(softint,
-> +		       gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
->  
->  	bl_migration_unlock();
->  }
-
-Is it worth the code complication to optimize this if the controller
-doesn't support grouping?  Maybe set group_enabled at init so the above
-would become:
-
-	softint = map << 16 | irq;
-	if (group_enabled &&
-	    gic_get_group_irq(gic_data_dist_base(&gic_data[0]), irq))
-		softint |= 0x8000;
-	writel_relaxed(...);
-
-thx,
-
-Jason.
+-dl
