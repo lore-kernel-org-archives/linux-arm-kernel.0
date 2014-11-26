@@ -1,80 +1,110 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 26 Nov 2014 17:22:29 +0100
-Subject: [PATCH 3/3] dmaengine: at_xdmac: allow muliple dwidths when doing
- slave transfers
-In-Reply-To: <1417018949-24246-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1417018949-24246-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1417018949-24246-4-git-send-email-ludovic.desroches@atmel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Nov 2014 17:23:34 +0100
+Subject: [PATCH v3 03/13] arm64: improve CONFIG_STRICT_DEVMEM handling
+In-Reply-To: <20141126093042.GA6474@darkstar.nay.redhat.com>
+References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1416315432-8534-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20141126093042.GA6474@darkstar.nay.redhat.com>
+Message-ID: <CAKv+Gu8UyfdFhaKXNQMzuf7L3b9jDyUd4FzG1x-c7FfoxnZe=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using FIFO, we need to support differents data width in a single
-transfer. For example, serial device which usually uses 1-byte data
-width will use 4-bytes data width when using the FIFO. If the transfer
-size is not aligned on 4-bytes then the end of the transfer will be
-performed with 1-byte data-width. For that reason,
-at_xdmac_prep_slave_sg() now builds linked list descriptors using view 2
-instead of view 1 so each of them can update the DWIDTH field into the
-Channel Configuration Register.
+On 26 November 2014 at 10:30, Dave Young <dyoung@redhat.com> wrote:
+> On 11/18/14 at 01:57pm, Ard Biesheuvel wrote:
+>> Improve the handling of /dev/mem mappings under CONFIG_STRICT_DEVMEM by:
+>> - allowing read-only access to parts of System RAM that are not
+>>   considered memory by the kernel, this is mainly intended for exposing
+>>   UEFI Configuration tables to userland;
+>
+> Ard, can you elabrate a bit? Are this for the acpi case because no dtb in
+> procfs?
+>
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/dma/at_xdmac.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+No, that is a different issue.
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index 94b714e..64f5b7f 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -25,6 +25,7 @@
- #include <linux/dmapool.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/kernel.h>
- #include <linux/list.h>
- #include <linux/module.h>
- #include <linux/of_dma.h>
-@@ -352,11 +353,11 @@ static void at_xdmac_start_xfer(struct at_xdmac_chan *atchan,
- 	at_xdmac_chan_write(atchan, AT_XDMAC_CNDA, reg);
- 
- 	/*
--	 * When doing memory to memory transfer we need to use the next
-+	 * When doing non cyclic transfer we need to use the next
- 	 * descriptor view 2 since some fields of the configuration register
- 	 * depend on transfer size and src/dest addresses.
- 	 */
--	if (is_slave_direction(first->direction)) {
-+	if (at_xdmac_chan_is_cyclic(atchan)) {
- 		reg = AT_XDMAC_CNDC_NDVIEW_NDV1;
- 		at_xdmac_chan_write(atchan, AT_XDMAC_CC, first->lld.mbr_cfg);
- 	} else {
-@@ -583,7 +584,7 @@ at_xdmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	/* Prepare descriptors. */
- 	for_each_sg(sgl, sg, sg_len, i) {
- 		struct at_xdmac_desc	*desc = NULL;
--		u32			len, mem;
-+		u32			len, mem, dwidth, fixed_dwidth;
- 
- 		len = sg_dma_len(sg);
- 		mem = sg_dma_address(sg);
-@@ -614,11 +615,15 @@ at_xdmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 			desc->lld.mbr_da = atchan->per_dst_addr;
- 			desc->lld.mbr_cfg = atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG];
- 		}
--		desc->lld.mbr_ubc = AT_XDMAC_MBR_UBC_NDV1			/* next descriptor view */
-+		dwidth = at_xdmac_get_dwidth(desc->lld.mbr_cfg);
-+		fixed_dwidth = IS_ALIGNED(len, 1 << dwidth)
-+			       ? at_xdmac_get_dwidth(desc->lld.mbr_cfg)
-+			       : AT_XDMAC_CC_DWIDTH_BYTE;
-+		desc->lld.mbr_ubc = AT_XDMAC_MBR_UBC_NDV2			/* next descriptor view */
- 			| AT_XDMAC_MBR_UBC_NDEN					/* next descriptor dst parameter update */
- 			| AT_XDMAC_MBR_UBC_NSEN					/* next descriptor src parameter update */
- 			| (i == sg_len - 1 ? 0 : AT_XDMAC_MBR_UBC_NDE)		/* descriptor fetch */
--			| len / (1 << at_xdmac_get_dwidth(desc->lld.mbr_cfg));	/* microblock length */
-+			| (len >> fixed_dwidth);				/* microblock length */
- 		dev_dbg(chan2dev(chan),
- 			 "%s: lld: mbr_sa=%pad, mbr_da=%pad, mbr_ubc=0x%08x\n",
- 			 __func__, &desc->lld.mbr_sa, &desc->lld.mbr_da, desc->lld.mbr_ubc);
+> Anyway I also think using /dev/mem looks not a good way to expose
+> infomation to userspace.
+>
+
+This is for compatibility with existing tools like dmidecode and lshw
+that already use /dev/mem.
+However, on x86, the tables they access are in iomem resource ranges
+that are accessible under CONFIG_STRICT_DEVMEM, whereas on arm64,
+those regions are inaccessible.
+
+So while our position is that using /dev/mem for *anything* is an
+awful idea, this particular patch just tries to bring arm64 in line
+with what currently existing tools expect.
+
 -- 
-2.0.3
+Ard.
+
+
+
+>> - avoid using non-cached mappings for those parts of System RAM, as it
+>>   may result in mismatched attributes.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/mm/mmap.c |  5 +++--
+>>  arch/arm64/mm/mmu.c  | 15 ++++++++++++++-
+>>  2 files changed, 17 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
+>> index 1d73662f00ff..802cdf0df921 100644
+>> --- a/arch/arm64/mm/mmap.c
+>> +++ b/arch/arm64/mm/mmap.c
+>> @@ -127,14 +127,15 @@ int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
+>>  /*
+>>   * devmem_is_allowed() checks to see if /dev/mem access to a certain address
+>>   * is valid. The argument is a physical page number.  We mimic x86 here by
+>> - * disallowing access to system RAM as well as device-exclusive MMIO regions.
+>> + * disallowing access to system RAM that is in active use by the kernel, as
+>> + * well as device-exclusive MMIO regions.
+>>   * This effectively disable read()/write() on /dev/mem.
+>>   */
+>>  int devmem_is_allowed(unsigned long pfn)
+>>  {
+>>       if (iomem_is_exclusive(pfn << PAGE_SHIFT))
+>>               return 0;
+>> -     if (!page_is_ram(pfn))
+>> +     if (!pfn_valid(pfn))
+>>               return 1;
+>>       return 0;
+>>  }
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index 4d583aa9ff4e..93ba10838359 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -121,7 +121,7 @@ early_param("cachepolicy", early_cachepolicy);
+>>  pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+>>                             unsigned long size, pgprot_t vma_prot)
+>>  {
+>> -     if (!pfn_valid(pfn))
+>> +     if (!page_is_ram(pfn))
+>>               return pgprot_noncached(vma_prot);
+>>       else if (file->f_flags & O_SYNC)
+>>               return pgprot_writecombine(vma_prot);
+>> @@ -129,6 +129,19 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+>>  }
+>>  EXPORT_SYMBOL(phys_mem_access_prot);
+>>
+>> +/*
+>> + * This definition of phys_mem_access_prot_allowed() overrides
+>> + * the __weak definition in drivers/char/mem.c
+>> + */
+>> +int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
+>> +                              unsigned long size, pgprot_t *prot)
+>> +{
+>> +     /* Disallow read-write access to reserved system RAM */
+>> +     if ((pgprot_val(*prot) & PTE_WRITE) && page_is_ram(pfn))
+>> +             return 0;
+>> +     return 1;
+>> +}
+>> +
+>>  static void __init *early_alloc(unsigned long sz)
+>>  {
+>>       void *ptr = __va(memblock_alloc(sz, sz));
+>> --
+>> 1.8.3.2
+>>
