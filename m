@@ -1,91 +1,20 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 26 Nov 2014 18:12:42 +0100
-Subject: Again about leds-pwm and pwm-mxs
-Message-ID: <20141126171242.GO4431@pengutronix.de>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 26 Nov 2014 17:14:40 +0000
+Subject: [PATCH 4/7] KVM: arm64: guest debug, add SW break point support
+In-Reply-To: <20141126160720.GD3245@hawk.usersys.redhat.com>
+References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
+ <1416931805-23223-5-git-send-email-alex.bennee@linaro.org>
+ <20141126160720.GD3245@hawk.usersys.redhat.com>
+Message-ID: <CAFEAcA-xV80Z3j52H5yh2e+JxOo5=inZNcM54HkOa2U2rBvKhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 26 November 2014 at 16:07, Andrew Jones <drjones@redhat.com> wrote:
+> There appears to be a typo in the ARM ARM. Subsection "Software
+> Breakpoint Instruction exception" of D1.10.4 says BRK (ESR_EL2_EC_BRK64)
+> is 0x39, but the table above that has it correctly as 0x3c.
 
-two years ago I addressed the issue that on i.MX28 a led connected to a
-pwm-mxs device doesn't go off when brightness is set to 0. I tried again
-later to find an acceptable solution.
-(Links to respective threads:
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/282593/focus=282596)
-http://thread.gmane.org/gmane.linux.kernel/1381289
-)
+Thanks for pointing out this typo -- I've reported it to the
+appropriate documentation people.
 
-The technical side is well understood: The problem is that leds-pwm does
-the following:
-
-	pwm_config(led_dat->pwm, new_duty, led_dat->period);
-
-	if (new_duty == 0)
-		pwm_disable(led_dat->pwm);
-	else
-		pwm_enable(led_dat->pwm);
-
-On i.MX28 reconfiguring the duty cycle only takes effect after the
-current period is over. That means that if the previous configuration
-was duty=period (i.e. "on") the likely outcome of the above sequence
-with new_duty=0 is that setting the duty cycle to 0 is scheduled but the
-current period never ends because the clock is stopped. So the led keeps
-being on.
-
-Now we need a settlement in which way this should be fixed.
-There are several possibilities, roughly in order of my preference:
- a) Declare the pin state after pwm_disable as undefined
-    In this case the leds-pwm driver must not call pwm_disable when
-    expecting a certain brightness (here: off).
-    A nice follow-up is then to patch the drivers that work the way the
-    leds-pwm author expected to call their equivalent of pwm_disable
-    themselves on new_duty=0.
- b) Let pwm_config return at once, implement the waiting in a new call
-    pwm_sync() that either busy-loops or sleeps until the configuration
-    is 
- c) Make the call to pwm_config for pwm-mxs block until the new period
-    started.
- d) Make the call to pwm_config for pwm-mxs sleep until the new period
-    started.
-    (Not sure this works nicely because IIRC there is no irq available
-    that triggers accordingly.)
- e) In pwm_disable detect that there is a reconfiguration pending and
-    block accordingly.
- f) Extend the PWM-API to differentiate the two variants of pwm_config
-    E.g. make pwm_config sleep/busy-looping until the requested config is
-    active plus a new function pwm_config_schedule.
-
-Back then Sascha and Matt also prefered a). The obvious downside of a)
-is that most people expect pwm_disable implying a constant 0. The
-obvious advantage of a) is that it's the simplest alternative and also
-works best when there are board specific inverters involved or the pwm
-supports built-in inversion.
-
-b) looks quite natural to me. It could implemented simply as:
-
-	void pwm_sync(..)
-	{
-		if (driver->sync)
-			driver->sync(...)
-	}
-
-and so nothing has to be done for drivers that apply a reconfiguration
-instantly.
-
-For all alternatives from b) to f) the result of calling pwm_disable
-should be specified to yield a 0 output (maybe only iff the configured
-duty is 0?). I don't know many pwm hardware cores but this might be
-unnatural for some of them?
-
-I consider f) only a theoretical alternative because it makes life
-harder for both pwm-driver writers and consumers.
-
-It would be nice to be able to close this case finally after two years.
-How can we determine which alternative to pick? Thierry?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-- PMM
