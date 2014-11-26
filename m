@@ -1,49 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 26 Nov 2014 00:19:37 -0500
-Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.19 (round 2)
-Message-ID: <20141126051937.GV22670@titan.lakedaemon.net>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 26 Nov 2014 10:53:51 +0530
+Subject: [PATCH v4 6/7] ARM: mvebu: add PHY support to the dts for the
+ USB controllers on Armada 375
+In-Reply-To: <20141126051701.GU22670@titan.lakedaemon.net>
+References: <1415879269-29711-1-git-send-email-gregory.clement@free-electrons.com>
+ <1415879269-29711-7-git-send-email-gregory.clement@free-electrons.com>
+ <20141122020811.GO22670@titan.lakedaemon.net>
+ <5470556B.6080608@free-electrons.com>
+ <20141126035929.GJ22670@titan.lakedaemon.net> <54756164.3070206@ti.com>
+ <20141126051701.GU22670@titan.lakedaemon.net>
+Message-ID: <547563E7.7080106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Folks,
-
-Here's a round of defconfig changes.  Been in -next a few days.
-
-Incremental pull request from tags/mvebu-defconfig-3.19 up to
-tags/mvebu-defconfig-3.19-2 on the mvebu/defconfig branch.
-
-Please pull.
-
-thx,
-
-Jason.
 
 
-The following changes since commit 64bbc2bf639cd7891d6d9589ad665f1b30ee1b4a:
+On Wednesday 26 November 2014 10:47 AM, Jason Cooper wrote:
+> On Wed, Nov 26, 2014 at 10:43:08AM +0530, Kishon Vijay Abraham I wrote:
+>> Hi,
+>>
+>> On Wednesday 26 November 2014 09:29 AM, Jason Cooper wrote:
+>>> On Sat, Nov 22, 2014 at 10:20:43AM +0100, Gregory CLEMENT wrote:
+>>>> Hi Jason,
+>>>>
+>>>> On 22/11/2014 03:08, Jason Cooper wrote:
+>>>>> On Thu, Nov 13, 2014 at 12:47:48PM +0100, Gregory CLEMENT wrote:
+>>>>>> Now that the USB cluster node has been added, use it as a PHY provider
+>>>>>> for the USB controller linked to it: the first EHCI and the xHCI.
+>>>>>>
+>>>>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>
+>> Looks like I'm not cc'ed in v4 of this patch series :-(
+> 
+> I've bounced emails maybe three times in my life.  Thought it might work
+> here.  Did it?
 
-  ARM: mvebu: defconfig: Enable the mv88E6171 switch driver (2014-11-07 03:31:21 +0000)
+Actually I'm CC'ed, just that search didn't find it. Sorry for the noise.
 
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-3.19-2
-
-for you to fetch changes up to 7dd0502d69fabb35f1538aef241a7dc4b627eaba:
-
-  ARM: mvebu: add MTD_BLOCK to mvebu_v7_defconfig (2014-11-22 02:58:53 +0000)
-
-----------------------------------------------------------------
-mvebu defconfig changes for v3.19 (round 2)
-
- - mvebu
-    - Add SDHCI, i2c, and MTD_BLOCK
-
-----------------------------------------------------------------
-Marcin Wojtas (2):
-      ARM: mvebu: re-enable SDHCI driver for Armada 38x SoC in v7 defconfig
-      ARM: mvebu: enable i2c device in mvebu_v7_defconfig
-
-Thomas Petazzoni (1):
-      ARM: mvebu: add MTD_BLOCK to mvebu_v7_defconfig
-
- arch/arm/configs/mvebu_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Thanks
+Kishon
+> 
+> thx,
+> 
+> Jason.
+> 
