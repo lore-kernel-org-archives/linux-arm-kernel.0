@@ -1,110 +1,88 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 26 Nov 2014 12:51:08 +0100
-Subject: [PATCH v4] clocksource: arch_timer: Allow the device tree to
- specify uninitialized timer registers
-In-Reply-To: <CAD=FV=VhaMo4fNide3a2S6jdLiq2pyOqY3hmx7ai0iDTPxCsPA@mail.gmail.com>
-References: <1412753627-28287-1-git-send-email-sonnyrao@chromium.org>
- <CAD=FV=VhaMo4fNide3a2S6jdLiq2pyOqY3hmx7ai0iDTPxCsPA@mail.gmail.com>
-Message-ID: <5475BEAC.9020208@linaro.org>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Wed, 26 Nov 2014 11:57:59 +0000
+Subject: [PATCH v9 05/10] sched: make scale_rt invariant with frequency
+In-Reply-To: <CAKfTPtAG1qtqSgG3Ek7CeKcvm2=KXbMdb7TgrVcEFivwGeDOGg@mail.gmail.com>
+References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
+ <1415033687-23294-6-git-send-email-vincent.guittot@linaro.org>
+ <20141121123559.GF23177@e105550-lin.cambridge.arm.com>
+ <CAKfTPtAo3PzZ=-KtH-YS2nf9R9srMGAUJ2A2qkHrsPZmj18-Jw@mail.gmail.com>
+ <20141124170502.GK23177@e105550-lin.cambridge.arm.com>
+ <CAKfTPtAG1qtqSgG3Ek7CeKcvm2=KXbMdb7TgrVcEFivwGeDOGg@mail.gmail.com>
+Message-ID: <20141126115759.GB3430@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 25, 2014 at 01:48:02PM +0000, Vincent Guittot wrote:
+> On 24 November 2014 at 18:05, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+> > On Mon, Nov 24, 2014 at 02:24:00PM +0000, Vincent Guittot wrote:
+> >> On 21 November 2014 at 13:35, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+> >> > On Mon, Nov 03, 2014 at 04:54:42PM +0000, Vincent Guittot wrote:
+> >>
+> >> [snip]
+> >>
+> >> >> The average running time of RT tasks is used to estimate the remaining compute
+> >> >> @@ -5801,19 +5801,12 @@ static unsigned long scale_rt_capacity(int cpu)
+> >> >>
+> >> >>       total = sched_avg_period() + delta;
+> >> >>
+> >> >> -     if (unlikely(total < avg)) {
+> >> >> -             /* Ensures that capacity won't end up being negative */
+> >> >> -             available = 0;
+> >> >> -     } else {
+> >> >> -             available = total - avg;
+> >> >> -     }
+> >> >> +     used = div_u64(avg, total);
+> >> >
+> >> > I haven't looked through all the details of the rt avg tracking, but if
+> >> > 'used' is in the range [0..SCHED_CAPACITY_SCALE], I believe it should
+> >> > work. Is it guaranteed that total > 0 so we don't get division by zero?
+> >>
+> >> static inline u64 sched_avg_period(void)
+> >> {
+> >> return (u64)sysctl_sched_time_avg * NSEC_PER_MSEC / 2;
+> >> }
+> >>
+> >
+> > I see.
+> >
+> >> >
+> >> > It does get a slightly more complicated if we want to figure out the
+> >> > available capacity at the current frequency (current < max) later. Say,
+> >> > rt eats 25% of the compute capacity, but the current frequency is only
+> >> > 50%. In that case get:
+> >> >
+> >> > curr_avail_capacity = (arch_scale_cpu_capacity() *
+> >> >   (arch_scale_freq_capacity() - (SCHED_SCALE_CAPACITY - scale_rt_capacity())))
+> >> >   >> SCHED_CAPACITY_SHIFT
+> >>
+> >> You don't have to be so complicated but simply need to do:
+> >> curr_avail_capacity for CFS = (capacity_of(CPU) *
+> >> arch_scale_freq_capacity())  >> SCHED_CAPACITY_SHIFT
+> >>
+> >> capacity_of(CPU) = 600 is the max available capacity for CFS tasks
+> >> once we have removed the 25% of capacity that is used by RT tasks
+> >> arch_scale_freq_capacity = 512 because we currently run at 50% of max freq
+> >>
+> >> so curr_avail_capacity for CFS = 300
+> >
+> > I don't think that is correct. It is at least not what I had in mind.
+> >
+> > capacity_orig_of(cpu) = 800, we run at 50% frequency which means:
+> >
+> > curr_capacity = capacity_orig_of(cpu) * arch_scale_freq_capacity()
+> >                   >> SCHED_CAPACITY_SHIFT
+> >               = 400
+> >
+> > So the total capacity at the current frequency (50%) is 400, without
+> > considering RT. scale_rt_capacity() is frequency invariant, so it takes
+> > away capacity_orig_of(cpu) - capacity_of(cpu) = 200 worth of capacity
+> > for RT.  We need to subtract that from the current capacity to get the
+> > available capacity at the current frequency.
+> >
+> > curr_available_capacity = curr_capacity - (capacity_orig_of(cpu) -
+> > capacity_of(cpu)) = 200
+> 
+> you're right, this one looks good to me too
 
-Hi Doug, Olof,
-
-IIUC, it sounds like this patch is needed from some other patches in 
-arm-soc. Olof was proposing to take this patch through its tree to 
-facilitate the integration.
-
-Olof, is it this patch you were worried about ?
-
-Thanks
-
-   -- Daniel
-
-On 11/20/2014 12:01 AM, Doug Anderson wrote:
-> Daniel,
->
-> On Wed, Oct 8, 2014 at 12:33 AM, Sonny Rao <sonnyrao@chromium.org> wrote:
->> From: Doug Anderson <dianders@chromium.org>
->>
->> Some 32-bit (ARMv7) systems are architected like this:
->>
->> * The firmware doesn't know and doesn't care about hypervisor mode and
->>    we don't want to add the complexity of hypervisor there.
->>
->> * The firmware isn't involved in SMP bringup or resume.
->>
->> * The ARCH timer come up with an uninitialized offset (CNTVOFF)
->>    between the virtual and physical counters.  Each core gets a
->>    different random offset.
->>
->> * The device boots in "Secure SVC" mode.
->>
->> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
->>    CNTHCTL.PL1PCTEN (both default to 1 at reset)
->>
->> On systems like the above, it doesn't make sense to use the virtual
->> counter.  There's nobody managing the offset and each time a core goes
->> down and comes back up it will get reinitialized to some other random
->> value.
->>
->> This adds an optional property which can inform the kernel of this
->> situation, and firmware is free to remove the property if it is going
->> to initialize the CNTVOFF registers when each CPU comes out of reset.
->>
->> Currently, the best course of action in this case is to use the
->> physical timer, which is why it is important that CNTHCTL hasn't been
->> changed from its reset value and it's a reasonable assumption given
->> that the firmware has never entered HYP mode.
->>
->> Note that it's been said that on ARMv8 systems the firmware and
->> kernel really can't be architected as described above.  That means
->> using the physical timer like this really only makes sense for ARMv7
->> systems.
->>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
->> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
->> ---
->> Changes in v2:
->> - Add "#ifdef CONFIG_ARM" as per Will Deacon
->>
->> Changes in v3:
->> - change property name to arm,cntvoff-not-fw-configured and specify
->>    that the value of CNTHCTL.PL1PC(T)EN must still be the reset value
->>    of 1 as per Mark Rutland
->>
->> Changes in v4:
->> - change property name to arm,cpu-registers-not-fw-configured and
->>    specify that all cpu registers must have architected reset values
->>    per Mark Rutland
->> - change from "#ifdef CONFIG_ARM" to "if (IS_ENABLED(CONFIG_ARM))" per
->>    Arnd Bergmann
->> ---
->>   Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
->>   drivers/clocksource/arm_arch_timer.c                 | 8 ++++++++
->>   2 files changed, 16 insertions(+)
->
-> Do you know what the status of this patch is?  This patch and Sonny's
-> patch at <https://patchwork.kernel.org/patch/5051901/> are needed on
-> Rockchip rk3288 for some specific things:
->
-> 1. To make SMP happy with coreboot.
->
-> 2. To (I assume) make SMP happy after S2R (no matter which firmware is
-> used since I don't think anyone has PSCI for rk3288).
->
-> ...we still need a DTS entry atop these patches, but that's trivial to
-> add once these land.
->
-> Thanks!
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Okay, thanks for confirming. It doesn't affect this patch set anyway, I just
+wanted to be sure that I got all the scaling factors right :)
