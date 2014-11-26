@@ -1,72 +1,66 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 26 Nov 2014 12:19:36 +0000
-Subject: [RFC PATCH 1/4] iommu: build iova.c for any IOMMU
-In-Reply-To: <54757A20.2090609@huawei.com>
-References: <cover.1416931258.git.robin.murphy@arm.com>
- <90240865e7cc00d0f7e471605ba9d2478b81ea88.1416931258.git.robin.murphy@arm.com>
- <54757A20.2090609@huawei.com>
-Message-ID: <5475C558.9060600@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 26 Nov 2014 13:22:50 +0100
+Subject: [PATCH 2/3] i2c: slave-eeprom: add eeprom simulator driver
+In-Reply-To: <CAOY=C6F6TMyeDvNneBV6K5hVjoG+qk-1Y_R3oJkEiGxhLOoQ0A@mail.gmail.com>
+References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+ <1416326695-13083-3-git-send-email-wsa@the-dreams.de>
+ <CAOY=C6FSXWn2AKn9gp0oU69U8VkkyJAE7MMUTZsToy0P_Tf6AA@mail.gmail.com>
+ <20141122181229.GB9698@katana>
+ <CAOY=C6F6TMyeDvNneBV6K5hVjoG+qk-1Y_R3oJkEiGxhLOoQ0A@mail.gmail.com>
+Message-ID: <20141126122250.GA4397@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 26/11/14 06:58, leizhen wrote:
-> On 2014/11/26 1:27, Robin Murphy wrote:
->> In preparation for sharing the IOVA allocator, build it for all
->> IOMMU API users.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>   drivers/iommu/Makefile | 4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
->> index 16edef7..9f7910b 100644
->> --- a/drivers/iommu/Makefile
->> +++ b/drivers/iommu/Makefile
->> @@ -1,4 +1,4 @@
->> -obj-$(CONFIG_IOMMU_API) += iommu.o
->> +obj-$(CONFIG_IOMMU_API) += iommu.o iova.o
->
-> I'm not a maintainer, so just code review comment.
->
-> I don't known whether or not you will apply iova to all iommu drivers. But if only x86 and arm/arm64,
-> it's no good to force other iommu drivers to include iova.o, because they have not used it yet.
+> My bad, will minimize the overhead in the future.
 
-I agree, the "build it anyway and rely on the linker to throw it away" 
-approach is very hacky. As I mentioned in the cover letter, the other 
-series which appeared as I was cleaning this up for posting duplicates 
-patch 1 and 2 here, but in a nicer way, so I'm fully expecting to simply 
-rebase patches 3 and 4 on top of that series.
+Thanks!
 
-Thanks,
-Robin.
+> I think usable semantics could be that a slave driver can indicate at any
+> point during an I2C read transaction that the next X bytes should be
+> returned from a buffer and for a write transaction, that the next X bytes
+> should be buffered before passed on to the driver. When the transaction
 
->
-> Maybe it's good to define a new config, like CONFIG_IOMMU_IOVA.
->
-> config INTEL_IOMMU
-> 	select IOMMU_IOVA
->
-> config ARM_SMMU
-> 	select IOMMU_IOVA
->
-> obj-$(CONFIG_IOMMU_IOVA) += iova.o
->
->>   obj-$(CONFIG_IOMMU_API) += iommu-traces.o
->>   obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
->>   obj-$(CONFIG_OF_IOMMU)	+= of_iommu.o
->> @@ -7,7 +7,7 @@ obj-$(CONFIG_AMD_IOMMU) += amd_iommu.o amd_iommu_init.o
->>   obj-$(CONFIG_AMD_IOMMU_V2) += amd_iommu_v2.o
->>   obj-$(CONFIG_ARM_SMMU) += arm-smmu.o
->>   obj-$(CONFIG_DMAR_TABLE) += dmar.o
->> -obj-$(CONFIG_INTEL_IOMMU) += iova.o intel-iommu.o
->> +obj-$(CONFIG_INTEL_IOMMU) += intel-iommu.o
->>   obj-$(CONFIG_IPMMU_VMSA) += ipmmu-vmsa.o
->>   obj-$(CONFIG_IRQ_REMAP) += intel_irq_remapping.o irq_remapping.o
->>   obj-$(CONFIG_OMAP_IOMMU) += omap-iommu.o
->>
->
->
->
+Yes, if we have something like that it should definately be that the
+slave driver offers a buffer and the bus driver may accept the buffer or
+not. Buffers should be opt-in and slave drivers will always have to
+support byte-based transactions as the ultimate fallback because this is
+how the vast majority of HW works (at least those I checked).
+
+That makes me really wonder if there will be a case where performance is
+so important that buffer handling is coded on top of the always needed
+byte based handling?
+
+More so, I'd think most slaves will have stuff like registers. So,
+buffered writes usually won't make sense because setting bits should
+cause an action immediately. And reading bits will have the problem of
+data getting stale. I'd think this is the biggest use case of I2C.
+Except for reading an EEPROM _once_ ;)
+
+> ends or the adapter reaches the end of the buffer, it indicates this to
+> the driver which can then either cleanup or otherwise act accordingly.
+
+Or the adapter encounters an unexpected STOP. Cleanups need to handle
+interrupted transactions as well. I'd think this is a bit more error
+prone, because people would need to check a return value and compare it
+to the number of bytes they wanted. Not a show stopper, but also nothing
+I want to throw in too easily.
+
+> But as you say, this can be added later on when the need arises.
+
+I'd really say so.
+
+> Just checked components we're using and stop/repeated-start both
+> transition into the same state.
+
+Good, thanks for checking! May I ask which components you are using?
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141126/daf55b27/attachment.sig>
