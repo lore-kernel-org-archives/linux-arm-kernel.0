@@ -1,98 +1,215 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Nov 2014 16:30:01 +0000
-Subject: [PATCH] arm64: jump labels: NOP out NOP -> NOP replacement
-In-Reply-To: <1416942242-6587-1-git-send-email-mark.rutland@arm.com>
-References: <1416942242-6587-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20141126163001.GL14866@arm.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Wed, 26 Nov 2014 17:40:58 +0100
+Subject: [PATCH 5/7] KVM: arm64: guest debug, add support for single-step
+In-Reply-To: <1416931805-23223-6-git-send-email-alex.bennee@linaro.org>
+References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
+ <1416931805-23223-6-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20141126164057.GE3245@hawk.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 07:04:02PM +0000, Mark Rutland wrote:
-> In the arm64 arch_static_branch implementation we place an A64 NOP into
-> the instruction stream and log relevant details to a jump_entry in a
-> __jump_table section. Later this may be replaced with an immediate
-> branch without link to the code for the unlikely case.
+On Tue, Nov 25, 2014 at 04:10:03PM +0000, Alex Benn?e wrote:
+> This adds support for single-stepping the guest. As userspace can and
+> will manipulate guest registers before restarting any tweaking of the
+> registers has to occur just before control is passed back to the guest.
+> Furthermore while guest debugging is in effect we need to squash the
+> ability of the guest to single-step itself as we have no easy way of
+> re-entering the guest after the exception has been delivered to the
+> hypervisor.
 > 
-> At init time, the core calls arch_jump_label_transform_static to
-> initialise the NOPs. On x86 this involves inserting the optimal NOP for
-> a given microarchitecture, but on arm64 we only use the architectural
-> NOP, and hence replace each NOP with the exact same NOP. This is
-> somewhat pointless.
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 > 
-> Additionally, at module load time we don't call jump_label_apply_nops to
-> patch the optimal NOPs in, unlike other architectures, but get away with
-> this because we only use the architectural NOP anyway. A later notifier
-> will patch NOPs with branches as required.
-> 
-> Similarly to x86 commit 11570da1c5b1dee1 (x86/jump-label: Do not bother
-> updating NOPs if they are correct), we can avoid patching NOPs with
-> identical NOPs. Given that we only use a single NOP encoding, this means
-> we can NOP-out the body of arch_jump_label_transform_static entirely. As
-> the default __weak arch_jump_label_transform_static implementation
-> performs a patch, we must use an empty function to achieve this.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Jiang Liu <liuj97@gmail.com>
-> Cc: Laura Abbott <lauraa@codeaurora.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
-
-Looks pretty boring:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
-
->  arch/arm64/kernel/jump_label.c | 23 +++++++++--------------
->  1 file changed, 9 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
-> index 9ac30bb..4f1fec7 100644
-> --- a/arch/arm64/kernel/jump_label.c
-> +++ b/arch/arm64/kernel/jump_label.c
-> @@ -22,9 +22,8 @@
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 48d26bb..a76daae 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -38,6 +38,7 @@
+>  #include <asm/tlbflush.h>
+>  #include <asm/cacheflush.h>
+>  #include <asm/virt.h>
+> +#include <asm/debug-monitors.h>
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_mmu.h>
+> @@ -300,6 +301,17 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>  	kvm_arm_set_running_vcpu(NULL);
+>  }
 >  
->  #ifdef HAVE_JUMP_LABEL
->  
-> -static void __arch_jump_label_transform(struct jump_entry *entry,
-> -					enum jump_label_type type,
-> -					bool is_static)
-> +void arch_jump_label_transform(struct jump_entry *entry,
-> +			       enum jump_label_type type)
+> +/**
+> + * kvm_arch_vcpu_ioctl_set_guest_debug - Setup guest debugging
+> + * @kvm:	pointer to the KVM struct
+> + * @kvm_guest_debug: the ioctl data buffer
+> + *
+> + * This sets up the VM for guest debugging. Care has to be taken when
+> + * manipulating guest registers as these will be set/cleared by the
+> + * hyper-visor controller, typically before each kvm_run event. As a
+> + * result modification of the guest registers needs to take place
+> + * after they have been restored in the hyp.S trampoline code.
+> + */
+>  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+>  					struct kvm_guest_debug *dbg)
 >  {
->  	void *addr = (void *)entry->code;
->  	u32 insn;
-> @@ -37,22 +36,18 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
->  		insn = aarch64_insn_gen_nop();
+> @@ -317,8 +329,8 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+>  
+>  	/* Single Step */
+>  	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
+> -		kvm_info("SS requested, not yet implemented\n");
+> -		return -EINVAL;
+> +		kvm_info("SS requested\n");
+> +		route_el2 = true;
 >  	}
 >  
-> -	if (is_static)
-> -		__aarch64_insn_patch_text_nosync(addr, insn, true);
-> -	else
-> -		aarch64_insn_patch_text(&addr, &insn, 1);
-> -}
+>  	/* Software Break Points */
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index 8da1043..78e5ae1 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -121,6 +121,7 @@ int main(void)
+>    DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
+>    DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
+>    DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
+> +  DEFINE(GUEST_DEBUG,		offsetof(struct kvm_vcpu, guest_debug));
+>    DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
+>    DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
+>    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index 28dc92b..6def054 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -91,6 +91,25 @@ static int kvm_handle_bkpt(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	return 0;
+>  }
+>  
+> +/**
+> + * kvm_handle_ss - handle single step exceptions
+> + *
+> + * @vcpu:	the vcpu pointer
+
+same @run comment as other handler header in previous patch
+
+> + *
+> + * See: ARM ARM D2.12 for the details. While the host is routing debug
+> + * exceptions to it's handlers we have to suppress the ability of the
+> + * guest to trigger exceptions.
+> + */
+> +static int kvm_handle_ss(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +{
+> +	WARN_ON(!(vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP));
+
+I'm not sure about this WARN_ON. Is there some scenario you were
+thinking of when you put it here? Is there some scenario where this
+could trigger so frequently we kill the log buffer?
+
+> +
+> +	run->exit_reason = KVM_EXIT_DEBUG;
+> +	run->debug.arch.exit_type = KVM_DEBUG_EXIT_SINGLE_STEP;
+> +	run->debug.arch.address = *vcpu_pc(vcpu);
+> +	return 0;
+> +}
+> +
+>  static exit_handle_fn arm_exit_handlers[] = {
+>  	[ESR_EL2_EC_WFI]	= kvm_handle_wfx,
+>  	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
+> @@ -105,6 +124,7 @@ static exit_handle_fn arm_exit_handlers[] = {
+>  	[ESR_EL2_EC_SYS64]	= kvm_handle_sys_reg,
+>  	[ESR_EL2_EC_IABT]	= kvm_handle_guest_abort,
+>  	[ESR_EL2_EC_DABT]	= kvm_handle_guest_abort,
+> +	[ESR_EL2_EC_SOFTSTP]    = kvm_handle_ss,
+>  	[ESR_EL2_EC_BKPT32]	= kvm_handle_bkpt,
+>  	[ESR_EL2_EC_BRK64]	= kvm_handle_bkpt,
+>  };
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index 3c733ea..c0bc218 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -16,6 +16,7 @@
+>   */
+>  
+>  #include <linux/linkage.h>
+> +#include <linux/kvm.h>
+>  
+>  #include <asm/assembler.h>
+>  #include <asm/memory.h>
+> @@ -168,6 +169,31 @@
+>  	// x19-x29, lr, sp*, elr*, spsr*
+>  	restore_common_regs
+>  
+> +	// After restoring the guest registers but before we return to the guest
+> +	// we may want to make some final tweaks to support guest debugging.
+> +	ldr	x3, [x0, #GUEST_DEBUG]
+> +	tbz	x3, #KVM_GUESTDBG_ENABLE_SHIFT, 2f	// No guest debug
+> +
+> +	// x0 - preserved as VCPU ptr
+> +	// x1 - spsr
+> +	// x2 - mdscr
+> +	mrs	x1, spsr_el2
+> +	mrs 	x2, mdscr_el1
+> +
+> +	// See ARM ARM D2.12.3 The software step state machine
+> +	// If we are doing Single Step - set MDSCR_EL1.SS and PSTATE.SS
+> +	orr	x1, x1, #DBG_SPSR_SS
+> +	orr	x2, x2, #DBG_MDSCR_SS
+> +	tbnz	x3, #KVM_GUESTDBG_SINGLESTEP_SHIFT, 1f
+> +	// If we are not doing Single Step we want to prevent the guest doing so
+> +	// as otherwise we will have to deal with the re-routed exceptions as we
+> +	// are doing other guest debug related things
+> +	eor	x1, x1, #DBG_SPSR_SS
+> +	eor	x2, x2, #DBG_MDSCR_SS
+> +1:
+> +	msr	spsr_el2, x1
+> +	msr	mdscr_el1, x2
+> +2:
+>  	// Last bits of the 64bit state
+>  	pop	x2, x3
+>  	pop	x0, x1
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 523f476..347e5b0 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -7,6 +7,8 @@
+>   * Note: you must update KVM_API_VERSION if you change this interface.
+>   */
+>  
+> +#ifndef __ASSEMBLY__
+> +
+>  #include <linux/types.h>
+>  #include <linux/compiler.h>
+>  #include <linux/ioctl.h>
+> @@ -515,11 +517,6 @@ struct kvm_s390_irq {
+>  	} u;
+>  };
+>  
+> -/* for KVM_SET_GUEST_DEBUG */
 > -
-> -void arch_jump_label_transform(struct jump_entry *entry,
-> -			       enum jump_label_type type)
-> -{
-> -	__arch_jump_label_transform(entry, type, false);
-> +	aarch64_insn_patch_text(&addr, &insn, 1);
->  }
+> -#define KVM_GUESTDBG_ENABLE		0x00000001
+> -#define KVM_GUESTDBG_SINGLESTEP		0x00000002
+> -
+>  struct kvm_guest_debug {
+>  	__u32 control;
+>  	__u32 pad;
+> @@ -1189,4 +1186,15 @@ struct kvm_assigned_msix_entry {
+>  	__u16 padding[3];
+>  };
 >  
->  void arch_jump_label_transform_static(struct jump_entry *entry,
->  				      enum jump_label_type type)
->  {
-> -	__arch_jump_label_transform(entry, type, true);
-> +	/*
-> +	 * We use the architected A64 NOP in arch_static_branch, so there's no
-> +	 * need to patch an identical A64 NOP over the top of it here. The core
-> +	 * will call arch_jump_label_transform from a module notifier if the
-> +	 * NOP needs to be replaced by a branch.
-> +	 */
->  }
->  
->  #endif	/* HAVE_JUMP_LABEL */
+> +#endif /* __ASSEMBLY__ */
+> +
+> +/* for KVM_SET_GUEST_DEBUG */
+> +
+> +#define KVM_GUESTDBG_ENABLE_SHIFT	0
+> +#define KVM_GUESTDBG_ENABLE		(1 << KVM_GUESTDBG_ENABLE_SHIFT)
+> +#define KVM_GUESTDBG_SINGLESTEP_SHIFT	1
+> +#define KVM_GUESTDBG_SINGLESTEP	(1 << KVM_GUESTDBG_SINGLESTEP_SHIFT)
+
+EALIGN: we can tab these defines up better
+
+> +
+> +
+> +
+>  #endif /* __LINUX_KVM_H */
 > -- 
-> 1.9.1
+> 2.1.3
 > 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
