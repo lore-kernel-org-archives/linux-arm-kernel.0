@@ -1,145 +1,130 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 26 Nov 2014 13:31:41 +0000
-Subject: [RFC PATCH 4/4] iommu: make IOVA domain page size explicit
-In-Reply-To: <54757E98.9010006@huawei.com>
-References: <cover.1416931258.git.robin.murphy@arm.com>
- <3774c76c45b21820b6a6acf582b8f441b639ffe9.1416931258.git.robin.murphy@arm.com>
- <54757E98.9010006@huawei.com>
-Message-ID: <5475D63D.1050405@arm.com>
+From: js07.lee@gmail.com (Jungseung Lee)
+Date: Wed, 26 Nov 2014 22:34:00 +0900
+Subject: [PATCH v3] arm: Support for the PXN CPU feature on ARMv7
+Message-ID: <1417008840-27591-1-git-send-email-js07.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Modern ARMv7-A/R cores optionally implement below new
+hardware feature:
 
-On 26/11/14 07:17, leizhen wrote:
-[...]
->> diff --git a/drivers/iommu/iova.c b/drivers/iommu/iova.c
->> index a3dbba8..9e50625 100644
->> --- a/drivers/iommu/iova.c
->> +++ b/drivers/iommu/iova.c
->> @@ -55,12 +55,16 @@ void free_iova_mem(struct iova *iova)
->>   }
->>
->>   void
->> -init_iova_domain(struct iova_domain *iovad, unsigned long start_pfn,
->> -	unsigned long pfn_32bit)
->> +init_iova_domain(struct iova_domain *iovad, unsigned long granule,
->> +	unsigned long start_pfn, unsigned long pfn_32bit)
->>   {
->> +	/* IOMMUs must support at least the CPU page size */
->> +	BUG_ON(granule > PAGE_SIZE);
->
-> ??? BUG_ON(granule < PAGE_SIZE);
->
+- PXN:
+Privileged execute-never(PXN) is a security feature. PXN bit
+determines whether the processor can execute software from
+the region. This is effective solution against ret2usr attack.
+On an implementation that does not include the LPAE, PXN is
+optionally supported.
 
-Granule represents the smallest page size that the IOMMU can map - we'd 
-never allocate less IOVA space than a single page, so we don't need a 
-unit smaller than that, and a bigger unit would make it problematic to 
-allocate IOVA space for individual pages.
+This patch set PXN bit on user page table for preventing
+user code execution with privilege mode.
 
-If, for instance, the CPU has 64k pages, and the IOMMU supports 1k tiny 
-pages, granule would be less than PAGE_SIZE, but the IOMMU could happily 
-that 64k as 64 contiguous tiny pages, even if it's a waste of TLB space.
+Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
+---
+ arch/arm/include/asm/pgalloc.h              | 28 +++++++++++++++++++++++++++-
+ arch/arm/include/asm/pgtable-2level-hwdef.h |  2 ++
+ arch/arm/include/asm/pgtable-3level-hwdef.h |  1 +
+ arch/arm/mm/mmu.c                           |  5 +++++
+ 4 files changed, 35 insertions(+), 1 deletion(-)
 
-However, say the IOMMU only supports 16k pages and we try to map two 
-noncontiguous 4k CPU pages as a contiguous 8k buffer in IOVA space - 
-this can't work, hence why the _minimum_ IOMMU page size, and thus 
-granule, may never be _bigger_ than a CPU page.
-
->> +
->>   	spin_lock_init(&iovad->iova_rbtree_lock);
->>   	iovad->rbroot = RB_ROOT;
->>   	iovad->cached32_node = NULL;
->> +	iovad->granule = granule;
->
-> Do you need to check granule is 2^n ?
->
-
-Yes, that would make a lot of sense.
-
->>   	iovad->start_pfn = start_pfn;
->>   	iovad->dma_32bit_pfn = pfn_32bit;
->>   }
->> diff --git a/include/linux/iova.h b/include/linux/iova.h
->> index 591b196..3920a19 100644
->> --- a/include/linux/iova.h
->> +++ b/include/linux/iova.h
->> @@ -28,6 +28,7 @@ struct iova_domain {
->>   	spinlock_t	iova_rbtree_lock; /* Lock to protect update of rbtree */
->>   	struct rb_root	rbroot;		/* iova domain rbtree root */
->>   	struct rb_node	*cached32_node; /* Save last alloced node */
->> +	unsigned long	granule;	/* pfn granularity for this domain */
->>   	unsigned long	start_pfn;	/* Lower limit for this domain */
->>   	unsigned long	dma_32bit_pfn;
->>   };
->> @@ -37,6 +38,36 @@ static inline unsigned long iova_size(struct iova *iova)
->>   	return iova->pfn_hi - iova->pfn_lo + 1;
->>   }
->>
->> +static inline unsigned long iova_shift(struct iova_domain *iovad)
->> +{
->> +	return __ffs(iovad->granule);
->
-> I think it's good to save the result to a struct member. If we caculate it ervertime, it's too slow.
->
-
-I did give some consideration at the time to which of size, shift and 
-mask to store - given the redundancy between them storing more than one 
-seems excessively wasteful - and this made for the nicest-looking code 
-IMO. These IOVA operations are going to be mostly used in map/unmap 
-situations leading to an IOMMU TLB flush anyway, so I'm not sure how 
-performance-critical they really are.
-
-Are we likely to see this code used on architectures where __ffs takes 
-more than a few cycles and has more impact than the general memory bloat 
-of making structures bigger?
-
-
-Thanks for the review,
-Robin.
-
->> +}
->> +
->> +static inline unsigned long iova_mask(struct iova_domain *iovad)
->> +{
->> +	return iovad->granule - 1;
->> +}
->> +
->> +static inline size_t iova_offset(struct iova_domain *iovad, dma_addr_t iova)
->> +{
->> +	return iova & iova_mask(iovad);
->> +}
->> +
->> +static inline size_t iova_align(struct iova_domain *iovad, size_t size)
->> +{
->> +	return ALIGN(size, iovad->granule);
->> +}
->> +
->> +static inline dma_addr_t iova_dma_addr(struct iova_domain *iovad, struct iova *iova)
->> +{
->> +	return (dma_addr_t)iova->pfn_lo << iova_shift(iovad);
->> +}
->> +
->> +static inline unsigned long iova_pfn(struct iova_domain *iovad, dma_addr_t iova)
->> +{
->> +	return iova >> iova_shift(iovad);
->> +}
->> +
->>   int iommu_iova_cache_init(void);
->>   void iommu_iova_cache_destroy(void);
->>
->> @@ -50,8 +81,8 @@ struct iova *alloc_iova(struct iova_domain *iovad, unsigned long size,
->>   struct iova *reserve_iova(struct iova_domain *iovad, unsigned long pfn_lo,
->>   	unsigned long pfn_hi);
->>   void copy_reserved_iova(struct iova_domain *from, struct iova_domain *to);
->> -void init_iova_domain(struct iova_domain *iovad, unsigned long start_pfn,
->> -	unsigned long pfn_32bit);
->> +void init_iova_domain(struct iova_domain *iovad, unsigned long granule,
->> +	unsigned long start_pfn, unsigned long pfn_32bit);
->>   struct iova *find_iova(struct iova_domain *iovad, unsigned long pfn);
->>   void put_iova_domain(struct iova_domain *iovad);
->>   struct iova *split_and_remove_iova(struct iova_domain *iovad,
->>
->
->
->
+diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
+index 78a7793..69e565e 100644
+--- a/arch/arm/include/asm/pgalloc.h
++++ b/arch/arm/include/asm/pgalloc.h
+@@ -17,6 +17,8 @@
+ #include <asm/processor.h>
+ #include <asm/cacheflush.h>
+ #include <asm/tlbflush.h>
++#include <asm/cputype.h>
++#include <asm/system_info.h>
+ 
+ #define check_pgt_cache()		do { } while (0)
+ 
+@@ -25,6 +27,26 @@
+ #define _PAGE_USER_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_USER))
+ #define _PAGE_KERNEL_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_KERNEL))
+ 
++/*
++ * Once this call has completed the variable @vmsa is set to 'VMSA support'
++ * in case of ARMv7.
++ */
++static inline bool cpu_has_classic_pxn(void)
++{
++	if (__LINUX_ARM_ARCH__ >= 6 && !IS_ENABLED(CONFIG_ARM_LPAE)) {
++		static unsigned int vmsa = ~0UL;
++
++		if (cpu_architecture() != CPU_ARCH_ARMv7)
++			return false;
++		if (vmsa == 4)
++			return true;
++
++		vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
++		return vmsa == 4;
++	} else
++		return false;
++}
++
+ #ifdef CONFIG_ARM_LPAE
+ 
+ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
+@@ -157,7 +179,11 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
+ static inline void
+ pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
+ {
+-	__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
++	pmdval_t pmdval = _PAGE_USER_TABLE;
++
++	if (cpu_has_classic_pxn())
++		pmdval |= PMD_PXNTABLE;
++	__pmd_populate(pmdp, page_to_phys(ptep), pmdval);
+ }
+ #define pmd_pgtable(pmd) pmd_page(pmd)
+ 
+diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
+index 5cfba15..5e68278 100644
+--- a/arch/arm/include/asm/pgtable-2level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
+@@ -20,12 +20,14 @@
+ #define PMD_TYPE_FAULT		(_AT(pmdval_t, 0) << 0)
+ #define PMD_TYPE_TABLE		(_AT(pmdval_t, 1) << 0)
+ #define PMD_TYPE_SECT		(_AT(pmdval_t, 2) << 0)
++#define PMD_PXNTABLE		(_AT(pmdval_t, 1) << 2)     /* v7 */
+ #define PMD_BIT4		(_AT(pmdval_t, 1) << 4)
+ #define PMD_DOMAIN(x)		(_AT(pmdval_t, (x)) << 5)
+ #define PMD_PROTECTION		(_AT(pmdval_t, 1) << 9)		/* v5 */
+ /*
+  *   - section
+  */
++#define PMD_SECT_PXN    (_AT(pmdval_t, 1) << 0)     /* v7 */
+ #define PMD_SECT_BUFFERABLE	(_AT(pmdval_t, 1) << 2)
+ #define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
+ #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 4)		/* v6 */
+diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
+index 9fd61c7..f8f1cff 100644
+--- a/arch/arm/include/asm/pgtable-3level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
+@@ -76,6 +76,7 @@
+ #define PTE_EXT_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
+ #define PTE_EXT_AF		(_AT(pteval_t, 1) << 10)	/* Access Flag */
+ #define PTE_EXT_NG		(_AT(pteval_t, 1) << 11)	/* nG */
++#define PTE_EXT_PXN		(_AT(pteval_t, 1) << 53)	/* PXN */
+ #define PTE_EXT_XN		(_AT(pteval_t, 1) << 54)	/* XN */
+ 
+ /*
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 9f98cec..5b0a047 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -605,6 +605,11 @@ static void __init build_mem_type_table(void)
+ 	}
+ 	kern_pgprot |= PTE_EXT_AF;
+ 	vecs_pgprot |= PTE_EXT_AF;
++
++	/*
++	 * Set PXN for user mappings
++	 */
++	user_pgprot |= PTE_EXT_PXN;
+ #endif
+ 
+ 	for (i = 0; i < 16; i++) {
+-- 
+1.9.1
