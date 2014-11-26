@@ -1,71 +1,32 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Thu, 27 Nov 2014 00:38:01 +0100
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141126231435.GQ2817@atomide.com>
-References: <20141027200008.GR2560@atomide.com> <201411270001.44871@pali>
- <20141126231435.GQ2817@atomide.com>
-Message-ID: <201411270038.01312@pali>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 26 Nov 2014 16:41:31 -0700
+Subject: [PATCH 04/10] arm: dts: qcom: Add power-controller device node
+ for 8074 Krait CPUs
+In-Reply-To: <5476576E.6010608@codeaurora.org>
+References: <1417040910-43290-1-git-send-email-lina.iyer@linaro.org>
+ <1417040910-43290-5-git-send-email-lina.iyer@linaro.org>
+ <5476576E.6010608@codeaurora.org>
+Message-ID: <20141126234131.GG594@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014 00:14:36 Tony Lindgren wrote:
-> * Pali Roh?r <pali.rohar@gmail.com> [141126 15:03]:
-> > On Wednesday 26 November 2014 21:08:06 Tony Lindgren wrote:
-> > 
-> > With your patch I'm getting:
-> > 
-> > Hardware        : Nokia RX-51 board
-> > 
-> > So patch is good.
-> 
-> Is that a Tested-by: then? :)
-> 
+On Wed, Nov 26 2014 at 15:42 -0700, Stephen Boyd wrote:
+>On 11/26/2014 02:28 PM, Lina Iyer wrote:
+>>Each Krait CPU in the QCOM 8074/8974 SoC has an SAW power controller to
+>>regulate the power to the cpu and aide the core in entering idle states.
+>>Reference the SAW instance and associate the instance with the CPU core.
+>>
+>>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>>
+>
+>Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+>
+>I imagine all these dts changes will go through qcom tree -> arm-soc?
 
-Yes for Hardware line you can add my:
+I will ping Kumar.
 
-Tested-by: Pali Roh?r <pali.rohar@gmail.com>
-
-> > > > Revision comes from bootloader (via ATAG) and it is HW
-> > > > revision of N900 device. It cannot be hardcoded into
-> > > > kernel or DTS as it it depends on HW.
-> > > 
-> > > Well for the "Revision" line problem, we could pass the
-> > > revision in cmdline or .dts if not passed in the legacy
-> > > ATAGs. It sounds like were just not copying it to
-> > > system_rev for DT based booting? Maybe it's just some
-> > > missing CONFIG_ATAG option that needs to be enabled?
-> > 
-> > Yes it looks like DT code does not read Revision ATAG... I
-> > tried to enable everything but always same problem...
-> 
-> Maybe check if it shows up properly in /proc/atags or whatever
-> the interface for it was?
-> 
-
-With enabled CONFIG_ARM_APPENDED_DTB=y file /proc/atags is 
-missing.
-
-> The build_tag_list() should parse ATAG_REVISION and then
-> parse_tag_revision() should copy it to system_rev. Maybe try
-> adding some printks to see if those functions get called?
-> 
-> Regards,
-> 
-> Tony
-
-Now I see... Problem is that build_tag_list() is called from 
-convert_to_tag_list() which is called from setup_machine_tags() 
-which is called from setup_arch() only if setup_machine_fdt() 
-call fails. And it fails for *non* DT boot. You can check this 
-chain too.
-
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/c8e39090/attachment.sig>
+>
+>-- 
+>Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+>a Linux Foundation Collaborative Project
+>
