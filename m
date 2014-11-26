@@ -1,296 +1,315 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 26 Nov 2014 15:24:15 +0100
-Subject: [PATCH v2 3/5] pinctrl: exynos: Fix GPIO setup failure because domain
- clock being gated
-In-Reply-To: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
-References: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1417011857-10419-4-git-send-email-k.kozlowski@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 26 Nov 2014 19:54:46 +0530
+Subject: [PATCH 1/2] phy: add the Berlin USB PHY driver
+In-Reply-To: <5475D90B.9070908@gmail.com>
+References: <1416520406-1852-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <5475D90B.9070908@gmail.com>
+Message-ID: <5475E2AE.6010905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The audio subsystem on Exynos 5420 has separate clocks and GPIO. To
-operate properly on GPIOs the main block clock 'mau_epll' must be
-enabled.
 
-This was observed on Peach Pi/Pit and Arndale Octa (after enabling i2s0)
-after introducing runtime PM to pl330 DMA driver. After that commit the
-'mau_epll' was gated, because the "amba" clock was disabled and there
-were no more users of mau_epll.
 
-The system hang just before probing i2s0 because
-samsung_pinmux_setup() tried to access memory from audss block which was
-gated.
+On Wednesday 26 November 2014 07:13 PM, Sebastian Hesselbarth wrote:
+> On 11/20/2014 10:53 PM, Sebastian Hesselbarth wrote:
+>> From: Antoine Tenart <antoine.tenart@free-electrons.com>
+>>
+>> Add the driver driving the Marvell Berlin USB PHY. This allows to
+>> initialize the PHY and to use it from the USB driver later.
+>>
+>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> 
+> Gentle ping.
+> 
+> Kishon, anything wrong with these two patches?
 
-Add a clock property to the pinctrl driver and enable the clock during
-GPIO setup. During normal GPIO operations (set, get, set_direction) the
-clock is not enabled.
+It's already queued in linux-phy next.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- .../bindings/pinctrl/samsung-pinctrl.txt           |   6 ++
- drivers/pinctrl/samsung/pinctrl-samsung.c          | 110 +++++++++++++++++++--
- drivers/pinctrl/samsung/pinctrl-samsung.h          |   2 +
- 3 files changed, 111 insertions(+), 7 deletions(-)
+Thanks
+Kishon
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-index 8425838a6dff..eb121daabe9d 100644
---- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-@@ -93,6 +93,12 @@ Required Properties:
-   pin configuration should use the bindings listed in the "pinctrl-bindings.txt"
-   file.
- 
-+Optional Properties:
-+- clocks: Optional clock needed to access the block. Will be enabled/disabled
-+  during GPIO configuration, suspend and resume but not during GPIO operations
-+  (like set, get, set direction).
-+- clock-names: Must be "block".
-+
- External GPIO and Wakeup Interrupts:
- 
- The controller supports two types of external interrupts over gpio. The first
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index ec580af35856..96419aba7650 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -24,6 +24,7 @@
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/slab.h>
-+#include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/gpio.h>
- #include <linux/irqdomain.h>
-@@ -55,6 +56,32 @@ static LIST_HEAD(drvdata_list);
- 
- static unsigned int pin_base;
- 
-+static int pctl_clk_enable(struct pinctrl_dev *pctldev)
-+{
-+	struct samsung_pinctrl_drv_data *drvdata;
-+	int ret;
-+
-+	drvdata = pinctrl_dev_get_drvdata(pctldev);
-+	if (!drvdata->clk)
-+		return 0;
-+
-+	ret = clk_enable(drvdata->clk);
-+	if (ret)
-+		dev_err(pctldev->dev, "failed to enable clock: %d\n", ret);
-+
-+	return ret;
-+}
-+
-+static void pctl_clk_disable(struct pinctrl_dev *pctldev)
-+{
-+	struct samsung_pinctrl_drv_data *drvdata;
-+
-+	drvdata = pinctrl_dev_get_drvdata(pctldev);
-+
-+	/* clk/core.c does the check if clk != NULL */
-+	clk_disable(drvdata->clk);
-+}
-+
- static inline struct samsung_pin_bank *gc_to_pin_bank(struct gpio_chip *gc)
- {
- 	return container_of(gc, struct samsung_pin_bank, gpio_chip);
-@@ -374,7 +401,9 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
- 	const struct samsung_pmx_func *func;
- 	const struct samsung_pin_group *grp;
- 
-+	pctl_clk_enable(pctldev);
- 	drvdata = pinctrl_dev_get_drvdata(pctldev);
-+
- 	func = &drvdata->pmx_functions[selector];
- 	grp = &drvdata->pin_groups[group];
- 
-@@ -398,6 +427,8 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
- 	writel(data, reg + type->reg_offset[PINCFG_TYPE_FUNC]);
- 
- 	spin_unlock_irqrestore(&bank->slock, flags);
-+
-+	pctl_clk_disable(pctldev);
- }
- 
- /* enable a specified pinmux by writing to registers */
-@@ -469,20 +500,37 @@ static int samsung_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
- {
- 	int i, ret;
- 
-+	ret = pctl_clk_enable(pctldev);
-+	if (ret)
-+		goto out;
-+
- 	for (i = 0; i < num_configs; i++) {
- 		ret = samsung_pinconf_rw(pctldev, pin, &configs[i], true);
- 		if (ret < 0)
--			return ret;
-+			goto out;
- 	} /* for each config */
- 
--	return 0;
-+out:
-+	pctl_clk_disable(pctldev);
-+
-+	return ret;
- }
- 
- /* get the pin config settings for a specified pin */
- static int samsung_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin,
- 					unsigned long *config)
- {
--	return samsung_pinconf_rw(pctldev, pin, config, false);
-+	int ret;
-+
-+	ret = pctl_clk_enable(pctldev);
-+	if (ret)
-+		return ret;
-+
-+	ret = samsung_pinconf_rw(pctldev, pin, config, false);
-+
-+	pctl_clk_disable(pctldev);
-+
-+	return ret;
- }
- 
- /* set the pin config settings for a specified pin group */
-@@ -1057,10 +1105,23 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
- 	}
- 	drvdata->dev = dev;
- 
-+	drvdata->clk = clk_get(&pdev->dev, "block");
-+	if (!IS_ERR(drvdata->clk)) {
-+		ret = clk_prepare_enable(drvdata->clk);
-+		if (ret) {
-+			dev_err(dev, "failed to enable clk: %d\n", ret);
-+			return ret;
-+		}
-+	} else {
-+		drvdata->clk = NULL;
-+	}
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	drvdata->virt_base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(drvdata->virt_base))
--		return PTR_ERR(drvdata->virt_base);
-+	if (IS_ERR(drvdata->virt_base)) {
-+		ret = PTR_ERR(drvdata->virt_base);
-+		goto err;
-+	}
- 
- 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
- 	if (res)
-@@ -1068,12 +1129,12 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
- 
- 	ret = samsung_gpiolib_register(pdev, drvdata);
- 	if (ret)
--		return ret;
-+		goto err;
- 
- 	ret = samsung_pinctrl_register(pdev, drvdata);
- 	if (ret) {
- 		samsung_gpiolib_unregister(pdev, drvdata);
--		return ret;
-+		goto err;
- 	}
- 
- 	if (ctrl->eint_gpio_init)
-@@ -1085,6 +1146,22 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
- 
- 	/* Add to the global list */
- 	list_add_tail(&drvdata->node, &drvdata_list);
-+	clk_disable(drvdata->clk); /* Leave prepared */
-+
-+	return 0;
-+
-+err:
-+	if (drvdata->clk)
-+		clk_disable_unprepare(drvdata->clk);
-+
-+	return ret;
-+}
-+
-+static int samsung_pinctrl_remove(struct platform_device *pdev)
-+{
-+	struct samsung_pinctrl_drv_data *drvdata = platform_get_drvdata(pdev);
-+
-+	clk_disable_unprepare(drvdata->clk);
- 
- 	return 0;
- }
-@@ -1102,6 +1179,13 @@ static void samsung_pinctrl_suspend_dev(
- 	void __iomem *virt_base = drvdata->virt_base;
- 	int i;
- 
-+	if (drvdata->clk) {
-+		if (clk_enable(drvdata->clk)) {
-+			dev_err(drvdata->dev, "failed to enable clock\n");
-+			return;
-+		}
-+	}
-+
- 	for (i = 0; i < drvdata->nr_banks; i++) {
- 		struct samsung_pin_bank *bank = &drvdata->pin_banks[i];
- 		void __iomem *reg = virt_base + bank->pctl_offset;
-@@ -1133,6 +1217,8 @@ static void samsung_pinctrl_suspend_dev(
- 
- 	if (drvdata->suspend)
- 		drvdata->suspend(drvdata);
-+
-+	clk_disable(drvdata->clk);
- }
- 
- /**
-@@ -1148,6 +1234,13 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
- 	void __iomem *virt_base = drvdata->virt_base;
- 	int i;
- 
-+	if (drvdata->clk) {
-+		if (clk_enable(drvdata->clk)) {
-+			dev_err(drvdata->dev, "failed to enable clock\n");
-+			return;
-+		}
-+	}
-+
- 	if (drvdata->resume)
- 		drvdata->resume(drvdata);
- 
-@@ -1181,6 +1274,8 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
- 			if (widths[type])
- 				writel(bank->pm_save[type], reg + offs[type]);
- 	}
-+
-+	clk_disable(drvdata->clk);
- }
- 
- /**
-@@ -1264,6 +1359,7 @@ MODULE_DEVICE_TABLE(of, samsung_pinctrl_dt_match);
- 
- static struct platform_driver samsung_pinctrl_driver = {
- 	.probe		= samsung_pinctrl_probe,
-+	.remove		= samsung_pinctrl_remove,
- 	.driver = {
- 		.name	= "samsung-pinctrl",
- 		.of_match_table = samsung_pinctrl_dt_match,
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-index 1b8c0139d604..666cb23eb9f2 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.h
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-@@ -201,6 +201,7 @@ struct samsung_pin_ctrl {
-  * struct samsung_pinctrl_drv_data: wrapper for holding driver data together.
-  * @node: global list node
-  * @virt_base: register base address of the controller.
-+ * @clk: Optional clock to enable/disable during setup. May be NULL.
-  * @dev: device instance representing the controller.
-  * @irq: interrpt number used by the controller to notify gpio interrupts.
-  * @ctrl: pin controller instance managed by the driver.
-@@ -218,6 +219,7 @@ struct samsung_pinctrl_drv_data {
- 	void __iomem			*virt_base;
- 	struct device			*dev;
- 	int				irq;
-+	struct clk			*clk;
- 
- 	struct pinctrl_desc		pctl;
- 	struct pinctrl_dev		*pctl_dev;
--- 
-1.9.1
+> 
+> Sebastian
+> 
+>> ---
+>> Split-off patches from latest Berlin USB PHY patches
+>>   
+>> https://lkml.kernel.org/g/1416231347-27193-1-git-send-email-antoine.tenart at free-electrons.com
+>>
+>>
+>> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+>> Cc: Grant Likely <grant.likely@linaro.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
+>> Cc: devicetree at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> ---
+>>   drivers/phy/Kconfig          |    7 ++
+>>   drivers/phy/Makefile         |    1 +
+>>   drivers/phy/phy-berlin-usb.c |  224 ++++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 232 insertions(+), 0 deletions(-)
+>>   create mode 100644 drivers/phy/phy-berlin-usb.c
+>>
+>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>> index 2a436e6..38ca6ff 100644
+>> --- a/drivers/phy/Kconfig
+>> +++ b/drivers/phy/Kconfig
+>> @@ -15,6 +15,13 @@ config GENERIC_PHY
+>>         phy users can obtain reference to the PHY. All the users of this
+>>         framework should select this config.
+>>
+>> +config PHY_BERLIN_USB
+>> +    tristate "Marvell Berlin USB PHY Driver"
+>> +    depends on ARCH_BERLIN && RESET_CONTROLLER && HAS_IOMEM && OF
+>> +    select GENERIC_PHY
+>> +    help
+>> +      Enable this to support the USB PHY on Marvell Berlin SoCs.
+>> +
+>>   config PHY_BERLIN_SATA
+>>       tristate "Marvell Berlin SATA PHY driver"
+>>       depends on ARCH_BERLIN && HAS_IOMEM && OF
+>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+>> index c4590fc..6fd1f77 100644
+>> --- a/drivers/phy/Makefile
+>> +++ b/drivers/phy/Makefile
+>> @@ -3,6 +3,7 @@
+>>   #
+>>
+>>   obj-$(CONFIG_GENERIC_PHY)        += phy-core.o
+>> +obj-$(CONFIG_PHY_BERLIN_USB)        += phy-berlin-usb.o
+>>   obj-$(CONFIG_PHY_BERLIN_SATA)        += phy-berlin-sata.o
+>>   obj-$(CONFIG_BCM_KONA_USB2_PHY)        += phy-bcm-kona-usb2.o
+>>   obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)    += phy-exynos-dp-video.o
+>> diff --git a/drivers/phy/phy-berlin-usb.c b/drivers/phy/phy-berlin-usb.c
+>> new file mode 100644
+>> index 0000000..f9f1306
+>> --- /dev/null
+>> +++ b/drivers/phy/phy-berlin-usb.c
+>> @@ -0,0 +1,224 @@
+>> +/*
+>> + * Copyright (C) 2014 Marvell Technology Group Ltd.
+>> + *
+>> + * Antoine Tenart <antoine.tenart@free-electrons.com>
+>> + * Jisheng Zhang <jszhang@marvell.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2. This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#include <linux/gpio.h>
+>> +#include <linux/io.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/of_gpio.h>
+>> +#include <linux/phy/phy.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/reset.h>
+>> +
+>> +#define USB_PHY_PLL        0x04
+>> +#define USB_PHY_PLL_CONTROL    0x08
+>> +#define USB_PHY_TX_CTRL0    0x10
+>> +#define USB_PHY_TX_CTRL1    0x14
+>> +#define USB_PHY_TX_CTRL2    0x18
+>> +#define USB_PHY_RX_CTRL        0x20
+>> +#define USB_PHY_ANALOG        0x34
+>> +
+>> +/* USB_PHY_PLL */
+>> +#define CLK_REF_DIV(x)        ((x) << 4)
+>> +#define FEEDBACK_CLK_DIV(x)    ((x) << 8)
+>> +
+>> +/* USB_PHY_PLL_CONTROL */
+>> +#define CLK_STABLE        BIT(0)
+>> +#define PLL_CTRL_PIN        BIT(1)
+>> +#define PLL_CTRL_REG        BIT(2)
+>> +#define PLL_ON            BIT(3)
+>> +#define PHASE_OFF_TOL_125    (0x0 << 5)
+>> +#define PHASE_OFF_TOL_250    BIT(5)
+>> +#define KVC0_CALIB        (0x0 << 9)
+>> +#define KVC0_REG_CTRL        BIT(9)
+>> +#define KVC0_HIGH        (0x0 << 10)
+>> +#define KVC0_LOW        (0x3 << 10)
+>> +#define CLK_BLK_EN        BIT(13)
+>> +
+>> +/* USB_PHY_TX_CTRL0 */
+>> +#define EXT_HS_RCAL_EN        BIT(3)
+>> +#define EXT_FS_RCAL_EN        BIT(4)
+>> +#define IMPCAL_VTH_DIV(x)    ((x) << 5)
+>> +#define EXT_RS_RCAL_DIV(x)    ((x) << 8)
+>> +#define EXT_FS_RCAL_DIV(x)    ((x) << 12)
+>> +
+>> +/* USB_PHY_TX_CTRL1 */
+>> +#define TX_VDD15_14        (0x0 << 4)
+>> +#define TX_VDD15_15        BIT(4)
+>> +#define TX_VDD15_16        (0x2 << 4)
+>> +#define TX_VDD15_17        (0x3 << 4)
+>> +#define TX_VDD12_VDD        (0x0 << 6)
+>> +#define TX_VDD12_11        BIT(6)
+>> +#define TX_VDD12_12        (0x2 << 6)
+>> +#define TX_VDD12_13        (0x3 << 6)
+>> +#define LOW_VDD_EN        BIT(8)
+>> +#define TX_OUT_AMP(x)        ((x) << 9)
+>> +
+>> +/* USB_PHY_TX_CTRL2 */
+>> +#define TX_CHAN_CTRL_REG(x)    ((x) << 0)
+>> +#define DRV_SLEWRATE(x)        ((x) << 4)
+>> +#define IMP_CAL_FS_HS_DLY_0    (0x0 << 6)
+>> +#define IMP_CAL_FS_HS_DLY_1    BIT(6)
+>> +#define IMP_CAL_FS_HS_DLY_2    (0x2 << 6)
+>> +#define IMP_CAL_FS_HS_DLY_3    (0x3 << 6)
+>> +#define FS_DRV_EN_MASK(x)    ((x) << 8)
+>> +#define HS_DRV_EN_MASK(x)    ((x) << 12)
+>> +
+>> +/* USB_PHY_RX_CTRL */
+>> +#define PHASE_FREEZE_DLY_2_CL    (0x0 << 0)
+>> +#define PHASE_FREEZE_DLY_4_CL    BIT(0)
+>> +#define ACK_LENGTH_8_CL        (0x0 << 2)
+>> +#define ACK_LENGTH_12_CL    BIT(2)
+>> +#define ACK_LENGTH_16_CL    (0x2 << 2)
+>> +#define ACK_LENGTH_20_CL    (0x3 << 2)
+>> +#define SQ_LENGTH_3        (0x0 << 4)
+>> +#define SQ_LENGTH_6        BIT(4)
+>> +#define SQ_LENGTH_9        (0x2 << 4)
+>> +#define SQ_LENGTH_12        (0x3 << 4)
+>> +#define DISCON_THRESHOLD_260    (0x0 << 6)
+>> +#define DISCON_THRESHOLD_270    BIT(6)
+>> +#define DISCON_THRESHOLD_280    (0x2 << 6)
+>> +#define DISCON_THRESHOLD_290    (0x3 << 6)
+>> +#define SQ_THRESHOLD(x)        ((x) << 8)
+>> +#define LPF_COEF(x)        ((x) << 12)
+>> +#define INTPL_CUR_10        (0x0 << 14)
+>> +#define INTPL_CUR_20        BIT(14)
+>> +#define INTPL_CUR_30        (0x2 << 14)
+>> +#define INTPL_CUR_40        (0x3 << 14)
+>> +
+>> +/* USB_PHY_ANALOG */
+>> +#define ANA_PWR_UP        BIT(1)
+>> +#define ANA_PWR_DOWN        BIT(2)
+>> +#define V2I_VCO_RATIO(x)    ((x) << 7)
+>> +#define R_ROTATE_90        (0x0 << 10)
+>> +#define R_ROTATE_0        BIT(10)
+>> +#define MODE_TEST_EN        BIT(11)
+>> +#define ANA_TEST_DC_CTRL(x)    ((x) << 12)
+>> +
+>> +#define to_phy_berlin_usb_priv(p)    \
+>> +    container_of((p), struct phy_berlin_usb_priv, phy)
+>> +
+>> +static const u32 phy_berlin_pll_dividers[] = {
+>> +    /* Berlin 2 */
+>> +    CLK_REF_DIV(0xc) | FEEDBACK_CLK_DIV(0x54),
+>> +    /* Berlin 2CD */
+>> +    CLK_REF_DIV(0x6) | FEEDBACK_CLK_DIV(0x55),
+>> +};
+>> +
+>> +struct phy_berlin_usb_priv {
+>> +    void __iomem        *base;
+>> +    struct phy        *phy;
+>> +    struct reset_control    *rst_ctrl;
+>> +    u32            pll_divider;
+>> +};
+>> +
+>> +static int phy_berlin_usb_power_on(struct phy *phy)
+>> +{
+>> +    struct phy_berlin_usb_priv *priv = dev_get_drvdata(phy->dev.parent);
+>> +
+>> +    reset_control_reset(priv->rst_ctrl);
+>> +
+>> +    writel(priv->pll_divider,
+>> +           priv->base + USB_PHY_PLL);
+>> +    writel(CLK_STABLE | PLL_CTRL_REG | PHASE_OFF_TOL_250 | KVC0_REG_CTRL |
+>> +           CLK_BLK_EN, priv->base + USB_PHY_PLL_CONTROL);
+>> +    writel(V2I_VCO_RATIO(0x5) | R_ROTATE_0 | ANA_TEST_DC_CTRL(0x5),
+>> +           priv->base + USB_PHY_ANALOG);
+>> +    writel(PHASE_FREEZE_DLY_4_CL | ACK_LENGTH_16_CL | SQ_LENGTH_12 |
+>> +           DISCON_THRESHOLD_260 | SQ_THRESHOLD(0xa) | LPF_COEF(0x2) |
+>> +           INTPL_CUR_30, priv->base + USB_PHY_RX_CTRL);
+>> +
+>> +    writel(TX_VDD12_13 | TX_OUT_AMP(0x3), priv->base + USB_PHY_TX_CTRL1);
+>> +    writel(EXT_HS_RCAL_EN | IMPCAL_VTH_DIV(0x3) | EXT_RS_RCAL_DIV(0x4),
+>> +           priv->base + USB_PHY_TX_CTRL0);
+>> +
+>> +    writel(EXT_HS_RCAL_EN | IMPCAL_VTH_DIV(0x3) | EXT_RS_RCAL_DIV(0x4) |
+>> +           EXT_FS_RCAL_DIV(0x2), priv->base + USB_PHY_TX_CTRL0);
+>> +
+>> +    writel(EXT_HS_RCAL_EN | IMPCAL_VTH_DIV(0x3) | EXT_RS_RCAL_DIV(0x4),
+>> +           priv->base + USB_PHY_TX_CTRL0);
+>> +    writel(TX_CHAN_CTRL_REG(0xf) | DRV_SLEWRATE(0x3) | IMP_CAL_FS_HS_DLY_3 |
+>> +           FS_DRV_EN_MASK(0xd), priv->base + USB_PHY_TX_CTRL2);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +static struct phy_ops phy_berlin_usb_ops = {
+>> +    .power_on    = phy_berlin_usb_power_on,
+>> +    .owner        = THIS_MODULE,
+>> +};
+>> +
+>> +static const struct of_device_id phy_berlin_sata_of_match[] = {
+>> +    {
+>> +        .compatible = "marvell,berlin2-usb-phy",
+>> +        .data = &phy_berlin_pll_dividers[0],
+>> +    },
+>> +    {
+>> +        .compatible = "marvell,berlin2cd-usb-phy",
+>> +        .data = &phy_berlin_pll_dividers[1],
+>> +    },
+>> +    { },
+>> +};
+>> +MODULE_DEVICE_TABLE(of, phy_berlin_sata_of_match);
+>> +
+>> +static int phy_berlin_usb_probe(struct platform_device *pdev)
+>> +{
+>> +    const struct of_device_id *match =
+>> +        of_match_device(phy_berlin_sata_of_match, &pdev->dev);
+>> +    struct phy_berlin_usb_priv *priv;
+>> +    struct resource *res;
+>> +    struct phy_provider *phy_provider;
+>> +
+>> +    priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+>> +    if (!priv)
+>> +        return -ENOMEM;
+>> +
+>> +    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +    priv->base = devm_ioremap_resource(&pdev->dev, res);
+>> +    if (IS_ERR(priv->base))
+>> +        return PTR_ERR(priv->base);
+>> +
+>> +    priv->rst_ctrl = devm_reset_control_get(&pdev->dev, NULL);
+>> +    if (IS_ERR(priv->rst_ctrl))
+>> +        return PTR_ERR(priv->rst_ctrl);
+>> +
+>> +    priv->pll_divider = *((u32 *)match->data);
+>> +
+>> +    priv->phy = devm_phy_create(&pdev->dev, NULL, &phy_berlin_usb_ops,
+>> +                    NULL);
+>> +    if (IS_ERR(priv->phy)) {
+>> +        dev_err(&pdev->dev, "failed to create PHY\n");
+>> +        return PTR_ERR(priv->phy);
+>> +    }
+>> +
+>> +    platform_set_drvdata(pdev, priv);
+>> +
+>> +    phy_provider =
+>> +        devm_of_phy_provider_register(&pdev->dev, of_phy_simple_xlate);
+>> +    if (IS_ERR(phy_provider))
+>> +        return PTR_ERR(phy_provider);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +static struct platform_driver phy_berlin_usb_driver = {
+>> +    .probe    = phy_berlin_usb_probe,
+>> +    .driver    = {
+>> +        .name        = "phy-berlin-usb",
+>> +        .owner        = THIS_MODULE,
+>> +        .of_match_table    = phy_berlin_sata_of_match,
+>> +     },
+>> +};
+>> +module_platform_driver(phy_berlin_usb_driver);
+>> +
+>> +MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
+>> +MODULE_DESCRIPTION("Marvell Berlin PHY driver for USB");
+>> +MODULE_LICENSE("GPL");
+>>
+> 
