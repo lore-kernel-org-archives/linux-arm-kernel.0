@@ -1,227 +1,141 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 26 Nov 2014 17:59:20 +0000
-Subject: [PATCH v10 07/10] qcom: cpuidle: Add cpuidle driver for QCOM cpus
-In-Reply-To: <1416593037-27527-8-git-send-email-lina.iyer@linaro.org>
-References: <1416593037-27527-1-git-send-email-lina.iyer@linaro.org>
- <1416593037-27527-8-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20141126175920.GB4809@red-moon>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Wed, 26 Nov 2014 18:00:45 +0000
+Subject: [PATCH 5/7] KVM: arm64: guest debug, add support for single-step
+In-Reply-To: <20141126164057.GE3245@hawk.usersys.redhat.com>
+References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
+ <1416931805-23223-6-git-send-email-alex.bennee@linaro.org>
+ <20141126164057.GE3245@hawk.usersys.redhat.com>
+Message-ID: <87lhmxlu42.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 06:03:54PM +0000, Lina Iyer wrote:
-> Add cpuidle driver interface to allow cpus to go into C-States. Use the
 
-"idle states" please.
+Andrew Jones <drjones@redhat.com> writes:
 
-> cpuidle DT interface, common across ARM architectures, to provide the
-> idle state information to the cpuidle framework.
-> 
-> Supported modes at this time are Standby and Standalone Power Collapse.
-> 
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> ---
->  .../bindings/arm/msm/qcom,idle-state.txt           | 81 ++++++++++++++++++++++
->  drivers/cpuidle/Kconfig.arm                        |  7 ++
->  drivers/cpuidle/Makefile                           |  1 +
->  drivers/cpuidle/cpuidle-qcom.c                     | 72 +++++++++++++++++++
->  4 files changed, 161 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
->  create mode 100644 drivers/cpuidle/cpuidle-qcom.c
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
-> new file mode 100644
-> index 0000000..ae1b07f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
-> @@ -0,0 +1,81 @@
-> +QCOM Idle States for cpuidle driver
-> +
-> +ARM provides idle-state node to define the cpuidle states, as defined in [1].
-> +cpuidle-qcom is the cpuidle driver for Qualcomm SoCs and uses these idle
-> +states. Idle states have different enter/exit latency and residency values.
-> +The idle states supported by the QCOM SoC are defined as -
-> +
-> +    * Standby
-> +    * Retention
-> +    * Standalone Power Collapse (Standalone PC or SPC)
-> +    * Power Collapse (PC)
-> +
-> +Standby: Standby does a little more in addition to architectural clock gating.
-> +When the WFI instruction is executed the ARM core would gate its internal
-> +clocks. In addition to gating the clocks, QCOM cpus use this instruction as a
-> +trigger to execute the SPM state machine. The SPM state machine waits for the
-> +interrupt to trigger the core back in to active. This triggers the cache
-> +hierarchy to enter standby states, when all cpus are idle. An interrupt brings
-> +the SPM state machine out of its wait, the next step is to ensure that the
-> +cache hierarchy is also out of standby, and then the cpu is allowed to resume
-> +execution.
-> +
-> +Retention: Retention is a low power state where the core is clock gated and
-> +the memory and the registers associated with the core are retained. The
-> +voltage may be reduced to the minimum value needed to keep the processor
-> +registers active. The SPM should be configured to execute the retention
-> +sequence and would wait for interrupt, before restoring the cpu to execution
-> +state. Retention may have a slightly higher latency than Standby.
-> +
-> +Standalone PC: A cpu can power down and warmboot if there is a sufficient time
-> +between the time it enters idle and the next known wake up. SPC mode is used
-> +to indicate a core entering a power down state without consulting any other
-> +cpu or the system resources. This helps save power only on that core.  The SPM
-> +sequence for this idle state is programmed to power down the supply to the
-> +core, wait for the interrupt, restore power to the core, and ensure the
-> +system state including cache hierarchy is ready before allowing core to
-> +resume. Applying power and resetting the core causes the core to warmboot
-> +back into Elevation Level (EL) which trampolines the control back to the
-> +kernel. Entering a power down state for the cpu, needs to be done by trapping
-> +into a EL. Failing to do so, would result in a crash enforced by the warm boot
-> +code in the EL for the SoC. On SoCs with write-back L1 cache, the cache has to
-> +be flushed in s/w, before powering down the core.
-> +
-> +Power Collapse: This state is similar to the SPC mode, but distinguishes
-> +itself in that the cpu acknowledges and permits the SoC to enter deeper sleep
-> +modes. In a hierarchical power domain SoC, this means L2 and other caches can
-> +be flushed, system bus, clocks - lowered, and SoC main XO clock gated and
-> +voltages reduced, provided all cpus enter this state.  Since the span of low
-> +power modes possible at this state is vast, the exit latency and the residency
-> +of this low power mode would be considered high even though at a cpu level,
-> +this essentially is cpu power down. The SPM in this state also may handshake
-> +with the Resource power manager processor in the SoC to indicate a complete
-> +application processor subsystem shut down.
-> +
-> +The idle-state for QCOM SoCs are distinguished by the compatible property of
-> +the idle-states device node.
-> +The devicetree representation of the idle state should be -
-> +
-> +Required properties:
-> +
-> +- compatible: Must be one of -
-> +			"qcom,idle-state-stby",
-> +			"qcom,idle-state-ret",
-> +			"qcom,idle-state-spc",
-> +			"qcom,idle-state-pc",
-> +		and "arm,idle-state".
-> +
-> +Other required and optional properties are specified in [1].
-> +
-> +Example:
-> +
-> +	idle-states {
-> +		CPU_SPC: spc {
-> +			compatible = "qcom,idle-state-spc", "arm,idle-state";
-> +			entry-latency-us = <150>;
-> +			exit-latency-us = <200>;
-> +			min-residency-us = <2000>;
-> +		};
-> +	};
-> +
-> +[1]. Documentation/devicetree/bindings/arm/idle-states.txt
-> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-> index 8c16ab2..e98993c 100644
-> --- a/drivers/cpuidle/Kconfig.arm
-> +++ b/drivers/cpuidle/Kconfig.arm
-> @@ -63,3 +63,10 @@ config ARM_MVEBU_V7_CPUIDLE
->  	depends on ARCH_MVEBU
->  	help
->  	  Select this to enable cpuidle on Armada 370, 38x and XP processors.
-> +
-> +config ARM_QCOM_CPUIDLE
-> +	bool "CPU Idle drivers for Qualcomm processors"
-> +	depends on ARCH_QCOM
-> +	select DT_IDLE_STATES
-> +	help
-> +	  Select this to enable cpuidle for QCOM processors
-> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-> index 4d177b9..6c222d5 100644
-> --- a/drivers/cpuidle/Makefile
-> +++ b/drivers/cpuidle/Makefile
-> @@ -17,6 +17,7 @@ obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
->  obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
->  obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
->  obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
-> +obj-$(CONFIG_ARM_QCOM_CPUIDLE)		+= cpuidle-qcom.o
->  
->  ###############################################################################
->  # MIPS drivers
-> diff --git a/drivers/cpuidle/cpuidle-qcom.c b/drivers/cpuidle/cpuidle-qcom.c
-> new file mode 100644
-> index 0000000..1c1dcbc
-> --- /dev/null
-> +++ b/drivers/cpuidle/cpuidle-qcom.c
-> @@ -0,0 +1,72 @@
-> +/*
-> + * Copyright (c) 2014, Linaro Limited.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/cpuidle.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include <soc/qcom/pm.h>
-> +#include "dt_idle_states.h"
-> +
-> +static struct qcom_cpu_pm_ops *lpm_ops;
-> +
-> +static int qcom_cpu_stby(struct cpuidle_device *dev,
-> +				struct cpuidle_driver *drv, int index)
-> +{
-> +	lpm_ops->standby(NULL);
-> +
-> +	return index;
-> +}
-> +
-> +static int qcom_cpu_spc(struct cpuidle_device *dev,
-> +				struct cpuidle_driver *drv, int index)
-> +{
-> +	lpm_ops->spc(NULL);
-> +
-> +	return index;
-> +}
+> On Tue, Nov 25, 2014 at 04:10:03PM +0000, Alex Benn?e wrote:
+>> This adds support for single-stepping the guest. As userspace can and
+>> will manipulate guest registers before restarting any tweaking of the
+>> registers has to occur just before control is passed back to the guest.
+>> Furthermore while guest debugging is in effect we need to squash the
+>> ability of the guest to single-step itself as we have no easy way of
+>> re-entering the guest after the exception has been delivered to the
+>> hypervisor.
+>> 
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> 
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 48d26bb..a76daae 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -38,6 +38,7 @@
+>>  #include <asm/tlbflush.h>
+>>  #include <asm/cacheflush.h>
+>>  #include <asm/virt.h>
+>> +#include <asm/debug-monitors.h>
+>>  #include <asm/kvm_arm.h>
+>>  #include <asm/kvm_asm.h>
+>>  #include <asm/kvm_mmu.h>
+>> @@ -300,6 +301,17 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>>  	kvm_arm_set_running_vcpu(NULL);
+>>  }
+>>  
+>> +/**
+>> + * kvm_arch_vcpu_ioctl_set_guest_debug - Setup guest debugging
+>> + * @kvm:	pointer to the KVM struct
+>> + * @kvm_guest_debug: the ioctl data buffer
+>> + *
+>> + * This sets up the VM for guest debugging. Care has to be taken when
+>> + * manipulating guest registers as these will be set/cleared by the
+>> + * hyper-visor controller, typically before each kvm_run event. As a
+>> + * result modification of the guest registers needs to take place
+>> + * after they have been restored in the hyp.S trampoline code.
+>> + */
+>>  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+>>  					struct kvm_guest_debug *dbg)
+>>  {
+>> @@ -317,8 +329,8 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+>>  
+>>  	/* Single Step */
+>>  	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
+>> -		kvm_info("SS requested, not yet implemented\n");
+>> -		return -EINVAL;
+>> +		kvm_info("SS requested\n");
+>> +		route_el2 = true;
+>>  	}
+>>  
+>>  	/* Software Break Points */
+>> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+>> index 8da1043..78e5ae1 100644
+>> --- a/arch/arm64/kernel/asm-offsets.c
+>> +++ b/arch/arm64/kernel/asm-offsets.c
+>> @@ -121,6 +121,7 @@ int main(void)
+>>    DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
+>>    DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
+>>    DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
+>> +  DEFINE(GUEST_DEBUG,		offsetof(struct kvm_vcpu, guest_debug));
+>>    DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
+>>    DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
+>>    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
+>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+>> index 28dc92b..6def054 100644
+>> --- a/arch/arm64/kvm/handle_exit.c
+>> +++ b/arch/arm64/kvm/handle_exit.c
+>> @@ -91,6 +91,25 @@ static int kvm_handle_bkpt(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  	return 0;
+>>  }
+>>  
+>> +/**
+>> + * kvm_handle_ss - handle single step exceptions
+>> + *
+>> + * @vcpu:	the vcpu pointer
+>
+> same @run comment as other handler header in previous patch
 
-Check power down functions return codes please as Daniel already
-pointed out, this might skew stats and prevent debugging.
+Yeah I think I'll be merging them all together given the comments about
+passing syndrome info directly.
 
-> +static struct cpuidle_driver qcom_cpuidle_driver = {
-> +	.name	= "qcom_cpuidle",
-> +};
-> +
-> +static const struct of_device_id qcom_idle_state_match[] = {
-> +	{ .compatible = "qcom,idle-state-stby", .data = qcom_cpu_stby},
-> +	{ .compatible = "qcom,idle-state-spc", .data = qcom_cpu_spc },
-> +	{ },
-> +};
-> +
-> +static int qcom_cpuidle_probe(struct platform_device *pdev)
-> +{
-> +	struct cpuidle_driver *drv = &qcom_cpuidle_driver;
-> +	int ret;
-> +
-> +	lpm_ops = pdev->dev.platform_data;
-> +
-> +	/* Probe for other states, including standby */
-> +	ret = dt_init_idle_driver(drv, qcom_idle_state_match, 0);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	return cpuidle_register(drv, NULL);
-> +}
-> +
-> +static struct platform_driver qcom_cpuidle_plat_driver = {
-> +	.probe	= qcom_cpuidle_probe,
-> +	.driver = {
-> +		.name = "qcom_cpuidle",
-> +	},
-> +};
-> +
-> +module_platform_driver(qcom_cpuidle_plat_driver);
+>> + *
+>> + * See: ARM ARM D2.12 for the details. While the host is routing debug
+>> + * exceptions to it's handlers we have to suppress the ability of the
+>> + * guest to trigger exceptions.
+>> + */
+>> +static int kvm_handle_ss(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +{
+>> +	WARN_ON(!(vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP));
+>
+> I'm not sure about this WARN_ON. Is there some scenario you were
+> thinking of when you put it here? Is there some scenario where this
+> could trigger so frequently we kill the log buffer?
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+The main one I had in mind was not suppressing the guest's attempt to
+step while guest debugging was running.
+
+<snip>
+>>  
+>> -/* for KVM_SET_GUEST_DEBUG */
+>> -
+>> -#define KVM_GUESTDBG_ENABLE		0x00000001
+>> -#define KVM_GUESTDBG_SINGLESTEP		0x00000002
+>> -
+>>  struct kvm_guest_debug {
+>>  	__u32 control;
+>>  	__u32 pad;
+>> @@ -1189,4 +1186,15 @@ struct kvm_assigned_msix_entry {
+>>  	__u16 padding[3];
+>>  };
+>>  
+>> +#endif /* __ASSEMBLY__ */
+>> +
+>> +/* for KVM_SET_GUEST_DEBUG */
+>> +
+>> +#define KVM_GUESTDBG_ENABLE_SHIFT	0
+>> +#define KVM_GUESTDBG_ENABLE		(1 << KVM_GUESTDBG_ENABLE_SHIFT)
+>> +#define KVM_GUESTDBG_SINGLESTEP_SHIFT	1
+>> +#define KVM_GUESTDBG_SINGLESTEP	(1 << KVM_GUESTDBG_SINGLESTEP_SHIFT)
+>
+> EALIGN: we can tab these defines up better
+
+Sure, I'll clean those up.
+
+-- 
+Alex Benn?e
