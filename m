@@ -1,156 +1,47 @@
-From: thunder.leizhen@huawei.com (leizhen)
-Date: Wed, 26 Nov 2014 15:17:44 +0800
-Subject: [RFC PATCH 4/4] iommu: make IOVA domain page size explicit
-In-Reply-To: <3774c76c45b21820b6a6acf582b8f441b639ffe9.1416931258.git.robin.murphy@arm.com>
-References: <cover.1416931258.git.robin.murphy@arm.com>
- <3774c76c45b21820b6a6acf582b8f441b639ffe9.1416931258.git.robin.murphy@arm.com>
-Message-ID: <54757E98.9010006@huawei.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 26 Nov 2014 13:22:53 +0530
+Subject: [PATCH] ARM: EXYNOS: use u8 for val[] in struct exynos_pmu_conf
+In-Reply-To: <2379473.Yu7PYOQ3m0@amdc1032>
+References: <2379473.Yu7PYOQ3m0@amdc1032>
+Message-ID: <547586D5.2040902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/26 1:27, Robin Murphy wrote:
-> Systems may contain heterogeneous IOMMUs supporting differing minimum
-> page sizes, which may also not be common with the CPU page size.
-> Thus it is practical to have an explicit notion of IOVA granularity
-> to simplify handling of mapping and allocation constraints.
-> 
-> As an initial step, move the IOVA page granularity from an implicit
-> compile-time constant to a per-domain property so we can make use
-> of it in IOVA domain context at runtime. To keep the abstraction tidy,
-> extend the little API of inline iova_* helpers to parallel some of the
-> equivalent PAGE_* macros.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Hi Bartilomiej,
+
+
+On Tuesday 08 July 2014 05:33 PM, Bartlomiej Zolnierkiewicz wrote:
+> Values stored in val[] are never bigger than a byte.
+>
+>     text    data     bss     dec     hex filename
+>     5264       4       4    5272    1498 arch/arm/mach-exynos/pmu.o.before
+>     2992       4       4    3000     bb8 arch/arm/mach-exynos/pmu.o.after
+>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+
+I tested this patch and it's really helpful to reduce size.
+How about resubmitting this change? As this will not get applied on 
+current tree.
+
+Thanks,
+Pankaj Dubey
+
 > ---
->  drivers/iommu/intel-iommu.c |  9 ++++++---
->  drivers/iommu/iova.c        |  8 ++++++--
->  include/linux/iova.h        | 35 +++++++++++++++++++++++++++++++++--
->  3 files changed, 45 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
-> index daba0c2..d4cf6f0 100644
-> --- a/drivers/iommu/intel-iommu.c
-> +++ b/drivers/iommu/intel-iommu.c
-> @@ -1632,7 +1632,8 @@ static int dmar_init_reserved_ranges(void)
->  	struct iova *iova;
->  	int i;
->  
-> -	init_iova_domain(&reserved_iova_list, IOVA_START_PFN, DMA_32BIT_PFN);
-> +	init_iova_domain(&reserved_iova_list, VTD_PAGE_SIZE, IOVA_START_PFN,
-> +			DMA_32BIT_PFN);
->  
->  	lockdep_set_class(&reserved_iova_list.iova_rbtree_lock,
->  		&reserved_rbtree_key);
-> @@ -1690,7 +1691,8 @@ static int domain_init(struct dmar_domain *domain, int guest_width)
->  	int adjust_width, agaw;
->  	unsigned long sagaw;
->  
-> -	init_iova_domain(&domain->iovad, IOVA_START_PFN, DMA_32BIT_PFN);
-> +	init_iova_domain(&domain->iovad, VTD_PAGE_SIZE, IOVA_START_PFN,
-> +			DMA_32BIT_PFN);
->  	domain_reserve_special_ranges(domain);
->  
->  	/* calculate AGAW */
-> @@ -4163,7 +4165,8 @@ static int md_domain_init(struct dmar_domain *domain, int guest_width)
->  {
->  	int adjust_width;
->  
-> -	init_iova_domain(&domain->iovad, IOVA_START_PFN, DMA_32BIT_PFN);
-> +	init_iova_domain(&domain->iovad, VTD_PAGE_SIZE, IOVA_START_PFN,
-> +			DMA_32BIT_PFN);
->  	domain_reserve_special_ranges(domain);
->  
->  	/* calculate AGAW */
-> diff --git a/drivers/iommu/iova.c b/drivers/iommu/iova.c
-> index a3dbba8..9e50625 100644
-> --- a/drivers/iommu/iova.c
-> +++ b/drivers/iommu/iova.c
-> @@ -55,12 +55,16 @@ void free_iova_mem(struct iova *iova)
->  }
->  
->  void
-> -init_iova_domain(struct iova_domain *iovad, unsigned long start_pfn,
-> -	unsigned long pfn_32bit)
-> +init_iova_domain(struct iova_domain *iovad, unsigned long granule,
-> +	unsigned long start_pfn, unsigned long pfn_32bit)
->  {
-> +	/* IOMMUs must support at least the CPU page size */
-> +	BUG_ON(granule > PAGE_SIZE);
-
-??? BUG_ON(granule < PAGE_SIZE);
-
-> +
->  	spin_lock_init(&iovad->iova_rbtree_lock);
->  	iovad->rbroot = RB_ROOT;
->  	iovad->cached32_node = NULL;
-> +	iovad->granule = granule;
-
-Do you need to check granule is 2^n ?
-
->  	iovad->start_pfn = start_pfn;
->  	iovad->dma_32bit_pfn = pfn_32bit;
->  }
-> diff --git a/include/linux/iova.h b/include/linux/iova.h
-> index 591b196..3920a19 100644
-> --- a/include/linux/iova.h
-> +++ b/include/linux/iova.h
-> @@ -28,6 +28,7 @@ struct iova_domain {
->  	spinlock_t	iova_rbtree_lock; /* Lock to protect update of rbtree */
->  	struct rb_root	rbroot;		/* iova domain rbtree root */
->  	struct rb_node	*cached32_node; /* Save last alloced node */
-> +	unsigned long	granule;	/* pfn granularity for this domain */
->  	unsigned long	start_pfn;	/* Lower limit for this domain */
->  	unsigned long	dma_32bit_pfn;
->  };
-> @@ -37,6 +38,36 @@ static inline unsigned long iova_size(struct iova *iova)
->  	return iova->pfn_hi - iova->pfn_lo + 1;
->  }
->  
-> +static inline unsigned long iova_shift(struct iova_domain *iovad)
-> +{
-> +	return __ffs(iovad->granule);
-
-I think it's good to save the result to a struct member. If we caculate it ervertime, it's too slow.
-
-> +}
-> +
-> +static inline unsigned long iova_mask(struct iova_domain *iovad)
-> +{
-> +	return iovad->granule - 1;
-> +}
-> +
-> +static inline size_t iova_offset(struct iova_domain *iovad, dma_addr_t iova)
-> +{
-> +	return iova & iova_mask(iovad);
-> +}
-> +
-> +static inline size_t iova_align(struct iova_domain *iovad, size_t size)
-> +{
-> +	return ALIGN(size, iovad->granule);
-> +}
-> +
-> +static inline dma_addr_t iova_dma_addr(struct iova_domain *iovad, struct iova *iova)
-> +{
-> +	return (dma_addr_t)iova->pfn_lo << iova_shift(iovad);
-> +}
-> +
-> +static inline unsigned long iova_pfn(struct iova_domain *iovad, dma_addr_t iova)
-> +{
-> +	return iova >> iova_shift(iovad);
-> +}
-> +
->  int iommu_iova_cache_init(void);
->  void iommu_iova_cache_destroy(void);
->  
-> @@ -50,8 +81,8 @@ struct iova *alloc_iova(struct iova_domain *iovad, unsigned long size,
->  struct iova *reserve_iova(struct iova_domain *iovad, unsigned long pfn_lo,
->  	unsigned long pfn_hi);
->  void copy_reserved_iova(struct iova_domain *from, struct iova_domain *to);
-> -void init_iova_domain(struct iova_domain *iovad, unsigned long start_pfn,
-> -	unsigned long pfn_32bit);
-> +void init_iova_domain(struct iova_domain *iovad, unsigned long granule,
-> +	unsigned long start_pfn, unsigned long pfn_32bit);
->  struct iova *find_iova(struct iova_domain *iovad, unsigned long pfn);
->  void put_iova_domain(struct iova_domain *iovad);
->  struct iova *split_and_remove_iova(struct iova_domain *iovad,
-> 
+>   arch/arm/mach-exynos/common.h | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> index b850db4..55ff019 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -101,7 +101,7 @@ enum sys_powerdown {
+>
+>   struct exynos_pmu_conf {
+>   	void __iomem *reg;
+> -	unsigned int val[NUM_SYS_POWERDOWN];
+> +	u8 val[NUM_SYS_POWERDOWN];
+>   };
+>
+>   extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
+>
