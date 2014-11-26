@@ -1,22 +1,27 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 26 Nov 2014 16:57:11 +0100
-Subject: [PATCH v2 2/5] i2c: davinci: query STP always when NACK is
- received
-In-Reply-To: <1417010393-30598-3-git-send-email-grygorii.strashko@ti.com>
+Date: Wed, 26 Nov 2014 16:59:20 +0100
+Subject: [PATCH v2 4/5] i2c: davinci: use bus recovery infrastructure
+In-Reply-To: <1417010393-30598-5-git-send-email-grygorii.strashko@ti.com>
 References: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
- <1417010393-30598-3-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20141126155711.GL4431@pengutronix.de>
+ <1417010393-30598-5-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20141126155920.GM4431@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-I don't understand your use of "query" in the subject and later in the
-commit log. Do you mean "send"?
 
-On Wed, Nov 26, 2014 at 03:59:50PM +0200, Grygorii Strashko wrote:
-> According to I2C specification the NACK should be handled as folows:
-s/folows/follows/
+On Wed, Nov 26, 2014 at 03:59:52PM +0200, Grygorii Strashko wrote:
+> This patch converts Davinci I2C driver to use I2C bus recovery
+> infrastructure, introduced by commit 5f9296ba21b3 ("i2c: Add
+> bus recovery infrastructure").
+> 
+> The i2c_bus_recovery_info is configured for Davinci I2C adapter
+> only in case if scl_pin is provided in platform data at least.
+My German feeling for English tells me:
+s/if//; s/at least//;
+
+With that changed you can add my Ack.
 
 Best regards
 Uwe
