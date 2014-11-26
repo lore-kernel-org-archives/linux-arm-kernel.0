@@ -1,89 +1,70 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Wed, 26 Nov 2014 17:30:42 +0800
-Subject: [PATCH v3 03/13] arm64: improve CONFIG_STRICT_DEVMEM handling
-In-Reply-To: <1416315432-8534-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
- <1416315432-8534-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20141126093042.GA6474@darkstar.nay.redhat.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 26 Nov 2014 10:33:35 +0100
+Subject: [PATCH] rtc: omap: drop vendor-prefix from power-controller dt
+ property
+Message-ID: <1416994415-22367-1-git-send-email-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/14 at 01:57pm, Ard Biesheuvel wrote:
-> Improve the handling of /dev/mem mappings under CONFIG_STRICT_DEVMEM by:
-> - allowing read-only access to parts of System RAM that are not
->   considered memory by the kernel, this is mainly intended for exposing
->   UEFI Configuration tables to userland;
+Drop the vendor-prefix from the "ti,system-power-controller" device-tree
+property name.
 
-Ard, can you elabrate a bit? Are this for the acpi case because no dtb in
-procfs? 
+It has been agreed to make "system-power-controller" a standard property
+and to drop the vendor-prefix that is currently used by several drivers.
+
+Note that drivers that have used "<vendor>,system-power-controller" in a
+released kernel will need to support both versions.
+
+Signed-off-by: Johan Hovold <johan@kernel.org>
+---
+ Documentation/devicetree/bindings/rtc/rtc-omap.txt | 4 ++--
+ arch/arm/boot/dts/am335x-boneblack.dts             | 2 +-
+ drivers/rtc/rtc-omap.c                             | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+index 750efd40c72e..4ba4dbd34289 100644
+--- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
++++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+@@ -13,7 +13,7 @@ Required properties:
+ - interrupt-parent: phandle for the interrupt controller
  
-Anyway I also think using /dev/mem looks not a good way to expose
-infomation to userspace.
-
-> - avoid using non-cached mappings for those parts of System RAM, as it
->   may result in mismatched attributes.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/mm/mmap.c |  5 +++--
->  arch/arm64/mm/mmu.c  | 15 ++++++++++++++-
->  2 files changed, 17 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
-> index 1d73662f00ff..802cdf0df921 100644
-> --- a/arch/arm64/mm/mmap.c
-> +++ b/arch/arm64/mm/mmap.c
-> @@ -127,14 +127,15 @@ int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
->  /*
->   * devmem_is_allowed() checks to see if /dev/mem access to a certain address
->   * is valid. The argument is a physical page number.  We mimic x86 here by
-> - * disallowing access to system RAM as well as device-exclusive MMIO regions.
-> + * disallowing access to system RAM that is in active use by the kernel, as
-> + * well as device-exclusive MMIO regions.
->   * This effectively disable read()/write() on /dev/mem.
->   */
->  int devmem_is_allowed(unsigned long pfn)
->  {
->  	if (iomem_is_exclusive(pfn << PAGE_SHIFT))
->  		return 0;
-> -	if (!page_is_ram(pfn))
-> +	if (!pfn_valid(pfn))
->  		return 1;
->  	return 0;
->  }
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 4d583aa9ff4e..93ba10838359 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -121,7 +121,7 @@ early_param("cachepolicy", early_cachepolicy);
->  pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
->  			      unsigned long size, pgprot_t vma_prot)
->  {
-> -	if (!pfn_valid(pfn))
-> +	if (!page_is_ram(pfn))
->  		return pgprot_noncached(vma_prot);
->  	else if (file->f_flags & O_SYNC)
->  		return pgprot_writecombine(vma_prot);
-> @@ -129,6 +129,19 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
->  }
->  EXPORT_SYMBOL(phys_mem_access_prot);
->  
-> +/*
-> + * This definition of phys_mem_access_prot_allowed() overrides
-> + * the __weak definition in drivers/char/mem.c
-> + */
-> +int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
-> +				 unsigned long size, pgprot_t *prot)
-> +{
-> +	/* Disallow read-write access to reserved system RAM */
-> +	if ((pgprot_val(*prot) & PTE_WRITE) && page_is_ram(pfn))
-> +		return 0;
-> +	return 1;
-> +}
-> +
->  static void __init *early_alloc(unsigned long sz)
->  {
->  	void *ptr = __va(memblock_alloc(sz, sz));
-> -- 
-> 1.8.3.2
-> 
+ Optional properties:
+-- ti,system-power-controller: whether the rtc is controlling the system power
++- system-power-controller: whether the rtc is controlling the system power
+   through pmic_power_en
+ 
+ Example:
+@@ -24,5 +24,5 @@ rtc at 1c23000 {
+ 	interrupts = <19
+ 		      19>;
+ 	interrupt-parent = <&intc>;
+-	ti,system-power-controller;
++	system-power-controller;
+ };
+diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
+index 0c8cdc9520b7..d4affb7e3b61 100644
+--- a/arch/arm/boot/dts/am335x-boneblack.dts
++++ b/arch/arm/boot/dts/am335x-boneblack.dts
+@@ -77,5 +77,5 @@
+ };
+ 
+ &rtc {
+-	ti,system-power-controller;
++	system-power-controller;
+ };
+diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+index fba13e53c278..4f1c6ca97211 100644
+--- a/drivers/rtc/rtc-omap.c
++++ b/drivers/rtc/rtc-omap.c
+@@ -502,7 +502,7 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 		rtc->type = of_id->data;
+ 		rtc->is_pmic_controller = rtc->type->has_pmic_mode &&
+ 				of_property_read_bool(pdev->dev.of_node,
+-						"ti,system-power-controller");
++						"system-power-controller");
+ 	} else {
+ 		id_entry = platform_get_device_id(pdev);
+ 		rtc->type = (void *)id_entry->driver_data;
+-- 
+2.0.4
