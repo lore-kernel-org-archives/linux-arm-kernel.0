@@ -1,93 +1,50 @@
-From: tim@krieglstein.org (Tim Sander)
-Date: Wed, 26 Nov 2014 13:46:52 +0100
-Subject: [PATCH 3.18-rc3 v9 5/5] arm: smp: Handle ipi_cpu_backtrace()
- using FIQ (if available)
-In-Reply-To: <1416936401-5147-6-git-send-email-daniel.thompson@linaro.org>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1416936401-5147-1-git-send-email-daniel.thompson@linaro.org>
- <1416936401-5147-6-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <2744845.J3XUj2a9bM@dabox>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 26 Nov 2014 13:49:01 +0100
+Subject: [PATCH 2/3] i2c: slave-eeprom: add eeprom simulator driver
+In-Reply-To: <2A7C987F-15E0-46FD-A711-E7F5BA9893FC@gmail.com>
+References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+ <1416326695-13083-3-git-send-email-wsa@the-dreams.de>
+ <CAOY=C6FSXWn2AKn9gp0oU69U8VkkyJAE7MMUTZsToy0P_Tf6AA@mail.gmail.com>
+ <20141122181229.GB9698@katana>
+ <2A7C987F-15E0-46FD-A711-E7F5BA9893FC@gmail.com>
+Message-ID: <20141126124901.GB4397@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel
+On Wed, Nov 26, 2014 at 03:25:29PM +0300, Alexander Kochetkov wrote:
+> 
+> 22 ????. 2014 ?., ? 21:12, Wolfram Sang <wsa@the-dreams.de> ???????(?):
+> 
+> > IMO a repeated start is to ensure that two messages arrive at the slave
+> > without interruption from another master. I can't think why a slave
+> > should know which type of start that was. In fact, if it does that would
+> > raise an eyebrow for me. Do you have an example?
+> 
+> It is used to implement Device ID reading.
 
-Am Dienstag, 25. November 2014, 17:26:41 schrieb Daniel Thompson:
-> Previous changes have introduced both a replacement default FIQ handler
-> and an implementation of arch_trigger_all_cpu_backtrace for ARM but
-> these are currently independent of each other.
-> 
-> This patch plumbs together these features making it possible, on platforms
-> that support it, to trigger backtrace using FIQ.
-Does this ipi handler interfere in any way with set_fiq_handler?
+Yes and no, I'd say :) Technically, it needs repeated start. But really,
+the hardware should handle this (and I know one IP core which has
+support for it). One could try to simulate the behaviour in the bus
+driver IF a second slave address AND detection of repeated start is
+available, but I doubt this combination exists.
 
-As far as i know there is only one FIQ handler vector so i guess there is a 
-potential conflict. But i have not worked with IPI's so i might be completley
-wrong.
+Still, all the _slave driver_ needs to handle is an
+I2C_SLAVE_EVENT_DEVICE_ID which should return the apropriate value.
 
-Regards
-Tim
+That being said, I have never seen querying Device ID in action.
 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> ---
->  arch/arm/include/asm/smp.h | 3 +++
->  arch/arm/kernel/smp.c      | 4 +++-
->  arch/arm/kernel/traps.c    | 3 +++
->  3 files changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-> index 18f5a554134f..b076584ac0fa 100644
-> --- a/arch/arm/include/asm/smp.h
-> +++ b/arch/arm/include/asm/smp.h
-> @@ -18,6 +18,8 @@
->  # error "<asm/smp.h> included in non-SMP build"
->  #endif
-> 
-> +#define SMP_IPI_FIQ_MASK 0x0100
-> +
->  #define raw_smp_processor_id() (current_thread_info()->cpu)
-> 
->  struct seq_file;
-> @@ -79,6 +81,7 @@ extern void arch_send_call_function_single_ipi(int cpu);
->  extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
->  extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
-> 
-> +extern void ipi_cpu_backtrace(struct pt_regs *regs);
->  extern int register_ipi_completion(struct completion *completion, int cpu);
-> 
->  struct smp_operations {
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 14c594a12bef..e923843562d9 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -539,7 +539,7 @@ static void ipi_cpu_stop(unsigned int cpu)
->  		cpu_relax();
->  }
-> 
-> -static void ipi_cpu_backtrace(struct pt_regs *regs)
-> +void ipi_cpu_backtrace(struct pt_regs *regs)
->  {
->  	int cpu = smp_processor_id();
-> 
-> @@ -580,6 +580,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->  	unsigned int cpu = smp_processor_id();
->  	struct pt_regs *old_regs = set_irq_regs(regs);
-> 
-> +	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
-> +
->  	if ((unsigned)ipinr < NR_IPI) {
->  		trace_ipi_entry(ipi_types[ipinr]);
->  		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index 4dc45b38e56e..9eb05be9526e 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry
-> handle_fiq_as_nmi(struct pt_regs *regs) #ifdef CONFIG_ARM_GIC
->  	gic_handle_fiq_ipi();
->  #endif
-> +#ifdef CONFIG_SMP
-> +	ipi_cpu_backtrace(regs);
-> +#endif
-> 
->  	nmi_exit();
+> Not sure, that the feature is really needed for the first release.
+
+I am sure it is not :D
+
+Thanks,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141126/cc018256/attachment.sig>
