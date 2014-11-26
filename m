@@ -1,91 +1,143 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 26 Nov 2014 10:10:52 +0100
-Subject: [GIT PULL v2 1/4] ARM: tegra: IOMMU support for v3.19
-In-Reply-To: <1416570832-6220-1-git-send-email-thierry.reding@gmail.com>
-References: <1416570832-6220-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1416993053-3630-1-git-send-email-thierry.reding@gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 26 Nov 2014 17:12:49 +0800
+Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <2065254.jRdQcinOdg@wuerfel>
+References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <2966212.dpWQ0OTb0A@wuerfel>
+ <CAFpQJXUjYsTiHSyHdgtN9JPWGN8CByR4VwtSMJhwkAUWA4iV9w@mail.gmail.com>
+ <2065254.jRdQcinOdg@wuerfel>
+Message-ID: <54759991.50204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On 2014-11-26 3:00, Arnd Bergmann wrote:
+> On Tuesday 25 November 2014 08:15:47 Ganapatrao Kulkarni wrote:
+>>> No, don't hardcode ARM specifics into a common binding either. I've looked
+>>> at the ibm,associativity properties again, and I think we should just use
+>>> those, they can cover all cases and are completely independent of the
+>>> architecture. We should probably discuss about the property name though,
+>>> as using the "ibm," prefix might not be the best idea.
+>>
+>> We have started with new proposal, since not got enough details how
+>> ibm/ppc is managing the numa using dt.
+>> there is no documentation and there is no power/PAPR spec for numa in
+>> public domain and there are no single dt file in arch/powerpc which
+>> describes the numa. if we get any one of these details, we can align
+>> to powerpc implementation.
+> 
+> Basically the idea is to have an "ibm,associativity" property in each
+> bus or device that is node specific, and this includes all CPUs and
+> memory nodes. The property contains an array of 32-bit integers that
+> count the resources. Take an example of a NUMA cluster of two machines
+> with four sockets and four cores each (32 cores total), a memory
+> channel on each socket and one PCI host per board that is connected
+> at equal speed to each socket on the board.
+> 
+> The ibm,associativity property in each PCI host, CPU or memory device
+> node consequently has an array of three (board, socket, core) integers:
+> 
+> 	memory at 0,0 {
+> 		device_type = "memory";
+> 		reg = <0x0 0x0  0x4 0x0;
+> 		/* board 0, socket 0, no specific core */
+> 		ibm,asssociativity = <0 0 0xffff>;
+> 	};
+> 
+> 	memory at 4,0 {
+> 		device_type = "memory";
+> 		reg = <0x4 0x0  0x4 0x0>;
+> 		/* board 0, socket 1, no specific core */
+> 		ibm,asssociativity = <0 1 0xffff>; 
+> 	};
+> 
+> 	...
+> 
+> 	memory at 1c,0 {
+> 		device_type = "memory";
+> 		reg = <0x1c 0x0  0x4 0x0>;
+> 		/* board 0, socket 7, no specific core */
+> 		ibm,asssociativity = <1 7 0xffff>; 
+> 	};
+> 
+> 	cpus {
+> 		#address-cells = <2>;
+> 		#size-cells = <0>;
+> 		cpu at 0 {
+> 			device_type = "cpu";
+> 			reg = <0 0>;
+> 			/* board 0, socket 0, core 0*/
+> 			ibm,asssociativity = <0 0 0>; 
+> 		};
+> 
+> 		cpu at 1 {
+> 			device_type = "cpu";
+> 			reg = <0 0>;
+> 			/* board 0, socket 0, core 0*/
+> 			ibm,asssociativity = <0 0 0>; 
+> 		};
+> 
+> 		...
+> 
+> 		cpu at 31 {
+> 			device_type = "cpu";
+> 			reg = <0 32>;
+> 			/* board 1, socket 7, core 31*/
+> 			ibm,asssociativity = <1 7 31>; 
+> 		};
+> 	};
+> 
+> 	pci at 100,0 {
+> 		device_type = "pci";
+> 		/* board 0 */
+> 		ibm,associativity = <0 0xffff 0xffff>;
+> 		...
+> 	};
+> 
+> 	pci at 200,0 {
+> 		device_type = "pci";
+> 		/* board 1 */
+> 		ibm,associativity = <1 0xffff 0xffff>;
+> 		...
+> 	};
+> 
+> 	ibm,associativity-reference-points = <0 1>;
+> 
+> The "ibm,associativity-reference-points" property here indicates that index 2
+> of each array is the most important NUMA boundary for the particular system,
+> because the performance impact of allocating memory on the remote board 
+> is more significant than the impact of using memory on a remote socket of the
+> same board. Linux will consequently use the first field in the array as
+> the NUMA node ID. If the link between the boards however is relatively fast,
+> so you care mostly about allocating memory on the same socket, but going to
+> another board isn't much worse than going to another socket on the same
+> board, this would be
+> 
+> 	ibm,associativity-reference-points = <1 0>;
+> 
+> so Linux would ignore the board ID and use the socket ID as the NUMA node
+> number. The same would apply if you have only one (otherwise identical
+> board, then you would get
+> 
+> 	ibm,associativity-reference-points = <1>;
+> 
+> which means that index 0 is completely irrelevant for NUMA considerations
+> and you just care about the socket ID. In this case, devices on the PCI
+> bus would also not care about NUMA policy and just allocate buffers from
+> anywhere, while in original example Linux would allocate DMA buffers only
+> from the local board.
 
-The following changes since commit 0690cbd2e55a72a8eae557c389d1a136ed9fa142:
+Thanks for the detail information. I have the concerns about the distance
+for NUMA nodes, does the "ibm,associativity-reference-points" property can
+represent the distance between NUMA nodes?
 
-  powerpc/iommu: Rename iommu_[un]map_sg functions (2014-11-18 11:30:01 +0100)
+For example, a system with 4 sockets connected like below:
 
-are available in the git repository at:
+Socket 0  <---->  Socket 1  <---->  Socket 2  <---->  Socket 3
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.19-iommu-rebased
+So from socket 0 to socket 1 (maybe on the same board), it just need 1
+jump to access the memory, but from socket 0 to socket 2/3, it needs
+2/3 jumps and the *distance* relative longer. Can
+"ibm,associativity-reference-points" property cover this?
 
-for you to fetch changes up to 37d21f8918f2aa2289036cc778ee188951e53288:
-
-  memory: Add NVIDIA Tegra memory controller support (2014-11-26 09:45:02 +0100)
-
-Here's a version of the pull request rebased on top of Joerg's core
-branch from the IOMMU tree. It has the advantage of having resolved
-the merge conflicts and the disadvantage of pulling in v3.18-rc3.
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-ARM: tegra: IOMMU support for v3.19
-
-This adds the driver pieces required for IOMMU support on Tegra30,
-Tegra114 and Tegra124.
-
-----------------------------------------------------------------
-Thierry Reding (6):
-      Merge branch 'core' of git://git.kernel.org/.../joro/iommu
-      clk: tegra: Implement memory-controller clock
-      amba: Add Kconfig file
-      ARM: tegra: Move AHB Kconfig to drivers/amba
-      of: Add NVIDIA Tegra memory controller binding
-      memory: Add NVIDIA Tegra memory controller support
-
- .../memory-controllers/nvidia,tegra-mc.txt         |   36 +
- arch/arm/Kconfig                                   |    3 -
- arch/arm/mach-tegra/Kconfig                        |    9 +-
- arch/arm64/Kconfig                                 |    3 -
- drivers/Kconfig                                    |    2 +
- drivers/amba/Kconfig                               |   14 +
- drivers/clk/tegra/clk-divider.c                    |   13 +
- drivers/clk/tegra/clk-tegra114.c                   |    7 +-
- drivers/clk/tegra/clk-tegra124.c                   |    7 +-
- drivers/clk/tegra/clk-tegra20.c                    |    8 +-
- drivers/clk/tegra/clk-tegra30.c                    |    7 +-
- drivers/clk/tegra/clk.h                            |    2 +
- drivers/iommu/Kconfig                              |   12 +-
- drivers/iommu/tegra-smmu.c                         | 1604 +++++++-------------
- drivers/memory/Kconfig                             |   12 +-
- drivers/memory/Makefile                            |    3 +-
- drivers/memory/tegra/Kconfig                       |    7 +
- drivers/memory/tegra/Makefile                      |    7 +
- drivers/memory/tegra/mc.c                          |  301 ++++
- drivers/memory/tegra/mc.h                          |   53 +
- drivers/memory/tegra/tegra114.c                    |  948 ++++++++++++
- drivers/memory/tegra/tegra124.c                    |  995 ++++++++++++
- drivers/memory/tegra/tegra30.c                     |  970 ++++++++++++
- drivers/memory/tegra30-mc.c                        |  378 -----
- include/dt-bindings/clock/tegra114-car.h           |    2 +-
- include/dt-bindings/clock/tegra124-car.h           |    2 +-
- include/dt-bindings/clock/tegra20-car.h            |    2 +-
- include/dt-bindings/memory/tegra114-mc.h           |   25 +
- include/dt-bindings/memory/tegra124-mc.h           |   31 +
- include/dt-bindings/memory/tegra30-mc.h            |   24 +
- include/soc/tegra/mc.h                             |  107 ++
- 31 files changed, 4089 insertions(+), 1505 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/nvidia,tegra-mc.txt
- create mode 100644 drivers/amba/Kconfig
- create mode 100644 drivers/memory/tegra/Kconfig
- create mode 100644 drivers/memory/tegra/Makefile
- create mode 100644 drivers/memory/tegra/mc.c
- create mode 100644 drivers/memory/tegra/mc.h
- create mode 100644 drivers/memory/tegra/tegra114.c
- create mode 100644 drivers/memory/tegra/tegra124.c
- create mode 100644 drivers/memory/tegra/tegra30.c
- delete mode 100644 drivers/memory/tegra30-mc.c
- create mode 100644 include/dt-bindings/memory/tegra114-mc.h
- create mode 100644 include/dt-bindings/memory/tegra124-mc.h
- create mode 100644 include/dt-bindings/memory/tegra30-mc.h
- create mode 100644 include/soc/tegra/mc.h
+Thanks
+Hanjun
