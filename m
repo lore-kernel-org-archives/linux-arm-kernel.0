@@ -1,210 +1,118 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 26 Nov 2014 17:57:08 +0100
-Subject: [PATCH v5 1/3] mtd: nand: gpmi: add gpmi_move_bits function
-In-Reply-To: <1417020793-3354-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1417020793-3354-1-git-send-email-boris.brezillon@free-electrons.com>
- <1417020793-3354-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20141126175708.1acb90ac@bbrezillon>
+From: tim@krieglstein.org (Tim Sander)
+Date: Wed, 26 Nov 2014 17:58:19 +0100
+Subject: [PATCH 3.18-rc3 v9 3/5] irqchip: gic: Introduce plumbing for IPI
+ FIQ
+In-Reply-To: <5475F65F.4030905@linaro.org>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <1678979.dHizJmHVtD@dabox> <5475F65F.4030905@linaro.org>
+Message-ID: <1494053.N1Xc171oq1@dabox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Nov 2014 17:53:11 +0100
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-
-> Add a new function to move bits (not bytes) from a memory region to
-> another one.
-> This function is similar to memmove except it acts at bit level.
-> This function is needed to implement GPMI raw access functions, given the
-> fact that ECC engine does not pad ECC bits to the next byte boundary.
+Am Mittwoch, 26. November 2014, 15:48:47 schrieb Daniel Thompson:
+> On 26/11/14 15:09, Tim Sander wrote:
+> > I would be quite happy if grouping support for gic would be mainlined.
+> > Then only the dance to get the old gic version 1 working with fiqs would
+> > be
+> > needed...
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/mtd/nand/gpmi-nand/gpmi-lib.c  | 151 +++++++++++++++++++++++++++++++++
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   4 +
->  2 files changed, 155 insertions(+)
+> You mention "the dance"...
 > 
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> index 87e658c..77eff0e 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> @@ -1353,3 +1353,154 @@ int gpmi_read_page(struct gpmi_nand_data *this,
->  	set_dma_type(this, DMA_FOR_READ_ECC_PAGE);
->  	return start_dma_with_bch_irq(this, desc);
->  }
-> +
-> +/**
-> + * gpmi_move_bits - move bits from one memory region to another
-> + * @dst: destination buffer
-> + * @dst_bit_off: bit offset we're starting to write at
-> + * @src: source buffer
-> + * @src_bit_off: bit offset we're starting to read from
-> + * @nbits: number of bits to copy
-> + *
-> + * This functions copies bits from one memory region to another, and is used by
-> + * the GPMI driver to copy ECC sections which are not guaranteed to be byte
-> + * aligned.
+> Are you familiar with this work from Marek Vasut?
+>   https://lkml.org/lkml/2014/7/15/550
+The world is a small place isn't it. Unfortunatly yes.. and that is not 
+because Marek is a not a nice guy (quite in contrary) but the way it solves 
+the problem we had with the GIC in the socfpga. There should have been some 
+pins from the FPGA fabric to the "legacy" FIQ interrupt "pins" of the core. 
+Unfortunatly these where forgotten...
 
-I forgot to add that src and dst should not overlap, otherwise it won't
-work...
+Marek had also an aproach similar to yours checking if the irq is wrongly 
+signalled. In our workload the performance was much to worse to consider it a 
+solution (which is contrary to Harro Haan's findings but we have a magnitude 
+higher FIQ load). So he got a hint from a french guy (forgot the name) who had 
+the idea to use a non-secure mapping to read the irq id as fiq id's must not be 
+read in non-secure reads.
 
-> + *
-> + */
-> +void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
-> +		    const u8 *src, size_t src_bit_off,
-> +		    size_t nbits)
-> +{
-> +	size_t i;
-> +	size_t nbytes;
-> +	u32 src_buffer = 0;
-> +	size_t bits_in_src_buffer = 0;
-> +
-> +	if (!nbits)
-> +		return;
-> +
-> +	/*
-> +	 * Move src and dst pointers to the closest byte pointer and store bit
-> +	 * offsets within a byte.
-> +	 */
-> +	src += src_bit_off / 8;
-> +	src_bit_off %= 8;
-> +
-> +	dst += dst_bit_off / 8;
-> +	dst_bit_off %= 8;
-> +
-> +	/*
-> +	 * Initialize the src_buffer value with bits available in the first
-> +	 * byte of data so that we end up with a byte aligned src pointer.
-> +	 */
-> +	if (src_bit_off) {
-> +		src_buffer = src[0] >> src_bit_off;
-> +		if (nbits >= (8 - src_bit_off)) {
-> +			bits_in_src_buffer += 8 - src_bit_off;
-> +		} else {
-> +			src_buffer &= GENMASK(nbits - 1, 0);
-> +			bits_in_src_buffer += nbits;
-> +		}
-> +		nbits -= bits_in_src_buffer;
-> +		src++;
-> +	}
-> +
-> +	/* Calculate the number of bytes that can be copied from src to dst. */
-> +	nbytes = nbits / 8;
-> +
-> +	/* Try to align dst to a byte boundary. */
-> +	if (dst_bit_off) {
-> +		if (bits_in_src_buffer < (8 - dst_bit_off) && nbytes) {
-> +			src_buffer |= src[0] << bits_in_src_buffer;
-> +			bits_in_src_buffer += 8;
-> +			src++;
-> +			nbytes--;
-> +		}
-> +
-> +		if (bits_in_src_buffer >= (8 - dst_bit_off)) {
-> +			dst[0] &= GENMASK(dst_bit_off - 1, 0);
-> +			dst[0] |= src_buffer << dst_bit_off;
-> +			src_buffer >>= (8 - dst_bit_off);
-> +			bits_in_src_buffer -= (8 - dst_bit_off);
-> +			dst_bit_off = 0;
-> +			dst++;
-> +			if (bits_in_src_buffer > 7) {
-> +				bits_in_src_buffer -= 8;
-> +				dst[0] = src_buffer;
-> +				dst++;
-> +				src_buffer >>= 8;
-> +			}
-> +		}
-> +	}
-> +
-> +	if (!bits_in_src_buffer && !dst_bit_off) {
-> +		/*
-> +		 * Both src and dst pointers are byte aligned, thus we can
-> +		 * just use the optimized memcpy function.
-> +		 */
-> +		if (nbytes)
-> +			memcpy(dst, src, nbytes);
-> +	} else {
-> +		/*
-> +		 * src buffer is not byte aligned, hence we have to copy each
-> +		 * src byte to the src_buffer variable before extracting a byte
-> +		 * to store in dst.
-> +		 */
-> +		for (i = 0; i < nbytes; i++) {
-> +			src_buffer |= src[i] << bits_in_src_buffer;
-> +			dst[i] = src_buffer;
-> +			src_buffer >>= 8;
-> +		}
-> +	}
-> +	/* Update dst and src pointers */
-> +	dst += nbytes;
-> +	src += nbytes;
-> +
-> +	/*
-> +	 * nbits is the number of remaining bits. It should not exceed 8 as
-> +	 * we've already copied as much bytes as possible.
-> +	 */
-> +	nbits %= 8;
-> +
-> +	/*
-> +	 * If there's no more bits to copy to the destination and src buffer
-> +	 * was already byte aligned, then we're done.
-> +	 */
-> +	if (!nbits && !bits_in_src_buffer)
-> +		return;
-> +
-> +	/* Copy the remaining bits to src_buffer */
-> +	if (nbits)
-> +		src_buffer |= (*src & GENMASK(nbits - 1, 0)) <<
-> +			      bits_in_src_buffer;
-> +	bits_in_src_buffer += nbits;
-> +
-> +	/*
-> +	 * In case there were not enough bits to get a byte aligned dst buffer
-> +	 * prepare the src_buffer variable to match the dst organization (shift
-> +	 * src_buffer by dst_bit_off and retrieve the least significant bits
-> +	 * from dst).
-> +	 */
-> +	if (dst_bit_off)
-> +		src_buffer = (src_buffer << dst_bit_off) |
-> +			     (*dst & GENMASK(dst_bit_off - 1, 0));
-> +	bits_in_src_buffer += dst_bit_off;
-> +
-> +	/*
-> +	 * Keep most significant bits from dst if we end up with an unaligned
-> +	 * number of bits.
-> +	 */
-> +	nbytes = bits_in_src_buffer / 8;
-> +	if (bits_in_src_buffer % 8) {
-> +		src_buffer |= (dst[nbytes] &
-> +			       GENMASK(7, bits_in_src_buffer % 8)) <<
-> +			      (nbytes * 8);
-> +		nbytes++;
-> +	}
-> +
-> +	/* Copy the remaining bytes to dst */
-> +	for (i = 0; i < nbytes; i++) {
-> +		dst[i] = src_buffer;
-> +		src_buffer >>= 8;
-> +	}
-> +}
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-> index 32c6ba4..17d0736 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-> @@ -290,6 +290,10 @@ extern int gpmi_send_page(struct gpmi_nand_data *,
->  extern int gpmi_read_page(struct gpmi_nand_data *,
->  			dma_addr_t payload, dma_addr_t auxiliary);
->  
-> +void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
-> +		    const u8 *src, size_t src_bit_off,
-> +		    size_t nbits);
-> +
->  /* BCH : Status Block Completion Codes */
->  #define STATUS_GOOD		0x00
->  #define STATUS_ERASED		0xff
+This leads to the question i was also asking Marc Zyngier at LinuxCon: if this 
+aproach is mainlinable in any way.
 
+And just to get the message out there, espcially to ARM: yes there are users 
+of FIQ interrupts which wan't to use Linux in combination with FIQ's and who 
+don't wan't to resort to Cortex R cores without a MMU. And seeing that ARM is 
+deprecating the use of FIQ on ARM64 i wonder how a solution to have IRQ's not
+masked by Linux looks in this for upcoming processor generations.
+ 
+> Marek blushed a bit when it was written and it wasn't very popular in
+> code review... however it does arranges memory to mapped in a manner
+> that allows FIQ to be deployed by the kernel on early gic v1 devices.
+In a way i made him indirectly do it by asking the right questions to the 
+silicon vendor.
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> >> +/*
+> >> + * Shift an interrupt between Group 0 and Group 1.
+> >> + *
+> >> + * In addition to changing the group we also modify the priority to
+> >> + * match what "ARM strongly recommends" for a system where no Group 1
+> >> + * interrupt must ever preempt a Group 0 interrupt.
+> >> + *
+> >> + * If is safe to call this function on systems which do not support
+> >> + * grouping (it will have no effect).
+> >> + */
+> >> +static void gic_set_group_irq(void __iomem *base, unsigned int hwirq,
+> >> +				int group)
+> >> +{
+> >> +	unsigned int grp_reg = hwirq / 32 * 4;
+> >> +	u32 grp_mask = BIT(hwirq % 32);
+> >> +	u32 grp_val;
+> >> +
+> >> +	unsigned int pri_reg = (hwirq / 4) * 4;
+> >> +	u32 pri_mask = BIT(7 + ((hwirq % 4) * 8));
+> >> +	u32 pri_val;
+> >> +
+> >> +	/*
+> >> +	 * Systems which do not support grouping will have not have
+> >> +	 * the EnableGrp1 bit set.
+> >> +	 */
+> >> +	if (!(GICD_ENABLE_GRP1 & readl_relaxed(base + GIC_DIST_CTRL)))
+> >> +		return;
+> >> +
+> >> +	raw_spin_lock(&irq_controller_lock);
+> >> +
+> > 
+> > Assumption: The interrupt in question is not masked over here?
+> 
+> At present this function is called only during initialization and all
+> interrupts are globally disabled at that stage in the boot.
+> 
+> >> +	grp_val = readl_relaxed(base + GIC_DIST_IGROUP + grp_reg);
+> >> +	pri_val = readl_relaxed(base + GIC_DIST_PRI + pri_reg);
+> >> +
+> >> +	if (group) {
+> >> +		grp_val |= grp_mask;
+> >> +		pri_val |= pri_mask;
+> >> +	} else {
+> >> +		grp_val &= ~grp_mask;
+> >> +		pri_val &= ~pri_mask;
+> >> +	}
+> >> +
+> >> +	writel_relaxed(grp_val, base + GIC_DIST_IGROUP + grp_reg);
+> > 
+> > If the assumption is true, then there is a race if the interrupt in
+> > question hits here with undefined priority setting. Recomended workaround
+> > would be masking the interrupt in question.
+> 
+> An interesting question!
+> 
+> Firstly, as mentioned above, such a race is impossible with the code
+> proposed so far.
+> 
+> I do have some code sitting written by untested that makes it possible
+> to set the group based on a flag passed during request_irq() (something
+> requested by tglx in a review from a month or two back). That also means
+> the interrupt is disabled during the call.
+> 
+> I think that means that neither now nor in the immediate future would
+> such a race be possible.
+> 
+> 
+> Daniel.
