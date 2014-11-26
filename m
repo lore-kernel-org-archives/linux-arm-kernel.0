@@ -1,57 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Nov 2014 12:41:28 +0000
-Subject: [PATCH v9 1/6] arm64: ptrace: add NT_ARM_SYSTEM_CALL regset
-In-Reply-To: <1416977391-24231-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1416977391-24231-1-git-send-email-takahiro.akashi@linaro.org>
- <1416977391-24231-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20141126124128.GH14866@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 26 Nov 2014 13:48:32 +0100
+Subject: [PATCH v4] clocksource: arch_timer: Allow the device tree to
+ specify uninitialized timer registers
+In-Reply-To: <5475C802.4050903@linaro.org>
+References: <1412753627-28287-1-git-send-email-sonnyrao@chromium.org>
+ <4822206.0yqmIumDEc@diego> <5475C802.4050903@linaro.org>
+Message-ID: <11522840.iniX5CHHHk@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+Am Mittwoch, 26. November 2014, 13:30:58 schrieb Daniel Lezcano:
+> On 11/26/2014 01:06 PM, Heiko St?bner wrote:
+> > Hi Daniel,
+> > 
+> > Am Mittwoch, 26. November 2014, 12:51:08 schrieb Daniel Lezcano:
+> >> Hi Doug, Olof,
+> >> 
+> >> IIUC, it sounds like this patch is needed from some other patches in
+> >> arm-soc. Olof was proposing to take this patch through its tree to
+> >> facilitate the integration.
+> >> 
+> >> Olof, is it this patch you were worried about ?
+> > 
+> > I think this is one of two patches in question.
+> > 
+> > "clocksource: arch_timer: Fix code to use physical timers when requested"
+> > [0] would be the second one.
+> > 
+> > And the patch for arm-soc that Olof means would be "ARM: dts: rk3288: add
+> > arm,cpu-registers-not-fw-configured" [1].
+> 
+> Ok, so IIUC, "clocksource: arch_timer: Fix code to use physical timers
+> when requested" should go via arm's tree, right ?
 
-On Wed, Nov 26, 2014 at 04:49:46AM +0000, AKASHI Takahiro wrote:
-> This regeset is intended to be used to get and set a system call number
-> while tracing.
-> There was some discussion about possible approaches to do so:
-> 
-> (1) modify x8 register with ptrace(PTRACE_SETREGSET) indirectly,
->     and update regs->syscallno later on in syscall_trace_enter(), or
-> (2) define a dedicated regset for this purpose as on s390, or
-> (3) support ptrace(PTRACE_SET_SYSCALL) as on arch/arm
-> 
-> Thinking of the fact that user_pt_regs doesn't expose 'syscallno' to
-> tracer as well as that secure_computing() expects a changed syscall number,
-> especially case of -1, to be visible before this function returns in
-> syscall_trace_enter(), (1) doesn't work well.
-> We will take (2) since it looks much cleaner.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/kernel/ptrace.c |   35 +++++++++++++++++++++++++++++++++++
->  include/uapi/linux/elf.h   |    1 +
->  2 files changed, 36 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 8a4ae8e..8b98781 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -551,6 +551,32 @@ static int tls_set(struct task_struct *target, const struct user_regset *regset,
->  	return ret;
->  }
->  
-> +static int system_call_get(struct task_struct *target,
-> +			   const struct user_regset *regset,
-> +			   unsigned int pos, unsigned int count,
-> +			   void *kbuf, void __user *ubuf)
-> +{
-> +	struct pt_regs *regs = task_pt_regs(target);
-> +
-> +	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-> +				   &regs->syscallno, 0, -1);
+If I'm reading Olof's irc-comments from yesterday correctly, that is right and 
+the 3 patches should go in together:
 
-Does this work for big-endian machines? regs->syscallno is a u64, but the
-regset defines it as an int. I think you need to copy to a temporary
-register first.
+- "clocksource: arch_timer: Fix code to use physical timers
+  when requested" fixes the use of physical timers in general
+- "clocksource: arch_timer: Allow the device tree to specify uninitialized
+  timer registers" allows this to be set from dt
+- "ARM: dts: rk3288: add arm,cpu-registers-not-fw-configured" enables this on
+  rk3288
 
-Will
+
+Heiko
