@@ -1,129 +1,102 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 27 Nov 2014 17:29:30 +0800
-Subject: [PATCH] clk: sunxi: Fix factor clocks usage for sun9i core clocks
-Message-ID: <1417080570-5099-1-git-send-email-wens@csie.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 27 Nov 2014 10:41:23 +0100
+Subject: [RFC PATCH 2/2] lib: devres: Add exec versions of
+ devm_ioremap_resource and friends
+In-Reply-To: <bde13d5e7931af9aa90ddc09a79be5c30e3eef94.1417029918.git.d-gerlach@ti.com>
+References: <cover.1417029918.git.d-gerlach@ti.com>
+ <bde13d5e7931af9aa90ddc09a79be5c30e3eef94.1417029918.git.d-gerlach@ti.com>
+Message-ID: <CAMuHMdWn3mgzwX55+OCWwMZwvfXkh7B+n-b0uChAW5gbx9b7Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sunxi factor clocks usage was changed in
+On Wed, Nov 26, 2014 at 10:14 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
+> --- a/lib/devres.c
+> +++ b/lib/devres.c
+> @@ -72,6 +72,64 @@ void __iomem *devm_ioremap_nocache(struct device *dev, resource_size_t offset,
+>  EXPORT_SYMBOL(devm_ioremap_nocache);
+>
+>  /**
+> + * devm_ioremap_exec - Managed ioremap_exec()
+> + * @dev: Generic device to remap IO address for
+> + * @offset: BUS offset to map
+> + * @size: Size of map
+> + *
+> + * Managed ioremap_exec().  Map is automatically unmapped on driver detach.
+> + */
+> +void __iomem *devm_ioremap_exec(struct device *dev, resource_size_t offset,
+> +                               unsigned long size)
+> +{
 
-    clk: sunxi: Give sunxi_factors_register a registers parameter
+[...]
 
-However the sun9i core clocks were not fixed up in that patch,
-resulting in breakage. This patch fixes that.
+> +       addr = ioremap_exec(offset, size);
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Cc: Hans de Goede <hdegoede@redhat.com>
----
+[...]
 
-This patch is for 3.20.
+> +}
+> +EXPORT_SYMBOL(devm_ioremap_exec);
+> +
+> +/**
+> + * devm_ioremap_exec_nocache - Managed ioremap_exec_nocache()
+> + * @dev: Generic device to remap IO address for
+> + * @offset: BUS offset to map
+> + * @size: Size of map
+> + *
+> + * Managed ioremap_exec_nocache().  Map is automatically unmapped on driver
+> + * detach.
+> + */
+> +void __iomem *devm_ioremap_exec_nocache(struct device *dev,
+> +                                       resource_size_t offset,
+> +                                       unsigned long size)
+> +{
 
-A bit of boiler plate code for each clock provider.
-Maybe we should add a local helper or something?
+[...]
 
----
- drivers/clk/sunxi/clk-sun9i-core.c | 62 ++++++++++++++++++++++++++++++++++----
- 1 file changed, 56 insertions(+), 6 deletions(-)
+> +       addr = ioremap_exec_nocache(offset, size);
 
-diff --git a/drivers/clk/sunxi/clk-sun9i-core.c b/drivers/clk/sunxi/clk-sun9i-core.c
-index 3cb9036..9b5e7a1 100644
---- a/drivers/clk/sunxi/clk-sun9i-core.c
-+++ b/drivers/clk/sunxi/clk-sun9i-core.c
-@@ -89,7 +89,17 @@ static DEFINE_SPINLOCK(sun9i_a80_pll4_lock);
- 
- static void __init sun9i_a80_pll4_setup(struct device_node *node)
- {
--	sunxi_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
-+	void __iomem *reg;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (!reg) {
-+		pr_err("Could not get registers for a80-pll4-clk: %s\n",
-+		       node->name);
-+		return;
-+	}
-+
-+	sunxi_factors_register(node, &sun9i_a80_pll4_data,
-+			       &sun9i_a80_pll4_lock, reg);
- }
- CLK_OF_DECLARE(sun9i_a80_pll4, "allwinner,sun9i-a80-pll4-clk", sun9i_a80_pll4_setup);
- 
-@@ -139,8 +149,18 @@ static DEFINE_SPINLOCK(sun9i_a80_gt_lock);
- 
- static void __init sun9i_a80_gt_setup(struct device_node *node)
- {
--	struct clk *gt = sunxi_factors_register(node, &sun9i_a80_gt_data,
--						&sun9i_a80_gt_lock);
-+	void __iomem *reg;
-+	struct clk *gt;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (!reg) {
-+		pr_err("Could not get registers for a80-gt-clk: %s\n",
-+		       node->name);
-+		return;
-+	}
-+
-+	gt = sunxi_factors_register(node, &sun9i_a80_gt_data,
-+				    &sun9i_a80_gt_lock, reg);
- 
- 	/* The GT bus clock needs to be always enabled */
- 	__clk_get(gt);
-@@ -194,7 +214,17 @@ static DEFINE_SPINLOCK(sun9i_a80_ahb_lock);
- 
- static void __init sun9i_a80_ahb_setup(struct device_node *node)
- {
--	sunxi_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
-+	void __iomem *reg;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (!reg) {
-+		pr_err("Could not get registers for a80-ahb-clk: %s\n",
-+		       node->name);
-+		return;
-+	}
-+
-+	sunxi_factors_register(node, &sun9i_a80_ahb_data,
-+			       &sun9i_a80_ahb_lock, reg);
- }
- CLK_OF_DECLARE(sun9i_a80_ahb, "allwinner,sun9i-a80-ahb-clk", sun9i_a80_ahb_setup);
- 
-@@ -210,7 +240,17 @@ static DEFINE_SPINLOCK(sun9i_a80_apb0_lock);
- 
- static void __init sun9i_a80_apb0_setup(struct device_node *node)
- {
--	sunxi_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
-+	void __iomem *reg;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (!reg) {
-+		pr_err("Could not get registers for a80-apb0-clk: %s\n",
-+		       node->name);
-+		return;
-+	}
-+
-+	sunxi_factors_register(node, &sun9i_a80_apb0_data,
-+			       &sun9i_a80_apb0_lock, reg);
- }
- CLK_OF_DECLARE(sun9i_a80_apb0, "allwinner,sun9i-a80-apb0-clk", sun9i_a80_apb0_setup);
- 
-@@ -266,6 +306,16 @@ static DEFINE_SPINLOCK(sun9i_a80_apb1_lock);
- 
- static void __init sun9i_a80_apb1_setup(struct device_node *node)
- {
--	sunxi_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
-+	void __iomem *reg;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (!reg) {
-+		pr_err("Could not get registers for a80-apb1-clk: %s\n",
-+		       node->name);
-+		return;
-+	}
-+
-+	sunxi_factors_register(node, &sun9i_a80_apb1_data,
-+			       &sun9i_a80_apb1_lock, reg);
- }
- CLK_OF_DECLARE(sun9i_a80_apb1, "allwinner,sun9i-a80-apb1-clk", sun9i_a80_apb1_setup);
--- 
-2.1.3
+[...]
+
+> +}
+> +EXPORT_SYMBOL(devm_ioremap_exec_nocache);
+> +
+
+Both of these are identical to the already-existing devm_ioremap() and
+devm_ioremap_nocache(), except for the call to the underlying
+ioremap*() variant.
+
+Can't the variant selection be done by passing a flag around, set by
+the top-level inline functions, to avoid code duplication?
+Some architecture-specific ioremap() implementations already work that
+way, cfr. arch/m68k/include/asm/io_mm.h:
+
+static inline void __iomem *ioremap(unsigned long physaddr, unsigned long size)
+{
+        return __ioremap(physaddr, size, IOMAP_NOCACHE_SER);
+}
+static inline void __iomem *ioremap_nocache(unsigned long physaddr,
+unsigned lonn
+g size)
+{
+        return __ioremap(physaddr, size, IOMAP_NOCACHE_SER);
+}
+static inline void __iomem *ioremap_writethrough(unsigned long physaddr,
+                                         unsigned long size)
+{
+        return __ioremap(physaddr, size, IOMAP_WRITETHROUGH);
+}
+static inline void __iomem *ioremap_fullcache(unsigned long physaddr,
+                                      unsigned long size)
+{
+        return __ioremap(physaddr, size, IOMAP_FULL_CACHING);
+}
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
