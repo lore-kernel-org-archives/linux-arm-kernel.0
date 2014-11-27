@@ -1,273 +1,127 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 27 Nov 2014 16:23:31 +0200
-Subject: [PATCH 2/3] ARM: edma: Rename header file for dmaengine filter
- function definition
-In-Reply-To: <8235185.7qUDHu9jso@wuerfel>
-References: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>
- <1417084891-17990-3-git-send-email-peter.ujfalusi@ti.com>
- <8235185.7qUDHu9jso@wuerfel>
-Message-ID: <547733E3.3020408@ti.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 27 Nov 2014 14:28:11 +0000
+Subject: [PATCH V4] arm64: amd-seattle: Adding device tree for AMD
+ Seattle platform
+In-Reply-To: <D09A7217.A4E1%suravee.suthikulpanit@amd.com>
+References: <547458B9.2000805@arm.com>
+ <D09A7217.A4E1%suravee.suthikulpanit@amd.com>
+Message-ID: <20141127142811.GN828@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2014 01:14 PM, Arnd Bergmann wrote:
-> On Thursday 27 November 2014 12:41:30 Peter Ujfalusi wrote:
->> diff --git a/include/linux/edma-dmaengine.h b/include/linux/edma-dmaengine.h
->> new file mode 100644
->> index 000000000000..8a2602809a77
->> --- /dev/null
->> +++ b/include/linux/edma-dmaengine.h
->> @@ -0,0 +1,29 @@
->> +struct dma_chan;
->> +
->> +#if defined(CONFIG_TI_EDMA) || defined(CONFIG_TI_EDMA_MODULE)
->> +bool edma_filter_fn(struct dma_chan *, void *);
->> +#else
->> +static inline bool edma_filter_fn(struct dma_chan *chan, void *param)
->> +{
->> +	return false;
->> +}
->> +#endif
->> +
->> +#endif
+On Tue, Nov 25, 2014 at 11:46:50AM +0000, Suthikulpanit, Suravee wrote:
+> Hi Marc,
 > 
-> It's better not to hardcode the name of the filter function in a driver,
-> better move the filter function into platform code and pass it down
-> to the driver in the platform_data pointer in davinci_mmc_config and
-> davinci_spi_platform_data to get rid of this dependency.
+> On 11/25/14, 17:23, "Marc Zyngier" <marc.zyngier@arm.com> wrote:
 > 
-> Something roughly like the patch below.
+> >Hi Suravee,
+> >
+> >Just spotted a small issue below (looks like a recurring mistake in a
+> >number of DTs I've seem lately):
+> >
+> >On 24/11/14 21:51, suravee.suthikulpanit at amd.com wrote:
+> >> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> >> 
+> >> Initial revision of device tree for AMD Seattle platform.
+> >> 
+> >> Cc: Arnd Bergmann <arnd@arndb.de>
+> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> >> Signed-off-by: Thomas Lendacky <Thomas.Lendacky@amd.com>
+> >> Signed-off-by: Joel Schopp <Joel.Schopp@amd.com>
+> >> ---
+> >> V4 Changes:
+> >>     * Remove unnecessary smb layer and move motherbord to top level
+> >>     * Move include dtsi to top level
+> >>     * Remove apb_pclk from sata0 and i2c
+> >>     * Fix GIC Virtual Maintanance Interrupt from PPI24 (8) to PPI25 (9)
+> >>     * Add 40-bit dma-ranges for motherboard (simple-bus)
+> >>     * Remove dma0 (pl330) entry for now since it only supports 32-bit
+> >>DMA.
+> >>       It is basically not used at the moment. It would also need SMMU
+> >>       to allow dma remapping to 40-bit DMA range.
+> >>     * Add phandle spi0 and spi1
+> >>     * Hook up gpio0 pin 7 with MMC Card Detection (CD) support.
+> >>     * Changes in pcie0 entry:
+> >>         - Add 40-bit dma-ranges
+> >>         - Remove interrupts property
+> >>         - Add interrupt-map/mask property
+> >>         - Fix PCI I/O range
+> >>         - Merge PCI 32-bit ranges
+> >>         - Merge PCI 64-bit ranges
+> >> 
+> >> NOTE: I am not add a new compatible ID for the sata0 as Rob Herring
+> >>       suggested since there is no need at the momement, and I am trying
+> >>       to avoid introducing ID unnecessarily.
+> >> 
+> >>  arch/arm64/Kconfig                          |   5 +
+> >>  arch/arm64/boot/dts/Makefile                |   1 +
+> >>  arch/arm64/boot/dts/amd-seattle-periph.dtsi | 156
+> >>++++++++++++++++++++++++++++
+> >>  arch/arm64/boot/dts/amd-seattle.dts         |  89 ++++++++++++++++
+> >>  4 files changed, 251 insertions(+)
+> >>  create mode 100644 arch/arm64/boot/dts/amd-seattle-periph.dtsi
+> >>  create mode 100644 arch/arm64/boot/dts/amd-seattle.dts
+> >> 
+> >
+> >[...]
+> >
+> >> diff --git a/arch/arm64/boot/dts/amd-seattle.dts
+> >>b/arch/arm64/boot/dts/amd-seattle.dts
+> >> new file mode 100644
+> >> index 0000000..d5fc482
+> >> --- /dev/null
+> >> +++ b/arch/arm64/boot/dts/amd-seattle.dts
+> >> @@ -0,0 +1,89 @@
+> >> +/*
+> >> + * DTS file for AMD Seattle
+> >> + *
+> >> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
+> >> + */
+> >> +
+> >> +/dts-v1/;
+> >> +
+> 
+> [...] 
+> 
+> >> +
+> >> +	timer {
+> >> +		compatible = "arm,armv8-timer";
+> >> +		interrupts = <1 13 0xff01>,
+> >> +			     <1 14 0xff01>,
+> >> +			     <1 11 0xff01>,
+> >> +			     <1 10 0xff01>;
+> >> +	};
+> >
+> >The Cortex-A57 TRM clearly states that these interrupts are level
+> >triggered.
+> 
+> Thanks for pointing this out. I?ll fix this to <1 1X 0xff04> (4 for the
+> Active-High) then.
 
-This will only work in case of legacy boot. When booting with DT we do not
-have pdata and after this patch in dt boot we are not going to be able to get
-the DMA resources either.
+Hi Suravee,
 
-I think if we want to do something like this, it has to be done within the
-dmaengine framework. The dma controller's of_dma_filter_info already have
-.filter_fn which could be used by the framework.
+Don't know what Seattle does, but the TRM says that the outputs are active-LOW.
 
-On the other hand the davinci_mmc (and spi-davinci) is only going to work on
-davinci devices, so I don't really see issue with 'hard coding' davinci
-related callback in the code.
+Best regards,
+Liviu
+
+> 
+> Suravee
+> 
+> >
+> 
+> 
 
 -- 
-P?ter
-
-> 
-> 	Arnd
-> 
-> 
-> ---
-> [DRAFT] ARM: davinci: pass dma config through platform data
-> 
-> DMA slave drivers are supposed to be written independent of the dma engine
-> driver, which means that the mmc and spi drivers on davinci should not
-> reference the edma_filter_fn or know about the specific format of the
-> data passed into it.
-> 
-> This changes the channel data from a resource into a void pointer and
-> passes it as platform data along with the filter function.
-> 
-> TODO: do the same thing for SPI, and adapt the filter function for the
-> new format.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
->  arch/arm/mach-davinci/devices-da8xx.c     | 26 ++++++--------------------
->  arch/arm/mach-davinci/devices.c           | 22 ++++++----------------
->  drivers/mmc/host/davinci_mmc.c            | 27 +++++++++++----------------
->  include/linux/platform_data/mmc-davinci.h |  5 +++++
->  4 files changed, 28 insertions(+), 52 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-> index b85b781b05fd..4aa872dc6dc3 100644
-> --- a/arch/arm/mach-davinci/devices-da8xx.c
-> +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> @@ -671,16 +671,6 @@ static struct resource da8xx_mmcsd0_resources[] = {
->  		.end	= IRQ_DA8XX_MMCSDINT0,
->  		.flags	= IORESOURCE_IRQ,
->  	},
-> -	{		/* DMA RX */
-> -		.start	= DA8XX_DMA_MMCSD0_RX,
-> -		.end	= DA8XX_DMA_MMCSD0_RX,
-> -		.flags	= IORESOURCE_DMA,
-> -	},
-> -	{		/* DMA TX */
-> -		.start	= DA8XX_DMA_MMCSD0_TX,
-> -		.end	= DA8XX_DMA_MMCSD0_TX,
-> -		.flags	= IORESOURCE_DMA,
-> -	},
->  };
->  
->  static struct platform_device da8xx_mmcsd0_device = {
-> @@ -693,6 +683,9 @@ static struct platform_device da8xx_mmcsd0_device = {
->  int __init da8xx_register_mmcsd0(struct davinci_mmc_config *config)
->  {
->  	da8xx_mmcsd0_device.dev.platform_data = config;
-> +	config->filter = edma_filter_fn;
-> +	config->rxdma = (void *)DA8XX_DMA_MMCSD0_RX;
-> +	config->txdma = (void *)DA8XX_DMA_MMCSD0_TX;
->  	return platform_device_register(&da8xx_mmcsd0_device);
->  }
->  
-> @@ -708,16 +701,6 @@ static struct resource da850_mmcsd1_resources[] = {
->  		.end	= IRQ_DA850_MMCSDINT0_1,
->  		.flags	= IORESOURCE_IRQ,
->  	},
-> -	{		/* DMA RX */
-> -		.start	= DA850_DMA_MMCSD1_RX,
-> -		.end	= DA850_DMA_MMCSD1_RX,
-> -		.flags	= IORESOURCE_DMA,
-> -	},
-> -	{		/* DMA TX */
-> -		.start	= DA850_DMA_MMCSD1_TX,
-> -		.end	= DA850_DMA_MMCSD1_TX,
-> -		.flags	= IORESOURCE_DMA,
-> -	},
->  };
->  
->  static struct platform_device da850_mmcsd1_device = {
-> @@ -730,6 +713,9 @@ static struct platform_device da850_mmcsd1_device = {
->  int __init da850_register_mmcsd1(struct davinci_mmc_config *config)
->  {
->  	da850_mmcsd1_device.dev.platform_data = config;
-> +	config->filter = edma_filter_fn;
-> +	config->rxdma = (void *)DA8XX_DMA_MMCSD1_RX;
-> +	config->txdma = (void *)DA8XX_DMA_MMCSD1_TX;
->  	return platform_device_register(&da850_mmcsd1_device);
->  }
->  #endif
-> diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
-> index 6257aa452568..7b7039d9b079 100644
-> --- a/arch/arm/mach-davinci/devices.c
-> +++ b/arch/arm/mach-davinci/devices.c
-> @@ -144,14 +144,6 @@ static struct resource mmcsd0_resources[] = {
->  		.start = IRQ_SDIOINT,
->  		.flags = IORESOURCE_IRQ,
->  	},
-> -	/* DMA channels: RX, then TX */
-> -	{
-> -		.start = EDMA_CTLR_CHAN(0, DAVINCI_DMA_MMCRXEVT),
-> -		.flags = IORESOURCE_DMA,
-> -	}, {
-> -		.start = EDMA_CTLR_CHAN(0, DAVINCI_DMA_MMCTXEVT),
-> -		.flags = IORESOURCE_DMA,
-> -	},
->  };
->  
->  static struct platform_device davinci_mmcsd0_device = {
-> @@ -181,14 +173,6 @@ static struct resource mmcsd1_resources[] = {
->  		.start = IRQ_DM355_SDIOINT1,
->  		.flags = IORESOURCE_IRQ,
->  	},
-> -	/* DMA channels: RX, then TX */
-> -	{
-> -		.start = EDMA_CTLR_CHAN(0, 30),	/* rx */
-> -		.flags = IORESOURCE_DMA,
-> -	}, {
-> -		.start = EDMA_CTLR_CHAN(0, 31),	/* tx */
-> -		.flags = IORESOURCE_DMA,
-> -	},
->  };
->  
->  static struct platform_device davinci_mmcsd1_device = {
-> @@ -218,6 +202,9 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
->  	 */
->  	switch (module) {
->  	case 1:
-> +		config->filter = edma_filter_fn;
-> +		config->rxdma = (void *)EDMA_CTLR_CHAN(0, DAVINCI_DMA_MMCRXEVT);
-> +		config->txdma = (void *)EDMA_CTLR_CHAN(0, DAVINCI_DMA_MMCTXEVT);
->  		if (cpu_is_davinci_dm355()) {
->  			/* REVISIT we may not need all these pins if e.g. this
->  			 * is a hard-wired SDIO device...
-> @@ -247,6 +234,9 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
->  		pdev = &davinci_mmcsd1_device;
->  		break;
->  	case 0:
-> +		config->filter = edma_filter_fn;
-> +		config->rxdma = (void *)EDMA_CTLR_CHAN(0, 30);
-> +		config->txdma = (void *)EDMA_CTLR_CHAN(0, 31);
->  		if (cpu_is_davinci_dm355()) {
->  			mmcsd0_resources[0].start = DM355_MMCSD0_BASE;
->  			mmcsd0_resources[0].end = DM355_MMCSD0_BASE + SZ_4K - 1;
-> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-> index 1625f908dc70..3f25be9942c8 100644
-> --- a/drivers/mmc/host/davinci_mmc.c
-> +++ b/drivers/mmc/host/davinci_mmc.c
-> @@ -202,7 +202,8 @@ struct mmc_davinci_host {
->  	u32 buffer_bytes_left;
->  	u32 bytes_left;
->  
-> -	u32 rxdma, txdma;
-> +	dma_filter_fn filter;
-> +	void *rxdma, *txdma;
->  	struct dma_chan *dma_tx;
->  	struct dma_chan *dma_rx;
->  	bool use_dma;
-> @@ -524,16 +525,16 @@ static int __init davinci_acquire_dma_channels(struct mmc_davinci_host *host)
->  	dma_cap_set(DMA_SLAVE, mask);
->  
->  	host->dma_tx =
-> -		dma_request_slave_channel_compat(mask, edma_filter_fn,
-> -				&host->txdma, mmc_dev(host->mmc), "tx");
-> +		dma_request_slave_channel_compat(mask, host->filter,
-> +				host->txdma, mmc_dev(host->mmc), "tx");
->  	if (!host->dma_tx) {
->  		dev_err(mmc_dev(host->mmc), "Can't get dma_tx channel\n");
->  		return -ENODEV;
->  	}
->  
->  	host->dma_rx =
-> -		dma_request_slave_channel_compat(mask, edma_filter_fn,
-> -				&host->rxdma, mmc_dev(host->mmc), "rx");
-> +		dma_request_slave_channel_compat(mask, host->filter,
-> +				host->rxdma, mmc_dev(host->mmc), "rx");
->  	if (!host->dma_rx) {
->  		dev_err(mmc_dev(host->mmc), "Can't get dma_rx channel\n");
->  		r = -ENODEV;
-> @@ -1262,17 +1263,11 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
->  	host = mmc_priv(mmc);
->  	host->mmc = mmc;	/* Important */
->  
-> -	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-> -	if (!r)
-> -		dev_warn(&pdev->dev, "RX DMA resource not specified\n");
-> -	else
-> -		host->rxdma = r->start;
-> -
-> -	r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
-> -	if (!r)
-> -		dev_warn(&pdev->dev, "TX DMA resource not specified\n");
-> -	else
-> -		host->txdma = r->start;
-> +	if (pdata) {
-> +		host->filter = pdata->filter;
-> +		host->rxdma  = pdata->rxdma;
-> +		host->txdma  = pdata->txdma;
-> +	}
->  
->  	host->mem_res = mem;
->  	host->base = ioremap(mem->start, mem_size);
-> diff --git a/include/linux/platform_data/mmc-davinci.h b/include/linux/platform_data/mmc-davinci.h
-> index 9cea4ee377b5..0e5809bcaff0 100644
-> --- a/include/linux/platform_data/mmc-davinci.h
-> +++ b/include/linux/platform_data/mmc-davinci.h
-> @@ -25,6 +25,11 @@ struct davinci_mmc_config {
->  
->  	/* Number of sg segments */
->  	u8	nr_sg;
-> +
-> +	/* DMA setup */
-> +	dma_filter_fn filter;
-> +	void	*rxdma;
-> +	void	*txdma;
->  };
->  void davinci_setup_mmc(int module, struct davinci_mmc_config *config);
->  
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
