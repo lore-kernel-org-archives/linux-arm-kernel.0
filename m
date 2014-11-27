@@ -1,65 +1,193 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 27 Nov 2014 17:51:53 +0200
-Subject: [PATCH 22/23] ARM: OMAP4+: PRM: setup prm_features from the PRM init
- time flags
+Date: Thu, 27 Nov 2014 17:51:48 +0200
+Subject: [PATCH 17/23] ARM: OMAP4: control: remove support for legacy padconf
+ APIs
 In-Reply-To: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
 References: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1417103514-17027-23-git-send-email-t-kristo@ti.com>
+Message-ID: <1417103514-17027-18-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently some cpu_is_X checks are used to setup prm_features, however
-the same can be accomplished by just passing these flags from the PRM
-init data. This is done in preparation to make PRM a separate driver.
+These are no longer needed for anything with the introduction of
+pinctrl DT support, thus removed.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/prm44xx.c    |    4 ++--
- arch/arm/mach-omap2/prm_common.c |    3 +++
- 2 files changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/control.c |   23 +----------------------
+ arch/arm/mach-omap2/control.h |    5 +----
+ arch/arm/mach-omap2/io.c      |   27 +++++++++------------------
+ 3 files changed, 11 insertions(+), 44 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index 1994dcc..af12302b 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -706,10 +706,10 @@ int __init omap44xx_prm_init(const struct omap_prcm_init_data *data)
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index f9519f1..e664dba 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -33,7 +33,6 @@
+ #define PADCONF_SAVE_DONE		0x1
+ 
+ static void __iomem *omap2_ctrl_base;
+-static void __iomem *omap4_ctrl_pad_base;
+ 
+ #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
+ struct omap3_scratchpad {
+@@ -136,13 +135,10 @@ static struct omap3_control_regs control_context;
+ #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
+ 
+ #define OMAP_CTRL_REGADDR(reg)		(omap2_ctrl_base + (reg))
+-#define OMAP4_CTRL_PAD_REGADDR(reg)	(omap4_ctrl_pad_base + (reg))
+ 
+-void __init omap2_set_globals_control(void __iomem *ctrl,
+-				      void __iomem *ctrl_pad)
++void __init omap2_set_globals_control(void __iomem *ctrl)
  {
- 	omap_prm_base_init();
+ 	omap2_ctrl_base = ctrl;
+-	omap4_ctrl_pad_base = ctrl_pad;
+ }
  
--	if (cpu_is_omap44xx() || soc_is_omap54xx() || soc_is_dra7xx())
-+	if (data->flags & PRM_HAS_IO_WAKEUP)
- 		prm_features |= PRM_HAS_IO_WAKEUP;
+ void __iomem *omap_ctrl_base_get(void)
+@@ -180,23 +176,6 @@ void omap_ctrl_writel(u32 val, u16 offset)
+ 	writel_relaxed(val, OMAP_CTRL_REGADDR(offset));
+ }
  
--	if (!soc_is_dra7xx())
-+	if (data->flags & PRM_HAS_VOLTAGE)
- 		prm_features |= PRM_HAS_VOLTAGE;
+-/*
+- * On OMAP4 control pad are not addressable from control
+- * core base. So the common omap_ctrl_read/write APIs breaks
+- * Hence export separate APIs to manage the omap4 pad control
+- * registers. This APIs will work only for OMAP4
+- */
+-
+-u32 omap4_ctrl_pad_readl(u16 offset)
+-{
+-	return readl_relaxed(OMAP4_CTRL_PAD_REGADDR(offset));
+-}
+-
+-void omap4_ctrl_pad_writel(u32 val, u16 offset)
+-{
+-	writel_relaxed(val, OMAP4_CTRL_PAD_REGADDR(offset));
+-}
+-
+ #ifdef CONFIG_ARCH_OMAP3
  
- 	omap4_prminst_set_prm_dev_inst(data->device_inst_offset);
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index b828352..d5bb649 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -651,18 +651,21 @@ static struct omap_prcm_init_data omap4_prm_data __initdata = {
- 	.index = CLK_MEMMAP_INDEX_PRM,
- 	.init = omap44xx_prm_init,
- 	.device_inst_offset = OMAP4430_PRM_DEVICE_INST,
-+	.flags = PRM_HAS_IO_WAKEUP | PRM_HAS_VOLTAGE,
- };
+ /**
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index 8a9d97d7..c08c00f 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -436,11 +436,9 @@ extern void __iomem *omap_ctrl_base_get(void);
+ extern u8 omap_ctrl_readb(u16 offset);
+ extern u16 omap_ctrl_readw(u16 offset);
+ extern u32 omap_ctrl_readl(u16 offset);
+-extern u32 omap4_ctrl_pad_readl(u16 offset);
+ extern void omap_ctrl_writeb(u8 val, u16 offset);
+ extern void omap_ctrl_writew(u16 val, u16 offset);
+ extern void omap_ctrl_writel(u32 val, u16 offset);
+-extern void omap4_ctrl_pad_writel(u32 val, u16 offset);
  
- static struct omap_prcm_init_data omap5_prm_data __initdata = {
- 	.index = CLK_MEMMAP_INDEX_PRM,
- 	.init = omap44xx_prm_init,
- 	.device_inst_offset = OMAP54XX_PRM_DEVICE_INST,
-+	.flags = PRM_HAS_IO_WAKEUP | PRM_HAS_VOLTAGE,
- };
- 
- static struct omap_prcm_init_data dra7_prm_data __initdata = {
- 	.index = CLK_MEMMAP_INDEX_PRM,
- 	.init = omap44xx_prm_init,
- 	.device_inst_offset = DRA7XX_PRM_DEVICE_INST,
-+	.flags = PRM_HAS_IO_WAKEUP,
- };
- 
- static struct omap_prcm_init_data am4_prm_data __initdata = {
+ extern void omap3_save_scratchpad_contents(void);
+ extern void omap3_clear_scratchpad_contents(void);
+@@ -457,8 +455,7 @@ extern void omap3630_ctrl_disable_rta(void);
+ extern int omap3_ctrl_save_padconf(void);
+ void omap3_ctrl_init(void);
+ int omap_control_init(void);
+-extern void omap2_set_globals_control(void __iomem *ctrl,
+-				      void __iomem *ctrl_pad);
++void omap2_set_globals_control(void __iomem *ctrl);
+ #else
+ #define omap_ctrl_base_get()		0
+ #define omap_ctrl_readb(x)		0
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 6a94345..3a61b31 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -384,8 +384,7 @@ void __init omap2420_init_early(void)
+ 	omap2_set_globals_tap(OMAP242X_CLASS, OMAP2_L4_IO_ADDRESS(0x48014000));
+ 	omap2_set_globals_sdrc(OMAP2_L3_IO_ADDRESS(OMAP2420_SDRC_BASE),
+ 			       OMAP2_L3_IO_ADDRESS(OMAP2420_SMS_BASE));
+-	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP242X_CTRL_BASE),
+-				  NULL);
++	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP242X_CTRL_BASE));
+ 	omap2xxx_check_revision();
+ 	omap2xxx_prm_init();
+ 	omap2xxx_cm_init();
+@@ -412,8 +411,7 @@ void __init omap2430_init_early(void)
+ 	omap2_set_globals_tap(OMAP243X_CLASS, OMAP2_L4_IO_ADDRESS(0x4900a000));
+ 	omap2_set_globals_sdrc(OMAP2_L3_IO_ADDRESS(OMAP243X_SDRC_BASE),
+ 			       OMAP2_L3_IO_ADDRESS(OMAP243X_SMS_BASE));
+-	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP243X_CTRL_BASE),
+-				  NULL);
++	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP243X_CTRL_BASE));
+ 	omap2xxx_check_revision();
+ 	omap2xxx_prm_init();
+ 	omap2xxx_cm_init();
+@@ -444,8 +442,7 @@ void __init omap3_init_early(void)
+ 	omap2_set_globals_tap(OMAP343X_CLASS, OMAP2_L4_IO_ADDRESS(0x4830A000));
+ 	omap2_set_globals_sdrc(OMAP2_L3_IO_ADDRESS(OMAP343X_SDRC_BASE),
+ 			       OMAP2_L3_IO_ADDRESS(OMAP343X_SMS_BASE));
+-	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP343X_CTRL_BASE),
+-				  NULL);
++	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP343X_CTRL_BASE));
+ 	/* XXX: remove these two once OMAP3 is DT only */
+ 	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP3430_PRM_BASE));
+ 	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE), NULL);
+@@ -493,8 +490,7 @@ void __init ti81xx_init_early(void)
+ {
+ 	omap2_set_globals_tap(OMAP343X_CLASS,
+ 			      OMAP2_L4_IO_ADDRESS(TI81XX_TAP_BASE));
+-	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(TI81XX_CTRL_BASE),
+-				  NULL);
++	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(TI81XX_CTRL_BASE));
+ 	/* XXX: remove these two once TI81xx is DT only */
+ 	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE));
+ 	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE), NULL);
+@@ -559,8 +555,7 @@ void __init am33xx_init_early(void)
+ {
+ 	omap2_set_globals_tap(AM335X_CLASS,
+ 			      AM33XX_L4_WK_IO_ADDRESS(AM33XX_TAP_BASE));
+-	omap2_set_globals_control(AM33XX_L4_WK_IO_ADDRESS(AM33XX_CTRL_BASE),
+-				  NULL);
++	omap2_set_globals_control(AM33XX_L4_WK_IO_ADDRESS(AM33XX_CTRL_BASE));
+ 	omap3xxx_check_revision();
+ 	am33xx_check_features();
+ 	am33xx_prm_init();
+@@ -583,8 +578,7 @@ void __init am43xx_init_early(void)
+ {
+ 	omap2_set_globals_tap(AM335X_CLASS,
+ 			      AM33XX_L4_WK_IO_ADDRESS(AM33XX_TAP_BASE));
+-	omap2_set_globals_control(AM33XX_L4_WK_IO_ADDRESS(AM33XX_CTRL_BASE),
+-				  NULL);
++	omap2_set_globals_control(AM33XX_L4_WK_IO_ADDRESS(AM33XX_CTRL_BASE));
+ 	omap3xxx_check_revision();
+ 	am33xx_check_features();
+ 	omap44xx_prm_init();
+@@ -608,8 +602,7 @@ void __init omap4430_init_early(void)
+ {
+ 	omap2_set_globals_tap(OMAP443X_CLASS,
+ 			      OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE));
+-	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
+-				  OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE));
++	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE));
+ 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE));
+ 	omap4xxx_check_revision();
+ 	omap4xxx_check_features();
+@@ -638,8 +631,7 @@ void __init omap5_init_early(void)
+ {
+ 	omap2_set_globals_tap(OMAP54XX_CLASS,
+ 			      OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
+-	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
+-				  OMAP2_L4_IO_ADDRESS(OMAP54XX_CTRL_BASE));
++	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
+ 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
+ 	omap4_pm_init_early();
+ 	omap44xx_prm_init();
+@@ -665,8 +657,7 @@ void __init omap5_init_late(void)
+ void __init dra7xx_init_early(void)
+ {
+ 	omap2_set_globals_tap(-1, OMAP2_L4_IO_ADDRESS(DRA7XX_TAP_BASE));
+-	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
+-				  OMAP2_L4_IO_ADDRESS(DRA7XX_CTRL_BASE));
++	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
+ 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
+ 	omap4_pm_init_early();
+ 	omap44xx_prm_init();
 -- 
 1.7.9.5
