@@ -1,94 +1,78 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Thu, 27 Nov 2014 23:59:32 +0800
-Subject: [PATCH] arm64: jump labels: NOP out NOP -> NOP replacement
-In-Reply-To: <1416942242-6587-1-git-send-email-mark.rutland@arm.com>
-References: <1416942242-6587-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <2B049EEF-17EB-4ADB-8D7F-19E23CADD92E@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Nov 2014 16:59:51 +0100
+Subject: Code generation involving __raw_readl and __raw_writel
+In-Reply-To: <54774756.40408@free.fr>
+References: <5476FFA2.8010403@free.fr> <2978273.VePW8UymqL@wuerfel>
+ <54774756.40408@free.fr>
+Message-ID: <11601741.5istDo3S3l@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Jiang Liu <liuj97@gmail.com>
+On Thursday 27 November 2014 16:46:30 Mason wrote:
+> On 27/11/2014 16:00, Arnd Bergmann wrote:
+> 
+> > On Thursday 27 November 2014 15:51:55 Mason wrote:
+> >
+> >> (BTW, the original code is 4-5 years old, while my target is 3.14.x)
+> >
+> > I meant the IO_ADDRESS stuff. Modern code uses ioremap() instead
+> > since the IO_ADDRESS was platform specific, and drivers can no longer
+> > use platform headers on CONFIG_ARCH_MULTIPLATFORM, which is used
+> > for all new code now.
+> 
+> $ grep CONFIG_ARCH_MULTIPLATFORM .config
+> # CONFIG_ARCH_MULTIPLATFORM is not set
+> 
+> One more thing on the TODO list (which is starting to look like a
+> phone directory). Do you have a reference explaining this option?
+> (I did read the short description in arch/arm/Kconfig)
 
-> ? 2014?11?26????3:04?Mark Rutland <mark.rutland@arm.com> ???
+The brief version is that instead of selecting just one platform
+at a time, you can now build a kernel with (almost) all ARMv6 and
+ARMv7 platforms enabled at the same time, and new platforms are no
+longer allowed to be separate options. When you look at any of the
+modern (e.g. sunxi, rockchip, hisi, ...) platforms you find how
+their Kconfig is structured. Some older platforms still have a lot
+of other files in the mach-* directories for historic reasons, but
+you wouldn't do that for a new platform.
+
+> > Would you consider submitting the code upstream?
 > 
-> In the arm64 arch_static_branch implementation we place an A64 NOP into
-> the instruction stream and log relevant details to a jump_entry in a
-> __jump_table section. Later this may be replaced with an immediate
-> branch without link to the code for the unlikely case.
+> This is definitely one of my objectives. I'm still learning the ropes
+> (I rewrote the cpufreq driver to use mostly generic functions, heard
+> of the clk "meta-framework" but haven't even started looking at that,
+> I'm also writing a temperature sensor driver for lm-sensors.)
+
+Ok, cool. Can you upload what you have to a public git tree for
+reference? 
+
+> > Modern platforms no longer have an include directory and use the
+> > standard definitions. How many other header files do you have in there?
 > 
-> At init time, the core calls arch_jump_label_transform_static to
-> initialise the NOPs. On x86 this involves inserting the optimal NOP for
-> a given microarchitecture, but on arm64 we only use the architectural
-> NOP, and hence replace each NOP with the exact same NOP. This is
-> somewhat pointless.
+> $ find arch/arm/mach-tangox -name *.h | wc -l
+> 44
+
+Ouch. I'm guessing that a lot of these will be driver specific.
+Those headers should just be merged into whatever driver uses the
+registers and removed from the platform.
+
+Then there is the case of platform_data definitions. For platforms
+using traditional board files, these should get moved to
+include/linux/platform_data/, but for an upstream port you will have
+to use devicetree anyway, and then you won't need platform data.
+
+> > Actually, we also try to get rid of the need for most other files
+> > in mach-* as well, though commonly you need a little bit of code for
+> > bringing up secondary CPU cores. Everything else should be a device
+> > driver.
 > 
-> Additionally, at module load time we don't call jump_label_apply_nops to
-> patch the optimal NOPs in, unlike other architectures, but get away with
-> this because we only use the architectural NOP anyway. A later notifier
-> will patch NOPs with branches as required.
-> 
-> Similarly to x86 commit 11570da1c5b1dee1 (x86/jump-label: Do not bother
-> updating NOPs if they are correct), we can avoid patching NOPs with
-> identical NOPs. Given that we only use a single NOP encoding, this means
-> we can NOP-out the body of arch_jump_label_transform_static entirely. As
-> the default __weak arch_jump_label_transform_static implementation
-> performs a patch, we must use an empty function to achieve this.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Jiang Liu <liuj97@gmail.com>
-> Cc: Laura Abbott <lauraa@codeaurora.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
-> arch/arm64/kernel/jump_label.c | 23 +++++++++--------------
-> 1 file changed, 9 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
-> index 9ac30bb..4f1fec7 100644
-> --- a/arch/arm64/kernel/jump_label.c
-> +++ b/arch/arm64/kernel/jump_label.c
-> @@ -22,9 +22,8 @@
-> 
-> #ifdef HAVE_JUMP_LABEL
-> 
-> -static void __arch_jump_label_transform(struct jump_entry *entry,
-> -                    enum jump_label_type type,
-> -                    bool is_static)
-> +void arch_jump_label_transform(struct jump_entry *entry,
-> +                   enum jump_label_type type)
-> {
->    void *addr = (void *)entry->code;
->    u32 insn;
-> @@ -37,22 +36,18 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
->        insn = aarch64_insn_gen_nop();
->    }
-> 
-> -    if (is_static)
-> -        __aarch64_insn_patch_text_nosync(addr, insn, true);
-> -    else
-> -        aarch64_insn_patch_text(&addr, &insn, 1);
-> -}
-> -
-> -void arch_jump_label_transform(struct jump_entry *entry,
-> -                   enum jump_label_type type)
-> -{
-> -    __arch_jump_label_transform(entry, type, false);
-> +    aarch64_insn_patch_text(&addr, &insn, 1);
-> }
-> 
-> void arch_jump_label_transform_static(struct jump_entry *entry,
->                      enum jump_label_type type)
-> {
-> -    __arch_jump_label_transform(entry, type, true);
-> +    /*
-> +     * We use the architected A64 NOP in arch_static_branch, so there's no
-> +     * need to patch an identical A64 NOP over the top of it here. The core
-> +     * will call arch_jump_label_transform from a module notifier if the
-> +     * NOP needs to be replaced by a branch.
-> +     */
-> }
-> 
-> #endif    /* HAVE_JUMP_LABEL */
-> -- 
-> 1.9.1
-> 
+> I see that other platforms put their cpufreq driver in drivers/cpufreq
+> Ours is in arch/arm/mach-tangox (same for cpuidle.c)
+> (Hmmm, now that I look more closely, I see that we also have a generic
+> clock.c in there... More on the TODO list.)
+
+Right. We moved almost everything into subsystems. Also clocksource,
+irqchip, pinctrl, gpio, dma, led, pwm, and probably some more that
+I forgot.
+
+	Arnd
