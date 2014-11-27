@@ -1,45 +1,65 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 27 Nov 2014 14:04:29 +0530
-Subject: [v3, 1/2] arm64: Create link to include/dt-bindings to enable C
- preprocessor use.
-In-Reply-To: <1415727131-4572-2-git-send-email-Liviu.Dudau@arm.com>
-References: <1415727131-4572-2-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <5476E215.5020405@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 27 Nov 2014 08:36:29 +0000
+Subject: [PATCH v2 3/9] clk: sunxi: Add prcm mod0 clock driver
+In-Reply-To: <547589A9.5060802@redhat.com>
+References: <1416749895-25013-1-git-send-email-hdegoede@redhat.com>
+ <1416749895-25013-4-git-send-email-hdegoede@redhat.com>
+ <20141125165744.GA17789@x1> <547589A9.5060802@redhat.com>
+Message-ID: <20141127083629.GA4628@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liviu,
+On Wed, 26 Nov 2014, Hans de Goede wrote:
 
-On Tuesday 11 November 2014 11:02 PM, Liviu Dudau wrote:
-> DT files used in the compilation phase can be preprocessed by the C
-> preprocessor. This requires an include/dt-bindings directory to be
-> present in the arch/arm64/boot/dts directory.
->
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
->
+> Hi,
+> 
+> On 11/25/2014 05:57 PM, Lee Jones wrote:
+> >On Sun, 23 Nov 2014, Hans de Goede wrote:
+> >
+> >>Add a driver for mod0 clocks found in the prcm. Currently there is only
+> >>one mod0 clocks in the prcm, the ir clock.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+> >>  drivers/clk/sunxi/Makefile                        |  2 +-
+> >>  drivers/clk/sunxi/clk-sun6i-prcm-mod0.c           | 63 +++++++++++++++++++++++
+> >>  drivers/mfd/sun6i-prcm.c                          | 14 +++++
+> >>  4 files changed, 79 insertions(+), 1 deletion(-)
+> >>  create mode 100644 drivers/clk/sunxi/clk-sun6i-prcm-mod0.c
+> >
+> >[...]
+> >
+> >>diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
+> >>index 283ab8d..ff1254f 100644
+> >>--- a/drivers/mfd/sun6i-prcm.c
+> >>+++ b/drivers/mfd/sun6i-prcm.c
+> >>@@ -41,6 +41,14 @@ static const struct resource sun6i_a31_apb0_gates_clk_res[] = {
+> >>  	},
+> >>  };
+> >>
+> >>+static const struct resource sun6i_a31_ir_clk_res[] = {
+> >>+	{
+> >>+		.start = 0x54,
+> >>+		.end = 0x57,
+> >>+		.flags = IORESOURCE_MEM,
+> >>+	},
+> >>+};
+> >
+> >I'm not overly keen on these magic numbers (and yes, I'm well aware
+> >that I SoB'ed the patch which started them off).
+> >
+> >It's not a show stopper, although I'd prefer if they were fixed with a
+> >subsequent patch.
+> 
+> These are offsets of the relevant registers inside the prcm register block,
+> if not done this way, then how should they be done ?
 
-Same change already has been posted as part of adding Exynos7 SoC 
-support, as Exynos7 patches have been accepted in Kukjin's tree, I think 
-following patch [1] as part of Exynos7 series [2] can also be taken.
+I like these kinds of things to be defined.  No implementation changes
+are necessary.
 
-1: http://www.spinics.net/lists/devicetree/msg56552.html
-2: http://www.spinics.net/lists/devicetree/msg56551.html
-
-Thanks,
-Pankaj Dubey
-
-> ---
-> arch/arm64/boot/dts/include/dt-bindings | 1 +
->   1 file changed, 1 insertion(+)
->   create mode 120000 arch/arm64/boot/dts/include/dt-bindings
->
-> \ No newline at end of file
->
-> diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
-> new file mode 120000
-> index 0000000..08c00e4
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/include/dt-bindings
-> @@ -0,0 +1 @@
-> +../../../../../include/dt-bindings
->
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
