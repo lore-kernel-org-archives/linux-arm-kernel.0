@@ -1,64 +1,42 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 26 Nov 2014 18:01:22 -0700
-Subject: [PATCH v12 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <7hk32hcvkx.fsf@deeprootsystems.com>
-References: <1417047195-18978-1-git-send-email-lina.iyer@linaro.org>
- <1417047195-18978-4-git-send-email-lina.iyer@linaro.org>
- <7hk32hcvkx.fsf@deeprootsystems.com>
-Message-ID: <20141127010122.GD5137@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 26 Nov 2014 17:12:04 -0800
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <201411270038.01312@pali>
+References: <20141027200008.GR2560@atomide.com> <201411270001.44871@pali>
+ <20141126231435.GQ2817@atomide.com> <201411270038.01312@pali>
+Message-ID: <20141127011203.GR2817@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26 2014 at 17:53 -0700, Kevin Hilman wrote:
->Lina Iyer <lina.iyer@linaro.org> writes:
->
->> SPM is a hardware block that controls the peripheral logic surrounding
->> the application cores (cpu/l$). When the core executes WFI instruction,
->> the SPM takes over the putting the core in low power state as
->> configured. The wake up for the SPM is an interrupt at the GIC, which
->> then completes the rest of low power mode sequence and brings the core
->> out of low power mode.
->>
->> The SPM has a set of control registers that configure the SPMs
->> individually based on the type of the core and the runtime conditions.
->> SPM is a finite state machine block to which a sequence is provided and
->> it interprets the bytes and executes them in sequence. Each low power
->> mode that the core can enter into is provided to the SPM as a sequence.
->>
->> Configure the SPM to set the core (cpu or L2) into its low power mode,
->> the index of the first command in the sequence is set in the SPM_CTL
->> register. When the core executes ARM wfi instruction, it triggers the
->> SPM state machine to start executing from that index. The SPM state
->> machine waits until the interrupt occurs and starts executing the rest
->> of the sequence until it hits the end of the sequence. The end of the
->> sequence jumps the core out of its low power mode.
->>
->> Add support for an idle driver to set up the SPM to place the core in
->> Standby or Standalone power collapse mode when the core is idle.
->>
->> Based on work by: Mahesh Sivasubramanian <msivasub@codeaurora.org>,
->> Ai Li <ali@codeaurora.org>, Praveen Chidambaram <pchidamb@codeaurora.org>
->> Original tree available at -
->> git://codeaurora.org/quic/la/kernel/msm-3.10.git
->>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->
->[...]
->
->> diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
->> new file mode 100644
->> index 0000000..e5d3ebd
->> --- /dev/null
->> +++ b/drivers/soc/qcom/spm.c
->> @@ -0,0 +1,328 @@
->> +/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
->
->nit: one more multi-line coding style missed (no need to repost just for
->this, feel free to just updated it locally)
->
->After that, feel free to add:
-Thanks, I am going to send an updated set later tonight. This will be
-fixed.
+* Pali Roh?r <pali.rohar@gmail.com> [141126 15:40]:
+> 
+> With enabled CONFIG_ARM_APPENDED_DTB=y file /proc/atags is 
+> missing.
 
->
->Reviewed-by: Kevin Hilman <khilman@linaro.org>
+OK I guess it should not be needed for DT based booting.
+ 
+> > The build_tag_list() should parse ATAG_REVISION and then
+> > parse_tag_revision() should copy it to system_rev. Maybe try
+> > adding some printks to see if those functions get called?
+> 
+> Now I see... Problem is that build_tag_list() is called from 
+> convert_to_tag_list() which is called from setup_machine_tags() 
+> which is called from setup_arch() only if setup_machine_fdt() 
+> call fails. And it fails for *non* DT boot. You can check this 
+> chain too.
+
+Thinking about this probably the best long term solution is
+to pass optional board_revision in the kernel cmdline that
+can be parsed early and copied to system_rev variable.
+
+Or if you can think of some other way to get it, we can set
+system_rev in pdata-quirks.c.
+
+Or maybe add some code to copy the ATAGs somewhere where
+they are out of the way and don't conflict with the device
+tree data? Then we can query ATAG_REVISION from pdata-quirks.c
+and set system_rev.
+
+Regards,
+
+Tony
