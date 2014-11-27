@@ -1,41 +1,94 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Thu, 27 Nov 2014 14:22:14 +0800
-Subject: [PATCH v3 03/13] arm64: improve CONFIG_STRICT_DEVMEM handling
-In-Reply-To: <CAKv+Gu8UyfdFhaKXNQMzuf7L3b9jDyUd4FzG1x-c7FfoxnZe=Q@mail.gmail.com>
-References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
- <1416315432-8534-4-git-send-email-ard.biesheuvel@linaro.org>
- <20141126093042.GA6474@darkstar.nay.redhat.com>
- <CAKv+Gu8UyfdFhaKXNQMzuf7L3b9jDyUd4FzG1x-c7FfoxnZe=Q@mail.gmail.com>
-Message-ID: <20141127062214.GC2860@darkstar.nay.redhat.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 27 Nov 2014 15:46:29 +0900
+Subject: [PATCH v9 2/6] arm64: ptrace: allow tracer to skip a system call
+In-Reply-To: <20141126130252.GI14866@arm.com>
+References: <1416977391-24231-1-git-send-email-takahiro.akashi@linaro.org>
+ <1416977391-24231-3-git-send-email-takahiro.akashi@linaro.org>
+ <20141126130252.GI14866@arm.com>
+Message-ID: <5476C8C5.4010202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/14 at 05:23pm, Ard Biesheuvel wrote:
-> On 26 November 2014 at 10:30, Dave Young <dyoung@redhat.com> wrote:
-> > On 11/18/14 at 01:57pm, Ard Biesheuvel wrote:
-> >> Improve the handling of /dev/mem mappings under CONFIG_STRICT_DEVMEM by:
-> >> - allowing read-only access to parts of System RAM that are not
-> >>   considered memory by the kernel, this is mainly intended for exposing
-> >>   UEFI Configuration tables to userland;
-> >
-> > Ard, can you elabrate a bit? Are this for the acpi case because no dtb in
-> > procfs?
-> >
-> 
-> No, that is a different issue.
-> 
-> > Anyway I also think using /dev/mem looks not a good way to expose
-> > infomation to userspace.
-> >
-> 
-> This is for compatibility with existing tools like dmidecode and lshw
-> that already use /dev/mem.
-> However, on x86, the tables they access are in iomem resource ranges
-> that are accessible under CONFIG_STRICT_DEVMEM, whereas on arm64,
-> those regions are inaccessible.
-> 
-> So while our position is that using /dev/mem for *anything* is an
-> awful idea, this particular patch just tries to bring arm64 in line
-> with what currently existing tools expect.
+On 11/26/2014 10:02 PM, Will Deacon wrote:
+> On Wed, Nov 26, 2014 at 04:49:47AM +0000, AKASHI Takahiro wrote:
+>> If tracer modifies a syscall number to -1, this traced system call should
+>> be skipped with a return value specified in x0.
+>> This patch implements this semantics.
+>>
+>> Please note:
+>> * syscall entry tracing and syscall exit tracing (ftrace tracepoint and
+>>    audit) are always executed, if enabled, even when skipping a system call
+>>    (that is, -1).
+>>    In this way, we can avoid a potential bug where audit_syscall_entry()
+>>    might be called without audit_syscall_exit() at the previous system call
+>>    being called, that would cause OOPs in audit_syscall_entry().
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>   arch/arm64/kernel/entry.S |   10 +++++++++-
+>>   1 file changed, 9 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index 726b910..946ec52 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -161,6 +161,7 @@
+>>    */
+>>   sc_nr	.req	x25		// number of system calls
+>>   scno	.req	x26		// syscall number
+>> +scno_w	.req	w26		// syscall number (lower 32 bits)
+>>   stbl	.req	x27		// syscall table pointer
+>>   tsk	.req	x28		// current thread_info
+>>
+>> @@ -668,8 +669,14 @@ ENDPROC(el0_svc)
+>>   	 * switches, and waiting for our parent to respond.
+>>   	 */
+>>   __sys_trace:
+>> -	mov	x0, sp
+>> +	cmp     scno_w, #-1			// set default errno for
+>
+> I hate that we have to use scno_w, but the only alternative I can think of
+> is using w8 directly, which isn't any better and doesn't work for compat.
+> Ho-hum, I guess we'll stick with what you have.
 
-Ard, Ok, thanks for the clarification.
+The possible approaches might be:
+* use 32-bit registers for scno & sc_nr and use "sxtw scno, w8," or
+* use an extra reg like
+     __sys_trace:
+         mov x0, #0xffffffff
+         cmp scno, x0
+         b.ne 1f
+
+>> +	b.ne	1f				// user-issued syscall(-1)
+>> +	mov	x0, #-ENOSYS
+>> +	str	x0, [sp]
+>
+> Can you use #S_X0 here for clarity, please?
+
+Okey.
+
+>> +1:	mov	x0, sp
+>>   	bl	syscall_trace_enter
+>> +	cmp	w0, #-1				// skip the syscall?
+>> +	b.eq	__sys_trace_return_skipped
+>>   	adr	lr, __sys_trace_return		// return address
+>>   	uxtw	scno, w0			// syscall number (possibly new)
+>>   	mov	x1, sp				// pointer to regs
+>> @@ -684,6 +691,7 @@ __sys_trace:
+>>
+>>   __sys_trace_return:
+>>   	str	x0, [sp]			// save returned x0
+>
+> and update this guy too.
+
+Sure.
+
+-Takahiro AKASHI
+
+> Will
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+>
