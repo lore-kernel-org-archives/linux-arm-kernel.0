@@ -1,165 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Nov 2014 00:12:25 +0100
-Subject: [PATCH 00/11] ARM: at91: remove !DT support for at91rm9200
-In-Reply-To: <20141127171243.GL4508@piout.net>
-References: <cover.1417103399.git.nicolas.ferre@atmel.com>
- <3550407.q87bWB4Jdt@wuerfel> <20141127171243.GL4508@piout.net>
-Message-ID: <3935244.Dm2HkZj2Bg@wuerfel>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 28 Nov 2014 00:27:05 +0100
+Subject: [PATCH] ARM vf610: add compatibilty strings of supported Vybrid SoC's
+Message-ID: <1417130825-2818-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014 18:12:43 Alexandre Belloni wrote:
-> 
-> As discussed some weeks ago, I prepared patches to switch sama5d[3-4] to
-> multiplatform. We are still missing the SMC and matrix drivers to switch
-> sam9 and rm9200.
+The Vybrid SoC family (in the kernel known as vf610) is a familiy
+of multiple similar SoC's. The VF5xx series comes without secondary
+Cortex-M4 core, while the second number VFx1x indicates the presence
+of a L2 cache controller.
 
-I just looked at the drivers because I got curious, and to see if
-there are still any low-hanging fruit, but I guess you already picked
-them all ;-)
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ Documentation/devicetree/bindings/arm/fsl.txt | 12 ++++++++++++
+ arch/arm/mach-imx/mach-vf610.c                |  5 ++++-
+ 2 files changed, 16 insertions(+), 1 deletion(-)
 
-> The currently affected drivers are:
->  - drivers/ata/pata_at91.c (SMC)
->  - drivers/pcmcia/at91_cf.c (SMC)
-
-I guess the SMC should live in drivers/memory with an interface
-similar to mvebu-devbus.c?
-
-Seems doable but nontrivial.
-
->  - drivers/usb/gadget/udc/at91_udc.c (Matrix, this is the only one
->    for sam9)
-
-Is at91_matrix a pin controller? With the board files removed, the udc
-driver has the only two remaining calls to at91_matrix_{read,write}
-for setting the pullup, so that could be modeled as a trivial pinctrl
-driver
-
->  - sound/atmel/ac97c.c (that one is still not converted to DT anyway...)
-
-This one seems fairly straightforward to do, including a DT binding,
-but the result is still ugly as it supports the at32 chips that
-do things very differently.
-
-The patch below gets it to compile and should be enough as a replacement
-once a compatible string gets added.
-
->  - drivers/watchdog/at91rm9200_wdt.c (WIP, will be converted properly to
->    an MFD)
-
-I think we discussed this one before. Remind me why we can't just convert
-it to use watchdog_register() for simplification and then move whatever
-remains into the arch/arm/mach-at91/at91rm9200_time.c file, or both
-into drivers/clocksource.
-
-	Arnd
-
-8<----
-ASoC: atmel/ac97c: remove platform_data dependency
-
-As at91 gets changed to multiplatform, we can't use the mach/cpu.h
-header any more, but this is ok as it only gets used to check for
-cpu_is_at32ap7000(), which arch/avr32.
-
-In order to make the driver work without platform_data, this also
-changes the reset gpio line handling so it can look up the gpio
-descriptor from DT. It is still missing a compatible string and
-a binding that describes the valid DT properties.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/sound/atmel/ac97c.c b/sound/atmel/ac97c.c
-index b59427d5a697..4eec216b7f92 100644
---- a/sound/atmel/ac97c.c
-+++ b/sound/atmel/ac97c.c
-@@ -34,10 +34,10 @@
- #include <linux/platform_data/dma-dw.h>
- #include <linux/dma/dw.h>
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index 4e8b7df..c830b5b 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -75,6 +75,18 @@ i.MX6q generic board
+ Required root node properties:
+     - compatible = "fsl,imx6q";
  
-+#ifdef CONFIG_AVR32
- #include <mach/cpu.h>
--
--#ifdef CONFIG_ARCH_AT91
--#include <mach/hardware.h>
-+#else
-+#define cpu_is_at32ap7000() (0)
- #endif
++Freescale Vybrid Platform Device Tree Bindings
++----------------------------------------------
++
++For the Vybrid SoC familiy all variants with DDR controller are supported,
++which is the VF5xx and VF6xx series. Out of historical reasons, in most
++places the kernel uses vf610 to refer to the whole familiy.
++
++Required root node compatible property (one of them):
++    - compatible = "fsl,vf500";
++    - compatible = "fsl,vf510";
++    - compatible = "fsl,vf600";
++    - compatible = "fsl,vf610";
  
- #include "ac97c.h"
-@@ -78,7 +78,7 @@ struct atmel_ac97c {
- 	void __iomem			*regs;
- 	int				irq;
- 	int				opened;
--	int				reset_pin;
-+	struct gpio_desc		*reset_pin;
+ Freescale LS1021A Platform Device Tree Bindings
+ ------------------------------------------------
+diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
+index c11ab6a..2e7c75b 100644
+--- a/arch/arm/mach-imx/mach-vf610.c
++++ b/arch/arm/mach-imx/mach-vf610.c
+@@ -13,11 +13,14 @@
+ #include <asm/hardware/cache-l2x0.h>
+ 
+ static const char * const vf610_dt_compat[] __initconst = {
++	"fsl,vf500",
++	"fsl,vf510",
++	"fsl,vf600",
+ 	"fsl,vf610",
+ 	NULL,
  };
  
- #define get_chip(card) ((struct atmel_ac97c *)(card)->private_data)
-@@ -890,11 +890,11 @@ static void atmel_ac97c_reset(struct atmel_ac97c *chip)
- 	ac97c_writel(chip, CAMR, 0);
- 	ac97c_writel(chip, COMR, 0);
- 
--	if (gpio_is_valid(chip->reset_pin)) {
--		gpio_set_value(chip->reset_pin, 0);
-+	if (chip->reset_pin) {
-+		gpiod_set_value(chip->reset_pin, 0);
- 		/* AC97 v2.2 specifications says minimum 1 us. */
- 		udelay(2);
--		gpio_set_value(chip->reset_pin, 1);
-+		gpiod_set_value(chip->reset_pin, 1);
- 	} else {
- 		ac97c_writel(chip, MR, AC97C_MR_WRST | AC97C_MR_ENA);
- 		udelay(2);
-@@ -923,7 +923,7 @@ static int atmel_ac97c_probe(struct platform_device *pdev)
- 	}
- 
- 	pdata = pdev->dev.platform_data;
--	if (!pdata) {
-+	if (cpu_is_at32ap7000() && !pdata) {
- 		dev_dbg(&pdev->dev, "no platform data\n");
- 		return -ENXIO;
- 	}
-@@ -980,16 +980,18 @@ static int atmel_ac97c_probe(struct platform_device *pdev)
- 		goto err_ioremap;
- 	}
- 
--	if (gpio_is_valid(pdata->reset_pin)) {
--		if (gpio_request(pdata->reset_pin, "reset_pin")) {
-+	if (pdata && gpio_is_valid(pdata->reset_pin)) {
-+		if (devm_gpio_request(&pdev->dev, pdata->reset_pin, "reset")) {
- 			dev_dbg(&pdev->dev, "reset pin not available\n");
--			chip->reset_pin = -ENODEV;
-+			chip->reset_pin = NULL;
- 		} else {
- 			gpio_direction_output(pdata->reset_pin, 1);
--			chip->reset_pin = pdata->reset_pin;
-+			chip->reset_pin = gpio_to_desc(pdata->reset_pin);
- 		}
- 	} else {
--		chip->reset_pin = -EINVAL;
-+		chip->reset_pin = devm_gpiod_get(&pdev->dev, "reset", 0);
-+		if (IS_ERR(chip->reset_pin))
-+			chip->reset_pin = NULL;
- 	}
- 
- 	atmel_ac97c_reset(chip);
-@@ -1113,9 +1115,6 @@ err_dma:
- 		chip->dma.tx_chan = NULL;
- 	}
- err_ac97_bus:
--	if (gpio_is_valid(chip->reset_pin))
--		gpio_free(chip->reset_pin);
--
- 	iounmap(chip->regs);
- err_ioremap:
- 	free_irq(irq, chip);
-@@ -1170,9 +1169,6 @@ static int atmel_ac97c_remove(struct platform_device *pdev)
- 	struct snd_card *card = platform_get_drvdata(pdev);
- 	struct atmel_ac97c *chip = get_chip(card);
- 
--	if (gpio_is_valid(chip->reset_pin))
--		gpio_free(chip->reset_pin);
--
- 	ac97c_writel(chip, CAMR, 0);
- 	ac97c_writel(chip, COMR, 0);
- 	ac97c_writel(chip, MR,   0);
+-DT_MACHINE_START(VYBRID_VF610, "Freescale Vybrid VF610 (Device Tree)")
++DT_MACHINE_START(VYBRID_VF610, "Freescale Vybrid VF5xx/VF6xx (Device Tree)")
+ 	.l2c_aux_val	= 0,
+ 	.l2c_aux_mask	= ~0,
+ 	.dt_compat	= vf610_dt_compat,
+-- 
+2.1.3
