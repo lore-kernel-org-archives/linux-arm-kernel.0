@@ -1,85 +1,56 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 27 Nov 2014 11:36:31 +0100
-Subject: [PATCH] ARM: mm: fix size rounding-down of arm_add_memory()
-In-Reply-To: <CAMuHMdXjX5AJT9fVja+GCTV4Zxp==xTe8ZFT8_uf=aFDYZ9+Jw@mail.gmail.com>
-References: <1402025567-18021-1-git-send-email-yamada.m@jp.panasonic.com>
- <20140801213719.D537.AA925319@jp.panasonic.com>
- <CAMuHMdXjX5AJT9fVja+GCTV4Zxp==xTe8ZFT8_uf=aFDYZ9+Jw@mail.gmail.com>
-Message-ID: <CAMuHMdXo9HCTJNi8ObutwcUZiXyfyta5+McoA9UaEhueh-6gRg@mail.gmail.com>
+From: mpeg.blue@free.fr (Mason)
+Date: Thu, 27 Nov 2014 11:40:34 +0100
+Subject: Code generation involving __raw_readl and __raw_writel
+Message-ID: <5476FFA2.8010403@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any chance we can get this fix applied?
+Hello everyone,
 
-On Wed, Aug 20, 2014 at 5:08 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Yamada-san,
->
-> On Fri, Aug 1, 2014 at 2:37 PM, Masahiro Yamada
-> <yamada.m@jp.panasonic.com> wrote:
->> Any comments for this patch?
->
-> Thanks for your patch!
->
-> I had a slightly different fix for the same issue, but apparently it got stuck
-> on the freshly installed machine that didn't have email set up yet ;-(
->
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
->
-> early_init_dt_add_memory_arch() has the same bug, I'll resend my (also stuck)
-> fix for that.
->
->> Thanks
->>
->> Best Regards
->> Masahiro Yamada
->>
->>
->>
->> On Fri,  6 Jun 2014 12:32:47 +0900
->> Masahiro Yamada <yamada.m@jp.panasonic.com> wrote:
->>
->>> The current rounding of "size" is wrong.
->>>
->>>     size -= start & ~PAGE_MASK;
->>>
->>> should be
->>>
->>>     size -= PAGE_SIZE - (start & ~PAGE_MASK);
->>>
->>> Or more simply
->>>
->>>     size -= aligned_start - start;
->>>
->>> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
->>> ---
->>>  arch/arm/kernel/setup.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->>> index 50e198c..84508c0 100644
->>> --- a/arch/arm/kernel/setup.c
->>> +++ b/arch/arm/kernel/setup.c
->>> @@ -641,8 +641,8 @@ int __init arm_add_memory(u64 start, u64 size)
->>>        * Ensure that start/size are aligned to a page boundary.
->>>        * Size is appropriately rounded down, start is rounded up.
->>>        */
->>> -     size -= start & ~PAGE_MASK;
->>>       aligned_start = PAGE_ALIGN(start);
->>> +     size -= aligned_start - start;
->>>
->>>  #ifndef CONFIG_ARCH_PHYS_ADDR_T_64BIT
->>>       if (aligned_start > ULONG_MAX) {
->>> --
->>> 1.9.1
+Consider the following code (preprocessor output):
 
-Gr{oetje,eeting}s,
+static int tangox_target(struct cpufreq_policy *policy, unsigned int index)
+{
+  while (__raw_readl((volatile void *)(0xf0000000 +(0x10024))) >> 31);
+  __raw_writel(0, (volatile void *)(0xf0000000 +(0x10024)));
+  return 0;
+}
 
-                        Geert
+gcc generates the following code:
+(version and command-line in sig below)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+00000014 <tangox_target>:
+   14:   e3a03000        mov     r3, #0
+   18:   e34f3001        movt    r3, #61441      ; 0xf001
+   1c:   e3a02000        mov     r2, #0
+   20:   e34f2001        movt    r2, #61441      ; 0xf001
+   24:   e5931024        ldr     r1, [r3, #36]   ; 0x24
+   28:   e3510000        cmp     r1, #0
+   2c:   bafffffa        blt     1c <tangox_target+0x8>
+   30:   e3a00000        mov     r0, #0
+   34:   e5820024        str     r0, [r2, #36]   ; 0x24
+   38:   e12fff1e        bx      lr
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Do you know why gcc duplicates the address in r2 and r3?
+And keeps putting the address in r2 over and over in the loop?
+
+I was expecting something more along these lines:
+
+00000014 <tangox_target>:
+   14:   e3a03000        mov     r3, #0
+   18:   e34f3001        movt    r3, #61441      ; 0xf001
+   1c:   e5931024        ldr     r1, [r3, #36]   ; 0x24
+   20:   e3510000        cmp     r1, #0
+   24:   bafffffa        blt     1c <tangox_target+0x8>
+   28:   e3a00000        mov     r0, #0
+   2c:   e5820024        str     r0, [r3, #36]   ; 0x24
+   30:   e12fff1e        bx      lr
+
+Regards.
+
+-- 
+gcc version 4.6.3 (Sourcery CodeBench Lite 2012.03-57)
+
+arm-none-linux-gnueabi-gcc -Wp,-MD,arch/arm/mach-tangox/.cpufreq.o.d  -nostdinc -isystem /utils/release/sets/6_1_3_8756/sigma-buildroot_2012.02-22/output/host/opt/ext-toolchain/bin/../lib/gcc/arm-none-linux-gnueabi/4.6.3/include -I/home/maze/linux/arch/arm/include -Iarch/arm/include/generated  -Iinclude -I/home/maze/linux/arch/arm/include/uapi -Iarch/arm/include/generated/uapi -I/home/maze/linux/include/uapi -Iinclude/generated/uapi -include /home/maze/linux/include/linux/kconfig.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-tangox/include -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -O2 -fno-dwarf2-cfi-asm -mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp -funwind-tables -marm -D__LINUX_ARM_ARCH__=7 -march=armv7-a -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -Wno-unused-but-set-variable -fomit-frame-pointer -fno-var-tracking-assignments 
+ -
+g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -Werror=implicit-int -Werror=strict-prototypes    -D"KBUILD_STR(s)=#s" -D"KBUILD_BASENAME=KBUILD_STR(cpufreq)"  -D"KBUILD_MODNAME=KBUILD_STR(cpufreq)" -c -o arch/arm/mach-tangox/cpufreq.o arch/arm/mach-tangox/cpufreq.c
