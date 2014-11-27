@@ -1,32 +1,60 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 27 Nov 2014 12:12:15 +0000
-Subject: [PATCH v3 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC
- in dts and Makefile
-In-Reply-To: <20141127115042.GE857@leverpostej>
-References: <Sharkl64-v3>
- <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1416917818-10506-4-git-send-email-chunyan.zhang@spreadtrum.com>
- <20141127115042.GE857@leverpostej>
-Message-ID: <20141127121214.GF11511@e104818-lin.cambridge.arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 27 Nov 2014 21:14:42 +0900
+Subject: [PATCH 11/19] clk: samsung: exynos5433: Add clocks for
+ CMU_BUS{0|1|2} domains
+In-Reply-To: <54771518.1010004@samsung.com>
+References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
+ <1417073716-22997-12-git-send-email-cw00.choi@samsung.com>
+ <6217579.xNXtO7YiDs@wuerfel> <54771173.6090408@samsung.com>
+ <54771518.1010004@samsung.com>
+Message-ID: <547715B2.3070508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 11:50:43AM +0000, Mark Rutland wrote:
-> On Tue, Nov 25, 2014 at 12:16:56PM +0000, Chunyan Zhang wrote:
-> > +
-> > +       timer {
-> > +               compatible = "arm,armv8-timer";
-> > +               interrupts = <1 13 0xff01>,
-> > +                            <1 14 0xff01>,
-> > +                            <1 11 0xff01>,
-> > +                            <1 10 0xff01>;
-> > +               clock-frequency = <26000000>;
+Hi Sylwester,
+
+On 11/27/2014 09:12 PM, Sylwester Nawrocki wrote:
+> Hi,
 > 
-> Please remove the clock-frequency property. Your FW should initialise
-> CNTFRQ_EL0 on all CPUs (certainly PSCI 0.2 requires that you do this).
+> On 27/11/14 12:56, Chanwoo Choi wrote:
+>> On 11/27/2014 08:41 PM, Arnd Bergmann wrote:
+>>>> On Thursday 27 November 2014 16:35:08 Chanwoo Choi wrote:
+>>>>>> +  - "samsung,exynos5433-cmu-bus0", "samsung,exynos5433-cmu-bus1"
+>>>>>> +    and "samsung,exynos5433-cmu-bus2" - clock controller compatible for CMU_BUS
+>>>>>> +    which generates global data buses clock and global peripheral buses clock.
+>>>>>>  
+>>>>>>  - reg: physical base address of the controller and length of memory mapped
+>>>>>>    region.
+>>>>>>
+>>>>
+>>>> This looks like you are duplicating the bindings and the code, but
+>>>> it's really the same hardware multiple times with minor variations
+>>>> that you should be able to describe properly here. Why not make
+>>>> three nodes with the same compatible string and have them handled
+>>>> by the same code?
+>>
+>> Each CMU_BUSx domain of Exynos5433 have different base address as following:
+>> - CMU_BUS0's base address and range : 0x1360_0000 ~ 0x1360_0b04
+>> - CMU_BUS1's base address and range : 0x1480_0000 ~ 0x1480_0b04
+>> - CMU_BUS2's base address and range : 0x1340_0000 ~ 0x1340_0b04
+>>
+>> So, I implement CMU_BUSx domain which has each compatible string.
+> 
+> You can always have multiple entries in the reg property. I've done
+> something like this for the exynos4415 CMU_ISPx units:
+> 
+> 	cmu_isp: clock-controller at 12060000 {
+> 		compatible = "samsung,exynos4415-cmu-isp";
+> 		reg = <0x12060000 0xB10>, <0x12070000 0xB10>;
+> 		#clock-cells = <1>;
+> 
+> 		assigned-clocks = <&cmu CLK_FOUT_ISP_PLL>;
+> 		assigned-clock-rates = <300000000>;
+> 	};
 
-Since this comes up regularly, I think we need a dev_warn() in the arch
-timer driver when CONFIG_ARM64.
+Thanks for your guide.
 
--- 
-Catalin
+I'll re-implment CMU_BUSx domain according to your guide.
+
+Best Regards,
+Chanwoo Choi
