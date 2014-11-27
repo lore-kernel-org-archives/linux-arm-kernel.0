@@ -1,40 +1,33 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 27 Nov 2014 15:51:51 +0100
-Subject: [PATCH V2 3/3] ARM: shmobile: Convert to genpd flags for PM clocks
- for R-mobile
-In-Reply-To: <1417099911-12688-1-git-send-email-ulf.hansson@linaro.org>
-References: <1417099911-12688-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1417099911-12688-4-git-send-email-ulf.hansson@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 27 Nov 2014 14:55:42 +0000
+Subject: [PATCH 2/4] spi: st: Provide Device Tree binding documentation
+In-Reply-To: <20141127130053.GW7712@sirena.org.uk>
+References: <1417088636-11994-1-git-send-email-lee.jones@linaro.org>
+ <1417088636-11994-3-git-send-email-lee.jones@linaro.org>
+ <20141127130053.GW7712@sirena.org.uk>
+Message-ID: <20141127145542.GH4628@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using the dev_ops ->stop|start() callbacks for genpd, let's
-convert to use genpd's flag field and set it to PM_DOMAIN_PM_CLK.
+On Thu, 27 Nov 2014, Mark Brown wrote:
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
+> On Thu, Nov 27, 2014 at 11:43:54AM +0000, Lee Jones wrote:
+> 
+> > +Required properties:
+> > +- compatible	: "st,comms-ssc-spi" or "st,comms-ssc4-spi"
+> 
+> What do the two different compatible strings mean (for example, should
+> ssc4 be used for version 4 and higher or is it just a quirk for that
+> version)?
 
-Changes in v2:
-	None.
+This appears to be historical.  There aren't any functional
+differences i.e. we don't match on them.  I believe the former is a
+more informal, generic name and the latter is the official name of the
+IP block.  The I2C component already upstreamed has the same naming
+conventions by the looks of it.
 
----
- arch/arm/mach-shmobile/pm-rmobile.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index 717e641..42af9bd 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.c
-+++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -106,9 +106,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- 	struct generic_pm_domain *genpd = &rmobile_pd->genpd;
- 	struct dev_power_governor *gov = rmobile_pd->gov;
- 
-+	genpd->flags = PM_DOMAIN_PM_CLK;
- 	pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
--	genpd->dev_ops.stop		= pm_clk_suspend;
--	genpd->dev_ops.start		= pm_clk_resume;
- 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
- 	genpd->power_off		= rmobile_pd_power_down;
- 	genpd->power_on			= rmobile_pd_power_up;
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
