@@ -1,48 +1,53 @@
-From: zhang.lyra@gmail.com (Lyra Zhang)
-Date: Thu, 27 Nov 2014 20:08:51 +0800
-Subject: [PATCH v3 1/5] Documentation: DT: Renamed of-serial.txt to
- 8250.txt
-In-Reply-To: <20141127113819.GD857@leverpostej>
-References: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1416917818-10506-2-git-send-email-chunyan.zhang@spreadtrum.com>
- <20141127113819.GD857@leverpostej>
-Message-ID: <CAAfSe-uGF2DbE894ij9ezH7dZuU_iMWX4G-Lb77CoZ1ApS_vgg@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 27 Nov 2014 13:12:08 +0100
+Subject: [PATCH 11/19] clk: samsung: exynos5433: Add clocks for
+ CMU_BUS{0|1|2} domains
+In-Reply-To: <54771173.6090408@samsung.com>
+References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
+ <1417073716-22997-12-git-send-email-cw00.choi@samsung.com>
+ <6217579.xNXtO7YiDs@wuerfel> <54771173.6090408@samsung.com>
+Message-ID: <54771518.1010004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-27 19:38 GMT+08:00 Mark Rutland <mark.rutland@arm.com>:
-> On Tue, Nov 25, 2014 at 12:16:54PM +0000, Chunyan Zhang wrote:
->> The file of-serial.txt was only for 8250 compatible UART implementations,
->> so renamed it to 8250.txt to avoid confusing other persons.
->> This is recommended by Arnd, see:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/291455.html
->>
->> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
->
-> My prior Ack [1] still applies (given you've just changed the way the
-> patch was generated, as Arnd and I suggested).
->
-OK, I'll add in v4.
+Hi,
 
-> Mark.
+On 27/11/14 12:56, Chanwoo Choi wrote:
+> On 11/27/2014 08:41 PM, Arnd Bergmann wrote:
+>> > On Thursday 27 November 2014 16:35:08 Chanwoo Choi wrote:
+>>> >> +  - "samsung,exynos5433-cmu-bus0", "samsung,exynos5433-cmu-bus1"
+>>> >> +    and "samsung,exynos5433-cmu-bus2" - clock controller compatible for CMU_BUS
+>>> >> +    which generates global data buses clock and global peripheral buses clock.
+>>> >>  
+>>> >>  - reg: physical base address of the controller and length of memory mapped
+>>> >>    region.
+>>> >>
+>> > 
+>> > This looks like you are duplicating the bindings and the code, but
+>> > it's really the same hardware multiple times with minor variations
+>> > that you should be able to describe properly here. Why not make
+>> > three nodes with the same compatible string and have them handled
+>> > by the same code?
 >
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295152.html
->
->> ---
->>  .../bindings/serial/{of-serial.txt => 8250.txt}    |    0
->>  1 file changed, 0 insertions(+), 0 deletions(-)
->>  rename Documentation/devicetree/bindings/serial/{of-serial.txt => 8250.txt} (100%)
->>
->> diff --git a/Documentation/devicetree/bindings/serial/of-serial.txt b/Documentation/devicetree/bindings/serial/8250.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/serial/of-serial.txt
->> rename to Documentation/devicetree/bindings/serial/8250.txt
->> --
->> 1.7.9.5
->>
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Each CMU_BUSx domain of Exynos5433 have different base address as following:
+> - CMU_BUS0's base address and range : 0x1360_0000 ~ 0x1360_0b04
+> - CMU_BUS1's base address and range : 0x1480_0000 ~ 0x1480_0b04
+> - CMU_BUS2's base address and range : 0x1340_0000 ~ 0x1340_0b04
+> 
+> So, I implement CMU_BUSx domain which has each compatible string.
+
+You can always have multiple entries in the reg property. I've done
+something like this for the exynos4415 CMU_ISPx units:
+
+	cmu_isp: clock-controller at 12060000 {
+		compatible = "samsung,exynos4415-cmu-isp";
+		reg = <0x12060000 0xB10>, <0x12070000 0xB10>;
+		#clock-cells = <1>;
+
+		assigned-clocks = <&cmu CLK_FOUT_ISP_PLL>;
+		assigned-clock-rates = <300000000>;
+	};
+
+--
+Regards,
+Sylwester
