@@ -1,61 +1,45 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 27 Nov 2014 13:39:17 +0000
-Subject: [PATCH v2 2/2] of: support passing console options with
- stdout-path
-In-Reply-To: <20141126214847.GJ3443@lunn.ch>
-References: <1417023640-23464-1-git-send-email-leif.lindholm@linaro.org>
- <1417023640-23464-3-git-send-email-leif.lindholm@linaro.org>
- <20141126183052.GH3443@lunn.ch>
- <CACxGe6tYZ8aE_TKw1cYMY5DDjpSXPSnhhAam-rG5NgdjpKJe+A@mail.gmail.com>
- <20141126214847.GJ3443@lunn.ch>
-Message-ID: <CACxGe6v6jrwKaT0NT1jzHfbmGi2sTe9SrriTB1kib+01=C0-Lw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 27 Nov 2014 14:40:42 +0100
+Subject: [PATCH v2] ARM: dt: fix up PL011 device tree bindings
+In-Reply-To: <1399887437-32154-1-git-send-email-linus.walleij@linaro.org>
+References: <1399887437-32154-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdbQYSo0pQxPDXEPw-yMm8pA0oCnYJa2+v==pAgKWax5UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 9:48 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Wed, Nov 26, 2014 at 09:07:33PM +0000, Grant Likely wrote:
->> On Wed, Nov 26, 2014 at 6:30 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> > On Wed, Nov 26, 2014 at 05:40:40PM +0000, Leif Lindholm wrote:
->> >> Support specifying console options (like with console=ttyXN,<options>)
->> >> by appending them to the stdout-path property after a separating ':'.
->> >>
->> >> Example:
->> >>         stdout-path = "uart0:115200";
->> >
->> > Hi Leif
->> >
->> > This should be documented somewhere under
->> > Documentation/devicetree/bindings/
->> >
->> > Not sure where thought. Maybe a top level chosen.txt?
->>
->> Actually, this one doesn't. It is already documented in ePAPR
->
-> Hi Grant
->
-> Humm, do i have an old version of ePAPR?
->
-> All i see is that in Table 3-4 It says:
->
-> stdout-path O <string> A string that specifies the full path to the
->                        node representing the device to be used for
->                        boot console output. If the character ":" is
->                        present in the value it terminates the
->                        path. The value may be an alias.
->
->                        If the stdin-path property is not specified,
->                        stdout-path should be assumed to define the input device.
->
-> So what is before the : is defined. What comes afterwards,
-> baudrate/parity/bits/flow control does not appear to the defined in
-> ePAPR. Should we not document the extension being added here?
+On Mon, May 12, 2014 at 11:37 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
 
-Ah, good point. I had thought you were referring to the argument separator.
+> Make the map match the reality, the current binding text is
+> nonsense:
+>
+> - The clock required for the clocking of the serial port
+>   must come first and is not optional (as the driver will
+>   otherwise proceed to grab and use the apb_pclk as uartclk),
+>   and the apb_pclk that clocks the logic must come second
+>   as the code will retrieve the first clock by index,
+>   whereas the PrimeCell but will explicitly look for
+>   "apb_pclk" so this can be specified later, as it is
+>   looked up by name.
+>
+> - The pin control state "default" is the only mandated
+>   state, the sleep state is entirely optional.
+>
+> We also add an example to avoid further confusion.
+>
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Rename amba_pclk to apb_pclk
+> - Split clock/clocks properties and indicate that listin one
+>   clock only is deprecated
 
-Yes, the extension should be documented. The binding can actually be
-driver specific, but there is little to no reason for each uart driver
-to be unique in this regard and the b/p/b/f format is very well
-established, so I agree. Other drivers, say video out or netcon, could
-use different arguments.
+PING on this, 6 months and the bindings still look like hell.
 
-g.
+Greg can you pick this up through the serial tree?
+
+I can resend the patch if you don't have it...
+
+Yours,
+Linus Walleij
