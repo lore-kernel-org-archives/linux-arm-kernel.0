@@ -1,39 +1,38 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 27 Nov 2014 08:19:11 +0530
-Subject: [PATCH v6 1/2] i2c: s3c2410: add Sysreg phandle to i2c device
- nodes
-In-Reply-To: <54761F38.4030102@kernel.org>
-References: <1416818867-29156-1-git-send-email-pankaj.dubey@samsung.com>
- <1416818867-29156-2-git-send-email-pankaj.dubey@samsung.com>
- <54761F38.4030102@kernel.org>
-Message-ID: <54769127.3020102@samsung.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 27 Nov 2014 11:15:01 +0800
+Subject: [PATCH] media: v4l2-image-sizes.h: correct the SVGA height definition
+Message-ID: <1417058101-2798-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014 12:13 AM, Kukjin Kim wrote:
-> On 11/24/14 17:47, Pankaj Dubey wrote:
->> This patch adds syscon based phandle to i2c device nodes of exynos5250
->> and exynos5420. These phandles will be used to save restore i2c sysreg
->> configuration register during s2r from i2c driver.
->>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: Randy Dunlap <rdunlap@infradead.org>
->> CC: Russell King <linux@arm.linux.org.uk>
->> CC: devicetree at vger.kernel.org
->> CC: linux-doc at vger.kernel.org
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->
-> Applied with change the subject 'ARM: dts: add sysreg phandle to...'
->
+SVGA height should be 600 not 680.
 
-Thanks for correcting subject message.
+Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+Hi, Mauro
 
-> BTW I'm holding on 2nd because conflicts between pm update and cleanup
-> branches in my tree...
+There a typo in my previous patch, so this patch is the fix for that.
+Sorry for the incovenience.
 
-Please let me know if anything to be done from my end.
+Best Regards,
+Josh Wu
 
-Thanks,
-Pankaj Dubey
->
-> - Kukjin
+ include/media/v4l2-image-sizes.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/media/v4l2-image-sizes.h b/include/media/v4l2-image-sizes.h
+index c70c917..a07d7a6 100644
+--- a/include/media/v4l2-image-sizes.h
++++ b/include/media/v4l2-image-sizes.h
+@@ -26,7 +26,7 @@
+ #define QVGA_HEIGHT	240
+ 
+ #define SVGA_WIDTH	800
+-#define SVGA_HEIGHT	680
++#define SVGA_HEIGHT	600
+ 
+ #define SXGA_WIDTH	1280
+ #define SXGA_HEIGHT	1024
+-- 
+1.9.1
