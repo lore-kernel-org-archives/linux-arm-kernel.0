@@ -1,46 +1,33 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Thu, 27 Nov 2014 22:37:29 +0100
-Subject: [GIT PULL v2] ARM: BCM5301X: DT changes for v3.19
-Message-ID: <54779999.8020709@hauke-m.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 27 Nov 2014 22:37:44 +0100 (CET)
+Subject: [PATCH 3.18-rc4 v11 2/6] irqchip: gic: Optimize locking in
+ gic_raise_softirq
+In-Reply-To: <1417119024-22844-3-git-send-email-daniel.thompson@linaro.org>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <1417119024-22844-1-git-send-email-daniel.thompson@linaro.org>
+ <1417119024-22844-3-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <alpine.DEB.2.11.1411272231450.3961@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+On Thu, 27 Nov 2014, Daniel Thompson wrote:
 
-Please consider these BCM5301X ARM based SoC dt updates for v3.19.
+> Currently gic_raise_softirq() unconditionally takes and releases a lock
+> whose only purpose is to synchronize with the b.L switcher.
+> 
+> Remove this lock if the b.L switcher is not compiled in.
 
-This is the second try based on 3.18-rc1 and without the early printk patch.
+I think the patches are in the wrong order. We optimize for the sane
+use case first, i.e BL=n. So you want to make the locking of
+irq_controller_lock in gic_raise_softirq() conditional in the first
+place, which should have been done when this was introduced.
 
+Once you have isolated that you can apply your split lock patch for
+the BL=y nonsense.
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+Adding more locks first and then optimizing them out does not make any
+sense.
 
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+Thanks,
 
-are available in the git repository at:
-
-  https://github.com/hauke/linux.git tags/bcm5301x-dt-2014-11-27
-
-for you to fetch changes up to dd6d2e5f4bbb828268506e9d6b772fffe101e76c:
-
-  ARM: BCM5301X: Add LEDs for Netgear R6250 V1 (2014-11-27 22:30:32 +0100)
-
-----------------------------------------------------------------
-ARM: BCM5301X: Add some more devices to device tree
-
-The most important part is adding the axi bus to the SoC dtsi file,
-this is the main bus on the SoC.
-
-These patches were all send to the arm list and I haven't got any
-negative responses.
-
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
-
-----------------------------------------------------------------
-Rafa? Mi?ecki (2):
-      ARM: BCM5301X: Add Broadcom's bus-axi to the DTS file
-      ARM: BCM5301X: Add LEDs for Netgear R6250 V1
-
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts | 34
-+++++++++++++++++++++++++++++
- arch/arm/boot/dts/bcm5301x.dtsi             | 16 ++++++++++++++
- 2 files changed, 50 insertions(+)
+	tglx
