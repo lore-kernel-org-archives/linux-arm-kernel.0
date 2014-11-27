@@ -1,33 +1,38 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Thu, 27 Nov 2014 23:34:02 +0100
-Subject: [PATCH v3 2/3] pinctrl: add driver for Amlogic Meson SoCs
-In-Reply-To: <CACRpkda-U5OuKdBVGJ8UWprJkAtmTL1m11+AbNskVULPfyS72A@mail.gmail.com>
-References: <1416168856-12747-1-git-send-email-b.galvani@gmail.com>
- <1416168856-12747-3-git-send-email-b.galvani@gmail.com>
- <CACRpkda-U5OuKdBVGJ8UWprJkAtmTL1m11+AbNskVULPfyS72A@mail.gmail.com>
-Message-ID: <20141127223402.GA11418@gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 27 Nov 2014 22:44:29 +0000
+Subject: [PATCH 1/5] arm/arm64: KVM: Correct KVM_ARM_VCPU_INIT power off
+ option
+In-Reply-To: <1417113660-23610-2-git-send-email-christoffer.dall@linaro.org>
+References: <1417113660-23610-1-git-send-email-christoffer.dall@linaro.org>
+ <1417113660-23610-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <CAFEAcA_=2z+SkjTbU9NQkof-rVDS=fpG+XG4xEGVHkjoxrxrSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 02:48:31PM +0100, Linus Walleij wrote:
-> On Sun, Nov 16, 2014 at 9:14 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
-> 
-> > This is a driver for the pinmux and GPIO controller available in
-> > Amlogic Meson SoCs. At the moment it only supports Meson8 devices,
-> > however other SoC families like Meson6 and Meson8b (the Cortex-A5
-> > variant) appear to be similar, with just different sets of banks and
-> > registers.
-> >
-> > GPIO interrupts are not supported at the moment due to lack of
-> > documentation.
-> >
-> > Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
-> 
-> This is dependent on S?ren's patches I guess?
-> 
-> OK I'll merge this once we have that other code sorted out.
+On 27 November 2014 at 18:40, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> The implementation of KVM_ARM_VCPU_INIT is currently not doing what
+> userspace expects, namely making sure that a vcpu which may have been
+> turned off using PSCI is returned to its initial state, which would be
+> powered on if userspace does not set the KVM_ARM_VCPU_POWER_OFF flag.
+>
+> Implment the expected functionality and clarify the ABI.
 
-Yes, this depends on Soren's patches.
+("Implement", if you have to respin.)
 
-Thanks,
-Beniamino
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 9e193c8..4dcc8c2 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -663,6 +663,8 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+>          */
+>         if (__test_and_clear_bit(KVM_ARM_VCPU_POWER_OFF, vcpu->arch.features))
+>                 vcpu->arch.pause = true;
+> +       else
+> +               vcpu->arch.pause = false;
+
+Out of curiosity, why do we have to test-and-clear the bit rather than
+just testing it?
+
+thanks
+-- PMM
