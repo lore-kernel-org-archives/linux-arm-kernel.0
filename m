@@ -1,45 +1,85 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Nov 2014 10:35:08 +0000
-Subject: [PATCH v4] arm: Support for the PXN CPU feature on ARMv7
-In-Reply-To: <1417077724-15885-1-git-send-email-js07.lee@gmail.com>
-References: <1417077724-15885-1-git-send-email-js07.lee@gmail.com>
-Message-ID: <20141127103508.GN3836@n2100.arm.linux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 27 Nov 2014 11:36:31 +0100
+Subject: [PATCH] ARM: mm: fix size rounding-down of arm_add_memory()
+In-Reply-To: <CAMuHMdXjX5AJT9fVja+GCTV4Zxp==xTe8ZFT8_uf=aFDYZ9+Jw@mail.gmail.com>
+References: <1402025567-18021-1-git-send-email-yamada.m@jp.panasonic.com>
+ <20140801213719.D537.AA925319@jp.panasonic.com>
+ <CAMuHMdXjX5AJT9fVja+GCTV4Zxp==xTe8ZFT8_uf=aFDYZ9+Jw@mail.gmail.com>
+Message-ID: <CAMuHMdXo9HCTJNi8ObutwcUZiXyfyta5+McoA9UaEhueh-6gRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 05:42:04PM +0900, Jungseung Lee wrote:
-> Modern ARMv7-A/R cores optionally implement below new
-> hardware feature:
-> 
-> - PXN:
-> Privileged execute-never(PXN) is a security feature. PXN bit
-> determines whether the processor can execute software from
-> the region. This is effective solution against ret2usr attack.
-> On an implementation that does not include the LPAE, PXN is
-> optionally supported.
-> 
-> This patch set PXN bit on user page table for preventing
-> user code execution with privilege mode.
+Any chance we can get this fix applied?
 
-This looks fine to me, only one niggle:
+On Wed, Aug 20, 2014 at 5:08 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Yamada-san,
+>
+> On Fri, Aug 1, 2014 at 2:37 PM, Masahiro Yamada
+> <yamada.m@jp.panasonic.com> wrote:
+>> Any comments for this patch?
+>
+> Thanks for your patch!
+>
+> I had a slightly different fix for the same issue, but apparently it got stuck
+> on the freshly installed machine that didn't have email set up yet ;-(
+>
+> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+>
+> early_init_dt_add_memory_arch() has the same bug, I'll resend my (also stuck)
+> fix for that.
+>
+>> Thanks
+>>
+>> Best Regards
+>> Masahiro Yamada
+>>
+>>
+>>
+>> On Fri,  6 Jun 2014 12:32:47 +0900
+>> Masahiro Yamada <yamada.m@jp.panasonic.com> wrote:
+>>
+>>> The current rounding of "size" is wrong.
+>>>
+>>>     size -= start & ~PAGE_MASK;
+>>>
+>>> should be
+>>>
+>>>     size -= PAGE_SIZE - (start & ~PAGE_MASK);
+>>>
+>>> Or more simply
+>>>
+>>>     size -= aligned_start - start;
+>>>
+>>> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
+>>> ---
+>>>  arch/arm/kernel/setup.c | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>>> index 50e198c..84508c0 100644
+>>> --- a/arch/arm/kernel/setup.c
+>>> +++ b/arch/arm/kernel/setup.c
+>>> @@ -641,8 +641,8 @@ int __init arm_add_memory(u64 start, u64 size)
+>>>        * Ensure that start/size are aligned to a page boundary.
+>>>        * Size is appropriately rounded down, start is rounded up.
+>>>        */
+>>> -     size -= start & ~PAGE_MASK;
+>>>       aligned_start = PAGE_ALIGN(start);
+>>> +     size -= aligned_start - start;
+>>>
+>>>  #ifndef CONFIG_ARCH_PHYS_ADDR_T_64BIT
+>>>       if (aligned_start > ULONG_MAX) {
+>>> --
+>>> 1.9.1
 
-> +	/*
-> +	 * Check is it with support for the PXN bit
-> +	 * in the Short-descriptor translation table format descriptors.
-> +	 */
-> +	if (cpu_arch == CPU_ARCH_ARMv7 &&
-> +		(read_cpuid_ext(CPUID_EXT_MMFR0) & 0xF) == 4) {
-> +		user_pmd_table |= PMD_PXNTABLE;
-> +	}
+Gr{oetje,eeting}s,
 
-Use spaces to indent the second line of the if() statement so that the
-open paren aligns with the 'c' character of cpu_arch.
+                        Geert
 
-Using tabs within an if() expression is wrong from the readability point
-of view as it makes it harder to see where the first statement if the
-condition starts, and indenting to the appropriate point also helps
-readability when there's multiple lines to the if() expression.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
