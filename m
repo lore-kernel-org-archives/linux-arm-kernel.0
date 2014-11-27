@@ -1,116 +1,150 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 27 Nov 2014 15:33:21 +0000
-Subject: [PATCH] arm64: ARM: Fix the Generic Timers interrupt active
- level description
-In-Reply-To: <5477389A.8010606@arm.com>
-References: <1417099005-18638-1-git-send-email-Liviu.Dudau@arm.com>
- <5477389A.8010606@arm.com>
-Message-ID: <20141127153321.GQ828@e106497-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Nov 2014 16:33:26 +0100
+Subject: [PATCH 11/19] clk: samsung: exynos5433: Add clocks for
+ CMU_BUS{0|1|2} domains
+In-Reply-To: <CAGTfZH1DdBGYKXv6VgWYfqfcyWVMm8MLux1U7sn_rX5h3-TGNQ@mail.gmail.com>
+References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
+ <2120788.f3P3CC6nYQ@wuerfel>
+ <CAGTfZH1DdBGYKXv6VgWYfqfcyWVMm8MLux1U7sn_rX5h3-TGNQ@mail.gmail.com>
+Message-ID: <2150099.t3m9xROUE3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 02:43:38PM +0000, Marc Zyngier wrote:
-> On 27/11/14 14:36, Liviu Dudau wrote:
-> > The Cortex-A5x TRM states in paragraph "9.2 Generic Timer functional
-> > description" that generic timers provide an active-LOW interrupt
-> > output. Fix the device trees to correctly describe this.
-> > 
-> > While doing this update the CPU mask to match the number of described
-> > CPUs as well.
-> > 
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > ---
-> > 
-> > Arnd, Olof: This is on top of linux-next/master as it patches the Juno
-> > as well as all the other ARM DTs.
-> > 
-> >  arch/arm64/boot/dts/arm/foundation-v8.dts  | 8 ++++----
-> >  arch/arm64/boot/dts/arm/juno.dts           | 8 ++++----
-> >  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts | 8 ++++----
-> >  3 files changed, 12 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dts
-> > index 4a06090..27f3296 100644
-> > --- a/arch/arm64/boot/dts/arm/foundation-v8.dts
-> > +++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
-> > @@ -78,10 +78,10 @@
-> >  
-> >  	timer {
-> >  		compatible = "arm,armv8-timer";
-> > -		interrupts = <1 13 0xff01>,
-> > -			     <1 14 0xff01>,
-> > -			     <1 11 0xff01>,
-> > -			     <1 10 0xff01>;
-> > +		interrupts = <1 13 0xf08>,
-> > +			     <1 14 0xf08>,
-> > +			     <1 11 0xf08>,
-> > +			     <1 10 0xf08>;
-> >  		clock-frequency = <100000000>;
-> >  	};
-> >  
-> > diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-> > index 097ecc4..cb3073e 100644
-> > --- a/arch/arm64/boot/dts/arm/juno.dts
-> > +++ b/arch/arm64/boot/dts/arm/juno.dts
-> > @@ -98,10 +98,10 @@
-> >  
-> >  	timer {
-> >  		compatible = "arm,armv8-timer";
-> > -		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
-> > -			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
-> > -			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
-> > -			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>;
-> > +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
-> >  	};
-> >  
-> >  	pmu {
-> > diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
-> > index 572005e..efc59b3 100644
-> > --- a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
-> > +++ b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
-> > @@ -81,10 +81,10 @@
-> >  
-> >  	timer {
-> >  		compatible = "arm,armv8-timer";
-> > -		interrupts = <1 13 0xff01>,
-> > -			     <1 14 0xff01>,
-> > -			     <1 11 0xff01>,
-> > -			     <1 10 0xff01>;
-> > +		interrupts = <1 13 0xf08>,
-> > +			     <1 14 0xf08>,
-> > +			     <1 11 0xf08>,
-> > +			     <1 10 0xf08>;
-> >  		clock-frequency = <100000000>;
-> >  	};
-> >  
-> > 
+On Friday 28 November 2014 00:17:40 Chanwoo Choi wrote:
 > 
-> Sorry, but that's wrong. Despite the *cores* having an level-low output,
-> the GIC only triggers on *level-high*. Yes, there is probably an
-> inverter in between.
+> But, "fixed-clock" pass all properties from dt file to
+> driver/clk/clk-fixed-rate.c.
+> and "fixed-clock" driver has not the data dependent on h/w. e.g.,
+> clock offset, parent clock.
 
-Hah, one can never read enough specs to get the right answer!
+The parent clocks would obviously have to be provided in DT if you
+do this. I'm not sure what you mean with clock offsets. What would
+it take to describe that?
 
-I'll update the patch.
-
-Best regards,
-Liviu
-
+> >> >
+> >> > > >     clock-controller at 113600000 {
+> >> > > >             reg = <0 0x113600000 0 0x1000>;
+> >> > > >             compatible = "samsung,exynos5433-cmu";
+> >> > > >             #clock-cells = <1>;
+> >> > > >     };
+> >> > > >
+> >> > > >     clock-controller at 114800000 {
+> >> > > >             reg = <0 0x114800000 0 0x1000>;
+> >> > > >             compatible = "samsung,exynos5433-cmu";
+> >> > > >             #clock-cells = <1>;
+> >> > > >     };
+> >> > > >
+> >> > > > The code will just map the local registers for each instance and then
+> >> > > > provide the clocks of the right instance when asked for it.
+> >> > >
+> >> > > Each clock domain has not the same mux/divider/clock. So, just one
+> >> > compatible
+> >> > > string could not support all of clock domains.
+> >> >
+> >> > What are the specific differences?
+> >>
+> >>
+> >>
+> >> > I'm not sure that difference among clock domains because I think it is
+> >> dependent on the opinion of architect of SoC.
+> >>
+> >> cmu_bus0/1/2 are much similar. Just cmu_bus2 has one more mux/gate clock
+> >> than cmu_bus0/1.
+> >
+> > Yes, that's what I mean. You can simply model that extra mux/gate
+> > in the driver, as long as nothing ever tries to access the clock.
 > 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny...
+> If only use one compatible to support CMU_BUSx domains,
+> I would implement it as following with Sylwester's guide.
 > 
+> To Sylwester, Tomaz,
+> Are you agree following method to support CMU_BUSx domains
+> by using one compatible string?
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+
+> +#define bus_clk_regs(num)                \
+> +static unsigned long bus##num_clk_regs[] __initdata = {    \
+> +    DIV_BUS,                    \
+> +    DIV_STAT_BUS,                    \
+> +    ENABLE_ACLK_BUS,                \
+> +    ENABLE_PCLK_BUS,                \
+> +    ENABLE_IP_BUS0,                    \
+> +    ENABLE_IP_BUS1,                    \
+> +};                            \
+
+I don't understand why you would need a macro here. Isn't this constant
+data that you can pass into multiple devices? The use of macros
+definitely makes it worse than the original patch.
+
+> +#define bus_div_clks(num)                        \
+> +static struct samsung_div_clock bus##num_div_clks[] __initdata = {    \
+> +    /* DIV_BUS */                            \
+> +    DIV(CLK_DIV_PCLK_BUS##num_133, "div_pclk_bus"#num"_133",    \
+> +            "aclk_bus"#num"_400", DIV_BUS##num, 0, 3),    \
+> +};                                    \
+
+To illustrate my point further: CLK_DIV_PCLK_BUS0/1/2 are all the
+same, and so are DIV_BUS0/1/2, so you should not need to duplicate
+the definitions at all but just call them 'CLK_DIV_PCLK_BUS'
+and 'DIV_BUS'.
+
+For the "aclk_bus"#num"_400" and "div_pclk_bus"#num"_133" strings,
+I don't know what they refer to. Are you sure they have to be unique?
+
+> +
+> +#define bus_clk_regs(0)
+> +#define bus_div_clks(0)
+> +#define bus_gate_clks(0)
+> +
+> +#define bus_clk_regs(1)
+> +#define bus_div_clks(1)
+> +#define bus_gate_clks(1)
+> +
+> +static void __init exynos5433_cmu_bus_init(struct device_node *np)
+> +{
+> +    void __iomem *reg_base_bus0, *reg_base_bus1;
+> +
+> +    reg_base_bus0 = of_iomap(np, 0);
+> +    reg_base_bus1 = of_iomap(np, 1);
+> +
+> +    bus0_ctx = samsung_clk_init(np, reg_base_bus0, BUS0_NR_CLKS);
+> +    bus1_ctx = samsung_clk_init(np, reg_base_bus0, BUS0_NR_CLKS);
+> +
+> +    samsung_clk_register_div(bus0_ctx, bus0_div_clks,
+> +                    ARRAY_SIZE(bus0_div_clks));
+> +    samsung_clk_register_gate(bus0_ctx, bus0_gate_clks,
+> +                    ARRAY_SIZE(bus0_gate_clks));
+> +    samsung_clk_register_div(bus1_ctx, bus1_div_clks,
+> +                    ARRAY_SIZE(bus1_div_clks));
+> +    samsung_clk_register_gate(bus1_ctx, bus1_gate_clks,
+> +                    ARRAY_SIZE(bus1_gate_clks));
+> +
+> +    samsung_clk_of_provider(np, bus0_ctx);
+> +    samsung_clk_of_provider(np, bus1_ctx);
+> +
+> +}
+> +CLK_OF_DECLARE(exynos5433_cmu_bus, "samsung,exynos5433-cmu-bus",
+> +        exynos5433_cmu_bus_init);
+
+This isn't helpful either: you really have two instances and should
+not merge them together into one device node. This should look like
+
+static void __init exynos5433_cmu_bus_init(struct device_node *np)
+{
+    void __iomem *reg_base_bus;
+
+    reg_base_bus = of_iomap(np, 0);
+
+    bus_ctx = samsung_clk_init(np, reg_base_bus, BUS_NR_CLKS);
+
+    samsung_clk_register_div(bus_ctx, bus_div_clks,
+                    ARRAY_SIZE(bus_div_clks));
+    samsung_clk_register_gate(bus_ctx, bus_gate_clks,
+                    ARRAY_SIZE(bus_gate_clks));
+
+    samsung_clk_of_provider(np, bus0_ctx);
+}
+
+and get called three times.
+
+	Arnd
