@@ -1,137 +1,87 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 27 Nov 2014 19:40:59 +0100
-Subject: [PATCH 4/5] arm/arm64: KVM: Introduce stage2_unmap_vm
-In-Reply-To: <1417113660-23610-1-git-send-email-christoffer.dall@linaro.org>
-References: <1417113660-23610-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1417113660-23610-5-git-send-email-christoffer.dall@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 27 Nov 2014 18:41:33 +0000
+Subject: [PATCH v3 1/3] devicetree: of: Add bindings for chosen node,
+ stdout-path
+In-Reply-To: <1417110967-16284-2-git-send-email-leif.lindholm@linaro.org>
+References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
+ <1417110967-16284-2-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <20141127184133.GM857@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new function to unmap user RAM regions in the stage2 page
-tables.  This is needed on reboot (or when the guest turns off the MMU)
-to ensure we fault in pages again and make the dcache, RAM, and icache
-coherent.
+On Thu, Nov 27, 2014 at 05:56:05PM +0000, Leif Lindholm wrote:
+> Add a global binding for the chosen node.
+> Include a description of the stdout-path, and an explicit statement on
+> its extra options in the context of a UART console.
+> 
+> Opening description stolen from www.devicetree.org, and part of the
+> remaining text provided by Mark Rutland.
+> 
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/chosen.txt |   42 ++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/chosen.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+> new file mode 100644
+> index 0000000..9cd74e9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/chosen.txt
+> @@ -0,0 +1,42 @@
+> +The chosen node
+> +---------------
+> +
+> +The chosen node does not represent a real device, but serves as a place
+> +for passing data between firmware and the operating system, like boot
+> +arguments. Data in the chosen node does not represent the hardware.
+> +
+> +
+> +stdout-path property
+> +--------------------
+> +
+> +Device trees may specify the device to be used for boot console output
+> +with a stdout-path property under /chosen, as described in ePAPR, e.g.
+> +
+> +/ {
+> +	chosen {
+> +		stdout-path = "/serial at f00:115200";
+> +	};
+> +
+> +	serial at f00 {
+> +		compatible = "vendor,some-uart";
+> +		reg = <0xf00 0x10>;
+> +	};
+> +};
+> +
+> +If the character ":" is present in the value, this terminates the path.
+> +The meaning of any characters following the ":" is device-specific, and
+> +must be specified in the relevant binding documentation.
+> +
+> +For UART devices, the format supported by uart_parse_options() is the
+> +expected one. In this case, the format of the string is:
 
-Using unmap_stage2_range for the whole guest physical range does not
-work, because that unmaps IO regions (such as the GIC) which will not be
-recreated or in the best case faulted in on a page-by-page basis.
+Please drop the mention of uart_parse_options and just describe the
+format. Linux internal details are irrelevant to the contract of the
+binding.
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-There is an alternative version with more code reuse available here:
-http://git.linaro.org/people/christoffer.dall/linux-kvm-arm.git vcpu_init_fixes-alternative
+Otherwise this looks good to me!
 
-That version improves code-reuse at the cost of reduced code-readibility and
-increased complexity.  I didn't test the alternative version or spend huge
-amounts of time thinking about potential cleaner versions of the code, but
-chose to include a pointer to the version as I can't make up my mind about the
-preferred approach.  Input is welcome.
+Thanks,
+Mark.
 
- arch/arm/include/asm/kvm_mmu.h   |  1 +
- arch/arm/kvm/mmu.c               | 65 ++++++++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/kvm_mmu.h |  1 +
- 3 files changed, 67 insertions(+)
-
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index acb0d57..4654c42 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -52,6 +52,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
- void free_boot_hyp_pgd(void);
- void free_hyp_pgds(void);
- 
-+void stage2_unmap_vm(struct kvm *kvm);
- int kvm_alloc_stage2_pgd(struct kvm *kvm);
- void kvm_free_stage2_pgd(struct kvm *kvm);
- int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 57a403a..b1f3c9a 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -611,6 +611,71 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
- 	unmap_range(kvm, kvm->arch.pgd, start, size);
- }
- 
-+static void stage2_unmap_memslot(struct kvm *kvm,
-+				 struct kvm_memory_slot *memslot)
-+{
-+	hva_t hva = memslot->userspace_addr;
-+	phys_addr_t addr = memslot->base_gfn << PAGE_SHIFT;
-+	phys_addr_t size = PAGE_SIZE * memslot->npages;
-+	hva_t reg_end = hva + size;
-+
-+	/*
-+	 * A memory region could potentially cover multiple VMAs, and any holes
-+	 * between them, so iterate over all of them to find out if we should
-+	 * unmap any of them.
-+	 *
-+	 *     +--------------------------------------------+
-+	 * +---------------+----------------+   +----------------+
-+	 * |   : VMA 1     |      VMA 2     |   |    VMA 3  :    |
-+	 * +---------------+----------------+   +----------------+
-+	 *     |               memory region                |
-+	 *     +--------------------------------------------+
-+	 */
-+	do {
-+		struct vm_area_struct *vma = find_vma(current->mm, hva);
-+		hva_t vm_start, vm_end;
-+
-+		if (!vma || vma->vm_start >= reg_end)
-+			break;
-+
-+		/*
-+		 * Take the intersection of this VMA with the memory region
-+		 */
-+		vm_start = max(hva, vma->vm_start);
-+		vm_end = min(reg_end, vma->vm_end);
-+
-+		if (!(vma->vm_flags & VM_PFNMAP)) {
-+			gpa_t gpa = addr + (vm_start - memslot->userspace_addr);
-+			unmap_stage2_range(kvm, gpa, vm_end - vm_start);
-+		}
-+		hva = vm_end;
-+	} while (hva < reg_end);
-+}
-+
-+/**
-+ * stage2_unmap_vm - Unmap Stage-2 RAM mappings
-+ * @kvm: The struct kvm pointer
-+ *
-+ * Go through the memregions and unmap any reguler RAM
-+ * backing memory already mapped to the VM.
-+ */
-+void stage2_unmap_vm(struct kvm *kvm)
-+{
-+	struct kvm_memslots *slots;
-+	struct kvm_memory_slot *memslot;
-+	int idx;
-+
-+	idx = srcu_read_lock(&kvm->srcu);
-+	spin_lock(&kvm->mmu_lock);
-+
-+	slots = kvm_memslots(kvm);
-+	kvm_for_each_memslot(memslot, slots)
-+		stage2_unmap_memslot(kvm, memslot);
-+
-+	spin_unlock(&kvm->mmu_lock);
-+	srcu_read_unlock(&kvm->srcu, idx);
-+}
-+
- /**
-  * kvm_free_stage2_pgd - free all stage-2 tables
-  * @kvm:	The KVM struct pointer for the VM.
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 0caf7a5..061fed7 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -83,6 +83,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
- void free_boot_hyp_pgd(void);
- void free_hyp_pgds(void);
- 
-+void stage2_unmap_vm(struct kvm *kvm);
- int kvm_alloc_stage2_pgd(struct kvm *kvm);
- void kvm_free_stage2_pgd(struct kvm *kvm);
- int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
--- 
-2.1.2.330.g565301e.dirty
+> +
+> +	<baud>{<parity>{<bits>{<flow>}}}
+> +
+> +where
+> +
+> +	baud	- baud rate in decimal
+> +	parity	- 'n' (none), 'o', (odd) or 'e' (even)
+> +	bits	- number of data bits
+> +	flow	- 'r' (rts)
+> +
+> +For example: 115200n8r
+> -- 
+> 1.7.10.4
+> 
+> 
