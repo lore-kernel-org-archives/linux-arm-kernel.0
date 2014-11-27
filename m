@@ -1,32 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Nov 2014 16:30:59 +0000
-Subject: [PATCH 2/4] spi: st: Provide Device Tree binding documentation
-In-Reply-To: <20141127145542.GH4628@x1>
-References: <1417088636-11994-1-git-send-email-lee.jones@linaro.org>
- <1417088636-11994-3-git-send-email-lee.jones@linaro.org>
- <20141127130053.GW7712@sirena.org.uk> <20141127145542.GH4628@x1>
-Message-ID: <20141127163059.GZ7712@sirena.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 27 Nov 2014 17:40:56 +0100
+Subject: [PATCH 3/9] clk: sunxi: Add prcm mod0 clock driver
+In-Reply-To: <20141126211318.GN25249@lukather>
+References: <54743DE1.7020704@redhat.com>
+	<20141126211318.GN25249@lukather>
+Message-ID: <20141127174056.6697cde3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 02:55:42PM +0000, Lee Jones wrote:
-> On Thu, 27 Nov 2014, Mark Brown wrote:
+Hi,
 
-> > What do the two different compatible strings mean (for example, should
-> > ssc4 be used for version 4 and higher or is it just a quirk for that
-> > version)?
+On Wed, 26 Nov 2014 22:13:18 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-> This appears to be historical.  There aren't any functional
-> differences i.e. we don't match on them.  I believe the former is a
-> more informal, generic name and the latter is the official name of the
-> IP block.  The I2C component already upstreamed has the same naming
-> conventions by the looks of it.
+[...]
 
-Probably best to say something or retire one then.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/eb94ebc5/attachment.sig>
+> 
+> I remember someone (Chen-Yu? Boris?) saying that the 1wire clock was
+> not really a mod0 clk. From what I could gather from the source code,
+> it seems to have a wider m divider, so we could argue that it should
+> need a new compatible.
+
+Wasn't me :-).
+
+Regarding the rest of the discussion I miss some context, but here's
+what I remember decided us to choose the MFD approach for the PRCM
+block:
+
+1) it's embedding several unrelated functional blocks (reset, clk, and
+some other things I don't remember).
+2) none of the functionalities provided by the PRCM were required in
+the early boot stage
+3) We wanted to represent the HW blocks as they are really described in
+the memory mapping instead of splitting small register chunks over the
+DT.
+
+Can someone sum-up the current issue you're trying to solve ?
+
+IMHO, if you really want to split those functionalities over the DT
+(some nodes under clks and other under reset controller), then I
+suggest to use..............
+(Maxime, please stop smiling :P)
+..............
+
+SYSCON
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
