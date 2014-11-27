@@ -1,48 +1,32 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 27 Nov 2014 15:36:16 +0000
-Subject: Code generation involving __raw_readl and __raw_writel
-In-Reply-To: <2978273.VePW8UymqL@wuerfel> (Arnd Bergmann's message of "Thu, 27
- Nov 2014 16:00:01 +0100")
-References: <5476FFA2.8010403@free.fr> <7958894.CNnhBWEkgT@wuerfel>
- <54773A8B.5000200@free.fr> <2978273.VePW8UymqL@wuerfel>
-Message-ID: <yw1x61e0fyfj.fsf@unicorn.mansr.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Nov 2014 16:36:52 +0100
+Subject: [PATCH v3 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <CAAfSe-uWvn4MX-+GKuvvd=G2MTfLDCFeLRoUGWp7vvc81wfu0w@mail.gmail.com>
+References: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <3400511.2SONqVcoEr@wuerfel>
+ <CAAfSe-uWvn4MX-+GKuvvd=G2MTfLDCFeLRoUGWp7vvc81wfu0w@mail.gmail.com>
+Message-ID: <7773522.25QE5ibXJZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Thursday 27 November 2014 23:23:17 Lyra Zhang wrote:
+> 
+> Yes, I saw this way in other serial drivers.
+> But, if then, there are two questions for me:
+> 1. Why did some serial drivers need an UN_SHARED irq?
 
-> On Thursday 27 November 2014 15:51:55 Mason wrote:
->> Arnd,
->> 
->> First of all, thanks (a lot) for your highly informative replies!
->> 
->> On 27/11/2014 14:12, Arnd Bergmann wrote:
->> 
->> > On Thursday 27 November 2014 14:01:41 Mason wrote:
->> >
->> >> #define gbus_read_reg32(r)      __raw_readl((volatile void __iomem *)IO_ADDRESS(r))
->> >> #define gbus_write_reg32(r, v)  __raw_writel(v, (volatile void __iomem *)IO_ADDRESS(r))
->> >
->> > Right, that's how things used to be done a while ago.
->> 
->> So, IIUC, old code used to call __raw_readl directly, but modern
->> code is supposed to call either readl or readl_relaxed?
->> 
->> (BTW, the original code is 4-5 years old, while my target is 3.14.x)
->
-> I meant the IO_ADDRESS stuff. Modern code uses ioremap() instead
-> since the IO_ADDRESS was platform specific, and drivers can no longer
-> use platform headers on CONFIG_ARCH_MULTIPLATFORM, which is used
-> for all new code now.
->
-> The __raw_readl() was probably considered bad back then already, but
-> a lot of people did it as we were lacking readl_relaxed().
->
-> Would you consider submitting the code upstream?
+A lot of drivers were written before we had shared IRQs, or
+were copied from old drivers, or are for hardware that uses
+edge-triggered interrupts instead of level-triggered interrupts.
 
-This appears to be targeting a Sigma Designs chip, and nobody has to my
-knowledge ever seen anything go upstream from them.
+Only level-triggered interrupts can be shared.
 
--- 
-M?ns Rullg?rd
-mans at mansr.com
+> 2. How can we choose a right way?
+
+It never hurts to implement a shared interrupt handler. Only
+if you have no way to find out whether the device triggered
+the interrupt or not you have to leave out IRQF_SHARED, and then
+you won't be able to return IRQ_NONE.
+
+	Arnd
