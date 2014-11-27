@@ -1,77 +1,83 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Nov 2014 19:02:33 +0000
-Subject: [RFC 0/2] Qualcomm RPM sleep states
-In-Reply-To: <20141126233447.GD2872@sonymobile.com>
-References: <546FC674.1070005@codeaurora.org>
- <20141121232738.GP3815@sirena.org.uk>
- <546FCE3A.1000005@codeaurora.org>
- <20141124181614.GT7712@sirena.org.uk>
- <5473A0F3.6080405@codeaurora.org>
- <20141125204430.GN7712@sirena.org.uk>
- <20141126233447.GD2872@sonymobile.com>
-Message-ID: <20141127190233.GF7712@sirena.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 27 Nov 2014 20:06:47 +0100
+Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
+In-Reply-To: <54775E12.6020906@roeck-us.net>
+References: <5465C00E.4030808@offcode.fi>
+ <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
+ <5476CA7F.4000802@offcode.fi> <5476ED44.603@atmel.com>
+ <54775E12.6020906@roeck-us.net>
+Message-ID: <20141127200647.4f0575ca@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 03:34:47PM -0800, Bjorn Andersson wrote:
+Hi Guenter,
 
-> Problem 1:
-> Regulators are shared between CPU PLLs and other peripherals and when we take
-> the cpu to idle we need a way to let go of the CPU PLL "vote" on the regulator.
+On Thu, 27 Nov 2014 09:23:30 -0800
+Guenter Roeck <linux@roeck-us.net> wrote:
 
-> In the case of the CPU being the only consumer I think we've come down to the
-> problems being:
-> * we're in atomic context
+> On 11/27/2014 01:22 AM, Nicolas Ferre wrote:
+> > On 27/11/2014 07:53, Timo Kokkonen wrote:
+> >> Hi,
+> >>
+> >> On 21.11.2014 14:23, Timo Kokkonen wrote:
+> >>> By default the driver will start a kernel timer which keeps on kicking
+> >>> the watchdog HW until user space has opened the watchdog
+> >>> device. Usually this is desirable as the watchdog HW is running by
+> >>> default and the user space may not have any watchdog daemon running at
+> >>> all.
+> >>>
+> >>> However, on production systems it may be mandatory that also early
+> >>> crashes and lockups will lead to a watchdog reset, even if they happen
+> >>> before the user space has opened the watchdog device.
+> >>>
+> >>> To resolve the issue, add a new device tree property
+> >>> "enable-early-reset" which will prevent the kernel timer from pinging
+> >>> the watchdog HW on behalf of user space. The default is still to use
+> >>> kernel timer, but more strict behavior can be enabled via the device
+> >>> tree property.
+> >>>
+> >>> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+> >>
+> >> I forgot to put the PATCHv2 on the subject line.. But anyway, any
+> >> thoughts about it? Is there something that should be done to get it forward?
+> >
+> > Sorry for not having come back to you quickly.
+> >
+> > The only thing that tend to prevent me from taking this patch is the
+> > fact that this DT property is mostly a software, Linux-specific one...
+> > Which is somehow not covered by the DT.
+> > This might explain as well why this property is not present on other SoCs.
+> >
+> > Can we have other people's advices?
+> >
+> 
+> We have been thinking about a more generic (infrastructure based) solution
+> for the problem at hand, but that was a bit more complex and would specify
+> the actual timeout during boot, not just a boolean like suggested here.
 
-That shouldn't be an issue, we can do something like what we've got for
-regmap and allow regulators to replace their mutexes with spinlocks
-(users and drivers will need to be careful they don't do expensive
-things, plus we wamy want to look at optimizing the core, but that's
-true anyway).
+Can't we keep the same timeout (the one specified in the timeout-sec
+property) ?
 
-> * we don't want to waste the time of making sending out the request
-> * we have hardware support for this and we want to use it(?)
+> 
+> As for DT not supposed to be used for configuration, that is really a
+> tricky problem which is hard to solve. I seem to recall, though, that
+> it may be now acceptable under certain conditions. A module parameter
+> might be easier.
 
-I'm still hazy on what that actually means.  I thought the CPU case was
-one of the big ones where you *did* want to act on the configuration
-changes?
+I'm not a big fan of passing these kind information through module
+params, cause it's kind of hard to assign parameters when you have
+multiple device instances (it might not be applicable to watchdog
+devices though).
+Moreover, adding more module parameters will just expand the cmdline
+and make it less and less readable.
 
-> In the case of us having other active consumers (e.g. GPU, display or some
-> peripherals) the voltage range or operating mode specified by the cpufreq
-> driver might be suboptimal when we remove the cpu.
+Anyway, this is not my call to make :-).
 
-I don't understand.  Why is the other consumer asking for something it
-doesn't need itself?
+Regards,
 
-> Problem 2:
-> As we're implementing a solution for problem 1 we end up with a set of writes
-> to the sleep state that are superfluous. The codeaurora solution for this is to
-> buffer any writes to the sleep state and right before putting the cpu into idle
-> state there's a direct call going, that flushes the buffered writes.
+Boris
 
-> This is "only" and optimization and I think the tricky parts are how to
-> actually trigger the flush from the cpuidle driver and how to handle the smd
-> communication in a sane way.
-
-That seems like a very obvious thing to do.
-
-> > I think any duplication that's going on sounds like a consequence of
-> > the way this is currently implemented.  I think based on what I *think*
-> > you're saying the RPM driver probably ought to be hiding this and adding
-> > a property which makes the active and sleep sets track each other with
-> > normal suspend mode control otherwise.  That could potentially be done
-> > in the core, though the tracking would be substantial surgery.
-
-> I think we should start off by hiding this in the driver, if others come
-> forward needing something similar we can look at how to integrate parts of it
-> into the core.
-
-If you're hiding it in the driver make sure it's *hidden* in the driver
-- exporting duplicate regulators doesn't sound like hiding to me.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/afd860fd/attachment.sig>
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
