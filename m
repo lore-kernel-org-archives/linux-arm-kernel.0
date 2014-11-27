@@ -1,69 +1,37 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 27 Nov 2014 10:23:08 +0000
-Subject: [PATCH v10 07/10] qcom: cpuidle: Add cpuidle driver for QCOM cpus
-In-Reply-To: <7hegspeoje.fsf@deeprootsystems.com>
-References: <1416593037-27527-1-git-send-email-lina.iyer@linaro.org>
- <1416593037-27527-8-git-send-email-lina.iyer@linaro.org>
- <5475A599.1010601@linaro.org> <7hegspeoje.fsf@deeprootsystems.com>
-Message-ID: <20141127102308.GA6560@red-moon>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Thu, 27 Nov 2014 11:23:45 +0100
+Subject: [PATCH] arm: ftrace: Adds support for ftrace operations
+In-Reply-To: <20141125182038.04497ec0@gandalf.local.home>
+References: <1415372352-15664-1-git-send-email-jjhiblot@traphandler.com>
+ <20141107115225.72bc6cbf@gandalf.local.home>
+ <545CFAF4.8030104@traphandler.com>
+ <CACh+v5MDFZj+NOPWdnMgNthn_DxL3nn=CZJ224vMh7hSf84o4Q@mail.gmail.com>
+ <20141125182038.04497ec0@gandalf.local.home>
+Message-ID: <CACh+v5Phr-yA8c_bnooR8eLyEpmiMDwCGi2Oy8ArQayuRbeczA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+2014-11-26 0:20 GMT+01:00 Steven Rostedt <rostedt@goodmis.org>:
+> On Mon, 24 Nov 2014 10:59:24 +0100
+> Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
+>
+>> Hi Steve,
+>> did you get a chance of running your tests suite on real hardware with
+>> this patch? I'd be really interested in the results.
+>
+> Yes I finally got it working on my beaglebone white. It passed all the
+> tests that passed without it. Although I'm not sure this patch itself
+> was tested as I didn't have kprobes which might use it.
+>
+Thanks for testing it. At least it doesn't cause regression.
+What do you mean by not having krpobes which might use it ? Are you
+thinking of the kprobe optimization based on ftrace ?
 
-On Wed, Nov 26, 2014 at 07:43:01PM +0000, Kevin Hilman wrote:
-> Daniel Lezcano <daniel.lezcano@linaro.org> writes:
-> 
-> > On 11/21/2014 07:03 PM, Lina Iyer wrote:
-> >> Add cpuidle driver interface to allow cpus to go into C-States. Use the
-> >> cpuidle DT interface, common across ARM architectures, to provide the
-> >> idle state information to the cpuidle framework.
-> >>
-> >> Supported modes at this time are Standby and Standalone Power Collapse.
-> >>
-> >> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> >
-> > One nit and one comment below. Other than that:
-> >
-> > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >
-> > [ ... ]
-> >
-> >> +static int qcom_cpu_stby(struct cpuidle_device *dev,
-> >> +				struct cpuidle_driver *drv, int index)
-> >> +{
-> >> +	lpm_ops->standby(NULL);
-> >
-> > In my last comment I was referring about a check for entering
-> > successfully the idle state:
-> >
-> > 	if (lpm_ops->standby(NULL))
-> > 		return -1;
-> >
-> >> +	return index;
-> >> +}
-> >> +
-> >> +static int qcom_cpu_spc(struct cpuidle_device *dev,
-> >> +				struct cpuidle_driver *drv, int index)
-> >> +{
-> >> +	lpm_ops->spc(NULL);
-> >> +
-> >> +	return index;
->  
-> Similar to Daniel's comment above.  if lpm_ops->spc() fails, do you want
-> to fall back to standby.
-> 
-> Hmm, using the DT idle states, it doesn't look as straight forward as it
-> used to be to fall back to a "safe state."
+JJ
 
-What do you mean by "safe state" ? As in coupled idle states ?
-
-It is just for me to understand why DT makes things more complicated :)
-
-If the idle state enter fails it might also be because there is an
-aborted power down owing to eg pending IRQ, there would be no reason
-why you would revert to standby instead of going back to the kernel, so
-error code must be explicit at least in that respect.
-
-Thanks,
-Lorenzo
+> -- Steve
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
