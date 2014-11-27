@@ -1,41 +1,34 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 27 Nov 2014 22:45:02 +0100 (CET)
-Subject: [PATCH 3.18-rc4 v11 3/6] irqchip: gic: Make gic_raise_softirq
- FIQ-safe
-In-Reply-To: <1417119024-22844-4-git-send-email-daniel.thompson@linaro.org>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1417119024-22844-1-git-send-email-daniel.thompson@linaro.org>
- <1417119024-22844-4-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <alpine.DEB.2.11.1411272238190.3961@nanos>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Nov 2014 22:49:55 +0100
+Subject: Code generation involving __raw_readl and __raw_writel
+In-Reply-To: <54779718.1010001@free.fr>
+References: <5476FFA2.8010403@free.fr> <5308846.uKgsdBdD5V@wuerfel>
+ <54779718.1010001@free.fr>
+Message-ID: <2584668.YoDkSvJUv9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Nov 2014, Daniel Thompson wrote:
-> It is currently possible for FIQ handlers to re-enter gic_raise_softirq()
-> and lock up.
+On Thursday 27 November 2014 22:26:48 Mason wrote:
+> On 27/11/2014 17:51, Arnd Bergmann wrote:
 > 
->     	gic_raise_softirq()
-> 	   lock(x);
-> -~-> FIQ
->         handle_fiq()
-> 	   gic_raise_softirq()
-> 	      lock(x);		<-- Lockup
+> > On Thursday 27 November 2014 16:18:20 M?ns Rullg?rd wrote:
+> >
+> >> That's great.  You mentioned working against 3.14.  Do you have any
+> >> plans to move onto the current version?  That would be a prerequisite
+> >> for upstream acceptance.
+> > 
+> > FWIW, it's also a good strategy to do the initial bringup on the latest
+> > kernel and then backport to the older one for product work, otherwise
+> > you end up doing the forward port twice, and it's almost always harder
+> > than a backport.
 > 
-> Calling printk() from a FIQ handler can trigger this problem because
-> printk() raises an IPI when it needs to wake_up_klogd(). More generally,
-> IPIs are the only means for FIQ handlers to safely defer work to less
-> restrictive calling context so the function to raise them really needs
-> to be FIQ-safe.
+> Hmmm, I was told to target 3.14, because that's what we plan to support.
+> 
+> Maybe I can push one driver at a time?
+> (I have no idea if this is realistic or not.)
+> 
 
-That's not really true. irq_work can be used from FIQ/NMI context and
-it was specifically designed for that purpose.
- 
-Now printk is a different issue, but there is work in progress to make
-printk safe from FIQ/NMI context as well. This is not an ARM specific
-issue. Any architecture which has NMI like facilities has the problem
-of doing printk from that context. Steven is working on a mitigation
-for that. https://lkml.org/lkml/2014/11/18/1146
+Doing one driver at a time is the normal way anyway, what I'm saying
+is just that it's more work for you if you first port everything to 3.14.
 
-Thanks,
-
-	tglx
+	Arnd
