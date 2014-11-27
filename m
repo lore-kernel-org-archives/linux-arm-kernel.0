@@ -1,48 +1,116 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 27 Nov 2014 16:25:56 +0100
-Subject: [PATCH 1/2] ARM: tegra: irq: fix buggy usage of irq_data irq field
-In-Reply-To: <54773A33.2060705@arm.com>
-References: <1417024532-5777-1-git-send-email-marc.zyngier@arm.com>
- <1417024532-5777-2-git-send-email-marc.zyngier@arm.com>
- <20141127082836.GA19323@ulmo> <5476EA0A.7090406@arm.com>
- <20141127120826.GA25222@ulmo> <5477330E.7020404@arm.com>
- <20141127144509.GA27744@ulmo> <54773A33.2060705@arm.com>
-Message-ID: <20141127152555.GA20241@ulmo>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 27 Nov 2014 15:33:21 +0000
+Subject: [PATCH] arm64: ARM: Fix the Generic Timers interrupt active
+ level description
+In-Reply-To: <5477389A.8010606@arm.com>
+References: <1417099005-18638-1-git-send-email-Liviu.Dudau@arm.com>
+ <5477389A.8010606@arm.com>
+Message-ID: <20141127153321.GQ828@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 02:50:27PM +0000, Marc Zyngier wrote:
-> On 27/11/14 14:45, Thierry Reding wrote:
-[...]
-> > Thanks for explaining this in so much detail. That makes perfect sense.
-> > On the other hand it means that we'd be breaking DTs in a backwards-
-> > incompatibile way, severely. Would there be provision for some sort of
-> > fallback to keep existing DTBs working?
+On Thu, Nov 27, 2014 at 02:43:38PM +0000, Marc Zyngier wrote:
+> On 27/11/14 14:36, Liviu Dudau wrote:
+> > The Cortex-A5x TRM states in paragraph "9.2 Generic Timer functional
+> > description" that generic timers provide an active-LOW interrupt
+> > output. Fix the device trees to correctly describe this.
+> > 
+> > While doing this update the CPU mask to match the number of described
+> > CPUs as well.
+> > 
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > ---
+> > 
+> > Arnd, Olof: This is on top of linux-next/master as it patches the Juno
+> > as well as all the other ARM DTs.
+> > 
+> >  arch/arm64/boot/dts/arm/foundation-v8.dts  | 8 ++++----
+> >  arch/arm64/boot/dts/arm/juno.dts           | 8 ++++----
+> >  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts | 8 ++++----
+> >  3 files changed, 12 insertions(+), 12 deletions(-)
+> > 
+> > diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dts
+> > index 4a06090..27f3296 100644
+> > --- a/arch/arm64/boot/dts/arm/foundation-v8.dts
+> > +++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
+> > @@ -78,10 +78,10 @@
+> >  
+> >  	timer {
+> >  		compatible = "arm,armv8-timer";
+> > -		interrupts = <1 13 0xff01>,
+> > -			     <1 14 0xff01>,
+> > -			     <1 11 0xff01>,
+> > -			     <1 10 0xff01>;
+> > +		interrupts = <1 13 0xf08>,
+> > +			     <1 14 0xf08>,
+> > +			     <1 11 0xf08>,
+> > +			     <1 10 0xf08>;
+> >  		clock-frequency = <100000000>;
+> >  	};
+> >  
+> > diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> > index 097ecc4..cb3073e 100644
+> > --- a/arch/arm64/boot/dts/arm/juno.dts
+> > +++ b/arch/arm64/boot/dts/arm/juno.dts
+> > @@ -98,10 +98,10 @@
+> >  
+> >  	timer {
+> >  		compatible = "arm,armv8-timer";
+> > -		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
+> > -			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
+> > -			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
+> > -			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>;
+> > +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> > +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> > +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> > +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
+> >  	};
+> >  
+> >  	pmu {
+> > diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+> > index 572005e..efc59b3 100644
+> > --- a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+> > +++ b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+> > @@ -81,10 +81,10 @@
+> >  
+> >  	timer {
+> >  		compatible = "arm,armv8-timer";
+> > -		interrupts = <1 13 0xff01>,
+> > -			     <1 14 0xff01>,
+> > -			     <1 11 0xff01>,
+> > -			     <1 10 0xff01>;
+> > +		interrupts = <1 13 0xf08>,
+> > +			     <1 14 0xf08>,
+> > +			     <1 11 0xf08>,
+> > +			     <1 10 0xf08>;
+> >  		clock-frequency = <100000000>;
+> >  	};
+> >  
+> > 
 > 
-> I've been thinking of this, but that's not very nice. The box will
-> probably still boot, but suspend will be broken (all interrupts would be
-> pointing to the GIC, bypassing the LIC entirely).
+> Sorry, but that's wrong. Despite the *cores* having an level-low output,
+> the GIC only triggers on *level-high*. Yes, there is probably an
+> inverter in between.
 
-Given your description it sounds like suspend will still work, but the
-box won't be able to resume. There must be a way to refuse suspend in
-those cases. I think that's something we could live with, but not
-resuming sounds pretty bad.
+Hah, one can never read enough specs to get the right answer!
 
-> I've been looking at how to patch the FDT at runtime (ideally replacing
-> the top-level interrupt-parent), but that doesn't seem to be possible.
+I'll update the patch.
+
+Best regards,
+Liviu
+
 > 
-> Suggestions?
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
+> 
 
->From what I remember the gic_arch_extn structure had a flags field that
-needs to contain a specific flag to make resume work. Would it be
-possible to force that flag if we detect that LIC is not the top-level
-interrupt parent?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/3ee0cb6e/attachment.sig>
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
