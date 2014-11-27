@@ -1,69 +1,85 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 27 Nov 2014 20:15:52 +0100
-Subject: [PATCH 3/9] clk: sunxi: Add prcm mod0 clock driver
-In-Reply-To: <20141127174056.6697cde3@bbrezillon>
-References: <54743DE1.7020704@redhat.com> <20141126211318.GN25249@lukather>
- <20141127174056.6697cde3@bbrezillon>
-Message-ID: <20141127191552.GS25249@lukather>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 27 Nov 2014 11:31:36 -0800
+Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
+In-Reply-To: <20141127200647.4f0575ca@bbrezillon>
+References: <5465C00E.4030808@offcode.fi>	<1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>	<5476CA7F.4000802@offcode.fi>	<5476ED44.603@atmel.com>	<54775E12.6020906@roeck-us.net>
+ <20141127200647.4f0575ca@bbrezillon>
+Message-ID: <54777C18.3010609@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 05:40:56PM +0100, Boris Brezillon wrote:
-> Hi,
-> 
-> On Wed, 26 Nov 2014 22:13:18 +0100
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> [...]
-> 
-> > 
-> > I remember someone (Chen-Yu? Boris?) saying that the 1wire clock was
-> > not really a mod0 clk. From what I could gather from the source code,
-> > it seems to have a wider m divider, so we could argue that it should
-> > need a new compatible.
-> 
-> Wasn't me :-).
-> 
-> Regarding the rest of the discussion I miss some context, but here's
-> what I remember decided us to choose the MFD approach for the PRCM
-> block:
-> 
-> 1) it's embedding several unrelated functional blocks (reset, clk, and
-> some other things I don't remember).
-> 2) none of the functionalities provided by the PRCM were required in
-> the early boot stage
-> 3) We wanted to represent the HW blocks as they are really described in
-> the memory mapping instead of splitting small register chunks over the
-> DT.
-> 
-> Can someone sum-up the current issue you're trying to solve ?
+On 11/27/2014 11:06 AM, Boris Brezillon wrote:
+> Hi Guenter,
+>
+> On Thu, 27 Nov 2014 09:23:30 -0800
+> Guenter Roeck <linux@roeck-us.net> wrote:
+>
+>> On 11/27/2014 01:22 AM, Nicolas Ferre wrote:
+>>> On 27/11/2014 07:53, Timo Kokkonen wrote:
+>>>> Hi,
+>>>>
+>>>> On 21.11.2014 14:23, Timo Kokkonen wrote:
+>>>>> By default the driver will start a kernel timer which keeps on kicking
+>>>>> the watchdog HW until user space has opened the watchdog
+>>>>> device. Usually this is desirable as the watchdog HW is running by
+>>>>> default and the user space may not have any watchdog daemon running at
+>>>>> all.
+>>>>>
+>>>>> However, on production systems it may be mandatory that also early
+>>>>> crashes and lockups will lead to a watchdog reset, even if they happen
+>>>>> before the user space has opened the watchdog device.
+>>>>>
+>>>>> To resolve the issue, add a new device tree property
+>>>>> "enable-early-reset" which will prevent the kernel timer from pinging
+>>>>> the watchdog HW on behalf of user space. The default is still to use
+>>>>> kernel timer, but more strict behavior can be enabled via the device
+>>>>> tree property.
+>>>>>
+>>>>> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+>>>>
+>>>> I forgot to put the PATCHv2 on the subject line.. But anyway, any
+>>>> thoughts about it? Is there something that should be done to get it forward?
+>>>
+>>> Sorry for not having come back to you quickly.
+>>>
+>>> The only thing that tend to prevent me from taking this patch is the
+>>> fact that this DT property is mostly a software, Linux-specific one...
+>>> Which is somehow not covered by the DT.
+>>> This might explain as well why this property is not present on other SoCs.
+>>>
+>>> Can we have other people's advices?
+>>>
+>>
+>> We have been thinking about a more generic (infrastructure based) solution
+>> for the problem at hand, but that was a bit more complex and would specify
+>> the actual timeout during boot, not just a boolean like suggested here.
+>
+> Can't we keep the same timeout (the one specified in the timeout-sec
+> property) ?
+>
+That doesn't take into account systems where - for whatever reason -
+the initial timeout needs to be longer. I do not think it is a good idea
+to unnecessarily limit functionality. We may make the additional timeout
+optional - in that case timeout-sec could be used as default.
 
-There's (at least) one module0 clock exposed in the PRCM block. We
-have a disagreement on whether all module0 clocks should be platform
-drivers to support probing that one clock or just to introduce a new
-compatible for that one clock in the PRCM alone.
+>>
+>> As for DT not supposed to be used for configuration, that is really a
+>> tricky problem which is hard to solve. I seem to recall, though, that
+>> it may be now acceptable under certain conditions. A module parameter
+>> might be easier.
+>
+> I'm not a big fan of passing these kind information through module
+> params, cause it's kind of hard to assign parameters when you have
+> multiple device instances (it might not be applicable to watchdog
+> devices though).
+> Moreover, adding more module parameters will just expand the cmdline
+> and make it less and less readable.
+>
+Agreed but ...
 
-> IMHO, if you really want to split those functionalities over the DT
-> (some nodes under clks and other under reset controller), then I
-> suggest to use..............
-> (Maxime, please stop smiling :P)
-> ..............
-> 
-> SYSCON
+> Anyway, this is not my call to make :-).
 
-We don't really need to share anything, these components are isolated
-in separate registers, so syscon doesn't really bring anything here.
+it isn't us who restrict the DT scope (though of course timeout-sec
+_is_ configuration, but that was before things got more restrictive).
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/fd9fdb79/attachment.sig>
+Guenter
