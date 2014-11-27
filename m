@@ -1,35 +1,25 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 27 Nov 2014 13:43:09 +0000
-Subject: [PATCH v3 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC
- in dts and Makefile
-In-Reply-To: <20141127121214.GF11511@e104818-lin.cambridge.arm.com>
-References: <Sharkl64-v3>
- <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1416917818-10506-4-git-send-email-chunyan.zhang@spreadtrum.com>
- <20141127115042.GE857@leverpostej>
- <20141127121214.GF11511@e104818-lin.cambridge.arm.com>
-Message-ID: <20141127134309.GJ857@leverpostej>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 27 Nov 2014 14:44:58 +0100
+Subject: [PATCH v3 1/3] pinctrl: meson: add device tree bindings
+ documentation
+In-Reply-To: <1416168856-12747-2-git-send-email-b.galvani@gmail.com>
+References: <1416168856-12747-1-git-send-email-b.galvani@gmail.com>
+ <1416168856-12747-2-git-send-email-b.galvani@gmail.com>
+Message-ID: <CACRpkdajw44K0jj2F=Fsf6CY4FDyuuj8Y3b3uiUeK6_1FwJcSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 12:12:15PM +0000, Catalin Marinas wrote:
-> On Thu, Nov 27, 2014 at 11:50:43AM +0000, Mark Rutland wrote:
-> > On Tue, Nov 25, 2014 at 12:16:56PM +0000, Chunyan Zhang wrote:
-> > > +
-> > > +       timer {
-> > > +               compatible = "arm,armv8-timer";
-> > > +               interrupts = <1 13 0xff01>,
-> > > +                            <1 14 0xff01>,
-> > > +                            <1 11 0xff01>,
-> > > +                            <1 10 0xff01>;
-> > > +               clock-frequency = <26000000>;
-> > 
-> > Please remove the clock-frequency property. Your FW should initialise
-> > CNTFRQ_EL0 on all CPUs (certainly PSCI 0.2 requires that you do this).
-> 
-> Since this comes up regularly, I think we need a dev_warn() in the arch
-> timer driver when CONFIG_ARM64.
+On Sun, Nov 16, 2014 at 9:14 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
 
-I'll ack such a patch ;)
+> Add device tree bindings documentation for Amlogic Meson pin and GPIO
+> controller.
+>
+> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
 
-Mark.
+This is exactly how I want modern pin controller bindings to look
+when combining groups and functions, so patch applied.
+
+Now let me look at the driver!
+
+Yours,
+Linus Walleij
