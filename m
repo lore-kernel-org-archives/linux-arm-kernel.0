@@ -1,127 +1,85 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 27 Nov 2014 14:28:11 +0000
-Subject: [PATCH V4] arm64: amd-seattle: Adding device tree for AMD
- Seattle platform
-In-Reply-To: <D09A7217.A4E1%suravee.suthikulpanit@amd.com>
-References: <547458B9.2000805@arm.com>
- <D09A7217.A4E1%suravee.suthikulpanit@amd.com>
-Message-ID: <20141127142811.GN828@e106497-lin.cambridge.arm.com>
+Date: Thu, 27 Nov 2014 14:36:45 +0000
+Subject: [PATCH] arm64: ARM: Fix the Generic Timers interrupt active level
+ description
+Message-ID: <1417099005-18638-1-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 11:46:50AM +0000, Suthikulpanit, Suravee wrote:
-> Hi Marc,
-> 
-> On 11/25/14, 17:23, "Marc Zyngier" <marc.zyngier@arm.com> wrote:
-> 
-> >Hi Suravee,
-> >
-> >Just spotted a small issue below (looks like a recurring mistake in a
-> >number of DTs I've seem lately):
-> >
-> >On 24/11/14 21:51, suravee.suthikulpanit at amd.com wrote:
-> >> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> >> 
-> >> Initial revision of device tree for AMD Seattle platform.
-> >> 
-> >> Cc: Arnd Bergmann <arnd@arndb.de>
-> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> >> Signed-off-by: Thomas Lendacky <Thomas.Lendacky@amd.com>
-> >> Signed-off-by: Joel Schopp <Joel.Schopp@amd.com>
-> >> ---
-> >> V4 Changes:
-> >>     * Remove unnecessary smb layer and move motherbord to top level
-> >>     * Move include dtsi to top level
-> >>     * Remove apb_pclk from sata0 and i2c
-> >>     * Fix GIC Virtual Maintanance Interrupt from PPI24 (8) to PPI25 (9)
-> >>     * Add 40-bit dma-ranges for motherboard (simple-bus)
-> >>     * Remove dma0 (pl330) entry for now since it only supports 32-bit
-> >>DMA.
-> >>       It is basically not used at the moment. It would also need SMMU
-> >>       to allow dma remapping to 40-bit DMA range.
-> >>     * Add phandle spi0 and spi1
-> >>     * Hook up gpio0 pin 7 with MMC Card Detection (CD) support.
-> >>     * Changes in pcie0 entry:
-> >>         - Add 40-bit dma-ranges
-> >>         - Remove interrupts property
-> >>         - Add interrupt-map/mask property
-> >>         - Fix PCI I/O range
-> >>         - Merge PCI 32-bit ranges
-> >>         - Merge PCI 64-bit ranges
-> >> 
-> >> NOTE: I am not add a new compatible ID for the sata0 as Rob Herring
-> >>       suggested since there is no need at the momement, and I am trying
-> >>       to avoid introducing ID unnecessarily.
-> >> 
-> >>  arch/arm64/Kconfig                          |   5 +
-> >>  arch/arm64/boot/dts/Makefile                |   1 +
-> >>  arch/arm64/boot/dts/amd-seattle-periph.dtsi | 156
-> >>++++++++++++++++++++++++++++
-> >>  arch/arm64/boot/dts/amd-seattle.dts         |  89 ++++++++++++++++
-> >>  4 files changed, 251 insertions(+)
-> >>  create mode 100644 arch/arm64/boot/dts/amd-seattle-periph.dtsi
-> >>  create mode 100644 arch/arm64/boot/dts/amd-seattle.dts
-> >> 
-> >
-> >[...]
-> >
-> >> diff --git a/arch/arm64/boot/dts/amd-seattle.dts
-> >>b/arch/arm64/boot/dts/amd-seattle.dts
-> >> new file mode 100644
-> >> index 0000000..d5fc482
-> >> --- /dev/null
-> >> +++ b/arch/arm64/boot/dts/amd-seattle.dts
-> >> @@ -0,0 +1,89 @@
-> >> +/*
-> >> + * DTS file for AMD Seattle
-> >> + *
-> >> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
-> >> + */
-> >> +
-> >> +/dts-v1/;
-> >> +
-> 
-> [...] 
-> 
-> >> +
-> >> +	timer {
-> >> +		compatible = "arm,armv8-timer";
-> >> +		interrupts = <1 13 0xff01>,
-> >> +			     <1 14 0xff01>,
-> >> +			     <1 11 0xff01>,
-> >> +			     <1 10 0xff01>;
-> >> +	};
-> >
-> >The Cortex-A57 TRM clearly states that these interrupts are level
-> >triggered.
-> 
-> Thanks for pointing this out. I?ll fix this to <1 1X 0xff04> (4 for the
-> Active-High) then.
+The Cortex-A5x TRM states in paragraph "9.2 Generic Timer functional
+description" that generic timers provide an active-LOW interrupt
+output. Fix the device trees to correctly describe this.
 
-Hi Suravee,
+While doing this update the CPU mask to match the number of described
+CPUs as well.
 
-Don't know what Seattle does, but the TRM says that the outputs are active-LOW.
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
 
-Best regards,
-Liviu
+Arnd, Olof: This is on top of linux-next/master as it patches the Juno
+as well as all the other ARM DTs.
 
-> 
-> Suravee
-> 
-> >
-> 
-> 
+ arch/arm64/boot/dts/arm/foundation-v8.dts  | 8 ++++----
+ arch/arm64/boot/dts/arm/juno.dts           | 8 ++++----
+ arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts | 8 ++++----
+ 3 files changed, 12 insertions(+), 12 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dts
+index 4a06090..27f3296 100644
+--- a/arch/arm64/boot/dts/arm/foundation-v8.dts
++++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
+@@ -78,10 +78,10 @@
+ 
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+-		interrupts = <1 13 0xff01>,
+-			     <1 14 0xff01>,
+-			     <1 11 0xff01>,
+-			     <1 10 0xff01>;
++		interrupts = <1 13 0xf08>,
++			     <1 14 0xf08>,
++			     <1 11 0xf08>,
++			     <1 10 0xf08>;
+ 		clock-frequency = <100000000>;
+ 	};
+ 
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index 097ecc4..cb3073e 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -98,10 +98,10 @@
+ 
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+-		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
+-			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
+-			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
+-			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
+ 
+ 	pmu {
+diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+index 572005e..efc59b3 100644
+--- a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
++++ b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+@@ -81,10 +81,10 @@
+ 
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+-		interrupts = <1 13 0xff01>,
+-			     <1 14 0xff01>,
+-			     <1 11 0xff01>,
+-			     <1 10 0xff01>;
++		interrupts = <1 13 0xf08>,
++			     <1 14 0xf08>,
++			     <1 11 0xf08>,
++			     <1 10 0xf08>;
+ 		clock-frequency = <100000000>;
+ 	};
+ 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+2.1.3
