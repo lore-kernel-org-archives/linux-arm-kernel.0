@@ -1,114 +1,48 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 27 Nov 2014 15:34:54 +0000
-Subject: [PATCH] arm64: ARM: Fix the Generic Timers interrupt active
- level description
-In-Reply-To: <5477389A.8010606@arm.com>
-References: <1417099005-18638-1-git-send-email-Liviu.Dudau@arm.com>
- <5477389A.8010606@arm.com>
-Message-ID: <20141127153453.GR828@e106497-lin.cambridge.arm.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Thu, 27 Nov 2014 15:36:16 +0000
+Subject: Code generation involving __raw_readl and __raw_writel
+In-Reply-To: <2978273.VePW8UymqL@wuerfel> (Arnd Bergmann's message of "Thu, 27
+ Nov 2014 16:00:01 +0100")
+References: <5476FFA2.8010403@free.fr> <7958894.CNnhBWEkgT@wuerfel>
+ <54773A8B.5000200@free.fr> <2978273.VePW8UymqL@wuerfel>
+Message-ID: <yw1x61e0fyfj.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 02:43:38PM +0000, Marc Zyngier wrote:
-> On 27/11/14 14:36, Liviu Dudau wrote:
-> > The Cortex-A5x TRM states in paragraph "9.2 Generic Timer functional
-> > description" that generic timers provide an active-LOW interrupt
-> > output. Fix the device trees to correctly describe this.
-> > 
-> > While doing this update the CPU mask to match the number of described
-> > CPUs as well.
-> > 
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > ---
-> > 
-> > Arnd, Olof: This is on top of linux-next/master as it patches the Juno
-> > as well as all the other ARM DTs.
-> > 
-> >  arch/arm64/boot/dts/arm/foundation-v8.dts  | 8 ++++----
-> >  arch/arm64/boot/dts/arm/juno.dts           | 8 ++++----
-> >  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts | 8 ++++----
-> >  3 files changed, 12 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dts
-> > index 4a06090..27f3296 100644
-> > --- a/arch/arm64/boot/dts/arm/foundation-v8.dts
-> > +++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
-> > @@ -78,10 +78,10 @@
-> >  
-> >  	timer {
-> >  		compatible = "arm,armv8-timer";
-> > -		interrupts = <1 13 0xff01>,
-> > -			     <1 14 0xff01>,
-> > -			     <1 11 0xff01>,
-> > -			     <1 10 0xff01>;
-> > +		interrupts = <1 13 0xf08>,
-> > +			     <1 14 0xf08>,
-> > +			     <1 11 0xf08>,
-> > +			     <1 10 0xf08>;
-> >  		clock-frequency = <100000000>;
-> >  	};
-> >  
-> > diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-> > index 097ecc4..cb3073e 100644
-> > --- a/arch/arm64/boot/dts/arm/juno.dts
-> > +++ b/arch/arm64/boot/dts/arm/juno.dts
-> > @@ -98,10 +98,10 @@
-> >  
-> >  	timer {
-> >  		compatible = "arm,armv8-timer";
-> > -		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
-> > -			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
-> > -			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
-> > -			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>;
-> > +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
-> >  	};
-> >  
-> >  	pmu {
-> > diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
-> > index 572005e..efc59b3 100644
-> > --- a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
-> > +++ b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
-> > @@ -81,10 +81,10 @@
-> >  
-> >  	timer {
-> >  		compatible = "arm,armv8-timer";
-> > -		interrupts = <1 13 0xff01>,
-> > -			     <1 14 0xff01>,
-> > -			     <1 11 0xff01>,
-> > -			     <1 10 0xff01>;
-> > +		interrupts = <1 13 0xf08>,
-> > +			     <1 14 0xf08>,
-> > +			     <1 11 0xf08>,
-> > +			     <1 10 0xf08>;
-> >  		clock-frequency = <100000000>;
-> >  	};
-> >  
-> > 
-> 
-> Sorry, but that's wrong. Despite the *cores* having an level-low output,
-> the GIC only triggers on *level-high*. Yes, there is probably an
-> inverter in between.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-BTW, should I also update the bindings example to get this right?
+> On Thursday 27 November 2014 15:51:55 Mason wrote:
+>> Arnd,
+>> 
+>> First of all, thanks (a lot) for your highly informative replies!
+>> 
+>> On 27/11/2014 14:12, Arnd Bergmann wrote:
+>> 
+>> > On Thursday 27 November 2014 14:01:41 Mason wrote:
+>> >
+>> >> #define gbus_read_reg32(r)      __raw_readl((volatile void __iomem *)IO_ADDRESS(r))
+>> >> #define gbus_write_reg32(r, v)  __raw_writel(v, (volatile void __iomem *)IO_ADDRESS(r))
+>> >
+>> > Right, that's how things used to be done a while ago.
+>> 
+>> So, IIUC, old code used to call __raw_readl directly, but modern
+>> code is supposed to call either readl or readl_relaxed?
+>> 
+>> (BTW, the original code is 4-5 years old, while my target is 3.14.x)
+>
+> I meant the IO_ADDRESS stuff. Modern code uses ioremap() instead
+> since the IO_ADDRESS was platform specific, and drivers can no longer
+> use platform headers on CONFIG_ARCH_MULTIPLATFORM, which is used
+> for all new code now.
+>
+> The __raw_readl() was probably considered bad back then already, but
+> a lot of people did it as we were lacking readl_relaxed().
+>
+> Would you consider submitting the code upstream?
 
-Regards,
-Liviu
-
-> 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny...
-> 
+This appears to be targeting a Sigma Designs chip, and nobody has to my
+knowledge ever seen anything go upstream from them.
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+M?ns Rullg?rd
+mans at mansr.com
