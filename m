@@ -1,51 +1,61 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 27 Nov 2014 11:57:16 +0100
-Subject: [PATCH 1/4] ARM: shmobile: r8a7791: Correct mask for GIC PPI
- interrupts
-In-Reply-To: <1417085839-22836-1-git-send-email-geert+renesas@glider.be>
-References: <1417085839-22836-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1417085839-22836-2-git-send-email-geert+renesas@glider.be>
+Date: Thu, 27 Nov 2014 11:57:15 +0100
+Subject: [PATCH/RFC 0/4] ARM: shmobile: Correct masks for GIC PPI interrupts
+Message-ID: <1417085839-22836-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R-Car M2-W (r8a7791) contains two Cortex-A15 cores, hence the second
-interrupt specifier cell for Private Peripheral Interrupts should use
-"GIC_CPU_MASK_SIMPLE(2)".
+	Hi all,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Tested on koelsch
----
+This patch series corrects the masks in the second interrupt cells for
+Private Peripheral Interrupts in dtsi files for the shmobile family of
+SoCs.
+
+It's my understanding this mask should reflect the actual number of CPU
+cores the interrupt is wired too.
+Is that correct?
+
+  - Hence it should be "GIC_CPU_MASK_SIMPLE(2)" on dual-core CPUs, like
+    r8a7791 and r8a7794 (the first two patches),
+  - Should it be "GIC_CPU_MASK_SIMPLE(8)" on big.LITTLE configurations
+    with four Cortex-A15 cores and four Cortex-A7 cores?
+    Or should the interrupts be delivered to the four Cortex-A15 cores
+    only by default?
+    The last two RFC-patches implement the former for r8a7790 and
+    r8a73a4.
+
+Note that incorrect masks for GIC PPI interrupts are not limited to
+shmobile. Presumably the interrupt specifiers got copied around a lot,
+cfr. the proliferation of "GIC_CPU_MASK_SIMPLE(4)" (and the older
+hardcoded "0xf0x" variant) in various dtsi files, not always limited to
+quad-core CPUs.
+
+This was tested on r8a7791/koelsch, which uses the arch timer interrupt.
+
+Thanks for your feedback!
+
+Geert Uytterhoeven (4):
+  ARM: shmobile: r8a7791: Correct mask for GIC PPI interrupts
+  ARM: shmobile: r8a7794: Correct mask for GIC PPI interrupts
+  [RFC] ARM: shmobile: r8a7790: Correct mask for GIC PPI interrupts
+  [RFC] ARM: shmobile: r8a73a4: Correct mask for GIC PPI interrupts
+
+ arch/arm/boot/dts/r8a73a4.dtsi | 10 +++++-----
+ arch/arm/boot/dts/r8a7790.dtsi | 10 +++++-----
  arch/arm/boot/dts/r8a7791.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/r8a7794.dtsi | 10 +++++-----
+ 4 files changed, 20 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 77c0beeb8d7c984c..6293d3aaf23822bc 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -78,7 +78,7 @@
- 			<0 0xf1002000 0 0x1000>,
- 			<0 0xf1004000 0 0x2000>,
- 			<0 0xf1006000 0 0x2000>;
--		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
- 	};
- 
- 	gpio0: gpio at e6050000 {
-@@ -186,10 +186,10 @@
- 
- 	timer {
- 		compatible = "arm,armv7-timer";
--		interrupts = <1 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--			     <1 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--			     <1 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupts = <1 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <1 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <1 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <1 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- 
- 	cmt0: timer at ffca0000 {
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
