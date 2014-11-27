@@ -1,64 +1,237 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Thu, 27 Nov 2014 13:02:49 +0530
-Subject: [PATCH v4] mailbox/omap: adapt to the new mailbox framework
-In-Reply-To: <1415055950-64090-1-git-send-email-s-anna@ti.com>
-References: <1415055950-64090-1-git-send-email-s-anna@ti.com>
-Message-ID: <CAJe_Zhc7-PZn01C+fNhQ1WZrYcXxiw6eP5xhXVgxACQrM=W2Pg@mail.gmail.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Thu, 27 Nov 2014 16:33:54 +0900
+Subject: [PATCH 5/9] gpio: Add Fujitsu MB86S7x GPIO driver
+In-Reply-To: <1416487023-25426-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1416487023-25426-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <CAAVeFuL+RKOt1b=JiRTiajGq159_W0kJ2KOiiHa7ZwMBwuk3qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 November 2014 at 04:35, Suman Anna <s-anna@ti.com> wrote:
-> The OMAP mailbox driver and its existing clients (remoteproc
-> for OMAP4+) are adapted to use the generic mailbox framework.
+On Thu, Nov 20, 2014 at 9:37 PM, Vincent Yang
+<vincent.yang.fujitsu@gmail.com> wrote:
+> Driver for Fujitsu MB86S7x SoCs that have a memory mapped GPIO controller.
 >
-> The main changes for the adaptation are:
->   - The tasklet used for Tx is replaced with the state machine from
->     the generic mailbox framework. The workqueue used for processing
->     the received messages stays intact for minimizing the effects on
->     the OMAP mailbox clients.
->   - The existing exported client API, omap_mbox_get, omap_mbox_put and
->     omap_mbox_send_msg are deleted, as the framework provides equivalent
->     functionality. A OMAP-specific omap_mbox_request_channel is added
->     though to support non-DT way of requesting mailboxes.
->   - The OMAP mailbox driver is integrated with the mailbox framework
->     through the proper implementations of mbox_chan_ops, except for
->     .last_tx_done and .peek_data. The OMAP mailbox driver does not need
->     these ops, as it is completely interrupt driven.
->   - The OMAP mailbox driver uses a custom of_xlate controller ops that
->     allows phandles for the pargs specifier instead of indexing to avoid
->     any channel registration order dependencies.
->   - The new framework does not support multiple clients operating on a
->     single channel, so the reference counting logic is simplified.
->   - The remoteproc driver (current client) is adapted to use the new API.
->     The notifier callbacks used within this client is replaced with the
->     regular callbacks from the newer framework.
->   - The exported OMAP mailbox API are limited to omap_mbox_save_ctx,
->     omap_mbox_restore_ctx, omap_mbox_enable_irq & omap_mbox_disable_irq,
->     with the signature modified to take in the new mbox_chan handle instead
->     of the OMAP specific omap_mbox handle. The first 2 will be removed when
->     the OMAP mailbox driver is adapted to runtime_pm. The other exported
->     API omap_mbox_request_channel will be removed once existing legacy
->     users are converted to DT.
->
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Ohad Ben-Cohen <ohad@wizery.com>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
+> Signed-off-by: Andy Green <andy.green@linaro.org>
+> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+> Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
 > ---
-> v3->v4: No code changes, switched the example to use the DSP node instead of
-> WkupM3 in the bindings document & minor commit description changes. Other than
-> that, this is a repost of the driver adaptation patch [1] from the OMAP Mailbox
-> framework adaptation series [2]. This patch is intended for the 3.19 merge window,
-> all the dependent patches in [2] are merged as of 3.18-rc2. The DTS patch in [2]
-> will be posted separately.
+>  .../bindings/gpio/fujitsu,mb86s70-gpio.txt         |  18 ++
+>  drivers/gpio/Kconfig                               |   6 +
+>  drivers/gpio/Makefile                              |   1 +
+>  drivers/gpio/gpio-mb86s7x.c                        | 211 +++++++++++++++++++++
+>  4 files changed, 236 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/fujitsu,mb86s70-gpio.txt
+>  create mode 100644 drivers/gpio/gpio-mb86s7x.c
 >
-> [1] http://marc.info/?l=linux-omap&m=141038453917790&w=2
-> [2] http://marc.info/?l=linux-omap&m=141038447817775&w=2
+> diff --git a/Documentation/devicetree/bindings/gpio/fujitsu,mb86s70-gpio.txt b/Documentation/devicetree/bindings/gpio/fujitsu,mb86s70-gpio.txt
+> new file mode 100644
+> index 0000000..38300ee
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/fujitsu,mb86s70-gpio.txt
+> @@ -0,0 +1,18 @@
+> +Fujitsu MB86S7x GPIO Controller
+> +-------------------------------
+> +
+> +Required properties:
+> +- compatible: Should be "fujitsu,mb86s70-gpio"
+> +- gpio-controller: Marks the device node as a gpio controller.
+> +- #gpio-cells: Should be <2>. The first cell is the pin number and the
+> +  second cell is used to specify optional parameters:
+> +   - bit 0 specifies polarity (0 for normal, 1 for inverted).
+
+According to the example below and the code, "reg" and "clocks" are
+also required properties.
+
+> +
+> +Examples:
+> +       gpio0: gpio at 31000000 {
+> +               compatible = "fujitsu,mb86s70-gpio";
+> +               reg = <0 0x31000000 0x10000>;
+> +               gpio-controller;
+> +               #gpio-cells = <2>;
+> +               clocks = <&clk_alw_2_1>;
+
+Maybe add a "clocks-names" property so the clock can be given a meaningful name?
+
+> +       };
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index 0959ca9..493b7fe 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -181,6 +181,12 @@ config GPIO_F7188X
+>           To compile this driver as a module, choose M here: the module will
+>           be called f7188x-gpio.
 >
->  .../devicetree/bindings/mailbox/omap-mailbox.txt   |  23 ++
->  drivers/mailbox/omap-mailbox.c                     | 346 ++++++++++++---------
->  drivers/remoteproc/omap_remoteproc.c               |  51 +--
->  include/linux/omap-mailbox.h                       |  16 +-
->  4 files changed, 256 insertions(+), 180 deletions(-)
->
-Applied to mailbox-devel, Thanks
--Jassi
+> +config GPIO_MB86S7X
+> +       bool "GPIO support for Fujitsu MB86S7x Platforms"
+> +       depends on ARCH_MB86S7X
+> +       help
+> +         Say yes here to support the GPIO controller in LSI ZEVIO SoCs.
+> +
+>  config GPIO_MOXART
+>         bool "MOXART GPIO support"
+>         depends on ARCH_MOXART
+> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+> index e5d346c..eec0664 100644
+> --- a/drivers/gpio/Makefile
+> +++ b/drivers/gpio/Makefile
+> @@ -46,6 +46,7 @@ obj-$(CONFIG_GPIO_MAX730X)    += gpio-max730x.o
+>  obj-$(CONFIG_GPIO_MAX7300)     += gpio-max7300.o
+>  obj-$(CONFIG_GPIO_MAX7301)     += gpio-max7301.o
+>  obj-$(CONFIG_GPIO_MAX732X)     += gpio-max732x.o
+> +obj-$(CONFIG_GPIO_MB86S7X)     += gpio-mb86s7x.o
+>  obj-$(CONFIG_GPIO_MC33880)     += gpio-mc33880.o
+>  obj-$(CONFIG_GPIO_MC9S08DZ60)  += gpio-mc9s08dz60.o
+>  obj-$(CONFIG_GPIO_MCP23S08)    += gpio-mcp23s08.o
+> diff --git a/drivers/gpio/gpio-mb86s7x.c b/drivers/gpio/gpio-mb86s7x.c
+> new file mode 100644
+> index 0000000..f0b2dc0
+> --- /dev/null
+> +++ b/drivers/gpio/gpio-mb86s7x.c
+> @@ -0,0 +1,211 @@
+> +/*
+> + *  linux/drivers/gpio/gpio-mb86s7x.c
+> + *
+> + *  Copyright (C) 2014 Fujitsu Semiconductor Limited
+> + *  Copyright (C) 2014 Linaro Ltd.
+> + *
+> + *  This program is free software: you can redistribute it and/or modify
+> + *  it under the terms of the GNU General Public License as published by
+> + *  the Free Software Foundation, version 2 of the License.
+> + *
+> + *  This program is distributed in the hope that it will be useful,
+> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *  GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/init.h>
+> +#include <linux/clk.h>
+> +#include <linux/gpio.h>
+> +#include <linux/module.h>
+> +#include <linux/err.h>
+> +#include <linux/errno.h>
+> +#include <linux/ioport.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/slab.h>
+> +
+> +#define PDR(x) (0x0 + x)
+> +#define DDR(x) (0x10 + x)
+> +#define PFR(x) (0x20 + x)
+
+Everytime these macros are used in the code, they are called in the
+form PFR(offset / 8 * 4). How about doing this operation in the macros
+instead of repeating it at every call?
+
+> +
+> +struct mb86s70_gpio_chip {
+> +       spinlock_t lock;
+> +       struct clk *clk;
+> +       void __iomem *base;
+> +       struct gpio_chip gc;
+> +};
+> +
+> +static int mb86s70_gpio_request(struct gpio_chip *gc, unsigned offset)
+> +{
+> +       struct mb86s70_gpio_chip *gchip = container_of(gc,
+> +                                       struct mb86s70_gpio_chip, gc);
+
+Please have a chip_to_mb86s70() macro to avoid that cumbersome call to
+container_of in every function. Also I suggest you move the gpio_chip
+to the top of your mb86s70_gpio_chip structure so the container_of
+translates to a simple recast without any arithmetic.
+
+> +       unsigned long flags;
+> +       u32 val;
+> +
+> +       spin_lock_irqsave(&gchip->lock, flags);
+> +       val = readl(gchip->base + PFR(offset / 8 * 4));
+
+Same, having mb86s70_readl()/mb86s70_writel() functions would prevent
+you from explicitly doing pointer arithmetic every time you write a
+register.
+
+> +       val &= ~(1 << (offset % 8)); /* as gpio-port */
+
+val &= ~BIT(offset % 8); ? Same everywhere it applies.
+
+> +       writel(val, gchip->base + PFR(offset / 8 * 4));
+> +       spin_unlock_irqrestore(&gchip->lock, flags);
+> +
+> +       return 0;
+> +}
+> +
+> +static void mb86s70_gpio_free(struct gpio_chip *gc, unsigned offset)
+> +{
+> +       struct mb86s70_gpio_chip *gchip = container_of(gc,
+> +                                       struct mb86s70_gpio_chip, gc);
+> +       unsigned long flags;
+> +       u32 val;
+> +
+> +       spin_lock_irqsave(&gchip->lock, flags);
+> +       val = readl(gchip->base + PFR(offset / 8 * 4));
+> +       val |= (1 << (offset % 8)); /* as peri-port */
+> +       writel(val, gchip->base + PFR(offset / 8 * 4));
+> +       spin_unlock_irqrestore(&gchip->lock, flags);
+> +}
+> +
+> +static int mb86s70_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
+> +{
+> +       struct mb86s70_gpio_chip *gchip =
+> +                       container_of(gc, struct mb86s70_gpio_chip, gc);
+> +       unsigned long flags;
+> +       unsigned char val;
+> +
+> +       spin_lock_irqsave(&gchip->lock, flags);
+> +       val = readl(gchip->base + DDR(offset / 8 * 4));
+> +       val &= ~(1 << (offset % 8));
+> +       writel(val, gchip->base + DDR(offset / 8 * 4));
+> +       spin_unlock_irqrestore(&gchip->lock, flags);
+> +
+> +       return 0;
+> +}
+> +
+> +static int mb86s70_gpio_direction_output(struct gpio_chip *gc,
+> +                                        unsigned offset, int value)
+> +{
+> +       struct mb86s70_gpio_chip *gchip =
+> +                       container_of(gc, struct mb86s70_gpio_chip, gc);
+> +       unsigned long flags;
+> +       unsigned char val;
+> +
+> +       spin_lock_irqsave(&gchip->lock, flags);
+> +
+> +       val = readl(gchip->base + PDR(offset / 8 * 4));
+> +       if (value)
+> +               val |= (1 << (offset % 8));
+> +       else
+> +               val &= ~(1 << (offset % 8));
+> +       writel(val, gchip->base + PDR(offset / 8 * 4));
+> +
+> +       val = readl(gchip->base + DDR(offset / 8 * 4));
+> +       val |= (1 << (offset % 8));
+> +       writel(val, gchip->base + DDR(offset / 8 * 4));
+> +
+> +       spin_unlock_irqrestore(&gchip->lock, flags);
+> +
+> +       return 0;
+> +}
+> +
+> +static int mb86s70_gpio_get(struct gpio_chip *gc, unsigned offset)
+> +{
+> +       struct mb86s70_gpio_chip *gchip =
+> +                       container_of(gc, struct mb86s70_gpio_chip, gc);
+> +       unsigned char val;
+> +
+> +       val = readl(gchip->base + PDR(offset / 8 * 4));
+> +       val &= (1 << (offset % 8));
+> +       return val ? 1 : 0;
+
+Shouldn't this function be protected by the spin lock as well?
+
+These minor comments aside, the driver looks nice and simple.
