@@ -1,98 +1,85 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Thu, 27 Nov 2014 15:51:55 +0100
-Subject: Code generation involving __raw_readl and __raw_writel
-In-Reply-To: <7958894.CNnhBWEkgT@wuerfel>
-References: <5476FFA2.8010403@free.fr> <7562945.VT72mKYTjh@wuerfel>
- <547720B5.7020904@free.fr> <7958894.CNnhBWEkgT@wuerfel>
-Message-ID: <54773A8B.5000200@free.fr>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 27 Nov 2014 15:51:49 +0100
+Subject: [PATCH V2 1/3] PM / Domains: Initial PM clock support for genpd
+In-Reply-To: <1417099911-12688-1-git-send-email-ulf.hansson@linaro.org>
+References: <1417099911-12688-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1417099911-12688-2-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+It's quite common for PM domains to use PM clocks. Typically from SOC
+specific code, the per device PM clock list is created and
+pm_clk_suspend|resume() are invoked to handle clock gating/ungating.
 
-First of all, thanks (a lot) for your highly informative replies!
+A step towards consolidation is to integrate PM clock support into
+genpd, which is what this patch does.
 
-On 27/11/2014 14:12, Arnd Bergmann wrote:
+In this initial step, the calls to the pm_clk_suspend|resume() are
+handled within genpd, but the per device PM clock list still needs to
+be created from SOC specific code. It seems reasonable to have gendp to
+handle that as well, but that left to future patches to address.
 
-> On Thursday 27 November 2014 14:01:41 Mason wrote:
->
->> #define gbus_read_reg32(r)      __raw_readl((volatile void __iomem *)IO_ADDRESS(r))
->> #define gbus_write_reg32(r, v)  __raw_writel(v, (volatile void __iomem *)IO_ADDRESS(r))
->
-> Right, that's how things used to be done a while ago.
+It's not every users of genpd that are keen on using PM clocks thus we
+need to provide this a configuration option for genpd. Therefore let's
+add flag field in the genpd struct to keep this information and define
+a new PM_DOMAIN_PM_CLK bit can then be set at initialization.
 
-So, IIUC, old code used to call __raw_readl directly, but modern
-code is supposed to call either readl or readl_relaxed?
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
 
-(BTW, the original code is 4-5 years old, while my target is 3.14.x)
+Changes in v2:
+	Set ->start() callback to pm_clk_resume() and fixed comment.
 
->>> use of_iomap or devm_ioremap_resource to get to the pointer for
->>> a device, don't just hardcode virtual addresses.
->>
->> About that. If nothing had been done, 0xf0010024 would be an
->> invalid virtual address, and reading from that address would
->> generate a TLB miss, right? So something must have configured
->> the TLB to accept and translate this address correctly.
->>
->> I'm looking for an iomap or ioremap call, right?
->
-> The IO_ADDRESS() macro on this platform is probably defined to
-> match a address range that is set up from a map_io callback in
-> the platform.
+---
+ drivers/base/power/domain.c | 7 +++++++
+ include/linux/pm_domain.h   | 3 +++
+ 2 files changed, 10 insertions(+)
 
-#define __IO_START 0xf0000000
-#define __IO_SIZE  SZ_8M
-#define __IO_END   (__IO_START + __IO_SIZE)
-#define IO_ADDRESS(x) (__IO_START +(x))
-
-static struct map_desc hw_io_desc[] __initdata = {
-	{
-		.virtual	= SCU_VIRT_BASE_ADDR,
-		.pfn		=__phys_to_pfn(SCU_BASE_ADDR),
-		.length		= SZ_2M,
-		.type 		= MT_DEVICE,
-	},
-	{
-		.virtual	= IO_ADDRESS(0),
-		.pfn		=__phys_to_pfn(0),
-		.length		= SZ_8M,
-		.type 		= MT_DEVICE,
-	},
-};
-
-   ...
-   iotable_init(hw_io_desc, ARRAY_SIZE(tangox_87xx_io_desc));
-
-I'll take a much closer look at iotable_init, but I suppose it is
-this function that sets up the TLB? As far as I can see, it is not
-optimal to map 8 MB, because that will take up 8 entries in the TLB,
-whereas 16 MB would take only one (in theory).
-
-> On new platforms, you can't do that because the mach/*.h header
-> files are inaccessible to drivers, so you have to use ioremap.
-
-What do you mean by new platforms?
-
-Indeed, the IO_* macros given above are defined in
-arch/arm/mach-tangox/include/mach/io.h
-
-But my 3.14 driver does see the header.
-
->> I'm asking because I have an idea in mind: on the bus, the first
->> 16 MB contains only memory-mapped registers, so I've been thinking
->> I can map this region at init, and keep it for the lifetime of the
->> system. It would use only one entry in the TLB, since the CPU
->> supports 16 MB super-sections (or whatever they are called).
->>
->> I could even lock that entry in the TLB so that these accesses
->> are guaranteed to never TLB miss, right?
->
-> The map_io callback will set up a mapping like that, and when
-> a driver calls ioremap on the same physical address, you will
-> get the correct pointer using that TLB, you just don't communicate
-> the address through a pointer any more.
-
-IIUC, you're saying the current method using iotable_init is not
-appropriate, and I should use the map_io callback?
-
-Regards. (And thanks again)
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 735c473..42ba5a0 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -12,6 +12,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/pm_domain.h>
+ #include <linux/pm_qos.h>
++#include <linux/pm_clock.h>
+ #include <linux/slab.h>
+ #include <linux/err.h>
+ #include <linux/sched.h>
+@@ -1928,6 +1929,12 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+ 	genpd->domain.ops.complete = pm_genpd_complete;
+ 	genpd->dev_ops.save_state = pm_genpd_default_save_state;
+ 	genpd->dev_ops.restore_state = pm_genpd_default_restore_state;
++
++	if (genpd->flags & PM_DOMAIN_PM_CLK) {
++		genpd->dev_ops.stop = pm_clk_suspend;
++		genpd->dev_ops.start = pm_clk_resume;
++	}
++
+ 	mutex_lock(&gpd_list_lock);
+ 	list_add(&genpd->gpd_list_node, &gpd_list);
+ 	mutex_unlock(&gpd_list_lock);
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 8cbd32e..4ba06a4f 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -14,6 +14,7 @@
+ #include <linux/pm.h>
+ #include <linux/err.h>
+ #include <linux/of.h>
++#include <linux/bitops.h>
+ #include <linux/notifier.h>
+ #include <linux/cpuidle.h>
+ 
+@@ -76,6 +77,8 @@ struct generic_pm_domain {
+ 			  struct device *dev);
+ 	void (*detach_dev)(struct generic_pm_domain *domain,
+ 			   struct device *dev);
++	unsigned int flags;		/* Bit field of configs for genpd */
++#define PM_DOMAIN_PM_CLK	BIT(0)	/* PM domain uses PM clk */
+ };
+ 
+ static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
+-- 
+1.9.1
