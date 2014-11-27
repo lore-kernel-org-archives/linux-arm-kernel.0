@@ -1,89 +1,82 @@
-From: js07.lee@gmail.com (Jungseung Lee)
-Date: Thu, 27 Nov 2014 10:32:25 +0900
-Subject: [PATCH v3] arm: Support for the PXN CPU feature on ARMv7
-In-Reply-To: <20141126135210.GJ3836@n2100.arm.linux.org.uk>
-References: <1417008840-27591-1-git-send-email-js07.lee@gmail.com>
- <20141126135210.GJ3836@n2100.arm.linux.org.uk>
-Message-ID: <CAPP0e=NcJjHy2ei2JeStBL0SKtz6hkiRnT=Zb55PzCOY4U7J3w@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 26 Nov 2014 17:51:32 -0800
+Subject: [RFC 0/2] Qualcomm RPM sleep states
+In-Reply-To: <20141126134055.GF7712@sirena.org.uk>
+References: <546FC674.1070005@codeaurora.org>
+ <20141121232738.GP3815@sirena.org.uk> <546FCE3A.1000005@codeaurora.org>
+ <20141124181614.GT7712@sirena.org.uk> <5473A0F3.6080405@codeaurora.org>
+ <20141125204430.GN7712@sirena.org.uk> <547526BC.1090202@codeaurora.org>
+ <20141126134055.GF7712@sirena.org.uk>
+Message-ID: <547683A4.4000700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-26 22:52 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Wed, Nov 26, 2014 at 10:34:00PM +0900, Jungseung Lee wrote:
->> +/*
->> + * Once this call has completed the variable @vmsa is set to 'VMSA support'
->> + * in case of ARMv7.
->> + */
->> +static inline bool cpu_has_classic_pxn(void)
->> +{
->> +     if (__LINUX_ARM_ARCH__ >= 6 && !IS_ENABLED(CONFIG_ARM_LPAE)) {
->> +             static unsigned int vmsa = ~0UL;
->> +
->> +             if (cpu_architecture() != CPU_ARCH_ARMv7)
->> +                     return false;
->> +             if (vmsa == 4)
->> +                     return true;
->> +
->> +             vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
->> +             return vmsa == 4;
->> +     } else
->> +             return false;
->> +}
->
-> Take a moment to consider whether this should be an inline function.  It's
-> rather complex, involves calling out to a function, reading a variable,
-> etc...
->
->>  static inline void
->>  pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
->>  {
->> -     __pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
->> +     pmdval_t pmdval = _PAGE_USER_TABLE;
->> +
->> +     if (cpu_has_classic_pxn())
->> +             pmdval |= PMD_PXNTABLE;
->> +     __pmd_populate(pmdp, page_to_phys(ptep), pmdval);
->>  }
->>  #define pmd_pgtable(pmd) pmd_page(pmd)
->
-> It's also used in another inline function.
->
-> Now, consider if we did this:
->
-> extern pmdval_t user_pmd_table;
->
-> static inline void
-> pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
-> {
->         __pmd_populate(pmdp, page_to_phys(ptep), user_pmd_table);
-> }
->
-> This means that pmd_populate() only has to load the value instead, which
-> is far simpler.  All the setup complexity can live in build_mem_type_table()
-> which means that it only happens once, and we don't have to have checks
-> in these paths to see whether we've done that.
->
-> What would also be acceptable is to have the constant tests here, so the
-> compiler can eliminate the unnecessary load when we have no hope of ever
-> supporting PXN:
->
-> static inline void
-> pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
-> {
->         pmdval_t prot;
->
->         if (__LINUX_ARM_ARCH__ >= 6 && !IS_ENABLED(CONFIG_ARM_LPAE))
->                 prot = user_pmd_table;
->         else
->                 prot = _PAGE_USER_TABLE;
->
->         __pmd_populate(pmdp, page_to_phys(ptep), prot);
-> }
->
-Yes, that would be solution to make any redundant overhead.
-I'll prepare patch including your suggestion.
-thanks for review,
+On 11/26/2014 05:40 AM, Mark Brown wrote:
+> On Tue, Nov 25, 2014 at 05:02:52PM -0800, Stephen Boyd wrote:
+>> On 11/25/2014 12:44 PM, Mark Brown wrote:
+>>
+>>
+>>> I can't help but think that this all sounds like the RPM isn't mapping
+>>> very well onto practical systems and needs revisiting in future
+>>> versions...  for example with what I'm parsing out of the above an
+>>> active+sleep set command or otherwise having the two modes tied together
+>>> for some regulators would make the whole problem go away.
+>> We create the 'active only' regulators for consumers that actually need
+>> them. From the set of regulators on a board only a couple need this
+> That's what I don't think is making any sense.  Creating two regulators
+> for the same thing seems like bad news, at best it's going to make reuse
+> harder.
 
-> --
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
+What reuse is harder?
+
+>
+>> treatment. I don't see how tying the two states together via an active+sleep
+>> set command would make this problem go away for the cases I already
+>> described before, i.e. CPU wants some voltage and other IO devices want
+>> another voltage and the CPU doesn't care what the voltage is when the CPU is
+> Not paying attention to requests from a disabled consumer seems like
+> something we should be able to do in general.
+
+Sounds good.
+
+>
+>> in idle or suspend. Having a combination active + sleep set command would be
+>> nice. The RPM already sort of supports this by allowing you to only modify
+>> the active set. If you never modify the sleep set, then the RPM just applies
+>> whatever is in the active set to the sleep set. We can probably go through
+>> and figure out what resources could get away with only using the active set
+>> so we can cut down on sleep set requests that are always the same between
+>> active and sleep set.
+> This version is starting to sound a lot like the consumers need to be
+> able to do an idle to sleep transition and change their settings when
+> they enter their sleep mode.  It seems a lot like what many devices do
+> now when they enter and exit runtime PM but with deferred application
+> depending on other users (for regulators I'm assuming the active set
+> would actually be a subset of the sleep set of valid voltages).
+
+Yes, one key point is that we want the transition to be handled by the 
+RPM co-processor. The reason being that usually we want to change 
+settings after the last CPU transitions into their sleep mode. There's 
+no way to do this without relying on some external co-processor to go 
+and change the settings for us.
+
+>
+>>> I think any duplication that's going on sounds like a consequence of
+>>> the way this is currently implemented.  I think based on what I *think*
+>>> you're saying the RPM driver probably ought to be hiding this and adding
+>>> a property which makes the active and sleep sets track each other with
+>>> normal suspend mode control otherwise.  That could potentially be done
+>>> in the core, though the tracking would be substantial surgery.
+>> Sorry I don't follow this part. It's about more than suspend, we also care
+>> about idle. I agree that pushing the concept of active vs. sleep into the
+>> framework is substantial.
+> That's not what it seemed like people had been talking about up until
+> this most recent e-mail, you'd been talking about suspend mode.  The
+> starting point was mapping onto the suspend support the regulator has.
+
+Hm? I've been saying "idle and suspend" each time. Perhaps the initial 
+discussion about regulator suspend support threw things off.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
