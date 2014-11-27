@@ -1,107 +1,104 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 27 Nov 2014 16:21:23 +0000
-Subject: [PATCH v2] arm64: ARM: Fix the Generic Timers interrupt active level
- description
-Message-ID: <1417105283-19575-1-git-send-email-Liviu.Dudau@arm.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 27 Nov 2014 17:42:51 +0100
+Subject: [PATCH] PM / Domains: Add pm_genpd_lookup() API to lookup domain
+ by device node
+In-Reply-To: <1417097653-22599-1-git-send-email-ulf.hansson@linaro.org>
+References: <1417097653-22599-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <2598170.BNh0BBOOkI@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex-A5x TRM states in paragraph "9.2 Generic Timer functional
-description" that generic timers provide a level not edge interrupt
-output. Fix the device trees to correctly describe this.
+On Thursday, November 27, 2014 03:14:13 PM Ulf Hansson wrote:
+> In a step to move away from using genpd's name based APIs, such as the
+> pm_genpd_add_subdomain_names(), provide an API to lookup an already
+> initialized generic PM domain by its device node.
+> 
+> This API would typically be a called from SOC specific code, to fetch a
+> handle to the domain. Especially convenient to configure subdomains and
+> when the hierarchy of the domains are described in DT.
+> 
+> Do note, before pm_genpd_init() is invoked to initialize a generic PM
+> domain, it's the callers responsibility to assign the new ->dev_node
+> pointer in the struct generic_pm_domain, to enable pm_genpd_lookup() to
+> find the domain.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+> 
+> The background to why I propose this patch comes from a discussion around the
+> below patchset:
+> https://lkml.org/lkml/2014/11/24/290
+> 
+> 
+> ---
+>  drivers/base/power/domain.c | 26 ++++++++++++++++++++++++++
+>  include/linux/pm_domain.h   |  2 ++
+>  2 files changed, 28 insertions(+)
+> 
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 735c473..34555eb 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -75,6 +75,32 @@ struct generic_pm_domain *dev_to_genpd(struct device *dev)
+>  	return pd_to_genpd(dev->pm_domain);
+>  }
+>  
+> +/**
+> + * pm_genpd_lookup - Fetch a generic PM domain object by device node
+> + * @node: Device node to a corresponding genpd.
+> + *
+> + * Returns a valid pointer to struct generic_pm_domain on success or ERR_PTR()
+> + * on failure.
+> + */
+> +struct generic_pm_domain *pm_genpd_lookup(struct device_node *node)
+> +{
+> +	struct generic_pm_domain *genpd = ERR_PTR(-ENOENT), *gpd;
+> +
+> +	if (IS_ERR_OR_NULL(node))
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	mutex_lock(&gpd_list_lock);
+> +	list_for_each_entry(gpd, &gpd_list, gpd_list_node) {
+> +		if (gpd->dev_node == node) {
+> +			genpd = gpd;
+> +			break;
+> +		}
+> +	}
+> +	mutex_unlock(&gpd_list_lock);
+> +	return genpd;
+> +}
+> +EXPORT_SYMBOL_GPL(pm_genpd_lookup);
+> +
+>  static int genpd_stop_dev(struct generic_pm_domain *genpd, struct device *dev)
+>  {
+>  	return GENPD_DEV_TIMED_CALLBACK(genpd, int, stop, dev,
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index 8cbd32e..322cb7c 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -53,6 +53,7 @@ struct generic_pm_domain {
+>  	struct dev_power_governor *gov;
+>  	struct work_struct power_off_work;
+>  	const char *name;
+> +	struct device_node *dev_node;	/* Device node for the PM domain */
 
-While doing this update the CPU mask to match the number of described
-CPUs as well as the DT bindings documentation for Generic Timers.
+Please don't add DT-specific members to generic data structures.
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
+You can use struct fwnode_handle (currently in linux-next) instead.
 
-Arnd, Olof: This is on top of linux-next/master as it patches Juno's
-as well as all the other ARM DTs.
+>  	unsigned int in_progress;	/* Number of devices being suspended now */
+>  	atomic_t sd_count;	/* Number of subdomains with power "on" */
+>  	enum gpd_status status;	/* Current state of the domain */
+> @@ -126,6 +127,7 @@ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
+>  }
+>  
+>  extern struct generic_pm_domain *dev_to_genpd(struct device *dev);
+> +extern struct generic_pm_domain *pm_genpd_lookup(struct device_node *node);
+>  extern int __pm_genpd_add_device(struct generic_pm_domain *genpd,
+>  				 struct device *dev,
+>  				 struct gpd_timing_data *td);
+> 
 
---
-
- Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++----
- arch/arm64/boot/dts/arm/foundation-v8.dts            | 8 ++++----
- arch/arm64/boot/dts/arm/juno.dts                     | 8 ++++----
- arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts           | 8 ++++----
- 4 files changed, 16 insertions(+), 16 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-index 37b2caf..6d2aa87 100644
---- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-+++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-@@ -27,10 +27,10 @@ Example:
- 	timer {
- 		compatible = "arm,cortex-a15-timer",
- 			     "arm,armv7-timer";
--		interrupts = <1 13 0xf08>,
--			     <1 14 0xf08>,
--			     <1 11 0xf08>,
--			     <1 10 0xf08>;
-+		interrupts = <1 13 0xf04>,
-+			     <1 14 0xf04>,
-+			     <1 11 0xf04>,
-+			     <1 10 0xf04>;
- 		clock-frequency = <100000000>;
- 	};
- 
-diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dts
-index 4a06090..8c0214e 100644
---- a/arch/arm64/boot/dts/arm/foundation-v8.dts
-+++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
-@@ -78,10 +78,10 @@
- 
- 	timer {
- 		compatible = "arm,armv8-timer";
--		interrupts = <1 13 0xff01>,
--			     <1 14 0xff01>,
--			     <1 11 0xff01>,
--			     <1 10 0xff01>;
-+		interrupts = <1 13 0xf04>,
-+			     <1 14 0xf04>,
-+			     <1 11 0xf04>,
-+			     <1 10 0xf04>;
- 		clock-frequency = <100000000>;
- 	};
- 
-diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-index 097ecc4..551a688 100644
---- a/arch/arm64/boot/dts/arm/juno.dts
-+++ b/arch/arm64/boot/dts/arm/juno.dts
-@@ -98,10 +98,10 @@
- 
- 	timer {
- 		compatible = "arm,armv8-timer";
--		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
--			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
--			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
--			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
- 	};
- 
- 	pmu {
-diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
-index 572005e..49d1b19 100644
---- a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
-+++ b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
-@@ -81,10 +81,10 @@
- 
- 	timer {
- 		compatible = "arm,armv8-timer";
--		interrupts = <1 13 0xff01>,
--			     <1 14 0xff01>,
--			     <1 11 0xff01>,
--			     <1 10 0xff01>;
-+		interrupts = <1 13 0xf04>,
-+			     <1 14 0xf04>,
-+			     <1 11 0xf04>,
-+			     <1 10 0xf04>;
- 		clock-frequency = <100000000>;
- 	};
- 
 -- 
-2.1.3
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
