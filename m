@@ -1,55 +1,63 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 27 Nov 2014 10:18:19 -0200
-Subject: [PATCH v2] ARM: dts: imx: Update VPU compatible strings
-Message-ID: <1417090699-3051-1-git-send-email-festevam@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 27 Nov 2014 12:26:27 +0000
+Subject: [PATCH] arm64:mm: free the useless initial page table
+In-Reply-To: <5474951F.8050809@linaro.org>
+References: <1416558460-7257-1-git-send-email-zhichang.yuan@linaro.org>
+ <20141124143208.GE15872@e104818-lin.cambridge.arm.com>
+ <5474951F.8050809@linaro.org>
+Message-ID: <20141127122627.GH11511@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Tue, Nov 25, 2014 at 02:41:35PM +0000, zhichang.yuan wrote:
+> On 2014?11?24? 22:32, Catalin Marinas wrote:
+> > On Fri, Nov 21, 2014 at 08:27:40AM +0000, zhichang.yuan at linaro.org wrote:
+> >> From: "zhichang.yuan" <zhichang.yuan@linaro.org>
+> >>
+> >> For 64K page system, after mapping a PMD section, the corresponding initial
+> >> page table is not needed any more. That page can be freed.
+> >>
+> >> Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
+> >> ---
+> >>  arch/arm64/mm/mmu.c |    5 ++++-
+> >>  1 file changed, 4 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> >> index f4f8b50..12a336b 100644
+> >> --- a/arch/arm64/mm/mmu.c
+> >> +++ b/arch/arm64/mm/mmu.c
+> >> @@ -191,8 +191,11 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+> >>  			 * Check for previous table entries created during
+> >>  			 * boot (__create_page_tables) and flush them.
+> >>  			 */
+> >> -			if (!pmd_none(old_pmd))
+> >> +			if (!pmd_none(old_pmd)) {
+> >>  				flush_tlb_all();
+> >> +				if (pmd_table(old_pmd))
+> >> +					memblock_free(pte_pfn(pmd_pte(old_pmd)) << PAGE_SHIFT, PAGE_SIZE);
+> >> +			}
+> > For consistency with alloc_init_pud(), could you do:
+> >
+> > 	phys_addr_t table = __pa(pte_offset(&old_pmd, 0));
+> > 	memblock_free(table, PAGE_SIZE);
+>
+> Just as Laura comments, the pte_offset will convert the PA to VA, and
+> then convert  VA to PA. It seems to be verbose. That is why i use
+> pte_pfn. Anyway, the consistency is better, i will revise it.
+> 
+> > Since you are at this, for alloc_init_pud() could you please move the
+> > flush_tlb_all() before memblock_free()? Theoretical problem really but
+> > it's nice for consistency.
+>
+> As for this issue, i have a small question.  Since the new PMD entry
+> had been set by set_pmd, why not do the tlb flush as soon as we can?
 
-Update the VPU compatible strings to also use "cnm,coda<model>".
+So we need to flush the tlb shortly _after_ the new PMD or PUD has been
+set to guarantee that a TLB load will see the new page table value. In
+theory, we also need to flush it _before_ the old one is freed in case
+the freed page is used by some other CPU (not a problem for boot code)
+or some debug code poisons the freed page with a value that happens to
+match a valid translation.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
----
-Changes since v1:
-- Add missing whitespace
-- Add Phillip's Acked-by
-
-Shawn,
-
-The documentation patch for Documentation/devicetree/bindings/media/coda.txt 
-has been re-sent to the linux-media list with such updates.
-
- arch/arm/boot/dts/imx27.dtsi | 2 +-
- arch/arm/boot/dts/imx53.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 107d713..4b063b6 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -464,7 +464,7 @@
- 			};
- 
- 			coda: coda at 10023000 {
--				compatible = "fsl,imx27-vpu";
-+				compatible = "fsl,imx27-vpu", "cnm,codadx6";
- 				reg = <0x10023000 0x0200>;
- 				interrupts = <53>;
- 				clocks = <&clks IMX27_CLK_VPU_BAUD_GATE>,
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index a30bddf..132410c 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -756,7 +756,7 @@
- 			};
- 
- 			vpu: vpu at 63ff4000 {
--				compatible = "fsl,imx53-vpu";
-+				compatible = "fsl,imx53-vpu", "cnm,coda7541";
- 				reg = <0x63ff4000 0x1000>;
- 				interrupts = <9>;
- 				clocks = <&clks IMX5_CLK_VPU_REFERENCE_GATE>,
 -- 
-1.9.1
+Catalin
