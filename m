@@ -1,78 +1,77 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 27 Nov 2014 20:00:56 +0100
-Subject: [PATCH] ARM: xscale: correct auxiliary register in suspend/resume
-In-Reply-To: <87r3wz6mvs.fsf@free.fr> (Robert Jarzmik's message of "Wed, 19
- Nov 2014 19:55:35 +0100")
-References: <1416053153-27491-1-git-send-email-dbaryshkov@gmail.com>
- <87r3wz6mvs.fsf@free.fr>
-Message-ID: <87vbm01n9z.fsf@free.fr>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 27 Nov 2014 19:02:33 +0000
+Subject: [RFC 0/2] Qualcomm RPM sleep states
+In-Reply-To: <20141126233447.GD2872@sonymobile.com>
+References: <546FC674.1070005@codeaurora.org>
+ <20141121232738.GP3815@sirena.org.uk>
+ <546FCE3A.1000005@codeaurora.org>
+ <20141124181614.GT7712@sirena.org.uk>
+ <5473A0F3.6080405@codeaurora.org>
+ <20141125204430.GN7712@sirena.org.uk>
+ <20141126233447.GD2872@sonymobile.com>
+Message-ID: <20141127190233.GF7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+On Wed, Nov 26, 2014 at 03:34:47PM -0800, Bjorn Andersson wrote:
 
-> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
-> ...zip...
-> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> Hi Russell,
->
-> Is this patch in [1] fine by you so that Dmitry can submit it to your patch system ?
+> Problem 1:
+> Regulators are shared between CPU PLLs and other peripherals and when we take
+> the cpu to idle we need a way to let go of the CPU PLL "vote" on the regulator.
 
-OK Dmitry, let's say that Russell didn't object. Please submit it to his patch
-system (with the required procedure, kernel version upon which this applies, etc
-... all in [2]).
+> In the case of the CPU being the only consumer I think we've come down to the
+> problems being:
+> * we're in atomic context
 
-If Russell disagrees, he'll drop the patch and you'll know there is more work.
+That shouldn't be an issue, we can do something like what we've got for
+regmap and allow regulators to replace their mutexes with spinlocks
+(users and drivers will need to be careful they don't do expensive
+things, plus we wamy want to look at optimizing the core, but that's
+true anyway).
 
-Thanks.
+> * we don't want to waste the time of making sending out the request
+> * we have hardware support for this and we want to use it(?)
 
---
-Robert
+I'm still hazy on what that actually means.  I thought the CPU case was
+one of the big ones where you *did* want to act on the configuration
+changes?
 
-[1] The patch
->
-> ---8>---
-> According to the manuals I have, XScale auxiliary register should be
-> reached with opc_2 = 1 instead of crn = 1. cpu_xscale_proc_init
-> correctly uses c1, c0, 1 arguments, but cpu_xscale_do_suspend and
-> cpu_xscale_do_resume use c1, c1, 0. Correct suspend/resume functions to
-> also use c1, c0, 1.
->
-> The issue was primarily noticed thanks to qemu reporing "unsupported
-> instruction" on the pxa suspend path. Confirmed in PXA210/250 and PXA255
-> XScale Core manuals and in PXA270 and PXA320 Developers Guides.
->
-> Harware tested by me on tosa (pxa255). Robert confirmed on pxa270 board.
->
-> Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> ---
->  arch/arm/mm/proc-xscale.S | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
-> index 23259f1..afa2b3c 100644
-> --- a/arch/arm/mm/proc-xscale.S
-> +++ b/arch/arm/mm/proc-xscale.S
-> @@ -535,7 +535,7 @@ ENTRY(cpu_xscale_do_suspend)
->  	mrc	p15, 0, r5, c15, c1, 0	@ CP access reg
->  	mrc	p15, 0, r6, c13, c0, 0	@ PID
->  	mrc	p15, 0, r7, c3, c0, 0	@ domain ID
-> -	mrc	p15, 0, r8, c1, c1, 0	@ auxiliary control reg
-> +	mrc	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
->  	mrc	p15, 0, r9, c1, c0, 0	@ control reg
->  	bic	r4, r4, #2		@ clear frequency change bit
->  	stmia	r0, {r4 - r9}		@ store cp regs
-> @@ -552,7 +552,7 @@ ENTRY(cpu_xscale_do_resume)
->  	mcr	p15, 0, r6, c13, c0, 0	@ PID
->  	mcr	p15, 0, r7, c3, c0, 0	@ domain ID
->  	mcr	p15, 0, r1, c2, c0, 0	@ translation table base addr
-> -	mcr	p15, 0, r8, c1, c1, 0	@ auxiliary control reg
-> +	mcr	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
->  	mov	r0, r9			@ control register
->  	b	cpu_resume_mmu
->  ENDPROC(cpu_xscale_do_resume)
+> In the case of us having other active consumers (e.g. GPU, display or some
+> peripherals) the voltage range or operating mode specified by the cpufreq
+> driver might be suboptimal when we remove the cpu.
 
-[2] Russell's patch system rules
-http://www.arm.linux.org.uk/developer/patches/info.php
+I don't understand.  Why is the other consumer asking for something it
+doesn't need itself?
+
+> Problem 2:
+> As we're implementing a solution for problem 1 we end up with a set of writes
+> to the sleep state that are superfluous. The codeaurora solution for this is to
+> buffer any writes to the sleep state and right before putting the cpu into idle
+> state there's a direct call going, that flushes the buffered writes.
+
+> This is "only" and optimization and I think the tricky parts are how to
+> actually trigger the flush from the cpuidle driver and how to handle the smd
+> communication in a sane way.
+
+That seems like a very obvious thing to do.
+
+> > I think any duplication that's going on sounds like a consequence of
+> > the way this is currently implemented.  I think based on what I *think*
+> > you're saying the RPM driver probably ought to be hiding this and adding
+> > a property which makes the active and sleep sets track each other with
+> > normal suspend mode control otherwise.  That could potentially be done
+> > in the core, though the tracking would be substantial surgery.
+
+> I think we should start off by hiding this in the driver, if others come
+> forward needing something similar we can look at how to integrate parts of it
+> into the core.
+
+If you're hiding it in the driver make sure it's *hidden* in the driver
+- exporting duplicate regulators doesn't sound like hiding to me.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/afd860fd/attachment.sig>
