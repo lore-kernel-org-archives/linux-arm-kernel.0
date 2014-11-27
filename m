@@ -1,64 +1,204 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 27 Nov 2014 12:18:36 +0100
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141126200806.GO2817@atomide.com>
-References: <20141027200008.GR2560@atomide.com> <201411261957.08860@pali>
- <20141126191027.GM2817@atomide.com> <201411262022.03338@pali>
- <20141126200806.GO2817@atomide.com>
-Message-ID: <20141127111836.GA20159@amd>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 27 Nov 2014 11:18:34 +0000
+Subject: [PATCH 16/19] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <1417073716-22997-17-git-send-email-cw00.choi@samsung.com>
+References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
+ <1417073716-22997-17-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20141127111834.GB857@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 8< ------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Wed, 26 Nov 2014 11:55:29 -0800
-> Subject: [PATCH] ARM: OMAP2+: Fix n900 board name for legacy user space
-> 
-> N900 legacy user space apps need the board name in
-> /proc/cpuinfo to work properly for the Hardware entry.
-> 
-> For other boards this should not be an issues and they
-> can use the generic Hardware entry.
-> 
-> Let's fix the issue by adding a custom DT_MACHINE_START
-> for n900.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+On Thu, Nov 27, 2014 at 07:35:13AM +0000, Chanwoo Choi wrote:
+> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC
+> based on Octal core CPUs (quad Cortex-A57 and quad Cortex-A53).
+>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Inki Dae <inki.dae@samsung.com>
+> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi | 698 +++++++++++++++++++++
+>  arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 523 +++++++++++++++
+>  2 files changed, 1221 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
 
-Acked-by: Pavel Machek <pavel@ucw.cz>
+[...]
 
-Thanks!
-								Pavel
-
-> 
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -118,6 +118,24 @@ MACHINE_END
->  #endif
->  
->  #ifdef CONFIG_ARCH_OMAP3
-> +/* Some boards need board name for legacy userspace in /proc/cpuinfo */
-> +static const char *const n900_boards_compat[] __initconst = {
-> +	"nokia,omap3-n900",
-> +	NULL,
-> +};
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+> new file mode 100644
+> index 0000000..3d8b576
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+> @@ -0,0 +1,523 @@
+> +/*
+> + * Samsung's Exynos5433 SoC device tree source
+> + *
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + *             http://www.samsung.com
+> + *
+> + * Samsung's Exynos5433 SoC device nodes are listed in this file. Exynos5433
+> + * based board files can include this file and provide values for board specfic
+> + * bindings.
+> + *
+> + * Note: This file does not include device nodes for all the controllers in
+> + * Exynos5433 SoC. As device tree coverage for Exynos5433 increases, additional
+> + * nodes can be added to this file.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
 > +
-> +DT_MACHINE_START(OMAP3_N900_DT, "Nokia RX-51 board")
-> +	.reserve	= omap_reserve,
-> +	.map_io		= omap3_map_io,
-> +	.init_early	= omap3430_init_early,
-> +	.init_machine	= omap_generic_init,
-> +	.init_late	= omap3_init_late,
-> +	.init_time	= omap3_sync32k_timer_init,
-> +	.dt_compat	= n900_boards_compat,
-> +	.restart	= omap3xxx_restart,
-> +MACHINE_END
+> +#include "skeleton.dtsi"
+> +#include <dt-bindings/clock/exynos5433.h>
 > +
-> +/* Generic omap3 boards, most boards can use these */
->  static const char *const omap3_boards_compat[] __initconst = {
->  	"ti,omap3430",
->  	"ti,omap3",
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Just to check: no memory reservations required for any reason?
+
+There also don't appear to be any memory nodes. Typically if that's
+filled in by the bootloader/FW we'd have an empty node (or one with a
+zero size entry) and a comment regarding the FW.
+
+> +/ {
+> +       compatible = "samsung,exynos5433";
+> +       #address-cells = <1>;
+> +       #size-cells = <1>;
+
+Not two, on both counts? The CPUs can address more than 32 bits.
+
+Is there nothing in the physical address space above 0xffffffff?
+
+[...]
+
+> +       cpus {
+> +               #address-cells = <2>;
+> +               #size-cells = <0>;
+> +
+> +               cpu0: cpu at 100 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       enable-method = "psci";
+
+While the CPU nodes have enable-methods, I didn't spot a PSCI node
+anywhere, so this dts cannot possibly have been used to bring up an SMP
+system.
+
+How has this dts been tested?
+
+What PSCI revision have you implemented? Have have you tested it?
+
+I take it from the presence of GICH/GICV in the gic node that CPUs enter
+the kernel at EL2?
+
+> +                       reg = <0x0 0x100>;
+> +                       clock-frequency = <1050000000>;
+
+What uses this?
+
+> +               };
+
+[...]
+
+> +       soc: soc {
+> +               compatible = "simple-bus";
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges;
+> +
+> +               fixed-rate-clocks {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       xusbxti: clock at 0 {
+> +                               compatible = "fixed-clock";
+> +                               clock-output-names = "xusbxti";
+> +                               #clock-cells = <0>;
+> +                       };
+> +               };
+
+Get rid of the fixed-rate-clocks container node. It's pointless and
+messy. Given you only have one there's no need for the bogus
+unit-address either.
+
+> +
+> +               cmu_top: clock-controller at 0x10030000{
+
+s/@0x/@/ -- a unit-address should not have the leading '0x'. Please
+apply that to the rest of the file.
+
+> +                       compatible = "samsung,exynos5433-cmu-top";
+> +                       reg = <0x10030000 0x0c04>;
+> +                       #clock-cells = <1>;
+> +               };
+
+[...]
+
+> +               mct at 101c0000 {
+> +                       compatible = "samsung,exynos4210-mct";
+> +                       reg = <0x101c0000 0x800>;
+> +                       interrupts = <0 102 0>, <0 103 0>, <0 104 0>, <0 105 0>,
+> +                               <0 106 0>, <0 107 0>, <0 108 0>, <0 109>,
+> +                               <0 110 0>, <0 111 0>, <0 112 0>, <0 113 0>;
+> +                       clocks = <&cmu_top CLK_FIN_PLL>, <&cmu_peris CLK_PCLK_MCT>;
+> +                       clock-names = "fin_pll", "mct";
+> +               };
+
+Hase this block had no changes whatsoever since its use in Exynos4210?
+Do we not need a "samsung,exynos5433-mct" comaptible string too?
+
+> +
+> +               gic:interrupt-controller at 11001000 {
+> +                       compatible = "arm,cortex-a15-gic";
+
+Given this is multi-cluster, surely this is an external GIC-400, for
+which we have a supported compatible string?
+
+So this should at least be:
+
+	compatible = "arm,gic-400", "arm,cortex-a15-gic";
+
+> +                       #interrupt-cells = <3>;
+> +                       interrupt-controller;
+> +                       reg =   <0x11001000 0x1000>,
+> +                               <0x11002000 0x1000>,
+> +                               <0x11004000 0x2000>,
+> +                               <0x11006000 0x2000>;
+
+As far as I am aware, the GICC size is 8KiB. Regardless of whether we
+currently use the second page of registers, they should be described.
+
+> +                       interrupts = <1 9 0xf04>;
+> +               };
+> +
+> +               serial_0: serial at 14C10000 {
+
+Nit: Please be consistent with capitalisation of hex. IMO it's better
+to leave it all lower-case.
+
+[...]
+
+> +               timer {
+> +                       compatible = "arm,armv8-timer";
+> +                       interrupts = <1 13 0xff01>,
+> +                                    <1 14 0xff01>,
+> +                                    <1 11 0xff01>,
+> +                                    <1 10 0xff01>;
+> +                       clock-frequency = <24000000>;
+> +                       use-clocksource-only;
+> +                       use-physical-timer;
+
+As Marc said, NAK for these last three properties.
+
+There is no excuse for not setting CNTFRQ_EL0, especially given a PSCI
+implementation. The last two properties have never been supported in
+mainline, and shouldn't be necessary regardless.
+
+Thanks,
+Mark.
