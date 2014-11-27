@@ -1,41 +1,70 @@
-From: baolu.lu@linux.intel.com (Lu, Baolu)
-Date: Thu, 27 Nov 2014 10:00:27 +0800
-Subject: [PATCH 06/19] usb: dwc3: host: Pass the XHCI_DRD_SUPPORT and
- XHCI_NEEDS_LHC_RESET quirk
-In-Reply-To: <1416921115-10467-7-git-send-email-george.cherian@ti.com>
-References: <1416921115-10467-1-git-send-email-george.cherian@ti.com>
- <1416921115-10467-7-git-send-email-george.cherian@ti.com>
-Message-ID: <547685BB.3020109@linux.intel.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 27 Nov 2014 10:27:04 +0800
+Subject: [PATCH v4] clocksource: arch_timer: Allow the device tree to
+ specify uninitialized timer registers
+In-Reply-To: <CAD=FV=XFcWEp=nZ3=8QEausKzpBbPCzFUSHY-g0K5y+VPpU3Vw@mail.gmail.com>
+References: <1412753627-28287-1-git-send-email-sonnyrao@chromium.org>
+ <1417012893.12707.12.camel@mtksdaap41>
+ <CAD=FV=XFcWEp=nZ3=8QEausKzpBbPCzFUSHY-g0K5y+VPpU3Vw@mail.gmail.com>
+Message-ID: <1417055224.12707.24.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 2014?11?25? 21:11, George Cherian wrote:
-> Pass the quir flag XHCI_DRD_SUPPORT from DWC3 host to xhci platform driver.
-"quir" to "quirk"
+Hi,
 
-Regards,
-Baolu
+On Wed, 2014-11-26 at 08:14 -0800, Doug Anderson wrote:
+> Yingjoe,
+> 
+> On Wed, Nov 26, 2014 at 6:41 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+> > Sorry for the (very) late reply.
+> > I just realize today MT8135 need this and the other patch [1] to boot
+> > SMP correctly. I've applied both patches and they works fine. Thanks :)
+> 
+> Excellent.  It's helpful to include a Tested-by: tag in your email.
+> You'd have a line with just "Tested-by: Yingjoe Chen
+> <yingjoe.chen@mediatek.com>"
 
-> This enables xhci driver to handle deallocation's differently while in DRD mode.
-> Pass the quirk flag XHCI_NEEDS_LHC_RESET from DWC3 host to xhci platform
-> driver. This enables to do LHRESET during xhci_reset().
->
-> Signed-off-by: George Cherian <george.cherian@ti.com>
-> ---
->   drivers/usb/dwc3/host.c | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
-> index dcb8ca0..257b5b5 100644
-> --- a/drivers/usb/dwc3/host.c
-> +++ b/drivers/usb/dwc3/host.c
-> @@ -53,6 +53,8 @@ int dwc3_host_init(struct dwc3 *dwc)
->   #ifdef CONFIG_DWC3_HOST_USB3_LPM_ENABLE
->   	pdata.usb3_lpm_capable = 1;
->   #endif
-> +	pdata.usb_drd_support = 1;
-> +	pdata.usb_needs_lhc_reset = 1;
->   
->   	ret = platform_device_add_data(xhci, &pdata, sizeof(pdata));
->   	if (ret) {
+sure, here's my tested-by for the 2 patches
+
+Tested-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+
+I'll remember to add it next time :)
+
+
+> > However, I'm not sure if we really need to add new property.
+> > arm_arch_timer driver will only use virtual timer when virtual PPI
+> > interrupt is provided, so the following patch to timer dtsi will also
+> > works. I think if the firmware doesn't support virtual timer, it make
+> > sense to not supply virtual interrupt.
+> >
+> >         timer {
+> >                 compatible = "arm,armv7-timer";
+> >                 interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
+> > -                            <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
+> > -                            <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
+> > -                            <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
+> > +                            <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>;
+> >                 clock-frequency = <13000000>;
+> >         };
+> 
+> Once you have Sonny's patch then I believe that the above would work.
+> However we rejected something like this because device tree is
+> supposed to describe the hardware.  The hardware really does provide
+> the virtual timer interrupts and they really are at PPI 11 and PPI 10.
+> It's just that firmware doesn't handle things properly so they can't
+> be used.
+> 
+> NOTE: If we add the "arm,cpu-registers-not-fw-configured" to the
+> device tree and firmware actually works out how to configure things
+> (like if somehow has firmware that has a hypervisor) then it can
+> easily remove this device tree property before calling through to the
+> kernel.  It would be much harder for the firmware to add back in the
+> "PPI 11" and "PPI 10" entries to the timer.
+> 
+> -Doug
+
+I see your point, that's good for me then.
+Thanks.
+
+Joe.C
