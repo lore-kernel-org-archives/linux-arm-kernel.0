@@ -1,83 +1,41 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 27 Nov 2014 11:19:12 +0100
-Subject: [RFC PATCH 2/5] ARM: on IO mem abort - route the call to KVM
- MMIO bus
-In-Reply-To: <20141124212651.10605.58116.stgit@i3820>
-References: <20141124212240.10605.46770.stgit@i3820>
- <20141124212651.10605.58116.stgit@i3820>
-Message-ID: <5476FAA0.1060104@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 27 Nov 2014 10:22:03 +0000
+Subject: [RFC PATCH] ARM64: PCI: inherit root controller's dma-coherent
+In-Reply-To: <2081877.zLc8dS8vkP@wuerfel>
+References: <1417066891-16789-1-git-send-email-ming.lei@canonical.com>
+ <2081877.zLc8dS8vkP@wuerfel>
+Message-ID: <20141127102203.GD20649@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2014 10:26 PM, Nikolay Nikolaev wrote:
-> On IO memory abort, try to handle the MMIO access thorugh the KVM
-typo
-> registered read/write callbacks. This is done by invoking the relevant
-> kvm_io_bus_* API.
+On Thu, Nov 27, 2014 at 09:03:38AM +0000, Arnd Bergmann wrote:
+> On Thursday 27 November 2014 13:41:31 Ming Lei wrote:
 > 
-> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
-> ---
->  arch/arm/kvm/mmio.c |   33 +++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
+> > @@ -37,6 +38,21 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+> >  	return res->start;
+> >  }
+> >  
+> > +/* Inherit root controller's dma coherent ops */
+> > +static void pci_dma_config(struct pci_dev *dev)
+> > +{
+> > +	struct pci_bus *bus = dev->bus;
+> > +	struct device *host;
+> > +
+> > +	while (!pci_is_root_bus(bus)) {
+> > +		bus = bus->parent;
+> > +	}
+> > +
+> > +	host = bus->dev.parent->parent;
+> > +	if (of_dma_is_coherent(host->of_node))
+> > +		set_arch_dma_coherent_ops(&dev->dev);
+> > +}
+> > +
 > 
-> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-> index 4cb5a93..81230da 100644
-> --- a/arch/arm/kvm/mmio.c
-> +++ b/arch/arm/kvm/mmio.c
-> @@ -162,6 +162,36 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	return 0;
->  }
->  
-> +/**
-> + * kvm_handle_mmio - handle an in-kernel MMIO access
-handle_kernel_mmio
-> + * @vcpu:	pointer to the vcpu performing the access
-> + * @run:	pointer to the kvm_run structure
-> + * @mmio:	pointer to the data describing the access
-> + *
-> + * returns true if the MMIO access has been performed in kernel space,
-> + * and false if it needs to be emulated in user space.
-> + */
-> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +		struct kvm_exit_mmio *mmio)
-> +{
-> +	int ret;
-> +
-> +	if (mmio->is_write) {
-> +		ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
-> +				mmio->len, &mmio->data);
-> +
-> +	} else {
-> +		ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
-> +				mmio->len, &mmio->data);
+> I think we need something more generic than this: This is not architecture
+> specific at all, and we have to deal with IOMMU, swiotlb, dma offset and
+> dma mask as well, coherency is definitely not the only issue.
 
-> +	}
-> +	if (!ret) {
-> +		kvm_prepare_mmio(run, mmio);
-> +		kvm_handle_mmio_return(vcpu, run);
-Shouldn't the comment associated to kvm_handle_mmio_return saying
-the function "should only be called after returning from userspace for
-MMIO load emulation" be updated? Here we did kernel emulation and we
-call it. also in vgic it is called. Must aknowledge I do not fully
-understand what the .rt is.
-> +	}
-> +
-> +	return !ret;
-what if kvm_io_bus_read returned -EOPNOTSUPP?
-> +}
-> +
->  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		 phys_addr_t fault_ipa)
->  {
-> @@ -200,6 +230,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  	if (vgic_handle_mmio(vcpu, run, &mmio))
->  		return 1;
->  
-> +	if (handle_kernel_mmio(vcpu, run, &mmio))
-> +		return 1;
-> +
+Yeah, and we need to extend the IOMMU binding to express RequesterID ->
+StreamID (master ID) mappings at the host controller, too.
 
->  	kvm_prepare_mmio(run, &mmio);
->  	return 0;
->  }
-> 
+Will
