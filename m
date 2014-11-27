@@ -1,137 +1,67 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Thu, 27 Nov 2014 13:02:24 +0900
-Subject: [PATCH] arm: cacheflush: get rid of restarting block
-In-Reply-To: <1416928737-29723-1-git-send-email-vladimir.murzin@arm.com>
-References: <1416928737-29723-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <005b01d009f6$f3c6a0f0$db53e2d0$@min@lge.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 27 Nov 2014 09:38:39 +0530
+Subject: [PATCH 1/1] thermal: cpu_cooling: check for the readiness of
+ cpufreq layer
+In-Reply-To: <1417024212-1775-1-git-send-email-edubezval@gmail.com>
+References: <1417024212-1775-1-git-send-email-edubezval@gmail.com>
+Message-ID: <CAKohponxUWVT1mjRfJarNtj-+=rXNOa_ONHUjmdu_+6N+=ZjPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Vladimir Murzin [mailto:vladimir.murzin at arm.com]
-> Sent: Wednesday, November 26, 2014 12:19 AM
-> To: linux-arm-kernel at lists.infradead.org; linux at arm.linux.org.uk
-> Cc: chanho.min at lge.com; will.deacon at arm.com; stable at vger.kernel.org
-> Subject: [PATCH] arm: cacheflush: get rid of restarting block
-> 
-> We cannot restart cacheflush safely if a process provides user-defined
-> signal handler and signal is pending. In this case -EINTR is returned
-> and it is expected that process re-invokes syscall. However, there are
-> a few problems with that:
->  * looks like nobody bothers checking return value from cacheflush
->  * but if it did, we don't provide the restart address for that, so the
->    process has to use the same range again
->  * ...and again, what might lead to looping forever
-> 
-> So, remove cacheflush restarting code and terminate cache flushing
-> as early as fatal signal is pending.
-> 
-> Cc: stable at vger.kernel.org # 3.12+
-> Reported-by: Chanho Min <chanho.min@lge.com>
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> ---
-> Hi,
-> 
-> There is my proposal for the problem reported in [1]. Since that
-> thread has not been progressing much, I'm addressing the problem in
-> separate patch.
-> 
-> Comments?
-Thanks, We hope this to be applied.
+Few nits..
 
-> 
-> [1] https://lkml.org/lkml/2014/11/13/29
-> 
->  arch/arm/include/asm/thread_info.h |   11 -----------
->  arch/arm/kernel/traps.c            |   31 ++-----------------------------
->  2 files changed, 2 insertions(+), 40 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-> index fc44d37..ce73ab6 100644
-> --- a/arch/arm/include/asm/thread_info.h
-> +++ b/arch/arm/include/asm/thread_info.h
-> @@ -44,16 +44,6 @@ struct cpu_context_save {
->  	__u32	extra[2];		/* Xscale 'acc' register, etc */
->  };
-> 
-> -struct arm_restart_block {
-> -	union {
-> -		/* For user cache flushing */
-> -		struct {
-> -			unsigned long start;
-> -			unsigned long end;
-> -		} cache;
-> -	};
-> -};
-> -
->  /*
->   * low level task data that entry.S needs immediate access to.
->   * __switch_to() assumes cpu_context follows immediately after cpu_domain.
-> @@ -79,7 +69,6 @@ struct thread_info {
->  	unsigned long		thumbee_state;	/* ThumbEE Handler Base register */
->  #endif
->  	struct restart_block	restart_block;
-> -	struct arm_restart_block	arm_restart_block;
->  };
-> 
->  #define INIT_THREAD_INFO(tsk)						\
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index 0c8b108..8dd03ee 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -533,8 +533,6 @@ static int bad_syscall(int n, struct pt_regs *regs)
->  	return regs->ARM_r0;
->  }
-> 
-> -static long do_cache_op_restart(struct restart_block *);
-> -
->  static inline int
->  __do_cache_op(unsigned long start, unsigned long end)
->  {
-> @@ -543,24 +541,8 @@ __do_cache_op(unsigned long start, unsigned long end)
->  	do {
->  		unsigned long chunk = min(PAGE_SIZE, end - start);
-> 
-> -		if (signal_pending(current)) {
-> -			struct thread_info *ti = current_thread_info();
-> -
-> -			ti->restart_block = (struct restart_block) {
-> -				.fn	= do_cache_op_restart,
-> -			};
-> -
-> -			ti->arm_restart_block = (struct arm_restart_block) {
-> -				{
-> -					.cache = {
-> -						.start	= start,
-> -						.end	= end,
-> -					},
-> -				},
-> -			};
-> -
-> -			return -ERESTART_RESTARTBLOCK;
-> -		}
-> +		if (fatal_signal_pending(current))
-> +			return 0;
-> 
->  		ret = flush_cache_user_range(start, start + chunk);
->  		if (ret)
-> @@ -573,15 +555,6 @@ __do_cache_op(unsigned long start, unsigned long end)
->  	return 0;
->  }
-> 
-> -static long do_cache_op_restart(struct restart_block *unused)
-> -{
-> -	struct arm_restart_block *restart_block;
-> -
-> -	restart_block = &current_thread_info()->arm_restart_block;
-> -	return __do_cache_op(restart_block->cache.start,
-> -			     restart_block->cache.end);
-> -}
-> -
->  static inline int
->  do_cache_op(unsigned long start, unsigned long end, int flags)
->  {
-> --
-> 1.7.9.5
-Chanho
+On 26 November 2014 at 23:20, Eduardo Valentin <edubezval@gmail.com> wrote:
+
+> Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
+> ---
+
+The normal practice is to write the non-commitable part here ...
+
+>  drivers/thermal/cpu_cooling.c                      | 5 +++++
+>  drivers/thermal/db8500_cpufreq_cooling.c           | 5 -----
+>  drivers/thermal/imx_thermal.c                      | 5 -----
+>  drivers/thermal/samsung/exynos_thermal_common.c    | 2 +-
+>  drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 6 ------
+>  5 files changed, 6 insertions(+), 17 deletions(-)
+> ---
+
+But this works as well :)
+
+> This is attempt to organize the cpu cooling vs. cpufreq boot sequencing.
+> The main change in this patch, as in the commit log, is to have the check
+> for the cpufreq layer in the cpu cooling device registration, instead of
+> in thermal drivers. This way, drivers don't need to bother about it, they
+> just need to propagate the error value.
+>
+> This change was tested on top of:
+> (0) - Viresh's change in cpufreq layer and cpufreq-dt (up to patch 4):
+> https://patchwork.kernel.org/patch/5384141/
+> https://patchwork.kernel.org/patch/5384151/
+> https://patchwork.kernel.org/patch/5384161/
+> https://patchwork.kernel.org/patch/5384171/
+> (1) - fix of thermal core:
+> https://patchwork.kernel.org/patch/5326991/
+>
+> After Viresh's changes, cpufreq-dt is properly sequenced with cpu cooling
+> registration. Non-of based drivers also should take advantage if these
+> changes, as now they do not need to check for cpufreq layer. The check is
+> where it belongs, in cpu cooling device registration.
+>
+> BR, Eduardo Valentin
+>
+>
+> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+> index 1ab0018..9e6945b 100644
+> --- a/drivers/thermal/cpu_cooling.c
+> +++ b/drivers/thermal/cpu_cooling.c
+> @@ -440,6 +440,11 @@ __cpufreq_cooling_register(struct device_node *np,
+>         int ret = 0, i;
+>         struct cpufreq_policy policy;
+>
+> +       if (!cpufreq_get_current_driver() || !cpufreq_frequency_get_table(0)) {
+
+Only !cpufreq_frequency_get_table(0) is enough here.
+
+For rest:
+
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
