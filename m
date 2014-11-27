@@ -1,111 +1,90 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 27 Nov 2014 16:35:16 +0900
-Subject: [PATCH 19/19] serial: samsung: Add the support for Exynos5433 SoC
+Date: Thu, 27 Nov 2014 16:35:14 +0900
+Subject: [PATCH 17/19] arm64: dts: exynos: Add MSHC dt node for Exynos5433
 In-Reply-To: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
 References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1417073716-22997-20-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1417073716-22997-18-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new s3c24xx_serial_drv_data structure for Exynos5433 SoC
-because Exynos5433 has different fifo size from existing Exynos4 SoC.
+From: Jaehoon Chung <jh80.chung@samsung.com>
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
-Cc: linux-serial at vger.kernel.org
+This patch adds MSHC (Mobile Storage Host Controller) dt node for Exynos5433
+SoC. MSHC is an interface between the system the SD/MMC card.
+
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Acked-by: Inki Dae <inki.dae@samsung.com>
 Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
 ---
- drivers/tty/serial/samsung.c | 56 ++++++++++++++++++++++++++++----------------
- 1 file changed, 36 insertions(+), 20 deletions(-)
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 42 ++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-index 2338ad8..6f1fb9a 100644
---- a/drivers/tty/serial/samsung.c
-+++ b/drivers/tty/serial/samsung.c
-@@ -1766,32 +1766,43 @@ static struct s3c24xx_serial_drv_data s5pv210_serial_drv_data = {
- #endif
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+index 3d8b576..cfe3de8 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+@@ -53,6 +53,9 @@
+ 		i2c9 = &hsi2c_9;
+ 		i2c10 = &hsi2c_10;
+ 		i2c11 = &hsi2c_11;
++		mshc0 = &mshc_0;
++		mshc1 = &mshc_1;
++		mshc2 = &mshc_2;
+ 	};
  
- #if defined(CONFIG_ARCH_EXYNOS)
-+#define EXYNOS_COMMON_SERIAL_DRV_DATA				\
-+	.info = &(struct s3c24xx_uart_info) {			\
-+		.name		= "Samsung Exynos UART",	\
-+		.type		= PORT_S3C6400,			\
-+		.has_divslot	= 1,				\
-+		.rx_fifomask	= S5PV210_UFSTAT_RXMASK,	\
-+		.rx_fifoshift	= S5PV210_UFSTAT_RXSHIFT,	\
-+		.rx_fifofull	= S5PV210_UFSTAT_RXFULL,	\
-+		.tx_fifofull	= S5PV210_UFSTAT_TXFULL,	\
-+		.tx_fifomask	= S5PV210_UFSTAT_TXMASK,	\
-+		.tx_fifoshift	= S5PV210_UFSTAT_TXSHIFT,	\
-+		.def_clk_sel	= S3C2410_UCON_CLKSEL0,		\
-+		.num_clks	= 1,				\
-+		.clksel_mask	= 0,				\
-+		.clksel_shift	= 0,				\
-+	},							\
-+	.def_cfg = &(struct s3c2410_uartcfg) {			\
-+		.ucon		= S5PV210_UCON_DEFAULT,		\
-+		.ufcon		= S5PV210_UFCON_DEFAULT,	\
-+		.has_fracval	= 1,				\
-+	}							\
-+
- static struct s3c24xx_serial_drv_data exynos4210_serial_drv_data = {
--	.info = &(struct s3c24xx_uart_info) {
--		.name		= "Samsung Exynos4 UART",
--		.type		= PORT_S3C6400,
--		.has_divslot	= 1,
--		.rx_fifomask	= S5PV210_UFSTAT_RXMASK,
--		.rx_fifoshift	= S5PV210_UFSTAT_RXSHIFT,
--		.rx_fifofull	= S5PV210_UFSTAT_RXFULL,
--		.tx_fifofull	= S5PV210_UFSTAT_TXFULL,
--		.tx_fifomask	= S5PV210_UFSTAT_TXMASK,
--		.tx_fifoshift	= S5PV210_UFSTAT_TXSHIFT,
--		.def_clk_sel	= S3C2410_UCON_CLKSEL0,
--		.num_clks	= 1,
--		.clksel_mask	= 0,
--		.clksel_shift	= 0,
--	},
--	.def_cfg = &(struct s3c2410_uartcfg) {
--		.ucon		= S5PV210_UCON_DEFAULT,
--		.ufcon		= S5PV210_UFCON_DEFAULT,
--		.has_fracval	= 1,
--	},
-+	EXYNOS_COMMON_SERIAL_DRV_DATA,
- 	.fifosize = { 256, 64, 16, 16 },
- };
-+
-+static struct s3c24xx_serial_drv_data exynos5433_serial_drv_data = {
-+	EXYNOS_COMMON_SERIAL_DRV_DATA,
-+	.fifosize = { 64, 256, 16, 256 },
-+};
-+
- #define EXYNOS4210_SERIAL_DRV_DATA ((kernel_ulong_t)&exynos4210_serial_drv_data)
-+#define EXYNOS5433_SERIAL_DRV_DATA ((kernel_ulong_t)&exynos5433_serial_drv_data)
- #else
- #define EXYNOS4210_SERIAL_DRV_DATA (kernel_ulong_t)NULL
-+#define EXYNOS5433_SERIAL_DRV_DATA (kernel_ulong_t)NULL
- #endif
+ 	chipid at 10000000 {
+@@ -507,6 +510,45 @@
+ 			status = "disabled";
+ 		};
  
- static struct platform_device_id s3c24xx_serial_driver_ids[] = {
-@@ -1813,6 +1824,9 @@ static struct platform_device_id s3c24xx_serial_driver_ids[] = {
- 	}, {
- 		.name		= "exynos4210-uart",
- 		.driver_data	= EXYNOS4210_SERIAL_DRV_DATA,
-+	}, {
-+		.name		= "exynos5433-uart",
-+		.driver_data	= EXYNOS5433_SERIAL_DRV_DATA,
- 	},
- 	{ },
- };
-@@ -1832,6 +1846,8 @@ static const struct of_device_id s3c24xx_uart_dt_match[] = {
- 		.data = (void *)S5PV210_SERIAL_DRV_DATA },
- 	{ .compatible = "samsung,exynos4210-uart",
- 		.data = (void *)EXYNOS4210_SERIAL_DRV_DATA },
-+	{ .compatible = "samsung,exynos5433-uart",
-+		.data = (void *)EXYNOS5433_SERIAL_DRV_DATA },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, s3c24xx_uart_dt_match);
++		mshc_0: mshc at 15540000 {
++			compatible = "samsung,exynos7-dw-mshc-smu";
++			interrupts = <0 225 0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x15540000 0x2000>;
++			clocks = <&cmu_fsys CLK_ACLK_MMC0>,
++				 <&cmu_fsys CLK_SCLK_MMC0>;
++			clock-names = "biu", "ciu";
++			fifo-depth = <0x40>;
++			status = "disabled";
++		};
++
++		mshc_1: mshc at 15550000 {
++			compatible = "samsung,exynos7-dw-mshc-smu";
++			interrupts = <0 226 0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x15550000 0x2000>;
++			clocks = <&cmu_fsys CLK_ACLK_MMC1>,
++				 <&cmu_fsys CLK_SCLK_MMC1>;
++			clock-names = "biu", "ciu";
++			fifo-depth = <0x40>;
++			status = "disabled";
++		};
++
++		mshc_2: mshc at 15560000 {
++			compatible = "samsung,exynos7-dw-mshc-smu";
++			interrupts = <0 227 0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x15560000 0x2000>;
++			clocks = <&cmu_fsys CLK_ACLK_MMC2>,
++				 <&cmu_fsys CLK_SCLK_MMC2>;
++			clock-names = "biu", "ciu";
++			fifo-depth = <0x40>;
++			status = "disabled";
++		};
++
+ 		timer {
+ 			compatible = "arm,armv8-timer";
+ 			interrupts = <1 13 0xff01>,
 -- 
 1.8.5.5
