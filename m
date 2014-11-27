@@ -1,25 +1,25 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Nov 2014 13:00:53 +0000
-Subject: [PATCH 2/4] spi: st: Provide Device Tree binding documentation
-In-Reply-To: <1417088636-11994-3-git-send-email-lee.jones@linaro.org>
-References: <1417088636-11994-1-git-send-email-lee.jones@linaro.org>
- <1417088636-11994-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20141127130053.GW7712@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Nov 2014 14:02:48 +0100
+Subject: [PATCH 1/2] ARM: tegra: irq: fix buggy usage of irq_data irq field
+In-Reply-To: <20141127120826.GA25222@ulmo>
+References: <1417024532-5777-1-git-send-email-marc.zyngier@arm.com>
+ <5476EA0A.7090406@arm.com> <20141127120826.GA25222@ulmo>
+Message-ID: <5826341.lADJtgptEV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 11:43:54AM +0000, Lee Jones wrote:
+On Thursday 27 November 2014 13:08:28 Thierry Reding wrote:
+> 
+> > I'd be tempted to consider it as a fix for 3.18, as the current code is
+> > obviously wrong. Just let me know how you want to get it in.
+> 
+> That's fine with me:
+> 
+> Acked-by: Thierry Reding <treding@nvidia.com>
+> 
+> Arnd, is this anything you could pick up for 3.18?
+> 
 
-> +Required properties:
-> +- compatible	: "st,comms-ssc-spi" or "st,comms-ssc4-spi"
+Sure, no problem. Applied to fixes branch now.
 
-What do the two different compatible strings mean (for example, should
-ssc4 be used for version 4 and higher or is it just a quirk for that
-version)?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/b47715e3/attachment-0001.sig>
+	Arnd
