@@ -1,73 +1,44 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 27 Nov 2014 12:01:07 +0100
-Subject: [RFC PATCH 0/5] ARM: KVM: Enable the ioeventfd capability of
- KVM on ARM
-In-Reply-To: <20141124212240.10605.46770.stgit@i3820>
-References: <20141124212240.10605.46770.stgit@i3820>
-Message-ID: <54770473.7010307@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 27 Nov 2014 12:04:47 +0100
+Subject: [PATCH] ARM: mm: fix size rounding-down of arm_add_memory()
+In-Reply-To: <CAKv+Gu8yOcxu2LXdunSH-vB+mcckigoJGrnV+TDXeN-+AVYoSA@mail.gmail.com>
+References: <1402025567-18021-1-git-send-email-yamada.m@jp.panasonic.com>
+ <20140801213719.D537.AA925319@jp.panasonic.com>
+ <CAMuHMdXjX5AJT9fVja+GCTV4Zxp==xTe8ZFT8_uf=aFDYZ9+Jw@mail.gmail.com>
+ <CAMuHMdXo9HCTJNi8ObutwcUZiXyfyta5+McoA9UaEhueh-6gRg@mail.gmail.com>
+ <CAKv+Gu8yOcxu2LXdunSH-vB+mcckigoJGrnV+TDXeN-+AVYoSA@mail.gmail.com>
+Message-ID: <CAMuHMdVMk=6NgkQ3AuMPOTZdqx2P2U2N-QkDco+Ocd3hD-hp4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2014 10:26 PM, Nikolay Nikolaev wrote:
-> The IOEVENTFD KVM capability is a prerequisite for vhost support,
-> and is also used to implement improved interrupt handling in VFIO drivers.
-Hi Nikolay
+On Thu, Nov 27, 2014 at 11:50 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+>>>>> --- a/arch/arm/kernel/setup.c
+>>>>> +++ b/arch/arm/kernel/setup.c
+>>>>> @@ -641,8 +641,8 @@ int __init arm_add_memory(u64 start, u64 size)
+>>>>>        * Ensure that start/size are aligned to a page boundary.
+>>>>>        * Size is appropriately rounded down, start is rounded up.
+>>>>>        */
+>>>>> -     size -= start & ~PAGE_MASK;
+>>>>>       aligned_start = PAGE_ALIGN(start);
+>>>>> +     size -= aligned_start - start;
+>
+> Beware that if size if sufficiently small, (i.e., smaller than the
+> unaligned leading fraction @ start), this wraps around and produces a
+> bogus value.
 
-As far as I am aware, irqfd currently is used in vfio context, not
-ioeventfd, although they both are implemented in eventfd.c. Could you
-elaborate?
-> 
-> This series enables the ioeventfd KVM capability on ARM.
-> 
-> The implementation routes MMIO access in the IO abort handler to the KVM IO bus.
-> If there is already a registered ioeventfd handler for this address, the file
-> descriptor will be triggered.
-> 
-> We extended the KVM IO bus API to expose the VCPU struct pointer. Now the VGIC
-> MMIO access is done through this API. For this to operate the VGIC registers a
-> kvm_io_device which reprresents the whole MMIO region.
-typo & the whole dist MMIO region?
+That could have happened before, couldn't it?
 
-I think the transformation makes sense and does not bring upheavals in
-the vgic code which is good.
+Nevertheless, fixing that can be a follow-up patch?
+Unless Yamada-san wants to incorporate the fix in this patch?
 
-Best Regards
+Gr{oetje,eeting}s,
 
-Eric
-> 
-> The patches are implemented on top of the latest Andre's vGICv3 work from here:
-> http://www.linux-arm.org/git?p=linux-ap.git;a=shortlog;h=refs/heads/kvm-gicv3/v4
-> 
-> The code was tested on Dual Cortex-A15 Exynos5250 (ARM Chromebook).
-> 
-> ---
-> 
-> Nikolay Nikolaev (5):
->       KVM: redesing kvm_io_bus_ API to pass VCPU structure to the callbacks.
->       ARM: on IO mem abort - route the call to KVM MMIO bus
->       KVM: ARM VGIC add kvm_io_bus_ frontend
->       ARM: enable linking against eventfd and irqchip
->       ARM: enable KVM_CAP_IOEVENTFD
-> 
-> 
->  arch/arm/kvm/Kconfig       |    1 +
->  arch/arm/kvm/Makefile      |    2 +
->  arch/arm/kvm/arm.c         |    3 ++
->  arch/arm/kvm/mmio.c        |   32 ++++++++++++++++
->  arch/ia64/kvm/kvm-ia64.c   |    4 +-
->  arch/powerpc/kvm/powerpc.c |    4 +-
->  arch/s390/kvm/diag.c       |    2 +
->  arch/x86/kvm/vmx.c         |    2 +
->  arch/x86/kvm/x86.c         |   11 +++---
->  include/kvm/arm_vgic.h     |    3 +-
->  include/linux/kvm_host.h   |   10 +++--
->  virt/kvm/arm/vgic.c        |   88 +++++++++++++++++++++++++++++++++++++-------
->  virt/kvm/coalesced_mmio.c  |    5 ++-
->  virt/kvm/eventfd.c         |    4 +-
->  virt/kvm/iodev.h           |   23 ++++++++----
->  virt/kvm/kvm_main.c        |   32 ++++++++--------
->  16 files changed, 163 insertions(+), 63 deletions(-)
-> 
-> --
-> Signature
-> 
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
