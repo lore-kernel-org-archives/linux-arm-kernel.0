@@ -1,106 +1,127 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 27 Nov 2014 12:03:56 +0000
-Subject: [PATCH v3 0/5] Add Spreadtrum Sharkl64 Platform support
-In-Reply-To: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <Sharkl64-v3>
- <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <20141127120356.GF857@leverpostej>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 27 Nov 2014 13:08:28 +0100
+Subject: [PATCH 1/2] ARM: tegra: irq: fix buggy usage of irq_data irq field
+In-Reply-To: <5476EA0A.7090406@arm.com>
+References: <1417024532-5777-1-git-send-email-marc.zyngier@arm.com>
+ <1417024532-5777-2-git-send-email-marc.zyngier@arm.com>
+ <20141127082836.GA19323@ulmo> <5476EA0A.7090406@arm.com>
+Message-ID: <20141127120826.GA25222@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Nov 27, 2014 at 09:08:26AM +0000, Marc Zyngier wrote:
+> Hi Thierry,
+> 
+> On 27/11/14 08:28, Thierry Reding wrote:
+> > On Wed, Nov 26, 2014 at 05:55:31PM +0000, Marc Zyngier wrote:
+> >> The crazy gic_arch_extn thing that Tegra uses contains multiple
+> >> references to the irq field in struct irq_data, and uses this
+> >> to directly poke hardware register.
+> >>
+> >> But irq is the *virtual* irq number, something that has nothing
+> >> to do with the actual HW irq (stored in the hwirq field). And once
+> >> we put the stacked domain code in action, the whole thing explodes,
+> >> as these two values are *very* different:
+> > 
+> > Do you have follow-up patches to use stacked domains on Tegra? I tried
+> > to move this driver out to drivers/irqchip at some point and that caused
+> > a bit of pain because of gic_arch_extn and probe order. At the time I
+> > was told that work was in progress to provide a more generic solution
+> > that could replace gic_arch_extn, which I'm assuming this stacked domain
+> > code is.
+> 
+> I'm working on that at the moment, and things look pretty good. The only
+> issue I have so far is that this piece of HW needs to become the
+> top-level interrupt-parent for all devices that are currently
+> interrupting on the GIC. So far, the only solution I have is a change in
+> the DT. But arguably, this should have been described in DT too...
 
-On Tue, Nov 25, 2014 at 12:16:53PM +0000, Chunyan Zhang wrote:
-> Spreadtrum is a rapid growing chip vendor providing smart phone total solutions.
-> 
-> Sharkl64 Platform is nominated as a SoC infrastructure that supports 4G/3G/2G
-> standards based on ARMv8 multiple core architecture.Now we have only one
-> SoC(SC9836) based on this Platform in developing.
-> 
-> This patchset adds Sharkl64 support in arm64 device tree and the serial driver
-> of SC9836-UART.
-> 
-> This patchset also has patches which address "sprd" prefix and DT compatible
-> strings for nodes which appear un-documented.
-> 
-> This version code was tesed on Fast Mode.
+I think I had discussed this with Arnd (Cc'ed) at some point but I can't
+find a link to the discussion (perhaps it was on IRC). The outcome I
+think was that from the CPU's perspective the GIC would still be the
+interrupt parent of the devices, whereas the LIC would become the
+interrupt parent of the GIC.
 
-This concerns me a bit because fast models are extremely lenient w.r.t.
-the management of clocks and regulators. Are you sure you have
-everything you need for your UART described?
+Admittedly, though, everytime I think about this I start feeling dizzy,
+so perhaps I'm mixing this up again.
 
-> We use boot-wrapper-aarch64 as the bootloader.
+Maybe a picture to clarify for my own sake how this works:
 
-Which version of boot-wrapper-aarch64 are you using?
+	             /-----\     /-----\     /-----\
+	   various --|     |     |     |     |     |
+	  hardware --| LIC |-----| GIC |-----| CPU |
+	interrupts --|     |     |     |  |  |     |
+	             \-----/     \-----/  |  \-----/
+	                |                 |
+	             /-----\              |  /-----\
+	             |     |              |  |     |
+	             | AVP |              ---| CPU |
+	             |     |              .  |     |
+	             \-----/              .  \-----/
+	                                  .
 
-Upstream does not implement PSCI 0.2, but its --enable-psci option will
-inject PSCI 0.1 compatible properties, which leads me to suspect that
-your DT is misleading. The boot wrapper should also program CNTFRQ_EL0
-correctly regardless.
+That is, interrupts are first routed to the LIC, which will primarily be
+used by the AVP. The LIC is also configured (and that's the part where
+gic_arch_extn comes into play) to forward interrupts to the GIC which
+will distribute them to the Cortex-AXs.
 
-What do you intend to use on real hardware?
+Therefore, from the CPU perspective, the interrupt-parent of devices
+should still be the GIC, since that's where the interrupt numbers will
+need to come from in order to set up interrupt handlers. For any of
+these interrupts GIC will need to program LIC so that they are forwarded
+and can be used to wake up CPUs.
 
-Thanks,
-Mark.
+Doesn't that simplify everything to just adding an interrupt-parent
+property to GIC referencing LIC?
 
+> >> root at bacon-fat:~# cat /proc/interrupts
+> >>             CPU0       CPU1
+> >>  16:      25801       2075       GIC  29  twd
+> >>  17:          0          0       GIC  73  timer0
+> >> 112:          0          0      GPIO  58  c8000600.sdhci cd
+> >> 123:          0          0      GPIO  69  c8000200.sdhci cd
+> >> 279:       1126          0       GIC 122  serial
+> >> 281:          0          0       GIC  70  7000c000.i2c
+> >> 282:          0          0       GIC 116  7000c400.i2c
+> >> 283:          0          0       GIC 124  7000c500.i2c
+> >> 284:        300          0       GIC  85  7000d000.i2c
+> >> [...]
+> >>
+> >> Just replacing all instances of irq with hwirq fixes the issue.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm/mach-tegra/irq.c | 22 +++++++++++-----------
+> >>  1 file changed, 11 insertions(+), 11 deletions(-)
+> > 
+> > This looks correct to me. Do you need this to base subsequent patches on
+> > or shall I just take those through the Tegra tree? I'm not sure if the
+> > ARM SoC maintainers will take a follow-up pull request for 3.19, so let
+> > me know if there's a hurry to get this in if it's going to make stacked
+> > domain code difficult to merge.
 > 
-> Changes from v2:
-> * Addressed review comments:
-> 	- Added a specific compitible string 'sc9836-uart' for the serial
-> 	- Added a full serial driver
-> 	- Added the property 'clock-frequency' for timer node in dtsi.
-> 	- Replaceed the old macro prefix 'UART_' with 'SPRD_' in the 
-> 	  Spreadtrum serial driver code.
-> * Revised the name of SoC and board from 'sharkl3' to 'sc9836'
-> * Used dual-license for DTS files
-> * Added a menuconfig 'ARCH_SPRD' in arch/arm64/Kconfig
-> 
-> Changes from v1:
-> * Addressed review comments:
->         - Added "sprd" prefix to vendor-prefixes.txt
->         - Created serial/sprd-serial.txt and remove the properties for serial-sprd
->           from of-serial.txt to it.
->         - Renamed of-serial.txt to 8250.txt according to Arnd's review comments
->         - Splited and revised .dts for Sharkl64 Platform
->         - Changed to PSCI method for cpu power management
->         - Revised Kconfig Makefile to match the alphabetical ordering
->         - Renamed serial-sprd-earlycon.c to serial-sprd.c
-> 
-> Chunyan Zhang (3):
->   Documentation: DT: Renamed of-serial.txt to 8250.txt
->   Documentation: DT: Add bindings for Spreadtrum SoC Platform
->   tty/serial: Add Spreadtrum sc9836-uart driver support
-> 
-> Zhizhou Zhang (2):
->   arm64: dts: Add support for Spreadtrum SC9836 SoC in dts and Makefile
->   arm64: Add support for Spreadtrum's Sharkl64 Platform in Kconfig and
->     defconfig
-> 
->  Documentation/devices.txt                          |    3 +
->  Documentation/devicetree/bindings/arm/sprd.txt     |   11 +
->  .../bindings/serial/{of-serial.txt => 8250.txt}    |    0
->  .../devicetree/bindings/serial/sprd-uart.txt       |    6 +
->  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
->  arch/arm64/Kconfig                                 |   17 +
->  arch/arm64/boot/dts/Makefile                       |    1 +
->  arch/arm64/boot/dts/sprd-sc9836-openphone.dts      |   85 +++
->  arch/arm64/boot/dts/sprd-sc9836.dtsi               |  103 +++
->  arch/arm64/boot/dts/sprd-sharkl64.dtsi             |  105 +++
->  arch/arm64/configs/defconfig                       |    2 +
->  drivers/tty/serial/Kconfig                         |   23 +
->  drivers/tty/serial/Makefile                        |    1 +
->  drivers/tty/serial/sprd_serial.c                   |  752 ++++++++++++++++++++
->  include/uapi/linux/serial_core.h                   |    3 +
->  15 files changed, 1113 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
->  rename Documentation/devicetree/bindings/serial/{of-serial.txt => 8250.txt} (100%)
->  create mode 100644 Documentation/devicetree/bindings/serial/sprd-uart.txt
->  create mode 100644 arch/arm64/boot/dts/sprd-sc9836-openphone.dts
->  create mode 100644 arch/arm64/boot/dts/sprd-sc9836.dtsi
->  create mode 100644 arch/arm64/boot/dts/sprd-sharkl64.dtsi
->  create mode 100644 drivers/tty/serial/sprd_serial.c
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
+> Up to you, really. The only real issue is that when the stacked domain
+> code hits mainline, Tegra will stop working without this patch. -next is
+> probably already broken.
+
+I've been running next-20141126 and nothing seems obviously broken.
+Perhaps the numbering doesn't change until we actually enable stacked
+domains by wiring this up to the GIC?
+
+> I'd be tempted to consider it as a fix for 3.18, as the current code is
+> obviously wrong. Just let me know how you want to get it in.
+
+That's fine with me:
+
+Acked-by: Thierry Reding <treding@nvidia.com>
+
+Arnd, is this anything you could pick up for 3.18?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/637edd5f/attachment-0001.sig>
