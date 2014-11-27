@@ -1,63 +1,116 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 27 Nov 2014 18:12:43 +0100
-Subject: [PATCH 00/11] ARM: at91: remove !DT support for at91rm9200
-In-Reply-To: <3550407.q87bWB4Jdt@wuerfel>
-References: <cover.1417103399.git.nicolas.ferre@atmel.com>
- <3550407.q87bWB4Jdt@wuerfel>
-Message-ID: <20141127171243.GL4508@piout.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 27 Nov 2014 09:23:30 -0800
+Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
+In-Reply-To: <5476ED44.603@atmel.com>
+References: <5465C00E.4030808@offcode.fi>
+ <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
+ <5476CA7F.4000802@offcode.fi> <5476ED44.603@atmel.com>
+Message-ID: <54775E12.6020906@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/2014 at 17:49:50 +0100, Arnd Bergmann wrote :
-> On Thursday 27 November 2014 17:06:28 Nicolas Ferre wrote:
-> > This is the last series of patches that removes the non-Device-Tree board
-> > support for older Atmel SoCs.
-> > Again, for the record, it was announced here
-> > https://lkml.org/lkml/2014/9/10/293 ([ANNOUNCE] ARM: at91: removal of board
-> > files) two months ago.
-> > Several files beyond at91rm9200 are touched this time as I tried to remove the
-> > biggest parts that were related to !DT SoC initializations. More cleanup is
-> > certainly needed to remove dead code.
-> > 
-> > The diffstat is also pretty big as a lot of at91rm9200 boards were remaining.
-> > 
-> 
-> Awesome stuff!
-> 
-> Two questions:
-> 
-> - is anything holding this up from getting merged in 3.19?
-> 
+On 11/27/2014 01:22 AM, Nicolas Ferre wrote:
+> On 27/11/2014 07:53, Timo Kokkonen wrote:
+>> Hi,
+>>
+>> On 21.11.2014 14:23, Timo Kokkonen wrote:
+>>> By default the driver will start a kernel timer which keeps on kicking
+>>> the watchdog HW until user space has opened the watchdog
+>>> device. Usually this is desirable as the watchdog HW is running by
+>>> default and the user space may not have any watchdog daemon running at
+>>> all.
+>>>
+>>> However, on production systems it may be mandatory that also early
+>>> crashes and lockups will lead to a watchdog reset, even if they happen
+>>> before the user space has opened the watchdog device.
+>>>
+>>> To resolve the issue, add a new device tree property
+>>> "enable-early-reset" which will prevent the kernel timer from pinging
+>>> the watchdog HW on behalf of user space. The default is still to use
+>>> kernel timer, but more strict behavior can be enabled via the device
+>>> tree property.
+>>>
+>>> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+>>
+>> I forgot to put the PATCHv2 on the subject line.. But anyway, any
+>> thoughts about it? Is there something that should be done to get it forward?
+>
+> Sorry for not having come back to you quickly.
+>
+> The only thing that tend to prevent me from taking this patch is the
+> fact that this DT property is mostly a software, Linux-specific one...
+> Which is somehow not covered by the DT.
+> This might explain as well why this property is not present on other SoCs.
+>
+> Can we have other people's advices?
+>
 
-If you think this is not too late in the cycle, I would say go ahead ;)
+We have been thinking about a more generic (infrastructure based) solution
+for the problem at hand, but that was a bit more complex and would specify
+the actual timeout during boot, not just a boolean like suggested here.
 
-> - Are there any remaining issues that keep us from using multiplatform?
->   I know you all have been working on those a lot, but I haven't
->   checked what is still missing.
-> 
+As for DT not supposed to be used for configuration, that is really a
+tricky problem which is hard to solve. I seem to recall, though, that
+it may be now acceptable under certain conditions. A module parameter
+might be easier.
 
-As discussed some weeks ago, I prepared patches to switch sama5d[3-4] to
-multiplatform. We are still missing the SMC and matrix drivers to switch
-sam9 and rm9200.
+Guenter
 
-The currently affected drivers are:
- - drivers/ata/pata_at91.c (SMC)
- - drivers/pcmcia/at91_cf.c (SMC)
- - drivers/usb/gadget/udc/at91_udc.c (Matrix, this is the only one
-   for sam9)
- - sound/atmel/ac97c.c (that one is still not converted to DT anyway...)
- - drivers/watchdog/at91rm9200_wdt.c (WIP, will be converted properly to
-   an MFD)
-
-I'll resume working on that in December.
-
-Do you want me to submit the sama5d[3-4] switch for 3.19? I'll have to
-rebase on that series. The main remaining issue is that I couldn't work
-out a way not breaking the defconfigs, even after talking with the
-Kconfig maintainer so doing first sama5 then sam9/rm9200 will break the
-defconfigs for sam9/rm9200 twice.
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> Bye,
+>
+>>> ---
+>>>    Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
+>>>    drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
+>>>    2 files changed, 9 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>> index f90e294..a0b7b75 100644
+>>> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>> @@ -28,6 +28,10 @@ Optional properties:
+>>>    	entering idle state.
+>>>    - atmel,dbg-halt : Should be present if you want to stop the watchdog when
+>>>    	entering debug state.
+>>> +- enable-early-reset : Should be present if you want to let the
+>>> +	watchdog timer to expire even before user space has opened the
+>>> +	device. If not set, a kernel timer will keep on pinging the
+>>> +	watchdog until it is opened.
+>>>
+>>>    Example:
+>>>    	watchdog at fffffd40 {
+>>> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+>>> index 489729b..78b1977 100644
+>>> --- a/drivers/watchdog/at91sam9_wdt.c
+>>> +++ b/drivers/watchdog/at91sam9_wdt.c
+>>> @@ -89,6 +89,7 @@ struct at91wdt {
+>>>    	u32 mr_mask;
+>>>    	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
+>>>    	bool nowayout;
+>>> +	bool no_early_timer;
+>>>    	unsigned int irq;
+>>>    };
+>>>
+>>> @@ -122,7 +123,7 @@ static void at91_ping(unsigned long data)
+>>>    {
+>>>    	struct at91wdt *wdt = (struct at91wdt *)data;
+>>>    	if (time_before(jiffies, wdt->next_heartbeat) ||
+>>> -	    !watchdog_active(&wdt->wdd)) {
+>>> +		(!watchdog_active(&wdt->wdd) && !wdt->no_early_timer)) {
+>>>    		at91_wdt_reset(wdt);
+>>>    		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
+>>>    	} else {
+>>> @@ -316,6 +317,9 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
+>>>
+>>>    	wdt->mr |= max | ((max - min) << 16);
+>>>
+>>> +	if (of_property_read_bool(np, "enable-early-reset"))
+>>> +		wdt->no_early_timer = 1;
+>>> +
+>>>    	return 0;
+>>>    }
+>>>    #else
+>>>
+>>
+>>
+>
+>
