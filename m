@@ -1,147 +1,185 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Thu, 27 Nov 2014 14:13:05 +0900
-Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
-In-Reply-To: <20141126100325.GA9157@linaro.org>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <20141120135851.GA32528@linaro.org> <54759041.9080105@hitachi.com>
- <20141126100325.GA9157@linaro.org>
-Message-ID: <5476B2E1.7030304@hitachi.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 26 Nov 2014 22:24:04 -0700
+Subject: [PATCH v13 00/10] cpuidle driver for QCOM SoCs: 8064, 8074, 8084
+Message-ID: <1417065854-37745-1-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2014/11/26 19:03), Steve Capper wrote:
-> On Wed, Nov 26, 2014 at 05:33:05PM +0900, Masami Hiramatsu wrote:
->> (2014/11/21 0:02), Steve Capper wrote:
->>> On Tue, Nov 18, 2014 at 01:32:50AM -0500, David Long wrote:
->>>> From: "David A. Long" <dave.long@linaro.org>
->>>>
->>>> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches, first
->>>> seen in October 2013.  This version attempts to address concerns raised by
->>>> reviewers and also fixes problems discovered during testing, particularly during
->>>> SMP testing.
->>>>
->>>> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
->>>> and return probes(kretprobes) support for ARM64.
->>>>
->>>> Kprobes mechanism makes use of software breakpoint and single stepping
->>>> support available in the ARM v8 kernel.
->>>>
->>>> Changes since v2 include:
->>>>
->>>> 1) Removal of NOP padding in kprobe XOL slots.  Slots are now exactly one
->>>> instruction long.
->>>> 2) Disabling of interrupts during execution in single-step mode.
->>>> 3) Fixing of numerous problems in instruction simulation code.
->>>> 4) Support for the HAVE_REGS_AND_STACK_ACCESS_API feature is added, to allow
->>>> access to kprobes through debugfs.
->>>> 5) kprobes is *not* enabled in defconfig.
->>>> 6) Numerous complaints from checkpatch have been cleaned up, although a couple
->>>> remain as removing the function pointer typedefs results in ugly code.
->>>
->>> Hi David,
->>> I've been playing with this on a Juno board.
->>> I ran into one crash, which I'm not yet sure is an issue, but thought I
->>> would flag it.
->>>
->>> I opted to put a kprobe on memcpy, this is an assembler function so I
->>> located it via:
->>> $ nm ./vmlinux | grep \ memcpy$
->>> fffffe0000408a00 T memcpy
->>>
->>> Then placed a probe as follows:
->>> echo "p:memcpy 0xfffffe0000408a00 %x2" > /sys/kernel/debug/tracing/kprobe_events
->>
->> You can also do "p:memcpy memcpy %x2" > ...
-> 
-> Thanks, that is easier :-).
-> 
->>
->>>
->>> I was able to cat out the /sys/kernel/debug/tracing/trace_pipe file and
->>> activate the probe via:
->>> echo 1 > /sys/kernel/debug/tracing/events/kprobes/enable
->>>
->>> Everything worked well, and I got the expected output.
->>>
->>> I then tried to record events with perf via:
->>> perf record -e kprobes:memcpy -a sleep 5
->>>
->>> Then I got an, easily reproducible, panic (pasted below).
->>
->> On x86, I didn't get a panic.
->>
->>>
->>> The point of failure in the panic was:
->>> fs/buffer.c:1257
->>>
->>> static inline void check_irqs_on(void)
->>> {
->>> #ifdef irqs_disabled
->>>         BUG_ON(irqs_disabled());
->>> #endif
->>> }
->>>
->>> I will do some more digging; but I have managed to code up an ftrace
->>> static probe on memcpy and record that using perf on arm64 without
->>> issue.
->>
->> Yeah, this can be a bug related to kprobes recursive call.
->> Could you do "cat /sys/kernel/debug/tracing/kprobe_profile" (before
->> run perf)?
->> The first digit is # of hit, and the second is # of missed (since
->> recursively called).
->>
->> On x86, right after tracing by ftrace, we have no missed probe.
->>
->>  # cat /sys/kernel/debug/tracing/kprobe_profile
->>   memcpy                                                  4547               0
->>
->> But after tracing by perf, many missed events I could see.
->>
->>  # cat /sys/kernel/debug/tracing/kprobe_profile
->>   memcpy                                                413983            7632
->>
->> So I guess this can be related to the recursive call (which
->> is correctly handled on x86).
->>
-> 
-> Before running perf, I got the following:
-> 
->  # cat /sys/kernel/debug/tracing/kprobe_profile
->    memcpy                                                   838               0
-> 
-> Unfortunately, after the crash, I was then unable to take any other
-> measurements.
+Dependent patchsets - 
+        https://lkml.org/lkml/2014/8/4/767
+        http://www.spinics.net/lists/linux-arm-msm/msg10799.html
+        http://www.spinics.net/lists/linux-arm-msm/msg10795.html
 
-Yes, but we can ensure that the recursion must be occur by
-probing kprobe-tracer (ftrace) itself.
+Changes since v12:
+- Minor fixes
+- Added Reviewed-by
 
-E.g.
-Ensure trace_event_buffer_lock_reserve exists.
-  # grep trace_event_buffer_lock_reserve /proc/kallsyms
-  ffffffff8113a100 T trace_event_buffer_lock_reserve
+Changes since v11:
+- Address review comments on spm.c
+- Commenting style fixes
+- Added Reviewed-by
 
-Define a probe on it.
-  # echo p:test trace_event_buffer_lock_reserve > kprobe_events
+Changes since v10:
+[ https://www.mail-archive.com/devicetree at vger.kernel.org/msg51880.html ]
+- Address review comments
+- Added Acked-by and Reviewed-by
 
-And enable with another event (because this probe is not hit unless
-other events hit)
+Changes since v9:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg11714.html ]
+- Address review comments on v9
 
- # echo 1 > events/kprobes/test/enable
- # echo 1 > events/sched/sched_process_exec/enable
+Changes since v8:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg11473.html ]
+- Flatten out the file structure - merge pm.c into spm.c after discussions
+- Add a new function to set warm boot address, in scm-boot.c
+- Support for 8064 (New)
+- Tested on 8074, 8084. 8064 was tested with a WIP tree
+- Address review comments from v8
+- Looking into possiblility of  initializing the cpuidle device for a cpu,
+only when the corresponding spm device is probed successfully.
 
-If recursive call has a problem, you'll have a panic if you execute
-any command. Anyway, on x86, we can see below result.
+Changes since v7:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg11199.html ]
+- Address review comments
+- Tested on 8974 but not 8084
+- WFI renamed to Standby
+- Update commit text with original author and link to the downstream tree
 
- # cat kprobe_profile
-  test                                                       1               1
+Changes since v6:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg11012.html ]
+- SPM device nodes merged with existing SAW DT nodes
+- SPM register information is handled within the driver
+- Clean up from using 'msm' to 'qcom'
+        - Shorten some enumerations as well
+- Review comments from v6 addressed
+- New: Support for 8084 SoC
+        - Not tested. I do not have a board with this SoC, but the SPM
+        configuration should be identical for WFI and SPC
 
-So, the half of all probes will be missed.
+Changes since v5:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10559.html ]
+- Merge spm-devices.c and spm.c into one file and one patch
+        - Simplify implementation of the driver.
+        - Update documentation mapping the DT properties with corresponding
+          SPM register information.
+- Removed scm-boot changes for quad core warmboot, its has been pulled in.
 
-Thank you,
+Changes since v4:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10327.html ]
+- Update to the v8 of ARM generic idle states patches
+- Use platform device model for cpuidle-qcom
+- Clean up msm-pm.c to remove unnecessary include files and functions
+- Update commit text and documentation for all idle states
+- Remove scm-boot relocate patch from this series, submitted earlier
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10518.html ]
+
+Changes since v3:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10288.html ]
+- Fix CONFIG_QCOM_PM Kconfig as bool
+- More clean ups in spm.c and spm-devices.c
+        - Removed and re-organized data structures to make initialization simple
+        - Remove export of sequence flush functions
+        - Updated commit text
+        - Comments for use of barriers.
+- Rebase on top of 3.17-rc1
+
+Changes since v2:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10148.html ]
+- Prune all the drivers to support basic WFI and power down cpuidle
+  functionality. Remove debug code.
+- Integrate KConfig changes into the drivers' patches.
+- Use Lorenzo's ARM idle-states patches as the basis for reading cpuidle
+  c-states from DT.
+  [ http://marc.info/?l=linux-pm&m=140794514812383&w=2 ]
+- Incorporate review comments
+- Rebase on top of 3.16
+
+Changes since v1/RFC:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10065.html ]
+- Remove hotplug from the patch series. Will submit it separately.
+- Fix SPM drivers per the review comments
+- Modify patch sequence to compile SPM drivers independent of msm-pm, so as to
+  allow wfi() calls to use SPM even without SoC interface driver.
+
+8074/8084/8064 like any ARM SoC can do architectural clock gating, that helps save
+on power, but not enough of leakage power.  Leakage power of the SoC can be
+further reduced by turning off power to the core. To aid this, every core (cpu
+and L2) is accompanied by a Sub-system Power Manager (SPM), that can be
+configured to indicate the low power mode, the core would be put into and the
+SPM programs the peripheral h/w accordingly to enter low power and turn off the
+power rail to the core.
+
+The idle invocation hierarchy -
+
+CPUIDLE
+        |
+        cpuidle-qcom.c [CPUIdle driver]
+        |
+        ------> spm.c [SPM driver]
+                |
+                ------> scm-boot.c [SCM interface layer]
+                        |
+------------------------|--------------------------
+(EL)                    Secure Monitor Code
+                        |
+                        |
+                        wfi();
+------------------------|--------------------------
+(HW)                    [CPU] {clock gate}
+                        |
+                        -----> [SPM] {statemachine}
+
+
+The patchset does the following -
+
+- Introduce the SPM driver to control power to the core
+- Add device bindings for 8974, 8084, 8064 CPU SPM devices
+- Add cpuidle driver for QCOM cpus, using ARM generic idle state definitions.
+- Add device bindings for 8974, 8084, 8064 idle-states - WFI and SPC
+
+Thanks,
+Lina
+
+
+
+
+Lina Iyer (10):
+  qcom: scm: Move scm-boot files to drivers/soc/qcom/ and
+    include/soc/qcom
+  qcom: scm: Add SCM warmboot support for quad core SoCs
+  qcom: spm: Add Subsystem Power Manager driver
+  arm: dts: qcom: Add power-controller device node for 8074 Krait CPUs
+  arm: dts: qcom: Add power-controller device node for 8084 Krait CPUs
+  arm: dts: qcom: Update power-controller device node for 8064 Krait
+    CPUs
+  qcom: cpuidle: Add cpuidle driver for QCOM cpus
+  arm: dts: qcom: Add idle states device nodes for 8074
+  arm: dts: qcom: Add idle states device nodes for 8084
+  arm: dts: qcom: Add idle state device nodes for 8064
+
+ .../bindings/arm/msm/qcom,idle-state.txt           |  81 +++++
+ .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  31 +-
+ arch/arm/boot/dts/qcom-apq8064.dtsi                |  36 ++-
+ arch/arm/boot/dts/qcom-apq8084.dtsi                |  46 ++-
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |  46 ++-
+ arch/arm/mach-qcom/Makefile                        |   1 -
+ arch/arm/mach-qcom/platsmp.c                       |   2 +-
+ drivers/cpuidle/Kconfig.arm                        |   7 +
+ drivers/cpuidle/Makefile                           |   1 +
+ drivers/cpuidle/cpuidle-qcom.c                     |  78 +++++
+ drivers/soc/qcom/Kconfig                           |   8 +
+ drivers/soc/qcom/Makefile                          |   3 +-
+ .../arm/mach-qcom => drivers/soc/qcom}/scm-boot.c  |  37 ++-
+ drivers/soc/qcom/spm.c                             | 327 +++++++++++++++++++++
+ include/soc/qcom/pm.h                              |  31 ++
+ .../arm/mach-qcom => include/soc/qcom}/scm-boot.h  |   3 +-
+ 16 files changed, 716 insertions(+), 22 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+ create mode 100644 drivers/cpuidle/cpuidle-qcom.c
+ rename {arch/arm/mach-qcom => drivers/soc/qcom}/scm-boot.c (59%)
+ create mode 100644 drivers/soc/qcom/spm.c
+ create mode 100644 include/soc/qcom/pm.h
+ rename {arch/arm/mach-qcom => include/soc/qcom}/scm-boot.h (91%)
 
 -- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+2.1.0
