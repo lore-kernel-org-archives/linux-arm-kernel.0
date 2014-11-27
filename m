@@ -1,44 +1,27 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 27 Nov 2014 19:44:18 +0100
-Subject: [PATCHv2 05/16] gpio: mvebu: add suspend/resume support
-In-Reply-To: <CACRpkdb5S7Fv4+Ck2btLPTYWaWr_E-iMcQGeATB4NMwx_T-4GA@mail.gmail.com>
-References: <1415978496-9334-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1415978496-9334-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <CACRpkdb5S7Fv4+Ck2btLPTYWaWr_E-iMcQGeATB4NMwx_T-4GA@mail.gmail.com>
-Message-ID: <20141127194418.43e03e80@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 27 Nov 2014 18:45:44 +0000
+Subject: [PATCH v4 3/7] regulator: of: Parse ena-gpios property from DTS
+In-Reply-To: <1417087253-12306-4-git-send-email-k.kozlowski@samsung.com>
+References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
+ <1417087253-12306-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20141127184544.GD7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Linus Walleij,
+On Thu, Nov 27, 2014 at 12:20:49PM +0100, Krzysztof Kozlowski wrote:
 
-On Thu, 27 Nov 2014 14:29:47 +0100, Linus Walleij wrote:
-> On Fri, Nov 14, 2014 at 4:21 PM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> 
-> > This commit adds the implementation of ->suspend() and ->resume()
-> > platform_driver hooks in order to save and restore the state of the
-> > GPIO configuration. In order to achieve that, additional fields are
-> > added to the mvebu_gpio_chip structure.
-> >
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Alexandre Courbot <gnurou@gmail.com>
-> > Cc: linux-gpio at vger.kernel.org
-> > Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-> > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Do you want me to merge the patch or is it dependent on other patches?
+> +	constraints->ena_gpio = of_get_named_gpio_flags(np, "ena-gpios", 0,
+> +							&gpio_flags);
+> +	if (gpio_is_valid(constraints->ena_gpio)) {
 
-This patch has already been merged by you, and is already in
-linux-next. See
-https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-gpio.git/commit/?h=for-next&id=b5b7b487431b01619f2947d91dadd7c7a233692e.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+No, this isn't sensible - in what way would an enable control GPIO be a
+constraint?  The whole reason we have separate constraint and config
+structures is that these are different things.  Keep the GPIO setup in
+the configuration.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/779f525e/attachment.sig>
