@@ -1,48 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Nov 2014 09:02:55 +0000
-Subject: [PATCH v2 2/8] irqchip: Supply new driver for STi based devices
-In-Reply-To: <2433040.4NqTrOMmEE@wuerfel>
-References: <1416932705-16880-1-git-send-email-lee.jones@linaro.org>
- <1416932705-16880-3-git-send-email-lee.jones@linaro.org>
- <2433040.4NqTrOMmEE@wuerfel>
-Message-ID: <20141127090255.GD4628@x1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Nov 2014 10:03:38 +0100
+Subject: [RFC PATCH] ARM64: PCI: inherit root controller's dma-coherent
+In-Reply-To: <1417066891-16789-1-git-send-email-ming.lei@canonical.com>
+References: <1417066891-16789-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <2081877.zLc8dS8vkP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Nov 2014, Arnd Bergmann wrote:
+On Thursday 27 November 2014 13:41:31 Ming Lei wrote:
 
-> On Tuesday 25 November 2014 16:24:59 Lee Jones wrote:
-> 
-> > diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> > index b21f12f..e502f15 100644
-> > --- a/drivers/irqchip/Kconfig
-> > +++ b/drivers/irqchip/Kconfig
-> > @@ -93,6 +93,13 @@ config RENESAS_IRQC
-> >  	bool
-> >  	select IRQ_DOMAIN
-> >  
-> > +config ST_IRQCHIP
-> > +	bool
-> > +	select REGMAP
-> > +	select MFD_SYSCON
-> > +	help
-> > +	  Enables SysCfg Controlled IRQs on STi based platforms.
-> > +
-> 
-> I'm confused by the purpose of this code. It's apparently a driver
-> in drivers/irqchip, the Kconfig symbol contains the string IRQCHIP,
-> yet it doesn't actually register an irq_chip.
-> 
-> Also, the name is a bit too generic, ST has lots of different irqchips,
-> and this apparently isn't even one of them ;-)
+> @@ -37,6 +38,21 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  	return res->start;
+>  }
+>  
+> +/* Inherit root controller's dma coherent ops */
+> +static void pci_dma_config(struct pci_dev *dev)
+> +{
+> +	struct pci_bus *bus = dev->bus;
+> +	struct device *host;
+> +
+> +	while (!pci_is_root_bus(bus)) {
+> +		bus = bus->parent;
+> +	}
+> +
+> +	host = bus->dev.parent->parent;
+> +	if (of_dma_is_coherent(host->of_node))
+> +		set_arch_dma_coherent_ops(&dev->dev);
+> +}
+> +
 
-Hmm... now you're going to ask me to remember who I had the
-conversation with that alluded to this as the best location for this
-driver.  Unfortunately, I cannot.  Can you think of a better place to
-put it then?
+I think we need something more generic than this: This is not architecture
+specific at all, and we have to deal with IOMMU, swiotlb, dma offset and
+dma mask as well, coherency is definitely not the only issue.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+We have the of_dma_configure() function that does some of this for platform
+devices and that have to extend to make it work with IOMMUs, and the
+common pci_device_add() function does some other subset in architecture
+independent code for PCI, so I think that's where it should go.
+We will need an architecture-specific helper to set the dma_map_ops
+pointer, dma_parms, dma offset, and the iommu, but that is not PCI
+specific, it just gets called from both the platform device and pci
+device code.
+
+Regarding the pcibios_add_device() function, I'd rather see the existing
+code moved into the PCI core and the function removed, since it also
+is not architecture specific. We should be able to delete the entire
+arm64/pci.c file eventually.
+
+	Arnd
