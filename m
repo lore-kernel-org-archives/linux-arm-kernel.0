@@ -1,43 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 26 Nov 2014 17:54:41 -0800
-Subject: [PATCH] ARM: Update processor_modes for hyp and monitor mode
-In-Reply-To: <1416272732-20573-1-git-send-email-sboyd@codeaurora.org>
-References: <1416272732-20573-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <54768461.3050501@codeaurora.org>
+From: baolu.lu@linux.intel.com (Lu, Baolu)
+Date: Thu, 27 Nov 2014 10:00:27 +0800
+Subject: [PATCH 06/19] usb: dwc3: host: Pass the XHCI_DRD_SUPPORT and
+ XHCI_NEEDS_LHC_RESET quirk
+In-Reply-To: <1416921115-10467-7-git-send-email-george.cherian@ti.com>
+References: <1416921115-10467-1-git-send-email-george.cherian@ti.com>
+ <1416921115-10467-7-git-send-email-george.cherian@ti.com>
+Message-ID: <547685BB.3020109@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17/2014 05:05 PM, Stephen Boyd wrote:
-> If the kernel is running in hypervisor mode or monitor mode we'll
-> print UK6_32 or UK10_32 if we call into __show_regs(). Let's
-> update these strings to indicate the new modes that didn't exist
-> when this code was written.
+
+On 2014?11?25? 21:11, George Cherian wrote:
+> Pass the quir flag XHCI_DRD_SUPPORT from DWC3 host to xhci platform driver.
+"quir" to "quirk"
+
+Regards,
+Baolu
+
+> This enables xhci driver to handle deallocation's differently while in DRD mode.
+> Pass the quirk flag XHCI_NEEDS_LHC_RESET from DWC3 host to xhci platform
+> driver. This enables to do LHRESET during xhci_reset().
 >
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: George Cherian <george.cherian@ti.com>
 > ---
-
-Can I throw this into the patch tracker?
-
->   arch/arm/kernel/process.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
+>   drivers/usb/dwc3/host.c | 2 ++
+>   1 file changed, 2 insertions(+)
 >
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index fe972a2f3df3..fdfa3a78ec8c 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -51,8 +51,8 @@ EXPORT_SYMBOL(__stack_chk_guard);
->   static const char *processor_modes[] __maybe_unused = {
->     "USER_26", "FIQ_26" , "IRQ_26" , "SVC_26" , "UK4_26" , "UK5_26" , "UK6_26" , "UK7_26" ,
->     "UK8_26" , "UK9_26" , "UK10_26", "UK11_26", "UK12_26", "UK13_26", "UK14_26", "UK15_26",
-> -  "USER_32", "FIQ_32" , "IRQ_32" , "SVC_32" , "UK4_32" , "UK5_32" , "UK6_32" , "ABT_32" ,
-> -  "UK8_32" , "UK9_32" , "UK10_32", "UND_32" , "UK12_32", "UK13_32", "UK14_32", "SYS_32"
-> +  "USER_32", "FIQ_32" , "IRQ_32" , "SVC_32" , "UK4_32" , "UK5_32" , "MON_32" , "ABT_32" ,
-> +  "UK8_32" , "UK9_32" , "HYP_32", "UND_32" , "UK12_32", "UK13_32", "UK14_32", "SYS_32"
->   };
+> diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
+> index dcb8ca0..257b5b5 100644
+> --- a/drivers/usb/dwc3/host.c
+> +++ b/drivers/usb/dwc3/host.c
+> @@ -53,6 +53,8 @@ int dwc3_host_init(struct dwc3 *dwc)
+>   #ifdef CONFIG_DWC3_HOST_USB3_LPM_ENABLE
+>   	pdata.usb3_lpm_capable = 1;
+>   #endif
+> +	pdata.usb_drd_support = 1;
+> +	pdata.usb_needs_lhc_reset = 1;
 >   
->   static const char *isa_modes[] __maybe_unused = {
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>   	ret = platform_device_add_data(xhci, &pdata, sizeof(pdata));
+>   	if (ret) {
