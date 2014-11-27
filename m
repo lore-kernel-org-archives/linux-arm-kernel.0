@@ -1,70 +1,76 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 27 Nov 2014 19:42:01 +0100
-Subject: [PATCH] ARM: pxa: fix lubbock interrupts handling
-Message-ID: <1417113721-9062-1-git-send-email-robert.jarzmik@free.fr>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 27 Nov 2014 18:43:42 +0000
+Subject: [PATCH v4 4/7] regulator: Use ena_gpio supplied with generic
+ regulator bindings
+In-Reply-To: <1417087253-12306-5-git-send-email-k.kozlowski@samsung.com>
+References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
+ <1417087253-12306-5-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20141127184342.GC7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When gpio-pxa was moved to drivers/pxa, it became a driver, and its
-initialization and probing happen at postcore initcall. The lubbock code
-used to install the chained lubbock interrupt handler at init_irq()
-time.
+On Thu, Nov 27, 2014 at 12:20:50PM +0100, Krzysztof Kozlowski wrote:
+> Use ena_gpio from regulator constraints (filled by parsing generic
+> bindings) to initialize the GPIO enable control. Support also the old
+> way: ena_gpio supplied in regulator_config structure.
+> 
+> This also adds a new set_ena_gpio() callback in regulator_ops structure
+> which driver may provide to actually enable the GPIO control in
+> hardware.
 
-The consequence of the gpio-pxa change is that the installed chained irq
-handler lubbock_irq_handler() was overwritten in pxa_gpio_probe(_dt)(),
-removing :
- - the handler
- - the falling edge detection setting of GPIO0, which revealed the
-   interrupt request from the lubbock IO board.
+This seems really confused like it's trying to work around some other
+problem - this all feels like it's at the wrong abstraction level.  As
+far as I can tell this is trying to fix bugs in the previous patch and
+do some other refactorings (the "also add this other random op" bit
+especially) but I'm really not clear what the goal is.
 
-As a fix, move the gpio0 chained handler setup to a place where we have
-the guarantee that pxa_gpio_probe() was called before, so that lubbock
-handler becomes the true IRQ chained handler of GPIO0, demuxing the
-lubbock IO board interrupts.
+Please try to think if the code you're writing makes sense at the big
+picture level rather than just band aiding specific problems you see.
+It's also a good idea to keep random code motion separate from
+functional changes since it makes it much easier to follow what each is
+supposed to do.
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-For Thomas: as a side note, I'm not very happy with this patch. What
-            makes me unhappy is that I don't know how to express the
-            dependency between gpio-pxa probe time and
-            irq_set_chained_handler(irq, lubbock_irq_handler).
+> @@ -1044,6 +1045,14 @@ static int set_machine_constraints(struct regulator_dev *rdev,
+>  		}
+>  	}
+>  
+> +	if (rdev->constraints->use_ena_gpio && ops->set_ena_gpio) {
+> +		ret = ops->set_ena_gpio(rdev);
+> +		if (ret < 0) {
+> +			rdev_err(rdev, "failed to set enable GPIO control\n");
+> +			goto out;
+> +		}
+> +	}
 
-            At the moment I rely on the fact that
-            lubbock_irq_device_init() is called as device initcall while
-            pxa_gpio_probe() is called as postcore initcall.
+Why do we need some special magic operation for GPIO based enables
+that's separate to any other enable operation?  This seems really
+confusing, if the constraint setting doesn't work somehow for GPIO based
+enables we should fix that.  Though since this operation takes no
+parameters it's hard to see how it's supposed to apply constraints
+unless it reparses them which doesn't seem like a good idea...
 
-            If you have a better idea I'm all ears.
----
- arch/arm/mach-pxa/lubbock.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+>  static int regulator_ena_gpio_request(struct regulator_dev *rdev,
+> -				const struct regulator_config *config)
 
-diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
-index d8a1be6..1f138f9 100644
---- a/arch/arm/mach-pxa/lubbock.c
-+++ b/arch/arm/mach-pxa/lubbock.c
-@@ -172,9 +172,6 @@ static void __init lubbock_init_irq(void)
- 					 handle_level_irq);
- 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
- 	}
--
--	irq_set_chained_handler(PXA_GPIO_TO_IRQ(0), lubbock_irq_handler);
--	irq_set_irq_type(PXA_GPIO_TO_IRQ(0), IRQ_TYPE_EDGE_FALLING);
- }
- 
- #ifdef CONFIG_PM
-@@ -190,7 +187,13 @@ static struct syscore_ops lubbock_irq_syscore_ops = {
- 
- static int __init lubbock_irq_device_init(void)
- {
-+	int irq;
-+
- 	if (machine_is_lubbock()) {
-+		irq = PXA_GPIO_TO_IRQ(0);
-+		irq_set_chained_handler(irq, lubbock_irq_handler);
-+		irq_set_irq_type(irq, IRQ_TYPE_EDGE_FALLING);
-+
- 		register_syscore_ops(&lubbock_irq_syscore_ops);
- 		return 0;
- 	}
--- 
-2.1.0
+> -	ret = gpio_request_one(config->ena_gpio,
+> -				GPIOF_DIR_OUT | config->ena_gpio_flags,
+> +	ret = gpio_request_one(gpio, GPIOF_DIR_OUT | gpio_flags,
+>  				rdev_get_name(rdev));
+
+> +/*
+> + * Request GPIO for enable control from regulator_config
+> + * or init_data->constraints.
+> + */
+> +static int regulator_ena_gpio_setup(struct regulator_dev *rdev,
+> +			const struct regulator_config *config,
+> +			const struct regulator_init_data *init_data)
+
+Why is setting up the GPIO different to requesting it, especially given
+that we have an existing function called _request() which still exists?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/cad8a8a4/attachment.sig>
