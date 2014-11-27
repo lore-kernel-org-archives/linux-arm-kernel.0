@@ -1,104 +1,98 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Nov 2014 15:02:26 +0100
-Subject: [PATCH 11/19] clk: samsung: exynos5433: Add clocks for
- CMU_BUS{0|1|2} domains
-In-Reply-To: <CAGTfZH3KmwhJNFdmeWnujbbUbtLf5vSi6i2dbV62DeCtV7n4TQ@mail.gmail.com>
-References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
- <2232281.fbydzq3GMs@wuerfel>
- <CAGTfZH3KmwhJNFdmeWnujbbUbtLf5vSi6i2dbV62DeCtV7n4TQ@mail.gmail.com>
-Message-ID: <2120788.f3P3CC6nYQ@wuerfel>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 27 Nov 2014 10:08:06 -0400
+Subject: [PATCH 1/1] thermal: cpu_cooling: check for the readiness of
+ cpufreq layer
+In-Reply-To: <CAKohponxUWVT1mjRfJarNtj-+=rXNOa_ONHUjmdu_+6N+=ZjPQ@mail.gmail.com>
+References: <1417024212-1775-1-git-send-email-edubezval@gmail.com>
+ <CAKohponxUWVT1mjRfJarNtj-+=rXNOa_ONHUjmdu_+6N+=ZjPQ@mail.gmail.com>
+Message-ID: <20141127140803.GA3342@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014 22:41:49 Chanwoo Choi wrote:
-> 2014? 11? 27? ???, Arnd Bergmann<arnd@arndb.de>?? ??? ???:
+
+Hello Viresh,
+
+On Thu, Nov 27, 2014 at 09:38:39AM +0530, Viresh Kumar wrote:
+> Few nits..
 > 
-> > On Thursday 27 November 2014 21:58:53 Chanwoo Choi wrote:
-> > > Dear Arnd,
-> > >
-> > > On 11/27/2014 09:35 PM, Arnd Bergmann wrote:
-> > > > On Thursday 27 November 2014 13:12:08 Sylwester Nawrocki wrote:
-> > > >> On 27/11/14 12:56, Chanwoo Choi wrote:
-> > > >>> On 11/27/2014 08:41 PM, Arnd Bergmann wrote:
-> > > >>>>> On Thursday 27 November 2014 16:35:08 Chanwoo Choi wrote:
-> > > >>>>>>> +  - "samsung,exynos5433-cmu-bus0", "samsung,exynos5433-cmu-bus1"
-> > > >>>>>>> +    and "samsung,exynos5433-cmu-bus2" - clock controller
-> > compatible for CMU_BUS
-> > > >>>>>>> +    which generates global data buses clock and global
-> > peripheral buses clock.
-> > > >>>>>>>
-> > > >>>>>>>  - reg: physical base address of the controller and length of
-> > memory mapped
-> > > >>>>>>>    region.
-> > > >>>>>>>
-> > > >>>>>
-> > > >>>>> This looks like you are duplicating the bindings and the code, but
-> > > >>>>> it's really the same hardware multiple times with minor variations
-> > > >>>>> that you should be able to describe properly here. Why not make
-> > > >>>>> three nodes with the same compatible string and have them handled
-> > > >>>>> by the same code?
-> > > >>>
-> > > >>> Each CMU_BUSx domain of Exynos5433 have different base address as
-> > following:
-> > > >>> - CMU_BUS0's base address and range : 0x1360_0000 ~ 0x1360_0b04
-> > > >>> - CMU_BUS1's base address and range : 0x1480_0000 ~ 0x1480_0b04
-> > > >>> - CMU_BUS2's base address and range : 0x1340_0000 ~ 0x1340_0b04
-> > > >>>
-> > > >>> So, I implement CMU_BUSx domain which has each compatible string.
-> > > >
-> > > > But the base address is in the reg property, not in the compatible
-> > > > property. What I mean is to have multiple nodes like
-> > >
-> > > The merged clock driver in mainline have different compatible string
-> > > if base addresss of clock domain is different. So, I implemented each
-> > CMU_BUSx domain
-> > > with different compatible string.
+> On 26 November 2014 at 23:20, Eduardo Valentin <edubezval@gmail.com> wrote:
+> 
+> > Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
+> > ---
+> 
+> The normal practice is to write the non-commitable part here ...
+> 
+
+err... normal practice by whom? hehe...
+
+My "normal" practice is to allow people to read the diff stat before my
+extra comments :-)
+
+> >  drivers/thermal/cpu_cooling.c                      | 5 +++++
+> >  drivers/thermal/db8500_cpufreq_cooling.c           | 5 -----
+> >  drivers/thermal/imx_thermal.c                      | 5 -----
+> >  drivers/thermal/samsung/exynos_thermal_common.c    | 2 +-
+> >  drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 6 ------
+> >  5 files changed, 6 insertions(+), 17 deletions(-)
+> > ---
+> 
+> But this works as well :)
+> 
+
+hehe ok.
+
+> > This is attempt to organize the cpu cooling vs. cpufreq boot sequencing.
+> > The main change in this patch, as in the commit log, is to have the check
+> > for the cpufreq layer in the cpu cooling device registration, instead of
+> > in thermal drivers. This way, drivers don't need to bother about it, they
+> > just need to propagate the error value.
 > >
-> > Why?
-> 
-> 
-> As I explained on below, each clock domain have different clocks.
-> So, clocks have unique clock name.
-> 
->  If clock driver use only one compatible for various clock domain, clock
-> driver have to know the base address of each domain for distinction of
-> clock domain. I think It is stong dependency between device and driver.
-
-No, not at all. You can have lots of clock controllers with the same
-compatible string defining different instances of the same IP block,
-e.g. for compatible="fixed-clock".
-
+> > This change was tested on top of:
+> > (0) - Viresh's change in cpufreq layer and cpufreq-dt (up to patch 4):
+> > https://patchwork.kernel.org/patch/5384141/
+> > https://patchwork.kernel.org/patch/5384151/
+> > https://patchwork.kernel.org/patch/5384161/
+> > https://patchwork.kernel.org/patch/5384171/
+> > (1) - fix of thermal core:
+> > https://patchwork.kernel.org/patch/5326991/
 > >
-> > > >     clock-controller at 113600000 {
-> > > >             reg = <0 0x113600000 0 0x1000>;
-> > > >             compatible = "samsung,exynos5433-cmu";
-> > > >             #clock-cells = <1>;
-> > > >     };
-> > > >
-> > > >     clock-controller at 114800000 {
-> > > >             reg = <0 0x114800000 0 0x1000>;
-> > > >             compatible = "samsung,exynos5433-cmu";
-> > > >             #clock-cells = <1>;
-> > > >     };
-> > > >
-> > > > The code will just map the local registers for each instance and then
-> > > > provide the clocks of the right instance when asked for it.
-> > >
-> > > Each clock domain has not the same mux/divider/clock. So, just one
-> > compatible
-> > > string could not support all of clock domains.
+> > After Viresh's changes, cpufreq-dt is properly sequenced with cpu cooling
+> > registration. Non-of based drivers also should take advantage if these
+> > changes, as now they do not need to check for cpufreq layer. The check is
+> > where it belongs, in cpu cooling device registration.
 > >
-> > What are the specific differences?
+> > BR, Eduardo Valentin
+> >
+> >
+> > diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+> > index 1ab0018..9e6945b 100644
+> > --- a/drivers/thermal/cpu_cooling.c
+> > +++ b/drivers/thermal/cpu_cooling.c
+> > @@ -440,6 +440,11 @@ __cpufreq_cooling_register(struct device_node *np,
+> >         int ret = 0, i;
+> >         struct cpufreq_policy policy;
+> >
+> > +       if (!cpufreq_get_current_driver() || !cpufreq_frequency_get_table(0)) {
 > 
+> Only !cpufreq_frequency_get_table(0) is enough here.
 > 
-> 
-> > I'm not sure that difference among clock domains because I think it is
-> dependent on the opinion of architect of SoC.
-> 
-> cmu_bus0/1/2 are much similar. Just cmu_bus2 has one more mux/gate clock
-> than cmu_bus0/1.
 
-Yes, that's what I mean. You can simply model that extra mux/gate
-in the driver, as long as nothing ever tries to access the clock.
+Yeah, I thought of it too. Just combined what people had in their
+drivers here. But I agree that latter is enough.
 
-	Arnd
+> For rest:
+> 
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+Ok.
+
+though.. "normal practice" says  ack's are oftern used by the maintainer
+of the affected code (quoting Documentation/SubmittingPatches) :-)
+BR, Eduardo Valenti
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/8e88e19b/attachment.sig>
