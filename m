@@ -1,57 +1,72 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 28 Nov 2014 10:36:17 +1100
-Subject: linux-next: manual merge of the sunxi tree with the arm-soc tree
-Message-ID: <20141128103617.13a1821c@canb.auug.org.au>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 28 Nov 2014 00:39:38 +0100
+Subject: [PATCH 00/11] ARM: at91: remove !DT support for at91rm9200
+In-Reply-To: <3935244.Dm2HkZj2Bg@wuerfel>
+References: <cover.1417103399.git.nicolas.ferre@atmel.com>
+ <3550407.q87bWB4Jdt@wuerfel> <20141127171243.GL4508@piout.net>
+ <3935244.Dm2HkZj2Bg@wuerfel>
+Message-ID: <20141128003938.7efb4ea0@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Arnd,
 
-Today's linux-next merge of the sunxi tree got a conflict in
-arch/arm/boot/dts/sun6i-a31.dtsi between commit 3fd0c05da46c ("Revert
-"ARM: dts: sunxi: Use sun4i-a10-apb1-clk for sun6i/sun8i apb2
-clocks."") from the arm-soc tree and commit 74c947ab33c9 ("ARM: dts:
-sunxi: Use sun4i-a10-apb1-clk for sun6i/sun8i apb2 clocks") from the
-sunxi tree.
+On Fri, 28 Nov 2014 00:12:25 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-I fixed it up (I just used the arm-soc version for now) and can carry
-the fix as necessary (no action is required).
+> On Thursday 27 November 2014 18:12:43 Alexandre Belloni wrote:
+> > 
+> > As discussed some weeks ago, I prepared patches to switch sama5d[3-4] to
+> > multiplatform. We are still missing the SMC and matrix drivers to switch
+> > sam9 and rm9200.
+> 
+> I just looked at the drivers because I got curious, and to see if
+> there are still any low-hanging fruit, but I guess you already picked
+> them all ;-)
+> 
+> > The currently affected drivers are:
+> >  - drivers/ata/pata_at91.c (SMC)
+> >  - drivers/pcmcia/at91_cf.c (SMC)
+> 
+> I guess the SMC should live in drivers/memory with an interface
+> similar to mvebu-devbus.c?
+
+Actually, there's some work in progress to support the EBI/SMC blocks
+as a memory controller driver ;-):
+
+http://thread.gmane.org/gmane.linux.kernel/1822096
+
+I'll post a new version soon.
+
+> 
+> Seems doable but nontrivial.
+> 
+> >  - drivers/usb/gadget/udc/at91_udc.c (Matrix, this is the only one
+> >    for sam9)
+> 
+> Is at91_matrix a pin controller? With the board files removed, the udc
+> driver has the only two remaining calls to at91_matrix_{read,write}
+> for setting the pullup, so that could be modeled as a trivial pinctrl
+> driver
+
+The matrix block is containing several system configuration registers.
+Most of them are related to AHB/APB bus config (master <-> slave
+priority, burst and some other configs I don't remember).
+Another register is here to define which HW logic is attached to an
+external device connected through the EBI (External Bus Interface):
+NAND, SDRAM, CompactFlash, ...
+And, as you pointed out, there's a register to configure the pullup of
+the UDC device.
+
+As you can see, the matrix registers might be accessed by different
+drivers (include the EBI/SMC driver), hence I proposed to expose them as
+a syscon device (see the EBI/SMC series).
+
+Best Regards,
+
+Boris
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/boot/dts/sun6i-a31.dtsi
-index 529c73803976,f47156b6572b..000000000000
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@@ -217,19 -229,11 +229,19 @@@
-  					"apb1_daudio1";
-  		};
-  
- -		apb2: clk at 01c20058 {
- +		apb2_mux: apb2_mux at 01c20058 {
- +			#clock-cells = <0>;
- +			compatible = "allwinner,sun4i-a10-apb1-mux-clk";
- +			reg = <0x01c20058 0x4>;
- +			clocks = <&osc32k>, <&osc24M>, <&pll6 0>, <&pll6 0>;
- +			clock-output-names = "apb2_mux";
- +		};
- +
- +		apb2: apb2 at 01c20058 {
-  			#clock-cells = <0>;
-- 			compatible = "allwinner,sun6i-a31-apb2-div-clk";
-+ 			compatible = "allwinner,sun4i-a10-apb1-clk";
-  			reg = <0x01c20058 0x4>;
-- 			clocks = <&apb2_mux>;
-+ 			clocks = <&osc32k>, <&osc24M>, <&pll6 0>, <&pll6 0>;
-  			clock-output-names = "apb2";
-  		};
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141128/5803187a/attachment.sig>
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
