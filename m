@@ -1,102 +1,61 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 27 Nov 2014 10:41:23 +0100
-Subject: [RFC PATCH 2/2] lib: devres: Add exec versions of
- devm_ioremap_resource and friends
-In-Reply-To: <bde13d5e7931af9aa90ddc09a79be5c30e3eef94.1417029918.git.d-gerlach@ti.com>
-References: <cover.1417029918.git.d-gerlach@ti.com>
- <bde13d5e7931af9aa90ddc09a79be5c30e3eef94.1417029918.git.d-gerlach@ti.com>
-Message-ID: <CAMuHMdWn3mgzwX55+OCWwMZwvfXkh7B+n-b0uChAW5gbx9b7Dw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Nov 2014 10:47:34 +0100
+Subject: [PATCH v2 2/8] irqchip: Supply new driver for STi based devices
+In-Reply-To: <20141127092901.GE4628@x1>
+References: <1416932705-16880-1-git-send-email-lee.jones@linaro.org>
+ <35179358.tOpRGufXmc@wuerfel> <20141127092901.GE4628@x1>
+Message-ID: <2111250.BPZOtBCtcF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 10:14 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
-> --- a/lib/devres.c
-> +++ b/lib/devres.c
-> @@ -72,6 +72,64 @@ void __iomem *devm_ioremap_nocache(struct device *dev, resource_size_t offset,
->  EXPORT_SYMBOL(devm_ioremap_nocache);
->
->  /**
-> + * devm_ioremap_exec - Managed ioremap_exec()
-> + * @dev: Generic device to remap IO address for
-> + * @offset: BUS offset to map
-> + * @size: Size of map
-> + *
-> + * Managed ioremap_exec().  Map is automatically unmapped on driver detach.
-> + */
-> +void __iomem *devm_ioremap_exec(struct device *dev, resource_size_t offset,
-> +                               unsigned long size)
-> +{
+On Thursday 27 November 2014 09:29:01 Lee Jones wrote:
+> On Thu, 27 Nov 2014, Arnd Bergmann wrote:
+> > On Thursday 27 November 2014 09:02:55 Lee Jones wrote:
+> > > On Tue, 25 Nov 2014, Arnd Bergmann wrote:
+> > > 
+> > > > On Tuesday 25 November 2014 16:24:59 Lee Jones wrote:
+> > > > 
+> > > > > diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> > > > > index b21f12f..e502f15 100644
+> > > > > --- a/drivers/irqchip/Kconfig
+> > > > > +++ b/drivers/irqchip/Kconfig
+> > > > > @@ -93,6 +93,13 @@ config RENESAS_IRQC
+> > > > >     bool
+> > > > >     select IRQ_DOMAIN
+> > > > >  
+> > > > > +config ST_IRQCHIP
+> > > > > +   bool
+> > > > > +   select REGMAP
+> > > > > +   select MFD_SYSCON
+> > > > > +   help
+> > > > > +     Enables SysCfg Controlled IRQs on STi based platforms.
+> > > > > +
+> > > > 
+> > > > I'm confused by the purpose of this code. It's apparently a driver
+> > > > in drivers/irqchip, the Kconfig symbol contains the string IRQCHIP,
+> > > > yet it doesn't actually register an irq_chip.
+> > > > 
+> > > > Also, the name is a bit too generic, ST has lots of different irqchips,
+> > > > and this apparently isn't even one of them 
+> > > 
+> > > Hmm... now you're going to ask me to remember who I had the
+> > > conversation with that alluded to this as the best location for this
+> > > driver.  Unfortunately, I cannot.  Can you think of a better place to
+> > > put it then?
+> > 
+> > I suspect it's in the right place but should actually be an irqchip
+> > driver. I'm having trouble understanding what this code actually does,
+> > can you you explain the functionality in more detail so we can figure
+> > out what to do with it?
+> 
+> In the simplest terms it's an IRQ unmasker.  A9 Core IRQs are disabled
+> on boot; PMU, CTI (CoreSight), PL310_L2 and EXT.  In order for you to
+> make use of them they need to be unmasked in SYSCFG.
 
-[...]
+So you just apply static configuration once, or are there reasons why you
+would mask the interrupts again later?
 
-> +       addr = ioremap_exec(offset, size);
+If it's all static, why doesn't the boot loader unmask all interrupts before
+starting the kernel?
 
-[...]
-
-> +}
-> +EXPORT_SYMBOL(devm_ioremap_exec);
-> +
-> +/**
-> + * devm_ioremap_exec_nocache - Managed ioremap_exec_nocache()
-> + * @dev: Generic device to remap IO address for
-> + * @offset: BUS offset to map
-> + * @size: Size of map
-> + *
-> + * Managed ioremap_exec_nocache().  Map is automatically unmapped on driver
-> + * detach.
-> + */
-> +void __iomem *devm_ioremap_exec_nocache(struct device *dev,
-> +                                       resource_size_t offset,
-> +                                       unsigned long size)
-> +{
-
-[...]
-
-> +       addr = ioremap_exec_nocache(offset, size);
-
-[...]
-
-> +}
-> +EXPORT_SYMBOL(devm_ioremap_exec_nocache);
-> +
-
-Both of these are identical to the already-existing devm_ioremap() and
-devm_ioremap_nocache(), except for the call to the underlying
-ioremap*() variant.
-
-Can't the variant selection be done by passing a flag around, set by
-the top-level inline functions, to avoid code duplication?
-Some architecture-specific ioremap() implementations already work that
-way, cfr. arch/m68k/include/asm/io_mm.h:
-
-static inline void __iomem *ioremap(unsigned long physaddr, unsigned long size)
-{
-        return __ioremap(physaddr, size, IOMAP_NOCACHE_SER);
-}
-static inline void __iomem *ioremap_nocache(unsigned long physaddr,
-unsigned lonn
-g size)
-{
-        return __ioremap(physaddr, size, IOMAP_NOCACHE_SER);
-}
-static inline void __iomem *ioremap_writethrough(unsigned long physaddr,
-                                         unsigned long size)
-{
-        return __ioremap(physaddr, size, IOMAP_WRITETHROUGH);
-}
-static inline void __iomem *ioremap_fullcache(unsigned long physaddr,
-                                      unsigned long size)
-{
-        return __ioremap(physaddr, size, IOMAP_FULL_CACHING);
-}
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
