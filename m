@@ -1,102 +1,181 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Thu, 27 Nov 2014 11:42:41 -0800
-Subject: [RFC 0/2] Qualcomm RPM sleep states
-In-Reply-To: <20141127190233.GF7712@sirena.org.uk>
-References: <546FC674.1070005@codeaurora.org>
- <20141121232738.GP3815@sirena.org.uk>
- <546FCE3A.1000005@codeaurora.org>
- <20141124181614.GT7712@sirena.org.uk>
- <5473A0F3.6080405@codeaurora.org>
- <20141125204430.GN7712@sirena.org.uk>
- <20141126233447.GD2872@sonymobile.com>
- <20141127190233.GF7712@sirena.org.uk>
-Message-ID: <CAJAp7OgBepNL6j4D6_MvXJ5PTRDUFNt6paskkP=q=h8W_YNP_Q@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 27 Nov 2014 20:10:18 +0000
+Subject: [PATCH 3.18-rc4 v11 0/6] arm: Implement arch_trigger_all_cpu_backtrace
+In-Reply-To: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1417119024-22844-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 11:02 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Nov 26, 2014 at 03:34:47PM -0800, Bjorn Andersson wrote:
->
->> Problem 1:
->> Regulators are shared between CPU PLLs and other peripherals and when we take
->> the cpu to idle we need a way to let go of the CPU PLL "vote" on the regulator.
->
->> In the case of the CPU being the only consumer I think we've come down to the
->> problems being:
->> * we're in atomic context
->
-> That shouldn't be an issue, we can do something like what we've got for
-> regmap and allow regulators to replace their mutexes with spinlocks
-> (users and drivers will need to be careful they don't do expensive
-> things, plus we wamy want to look at optimizing the core, but that's
-> true anyway).
->
+Hi Thomas, Hi Jason: Patches 1 to 4 are for you.
 
-If I understand Stephen correctly, this is basically what would happen
-when we go to suspend (take the CPUs off the individual PLLs and
-releasing the regulators), but for going in and out of _idle_ this is
-too costly and we want to utilise the hardware assist for this.
+This patchset modifies the GIC driver to allow it, on supported
+platforms, to route IPI interrupts to FIQ and uses this feature to
+implement arch_trigger_all_cpu_backtrace for arm.
 
->> * we don't want to waste the time of making sending out the request
->> * we have hardware support for this and we want to use it(?)
->
-> I'm still hazy on what that actually means.  I thought the CPU case was
-> one of the big ones where you *did* want to act on the configuration
-> changes?
->
+On platforms not capable of supporting FIQ the signal to generate a
+backtrace we fall back to using IRQ for propagation instead (relying on
+a timeout to avoid wedging the CPU requesting the backtrace if other
+CPUs are not responsive).
 
-By utilising the hardware support for switching between active and
-sleep state (and having the cpu only affecting the active state) we
-can do this asynchronously, while being in wfi.
+It has been tested on two systems capable of supporting grouping
+(Freescale i.MX6 and STiH416) and two that do not (vexpress-a9 and
+Qualcomm Snapdragon 600).
 
->> In the case of us having other active consumers (e.g. GPU, display or some
->> peripherals) the voltage range or operating mode specified by the cpufreq
->> driver might be suboptimal when we remove the cpu.
->
-> I don't understand.  Why is the other consumer asking for something it
-> doesn't need itself?
->
+v11:
 
-I don't have the actual numbers, but we have a situation that looks like this:
-gpu driver does regulator_set_voltage(.5V, 1V);
-cpufreq driver does regulator_set_voltage(1V,1V);
+* Optimized gic_raise_softirq() by replacing a register read with
+  a memory read (Jason Cooper).
 
-The regulator framework will make the regulator tick at 1V
+v10:
 
-Upon going to sleep the cpuidle driver will, through the hardware
-support, make the regulator tick at .5V. Before returning the cpu from
-idle the hardware will make the regulator tick at 1V again.
+* Add a further patch to optimize away some of the locking on systems
+  where CONFIG_BL_SWITCHER is not set (Marc Zyngier). Compiles OK with
+  exynos_defconfig (which is the only defconfig to set this option).
 
-[..]
+* Whitespace fixes in patch 4. That patch previously used spaces for
+  alignment of new constants but the rest of the file used tabs.
 
->> > I think any duplication that's going on sounds like a consequence of
->> > the way this is currently implemented.  I think based on what I *think*
->> > you're saying the RPM driver probably ought to be hiding this and adding
->> > a property which makes the active and sleep sets track each other with
->> > normal suspend mode control otherwise.  That could potentially be done
->> > in the core, though the tracking would be substantial surgery.
->
->> I think we should start off by hiding this in the driver, if others come
->> forward needing something similar we can look at how to integrate parts of it
->> into the core.
->
-> If you're hiding it in the driver make sure it's *hidden* in the driver
-> - exporting duplicate regulators doesn't sound like hiding to me.
->
+v9:
 
-This is the problem at hand, we have not found any way to actually
-hide this in the driver as the two modes depend on the consumer and
-not the aggregated values we get out of the regulator framework.
+* Improved documentation and structure of initial patch (now initial
+  two patches) to make gic_raise_softirq() safe to call from FIQ
+  (Thomas Gleixner).
 
-Or rather, my proposal would do that, but that will not be able to
-handle the case when there's different voltages in the two states. It
-would only take care of the enable/disable case.
+* Avoid masking interrupts during gic_raise_softirq(). The use of the
+  read lock makes this redundant (because we can safely re-enter the
+  function).
+
+v8:
+
+* Fixed build on arm64 causes by a spurious include file in irq-gic.c.
+
+v7-2 (accidentally released twice with same number):
+
+* Fixed boot regression on vexpress-a9 (reported by Russell King).
+
+* Rebased on v3.18-rc3; removed one patch from set that is already
+  included in mainline.
+
+* Dropped arm64/fiq.h patch from the set (still useful but not related
+  to issuing backtraces).
+
+v7:
+
+* Re-arranged code within the patch series to fix a regression
+  introduced midway through the series and corrected by a later patch
+  (testing by Olof's autobuilder). Tested offending patch in isolation
+  using defconfig identified by the autobuilder.
+
+v6:
+
+* Renamed svc_entry's call_trace argument to just trace (example code
+  from Russell King).
+
+* Fixed mismatched ENDPROC() in __fiq_abt (example code from Russell
+  King).
+
+* Modified usr_entry to optional avoid calling into the trace code and
+  used this in FIQ entry from usr path. Modified corresponding exit code
+  to avoid calling into trace code and the scheduler (example code from
+  Russell King).
+
+* Ensured the default FIQ register state is restored when the default
+  FIQ handler is reinstalled (example code from Russell King).
+
+* Renamed no_fiq_insn to dfl_fiq_insn to reflect the effect of adopting
+  a default FIQ handler.
+
+* Re-instated fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq(). gic_raise_softirq() is called by wake_up_klogd()
+  in the console unlock logic.
+
+v5:
+
+* Rebased on 3.17-rc4.
+
+* Removed a spurious line from the final "glue it together" patch
+  that broke the build.
+
+v4:
+
+* Replaced push/pop with stmfd/ldmfd respectively (review of Nicolas
+  Pitre).
+
+* Really fix bad pt_regs pointer generation in __fiq_abt.
+
+* Remove fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq() (review of Russell King)
+
+* Restructured to introduce the default FIQ handler first, before the
+  new features (review of Russell King).
+
+v3:
+
+* Removed redundant header guards from arch/arm64/include/asm/fiq.h
+  (review of Catalin Marinas).
+
+* Moved svc_exit_via_fiq macro to entry-header.S (review of Nicolas
+  Pitre).
+
+v2:
+
+* Restructured to sit nicely on a similar FYI patchset from Russell
+  King. It now effectively replaces the work in progress final patch
+  with something much more complete.
+
+* Implemented (and tested) a Thumb-2 implementation of svc_exit_via_fiq
+  (review of Nicolas Pitre)
+
+* Dropped the GIC group 0 workaround patch. The issue of FIQ interrupts
+  being acknowledged by the IRQ handler does still exist but should be
+  harmless because the IRQ handler will still wind up calling
+  ipi_cpu_backtrace().
+
+* Removed any dependency on CONFIG_FIQ; all cpu backtrace effectively
+  becomes a platform feature (although the use of non-maskable
+  interrupts to implement it is best effort rather than guaranteed).
+
+* Better comments highlighting usage of RAZ/WI registers (and parts of
+  registers) in the GIC code.
+
+Changes *before* v1:
+
+* This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
+  arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
+  the new structure. For historic details see:
+        https://lkml.org/lkml/2014/9/2/227
+
+* Fix bug in __fiq_abt (no longer passes a bad struct pt_regs value).
+  In fixing this we also remove the useless indirection previously
+  found in the fiq_handler macro.
+
+* Make default fiq handler "always on" by migrating from fiq.c to
+  traps.c and replace do_unexp_fiq with the new handler (review
+  of Russell King).
+
+* Add arm64 version of fiq.h (review of Russell King)
+
+* Removed conditional branching and code from irq-gic.c, this is
+  replaced by much simpler code that relies on the GIC specification's
+  heavy use of read-as-zero/write-ignored (review of Russell King)
 
 
-The exposure of multiple regulators moves the problem to the
-devicetree, making sure to map the consumers to the right
-state/regulator. But it should only be the cpu (in its various forms)
-that ever consume the active only regulator.
+Daniel Thompson (6):
+  irqchip: gic: Finer grain locking for gic_raise_softirq
+  irqchip: gic: Optimize locking in gic_raise_softirq
+  irqchip: gic: Make gic_raise_softirq FIQ-safe
+  irqchip: gic: Introduce plumbing for IPI FIQ
+  ARM: add basic support for on-demand backtrace of other CPUs
+  arm: smp: Handle ipi_cpu_backtrace() using FIQ (if available)
 
-Regards,
-Bjorn
+ arch/arm/include/asm/irq.h      |   5 +
+ arch/arm/include/asm/smp.h      |   3 +
+ arch/arm/kernel/smp.c           |  64 +++++++++++++
+ arch/arm/kernel/traps.c         |   8 +-
+ drivers/irqchip/irq-gic.c       | 203 +++++++++++++++++++++++++++++++++++++---
+ include/linux/irqchip/arm-gic.h |   8 ++
+ 6 files changed, 275 insertions(+), 16 deletions(-)
+
+--
+1.9.3
