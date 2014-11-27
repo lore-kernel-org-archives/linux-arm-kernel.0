@@ -1,108 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Nov 2014 14:19:58 +0000
-Subject: [PATCH 1/2] ARM: tegra: irq: fix buggy usage of irq_data irq field
-In-Reply-To: <20141127120826.GA25222@ulmo>
-References: <1417024532-5777-1-git-send-email-marc.zyngier@arm.com>
- <1417024532-5777-2-git-send-email-marc.zyngier@arm.com>
- <20141127082836.GA19323@ulmo> <5476EA0A.7090406@arm.com>
- <20141127120826.GA25222@ulmo>
-Message-ID: <5477330E.7020404@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 27 Nov 2014 15:20:42 +0100
+Subject: [PATCH RFC v2 07/12] PM / Domains: export pm_genpd_lookup_name
+In-Reply-To: <CADGdYn6fAScrpz4Va=THtC1ZgT+rYN_gQuE6NnRaCiN4NErg5g@mail.gmail.com>
+References: <1416833572-6880-1-git-send-email-amit.daniel@samsung.com>
+ <1416834256-11225-1-git-send-email-amit.daniel@samsung.com>
+ <1416834256-11225-7-git-send-email-amit.daniel@samsung.com>
+ <CAPDyKFqE_qhrRs3X9s9juyPH_Zcq8vdE_amqKM3VUnMjHtL2Rg@mail.gmail.com>
+ <CADGdYn6fAScrpz4Va=THtC1ZgT+rYN_gQuE6NnRaCiN4NErg5g@mail.gmail.com>
+Message-ID: <CAPDyKFo0epKqKuwHS_CKMG2hF+J=Fdve9kPK2EVeeR7FvdoJmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/14 12:08, Thierry Reding wrote:
-> On Thu, Nov 27, 2014 at 09:08:26AM +0000, Marc Zyngier wrote:
->> Hi Thierry,
+On 25 November 2014 at 09:48, amit daniel kachhap
+<amit.daniel@samsung.com> wrote:
+> On Tue, Nov 25, 2014 at 1:05 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> On 24 November 2014 at 14:04, Amit Daniel Kachhap
+>> <amit.daniel@samsung.com> wrote:
+>>> This API may be needed to set the power domain parent/child relationship
+>>> in the power domain platform driver. The parent relationship is
+>>> generally set after the child power domain is registered with the power
+>>> domain subsystem. In this case, pm_genpd_lookup_name API might be
+>>> useful.
 >>
->> On 27/11/14 08:28, Thierry Reding wrote:
->>> On Wed, Nov 26, 2014 at 05:55:31PM +0000, Marc Zyngier wrote:
->>>> The crazy gic_arch_extn thing that Tegra uses contains multiple
->>>> references to the irq field in struct irq_data, and uses this
->>>> to directly poke hardware register.
->>>>
->>>> But irq is the *virtual* irq number, something that has nothing
->>>> to do with the actual HW irq (stored in the hwirq field). And once
->>>> we put the stacked domain code in action, the whole thing explodes,
->>>> as these two values are *very* different:
->>>
->>> Do you have follow-up patches to use stacked domains on Tegra? I tried
->>> to move this driver out to drivers/irqchip at some point and that caused
->>> a bit of pain because of gic_arch_extn and probe order. At the time I
->>> was told that work was in progress to provide a more generic solution
->>> that could replace gic_arch_extn, which I'm assuming this stacked domain
->>> code is.
+>> I think this is a step in the wrong direction. Instead we should be
+>> working on removing the "name" based APIs from genpd.
 >>
->> I'm working on that at the moment, and things look pretty good. The only
->> issue I have so far is that this piece of HW needs to become the
->> top-level interrupt-parent for all devices that are currently
->> interrupting on the GIC. So far, the only solution I have is a change in
->> the DT. But arguably, this should have been described in DT too...
-> 
-> I think I had discussed this with Arnd (Cc'ed) at some point but I can't
-> find a link to the discussion (perhaps it was on IRC). The outcome I
-> think was that from the CPU's perspective the GIC would still be the
-> interrupt parent of the devices, whereas the LIC would become the
-> interrupt parent of the GIC.
-> 
-> Admittedly, though, everytime I think about this I start feeling dizzy,
-> so perhaps I'm mixing this up again.
-> 
-> Maybe a picture to clarify for my own sake how this works:
-> 
-> 	             /-----\     /-----\     /-----\
-> 	   various --|     |     |     |     |     |
-> 	  hardware --| LIC |-----| GIC |-----| CPU |
-> 	interrupts --|     |     |     |  |  |     |
-> 	             \-----/     \-----/  |  \-----/
-> 	                |                 |
-> 	             /-----\              |  /-----\
-> 	             |     |              |  |     |
-> 	             | AVP |              ---| CPU |
-> 	             |     |              .  |     |
-> 	             \-----/              .  \-----/
-> 	                                  .
-> 
-> That is, interrupts are first routed to the LIC, which will primarily be
-> used by the AVP. The LIC is also configured (and that's the part where
-> gic_arch_extn comes into play) to forward interrupts to the GIC which
-> will distribute them to the Cortex-AXs.
-> 
-> Therefore, from the CPU perspective, the interrupt-parent of devices
-> should still be the GIC, since that's where the interrupt numbers will
-> need to come from in order to set up interrupt handlers. For any of
-> these interrupts GIC will need to program LIC so that they are forwarded
-> and can be used to wake up CPUs.
-> 
-> Doesn't that simplify everything to just adding an interrupt-parent
-> property to GIC referencing LIC?
+>> The proper way should be to pass the PM domain as a parameter to the
+>> APIs instead.
+> Yes i understand but i had a special requirement for using this API
+> during pd probe.
+>  I cannot use hierarchy to represent parent/child pd nodes as it will
+> break the existing SoC's. In my case all the PD nodes are linear. The
+> parent/child relationship are established in the second pass after all
+> the PD entries are registered with the help of this API.
+> Although there a way that i can always keep parent PD's before the
+> child PD's in DT in linear order. Will check this approach.
 
-Actually, this is exactly the opposite! ;-)
+I had some thinking around this, could the below approach work?
 
->From a DT perspective, all devices (except those using PPIs) are
-connected to the LIC. Therefore, their interrupt parent has to be the
-LIC, and I don't think there is a way out of that.
+I just posted a patch[1] adding a new pm_genpd_lookup() API, which is
+using a "DT device node" to fetch the genpd. The idea is to use that
+API to get the genpd handle which is needed to configure a subdomain
+through pm_genpd_add_subdomain() API.
 
-Now, the stacked domains give you a lot of flexibility, and that's what
-we need to implement this:
-- The LIC gets its own domain, and so does the GIC.
-- For virq X, you get hwirq Y in the LIC domain, and hwirw Z in the GIC
-domain. The don't have to be identical.
+In principle you will have to walk through the DT a couple of times,
+initialize those domains (and subdomains) which either don't have a
+parent domain or which parent domain already has been initialized. I
+guess you need a somewhat clever loop to do that, but I think it's
+doable.
 
-For example, take the interrupt associated to UARTD, which happens to be
-SPI90. Its virq is 279, its hwirq in the LIC domain is 90, and 122 in
-the GIC.
+Obviously we also need to have a generic binding for a "parent
+domain". I like Geert's proposal from the other patch, which means
+using "power-domains = <&pd_xyz>".
 
-When the interrupt fires, the domain lookup at the GIC level will
-convert 122 (GIC) to 279 (virq), and process the the interrupt going
-through the stacked domains, each domain processing its view of the
-interrupt. Much nicer.
+Kind regards
+Uffe
 
-If course, all of this mandates that the device appears to be attached
-to the LIC, but I believe that it is what both your drawing and the TRM
-describe.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+[1]
+http://marc.info/?l=linux-pm&m=141709766008458&w=2
