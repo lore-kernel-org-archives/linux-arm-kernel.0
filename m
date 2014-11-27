@@ -1,81 +1,40 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 26 Nov 2014 22:24:14 -0700
-Subject: [PATCH v13 10/10] arm: dts: qcom: Add idle state device nodes for 8064
-In-Reply-To: <1417065854-37745-1-git-send-email-lina.iyer@linaro.org>
-References: <1417065854-37745-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1417065854-37745-11-git-send-email-lina.iyer@linaro.org>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 27 Nov 2014 13:29:55 +0800
+Subject: [PATCH v2 2/3] ACPI / processor: Convert apic_id to phys_id to
+ make it arch agnostic
+In-Reply-To: <1417064853-27905-3-git-send-email-hanjun.guo@linaro.com>
+References: <1417064853-27905-1-git-send-email-hanjun.guo@linaro.com>
+ <1417064853-27905-3-git-send-email-hanjun.guo@linaro.com>
+Message-ID: <5476B6D3.9080700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ARM common idle state device bindings for cpuidle support for APQ
-8064.
+Hi Rafael,
 
-Support Standby and Standalone power collapse (power down that does not
-affect any SoC idle states) for each cpu.
+On 2014-11-27 13:07, Hanjun Guo wrote:
+> apic_id in MADT table is the CPU hardware id which identify
+> it self in the system for x86 and ia64, OSPM will use it for
+> SMP init to map APIC ID to logical cpu number in the early
+> boot, when the DSDT/SSDT (ACPI namespace) is scanned later, the
+> ACPI processor driver is probed and the driver will use acpi_id
+> in DSDT to get the apic_id, then map to the logical cpu number
+> which is needed by the processor driver.
+> 
+> Before ACPI 5.0, only x86 and ia64 were supported in ACPI spec,
+> so apic_id is used both in arch code and ACPI core which is
+> pretty fine. Since ACPI 5.0, ARM is supported by ACPI and
+> APIC is not available on ARM, this will confuse people when
+> apic_id is both used by x86 and ARM in one function.
+> 
+> So convert apic_id to phys_id (which is the original meaning)
+> in ACPI processor dirver to make it arch agnostic, but leave the
+> arch dependent code unchanged, no functional change.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.com>
 
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/boot/dts/qcom-apq8064.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Sorry, my bad, not linaro.com but linaro.org, and patch 3
+has the same problem, if you need resend those patch, please
+let me know.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 9fd24bc..ab21dba 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -23,6 +23,7 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc0>;
- 			qcom,saw = <&saw0>;
-+			cpu-idle-states = <&CPU_STBY &CPU_SPC>;
- 		};
- 
- 		cpu at 1 {
-@@ -33,6 +34,7 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc1>;
- 			qcom,saw = <&saw1>;
-+			cpu-idle-states = <&CPU_STBY &CPU_SPC>;
- 		};
- 
- 		cpu at 2 {
-@@ -43,6 +45,7 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc2>;
- 			qcom,saw = <&saw2>;
-+			cpu-idle-states = <&CPU_STBY &CPU_SPC>;
- 		};
- 
- 		cpu at 3 {
-@@ -53,12 +56,29 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc3>;
- 			qcom,saw = <&saw3>;
-+			cpu-idle-states = <&CPU_STBY &CPU_SPC>;
- 		};
- 
- 		L2: l2-cache {
- 			compatible = "cache";
- 			cache-level = <2>;
- 		};
-+
-+		idle-states {
-+			CPU_STBY: standby {
-+				compatible = "qcom,idle-state-stby", "arm,idle-state";
-+				entry-latency-us = <1>;
-+				exit-latency-us = <1>;
-+				min-residency-us = <2>;
-+			};
-+
-+			CPU_SPC: spc {
-+				compatible = "qcom,idle-state-spc", "arm,idle-state";
-+				entry-latency-us = <400>;
-+				exit-latency-us = <900>;
-+				min-residency-us = <3000>;
-+			};
-+		};
- 	};
- 
- 	cpu-pmu {
--- 
-2.1.0
+Thanks
+Hanjun
