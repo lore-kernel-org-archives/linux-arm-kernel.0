@@ -1,109 +1,51 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 27 Nov 2014 10:36:19 +0800
-Subject: For the problem when using swiotlb
-In-Reply-To: <20141125122302.GC18858@e104818-lin.cambridge.arm.com>
-References: <5469E26B.2010905@huawei.com> <20141121175118.GA10451@localhost>
- <20141121180925.GG19783@e104818-lin.cambridge.arm.com>
- <2166613.l2i4mdmtLA@wuerfel>
- <20141125105815.GB18858@e104818-lin.cambridge.arm.com>
- <20141125112905.GC3836@n2100.arm.linux.org.uk>
- <20141125122302.GC18858@e104818-lin.cambridge.arm.com>
-Message-ID: <54768E23.7080406@huawei.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 26 Nov 2014 16:01:47 -0800
+Subject: [PATCH v5 2/6] uio: Add new UIO_MEM_PHYS_CACHE type for mem
+ regions
+In-Reply-To: <1416220572-13381-3-git-send-email-ankit.jindal@linaro.org>
+References: <1416220572-13381-1-git-send-email-ankit.jindal@linaro.org>
+ <1416220572-13381-3-git-send-email-ankit.jindal@linaro.org>
+Message-ID: <20141127000147.GC5313@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/25 20:23, Catalin Marinas wrote:
-> On Tue, Nov 25, 2014 at 11:29:05AM +0000, Russell King - ARM Linux wrote:
->> On Tue, Nov 25, 2014 at 10:58:15AM +0000, Catalin Marinas wrote:
->>> Since we don't have a coherent_dma_supported() function, we defer the
->>> validity check of coherent_dma_mask to dma_alloc_coherent() (and here we
->>> can remove bouncing since swiotlb has relatively small buffers).
->>
->> Bouncing of coherent DMA buffers is insane; if you have to bounce them,
->> they're by definition not coherent.
-> 
-> "Bouncing" is not a proper term here. What I meant is not using the
-> swiotlb bounce buffers for the dma_alloc_coherent(). The
-> swiotlb_alloc_coherent() allows this but it doesn't do any
-> copying/bouncing in such scenario (it would not make sense, as you said
-> below).
-> 
+On Mon, Nov 17, 2014 at 04:06:08PM +0530, Ankit Jindal wrote:
+> Currently, three types of mem regions are supported: UIO_MEM_PHYS,
+> UIO_MEM_LOGICAL and UIO_MEM_VIRTUAL. Among these UIO_MEM_PHYS helps
+> UIO driver export physcial memory to user space as non-cacheable
+> user memory. Typcially memory-mapped registers of a device are exported
+> to user space as UIO_MEM_PHYS type mem region. The UIO_MEM_PHYS type
+> is not efficient if dma-capable devices are capable of maintaining coherency
+> with CPU caches.
 
-After the long discussion, I think the idea is clear, the drivers should set
-correct dma mask and coherent dma mask to use the buffer avoiding using swiotlb,
-and my case is fixed by this way.
+Not efficient in what way?
 
-On my aarch64 board, the coherent dma mask is always bigger than swiotlb bounce,
-so dma_supported() looks no sense here, but maybe useful for other board, Thanks everyone.
+> This patch adds new type UIO_MEM_PHYS_CACHE for mem regions to enable
+> cacheable access to physical memory from user space.
+> 
+> Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
+> Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
+> ---
+>  drivers/uio/uio.c          |   11 ++++++++---
+>  include/linux/uio_driver.h |    1 +
+>  2 files changed, 9 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/uio/uio.c b/drivers/uio/uio.c
+> index 97e6444..120a84b 100644
+> --- a/drivers/uio/uio.c
+> +++ b/drivers/uio/uio.c
+> @@ -644,7 +644,7 @@ static const struct vm_operations_struct uio_physical_vm_ops = {
+>  #endif
+>  };
+>  
+> -static int uio_mmap_physical(struct vm_area_struct *vma)
+> +static int uio_mmap_physical(struct vm_area_struct *vma, bool cacheable)
 
-Regards
-Ding
+I despise "bool" flags in a function, as they don't give any idea of
+what is going on when you see the function being called.  Please create
+a new function that does this properly, with a correct name, if it's
+needed.
 
->> Think about one of the common uses of coherent DMA buffers: ring buffers,
->> where both the CPU and the DMA agent write to the ring:
->>
->> - CPU writes to ring, loading address and length, then writing to the
->>   status word for the ring entry.
->> - DMA reads the ring status word, sees it owns the entry, processes it,
->>   DMA writes to the ring status word to give it back.
->>
->> What this means is that if you are bouncing the buffer, you are copying
->> it whole-sale between the CPU visible version and the DMA visible
->> version, which means that you can miss DMA updates to it.  So, bouncing
->> a coherent DMA buffer is simply not an acceptable implementation for
->> dma_alloc_coherent().
-> 
-> I agree, not arguing against this.
-> 
->> As for validity of masks, it is defined in the DMA API documentation that
->> if a DMA mask is suitable for the streaming APIs, then it is also suitable
->> for the coherent APIs.  The reverse is left open, and so may not
->> necessarily be true.
->>
->> In other words:
->>
->> 	err = dma_set_mask(dev, mask);
->> 	if (err == 0)
->> 		assert(dma_set_coherent_mask(dev, mask) == 0);
->>
->> must always succeed, but reversing the two calls has no guarantee.
-> 
-> That would succeed on arm64 currently.
-> 
-> The problem is that swiotlb bounce buffers allow for smaller than 32-bit
-> dma_mask for streaming DMA since it can do bouncing. With coherent
-> allocations, we could allow the same smaller than 32-bit
-> coherent_dma_mask, however allocations may fail since they fall back to
-> the swiotlb reserved buffer which is relatively small.
-> 
-> What I want to avoid is threads like this where people ask for bigger
-> swiotlb buffers for coherent allocations most likely because they do the
-> wrong thing with their dma masks (or dma-ranges property). If the arm64
-> dma_alloc_coherent() code avoids calling swiotlb_alloc_coherent() and
-> just limits itself to ZONE_DMA, we make it clear that the swiotlb
-> buffers are only used for streaming DMA (bouncing).
-> 
-> Once we avoid swiotlb buffers for coherent DMA, the problem is that even
-> though your assertion above would pass, dma_alloc_coherent() may fail if
-> coherent_dma_mask is smaller than the end of ZONE_DMA (and pfn offsets
-> considered). Basically breaking the assumption that you mentioned above
-> with regards to coherent_dma_mask suitability.
-> 
-> I think the best we can get is for dma_supported() to ignore
-> swiotlb_dma_supported() and simply check for ZONE_DMA (similar to the
-> arm32 one). We guarantee that swiotlb bounce buffers are within ZONE_DMA
-> already, so no need for calling swiotlb_dma_supported(). If we ever have
-> devices with smaller than 32-bit mask on arm64, we will have to reduce
-> ZONE_DMA.
-> 
->> Note that there seems to be only one driver which has different coherent
->> and streaming DMA masks today:
->>
->> drivers/media/pci/sta2x11/sta2x11_vip.c:
->>         if (dma_set_mask(&pdev->dev, DMA_BIT_MASK(26))) {
->>         err = dma_set_coherent_mask(&vip->pdev->dev, DMA_BIT_MASK(29));
-> 
-> This would work if we have a ZONE_DMA of 29-bit while the swiotlb bounce
-> buffer within 26-bit. If we go with the above ZONE_DMA only check, we
-> would need ZONE_DMA of 26-bit.
-> 
+thanks,
+
+greg k-h
