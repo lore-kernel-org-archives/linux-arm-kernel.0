@@ -1,51 +1,58 @@
-From: hansverk@cisco.com (Hans Verkuil)
-Date: Thu, 27 Nov 2014 08:41:59 +0100
-Subject: [PATCH] arm: omap2: rx51-peripherals: fix build warning
-In-Reply-To: <1417033655-32332-1-git-send-email-balbi@ti.com>
-References: <1417033655-32332-1-git-send-email-balbi@ti.com>
-Message-ID: <5476D5C7.7030400@cisco.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 27 Nov 2014 09:10:55 +0100
+Subject: [PATCH] ARM: dts: imx: Update VPU compatible strings
+In-Reply-To: <1417035695-18405-1-git-send-email-festevam@gmail.com>
+References: <1417035695-18405-1-git-send-email-festevam@gmail.com>
+Message-ID: <1417075855.3163.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2014 09:27 PM, Felipe Balbi wrote:
-> commit 68a3c04 ([media] ARM: OMAP2: RX-51: update
-> si4713 platform data) updated board-rx51-peripherals.c
-> so that si4713 could be easily used on DT boot, but
-> it ended up introducing a build warning whenever
-> si4713 isn't enabled.
-> 
-> This patches fixes that warning:
-> 
-> arch/arm/mach-omap2/board-rx51-peripherals.c:1000:36: warning: \
-> 	?rx51_si4713_platform_data? defined but not used [-Wunused-variable]
->  static struct si4713_platform_data rx51_si4713_platform_data = {
-> 
-> Cc: Sebastian Reichel <sre@kernel.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Hans Verkuil <hans.verkuil@cisco.com>
-> Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+Hi Fabio,
 
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+just one tiny issue below:
 
+Am Mittwoch, den 26.11.2014, 19:01 -0200 schrieb Fabio Estevam:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Update the VPU compatible strings to also use "cnm,coda<model>".
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  arch/arm/mach-omap2/board-rx51-peripherals.c | 2 ++
->  1 file changed, 2 insertions(+)
+> Shawn,
 > 
-> diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
-> index d18a5cf..bda20c5 100644
-> --- a/arch/arm/mach-omap2/board-rx51-peripherals.c
-> +++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-> @@ -997,9 +997,11 @@ static struct aic3x_pdata rx51_aic3x_data2 = {
->  	.gpio_reset = 60,
->  };
->  
-> +#if IS_ENABLED(CONFIG_I2C_SI4713) && IS_ENABLED(CONFIG_PLATFORM_SI4713)
->  static struct si4713_platform_data rx51_si4713_platform_data = {
->  	.is_platform_device = true
->  };
-> +#endif
->  
->  static struct i2c_board_info __initdata rx51_peripherals_i2c_board_info_2[] = {
->  #if IS_ENABLED(CONFIG_I2C_SI4713) && IS_ENABLED(CONFIG_PLATFORM_SI4713)
+> The documentation patch for Documentation/devicetree/bindings/media/coda.txt 
+> has been re-sent to the linux-media list with such updates.
 > 
+>  arch/arm/boot/dts/imx27.dtsi | 2 +-
+>  arch/arm/boot/dts/imx53.dtsi | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> index 107d713..4b063b6 100644
+> --- a/arch/arm/boot/dts/imx27.dtsi
+> +++ b/arch/arm/boot/dts/imx27.dtsi
+> @@ -464,7 +464,7 @@
+>  			};
+>  
+>  			coda: coda at 10023000 {
+> -				compatible = "fsl,imx27-vpu";
+> +				compatible = "fsl,imx27-vpu", "cnm,codadx6";
+>  				reg = <0x10023000 0x0200>;
+>  				interrupts = <53>;
+>  				clocks = <&clks IMX27_CLK_VPU_BAUD_GATE>,
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index a30bddf..132410c 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -756,7 +756,7 @@
+>  			};
+>  
+>  			vpu: vpu at 63ff4000 {
+> -				compatible = "fsl,imx53-vpu";
+> +				compatible = "fsl,imx53-vpu","cnm,coda7541";
+
+Missing whitespace here. Other than that,
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+regards
+Philipp
