@@ -1,34 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Nov 2014 22:49:55 +0100
-Subject: Code generation involving __raw_readl and __raw_writel
-In-Reply-To: <54779718.1010001@free.fr>
-References: <5476FFA2.8010403@free.fr> <5308846.uKgsdBdD5V@wuerfel>
- <54779718.1010001@free.fr>
-Message-ID: <2584668.YoDkSvJUv9@wuerfel>
+Date: Thu, 27 Nov 2014 22:52:10 +0100
+Subject: [PATCH 2/3] ARM: edma: Rename header file for dmaengine filter
+ function definition
+In-Reply-To: <54777174.4070203@ti.com>
+References: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>
+ <3300340.ou8f7H2hIc@wuerfel> <54777174.4070203@ti.com>
+Message-ID: <4859328.eEV7jzKEaA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014 22:26:48 Mason wrote:
-> On 27/11/2014 17:51, Arnd Bergmann wrote:
+On Thursday 27 November 2014 20:46:12 Peter Ujfalusi wrote:
 > 
-> > On Thursday 27 November 2014 16:18:20 M?ns Rullg?rd wrote:
-> >
-> >> That's great.  You mentioned working against 3.14.  Do you have any
-> >> plans to move onto the current version?  That would be a prerequisite
-> >> for upstream acceptance.
-> > 
-> > FWIW, it's also a good strategy to do the initial bringup on the latest
-> > kernel and then backport to the older one for product work, otherwise
-> > you end up doing the forward port twice, and it's almost always harder
-> > than a backport.
-> 
-> Hmmm, I was told to target 3.14, because that's what we plan to support.
-> 
-> Maybe I can push one driver at a time?
-> (I have no idea if this is realistic or not.)
-> 
+> I see. With this series I did not planed to fix all edma related issues, just
+> as a start clean up the related header files. I would rather not add fixes to
+> mmc, spi, etc drivers since while you have valid point it is not in the scope
+> of this series.
+> Can we do the changes you are suggesting in an incremental manner?
 
-Doing one driver at a time is the normal way anyway, what I'm saying
-is just that it's more work for you if you first port everything to 3.14.
+Sure, but I'd leave the existing filter function declaration alone then
+and not move it, since we wouldn't want to keep it in the long run.
 
 	Arnd
