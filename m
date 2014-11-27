@@ -1,70 +1,109 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 27 Nov 2014 10:27:04 +0800
-Subject: [PATCH v4] clocksource: arch_timer: Allow the device tree to
- specify uninitialized timer registers
-In-Reply-To: <CAD=FV=XFcWEp=nZ3=8QEausKzpBbPCzFUSHY-g0K5y+VPpU3Vw@mail.gmail.com>
-References: <1412753627-28287-1-git-send-email-sonnyrao@chromium.org>
- <1417012893.12707.12.camel@mtksdaap41>
- <CAD=FV=XFcWEp=nZ3=8QEausKzpBbPCzFUSHY-g0K5y+VPpU3Vw@mail.gmail.com>
-Message-ID: <1417055224.12707.24.camel@mtksdaap41>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 27 Nov 2014 10:36:19 +0800
+Subject: For the problem when using swiotlb
+In-Reply-To: <20141125122302.GC18858@e104818-lin.cambridge.arm.com>
+References: <5469E26B.2010905@huawei.com> <20141121175118.GA10451@localhost>
+ <20141121180925.GG19783@e104818-lin.cambridge.arm.com>
+ <2166613.l2i4mdmtLA@wuerfel>
+ <20141125105815.GB18858@e104818-lin.cambridge.arm.com>
+ <20141125112905.GC3836@n2100.arm.linux.org.uk>
+ <20141125122302.GC18858@e104818-lin.cambridge.arm.com>
+Message-ID: <54768E23.7080406@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Wed, 2014-11-26 at 08:14 -0800, Doug Anderson wrote:
-> Yingjoe,
+On 2014/11/25 20:23, Catalin Marinas wrote:
+> On Tue, Nov 25, 2014 at 11:29:05AM +0000, Russell King - ARM Linux wrote:
+>> On Tue, Nov 25, 2014 at 10:58:15AM +0000, Catalin Marinas wrote:
+>>> Since we don't have a coherent_dma_supported() function, we defer the
+>>> validity check of coherent_dma_mask to dma_alloc_coherent() (and here we
+>>> can remove bouncing since swiotlb has relatively small buffers).
+>>
+>> Bouncing of coherent DMA buffers is insane; if you have to bounce them,
+>> they're by definition not coherent.
 > 
-> On Wed, Nov 26, 2014 at 6:41 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> > Sorry for the (very) late reply.
-> > I just realize today MT8135 need this and the other patch [1] to boot
-> > SMP correctly. I've applied both patches and they works fine. Thanks :)
+> "Bouncing" is not a proper term here. What I meant is not using the
+> swiotlb bounce buffers for the dma_alloc_coherent(). The
+> swiotlb_alloc_coherent() allows this but it doesn't do any
+> copying/bouncing in such scenario (it would not make sense, as you said
+> below).
 > 
-> Excellent.  It's helpful to include a Tested-by: tag in your email.
-> You'd have a line with just "Tested-by: Yingjoe Chen
-> <yingjoe.chen@mediatek.com>"
 
-sure, here's my tested-by for the 2 patches
+After the long discussion, I think the idea is clear, the drivers should set
+correct dma mask and coherent dma mask to use the buffer avoiding using swiotlb,
+and my case is fixed by this way.
 
-Tested-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+On my aarch64 board, the coherent dma mask is always bigger than swiotlb bounce,
+so dma_supported() looks no sense here, but maybe useful for other board, Thanks everyone.
 
-I'll remember to add it next time :)
+Regards
+Ding
 
-
-> > However, I'm not sure if we really need to add new property.
-> > arm_arch_timer driver will only use virtual timer when virtual PPI
-> > interrupt is provided, so the following patch to timer dtsi will also
-> > works. I think if the firmware doesn't support virtual timer, it make
-> > sense to not supply virtual interrupt.
-> >
-> >         timer {
-> >                 compatible = "arm,armv7-timer";
-> >                 interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
-> > -                            <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
-> > -                            <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
-> > -                            <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-> > +                            <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>;
-> >                 clock-frequency = <13000000>;
-> >         };
+>> Think about one of the common uses of coherent DMA buffers: ring buffers,
+>> where both the CPU and the DMA agent write to the ring:
+>>
+>> - CPU writes to ring, loading address and length, then writing to the
+>>   status word for the ring entry.
+>> - DMA reads the ring status word, sees it owns the entry, processes it,
+>>   DMA writes to the ring status word to give it back.
+>>
+>> What this means is that if you are bouncing the buffer, you are copying
+>> it whole-sale between the CPU visible version and the DMA visible
+>> version, which means that you can miss DMA updates to it.  So, bouncing
+>> a coherent DMA buffer is simply not an acceptable implementation for
+>> dma_alloc_coherent().
 > 
-> Once you have Sonny's patch then I believe that the above would work.
-> However we rejected something like this because device tree is
-> supposed to describe the hardware.  The hardware really does provide
-> the virtual timer interrupts and they really are at PPI 11 and PPI 10.
-> It's just that firmware doesn't handle things properly so they can't
-> be used.
+> I agree, not arguing against this.
 > 
-> NOTE: If we add the "arm,cpu-registers-not-fw-configured" to the
-> device tree and firmware actually works out how to configure things
-> (like if somehow has firmware that has a hypervisor) then it can
-> easily remove this device tree property before calling through to the
-> kernel.  It would be much harder for the firmware to add back in the
-> "PPI 11" and "PPI 10" entries to the timer.
+>> As for validity of masks, it is defined in the DMA API documentation that
+>> if a DMA mask is suitable for the streaming APIs, then it is also suitable
+>> for the coherent APIs.  The reverse is left open, and so may not
+>> necessarily be true.
+>>
+>> In other words:
+>>
+>> 	err = dma_set_mask(dev, mask);
+>> 	if (err == 0)
+>> 		assert(dma_set_coherent_mask(dev, mask) == 0);
+>>
+>> must always succeed, but reversing the two calls has no guarantee.
 > 
-> -Doug
-
-I see your point, that's good for me then.
-Thanks.
-
-Joe.C
+> That would succeed on arm64 currently.
+> 
+> The problem is that swiotlb bounce buffers allow for smaller than 32-bit
+> dma_mask for streaming DMA since it can do bouncing. With coherent
+> allocations, we could allow the same smaller than 32-bit
+> coherent_dma_mask, however allocations may fail since they fall back to
+> the swiotlb reserved buffer which is relatively small.
+> 
+> What I want to avoid is threads like this where people ask for bigger
+> swiotlb buffers for coherent allocations most likely because they do the
+> wrong thing with their dma masks (or dma-ranges property). If the arm64
+> dma_alloc_coherent() code avoids calling swiotlb_alloc_coherent() and
+> just limits itself to ZONE_DMA, we make it clear that the swiotlb
+> buffers are only used for streaming DMA (bouncing).
+> 
+> Once we avoid swiotlb buffers for coherent DMA, the problem is that even
+> though your assertion above would pass, dma_alloc_coherent() may fail if
+> coherent_dma_mask is smaller than the end of ZONE_DMA (and pfn offsets
+> considered). Basically breaking the assumption that you mentioned above
+> with regards to coherent_dma_mask suitability.
+> 
+> I think the best we can get is for dma_supported() to ignore
+> swiotlb_dma_supported() and simply check for ZONE_DMA (similar to the
+> arm32 one). We guarantee that swiotlb bounce buffers are within ZONE_DMA
+> already, so no need for calling swiotlb_dma_supported(). If we ever have
+> devices with smaller than 32-bit mask on arm64, we will have to reduce
+> ZONE_DMA.
+> 
+>> Note that there seems to be only one driver which has different coherent
+>> and streaming DMA masks today:
+>>
+>> drivers/media/pci/sta2x11/sta2x11_vip.c:
+>>         if (dma_set_mask(&pdev->dev, DMA_BIT_MASK(26))) {
+>>         err = dma_set_coherent_mask(&vip->pdev->dev, DMA_BIT_MASK(29));
+> 
+> This would work if we have a ZONE_DMA of 29-bit while the swiotlb bounce
+> buffer within 26-bit. If we go with the above ZONE_DMA only check, we
+> would need ZONE_DMA of 26-bit.
+> 
