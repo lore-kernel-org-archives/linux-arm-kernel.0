@@ -1,70 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Nov 2014 00:41:55 +0100
-Subject: [PATCH 00/11] ARM: at91: remove !DT support for at91rm9200
-In-Reply-To: <20141128003938.7efb4ea0@bbrezillon>
-References: <cover.1417103399.git.nicolas.ferre@atmel.com>
- <3935244.Dm2HkZj2Bg@wuerfel> <20141128003938.7efb4ea0@bbrezillon>
-Message-ID: <2241590.9KpWgUxqh8@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 28 Nov 2014 00:47:14 +0100
+Subject: [PATCH v4 0/2] Add support for the rockchip mmc clock phases
+ using the framework
+In-Reply-To: <1417051827-12564-1-git-send-email-amstan@chromium.org>
+References: <1417051827-12564-1-git-send-email-amstan@chromium.org>
+Message-ID: <3766029.50NHsEnjv7@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 November 2014 00:39:38 Boris Brezillon wrote:
-> Hi Arnd,
+Am Mittwoch, 26. November 2014, 17:30:25 schrieb Alexandru M Stan:
+> For now all I have is the getter and setter for the phase, nothing that uses
+> it (that is ready). You can test the getter like this:
+> localhost ~ # cat /sys/kernel/debug/clk/clk_summary|grep sample -C 1
+> sclk_sdio1                            0            0    24000000          0
+> 0 sdio1_sample                       0            0    12000000          0
+> 0 sdio1_drv                          0            0    12000000          0
+> 90 --
+> 	sclk_sdmmc                      1            1   297000000          0 0
+> 		sdmmc_sample                 0            0   148500000          0 
+134
+> 		sdmmc_drv                    0            0   148500000          0 
+90
+> --
+> 	sclk_sdio0                      1            1   100000000          0 0
+> 		sdio0_sample                 0            0    50000000          0 0
+> 		sdio0_drv                    0            0    50000000          0 
+90
+> 	sclk_emmc                       1            1   100000000          0 0
+> 		emmc_sample                  0            0    50000000          0 0
+> 		emmc_drv                     0            0    50000000          0 
+180
 > 
-> On Fri, 28 Nov 2014 00:12:25 +0100
-> Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > On Thursday 27 November 2014 18:12:43 Alexandre Belloni wrote:
-> > > 
-> > > As discussed some weeks ago, I prepared patches to switch sama5d[3-4] to
-> > > multiplatform. We are still missing the SMC and matrix drivers to switch
-> > > sam9 and rm9200.
-> > 
-> > I just looked at the drivers because I got curious, and to see if
-> > there are still any low-hanging fruit, but I guess you already picked
-> > them all 
-> > 
-> > > The currently affected drivers are:
-> > >  - drivers/ata/pata_at91.c (SMC)
-> > >  - drivers/pcmcia/at91_cf.c (SMC)
-> > 
-> > I guess the SMC should live in drivers/memory with an interface
-> > similar to mvebu-devbus.c?
-> 
-> Actually, there's some work in progress to support the EBI/SMC blocks
-> as a memory controller driver ;-):
-> 
-> http://thread.gmane.org/gmane.linux.kernel/1822096
-> 
-> I'll post a new version soon.
+> Next thing that will come is some dts changes that will make use of these
+> new clocks, and eventually mmc code will be changed to tune with these
+> clocks. You can see some WIP on
+> https://chromium-review.googlesource.com/#/c/227240
 
-Ok, cool.
+I've applied both patches to my clk branch.
 
-> > 
-> > Seems doable but nontrivial.
-> > 
-> > >  - drivers/usb/gadget/udc/at91_udc.c (Matrix, this is the only one
-> > >    for sam9)
-> > 
-> > Is at91_matrix a pin controller? With the board files removed, the udc
-> > driver has the only two remaining calls to at91_matrix_{read,write}
-> > for setting the pullup, so that could be modeled as a trivial pinctrl
-> > driver
-> 
-> The matrix block is containing several system configuration registers.
-> Most of them are related to AHB/APB bus config (master <-> slave
-> priority, burst and some other configs I don't remember).
-> Another register is here to define which HW logic is attached to an
-> external device connected through the EBI (External Bus Interface):
-> NAND, SDRAM, CompactFlash, ...
-> And, as you pointed out, there's a register to configure the pullup of
-> the UDC device.
-> 
-> As you can see, the matrix registers might be accessed by different
-> drivers (include the EBI/SMC driver), hence I proposed to expose them as
-> a syscon device (see the EBI/SMC series).
-> 
 
-Sounds good.
-
-	Arnd
+Heiko
