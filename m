@@ -1,120 +1,119 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 27 Nov 2014 15:45:10 +0100
-Subject: [PATCH 1/2] ARM: tegra: irq: fix buggy usage of irq_data irq field
-In-Reply-To: <5477330E.7020404@arm.com>
-References: <1417024532-5777-1-git-send-email-marc.zyngier@arm.com>
- <1417024532-5777-2-git-send-email-marc.zyngier@arm.com>
- <20141127082836.GA19323@ulmo> <5476EA0A.7090406@arm.com>
- <20141127120826.GA25222@ulmo> <5477330E.7020404@arm.com>
-Message-ID: <20141127144509.GA27744@ulmo>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 27 Nov 2014 14:45:26 +0000
+Subject: [PATCH V4] arm64: amd-seattle: Adding device tree for AMD Seattle
+ platform
+In-Reply-To: <20141127142811.GN828@e106497-lin.cambridge.arm.com>
+References: <547458B9.2000805@arm.com>
+ <D09A7217.A4E1%suravee.suthikulpanit@amd.com>
+ <20141127142811.GN828@e106497-lin.cambridge.arm.com>
+Message-ID: <54773906.5030504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 02:19:58PM +0000, Marc Zyngier wrote:
-> On 27/11/14 12:08, Thierry Reding wrote:
-> > On Thu, Nov 27, 2014 at 09:08:26AM +0000, Marc Zyngier wrote:
-> >> Hi Thierry,
-> >>
-> >> On 27/11/14 08:28, Thierry Reding wrote:
-> >>> On Wed, Nov 26, 2014 at 05:55:31PM +0000, Marc Zyngier wrote:
-> >>>> The crazy gic_arch_extn thing that Tegra uses contains multiple
-> >>>> references to the irq field in struct irq_data, and uses this
-> >>>> to directly poke hardware register.
-> >>>>
-> >>>> But irq is the *virtual* irq number, something that has nothing
-> >>>> to do with the actual HW irq (stored in the hwirq field). And once
-> >>>> we put the stacked domain code in action, the whole thing explodes,
-> >>>> as these two values are *very* different:
-> >>>
-> >>> Do you have follow-up patches to use stacked domains on Tegra? I tried
-> >>> to move this driver out to drivers/irqchip at some point and that caused
-> >>> a bit of pain because of gic_arch_extn and probe order. At the time I
-> >>> was told that work was in progress to provide a more generic solution
-> >>> that could replace gic_arch_extn, which I'm assuming this stacked domain
-> >>> code is.
-> >>
-> >> I'm working on that at the moment, and things look pretty good. The only
-> >> issue I have so far is that this piece of HW needs to become the
-> >> top-level interrupt-parent for all devices that are currently
-> >> interrupting on the GIC. So far, the only solution I have is a change in
-> >> the DT. But arguably, this should have been described in DT too...
-> > 
-> > I think I had discussed this with Arnd (Cc'ed) at some point but I can't
-> > find a link to the discussion (perhaps it was on IRC). The outcome I
-> > think was that from the CPU's perspective the GIC would still be the
-> > interrupt parent of the devices, whereas the LIC would become the
-> > interrupt parent of the GIC.
-> > 
-> > Admittedly, though, everytime I think about this I start feeling dizzy,
-> > so perhaps I'm mixing this up again.
-> > 
-> > Maybe a picture to clarify for my own sake how this works:
-> > 
-> > 	             /-----\     /-----\     /-----\
-> > 	   various --|     |     |     |     |     |
-> > 	  hardware --| LIC |-----| GIC |-----| CPU |
-> > 	interrupts --|     |     |     |  |  |     |
-> > 	             \-----/     \-----/  |  \-----/
-> > 	                |                 |
-> > 	             /-----\              |  /-----\
-> > 	             |     |              |  |     |
-> > 	             | AVP |              ---| CPU |
-> > 	             |     |              .  |     |
-> > 	             \-----/              .  \-----/
-> > 	                                  .
-> > 
-> > That is, interrupts are first routed to the LIC, which will primarily be
-> > used by the AVP. The LIC is also configured (and that's the part where
-> > gic_arch_extn comes into play) to forward interrupts to the GIC which
-> > will distribute them to the Cortex-AXs.
-> > 
-> > Therefore, from the CPU perspective, the interrupt-parent of devices
-> > should still be the GIC, since that's where the interrupt numbers will
-> > need to come from in order to set up interrupt handlers. For any of
-> > these interrupts GIC will need to program LIC so that they are forwarded
-> > and can be used to wake up CPUs.
-> > 
-> > Doesn't that simplify everything to just adding an interrupt-parent
-> > property to GIC referencing LIC?
+On 27/11/14 14:28, Liviu Dudau wrote:
+> On Tue, Nov 25, 2014 at 11:46:50AM +0000, Suthikulpanit, Suravee wrote:
+>> Hi Marc,
+>>
+>> On 11/25/14, 17:23, "Marc Zyngier" <marc.zyngier@arm.com> wrote:
+>>
+>>> Hi Suravee,
+>>>
+>>> Just spotted a small issue below (looks like a recurring mistake in a
+>>> number of DTs I've seem lately):
+>>>
+>>> On 24/11/14 21:51, suravee.suthikulpanit at amd.com wrote:
+>>>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>>>
+>>>> Initial revision of device tree for AMD Seattle platform.
+>>>>
+>>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>>> Signed-off-by: Thomas Lendacky <Thomas.Lendacky@amd.com>
+>>>> Signed-off-by: Joel Schopp <Joel.Schopp@amd.com>
+>>>> ---
+>>>> V4 Changes:
+>>>>     * Remove unnecessary smb layer and move motherbord to top level
+>>>>     * Move include dtsi to top level
+>>>>     * Remove apb_pclk from sata0 and i2c
+>>>>     * Fix GIC Virtual Maintanance Interrupt from PPI24 (8) to PPI25 (9)
+>>>>     * Add 40-bit dma-ranges for motherboard (simple-bus)
+>>>>     * Remove dma0 (pl330) entry for now since it only supports 32-bit
+>>>> DMA.
+>>>>       It is basically not used at the moment. It would also need SMMU
+>>>>       to allow dma remapping to 40-bit DMA range.
+>>>>     * Add phandle spi0 and spi1
+>>>>     * Hook up gpio0 pin 7 with MMC Card Detection (CD) support.
+>>>>     * Changes in pcie0 entry:
+>>>>         - Add 40-bit dma-ranges
+>>>>         - Remove interrupts property
+>>>>         - Add interrupt-map/mask property
+>>>>         - Fix PCI I/O range
+>>>>         - Merge PCI 32-bit ranges
+>>>>         - Merge PCI 64-bit ranges
+>>>>
+>>>> NOTE: I am not add a new compatible ID for the sata0 as Rob Herring
+>>>>       suggested since there is no need at the momement, and I am trying
+>>>>       to avoid introducing ID unnecessarily.
+>>>>
+>>>>  arch/arm64/Kconfig                          |   5 +
+>>>>  arch/arm64/boot/dts/Makefile                |   1 +
+>>>>  arch/arm64/boot/dts/amd-seattle-periph.dtsi | 156
+>>>> ++++++++++++++++++++++++++++
+>>>>  arch/arm64/boot/dts/amd-seattle.dts         |  89 ++++++++++++++++
+>>>>  4 files changed, 251 insertions(+)
+>>>>  create mode 100644 arch/arm64/boot/dts/amd-seattle-periph.dtsi
+>>>>  create mode 100644 arch/arm64/boot/dts/amd-seattle.dts
+>>>>
+>>>
+>>> [...]
+>>>
+>>>> diff --git a/arch/arm64/boot/dts/amd-seattle.dts
+>>>> b/arch/arm64/boot/dts/amd-seattle.dts
+>>>> new file mode 100644
+>>>> index 0000000..d5fc482
+>>>> --- /dev/null
+>>>> +++ b/arch/arm64/boot/dts/amd-seattle.dts
+>>>> @@ -0,0 +1,89 @@
+>>>> +/*
+>>>> + * DTS file for AMD Seattle
+>>>> + *
+>>>> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
+>>>> + */
+>>>> +
+>>>> +/dts-v1/;
+>>>> +
+>>
+>> [...] 
+>>
+>>>> +
+>>>> +	timer {
+>>>> +		compatible = "arm,armv8-timer";
+>>>> +		interrupts = <1 13 0xff01>,
+>>>> +			     <1 14 0xff01>,
+>>>> +			     <1 11 0xff01>,
+>>>> +			     <1 10 0xff01>;
+>>>> +	};
+>>>
+>>> The Cortex-A57 TRM clearly states that these interrupts are level
+>>> triggered.
+>>
+>> Thanks for pointing this out. I?ll fix this to <1 1X 0xff04> (4 for the
+>> Active-High) then.
 > 
-> Actually, this is exactly the opposite! ;-)
+> Hi Suravee,
 > 
-> From a DT perspective, all devices (except those using PPIs) are
-> connected to the LIC. Therefore, their interrupt parent has to be the
-> LIC, and I don't think there is a way out of that.
-> 
-> Now, the stacked domains give you a lot of flexibility, and that's what
-> we need to implement this:
-> - The LIC gets its own domain, and so does the GIC.
-> - For virq X, you get hwirq Y in the LIC domain, and hwirw Z in the GIC
-> domain. The don't have to be identical.
-> 
-> For example, take the interrupt associated to UARTD, which happens to be
-> SPI90. Its virq is 279, its hwirq in the LIC domain is 90, and 122 in
-> the GIC.
-> 
-> When the interrupt fires, the domain lookup at the GIC level will
-> convert 122 (GIC) to 279 (virq), and process the the interrupt going
-> through the stacked domains, each domain processing its view of the
-> interrupt. Much nicer.
-> 
-> If course, all of this mandates that the device appears to be attached
-> to the LIC, but I believe that it is what both your drawing and the TRM
-> describe.
+> Don't know what Seattle does, but the TRM says that the outputs are active-LOW.
 
-The drawing was derived from my reading of the TRM, so I'm comforted
-that it matches your interpretation as well. =)
+As I said in another thread, 0xff04 *is* the right value. This is an
+interrupt descriptor for the GIC, not a qualifier for the signal that
+comes out of the core.
 
-Thanks for explaining this in so much detail. That makes perfect sense.
-On the other hand it means that we'd be breaking DTs in a backwards-
-incompatibile way, severely. Would there be provision for some sort of
-fallback to keep existing DTBs working?
+Thanks.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/e2960c55/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
