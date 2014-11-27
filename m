@@ -1,127 +1,278 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Nov 2014 16:00:01 +0100
-Subject: Code generation involving __raw_readl and __raw_writel
-In-Reply-To: <54773A8B.5000200@free.fr>
-References: <5476FFA2.8010403@free.fr> <7958894.CNnhBWEkgT@wuerfel>
- <54773A8B.5000200@free.fr>
-Message-ID: <2978273.VePW8UymqL@wuerfel>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 27 Nov 2014 15:01:37 +0000
+Subject: [PATCH v13 03/10] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <1417065854-37745-4-git-send-email-lina.iyer@linaro.org>
+References: <1417065854-37745-1-git-send-email-lina.iyer@linaro.org>
+ <1417065854-37745-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20141127150137.GA7889@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014 15:51:55 Mason wrote:
-> Arnd,
+On Thu, Nov 27, 2014 at 05:24:07AM +0000, Lina Iyer wrote:
+
+[...]
+
+> +static int spm_set_low_power_mode(enum pm_sleep_mode mode)
+> +{
+> +       struct spm_driver_data *drv = per_cpu(cpu_spm_drv,
+> +                                               smp_processor_id());
+> +       u32 start_index;
+> +       u32 ctl_val;
+> +
+> +       if (!drv)
+> +               return -ENXIO;
+> +
+> +       start_index = drv->reg_data->start_index[mode];
+> +
+> +       ctl_val = spm_register_read(drv, SPM_REG_SPM_CTL);
+> +       ctl_val &= ~(SPM_CTL_INDEX << SPM_CTL_INDEX_SHIFT);
+> +       ctl_val |= start_index << SPM_CTL_INDEX_SHIFT;
+> +       ctl_val |= SPM_CTL_EN;
+> +       spm_register_write(drv, SPM_REG_SPM_CTL, ctl_val);
+> +
+> +       /* Ensure we have written the start address */
+> +       wmb();
+
+Can you explain please what this wmb is meant to achieve ? If it is there
+to make sure the write made it to the SPM that's not a proper way
+to achieve it, the barrier ensures ordering, not write completion.
+
+> +
+> +       return 0;
+> +}
+> +
+> +static int qcom_pm_collapse(unsigned long int unused)
+> +{
+> +       int ret;
+> +       u32 flag;
+> +       int cpu = smp_processor_id();
+> +
+> +       ret = scm_set_warm_boot_addr(cpu_resume, cpu);
+> +       if (ret)
+> +               return ret;
+> +
+> +       flag = SCM_L2_ON & SCM_FLUSH_FLAG_MASK;
+> +       scm_call_atomic1(SCM_SVC_BOOT, SCM_CMD_TERMINATE_PC, flag);
+> +
+> +       /*
+> +        * Returns here only if there was a pending interrupt and we did not
+> +        * power down as a result.
+> +        */
+> +       return 0;
+
+I know the return value is changed by the cpu_suspend implementation to
+signal error when not returning from cpu_resume, but you should not
+return 0 anyway.
+
+> +}
+> +
+> +static int qcom_cpu_standby(void *unused)
+> +{
+> +       int ret;
+> +
+> +       ret = spm_set_low_power_mode(PM_SLEEP_MODE_STBY);
+> +       if (ret)
+> +               return ret;
+> +
+> +       cpu_do_idle();
+> +
+> +       return 0;
+> +}
+> +
+> +static int qcom_cpu_spc(void *unused)
+> +{      int ret;
+> +
+> +       ret = spm_set_low_power_mode(PM_SLEEP_MODE_STBY);
+> +       if (ret)
+> +               return ret;
+> +
+> +       cpu_pm_enter();
+> +       cpu_suspend(0, qcom_pm_collapse);
+
+You must stash the return value and propagate it.
+
+> +       cpu_pm_exit();
+> +
+> +       return 0;
+> +}
+> +
+> +static struct spm_driver_data *spm_get_drv(struct platform_device *pdev,
+> +               int *spm_cpu)
+> +{
+> +       struct spm_driver_data *drv = NULL;
+> +       struct device_node *cpu_node, *saw_node;
+> +       int cpu;
+> +       bool found = false;
+> +
+> +       for_each_possible_cpu(cpu) {
+> +               cpu_node = of_cpu_device_node_get(cpu);
+> +               if (!cpu_node)
+> +                       continue;
+> +               saw_node = of_parse_phandle(cpu_node, "qcom,saw", 0);
+
++               if (saw_node) {
++                       if (saw_node == pdev->dev.of_node)
++                               found = true;
++                       of_node_put(saw_node);
++               }
+
+can be:
+		found = (saw_node == pdev->dev.of_node);
+		of_node_put(saw_node);
+
+Thanks,
+Lorenzo
+
+> +               of_node_put(cpu_node);
+> +               if (found)
+> +                       break;
+> +       }
+> +
+> +       if (found) {
+> +               drv = devm_kzalloc(&pdev->dev, sizeof(*drv), GFP_KERNEL);
+> +               if (drv)
+> +                       *spm_cpu = cpu;
+> +       }
+> +
+> +       return drv;
+> +}
+> +
+> +static const struct of_device_id spm_match_table[] = {
+> +       { .compatible = "qcom,msm8974-saw2-v2.1-cpu",
+> +         .data = &spm_reg_8974_8084_cpu },
+> +       { .compatible = "qcom,apq8084-saw2-v2.1-cpu",
+> +         .data = &spm_reg_8974_8084_cpu },
+> +       { .compatible = "qcom,apq8064-saw2-v1.1-cpu",
+> +         .data = &spm_reg_8064_cpu },
+> +       { },
+> +};
+> +
+> +static const struct qcom_cpu_pm_ops lpm_ops = {
+> +       .standby = qcom_cpu_standby,
+> +       .spc = qcom_cpu_spc,
+> +};
+> +
+> +static int spm_dev_probe(struct platform_device *pdev)
+> +{
+> +       struct spm_driver_data *drv;
+> +       struct resource *res;
+> +       const struct of_device_id *match_id;
+> +       void __iomem *addr;
+> +       int cpu = -EINVAL;
+> +       static bool cpuidle_drv_init;
+> +       const struct platform_device_info qcom_cpuidle_info = {
+> +               .name   = "qcom_cpuidle",
+> +               .id     = -1,
+> +               .data = &lpm_ops,
+> +               .size_data = sizeof(lpm_ops),
+> +       };
+> +
+> +       drv = spm_get_drv(pdev, &cpu);
+> +       if (!drv || cpu < 0)
+> +               return -EINVAL;
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       drv->reg_base = devm_ioremap_resource(&pdev->dev, res);
+> +       if (IS_ERR(drv->reg_base))
+> +               return PTR_ERR(drv->reg_base);
+> +
+> +       match_id = of_match_node(spm_match_table, pdev->dev.of_node);
+> +       if (!match_id)
+> +               return -ENODEV;
+> +
+> +       drv->reg_data = match_id->data;
+> +
+> +       /* Write the SPM sequences first.. */
+> +       addr = drv->reg_base + drv->reg_data->reg_offset[SPM_REG_SEQ_ENTRY];
+> +       __iowrite32_copy(addr, drv->reg_data->seq,
+> +                       ARRAY_SIZE(drv->reg_data->seq) / 4);
+> +
+> +       /*
+> +        * ..and then the control registers.
+> +        * On some SoC's if the control registers are written first and if the
+> +        * CPU was held in reset, the reset signal could trigger the SPM state
+> +        * machine, before the sequences are completely written.
+> +        */
+> +       spm_register_write(drv, SPM_REG_CFG, drv->reg_data->spm_cfg);
+> +       spm_register_write(drv, SPM_REG_DLY, drv->reg_data->spm_dly);
+> +       spm_register_write(drv, SPM_REG_PMIC_DLY, drv->reg_data->pmic_dly);
+> +
+> +       spm_register_write(drv, SPM_REG_PMIC_DATA_0,
+> +                               drv->reg_data->pmic_data[0]);
+> +       spm_register_write(drv, SPM_REG_PMIC_DATA_1,
+> +                               drv->reg_data->pmic_data[1]);
+> +
+> +       /*
+> +        * Ensure all observers see the above register writes before the
+> +        * cpuidle driver is allowed to use the SPM.
+> +        */
+> +       wmb();
+> +       per_cpu(cpu_spm_drv, cpu) = drv;
+> +
+> +       if (!cpuidle_drv_init) {
+> +               platform_device_register_full(&qcom_cpuidle_info);
+> +               cpuidle_drv_init = true;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static struct platform_driver spm_driver = {
+> +       .probe = spm_dev_probe,
+> +       .driver = {
+> +               .name = "saw",
+> +               .of_match_table = spm_match_table,
+> +       },
+> +};
+> +
+> +module_platform_driver(spm_driver);
+> +
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_DESCRIPTION("SAW power controller driver");
+> +MODULE_ALIAS("platform:saw");
+> diff --git a/include/soc/qcom/pm.h b/include/soc/qcom/pm.h
+> new file mode 100644
+> index 0000000..d9a56d7
+> --- /dev/null
+> +++ b/include/soc/qcom/pm.h
+> @@ -0,0 +1,31 @@
+> +/*
+> + * Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#ifndef __QCOM_PM_H
+> +#define __QCOM_PM_H
+> +
+> +enum pm_sleep_mode {
+> +       PM_SLEEP_MODE_STBY,
+> +       PM_SLEEP_MODE_RET,
+> +       PM_SLEEP_MODE_SPC,
+> +       PM_SLEEP_MODE_PC,
+> +       PM_SLEEP_MODE_NR,
+> +};
+> +
+> +struct qcom_cpu_pm_ops {
+> +       int (*standby)(void *data);
+> +       int (*spc)(void *data);
+> +};
+> +
+> +#endif  /* __QCOM_PM_H */
+> --
+> 2.1.0
 > 
-> First of all, thanks (a lot) for your highly informative replies!
 > 
-> On 27/11/2014 14:12, Arnd Bergmann wrote:
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> > On Thursday 27 November 2014 14:01:41 Mason wrote:
-> >
-> >> #define gbus_read_reg32(r)      __raw_readl((volatile void __iomem *)IO_ADDRESS(r))
-> >> #define gbus_write_reg32(r, v)  __raw_writel(v, (volatile void __iomem *)IO_ADDRESS(r))
-> >
-> > Right, that's how things used to be done a while ago.
-> 
-> So, IIUC, old code used to call __raw_readl directly, but modern
-> code is supposed to call either readl or readl_relaxed?
-> 
-> (BTW, the original code is 4-5 years old, while my target is 3.14.x)
-
-I meant the IO_ADDRESS stuff. Modern code uses ioremap() instead
-since the IO_ADDRESS was platform specific, and drivers can no longer
-use platform headers on CONFIG_ARCH_MULTIPLATFORM, which is used
-for all new code now.
-
-The __raw_readl() was probably considered bad back then already, but
-a lot of people did it as we were lacking readl_relaxed().
-
-Would you consider submitting the code upstream?
-
-> >>> use of_iomap or devm_ioremap_resource to get to the pointer for
-> >>> a device, don't just hardcode virtual addresses.
-> >>
-> >> About that. If nothing had been done, 0xf0010024 would be an
-> >> invalid virtual address, and reading from that address would
-> >> generate a TLB miss, right? So something must have configured
-> >> the TLB to accept and translate this address correctly.
-> >>
-> >> I'm looking for an iomap or ioremap call, right?
-> >
-> > The IO_ADDRESS() macro on this platform is probably defined to
-> > match a address range that is set up from a map_io callback in
-> > the platform.
-> 
-> #define __IO_START 0xf0000000
-> #define __IO_SIZE  SZ_8M
-> #define __IO_END   (__IO_START + __IO_SIZE)
-> #define IO_ADDRESS(x) (__IO_START +(x))
-> 
-> static struct map_desc hw_io_desc[] __initdata = {
-> 	{
-> 		.virtual	= SCU_VIRT_BASE_ADDR,
-> 		.pfn		=__phys_to_pfn(SCU_BASE_ADDR),
-> 		.length		= SZ_2M,
-> 		.type 		= MT_DEVICE,
-> 	},
-> 	{
-> 		.virtual	= IO_ADDRESS(0),
-> 		.pfn		=__phys_to_pfn(0),
-> 		.length		= SZ_8M,
-> 		.type 		= MT_DEVICE,
-> 	},
-> };
-> 
->    ...
->    iotable_init(hw_io_desc, ARRAY_SIZE(tangox_87xx_io_desc));
-> 
-> I'll take a much closer look at iotable_init, but I suppose it is
-> this function that sets up the TLB? As far as I can see, it is not
-> optimal to map 8 MB, because that will take up 8 entries in the TLB,
-> whereas 16 MB would take only one (in theory).
-
-Right, it should just map 16 MB.
-
-> > On new platforms, you can't do that because the mach/*.h header
-> > files are inaccessible to drivers, so you have to use ioremap.
-> 
-> What do you mean by new platforms?
-> 
-> Indeed, the IO_* macros given above are defined in
-> arch/arm/mach-tangox/include/mach/io.h
-
-Modern platforms no longer have an include directory and use the
-standard definitions. How many other header files do you have in there?
-
-Actually, we also try to get rid of the need for most other files
-in mach-* as well, though commonly you need a little bit of code for
-bringing up secondary CPU cores. Everything else should be a device
-driver.
-
-> But my 3.14 driver does see the header.
-
-That means you don't use CONFIG_ARCH_MULTIPLATFORM. You should ;-)
-
-> >> I'm asking because I have an idea in mind: on the bus, the first
-> >> 16 MB contains only memory-mapped registers, so I've been thinking
-> >> I can map this region at init, and keep it for the lifetime of the
-> >> system. It would use only one entry in the TLB, since the CPU
-> >> supports 16 MB super-sections (or whatever they are called).
-> >>
-> >> I could even lock that entry in the TLB so that these accesses
-> >> are guaranteed to never TLB miss, right?
-> >
-> > The map_io callback will set up a mapping like that, and when
-> > a driver calls ioremap on the same physical address, you will
-> > get the correct pointer using that TLB, you just don't communicate
-> > the address through a pointer any more.
-> 
-> IIUC, you're saying the current method using iotable_init is not
-> appropriate, and I should use the map_io callback?
-
-map_io and iotable_init is the same thing, the former calls the latter.
-What I'm saying is that relying on hardcoded virtual addresses is
-not appropriate, you can use the iotable_init call to set up a
-hugetlb mapping for performance optimization, but it should really
-work without that.
-
-	Arnd
