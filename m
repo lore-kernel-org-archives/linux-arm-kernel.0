@@ -1,37 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Nov 2014 14:31:05 +0100
-Subject: [GIT PULL 2/2] Samsung defconfig update for v3.18
-In-Reply-To: <201411271428.41847.arnd@arndb.de>
-References: <546F3CE3.5010502@kernel.org> <201411271428.41847.arnd@arndb.de>
-Message-ID: <201411271431.05461.arnd@arndb.de>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 27 Nov 2014 21:31:12 +0800
+Subject: [PATCH v8 3/4] ARM: mediatek: Add sysirq in
+ mt6589/mt8135/mt8127 dtsi
+In-Reply-To: <1416902662-19281-4-git-send-email-yingjoe.chen@mediatek.com>
+References: <1416902662-19281-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1416902662-19281-4-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1417095072.12707.29.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014, Arnd Bergmann wrote:
-> On Friday 21 November 2014, Kukjin Kim wrote:
-> > The following changes since commit 0df1f2487d2f0d04703f142813d53615d62a1da4:
-> > 
-> >   Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > tags/samsung-defconfig-v3.18
-> > 
-> > for you to fetch changes up to 0788148935c3a0fae3cca6af72943b9628bf8a54:
-> > 
-> >   ARM: exynos_defconfig: Enable max77802 rtc and clock drivers
-> > (2014-11-21 21:46:21 +0900)
-> > 
-> > ----------------------------------------------------------------
-> > Samsung defconfig update for v3.18
-> > 
-> > - enable max77802 rtc and clock drivers for exynos_defconfig
-> >   : enable the kernel config options to have the drivers for
-> >     max77802 including rtc and 2-ch 32kHz clock outputs
-> 
-> Pulled into next/fixes, thanks!
+On Tue, 2014-11-25 at 16:04 +0800, Yingjoe Chen wrote:
+> Add sysirq settings for mt6589/mt8135/mt8127
+> This also correct timer interrupt flag. The old setting works
+> because boot loader already set polarity for timer interrupt.
+> Without intpol support, the setting was not changed so gic
+> can get the irq correctly.
 
-Sorry, I meant fixes, not next/fixes. It's queued for 3.18.
+Hi Matthias,
 
-	Arnd
+I think this patch should go through you. Would you take a look at this
+patch? Also, mt8135/mt8127 uart support[1] depends on this, should we
+send it again?
+
+Thanks.
+
+Joe.C
+
+[1]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296147.html
