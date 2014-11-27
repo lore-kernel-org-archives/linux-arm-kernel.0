@@ -1,42 +1,118 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Nov 2014 18:30:58 +0000
-Subject: [PATCH v4 2/7] regulator: dt-bindings: Document the ena-gpios
- property
-In-Reply-To: <1417087253-12306-3-git-send-email-k.kozlowski@samsung.com>
-References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
- <1417087253-12306-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20141127183058.GB7712@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 27 Nov 2014 18:39:28 +0000
+Subject: [PATCH v2] arm64: ARM: Fix the Generic Timers interrupt active
+ level description
+In-Reply-To: <1417105283-19575-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1417105283-19575-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <54776FE0.8030600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 12:20:48PM +0100, Krzysztof Kozlowski wrote:
+On 27/11/14 16:21, Liviu Dudau wrote:
+> The Cortex-A5x TRM states in paragraph "9.2 Generic Timer functional
+> description" that generic timers provide a level not edge interrupt
+> output. Fix the device trees to correctly describe this.
+> 
+> While doing this update the CPU mask to match the number of described
+> CPUs as well as the DT bindings documentation for Generic Timers.
+> 
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-> +- ena-gpios: GPIO to use for enable control. Actual implementation depends
-> +  on regulator driver. The bindings documentation for given driver describes
-> +  which regulator actually supports it.
-> +- ena-gpio-open-drain: GPIO is open drain type.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I'm relly not a big fan of adding a fixed name property here with no
-override capability, it means that the naming won't reflect the specific
-regulator design so closely and in practice for many of the PMICs the
-GPIO control can do rather more than just control enables and supports
-reprogramming.  The latter case where we've got a signal which can
-sometimes be simply and enable but sometimes more makes it especially
-worrying to have the property always be there, it's something that might
-work in some configurations but could easily be broken if we try to
-exploit more advanced functionality (things also triggering other
-configuration changes at the same time).
+	M.
 
-Factoring out the code is good but it seems better to have it be
-something which drivers can control, for example by having them
-explicitly specify a property name to use or perhaps a flag to enable
-the default name.
+> ---
+> 
+> Arnd, Olof: This is on top of linux-next/master as it patches Juno's
+> as well as all the other ARM DTs.
+> 
+> --
+> 
+>  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++----
+>  arch/arm64/boot/dts/arm/foundation-v8.dts            | 8 ++++----
+>  arch/arm64/boot/dts/arm/juno.dts                     | 8 ++++----
+>  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts           | 8 ++++----
+>  4 files changed, 16 insertions(+), 16 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> index 37b2caf..6d2aa87 100644
+> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> @@ -27,10 +27,10 @@ Example:
+>  	timer {
+>  		compatible = "arm,cortex-a15-timer",
+>  			     "arm,armv7-timer";
+> -		interrupts = <1 13 0xf08>,
+> -			     <1 14 0xf08>,
+> -			     <1 11 0xf08>,
+> -			     <1 10 0xf08>;
+> +		interrupts = <1 13 0xf04>,
+> +			     <1 14 0xf04>,
+> +			     <1 11 0xf04>,
+> +			     <1 10 0xf04>;
+>  		clock-frequency = <100000000>;
+>  	};
+>  
+> diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dts
+> index 4a06090..8c0214e 100644
+> --- a/arch/arm64/boot/dts/arm/foundation-v8.dts
+> +++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
+> @@ -78,10 +78,10 @@
+>  
+>  	timer {
+>  		compatible = "arm,armv8-timer";
+> -		interrupts = <1 13 0xff01>,
+> -			     <1 14 0xff01>,
+> -			     <1 11 0xff01>,
+> -			     <1 10 0xff01>;
+> +		interrupts = <1 13 0xf04>,
+> +			     <1 14 0xf04>,
+> +			     <1 11 0xf04>,
+> +			     <1 10 0xf04>;
+>  		clock-frequency = <100000000>;
+>  	};
+>  
+> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> index 097ecc4..551a688 100644
+> --- a/arch/arm64/boot/dts/arm/juno.dts
+> +++ b/arch/arm64/boot/dts/arm/juno.dts
+> @@ -98,10 +98,10 @@
+>  
+>  	timer {
+>  		compatible = "arm,armv8-timer";
+> -		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
+> -			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
+> -			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
+> -			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>;
+> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>,
+> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>,
+> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>,
+> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
+>  	};
+>  
+>  	pmu {
+> diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+> index 572005e..49d1b19 100644
+> --- a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+> +++ b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+> @@ -81,10 +81,10 @@
+>  
+>  	timer {
+>  		compatible = "arm,armv8-timer";
+> -		interrupts = <1 13 0xff01>,
+> -			     <1 14 0xff01>,
+> -			     <1 11 0xff01>,
+> -			     <1 10 0xff01>;
+> +		interrupts = <1 13 0xf04>,
+> +			     <1 14 0xf04>,
+> +			     <1 11 0xf04>,
+> +			     <1 10 0xf04>;
+>  		clock-frequency = <100000000>;
+>  	};
+>  
+> 
 
-We also need an invert option.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/310d8ea9/attachment.sig>
+
+-- 
+Jazz is not dead. It just smells funny...
