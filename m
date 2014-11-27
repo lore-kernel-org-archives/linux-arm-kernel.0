@@ -1,36 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 27 Nov 2014 11:36:36 +0000
-Subject: [RFC PATCH] ARM64: PCI: inherit root controller's dma-coherent
-In-Reply-To: <9101942.u99uxeQ3XX@wuerfel>
-References: <1417066891-16789-1-git-send-email-ming.lei@canonical.com>
- <5E6565C8-E868-4559-978A-681045F3582F@redhat.com>
- <9101942.u99uxeQ3XX@wuerfel>
-Message-ID: <20141127113636.GE11511@e104818-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 27 Nov 2014 11:38:20 +0000
+Subject: [PATCH v3 1/5] Documentation: DT: Renamed of-serial.txt to
+ 8250.txt
+In-Reply-To: <1416917818-10506-2-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <Sharkl64-v3>
+ <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1416917818-10506-2-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <20141127113819.GD857@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 09:05:57AM +0000, Arnd Bergmann wrote:
-> On Thursday 27 November 2014 02:39:59 Jon Masters wrote:
-> > We're looking at this at the moment (in addition to having the ACPI specification
-> > clarified to indicate that there is no safe default assumption, requiring that
-> > DMA masters always indicate their coherency or otherwise via a _CCA whether true
-> > or false). 
+On Tue, Nov 25, 2014 at 12:16:54PM +0000, Chunyan Zhang wrote:
+> The file of-serial.txt was only for 8250 compatible UART implementations,
+> so renamed it to 8250.txt to avoid confusing other persons.
+> This is recommended by Arnd, see:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/291455.html
 > 
-> I think for arm64, this should be easy: since ACPI is only for servers, we can
-> rely on the fact that the devices have cache-coherent DMA all the time. Let's
-> not over-complicate the ACPI case with all the special hacks we need for embedded.
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 
-As usual, we need hw vendors to say what they expect/build here.
+My prior Ack [1] still applies (given you've just changed the way the
+patch was generated, as Arnd and I suggested).
 
-I think in the past (non-ARM) the assumption was that the DMA is
-coherent on ACPI-capable systems unless otherwise stated but I've seen
-discussions (as Jon mentioned above) that ACPI should always indicate
-the coherency on ARM without any assumption.
+Mark.
 
-Either way, I don't think it's a problem for the kernel. We just need to
-change the default DMA ops to coherent when booting with ACPI (using
-non-coherent ops for a coherent device is not safe as the CPU can
-corrupt cache lines written by the device).
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295152.html
 
--- 
-Catalin
+> ---
+>  .../bindings/serial/{of-serial.txt => 8250.txt}    |    0
+>  1 file changed, 0 insertions(+), 0 deletions(-)
+>  rename Documentation/devicetree/bindings/serial/{of-serial.txt => 8250.txt} (100%)
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/of-serial.txt b/Documentation/devicetree/bindings/serial/8250.txt
+> similarity index 100%
+> rename from Documentation/devicetree/bindings/serial/of-serial.txt
+> rename to Documentation/devicetree/bindings/serial/8250.txt
+> -- 
+> 1.7.9.5
+> 
+> 
