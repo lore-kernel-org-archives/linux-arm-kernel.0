@@ -1,93 +1,58 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 27 Nov 2014 21:58:53 +0900
-Subject: [PATCH 11/19] clk: samsung: exynos5433: Add clocks for
- CMU_BUS{0|1|2} domains
-In-Reply-To: <3556463.Me1EFEY7Zb@wuerfel>
-References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
- <54771173.6090408@samsung.com> <54771518.1010004@samsung.com>
- <3556463.Me1EFEY7Zb@wuerfel>
-Message-ID: <5477200D.5030706@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Nov 2014 13:57:57 +0100
+Subject: [PATCH v3 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <CAAfSe-uMqy7zwiEK+nDoMPw_oni8L_vq7oW2Me5AY8z8KGpjwQ@mail.gmail.com>
+References: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <54761BFC.4020705@ti.com>
+ <CAAfSe-uMqy7zwiEK+nDoMPw_oni8L_vq7oW2Me5AY8z8KGpjwQ@mail.gmail.com>
+Message-ID: <3400511.2SONqVcoEr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd,
+On Thursday 27 November 2014 19:59:46 Lyra Zhang wrote:
+> 2014-11-27 2:29 GMT+08:00 Murali Karicheri <m-karicheri2@ti.com>:
+> > On 11/25/2014 07:16 AM, Chunyan Zhang wrote:
+> >>
+> >> Add a full sc9836-uart driver for SC9836 SoC which is based on the
+> 
+> >> +#include<linux/clk.h>
+> >
+> > How about sorting this includes? asm/irq.h go first followed linux/ in
+> > alphabatical order?
+> 
+> >> +static irqreturn_t sprd_handle_irq(int irq, void *dev_id)
+> >> +{
+> >> +       struct uart_port *port = (struct uart_port *)dev_id;
+> >> +       u32 ims;
+> >> +
+> >> +       ims = serial_in(port, SPRD_IMSR);
+> >> +
+> >> +       serial_out(port, SPRD_ICLR, ~0);
+> >> +
+> >> +       if (ims&  (SPRD_IMSR_RX_FIFO_FULL |
+> >> +               SPRD_IMSR_BREAK_DETECT | SPRD_IMSR_TIMEOUT)) {
+> >> +               sprd_rx(irq, port);
+> >> +       }
+> >> +       if (ims&  SPRD_IMSR_TX_FIFO_EMPTY)
+> >> +               sprd_tx(irq, port);
+> >> +
+> >> +       return IRQ_HANDLED;
+> >
+> > You are always returning IRQ_HANDLED and this is registered as a SHARED irq.
+> > Is there a chance this handler is called and the irq event doesn't
+> > belong to this device?
+> >
+> > Murali
+> 
+> You are right, this is not a SHARED irq. I'll pass 0 for irqflags when
+> called 'devm_request_irq' in the next version patch.
 
-On 11/27/2014 09:35 PM, Arnd Bergmann wrote:
-> On Thursday 27 November 2014 13:12:08 Sylwester Nawrocki wrote:
->> On 27/11/14 12:56, Chanwoo Choi wrote:
->>> On 11/27/2014 08:41 PM, Arnd Bergmann wrote:
->>>>> On Thursday 27 November 2014 16:35:08 Chanwoo Choi wrote:
->>>>>>> +  - "samsung,exynos5433-cmu-bus0", "samsung,exynos5433-cmu-bus1"
->>>>>>> +    and "samsung,exynos5433-cmu-bus2" - clock controller compatible for CMU_BUS
->>>>>>> +    which generates global data buses clock and global peripheral buses clock.
->>>>>>>  
->>>>>>>  - reg: physical base address of the controller and length of memory mapped
->>>>>>>    region.
->>>>>>>
->>>>>
->>>>> This looks like you are duplicating the bindings and the code, but
->>>>> it's really the same hardware multiple times with minor variations
->>>>> that you should be able to describe properly here. Why not make
->>>>> three nodes with the same compatible string and have them handled
->>>>> by the same code?
->>>
->>> Each CMU_BUSx domain of Exynos5433 have different base address as following:
->>> - CMU_BUS0's base address and range : 0x1360_0000 ~ 0x1360_0b04
->>> - CMU_BUS1's base address and range : 0x1480_0000 ~ 0x1480_0b04
->>> - CMU_BUS2's base address and range : 0x1340_0000 ~ 0x1340_0b04
->>>
->>> So, I implement CMU_BUSx domain which has each compatible string.
-> 
-> But the base address is in the reg property, not in the compatible
-> property. What I mean is to have multiple nodes like
+I think you could also add
 
-The merged clock driver in mainline have different compatible string
-if base addresss of clock domain is different. So, I implemented each CMU_BUSx domain
-with different compatible string.
+	if (!ims)
+		return IRQ_NONE;
 
-> 
-> 	clock-controller at 113600000 {
-> 		reg = <0 0x113600000 0 0x1000>;
-> 		compatible = "samsung,exynos5433-cmu";
-> 		#clock-cells = <1>;
-> 	};
-> 
-> 	clock-controller at 114800000 {
-> 		reg = <0 0x114800000 0 0x1000>;
-> 		compatible = "samsung,exynos5433-cmu";
-> 		#clock-cells = <1>;
-> 	};
-> 
-> The code will just map the local registers for each instance and then
-> provide the clocks of the right instance when asked for it.
+which would make it work on shared interrupt lines.
 
-Each clock domain has not the same mux/divider/clock. So, just one compatible
-string could not support all of clock domains.
-
-Best Regards,
-Chanwoo Choi
-
-> 
->> You can always have multiple entries in the reg property. I've done
->> something like this for the exynos4415 CMU_ISPx units:
->>
->>         cmu_isp: clock-controller at 12060000 {
->>                 compatible = "samsung,exynos4415-cmu-isp";
->>                 reg = <0x12060000 0xB10>, <0x12070000 0xB10>;
->>                 #clock-cells = <1>;
->>
->>                 assigned-clocks = <&cmu CLK_FOUT_ISP_PLL>;
->>                 assigned-clock-rates = <300000000>;
->>         };
-> 
-> This is a different problem, this is a clock controller with multiple
-> sets of registers that are all different. In case of the cmu, it seems
-> that they are all the same, you just have multiple copies at different
-> locations, and they are connected to different devices.
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+	Arnd
