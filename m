@@ -1,27 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Nov 2014 18:45:44 +0000
-Subject: [PATCH v4 3/7] regulator: of: Parse ena-gpios property from DTS
-In-Reply-To: <1417087253-12306-4-git-send-email-k.kozlowski@samsung.com>
-References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
- <1417087253-12306-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20141127184544.GD7712@sirena.org.uk>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 27 Nov 2014 20:46:12 +0200
+Subject: [PATCH 2/3] ARM: edma: Rename header file for dmaengine filter
+ function definition
+In-Reply-To: <3300340.ou8f7H2hIc@wuerfel>
+References: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>
+ <8235185.7qUDHu9jso@wuerfel> <547733E3.3020408@ti.com>
+ <3300340.ou8f7H2hIc@wuerfel>
+Message-ID: <54777174.4070203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 12:20:49PM +0100, Krzysztof Kozlowski wrote:
+On 11/27/2014 04:50 PM, Arnd Bergmann wrote:
+> On Thursday 27 November 2014 16:23:31 Peter Ujfalusi wrote:
+>> This will only work in case of legacy boot. When booting with DT we do not
+>> have pdata and after this patch in dt boot we are not going to be able to get
+>> the DMA resources either.
+> 
+> No, when booting with DT, the filter_fn and data are not used at all,
+> we get the dma channel by parsing the DT instead.
 
-> +	constraints->ena_gpio = of_get_named_gpio_flags(np, "ena-gpios", 0,
-> +							&gpio_flags);
-> +	if (gpio_is_valid(constraints->ena_gpio)) {
+Correct.
 
-No, this isn't sensible - in what way would an enable control GPIO be a
-constraint?  The whole reason we have separate constraint and config
-structures is that these are different things.  Keep the GPIO setup in
-the configuration.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/779f525e/attachment.sig>
+>> I think if we want to do something like this, it has to be done within the
+>> dmaengine framework. The dma controller's of_dma_filter_info already have
+>> .filter_fn which could be used by the framework.
+> 
+> No, of_dma_filter_info/of_dma_simple_xlate was a mistake, we should never
+> have even introduced that. All drivers that rely on this can simply
+> provide their own xlate function that calls of_dma_get_slave_channel()
+> or one of the related functions.
+> 
+> edma is particularly trivial, it can just use of_dma_xlate_by_chan_id()
+> instead of of_dma_simple_xlate, as it looks up the channel by its number.
+
+I see. With this series I did not planed to fix all edma related issues, just
+as a start clean up the related header files. I would rather not add fixes to
+mmc, spi, etc drivers since while you have valid point it is not in the scope
+of this series.
+Can we do the changes you are suggesting in an incremental manner?
+
+-- 
+P?ter
