@@ -1,61 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Nov 2014 11:43:56 +0000
-Subject: [PATCH 4/4] ARM: sti: Provide DT nodes for SBC SSC[0..2]
-In-Reply-To: <1417088636-11994-1-git-send-email-lee.jones@linaro.org>
-References: <1417088636-11994-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1417088636-11994-5-git-send-email-lee.jones@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Nov 2014 12:45:45 +0100
+Subject: [PATCH 01/19] pinctrl: exynos: Add support for Exynos5433
+In-Reply-To: <1417073716-22997-2-git-send-email-cw00.choi@samsung.com>
+References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
+ <1417073716-22997-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <3904347.Bp2gmpYM49@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Synchronous Serial Controller is used to provide SPI.
+On Thursday 27 November 2014 16:34:58 Chanwoo Choi wrote:
+> +
+> +/*
+> + * Samsung pinctrl driver data for Exynos5433 SoC. Exynos5433 SoC includes
+> + * four gpio/pin-mux/pinconfig controllers.
+> + */
+> +struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
+> +       {
+> +               /* pin-controller instance 0 data */
+> +               .pin_banks      = exynos5433_pin_banks0,
+> +               .nr_banks       = ARRAY_SIZE(exynos5433_pin_banks0),
+> +               .eint_wkup_init = exynos_eint_wkup_init,
+> +               .suspend        = exynos_pinctrl_suspend,
+> +               .resume         = exynos_pinctrl_resume,
+> +               .label          = "exynos5433-gpio-ctrl0",
+> +       }, {
+> 
 
-These are the ports which are located on the Stand-By Controller (SBC).
+I'm counting nine controllers, not four ;-)
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih407.dtsi | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+These seem to all be fairly regular, my impression is that with the
+move to arm64, you should come up with a new binding that can fully
+describe each controller so you don't have to add new code and bindings
+for each future SoC that uses the same scheme.
 
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-index 245aa31..cff106d 100644
---- a/arch/arm/boot/dts/stih407.dtsi
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -329,5 +329,36 @@
- 
- 			status = "disabled";
- 		};
-+
-+		/* SBC SSC */
-+		spi at 9540000 {
-+			compatible = "st,comms-ssc-spi";
-+			reg = <0x9540000 0x110>;
-+			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_sysin>;
-+			clock-names = "ssc";
-+
-+			status = "disabled";
-+		};
-+
-+		spi at 9541000 {
-+			compatible = "st,comms-ssc-spi";
-+			reg = <0x9541000 0x110>;
-+			interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_sysin>;
-+			clock-names = "ssc";
-+
-+			status = "disabled";
-+		};
-+
-+		spi at 9542000 {
-+			compatible = "st,comms-ssc-spi";
-+			reg = <0x9542000 0x110>;
-+			interrupts = <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_sysin>;
-+			clock-names = "ssc";
-+
-+			status = "disabled";
-+		};
- 	};
- };
--- 
-1.9.1
+	Arnd
