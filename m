@@ -1,49 +1,105 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Nov 2014 10:15 +0100
-Subject: [PATCH v2 2/8] irqchip: Supply new driver for STi based devices
-In-Reply-To: <20141127090255.GD4628@x1>
-References: <1416932705-16880-1-git-send-email-lee.jones@linaro.org>
- <2433040.4NqTrOMmEE@wuerfel> <20141127090255.GD4628@x1>
-Message-ID: <35179358.tOpRGufXmc@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 27 Nov 2014 10:22:12 +0100
+Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
+In-Reply-To: <5476CA7F.4000802@offcode.fi>
+References: <5465C00E.4030808@offcode.fi>
+ <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
+ <5476CA7F.4000802@offcode.fi>
+Message-ID: <5476ED44.603@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014 09:02:55 Lee Jones wrote:
-> On Tue, 25 Nov 2014, Arnd Bergmann wrote:
+On 27/11/2014 07:53, Timo Kokkonen wrote:
+> Hi,
 > 
-> > On Tuesday 25 November 2014 16:24:59 Lee Jones wrote:
-> > 
-> > > diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> > > index b21f12f..e502f15 100644
-> > > --- a/drivers/irqchip/Kconfig
-> > > +++ b/drivers/irqchip/Kconfig
-> > > @@ -93,6 +93,13 @@ config RENESAS_IRQC
-> > >     bool
-> > >     select IRQ_DOMAIN
-> > >  
-> > > +config ST_IRQCHIP
-> > > +   bool
-> > > +   select REGMAP
-> > > +   select MFD_SYSCON
-> > > +   help
-> > > +     Enables SysCfg Controlled IRQs on STi based platforms.
-> > > +
-> > 
-> > I'm confused by the purpose of this code. It's apparently a driver
-> > in drivers/irqchip, the Kconfig symbol contains the string IRQCHIP,
-> > yet it doesn't actually register an irq_chip.
-> > 
-> > Also, the name is a bit too generic, ST has lots of different irqchips,
-> > and this apparently isn't even one of them 
+> On 21.11.2014 14:23, Timo Kokkonen wrote:
+>> By default the driver will start a kernel timer which keeps on kicking
+>> the watchdog HW until user space has opened the watchdog
+>> device. Usually this is desirable as the watchdog HW is running by
+>> default and the user space may not have any watchdog daemon running at
+>> all.
+>>
+>> However, on production systems it may be mandatory that also early
+>> crashes and lockups will lead to a watchdog reset, even if they happen
+>> before the user space has opened the watchdog device.
+>>
+>> To resolve the issue, add a new device tree property
+>> "enable-early-reset" which will prevent the kernel timer from pinging
+>> the watchdog HW on behalf of user space. The default is still to use
+>> kernel timer, but more strict behavior can be enabled via the device
+>> tree property.
+>>
+>> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
 > 
-> Hmm... now you're going to ask me to remember who I had the
-> conversation with that alluded to this as the best location for this
-> driver.  Unfortunately, I cannot.  Can you think of a better place to
-> put it then?
+> I forgot to put the PATCHv2 on the subject line.. But anyway, any 
+> thoughts about it? Is there something that should be done to get it forward?
 
-I suspect it's in the right place but should actually be an irqchip
-driver. I'm having trouble understanding what this code actually does,
-can you you explain the functionality in more detail so we can figure
-out what to do with it?
+Sorry for not having come back to you quickly.
 
-	Arnd
+The only thing that tend to prevent me from taking this patch is the
+fact that this DT property is mostly a software, Linux-specific one...
+Which is somehow not covered by the DT.
+This might explain as well why this property is not present on other SoCs.
+
+Can we have other people's advices?
+
+Bye,
+
+>> ---
+>>   Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
+>>   drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
+>>   2 files changed, 9 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>> index f90e294..a0b7b75 100644
+>> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>> @@ -28,6 +28,10 @@ Optional properties:
+>>   	entering idle state.
+>>   - atmel,dbg-halt : Should be present if you want to stop the watchdog when
+>>   	entering debug state.
+>> +- enable-early-reset : Should be present if you want to let the
+>> +	watchdog timer to expire even before user space has opened the
+>> +	device. If not set, a kernel timer will keep on pinging the
+>> +	watchdog until it is opened.
+>>
+>>   Example:
+>>   	watchdog at fffffd40 {
+>> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+>> index 489729b..78b1977 100644
+>> --- a/drivers/watchdog/at91sam9_wdt.c
+>> +++ b/drivers/watchdog/at91sam9_wdt.c
+>> @@ -89,6 +89,7 @@ struct at91wdt {
+>>   	u32 mr_mask;
+>>   	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
+>>   	bool nowayout;
+>> +	bool no_early_timer;
+>>   	unsigned int irq;
+>>   };
+>>
+>> @@ -122,7 +123,7 @@ static void at91_ping(unsigned long data)
+>>   {
+>>   	struct at91wdt *wdt = (struct at91wdt *)data;
+>>   	if (time_before(jiffies, wdt->next_heartbeat) ||
+>> -	    !watchdog_active(&wdt->wdd)) {
+>> +		(!watchdog_active(&wdt->wdd) && !wdt->no_early_timer)) {
+>>   		at91_wdt_reset(wdt);
+>>   		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
+>>   	} else {
+>> @@ -316,6 +317,9 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
+>>
+>>   	wdt->mr |= max | ((max - min) << 16);
+>>
+>> +	if (of_property_read_bool(np, "enable-early-reset"))
+>> +		wdt->no_early_timer = 1;
+>> +
+>>   	return 0;
+>>   }
+>>   #else
+>>
+> 
+> 
+
+
+-- 
+Nicolas Ferre
