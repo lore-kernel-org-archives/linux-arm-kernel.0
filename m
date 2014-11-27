@@ -1,66 +1,67 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Thu, 27 Nov 2014 13:41:31 +0800
-Subject: [RFC PATCH] ARM64: PCI: inherit root controller's dma-coherent
-Message-ID: <1417066891-16789-1-git-send-email-ming.lei@canonical.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 27 Nov 2014 14:53:36 +0900
+Subject: [PATCH v9 1/6] arm64: ptrace: add NT_ARM_SYSTEM_CALL regset
+In-Reply-To: <20141126124128.GH14866@arm.com>
+References: <1416977391-24231-1-git-send-email-takahiro.akashi@linaro.org>
+ <1416977391-24231-2-git-send-email-takahiro.akashi@linaro.org>
+ <20141126124128.GH14866@arm.com>
+Message-ID: <5476BC60.6060005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch sets pci device's dma ops as coherent if the root
-controller is dma-coherent.
+On 11/26/2014 09:41 PM, Will Deacon wrote:
+> Hi Akashi,
+>
+> On Wed, Nov 26, 2014 at 04:49:46AM +0000, AKASHI Takahiro wrote:
+>> This regeset is intended to be used to get and set a system call number
+>> while tracing.
+>> There was some discussion about possible approaches to do so:
+>>
+>> (1) modify x8 register with ptrace(PTRACE_SETREGSET) indirectly,
+>>      and update regs->syscallno later on in syscall_trace_enter(), or
+>> (2) define a dedicated regset for this purpose as on s390, or
+>> (3) support ptrace(PTRACE_SET_SYSCALL) as on arch/arm
+>>
+>> Thinking of the fact that user_pt_regs doesn't expose 'syscallno' to
+>> tracer as well as that secure_computing() expects a changed syscall number,
+>> especially case of -1, to be visible before this function returns in
+>> syscall_trace_enter(), (1) doesn't work well.
+>> We will take (2) since it looks much cleaner.
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>   arch/arm64/kernel/ptrace.c |   35 +++++++++++++++++++++++++++++++++++
+>>   include/uapi/linux/elf.h   |    1 +
+>>   2 files changed, 36 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>> index 8a4ae8e..8b98781 100644
+>> --- a/arch/arm64/kernel/ptrace.c
+>> +++ b/arch/arm64/kernel/ptrace.c
+>> @@ -551,6 +551,32 @@ static int tls_set(struct task_struct *target, const struct user_regset *regset,
+>>   	return ret;
+>>   }
+>>
+>> +static int system_call_get(struct task_struct *target,
+>> +			   const struct user_regset *regset,
+>> +			   unsigned int pos, unsigned int count,
+>> +			   void *kbuf, void __user *ubuf)
+>> +{
+>> +	struct pt_regs *regs = task_pt_regs(target);
+>> +
+>> +	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+>> +				   &regs->syscallno, 0, -1);
+>
+> Does this work for big-endian machines? regs->syscallno is a u64, but the
+> regset defines it as an int. I think you need to copy to a temporary
+> register first.
 
-This patch fixes the bug in below link:
+Right. I will fix it.
+Do you prefer to use s32, instead of int, like other regsets?
 
-	https://bugs.launchpad.net/bugs/1386490
 
-Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-Cc: Jon Masters <jcm@redhat.com>
-Cc: Dann Frazier <dann.frazier@canonical.com>
-Signed-off-by: Ming Lei <ming.lei@canonical.com>
----
- arch/arm64/kernel/pci.c |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Thanks,
+-Takahiro AKASHI
 
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index ce5836c..4b6444a 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -16,6 +16,7 @@
- #include <linux/mm.h>
- #include <linux/of_pci.h>
- #include <linux/of_platform.h>
-+#include <linux/of_address.h>
- #include <linux/slab.h>
- 
- #include <asm/pci-bridge.h>
-@@ -37,6 +38,21 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 	return res->start;
- }
- 
-+/* Inherit root controller's dma coherent ops */
-+static void pci_dma_config(struct pci_dev *dev)
-+{
-+	struct pci_bus *bus = dev->bus;
-+	struct device *host;
-+
-+	while (!pci_is_root_bus(bus)) {
-+		bus = bus->parent;
-+	}
-+
-+	host = bus->dev.parent->parent;
-+	if (of_dma_is_coherent(host->of_node))
-+		set_arch_dma_coherent_ops(&dev->dev);
-+}
-+
- /*
-  * Try to assign the IRQ number from DT when adding a new device
-  */
-@@ -44,6 +60,7 @@ int pcibios_add_device(struct pci_dev *dev)
- {
- 	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
- 
-+	pci_dma_config(dev);
- 	return 0;
- }
- 
--- 
-1.7.9.5
+> Will
+>
