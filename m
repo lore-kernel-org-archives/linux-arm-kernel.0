@@ -1,25 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Nov 2014 14:02:48 +0100
-Subject: [PATCH 1/2] ARM: tegra: irq: fix buggy usage of irq_data irq field
-In-Reply-To: <20141127120826.GA25222@ulmo>
-References: <1417024532-5777-1-git-send-email-marc.zyngier@arm.com>
- <5476EA0A.7090406@arm.com> <20141127120826.GA25222@ulmo>
-Message-ID: <5826341.lADJtgptEV@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 27 Nov 2014 13:03:01 +0000
+Subject: [PATCH v4 1/7] mfd: max77686/802: Remove support for board files
+In-Reply-To: <1417087253-12306-2-git-send-email-k.kozlowski@samsung.com>
+References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
+ <1417087253-12306-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20141127130301.GX7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014 13:08:28 Thierry Reding wrote:
-> 
-> > I'd be tempted to consider it as a fix for 3.18, as the current code is
-> > obviously wrong. Just let me know how you want to get it in.
-> 
-> That's fine with me:
-> 
-> Acked-by: Thierry Reding <treding@nvidia.com>
-> 
-> Arnd, is this anything you could pick up for 3.18?
-> 
+On Thu, Nov 27, 2014 at 12:20:47PM +0100, Krzysztof Kozlowski wrote:
+> The driver is used only on Exynos based boards with DTS support.
+> After removal of board file support from max77686 and max77802 regulator
+> drivers, the MFD driver can be converted to DTS-only version. This
+> simplifies a little the code:
 
-Sure, no problem. Applied to fixes branch now.
-
-	Arnd
+Why is this a dependency for new features in the regulator core?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/3d80f30f/attachment.sig>
