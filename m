@@ -1,119 +1,231 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Nov 2014 14:45:26 +0000
-Subject: [PATCH V4] arm64: amd-seattle: Adding device tree for AMD Seattle
- platform
-In-Reply-To: <20141127142811.GN828@e106497-lin.cambridge.arm.com>
-References: <547458B9.2000805@arm.com>
- <D09A7217.A4E1%suravee.suthikulpanit@amd.com>
- <20141127142811.GN828@e106497-lin.cambridge.arm.com>
-Message-ID: <54773906.5030504@arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 27 Nov 2014 15:46:32 +0100
+Subject: [PATCH v3] can: Convert to runtime_pm
+In-Reply-To: <1417093733-29576-1-git-send-email-appanad@xilinx.com>
+References: <1417093733-29576-1-git-send-email-appanad@xilinx.com>
+Message-ID: <e7afe187b4694ca591b2c22adafa8449@BL2FFO11FD053.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/14 14:28, Liviu Dudau wrote:
-> On Tue, Nov 25, 2014 at 11:46:50AM +0000, Suthikulpanit, Suravee wrote:
->> Hi Marc,
->>
->> On 11/25/14, 17:23, "Marc Zyngier" <marc.zyngier@arm.com> wrote:
->>
->>> Hi Suravee,
->>>
->>> Just spotted a small issue below (looks like a recurring mistake in a
->>> number of DTs I've seem lately):
->>>
->>> On 24/11/14 21:51, suravee.suthikulpanit at amd.com wrote:
->>>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>>>
->>>> Initial revision of device tree for AMD Seattle platform.
->>>>
->>>> Cc: Arnd Bergmann <arnd@arndb.de>
->>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>> Cc: Will Deacon <will.deacon@arm.com>
->>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>>> Signed-off-by: Thomas Lendacky <Thomas.Lendacky@amd.com>
->>>> Signed-off-by: Joel Schopp <Joel.Schopp@amd.com>
->>>> ---
->>>> V4 Changes:
->>>>     * Remove unnecessary smb layer and move motherbord to top level
->>>>     * Move include dtsi to top level
->>>>     * Remove apb_pclk from sata0 and i2c
->>>>     * Fix GIC Virtual Maintanance Interrupt from PPI24 (8) to PPI25 (9)
->>>>     * Add 40-bit dma-ranges for motherboard (simple-bus)
->>>>     * Remove dma0 (pl330) entry for now since it only supports 32-bit
->>>> DMA.
->>>>       It is basically not used at the moment. It would also need SMMU
->>>>       to allow dma remapping to 40-bit DMA range.
->>>>     * Add phandle spi0 and spi1
->>>>     * Hook up gpio0 pin 7 with MMC Card Detection (CD) support.
->>>>     * Changes in pcie0 entry:
->>>>         - Add 40-bit dma-ranges
->>>>         - Remove interrupts property
->>>>         - Add interrupt-map/mask property
->>>>         - Fix PCI I/O range
->>>>         - Merge PCI 32-bit ranges
->>>>         - Merge PCI 64-bit ranges
->>>>
->>>> NOTE: I am not add a new compatible ID for the sata0 as Rob Herring
->>>>       suggested since there is no need at the momement, and I am trying
->>>>       to avoid introducing ID unnecessarily.
->>>>
->>>>  arch/arm64/Kconfig                          |   5 +
->>>>  arch/arm64/boot/dts/Makefile                |   1 +
->>>>  arch/arm64/boot/dts/amd-seattle-periph.dtsi | 156
->>>> ++++++++++++++++++++++++++++
->>>>  arch/arm64/boot/dts/amd-seattle.dts         |  89 ++++++++++++++++
->>>>  4 files changed, 251 insertions(+)
->>>>  create mode 100644 arch/arm64/boot/dts/amd-seattle-periph.dtsi
->>>>  create mode 100644 arch/arm64/boot/dts/amd-seattle.dts
->>>>
->>>
->>> [...]
->>>
->>>> diff --git a/arch/arm64/boot/dts/amd-seattle.dts
->>>> b/arch/arm64/boot/dts/amd-seattle.dts
->>>> new file mode 100644
->>>> index 0000000..d5fc482
->>>> --- /dev/null
->>>> +++ b/arch/arm64/boot/dts/amd-seattle.dts
->>>> @@ -0,0 +1,89 @@
->>>> +/*
->>>> + * DTS file for AMD Seattle
->>>> + *
->>>> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
->>>> + */
->>>> +
->>>> +/dts-v1/;
->>>> +
->>
->> [...] 
->>
->>>> +
->>>> +	timer {
->>>> +		compatible = "arm,armv8-timer";
->>>> +		interrupts = <1 13 0xff01>,
->>>> +			     <1 14 0xff01>,
->>>> +			     <1 11 0xff01>,
->>>> +			     <1 10 0xff01>;
->>>> +	};
->>>
->>> The Cortex-A57 TRM clearly states that these interrupts are level
->>> triggered.
->>
->> Thanks for pointing this out. I?ll fix this to <1 1X 0xff04> (4 for the
->> Active-High) then.
+On 11/27/2014 02:08 PM, Kedareswara rao Appana wrote:
+> Instead of enabling/disabling clocks at several locations in the driver,
+> use the runtime_pm framework. This consolidates the actions for
+> runtime PM in the appropriate callbacks and makes the driver more
+> readable and mantainable.
 > 
-> Hi Suravee,
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> Changes for v3:
+>   - Converted the driver to use runtime_pm.
+> Changes for v2:
+>   - Removed the struct platform_device* from suspend/resume
+>     as suggest by Lothar.
 > 
-> Don't know what Seattle does, but the TRM says that the outputs are active-LOW.
+>  drivers/net/can/xilinx_can.c |  119 +++++++++++++++++++++++++----------------
+>  1 files changed, 72 insertions(+), 47 deletions(-)
+> 
+> diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
+> index 8a998e3..1be28ed 100644
+> --- a/drivers/net/can/xilinx_can.c
+> +++ b/drivers/net/can/xilinx_can.c
+> @@ -32,6 +32,7 @@
+>  #include <linux/can/dev.h>
+>  #include <linux/can/error.h>
+>  #include <linux/can/led.h>
+> +#include <linux/pm_runtime.h>
+>  
+>  #define DRIVER_NAME	"xilinx_can"
+>  
+> @@ -138,7 +139,7 @@ struct xcan_priv {
+>  	u32 (*read_reg)(const struct xcan_priv *priv, enum xcan_reg reg);
+>  	void (*write_reg)(const struct xcan_priv *priv, enum xcan_reg reg,
+>  			u32 val);
+> -	struct net_device *dev;
+> +	struct device *dev;
+>  	void __iomem *reg_base;
+>  	unsigned long irq_flags;
+>  	struct clk *bus_clk;
+> @@ -842,6 +843,13 @@ static int xcan_open(struct net_device *ndev)
+>  	struct xcan_priv *priv = netdev_priv(ndev);
+>  	int ret;
+>  
+> +	ret = pm_runtime_get_sync(priv->dev);
+> +	if (ret < 0) {
+> +		netdev_err(ndev, "%s: runtime CAN resume failed(%d)\n\r",
+> +				__func__, ret);
+> +		return ret;
+> +	}
+> +
+>  	ret = request_irq(ndev->irq, xcan_interrupt, priv->irq_flags,
+>  			ndev->name, ndev);
+>  	if (ret < 0) {
+> @@ -849,29 +857,17 @@ static int xcan_open(struct net_device *ndev)
+>  		goto err;
+>  	}
+>  
+> -	ret = clk_prepare_enable(priv->can_clk);
+> -	if (ret) {
+> -		netdev_err(ndev, "unable to enable device clock\n");
+> -		goto err_irq;
+> -	}
+> -
+> -	ret = clk_prepare_enable(priv->bus_clk);
+> -	if (ret) {
+> -		netdev_err(ndev, "unable to enable bus clock\n");
+> -		goto err_can_clk;
+> -	}
+> -
+>  	/* Set chip into reset mode */
+>  	ret = set_reset_mode(ndev);
+>  	if (ret < 0) {
+>  		netdev_err(ndev, "mode resetting failed!\n");
+> -		goto err_bus_clk;
+> +		goto err_irq;
+>  	}
+>  
+>  	/* Common open */
+>  	ret = open_candev(ndev);
+>  	if (ret)
+> -		goto err_bus_clk;
+> +		goto err_irq;
+>  
+>  	ret = xcan_chip_start(ndev);
+>  	if (ret < 0) {
+> @@ -887,13 +883,11 @@ static int xcan_open(struct net_device *ndev)
+>  
+>  err_candev:
+>  	close_candev(ndev);
+> -err_bus_clk:
+> -	clk_disable_unprepare(priv->bus_clk);
+> -err_can_clk:
+> -	clk_disable_unprepare(priv->can_clk);
+>  err_irq:
+>  	free_irq(ndev->irq, ndev);
+>  err:
+> +	pm_runtime_put(priv->dev);
+> +
+>  	return ret;
+>  }
+>  
+> @@ -910,12 +904,11 @@ static int xcan_close(struct net_device *ndev)
+>  	netif_stop_queue(ndev);
+>  	napi_disable(&priv->napi);
+>  	xcan_chip_stop(ndev);
+> -	clk_disable_unprepare(priv->bus_clk);
+> -	clk_disable_unprepare(priv->can_clk);
+>  	free_irq(ndev->irq, ndev);
+>  	close_candev(ndev);
+>  
+>  	can_led_event(ndev, CAN_LED_EVENT_STOP);
+> +	pm_runtime_put(priv->dev);
+>  
+>  	return 0;
+>  }
+> @@ -934,27 +927,21 @@ static int xcan_get_berr_counter(const struct net_device *ndev,
+>  	struct xcan_priv *priv = netdev_priv(ndev);
+>  	int ret;
+>  
+> -	ret = clk_prepare_enable(priv->can_clk);
+> -	if (ret)
+> -		goto err;
+> +	ret = pm_runtime_get_sync(priv->dev);
+> +	if (ret < 0) {
+> +		netdev_err(ndev, "%s: runtime resume failed(%d)\n\r",
+> +				__func__, ret);
+> +		return ret;
+> +	}
+>  
+> -	ret = clk_prepare_enable(priv->bus_clk);
+> -	if (ret)
+> -		goto err_clk;
+>  
+>  	bec->txerr = priv->read_reg(priv, XCAN_ECR_OFFSET) & XCAN_ECR_TEC_MASK;
+>  	bec->rxerr = ((priv->read_reg(priv, XCAN_ECR_OFFSET) &
+>  			XCAN_ECR_REC_MASK) >> XCAN_ESR_REC_SHIFT);
+>  
+> -	clk_disable_unprepare(priv->bus_clk);
+> -	clk_disable_unprepare(priv->can_clk);
+> +	pm_runtime_put(priv->dev);
+>  
+>  	return 0;
+> -
+> -err_clk:
+> -	clk_disable_unprepare(priv->can_clk);
+> -err:
+> -	return ret;
+>  }
+>  
+>  
+> @@ -967,15 +954,45 @@ static const struct net_device_ops xcan_netdev_ops = {
+>  
+>  /**
+>   * xcan_suspend - Suspend method for the driver
+> - * @dev:	Address of the platform_device structure
+> + * @dev:	Address of the net_device structure
 
-As I said in another thread, 0xff04 *is* the right value. This is an
-interrupt descriptor for the GIC, not a qualifier for the signal that
-comes out of the core.
+This is just the device structure.
 
-Thanks.
+>   *
+>   * Put the driver into low power mode.
+> - * Return: 0 always
+> + * Return: 0 on success and failure value on error
+>   */
+>  static int __maybe_unused xcan_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = dev_get_drvdata(dev);
+> -	struct net_device *ndev = platform_get_drvdata(pdev);
+> +	if (!device_may_wakeup(dev))
+> +		return pm_runtime_force_suspend(dev);
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * xcan_resume - Resume from suspend
+> + * @dev:	Address of the net_device structure
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+ditto
+
+> + *
+> + * Resume operation after suspend.
+> + * Return: 0 on success and failure value on error
+> + */
+> +static int __maybe_unused xcan_resume(struct device *dev)
+> +{
+> +	if (!device_may_wakeup(dev))
+> +		return pm_runtime_force_resume(dev);
+> +
+> +	return 0;
+> +
+> +}
+> +
+> +/**
+> + * xcan_runtime_suspend - Runtime suspend method for the driver
+> + * @dev:	Address of the net_device structure
+
+ditto.
+
+> + *
+> + * Put the driver into low power mode.
+> + * Return: 0 always
+> + */
+> +static int __maybe_unused xcan_runtime_suspend(struct device *dev)
+> +{
+> +	struct net_device *ndev = dev_get_drvdata(dev);
+>  	struct xcan_priv *priv = netdev_priv(ndev);
+>  
+>  	if (netif_running(ndev)) {
+> @@ -993,16 +1010,15 @@ static int __maybe_unused xcan_suspend(struct device *dev)
+>  }
+>  
+>  /**
+> - * xcan_resume - Resume from suspend
+> - * @dev:	Address of the platformdevice structure
+> + * xcan_runtime_resume - Runtime resume from suspend
+> + * @dev:	Address of the net_device structure
+
+ditto.
+
+Thanks,
+Michal
