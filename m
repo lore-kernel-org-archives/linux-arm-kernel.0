@@ -1,156 +1,94 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 27 Nov 2014 12:20:47 +0100
-Subject: [PATCH v4 1/7] mfd: max77686/802: Remove support for board files
-In-Reply-To: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
-References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1417087253-12306-2-git-send-email-k.kozlowski@samsung.com>
+Date: Thu, 27 Nov 2014 12:20:46 +0100
+Subject: [PATCH v4 0/7] regulator: Parse ena_gpio in core, add GPIO to max77686
+Message-ID: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver is used only on Exynos based boards with DTS support.
-After removal of board file support from max77686 and max77802 regulator
-drivers, the MFD driver can be converted to DTS-only version. This
-simplifies a little the code:
-1. No dead (unused) entries in platform_data structure.
-2. More code removed.
-3. Regulator driver does not depend on allocated memory
-   from MFD driver.
-4. It makes also easier extending the regulator driver.
+Hi,
 
-Add to the max77686 MFD driver dependency on CONFIG_OF because without
-DTS the regulator drivers (max77686 and max77802) won't bind.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- drivers/mfd/Kconfig                  |  1 +
- drivers/mfd/max77686.c               | 23 -----------------------
- include/linux/mfd/max77686-private.h |  1 -
- include/linux/mfd/max77686.h         | 28 ----------------------------
- 4 files changed, 1 insertion(+), 52 deletions(-)
+The patchset generalizes the ena_gpio bindings and finally adds GPIO
+support to the max77686 driver. Adding GPIO to max77686 allows removal of
+fixed regulators from DTS which duplicate the description of hardware.
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 72d38081f779..2bb0789a828b 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -412,6 +412,7 @@ config MFD_MAX14577
- config MFD_MAX77686
- 	bool "Maxim Semiconductor MAX77686/802 PMIC Support"
- 	depends on I2C=y
-+	depends on OF
- 	select MFD_CORE
- 	select REGMAP_I2C
- 	select REGMAP_IRQ
-diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
-index 929795eae9fc..3da237afacde 100644
---- a/drivers/mfd/max77686.c
-+++ b/drivers/mfd/max77686.c
-@@ -205,24 +205,10 @@ static const struct of_device_id max77686_pmic_dt_match[] = {
- 	{ },
- };
- 
--static struct max77686_platform_data *max77686_i2c_parse_dt_pdata(struct device
--								  *dev)
--{
--	struct max77686_platform_data *pd;
--
--	pd = devm_kzalloc(dev, sizeof(*pd), GFP_KERNEL);
--	if (!pd)
--		return NULL;
--
--	dev->platform_data = pd;
--	return pd;
--}
--
- static int max77686_i2c_probe(struct i2c_client *i2c,
- 			      const struct i2c_device_id *id)
- {
- 	struct max77686_dev *max77686 = NULL;
--	struct max77686_platform_data *pdata = dev_get_platdata(&i2c->dev);
- 	const struct of_device_id *match;
- 	unsigned int data;
- 	int ret = 0;
-@@ -233,14 +219,6 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
- 	const struct mfd_cell *cells;
- 	int n_devs;
- 
--	if (IS_ENABLED(CONFIG_OF) && i2c->dev.of_node && !pdata)
--		pdata = max77686_i2c_parse_dt_pdata(&i2c->dev);
--
--	if (!pdata) {
--		dev_err(&i2c->dev, "No platform data found.\n");
--		return -EINVAL;
--	}
--
- 	max77686 = devm_kzalloc(&i2c->dev,
- 				sizeof(struct max77686_dev), GFP_KERNEL);
- 	if (!max77686)
-@@ -259,7 +237,6 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
- 	max77686->dev = &i2c->dev;
- 	max77686->i2c = i2c;
- 
--	max77686->wakeup = pdata->wakeup;
- 	max77686->irq = i2c->irq;
- 
- 	if (max77686->type == TYPE_MAX77686) {
-diff --git a/include/linux/mfd/max77686-private.h b/include/linux/mfd/max77686-private.h
-index 960b92ad450d..f5043490d67c 100644
---- a/include/linux/mfd/max77686-private.h
-+++ b/include/linux/mfd/max77686-private.h
-@@ -447,7 +447,6 @@ struct max77686_dev {
- 	struct regmap_irq_chip_data *rtc_irq_data;
- 
- 	int irq;
--	bool wakeup;
- 	struct mutex irqlock;
- 	int irq_masks_cur[MAX77686_IRQ_GROUP_NR];
- 	int irq_masks_cache[MAX77686_IRQ_GROUP_NR];
-diff --git a/include/linux/mfd/max77686.h b/include/linux/mfd/max77686.h
-index 553f7d09258a..bb995ab9a575 100644
---- a/include/linux/mfd/max77686.h
-+++ b/include/linux/mfd/max77686.h
-@@ -119,12 +119,6 @@ enum max77802_regulators {
- 	MAX77802_REG_MAX,
- };
- 
--struct max77686_regulator_data {
--	int id;
--	struct regulator_init_data *initdata;
--	struct device_node *of_node;
--};
--
- enum max77686_opmode {
- 	MAX77686_OPMODE_NORMAL,
- 	MAX77686_OPMODE_LP,
-@@ -136,26 +130,4 @@ struct max77686_opmode_data {
- 	int mode;
- };
- 
--struct max77686_platform_data {
--	int ono;
--	int wakeup;
--
--	/* ---- PMIC ---- */
--	struct max77686_regulator_data *regulators;
--	int num_regulators;
--
--	struct max77686_opmode_data *opmode_data;
--
--	/*
--	 * GPIO-DVS feature is not enabled with the current version of
--	 * MAX77686 driver. Buck2/3/4_voltages[0] is used as the default
--	 * voltage at probe. DVS/SELB gpios are set as OUTPUT-LOW.
--	 */
--	int buck234_gpio_dvs[3]; /* GPIO of [0]DVS1, [1]DVS2, [2]DVS3 */
--	int buck234_gpio_selb[3]; /* [0]SELB2, [1]SELB3, [2]SELB4 */
--	unsigned int buck2_voltage[8]; /* buckx_voltage in uV */
--	unsigned int buck3_voltage[8];
--	unsigned int buck4_voltage[8];
--};
--
- #endif /* __LINUX_MFD_MAX77686_H */
+Rationale behind adding ena-gpios to regulator core
+===================================================
+Drivers often add custom DTS properties for parsing the GPIO for
+regulator enable control. Some of them don't have to do this in a
+special custom way and would work with a generic approach (e.g. S5M8767,
+S2MPS1x, MAX77686). As such drivers have to do this on their own,
+multiple different bindings are added and each driver duplicates similar
+code.
+
+Add a generic binding so the regulator core will do this work for
+drivers. This should offload some work from drivers and also limit
+creation of new custom properties for GPIO control.
+
+Changes since v3
+================
+1. Regulator cleanup patches were applied by Mark, drop them.
+2. Re-work idea by adding generic ena-gpios binding.
+
+Changes since v2
+================
+Re-work the board file support removal after Javier's comments: use
+new DT style parsing. This imposes a lot of changes.
+1. Add "of_compatible" for regulator drivers.
+2. Provide backward compatibility if such "of_compatible" is not present.
+   The driver will search for regulators node and use it as dev->of_node.
+   Everything should be bisect-friendly.
+3. New patches: 1, 2, 3, 5, 13 and 14.
+4. Because of new style DT parsing it is much easier to put "gpio"
+   properties in regulators top node (not in each regulator).
+   This will be also new-gpio-lib friendly.
+
+Changes since v1
+================
+1. Add patch: 1/8 "regulator: max77686: Consistently index opmode
+   array by rdev id".
+2. Remove patch "regulator: max77686: Make regulator_desc array
+   const" (applied).
+3. Re-work patches removing from regulators board file support (2/8
+   and 3/8). Parse regulators with of_regulator_match() at once, remove
+   num_regulators.
+4. Patch 4/8: Add depends on OF to mfd/Kconfig. Add Javier's
+   reviewed-by.
+5. Patch 5/8: Add Javier's reviewed-by.
+6. Patch 6/8: Add depends on GPIOLIB to regulator/Kconfig. Rename
+   "external control" to "GPIO control" and "ext_control_gpios" to
+   simpler "gpios".
+   I tried to use new GPIO API but it ended with more problems
+   https://lkml.org/lkml/2014/10/29/239
+
+
+Patchset is rebased on next-20141114.
+
+Best regards,
+Krzysztof
+
+Krzysztof Kozlowski (7):
+  mfd: max77686/802: Remove support for board files
+  regulator: dt-bindings: Document the ena-gpios property
+  regulator: of: Parse ena-gpios property from DTS
+  regulator: Use ena_gpio supplied with generic regulator bindings
+  regulator: max77686: Add GPIO control
+  mfd/regulator: dt-bindings: max77686: Document gpio properties
+  ARM: dts: exynos4412-trats: Switch max77686 regulators to GPIO control
+
+ Documentation/devicetree/bindings/mfd/max77686.txt | 14 +++-
+ .../devicetree/bindings/regulator/regulator.txt    |  4 +
+ arch/arm/boot/dts/exynos4412-trats2.dts            | 25 ++----
+ drivers/mfd/Kconfig                                |  1 +
+ drivers/mfd/max77686.c                             | 23 ------
+ drivers/regulator/core.c                           | 96 ++++++++++++++++------
+ drivers/regulator/max77686.c                       | 58 +++++++++++--
+ drivers/regulator/of_regulator.c                   | 11 +++
+ include/linux/mfd/max77686-private.h               |  1 -
+ include/linux/mfd/max77686.h                       | 28 -------
+ include/linux/regulator/driver.h                   |  5 ++
+ include/linux/regulator/machine.h                  | 13 +++
+ 12 files changed, 178 insertions(+), 101 deletions(-)
+
 -- 
 1.9.1
