@@ -1,31 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 27 Nov 2014 10:14:27 +0100
-Subject: [PATCH v2 8/9] ARM: dts: sun6i: Add pinmux settings for the ir
- pins
-In-Reply-To: <1416749895-25013-9-git-send-email-hdegoede@redhat.com>
-References: <1416749895-25013-1-git-send-email-hdegoede@redhat.com>
- <1416749895-25013-9-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141127091427.GP25249@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Nov 2014 10:15 +0100
+Subject: [PATCH v2 2/8] irqchip: Supply new driver for STi based devices
+In-Reply-To: <20141127090255.GD4628@x1>
+References: <1416932705-16880-1-git-send-email-lee.jones@linaro.org>
+ <2433040.4NqTrOMmEE@wuerfel> <20141127090255.GD4628@x1>
+Message-ID: <35179358.tOpRGufXmc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 23, 2014 at 02:38:14PM +0100, Hans de Goede wrote:
-> Add pinmux settings for the ir receive pin of the A31.
+On Thursday 27 November 2014 09:02:55 Lee Jones wrote:
+> On Tue, 25 Nov 2014, Arnd Bergmann wrote:
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> > On Tuesday 25 November 2014 16:24:59 Lee Jones wrote:
+> > 
+> > > diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> > > index b21f12f..e502f15 100644
+> > > --- a/drivers/irqchip/Kconfig
+> > > +++ b/drivers/irqchip/Kconfig
+> > > @@ -93,6 +93,13 @@ config RENESAS_IRQC
+> > >     bool
+> > >     select IRQ_DOMAIN
+> > >  
+> > > +config ST_IRQCHIP
+> > > +   bool
+> > > +   select REGMAP
+> > > +   select MFD_SYSCON
+> > > +   help
+> > > +     Enables SysCfg Controlled IRQs on STi based platforms.
+> > > +
+> > 
+> > I'm confused by the purpose of this code. It's apparently a driver
+> > in drivers/irqchip, the Kconfig symbol contains the string IRQCHIP,
+> > yet it doesn't actually register an irq_chip.
+> > 
+> > Also, the name is a bit too generic, ST has lots of different irqchips,
+> > and this apparently isn't even one of them 
+> 
+> Hmm... now you're going to ask me to remember who I had the
+> conversation with that alluded to this as the best location for this
+> driver.  Unfortunately, I cannot.  Can you think of a better place to
+> put it then?
 
-Applied, thanks!
+I suspect it's in the right place but should actually be an irqchip
+driver. I'm having trouble understanding what this code actually does,
+can you you explain the functionality in more detail so we can figure
+out what to do with it?
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/8b8fc5ea/attachment.sig>
+	Arnd
