@@ -1,39 +1,73 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 27 Nov 2014 17:56:04 +0000
-Subject: [PATCH v3 0/3] of: support passing console options with stdout-path
-Message-ID: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
+Date: Thu, 27 Nov 2014 17:56:05 +0000
+Subject: [PATCH v3 1/3] devicetree: of: Add bindings for chosen node,
+ stdout-path
+In-Reply-To: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
+References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1417110967-16284-2-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set started its life as a small, self-contained, patch enabling
-specifying console options in the stdout-path property, but then
-grew into a mahoosive behemoth with one of the patches taking 1m42s
-for get_maintainer to process. It has now once again reverted to a
-smaller, more pleasant, state of being.
+Add a global binding for the chosen node.
+Include a description of the stdout-path, and an explicit statement on
+its extra options in the context of a UART console.
 
-Changes since v2:
-- Revert the invasive bit, creating a replacement wrapper function
-  for of_get_node_by_path() callers.
-- Make the of_get_node_opts_by_path() function return a const pointer
-  to the argument.
-- Added binding for /chosen node, with a description of stdout-path.
+Opening description stolen from www.devicetree.org, and part of the
+remaining text provided by Mark Rutland.
 
-Changes since v1:
-- Change interface of of_get_node_by_path() to take an additional
-  argument, and update all of its callers to keep working.
-- Rework original patch to use this interface.
-
-Leif Lindholm (3):
-  devicetree: of: Add bindings for chosen node, stdout-path
-  of: add optional options parameter to of_find_node_by_path()
-  of: support passing console options with stdout-path
-
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+---
  Documentation/devicetree/bindings/chosen.txt |   42 ++++++++++++++++++++++++++
- drivers/of/base.c                            |   30 ++++++++++++++----
- drivers/of/selftest.c                        |   12 ++++++++
- include/linux/of.h                           |   14 ++++++++-
- 4 files changed, 91 insertions(+), 7 deletions(-)
+ 1 file changed, 42 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/chosen.txt
 
+diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+new file mode 100644
+index 0000000..9cd74e9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/chosen.txt
+@@ -0,0 +1,42 @@
++The chosen node
++---------------
++
++The chosen node does not represent a real device, but serves as a place
++for passing data between firmware and the operating system, like boot
++arguments. Data in the chosen node does not represent the hardware.
++
++
++stdout-path property
++--------------------
++
++Device trees may specify the device to be used for boot console output
++with a stdout-path property under /chosen, as described in ePAPR, e.g.
++
++/ {
++	chosen {
++		stdout-path = "/serial at f00:115200";
++	};
++
++	serial at f00 {
++		compatible = "vendor,some-uart";
++		reg = <0xf00 0x10>;
++	};
++};
++
++If the character ":" is present in the value, this terminates the path.
++The meaning of any characters following the ":" is device-specific, and
++must be specified in the relevant binding documentation.
++
++For UART devices, the format supported by uart_parse_options() is the
++expected one. In this case, the format of the string is:
++
++	<baud>{<parity>{<bits>{<flow>}}}
++
++where
++
++	baud	- baud rate in decimal
++	parity	- 'n' (none), 'o', (odd) or 'e' (even)
++	bits	- number of data bits
++	flow	- 'r' (rts)
++
++For example: 115200n8r
 -- 
 1.7.10.4
