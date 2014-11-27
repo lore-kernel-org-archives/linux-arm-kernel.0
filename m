@@ -1,87 +1,27 @@
-From: zhang.lyra@gmail.com (Lyra Zhang)
-Date: Thu, 27 Nov 2014 19:39:36 +0800
-Subject: [PATCH v3 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
- support
-In-Reply-To: <20141126094838.GB17980@distanz.ch>
-References: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1416917818-10506-6-git-send-email-chunyan.zhang@spreadtrum.com>
- <20141126094838.GB17980@distanz.ch>
-Message-ID: <CAAfSe-sdMVG-JV9DjQ0YYqe++r3MtgADReQHr1x54Z8xjp8pRA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Nov 2014 12:41:51 +0100
+Subject: [PATCH 11/19] clk: samsung: exynos5433: Add clocks for
+ CMU_BUS{0|1|2} domains
+In-Reply-To: <1417073716-22997-12-git-send-email-cw00.choi@samsung.com>
+References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
+ <1417073716-22997-12-git-send-email-cw00.choi@samsung.com>
+Message-ID: <6217579.xNXtO7YiDs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-26 17:48 GMT+08:00 Tobias Klauser <tklauser@distanz.ch>:
-> On 2014-11-25 at 13:16:58 +0100, Chunyan Zhang <chunyan.zhang@spreadtrum.com> wrote:
+On Thursday 27 November 2014 16:35:08 Chanwoo Choi wrote:
+> +  - "samsung,exynos5433-cmu-bus0", "samsung,exynos5433-cmu-bus1"
+> +    and "samsung,exynos5433-cmu-bus2" - clock controller compatible for CMU_BUS
+> +    which generates global data buses clock and global peripheral buses clock.
+>  
+>  - reg: physical base address of the controller and length of memory mapped
+>    region.
+> 
 
->> ---
-[...]
->> +
->> +config SERIAL_SPRD_CONSOLE
->> +        bool "SPRD UART console support"
->> +        depends on SERIAL_SPRD=y
->> +        select SERIAL_CORE_CONSOLE
->> +     select SERIAL_EARLYCON
->> +        help
->> +       Support for early debug console using Spreadtrum's serial. This enables
->> +       the console before standard serial driver is probed. This is enabled
->> +       with "earlycon" on the kernel command line. The console is
->> +       enabled when early_param is processed.
->> +
->>  endmenu
->
-> Please consistently use tabs instead of spaces for indentation. The help
-> text should be indented by one tabe + 2 spaces.
->
+This looks like you are duplicating the bindings and the code, but
+it's really the same hardware multiple times with minor variations
+that you should be able to describe properly here. Why not make
+three nodes with the same compatible string and have them handled
+by the same code?
 
-OK, I will note it later.
-[...]
-
->> +static inline int handle_lsr_errors(struct uart_port *port,
->> +     unsigned int *flag, unsigned int *lsr)
->
-> This line should be aligned with the opening ( above.
->
-OK, will change.
-
->> +static inline void sprd_rx(int irq, void *dev_id)
->> +{
->> +     struct uart_port *port = (struct uart_port *)dev_id;
->
-> No need to cast a void pointer.
->
-
->> +static void sprd_console_write(struct console *co, const char *s,
->> +                                   unsigned int count)
->> +{
->> +     struct uart_port *port = (struct uart_port *)sprd_port[co->index];
->
-> Better explicitly access the .port member of sprd_port[co->index] here
-> instead of casting.
->
-
->> +     port = (struct uart_port *)sprd_port[co->index];
->
-> Same here, use the .port member of struct sprd_port[co->index].
->
->> +     if (port == NULL) {
->> +             pr_info("srial port %d not yet initialized\n", co->index);
->
-> Typo: should be serial instead of srial.
->
-
->> +     up->mapbase = mem->start;
->> +     up->membase = ioremap(mem->start, resource_size(mem));
->
-> Return value of ioremap() should be checked for NULL.
->
->> +static int sprd_resume(struct platform_device *dev)
->> +{
->> +     int id = dev->id;
->> +     struct uart_port *port = (struct uart_port *)sprd_port[id];
->
-> Access the .port member instead of the cast.
->
-OK, will change all of the problems you pointed out in v4.
-Thanks for your review.
-
-Chunyan
+	Arnd
