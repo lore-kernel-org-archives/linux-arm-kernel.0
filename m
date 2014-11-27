@@ -1,238 +1,76 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 27 Nov 2014 14:24:08 +0100
-Subject: [PATCH 1/4] spi: Add new driver for STMicroelectronics' SPI
- Controller
-In-Reply-To: <1417088636-11994-2-git-send-email-lee.jones@linaro.org>
-References: <1417088636-11994-1-git-send-email-lee.jones@linaro.org>
- <1417088636-11994-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <547725F8.1050106@st.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 27 Nov 2014 13:25:04 +0000
+Subject: [PATCH 2/9] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <CAJe_Zhdmup3DB5R3gufiveYtOOU+zrMQJVanQxbjSQ996=ZLXQ@mail.gmail.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>	<1416486872-25301-1-git-send-email-Vincent.Yang@tw.fujitsu.com>	<54749429.9080505@arm.com>	<CAJe_ZhciCP2VbmRtrq9d14WhfLhnC-xaitCCiW_6Yf1S-0sdUg@mail.gmail.com>	<5474C3DD.5060706@arm.com>	<CAJe_ZhfkcSv7oBfXdiW5=F0bZvv+9z3m90cXdy=O66VwZWCQnw@mail.gmail.com>	<5475DD19.9000107@arm.com>	<CAJe_ZheKfEkdzcNE_5cpDg4qbYNLEJ=kKi+ScRf2=a8irAfnDg@mail.gmail.com>	<547601EF.7070307@arm.com>
+ <CAJe_Zhdmup3DB5R3gufiveYtOOU+zrMQJVanQxbjSQ996=ZLXQ@mail.gmail.com>
+Message-ID: <54772630.1090107@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 11/27/2014 12:43 PM, Lee Jones wrote:
-> This patch adds support for the SPI portion of ST's SSC device.
+
+On 27/11/14 05:11, Jassi Brar wrote:
+> On 26 November 2014 at 22:08, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>
+>>
+>> On 26/11/14 16:20, Jassi Brar wrote:
+>>>
+>>> On 26 November 2014 at 19:30, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>>
+>>>> On 26/11/14 05:37, Jassi Brar wrote:
+>>>>>
+>>>>>
+>>>
+>>>>>>>      It seems you still don't get my point that the driver should
+>>>>>>> manage
+>>>>>>> all channels - S & NS. If Linux is running in NS mode on a platform,
+>>>>>>> the DT will specify only some NS channel to be used. The controller
+>>>>>>> driver shouldn't be crippled just because you think Linux will never
+>>>>>>> be run in Secure mode.
+>>>>>>>
+>>>>>>
+>>>>>> Ok how do you handle that, I don't see that in the DT binding. As it
+>>>>>> stands, you can unconditionally try to access the secure channel and
+>>>>>> cause aborts if the platform is running in non-secure mode.
+>>>>>>
+>>>>> No. Please look at the dtsi again ....
+>>>>>
+>>>>>            mhu: mailbox at 2b1f0000 {
+>>>>>                    #mbox-cells = <1>;
+>>>>>                    compatible = "arm,mbox-mhu";
+>>>>>                    reg = <0 0x2b1f0000 0x1000>;
+>>>>>                    interrupts = <0 36 4>, /* LP Non-Sec */
+>>>>>                                 <0 35 4>, /* HP Non-Sec */
+>>>>>                                 <0 37 4>; /* Secure */
+>>>>
+>>>>
+>>>>
+>>>> One possible issue I can think of(though current driver design requests
+>>>> irq only on channel startup, it could be moved to probe for optimization
+>>>> in which case you need a way to make sure secure channel or irq is not
+>>>> accessed)
+>>>>
+>>> As you see it is fine as such.
+>>
+>>
+>> Agreed, but assuming some driver logic. I would like to see some way of
+>> identifying that from DT if we adding the support for secure channel in
+>> the driver else I prefer not to add it unless there is a real user of
+>> it(which is not the case with your current patch set). That will be
+>> handy if there's any issue in future due to some firmware that can't be
+>> changed or upgraded.
+>>
+> Could you please suggest some way of identifying that from DT if we
+> adding the support for secure channel in the driver?
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   drivers/spi/Kconfig  |   8 +
->   drivers/spi/Makefile |   1 +
->   drivers/spi/spi-st.c | 535 +++++++++++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 544 insertions(+)
->   create mode 100644 drivers/spi/spi-st.c
-<snip>
 
-> +
-> +static int spi_st_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device *dev = &pdev->dev;
-> +	struct spi_master *master;
-> +	struct resource *res;
-> +	struct spi_st *spi_st;
-> +	int num_cs, cs_gpio, i, ret = 0;
-> +	u32 var;
-> +	
-> +	printk("LEE: %s: %s()[%d]: Probing\n", __FILE__, __func__, __LINE__);
-> +
-> +	master = spi_alloc_master(&pdev->dev, sizeof(*spi_st));
-> +	if (!master) {
-> +		dev_err(&pdev->dev, "failed to allocate spi master\n");
-> +		return -ENOMEM;
-> +	}
-> +	spi_st = spi_master_get_devdata(master);
-> +
-> +	if (!IS_ERR(dev->pins->p)) {
-> +		spi_st->pins_sleep =
-> +			pinctrl_lookup_state(dev->pins->p, PINCTRL_STATE_SLEEP);
-> +		if (IS_ERR(spi_st->pins_sleep))
-> +			dev_warn(&pdev->dev, "could not get sleep pinstate\n");
-> +	}
-> +
-> +	num_cs = of_gpio_named_count(np, "cs-gpios");
-> +
-> +	for (i = 0; i < num_cs; i++) {
-> +		cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
-> +
-> +		if (!gpio_is_valid(cs_gpio)) {
-> +			dev_err(&pdev->dev,
-> +				"%d is not a valid gpio\n", cs_gpio);
-> +			return -EINVAL;
-> +		}
-> +			
-> +		if (devm_gpio_request(&pdev->dev, cs_gpio, pdev->name)) {
-> +			dev_err(&pdev->dev,
-> +				"could not request %d gpio\n", cs_gpio);
-> +			return -EINVAL;
-> +		}
-> +	}
-> +
-> +	spi_st->clk = of_clk_get_by_name(np, "ssc");
-> +	if (IS_ERR(spi_st->clk)) {
-> +		dev_err(&pdev->dev, "Unable to request clock\n");
-> +		ret = PTR_ERR(spi_st->clk);
-> +		goto free_master;
-> +	}
-> +
-> +	ret = clk_prepare_enable(spi_st->clk);
-> +	if (ret)
-> +		goto free_master;
-> +
-> +	master->dev.of_node		= np;
-> +	master->bus_num			= pdev->id;
-> +	master->mode_bits		= MODEBITS;
-> +	spi_st->bitbang.master		= spi_master_get(master);
-> +	spi_st->bitbang.setup_transfer	= spi_st_setup_transfer;
-> +	spi_st->bitbang.txrx_bufs	= spi_st_txrx_bufs;
-> +	spi_st->bitbang.master->setup	= spi_st_setup;
-> +	spi_st->bitbang.master->cleanup	= spi_st_cleanup;
-> +	spi_st->bitbang.chipselect	= spi_st_gpio_chipselect;
-> +	spi_st->dev			= dev;
-> +
-> +	init_completion(&spi_st->done);
-> +
-> +	/* Get resources */
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	spi_st->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(spi_st->base)) {
-> +		ret = PTR_ERR(spi_st->base);
-> +		goto clk_disable;
-> +	}
-> +
-> +	spi_st->irq = irq_of_parse_and_map(np, 0);
-> +	if (!spi_st->irq) {
-> +		dev_err(&pdev->dev, "IRQ missing or invalid\n");
-> +		ret = -EINVAL;
-> +		goto clk_disable;
-> +	}
-> +
-> +	ret = devm_request_irq(&pdev->dev, spi_st->irq, spi_st_irq, 0,
-> +			       pdev->name, spi_st);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed to request irq %d\n", spi_st->irq);
-> +		goto clk_disable;
-> +	}
-> +
-> +	/* Disable I2C and Reset SSC */
-> +	writel_relaxed(0x0, spi_st->base + SSC_I2C);
-> +	var = readw(spi_st->base + SSC_CTL);
-Why not readw_relaxed to be consistent with readl:s?
-> +	var |= SSC_CTL_SR;
-> +	writel_relaxed(var, spi_st->base + SSC_CTL);
-> +
-> +	udelay(1);
-> +	var = readl_relaxed(spi_st->base + SSC_CTL);
-> +	var &= ~SSC_CTL_SR;
-> +	writel_relaxed(var, spi_st->base + SSC_CTL);
-> +
-> +	/* Set SSC into slave mode before reconfiguring PIO pins */
-> +	var = readl_relaxed(spi_st->base + SSC_CTL);
-> +	var &= ~SSC_CTL_MS;
-> +	writel_relaxed(var, spi_st->base + SSC_CTL);
-> +
-> +	/* Start "bitbang" worker */
-> +	ret = spi_bitbang_start(&spi_st->bitbang);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "bitbang start failed [%d]\n", ret);
-> +		goto clk_disable;
-> +	}
-> +
-> +	dev_info(&pdev->dev, "registered SPI Bus %d\n", master->bus_num);
-> +
-> +	platform_set_drvdata(pdev, master);
+Sorry, I don't have any idea yet on that as the general rule is not to
+touch anything secure in kernel assuming Linux always runs in non-secure
+mode.
 
-Shouldn't you call devm_spi_register_master ?
-> +
-> +	/* by default the device is on */
-> +	pm_runtime_set_active(&pdev->dev);
-> +	pm_runtime_enable(&pdev->dev);
-> +
-> +	return 0;
-> +
-> +clk_disable:
-> +	clk_disable_unprepare(spi_st->clk);
-> +free_master:
-> +	spi_master_put(master);
-> +
-> +	return ret;
-> +}
-> +
-> +static int spi_st_remove(struct platform_device *pdev)
-> +{
-> +	struct spi_master *master = platform_get_drvdata(pdev);
-> +	struct spi_st *spi_st = spi_master_get_devdata(master);
-> +
-> +	spi_bitbang_stop(&spi_st->bitbang);
-> +	clk_disable_unprepare(spi_st->clk);
-> +
-> +	if (spi_st->pins_sleep)
-> +		pinctrl_select_state(pdev->dev.pins->p, spi_st->pins_sleep);
-You should use pinctrl_pm_select_sleep_state(dev); instead.
+Now if you need an exception, you need to propose the binding and take
+up the discussion on the devicetree list.
 
-> +
-> +	spi_master_put(spi_st->bitbang.master);
-If you use devm_spi_register_master at probe time,
-you shouldn't need to call spi_master_put IIUC.
-
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int spi_st_suspend(struct device *dev)
-> +{
-> +	struct spi_master *master = dev_get_drvdata(dev);
-> +	struct spi_st *spi_st = spi_master_get_devdata(master);
-> +
-> +	writel_relaxed(0, spi_st->base + SSC_IEN);
-> +
-> +	if (!IS_ERR(spi_st->pins_sleep))
-> +		pinctrl_select_state(dev->pins->p, spi_st->pins_sleep);
-Ditto
-> +
-> +	clk_disable_unprepare(spi_st->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int spi_st_resume(struct device *dev)
-> +{
-> +	struct spi_master *master = dev_get_drvdata(dev);
-> +	struct spi_st *spi_st = spi_master_get_devdata(master);
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(spi_st->clk);
-> +
-> +	if (!IS_ERR(dev->pins->default_state))
-> +		pinctrl_select_state(dev->pins->p, dev->pins->default_state);
-     pinctrl_pm_select_default_state(i2c_dev->dev);
-     pinctrl_pm_select_idle_state(i2c_dev->dev);
-
-> +
-> +	return ret;
-> +}
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(spi_st_pm, spi_st_suspend, spi_st_resume);
-> +
-> +static struct of_device_id stm_spi_match[] = {
-> +	{ .compatible = "st,comms-ssc-spi", },
-> +	{ .compatible = "st,comms-ssc4-spi", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, stm_spi_match);
-> +
-> +static struct platform_driver spi_st_driver = {
-> +	.driver = {
-> +		.name = "spi-st",
-> +		.pm = &spi_st_pm,
-> +		.of_match_table = of_match_ptr(stm_spi_match),
-> +	},
-> +	.probe = spi_st_probe,
-> +	.remove = spi_st_remove,
-> +};
-> +module_platform_driver(spi_st_driver);
-> +
-> +MODULE_AUTHOR("Patrice Chotard <patrice.chotard@st.com>");
-> +MODULE_DESCRIPTION("STM SSC SPI driver");
-> +MODULE_LICENSE("GPL v2");
+Regards,
+Sudeep
