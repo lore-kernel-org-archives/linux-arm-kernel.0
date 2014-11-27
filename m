@@ -1,143 +1,72 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Nov 2014 14:12:48 +0100
-Subject: Code generation involving __raw_readl and __raw_writel
-In-Reply-To: <547720B5.7020904@free.fr>
-References: <5476FFA2.8010403@free.fr> <7562945.VT72mKYTjh@wuerfel>
- <547720B5.7020904@free.fr>
-Message-ID: <7958894.CNnhBWEkgT@wuerfel>
+Date: Thu, 27 Nov 2014 14:15:18 +0100
+Subject: [PATCH 11/19] clk: samsung: exynos5433: Add clocks for
+ CMU_BUS{0|1|2} domains
+In-Reply-To: <5477200D.5030706@samsung.com>
+References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
+ <3556463.Me1EFEY7Zb@wuerfel> <5477200D.5030706@samsung.com>
+Message-ID: <2232281.fbydzq3GMs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014 14:01:41 Mason wrote:
-> On 27/11/2014 12:23, Arnd Bergmann wrote:
+On Thursday 27 November 2014 21:58:53 Chanwoo Choi wrote:
+> Dear Arnd,
 > 
-> > On Thursday 27 November 2014 11:40:34 Mason wrote:
-> >
-> >> Hello everyone,
-> >>
-> >> Consider the following code (preprocessor output):
-> >>
-> >> static int tangox_target(struct cpufreq_policy *policy, unsigned int index)
-> >> {
-> >>    while (__raw_readl((volatile void *)(0xf0000000 +(0x10024))) >> 31);
-> >>    __raw_writel(0, (volatile void *)(0xf0000000 +(0x10024)));
-> >>    return 0;
-> >> }
-> >
-> > First of all:
+> On 11/27/2014 09:35 PM, Arnd Bergmann wrote:
+> > On Thursday 27 November 2014 13:12:08 Sylwester Nawrocki wrote:
+> >> On 27/11/14 12:56, Chanwoo Choi wrote:
+> >>> On 11/27/2014 08:41 PM, Arnd Bergmann wrote:
+> >>>>> On Thursday 27 November 2014 16:35:08 Chanwoo Choi wrote:
+> >>>>>>> +  - "samsung,exynos5433-cmu-bus0", "samsung,exynos5433-cmu-bus1"
+> >>>>>>> +    and "samsung,exynos5433-cmu-bus2" - clock controller compatible for CMU_BUS
+> >>>>>>> +    which generates global data buses clock and global peripheral buses clock.
+> >>>>>>>  
+> >>>>>>>  - reg: physical base address of the controller and length of memory mapped
+> >>>>>>>    region.
+> >>>>>>>
+> >>>>>
+> >>>>> This looks like you are duplicating the bindings and the code, but
+> >>>>> it's really the same hardware multiple times with minor variations
+> >>>>> that you should be able to describe properly here. Why not make
+> >>>>> three nodes with the same compatible string and have them handled
+> >>>>> by the same code?
+> >>>
+> >>> Each CMU_BUSx domain of Exynos5433 have different base address as following:
+> >>> - CMU_BUS0's base address and range : 0x1360_0000 ~ 0x1360_0b04
+> >>> - CMU_BUS1's base address and range : 0x1480_0000 ~ 0x1480_0b04
+> >>> - CMU_BUS2's base address and range : 0x1340_0000 ~ 0x1340_0b04
+> >>>
+> >>> So, I implement CMU_BUSx domain which has each compatible string.
+> > 
+> > But the base address is in the reg property, not in the compatible
+> > property. What I mean is to have multiple nodes like
 > 
-> Disclaimer: I've only recently started writing driver code, so I am
-> very grateful for every tip/suggestion I receive. Please note that
-> what I provided was *preprocessor output* (to help in diagnosing the
-> "C to ASM" translation). The actual code was:
-> 
->    while (gbus_read_reg32(SYS_cpuclk_div_ctrl) >> 31);
->    gbus_write_reg32(SYS_cpuclk_div_ctrl, 0);
-> 
-> these being macro wrappers:
-> 
-> #define gbus_read_reg32(r)      __raw_readl((volatile void __iomem *)IO_ADDRESS(r))
-> #define gbus_write_reg32(r, v)  __raw_writel(v, (volatile void __iomem *)IO_ADDRESS(r))
+> The merged clock driver in mainline have different compatible string
+> if base addresss of clock domain is different. So, I implemented each CMU_BUSx domain
+> with different compatible string.
 
-Right, that's how things used to be done a while ago.
+Why?
 
-> > - don't use __raw_readl in driver code, use readl or readl_relaxed.
+> > 	clock-controller at 113600000 {
+> > 		reg = <0 0x113600000 0 0x1000>;
+> > 		compatible = "samsung,exynos5433-cmu";
+> > 		#clock-cells = <1>;
+> > 	};
+> > 
+> > 	clock-controller at 114800000 {
+> > 		reg = <0 0x114800000 0 0x1000>;
+> > 		compatible = "samsung,exynos5433-cmu";
+> > 		#clock-cells = <1>;
+> > 	};
+> > 
+> > The code will just map the local registers for each instance and then
+> > provide the clocks of the right instance when asked for it.
 > 
-> Can you expand a bit on the differences between these variants?
-> __raw_readl, readl, readl_relaxed
+> Each clock domain has not the same mux/divider/clock. So, just one compatible
+> string could not support all of clock domains.
 
-__raw_* is for accessing RAM behind a memory-mapped I/O bus,
-and will not do any endian-swaps or guarantee atomic access.
-
-readl is the standard way to access an MMIO register
-
-readl_relaxed is like readl, but it does not guarantee synchronization
-with device access to DMA buffers, and can be a little faster than
-readl.
-
-> Is this an appropriate reference?
-> https://www.kernel.org/doc/htmldocs/deviceiobook/index.html
-> ( https://lwn.net/Articles/66938/ )
-> 
-> NB: if it matters, I am accessing memory-mapped registers, across
-> a non-standard (I mean not PCI, ISA, etc) memory bus.
-> 
-> arch/arm/include/asm/io.h defines
-> #define readl_relaxed(c) ({ u32 __r = le32_to_cpu((__force __le32) __raw_readl(c)); __r; })
-> #define readl(c)         ({ u32 __v = readl_relaxed(c); __iormb(); __v; })
-> #define ioread32(p)	 ({ unsigned int __v = le32_to_cpu((__force __le32)__raw_readl(p)); __iormb(); __v; })
-> static inline u32 __raw_readl(const volatile void __iomem *addr)
-> {
-> 	u32 val;
-> 	asm volatile("ldr %1, %0"
-> 		     : "+Qo" (*(volatile u32 __force *)addr),
-> 		       "=r" (val));
-> 	return val;
-> }
-> 
-> As far as I can tell, readl and ioread32 are equivalent, right?
-
-On arm32 yes. On other architectures, ioread32 may be a little slower
-but also take __iomem tokens that were returned from ioport_map()
-or pci_iomap() instead of ioremap(). On arm32 those are all pointers
-that can be passed into readl.
-
-> > - When you do a busy-loop, add a cpu_relax().
-> 
-> LDD3 mentions cpu_relax in the context of long delays.
-> My busy wait loop has a maximum latency of 60 ?s, and the cpufreq core
-> is given this information, so that, typically, execution falls through
-> the loop at the first iteration.
-> 
-> Should I still use cpu_relax? Doesn't that risk adding latency to the
-> calling thread?
-> 
-> On my platform, cpu_relax is defined to a barrier:
-> __asm__ __volatile__("": : :"memory")
-
-I would always use it in a busy-loop.
-
-> > - use proper types: 'void __iomem *', not 'volatile void *'.
-> 
-> The actual code does use the __iomem attribute.
-> 
-> > - use of_iomap or devm_ioremap_resource to get to the pointer for
-> >    a device, don't just hardcode virtual addresses.
-> 
-> About that. If nothing had been done, 0xf0010024 would be an
-> invalid virtual address, and reading from that address would
-> generate a TLB miss, right? So something must have configured
-> the TLB to accept and translate this address correctly.
-> 
-> I'm looking for an iomap or ioremap call, right?
-
-The IO_ADDRESS() macro on this platform is probably defined to
-match a address range that is set up from a map_io callback in
-the platform.
-
-On new platforms, you can't do that because the mach/*.h header
-files are inaccessible to drivers, so you have to use ioremap.
-
-> I'm asking because I have an idea in mind: on the bus, the first
-> 16 MB contains only memory-mapped registers, so I've been thinking
-> I can map this region at init, and keep it for the lifetime of the
-> system. It would use only one entry in the TLB, since the CPU
-> supports 16 MB super-sections (or whatever they are called).
-> 
-> I could even lock that entry in the TLB so that these accesses
-> are guaranteed to never TLB miss, right?
-
-The map_io callback will set up a mapping like that, and when
-a driver calls ioremap on the same physical address, you will
-get the correct pointer using that TLB, you just don't communicate
-the address through a pointer any more.
-
-> I'm also wondering: why did we choose to map physical address
-> PA at virtual address VA = PA + 0xf000000? What happens if I
-> map PA at VA = PA? Is it a problem if I "shadow" the 0 page?
-> (I imagine it is.)
-
-The address has to be between VMALLOC_START and VMALLOC_END.
-0xf0000000 is a typical address for such mappings.
+What are the specific differences? I saw that one of them has more
+outputs than the others but it seemed like a superset, so you just
+wouldn't be allowed to access the non-connected outputs.
 
 	Arnd
