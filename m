@@ -1,50 +1,96 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 27 Nov 2014 22:53:50 +0000
-Subject: [PATCH 3/5] arm/arm64: KVM: Clarify KVM_ARM_VCPU_INIT ABI
-In-Reply-To: <1417113660-23610-4-git-send-email-christoffer.dall@linaro.org>
-References: <1417113660-23610-1-git-send-email-christoffer.dall@linaro.org>
- <1417113660-23610-4-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <CAFEAcA8ysq5UD4WcfuJqSUV=E8zJR259=8v5S9q1o5aVJpPJQQ@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 27 Nov 2014 23:55:47 +0100
+Subject: [PATCH v3] can: Convert to runtime_pm
+In-Reply-To: <820358d5369f465188dfa9306eae5658@BL2FFO11FD009.protection.gbl>
+References: <6b6db31d46074512a322eae6e4ef64d4@BN1BFFO11FD038.protection.gbl>
+ <54779501.8060009@pengutronix.de>
+ <820358d5369f465188dfa9306eae5658@BL2FFO11FD009.protection.gbl>
+Message-ID: <5477ABF3.1020605@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 November 2014 at 18:40, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> It is not clear that this ioctl can be called multiple times for a given
-> vcpu.  Userspace already does this, so clarify the ABI.
->
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  Documentation/virtual/kvm/api.txt | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index bb82a90..fc12b4f 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -2453,6 +2453,9 @@ return ENOEXEC for that vcpu.
->  Note that because some registers reflect machine topology, all vcpus
->  should be created before this ioctl is invoked.
->
-> +Userspace can call this function multiple times for a given VCPU, which will
-> +reset the VCPU to its initial states.
+On 11/27/2014 11:47 PM, S?ren Brinkmann wrote:
+> On Thu, 2014-11-27 at 10:17PM +0100, Marc Kleine-Budde wrote:
+>> On 11/27/2014 02:08 PM, Kedareswara rao Appana wrote:
+>>> Instead of enabling/disabling clocks at several locations in the driver,
+>>> use the runtime_pm framework. This consolidates the actions for
+>>> runtime PM in the appropriate callbacks and makes the driver more
+>>> readable and mantainable.
+>>>
+>>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>>> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+>>> ---
+>>> Changes for v3:
+>>>   - Converted the driver to use runtime_pm.
+>>> Changes for v2:
+>>>   - Removed the struct platform_device* from suspend/resume
+>>>     as suggest by Lothar.
+>>>
+>>>  drivers/net/can/xilinx_can.c |  119 +++++++++++++++++++++++++----------------
+>>>  1 files changed, 72 insertions(+), 47 deletions(-)
+>>>
+>>> diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
+>>> index 8a998e3..1be28ed 100644
+>>> --- a/drivers/net/can/xilinx_can.c
+>>> +++ b/drivers/net/can/xilinx_can.c
+> [...]
+>>> @@ -1030,7 +1046,10 @@ static int __maybe_unused xcan_resume(struct device *dev)
+>>>  	return 0;
+>>>  }
+>>>  
+>>> -static SIMPLE_DEV_PM_OPS(xcan_dev_pm_ops, xcan_suspend, xcan_resume);
+>>> +static const struct dev_pm_ops xcan_dev_pm_ops = {
+>>> +	SET_SYSTEM_SLEEP_PM_OPS(xcan_suspend, xcan_resume)
+>>> +	SET_PM_RUNTIME_PM_OPS(xcan_runtime_suspend, xcan_runtime_resume, NULL)
+>>> +};
+>>>  
+>>>  /**
+>>>   * xcan_probe - Platform registration call
+>>> @@ -1071,7 +1090,7 @@ static int xcan_probe(struct platform_device *pdev)
+>>>  		return -ENOMEM;
+>>>  
+>>>  	priv = netdev_priv(ndev);
+>>> -	priv->dev = ndev;
+>>> +	priv->dev = &pdev->dev;
+>>>  	priv->can.bittiming_const = &xcan_bittiming_const;
+>>>  	priv->can.do_set_mode = xcan_do_set_mode;
+>>>  	priv->can.do_get_berr_counter = xcan_get_berr_counter;
+>>> @@ -1137,6 +1156,11 @@ static int xcan_probe(struct platform_device *pdev)
+>>>  
+>>>  	netif_napi_add(ndev, &priv->napi, xcan_rx_poll, rx_max);
+>>>  
+>>> +	pm_runtime_set_active(&pdev->dev);
+>>> +	pm_runtime_irq_safe(&pdev->dev);
+>>
+>> You use just clock_enable()/disable() in the runtime functions, thus you
+>> can say they are irq_safe. On the other the the zync grpio driver uses
+>> "full" prepare_enable/disable_unprepare calls. What's best practice here?
+> 
+> IIRC, the prepare/unprepare functions can sleep. xcan_get_berr_counter
+> is called from atomic context. So, I think we have to use the
+> disable/enable functions without the prepare/unprepare.
+> In the GPIO driver the that problem does not exist.
 
-How about being a little bit more explicit here with something like:
+IC, yes, correct.
 
-"Userspace can call this function multiple times for a given VCPU, including
-after the VCPU has been run. This will reset the VCPU to its initial
-state."
+This is why we introducted in other drivers a __get_berr_counter()
+function, that doesn't touch the clocks, which is used from within the
+driver (from the atomic contects), while get_berr_counter() will fiddle
+with the clocks. This function is used for the
+priv->can.do_get_berr_counter callback.
 
-(I notice that api.txt is inconsistent about using "vcpu" or "VCPU"
-or "vCPU"... do we have a preference for new text?)
+Marc
 
-> +
->  Possible features:
->         - KVM_ARM_VCPU_POWER_OFF: Starts the CPU in a power-off state.
->           Depends on KVM_CAP_ARM_PSCI.  If not set, the CPU will be powered on
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Do you have to use the same set of feature flags for second and
-subsequent VCPU_INIT calls, or can they be different each time?
-
-thanks
--- PMM
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/20c9c15f/attachment.sig>
