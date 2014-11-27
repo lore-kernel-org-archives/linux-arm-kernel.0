@@ -1,58 +1,141 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 27 Nov 2014 09:10:55 +0100
-Subject: [PATCH] ARM: dts: imx: Update VPU compatible strings
-In-Reply-To: <1417035695-18405-1-git-send-email-festevam@gmail.com>
-References: <1417035695-18405-1-git-send-email-festevam@gmail.com>
-Message-ID: <1417075855.3163.1.camel@pengutronix.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 27 Nov 2014 09:28:11 +0100
+Subject: [PATCH 1/5] pinctrl: sun6i: Add some missing functions, fix i2c3
+ muxing
+In-Reply-To: <20141126184408.GL25249@lukather>
+References: <1416747283-13489-1-git-send-email-hdegoede@redhat.com>
+ <1416747283-13489-2-git-send-email-hdegoede@redhat.com>
+ <20141125180455.GA25249@lukather> <54758FB0.4010503@redhat.com>
+ <20141126184408.GL25249@lukather>
+Message-ID: <5476E09B.3020601@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hi,
 
-just one tiny issue below:
+On 11/26/2014 07:44 PM, Maxime Ripard wrote:
+> On Wed, Nov 26, 2014 at 09:30:40AM +0100, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 11/25/2014 07:04 PM, Maxime Ripard wrote:
+>>> Hi,
+>>>
+>>> On Sun, Nov 23, 2014 at 01:54:39PM +0100, Hans de Goede wrote:
+>>>> While working on pinctrl for the A31s, I noticed that function 4 of
+>>>> PA15 - PA18 was missing, add these.
+>>>>
+>>>> I also noticed that i2c3 sck / sda got assigned to PB5 & PB6, this should
+>>>> be PB4 & PB5, fix this as well.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>>   drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c | 9 +++++++--
+>>>>   1 file changed, 7 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+>>>> index a2b4b85..fb19e15 100644
+>>>> --- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+>>>> +++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+>>>> @@ -134,24 +134,28 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
+>>>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>>>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD4 */
+>>>>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D15 */
+>>>> +		  SUNXI_FUNCTION(0x4, "clk_a_out"),
+>>>
+>>> It's called clk_out_a on the A20, I'd rather stick with the same
+>>> scheme here.
+>>
+>> Will fix.
+>>
+>>>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 15)),	/* PA_EINT15 */
+>>>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 16),
+>>>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>>>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>>>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD5 */
+>>>>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D16 */
+>>>> +		  SUNXI_FUNCTION(0x4, "dmic"),		/* CLK */
+>>>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 16)),	/* PA_EINT16 */
+>>>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 17),
+>>>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>>>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>>>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD6 */
+>>>>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D17 */
+>>>> +		  SUNXI_FUNCTION(0x4, "dmic"),		/* DIN */
+>>>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 17)),	/* PA_EINT17 */
+>>>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 18),
+>>>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>>>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>>>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD7 */
+>>>>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D18 */
+>>>> +		  SUNXI_FUNCTION(0x4, "clk_b_out"),
+>>>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 18)),	/* PA_EINT18 */
+>>>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 19),
+>>>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>>>> @@ -207,6 +211,7 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
+>>>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>>>   		  SUNXI_FUNCTION(0x2, "gmac"),		/* MDC */
+>>>>   		  SUNXI_FUNCTION(0x3, "lcd1"),		/* HSYNC */
+>>>> +		  SUNXI_FUNCTION(0x4, "clk_c_out"),
+>>>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 26)),	/* PA_EINT26 */
+>>>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 27),
+>>>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>>>> @@ -242,20 +247,20 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
+>>>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>>>   		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DO1 */
+>>>>   		  SUNXI_FUNCTION(0x3, "uart3"),		/* RTS */
+>>>> +		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SCK */
+>>>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 4)),	/* PB_EINT4 */
+>>>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 5),
+>>>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>>>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>>>   		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DO2 */
+>>>>   		  SUNXI_FUNCTION(0x3, "uart3"),		/* TX */
+>>>> -		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SCK */
+>>>> +		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SDA */
+>>>>   		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 5)),	/* PB_EINT5 */
+>>>>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 6),
+>>>>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>>>>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>>>>   		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DO3 */
+>>>>   		  SUNXI_FUNCTION(0x3, "uart3"),		/* RX */
+>>>> -		  SUNXI_FUNCTION(0x4, "i2c3"),		/* SDA */
+>>>
+>>> Where did you get that info from? The datasheet still reports that
+>>> information.
+>>
+>> I assume with the datasheet you mean "A31 User Manual V1.20.pdf", which
+>> was last updated on September 20, 2013. I did not check that one, now I
+>> see where the original pinctrl code from.
+>>
+>> So I've done some more digging:
+>>
+>> "A31 Datasheet - v1.00 (2012-12-24).pdf" also has twi3 sck / sda on pin
+>> PB5 / PB6 like the current pinctrl code.
+>>
+>> But "A31 Datasheet V1.40.pdf" which has the following in its revision log:
+>> "1.4 Dec 10,2013 Modify Pin Description"
+>>
+>> Moves them to PB4 / PB5 and that is where I got this from (and was the only
+>> place I initially looked), I think that this is an intentional change, and
+>> that PB4 / PB5 are the correct pins.
+>
+> Funny, I was looking at the A31 datasheet v1.4 from 10/12/2013 that is
+> in the allwinner's repo, and that's where I got this from (or some
+> earlier version of it)
+>
+> https://github.com/allwinner-zh/documents/blob/master/A31/A31%20datasheet%20V1.4%2020131210.pdf
+>
+> Something's weird here :)
 
-Am Mittwoch, den 26.11.2014, 19:01 -0200 schrieb Fabio Estevam:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Update the VPU compatible strings to also use "cnm,coda<model>".
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Shawn,
-> 
-> The documentation patch for Documentation/devicetree/bindings/media/coda.txt 
-> has been re-sent to the linux-media list with such updates.
-> 
->  arch/arm/boot/dts/imx27.dtsi | 2 +-
->  arch/arm/boot/dts/imx53.dtsi | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> index 107d713..4b063b6 100644
-> --- a/arch/arm/boot/dts/imx27.dtsi
-> +++ b/arch/arm/boot/dts/imx27.dtsi
-> @@ -464,7 +464,7 @@
->  			};
->  
->  			coda: coda at 10023000 {
-> -				compatible = "fsl,imx27-vpu";
-> +				compatible = "fsl,imx27-vpu", "cnm,codadx6";
->  				reg = <0x10023000 0x0200>;
->  				interrupts = <53>;
->  				clocks = <&clks IMX27_CLK_VPU_BAUD_GATE>,
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index a30bddf..132410c 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -756,7 +756,7 @@
->  			};
->  
->  			vpu: vpu at 63ff4000 {
-> -				compatible = "fsl,imx53-vpu";
-> +				compatible = "fsl,imx53-vpu","cnm,coda7541";
+Oh, on double checking my "A31 Datasheet V1.40.pdf" also has the ins at PB5/6, only the
+A31s data sheet V1.4 has them at PB4/5.
 
-Missing whitespace here. Other than that,
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+>> I will ask Allwinner which is correct, so that we know for sure.
+>
+> Yep, I saw that, thanks for clearing that up.
 
-regards
-Philipp
+So lets wait for their answer.
+
+Regards,
+
+Hans
