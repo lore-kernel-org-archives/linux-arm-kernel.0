@@ -1,63 +1,42 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 28 Nov 2014 00:27:05 +0100
-Subject: [PATCH] ARM vf610: add compatibilty strings of supported Vybrid SoC's
-Message-ID: <1417130825-2818-1-git-send-email-stefan@agner.ch>
+Date: Fri, 28 Nov 2014 00:33:55 +0100
+Subject: [PATCH] MAINTAINERS: add Freescale Vybrid SoC
+Message-ID: <1417131235-3077-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Vybrid SoC family (in the kernel known as vf610) is a familiy
-of multiple similar SoC's. The VF5xx series comes without secondary
-Cortex-M4 core, while the second number VFx1x indicates the presence
-of a L2 cache controller.
+Add Freescale Vybrid family as a own entry, along with an entry for
+the so far orphan Vybrid device tree files. Also add myself as
+a designated reviewer.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- Documentation/devicetree/bindings/arm/fsl.txt | 12 ++++++++++++
- arch/arm/mach-imx/mach-vf610.c                |  5 ++++-
- 2 files changed, 16 insertions(+), 1 deletion(-)
+Not sure if this is acceptable, but it would be nice when I get Vybrid
+related stuff automatically...
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index 4e8b7df..c830b5b 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -75,6 +75,18 @@ i.MX6q generic board
- Required root node properties:
-     - compatible = "fsl,imx6q";
+ MAINTAINERS | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 3c64271..6837f23 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -990,6 +990,16 @@ F:	arch/arm/mach-mxs/
+ F:	arch/arm/boot/dts/imx*
+ F:	arch/arm/configs/imx*_defconfig
  
-+Freescale Vybrid Platform Device Tree Bindings
-+----------------------------------------------
++ARM/FREESCALE VYBRID ARM ARCHITECTURE
++M:	Shawn Guo <shawn.guo@linaro.org>
++M:	Sascha Hauer <kernel@pengutronix.de>
++R:	Stefan Agner <stefan@agner.ch>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
++F:	arch/arm/mach-imx/*vf610*
++F:	arch/arm/boot/dts/vf*
 +
-+For the Vybrid SoC familiy all variants with DDR controller are supported,
-+which is the VF5xx and VF6xx series. Out of historical reasons, in most
-+places the kernel uses vf610 to refer to the whole familiy.
-+
-+Required root node compatible property (one of them):
-+    - compatible = "fsl,vf500";
-+    - compatible = "fsl,vf510";
-+    - compatible = "fsl,vf600";
-+    - compatible = "fsl,vf610";
- 
- Freescale LS1021A Platform Device Tree Bindings
- ------------------------------------------------
-diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
-index c11ab6a..2e7c75b 100644
---- a/arch/arm/mach-imx/mach-vf610.c
-+++ b/arch/arm/mach-imx/mach-vf610.c
-@@ -13,11 +13,14 @@
- #include <asm/hardware/cache-l2x0.h>
- 
- static const char * const vf610_dt_compat[] __initconst = {
-+	"fsl,vf500",
-+	"fsl,vf510",
-+	"fsl,vf600",
- 	"fsl,vf610",
- 	NULL,
- };
- 
--DT_MACHINE_START(VYBRID_VF610, "Freescale Vybrid VF610 (Device Tree)")
-+DT_MACHINE_START(VYBRID_VF610, "Freescale Vybrid VF5xx/VF6xx (Device Tree)")
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
- 	.dt_compat	= vf610_dt_compat,
+ ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
 2.1.3
