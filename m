@@ -1,122 +1,64 @@
-From: js07.lee@gmail.com (Jungseung Lee)
-Date: Thu, 27 Nov 2014 17:42:04 +0900
-Subject: [PATCH v4] arm: Support for the PXN CPU feature on ARMv7
-Message-ID: <1417077724-15885-1-git-send-email-js07.lee@gmail.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Thu, 27 Nov 2014 10:44:23 +0200
+Subject: [PATCH v13 03/10] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <1417065854-37745-4-git-send-email-lina.iyer@linaro.org>
+References: <1417065854-37745-1-git-send-email-lina.iyer@linaro.org>
+ <1417065854-37745-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1417077863.10282.3.camel@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modern ARMv7-A/R cores optionally implement below new
-hardware feature:
 
-- PXN:
-Privileged execute-never(PXN) is a security feature. PXN bit
-determines whether the processor can execute software from
-the region. This is effective solution against ret2usr attack.
-On an implementation that does not include the LPAE, PXN is
-optionally supported.
+Hi, 
 
-This patch set PXN bit on user page table for preventing
-user code execution with privilege mode.
+On Wed, 2014-11-26 at 22:24 -0700, Lina Iyer wrote:
+> 
 
-Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
----
- arch/arm/include/asm/pgalloc.h              | 10 +++++++++-
- arch/arm/include/asm/pgtable-2level-hwdef.h |  2 ++
- arch/arm/include/asm/pgtable-3level-hwdef.h |  1 +
- arch/arm/mm/mmu.c                           | 15 +++++++++++++++
- 4 files changed, 27 insertions(+), 1 deletion(-)
+>  - compatible:
+> @@ -14,10 +23,13 @@ PROPERTIES
+>         Value type: <string>
+>         Definition: shall contain "qcom,saw2". A more specific value should be
+>                                                 one of:
 
-diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index 78a7793..19cfab5 100644
---- a/arch/arm/include/asm/pgalloc.h
-+++ b/arch/arm/include/asm/pgalloc.h
-@@ -157,7 +157,15 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
- static inline void
- pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
- {
--	__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
-+	extern pmdval_t user_pmd_table;
-+	pmdval_t prot;
-+
-+	if (__LINUX_ARM_ARCH__ >= 6 && !IS_ENABLED(CONFIG_ARM_LPAE))
-+		prot = user_pmd_table;
-+	else
-+		prot = _PAGE_USER_TABLE;
-+
-+	__pmd_populate(pmdp, page_to_phys(ptep), prot);
- }
- #define pmd_pgtable(pmd) pmd_page(pmd)
- 
-diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
-index 5cfba15..5e68278 100644
---- a/arch/arm/include/asm/pgtable-2level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
-@@ -20,12 +20,14 @@
- #define PMD_TYPE_FAULT		(_AT(pmdval_t, 0) << 0)
- #define PMD_TYPE_TABLE		(_AT(pmdval_t, 1) << 0)
- #define PMD_TYPE_SECT		(_AT(pmdval_t, 2) << 0)
-+#define PMD_PXNTABLE		(_AT(pmdval_t, 1) << 2)     /* v7 */
- #define PMD_BIT4		(_AT(pmdval_t, 1) << 4)
- #define PMD_DOMAIN(x)		(_AT(pmdval_t, (x)) << 5)
- #define PMD_PROTECTION		(_AT(pmdval_t, 1) << 9)		/* v5 */
- /*
-  *   - section
-  */
-+#define PMD_SECT_PXN    (_AT(pmdval_t, 1) << 0)     /* v7 */
- #define PMD_SECT_BUFFERABLE	(_AT(pmdval_t, 1) << 2)
- #define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
- #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 4)		/* v6 */
-diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
-index 9fd61c7..f8f1cff 100644
---- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-@@ -76,6 +76,7 @@
- #define PTE_EXT_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
- #define PTE_EXT_AF		(_AT(pteval_t, 1) << 10)	/* Access Flag */
- #define PTE_EXT_NG		(_AT(pteval_t, 1) << 11)	/* nG */
-+#define PTE_EXT_PXN		(_AT(pteval_t, 1) << 53)	/* PXN */
- #define PTE_EXT_XN		(_AT(pteval_t, 1) << 54)	/* XN */
- 
- /*
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 9f98cec..f991c54 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -52,6 +52,8 @@ EXPORT_SYMBOL(empty_zero_page);
-  */
- pmd_t *top_pmd;
- 
-+pmdval_t user_pmd_table = _PAGE_USER_TABLE;
-+
- #define CPOLICY_UNCACHED	0
- #define CPOLICY_BUFFERED	1
- #define CPOLICY_WRITETHROUGH	2
-@@ -537,6 +539,14 @@ static void __init build_mem_type_table(void)
- 	if (cpu_arch == CPU_ARCH_ARMv6)
- 		vecs_pgprot |= L_PTE_MT_VECTORS;
- #endif
-+	/*
-+	 * Check is it with support for the PXN bit
-+	 * in the Short-descriptor translation table format descriptors.
-+	 */
-+	if (cpu_arch == CPU_ARCH_ARMv7 &&
-+		(read_cpuid_ext(CPUID_EXT_MMFR0) & 0xF) == 4) {
-+		user_pmd_table |= PMD_PXNTABLE;
-+	}
- 
- 	/*
- 	 * ARMv6 and above have extended page tables.
-@@ -605,6 +615,11 @@ static void __init build_mem_type_table(void)
- 	}
- 	kern_pgprot |= PTE_EXT_AF;
- 	vecs_pgprot |= PTE_EXT_AF;
-+
-+	/*
-+	 * Set PXN for user mappings
-+	 */
-+	user_pgprot |= PTE_EXT_PXN;
- #endif
- 
- 	for (i = 0; i < 16; i++) {
--- 
-1.9.1
+Which driver is supposed to handle this property?
+
+> -                               "qcom,saw2-v1"
+> -                               "qcom,saw2-v1.1"
+> -                               "qcom,saw2-v2"
+> -                               "qcom,saw2-v2.1"
+> +                       "qcom,saw2-v1"
+> +                       "qcom,saw2-v1.1"
+> +                       "qcom,saw2-v2"
+> +                       "qcom,saw2-v2.1"
+
+Doesn't seems to be used or supported?
+
+> +                       "qcom,apq8064-saw2-v1.1-cpu"
+> +                       "qcom,msm8974-saw2-v2.1-cpu"
+> +                       "qcom,apq8084-saw2-v2.1-cpu"
+> 
+
+<snip>
+
+> -???????regulator at 2099000 {
+> +???????power-controller at 2099000 {
+>                 compatible = "qcom,saw2";
+>                 reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
+> +               regulator;
+> 
+
+<snip>
+
+> +static const struct of_device_id spm_match_table[] = {
+> +       { .compatible = "qcom,msm8974-saw2-v2.1-cpu",
+> +                       .data = &spm_reg_8974_8084_cpu },
+> +       { .compatible = "qcom,apq8084-saw2-v2.1-cpu",
+> +                       .data = &spm_reg_8974_8084_cpu },
+> +       { .compatible = "qcom,apq8064-saw2-v1.1-cpu",
+> +                       .data = &spm_reg_8064_cpu },
+> +       { },
+> +};
+> +
+
+Regards,
+Ivan
