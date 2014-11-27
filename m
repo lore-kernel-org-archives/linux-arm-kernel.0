@@ -1,153 +1,64 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 27 Nov 2014 12:41:30 +0200
-Subject: [PATCH 2/3] ARM: edma: Rename header file for dmaengine filter
- function definition
-In-Reply-To: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1417084891-17990-3-git-send-email-peter.ujfalusi@ti.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 27 Nov 2014 10:43:23 +0000
+Subject: [PATCH] arm: cacheflush: get rid of restarting block
+In-Reply-To: <20141127100306.GA20649@arm.com>
+References: <1416928737-29723-1-git-send-email-vladimir.murzin@arm.com>
+ <005b01d009f6$f3c6a0f0$db53e2d0$@min@lge.com>
+ <20141127100306.GA20649@arm.com>
+Message-ID: <5477004B.5000100@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the include/linux/edma.h to include/linux/edma-dmaengine.h
+On 27/11/14 10:03, Will Deacon wrote:
+> On Thu, Nov 27, 2014 at 04:02:24AM +0000, Chanho Min wrote:
+>>> -----Original Message-----
+>>> From: Vladimir Murzin [mailto:vladimir.murzin at arm.com]
+>>> Sent: Wednesday, November 26, 2014 12:19 AM
+>>> To: linux-arm-kernel at lists.infradead.org; linux at arm.linux.org.uk
+>>> Cc: chanho.min at lge.com; will.deacon at arm.com; stable at vger.kernel.org
+>>> Subject: [PATCH] arm: cacheflush: get rid of restarting block
+>>>
+>>> We cannot restart cacheflush safely if a process provides user-defined
+>>> signal handler and signal is pending. In this case -EINTR is returned
+>>> and it is expected that process re-invokes syscall. However, there are
+>>> a few problems with that:
+>>>  * looks like nobody bothers checking return value from cacheflush
+>>>  * but if it did, we don't provide the restart address for that, so the
+>>>    process has to use the same range again
+>>>  * ...and again, what might lead to looping forever
+>>>
+>>> So, remove cacheflush restarting code and terminate cache flushing
+>>> as early as fatal signal is pending.
+>>>
+>>> Cc: stable at vger.kernel.org # 3.12+
+>>> Reported-by: Chanho Min <chanho.min@lge.com>
+>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>>> Acked-by: Will Deacon <will.deacon@arm.com>
+>>> ---
+>>> Hi,
+>>>
+>>> There is my proposal for the problem reported in [1]. Since that
+>>> thread has not been progressing much, I'm addressing the problem in
+>>> separate patch.
+>>>
+>>> Comments?
+>> Thanks, We hope this to be applied.
+>
+> Ok, good. In which case, can you put it into the patch system please,
+> Vladimir?
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/common/edma.c         |  2 +-
- drivers/mmc/host/davinci_mmc.c |  3 +--
- drivers/spi/spi-davinci.c      |  2 +-
- include/linux/edma-dmaengine.h | 29 +++++++++++++++++++++++++++++
- include/linux/edma.h           | 29 -----------------------------
- sound/soc/davinci/edma-pcm.c   |  2 +-
- 6 files changed, 33 insertions(+), 34 deletions(-)
- create mode 100644 include/linux/edma-dmaengine.h
- delete mode 100644 include/linux/edma.h
+Already in patch system as 8226/1.
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 5662a872689b..bac677e65c76 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -25,7 +25,7 @@
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/slab.h>
--#include <linux/edma.h>
-+#include <linux/edma-dmaengine.h>
- #include <linux/dma-mapping.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
-diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-index 1625f908dc70..47323662c818 100644
---- a/drivers/mmc/host/davinci_mmc.c
-+++ b/drivers/mmc/host/davinci_mmc.c
-@@ -32,12 +32,11 @@
- #include <linux/delay.h>
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
--#include <linux/edma.h>
-+#include <linux/edma-dmaengine.h>
- #include <linux/mmc/mmc.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
- 
--#include <linux/platform_data/edma.h>
- #include <linux/platform_data/mmc-davinci.h>
- 
- /*
-diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index b3707badb1e5..d61b7cdb2deb 100644
---- a/drivers/spi/spi-davinci.c
-+++ b/drivers/spi/spi-davinci.c
-@@ -27,7 +27,7 @@
- #include <linux/clk.h>
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
--#include <linux/edma.h>
-+#include <linux/edma-dmaengine.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/of_gpio.h>
-diff --git a/include/linux/edma-dmaengine.h b/include/linux/edma-dmaengine.h
-new file mode 100644
-index 000000000000..8a2602809a77
---- /dev/null
-+++ b/include/linux/edma-dmaengine.h
-@@ -0,0 +1,29 @@
-+/*
-+ * TI EDMA DMA engine driver
-+ *
-+ * Copyright 2012 Texas Instruments
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#ifndef __LINUX_EDMA_DMAENGINE_H
-+#define __LINUX_EDMA_DMAENGINE_H
-+
-+struct dma_chan;
-+
-+#if defined(CONFIG_TI_EDMA) || defined(CONFIG_TI_EDMA_MODULE)
-+bool edma_filter_fn(struct dma_chan *, void *);
-+#else
-+static inline bool edma_filter_fn(struct dma_chan *chan, void *param)
-+{
-+	return false;
-+}
-+#endif
-+
-+#endif
-diff --git a/include/linux/edma.h b/include/linux/edma.h
-deleted file mode 100644
-index a1307e7827e8..000000000000
---- a/include/linux/edma.h
-+++ /dev/null
-@@ -1,29 +0,0 @@
--/*
-- * TI EDMA DMA engine driver
-- *
-- * Copyright 2012 Texas Instruments
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation version 2.
-- *
-- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-- * kind, whether express or implied; without even the implied warranty
-- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--#ifndef __LINUX_EDMA_H
--#define __LINUX_EDMA_H
--
--struct dma_chan;
--
--#if defined(CONFIG_TI_EDMA) || defined(CONFIG_TI_EDMA_MODULE)
--bool edma_filter_fn(struct dma_chan *, void *);
--#else
--static inline bool edma_filter_fn(struct dma_chan *chan, void *param)
--{
--	return false;
--}
--#endif
--
--#endif
-diff --git a/sound/soc/davinci/edma-pcm.c b/sound/soc/davinci/edma-pcm.c
-index 59e588abe54b..873c8a090427 100644
---- a/sound/soc/davinci/edma-pcm.c
-+++ b/sound/soc/davinci/edma-pcm.c
-@@ -23,7 +23,7 @@
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
- #include <sound/dmaengine_pcm.h>
--#include <linux/edma.h>
-+#include <linux/edma-dmaengine.h>
- 
- #include "edma-pcm.h"
- 
--- 
-2.1.3
+Vladimir
+
+>
+> Will
+>
+>
+>
+
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+
+ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
