@@ -1,149 +1,42 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 27 Nov 2014 10:23:37 -0800
-Subject: [PATCH v3] can: Convert to runtime_pm
-In-Reply-To: <6b6db31d46074512a322eae6e4ef64d4@BN1BFFO11FD038.protection.gbl>
-References: <6b6db31d46074512a322eae6e4ef64d4@BN1BFFO11FD038.protection.gbl>
-Message-ID: <6268c783e4514fe9bbae2aff8fd75edd@BY2FFO11FD043.protection.gbl>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 27 Nov 2014 18:30:58 +0000
+Subject: [PATCH v4 2/7] regulator: dt-bindings: Document the ena-gpios
+ property
+In-Reply-To: <1417087253-12306-3-git-send-email-k.kozlowski@samsung.com>
+References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
+ <1417087253-12306-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20141127183058.GB7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kedar,
+On Thu, Nov 27, 2014 at 12:20:48PM +0100, Krzysztof Kozlowski wrote:
 
-On Thu, 2014-11-27 at 06:38PM +0530, Kedareswara rao Appana wrote:
-> Instead of enabling/disabling clocks at several locations in the driver,
-> use the runtime_pm framework. This consolidates the actions for
-> runtime PM in the appropriate callbacks and makes the driver more
-> readable and mantainable.
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> ---
-> Changes for v3:
->   - Converted the driver to use runtime_pm.
-> Changes for v2:
->   - Removed the struct platform_device* from suspend/resume
->     as suggest by Lothar.
-> 
->  drivers/net/can/xilinx_can.c |  119 +++++++++++++++++++++++++----------------
->  1 files changed, 72 insertions(+), 47 deletions(-)
-> 
-> diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
-> index 8a998e3..1be28ed 100644
-> --- a/drivers/net/can/xilinx_can.c
-> +++ b/drivers/net/can/xilinx_can.c
-> @@ -32,6 +32,7 @@
->  #include <linux/can/dev.h>
->  #include <linux/can/error.h>
->  #include <linux/can/led.h>
-> +#include <linux/pm_runtime.h>
->  
->  #define DRIVER_NAME	"xilinx_can"
->  
-> @@ -138,7 +139,7 @@ struct xcan_priv {
->  	u32 (*read_reg)(const struct xcan_priv *priv, enum xcan_reg reg);
->  	void (*write_reg)(const struct xcan_priv *priv, enum xcan_reg reg,
->  			u32 val);
-> -	struct net_device *dev;
-> +	struct device *dev;
->  	void __iomem *reg_base;
->  	unsigned long irq_flags;
->  	struct clk *bus_clk;
-> @@ -842,6 +843,13 @@ static int xcan_open(struct net_device *ndev)
->  	struct xcan_priv *priv = netdev_priv(ndev);
->  	int ret;
->  
-> +	ret = pm_runtime_get_sync(priv->dev);
-> +	if (ret < 0) {
-> +		netdev_err(ndev, "%s: runtime CAN resume failed(%d)\n\r",
+> +- ena-gpios: GPIO to use for enable control. Actual implementation depends
+> +  on regulator driver. The bindings documentation for given driver describes
+> +  which regulator actually supports it.
+> +- ena-gpio-open-drain: GPIO is open drain type.
 
-There might be other issues than the resume that make this fail. It
-should probably just say 'pm_runtime_get failed'.
-The CAN in the string should not be needed, the netdev_err macro makes
-sure the device name is printed.
-Can we have a space between 'failed' and the error code?
-There should not be a '\r'
+I'm relly not a big fan of adding a fixed name property here with no
+override capability, it means that the naming won't reflect the specific
+regulator design so closely and in practice for many of the PMICs the
+GPIO control can do rather more than just control enables and supports
+reprogramming.  The latter case where we've got a signal which can
+sometimes be simply and enable but sometimes more makes it especially
+worrying to have the property always be there, it's something that might
+work in some configurations but could easily be broken if we try to
+exploit more advanced functionality (things also triggering other
+configuration changes at the same time).
 
-> +				__func__, ret);
-> +		return ret;
-> +	}
-> +
->  	ret = request_irq(ndev->irq, xcan_interrupt, priv->irq_flags,
->  			ndev->name, ndev);
->  	if (ret < 0) {
-> @@ -849,29 +857,17 @@ static int xcan_open(struct net_device *ndev)
->  		goto err;
->  	}
->  
-> -	ret = clk_prepare_enable(priv->can_clk);
-> -	if (ret) {
-> -		netdev_err(ndev, "unable to enable device clock\n");
-> -		goto err_irq;
-> -	}
-> -
-> -	ret = clk_prepare_enable(priv->bus_clk);
-> -	if (ret) {
-> -		netdev_err(ndev, "unable to enable bus clock\n");
-> -		goto err_can_clk;
-> -	}
-> -
->  	/* Set chip into reset mode */
->  	ret = set_reset_mode(ndev);
->  	if (ret < 0) {
->  		netdev_err(ndev, "mode resetting failed!\n");
-> -		goto err_bus_clk;
-> +		goto err_irq;
->  	}
->  
->  	/* Common open */
->  	ret = open_candev(ndev);
->  	if (ret)
-> -		goto err_bus_clk;
-> +		goto err_irq;
->  
->  	ret = xcan_chip_start(ndev);
->  	if (ret < 0) {
-> @@ -887,13 +883,11 @@ static int xcan_open(struct net_device *ndev)
->  
->  err_candev:
->  	close_candev(ndev);
-> -err_bus_clk:
-> -	clk_disable_unprepare(priv->bus_clk);
-> -err_can_clk:
-> -	clk_disable_unprepare(priv->can_clk);
->  err_irq:
->  	free_irq(ndev->irq, ndev);
->  err:
-> +	pm_runtime_put(priv->dev);
-> +
->  	return ret;
->  }
->  
-> @@ -910,12 +904,11 @@ static int xcan_close(struct net_device *ndev)
->  	netif_stop_queue(ndev);
->  	napi_disable(&priv->napi);
->  	xcan_chip_stop(ndev);
-> -	clk_disable_unprepare(priv->bus_clk);
-> -	clk_disable_unprepare(priv->can_clk);
->  	free_irq(ndev->irq, ndev);
->  	close_candev(ndev);
->  
->  	can_led_event(ndev, CAN_LED_EVENT_STOP);
-> +	pm_runtime_put(priv->dev);
->  
->  	return 0;
->  }
-> @@ -934,27 +927,21 @@ static int xcan_get_berr_counter(const struct net_device *ndev,
->  	struct xcan_priv *priv = netdev_priv(ndev);
->  	int ret;
->  
-> -	ret = clk_prepare_enable(priv->can_clk);
-> -	if (ret)
-> -		goto err;
-> +	ret = pm_runtime_get_sync(priv->dev);
-> +	if (ret < 0) {
-> +		netdev_err(ndev, "%s: runtime resume failed(%d)\n\r",
-> +				__func__, ret);
+Factoring out the code is good but it seems better to have it be
+something which drivers can control, for example by having them
+explicitly specify a property name to use or perhaps a flag to enable
+the default name.
 
-As above.
-
-	S?ren
+We also need an invert option.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/310d8ea9/attachment.sig>
