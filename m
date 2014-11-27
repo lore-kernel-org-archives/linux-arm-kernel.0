@@ -1,70 +1,48 @@
-From: zhang.lyra@gmail.com (Lyra Zhang)
-Date: Thu, 27 Nov 2014 23:23:17 +0800
-Subject: [PATCH v3 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
- support
-In-Reply-To: <3400511.2SONqVcoEr@wuerfel>
-References: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <54761BFC.4020705@ti.com>
- <CAAfSe-uMqy7zwiEK+nDoMPw_oni8L_vq7oW2Me5AY8z8KGpjwQ@mail.gmail.com>
- <3400511.2SONqVcoEr@wuerfel>
-Message-ID: <CAAfSe-uWvn4MX-+GKuvvd=G2MTfLDCFeLRoUGWp7vvc81wfu0w@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 27 Nov 2014 16:25:56 +0100
+Subject: [PATCH 1/2] ARM: tegra: irq: fix buggy usage of irq_data irq field
+In-Reply-To: <54773A33.2060705@arm.com>
+References: <1417024532-5777-1-git-send-email-marc.zyngier@arm.com>
+ <1417024532-5777-2-git-send-email-marc.zyngier@arm.com>
+ <20141127082836.GA19323@ulmo> <5476EA0A.7090406@arm.com>
+ <20141127120826.GA25222@ulmo> <5477330E.7020404@arm.com>
+ <20141127144509.GA27744@ulmo> <54773A33.2060705@arm.com>
+Message-ID: <20141127152555.GA20241@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-27 20:57 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> On Thursday 27 November 2014 19:59:46 Lyra Zhang wrote:
->> 2014-11-27 2:29 GMT+08:00 Murali Karicheri <m-karicheri2@ti.com>:
->> > On 11/25/2014 07:16 AM, Chunyan Zhang wrote:
->> >>
->> >> Add a full sc9836-uart driver for SC9836 SoC which is based on the
->>
->> >> +#include<linux/clk.h>
->> >
->> > How about sorting this includes? asm/irq.h go first followed linux/ in
->> > alphabatical order?
->>
->> >> +static irqreturn_t sprd_handle_irq(int irq, void *dev_id)
->> >> +{
->> >> +       struct uart_port *port = (struct uart_port *)dev_id;
->> >> +       u32 ims;
->> >> +
->> >> +       ims = serial_in(port, SPRD_IMSR);
->> >> +
->> >> +       serial_out(port, SPRD_ICLR, ~0);
->> >> +
->> >> +       if (ims&  (SPRD_IMSR_RX_FIFO_FULL |
->> >> +               SPRD_IMSR_BREAK_DETECT | SPRD_IMSR_TIMEOUT)) {
->> >> +               sprd_rx(irq, port);
->> >> +       }
->> >> +       if (ims&  SPRD_IMSR_TX_FIFO_EMPTY)
->> >> +               sprd_tx(irq, port);
->> >> +
->> >> +       return IRQ_HANDLED;
->> >
->> > You are always returning IRQ_HANDLED and this is registered as a SHARED irq.
->> > Is there a chance this handler is called and the irq event doesn't
->> > belong to this device?
->> >
->> > Murali
->>
->> You are right, this is not a SHARED irq. I'll pass 0 for irqflags when
->> called 'devm_request_irq' in the next version patch.
->
-> I think you could also add
->
->         if (!ims)
->                 return IRQ_NONE;
->
-> which would make it work on shared interrupt lines.
->
->         Arnd
+On Thu, Nov 27, 2014 at 02:50:27PM +0000, Marc Zyngier wrote:
+> On 27/11/14 14:45, Thierry Reding wrote:
+[...]
+> > Thanks for explaining this in so much detail. That makes perfect sense.
+> > On the other hand it means that we'd be breaking DTs in a backwards-
+> > incompatibile way, severely. Would there be provision for some sort of
+> > fallback to keep existing DTBs working?
+> 
+> I've been thinking of this, but that's not very nice. The box will
+> probably still boot, but suspend will be broken (all interrupts would be
+> pointing to the GIC, bypassing the LIC entirely).
 
-Yes, I saw this way in other serial drivers.
-But, if then, there are two questions for me:
-1. Why did some serial drivers need an UN_SHARED irq?
-2. How can we choose a right way?
+Given your description it sounds like suspend will still work, but the
+box won't be able to resume. There must be a way to refuse suspend in
+those cases. I think that's something we could live with, but not
+resuming sounds pretty bad.
 
-Thank you!
+> I've been looking at how to patch the FDT at runtime (ideally replacing
+> the top-level interrupt-parent), but that doesn't seem to be possible.
+> 
+> Suggestions?
 
-Best regards,
-Chunyan
+>From what I remember the gic_arch_extn structure had a flags field that
+needs to contain a specific flag to make resume work. Would it be
+possible to force that flag if we detect that LIC is not the top-level
+interrupt parent?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/3ee0cb6e/attachment.sig>
