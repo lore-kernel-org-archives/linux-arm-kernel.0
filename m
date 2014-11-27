@@ -1,138 +1,226 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 27 Nov 2014 16:34:59 +0900
-Subject: [PATCH 02/19] clk: samsung: Add binding documentation for Exynos5433
- clock controller
+Date: Thu, 27 Nov 2014 16:34:58 +0900
+Subject: [PATCH 01/19] pinctrl: exynos: Add support for Exynos5433
 In-Reply-To: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
 References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1417073716-22997-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1417073716-22997-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add binding documentation for Exynos5433 clock controller.
-Exynos5433 has various clock domains So, this documentation explains
-the detailed clock domains ans usage guide.
+This patch adds driver data for Exynos5433 SoC. Exynos5433 includes 228 multi-
+functional input/output port pins and 135 memory port pins. There are 41 general
+port groups and 2 memory port groups.
 
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Thomas Abraham <thomas.abraham@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Inki Dae <inki.dae@samsung.com>
 Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
+Acked-by: Inki Dae <inki.dae@samsung.com>
 ---
- .../devicetree/bindings/clock/exynos5433-clock.txt | 106 +++++++++++++++++++++
- 1 file changed, 106 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/exynos5433-clock.txt
+ drivers/pinctrl/samsung/pinctrl-exynos.c  | 163 ++++++++++++++++++++++++++++++
+ drivers/pinctrl/samsung/pinctrl-samsung.c |   2 +
+ drivers/pinctrl/samsung/pinctrl-samsung.h |   1 +
+ 3 files changed, 166 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/exynos5433-clock.txt b/Documentation/devicetree/bindings/clock/exynos5433-clock.txt
-new file mode 100644
-index 0000000..72cd0ba
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/exynos5433-clock.txt
-@@ -0,0 +1,106 @@
-+* Samsung Exynos5433 CMU (Clock Management Units)
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index 8e3e0c0..bd4c4ec 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -1268,6 +1268,169 @@ struct samsung_pin_ctrl exynos5420_pin_ctrl[] = {
+ 	},
+ };
+ 
++/* pin banks of exynos5433 pin-controller - ALIVE */
++static struct samsung_pin_bank exynos5433_pin_banks0[] = {
++	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
++	EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
++	EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
++	EXYNOS_PIN_BANK_EINTW(8, 0x060, "gpa3", 0x0c),
++};
 +
-+The Exynos5433 clock controller generates and supplies clock to various
-+controllers within the Exynos5433 SoC.
++/* pin banks of exynos5433 pin-controller - AUD */
++static struct samsung_pin_bank exynos5433_pin_banks1[] = {
++	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
++	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
++};
 +
-+Required Properties:
++/* pin banks of exynos5433 pin-controller - CPIF */
++static struct samsung_pin_bank exynos5433_pin_banks2[] = {
++	EXYNOS_PIN_BANK_EINTG(2, 0x000, "gpv6", 0x00),
++};
 +
-+- compatible: should be one of the following.
-+  - "samsung,exynos5433-cmu-top"   - clock controller compatible for CMU_TOP
-+    which generates clocks for IMEM/FSYS/G3D/GSCL/HEVC/MSCL/G2D/MFC/PERIC/PERIS
-+    domains and bus clocks.
-+  - "samsung,exynos5433-cmu-cpif"  - clock controller compatible for CMU_CPIF
-+    which generates clocks for LLI (Low Latency Interface) IP.
-+  - "samsung,exynos5433-cmu-mif"   - clock controller compatible for CMU_MIF
-+    which generates clocks for DRAM Memory Controller domain.
-+  - "samsung,exynos5433-cmu-peric" - clock controller compatible for CMU_PERIC
-+    which generates clocks for UART/I2C/SPI/I2S/PCM/SPDIF/PWM/SLIMBUS IPs.
-+  - "samsung,exynos5433-cmu-peris" - clock controller compatible for CMU_PERIS
-+    which generates clocks for PMU/TMU/MCT/WDT/RTC/SECKEY/TZPC IPs.
-+  - "samsung,exynos5433-cmu-fsys"  - clock controller compatible for CMU_FSYS
-+    which generates clocks for USB/UFS/SDMMC/TSI/PDMA IPs.
++/* pin banks of exynos5433 pin-controller - eSE */
++static struct samsung_pin_bank exynos5433_pin_banks3[] = {
++	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj2", 0x00),
++};
 +
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
++/* pin banks of exynos5433 pin-controller - FINGER */
++static struct samsung_pin_bank exynos5433_pin_banks4[] = {
++	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpd5", 0x00),
++};
 +
-+- #clock-cells: should be 1.
++/* pin banks of exynos5433 pin-controller - FSYS */
++static struct samsung_pin_bank exynos5433_pin_banks5[] = {
++	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gph1", 0x00),
++	EXYNOS_PIN_BANK_EINTG(7, 0x020, "gpr4", 0x04),
++	EXYNOS_PIN_BANK_EINTG(5, 0x040, "gpr0", 0x08),
++	EXYNOS_PIN_BANK_EINTG(8, 0x060, "gpr1", 0x0c),
++	EXYNOS_PIN_BANK_EINTG(2, 0x080, "gpr2", 0x10),
++	EXYNOS_PIN_BANK_EINTG(8, 0x0a0, "gpr3", 0x14),
++};
 +
-+Each clock is assigned an identifier and client nodes can use this identifier
-+to specify the clock which they consume.
++/* pin banks of exynos5433 pin-controller - IMEM */
++static struct samsung_pin_bank exynos5433_pin_banks6[] = {
++	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpf0", 0x00),
++};
 +
-+All available clocks are defined as preprocessor macros in
-+dt-bindings/clock/exynos5433.h header and can be used in device
-+tree sources.
++/* pin banks of exynos5433 pin-controller - NFC */
++static struct samsung_pin_bank exynos5433_pin_banks7[] = {
++	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj0", 0x00),
++};
 +
-+Example 1: Examples of clock controller nodes are listed below.
++/* pin banks of exynos5433 pin-controller - PERIC */
++static struct samsung_pin_bank exynos5433_pin_banks8[] = {
++	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gpv7", 0x00),
++	EXYNOS_PIN_BANK_EINTG(5, 0x020, "gpb0", 0x04),
++	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpc0", 0x08),
++	EXYNOS_PIN_BANK_EINTG(2, 0x060, "gpc1", 0x0c),
++	EXYNOS_PIN_BANK_EINTG(6, 0x080, "gpc2", 0x10),
++	EXYNOS_PIN_BANK_EINTG(8, 0x0a0, "gpc3", 0x14),
++	EXYNOS_PIN_BANK_EINTG(2, 0x0c0, "gpg0", 0x18),
++	EXYNOS_PIN_BANK_EINTG(4, 0x0e0, "gpd0", 0x1c),
++	EXYNOS_PIN_BANK_EINTG(6, 0x100, "gpd1", 0x20),
++	EXYNOS_PIN_BANK_EINTG(8, 0x120, "gpd2", 0x24),
++	EXYNOS_PIN_BANK_EINTG(5, 0x140, "gpd4", 0x28),
++	EXYNOS_PIN_BANK_EINTG(2, 0x160, "gpd8", 0x2c),
++	EXYNOS_PIN_BANK_EINTG(7, 0x180, "gpd6", 0x30),
++	EXYNOS_PIN_BANK_EINTG(3, 0x1a0, "gpd7", 0x34),
++	EXYNOS_PIN_BANK_EINTG(5, 0x1c0, "gpg1", 0x38),
++	EXYNOS_PIN_BANK_EINTG(2, 0x1e0, "gpg2", 0x3c),
++	EXYNOS_PIN_BANK_EINTG(8, 0x200, "gpg3", 0x40),
++};
 +
-+	cmu_top: clock-controller at 0x10030000 {
-+		compatible = "samsung,exynos5433-cmu-top";
-+		reg = <0x10030000 0x0c04>;
-+		#clock-cells = <1>;
-+	};
++/* pin banks of exynos5433 pin-controller - TOUCH */
++static struct samsung_pin_bank exynos5433_pin_banks9[] = {
++	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj1", 0x00),
++};
 +
-+	cmu_cpif: clock-controller at 0x10fc0000 {
-+		compatible = "samsung,exynos5433-cmu-cpif";
-+		reg = <0x10fc0000 0x0c04>;
-+		#clock-cells = <1>;
-+	};
++/*
++ * Samsung pinctrl driver data for Exynos5433 SoC. Exynos5433 SoC includes
++ * four gpio/pin-mux/pinconfig controllers.
++ */
++struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
++	{
++		/* pin-controller instance 0 data */
++		.pin_banks	= exynos5433_pin_banks0,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks0),
++		.eint_wkup_init = exynos_eint_wkup_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++		.label		= "exynos5433-gpio-ctrl0",
++	}, {
++		/* pin-controller instance 1 data */
++		.pin_banks	= exynos5433_pin_banks1,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks1),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++		.label		= "exynos5433-gpio-ctrl1",
++	}, {
++		/* pin-controller instance 2 data */
++		.pin_banks	= exynos5433_pin_banks2,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks2),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++		.label		= "exynos5433-gpio-ctrl2",
++	}, {
++		/* pin-controller instance 3 data */
++		.pin_banks	= exynos5433_pin_banks3,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks3),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++		.label		= "exynos5433-gpio-ctrl3",
++	}, {
++		/* pin-controller instance 4 data */
++		.pin_banks	= exynos5433_pin_banks4,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks4),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++		.label		= "exynos5433-gpio-ctrl4",
++	}, {
++		/* pin-controller instance 5 data */
++		.pin_banks	= exynos5433_pin_banks5,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks5),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++		.label		= "exynos5433-gpio-ctrl5",
++	}, {
++		/* pin-controller instance 6 data */
++		.pin_banks	= exynos5433_pin_banks6,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks6),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++		.label		= "exynos5433-gpio-ctrl6",
++	}, {
++		/* pin-controller instance 7 data */
++		.pin_banks	= exynos5433_pin_banks7,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks7),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++		.label		= "exynos5433-gpio-ctrl7",
++	}, {
++		/* pin-controller instance 8 data */
++		.pin_banks	= exynos5433_pin_banks8,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks8),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++		.label		= "exynos5433-gpio-ctrl8",
++	}, {
++		/* pin-controller instance 9 data */
++		.pin_banks	= exynos5433_pin_banks9,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks9),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++		.label		= "exynos5433-gpio-ctrl9",
++	},
++};
 +
-+	cmu_mif: clock-controller at 0x105b0000 {
-+		compatible = "samsung,exynos5433-cmu-mif";
-+		reg = <0x105b0000 0x100c>;
-+		#clock-cells = <1>;
-+	};
-+
-+	cmu_peric: clock-controller at 0x14c80000 {
-+		compatible = "samsung,exynos5433-cmu-peric";
-+		reg = <0x14c80000 0x0b08>;
-+		#clock-cells = <1>;
-+	};
-+
-+	cmu_peris: clock-controller at 0x10040000 {
-+		compatible = "samsung,exynos5433-cmu-peris";
-+		reg = <0x10040000 0x0b20>;
-+		#clock-cells = <1>;
-+	};
-+
-+	cmu_fsys: clock-controller at 0x156e0000 {
-+		compatible = "samsung,exynos5433-cmu-fsys";
-+		reg = <0x156e0000 0x0b04>;
-+		#clock-cells = <1>;
-+	};
-+
-+Example 2: UART controller node that consumes the clock generated by the clock
-+	   controller.
-+
-+	serial_0: serial at 14C10000 {
-+		compatible = "samsung,exynos5433-uart";
-+		reg = <0x14C10000 0x100>;
-+		interrupts = <0 421 0>;
-+		clocks = <&cmu_peric CLK_PCLK_UART0>,
-+			 <&cmu_peric CLK_SCLK_UART0>;
-+		clock-names = "uart", "clk_uart_baud0";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&uart0_bus>;
-+		status = "disabled";
-+	};
-+
-+Example 3: SPI controller node that consumes the clock generated by the clock
-+	   controller.
-+
-+	spi_0: spi at 14d20000 {
-+		compatible = "samsung,exynos7-spi";
-+		reg = <0x14d20000 0x100>;
-+		interrupts = <0 432 0>;
-+		dmas = <&pdma0 9>, <&pdma0 8>;
-+		dma-names = "tx", "rx";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&cmu_peric CLK_PCLK_SPI0>,
-+			 <&cmu_top CLK_SCLK_SPI0_PERIC>;
-+		clock-names = "spi", "spi_busclk0";
-+		samsung,spi-src-clk = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&spi0_bus>;
-+		status = "disabled";
-+	};
+ /* pin banks of exynos7 pin-controller - ALIVE */
+ static struct samsung_pin_bank exynos7_pin_banks0[] = {
+ 	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index e0ba851..4eb61ea 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -1226,6 +1226,8 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
+ 		.data = (void *)exynos5260_pin_ctrl },
+ 	{ .compatible = "samsung,exynos5420-pinctrl",
+ 		.data = (void *)exynos5420_pin_ctrl },
++	{ .compatible = "samsung,exynos5433-pinctrl",
++		.data = (void *)exynos5433_pin_ctrl },
+ 	{ .compatible = "samsung,s5pv210-pinctrl",
+ 		.data = (void *)s5pv210_pin_ctrl },
+ 	{ .compatible = "samsung,exynos7-pinctrl",
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
+index e737d1f..d260356 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.h
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
+@@ -245,6 +245,7 @@ extern struct samsung_pin_ctrl exynos4415_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos5250_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos5260_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos5420_pin_ctrl[];
++extern struct samsung_pin_ctrl exynos5433_pin_ctrl[];
+ extern const struct samsung_pin_ctrl exynos7_pin_ctrl[];
+ extern struct samsung_pin_ctrl s3c64xx_pin_ctrl[];
+ extern struct samsung_pin_ctrl s3c2412_pin_ctrl[];
 -- 
 1.8.5.5
