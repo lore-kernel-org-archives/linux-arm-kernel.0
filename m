@@ -1,156 +1,102 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 27 Nov 2014 19:42:25 +0000
-Subject: [PATCH 3.18-rc4 v10 4/6] irqchip: gic: Introduce plumbing for
- IPI FIQ
-In-Reply-To: <20141127180633.GM22670@titan.lakedaemon.net>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1417019010-9220-1-git-send-email-daniel.thompson@linaro.org>
- <1417019010-9220-5-git-send-email-daniel.thompson@linaro.org>
- <20141126174204.GK22670@titan.lakedaemon.net> <54772975.9090908@linaro.org>
- <20141127180633.GM22670@titan.lakedaemon.net>
-Message-ID: <54777EA1.3030508@linaro.org>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Thu, 27 Nov 2014 11:42:41 -0800
+Subject: [RFC 0/2] Qualcomm RPM sleep states
+In-Reply-To: <20141127190233.GF7712@sirena.org.uk>
+References: <546FC674.1070005@codeaurora.org>
+ <20141121232738.GP3815@sirena.org.uk>
+ <546FCE3A.1000005@codeaurora.org>
+ <20141124181614.GT7712@sirena.org.uk>
+ <5473A0F3.6080405@codeaurora.org>
+ <20141125204430.GN7712@sirena.org.uk>
+ <20141126233447.GD2872@sonymobile.com>
+ <20141127190233.GF7712@sirena.org.uk>
+Message-ID: <CAJAp7OgBepNL6j4D6_MvXJ5PTRDUFNt6paskkP=q=h8W_YNP_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/14 18:06, Jason Cooper wrote:
-> Daniel,
-> 
-> On Thu, Nov 27, 2014 at 01:39:01PM +0000, Daniel Thompson wrote:
->> On 26/11/14 17:42, Jason Cooper wrote:
->>> On Wed, Nov 26, 2014 at 04:23:28PM +0000, Daniel Thompson wrote:
->>>> Currently it is not possible to exploit FIQ for systems with a GIC, even if
->>>> the systems are otherwise capable of it. This patch makes it possible
->>>> for IPIs to be delivered using FIQ.
->>>>
->>>> To do so it modifies the register state so that normal interrupts are
->>>> placed in group 1 and specific IPIs are placed into group 0. It also
->>>> configures the controller to raise group 0 interrupts using the FIQ
->>>> signal. It provides a means for architecture code to define which IPIs
->>>> shall use FIQ and to acknowledge any IPIs that are raised.
->>>>
->>>> All GIC hardware except GICv1-without-TrustZone support provides a means
->>>> to group exceptions into group 0 and group 1 but the hardware
->>>> functionality is unavailable to the kernel when a secure monitor is
->>>> present because access to the grouping registers are prohibited outside
->>>> "secure world". However when grouping is not available (or in the case
->>>> of early GICv1 implementations is very hard to configure) the code to
->>>> change groups does not deploy and all IPIs will be raised via IRQ.
->>>>
->>>> It has been tested and shown working on two systems capable of
->>>> supporting grouping (Freescale i.MX6 and STiH416). It has also been
->>>> tested for boot regressions on two systems that do not support grouping
->>>> (vexpress-a9 and Qualcomm Snapdragon 600).
->>>>
->>>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->>>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>>> Cc: Jason Cooper <jason@lakedaemon.net>
->>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>> Tested-by: Jon Medhurst <tixy@linaro.org>
->>>> ---
->>>>  arch/arm/kernel/traps.c         |   5 +-
->>>>  drivers/irqchip/irq-gic.c       | 155 +++++++++++++++++++++++++++++++++++++---
->>>>  include/linux/irqchip/arm-gic.h |   8 +++
->>>>  3 files changed, 158 insertions(+), 10 deletions(-)
->>> ...
->>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>>> index 5d72823bc5e9..978e5e48d5c1 100644
->>>> --- a/drivers/irqchip/irq-gic.c
->>>> +++ b/drivers/irqchip/irq-gic.c
->>> ...
->>>> +/*
->>>> + * Test which group an interrupt belongs to.
->>>> + *
->>>> + * Returns 0 if the controller does not support grouping.
->>>> + */
->>>> +static int gic_get_group_irq(void __iomem *base, unsigned int hwirq)
->>>> +{
->>>> +	unsigned int grp_reg = hwirq / 32 * 4;
->>>> +	u32 grp_val;
->>>> +
->>>> +	grp_val = readl_relaxed(base + GIC_DIST_IGROUP + grp_reg);
->>>> +
->>>> +	return (grp_val >> (hwirq % 32)) & 1;
->>>> +}
->>> ...
->>>> @@ -669,7 +802,11 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->>>>  	dmb(ishst);
->>>>  
->>>>  	/* this always happens on GIC0 */
->>>> -	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
->>>> +	softint = map << 16 | irq;
->>>> +	if (gic_get_group_irq(gic_data_dist_base(&gic_data[0]), irq))
->>>> +		softint |= 0x8000;
->>>> +	writel_relaxed(softint,
->>>> +		       gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
->>>>  
->>>>  	bl_migration_unlock();
->>>>  }
->>>
->>> Is it worth the code complication to optimize this if the controller
->>> doesn't support grouping?  Maybe set group_enabled at init so the above
->>> would become:
->>>
->>> 	softint = map << 16 | irq;
->>> 	if (group_enabled &&
->>> 	    gic_get_group_irq(gic_data_dist_base(&gic_data[0]), irq))
->>> 		softint |= 0x8000;
->>> 	writel_relaxed(...);
->>
->> No objections.
->>
->> However given this code always calls gic_get_group_irq() with irq < 16
->> we might be able to do better even than this. The lower 16-bits of
->> IGROUP[0] are constant after boot so if we keep a shadow copy around
->> instead of just a boolean then we can avoid the register read on all
->> code paths.
-> 
-> Hmm, I'd look at that as a performance enhancement.  I'm more concerned
-> about performance regressions for current users of the gic (non-group
-> enabled).
+On Thu, Nov 27, 2014 at 11:02 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Nov 26, 2014 at 03:34:47PM -0800, Bjorn Andersson wrote:
+>
+>> Problem 1:
+>> Regulators are shared between CPU PLLs and other peripherals and when we take
+>> the cpu to idle we need a way to let go of the CPU PLL "vote" on the regulator.
+>
+>> In the case of the CPU being the only consumer I think we've come down to the
+>> problems being:
+>> * we're in atomic context
+>
+> That shouldn't be an issue, we can do something like what we've got for
+> regmap and allow regulators to replace their mutexes with spinlocks
+> (users and drivers will need to be careful they don't do expensive
+> things, plus we wamy want to look at optimizing the core, but that's
+> true anyway).
+>
 
-"Current users of the gic" doesn't imply "non-group enabled". Whether or
-not grouping is enabled is a property of the hardware or (secure)
-bootloader.
+If I understand Stephen correctly, this is basically what would happen
+when we go to suspend (take the CPUs off the individual PLLs and
+releasing the regulators), but for going in and out of _idle_ this is
+too costly and we want to utilise the hardware assist for this.
 
-If we are seriously worried about a performance regression here we
-actually have to care about both cases.
+>> * we don't want to waste the time of making sending out the request
+>> * we have hardware support for this and we want to use it(?)
+>
+> I'm still hazy on what that actually means.  I thought the CPU case was
+> one of the big ones where you *did* want to act on the configuration
+> changes?
+>
+
+By utilising the hardware support for switching between active and
+sleep state (and having the cpu only affecting the active state) we
+can do this asynchronously, while being in wfi.
+
+>> In the case of us having other active consumers (e.g. GPU, display or some
+>> peripherals) the voltage range or operating mode specified by the cpufreq
+>> driver might be suboptimal when we remove the cpu.
+>
+> I don't understand.  Why is the other consumer asking for something it
+> doesn't need itself?
+>
+
+I don't have the actual numbers, but we have a situation that looks like this:
+gpu driver does regulator_set_voltage(.5V, 1V);
+cpufreq driver does regulator_set_voltage(1V,1V);
+
+The regulator framework will make the regulator tick at 1V
+
+Upon going to sleep the cpuidle driver will, through the hardware
+support, make the regulator tick at .5V. Before returning the cpu from
+idle the hardware will make the regulator tick at 1V again.
+
+[..]
+
+>> > I think any duplication that's going on sounds like a consequence of
+>> > the way this is currently implemented.  I think based on what I *think*
+>> > you're saying the RPM driver probably ought to be hiding this and adding
+>> > a property which makes the active and sleep sets track each other with
+>> > normal suspend mode control otherwise.  That could potentially be done
+>> > in the core, though the tracking would be substantial surgery.
+>
+>> I think we should start off by hiding this in the driver, if others come
+>> forward needing something similar we can look at how to integrate parts of it
+>> into the core.
+>
+> If you're hiding it in the driver make sure it's *hidden* in the driver
+> - exporting duplicate regulators doesn't sound like hiding to me.
+>
+
+This is the problem at hand, we have not found any way to actually
+hide this in the driver as the two modes depend on the consumer and
+not the aggregated values we get out of the regulator framework.
+
+Or rather, my proposal would do that, but that will not be able to
+handle the case when there's different voltages in the two states. It
+would only take care of the enable/disable case.
 
 
-> Let's go ahead and do the change (well, a working facsimile) I suggested
-> above, and we can do a follow on patch to increase performance for the
-> group enabled use case.
+The exposure of multiple regulators moves the problem to the
+devicetree, making sure to map the consumers to the right
+state/regulator. But it should only be the cpu (in its various forms)
+that ever consume the active only regulator.
 
-Hmnnn...
-
-I've have a new patch ready to go that shadows the IGROUP[0]. Its looks
-OK to me and I think it is actually fewer lines of code than v10 because
-we can remove gic_get_group_irq() completely.
-
-The code in question ends up looking like:
-
- 	softint = map << 16 | irq;
- 	if (gic->igroup0_shadow & BIT(irq))
- 		softint |= 0x8000;
- 	writel_relaxed(...);
-
-This should end up with the same (data) cache profile as your proposal
-in the non-group case and should normally be a win for the grouped case.
-I even remembered an informative comment to make clear the use of
-shadowing is as an optimization and nothing to do with working around
-stupid hardware ;-).
-
-I hope you don't mind but I'm about to share a patchset based on the
-above so you can see it in full and decide if you like it. I don't
-object to adding an extra boolean (and will do that if you don't like
-the above) but I think this code is better.
-
-
-> If there's no objections, I'd like to try to get this in for v3.19, but
-> it's really late.  So we'll see how it goes.
-
-I like that too. I also agree its pretty late and that's one of the
-reasons why I'm turning round new patchsets for each bit of feedback.
-
-
-Daniel.
+Regards,
+Bjorn
