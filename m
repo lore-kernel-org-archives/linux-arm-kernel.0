@@ -1,32 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Nov 2014 15:50:46 +0100
-Subject: [PATCH 2/3] ARM: edma: Rename header file for dmaengine filter
- function definition
-In-Reply-To: <547733E3.3020408@ti.com>
-References: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>
- <8235185.7qUDHu9jso@wuerfel> <547733E3.3020408@ti.com>
-Message-ID: <3300340.ou8f7H2hIc@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 27 Nov 2014 15:51:48 +0100
+Subject: [PATCH V2 0/3] PM / Domains: Add initial PM clock support to genpd
+Message-ID: <1417099911-12688-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014 16:23:31 Peter Ujfalusi wrote:
-> This will only work in case of legacy boot. When booting with DT we do not
-> have pdata and after this patch in dt boot we are not going to be able to get
-> the DMA resources either.
+Changes in v2:
+	-Small fixes in patch 1.
 
-No, when booting with DT, the filter_fn and data are not used at all,
-we get the dma channel by parsing the DT instead.
 
-> I think if we want to do something like this, it has to be done within the
-> dmaengine framework. The dma controller's of_dma_filter_info already have
-> .filter_fn which could be used by the framework.
+It's quite common for PM domains to use PM clocks. Typically from SOC specific
+code, the per device PM clock list is created and pm_clk_suspend|resume() are
+invoked to handle clock gating/ungating.
 
-No, of_dma_filter_info/of_dma_simple_xlate was a mistake, we should never
-have even introduced that. All drivers that rely on this can simply
-provide their own xlate function that calls of_dma_get_slave_channel()
-or one of the related functions.
+A step towards consolidation is to integrate PM clock support into genpd, which
+is what this patchset does.
 
-edma is particularly trivial, it can just use of_dma_xlate_by_chan_id()
-instead of of_dma_simple_xlate, as it looks up the channel by its number.
+In this initial step, the calls to the pm_clk_suspend|resume() are handled
+within genpd, but the per device PM clock list still needs to be created from
+SOC specific code. It seems reasonable to have gendp to handle that as well, but
+that left to future patchsets to address.
 
-	Arnd
+It's not every users of genpd that are keen on using PM clocks thus we need
+to provide this a configuration option for genpd.
+
+In patch 2 and patch 3, we convert some of the SH-MOBILE SOCs to start using the
+new PM clock support in genpd.
+
+
+Ulf Hansson (3):
+  PM / Domains: Initial PM clock support for genpd
+  ARM: shmobile: Convert to genpd flags for PM clocks for r8a7779
+  ARM: shmobile: Convert to genpd flags for PM clocks for R-mobile
+
+ arch/arm/mach-shmobile/pm-r8a7779.c | 3 +--
+ arch/arm/mach-shmobile/pm-rmobile.c | 3 +--
+ drivers/base/power/domain.c         | 7 +++++++
+ include/linux/pm_domain.h           | 3 +++
+ 4 files changed, 12 insertions(+), 4 deletions(-)
+
+-- 
+1.9.1
