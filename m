@@ -1,37 +1,34 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 27 Nov 2014 08:54:07 +0530
-Subject: [PATCH V1 5/8] opp: replace kfree_rcu() with call_srcu() in
- opp_set_availability()
-In-Reply-To: <9a64eb3d9d11ff7379b7eb6d9207625175f28e47.1417058376.git.viresh.kumar@linaro.org>
-References: <f815d0855c1bd28d8389554176acd2620e56b3c8.1416910766.git.viresh.kumar@linaro.org>
- <9a64eb3d9d11ff7379b7eb6d9207625175f28e47.1417058376.git.viresh.kumar@linaro.org>
-Message-ID: <268325a89f657777924a52082749d8342e4ef79f.1417058376.git.viresh.kumar@linaro.org>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Wed, 26 Nov 2014 19:47:10 -0800
+Subject: [PATCH] clk: rockchip: rk3288 export i2s0_clkout for use in DT
+In-Reply-To: <3863623.tcGxuFQcZa@diego>
+References: <1416381319-31117-1-git-send-email-sonnyrao@chromium.org>
+ <3863623.tcGxuFQcZa@diego>
+Message-ID: <CAPz6YkXOS08hv7x+DM3roTuZYMbh9n4=kpTrH8NGYUffczQwLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This existed before we introduced call_srcu() in opp layer to synchronize with
-srcu_notifier_call_chain() while removing OPPs. And is a potential bug which
-wasn't noticed earlier.
+On Wed, Nov 26, 2014 at 3:32 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Dienstag, 18. November 2014, 23:15:19 schrieb Sonny Rao:
+>> This exposes the clock that comes out of the i2s block which generally
+>> goes to the audio codec.
+>>
+>> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+>
+> applied to my clk branch after removing the CLK_SET_RATE_PARENT
 
-Let fix it as well by using the right API to free OPP.
+Hi, sorry for the delay, and thanks for fixing it.  I think when I
+applied the patch to next-20141118 that had a CLK_SET_RATE_PARENT in
+it from this patch:
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/base/power/opp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+commit fc69ed70c16a31d6a77ec47a30a9fe941f763f1e
+Author: Jianqun <jay.xu@rock-chips.com>
+Date:   Tue Sep 30 11:12:04 2014 +0800
 
-diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-index 977474a..2d195f3 100644
---- a/drivers/base/power/opp.c
-+++ b/drivers/base/power/opp.c
-@@ -641,7 +641,7 @@ static int opp_set_availability(struct device *dev, unsigned long freq,
- 
- 	list_replace_rcu(&opp->node, &new_opp->node);
- 	mutex_unlock(&dev_opp_list_lock);
--	kfree_rcu(opp, rcu_head);
-+	call_srcu(&dev_opp->srcu_head.srcu, &opp->rcu_head, kfree_opp_rcu);
- 
- 	/* Notify the change of the OPP availability */
- 	if (availability_req)
--- 
-2.0.3.693.g996b0fd
+    clk: rockchip: rk3288: i2s_frac adds flag to set parent's rate
+
+
+I agree that is is not necessary and maybe not desirable.  Thanks again!
+
+
+> Heiko
