@@ -1,71 +1,78 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 27 Nov 2014 20:00:36 +0100
-Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
-In-Reply-To: <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
-References: <5465C00E.4030808@offcode.fi>
- <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <20141127200036.2c65df62@bbrezillon>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 27 Nov 2014 20:00:56 +0100
+Subject: [PATCH] ARM: xscale: correct auxiliary register in suspend/resume
+In-Reply-To: <87r3wz6mvs.fsf@free.fr> (Robert Jarzmik's message of "Wed, 19
+ Nov 2014 19:55:35 +0100")
+References: <1416053153-27491-1-git-send-email-dbaryshkov@gmail.com>
+ <87r3wz6mvs.fsf@free.fr>
+Message-ID: <87vbm01n9z.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timo,
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-Sorry for the late reply.
+> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+> ...zip...
+> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>
+> Hi Russell,
+>
+> Is this patch in [1] fine by you so that Dmitry can submit it to your patch system ?
 
-On Fri, 21 Nov 2014 14:23:30 +0200
-Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
+OK Dmitry, let's say that Russell didn't object. Please submit it to his patch
+system (with the required procedure, kernel version upon which this applies, etc
+... all in [2]).
 
-> By default the driver will start a kernel timer which keeps on kicking
-> the watchdog HW until user space has opened the watchdog
-> device. Usually this is desirable as the watchdog HW is running by
-> default and the user space may not have any watchdog daemon running at
-> all.
-> 
-> However, on production systems it may be mandatory that also early
-> crashes and lockups will lead to a watchdog reset, even if they happen
-> before the user space has opened the watchdog device.
-> 
-> To resolve the issue, add a new device tree property
-> "enable-early-reset" which will prevent the kernel timer from pinging
-> the watchdog HW on behalf of user space. The default is still to use
-> kernel timer, but more strict behavior can be enabled via the device
-> tree property.
-> 
-> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+If Russell disagrees, he'll drop the patch and you'll know there is more work.
+
+Thanks.
+
+--
+Robert
+
+[1] The patch
+>
+> ---8>---
+> According to the manuals I have, XScale auxiliary register should be
+> reached with opc_2 = 1 instead of crn = 1. cpu_xscale_proc_init
+> correctly uses c1, c0, 1 arguments, but cpu_xscale_do_suspend and
+> cpu_xscale_do_resume use c1, c1, 0. Correct suspend/resume functions to
+> also use c1, c0, 1.
+>
+> The issue was primarily noticed thanks to qemu reporing "unsupported
+> instruction" on the pxa suspend path. Confirmed in PXA210/250 and PXA255
+> XScale Core manuals and in PXA270 and PXA320 Developers Guides.
+>
+> Harware tested by me on tosa (pxa255). Robert confirmed on pxa270 board.
+>
+> Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 > ---
->  Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
->  drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
->  2 files changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> index f90e294..a0b7b75 100644
-> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> @@ -28,6 +28,10 @@ Optional properties:
->  	entering idle state.
->  - atmel,dbg-halt : Should be present if you want to stop the watchdog when
->  	entering debug state.
-> +- enable-early-reset : Should be present if you want to let the
-> +	watchdog timer to expire even before user space has opened the
-> +	device. If not set, a kernel timer will keep on pinging the
-> +	watchdog until it is opened.
+>  arch/arm/mm/proc-xscale.S | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+> index 23259f1..afa2b3c 100644
+> --- a/arch/arm/mm/proc-xscale.S
+> +++ b/arch/arm/mm/proc-xscale.S
+> @@ -535,7 +535,7 @@ ENTRY(cpu_xscale_do_suspend)
+>  	mrc	p15, 0, r5, c15, c1, 0	@ CP access reg
+>  	mrc	p15, 0, r6, c13, c0, 0	@ PID
+>  	mrc	p15, 0, r7, c3, c0, 0	@ domain ID
+> -	mrc	p15, 0, r8, c1, c1, 0	@ auxiliary control reg
+> +	mrc	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
+>  	mrc	p15, 0, r9, c1, c0, 0	@ control reg
+>  	bic	r4, r4, #2		@ clear frequency change bit
+>  	stmia	r0, {r4 - r9}		@ store cp regs
+> @@ -552,7 +552,7 @@ ENTRY(cpu_xscale_do_resume)
+>  	mcr	p15, 0, r6, c13, c0, 0	@ PID
+>  	mcr	p15, 0, r7, c3, c0, 0	@ domain ID
+>  	mcr	p15, 0, r1, c2, c0, 0	@ translation table base addr
+> -	mcr	p15, 0, r8, c1, c1, 0	@ auxiliary control reg
+> +	mcr	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
+>  	mov	r0, r9			@ control register
+>  	b	cpu_resume_mmu
+>  ENDPROC(cpu_xscale_do_resume)
 
-If you want to make this property generic, maybe you should document it
-in a generic binding doc
-(Documentation/devicetree/bindings/watchdog/watchdog.txt ?).
-Once you're at it, maybe you could document the generic timeout-sec
-property in this file.
-Moreover, you might want to parse this property in watchdog_core.c and
-store the information in the watchdog_device struct.
-
-Apart from that, I'm not opposed to the approach, and I'm fine with the
-current implementation.
-
-Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+[2] Russell's patch system rules
+http://www.arm.linux.org.uk/developer/patches/info.php
