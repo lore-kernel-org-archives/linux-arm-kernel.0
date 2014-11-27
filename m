@@ -1,93 +1,65 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 27 Nov 2014 16:06:42 +0900
-Subject: [GIT PULL 3/4] Samsung 3rd round of DT updates for v3.19
-Message-ID: <5476CD82.5050705@kernel.org>
+Date: Thu, 27 Nov 2014 16:06:48 +0900
+Subject: [GIT PULL 4/4] Samsung exynos7 updates for v3.19
+Message-ID: <5476CD88.1030406@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a427d15062ac46a00a22d2f0b9d05093c18ff2f1:
+The following changes since commit 3b1f6f3450b6a64aead53d09fc6f8bba2999c450:
 
-  ARM: dts: Add micro SD card SDHCI node for exynos4412-trats
-(2014-11-07 08:28:24 +0900)
+  Merge remote-tracking branch 'arm-soc/cleanup/dts-subdirs' into
+v3.19-next/dt-samsung-64 (2014-11-26 16:02:13 +0900)
 
 are available in the git repository at:
 
+
   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-dt-3
+tags/samsung-dt-64
 
-for you to fetch changes up to 1888eb75e68caceaab2fe0db820bd6ed574a468f:
+for you to fetch changes up to ab93f6ca63943d6eca9494547127fe1c337c1d83:
 
-  ARM: dts: add sysreg phandle to i2c device nodes for exynos
-(2014-11-27 03:24:45 +0900)
-
-----------------------------------------------------------------
-Samsung 3rd DT updates for v3.19
-
-- exynos3250
-  : remove unused bootargs on exynos3250-rinato
-  : add new board dt file for exynos3250-monk
-- exynos4
-  : add missing clock for MFC
-  : specify default clocks for camera
-- exynos4x12
-  : add TMU related DT nodes
-- exynos4412-trats2
-  : add max77693-haptic and pwm nodes, enable TMU support
-- exynos4412-odroid
-  : specify audio clock parents and rates
-- exynos5250 and exynos5420
-  : add syscon based phandle to i2c device nodes
-- exynos5250-spring
-  : add trackpad, temperature sensor and usb3505 pinctrl
-
-Note: based on previous tags/samsung-dt-2 for v3.19
+  arm64: Enable ARMv8 based exynos7 SoC support (2014-11-27 02:14:00 +0900)
 
 ----------------------------------------------------------------
-Andreas Faerber (3):
-      ARM: dts: Add usb3503 pinctrl to exynos5250-spring
-      ARM: dts: Add temperature sensor to exynos5250-spring
-      ARM: dts: Add trackpad to exynos5250-spring
+Samsung arch/arm64 DT updates for v3.19
 
-Chanwoo Choi (2):
-      Documentation: devicetree: Add Exynos-based boards compatible string
-      ARM: dts: Remove unused bootargs from exynos3250-rinato
+- to support ARMv8 based exynos7 SoC
+  : add initial device tree and add pinctrl, PMU, mmc, i2c, rtc,
+    watchdog, and adc nodes for exynos7 SoC and exynos7 based
+    espresso board.
 
-Jaewon Kim (2):
-      ARM: dts: add pwm node for exynos4412-trats2
-      ARM: dts: Add max77693-haptic node for exynos4412-trats2
+NOTE that this is including following dependencies
+: cleanup/dts-subdirs in arm-soc for arm64 vendor support
+: tags/samsung-driver for samsung serial
+: for-v3.19/exynos-clk in samsung-clk tree for exynos7 clk
 
-Lukasz Majewski (2):
-      ARM: dts: Device tree node definition for TMU on exynos4x12
-      ARM: dts: Enable TMU support for exynos4412-trats2
+One more NOTE, for support exynos7 we need Liviu's "arm64: Create
+link to include/dt-bindings to enable C preprocessor use" in arm-soc
+tree and arm64 defconfig update should be handled directly.
 
-Marek Szyprowski (1):
-      ARM: dts: add missing clock to MFC device for exynos4
+----------------------------------------------------------------
+Abhilash Kesavan (2):
+      arm64: dts: Add PMU DT node for exynos7 SoC
+      arm64: dts: Add nodes for mmc, i2c, rtc, watchdog, adc on exynos7
 
-Pankaj Dubey (1):
-      ARM: dts: add sysreg phandle to i2c device nodes for exynos
+Alim Akhtar (1):
+      arm64: Enable ARMv8 based exynos7 SoC support
 
-Sylwester Nawrocki (2):
-      ARM: dts: Specify default clocks for Exynos4 camera devices
-      ARM: dts: Specify audio clock parents and rates for
-exynos4412-odroid-common
+Naveen Krishna Ch (2):
+      arm64: dts: Add initial device tree support for exynos7
+      arm64: dts: Add initial pinctrl support to exynos7
 
-Youngjun Cho (1):
-      ARM: dts: add board dts file for Exynos3250-based Monk board
-
- .../devicetree/bindings/arm/samsung-boards.txt     |  19 +-
- .../devicetree/bindings/i2c/i2c-s3c2410.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/exynos3250-monk.dts              | 579
+ .../devicetree/bindings/arm/samsung/pmu.txt        |   1 +
+ arch/arm64/Kconfig                                 |  17 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/exynos/Makefile                |   5 +
+ arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |  84 +++
+ arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    | 588
 +++++++++++++++++++++
- arch/arm/boot/dts/exynos3250-rinato.dts            |   4 -
- arch/arm/boot/dts/exynos4.dtsi                     |   4 +-
- arch/arm/boot/dts/exynos4210-trats.dts             |  16 +
- arch/arm/boot/dts/exynos4210-universal_c210.dts    |  16 +
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |  26 +
- arch/arm/boot/dts/exynos4412-trats2.dts            |  50 +-
- arch/arm/boot/dts/exynos4x12.dtsi                  |  10 +
- arch/arm/boot/dts/exynos5250-spring.dts            |  30 ++
- arch/arm/boot/dts/exynos5250.dtsi                  |   4 +
- arch/arm/boot/dts/exynos5420.dtsi                  |   4 +
- 14 files changed, 751 insertions(+), 15 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos3250-monk.dts
+ arch/arm64/boot/dts/exynos/exynos7.dtsi            | 530
++++++++++++++++++++
+ 7 files changed, 1226 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/exynos/Makefile
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7.dtsi
