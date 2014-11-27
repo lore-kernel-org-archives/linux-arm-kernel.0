@@ -1,76 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Nov 2014 18:43:42 +0000
-Subject: [PATCH v4 4/7] regulator: Use ena_gpio supplied with generic
- regulator bindings
-In-Reply-To: <1417087253-12306-5-git-send-email-k.kozlowski@samsung.com>
-References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
- <1417087253-12306-5-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20141127184342.GC7712@sirena.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 27 Nov 2014 19:44:18 +0100
+Subject: [PATCHv2 05/16] gpio: mvebu: add suspend/resume support
+In-Reply-To: <CACRpkdb5S7Fv4+Ck2btLPTYWaWr_E-iMcQGeATB4NMwx_T-4GA@mail.gmail.com>
+References: <1415978496-9334-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1415978496-9334-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CACRpkdb5S7Fv4+Ck2btLPTYWaWr_E-iMcQGeATB4NMwx_T-4GA@mail.gmail.com>
+Message-ID: <20141127194418.43e03e80@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 12:20:50PM +0100, Krzysztof Kozlowski wrote:
-> Use ena_gpio from regulator constraints (filled by parsing generic
-> bindings) to initialize the GPIO enable control. Support also the old
-> way: ena_gpio supplied in regulator_config structure.
+Dear Linus Walleij,
+
+On Thu, 27 Nov 2014 14:29:47 +0100, Linus Walleij wrote:
+> On Fri, Nov 14, 2014 at 4:21 PM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com> wrote:
 > 
-> This also adds a new set_ena_gpio() callback in regulator_ops structure
-> which driver may provide to actually enable the GPIO control in
-> hardware.
+> > This commit adds the implementation of ->suspend() and ->resume()
+> > platform_driver hooks in order to save and restore the state of the
+> > GPIO configuration. In order to achieve that, additional fields are
+> > added to the mvebu_gpio_chip structure.
+> >
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Alexandre Courbot <gnurou@gmail.com>
+> > Cc: linux-gpio at vger.kernel.org
+> > Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+> > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Do you want me to merge the patch or is it dependent on other patches?
 
-This seems really confused like it's trying to work around some other
-problem - this all feels like it's at the wrong abstraction level.  As
-far as I can tell this is trying to fix bugs in the previous patch and
-do some other refactorings (the "also add this other random op" bit
-especially) but I'm really not clear what the goal is.
+This patch has already been merged by you, and is already in
+linux-next. See
+https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-gpio.git/commit/?h=for-next&id=b5b7b487431b01619f2947d91dadd7c7a233692e.
 
-Please try to think if the code you're writing makes sense at the big
-picture level rather than just band aiding specific problems you see.
-It's also a good idea to keep random code motion separate from
-functional changes since it makes it much easier to follow what each is
-supposed to do.
+Best regards,
 
-> @@ -1044,6 +1045,14 @@ static int set_machine_constraints(struct regulator_dev *rdev,
->  		}
->  	}
->  
-> +	if (rdev->constraints->use_ena_gpio && ops->set_ena_gpio) {
-> +		ret = ops->set_ena_gpio(rdev);
-> +		if (ret < 0) {
-> +			rdev_err(rdev, "failed to set enable GPIO control\n");
-> +			goto out;
-> +		}
-> +	}
-
-Why do we need some special magic operation for GPIO based enables
-that's separate to any other enable operation?  This seems really
-confusing, if the constraint setting doesn't work somehow for GPIO based
-enables we should fix that.  Though since this operation takes no
-parameters it's hard to see how it's supposed to apply constraints
-unless it reparses them which doesn't seem like a good idea...
-
->  static int regulator_ena_gpio_request(struct regulator_dev *rdev,
-> -				const struct regulator_config *config)
-
-> -	ret = gpio_request_one(config->ena_gpio,
-> -				GPIOF_DIR_OUT | config->ena_gpio_flags,
-> +	ret = gpio_request_one(gpio, GPIOF_DIR_OUT | gpio_flags,
->  				rdev_get_name(rdev));
-
-> +/*
-> + * Request GPIO for enable control from regulator_config
-> + * or init_data->constraints.
-> + */
-> +static int regulator_ena_gpio_setup(struct regulator_dev *rdev,
-> +			const struct regulator_config *config,
-> +			const struct regulator_init_data *init_data)
-
-Why is setting up the GPIO different to requesting it, especially given
-that we have an existing function called _request() which still exists?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/cad8a8a4/attachment.sig>
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
