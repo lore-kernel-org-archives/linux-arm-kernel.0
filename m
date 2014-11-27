@@ -1,83 +1,82 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 27 Nov 2014 20:06:47 +0100
-Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
-In-Reply-To: <54775E12.6020906@roeck-us.net>
-References: <5465C00E.4030808@offcode.fi>
- <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
- <5476CA7F.4000802@offcode.fi> <5476ED44.603@atmel.com>
- <54775E12.6020906@roeck-us.net>
-Message-ID: <20141127200647.4f0575ca@bbrezillon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 27 Nov 2014 20:05:09 +0100
+Subject: [PATCH 3/9] clk: sunxi: Add prcm mod0 clock driver
+In-Reply-To: <5476F8AB.2000601@redhat.com>
+References: <20141126211318.GN25249@lukather> <5476E3A5.4000708@redhat.com>
+ <CAGb2v652m0bCdPWFF4LWwjcrCJZvnLibFPw8xXJ3Q-Ge+_-p7g@mail.gmail.com>
+ <5476F8AB.2000601@redhat.com>
+Message-ID: <20141127190509.GR25249@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+Hi,
 
-On Thu, 27 Nov 2014 09:23:30 -0800
-Guenter Roeck <linux@roeck-us.net> wrote:
-
-> On 11/27/2014 01:22 AM, Nicolas Ferre wrote:
-> > On 27/11/2014 07:53, Timo Kokkonen wrote:
-> >> Hi,
-> >>
-> >> On 21.11.2014 14:23, Timo Kokkonen wrote:
-> >>> By default the driver will start a kernel timer which keeps on kicking
-> >>> the watchdog HW until user space has opened the watchdog
-> >>> device. Usually this is desirable as the watchdog HW is running by
-> >>> default and the user space may not have any watchdog daemon running at
-> >>> all.
-> >>>
-> >>> However, on production systems it may be mandatory that also early
-> >>> crashes and lockups will lead to a watchdog reset, even if they happen
-> >>> before the user space has opened the watchdog device.
-> >>>
-> >>> To resolve the issue, add a new device tree property
-> >>> "enable-early-reset" which will prevent the kernel timer from pinging
-> >>> the watchdog HW on behalf of user space. The default is still to use
-> >>> kernel timer, but more strict behavior can be enabled via the device
-> >>> tree property.
-> >>>
-> >>> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
-> >>
-> >> I forgot to put the PATCHv2 on the subject line.. But anyway, any
-> >> thoughts about it? Is there something that should be done to get it forward?
-> >
-> > Sorry for not having come back to you quickly.
-> >
-> > The only thing that tend to prevent me from taking this patch is the
-> > fact that this DT property is mostly a software, Linux-specific one...
-> > Which is somehow not covered by the DT.
-> > This might explain as well why this property is not present on other SoCs.
-> >
-> > Can we have other people's advices?
-> >
+On Thu, Nov 27, 2014 at 11:10:51AM +0100, Hans de Goede wrote:
+> Hi,
 > 
-> We have been thinking about a more generic (infrastructure based) solution
-> for the problem at hand, but that was a bit more complex and would specify
-> the actual timeout during boot, not just a boolean like suggested here.
-
-Can't we keep the same timeout (the one specified in the timeout-sec
-property) ?
-
+> On 11/27/2014 10:28 AM, Chen-Yu Tsai wrote:
+> >Hi,
+> >
+> >On Thu, Nov 27, 2014 at 4:41 PM, Hans de Goede <hdegoede@redhat.com> wrote:
 > 
-> As for DT not supposed to be used for configuration, that is really a
-> tricky problem which is hard to solve. I seem to recall, though, that
-> it may be now acceptable under certain conditions. A module parameter
-> might be easier.
+> <snip>
+> 
+> >>I notice that you've not responded to my proposal to simple make the clock
+> >>node a child node of the clocks node in the dt, that should work nicely, and
+> >>avoid the need for any kernel level changes to support it, I'm beginning to
+> >>think that that is probably the best solution.
+> >
+> >Would that not cause an overlap of the io regions, and cause one of them
+> >to fail? AFAIK the OF subsystem doesn't like overlapping resources.
+> 
+> No the overlap check is done by the platform dev resource code, and of_clk_declare
+> does not use that. So the overlap would be there, but not an issue (in theory
+> I did not test this).
 
-I'm not a big fan of passing these kind information through module
-params, cause it's kind of hard to assign parameters when you have
-multiple device instances (it might not be applicable to watchdog
-devices though).
-Moreover, adding more module parameters will just expand the cmdline
-and make it less and less readable.
+An overlap is always an issue.
 
-Anyway, this is not my call to make :-).
+> Thinking more about this, I believe that using the MFD framework for the prcm seems
+> like a mistake to me. It gains us nothing, since we have no irq to de-multiplex or
+> some such. We're not using MFD for the CMU, why use it for CMU2 (which the prcm
+> effectively is) ?
 
-Regards,
+Because the PRCM is much more than that. It also handles the power
+domains for example.
 
-Boris
+And also because the 1 node per clock is no longer the current trend
+and that Mike discourages to use that model nowadays.
+
+> So I think it would be best to remove the prcm node from the dt, and simply put the
+> different blocks inside it directly under the soc node, this will work fine with
+> current kernels, since as said we do not use any MFD features, we use it to
+> create platform devs and assign resources, something which will happen automatically
+> if we put the nodes directly under the soc node, since then simple-bus will do the
+> work for us.
+> 
+> And then in a release or 2 we can remove the mfd prcm driver from the kernel, and we
+> have the same functionality we have now with less code.
+> 
+> We could then also chose to move the existing prcm clock nodes to of_clk_declare
+> (this will work once they are nodes directly under soc with a proper reg property).
+> and the ir-clk can use allwinner,sun4i-a10-mod0-clk compatible and can live under
+> either clocks or soc, depending on what we want to do with the other prcm clocks.
+
+Have you considered the SMP code in that smooth plan?
+
+The one that is in neither a platform driver, nor a clock, nor does it
+have a compatible of its own, but still needs to access some of the
+PRCM registers?
+
+Maxime
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/188085ba/attachment.sig>
