@@ -1,68 +1,36 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Thu, 27 Nov 2014 12:32:47 +0100
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141127011203.GR2817@atomide.com>
-References: <20141027200008.GR2560@atomide.com> <201411270038.01312@pali>
- <20141127011203.GR2817@atomide.com>
-Message-ID: <201411271232.47231@pali>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 27 Nov 2014 11:36:36 +0000
+Subject: [RFC PATCH] ARM64: PCI: inherit root controller's dma-coherent
+In-Reply-To: <9101942.u99uxeQ3XX@wuerfel>
+References: <1417066891-16789-1-git-send-email-ming.lei@canonical.com>
+ <5E6565C8-E868-4559-978A-681045F3582F@redhat.com>
+ <9101942.u99uxeQ3XX@wuerfel>
+Message-ID: <20141127113636.GE11511@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014 02:12:04 Tony Lindgren wrote:
-> * Pali Roh?r <pali.rohar@gmail.com> [141126 15:40]:
-> > With enabled CONFIG_ARM_APPENDED_DTB=y file /proc/atags is
-> > missing.
+On Thu, Nov 27, 2014 at 09:05:57AM +0000, Arnd Bergmann wrote:
+> On Thursday 27 November 2014 02:39:59 Jon Masters wrote:
+> > We're looking at this at the moment (in addition to having the ACPI specification
+> > clarified to indicate that there is no safe default assumption, requiring that
+> > DMA masters always indicate their coherency or otherwise via a _CCA whether true
+> > or false). 
 > 
-> OK I guess it should not be needed for DT based booting.
-> 
+> I think for arm64, this should be easy: since ACPI is only for servers, we can
+> rely on the fact that the devices have cache-coherent DMA all the time. Let's
+> not over-complicate the ACPI case with all the special hacks we need for embedded.
 
-If I do not enable CONFIG_ARM_APPENDED_DTB=y then kernel is 
-booting in legacy mode (not in DT).
+As usual, we need hw vendors to say what they expect/build here.
 
-> > > The build_tag_list() should parse ATAG_REVISION and then
-> > > parse_tag_revision() should copy it to system_rev. Maybe
-> > > try adding some printks to see if those functions get
-> > > called?
-> > 
-> > Now I see... Problem is that build_tag_list() is called from
-> > convert_to_tag_list() which is called from
-> > setup_machine_tags() which is called from setup_arch() only
-> > if setup_machine_fdt() call fails. And it fails for *non*
-> > DT boot. You can check this chain too.
-> 
-> Thinking about this probably the best long term solution is
-> to pass optional board_revision in the kernel cmdline that
-> can be parsed early and copied to system_rev variable.
-> 
+I think in the past (non-ARM) the assumption was that the DMA is
+coherent on ACPI-capable systems unless otherwise stated but I've seen
+discussions (as Jon mentioned above) that ACPI should always indicate
+the coherency on ARM without any assumption.
 
-Not possible. Our bootloader is closed & proprietary. I tried to 
-replace it with u-boot I was not able to do that. So we will use 
-that Nokia closed bootloader forever and it can provide data only 
-in ATAG structure.
-
-> Or if you can think of some other way to get it, we can set
-> system_rev in pdata-quirks.c.
-> 
-> Or maybe add some code to copy the ATAGs somewhere where
-> they are out of the way and don't conflict with the device
-> tree data? Then we can query ATAG_REVISION from pdata-quirks.c
-> and set system_rev.
-> 
-> Regards,
-> 
-> Tony
-
-If we are able to read ATAG from pdata-quirks, then we can parse 
-it there and fix problems... But I do not know if address of ATAG 
-structure is available there...
+Either way, I don't think it's a problem for the kernel. We just need to
+change the default DMA ops to coherent when booting with ACPI (using
+non-coherent ops for a coherent device is not safe as the CPU can
+corrupt cache lines written by the device).
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/04fc59bf/attachment-0001.sig>
+Catalin
