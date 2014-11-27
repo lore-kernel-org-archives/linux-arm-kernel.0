@@ -1,131 +1,94 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Fri, 28 Nov 2014 00:58:22 +0900
-Subject: [PATCH 11/19] clk: samsung: exynos5433: Add clocks for
- CMU_BUS{0|1|2} domains
-In-Reply-To: <3844465.a5d3AtOSOo@wuerfel>
-References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
- <2150099.t3m9xROUE3@wuerfel>
- <CAGTfZH1C28s7trTh9+PhrnLnmJ9vpsKtAA61ASK-LA_1d_cihg@mail.gmail.com>
- <3844465.a5d3AtOSOo@wuerfel>
-Message-ID: <CAGTfZH1fXVVT0594wRRKerrRmXRp6weWTkZymErAnbP3ntdMug@mail.gmail.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Thu, 27 Nov 2014 23:59:32 +0800
+Subject: [PATCH] arm64: jump labels: NOP out NOP -> NOP replacement
+In-Reply-To: <1416942242-6587-1-git-send-email-mark.rutland@arm.com>
+References: <1416942242-6587-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <2B049EEF-17EB-4ADB-8D7F-19E23CADD92E@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 12:51 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 28 November 2014 00:44:07 Chanwoo Choi wrote:
->> >
->> >> +#define bus_div_clks(num)                        \
->> >> +static struct samsung_div_clock bus##num_div_clks[] __initdata = {    \
->> >> +    /* DIV_BUS */                            \
->> >> +    DIV(CLK_DIV_PCLK_BUS##num_133, "div_pclk_bus"#num"_133",    \
->> >> +            "aclk_bus"#num"_400", DIV_BUS##num, 0, 3),    \
->> >> +};                                    \
->> >
->> > To illustrate my point further: CLK_DIV_PCLK_BUS0/1/2 are all the
->> > same, and so are DIV_BUS0/1/2, so you should not need to duplicate
->> > the definitions at all but just call them 'CLK_DIV_PCLK_BUS'
->> > and 'DIV_BUS'.
->>
->> CLK_DIV_PCLK_BUS0/1/2 is not all the same.
->> Each CLK_DIV_PCLK_BUS0/1/2 must need the unique clock number.
->> Because some device may need some clocks by using unique clock number.
->
-> This is from your original patch:
->
-> +/* CMU_BUS0 */
-> +#define CLK_DIV_PCLK_BUS0_133                          1
-> +
-> +#define CLK_ACLK_AHB2APB_BUS0P                         2
-> +#define CLK_ACLK_BUS0NP_133                            3
-> +#define CLK_ACLK_BUS0ND_400                            4
-> +#define CLK_PCLK_BUS0SRVND_133                         5
-> +#define CLK_PCLK_PMU_BUS0                              6
-> +#define CLK_PCLK_SYSREG_BUS0                           7
-> +
-> +#define BUS0_NR_CLK                                    8
-> +
-> +/* CMU_BUS1 */
-> +#define CLK_DIV_PCLK_BUS1_133                          1
-> +
-> +#define CLK_ACLK_AHB2APB_BUS1P                         2
-> +#define CLK_ACLK_BUS1NP_133                            3
-> +#define CLK_ACLK_BUS1ND_400                            4
-> +#define CLK_PCLK_BUS1SRVND_133                         5
-> +#define CLK_PCLK_PMU_BUS1                              6
-> +#define CLK_PCLK_SYSREG_BUS1                           7
-> +
-> +#define BUS1_NR_CLK                                    8
-> +
-> +/* CMU_BUS2 */
-> +#define CLK_MOUT_ACLK_BUS2_400_USER                    1
-> +
-> +#define CLK_DIV_PCLK_BUS2_133                          2
-> +
-> +#define CLK_ACLK_AHB2APB_BUS2P                         3
-> +#define CLK_ACLK_BUS2NP_133                            4
-> +#define CLK_ACLK_BUS2BEND_400                          5
-> +#define CLK_ACLK_BUS2RTND_400                          6
-> +#define CLK_PCLK_BUS2SRVND_133                         7
-> +#define CLK_PCLK_PMU_BUS2                              8
-> +#define CLK_PCLK_SYSREG_BUS2                           9
-> +
-> +#define BUS2_NR_CLK                                    10
->
->
-> The numbers are arbitrarily assigned, but for bus0 and bus1,
-> they are all identical, while bus2 uses a lightly different
-> numbering, which you could easily change, e.g. by using the
-> numbers you have for bus2 on bus0 and bus1 as well.
+Reviewed-by: Jiang Liu <liuj97@gmail.com>
 
-OK, I'll remove duplicate clock number due to the same on other clock domain.
-
-If use only CLK_DIV_PCLK_BUS instead of CLK_DIV_PCLK_BUS0/1/2,
-I think I have to use three compatible string for each CMU_BUSx domain
-as following:.
-
-clocks = <&cmu_bus0 CLK_DIV_PCLK_BUS>;
-clocks = <&cmu_bus1 CLK_DIV_PCLK_BUS>;
-clocks = <&cmu_bus2 CLK_DIV_PCLK_BUS>;
-
->
-> + * Register offset definitions for CMU_BUS0
-> + */
-> +#define DIV_BUS0                       0x0600
-> +#define DIV_STAT_BUS0                  0x0700
-> +#define ENABLE_ACLK_BUS0               0x0800
-> +#define ENABLE_PCLK_BUS0               0x0900
-> +#define ENABLE_IP_BUS0                 0x0b00
-> +#define ENABLE_IP_BUS1                 0x0b04
-> +
->
-> +/*
-> + * Register offset definitions for CMU_BUS1
-> + */
-> +#define DIV_BUS1                       0x0600
-> +#define DIV_STAT_BUS1                  0x0700
-> +#define ENABLE_ACLK_BUS1               0x0800
-> +#define ENABLE_PCLK_BUS1               0x0900
-> +#define ENABLE_IP_BUS10                        0x0b00
-> +#define ENABLE_IP_BUS11                        0x0b04
->
-> +/*
-> + * Register offset definitions for CMU_BUS2
-> + */
-> +#define MUX_SEL_BUS2                   0x0200
-> +#define MUX_ENABLE_BUS2                        0x0300
-> +#define MUX_STAT_BUS2                  0x0400
-> +#define DIV_BUS2                       0x0600
-> +#define DIV_STAT_BUS2                  0x0700
-> +#define ENABLE_ACLK_BUS2               0x0800
-> +#define ENABLE_PCLK_BUS2               0x0900
-> +#define ENABLE_IP_BUS20                        0x0b00
-> +#define ENABLE_IP_BUS21                        0x0b04
->
-> More importantly, the register offsets are all identical, except that
-> bus2 has the additional MUX_SEL and MUX_ENABLE definitions. It's very
-> obvious that this is the same hardware block in multiple instances.
-
-You're right. I'll remove duplicate offset definition.
-
-Best Regards,
-Chanwoo Choi
+> ? 2014?11?26????3:04?Mark Rutland <mark.rutland@arm.com> ???
+> 
+> In the arm64 arch_static_branch implementation we place an A64 NOP into
+> the instruction stream and log relevant details to a jump_entry in a
+> __jump_table section. Later this may be replaced with an immediate
+> branch without link to the code for the unlikely case.
+> 
+> At init time, the core calls arch_jump_label_transform_static to
+> initialise the NOPs. On x86 this involves inserting the optimal NOP for
+> a given microarchitecture, but on arm64 we only use the architectural
+> NOP, and hence replace each NOP with the exact same NOP. This is
+> somewhat pointless.
+> 
+> Additionally, at module load time we don't call jump_label_apply_nops to
+> patch the optimal NOPs in, unlike other architectures, but get away with
+> this because we only use the architectural NOP anyway. A later notifier
+> will patch NOPs with branches as required.
+> 
+> Similarly to x86 commit 11570da1c5b1dee1 (x86/jump-label: Do not bother
+> updating NOPs if they are correct), we can avoid patching NOPs with
+> identical NOPs. Given that we only use a single NOP encoding, this means
+> we can NOP-out the body of arch_jump_label_transform_static entirely. As
+> the default __weak arch_jump_label_transform_static implementation
+> performs a patch, we must use an empty function to achieve this.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Jiang Liu <liuj97@gmail.com>
+> Cc: Laura Abbott <lauraa@codeaurora.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+> arch/arm64/kernel/jump_label.c | 23 +++++++++--------------
+> 1 file changed, 9 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
+> index 9ac30bb..4f1fec7 100644
+> --- a/arch/arm64/kernel/jump_label.c
+> +++ b/arch/arm64/kernel/jump_label.c
+> @@ -22,9 +22,8 @@
+> 
+> #ifdef HAVE_JUMP_LABEL
+> 
+> -static void __arch_jump_label_transform(struct jump_entry *entry,
+> -                    enum jump_label_type type,
+> -                    bool is_static)
+> +void arch_jump_label_transform(struct jump_entry *entry,
+> +                   enum jump_label_type type)
+> {
+>    void *addr = (void *)entry->code;
+>    u32 insn;
+> @@ -37,22 +36,18 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
+>        insn = aarch64_insn_gen_nop();
+>    }
+> 
+> -    if (is_static)
+> -        __aarch64_insn_patch_text_nosync(addr, insn, true);
+> -    else
+> -        aarch64_insn_patch_text(&addr, &insn, 1);
+> -}
+> -
+> -void arch_jump_label_transform(struct jump_entry *entry,
+> -                   enum jump_label_type type)
+> -{
+> -    __arch_jump_label_transform(entry, type, false);
+> +    aarch64_insn_patch_text(&addr, &insn, 1);
+> }
+> 
+> void arch_jump_label_transform_static(struct jump_entry *entry,
+>                      enum jump_label_type type)
+> {
+> -    __arch_jump_label_transform(entry, type, true);
+> +    /*
+> +     * We use the architected A64 NOP in arch_static_branch, so there's no
+> +     * need to patch an identical A64 NOP over the top of it here. The core
+> +     * will call arch_jump_label_transform from a module notifier if the
+> +     * NOP needs to be replaced by a branch.
+> +     */
+> }
+> 
+> #endif    /* HAVE_JUMP_LABEL */
+> -- 
+> 1.9.1
+> 
