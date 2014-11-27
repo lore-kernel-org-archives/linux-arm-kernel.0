@@ -1,51 +1,33 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 27 Nov 2014 23:03:10 +0100 (CET)
-Subject: [PATCH] ARM: pxa: fix lubbock interrupts handling
-In-Reply-To: <1417113721-9062-1-git-send-email-robert.jarzmik@free.fr>
-References: <1417113721-9062-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <alpine.DEB.2.11.1411272258010.3961@nanos>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Thu, 27 Nov 2014 23:34:02 +0100
+Subject: [PATCH v3 2/3] pinctrl: add driver for Amlogic Meson SoCs
+In-Reply-To: <CACRpkda-U5OuKdBVGJ8UWprJkAtmTL1m11+AbNskVULPfyS72A@mail.gmail.com>
+References: <1416168856-12747-1-git-send-email-b.galvani@gmail.com>
+ <1416168856-12747-3-git-send-email-b.galvani@gmail.com>
+ <CACRpkda-U5OuKdBVGJ8UWprJkAtmTL1m11+AbNskVULPfyS72A@mail.gmail.com>
+Message-ID: <20141127223402.GA11418@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Nov 2014, Robert Jarzmik wrote:
-
-> When gpio-pxa was moved to drivers/pxa, it became a driver, and its
-> initialization and probing happen at postcore initcall. The lubbock code
-> used to install the chained lubbock interrupt handler at init_irq()
-> time.
+On Thu, Nov 27, 2014 at 02:48:31PM +0100, Linus Walleij wrote:
+> On Sun, Nov 16, 2014 at 9:14 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
 > 
-> The consequence of the gpio-pxa change is that the installed chained irq
-> handler lubbock_irq_handler() was overwritten in pxa_gpio_probe(_dt)(),
-> removing :
->  - the handler
->  - the falling edge detection setting of GPIO0, which revealed the
->    interrupt request from the lubbock IO board.
->
-> As a fix, move the gpio0 chained handler setup to a place where we have
-> the guarantee that pxa_gpio_probe() was called before, so that lubbock
-> handler becomes the true IRQ chained handler of GPIO0, demuxing the
-> lubbock IO board interrupts.
+> > This is a driver for the pinmux and GPIO controller available in
+> > Amlogic Meson SoCs. At the moment it only supports Meson8 devices,
+> > however other SoC families like Meson6 and Meson8b (the Cortex-A5
+> > variant) appear to be similar, with just different sets of banks and
+> > registers.
+> >
+> > GPIO interrupts are not supported at the moment due to lack of
+> > documentation.
+> >
+> > Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
 > 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
-> For Thomas: as a side note, I'm not very happy with this patch. What
->             makes me unhappy is that I don't know how to express the
->             dependency between gpio-pxa probe time and
->             irq_set_chained_handler(irq, lubbock_irq_handler).
+> This is dependent on S?ren's patches I guess?
 > 
->             At the moment I rely on the fact that
->             lubbock_irq_device_init() is called as device initcall while
->             pxa_gpio_probe() is called as postcore initcall.
+> OK I'll merge this once we have that other code sorted out.
 
-Admittedly I'm confused.
-
-So what is the relationship between installing that chained handler
-and that gpio-pxa probe stuff?
-
-And why is the GPIO0 interrupt handled from arch code rather than from
-a regular driver setup, which depends on the availablity of the GPIO
-driver?
+Yes, this depends on Soren's patches.
 
 Thanks,
-
-	tglx
+Beniamino
