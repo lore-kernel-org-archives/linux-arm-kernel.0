@@ -1,42 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 26 Nov 2014 17:12:04 -0800
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <201411270038.01312@pali>
-References: <20141027200008.GR2560@atomide.com> <201411270001.44871@pali>
- <20141126231435.GQ2817@atomide.com> <201411270038.01312@pali>
-Message-ID: <20141127011203.GR2817@atomide.com>
+From: amstan@chromium.org (Alexandru M Stan)
+Date: Wed, 26 Nov 2014 17:30:25 -0800
+Subject: [PATCH v4 0/2] Add support for the rockchip mmc clock phases using
+ the framework
+Message-ID: <1417051827-12564-1-git-send-email-amstan@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [141126 15:40]:
-> 
-> With enabled CONFIG_ARM_APPENDED_DTB=y file /proc/atags is 
-> missing.
+For now all I have is the getter and setter for the phase, nothing that uses it
+(that is ready). You can test the getter like this:
+localhost ~ # cat /sys/kernel/debug/clk/clk_summary|grep sample -C 1
+sclk_sdio1                            0            0    24000000          0 0
+	sdio1_sample                       0            0    12000000          0 0
+	sdio1_drv                          0            0    12000000          0 90
+--
+	sclk_sdmmc                      1            1   297000000          0 0
+		sdmmc_sample                 0            0   148500000          0 134
+		sdmmc_drv                    0            0   148500000          0 90
+--
+	sclk_sdio0                      1            1   100000000          0 0
+		sdio0_sample                 0            0    50000000          0 0
+		sdio0_drv                    0            0    50000000          0 90
+	sclk_emmc                       1            1   100000000          0 0
+		emmc_sample                  0            0    50000000          0 0
+		emmc_drv                     0            0    50000000          0 180
 
-OK I guess it should not be needed for DT based booting.
- 
-> > The build_tag_list() should parse ATAG_REVISION and then
-> > parse_tag_revision() should copy it to system_rev. Maybe try
-> > adding some printks to see if those functions get called?
-> 
-> Now I see... Problem is that build_tag_list() is called from 
-> convert_to_tag_list() which is called from setup_machine_tags() 
-> which is called from setup_arch() only if setup_machine_fdt() 
-> call fails. And it fails for *non* DT boot. You can check this 
-> chain too.
+Next thing that will come is some dts changes that will make use of these new
+clocks, and eventually mmc code will be changed to tune with these clocks. You
+can see some WIP on https://chromium-review.googlesource.com/#/c/227240
 
-Thinking about this probably the best long term solution is
-to pass optional board_revision in the kernel cmdline that
-can be parsed early and copied to system_rev variable.
 
-Or if you can think of some other way to get it, we can set
-system_rev in pdata-quirks.c.
+Changes in v4:
+- Changed set_phase to 22.5 increments, it seems better for tuning, better at
+splitting up big ranges where we might have used an iffy phase from the middle.
+- renamed ROCKCHIP_MMC_DELAY_ELEMENT_PSEC
+- saner mask of 0x07ff
+- only set ROCKCHIP_MMC_DELAYNUM_OFFSET when we need it
 
-Or maybe add some code to copy the ATAGs somewhere where
-they are out of the way and don't conflict with the device
-tree data? Then we can query ATAG_REVISION from pdata-quirks.c
-and set system_rev.
+Changes in v3:
+- renamed everything internal from phase to just mmc_clock or mmc
+- added RK3288_MMC_CLKGEN_DIV instead of the magic number
+- added new paragraph to commit message
 
-Regards,
+Changes in v2:
+- fixed my cc/to list
+- removed dangling #DEFINE DEBUG
 
-Tony
+Alexandru M Stan (2):
+  clk: rockchip: add bindings for the mmc clocks
+  clk: rockchip: Add support for the mmc clock phases using the
+    framework
+
+ drivers/clk/rockchip/Makefile          |   1 +
+ drivers/clk/rockchip/clk-mmc-phase.c   | 154 +++++++++++++++++++++++++++++++++
+ drivers/clk/rockchip/clk-rk3288.c      |  12 +++
+ drivers/clk/rockchip/clk.c             |   8 ++
+ drivers/clk/rockchip/clk.h             |  23 +++++
+ include/dt-bindings/clock/rk3288-cru.h |  10 +++
+ 6 files changed, 208 insertions(+)
+ create mode 100644 drivers/clk/rockchip/clk-mmc-phase.c
+
+-- 
+2.2.0.rc0.207.ga3a616c
