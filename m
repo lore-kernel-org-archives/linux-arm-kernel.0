@@ -1,78 +1,71 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 27 Nov 2014 10:45:01 +0000
-Subject: [PATCH] arm: cacheflush: get rid of restarting block
-In-Reply-To: <5477004B.5000100@arm.com>
-References: <1416928737-29723-1-git-send-email-vladimir.murzin@arm.com>
- <005b01d009f6$f3c6a0f0$db53e2d0$@min@lge.com>
- <20141127100306.GA20649@arm.com> <5477004B.5000100@arm.com>
-Message-ID: <547700AD.6030408@arm.com>
+From: bocui107@gmail.com (Hongbo Zhong)
+Date: Thu, 27 Nov 2014 18:46:34 +0800
+Subject: [PATCH] mm: Remove the highmem zones' memmap in the highmem zone
+Message-ID: <1417085194-17042-1-git-send-email-bocui107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/14 10:43, Vladimir Murzin wrote:
-> On 27/11/14 10:03, Will Deacon wrote:
->> On Thu, Nov 27, 2014 at 04:02:24AM +0000, Chanho Min wrote:
->>>> -----Original Message-----
->>>> From: Vladimir Murzin [mailto:vladimir.murzin at arm.com]
->>>> Sent: Wednesday, November 26, 2014 12:19 AM
->>>> To: linux-arm-kernel at lists.infradead.org; linux at arm.linux.org.uk
->>>> Cc: chanho.min at lge.com; will.deacon at arm.com; stable at vger.kernel.org
->>>> Subject: [PATCH] arm: cacheflush: get rid of restarting block
->>>>
->>>> We cannot restart cacheflush safely if a process provides user-defined
->>>> signal handler and signal is pending. In this case -EINTR is returned
->>>> and it is expected that process re-invokes syscall. However, there are
->>>> a few problems with that:
->>>>  * looks like nobody bothers checking return value from cacheflush
->>>>  * but if it did, we don't provide the restart address for that, so the
->>>>    process has to use the same range again
->>>>  * ...and again, what might lead to looping forever
->>>>
->>>> So, remove cacheflush restarting code and terminate cache flushing
->>>> as early as fatal signal is pending.
->>>>
->>>> Cc: stable at vger.kernel.org # 3.12+
->>>> Reported-by: Chanho Min <chanho.min@lge.com>
->>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->>>> Acked-by: Will Deacon <will.deacon@arm.com>
->>>> ---
->>>> Hi,
->>>>
->>>> There is my proposal for the problem reported in [1]. Since that
->>>> thread has not been progressing much, I'm addressing the problem in
->>>> separate patch.
->>>>
->>>> Comments?
->>> Thanks, We hope this to be applied.
->>
->> Ok, good. In which case, can you put it into the patch system please,
->> Vladimir?
-> 
-> Already in patch system as 8226/1.
-> 
-> Vladimir
-> 
+From: Zhong Hongbo <bocui107@gmail.com>
 
-Sorry for banner - I should have checked that I use proper smtp server :(
+Since the commit 01cefaef40c4 ("mm: provide more accurate estimation
+of pages occupied by memmap") allocate the pages from lowmem for the
+highmem zones' memmap. So It is not need to reserver the memmap's for
+the highmem.
 
-Vladimir
+A 2G DDR3 for the arm platform:
+On node 0 totalpages: 524288
+free_area_init_node: node 0, pgdat 80ccd380, node_mem_map 80d38000
+  DMA zone: 3568 pages used for memmap
+  DMA zone: 0 pages reserved
+  DMA zone: 456704 pages, LIFO batch:31
+  HighMem zone: 528 pages used for memmap
+  HighMem zone: 67584 pages, LIFO batch:15
 
->>
->> Will
->>
->>
->>
-> 
-> 
-> -- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
-> 
-> ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
-> ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe stable" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-> 
+On node 0 totalpages: 524288
+free_area_init_node: node 0, pgdat 80cd6f40, node_mem_map 80d42000
+  DMA zone: 3568 pages used for memmap
+  DMA zone: 0 pages reserved
+  DMA zone: 456704 pages, LIFO batch:31
+  HighMem zone: 67584 pages, LIFO batch:15
+
+
+Signed-off-by: Hongbo Zhong <hongbo.zhong@gmail.com>
+---
+ mm/page_alloc.c |   22 ++++++++++++----------
+ 1 file changed, 12 insertions(+), 10 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 616a2c9..d2f723c 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -4851,16 +4851,18 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
+ 		 * and per-cpu initialisations
+ 		 */
+ 		memmap_pages = calc_memmap_size(size, realsize);
+-		if (freesize >= memmap_pages) {
+-			freesize -= memmap_pages;
+-			if (memmap_pages)
+-				printk(KERN_DEBUG
+-				       "  %s zone: %lu pages used for memmap\n",
+-				       zone_names[j], memmap_pages);
+-		} else
+-			printk(KERN_WARNING
+-				"  %s zone: %lu pages exceeds freesize %lu\n",
+-				zone_names[j], memmap_pages, freesize);
++		if (!is_highmem_idx(j)) {
++			if (freesize >= memmap_pages) {
++				freesize -= memmap_pages;
++				if (memmap_pages)
++					printk(KERN_DEBUG
++					       "  %s zone: %lu pages used for memmap\n",
++					       zone_names[j], memmap_pages);
++			} else
++				printk(KERN_WARNING
++					"  %s zone: %lu pages exceeds freesize %lu\n",
++					zone_names[j], memmap_pages, freesize);
++		}
+ 
+ 		/* Account for reserved pages */
+ 		if (j == 0 && freesize > dma_reserve) {
+-- 
+1.7.9.5
