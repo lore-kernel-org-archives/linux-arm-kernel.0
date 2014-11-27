@@ -1,54 +1,29 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 27 Nov 2014 11:10:51 +0100
-Subject: [PATCH 3/9] clk: sunxi: Add prcm mod0 clock driver
-In-Reply-To: <CAGb2v652m0bCdPWFF4LWwjcrCJZvnLibFPw8xXJ3Q-Ge+_-p7g@mail.gmail.com>
-References: <20141126211318.GN25249@lukather> <5476E3A5.4000708@redhat.com>
- <CAGb2v652m0bCdPWFF4LWwjcrCJZvnLibFPw8xXJ3Q-Ge+_-p7g@mail.gmail.com>
-Message-ID: <5476F8AB.2000601@redhat.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Thu, 27 Nov 2014 18:14:14 +0800
+Subject: [RFC PATCH] ARM64: PCI: inherit root controller's dma-coherent
+In-Reply-To: <2081877.zLc8dS8vkP@wuerfel>
+References: <1417066891-16789-1-git-send-email-ming.lei@canonical.com>
+ <2081877.zLc8dS8vkP@wuerfel>
+Message-ID: <CACVXFVN=M6VX31QWVzFj8MwBskjc5aYe3zJmcM1OG9xj-Y_WOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 11/27/2014 10:28 AM, Chen-Yu Tsai wrote:
-> Hi,
+On Thu, Nov 27, 2014 at 5:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 >
-> On Thu, Nov 27, 2014 at 4:41 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Regarding the pcibios_add_device() function, I'd rather see the existing
+> code moved into the PCI core and the function removed, since it also
+> is not architecture specific. We should be able to delete the entire
+> arm64/pci.c file eventually.
 
-<snip>
+I totally agree.
 
->> I notice that you've not responded to my proposal to simple make the clock
->> node a child node of the clocks node in the dt, that should work nicely, and
->> avoid the need for any kernel level changes to support it, I'm beginning to
->> think that that is probably the best solution.
->
-> Would that not cause an overlap of the io regions, and cause one of them
-> to fail? AFAIK the OF subsystem doesn't like overlapping resources.
+Looks pcibios_*() are misused by ARCHs, which should have been
+designed for addressing ARCH pcibios things, now these functions
+are just a hook for ARCH code.
 
-No the overlap check is done by the platform dev resource code, and of_clk_declare
-does not use that. So the overlap would be there, but not an issue (in theory
-I did not test this).
+Specifically pci host controller driver can't be arch independent
+at all because of ARCH's pcibios_*() implementation and
+the specific data type defined by ARCH code.
 
-Thinking more about this, I believe that using the MFD framework for the prcm seems
-like a mistake to me. It gains us nothing, since we have no irq to de-multiplex or
-some such. We're not using MFD for the CMU, why use it for CMU2 (which the prcm
-effectively is) ?
-
-So I think it would be best to remove the prcm node from the dt, and simply put the
-different blocks inside it directly under the soc node, this will work fine with
-current kernels, since as said we do not use any MFD features, we use it to
-create platform devs and assign resources, something which will happen automatically
-if we put the nodes directly under the soc node, since then simple-bus will do the
-work for us.
-
-And then in a release or 2 we can remove the mfd prcm driver from the kernel, and we
-have the same functionality we have now with less code.
-
-We could then also chose to move the existing prcm clock nodes to of_clk_declare
-(this will work once they are nodes directly under soc with a proper reg property).
-and the ir-clk can use allwinner,sun4i-a10-mod0-clk compatible and can live under
-either clocks or soc, depending on what we want to do with the other prcm clocks.
-
-Regards,
-
-Hans
+Thanks,
+Ming Lei
