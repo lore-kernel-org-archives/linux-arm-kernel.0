@@ -1,103 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Nov 2014 15:48:47 +0000
-Subject: [PATCH] arm64: ARM: Fix the Generic Timers interrupt active level
- description
-In-Reply-To: <20141127153453.GR828@e106497-lin.cambridge.arm.com>
-References: <1417099005-18638-1-git-send-email-Liviu.Dudau@arm.com>
- <5477389A.8010606@arm.com>
- <20141127153453.GR828@e106497-lin.cambridge.arm.com>
-Message-ID: <547747DF.9070402@arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 27 Nov 2014 17:51:31 +0200
+Subject: [PATCH 00/23] ARM: OMAP2+: PRCM cleanups towards 3.19 / part2
+Message-ID: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/14 15:34, Liviu Dudau wrote:
-> On Thu, Nov 27, 2014 at 02:43:38PM +0000, Marc Zyngier wrote:
->> On 27/11/14 14:36, Liviu Dudau wrote:
->>> The Cortex-A5x TRM states in paragraph "9.2 Generic Timer functional
->>> description" that generic timers provide an active-LOW interrupt
->>> output. Fix the device trees to correctly describe this.
->>>
->>> While doing this update the CPU mask to match the number of described
->>> CPUs as well.
->>>
->>> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
->>> ---
->>>
->>> Arnd, Olof: This is on top of linux-next/master as it patches the Juno
->>> as well as all the other ARM DTs.
->>>
->>>  arch/arm64/boot/dts/arm/foundation-v8.dts  | 8 ++++----
->>>  arch/arm64/boot/dts/arm/juno.dts           | 8 ++++----
->>>  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts | 8 ++++----
->>>  3 files changed, 12 insertions(+), 12 deletions(-)
->>>
->>> diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dts
->>> index 4a06090..27f3296 100644
->>> --- a/arch/arm64/boot/dts/arm/foundation-v8.dts
->>> +++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
->>> @@ -78,10 +78,10 @@
->>>  
->>>  	timer {
->>>  		compatible = "arm,armv8-timer";
->>> -		interrupts = <1 13 0xff01>,
->>> -			     <1 14 0xff01>,
->>> -			     <1 11 0xff01>,
->>> -			     <1 10 0xff01>;
->>> +		interrupts = <1 13 0xf08>,
->>> +			     <1 14 0xf08>,
->>> +			     <1 11 0xf08>,
->>> +			     <1 10 0xf08>;
->>>  		clock-frequency = <100000000>;
->>>  	};
->>>  
->>> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
->>> index 097ecc4..cb3073e 100644
->>> --- a/arch/arm64/boot/dts/arm/juno.dts
->>> +++ b/arch/arm64/boot/dts/arm/juno.dts
->>> @@ -98,10 +98,10 @@
->>>  
->>>  	timer {
->>>  		compatible = "arm,armv8-timer";
->>> -		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
->>> -			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
->>> -			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
->>> -			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>;
->>> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
->>> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
->>> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
->>> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
->>>  	};
->>>  
->>>  	pmu {
->>> diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
->>> index 572005e..efc59b3 100644
->>> --- a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
->>> +++ b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
->>> @@ -81,10 +81,10 @@
->>>  
->>>  	timer {
->>>  		compatible = "arm,armv8-timer";
->>> -		interrupts = <1 13 0xff01>,
->>> -			     <1 14 0xff01>,
->>> -			     <1 11 0xff01>,
->>> -			     <1 10 0xff01>;
->>> +		interrupts = <1 13 0xf08>,
->>> +			     <1 14 0xf08>,
->>> +			     <1 11 0xf08>,
->>> +			     <1 10 0xf08>;
->>>  		clock-frequency = <100000000>;
->>>  	};
->>>  
->>>
->>
->> Sorry, but that's wrong. Despite the *cores* having an level-low output,
->> the GIC only triggers on *level-high*. Yes, there is probably an
->> inverter in between.
-> 
-> BTW, should I also update the bindings example to get this right?
+Hi,
 
-Definitely. I'm pretty sure I got it wrong too at some point...
+Yet another PRCM cleanup set, towards making PRCM a separate driver.
+This set is most likely too late for 3.19, but hopefully it can make
+it to 3.20. Couple of related clock patches are also within this set,
+as some of the clock support code is now obsolete. Most important
+things this set does, is to separate the PRCM driver initializations
+under their own parts, and split the control module init under its
+own driver file also. This set still does not introduce regmap support
+for PRCM, as I am not too sure whether it should be done at all.
+It seems we can implement all the clock / vcvp / etc. support rather
+neatly just with using iomaps.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Testing done:
+
+am335x-evm: boot
+am335x-sk: boot
+am3517-evm: boot
+am43xx-gpevm: boot
+beaglebone-black: boot
+beaglebone: boot
+dra7xx-evm: boot
+omap5-evm: boot
+omap3-beagle: boot, suspend (ret), suspend (off) (UART wakeup seems broken on 3.18-rc1 btw)
+omap4-panda-es: boot
+
+Testing branch pushed here:
+tree: https://github.com/t-kristo/linux-pm.git
+branch: for-v3.19/prcm-cleanup-part2
+
+This is based on top of Tony's omap-for-v3.19/prcm.
+
+-Tero
