@@ -1,93 +1,91 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 27 Nov 2014 15:14:13 +0100
-Subject: [PATCH] PM / Domains: Add pm_genpd_lookup() API to lookup domain by
- device node
-Message-ID: <1417097653-22599-1-git-send-email-ulf.hansson@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 27 Nov 2014 14:15:43 +0000
+Subject: [PATCH 1/2] ARM: tegra: irq: fix buggy usage of irq_data irq field
+In-Reply-To: <20141127120826.GA25222@ulmo>
+References: <1417024532-5777-1-git-send-email-marc.zyngier@arm.com>
+ <1417024532-5777-2-git-send-email-marc.zyngier@arm.com>
+ <20141127082836.GA19323@ulmo> <5476EA0A.7090406@arm.com>
+ <20141127120826.GA25222@ulmo>
+Message-ID: <20141127141543.GK857@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a step to move away from using genpd's name based APIs, such as the
-pm_genpd_add_subdomain_names(), provide an API to lookup an already
-initialized generic PM domain by its device node.
+On Thu, Nov 27, 2014 at 12:08:28PM +0000, Thierry Reding wrote:
+> On Thu, Nov 27, 2014 at 09:08:26AM +0000, Marc Zyngier wrote:
+> > Hi Thierry,
+> > 
+> > On 27/11/14 08:28, Thierry Reding wrote:
+> > > On Wed, Nov 26, 2014 at 05:55:31PM +0000, Marc Zyngier wrote:
+> > >> The crazy gic_arch_extn thing that Tegra uses contains multiple
+> > >> references to the irq field in struct irq_data, and uses this
+> > >> to directly poke hardware register.
+> > >>
+> > >> But irq is the *virtual* irq number, something that has nothing
+> > >> to do with the actual HW irq (stored in the hwirq field). And once
+> > >> we put the stacked domain code in action, the whole thing explodes,
+> > >> as these two values are *very* different:
+> > > 
+> > > Do you have follow-up patches to use stacked domains on Tegra? I tried
+> > > to move this driver out to drivers/irqchip at some point and that caused
+> > > a bit of pain because of gic_arch_extn and probe order. At the time I
+> > > was told that work was in progress to provide a more generic solution
+> > > that could replace gic_arch_extn, which I'm assuming this stacked domain
+> > > code is.
+> > 
+> > I'm working on that at the moment, and things look pretty good. The only
+> > issue I have so far is that this piece of HW needs to become the
+> > top-level interrupt-parent for all devices that are currently
+> > interrupting on the GIC. So far, the only solution I have is a change in
+> > the DT. But arguably, this should have been described in DT too...
+> 
+> I think I had discussed this with Arnd (Cc'ed) at some point but I can't
+> find a link to the discussion (perhaps it was on IRC). The outcome I
+> think was that from the CPU's perspective the GIC would still be the
+> interrupt parent of the devices, whereas the LIC would become the
+> interrupt parent of the GIC.
 
-This API would typically be a called from SOC specific code, to fetch a
-handle to the domain. Especially convenient to configure subdomains and
-when the hierarchy of the domains are described in DT.
+For a given node, the interrupt parent is whatever the interrupt is fed
+directly into (and hence the interrupts exist within the domain of). Per
+the diagram below, the LIC is the interrupt parent of the devices, and
+the GIC is the interrupt parent of the LIC. Implicitly the top level
+interrupt parent feeds into the CPU(s).
 
-Do note, before pm_genpd_init() is invoked to initialize a generic PM
-domain, it's the callers responsibility to assign the new ->dev_node
-pointer in the struct generic_pm_domain, to enable pm_genpd_lookup() to
-find the domain.
+> Admittedly, though, everytime I think about this I start feeling dizzy,
+> so perhaps I'm mixing this up again.
+> 
+> Maybe a picture to clarify for my own sake how this works:
+> 
+> 	             /-----\     /-----\     /-----\
+> 	   various --|     |     |     |     |     |
+> 	  hardware --| LIC |-----| GIC |-----| CPU |
+> 	interrupts --|     |     |     |  |  |     |
+> 	             \-----/     \-----/  |  \-----/
+> 	                |                 |
+> 	             /-----\              |  /-----\
+> 	             |     |              |  |     |
+> 	             | AVP |              ---| CPU |
+> 	             |     |              .  |     |
+> 	             \-----/              .  \-----/
+> 	                                  .
+> 
+> That is, interrupts are first routed to the LIC, which will primarily be
+> used by the AVP. The LIC is also configured (and that's the part where
+> gic_arch_extn comes into play) to forward interrupts to the GIC which
+> will distribute them to the Cortex-AXs.
+> 
+> Therefore, from the CPU perspective, the interrupt-parent of devices
+> should still be the GIC, since that's where the interrupt numbers will
+> need to come from in order to set up interrupt handlers. For any of
+> these interrupts GIC will need to program LIC so that they are forwarded
+> and can be used to wake up CPUs.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
+If the LIC were the interrupt parent, wouldn't the usual nested irq chip
+handling would program the GIC as appropriate for a given LIC interrupt?
 
-The background to why I propose this patch comes from a discussion around the
-below patchset:
-https://lkml.org/lkml/2014/11/24/290
+> Doesn't that simplify everything to just adding an interrupt-parent
+> property to GIC referencing LIC?
 
+The other way around would make more sense to me.
 
----
- drivers/base/power/domain.c | 26 ++++++++++++++++++++++++++
- include/linux/pm_domain.h   |  2 ++
- 2 files changed, 28 insertions(+)
-
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 735c473..34555eb 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -75,6 +75,32 @@ struct generic_pm_domain *dev_to_genpd(struct device *dev)
- 	return pd_to_genpd(dev->pm_domain);
- }
- 
-+/**
-+ * pm_genpd_lookup - Fetch a generic PM domain object by device node
-+ * @node: Device node to a corresponding genpd.
-+ *
-+ * Returns a valid pointer to struct generic_pm_domain on success or ERR_PTR()
-+ * on failure.
-+ */
-+struct generic_pm_domain *pm_genpd_lookup(struct device_node *node)
-+{
-+	struct generic_pm_domain *genpd = ERR_PTR(-ENOENT), *gpd;
-+
-+	if (IS_ERR_OR_NULL(node))
-+		return ERR_PTR(-EINVAL);
-+
-+	mutex_lock(&gpd_list_lock);
-+	list_for_each_entry(gpd, &gpd_list, gpd_list_node) {
-+		if (gpd->dev_node == node) {
-+			genpd = gpd;
-+			break;
-+		}
-+	}
-+	mutex_unlock(&gpd_list_lock);
-+	return genpd;
-+}
-+EXPORT_SYMBOL_GPL(pm_genpd_lookup);
-+
- static int genpd_stop_dev(struct generic_pm_domain *genpd, struct device *dev)
- {
- 	return GENPD_DEV_TIMED_CALLBACK(genpd, int, stop, dev,
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 8cbd32e..322cb7c 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -53,6 +53,7 @@ struct generic_pm_domain {
- 	struct dev_power_governor *gov;
- 	struct work_struct power_off_work;
- 	const char *name;
-+	struct device_node *dev_node;	/* Device node for the PM domain */
- 	unsigned int in_progress;	/* Number of devices being suspended now */
- 	atomic_t sd_count;	/* Number of subdomains with power "on" */
- 	enum gpd_status status;	/* Current state of the domain */
-@@ -126,6 +127,7 @@ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
- }
- 
- extern struct generic_pm_domain *dev_to_genpd(struct device *dev);
-+extern struct generic_pm_domain *pm_genpd_lookup(struct device_node *node);
- extern int __pm_genpd_add_device(struct generic_pm_domain *genpd,
- 				 struct device *dev,
- 				 struct gpd_timing_data *td);
--- 
-1.9.1
+Thanks,
+Mark.
