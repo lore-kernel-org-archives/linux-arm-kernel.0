@@ -1,118 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Nov 2014 18:39:28 +0000
-Subject: [PATCH v2] arm64: ARM: Fix the Generic Timers interrupt active
- level description
-In-Reply-To: <1417105283-19575-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1417105283-19575-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <54776FE0.8030600@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 27 Nov 2014 19:40:55 +0100
+Subject: [PATCH 0/5] Improve PSCI system events and fix reboot bugs
+Message-ID: <1417113660-23610-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/14 16:21, Liviu Dudau wrote:
-> The Cortex-A5x TRM states in paragraph "9.2 Generic Timer functional
-> description" that generic timers provide a level not edge interrupt
-> output. Fix the device trees to correctly describe this.
-> 
-> While doing this update the CPU mask to match the number of described
-> CPUs as well as the DT bindings documentation for Generic Timers.
-> 
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Several people have reported problems with rebooting ARM VMs, especially
+on 32-bit ARM.  This is mainly due to the same reason we were seeing
+boot errors in the past, namely that the ram, dcache, and icache weren't
+coherent on guest boot with the guest (stage-1) MMU disabled.  We solved
+this by ensuring coherency when we fault in pages, but since most memory
+is already mapped after a reboot, we don't do anything.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+The solution is to unmap the regular RAM on system events, but we must
+take care to not unmap the GIC or other IO regions, hence the somehwat
+complicated solution.
 
-	M.
+As part of figuring this out, it became clear that some semantics around
+the KVM_ARM_VCPU_INIT ABI and system event ABI was unclear (what is
+userspace expected to do when it receives a system event).  This series
+also clarifies the ABI and changes the kernel functionality to do what
+userspace expects (turn off VCPUs on a system shutdown event).
 
-> ---
-> 
-> Arnd, Olof: This is on top of linux-next/master as it patches Juno's
-> as well as all the other ARM DTs.
-> 
-> --
-> 
->  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++----
->  arch/arm64/boot/dts/arm/foundation-v8.dts            | 8 ++++----
->  arch/arm64/boot/dts/arm/juno.dts                     | 8 ++++----
->  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts           | 8 ++++----
->  4 files changed, 16 insertions(+), 16 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> index 37b2caf..6d2aa87 100644
-> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> @@ -27,10 +27,10 @@ Example:
->  	timer {
->  		compatible = "arm,cortex-a15-timer",
->  			     "arm,armv7-timer";
-> -		interrupts = <1 13 0xf08>,
-> -			     <1 14 0xf08>,
-> -			     <1 11 0xf08>,
-> -			     <1 10 0xf08>;
-> +		interrupts = <1 13 0xf04>,
-> +			     <1 14 0xf04>,
-> +			     <1 11 0xf04>,
-> +			     <1 10 0xf04>;
->  		clock-frequency = <100000000>;
->  	};
->  
-> diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dts
-> index 4a06090..8c0214e 100644
-> --- a/arch/arm64/boot/dts/arm/foundation-v8.dts
-> +++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
-> @@ -78,10 +78,10 @@
->  
->  	timer {
->  		compatible = "arm,armv8-timer";
-> -		interrupts = <1 13 0xff01>,
-> -			     <1 14 0xff01>,
-> -			     <1 11 0xff01>,
-> -			     <1 10 0xff01>;
-> +		interrupts = <1 13 0xf04>,
-> +			     <1 14 0xf04>,
-> +			     <1 11 0xf04>,
-> +			     <1 10 0xf04>;
->  		clock-frequency = <100000000>;
->  	};
->  
-> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-> index 097ecc4..551a688 100644
-> --- a/arch/arm64/boot/dts/arm/juno.dts
-> +++ b/arch/arm64/boot/dts/arm/juno.dts
-> @@ -98,10 +98,10 @@
->  
->  	timer {
->  		compatible = "arm,armv8-timer";
-> -		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
-> -			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
-> -			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
-> -			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>;
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
->  	};
->  
->  	pmu {
-> diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
-> index 572005e..49d1b19 100644
-> --- a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
-> +++ b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
-> @@ -81,10 +81,10 @@
->  
->  	timer {
->  		compatible = "arm,armv8-timer";
-> -		interrupts = <1 13 0xff01>,
-> -			     <1 14 0xff01>,
-> -			     <1 11 0xff01>,
-> -			     <1 10 0xff01>;
-> +		interrupts = <1 13 0xf04>,
-> +			     <1 14 0xf04>,
-> +			     <1 11 0xf04>,
-> +			     <1 10 0xf04>;
->  		clock-frequency = <100000000>;
->  	};
->  
-> 
+The code is avaliable here as well:
+http://git.linaro.org/people/christoffer.dall/linux-kvm-arm.git vcpu_init_fixes
 
+There is an alternative version with more code reuse for what is patch 4
+in this series available here:
+http://git.linaro.org/people/christoffer.dall/linux-kvm-arm.git vcpu_init_fixes-alternative
+
+See patch 4 for more info on this one.
+
+Testing
+-------
+This has been tested on CubieBoard, Arndale, TC2, and Juno.  On Arndale
+and TC2 it was extremely easy to reproduce the setup (just start a VM
+that runs reboot from /etc/rc.local or similar) and this series clearly
+fixes the behavior.
+
+On Juno we occasionally see lockups of reboot, but I see this both with
+and without this series.  I have run a VM in a loop where the guest
+shuts itself down (same code path) a couple of hundred times without
+seeing any issues, so I think it's safe to merge this and further
+investigate the Juno reboot issue.
+
+
+Christoffer Dall (5):
+  arm/arm64: KVM: Correct KVM_ARM_VCPU_INIT power off option
+  arm/arm64: KVM: Reset the HCR on each vcpu when resetting the vcpu
+  arm/arm64: KVM: Clarify KVM_ARM_VCPU_INIT ABI
+  arm/arm64: KVM: Introduce stage2_unmap_vm
+  arm/arm64: KVM: Turn off vcpus and flush stage-2 pgtables on sytem
+    exit events
+
+ Documentation/virtual/kvm/api.txt    | 10 +++++-
+ arch/arm/include/asm/kvm_emulate.h   |  5 +++
+ arch/arm/include/asm/kvm_mmu.h       |  1 +
+ arch/arm/kvm/arm.c                   |  4 +++
+ arch/arm/kvm/guest.c                 |  1 -
+ arch/arm/kvm/mmu.c                   | 65 ++++++++++++++++++++++++++++++++++++
+ arch/arm/kvm/psci.c                  | 18 ++++++++++
+ arch/arm64/include/asm/kvm_emulate.h |  5 +++
+ arch/arm64/include/asm/kvm_host.h    |  1 +
+ arch/arm64/include/asm/kvm_mmu.h     |  1 +
+ arch/arm64/kvm/guest.c               |  1 -
+ 11 files changed, 109 insertions(+), 3 deletions(-)
 
 -- 
-Jazz is not dead. It just smells funny...
+2.1.2.330.g565301e.dirty
