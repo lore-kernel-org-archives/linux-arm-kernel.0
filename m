@@ -1,51 +1,70 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 27 Nov 2014 12:20:52 +0100
-Subject: [PATCH v4 6/7] mfd/regulator: dt-bindings: max77686: Document gpio
- properties
-In-Reply-To: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
-References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1417087253-12306-7-git-send-email-k.kozlowski@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 27 Nov 2014 11:21:13 +0000
+Subject: [PATCH 02/19] clk: samsung: Add binding documentation for
+ Exynos5433 clock controller
+In-Reply-To: <1417073716-22997-3-git-send-email-cw00.choi@samsung.com>
+References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
+ <1417073716-22997-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20141127112113.GC857@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document usage of ena-gpios properties which turn on external/GPIO
-control over regulator.
+On Thu, Nov 27, 2014 at 07:34:59AM +0000, Chanwoo Choi wrote:
+> This patch add binding documentation for Exynos5433 clock controller.
+> Exynos5433 has various clock domains So, this documentation explains
+> the detailed clock domains ans usage guide.
+> 
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Inki Dae <inki.dae@samsung.com>
+> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
+> ---
+>  .../devicetree/bindings/clock/exynos5433-clock.txt | 106 +++++++++++++++++++++
+>  1 file changed, 106 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/exynos5433-clock.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/exynos5433-clock.txt b/Documentation/devicetree/bindings/clock/exynos5433-clock.txt
+> new file mode 100644
+> index 0000000..72cd0ba
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/exynos5433-clock.txt
+> @@ -0,0 +1,106 @@
+> +* Samsung Exynos5433 CMU (Clock Management Units)
+> +
+> +The Exynos5433 clock controller generates and supplies clock to various
+> +controllers within the Exynos5433 SoC.
+> +
+> +Required Properties:
+> +
+> +- compatible: should be one of the following.
+> +  - "samsung,exynos5433-cmu-top"   - clock controller compatible for CMU_TOP
+> +    which generates clocks for IMEM/FSYS/G3D/GSCL/HEVC/MSCL/G2D/MFC/PERIC/PERIS
+> +    domains and bus clocks.
+> +  - "samsung,exynos5433-cmu-cpif"  - clock controller compatible for CMU_CPIF
+> +    which generates clocks for LLI (Low Latency Interface) IP.
+> +  - "samsung,exynos5433-cmu-mif"   - clock controller compatible for CMU_MIF
+> +    which generates clocks for DRAM Memory Controller domain.
+> +  - "samsung,exynos5433-cmu-peric" - clock controller compatible for CMU_PERIC
+> +    which generates clocks for UART/I2C/SPI/I2S/PCM/SPDIF/PWM/SLIMBUS IPs.
+> +  - "samsung,exynos5433-cmu-peris" - clock controller compatible for CMU_PERIS
+> +    which generates clocks for PMU/TMU/MCT/WDT/RTC/SECKEY/TZPC IPs.
+> +  - "samsung,exynos5433-cmu-fsys"  - clock controller compatible for CMU_FSYS
+> +    which generates clocks for USB/UFS/SDMMC/TSI/PDMA IPs.
+> +
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- #clock-cells: should be 1.
+> +
+> +Each clock is assigned an identifier and client nodes can use this identifier
+> +to specify the clock which they consume.
+> +
+> +All available clocks are defined as preprocessor macros in
+> +dt-bindings/clock/exynos5433.h header and can be used in device
+> +tree sources.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- Documentation/devicetree/bindings/mfd/max77686.txt | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+That header should be added as part of this patch, otehrwise this is
+incomplete.
 
-diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
-index 75fdfaf41831..93c4cd07ffc8 100644
---- a/Documentation/devicetree/bindings/mfd/max77686.txt
-+++ b/Documentation/devicetree/bindings/mfd/max77686.txt
-@@ -37,8 +37,12 @@ to get matched with their hardware counterparts as follow:
-   Regulators which can be turned off during system suspend:
- 	-LDOn	:	2, 6-8, 10-12, 14-16,
- 	-BUCKn	:	1-4.
--  Use standard regulator bindings for it ('regulator-off-in-suspend').
- 
-+  Regulators which can be configured for GPIO enable control:
-+	-LDOn	:	20, 21, 22
-+	-BUCKn	:	8, 9
-+  Use standard regulator bindings for these ('regulator-off-in-suspend',
-+  'ena-gpios').
- 
- Example:
- 
-@@ -65,4 +69,12 @@ Example:
- 				regulator-always-on;
- 				regulator-boot-on;
- 			};
-+
-+			buck9_reg {
-+				regulator-compatible = "BUCK9";
-+				regulator-name = "CAM_ISP_CORE_1.2V";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1200000>;
-+				ena-gpios = <&gpm0 3 GPIO_ACTIVE_HIGH>;
-+			};
- 	}
--- 
-1.9.1
+Mark.
