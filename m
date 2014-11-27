@@ -1,238 +1,72 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 27 Nov 2014 15:56:22 +0530
-Subject: [01/19] pinctrl: exynos: Add support for Exynos5433
-In-Reply-To: <1417073716-22997-2-git-send-email-cw00.choi@samsung.com>
-References: <1417073716-22997-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <5476FC4E.7030505@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 27 Nov 2014 10:26:29 +0000
+Subject: [PATCH 16/19] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <1417073716-22997-17-git-send-email-cw00.choi@samsung.com>
+References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
+ <1417073716-22997-17-git-send-email-cw00.choi@samsung.com>
+Message-ID: <5476FC55.1020606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
-
-On Thursday 27 November 2014 01:04 PM, Chanwoo Choi wrote:
-> This patch adds driver data for Exynos5433 SoC. Exynos5433 includes 228 multi-
-> functional input/output port pins and 135 memory port pins. There are 41 general
-> port groups and 2 memory port groups.
->
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Thomas Abraham <thomas.abraham@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+On 27/11/14 07:35, Chanwoo Choi wrote:
+> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC
+> based on Octal core CPUs (quad Cortex-A57 and quad Cortex-A53).
+> 
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
 > Acked-by: Inki Dae <inki.dae@samsung.com>
->
+> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
 > ---
-> drivers/pinctrl/samsung/pinctrl-exynos.c  | 163 ++++++++++++++++++++++++++++++
->   drivers/pinctrl/samsung/pinctrl-samsung.c |   2 +
->   drivers/pinctrl/samsung/pinctrl-samsung.h |   1 +
->   3 files changed, 166 insertions(+)
->
-> diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-> index 8e3e0c0..bd4c4ec 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-> +++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-> @@ -1268,6 +1268,169 @@ struct samsung_pin_ctrl exynos5420_pin_ctrl[] = {
->   	},
->   };
->
-> +/* pin banks of exynos5433 pin-controller - ALIVE */
-> +static struct samsung_pin_bank exynos5433_pin_banks0[] = {
-> +	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
-> +	EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
-> +	EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
-> +	EXYNOS_PIN_BANK_EINTW(8, 0x060, "gpa3", 0x0c),
-> +};
-> +
-> +/* pin banks of exynos5433 pin-controller - AUD */
-> +static struct samsung_pin_bank exynos5433_pin_banks1[] = {
-> +	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
-> +	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
-> +};
-> +
-> +/* pin banks of exynos5433 pin-controller - CPIF */
-> +static struct samsung_pin_bank exynos5433_pin_banks2[] = {
-> +	EXYNOS_PIN_BANK_EINTG(2, 0x000, "gpv6", 0x00),
-> +};
-> +
-> +/* pin banks of exynos5433 pin-controller - eSE */
-> +static struct samsung_pin_bank exynos5433_pin_banks3[] = {
-> +	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj2", 0x00),
-> +};
-> +
-> +/* pin banks of exynos5433 pin-controller - FINGER */
-> +static struct samsung_pin_bank exynos5433_pin_banks4[] = {
-> +	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpd5", 0x00),
-> +};
-> +
-> +/* pin banks of exynos5433 pin-controller - FSYS */
-> +static struct samsung_pin_bank exynos5433_pin_banks5[] = {
-> +	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gph1", 0x00),
-> +	EXYNOS_PIN_BANK_EINTG(7, 0x020, "gpr4", 0x04),
-> +	EXYNOS_PIN_BANK_EINTG(5, 0x040, "gpr0", 0x08),
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x060, "gpr1", 0x0c),
-> +	EXYNOS_PIN_BANK_EINTG(2, 0x080, "gpr2", 0x10),
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x0a0, "gpr3", 0x14),
-> +};
-> +
-> +/* pin banks of exynos5433 pin-controller - IMEM */
-> +static struct samsung_pin_bank exynos5433_pin_banks6[] = {
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpf0", 0x00),
+>  arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi | 698 +++++++++++++++++++++
+>  arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 523 +++++++++++++++
+>  2 files changed, 1221 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
+> 
 
-Is this complete?
+[...]
 
-> +};
-> +
-> +/* pin banks of exynos5433 pin-controller - NFC */
-> +static struct samsung_pin_bank exynos5433_pin_banks7[] = {
-> +	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj0", 0x00),
-> +};
-> +
-> +/* pin banks of exynos5433 pin-controller - PERIC */
-> +static struct samsung_pin_bank exynos5433_pin_banks8[] = {
-> +	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gpv7", 0x00),
-> +	EXYNOS_PIN_BANK_EINTG(5, 0x020, "gpb0", 0x04),
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpc0", 0x08),
-> +	EXYNOS_PIN_BANK_EINTG(2, 0x060, "gpc1", 0x0c),
-> +	EXYNOS_PIN_BANK_EINTG(6, 0x080, "gpc2", 0x10),
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x0a0, "gpc3", 0x14),
-> +	EXYNOS_PIN_BANK_EINTG(2, 0x0c0, "gpg0", 0x18),
-> +	EXYNOS_PIN_BANK_EINTG(4, 0x0e0, "gpd0", 0x1c),
-> +	EXYNOS_PIN_BANK_EINTG(6, 0x100, "gpd1", 0x20),
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x120, "gpd2", 0x24),
-> +	EXYNOS_PIN_BANK_EINTG(5, 0x140, "gpd4", 0x28),
-> +	EXYNOS_PIN_BANK_EINTG(2, 0x160, "gpd8", 0x2c),
-> +	EXYNOS_PIN_BANK_EINTG(7, 0x180, "gpd6", 0x30),
-> +	EXYNOS_PIN_BANK_EINTG(3, 0x1a0, "gpd7", 0x34),
-> +	EXYNOS_PIN_BANK_EINTG(5, 0x1c0, "gpg1", 0x38),
-> +	EXYNOS_PIN_BANK_EINTG(2, 0x1e0, "gpg2", 0x3c),
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x200, "gpg3", 0x40),
-> +};
-> +
-> +/* pin banks of exynos5433 pin-controller - TOUCH */
-> +static struct samsung_pin_bank exynos5433_pin_banks9[] = {
-> +	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj1", 0x00),
-> +};
-> +
-> +/*
-> + * Samsung pinctrl driver data for Exynos5433 SoC. Exynos5433 SoC includes
-> + * four gpio/pin-mux/pinconfig controllers.
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+> new file mode 100644
+> index 0000000..3d8b576
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
 
-four? I can see you added 10.
+[...]
 
+> +               timer {
+> +                       compatible = "arm,armv8-timer";
+> +                       interrupts = <1 13 0xff01>,
+> +                                    <1 14 0xff01>,
+> +                                    <1 11 0xff01>,
+> +                                    <1 10 0xff01>;
+
+This is wrong. Timer interrupts for both A53 and A57 are level triggered.
+
+> +                       clock-frequency = <24000000>;
+
+Please go and fix your firmware. Really...
+
+> +                       use-clocksource-only;
+> +                       use-physical-timer;
+> +               };
+
+Well, that's a total NAK. Neither of these properties are part of the
+binding, and we've already established that none of that would never be
+valid on arm64.
+
+I suggest you finally do what we've been asking for years, which is to
+fix your boot ROM by adding the 5 lines of assembly code that are needed
+instead of repeatedly post the same bogus DT files.
 
 Thanks,
-Pankaj Dubey
-> + */
-> +struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
-> +	{
-> +		/* pin-controller instance 0 data */
-> +		.pin_banks	= exynos5433_pin_banks0,
-> +		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks0),
-> +		.eint_wkup_init = exynos_eint_wkup_init,
-> +		.suspend	= exynos_pinctrl_suspend,
-> +		.resume		= exynos_pinctrl_resume,
-> +		.label		= "exynos5433-gpio-ctrl0",
-> +	}, {
-> +		/* pin-controller instance 1 data */
-> +		.pin_banks	= exynos5433_pin_banks1,
-> +		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks1),
-> +		.eint_gpio_init = exynos_eint_gpio_init,
-> +		.suspend	= exynos_pinctrl_suspend,
-> +		.resume		= exynos_pinctrl_resume,
-> +		.label		= "exynos5433-gpio-ctrl1",
-> +	}, {
-> +		/* pin-controller instance 2 data */
-> +		.pin_banks	= exynos5433_pin_banks2,
-> +		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks2),
-> +		.eint_gpio_init = exynos_eint_gpio_init,
-> +		.suspend	= exynos_pinctrl_suspend,
-> +		.resume		= exynos_pinctrl_resume,
-> +		.label		= "exynos5433-gpio-ctrl2",
-> +	}, {
-> +		/* pin-controller instance 3 data */
-> +		.pin_banks	= exynos5433_pin_banks3,
-> +		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks3),
-> +		.eint_gpio_init = exynos_eint_gpio_init,
-> +		.suspend	= exynos_pinctrl_suspend,
-> +		.resume		= exynos_pinctrl_resume,
-> +		.label		= "exynos5433-gpio-ctrl3",
-> +	}, {
-> +		/* pin-controller instance 4 data */
-> +		.pin_banks	= exynos5433_pin_banks4,
-> +		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks4),
-> +		.eint_gpio_init = exynos_eint_gpio_init,
-> +		.suspend	= exynos_pinctrl_suspend,
-> +		.resume		= exynos_pinctrl_resume,
-> +		.label		= "exynos5433-gpio-ctrl4",
-> +	}, {
-> +		/* pin-controller instance 5 data */
-> +		.pin_banks	= exynos5433_pin_banks5,
-> +		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks5),
-> +		.eint_gpio_init = exynos_eint_gpio_init,
-> +		.suspend	= exynos_pinctrl_suspend,
-> +		.resume		= exynos_pinctrl_resume,
-> +		.label		= "exynos5433-gpio-ctrl5",
-> +	}, {
-> +		/* pin-controller instance 6 data */
-> +		.pin_banks	= exynos5433_pin_banks6,
-> +		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks6),
-> +		.eint_gpio_init = exynos_eint_gpio_init,
-> +		.suspend	= exynos_pinctrl_suspend,
-> +		.resume		= exynos_pinctrl_resume,
-> +		.label		= "exynos5433-gpio-ctrl6",
-> +	}, {
-> +		/* pin-controller instance 7 data */
-> +		.pin_banks	= exynos5433_pin_banks7,
-> +		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks7),
-> +		.eint_gpio_init = exynos_eint_gpio_init,
-> +		.suspend	= exynos_pinctrl_suspend,
-> +		.resume		= exynos_pinctrl_resume,
-> +		.label		= "exynos5433-gpio-ctrl7",
-> +	}, {
-> +		/* pin-controller instance 8 data */
-> +		.pin_banks	= exynos5433_pin_banks8,
-> +		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks8),
-> +		.eint_gpio_init = exynos_eint_gpio_init,
-> +		.suspend	= exynos_pinctrl_suspend,
-> +		.resume		= exynos_pinctrl_resume,
-> +		.label		= "exynos5433-gpio-ctrl8",
-> +	}, {
-> +		/* pin-controller instance 9 data */
-> +		.pin_banks	= exynos5433_pin_banks9,
-> +		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks9),
-> +		.eint_gpio_init = exynos_eint_gpio_init,
-> +		.suspend	= exynos_pinctrl_suspend,
-> +		.resume		= exynos_pinctrl_resume,
-> +		.label		= "exynos5433-gpio-ctrl9",
-> +	},
-> +};
-> +
->   /* pin banks of exynos7 pin-controller - ALIVE */
->   static struct samsung_pin_bank exynos7_pin_banks0[] = {
->   	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
-> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> index e0ba851..4eb61ea 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> @@ -1226,6 +1226,8 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
->   		.data = (void *)exynos5260_pin_ctrl },
->   	{ .compatible = "samsung,exynos5420-pinctrl",
->   		.data = (void *)exynos5420_pin_ctrl },
-> +	{ .compatible = "samsung,exynos5433-pinctrl",
-> +		.data = (void *)exynos5433_pin_ctrl },
->   	{ .compatible = "samsung,s5pv210-pinctrl",
->   		.data = (void *)s5pv210_pin_ctrl },
->   	{ .compatible = "samsung,exynos7-pinctrl",
-> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-> index e737d1f..d260356 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-samsung.h
-> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-> @@ -245,6 +245,7 @@ extern struct samsung_pin_ctrl exynos4415_pin_ctrl[];
->   extern struct samsung_pin_ctrl exynos5250_pin_ctrl[];
->   extern struct samsung_pin_ctrl exynos5260_pin_ctrl[];
->   extern struct samsung_pin_ctrl exynos5420_pin_ctrl[];
-> +extern struct samsung_pin_ctrl exynos5433_pin_ctrl[];
->   extern const struct samsung_pin_ctrl exynos7_pin_ctrl[];
->   extern struct samsung_pin_ctrl s3c64xx_pin_ctrl[];
->   extern struct samsung_pin_ctrl s3c2412_pin_ctrl[];
->
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
