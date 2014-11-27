@@ -1,54 +1,40 @@
-From: tremyfr@gmail.com (Philippe Reynes)
-Date: Thu, 27 Nov 2014 21:33:59 +0100
-Subject: [PATCH] apf27dev: add max5821 to the dts
-Message-ID: <1417120439-11784-1-git-send-email-tremyfr@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 27 Nov 2014 22:48:12 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Soc Updates for v3.19
+In-Reply-To: <201411192205.57149.arnd@arndb.de>
+References: <cover.1415058939.git.horms+renesas@verge.net.au>
+ <201411192205.57149.arnd@arndb.de>
+Message-ID: <2367916.IecTPygCF4@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
 
-Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
----
- arch/arm/boot/dts/imx27-apf27dev.dts |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+On Wednesday 19 November 2014 22:05:56 Arnd Bergmann wrote:
+> On Tuesday 04 November 2014, Simon Horman wrote:
+> > ----------------------------------------------------------------
+> > Renesas ARM Based SoC Soc Updates for v3.19
+> > 
+> > * Select CONFIG_ZONE_DMA when CONFIG_ARM_LPAE is enabled
+> > * Add CA7 arch_timer initialization for r8a7794
+> > * Handle CA7 arch timer delay
+> > * Add shmobile_init_late() to sh7372
+> > 
+> >   - This is consistent with other shmobile SoCs
+> 
+> Pulled into next/soc.
+> 
+> Note that the CONFIG_ZONE_DMA change might not be the best solution, we
+> should probably have CONFIG_ZONE_DMA32 instead as some other architectures
+> do, so you can use the entire lowmem area for DMA allocations.
 
-diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
-index da306c5..bba3f41 100644
---- a/arch/arm/boot/dts/imx27-apf27dev.dts
-+++ b/arch/arm/boot/dts/imx27-apf27dev.dts
-@@ -59,6 +59,21 @@
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_max5821: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "max5821-reg";
-+			regulator-min-microvolt = <2500000>;
-+			regulator-max-microvolt = <2500000>;
-+			regulator-always-on;
-+		};
-+	};
- };
- 
- &cspi1 {
-@@ -107,6 +122,12 @@
- 		compatible = "dallas,ds1374";
- 		reg = <0x68>;
- 	};
-+
-+	max5821 at 38 {
-+		compatible = "maxim,max5821";
-+		reg = <0x38>;
-+		vref-supply = <&reg_max5821>;
-+	};
- };
- 
- &i2c2 {
+I might be mistaken, but if the machine description doesn't set the 
+dma_zone_size field, arm_dma_zone_size and arm_dma_limit are set to 0 and 
+0xffffffff respectively. This results in MAX_DMA_ADDRESS being set to 
+0xffffffff. Doesn't that allow using the entire lowmem area for DMA 
+allocations ?
+
 -- 
-1.7.4.4
+Regards,
+
+Laurent Pinchart
