@@ -1,64 +1,103 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Thu, 27 Nov 2014 16:46:30 +0100
-Subject: Code generation involving __raw_readl and __raw_writel
-In-Reply-To: <2978273.VePW8UymqL@wuerfel>
-References: <5476FFA2.8010403@free.fr> <7958894.CNnhBWEkgT@wuerfel>
- <54773A8B.5000200@free.fr> <2978273.VePW8UymqL@wuerfel>
-Message-ID: <54774756.40408@free.fr>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 27 Nov 2014 15:48:47 +0000
+Subject: [PATCH] arm64: ARM: Fix the Generic Timers interrupt active level
+ description
+In-Reply-To: <20141127153453.GR828@e106497-lin.cambridge.arm.com>
+References: <1417099005-18638-1-git-send-email-Liviu.Dudau@arm.com>
+ <5477389A.8010606@arm.com>
+ <20141127153453.GR828@e106497-lin.cambridge.arm.com>
+Message-ID: <547747DF.9070402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/2014 16:00, Arnd Bergmann wrote:
+On 27/11/14 15:34, Liviu Dudau wrote:
+> On Thu, Nov 27, 2014 at 02:43:38PM +0000, Marc Zyngier wrote:
+>> On 27/11/14 14:36, Liviu Dudau wrote:
+>>> The Cortex-A5x TRM states in paragraph "9.2 Generic Timer functional
+>>> description" that generic timers provide an active-LOW interrupt
+>>> output. Fix the device trees to correctly describe this.
+>>>
+>>> While doing this update the CPU mask to match the number of described
+>>> CPUs as well.
+>>>
+>>> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>>> ---
+>>>
+>>> Arnd, Olof: This is on top of linux-next/master as it patches the Juno
+>>> as well as all the other ARM DTs.
+>>>
+>>>  arch/arm64/boot/dts/arm/foundation-v8.dts  | 8 ++++----
+>>>  arch/arm64/boot/dts/arm/juno.dts           | 8 ++++----
+>>>  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts | 8 ++++----
+>>>  3 files changed, 12 insertions(+), 12 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dts
+>>> index 4a06090..27f3296 100644
+>>> --- a/arch/arm64/boot/dts/arm/foundation-v8.dts
+>>> +++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
+>>> @@ -78,10 +78,10 @@
+>>>  
+>>>  	timer {
+>>>  		compatible = "arm,armv8-timer";
+>>> -		interrupts = <1 13 0xff01>,
+>>> -			     <1 14 0xff01>,
+>>> -			     <1 11 0xff01>,
+>>> -			     <1 10 0xff01>;
+>>> +		interrupts = <1 13 0xf08>,
+>>> +			     <1 14 0xf08>,
+>>> +			     <1 11 0xf08>,
+>>> +			     <1 10 0xf08>;
+>>>  		clock-frequency = <100000000>;
+>>>  	};
+>>>  
+>>> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+>>> index 097ecc4..cb3073e 100644
+>>> --- a/arch/arm64/boot/dts/arm/juno.dts
+>>> +++ b/arch/arm64/boot/dts/arm/juno.dts
+>>> @@ -98,10 +98,10 @@
+>>>  
+>>>  	timer {
+>>>  		compatible = "arm,armv8-timer";
+>>> -		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
+>>> -			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
+>>> -			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>,
+>>> -			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_EDGE_RISING)>;
+>>> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+>>> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+>>> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+>>> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
+>>>  	};
+>>>  
+>>>  	pmu {
+>>> diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+>>> index 572005e..efc59b3 100644
+>>> --- a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+>>> +++ b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+>>> @@ -81,10 +81,10 @@
+>>>  
+>>>  	timer {
+>>>  		compatible = "arm,armv8-timer";
+>>> -		interrupts = <1 13 0xff01>,
+>>> -			     <1 14 0xff01>,
+>>> -			     <1 11 0xff01>,
+>>> -			     <1 10 0xff01>;
+>>> +		interrupts = <1 13 0xf08>,
+>>> +			     <1 14 0xf08>,
+>>> +			     <1 11 0xf08>,
+>>> +			     <1 10 0xf08>;
+>>>  		clock-frequency = <100000000>;
+>>>  	};
+>>>  
+>>>
+>>
+>> Sorry, but that's wrong. Despite the *cores* having an level-low output,
+>> the GIC only triggers on *level-high*. Yes, there is probably an
+>> inverter in between.
+> 
+> BTW, should I also update the bindings example to get this right?
 
-> On Thursday 27 November 2014 15:51:55 Mason wrote:
->
->> (BTW, the original code is 4-5 years old, while my target is 3.14.x)
->
-> I meant the IO_ADDRESS stuff. Modern code uses ioremap() instead
-> since the IO_ADDRESS was platform specific, and drivers can no longer
-> use platform headers on CONFIG_ARCH_MULTIPLATFORM, which is used
-> for all new code now.
+Definitely. I'm pretty sure I got it wrong too at some point...
 
-$ grep CONFIG_ARCH_MULTIPLATFORM .config
-# CONFIG_ARCH_MULTIPLATFORM is not set
-
-One more thing on the TODO list (which is starting to look like a
-phone directory). Do you have a reference explaining this option?
-(I did read the short description in arch/arm/Kconfig)
-
-> Would you consider submitting the code upstream?
-
-This is definitely one of my objectives. I'm still learning the ropes
-(I rewrote the cpufreq driver to use mostly generic functions, heard
-of the clk "meta-framework" but haven't even started looking at that,
-I'm also writing a temperature sensor driver for lm-sensors.)
-
-> Modern platforms no longer have an include directory and use the
-> standard definitions. How many other header files do you have in there?
-
-$ find arch/arm/mach-tangox -name *.h | wc -l
-44
-
-> Actually, we also try to get rid of the need for most other files
-> in mach-* as well, though commonly you need a little bit of code for
-> bringing up secondary CPU cores. Everything else should be a device
-> driver.
-
-I see that other platforms put their cpufreq driver in drivers/cpufreq
-Ours is in arch/arm/mach-tangox (same for cpuidle.c)
-(Hmmm, now that I look more closely, I see that we also have a generic
-clock.c in there... More on the TODO list.)
-
->> IIUC, you're saying the current method using iotable_init is not
->> appropriate, and I should use the map_io callback?
->
-> map_io and iotable_init is the same thing, the former calls the latter.
-> What I'm saying is that relying on hardcoded virtual addresses is
-> not appropriate, you can use the iotable_init call to set up a
-> hugetlb mapping for performance optimization, but it should really
-> work without that.
-
-I think I don't fully understand this paragraph yet. But you've given
-me a lot to think about today, so maybe It'll sink in later.
-
-Regards.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
