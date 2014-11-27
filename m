@@ -1,81 +1,42 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 26 Nov 2014 17:51:32 -0800
-Subject: [RFC 0/2] Qualcomm RPM sleep states
-In-Reply-To: <20141126134055.GF7712@sirena.org.uk>
-References: <546FC674.1070005@codeaurora.org>
- <20141121232738.GP3815@sirena.org.uk> <546FCE3A.1000005@codeaurora.org>
- <20141124181614.GT7712@sirena.org.uk> <5473A0F3.6080405@codeaurora.org>
- <20141125204430.GN7712@sirena.org.uk> <547526BC.1090202@codeaurora.org>
- <20141126134055.GF7712@sirena.org.uk>
-Message-ID: <547683A4.4000700@codeaurora.org>
+Date: Wed, 26 Nov 2014 17:54:41 -0800
+Subject: [PATCH] ARM: Update processor_modes for hyp and monitor mode
+In-Reply-To: <1416272732-20573-1-git-send-email-sboyd@codeaurora.org>
+References: <1416272732-20573-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <54768461.3050501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2014 05:40 AM, Mark Brown wrote:
-> On Tue, Nov 25, 2014 at 05:02:52PM -0800, Stephen Boyd wrote:
->> On 11/25/2014 12:44 PM, Mark Brown wrote:
->>
->>
->>> I can't help but think that this all sounds like the RPM isn't mapping
->>> very well onto practical systems and needs revisiting in future
->>> versions...  for example with what I'm parsing out of the above an
->>> active+sleep set command or otherwise having the two modes tied together
->>> for some regulators would make the whole problem go away.
->> We create the 'active only' regulators for consumers that actually need
->> them. From the set of regulators on a board only a couple need this
-> That's what I don't think is making any sense.  Creating two regulators
-> for the same thing seems like bad news, at best it's going to make reuse
-> harder.
-
-What reuse is harder?
-
+On 11/17/2014 05:05 PM, Stephen Boyd wrote:
+> If the kernel is running in hypervisor mode or monitor mode we'll
+> print UK6_32 or UK10_32 if we call into __show_regs(). Let's
+> update these strings to indicate the new modes that didn't exist
+> when this code was written.
 >
->> treatment. I don't see how tying the two states together via an active+sleep
->> set command would make this problem go away for the cases I already
->> described before, i.e. CPU wants some voltage and other IO devices want
->> another voltage and the CPU doesn't care what the voltage is when the CPU is
-> Not paying attention to requests from a disabled consumer seems like
-> something we should be able to do in general.
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 
-Sounds good.
+Can I throw this into the patch tracker?
 
+>   arch/arm/kernel/process.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
 >
->> in idle or suspend. Having a combination active + sleep set command would be
->> nice. The RPM already sort of supports this by allowing you to only modify
->> the active set. If you never modify the sleep set, then the RPM just applies
->> whatever is in the active set to the sleep set. We can probably go through
->> and figure out what resources could get away with only using the active set
->> so we can cut down on sleep set requests that are always the same between
->> active and sleep set.
-> This version is starting to sound a lot like the consumers need to be
-> able to do an idle to sleep transition and change their settings when
-> they enter their sleep mode.  It seems a lot like what many devices do
-> now when they enter and exit runtime PM but with deferred application
-> depending on other users (for regulators I'm assuming the active set
-> would actually be a subset of the sleep set of valid voltages).
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index fe972a2f3df3..fdfa3a78ec8c 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -51,8 +51,8 @@ EXPORT_SYMBOL(__stack_chk_guard);
+>   static const char *processor_modes[] __maybe_unused = {
+>     "USER_26", "FIQ_26" , "IRQ_26" , "SVC_26" , "UK4_26" , "UK5_26" , "UK6_26" , "UK7_26" ,
+>     "UK8_26" , "UK9_26" , "UK10_26", "UK11_26", "UK12_26", "UK13_26", "UK14_26", "UK15_26",
+> -  "USER_32", "FIQ_32" , "IRQ_32" , "SVC_32" , "UK4_32" , "UK5_32" , "UK6_32" , "ABT_32" ,
+> -  "UK8_32" , "UK9_32" , "UK10_32", "UND_32" , "UK12_32", "UK13_32", "UK14_32", "SYS_32"
+> +  "USER_32", "FIQ_32" , "IRQ_32" , "SVC_32" , "UK4_32" , "UK5_32" , "MON_32" , "ABT_32" ,
+> +  "UK8_32" , "UK9_32" , "HYP_32", "UND_32" , "UK12_32", "UK13_32", "UK14_32", "SYS_32"
+>   };
+>   
+>   static const char *isa_modes[] __maybe_unused = {
 
-Yes, one key point is that we want the transition to be handled by the 
-RPM co-processor. The reason being that usually we want to change 
-settings after the last CPU transitions into their sleep mode. There's 
-no way to do this without relying on some external co-processor to go 
-and change the settings for us.
-
->
->>> I think any duplication that's going on sounds like a consequence of
->>> the way this is currently implemented.  I think based on what I *think*
->>> you're saying the RPM driver probably ought to be hiding this and adding
->>> a property which makes the active and sleep sets track each other with
->>> normal suspend mode control otherwise.  That could potentially be done
->>> in the core, though the tracking would be substantial surgery.
->> Sorry I don't follow this part. It's about more than suspend, we also care
->> about idle. I agree that pushing the concept of active vs. sleep into the
->> framework is substantial.
-> That's not what it seemed like people had been talking about up until
-> this most recent e-mail, you'd been talking about suspend mode.  The
-> starting point was mapping onto the suspend support the regulator has.
-
-Hm? I've been saying "idle and suspend" each time. Perhaps the initial 
-discussion about regulator suspend support threw things off.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
