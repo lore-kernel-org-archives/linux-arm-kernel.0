@@ -1,64 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Nov 2014 18:56:41 +0000
-Subject: [RFC 0/2] Qualcomm RPM sleep states
-In-Reply-To: <547683A4.4000700@codeaurora.org>
-References: <546FC674.1070005@codeaurora.org>
- <20141121232738.GP3815@sirena.org.uk>
- <546FCE3A.1000005@codeaurora.org>
- <20141124181614.GT7712@sirena.org.uk>
- <5473A0F3.6080405@codeaurora.org>
- <20141125204430.GN7712@sirena.org.uk>
- <547526BC.1090202@codeaurora.org>
- <20141126134055.GF7712@sirena.org.uk>
- <547683A4.4000700@codeaurora.org>
-Message-ID: <20141127185641.GE7712@sirena.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 27 Nov 2014 20:00:36 +0100
+Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
+In-Reply-To: <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
+References: <5465C00E.4030808@offcode.fi>
+ <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
+Message-ID: <20141127200036.2c65df62@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 05:51:32PM -0800, Stephen Boyd wrote:
-> On 11/26/2014 05:40 AM, Mark Brown wrote:
+Hi Timo,
 
-> >That's what I don't think is making any sense.  Creating two regulators
-> >for the same thing seems like bad news, at best it's going to make reuse
-> >harder.
+Sorry for the late reply.
 
-> What reuse is harder?
+On Fri, 21 Nov 2014 14:23:30 +0200
+Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
 
-The consumer needs to understand the fact that a given supply might be
-represented by multiple different regulators that it sees.  This means
-the system integration is not being abstracted away from the consumer.
+> By default the driver will start a kernel timer which keeps on kicking
+> the watchdog HW until user space has opened the watchdog
+> device. Usually this is desirable as the watchdog HW is running by
+> default and the user space may not have any watchdog daemon running at
+> all.
+> 
+> However, on production systems it may be mandatory that also early
+> crashes and lockups will lead to a watchdog reset, even if they happen
+> before the user space has opened the watchdog device.
+> 
+> To resolve the issue, add a new device tree property
+> "enable-early-reset" which will prevent the kernel timer from pinging
+> the watchdog HW on behalf of user space. The default is still to use
+> kernel timer, but more strict behavior can be enabled via the device
+> tree property.
+> 
+> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+> ---
+>  Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
+>  drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
+>  2 files changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+> index f90e294..a0b7b75 100644
+> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+> @@ -28,6 +28,10 @@ Optional properties:
+>  	entering idle state.
+>  - atmel,dbg-halt : Should be present if you want to stop the watchdog when
+>  	entering debug state.
+> +- enable-early-reset : Should be present if you want to let the
+> +	watchdog timer to expire even before user space has opened the
+> +	device. If not set, a kernel timer will keep on pinging the
+> +	watchdog until it is opened.
 
-> >This version is starting to sound a lot like the consumers need to be
-> >able to do an idle to sleep transition and change their settings when
-> >they enter their sleep mode.  It seems a lot like what many devices do
-> >now when they enter and exit runtime PM but with deferred application
-> >depending on other users (for regulators I'm assuming the active set
-> >would actually be a subset of the sleep set of valid voltages).
+If you want to make this property generic, maybe you should document it
+in a generic binding doc
+(Documentation/devicetree/bindings/watchdog/watchdog.txt ?).
+Once you're at it, maybe you could document the generic timeout-sec
+property in this file.
+Moreover, you might want to parse this property in watchdog_core.c and
+store the information in the watchdog_device struct.
 
-> Yes, one key point is that we want the transition to be handled by the RPM
-> co-processor. The reason being that usually we want to change settings after
-> the last CPU transitions into their sleep mode. There's no way to do this
-> without relying on some external co-processor to go and change the settings
-> for us.
+Apart from that, I'm not opposed to the approach, and I'm fine with the
+current implementation.
 
-That all seems like something that can be handled in the RPM driver, it
-just needs something to kick it to do the actual writes and let the
-consumers proceed as normal.
+Regards,
 
-> >That's not what it seemed like people had been talking about up until
-> >this most recent e-mail, you'd been talking about suspend mode.  The
-> >starting point was mapping onto the suspend support the regulator has.
+Boris
 
-> Hm? I've been saying "idle and suspend" each time. Perhaps the initial
-> discussion about regulator suspend support threw things off.
-
-I was being asked about use of regulator suspend support, I naively
-thought that this might mean the discussion was something about suspend!
-It's also not terribly clear to me what the involvement of idle is here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141127/a56329be/attachment.sig>
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
