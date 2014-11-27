@@ -1,105 +1,139 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 27 Nov 2014 10:22:12 +0100
-Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
-In-Reply-To: <5476CA7F.4000802@offcode.fi>
-References: <5465C00E.4030808@offcode.fi>
- <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
- <5476CA7F.4000802@offcode.fi>
-Message-ID: <5476ED44.603@atmel.com>
+From: uwe@kleine-koenig.org (=?UTF-8?B?VXdlIEtsZWluZS1Lw7ZuaWc=?=)
+Date: Thu, 27 Nov 2014 10:23:43 +0100
+Subject: [PATCHv1 6/6] rtc: rtc-isl12057: add alarm support to Intersil
+ ISL12057 RTC driver
+In-Reply-To: <986ee8d9d3e6862007f398ffddc2a4bb2368933e.1416006090.git.arno@natisbad.org>
+References: <cover.1416006090.git.arno@natisbad.org>
+ <986ee8d9d3e6862007f398ffddc2a4bb2368933e.1416006090.git.arno@natisbad.org>
+Message-ID: <5476ED9F.2070600@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/2014 07:53, Timo Kokkonen wrote:
-> Hi,
+Hello,
+
+finally I managed to test this series on my (unmodified) rn104.
+
+For patch 1: Maybe point out that the issue with the century bit isn't
+that critical, because this bit is not expected to be set before year 2100.
+
+For patch 3: This patch adds a few dev_err calls that get later amended
+in patch 5 to also include an error code. IMHO these should already be
+added in patch 3. Patch 5 should only add it to the already existing
+strings (if applicable).
+
+For patch 4: Maybe
+s/obsolete/for backwards compatibility, don't use in new code/.
+
+Some further comments inline ...
+
+On 11/15/2014 12:07 AM, Arnaud Ebalard wrote:
+> The latter is the one found on current 3 kernel users of the chip
+> for which support was initially developed (Netgear ReadyNAS 102,
+> 104 and 2120 NAS). On those devices, the IRQ#2 pin of the chip is not
+> connected to the SoC but to a PMIC. This allows setting an alarm,
+> powering off the device and have it wake up when the alarm rings.
+> To support that configuration the driver does the following:
 > 
-> On 21.11.2014 14:23, Timo Kokkonen wrote:
->> By default the driver will start a kernel timer which keeps on kicking
->> the watchdog HW until user space has opened the watchdog
->> device. Usually this is desirable as the watchdog HW is running by
->> default and the user space may not have any watchdog daemon running at
->> all.
->>
->> However, on production systems it may be mandatory that also early
->> crashes and lockups will lead to a watchdog reset, even if they happen
->> before the user space has opened the watchdog device.
->>
->> To resolve the issue, add a new device tree property
->> "enable-early-reset" which will prevent the kernel timer from pinging
->> the watchdog HW on behalf of user space. The default is still to use
->> kernel timer, but more strict behavior can be enabled via the device
->> tree property.
->>
->> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+>  1. it has alarm_irq_enable() function returns -ENOTTY when no IRQ
+>     is passed to the driver.
+>  2. it marks the device as a wakeup source in all cases (whether an
+>     IRQ is passed to the driver or not) to have 'wakealarm' sysfs
+>     entry created.
+This is not pretty, but I don't know if there is a nicer alternative.
+Maybe this should only be done in the presence of a flag in the device
+tree (say: can-wakeup-machine, a prefix would be nice, but "isil," feels
+wrong).
+
+> [...]
+> FWIW, if someone is looking for a way to test alarm support on a system
+> on which the chip IRQ line has the ability to boot the system (e.g.
+> ReadyNAS 102, 104, etc):
 > 
-> I forgot to put the PATCHv2 on the subject line.. But anyway, any 
-> thoughts about it? Is there something that should be done to get it forward?
+>     # echo 0 > /sys/class/rtc/rtc0/wakealarm
+Why is this needed?
 
-Sorry for not having come back to you quickly.
-
-The only thing that tend to prevent me from taking this patch is the
-fact that this DT property is mostly a software, Linux-specific one...
-Which is somehow not covered by the DT.
-This might explain as well why this property is not present on other SoCs.
-
-Can we have other people's advices?
-
-Bye,
-
->> ---
->>   Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
->>   drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
->>   2 files changed, 9 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->> index f90e294..a0b7b75 100644
->> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->> @@ -28,6 +28,10 @@ Optional properties:
->>   	entering idle state.
->>   - atmel,dbg-halt : Should be present if you want to stop the watchdog when
->>   	entering debug state.
->> +- enable-early-reset : Should be present if you want to let the
->> +	watchdog timer to expire even before user space has opened the
->> +	device. If not set, a kernel timer will keep on pinging the
->> +	watchdog until it is opened.
->>
->>   Example:
->>   	watchdog at fffffd40 {
->> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
->> index 489729b..78b1977 100644
->> --- a/drivers/watchdog/at91sam9_wdt.c
->> +++ b/drivers/watchdog/at91sam9_wdt.c
->> @@ -89,6 +89,7 @@ struct at91wdt {
->>   	u32 mr_mask;
->>   	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
->>   	bool nowayout;
->> +	bool no_early_timer;
->>   	unsigned int irq;
->>   };
->>
->> @@ -122,7 +123,7 @@ static void at91_ping(unsigned long data)
->>   {
->>   	struct at91wdt *wdt = (struct at91wdt *)data;
->>   	if (time_before(jiffies, wdt->next_heartbeat) ||
->> -	    !watchdog_active(&wdt->wdd)) {
->> +		(!watchdog_active(&wdt->wdd) && !wdt->no_early_timer)) {
->>   		at91_wdt_reset(wdt);
->>   		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
->>   	} else {
->> @@ -316,6 +317,9 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
->>
->>   	wdt->mr |= max | ((max - min) << 16);
->>
->> +	if (of_property_read_bool(np, "enable-early-reset"))
->> +		wdt->no_early_timer = 1;
->> +
->>   	return 0;
->>   }
->>   #else
->>
+>     # echo `date '+%s' -d '+ 1 minutes'` > /sys/class/rtc/rtc0/wakealarm
+>     # shutdown -h now
 > 
-> 
+> With the commandes above, after a minute, the system comes back to life.
+s/commandes/commands/
 
+> +	ret = regmap_update_bits(data->regmap, ISL12057_REG_INT,
+> +				 ISL12057_REG_INT_A1IE,
+> +				 enable ? ISL12057_REG_INT_A1IE : 0);
+> +	if (ret)
+> +		dev_err(dev, "%s: changing alarm interrupt flag failed (%d)\n",
+> +			__func__, ret);
+> +
+> +	return ret;
+> +}
+Maybe point out in the commit log that the first alarm (of two) is used,
+and the event is signaled on pin $Ididntlookitup.
+(IIRC the 2nd alarm register set doesn't support seconds, but in return
+has year and month field.)
 
--- 
-Nicolas Ferre
+> [...]
+> +	/*
+> +	 * This is needed to have 'wakealarm' sysfs entry available. One
+> +	 * would expect the device to be marked as a wakeup source only
+> +	 * when an IRQ pin of the RTC is routed to an interrupt line of the
+> +	 * CPU. In practice, such an IRQ pin can be connected to a PMIC and
+> +	 * this allows the device to be powered up when RTC alarm rings.
+Maybe add the machines you know of that have this setup to the comment.
+
+> +	 */
+> +	device_init_wakeup(dev, true);
+> +
+> +	data->rtc = devm_rtc_device_register(dev, DRV_NAME, &rtc_ops,
+> +					     THIS_MODULE);
+> +	ret = PTR_ERR_OR_ZERO(data->rtc);
+> +	if (ret) {
+> +		dev_err(dev, "%s: unable to register RTC device (%d)\n",
+> +			__func__, ret);
+> +		goto err;
+> +	}
+> +
+> +	/* We cannot support UIE mode if we do not have an IRQ line */
+> +	if (!data->irq)
+> +		data->rtc->uie_unsupported = 1;
+> +
+> +err:
+> +	return ret;
+>  }
+>  
+> +static int isl12057_remove(struct i2c_client *client)
+> +{
+> +	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(&client->dev);
+> +
+> +	if (rtc_data->irq > 0)
+> +		device_init_wakeup(&client->dev, false);
+I didn't check, but I wonder it that could be/is done by the device
+core already?
+
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int isl12057_rtc_suspend(struct device *dev)
+> +{
+> +	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(dev);
+> +
+> +	if (device_may_wakeup(dev))
+> +		return enable_irq_wake(rtc_data->irq);
+Does this need a check for data->irq?
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int isl12057_rtc_resume(struct device *dev)
+> +{
+> +	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(dev);
+> +
+> +	if (device_may_wakeup(dev))
+> +		return disable_irq_wake(rtc_data->irq);
+ditto.
+
+Thanks for your efforts to improve my NAS :-)
+Uwe
