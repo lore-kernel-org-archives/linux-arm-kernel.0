@@ -1,125 +1,33 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Fri, 28 Nov 2014 17:54:15 +0100
-Subject: [PATCH 2/4] ARM: dts: add DT for Alphascale ASM9260 SoC
+Date: Fri, 28 Nov 2014 17:54:17 +0100
+Subject: [PATCH 4/4] add Alphascale to vendor-prefixes.txt
 In-Reply-To: <1417193657-31602-1-git-send-email-linux@rempel-privat.de>
 References: <201411281509.19170.arnd@arndb.de>
  <1417193657-31602-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1417193657-31602-3-git-send-email-linux@rempel-privat.de>
+Message-ID: <1417193657-31602-5-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for now it is wary basic SoC description with most important IPs needed
-to make this device work
+this company already provided some products, so it make sense to add
+them to vendor-prefixes.txt list
 
 Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/Makefile                      |  2 +
- arch/arm/boot/dts/alphascale-asm9260-devkit.dts | 13 +++++
- arch/arm/boot/dts/alphascale-asm9260.dtsi       | 63 +++++++++++++++++++++++++
- 3 files changed, 78 insertions(+)
- create mode 100644 arch/arm/boot/dts/alphascale-asm9260-devkit.dts
- create mode 100644 arch/arm/boot/dts/alphascale-asm9260.dtsi
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 38c89ca..6e24264 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -517,6 +517,8 @@ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
- 	dove-dove-db.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6589-aquaris5.dtb
- 
-+dtb-$(CONFIG_MACH_ASM9260) += alphascale-asm9260-devkit.dtb
-+
- targets += dtbs dtbs_install
- targets += $(dtb-y)
- endif
-diff --git a/arch/arm/boot/dts/alphascale-asm9260-devkit.dts b/arch/arm/boot/dts/alphascale-asm9260-devkit.dts
-new file mode 100644
-index 0000000..c77e2c9
---- /dev/null
-+++ b/arch/arm/boot/dts/alphascale-asm9260-devkit.dts
-@@ -0,0 +1,13 @@
-+/*
-+ * Copyright 2014 Oleksij Rempel <linux@rempel-privat.de>
-+ *
-+ * Licensed under the X11 license or the GPL v2 (or later)
-+ */
-+
-+/dts-v1/;
-+#include "alphascale-asm9260.dtsi"
-+
-+/ {
-+	model = "Alphascale asm9260 Development Kit";
-+	compatible = "alphascale,asm9260devkit", "alphascale,asm9260";
-+};
-diff --git a/arch/arm/boot/dts/alphascale-asm9260.dtsi b/arch/arm/boot/dts/alphascale-asm9260.dtsi
-new file mode 100644
-index 0000000..907fc7b
---- /dev/null
-+++ b/arch/arm/boot/dts/alphascale-asm9260.dtsi
-@@ -0,0 +1,63 @@
-+/*
-+ * Copyright 2014 Oleksij Rempel <linux@rempel-privat.de>
-+ *
-+ * Licensed under the X11 license or the GPL v2 (or later)
-+ */
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/clock/alphascale,asm9260.h>
-+
-+/ {
-+	interrupt-parent = <&icoll>;
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x20000000 0x2000000>;
-+	};
-+
-+	cpus {
-+		#address-cells = <0>;
-+		#size-cells = <0>;
-+
-+		cpu {
-+			compatible = "arm,arm926ej-s";
-+			device_type = "cpu";
-+			clocks = <&acc CLKID_SYS_CPU>;
-+		};
-+	};
-+
-+	osc24m: oscillator {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <24000000>;
-+		clock-accuracy = <30000>;
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+
-+		acc: clock-controller at 80040000 {
-+			compatible = "alphascale,asm9260-clock-controller";
-+			#clock-cells = <1>;
-+			clocks = <&osc24m>;
-+			reg = <0x80040000 0x204>;
-+		};
-+
-+		icoll: interrupt-controller at 80054000 {
-+			compatible = "alphascale,asm9260-icoll";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			reg = <0x80054000 0x200>;
-+		};
-+
-+		timer0: timer at 80088000 {
-+			compatible = "alphascale,asm9260-timer";
-+			reg = <0x80088000 0x4000>;
-+			clocks = <&acc CLKID_AHB_TIMER0>;
-+			interrupts = <29>;
-+		};
-+	};
-+};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 723999d..cd17a66 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -11,6 +11,7 @@ adi	Analog Devices, Inc.
+ aeroflexgaisler	Aeroflex Gaisler AB
+ ak	Asahi Kasei Corp.
+ allwinner	Allwinner Technology Co., Ltd.
++alphascale	AlphaScale Integrated Circuits Systems, Inc.
+ altr	Altera Corp.
+ amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
+ amd	Advanced Micro Devices (AMD), Inc.
 -- 
 1.9.1
