@@ -1,21 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Nov 2014 22:36:03 +0100
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.19 (round 2)
-In-Reply-To: <20141126052920.GW22670@titan.lakedaemon.net>
-References: <20141126052920.GW22670@titan.lakedaemon.net>
-Message-ID: <201411282236.03937.arnd@arndb.de>
+Date: Fri, 28 Nov 2014 22:37:48 +0100
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.19 (round 3)
+In-Reply-To: <20141126053819.GX22670@titan.lakedaemon.net>
+References: <20141126053819.GX22670@titan.lakedaemon.net>
+Message-ID: <201411282237.48754.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wednesday 26 November 2014, Jason Cooper wrote:
 > Folks,
 > 
-> Here's a round of changes for v3.19.  All except for the top two commits
-> have been in -next for several days.
+> This is the last round of DT changes.  I kept it out separate because I
+> just applied the patches tonight.  It also has a dependency on Kishon's
+> guaranteed immutable branch tag, phy-dt-header.  Which, unfortunately,
+> pulls in -rc4.  Hopefully this isn't a surprise to you. :)
 > 
-> This is an incremental pull request from tags/mvebu-dt-3.19 up
-> tags/mvebu-dt-3.19-2 on the mvebu/dt branch.
+> This is an incremental pull request from a random position on the
+> mvebu/dt branch up to tags/mvebu-dt-3.19-3.
 
-pulled into next/dt, thanks!
+I would have preferred -rc3 to earlier to avoid the backmerge, but it's
+not a big issue since we already have a next/dt2 branch with another
+odd dependency. I plan to submit that a little later to wait for the
+other branches to get merged first and then will have to hand-craft the
+pull request anyway.
+
+Pulled into next/dt2, thanks!
 
 	Arnd
