@@ -1,60 +1,23 @@
-From: l.majewski@majess.pl (Lukasz Majewski)
-Date: Fri, 28 Nov 2014 11:18:24 +0100
-Subject: [PATCHv2 1/1] thermal: cpu_cooling: check for the readiness of
- cpufreq layer
-In-Reply-To: <CAKohponu_PRrqsuMdCJDznhiO_-=iCaYPhCCad8F4WS3rNxo5A@mail.gmail.com>
-References: <1417097577-3548-1-git-send-email-edubezval@gmail.com>
- <CAKohponu_PRrqsuMdCJDznhiO_-=iCaYPhCCad8F4WS3rNxo5A@mail.gmail.com>
-Message-ID: <20141128111824.533c4641@jawa>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 28 Nov 2014 18:24:44 +0800
+Subject: [PATCH 0/4] media: ov2640: add device tree support
+Message-ID: <1417170288-11112-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Nov 2014 13:35:49 +0530
-Viresh Kumar <viresh.kumar@linaro.org> wrote:
+This patch series add device tree support for ov2640. And also add
+the document for the devicetree properties.
 
-> On 27 November 2014 at 19:42, Eduardo Valentin <edubezval@gmail.com>
-> wrote:
-> > (I'm sorry VireshK, I am still using my normal practice) :-)
-> 
-> That's fine :)
-> 
-> > diff --git a/drivers/thermal/cpu_cooling.c
-> > b/drivers/thermal/cpu_cooling.c index 1ab0018..bed3fa2 100644
-> > --- a/drivers/thermal/cpu_cooling.c
-> > +++ b/drivers/thermal/cpu_cooling.c
-> > @@ -440,6 +440,11 @@ __cpufreq_cooling_register(struct device_node
-> > *np, int ret = 0, i;
-> >         struct cpufreq_policy policy;
-> >
-> > +       if (!cpufreq_frequency_get_table(0)) {
-> > +               pr_err("cpu_cooling: cpufreq layer not ready!
-> > Deferring.\n");
-> 
-> Throwing an error here doesn't look to be the right thing. Ultimately
-> we will register the cooling dev when probed again after some time.
-> 
-> So, a pr_debug() suits more here.
-> 
-> Also, this breaks existing exynos thermal drivers as they don't handle
-> -EPROBE_DEFER well right now.
+Josh Wu (4):
+  media: ov2640: add async probe function
+  media: ov2640: add primary dt support
+  media: ov2640: add a master clock for sensor
+  media: ov2640: dt: add the device tree binding document
 
-Unfortunately Viresh is correct here. Current (before rework) Exynos
-TMU driver expects that cpu_cooling device will succeed.
+ .../devicetree/bindings/media/i2c/ov2640.txt       |  43 ++++++
+ drivers/media/i2c/soc_camera/ov2640.c              | 151 ++++++++++++++++++---
+ 2 files changed, 178 insertions(+), 16 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
 
-> 
-> I reached here, because one of my patches had something similar to
-> what you wrote. Just for this file though, haven't updated any other
-> drivers though.
-> 
-> Will be sending you my small patchset by end of day today, please see
-> if they make any sense at all..
-
-Best regards,
-?ukasz Majewski
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141128/59d1b520/attachment.sig>
+-- 
+1.9.1
