@@ -1,23 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Nov 2014 15:09:18 +0100
-Subject: [PATCH v4 0/2] initial suport for Alphascale ASM9260
-In-Reply-To: <1416827308-16481-1-git-send-email-linux@rempel-privat.de>
-References: <1415086486-10260-1-git-send-email-linux@rempel-privat.de>
- <1416827308-16481-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <201411281509.19170.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 28 Nov 2014 15:10:30 +0100
+Subject: [PATCH] ARM: kbuild: Fix forced rebuild after 'make dtbs'
+In-Reply-To: <20141126144153.GK3836@n2100.arm.linux.org.uk>
+References: <CACRpkdYmJWy1_vs0tWRA7SvkQnvbXXKqf7pHpH5b5tZ6vR+KJg@mail.gmail.com>
+ <1414961549-31666-1-git-send-email-jason@lakedaemon.net>
+ <5474F78F.2060906@suse.cz>
+ <20141125235150.GH3836@n2100.arm.linux.org.uk>
+ <20141126005710.GE22670@titan.lakedaemon.net>
+ <CACRpkdZJoWbQeuZ4ZXGbQr0+SNG_9ZA+cQkAA0C2F9rnZDYtyQ@mail.gmail.com>
+ <20141126144153.GK3836@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdYwQT3+RLxP_b_kYJoHV4L7sZ7yiU=JZWVq_zHKz0EY_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 November 2014, Oleksij Rempel wrote:
-> This is reduced patchset to provide initial support for Alphascale ASM9260
-> 
-> Oleksij Rempel (2):
->   ARM: add mach-asm9260
->   ARM: add lolevel debug support for asm9260
-> 
+On Wed, Nov 26, 2014 at 3:41 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Nov 26, 2014 at 02:57:42PM +0100, Linus Walleij wrote:
+>> make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+>> KBUILD_OUTPUT=build-u300 u300_defconfig
+>> make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+>> KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
+>> make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+>> KBUILD_OUTPUT=build-u300 dtbs
+>> make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+>> KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
+>>
+>> -> Rebuilds everything.
+>>
+>> This doesn't occur before the offending commit. So it only happens
+>> when specifying extra environment variables on the command line.
+>
+> I suspect if you also provide the CONFIG_DEBUG_SECTION_MISMATCH=y on the
+> dtbs line, everything will work properly.
 
-Applied to next/soc, thanks a lot for keeping this up!
+Yay, it works! :)
 
-Are you planning to send some matching dts files for 3.19 as well?
+> The problem is that dtbs line executes a prepare, which I guess rebuilds
+> the bounds stuff.  So, the dtbs target results in it being rebuilt without
+> the section mismatch, and then you re-execute a make with it, causing
+> the bounds stuff to be rebuilt again.
 
-	Arnd
+Yep. Not very intuitive to require passing section mismatch debug
+flags to DTB rebuilding but whatever, it's not so bad I can't live with
+it.
+
+Strange that it worked before.
+
+Yours,
+Linus Walleij
