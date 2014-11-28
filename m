@@ -1,128 +1,32 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 28 Nov 2014 14:26:39 +0900
-Subject: [PATCH v10 6/6] arm64: add seccomp support
-In-Reply-To: <1417152399-32717-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1417152399-32717-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1417152399-32717-7-git-send-email-takahiro.akashi@linaro.org>
+From: yamada.m@jp.panasonic.com (Masahiro Yamada)
+Date: Fri, 28 Nov 2014 15:10:41 +0900
+Subject: [PATCH] ARM: replace magic number with PAGE_SHIFT macro in fixup_pv
+ code
+Message-ID: <1417155041-29735-1-git-send-email-yamada.m@jp.panasonic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-secure_computing() is called first in syscall_trace_enter() so that
-a system call will be aborted quickly without doing succeeding syscall
-tracing if seccomp rules want to deny that system call.
+This line converts PHYS_OFFSET into PHYS_PFN_OFFSET.
+It is better to use PAGE_SHIFT rather than the magic number 12.
 
-On compat task, syscall numbers for system calls allowed in seccomp mode 1
-are different from those on normal tasks, and so _NR_seccomp_xxx_32's need
-to be redefined.
-
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
 ---
- arch/arm64/Kconfig               |   14 ++++++++++++++
- arch/arm64/include/asm/seccomp.h |   25 +++++++++++++++++++++++++
- arch/arm64/include/asm/unistd.h  |    3 +++
- arch/arm64/kernel/ptrace.c       |    5 +++++
- 4 files changed, 47 insertions(+)
- create mode 100644 arch/arm64/include/asm/seccomp.h
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 9532f8d..f495d3c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -37,6 +37,7 @@ config ARM64
- 	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_ARCH_JUMP_LABEL
- 	select HAVE_ARCH_KGDB
-+	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_BPF_JIT
- 	select HAVE_C_RECORDMCOUNT
-@@ -345,6 +346,19 @@ config ARCH_HAS_CACHE_LINE_SIZE
- 
- source "mm/Kconfig"
- 
-+config SECCOMP
-+	bool "Enable seccomp to safely compute untrusted bytecode"
-+	---help---
-+	  This kernel feature is useful for number crunching applications
-+	  that may need to compute untrusted bytecode during their
-+	  execution. By using pipes or other transports made available to
-+	  the process as file descriptors supporting the read/write
-+	  syscalls, it's possible to isolate those applications in
-+	  their own address space using seccomp. Once seccomp is
-+	  enabled via prctl(PR_SET_SECCOMP), it cannot be disabled
-+	  and the task is only allowed to execute a few safe syscalls
-+	  defined by each seccomp mode.
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm64/include/asm/seccomp.h b/arch/arm64/include/asm/seccomp.h
-new file mode 100644
-index 0000000..c76fac9
---- /dev/null
-+++ b/arch/arm64/include/asm/seccomp.h
-@@ -0,0 +1,25 @@
-+/*
-+ * arch/arm64/include/asm/seccomp.h
-+ *
-+ * Copyright (C) 2014 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef _ASM_SECCOMP_H
-+#define _ASM_SECCOMP_H
-+
-+#include <asm/unistd.h>
-+
-+#ifdef CONFIG_COMPAT
-+#define __NR_seccomp_read_32		__NR_compat_read
-+#define __NR_seccomp_write_32		__NR_compat_write
-+#define __NR_seccomp_exit_32		__NR_compat_exit
-+#define __NR_seccomp_sigreturn_32	__NR_compat_rt_sigreturn
-+#endif /* CONFIG_COMPAT */
-+
-+#include <asm-generic/seccomp.h>
-+
-+#endif /* _ASM_SECCOMP_H */
-diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-index 6d2bf41..49c9aef 100644
---- a/arch/arm64/include/asm/unistd.h
-+++ b/arch/arm64/include/asm/unistd.h
-@@ -31,6 +31,9 @@
-  * Compat syscall numbers used by the AArch64 kernel.
-  */
- #define __NR_compat_restart_syscall	0
-+#define __NR_compat_exit		1
-+#define __NR_compat_read		3
-+#define __NR_compat_write		4
- #define __NR_compat_sigreturn		119
- #define __NR_compat_rt_sigreturn	173
- 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index f576781..d882b83 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -27,6 +27,7 @@
- #include <linux/smp.h>
- #include <linux/ptrace.h>
- #include <linux/user.h>
-+#include <linux/seccomp.h>
- #include <linux/security.h>
- #include <linux/init.h>
- #include <linux/signal.h>
-@@ -1149,6 +1150,10 @@ static void tracehook_report_syscall(struct pt_regs *regs,
- 
- asmlinkage int syscall_trace_enter(struct pt_regs *regs)
- {
-+	/* Do the secure computing check first; failures should be fast. */
-+	if (secure_computing() == -1)
-+		return -1;
-+
- 	if (test_thread_flag(TIF_SYSCALL_TRACE))
- 		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
- 
+ arch/arm/kernel/head.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 664eee8..ecb7be8 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -586,7 +586,7 @@ __fixup_pv_table:
+ 	add	r5, r5, r3	@ adjust table end address
+ 	add	r6, r6, r3	@ adjust __pv_phys_pfn_offset address
+ 	add	r7, r7, r3	@ adjust __pv_offset address
+-	mov	r0, r8, lsr #12	@ convert to PFN
++	mov	r0, r8, lsr #PAGE_SHIFT	@ convert to PFN
+ 	str	r0, [r6]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
+ 	strcc	ip, [r7, #HIGH_OFFSET]	@ save to __pv_offset high bits
+ 	mov	r6, r3, lsr #24	@ constant for add/sub instructions
 -- 
-1.7.9.5
+1.9.1
