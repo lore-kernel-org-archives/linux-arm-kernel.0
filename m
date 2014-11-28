@@ -1,75 +1,82 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Fri, 28 Nov 2014 17:50:54 +0100
-Subject: [PATCH 2/2] ARM: irqchip: mxs: add Alpascale ASM9260 support
-In-Reply-To: <1417193454-31417-1-git-send-email-linux@rempel-privat.de>
+Date: Fri, 28 Nov 2014 17:54:14 +0100
+Subject: [PATCH 1/4] ARM: clocksource: add asm9260_timer driver
+In-Reply-To: <1417193657-31602-1-git-send-email-linux@rempel-privat.de>
 References: <201411281509.19170.arnd@arndb.de>
- <1417193454-31417-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1417193454-31417-3-git-send-email-linux@rempel-privat.de>
+ <1417193657-31602-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <1417193657-31602-2-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Freescale iMX23/iMX28 and Alphascale ASM9260 have similar
-interrupt collectors. It makes easy to reuse irq-mxs code for ASM9260.
-Differences between this devices are fallowing:
-- different register offsets
-- different count of intterupt lines per register
-- ASM9260 don't provide reset bit
-- ASM9260 don't support FIQ.
+In some cases asm9260 looks similar to iMX2x. One of exceptions is
+timer controller. So this patch introduces new driver for this special case.
 
 Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/irqchip/Kconfig                    |   5 ++
- drivers/irqchip/Makefile                   |   2 +-
- drivers/irqchip/alphascale_asm9260-icoll.h | 109 +++++++++++++++++++++++++++++
- drivers/irqchip/irq-mxs.c                  | 105 ++++++++++++++++++++++++---
- 4 files changed, 212 insertions(+), 9 deletions(-)
- create mode 100644 drivers/irqchip/alphascale_asm9260-icoll.h
+ drivers/clocksource/Kconfig         |   9 ++
+ drivers/clocksource/Makefile        |   1 +
+ drivers/clocksource/asm9260_timer.c | 220 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 230 insertions(+)
+ create mode 100644 drivers/clocksource/asm9260_timer.c
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index b21f12f..badc2dc 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -125,3 +125,8 @@ config KEYSTONE_IRQ
- 	help
- 		Support for Texas Instruments Keystone 2 IRQ controller IP which
- 		is part of the Keystone 2 IPC mechanism
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 9042060..a2df6b2 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -223,4 +223,13 @@ config CLKSRC_VERSATILE
+ 	  ARM Versatile, RealView and Versatile Express reference
+ 	  platforms.
+ 
++config ASM9260_TIMER
++	bool "Alphascale ASM9260 timer driver"
++	select CLKSRC_MMIO
++	select CLKSRC_OF
++	default y if MACH_ASM9260
++	help
++	  This enables build of a clocksource and clockevent driver for
++	  the 32-bit System Timer hardware available on a Alphascale ASM9260.
 +
-+config IRQ_MXS
-+	def_bool y if MACH_ASM9260 || ARCH_MXS
-+	select IRQ_DOMAIN
-+	select STMP_DEVICE
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 173bb5f..fd06d5e 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -5,7 +5,7 @@ obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
- obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
- obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
- obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
--obj-$(CONFIG_ARCH_MXS)			+= irq-mxs.o
-+obj-$(CONFIG_IRQ_MXS)			+= irq-mxs.o
- obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
- obj-$(CONFIG_DW_APB_ICTL)		+= irq-dw-apb-ictl.o
- obj-$(CONFIG_METAG)			+= irq-metag-ext.o
-diff --git a/drivers/irqchip/alphascale_asm9260-icoll.h b/drivers/irqchip/alphascale_asm9260-icoll.h
+ endmenu
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 756f6f1..b84c3b8 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -46,3 +46,4 @@ obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
+ obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
+ obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
+ obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
++obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
+diff --git a/drivers/clocksource/asm9260_timer.c b/drivers/clocksource/asm9260_timer.c
 new file mode 100644
-index 0000000..5cec108
+index 0000000..2c9c993
 --- /dev/null
-+++ b/drivers/irqchip/alphascale_asm9260-icoll.h
-@@ -0,0 +1,109 @@
++++ b/drivers/clocksource/asm9260_timer.c
+@@ -0,0 +1,220 @@
 +/*
 + * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
 + */
 +
-+#ifndef _ALPHASCALE_ASM9260_ICOLL_H
-+#define _ALPHASCALE_ASM9260_ICOLL_H
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/sched.h>
++#include <linux/clk.h>
++#include <linux/clocksource.h>
++#include <linux/clockchips.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/bitops.h>
 +
-+#define ASM9260_NUM_IRQS		64
++#define DRIVER_NAME	"asm9260-timer"
++
 +/*
 + * this device provide 4 offsets for each register:
 + * 0x0 - plain read write mode
@@ -77,252 +84,194 @@ index 0000000..5cec108
 + * 0x8 - clr mode, XOR logic.
 + * 0xc - togle mode.
 + */
++#define SET_REG 4
++#define CLR_REG 8
 +
-+#define ASM9260_HW_ICOLL_VECTOR				0x0000
-+/*
-+ * bits 31:2
-+ * This register presents the vector address for the interrupt currently
-+ * active on the CPU IRQ input. Writing to this register notifies the
-+ * interrupt collector that the interrupt service routine for the current
-+ * interrupt has been entered.
-+ * The exception trap should have a LDPC instruction from this address:
-+ * LDPC ASM9260_HW_ICOLL_VECTOR_ADDR; IRQ exception at 0xffff0018
-+ */
++#define HW_IR           0x0000 /* RW. Interrupt */
++#define BM_IR_CR0	BIT(4)
++#define BM_IR_MR3	BIT(3)
++#define BM_IR_MR2	BIT(2)
++#define BM_IR_MR1	BIT(1)
++#define BM_IR_MR0	BIT(0)
 +
-+/*
-+ * The Interrupt Collector Level Acknowledge Register is used by software to
-+ * indicate the completion of an interrupt on a specific level.
-+ * This register is written at the very end of an interrupt service routine. If
-+ * nesting is used then the CPU irq must be turned on before writing to this
-+ * register to avoid a race condition in the CPU interrupt hardware.
-+ */
-+#define ASM9260_HW_ICOLL_LEVELACK			0x0010
-+#define ASM9260_BM_LEVELn(nr)				BIT(nr)
++#define HW_TCR		0x0010 /* RW. Timer controller */
++/* BM_C*_RST
++ * Timer Counter and the Prescale Counter are synchronously reset on the
++ * next positive edge of PCLK. The counters remain reset until TCR[1] is
++ * returned to zero. */
++#define BM_C3_RST	BIT(7)
++#define BM_C2_RST	BIT(6)
++#define BM_C1_RST	BIT(5)
++#define BM_C0_RST	BIT(4)
++/* BM_C*_EN
++ * 1 - Timer Counter and Prescale Counter are enabled for counting
++ * 0 - counters are disabled */
++#define BM_C3_EN	BIT(3)
++#define BM_C2_EN	BIT(2)
++#define BM_C1_EN	BIT(1)
++#define BM_C0_EN	BIT(0)
 +
-+#define ASM9260_HW_ICOLL_CTRL				0x0020
-+/*
-+ * ASM9260_BM_CTRL_SFTRST and ASM9260_BM_CTRL_CLKGATE are not available on
-+ * asm9260.
-+ */
-+#define ASM9260_BM_CTRL_SFTRST				BIT(31)
-+#define ASM9260_BM_CTRL_CLKGATE				BIT(30)
-+/* disable interrupt level nesting */
-+#define ASM9260_BM_CTRL_NO_NESTING			BIT(19)
-+/*
-+ * Set this bit to one enable the RISC32-style read side effect associated with
-+ * the vector address register. In this mode, interrupt in-service is signaled
-+ * by the read of the ASM9260_HW_ICOLL_VECTOR register to acquire the interrupt
-+ * vector address. Set this bit to zero for normal operation, in which the ISR
-+ * signals in-service explicitly by means of a write to the
-+ * ASM9260_HW_ICOLL_VECTOR register.
-+ * 0 - Must Write to Vector register to go in-service.
-+ * 1 - Go in-service as a read side effect
-+ */
-+#define ASM9260_BM_CTRL_ARM_RSE_MODE			BIT(18)
-+#define ASM9260_BM_CTRL_IRQ_ENABLE			BIT(16)
++#define HW_DIR		0x0020 /* RW. Direction? */
++/* 00 - count up
++ * 01 - count down
++ * 10 - ?? 2^n/2 */
++#define BM_DIR_COUNT_UP		0
++#define BM_DIR_COUNT_DOWN	1
++#define BM_DIR0_SHIFT	0
++#define BM_DIR1_SHIFT	4
++#define BM_DIR2_SHIFT	8
++#define BM_DIR3_SHIFT	12
++#define BM_DIR_DEFAULT		(BM_DIR_COUNT_UP << BM_DIR0_SHIFT | \
++				 BM_DIR_COUNT_UP << BM_DIR1_SHIFT | \
++				 BM_DIR_COUNT_UP << BM_DIR2_SHIFT | \
++				 BM_DIR_COUNT_UP << BM_DIR3_SHIFT)
 +
-+#define ASM9260_HW_ICOLL_STAT_OFFSET			0x0030
-+/*
-+ * bits 5:0
-+ * Vector number of current interrupt. Multiply by 4 and add to vector base
-+ * address to obtain the value in ASM9260_HW_ICOLL_VECTOR.
-+ */
++#define HW_TC0		0x0030 /* RO. Timer counter 0 */
++/* HW_TC*. Timer counter owerflow (0xffff.ffff to 0x0000.0000) do not generate
++ * interrupt. This registers can be used to detect overflow */
++#define HW_TC1          0x0040
++#define HW_TC2		0x0050
++#define HW_TC3		0x0060
 +
-+/*
-+ * RAW0 and RAW1 provides a read-only view of the raw interrupt request lines
-+ * coming from various parts of the chip. Its purpose is to improve diagnostic
-+ * observability.
-+ */
-+#define ASM9260_HW_ICOLL_RAW0				0x0040
-+#define ASM9260_HW_ICOLL_RAW1				0x0050
++#define HW_PR		0x0070 /* RW. prescaler */
++#define BM_PR_DISABLE	0
++#define HW_PC		0x0080 /* RO. Prescaler counter */
++#define HW_MCR		0x0090 /* RW. Match control */
++/* enable interrupt on match */
++#define BM_MCR_INT_EN(n)	(1 << (n * 3 + 0))
++/* enable TC reset on match */
++#define BM_MCR_RES_EN(n)	(1 << (n * 3 + 1))
++/* enable stop TC on match */
++#define BM_MCR_STOP_EN(n)	(1 << (n * 3 + 2))
 +
-+#define ASM9260_HW_ICOLL_INTERRUPT0			0x0060
-+#define ASM9260_HW_ICOLL_INTERRUPTn(n)		(0x0060 + ((n) >> 2) * 0x10)
-+/*
-+ * WARNING: Modifying the priority of an enabled interrupt may result in
-+ * undefined behavior.
-+ */
-+#define ASM9260_BM_INT_PRIORITY_MASK			0x3
-+#define ASM9260_BM_INT_ENABLE				BIT(2)
-+#define ASM9260_BM_INT_SOFTIRQ				BIT(3)
++#define HW_MR0		0x00a0 /* RW. Match reg */
++#define HW_MR1		0x00b0
++#define HW_MR2		0x00C0
++#define HW_MR3		0x00D0
 +
-+#define ASM9260_BM_ICOLL_INTERRUPTn_SHIFT(n)		(((n) & 0x3) << 3)
-+#define ASM9260_BM_ICOLL_INTERRUPTn_ENABLE(n)		(1 << (2 + \
-+			ASM9260_BM_ICOLL_INTERRUPTn_SHIFT(n)))
++#define HW_CTCR		0x0180 /* Counter control */
++#define BM_CTCR0_SHIFT	0
++#define BM_CTCR1_SHIFT	2
++#define BM_CTCR2_SHIFT	4
++#define BM_CTCR3_SHIFT	6
++#define BM_CTCR_TM	0	/* Timer mode. Every rising PCLK edge. */
++#define BM_CTCR_DEFAULT	(BM_CTCR_TM << BM_CTCR0_SHIFT | \
++			 BM_CTCR_TM << BM_CTCR1_SHIFT | \
++			 BM_CTCR_TM << BM_CTCR2_SHIFT | \
++			 BM_CTCR_TM << BM_CTCR3_SHIFT)
 +
-+#define ASM9260_HW_ICOLL_VBASE				0x0160
-+/*
-+ * bits 31:2
-+ * This bitfield holds the upper 30 bits of the base address of the vector
-+ * table.
-+ */
++static struct asm9260_timer_priv {
++	void __iomem *base;
++	unsigned long ticks_per_jiffy;
++} priv;
 +
-+#define ASM9260_HW_ICOLL_CLEAR0				0x01d0
-+#define ASM9260_HW_ICOLL_CLEAR1				0x01e0
-+#define ASM9260_HW_ICOLL_CLEARn(n)			(((n >> 5) * 0x10) \
-+							+ SET_REG)
-+#define ASM9260_BM_CLEAR_BIT(n)				BIT(n & 0x1f)
-+
-+/* Scratchpad */
-+#define ASM9260_HW_ICOLL_UNDEF_VECTOR			0x01f0
-+#endif
-diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
-index 681125d..8c5c3d2 100644
---- a/drivers/irqchip/irq-mxs.c
-+++ b/drivers/irqchip/irq-mxs.c
-@@ -1,5 +1,7 @@
- /*
-  * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
-+ *	Add Alphascale ASM9260 support.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -28,6 +30,7 @@
- #include <asm/exception.h>
- 
- #include "irqchip.h"
-+#include "alphascale_asm9260-icoll.h"
- 
- /*
-  * this device provide 4 offsets for each register:
-@@ -63,6 +66,33 @@ struct icoll_priv {
- 
- static struct icoll_priv icoll_priv;
- static struct irq_domain *icoll_domain;
-+static DEFINE_RAW_SPINLOCK(icoll_lock);
-+
-+/* calculate bit offset depending on number of intterupt per register */
-+static u32 icoll_intr_bitshift(struct irq_data *d, u32 bit)
++static int asm9260_timer_set_next_event(unsigned long delta,
++					 struct clock_event_device *evt)
 +{
-+	/*
-+	 * We expect intr_per_reg to be 4 or 1, it means
-+	 * "n" will be 3 or 0.
-+	 */
-+	int n = icoll_priv.intr_per_reg - 1;
-+
-+	/*
-+	 * If n = 0, "bit" is never shifted.
-+	 * If n = 3, mask lower part of hwirq to convert it
-+	 * in 0, 1, 2 or 3 and then multiply it by 8 (or shift by 3)
-+	 */
-+	return bit << ((d->hwirq & n) << n);
++	/* configure match count for TC0 */
++	writel_relaxed(delta, priv.base + HW_MR0);
++	/* enable TC0 */
++	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
++	return 0;
 +}
 +
-+/* calculate mem offset depending on number of intterupt per register */
-+static void __iomem *icoll_intr_reg(struct irq_data *d)
++static void asm9260_timer_set_mode(enum clock_event_mode mode,
++				    struct clock_event_device *evt)
 +{
-+	int n = icoll_priv.intr_per_reg >> 1;
++	/* stop timer0 */
++	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + CLR_REG);
 +
-+	/* offset = hwirq / intr_per_reg * 0x10 */
-+	return icoll_priv.intr + ((d->hwirq >> n) * 0x10);
-+}
- 
- static void icoll_ack_irq(struct irq_data *d)
- {
-@@ -77,14 +107,21 @@ static void icoll_ack_irq(struct irq_data *d)
- 
- static void icoll_mask_irq(struct irq_data *d)
- {
--	__raw_writel(BM_ICOLL_INTR_ENABLE,
--			icoll_priv.intr + CLR_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
-+	__raw_writel(icoll_intr_bitshift(d, BM_ICOLL_INTR_ENABLE),
-+			icoll_intr_reg(d) + CLR_REG);
- }
- 
- static void icoll_unmask_irq(struct irq_data *d)
- {
--	__raw_writel(BM_ICOLL_INTR_ENABLE,
--			icoll_priv.intr + SET_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
-+	raw_spin_lock(&icoll_lock);
-+	if (icoll_priv.clear)
-+		__raw_writel(ASM9260_BM_CLEAR_BIT(d->hwirq),
-+				icoll_priv.clear +
-+				ASM9260_HW_ICOLL_CLEARn(d->hwirq));
-+
-+	__raw_writel(icoll_intr_bitshift(d, BM_ICOLL_INTR_ENABLE),
-+			icoll_intr_reg(d) + SET_REG);
-+	raw_spin_unlock(&icoll_lock);
- }
- 
- static struct irq_chip mxs_icoll_chip = {
-@@ -116,12 +153,34 @@ static struct irq_domain_ops icoll_irq_domain_ops = {
- 	.xlate = irq_domain_xlate_onecell,
- };
- 
-+static void __init icoll_add_domain(struct device_node *np,
-+			  int num)
-+{
-+	icoll_domain = irq_domain_add_linear(np, num,
-+					     &icoll_irq_domain_ops, NULL);
-+
-+	if (!icoll_domain)
-+		panic("%s: unable add irq domain", np->full_name);
-+	irq_set_default_host(icoll_domain);
-+	set_handle_irq(icoll_handle_irq);
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		/* disable reset and stop on match */
++		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
++				priv.base + HW_MCR + CLR_REG);
++		/* configure match count for TC0 */
++		writel_relaxed(priv.ticks_per_jiffy, priv.base + HW_MR0);
++		/* enable TC0 */
++		writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++		/* enable reset and stop on match */
++		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
++				priv.base + HW_MCR + SET_REG);
++		break;
++	default:
++		break;
++	}
 +}
 +
-+static void __iomem * __init icoll_init_iobase(struct device_node *np)
-+{
-+	void __iomem *icoll_base;
++static struct clock_event_device event_dev = {
++	.name		= DRIVER_NAME,
++	.rating		= 200,
++	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_next_event	= asm9260_timer_set_next_event,
++	.set_mode	= asm9260_timer_set_mode,
++};
 +
-+	icoll_base = of_io_request_and_map(np, 0, np->name);
-+	if (!icoll_base)
-+		panic("%s: unable to map resource", np->full_name);
-+	return icoll_base;
++static irqreturn_t asm9260_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++
++	evt->event_handler(evt);
++
++	writel_relaxed(BM_IR_MR0, priv.base + HW_IR);
++
++	return IRQ_HANDLED;
 +}
 +
- static int __init icoll_of_init(struct device_node *np,
- 			  struct device_node *interrupt_parent)
- {
--	void __iomem *icoll_base = of_iomap(np, 0);
--	WARN_ON(!icoll_base);
-+	void __iomem *icoll_base;
- 
-+	icoll_base		= icoll_init_iobase(np);
- 	icoll_priv.vector	= icoll_base + HW_ICOLL_VECTOR;
- 	icoll_priv.levelack	= icoll_base + HW_ICOLL_LEVELACK;
- 	icoll_priv.ctrl		= icoll_base + HW_ICOLL_CTRL;
-@@ -136,8 +195,38 @@ static int __init icoll_of_init(struct device_node *np,
- 	 */
- 	stmp_reset_block(icoll_priv.ctrl);
- 
--	icoll_domain = irq_domain_add_linear(np, ICOLL_NUM_IRQS,
--					     &icoll_irq_domain_ops, NULL);
-+	icoll_add_domain(np, ICOLL_NUM_IRQS);
-+
- 	return icoll_domain ? 0 : -ENODEV;
- }
- IRQCHIP_DECLARE(mxs, "fsl,icoll", icoll_of_init);
-+
-+static int __init asm9260_of_init(struct device_node *np,
-+			  struct device_node *interrupt_parent)
++/*
++ * ---------------------------------------------------------------------------
++ * Timer initialization
++ * ---------------------------------------------------------------------------
++ */
++static void __init asm9260_timer_init(struct device_node *np)
 +{
-+	void __iomem *icoll_base;
-+	int i;
++	int irq;
++	struct clk *clk;
++	int ret;
++	unsigned long rate;
 +
-+	icoll_base = icoll_init_iobase(np);
-+	icoll_priv.vector	= icoll_base + ASM9260_HW_ICOLL_VECTOR;
-+	icoll_priv.levelack	= icoll_base + ASM9260_HW_ICOLL_LEVELACK;
-+	icoll_priv.ctrl		= icoll_base + ASM9260_HW_ICOLL_CTRL;
-+	icoll_priv.stat		= icoll_base + ASM9260_HW_ICOLL_STAT_OFFSET;
-+	icoll_priv.intr		= icoll_base + ASM9260_HW_ICOLL_INTERRUPT0;
-+	icoll_priv.intr_per_reg	= 4;
-+	icoll_priv.clear	= icoll_base + ASM9260_HW_ICOLL_CLEAR0;
++	priv.base = of_io_request_and_map(np, 0, np->name);
++	if (!priv.base)
++		panic("%s: unable to map resource", np->name);
 +
-+	writel_relaxed(ASM9260_BM_CTRL_IRQ_ENABLE,
-+			icoll_priv.ctrl);
-+	/*
-+	 * ASM9260 don't provide reset bit. So, we need to set level 0
-+	 * manually.
-+	 */
-+	for (i = 0; i < 16 * 0x10; i += 0x10)
-+		writel(0, icoll_priv.intr + i);
++	clk = of_clk_get(np, 0);
 +
-+	icoll_add_domain(np, ASM9260_NUM_IRQS);
++	ret = clk_prepare_enable(clk);
++	if (ret)
++		panic("Failed to enable clk!\n");
 +
-+	return icoll_domain ? 0 : -ENODEV;
++	irq = irq_of_parse_and_map(np, 0);
++	ret = request_irq(irq, asm9260_timer_interrupt, IRQF_TIMER,
++			DRIVER_NAME, &event_dev);
++	if (ret)
++		panic("Failed to setup irq!\n");
++
++	/* set all timers for count-up */
++	writel_relaxed(BM_DIR_DEFAULT, priv.base + HW_DIR);
++	/* disable divider */
++	writel_relaxed(BM_PR_DISABLE, priv.base + HW_PR);
++	/* make sure all timers use every rising PCLK edge. */
++	writel_relaxed(BM_CTCR_DEFAULT, priv.base + HW_CTCR);
++	/* enable interrupt for TC0 and clean setting for all other lines */
++	writel_relaxed(BM_MCR_INT_EN(0) , priv.base + HW_MCR);
++
++	rate = clk_get_rate(clk);
++	clocksource_mmio_init(priv.base + HW_TC1, DRIVER_NAME, rate,
++			200, 32, clocksource_mmio_readl_up);
++
++	/* Seems like we can't use counter without match register even if
++	 * actions for MR are disabled. So, set MR to max value. */
++	writel_relaxed(0xffffffff, priv.base + HW_MR1);
++	/* enable TC1 */
++	writel_relaxed(BM_C1_EN, priv.base + HW_TCR + SET_REG);
++
++	priv.ticks_per_jiffy = DIV_ROUND_CLOSEST(rate, HZ);
++	event_dev.cpumask = cpumask_of(0);
++	clockevents_config_and_register(&event_dev, rate, 0x2c00, 0xfffffffe);
 +}
-+IRQCHIP_DECLARE(asm9260, "alphascale,asm9260-icoll", asm9260_of_init);
++CLOCKSOURCE_OF_DECLARE(asm9260_timer, "alphascale,asm9260-timer",
++		asm9260_timer_init);
 -- 
 1.9.1
