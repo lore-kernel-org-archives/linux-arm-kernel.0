@@ -1,32 +1,39 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 28 Nov 2014 09:19:05 +0100
-Subject: [PATCH] drm: i2c: tda998x: Retry fetching the EDID if it fails
- first time.
-In-Reply-To: <546B84C6.3090809@arm.com>
-References: <546B84C6.3090809@arm.com>
-Message-ID: <20141128091905.3e491c39@armhf>
+From: alexanders83@web.de (Alexander Stein)
+Date: Fri, 28 Nov 2014 09:27:38 +0100
+Subject: [PATCH 00/11] ARM: at91: remove !DT support for at91rm9200
+In-Reply-To: <20141128002822.GM4508@piout.net>
+References: <cover.1417103399.git.nicolas.ferre@atmel.com>
+ <3935244.Dm2HkZj2Bg@wuerfel> <20141128002822.GM4508@piout.net>
+Message-ID: <1422574.pPO36BQRH8@kongar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Nov 2014 17:41:26 +0000
-Andrew Jackson <Andrew.Jackson@arm.com> wrote:
+Hi Alexandre,
 
-> Fetching the EDID from a connected monitor is an automated thing
-> with NXP TDA19988. But on some boards the fetching fails for the
-> first time silently without any indication that an error has occured.
-> More than that, subsequent fetches of the EDID succeed until the
-> monitor(s) are unplugged.
+On Friday 28 November 2014, 01:28:22 wrote Alexandre Belloni:
+> > >  - sound/atmel/ac97c.c (that one is still not converted to DT anyway...)
+> > 
+> > This one seems fairly straightforward to do, including a DT binding,
+> > but the result is still ugly as it supports the at32 chips that
+> > do things very differently.
+> > 
+> > The patch below gets it to compile and should be enough as a replacement
+> > once a compatible string gets added.
+> > 
 > 
-> Add a function to validate the read EDID and retry if the block
-> retrieved is not valid.
+> Actually, some work was done but we never saw an other version of the
+> series. Alexander, are you still interested? Else we can take the patch
+> below.
 > 
-> Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/246679.html
 
-It seems that your patch is deprecated by Laurent Pinchart's
-	[PATCH] drm: tda998x: Use drm_do_get_edid()
-http://lists.freedesktop.org/archives/dri-devel/2014-November/072906.html
+Well, I tried to get a ac97c driver based on alsa soc framework as suggested 
+by Takashi. But I failed so far, I could not get my head around those 
+architecture.
+When keeping my DT support on the current driver, the only thing which is open 
+that the bindings should be modifed that they are like soc-ac97link bindings.
+I could work on that, but I currently don't know when I can get access again 
+to that hardware for testing.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Best regards,
+Alexander
