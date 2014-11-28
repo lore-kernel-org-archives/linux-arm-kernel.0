@@ -1,50 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 28 Nov 2014 12:22:47 -0800
-Subject: [GIT PULL 1/2] part 2 of omap soc changes for v3.19
-In-Reply-To: <201411281454.28102.arnd@arndb.de>
-References: <pull-1416703431-245942>
- <201411281454.28102.arnd@arndb.de>
-Message-ID: <20141128202246.GT2817@atomide.com>
+Date: Fri, 28 Nov 2014 12:27:19 -0800
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <201411271232.47231@pali>
+References: <20141027200008.GR2560@atomide.com> <201411270038.01312@pali>
+ <20141127011203.GR2817@atomide.com> <201411271232.47231@pali>
+Message-ID: <20141128202719.GU2817@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [141128 05:57]:
-> On Sunday 23 November 2014, Tony Lindgren wrote:
-> > The following changes since commit 9889278181bcdbae882664d8cee5bb0e064397e4:
+* Pali Roh?r <pali.rohar@gmail.com> [141127 03:34]:
+> On Thursday 27 November 2014 02:12:04 Tony Lindgren wrote:
 > > 
-> >   Merge tag 'for-v3.19/omap-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.19/soc (2014-11-14 10:25:12 -0800)
+> > Thinking about this probably the best long term solution is
+> > to pass optional board_revision in the kernel cmdline that
+> > can be parsed early and copied to system_rev variable.
 > > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/hwmod-and-defconfig
-> > 
-> > for you to fetch changes up to 374a735894fe2fb82ba07c6e6b7d326640c1c17f:
-> > 
-> >   ARM: omap2plus_defconfig: enable ECAP and EHRPWM (2014-11-21 16:30:28 -0800)
-> > 
-> > ----------------------------------------------------------------
-> > SoC related changes for omaps including hwmod clean-up for
-> > DSS, and hwmod data for more UARTs and ADC. Also few defconfig
-> > changes to enable devices found on am335x and am437x.
 > 
-> Hi Tony,
-> 
-> We have started doing the defconfig changes in a separate branch a while ago.
-> I normally don't mess with the tags I got, but this one seemed easy enough
-> to redo, as the defconfig changes are all on top.
-> 
-> I ended up pulling in only the commits before the defconfig changes into
-> next/soc, and am cherry-picking the defconfig bits onto the next/defconfig
-> branch. Hope that's ok for you.
+> Not possible. Our bootloader is closed & proprietary. I tried to 
+> replace it with u-boot I was not able to do that. So we will use 
+> that Nokia closed bootloader forever and it can provide data only 
+> in ATAG structure.
 
-Sure that's fine with me, I only have fixes coming up after the pending
-pull requests.
+I'm using just mainline u-boot flashed as kernel for nolo that
+then loads the kernel.
+
+For passing the board revision using the pass through u-boot is
+probably the best long term solution. U-boot can read the ATAGs
+from nolo and modify the .dtb for the revision information.
+
+Are you saying there are some issues with that?
  
-> I checked that the defconfig changes are all harmless and do not depend
-> on the other changes, but I may have missed something subtle, so please
-> confirm that this is ok for you.
+> > Or if you can think of some other way to get it, we can set
+> > system_rev in pdata-quirks.c.
+> > 
+> > Or maybe add some code to copy the ATAGs somewhere where
+> > they are out of the way and don't conflict with the device
+> > tree data? Then we can query ATAG_REVISION from pdata-quirks.c
+> > and set system_rev.
+> 
+> If we are able to read ATAG from pdata-quirks, then we can parse 
+> it there and fix problems... But I do not know if address of ATAG 
+> structure is available there...
 
-Should be just fine thanks.
+Are there other ATAGs needed beyond the ATAG_REVISION?
 
 Regards,
 
