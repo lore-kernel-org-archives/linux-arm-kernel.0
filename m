@@ -1,36 +1,273 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Nov 2014 14:59:22 +0100
-Subject: [GIT PULL v2] ARM: imx: cleanup for 3.19
-In-Reply-To: <20141123083353.GE11253@dragon>
-References: <20141123083353.GE11253@dragon>
-Message-ID: <201411281459.22594.arnd@arndb.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 28 Nov 2014 14:00:59 +0000
+Subject: [PATCH 16/19] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <54787621.4000503@samsung.com>
+References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
+ <1417073716-22997-17-git-send-email-cw00.choi@samsung.com>
+ <20141127111834.GB857@leverpostej> <54787621.4000503@samsung.com>
+Message-ID: <20141128140059.GH25883@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 23 November 2014, Shawn Guo wrote:
-> Changes since v1:
->  - Rebase the change set on 3.18-rc3
+On Fri, Nov 28, 2014 at 01:18:25PM +0000, Chanwoo Choi wrote:
+> Dear Mark,
 > 
-> The following changes since commit 0df1f2487d2f0d04703f142813d53615d62a1da4:
-> 
->   Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-cleanup-3.19
-> 
-> for you to fetch changes up to b50e7df946138399832af8f2b067fa6c3256a005:
-> 
->   ARM: imx: Remove unneeded .map_io initialization (2014-11-22 07:39:36 +0800)
-> 
-> ----------------------------------------------------------------
-> The i.MX cleanup for 3.19:
->  - Clean up reset handler for DT machines, since reset has been handled
->    in watchdog driver
->  - Remove unneeded .map_io hook for a couple of i.MX6 machines
->  - A few small i.MX6 device tree source cleanups
->  - Some random iomuxc and pllv3 code cleanup
+> On 11/27/2014 08:18 PM, Mark Rutland wrote:
+> > On Thu, Nov 27, 2014 at 07:35:13AM +0000, Chanwoo Choi wrote:
+> >> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC
+> >> based on Octal core CPUs (quad Cortex-A57 and quad Cortex-A53).
+> >>
+> >> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> Cc: Arnd Bergmann <arnd@arndb.de>
+> >> Cc: Olof Johansson <olof@lixom.net>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> >> Acked-by: Inki Dae <inki.dae@samsung.com>
+> >> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
+> >> ---
+> >>  arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi | 698 +++++++++++++++++++++
+> >>  arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 523 +++++++++++++++
+> >>  2 files changed, 1221 insertions(+)
+> >>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
+> >>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
+> >
 
-Pulled into next/cleanup, thanks!
+[...]
 
-	Arnd
+> >> +       cpus {
+> >> +               #address-cells = <2>;
+> >> +               #size-cells = <0>;
+> >> +
+> >> +               cpu0: cpu at 100 {
+> >> +                       device_type = "cpu";
+> >> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> >> +                       enable-method = "psci";
+> >
+> > While the CPU nodes have enable-methods, I didn't spot a PSCI node
+> > anywhere, so this dts cannot possibly have been used to bring up an SMP
+> > system.
+> >
+> > How has this dts been tested?
+> >
+> > What PSCI revision have you implemented? Have have you tested it?
+> 
+> My mistake,
+> Exynos5433 supports PSCI v0.1. I'll add following PSCI nodes:
+> I tested the boot of secondary cpu.
+> 
+>         psci {
+>                 compatible = "arm,psci";
+>                 method = "smc";
+>                 cpu_off = <0x84000002>;
+>                 cpu_on = <0xC4000003>;
+>         };
+
+Ok. I take it _any_ CPU may be hotplugged (including CPU0), given that
+you don't have MIGRATE_INFO_TYPE from PSCI 0.2 to tell you that this is
+not possible? If not, attempting to hotplug CPU0 will result in a BUG()
+and the kernel will explode.
+
+Has that been tested? 
+
+Do all CPUs enter the kernel at EL2?
+
+> >> +       soc: soc {
+> >> +               compatible = "simple-bus";
+> >> +               #address-cells = <1>;
+> >> +               #size-cells = <1>;
+> >> +               ranges;
+> >> +
+> >> +               fixed-rate-clocks {
+> >> +                       #address-cells = <1>;
+> >> +                       #size-cells = <0>;
+> >> +
+> >> +                       xusbxti: clock at 0 {
+> >> +                               compatible = "fixed-clock";
+> >> +                               clock-output-names = "xusbxti";
+> >> +                               #clock-cells = <0>;
+> >> +                       };
+> >> +               };
+> >
+> > Get rid of the fixed-rate-clocks container node. It's pointless and
+> > messy. Given you only have one there's no need for the bogus
+> > unit-address either.
+> 
+> OK, I'll remove unneeded code and will add following dt node for fin_pll.
+> 
+>         fin_pll: xxti {
+>                 compatible = "fixed-clock";
+>                 clock-output-names = "fin_pll";
+>                 #clock-cells = <0>;
+>         };
+
+That looks fine to me.
+
+[...]
+
+> >> +               mct at 101c0000 {
+> >> +                       compatible = "samsung,exynos4210-mct";
+> >> +                       reg = <0x101c0000 0x800>;
+> >> +                       interrupts = <0 102 0>, <0 103 0>, <0 104 0>, <0 105 0>,
+> >> +                               <0 106 0>, <0 107 0>, <0 108 0>, <0 109>,
+> >> +                               <0 110 0>, <0 111 0>, <0 112 0>, <0 113 0>;
+> >> +                       clocks = <&cmu_top CLK_FIN_PLL>, <&cmu_peris CLK_PCLK_MCT>;
+> >> +                       clock-names = "fin_pll", "mct";
+> >> +               };
+> >
+> > Hase this block had no changes whatsoever since its use in Exynos4210?
+> > Do we not need a "samsung,exynos5433-mct" comaptible string too?
+> 
+> The type of Exynos5433's MCT(Multi-Core Timer) IP is the same with the type of Exynos4210 MCT.
+> Just Exynos5433 have eight local timer for Octa cores.
+
+So "samsung,exynos4210-mct" should appear in the list. I'm just
+wondering if it's worth having:
+
+	compatible = "samsung,exynos5433-mct", "samsung,exynos4210-mct";
+
+Just in case we need to special-case the 5433 MCT for some reason later.
+
+> 
+>            CPU0       CPU1       CPU2       CPU3       CPU4       CPU5       CPU6       CPU7
+> 134:          0          0          0          0          0          0          0          0       GIC 134  mct_comp_irq
+> 138:       3189          0          0          0          0          0          0          0       GIC 138  mct_tick0
+> 139:          0       2670          0          0          0          0          0          0       GIC 139  mct_tick1
+> 140:          0          0       2763          0          0          0          0          0       GIC 140  mct_tick2
+> 141:          0          0          0       2732          0          0          0          0       GIC 141  mct_tick3
+> 142:          0          0          0          0       2998          0          0          0       GIC 142  mct_tick4
+> 143:          0          0          0          0          0       2664          0          0       GIC 143  mct_tick5
+> 144:          0          0          0          0          0          0       2485          0       GIC 144  mct_tick6
+> 145:          0          0          0          0          0          0          0       2681       GIC 145  mct_tick7
+> 
+> But, existing exynos-mct.c driver(drivers/clocksource/exynos-mct.c) used
+> 'register_current_timer_delay()' function which is supported on arm 32bit.
+> I fix it as following diff and then I'll send it to support 64-bit Exynos SoC on exynos-mct.c.
+> 
+>  drivers/clocksource/Kconfig      | 1 -
+>  drivers/clocksource/exynos_mct.c | 4 ++++
+>  2 files changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index 9042060..27ef3fa 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -134,7 +134,6 @@ config CLKSRC_METAG_GENERIC
+> 
+>  config CLKSRC_EXYNOS_MCT
+>         def_bool y if ARCH_EXYNOS
+> -       depends on !ARM64
+>         help
+>           Support for Multi Core Timer controller on Exynos SoCs.
+> 
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 9403061..d9c7dbb 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -223,6 +223,7 @@ static u64 notrace exynos4_read_sched_clock(void)
+>         return exynos4_read_count_32();
+>  }
+> 
+> +#if !defined(CONFIG_ARM64)
+>  static struct delay_timer exynos4_delay_timer;
+> 
+>  static cycles_t exynos4_read_current_timer(void)
+> @@ -231,14 +232,17 @@ static cycles_t exynos4_read_current_timer(void)
+>                          "cycles_t needs to move to 32-bit for ARM64 usage");
+>         return exynos4_read_count_32();
+>  }
+> +#endif
+> 
+>  static void __init exynos4_clocksource_init(void)
+>  {
+>         exynos4_mct_frc_start();
+> 
+> +#if !defined(CONFIG_ARM64)
+>         exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
+>         exynos4_delay_timer.freq = clk_rate;
+>         register_current_timer_delay(&exynos4_delay_timer);
+> +#endif
+
+Why not make both of these depend on CONFIG_ARM, rather than
+!CONFIG_ARM64? We care about the presence of the delay_timer struct and
+functions, which (from grepping around) exist in arch/arm and nowhere
+else.
+
+> >> +               gic:interrupt-controller at 11001000 {
+> >> +                       compatible = "arm,cortex-a15-gic";
+> >
+> > Given this is multi-cluster, surely this is an external GIC-400, for
+> > which we have a supported compatible string?
+> >
+> > So this should at least be:
+> >
+> >       compatible = "arm,gic-400", "arm,cortex-a15-gic";
+> 
+> Exynos5433 used GIC-400. I'll modify it as following:
+> 
+>         compatible = "arm,gic-400";
+
+Ok. The former variant (with "arm,cortex-a15-gic" later in the list) has
+the benefit of working with KVM today (which doesn't currently look for
+"arm,gic-400").
+
+> >> +                       #interrupt-cells = <3>;
+> >> +                       interrupt-controller;
+> >> +                       reg =   <0x11001000 0x1000>,
+> >> +                               <0x11002000 0x1000>,
+> >> +                               <0x11004000 0x2000>,
+> >> +                               <0x11006000 0x2000>;
+> >
+> > As far as I am aware, the GICC size is 8KiB. Regardless of whether we
+> > currently use the second page of registers, they should be described.
+> 
+> The GICC (CPU Interface Register) register of Exynos5433 is range of 0x1100_2000 ~ 0x1100_2100.
+
+That does not sound right. Per the GICv2 architecture, GICC is at least
+0x1004 bytes long (as GICC_DIR lives at offset 0x1000).
+
+> But, I'll modify GICC size from 4KiB to 8KiB as following according to your comment:
+>         <0x11002000 0x1000> -> <0x11002000 0x2000>
+
+To clarify: is GICC_DIR accessible in Exynos5433 systems, or is
+everything past offset 0x100 not physically mapped?
+
+> >> +                       interrupts = <1 9 0xf04>;
+> >> +               };
+> >> +
+> >> +               serial_0: serial at 14C10000 {
+> >
+> > Nit: Please be consistent with capitalisation of hex. IMO it's better
+> > to leave it all lower-case.
+> 
+> I'll use the lower-case for all base address.
+
+Thanks.
+
+> 
+> >
+> > [...]
+> >
+> >> +               timer {
+> >> +                       compatible = "arm,armv8-timer";
+> >> +                       interrupts = <1 13 0xff01>,
+> >> +                                    <1 14 0xff01>,
+> >> +                                    <1 11 0xff01>,
+> >> +                                    <1 10 0xff01>;
+> >> +                       clock-frequency = <24000000>;
+> >> +                       use-clocksource-only;
+> >> +                       use-physical-timer;
+> >
+> > As Marc said, NAK for these last three properties.
+> >
+> > There is no excuse for not setting CNTFRQ_EL0, especially given a PSCI
+> > implementation. The last two properties have never been supported in
+> > mainline, and shouldn't be necessary regardless.
+> 
+> OK, I'll remove last three properties.
+
+Thanks.
+
+Mark.
