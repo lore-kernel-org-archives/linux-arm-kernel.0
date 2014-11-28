@@ -1,88 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Nov 2014 09:49:10 +0100
-Subject: [PATCH 00/11] ARM: at91: remove !DT support for at91rm9200
-In-Reply-To: <1422574.pPO36BQRH8@kongar>
-References: <cover.1417103399.git.nicolas.ferre@atmel.com>
- <20141128002822.GM4508@piout.net> <1422574.pPO36BQRH8@kongar>
-Message-ID: <2770184.6f6RpLLlMS@wuerfel>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Fri, 28 Nov 2014 14:22:09 +0530
+Subject: [PATCH RFC v2 07/12] PM / Domains: export pm_genpd_lookup_name
+In-Reply-To: <CAPDyKFo0epKqKuwHS_CKMG2hF+J=Fdve9kPK2EVeeR7FvdoJmg@mail.gmail.com>
+References: <1416833572-6880-1-git-send-email-amit.daniel@samsung.com>
+ <1416834256-11225-1-git-send-email-amit.daniel@samsung.com>
+ <1416834256-11225-7-git-send-email-amit.daniel@samsung.com>
+ <CAPDyKFqE_qhrRs3X9s9juyPH_Zcq8vdE_amqKM3VUnMjHtL2Rg@mail.gmail.com>
+ <CADGdYn6fAScrpz4Va=THtC1ZgT+rYN_gQuE6NnRaCiN4NErg5g@mail.gmail.com>
+ <CAPDyKFo0epKqKuwHS_CKMG2hF+J=Fdve9kPK2EVeeR7FvdoJmg@mail.gmail.com>
+Message-ID: <CADGdYn70xe=JcXwMiQ4FXpq4pwHVhv+1Kp7YM_t=R_qk-_hk8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 November 2014 09:27:38 Alexander Stein wrote:
-> Hi Alexandre,
-> 
-> On Friday 28 November 2014, 01:28:22 wrote Alexandre Belloni:
-> > > >  - sound/atmel/ac97c.c (that one is still not converted to DT anyway...)
-> > > 
-> > > This one seems fairly straightforward to do, including a DT binding,
-> > > but the result is still ugly as it supports the at32 chips that
-> > > do things very differently.
-> > > 
-> > > The patch below gets it to compile and should be enough as a replacement
-> > > once a compatible string gets added.
-> > > 
-> > 
-> > Actually, some work was done but we never saw an other version of the
-> > series. Alexander, are you still interested? Else we can take the patch
-> > below.
-> > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/246679.html
+On Thu, Nov 27, 2014 at 7:50 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 25 November 2014 at 09:48, amit daniel kachhap
+> <amit.daniel@samsung.com> wrote:
+>> On Tue, Nov 25, 2014 at 1:05 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> On 24 November 2014 at 14:04, Amit Daniel Kachhap
+>>> <amit.daniel@samsung.com> wrote:
+>>>> This API may be needed to set the power domain parent/child relationship
+>>>> in the power domain platform driver. The parent relationship is
+>>>> generally set after the child power domain is registered with the power
+>>>> domain subsystem. In this case, pm_genpd_lookup_name API might be
+>>>> useful.
+>>>
+>>> I think this is a step in the wrong direction. Instead we should be
+>>> working on removing the "name" based APIs from genpd.
+>>>
+>>> The proper way should be to pass the PM domain as a parameter to the
+>>> APIs instead.
+>> Yes i understand but i had a special requirement for using this API
+>> during pd probe.
+>>  I cannot use hierarchy to represent parent/child pd nodes as it will
+>> break the existing SoC's. In my case all the PD nodes are linear. The
+>> parent/child relationship are established in the second pass after all
+>> the PD entries are registered with the help of this API.
+>> Although there a way that i can always keep parent PD's before the
+>> child PD's in DT in linear order. Will check this approach.
+>
+> I had some thinking around this, could the below approach work?
+>
+> I just posted a patch[1] adding a new pm_genpd_lookup() API, which is
+> using a "DT device node" to fetch the genpd. The idea is to use that
+> API to get the genpd handle which is needed to configure a subdomain
+> through pm_genpd_add_subdomain() API.
+I looked at your patch. I seems fine. i will test them and post the
+new version of my series.
 
-I see. Yes, the approach is similar, and there are actually multiple
-independent problems:
-
-- getting the current driver to build with multiplatform (trivial, 5 lines)
-- changing the gpio handling to work with DT (simple, both of us did that)
-- writing the binding (simple)
-- changing the driver to ASoC (not that simple)
-
-> Well, I tried to get a ac97c driver based on alsa soc framework as suggested 
-> by Takashi. But I failed so far, I could not get my head around those 
-> architecture.
-
-Let's just start with the trivial first patch, that can probably just be merged
-into 3.19, and then we can build on top of that later if anybody wants to
-get ac97 working again on at91.
-
-> When keeping my DT support on the current driver, the only thing which is open 
-> that the bindings should be modifed that they are like soc-ac97link bindings.
-
-Makes sense, if that binding works on the at91 hardware. I'm not sure
-whether the pinctrl stuff or the first two gpio lines apply though.
-
-	Arnd
-
-8<---
-ALSA: atmel: fix building the ac97 driver for at91-multiplatform
-
-at91 will no longer export the mach/cpu.h and mach/hardware.h header files
-in the future, which would break building the atmel ac97c driver.
-
-Since the cpu_is_* check is only used to find out whether we are running
-on avr32 or arm/at91, we can hardcode that check in the ARM case.
-
-Unfortunately the driver is missing other work to be useful again on ARM,
-if anyone wants to actually use it, they need to add a DT binding, and
-the driver should really be converted to use the ASoC framework.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Link: http://www.spinics.net/lists/arm-kernel/msg382068.html
-
-diff --git a/sound/atmel/ac97c.c b/sound/atmel/ac97c.c
-index b59427d5a697..4eec216b7f92 100644
---- a/sound/atmel/ac97c.c
-+++ b/sound/atmel/ac97c.c
-@@ -34,10 +34,10 @@
- #include <linux/platform_data/dma-dw.h>
- #include <linux/dma/dw.h>
- 
-+#ifdef CONFIG_AVR32
- #include <mach/cpu.h>
--
--#ifdef CONFIG_ARCH_AT91
--#include <mach/hardware.h>
-+#else
-+#define cpu_is_at32ap7000() (0)
- #endif
- 
- #include "ac97c.h"
+Regards,
+Amit D
+>
+> In principle you will have to walk through the DT a couple of times,
+> initialize those domains (and subdomains) which either don't have a
+> parent domain or which parent domain already has been initialized. I
+> guess you need a somewhat clever loop to do that, but I think it's
+> doable.
+>
+> Obviously we also need to have a generic binding for a "parent
+> domain". I like Geert's proposal from the other patch, which means
+> using "power-domains = <&pd_xyz>".
+>
+> Kind regards
+> Uffe
+>
+> [1]
+> http://marc.info/?l=linux-pm&m=141709766008458&w=2
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
