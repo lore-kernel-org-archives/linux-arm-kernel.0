@@ -1,20 +1,18 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 28 Nov 2014 16:34:00 +0000
-Subject: [PATCH v2 RESEND 1/2] ARM: vexpress: Remove non-DT code
-In-Reply-To: <3935390.Q4yT7WfqCv@wuerfel>
-References: <1416939455-1814-1-git-send-email-pawel.moll@arm.com>
- <20141128153026.GU3836@n2100.arm.linux.org.uk>
- <1417189984.4371.12.camel@arm.com> <3935390.Q4yT7WfqCv@wuerfel>
-Message-ID: <1417192440.4371.15.camel@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Nov 2014 17:34:26 +0100
+Subject: [PATCH] suport for Alphascale ASM9260, part 2
+In-Reply-To: <1417187120-23659-1-git-send-email-linux@rempel-privat.de>
+References: <201411281509.19170.arnd@arndb.de>
+ <1417187120-23659-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <3935390.6VheEZ6WHF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-11-28 at 16:31 +0000, Arnd Bergmann wrote:
-> I would suggest applying your patch from
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/223426/focus=224128
+On Friday 28 November 2014 16:05:19 Oleksij Rempel wrote:
+> it is secong logical part of ASM9260 patch set.
+> 
 
-Yes, please :-)
+Note that there is no reason to wait for one part to be applied before
+sending the next one, as long as you introduce no build breakage.
 
-Do you want me to resend?
-
-Pawel
+	Arnd
