@@ -1,73 +1,76 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 28 Nov 2014 01:06:01 +0100
-Subject: [GIT PULL] clk: rockchip: second batch for 3.19
-Message-ID: <4638213.B2LsUVeJxf@diego>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 28 Nov 2014 00:22:20 +0000
+Subject: [PATCH v3 1/3] devicetree: of: Add bindings for chosen
+ =?iso-8859-1?Q?node=2C=0D?= stdout-path
+In-Reply-To: <20141127184133.GM857@leverpostej>
+References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
+ <1417110967-16284-2-git-send-email-leif.lindholm@linaro.org>
+ <20141127184133.GM857@leverpostej>
+Message-ID: <20141128002220.A5122C40A7F@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Thu, 27 Nov 2014 18:41:33 +0000
+, Mark Rutland <mark.rutland@arm.com>
+ wrote:
+> On Thu, Nov 27, 2014 at 05:56:05PM +0000, Leif Lindholm wrote:
+> > Add a global binding for the chosen node.
+> > Include a description of the stdout-path, and an explicit statement on
+> > its extra options in the context of a UART console.
+> > 
+> > Opening description stolen from www.devicetree.org, and part of the
+> > remaining text provided by Mark Rutland.
+> > 
+> > Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> > ---
+> >  Documentation/devicetree/bindings/chosen.txt |   42 ++++++++++++++++++++++++++
+> >  1 file changed, 42 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/chosen.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+> > new file mode 100644
+> > index 0000000..9cd74e9
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/chosen.txt
+> > @@ -0,0 +1,42 @@
+> > +The chosen node
+> > +---------------
+> > +
+> > +The chosen node does not represent a real device, but serves as a place
+> > +for passing data between firmware and the operating system, like boot
+> > +arguments. Data in the chosen node does not represent the hardware.
+> > +
+> > +
+> > +stdout-path property
+> > +--------------------
+> > +
+> > +Device trees may specify the device to be used for boot console output
+> > +with a stdout-path property under /chosen, as described in ePAPR, e.g.
+> > +
+> > +/ {
+> > +	chosen {
+> > +		stdout-path = "/serial at f00:115200";
+> > +	};
+> > +
+> > +	serial at f00 {
+> > +		compatible = "vendor,some-uart";
+> > +		reg = <0xf00 0x10>;
+> > +	};
+> > +};
+> > +
+> > +If the character ":" is present in the value, this terminates the path.
+> > +The meaning of any characters following the ":" is device-specific, and
+> > +must be specified in the relevant binding documentation.
+> > +
+> > +For UART devices, the format supported by uart_parse_options() is the
+> > +expected one. In this case, the format of the string is:
+> 
+> Please drop the mention of uart_parse_options and just describe the
+> format. Linux internal details are irrelevant to the contract of the
+> binding.
+> 
+> Otherwise this looks good to me!
 
-here is the second (and most likely last) batch of rockchip clock
-changes for 3.19. Biggest changes are the pll init stuff and the
-mmc clock-phase support for rk3288.
+I've fixed it up and merged it. No need to respin. Thanks!
 
-Apart from that only some more clock-ids and minor fixes.
-
-So if this looks ok, please pull
-
-
-Thanks
-Heiko
-
-The following changes since commit 29e94468516cdf191ec839ee39f79e011817276d:
-
-  clk: rockchip: fix clock select order for rk3288 usbphy480m_src (2014-11-16 00:40:19 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.19-rockchip-clk2
-
-for you to fetch changes up to 89bf26cbc1a09476c4c4740d16a0ffdfa2192b9c:
-
-  clk: rockchip: Add support for the mmc clock phases using the framework (2014-11-28 00:44:24 +0100)
-
-----------------------------------------------------------------
-- clock phase setting capability for the rk3288 mmc clocks
-- pll init to allow syncing to actual rate table values
-- some more exported clocks
-- fixes for some clocks (typos etc) all of them not yet used
-  in actual drivers
-
-----------------------------------------------------------------
-Alexandru M Stan (2):
-      clk: rockchip: add bindings for the mmc clocks
-      clk: rockchip: Add support for the mmc clock phases using the framework
-
-Heiko Stuebner (4):
-      clk: rockchip: add ability to specify pll-specific flags
-      clk: rockchip: setup pll_mux data earlier
-      clk: rockchip: add optional sync to pll rate parameters
-      clk: rockchip: add ROCKCHIP_PLL_SYNC_RATE flag to some plls
-
-Jeff Chen (2):
-      clk: rockchip: add binding ID for DMC (memory controller) clocks on rk3288
-      clk: rockchip: use clock ID for DMC (memory controller) on rk3288
-
-Julien CHAUVEAU (3):
-      clk: rockchip: fix parent clock for rk3188 hclk_lcdc1
-      clk: rockchip: fix clock gate for rk3188 spdif_pre
-      clk: rockchip: fix rk3188 USB HSIC PHY clock divider
-
-Sonny Rao (1):
-      clk: rockchip: rk3288 export i2s0_clkout for use in DT
-
- drivers/clk/rockchip/Makefile          |   1 +
- drivers/clk/rockchip/clk-mmc-phase.c   | 154 +++++++++++++++++++++++++++++++++
- drivers/clk/rockchip/clk-pll.c         |  81 +++++++++++++----
- drivers/clk/rockchip/clk-rk3188.c      |  37 ++++----
- drivers/clk/rockchip/clk-rk3288.c      |  32 ++++---
- drivers/clk/rockchip/clk.c             |  11 ++-
- drivers/clk/rockchip/clk.h             |  36 +++++++-
- include/dt-bindings/clock/rk3288-cru.h |  13 +++
- 8 files changed, 315 insertions(+), 50 deletions(-)
- create mode 100644 drivers/clk/rockchip/clk-mmc-phase.c
+g.
