@@ -1,61 +1,153 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Nov 2014 10:39:09 +0000
-Subject: [PATCH NEXT] irqchip: gic: fix compilation of asm code depending
- on arm-gic.h
-In-Reply-To: <1417170975-1163-1-git-send-email-marc.zyngier@arm.com>
-References: <1417170975-1163-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20141128103908.GB7144@arm.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Fri, 28 Nov 2014 19:43:22 +0900
+Subject: [PATCH v10 2/2] ARM: kprobes: enable OPTPROBES for ARM 32
+In-Reply-To: <1417169308.1845.1.camel@linaro.org>
+References: <1416551751-50846-1-git-send-email-wangnan0@huawei.com>
+ <1416551751-50846-3-git-send-email-wangnan0@huawei.com>
+ <1417099007.2041.6.camel@linaro.org> <5477E82A.3020208@hitachi.com>
+ <1417169308.1845.1.camel@linaro.org>
+Message-ID: <547851CA.7050803@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 10:36:15AM +0000, Marc Zyngier wrote:
-> Commit 01f17a66be97 (irqchip: gic: Remove warning by including
-> linux/irqdomain.h) indeed fixed an annoying warning in the ARM
-> code, but also broke the compilation of arm64 defconfig and
-> any other defconfig that includes KVM support in a rather
-> spectacular way:
+(2014/11/28 19:08), Jon Medhurst (Tixy) wrote:
+> On Fri, 2014-11-28 at 12:12 +0900, Masami Hiramatsu wrote:
+>> (2014/11/27 23:36), Jon Medhurst (Tixy) wrote:
+> [...]
+>>> I thought it good to see what sort of benefits this code achieves,
+>>> especially as it could grow quite complex over time, and the cost of
+>>> that versus the benefit should be considered.
+>>
+>> I don't think it's so complex. It's actually cleanly separated.
+>> However, ARM tree should have arch/arm/kernel/kprobe/ dir,
+>> since there are too many kprobe related files under arch/arm/kernel/ ...
 > 
-> http://lists.linaro.org/pipermail/kernel-build-reports/2014-November/006475.html
-> 
-> Moving the #include directive to a spot that is not going to
-> be used by assembly code fixes the issue.
-> 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  include/linux/irqchip/arm-gic.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Yes, that does seem like a good idea. Or rather a 'probes' directory to
+> also include uprobes as that shares a lot of code with kprobes.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Agreed.
 
-arm64 allmodconfig is dead in the water without this fix.
-
-Will
-
-> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-> index d1b2263..71d706d 100644
-> --- a/include/linux/irqchip/arm-gic.h
-> +++ b/include/linux/irqchip/arm-gic.h
-> @@ -10,8 +10,6 @@
->  #ifndef __LINUX_IRQCHIP_ARM_GIC_H
->  #define __LINUX_IRQCHIP_ARM_GIC_H
->  
-> -#include <linux/irqdomain.h>
-> -
->  #define GIC_CPU_CTRL			0x00
->  #define GIC_CPU_PRIMASK			0x04
->  #define GIC_CPU_BINPOINT		0x08
-> @@ -93,6 +91,8 @@
->  
->  #ifndef __ASSEMBLY__
->  
-> +#include <linux/irqdomain.h>
-> +
->  struct device_node;
->  
->  extern struct irq_chip gic_arch_extn;
-> -- 
-> 2.1.3
+>>>>
+>>>> Limitations:
+>>>>  - Currently only kernel compiled with ARM ISA is supported.
+>>>
+>>> Supporting Thumb will be very difficult because I don't believe that
+>>> putting a branch into an IT block could be made to work, and you can't
+>>> feasibly know if an instruction is in an IT block other than by first
+>>> using something like the breakpoint probe method and then when that is
+>>> hit examine the IT flags to see if they're set. If they aren't you could
+>>> then change the probe to an optimised probe. Is transforming the probe
+>>> type like that currently supported by the generic kprobes code?
+>>
+>> Optprobe framework optimizes probes transparently. If it can not be
+>> optimized, it just do nothing on it.
 > 
+> Yes, but I was saying that with the Thumb ISA, we can't know until the
+> first time a probe is hit if it is possible to optimise it, so when any
+> probe is first registered we would have to return an error from
+> arch_prepare_optimized_kprobe. Then have probe handling code do some
+> checks when it is first hit, and then trigger the optimising of the
+> probe if possible. I guess the extra plumbing for that wouldn't be too
+> hard.
+
+Ah, I see. In that case we need another optimizing worker. Hmm, but
+it also requires to consume more resource and could make bigger the
+kernel. I doubt how many people who use Thumb ISA to reduce the
+kernel size need this extra work...
+
+>>> Also, the Thumb branch instruction can only jump half as far as the ARM
+>>> mode one. And being 32-bits when a lot of instructions people will want
+>>> to probe are 16-bits will be an additional problem, similar as
+>>> identified below for ARM instructions...
+>>>
+>>>
+>>>>
+>>>>  - Offset between probe point and optinsn slot must not larger than
+>>>>    32MiB.
+>>>
+>>>
+>>> I see that elsewhere [1] people are working on supporting loading kernel
+>>> modules at locations that are out of the range of a branch instruction,
+>>> I guess because with multi-platform kernels and general code bloat
+>>> kernels are getting too big. The same reasons would impact the usability
+>>> of optimized kprobes as well if they're restricted to the range of a
+>>> single branch instruction.
+>>>
+>>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305539.html
+>>>
+>>>
+>>>>  Masami Hiramatsu suggests replacing 2 words, it will make
+>>>>    things complex. Futher patch can make such optimization.
+>>>
+>>> I'm wondering how can we replace 2 words if we can't determine if the
+>>> second word is the target of a branch instruction?
+>>
+>> on X86, we already have an instruction decoder for finding the
+>> branch target :).
 > 
+> How do you know where to start decoding the instructions stream from?
+
+I just start decoding from the entry of the probed function :)
+
+>>  But yes, it can be impossible in other arch if
+>> it intensively uses indirect branch.
+> 
+> I don't know if it's 'impossible' on ARM, would need someone with
+> expertise in formal proofs. Anyway, I for one wouldn't want to have to
+> try such a thing on ARM unless I was given it as something like a paid
+> year long research project. :-)
+
+Agreed :-)
+
+> 
+>> [...]
+> 
+>>  
+>>> I initially had some trouble testing this. I tried running the kprobes
+>>> test code with some printf's added to the code and it seems that only
+>>> very rarely are optimised probes actually executed. This turned out to
+>>> be due to the optimization being run as a background task after a delay.
+>>> So I ended up hacking kernel/kprobes.c to force some calls to
+>>> wait_for_kprobe_optimizer(). It would be nice to have the test code to
+>>> robustly cover both optimised and unoptimised cases but that would need
+>>> some new exported functions from the generic kprobes code, not sure what
+>>> people think of that idea?
+>>
+>> Hm, did you use ftrace's kprobe events?
+> 
+> Not something I've come across. I'm somewhat ashamed to say that kprobes
+> is something that I've only worked on from an implementation point of
+> view, not a user point of view.
+> 
+>> You can actually add kprobes via /sys/kernel/debug/tracing/kprobe_events and
+>> see what kprobes are optimized via /sys/kernel/debug/kprobes/list.
+>>
+>> For more information, please refer
+>>  Documentation/trace/kprobetrace.txt
+>>  Documentation/kprobes.txt
+> 
+> Well, on ARM we decode and emulate the entire instruction set, so when I
+> came to implement Thumb ISA kprobes I created test code with test cases
+> to cover every instruction form and combination of argument types, which
+> required a fair amount of automation, so I created a test framework for
+> that (arch/arm/kernel/kprobes-test*). I also added test to cover the
+> existing ARM ISA code at the time and found it mostly broken and had to
+> fix it
+
+Ah, that's a nice test code :-) It could be moved under tools/testing/selftests/.
+
+> I know comprehensive testing isn't the Linux way, but that was my first
+> Linux project and I brought my old habits with me. And as you can see
+> from my testing of these latest patches I've not yet given up those
+> habits.
+
+Thank you for continuing on it!
+I really appreciate your efforts!
+
+Thanks,
+
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
