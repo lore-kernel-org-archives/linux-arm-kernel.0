@@ -1,93 +1,61 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 28 Nov 2014 10:38:43 +0000
-Subject: [PATCH v2] arm64: ARM: Fix the Generic Timers interrupt active
- level description
-In-Reply-To: <20141128111252.4a6e8892@xhacker>
-References: <1417105283-19575-1-git-send-email-Liviu.Dudau@arm.com>
- <54776FE0.8030600@arm.com> <20141128111252.4a6e8892@xhacker>
-Message-ID: <20141128103843.GW828@e106497-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Nov 2014 10:39:09 +0000
+Subject: [PATCH NEXT] irqchip: gic: fix compilation of asm code depending
+ on arm-gic.h
+In-Reply-To: <1417170975-1163-1-git-send-email-marc.zyngier@arm.com>
+References: <1417170975-1163-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20141128103908.GB7144@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 03:12:52AM +0000, Jisheng Zhang wrote:
-> Dear Marc and Liviu,
+On Fri, Nov 28, 2014 at 10:36:15AM +0000, Marc Zyngier wrote:
+> Commit 01f17a66be97 (irqchip: gic: Remove warning by including
+> linux/irqdomain.h) indeed fixed an annoying warning in the ARM
+> code, but also broke the compilation of arm64 defconfig and
+> any other defconfig that includes KVM support in a rather
+> spectacular way:
 > 
-> On Thu, 27 Nov 2014 10:39:28 -0800
-> Marc Zyngier <marc.zyngier@arm.com> wrote:
+> http://lists.linaro.org/pipermail/kernel-build-reports/2014-November/006475.html
 > 
-> > On 27/11/14 16:21, Liviu Dudau wrote:
-> > > The Cortex-A5x TRM states in paragraph "9.2 Generic Timer functional
-> > > description" that generic timers provide a level not edge interrupt
-> > > output. Fix the device trees to correctly describe this.
-> > > 
-> > > While doing this update the CPU mask to match the number of described
-> > > CPUs as well as the DT bindings documentation for Generic Timers.
-> > > 
-> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > 
-> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> > 
-> > 	M.
-> > 
-> > > ---
-> > > 
-> > > Arnd, Olof: This is on top of linux-next/master as it patches Juno's
-> > > as well as all the other ARM DTs.
-> > > 
-> > > --
-> > > 
-> > >  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++----
-> > >  arch/arm64/boot/dts/arm/foundation-v8.dts            | 8 ++++----
-> > >  arch/arm64/boot/dts/arm/juno.dts                     | 8 ++++----
-> > >  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts           | 8 ++++----
-> > >  4 files changed, 16 insertions(+), 16 deletions(-)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt
-> > > b/Documentation/devicetree/bindings/arm/arch_timer.txt index
-> > > 37b2caf..6d2aa87 100644 ---
-> > > a/Documentation/devicetree/bindings/arm/arch_timer.txt +++
-> > > b/Documentation/devicetree/bindings/arm/arch_timer.txt @@ -27,10 +27,10
-> > > @@ Example: timer {
-> > >  		compatible = "arm,cortex-a15-timer",
-> > >  			     "arm,armv7-timer";
-> > > -		interrupts = <1 13 0xf08>,
-> > > -			     <1 14 0xf08>,
-> > > -			     <1 11 0xf08>,
-> > > -			     <1 10 0xf08>;
-> > > +		interrupts = <1 13 0xf04>,
-> > > +			     <1 14 0xf04>,
-> > > +			     <1 11 0xf04>,
-> > > +			     <1 10 0xf04>;
-> > >  		clock-frequency = <100000000>;
-> > >  	};
-> > >  
+> Moving the #include directive to a spot that is not going to
+> be used by assembly code fixes the issue.
 > 
-> Does it mean we also need to fix the interrupt level description under
-> arch/arm/boot/dts? I found they are also wrong or I misunderstand something?
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  include/linux/irqchip/arm-gic.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-Hi Jisheng,
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-It looks like Marc and I managed to confuse ourselves. The TRM for GIC-500 and
-GIC-400 (basically covering most of GICv1 and > GICv2) clearly says that for *PPIs*
-the level triggered interrupts are active-LOW.
+arm64 allmodconfig is dead in the water without this fix.
 
-So, this patch is invalid and my v1 version is correct, but Marc tells that in
-that case the GIC driver needs patching (which I'm going to look into).
+Will
 
-Best regards,
-Liviu
-
+> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+> index d1b2263..71d706d 100644
+> --- a/include/linux/irqchip/arm-gic.h
+> +++ b/include/linux/irqchip/arm-gic.h
+> @@ -10,8 +10,6 @@
+>  #ifndef __LINUX_IRQCHIP_ARM_GIC_H
+>  #define __LINUX_IRQCHIP_ARM_GIC_H
+>  
+> -#include <linux/irqdomain.h>
+> -
+>  #define GIC_CPU_CTRL			0x00
+>  #define GIC_CPU_PRIMASK			0x04
+>  #define GIC_CPU_BINPOINT		0x08
+> @@ -93,6 +91,8 @@
+>  
+>  #ifndef __ASSEMBLY__
+>  
+> +#include <linux/irqdomain.h>
+> +
+>  struct device_node;
+>  
+>  extern struct irq_chip gic_arch_extn;
+> -- 
+> 2.1.3
 > 
-> Thanks,
-> Jisheng
 > 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
