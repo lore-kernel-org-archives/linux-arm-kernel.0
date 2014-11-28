@@ -1,42 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 28 Nov 2014 16:40:47 +0000
-Subject: [PATCH v3 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC
- in dts and Makefile
-In-Reply-To: <20141128150325.GC24370@e104818-lin.cambridge.arm.com>
-References: <Sharkl64-v3>
- <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1416917818-10506-4-git-send-email-chunyan.zhang@spreadtrum.com>
- <20141127115042.GE857@leverpostej>
- <20141127121214.GF11511@e104818-lin.cambridge.arm.com>
- <20141127134309.GJ857@leverpostej>
- <20141128142913.GB5393@localhost>
- <20141128143532.GI25883@leverpostej>
- <20141128144412.GG7144@arm.com>
- <20141128150325.GC24370@e104818-lin.cambridge.arm.com>
-Message-ID: <20141128164047.GL25883@leverpostej>
+From: Suravee.Suthikulpanit@amd.com (Suthikulpanit, Suravee)
+Date: Fri, 28 Nov 2014 16:42:04 +0000
+Subject: [PATCH V5] arm64: amd-seattle: Adding device tree for AMD
+ Seattle platform
+In-Reply-To: <201411281613.11626.arnd@arndb.de>
+Message-ID: <D09EA4E8.A828%suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
 
-> In the meantime I think we can be more tolerant:
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 2133f9d59d06..87f67a93fcc7 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -376,6 +376,8 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
->  			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
->  		else
->  			arch_timer_rate = arch_timer_get_cntfrq();
-> +	} else if (IS_ENABLED(CONFIG_ARM64)) {
-> +		pr_warn("Architected timer frequency overridden by DT (broken firmware?)\n");
->  	}
 
-That looks good to me. On a related note, it looks like my documentation
-patch [1] from a while back fell by the wayside. Does anyone fancy
-picking that up to go with this?
+On 11/28/14, 22:13, "Arnd Bergmann" <arnd@arndb.de> wrote:
 
-Mark.
+>On Wednesday 26 November 2014, suravee.suthikulpanit at amd.com wrote:
+>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> 
+>> Initial revision of device tree for AMD Seattle Development platform.
+>> 
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> Signed-off-by: Thomas Lendacky <Thomas.Lendacky@amd.com>
+>> Signed-off-by: Joel Schopp <Joel.Schopp@amd.com>
+>> ---
+>> V5 Changes:
+>>   * Rebase to arm-soc for-next (per Olof)
+>>   * Restructure the DTS/DTSI into board and SoC configurations (per
+>>Olof)
+>>   * Add model property at the top level (per Olof)
+>>   * Move pcie0 under smb and change smb's ranges property to empty
+>>since pcie
+>>     is not in the same range. (per Olof)
+>>   * Change v2m0's ranges property (per Arnd)
+>>   * Change timer interrupt type to level-trigger (per Marc)
+>
+>Applied to next/arm64, thanks!
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/282830.html
+Thank you
+>
+>Looking at this one more time, I had another question:
+>
+>> +	smb0: smb {
+>> +		compatible = "simple-bus";
+>> +		#address-cells = <2>;
+>> +		#size-cells = <2>;
+>> +		ranges;
+>> +
+>> +		/* DDR range is 40-bit addressing */
+>> +		dma-ranges = <0x80 0x0 0x80 0x0 0x7f 0xffffffff>;
+>> +
+>
+>What is a DDR range?
+>
+>Also, what is special about the last byte? Did you intentionally
+>leave it out? I think when we calculate the dma mask, we will
+>use 0x3fffffffff so we don't step on the last byte, which I assume
+>is not what you intended.
+>
+>	Arnd
+
+Hm..probably not then. What I meant is to specify 40-bit addressing for
+the memory range starting
+from [0x80_0000_0000 - 0x100_0000_0000).
+
+As, I discussed with you on IRC, it should also cover the V2m MSI register
+frame, and should be starting from
+0. The fix should then be:
+
+dma-ranges = <0 0 0 0 0x100 0x00000000>
+
+
+I will send a patch out to fix and add better comment for this.
+
+Thanks,
+
+Suravee
