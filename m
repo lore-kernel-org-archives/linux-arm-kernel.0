@@ -1,91 +1,93 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 28 Nov 2014 18:28:24 +0800
-Subject: [PATCH 1/4] media: ov2640: add async probe function
+Date: Fri, 28 Nov 2014 18:28:26 +0800
+Subject: [PATCH 3/4] media: ov2640: add a master clock for sensor
 In-Reply-To: <1417170507-11172-1-git-send-email-josh.wu@atmel.com>
 References: <1417170507-11172-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1417170507-11172-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <1417170507-11172-4-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support async probe for ov2640, we need remove the code to get 'mclk'
-in ov2640_probe() function. oterwise, if soc_camera host is not probed
-in the moment, then we will fail to get 'mclk' and quit the ov2640_probe()
-function.
+The master clock can be optional. It's a common clock framework clock.
+It can make sensor output a pixel clock to the camera interface.
 
-So in this patch, we move such 'mclk' getting code to ov2640_s_power()
-function. That make ov2640 survive, as we can pass a NULL (priv-clk) to
-soc_camera_set_power() function.
-
-And if soc_camera host is probed, the when ov2640_s_power() is called,
-then we can get the 'mclk' and that make us enable/disable soc_camera
-host's clock as well.
+If you just use a external oscillator clock as the master clock, then,
+just don't need set 'mck' in dt node.
 
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
- drivers/media/i2c/soc_camera/ov2640.c | 31 +++++++++++++++++++++----------
- 1 file changed, 21 insertions(+), 10 deletions(-)
+ drivers/media/i2c/soc_camera/ov2640.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
 diff --git a/drivers/media/i2c/soc_camera/ov2640.c b/drivers/media/i2c/soc_camera/ov2640.c
-index 1fdce2f..9ee910d 100644
+index 6506126..06c2aa9 100644
 --- a/drivers/media/i2c/soc_camera/ov2640.c
 +++ b/drivers/media/i2c/soc_camera/ov2640.c
-@@ -739,6 +739,15 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int on)
- 	struct i2c_client *client = v4l2_get_subdevdata(sd);
+@@ -13,6 +13,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/clk.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
+ #include <linux/i2c.h>
+@@ -31,6 +32,8 @@
+ 
+ #define VAL_SET(x, mask, rshift, lshift)  \
+ 		((((x) >> rshift) & mask) << lshift)
++#define DEFAULT_MASTER_CLK_FREQ		25000000
++
+ /*
+  * DSP registers
+  * register offset for BANK_SEL == BANK_SEL_DSP
+@@ -284,6 +287,7 @@ struct ov2640_priv {
+ 	struct v4l2_ctrl_handler	hdl;
+ 	u32	cfmt_code;
+ 	struct v4l2_clk			*clk;
++	struct clk			*master_clk;
+ 	const struct ov2640_win_size	*win;
+ 
+ 	struct soc_camera_subdev_desc	ssdd_dt;
+@@ -746,6 +750,7 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int on)
  	struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
  	struct ov2640_priv *priv = to_ov2640(client);
-+	struct v4l2_clk *clk;
-+
-+	if (!priv->clk) {
-+		clk = v4l2_clk_get(&client->dev, "mclk");
-+		if (IS_ERR(clk))
-+			dev_warn(&client->dev, "Cannot get the mclk. maybe soc-camera host is not probed yet.\n");
-+		else
-+			priv->clk = clk;
-+	}
+ 	struct v4l2_clk *clk;
++	int ret = 0;
  
- 	return soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
- }
-@@ -1078,21 +1087,21 @@ static int ov2640_probe(struct i2c_client *client,
- 	if (priv->hdl.error)
- 		return priv->hdl.error;
- 
--	priv->clk = v4l2_clk_get(&client->dev, "mclk");
--	if (IS_ERR(priv->clk)) {
--		ret = PTR_ERR(priv->clk);
--		goto eclkget;
--	}
--
- 	ret = ov2640_video_probe(client);
- 	if (ret) {
--		v4l2_clk_put(priv->clk);
--eclkget:
--		v4l2_ctrl_handler_free(&priv->hdl);
-+		goto evideoprobe;
- 	} else {
- 		dev_info(&adapter->dev, "OV2640 Probed\n");
+ 	if (!priv->clk) {
+ 		clk = v4l2_clk_get(&client->dev, "mclk");
+@@ -755,6 +760,16 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int on)
+ 			priv->clk = clk;
  	}
  
-+	ret = v4l2_async_register_subdev(&priv->subdev);
-+	if (ret < 0)
-+		goto evideoprobe;
++	if (!IS_ERR(priv->master_clk)) {
++		if (on)
++			ret = clk_prepare_enable(priv->master_clk);
++		else
++			clk_disable_unprepare(priv->master_clk);
 +
-+	return 0;
++		if (ret)
++			return ret;
++	}
 +
-+evideoprobe:
-+	v4l2_ctrl_handler_free(&priv->hdl);
- 	return ret;
+ 	return soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
  }
  
-@@ -1100,7 +1109,9 @@ static int ov2640_remove(struct i2c_client *client)
- {
- 	struct ov2640_priv       *priv = to_ov2640(client);
+@@ -1153,6 +1168,16 @@ static int ov2640_probe(struct i2c_client *client,
+ 		}
+ 	}
  
--	v4l2_clk_put(priv->clk);
-+	v4l2_async_unregister_subdev(&priv->subdev);
-+	if (priv->clk)
-+		v4l2_clk_put(priv->clk);
- 	v4l2_device_unregister_subdev(&priv->subdev);
- 	v4l2_ctrl_handler_free(&priv->hdl);
- 	return 0;
++	priv->master_clk = devm_clk_get(&client->dev, "mck");
++	if (!IS_ERR(priv->master_clk)) {
++		/* Set ISI_MCK's frequency, it should be faster than pixel
++		 * clock.
++		 */
++		ret = clk_set_rate(priv->master_clk, DEFAULT_MASTER_CLK_FREQ);
++		if (ret < 0)
++			return ret;
++	}
++
+ 	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
+ 	v4l2_ctrl_handler_init(&priv->hdl, 2);
+ 	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
 -- 
 1.9.1
