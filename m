@@ -1,91 +1,73 @@
-From: hongzhou.yang@mediatek.com (hongzhou yang)
-Date: Fri, 28 Nov 2014 12:19:13 +0800
-Subject: [PATCH v3 2/3] dt-bindings: Add pinctrl bindings for
- mt65xx/mt81xx.
-In-Reply-To: <CACRpkdYSe_BH_qiHma2BA+c2otEi3wd0TBXy83t8vwrNL+3U2g@mail.gmail.com>
-References: <1415709535-31515-1-git-send-email-hongzhou.yang@mediatek.com>
- <1415709535-31515-3-git-send-email-hongzhou.yang@mediatek.com>
- <CACRpkdYSe_BH_qiHma2BA+c2otEi3wd0TBXy83t8vwrNL+3U2g@mail.gmail.com>
-Message-ID: <1417148353.25975.2.camel@mhfsdcap03>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Fri, 28 Nov 2014 09:57:29 +0530
+Subject: [[PATCHv2] 3/3] drivers/rtc/rtc-snvs: Add clock support
+In-Reply-To: <546C2164.3040708@gmail.com>
+References: <cover.1415364391.git.maitysanchayan@gmail.com>
+ <30e496ce2d6521e608df3b68b73b3e05caa1daef.1415364391.git.maitysanchayan@gmail.com>
+ <7807253ec0fd349b5bb1489e0d3b1347@agner.ch> <546320D3.2030501@gmail.com>
+ <20141112104735.GK2704@dragon> <54644295.2050003@gmail.com>
+ <20141119011721.GA24042@dragon> <546C2164.3040708@gmail.com>
+Message-ID: <5477F9B1.2060704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-11-27 at 09:44 +0100, Linus Walleij wrote:
-> On Tue, Nov 11, 2014 at 1:38 PM, Hongzhou Yang
-> <hongzhou.yang@mediatek.com> wrote:
+On Wednesday 19 November 2014 10:19 AM, Sanchayan Maity wrote:
+> On Wednesday 19 November 2014 06:47 AM, Shawn Guo wrote:
+>> On Thu, Nov 13, 2014 at 11:03:09AM +0530, Sanchayan Maity wrote:
+>>> On Wednesday 12 November 2014 04:17 PM, Shawn Guo wrote:
+>>>> On Wed, Nov 12, 2014 at 02:26:51PM +0530, Sanchayan Maity wrote:
+>>>>> On Wednesday 12 November 2014 02:57 AM, Stefan Agner wrote:
+>>>>>> On 2014-11-07 14:04, Sanchayan Maity wrote:
+>>>>>>> This patch adds clock enable and disable support for
+>>>>>>> the SNVS peripheral, which is required for using the
+>>>>>>> RTC within the SNVS block.
+>>>>>>
+>>>>>> What happens if the device tree node is there while this patch is not
+>>>>>> applied? I guess the driver would load, but since the clocks of the
+>>>>>> peripheral are not enabled the first register access would lead to bus
+>>>>>> error or similar. If this is the case, this would break bisectability.
+>>>>>> You should move the device tree patch to the end.
+>>>>>>
+>>>>>
+>>>>> If the DT node was present with this patch not applied, the driver would 
+>>>>> still crash with a bus error, since the clocks for SNVS are not explicitly 
+>>>>> enabled anywhere else. I had not thought about any problems which might 
+>>>>> occur later with git bisect. Will move this to the end with v3.
+>>>>
+>>>> Since changes on rtc-snvs.c will need to go through RTC subsystem tree,
+>>>> that means I cannot apply DTS changes until the driver patch gets
+>>>> mainlined and appears on my tree.
+>>>>
+>>>> Shawn
+>>>
+>>> Shawn
+>>>
+>>> So the approach in this patch is OK and acceptable? 
+>>
+>> Yes, I'm fine with it.
+>>
+>> Shawn
 > 
-> > +* Mediatek MT65XX Pin Controller
-> > +
-> > +The Mediatek's Pin controller is used to control GPIO pins.
 > 
-> It's not GPIO pins, since they are not always general purpose. It's just
-> pins. Say "control SoC pins".
+> Hello Alessandro, 
+> 
+> Sorry I missed adding you while sending this patch set.
+> 
+> Can you take this third patch, in this series through your RTC subsytem
+> tree? Or should I resend this third patch separately?
 
-Ok, I'll modify it, thanks.
-
-> > +Required properties:
-> > +- compatible: value should be either of the following.
-> > +    (a) "mediatek,mt8135-pinctrl", compatible with mt8135 pinctrl.
-> > +- mediatek,pctl-regmap: Should be a phandle of the syscfg node.
-> > +- gpio-controller : Marks the device node as a gpio controller.
-> > +- #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
-> > +  binding is used, the amount of cells must be specified as 2. See the below
-> > +  mentioned gpio binding representation for description of particular cells.
-> > +
-> > +       Eg: <&pio 6 0>
-> > +       <[phandle of the gpio controller node]
-> > +       [pin number within the gpio controller]
+Ping? Any inputs? Should I resend or is this Ok?
 > 
-> It's not a pin number really, it is a GPIO offset. But incidentally it's
-> the same as the pin number. (This is OK...)
-
-Yes, you're right, I will modify it. Thanks.
-
-> > +- mediatek,pins: 2 integers array, represents gpio pinmux number and config
-> > +  setting. The format as following
-> > +
-> > +    node {
-> > +     mediatek,pins = <PIN_NUMBER_PINMUX>;
-> > +                     GENERIC_PINCONFIG;
-> > +    };
+> Regards,
+> Sanchayan.
 > 
-> As suggested by Sacha, use just "pins" and define the binding as a patch
-> to Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> that is generic for multiplexing, so we get some order here.
-> 
-> I want you however to put pin multiplexing and pin configuration into
-> different nodes if possible. I don't like combines muxing and config
-> nodes. If necessary tag the node with something.
-> 
-> In the end we can also move the parsing functions to the pinctrl core, as
-> long as the bindings are correct (possibly as a refactoring later).
-> 
-> > +               i2c0_pins_a: i2c0 at 0 {
-> > +                       pins1 {
-> > +                               mediatek,pins = <MT8135_PIN_100_SDA0__FUNC_SDA0>,
-> > +                                               <MT8135_PIN_101_SCL0__FUNC_SCL0>;
-> > +                               bias-disable;
-> > +                       };
-> > +               };
-> 
-> I would split it up.
-> 
-> i2c0_pins_a: i2c0 at 0 {
->         pins1 {
->                 pins = <MT8135_PIN_100_SDA0>;
->                 function = <MT8135_PIN_100_FUNC_SDA0>;
->         };
->         pins2 {
->                pins = <MT8135_PIN_100_SDA0>;
->                bias-disable;
->         };
-> };
-> 
-> One node for the multiplexing, one node for the config. This is the
-> pattern used by most drivers, so I want to have this structure.
-> 
-> It is also easy to tell one node from the other: if it contains "function"
-> we know it's a multiplexing node, if it doesn't, it's a config node.
-> 
-> Yours,
-> Linus Walleij
+>>
+>>>
+>>> Since the DT changes cannot be applied by you, till this goes through the 
+>>> RTC subsystem tree, gets mainlined and appears on your tree, I will send out 
+>>> this patch by itself then and send the DT changes later once this gets
+>>> mainlined?
+>>>
+>>> I did not CC Alessandro Zummo, the maintainer of RTC subsystem by mistake.
+>>> Once you ACK/OK this i will send out this patch in isolation then or just 
+>>> CC Alessandro Zummo.
