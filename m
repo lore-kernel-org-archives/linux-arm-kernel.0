@@ -1,57 +1,40 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 28 Nov 2014 12:58:36 +1100
-Subject: linux-next: manual merge of the kbuild tree with the arm-soc tree
-Message-ID: <20141128125836.2736fe99@canb.auug.org.au>
+From: long.wanglong@huawei.com (Wang Long)
+Date: Fri, 28 Nov 2014 02:15:43 +0000
+Subject: [PATCH 0/7] ARM: hisi: enable HiP01 SoC
+Message-ID: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+This series patch enable Hisilicon HiP01 SoC. The HiP01 SoC series
+chip is designed for networking product, it integrates a rich peripheral
+interfaces to support network applications and supports both one 
+core or dual cores and quad cores. The core is Cortex A9. 
 
-Today's linux-next merge of the kbuild tree got a conflict in
-scripts/Kbuild.include between commit 9fb5e5372208 ("dts, kbuild:
-Factor out dtbs install rules to Makefile.dtbinst") from the arm-soc
-tree and commit 371fdc77af44 ("kbuild: collect shorthands into
-scripts/Kbuild.include") from the kbuild tree.
+Wang Long (7):
+  ARM: debug: add HiP01 debug uart
+  ARM: hisi: enable HiP01 SoC
+  ARM: dts: Add hip01-ca9x2 dts file
+  ARM: config: enable ARCH_HIP01
+  ARM: hisi: add a common smp_prepares_cpus function
+  ARM: hisi: rename secondary_startup function
+  ARM: hisi: enable smp for HiP01
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+ .../bindings/arm/hisilicon/hisilicon.txt           |  25 +++++
+ arch/arm/Kconfig.debug                             |  10 ++
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/hip01-ca9x2.dts                  |  52 ++++++++++
+ arch/arm/boot/dts/hip01.dtsi                       | 110 +++++++++++++++++++++
+ arch/arm/configs/hisi_defconfig                    |   1 +
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/mach-hisi/Kconfig                         |   8 ++
+ arch/arm/mach-hisi/core.h                          |   5 +-
+ arch/arm/mach-hisi/headsmp.S                       |   2 +-
+ arch/arm/mach-hisi/hisilicon.c                     |  10 ++
+ arch/arm/mach-hisi/hotplug.c                       |  31 ++++++
+ arch/arm/mach-hisi/platsmp.c                       |  56 ++++++++++-
+ 13 files changed, 307 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/boot/dts/hip01-ca9x2.dts
+ create mode 100644 arch/arm/boot/dts/hip01.dtsi
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc scripts/Kbuild.include
-index 5374b1bdf02f,0f909814edfc..000000000000
---- a/scripts/Kbuild.include
-+++ b/scripts/Kbuild.include
-@@@ -180,11 -180,17 +180,23 @@@ build := -f $(srctree)/scripts/Makefile
-  modbuiltin := -f $(srctree)/scripts/Makefile.modbuiltin obj
-  
-  ###
- +# Shorthand for $(Q)$(MAKE) -f scripts/Makefile.dtbinst obj=
- +# Usage:
- +# $(Q)$(MAKE) $(dtbinst)=dir
- +dtbinst := -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.dtbinst obj
- +
-++###
-+ # Shorthand for $(Q)$(MAKE) -f scripts/Makefile.clean obj=
-+ # Usage:
-+ # $(Q)$(MAKE) $(clean)=dir
-+ clean := -f $(srctree)/scripts/Makefile.clean obj
-+ 
-+ ###
-+ # Shorthand for $(Q)$(MAKE) -rR -f scripts/Makefile.headersinst obj=
-+ # Usage:
-+ # $(Q)$(MAKE) $(hdr-inst)=dir
-+ hdr-inst := -rR -f $(srctree)/scripts/Makefile.headersinst obj
-+ 
-  # Prefix -I with $(srctree) if it is not an absolute path.
-  # skip if -I has no parameter
-  addtree = $(if $(patsubst -I%,%,$(1)), \
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141128/124d572e/attachment.sig>
+1.8.3.4
