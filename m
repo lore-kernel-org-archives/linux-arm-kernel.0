@@ -1,54 +1,45 @@
 From: long.wanglong@huawei.com (Wang Long)
-Date: Fri, 28 Nov 2014 02:15:44 +0000
-Subject: [PATCH 1/7] ARM: debug: add HiP01 debug uart
+Date: Fri, 28 Nov 2014 02:15:48 +0000
+Subject: [PATCH 5/7] ARM: hisi: add a common smp_prepares_cpus function
 In-Reply-To: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
 References: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
-Message-ID: <1417140950-67103-2-git-send-email-long.wanglong@huawei.com>
+Message-ID: <1417140950-67103-6-git-send-email-long.wanglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the support of Hisilicon HiP01 debug uart.
-The uart of hip01 is 8250 compatible.
+As hix5hd2 and hip01 has the same .smp_prepare_cpus
+in struct smp_operations, so rename hix5hd2_smp_prepare_cpus
+to hisi_common_smp_prepare_cpus.
+
+the hip01 will use hisi_common_smp_prepare_cpus in its
+struct smp_operations.
 
 Signed-off-by: Wang Long <long.wanglong@huawei.com>
 ---
- arch/arm/Kconfig.debug | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/mach-hisi/platsmp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index d8f6a2e..ab65e58 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -240,6 +240,14 @@ choice
- 		  Say Y here if you want the debug print routines to direct
- 		  their output to the UART on Highbank based devices.
+diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
+index 575dd82..b3c3a58 100644
+--- a/arch/arm/mach-hisi/platsmp.c
++++ b/arch/arm/mach-hisi/platsmp.c
+@@ -96,7 +96,7 @@ struct smp_operations hi3xxx_smp_ops __initdata = {
+ #endif
+ };
  
-+	config DEBUG_HIP01_UART
-+		bool "Hisilicon Hip01 Debug UART"
-+		depends on ARCH_HIP01
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on HIP01 UART.
-+
- 	config DEBUG_HIP04_UART
- 		bool "Hisilicon HiP04 Debug UART"
- 		depends on ARCH_HIP04
-@@ -1117,6 +1125,7 @@ config DEBUG_UART_PHYS
- 	default 0x16000000 if ARCH_INTEGRATOR
- 	default 0x18000300 if DEBUG_BCM_5301X
- 	default 0x1c090000 if DEBUG_VEXPRESS_UART0_RS1
-+	default 0x20001000 if DEBUG_HIP01_UART
- 	default 0x20060000 if DEBUG_RK29_UART0
- 	default 0x20064000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
- 	default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
-@@ -1240,6 +1249,7 @@ config DEBUG_UART_VIRT
- 	default 0xfef36000 if DEBUG_HIGHBANK_UART
- 	default 0xfefff700 if ARCH_IOP33X
- 	default 0xff003000 if DEBUG_U300_UART
-+	default 0xffd01000 if DEBUG_HIP01_UART
- 	default DEBUG_UART_PHYS if !MMU
- 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
+-static void __init hix5hd2_smp_prepare_cpus(unsigned int max_cpus)
++static void __init hisi_common_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	hisi_enable_scu_a9();
+ }
+@@ -125,7 +125,7 @@ static int hix5hd2_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 
+ 
+ struct smp_operations hix5hd2_smp_ops __initdata = {
+-	.smp_prepare_cpus	= hix5hd2_smp_prepare_cpus,
++	.smp_prepare_cpus	= hisi_common_smp_prepare_cpus,
+ 	.smp_boot_secondary	= hix5hd2_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= hix5hd2_cpu_die,
 -- 
 1.8.3.4
