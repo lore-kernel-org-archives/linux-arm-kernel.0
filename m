@@ -1,221 +1,91 @@
-From: flora.fu@mediatek.com (Flora Fu)
-Date: Fri, 28 Nov 2014 11:54:34 +0800
-Subject: [PATCH v2 8/8] ARM: dts: mt8135: Add support for MT6397 regulator
-In-Reply-To: <1417146874-5232-1-git-send-email-flora.fu@mediatek.com>
-References: <1417146874-5232-1-git-send-email-flora.fu@mediatek.com>
-Message-ID: <1417146874-5232-9-git-send-email-flora.fu@mediatek.com>
+From: hongzhou.yang@mediatek.com (hongzhou yang)
+Date: Fri, 28 Nov 2014 12:19:13 +0800
+Subject: [PATCH v3 2/3] dt-bindings: Add pinctrl bindings for
+ mt65xx/mt81xx.
+In-Reply-To: <CACRpkdYSe_BH_qiHma2BA+c2otEi3wd0TBXy83t8vwrNL+3U2g@mail.gmail.com>
+References: <1415709535-31515-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1415709535-31515-3-git-send-email-hongzhou.yang@mediatek.com>
+ <CACRpkdYSe_BH_qiHma2BA+c2otEi3wd0TBXy83t8vwrNL+3U2g@mail.gmail.com>
+Message-ID: <1417148353.25975.2.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree for MT6397 regulators in mt8135.dtsi.
+On Thu, 2014-11-27 at 09:44 +0100, Linus Walleij wrote:
+> On Tue, Nov 11, 2014 at 1:38 PM, Hongzhou Yang
+> <hongzhou.yang@mediatek.com> wrote:
+> 
+> > +* Mediatek MT65XX Pin Controller
+> > +
+> > +The Mediatek's Pin controller is used to control GPIO pins.
+> 
+> It's not GPIO pins, since they are not always general purpose. It's just
+> pins. Say "control SoC pins".
 
-Signed-off-by: Flora Fu <flora.fu@mediatek.com>
----
- arch/arm/boot/dts/mt8135.dtsi | 192 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 192 insertions(+)
+Ok, I'll modify it, thanks.
 
-diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-index 14a8aad..436b72f 100644
---- a/arch/arm/boot/dts/mt8135.dtsi
-+++ b/arch/arm/boot/dts/mt8135.dtsi
-@@ -118,6 +118,198 @@
- 
- 			pmic {
- 				compatible = "mediatek,mt6397";
-+
-+				regulators {
-+					mt6397_vpca15_reg: buck_vpca15 {
-+						regulator-name = "vpca15";
-+						regulator-min-microvolt = < 700000>;
-+						regulator-max-microvolt = <1493750>;
-+						regulator-ramp-delay = <12500>;
-+						regulator-enable-ramp-delay = <200>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					mt6397_vpca7_reg: buck_vpca7 {
-+						regulator-name = "vpca7";
-+						regulator-min-microvolt = < 700000>;
-+						regulator-max-microvolt = <1493750>;
-+						regulator-ramp-delay = <12500>;
-+						regulator-enable-ramp-delay = <115>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					mt6397_vsramca15_reg: buck_vsramca15 {
-+						regulator-name = "vsramca15";
-+						regulator-min-microvolt = < 700000>;
-+						regulator-max-microvolt = <1493750>;
-+						regulator-ramp-delay = <12500>;
-+						regulator-enable-ramp-delay = <115>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					mt6397_vsramca7_reg: buck_vsramca7 {
-+						regulator-name = "vsramca7";
-+						regulator-min-microvolt = < 700000>;
-+						regulator-max-microvolt = <1493750>;
-+						regulator-ramp-delay = <12500>;
-+						regulator-enable-ramp-delay = <115>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					mt6397_vcore_reg: buck_vcore {
-+						regulator-name = "vcore";
-+						regulator-min-microvolt = < 700000>;
-+						regulator-max-microvolt = <1493750>;
-+						regulator-ramp-delay = <12500>;
-+						regulator-enable-ramp-delay = <115>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					mt6397_vgpu_reg: buck_vgpu {
-+						regulator-name = "vgpu";
-+						regulator-min-microvolt = < 700000>;
-+						regulator-max-microvolt = <1493750>;
-+						regulator-ramp-delay = <12500>;
-+						regulator-enable-ramp-delay = <115>;
-+					};
-+
-+					mt6397_vdrm_reg: buck_vdrm {
-+						regulator-name = "vdrm";
-+						regulator-min-microvolt = < 800000>;
-+						regulator-max-microvolt = <1593750>;
-+						regulator-ramp-delay = <12500>;
-+						regulator-enable-ramp-delay = <500>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					mt6397_vio18_reg: buck_vio18 {
-+						regulator-name = "vio18";
-+						regulator-min-microvolt = <1500000>;
-+						regulator-max-microvolt = <2120000>;
-+						regulator-ramp-delay = <12500>;
-+						regulator-enable-ramp-delay = <500>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					mt6397_vtcxo_reg: ldo_vtcxo {
-+						regulator-name = "vtcxo";
-+						regulator-min-microvolt = <2800000>;
-+						regulator-max-microvolt = <2800000>;
-+						regulator-enable-ramp-delay = <90>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					mt6397_va28_reg: ldo_va28 {
-+						regulator-name = "va28";
-+						regulator-min-microvolt = <2800000>;
-+						regulator-max-microvolt = <2800000>;
-+						regulator-enable-ramp-delay = <218>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					mt6397_vcama_reg: ldo_vcama {
-+						regulator-name = "vcama";
-+						regulator-min-microvolt = <1500000>;
-+						regulator-max-microvolt = <2800000>;
-+						regulator-enable-ramp-delay = <218>;
-+					};
-+
-+					mt6397_vio28_reg: ldo_vio28 {
-+						regulator-name = "vio28";
-+						regulator-min-microvolt = <2800000>;
-+						regulator-max-microvolt = <2800000>;
-+						regulator-enable-ramp-delay = <240>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					mt6397_usb_reg: ldo_usb {
-+						regulator-name = "usb";
-+						regulator-min-microvolt = <3300000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-enable-ramp-delay = <218>;
-+					};
-+
-+					mt6397_vmc_reg: ldo_vmc {
-+						regulator-name = "vmc";
-+						regulator-min-microvolt = <1800000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-enable-ramp-delay = <218>;
-+					};
-+
-+					mt6397_vmch_reg: ldo_vmch {
-+						regulator-name = "vmch";
-+						regulator-min-microvolt = <3000000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-enable-ramp-delay = <218>;
-+					};
-+
-+					mt6397_vemc_3v3_reg: ldo_vemc3v3 {
-+						regulator-name = "vemc_3v3";
-+						regulator-min-microvolt = <3000000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-enable-ramp-delay = <218>;
-+						regulator-boot-on;
-+					};
-+
-+					mt6397_vgp1_reg: ldo_vcamd {
-+						regulator-name = "vgp1";
-+						regulator-min-microvolt = <1220000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-enable-ramp-delay = <240>;
-+					};
-+
-+					mt6397_vgp2_reg: ldo_vcamio {
-+						regulator-name = "vgp2";
-+						regulator-min-microvolt = <1200000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-enable-ramp-delay = <218>;
-+					};
-+
-+					mt6397_vgp3_reg: ldo_vcamaf {
-+						regulator-name = "vgp3";
-+						regulator-min-microvolt = <1200000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-enable-ramp-delay = <218>;
-+					};
-+
-+					mt6397_vgp4_reg: ldo_vgp4 {
-+						regulator-name = "vgp4";
-+						regulator-min-microvolt = <1200000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-enable-ramp-delay = <218>;
-+					};
-+
-+					mt6397_vgp5_reg: ldo_vgp5 {
-+						regulator-name = "vgp5";
-+						regulator-min-microvolt = <1200000>;
-+						regulator-max-microvolt = <3000000>;
-+						regulator-enable-ramp-delay = <218>;
-+					};
-+
-+					mt6397_vgp6_reg: ldo_vgp6 {
-+						regulator-name = "vgp6";
-+						regulator-min-microvolt = <1200000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-enable-ramp-delay = <218>;
-+					};
-+
-+					mt6397_vibr_reg: ldo_vibr {
-+						regulator-name = "vibr";
-+						regulator-min-microvolt = <1200000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-enable-ramp-delay = <218>;
-+					};
-+				};
- 			};
- 		};
- 
--- 
-1.8.1.1.dirty
+> > +Required properties:
+> > +- compatible: value should be either of the following.
+> > +    (a) "mediatek,mt8135-pinctrl", compatible with mt8135 pinctrl.
+> > +- mediatek,pctl-regmap: Should be a phandle of the syscfg node.
+> > +- gpio-controller : Marks the device node as a gpio controller.
+> > +- #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
+> > +  binding is used, the amount of cells must be specified as 2. See the below
+> > +  mentioned gpio binding representation for description of particular cells.
+> > +
+> > +       Eg: <&pio 6 0>
+> > +       <[phandle of the gpio controller node]
+> > +       [pin number within the gpio controller]
+> 
+> It's not a pin number really, it is a GPIO offset. But incidentally it's
+> the same as the pin number. (This is OK...)
+
+Yes, you're right, I will modify it. Thanks.
+
+> > +- mediatek,pins: 2 integers array, represents gpio pinmux number and config
+> > +  setting. The format as following
+> > +
+> > +    node {
+> > +     mediatek,pins = <PIN_NUMBER_PINMUX>;
+> > +                     GENERIC_PINCONFIG;
+> > +    };
+> 
+> As suggested by Sacha, use just "pins" and define the binding as a patch
+> to Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+> that is generic for multiplexing, so we get some order here.
+> 
+> I want you however to put pin multiplexing and pin configuration into
+> different nodes if possible. I don't like combines muxing and config
+> nodes. If necessary tag the node with something.
+> 
+> In the end we can also move the parsing functions to the pinctrl core, as
+> long as the bindings are correct (possibly as a refactoring later).
+> 
+> > +               i2c0_pins_a: i2c0 at 0 {
+> > +                       pins1 {
+> > +                               mediatek,pins = <MT8135_PIN_100_SDA0__FUNC_SDA0>,
+> > +                                               <MT8135_PIN_101_SCL0__FUNC_SCL0>;
+> > +                               bias-disable;
+> > +                       };
+> > +               };
+> 
+> I would split it up.
+> 
+> i2c0_pins_a: i2c0 at 0 {
+>         pins1 {
+>                 pins = <MT8135_PIN_100_SDA0>;
+>                 function = <MT8135_PIN_100_FUNC_SDA0>;
+>         };
+>         pins2 {
+>                pins = <MT8135_PIN_100_SDA0>;
+>                bias-disable;
+>         };
+> };
+> 
+> One node for the multiplexing, one node for the config. This is the
+> pattern used by most drivers, so I want to have this structure.
+> 
+> It is also easy to tell one node from the other: if it contains "function"
+> we know it's a multiplexing node, if it doesn't, it's a config node.
+> 
+> Yours,
+> Linus Walleij
