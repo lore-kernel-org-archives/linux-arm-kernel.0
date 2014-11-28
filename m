@@ -1,52 +1,49 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 28 Nov 2014 15:08:05 +0100
-Subject: [PATCH v3 3/4] mmc: atmel-mci: stop using specific initcall
-In-Reply-To: <1417183686-31481-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1417183686-31481-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1417183686-31481-4-git-send-email-ludovic.desroches@atmel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 28 Nov 2014 15:08:44 +0100
+Subject: [PATCH v2 3/5] pinctrl: exynos: Fix GPIO setup failure because
+ domain clock being gated
+In-Reply-To: <CACRpkdb8F8YcvFeHPvOKHjx_p4HEpimck3XRabB3oHpZTdmRQQ@mail.gmail.com>
+References: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
+ <1417011857-10419-4-git-send-email-k.kozlowski@samsung.com>
+ <CACRpkdb8F8YcvFeHPvOKHjx_p4HEpimck3XRabB3oHpZTdmRQQ@mail.gmail.com>
+Message-ID: <1417183724.18249.36.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No more use late initcall to manage probing order. Use probe deferring
-if needed.
+On pi?, 2014-11-28 at 15:04 +0100, Linus Walleij wrote:
+> On Wed, Nov 26, 2014 at 3:24 PM, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+> 
+> > The audio subsystem on Exynos 5420 has separate clocks and GPIO. To
+> > operate properly on GPIOs the main block clock 'mau_epll' must be
+> > enabled.
+> >
+> > This was observed on Peach Pi/Pit and Arndale Octa (after enabling i2s0)
+> > after introducing runtime PM to pl330 DMA driver. After that commit the
+> > 'mau_epll' was gated, because the "amba" clock was disabled and there
+> > were no more users of mau_epll.
+> >
+> > The system hang just before probing i2s0 because
+> > samsung_pinmux_setup() tried to access memory from audss block which was
+> > gated.
+> >
+> > Add a clock property to the pinctrl driver and enable the clock during
+> > GPIO setup. During normal GPIO operations (set, get, set_direction) the
+> > clock is not enabled.
+> >
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> Waiting for Tomasz to review this.
+> 
+> Can this patch be applied in separation from the others?
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/mmc/host/atmel-mci.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+Yes, it can be picked independently.
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 064358d..00f6088 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -2565,6 +2565,7 @@ static const struct dev_pm_ops atmci_dev_pm_ops = {
- };
- 
- static struct platform_driver atmci_driver = {
-+	.probe		= atmci_probe,
- 	.remove		= atmci_remove,
- 	.driver		= {
- 		.name		= "atmel_mci",
-@@ -2572,19 +2573,7 @@ static struct platform_driver atmci_driver = {
- 		.pm		= &atmci_dev_pm_ops,
- 	},
- };
--
--static int atmci_init(void)
--{
--	return platform_driver_probe(&atmci_driver, atmci_probe);
--}
--
--static void atmci_exit(void)
--{
--	platform_driver_unregister(&atmci_driver);
--}
--
--late_initcall(atmci_init); /* try to load after dma driver when built-in */
--module_exit(atmci_exit);
-+module_platform_driver(atmci_driver);
- 
- MODULE_DESCRIPTION("Atmel Multimedia Card Interface driver");
- MODULE_AUTHOR("Haavard Skinnemoen (Atmel)");
--- 
-2.0.3
+The commit message is somehow misleading because issue is actually fixed
+by enabling this in DTS. So the next patch (4/5: ARM: dts: exynos5420:
+Add clock for audss pinctrl) actually fixes the issue on Arndale Octa
+board from pinctrl perspective. Unfortunately I spot that mistake (in
+commit msg) later...
+
+Best regards,
+Krzysztof
