@@ -1,123 +1,80 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 28 Nov 2014 15:24:11 +0000
-Subject: [PATCH v4 15/19] arm/arm64: KVM: add virtual GICv3 distributor
- emulation
-In-Reply-To: <20141125104129.GC31297@cbox>
-References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
- <1415959683-26027-16-git-send-email-andre.przywara@arm.com>
- <20141123143841.GB3401@cbox> <5473562E.7060303@arm.com>
- <20141125104129.GC31297@cbox>
-Message-ID: <5478939B.8010103@arm.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 28 Nov 2014 15:25:12 +0000
+Subject: [PATCH v3 2/3] of: add optional options parameter
+ =?iso-8859-1?Q?to=0D?= of_find_node_by_path()
+In-Reply-To: <20141128113428.GM2361@bivouac.eciton.net>
+References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
+ <1417110967-16284-3-git-send-email-leif.lindholm@linaro.org>
+ <20141128004403.08D90C40A7F@trevor.secretlab.ca>
+ <20141128113428.GM2361@bivouac.eciton.net>
+Message-ID: <20141128152512.2152EC40884@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hej Christoffer,
-
-On 25/11/14 10:41, Christoffer Dall wrote:
-> Hi Andre,
+On Fri, 28 Nov 2014 11:34:28 +0000
+, Leif Lindholm <leif.lindholm@linaro.org>
+ wrote:
+> On Fri, Nov 28, 2014 at 12:44:03AM +0000, Grant Likely wrote:
+> > > +	separator = strchr(path, ':');
+> > > +	if (separator && opts)
+> > > +		*opts = separator + 1;
+> > > +
+> > 
+> > What about when there are no opts? Do we require the caller to make sure
+> > opts is NULL before calling the function (which sounds like a good
+> > source of bugs) or do we clear it on successful return?
+> > 
+> > I think if opts is passed in, but there are no options, then it should
+> > set *opts = NULL.
 > 
-> On Mon, Nov 24, 2014 at 04:00:46PM +0000, Andre Przywara wrote:
+> Yeah, oops.
 > 
-
-[...]
-
->>>> +
->>>> +     /* This region only covers SPIs, so no handling of private IRQs here. */
->>>> +     spi = offset / 8;
->>>
->>> that's not how I read the spec, it says that GICD_IROUTER0 to
->>> GICD_IROUTER1 are not implemented (because they are SGIs and PPIs), and
->>> I read the 'SPI ID m' as the lowest numbered SPI ID being 32, thus you
->>> should do:
->>>
->>> spi = offset / 8 - VGIC_NR_PRIVATE_IRQS;
->>
->> Well, below I changed the description of the IROUTER range to:
+> > There should be test cases for this also. Must set opts to NULL on
+> > successful return, and (I think) should leave opts alone on an
+> > unsuccessful search.
 > 
-> oh, now it's finally coming back together for me, I think I
-> misunderstodd your point from last rounds of review because I didn't
-> realize that GICD_IROUTER was defined as 0x6000 (which I actually think
-> is a bit backwards, but this is not the place or time).
+> I would actually argue for always nuking the opts - since that could
+> (theoretically) prevent something working by accident in spite of
+> error conditions.
 > 
->> +     {
->> +             .base           = GICD_IROUTER + 0x100,
->> +             .len            = 0x1edc,
+> How about the below?
+
+Perfect, applied with one fixup below...
+
 > 
-> in that case, len should be 0x1ee0:
+> /
+>     Leif
 > 
->  $ printf '0x%x\n' $(( (0x7fd8 + 8) - 0x6100 ))
-
-Ah yes, the spec gives the beginning of the last register, not the end
-of the region. Thanks for spotting this!
-
-[...]
-
->>>> +
->>>> +     if (!is_in_range(mmio->phys_addr, mmio->len, rdbase,
->>>> +         GIC_V3_REDIST_SIZE * nrcpus))
->>>> +             return false;
->>>
->>> Did you think more about the contiguous allocation issue here or can you
->>> give me a pointer to the requirement in the spec?
->>
->> 5.4.1 Re-Distributor Addressing
->>
+> From 2e1a44e539967d96366d074ae158092900e0c822 Mon Sep 17 00:00:00 2001
+> From: Leif Lindholm <leif.lindholm@linaro.org>
+> Date: Thu, 27 Nov 2014 09:24:31 +0000
+> Subject: [PATCH] of: add optional options parameter to of_find_node_by_path()
 > 
-> Section 5.4.1 talks about the pages within a single re-distributor having
-> to be contiguous, not all the re-deistributor regions having to be
-> contiguous, right?
-
-Ah yes, you are right. But I still think it does not matter:
-1) We are "implementing" the GICv3. So as the spec does not forbid this,
-we just state that the redistributor register maps for each VCPU are
-contiguous. Also we create the FDT accordingly. I will add a comment in
-the documentation to state this.
-
-2) The kernel's GICv3 DT bindings assume this allocation is the default.
-Although Marc added bindings to work around this (stride), it seems much
-more logical to me to not use it.
-
->>>> +
->>>> +static int vgic_v3_init(struct kvm *kvm, const struct vgic_params *params)
->>>> +{
->>>> +     struct vgic_dist *dist = &kvm->arch.vgic;
->>>> +     int ret, i;
->>>> +     u32 mpidr;
->>>> +
->>>> +     if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) ||
->>>> +         IS_VGIC_ADDR_UNDEF(dist->vgic_redist_base)) {
->>>> +             kvm_err("Need to set vgic distributor addresses first\n");
->>>> +             return -ENXIO;
->>>> +     }
->>>> +
->>>> +     /*
->>>> +      * FIXME: this should be moved to init_maps time, and may bite
->>>> +      * us when adding save/restore. Add a per-emulation hook?
->>>> +      */
->>>
->>> progress on this fixme?
->>
->> Progress supplies the ISS, but not this piece of code (read: none) ;-)
->> I am more in favour of a follow-up patch on this one ...
+> Update of_find_node_by_path():
+> 1) Rename function to of_find_node_opts_by_path(), adding an optional
+>    pointer argument. Provide a static inline wrapper version of
+>    of_find_node_by_path() which calls the new function with NULL as
+>    the optional argument.
+> 2) Ignore any part of the path beyond and including the ':' separator.
+> 3) Set the new provided pointer argument to the beginning of the string
+>    following the ':' separator.
+> 4: Add tests.
 > 
-> hmmm, I'm not a fan of merging code with this kind of a comment in it,
-> because it looks scary, and I dont' really understand the problem from
-> just reading the comment, so something needs to be done here.
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> ---
+> @@ -729,19 +737,24 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
+>   *	Returns a node pointer with refcount incremented, use
+>   *	of_node_put() on it when done.
+>   */
+> -struct device_node *of_find_node_by_path(const char *path)
+> +struct device_node *of_find_node_opts_by_path(const char *path, const char **opts)
+>  {
+>  	struct device_node *np = NULL;
+>  	struct property *pp;
+>  	unsigned long flags;
+> +	char *separator;
 
-I see. What about we are moving this unconditionally into vgic_init_maps
-and allocate it for both v2 and v3 guests and get rid of the whole
-function? It allocates only memory for the irq_spi_mpidr, which is 4
-bytes per configured SPI (so at most less than 4 KB, but usually just
-128 Bytes per guest). This would be a pretty quick solution. Does that
-sound too hackish?
+const char *separator.
 
-After your comments about the per-VM ops function pointers I am a bit
-reluctant to introduce another one (which would be the obvious way
-following the comment) for just this simple kalloc().
-On the other hand the ITS emulation may later make better use of a GICv3
-specific allocation function.
-
-What's your opinion on this?
-
-Cheers,
-Andre.
+Thanks,
+g.
