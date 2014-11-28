@@ -1,277 +1,125 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Fri, 28 Nov 2014 17:54:14 +0100
-Subject: [PATCH 1/4] ARM: clocksource: add asm9260_timer driver
+Date: Fri, 28 Nov 2014 17:54:15 +0100
+Subject: [PATCH 2/4] ARM: dts: add DT for Alphascale ASM9260 SoC
 In-Reply-To: <1417193657-31602-1-git-send-email-linux@rempel-privat.de>
 References: <201411281509.19170.arnd@arndb.de>
  <1417193657-31602-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1417193657-31602-2-git-send-email-linux@rempel-privat.de>
+Message-ID: <1417193657-31602-3-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases asm9260 looks similar to iMX2x. One of exceptions is
-timer controller. So this patch introduces new driver for this special case.
+for now it is wary basic SoC description with most important IPs needed
+to make this device work
 
 Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/Kconfig         |   9 ++
- drivers/clocksource/Makefile        |   1 +
- drivers/clocksource/asm9260_timer.c | 220 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 230 insertions(+)
- create mode 100644 drivers/clocksource/asm9260_timer.c
+ arch/arm/boot/dts/Makefile                      |  2 +
+ arch/arm/boot/dts/alphascale-asm9260-devkit.dts | 13 +++++
+ arch/arm/boot/dts/alphascale-asm9260.dtsi       | 63 +++++++++++++++++++++++++
+ 3 files changed, 78 insertions(+)
+ create mode 100644 arch/arm/boot/dts/alphascale-asm9260-devkit.dts
+ create mode 100644 arch/arm/boot/dts/alphascale-asm9260.dtsi
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 9042060..a2df6b2 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -223,4 +223,13 @@ config CLKSRC_VERSATILE
- 	  ARM Versatile, RealView and Versatile Express reference
- 	  platforms.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 38c89ca..6e24264 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -517,6 +517,8 @@ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
+ 	dove-dove-db.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6589-aquaris5.dtb
  
-+config ASM9260_TIMER
-+	bool "Alphascale ASM9260 timer driver"
-+	select CLKSRC_MMIO
-+	select CLKSRC_OF
-+	default y if MACH_ASM9260
-+	help
-+	  This enables build of a clocksource and clockevent driver for
-+	  the 32-bit System Timer hardware available on a Alphascale ASM9260.
++dtb-$(CONFIG_MACH_ASM9260) += alphascale-asm9260-devkit.dtb
 +
- endmenu
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 756f6f1..b84c3b8 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -46,3 +46,4 @@ obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
- obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
- obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
- obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
-+obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
-diff --git a/drivers/clocksource/asm9260_timer.c b/drivers/clocksource/asm9260_timer.c
+ targets += dtbs dtbs_install
+ targets += $(dtb-y)
+ endif
+diff --git a/arch/arm/boot/dts/alphascale-asm9260-devkit.dts b/arch/arm/boot/dts/alphascale-asm9260-devkit.dts
 new file mode 100644
-index 0000000..2c9c993
+index 0000000..c77e2c9
 --- /dev/null
-+++ b/drivers/clocksource/asm9260_timer.c
-@@ -0,0 +1,220 @@
++++ b/arch/arm/boot/dts/alphascale-asm9260-devkit.dts
+@@ -0,0 +1,13 @@
 +/*
-+ * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
++ * Copyright 2014 Oleksij Rempel <linux@rempel-privat.de>
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
++ * Licensed under the X11 license or the GPL v2 (or later)
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/sched.h>
-+#include <linux/clk.h>
-+#include <linux/clocksource.h>
-+#include <linux/clockchips.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/bitops.h>
++/dts-v1/;
++#include "alphascale-asm9260.dtsi"
 +
-+#define DRIVER_NAME	"asm9260-timer"
-+
-+/*
-+ * this device provide 4 offsets for each register:
-+ * 0x0 - plain read write mode
-+ * 0x4 - set mode, OR logic.
-+ * 0x8 - clr mode, XOR logic.
-+ * 0xc - togle mode.
-+ */
-+#define SET_REG 4
-+#define CLR_REG 8
-+
-+#define HW_IR           0x0000 /* RW. Interrupt */
-+#define BM_IR_CR0	BIT(4)
-+#define BM_IR_MR3	BIT(3)
-+#define BM_IR_MR2	BIT(2)
-+#define BM_IR_MR1	BIT(1)
-+#define BM_IR_MR0	BIT(0)
-+
-+#define HW_TCR		0x0010 /* RW. Timer controller */
-+/* BM_C*_RST
-+ * Timer Counter and the Prescale Counter are synchronously reset on the
-+ * next positive edge of PCLK. The counters remain reset until TCR[1] is
-+ * returned to zero. */
-+#define BM_C3_RST	BIT(7)
-+#define BM_C2_RST	BIT(6)
-+#define BM_C1_RST	BIT(5)
-+#define BM_C0_RST	BIT(4)
-+/* BM_C*_EN
-+ * 1 - Timer Counter and Prescale Counter are enabled for counting
-+ * 0 - counters are disabled */
-+#define BM_C3_EN	BIT(3)
-+#define BM_C2_EN	BIT(2)
-+#define BM_C1_EN	BIT(1)
-+#define BM_C0_EN	BIT(0)
-+
-+#define HW_DIR		0x0020 /* RW. Direction? */
-+/* 00 - count up
-+ * 01 - count down
-+ * 10 - ?? 2^n/2 */
-+#define BM_DIR_COUNT_UP		0
-+#define BM_DIR_COUNT_DOWN	1
-+#define BM_DIR0_SHIFT	0
-+#define BM_DIR1_SHIFT	4
-+#define BM_DIR2_SHIFT	8
-+#define BM_DIR3_SHIFT	12
-+#define BM_DIR_DEFAULT		(BM_DIR_COUNT_UP << BM_DIR0_SHIFT | \
-+				 BM_DIR_COUNT_UP << BM_DIR1_SHIFT | \
-+				 BM_DIR_COUNT_UP << BM_DIR2_SHIFT | \
-+				 BM_DIR_COUNT_UP << BM_DIR3_SHIFT)
-+
-+#define HW_TC0		0x0030 /* RO. Timer counter 0 */
-+/* HW_TC*. Timer counter owerflow (0xffff.ffff to 0x0000.0000) do not generate
-+ * interrupt. This registers can be used to detect overflow */
-+#define HW_TC1          0x0040
-+#define HW_TC2		0x0050
-+#define HW_TC3		0x0060
-+
-+#define HW_PR		0x0070 /* RW. prescaler */
-+#define BM_PR_DISABLE	0
-+#define HW_PC		0x0080 /* RO. Prescaler counter */
-+#define HW_MCR		0x0090 /* RW. Match control */
-+/* enable interrupt on match */
-+#define BM_MCR_INT_EN(n)	(1 << (n * 3 + 0))
-+/* enable TC reset on match */
-+#define BM_MCR_RES_EN(n)	(1 << (n * 3 + 1))
-+/* enable stop TC on match */
-+#define BM_MCR_STOP_EN(n)	(1 << (n * 3 + 2))
-+
-+#define HW_MR0		0x00a0 /* RW. Match reg */
-+#define HW_MR1		0x00b0
-+#define HW_MR2		0x00C0
-+#define HW_MR3		0x00D0
-+
-+#define HW_CTCR		0x0180 /* Counter control */
-+#define BM_CTCR0_SHIFT	0
-+#define BM_CTCR1_SHIFT	2
-+#define BM_CTCR2_SHIFT	4
-+#define BM_CTCR3_SHIFT	6
-+#define BM_CTCR_TM	0	/* Timer mode. Every rising PCLK edge. */
-+#define BM_CTCR_DEFAULT	(BM_CTCR_TM << BM_CTCR0_SHIFT | \
-+			 BM_CTCR_TM << BM_CTCR1_SHIFT | \
-+			 BM_CTCR_TM << BM_CTCR2_SHIFT | \
-+			 BM_CTCR_TM << BM_CTCR3_SHIFT)
-+
-+static struct asm9260_timer_priv {
-+	void __iomem *base;
-+	unsigned long ticks_per_jiffy;
-+} priv;
-+
-+static int asm9260_timer_set_next_event(unsigned long delta,
-+					 struct clock_event_device *evt)
-+{
-+	/* configure match count for TC0 */
-+	writel_relaxed(delta, priv.base + HW_MR0);
-+	/* enable TC0 */
-+	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
-+	return 0;
-+}
-+
-+static void asm9260_timer_set_mode(enum clock_event_mode mode,
-+				    struct clock_event_device *evt)
-+{
-+	/* stop timer0 */
-+	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + CLR_REG);
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		/* disable reset and stop on match */
-+		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
-+				priv.base + HW_MCR + CLR_REG);
-+		/* configure match count for TC0 */
-+		writel_relaxed(priv.ticks_per_jiffy, priv.base + HW_MR0);
-+		/* enable TC0 */
-+		writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		/* enable reset and stop on match */
-+		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
-+				priv.base + HW_MCR + SET_REG);
-+		break;
-+	default:
-+		break;
-+	}
-+}
-+
-+static struct clock_event_device event_dev = {
-+	.name		= DRIVER_NAME,
-+	.rating		= 200,
-+	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_next_event	= asm9260_timer_set_next_event,
-+	.set_mode	= asm9260_timer_set_mode,
++/ {
++	model = "Alphascale asm9260 Development Kit";
++	compatible = "alphascale,asm9260devkit", "alphascale,asm9260";
 +};
-+
-+static irqreturn_t asm9260_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = dev_id;
-+
-+	evt->event_handler(evt);
-+
-+	writel_relaxed(BM_IR_MR0, priv.base + HW_IR);
-+
-+	return IRQ_HANDLED;
-+}
-+
+diff --git a/arch/arm/boot/dts/alphascale-asm9260.dtsi b/arch/arm/boot/dts/alphascale-asm9260.dtsi
+new file mode 100644
+index 0000000..907fc7b
+--- /dev/null
++++ b/arch/arm/boot/dts/alphascale-asm9260.dtsi
+@@ -0,0 +1,63 @@
 +/*
-+ * ---------------------------------------------------------------------------
-+ * Timer initialization
-+ * ---------------------------------------------------------------------------
++ * Copyright 2014 Oleksij Rempel <linux@rempel-privat.de>
++ *
++ * Licensed under the X11 license or the GPL v2 (or later)
 + */
-+static void __init asm9260_timer_init(struct device_node *np)
-+{
-+	int irq;
-+	struct clk *clk;
-+	int ret;
-+	unsigned long rate;
 +
-+	priv.base = of_io_request_and_map(np, 0, np->name);
-+	if (!priv.base)
-+		panic("%s: unable to map resource", np->name);
++#include "skeleton.dtsi"
++#include <dt-bindings/clock/alphascale,asm9260.h>
 +
-+	clk = of_clk_get(np, 0);
++/ {
++	interrupt-parent = <&icoll>;
 +
-+	ret = clk_prepare_enable(clk);
-+	if (ret)
-+		panic("Failed to enable clk!\n");
++	memory {
++		device_type = "memory";
++		reg = <0x20000000 0x2000000>;
++	};
 +
-+	irq = irq_of_parse_and_map(np, 0);
-+	ret = request_irq(irq, asm9260_timer_interrupt, IRQF_TIMER,
-+			DRIVER_NAME, &event_dev);
-+	if (ret)
-+		panic("Failed to setup irq!\n");
++	cpus {
++		#address-cells = <0>;
++		#size-cells = <0>;
 +
-+	/* set all timers for count-up */
-+	writel_relaxed(BM_DIR_DEFAULT, priv.base + HW_DIR);
-+	/* disable divider */
-+	writel_relaxed(BM_PR_DISABLE, priv.base + HW_PR);
-+	/* make sure all timers use every rising PCLK edge. */
-+	writel_relaxed(BM_CTCR_DEFAULT, priv.base + HW_CTCR);
-+	/* enable interrupt for TC0 and clean setting for all other lines */
-+	writel_relaxed(BM_MCR_INT_EN(0) , priv.base + HW_MCR);
++		cpu {
++			compatible = "arm,arm926ej-s";
++			device_type = "cpu";
++			clocks = <&acc CLKID_SYS_CPU>;
++		};
++	};
 +
-+	rate = clk_get_rate(clk);
-+	clocksource_mmio_init(priv.base + HW_TC1, DRIVER_NAME, rate,
-+			200, 32, clocksource_mmio_readl_up);
++	osc24m: oscillator {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24000000>;
++		clock-accuracy = <30000>;
++	};
 +
-+	/* Seems like we can't use counter without match register even if
-+	 * actions for MR are disabled. So, set MR to max value. */
-+	writel_relaxed(0xffffffff, priv.base + HW_MR1);
-+	/* enable TC1 */
-+	writel_relaxed(BM_C1_EN, priv.base + HW_TCR + SET_REG);
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		ranges;
 +
-+	priv.ticks_per_jiffy = DIV_ROUND_CLOSEST(rate, HZ);
-+	event_dev.cpumask = cpumask_of(0);
-+	clockevents_config_and_register(&event_dev, rate, 0x2c00, 0xfffffffe);
-+}
-+CLOCKSOURCE_OF_DECLARE(asm9260_timer, "alphascale,asm9260-timer",
-+		asm9260_timer_init);
++		acc: clock-controller at 80040000 {
++			compatible = "alphascale,asm9260-clock-controller";
++			#clock-cells = <1>;
++			clocks = <&osc24m>;
++			reg = <0x80040000 0x204>;
++		};
++
++		icoll: interrupt-controller at 80054000 {
++			compatible = "alphascale,asm9260-icoll";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			reg = <0x80054000 0x200>;
++		};
++
++		timer0: timer at 80088000 {
++			compatible = "alphascale,asm9260-timer";
++			reg = <0x80088000 0x4000>;
++			clocks = <&acc CLKID_AHB_TIMER0>;
++			interrupts = <29>;
++		};
++	};
++};
 -- 
 1.9.1
