@@ -1,60 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 28 Nov 2014 15:30:08 +0000
-Subject: [PATCH v2 8/8] ARM: dts: mt8135: Add support for MT6397 regulator
-In-Reply-To: <1417146874-5232-9-git-send-email-flora.fu@mediatek.com>
-References: <1417146874-5232-1-git-send-email-flora.fu@mediatek.com>
- <1417146874-5232-9-git-send-email-flora.fu@mediatek.com>
-Message-ID: <20141128153008.GS7712@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Nov 2014 15:30:26 +0000
+Subject: [PATCH v2 RESEND 1/2] ARM: vexpress: Remove non-DT code
+In-Reply-To: <201411281608.34978.arnd@arndb.de>
+References: <1416939455-1814-1-git-send-email-pawel.moll@arm.com>
+ <201411281608.34978.arnd@arndb.de>
+Message-ID: <20141128153026.GU3836@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 11:54:34AM +0800, Flora Fu wrote:
-
-> Add device tree for MT6397 regulators in mt8135.dtsi.
+On Fri, Nov 28, 2014 at 04:08:34PM +0100, Arnd Bergmann wrote:
+> On Tuesday 25 November 2014, Pawel Moll wrote:
+> > Now, with the CLCD DT support available, there is no
+> > more reason to keep the non-DT support for V2P-CA9.
+> > 
+> > Removed, together with "some" supporting code. It was
+> > necessary to make PLAT_VERSATILE_SCHED_CLOCK optional
+> > and selected by the machines still interested in it.
+> > 
+> > Acked-by: Mike Turquette <mturquette@linaro.org>
+> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > ---
+> > Changes since v1:
+> > 
+> > - Removed MFD and power/reset changes from the patch;
+> >   will be posted separately after this is merged.
 > 
-> Signed-off-by: Flora Fu <flora.fu@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt8135.dtsi | 192 ++++++++++++++++++++++++++++++++++++++++++
+> Applied to next/cleanup, thanks!
 
-This appears to be the DT fragment for a SoC but you are defining the
-system integration for the PMIC.  That's bad, the PMIC is a separate
-device so should be hooked up by the board using it.  If there's common
-elements from a reference design they should be in their own .dtsi.
+Shame it doesn't work in DT mode though.  Compare these boot logs:
 
-> +					mt6397_vsramca15_reg: buck_vsramca15 {
-> +						regulator-name = "vsramca15";
-> +						regulator-min-microvolt = < 700000>;
-> +						regulator-max-microvolt = <1493750>;
-> +						regulator-ramp-delay = <12500>;
-> +						regulator-enable-ramp-delay = <115>;
-> +						regulator-always-on;
-> +						regulator-boot-on;
+  http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=3068
 
-Why do these regulators have both a board specific ramp delay specified
-and -always-on?  If they are always on presumably they never ramp at
-runtime; if this is a generic parameter for the device it should be in
-the driver.
+with:
 
-Similarly why is boot_on being specified - we can read the startup state
-for all these regulators?
+  http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=3071
 
-> +					};
-> +
-> +					mt6397_vsramca7_reg: buck_vsramca7 {
-> +						regulator-name = "vsramca7";
-> +						regulator-min-microvolt = < 700000>;
-> +						regulator-max-microvolt = <1493750>;
+and spot the difference.
 
-All these regulators seem to have exactly the same range specified which
-looks awfully like it might be the maximum variability the regulator has
-rather than the board specific range that's supported; the fact that
-they appear to have no consumers that might vary the voltage is another
-warning sign.  This is probably wrong, the constraints should be
-whatever is verified good for the board.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141128/d12261be/attachment.sig>
+The biggest problem is the nonfunctional MMC interface:
+
+mmci-pl18x 10005000.mmci: no support for card's volts
+mmc0: error -22 whilst initialising SD card
+
+which, as the rootfs is on the SD card, is pretty fatal.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
