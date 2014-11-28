@@ -1,75 +1,41 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 28 Nov 2014 11:48:43 +0100
-Subject: [PATCH 00/11] ARM: at91: remove !DT support for at91rm9200
-In-Reply-To: <2351041.YbSYt1FKtz@wuerfel>
-References: <cover.1417103399.git.nicolas.ferre@atmel.com>
- <27354361.uIQEXGDqXb@wuerfel> <54784209.6070003@atmel.com>
- <2351041.YbSYt1FKtz@wuerfel>
-Message-ID: <5478530B.3090102@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Nov 2014 11:51:37 +0100
+Subject: [PATCH 2/3] ARM: edma: Rename header file for dmaengine filter
+ function definition
+In-Reply-To: <54782148.6040108@ti.com>
+References: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>
+ <4859328.eEV7jzKEaA@wuerfel> <54782148.6040108@ti.com>
+Message-ID: <6448422.mtUnef24Xp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/11/2014 11:25, Arnd Bergmann wrote:
-> On Friday 28 November 2014 10:36:09 Nicolas Ferre wrote:
->> On 27/11/2014 18:38, Arnd Bergmann wrote:
->>> On Thursday 27 November 2014 18:12:43 Alexandre Belloni wrote:
->>>> On 27/11/2014 at 17:49:50 +0100, Arnd Bergmann wrote :
->>>>> On Thursday 27 November 2014 17:06:28 Nicolas Ferre wrote:
->>>>>> This is the last series of patches that removes the non-Device-Tree board
->>>>>> support for older Atmel SoCs.
->>>>>> Again, for the record, it was announced here
->>>>>> https://lkml.org/lkml/2014/9/10/293 ([ANNOUNCE] ARM: at91: removal of board
->>>>>> files) two months ago.
->>>>>> Several files beyond at91rm9200 are touched this time as I tried to remove the
->>>>>> biggest parts that were related to !DT SoC initializations. More cleanup is
->>>>>> certainly needed to remove dead code.
->>>>>>
->>>>>> The diffstat is also pretty big as a lot of at91rm9200 boards were remaining.
->>>>>>
->>>>>
->>>>> Awesome stuff!
->>>>>
->>>>> Two questions:
->>>>>
->>>>> - is anything holding this up from getting merged in 3.19?
->>>>>
->>>>
->>>> If you think this is not too late in the cycle, I would say go ahead 
->>>
->>> I'd say we should do it, unless there are last-minute regressions.
->>
->> Arnd,
->>
->> I am totally in favor for a merge into 3.19.
->> I wanted to wait one day or two but given that the official announce had
->> been made several months ago, I don't think it makes a big difference.
->>
->> So, what do you prefer:
->>
->> 1/ I wait today and send you the pull-request this evening (our time)
->> 2/ I send you the pull-request at the beginning of next week but still
->> can make it for 3.19?
+On Friday 28 November 2014 09:16:24 Peter Ujfalusi wrote:
+> On 11/27/2014 11:52 PM, Arnd Bergmann wrote:
+> > On Thursday 27 November 2014 20:46:12 Peter Ujfalusi wrote:
+> >>
+> >> I see. With this series I did not planed to fix all edma related issues, just
+> >> as a start clean up the related header files. I would rather not add fixes to
+> >> mmc, spi, etc drivers since while you have valid point it is not in the scope
+> >> of this series.
+> >> Can we do the changes you are suggesting in an incremental manner?
+> > 
+> > Sure, but I'd leave the existing filter function declaration alone then
+> > and not move it, since we wouldn't want to keep it in the long run.
 > 
-> Just send the pull request whenever you have it ready. If some bug shows
-> up, reply to that mail with an updated pull request.
+> but if you want to reference the filter function (which is in
+> drivers/dma/edma.c) in arch/arm/mach-davinci/ directory, we will need it.
+> Don't we?
 
-Okay, I do it right now then.
+Yes, unless you move the definition of the filter function into
+arch/arm/common/edma.c or arch/arm/mach-davinci/devices.c, but that
+would require other changes.
 
-Thanks Arnd.
+> If I leave the header as it is, then how would we clean up the edma headers? I
+> would not put the API definitions for the arch code into the same file as we
+> have the filter definition.
 
+Ok, just go ahead with your current patch then, we can always follow up.
+The most important cleanup for edma is elsewhere anyway, so once the asoc
+drivers can use the dmaengine interface, this should be easier.
 
->> (BTW, in the meantime, there is a pending pull-request (at91-cleanup3)
->> but it is true that you needn't pulling it in if you plan to take this
->> one which will be named at91-cleanup4 and that will obviously contain
->> the 3rd one).
-> 
-> Yes, I have a backlog of pull requests to look at, should get to that soon
-> today.
-> 
-> 	Arnd
-> 
-> 
-
-
--- 
-Nicolas Ferre
+	Arnd
