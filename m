@@ -1,61 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 28 Nov 2014 14:16:48 +0000
-Subject: [PATCH v4] clocksource: arch_timer: Allow the device tree to
- specify uninitialized timer registers
-In-Reply-To: <5475CC66.6080600@linaro.org>
-References: <1412753627-28287-1-git-send-email-sonnyrao@chromium.org>
- <5475CC66.6080600@linaro.org>
-Message-ID: <20141128141648.GB4249@localhost>
+From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
+Date: Fri, 28 Nov 2014 15:17:59 +0100
+Subject: [RFC 0/7] ARM: vf610m4: Add Vybrid Cortex-M4 support
+In-Reply-To: <cover.1413136383.git.stefan@agner.ch>
+References: <cover.1413136383.git.stefan@agner.ch>
+Message-ID: <54788417.6020408@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 12:49:42PM +0000, Daniel Lezcano wrote:
-> On 10/08/2014 09:33 AM, Sonny Rao wrote:
-> > From: Doug Anderson <dianders@chromium.org>
-> >
-> > Some 32-bit (ARMv7) systems are architected like this:
-> >
-> > * The firmware doesn't know and doesn't care about hypervisor mode and
-> >    we don't want to add the complexity of hypervisor there.
-> >
-> > * The firmware isn't involved in SMP bringup or resume.
-> >
-> > * The ARCH timer come up with an uninitialized offset (CNTVOFF)
-> >    between the virtual and physical counters.  Each core gets a
-> >    different random offset.
-> >
-> > * The device boots in "Secure SVC" mode.
-> >
-> > * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
-> >    CNTHCTL.PL1PCTEN (both default to 1 at reset)
-> >
-> > On systems like the above, it doesn't make sense to use the virtual
-> > counter.  There's nobody managing the offset and each time a core goes
-> > down and comes back up it will get reinitialized to some other random
-> > value.
-> >
-> > This adds an optional property which can inform the kernel of this
-> > situation, and firmware is free to remove the property if it is going
-> > to initialize the CNTVOFF registers when each CPU comes out of reset.
-> >
-> > Currently, the best course of action in this case is to use the
-> > physical timer, which is why it is important that CNTHCTL hasn't been
-> > changed from its reset value and it's a reasonable assumption given
-> > that the firmware has never entered HYP mode.
-> >
-> > Note that it's been said that on ARMv8 systems the firmware and
-> > kernel really can't be architected as described above.  That means
-> > using the physical timer like this really only makes sense for ARMv7
-> > systems.
-> >
-> > Signed-off-by: Doug Anderson <dianders@chromium.org>
-> > Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> 
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> 
-> I would be nice to have Catalin's ack.
+Hi Stefan,
 
-FWIW:
+Am 12.10.2014 um 20:13 schrieb Stefan Agner:
+> One thing I noticed that when I move the xipImage below the DRAM base
+> address, the kernel freezes:
+> ...
+> Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
+> Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
+> [freeze]
+> 
+> I think it happens when the scheduler gets started. Any idea what could
+> go wrong here?
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+I ran into a similar issue on STM32F4 recently - hanging there, or:
+
+Unhandled exception: IPSR = 00000006 LR = fffffff1
+CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc5-00003-g489983a-dirty #25
+task: 90432000 ti: 90434000 task.ti: 90434000
+
+Unhandled exception: IPSR = 00000003 LR = fffffff1
+CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc5-00003-g489983a-dirty #25
+task: 90432000 ti: 90434000 task.ti: 90434000
+-Boot 2010.03-00003-g934021a-dirty (Nov 26 2014 - 06:52:49)
+
+My debugging indicated that %pF was not working, used among others in
+checking for blacklisted initcalls. Disabling CONFIG_KALLSYMS worked
+around this, so I assume something there is not compatible with XIP...
+
+Regards,
+Andreas
+
+-- 
+SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
