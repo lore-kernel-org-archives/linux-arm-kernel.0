@@ -1,50 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Nov 2014 15:10:30 +0100
-Subject: [PATCH] ARM: kbuild: Fix forced rebuild after 'make dtbs'
-In-Reply-To: <20141126144153.GK3836@n2100.arm.linux.org.uk>
-References: <CACRpkdYmJWy1_vs0tWRA7SvkQnvbXXKqf7pHpH5b5tZ6vR+KJg@mail.gmail.com>
- <1414961549-31666-1-git-send-email-jason@lakedaemon.net>
- <5474F78F.2060906@suse.cz>
- <20141125235150.GH3836@n2100.arm.linux.org.uk>
- <20141126005710.GE22670@titan.lakedaemon.net>
- <CACRpkdZJoWbQeuZ4ZXGbQr0+SNG_9ZA+cQkAA0C2F9rnZDYtyQ@mail.gmail.com>
- <20141126144153.GK3836@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYwQT3+RLxP_b_kYJoHV4L7sZ7yiU=JZWVq_zHKz0EY_g@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 28 Nov 2014 14:12:41 +0000
+Subject: [PATCH] arm64: enable ARCH_HAS_BANDGAP config
+In-Reply-To: <CAGOxZ52o-O+=PCsGRfKEGGc0NUg_M+z5_UmbrjBwvW8+x3c22w@mail.gmail.com>
+References: <1415968254-5182-1-git-send-email-a.kesavan@samsung.com>
+ <CAGOxZ52o-O+=PCsGRfKEGGc0NUg_M+z5_UmbrjBwvW8+x3c22w@mail.gmail.com>
+Message-ID: <20141128141240.GA4249@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 3:41 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Nov 26, 2014 at 02:57:42PM +0100, Linus Walleij wrote:
->> make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
->> KBUILD_OUTPUT=build-u300 u300_defconfig
->> make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
->> KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
->> make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
->> KBUILD_OUTPUT=build-u300 dtbs
->> make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
->> KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
->>
->> -> Rebuilds everything.
->>
->> This doesn't occur before the offending commit. So it only happens
->> when specifying extra environment variables on the command line.
->
-> I suspect if you also provide the CONFIG_DEBUG_SECTION_MISMATCH=y on the
-> dtbs line, everything will work properly.
+On Sun, Nov 23, 2014 at 08:05:05AM +0000, Alim Akhtar wrote:
+> On Fri, Nov 14, 2014 at 6:00 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+> > Some of the existing thermal drivers (ti and exynos) have a dependency on
+> > ARCH_HAS_BANDGAP. Activate ARCH_HAS_BANDGAP config entry for ARM64 so that
+> > these drivers may be re-used.
+> >
+> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > ---
+> HAS_BANDGAP was added to ARM to indicate that arch supports a bandgap
+> device like a thermal management unit, so this looks good to me.
 
-Yay, it works! :)
+But it doesn't look good to me. ARCH_HAS_* kind of implies that the
+architecture has some feature or the port provides some feature. But in
+the current use, it simply allows the enabling of the menu config
+entries for two drivers (EXYNOS_THERMAL and TI_SOC_THERMAL).
 
-> The problem is that dtbs line executes a prepare, which I guess rebuilds
-> the bounds stuff.  So, the dtbs target results in it being rebuilt without
-> the section mismatch, and then you re-execute a make with it, causing
-> the bounds stuff to be rebuilt again.
+If you want to specify that the SoC has a device, just use DT and not
+some random config option that only enables the menu entry for the
+corresponding driver.
 
-Yep. Not very intuitive to require passing section mismatch debug
-flags to DTB rebuilding but whatever, it's not so bad I can't live with
-it.
-
-Strange that it worked before.
-
-Yours,
-Linus Walleij
+-- 
+Catalin
