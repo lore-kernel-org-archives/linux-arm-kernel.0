@@ -1,62 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Nov 2014 14:42:34 +0100
-Subject: ARM: SoC fixes for 3.18-rc7
-Message-ID: <201411281442.35201.arnd@arndb.de>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 28 Nov 2014 19:13:02 +0530
+Subject: [PATCHv2 1/1] thermal: cpu_cooling: check for the readiness of
+ cpufreq layer
+In-Reply-To: <20141128131425.GA23622@developer>
+References: <1417097577-3548-1-git-send-email-edubezval@gmail.com>
+ <CAKohponu_PRrqsuMdCJDznhiO_-=iCaYPhCCad8F4WS3rNxo5A@mail.gmail.com>
+ <20141128111824.533c4641@jawa> <20141128131425.GA23622@developer>
+Message-ID: <CAKohpokh9oGTOrGB3L=qD2o+nSLJCyBLrpGu4DHiFPU-ByRLpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 28 November 2014 at 18:44, Eduardo Valentin <edubezval@gmail.com> wrote:
+> Well, I wouldn't say unfortunately, but fortunately! :-)
 
-Not much interesting going on fixes-wise for us this week, as it should be
-for an -rc7. I'm not expecting Olof to work much over Thanksgiving weekend,
-so I decided to take over again and push these out to you.
++1 :)
 
-	Arnd
+> However, I would prefer, at least to what comes to deferring, to update
+> the drivers altogether with the inclusion of the check in cpu cooling.
+> This way the change in behavior is atomic, in terms of commit changes.
+>
+> Viresh, if you don't mind, I will merge your patch 04/26 into this one.
 
-The following changes since commit 5d01410fe4d92081f349b013a2e7a95429e4f2c9:
-
-  Linux 3.18-rc6 (2014-11-23 15:25:20 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc tags/armsoc-for-rc7
-
-for you to fetch changes up to 96ba18ffd09cc063b8d1ddc8c6cafea6177c8259:
-
-  Merge tag 'mvebu-fixes-3.18-2' of git://git.infradead.org/linux-mvebu into fixes (2014-11-27 14:29:23 +0100)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 3.18-rc7
-
-Just four simple fixes this week:
-
-- one missing of_node_put() on armv7 based mvebu
-- forcing the USB host into the right mode on Chromebook (exynos5-snow)
-- enabling two important drivers for exynos_defconfig
-- fixing a noncritical bug for tegra that would cause a
-  regression with common code patches queued for 3.19
-
-----------------------------------------------------------------
-Arnd Bergmann (3):
-      Merge tag 'samsung-fixes-v3.18' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-      Merge tag 'samsung-defconfig-v3.18' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-      Merge tag 'mvebu-fixes-3.18-2' of git://git.infradead.org/linux-mvebu into fixes
-
-Javier Martinez Canillas (1):
-      ARM: exynos_defconfig: Enable max77802 rtc and clock drivers
-
-Marc Zyngier (1):
-      ARM: tegra: irq: fix buggy usage of irq_data irq field
-
-Sjoerd Simons (1):
-      ARM: dts: Explicitly set dr_mode on exynos5250-snow
-
-Thomas Petazzoni (1):
-      ARM: mvebu: add missing of_node_put() call in coherency.c
-
- arch/arm/boot/dts/exynos5250-snow.dts |  4 ++++
- arch/arm/boot/dts/exynos5250.dtsi     |  2 +-
- arch/arm/configs/exynos_defconfig     |  2 ++
- arch/arm/mach-mvebu/coherency.c       |  2 ++
- arch/arm/mach-tegra/irq.c             | 22 +++++++++++-----------
- 5 files changed, 20 insertions(+), 12 deletions(-)
+Sure, go ahead.
