@@ -1,43 +1,84 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 28 Nov 2014 09:30:02 +0100
-Subject: [PATCH V3 2/3] ARM: shmobile: Convert to genpd flags for PM clocks
- for r8a7779
-In-Reply-To: <1417163403-7070-1-git-send-email-ulf.hansson@linaro.org>
-References: <1417163403-7070-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1417163403-7070-3-git-send-email-ulf.hansson@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 28 Nov 2014 09:37:06 +0100
+Subject: linux-next: manual merge of the sunxi tree with the arm-soc tree
+In-Reply-To: <20141128103617.13a1821c@canb.auug.org.au>
+References: <20141128103617.13a1821c@canb.auug.org.au>
+Message-ID: <20141128083706.GT25249@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using the dev_ops ->stop|start() callbacks for genpd, let's
-convert to use genpd's flag field and set it to GENPD_PM_CLK.
+Hi,
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
+On Fri, Nov 28, 2014 at 10:36:17AM +1100, Stephen Rothwell wrote:
+> Hi Maxime,
+> 
+> Today's linux-next merge of the sunxi tree got a conflict in
+> arch/arm/boot/dts/sun6i-a31.dtsi between commit 3fd0c05da46c ("Revert
+> "ARM: dts: sunxi: Use sun4i-a10-apb1-clk for sun6i/sun8i apb2
+> clocks."") from the arm-soc tree and commit 74c947ab33c9 ("ARM: dts:
+> sunxi: Use sun4i-a10-apb1-clk for sun6i/sun8i apb2 clocks") from the
+> sunxi tree.
+> 
+> I fixed it up (I just used the arm-soc version for now) and can carry
+> the fix as necessary (no action is required).
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
+> 
+> diff --cc arch/arm/boot/dts/sun6i-a31.dtsi
+> index 529c73803976,f47156b6572b..000000000000
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@@ -217,19 -229,11 +229,19 @@@
+>   					"apb1_daudio1";
+>   		};
+>   
+>  -		apb2: clk at 01c20058 {
+>  +		apb2_mux: apb2_mux at 01c20058 {
+>  +			#clock-cells = <0>;
+>  +			compatible = "allwinner,sun4i-a10-apb1-mux-clk";
+>  +			reg = <0x01c20058 0x4>;
+>  +			clocks = <&osc32k>, <&osc24M>, <&pll6 0>, <&pll6 0>;
+>  +			clock-output-names = "apb2_mux";
+>  +		};
+>  +
+>  +		apb2: apb2 at 01c20058 {
+>   			#clock-cells = <0>;
+> - 			compatible = "allwinner,sun6i-a31-apb2-div-clk";
+> + 			compatible = "allwinner,sun4i-a10-apb1-clk";
+>   			reg = <0x01c20058 0x4>;
+> - 			clocks = <&apb2_mux>;
+> + 			clocks = <&osc32k>, <&osc24M>, <&pll6 0>, <&pll6 0>;
+>   			clock-output-names = "apb2";
+>   		};
+>   
 
-Changes in v3:
-        Convert to renamed define.
+I'm not exactly sure why there is still conflicts between my branches
+and arm-soc, since the previous branch that generates these conflicts
+was supposed to be dropped, but the correct fix is:
 
-Changes in v2:
-        None.
+		apb2: clk at 01c20058 {
+			#clock-cells = <0>;
+			compatible = "allwinner,sun4i-a10-apb1-clk";
+			reg = <0x01c20058 0x4>;
+			clocks = <&osc32k>, <&osc24M>, <&pll6 0>, <&pll6 0>;
+			clock-output-names = "apb2";
+		};
 
----
- arch/arm/mach-shmobile/pm-r8a7779.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+with the apb2_mux node dropped entirely.
 
-diff --git a/arch/arm/mach-shmobile/pm-r8a7779.c b/arch/arm/mach-shmobile/pm-r8a7779.c
-index 82fe3d7..3a09ae7 100644
---- a/arch/arm/mach-shmobile/pm-r8a7779.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7779.c
-@@ -83,9 +83,8 @@ static void r8a7779_init_pm_domain(struct r8a7779_pm_domain *r8a7779_pd)
- {
- 	struct generic_pm_domain *genpd = &r8a7779_pd->genpd;
- 
-+	genpd->flags = GENPD_PM_CLK;
- 	pm_genpd_init(genpd, NULL, false);
--	genpd->dev_ops.stop = pm_clk_suspend;
--	genpd->dev_ops.start = pm_clk_resume;
- 	genpd->dev_ops.active_wakeup = pd_active_wakeup;
- 	genpd->power_off = pd_power_down;
- 	genpd->power_on = pd_power_up;
+Thanks!
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141128/63f17231/attachment-0001.sig>
