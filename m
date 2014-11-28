@@ -1,167 +1,61 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Fri, 28 Nov 2014 01:49:12 +0000
-Subject: [PATCH v3] can: Convert to runtime_pm
-In-Reply-To: <20141127182337.GF17884@xsjandreislx>
-References: <6b6db31d46074512a322eae6e4ef64d4@BN1BFFO11FD038.protection.gbl>
- <20141127182337.GF17884@xsjandreislx>
-Message-ID: <d306383c84b9479d933b15c4b38da532@BN1AFFO11FD025.protection.gbl>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 28 Nov 2014 10:57:17 +0900
+Subject: [03/19] clk: samsung: exynos5433: Add clocks using common clock
+ framework
+In-Reply-To: <54770FA2.9090804@samsung.com>
+References: <1417073716-22997-4-git-send-email-cw00.choi@samsung.com>
+ <54770FA2.9090804@samsung.com>
+Message-ID: <5477D67D.2080407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Soren,
+Hi Pankaj,
 
------Original Message-----
-From: S?ren Brinkmann [mailto:soren.brinkmann at xilinx.com]
-Sent: Thursday, November 27, 2014 11:54 PM
-To: Appana Durga Kedareswara Rao
-Cc: wg at grandegger.com; mkl at pengutronix.de; Michal Simek; grant.likely at linaro.org; robh+dt at kernel.org; devicetree at vger.kernel.org; netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-can at vger.kernel.org; Appana Durga Kedareswara Rao; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH v3] can: Convert to runtime_pm
+On 11/27/2014 08:48 PM, Pankaj Dubey wrote:
+> Hi Chanwoo,
+> 
+> On Thursday 27 November 2014 01:05 PM, Chanwoo Choi wrote:
+>> This patch adds the support for CMU (Clock Management Units) of Exynos5433
+>> which is 64bit SoC and has Octa-cores. This patch supports necessary clocks
+>> for kernel boot as following:
+>> - PLL/MMC/UART/MCT/I2C/SPI
+>>
+>> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Inki Dae <inki.dae@samsung.com>
+>> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
+>>
+>> ---
+>> drivers/clk/samsung/Makefile           |   1 +
+>>   drivers/clk/samsung/clk-exynos5433.c   | 971 +++++++++++++++++++++++++++++++++
+>>   include/dt-bindings/clock/exynos5433.h | 200 +++++++
+>>   3 files changed, 1172 insertions(+)
+>>   create mode 100644 drivers/clk/samsung/clk-exynos5433.c
+>>   create mode 100644 include/dt-bindings/clock/exynos5433.h
+>>
 
-Hi Kedar,
+(snip)
 
-On Thu, 2014-11-27 at 06:38PM +0530, Kedareswara rao Appana wrote:
-> Instead of enabling/disabling clocks at several locations in the
-> driver, use the runtime_pm framework. This consolidates the actions
-> for runtime PM in the appropriate callbacks and makes the driver more
-> readable and mantainable.
->
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> ---
-> Changes for v3:
->   - Converted the driver to use runtime_pm.
-> Changes for v2:
->   - Removed the struct platform_device* from suspend/resume
->     as suggest by Lothar.
->
->  drivers/net/can/xilinx_can.c |  119
-> +++++++++++++++++++++++++----------------
->  1 files changed, 72 insertions(+), 47 deletions(-)
->
-> diff --git a/drivers/net/can/xilinx_can.c
-> b/drivers/net/can/xilinx_can.c index 8a998e3..1be28ed 100644
-> --- a/drivers/net/can/xilinx_can.c
-> +++ b/drivers/net/can/xilinx_can.c
-> @@ -32,6 +32,7 @@
->  #include <linux/can/dev.h>
->  #include <linux/can/error.h>
->  #include <linux/can/led.h>
-> +#include <linux/pm_runtime.h>
->
->  #define DRIVER_NAME  "xilinx_can"
->
-> @@ -138,7 +139,7 @@ struct xcan_priv {
->       u32 (*read_reg)(const struct xcan_priv *priv, enum xcan_reg reg);
->       void (*write_reg)(const struct xcan_priv *priv, enum xcan_reg reg,
->                       u32 val);
-> -     struct net_device *dev;
-> +     struct device *dev;
->       void __iomem *reg_base;
->       unsigned long irq_flags;
->       struct clk *bus_clk;
-> @@ -842,6 +843,13 @@ static int xcan_open(struct net_device *ndev)
->       struct xcan_priv *priv = netdev_priv(ndev);
->       int ret;
->
-> +     ret = pm_runtime_get_sync(priv->dev);
-> +     if (ret < 0) {
-> +             netdev_err(ndev, "%s: runtime CAN resume failed(%d)\n\r",
+>> +
+>> +static struct samsung_div_clock top_div_clks[] __initdata = {
+>> +    /* DIV_TOP2 */
+>> +    DIV(CLK_DIV_ACLK_FSYS_200, "div_aclk_fsys_200", "mout_bus_pll_user",
+>> +            DIV_TOP2, 0, 3),
+>> +
+>> +    /* DIV_TOP3 */
+>> +    DIV(CLK_DIV_ACLK_IMEM_SSSX, "div_aclk_imem_sssx",
+>> +            "mout_bus_pll_user", DIV_TOP3, 24, 3),
+> 
+> Isn't this clock name should be div_aclk_imem_sssx_266 as per UM?
 
-There might be other issues than the resume that make this fail. It should probably just say 'pm_runtime_get failed'.
-The CAN in the string should not be needed, the netdev_err macro makes sure the device name is printed.
-Can we have a space between 'failed' and the error code?
-There should not be a '\r'
+You're right. So, I fxied clock name on patch11[1] for CMU_BUSx domains.
+- [1] [PATCH 11/19] clk: samsung: exynos5433: Add clocks for CMU_BUS{0|1|2} domains
 
-K sure will modify the error message as you explained above.
+ 	/* DIV_TOP3 */
+-	DIV(CLK_DIV_ACLK_IMEM_SSSX, "div_aclk_imem_sssx",
++	DIV(CLK_DIV_ACLK_IMEM_SSSX_266, "div_aclk_imem_sssx_266",
+ 			"mout_bus_pll_user", DIV_TOP3, 24, 3),
 
-> +                             __func__, ret);
-> +             return ret;
-> +     }
-> +
->       ret = request_irq(ndev->irq, xcan_interrupt, priv->irq_flags,
->                       ndev->name, ndev);
->       if (ret < 0) {
-> @@ -849,29 +857,17 @@ static int xcan_open(struct net_device *ndev)
->               goto err;
->       }
->
-> -     ret = clk_prepare_enable(priv->can_clk);
-> -     if (ret) {
-> -             netdev_err(ndev, "unable to enable device clock\n");
-> -             goto err_irq;
-> -     }
-> -
-> -     ret = clk_prepare_enable(priv->bus_clk);
-> -     if (ret) {
-> -             netdev_err(ndev, "unable to enable bus clock\n");
-> -             goto err_can_clk;
-> -     }
-> -
->       /* Set chip into reset mode */
->       ret = set_reset_mode(ndev);
->       if (ret < 0) {
->               netdev_err(ndev, "mode resetting failed!\n");
-> -             goto err_bus_clk;
-> +             goto err_irq;
->       }
->
->       /* Common open */
->       ret = open_candev(ndev);
->       if (ret)
-> -             goto err_bus_clk;
-> +             goto err_irq;
->
->       ret = xcan_chip_start(ndev);
->       if (ret < 0) {
-> @@ -887,13 +883,11 @@ static int xcan_open(struct net_device *ndev)
->
->  err_candev:
->       close_candev(ndev);
-> -err_bus_clk:
-> -     clk_disable_unprepare(priv->bus_clk);
-> -err_can_clk:
-> -     clk_disable_unprepare(priv->can_clk);
->  err_irq:
->       free_irq(ndev->irq, ndev);
->  err:
-> +     pm_runtime_put(priv->dev);
-> +
->       return ret;
->  }
->
-> @@ -910,12 +904,11 @@ static int xcan_close(struct net_device *ndev)
->       netif_stop_queue(ndev);
->       napi_disable(&priv->napi);
->       xcan_chip_stop(ndev);
-> -     clk_disable_unprepare(priv->bus_clk);
-> -     clk_disable_unprepare(priv->can_clk);
->       free_irq(ndev->irq, ndev);
->       close_candev(ndev);
->
->       can_led_event(ndev, CAN_LED_EVENT_STOP);
-> +     pm_runtime_put(priv->dev);
->
->       return 0;
->  }
-> @@ -934,27 +927,21 @@ static int xcan_get_berr_counter(const struct net_device *ndev,
->       struct xcan_priv *priv = netdev_priv(ndev);
->       int ret;
->
-> -     ret = clk_prepare_enable(priv->can_clk);
-> -     if (ret)
-> -             goto err;
-> +     ret = pm_runtime_get_sync(priv->dev);
-> +     if (ret < 0) {
-> +             netdev_err(ndev, "%s: runtime resume failed(%d)\n\r",
-> +                             __func__, ret);
-
-As above.
-
-K will modify this too.
-
-Regards,
-Kedar.
-        S?ren
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Best Regards,
+Chanwoo Choi
