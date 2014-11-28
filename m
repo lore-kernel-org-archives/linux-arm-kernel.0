@@ -1,63 +1,32 @@
-From: long.wanglong@huawei.com (Wang Long)
-Date: Fri, 28 Nov 2014 02:15:49 +0000
-Subject: [PATCH 6/7] ARM: hisi: rename secondary_startup function
-In-Reply-To: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
-References: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
-Message-ID: <1417140950-67103-7-git-send-email-long.wanglong@huawei.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 28 Nov 2014 07:58:52 +0530
+Subject: [PATCH 1/1] thermal: cpu_cooling: check for the readiness of
+ cpufreq layer
+In-Reply-To: <20141127140803.GA3342@developer>
+References: <1417024212-1775-1-git-send-email-edubezval@gmail.com>
+ <CAKohponxUWVT1mjRfJarNtj-+=rXNOa_ONHUjmdu_+6N+=ZjPQ@mail.gmail.com>
+ <20141127140803.GA3342@developer>
+Message-ID: <CAKohpok90KG7ZcY8qq7g-VmhPSCsn83Ut_K_QJqC2b+efWiXkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As hix5hd2 and hip01 has the same secondary_startup
-so rename hix5hd2_secondary_startup to
-to hisi_secondary_startup.
+On 27 November 2014 at 19:38, Eduardo Valentin <edubezval@gmail.com> wrote:
+>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>
+> Ok.
+>
+> though.. "normal practice" says  ack's are oftern used by the maintainer
+> of the affected code (quoting Documentation/SubmittingPatches) :-)
 
-the hip01 will use hisi_secondary_startup for the
-secondary core boot.
+Hehe :)
 
-Signed-off-by: Wang Long <long.wanglong@huawei.com>
----
- arch/arm/mach-hisi/core.h    | 2 +-
- arch/arm/mach-hisi/headsmp.S | 2 +-
- arch/arm/mach-hisi/platsmp.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+Another paragraph from the same file:
 
-diff --git a/arch/arm/mach-hisi/core.h b/arch/arm/mach-hisi/core.h
-index 88b1f48..75520b0 100644
---- a/arch/arm/mach-hisi/core.h
-+++ b/arch/arm/mach-hisi/core.h
-@@ -12,7 +12,7 @@ extern void hi3xxx_cpu_die(unsigned int cpu);
- extern int hi3xxx_cpu_kill(unsigned int cpu);
- extern void hi3xxx_set_cpu(int cpu, bool enable);
- 
--extern void hix5hd2_secondary_startup(void);
-+extern void hisi_secondary_startup(void);
- extern struct smp_operations hix5hd2_smp_ops;
- extern void hix5hd2_set_cpu(int cpu, bool enable);
- extern void hix5hd2_cpu_die(unsigned int cpu);
-diff --git a/arch/arm/mach-hisi/headsmp.S b/arch/arm/mach-hisi/headsmp.S
-index 278889c..81e35b1 100644
---- a/arch/arm/mach-hisi/headsmp.S
-+++ b/arch/arm/mach-hisi/headsmp.S
-@@ -11,6 +11,6 @@
- 
- 	__CPUINIT
- 
--ENTRY(hix5hd2_secondary_startup)
-+ENTRY(hisi_secondary_startup)
- 	bl	v7_invalidate_l1
- 	b	secondary_startup
-diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
-index b3c3a58..4a70f56 100644
---- a/arch/arm/mach-hisi/platsmp.c
-+++ b/arch/arm/mach-hisi/platsmp.c
-@@ -116,7 +116,7 @@ static int hix5hd2_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	phys_addr_t jumpaddr;
- 
--	jumpaddr = virt_to_phys(hix5hd2_secondary_startup);
-+	jumpaddr = virt_to_phys(hisi_secondary_startup);
- 	hix5hd2_set_scu_boot_addr(HIX5HD2_BOOT_ADDRESS, jumpaddr);
- 	hix5hd2_set_cpu(cpu, true);
- 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
--- 
-1.8.3.4
+Acked-by: does not necessarily indicate acknowledgement of the entire patch.
+For example, if a patch affects multiple subsystems and has an Acked-by: from
+one subsystem maintainer then this usually indicates acknowledgement of just
+the part which affects that maintainer's code.  Judgement should be used here.
+When in doubt people should refer to the original discussion in the mailing
+list archives.
+
+So my Acked-by was as cpufreq subsystem Maintainer :)
