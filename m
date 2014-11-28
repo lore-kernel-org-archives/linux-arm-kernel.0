@@ -1,114 +1,104 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 28 Nov 2014 14:26:33 +0900
-Subject: [PATCH v10 0/6] arm64: add seccomp support
-Message-ID: <1417152399-32717-1-git-send-email-takahiro.akashi@linaro.org>
+Date: Fri, 28 Nov 2014 14:26:34 +0900
+Subject: [PATCH v10 1/6] arm64: ptrace: add NT_ARM_SYSTEM_CALL regset
+In-Reply-To: <1417152399-32717-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1417152399-32717-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1417152399-32717-2-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enables secure computing (system call filtering) on arm64,
-and contains related enhancements and bug fixes.
+This regeset is intended to be used to get and set a system call number
+while tracing.
+There was some discussion about possible approaches to do so:
 
-  NOTE: This versions contain a workaround against possible BUG_ON() failure
-  at audit_syscall_exit(), but doesn't contain an extra optimization, as I
-  submitted for arm, of excluding syscall enter/exit tracing against invalid
-  system calls due to an issue that I reported in:
-       http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/292170.html
+(1) modify x8 register with ptrace(PTRACE_SETREGSET) indirectly,
+    and update regs->syscallno later on in syscall_trace_enter(), or
+(2) define a dedicated regset for this purpose as on s390, or
+(3) support ptrace(PTRACE_SET_SYSCALL) as on arch/arm
 
-The code was tested on ARMv8 fast model with 64-bit/32-bit userspace using:
- * libseccomp v2.1.1 with modifications for arm64, especially its "live"
-   tests: No.20, 21 and 24.
- * modified version of Kees' seccomp test for 'changing/skipping a syscall'
-   and seccomp() system call
- * in-house tests for 'changing/skipping a system call' by tracing with
-   ptrace(SETREGSET, NT_SYSTEM_CALL) (that is, not via seccomp filter)'
-with and without audit tracing.
+Thinking of the fact that user_pt_regs doesn't expose 'syscallno' to
+tracer as well as that secure_computing() expects a changed syscall number,
+especially case of -1, to be visible before this function returns in
+syscall_trace_enter(), (1) doesn't work well.
+We will take (2) since it looks much cleaner.
 
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm64/kernel/ptrace.c |   35 +++++++++++++++++++++++++++++++++++
+ include/uapi/linux/elf.h   |    1 +
+ 2 files changed, 36 insertions(+)
 
-Changes v9 -> v10:
-* modified system_call_get() for big-endian build [1/6]
-* modified the way to check for syscall(-1) on syscall entry [2/6]
-
-Changes v8 -> v9:
-* removed a restriction on syscall(-1) by setting a default errno [2/6]
-
-Changes v7 -> v8:
-* changed an interface of changing a syscall number from ptrace(SET_SYSCALL)
-  to ptrace(SETREGSET, NT_ARM_SYSTEM_CALL) [1/6]
-* removed IS_SKILL_SYSCALL macro [2/6]
-* clarified comments in syscall_trace_enter() [2/6]
-* changed unsigned int to compat_uint_t in compat_siginfo._sigsys [5/6]
-* moved to a new calling interface of secure_computing(void) [6/6]
-
-Changes v6 -> v7:
-* simplified the condition of checking for user-issued syscall(-1) at
-  syscall_trace_enter() [2/6]
-* defines __NR_seccomp_sigreturn only if arch-specific def doesn't exist.
-  As Kees suggests, this is necessary for x86 and others. [3/6]
-* removed "#ifdef __ARCH_SIGSYS" which is always true on arm64. [5/6]
-* changed to call syscall_trace_exit() even if secure_computing fails. [6/6]
-  In v6, syscall_trace_enter() returns RET_SYSCALL_SKIP_TRACE (== -2) and
-  skips syscall_trace_exit() to minimize the overhead, but this case can be
-  easily confused with user-issued (and invalid) syscall(-2).
-  Anyway, this is now a consistent behavior with arm and other archs.
-
-Changes v5 -> v6:
-* rebased to v3.17-rc
-* changed the interface of changing/skipping a system call from re-writing
-  x8 register [v5 1/3] to using dedicated PTRACE_SET_SYSCALL command
-  [1/6, 2/6]
-  Patch [1/6] contains a checkpatch error around a switch statement, but it
-  won't be fixed as in compat_arch_ptrace().
-* added a new system call, seccomp(), for compat task [4/6]
-* added SIGSYS siginfo for compat task [5/6]
-* changed to always execute audit exit tracing to avoid OOPs [2/6, 6/6]
-
-Changes v4 -> v5:
-* rebased to v3.16-rc
-* add patch [1/3] to allow ptrace to change a system call
-  (please note that this patch should be applied even without seccomp.)
-
-Changes v3 -> v4:
-* removed the following patch and moved it to "arm64: prerequisites for
-  audit and ftrace" patchset since it is required for audit and ftrace in
-  case of !COMPAT, too.
-  "arm64: is_compat_task is defined both in asm/compat.h and linux/compat.h"
-
-Changes v2 -> v3:
-* removed unnecessary 'type cast' operations [2/3]
-* check for a return value (-1) of secure_computing() explicitly [2/3]
-* aligned with the patch, "arm64: split syscall_trace() into separate
-  functions for enter/exit" [2/3]
-* changed default of CONFIG_SECCOMP to n [2/3]
-
-Changes v1 -> v2:
-* added generic seccomp.h for arm64 to utilize it [1,2/3] 
-* changed syscall_trace() to return more meaningful value (-EPERM)
-  on seccomp failure case [2/3]
-* aligned with the change in "arm64: make a single hook to syscall_trace()
-  for all syscall features" v2 [2/3]
-* removed is_compat_task() definition from compat.h [3/3]
-
-AKASHI Takahiro (6):
-  arm64: ptrace: add NT_ARM_SYSTEM_CALL regset
-  arm64: ptrace: allow tracer to skip a system call
-  asm-generic: add generic seccomp.h for secure computing mode 1
-  arm64: add seccomp syscall for compat task
-  arm64: add SIGSYS siginfo for compat task
-  arm64: add seccomp support
-
- arch/arm64/Kconfig                |   14 +++++++++++++
- arch/arm64/include/asm/compat.h   |    7 +++++++
- arch/arm64/include/asm/seccomp.h  |   25 +++++++++++++++++++++++
- arch/arm64/include/asm/unistd.h   |    3 +++
- arch/arm64/include/asm/unistd32.h |    3 ++-
- arch/arm64/kernel/entry.S         |   12 +++++++++--
- arch/arm64/kernel/ptrace.c        |   40 +++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/signal32.c      |    6 ++++++
- include/asm-generic/seccomp.h     |   30 ++++++++++++++++++++++++++++
- include/uapi/linux/elf.h          |    1 +
- 10 files changed, 138 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm64/include/asm/seccomp.h
- create mode 100644 include/asm-generic/seccomp.h
-
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 8a4ae8e..f576781 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -551,6 +551,32 @@ static int tls_set(struct task_struct *target, const struct user_regset *regset,
+ 	return ret;
+ }
+ 
++static int system_call_get(struct task_struct *target,
++			   const struct user_regset *regset,
++			   unsigned int pos, unsigned int count,
++			   void *kbuf, void __user *ubuf)
++{
++	int syscallno = task_pt_regs(target)->syscallno;
++
++	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
++				   &syscallno, 0, -1);
++}
++
++static int system_call_set(struct task_struct *target,
++			   const struct user_regset *regset,
++			   unsigned int pos, unsigned int count,
++			   const void *kbuf, const void __user *ubuf)
++{
++	int syscallno, ret;
++
++	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &syscallno, 0, -1);
++	if (ret)
++		return ret;
++
++	task_pt_regs(target)->syscallno = syscallno;
++	return ret;
++}
++
+ enum aarch64_regset {
+ 	REGSET_GPR,
+ 	REGSET_FPR,
+@@ -559,6 +585,7 @@ enum aarch64_regset {
+ 	REGSET_HW_BREAK,
+ 	REGSET_HW_WATCH,
+ #endif
++	REGSET_SYSTEM_CALL,
+ };
+ 
+ static const struct user_regset aarch64_regsets[] = {
+@@ -608,6 +635,14 @@ static const struct user_regset aarch64_regsets[] = {
+ 		.set = hw_break_set,
+ 	},
+ #endif
++	[REGSET_SYSTEM_CALL] = {
++		.core_note_type = NT_ARM_SYSTEM_CALL,
++		.n = 1,
++		.size = sizeof(int),
++		.align = sizeof(int),
++		.get = system_call_get,
++		.set = system_call_set,
++	},
+ };
+ 
+ static const struct user_regset_view user_aarch64_view = {
+diff --git a/include/uapi/linux/elf.h b/include/uapi/linux/elf.h
+index ea9bf25..71e1d0e 100644
+--- a/include/uapi/linux/elf.h
++++ b/include/uapi/linux/elf.h
+@@ -397,6 +397,7 @@ typedef struct elf64_shdr {
+ #define NT_ARM_TLS	0x401		/* ARM TLS register */
+ #define NT_ARM_HW_BREAK	0x402		/* ARM hardware breakpoint registers */
+ #define NT_ARM_HW_WATCH	0x403		/* ARM hardware watchpoint registers */
++#define NT_ARM_SYSTEM_CALL	0x404	/* ARM system call number */
+ #define NT_METAG_CBUF	0x500		/* Metag catch buffer registers */
+ #define NT_METAG_RPIPE	0x501		/* Metag read pipeline state */
+ #define NT_METAG_TLS	0x502		/* Metag TLS pointer */
 -- 
 1.7.9.5
