@@ -1,185 +1,68 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 28 Nov 2014 00:44:03 +0000
-Subject: [PATCH v3 2/3] of: add optional options parameter to
- of_find_node_by_path()
-In-Reply-To: <1417110967-16284-3-git-send-email-leif.lindholm@linaro.org>
-References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
- <1417110967-16284-3-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <20141128004403.08D90C40A7F@trevor.secretlab.ca>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 28 Nov 2014 09:44:27 +0900
+Subject: [PATCH 1/2] ARM: shmobile: sh73a0 legacy/reference: Add missing
+ INTCA0 clock for irqpin module
+In-Reply-To: <20141126013156.GE17620@verge.net.au>
+References: <1416410820-30020-1-git-send-email-geert+renesas@glider.be>
+ <1416410820-30020-2-git-send-email-geert+renesas@glider.be>
+ <20141125024405.GA21881@verge.net.au>
+ <CAMuHMdW_-Dj8x2+4RG8yGurPsc8oVZVME2UaoU+EOhrxaCQ-4Q@mail.gmail.com>
+ <CAMuHMdV3D8odk0+A5KPgv0yWhFB2KsyKFac8rHm3B=SRUUQ__w@mail.gmail.com>
+ <20141126013156.GE17620@verge.net.au>
+Message-ID: <20141128004426.GH30850@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Nov 2014 17:56:06 +0000
-, Leif Lindholm <leif.lindholm@linaro.org>
- wrote:
-> Update of_find_node_by_path():
-> 1) Rename function to of_find_node_opts_by_path(), adding an optional
->    pointer argument. Provide a static inline wrapper version of
->    of_find_node_by_path() which calls the new function with NULL as
->    the optional argument.
-> 2) Ignore any part of the path beyond and including the ':' separator.
-> 3) Set the new provided pointer argument to the beginning of the string
->    following the ':' separator.
-> 4: Add tests.
+Hi Geert,
+
+On Wed, Nov 26, 2014 at 10:31:56AM +0900, Simon Horman wrote:
+> On Tue, Nov 25, 2014 at 11:16:40AM +0100, Geert Uytterhoeven wrote:
+> > On Tue, Nov 25, 2014 at 10:31 AM, Geert Uytterhoeven
+> > <geert@linux-m68k.org> wrote:
+> > > On Tue, Nov 25, 2014 at 3:44 AM, Simon Horman <horms@verge.net.au> wrote:
+> > >> On Wed, Nov 19, 2014 at 04:26:59PM +0100, Geert Uytterhoeven wrote:
+> > >>> This clock drives the irqpin controller modules.
+> > >>> Before, it was assumed enabled by the bootloader or reset state.
+> > >>> By making it available to the driver, we make sure it gets enabled when
+> > >>> needed, and allow it to be managed by system or runtime PM.
+> > >>>
+> > >>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > >>
+> > >> Hi Geert,
+> > >>
+> > >> should this be considered a fix?
+> > >
+> > > In some sense this is a fix. But I don't think anyone is suffering from it.
+> > > Just poor guys like me who disable all MSTP clocks in early boot code,
+> > > to find more missing clock declarations and more drivers that don't manage
+> > > their clocks ;-)
+> > >
+> > >> If so could you cook up some text describing which patch introduced
+> > >> this problem in which kernel version.
+> > >
+> > > I guess that would be:
+> > >
+> > > commit 341eb5465f67437ad37ef2f6302b581beda4614a
+> > > Author: Magnus Damm <damm@opensource.se>
+> > > Date:   Tue Feb 26 12:01:09 2013 +0900
+> > >
+> > >     ARM: shmobile: INTC External IRQ pin driver on sh73a0
+> > >
+> > > But I don't think it's worth adding that, or do you plan to backport
+> > > this to LTSI?
 > 
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> ---
->  drivers/of/base.c     |   21 +++++++++++++++++----
->  drivers/of/selftest.c |   12 ++++++++++++
->  include/linux/of.h    |   14 +++++++++++++-
->  3 files changed, 42 insertions(+), 5 deletions(-)
+> Thanks. My main motivation for asking is that Olof asked about some
+> recent patches that looked like fixes. So I am trying to be a bit
+> better at breaking out fixes and documenting them appropriately.
 > 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 3823edf..7f0e5f7 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -699,10 +699,15 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
->  {
->  	struct device_node *child;
->  	int len = strchrnul(path, '/') - path;
-> +	int term;
->  
->  	if (!len)
->  		return NULL;
->  
-> +	term = strchrnul(path, ':') - path;
-> +	if (term < len)
-> +		len = term;
-> +
->  	__for_each_child_of_node(parent, child) {
->  		const char *name = strrchr(child->full_name, '/');
->  		if (WARN(!name, "malformed device_node %s\n", child->full_name))
-> @@ -715,11 +720,14 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
->  }
->  
->  /**
-> - *	of_find_node_by_path - Find a node matching a full OF path
-> + *	of_find_node_opts_by_path - Find a node matching a full OF path
->   *	@path: Either the full path to match, or if the path does not
->   *	       start with '/', the name of a property of the /aliases
->   *	       node (an alias).  In the case of an alias, the node
->   *	       matching the alias' value will be returned.
-> + *	@opts: Address of a pointer into which to store the start of
-> + *	       an options string appended to the end of the path with
-> + *	       a ':' separator.
->   *
->   *	Valid paths:
->   *		/foo/bar	Full path
-> @@ -729,19 +737,24 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
->   *	Returns a node pointer with refcount incremented, use
->   *	of_node_put() on it when done.
->   */
-> -struct device_node *of_find_node_by_path(const char *path)
-> +struct device_node *of_find_node_opts_by_path(const char *path, const char **opts)
->  {
->  	struct device_node *np = NULL;
->  	struct property *pp;
->  	unsigned long flags;
-> +	char *separator;
->  
->  	if (strcmp(path, "/") == 0)
->  		return of_node_get(of_allnodes);
->  
-> +	separator = strchr(path, ':');
-> +	if (separator && opts)
-> +		*opts = separator + 1;
-> +
-
-What about when there are no opts? Do we require the caller to make sure
-opts is NULL before calling the function (which sounds like a good
-source of bugs) or do we clear it on successful return?
-
-I think if opts is passed in, but there are no options, then it should
-set *opts = NULL.
-
-There should be test cases for this also. Must set opts to NULL on
-successful return, and (I think) should leave opts alone on an
-unsuccessful search.
-
-Otherwise the patch looks good. If it wasn't for the above ambiguity I
-would merge it right now.
-
-g.
-
->  	/* The path could begin with an alias */
->  	if (*path != '/') {
->  		char *p = strchrnul(path, '/');
-> -		int len = p - path;
-> +		int len = separator ? separator - path : p - path;
->  
->  		/* of_aliases must not be NULL */
->  		if (!of_aliases)
-> @@ -770,7 +783,7 @@ struct device_node *of_find_node_by_path(const char *path)
->  	raw_spin_unlock_irqrestore(&devtree_lock, flags);
->  	return np;
->  }
-> -EXPORT_SYMBOL(of_find_node_by_path);
-> +EXPORT_SYMBOL(of_find_node_opts_by_path);
->  
->  /**
->   *	of_find_node_by_name - Find a node by its "name" property
-> diff --git a/drivers/of/selftest.c b/drivers/of/selftest.c
-> index e2d79af..c298065 100644
-> --- a/drivers/of/selftest.c
-> +++ b/drivers/of/selftest.c
-> @@ -43,6 +43,7 @@ static bool selftest_live_tree;
->  static void __init of_selftest_find_node_by_name(void)
->  {
->  	struct device_node *np;
-> +	const char *options;
->  
->  	np = of_find_node_by_path("/testcase-data");
->  	selftest(np && !strcmp("/testcase-data", np->full_name),
-> @@ -83,6 +84,17 @@ static void __init of_selftest_find_node_by_name(void)
->  	np = of_find_node_by_path("testcase-alias/missing-path");
->  	selftest(!np, "non-existent alias with relative path returned node %s\n", np->full_name);
->  	of_node_put(np);
-> +
-> +	np = of_find_node_opts_by_path("/testcase-data:testoption", &options);
-> +	selftest(np && !strcmp("testoption", options),
-> +		 "option path test failed\n");
-> +	of_node_put(np);
-> +
-> +	np = of_find_node_opts_by_path("testcase-alias:testaliasoption",
-> +				       &options);
-> +	selftest(np && !strcmp("testaliasoption", options),
-> +		 "option alias path test failed\n");
-> +	of_node_put(np);
->  }
->  
->  static void __init of_selftest_dynamic(void)
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 29f0adc..a36be70 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -228,7 +228,13 @@ extern struct device_node *of_find_matching_node_and_match(
->  	const struct of_device_id *matches,
->  	const struct of_device_id **match);
->  
-> -extern struct device_node *of_find_node_by_path(const char *path);
-> +extern struct device_node *of_find_node_opts_by_path(const char *path,
-> +	const char **opts);
-> +static inline struct device_node *of_find_node_by_path(const char *path)
-> +{
-> +	return of_find_node_opts_by_path(path, NULL);
-> +}
-> +
->  extern struct device_node *of_find_node_by_phandle(phandle handle);
->  extern struct device_node *of_get_parent(const struct device_node *node);
->  extern struct device_node *of_get_next_parent(struct device_node *node);
-> @@ -385,6 +391,12 @@ static inline struct device_node *of_find_node_by_path(const char *path)
->  	return NULL;
->  }
->  
-> +static inline struct device_node *of_find_node_opts_by_path(const char *path,
-> +	const char **opts)
-> +{
-> +	return NULL;
-> +}
-> +
->  static inline struct device_node *of_get_parent(const struct device_node *node)
->  {
->  	return NULL;
-> -- 
-> 1.7.10.4
+> > Seeing the similar fix for r8a7740 has landed in backports, I now assume
+> > you will ;-)
 > 
+> Yes, I plan to backport this at some point.
+
+Thanks for all your effort with this change.
+After all our discussion of fixes I have decided
+just to classify it as a regular change and have queued it up for v3.20.
+
+I expect the discussion earlier in this thread will be useful when
+explaining things to the arm-soc maintainers, so thanks for that material.
