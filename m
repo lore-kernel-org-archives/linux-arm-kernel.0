@@ -1,40 +1,54 @@
 From: long.wanglong@huawei.com (Wang Long)
-Date: Fri, 28 Nov 2014 02:15:43 +0000
-Subject: [PATCH 0/7] ARM: hisi: enable HiP01 SoC
-Message-ID: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
+Date: Fri, 28 Nov 2014 02:15:44 +0000
+Subject: [PATCH 1/7] ARM: debug: add HiP01 debug uart
+In-Reply-To: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
+References: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
+Message-ID: <1417140950-67103-2-git-send-email-long.wanglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series patch enable Hisilicon HiP01 SoC. The HiP01 SoC series
-chip is designed for networking product, it integrates a rich peripheral
-interfaces to support network applications and supports both one 
-core or dual cores and quad cores. The core is Cortex A9. 
+Add the support of Hisilicon HiP01 debug uart.
+The uart of hip01 is 8250 compatible.
 
-Wang Long (7):
-  ARM: debug: add HiP01 debug uart
-  ARM: hisi: enable HiP01 SoC
-  ARM: dts: Add hip01-ca9x2 dts file
-  ARM: config: enable ARCH_HIP01
-  ARM: hisi: add a common smp_prepares_cpus function
-  ARM: hisi: rename secondary_startup function
-  ARM: hisi: enable smp for HiP01
+Signed-off-by: Wang Long <long.wanglong@huawei.com>
+---
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
- .../bindings/arm/hisilicon/hisilicon.txt           |  25 +++++
- arch/arm/Kconfig.debug                             |  10 ++
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/hip01-ca9x2.dts                  |  52 ++++++++++
- arch/arm/boot/dts/hip01.dtsi                       | 110 +++++++++++++++++++++
- arch/arm/configs/hisi_defconfig                    |   1 +
- arch/arm/configs/multi_v7_defconfig                |   1 +
- arch/arm/mach-hisi/Kconfig                         |   8 ++
- arch/arm/mach-hisi/core.h                          |   5 +-
- arch/arm/mach-hisi/headsmp.S                       |   2 +-
- arch/arm/mach-hisi/hisilicon.c                     |  10 ++
- arch/arm/mach-hisi/hotplug.c                       |  31 ++++++
- arch/arm/mach-hisi/platsmp.c                       |  56 ++++++++++-
- 13 files changed, 307 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/boot/dts/hip01-ca9x2.dts
- create mode 100644 arch/arm/boot/dts/hip01.dtsi
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index d8f6a2e..ab65e58 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -240,6 +240,14 @@ choice
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the UART on Highbank based devices.
+ 
++	config DEBUG_HIP01_UART
++		bool "Hisilicon Hip01 Debug UART"
++		depends on ARCH_HIP01
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on HIP01 UART.
++
+ 	config DEBUG_HIP04_UART
+ 		bool "Hisilicon HiP04 Debug UART"
+ 		depends on ARCH_HIP04
+@@ -1117,6 +1125,7 @@ config DEBUG_UART_PHYS
+ 	default 0x16000000 if ARCH_INTEGRATOR
+ 	default 0x18000300 if DEBUG_BCM_5301X
+ 	default 0x1c090000 if DEBUG_VEXPRESS_UART0_RS1
++	default 0x20001000 if DEBUG_HIP01_UART
+ 	default 0x20060000 if DEBUG_RK29_UART0
+ 	default 0x20064000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
+ 	default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
+@@ -1240,6 +1249,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfef36000 if DEBUG_HIGHBANK_UART
+ 	default 0xfefff700 if ARCH_IOP33X
+ 	default 0xff003000 if DEBUG_U300_UART
++	default 0xffd01000 if DEBUG_HIP01_UART
+ 	default DEBUG_UART_PHYS if !MMU
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
 -- 
 1.8.3.4
