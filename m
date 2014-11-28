@@ -1,141 +1,186 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Fri, 28 Nov 2014 17:54:16 +0100
-Subject: [PATCH 3/4] ARM: add alphascale,acc.txt bindings documentation
-In-Reply-To: <1417193657-31602-1-git-send-email-linux@rempel-privat.de>
-References: <201411281509.19170.arnd@arndb.de>
- <1417193657-31602-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1417193657-31602-4-git-send-email-linux@rempel-privat.de>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Fri, 28 Nov 2014 10:53:30 -0400
+Subject: [PATCHv3 1/1] thermal: cpu_cooling: check for the readiness of
+ cpufreq layer
+Message-ID: <1417186410-24551-1-git-send-email-edubezval@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACC is for AlphaScale Clock Controller.
+In this patch, the cpu_cooling code checks for the usability of cpufreq
+layer before proceeding with the CPU cooling device registration. The
+main reason is: CPU cooling device is not usable if cpufreq cannot
+switch frequencies.
 
-Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+Similar checks are spread in thermal drivers. Thus, the advantage now
+is to have the check in a single place: cpu cooling device registration.
+For this reason, this patch also updates the existing drivers that
+depend on CPU cooling to simply propagate the error code of the cpu
+cooling registration call. Therefore, in case cpufreq is not ready, the
+thermal drivers will still return -EPROBE_DEFER, in an attempt to try
+again when cpufreq layer gets ready.
+
+Cc: devicetree at vger.kernel.org
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-pm at vger.kernel.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
 ---
- .../devicetree/bindings/clock/alphascale,acc.txt   | 115 +++++++++++++++++++++
- 1 file changed, 115 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/alphascale,acc.txt
+ drivers/thermal/cpu_cooling.c                      | 3 +++
+ drivers/thermal/db8500_cpufreq_cooling.c           | 5 -----
+ drivers/thermal/imx_thermal.c                      | 5 -----
+ drivers/thermal/samsung/exynos_thermal_common.c    | 7 ++++---
+ drivers/thermal/samsung/exynos_tmu.c               | 4 +++-
+ drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 6 ------
+ 6 files changed, 10 insertions(+), 20 deletions(-)
+---
+Changes from V2:
+- Removed logging message when returning EPROBE_DEFER. Majority
+of the existing code simply do not log. Following the pattern
+- Merges Viresh's patch in Exynos driver. Reasoning, the change
+in the API behavior goes together with the needed changes in the API
+users.
 
-diff --git a/Documentation/devicetree/bindings/clock/alphascale,acc.txt b/Documentation/devicetree/bindings/clock/alphascale,acc.txt
-new file mode 100644
-index 0000000..62e67e8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/alphascale,acc.txt
-@@ -0,0 +1,115 @@
-+Alphascale Clock Controller
+Changes from V1:
+ - As per Viresh K. suggestion's, the check for cpufreq layer readiness is now
+    only a simple fetch for cpufreq table.
+
+This patch depends on:
+(0) - Viresh's change in cpufreq layer and cpufreq-dt (up to patch 4):
+https://patchwork.kernel.org/patch/5390731/
+https://patchwork.kernel.org/patch/5390741/
+https://patchwork.kernel.org/patch/5390751/
+https://patchwork.kernel.org/patch/5390761/
+(1) - fix of thermal core:
+https://patchwork.kernel.org/patch/5326991/
+
+
+BR,
+
+Eduardo Valentin
+
+diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+index 1ab0018..88d2775 100644
+--- a/drivers/thermal/cpu_cooling.c
++++ b/drivers/thermal/cpu_cooling.c
+@@ -440,6 +440,9 @@ __cpufreq_cooling_register(struct device_node *np,
+ 	int ret = 0, i;
+ 	struct cpufreq_policy policy;
+ 
++	if (!cpufreq_frequency_get_table(0))
++		return ERR_PTR(-EPROBE_DEFER);
 +
-+The ACC (Alphascale Clock Controller) is responsible of choising proper
-+clock source, setting deviders and clock gates.
-+
-+Required properties for the ACC node:
-+ - compatible: must be "alphascale,asm9260-clock-controller"
-+ - reg: must contain the ACC register base and size
-+ - #clock-cells : shall be set to 1.
-+
-+Simple one-cell clock specifier format is used, where the only cell is used
-+as an index of the clock inside the provider.
-+It is encouraged to use dt-binding for clock index definitions. SoC specific
-+dt-binding should be included to the device tree descriptor. For example
-+Alphascale ASM9260:
-+#include <dt-bindings/clock/alphascale,asm9260.h>
-+
-+This binding contains two types of clock providers:
-+ _AHB_ - AHB gate;
-+ _SYS_ - adjustable clock source. Not all peripheral have _SYS_ clock provider.
-+All clock specific details can be found in the SoC documentation.
-+CLKID_AHB_ROM		0
-+CLKID_AHB_RAM		1
-+CLKID_AHB_GPIO		2
-+CLKID_AHB_MAC		3
-+CLKID_AHB_EMI		4
-+CLKID_AHB_USB0		5
-+CLKID_AHB_USB1		6
-+CLKID_AHB_DMA0		7
-+CLKID_AHB_DMA1		8
-+CLKID_AHB_UART0		9
-+CLKID_AHB_UART1		10
-+CLKID_AHB_UART2		11
-+CLKID_AHB_UART3		12
-+CLKID_AHB_UART4		13
-+CLKID_AHB_UART5		14
-+CLKID_AHB_UART6		15
-+CLKID_AHB_UART7		16
-+CLKID_AHB_UART8		17
-+CLKID_AHB_UART9		18
-+CLKID_AHB_I2S0		19
-+CLKID_AHB_I2C0		20
-+CLKID_AHB_I2C1		21
-+CLKID_AHB_SSP0		22
-+CLKID_AHB_IOCONFIG	23
-+CLKID_AHB_WDT		24
-+CLKID_AHB_CAN0		25
-+CLKID_AHB_CAN1		26
-+CLKID_AHB_MPWM		27
-+CLKID_AHB_SPI0		28
-+CLKID_AHB_SPI1		29
-+CLKID_AHB_QEI		30
-+CLKID_AHB_QUADSPI0	31
-+CLKID_AHB_CAMIF		32
-+CLKID_AHB_LCDIF		33
-+CLKID_AHB_TIMER0	34
-+CLKID_AHB_TIMER1	35
-+CLKID_AHB_TIMER2	36
-+CLKID_AHB_TIMER3	37
-+CLKID_AHB_IRQ		38
-+CLKID_AHB_RTC		39
-+CLKID_AHB_NAND		40
-+CLKID_AHB_ADC0		41
-+CLKID_AHB_LED		42
-+CLKID_AHB_DAC0		43
-+CLKID_AHB_LCD		44
-+CLKID_AHB_I2S1		45
-+CLKID_AHB_MAC1		46
-+
-+CLKID_SYS_CPU		47
-+CLKID_SYS_AHB		48
-+CLKID_SYS_I2S0M		49
-+CLKID_SYS_I2S0S		50
-+CLKID_SYS_I2S1M		51
-+CLKID_SYS_I2S1S		52
-+CLKID_SYS_UART0		53
-+CLKID_SYS_UART1		54
-+CLKID_SYS_UART2		55
-+CLKID_SYS_UART3		56
-+CLKID_SYS_UART4		56
-+CLKID_SYS_UART5		57
-+CLKID_SYS_UART6		58
-+CLKID_SYS_UART7		59
-+CLKID_SYS_UART8		60
-+CLKID_SYS_UART9		61
-+CLKID_SYS_SPI0		62
-+CLKID_SYS_SPI1		63
-+CLKID_SYS_QUADSPI	64
-+CLKID_SYS_SSP0		65
-+CLKID_SYS_NAND		66
-+CLKID_SYS_TRACE		67
-+CLKID_SYS_CAMM		68
-+CLKID_SYS_WDT		69
-+CLKID_SYS_CLKOUT	70
-+CLKID_SYS_MAC		71
-+CLKID_SYS_LCD		72
-+CLKID_SYS_ADCANA	73
-+
-+Example of clock consumer with _SYS_ and _AHB_ sinks.
-+uart4: serial at 80010000 {
-+	compatible = "alphascale,asm9260-uart";
-+	reg = <0x80010000 0x4000>;
-+	clocks = <&acc CLKID_SYS_UART4>, <&acc CLKID_AHB_UART4>;
-+	interrupts = <19>;
-+	status = "disabled";
-+};
-+
-+Clock consumer with only one, _AHB_ sink.
-+timer0: timer at 80088000 {
-+	compatible = "alphascale,asm9260-timer";
-+	reg = <0x80088000 0x4000>;
-+	clocks = <&acc CLKID_AHB_TIMER0>;
-+	interrupts = <29>;
-+};
-+
+ 	/* Verify that all the clip cpus have same freq_min, freq_max limit */
+ 	for_each_cpu(i, clip_cpus) {
+ 		/* continue if cpufreq policy not found and not return error */
+diff --git a/drivers/thermal/db8500_cpufreq_cooling.c b/drivers/thermal/db8500_cpufreq_cooling.c
+index 786d192..1ac7ec6 100644
+--- a/drivers/thermal/db8500_cpufreq_cooling.c
++++ b/drivers/thermal/db8500_cpufreq_cooling.c
+@@ -18,7 +18,6 @@
+  */
+ 
+ #include <linux/cpu_cooling.h>
+-#include <linux/cpufreq.h>
+ #include <linux/err.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+@@ -30,10 +29,6 @@ static int db8500_cpufreq_cooling_probe(struct platform_device *pdev)
+ 	struct thermal_cooling_device *cdev;
+ 	struct cpumask mask_val;
+ 
+-	/* make sure cpufreq driver has been initialized */
+-	if (!cpufreq_frequency_get_table(0))
+-		return -EPROBE_DEFER;
+-
+ 	cpumask_set_cpu(0, &mask_val);
+ 	cdev = cpufreq_cooling_register(&mask_val);
+ 
+diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+index 5a1f107..16405b4 100644
+--- a/drivers/thermal/imx_thermal.c
++++ b/drivers/thermal/imx_thermal.c
+@@ -9,7 +9,6 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/cpu_cooling.h>
+-#include <linux/cpufreq.h>
+ #include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/init.h>
+@@ -459,10 +458,6 @@ static int imx_thermal_probe(struct platform_device *pdev)
+ 	int measure_freq;
+ 	int ret;
+ 
+-	if (!cpufreq_get_current_driver()) {
+-		dev_dbg(&pdev->dev, "no cpufreq driver!");
+-		return -EPROBE_DEFER;
+-	}
+ 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+ 	if (!data)
+ 		return -ENOMEM;
+diff --git a/drivers/thermal/samsung/exynos_thermal_common.c b/drivers/thermal/samsung/exynos_thermal_common.c
+index 3f5ad25..d4eaa1b 100644
+--- a/drivers/thermal/samsung/exynos_thermal_common.c
++++ b/drivers/thermal/samsung/exynos_thermal_common.c
+@@ -371,9 +371,10 @@ int exynos_register_thermal(struct thermal_sensor_conf *sensor_conf)
+ 		th_zone->cool_dev[th_zone->cool_dev_size] =
+ 					cpufreq_cooling_register(&mask_val);
+ 		if (IS_ERR(th_zone->cool_dev[th_zone->cool_dev_size])) {
+-			dev_err(sensor_conf->dev,
+-				"Failed to register cpufreq cooling device\n");
+-			ret = -EINVAL;
++			ret = PTR_ERR(th_zone->cool_dev[th_zone->cool_dev_size]);
++			if (ret != -EPROBE_DEFER)
++				dev_err(sensor_conf->dev,
++					"Failed to register cpufreq cooling device\n");
+ 			goto err_unregister;
+ 		}
+ 		th_zone->cool_dev_size++;
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index 2a1c4c7..d4429a5 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -927,7 +927,9 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+ 	/* Register the sensor with thermal management interface */
+ 	ret = exynos_register_thermal(sensor_conf);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "Failed to register thermal interface\n");
++		if (ret != -EPROBE_DEFER)
++			dev_err(&pdev->dev,
++				"Failed to register thermal interface\n");
+ 		goto err_clk;
+ 	}
+ 	data->reg_conf = sensor_conf;
+diff --git a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+index 5fd0386..cf88585 100644
+--- a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
++++ b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+@@ -28,7 +28,6 @@
+ #include <linux/kernel.h>
+ #include <linux/workqueue.h>
+ #include <linux/thermal.h>
+-#include <linux/cpufreq.h>
+ #include <linux/cpumask.h>
+ #include <linux/cpu_cooling.h>
+ #include <linux/of.h>
+@@ -407,11 +406,6 @@ int ti_thermal_register_cpu_cooling(struct ti_bandgap *bgp, int id)
+ 	if (!data)
+ 		return -EINVAL;
+ 
+-	if (!cpufreq_get_current_driver()) {
+-		dev_dbg(bgp->dev, "no cpufreq driver yet\n");
+-		return -EPROBE_DEFER;
+-	}
+-
+ 	/* Register cooling device */
+ 	data->cool_dev = cpufreq_cooling_register(cpu_present_mask);
+ 	if (IS_ERR(data->cool_dev)) {
 -- 
-1.9.1
+2.1.3
