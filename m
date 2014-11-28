@@ -1,23 +1,25 @@
 From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Fri, 28 Nov 2014 01:47:42 +0000
+Date: Fri, 28 Nov 2014 01:49:12 +0000
 Subject: [PATCH v3] can: Convert to runtime_pm
-In-Reply-To: <54773948.2070605@xilinx.com>
-References: <1417093733-29576-1-git-send-email-appanad@xilinx.com>
- <54773948.2070605@xilinx.com>
-Message-ID: <9b39dc479fae4456a9868770bea3d95c@BN1AFFO11FD035.protection.gbl>
+In-Reply-To: <20141127182337.GF17884@xsjandreislx>
+References: <6b6db31d46074512a322eae6e4ef64d4@BN1BFFO11FD038.protection.gbl>
+ <20141127182337.GF17884@xsjandreislx>
+Message-ID: <d306383c84b9479d933b15c4b38da532@BN1AFFO11FD025.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Hi Soren,
 
 -----Original Message-----
-From: Michal Simek [mailto:michal.simek at xilinx.com]
-Sent: Thursday, November 27, 2014 8:17 PM
-To: Appana Durga Kedareswara Rao; wg at grandegger.com; mkl at pengutronix.de; Michal Simek; Soren Brinkmann; grant.likely at linaro.org; robh+dt at kernel.org
-Cc: linux-can at vger.kernel.org; netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Appana Durga Kedareswara Rao
+From: S?ren Brinkmann [mailto:soren.brinkmann at xilinx.com]
+Sent: Thursday, November 27, 2014 11:54 PM
+To: Appana Durga Kedareswara Rao
+Cc: wg at grandegger.com; mkl at pengutronix.de; Michal Simek; grant.likely at linaro.org; robh+dt at kernel.org; devicetree at vger.kernel.org; netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-can at vger.kernel.org; Appana Durga Kedareswara Rao; linux-arm-kernel at lists.infradead.org
 Subject: Re: [PATCH v3] can: Convert to runtime_pm
 
-On 11/27/2014 02:08 PM, Kedareswara rao Appana wrote:
+Hi Kedar,
+
+On Thu, 2014-11-27 at 06:38PM +0530, Kedareswara rao Appana wrote:
 > Instead of enabling/disabling clocks at several locations in the
 > driver, use the runtime_pm framework. This consolidates the actions
 > for runtime PM in the appropriate callbacks and makes the driver more
@@ -64,6 +66,14 @@ On 11/27/2014 02:08 PM, Kedareswara rao Appana wrote:
 > +     ret = pm_runtime_get_sync(priv->dev);
 > +     if (ret < 0) {
 > +             netdev_err(ndev, "%s: runtime CAN resume failed(%d)\n\r",
+
+There might be other issues than the resume that make this fail. It should probably just say 'pm_runtime_get failed'.
+The CAN in the string should not be needed, the netdev_err macro makes sure the device name is printed.
+Can we have a space between 'failed' and the error code?
+There should not be a '\r'
+
+K sure will modify the error message as you explained above.
+
 > +                             __func__, ret);
 > +             return ret;
 > +     }
@@ -144,106 +154,14 @@ On 11/27/2014 02:08 PM, Kedareswara rao Appana wrote:
 > +     if (ret < 0) {
 > +             netdev_err(ndev, "%s: runtime resume failed(%d)\n\r",
 > +                             __func__, ret);
-> +             return ret;
-> +     }
->
-> -     ret = clk_prepare_enable(priv->bus_clk);
-> -     if (ret)
-> -             goto err_clk;
->
->       bec->txerr = priv->read_reg(priv, XCAN_ECR_OFFSET) & XCAN_ECR_TEC_MASK;
->       bec->rxerr = ((priv->read_reg(priv, XCAN_ECR_OFFSET) &
->                       XCAN_ECR_REC_MASK) >> XCAN_ESR_REC_SHIFT);
->
-> -     clk_disable_unprepare(priv->bus_clk);
-> -     clk_disable_unprepare(priv->can_clk);
-> +     pm_runtime_put(priv->dev);
->
->       return 0;
-> -
-> -err_clk:
-> -     clk_disable_unprepare(priv->can_clk);
-> -err:
-> -     return ret;
->  }
->
->
-> @@ -967,15 +954,45 @@ static const struct net_device_ops
-> xcan_netdev_ops = {
->
->  /**
->   * xcan_suspend - Suspend method for the driver
-> - * @dev:     Address of the platform_device structure
-> + * @dev:     Address of the net_device structure
 
-This is just the device structure.
+As above.
 
-K will modify in the next version of the patch .
-
->   *
->   * Put the driver into low power mode.
-> - * Return: 0 always
-> + * Return: 0 on success and failure value on error
->   */
->  static int __maybe_unused xcan_suspend(struct device *dev)  {
-> -     struct platform_device *pdev = dev_get_drvdata(dev);
-> -     struct net_device *ndev = platform_get_drvdata(pdev);
-> +     if (!device_may_wakeup(dev))
-> +             return pm_runtime_force_suspend(dev);
-> +
-> +     return 0;
-> +}
-> +
-> +/**
-> + * xcan_resume - Resume from suspend
-> + * @dev:     Address of the net_device structure
-
-ditto
-
-K will modify in the next version of the patch .
-
-> + *
-> + * Resume operation after suspend.
-> + * Return: 0 on success and failure value on error  */ static int
-> +__maybe_unused xcan_resume(struct device *dev) {
-> +     if (!device_may_wakeup(dev))
-> +             return pm_runtime_force_resume(dev);
-> +
-> +     return 0;
-> +
-> +}
-> +
-> +/**
-> + * xcan_runtime_suspend - Runtime suspend method for the driver
-> + * @dev:     Address of the net_device structure
-
-ditto.
-K will modify in the next version of the patch .
-> + *
-> + * Put the driver into low power mode.
-> + * Return: 0 always
-> + */
-> +static int __maybe_unused xcan_runtime_suspend(struct device *dev) {
-> +     struct net_device *ndev = dev_get_drvdata(dev);
->       struct xcan_priv *priv = netdev_priv(ndev);
->
->       if (netif_running(ndev)) {
-> @@ -993,16 +1010,15 @@ static int __maybe_unused xcan_suspend(struct
-> device *dev)  }
->
->  /**
-> - * xcan_resume - Resume from suspend
-> - * @dev:     Address of the platformdevice structure
-> + * xcan_runtime_resume - Runtime resume from suspend
-> + * @dev:     Address of the net_device structure
-
-ditto.
-K will modify in the next version of the patch .
+K will modify this too.
 
 Regards,
 Kedar.
-Thanks,
-Michal
+        S?ren
 
 
 This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
