@@ -1,28 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Nov 2014 16:08:34 +0100
-Subject: [PATCH v2 RESEND 1/2] ARM: vexpress: Remove non-DT code
-In-Reply-To: <1416939455-1814-1-git-send-email-pawel.moll@arm.com>
-References: <1416939455-1814-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <201411281608.34978.arnd@arndb.de>
+Date: Fri, 28 Nov 2014 16:07:48 +0100
+Subject: [PATCH v1] ARM: multi_v7_defconfig: add driver support for hix5hd2
+In-Reply-To: <1416901046-21091-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1416901046-21091-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <201411281607.48459.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 November 2014, Pawel Moll wrote:
-> Now, with the CLCD DT support available, there is no
-> more reason to keep the non-DT support for V2P-CA9.
+On Tuesday 25 November 2014, Zhangfei Gao wrote:
+> Tested on hix5hd2 platform with mmc, usb, network, reboot etc.
 > 
-> Removed, together with "some" supporting code. It was
-> necessary to make PLAT_VERSATILE_SCHED_CLOCK optional
-> and selected by the machines still interested in it.
-> 
-> Acked-by: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
-> Changes since v1:
-> 
-> - Removed MFD and power/reset changes from the patch;
->   will be posted separately after this is merged.
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 
-Applied to next/cleanup, thanks!
+Applied to next/defconfig, thanks!
+
+You mentioned earlier that you'd like me to apply this patch so I took it, but
+you did not send it to arm at kernel.org or ask for it to be applied in the email,
+so there was still a chance for it to get lost. Please try to be explict
+about these things as you can.
 
 	Arnd
