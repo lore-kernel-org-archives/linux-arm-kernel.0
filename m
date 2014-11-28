@@ -1,65 +1,46 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 28 Nov 2014 11:09:35 -0400
-Subject: [PATCHv3 1/1] thermal: cpu_cooling: check for the readiness of
- cpufreq layer
-In-Reply-To: <20141128171024.GW3836@n2100.arm.linux.org.uk>
-References: <1417186410-24551-1-git-send-email-edubezval@gmail.com>
- <20141128171024.GW3836@n2100.arm.linux.org.uk>
-Message-ID: <20141128150932.GA24720@developer>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 28 Nov 2014 17:24:31 +0000
+Subject: [PATCH v3 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC
+ in dts and Makefile
+In-Reply-To: <20141128164047.GL25883@leverpostej>
+References: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1416917818-10506-4-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20141127115042.GE857@leverpostej>
+ <20141127121214.GF11511@e104818-lin.cambridge.arm.com>
+ <20141127134309.GJ857@leverpostej>
+ <20141128142913.GB5393@localhost>
+ <20141128143532.GI25883@leverpostej>
+ <20141128144412.GG7144@arm.com>
+ <20141128150325.GC24370@e104818-lin.cambridge.arm.com>
+ <20141128164047.GL25883@leverpostej>
+Message-ID: <20141128172431.GA32393@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russel,
-
-On Fri, Nov 28, 2014 at 05:10:24PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Nov 28, 2014 at 10:53:30AM -0400, Eduardo Valentin wrote:
-> > diff --git a/drivers/thermal/samsung/exynos_thermal_common.c b/drivers/thermal/samsung/exynos_thermal_common.c
-> > index 3f5ad25..d4eaa1b 100644
-> > --- a/drivers/thermal/samsung/exynos_thermal_common.c
-> > +++ b/drivers/thermal/samsung/exynos_thermal_common.c
-> > @@ -371,9 +371,10 @@ int exynos_register_thermal(struct thermal_sensor_conf *sensor_conf)
-> >  		th_zone->cool_dev[th_zone->cool_dev_size] =
-> >  					cpufreq_cooling_register(&mask_val);
-> >  		if (IS_ERR(th_zone->cool_dev[th_zone->cool_dev_size])) {
-> > -			dev_err(sensor_conf->dev,
-> > -				"Failed to register cpufreq cooling device\n");
-> > -			ret = -EINVAL;
-> > +			ret = PTR_ERR(th_zone->cool_dev[th_zone->cool_dev_size]);
-> > +			if (ret != -EPROBE_DEFER)
-> > +				dev_err(sensor_conf->dev,
-> > +					"Failed to register cpufreq cooling device\n");
+On Fri, Nov 28, 2014 at 04:40:47PM +0000, Mark Rutland wrote:
+> [...]
 > 
-> Something which bugs me quite a lot is when there is an error code (which
-> tells you why something didn't work) and you have an error message, and
-> the error message doesn't bother printing the error code.
+> > In the meantime I think we can be more tolerant:
+> > 
+> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> > index 2133f9d59d06..87f67a93fcc7 100644
+> > --- a/drivers/clocksource/arm_arch_timer.c
+> > +++ b/drivers/clocksource/arm_arch_timer.c
+> > @@ -376,6 +376,8 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
+> >  			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
+> >  		else
+> >  			arch_timer_rate = arch_timer_get_cntfrq();
+> > +	} else if (IS_ENABLED(CONFIG_ARM64)) {
+> > +		pr_warn("Architected timer frequency overridden by DT (broken firmware?)\n");
+> >  	}
 > 
-> You might as well just print "Failed\n" and leave it at that, or md5sum
-> the error message and print the sum instead. :)
-> 
+> That looks good to me. On a related note, it looks like my documentation
+> patch [1] from a while back fell by the wayside. Does anyone fancy
+> picking that up to go with this?
 
-I like the md5sum better! :-)
+I can put the two together (keeping you as author). Do we still need the
+IS_ENABLED(CONFIG_ARM64) part here or we extend the warning to to arm32
+as well?
 
-
-> Knowing why something failed allows you to read the source, and find
-> possible reasons for the failure (which could come down to one reason)
-> and allows faster resolution of the problem.
-> 
-
-Sure. I will resend with the error codes in the error messages. Makes
-completely sense.
-
-Thanks for taking the time and reviewing.
-
-
-Eduardo Valentin
-
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141128/8a9daeec/attachment.sig>
+-- 
+Catalin
