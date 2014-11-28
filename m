@@ -1,134 +1,109 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 28 Nov 2014 16:16:13 +0000
-Subject: [PATCH 3.18-rc4 v12 4/5] ARM: add basic support for on-demand
- backtrace of other CPUs
+Date: Fri, 28 Nov 2014 16:16:10 +0000
+Subject: [PATCH 3.18-rc4 v12 1/5] irqchip: gic: Optimize locking in
+ gic_raise_softirq
 In-Reply-To: <1417191374-26719-1-git-send-email-daniel.thompson@linaro.org>
 References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
  <1417191374-26719-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1417191374-26719-5-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1417191374-26719-2-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic infrastructure for triggering a backtrace of other CPUs
-via an IPI, preferably at FIQ level.  It is intended that this shall
-be used for cases where we have detected that something has already
-failed in the kernel.
+Currently gic_raise_softirq() is locked using upon irq_controller_lock.
+This lock is primarily used to make register read-modify-write sequences
+atomic but gic_raise_softirq() uses it instead to ensure that the
+big.LITTLE migration logic can figure out when it is safe to migrate
+interrupts between physical cores.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+This is sub-optimal in closely related ways:
+
+1. No locking at all is required on systems where the b.L switcher is
+   not configured.
+
+2. Finer grain locking can be used on systems where the b.L switcher is
+   present.
+
+This patch resolves both of the above by introducing a separate finer
+grain lock and providing conditionally compiled inlines to lock/unlock
+it.
+
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/irq.h |  5 ++++
- arch/arm/kernel/smp.c      | 62 ++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 67 insertions(+)
+ drivers/irqchip/irq-gic.c | 36 +++++++++++++++++++++++++++++++++---
+ 1 file changed, 33 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-index 53c15dec7af6..be1d07d59ee9 100644
---- a/arch/arm/include/asm/irq.h
-+++ b/arch/arm/include/asm/irq.h
-@@ -35,6 +35,11 @@ extern void (*handle_arch_irq)(struct pt_regs *);
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- #endif
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 38493ff28fa5..e875da93f24a 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -73,6 +73,27 @@ struct gic_chip_data {
+ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
  
-+#ifdef CONFIG_SMP
-+extern void arch_trigger_all_cpu_backtrace(bool);
-+#define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
+ /*
++ * This lock is used by the big.LITTLE migration code to ensure no IPIs
++ * can be pended on the old core after the map has been updated.
++ */
++#ifdef CONFIG_BL_SWITCHER
++static DEFINE_RAW_SPINLOCK(cpu_map_migration_lock);
++
++static inline void bl_migration_lock(unsigned long *flags)
++{
++	raw_spin_lock_irqsave(&cpu_map_migration_lock, *flags);
++}
++
++static inline void bl_migration_unlock(unsigned long flags)
++{
++	raw_spin_unlock_irqrestore(&cpu_map_migration_lock, flags);
++}
++#else
++static inline void bl_migration_lock(unsigned long *flags) {}
++static inline void bl_migration_unlock(unsigned long flags) {}
 +#endif
 +
- #endif
++/*
+  * The GIC mapping of CPU interfaces does not necessarily match
+  * the logical CPU numbering.  Let's use a mapping as returned
+  * by the GIC itself.
+@@ -624,7 +645,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	int cpu;
+ 	unsigned long flags, map = 0;
  
- #endif
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 13396d3d600e..14c594a12bef 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -72,8 +72,12 @@ enum ipi_msg_type {
- 	IPI_CPU_STOP,
- 	IPI_IRQ_WORK,
- 	IPI_COMPLETION,
-+	IPI_CPU_BACKTRACE,
- };
+-	raw_spin_lock_irqsave(&irq_controller_lock, flags);
++	bl_migration_lock(&flags);
  
-+/* For reliability, we're prepared to waste bits here. */
-+static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
-+
- static DECLARE_COMPLETION(cpu_running);
+ 	/* Convert our logical CPU mask into a physical one. */
+ 	for_each_cpu(cpu, mask)
+@@ -639,7 +660,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	/* this always happens on GIC0 */
+ 	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
  
- static struct smp_operations smp_ops;
-@@ -535,6 +539,21 @@ static void ipi_cpu_stop(unsigned int cpu)
- 		cpu_relax();
+-	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
++	bl_migration_unlock(flags);
  }
- 
-+static void ipi_cpu_backtrace(struct pt_regs *regs)
-+{
-+	int cpu = smp_processor_id();
-+
-+	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
-+		static arch_spinlock_t lock = __ARCH_SPIN_LOCK_UNLOCKED;
-+
-+		arch_spin_lock(&lock);
-+		printk(KERN_WARNING "FIQ backtrace for cpu %d\n", cpu);
-+		show_regs(regs);
-+		arch_spin_unlock(&lock);
-+		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-+	}
-+}
-+
- static DEFINE_PER_CPU(struct completion *, cpu_completion);
- 
- int register_ipi_completion(struct completion *completion, int cpu)
-@@ -614,6 +633,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 		irq_exit();
- 		break;
- 
-+	case IPI_CPU_BACKTRACE:
-+		irq_enter();
-+		ipi_cpu_backtrace(regs);
-+		irq_exit();
-+		break;
-+
- 	default:
- 		printk(KERN_CRIT "CPU%u: Unknown IPI message 0x%x\n",
- 		       cpu, ipinr);
-@@ -708,3 +733,40 @@ static int __init register_cpufreq_notifier(void)
- core_initcall(register_cpufreq_notifier);
- 
  #endif
-+
-+void arch_trigger_all_cpu_backtrace(bool include_self)
-+{
-+	static unsigned long backtrace_flag;
-+	int i, cpu = get_cpu();
-+
-+	if (test_and_set_bit(0, &backtrace_flag)) {
-+		/*
-+		 * If there is already a trigger_all_cpu_backtrace() in progress
-+		 * (backtrace_flag == 1), don't output double cpu dump infos.
-+		 */
-+		put_cpu();
-+		return;
-+	}
-+
-+	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
-+	if (!include_self)
-+		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-+
-+	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
-+		pr_info("Sending FIQ to %s CPUs:\n",
-+			(include_self ? "all" : "other"));
-+		smp_cross_call(to_cpumask(backtrace_mask), IPI_CPU_BACKTRACE);
-+	}
-+
-+	/* Wait for up to 10 seconds for all CPUs to do the backtrace */
-+	for (i = 0; i < 10 * 1000; i++) {
-+		if (cpumask_empty(to_cpumask(backtrace_mask)))
-+			break;
-+
-+		mdelay(1);
-+	}
-+
-+	clear_bit(0, &backtrace_flag);
-+	smp_mb__after_atomic();
-+	put_cpu();
-+}
+ 
+@@ -710,8 +731,17 @@ void gic_migrate_target(unsigned int new_cpu_id)
+ 
+ 	raw_spin_lock(&irq_controller_lock);
+ 
+-	/* Update the target interface for this logical CPU */
++	/*
++	 * Update the target interface for this logical CPU
++	 *
++	 * From the point we release the cpu_map_migration_lock any new
++	 * SGIs will be pended on the new cpu which makes the set of SGIs
++	 * pending on the old cpu static. That means we can defer the
++	 * migration until after we have released the irq_controller_lock.
++	 */
++	raw_spin_lock(&cpu_map_migration_lock);
+ 	gic_cpu_map[cpu] = 1 << new_cpu_id;
++	raw_spin_unlock(&cpu_map_migration_lock);
+ 
+ 	/*
+ 	 * Find all the peripheral interrupts targetting the current
 -- 
 1.9.3
