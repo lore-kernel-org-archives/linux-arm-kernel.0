@@ -1,41 +1,60 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 28 Nov 2014 10:14:59 +0000
-Subject: [PATCH 3.18-rc4 v11 2/6] irqchip: gic: Optimize locking in
- gic_raise_softirq
-In-Reply-To: <alpine.DEB.2.11.1411272231450.3961@nanos>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1417119024-22844-1-git-send-email-daniel.thompson@linaro.org>
- <1417119024-22844-3-git-send-email-daniel.thompson@linaro.org>
- <alpine.DEB.2.11.1411272231450.3961@nanos>
-Message-ID: <54784B23.9040604@linaro.org>
+From: l.majewski@majess.pl (Lukasz Majewski)
+Date: Fri, 28 Nov 2014 11:18:24 +0100
+Subject: [PATCHv2 1/1] thermal: cpu_cooling: check for the readiness of
+ cpufreq layer
+In-Reply-To: <CAKohponu_PRrqsuMdCJDznhiO_-=iCaYPhCCad8F4WS3rNxo5A@mail.gmail.com>
+References: <1417097577-3548-1-git-send-email-edubezval@gmail.com>
+ <CAKohponu_PRrqsuMdCJDznhiO_-=iCaYPhCCad8F4WS3rNxo5A@mail.gmail.com>
+Message-ID: <20141128111824.533c4641@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/14 21:37, Thomas Gleixner wrote:
-> On Thu, 27 Nov 2014, Daniel Thompson wrote:
+On Fri, 28 Nov 2014 13:35:49 +0530
+Viresh Kumar <viresh.kumar@linaro.org> wrote:
+
+> On 27 November 2014 at 19:42, Eduardo Valentin <edubezval@gmail.com>
+> wrote:
+> > (I'm sorry VireshK, I am still using my normal practice) :-)
 > 
->> Currently gic_raise_softirq() unconditionally takes and releases a lock
->> whose only purpose is to synchronize with the b.L switcher.
->>
->> Remove this lock if the b.L switcher is not compiled in.
+> That's fine :)
 > 
-> I think the patches are in the wrong order. We optimize for the sane
-> use case first, i.e BL=n. So you want to make the locking of
-> irq_controller_lock in gic_raise_softirq() conditional in the first
-> place, which should have been done when this was introduced.
->
-> Once you have isolated that you can apply your split lock patch for
-> the BL=y nonsense.
+> > diff --git a/drivers/thermal/cpu_cooling.c
+> > b/drivers/thermal/cpu_cooling.c index 1ab0018..bed3fa2 100644
+> > --- a/drivers/thermal/cpu_cooling.c
+> > +++ b/drivers/thermal/cpu_cooling.c
+> > @@ -440,6 +440,11 @@ __cpufreq_cooling_register(struct device_node
+> > *np, int ret = 0, i;
+> >         struct cpufreq_policy policy;
+> >
+> > +       if (!cpufreq_frequency_get_table(0)) {
+> > +               pr_err("cpu_cooling: cpufreq layer not ready!
+> > Deferring.\n");
 > 
-> Adding more locks first and then optimizing them out does not make any
-> sense.
+> Throwing an error here doesn't look to be the right thing. Ultimately
+> we will register the cooling dev when probed again after some time.
+> 
+> So, a pr_debug() suits more here.
+> 
+> Also, this breaks existing exynos thermal drivers as they don't handle
+> -EPROBE_DEFER well right now.
 
-You original described the use of irq_controller_lock for its current
-dual purpose to be an abuse of the lock. Does it really make more sense
-to optimize before we correct the abuse?
+Unfortunately Viresh is correct here. Current (before rework) Exynos
+TMU driver expects that cpu_cooling device will succeed.
 
-How about just squashing them together? It reduces the combined diffstat
-by ~10%...
+> 
+> I reached here, because one of my patches had something similar to
+> what you wrote. Just for this file though, haven't updated any other
+> drivers though.
+> 
+> Will be sending you my small patchset by end of day today, please see
+> if they make any sense at all..
 
-
-Daniel.
+Best regards,
+?ukasz Majewski
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141128/59d1b520/attachment.sig>
