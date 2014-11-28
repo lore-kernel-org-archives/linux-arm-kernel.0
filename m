@@ -1,23 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Nov 2014 22:38:36 +0100
-Subject: [PATCH] arm64: ARM: Fix the Generic Timers interrupt active level
- description
-In-Reply-To: <1417099005-18638-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1417099005-18638-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <201411282238.36406.arnd@arndb.de>
+Date: Fri, 28 Nov 2014 22:40:20 +0100
+Subject: [GIT PULL v2] ARM: BCM5301X: DT changes for v3.19
+In-Reply-To: <54779999.8020709@hauke-m.de>
+References: <54779999.8020709@hauke-m.de>
+Message-ID: <201411282240.20360.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014, Liviu Dudau wrote:
-> The Cortex-A5x TRM states in paragraph "9.2 Generic Timer functional
-> description" that generic timers provide an active-LOW interrupt
-> output. Fix the device trees to correctly describe this.
+On Thursday 27 November 2014, Hauke Mehrtens wrote:
+> Hi Olof, Hi Arnd,
 > 
-> While doing this update the CPU mask to match the number of described
-> CPUs as well.
+> Please consider these BCM5301X ARM based SoC dt updates for v3.19.
 > 
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> This is the second try based on 3.18-rc1 and without the early printk patch.
+> 
+> 
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+> 
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/hauke/linux.git tags/bcm5301x-dt-2014-11-27
+> 
+> for you to fetch changes up to dd6d2e5f4bbb828268506e9d6b772fffe101e76c:
+> 
+>   ARM: BCM5301X: Add LEDs for Netgear R6250 V1 (2014-11-27 22:30:32 +0100)
+> 
+> ----------------------------------------------------------------
+> ARM: BCM5301X: Add some more devices to device tree
+> 
+> The most important part is adding the axi bus to the SoC dtsi file,
+> this is the main bus on the SoC.
+> 
+> These patches were all send to the arm list and I haven't got any
+> negative responses.
+> 
+> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 
-Applied to next/arm64, thanks!
+Pulled into next/dt, thanks!
 
 	Arnd
