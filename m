@@ -1,45 +1,44 @@
 From: long.wanglong@huawei.com (Wang Long)
-Date: Fri, 28 Nov 2014 02:15:48 +0000
-Subject: [PATCH 5/7] ARM: hisi: add a common smp_prepares_cpus function
+Date: Fri, 28 Nov 2014 02:15:47 +0000
+Subject: [PATCH 4/7] ARM: config: enable ARCH_HIP01
 In-Reply-To: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
 References: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
-Message-ID: <1417140950-67103-6-git-send-email-long.wanglong@huawei.com>
+Message-ID: <1417140950-67103-5-git-send-email-long.wanglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As hix5hd2 and hip01 has the same .smp_prepare_cpus
-in struct smp_operations, so rename hix5hd2_smp_prepare_cpus
-to hisi_common_smp_prepare_cpus.
-
-the hip01 will use hisi_common_smp_prepare_cpus in its
-struct smp_operations.
+Make hip01 share the hisi_defconfig.
+And add it into multi_v7_defconfig too.
 
 Signed-off-by: Wang Long <long.wanglong@huawei.com>
 ---
- arch/arm/mach-hisi/platsmp.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/configs/hisi_defconfig     | 1 +
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
-index 575dd82..b3c3a58 100644
---- a/arch/arm/mach-hisi/platsmp.c
-+++ b/arch/arm/mach-hisi/platsmp.c
-@@ -96,7 +96,7 @@ struct smp_operations hi3xxx_smp_ops __initdata = {
- #endif
- };
- 
--static void __init hix5hd2_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init hisi_common_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	hisi_enable_scu_a9();
- }
-@@ -125,7 +125,7 @@ static int hix5hd2_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 
- 
- struct smp_operations hix5hd2_smp_ops __initdata = {
--	.smp_prepare_cpus	= hix5hd2_smp_prepare_cpus,
-+	.smp_prepare_cpus	= hisi_common_smp_prepare_cpus,
- 	.smp_boot_secondary	= hix5hd2_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_die		= hix5hd2_cpu_die,
+diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
+index 1772505..33b0b76 100644
+--- a/arch/arm/configs/hisi_defconfig
++++ b/arch/arm/configs/hisi_defconfig
+@@ -6,6 +6,7 @@ CONFIG_RD_LZMA=y
+ CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_HI3xxx=y
+ CONFIG_ARCH_HIX5HD2=y
++CONFIG_ARCH_HIP01=y
+ CONFIG_ARCH_HIP04=y
+ CONFIG_SMP=y
+ CONFIG_NR_CPUS=16
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 9d7a32f..df335a2 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -28,6 +28,7 @@ CONFIG_ARCH_HIGHBANK=y
+ CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_HI3xxx=y
+ CONFIG_ARCH_HIX5HD2=y
++CONFIG_ARCH_HIP01=y
+ CONFIG_ARCH_HIP04=y
+ CONFIG_ARCH_KEYSTONE=y
+ CONFIG_ARCH_MESON=y
 -- 
 1.8.3.4
