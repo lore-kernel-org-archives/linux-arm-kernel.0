@@ -1,38 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Nov 2014 12:28:52 +0100
-Subject: [GIT PULL] move omap gpmc to drivers finally
-In-Reply-To: <20141126194330.GN2817@atomide.com>
-References: <20141126194330.GN2817@atomide.com>
-Message-ID: <201411281228.52786.arnd@arndb.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 28 Nov 2014 12:31:12 +0100
+Subject: [PATCH 00/11] ARM: at91: remove !DT support for at91rm9200
+In-Reply-To: <2770184.6f6RpLLlMS@wuerfel>
+References: <cover.1417103399.git.nicolas.ferre@atmel.com>
+ <20141128002822.GM4508@piout.net> <1422574.pPO36BQRH8@kongar>
+ <2770184.6f6RpLLlMS@wuerfel>
+Message-ID: <20141128113111.GO4508@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 November 2014, Tony Lindgren wrote:
-> The following changes since commit 6f8782a7a1c826e1c013d6b7d5504af6bcc079e6:
+On 28/11/2014 at 09:49:10 +0100, Arnd Bergmann wrote :
+> > > Actually, some work was done but we never saw an other version of the
+> > > series. Alexander, are you still interested? Else we can take the patch
+> > > below.
+> > > 
+> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/246679.html
 > 
->   ARM: OMAP2+: Remove unnecesary include in GPMC driver (2014-11-06 10:51:06 -0800)
+> I see. Yes, the approach is similar, and there are actually multiple
+> independent problems:
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/gpmc-move
-> 
-> for you to fetch changes up to d2c70f553d7203b9bb37730e577be29794ae3169:
-> 
->   memory: gpmc: Move omap gpmc code to live under drivers (2014-11-26 11:11:19 -0800)
-> 
-> ----------------------------------------------------------------
-> We can finally move the GPMC code to live in drivers/memory
-> for further clean up work. This series does the move with
-> minimal changes to the code.
+> - getting the current driver to build with multiplatform (trivial, 5 lines)
+> - changing the gpio handling to work with DT (simple, both of us did that)
+> - writing the binding (simple)
 
-I just looked at this branch. It's definitely nice to move the code
-to drivers/memory, but I don't like the idea of having lots of function
-declarations and internal data structures in a linux/platform_data/*.h
-file. We can still merge this for 3.19, but I want to make sure you have
-a plan for getting rid of this (and put that into the tag description).
+Yeah, let's focus on those first steps. Takashi was willing to take
+patches, even if we were not converting the driver to ASoC.
 
-Does this header file get removed once all non-DT board files are gone?
+> - changing the driver to ASoC (not that simple)
+> 
+> > Well, I tried to get a ac97c driver based on alsa soc framework as suggested 
+> > by Takashi. But I failed so far, I could not get my head around those 
+> > architecture.
+> 
+> Let's just start with the trivial first patch, that can probably just be merged
+> into 3.19, and then we can build on top of that later if anybody wants to
+> get ac97 working again on at91.
+> 
 
-How about moving the declarations into include/linux/omap-gpmc.h instead?
+Do you want one of us to send that patch to Takashi and the Alsa ML or
+will you do it?
+You can add my ack.
 
-	Arnd
+> > When keeping my DT support on the current driver, the only thing which is open 
+> > that the bindings should be modifed that they are like soc-ac97link bindings.
+> 
+> Makes sense, if that binding works on the at91 hardware. I'm not sure
+> whether the pinctrl stuff or the first two gpio lines apply though.
+> 
+> 	Arnd
+> 
+> 8<---
+> ALSA: atmel: fix building the ac97 driver for at91-multiplatform
+> 
+> at91 will no longer export the mach/cpu.h and mach/hardware.h header files
+> in the future, which would break building the atmel ac97c driver.
+> 
+> Since the cpu_is_* check is only used to find out whether we are running
+> on avr32 or arm/at91, we can hardcode that check in the ARM case.
+> 
+> Unfortunately the driver is missing other work to be useful again on ARM,
+> if anyone wants to actually use it, they need to add a DT binding, and
+> the driver should really be converted to use the ASoC framework.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Link: http://www.spinics.net/lists/arm-kernel/msg382068.html
+> 
+> diff --git a/sound/atmel/ac97c.c b/sound/atmel/ac97c.c
+> index b59427d5a697..4eec216b7f92 100644
+> --- a/sound/atmel/ac97c.c
+> +++ b/sound/atmel/ac97c.c
+> @@ -34,10 +34,10 @@
+>  #include <linux/platform_data/dma-dw.h>
+>  #include <linux/dma/dw.h>
+>  
+> +#ifdef CONFIG_AVR32
+>  #include <mach/cpu.h>
+> -
+> -#ifdef CONFIG_ARCH_AT91
+> -#include <mach/hardware.h>
+> +#else
+> +#define cpu_is_at32ap7000() (0)
+>  #endif
+>  
+>  #include "ac97c.h"
+> 
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
