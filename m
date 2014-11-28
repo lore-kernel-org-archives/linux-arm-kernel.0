@@ -1,45 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Nov 2014 12:57:57 +0100
-Subject: [PATCH 6/6] dmaengine: ste_dma40: fix error return code
-In-Reply-To: <1416667159-9808-7-git-send-email-Julia.Lawall@lip6.fr>
-References: <1416667159-9808-1-git-send-email-Julia.Lawall@lip6.fr>
- <1416667159-9808-7-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <CACRpkdaobn4Zp8KYM-wA1L_uL8CHZW6K6yNb3dE=hSuHcxj6+w@mail.gmail.com>
+Date: Fri, 28 Nov 2014 12:59:35 +0100
+Subject: [PATCH v3 3/5] pinctrl: exynos: add exynos5410 SoC specific data
+In-Reply-To: <1416695185-5198-1-git-send-email-afaerber@suse.de>
+References: <547104D5.4030803@suse.de>
+ <1416695185-5198-1-git-send-email-afaerber@suse.de>
+Message-ID: <CACRpkdZie8JJGxSPkc8PPvC3qZkWhe5WqmpSKSoDFwqRd6tR_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 22, 2014 at 3:39 PM, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
+On Sat, Nov 22, 2014 at 11:26 PM, Andreas F?rber <afaerber@suse.de> wrote:
 
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
+> From: Hakjoo Kim <ruppi.kim@hardkernel.com>
 >
-> Return a negative error code on failure.
+> Add Samsung EXYNOS5410 SoC specific data to enable pinctrl
+> support for all platforms based on EXYNOS5410.
 >
-> A simplified version of the semantic match that finds this problem is as
-> follows: (http://coccinelle.lip6.fr/)
+> Signed-off-by: Hakjoo Kim <ruppi.kim@hardkernel.com>
+> [AF: Rebased onto Exynos5260 and irq_chip consolidation]
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v2 -> v3:
+>  * Rebased (.svc, .{g,w}eint_{con,mask,pend} fields dropped)
 >
-> // <smpl>
-> @@
-> identifier ret; expression e1,e2;
-> @@
-> (
-> if (\(ret < 0\|ret != 0\))
->  { ... return ret; }
-> |
-> ret = 0
-> )
-> ... when != ret = e1
->     when != &ret
-> *if(...)
-> {
->   ... when != ret = e2
->       when forall
->  return ret;
-> }
-> // </smpl>
->
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+>  v1 -> v2:
+>  * Filled in Sob from Hakjoo Kim
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Is this based on the pinctrl devel branch so I can apply it?
+
+I'd like Tomasz ACK on it first though.
 
 Yours,
 Linus Walleij
