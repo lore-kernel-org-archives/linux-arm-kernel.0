@@ -1,68 +1,61 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 28 Nov 2014 11:12:52 +0800
-Subject: [PATCH v2] arm64: ARM: Fix the Generic Timers interrupt active
- level description
-In-Reply-To: <54776FE0.8030600@arm.com>
-References: <1417105283-19575-1-git-send-email-Liviu.Dudau@arm.com>
- <54776FE0.8030600@arm.com>
-Message-ID: <20141128111252.4a6e8892@xhacker>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Fri, 28 Nov 2014 09:02:07 +0530
+Subject: [PATCH] ARM: OMAP2+: AM43x: Add ID for ES1.2
+Message-ID: <1417145527-31086-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marc and Liviu,
+ES1.2 is a minor variant of ES1.1. Major changes since ES1.1 are
+updating ROM for fixing the following boot modes:
+- NAND boot
+- UART boot
+- Ethernet boot
+- USB HOST/Client boot
+This patch adds ID support for AM437x ES1.2 silicon.
+There are no additional kernel fixes required for ES1.2 silicon.
 
-On Thu, 27 Nov 2014 10:39:28 -0800
-Marc Zyngier <marc.zyngier@arm.com> wrote:
+Latest Technical Documentation can be found here:
+http://www.ti.com/lsds/ti/arm/sitara_arm_cortex_a_processor/arm_cortex_a9_core/am437x_arm_cortex_a9/tech_docs.page
 
-> On 27/11/14 16:21, Liviu Dudau wrote:
-> > The Cortex-A5x TRM states in paragraph "9.2 Generic Timer functional
-> > description" that generic timers provide a level not edge interrupt
-> > output. Fix the device trees to correctly describe this.
-> > 
-> > While doing this update the CPU mask to match the number of described
-> > CPUs as well as the DT bindings documentation for Generic Timers.
-> > 
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> 	M.
-> 
-> > ---
-> > 
-> > Arnd, Olof: This is on top of linux-next/master as it patches Juno's
-> > as well as all the other ARM DTs.
-> > 
-> > --
-> > 
-> >  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++----
-> >  arch/arm64/boot/dts/arm/foundation-v8.dts            | 8 ++++----
-> >  arch/arm64/boot/dts/arm/juno.dts                     | 8 ++++----
-> >  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts           | 8 ++++----
-> >  4 files changed, 16 insertions(+), 16 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt
-> > b/Documentation/devicetree/bindings/arm/arch_timer.txt index
-> > 37b2caf..6d2aa87 100644 ---
-> > a/Documentation/devicetree/bindings/arm/arch_timer.txt +++
-> > b/Documentation/devicetree/bindings/arm/arch_timer.txt @@ -27,10 +27,10
-> > @@ Example: timer {
-> >  		compatible = "arm,cortex-a15-timer",
-> >  			     "arm,armv7-timer";
-> > -		interrupts = <1 13 0xf08>,
-> > -			     <1 14 0xf08>,
-> > -			     <1 11 0xf08>,
-> > -			     <1 10 0xf08>;
-> > +		interrupts = <1 13 0xf04>,
-> > +			     <1 14 0xf04>,
-> > +			     <1 11 0xf04>,
-> > +			     <1 10 0xf04>;
-> >  		clock-frequency = <100000000>;
-> >  	};
-> >  
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ arch/arm/mach-omap2/id.c  | 8 ++++++--
+ arch/arm/mach-omap2/soc.h | 1 +
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
-Does it mean we also need to fix the interrupt level description under
-arch/arm/boot/dts? I found they are also wrong or I misunderstand something?
-
-Thanks,
-Jisheng
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 53841de..c25feba 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -471,11 +471,15 @@ void __init omap3xxx_check_revision(void)
+ 			cpu_rev = "1.0";
+ 			break;
+ 		case 1:
+-		/* FALLTHROUGH */
+-		default:
+ 			omap_revision = AM437X_REV_ES1_1;
+ 			cpu_rev = "1.1";
+ 			break;
++		case 2:
++		/* FALLTHROUGH */
++		default:
++			omap_revision = AM437X_REV_ES1_2;
++			cpu_rev = "1.2";
++			break;
+ 		}
+ 		break;
+ 	case 0xb8f2:
+diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+index 4376f59..c1a3b44 100644
+--- a/arch/arm/mach-omap2/soc.h
++++ b/arch/arm/mach-omap2/soc.h
+@@ -446,6 +446,7 @@ IS_OMAP_TYPE(3430, 0x3430)
+ #define AM437X_CLASS		0x43700000
+ #define AM437X_REV_ES1_0	(AM437X_CLASS | (0x10 << 8))
+ #define AM437X_REV_ES1_1	(AM437X_CLASS | (0x11 << 8))
++#define AM437X_REV_ES1_2	(AM437X_CLASS | (0x12 << 8))
+ 
+ #define OMAP443X_CLASS		0x44300044
+ #define OMAP4430_REV_ES1_0	(OMAP443X_CLASS | (0x10 << 8))
+-- 
+1.9.1
