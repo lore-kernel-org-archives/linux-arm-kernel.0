@@ -1,71 +1,115 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sat, 29 Nov 2014 00:02:15 +0800
-Subject: [PATCH] ARM: pxa: fix lubbock interrupts handling
-In-Reply-To: <87r3wn1mhu.fsf@free.fr>
-References: <1417113721-9062-1-git-send-email-robert.jarzmik@free.fr>
- <alpine.DEB.2.11.1411272258010.3961@nanos> <87r3wn1mhu.fsf@free.fr>
-Message-ID: <CAN1soZzZ7nuvvHguaHVHZc8hXvv8SzvWY9Ejf-fYhA5yfbcM-w@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 28 Nov 2014 17:12:44 +0100
+Subject: [PATCH v3 2/3] dt-bindings: Add pinctrl bindings for
+ mt65xx/mt81xx.
+In-Reply-To: <20141127101830.GP30369@pengutronix.de>
+References: <1415709535-31515-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1415709535-31515-3-git-send-email-hongzhou.yang@mediatek.com>
+ <CACRpkdYSe_BH_qiHma2BA+c2otEi3wd0TBXy83t8vwrNL+3U2g@mail.gmail.com>
+ <20141127101830.GP30369@pengutronix.de>
+Message-ID: <CACRpkdbMdJT6y-NL36RgQe0-CAFAVGqKiwY9+yFcwA7JDLmA+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 9:30 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Thomas Gleixner <tglx@linutronix.de> writes:
->
->> So what is the relationship between installing that chained handler
->> and that gpio-pxa probe stuff?
-> The relation is in gpio-pxa probe, look at the extract of pxa_gpio_probe() :
-> pxa_gpio_probe()
->                 irq = gpio_to_irq(0);
->                 irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
->                                          handle_edge_irq);
->                 set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
->                 irq_set_chained_handler(IRQ_GPIO0, pxa_gpio_demux_handler);
->
-> Now look at the extract from the former lubbock_init_irq() :
-> lubbock_init_irq()
->                 irq = PXA_GPIO_TO_IRQ(0);
->                 irq_set_chained_handler(irq, lubbock_irq_handler);
->                 irq_set_irq_type(irq, IRQ_TYPE_EDGE_FALLING);
->
-> Given that gpio_to_irq(0) = PXA_GPIO_TO_IRQ(0), see how these 2 are fighting to
-> install the handler, and how the resulting installed handler depends on the
-> order of execution of pxa_gpio_to_irq() wrt lubbock_init_irq().
->
->> And why is the GPIO0 interrupt handled from arch code rather than from
->> a regular driver setup, which depends on the availablity of the GPIO
->> driver?
-> Ah that's a good question. Maybe the answer is that there is no driver in this
-> case.
-> When I say "no driver", it's because this interrupt is a consequence of the
-> IO-Board (or motherboard) wiring topology.
->
-> I think I need to add a bit of context, so pardon my crude ascii-art style, and
-> see in the lubbock case, we have this wiring (list of IPs not exhaustive, and
-> gates to mask each XXX irq not added) :
->
-> IPs on Motherboard          Gates on motherboard                       SoC
->
-> +-------------+              +-------+
-> |  SMC Lan    | --lan irq--- | Latch | -
-> +-------------+              |       |  \                      +------PXA-----+
->                              |       |   \                     |              |
-> +-------------+              |       |                         |+----------+  |
-> |   UDC Vbus  | --vbus irq-- | Latch | -- NOR gate -- GPIO0 -- ||GPIO block|  |
-> +-------------+              |       |                line     |+----------+  |
->                              |       |   /                     |              |
-> +-------------+              |       |  /                      +--------------+
-> |   SA1111    | --sa11x irq--| Latch | -
-> +-------------+              +-------+
->
-> The "gates on motherboard" is what lubbock.c is describing, ie. the
-> interconnection on the motherboard. I don't see the device/driver model fitting
-> to describe these gates, do you ?
->
+On Thu, Nov 27, 2014 at 11:18 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Thu, Nov 27, 2014 at 09:44:42AM +0100, Linus Walleij wrote:
+>> On Tue, Nov 11, 2014 at 1:38 PM, Hongzhou Yang
+>> <hongzhou.yang@mediatek.com> wrote:
 
-I think that it's a kind of irq muxing, just like lots of PMIC (power
-management IC).
-We should move the lubbock board irqs to a mfd driver, and register them as
-threaded irqs.
+>> > +- mediatek,pins: 2 integers array, represents gpio pinmux number and config
+>> > +  setting. The format as following
+>> > +
+>> > +    node {
+>> > +     mediatek,pins = <PIN_NUMBER_PINMUX>;
+>> > +                     GENERIC_PINCONFIG;
+>> > +    };
+>>
+>> As suggested by Sacha, use just "pins" and define the binding as a patch
+>> to Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+>> that is generic for multiplexing, so we get some order here.
+>>
+>> I want you however to put pin multiplexing and pin configuration into
+>> different nodes if possible. I don't like combines muxing and config
+>> nodes. If necessary tag the node with something.
+>
+> Why? I think the properties can live happily together, even when the
+> parsing functions go to the pinctrl core.
 
-Best Regards
-Haojian
+I'm worried about the semantic ambiguity between the pins = <...>;
+property on different pin controllers, whether they are based on
+function+group or per-pin. It's not even up to me to decide,
+this is for the DT binding people.
+
+In this case:
+
+pins = <MT8135_PIN_100_SDA0__FUNC_SDA0>,
+          <MT8135_PIN_101_SCL0__FUNC_SCL0>;
+
+Each element is a 32bit unsigned where the lower and higher
+16 bits have different meanings.
+
+In some other pin controller (using generic bindings and
+already merged! arch/arm/boot/dts/ste-href-ab8500.dtsi):
+
+gpio39 {
+      gpio39_default_mode: gpio39_default {
+             default_mux {
+                      function = "gpio";
+                      groups = "gpio39_a_1";
+             };
+             default_cfg {
+                      pins = "GPIO39_E16";
+                      input-enable;
+                      bias-pull-down;
+             };
+     };
+};
+
+Can we get away with using the same core parser with this
+as well, here the nodes are split and using strings to identify
+pins, not 32bit numbers.
+
+I am worried about semantic coexistance...
+
+>> > +               i2c0_pins_a: i2c0 at 0 {
+>> > +                       pins1 {
+>> > +                               mediatek,pins = <MT8135_PIN_100_SDA0__FUNC_SDA0>,
+>> > +                                               <MT8135_PIN_101_SCL0__FUNC_SCL0>;
+>> > +                               bias-disable;
+>> > +                       };
+>> > +               };
+>>
+>> I would split it up.
+>>
+>> i2c0_pins_a: i2c0 at 0 {
+>>         pins1 {
+>>                 pins = <MT8135_PIN_100_SDA0>;
+>>                 function = <MT8135_PIN_100_FUNC_SDA0>;
+>>         };
+>
+> The reason to put this in a single define was to make writing the device
+> trees less error prone. When you have two arrays you must correlate the
+> entries.
+
+I see the upside. I'm just worried about ambiguity when comparing
+different device trees to each other, because they should be about
+readability and understanding, not confusing...
+
+>> One node for the multiplexing, one node for the config. This is the
+>> pattern used by most drivers, so I want to have this structure.
+>>
+>> It is also easy to tell one node from the other: if it contains "function"
+>> we know it's a multiplexing node, if it doesn't, it's a config node.
+>
+> So when merging these together a node is always multiplexing and
+> configuration. But do we really win anything if both are separated? When
+> both are separated you still need an array of pins in the nodes to
+> tell which pins this node is for. If this array also contains the
+> mux information then this won't hurt. You can still ignore it.
+
+Well we definately have to support the case with split config and
+muxing nodes at least. I am very worried that we would get into
+ambguities where that is not possible.
+
+Yours,
+Linus Walleij
