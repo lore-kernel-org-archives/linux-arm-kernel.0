@@ -1,29 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Nov 2014 21:57:34 +0100
-Subject: [PATCH RESEND] ARM: vexpress: Enable regulator framework when
- MMCI is in use
-In-Reply-To: <1417193071-801-1-git-send-email-pawel.moll@arm.com>
-References: <1417192440.4371.15.camel@arm.com>
- <1417193071-801-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <2719121.hRCeH8rxZM@wuerfel>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 28 Nov 2014 22:02:01 +0100
+Subject: [PATCH 2/2] ARM: imx: src: support vf610 system reset controller
+In-Reply-To: <34359137.rt8QrS7shW@wuerfel>
+References: <1417193015-6033-1-git-send-email-stefan@agner.ch>
+ <1417193015-6033-3-git-send-email-stefan@agner.ch>
+ <34359137.rt8QrS7shW@wuerfel>
+Message-ID: <7cd7c820d32cb04fa1d59889d16666a9@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 November 2014 16:44:31 Pawel Moll wrote:
-> The MMCI driver, when used with a Device Tree described device, relies
-> on the "vmmc" voltage regulator supply to set the OCR register voltage bits,
-> using MMC core's mmc_regulator_get_supply() function.
+On 2014-11-28 17:49, Arnd Bergmann wrote:
+> On Friday 28 November 2014 17:43:35 Stefan Agner wrote:
+>> Support Vybrid SoC's system reset controller (SRC). Currently we
+>> don't register a reset controller but only support the imx_cpu_jump
+>> and imx_cpu_arg functions.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > 
-> Without the regulator framework present there are no valid operating
-> voltages reported and the device initialisation fails:
-> 
-> mmci-pl18x 10005000.mmci: No vmmc regulator found
-> mmci-pl18x 10005000.mmci: no support for card's volts
-> mmc0: error -22 whilst initialising SD card
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> 
+> I think this should be a platform driver in drivers/power/reset.
 
-Applied on top, thanks!
+Yeah, I thought that too, see my cover letter. The problem is, in that
+module are also some register which are of interest when implementing
+suspend/resume support (see cover letter too). However, we could also
+just make a dt entry for that reset register only, and create another dt
+entry for the other registers.
 
-	Arnd
+> If the SRC is also capable of resetting individual blocks instead of just
+> the entire machine, it would be a reset driver in drivers/reset instead.
+
+Beside the system reset, there is only a mask functionality for the
+watchdogs (there are two watchdogs, one for Cortex-A5 and one for the
+M4). This makes the SRC module in the Vybrid a bit different then what
+is available on other i.MX SoC's...
+
+--
+Stefan
+
+> 
+> 	Arnd
