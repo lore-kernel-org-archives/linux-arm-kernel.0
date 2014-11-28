@@ -1,115 +1,188 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Nov 2014 17:12:44 +0100
-Subject: [PATCH v3 2/3] dt-bindings: Add pinctrl bindings for
- mt65xx/mt81xx.
-In-Reply-To: <20141127101830.GP30369@pengutronix.de>
-References: <1415709535-31515-1-git-send-email-hongzhou.yang@mediatek.com>
- <1415709535-31515-3-git-send-email-hongzhou.yang@mediatek.com>
- <CACRpkdYSe_BH_qiHma2BA+c2otEi3wd0TBXy83t8vwrNL+3U2g@mail.gmail.com>
- <20141127101830.GP30369@pengutronix.de>
-Message-ID: <CACRpkdbMdJT6y-NL36RgQe0-CAFAVGqKiwY9+yFcwA7JDLmA+Q@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 28 Nov 2014 16:16:09 +0000
+Subject: [PATCH 3.18-rc4 v12 0/5] arm: Implement arch_trigger_all_cpu_backtrace
+In-Reply-To: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1417191374-26719-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 11:18 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Thu, Nov 27, 2014 at 09:44:42AM +0100, Linus Walleij wrote:
->> On Tue, Nov 11, 2014 at 1:38 PM, Hongzhou Yang
->> <hongzhou.yang@mediatek.com> wrote:
+Hi Thomas, Hi Jason: Patches 1 to 3 are for you.
 
->> > +- mediatek,pins: 2 integers array, represents gpio pinmux number and config
->> > +  setting. The format as following
->> > +
->> > +    node {
->> > +     mediatek,pins = <PIN_NUMBER_PINMUX>;
->> > +                     GENERIC_PINCONFIG;
->> > +    };
->>
->> As suggested by Sacha, use just "pins" and define the binding as a patch
->> to Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->> that is generic for multiplexing, so we get some order here.
->>
->> I want you however to put pin multiplexing and pin configuration into
->> different nodes if possible. I don't like combines muxing and config
->> nodes. If necessary tag the node with something.
->
-> Why? I think the properties can live happily together, even when the
-> parsing functions go to the pinctrl core.
+This patchset modifies the GIC driver to allow it, on supported
+platforms, to route IPI interrupts to FIQ and uses this feature to
+implement arch_trigger_all_cpu_backtrace for arm.
 
-I'm worried about the semantic ambiguity between the pins = <...>;
-property on different pin controllers, whether they are based on
-function+group or per-pin. It's not even up to me to decide,
-this is for the DT binding people.
+On platforms not capable of supporting FIQ the signal to generate a
+backtrace we fall back to using IRQ for propagation instead (relying on
+a timeout to avoid wedging the CPU requesting the backtrace if other
+CPUs are not responsive).
 
-In this case:
+It has been tested on two systems capable of supporting grouping
+(Freescale i.MX6 and STiH416) and two that do not (vexpress-a9 and
+Qualcomm Snapdragon 600).
 
-pins = <MT8135_PIN_100_SDA0__FUNC_SDA0>,
-          <MT8135_PIN_101_SCL0__FUNC_SCL0>;
+v12:
 
-Each element is a 32bit unsigned where the lower and higher
-16 bits have different meanings.
+* Squash first two patches into a single one and re-describe
+  (Thomas Gleixner).
 
-In some other pin controller (using generic bindings and
-already merged! arch/arm/boot/dts/ste-href-ab8500.dtsi):
+* Improve description of "irqchip: gic: Make gic_raise_softirq FIQ-safe"
+  (Thomas Gleixner).
 
-gpio39 {
-      gpio39_default_mode: gpio39_default {
-             default_mux {
-                      function = "gpio";
-                      groups = "gpio39_a_1";
-             };
-             default_cfg {
-                      pins = "GPIO39_E16";
-                      input-enable;
-                      bias-pull-down;
-             };
-     };
-};
+v11:
 
-Can we get away with using the same core parser with this
-as well, here the nodes are split and using strings to identify
-pins, not 32bit numbers.
+* Optimized gic_raise_softirq() by replacing a register read with
+  a memory read (Jason Cooper).
 
-I am worried about semantic coexistance...
+v10:
 
->> > +               i2c0_pins_a: i2c0 at 0 {
->> > +                       pins1 {
->> > +                               mediatek,pins = <MT8135_PIN_100_SDA0__FUNC_SDA0>,
->> > +                                               <MT8135_PIN_101_SCL0__FUNC_SCL0>;
->> > +                               bias-disable;
->> > +                       };
->> > +               };
->>
->> I would split it up.
->>
->> i2c0_pins_a: i2c0 at 0 {
->>         pins1 {
->>                 pins = <MT8135_PIN_100_SDA0>;
->>                 function = <MT8135_PIN_100_FUNC_SDA0>;
->>         };
->
-> The reason to put this in a single define was to make writing the device
-> trees less error prone. When you have two arrays you must correlate the
-> entries.
+* Add a further patch to optimize away some of the locking on systems
+  where CONFIG_BL_SWITCHER is not set (Marc Zyngier). Compiles OK with
+  exynos_defconfig (which is the only defconfig to set this option).
 
-I see the upside. I'm just worried about ambiguity when comparing
-different device trees to each other, because they should be about
-readability and understanding, not confusing...
+* Whitespace fixes in patch 4. That patch previously used spaces for
+  alignment of new constants but the rest of the file used tabs.
 
->> One node for the multiplexing, one node for the config. This is the
->> pattern used by most drivers, so I want to have this structure.
->>
->> It is also easy to tell one node from the other: if it contains "function"
->> we know it's a multiplexing node, if it doesn't, it's a config node.
->
-> So when merging these together a node is always multiplexing and
-> configuration. But do we really win anything if both are separated? When
-> both are separated you still need an array of pins in the nodes to
-> tell which pins this node is for. If this array also contains the
-> mux information then this won't hurt. You can still ignore it.
+v9:
 
-Well we definately have to support the case with split config and
-muxing nodes at least. I am very worried that we would get into
-ambguities where that is not possible.
+* Improved documentation and structure of initial patch (now initial
+  two patches) to make gic_raise_softirq() safe to call from FIQ
+  (Thomas Gleixner).
 
-Yours,
-Linus Walleij
+* Avoid masking interrupts during gic_raise_softirq(). The use of the
+  read lock makes this redundant (because we can safely re-enter the
+  function).
+
+v8:
+
+* Fixed build on arm64 causes by a spurious include file in irq-gic.c.
+
+v7-2 (accidentally released twice with same number):
+
+* Fixed boot regression on vexpress-a9 (reported by Russell King).
+
+* Rebased on v3.18-rc3; removed one patch from set that is already
+  included in mainline.
+
+* Dropped arm64/fiq.h patch from the set (still useful but not related
+  to issuing backtraces).
+
+v7:
+
+* Re-arranged code within the patch series to fix a regression
+  introduced midway through the series and corrected by a later patch
+  (testing by Olof's autobuilder). Tested offending patch in isolation
+  using defconfig identified by the autobuilder.
+
+v6:
+
+* Renamed svc_entry's call_trace argument to just trace (example code
+  from Russell King).
+
+* Fixed mismatched ENDPROC() in __fiq_abt (example code from Russell
+  King).
+
+* Modified usr_entry to optional avoid calling into the trace code and
+  used this in FIQ entry from usr path. Modified corresponding exit code
+  to avoid calling into trace code and the scheduler (example code from
+  Russell King).
+
+* Ensured the default FIQ register state is restored when the default
+  FIQ handler is reinstalled (example code from Russell King).
+
+* Renamed no_fiq_insn to dfl_fiq_insn to reflect the effect of adopting
+  a default FIQ handler.
+
+* Re-instated fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq(). gic_raise_softirq() is called by wake_up_klogd()
+  in the console unlock logic.
+
+v5:
+
+* Rebased on 3.17-rc4.
+
+* Removed a spurious line from the final "glue it together" patch
+  that broke the build.
+
+v4:
+
+* Replaced push/pop with stmfd/ldmfd respectively (review of Nicolas
+  Pitre).
+
+* Really fix bad pt_regs pointer generation in __fiq_abt.
+
+* Remove fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq() (review of Russell King)
+
+* Restructured to introduce the default FIQ handler first, before the
+  new features (review of Russell King).
+
+v3:
+
+* Removed redundant header guards from arch/arm64/include/asm/fiq.h
+  (review of Catalin Marinas).
+
+* Moved svc_exit_via_fiq macro to entry-header.S (review of Nicolas
+  Pitre).
+
+v2:
+
+* Restructured to sit nicely on a similar FYI patchset from Russell
+  King. It now effectively replaces the work in progress final patch
+  with something much more complete.
+
+* Implemented (and tested) a Thumb-2 implementation of svc_exit_via_fiq
+  (review of Nicolas Pitre)
+
+* Dropped the GIC group 0 workaround patch. The issue of FIQ interrupts
+  being acknowledged by the IRQ handler does still exist but should be
+  harmless because the IRQ handler will still wind up calling
+  ipi_cpu_backtrace().
+
+* Removed any dependency on CONFIG_FIQ; all cpu backtrace effectively
+  becomes a platform feature (although the use of non-maskable
+  interrupts to implement it is best effort rather than guaranteed).
+
+* Better comments highlighting usage of RAZ/WI registers (and parts of
+  registers) in the GIC code.
+
+Changes *before* v1:
+
+* This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
+  arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
+  the new structure. For historic details see:
+        https://lkml.org/lkml/2014/9/2/227
+
+* Fix bug in __fiq_abt (no longer passes a bad struct pt_regs value).
+  In fixing this we also remove the useless indirection previously
+  found in the fiq_handler macro.
+
+* Make default fiq handler "always on" by migrating from fiq.c to
+  traps.c and replace do_unexp_fiq with the new handler (review
+  of Russell King).
+
+* Add arm64 version of fiq.h (review of Russell King)
+
+* Removed conditional branching and code from irq-gic.c, this is
+  replaced by much simpler code that relies on the GIC specification's
+  heavy use of read-as-zero/write-ignored (review of Russell King)
+
+
+Daniel Thompson (5):
+  irqchip: gic: Optimize locking in gic_raise_softirq
+  irqchip: gic: Make gic_raise_softirq FIQ-safe
+  irqchip: gic: Introduce plumbing for IPI FIQ
+  ARM: add basic support for on-demand backtrace of other CPUs
+  arm: smp: Handle ipi_cpu_backtrace() using FIQ (if available)
+
+ arch/arm/include/asm/irq.h      |   5 +
+ arch/arm/include/asm/smp.h      |   3 +
+ arch/arm/kernel/smp.c           |  64 +++++++++++++
+ arch/arm/kernel/traps.c         |   8 +-
+ drivers/irqchip/irq-gic.c       | 203 +++++++++++++++++++++++++++++++++++++---
+ include/linux/irqchip/arm-gic.h |   8 ++
+ 6 files changed, 275 insertions(+), 16 deletions(-)
+
+--
+1.9.3
