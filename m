@@ -1,48 +1,24 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Fri, 28 Nov 2014 22:30:52 +0000
-Subject: [PATCH] arm: ep93xx: add dma_masks for the M2P and M2M DMA
- controllers
-In-Reply-To: <201411281235.50962.arnd@arndb.de>
-References: <1416590622-7765-1-git-send-email-hsweeten@visionengravers.com>,
- <201411281235.50962.arnd@arndb.de>
-Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D88260697B7@P3PWEX4MB008.ex4.secureserver.net>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sat, 29 Nov 2014 00:41:35 +0200
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <201411282241.12095@pali>
+References: <20141027200008.GR2560@atomide.com> <201411271232.47231@pali>
+ <20141128202719.GU2817@atomide.com> <201411282241.12095@pali>
+Message-ID: <20141128224134.GB1382@fuloong-minipc.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 28, 2014 4:35 AM, Arnd Bergmann wrote:
-> On Friday 21 November 2014, H Hartley Sweeten wrote:
->> The dma_mask and coherent_dma_mask need to be set or DMA memory allocations
->> will fail with error messages like this:
->>
->>   ep93xx-dma ep93xx-dma-m2p: coherent DMA mask is unset
->>
->>   ep93xx-dma ep93xx-dma-m2m: coherent DMA mask is unset
->>
->> Add the missing information to the ep93xx-dma-m2p and ep93xx-dma-m2m
->> devices.
->>
->> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->> Reported-by: Jeremy Moles <cubicool@gmail.com>
->> Tested-by: Alexander Sverdlin <subaparts@yandex.ru>
->> Cc: Ryan Mallon <rmallon@gmail.com>
->
-> Applied to next/fixes-non-critical. I couldn't tell from your description
-> whether you want this on 3.18 or even backported to older releases,
-> which I guess would make sense.
->
-> If you want a backport, let me know.
+Hi,
 
-Arnd,
+On Fri, Nov 28, 2014 at 10:41:12PM +0100, Pali Roh?r wrote:
+> uboot (in mode when is loaded from NOLO) has those issues:
+> 
+> 1) uboot cannot read n900 onenand mtd (uboot onenand driver not
+> working, do not know why)
+> 2) missing support for battery charging (can totally discharge
+> battery)
 
-This fixes the ep93xx sound driver. It should probably be backported and
-applied to 3.18.
+NOLO enables watchdogs when booting. So if you get stuck in the U-boot
+for whatever reason the device will power off after ~30 secs or so.
 
-The sound driver was broken when it was converted to the dmaengine API.
-I missed this when the driver was converted because my normal ep93xx
-boards do not have sound support.
-
-I'll try to determine when the audio actually broke so we can figure out how
-far the backport needs to go,
-
-Thanks,
-Hartley
+A.
