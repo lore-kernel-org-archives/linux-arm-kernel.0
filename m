@@ -1,84 +1,45 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 28 Nov 2014 16:16:14 +0000
-Subject: [PATCH 3.18-rc4 v12 5/5] arm: smp: Handle ipi_cpu_backtrace() using
- FIQ (if available)
-In-Reply-To: <1417191374-26719-1-git-send-email-daniel.thompson@linaro.org>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1417191374-26719-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1417191374-26719-6-git-send-email-daniel.thompson@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Nov 2014 17:31:45 +0100
+Subject: [PATCH v2 RESEND 1/2] ARM: vexpress: Remove non-DT code
+In-Reply-To: <1417189984.4371.12.camel@arm.com>
+References: <1416939455-1814-1-git-send-email-pawel.moll@arm.com>
+ <20141128153026.GU3836@n2100.arm.linux.org.uk>
+ <1417189984.4371.12.camel@arm.com>
+Message-ID: <3935390.Q4yT7WfqCv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous changes have introduced both a replacement default FIQ handler
-and an implementation of arch_trigger_all_cpu_backtrace for ARM but
-these are currently independent of each other.
+On Friday 28 November 2014 15:53:04 Pawel Moll wrote:
+> vmmc-supply is a defined as:
+> 
+>                                 vmmc-supply = <&v2m_fixed_3v3>;
+> 
+> which is:
+> 
+>                 v2m_fixed_3v3: fixedregulator at 0 {
+>                         compatible = "regulator-fixed";
+> 
+> and arch/arm/mach-vexpress/Kconfig says:
+> 
+> menuconfig ARCH_VEXPRESS
+> [...]
+>         select REGULATOR_FIXED_VOLTAGE if REGULATOR
+> 
+> but it doesn't select REGULATOR in result of this discussion:
+> 
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/223426/focus=223427
+> 
+> To summarize, I believe that setting CONFIG_REGULATOR=y (as in
+> vexpress_defconfig) should solve your issue.
 
-This patch plumbs together these features making it possible, on platforms
-that support it, to trigger backtrace using FIQ.
+Well, there is clearly a bug somewhere. As you say, the mmc driver
+now uses the regulator API to check the voltage instead of using
+platform_data. But there is no dependency on having the regulator
+support around, so it can't.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/include/asm/smp.h | 3 +++
- arch/arm/kernel/smp.c      | 4 +++-
- arch/arm/kernel/traps.c    | 3 +++
- 3 files changed, 9 insertions(+), 1 deletion(-)
+I would suggest applying your patch from
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/223426/focus=224128
+after all, or just hardcoding regulator support like a lot of other
+platforms do.
 
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 18f5a554134f..b076584ac0fa 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -18,6 +18,8 @@
- # error "<asm/smp.h> included in non-SMP build"
- #endif
- 
-+#define SMP_IPI_FIQ_MASK 0x0100
-+
- #define raw_smp_processor_id() (current_thread_info()->cpu)
- 
- struct seq_file;
-@@ -79,6 +81,7 @@ extern void arch_send_call_function_single_ipi(int cpu);
- extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
- extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
- 
-+extern void ipi_cpu_backtrace(struct pt_regs *regs);
- extern int register_ipi_completion(struct completion *completion, int cpu);
- 
- struct smp_operations {
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 14c594a12bef..e923843562d9 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -539,7 +539,7 @@ static void ipi_cpu_stop(unsigned int cpu)
- 		cpu_relax();
- }
- 
--static void ipi_cpu_backtrace(struct pt_regs *regs)
-+void ipi_cpu_backtrace(struct pt_regs *regs)
- {
- 	int cpu = smp_processor_id();
- 
-@@ -580,6 +580,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 	unsigned int cpu = smp_processor_id();
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
-+	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
-+
- 	if ((unsigned)ipinr < NR_IPI) {
- 		trace_ipi_entry(ipi_types[ipinr]);
- 		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 4dc45b38e56e..9eb05be9526e 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
- #ifdef CONFIG_ARM_GIC
- 	gic_handle_fiq_ipi();
- #endif
-+#ifdef CONFIG_SMP
-+	ipi_cpu_backtrace(regs);
-+#endif
- 
- 	nmi_exit();
- 
--- 
-1.9.3
+	Arnd
