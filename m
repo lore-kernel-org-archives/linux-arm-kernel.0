@@ -1,42 +1,70 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Fri, 28 Nov 2014 23:21:54 +0800
-Subject: [PATCH v1] ARM: multi_v7_defconfig: add driver support for hix5hd2
-In-Reply-To: <44903559.5EVSLnOq11@wuerfel>
-References: <1416901046-21091-1-git-send-email-zhangfei.gao@linaro.org>
- <201411281607.48459.arnd@arndb.de> <547891A4.9090405@linaro.org>
- <44903559.5EVSLnOq11@wuerfel>
-Message-ID: <54789312.1010804@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 28 Nov 2014 15:22:47 +0000
+Subject: [PATCH v2 3/8] regulator: MT6397: Add support for MT6397 regulator
+In-Reply-To: <1417146874-5232-4-git-send-email-flora.fu@mediatek.com>
+References: <1417146874-5232-1-git-send-email-flora.fu@mediatek.com>
+ <1417146874-5232-4-git-send-email-flora.fu@mediatek.com>
+Message-ID: <20141128152247.GR7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 28, 2014 at 11:54:29AM +0800, Flora Fu wrote:
 
+> @@ -96,5 +97,4 @@ obj-$(CONFIG_REGULATOR_WM8350) += wm8350-regulator.o
+>  obj-$(CONFIG_REGULATOR_WM8400) += wm8400-regulator.o
+>  obj-$(CONFIG_REGULATOR_WM8994) += wm8994-regulator.o
+>  
+> -
+>  ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG
 
-On 11/28/2014 11:17 PM, Arnd Bergmann wrote:
-> On Friday 28 November 2014 23:15:48 zhangfei wrote:
->> On 11/28/2014 11:07 PM, Arnd Bergmann wrote:
->>> On Tuesday 25 November 2014, Zhangfei Gao wrote:
->>>> Tested on hix5hd2 platform with mmc, usb, network, reboot etc.
->>>>
->>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->>>
->>> Applied to next/defconfig, thanks!
->>>
->>> You mentioned earlier that you'd like me to apply this patch so I took it, but
->>> you did not send it to arm at kernel.org or ask for it to be applied in the email,
->>> so there was still a chance for it to get lost. Please try to be explict
->>> about these things as you can.
->>>
->>
->> Thanks Arnd
->>
->> Usually, should this info be listed in the git msg or reply with the
->> original patch?
->
-> The best way to do this is to put it under the '---' line that separates
-> the changelog part of the patch from the additional info like the diffstat.
->
-> If you are sending more than one patch at once, use a [PATCH 0/x] introductory
-> mail and put it in there.
->
+Random whitespace change here...
 
-Thanks Arnd for the kind education.
+> +	/* For HW design, buck voltage control register has two parts.
+> +	 * part 1: vsel_reg for register mode
+> +	 * part 2: voselon_reg or hw control mode
+> +	 * Both parts should be updated and sync when user set voltage.
+> +	 */
+
+Why does nothing else in the driver know about this "hw control mode" -
+what does it actually mean, shouldn't it affect some of the other
+operations?
+
+> +	ret = regmap_update_bits(rdev->regmap, info->desc.vsel_reg,
+> +		info->desc.vsel_mask, sel);
+> +	if (ret != 0) {
+> +		dev_err(&rdev->dev, "Failed to update vsel: %d\n", ret);
+> +		return ret;
+> +	}
+> +	ret = regmap_update_bits(rdev->regmap, info->voselon_reg,
+
+Missing blank line between these blocks.
+
+> +static int mt6397_buck_get_voltage_sel(struct regulator_dev *rdev)
+> +{
+
+> +static int mt6397_regulator_is_enabled(struct regulator_dev *rdev)
+> +{
+
+To repeat my comments on the last version: please use the generic regmap
+operations rather than copying them.
+
+> +	np = of_node_get(pdev->dev.parent->of_node);
+> +	if (!np)
+> +		return -EINVAL;
+> +
+> +	regulators = of_get_child_by_name(np, "regulators");
+
+To further repeat my previous review comments:
+
+| Define regulators_node and of_match in the regulator desc and you can
+| remove both this table and all your DT matching code in the driver, the
+| core will handle it for you.
+
+Please don't ignore review comments.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141128/71cdd44e/attachment-0001.sig>
