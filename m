@@ -1,79 +1,50 @@
-From: Suravee.Suthikulpanit@amd.com (Suthikulpanit, Suravee)
-Date: Fri, 28 Nov 2014 16:42:04 +0000
-Subject: [PATCH V5] arm64: amd-seattle: Adding device tree for AMD
- Seattle platform
-In-Reply-To: <201411281613.11626.arnd@arndb.de>
-Message-ID: <D09EA4E8.A828%suravee.suthikulpanit@amd.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 28 Nov 2014 17:43:34 +0100
+Subject: [PATCH 1/2] ARM: dts: vf610: add system reset controller (SRC)
+In-Reply-To: <1417193015-6033-1-git-send-email-stefan@agner.ch>
+References: <1417193015-6033-1-git-send-email-stefan@agner.ch>
+Message-ID: <1417193015-6033-2-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add device tree property for system reset controller.
 
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/vf500.dtsi | 4 ++++
+ arch/arm/boot/dts/vfxxx.dtsi | 5 +++++
+ 2 files changed, 9 insertions(+)
 
-On 11/28/14, 22:13, "Arnd Bergmann" <arnd@arndb.de> wrote:
-
->On Wednesday 26 November 2014, suravee.suthikulpanit at amd.com wrote:
->> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> 
->> Initial revision of device tree for AMD Seattle Development platform.
->> 
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> Signed-off-by: Thomas Lendacky <Thomas.Lendacky@amd.com>
->> Signed-off-by: Joel Schopp <Joel.Schopp@amd.com>
->> ---
->> V5 Changes:
->>   * Rebase to arm-soc for-next (per Olof)
->>   * Restructure the DTS/DTSI into board and SoC configurations (per
->>Olof)
->>   * Add model property at the top level (per Olof)
->>   * Move pcie0 under smb and change smb's ranges property to empty
->>since pcie
->>     is not in the same range. (per Olof)
->>   * Change v2m0's ranges property (per Arnd)
->>   * Change timer interrupt type to level-trigger (per Marc)
->
->Applied to next/arm64, thanks!
-
-Thank you
->
->Looking at this one more time, I had another question:
->
->> +	smb0: smb {
->> +		compatible = "simple-bus";
->> +		#address-cells = <2>;
->> +		#size-cells = <2>;
->> +		ranges;
->> +
->> +		/* DDR range is 40-bit addressing */
->> +		dma-ranges = <0x80 0x0 0x80 0x0 0x7f 0xffffffff>;
->> +
->
->What is a DDR range?
->
->Also, what is special about the last byte? Did you intentionally
->leave it out? I think when we calculate the dma mask, we will
->use 0x3fffffffff so we don't step on the last byte, which I assume
->is not what you intended.
->
->	Arnd
-
-Hm..probably not then. What I meant is to specify 40-bit addressing for
-the memory range starting
-from [0x80_0000_0000 - 0x100_0000_0000).
-
-As, I discussed with you on IRC, it should also cover the V2m MSI register
-frame, and should be starting from
-0. The fix should then be:
-
-dma-ranges = <0 0 0 0 0x100 0x00000000>
-
-
-I will send a patch out to fix and add better comment for this.
-
-Thanks,
-
-Suravee
+diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
+index de67005..3f38f49 100644
+--- a/arch/arm/boot/dts/vf500.dtsi
++++ b/arch/arm/boot/dts/vf500.dtsi
+@@ -130,6 +130,10 @@
+ 	interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+ };
+ 
++&src {
++	interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
++};
++
+ &uart0 {
+ 	interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ };
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index 505969a..5ff9cc5 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -318,6 +318,11 @@
+ 				clocks = <&clks VF610_CLK_USBC0>;
+ 				status = "disabled";
+ 			};
++
++			src: src at 4006e000 {
++				compatible = "fsl,vf610-src";
++				reg = <0x4006e000 0x1000>;
++			};
+ 		};
+ 
+ 		aips1: aips-bus at 40080000 {
+-- 
+2.1.3
