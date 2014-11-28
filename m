@@ -1,63 +1,45 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 28 Nov 2014 14:35:32 +0000
-Subject: [PATCH v3 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC
- in dts and Makefile
-In-Reply-To: <20141128142913.GB5393@localhost>
-References: <Sharkl64-v3>
- <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1416917818-10506-4-git-send-email-chunyan.zhang@spreadtrum.com>
- <20141127115042.GE857@leverpostej>
- <20141127121214.GF11511@e104818-lin.cambridge.arm.com>
- <20141127134309.GJ857@leverpostej>
- <20141128142913.GB5393@localhost>
-Message-ID: <20141128143532.GI25883@leverpostej>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Fri, 28 Nov 2014 20:09:09 +0530
+Subject: [PATCH] arm64: enable ARCH_HAS_BANDGAP config
+In-Reply-To: <20141128141240.GA4249@localhost>
+References: <1415968254-5182-1-git-send-email-a.kesavan@samsung.com>
+ <CAGOxZ52o-O+=PCsGRfKEGGc0NUg_M+z5_UmbrjBwvW8+x3c22w@mail.gmail.com>
+ <20141128141240.GA4249@localhost>
+Message-ID: <CAM4voamq0KpLU4-5vKeV5eyHeT9tTP3wGzrH5KNsnR8maSS5Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 02:29:13PM +0000, Catalin Marinas wrote:
-> On Thu, Nov 27, 2014 at 01:43:09PM +0000, Mark Rutland wrote:
-> > On Thu, Nov 27, 2014 at 12:12:15PM +0000, Catalin Marinas wrote:
-> > > On Thu, Nov 27, 2014 at 11:50:43AM +0000, Mark Rutland wrote:
-> > > > On Tue, Nov 25, 2014 at 12:16:56PM +0000, Chunyan Zhang wrote:
-> > > > > +
-> > > > > +       timer {
-> > > > > +               compatible = "arm,armv8-timer";
-> > > > > +               interrupts = <1 13 0xff01>,
-> > > > > +                            <1 14 0xff01>,
-> > > > > +                            <1 11 0xff01>,
-> > > > > +                            <1 10 0xff01>;
-> > > > > +               clock-frequency = <26000000>;
-> > > > 
-> > > > Please remove the clock-frequency property. Your FW should initialise
-> > > > CNTFRQ_EL0 on all CPUs (certainly PSCI 0.2 requires that you do this).
-> > > 
-> > > Since this comes up regularly, I think we need a dev_warn() in the arch
-> > > timer driver when CONFIG_ARM64.
-> > 
-> > I'll ack such a patch ;)
-> 
-> How rude would this be?
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 2133f9d59d06..aaaf3433ccb9 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -371,7 +371,8 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
-> 		return;
->  
-> 	/* Try to determine the frequency from the device tree or CNTFRQ */
-> -	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
-> +	if (IS_ENABLED(CONFIG_ARM64) ||
-> +	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
-> 		if (cntbase)
-> 			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
-> 		else
+Hi Catalin,
+
+On Fri, Nov 28, 2014 at 7:42 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Sun, Nov 23, 2014 at 08:05:05AM +0000, Alim Akhtar wrote:
+>> On Fri, Nov 14, 2014 at 6:00 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+>> > Some of the existing thermal drivers (ti and exynos) have a dependency on
+>> > ARCH_HAS_BANDGAP. Activate ARCH_HAS_BANDGAP config entry for ARM64 so that
+>> > these drivers may be re-used.
+>> >
+>> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> > ---
+>> HAS_BANDGAP was added to ARM to indicate that arch supports a bandgap
+>> device like a thermal management unit, so this looks good to me.
 >
+> But it doesn't look good to me. ARCH_HAS_* kind of implies that the
+> architecture has some feature or the port provides some feature. But in
+> the current use, it simply allows the enabling of the menu config
+> entries for two drivers (EXYNOS_THERMAL and TI_SOC_THERMAL).
+>
+> If you want to specify that the SoC has a device, just use DT and not
+> some random config option that only enables the menu entry for the
+> corresponding driver.
 
-Probably too rude, given it doesn't WARN() the user.
+So, you are suggesting that the ARCH_HAS_BANDGAP dependency for these
+two drivers be removed ? I am not aware of the history behind adding
+this symbol, but as it is only used  by the 2 platforms it should be
+easy to remove.
 
-We should be extremely loud if we see the clock-frequency property on an
-arm64 system. Whether or not we should ignore the property is another
-matter.
-
-Mark.
+Regards,
+Abhilash
+>
+> --
+> Catalin
