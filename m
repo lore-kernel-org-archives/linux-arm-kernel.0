@@ -1,84 +1,88 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Nov 2014 09:37:06 +0100
-Subject: linux-next: manual merge of the sunxi tree with the arm-soc tree
-In-Reply-To: <20141128103617.13a1821c@canb.auug.org.au>
-References: <20141128103617.13a1821c@canb.auug.org.au>
-Message-ID: <20141128083706.GT25249@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Nov 2014 09:49:10 +0100
+Subject: [PATCH 00/11] ARM: at91: remove !DT support for at91rm9200
+In-Reply-To: <1422574.pPO36BQRH8@kongar>
+References: <cover.1417103399.git.nicolas.ferre@atmel.com>
+ <20141128002822.GM4508@piout.net> <1422574.pPO36BQRH8@kongar>
+Message-ID: <2770184.6f6RpLLlMS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Nov 28, 2014 at 10:36:17AM +1100, Stephen Rothwell wrote:
-> Hi Maxime,
+On Friday 28 November 2014 09:27:38 Alexander Stein wrote:
+> Hi Alexandre,
 > 
-> Today's linux-next merge of the sunxi tree got a conflict in
-> arch/arm/boot/dts/sun6i-a31.dtsi between commit 3fd0c05da46c ("Revert
-> "ARM: dts: sunxi: Use sun4i-a10-apb1-clk for sun6i/sun8i apb2
-> clocks."") from the arm-soc tree and commit 74c947ab33c9 ("ARM: dts:
-> sunxi: Use sun4i-a10-apb1-clk for sun6i/sun8i apb2 clocks") from the
-> sunxi tree.
-> 
-> I fixed it up (I just used the arm-soc version for now) and can carry
-> the fix as necessary (no action is required).
-> 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc arch/arm/boot/dts/sun6i-a31.dtsi
-> index 529c73803976,f47156b6572b..000000000000
-> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
-> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-> @@@ -217,19 -229,11 +229,19 @@@
->   					"apb1_daudio1";
->   		};
->   
->  -		apb2: clk at 01c20058 {
->  +		apb2_mux: apb2_mux at 01c20058 {
->  +			#clock-cells = <0>;
->  +			compatible = "allwinner,sun4i-a10-apb1-mux-clk";
->  +			reg = <0x01c20058 0x4>;
->  +			clocks = <&osc32k>, <&osc24M>, <&pll6 0>, <&pll6 0>;
->  +			clock-output-names = "apb2_mux";
->  +		};
->  +
->  +		apb2: apb2 at 01c20058 {
->   			#clock-cells = <0>;
-> - 			compatible = "allwinner,sun6i-a31-apb2-div-clk";
-> + 			compatible = "allwinner,sun4i-a10-apb1-clk";
->   			reg = <0x01c20058 0x4>;
-> - 			clocks = <&apb2_mux>;
-> + 			clocks = <&osc32k>, <&osc24M>, <&pll6 0>, <&pll6 0>;
->   			clock-output-names = "apb2";
->   		};
->   
+> On Friday 28 November 2014, 01:28:22 wrote Alexandre Belloni:
+> > > >  - sound/atmel/ac97c.c (that one is still not converted to DT anyway...)
+> > > 
+> > > This one seems fairly straightforward to do, including a DT binding,
+> > > but the result is still ugly as it supports the at32 chips that
+> > > do things very differently.
+> > > 
+> > > The patch below gets it to compile and should be enough as a replacement
+> > > once a compatible string gets added.
+> > > 
+> > 
+> > Actually, some work was done but we never saw an other version of the
+> > series. Alexander, are you still interested? Else we can take the patch
+> > below.
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/246679.html
 
-I'm not exactly sure why there is still conflicts between my branches
-and arm-soc, since the previous branch that generates these conflicts
-was supposed to be dropped, but the correct fix is:
+I see. Yes, the approach is similar, and there are actually multiple
+independent problems:
 
-		apb2: clk at 01c20058 {
-			#clock-cells = <0>;
-			compatible = "allwinner,sun4i-a10-apb1-clk";
-			reg = <0x01c20058 0x4>;
-			clocks = <&osc32k>, <&osc24M>, <&pll6 0>, <&pll6 0>;
-			clock-output-names = "apb2";
-		};
+- getting the current driver to build with multiplatform (trivial, 5 lines)
+- changing the gpio handling to work with DT (simple, both of us did that)
+- writing the binding (simple)
+- changing the driver to ASoC (not that simple)
 
-with the apb2_mux node dropped entirely.
+> Well, I tried to get a ac97c driver based on alsa soc framework as suggested 
+> by Takashi. But I failed so far, I could not get my head around those 
+> architecture.
 
-Thanks!
-Maxime
+Let's just start with the trivial first patch, that can probably just be merged
+into 3.19, and then we can build on top of that later if anybody wants to
+get ac97 working again on at91.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141128/63f17231/attachment-0001.sig>
+> When keeping my DT support on the current driver, the only thing which is open 
+> that the bindings should be modifed that they are like soc-ac97link bindings.
+
+Makes sense, if that binding works on the at91 hardware. I'm not sure
+whether the pinctrl stuff or the first two gpio lines apply though.
+
+	Arnd
+
+8<---
+ALSA: atmel: fix building the ac97 driver for at91-multiplatform
+
+at91 will no longer export the mach/cpu.h and mach/hardware.h header files
+in the future, which would break building the atmel ac97c driver.
+
+Since the cpu_is_* check is only used to find out whether we are running
+on avr32 or arm/at91, we can hardcode that check in the ARM case.
+
+Unfortunately the driver is missing other work to be useful again on ARM,
+if anyone wants to actually use it, they need to add a DT binding, and
+the driver should really be converted to use the ASoC framework.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Link: http://www.spinics.net/lists/arm-kernel/msg382068.html
+
+diff --git a/sound/atmel/ac97c.c b/sound/atmel/ac97c.c
+index b59427d5a697..4eec216b7f92 100644
+--- a/sound/atmel/ac97c.c
++++ b/sound/atmel/ac97c.c
+@@ -34,10 +34,10 @@
+ #include <linux/platform_data/dma-dw.h>
+ #include <linux/dma/dw.h>
+ 
++#ifdef CONFIG_AVR32
+ #include <mach/cpu.h>
+-
+-#ifdef CONFIG_ARCH_AT91
+-#include <mach/hardware.h>
++#else
++#define cpu_is_at32ap7000() (0)
+ #endif
+ 
+ #include "ac97c.h"
