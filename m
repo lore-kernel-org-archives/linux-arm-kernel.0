@@ -1,187 +1,249 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 27 Nov 2014 17:26:33 -0800
-Subject: [PATCH v2 7/7] pinctrl: qcom-spmi-gpio: Migrate to pinconf-generic
-In-Reply-To: <1417137993-8337-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1417137993-8337-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1417137993-8337-8-git-send-email-soren.brinkmann@xilinx.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Fri, 28 Nov 2014 01:47:42 +0000
+Subject: [PATCH v3] can: Convert to runtime_pm
+In-Reply-To: <54773948.2070605@xilinx.com>
+References: <1417093733-29576-1-git-send-email-appanad@xilinx.com>
+ <54773948.2070605@xilinx.com>
+Message-ID: <9b39dc479fae4456a9868770bea3d95c@BN1AFFO11FD035.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of the driver caring about implementation details like device
-tree, just provide information about driver specific pinconf parameters
-to pinconf-generic which takes care of parsing the DT.
+Hi Michal,
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-This is compile tested only. So, it's likely that it needs more tweaking
-to make it actually work on HW. But it illustrates the potential
-benefits of the pinconf-generic changes in this series.
----
- drivers/pinctrl/qcom/pinctrl-spmi-gpio.c | 125 +++----------------------------
- 1 file changed, 11 insertions(+), 114 deletions(-)
+-----Original Message-----
+From: Michal Simek [mailto:michal.simek at xilinx.com]
+Sent: Thursday, November 27, 2014 8:17 PM
+To: Appana Durga Kedareswara Rao; wg at grandegger.com; mkl at pengutronix.de; Michal Simek; Soren Brinkmann; grant.likely at linaro.org; robh+dt at kernel.org
+Cc: linux-can at vger.kernel.org; netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Appana Durga Kedareswara Rao
+Subject: Re: [PATCH v3] can: Convert to runtime_pm
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-index b863b5080890..2db85e53ef73 100644
---- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-+++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-@@ -131,14 +131,14 @@ struct pmic_gpio_state {
- 	struct gpio_chip chip;
- };
- 
--struct pmic_gpio_bindings {
--	const char	*property;
--	unsigned	param;
-+static const struct pinconf_generic_dt_params pmic_gpio_bindings[] = {
-+	{"qcom,pull-up-strength",	PMIC_GPIO_CONF_PULL_UP,		0},
-+	{"qcom,drive-strength",		PMIC_GPIO_CONF_STRENGTH,	0},
- };
- 
--static struct pmic_gpio_bindings pmic_gpio_bindings[] = {
--	{"qcom,pull-up-strength",	PMIC_GPIO_CONF_PULL_UP},
--	{"qcom,drive-strength",		PMIC_GPIO_CONF_STRENGTH},
-+static const struct pin_config_item pmic_conf_items[] = {
-+	PCONFDUMP(PMIC_GPIO_CONF_PULL_UP,  "pull-up-strength", NULL, true),
-+	PCONFDUMP(PMIC_GPIO_CONF_STRENGTH, "drive-strength", NULL, true),
- };
- 
- static const char *const pmic_gpio_groups[] = {
-@@ -209,118 +209,11 @@ static int pmic_gpio_get_group_pins(struct pinctrl_dev *pctldev, unsigned pin,
- 	return 0;
- }
- 
--static int pmic_gpio_parse_dt_config(struct device_node *np,
--				     struct pinctrl_dev *pctldev,
--				     unsigned long **configs,
--				     unsigned int *nconfs)
--{
--	struct pmic_gpio_bindings *par;
--	unsigned long cfg;
--	int ret, i;
--	u32 val;
--
--	for (i = 0; i < ARRAY_SIZE(pmic_gpio_bindings); i++) {
--		par = &pmic_gpio_bindings[i];
--		ret = of_property_read_u32(np, par->property, &val);
--
--		/* property not found */
--		if (ret == -EINVAL)
--			continue;
--
--		/* use zero as default value */
--		if (ret)
--			val = 0;
--
--		dev_dbg(pctldev->dev, "found %s with value %u\n",
--			par->property, val);
--
--		cfg = pinconf_to_config_packed(par->param, val);
--
--		ret = pinctrl_utils_add_config(pctldev, configs, nconfs, cfg);
--		if (ret)
--			return ret;
--	}
--
--	return 0;
--}
--
--static int pmic_gpio_dt_subnode_to_map(struct pinctrl_dev *pctldev,
--				       struct device_node *np,
--				       struct pinctrl_map **map,
--				       unsigned *reserv, unsigned *nmaps,
--				       enum pinctrl_map_type type)
--{
--	unsigned long *configs = NULL;
--	unsigned nconfs = 0;
--	struct property *prop;
--	const char *group;
--	int ret;
--
--	ret = pmic_gpio_parse_dt_config(np, pctldev, &configs, &nconfs);
--	if (ret < 0)
--		return ret;
--
--	if (!nconfs)
--		return 0;
--
--	ret = of_property_count_strings(np, "pins");
--	if (ret < 0)
--		goto exit;
--
--	ret = pinctrl_utils_reserve_map(pctldev, map, reserv, nmaps, ret);
--	if (ret < 0)
--		goto exit;
--
--	of_property_for_each_string(np, "pins", prop, group) {
--		ret = pinctrl_utils_add_map_configs(pctldev, map,
--						    reserv, nmaps, group,
--						    configs, nconfs, type);
--		if (ret < 0)
--			break;
--	}
--exit:
--	kfree(configs);
--	return ret;
--}
--
--static int pmic_gpio_dt_node_to_map(struct pinctrl_dev *pctldev,
--				    struct device_node *np_config,
--				    struct pinctrl_map **map, unsigned *nmaps)
--{
--	enum pinctrl_map_type type;
--	struct device_node *np;
--	unsigned reserv;
--	int ret;
--
--	ret = 0;
--	*map = NULL;
--	*nmaps = 0;
--	reserv = 0;
--	type = PIN_MAP_TYPE_CONFIGS_GROUP;
--
--	for_each_child_of_node(np_config, np) {
--		ret = pinconf_generic_dt_subnode_to_map(pctldev, np, map,
--							&reserv, nmaps, type);
--		if (ret)
--			break;
--
--		ret = pmic_gpio_dt_subnode_to_map(pctldev, np, map, &reserv,
--						  nmaps, type);
--		if (ret)
--			break;
--	}
--
--	if (ret < 0)
--		pinctrl_utils_dt_free_map(pctldev, *map, *nmaps);
--
--	return ret;
--}
--
- static const struct pinctrl_ops pmic_gpio_pinctrl_ops = {
- 	.get_groups_count	= pmic_gpio_get_groups_count,
- 	.get_group_name		= pmic_gpio_get_group_name,
- 	.get_group_pins		= pmic_gpio_get_group_pins,
--	.dt_node_to_map		= pmic_gpio_dt_node_to_map,
-+	.dt_node_to_map		= pinconf_generic_dt_node_to_map_group,
- 	.dt_free_map		= pinctrl_utils_dt_free_map,
- };
- 
-@@ -590,6 +483,7 @@ static void pmic_gpio_config_dbg_show(struct pinctrl_dev *pctldev,
- }
- 
- static const struct pinconf_ops pmic_gpio_pinconf_ops = {
-+	.is_generic			= true,
- 	.pin_config_group_get		= pmic_gpio_config_get,
- 	.pin_config_group_set		= pmic_gpio_config_set,
- 	.pin_config_group_dbg_show	= pmic_gpio_config_dbg_show,
-@@ -848,6 +742,9 @@ static int pmic_gpio_probe(struct platform_device *pdev)
- 	pctrldesc->name = dev_name(dev);
- 	pctrldesc->pins = pindesc;
- 	pctrldesc->npins = npins;
-+	pctrldesc->num_dt_params = ARRAY_SIZE(pmic_gpio_bindings);
-+	pctrldesc->params = pmic_gpio_bindings;
-+	pctrldesc->conf_items = pmic_conf_items;
- 
- 	for (i = 0; i < npins; i++, pindesc++) {
- 		pad = &pads[i];
--- 
-2.1.3.1.ge241007
+On 11/27/2014 02:08 PM, Kedareswara rao Appana wrote:
+> Instead of enabling/disabling clocks at several locations in the
+> driver, use the runtime_pm framework. This consolidates the actions
+> for runtime PM in the appropriate callbacks and makes the driver more
+> readable and mantainable.
+>
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> Changes for v3:
+>   - Converted the driver to use runtime_pm.
+> Changes for v2:
+>   - Removed the struct platform_device* from suspend/resume
+>     as suggest by Lothar.
+>
+>  drivers/net/can/xilinx_can.c |  119
+> +++++++++++++++++++++++++----------------
+>  1 files changed, 72 insertions(+), 47 deletions(-)
+>
+> diff --git a/drivers/net/can/xilinx_can.c
+> b/drivers/net/can/xilinx_can.c index 8a998e3..1be28ed 100644
+> --- a/drivers/net/can/xilinx_can.c
+> +++ b/drivers/net/can/xilinx_can.c
+> @@ -32,6 +32,7 @@
+>  #include <linux/can/dev.h>
+>  #include <linux/can/error.h>
+>  #include <linux/can/led.h>
+> +#include <linux/pm_runtime.h>
+>
+>  #define DRIVER_NAME  "xilinx_can"
+>
+> @@ -138,7 +139,7 @@ struct xcan_priv {
+>       u32 (*read_reg)(const struct xcan_priv *priv, enum xcan_reg reg);
+>       void (*write_reg)(const struct xcan_priv *priv, enum xcan_reg reg,
+>                       u32 val);
+> -     struct net_device *dev;
+> +     struct device *dev;
+>       void __iomem *reg_base;
+>       unsigned long irq_flags;
+>       struct clk *bus_clk;
+> @@ -842,6 +843,13 @@ static int xcan_open(struct net_device *ndev)
+>       struct xcan_priv *priv = netdev_priv(ndev);
+>       int ret;
+>
+> +     ret = pm_runtime_get_sync(priv->dev);
+> +     if (ret < 0) {
+> +             netdev_err(ndev, "%s: runtime CAN resume failed(%d)\n\r",
+> +                             __func__, ret);
+> +             return ret;
+> +     }
+> +
+>       ret = request_irq(ndev->irq, xcan_interrupt, priv->irq_flags,
+>                       ndev->name, ndev);
+>       if (ret < 0) {
+> @@ -849,29 +857,17 @@ static int xcan_open(struct net_device *ndev)
+>               goto err;
+>       }
+>
+> -     ret = clk_prepare_enable(priv->can_clk);
+> -     if (ret) {
+> -             netdev_err(ndev, "unable to enable device clock\n");
+> -             goto err_irq;
+> -     }
+> -
+> -     ret = clk_prepare_enable(priv->bus_clk);
+> -     if (ret) {
+> -             netdev_err(ndev, "unable to enable bus clock\n");
+> -             goto err_can_clk;
+> -     }
+> -
+>       /* Set chip into reset mode */
+>       ret = set_reset_mode(ndev);
+>       if (ret < 0) {
+>               netdev_err(ndev, "mode resetting failed!\n");
+> -             goto err_bus_clk;
+> +             goto err_irq;
+>       }
+>
+>       /* Common open */
+>       ret = open_candev(ndev);
+>       if (ret)
+> -             goto err_bus_clk;
+> +             goto err_irq;
+>
+>       ret = xcan_chip_start(ndev);
+>       if (ret < 0) {
+> @@ -887,13 +883,11 @@ static int xcan_open(struct net_device *ndev)
+>
+>  err_candev:
+>       close_candev(ndev);
+> -err_bus_clk:
+> -     clk_disable_unprepare(priv->bus_clk);
+> -err_can_clk:
+> -     clk_disable_unprepare(priv->can_clk);
+>  err_irq:
+>       free_irq(ndev->irq, ndev);
+>  err:
+> +     pm_runtime_put(priv->dev);
+> +
+>       return ret;
+>  }
+>
+> @@ -910,12 +904,11 @@ static int xcan_close(struct net_device *ndev)
+>       netif_stop_queue(ndev);
+>       napi_disable(&priv->napi);
+>       xcan_chip_stop(ndev);
+> -     clk_disable_unprepare(priv->bus_clk);
+> -     clk_disable_unprepare(priv->can_clk);
+>       free_irq(ndev->irq, ndev);
+>       close_candev(ndev);
+>
+>       can_led_event(ndev, CAN_LED_EVENT_STOP);
+> +     pm_runtime_put(priv->dev);
+>
+>       return 0;
+>  }
+> @@ -934,27 +927,21 @@ static int xcan_get_berr_counter(const struct net_device *ndev,
+>       struct xcan_priv *priv = netdev_priv(ndev);
+>       int ret;
+>
+> -     ret = clk_prepare_enable(priv->can_clk);
+> -     if (ret)
+> -             goto err;
+> +     ret = pm_runtime_get_sync(priv->dev);
+> +     if (ret < 0) {
+> +             netdev_err(ndev, "%s: runtime resume failed(%d)\n\r",
+> +                             __func__, ret);
+> +             return ret;
+> +     }
+>
+> -     ret = clk_prepare_enable(priv->bus_clk);
+> -     if (ret)
+> -             goto err_clk;
+>
+>       bec->txerr = priv->read_reg(priv, XCAN_ECR_OFFSET) & XCAN_ECR_TEC_MASK;
+>       bec->rxerr = ((priv->read_reg(priv, XCAN_ECR_OFFSET) &
+>                       XCAN_ECR_REC_MASK) >> XCAN_ESR_REC_SHIFT);
+>
+> -     clk_disable_unprepare(priv->bus_clk);
+> -     clk_disable_unprepare(priv->can_clk);
+> +     pm_runtime_put(priv->dev);
+>
+>       return 0;
+> -
+> -err_clk:
+> -     clk_disable_unprepare(priv->can_clk);
+> -err:
+> -     return ret;
+>  }
+>
+>
+> @@ -967,15 +954,45 @@ static const struct net_device_ops
+> xcan_netdev_ops = {
+>
+>  /**
+>   * xcan_suspend - Suspend method for the driver
+> - * @dev:     Address of the platform_device structure
+> + * @dev:     Address of the net_device structure
+
+This is just the device structure.
+
+K will modify in the next version of the patch .
+
+>   *
+>   * Put the driver into low power mode.
+> - * Return: 0 always
+> + * Return: 0 on success and failure value on error
+>   */
+>  static int __maybe_unused xcan_suspend(struct device *dev)  {
+> -     struct platform_device *pdev = dev_get_drvdata(dev);
+> -     struct net_device *ndev = platform_get_drvdata(pdev);
+> +     if (!device_may_wakeup(dev))
+> +             return pm_runtime_force_suspend(dev);
+> +
+> +     return 0;
+> +}
+> +
+> +/**
+> + * xcan_resume - Resume from suspend
+> + * @dev:     Address of the net_device structure
+
+ditto
+
+K will modify in the next version of the patch .
+
+> + *
+> + * Resume operation after suspend.
+> + * Return: 0 on success and failure value on error  */ static int
+> +__maybe_unused xcan_resume(struct device *dev) {
+> +     if (!device_may_wakeup(dev))
+> +             return pm_runtime_force_resume(dev);
+> +
+> +     return 0;
+> +
+> +}
+> +
+> +/**
+> + * xcan_runtime_suspend - Runtime suspend method for the driver
+> + * @dev:     Address of the net_device structure
+
+ditto.
+K will modify in the next version of the patch .
+> + *
+> + * Put the driver into low power mode.
+> + * Return: 0 always
+> + */
+> +static int __maybe_unused xcan_runtime_suspend(struct device *dev) {
+> +     struct net_device *ndev = dev_get_drvdata(dev);
+>       struct xcan_priv *priv = netdev_priv(ndev);
+>
+>       if (netif_running(ndev)) {
+> @@ -993,16 +1010,15 @@ static int __maybe_unused xcan_suspend(struct
+> device *dev)  }
+>
+>  /**
+> - * xcan_resume - Resume from suspend
+> - * @dev:     Address of the platformdevice structure
+> + * xcan_runtime_resume - Runtime resume from suspend
+> + * @dev:     Address of the net_device structure
+
+ditto.
+K will modify in the next version of the patch .
+
+Regards,
+Kedar.
+Thanks,
+Michal
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
