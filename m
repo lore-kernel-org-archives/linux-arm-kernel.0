@@ -1,36 +1,20 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Fri, 28 Nov 2014 13:07:03 +0100
-Subject: [PATCH v3 3/5] pinctrl: exynos: add exynos5410 SoC specific data
-In-Reply-To: <CACRpkdZie8JJGxSPkc8PPvC3qZkWhe5WqmpSKSoDFwqRd6tR_Q@mail.gmail.com>
-References: <547104D5.4030803@suse.de>	<1416695185-5198-1-git-send-email-afaerber@suse.de>
- <CACRpkdZie8JJGxSPkc8PPvC3qZkWhe5WqmpSKSoDFwqRd6tR_Q@mail.gmail.com>
-Message-ID: <54786567.4050305@suse.de>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Fri, 28 Nov 2014 13:08:27 +0100
+Subject: [PATCH] ARM: exynos_defconfig: Enable CONFIG_FHANDLE
+In-Reply-To: <1417176414-21558-1-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1417176414-21558-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <547865BB.1010604@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.11.2014 um 12:59 schrieb Linus Walleij:
-> On Sat, Nov 22, 2014 at 11:26 PM, Andreas F?rber <afaerber@suse.de> wrote:
+Am 28.11.2014 um 13:06 schrieb Sjoerd Simons:
+> CONFIG_FHANDLE is required by systemd, which is the default init system
+> in more and more distributions. So lets enable it for Exynos as well
+> (it's already enabled in multi_v7_defconfig)
 > 
->> From: Hakjoo Kim <ruppi.kim@hardkernel.com>
->>
->> Add Samsung EXYNOS5410 SoC specific data to enable pinctrl
->> support for all platforms based on EXYNOS5410.
->>
->> Signed-off-by: Hakjoo Kim <ruppi.kim@hardkernel.com>
->> [AF: Rebased onto Exynos5260 and irq_chip consolidation]
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  v2 -> v3:
->>  * Rebased (.svc, .{g,w}eint_{con,mask,pend} fields dropped)
->>
->>  v1 -> v2:
->>  * Filled in Sob from Hakjoo Kim
-> 
-> Is this based on the pinctrl devel branch so I can apply it?
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-It was based on the Samsung for-next tree. I can rebase if needed.
-
-> I'd like Tomasz ACK on it first though.
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
 
 Thanks,
 Andreas
