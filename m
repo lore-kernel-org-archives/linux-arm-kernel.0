@@ -1,64 +1,122 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Nov 2014 13:29:38 +0000
-Subject: [PATCH v5 0/8] Introduce automatic DMA configuration for IOMMU masters
-Message-ID: <1417181386-18142-1-git-send-email-will.deacon@arm.com>
+Date: Fri, 28 Nov 2014 13:29:42 +0000
+Subject: [PATCH v5 4/8] iommu: provide helper function to configure an IOMMU
+ for an of master
+In-Reply-To: <1417181386-18142-1-git-send-email-will.deacon@arm.com>
+References: <1417181386-18142-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1417181386-18142-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The generic IOMMU device-tree bindings can be used to add arbitrary OF
+masters to an IOMMU with a compliant binding.
 
-Here is v5 of the patches I've previously sent here:
+This patch introduces of_iommu_configure, which does exactly that.
 
-  RFCv1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/283023.html
-  RFCv2: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/283752.html
-  RFCv3: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/287031.html
-  RFCv4: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/302711.html
+Acked-by: Joerg Roedel <jroedel@suse.de>
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Tested-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/Kconfig    |  2 +-
+ drivers/iommu/of_iommu.c | 33 +++++++++++++++++++++++++++++++++
+ include/linux/of_iommu.h |  6 ++++++
+ 3 files changed, 40 insertions(+), 1 deletion(-)
 
-Changes since RFCv4 include:
-
-  - Dropped the RFC tag, since has been used by a couple of people now
-
-  - Dropped the DMA segment configuration from of_dma_configure, as there
-    appear to be assumptions about 64k segments elsewhere in the kernel
-
-  - Added acks/tested-bys (thanks to everybody who reviewed the series)
-
-  - A few small fixes for issues found by Marek
-
-Arnd: Is this too late for 3.19? We could merge the first 6 patches
-with no issues, since there aren't any callers of of_iommu_init
-without patch 7 anyway.
-
-Up to you.
-
-Will
-
---->8
-
-Marek Szyprowski (1):
-  iommu: fix initialization without 'add_device' callback
-
-Will Deacon (7):
-  iommu: provide early initialisation hook for IOMMU drivers
-  dma-mapping: replace set_arch_dma_coherent_ops with arch_setup_dma_ops
-  iommu: add new iommu_ops callback for adding an OF device
-  iommu: provide helper function to configure an IOMMU for an of master
-  dma-mapping: detect and configure IOMMU in of_dma_configure
-  arm: call iommu_init before of_platform_populate
-  arm: dma-mapping: plumb our iommu mapping ops into arch_setup_dma_ops
-
- arch/arm/include/asm/dma-mapping.h | 12 +++---
- arch/arm/kernel/setup.c            |  2 +
- arch/arm/mm/dma-mapping.c          | 83 ++++++++++++++++++++++++++++++++++----
- drivers/iommu/Kconfig              |  2 +-
- drivers/iommu/iommu.c              |  2 +-
- drivers/iommu/of_iommu.c           | 50 +++++++++++++++++++++++
- drivers/of/platform.c              | 50 ++++++++++++-----------
- include/asm-generic/vmlinux.lds.h  |  2 +
- include/linux/dma-mapping.h        | 13 +++---
- include/linux/iommu.h              |  8 ++++
- include/linux/of_iommu.h           | 31 ++++++++++++++
- 11 files changed, 211 insertions(+), 44 deletions(-)
-
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index dd5112265cc9..6d13f962f156 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -15,7 +15,7 @@ if IOMMU_SUPPORT
+ 
+ config OF_IOMMU
+        def_bool y
+-       depends on OF
++       depends on OF && IOMMU_API
+ 
+ config FSL_PAMU
+ 	bool "Freescale IOMMU support"
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 89b903406968..73236d3cc955 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -18,6 +18,7 @@
+  */
+ 
+ #include <linux/export.h>
++#include <linux/iommu.h>
+ #include <linux/limits.h>
+ #include <linux/of.h>
+ #include <linux/of_iommu.h>
+@@ -93,6 +94,38 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+ }
+ EXPORT_SYMBOL_GPL(of_get_dma_window);
+ 
++struct iommu_ops *of_iommu_configure(struct device *dev)
++{
++	struct of_phandle_args iommu_spec;
++	struct device_node *np;
++	struct iommu_ops *ops = NULL;
++	int idx = 0;
++
++	/*
++	 * We don't currently walk up the tree looking for a parent IOMMU.
++	 * See the `Notes:' section of
++	 * Documentation/devicetree/bindings/iommu/iommu.txt
++	 */
++	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
++					   "#iommu-cells", idx,
++					   &iommu_spec)) {
++		np = iommu_spec.np;
++		ops = of_iommu_get_ops(np);
++
++		if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
++			goto err_put_node;
++
++		of_node_put(np);
++		idx++;
++	}
++
++	return ops;
++
++err_put_node:
++	of_node_put(np);
++	return NULL;
++}
++
+ void __init of_iommu_init(void)
+ {
+ 	struct device_node *np;
+diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+index 5762cdc8effe..d03abbb11c34 100644
+--- a/include/linux/of_iommu.h
++++ b/include/linux/of_iommu.h
+@@ -1,6 +1,7 @@
+ #ifndef __OF_IOMMU_H
+ #define __OF_IOMMU_H
+ 
++#include <linux/device.h>
+ #include <linux/iommu.h>
+ #include <linux/of.h>
+ 
+@@ -11,6 +12,7 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
+ 			     size_t *size);
+ 
+ extern void of_iommu_init(void);
++extern struct iommu_ops *of_iommu_configure(struct device *dev);
+ 
+ #else
+ 
+@@ -22,6 +24,10 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+ }
+ 
+ static inline void of_iommu_init(void) { }
++static inline struct iommu_ops *of_iommu_configure(struct device *dev)
++{
++	return NULL;
++}
+ 
+ #endif	/* CONFIG_OF_IOMMU */
+ 
 -- 
 2.1.1
