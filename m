@@ -1,52 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 28 Nov 2014 14:29:13 +0000
-Subject: [PATCH v3 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC
- in dts and Makefile
-In-Reply-To: <20141127134309.GJ857@leverpostej>
-References: <Sharkl64-v3>
- <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1416917818-10506-4-git-send-email-chunyan.zhang@spreadtrum.com>
- <20141127115042.GE857@leverpostej>
- <20141127121214.GF11511@e104818-lin.cambridge.arm.com>
- <20141127134309.GJ857@leverpostej>
-Message-ID: <20141128142913.GB5393@localhost>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 28 Nov 2014 14:29:38 +0000
+Subject: [PATCH v4 2/7] regulator: dt-bindings: Document the ena-gpios
+ property
+In-Reply-To: <1417175667.18249.26.camel@AMDC1943>
+References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
+ <1417087253-12306-3-git-send-email-k.kozlowski@samsung.com>
+ <20141127183058.GB7712@sirena.org.uk>
+ <1417165784.18249.15.camel@AMDC1943>
+ <20141128112116.GG7712@sirena.org.uk>
+ <1417175667.18249.26.camel@AMDC1943>
+Message-ID: <20141128142938.GM7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 01:43:09PM +0000, Mark Rutland wrote:
-> On Thu, Nov 27, 2014 at 12:12:15PM +0000, Catalin Marinas wrote:
-> > On Thu, Nov 27, 2014 at 11:50:43AM +0000, Mark Rutland wrote:
-> > > On Tue, Nov 25, 2014 at 12:16:56PM +0000, Chunyan Zhang wrote:
-> > > > +
-> > > > +       timer {
-> > > > +               compatible = "arm,armv8-timer";
-> > > > +               interrupts = <1 13 0xff01>,
-> > > > +                            <1 14 0xff01>,
-> > > > +                            <1 11 0xff01>,
-> > > > +                            <1 10 0xff01>;
-> > > > +               clock-frequency = <26000000>;
-> > > 
-> > > Please remove the clock-frequency property. Your FW should initialise
-> > > CNTFRQ_EL0 on all CPUs (certainly PSCI 0.2 requires that you do this).
-> > 
-> > Since this comes up regularly, I think we need a dev_warn() in the arch
-> > timer driver when CONFIG_ARM64.
-> 
-> I'll ack such a patch ;)
+On Fri, Nov 28, 2014 at 12:54:27PM +0100, Krzysztof Kozlowski wrote:
+> On pi?, 2014-11-28 at 11:21 +0000, Mark Brown wrote:
+> > On Fri, Nov 28, 2014 at 10:09:44AM +0100, Krzysztof Kozlowski wrote:
 
-How rude would this be?
+> > > I understand your concerns here however I didn't want to overengineer
+> > > this. Is the same GPIO (on more complex PMICs) used in different
+> > > contexts? Like enable control and something more in the same time?
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 2133f9d59d06..aaaf3433ccb9 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -371,7 +371,8 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
-		return;
- 
-	/* Try to determine the frequency from the device tree or CNTFRQ */
--	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
-+	if (IS_ENABLED(CONFIG_ARM64) ||
-+	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
-		if (cntbase)
-			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
-		else
+> > Yes, and it's often reprogrammable at runtime.
+
+> I have doubts if generalized code could support such configuration...
+
+That's pretty much my point.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141128/79e28c69/attachment.sig>
