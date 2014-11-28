@@ -1,129 +1,64 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 28 Nov 2014 12:09:47 +0100
-Subject: [PATCH] mmc: atmel-mci: use probe deferring if dma controller is
- not ready yet
-In-Reply-To: <1416925541-6857-1-git-send-email-ludovic.desroches@atmel.com>
-References: <CAPDyKFq-0EaGSf9Mn7aMa1s9CCP5hxqRCkKrZrAnSs-h5OFmxw@mail.gmail.com>
- <1416925541-6857-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <CAPDyKFr5GBuWW4UxvAKz6++Qc=wACtn-+c4_s0tNLLjL3mhhMA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Nov 2014 12:11:38 +0100
+Subject: [PATCH v9 0/7] Enable L2 cache support on Exynos4210/4x12 SoCs
+In-Reply-To: <54783899.2060604@samsung.com>
+References: <1416224909-4290-1-git-send-email-m.szyprowski@samsung.com>
+ <20141127225100.GA3840@n2100.arm.linux.org.uk> <54783899.2060604@samsung.com>
+Message-ID: <3059840.P4aX5Il9dy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 November 2014 at 15:25, Ludovic Desroches
-<ludovic.desroches@atmel.com> wrote:
-> Return probe defer if requesting a dma channel without a dma controller
-> probed.
->
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->
-> Hi Ulf,
->
-> I didn't send the whole set of patches for this small change, tell me if you
-> want a new series.
+On Friday 28 November 2014 09:55:53 Marek Szyprowski wrote:
+> On 2014-11-27 23:51, Russell King - ARM Linux wrote:
+> > On Mon, Nov 17, 2014 at 12:48:22PM +0100, Marek Szyprowski wrote:
+> >>
+> >> Changes in this version tested on Exynos4412-based TRATS2 and OdroidU3+
+> >> boards (both with secure firmware). There should be no functional change
+> >> for Exynos boards running without secure firmware. I do not have access
+> >> to affected non-Exynos boards, so I could not test on them.
+> > So, I applied this series, and now I get a conflicts between my tree and
+> > arm-soc for:
+> >
+> > arch/arm/mach-exynos/firmware.c
+> > arch/arm/mach-exynos/sleep.S
+> >
+> > So, I'm going to un-stage the exynos bits, and we'll have to work out
+> > some way to handle those.
 
-I tried to apply the patchset and get two problems.
+Ok
 
-1) This patch 4 has checkpatch errors.
-2) I hit conflicts on patch2.
+> I've already pointed that those patches depend on other previously merged to
+> exynos and arm-soc trees, but both Arnd and Kukjin said that those patch 
+> series
+> should go via your kernel tree:
+> 
+> https://lkml.org/lkml/2014/11/15/158
+> 
+> That's why in v9 I rebased patches once again onto vanilla v3.18-rc4 and 
+> uploaded
+> to your patch tracker. I see the following two possibilities to get them 
+> merged:
+> 
+> 1. Merge patches to rmk tree and resolve the merge conflict. The 
+> conflict IS quite
+> easy to resolve - both trees, arm-soc and rmk only adds some code and 
+> the goal is
+> simply to have both chunks added.
+> 
+> 2. Merge the previous version (v8 from the above link) to arm-soc tree, 
+> where it
+> applies cleanly on for-next, preferably with Russell's Acked-by.
+> 
+> Arnd, Russell: which approach do you prefer? How can I help to get it 
+> merged?
 
-Please resend the complete patchset fixing the above.
+I'm fine with it either way. Russell, if you like you can merge
+http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung v3.19-next/pm-samsung-2
+into your tree and resolve the conflict on your end, we have a stable
+copy of that branch queued in next/soc.
 
-Kind regards
-Uffe
+If you prefer v8 to go through arm-soc, that's fine with me too, or
+we could share a branch with v9 of Marek's series and have that merged
+into arm-soc/next/soc to resolve the conflict.
 
->
->  drivers/mmc/host/atmel-mci.c | 49 ++++++++++++++++++++++----------------------
->  1 file changed, 25 insertions(+), 24 deletions(-)
->
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index 28546c3..f4daef9 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -2265,29 +2265,26 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
->         mmc_free_host(slot->mmc);
->  }
->
-> -static bool atmci_configure_dma(struct atmel_mci *host)
-> +static int atmci_configure_dma(struct atmel_mci *host)
->  {
-> -       if (host == NULL)
-> -               return false;
-> +       int ret = 0;
->
-> -       host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
-> -       if (!host->dma.chan) {
-> -               dev_warn(&host->pdev->dev, "no DMA channel available\n");
-> -               return false;
-> -       } else {
-> -               dev_info(&host->pdev->dev,
-> -                                       "using %s for DMA transfers\n",
-> -                                       dma_chan_name(host->dma.chan));
-> -
-> -               host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
-> -               host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> -               host->dma_conf.src_maxburst = 1;
-> -               host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
-> -               host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> -               host->dma_conf.dst_maxburst = 1;
-> -               host->dma_conf.device_fc = false;
-> -               return true;
-> -       }
-> +       host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev, "rxtx");
-> +       if (IS_ERR(host->dma.chan))
-> +               return PTR_ERR(host->dma.chan);
-> +
-> +       dev_info(&host->pdev->dev, "using %s for DMA transfers\n",
-> +                dma_chan_name(host->dma.chan));
-> +
-> +       host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
-> +       host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> +       host->dma_conf.src_maxburst = 1;
-> +       host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
-> +       host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> +       host->dma_conf.dst_maxburst = 1;
-> +       host->dma_conf.device_fc = false;
-> +
-> +       return ret;
->  }
->
->  /*
-> @@ -2403,7 +2400,10 @@ static int atmci_probe(struct platform_device *pdev)
->
->         /* Get MCI capabilities and set operations according to it */
->         atmci_get_cap(host);
-> -       if (atmci_configure_dma(host)) {
-> +       ret = atmci_configure_dma(host);
-> +       if (ret == -EPROBE_DEFER)
-> +               goto err_dma_probe_defer;
-> +       if (ret == 0) {
->                 host->prepare_data = &atmci_prepare_data_dma;
->                 host->submit_data = &atmci_submit_data_dma;
->                 host->stop_transfer = &atmci_stop_transfer_dma;
-> @@ -2474,8 +2474,9 @@ err_dma_alloc:
->         }
->  err_init_slot:
->         del_timer_sync(&host->timer);
-> -       if (host->dma.chan)
-> +       if (!IS_ERR(host->dma.chan))
->                 dma_release_channel(host->dma.chan);
-> +err_dma_probe_defer:
->         free_irq(irq, host);
->         return ret;
->  }
-> @@ -2501,7 +2502,7 @@ static int atmci_remove(struct platform_device *pdev)
->         clk_disable_unprepare(host->mck);
->
->         del_timer_sync(&host->timer);
-> -       if (host->dma.chan)
-> +       if (!IS_ERR(host->dma.chan))
->                 dma_release_channel(host->dma.chan);
->
->         free_irq(platform_get_irq(pdev, 0), host);
-> --
-> 2.0.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+	arnd
