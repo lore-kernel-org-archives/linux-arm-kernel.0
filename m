@@ -1,67 +1,62 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 28 Nov 2014 17:26:48 +0000
-Subject: [PATCH 4/9] ARM: tegra: skip gic_arch_extn setup if DT has a LIC node
+Date: Fri, 28 Nov 2014 17:26:50 +0000
+Subject: [PATCH 6/9] DT: tegra: add binding for the legacy interrupt controller
 In-Reply-To: <1417195613-8447-1-git-send-email-marc.zyngier@arm.com>
 References: <1417195613-8447-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1417195613-8447-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1417195613-8447-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we detect that our DT has a LIC node, don't setup gic_arch_extn,
-and skip tegra_legacy_irq_syscore_init as well.
-
-This is only a temporary measure until that code is removed for good.
-
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-tegra/irq.c   | 11 +++++++++++
- arch/arm/mach-tegra/tegra.c |  1 -
- 2 files changed, 11 insertions(+), 1 deletion(-)
+ .../interrupt-controller/nvdia,tegra-ictlr.txt     | 39 ++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nvdia,tegra-ictlr.txt
 
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index 7f87a50..b37141d 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -255,11 +255,21 @@ static void tegra114_gic_cpu_pm_registration(void)
- static void tegra114_gic_cpu_pm_registration(void) { }
- #endif
- 
-+static const struct of_device_id tegra_ictlr_match[] __initconst = {
-+	{ .compatible = "nvidia,tegra-ictlr" },
-+	{ }
-+};
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/nvdia,tegra-ictlr.txt b/Documentation/devicetree/bindings/interrupt-controller/nvdia,tegra-ictlr.txt
+new file mode 100644
+index 0000000..4de6a2c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/nvdia,tegra-ictlr.txt
+@@ -0,0 +1,39 @@
++NVIDIA Legacy Interrupt Controller
 +
- void __init tegra_init_irq(void)
- {
- 	int i;
- 	void __iomem *distbase;
- 
-+	if (of_find_matching_node(NULL, tegra_ictlr_match))
-+		goto skip_extn_setup;
++All Tegra SoCs contain a legacy interrupt controller that routes
++interrupts to the GIC, and also serves as a wakeup source. It is also
++refered to as "ictlr", hence the name of the binding.
 +
-+	tegra_legacy_irq_syscore_init();
++The HW block exposes a number of frames, each implementing a set of 32
++interrupts.
 +
- 	distbase = IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE);
- 	num_ictlrs = readl_relaxed(distbase + GIC_DIST_CTR) & 0x1f;
- 
-@@ -283,5 +293,6 @@ void __init tegra_init_irq(void)
- 	gic_arch_extn.irq_set_wake = tegra_set_wake;
- 	gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
- 
-+skip_extn_setup:
- 	tegra114_gic_cpu_pm_registration();
- }
-diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
-index ef016af..c33fba7 100644
---- a/arch/arm/mach-tegra/tegra.c
-+++ b/arch/arm/mach-tegra/tegra.c
-@@ -82,7 +82,6 @@ static void __init tegra_dt_init_irq(void)
- {
- 	tegra_init_irq();
- 	irqchip_init();
--	tegra_legacy_irq_syscore_init();
- }
- 
- static void __init tegra_dt_init(void)
++Reguired properties:
++
++- compatible : should contain at least "nvidia,tegra-ictlr".
++- reg : Specifies base physical address and size of the registers.
++  Each frame must be described separately.
++- interrupt-controller : Identifies the node as an interrupt controller.
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value must be 3.
++- interrupt-parent : a phandle to the GIC these interrupts are routed
++  to.
++
++Notes:
++
++- Because this HW ultimately routes interrupts to the GIC, the
++  interrupt specifier must be that of the GIC.
++- Only SPIs can use the ictlr as an interrupt parent. SGIs and PPIs
++  are excplicitely forbiden.
++
++Example:
++
++	ictlr: interrupt-controller at 60004000 {
++		compatible = "nvidia,tegra20-ictlr", "nvidia,tegra-ictlr";
++		reg = <0x60004000 64>,
++		      <0x60004100 64>,
++		      <0x60004200 64>,
++		      <0x60004300 64>;
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&intc>;
++	};
 -- 
 2.1.3
