@@ -1,67 +1,75 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 28 Nov 2014 23:09:09 +0100
-Subject: [PATCH 2/2] ARM: imx: src: support vf610 system reset controller
-In-Reply-To: <2716009.DOfHfaSPkY@wuerfel>
-References: <1417193015-6033-1-git-send-email-stefan@agner.ch>
- <34359137.rt8QrS7shW@wuerfel> <7cd7c820d32cb04fa1d59889d16666a9@agner.ch>
- <2716009.DOfHfaSPkY@wuerfel>
-Message-ID: <6341b31998ff843d236bc2a3e34537b0@agner.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Nov 2014 23:20:19 +0100
+Subject: [GIT PULL v2 1/4] ARM: tegra: IOMMU support for v3.19
+In-Reply-To: <1416993053-3630-1-git-send-email-thierry.reding@gmail.com>
+References: <1416570832-6220-1-git-send-email-thierry.reding@gmail.com>
+ <1416993053-3630-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <201411282320.19546.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-11-28 22:24, Arnd Bergmann wrote:
-> On Friday 28 November 2014 22:02:01 Stefan Agner wrote:
->> On 2014-11-28 17:49, Arnd Bergmann wrote:
->> > On Friday 28 November 2014 17:43:35 Stefan Agner wrote:
->> >> Support Vybrid SoC's system reset controller (SRC). Currently we
->> >> don't register a reset controller but only support the imx_cpu_jump
->> >> and imx_cpu_arg functions.
->> >>
->> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> >
->> > I think this should be a platform driver in drivers/power/reset.
->>
->> Yeah, I thought that too, see my cover letter. The problem is, in that
->> module are also some register which are of interest when implementing
->> suspend/resume support (see cover letter too). However, we could also
->> just make a dt entry for that reset register only, and create another dt
->> entry for the other registers.
+On Wednesday 26 November 2014, Thierry Reding wrote:
+> Hi ARM SoC maintainers,
 > 
-> Don't make a node with just one register, in this case, a syscon device
-> would be best.
-
-Syscon seems like a match here. Was not aware of that, thx!
-
+> The following changes since commit 0690cbd2e55a72a8eae557c389d1a136ed9fa142:
 > 
->> > If the SRC is also capable of resetting individual blocks instead of just
->> > the entire machine, it would be a reset driver in drivers/reset instead.
->>
->> Beside the system reset, there is only a mask functionality for the
->> watchdogs (there are two watchdogs, one for Cortex-A5 and one for the
->> M4). This makes the SRC module in the Vybrid a bit different then what
->> is available on other i.MX SoC's...
+>   powerpc/iommu: Rename iommu_[un]map_sg functions (2014-11-18 11:30:01 +0100)
 > 
-> If you already have the watchdog registers in there and want to have
-> a watchdog driver too, the easiest way would be to register the reboot
-> handler from the watchdog driver.
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.19-iommu-rebased
+> 
+> for you to fetch changes up to 37d21f8918f2aa2289036cc778ee188951e53288:
+> 
+>   memory: Add NVIDIA Tegra memory controller support (2014-11-26 09:45:02 +0100)
+> 
+> Here's a version of the pull request rebased on top of Joerg's core
+> branch from the IOMMU tree. It has the advantage of having resolved
+> the merge conflicts and the disadvantage of pulling in v3.18-rc3.
+> 
 
-Hm, not sure we speak about the same here. The SRC module has two
-(multi-)bit fields to mask the watchdog reset event for each watchdog.
-Beside that, there are two full watchdog register maps, which are in
-different areas. There is already a driver for this watchdogs. I'm not
-sure what the idea behind this is exactly, I guess it would easily allow
-to (temporary) mask the other CPU's watchdog. However, I don't think we
-need that functionality, so I don't care about that right now.
+Hi Thierry,
 
-There is also a restart handler in the watchdog driver, but I prefer to
-use the reset capabilities of the SRC since it has immediate effect. 
+sorry for taking my time on this, I had some concerns when I first
+looked at the memory controller driver and binding (after I got your
+pull request), and wanted to be sure everything is fine before I merge
+it.
 
-Lets get to the big picture again: I could register the whole SRC
-register map as a syscon device and then access the registers from my
-suspend/resume implementation later on. And similar in the restart
-driver, I would use syscon_regmap_lookup_by_compatible to check if it
-contains the vf610-src compatible string and register the restart
-driver/handler if available.
+Pulling in v3.18-rc3 is not a problem, since the next/soc branch is
+already based on -rc3 (you can see that yourself if you check out the
+branch from the arm-soc tree), and I'm absolutely fine with merging
+either v1 or v2 of this, the conflict seems harmless, and so does 
+pulling in the dependency.
 
---
-Stefan
+The extra attention for the binding is because the base iommu binding
+is still very new and gives some options to driver authors, and I want
+to make sure we are setting a good example for others to look at.
+My problem is mainly lack of understanding for your hardware requirements,
+so hopefully you can clarify this all and I can just merge it, or we
+find an easy way to change the code if I have stumbled on a problem.
+
+My main question is about the relation between 'swgroup' and 'id'
+settings. What do the two things mean respectively, does your driver
+define how they get combined, or is each master hardcoded to both?
+
+I generally dislike having SoC-specific lookup tables in drivers for
+things that could be fully described in DT, so I really want to understand
+why you added those tables.
+
+The .smmu.reg and .smmu.bit settings seem to directly correlate to the
+.id value in the table, so I'm assuming you could derive one from the
+other if it was advantagous. The name is only used for debugging purposes
+and we could also leave it out if we had a way to kill off the other fields
+of the table.
+
+In the comment you mention that the latency allowance is set up to the
+hardware defaults, so I guess in the current version this is not required,
+but the .la.reg/shift/mask fields can't be determined from the other
+fields. This means in order to implement the extension for changing the
+setting in the future, you'd have to add some other way of communicating
+it without the table, right?
+
+Back to the swgroup/id fields: if you need both, would it make sense
+to have #iommu-cells = <2> and pass both from the dma master device?
+
+	Arnd
