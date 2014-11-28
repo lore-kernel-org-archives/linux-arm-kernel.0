@@ -1,123 +1,73 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 27 Nov 2014 15:46:03 -0800
-Subject: [PATCH v3] can: Convert to runtime_pm
-In-Reply-To: <5477ABF3.1020605@pengutronix.de>
-References: <6b6db31d46074512a322eae6e4ef64d4@BN1BFFO11FD038.protection.gbl>
- <54779501.8060009@pengutronix.de>
- <820358d5369f465188dfa9306eae5658@BL2FFO11FD009.protection.gbl>
- <5477ABF3.1020605@pengutronix.de>
-Message-ID: <cb000149727543b5a08b9f56d9cc0626@BN1BFFO11FD036.protection.gbl>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 28 Nov 2014 01:06:01 +0100
+Subject: [GIT PULL] clk: rockchip: second batch for 3.19
+Message-ID: <4638213.B2LsUVeJxf@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-11-27 at 11:55PM +0100, Marc Kleine-Budde wrote:
-> On 11/27/2014 11:47 PM, S?ren Brinkmann wrote:
-> > On Thu, 2014-11-27 at 10:17PM +0100, Marc Kleine-Budde wrote:
-> >> On 11/27/2014 02:08 PM, Kedareswara rao Appana wrote:
-> >>> Instead of enabling/disabling clocks at several locations in the driver,
-> >>> use the runtime_pm framework. This consolidates the actions for
-> >>> runtime PM in the appropriate callbacks and makes the driver more
-> >>> readable and mantainable.
-> >>>
-> >>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> >>> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> >>> ---
-> >>> Changes for v3:
-> >>>   - Converted the driver to use runtime_pm.
-> >>> Changes for v2:
-> >>>   - Removed the struct platform_device* from suspend/resume
-> >>>     as suggest by Lothar.
-> >>>
-> >>>  drivers/net/can/xilinx_can.c |  119 +++++++++++++++++++++++++----------------
-> >>>  1 files changed, 72 insertions(+), 47 deletions(-)
-> >>>
-> >>> diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
-> >>> index 8a998e3..1be28ed 100644
-> >>> --- a/drivers/net/can/xilinx_can.c
-> >>> +++ b/drivers/net/can/xilinx_can.c
-> > [...]
-> >>> @@ -1030,7 +1046,10 @@ static int __maybe_unused xcan_resume(struct device *dev)
-> >>>  	return 0;
-> >>>  }
-> >>>  
-> >>> -static SIMPLE_DEV_PM_OPS(xcan_dev_pm_ops, xcan_suspend, xcan_resume);
-> >>> +static const struct dev_pm_ops xcan_dev_pm_ops = {
-> >>> +	SET_SYSTEM_SLEEP_PM_OPS(xcan_suspend, xcan_resume)
-> >>> +	SET_PM_RUNTIME_PM_OPS(xcan_runtime_suspend, xcan_runtime_resume, NULL)
-> >>> +};
-> >>>  
-> >>>  /**
-> >>>   * xcan_probe - Platform registration call
-> >>> @@ -1071,7 +1090,7 @@ static int xcan_probe(struct platform_device *pdev)
-> >>>  		return -ENOMEM;
-> >>>  
-> >>>  	priv = netdev_priv(ndev);
-> >>> -	priv->dev = ndev;
-> >>> +	priv->dev = &pdev->dev;
-> >>>  	priv->can.bittiming_const = &xcan_bittiming_const;
-> >>>  	priv->can.do_set_mode = xcan_do_set_mode;
-> >>>  	priv->can.do_get_berr_counter = xcan_get_berr_counter;
-> >>> @@ -1137,6 +1156,11 @@ static int xcan_probe(struct platform_device *pdev)
-> >>>  
-> >>>  	netif_napi_add(ndev, &priv->napi, xcan_rx_poll, rx_max);
-> >>>  
-> >>> +	pm_runtime_set_active(&pdev->dev);
-> >>> +	pm_runtime_irq_safe(&pdev->dev);
-> >>
-> >> You use just clock_enable()/disable() in the runtime functions, thus you
-> >> can say they are irq_safe. On the other the the zync grpio driver uses
-> >> "full" prepare_enable/disable_unprepare calls. What's best practice here?
-> > 
-> > IIRC, the prepare/unprepare functions can sleep. xcan_get_berr_counter
-> > is called from atomic context. So, I think we have to use the
-> > disable/enable functions without the prepare/unprepare.
-> > In the GPIO driver the that problem does not exist.
-> 
-> IC, yes, correct.
-> 
-> This is why we introducted in other drivers a __get_berr_counter()
-> function, that doesn't touch the clocks, which is used from within the
-> driver (from the atomic contects), while get_berr_counter() will fiddle
-> with the clocks. This function is used for the
-> priv->can.do_get_berr_counter callback.
+Hi Mike,
 
-I have the feeling I'm missing something. If I remove the 'must not
-sleep' requirement from the runtime suspend/resume functions, I get
-this:
+here is the second (and most likely last) batch of rockchip clock
+changes for 3.19. Biggest changes are the pll init stuff and the
+mmc clock-phase support for rk3288.
 
-BUG: sleeping function called from invalid context at drivers/base/power/runtime.c:954
-in_atomic(): 0, irqs_disabled(): 0, pid: 161, name: ip
-INFO: lockdep is turned off.
-CPU: 0 PID: 161 Comm: ip Not tainted 3.18.0-rc1-xilinx-00059-g21da26693b61-dirty #104
-[<c00186a8>] (unwind_backtrace) from [<c00139f4>] (show_stack+0x20/0x24)
-[<c00139f4>] (show_stack) from [<c055a41c>] (dump_stack+0x8c/0xd0)
-[<c055a41c>] (dump_stack) from [<c0054808>] (__might_sleep+0x1ac/0x1e4)
-[<c0054808>] (__might_sleep) from [<c034f8f0>] (__pm_runtime_resume+0x40/0x9c)
-[<c034f8f0>] (__pm_runtime_resume) from [<c03b48d8>] (xcan_get_berr_counter+0x2c/0x9c)
-[<c03b48d8>] (xcan_get_berr_counter) from [<c03b2ecc>] (can_fill_info+0x160/0x1f4)
-[<c03b2ecc>] (can_fill_info) from [<c049f3b0>] (rtnl_fill_ifinfo+0x794/0x970)
-[<c049f3b0>] (rtnl_fill_ifinfo) from [<c04a0048>] (rtnl_dump_ifinfo+0x1b4/0x2fc)
-[<c04a0048>] (rtnl_dump_ifinfo) from [<c04af9c8>] (netlink_dump+0xe4/0x270)
-[<c04af9c8>] (netlink_dump) from [<c04b0764>] (__netlink_dump_start+0xdc/0x170)
-[<c04b0764>] (__netlink_dump_start) from [<c04a1fc4>] (rtnetlink_rcv_msg+0x154/0x1e0)
-[<c04a1fc4>] (rtnetlink_rcv_msg) from [<c04b1e88>] (netlink_rcv_skb+0x68/0xc4)
-[<c04b1e88>] (netlink_rcv_skb) from [<c04a045c>] (rtnetlink_rcv+0x28/0x34)
-[<c04a045c>] (rtnetlink_rcv) from [<c04b1770>] (netlink_unicast+0x144/0x210)
-[<c04b1770>] (netlink_unicast) from [<c04b1c9c>] (netlink_sendmsg+0x394/0x414)
-[<c04b1c9c>] (netlink_sendmsg) from [<c046ffcc>] (sock_sendmsg+0x8c/0xc0)
-[<c046ffcc>] (sock_sendmsg) from [<c04726bc>] (SyS_sendto+0xd8/0x114)
-[<c04726bc>] (SyS_sendto) from [<c000f3e0>] (ret_fast_syscall+0x0/0x48)
+Apart from that only some more clock-ids and minor fixes.
 
-I.e. the core calls this function from atomic context. And in an earlier
-thread you said the core can also call this before/after calling the
-open/close callbacks (which applies here too, I think).
+So if this looks ok, please pull
 
-I think the callback is required to
- - not sleep
- - get the device in a power state that allows querying its registers
 
-So, I don't see how splitting the xcan_get_berr_counter callback helps
-here, especially since it is not even used within the driver.
+Thanks
+Heiko
 
-	Thanks,
-	S?ren
+The following changes since commit 29e94468516cdf191ec839ee39f79e011817276d:
+
+  clk: rockchip: fix clock select order for rk3288 usbphy480m_src (2014-11-16 00:40:19 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.19-rockchip-clk2
+
+for you to fetch changes up to 89bf26cbc1a09476c4c4740d16a0ffdfa2192b9c:
+
+  clk: rockchip: Add support for the mmc clock phases using the framework (2014-11-28 00:44:24 +0100)
+
+----------------------------------------------------------------
+- clock phase setting capability for the rk3288 mmc clocks
+- pll init to allow syncing to actual rate table values
+- some more exported clocks
+- fixes for some clocks (typos etc) all of them not yet used
+  in actual drivers
+
+----------------------------------------------------------------
+Alexandru M Stan (2):
+      clk: rockchip: add bindings for the mmc clocks
+      clk: rockchip: Add support for the mmc clock phases using the framework
+
+Heiko Stuebner (4):
+      clk: rockchip: add ability to specify pll-specific flags
+      clk: rockchip: setup pll_mux data earlier
+      clk: rockchip: add optional sync to pll rate parameters
+      clk: rockchip: add ROCKCHIP_PLL_SYNC_RATE flag to some plls
+
+Jeff Chen (2):
+      clk: rockchip: add binding ID for DMC (memory controller) clocks on rk3288
+      clk: rockchip: use clock ID for DMC (memory controller) on rk3288
+
+Julien CHAUVEAU (3):
+      clk: rockchip: fix parent clock for rk3188 hclk_lcdc1
+      clk: rockchip: fix clock gate for rk3188 spdif_pre
+      clk: rockchip: fix rk3188 USB HSIC PHY clock divider
+
+Sonny Rao (1):
+      clk: rockchip: rk3288 export i2s0_clkout for use in DT
+
+ drivers/clk/rockchip/Makefile          |   1 +
+ drivers/clk/rockchip/clk-mmc-phase.c   | 154 +++++++++++++++++++++++++++++++++
+ drivers/clk/rockchip/clk-pll.c         |  81 +++++++++++++----
+ drivers/clk/rockchip/clk-rk3188.c      |  37 ++++----
+ drivers/clk/rockchip/clk-rk3288.c      |  32 ++++---
+ drivers/clk/rockchip/clk.c             |  11 ++-
+ drivers/clk/rockchip/clk.h             |  36 +++++++-
+ include/dt-bindings/clock/rk3288-cru.h |  13 +++
+ 8 files changed, 315 insertions(+), 50 deletions(-)
+ create mode 100644 drivers/clk/rockchip/clk-mmc-phase.c
