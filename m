@@ -1,50 +1,102 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 28 Nov 2014 10:36:15 +0000
-Subject: [PATCH NEXT] irqchip: gic: fix compilation of asm code depending on
- arm-gic.h
-Message-ID: <1417170975-1163-1-git-send-email-marc.zyngier@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 28 Nov 2014 11:38:35 +0100
+Subject: [PATCH V2] PM / Domains: Add pm_genpd_lookup() API to lookup domain
+ by firmware node
+Message-ID: <1417171115-5789-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 01f17a66be97 (irqchip: gic: Remove warning by including
-linux/irqdomain.h) indeed fixed an annoying warning in the ARM
-code, but also broke the compilation of arm64 defconfig and
-any other defconfig that includes KVM support in a rather
-spectacular way:
+In a step to move away from using genpd's name based APIs, such as the
+pm_genpd_add_subdomain_names(), provide an API to lookup an already
+initialized generic PM domain by its firmware node.
 
-http://lists.linaro.org/pipermail/kernel-build-reports/2014-November/006475.html
+This API would typically be a called from SOC specific code, to fetch a
+handle to the domain. Especially convenient to configure subdomains and
+when the hierarchy of the domains are described in DT.
 
-Moving the #include directive to a spot that is not going to
-be used by assembly code fixes the issue.
+Do note, before pm_genpd_init() is invoked to initialize a generic PM
+domain, it's the callers responsibility to assign the new ->fwnode
+pointer in the struct generic_pm_domain, to enable pm_genpd_lookup() to
+find the domain.
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- include/linux/irqchip/arm-gic.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index d1b2263..71d706d 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -10,8 +10,6 @@
- #ifndef __LINUX_IRQCHIP_ARM_GIC_H
- #define __LINUX_IRQCHIP_ARM_GIC_H
+Changes in v2:
+	Change from using struct device_node to struct fwnode_handle.
+	Updated commit header accordingly.
+
+---
+ drivers/base/power/domain.c | 27 +++++++++++++++++++++++++++
+ include/linux/pm_domain.h   |  4 ++++
+ 2 files changed, 31 insertions(+)
+
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 735c473..2d881d5 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -75,6 +75,33 @@ struct generic_pm_domain *dev_to_genpd(struct device *dev)
+ 	return pd_to_genpd(dev->pm_domain);
+ }
  
--#include <linux/irqdomain.h>
--
- #define GIC_CPU_CTRL			0x00
- #define GIC_CPU_PRIMASK			0x04
- #define GIC_CPU_BINPOINT		0x08
-@@ -93,6 +91,8 @@
- 
- #ifndef __ASSEMBLY__
- 
-+#include <linux/irqdomain.h>
++/**
++ * pm_genpd_lookup - Fetch a generic PM domain object by firmware node.
++ * @node: Firmware node to a corresponding genpd.
++ *
++ * Returns a valid pointer to struct generic_pm_domain on success or ERR_PTR()
++ * on failure.
++ */
++struct generic_pm_domain *pm_genpd_lookup(struct fwnode_handle *node)
++{
++	struct generic_pm_domain *genpd = ERR_PTR(-ENOENT), *gpd;
 +
- struct device_node;
++	if (IS_ERR_OR_NULL(node))
++		return ERR_PTR(-EINVAL);
++
++	mutex_lock(&gpd_list_lock);
++	list_for_each_entry(gpd, &gpd_list, gpd_list_node) {
++		if (gpd->fwnode == node) {
++			genpd = gpd;
++			break;
++		}
++	}
++	mutex_unlock(&gpd_list_lock);
++
++	return genpd;
++}
++EXPORT_SYMBOL_GPL(pm_genpd_lookup);
++
+ static int genpd_stop_dev(struct generic_pm_domain *genpd, struct device *dev)
+ {
+ 	return GENPD_DEV_TIMED_CALLBACK(genpd, int, stop, dev,
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 8cbd32e..aa01050 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -43,6 +43,8 @@ struct gpd_cpuidle_data {
+ 	struct cpuidle_state *idle_state;
+ };
  
- extern struct irq_chip gic_arch_extn;
++struct fwnode_handle;
++
+ struct generic_pm_domain {
+ 	struct dev_pm_domain domain;	/* PM domain operations */
+ 	struct list_head gpd_list_node;	/* Node in the global PM domains list */
+@@ -53,6 +55,7 @@ struct generic_pm_domain {
+ 	struct dev_power_governor *gov;
+ 	struct work_struct power_off_work;
+ 	const char *name;
++	struct fwnode_handle *fwnode;	/* Firware node for the PM domain */
+ 	unsigned int in_progress;	/* Number of devices being suspended now */
+ 	atomic_t sd_count;	/* Number of subdomains with power "on" */
+ 	enum gpd_status status;	/* Current state of the domain */
+@@ -126,6 +129,7 @@ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
+ }
+ 
+ extern struct generic_pm_domain *dev_to_genpd(struct device *dev);
++extern struct generic_pm_domain *pm_genpd_lookup(struct fwnode_handle *node);
+ extern int __pm_genpd_add_device(struct generic_pm_domain *genpd,
+ 				 struct device *dev,
+ 				 struct gpd_timing_data *td);
 -- 
-2.1.3
+1.9.1
