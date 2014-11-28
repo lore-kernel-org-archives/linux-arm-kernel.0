@@ -1,37 +1,40 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 28 Nov 2014 17:43:33 +0100
-Subject: [PATCH 0/2] ARM: imx: src: vf610 system reset controller
-Message-ID: <1417193015-6033-1-git-send-email-stefan@agner.ch>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 28 Nov 2014 16:44:31 +0000
+Subject: [PATCH RESEND] ARM: vexpress: Enable regulator framework when MMCI is
+ in use
+In-Reply-To: <1417192440.4371.15.camel@arm.com>
+References: <1417192440.4371.15.camel@arm.com>
+Message-ID: <1417193071-801-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a system reset controller handler for Vybrid SoC family.
-There is already a driver for the SRC (system reset controller)
-module for i.MX6, but since the module in Vybrid is a bit different
-I descided to create a new file (there are several MISC registers
-with various functionality in the Vybrid case).
+The MMCI driver, when used with a Device Tree described device, relies
+on the "vmmc" voltage regulator supply to set the OCR register voltage bits,
+using MMC core's mmc_regulator_get_supply() function.
 
-I'm not sure if it is acceptable to have that code still in the
-machine folder. However, since the current i.MX6 implementation
-is located there too, and the module has various functionality
-we need for instance from suspend/resume code (future pm-vf610.c),
-I descided to put it into the machine folder. If it needs to go
-under driver/, my question is how can I properly export the
-functionality (e.g. DDR Reset control on standby in MISC_2 or
-SRC_GPR), from the PM code located in the machine folder.
+Without the regulator framework present there are no valid operating
+voltages reported and the device initialisation fails:
 
-Stefan Agner (2):
-  ARM: dts: vf610: add system reset controller (SRC)
-  ARM: imx: src: support vf610 system reset controller
+mmci-pl18x 10005000.mmci: No vmmc regulator found
+mmci-pl18x 10005000.mmci: no support for card's volts
+mmc0: error -22 whilst initialising SD card
 
- arch/arm/boot/dts/vf500.dtsi   |  4 ++++
- arch/arm/boot/dts/vfxxx.dtsi   |  5 ++++
- arch/arm/mach-imx/Makefile     |  2 +-
- arch/arm/mach-imx/common.h     |  1 +
- arch/arm/mach-imx/mach-vf610.c |  8 +++++++
- arch/arm/mach-imx/src-vf610.c  | 53 ++++++++++++++++++++++++++++++++++++++++++
- 6 files changed, 72 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-imx/src-vf610.c
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/mach-vexpress/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 9a96bab..d6b16d9 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -16,6 +16,7 @@ menuconfig ARCH_VEXPRESS
+ 	select POWER_RESET
+ 	select POWER_RESET_VEXPRESS
+ 	select POWER_SUPPLY
++	select REGULATOR if MMC_ARMMMCI
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select VEXPRESS_CONFIG
+ 	select VEXPRESS_SYSCFG
 -- 
-2.1.3
+2.1.0
