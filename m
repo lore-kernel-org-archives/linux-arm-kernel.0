@@ -1,109 +1,86 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Thu, 27 Nov 2014 17:27:43 -0800
-Subject: [PATCH 1/4] clk: iproc: define Broadcom iProc clock binding
+Date: Thu, 27 Nov 2014 17:27:46 -0800
+Subject: [PATCH 4/4] ARM: dts: enable clock support for Broadcom Cygnus
 In-Reply-To: <1417138066-17906-1-git-send-email-rjui@broadcom.com>
 References: <Ray Jui <rjui@broadcom.com>
  <1417138066-17906-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1417138066-17906-2-git-send-email-rjui@broadcom.com>
+Message-ID: <1417138066-17906-5-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device tree binding for Broadcom iProc architecture based
-clock controller
+Replace current device tree dummy clocks with real clock support for
+Broadcom Cygnus SoC
 
 Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
+Reviewed-by: Scott Branden <sbraden@broadcom.com>
 ---
- brcm,iproc-clocks.txt |  178 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 178 insertions(+)
- create mode 100644 brcm,iproc-clocks.txt
+ arch/arm/boot/dts/bcm-cygnus-clock.dtsi |  110 ++++++++++++++++++++++++-------
+ arch/arm/boot/dts/bcm-cygnus.dtsi       |    2 +-
+ 2 files changed, 86 insertions(+), 26 deletions(-)
 
-diff --git a/brcm,iproc-clocks.txt b/brcm,iproc-clocks.txt
-new file mode 100644
-index 0000000..cc64fd2
---- /dev/null
-+++ b/brcm,iproc-clocks.txt
-@@ -0,0 +1,178 @@
-+Broadcom iProc Family Clocks
-+
-+This binding uses the common clock binding:
-+    Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+The iProc clock controller manages clocks that are common to the iProc family.
-+An SoC from the iProc family may have several PPLs, e.g., ARMPLL, GENPLL,
-+LCPLL0, MIPIPLL, and etc., all derived from an onboard crystal. Each PLL
-+comprises of several leaf clocks
-+
-+Required properties for PLLs:
-+- compatible:
-+    Should have a value of the form "brcm,<soc>-<pll>". For example, GENPLL on
-+Cygnus has a compatible string of "brcm,cygnus-genpll"
-+
-+- #clock-cells:
-+    Must be <0>
-+
-+- reg:
-+    Define the base and range of the I/O address space that contain the iProc
-+clock control registers required for the PLL
-+
-+- clocks:
-+    The input parent clock phandle for the PLL. For all iProc PLLs, this is an
-+onboard crystal with a fixed rate
-+
-+Optional Properties for PLLs:
-+- clock-frequency:
-+    PLL frequency in Hz. If specified, PLL will be configured to run at
-+<clock-frequency> instead of the default frequency after chip reset, provided
-+that <clock-frequency> and its parameters are defined in the SoC specific
-+frequency parameter table
-+
-+Example:
-+
-+	osc: oscillator {
+diff --git a/arch/arm/boot/dts/bcm-cygnus-clock.dtsi b/arch/arm/boot/dts/bcm-cygnus-clock.dtsi
+index 60d8389..f2da5e2 100644
+--- a/arch/arm/boot/dts/bcm-cygnus-clock.dtsi
++++ b/arch/arm/boot/dts/bcm-cygnus-clock.dtsi
+@@ -36,56 +36,116 @@ clocks {
+ 	ranges;
+ 
+ 	osc: oscillator {
 +		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <25000000>;
-+	};
-+
+ 		compatible = "fixed-clock";
+-		#clock-cells = <1>;
+ 		clock-frequency = <25000000>;
+ 	};
+ 
+-	apb_clk: apb_clk {
+-		compatible = "fixed-clock";
++	/* Cygnus ARM PLL */
++	armpll: armpll {
+ 		#clock-cells = <0>;
+-		clock-frequency = <1000000000>;
++		compatible = "brcm,cygnus-armpll";
++		clocks = <&osc>;
++		reg = <0x19000000 0x1000>;
+ 	};
+ 
+-	periph_clk: periph_clk {
+-		compatible = "fixed-clock";
++	/* peripheral clock for system timer */
++	arm_periph_clk: arm_periph_clk {
+ 		#clock-cells = <0>;
+-		clock-frequency = <500000000>;
++		compatible = "fixed-factor-clock";
++		clocks = <&armpll>;
++		clock-div = <2>;
++		clock-mult = <1>;
+ 	};
+ 
+-	sdio_clk: lcpll_ch2 {
+-		compatible = "fixed-clock";
++	/* APB bus clock */
++	apb_clk: apb_clk {
+ 		#clock-cells = <0>;
+-		clock-frequency = <200000000>;
++		compatible = "fixed-factor-clock";
++		clocks = <&armpll>;
++		clock-div = <4>;
++		clock-mult = <1>;
+ 	};
+ 
+-	axi81_clk: axi81_clk {
+-		compatible = "fixed-clock";
 +	genpll: genpll {
-+		#clock-cells = <0>;
+ 		#clock-cells = <0>;
+-		clock-frequency = <100000000>;
 +		compatible = "brcm,cygnus-genpll";
 +		reg = <0x0301d000 0x2c>,
 +			<0x0301c020 0x4>;
 +		clocks = <&osc>;
-+	};
-+
-+Required properties for leaf clocks of a PLL:
-+
-+- compatible:
-+    Should have a value of the form "brcm,<soc>-<pll>-clk". For example, leaf
-+clocks derived from the GENPLL on Cygnus SoC have a compatible string of
-+"brcm,cygnus-genpll-clk"
-+
-+- #clock-cells:
-+    Have a value of <1> since there are more than 1 leaf clock of a
-+given PLL
-+
-+- reg:
-+    Define the base and range of the I/O address space that contain the iProc
-+clock control registers required for the PLL leaf clocks
-+
-+- clocks:
-+    The input parent PLL phandle for the leaf clock
-+
-+- clock-output-names:
-+    An ordered list of strings defining the names of the leaf clocks
-+
-+Example:
-+
-+	genpll: genpll {
-+		#clock-cells = <0>;
-+		compatible = "brcm,cygnus-genpll";
-+		reg = <0x0301d000 0x2c>,
-+			<0x0301c020 0x4>;
-+		clocks = <&osc>;
-+	};
-+
+ 	};
+ 
+-	keypad_clk: keypad_clk {
+-		compatible = "fixed-clock";
++	/* various clocks running off the GENPLL */
 +	genpll_clks: genpll_clks {
 +		#clock-cells = <1>;
 +		compatible = "brcm,cygnus-genpll-clk";
@@ -113,35 +90,69 @@ index 0000000..cc64fd2
 +			"enet_sw", "audio_125", "can";
 +	};
 +
-+Required properties for ASIU clocks:
++	/* always 1/2 of the axi21 clock */
++	axi41_clk: axi41_clk {
+ 		#clock-cells = <0>;
+-		clock-frequency = <31806>;
++		compatible = "fixed-factor-clock";
++		clocks = <&genpll_clks 0>;
++		clock-div = <2>;
++		clock-mult = <1>;
+ 	};
+ 
+-	adc_clk: adc_clk {
+-		compatible = "fixed-clock";
++	/* always 1/4 of the axi21 clock */
++	axi81_clk: axi81_clk {
+ 		#clock-cells = <0>;
+-		clock-frequency = <1562500>;
++		compatible = "fixed-factor-clock";
++		clocks = <&genpll_clks 0>;
++		clock-div = <4>;
++		clock-mult = <1>;
+ 	};
+ 
+-	pwm_clk: pwm_clk {
+-		compatible = "fixed-clock";
++	lcpll0: lcpll0 {
+ 		#clock-cells = <0>;
+-		clock-frequency = <1000000>;
++		compatible = "brcm,cygnus-lcpll0";
++		reg = <0x0301d02c 0x1c>,
++			<0x0301c020 0x4>;
++		clocks = <&osc>;
+ 	};
+ 
+-	lcd_clk: mipipll_ch1 {
+-		compatible = "fixed-clock";
++	/* various clocks running off the LCPLL0 */
++	lcpll0_clks: lcpll0_clks {
++		#clock-cells = <1>;
++		compatible = "brcm,cygnus-lcpll0-clk";
++		reg = <0x0301d02c 0x1c>;
++		clocks = <&lcpll0>;
++		clock-output-names = "pcie_phy", "ddr_phy", "sdio",
++			"usb_phy", "smart_card", "ch5";
++	};
 +
-+ASIU clocks are a special case. These clocks are derived directly from the
-+reference clock of the onboard crystal
++	mipipll: mipipll {
+ 		#clock-cells = <0>;
+-		clock-frequency = <100000000>;
++		compatible = "brcm,cygnus-mipipll";
++		reg = <0x180a9800 0x2c>,
++			<0x0301c020 0x4>,
++			<0x180aa024 0x4>;
++		clock-frequency = <1350000000>;
++		clocks = <&osc>;
++	};
 +
-+- compatible:
-+    Should have a value of the form "brcm,<soc>-asiu-clk". For example, ASIU
-+clocks for Cygnus have a compatible string of "brcm,cygnus-asiu-clk"
-+
-+- #clock-cells:
-+    Have a value of <1> since there are more than 1 ASIU clocks
-+
-+- reg:
-+    Define the base and range of the I/O address space that contain the iProc
-+clock control registers required for ASIU clocks
-+
-+- clocks:
-+    The input parent clock phandle for the ASIU clock, i.e., the onboard
-+crystal
-+
-+- clock-output-names:
-+    An ordered list of strings defining the names of the ASIU clocks
-+
-+Example:
-+
-+	osc: oscillator {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <25000000>;
++	mipipll_clks: mipipll_clks {
++		#clock-cells = <1>;
++		compatible = "brcm,cygnus-mipipll-clk";
++		reg = <0x180a9800 0x2c>;
++		clocks = <&mipipll>;
++		clock-output-names = "ch0_unused", "ch1_lcd", "ch2_unused",
++			"ch3_unused", "ch4_unused", "ch5_unused";
 +	};
 +
 +	asiu_clks: asiu_clks {
@@ -151,56 +162,20 @@ index 0000000..cc64fd2
 +			<0x180aa024 0x4>;
 +		clocks = <&osc>;
 +		clock-output-names = "keypad", "adc/touch", "pwm";
-+	};
-+
-+Cygnus
-+------
-+PLL and leaf clock compatible strings for Cygnus are:
-+    "brcm,cygnus-armpll"
-+    "brcm,cygnus-genpll"
-+    "brcm,cygnus-lcpll0"
-+    "brcm,cygnus-mipipll"
-+    "brcm,cygnus-genpll-clk"
-+    "brcm,cygnus-lcpll0-clk"
-+    "brcm,cygnus-mipipll-clk"
-+    "brcm,cygnus-asiu-clk"
-+
-+The following table defines the set of PLL/clock index and ID for Cygnus.
-+These clock IDs are defined in:
-+    "include/dt-bindings/clock/bcm-cygnus.h"
-+
-+    Clock      Source           Index   ID
-+    ---        -----            -----   ---------
-+    crystal    N/A              N/A     N/A
-+
-+    armpll     crystal          N/A     N/A
-+    genpll     crystal          N/A     N/A
-+    lcpll0     crystal          N/A     N/A
-+    mipipll    crystal          N/A     N/A
-+
-+    keypad     crystal (ASIU)   0       BCM_CYGNUS_ASIU_KEYPAD_CLK
-+    adc/tsc    crystal (ASIU)   1       BCM_CYGNUS_ASIU_ADC_CLK
-+    pwm        crystal (ASIU)   2       BCM_CYGNUS_ASIU_PWM_CLK
-+
-+    axi21      genpll           0       BCM_CYGNUS_GENPLL_AXI21_CLK
-+    250mhz     genpll           1       BCM_CYGNUS_GENPLL_250MHZ_CLK
-+    ihost_sys  genpll           2       BCM_CYGNUS_GENPLL_IHOST_SYS_CLK
-+    enet_sw    genpll           3       BCM_CYGNUS_GENPLL_ENET_SW_CLK
-+    audio_125  genpll           4       BCM_CYGNUS_GENPLL_AUDIO_125_CLK
-+    can        genpll           5       BCM_CYGNUS_GENPLL_CAN_CLK
-+
-+    pcie_phy   lcpll0           0       BCM_CYGNUS_LCPLL0_PCIE_PHY_REF_CLK
-+    ddr_phy    lcpll0           1       BCM_CYGNUS_LCPLL0_DDR_PHY_CLK
-+    sdio       lcpll0           2       BCM_CYGNUS_LCPLL0_SDIO_CLK
-+    usb_phy    lcpll0           3       BCM_CYGNUS_LCPLL0_USB_PHY_REF_CLK
-+    smart_card lcpll0           4       BCM_CYGNUS_LCPLL0_SMART_CARD_CLK
-+    ch5        lcpll0           5       BCM_CYGNUS_LCPLL0_CH5_UNUSED
-+
-+    ch0_unused mipipll          0       BCM_CYGNUS_MIPIPLL_CH0_UNUSED
-+    ch1_lcd    mipipll          1       BCM_CYGNUS_MIPIPLL_CH1_LCD
-+    ch2_unused mipipll          2       BCM_CYGNUS_MIPIPLL_CH2_UNUSED
-+    ch3_unused mipipll          3       BCM_CYGNUS_MIPIPLL_CH3_UNUSED
-+    ch4_unused mipipll          4       BCM_CYGNUS_MIPIPLL_CH4_UNUSED
-+    ch5_unused mipipll          5       BCM_CYGNUS_MIPIPLL_CH5_UNUSED
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+index 5126f9e..2b99e9c 100644
+--- a/arch/arm/boot/dts/bcm-cygnus.dtsi
++++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+@@ -134,7 +134,7 @@
+ 		compatible = "arm,cortex-a9-global-timer";
+ 		reg = <0x19020200 0x100>;
+ 		interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&periph_clk>;
++		clocks = <&arm_periph_clk>;
+ 	};
+ 
+ };
 -- 
 1.7.9.5
