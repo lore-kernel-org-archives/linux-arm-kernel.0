@@ -1,68 +1,172 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 28 Nov 2014 09:44:27 +0900
-Subject: [PATCH 1/2] ARM: shmobile: sh73a0 legacy/reference: Add missing
- INTCA0 clock for irqpin module
-In-Reply-To: <20141126013156.GE17620@verge.net.au>
-References: <1416410820-30020-1-git-send-email-geert+renesas@glider.be>
- <1416410820-30020-2-git-send-email-geert+renesas@glider.be>
- <20141125024405.GA21881@verge.net.au>
- <CAMuHMdW_-Dj8x2+4RG8yGurPsc8oVZVME2UaoU+EOhrxaCQ-4Q@mail.gmail.com>
- <CAMuHMdV3D8odk0+A5KPgv0yWhFB2KsyKFac8rHm3B=SRUUQ__w@mail.gmail.com>
- <20141126013156.GE17620@verge.net.au>
-Message-ID: <20141128004426.GH30850@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 28 Nov 2014 10:04:15 +0900
+Subject: [PATCH v2 net] sh_eth: Fix sleeping function called from invalid
+ context
+Message-ID: <1417136655-20052-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+From: Mitsuhiro Kimura <mitsuhiro.kimura.kc@renesas.com>
 
-On Wed, Nov 26, 2014 at 10:31:56AM +0900, Simon Horman wrote:
-> On Tue, Nov 25, 2014 at 11:16:40AM +0100, Geert Uytterhoeven wrote:
-> > On Tue, Nov 25, 2014 at 10:31 AM, Geert Uytterhoeven
-> > <geert@linux-m68k.org> wrote:
-> > > On Tue, Nov 25, 2014 at 3:44 AM, Simon Horman <horms@verge.net.au> wrote:
-> > >> On Wed, Nov 19, 2014 at 04:26:59PM +0100, Geert Uytterhoeven wrote:
-> > >>> This clock drives the irqpin controller modules.
-> > >>> Before, it was assumed enabled by the bootloader or reset state.
-> > >>> By making it available to the driver, we make sure it gets enabled when
-> > >>> needed, and allow it to be managed by system or runtime PM.
-> > >>>
-> > >>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > >>
-> > >> Hi Geert,
-> > >>
-> > >> should this be considered a fix?
-> > >
-> > > In some sense this is a fix. But I don't think anyone is suffering from it.
-> > > Just poor guys like me who disable all MSTP clocks in early boot code,
-> > > to find more missing clock declarations and more drivers that don't manage
-> > > their clocks ;-)
-> > >
-> > >> If so could you cook up some text describing which patch introduced
-> > >> this problem in which kernel version.
-> > >
-> > > I guess that would be:
-> > >
-> > > commit 341eb5465f67437ad37ef2f6302b581beda4614a
-> > > Author: Magnus Damm <damm@opensource.se>
-> > > Date:   Tue Feb 26 12:01:09 2013 +0900
-> > >
-> > >     ARM: shmobile: INTC External IRQ pin driver on sh73a0
-> > >
-> > > But I don't think it's worth adding that, or do you plan to backport
-> > > this to LTSI?
-> 
-> Thanks. My main motivation for asking is that Olof asked about some
-> recent patches that looked like fixes. So I am trying to be a bit
-> better at breaking out fixes and documenting them appropriately.
-> 
-> > Seeing the similar fix for r8a7740 has landed in backports, I now assume
-> > you will ;-)
-> 
-> Yes, I plan to backport this at some point.
+This resolves the following bug which can be reproduced by building the
+kernel with CONFIG_DEBUG_ATOMIC_SLEEP=y and reading network statistics
+while the network interface is down.
 
-Thanks for all your effort with this change.
-After all our discussion of fixes I have decided
-just to classify it as a regular change and have queued it up for v3.20.
+e.g.:
 
-I expect the discussion earlier in this thread will be useful when
-explaining things to the arm-soc maintainers, so thanks for that material.
+ifconfig eth0 down
+cat /sys/class/net/eth0/statistics/tx_errors
+
+----
+[ 1238.161349] BUG: sleeping function called from invalid context at drivers/base/power/runtime.c:952
+[ 1238.188279] in_atomic(): 1, irqs_disabled(): 0, pid: 1388, name: cat
+[ 1238.207425] CPU: 0 PID: 1388 Comm: cat Not tainted 3.10.31-ltsi-00046-gefa0b46 #1087
+[ 1238.230737] Backtrace:
+[ 1238.238123] [<c0012e64>] (dump_backtrace+0x0/0x10c) from [<c0013000>] (show_stack+0x18/0x1c)
+[ 1238.263499]  r6:000003b8 r5:c06160c0 r4:c0669e00 r3:00404000
+[ 1238.280583] [<c0012fe8>] (show_stack+0x0/0x1c) from [<c04515a4>] (dump_stack+0x20/0x28)
+[ 1238.304631] [<c0451584>] (dump_stack+0x0/0x28) from [<c004970c>] (__might_sleep+0xf8/0x118)
+[ 1238.329734] [<c0049614>] (__might_sleep+0x0/0x118) from [<c02465ac>] (__pm_runtime_resume+0x38/0x90)
+[ 1238.357170]  r7:d616f000 r6:c049c458 r5:00000004 r4:d6a17210
+[ 1238.374251] [<c0246574>] (__pm_runtime_resume+0x0/0x90) from [<c029b1c4>] (sh_eth_get_stats+0x44/0x280)
+[ 1238.402468]  r7:d616f000 r6:c049c458 r5:d5c21000 r4:d5c21000
+[ 1238.419552] [<c029b180>] (sh_eth_get_stats+0x0/0x280) from [<c03ae39c>] (dev_get_stats+0x54/0x88)
+[ 1238.446204]  r5:d5c21000 r4:d5ed7e08
+[ 1238.456980] [<c03ae348>] (dev_get_stats+0x0/0x88) from [<c03c677c>] (netstat_show.isra.15+0x54/0x9c)
+[ 1238.484413]  r6:d5c21000 r5:d5c21238 r4:00000028 r3:00000001
+[ 1238.501495] [<c03c6728>] (netstat_show.isra.15+0x0/0x9c) from [<c03c69b8>] (show_tx_errors+0x18/0x1c)
+[ 1238.529196]  r7:d5f945d8 r6:d5f945c0 r5:c049716c r4:c0650e7c
+[ 1238.546279] [<c03c69a0>] (show_tx_errors+0x0/0x1c) from [<c023963c>] (dev_attr_show+0x24/0x50)
+[ 1238.572157] [<c0239618>] (dev_attr_show+0x0/0x50) from [<c010c148>] (sysfs_read_file+0xb0/0x140)
+[ 1238.598554]  r5:c049716c r4:d5c21240
+[ 1238.609326] [<c010c098>] (sysfs_read_file+0x0/0x140) from [<c00b9ee4>] (vfs_read+0xb0/0x13c)
+[ 1238.634679] [<c00b9e34>] (vfs_read+0x0/0x13c) from [<c00ba0ac>] (SyS_read+0x44/0x74)
+[ 1238.657944]  r8:bef45bf0 r7:00000000 r6:d6ac0600 r5:00000000 r4:00000000
+[ 1238.678172] [<c00ba068>] (SyS_read+0x0/0x74) from [<c000eec0>] (ret_fast_syscall+0x0/0x30)
+----
+
+Signed-off-by: Mitsuhiro Kimura <mitsuhiro.kimura.kc@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+---
+v2 [Simon Horman]
+* Enhance changelog to describe how the problem may be reproduced.
+* Use bitfield rather than boolean for is_opened field of
+  struct sh_eth_private. As suggested by Sergei Shtylyov.
+---
+ drivers/net/ethernet/renesas/sh_eth.c | 64 +++++++++++++++++++----------------
+ drivers/net/ethernet/renesas/sh_eth.h |  1 +
+ 2 files changed, 36 insertions(+), 29 deletions(-)
+
+diff --git a/drivers/net/ethernet/renesas/sh_eth.c b/drivers/net/ethernet/renesas/sh_eth.c
+index 60e9c2c..862a691 100644
+--- a/drivers/net/ethernet/renesas/sh_eth.c
++++ b/drivers/net/ethernet/renesas/sh_eth.c
+@@ -2042,6 +2042,8 @@ static int sh_eth_open(struct net_device *ndev)
+ 	if (ret)
+ 		goto out_free_irq;
+ 
++	mdp->is_opened = 1;
++
+ 	return ret;
+ 
+ out_free_irq:
+@@ -2131,6 +2133,36 @@ static int sh_eth_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 	return NETDEV_TX_OK;
+ }
+ 
++static struct net_device_stats *sh_eth_get_stats(struct net_device *ndev)
++{
++	struct sh_eth_private *mdp = netdev_priv(ndev);
++
++	if (sh_eth_is_rz_fast_ether(mdp))
++		return &ndev->stats;
++
++	if (!mdp->is_opened)
++		return &ndev->stats;
++
++	ndev->stats.tx_dropped += sh_eth_read(ndev, TROCR);
++	sh_eth_write(ndev, 0, TROCR);	/* (write clear) */
++	ndev->stats.collisions += sh_eth_read(ndev, CDCR);
++	sh_eth_write(ndev, 0, CDCR);	/* (write clear) */
++	ndev->stats.tx_carrier_errors += sh_eth_read(ndev, LCCR);
++	sh_eth_write(ndev, 0, LCCR);	/* (write clear) */
++
++	if (sh_eth_is_gether(mdp)) {
++		ndev->stats.tx_carrier_errors += sh_eth_read(ndev, CERCR);
++		sh_eth_write(ndev, 0, CERCR);	/* (write clear) */
++		ndev->stats.tx_carrier_errors += sh_eth_read(ndev, CEECR);
++		sh_eth_write(ndev, 0, CEECR);	/* (write clear) */
++	} else {
++		ndev->stats.tx_carrier_errors += sh_eth_read(ndev, CNDCR);
++		sh_eth_write(ndev, 0, CNDCR);	/* (write clear) */
++	}
++
++	return &ndev->stats;
++}
++
+ /* device close function */
+ static int sh_eth_close(struct net_device *ndev)
+ {
+@@ -2145,6 +2177,7 @@ static int sh_eth_close(struct net_device *ndev)
+ 	sh_eth_write(ndev, 0, EDTRR);
+ 	sh_eth_write(ndev, 0, EDRRR);
+ 
++	sh_eth_get_stats(ndev);
+ 	/* PHY Disconnect */
+ 	if (mdp->phydev) {
+ 		phy_stop(mdp->phydev);
+@@ -2163,36 +2196,9 @@ static int sh_eth_close(struct net_device *ndev)
+ 
+ 	pm_runtime_put_sync(&mdp->pdev->dev);
+ 
+-	return 0;
+-}
+-
+-static struct net_device_stats *sh_eth_get_stats(struct net_device *ndev)
+-{
+-	struct sh_eth_private *mdp = netdev_priv(ndev);
+-
+-	if (sh_eth_is_rz_fast_ether(mdp))
+-		return &ndev->stats;
+-
+-	pm_runtime_get_sync(&mdp->pdev->dev);
+-
+-	ndev->stats.tx_dropped += sh_eth_read(ndev, TROCR);
+-	sh_eth_write(ndev, 0, TROCR);	/* (write clear) */
+-	ndev->stats.collisions += sh_eth_read(ndev, CDCR);
+-	sh_eth_write(ndev, 0, CDCR);	/* (write clear) */
+-	ndev->stats.tx_carrier_errors += sh_eth_read(ndev, LCCR);
+-	sh_eth_write(ndev, 0, LCCR);	/* (write clear) */
+-	if (sh_eth_is_gether(mdp)) {
+-		ndev->stats.tx_carrier_errors += sh_eth_read(ndev, CERCR);
+-		sh_eth_write(ndev, 0, CERCR);	/* (write clear) */
+-		ndev->stats.tx_carrier_errors += sh_eth_read(ndev, CEECR);
+-		sh_eth_write(ndev, 0, CEECR);	/* (write clear) */
+-	} else {
+-		ndev->stats.tx_carrier_errors += sh_eth_read(ndev, CNDCR);
+-		sh_eth_write(ndev, 0, CNDCR);	/* (write clear) */
+-	}
+-	pm_runtime_put_sync(&mdp->pdev->dev);
++	mdp->is_opened = 0;
+ 
+-	return &ndev->stats;
++	return 0;
+ }
+ 
+ /* ioctl to device function */
+diff --git a/drivers/net/ethernet/renesas/sh_eth.h b/drivers/net/ethernet/renesas/sh_eth.h
+index b37c427..81fcab3 100644
+--- a/drivers/net/ethernet/renesas/sh_eth.h
++++ b/drivers/net/ethernet/renesas/sh_eth.h
+@@ -522,6 +522,7 @@ struct sh_eth_private {
+ 
+ 	unsigned no_ether_link:1;
+ 	unsigned ether_link_active_low:1;
++	unsigned is_opened:1;
+ };
+ 
+ static inline void sh_eth_soft_swap(char *src, int len)
+-- 
+2.1.3
