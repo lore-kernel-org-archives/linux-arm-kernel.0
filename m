@@ -1,104 +1,23 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 28 Nov 2014 15:08:06 +0100
-Subject: [PATCH v3 4/4] mmc: atmel-mci: use probe deferring if dma controller
- is not ready yet
-In-Reply-To: <1417183686-31481-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1417183686-31481-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1417183686-31481-5-git-send-email-ludovic.desroches@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Nov 2014 15:09:18 +0100
+Subject: [PATCH v4 0/2] initial suport for Alphascale ASM9260
+In-Reply-To: <1416827308-16481-1-git-send-email-linux@rempel-privat.de>
+References: <1415086486-10260-1-git-send-email-linux@rempel-privat.de>
+ <1416827308-16481-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <201411281509.19170.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return probe defer if requesting a dma channel without a dma controller
-probed.
+On Monday 24 November 2014, Oleksij Rempel wrote:
+> This is reduced patchset to provide initial support for Alphascale ASM9260
+> 
+> Oleksij Rempel (2):
+>   ARM: add mach-asm9260
+>   ARM: add lolevel debug support for asm9260
+> 
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/mmc/host/atmel-mci.c | 49 ++++++++++++++++++++++----------------------
- 1 file changed, 25 insertions(+), 24 deletions(-)
+Applied to next/soc, thanks a lot for keeping this up!
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 00f6088..0a96819 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -2272,29 +2272,26 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
- 	mmc_free_host(slot->mmc);
- }
- 
--static bool atmci_configure_dma(struct atmel_mci *host)
-+static int atmci_configure_dma(struct atmel_mci *host)
- {
--	if (host == NULL)
--		return false;
-+	int ret = 0;
- 
--	host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
--	if (!host->dma.chan) {
--		dev_warn(&host->pdev->dev, "no DMA channel available\n");
--		return false;
--	} else {
--		dev_info(&host->pdev->dev,
--					"using %s for DMA transfers\n",
--					dma_chan_name(host->dma.chan));
--
--		host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
--		host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--		host->dma_conf.src_maxburst = 1;
--		host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
--		host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--		host->dma_conf.dst_maxburst = 1;
--		host->dma_conf.device_fc = false;
--		return true;
--	}
-+	host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev, "rxtx");
-+	if (IS_ERR(host->dma.chan))
-+		return PTR_ERR(host->dma.chan);
-+
-+	dev_info(&host->pdev->dev, "using %s for DMA transfers\n",
-+		 dma_chan_name(host->dma.chan));
-+
-+	host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
-+	host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	host->dma_conf.src_maxburst = 1;
-+	host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
-+	host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	host->dma_conf.dst_maxburst = 1;
-+	host->dma_conf.device_fc = false;
-+
-+	return ret;
- }
- 
- /*
-@@ -2411,7 +2408,10 @@ static int atmci_probe(struct platform_device *pdev)
- 
- 	/* Get MCI capabilities and set operations according to it */
- 	atmci_get_cap(host);
--	if (atmci_configure_dma(host)) {
-+	ret = atmci_configure_dma(host);
-+	if (ret == -EPROBE_DEFER)
-+		goto err_dma_probe_defer;
-+	if (ret == 0) {
- 		host->prepare_data = &atmci_prepare_data_dma;
- 		host->submit_data = &atmci_submit_data_dma;
- 		host->stop_transfer = &atmci_stop_transfer_dma;
-@@ -2496,8 +2496,9 @@ err_init_slot:
- 	pm_runtime_put_noidle(&pdev->dev);
- 
- 	del_timer_sync(&host->timer);
--	if (host->dma.chan)
-+	if (!IS_ERR(host->dma.chan))
- 		dma_release_channel(host->dma.chan);
-+err_dma_probe_defer:
- 	free_irq(irq, host);
- 	return ret;
- }
-@@ -2523,7 +2524,7 @@ static int atmci_remove(struct platform_device *pdev)
- 	atmci_readl(host, ATMCI_SR);
- 
- 	del_timer_sync(&host->timer);
--	if (host->dma.chan)
-+	if (!IS_ERR(host->dma.chan))
- 		dma_release_channel(host->dma.chan);
- 
- 	free_irq(platform_get_irq(pdev, 0), host);
--- 
-2.0.3
+Are you planning to send some matching dts files for 3.19 as well?
+
+	Arnd
