@@ -1,43 +1,39 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Fri, 28 Nov 2014 15:17:59 +0100
-Subject: [RFC 0/7] ARM: vf610m4: Add Vybrid Cortex-M4 support
-In-Reply-To: <cover.1413136383.git.stefan@agner.ch>
-References: <cover.1413136383.git.stefan@agner.ch>
-Message-ID: <54788417.6020408@suse.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Nov 2014 14:16:51 +0000
+Subject: [PATCH v3 2/4] mmc: atmel-mci: remove __init/__exit attributes
+In-Reply-To: <1417183686-31481-3-git-send-email-ludovic.desroches@atmel.com>
+References: <1417183686-31481-1-git-send-email-ludovic.desroches@atmel.com>
+ <1417183686-31481-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20141128141651.GS3836@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Fri, Nov 28, 2014 at 03:08:04PM +0100, Ludovic Desroches wrote:
+> Using __init/__exit attributes can cause several breakages so remove
+> them.
 
-Am 12.10.2014 um 20:13 schrieb Stefan Agner:
-> One thing I noticed that when I move the xipImage below the DRAM base
-> address, the kernel freezes:
-> ...
-> Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
-> Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
-> [freeze]
-> 
-> I think it happens when the scheduler gets started. Any idea what could
-> go wrong here?
+I've really no idea why people jump overboard with these things - it
+seems people go from one extreme to the other (adding lots of __init /
+__exit annotations everywhere to removing them all), but:
 
-I ran into a similar issue on STM32F4 recently - hanging there, or:
+> @@ -2573,12 +2573,12 @@ static struct platform_driver atmci_driver = {
+>  	},
+>  };
+>  
+> -static int __init atmci_init(void)
+> +static int atmci_init(void)
+>  {
+>  	return platform_driver_probe(&atmci_driver, atmci_probe);
+>  }
+>  
+> -static void __exit atmci_exit(void)
+> +static void atmci_exit(void)
+>  {
+>  	platform_driver_unregister(&atmci_driver);
+>  }
 
-Unhandled exception: IPSR = 00000006 LR = fffffff1
-CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc5-00003-g489983a-dirty #25
-task: 90432000 ti: 90434000 task.ti: 90434000
-
-Unhandled exception: IPSR = 00000003 LR = fffffff1
-CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc5-00003-g489983a-dirty #25
-task: 90432000 ti: 90434000 task.ti: 90434000
--Boot 2010.03-00003-g934021a-dirty (Nov 26 2014 - 06:52:49)
-
-My debugging indicated that %pF was not working, used among others in
-checking for blacklisted initcalls. Disabling CONFIG_KALLSYMS worked
-around this, so I assume something there is not compatible with XIP...
-
-Regards,
-Andreas
+These last two are totally fine to leave there.
 
 -- 
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
