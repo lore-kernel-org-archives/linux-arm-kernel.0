@@ -1,29 +1,28 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 28 Nov 2014 13:59:46 +0100
-Subject: [PATCH 0/5] sun6i: Add A31s (pinctrl) support
-In-Reply-To: <CACRpkdb3P+KM+ANqe6fKqJcRnBp6zvJhWUFZDap8qFDWdY1JNQ@mail.gmail.com>
-References: <1416747283-13489-1-git-send-email-hdegoede@redhat.com>
- <CACRpkdb3P+KM+ANqe6fKqJcRnBp6zvJhWUFZDap8qFDWdY1JNQ@mail.gmail.com>
-Message-ID: <547871C2.6050209@redhat.com>
+From: jroedel@suse.de (jroedel at suse.de)
+Date: Fri, 28 Nov 2014 14:03:36 +0100
+Subject: [RFC PATCH v4 0/8] Introduce automatic DMA configuration for
+ IOMMU masters
+In-Reply-To: <20141126174707.GO14866@arm.com>
+References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
+ <546C7D36.7030400@samsung.com> <20141119114150.GD15985@arm.com>
+ <54743139.2020804@samsung.com> <20141126174707.GO14866@arm.com>
+Message-ID: <20141128130336.GF3156@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 26, 2014 at 05:47:07PM +0000, Will Deacon wrote:
+> Joerg, would you expect this to go via your tree or via something broader
+> like arm-soc, with your Ack on the IOMMU bits (patches 1, 3 and 4) instead?
 
-On 11/28/2014 01:01 PM, Linus Walleij wrote:
-> On Sun, Nov 23, 2014 at 1:54 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->
->> I'm not sure if sunxi pinctrl patches go through Maxime's tree or Linus' tree,
->> so I'll leave figuring out who takes what patches to you two.
->
-> The changes in drivers/pinctrl and arch/* are usually orthogonal
-> (just Kconfig symbols and DTS changes, no cross calls or header
-> files that break compilation etc) and then they can be
-> applied orthogonally. I just put the pinctrl patch in my tree and
-> the rest in the platform tree.
+Hmm, I don't like the idea of storing private data in iommu_ops. But
+given that this is already an improvement we can build on later, here is
+my
 
-Ok, note in case it was not clear there will be a v2, so please do not merge v1.
+	Acked-by: Joerg Roedel <jroedel@suse.de>
 
-Thanks,
+To further improve this we should probably introduce a seperate
+iommu-descriptor data-structure later which then describes a single
+hardware iommu device.
 
-Hans
+
+	Joerg
