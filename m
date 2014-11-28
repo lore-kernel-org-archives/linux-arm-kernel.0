@@ -1,49 +1,104 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 28 Nov 2014 15:08:44 +0100
-Subject: [PATCH v2 3/5] pinctrl: exynos: Fix GPIO setup failure because
- domain clock being gated
-In-Reply-To: <CACRpkdb8F8YcvFeHPvOKHjx_p4HEpimck3XRabB3oHpZTdmRQQ@mail.gmail.com>
-References: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
- <1417011857-10419-4-git-send-email-k.kozlowski@samsung.com>
- <CACRpkdb8F8YcvFeHPvOKHjx_p4HEpimck3XRabB3oHpZTdmRQQ@mail.gmail.com>
-Message-ID: <1417183724.18249.36.camel@AMDC1943>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 28 Nov 2014 15:08:06 +0100
+Subject: [PATCH v3 4/4] mmc: atmel-mci: use probe deferring if dma controller
+ is not ready yet
+In-Reply-To: <1417183686-31481-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1417183686-31481-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1417183686-31481-5-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pi?, 2014-11-28 at 15:04 +0100, Linus Walleij wrote:
-> On Wed, Nov 26, 2014 at 3:24 PM, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
-> 
-> > The audio subsystem on Exynos 5420 has separate clocks and GPIO. To
-> > operate properly on GPIOs the main block clock 'mau_epll' must be
-> > enabled.
-> >
-> > This was observed on Peach Pi/Pit and Arndale Octa (after enabling i2s0)
-> > after introducing runtime PM to pl330 DMA driver. After that commit the
-> > 'mau_epll' was gated, because the "amba" clock was disabled and there
-> > were no more users of mau_epll.
-> >
-> > The system hang just before probing i2s0 because
-> > samsung_pinmux_setup() tried to access memory from audss block which was
-> > gated.
-> >
-> > Add a clock property to the pinctrl driver and enable the clock during
-> > GPIO setup. During normal GPIO operations (set, get, set_direction) the
-> > clock is not enabled.
-> >
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> Waiting for Tomasz to review this.
-> 
-> Can this patch be applied in separation from the others?
+Return probe defer if requesting a dma channel without a dma controller
+probed.
 
-Yes, it can be picked independently.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/mmc/host/atmel-mci.c | 49 ++++++++++++++++++++++----------------------
+ 1 file changed, 25 insertions(+), 24 deletions(-)
 
-The commit message is somehow misleading because issue is actually fixed
-by enabling this in DTS. So the next patch (4/5: ARM: dts: exynos5420:
-Add clock for audss pinctrl) actually fixes the issue on Arndale Octa
-board from pinctrl perspective. Unfortunately I spot that mistake (in
-commit msg) later...
-
-Best regards,
-Krzysztof
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 00f6088..0a96819 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -2272,29 +2272,26 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
+ 	mmc_free_host(slot->mmc);
+ }
+ 
+-static bool atmci_configure_dma(struct atmel_mci *host)
++static int atmci_configure_dma(struct atmel_mci *host)
+ {
+-	if (host == NULL)
+-		return false;
++	int ret = 0;
+ 
+-	host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
+-	if (!host->dma.chan) {
+-		dev_warn(&host->pdev->dev, "no DMA channel available\n");
+-		return false;
+-	} else {
+-		dev_info(&host->pdev->dev,
+-					"using %s for DMA transfers\n",
+-					dma_chan_name(host->dma.chan));
+-
+-		host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
+-		host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+-		host->dma_conf.src_maxburst = 1;
+-		host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
+-		host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+-		host->dma_conf.dst_maxburst = 1;
+-		host->dma_conf.device_fc = false;
+-		return true;
+-	}
++	host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev, "rxtx");
++	if (IS_ERR(host->dma.chan))
++		return PTR_ERR(host->dma.chan);
++
++	dev_info(&host->pdev->dev, "using %s for DMA transfers\n",
++		 dma_chan_name(host->dma.chan));
++
++	host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
++	host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	host->dma_conf.src_maxburst = 1;
++	host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
++	host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	host->dma_conf.dst_maxburst = 1;
++	host->dma_conf.device_fc = false;
++
++	return ret;
+ }
+ 
+ /*
+@@ -2411,7 +2408,10 @@ static int atmci_probe(struct platform_device *pdev)
+ 
+ 	/* Get MCI capabilities and set operations according to it */
+ 	atmci_get_cap(host);
+-	if (atmci_configure_dma(host)) {
++	ret = atmci_configure_dma(host);
++	if (ret == -EPROBE_DEFER)
++		goto err_dma_probe_defer;
++	if (ret == 0) {
+ 		host->prepare_data = &atmci_prepare_data_dma;
+ 		host->submit_data = &atmci_submit_data_dma;
+ 		host->stop_transfer = &atmci_stop_transfer_dma;
+@@ -2496,8 +2496,9 @@ err_init_slot:
+ 	pm_runtime_put_noidle(&pdev->dev);
+ 
+ 	del_timer_sync(&host->timer);
+-	if (host->dma.chan)
++	if (!IS_ERR(host->dma.chan))
+ 		dma_release_channel(host->dma.chan);
++err_dma_probe_defer:
+ 	free_irq(irq, host);
+ 	return ret;
+ }
+@@ -2523,7 +2524,7 @@ static int atmci_remove(struct platform_device *pdev)
+ 	atmci_readl(host, ATMCI_SR);
+ 
+ 	del_timer_sync(&host->timer);
+-	if (host->dma.chan)
++	if (!IS_ERR(host->dma.chan))
+ 		dma_release_channel(host->dma.chan);
+ 
+ 	free_irq(platform_get_irq(pdev, 0), host);
+-- 
+2.0.3
