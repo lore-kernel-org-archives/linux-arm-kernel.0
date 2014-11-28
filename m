@@ -1,30 +1,45 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Nov 2014 12:55:16 +0100
-Subject: [PATCHv3 05/16] gpio: mvebu: add suspend/resume support
-In-Reply-To: <1416585613-2113-6-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1416585613-2113-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CACRpkdbPowMLHsw3+Ayi9zAJbd3Y8oTcnn=wb0H_Rmy74v8s7w@mail.gmail.com>
+Date: Fri, 28 Nov 2014 12:57:57 +0100
+Subject: [PATCH 6/6] dmaengine: ste_dma40: fix error return code
+In-Reply-To: <1416667159-9808-7-git-send-email-Julia.Lawall@lip6.fr>
+References: <1416667159-9808-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1416667159-9808-7-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <CACRpkdaobn4Zp8KYM-wA1L_uL8CHZW6K6yNb3dE=hSuHcxj6+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 5:00 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
+On Sat, Nov 22, 2014 at 3:39 PM, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
 
-> This commit adds the implementation of ->suspend() and ->resume()
-> platform_driver hooks in order to save and restore the state of the
-> GPIO configuration. In order to achieve that, additional fields are
-> added to the mvebu_gpio_chip structure.
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
 >
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: linux-gpio at vger.kernel.org
-> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Return a negative error code on failure.
+>
+> A simplified version of the semantic match that finds this problem is as
+> follows: (http://coccinelle.lip6.fr/)
+>
+> // <smpl>
+> @@
+> identifier ret; expression e1,e2;
+> @@
+> (
+> if (\(ret < 0\|ret != 0\))
+>  { ... return ret; }
+> |
+> ret = 0
+> )
+> ... when != ret = e1
+>     when != &ret
+> *if(...)
+> {
+>   ... when != ret = e2
+>       when forall
+>  return ret;
+> }
+> // </smpl>
+>
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-I already have this patch applied to the GPIO tree, I guess you're
-just resending the whole set on routine...
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
