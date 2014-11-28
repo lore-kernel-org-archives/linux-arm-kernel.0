@@ -1,110 +1,45 @@
-From: orsonzhai@gmail.com (Orson Zhai)
-Date: Fri, 28 Nov 2014 18:13:50 +0800
-Subject: [PATCH v3 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
- support
-In-Reply-To: <20141126123313.520ac83f@lxorguk.ukuu.org.uk>
-References: <Sharkl64-v3>	<1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>	<1416917818-10506-6-git-send-email-chunyan.zhang@spreadtrum.com>
- <20141126123313.520ac83f@lxorguk.ukuu.org.uk>
-Message-ID: <54784ADE.6010602@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 28 Nov 2014 14:45:01 +0300
+Subject: [PATCH v5][resend] of: replace Asahi Kasei Corp venter prefix
+In-Reply-To: <87egsob2cl.wl%kuninori.morimoto.gx@renesas.com>
+References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>	<20140922130026.GK3290@leverpostej>	<CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>	<20140922132743.GM3290@leverpostej>	<87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>	<1415845309.4269.6.camel@perches.com>	<20141113025105.GA16652@verge.net.au>	<87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>	<20141113110740.GE3815@sirena.org.uk>	<87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>	<20141114093554.GC3810@ulmo>	<87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>	<5469CD47.3040409@cogentembedded.com>	<877fytxsde.wl%kuninori.morimoto.gx@renesas.com>
+ <87egsob2cl.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <5478603D.1080404@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Alan,
+Hello.
 
-Thanks for your comments!
-Some question for them below,
+On 11/28/2014 3:22 AM, Kuninori Morimoto wrote:
 
-On 2014?11?26? 20:33, One Thousand Gnomes wrote:
->> +		 213 = /dev/ttySPX0		SPRD serial port 0
->> +		    ...
->> +		 216 = /dev/ttySPX3		SPRD serial port 3
-> Please use dynamic allocation or give a very very good reason why you
-> can't
-do we just leave the .major & .minor as NULL in struct uart_driver for 
-dynamic allocation?
->> +config SERIAL_SPRD_NR
->> +        int "Maximum number of sprd serial ports"
->> +        depends on SERIAL_SPRD
->> +        default "4"
-> If you are doing dynamic allocation this should pretty much go away
-I think you mean getting the number of uarts from dt and dynamically 
-allocate their port structure?
->
->> +static int sprd_startup(struct uart_port *port)
->> +{
->> +	int ret = 0;
->> +	unsigned int ien, ctrl1;
->> +	struct sprd_uart_port *sp;
->> +
->> +	serial_out(port, SPRD_CTL2, ((THLD_TX_EMPTY << 8) | THLD_RX_FULL));
->> +
->> +	/* clear rx fifo */
->> +	while (serial_in(port, SPRD_STS1) & 0x00ff)
->> +		serial_in(port, SPRD_RXD);
->> +
->> +	/* clear tx fifo */
->> +	while (serial_in(port, SPRD_STS1) & 0xff00)
->> +		;
-> Missing a cpu_relax and I would have thought a timeout on both of these.
-We will add in V4
->
->
->> +static void sprd_set_termios(struct uart_port *port,
->> +				    struct ktermios *termios,
->> +				    struct ktermios *old)
->> +{
->> +	unsigned int baud, quot;
->> +	/* calculate parity */
->> +	lcr &= ~SPRD_LCR_PARITY;
->> +	if (termios->c_cflag & PARENB) {
->> +		lcr |= SPRD_LCR_PARITY_EN;
->> +		if (termios->c_cflag & PARODD)
->> +			lcr |= SPRD_LCR_ODD_PAR;
->> +		else
->> +			lcr |= SPRD_LCR_EVEN_PAR;
->> +	}
-> If you don't support mark/space parity then also clear CMSPAR in
-> termios->c_cflag.
-just simply use code like "termios->c_cflag &= ~CMSPAR" ?
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-> If you do then it ought to be handled above.
->
->> +
->> +	/* clock divider bit16~bit20 */
->> +	serial_out(port, SPRD_CLKD1, (quot & 0x1f0000) >> 16);
->> +	serial_out(port, SPRD_LCR, lcr);
->> +	fc |= 0x3e00 | THLD_RX_FULL;
->> +	serial_out(port, SPRD_CTL1, fc);
-> Also set the resulting baud back into the termios (see the 8250 termios
-> for an example)
-you mean something like this part ?
+> Current vendor-prefixes.txt already has "ak" prefix for Asahi Kasei Corp
+> by ae8c4209af2c(of: Add vendor prefix for Asahi Kasei Corp.)
 
-/* Don't rewrite B0 */
-if (tty_termios_baud_rate(termios))
-tty_termios_encode_baud_rate(termios, baud, baud);
+> It went through the appropriate review process. But, almost all
+> Asahi Kasei chip drivers are using "asahi-kasei" prefix today.
+> (arch/arm/boot/dts/tegra20-seaboard.dts only is using "ak,ak8975",
+>   but there are instances of "asahi-kasei,ak8975" in other dts files.
+>   And drivers/iio/magnetometer/ak8975.c doesn't support "ak,ak8975" prefix)
+> So, we made a mistake there.
 
+> In addition, checkpatch.pl reports WARNING if it is using "asahi-kasei"
+> prerfix in DT file.
+> (DT compatible string vendor "asahi-kasei" appears un-documented)
 
->
->
->> +static int __init sprd_console_setup(struct console *co, char *options)
->> +{
->> +	struct uart_port *port;
->> +	int baud = 115200;
->> +	int bits = 8;
->> +	int parity = 'n';
->> +	int flow = 'n';
->> +
->> +	if (unlikely(co->index >= UART_NR_MAX || co->index < 0))
->> +		co->index = 0;
->> +
->> +	port = (struct uart_port *)sprd_port[co->index];
->> +	if (port == NULL) {
->> +		pr_info("srial port %d not yet initialized\n", co->index);
-> Typo
-it will be fixed :)
+> Marking it deprecated and warning with checkpatch is certainly
+> preferable. So, this patch replace "ak" to "asahi-kasei" in
+> vendor-prefixes.txt. (and fixup tegra20-seaboard)
 
-Thanks,
-Orson
-> Looks basically sound to me
->
-> Alan
+> OTOH, Asahi Kasei is usually referred to as "AKM", but this patch
+> doesn't care about it. Because no DT is using that today.
+
+> Acked-by: Thierry Reding <treding@nvidia.com>
+> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+    It's "venter" ISO "vendor" again in the subject. And you already fixed 
+that in the previous posting... :-)
+
+WBR, Sergei
