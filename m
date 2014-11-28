@@ -1,40 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 28 Nov 2014 11:21:16 +0000
-Subject: [PATCH v4 2/7] regulator: dt-bindings: Document the ena-gpios
- property
-In-Reply-To: <1417165784.18249.15.camel@AMDC1943>
-References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
- <1417087253-12306-3-git-send-email-k.kozlowski@samsung.com>
- <20141127183058.GB7712@sirena.org.uk>
- <1417165784.18249.15.camel@AMDC1943>
-Message-ID: <20141128112116.GG7712@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Nov 2014 12:28:52 +0100
+Subject: [GIT PULL] move omap gpmc to drivers finally
+In-Reply-To: <20141126194330.GN2817@atomide.com>
+References: <20141126194330.GN2817@atomide.com>
+Message-ID: <201411281228.52786.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 10:09:44AM +0100, Krzysztof Kozlowski wrote:
+On Wednesday 26 November 2014, Tony Lindgren wrote:
+> The following changes since commit 6f8782a7a1c826e1c013d6b7d5504af6bcc079e6:
+> 
+>   ARM: OMAP2+: Remove unnecesary include in GPMC driver (2014-11-06 10:51:06 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/gpmc-move
+> 
+> for you to fetch changes up to d2c70f553d7203b9bb37730e577be29794ae3169:
+> 
+>   memory: gpmc: Move omap gpmc code to live under drivers (2014-11-26 11:11:19 -0800)
+> 
+> ----------------------------------------------------------------
+> We can finally move the GPMC code to live in drivers/memory
+> for further clean up work. This series does the move with
+> minimal changes to the code.
 
-> I understand your concerns here however I didn't want to overengineer
-> this. Is the same GPIO (on more complex PMICs) used in different
-> contexts? Like enable control and something more in the same time?
+I just looked at this branch. It's definitely nice to move the code
+to drivers/memory, but I don't like the idea of having lots of function
+declarations and internal data structures in a linux/platform_data/*.h
+file. We can still merge this for 3.19, but I want to make sure you have
+a plan for getting rid of this (and put that into the tag description).
 
-Yes, and it's often reprogrammable at runtime.
+Does this header file get removed once all non-DT board files are gone?
 
-> Something like:
->  struct regulator_desc desc {
->  	.name		= "LDO1
->  	.of_match	= of_match_ptr("LDO1"),
->  	.regulators_node = of_match_ptr("voltage-regulators"),
->  	.ops		= &max77686_ldo_ops,
-> +	.of_ena_gpio	= of_match_ptr("ena-gpios"),
->  ...
->  }
+How about moving the declarations into include/linux/omap-gpmc.h instead?
 
-Yes, and note that this also means existing bindings can use the core
-code.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141128/beefc92c/attachment.sig>
+	Arnd
