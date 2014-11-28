@@ -1,77 +1,43 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 28 Nov 2014 15:14:04 +0100
-Subject: [PATCH v4 4/7] regulator: Use ena_gpio supplied with generic
- regulator bindings
-In-Reply-To: <20141128113859.GH7712@sirena.org.uk>
-References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
- <1417087253-12306-5-git-send-email-k.kozlowski@samsung.com>
- <20141127184342.GC7712@sirena.org.uk> <1417170655.18249.24.camel@AMDC1943>
- <20141128113859.GH7712@sirena.org.uk>
-Message-ID: <1417184044.18249.39.camel@AMDC1943>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Nov 2014 15:14:54 +0100
+Subject: [GIT PULL] CSR SiRFSOC DT for 3.19
+In-Reply-To: <CAGsJ_4yC8bStnYx3ramD=OXA03oihUEwCgcfqsStfWx2rasMqQ@mail.gmail.com>
+References: <CAGsJ_4yC8bStnYx3ramD=OXA03oihUEwCgcfqsStfWx2rasMqQ@mail.gmail.com>
+Message-ID: <201411281514.54841.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pi?, 2014-11-28 at 11:38 +0000, Mark Brown wrote:
-> On Fri, Nov 28, 2014 at 11:30:55AM +0100, Krzysztof Kozlowski wrote:
-> > On czw, 2014-11-27 at 18:43 +0000, Mark Brown wrote:
+On Tuesday 25 November 2014, Barry Song wrote:
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 > 
-> > > Why do we need some special magic operation for GPIO based enables
-> > > that's separate to any other enable operation?  This seems really
-> > > confusing, if the constraint setting doesn't work somehow for GPIO based
-> > > enables we should fix that.  Though since this operation takes no
-> > > parameters it's hard to see how it's supposed to apply constraints
-> > > unless it reparses them which doesn't seem like a good idea...
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 > 
-> > The regulator driver no longer parses GPIO control from DTS. So somehow
-> > it should be notified that regulator core parsed this and GPIO should be
-> > enabled.
+> are available in the git repository at:
 > 
-> > That is the purpose of ops->set_ena_gpio() call.
+>   gitolite.kernel.org:/pub/scm/linux/kernel/git/baohua/linux.git
+> tags/sirf-dts-for-3.19
 > 
-> This sort of thing is a sign that we're not saving much by moving the
-> parsing to the core and perhaps there's more flexiblity here... 
+> for you to fetch changes up to 294a212faa5bf7cb48fabccec5ee13e836e29ecb:
 
-The driver receive callbacks (or exposes other kind of interface) for
-other core-generalized code. Recent example is parsing regulator mode
-(added by Javier) and .of_map_mode() callback.
+The URL did not work for me, I had to replace it with
 
-I thought how to do this without this additional set_ena_gpio() call.
-One way would be to extend the regulator modes (FAST/IDLE/STANDBY/ and
-GPIO) but this would look somehow unnatural.
+git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux
 
-> It's
-> also not something that should be in the constraints handling, it's not
-> something that constrains the regulator.
+and I checked that the commit ID is the same. I think you need to
+configure your git tree to have a separate url and pushurl for
+your remote, so your pull requests are derived from a publically
+accessible url.
 
-Got it.
-
-> > > > +static int regulator_ena_gpio_setup(struct regulator_dev *rdev,
-> > > > +			const struct regulator_config *config,
-> > > > +			const struct regulator_init_data *init_data)
+>   ARM: dts: atlas6: add resets property for SPI nodes (2014-11-25
+> 18:46:43 +0800)
 > 
-> > > Why is setting up the GPIO different to requesting it, especially given
-> > > that we have an existing function called _request() which still exists?
+> ----------------------------------------------------------------
+> change pinmux pingroup and add some lost node/prop
 > 
-> > Maybe the name was not a best choice. The setup calls request.
-> 
-> > My patchset here tried to retain the compatibility with
-> > "config.ena_gpio" way so the core would accept GPIOs passed in one of
-> > two ways:
-> > 1. old: config.ena_gpio,
-> > 2. new: parsed by core from DTS.
-> 
-> > The request function previously worked only on "config.ena_gpio" and I
-> > changed it here to accept any GPIO. The setup uses one of GPIO methods
-> > (old or new) and calls request with appropriate GPIO.
-> 
-> We need to support both methods since not all the world is DT.  What I
-> can't tell is how this code achieves these objectives - it seems to be
-> an awfully big patch if that's all it's supposed to be doing, I'd expect
-> just a conditional where we try the two methods in turn.  It may be that
-> there's a good reason for all this but that needs to be made clear.
+> 1. add resets properity for some nodes;
+> 2. change pinctrl groups for audio
+> 3. add PMU node
 
-OK, I'll try to better describe the reason behind and to split the
-patches (if possible).
+Pulled into next/dt, thanks!
 
-Best regards,
-Krzysztof
+	Arnd
