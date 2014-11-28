@@ -1,42 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Nov 2014 14:19:03 +0000
-Subject: [PATCH v3 4/4] mmc: atmel-mci: use probe deferring if dma
- controller is not ready yet
-In-Reply-To: <1417183686-31481-5-git-send-email-ludovic.desroches@atmel.com>
-References: <1417183686-31481-1-git-send-email-ludovic.desroches@atmel.com>
- <1417183686-31481-5-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20141128141903.GT3836@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 28 Nov 2014 14:29:13 +0000
+Subject: [PATCH v3 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC
+ in dts and Makefile
+In-Reply-To: <20141127134309.GJ857@leverpostej>
+References: <Sharkl64-v3>
+ <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1416917818-10506-4-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20141127115042.GE857@leverpostej>
+ <20141127121214.GF11511@e104818-lin.cambridge.arm.com>
+ <20141127134309.GJ857@leverpostej>
+Message-ID: <20141128142913.GB5393@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's look at the resulting code:
+On Thu, Nov 27, 2014 at 01:43:09PM +0000, Mark Rutland wrote:
+> On Thu, Nov 27, 2014 at 12:12:15PM +0000, Catalin Marinas wrote:
+> > On Thu, Nov 27, 2014 at 11:50:43AM +0000, Mark Rutland wrote:
+> > > On Tue, Nov 25, 2014 at 12:16:56PM +0000, Chunyan Zhang wrote:
+> > > > +
+> > > > +       timer {
+> > > > +               compatible = "arm,armv8-timer";
+> > > > +               interrupts = <1 13 0xff01>,
+> > > > +                            <1 14 0xff01>,
+> > > > +                            <1 11 0xff01>,
+> > > > +                            <1 10 0xff01>;
+> > > > +               clock-frequency = <26000000>;
+> > > 
+> > > Please remove the clock-frequency property. Your FW should initialise
+> > > CNTFRQ_EL0 on all CPUs (certainly PSCI 0.2 requires that you do this).
+> > 
+> > Since this comes up regularly, I think we need a dev_warn() in the arch
+> > timer driver when CONFIG_ARM64.
+> 
+> I'll ack such a patch ;)
 
-On Fri, Nov 28, 2014 at 03:08:06PM +0100, Ludovic Desroches wrote:
-> +static int atmci_configure_dma(struct atmel_mci *host)
->  {
-> +	int ret = 0;
->  
-> +	host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev, "rxtx");
-> +	if (IS_ERR(host->dma.chan))
-> +		return PTR_ERR(host->dma.chan);
-> +
-> +	dev_info(&host->pdev->dev, "using %s for DMA transfers\n",
-> +		 dma_chan_name(host->dma.chan));
-> +
-> +	host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
-> +	host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> +	host->dma_conf.src_maxburst = 1;
-> +	host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
-> +	host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> +	host->dma_conf.dst_maxburst = 1;
-> +	host->dma_conf.device_fc = false;
-> +
-> +	return ret;
->  }
+How rude would this be?
 
-I think you can clean this up a little further - what do you notice
-about the value of "ret" here?
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 2133f9d59d06..aaaf3433ccb9 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -371,7 +371,8 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
+		return;
+ 
+	/* Try to determine the frequency from the device tree or CNTFRQ */
+-	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
++	if (IS_ENABLED(CONFIG_ARM64) ||
++	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+		if (cntbase)
+			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
+		else
