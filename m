@@ -1,71 +1,140 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Fri, 28 Nov 2014 14:22:09 +0530
-Subject: [PATCH RFC v2 07/12] PM / Domains: export pm_genpd_lookup_name
-In-Reply-To: <CAPDyKFo0epKqKuwHS_CKMG2hF+J=Fdve9kPK2EVeeR7FvdoJmg@mail.gmail.com>
-References: <1416833572-6880-1-git-send-email-amit.daniel@samsung.com>
- <1416834256-11225-1-git-send-email-amit.daniel@samsung.com>
- <1416834256-11225-7-git-send-email-amit.daniel@samsung.com>
- <CAPDyKFqE_qhrRs3X9s9juyPH_Zcq8vdE_amqKM3VUnMjHtL2Rg@mail.gmail.com>
- <CADGdYn6fAScrpz4Va=THtC1ZgT+rYN_gQuE6NnRaCiN4NErg5g@mail.gmail.com>
- <CAPDyKFo0epKqKuwHS_CKMG2hF+J=Fdve9kPK2EVeeR7FvdoJmg@mail.gmail.com>
-Message-ID: <CADGdYn70xe=JcXwMiQ4FXpq4pwHVhv+1Kp7YM_t=R_qk-_hk8A@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 28 Nov 2014 09:57:47 +0100
+Subject: [PATCH v12 3/3] ARM: dts: add rk3288 power-domain node
+In-Reply-To: <1416217842-4716-4-git-send-email-caesar.wang@rock-chips.com>
+References: <1416217842-4716-1-git-send-email-caesar.wang@rock-chips.com>
+ <1416217842-4716-4-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <5063652.5fn5DLTjuV@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 7:50 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 25 November 2014 at 09:48, amit daniel kachhap
-> <amit.daniel@samsung.com> wrote:
->> On Tue, Nov 25, 2014 at 1:05 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> On 24 November 2014 at 14:04, Amit Daniel Kachhap
->>> <amit.daniel@samsung.com> wrote:
->>>> This API may be needed to set the power domain parent/child relationship
->>>> in the power domain platform driver. The parent relationship is
->>>> generally set after the child power domain is registered with the power
->>>> domain subsystem. In this case, pm_genpd_lookup_name API might be
->>>> useful.
->>>
->>> I think this is a step in the wrong direction. Instead we should be
->>> working on removing the "name" based APIs from genpd.
->>>
->>> The proper way should be to pass the PM domain as a parameter to the
->>> APIs instead.
->> Yes i understand but i had a special requirement for using this API
->> during pd probe.
->>  I cannot use hierarchy to represent parent/child pd nodes as it will
->> break the existing SoC's. In my case all the PD nodes are linear. The
->> parent/child relationship are established in the second pass after all
->> the PD entries are registered with the help of this API.
->> Although there a way that i can always keep parent PD's before the
->> child PD's in DT in linear order. Will check this approach.
->
-> I had some thinking around this, could the below approach work?
->
-> I just posted a patch[1] adding a new pm_genpd_lookup() API, which is
-> using a "DT device node" to fetch the genpd. The idea is to use that
-> API to get the genpd handle which is needed to configure a subdomain
-> through pm_genpd_add_subdomain() API.
-I looked at your patch. I seems fine. i will test them and post the
-new version of my series.
+Hi Caesar,
 
-Regards,
-Amit D
->
-> In principle you will have to walk through the DT a couple of times,
-> initialize those domains (and subdomains) which either don't have a
-> parent domain or which parent domain already has been initialized. I
-> guess you need a somewhat clever loop to do that, but I think it's
-> doable.
->
-> Obviously we also need to have a generic binding for a "parent
-> domain". I like Geert's proposal from the other patch, which means
-> using "power-domains = <&pd_xyz>".
->
-> Kind regards
-> Uffe
->
-> [1]
-> http://marc.info/?l=linux-pm&m=141709766008458&w=2
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Am Montag, 17. November 2014, 17:50:41 schrieb Caesar Wang:
+> This patch add the needed clocks into power-controller.
+> 
+> why need we do so that?
+> 
+> Firstly, we always be needed turn off clocks to save power when
+> the system enter suspend.So we need to enumerate the clocks are needed
+> to switch power doamin no and off.
+> 
+> Secondly, Rk3288 reset circuit should be syncchronous reset and
+> then sync revoked.so we need to enable clocks of all devices.
+> 
+> Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
+> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> 
+> ---
+> 
+> Changes in v12:
+>     - Remove essential clocks from rk3288 PD_VIO domain,
+>       Some clocks are essential for the system health and should not be
+>       turned down. However there is no owner for them so if they listed as
+>       belonging to power domain we'll try toggling them up and down during
+>       power domain transition. As a result we either fail to suspend or
+> resume the system.
+> 
+> Changes in v11: None
+> Changes in v10:
+>     - fix missing the #include <dt-bindings/power-domain/rk3288.h>
+>     - remove the notes
+> 
+> Changes in v9:
+>     - add decription for power-doamin node
+> 
+> Changes in v8:
+>     - DTS go back to v2
+> 
+> Changes in v7: None
+> Changes in v6: None
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3:
+>     - Decomposition power-controller, changed to multiple controller
+>     (gpu-power-controller, hevc-power-controller)
+> 
+> Changes in v2:
+>     - make pd_vio clocks all one entry per line and alphabetize.
+>     - power: power-controller move back to pinctrl: pinctrl.
+> 
+>  arch/arm/boot/dts/rk3288.dtsi | 59
+> +++++++++++++++++++++++++++++++++++++++++++ 1 file changed, 59
+> insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index cb18bb4..d9cd8c0 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -15,6 +15,7 @@
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/pinctrl/rockchip.h>
+>  #include <dt-bindings/clock/rk3288-cru.h>
+> +#include <dt-bindings/power-domain/rk3288.h>
+>  #include "skeleton.dtsi"
+> 
+>  / {
+> @@ -989,4 +990,62 @@
+>  			};
+>  		};
+>  	};
+> +
+> +	power: power-controller {
+> +		compatible = "rockchip,rk3288-power-controller";
+> +		#power-domain-cells = <1>;
+> +		rockchip,pmu = <&pmu>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		pd_gpu {
+> +			reg = <RK3288_PD_GPU>;
+> +			clocks = <&cru ACLK_GPU>;
+> +		};
+> +
+> +		pd_hevc {
+> +			reg = <RK3288_PD_HEVC>;
+> +			clocks = <&cru ACLK_HEVC>,
+> +				 <&cru SCLK_HEVC_CABAC>,
+> +				 <&cru SCLK_HEVC_CORE>,
+> +				 <&cru HCLK_HEVC>;
+> +		};
+> +
+> +		pd_vio {
+> +			reg = <RK3288_PD_VIO>;
+> +			clocks = <&cru ACLK_IEP>,
+> +				 <&cru ACLK_ISP>,
+> +				 <&cru ACLK_RGA>,
+> +				 <&cru ACLK_VIP>,
+> +				 <&cru ACLK_VOP0>,
+> +				 <&cru ACLK_VOP1>,
+> +				 <&cru DCLK_VOP0>,
+> +				 <&cru DCLK_VOP1>,
+> +				 <&cru HCLK_IEP>,
+> +				 <&cru HCLK_ISP>,
+> +				 <&cru HCLK_RGA>,
+> +				 <&cru HCLK_VIP>,
+> +				 <&cru HCLK_VOP0>,
+> +				 <&cru HCLK_VOP1>,
+> +				 <&cru PCLK_EDP_CTRL>,
+> +				 <&cru PCLK_HDMI_CTRL>,
+> +				 <&cru PCLK_LVDS_PHY>,
+> +				 <&cru PCLK_MIPI_CSI>,
+> +				 <&cru PCLK_MIPI_DSI0>,
+> +				 <&cru PCLK_MIPI_DSI1>,
+> +				 <&cru SCLK_EDP_24M>,
+> +				 <&cru SCLK_EDP>,
+> +				 <&cru SCLK_HDMI_CEC>,
+> +				 <&cru SCLK_HDMI_HDCP>,
+> +				 <&cru SCLK_ISP_JPE>,
+> +				 <&cru SCLK_ISP>,
+> +				 <&cru SCLK_RGA>;
+> +		};
+> +
+> +		pd_video {
+> +			reg = <RK3288_PD_VIDEO>;
+> +			clocks = <&cru ACLK_VCODEC>,
+> +				 <&cru HCLK_VCODEC>;
+> +		};
+> +	};
+>  };
