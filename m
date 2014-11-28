@@ -1,33 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Nov 2014 12:59:35 +0100
-Subject: [PATCH v3 3/5] pinctrl: exynos: add exynos5410 SoC specific data
-In-Reply-To: <1416695185-5198-1-git-send-email-afaerber@suse.de>
-References: <547104D5.4030803@suse.de>
- <1416695185-5198-1-git-send-email-afaerber@suse.de>
-Message-ID: <CACRpkdZie8JJGxSPkc8PPvC3qZkWhe5WqmpSKSoDFwqRd6tR_Q@mail.gmail.com>
+Date: Fri, 28 Nov 2014 13:01:11 +0100
+Subject: [PATCH 0/5] sun6i: Add A31s (pinctrl) support
+In-Reply-To: <1416747283-13489-1-git-send-email-hdegoede@redhat.com>
+References: <1416747283-13489-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CACRpkdb3P+KM+ANqe6fKqJcRnBp6zvJhWUFZDap8qFDWdY1JNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 22, 2014 at 11:26 PM, Andreas F?rber <afaerber@suse.de> wrote:
+On Sun, Nov 23, 2014 at 1:54 PM, Hans de Goede <hdegoede@redhat.com> wrote:
 
-> From: Hakjoo Kim <ruppi.kim@hardkernel.com>
->
-> Add Samsung EXYNOS5410 SoC specific data to enable pinctrl
-> support for all platforms based on EXYNOS5410.
->
-> Signed-off-by: Hakjoo Kim <ruppi.kim@hardkernel.com>
-> [AF: Rebased onto Exynos5260 and irq_chip consolidation]
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v2 -> v3:
->  * Rebased (.svc, .{g,w}eint_{con,mask,pend} fields dropped)
->
->  v1 -> v2:
->  * Filled in Sob from Hakjoo Kim
+> I'm not sure if sunxi pinctrl patches go through Maxime's tree or Linus' tree,
+> so I'll leave figuring out who takes what patches to you two.
 
-Is this based on the pinctrl devel branch so I can apply it?
-
-I'd like Tomasz ACK on it first though.
+The changes in drivers/pinctrl and arch/* are usually orthogonal
+(just Kconfig symbols and DTS changes, no cross calls or header
+files that break compilation etc) and then they can be
+applied orthogonally. I just put the pinctrl patch in my tree and
+the rest in the platform tree.
 
 Yours,
 Linus Walleij
