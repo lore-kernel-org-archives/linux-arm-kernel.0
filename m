@@ -1,73 +1,129 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 28 Nov 2014 14:09:02 +0300
-Subject: [PATCH] ARM: shmobile: dts: koelsch: Fix flash partition label
- and size
-In-Reply-To: <20141128002718.GF30850@verge.net.au>
-References: <1416960805-15185-1-git-send-email-horms+renesas@verge.net.au>
- <5475CCA5.2020300@cogentembedded.com> <20141128002718.GF30850@verge.net.au>
-Message-ID: <547857CE.1090408@cogentembedded.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 28 Nov 2014 12:09:47 +0100
+Subject: [PATCH] mmc: atmel-mci: use probe deferring if dma controller is
+ not ready yet
+In-Reply-To: <1416925541-6857-1-git-send-email-ludovic.desroches@atmel.com>
+References: <CAPDyKFq-0EaGSf9Mn7aMa1s9CCP5hxqRCkKrZrAnSs-h5OFmxw@mail.gmail.com>
+ <1416925541-6857-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <CAPDyKFr5GBuWW4UxvAKz6++Qc=wACtn-+c4_s0tNLLjL3mhhMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 25 November 2014 at 15:25, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> Return probe defer if requesting a dma channel without a dma controller
+> probed.
+>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>
+> Hi Ulf,
+>
+> I didn't send the whole set of patches for this small change, tell me if you
+> want a new series.
 
-On 11/28/2014 3:27 AM, Simon Horman wrote:
+I tried to apply the patchset and get two problems.
 
->>> Update the size and names of flash partitions to match the
->>> expectations of the loader which are as follows:
+1) This patch 4 has checkpatch errors.
+2) I hit conflicts on patch2.
 
->>> "loader"---0x0000_0000-0x0008_0000 [loader program (readonly)]
->>> "user"  ---0x0008_0000-0x0060_0000 [U-Boot + bootargs + dt + uImage (readonly)]
->>> "flash" ---0x0060_0000-0x0400_0000 [filesystem and free (read/write)]
+Please resend the complete patchset fixing the above.
 
->>> ["user"'s assumed breakdown]
->>> U-boot+ bootargs(0x0008_0000-0x0010_0000) 512KB
->>> Device tree     (0x0010_0000-0x0014_0000) 256KB
->>> uImage          (0x0014_0000-0x0060_0000) 4.75MB
+Kind regards
+Uffe
 
->>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
->>> ---
-
->>> This replaces a patch that I previously posted, "shmobile: koelsch: Fix
->>> flash partition label and size in device tree", which has the same aim but
->>> does so for an older version of the loader which to my knowledge is not
->>> found in the wild.
-
->>> I plan to post a similar patch for Lager if this one goes well.
-
->>> I have been informed that the flash layout should also be the same
->>> for Alt (which currently does not have flash in its dts file in mainline).
-
->>> Based on the renesas-devel-20141125-v3.18-rc6 tag of my renesas tree.
->>> ---
->>>   arch/arm/boot/dts/r8a7791-koelsch.dts | 12 ++++++------
->>>   1 file changed, 6 insertions(+), 6 deletions(-)
-
->>> diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
->>> index 990af16..9a4e714 100644
->>> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
->>> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
->>> @@ -451,14 +451,14 @@
->>>   			reg = <0x00000000 0x00080000>;
->>>   			read-only;
->>>   		};
->>> -		partition at 80000 {
->>> -			label = "bootenv";
->>> -			reg = <0x00080000 0x00080000>;
->>> +		partition at 40000 {
->>> +			label = "user";
->>> +			reg = <0x00080000 0x00580000>;
-
->>     The "reg" prop doesn't match the <unit-address> pat of the name.
-
-> Are you suggesting this?
-
-> 			reg = <0x00080000 0x00600000>;
-
-    No, I'm suggesting to change the <unit-address> part of the node name to 
-match the offset in the "reg" property (given it's correct).
-
-[...]
-
-WBR, Sergei
+>
+>  drivers/mmc/host/atmel-mci.c | 49 ++++++++++++++++++++++----------------------
+>  1 file changed, 25 insertions(+), 24 deletions(-)
+>
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 28546c3..f4daef9 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -2265,29 +2265,26 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
+>         mmc_free_host(slot->mmc);
+>  }
+>
+> -static bool atmci_configure_dma(struct atmel_mci *host)
+> +static int atmci_configure_dma(struct atmel_mci *host)
+>  {
+> -       if (host == NULL)
+> -               return false;
+> +       int ret = 0;
+>
+> -       host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
+> -       if (!host->dma.chan) {
+> -               dev_warn(&host->pdev->dev, "no DMA channel available\n");
+> -               return false;
+> -       } else {
+> -               dev_info(&host->pdev->dev,
+> -                                       "using %s for DMA transfers\n",
+> -                                       dma_chan_name(host->dma.chan));
+> -
+> -               host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
+> -               host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+> -               host->dma_conf.src_maxburst = 1;
+> -               host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
+> -               host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+> -               host->dma_conf.dst_maxburst = 1;
+> -               host->dma_conf.device_fc = false;
+> -               return true;
+> -       }
+> +       host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev, "rxtx");
+> +       if (IS_ERR(host->dma.chan))
+> +               return PTR_ERR(host->dma.chan);
+> +
+> +       dev_info(&host->pdev->dev, "using %s for DMA transfers\n",
+> +                dma_chan_name(host->dma.chan));
+> +
+> +       host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
+> +       host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+> +       host->dma_conf.src_maxburst = 1;
+> +       host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
+> +       host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+> +       host->dma_conf.dst_maxburst = 1;
+> +       host->dma_conf.device_fc = false;
+> +
+> +       return ret;
+>  }
+>
+>  /*
+> @@ -2403,7 +2400,10 @@ static int atmci_probe(struct platform_device *pdev)
+>
+>         /* Get MCI capabilities and set operations according to it */
+>         atmci_get_cap(host);
+> -       if (atmci_configure_dma(host)) {
+> +       ret = atmci_configure_dma(host);
+> +       if (ret == -EPROBE_DEFER)
+> +               goto err_dma_probe_defer;
+> +       if (ret == 0) {
+>                 host->prepare_data = &atmci_prepare_data_dma;
+>                 host->submit_data = &atmci_submit_data_dma;
+>                 host->stop_transfer = &atmci_stop_transfer_dma;
+> @@ -2474,8 +2474,9 @@ err_dma_alloc:
+>         }
+>  err_init_slot:
+>         del_timer_sync(&host->timer);
+> -       if (host->dma.chan)
+> +       if (!IS_ERR(host->dma.chan))
+>                 dma_release_channel(host->dma.chan);
+> +err_dma_probe_defer:
+>         free_irq(irq, host);
+>         return ret;
+>  }
+> @@ -2501,7 +2502,7 @@ static int atmci_remove(struct platform_device *pdev)
+>         clk_disable_unprepare(host->mck);
+>
+>         del_timer_sync(&host->timer);
+> -       if (host->dma.chan)
+> +       if (!IS_ERR(host->dma.chan))
+>                 dma_release_channel(host->dma.chan);
+>
+>         free_irq(platform_get_irq(pdev, 0), host);
+> --
+> 2.0.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
