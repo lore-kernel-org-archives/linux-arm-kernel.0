@@ -1,36 +1,40 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 28 Nov 2014 11:17:36 +0000
-Subject: [PATCH v10 2/2] ARM: kprobes: enable OPTPROBES for ARM 32
-In-Reply-To: <20141128111327.GR3836@n2100.arm.linux.org.uk>
-References: <1416551751-50846-1-git-send-email-wangnan0@huawei.com>
- <1416551751-50846-3-git-send-email-wangnan0@huawei.com>
- <1417099007.2041.6.camel@linaro.org> <5477E82A.3020208@hitachi.com>
- <1417169308.1845.1.camel@linaro.org>
- <20141128111327.GR3836@n2100.arm.linux.org.uk>
-Message-ID: <1417173456.1845.3.camel@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 28 Nov 2014 11:21:16 +0000
+Subject: [PATCH v4 2/7] regulator: dt-bindings: Document the ena-gpios
+ property
+In-Reply-To: <1417165784.18249.15.camel@AMDC1943>
+References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
+ <1417087253-12306-3-git-send-email-k.kozlowski@samsung.com>
+ <20141127183058.GB7712@sirena.org.uk>
+ <1417165784.18249.15.camel@AMDC1943>
+Message-ID: <20141128112116.GG7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-11-28 at 11:13 +0000, Russell King - ARM Linux wrote:
-> On Fri, Nov 28, 2014 at 10:08:28AM +0000, Jon Medhurst (Tixy) wrote:
-> > On Fri, 2014-11-28 at 12:12 +0900, Masami Hiramatsu wrote:
-> > > (2014/11/27 23:36), Jon Medhurst (Tixy) wrote:
-> > [...]
-> > > > I thought it good to see what sort of benefits this code achieves,
-> > > > especially as it could grow quite complex over time, and the cost of
-> > > > that versus the benefit should be considered.
-> > > 
-> > > I don't think it's so complex. It's actually cleanly separated.
-> > > However, ARM tree should have arch/arm/kernel/kprobe/ dir,
-> > > since there are too many kprobe related files under arch/arm/kernel/ ...
-> > 
-> > Yes, that does seem like a good idea. Or rather a 'probes' directory to
-> > also include uprobes as that shares a lot of code with kprobes.
-> 
-> If you want to do this, then please make it arch/arm/probes rather than
-> making the directory tree deeper than it needs to be.
+On Fri, Nov 28, 2014 at 10:09:44AM +0100, Krzysztof Kozlowski wrote:
 
-Yes, good point.
+> I understand your concerns here however I didn't want to overengineer
+> this. Is the same GPIO (on more complex PMICs) used in different
+> contexts? Like enable control and something more in the same time?
 
--- 
-Tixy
+Yes, and it's often reprogrammable at runtime.
+
+> Something like:
+>  struct regulator_desc desc {
+>  	.name		= "LDO1
+>  	.of_match	= of_match_ptr("LDO1"),
+>  	.regulators_node = of_match_ptr("voltage-regulators"),
+>  	.ops		= &max77686_ldo_ops,
+> +	.of_ena_gpio	= of_match_ptr("ena-gpios"),
+>  ...
+>  }
+
+Yes, and note that this also means existing bindings can use the core
+code.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141128/beefc92c/attachment.sig>
