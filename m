@@ -1,8 +1,8 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Nov 2014 14:44:12 +0000
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 28 Nov 2014 14:46:51 +0000
 Subject: [PATCH v3 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC
  in dts and Makefile
-In-Reply-To: <20141128143532.GI25883@leverpostej>
+In-Reply-To: <20141128144412.GG7144@arm.com>
 References: <Sharkl64-v3>
  <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
  <1416917818-10506-4-git-send-email-chunyan.zhang@spreadtrum.com>
@@ -11,65 +11,63 @@ References: <Sharkl64-v3>
  <20141127134309.GJ857@leverpostej>
  <20141128142913.GB5393@localhost>
  <20141128143532.GI25883@leverpostej>
-Message-ID: <20141128144412.GG7144@arm.com>
+ <20141128144412.GG7144@arm.com>
+Message-ID: <20141128144650.GK25883@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 02:35:32PM +0000, Mark Rutland wrote:
-> On Fri, Nov 28, 2014 at 02:29:13PM +0000, Catalin Marinas wrote:
-> > On Thu, Nov 27, 2014 at 01:43:09PM +0000, Mark Rutland wrote:
-> > > On Thu, Nov 27, 2014 at 12:12:15PM +0000, Catalin Marinas wrote:
-> > > > On Thu, Nov 27, 2014 at 11:50:43AM +0000, Mark Rutland wrote:
-> > > > > On Tue, Nov 25, 2014 at 12:16:56PM +0000, Chunyan Zhang wrote:
-> > > > > > +
-> > > > > > +       timer {
-> > > > > > +               compatible = "arm,armv8-timer";
-> > > > > > +               interrupts = <1 13 0xff01>,
-> > > > > > +                            <1 14 0xff01>,
-> > > > > > +                            <1 11 0xff01>,
-> > > > > > +                            <1 10 0xff01>;
-> > > > > > +               clock-frequency = <26000000>;
+On Fri, Nov 28, 2014 at 02:44:12PM +0000, Will Deacon wrote:
+> On Fri, Nov 28, 2014 at 02:35:32PM +0000, Mark Rutland wrote:
+> > On Fri, Nov 28, 2014 at 02:29:13PM +0000, Catalin Marinas wrote:
+> > > On Thu, Nov 27, 2014 at 01:43:09PM +0000, Mark Rutland wrote:
+> > > > On Thu, Nov 27, 2014 at 12:12:15PM +0000, Catalin Marinas wrote:
+> > > > > On Thu, Nov 27, 2014 at 11:50:43AM +0000, Mark Rutland wrote:
+> > > > > > On Tue, Nov 25, 2014 at 12:16:56PM +0000, Chunyan Zhang wrote:
+> > > > > > > +
+> > > > > > > +       timer {
+> > > > > > > +               compatible = "arm,armv8-timer";
+> > > > > > > +               interrupts = <1 13 0xff01>,
+> > > > > > > +                            <1 14 0xff01>,
+> > > > > > > +                            <1 11 0xff01>,
+> > > > > > > +                            <1 10 0xff01>;
+> > > > > > > +               clock-frequency = <26000000>;
+> > > > > > 
+> > > > > > Please remove the clock-frequency property. Your FW should initialise
+> > > > > > CNTFRQ_EL0 on all CPUs (certainly PSCI 0.2 requires that you do this).
 > > > > > 
-> > > > > Please remove the clock-frequency property. Your FW should initialise
-> > > > > CNTFRQ_EL0 on all CPUs (certainly PSCI 0.2 requires that you do this).
+> > > > > Since this comes up regularly, I think we need a dev_warn() in the arch
+> > > > > timer driver when CONFIG_ARM64.
 > > > > 
-> > > > Since this comes up regularly, I think we need a dev_warn() in the arch
-> > > > timer driver when CONFIG_ARM64.
+> > > > I'll ack such a patch ;)
 > > > 
-> > > I'll ack such a patch ;)
+> > > How rude would this be?
+> > > 
+> > > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> > > index 2133f9d59d06..aaaf3433ccb9 100644
+> > > --- a/drivers/clocksource/arm_arch_timer.c
+> > > +++ b/drivers/clocksource/arm_arch_timer.c
+> > > @@ -371,7 +371,8 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
+> > > 		return;
+> > >  
+> > > 	/* Try to determine the frequency from the device tree or CNTFRQ */
+> > > -	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+> > > +	if (IS_ENABLED(CONFIG_ARM64) ||
+> > > +	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+> > > 		if (cntbase)
+> > > 			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
+> > > 		else
+> > >
 > > 
-> > How rude would this be?
-> > 
-> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> > index 2133f9d59d06..aaaf3433ccb9 100644
-> > --- a/drivers/clocksource/arm_arch_timer.c
-> > +++ b/drivers/clocksource/arm_arch_timer.c
-> > @@ -371,7 +371,8 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
-> > 		return;
-> >  
-> > 	/* Try to determine the frequency from the device tree or CNTFRQ */
-> > -	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
-> > +	if (IS_ENABLED(CONFIG_ARM64) ||
-> > +	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
-> > 		if (cntbase)
-> > 			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
-> > 		else
-> >
+> > Probably too rude, given it doesn't WARN() the user.
 > 
-> Probably too rude, given it doesn't WARN() the user.
+> We override broken hardware ID registers all the time in device-tree without
+> dumping stack. Why is this any different?
 
-We override broken hardware ID registers all the time in device-tree without
-dumping stack. Why is this any different?
+Exposure to guests via KVM, and the fact that it's possible to write to
+the register from EL3. This isn't so much broken HW (which cannot be
+fixed) as broken FW (which can be fixed).
 
-> We should be extremely loud if we see the clock-frequency property on an
-> arm64 system. Whether or not we should ignore the property is another
-> matter.
+Printing the warning gives people the chance to realise and fix the
+issue during bringup.
 
-I don't really see the point in ignoring it. We will see broken hardware
-[1] and this is just preventing ourselves from working around it. I'd much
-rather have arch-timers with a "clock-frequence" property than have some
-other timer instead because the kernel driver is being stubborn.
-
-Will
-
-[1] A previous version of the Juno firmware, for example.
+Mark.
