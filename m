@@ -1,34 +1,64 @@
-From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Fri, 28 Nov 2014 09:02:39 +0000
-Subject: [PATCH] drm: i2c: tda998x: Retry fetching the EDID if it fails
- first time.
-In-Reply-To: <20141128091905.3e491c39@armhf>
-References: <546B84C6.3090809@arm.com> <20141128091905.3e491c39@armhf>
-Message-ID: <54783A2F.5010405@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 28 Nov 2014 10:09:44 +0100
+Subject: [PATCH v4 2/7] regulator: dt-bindings: Document the ena-gpios
+ property
+In-Reply-To: <20141127183058.GB7712@sirena.org.uk>
+References: <1417087253-12306-1-git-send-email-k.kozlowski@samsung.com>
+ <1417087253-12306-3-git-send-email-k.kozlowski@samsung.com>
+ <20141127183058.GB7712@sirena.org.uk>
+Message-ID: <1417165784.18249.15.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/14 08:19, Jean-Francois Moine wrote:
-> On Tue, 18 Nov 2014 17:41:26 +0000
-> Andrew Jackson <Andrew.Jackson@arm.com> wrote:
+On czw, 2014-11-27 at 18:30 +0000, Mark Brown wrote:
+> On Thu, Nov 27, 2014 at 12:20:48PM +0100, Krzysztof Kozlowski wrote:
 > 
->> Fetching the EDID from a connected monitor is an automated thing
->> with NXP TDA19988. But on some boards the fetching fails for the
->> first time silently without any indication that an error has occured.
->> More than that, subsequent fetches of the EDID succeed until the
->> monitor(s) are unplugged.
->>
->> Add a function to validate the read EDID and retry if the block
->> retrieved is not valid.
->>
->> Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
->> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > +- ena-gpios: GPIO to use for enable control. Actual implementation depends
+> > +  on regulator driver. The bindings documentation for given driver describes
+> > +  which regulator actually supports it.
+> > +- ena-gpio-open-drain: GPIO is open drain type.
 > 
-> It seems that your patch is deprecated by Laurent Pinchart's
-> 	[PATCH] drm: tda998x: Use drm_do_get_edid()
-> http://lists.freedesktop.org/archives/dri-devel/2014-November/072906.html
-> 
+> I'm relly not a big fan of adding a fixed name property here with no
+> override capability, it means that the naming won't reflect the specific
+> regulator design so closely and in practice for many of the PMICs the
+> GPIO control can do rather more than just control enables and supports
+> reprogramming.  The latter case where we've got a signal which can
+> sometimes be simply and enable but sometimes more makes it especially
+> worrying to have the property always be there, it's something that might
+> work in some configurations but could easily be broken if we try to
+> exploit more advanced functionality (things also triggering other
+> configuration changes at the same time).
 
-Thank you for the heads-up, I'd not seen that.  I'll consider how my patch might be modified to suit the new infrastructure.
+I understand your concerns here however I didn't want to overengineer
+this. Is the same GPIO (on more complex PMICs) used in different
+contexts? Like enable control and something more in the same time?
 
-    Andrew
+For example the S5M8767 uses different GPIOs for:
+1. enable control - one GPIO per regulator,
+2. voltage selection (DVS) - 3 GPIOs total,
+so there is no benefit in merging this into one common regulator code.
+
+> Factoring out the code is good but it seems better to have it be
+> something which drivers can control, for example by having them
+> explicitly specify a property name to use or perhaps a flag to enable
+> the default name.
+
+Something like:
+ struct regulator_desc desc {
+ 	.name		= "LDO1
+ 	.of_match	= of_match_ptr("LDO1"),
+ 	.regulators_node = of_match_ptr("voltage-regulators"),
+ 	.ops		= &max77686_ldo_ops,
++	.of_ena_gpio	= of_match_ptr("ena-gpios"),
+ ...
+ }
+?
+
+
+> We also need an invert option.
+
+This is parsed from gpio specifier in DTS: the flags from
+include/dt-bindings/gpio/gpio.h.
+
+Thank you for feedback,
+Krzysztof
