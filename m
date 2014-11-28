@@ -1,8 +1,8 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 28 Nov 2014 14:50:35 +0000
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Nov 2014 14:59:29 +0000
 Subject: [PATCH v3 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC
  in dts and Makefile
-In-Reply-To: <20141128144412.GG7144@arm.com>
+In-Reply-To: <20141128144650.GK25883@leverpostej>
 References: <Sharkl64-v3>
  <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
  <1416917818-10506-4-git-send-email-chunyan.zhang@spreadtrum.com>
@@ -12,39 +12,70 @@ References: <Sharkl64-v3>
  <20141128142913.GB5393@localhost>
  <20141128143532.GI25883@leverpostej>
  <20141128144412.GG7144@arm.com>
-Message-ID: <20141128145035.GO7712@sirena.org.uk>
+ <20141128144650.GK25883@leverpostej>
+Message-ID: <20141128145929.GH7144@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 02:44:12PM +0000, Will Deacon wrote:
-> On Fri, Nov 28, 2014 at 02:35:32PM +0000, Mark Rutland wrote:
+On Fri, Nov 28, 2014 at 02:46:51PM +0000, Mark Rutland wrote:
+> On Fri, Nov 28, 2014 at 02:44:12PM +0000, Will Deacon wrote:
+> > On Fri, Nov 28, 2014 at 02:35:32PM +0000, Mark Rutland wrote:
+> > > On Fri, Nov 28, 2014 at 02:29:13PM +0000, Catalin Marinas wrote:
+> > > > On Thu, Nov 27, 2014 at 01:43:09PM +0000, Mark Rutland wrote:
+> > > > > On Thu, Nov 27, 2014 at 12:12:15PM +0000, Catalin Marinas wrote:
+> > > > > > On Thu, Nov 27, 2014 at 11:50:43AM +0000, Mark Rutland wrote:
+> > > > > > > On Tue, Nov 25, 2014 at 12:16:56PM +0000, Chunyan Zhang wrote:
+> > > > > > > > +
+> > > > > > > > +       timer {
+> > > > > > > > +               compatible = "arm,armv8-timer";
+> > > > > > > > +               interrupts = <1 13 0xff01>,
+> > > > > > > > +                            <1 14 0xff01>,
+> > > > > > > > +                            <1 11 0xff01>,
+> > > > > > > > +                            <1 10 0xff01>;
+> > > > > > > > +               clock-frequency = <26000000>;
+> > > > > > > 
+> > > > > > > Please remove the clock-frequency property. Your FW should initialise
+> > > > > > > CNTFRQ_EL0 on all CPUs (certainly PSCI 0.2 requires that you do this).
+> > > > > > 
+> > > > > > Since this comes up regularly, I think we need a dev_warn() in the arch
+> > > > > > timer driver when CONFIG_ARM64.
+> > > > > 
+> > > > > I'll ack such a patch ;)
+> > > > 
+> > > > How rude would this be?
+> > > > 
+> > > > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> > > > index 2133f9d59d06..aaaf3433ccb9 100644
+> > > > --- a/drivers/clocksource/arm_arch_timer.c
+> > > > +++ b/drivers/clocksource/arm_arch_timer.c
+> > > > @@ -371,7 +371,8 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
+> > > > 		return;
+> > > >  
+> > > > 	/* Try to determine the frequency from the device tree or CNTFRQ */
+> > > > -	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+> > > > +	if (IS_ENABLED(CONFIG_ARM64) ||
+> > > > +	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+> > > > 		if (cntbase)
+> > > > 			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
+> > > > 		else
+> > > >
+> > > 
+> > > Probably too rude, given it doesn't WARN() the user.
+> > 
+> > We override broken hardware ID registers all the time in device-tree without
+> > dumping stack. Why is this any different?
+> 
+> Exposure to guests via KVM, and the fact that it's possible to write to
+> the register from EL3. This isn't so much broken HW (which cannot be
+> fixed) as broken FW (which can be fixed).
 
-> > Probably too rude, given it doesn't WARN() the user.
+I think we'll see plenty of systems where vendors are reluctant to offer
+over-the-air firmware upgrades for issues that can be solved simply by
+adding a property to the device-tree.
 
-> We override broken hardware ID registers all the time in device-tree without
-> dumping stack. Why is this any different?
+> Printing the warning gives people the chance to realise and fix the
+> issue during bringup.
 
-I do tend to agree that a WARN() is excessive but given the amount of
-pushback on using this property on ARMv8 systems saying something would
-be nice, though...
+Print a warning, but don't dump the stack. A simple pr_warn is fine.
 
-> > We should be extremely loud if we see the clock-frequency property on an
-> > arm64 system. Whether or not we should ignore the property is another
-> > matter.
-
-> I don't really see the point in ignoring it. We will see broken hardware
-> [1] and this is just preventing ourselves from working around it. I'd much
-> rather have arch-timers with a "clock-frequence" property than have some
-> other timer instead because the kernel driver is being stubborn.
-
-...it is likely that even if there is a warning we'll end up in this
-situation.  If the kernel doesn't complain at all it seems totally
-reasonable for people to use the feature, but just refusing to allow it
-to be used at all doesn't seem like it's actually helping things.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141128/9cca4898/attachment.sig>
+Will
