@@ -1,39 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Nov 2014 15:04:49 +0100
-Subject: [PATCH v2 3/5] pinctrl: exynos: Fix GPIO setup failure because
- domain clock being gated
-In-Reply-To: <1417011857-10419-4-git-send-email-k.kozlowski@samsung.com>
-References: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
- <1417011857-10419-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CACRpkdb8F8YcvFeHPvOKHjx_p4HEpimck3XRabB3oHpZTdmRQQ@mail.gmail.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Fri, 28 Nov 2014 15:03:21 +0100
+Subject: [PATCH v6 0/7] Per-user clock constraints
+Message-ID: <1417183461-8210-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 26, 2014 at 3:24 PM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
+Hello,
 
-> The audio subsystem on Exynos 5420 has separate clocks and GPIO. To
-> operate properly on GPIOs the main block clock 'mau_epll' must be
-> enabled.
->
-> This was observed on Peach Pi/Pit and Arndale Octa (after enabling i2s0)
-> after introducing runtime PM to pl330 DMA driver. After that commit the
-> 'mau_epll' was gated, because the "amba" clock was disabled and there
-> were no more users of mau_epll.
->
-> The system hang just before probing i2s0 because
-> samsung_pinmux_setup() tried to access memory from audss block which was
-> gated.
->
-> Add a clock property to the pinctrl driver and enable the clock during
-> GPIO setup. During normal GPIO operations (set, get, set_direction) the
-> clock is not enabled.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+this sixth version of the series has a small fix in the per-user clks commit
+and the following changes in the clk constraints patch:
 
-Waiting for Tomasz to review this.
+* Take the prepare lock before removing a per-user clk
+* Init per-user clks list before adding the first clk
+* Pass the constraints to determine_rate and let clk implementations deal
+with constraints
+* Add clk_set_rate_range
 
-Can this patch be applied in separation from the others?
+A rough test module was used to test this:
 
-Yours,
-Linus Walleij
+http://cgit.collabora.com/git/user/tomeu/linux.git/commit/?h=per-user-clk-constraints-v6&id=1bada453ab690a1c5be28667d94a4861bc84f8ef
+
+The first five patches are just cleanups that should be desirable on their own,
+and that should make easier to review the actual per-user clock patch.
+
+The sixth patch actually moves the per-clock data that was stored in struct
+clk to a new struct clk_core and adds references to it from both struct clk and
+struct clk_hw. struct clk is now ready to contain information that is specific
+to a given clk consumer.
+
+The seventh patch adds API for setting floor and ceiling constraints and stores
+that information on the per-user struct clk, which is iterable from struct
+clk_core.
+
+They are based on top of linux-next 20141128.
+
+http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=per-user-clk-constraints-v6
+
+Thanks,
+
+Tomeu
+
+Tomeu Vizoso (7):
+  clk: Remove unused function __clk_get_prepare_count
+  clk: Don't try to use a struct clk* after it could have been freed
+  clk: Don't expose __clk_get_accuracy
+  clk: change clk_debugfs_add_file to take a struct clk_hw
+  clk: Change clk_ops->determine_rate to return a clk_hw as the best
+    parent
+  clk: Make clk API return per-user struct clk instances
+  clk: Add floor and ceiling constraints to clock rates
+
+ Documentation/clk.txt                   |   4 +-
+ arch/arm/mach-omap2/cclock3xxx_data.c   | 108 +++--
+ arch/arm/mach-omap2/clock.h             |  11 +-
+ arch/arm/mach-omap2/clock_common_data.c |   5 +-
+ arch/arm/mach-omap2/dpll3xxx.c          |   2 +
+ arch/arm/mach-omap2/dpll44xx.c          |   2 +
+ arch/mips/alchemy/common/clock.c        |  18 +-
+ drivers/clk/at91/clk-programmable.c     |   6 +-
+ drivers/clk/bcm/clk-kona.c              |   6 +-
+ drivers/clk/clk-composite.c             |  18 +-
+ drivers/clk/clk.c                       | 807 +++++++++++++++++++++-----------
+ drivers/clk/clk.h                       |   5 +
+ drivers/clk/clkdev.c                    |  73 ++-
+ drivers/clk/hisilicon/clk-hi3620.c      |   4 +-
+ drivers/clk/qcom/clk-pll.c              |   1 +
+ drivers/clk/qcom/clk-rcg.c              |  24 +-
+ drivers/clk/qcom/clk-rcg2.c             |  34 +-
+ drivers/clk/sunxi/clk-factors.c         |   6 +-
+ drivers/clk/sunxi/clk-sun6i-ar100.c     |   6 +-
+ include/linux/clk-private.h             |  41 +-
+ include/linux/clk-provider.h            |  26 +-
+ include/linux/clk.h                     |  28 ++
+ include/linux/clk/ti.h                  |   4 +
+ 23 files changed, 849 insertions(+), 390 deletions(-)
+
+-- 
+1.9.3
