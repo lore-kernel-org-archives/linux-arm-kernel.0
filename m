@@ -1,33 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 28 Nov 2014 17:27:33 +0000
-Subject: [PATCH v5] arm: Support for the PXN CPU feature on ARMv7
-In-Reply-To: <1417189491-4619-1-git-send-email-js07.lee@gmail.com>
-References: <1417189491-4619-1-git-send-email-js07.lee@gmail.com>
-Message-ID: <20141128172733.GB32393@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 28 Nov 2014 17:52:24 +0000
+Subject: [PATCH 0/9] irqchip: gic: kill gic_arch_extn
+In-Reply-To: <1417195613-8447-1-git-send-email-marc.zyngier@arm.com>
+References: <1417195613-8447-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <5478B658.8090809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 03:44:51PM +0000, Jungseung Lee wrote:
-> Modern ARMv7-A/R cores optionally implement below new
-> hardware feature:
-> 
-> - PXN:
-> Privileged execute-never(PXN) is a security feature. PXN bit
-> determines whether the processor can execute software from
-> the region. This is effective solution against ret2usr attack.
-> On an implementation that does not include the LPAE, PXN is
-> optionally supported.
-> 
-> This patch set PXN bit on user page table for preventing
-> user code execution with privilege mode.
-> 
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
+On 28/11/14 17:26, Marc Zyngier wrote:
+> The gic_arch_extn hack that Tegra uses has been nagging me for too
+> long. It is only there for the benefit of a single platform, and yet
+> it impacts all GIC users. Moreover, it gives people the wrong idea
+> ("let's use it to put some new custom hack in there"...).
 
-The patch looks fine to me. Unless there are other objections, you can
-send it to Russell's patch system:
+Of course, just after sending this I realised that quite a lot of
+platform are now using this crap:
 
-http://www.arm.linux.org.uk/developer/patches/
+arch/arm/mach-exynos/pm.c
+arch/arm/mach-imx/gpc.c
+arch/arm/mach-omap2/omap-wakeupgen.c
+arch/arm/mach-shmobile/intc-sh73a0.c
+arch/arm/mach-shmobile/setup-r8a7779.c
+arch/arm/mach-ux500/cpu.c
+arch/arm/mach-zynq/common.c
 
+Yes, I intend to address them as well...
+
+Thanks,
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
