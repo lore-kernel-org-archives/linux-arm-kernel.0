@@ -1,70 +1,40 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 28 Nov 2014 15:10:10 -0800
-Subject: [PATCH 2/2] ARM: imx: src: support vf610 system reset controller
-In-Reply-To: <d3026e3c95825c31a80cf32b3600ad42@agner.ch>
-References: <1417193015-6033-1-git-send-email-stefan@agner.ch>
- <2716009.DOfHfaSPkY@wuerfel> <6341b31998ff843d236bc2a3e34537b0@agner.ch>
- <18555848.LVhqYu0kXL@wuerfel> <d3026e3c95825c31a80cf32b3600ad42@agner.ch>
-Message-ID: <547900D2.6050404@roeck-us.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 28 Nov 2014 15:52:02 -0800
+Subject: [GIT PULL] Broadcom STB GISB bus driver for 3.19
+Message-ID: <1417218722-29944-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2014 03:00 PM, Stefan Agner wrote:
-> On 2014-11-28 23:22, Arnd Bergmann wrote:
->> On Friday 28 November 2014 23:09:09 Stefan Agner wrote:
->>> On 2014-11-28 22:24, Arnd Bergmann wrote:
->>>> On Friday 28 November 2014 22:02:01 Stefan Agner wrote:
->>>>
->>>>>> If the SRC is also capable of resetting individual blocks instead of just
->>>>>> the entire machine, it would be a reset driver in drivers/reset instead.
->>>>>
->>>>> Beside the system reset, there is only a mask functionality for the
->>>>> watchdogs (there are two watchdogs, one for Cortex-A5 and one for the
->>>>> M4). This makes the SRC module in the Vybrid a bit different then what
->>>>> is available on other i.MX SoC's...
->>>>
->>>> If you already have the watchdog registers in there and want to have
->>>> a watchdog driver too, the easiest way would be to register the reboot
->>>> handler from the watchdog driver.
->>>
->>> Hm, not sure we speak about the same here. The SRC module has two
->>> (multi-)bit fields to mask the watchdog reset event for each watchdog.
->>> Beside that, there are two full watchdog register maps, which are in
->>> different areas. There is already a driver for this watchdogs. I'm not
->>> sure what the idea behind this is exactly, I guess it would easily allow
->>> to (temporary) mask the other CPU's watchdog. However, I don't think we
->>> need that functionality, so I don't care about that right now.
->>
->> Ok, I see, thanks for the clarification!
->>
->>> There is also a restart handler in the watchdog driver, but I prefer to
->>> use the reset capabilities of the SRC since it has immediate effect.
->>>
->>> Lets get to the big picture again: I could register the whole SRC
->>> register map as a syscon device and then access the registers from my
->>> suspend/resume implementation later on. And similar in the restart
->>> driver, I would use syscon_regmap_lookup_by_compatible to check if it
->>> contains the vf610-src compatible string and register the restart
->>> driver/handler if available.
->>
->> Correct, and also in the watchdog driver, I guess.
->>
->> Instead of syscon_regmap_lookup_by_compatible, please use
->> syscon_regmap_lookup_by_phandle and put the link to the syscon
->> device into the device accessing it.
->>
->> Also, see if you can use or extend drivers/power/reset/syscon-reboot.c
->> for your use case.
->
-> Nice, this allows to do the reset with almost no code. The only thing
-> which might be a problem is the priority: I used 192 since 128 is
-> already used by the watchdog driver. Maybe we can change that
-> syscon-reboot is a bit above watchdogs by default, or maybe even a dt
-> property? I will try to use that driver for v2. Thx!
->
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-A dt property might make more sense if the syscon driver is to be used
-for multiple systems. Otherwise, no matter what you pick, it will be
-wrong for some system.
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
-Guenter
+are available in the git repository at:
+
+  https://github.com/brcm/linux.git tags/arm-soc/for-3.19/brcmstb-drivers
+
+for you to fetch changes up to 7938c2c819d7ec0e1f7d6b97acbd19c344139eb7:
+
+  bus: brcmstb_gisb: Honor the "big-endian" and "native-endian" DT properties (2014-11-28 15:44:44 -0800)
+
+----------------------------------------------------------------
+This pull request contains the following changes to the Broadcom GISB bus
+arbiter from Kevin Cernekee:
+
+- Extend brcmstb GISB bus driver to work on MIPS (currently ARM-only) and support
+  65nm and 40nm MIPS-based chips such as: BCM7038, BCM7400 and BCM7435
+
+- Extend brcmstb GISB bus driver to work on BE systems (currently LE-only).
+
+----------------------------------------------------------------
+Kevin Cernekee (5):
+      bus: brcmstb_gisb: Make the driver buildable on MIPS
+      bus: brcmstb_gisb: Introduce wrapper functions for MMIO accesses
+      bus: brcmstb_gisb: Look up register offsets in a table
+      bus: brcmstb_gisb: Add register offset tables for older chips
+      bus: brcmstb_gisb: Honor the "big-endian" and "native-endian" DT properties
+
+ .../devicetree/bindings/bus/brcm,gisb-arb.txt      |   6 +-
+ drivers/bus/Kconfig                                |   2 +-
+ drivers/bus/brcmstb_gisb.c                         | 127 ++++++++++++++++++---
+ 3 files changed, 114 insertions(+), 21 deletions(-)
