@@ -1,55 +1,71 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 28 Nov 2014 16:01:15 +0000
-Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
-In-Reply-To: <5476BFB4.2020705@hitachi.com>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <20141120135851.GA32528@linaro.org> <54759041.9080105@hitachi.com>
- <20141126100325.GA9157@linaro.org> <5476120D.9030703@linaro.org>
- <CAPvkgC3eVOZEn79C9PC9c7TqC_-yCtDhw5LL6ZWUJxr+oQFaow@mail.gmail.com>
- <5476BFB4.2020705@hitachi.com>
-Message-ID: <CAPvkgC0ELPPWfa-8kQ4H_e_O5G1ER4KEKuSWLxh_u-VZgh7W6A@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sat, 29 Nov 2014 00:02:15 +0800
+Subject: [PATCH] ARM: pxa: fix lubbock interrupts handling
+In-Reply-To: <87r3wn1mhu.fsf@free.fr>
+References: <1417113721-9062-1-git-send-email-robert.jarzmik@free.fr>
+ <alpine.DEB.2.11.1411272258010.3961@nanos> <87r3wn1mhu.fsf@free.fr>
+Message-ID: <CAN1soZzZ7nuvvHguaHVHZc8hXvv8SzvWY9Ejf-fYhA5yfbcM-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 November 2014 at 06:07, Masami Hiramatsu
-<masami.hiramatsu.pt@hitachi.com> wrote:
-> (2014/11/27 3:59), Steve Capper wrote:
->> The crash is extremely easy to reproduce.
->>
->> I've not observed any missed events on a kprobe on an arm64 system
->> that's still alive.
->> My (limited!) understanding is that this suggests there could be a
->> problem with how missed events from a recursive call to memcpy are
->> being handled.
+On Fri, Nov 28, 2014 at 9:30 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Thomas Gleixner <tglx@linutronix.de> writes:
 >
-> I think so too. BTW, could you bisect that? :)
+>> So what is the relationship between installing that chained handler
+>> and that gpio-pxa probe stuff?
+> The relation is in gpio-pxa probe, look at the extract of pxa_gpio_probe() :
+> pxa_gpio_probe()
+>                 irq = gpio_to_irq(0);
+>                 irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
+>                                          handle_edge_irq);
+>                 set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+>                 irq_set_chained_handler(IRQ_GPIO0, pxa_gpio_demux_handler);
+>
+> Now look at the extract from the former lubbock_init_irq() :
+> lubbock_init_irq()
+>                 irq = PXA_GPIO_TO_IRQ(0);
+>                 irq_set_chained_handler(irq, lubbock_irq_handler);
+>                 irq_set_irq_type(irq, IRQ_TYPE_EDGE_FALLING);
+>
+> Given that gpio_to_irq(0) = PXA_GPIO_TO_IRQ(0), see how these 2 are fighting to
+> install the handler, and how the resulting installed handler depends on the
+> order of execution of pxa_gpio_to_irq() wrt lubbock_init_irq().
+>
+>> And why is the GPIO0 interrupt handled from arch code rather than from
+>> a regular driver setup, which depends on the availablity of the GPIO
+>> driver?
+> Ah that's a good question. Maybe the answer is that there is no driver in this
+> case.
+> When I say "no driver", it's because this interrupt is a consequence of the
+> IO-Board (or motherboard) wiring topology.
+>
+> I think I need to add a bit of context, so pardon my crude ascii-art style, and
+> see in the lubbock case, we have this wiring (list of IPs not exhaustive, and
+> gates to mask each XXX irq not added) :
+>
+> IPs on Motherboard          Gates on motherboard                       SoC
+>
+> +-------------+              +-------+
+> |  SMC Lan    | --lan irq--- | Latch | -
+> +-------------+              |       |  \                      +------PXA-----+
+>                              |       |   \                     |              |
+> +-------------+              |       |                         |+----------+  |
+> |   UDC Vbus  | --vbus irq-- | Latch | -- NOR gate -- GPIO0 -- ||GPIO block|  |
+> +-------------+              |       |                line     |+----------+  |
+>                              |       |   /                     |              |
+> +-------------+              |       |  /                      +--------------+
+> |   SA1111    | --sa11x irq--| Latch | -
+> +-------------+              +-------+
+>
+> The "gates on motherboard" is what lubbock.c is describing, ie. the
+> interconnection on the motherboard. I don't see the device/driver model fitting
+> to describe these gates, do you ?
 >
 
-I can't bisect, but the following functions look suspicious to me
-(again I'm new to kprobes...):
-kprobes_save_local_irqflag
-kprobes_restore_local_irqflag
+I think that it's a kind of irq muxing, just like lots of PMIC (power
+management IC).
+We should move the lubbock board irqs to a mfd driver, and register them as
+threaded irqs.
 
-I think these are breaking somehow when nested (i.e. from a recursive probe).
-
-That would explain why the state of play of the interrupts is in an
-unexpected state in the crash I reported:
-"The point of failure in the panic was:
-fs/buffer.c:1257
-
-static inline void check_irqs_on(void)
-{
-#ifdef irqs_disabled
-        BUG_ON(irqs_disabled());
-#endif
-}
-"
-
-This is all new to me so I'm still at the head-scratching stage.
-
-David,
-Does the above make sense to you? Have you managed to reproduce the crash I get?
-
-Cheers,
---
-Steve
+Best Regards
+Haojian
