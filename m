@@ -1,28 +1,46 @@
 From: wangzhou.bry@gmail.com (Zhou Wang)
-Date: Fri, 28 Nov 2014 14:29:46 +0800
-Subject: [PATCH v3 0/2] ARM: hip04: add GPIO support
-Message-ID: <1417156188-500-1-git-send-email-wangzhou.bry@gmail.com>
+Date: Fri, 28 Nov 2014 14:29:47 +0800
+Subject: [PATCH v3 1/2] ARM: hip04: set ARCH_NR_GPIO to 128
+In-Reply-To: <1417156188-500-1-git-send-email-wangzhou.bry@gmail.com>
+References: <1417156188-500-1-git-send-email-wangzhou.bry@gmail.com>
+Message-ID: <1417156188-500-2-git-send-email-wangzhou.bry@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add the support for the GPIOs of Hisilicon Soc hip04. Hip04 uses
-synopsis' GPIO IP, and we use the dwapb GPIO driver here. This series add the
-corresponding dts.
+Set ARCH_NR_GPIO for Hisilicon Soc Hip04, which has 4 GPIO
+controllers with 32 GPIOs each.
 
-Change in v3:
-- Move CONFIG_GPIO_DWAPB to hisi_defconfig
-- Add CONFIG_GPIOLIB, CONFIG_GPIO_SYSFS in hisi_defconfig
-Change in v2:
-- Add select GPIO_DWAPB in arch/arm/mach-hisi/Kconfig
-
-Zhou Wang (2):
-  ARM: hip04: set ARCH_NR_GPIO to 128
-  ARM: dts: hip04: add GPIO pieces
-
+Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
+---
  arch/arm/Kconfig                |    1 +
- arch/arm/boot/dts/hip04.dtsi    |   75 +++++++++++++++++++++++++++++++++++++++
- arch/arm/configs/hisi_defconfig |    3 ++
- 3 files changed, 79 insertions(+)
+ arch/arm/configs/hisi_defconfig |    3 +++
+ 2 files changed, 4 insertions(+)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 89c4b5c..26aae1e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1509,6 +1509,7 @@ config ARCH_NR_GPIO
+ 	default 352 if ARCH_VT8500
+ 	default 288 if ARCH_ROCKCHIP
+ 	default 264 if MACH_H4700
++	default 128 if ARCH_HIP04
+ 	default 0
+ 	help
+ 	  Maximum number of GPIOs in the system.
+diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
+index 1772505..130292b 100644
+--- a/arch/arm/configs/hisi_defconfig
++++ b/arch/arm/configs/hisi_defconfig
+@@ -41,6 +41,9 @@ CONFIG_SPI_PL022=y
+ CONFIG_PINCTRL_SINGLE=y
+ CONFIG_GPIO_GENERIC_PLATFORM=y
+ CONFIG_REGULATOR_GPIO=y
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_DWAPB=y
++CONFIG_GPIO_SYSFS=y
+ CONFIG_DRM=y
+ CONFIG_FB_SIMPLE=y
+ CONFIG_USB=y
 -- 
 1.7.9.5
