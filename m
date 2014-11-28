@@ -1,46 +1,33 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 28 Nov 2014 13:35:41 +0100
-Subject: [PATCH] ARM: exynos_defconfig: Enable CONFIG_FHANDLE
-In-Reply-To: <1417176414-21558-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1417176414-21558-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <54786C1D.3050306@collabora.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Nov 2014 13:47:44 +0100
+Subject: [GIT PULL] Allwinner DT for 3.19, bis
+In-Reply-To: <20141123163413.GA5585@lukather>
+References: <20141123163413.GA5585@lukather>
+Message-ID: <201411281347.45210.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sjoerd,
-
-On 11/28/2014 01:06 PM, Sjoerd Simons wrote:
-> CONFIG_FHANDLE is required by systemd, which is the default init system
-> in more and more distributions. So lets enable it for Exynos as well
-> (it's already enabled in multi_v7_defconfig)
+On Sunday 23 November 2014, Maxime Ripard wrote:
+> Arnd, Kevin, Olof,
 > 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> ---
->  arch/arm/configs/exynos_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+> Here is the DT pull request for the Allwinner changes that replaces
+> the previous one.
 > 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index e419fac..d4751ef 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -1,4 +1,5 @@
->  CONFIG_SYSVIPC=y
-> +CONFIG_FHANDLE=y
+> The patch that was breaking the arm-soc boot has been dropped, and
+> will go through the clock tree.
+> 
 
-This is certainly required for newer systemd and has to be enabled.
+Ok. I see that the change between the old and the new branch was the
+removal of two patches, so in order to preserve a nicer history,
+I undid my earlier revert of the entire branch (which was still on
+top) and instead just reverted the two patches, making sure that the
+contents are the same as your new branch afterwards.
 
-But it would also be great to have enabled all the config symbols
-that are listed as requirements in the systemd README file:
+I've also checked that the new branch makes the boot farm happy.
 
-http://cgit.freedesktop.org/systemd/systemd/tree/README.
+The part that is still bugging me is that you have apparently done
+an incompatible change to the DT binding without even mentioning
+which machines are affected or explaining why the compatibility
+break was preferrable.
 
-Tony added that support to OMAP2+ defconfig in commit 673ce00c
-("ARM: omap2plus_defconfig: Add support for distros with systemd")
-so the same should be done in exynos_defconfig.
-
-That can of course be a follow-up patch though, so for $subject:
-
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-Best regards,
-Javier
+	Arnd
