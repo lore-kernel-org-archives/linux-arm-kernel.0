@@ -1,26 +1,28 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 28 Nov 2014 12:06:36 +0000
-Subject: [PATCH 2/4] clk: Add INFRA and PERI clocks for Mediatek MT8135.
-In-Reply-To: <1417174490-6845-3-git-send-email-jamesjj.liao@mediatek.com>
-References: <1417174490-6845-1-git-send-email-jamesjj.liao@mediatek.com>
- <1417174490-6845-3-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <20141128120636.GD25883@leverpostej>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Fri, 28 Nov 2014 13:06:54 +0100
+Subject: [PATCH] ARM: exynos_defconfig: Enable CONFIG_FHANDLE
+Message-ID: <1417176414-21558-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 11:34:48AM +0000, James Liao wrote:
-> This patch adds clock gates support for Mediatek SoCs, and adds clocks of
-> INFRA sys and PERI sys for MT8135.
-> 
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> ---
->  drivers/clk/mediatek/Makefile          |   2 +-
->  drivers/clk/mediatek/clk-gate.c        | 151 +++++++++++++++++++
->  drivers/clk/mediatek/clk-gate.h        |  48 ++++++
->  drivers/clk/mediatek/clk-mt8135.c      | 260 +++++++++++++++++++++++++++++++++
->  include/dt-bindings/clock/mt8135-clk.h |  62 ++++++++
+CONFIG_FHANDLE is required by systemd, which is the default init system
+in more and more distributions. So lets enable it for Exynos as well
+(it's already enabled in multi_v7_defconfig)
 
-Please fold the include/dt-bindings changes into the DT documentation
-patch, and put that earlier in the series.
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+---
+ arch/arm/configs/exynos_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Mark.
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index e419fac..d4751ef 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -1,4 +1,5 @@
+ CONFIG_SYSVIPC=y
++CONFIG_FHANDLE=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_CGROUPS=y
+-- 
+2.1.3
