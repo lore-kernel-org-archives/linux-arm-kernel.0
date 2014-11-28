@@ -1,43 +1,44 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 28 Nov 2014 02:15:41 -0500 (EST)
-Subject: [PATCH] ARM: decompressor: fix a wrong comment
-In-Reply-To: <1417155134-29808-1-git-send-email-yamada.m@jp.panasonic.com>
-References: <1417155134-29808-1-git-send-email-yamada.m@jp.panasonic.com>
-Message-ID: <alpine.LFD.2.11.1411280215050.11690@knanqh.ubzr>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 28 Nov 2014 09:16:24 +0200
+Subject: [PATCH 2/3] ARM: edma: Rename header file for dmaengine filter
+ function definition
+In-Reply-To: <4859328.eEV7jzKEaA@wuerfel>
+References: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>
+ <3300340.ou8f7H2hIc@wuerfel> <54777174.4070203@ti.com>
+ <4859328.eEV7jzKEaA@wuerfel>
+Message-ID: <54782148.6040108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Nov 2014, Masahiro Yamada wrote:
+On 11/27/2014 11:52 PM, Arnd Bergmann wrote:
+> On Thursday 27 November 2014 20:46:12 Peter Ujfalusi wrote:
+>>
+>> I see. With this series I did not planed to fix all edma related issues, just
+>> as a start clean up the related header files. I would rather not add fixes to
+>> mmc, spi, etc drivers since while you have valid point it is not in the scope
+>> of this series.
+>> Can we do the changes you are suggesting in an incremental manner?
+> 
+> Sure, but I'd leave the existing filter function declaration alone then
+> and not move it, since we wouldn't want to keep it in the long run.
 
-> This comment does not correspond to the actual code.
-> 
-> When zImage is loaded at a lower *OR* higher address of
-> the destination of Image, it won't overwrite itself.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
+but if you want to reference the filter function (which is in
+drivers/dma/edma.c) in arch/arm/mach-davinci/ directory, we will need it.
+Don't we?
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+If I leave the header as it is, then how would we clean up the edma headers? I
+would not put the API definitions for the arch code into the same file as we
+have the filter definition.
 
 
-> ---
 > 
->  arch/arm/boot/compressed/head.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 68be901..9dff614 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -178,7 +178,7 @@ not_angel:
->  
->  		/*
->  		 * Set up a page table only if it won't overwrite ourself.
-> -		 * That means r4 < pc && r4 - 16k page directory > &_end.
-> +		 * That means r4 < pc || r4 - 16k page directory > &_end.
->  		 * Given that r4 > &_end is most unfrequent, we add a rough
->  		 * additional 1MB of room for a possible appended DTB.
->  		 */
-> -- 
-> 1.9.1
-> 
-> 
+
+
+-- 
+P?ter
