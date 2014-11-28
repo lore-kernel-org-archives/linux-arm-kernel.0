@@ -1,41 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Nov 2014 11:51:37 +0100
-Subject: [PATCH 2/3] ARM: edma: Rename header file for dmaengine filter
- function definition
-In-Reply-To: <54782148.6040108@ti.com>
-References: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>
- <4859328.eEV7jzKEaA@wuerfel> <54782148.6040108@ti.com>
-Message-ID: <6448422.mtUnef24Xp@wuerfel>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 28 Nov 2014 18:51:43 +0800
+Subject: [PATCH v2] arm64: ARM: Fix the Generic Timers interrupt active
+ level description
+In-Reply-To: <20141128103843.GW828@e106497-lin.cambridge.arm.com>
+References: <1417105283-19575-1-git-send-email-Liviu.Dudau@arm.com>
+ <54776FE0.8030600@arm.com> <20141128111252.4a6e8892@xhacker>
+ <20141128103843.GW828@e106497-lin.cambridge.arm.com>
+Message-ID: <20141128185143.00ee05b5@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 November 2014 09:16:24 Peter Ujfalusi wrote:
-> On 11/27/2014 11:52 PM, Arnd Bergmann wrote:
-> > On Thursday 27 November 2014 20:46:12 Peter Ujfalusi wrote:
-> >>
-> >> I see. With this series I did not planed to fix all edma related issues, just
-> >> as a start clean up the related header files. I would rather not add fixes to
-> >> mmc, spi, etc drivers since while you have valid point it is not in the scope
-> >> of this series.
-> >> Can we do the changes you are suggesting in an incremental manner?
+On Fri, 28 Nov 2014 02:38:43 -0800
+Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+
+> On Fri, Nov 28, 2014 at 03:12:52AM +0000, Jisheng Zhang wrote:
+> > Dear Marc and Liviu,
 > > 
-> > Sure, but I'd leave the existing filter function declaration alone then
-> > and not move it, since we wouldn't want to keep it in the long run.
+> > On Thu, 27 Nov 2014 10:39:28 -0800
+> > Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > 
+> > > On 27/11/14 16:21, Liviu Dudau wrote:
+> > > > The Cortex-A5x TRM states in paragraph "9.2 Generic Timer functional
+> > > > description" that generic timers provide a level not edge interrupt
+> > > > output. Fix the device trees to correctly describe this.
+> > > > 
+> > > > While doing this update the CPU mask to match the number of described
+> > > > CPUs as well as the DT bindings documentation for Generic Timers.
+> > > > 
+> > > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > > 
+> > > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > > 
+> > > 	M.
+> > > 
+> > > > ---
+> > > > 
+> > > > Arnd, Olof: This is on top of linux-next/master as it patches Juno's
+> > > > as well as all the other ARM DTs.
+> > > > 
+> > > > --
+> > > > 
+> > > >  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++----
+> > > >  arch/arm64/boot/dts/arm/foundation-v8.dts            | 8 ++++----
+> > > >  arch/arm64/boot/dts/arm/juno.dts                     | 8 ++++----
+> > > >  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts           | 8 ++++----
+> > > >  4 files changed, 16 insertions(+), 16 deletions(-)
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt
+> > > > b/Documentation/devicetree/bindings/arm/arch_timer.txt index
+> > > > 37b2caf..6d2aa87 100644 ---
+> > > > a/Documentation/devicetree/bindings/arm/arch_timer.txt +++
+> > > > b/Documentation/devicetree/bindings/arm/arch_timer.txt @@ -27,10
+> > > > +27,10 @@ Example: timer {
+> > > >  		compatible = "arm,cortex-a15-timer",
+> > > >  			     "arm,armv7-timer";
+> > > > -		interrupts = <1 13 0xf08>,
+> > > > -			     <1 14 0xf08>,
+> > > > -			     <1 11 0xf08>,
+> > > > -			     <1 10 0xf08>;
+> > > > +		interrupts = <1 13 0xf04>,
+> > > > +			     <1 14 0xf04>,
+> > > > +			     <1 11 0xf04>,
+> > > > +			     <1 10 0xf04>;
+> > > >  		clock-frequency = <100000000>;
+> > > >  	};
+> > > >  
+> > 
+> > Does it mean we also need to fix the interrupt level description under
+> > arch/arm/boot/dts? I found they are also wrong or I misunderstand
+> > something?
 > 
-> but if you want to reference the filter function (which is in
-> drivers/dma/edma.c) in arch/arm/mach-davinci/ directory, we will need it.
-> Don't we?
+> Hi Jisheng,
+> 
+> It looks like Marc and I managed to confuse ourselves. The TRM for GIC-500
+> and GIC-400 (basically covering most of GICv1 and > GICv2) clearly says
+> that for *PPIs* the level triggered interrupts are active-LOW.
+> 
+> So, this patch is invalid and my v1 version is correct, but Marc tells that
+> in that case the GIC driver needs patching (which I'm going to look into).
+> 
 
-Yes, unless you move the definition of the filter function into
-arch/arm/common/edma.c or arch/arm/mach-davinci/devices.c, but that
-would require other changes.
-
-> If I leave the header as it is, then how would we clean up the edma headers? I
-> would not put the API definitions for the arch code into the same file as we
-> have the filter definition.
-
-Ok, just go ahead with your current patch then, we can always follow up.
-The most important cleanup for edma is elsewhere anyway, so once the asoc
-drivers can use the dmaengine interface, this should be easier.
-
-	Arnd
+Got it. Thanks for clarification.
