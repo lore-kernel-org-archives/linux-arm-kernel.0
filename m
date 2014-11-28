@@ -1,49 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 28 Nov 2014 08:26:28 +0100
-Subject: [PATCH V2 1/3] PM / Domains: Initial PM clock support for genpd
-In-Reply-To: <3169286.RI9fuSo8ZA@vostro.rjw.lan>
-References: <1417099911-12688-1-git-send-email-ulf.hansson@linaro.org>
- <1417099911-12688-2-git-send-email-ulf.hansson@linaro.org>
- <3169286.RI9fuSo8ZA@vostro.rjw.lan>
-Message-ID: <CAPDyKFp8sSCAt-oZTex-UG1RAFUYQBRPwbKuGmYiGP+0OtaTYw@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 28 Nov 2014 09:58:32 +0200
+Subject: [PATCH 16/23] ARM: OMAP4: omapdss: remove legacy pad muxing
+ support
+In-Reply-To: <54774CCD.5060600@ti.com>
+References: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
+ <1417103514-17027-17-git-send-email-t-kristo@ti.com>
+ <54774CCD.5060600@ti.com>
+Message-ID: <54782B28.7010306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/27/2014 06:09 PM, Tomi Valkeinen wrote:
+> On 27/11/14 17:51, Tero Kristo wrote:
+>> OMAP4 is DT only now, so the legacy mux support is not needed anymore.
+>> Padconf is used instead from the driver / DT. This removes the need
+>> for having the mux APIs exported from the control module driver.
 >
-> If you defined the flag as
->
->         #define PM_DOMAIN_FLAGS_PM_CLK  (1U << 0)
->
-> (which is a kind of usual way to do that), you wouldn't need the
-> bitops.h above.
->
-> Moreover, I personally don't like #defines in struct definitions.
->
->>
->> @@ -76,6 +77,8 @@ struct generic_pm_domain {
->>                         struct device *dev);
->>       void (*detach_dev)(struct generic_pm_domain *domain,
->>                          struct device *dev);
->> +     unsigned int flags;             /* Bit field of configs for genpd */
->> +#define PM_DOMAIN_PM_CLK     BIT(0)  /* PM domain uses PM clk */
+> We still use those mux functions for DT. The mux registers for DSI are
+> so funny that we can't use the normal padconf for them.
 
-While I fix your above comments, I wonder whether I actually also
-should change the prefix of the define as well.
->From "PM_DOMAIN" to "GENPD". Cause I think it's a genpd specific
-define and not a "PM domain" define. Please tell me if you have any
-objections to that.
+Ah hmm, so it seems, I overlooked the omapdss_init_of() function. Looks 
+like some of the patches in this set needs to be dropped for now then, 
+namely 16, 17, and patch 18 has to be modified.
 
->>  };
->>
->>  static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
->>
+The direct omap4 padconf hacks are very bad though. Maybe it should be 
+changed to only allow access to that single DSIPHY register.
+
+-Tero
+
+> I did do some work to use syscon, but I never had time to finish it.
 >
-> --
-> I speak only for myself.
-> Rafael J. Wysocki, Intel Open Source Technology Center.
-
-
-Thanks for review!
-
-Kind regards
-Uffe
+>   Tomi
+>
+>
