@@ -1,42 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Nov 2014 13:29:45 +0000
-Subject: [PATCH v5 7/8] arm: call iommu_init before of_platform_populate
-In-Reply-To: <1417181386-18142-1-git-send-email-will.deacon@arm.com>
-References: <1417181386-18142-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1417181386-18142-8-git-send-email-will.deacon@arm.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 28 Nov 2014 14:30:05 +0100
+Subject: [PATCH] ARM: pxa: fix lubbock interrupts handling
+In-Reply-To: <alpine.DEB.2.11.1411272258010.3961@nanos> (Thomas Gleixner's
+ message of "Thu, 27 Nov 2014 23:03:10 +0100 (CET)")
+References: <1417113721-9062-1-git-send-email-robert.jarzmik@free.fr>
+ <alpine.DEB.2.11.1411272258010.3961@nanos>
+Message-ID: <87r3wn1mhu.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to ensure that the IOMMUs in the system have a chance to perform
-some basic initialisation before we start adding masters to them.
+Thomas Gleixner <tglx@linutronix.de> writes:
 
-This patch adds a call to of_iommu_init before of_platform_populate.
+> So what is the relationship between installing that chained handler
+> and that gpio-pxa probe stuff?
+The relation is in gpio-pxa probe, look at the extract of pxa_gpio_probe() :
+pxa_gpio_probe()
+		irq = gpio_to_irq(0);
+		irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
+					 handle_edge_irq);
+		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+		irq_set_chained_handler(IRQ_GPIO0, pxa_gpio_demux_handler);
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/setup.c | 2 ++
- 1 file changed, 2 insertions(+)
+Now look at the extract from the former lubbock_init_irq() :
+lubbock_init_irq()
+		irq = PXA_GPIO_TO_IRQ(0);
+		irq_set_chained_handler(irq, lubbock_irq_handler);
+		irq_set_irq_type(irq, IRQ_TYPE_EDGE_FALLING);
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index c03106378b49..1cfc94aa7fa2 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -18,6 +18,7 @@
- #include <linux/bootmem.h>
- #include <linux/seq_file.h>
- #include <linux/screen_info.h>
-+#include <linux/of_iommu.h>
- #include <linux/of_platform.h>
- #include <linux/init.h>
- #include <linux/kexec.h>
-@@ -806,6 +807,7 @@ static int __init customize_machine(void)
- 	 * machine from the device tree, if no callback is provided,
- 	 * otherwise we would always need an init_machine callback.
- 	 */
-+	of_iommu_init();
- 	if (machine_desc->init_machine)
- 		machine_desc->init_machine();
- #ifdef CONFIG_OF
+Given that gpio_to_irq(0) = PXA_GPIO_TO_IRQ(0), see how these 2 are fighting to
+install the handler, and how the resulting installed handler depends on the
+order of execution of pxa_gpio_to_irq() wrt lubbock_init_irq().
+
+> And why is the GPIO0 interrupt handled from arch code rather than from
+> a regular driver setup, which depends on the availablity of the GPIO
+> driver?
+Ah that's a good question. Maybe the answer is that there is no driver in this
+case.
+When I say "no driver", it's because this interrupt is a consequence of the
+IO-Board (or motherboard) wiring topology.
+
+I think I need to add a bit of context, so pardon my crude ascii-art style, and
+see in the lubbock case, we have this wiring (list of IPs not exhaustive, and
+gates to mask each XXX irq not added) :
+
+IPs on Motherboard          Gates on motherboard                       SoC
+
++-------------+              +-------+
+|  SMC Lan    | --lan irq--- | Latch | -
++-------------+              |       |  \                      +------PXA-----+
+                             |       |   \                     |              |
++-------------+              |       |                         |+----------+  |
+|   UDC Vbus  | --vbus irq-- | Latch | -- NOR gate -- GPIO0 -- ||GPIO block|  |
++-------------+              |       |                line     |+----------+  |
+                             |       |   /                     |              |
++-------------+              |       |  /                      +--------------+
+|   SA1111    | --sa11x irq--| Latch | -
++-------------+              +-------+
+
+The "gates on motherboard" is what lubbock.c is describing, ie. the
+interconnection on the motherboard. I don't see the device/driver model fitting
+to describe these gates, do you ?
+
+Cheers.
+
 -- 
-2.1.1
+Robert
