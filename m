@@ -1,35 +1,39 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 28 Nov 2014 09:58:32 +0200
-Subject: [PATCH 16/23] ARM: OMAP4: omapdss: remove legacy pad muxing
- support
-In-Reply-To: <54774CCD.5060600@ti.com>
-References: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
- <1417103514-17027-17-git-send-email-t-kristo@ti.com>
- <54774CCD.5060600@ti.com>
-Message-ID: <54782B28.7010306@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 28 Nov 2014 13:35:49 +0530
+Subject: [PATCHv2 1/1] thermal: cpu_cooling: check for the readiness of
+ cpufreq layer
+In-Reply-To: <1417097577-3548-1-git-send-email-edubezval@gmail.com>
+References: <1417097577-3548-1-git-send-email-edubezval@gmail.com>
+Message-ID: <CAKohponu_PRrqsuMdCJDznhiO_-=iCaYPhCCad8F4WS3rNxo5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2014 06:09 PM, Tomi Valkeinen wrote:
-> On 27/11/14 17:51, Tero Kristo wrote:
->> OMAP4 is DT only now, so the legacy mux support is not needed anymore.
->> Padconf is used instead from the driver / DT. This removes the need
->> for having the mux APIs exported from the control module driver.
->
-> We still use those mux functions for DT. The mux registers for DSI are
-> so funny that we can't use the normal padconf for them.
+On 27 November 2014 at 19:42, Eduardo Valentin <edubezval@gmail.com> wrote:
+> (I'm sorry VireshK, I am still using my normal practice) :-)
 
-Ah hmm, so it seems, I overlooked the omapdss_init_of() function. Looks 
-like some of the patches in this set needs to be dropped for now then, 
-namely 16, 17, and patch 18 has to be modified.
+That's fine :)
 
-The direct omap4 padconf hacks are very bad though. Maybe it should be 
-changed to only allow access to that single DSIPHY register.
+> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+> index 1ab0018..bed3fa2 100644
+> --- a/drivers/thermal/cpu_cooling.c
+> +++ b/drivers/thermal/cpu_cooling.c
+> @@ -440,6 +440,11 @@ __cpufreq_cooling_register(struct device_node *np,
+>         int ret = 0, i;
+>         struct cpufreq_policy policy;
+>
+> +       if (!cpufreq_frequency_get_table(0)) {
+> +               pr_err("cpu_cooling: cpufreq layer not ready! Deferring.\n");
 
--Tero
+Throwing an error here doesn't look to be the right thing. Ultimately
+we will register the cooling dev when probed again after some time.
 
-> I did do some work to use syscon, but I never had time to finish it.
->
->   Tomi
->
->
+So, a pr_debug() suits more here.
+
+Also, this breaks existing exynos thermal drivers as they don't handle
+-EPROBE_DEFER well right now.
+
+I reached here, because one of my patches had something similar to what
+you wrote. Just for this file though, haven't updated any other drivers though.
+
+Will be sending you my small patchset by end of day today, please see if
+they make any sense at all..
