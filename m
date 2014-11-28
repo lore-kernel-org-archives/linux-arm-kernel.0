@@ -1,53 +1,55 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 28 Nov 2014 17:00:00 +0100
-Subject: [RFC 0/7] ARM: vf610m4: Add Vybrid Cortex-M4 support
-In-Reply-To: <54788417.6020408@suse.de>
-References: <cover.1413136383.git.stefan@agner.ch> <54788417.6020408@suse.de>
-Message-ID: <f176fb225d8679645fcfad4a98761f98@agner.ch>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 28 Nov 2014 16:01:15 +0000
+Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
+In-Reply-To: <5476BFB4.2020705@hitachi.com>
+References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
+ <20141120135851.GA32528@linaro.org> <54759041.9080105@hitachi.com>
+ <20141126100325.GA9157@linaro.org> <5476120D.9030703@linaro.org>
+ <CAPvkgC3eVOZEn79C9PC9c7TqC_-yCtDhw5LL6ZWUJxr+oQFaow@mail.gmail.com>
+ <5476BFB4.2020705@hitachi.com>
+Message-ID: <CAPvkgC0ELPPWfa-8kQ4H_e_O5G1ER4KEKuSWLxh_u-VZgh7W6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
-
-On 2014-11-28 15:17, Andreas F?rber wrote:
-> Hi Stefan,
-> 
-> Am 12.10.2014 um 20:13 schrieb Stefan Agner:
->> One thing I noticed that when I move the xipImage below the DRAM base
->> address, the kernel freezes:
->> ...
->> Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
->> Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
->> [freeze]
+On 27 November 2014 at 06:07, Masami Hiramatsu
+<masami.hiramatsu.pt@hitachi.com> wrote:
+> (2014/11/27 3:59), Steve Capper wrote:
+>> The crash is extremely easy to reproduce.
 >>
->> I think it happens when the scheduler gets started. Any idea what could
->> go wrong here?
-> 
-> I ran into a similar issue on STM32F4 recently - hanging there, or:
-> 
-> Unhandled exception: IPSR = 00000006 LR = fffffff1
-> CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc5-00003-g489983a-dirty #25
-> task: 90432000 ti: 90434000 task.ti: 90434000
-> 
-> Unhandled exception: IPSR = 00000003 LR = fffffff1
-> CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc5-00003-g489983a-dirty #25
-> task: 90432000 ti: 90434000 task.ti: 90434000
-> -Boot 2010.03-00003-g934021a-dirty (Nov 26 2014 - 06:52:49)
-> 
-> My debugging indicated that %pF was not working, used among others in
-> checking for blacklisted initcalls. Disabling CONFIG_KALLSYMS worked
-> around this, so I assume something there is not compatible with XIP...
+>> I've not observed any missed events on a kprobe on an arm64 system
+>> that's still alive.
+>> My (limited!) understanding is that this suggests there could be a
+>> problem with how missed events from a recursive call to memcpy are
+>> being handled.
+>
+> I think so too. BTW, could you bisect that? :)
+>
 
-Hm, interesting! So it needs to be somewhere in lib/vsprintf.c or even
-kernel/kallsyms.c. If XIP is incompatible with the KALLSYMS, we should
-fix this dependency. Maybe it's easily fixable, however I did not look
-into that symbolic stuff. I would be helpful to have symbols even on M4
-thought :-) Will probably have a look into it this weekend.
+I can't bisect, but the following functions look suspicious to me
+(again I'm new to kprobes...):
+kprobes_save_local_irqflag
+kprobes_restore_local_irqflag
 
+I think these are breaking somehow when nested (i.e. from a recursive probe).
+
+That would explain why the state of play of the interrupts is in an
+unexpected state in the crash I reported:
+"The point of failure in the panic was:
+fs/buffer.c:1257
+
+static inline void check_irqs_on(void)
+{
+#ifdef irqs_disabled
+        BUG_ON(irqs_disabled());
+#endif
+}
+"
+
+This is all new to me so I'm still at the head-scratching stage.
+
+David,
+Does the above make sense to you? Have you managed to reproduce the crash I get?
+
+Cheers,
 --
-Stefan
-
-
-> 
-> Regards,
-> Andreas
+Steve
