@@ -1,204 +1,84 @@
-From: n.nikolaev@virtualopensystems.com (Nikolay Nikolaev)
-Date: Sat, 29 Nov 2014 15:58:50 +0200
-Subject: [RFC PATCH 3/5] KVM: ARM VGIC add kvm_io_bus_ frontend
-In-Reply-To: <54797244.4070707@huawei.com>
-References: <20141124212240.10605.46770.stgit@i3820>
- <20141124212658.10605.16215.stgit@i3820>
- <54797244.4070707@huawei.com>
-Message-ID: <CADDJ2=OLgHhNwLrswfHAVYhh+4FEAxN=B5y4UFJahWkkkni4Tg@mail.gmail.com>
+From: amit.daniel@samsung.com (Amit Daniel Kachhap)
+Date: Sat, 29 Nov 2014 19:45:02 +0530
+Subject: [PATCH v5 0/6] exynos: Move pmu driver to driver/soc folder and add
+ exynos7 support
+Message-ID: <1417270508-11174-1-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 29, 2014 at 9:14 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> On 2014/11/25 5:26, Nikolay Nikolaev wrote:
->> In io_mem_abort remove the call to vgic_handle_mmio. The target is to have
->> a single MMIO handling path - that is through the kvm_io_bus_ API.
->>
->> Register a kvm_io_device in kvm_vgic_init on the whole vGIC MMIO region.
->> Both read and write calls are redirected to vgic_io_dev_access where
->> kvm_exit_mmio is composed to pass it to vm_ops.handle_mmio.
->>
->>
->> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
->> ---
->>  arch/arm/kvm/mmio.c    |    3 --
->>  include/kvm/arm_vgic.h |    3 +-
->>  virt/kvm/arm/vgic.c    |   88 ++++++++++++++++++++++++++++++++++++++++--------
->>  3 files changed, 74 insertions(+), 20 deletions(-)
->>
->> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
->> index 81230da..1c44a2b 100644
->> --- a/arch/arm/kvm/mmio.c
->> +++ b/arch/arm/kvm/mmio.c
->> @@ -227,9 +227,6 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>       if (mmio.is_write)
->>               mmio_write_buf(mmio.data, mmio.len, data);
->>
->> -     if (vgic_handle_mmio(vcpu, run, &mmio))
->> -             return 1;
->> -
->>       if (handle_kernel_mmio(vcpu, run, &mmio))
->>               return 1;
->>
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index e452ef7..d9b7d2a 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -233,6 +233,7 @@ struct vgic_dist {
->>       unsigned long           *irq_pending_on_cpu;
->>
->>       struct vgic_vm_ops      vm_ops;
->> +     struct kvm_io_device    *io_dev;
->>  #endif
->>  };
->>
->> @@ -307,8 +308,6 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->>                       bool level);
->>  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->> -bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->> -                   struct kvm_exit_mmio *mmio);
->>
->>  #define irqchip_in_kernel(k) (!!((k)->arch.vgic.in_kernel))
->>  #define vgic_initialized(k)  ((k)->arch.vgic.ready)
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index 1213da5..3da1115 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -31,6 +31,9 @@
->>  #include <asm/kvm_emulate.h>
->>  #include <asm/kvm_arm.h>
->>  #include <asm/kvm_mmu.h>
->> +#include <asm/kvm.h>
->> +
->> +#include "iodev.h"
->>
->>  /*
->>   * How the whole thing works (courtesy of Christoffer Dall):
->> @@ -775,28 +778,81 @@ bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>       return true;
->>  }
->>
->> -/**
->> - * vgic_handle_mmio - handle an in-kernel MMIO access for the GIC emulation
->> - * @vcpu:      pointer to the vcpu performing the access
->> - * @run:       pointer to the kvm_run structure
->> - * @mmio:      pointer to the data describing the access
->> - *
->> - * returns true if the MMIO access has been performed in kernel space,
->> - * and false if it needs to be emulated in user space.
->> - * Calls the actual handling routine for the selected VGIC model.
->> - */
->> -bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->> -                   struct kvm_exit_mmio *mmio)
->> +static int vgic_io_dev_access(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
->> +                         gpa_t addr, int len, void *val, bool is_write)
->>  {
->> -     if (!irqchip_in_kernel(vcpu->kvm))
->> -             return false;
->> +     struct kvm_exit_mmio mmio;
->> +     bool ret;
->> +
->> +     mmio = (struct kvm_exit_mmio) {
->> +             .phys_addr = addr,
->> +             .len = len,
->> +             .is_write = is_write,
->> +     };
->> +
->> +     if (is_write)
->> +             memcpy(mmio.data, val, len);
->>
->>       /*
->>        * This will currently call either vgic_v2_handle_mmio() or
->>        * vgic_v3_handle_mmio(), which in turn will call
->>        * vgic_handle_mmio_range() defined above.
->>        */
->> -     return vcpu->kvm->arch.vgic.vm_ops.handle_mmio(vcpu, run, mmio);
->> +     ret = vcpu->kvm->arch.vgic.vm_ops.handle_mmio(vcpu, vcpu->run, &mmio);
->> +
->> +     if (!is_write)
->> +             memcpy(val, mmio.data, len);
->> +
->> +     return ret ? 0 : 1;
->> +}
->> +
->> +static int vgic_io_dev_read(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
->> +                       gpa_t addr, int len, void *val)
->> +{
->> +     return vgic_io_dev_access(vcpu, this, addr, len, val, false);
->> +}
->> +
->> +static int vgic_io_dev_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
->> +                        gpa_t addr, int len, const void *val)
->> +{
->> +     return vgic_io_dev_access(vcpu, this, addr, len, (void *)val, true);
->> +}
->> +
->> +static const struct kvm_io_device_ops vgic_io_dev_ops = {
->> +     .read       = vgic_io_dev_read,
->> +     .write      = vgic_io_dev_write,
->> +};
->> +
->> +static int vgic_register_kvm_io_dev(struct kvm *kvm)
->> +{
->> +     struct kvm_io_device *dev;
->> +     int ret;
->> +
->> +     struct vgic_dist *dist = &kvm->arch.vgic;
->> +     unsigned long base = dist->vgic_dist_base;
->> +
->> +     dev = kzalloc(sizeof(struct kvm_io_device), GFP_KERNEL);
->> +     if (!dev)
->> +             return -ENOMEM;
->> +
->> +     kvm_iodevice_init(dev, &vgic_io_dev_ops);
->> +
->> +     mutex_lock(&kvm->slots_lock);
->> +
->> +     ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
->> +                     base, KVM_VGIC_V2_DIST_SIZE, dev);
->
-> Should we consider GICv3? I think if applying this patch, it can not run well while creating a vGICv3 for guest.
-Agree. Christofer also pointed this out. Will select the dist size
-depending on the vgic_model.
+This patch series [1 - 6] performs,
 
-Thanks.
-Nikolay Nikolay
+1) Moves pmu driver to driver/soc/samsung folder. This is needed as exynos7 is
+   an arm64 based platform and hence PMU driver should be in driver folder.
+   Some discussion happened about this in the v1 version. Finally adding it in
+   driver/soc folder as it too SoC specific and not a general driver.
+   Entire discussion can be found here (A).
+2) Add exynos7 PMU support.
+3) Enables the driver for 32bit arm exynos platforms.
 
->
-> Thanks,
-> Shannon
->> +     if (ret < 0)
->> +             goto out_free_dev;
->> +     mutex_unlock(&kvm->slots_lock);
->> +
->> +     kvm->arch.vgic.io_dev = dev;
->> +
->> +     return 0;
->> +
->> +out_free_dev:
->> +     mutex_unlock(&kvm->slots_lock);
->> +     kfree(dev);
->> +     return ret;
->>  }
->>
->>  static int vgic_nr_shared_irqs(struct vgic_dist *dist)
->> @@ -1545,6 +1601,8 @@ int kvm_vgic_init(struct kvm *kvm)
->>
->>       mutex_lock(&kvm->lock);
->>
->> +     vgic_register_kvm_io_dev(kvm);
->> +
->>       if (vgic_initialized(kvm))
->>               goto out;
->>
->>
->> _______________________________________________
->> kvmarm mailing list
->> kvmarm at lists.cs.columbia.edu
->> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
->>
->> .
->>
->
->
+TODO: There is some suggestion to split the PMU data for 32 bit and 64 bit
+Exynos SOC. This can be implemented as a separate optimization patches.
+Submitting this version without much change from previous version as the merge
+window is near.
+
+Change from V4:
+* Added a new configuration structure for u32 values in patch 4.
+* Rebased on Kukjin for-next tree.
+
+Changes from V3:
+* Fixed Kconfig as per Russell feedback
+* Rebased the series against Pankaj SoC restart consolidation patches (D) as per
+  Kukjin request.
+* Link to V3 can be found here (C)
+
+Changes from V2:
+* Added review comment changes suggested by Pankaj.
+* Removed mfd client support in this patch series. This will be added later in
+  the power domain patch series.
+* Link to V2 can be found here (B)
+
+Changes from V1:
+* Move pmu driver in driver/soc/samsung folder
+* Removed the power domain features. They will posted as a separate series.
+* Added exynos7 PMU support.
+* Link to v1 can be found here (A)
+
+This complete patch series is rebased on Kukjin for-next tree.
+
+(A) - http://www.spinics.net/lists/linux-samsung-soc/msg38442.html
+(B) - http://www.spinics.net/lists/arm-kernel/msg375910.html
+(C) - http://www.spinics.net/lists/linux-samsung-soc/msg39237.html 
+(D) - http://www.spinics.net/lists/linux-samsung-soc/msg39095.html
+
+Amit Daniel Kachhap (6):
+  ARM: EXYNOS: Move pmu specific header files under "linux/soc/samsung"
+  ARM: EXYNOS: Move pmu specific headers under "linux/soc/samsung"
+  drivers: soc: Add support for Exynos PMU driver
+  driver: soc: exynos-pmu: Add an API to be called after wakeup
+  driver: soc: exynos-pmu: Add a new structure to allow u32 conf data
+  drivers: soc: exynos-pmu: Add support for Exynos7
+  arm: exynos: Select SOC_SAMSUNG config option
+
+ arch/arm/mach-exynos/Kconfig                       |    1 +
+ arch/arm/mach-exynos/Makefile                      |    2 +-
+ arch/arm/mach-exynos/exynos.c                      |    2 +-
+ arch/arm/mach-exynos/mcpm-exynos.c                 |    2 +-
+ arch/arm/mach-exynos/platsmp.c                     |    2 +-
+ arch/arm/mach-exynos/pm.c                          |    4 +-
+ arch/arm/mach-exynos/suspend.c                     |    4 +-
+ drivers/soc/Kconfig                                |    1 +
+ drivers/soc/Makefile                               |    1 +
+ drivers/soc/samsung/Kconfig                        |   20 +
+ drivers/soc/samsung/Makefile                       |    1 +
+ .../pmu.c => drivers/soc/samsung/exynos-pmu.c      |  451 +++++++++++++++++++-
+ .../linux/soc/samsung}/exynos-pmu.h                |    1 +
+ .../linux/soc/samsung/exynos-regs-pmu.h            |  273 ++++++++++++
+ 14 files changed, 750 insertions(+), 15 deletions(-)
+ create mode 100644 drivers/soc/samsung/Kconfig
+ create mode 100644 drivers/soc/samsung/Makefile
+ rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (68%)
+ rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (89%)
+ rename arch/arm/mach-exynos/regs-pmu.h => include/linux/soc/samsung/exynos-regs-pmu.h (68%)
+
+-- 
+1.7.9.5
