@@ -1,46 +1,68 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 29 Nov 2014 09:13:02 +0900
-Subject: [GIT PULL 4/4] Samsung exynos7 updates for v3.19
-In-Reply-To: <201411281335.55663.arnd@arndb.de>
-References: <5476CD88.1030406@kernel.org> <201411281335.55663.arnd@arndb.de>
-Message-ID: <013701d00b69$3d7761d0$b8662570$@kernel.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 29 Nov 2014 01:15:57 +0100
+Subject: [PATCH 2/2] ARM: imx: src: support vf610 system reset controller
+In-Reply-To: <18555848.LVhqYu0kXL@wuerfel>
+References: <1417193015-6033-1-git-send-email-stefan@agner.ch>
+ <2716009.DOfHfaSPkY@wuerfel> <6341b31998ff843d236bc2a3e34537b0@agner.ch>
+ <18555848.LVhqYu0kXL@wuerfel>
+Message-ID: <f8bc59dd2c2d20c8fc9f49ec354ac474@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+On 2014-11-28 23:22, Arnd Bergmann wrote:
+> On Friday 28 November 2014 23:09:09 Stefan Agner wrote:
+>> On 2014-11-28 22:24, Arnd Bergmann wrote:
+>> > On Friday 28 November 2014 22:02:01 Stefan Agner wrote:
+>> >
+>> >> > If the SRC is also capable of resetting individual blocks instead of just
+>> >> > the entire machine, it would be a reset driver in drivers/reset instead.
+>> >>
+>> >> Beside the system reset, there is only a mask functionality for the
+>> >> watchdogs (there are two watchdogs, one for Cortex-A5 and one for the
+>> >> M4). This makes the SRC module in the Vybrid a bit different then what
+>> >> is available on other i.MX SoC's...
+>> >
+>> > If you already have the watchdog registers in there and want to have
+>> > a watchdog driver too, the easiest way would be to register the reboot
+>> > handler from the watchdog driver.
+>>
+>> Hm, not sure we speak about the same here. The SRC module has two
+>> (multi-)bit fields to mask the watchdog reset event for each watchdog.
+>> Beside that, there are two full watchdog register maps, which are in
+>> different areas. There is already a driver for this watchdogs. I'm not
+>> sure what the idea behind this is exactly, I guess it would easily allow
+>> to (temporary) mask the other CPU's watchdog. However, I don't think we
+>> need that functionality, so I don't care about that right now.
 > 
-> On Thursday 27 November 2014, Kukjin Kim wrote:
-> > Samsung arch/arm64 DT updates for v3.19
-> >
-> > - to support ARMv8 based exynos7 SoC
-> >   : add initial device tree and add pinctrl, PMU, mmc, i2c, rtc,
-> >     watchdog, and adc nodes for exynos7 SoC and exynos7 based
-> >     espresso board.
-> >
-> > NOTE that this is including following dependencies
-> > : cleanup/dts-subdirs in arm-soc for arm64 vendor support
-> > : tags/samsung-driver for samsung serial
-> > : for-v3.19/exynos-clk in samsung-clk tree for exynos7 clk
-> >
-> > One more NOTE, for support exynos7 we need Liviu's "arm64: Create
-> > link to include/dt-bindings to enable C preprocessor use" in arm-soc
-> > tree and arm64 defconfig update should be handled directly.
+> Ok, I see, thanks for the clarification!
 > 
-> I'm confused by the dependencies. I don't see a "for-v3.19/exynos-clk"
-> in arm-soc, you haven't put the clk maintainer on Cc and I see no indication
-> that he has this in his tree already, so I'm not pulling this until further
-> clarification.
+>> There is also a restart handler in the watchdog driver, but I prefer to
+>> use the reset capabilities of the SRC since it has immediate effect.
+>>
+>> Lets get to the big picture again: I could register the whole SRC
+>> register map as a syscon device and then access the registers from my
+>> suspend/resume implementation later on. And similar in the restart
+>> driver, I would use syscon_regmap_lookup_by_compatible to check if it
+>> contains the vf610-src compatible string and register the restart
+>> driver/handler if available.
+
+One thing which came into my mind regarding suspend: I might need to
+access the registers from assembler (in SRAM), can I do that through
+syscon/regmap? I had a quick look, but I don't found a way to get back
+the mapped IO base address.. By good reasons, of course, for most
+applications. But in my case, afaik I have no other choice.
+
+--
+Stefan
+
 > 
-Hi,
-
-Sorry for insufficient description.
-
-Since the exynos7 stuff requires regarding clk stuff for kernel build, I talked
-to Mike, Sylwester and Mike suggested pulling the branch into Samsung tree.
-
-http://www.spinics.net/lists/linux-samsung-soc/msg39368.html
-
-If any problems, please let me know.
-
-Thanks,
-Kukjin
+> Correct, and also in the watchdog driver, I guess.
+> 
+> Instead of syscon_regmap_lookup_by_compatible, please use
+> syscon_regmap_lookup_by_phandle and put the link to the syscon
+> device into the device accessing it.
+> 
+> Also, see if you can use or extend drivers/power/reset/syscon-reboot.c
+> for your use case.
+> 
+> 	Arnd
