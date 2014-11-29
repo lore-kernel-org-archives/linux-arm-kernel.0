@@ -1,13 +1,15 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 29 Nov 2014 12:28:58 +0100
+Date: Sat, 29 Nov 2014 12:29:06 +0100
 Subject: [RFC PATCH 2/5] ARM: on IO mem abort - route the call to KVM
  MMIO bus
 In-Reply-To: <20141124212651.10605.58116.stgit@i3820>
 References: <20141124212240.10605.46770.stgit@i3820>
  <20141124212651.10605.58116.stgit@i3820>
-Message-ID: <20141129112858.GB13623@macair>
+Message-ID: <20141129112906.GC13623@macair>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+The subject could use a KVM: prefix.
 
 On Mon, Nov 24, 2014 at 11:26:51PM +0200, Nikolay Nikolaev wrote:
 > On IO memory abort, try to handle the MMIO access thorugh the KVM
@@ -67,8 +69,7 @@ On Mon, Nov 24, 2014 at 11:26:51PM +0200, Nikolay Nikolaev wrote:
 > +	if (handle_kernel_mmio(vcpu, run, &mmio))
 > +		return 1;
 > +
-
-Is this stuff always synchronously handled so that the mmio is properly
-populated upon handle_kernel_mmio on reads?
-
--Christoffer
+>  	kvm_prepare_mmio(run, &mmio);
+>  	return 0;
+>  }
+> 
