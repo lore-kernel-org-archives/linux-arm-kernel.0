@@ -1,83 +1,83 @@
-From: orsonzhai@gmail.com (Orson Zhai)
-Date: Sat, 29 Nov 2014 10:50:02 +0800
-Subject: [PATCH] net: hisilicon: unmap IO resources when cleanup
-In-Reply-To: <1417225690-135860-1-git-send-email-shengyong1@huawei.com>
-References: <1417225690-135860-1-git-send-email-shengyong1@huawei.com>
-Message-ID: <5479345A.20408@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 28 Nov 2014 21:08:07 -0800
+Subject: [GIT PULL] clk: rockchip: second batch for 3.19
+In-Reply-To: <4638213.B2LsUVeJxf@diego>
+References: <4638213.B2LsUVeJxf@diego>
+Message-ID: <20141129050807.8497.25401@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Sheng Yong,
+Quoting Heiko St?bner (2014-11-27 16:06:01)
+> Hi Mike,
+> 
+> here is the second (and most likely last) batch of rockchip clock
+> changes for 3.19. Biggest changes are the pll init stuff and the
+> mmc clock-phase support for rk3288.
+> 
+> Apart from that only some more clock-ids and minor fixes.
+> 
+> So if this looks ok, please pull
 
-A question for you,
-
-On 2014?11?29? 09:48, Sheng Yong wrote:
-> Unmap IO resources if the driver initailization failed or the driver is
-> unmounted.
->
-> Signed-off-by: Sheng Yong <shengyong1@huawei.com>
-> ---
->   drivers/net/ethernet/hisilicon/hix5hd2_gmac.c | 14 ++++++++++----
->   1 file changed, 10 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/net/ethernet/hisilicon/hix5hd2_gmac.c b/drivers/net/ethernet/hisilicon/hix5hd2_gmac.c
-> index 0ffdcd3..3399ce6 100644
-> --- a/drivers/net/ethernet/hisilicon/hix5hd2_gmac.c
-> +++ b/drivers/net/ethernet/hisilicon/hix5hd2_gmac.c
-> @@ -917,26 +917,26 @@ static int hix5hd2_dev_probe(struct platform_device *pdev)
->   	priv->ctrl_base = devm_ioremap_resource(dev, res);
->   	if (IS_ERR(priv->ctrl_base)) {
->   		ret = PTR_ERR(priv->ctrl_base);
-> -		goto out_free_netdev;
-> +		goto out_base;
-As i know we don't need to do anything but return error code from probe 
-when using devm_xxx for getting resource.
-What's the idea to io-unmap explicitly here?
+Pulled.
 
 Thanks,
-Orson
->   	}
->   
->   	priv->clk = devm_clk_get(&pdev->dev, NULL);
->   	if (IS_ERR(priv->clk)) {
->   		netdev_err(ndev, "failed to get clk\n");
->   		ret = -ENODEV;
-> -		goto out_free_netdev;
-> +		goto out_ctrl_base;
->   	}
->   
->   	ret = clk_prepare_enable(priv->clk);
->   	if (ret < 0) {
->   		netdev_err(ndev, "failed to enable clk %d\n", ret);
-> -		goto out_free_netdev;
-> +		goto out_ctrl_base;
->   	}
->   
->   	bus = mdiobus_alloc();
->   	if (bus == NULL) {
->   		ret = -ENOMEM;
-> -		goto out_free_netdev;
-> +		goto out_ctrl_base;
->   	}
->   
->   	bus->priv = priv;
-> @@ -1019,6 +1019,10 @@ err_mdiobus:
->   	mdiobus_unregister(bus);
->   err_free_mdio:
->   	mdiobus_free(bus);
-> +out_base:
-> +        iounmap(priv->base);
-> +out_ctrl_base:
-> +	iounmap(priv->ctrl_base);
->   out_free_netdev:
->   	free_netdev(ndev);
->   
-> @@ -1038,6 +1042,8 @@ static int hix5hd2_dev_remove(struct platform_device *pdev)
->   	hix5hd2_destroy_hw_desc_queue(priv);
->   	of_node_put(priv->phy_node);
->   	cancel_work_sync(&priv->tx_timeout_task);
-> +	iounmap(priv->base);
-> +	iounmap(priv->ctrl_base);
->   	free_netdev(ndev);
->   
->   	return 0;
+Mike
+
+> 
+> 
+> Thanks
+> Heiko
+> 
+> The following changes since commit 29e94468516cdf191ec839ee39f79e011817276d:
+> 
+>   clk: rockchip: fix clock select order for rk3288 usbphy480m_src (2014-11-16 00:40:19 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.19-rockchip-clk2
+> 
+> for you to fetch changes up to 89bf26cbc1a09476c4c4740d16a0ffdfa2192b9c:
+> 
+>   clk: rockchip: Add support for the mmc clock phases using the framework (2014-11-28 00:44:24 +0100)
+> 
+> ----------------------------------------------------------------
+> - clock phase setting capability for the rk3288 mmc clocks
+> - pll init to allow syncing to actual rate table values
+> - some more exported clocks
+> - fixes for some clocks (typos etc) all of them not yet used
+>   in actual drivers
+> 
+> ----------------------------------------------------------------
+> Alexandru M Stan (2):
+>       clk: rockchip: add bindings for the mmc clocks
+>       clk: rockchip: Add support for the mmc clock phases using the framework
+> 
+> Heiko Stuebner (4):
+>       clk: rockchip: add ability to specify pll-specific flags
+>       clk: rockchip: setup pll_mux data earlier
+>       clk: rockchip: add optional sync to pll rate parameters
+>       clk: rockchip: add ROCKCHIP_PLL_SYNC_RATE flag to some plls
+> 
+> Jeff Chen (2):
+>       clk: rockchip: add binding ID for DMC (memory controller) clocks on rk3288
+>       clk: rockchip: use clock ID for DMC (memory controller) on rk3288
+> 
+> Julien CHAUVEAU (3):
+>       clk: rockchip: fix parent clock for rk3188 hclk_lcdc1
+>       clk: rockchip: fix clock gate for rk3188 spdif_pre
+>       clk: rockchip: fix rk3188 USB HSIC PHY clock divider
+> 
+> Sonny Rao (1):
+>       clk: rockchip: rk3288 export i2s0_clkout for use in DT
+> 
+>  drivers/clk/rockchip/Makefile          |   1 +
+>  drivers/clk/rockchip/clk-mmc-phase.c   | 154 +++++++++++++++++++++++++++++++++
+>  drivers/clk/rockchip/clk-pll.c         |  81 +++++++++++++----
+>  drivers/clk/rockchip/clk-rk3188.c      |  37 ++++----
+>  drivers/clk/rockchip/clk-rk3288.c      |  32 ++++---
+>  drivers/clk/rockchip/clk.c             |  11 ++-
+>  drivers/clk/rockchip/clk.h             |  36 +++++++-
+>  include/dt-bindings/clock/rk3288-cru.h |  13 +++
+>  8 files changed, 315 insertions(+), 50 deletions(-)
+>  create mode 100644 drivers/clk/rockchip/clk-mmc-phase.c
+> 
