@@ -1,46 +1,41 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 29 Nov 2014 09:18:31 +0900
-Subject: [GIT PULL 3/5] Samsung defconfig update for v3.19
-In-Reply-To: <201411281315.57712.arnd@arndb.de>
-References: <546F491B.4020709@kernel.org> <201411281315.57712.arnd@arndb.de>
-Message-ID: <019301d00b6a$01877d80$04967880$@kernel.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 28 Nov 2014 16:19:30 -0800
+Subject: [GIT PULL] Broadcom STB GISB bus driver for 3.19 (v2)
+Message-ID: <1417220370-469-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-> On Friday 21 November 2014, Kukjin Kim wrote:
-> > The following changes since commit 0df1f2487d2f0d04703f142813d53615d62a1da4:
-> >
-> >   Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > tags/samsung-defconfig-v3.19
-> >
-> > for you to fetch changes up to 26048def56ac2f901d4245d2935c797984e96d68:
-> >
-> >   ARM: exynos_defconfig: Use 16 minors per MMC block device (2014-11-21
-> > 22:04:05 +0900)
-> >
-> > ----------------------------------------------------------------
-> > Samsung defconfig update for v3.19
-> >
-> > - Use 16 minors per MMC block device for exynos_defconfig
-> >   : 16 minors per MMC block device are required for Rinato (Gear 2)
-> >
-> 
-> 
-> The defconfig branch didn't have v3.18-rc3 yet, so I cherry-picked the
-> one patch from this branch to avoid a back-merge from upstream.
-> 
-OK, I'm fine.
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-> Please make sure to base patches on older -rc releases if you can,
-> it makes our lives easier.
-> 
-OK, I will :)
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
-Thanks,
-Kukjin
+are available in the git repository at:
+
+  https://github.com/brcm/linux.git tags/arm-soc/for-3.19/brcmstb-drivers
+
+for you to fetch changes up to d1d6786846e1c40f780edb83569597a8a7769e95:
+
+  bus: brcmstb_gisb: Add register offset tables for older chips (2014-11-28 15:44:44 -0800)
+
+----------------------------------------------------------------
+This pull request contains the following changes to the Broadcom GISB bus
+arbiter from Kevin Cernekee:
+
+- Extend brcmstb GISB bus driver to work on MIPS (currently ARM-only) and support
+  65nm and 40nm MIPS-based chips such as: BCM7038, BCM7400 and BCM7435
+
+----------------------------------------------------------------
+Changes in v2:
+- drop bus: brcmstb_gisb: Honor the "big-endian" and "native-endian" DT properties
+  since it depends on of_device_is_big_endian which is not merged yet
+
+Kevin Cernekee (4):
+      bus: brcmstb_gisb: Make the driver buildable on MIPS
+      bus: brcmstb_gisb: Introduce wrapper functions for MMIO accesses
+      bus: brcmstb_gisb: Look up register offsets in a table
+      bus: brcmstb_gisb: Add register offset tables for older chips
+
+ .../devicetree/bindings/bus/brcm,gisb-arb.txt      |   6 +-
+ drivers/bus/Kconfig                                |   2 +-
+ drivers/bus/brcmstb_gisb.c                         | 118 +++++++++++++++++----
+ 3 files changed, 105 insertions(+), 21 deletions(-)
