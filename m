@@ -1,27 +1,74 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 29 Nov 2014 11:41:02 +0100
-Subject: [PATCH] drm: i2c: tda998x: Retry fetching the EDID if it fails
- first time.
-In-Reply-To: <54783A2F.5010405@arm.com>
-References: <546B84C6.3090809@arm.com> <20141128091905.3e491c39@armhf>
- <54783A2F.5010405@arm.com>
-Message-ID: <20141129114102.02366857@armhf>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat, 29 Nov 2014 12:28:58 +0100
+Subject: [RFC PATCH 2/5] ARM: on IO mem abort - route the call to KVM
+ MMIO bus
+In-Reply-To: <20141124212651.10605.58116.stgit@i3820>
+References: <20141124212240.10605.46770.stgit@i3820>
+ <20141124212651.10605.58116.stgit@i3820>
+Message-ID: <20141129112858.GB13623@macair>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Nov 2014 09:02:39 +0000
-Andrew Jackson <Andrew.Jackson@arm.com> wrote:
-
-> > It seems that your patch is deprecated by Laurent Pinchart's
-> > 	[PATCH] drm: tda998x: Use drm_do_get_edid()
-> > http://lists.freedesktop.org/archives/dri-devel/2014-November/072906.html
-> >   
+On Mon, Nov 24, 2014 at 11:26:51PM +0200, Nikolay Nikolaev wrote:
+> On IO memory abort, try to handle the MMIO access thorugh the KVM
+> registered read/write callbacks. This is done by invoking the relevant
+> kvm_io_bus_* API.
 > 
-> Thank you for the heads-up, I'd not seen that.  I'll consider how my patch might be modified to suit the new infrastructure.
+> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+> ---
+>  arch/arm/kvm/mmio.c |   33 +++++++++++++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+> 
+> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+> index 4cb5a93..81230da 100644
+> --- a/arch/arm/kvm/mmio.c
+> +++ b/arch/arm/kvm/mmio.c
+> @@ -162,6 +162,36 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	return 0;
+>  }
+>  
+> +/**
+> + * kvm_handle_mmio - handle an in-kernel MMIO access
+> + * @vcpu:	pointer to the vcpu performing the access
+> + * @run:	pointer to the kvm_run structure
+> + * @mmio:	pointer to the data describing the access
+> + *
+> + * returns true if the MMIO access has been performed in kernel space,
+> + * and false if it needs to be emulated in user space.
+> + */
+> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+> +		struct kvm_exit_mmio *mmio)
+> +{
+> +	int ret;
+> +
+> +	if (mmio->is_write) {
+> +		ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
+> +				mmio->len, &mmio->data);
+> +
+> +	} else {
+> +		ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
+> +				mmio->len, &mmio->data);
+> +	}
+> +	if (!ret) {
+> +		kvm_prepare_mmio(run, mmio);
+> +		kvm_handle_mmio_return(vcpu, run);
+> +	}
+> +
+> +	return !ret;
+> +}
+> +
+>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  		 phys_addr_t fault_ipa)
+>  {
+> @@ -200,6 +230,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  	if (vgic_handle_mmio(vcpu, run, &mmio))
+>  		return 1;
+>  
+> +	if (handle_kernel_mmio(vcpu, run, &mmio))
+> +		return 1;
+> +
 
-You don't need any patch: drm_do_get_edid() already loops on reading
-the EDID.
+Is this stuff always synchronously handled so that the mmio is properly
+populated upon handle_kernel_mmio on reads?
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+-Christoffer
