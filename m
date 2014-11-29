@@ -1,83 +1,70 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 28 Nov 2014 21:08:07 -0800
-Subject: [GIT PULL] clk: rockchip: second batch for 3.19
-In-Reply-To: <4638213.B2LsUVeJxf@diego>
-References: <4638213.B2LsUVeJxf@diego>
-Message-ID: <20141129050807.8497.25401@quantum>
+From: wangzhou.bry@gmail.com (Zhou Wang)
+Date: Sat, 29 Nov 2014 15:11:59 +0800
+Subject: [PATCH v3 1/2] ARM: hip04: set ARCH_NR_GPIO to 128
+In-Reply-To: <3094004.3WUKgY6xNz@wuerfel>
+References: <1417156188-500-1-git-send-email-wangzhou.bry@gmail.com>
+ <1417156188-500-2-git-send-email-wangzhou.bry@gmail.com>
+ <3094004.3WUKgY6xNz@wuerfel>
+Message-ID: <547971BF.1050706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Heiko St?bner (2014-11-27 16:06:01)
-> Hi Mike,
-> 
-> here is the second (and most likely last) batch of rockchip clock
-> changes for 3.19. Biggest changes are the pll init stuff and the
-> mmc clock-phase support for rk3288.
-> 
-> Apart from that only some more clock-ids and minor fixes.
-> 
-> So if this looks ok, please pull
+On 2014?11?28? 17:33, Arnd Bergmann wrote:
+> On Friday 28 November 2014 14:29:47 Zhou Wang wrote:
+>> Set ARCH_NR_GPIO for Hisilicon Soc Hip04, which has 4 GPIO
+>> controllers with 32 GPIOs each.
+>>
+>> Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
+>> ---
+>>   arch/arm/Kconfig                |    1 +
+>>   arch/arm/configs/hisi_defconfig |    3 +++
+>>   2 files changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 89c4b5c..26aae1e 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -1509,6 +1509,7 @@ config ARCH_NR_GPIO
+>>          default 352 if ARCH_VT8500
+>>          default 288 if ARCH_ROCKCHIP
+>>          default 264 if MACH_H4700
+>> +       default 128 if ARCH_HIP04
+>>          default 0
+>>          help
+>>            Maximum number of GPIOs in the system.
+>>
+>
+> If I remember correctly, you don't actually need to set this if all gpio
+> clients are using the new gpio descriptor interfaces instead of gpio
+> numbers. Would that work for you? You'd have to know which devices
 
-Pulled.
+Hi Arnd,
 
-Thanks,
-Mike
+If I don't set this, it will use the default ARCH_NR_GPIO(512), then
+the range of GPIO number will be 384~511 which is very strange to users,
+because Hip04 based machines can only support 128 GPIOs.
 
-> 
-> 
-> Thanks
-> Heiko
-> 
-> The following changes since commit 29e94468516cdf191ec839ee39f79e011817276d:
-> 
->   clk: rockchip: fix clock select order for rk3288 usbphy480m_src (2014-11-16 00:40:19 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.19-rockchip-clk2
-> 
-> for you to fetch changes up to 89bf26cbc1a09476c4c4740d16a0ffdfa2192b9c:
-> 
->   clk: rockchip: Add support for the mmc clock phases using the framework (2014-11-28 00:44:24 +0100)
-> 
-> ----------------------------------------------------------------
-> - clock phase setting capability for the rk3288 mmc clocks
-> - pll init to allow syncing to actual rate table values
-> - some more exported clocks
-> - fixes for some clocks (typos etc) all of them not yet used
->   in actual drivers
-> 
-> ----------------------------------------------------------------
-> Alexandru M Stan (2):
->       clk: rockchip: add bindings for the mmc clocks
->       clk: rockchip: Add support for the mmc clock phases using the framework
-> 
-> Heiko Stuebner (4):
->       clk: rockchip: add ability to specify pll-specific flags
->       clk: rockchip: setup pll_mux data earlier
->       clk: rockchip: add optional sync to pll rate parameters
->       clk: rockchip: add ROCKCHIP_PLL_SYNC_RATE flag to some plls
-> 
-> Jeff Chen (2):
->       clk: rockchip: add binding ID for DMC (memory controller) clocks on rk3288
->       clk: rockchip: use clock ID for DMC (memory controller) on rk3288
-> 
-> Julien CHAUVEAU (3):
->       clk: rockchip: fix parent clock for rk3188 hclk_lcdc1
->       clk: rockchip: fix clock gate for rk3188 spdif_pre
->       clk: rockchip: fix rk3188 USB HSIC PHY clock divider
-> 
-> Sonny Rao (1):
->       clk: rockchip: rk3288 export i2s0_clkout for use in DT
-> 
->  drivers/clk/rockchip/Makefile          |   1 +
->  drivers/clk/rockchip/clk-mmc-phase.c   | 154 +++++++++++++++++++++++++++++++++
->  drivers/clk/rockchip/clk-pll.c         |  81 +++++++++++++----
->  drivers/clk/rockchip/clk-rk3188.c      |  37 ++++----
->  drivers/clk/rockchip/clk-rk3288.c      |  32 ++++---
->  drivers/clk/rockchip/clk.c             |  11 ++-
->  drivers/clk/rockchip/clk.h             |  36 +++++++-
->  include/dt-bindings/clock/rk3288-cru.h |  13 +++
->  8 files changed, 315 insertions(+), 50 deletions(-)
->  create mode 100644 drivers/clk/rockchip/clk-mmc-phase.c
-> 
+Best Regards,
+Zhou Wang
+
+> can be connected to the gpio controller for all hip04 based machines,
+> but I think this is a short list of boards.
+>
+> Linus, one question for you: Does the ARCH_NR_GPIO actually work as designed?
+> I see that e.g. OMAP4 defines 192 GPIO lines but does not have an ARCH_NR_GPIO
+> setting. In an OMAP4-only kernel you would get the default value (512)
+> from include/asm-generic/gpio.h, and in a multiplatform kernel you get at
+> least 512 if any of the (ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 || \
+> SOC_DRA7XX || ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PV210 || ARCH_SHMOBILE
+> || ARCH_TEGRA) are set, so that is still good.
+>
+> However if one builds a kernel that just enables OMAP4 and HIP04, I suspect
+> it can't work on OMAP4 for any gpio line above 128, which seems to be
+> a fundamental multiplatform problem.
+>
+> Do we neet to increase the default to 512 for all ARCH_MULTIPLATFORM
+> configurations and just leave ARCH_SHMOBILE, ARCH_TEGRA and MACH_H4700
+> here as special cases?
+>
+> 	Arnd
+>
