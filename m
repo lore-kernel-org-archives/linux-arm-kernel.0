@@ -1,111 +1,46 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 29 Nov 2014 01:30:49 +0100
-Subject: [PATCH V2] PM / Domains: Add pm_genpd_lookup() API to lookup
- domain by firmware node
-In-Reply-To: <1417171115-5789-1-git-send-email-ulf.hansson@linaro.org>
-References: <1417171115-5789-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <5765394.eQjV2VvkSL@vostro.rjw.lan>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Sat, 29 Nov 2014 09:13:02 +0900
+Subject: [GIT PULL 4/4] Samsung exynos7 updates for v3.19
+In-Reply-To: <201411281335.55663.arnd@arndb.de>
+References: <5476CD88.1030406@kernel.org> <201411281335.55663.arnd@arndb.de>
+Message-ID: <013701d00b69$3d7761d0$b8662570$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 28, 2014 11:38:35 AM Ulf Hansson wrote:
-> In a step to move away from using genpd's name based APIs, such as the
-> pm_genpd_add_subdomain_names(), provide an API to lookup an already
-> initialized generic PM domain by its firmware node.
+Arnd Bergmann wrote:
 > 
-> This API would typically be a called from SOC specific code, to fetch a
-> handle to the domain. Especially convenient to configure subdomains and
-> when the hierarchy of the domains are described in DT.
+> On Thursday 27 November 2014, Kukjin Kim wrote:
+> > Samsung arch/arm64 DT updates for v3.19
+> >
+> > - to support ARMv8 based exynos7 SoC
+> >   : add initial device tree and add pinctrl, PMU, mmc, i2c, rtc,
+> >     watchdog, and adc nodes for exynos7 SoC and exynos7 based
+> >     espresso board.
+> >
+> > NOTE that this is including following dependencies
+> > : cleanup/dts-subdirs in arm-soc for arm64 vendor support
+> > : tags/samsung-driver for samsung serial
+> > : for-v3.19/exynos-clk in samsung-clk tree for exynos7 clk
+> >
+> > One more NOTE, for support exynos7 we need Liviu's "arm64: Create
+> > link to include/dt-bindings to enable C preprocessor use" in arm-soc
+> > tree and arm64 defconfig update should be handled directly.
 > 
-> Do note, before pm_genpd_init() is invoked to initialize a generic PM
-> domain, it's the callers responsibility to assign the new ->fwnode
-> pointer in the struct generic_pm_domain, to enable pm_genpd_lookup() to
-> find the domain.
+> I'm confused by the dependencies. I don't see a "for-v3.19/exynos-clk"
+> in arm-soc, you haven't put the clk maintainer on Cc and I see no indication
+> that he has this in his tree already, so I'm not pulling this until further
+> clarification.
 > 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Hi,
 
-I have no problems with that, but do you have a user for it?
+Sorry for insufficient description.
 
-> ---
-> 
-> Changes in v2:
-> 	Change from using struct device_node to struct fwnode_handle.
-> 	Updated commit header accordingly.
-> 
-> ---
->  drivers/base/power/domain.c | 27 +++++++++++++++++++++++++++
->  include/linux/pm_domain.h   |  4 ++++
->  2 files changed, 31 insertions(+)
-> 
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 735c473..2d881d5 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -75,6 +75,33 @@ struct generic_pm_domain *dev_to_genpd(struct device *dev)
->  	return pd_to_genpd(dev->pm_domain);
->  }
->  
-> +/**
-> + * pm_genpd_lookup - Fetch a generic PM domain object by firmware node.
-> + * @node: Firmware node to a corresponding genpd.
-> + *
-> + * Returns a valid pointer to struct generic_pm_domain on success or ERR_PTR()
-> + * on failure.
-> + */
-> +struct generic_pm_domain *pm_genpd_lookup(struct fwnode_handle *node)
-> +{
-> +	struct generic_pm_domain *genpd = ERR_PTR(-ENOENT), *gpd;
-> +
-> +	if (IS_ERR_OR_NULL(node))
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	mutex_lock(&gpd_list_lock);
-> +	list_for_each_entry(gpd, &gpd_list, gpd_list_node) {
-> +		if (gpd->fwnode == node) {
-> +			genpd = gpd;
-> +			break;
-> +		}
-> +	}
-> +	mutex_unlock(&gpd_list_lock);
-> +
-> +	return genpd;
-> +}
-> +EXPORT_SYMBOL_GPL(pm_genpd_lookup);
-> +
->  static int genpd_stop_dev(struct generic_pm_domain *genpd, struct device *dev)
->  {
->  	return GENPD_DEV_TIMED_CALLBACK(genpd, int, stop, dev,
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index 8cbd32e..aa01050 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -43,6 +43,8 @@ struct gpd_cpuidle_data {
->  	struct cpuidle_state *idle_state;
->  };
->  
-> +struct fwnode_handle;
-> +
->  struct generic_pm_domain {
->  	struct dev_pm_domain domain;	/* PM domain operations */
->  	struct list_head gpd_list_node;	/* Node in the global PM domains list */
-> @@ -53,6 +55,7 @@ struct generic_pm_domain {
->  	struct dev_power_governor *gov;
->  	struct work_struct power_off_work;
->  	const char *name;
-> +	struct fwnode_handle *fwnode;	/* Firware node for the PM domain */
->  	unsigned int in_progress;	/* Number of devices being suspended now */
->  	atomic_t sd_count;	/* Number of subdomains with power "on" */
->  	enum gpd_status status;	/* Current state of the domain */
-> @@ -126,6 +129,7 @@ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
->  }
->  
->  extern struct generic_pm_domain *dev_to_genpd(struct device *dev);
-> +extern struct generic_pm_domain *pm_genpd_lookup(struct fwnode_handle *node);
->  extern int __pm_genpd_add_device(struct generic_pm_domain *genpd,
->  				 struct device *dev,
->  				 struct gpd_timing_data *td);
-> 
+Since the exynos7 stuff requires regarding clk stuff for kernel build, I talked
+to Mike, Sylwester and Mike suggested pulling the branch into Samsung tree.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+http://www.spinics.net/lists/linux-samsung-soc/msg39368.html
+
+If any problems, please let me know.
+
+Thanks,
+Kukjin
