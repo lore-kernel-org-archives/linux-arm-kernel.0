@@ -1,41 +1,41 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sun, 30 Nov 2014 01:02:02 +0300
-Subject: [PATCH v2 0/3] ARM/usb: add PHY for Lubbock platform
-Message-ID: <1417298525-5587-1-git-send-email-dbaryshkov@gmail.com>
+Date: Sun, 30 Nov 2014 01:02:03 +0300
+Subject: [PATCH v2 1/3] ARM: pxa: lubbock: add declaration of vbus tranceiver
+In-Reply-To: <1417298525-5587-1-git-send-email-dbaryshkov@gmail.com>
+References: <1417298525-5587-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1417298525-5587-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the second iteration of a compile-tested-only PHY for the Lubbock
-platform. Could you please take a look and test.
+Add a declaration of lubbock-vbus device, used as UDC transceiver on
+Lubbock platform.
 
-Changes since V1:
-- Switched to using threaded IRQs in a phy
-- This allowed me to drop workqueue scheduling
-- Dropped mach/lubbock.h from pxa25x_udc.h header.
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ arch/arm/mach-pxa/lubbock.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git.infradead.org:public_git/zaurus.git lubbock
-
-for you to fetch changes up to 3ef110afa33e9e5c2ab77a4ababd279f8bd4e95c:
-
-  usb: gadget: drop lubbock-specific code from pxa25x_udc (2014-11-30 00:51:31 +0300)
-
-----------------------------------------------------------------
-Dmitry Eremin-Solenikov (3):
-      ARM: pxa: lubbock: add declaration of vbus tranceiver
-      usb: phy: add lubbock phy driver
-      usb: gadget: drop lubbock-specific code from pxa25x_udc
-
- arch/arm/mach-pxa/lubbock.c         |   6 +
- drivers/usb/gadget/udc/pxa25x_udc.c |  61 ----------
- drivers/usb/gadget/udc/pxa25x_udc.h |   5 -
- drivers/usb/phy/Kconfig             |  10 ++
- drivers/usb/phy/Makefile            |   1 +
- drivers/usb/phy/phy-lubbock.c       | 220 ++++++++++++++++++++++++++++++++++++
- 6 files changed, 237 insertions(+), 66 deletions(-)
- create mode 100644 drivers/usb/phy/phy-lubbock.c
+diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
+index d8a1be6..5e2dcf7 100644
+--- a/arch/arm/mach-pxa/lubbock.c
++++ b/arch/arm/mach-pxa/lubbock.c
+@@ -383,11 +383,17 @@ static struct platform_device lubbock_flash_device[2] = {
+ 	},
+ };
+ 
++static struct platform_device lubbock_vbus = {
++	.name	= "lubbock-vbus",
++	.id	= -1,
++};
++
+ static struct platform_device *devices[] __initdata = {
+ 	&sa1111_device,
+ 	&smc91x_device,
+ 	&lubbock_flash_device[0],
+ 	&lubbock_flash_device[1],
++	&lubbock_vbus,
+ };
+ 
+ static struct pxafb_mode_info sharp_lm8v31_mode = {
+-- 
+2.1.3
