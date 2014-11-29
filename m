@@ -1,10 +1,10 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 29 Nov 2014 12:29:14 +0100
+Date: Sat, 29 Nov 2014 12:29:22 +0100
 Subject: [RFC PATCH 3/5] KVM: ARM VGIC add kvm_io_bus_ frontend
 In-Reply-To: <20141124212658.10605.16215.stgit@i3820>
 References: <20141124212240.10605.46770.stgit@i3820>
  <20141124212658.10605.16215.stgit@i3820>
-Message-ID: <20141129112914.GD13623@macair>
+Message-ID: <20141129112922.GE13623@macair>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -146,7 +146,10 @@ On Mon, Nov 24, 2014 at 11:26:58PM +0200, Nikolay Nikolaev wrote:
 > +	unsigned long base = dist->vgic_dist_base;
 > +
 > +	dev = kzalloc(sizeof(struct kvm_io_device), GFP_KERNEL);
-
-when is this freed?
+> +	if (!dev)
+> +		return -ENOMEM;
+> +
+Do you even need a dynamic allocation here or can you just have it
+statically allocated as part of the kvm/vgic struct?
 
 -Christoffer
