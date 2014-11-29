@@ -1,46 +1,27 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Sat, 29 Nov 2014 10:48:23 +0100
-Subject: [PATCH] tty: serial: serial-omap: depend on !8250_omap
-In-Reply-To: <1417039306-2384-1-git-send-email-bigeasy@linutronix.de>
-References: <1417039306-2384-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20141129094823.GA10840@linutronix.de>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sat, 29 Nov 2014 11:41:02 +0100
+Subject: [PATCH] drm: i2c: tda998x: Retry fetching the EDID if it fails
+ first time.
+In-Reply-To: <54783A2F.5010405@arm.com>
+References: <546B84C6.3090809@arm.com> <20141128091905.3e491c39@armhf>
+ <54783A2F.5010405@arm.com>
+Message-ID: <20141129114102.02366857@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Andrzej Siewior | 2014-11-26 23:01:46 [+0100]:
+On Fri, 28 Nov 2014 09:02:39 +0000
+Andrew Jackson <Andrew.Jackson@arm.com> wrote:
 
->Technically speaking this is not required. If both are enabled then the
->Maikefile order says that 8250 one wins, the second is never probed.
->
->If we choose to enable 8250_omap via defconfig then one might get supprised
->that his console isn't working anymore since nothing says use ttySx
->instead ttyOx.
->This patch _tries_ to bring this to the users' attention by not showing
->the serial-omap driver once the 8250 one is enabled. So the user might
->choose to use the help text which says that this driver (8250_omap)
->uses ttySx instead ttyOx.
->
->Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
->---
->This is my attempt to warn the defconfig user of the defconfig change
->(which did not yet happen). Any suggestions?
+> > It seems that your patch is deprecated by Laurent Pinchart's
+> > 	[PATCH] drm: tda998x: Use drm_do_get_edid()
+> > http://lists.freedesktop.org/archives/dri-devel/2014-November/072906.html
+> >   
+> 
+> Thank you for the heads-up, I'd not seen that.  I'll consider how my patch might be modified to suit the new infrastructure.
 
-This is was Uwe Kleine-K?nig suggested off-list:
+You don't need any patch: drm_do_get_edid() already loops on reading
+the EDID.
 
-|Currently there are two drivers for the serial device. Until the new one
-|matured enough to drop the old one, let them conflict each other. They
-|both handle the same devices, but only one can be responsible for a
-|single device. There is no technical need, but having two drivers in the
-|same kernel might result in surprises.
-
-I personally don't mind having two drivers enabled since the makefile
-order is always the same. My main concern is the ttyOx -> ttySx switch
-after the newer driver is enabled by default via defconfig (and the user
-does not know it). "make oldconfig" is covered by "default n".
-Uwe's has a point about "matured enough to drop the old one". It isn't
-mentioned anywhere that the newer driver supports also DMA. Is this
-something we want to add to the help text?
-Could someone that will probably be dealling with possible fallout comment
-on this? This patch shouldn't go in without an ACK.
-
-Sebastian
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
