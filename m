@@ -1,32 +1,41 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Sat, 29 Nov 2014 21:14:12 +0100
-Subject: [PATCH v3 3/3] ARM: dts: socfpga: Add l3nic node
+Date: Sat, 29 Nov 2014 21:14:10 +0100
+Subject: [PATCH v3 1/3] Documentation: dt: add Altera L3 NIC bindings
 In-Reply-To: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
 References: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1417292052-12974-4-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1417292052-12974-2-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Documentation for the Altera L3 networked interconnect found on the
+SoCFPGA architecture.
+
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
- arch/arm/boot/dts/socfpga.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ .../devicetree/bindings/soc/socfpga/altr,l3-nic.txt       | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 4472fd92685c..e47b69c9f6cd 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -628,6 +628,11 @@
- 			arm,data-latency = <2 1 1>;
- 		};
- 
-+		l3regs: gpv at ff800000 {
-+			compatible = "altr,l3-nic";
-+			reg = <0xff800000 0x100000>;
-+		};
+diff --git a/Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt b/Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
+new file mode 100644
+index 000000000000..d9491f14eed3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
+@@ -0,0 +1,15 @@
++Altera SOCFPGA L3 Network Interconnect
++--------------------------------------
 +
- 		mmc: dwmmc0 at ff704000 {
- 			compatible = "altr,socfpga-dw-mshc";
- 			reg = <0xff704000 0x1000>;
++The L3 NIC provides access to Global Programmer View (GPV) registers for all
++AXI slaves and masters on the SoC.
++
++Required properties:
++- compatible : "altr,l3-nic"
++- reg : Should contain 1 register range (address and length)
++
++Example:
++	 gpv at ff800000 {
++		compatible = "altr,l3-nic";
++		reg = <0xff800000 0x100000>;
++	};
 -- 
 2.1.3
