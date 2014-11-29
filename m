@@ -1,118 +1,104 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 28 Nov 2014 23:57:49 +0000
-Subject: [PATCH v3 2/3] of: add optional options parameter to?
- of_find_node_by_path()
-In-Reply-To: <20141128163807.GN2361@bivouac.eciton.net>
-References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
- <1417110967-16284-3-git-send-email-leif.lindholm@linaro.org>
- <20141128004403.08D90C40A7F@trevor.secretlab.ca>
- <20141128113428.GM2361@bivouac.eciton.net>
- <20141128152512.2152EC40884@trevor.secretlab.ca>
- <20141128163807.GN2361@bivouac.eciton.net>
-Message-ID: <CACxGe6vsFOLSL+YXQNJcBZ_nEn9TxdWEe2JEjKw2-zBsEB4Rzw@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 29 Nov 2014 01:22:45 +0100
+Subject: [PATCH V3 1/3] PM / Domains: Initial PM clock support for genpd
+In-Reply-To: <1417163403-7070-2-git-send-email-ulf.hansson@linaro.org>
+References: <1417163403-7070-1-git-send-email-ulf.hansson@linaro.org>
+ <1417163403-7070-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <10683450.1AReCcVW08@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 4:38 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Fri, Nov 28, 2014 at 03:25:12PM +0000, Grant Likely wrote:
->> On Fri, 28 Nov 2014 11:34:28 +0000
->> , Leif Lindholm <leif.lindholm@linaro.org>
->>  wrote:
->> > On Fri, Nov 28, 2014 at 12:44:03AM +0000, Grant Likely wrote:
->> > > > +       separator = strchr(path, ':');
->> > > > +       if (separator && opts)
->> > > > +               *opts = separator + 1;
->> > > > +
->> > >
->> > > What about when there are no opts? Do we require the caller to make sure
->> > > opts is NULL before calling the function (which sounds like a good
->> > > source of bugs) or do we clear it on successful return?
->> > >
->> > > I think if opts is passed in, but there are no options, then it should
->> > > set *opts = NULL.
->> >
->> > Yeah, oops.
->> >
->> > > There should be test cases for this also. Must set opts to NULL on
->> > > successful return, and (I think) should leave opts alone on an
->> > > unsuccessful search.
->> >
->> > I would actually argue for always nuking the opts - since that could
->> > (theoretically) prevent something working by accident in spite of
->> > error conditions.
->> >
->> > How about the below?
->>
->> Perfect, applied with one fixup below...
->
-> Thanks!
-
-Fixups merged. Thanks.
-
-g.
-
->
-> And since it's Friday... *cough*
->
-> From 5c469dad81961164c444da7d6c4e1c5b1c097aab Mon Sep 17 00:00:00 2001
-> From: Leif Lindholm <leif.lindholm@linaro.org>
-> Date: Fri, 28 Nov 2014 16:27:25 +0000
-> Subject: [PATCH] of: fix options clearing when path is "/"
->
-> The addition of the optional options extraction on
-> of_find_node_opts_by_path failed to clear incoming options pointer
-> if the specified path was "/".
->
-> Resolve this case, and add a test to detect it.
->
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+On Friday, November 28, 2014 09:30:01 AM Ulf Hansson wrote:
+> It's quite common for PM domains to use PM clocks. Typically from SOC
+> specific code, the per device PM clock list is created and
+> pm_clk_suspend|resume() are invoked to handle clock gating/ungating.
+> 
+> A step towards consolidation is to integrate PM clock support into
+> genpd, which is what this patch does.
+> 
+> In this initial step, the calls to the pm_clk_suspend|resume() are
+> handled within genpd, but the per device PM clock list still needs to
+> be created from SOC specific code. It seems reasonable to have gendp to
+> handle that as well, but that left to future patches to address.
+> 
+> It's not every users of genpd that are keen on using PM clocks, thus we
+> need to provide this a configuration option for genpd. Therefore let's
+> add flag field in the genpd struct to keep this information and define
+> a new GENDP_PM_CLK bit for it.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > ---
->  drivers/of/base.c     |   11 ++++++-----
->  drivers/of/selftest.c |    5 +++++
->  2 files changed, 11 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 5e16c6b..32664d1 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -743,15 +743,16 @@ struct device_node *of_find_node_opts_by_path(const char *path, const char **opt
->         struct device_node *np = NULL;
->         struct property *pp;
->         unsigned long flags;
-> -       char *separator;
-> +       char *separator = NULL;
+> 
+> Changes in v3:
+> 	Moved define out of struct definition.
+> 	Don't use bitops.h
+> 	Rename define to GENDP_PM_CLK.
+> 	
+> Changes in v2:
+> 	Set ->start() callback to pm_clk_resume() and fixed comment.
+> 
+> ---
+>  drivers/base/power/domain.c | 7 +++++++
+>  include/linux/pm_domain.h   | 4 ++++
+>  2 files changed, 11 insertions(+)
+> 
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 735c473..a2424a7 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/pm_domain.h>
+>  #include <linux/pm_qos.h>
+> +#include <linux/pm_clock.h>
+>  #include <linux/slab.h>
+>  #include <linux/err.h>
+>  #include <linux/sched.h>
+> @@ -1928,6 +1929,12 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+>  	genpd->domain.ops.complete = pm_genpd_complete;
+>  	genpd->dev_ops.save_state = pm_genpd_default_save_state;
+>  	genpd->dev_ops.restore_state = pm_genpd_default_restore_state;
 > +
-> +       if (opts) {
-> +               separator = strchr(path, ':');
-> +               *opts = separator ? separator + 1 : NULL;
-> +       }
->
->         if (strcmp(path, "/") == 0)
->                 return of_node_get(of_allnodes);
->
-> -       separator = strchr(path, ':');
-> -       if (opts)
-> -               *opts = separator ? separator + 1 : NULL;
-> -
->         /* The path could begin with an alias */
->         if (*path != '/') {
->                 char *p = strchrnul(path, '/');
-> diff --git a/drivers/of/selftest.c b/drivers/of/selftest.c
-> index 721b2a4..914f0ae 100644
-> --- a/drivers/of/selftest.c
-> +++ b/drivers/of/selftest.c
-> @@ -100,6 +100,11 @@ static void __init of_selftest_find_node_by_name(void)
->         np = of_find_node_opts_by_path("testcase-alias", &options);
->         selftest(np && !options, "option clearing test failed\n");
->         of_node_put(np);
+> +	if (genpd->flags & GENPD_PM_CLK) {
+> +		genpd->dev_ops.stop = pm_clk_suspend;
+> +		genpd->dev_ops.start = pm_clk_resume;
+> +	}
 > +
-> +       options = "testoption";
-> +       np = of_find_node_opts_by_path("/", &options);
-> +       selftest(np && !options, "option clearing root node test failed\n");
-> +       of_node_put(np);
->  }
->
->  static void __init of_selftest_dynamic(void)
-> --
-> 1.7.10.4
->
+>  	mutex_lock(&gpd_list_lock);
+>  	list_add(&genpd->gpd_list_node, &gpd_list);
+>  	mutex_unlock(&gpd_list_lock);
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index 8cbd32e..173cc67 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -17,6 +17,9 @@
+>  #include <linux/notifier.h>
+>  #include <linux/cpuidle.h>
+>  
+> +/* Defines used for the flags field in the struct generic_pm_domain */
+> +#define GENPD_PM_CLK		(1U << 0) /* PM domain uses PM clk */
+
+I'd prefer GENPD_FLAG_PM_CLK to indicate in the name that this is, well, a flag.
+
+Otherwise it looks OK to me.
+
+If you want me to apply [2-3/3] too, ACKs from the ARM/shmobile maintainers
+are needed.
+
+> +
+>  enum gpd_status {
+>  	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
+>  	GPD_STATE_WAIT_MASTER,	/* PM domain's master is being waited for */
+> @@ -76,6 +79,7 @@ struct generic_pm_domain {
+>  			  struct device *dev);
+>  	void (*detach_dev)(struct generic_pm_domain *domain,
+>  			   struct device *dev);
+> +	unsigned int flags;		/* Bit field of configs for genpd */
+>  };
+>  
+>  static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
+> 
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
