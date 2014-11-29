@@ -1,85 +1,33 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 29 Nov 2014 17:20:45 +0100
+Date: Sat, 29 Nov 2014 17:20:53 +0100
 Subject: [PATCH 2/7] KVM: arm: guest debug, define API headers
-In-Reply-To: <1416931805-23223-3-git-send-email-alex.bennee@linaro.org>
+In-Reply-To: <87ppcaknpx.fsf@linaro.org>
 References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
  <1416931805-23223-3-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20141129162045.GC23653@cbox>
+ <CAFEAcA9P6aX+mh3rEMy=Z7SKF=kRrxgYefLwFcrk806QQpwiuQ@mail.gmail.com>
+ <87ppcaknpx.fsf@linaro.org>
+Message-ID: <20141129162053.GD23653@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 04:10:00PM +0000, Alex Benn?e wrote:
-> This commit defines the API headers for guest debugging. There are two
-> architecture specific debug structures:
+On Wed, Nov 26, 2014 at 03:04:10PM +0000, Alex Benn?e wrote:
 > 
->   - kvm_guest_debug_arch, allows us to pass in HW debug registers
->   - kvm_debug_exit_arch, signals the exact debug exit and address
+> Peter Maydell <peter.maydell@linaro.org> writes:
 > 
-> The type of debugging being used is control by the architecture specific
-s/control/controlled/ ?
-> control bits of the kvm_guest_debug->control flags in the ioctl
-> structure.
+> > On 25 November 2014 at 16:10, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> >> +/* Exit types which define why we did a debug exit */
+> >> +#define KVM_DEBUG_EXIT_ERROR           0x0
+> >> +#define KVM_DEBUG_EXIT_SINGLE_STEP     0x1
+> >> +#define KVM_DEBUG_EXIT_SW_BKPT         0x2
+> >> +#define KVM_DEBUG_EXIT_HW_BKPT         0x3
+> >> +#define KVM_DEBUG_EXIT_HW_WTPT         0x4
+> >
+> > The names of these imply that they're generic, but they're
+> > defined in an arch-specific header file...
 > 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 8e38878..de2450c 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -93,10 +93,30 @@ struct kvm_sregs {
->  struct kvm_fpu {
->  };
->  
-> +/* See ARM ARM D7.3: Debug Registers
+> Yeah, I think these will die and I'll just export the syndrome
+> information directly to QEMU.
 
-/* needs to go on a separate line.
+huh?
 
-> + *
-> + * The control registers are stored as 64bit values as the setup code
-> + * is shared with the normal cpu context restore code in hyp.S which
-> + * is 64 bit only.
-
-is this comment here because the architecture defines them as 32-bits?
-If so, adding that would make this comment make more sense.
-
-> + */
-> +#define KVM_ARM_NDBG_REGS 16
->  struct kvm_guest_debug_arch {
-> +	__u64 dbg_bcr[KVM_ARM_NDBG_REGS];
-> +	__u64 dbg_bvr[KVM_ARM_NDBG_REGS];
-> +	__u64 dbg_wcr[KVM_ARM_NDBG_REGS];
-> +	__u64 dbg_wvr[KVM_ARM_NDBG_REGS];
->  };
->  
-> +/* Exit types which define why we did a debug exit */
-> +#define KVM_DEBUG_EXIT_ERROR		0x0
-> +#define KVM_DEBUG_EXIT_SINGLE_STEP	0x1
-> +#define KVM_DEBUG_EXIT_SW_BKPT		0x2
-> +#define KVM_DEBUG_EXIT_HW_BKPT		0x3
-> +#define KVM_DEBUG_EXIT_HW_WTPT		0x4
-> +
->  struct kvm_debug_exit_arch {
-> +	__u64 address;
-> +	__u32 exit_type;
->  };
->  
->  struct kvm_sync_regs {
-> @@ -198,4 +218,12 @@ struct kvm_arch_memory_slot {
->  
->  #endif
->  
-> +/* Architecture related debug defines - upper 16 bits of
-
-same not with commenting style here
-
-> + * kvm_guest_debug->control
-> + */
-> +#define KVM_GUESTDBG_USE_SW_BP_SHIFT	16
-> +#define KVM_GUESTDBG_USE_SW_BP		(1 << KVM_GUESTDBG_USE_SW_BP_SHIFT)
-> +#define KVM_GUESTDBG_USE_HW_BP_SHIFT	17
-> +#define KVM_GUESTDBG_USE_HW_BP		(1 << KVM_GUESTDBG_USE_HW_BP_SHIFT)
-> +
->  #endif /* __ARM_KVM_H__ */
-> -- 
-> 2.1.3
-> 
+-Christoffer
