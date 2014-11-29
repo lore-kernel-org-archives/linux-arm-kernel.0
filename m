@@ -1,17 +1,16 @@
 From: n.nikolaev@virtualopensystems.com (Nikolay Nikolaev)
-Date: Sat, 29 Nov 2014 15:54:20 +0200
+Date: Sat, 29 Nov 2014 15:58:50 +0200
 Subject: [RFC PATCH 3/5] KVM: ARM VGIC add kvm_io_bus_ frontend
-In-Reply-To: <20141129112922.GE13623@macair>
+In-Reply-To: <54797244.4070707@huawei.com>
 References: <20141124212240.10605.46770.stgit@i3820>
  <20141124212658.10605.16215.stgit@i3820>
- <20141129112922.GE13623@macair>
-Message-ID: <CADDJ2=PkbiYjgfvPbiEDBOtx2qjNL=ejhhbFwidR3u18keGV4A@mail.gmail.com>
+ <54797244.4070707@huawei.com>
+Message-ID: <CADDJ2=OLgHhNwLrswfHAVYhh+4FEAxN=B5y4UFJahWkkkni4Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 29, 2014 at 1:29 PM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Mon, Nov 24, 2014 at 11:26:58PM +0200, Nikolay Nikolaev wrote:
+On Sat, Nov 29, 2014 at 9:14 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> On 2014/11/25 5:26, Nikolay Nikolaev wrote:
 >> In io_mem_abort remove the call to vgic_handle_mmio. The target is to have
 >> a single MMIO handling path - that is through the kvm_io_bus_ API.
 >>
@@ -152,11 +151,54 @@ On Sat, Nov 29, 2014 at 1:29 PM, Christoffer Dall
 >> +     if (!dev)
 >> +             return -ENOMEM;
 >> +
-> Do you even need a dynamic allocation here or can you just have it
-> statically allocated as part of the kvm/vgic struct?
-Right - static allocation should be just fine - will do
-Thanks
-Nikolay Nikolaev
+>> +     kvm_iodevice_init(dev, &vgic_io_dev_ops);
+>> +
+>> +     mutex_lock(&kvm->slots_lock);
+>> +
+>> +     ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
+>> +                     base, KVM_VGIC_V2_DIST_SIZE, dev);
+>
+> Should we consider GICv3? I think if applying this patch, it can not run well while creating a vGICv3 for guest.
+Agree. Christofer also pointed this out. Will select the dist size
+depending on the vgic_model.
+
+Thanks.
+Nikolay Nikolay
 
 >
-> -Christoffer
+> Thanks,
+> Shannon
+>> +     if (ret < 0)
+>> +             goto out_free_dev;
+>> +     mutex_unlock(&kvm->slots_lock);
+>> +
+>> +     kvm->arch.vgic.io_dev = dev;
+>> +
+>> +     return 0;
+>> +
+>> +out_free_dev:
+>> +     mutex_unlock(&kvm->slots_lock);
+>> +     kfree(dev);
+>> +     return ret;
+>>  }
+>>
+>>  static int vgic_nr_shared_irqs(struct vgic_dist *dist)
+>> @@ -1545,6 +1601,8 @@ int kvm_vgic_init(struct kvm *kvm)
+>>
+>>       mutex_lock(&kvm->lock);
+>>
+>> +     vgic_register_kvm_io_dev(kvm);
+>> +
+>>       if (vgic_initialized(kvm))
+>>               goto out;
+>>
+>>
+>> _______________________________________________
+>> kvmarm mailing list
+>> kvmarm at lists.cs.columbia.edu
+>> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+>>
+>> .
+>>
+>
+>
