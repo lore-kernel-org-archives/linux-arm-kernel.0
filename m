@@ -1,30 +1,44 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Sat, 29 Nov 2014 19:31:36 +0100
-Subject: [PATCH] drivers: kconfig: fix double include
-Message-ID: <1417285896-8587-1-git-send-email-s.trumtrar@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 29 Nov 2014 19:54:08 +0100
+Subject: [PATCH] net: hisilicon: unmap IO resources when cleanup
+In-Reply-To: <5479345A.20408@gmail.com>
+References: <1417225690-135860-1-git-send-email-shengyong1@huawei.com>
+ <5479345A.20408@gmail.com>
+Message-ID: <4355983.Q40FtqNjx8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/Kconfig sources drivers/soc/Kconfig twice.
-Remove the last include.
+On Saturday 29 November 2014 10:50:02 Orson Zhai wrote:
+> On 2014?11?29? 09:48, Sheng Yong wrote:
+> > Unmap IO resources if the driver initailization failed or the driver is
+> > unmounted.
+> >
+> > Signed-off-by: Sheng Yong <shengyong1@huawei.com>
+> > ---
+> >   drivers/net/ethernet/hisilicon/hix5hd2_gmac.c | 14 ++++++++++----
+> >   1 file changed, 10 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/drivers/net/ethernet/hisilicon/hix5hd2_gmac.c b/drivers/net/ethernet/hisilicon/hix5hd2_gmac.c
+> > index 0ffdcd3..3399ce6 100644
+> > --- a/drivers/net/ethernet/hisilicon/hix5hd2_gmac.c
+> > +++ b/drivers/net/ethernet/hisilicon/hix5hd2_gmac.c
+> > @@ -917,26 +917,26 @@ static int hix5hd2_dev_probe(struct platform_device *pdev)
+> >       priv->ctrl_base = devm_ioremap_resource(dev, res);
+> >       if (IS_ERR(priv->ctrl_base)) {
+> >               ret = PTR_ERR(priv->ctrl_base);
+> > -             goto out_free_netdev;
+> > +             goto out_base;
+> As i know we don't need to do anything but return error code from probe 
+> when using devm_xxx for getting resource.
+> What's the idea to io-unmap explicitly here?
+> 
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- drivers/Kconfig | 2 --
- 1 file changed, 2 deletions(-)
+I think it's actually a bug to pair devm_ioremap() with iounmap,
+since the iounmap will be done twice then, and that causes
+undefined behavior.
 
-diff --git a/drivers/Kconfig b/drivers/Kconfig
-index 694d5a70d6ce..2683e633c027 100644
---- a/drivers/Kconfig
-+++ b/drivers/Kconfig
-@@ -150,8 +150,6 @@ source "drivers/remoteproc/Kconfig"
- 
- source "drivers/rpmsg/Kconfig"
- 
--source "drivers/soc/Kconfig"
--
- source "drivers/devfreq/Kconfig"
- 
- source "drivers/extcon/Kconfig"
--- 
-2.1.3
+In cases where you have to unmap something explicitly, devm_iounmap
+should be used, but in this case the patch seems entirely wrong,
+the code without the patch looks correct.
+
+	Arnd
