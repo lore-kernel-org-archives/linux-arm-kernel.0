@@ -1,63 +1,253 @@
-From: jonathar@broadcom.com (Jonathan Richardson)
-Date: Wed, 31 Dec 2014 16:55:29 -0800
-Subject: [PATCH v2 1/2] Input: touchscreen-iproc: Add Broadcom iProc
- touchscreen driver
-In-Reply-To: <5494AEB8.8060606@broadcom.com>
-References: <Jonathan Richardson <jonathar@broadcom.com>
- <1419027470-7969-1-git-send-email-jonathar@broadcom.com>
- <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
- <1419028015.25129.14.camel@perches.com> <5494AEB8.8060606@broadcom.com>
-Message-ID: <54A49B01.6020002@broadcom.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 01 Dec 2014 00:00:21 +0200
+Subject: [PATCH 1/4] iommu: introduce generic page table allocation
+ framework
+In-Reply-To: <1417089078-22900-2-git-send-email-will.deacon@arm.com>
+References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
+ <1417089078-22900-2-git-send-email-will.deacon@arm.com>
+Message-ID: <3337836.UezZ1Klsom@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Will,
 
-Would anyone be able to look at this to help us move forward? Thanks.
+Thank you for the patch.
 
-On 14-12-19 03:03 PM, Jonathan Richardson wrote:
-> On 14-12-19 02:26 PM, Joe Perches wrote:
->> On Fri, 2014-12-19 at 14:17 -0800, Jonathan Richardson wrote:
->>> Add initial version of the Broadcom touchscreen driver.
->>
->> more trivia:
->>
->>> diff --git a/drivers/input/touchscreen/bcm_iproc_tsc.c b/drivers/input/touchscreen/bcm_iproc_tsc.c
->> []
->>> +static int get_tsc_config(struct device_node *np, struct iproc_ts_priv *priv)
->>> +{
->>> +	u32 val;
->> []
->>> +	if (of_property_read_u32(np, "debounce_timeout", &val) >= 0) {
->>> +		if (val < 0 || val > 255) {
->>> +			dev_err(dev, "debounce_timeout must be [0-255]\n");
->>> +			return -EINVAL;
->>> +		}
->>> +		priv->cfg_params.debounce_timeout = val;
->>
->> Doesn't the compiler generate a warning message
->> about an impossible "unsigned < 0" test for all
->> of these "val < 0" uses?
->>
+On Thursday 27 November 2014 11:51:15 Will Deacon wrote:
+> This patch introduces a generic framework for allocating page tables for
+> an IOMMU. There are a number of reasons we want to do this:
 > 
-> Actually no it doesn't. The gcc output shows that neither -Wtype-limits
-> nor -Wextra are used to compile that file. I assume this is because
-> there would be just too many warnings.
+>   - It avoids duplication of complex table management code in IOMMU
+>     drivers that use the same page table format
 > 
+>   - It removes any coupling with the CPU table format (and even the
+>     architecture!)
 > 
->>> +	}
->>> +
->>> +	if (of_property_read_u32(np, "settling_timeout", &val) >= 0) {
->>> +		if (val < 0 || val > 11) {
->> []
->>> +	if (of_property_read_u32(np, "touch_timeout", &val) >= 0) {
->>> +		if (val < 0 || val > 255) {
->> []
->>> +	if (of_property_read_u32(np, "average_data", &val) >= 0) {
->>> +		if (val < 0 || val > 8) {
->> []
->>> +	if (of_property_read_u32(np, "fifo_threshold", &val) >= 0) {
->>> +		if (val < 0 || val > 31) {
->>
->>
+>   - It defines an API for IOMMU TLB maintenance
 > 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/Kconfig      |  8 ++++++
+>  drivers/iommu/Makefile     |  1 +
+>  drivers/iommu/io-pgtable.c | 71 +++++++++++++++++++++++++++++++++++++++++++
+>  drivers/iommu/io-pgtable.h | 65 ++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 145 insertions(+)
+>  create mode 100644 drivers/iommu/io-pgtable.c
+>  create mode 100644 drivers/iommu/io-pgtable.h
+> 
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index dd5112265cc9..0f10554e7114 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -13,6 +13,14 @@ menuconfig IOMMU_SUPPORT
+> 
+>  if IOMMU_SUPPORT
+> 
+> +menu "Generic IOMMU Pagetable Support"
+> +
+> +# Selected by the actual pagetable implementations
+> +config IOMMU_IO_PGTABLE
+> +	bool
+> +
+> +endmenu
+> +
+>  config OF_IOMMU
+>         def_bool y
+>         depends on OF
+> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+> index 16edef74b8ee..aff244c78181 100644
+> --- a/drivers/iommu/Makefile
+> +++ b/drivers/iommu/Makefile
+> @@ -1,6 +1,7 @@
+>  obj-$(CONFIG_IOMMU_API) += iommu.o
+>  obj-$(CONFIG_IOMMU_API) += iommu-traces.o
+>  obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
+> +obj-$(CONFIG_IOMMU_IO_PGTABLE) += io-pgtable.o
+>  obj-$(CONFIG_OF_IOMMU)	+= of_iommu.o
+>  obj-$(CONFIG_MSM_IOMMU) += msm_iommu.o msm_iommu_dev.o
+>  obj-$(CONFIG_AMD_IOMMU) += amd_iommu.o amd_iommu_init.o
+> diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
+> new file mode 100644
+> index 000000000000..82e39a0db94b
+> --- /dev/null
+> +++ b/drivers/iommu/io-pgtable.c
+> @@ -0,0 +1,71 @@
+> +/*
+> + * Generic page table allocator for IOMMUs.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307,
+> USA. + *
+> + * Copyright (C) 2014 ARM Limited
+> + *
+> + * Author: Will Deacon <will.deacon@arm.com>
+> + */
+> +
+> +#include <linux/bug.h>
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +
+> +#include "io-pgtable.h"
+> +
+> +static struct io_pgtable_init_fns
+
+Any reason not to make the table const ?
+
+> *io_pgtable_init_table[IO_PGTABLE_NUM_FMTS] =
+> +{
+> +};
+> +
+> +struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
+> +					    struct io_pgtable_cfg *cfg,
+> +					    void *cookie)
+> +{
+> +	struct io_pgtable *iop;
+> +	struct io_pgtable_init_fns *fns;
+> +
+> +	if (fmt >= IO_PGTABLE_NUM_FMTS)
+> +		return NULL;
+> +
+> +	fns = io_pgtable_init_table[fmt];
+> +	if (!fns)
+> +		return NULL;
+> +
+> +	iop = fns->alloc(cfg, cookie);
+> +	if (!iop)
+> +		return NULL;
+> +
+> +	iop->fmt	= fmt;
+> +	iop->cookie	= cookie;
+> +	iop->cfg	= *cfg;
+> +
+> +	return &iop->ops;
+> +}
+> +
+> +/*
+> + * It is the IOMMU driver's responsibility to ensure that the page table
+> + * is no longer accessible to the walker by this point.
+> + */
+> +void free_io_pgtable_ops(struct io_pgtable_ops *ops)
+> +{
+> +	struct io_pgtable *iop;
+> +
+> +	if (!ops)
+> +		return;
+> +
+> +	iop = container_of(ops, struct io_pgtable, ops);
+> +	iop->cfg.tlb->tlb_flush_all(iop->cookie);
+> +	io_pgtable_init_table[iop->fmt]->free(iop);
+> +}
+> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+> new file mode 100644
+> index 000000000000..5ae75d9cae50
+> --- /dev/null
+> +++ b/drivers/iommu/io-pgtable.h
+> @@ -0,0 +1,65 @@
+> +#ifndef __IO_PGTABLE_H
+> +#define __IO_PGTABLE_H
+> +
+> +struct io_pgtable_ops {
+> +	int (*map)(struct io_pgtable_ops *ops, unsigned long iova,
+
+How about passing a struct io_pgtable * instead of the ops pointer ? This 
+would require returning a struct io_pgtable from the alloc function, which I 
+suppose you didn't want to do to ensure the caller will not touch the struct 
+io_pgtable fields directly. Do we really need to go that far, or can we simply 
+document struct io_pgtable as being private to the pg alloc framework core and 
+allocators ? Someone who really wants to get hold of the io_pgtable instance 
+could use container_of on the ops anyway, like the allocators do.
+
+> +		   phys_addr_t paddr, size_t size, int prot);
+> +	int (*unmap)(struct io_pgtable_ops *ops, unsigned long iova,
+> +		     size_t size);
+> +	phys_addr_t (*iova_to_phys)(struct io_pgtable_ops *ops,
+> +				    unsigned long iova);
+> +};
+> +
+> +struct iommu_gather_ops {
+> +	/* Synchronously invalidate the entire TLB context */
+> +	void (*tlb_flush_all)(void *cookie);
+> +
+> +	/* Queue up a TLB invalidation for a virtual address range */
+> +	void (*tlb_add_flush)(unsigned long iova, size_t size, bool leaf,
+> +			      void *cookie);
+
+Is there a limit to the number of entries that can be queued, or any other 
+kind of restriction ? Implementing a completely generic TLB flush queue can 
+become complex for IOMMU drivers.
+
+I would also document in which context(s) this callback will be called, as 
+IOMMU drivers might be tempted to allocate memory in order to implement a TLB 
+flush queue.
+
+> +	/* Ensure any queued TLB invalidation has taken effect */
+> +	void (*tlb_sync)(void *cookie);
+> +
+> +	/* Ensure page tables updates are visible to the IOMMU */
+> +	void (*flush_pgtable)(void *ptr, size_t size, void *cookie);
+> +};
+
+I suppose kerneldoc will come in the next version ;-)
+
+> +struct io_pgtable_cfg {
+> +	int			quirks; /* IO_PGTABLE_QUIRK_* */
+> +	unsigned long		pgsize_bitmap;
+> +	unsigned int		ias;
+> +	unsigned int		oas;
+> +	struct iommu_gather_ops	*tlb;
+> +
+> +	/* Low-level data specific to the table format */
+> +	union {
+> +	};
+> +};
+> +
+> +enum io_pgtable_fmt {
+> +	IO_PGTABLE_NUM_FMTS,
+> +};
+> +
+> +struct io_pgtable {
+> +	enum io_pgtable_fmt	fmt;
+> +	void			*cookie;
+> +	struct io_pgtable_cfg	cfg;
+> +	struct io_pgtable_ops	ops;
+
+This could be turned into a const pointer if we pass struct io_pgtable around 
+instead of the ops.
+
+> +};
+> +
+> +struct io_pgtable_init_fns {
+> +	struct io_pgtable *(*alloc)(struct io_pgtable_cfg *cfg, void *cookie);
+> +	void (*free)(struct io_pgtable *iop);
+> +};
+
+I would reorder structures into two groups, one clearly marked as private that 
+shouldn't be touched by IOMMU drivers, and then the io_pgtable_fmt enum and 
+the io_pgtable_cfg struct grouped with the two functions below.
+
+> +struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
+> +					    struct io_pgtable_cfg *cfg,
+> +					    void *cookie);
+> +
+> +/*
+> + * Free an io_pgtable_ops structure. The caller *must* ensure that the
+> + * page table is no longer live, but the TLB can be dirty.
+> + */
+> +void free_io_pgtable_ops(struct io_pgtable_ops *ops);
+> +
+> +#endif /* __IO_PGTABLE_H */
+
+-- 
+Regards,
+
+Laurent Pinchart
