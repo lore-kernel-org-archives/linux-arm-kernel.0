@@ -1,20 +1,23 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun, 30 Nov 2014 17:59:26 +0100
-Subject: [PATCH 0/8] replace memset by memzero_explicit
-Message-ID: <1417366774-32412-1-git-send-email-Julia.Lawall@lip6.fr>
+Date: Sun, 30 Nov 2014 17:59:33 +0100
+Subject: [PATCH 7/8] crypto: replace memset by memzero_explicit
+In-Reply-To: <1417366774-32412-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1417366774-32412-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1417366774-32412-8-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Julia Lawall <julia@diku.dk>
+
 Memset on a local variable may be removed when it is called just before the
 variable goes out of scope.  Using memzero_explicit defeats this
-optimization.  The complete semantic patch that makes this change is as
-follows: (http://coccinelle.lip6.fr/)
+optimization.  A simplified version of the semantic patch that makes this
+change is as follows: (http://coccinelle.lip6.fr/)
 
 // <smpl>
 @@
 identifier x;
-local idexpression e;
-type T,T1;
+type T;
 @@
 
 {
@@ -22,89 +25,39 @@ type T,T1;
 T x[...];
 ... when any
     when exists
-(
-e = (T1)x
-|
-e = (T1)&x[0]
-)
-... when any
-    when exists
 - memset
 + memzero_explicit
   (x,
--0,
-  ...)
-... when != x
-    when != e
-    when strict
-}
-
-@@
-identifier i,x;
-local idexpression e;
-type T;
-@@
-
-{
-... when any
-struct i x;
-... when any
-    when exists
-e = (T)&x
-... when any
-    when exists
-- memset
-+ memzero_explicit
-  (&x,
--0,
-  ...)
-... when != x
-    when != e
-    when strict
-}
-
-// ------------------------------------------------------------------------
-
-@@
-identifier x;
-type T,T1;
-expression e;
-@@
-
-{
-... when any
-T x[...];
-... when any
-    when exists
-    when != e = (T1)x
-    when != e = (T1)&x[0]
-- memset
-+ memzero_explicit
-  (x,
--0,
-  ...)
-... when != x
-    when strict
-}
-
-@@
-identifier i,x;
-expression e;
-type T;
-@@
-
-{
-... when any
-struct i x;
-... when any
-    when exists
-    when != e = (T)&x
-- memset
-+ memzero_explicit
-  (&x,
 -0,
   ...)
 ... when != x
     when strict
 }
 // </smpl>
+
+This change was suggested by Daniel Borkmann <dborkman@redhat.com>
+
+Signed-off-by: Julia Lawall <julia@diku.dk>
+
+---
+Daniel Borkmann suggested that these patches could go through Herbert Xu's
+cryptodev tree.
+
+I was not able to compile test this one.
+
+ arch/arm/crypto/sha512_neon_glue.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/crypto/sha512_neon_glue.c b/arch/arm/crypto/sha512_neon_glue.c
+index f3452c6..b124dce 100644
+--- a/arch/arm/crypto/sha512_neon_glue.c
++++ b/arch/arm/crypto/sha512_neon_glue.c
+@@ -241,7 +241,7 @@ static int sha384_neon_final(struct shash_desc *desc, u8 *hash)
+ 	sha512_neon_final(desc, D);
+ 
+ 	memcpy(hash, D, SHA384_DIGEST_SIZE);
+-	memset(D, 0, SHA512_DIGEST_SIZE);
++	memzero_explicit(D, SHA512_DIGEST_SIZE);
+ 
+ 	return 0;
+ }
