@@ -1,74 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 30 Nov 2014 22:54:51 +0800
-Subject: [PATCH] ARM: defconfig: imx_v6_v7_defconfig updates
-In-Reply-To: <1416614103-21237-1-git-send-email-shawn.guo@linaro.org>
-References: <1416614103-21237-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20141130145447.GA2411@dragon>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sun, 30 Nov 2014 23:39:26 +0800
+Subject: [PATCH v5 1/3] mtd: nand: gpmi: add gpmi_move_bits function
+In-Reply-To: <20141130095500.16f75e05@bbrezillon>
+References: <1417020793-3354-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1417020793-3354-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20141126175708.1acb90ac@bbrezillon>
+ <20141130081110.GC3608@norris-Latitude-E6410>
+ <20141130095500.16f75e05@bbrezillon>
+Message-ID: <20141130153918.GA14834@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Sun, Nov 30, 2014 at 09:55:00AM +0100, Boris Brezillon wrote:
+> Hi Brian,
+> 
+> On Sun, 30 Nov 2014 00:11:10 -0800
+> Brian Norris <computersforpeace@gmail.com> wrote:
+> 
+> > On Wed, Nov 26, 2014 at 05:57:08PM +0100, Boris Brezillon wrote:
+> > > On Wed, 26 Nov 2014 17:53:11 +0100 Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> > > > +/**
+> > > > + * gpmi_move_bits - move bits from one memory region to another
+> > > > + * @dst: destination buffer
+> > > > + * @dst_bit_off: bit offset we're starting to write at
+> > > > + * @src: source buffer
+> > > > + * @src_bit_off: bit offset we're starting to read from
+> > > > + * @nbits: number of bits to copy
+> > > > + *
+> > > > + * This functions copies bits from one memory region to another, and is used by
+> > > > + * the GPMI driver to copy ECC sections which are not guaranteed to be byte
+> > > > + * aligned.
+> > > 
+> > > I forgot to add that src and dst should not overlap, otherwise it won't
+> > > work...
+> > 
+> > Hmm, normally that's implied for copy-like operations. But since you
+> > named this function "move" (rather than "copy" or "cpy"), that's a
+> > little less clear.
+> 
+> Indeed, that's a good point.
+> 
+> > 
+> > Did you have a good reason for the "move" name? If not, maybe it's worth
+> > changing.
+> 
+> No, I don't, and I'd prefer changing the name than implementing a non
+> destructive move function.
+> 
+> I'll send a new version with this change.
+Please add my tested-by.
 
-On Sat, Nov 22, 2014 at 07:55:03AM +0800, Shawn Guo wrote:
-> From: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
-> 
-> This is a squash of several imx_v6_v7_defconfig update patches.
-> 
->  - Enable tlv320aic3x audio codec by default (Phytec PBAB01 board)
->  - Enable DS1307 rtc and gpio fan by default (TBS2910 board)
->  - Select thermal related drivers
->  - Add SNVS power off driver
-> 
-> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
-> Signed-off-by: Soeren Moch <smoch@web.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> Signed-off-by: Robin Gong <b38343@freescale.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-
-I haven't found this patch on arm-soc next/defconfig branch.  Can you
-please apply it?  Thanks.
-
-Shawn
-
-> ---
->  arch/arm/configs/imx_v6_v7_defconfig | 10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index 8fca6e276b69..c7b8fba8654b 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -162,7 +162,13 @@ CONFIG_SPI_IMX=y
->  CONFIG_GPIO_SYSFS=y
->  CONFIG_GPIO_MC9S08DZ60=y
->  CONFIG_GPIO_STMPE=y
-> -# CONFIG_HWMON is not set
-> +CONFIG_SENSORS_GPIO_FAN=y
-> +CONFIG_THERMAL=y
-> +CONFIG_CPU_THERMAL=y
-> +CONFIG_IMX_THERMAL=y
-> +CONFIG_POWER_SUPPLY=y
-> +CONFIG_POWER_RESET=y
-> +CONFIG_POWER_RESET_IMX=y
->  CONFIG_WATCHDOG=y
->  CONFIG_IMX2_WDT=y
->  CONFIG_MFD_DA9052_I2C=y
-> @@ -210,6 +216,7 @@ CONFIG_SND_SOC_IMX_WM8962=y
->  CONFIG_SND_SOC_IMX_SGTL5000=y
->  CONFIG_SND_SOC_IMX_SPDIF=y
->  CONFIG_SND_SOC_IMX_MC13783=y
-> +CONFIG_SND_SOC_TLV320AIC3X=y
->  CONFIG_SND_SIMPLE_CARD=y
->  CONFIG_USB=y
->  CONFIG_USB_EHCI_HCD=y
-> @@ -238,6 +245,7 @@ CONFIG_LEDS_TRIGGER_BACKLIGHT=y
->  CONFIG_LEDS_TRIGGER_GPIO=y
->  CONFIG_RTC_CLASS=y
->  CONFIG_RTC_INTF_DEV_UIE_EMUL=y
-> +CONFIG_RTC_DRV_DS1307=y
->  CONFIG_RTC_DRV_ISL1208=y
->  CONFIG_RTC_DRV_PCF8563=y
->  CONFIG_RTC_DRV_MC13XXX=y
-> -- 
-> 1.9.1
-> 
+Tested-by: Huang Shijie <shijie8@gmail.com>
