@@ -1,60 +1,50 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 30 Nov 2014 13:14:02 +0100
-Subject: [PATCH v3 2/8] KVM: arm64: Enable the KVM-VFIO device
-In-Reply-To: <1416767760-14487-3-git-send-email-eric.auger@linaro.org>
-References: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
- <1416767760-14487-3-git-send-email-eric.auger@linaro.org>
-Message-ID: <20141130121402.GC82106@macair>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 30 Nov 2014 21:19:44 +0900
+Subject: [PATCH v2 3/5] pinctrl: exynos: Fix GPIO setup failure because
+ domain clock being gated
+In-Reply-To: <1417183724.18249.36.camel@AMDC1943>
+References: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
+ <1417011857-10419-4-git-send-email-k.kozlowski@samsung.com>
+ <CACRpkdb8F8YcvFeHPvOKHjx_p4HEpimck3XRabB3oHpZTdmRQQ@mail.gmail.com>
+ <1417183724.18249.36.camel@AMDC1943>
+Message-ID: <CA+Ln22Ejo51VPWf6DmuRvV_fZr_H=-BXAshSPSOokNE1bz=-QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 23, 2014 at 07:35:54PM +0100, Eric Auger wrote:
-> Used by KVM-enabled VFIO-based device passthrough support in QEMU.
-> 
-> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> 
-> ---
-> 
-> Extracted from [RFC PATCH] arm64: KVM: add irqfd support
-> http://www.spinics.net/lists/kvm-arm/msg10798.html
-> ---
->  arch/arm64/kvm/Kconfig  | 1 +
->  arch/arm64/kvm/Makefile | 2 +-
->  2 files changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-> index 09c25c2..2edf926 100644
-> --- a/arch/arm64/kvm/Kconfig
-> +++ b/arch/arm64/kvm/Kconfig
-> @@ -26,6 +26,7 @@ config KVM
->  	select KVM_ARM_HOST
->  	select KVM_ARM_VGIC
->  	select KVM_ARM_TIMER
-> +	select KVM_VFIO
->  	select HAVE_KVM_EVENTFD
->  	---help---
->  	  Support hosting virtualized guest machines.
-> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> index 2e6b827..81ed091 100644
-> --- a/arch/arm64/kvm/Makefile
-> +++ b/arch/arm64/kvm/Makefile
-> @@ -11,7 +11,7 @@ ARM=../../../arch/arm/kvm
->  
->  obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
->  
-> -kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
-> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
->  
-> -- 
-> 1.9.1
-> 
+Hi Krzysztof,
 
-Should these patches not be squashed into one?
+2014-11-28 23:08 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> On pi?, 2014-11-28 at 15:04 +0100, Linus Walleij wrote:
+>> On Wed, Nov 26, 2014 at 3:24 PM, Krzysztof Kozlowski
+>> <k.kozlowski@samsung.com> wrote:
+>>
+>> > The audio subsystem on Exynos 5420 has separate clocks and GPIO. To
+>> > operate properly on GPIOs the main block clock 'mau_epll' must be
+>> > enabled.
+>> >
+>> > This was observed on Peach Pi/Pit and Arndale Octa (after enabling i2s0)
+>> > after introducing runtime PM to pl330 DMA driver. After that commit the
+>> > 'mau_epll' was gated, because the "amba" clock was disabled and there
+>> > were no more users of mau_epll.
+>> >
+>> > The system hang just before probing i2s0 because
+>> > samsung_pinmux_setup() tried to access memory from audss block which was
+>> > gated.
+>> >
+>> > Add a clock property to the pinctrl driver and enable the clock during
+>> > GPIO setup. During normal GPIO operations (set, get, set_direction) the
+>> > clock is not enabled.
 
-Also, what do they enable at this point?  Should they be queued by the
-end of the series instead?
+Could you make sure that possibility of gating this clock is worth the
+effort of adding gating code to all affected drivers? If there is no
+significant change in power consumption maybe it could be simply keep
+running all the time?
 
--Christoffer
+Also isn't a similar problem happening due to power domains? I believe
+the whole maudio block is located in a separate power domain but
+somehow it doesn't get turned off?
+
+Could you investigate the above, please?
+
+Best regards,
+Tomasz
