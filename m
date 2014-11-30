@@ -1,50 +1,138 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 30 Nov 2014 21:19:44 +0900
-Subject: [PATCH v2 3/5] pinctrl: exynos: Fix GPIO setup failure because
- domain clock being gated
-In-Reply-To: <1417183724.18249.36.camel@AMDC1943>
-References: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
- <1417011857-10419-4-git-send-email-k.kozlowski@samsung.com>
- <CACRpkdb8F8YcvFeHPvOKHjx_p4HEpimck3XRabB3oHpZTdmRQQ@mail.gmail.com>
- <1417183724.18249.36.camel@AMDC1943>
-Message-ID: <CA+Ln22Ejo51VPWf6DmuRvV_fZr_H=-BXAshSPSOokNE1bz=-QA@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Sun, 30 Nov 2014 13:37:43 +0100
+Subject: [PATCH] irqdomain: Correct early allocation of irq domains with IRQs
+ off
+In-Reply-To: <alpine.DEB.2.11.1411292112390.3961@nanos>
+References: <alpine.DEB.2.11.1411292112390.3961@nanos>
+Message-ID: <1417351063-19039-1-git-send-email-bp@alien8.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+From: Borislav Petkov <bp@suse.de>
 
-2014-11-28 23:08 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> On pi?, 2014-11-28 at 15:04 +0100, Linus Walleij wrote:
->> On Wed, Nov 26, 2014 at 3:24 PM, Krzysztof Kozlowski
->> <k.kozlowski@samsung.com> wrote:
->>
->> > The audio subsystem on Exynos 5420 has separate clocks and GPIO. To
->> > operate properly on GPIOs the main block clock 'mau_epll' must be
->> > enabled.
->> >
->> > This was observed on Peach Pi/Pit and Arndale Octa (after enabling i2s0)
->> > after introducing runtime PM to pl330 DMA driver. After that commit the
->> > 'mau_epll' was gated, because the "amba" clock was disabled and there
->> > were no more users of mau_epll.
->> >
->> > The system hang just before probing i2s0 because
->> > samsung_pinmux_setup() tried to access memory from audss block which was
->> > gated.
->> >
->> > Add a clock property to the pinctrl driver and enable the clock during
->> > GPIO setup. During normal GPIO operations (set, get, set_direction) the
->> > clock is not enabled.
+I'm seeing the following lockdep splat on an x2APIC machine with
+interrupts remapping. The problem is that enable_IR_x2apic() disables
+interrupts before doing any further initialization. However, after
+having moved to irq domains, domain allocation cannot happen with
+interrupts disabled (GFP_KERNEL).
 
-Could you make sure that possibility of gating this clock is worth the
-effort of adding gating code to all affected drivers? If there is no
-significant change in power consumption maybe it could be simply keep
-running all the time?
+A proper fix would be to move that initialization to the early irq setup
+path, which is something for another day. It is more involved work too.
 
-Also isn't a similar problem happening due to power domains? I believe
-the whole maudio block is located in a separate power domain but
-somehow it doesn't get turned off?
+So do a temporary fix which should not encourage the behaviour of even
+assuming the irq domains code should be called with interrupts disabled.
+Make it x86-only too.
 
-Could you investigate the above, please?
+...
+dmar: Host address width 36
+dmar: DRHD base: 0x000000fed90000 flags: 0x0
+dmar: IOMMU 0: reg_base_addr fed90000 ver 1:0 cap c0000020e60262 ecap f0101a
+dmar: DRHD base: 0x000000fed91000 flags: 0x1
+dmar: IOMMU 1: reg_base_addr fed91000 ver 1:0 cap c9008020660262 ecap f0105a
+dmar: RMRR base: 0x000000da2ba000 end: 0x000000da2d0fff
+dmar: RMRR base: 0x000000db800000 end: 0x000000df9fffff
+IOAPIC id 2 under DRHD base  0xfed91000 IOMMU 1
+HPET id 0 under DRHD base 0xfed91000
+Queued invalidation will be enabled to support x2apic and Intr-remapping.
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1 at kernel/locking/lockdep.c:2744 lockdep_trace_alloc+0xd4/0xe0()
+DEBUG_LOCKS_WARN_ON(irqs_disabled_flags(flags))
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.18.0-rc6+ #1
+Hardware name: LENOVO 2320CTO/2320CTO, BIOS G2ET86WW (2.06 ) 11/13/2012
+ 0000000000000009 ffff880213d07b58 ffffffff816502d7 0000000000000000
+ ffff880213d07ba8 ffff880213d07b98 ffffffff81059790 0000000000000001
+ 0000000000000092 0000000000000000 00000000000080d0 0000000000000000
+Call Trace:
+ dump_stack
+ warn_slowpath_common
+ warn_slowpath_fmt
+ lockdep_trace_alloc
+ __alloc_pages_nodemask
+ ? get_page_from_freelist
+ ? trace_hardirqs_off_caller
+ alloc_kmem_pages_node
+ kmalloc_large_node
+ __kmalloc_node
+ ? __dmar_enable_qi
+ __irq_domain_add
+ irq_domain_add_hierarchy
+ intel_setup_irq_remapping.part.4
+ intel_enable_irq_remapping
+ irq_remapping_enable
+ enable_IR
+ enable_IR_x2apic
+ default_setup_apic_routing
+ native_smp_prepare_cpus
+ kernel_init_freeable
+ ? ret_from_fork
+ ? rest_init
+ kernel_init
+ ret_from_fork
+ ? rest_init
+---[ end trace fac50e785fc22942 ]---
+Enabled IRQ remapping in x2apic mode
+Enabling x2apic
+Enabled x2apic
+Switched APIC routing to cluster x2apic.
+..TIMER: vector=0x30 apic1=0 pin1=2 apic2=-1 pin2=-1
+...
 
-Best regards,
-Tomasz
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jiang Liu <jiang.liu@linux.intel.com>
+Cc: Tony Luck <tony.luck@intel.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Yijing Wang <wangyijing@huawei.com>
+Cc: Yingjoe Chen <yingjoe.chen@mediatek.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+Link: Link: http://lkml.kernel.org/r/20141129125319.GA6491 at pd.tnic
+Signed-off-by: Borislav Petkov <bp@suse.de>
+---
+ kernel/irq/irqdomain.c | 21 +++++++++++++++++++--
+ 1 file changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 7fac311057b8..3395d8923f96 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -46,14 +46,31 @@ struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
+ 				    void *host_data)
+ {
+ 	struct irq_domain *domain;
++	gfp_t gfp_flags = GFP_KERNEL;
++
++#ifdef CONFIG_X86
++	/*
++	 * BIG FAT COMMENT: Early initialization paths like enable_IR_x2apic(),
++	 * for example, call into here with interrupts disabled but then we do
++	 * allocate memory and can sleep so no-no. A proper fix would be to do
++	 * x2APIC IR setup in the early irq setup path but it is too late for
++	 * fixing it this way now, shortly before the merge window.
++	 *
++	 * So we do this little brown paper bag, which is temporary! Do not even
++	 * think of calling irq domain setup code with IRQs disabled. You will
++	 * get frozen-sharked!
++	 */
++	if (irqs_disabled())
++		gfp_flags = GFP_NOFS;
++#endif
+ 
+ 	domain = kzalloc_node(sizeof(*domain) + (sizeof(unsigned int) * size),
+-			      GFP_KERNEL, of_node_to_nid(of_node));
++			      gfp_flags, of_node_to_nid(of_node));
+ 	if (WARN_ON(!domain))
+ 		return NULL;
+ 
+ 	/* Fill structure */
+-	INIT_RADIX_TREE(&domain->revmap_tree, GFP_KERNEL);
++	INIT_RADIX_TREE(&domain->revmap_tree, gfp_flags);
+ 	domain->ops = ops;
+ 	domain->host_data = host_data;
+ 	domain->of_node = of_node_get(of_node);
+-- 
+2.0.0
