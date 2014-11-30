@@ -1,95 +1,56 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Sun, 30 Nov 2014 18:28:33 +0100
-Subject: [PATCH 5/5] ARM: BCM5301X: Add DT for Buffalo WZR-600DHP2
-In-Reply-To: <1417368513-13808-1-git-send-email-zajec5@gmail.com>
-References: <1417368513-13808-1-git-send-email-zajec5@gmail.com>
-Message-ID: <1417368513-13808-5-git-send-email-zajec5@gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sun, 30 Nov 2014 19:10:30 +0100
+Subject: [PATCH v6 3/3] mtd: nand: gpmi: add raw oob access functions
+In-Reply-To: <1417371030-24015-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1417371030-24015-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1417371030-24015-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
- arch/arm/boot/dts/Makefile                         |  3 +-
- arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 57 ++++++++++++++++++++++
- 2 files changed, 59 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+Implement raw OOB access functions to retrieve OOB bytes when accessing the
+NAND in raw mode.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index db51a31..9400e94 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -59,7 +59,8 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4708-buffalo-wzr-1750dhp.dtb \
- 	bcm4708-netgear-r6250.dtb \
- 	bcm4708-netgear-r6300-v2.dtb \
--	bcm47081-asus-rt-n18u.dtb
-+	bcm47081-asus-rt-n18u.dtb \
-+	bcm47081-buffalo-wzr-600dhp2.dtb
- dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
- dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
- 	bcm911360k.dtb \
-diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-new file mode 100644
-index 0000000..1e64d11
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-@@ -0,0 +1,57 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ * DTS for Buffalo WZR-600DHP2
-+ *
-+ * Copyright ? 2014 Rafa? Mi?ecki <zajec5@gmail.com>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Tested-by: Huang Shijie <shijie8@gmail.com>
+---
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 987de1e..4f3851a 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1528,6 +1528,22 @@ static int gpmi_ecc_write_page_raw(struct mtd_info *mtd,
+ 	return 0;
+ }
+ 
++static int gpmi_ecc_read_oob_raw(struct mtd_info *mtd, struct nand_chip *chip,
++				 int page)
++{
++	chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
 +
-+/dts-v1/;
++	return gpmi_ecc_read_page_raw(mtd, chip, NULL, 1, page);
++}
 +
-+#include "bcm47081.dtsi"
++static int gpmi_ecc_write_oob_raw(struct mtd_info *mtd, struct nand_chip *chip,
++				 int page)
++{
++	chip->cmdfunc(mtd, NAND_CMD_SEQIN, 0, page);
 +
-+/ {
-+	compatible = "buffalo,wzr-600dhp2", "brcm,bcm47081";
-+	model = "Buffalo WZR-600DHP2 (BCM47081)";
++	return gpmi_ecc_write_page_raw(mtd, chip, NULL, 1);
++}
 +
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		poll-interval = <200>;
-+
-+		aoss {
-+			label = "AOSS";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&chipcommon 9 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		restart {
-+			label = "Reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		/* Switch device mode? */
-+		mode {
-+			label = "Mode";
-+			linux,code = <KEY_SETUP>;
-+			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		eject {
-+			label = "USB eject";
-+			linux,code = <KEY_EJECTCD>;
-+			gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
+ static int gpmi_block_markbad(struct mtd_info *mtd, loff_t ofs)
+ {
+ 	struct nand_chip *chip = mtd->priv;
+@@ -1847,6 +1863,8 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
+ 	ecc->write_oob	= gpmi_ecc_write_oob;
+ 	ecc->read_page_raw = gpmi_ecc_read_page_raw;
+ 	ecc->write_page_raw = gpmi_ecc_write_page_raw;
++	ecc->read_oob_raw = gpmi_ecc_read_oob_raw;
++	ecc->write_oob_raw = gpmi_ecc_write_oob_raw;
+ 	ecc->mode	= NAND_ECC_HW;
+ 	ecc->size	= bch_geo->ecc_chunk_size;
+ 	ecc->strength	= bch_geo->ecc_strength;
 -- 
-1.8.4.5
+1.9.1
