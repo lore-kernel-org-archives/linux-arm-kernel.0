@@ -1,56 +1,30 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 30 Nov 2014 12:08:42 +0100
-Subject: [PATCH] kvm: arm: vgic: Let one looping code instead of two
- looping code
-In-Reply-To: <547C7570.1020006@gmail.com>
-References: <547A9A7C.1080508@gmail.com> <20141130100718.GA484@cbox>
- <547C7570.1020006@gmail.com>
-Message-ID: <20141130110842.GA83910@macair>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 30 Nov 2014 12:49:46 +0100
+Subject: [PATCH v5 0/6] exynos: Move pmu driver to driver/soc folder and
+ add exynos7 support
+In-Reply-To: <1417270508-11174-1-git-send-email-amit.daniel@samsung.com>
+References: <1417270508-11174-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <2615519.HqpqtJvKZ1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 10:04:32PM +0800, Chen Gang wrote:
-> On 11/30/2014 06:07 PM, Christoffer Dall wrote:
-> > On Sun, Nov 30, 2014 at 12:18:04PM +0800, Chen Gang wrote:
-> >> Use one looping instead of two, so can let code more simpler and get a
-> >> little better performance.
-> >>
-> >> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
-> > 
-> > Performance?  Please, this is vgic_create....
-> > 
+On Saturday 29 November 2014 19:45:02 Amit Daniel Kachhap wrote:
+> This patch series [1 - 6] performs,
 > 
-> I guess your meaning is "this code is not performance sensitive", do not
-> mean "1 looping can not get a little better performance than 2 looping".
-> If what I guess is incorrect, please let me know.
+> 1) Moves pmu driver to driver/soc/samsung folder. This is needed as exynos7 is
+>    an arm64 based platform and hence PMU driver should be in driver folder.
+>    Some discussion happened about this in the v1 version. Finally adding it in
+>    driver/soc folder as it too SoC specific and not a general driver.
+>    Entire discussion can be found here (A).
+> 2) Add exynos7 PMU support.
+> 3) Enables the driver for 32bit arm exynos platforms.
 > 
+> TODO: There is some suggestion to split the PMU data for 32 bit and 64 bit
+> Exynos SOC. This can be implemented as a separate optimization patches.
+> Submitting this version without much change from previous version as the merge
+> window is near.
 
-I doubt if this is even measureable.  Have you even looked at how this
-compiles?
+I only now saw this series. I think it's a bad idea to have this code shared
+with arm64 at all, and I want to see a proper driver for the PMU.
 
-> > This does nothing else than introduce churn.
-> > 
-> 
-> I don't think it does nothing, it can let code simpler than before:
-> remove the redundant looping -- the 2 looping do the same thing which
-> is commented just above the firstly looping.
-
-I don't think there's any big benefit here.
-
-> 
-> And I don't know which churn this patch will introduce. At least, no one
-> want to waste him/her time resources to intend churn, please provide
-> more details about it.
-> 
-> If kvm does not like me, or does not like members to find issues based
-> on reading source code, please let me know (no reply means kvm does not
-> like me or this way), I will quit, so can save time resources both.
-> 
-I appreciate your efforts and welcome anybody to contribute to the code
-base.  But you seem to be insisting on changing some insignificant
-details, and we just have bigger fish to fry right now.  Sorry.
-
-This is not about anyone not liking someone, it is about the code and
-whether there's a need to take this patch right now or not.
-
--Christoffer
+	Arnd
