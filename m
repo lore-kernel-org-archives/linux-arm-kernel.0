@@ -1,89 +1,58 @@
-From: marek@goldelico.com (Marek Belisko)
-Date: Sun, 30 Nov 2014 14:07:47 +0100
-Subject: [PATCH v3 3/3] arm: dts: omap3-gta04: Add handling for tv output
-In-Reply-To: <1417352867-7436-1-git-send-email-marek@goldelico.com>
-References: <1417352867-7436-1-git-send-email-marek@goldelico.com>
-Message-ID: <1417352867-7436-4-git-send-email-marek@goldelico.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Sun, 30 Nov 2014 15:10:13 +0100
+Subject: [PATCH v1] ARM: dts: rockchip: Update LEDs to work with the last
+ leds-gpio driver on radxarock
+In-Reply-To: <CABgxDoLwqYttcPYc+Wth3B17P=e2cbV8G=hqbRfWx+PVTiAPig@mail.gmail.com>
+References: <1416759575-774-1-git-send-email-romain.perier@gmail.com>
+ <CABgxDoLwqYttcPYc+Wth3B17P=e2cbV8G=hqbRfWx+PVTiAPig@mail.gmail.com>
+Message-ID: <CABgxDoLx+5Bc_7TfRLOTrhP26=xQF8dawmEENqmXTUpBep_b4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add handling for gta04 tv out chain:
-venc -> opa362 -> svideo
+ping :)
 
-Use invert-polarity in venc node because opa362
-is doing polarity inversion also.
-
-Signed-off-by: Marek Belisko <marek@goldelico.com>
----
- arch/arm/boot/dts/omap3-gta04.dtsi | 49 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
-
-diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-index fd34f91..e9f221d 100644
---- a/arch/arm/boot/dts/omap3-gta04.dtsi
-+++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-@@ -83,6 +83,41 @@
- 		compatible = "usb-nop-xceiv";
- 		reset-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
- 	};
-+
-+	tv0: connector at 1 {
-+		compatible = "svideo-connector";
-+		label = "tv";
-+
-+		port {
-+			tv_connector_in: endpoint {
-+				remote-endpoint = <&opa_out>;
-+			};
-+		};
-+	};
-+
-+	tv_amp: opa362 {
-+		compatible = "ti,opa362";
-+		gpios = <&gpio1 23 0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				opa_in: endpoint at 0 {
-+					remote-endpoint = <&venc_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				opa_out: endpoint at 0 {
-+					remote-endpoint = <&tv_connector_in>;
-+				};
-+			};
-+		};
-+	};
- };
- 
- &omap3_pmx_core {
-@@ -396,6 +431,20 @@
- 	};
- };
- 
-+&venc {
-+	status = "okay";
-+
-+	vdda-supply = <&vdac>;
-+
-+	port {
-+		venc_out: endpoint {
-+			remote-endpoint = <&opa_in>;
-+			ti,channels = <2>;
-+			ti,invert-polarity;
-+		};
-+	};
-+};
-+
- &gpmc {
- 	ranges = <0 0 0x30000000 0x04>; /* CS0: NAND */
- 
--- 
-1.9.1
+2014-11-23 17:20 GMT+01:00 Romain Perier <romain.perier@gmail.com>:
+> See https://www.kernel.org/doc/Documentation/leds/leds-class.txt for
+> LEDs device naming
+>
+> 2014-11-23 17:19 GMT+01:00 Romain Perier <romain.perier@gmail.com>:
+>> The leds-gpio driver recently switched to the device property API. The device_node
+>> name is no longer retrieved if the "label" devicetree property is not found.
+>> In this case the driver tries to create entries with (null) name in
+>> /sys/class/leds, which is wrong and generates backtrace as several gpio_leds have
+>> the same name. Also renamed subnode "yellow" to "blue" to match the last
+>> schematics updates.
+>>
+>> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/rk3188-radxarock.dts | 5 ++++-
+>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+>> index 6eb62c0..9a09579 100644
+>> --- a/arch/arm/boot/dts/rk3188-radxarock.dts
+>> +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+>> @@ -43,16 +43,19 @@
+>>                 compatible = "gpio-leds";
+>>
+>>                 green {
+>> +                       label = "rock:green:user1";
+>>                         gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
+>>                         default-state = "off";
+>>                 };
+>>
+>> -               yellow {
+>> +               blue {
+>> +                       label = "rock:blue:user2";
+>>                         gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
+>>                         default-state = "off";
+>>                 };
+>>
+>>                 sleep {
+>> +                       label = "rock:red:power";
+>>                         gpios = <&gpio0 15 0>;
+>>                         default-state = "off";
+>>                 };
+>> --
+>> 1.9.1
+>>
