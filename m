@@ -1,79 +1,74 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 30 Nov 2014 20:57:28 +0100
-Subject: [PATCH 7/8 v2] crypto: replace memset by memzero_explicit
-In-Reply-To: <1417367029-32762-8-git-send-email-Julia.Lawall@lip6.fr>
-References: <1417367029-32762-1-git-send-email-Julia.Lawall@lip6.fr>
- <1417367029-32762-8-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <CAKv+Gu9op6hup253LtMpSo6aJ+mTmfDa0cxNv4bQbcnCqSsn+w@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun, 30 Nov 2014 21:02:20 +0100
+Subject: [PATCH 2/2] ARM: imx: src: support vf610 system reset controller
+In-Reply-To: <3198130.fuxnzyHmMt@wuerfel>
+References: <1417193015-6033-1-git-send-email-stefan@agner.ch>
+ <18555848.LVhqYu0kXL@wuerfel> <f8bc59dd2c2d20c8fc9f49ec354ac474@agner.ch>
+ <3198130.fuxnzyHmMt@wuerfel>
+Message-ID: <7964fa2c7d6a5fc56474f84a4a185d52@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 November 2014 at 18:03, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
->
-> Memset on a local variable may be removed when it is called just before the
-> variable goes out of scope.  Using memzero_explicit defeats this
-> optimization.  A simplified version of the semantic patch that makes this
-> change is as follows: (http://coccinelle.lip6.fr/)
->
-> // <smpl>
-> @@
-> identifier x;
-> type T;
-> @@
->
-> {
-> ... when any
-> T x[...];
-> ... when any
->     when exists
-> - memset
-> + memzero_explicit
->   (x,
-> -0,
->   ...)
-> ... when != x
->     when strict
-> }
-> // </smpl>
->
-> This change was suggested by Daniel Borkmann <dborkman@redhat.com>
->
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
->
-> ---
-> Daniel Borkmann suggested that these patches could go through Herbert Xu's
-> cryptodev tree.
->
-> I was not able to compile this one.
->
+On 2014-11-30 12:54, Arnd Bergmann wrote:
+> On Saturday 29 November 2014 01:15:57 Stefan Agner wrote:
+>> On 2014-11-28 23:22, Arnd Bergmann wrote:
+>> > On Friday 28 November 2014 23:09:09 Stefan Agner wrote:
+>> >> On 2014-11-28 22:24, Arnd Bergmann wrote:
+>> >> > On Friday 28 November 2014 22:02:01 Stefan Agner wrote:
+>> >> >
+>> >> >> > If the SRC is also capable of resetting individual blocks instead of just
+>> >> >> > the entire machine, it would be a reset driver in drivers/reset instead.
+>> >> >>
+>> >> >> Beside the system reset, there is only a mask functionality for the
+>> >> >> watchdogs (there are two watchdogs, one for Cortex-A5 and one for the
+>> >> >> M4). This makes the SRC module in the Vybrid a bit different then what
+>> >> >> is available on other i.MX SoC's...
+>> >> >
+>> >> > If you already have the watchdog registers in there and want to have
+>> >> > a watchdog driver too, the easiest way would be to register the reboot
+>> >> > handler from the watchdog driver.
+>> >>
+>> >> Hm, not sure we speak about the same here. The SRC module has two
+>> >> (multi-)bit fields to mask the watchdog reset event for each watchdog.
+>> >> Beside that, there are two full watchdog register maps, which are in
+>> >> different areas. There is already a driver for this watchdogs. I'm not
+>> >> sure what the idea behind this is exactly, I guess it would easily allow
+>> >> to (temporary) mask the other CPU's watchdog. However, I don't think we
+>> >> need that functionality, so I don't care about that right now.
+>> >
+>> > Ok, I see, thanks for the clarification!
+>> >
+>> >> There is also a restart handler in the watchdog driver, but I prefer to
+>> >> use the reset capabilities of the SRC since it has immediate effect.
+>> >>
+>> >> Lets get to the big picture again: I could register the whole SRC
+>> >> register map as a syscon device and then access the registers from my
+>> >> suspend/resume implementation later on. And similar in the restart
+>> >> driver, I would use syscon_regmap_lookup_by_compatible to check if it
+>> >> contains the vf610-src compatible string and register the restart
+>> >> driver/handler if available.
+>>
+>> One thing which came into my mind regarding suspend: I might need to
+>> access the registers from assembler (in SRAM), can I do that through
+>> syscon/regmap? I had a quick look, but I don't found a way to get back
+>> the mapped IO base address.. By good reasons, of course, for most
+>> applications. But in my case, afaik I have no other choice.
+> 
+> Yes, I can see that being a problem. What register specifically do
+> you need to access from code running in SRAM?
+> 
 
-Builds fine for me
+There are three registers I need in my current code, VF610_SRC_GPR0,
+VF610_SRC_GPR1 and VF610_SRC_MISC2. The last can done from C code, as it
+is only DDR RESET behavior during LP mode which need to be configured.
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+GPR0 is the location to jump at on wakeup, and GPR1 the argument to it.
+The argument is the base address in SRAM, but the location, GPR0, is
+currently calculated in assembler. I guess I can calculate that in C
+code too. Currently I do not have a symbol which I can access, the whole
+suspend and resume is done in one "function", similar as it is done for
+i.MX6:
+arch/arm/mach-imx/suspend-imx6.S
 
-
-> v2: fixed email address
->
->  arch/arm/crypto/sha512_neon_glue.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/crypto/sha512_neon_glue.c b/arch/arm/crypto/sha512_neon_glue.c
-> index f3452c6..b124dce 100644
-> --- a/arch/arm/crypto/sha512_neon_glue.c
-> +++ b/arch/arm/crypto/sha512_neon_glue.c
-> @@ -241,7 +241,7 @@ static int sha384_neon_final(struct shash_desc *desc, u8 *hash)
->         sha512_neon_final(desc, D);
->
->         memcpy(hash, D, SHA384_DIGEST_SIZE);
-> -       memset(D, 0, SHA512_DIGEST_SIZE);
-> +       memzero_explicit(D, SHA512_DIGEST_SIZE);
->
->         return 0;
->  }
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+--
+Stefan
