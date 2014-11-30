@@ -1,57 +1,21 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 30 Nov 2014 09:55:00 +0100
-Subject: [PATCH v5 1/3] mtd: nand: gpmi: add gpmi_move_bits function
-In-Reply-To: <20141130081110.GC3608@norris-Latitude-E6410>
-References: <1417020793-3354-1-git-send-email-boris.brezillon@free-electrons.com>
- <1417020793-3354-2-git-send-email-boris.brezillon@free-electrons.com>
- <20141126175708.1acb90ac@bbrezillon>
- <20141130081110.GC3608@norris-Latitude-E6410>
-Message-ID: <20141130095500.16f75e05@bbrezillon>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 30 Nov 2014 11:07:18 +0100
+Subject: [PATCH] kvm: arm: vgic: Let one looping code instead of two
+ looping code
+In-Reply-To: <547A9A7C.1080508@gmail.com>
+References: <547A9A7C.1080508@gmail.com>
+Message-ID: <20141130100718.GA484@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
-
-On Sun, 30 Nov 2014 00:11:10 -0800
-Brian Norris <computersforpeace@gmail.com> wrote:
-
-> On Wed, Nov 26, 2014 at 05:57:08PM +0100, Boris Brezillon wrote:
-> > On Wed, 26 Nov 2014 17:53:11 +0100 Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> > > +/**
-> > > + * gpmi_move_bits - move bits from one memory region to another
-> > > + * @dst: destination buffer
-> > > + * @dst_bit_off: bit offset we're starting to write at
-> > > + * @src: source buffer
-> > > + * @src_bit_off: bit offset we're starting to read from
-> > > + * @nbits: number of bits to copy
-> > > + *
-> > > + * This functions copies bits from one memory region to another, and is used by
-> > > + * the GPMI driver to copy ECC sections which are not guaranteed to be byte
-> > > + * aligned.
-> > 
-> > I forgot to add that src and dst should not overlap, otherwise it won't
-> > work...
+On Sun, Nov 30, 2014 at 12:18:04PM +0800, Chen Gang wrote:
+> Use one looping instead of two, so can let code more simpler and get a
+> little better performance.
 > 
-> Hmm, normally that's implied for copy-like operations. But since you
-> named this function "move" (rather than "copy" or "cpy"), that's a
-> little less clear.
+> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
 
-Indeed, that's a good point.
+Performance?  Please, this is vgic_create....
 
-> 
-> Did you have a good reason for the "move" name? If not, maybe it's worth
-> changing.
+This does nothing else than introduce churn.
 
-No, I don't, and I'd prefer changing the name than implementing a non
-destructive move function.
-
-I'll send a new version with this change.
-
-Thanks,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-Christoffer
