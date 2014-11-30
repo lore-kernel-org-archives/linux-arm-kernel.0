@@ -1,81 +1,74 @@
-From: gang.chen.5i5j@gmail.com (Chen Gang)
-Date: Sun, 30 Nov 2014 22:21:04 +0800
-Subject: [PATCH] kvm: arm: vgic: Let one looping code instead of two
- looping code
-In-Reply-To: <20141130110842.GA83910@macair>
-References: <547A9A7C.1080508@gmail.com> <20141130100718.GA484@cbox>
- <547C7570.1020006@gmail.com> <20141130110842.GA83910@macair>
-Message-ID: <547B27D0.6020200@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 30 Nov 2014 22:54:51 +0800
+Subject: [PATCH] ARM: defconfig: imx_v6_v7_defconfig updates
+In-Reply-To: <1416614103-21237-1-git-send-email-shawn.guo@linaro.org>
+References: <1416614103-21237-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20141130145447.GA2411@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/14 19:08, Christoffer Dall wrote:
-> On Mon, Dec 01, 2014 at 10:04:32PM +0800, Chen Gang wrote:
->> On 11/30/2014 06:07 PM, Christoffer Dall wrote:
->>> On Sun, Nov 30, 2014 at 12:18:04PM +0800, Chen Gang wrote:
->>>> Use one looping instead of two, so can let code more simpler and get a
->>>> little better performance.
->>>>
->>>> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
->>>
->>> Performance?  Please, this is vgic_create....
->>>
->>
->> I guess your meaning is "this code is not performance sensitive", do not
->> mean "1 looping can not get a little better performance than 2 looping".
->> If what I guess is incorrect, please let me know.
->>
+Hi Arnd, Olof,
+
+On Sat, Nov 22, 2014 at 07:55:03AM +0800, Shawn Guo wrote:
+> From: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
 > 
-> I doubt if this is even measureable.  Have you even looked at how this
-> compiles?
+> This is a squash of several imx_v6_v7_defconfig update patches.
 > 
-
-I did not look at the related assembly code for O2.
-
-But for me, it must be a little better than 2 loops: as far as I know,
-the compiler should/can not merge the 2 loops into 1 loop (it will
-change logical working flow, at least, need notice about lock/unlock).
-
-
->>> This does nothing else than introduce churn.
->>>
->>
->> I don't think it does nothing, it can let code simpler than before:
->> remove the redundant looping -- the 2 looping do the same thing which
->> is commented just above the firstly looping.
+>  - Enable tlv320aic3x audio codec by default (Phytec PBAB01 board)
+>  - Enable DS1307 rtc and gpio fan by default (TBS2910 board)
+>  - Select thermal related drivers
+>  - Add SNVS power off driver
 > 
-> I don't think there's any big benefit here.
+> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
+> Signed-off-by: Soeren Moch <smoch@web.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Robin Gong <b38343@freescale.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+
+I haven't found this patch on arm-soc next/defconfig branch.  Can you
+please apply it?  Thanks.
+
+Shawn
+
+> ---
+>  arch/arm/configs/imx_v6_v7_defconfig | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
 > 
-
-Really, no big benefit here.
-
->>
->> And I don't know which churn this patch will introduce. At least, no one
->> want to waste him/her time resources to intend churn, please provide
->> more details about it.
->>
->> If kvm does not like me, or does not like members to find issues based
->> on reading source code, please let me know (no reply means kvm does not
->> like me or this way), I will quit, so can save time resources both.
->>
-> I appreciate your efforts and welcome anybody to contribute to the code
-> base.  But you seem to be insisting on changing some insignificant
-> details, and we just have bigger fish to fry right now.  Sorry.
+> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> index 8fca6e276b69..c7b8fba8654b 100644
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -162,7 +162,13 @@ CONFIG_SPI_IMX=y
+>  CONFIG_GPIO_SYSFS=y
+>  CONFIG_GPIO_MC9S08DZ60=y
+>  CONFIG_GPIO_STMPE=y
+> -# CONFIG_HWMON is not set
+> +CONFIG_SENSORS_GPIO_FAN=y
+> +CONFIG_THERMAL=y
+> +CONFIG_CPU_THERMAL=y
+> +CONFIG_IMX_THERMAL=y
+> +CONFIG_POWER_SUPPLY=y
+> +CONFIG_POWER_RESET=y
+> +CONFIG_POWER_RESET_IMX=y
+>  CONFIG_WATCHDOG=y
+>  CONFIG_IMX2_WDT=y
+>  CONFIG_MFD_DA9052_I2C=y
+> @@ -210,6 +216,7 @@ CONFIG_SND_SOC_IMX_WM8962=y
+>  CONFIG_SND_SOC_IMX_SGTL5000=y
+>  CONFIG_SND_SOC_IMX_SPDIF=y
+>  CONFIG_SND_SOC_IMX_MC13783=y
+> +CONFIG_SND_SOC_TLV320AIC3X=y
+>  CONFIG_SND_SIMPLE_CARD=y
+>  CONFIG_USB=y
+>  CONFIG_USB_EHCI_HCD=y
+> @@ -238,6 +245,7 @@ CONFIG_LEDS_TRIGGER_BACKLIGHT=y
+>  CONFIG_LEDS_TRIGGER_GPIO=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_INTF_DEV_UIE_EMUL=y
+> +CONFIG_RTC_DRV_DS1307=y
+>  CONFIG_RTC_DRV_ISL1208=y
+>  CONFIG_RTC_DRV_PCF8563=y
+>  CONFIG_RTC_DRV_MC13XXX=y
+> -- 
+> 1.9.1
 > 
-> This is not about anyone not liking someone, it is about the code and
-> whether there's a need to take this patch right now or not.
-> 
-
-OK, thanks. Next, I shall try to find some bugs for it. And they are not
-urgent, since they are only found by reading source code.
-
-
-And could you provide any information or suggestion for kvm common test?
-(e.g. "make check" in gcc or qemu). At present, I only let my kvm
-related patches pass compiling, not give additional test.
-
-Thanks.
--- 
-Chen Gang
-
-Open, share, and attitude like air, water, and life which God blessed
