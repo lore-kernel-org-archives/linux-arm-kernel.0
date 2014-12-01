@@ -1,148 +1,74 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 1 Dec 2014 16:05:54 +0100
-Subject: [GIT PULL v2 1/4] ARM: tegra: IOMMU support for v3.19
-In-Reply-To: <201411282320.19546.arnd@arndb.de>
-References: <1416570832-6220-1-git-send-email-thierry.reding@gmail.com>
- <1416993053-3630-1-git-send-email-thierry.reding@gmail.com>
- <201411282320.19546.arnd@arndb.de>
-Message-ID: <20141201150552.GB11943@ulmo.nvidia.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 01 Dec 2014 15:07:15 +0000
+Subject: [RFC V1 0/8] CPUFreq: create platform-dev for DT based cpufreq
+ drivers
+In-Reply-To: <23115535.r6kXsReHU2@wuerfel>
+References: <cover.1417433163.git.viresh.kumar@linaro.org>
+ <CAKohpo=EPOH-WJ4mmAr-1BzzAEpvC-F0Y99Ox_yL7meUcRNx6Q@mail.gmail.com>
+ <547C6E9D.2090205@arm.com> <23115535.r6kXsReHU2@wuerfel>
+Message-ID: <547C8423.2090300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 11:20:19PM +0100, Arnd Bergmann wrote:
-> On Wednesday 26 November 2014, Thierry Reding wrote:
-> > Hi ARM SoC maintainers,
-> > 
-> > The following changes since commit 0690cbd2e55a72a8eae557c389d1a136ed9fa142:
-> > 
-> >   powerpc/iommu: Rename iommu_[un]map_sg functions (2014-11-18 11:30:01 +0100)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.19-iommu-rebased
-> > 
-> > for you to fetch changes up to 37d21f8918f2aa2289036cc778ee188951e53288:
-> > 
-> >   memory: Add NVIDIA Tegra memory controller support (2014-11-26 09:45:02 +0100)
-> > 
-> > Here's a version of the pull request rebased on top of Joerg's core
-> > branch from the IOMMU tree. It has the advantage of having resolved
-> > the merge conflicts and the disadvantage of pulling in v3.18-rc3.
-> > 
-> 
-> Hi Thierry,
-> 
-> sorry for taking my time on this, I had some concerns when I first
-> looked at the memory controller driver and binding (after I got your
-> pull request), and wanted to be sure everything is fine before I merge
-> it.
-> 
-> Pulling in v3.18-rc3 is not a problem, since the next/soc branch is
-> already based on -rc3 (you can see that yourself if you check out the
-> branch from the arm-soc tree), and I'm absolutely fine with merging
-> either v1 or v2 of this, the conflict seems harmless, and so does 
-> pulling in the dependency.
-> 
-> The extra attention for the binding is because the base iommu binding
-> is still very new and gives some options to driver authors, and I want
-> to make sure we are setting a good example for others to look at.
-> My problem is mainly lack of understanding for your hardware requirements,
-> so hopefully you can clarify this all and I can just merge it, or we
-> find an easy way to change the code if I have stumbled on a problem.
-> 
-> My main question is about the relation between 'swgroup' and 'id'
-> settings. What do the two things mean respectively, does your driver
-> define how they get combined, or is each master hardcoded to both?
 
-An ID refers to the client ID. Each client ID represents one requester
-and a set of IDs makes up one SWGROUP. For example there are two display
-controllers, each being three clients, yet there's only two SWGROUPs for
-them:
 
-	SWGROUP dc: - display0a
-	            - display0b
-	            - display0c
+On 01/12/14 14:11, Arnd Bergmann wrote:
+> On Monday 01 December 2014 13:35:25 Sudeep Holla wrote:
+>> On 01/12/14 13:29, Viresh Kumar wrote:
+>>> On 1 December 2014 at 18:24, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> Thanks a lot for working on this, we really need to figure it out one day!
+>>>
+>>>
+>>>
+>>>> Your patches seem well-implemented, so if everybody thinks the general
+>>>> approach is the best solution, we should do that. From my point of view,
+>>>> there are two things I would do differently:
+>>>>
+>>>> - In the DT binding, I would strongly prefer anything but the root compatible
+>>>>     property as the key for the new platforms. Clearly we have to keep using
+>>>>     it for the backwards-compatibility case, as you do, but I think there
+>>>>     are more appropriate places to put it. Sorting from most favorite to least
+>>>>     favorite, my list would be:
+>>>>           1. a new property in /cpus/
+>>>>           2. a new property each /cpus/cpu at ... node.
+>>>
+>>> I did it this way earlier and named it dvfs-method but probably putting this
+>>> into the /cpus/ node is far better. But then Sudeep asked to utilize
+>>> compatible property only..
+>>>
+>>> Are you fine with the name here? "dvfs-method"
+>>>
+>>
+>> That's right, I don't like driver specific method in the cpu node as you
+>> initially did. But if it's a property in the chosen node (where we
+>> usually put the Linux specific properties), I am fine with
+>> that as Arnd has illustrated in his patch.
+>
+> I would prefer the /cpus node over the /chosen node because the former
+> describes the hardware while the latter is supposed to be user-settable
+> (on real open-firmware at least). But I think either one is better than
+> using the / node compatible string.
+>
 
-	SWGROUP dcb: - display0ab
-	             - display0bb
-	             - display0cb
+Agreed, the main reason for objection was that in the initial proposal
+it was more a Linux configuration rather than hardware property.
 
-Each SWGROUP can be assigned a separate address space. That is, an
-address space for SWGROUP dc will apply for all clients in that group.
-However it can be additionally specified for which clients in a group
-IOMMU address translation should be enabled. Theoretically one could
-enable translation only for display0a and display0b, but not for
-display0c. I don't immediately see when that would be desirable, hence
-the driver always enables translation for all clients in a group.
+<dvfs-method> = "cpufreq-dt";
 
-> I generally dislike having SoC-specific lookup tables in drivers for
-> things that could be fully described in DT, so I really want to understand
-> why you added those tables.
+I don't see anything hardware feature presented with that. On the other
+hand, we could represent the some thing like whether the cpu share
+clock or are they independently clocked as a hardware property in the
+cpu nodes.
 
-What exactly is your concern with these tables? Is it the size? Roughly
-these are 3.5 KiB of .rodata per SoC generation. If that's too much I
-think I could perhaps get that down to something like half of it using
-bitfields (reg could be 11 bits, bit/shift could be 5, so that both fit
-into a single u16 instead of 2 u32). That'll probably increase code size
-a little to extract these fields, but that may be a suitable tradeoff.
+> How about a "linux,cpu-dvfs-method" property in the root node? Would
+> that work better for you than a "linux,dvfs-method" in the "/cpus"
+> node?
+>
 
-> The .smmu.reg and .smmu.bit settings seem to directly correlate to the
-> .id value in the table, so I'm assuming you could derive one from the
-> other if it was advantagous.
+I will leave that to the DT maintainers for specific details though
+my preference is still chosen node as it's more related to Linux and
+it's driver choice and unlikely to be used by other OSes. IMO we just
+need single entry in the DT, so I am fine with either of your choice above.
 
-This could be done using something like this:
-
-	unsigned int reg = 0x228 + (id / 32) * 4;
-	unsigned int bit = id % 32;
-
-However there are a couple of entries that are special, notable the PTC
-and MPCORE clients. Those have a SWGROUP but none of these enable bits,
-so I can't immediately think of a way to do that nicely. We'd probably
-have to hard-code checks for that, making it somewhat brittle. Having
-this all in a simple lookup table makes this really straightforward and
-easy to verify for correctness by comparing the table to internal files
-that specify these registers.
-
-> The name is only used for debugging purposes and we could also leave
-> it out if we had a way to kill off the other fields of the table.
-
-The name is also used in error messages to clarify where an error comes
-from. That's been very essential in tracking down various issues in some
-drivers (DRM primarily).
-
-Even if we could get rid of the SMMU related fields by special-casing in
-code (I haven't measured, but that might actually remove all the benefit
-of removing the table entries), we'd still need the latency allowance
-registers, so I don't think we can remove the table altogether.
-
-> In the comment you mention that the latency allowance is set up to the
-> hardware defaults, so I guess in the current version this is not required,
-> but the .la.reg/shift/mask fields can't be determined from the other
-> fields. This means in order to implement the extension for changing the
-> setting in the future, you'd have to add some other way of communicating
-> it without the table, right?
-
-Right, there is no programmatic way to derive the latency allowance data
-from the ID. They're more or less randomly spread across the registers.
-
-Note that there are other knobs in the memory controller associated with
-the memory clients, though they aren't in use (yet). Having this kind of
-table gives us a very nice way of collecting the per-client data in one
-location and then use that for register programming.
-
-> Back to the swgroup/id fields: if you need both, would it make sense
-> to have #iommu-cells = <2> and pass both from the dma master device?
-
-I think they are really orthogonal settings. Client IDs have nothing to
-do with the IOMMU specifically. The IOMMU is primarily concerned with
-the SWGROUP. The driver only makes sure that IOVA translation is enabled
-for each client in a SWGROUP.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/0f804eac/attachment-0001.sig>
+Regards,
+Sudeep
