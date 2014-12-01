@@ -1,172 +1,92 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 1 Dec 2014 12:13:38 +0000
-Subject: [PATCH 1/4] iommu: introduce generic page table allocation
- framework
-In-Reply-To: <3337836.UezZ1Klsom@avalon>
-References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
- <1417089078-22900-2-git-send-email-will.deacon@arm.com>
- <3337836.UezZ1Klsom@avalon>
-Message-ID: <20141201121338.GD18466@arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 1 Dec 2014 12:36:56 +0000
+Subject: [PATCH] irqchip: gic: Allow interrupt level to be set for PPIs.
+In-Reply-To: <20141201115400.GD3836@n2100.arm.linux.org.uk>
+References: <1417197340-27298-1-git-send-email-Liviu.Dudau@arm.com>
+ <20141201104145.GY3836@n2100.arm.linux.org.uk>
+ <20141201104612.GM828@e106497-lin.cambridge.arm.com>
+ <20141201110358.GA3836@n2100.arm.linux.org.uk>
+ <547C4ECD.20802@arm.com>
+ <20141201112302.GC3836@n2100.arm.linux.org.uk>
+ <547C5179.5020505@arm.com>
+ <20141201115400.GD3836@n2100.arm.linux.org.uk>
+Message-ID: <20141201123656.GQ828@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 30, 2014 at 10:00:21PM +0000, Laurent Pinchart wrote:
-> Hi Will,
-
-Hi Laurent,
-
-> Thank you for the patch.
-
-Cheers for the review!
-
-> On Thursday 27 November 2014 11:51:15 Will Deacon wrote:
-> > diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
-> > new file mode 100644
-> > index 000000000000..82e39a0db94b
-> > --- /dev/null
-> > +++ b/drivers/iommu/io-pgtable.c
-> > @@ -0,0 +1,71 @@
-> > +/*
-> > + * Generic page table allocator for IOMMUs.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program; if not, write to the Free Software
-> > + * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307,
-> > USA. + *
-> > + * Copyright (C) 2014 ARM Limited
-> > + *
-> > + * Author: Will Deacon <will.deacon@arm.com>
-> > + */
-> > +
-> > +#include <linux/bug.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/types.h>
-> > +
-> > +#include "io-pgtable.h"
-> > +
-> > +static struct io_pgtable_init_fns
+On Mon, Dec 01, 2014 at 11:54:00AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 01, 2014 at 11:31:05AM +0000, Marc Zyngier wrote:
+> > On 01/12/14 11:23, Russell King - ARM Linux wrote:
+> > > On Mon, Dec 01, 2014 at 11:19:41AM +0000, Marc Zyngier wrote:
+> > >> Hi Russell,
+> > >>
+> > >> On 01/12/14 11:03, Russell King - ARM Linux wrote:
+> > >>> If all you want to do is to bypass the following check, what's wrong
+> > >>> with actually doing that:
+> > >>>
+> > >>> -	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
+> > >>> +	if (gicirq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
+> > >>> +	    type != IRQ_TYPE_EDGE_RISING)
+> > >>> 		return -EINVAL;
+> > >>>
+> > >>
+> > >> I think that will require some additional changes to gic_configure_irq
+> > >> (in irq-gic-common.c).
+> > > 
+> > > I don't think so - gic_configure_irq() will treat it as a no-op as far
+> > > as trying to configure the IRQ settings.
+> > 
+> > I agree. But that's following ARM's tradition of making PPIs
+> > non-configurable. I seem to remember that there is at least one
+> > occurrence of a GIC with configurable PPIs (Qualcomm, IIRC).
+> > 
+> > With this use case in mind, Liviu's patch allows an active-low interrupt
+> > to be correctly configured as level, for example.
 > 
-> Any reason not to make the table const ?
+> Liviu's patch is nothing more than a hack.  It changes (eg) the active
+> low level to be an active high level with the explicitly stated reason to
+> bypass a test, and then hopes that the remaining functions do the right
+> thing.
 
-No reason, I'll give it a go.
+I was trying to make the smallest amount of changes possible. Given that
+ARM's GICs don't distinguish between high/low or raising/falling all I wanted
+was to get the level vs edge type being sticky.
 
-> > diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-> > new file mode 100644
-> > index 000000000000..5ae75d9cae50
-> > --- /dev/null
-> > +++ b/drivers/iommu/io-pgtable.h
-> > @@ -0,0 +1,65 @@
-> > +#ifndef __IO_PGTABLE_H
-> > +#define __IO_PGTABLE_H
-> > +
-> > +struct io_pgtable_ops {
-> > +	int (*map)(struct io_pgtable_ops *ops, unsigned long iova,
 > 
-> How about passing a struct io_pgtable * instead of the ops pointer ? This 
-> would require returning a struct io_pgtable from the alloc function, which I 
-> suppose you didn't want to do to ensure the caller will not touch the struct 
-> io_pgtable fields directly. Do we really need to go that far, or can we simply 
-> document struct io_pgtable as being private to the pg alloc framework core and 
-> allocators ? Someone who really wants to get hold of the io_pgtable instance 
-> could use container_of on the ops anyway, like the allocators do.
-
-Hmm, currently the struct io_pgtable is private to the page table allocator,
-so I don't like the IOMMU driver having an explicit handle to that. I also
-like having the value returned from alloc_io_pgtable_ops being used as the
-handle to pass around -- it keeps things simple for the caller because
-there's one structure that you get back and that's the thing you use as a
-reference.
-
-What do we gain by returning the struct io_pgtable pointer instead?
-
-> > +		   phys_addr_t paddr, size_t size, int prot);
-> > +	int (*unmap)(struct io_pgtable_ops *ops, unsigned long iova,
-> > +		     size_t size);
-> > +	phys_addr_t (*iova_to_phys)(struct io_pgtable_ops *ops,
-> > +				    unsigned long iova);
-> > +};
-> > +
-> > +struct iommu_gather_ops {
-> > +	/* Synchronously invalidate the entire TLB context */
-> > +	void (*tlb_flush_all)(void *cookie);
-> > +
-> > +	/* Queue up a TLB invalidation for a virtual address range */
-> > +	void (*tlb_add_flush)(unsigned long iova, size_t size, bool leaf,
-> > +			      void *cookie);
+> It would be better to explicitly bypass the test, and then explicitly
+> handle other cases in gic_configure_irq().
 > 
-> Is there a limit to the number of entries that can be queued, or any other 
-> kind of restriction ? Implementing a completely generic TLB flush queue can 
-> become complex for IOMMU drivers.
-
-I think it's only as complicated as you decide to make it. For example, 
-you could just issue the TLBI directly in the add_flush callback (like I
-do for the arm-smmu driver), but then don't bother polling the hardware
-for completion until the sync callback.
-
-> I would also document in which context(s) this callback will be called, as 
-> IOMMU drivers might be tempted to allocate memory in order to implement a TLB 
-> flush queue.
-
-Good idea.
-
-> > +	/* Ensure any queued TLB invalidation has taken effect */
-> > +	void (*tlb_sync)(void *cookie);
-> > +
-> > +	/* Ensure page tables updates are visible to the IOMMU */
-> > +	void (*flush_pgtable)(void *ptr, size_t size, void *cookie);
-> > +};
+> It would be even better to make the code reflect reality right the way
+> through.  If PPIs are non-configurable, then we should return -EINVAL if
+> trying to set them to a setting which is not supported.  For example,
+> pass through all states to gic_configure_irq(), and have gic_configure_irq()
+> return whether the state is valid.
 > 
-> I suppose kerneldoc will come in the next version ;-)
-
-Bah, ok then, if you insist!
-
-> > +struct io_pgtable_cfg {
-> > +	int			quirks; /* IO_PGTABLE_QUIRK_* */
-> > +	unsigned long		pgsize_bitmap;
-> > +	unsigned int		ias;
-> > +	unsigned int		oas;
-> > +	struct iommu_gather_ops	*tlb;
-> > +
-> > +	/* Low-level data specific to the table format */
-> > +	union {
-> > +	};
-> > +};
-> > +
-> > +enum io_pgtable_fmt {
-> > +	IO_PGTABLE_NUM_FMTS,
-> > +};
-> > +
-> > +struct io_pgtable {
-> > +	enum io_pgtable_fmt	fmt;
-> > +	void			*cookie;
-> > +	struct io_pgtable_cfg	cfg;
-> > +	struct io_pgtable_ops	ops;
+> Then, gic_configure_irq() can read back the register after trying to set
+> the appropriate value, and see whether it was taken.  If the bits remain
+> unchanged, then it can decide that the requested mode is not supported,
+> and return -EINVAL.
 > 
-> This could be turned into a const pointer if we pass struct io_pgtable around 
-> instead of the ops.
+> In any case, let's not hack the code in the way that Liviu is trying to
+> do.
+
+OK, I will send a v2 patch, doing the right thing.
+
+Best regards,
+Liviu
+
 > 
-> > +};
-> > +
-> > +struct io_pgtable_init_fns {
-> > +	struct io_pgtable *(*alloc)(struct io_pgtable_cfg *cfg, void *cookie);
-> > +	void (*free)(struct io_pgtable *iop);
-> > +};
+> -- 
+> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+> according to speedtest.net.
 > 
-> I would reorder structures into two groups, one clearly marked as private that 
-> shouldn't be touched by IOMMU drivers, and then the io_pgtable_fmt enum and 
-> the io_pgtable_cfg struct grouped with the two functions below.
 
-Sure.
-
-Thanks again for the review.
-
-Will
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
