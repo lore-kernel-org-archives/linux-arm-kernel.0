@@ -1,24 +1,49 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 01 Dec 2014 11:51:03 -0800
-Subject: [PATCH v10 0/4] This suspend patch is only support cut off the
- power of cpu and some external
-In-Reply-To: <1417423940-1669-1-git-send-email-zyw@rock-chips.com> (Chris
- Zhong's message of "Mon, 1 Dec 2014 16:52:16 +0800")
-References: <1417423940-1669-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <7htx1f409k.fsf@deeprootsystems.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Mon, 1 Dec 2014 11:52:20 -0800
+Subject: [PATCH RFT 2/2] arm: dts: disable CCI on exynos420 based
+ arndale-octa
+In-Reply-To: <7hbnnn5hmy.fsf@deeprootsystems.com>
+References: <1417186209-5256-1-git-send-email-a.kesavan@samsung.com>
+ <1417186209-5256-2-git-send-email-a.kesavan@samsung.com>
+ <7hbnnn5hmy.fsf@deeprootsystems.com>
+Message-ID: <CANMBJr60MOoHfeSYJK2dN-oyJtLaFWQ3ubjXLQYKfj1WQ8Qb2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris Zhong <zyw@rock-chips.com> writes:
+On 1 December 2014 at 10:50, Kevin Hilman <khilman@kernel.org> wrote:
+> Abhilash Kesavan <a.kesavan@samsung.com> writes:
+>
+>> The arndale-octa board was giving "imprecise external aborts" during
+>> boot-up with MCPM enabled. CCI enablement of the boot cluster was found
+>> to be the cause of these aborts (possibly because the secure f/w was not
+>> allowing it). Hence, disable CCI for the arndale-octa board.
+>>
+>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+>
+> Tested on top of next-20141128 with exynos_defconfig on my Octa board
+> and I'm not seeing the imprecise aborts anymore.
+>
+> Thanks,
+>
+> Kevin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-> devices, since we still lack power_domain driver, so the other power rail
-> of rk3288 need keep power on.
-> I have tested it on rk3288-evb board, atop next-20141112. goto suspend by type
-> "echo mem > /sys/power/state", vdd_cpu is about 0mv by measuring, so it can be
-> determined in sleep mode, then press power button to wakeup it.
+Tested-by: Tyler Baker <tyler.baker@linaro.org>
 
-I tested this on top of today's linux-next (next-20141201) and it
-suspends, but doesn't wake up from any of the button presses.  What
-wakeup sources are configured for the rk3288-evb-rk808?
+Tested on top of mainline/master with exynos_defconfig on my
+arndale-octa board.
+One hundred boots attempted with no imprecise aborts.
 
-Kevin
+Cheers,
+
+-- 
+Tyler Baker
+Tech Lead, LAVA
+Linaro.org | Open source software for ARM SoCs
+Follow Linaro: http://www.facebook.com/pages/Linaro
+http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
