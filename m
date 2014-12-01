@@ -1,65 +1,35 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  1 Dec 2014 11:27:27 +0100
-Subject: [PATCH v3 11/11] ARM: at91/dt: add NOR definition in sama5d3xcm dtsi
+Date: Mon,  1 Dec 2014 11:27:24 +0100
+Subject: [PATCH v3 08/11] ARM: at91/dt: add HSMC (Static Memory Controller)
+ node in sama5d3 dtsi
 In-Reply-To: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1417429647-3419-12-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1417429647-3419-9-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sama5d3 evaluation kit embeds a NOR chip which is connected through
-the EBI.
-Define this NOR chip in the CPU module dtsi.
+Add the SMC node in sama5d3 dtsi.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- arch/arm/boot/dts/sama5d3xcm.dtsi | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ arch/arm/boot/dts/sama5d3.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-index cfcd200..92be776 100644
---- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-@@ -75,6 +75,40 @@
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index 5f4144d..9f1eed5 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -395,6 +395,11 @@
+ 				clock-names = "tdes_clk";
  			};
- 		};
  
-+		ebi at 10000000 {
-+			pinctrl-0 = <&pinctrl_ebi_addr &pinctrl_ebi_cs0>;
-+
-+			cs at 0 {
-+				#address-cells = <2>;
-+				#size-cells = <1>;
-+				ranges;
-+				atmel,generic-dev;
-+				atmel,read-mode = "nrd";
-+				atmel,write-mode = "nwe";
-+				atmel,bus-width = <16>;
-+				atmel,ncs-rd-setup-ns = <0>;
-+				atmel,ncs-wr-setup-ns = <0>;
-+				atmel,nwe-setup-ns = <8>;
-+				atmel,nrd-setup-ns = <16>;
-+				atmel,ncs-rd-pulse-ns = <84>;
-+				atmel,ncs-wr-pulse-ns = <84>;
-+				atmel,nrd-pulse-ns = <76>;
-+				atmel,nwe-pulse-ns = <76>;
-+				atmel,nrd-cycle-ns = <107>;
-+				atmel,nwe-cycle-ns = <84>;
-+				atmel,tdf-ns = <16>;
-+
-+				nor: flash at 0,0 {
-+					compatible = "cfi-flash";
-+					linux,mtd-name = "physmap-flash.0";
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+					reg = <0x0 0x0 0x1000000>;
-+					bank-width = <2>;
-+				};
++			hsmc: hsmc at ffffc000 {
++				compatible = "atmel,sama5d3-smc", "syscon";
++				reg = <0xffffc000 0x1000>;
 +			};
-+		};
 +
- 		nand0: nand at 60000000 {
- 			nand-bus-width = <8>;
- 			nand-ecc-mode = "hw";
+ 			dma0: dma-controller at ffffe600 {
+ 				compatible = "atmel,at91sam9g45-dma";
+ 				reg = <0xffffe600 0x200>;
 -- 
 1.9.1
