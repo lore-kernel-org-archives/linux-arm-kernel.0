@@ -1,29 +1,50 @@
-From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Mon, 01 Dec 2014 13:19:28 +0000
-Subject: [PATCH] drm: i2c: tda998x: Retry fetching the EDID if it fails
- first time.
-In-Reply-To: <20141129114102.02366857@armhf>
-References: <546B84C6.3090809@arm.com>	<20141128091905.3e491c39@armhf>	<54783A2F.5010405@arm.com>
- <20141129114102.02366857@armhf>
-Message-ID: <547C6AE0.80808@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 1 Dec 2014 14:19:43 +0100
+Subject: [GIT PULL 4/4] ARM: tegra: Core code changes for v3.19
+In-Reply-To: <201411282249.58149.arnd@arndb.de>
+References: <1416570832-6220-1-git-send-email-thierry.reding@gmail.com>
+ <1416570832-6220-4-git-send-email-thierry.reding@gmail.com>
+ <201411282249.58149.arnd@arndb.de>
+Message-ID: <20141201131942.GA11943@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/14 10:41, Jean-Francois Moine wrote:
-> On Fri, 28 Nov 2014 09:02:39 +0000
-> Andrew Jackson <Andrew.Jackson@arm.com> wrote:
+On Fri, Nov 28, 2014 at 10:49:57PM +0100, Arnd Bergmann wrote:
+> On Friday 21 November 2014, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > Hi ARM SoC maintainers,
+> > 
+> > The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+> > 
+> >   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.19-soc
+> > 
+> > for you to fetch changes up to e4a680099a6e97ecdbb81081cff9e4a489a4dc44:
+> > 
+> >   ARM: tegra: Re-add removed SoC id macro to tegra_resume() (2014-11-17 11:43:21 +0100)
+> > 
 > 
->>> It seems that your patch is deprecated by Laurent Pinchart's
->>> 	[PATCH] drm: tda998x: Use drm_do_get_edid()
->>> http://lists.freedesktop.org/archives/dri-devel/2014-November/072906.html
->>>   
->>
->> Thank you for the heads-up, I'd not seen that.  I'll consider how my patch might be modified to suit the new infrastructure.
+> Hmm, I guess this should have been part of 3.18, but I just sent out
+> a pull request for fixes today, and it may have been the last time.
 > 
-> You don't need any patch: drm_do_get_edid() already loops on reading
-> the EDID.
-> 
+> Pulled into next/fixes-non-critical now. I see that there is a stable
+> tag on it, which means that it will find its way into 3.18.x, but it's
+> really the wrong way to send a patch for the following merge window when
+> there is a stable tag on it.
 
-Thank you again: that saves me work!
+It didn't seem quite critical enough for it to get it into 3.18, but
+perhaps it should still have gone that route. I'll try to be more
+careful next time around.
 
-   Andrew
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/f567fedc/attachment.sig>
