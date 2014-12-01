@@ -1,83 +1,44 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 01 Dec 2014 16:56:08 +0000
-Subject: [RFC V1 0/8] CPUFreq: create platform-dev for DT based cpufreq
- drivers
-In-Reply-To: <2342930.0NFoS1nEgv@wuerfel>
-References: <cover.1417433163.git.viresh.kumar@linaro.org>
- <23115535.r6kXsReHU2@wuerfel> <547C8423.2090300@arm.com>
- <2342930.0NFoS1nEgv@wuerfel>
-Message-ID: <547C9DA8.3080403@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon,  1 Dec 2014 16:57:13 +0000
+Subject: [PATCH v6 7/8] arm: call iommu_init before of_platform_populate
+In-Reply-To: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1417453034-21379-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We need to ensure that the IOMMUs in the system have a chance to perform
+some basic initialisation before we start adding masters to them.
 
+This patch adds a call to of_iommu_init before of_platform_populate.
 
-On 01/12/14 16:03, Arnd Bergmann wrote:
-> On Monday 01 December 2014 15:07:15 Sudeep Holla wrote:
->> On 01/12/14 14:11, Arnd Bergmann wrote:
->>> On Monday 01 December 2014 13:35:25 Sudeep Holla wrote:
->>>> On 01/12/14 13:29, Viresh Kumar wrote:
->>>>> On 1 December 2014 at 18:24, Arnd Bergmann <arnd@arndb.de> wrote:
->>>>>> Thanks a lot for working on this, we really need to figure it out one day!
->>>>>
->>>>>
->>>>>
->>>>>> Your patches seem well-implemented, so if everybody thinks the general
->>>>>> approach is the best solution, we should do that. From my point of view,
->>>>>> there are two things I would do differently:
->>>>>>
->>>>>> - In the DT binding, I would strongly prefer anything but the root compatible
->>>>>>      property as the key for the new platforms. Clearly we have to keep using
->>>>>>      it for the backwards-compatibility case, as you do, but I think there
->>>>>>      are more appropriate places to put it. Sorting from most favorite to least
->>>>>>      favorite, my list would be:
->>>>>>            1. a new property in /cpus/
->>>>>>            2. a new property each /cpus/cpu at ... node.
->>>>>
->>>>> I did it this way earlier and named it dvfs-method but probably putting this
->>>>> into the /cpus/ node is far better. But then Sudeep asked to utilize
->>>>> compatible property only..
->>>>>
->>>>> Are you fine with the name here? "dvfs-method"
->>>>>
->>>>
->>>> That's right, I don't like driver specific method in the cpu node as you
->>>> initially did. But if it's a property in the chosen node (where we
->>>> usually put the Linux specific properties), I am fine with
->>>> that as Arnd has illustrated in his patch.
->>>
->>> I would prefer the /cpus node over the /chosen node because the former
->>> describes the hardware while the latter is supposed to be user-settable
->>> (on real open-firmware at least). But I think either one is better than
->>> using the / node compatible string.
->>>
->>
->> Agreed, the main reason for objection was that in the initial proposal
->> it was more a Linux configuration rather than hardware property.
->>
->> <dvfs-method> = "cpufreq-dt";
->>
->> I don't see anything hardware feature presented with that. On the other
->> hand, we could represent the some thing like whether the cpu share
->> clock or are they independently clocked as a hardware property in the
->> cpu nodes.
->
-> My interpretation of the dvfs-method property is that the string states
-> how dvfs works. In particular, it would be used to tell the difference
-> between machines that just rely on the clocks and regulators properties
-> of the CPU nodes as defined in bindings/cpufreq/cpufreq-dt.txt compared
-> to those that need platform-specific properties beyond that. The value
-> of the string should indeed not be "cpufreq-dt", as that would be a linux
-> implementation detail and inappropriate here.
->
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/setup.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-May be I misunderstood, but from Viresh's initial proposal my
-understanding was that the value of the property would indicate that it
-should use the cpufreq-dt driver and that sounded like Linux specific.
-
-If it's not going to be used in that manner and is what have explained
-above, I am fine with that as that's exactly what I am trying to convey
-in this thread(though I now realize that I have not been so clear :( )
-
-Regards,
-Sudeep
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index c03106378b49..1cfc94aa7fa2 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -18,6 +18,7 @@
+ #include <linux/bootmem.h>
+ #include <linux/seq_file.h>
+ #include <linux/screen_info.h>
++#include <linux/of_iommu.h>
+ #include <linux/of_platform.h>
+ #include <linux/init.h>
+ #include <linux/kexec.h>
+@@ -806,6 +807,7 @@ static int __init customize_machine(void)
+ 	 * machine from the device tree, if no callback is provided,
+ 	 * otherwise we would always need an init_machine callback.
+ 	 */
++	of_iommu_init();
+ 	if (machine_desc->init_machine)
+ 		machine_desc->init_machine();
+ #ifdef CONFIG_OF
+-- 
+2.1.1
