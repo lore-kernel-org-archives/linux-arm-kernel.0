@@ -1,51 +1,65 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 1 Dec 2014 18:08:04 +0800
-Subject: [GIT PULL] CSR SiRFSOC DT for 3.19
-In-Reply-To: <201411281514.54841.arnd@arndb.de>
-References: <CAGsJ_4yC8bStnYx3ramD=OXA03oihUEwCgcfqsStfWx2rasMqQ@mail.gmail.com>
- <201411281514.54841.arnd@arndb.de>
-Message-ID: <CAGsJ_4xmDWiJH+sngcdiKJpkRH=xrRQFsArd+UcVoV4WWC=Jtw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 1 Dec 2014 10:08:58 +0000
+Subject: [PATCH v3 0/3] SoCFPGA: L3 NIC driver
+In-Reply-To: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20141201100858.GA17070@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-28 22:14 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday 25 November 2014, Barry Song wrote:
->> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
->>
->>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
->>
->> are available in the git repository at:
->>
->>   gitolite.kernel.org:/pub/scm/linux/kernel/git/baohua/linux.git
->> tags/sirf-dts-for-3.19
->>
->> for you to fetch changes up to 294a212faa5bf7cb48fabccec5ee13e836e29ecb:
->
-> The URL did not work for me, I had to replace it with
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux
->
-> and I checked that the commit ID is the same. I think you need to
-> configure your git tree to have a separate url and pushurl for
-> your remote, so your pull requests are derived from a publically
-> accessible url.
+On Sat, Nov 29, 2014 at 08:14:09PM +0000, Steffen Trumtrar wrote:
+> Hi!
 
-yes. Arnd, i made a mis-operation for remote when i did pull-request.
-thanks very much for your work to fix it.
+Hi Steffen,
 
->
->>   ARM: dts: atlas6: add resets property for SPI nodes (2014-11-25
->> 18:46:43 +0800)
->>
->> ----------------------------------------------------------------
->> change pinmux pingroup and add some lost node/prop
->>
->> 1. add resets properity for some nodes;
->> 2. change pinctrl groups for audio
->> 3. add PMU node
->
-> Pulled into next/dt, thanks!
->
->         Arnd
+> This series adds support for the SoCFPGA L3 NIC. As the memory range has
+> a lot of holes, where you can not read from, syscon can not be used for
+> this IP core. Instead add a new driver, that knows about all the allowed
+> ranges and guards the access via regmap.
 
--barry
+I note that while this series plumbs in a set of accessors (via regmap),
+there are no users as part of this series. What exactly do you intend to
+use these for? What is going to (re)program the bus, and how?
+
+I also note that you mention this L3/L4 bus hierarchy is composed of a
+number of NIC-301s, rather than being a single custom IP block. If
+that's the case, it would seem like there should be a binding for the
+NIC-301, and the hierarchy should be described.
+
+Thanks,
+Mark.
+
+> 
+> Changes in v3:
+> 
+> 	- Split out the devicetree binding in its own patch
+> 
+> Regards,
+> Steffen
+> 
+> Steffen Trumtrar (3):
+>   Documentation: dt: add Altera L3 NIC bindings
+>   ARM: socfpga: Add driver for the L3 interconnect
+>   ARM: dts: socfpga: Add l3nic node
+> 
+>  .../bindings/soc/socfpga/altr,l3-nic.txt           |  15 ++
+>  arch/arm/boot/dts/socfpga.dtsi                     |   5 +
+>  drivers/soc/Kconfig                                |   1 +
+>  drivers/soc/Makefile                               |   1 +
+>  drivers/soc/socfpga/Kconfig                        |  10 +
+>  drivers/soc/socfpga/Makefile                       |   1 +
+>  drivers/soc/socfpga/l3nic.c                        | 221 +++++++++++++++++++++
+>  include/soc/socfpga/gpv.h                          |  63 ++++++
+>  include/soc/socfpga/l3regs.h                       | 192 ++++++++++++++++++
+>  9 files changed, 509 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
+>  create mode 100644 drivers/soc/socfpga/Kconfig
+>  create mode 100644 drivers/soc/socfpga/Makefile
+>  create mode 100644 drivers/soc/socfpga/l3nic.c
+>  create mode 100644 include/soc/socfpga/gpv.h
+>  create mode 100644 include/soc/socfpga/l3regs.h
+> 
+> -- 
+> 2.1.3
+> 
+> 
