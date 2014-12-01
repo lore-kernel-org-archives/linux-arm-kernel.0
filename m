@@ -1,33 +1,99 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 1 Dec 2014 11:16:12 +0000
-Subject: [PATCH v2 8/8] ARM: dts: mt8135: Add support for MT6397 regulator
-In-Reply-To: <1417403967.9547.2.camel@mtksdaap41>
-References: <1417146874-5232-1-git-send-email-flora.fu@mediatek.com>
- <1417146874-5232-9-git-send-email-flora.fu@mediatek.com>
- <20141128153008.GS7712@sirena.org.uk>
- <1417403967.9547.2.camel@mtksdaap41>
-Message-ID: <20141201111612.GF7712@sirena.org.uk>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 01 Dec 2014 12:19:21 +0100
+Subject: [PATCH RFT 2/2] arm: dts: disable CCI on exynos420 based
+ arndale-octa
+In-Reply-To: <20141201110948.GB3836@n2100.arm.linux.org.uk>
+References: <1417186209-5256-1-git-send-email-a.kesavan@samsung.com>
+ <1417186209-5256-2-git-send-email-a.kesavan@samsung.com>
+ <1417187977.19247.4.camel@AMDC1943>
+ <CAM4voa=aN53CWjTzw-A736xZo3xWr2N4kBpM0vJX5KqfV-ikjQ@mail.gmail.com>
+ <1417424608.4055.24.camel@AMDC1943>
+ <20141201110948.GB3836@n2100.arm.linux.org.uk>
+Message-ID: <1417432761.4055.27.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 11:19:25AM +0800, Flora Fu wrote:
-> On Fri, 2014-11-28 at 15:30 +0000, Mark Brown wrote: 
+On pon, 2014-12-01 at 11:09 +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 01, 2014 at 10:03:28AM +0100, Krzysztof Kozlowski wrote:
+> > On pi?, 2014-11-28 at 21:09 +0530, Abhilash Kesavan wrote:
+> > > Hello Krzysztof,
+> > > 
+> > > On Fri, Nov 28, 2014 at 8:49 PM, Krzysztof Kozlowski
+> > > <k.kozlowski@samsung.com> wrote:
+> > > > On pi?, 2014-11-28 at 20:20 +0530, Abhilash Kesavan wrote:
+> > > >> The arndale-octa board was giving "imprecise external aborts" during
+> > > >> boot-up with MCPM enabled. CCI enablement of the boot cluster was found
+> > > >> to be the cause of these aborts (possibly because the secure f/w was not
+> > > >> allowing it). Hence, disable CCI for the arndale-octa board.
+> > > >>
+> > > >> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > > >> ---
+> > > >>  arch/arm/boot/dts/exynos5420-arndale-octa.dts |    4 ++++
+> > > >>  arch/arm/boot/dts/exynos5420.dtsi             |    2 +-
+> > > >>  2 files changed, 5 insertions(+), 1 deletion(-)
+> > > >
+> > > > I tested these 2 patches on Arndale Octa but there are no improvements.
+> > > > I still got imprecise aborts (some not fatal and sometimes killing init
+> > > > with full backtrace).
+> > > 
+> > > Thanks for testing. Are you testing this with exynos_defconfig with no
+> > > other changes ? Can you please confirm from the bootlog that MCPM and
+> > > CCI are not being initialized.
+> > > 
+> > That was exynos_defconfig with disabled DRM and enabled some debug,
+> > next-20141128.
+> > 
+> > When I tried only exynos_defconfig (with disabled DRM) it worked fine...
+> > So the imprecise aborts were caused by one of following debug options:
+> > 
+> > DEBUG_SECTION_MISMATCH
+> > DYNAMIC_DEBUG
+> > DEBUG_ATOMIC_SLEEP
+> > DEBUG_PREEMPT
+> > PROVE_LOCKING
+> > LOCKUP_DETECTOR
+> > DEBUG_LOCK_ALLOC
+> > PROVE_RCU
+> > DEBUG_RT_MUTEXES
+> > DEBUG_MUTEXES
+> > DEBUG_SPINLOCK
+> > DEBUG_LIST
+> > DEBUG_PAGEALLOC
+> > SPARSE_RCU_POINTER
+> > DEBUG_FS
+> > PM_DEBUG
+> > PM_ADVANCED_DEBUG
+> > GPIO_SYSFS
+> > 
+> > > Can you remove these 2 patches and on linux-next check if you are
+> > > getting aborts even with 5420_MCPM disabled.
+> > 
+> > I tried this already and imprecise aborts shown, however with my
+> > debugging options above.
+> > 
+> > Overall the patches seems to work properly (although the debugging issue
+> > needs to be resolved still), so:
+> > 
+> > On Arndale Octa (Exynos 5420):
+> > Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> Reading this message, it seems that this should *not* be given a tested-by,
+> because it seems from what you've reported above, they don't work correctly.
+> 
+> If you have to turn debugging options off in order to get the kernel to
+> apparently run correctly after applying some patches, it means those
+> patches themselves are probably buggy, rather than the debug itself
+> being buggy.
+> 
+> I'd suggest that you have some further work to do (a manual bisect of the
+> config options you've disabled) to discover which is the cause of the
+> problem.
+> 
+> It could be that the code introduces something like a use-after-free bug.
 
-> > This appears to be the DT fragment for a SoC but you are defining the
-> > system integration for the PMIC.  That's bad, the PMIC is a separate
-> > device so should be hooked up by the board using it.  If there's common
-> > elements from a reference design they should be in their own .dtsi.
+Maybe I was to eager to add Tested-by but (without debugging options)
+one imprecise-abort disappears with the patchset. Other issues seem not
+to be fixed.
 
-> Do you mean that we should add a mt6397.dtsi and include it from
-> mt8135.dtsi? For board specific, update them in mt8135.dtsi? 
-
-More likely you should just add any integration needed in the board
-file.  There should be no need to specify anything generically for the
-regulators on a PMIC except registering the device.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/7e88de18/attachment.sig>
+Best regards,
+Krzysztof
