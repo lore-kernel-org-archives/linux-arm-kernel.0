@@ -1,65 +1,48 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 01 Dec 2014 10:43:16 +0100
-Subject: [GIT PULL] Reset controller changes for v3.19
-In-Reply-To: <1417424646.4624.2.camel@pengutronix.de>
-References: <1417424646.4624.2.camel@pengutronix.de>
-Message-ID: <1417426996.4624.4.camel@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 1 Dec 2014 10:43:42 +0100
+Subject: [PATCH v2 03/11] mfd: syscon: Add atmel-smc registers definition
+In-Reply-To: <20141201103838.4a7a0ffa@bbrezillon>
+References: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>	<1415203287-21517-4-git-send-email-boris.brezillon@free-electrons.com>	<20141110095728.GJ21424@x1>
+ <20141201103838.4a7a0ffa@bbrezillon>
+Message-ID: <547C384E.80705@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 01.12.2014, 10:04 +0100 schrieb Philipp Zabel:
-> Hi Arnd, Olof,
+Le 01/12/2014 10:38, Boris Brezillon a ?crit :
+> Hi Lee,
 > 
-> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+> Sorry for the late reply.
 > 
->   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> On Mon, 10 Nov 2014 09:57:28 +0000
+> Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> are available in the git repository at:
+>> On Wed, 05 Nov 2014, Boris Brezillon wrote:
+>>
+>>> Atmel AT91 SoCs have a memory range reserved for SMC (Static Memory
+>>> Controller) configuration.
+>>> Expose those registers so that drivers can make use of the smc syscon
+>>> declared in at91 DTs.
+>>>
+>>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>>> ---
+>>>  include/linux/mfd/syscon/atmel-smc.h | 60 ++++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 60 insertions(+)
+>>>  create mode 100644 include/linux/mfd/syscon/atmel-smc.h
+>>
+>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> Any idea who will take this set?
 > 
->   git://git.pengutronix.de/pza/linux.git reset-for-3.19-2
+> I guess you could take patch 1 to 4 and Nicolas would take the other
+> ones (unless there's a maintainer for memory controller drivers).
+> Or, if we don't want to have dependency issues, Nicolas can take all of
+> them.
+> 
+> Nicolas, any preference ?
 
-Sorry, that should be
+Yes, I'd prefer to take the whole series. So add your Acked-by tags and
+I take all in one of my at91-x.yy-drivers branches.
 
-   git://git.pengutronix.de/git/pza/linux.git reset-for-3.19-2
-                            ^^^^
-
-regards
-Philipp
-
-> for you to fetch changes up to f200890f224d9ed0af207145a2279f51c6be230b:
-> 
->   reset: add socfpga_reset_status (2014-11-04 12:40:16 +0100)
-> 
-> ----------------------------------------------------------------
-> Reset controller changes for v3.19
-> 
-> ----------------------------------------------------------------
-> Dinh Nguyen (2):
->       reset: add reset_control_status helper function
->       reset: add socfpga_reset_status
-> 
-> Maxime Coquelin (1):
->       reset: stih407: Add reset controllers DT bindings
-> 
-> Peter Griffin (2):
->       reset: stih407: Add softreset, powerdown and picophy controllers
->       reset: sti: Document sti-picophyreset controllers bindings.
-> 
-> Philipp Zabel (1):
->       Merge tag 'sti-reset-for-v3.19-1' of git://git.stlinux.com/devel/kernel/linux-sti into reset/for_v3.19
-> 
->  .../bindings/reset/st,sti-picophyreset.txt         |  42 ++++++
->  drivers/reset/core.c                               |  15 ++
->  drivers/reset/reset-socfpga.c                      |  15 ++
->  drivers/reset/sti/Kconfig                          |   4 +
->  drivers/reset/sti/Makefile                         |   1 +
->  drivers/reset/sti/reset-stih407.c                  | 158 +++++++++++++++++++++
->  .../dt-bindings/reset-controller/stih407-resets.h  |  61 ++++++++
->  include/linux/reset-controller.h                   |   2 +
->  include/linux/reset.h                              |   7 +
->  9 files changed, 305 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/st,sti-picophyreset.txt
->  create mode 100644 drivers/reset/sti/reset-stih407.c
->  create mode 100644 include/dt-bindings/reset-controller/stih407-resets.h
-> 
-> 
+Bye,
+-- 
+Nicolas Ferre
