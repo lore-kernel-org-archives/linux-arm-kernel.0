@@ -1,187 +1,98 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 1 Dec 2014 16:57:52 +0100
-Subject: [PATCH] ASoC: snd-soc-afeb9260: delete driver as board has just been
- removed
-Message-ID: <1417449472-13498-1-git-send-email-nicolas.ferre@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Dec 2014 17:03:46 +0100
+Subject: [RFC V1 0/8] CPUFreq: create platform-dev for DT based cpufreq
+ drivers
+In-Reply-To: <547C8423.2090300@arm.com>
+References: <cover.1417433163.git.viresh.kumar@linaro.org>
+ <23115535.r6kXsReHU2@wuerfel> <547C8423.2090300@arm.com>
+Message-ID: <2342930.0NFoS1nEgv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the removal of all AT91 !DT boards, we removed the AFEB9260. This driver
-is !DT and was only used by this board, so we delete it as well.
+On Monday 01 December 2014 15:07:15 Sudeep Holla wrote:
+> On 01/12/14 14:11, Arnd Bergmann wrote:
+> > On Monday 01 December 2014 13:35:25 Sudeep Holla wrote:
+> >> On 01/12/14 13:29, Viresh Kumar wrote:
+> >>> On 1 December 2014 at 18:24, Arnd Bergmann <arnd@arndb.de> wrote:
+> >>>> Thanks a lot for working on this, we really need to figure it out one day!
+> >>>
+> >>>
+> >>>
+> >>>> Your patches seem well-implemented, so if everybody thinks the general
+> >>>> approach is the best solution, we should do that. From my point of view,
+> >>>> there are two things I would do differently:
+> >>>>
+> >>>> - In the DT binding, I would strongly prefer anything but the root compatible
+> >>>>     property as the key for the new platforms. Clearly we have to keep using
+> >>>>     it for the backwards-compatibility case, as you do, but I think there
+> >>>>     are more appropriate places to put it. Sorting from most favorite to least
+> >>>>     favorite, my list would be:
+> >>>>           1. a new property in /cpus/
+> >>>>           2. a new property each /cpus/cpu at ... node.
+> >>>
+> >>> I did it this way earlier and named it dvfs-method but probably putting this
+> >>> into the /cpus/ node is far better. But then Sudeep asked to utilize
+> >>> compatible property only..
+> >>>
+> >>> Are you fine with the name here? "dvfs-method"
+> >>>
+> >>
+> >> That's right, I don't like driver specific method in the cpu node as you
+> >> initially did. But if it's a property in the chosen node (where we
+> >> usually put the Linux specific properties), I am fine with
+> >> that as Arnd has illustrated in his patch.
+> >
+> > I would prefer the /cpus node over the /chosen node because the former
+> > describes the hardware while the latter is supposed to be user-settable
+> > (on real open-firmware at least). But I think either one is better than
+> > using the / node compatible string.
+> >
+> 
+> Agreed, the main reason for objection was that in the initial proposal
+> it was more a Linux configuration rather than hardware property.
+> 
+> <dvfs-method> = "cpufreq-dt";
+> 
+> I don't see anything hardware feature presented with that. On the other
+> hand, we could represent the some thing like whether the cpu share
+> clock or are they independently clocked as a hardware property in the
+> cpu nodes.
 
-Reported-by: Paul Bolle <pebolle@tiscali.nl>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- sound/soc/atmel/Makefile           |   1 -
- sound/soc/atmel/snd-soc-afeb9260.c | 151 -------------------------------------
- 2 files changed, 152 deletions(-)
- delete mode 100644 sound/soc/atmel/snd-soc-afeb9260.c
+My interpretation of the dvfs-method property is that the string states
+how dvfs works. In particular, it would be used to tell the difference
+between machines that just rely on the clocks and regulators properties
+of the CPU nodes as defined in bindings/cpufreq/cpufreq-dt.txt compared
+to those that need platform-specific properties beyond that. The value
+of the string should indeed not be "cpufreq-dt", as that would be a linux
+implementation detail and inappropriate here. 
 
-diff --git a/sound/soc/atmel/Makefile b/sound/soc/atmel/Makefile
-index 5baabc8bde3a..466a821da98c 100644
---- a/sound/soc/atmel/Makefile
-+++ b/sound/soc/atmel/Makefile
-@@ -17,4 +17,3 @@ snd-soc-sam9x5-wm8731-objs := sam9x5_wm8731.o
- obj-$(CONFIG_SND_AT91_SOC_SAM9G20_WM8731) += snd-soc-sam9g20-wm8731.o
- obj-$(CONFIG_SND_ATMEL_SOC_WM8904) += snd-atmel-soc-wm8904.o
- obj-$(CONFIG_SND_AT91_SOC_SAM9X5_WM8731) += snd-soc-sam9x5-wm8731.o
--obj-$(CONFIG_SND_AT91_SOC_AFEB9260) += snd-soc-afeb9260.o
-diff --git a/sound/soc/atmel/snd-soc-afeb9260.c b/sound/soc/atmel/snd-soc-afeb9260.c
-deleted file mode 100644
-index 9579799ace54..000000000000
---- a/sound/soc/atmel/snd-soc-afeb9260.c
-+++ /dev/null
-@@ -1,151 +0,0 @@
--/*
-- * afeb9260.c  --  SoC audio for AFEB9260
-- *
-- * Copyright (C) 2009 Sergey Lapin <slapin@ossfans.org>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-- * 02110-1301 USA
-- *
-- */
--
--#include <linux/module.h>
--#include <linux/moduleparam.h>
--#include <linux/kernel.h>
--#include <linux/clk.h>
--#include <linux/platform_device.h>
--
--#include <linux/atmel-ssc.h>
--#include <sound/core.h>
--#include <sound/pcm.h>
--#include <sound/pcm_params.h>
--#include <sound/soc.h>
--
--#include <asm/mach-types.h>
--#include <mach/hardware.h>
--#include <linux/gpio.h>
--
--#include "../codecs/tlv320aic23.h"
--#include "atmel-pcm.h"
--#include "atmel_ssc_dai.h"
--
--#define CODEC_CLOCK 	12000000
--
--static int afeb9260_hw_params(struct snd_pcm_substream *substream,
--			 struct snd_pcm_hw_params *params)
--{
--	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct snd_soc_dai *codec_dai = rtd->codec_dai;
--	int err;
--
--	/* Set the codec system clock for DAC and ADC */
--	err =
--	    snd_soc_dai_set_sysclk(codec_dai, 0, CODEC_CLOCK, SND_SOC_CLOCK_IN);
--
--	if (err < 0) {
--		printk(KERN_ERR "can't set codec system clock\n");
--		return err;
--	}
--
--	return err;
--}
--
--static struct snd_soc_ops afeb9260_ops = {
--	.hw_params = afeb9260_hw_params,
--};
--
--static const struct snd_soc_dapm_widget tlv320aic23_dapm_widgets[] = {
--	SND_SOC_DAPM_HP("Headphone Jack", NULL),
--	SND_SOC_DAPM_LINE("Line In", NULL),
--	SND_SOC_DAPM_MIC("Mic Jack", NULL),
--};
--
--static const struct snd_soc_dapm_route afeb9260_audio_map[] = {
--	{"Headphone Jack", NULL, "LHPOUT"},
--	{"Headphone Jack", NULL, "RHPOUT"},
--
--	{"LLINEIN", NULL, "Line In"},
--	{"RLINEIN", NULL, "Line In"},
--
--	{"MICIN", NULL, "Mic Jack"},
--};
--
--
--/* Digital audio interface glue - connects codec <--> CPU */
--static struct snd_soc_dai_link afeb9260_dai = {
--	.name = "TLV320AIC23",
--	.stream_name = "AIC23",
--	.cpu_dai_name = "atmel-ssc-dai.0",
--	.codec_dai_name = "tlv320aic23-hifi",
--	.platform_name = "atmel_pcm-audio",
--	.codec_name = "tlv320aic23-codec.0-001a",
--	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_IF |
--		   SND_SOC_DAIFMT_CBM_CFM,
--	.ops = &afeb9260_ops,
--};
--
--/* Audio machine driver */
--static struct snd_soc_card snd_soc_machine_afeb9260 = {
--	.name = "AFEB9260",
--	.owner = THIS_MODULE,
--	.dai_link = &afeb9260_dai,
--	.num_links = 1,
--
--	.dapm_widgets = tlv320aic23_dapm_widgets,
--	.num_dapm_widgets = ARRAY_SIZE(tlv320aic23_dapm_widgets),
--	.dapm_routes = afeb9260_audio_map,
--	.num_dapm_routes = ARRAY_SIZE(afeb9260_audio_map),
--};
--
--static struct platform_device *afeb9260_snd_device;
--
--static int __init afeb9260_soc_init(void)
--{
--	int err;
--	struct device *dev;
--
--	if (!(machine_is_afeb9260()))
--		return -ENODEV;
--
--
--	afeb9260_snd_device = platform_device_alloc("soc-audio", -1);
--	if (!afeb9260_snd_device) {
--		printk(KERN_ERR "ASoC: Platform device allocation failed\n");
--		return -ENOMEM;
--	}
--
--	platform_set_drvdata(afeb9260_snd_device, &snd_soc_machine_afeb9260);
--	err = platform_device_add(afeb9260_snd_device);
--	if (err)
--		goto err1;
--
--	dev = &afeb9260_snd_device->dev;
--
--	return 0;
--err1:
--	platform_device_put(afeb9260_snd_device);
--	return err;
--}
--
--static void __exit afeb9260_soc_exit(void)
--{
--	platform_device_unregister(afeb9260_snd_device);
--}
--
--module_init(afeb9260_soc_init);
--module_exit(afeb9260_soc_exit);
--
--MODULE_AUTHOR("Sergey Lapin <slapin@ossfans.org>");
--MODULE_DESCRIPTION("ALSA SoC for AFEB9260");
--MODULE_LICENSE("GPL");
--
--- 
-2.1.3
+For the strings, we could use a set like
+
+	linux,dvfs-method = "generic"; /* bindings/cpufreq/cpufreq-dt.txt */
+	linux,dvfs-method = "arm,big-little"; /* bindings/cpufreq/arm_big_little_dt.txt */
+	linux,dvfs-method = "samsung,exynos4210"; /* legacy exynos, all four */
+	linux,dvfs-method = "samsung,exynos4212";
+	linux,dvfs-method = "samsung,exynos4412";
+	linux,dvfs-method = "samsung,exynos5250";
+
+Note that the "linux," prefix here does not mean that the property would
+not be interpreted by another OS or that it doesn't describe the hardware.
+Instead, it means that it is defined by linux first and not specific to
+some other vendor. We could also drop the prefix, but that has the danger
+of conflicting with another property that someone already defined, while
+the "linux," namespace is managed through our upstream git and we know that
+nobody is using this property name.
+
+> > How about a "linux,cpu-dvfs-method" property in the root node? Would
+> > that work better for you than a "linux,dvfs-method" in the "/cpus"
+> > node?
+> >
+> 
+> I will leave that to the DT maintainers for specific details though
+> my preference is still chosen node as it's more related to Linux and
+> it's driver choice and unlikely to be used by other OSes. IMO we just
+> need single entry in the DT, so I am fine with either of your choice above.
+
+Ok.
+
+	Arnd
