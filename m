@@ -1,33 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Dec 2014 22:28:39 +0100
-Subject: [PATCH v3 05/11] memory: add Atmel EBI (External Bus Interface)
- driver
-In-Reply-To: <20141201212820.6a7fc4b0@bbrezillon>
-References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
- <2476626.8iiXDzb2Te@wuerfel> <20141201212820.6a7fc4b0@bbrezillon>
-Message-ID: <2153824.ln4mvSCK1X@wuerfel>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Mon,  1 Dec 2014 22:51:07 +0100
+Subject: [PATCH] ARM: BCM5301X: Add IRQs to Broadcom's bus-axi in DTS file
+Message-ID: <1417470667-15679-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 December 2014 21:28:20 Boris Brezillon wrote:
-> > On Monday 01 December 2014 19:29:23 Boris Brezillon wrote:
-> > > On Mon, 01 Dec 2014 17:26:27 +0100 Arnd Bergmann <arnd@arndb.de> wrote:
-> > > 
-> > > #define AT91_EBICSA_REGFIELD(off)                   \
-> > >     REG_FIELD(ebicsa_off, AT91_MATRIX_EBI_NUM_CS - 1)
-> > > 
-> > 
-> > That would be acceptable too, but what I really meant is one step further:
-> > 
-> > static const struct reg_field at91sam9260_ebi_csa = 
-> >       REG_FIELD(AT91SAM9260_MATRIX_EBICSA_OFF, 0, AT91_MATRIX_EBI_NUM_CS - 1);
-> 
-> That's what I did in the first place (in a version I didn't submitted),
-> and I guess I'll go for that one unless you really prefer the
-> alternative (I ran into a lot of trouble with DT bindings ABI
-> stability, and I'd prefer to keep DT bindings as simple as
-> possible).
+IRQ support for Broadcom's bus-axi driver bcma was merged into John
+Linville's wireless tree and will show up in 3.19. This patch makes use
+of this feature in the DTS file for the the BCM5301X SoCs. I left the
+PCIe controller out, because this still needs some discussion.
 
-Ok, that's good then.
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ arch/arm/boot/dts/bcm5301x.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-	Arnd
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index 6d80922..b7c4e9e 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -101,6 +101,40 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0x000fffff 0xffff>;
++		interrupt-map = 
++			/* ChipCommon */
++			<0x00000000 0 &gic GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* USB 2.0 Controller */
++			<0x00021000 0 &gic GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* USB 3.0 Controller */
++			<0x00023000 0 &gic GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* Ethernet Controller 0 */
++			<0x00024000 0 &gic GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* Ethernet Controller 1 */
++			<0x00025000 0 &gic GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* Ethernet Controller 2 */
++			<0x00026000 0 &gic GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* Ethernet Controller 3 */
++			<0x00027000 0 &gic GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* NAND Controller */
++			<0x00028000 0 &gic GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>,
++			<0x00028000 1 &gic GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>,
++			<0x00028000 2 &gic GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>,
++			<0x00028000 3 &gic GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
++			<0x00028000 4 &gic GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
++			<0x00028000 5 &gic GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
++			<0x00028000 6 &gic GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
++			<0x00028000 7 &gic GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
++
+ 		chipcommon: chipcommon at 0 {
+ 			reg = <0x00000000 0x1000>;
+ 
+-- 
+1.9.1
