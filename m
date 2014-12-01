@@ -1,146 +1,68 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 01 Dec 2014 12:52:55 +0100
-Subject: [PATCH 1/4] ARM: at91: remove at91sam9263 legacy board support
-In-Reply-To: <cf26d39a4a251662dbc363092b319b788d223a7b.1416392687.git.nicolas.ferre@atmel.com>
-References: <cover.1416392687.git.nicolas.ferre@atmel.com>
- <cf26d39a4a251662dbc363092b319b788d223a7b.1416392687.git.nicolas.ferre@atmel.com>
-Message-ID: <1417434775.30245.29.camel@x220>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 1 Dec 2014 11:54:00 +0000
+Subject: [PATCH] irqchip: gic: Allow interrupt level to be set for PPIs.
+In-Reply-To: <547C5179.5020505@arm.com>
+References: <1417197340-27298-1-git-send-email-Liviu.Dudau@arm.com>
+ <20141201104145.GY3836@n2100.arm.linux.org.uk>
+ <20141201104612.GM828@e106497-lin.cambridge.arm.com>
+ <20141201110358.GA3836@n2100.arm.linux.org.uk>
+ <547C4ECD.20802@arm.com>
+ <20141201112302.GC3836@n2100.arm.linux.org.uk>
+ <547C5179.5020505@arm.com>
+Message-ID: <20141201115400.GD3836@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-11-19 at 11:31 +0100, Nicolas Ferre wrote:
-> Remove legacy support for at91sam9rl boards.
-> This include board files removal plus all legacy code for non DT boards
-> support.
-> Use the Device Tree for running this board with newer kernels.
+On Mon, Dec 01, 2014 at 11:31:05AM +0000, Marc Zyngier wrote:
+> On 01/12/14 11:23, Russell King - ARM Linux wrote:
+> > On Mon, Dec 01, 2014 at 11:19:41AM +0000, Marc Zyngier wrote:
+> >> Hi Russell,
+> >>
+> >> On 01/12/14 11:03, Russell King - ARM Linux wrote:
+> >>> If all you want to do is to bypass the following check, what's wrong
+> >>> with actually doing that:
+> >>>
+> >>> -	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
+> >>> +	if (gicirq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
+> >>> +	    type != IRQ_TYPE_EDGE_RISING)
+> >>> 		return -EINVAL;
+> >>>
+> >>
+> >> I think that will require some additional changes to gic_configure_irq
+> >> (in irq-gic-common.c).
+> > 
+> > I don't think so - gic_configure_irq() will treat it as a no-op as far
+> > as trying to configure the IRQ settings.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-
-There's some further cleanup possible after this patch. I noticed that
-when it landed in today's linux-next (ie, next-20141201) as commit
-4403ac46edcd ("ARM: at91: remove at91sam9263 legacy board support").
-
->  arch/arm/configs/at91sam9263_defconfig   |  151 ---
->  arch/arm/mach-at91/Kconfig.non_dt        |   21 -
->  arch/arm/mach-at91/Makefile              |    4 -
->  arch/arm/mach-at91/at91sam9263.c         |  399 --------
->  arch/arm/mach-at91/at91sam9263_devices.c | 1538 ------------------------------
->  arch/arm/mach-at91/board-sam9263ek.c     |  493 ----------
->  6 files changed, 2606 deletions(-)
->  delete mode 100644 arch/arm/configs/at91sam9263_defconfig
->  delete mode 100644 arch/arm/mach-at91/at91sam9263_devices.c
->  delete mode 100644 arch/arm/mach-at91/board-sam9263ek.c
+> I agree. But that's following ARM's tradition of making PPIs
+> non-configurable. I seem to remember that there is at least one
+> occurrence of a GIC with configurable PPIs (Qualcomm, IIRC).
 > 
->[...]
-> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-> deleted file mode 100644
-> index cef0e2f57068..000000000000
-> --- a/arch/arm/mach-at91/at91sam9263_devices.c
-> +++ /dev/null
->[...]
-> -/* --------------------------------------------------------------------
-> - *  RTT
-> - * -------------------------------------------------------------------- */
-> -
-> -static struct resource rtt0_resources[] = {
-> -	{
-> -		.start	= AT91SAM9263_BASE_RTT0,
-> -		.end	= AT91SAM9263_BASE_RTT0 + SZ_16 - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	}, {
-> -		.flags	= IORESOURCE_MEM,
-> -	}, {
-> -		.flags  = IORESOURCE_IRQ,
-> -	}
-> -};
-> -
-> -static struct platform_device at91sam9263_rtt0_device = {
-> -	.name		= "at91_rtt",
-> -	.id		= 0,
-> -	.resource	= rtt0_resources,
-> -};
-> -
-> -static struct resource rtt1_resources[] = {
-> -	{
-> -		.start	= AT91SAM9263_BASE_RTT1,
-> -		.end	= AT91SAM9263_BASE_RTT1 + SZ_16 - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	}, {
-> -		.flags	= IORESOURCE_MEM,
-> -	}, {
-> -		.flags  = IORESOURCE_IRQ,
-> -	}
-> -};
-> -
-> -static struct platform_device at91sam9263_rtt1_device = {
-> -	.name		= "at91_rtt",
-> -	.id		= 1,
-> -	.resource	= rtt1_resources,
-> -};
-> -
-> -#if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
-> -static void __init at91_add_device_rtt_rtc(void)
-> -{
-> -	struct platform_device *pdev;
-> -	struct resource *r;
-> -
-> -	switch (CONFIG_RTC_DRV_AT91SAM9_RTT) {
+> With this use case in mind, Liviu's patch allows an active-low interrupt
+> to be correctly configured as level, for example.
 
-This and...
+Liviu's patch is nothing more than a hack.  It changes (eg) the active
+low level to be an active high level with the explicitly stated reason to
+bypass a test, and then hopes that the remaining functions do the right
+thing.
 
-> -	case 0:
-> -		/*
-> -		 * The second resource is needed only for the chosen RTT:
-> -		 * GPBR will serve as the storage for RTC time offset
-> -		 */
-> -		at91sam9263_rtt0_device.num_resources = 3;
-> -		at91sam9263_rtt1_device.num_resources = 1;
-> -		pdev = &at91sam9263_rtt0_device;
-> -		r = rtt0_resources;
-> -		break;
-> -	case 1:
-> -		at91sam9263_rtt0_device.num_resources = 1;
-> -		at91sam9263_rtt1_device.num_resources = 3;
-> -		pdev = &at91sam9263_rtt1_device;
-> -		r = rtt1_resources;
-> -		break;
-> -	default:
-> -		pr_err("at91sam9263: only supports 2 RTT (%d)\n",
-> -		       CONFIG_RTC_DRV_AT91SAM9_RTT);
+It would be better to explicitly bypass the test, and then explicitly
+handle other cases in gic_configure_irq().
 
-this are the only places were the Kconfig symbol RTC_DRV_AT91SAM9_RTT
-was used. It is useless now. That matches its help text, that reads:
-    This option is only relevant for legacy board support and
-    won't be used when booting a DT board.
+It would be even better to make the code reflect reality right the way
+through.  If PPIs are non-configurable, then we should return -EINVAL if
+trying to set them to a setting which is not supported.  For example,
+pass through all states to gic_configure_irq(), and have gic_configure_irq()
+return whether the state is valid.
 
-> -		return;
-> -	}
-> -
-> -	pdev->name = "rtc-at91sam9";
-> -	r[1].start = AT91SAM9263_BASE_GPBR + 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
-> -	r[1].end = r[1].start + 3;
-> -	r[2].start = NR_IRQS_LEGACY + AT91_ID_SYS;
-> -	r[2].end = NR_IRQS_LEGACY + AT91_ID_SYS;
-> -}
-> -#else
-> -static void __init at91_add_device_rtt_rtc(void)
-> -{
-> -	/* Only one resource is needed: RTT not used as RTC */
-> -	at91sam9263_rtt0_device.num_resources = 1;
-> -	at91sam9263_rtt1_device.num_resources = 1;
-> -}
-> -#endif
-> -
-> -static void __init at91_add_device_rtt(void)
-> -{
-> -	at91_add_device_rtt_rtc();
-> -	platform_device_register(&at91sam9263_rtt0_device);
-> -	platform_device_register(&at91sam9263_rtt1_device);
-> -}
+Then, gic_configure_irq() can read back the register after trying to set
+the appropriate value, and see whether it was taken.  If the bits remain
+unchanged, then it can decide that the requested mode is not supported,
+and return -EINVAL.
 
-Is a patch to remove that symbol from drivers/rtc/Kconfig queued
-somewhere?
+In any case, let's not hack the code in the way that Liviu is trying to
+do.
 
-
-Paul Bolle
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
