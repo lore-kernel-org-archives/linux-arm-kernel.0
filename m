@@ -1,57 +1,72 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Mon, 1 Dec 2014 17:27:39 +0530
-Subject: [PATCH V2] PM / Domains: Add pm_genpd_lookup() API to lookup
- domain by firmware node
-In-Reply-To: <CAPDyKFpX5nXR18pKdLrtDrPK60p1y2CEqq+--3z3jczRRmKrqA@mail.gmail.com>
-References: <1417171115-5789-1-git-send-email-ulf.hansson@linaro.org>
- <5765394.eQjV2VvkSL@vostro.rjw.lan>
- <CAPDyKFpX5nXR18pKdLrtDrPK60p1y2CEqq+--3z3jczRRmKrqA@mail.gmail.com>
-Message-ID: <CADGdYn5aLr69PrqO5RvU4q6HU9pPZ+1tWL27cc=cVazAvSVFpQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 1 Dec 2014 12:05:34 +0000
+Subject: [PATCH 0/4] Generic IOMMU page table framework
+In-Reply-To: <6034238.mfQ54vFFKj@avalon>
+References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
+ <6034238.mfQ54vFFKj@avalon>
+Message-ID: <20141201120534.GC18466@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 1, 2014 at 3:56 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 29 November 2014 at 01:30, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->> On Friday, November 28, 2014 11:38:35 AM Ulf Hansson wrote:
->>> In a step to move away from using genpd's name based APIs, such as the
->>> pm_genpd_add_subdomain_names(), provide an API to lookup an already
->>> initialized generic PM domain by its firmware node.
->>>
->>> This API would typically be a called from SOC specific code, to fetch a
->>> handle to the domain. Especially convenient to configure subdomains and
->>> when the hierarchy of the domains are described in DT.
->>>
->>> Do note, before pm_genpd_init() is invoked to initialize a generic PM
->>> domain, it's the callers responsibility to assign the new ->fwnode
->>> pointer in the struct generic_pm_domain, to enable pm_genpd_lookup() to
->>> find the domain.
->>>
->>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>
->> I have no problems with that, but do you have a user for it?
->
-> Amit Daniel Kachhap, posted a patchset which is adding subdomains
-> configured from DT for Exynos. It's from there the idea to this patch
-> comes from. Amit is about to post a new version, based on this patch.
+On Sun, Nov 30, 2014 at 10:03:08PM +0000, Laurent Pinchart wrote:
+> Hi Will,
 
-Hi Ulf,
+Hi Laurent,
 
-I was trying to use this API but i felt there is a better way of just exporting
-of_genpd_get_from_provider as a similar API is used to register the
-power domain.
+> On Thursday 27 November 2014 11:51:14 Will Deacon wrote:
+> > Hi all,
+> > 
+> > This series introduces a generic IOMMU page table allocation framework,
+> > implements support for ARM long-descriptors and then ports the arm-smmu
+> > driver over to the new code.
+> > 
+> > There are a few reasons for doing this:
+> > 
+> >   - Page table code is hard, and I don't enjoy shopping
+> > 
+> >   - A number of IOMMUs actually use the same table format, but currently
+> >     duplicate the code
+> > 
+> >   - It provides a CPU (and architecture) independent allocator, which
+> >     may be useful for some systems where the CPU is using a different
+> >     table format for its own mappings
+> > 
+> > As illustrated in the final patch, an IOMMU driver interacts with the
+> > allocator by passing in a configuration structure describing the
+> > input and output address ranges, the supported pages sizes and a set of
+> > ops for performing various TLB invalidation and PTE flushing routines.
+> > 
+> > The LPAE code implements support for 4k/2M/1G, 16k/32M and 64k/512M
+> > mappings, but I decided not to implement the contiguous bit in the
+> > interest of trying to keep the code semi-readable. This could always be
+> > added later, if needed.
+> 
+> Do you have any idea how much the contiguous bit can improve performances in 
+> real use cases ?
 
-Check if this make sense www.spinics.net/lists/arm-kernel/msg382665.html.
+It depends on the TLB, really. Given that the contiguous sized map directly
+onto block sizes using different granules, I didn't see that the complexity
+was worth it.
 
-Regards,
-Amit
+For example:
 
+   4k granule : 16 contiguous entries => {64k, 32M, 16G}
+  16k granule : 128 contiguous lvl3 entries => 2M
+                32 contiguous lvl2 entries => 1G
+  64k granule : 32 contiguous entries => {2M, 16G}
 
->
-> https://lkml.org/lkml/2014/11/24/290
->
-> Kind regards
-> Uffe
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+If we use block mappings, then we get:
+
+   4k granule : 2M @ lvl2, 1G @ lvl1
+  16k granule : 32M @ lvl2
+  64k granule : 512M @ lvl2
+
+so really, we only miss the ability to create 16G mappings. I doubt
+that hardware even implements that size in the TLB (the contiguous bit
+is only a hint).
+
+On top of that, the contiguous bit leads to additional expense on unmap,
+since you have extra TLB invalidation splitting the thing into
+non-contiguous pages before you can do anything.
+
+Will
