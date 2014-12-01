@@ -1,52 +1,55 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 01 Dec 2014 10:04:06 +0100
-Subject: [GIT PULL] Reset controller changes for v3.19
-Message-ID: <1417424646.4624.2.camel@pengutronix.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 01 Dec 2014 10:12:54 +0100
+Subject: [PATCH] clk: samsung: exynos4415: Fix build with PM_SLEEP disabled
+Message-ID: <1417425174-26694-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Fix following build errors when PM_SLEEP is disabled (e.g. by disabling
+SUSPEND and HIBERNATION):
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+drivers/clk/samsung/clk-exynos4415.c: In function ?exynos4415_cmu_init?:
+drivers/clk/samsung/clk-exynos4415.c:982:2: error: ?exynos4415_ctx? undeclared (first use in this function)
+drivers/clk/samsung/clk-exynos4415.c:982:2: note: each undeclared identifier is reported only once for each function it appears in
+drivers/clk/samsung/clk-exynos4415.c: In function ?exynos4415_cmu_dmc_init?:
+drivers/clk/samsung/clk-exynos4415.c:1123:2: error: ?exynos4415_dmc_ctx? undeclared (first use in this function)
+make[3]: *** [drivers/clk/samsung/clk-exynos4415.o] Error 1
 
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos4415.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-are available in the git repository at:
-
-  git://git.pengutronix.de/pza/linux.git reset-for-3.19-2
-
-for you to fetch changes up to f200890f224d9ed0af207145a2279f51c6be230b:
-
-  reset: add socfpga_reset_status (2014-11-04 12:40:16 +0100)
-
-----------------------------------------------------------------
-Reset controller changes for v3.19
-
-----------------------------------------------------------------
-Dinh Nguyen (2):
-      reset: add reset_control_status helper function
-      reset: add socfpga_reset_status
-
-Maxime Coquelin (1):
-      reset: stih407: Add reset controllers DT bindings
-
-Peter Griffin (2):
-      reset: stih407: Add softreset, powerdown and picophy controllers
-      reset: sti: Document sti-picophyreset controllers bindings.
-
-Philipp Zabel (1):
-      Merge tag 'sti-reset-for-v3.19-1' of git://git.stlinux.com/devel/kernel/linux-sti into reset/for_v3.19
-
- .../bindings/reset/st,sti-picophyreset.txt         |  42 ++++++
- drivers/reset/core.c                               |  15 ++
- drivers/reset/reset-socfpga.c                      |  15 ++
- drivers/reset/sti/Kconfig                          |   4 +
- drivers/reset/sti/Makefile                         |   1 +
- drivers/reset/sti/reset-stih407.c                  | 158 +++++++++++++++++++++
- .../dt-bindings/reset-controller/stih407-resets.h  |  61 ++++++++
- include/linux/reset-controller.h                   |   2 +
- include/linux/reset.h                              |   7 +
- 9 files changed, 305 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/st,sti-picophyreset.txt
- create mode 100644 drivers/reset/sti/reset-stih407.c
- create mode 100644 include/dt-bindings/reset-controller/stih407-resets.h
+diff --git a/drivers/clk/samsung/clk-exynos4415.c b/drivers/clk/samsung/clk-exynos4415.c
+index c7208c7a3add..2123fc251e0f 100644
+--- a/drivers/clk/samsung/clk-exynos4415.c
++++ b/drivers/clk/samsung/clk-exynos4415.c
+@@ -118,12 +118,13 @@ enum exynos4415_plls {
+ 	nr_plls,
+ };
+ 
++static struct samsung_clk_provider *exynos4415_ctx;
++
+ /*
+  * Support for CMU save/restore across system suspends
+  */
+ #ifdef CONFIG_PM_SLEEP
+ static struct samsung_clk_reg_dump *exynos4415_clk_regs;
+-static struct samsung_clk_provider *exynos4415_ctx;
+ 
+ static unsigned long exynos4415_cmu_clk_regs[] __initdata = {
+ 	SRC_LEFTBUS,
+@@ -1031,9 +1032,10 @@ enum exynos4415_dmc_plls {
+ 	nr_dmc_plls,
+ };
+ 
++static struct samsung_clk_provider *exynos4415_dmc_ctx;
++
+ #ifdef CONFIG_PM_SLEEP
+ static struct samsung_clk_reg_dump *exynos4415_dmc_clk_regs;
+-static struct samsung_clk_provider *exynos4415_dmc_ctx;
+ 
+ static unsigned long exynos4415_cmu_dmc_clk_regs[] __initdata = {
+ 	MPLL_LOCK,
+-- 
+1.9.1
