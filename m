@@ -1,90 +1,57 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 01 Dec 2014 23:18:47 +0100
-Subject: [PATCH v2 1/3] power: reset: read priority from device tree
-In-Reply-To: <20141201174215.GB24692@roeck-us.net>
-References: <1417453389-1588-1-git-send-email-stefan@agner.ch>
- <1417453389-1588-2-git-send-email-stefan@agner.ch>
- <CAL85gmBq30pWxP0buKbM8so6QqsJq2YojiSK1EWtMPsH_7foeg@mail.gmail.com>
- <ea4f7a2bfdb9bea45cab9418c211083b@agner.ch>
- <CAL85gmBNE7oDbE+LX+V=AFJO61Ta0Gekoq6sDb8TkEnoPsNFVA@mail.gmail.com>
- <20141201174215.GB24692@roeck-us.net>
-Message-ID: <3916ca2867ced70e16903d6d44aaae8f@agner.ch>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 1 Dec 2014 14:19:38 -0800
+Subject: [PATCH v10 4/4] ARM: dts: rockchip: add suspend settings for
+ rk3288-evb-rk808
+In-Reply-To: <1417423940-1669-5-git-send-email-zyw@rock-chips.com>
+References: <1417423940-1669-1-git-send-email-zyw@rock-chips.com>
+ <1417423940-1669-5-git-send-email-zyw@rock-chips.com>
+Message-ID: <CAD=FV=XHUze3ovhFSN7_9rvM6tpKrF90ii1XbHPxw4q-7ob+dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-01 18:42, Guenter Roeck wrote:
-> On Mon, Dec 01, 2014 at 09:38:09AM -0800, Feng Kan wrote:
->> On Mon, Dec 1, 2014 at 9:29 AM, Stefan Agner <stefan@agner.ch> wrote:
->> > On 2014-12-01 18:15, Feng Kan wrote:
->> >> On Mon, Dec 1, 2014 at 9:03 AM, Stefan Agner <stefan@agner.ch> wrote:
->> >>> This patch adds an optional property which allows to specify the
->> >>> reset source priority. This priority is used by the kernel restart
->> >>> handler call chain to sort out the proper reset/restart method.
->> >>> Depending on the power design of a board or other machine/board
->> >>> specific peculiarity, it is not possible to pick a generic priority.
->> >>>
->> >>> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> >>> ---
->> >>>  Documentation/devicetree/bindings/power/reset/syscon-reboot.txt | 3 +++
->> >>>  drivers/power/reset/syscon-reboot.c                             | 5 ++++-
->> >>>  2 files changed, 7 insertions(+), 1 deletion(-)
->> >>>
->> >>> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
->> >>> index 1190631..ee41d9c 100644
->> >>> --- a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
->> >>> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
->> >>> @@ -11,6 +11,9 @@ Required properties:
->> >>>  - offset: offset in the register map for the reboot register (in bytes)
->> >>>  - mask: the reset value written to the reboot register (32 bit access)
->> >>>
->> >>> +Optional properties:
->> >>> +- priority: define the priority of the reset (0-255, defaults to 128)
->> >>> +
->> >>>  Default will be little endian mode, 32 bit access only.
->> >>>
->> >>>  Examples:
->> >>> diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
->> >>> index 815b901..3060d6b 100644
->> >>> --- a/drivers/power/reset/syscon-reboot.c
->> >>> +++ b/drivers/power/reset/syscon-reboot.c
->> >>> @@ -67,8 +67,11 @@ static int syscon_reboot_probe(struct platform_device *pdev)
->> >>>         if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
->> >>>                 return -EINVAL;
->> >>>
->> >>> -       ctx->restart_handler.notifier_call = syscon_restart_handle;
->> >>>         ctx->restart_handler.priority = 128;
->> >>> +       of_property_read_u32(pdev->dev.of_node, "priority",
->> >>> +                            &ctx->restart_handler.priority);
->> >>
->> >> What is this for?
->> >
->> > What do you mean? The moved line "ctx->restart_handler.notifier_call =
->> > syscon_restart_handle;"? When one reads the diff, it looks like that
->> > line was moved, in fact I tried to keep the of_property_read function
->> > calls together. But I had to move the assignation of the default
->> > priority in front of restart_handler.priority. That's what is the
->> > outcome...
->>
->> I believe Guenter explained above already. Actually this help to solve one of
->> my problem. Thanks.
-> 
-> Since Mark doesn't seem to be happy with the idea of making the priority
-> dt-configurable, the alternative might be to just set a higher priority for
-> syscon triggered resets, as suggested by Stefan. Not as flexible, but it
-> should be ok for most use cases.
-> 
+Chris,
 
-I read the other branch of this thread too, but IMHO, this would be the
-best solution for now. It's a one line change and does the job. After
-all, we have that priority for a reason, it doesn't makes sense having
-all of them at a common default. As mentioned in an other reply, I think
-it is especially reasonable to configure the syscon-reboot driver a bit
-higher, since this driver is more likely to be used for a dedicated
-reboot feature provided by the SoC, which usually is the preferred one.
-If it happens one day that a SoC ends up with conflicting priorities or
-other priority odds, we can add the DT support then...
+On Mon, Dec 1, 2014 at 12:52 AM, Chris Zhong <zyw@rock-chips.com> wrote:
+> Add suspend-voltages and necessary pin-states for suspend on
+> rk3288-evb-rk808 boards. global_pwroff would be pulled high when
+> RK3288 entering suspend, this pin is a sleep signal for RK808, so
+> RK808 could goto sleep mode, and some regulators would be disable.
+>
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>
+> ---
+>
+> Changes in v10:
+> - remove regulator-suspend-mem-enabled and regulator-suspend-mem-microvolt
+> - enable the lcd, codec, sdmmc power during suspend
+>
+> Changes in v9:
+> - update the subject and description
+>
+> Changes in v8:
+> - keep all except cpu&tp power rail on during suspend
+> - add regulator-on-in-suspend before set suspend voltage
+> - add a reference of ddrio_pwroff and ddr0_retention
+>
+> Changes in v7:
+> - add regulator-state-mem sub node for suspend
+>
+> Changes in v6: None
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+>
+>  arch/arm/boot/dts/rk3288-evb-rk808.dts | 53 +++++++++++++++++++++++++++++++++-
+>  1 file changed, 52 insertions(+), 1 deletion(-)
 
-What do you think, can I go with that for now? (Guenter, Feng, Mark...?)
+I'm still not 100% clear on why it wakes up by itself, but I guess (?)
+that could be solved in a separate patch.  I did confirm that if I
+hacked the wakeup source to be just from GPIOs that it stayed asleep
+and could be awakened by the power button.  I tested on linux-next
+with evb-rk808.
 
---
-Stefan
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
+
+-Doug
