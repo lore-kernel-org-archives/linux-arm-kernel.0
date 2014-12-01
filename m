@@ -1,47 +1,92 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 01 Dec 2014 18:16:37 +0100
-Subject: [PATCH] ARM: imx: irq: fix buggy usage of irq_data irq field
-In-Reply-To: <1417454074.4624.28.camel@pengutronix.de>
-References: <1417451109-30276-1-git-send-email-marc.zyngier@arm.com>
- <CAOMZO5DoR57Afc3SH-gV3-dZkHvBab1LXKCWDajpf_sRDKpzSw@mail.gmail.com>
- <547C9F58.5070903@arm.com> <1417454074.4624.28.camel@pengutronix.de>
-Message-ID: <1417454197.4624.30.camel@pengutronix.de>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 01 Dec 2014 18:24:37 +0100
+Subject: [PATCH v2 1/3] power: reset: read priority from device tree
+In-Reply-To: <20141201171126.GB22708@leverpostej>
+References: <1417453389-1588-1-git-send-email-stefan@agner.ch>
+ <1417453389-1588-2-git-send-email-stefan@agner.ch>
+ <20141201171126.GB22708@leverpostej>
+Message-ID: <e5c5a44c84b95c4e48ed01c4dcffd35a@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 01.12.2014, 18:14 +0100 schrieb Philipp Zabel:
-> Am Montag, den 01.12.2014, 17:03 +0000 schrieb Marc Zyngier:
-> > On 01/12/14 17:00, Fabio Estevam wrote:
-> > > Hi Marc,
-> > > 
-> > > On Mon, Dec 1, 2014 at 2:25 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > >> mach-imx directly references to the irq field in
-> > >> struct irq_data, and uses this to directly poke hardware register.
-> > >>
-> > >> But irq is the *virtual* irq number, something that has nothing
-> > >> to do with the actual HW irq (stored in the hwirq field). And once
-> > >> we put the stacked domain code in action, the whole thing explodes,
-> > >> as these two values are *very* different.
-> > >>
-> > >> Just replacing all instances of irq with hwirq fixes the issue.
-> > >>
-> > >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > > 
-> > > I tested your patch and I still have the following problem on a mx6q:
-> > 
-> > [...]
-> > 
-> > > This issue does not happen on linux-next 20141126, but it stats at 201411267.
-> > > 
-> > > I haven't bisect it yet, but if you have any ideas, please let me know. Thanks
-> > 
-> > I do have an idea indeed, as well as a patch for this. I'll put you on
-> > Cc, watch that space.
+On 2014-12-01 18:11, Mark Rutland wrote:
+> On Mon, Dec 01, 2014 at 05:03:07PM +0000, Stefan Agner wrote:
+>> This patch adds an optional property which allows to specify the
+>> reset source priority. This priority is used by the kernel restart
+>> handler call chain to sort out the proper reset/restart method.
+>> Depending on the power design of a board or other machine/board
+>> specific peculiarity, it is not possible to pick a generic priority.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  Documentation/devicetree/bindings/power/reset/syscon-reboot.txt | 3 +++
+>>  drivers/power/reset/syscon-reboot.c                             | 5 ++++-
+>>  2 files changed, 7 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+>> index 1190631..ee41d9c 100644
+>> --- a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+>> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+>> @@ -11,6 +11,9 @@ Required properties:
+>>  - offset: offset in the register map for the reboot register (in bytes)
+>>  - mask: the reset value written to the reboot register (32 bit access)
+>>
+>> +Optional properties:
+>> +- priority: define the priority of the reset (0-255, defaults to 128)
+>> +
 > 
-> I've just arrived att his workaround for the issue by just directly
-> going to hwirq 32, please put me on Cc, too.
+> NAK. This is a leak of Linux-internal details.
+> 
+> What is this necessary for?
+> 
+> Mark.
 
-Never mind that, I just got that mail. Thanks!
+Hi Mark,
 
-regards
-Philipp
+In my case, it is necessary to be called ahead of the watchdog, which
+has a priority of 128. This syscon-reboot driver currently has a default
+priority of 128 too. I could live with a higher default priority for the
+syscon-reboot driver, in fact I proposed that in the discussion of v1 of
+that patch:
+https://lkml.org/lkml/2014/11/28/484
+
+IMHO, this priority might make sense for most cases, I guess that
+dedicated "syscon" capabilities are usually better suited as a reboot
+source than watchdog.
+
+If dt, then the question which arises: If there are different
+capabilities to reset/reboot a whole system, how do we reflect which is
+the best suited one in dt?
+
+--
+Stefan
+
+> 
+>>  Default will be little endian mode, 32 bit access only.
+>>
+>>  Examples:
+>> diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
+>> index 815b901..3060d6b 100644
+>> --- a/drivers/power/reset/syscon-reboot.c
+>> +++ b/drivers/power/reset/syscon-reboot.c
+>> @@ -67,8 +67,11 @@ static int syscon_reboot_probe(struct platform_device *pdev)
+>>  	if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
+>>  		return -EINVAL;
+>>
+>> -	ctx->restart_handler.notifier_call = syscon_restart_handle;
+>>  	ctx->restart_handler.priority = 128;
+>> +	of_property_read_u32(pdev->dev.of_node, "priority",
+>> +			     &ctx->restart_handler.priority);
+>> +
+>> +	ctx->restart_handler.notifier_call = syscon_restart_handle;
+>>  	err = register_restart_handler(&ctx->restart_handler);
+>>  	if (err)
+>>  		dev_err(dev, "can't register restart notifier (err=%d)\n", err);
+>> --
+>> 2.1.3
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
