@@ -1,220 +1,80 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Mon, 01 Dec 2014 11:33:30 +0000
-Subject: [PATCH 4/7] KVM: arm64: guest debug, add SW break point support
-In-Reply-To: <20141129162115.GF23653@cbox>
-References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
- <1416931805-23223-5-git-send-email-alex.bennee@linaro.org>
- <20141129162115.GF23653@cbox>
-Message-ID: <87sigz1u5x.fsf@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon,  1 Dec 2014 17:11:21 +0530
+Subject: [RFC V1 0/8] CPUFreq: create platform-dev for DT based cpufreq drivers
+Message-ID: <cover.1417433163.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Guys,
 
-Christoffer Dall <christoffer.dall@linaro.org> writes:
+DT based cpufreq drivers doesn't require much support from platform code now a
+days as most of the stuff is moved behind generic APIs. Like clk APIs for
+changing clock rates, regulator APIs for changing voltages, etc.
 
-> On Tue, Nov 25, 2014 at 04:10:02PM +0000, Alex Benn?e wrote:
->> This adds support for SW breakpoints inserted by userspace.
->> 
->> First we need to trap all BKPT exceptions in the hypervisor (ELS). This
->> in controlled through the MDCR_EL2 register. I've added a new field to
->
-> this is ?
->
->> the vcpu structure to hold this value. There should be scope to
->> rationlise this with the VCPU_DEBUG_FLAGS/KVM_ARM64_DEBUG_DIRTY_SHIFT
->> manipulation in later patches.
->
-> I don't understand what you mean with rationalising something in later
-> patches.
+One of the bottleneck still left was how to select which cpufreq driver to probe
+for a given platform as there might be multiple drivers available.
 
-I was pointing to potential future improvements. I'm wary of touching
-the lazy register syncing code in this patch set as it greatly increases
-the scope of testing. However I guess I'll have to bite the bullet and
-merge it in a sensible way.
+Traditionally, we used to create platform devices from machine specific code
+which binds with a cpufreq driver. And while we moved towards DT based device
+creation, these devices stayed as is.
 
->
->> 
->> Once the exception arrives we triggers an exit from the main hypervisor
->> loop to the hypervisor controller. The kvm_debug_exit_arch carries the
->
-> hypervisor controller is userspace?
+The problem is getting worse now as we have architectures now with Zero platform
+specific code. Forcefully these platforms have to create a new file in
+drivers/cpufreq/ to just add these platform devices in order to use the generic
+drivers like cpufreq-dt.c.
 
-Yeah sorry that one sneaked through.
+This has been discussed again and again, but with no solution yet. Last it was
+discussed here:
 
->
->> address of the exception. If the controller doesn't know of breakpoint
->
-> the breakint ?
->
->> then we have a guest inserted breakpoint and the hypervisor needs to
->> start again and deliver the exception to guest.
->
-> to the guest
->
->> 
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> 
->> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->> index 2c6386e..9383359 100644
->> --- a/Documentation/virtual/kvm/api.txt
->> +++ b/Documentation/virtual/kvm/api.txt
->> @@ -2592,7 +2592,7 @@ when running. Common control bits are:
->>  The top 16 bits of the control field are architecture specific control
->>  flags which can include the following:
->>  
->> -  - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86]
->> +  - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86, arm64]
->>    - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390]
->>    - KVM_GUESTDBG_INJECT_DB:     inject DB type exception [x86]
->>    - KVM_GUESTDBG_INJECT_BP:     inject BP type exception [x86]
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index a0ff410..48d26bb 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -303,6 +303,9 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->>  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->>  					struct kvm_guest_debug *dbg)
->>  {
->> +	/* Route debug traps to el2? */
->> +	bool route_el2 = false;
->> +
->>  	/* If it's not enabled clear all flags */
->>  	if (!(dbg->control & KVM_GUESTDBG_ENABLE)) {
->>  		vcpu->guest_debug = 0;
->> @@ -320,8 +323,8 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->>  
->>  	/* Software Break Points */
->>  	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP) {
->> -		kvm_info("SW BP support requested, not yet implemented\n");
->> -		return -EINVAL;
->> +		kvm_info("SW BP support requested\n");
->> +		route_el2 = true;
->>  	}
->>  
->>  	/* Hardware assisted Break and Watch points */
->> @@ -330,6 +333,20 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->>  		return -EINVAL;
->>  	}
->>  
->> +	/* If we are going to handle any debug exceptions we need to
->
-> wings on the comments
->
->> +	 * set MDCE_EL2.TDE to ensure they are routed to the
->> +	 * hypervisor. If userspace determines the exception was
->> +	 * actually internal to the guest it needs to handle
->> +	 * re-injecting the exception.
->> +	 */
->> +	if (route_el2) {
->> +		kvm_info("routing debug exceptions");
->> +		vcpu->arch.mdcr_el2 = MDCR_EL2_TDE;
->> +	} else {
->> +		kvm_info("not routing debug exceptions");
->> +		vcpu->arch.mdcr_el2 = 0;
->> +	}
->> +
->>  	return 0;
->>  }
->>  
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 2012c4b..38b0f07 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -98,6 +98,7 @@ struct kvm_vcpu_arch {
->>  
->>  	/* HYP configuration */
->>  	u64 hcr_el2;
->> +	u32 mdcr_el2;
->>  
->>  	/* Exception Information */
->>  	struct kvm_vcpu_fault_info fault;
->> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
->> index 9a9fce0..8da1043 100644
->> --- a/arch/arm64/kernel/asm-offsets.c
->> +++ b/arch/arm64/kernel/asm-offsets.c
->> @@ -122,6 +122,7 @@ int main(void)
->>    DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
->>    DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
->>    DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
->> +  DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
->>    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
->>    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
->>    DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
->> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
->> index 34b8bd0..28dc92b 100644
->> --- a/arch/arm64/kvm/handle_exit.c
->> +++ b/arch/arm64/kvm/handle_exit.c
->> @@ -71,6 +71,26 @@ static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  	return 1;
->>  }
->>  
->> +/**
->> + * kvm_handle_bkpt - handle a break-point instruction
->> + *
->> + * @vcpu:	the vcpu pointer
->> + *
->> + * By definition if we arrive here it's because we are routing
->> + * all SW breakpoints to the hyper-visor as some may be a result of
->
-> s/hyper-visor/hypervisor/
->
-> this sentence is weird. I think what you want is a full stop after
-> hypervisor and then a new sentence: Userspace may decide that this
-> particular breakpoint should be routed to the guest (if the breakpoint
-> does not come form userspace but by someone debugging a process inside
-> the guest), and in that case inject a software breakpoint instruction by
-> <insert the method here>.
->
->
->
->> + * guest debugging. If user-space decides this particular break-point
->> + * isn't for the host to handle it can re-feed the exception to the
->> + * guest.
->> + */
->> +static int kvm_handle_bkpt(struct kvm_vcpu *vcpu, struct kvm_run *run)
->> +{
->> +	run->exit_reason = KVM_EXIT_DEBUG;
->> +	run->debug.arch.exit_type = KVM_DEBUG_EXIT_SW_BKPT;
->> +	run->debug.arch.address = *vcpu_pc(vcpu);
->> +	kvm_info("exiting from %llx\n", run->debug.arch.address);
->> +	return 0;
->> +}
->> +
->>  static exit_handle_fn arm_exit_handlers[] = {
->>  	[ESR_EL2_EC_WFI]	= kvm_handle_wfx,
->>  	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
->> @@ -85,6 +105,8 @@ static exit_handle_fn arm_exit_handlers[] = {
->>  	[ESR_EL2_EC_SYS64]	= kvm_handle_sys_reg,
->>  	[ESR_EL2_EC_IABT]	= kvm_handle_guest_abort,
->>  	[ESR_EL2_EC_DABT]	= kvm_handle_guest_abort,
->> +	[ESR_EL2_EC_BKPT32]	= kvm_handle_bkpt,
->> +	[ESR_EL2_EC_BRK64]	= kvm_handle_bkpt,
->>  };
->>  
->>  static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
->> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
->> index b72aa9f..3c733ea 100644
->> --- a/arch/arm64/kvm/hyp.S
->> +++ b/arch/arm64/kvm/hyp.S
->> @@ -772,6 +772,10 @@
->>  	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
->>  	orr	x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
->>  
->> +	// Any other bits (currently TDE)
->> +	ldr	x3, [x0, #VCPU_MDCR_EL2]
->> +	orr	x2, x2, x3
->> +
->>  	// Check for KVM_ARM64_DEBUG_DIRTY, and set debug to trap
->>  	// if not dirty.
->>  	ldr	x3, [x0, #VCPU_DEBUG_FLAGS]
->> -- 
->> 2.1.3
->> 
->
-> It may be simpler to just load/restore the MDCR_EL2 and do all
-> bit-manipulations for a specific VCPU in C-code instead of this.
->
-> -Christoffer
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256154.html
+
+This patch is an attempt towards getting the bindings.
+
+We only need to have cpufreq drivers name string present in "compatible"
+property for the root node.. If a cpufreq driver with DT support exists with
+that name, then cpufreq core will create a platform device for that.
+
+The first patch presents the new binding, second one creates another file
+responsible for creating platform devices for all DT based cpufreq drivers.
+
+And later patches update platforms to migrate to it one by one.
+
+A BLACKLIST of platforms already supported by these drivers is also created for
+backward compatibility of newer kernels with older DTs. And so for such
+platforms DT files aren't updated.
+
+An initial RFC that presented the idea was discussed here:
+https://www.mail-archive.com/devicetree at vger.kernel.org/msg52509.html
+
+Tested-ON: Exynos5250. (The last patch for exynos depends on some commits to be
+upstreamed in 3.19, presented here just for testing).
+
+Viresh Kumar (8):
+  cpufreq: Reuse "compatible" binding to probe cpufreq drivers
+  cpufreq: Create cpufreq platform-device based on "compatible" from DT
+  cpufreq: imx: reuse dt_device.c to create cpufreq platform device
+  cpufreq: mvebu: reuse dt_device.c to create cpufreq platform device
+  cpufreq: shmobile: reuse dt_device.c to create cpufreq platform device
+  cpufreq: zynq: reuse dt_device.c to create cpufreq platform device
+  cpufreq: calxeda: reuse dt_device.c to create cpufreq platform device
+  cpufreq: exynos: reuse dt_device.c to create cpufreq platform device
+
+ .../devicetree/bindings/cpufreq/drivers.txt        | 46 +++++++++++++++
+ arch/arm/mach-exynos/exynos.c                      | 27 +++------
+ arch/arm/mach-imx/imx27-dt.c                       |  4 --
+ arch/arm/mach-imx/mach-imx51.c                     |  3 -
+ arch/arm/mach-mvebu/pmsu.c                         |  1 -
+ arch/arm/mach-shmobile/Makefile                    |  1 -
+ arch/arm/mach-shmobile/common.h                    |  7 ---
+ arch/arm/mach-shmobile/cpufreq.c                   | 17 ------
+ arch/arm/mach-zynq/common.c                        |  2 -
+ drivers/cpufreq/Makefile                           |  2 +-
+ drivers/cpufreq/dt_device.c                        | 68 ++++++++++++++++++++++
+ drivers/cpufreq/highbank-cpufreq.c                 |  5 --
+ 12 files changed, 123 insertions(+), 60 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/drivers.txt
+ delete mode 100644 arch/arm/mach-shmobile/cpufreq.c
+ create mode 100644 drivers/cpufreq/dt_device.c
 
 -- 
-Alex Benn?e
+2.0.3.693.g996b0fd
