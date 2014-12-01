@@ -1,51 +1,33 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 1 Dec 2014 12:12:41 +0100
-Subject: [PATCH] mfd: atmel-hlcdc: Add Kconfig option description and name
-In-Reply-To: <1417431156-4914-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1417431156-4914-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <547C4D29.10802@atmel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 1 Dec 2014 11:16:12 +0000
+Subject: [PATCH v2 8/8] ARM: dts: mt8135: Add support for MT6397 regulator
+In-Reply-To: <1417403967.9547.2.camel@mtksdaap41>
+References: <1417146874-5232-1-git-send-email-flora.fu@mediatek.com>
+ <1417146874-5232-9-git-send-email-flora.fu@mediatek.com>
+ <20141128153008.GS7712@sirena.org.uk>
+ <1417403967.9547.2.camel@mtksdaap41>
+Message-ID: <20141201111612.GF7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 01/12/2014 11:52, Boris Brezillon a ?crit :
-> The MFD_ATMEL_HLCDC was first intended to be selected by its sub-devices
-> but these sub-devices now depends on this option, we thus need to add
-> a name and a description so that users can see it.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Mon, Dec 01, 2014 at 11:19:25AM +0800, Flora Fu wrote:
+> On Fri, 2014-11-28 at 15:30 +0000, Mark Brown wrote: 
 
-Okay:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > This appears to be the DT fragment for a SoC but you are defining the
+> > system integration for the PMIC.  That's bad, the PMIC is a separate
+> > device so should be hooked up by the board using it.  If there's common
+> > elements from a reference design they should be in their own .dtsi.
 
-Thanks, bye.
+> Do you mean that we should add a mt6397.dtsi and include it from
+> mt8135.dtsi? For board specific, update them in mt8135.dtsi? 
 
-> ---
->  drivers/mfd/Kconfig | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index c9200d3..4a637f4 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -60,10 +60,15 @@ config MFD_AAT2870_CORE
->  	  functionality of the device.
->  
->  config MFD_ATMEL_HLCDC
-> -	tristate
-> +	tristate "Atmel HLCDC (High-end LCD Controller)"
->  	select MFD_CORE
->  	select REGMAP_MMIO
->  	depends on OF
-> +	help
-> +	  If you say yes here you get support for the HLCDC block.
-> +	  This driver provides common support for accessing the device,
-> +	  additional drivers must be enabled in order to use the
-> +	  functionality of the device.
->  
->  config MFD_BCM590XX
->  	tristate "Broadcom BCM590xx PMUs"
-> 
-
-
--- 
-Nicolas Ferre
+More likely you should just add any integration needed in the board
+file.  There should be no need to specify anything generically for the
+regulators on a PMIC except registering the device.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/7e88de18/attachment.sig>
