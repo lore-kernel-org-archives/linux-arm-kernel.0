@@ -1,165 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 1 Dec 2014 17:23:15 +0000
-Subject: [PATCH 2/4] iommu: add ARM LPAE page table allocator
-In-Reply-To: <3665319.WRLLeiHAYk@avalon>
-References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
- <1417089078-22900-3-git-send-email-will.deacon@arm.com>
- <3665319.WRLLeiHAYk@avalon>
-Message-ID: <20141201172315.GI18466@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 1 Dec 2014 09:22:19 -0800
+Subject: [PATCH v2 1/3] power: reset: read priority from device tree
+In-Reply-To: <20141201171126.GB22708@leverpostej>
+References: <1417453389-1588-1-git-send-email-stefan@agner.ch>
+ <1417453389-1588-2-git-send-email-stefan@agner.ch>
+ <20141201171126.GB22708@leverpostej>
+Message-ID: <20141201172219.GA24692@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 30, 2014 at 11:29:46PM +0000, Laurent Pinchart wrote:
-> Hi Will,
-
-Hello again,
-
-> On Thursday 27 November 2014 11:51:16 Will Deacon wrote:
-> > +static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable
-> > *data, +                                         int prot)
-> > +{
-> > +     arm_lpae_iopte pte;
+On Mon, Dec 01, 2014 at 05:11:26PM +0000, Mark Rutland wrote:
+> On Mon, Dec 01, 2014 at 05:03:07PM +0000, Stefan Agner wrote:
+> > This patch adds an optional property which allows to specify the
+> > reset source priority. This priority is used by the kernel restart
+> > handler call chain to sort out the proper reset/restart method.
+> > Depending on the power design of a board or other machine/board
+> > specific peculiarity, it is not possible to pick a generic priority.
+> > 
+> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > ---
+> >  Documentation/devicetree/bindings/power/reset/syscon-reboot.txt | 3 +++
+> >  drivers/power/reset/syscon-reboot.c                             | 5 ++++-
+> >  2 files changed, 7 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+> > index 1190631..ee41d9c 100644
+> > --- a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+> > +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+> > @@ -11,6 +11,9 @@ Required properties:
+> >  - offset: offset in the register map for the reboot register (in bytes)
+> >  - mask: the reset value written to the reboot register (32 bit access)
+> >  
+> > +Optional properties:
+> > +- priority: define the priority of the reset (0-255, defaults to 128)
 > > +
-> > +     if (data->iop.fmt == ARM_LPAE_S1) {
-> > +             pte = ARM_LPAE_PTE_AP_UNPRIV | ARM_LPAE_PTE_nG;
-> > +
-> > +             if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
-> > +                     pte |= ARM_LPAE_PTE_AP_RDONLY;
-> > +
-> > +             if (prot & IOMMU_CACHE)
-> > +                     pte |= (ARM_LPAE_MAIR_ATTR_IDX_CACHE
-> > +                             << ARM_LPAE_PTE_ATTRINDX_SHIFT);
 > 
-> In my case I'll need to manage the NS bit (here and when allocating tables in
-> __arm_lpae_map). The exact requirements are not exactly clear at the moment
-> I'm afraid, the datasheet doesn't clearly document secure behaviour, but tests
-> showed that setting the NS was necessary.
-
-Hurrah! You can add a quick to the currently unused quirks field that I have
-in io_pgtable_cfg :)
-
-> Given that arm_lpae_init_pte() will unconditionally set the AF and SH_IS bits
-> you could set them here too, but that shouldn't make a big difference.
-
-I prefer to keep only the protection bits handled here (i.e. those bits that
-map directly to the IOMMU_* prot flags).
-
-> > +     } else {
-> > +             pte = ARM_LPAE_PTE_HAP_FAULT;
-> > +             if (prot & IOMMU_READ)
-> > +                     pte |= ARM_LPAE_PTE_HAP_READ;
-> > +             if (prot & IOMMU_WRITE)
-> > +                     pte |= ARM_LPAE_PTE_HAP_WRITE;
-> > +             if (prot & IOMMU_CACHE)
-> > +                     pte |= ARM_LPAE_PTE_MEMATTR_OIWB;
-> > +             else
-> > +                     pte |= ARM_LPAE_PTE_MEMATTR_NC;
-> > +     }
-> > +
-> > +     if (prot & IOMMU_NOEXEC)
-> > +             pte |= ARM_LPAE_PTE_XN;
-> > +
-> > +     return pte;
-> > +}
-> > +
-> > +static int arm_lpae_map(struct io_pgtable_ops *ops, unsigned long iova,
-> > +                     phys_addr_t paddr, size_t size, int iommu_prot)
-> > +{
-> > +     struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
-> > +     arm_lpae_iopte *ptep = data->pgd;
-> > +     int lvl = ARM_LPAE_START_LVL(data);
-> > +     arm_lpae_iopte prot;
-> > +
-> > +     /* If no access, then nothing to do */
-> > +     if (!(iommu_prot & (IOMMU_READ | IOMMU_WRITE)))
-> > +             return 0;
+> NAK. This is a leak of Linux-internal details.
 > 
-> Shouldn't this create a faulting entry instead ?
-
-That's effectively what it does. Calling iommu_map on something that's
-already mapped is a programming error, so therefore we know that the entry
-is already faulting by virtue of it being unmapped.
-
-> > +static struct io_pgtable *arm_lpae_alloc_pgtable_s1(struct io_pgtable_cfg
-> > *cfg, +                                                   void *cookie)
-> > +{
-> > +     u64 reg;
-> > +     struct arm_lpae_io_pgtable *data = arm_lpae_alloc_pgtable(cfg);
-> > +
-> > +     if (!data)
-> > +             return NULL;
-> > +
-> > +     /* TCR */
-> > +     reg = ARM_LPAE_TCR_EAE |
-> > +          (ARM_LPAE_TCR_SH_IS << ARM_LPAE_TCR_SH0_SHIFT) |
-> > +          (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_IRGN0_SHIFT) |
-> > +          (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_ORGN0_SHIFT);
-> > +
-> > +     switch (1 << data->pg_shift) {
-> > +     case SZ_4K:
-> > +             reg |= ARM_LPAE_TCR_TG0_4K;
-> > +             break;
-> > +     case SZ_16K:
-> > +             reg |= ARM_LPAE_TCR_TG0_16K;
-> > +             break;
-> > +     case SZ_64K:
-> > +             reg |= ARM_LPAE_TCR_TG0_64K;
-> > +             break;
-> > +     }
-> > +
-> > +     switch (cfg->oas) {
-> > +     case 32:
-> > +             reg |= (ARM_LPAE_TCR_PS_32_BIT << ARM_LPAE_TCR_IPS_SHIFT);
-> > +             break;
-> > +     case 36:
-> > +             reg |= (ARM_LPAE_TCR_PS_36_BIT << ARM_LPAE_TCR_IPS_SHIFT);
-> > +             break;
-> > +     case 40:
-> > +             reg |= (ARM_LPAE_TCR_PS_40_BIT << ARM_LPAE_TCR_IPS_SHIFT);
-> > +             break;
-> > +     case 42:
-> > +             reg |= (ARM_LPAE_TCR_PS_42_BIT << ARM_LPAE_TCR_IPS_SHIFT);
-> > +             break;
-> > +     case 44:
-> > +             reg |= (ARM_LPAE_TCR_PS_44_BIT << ARM_LPAE_TCR_IPS_SHIFT);
-> > +             break;
-> > +     case 48:
-> > +             reg |= (ARM_LPAE_TCR_PS_48_BIT << ARM_LPAE_TCR_IPS_SHIFT);
-> > +             break;
-> > +     default:
-> > +             goto out_free_data;
-> > +     }
-> > +
-> > +     reg |= (64ULL - cfg->ias) << ARM_LPAE_TCR_T0SZ_SHIFT;
-> > +     cfg->arm_lpae_s1_cfg.tcr = reg;
-> > +
-> > +     /* MAIRs */
-> > +     reg = (ARM_LPAE_MAIR_ATTR_NC
-> > +            << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_NC)) |
-> > +           (ARM_LPAE_MAIR_ATTR_WBRWA
-> > +            << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_CACHE)) |
-> > +           (ARM_LPAE_MAIR_ATTR_DEVICE
-> > +            << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_DEV));
-> > +
-> > +     cfg->arm_lpae_s1_cfg.mair[0] = reg;
-> > +     cfg->arm_lpae_s1_cfg.mair[1] = 0;
-> > +
-> > +     /* Looking good; allocate a pgd */
-> > +     data->pgd = alloc_pages_exact(1UL << data->pg_shift,
-> > +                                   GFP_KERNEL | __GFP_ZERO);
+> What is this necessary for?
 > 
-> data->pg_shift is computed as __ffs(cfg->pgsize_bitmap). 1UL << data->pg_shift
-> will thus be equal to the smallest page size supported by the IOMMU. This will
-> thus allocate 4kB, 16kB or 64kB depending on the IOMMU configuration. However,
-> if I'm not mistaken the top-level directory needs to store one entry per
-> largest supported page size. That's 4, 128 or 8 entries depending on the
-> configuration. You're thus over-allocating.
+It establishes which restart handler to use if there more than one means
+to reset the system. See documentation to register_restart_handler() in
+kernel/reboot.c.
 
-Yeah, I'll take a closer look at this. The size of the pgd really depends
-on the TxSZ configuration, which in turn depends on the ias and the page
-size. There are also alignment constraints to bear in mind, but I'll see
-what I can do (as it stands, over-allocating will always work).
-
-Thanks,
-
-Will
+Guenter
