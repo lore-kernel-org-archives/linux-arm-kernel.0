@@ -1,227 +1,38 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 1 Dec 2014 15:25:25 -0800
-Subject: [PATCH V2 4/8] opp: Introduce APIs to remove OPPs
-In-Reply-To: <9a64eb3d9d11ff7379b7eb6d9207625175f28e47.1417058376.git.viresh.kumar@linaro.org>
-References: <1407c1d67e546a09f5dd122de943de45bcd3c846.1417058376.git.viresh.kumar@linaro.org>
- <9a64eb3d9d11ff7379b7eb6d9207625175f28e47.1417058376.git.viresh.kumar@linaro.org>
-Message-ID: <20141201232524.GG25340@linux.vnet.ibm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 1 Dec 2014 15:37:48 -0800
+Subject: [PATCH] mtd: gpmi: properly handle bitflips in erased pages
+In-Reply-To: <20141201211818.4e97f2e2@bbrezillon>
+References: <1417461159-2972-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20141201194139.GI21347@ld-irv-0074>
+ <20141201211818.4e97f2e2@bbrezillon>
+Message-ID: <20141201233748.GJ21347@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 08:54:06AM +0530, Viresh Kumar wrote:
-> OPPs are created statically (from DT) or dynamically. Currently we don't free
-> OPPs that are created statically, when the module unloads. And so if the module
-> is inserted back again, we get warning for duplicate OPPs as the same were
-> already present.
+On Mon, Dec 01, 2014 at 09:18:18PM +0100, Boris Brezillon wrote:
+> On Mon, 1 Dec 2014 11:41:39 -0800 Brian Norris <computersforpeace@gmail.com> wrote:
+> > On Mon, Dec 01, 2014 at 08:12:39PM +0100, Boris Brezillon wrote:
+> > > Brian, I really like the idea of having a generic implementation for this
+> > > feature (using read_page_raw) as you suggested here [1], but this implies
+> > > having a temporary buffer to store the page read in raw mode and keep the page
+> > > read in normal (HW ECC engine eanbled) mode, and I'm not sure we want to
+> > > allocate more buffers than we already have.
+> > 
+> > Why does this require an additional buffer? If we've already noticed an
+> > ECC error, we're expected to return raw data anyway, so what's the
+> > problem with clobbering the original data with a raw version of the
+> > data?
 > 
-> Also, there might be a need to remove dynamic OPPs in future and so API for that
-> is also added.
-> 
-> This patch adds helper APIs to remove/free existing static and dynamic OPPs.
-> 
-> Because the OPPs are used both under RCU and SRCU, we have to wait for grace
-> period of both. And so are using kfree_rcu() from within call_srcu().
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Well in the GPMI particular case (and more generally all NAND
+> controllers which do not support subpage write) this is true, but if you
+> can do subpage write, then you might have a bit flip in a specific
+> chunk which is still empty, while other chunks are written and are
+> expecting standard ECC correction.
+> In this case you want to keep the 3 chunks with  standard ECC correction
+> and only one in raw mode with 'erased page bitflips' fixed.
 
-This looks plausible from an RCU viewpoint.  In particular, the
-kfree_rcu() within the SRCU callback will result in freeing being
-deferred until after both an SRCU and an RCU grace period elapsing.
+So the problem's not really with subpage write, exactly; the problem is
+for drivers that support subpage write, we don't have a way to perform a
+raw subpage read without touching the other subpages.
 
-							Thanx, Paul
-
-> ---
-> V1->V2:
-> - Use kfree_rcu() instead of kfree() as OPP is accessed under rcu locks as well
->   and so we should wait for its grace period as well.
-> - Another patch which fixes a potential bug, 5/8. Must be applied after this
->   patch and before the original 5/8. Total of 9 patches now.
-> 
->  drivers/base/power/opp.c | 102 +++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/pm_opp.h   |  12 +++++-
->  2 files changed, 113 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-> index b249b01..977474a 100644
-> --- a/drivers/base/power/opp.c
-> +++ b/drivers/base/power/opp.c
-> @@ -79,6 +79,7 @@ struct dev_pm_opp {
->   *		however addition is possible and is secured by dev_opp_list_lock
->   * @dev:	device pointer
->   * @srcu_head:	notifier head to notify the OPP availability changes.
-> + * @rcu_head:	RCU callback head used for deferred freeing
->   * @opp_list:	list of opps
->   *
->   * This is an internal data structure maintaining the link to opps attached to
-> @@ -90,6 +91,7 @@ struct device_opp {
-> 
->  	struct device *dev;
->  	struct srcu_notifier_head srcu_head;
-> +	struct rcu_head rcu_head;
->  	struct list_head opp_list;
->  };
-> 
-> @@ -498,6 +500,76 @@ int dev_pm_opp_add(struct device *dev, unsigned long freq, unsigned long u_volt)
->  }
->  EXPORT_SYMBOL_GPL(dev_pm_opp_add);
-> 
-> +static void kfree_opp_rcu(struct rcu_head *head)
-> +{
-> +	struct dev_pm_opp *opp = container_of(head, struct dev_pm_opp, rcu_head);
-> +
-> +	kfree_rcu(opp, rcu_head);
-> +}
-> +
-> +static void kfree_device_rcu(struct rcu_head *head)
-> +{
-> +	struct device_opp *device_opp = container_of(head, struct device_opp, rcu_head);
-> +
-> +	kfree(device_opp);
-> +}
-> +
-> +void __dev_pm_opp_remove(struct device_opp *dev_opp, struct dev_pm_opp *opp)
-> +{
-> +	/*
-> +	 * Notify the changes in the availability of the operable
-> +	 * frequency/voltage list.
-> +	 */
-> +	srcu_notifier_call_chain(&dev_opp->srcu_head, OPP_EVENT_REMOVE, opp);
-> +	list_del_rcu(&opp->node);
-> +	call_srcu(&dev_opp->srcu_head.srcu, &opp->rcu_head, kfree_opp_rcu);
-> +
-> +	if (list_empty(&dev_opp->opp_list)) {
-> +		list_del_rcu(&dev_opp->node);
-> +		call_srcu(&dev_opp->srcu_head.srcu, &dev_opp->rcu_head,
-> +			  kfree_device_rcu);
-> +	}
-> +}
-> +
-> +/**
-> + * dev_pm_opp_remove()  - Remove an OPP from OPP list
-> + * @dev:	device for which we do this operation
-> + * @freq:	OPP to remove with matching 'freq'
-> + *
-> + * This function removes an opp from the opp list.
-> + */
-> +void dev_pm_opp_remove(struct device *dev, unsigned long freq)
-> +{
-> +	struct dev_pm_opp *opp;
-> +	struct device_opp *dev_opp;
-> +	bool found = false;
-> +
-> +	/* Hold our list modification lock here */
-> +	mutex_lock(&dev_opp_list_lock);
-> +
-> +	dev_opp = find_device_opp(dev);
-> +	if (IS_ERR(dev_opp))
-> +		goto unlock;
-> +
-> +	list_for_each_entry(opp, &dev_opp->opp_list, node) {
-> +		if (opp->rate == freq) {
-> +			found = true;
-> +			break;
-> +		}
-> +	}
-> +
-> +	if (!found) {
-> +		dev_warn(dev, "%s: Couldn't find OPP with freq: %lu\n",
-> +			 __func__, freq);
-> +		goto unlock;
-> +	}
-> +
-> +	__dev_pm_opp_remove(dev_opp, opp);
-> +unlock:
-> +	mutex_unlock(&dev_opp_list_lock);
-> +}
-> +EXPORT_SYMBOL_GPL(dev_pm_opp_remove);
-> +
->  /**
->   * opp_set_availability() - helper to set the availability of an opp
->   * @dev:		device for which we do this operation
-> @@ -687,4 +759,34 @@ int of_init_opp_table(struct device *dev)
->  	return 0;
->  }
->  EXPORT_SYMBOL_GPL(of_init_opp_table);
-> +
-> +/**
-> + * of_free_opp_table() - Free OPP table entries created from static DT entries
-> + * @dev:	device pointer used to lookup device OPPs.
-> + *
-> + * Free OPPs created using static entries present in DT.
-> + */
-> +void of_free_opp_table(struct device *dev)
-> +{
-> +	struct device_opp *dev_opp = find_device_opp(dev);
-> +	struct dev_pm_opp *opp, *tmp;
-> +
-> +	/* Check for existing list for 'dev' */
-> +	dev_opp = find_device_opp(dev);
-> +	if (WARN(IS_ERR(dev_opp), "%s: dev_opp: %ld\n", dev_name(dev),
-> +		 PTR_ERR(dev_opp)))
-> +		return;
-> +
-> +	/* Hold our list modification lock here */
-> +	mutex_lock(&dev_opp_list_lock);
-> +
-> +	/* Free static OPPs */
-> +	list_for_each_entry_safe(opp, tmp, &dev_opp->opp_list, node) {
-> +		if (!opp->dynamic)
-> +			__dev_pm_opp_remove(dev_opp, opp);
-> +	}
-> +
-> +	mutex_unlock(&dev_opp_list_lock);
-> +}
-> +EXPORT_SYMBOL_GPL(of_free_opp_table);
->  #endif
-> diff --git a/include/linux/pm_opp.h b/include/linux/pm_opp.h
-> index 0330217..cec2d45 100644
-> --- a/include/linux/pm_opp.h
-> +++ b/include/linux/pm_opp.h
-> @@ -21,7 +21,7 @@ struct dev_pm_opp;
->  struct device;
-> 
->  enum dev_pm_opp_event {
-> -	OPP_EVENT_ADD, OPP_EVENT_ENABLE, OPP_EVENT_DISABLE,
-> +	OPP_EVENT_ADD, OPP_EVENT_REMOVE, OPP_EVENT_ENABLE, OPP_EVENT_DISABLE,
->  };
-> 
->  #if defined(CONFIG_PM_OPP)
-> @@ -44,6 +44,7 @@ struct dev_pm_opp *dev_pm_opp_find_freq_ceil(struct device *dev,
-> 
->  int dev_pm_opp_add(struct device *dev, unsigned long freq,
->  		   unsigned long u_volt);
-> +void dev_pm_opp_remove(struct device *dev, unsigned long freq);
-> 
->  int dev_pm_opp_enable(struct device *dev, unsigned long freq);
-> 
-> @@ -90,6 +91,10 @@ static inline int dev_pm_opp_add(struct device *dev, unsigned long freq,
->  	return -EINVAL;
->  }
-> 
-> +static inline void dev_pm_opp_remove(struct device *dev, unsigned long freq)
-> +{
-> +}
-> +
->  static inline int dev_pm_opp_enable(struct device *dev, unsigned long freq)
->  {
->  	return 0;
-> @@ -109,11 +114,16 @@ static inline struct srcu_notifier_head *dev_pm_opp_get_notifier(
-> 
->  #if defined(CONFIG_PM_OPP) && defined(CONFIG_OF)
->  int of_init_opp_table(struct device *dev);
-> +void of_free_opp_table(struct device *dev);
->  #else
->  static inline int of_init_opp_table(struct device *dev)
->  {
->  	return -EINVAL;
->  }
-> +
-> +static inline void of_free_opp_table(struct device *dev)
-> +{
-> +}
->  #endif
-> 
->  #endif		/* __LINUX_OPP_H__ */
-> -- 
-> 2.0.3.693.g996b0fd
-> 
+Brian
