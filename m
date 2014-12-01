@@ -1,134 +1,196 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Mon,  1 Dec 2014 10:42:32 -0800
-Subject: [PATCH] ARM: zynq: DT: Add USB to device tree
-Message-ID: <1417459352-23401-1-git-send-email-soren.brinkmann@xilinx.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon, 1 Dec 2014 11:50:23 -0700
+Subject: [PATCH v13 03/10] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <5476E653.4040007@linaro.org>
+References: <1417065854-37745-1-git-send-email-lina.iyer@linaro.org>
+ <1417065854-37745-4-git-send-email-lina.iyer@linaro.org>
+ <5476E653.4040007@linaro.org>
+Message-ID: <20141201185023.GB499@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add USB nodes to zc702, zc706 and zed device trees.
+On Thu, Nov 27 2014 at 01:52 -0700, Daniel Lezcano wrote:
+>On 11/27/2014 06:24 AM, Lina Iyer wrote:
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- arch/arm/boot/dts/zynq-7000.dtsi | 22 +++++++++++++++++++++-
- arch/arm/boot/dts/zynq-zc702.dts | 11 +++++++++++
- arch/arm/boot/dts/zynq-zc706.dts | 10 ++++++++++
- arch/arm/boot/dts/zynq-zed.dts   | 10 ++++++++++
- 4 files changed, 52 insertions(+), 1 deletion(-)
+>+	static bool cpuidle_drv_init;
+>
+>        ^^^^^^^^^
+>
+>As already said in a previous comment, please find a way to remove that.
+>
+I will look into it. Stephen and I wanted the cpuidle driver to be
+probed only after any of the SPMs are ready. And possibly, only for that
+cpu, for which the SPM has been probed.
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index ce2ef5bec4f2..9ed60938f301 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -315,6 +315,26 @@
- 			clocks = <&clkc 4>;
- 		};
- 
-+		usb0: usb at e0002000 {
-+			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
-+			status = "disabled";
-+			clocks = <&clkc 28>;
-+			interrupt-parent = <&intc>;
-+			interrupts = <0 21 4>;
-+			reg = <0xe0002000 0x1000>;
-+			phy_type = "ulpi";
-+		};
-+
-+		usb1: usb at e0003000 {
-+			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
-+			status = "disabled";
-+			clocks = <&clkc 29>;
-+			interrupt-parent = <&intc>;
-+			interrupts = <0 44 4>;
-+			reg = <0xe0003000 0x1000>;
-+			phy_type = "ulpi";
-+		};
-+
- 		watchdog0: watchdog at f8005000 {
- 			clocks = <&clkc 45>;
- 			compatible = "xlnx,zynq-wdt-r1p2";
-@@ -324,6 +344,6 @@
- 			reg = <0xf8005000 0x1000>;
- 			reset = <0>;
- 			timeout-sec = <10>;
--		};
-+		} ;
- 	};
- };
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index 94e2cda6f9b6..690d2b6bbada 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -36,6 +36,11 @@
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-+
-+	usb_phy0: usb-phy at 0 {
-+		compatible = "usb-nop-xceiv";
-+		#phy-cells = <0>;
-+	};
- };
- 
- &can0 {
-@@ -135,3 +140,9 @@
- &uart1 {
- 	status = "okay";
- };
-+
-+&usb0 {
-+	status = "okay";
-+	dr_mode = "host";
-+	usb-phy = <&usb_phy0>;
-+};
-diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-index a8bbdfbc7093..e383c0a3f314 100644
---- a/arch/arm/boot/dts/zynq-zc706.dts
-+++ b/arch/arm/boot/dts/zynq-zc706.dts
-@@ -27,6 +27,10 @@
- 		bootargs = "console=ttyPS0,115200 earlyprintk";
- 	};
- 
-+	usb_phy0: usb-phy at 0 {
-+		compatible = "usb-nop-xceiv";
-+		#phy-cells = <0>;
-+	};
- };
- 
- &gem0 {
-@@ -114,3 +118,9 @@
- &uart1 {
- 	status = "okay";
- };
-+
-+&usb0 {
-+	status = "okay";
-+	dr_mode = "host";
-+	usb-phy = <&usb_phy0>;
-+};
-diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
-index 697779a353ed..b08ae18ad854 100644
---- a/arch/arm/boot/dts/zynq-zed.dts
-+++ b/arch/arm/boot/dts/zynq-zed.dts
-@@ -27,6 +27,10 @@
- 		bootargs = "console=ttyPS0,115200 earlyprintk";
- 	};
- 
-+	usb_phy0: usb-phy at 0 {
-+		compatible = "usb-nop-xceiv";
-+		#phy-cells = <0>;
-+	};
- };
- 
- &gem0 {
-@@ -46,3 +50,9 @@
- &uart1 {
- 	status = "okay";
- };
-+
-+&usb0 {
-+	status = "okay";
-+	dr_mode = "host";
-+	usb-phy = <&usb_phy0>;
-+};
--- 
-2.2.0.1.g9ee0458
+To achieve the SPM -> CPUIDLE Device relation, I havent found a good way
+to do that. Without using CPUIDLE_MULTIPLE_DRIVERS, initializing each
+cpuidle device, separate from the cpuidle driver, requires that I update 
+the cpuidle_driver->cpumask after probing each SPM device, to allow for
+only one driver and cpuidle devices only for the probed cpus. Using the
+cpuidle_register_driver(), resets the drv->refcnt in
+__cpuidle_driver_init.
+
+I may need something like this in the else clause of CPUIDLE_MULTIPLE_DRIVERS -
+
+static inline struct cpuidle_driver *__cpuidle_get_cpu_driver(int cpu)
+{
+        struct cpuidle_driver *drv = cpuidle_curr_driver;
+
+        if (drv && !cpumask_test_cpu(cpu, drv->cpumask))
+                 drv = NULL;
+
+        return drv;
+}
+
+void cpuidle_update_cpumask(struct cpumask *mask) {
+        struct cpuidle_driver *drv;
+
+        spin_lock(&cpuidle_driver_lock);
+        drv = cpuidle_get_driver();
+	if (drv)
+		drv->cpumask = mask ?: cpu_possible_mask;
+        spin_unlock(&cpuidle_driver_lock);
+}
+
+With that, I could register cpuidle driver the first time when the mask changes
+from empty and consequent updates would just update the cpumask. (I am not
+sure, if I missed anything in this change). It just seemed far too invasive at
+this time, in lieu of the static bool.
+
+>>+	const struct platform_device_info qcom_cpuidle_info = {
+>>+		.name	= "qcom_cpuidle",
+>>+		.id	= -1,
+>>+		.data = &lpm_ops,
+>>+		.size_data = sizeof(lpm_ops),
+>>+	};
+>>+
+>>+	drv = spm_get_drv(pdev, &cpu);
+>>+	if (!drv || cpu < 0)
+>>+		return -EINVAL;
+>
+>As already said in a previous comment, it is not possible to have "cpu 
+>< 0" with "drv != NULL", so except I am missing something the test 
+>should be:
+>
+>	if (!drv)
+>		return -EINVAL;
+>
+Sorry, done.
+
+>There is something wrong with the init sequence. Don't you find weird 
+>you have to backward search for the cpu belonging to the pdev each 
+>time the probe function is called ?
+>
+>
+Well, it was that or the SPM device node pointing to the CPU that it
+references. It seems more common to have an iterator than the doubly
+linked device nodes. I dont have a strong preference either way, just
+chose the way that made device nodes easier.
+
+>>+
+>>+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>+	drv->reg_base = devm_ioremap_resource(&pdev->dev, res);
+>>+	if (IS_ERR(drv->reg_base))
+>>+		return PTR_ERR(drv->reg_base);
+>>+
+>>+	match_id = of_match_node(spm_match_table, pdev->dev.of_node);
+>>+	if (!match_id)
+>>+		return -ENODEV;
+>>+
+>>+	drv->reg_data = match_id->data;
+>>+
+>>+	/* Write the SPM sequences first.. */
+>>+	addr = drv->reg_base + drv->reg_data->reg_offset[SPM_REG_SEQ_ENTRY];
+>>+	__iowrite32_copy(addr, drv->reg_data->seq,
+>>+			ARRAY_SIZE(drv->reg_data->seq) / 4);
+>>+
+>>+	/*
+>>+	 * ..and then the control registers.
+>>+	 * On some SoC's if the control registers are written first and if the
+>>+	 * CPU was held in reset, the reset signal could trigger the SPM state
+>>+	 * machine, before the sequences are completely written.
+>>+	 */
+>>+	spm_register_write(drv, SPM_REG_CFG, drv->reg_data->spm_cfg);
+>>+	spm_register_write(drv, SPM_REG_DLY, drv->reg_data->spm_dly);
+>>+	spm_register_write(drv, SPM_REG_PMIC_DLY, drv->reg_data->pmic_dly);
+>>+
+>>+	spm_register_write(drv, SPM_REG_PMIC_DATA_0,
+>>+				drv->reg_data->pmic_data[0]);
+>>+	spm_register_write(drv, SPM_REG_PMIC_DATA_1,
+>>+				drv->reg_data->pmic_data[1]);
+>>+
+>>+	/*
+>>+	 * Ensure all observers see the above register writes before the
+>>+	 * cpuidle driver is allowed to use the SPM.
+>>+	 */
+>>+	wmb();
+>>+	per_cpu(cpu_spm_drv, cpu) = drv;
+>>+
+>>+	if (!cpuidle_drv_init) {
+>>+		platform_device_register_full(&qcom_cpuidle_info);
+>>+		cpuidle_drv_init = true;
+>>+	}
+>>+
+>>+	return 0;
+>>+}
+>>+
+>>+static struct platform_driver spm_driver = {
+>>+	.probe = spm_dev_probe,
+>>+	.driver = {
+>>+		.name = "saw",
+>>+		.of_match_table = spm_match_table,
+>>+	},
+>>+};
+>>+
+>>+module_platform_driver(spm_driver);
+>>+
+>>+MODULE_LICENSE("GPL v2");
+>>+MODULE_DESCRIPTION("SAW power controller driver");
+>>+MODULE_ALIAS("platform:saw");
+>>diff --git a/include/soc/qcom/pm.h b/include/soc/qcom/pm.h
+>>new file mode 100644
+>>index 0000000..d9a56d7
+>>--- /dev/null
+>>+++ b/include/soc/qcom/pm.h
+>>@@ -0,0 +1,31 @@
+>>+/*
+>>+ * Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
+>>+ *
+>>+ * This software is licensed under the terms of the GNU General Public
+>>+ * License version 2, as published by the Free Software Foundation, and
+>>+ * may be copied, distributed, and modified under those terms.
+>>+ *
+>>+ * This program is distributed in the hope that it will be useful,
+>>+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>+ * GNU General Public License for more details.
+>>+ *
+>>+ */
+>>+
+>>+#ifndef __QCOM_PM_H
+>>+#define __QCOM_PM_H
+>>+
+>>+enum pm_sleep_mode {
+>>+	PM_SLEEP_MODE_STBY,
+>>+	PM_SLEEP_MODE_RET,
+>>+	PM_SLEEP_MODE_SPC,
+>>+	PM_SLEEP_MODE_PC,
+>>+	PM_SLEEP_MODE_NR,
+>>+};
+>>+
+>>+struct qcom_cpu_pm_ops {
+>>+	int (*standby)(void *data);
+>>+	int (*spc)(void *data);
+>>+};
+>>+
+>>+#endif  /* __QCOM_PM_H */
+>>
+>
+>
+>-- 
+> <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+>Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+><http://twitter.com/#!/linaroorg> Twitter |
+><http://www.linaro.org/linaro-blog/> Blog
+>
