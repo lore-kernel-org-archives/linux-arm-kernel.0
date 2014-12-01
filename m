@@ -1,148 +1,78 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 01 Dec 2014 17:22:59 +0100
-Subject: [PATCH 1/3] staging: imx-drm: document internal HDMI I2C master
- controller DT binding
-In-Reply-To: <547C8B9E.8050605@mentor.com>
-References: <1416073759-19939-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <1416073759-19939-2-git-send-email-vladimir_zapolskiy@mentor.com>
- <547C8113.3050100@mentor.com> <1417446703.4624.18.camel@pengutronix.de>
- <547C8B9E.8050605@mentor.com>
-Message-ID: <1417450979.4624.23.camel@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  1 Dec 2014 16:25:09 +0000
+Subject: [PATCH] ARM: imx: irq: fix buggy usage of irq_data irq field
+Message-ID: <1417451109-30276-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+mach-imx directly references to the irq field in
+struct irq_data, and uses this to directly poke hardware register.
 
-[Added Andy Yan to Cc:, because imx-hdmi->dw-hdmi]
+But irq is the *virtual* irq number, something that has nothing
+to do with the actual HW irq (stored in the hwirq field). And once
+we put the stacked domain code in action, the whole thing explodes,
+as these two values are *very* different.
 
-Am Montag, den 01.12.2014, 17:39 +0200 schrieb Vladimir Zapolskiy:
-> On 01.12.2014 17:11, Philipp Zabel wrote:
-> > Am Montag, den 01.12.2014, 16:54 +0200 schrieb Vladimir Zapolskiy:
-> >> Hi Philipp and Shawn,
-> >>
-> >> On 15.11.2014 19:49, Vladimir Zapolskiy wrote:
-> >>> Provide information about how to bind internal iMX6Q/DL HDMI DDC I2C
-> >>> master controller. The property is set as optional one, because iMX6
-> >>> HDMI DDC bus may be represented by one of general purpose I2C busses
-> >>> found on SoC.
-> >>>
-> >>> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> >>> Cc: Wolfram Sang <wsa@the-dreams.de>
-> >>> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> >>> Cc: Shawn Guo <shawn.guo@linaro.org>
-> >>> Cc: devicetree at vger.kernel.org
-> >>> Cc: linux-media at vger.kernel.org
-> >>> Cc: linux-arm-kernel at lists.infradead.org
-> >>> Cc: linux-i2c at vger.kernel.org
-> >>> ---
-> >>>  Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt |   10 +++++++++-
-> >>>  1 file changed, 9 insertions(+), 1 deletion(-)
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-> >>> index 1b756cf..43c8924 100644
-> >>> --- a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-> >>> +++ b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-> >>> @@ -10,6 +10,8 @@ Required properties:
-> >>>   - #address-cells : should be <1>
-> >>>   - #size-cells : should be <0>
-> >>>   - compatible : should be "fsl,imx6q-hdmi" or "fsl,imx6dl-hdmi".
-> >>> +   If internal HDMI DDC I2C master controller is supposed to be used,
-> >>> +   then "simple-bus" should be added to compatible value.
-> >>>   - gpr : should be <&gpr>.
-> >>>     The phandle points to the iomuxc-gpr region containing the HDMI
-> >>>     multiplexer control register.
-> >>> @@ -22,6 +24,7 @@ Required properties:
-> >>>  
-> >>>  Optional properties:
-> >>>   - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
-> >>> + - ddc: internal HDMI DDC I2C master controller
-> >>>  
-> >>>  example:
-> >>>  
-> >>> @@ -32,7 +35,7 @@ example:
-> >>>          hdmi: hdmi at 0120000 {
-> >>>                  #address-cells = <1>;
-> >>>                  #size-cells = <0>;
-> >>> -                compatible = "fsl,imx6q-hdmi";
-> >>> +                compatible = "fsl,imx6q-hdmi", "simple-bus";
-> >>>                  reg = <0x00120000 0x9000>;
-> >>>                  interrupts = <0 115 0x04>;
-> >>>                  gpr = <&gpr>;
-> >>> @@ -40,6 +43,11 @@ example:
-> >>>                  clock-names = "iahb", "isfr";
-> >>>                  ddc-i2c-bus = <&i2c2>;
-> >>>  
-> >>> +                hdmi_ddc: ddc {
-> >>> +                        compatible = "fsl,imx6q-hdmi-ddc";
-> >>> +                        status = "disabled";
-> >>> +                };
-> >>> +
-> >>>                  port at 0 {
-> >>>                          reg = <0>;
-> >>>  
-> >>>
-> >>
-> >> knowing in advance that I2C framework lacks a graceful support of non
-> >> fully compliant I2C devices, do you have any objections to the proposed
-> >> iMX HDMI DTS change?
-> > 
-> > I'm not sure about this. Have you seen "drm: Decouple EDID parsing from
-> > I2C adapter"? I feel like in the absence of a ddc-i2c-bus property the
-> > imx-hdmi/dw-hdmi driver should try to use the internal HDMI DDC I2C
-> > master controller, bypassing the I2C framework altogether.
-> > 
-> My idea is exactly not to bypass the I2C framework, briefly the
-> rationale is that
-> * it allows to reuse I2C UAPI/tools naturally applied to the internal
-> iMX HDMI DDC bus,
-> * it allows to use iMX HDMI DDC bus as an additional feature-limited I2C
-> bus on SoC (who knows, I absolutely won't be surprised, if anyone needs
-> it on practice),
-> * if an HDMI controller supports an external I2C bus, the integration
-> with HDMI DDC bus driver based on I2C framework is seamless.
-> 
-> However I agree that the selected approach may look odd, the question is
-> if the oddness comes from the technical side or from the fact that
-> nobody has done it before this way.
-> 
-> I'm open to any critique, if the proposal of creating an I2C bus from
-> HDMI DDC bus is lame, then I suppose the shared iMX HDMI DDC bus driver
-> should be converted to something formless and internally used by
-> imx-hdmi. The negative side-effects of such a change from my point of
-> view are
-> * more or less natural modularity is lost,
-> * a number of I2C framework API/functions should be copy-pasted to the
-> updated HDMI DDC bus driver to support a subset of I2C read/write
-> transactions.
+Just replacing all instances of irq with hwirq fixes the issue.
 
-If Wolfram is happy to accomodate such feature limited, 'I2C master'
-devices in i2c/drivers/busses in principle, I won't disagree.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-imx/gpc.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-But then it should be abstracted properly. The dw-hdmi-tx core on i.MX6
-has the DDC I2C master register space at 0x7e00 - 0x7e12. What are the
-offsets on the Rockchip version? If the "simple-bus" compatible is to be
-set on the hdmi driver, the ddc driver should do its own register
-access, and therefore needs a reg property. I suspect for the ddc-i2cm
-we should get away with a common compatible like "snps,dw-hdmi-i2c".
-
-	hdmi: hdmi at 120000 {
-		/* ... */
-		compatible = "fsl,imx6q-hdmi", "snps,dw-hdmi";
-		ddc-i2c-bus = <&hdmi_ddc>;
-
-		hdmi_ddc: i2c at 127e00 {
-			compatible = "snps,dw-hdmi-i2c";
-			reg = <0x1207e00 0x13>
-		};
-
-		/* could add phy-i2cm, cec, ... here */
-	};
-
-Also there's an i2c bus for communication with the phy at 0x3020 -
-0x3032, should that be handled in a similar way, then?
-
-Do we need to make the hdmi driver a proper interrupt controller? At
-least the two i2c masters have two interrupts each, "done" and "error".
-
-regards
-Philipp
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index 82ea74e..1455829 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -56,14 +56,14 @@ void imx_gpc_post_resume(void)
+ 
+ static int imx_gpc_irq_set_wake(struct irq_data *d, unsigned int on)
+ {
+-	unsigned int idx = d->irq / 32 - 1;
++	unsigned int idx = d->hwirq / 32 - 1;
+ 	u32 mask;
+ 
+ 	/* Sanity check for SPI irq */
+-	if (d->irq < 32)
++	if (d->hwirq < 32)
+ 		return -EINVAL;
+ 
+-	mask = 1 << d->irq % 32;
++	mask = 1 << d->hwirq % 32;
+ 	gpc_wake_irqs[idx] = on ? gpc_wake_irqs[idx] | mask :
+ 				  gpc_wake_irqs[idx] & ~mask;
+ 
+@@ -97,12 +97,12 @@ void imx_gpc_irq_unmask(struct irq_data *d)
+ 	u32 val;
+ 
+ 	/* Sanity check for SPI irq */
+-	if (d->irq < 32)
++	if (d->hwirq < 32)
+ 		return;
+ 
+-	reg = gpc_base + GPC_IMR1 + (d->irq / 32 - 1) * 4;
++	reg = gpc_base + GPC_IMR1 + (d->hwirq / 32 - 1) * 4;
+ 	val = readl_relaxed(reg);
+-	val &= ~(1 << d->irq % 32);
++	val &= ~(1 << d->hwirq % 32);
+ 	writel_relaxed(val, reg);
+ }
+ 
+@@ -112,12 +112,12 @@ void imx_gpc_irq_mask(struct irq_data *d)
+ 	u32 val;
+ 
+ 	/* Sanity check for SPI irq */
+-	if (d->irq < 32)
++	if (d->hwirq < 32)
+ 		return;
+ 
+-	reg = gpc_base + GPC_IMR1 + (d->irq / 32 - 1) * 4;
++	reg = gpc_base + GPC_IMR1 + (d->hwirq / 32 - 1) * 4;
+ 	val = readl_relaxed(reg);
+-	val |= 1 << (d->irq % 32);
++	val |= 1 << (d->hwirq % 32);
+ 	writel_relaxed(val, reg);
+ }
+ 
+-- 
+2.1.3
