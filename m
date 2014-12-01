@@ -1,50 +1,59 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 1 Dec 2014 14:19:43 +0100
-Subject: [GIT PULL 4/4] ARM: tegra: Core code changes for v3.19
-In-Reply-To: <201411282249.58149.arnd@arndb.de>
-References: <1416570832-6220-1-git-send-email-thierry.reding@gmail.com>
- <1416570832-6220-4-git-send-email-thierry.reding@gmail.com>
- <201411282249.58149.arnd@arndb.de>
-Message-ID: <20141201131942.GA11943@ulmo.nvidia.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 01 Dec 2014 15:25:06 +0200
+Subject: build regression with "rcar-du: Remove platform data support"
+In-Reply-To: <12234794.nfiRtpFgV8@wuerfel>
+References: <12234794.nfiRtpFgV8@wuerfel>
+Message-ID: <5028621.aLK7lB68Yl@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 10:49:57PM +0100, Arnd Bergmann wrote:
-> On Friday 21 November 2014, Thierry Reding wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> > 
-> > Hi ARM SoC maintainers,
-> > 
-> > The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-> > 
-> >   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.19-soc
-> > 
-> > for you to fetch changes up to e4a680099a6e97ecdbb81081cff9e4a489a4dc44:
-> > 
-> >   ARM: tegra: Re-add removed SoC id macro to tegra_resume() (2014-11-17 11:43:21 +0100)
-> > 
-> 
-> Hmm, I guess this should have been part of 3.18, but I just sent out
-> a pull request for fixes today, and it may have been the last time.
-> 
-> Pulled into next/fixes-non-critical now. I see that there is a stable
-> tag on it, which means that it will find its way into 3.18.x, but it's
-> really the wrong way to send a patch for the following merge window when
-> there is a stable tag on it.
+Hi Arnd,
 
-It didn't seem quite critical enough for it to get it into 3.18, but
-perhaps it should still have gone that route. I'll try to be more
-careful next time around.
+On Monday 01 December 2014 14:09:36 Arnd Bergmann wrote:
+> Hi Laurent,
+> 
+> linux-next has failed to build with lager_defconfig and marzen_defconfig for
+> a while, with this error:
+> 
+> arch/arm/mach-shmobile/board-lager.c:35:41: fatal error:
+> linux/platform_data/rcar-du.h: No such file or directory #include
+> <linux/platform_data/rcar-du.h>
+> 
+> which is evidently the result of your patch
+> 
+> commit 2378ad1228d2cdae0ea5448beb4fb2b42ebaf99c
+> Author: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Date:   Wed Sep 17 02:07:52 2014 +0300
+> 
+>     drm: rcar-du: Remove platform data support
+> 
+>     All platforms now instantiate the DU through DT, platform data support
+>     isn't needed anymore.
+> 
+>     Signed-off-by: Laurent Pinchart
+> <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> that removes the header files. I assume some dependency wasn't tracked
+> right, since linux-next still has these.
+> 
+> $ git grep rcar_du_ arch/arm
+> arch/arm/mach-shmobile/board-lager.c:static struct rcar_du_encoder_data
+> lager_du_encoders[] = { arch/arm/mach-shmobile/board-lager.c:static const
+> struct rcar_du_platform_data lager_du_pdata __initconst = {
+> arch/arm/mach-shmobile/board-marzen.c:static struct rcar_du_encoder_data
+> du_encoders[] = { arch/arm/mach-shmobile/board-marzen.c:static const struct
+> rcar_du_platform_data du_pdata __initconst = {
+> 
+> Can we please fix this before the merge window? Should the platform
+> device registration just get removed from the two board files?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/f567fedc/attachment.sig>
+That's what I've proposed in
+
+http://www.spinics.net/lists/dri-devel/msg72750.html
+
+Dave, could you please reply to that ?
+
+-- 
+Regards,
+
+Laurent Pinchart
