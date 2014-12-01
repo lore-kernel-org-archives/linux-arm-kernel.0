@@ -1,26 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 1 Dec 2014 19:33:57 +0000
-Subject: [PATCH v5 0/2] poweroff-source DT property renaming
-In-Reply-To: <1416918506-9366-1-git-send-email-romain.perier@gmail.com>
-References: <1416918506-9366-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <20141201193357.GO7712@sirena.org.uk>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 1 Dec 2014 11:41:39 -0800
+Subject: [PATCH] mtd: gpmi: properly handle bitflips in erased pages
+In-Reply-To: <1417461159-2972-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1417461159-2972-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141201194139.GI21347@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 12:28:24PM +0000, Romain Perier wrote:
-> The goal of this serie is to rename the property "poweroff-source" to
-> "system-power-controller". After discussions, it makes more sense to rename back
-> to the old established property name. This patches serie reverts
-> commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
+Hi Boris,
 
-> Changes since v4:
->   - Renamed the helper function to of_device_is_system_power_controller
+On Mon, Dec 01, 2014 at 08:12:39PM +0100, Boris Brezillon wrote:
+> Brian, I really like the idea of having a generic implementation for this
+> feature (using read_page_raw) as you suggested here [1], but this implies
+> having a temporary buffer to store the page read in raw mode and keep the page
+> read in normal (HW ECC engine eanbled) mode, and I'm not sure we want to
+> allocate more buffers than we already have.
 
-Applied both, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/ebc6c27c/attachment.sig>
+Why does this require an additional buffer? If we've already noticed an
+ECC error, we're expected to return raw data anyway, so what's the
+problem with clobbering the original data with a raw version of the
+data?
+
+I really *really* do not want to merge another one-off attempt at
+"solving" this problem in the low-level driver, if at all possible.
+
+Brian
+
+P.S. Sorry for not following up on my last attempt of a generic
+solution. I don't think I got enough constructive feedback, other than
+"this does not work for me", so I didn't pursue it further. If we have
+the attention of more than one driver developer here (i.e., at least you
+and me), then I'd really like to finish this off for good (?).
