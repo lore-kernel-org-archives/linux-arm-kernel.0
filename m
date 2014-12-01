@@ -1,189 +1,78 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 01 Dec 2014 22:21:58 +0200
-Subject: [PATCH 2/4] iommu: add ARM LPAE page table allocator
-In-Reply-To: <20141201172315.GI18466@arm.com>
-References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
- <3665319.WRLLeiHAYk@avalon> <20141201172315.GI18466@arm.com>
-Message-ID: <2303317.ZEDe4Fptcu@avalon>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Mon, 01 Dec 2014 21:26:11 +0100
+Subject: [PATCH] ARM: zynq: DT: Add USB to device tree
+In-Reply-To: <1417459352-23401-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1417459352-23401-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <547CCEE3.6020806@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi S?ren,
 
-On Monday 01 December 2014 17:23:15 Will Deacon wrote:
-> On Sun, Nov 30, 2014 at 11:29:46PM +0000, Laurent Pinchart wrote:
-> > Hi Will,
+Am 01.12.2014 um 19:42 schrieb Soren Brinkmann:
+> Add USB nodes to zc702, zc706 and zed device trees.
 > 
-> Hello again,
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 22 +++++++++++++++++++++-
+>  arch/arm/boot/dts/zynq-zc702.dts | 11 +++++++++++
+>  arch/arm/boot/dts/zynq-zc706.dts | 10 ++++++++++
+>  arch/arm/boot/dts/zynq-zed.dts   | 10 ++++++++++
+>  4 files changed, 52 insertions(+), 1 deletion(-)
 > 
-> > On Thursday 27 November 2014 11:51:16 Will Deacon wrote:
-> > > +static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable
-> > > *data, +                                         int prot)
-> > > +{
-> > > +     arm_lpae_iopte pte;
-> > > +
-> > > +     if (data->iop.fmt == ARM_LPAE_S1) {
-> > > +             pte = ARM_LPAE_PTE_AP_UNPRIV | ARM_LPAE_PTE_nG;
-> > > +
-> > > +             if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
-> > > +                     pte |= ARM_LPAE_PTE_AP_RDONLY;
-> > > +
-> > > +             if (prot & IOMMU_CACHE)
-> > > +                     pte |= (ARM_LPAE_MAIR_ATTR_IDX_CACHE
-> > > +                             << ARM_LPAE_PTE_ATTRINDX_SHIFT);
-> > 
-> > In my case I'll need to manage the NS bit (here and when allocating tables
-> > in __arm_lpae_map). The exact requirements are not exactly clear at the
-> > moment I'm afraid, the datasheet doesn't clearly document secure
-> > behaviour, but tests showed that setting the NS was necessary.
-> 
-> Hurrah! You can add a quick to the currently unused quirks field that I have
-> in io_pgtable_cfg :)
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index ce2ef5bec4f2..9ed60938f301 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -315,6 +315,26 @@
+>  			clocks = <&clkc 4>;
+>  		};
+>  
+> +		usb0: usb at e0002000 {
+> +			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
+> +			status = "disabled";
+> +			clocks = <&clkc 28>;
+> +			interrupt-parent = <&intc>;
+> +			interrupts = <0 21 4>;
+> +			reg = <0xe0002000 0x1000>;
+> +			phy_type = "ulpi";
+> +		};
+> +
+> +		usb1: usb at e0003000 {
+> +			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
+> +			status = "disabled";
+> +			clocks = <&clkc 29>;
+> +			interrupt-parent = <&intc>;
+> +			interrupts = <0 44 4>;
+> +			reg = <0xe0003000 0x1000>;
+> +			phy_type = "ulpi";
+> +		};
+> +
+>  		watchdog0: watchdog at f8005000 {
+>  			clocks = <&clkc 45>;
+>  			compatible = "xlnx,zynq-wdt-r1p2";
 
-:-)
+This part looks good.
 
-> > Given that arm_lpae_init_pte() will unconditionally set the AF and SH_IS
-> > bits you could set them here too, but that shouldn't make a big
-> > difference.
->
-> I prefer to keep only the protection bits handled here (i.e. those bits that
-> map directly to the IOMMU_* prot flags).
+> @@ -324,6 +344,6 @@
+>  			reg = <0xf8005000 0x1000>;
+>  			reset = <0>;
+>  			timeout-sec = <10>;
+> -		};
+> +		} ;
+>  	};
+>  };
 
-I thought so. That's fine with me.
+Unrelated accidental change here though. :)
 
-> > > +     } else {
-> > > +             pte = ARM_LPAE_PTE_HAP_FAULT;
-> > > +             if (prot & IOMMU_READ)
-> > > +                     pte |= ARM_LPAE_PTE_HAP_READ;
-> > > +             if (prot & IOMMU_WRITE)
-> > > +                     pte |= ARM_LPAE_PTE_HAP_WRITE;
-> > > +             if (prot & IOMMU_CACHE)
-> > > +                     pte |= ARM_LPAE_PTE_MEMATTR_OIWB;
-> > > +             else
-> > > +                     pte |= ARM_LPAE_PTE_MEMATTR_NC;
-> > > +     }
-> > > +
-> > > +     if (prot & IOMMU_NOEXEC)
-> > > +             pte |= ARM_LPAE_PTE_XN;
-> > > +
-> > > +     return pte;
-> > > +}
-> > > +
-> > > +static int arm_lpae_map(struct io_pgtable_ops *ops, unsigned long iova,
-> > > +                     phys_addr_t paddr, size_t size, int iommu_prot)
-> > > +{
-> > > +     struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
-> > > +     arm_lpae_iopte *ptep = data->pgd;
-> > > +     int lvl = ARM_LPAE_START_LVL(data);
-> > > +     arm_lpae_iopte prot;
-> > > +
-> > > +     /* If no access, then nothing to do */
-> > > +     if (!(iommu_prot & (IOMMU_READ | IOMMU_WRITE)))
-> > > +             return 0;
-> > 
-> > Shouldn't this create a faulting entry instead ?
-> 
-> That's effectively what it does. Calling iommu_map on something that's
-> already mapped is a programming error, so therefore we know that the entry
-> is already faulting by virtue of it being unmapped.
+Did I miss a matching series actually implementing the driver? I'd need
+to test the latest version to determine how to update the Parallella
+device tree - I assume that USB0 is in dr_mode="host", but with the
+previous patchsets I was unable to verify. CC'ing Ola.
 
-Indeed.
-
-> > > +static struct io_pgtable *arm_lpae_alloc_pgtable_s1(struct
-> > > io_pgtable_cfg
-> > > *cfg, +                                                   void *cookie)
-> > > +{
-> > > +     u64 reg;
-> > > +     struct arm_lpae_io_pgtable *data = arm_lpae_alloc_pgtable(cfg);
-> > > +
-> > > +     if (!data)
-> > > +             return NULL;
-> > > +
-> > > +     /* TCR */
-> > > +     reg = ARM_LPAE_TCR_EAE |
-> > > +          (ARM_LPAE_TCR_SH_IS << ARM_LPAE_TCR_SH0_SHIFT) |
-> > > +          (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_IRGN0_SHIFT) |
-> > > +          (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_ORGN0_SHIFT);
-> > > +
-> > > +     switch (1 << data->pg_shift) {
-> > > +     case SZ_4K:
-> > > +             reg |= ARM_LPAE_TCR_TG0_4K;
-> > > +             break;
-> > > +     case SZ_16K:
-> > > +             reg |= ARM_LPAE_TCR_TG0_16K;
-> > > +             break;
-> > > +     case SZ_64K:
-> > > +             reg |= ARM_LPAE_TCR_TG0_64K;
-> > > +             break;
-> > > +     }
-> > > +
-> > > +     switch (cfg->oas) {
-> > > +     case 32:
-> > > +             reg |= (ARM_LPAE_TCR_PS_32_BIT << ARM_LPAE_TCR_IPS_SHIFT);
-> > > +             break;
-> > > +     case 36:
-> > > +             reg |= (ARM_LPAE_TCR_PS_36_BIT << ARM_LPAE_TCR_IPS_SHIFT);
-> > > +             break;
-> > > +     case 40:
-> > > +             reg |= (ARM_LPAE_TCR_PS_40_BIT << ARM_LPAE_TCR_IPS_SHIFT);
-> > > +             break;
-> > > +     case 42:
-> > > +             reg |= (ARM_LPAE_TCR_PS_42_BIT << ARM_LPAE_TCR_IPS_SHIFT);
-> > > +             break;
-> > > +     case 44:
-> > > +             reg |= (ARM_LPAE_TCR_PS_44_BIT << ARM_LPAE_TCR_IPS_SHIFT);
-> > > +             break;
-> > > +     case 48:
-> > > +             reg |= (ARM_LPAE_TCR_PS_48_BIT << ARM_LPAE_TCR_IPS_SHIFT);
-> > > +             break;
-> > > +     default:
-> > > +             goto out_free_data;
-> > > +     }
-> > > +
-> > > +     reg |= (64ULL - cfg->ias) << ARM_LPAE_TCR_T0SZ_SHIFT;
-> > > +     cfg->arm_lpae_s1_cfg.tcr = reg;
-> > > +
-> > > +     /* MAIRs */
-> > > +     reg = (ARM_LPAE_MAIR_ATTR_NC
-> > > +            << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_NC)) |
-> > > +           (ARM_LPAE_MAIR_ATTR_WBRWA
-> > > +            << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_CACHE))
-> > > |
-> > > +           (ARM_LPAE_MAIR_ATTR_DEVICE
-> > > +            << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_DEV));
-> > > +
-> > > +     cfg->arm_lpae_s1_cfg.mair[0] = reg;
-> > > +     cfg->arm_lpae_s1_cfg.mair[1] = 0;
-> > > +
-> > > +     /* Looking good; allocate a pgd */
-> > > +     data->pgd = alloc_pages_exact(1UL << data->pg_shift,
-> > > +                                   GFP_KERNEL | __GFP_ZERO);
-> > 
-> > data->pg_shift is computed as __ffs(cfg->pgsize_bitmap). 1UL <<
-> > data->pg_shift will thus be equal to the smallest page size supported by
-> > the IOMMU. This will thus allocate 4kB, 16kB or 64kB depending on the
-> > IOMMU configuration. However, if I'm not mistaken the top-level directory
-> > needs to store one entry per largest supported page size. That's 4, 128
-> > or 8 entries depending on the configuration. You're thus over-allocating.
-> 
-> Yeah, I'll take a closer look at this. The size of the pgd really depends
-> on the TxSZ configuration, which in turn depends on the ias and the page
-> size. There are also alignment constraints to bear in mind, but I'll see
-> what I can do (as it stands, over-allocating will always work).
-
-Beside wasting memory, the code also doesn't reflect the requirements. It 
-works by chance, meaning it could break later. That's why I'd like to see this 
-being fixed. Can't the size be computed with something like
-
-	size = (1 << (ias - data->levels * data->pg_shift))
-	     * sizeof(arm_lpae_iopte);
-
-(please add a proper detailed comment to explain the computation, as the 
-meaning is not straightforward)
-
-There might be some corner cases I'm not aware of.
+Regards,
+Andreas
 
 -- 
-Regards,
-
-Laurent Pinchart
+SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
