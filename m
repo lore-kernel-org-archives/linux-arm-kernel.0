@@ -1,51 +1,49 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 1 Dec 2014 21:10:57 +0100
-Subject: [PATCH v3 3/8] VFIO: platform: forwarded state tested when
- selecting IRQ handler
-In-Reply-To: <547C7D9C.7030909@linaro.org>
-References: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
- <1416767760-14487-4-git-send-email-eric.auger@linaro.org>
- <20141130124730.GD82106@macair> <547C7D9C.7030909@linaro.org>
-Message-ID: <20141201201057.GK23653@cbox>
+From: gang.chen.5i5j@gmail.com (Chen Gang)
+Date: Tue, 02 Dec 2014 04:13:51 +0800
+Subject: [PATCH v3] virt: kvm: arm: vgic: Process the failure case when
+ kvm_register_device_ops() fails
+Message-ID: <547CCBFF.5070605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 03:39:24PM +0100, Eric Auger wrote:
-> Hi Christoffer,
-> On 11/30/2014 01:47 PM, Christoffer Dall wrote:
-> > The subject reads strangely, perhaps just:
-> > 
-> > VFIO: platform: test forward state when selecting IRQ handler
-> OK
-> > 
-> > On Sun, Nov 23, 2014 at 07:35:55PM +0100, Eric Auger wrote:
-> >> In case the IRQ is forwarded, the VFIO platform IRQ handler does not
-> >> need to disable the IRQ anymore.
-> >>
-> >> When setting the IRQ handler we now also test the forwarded state. In
-> >> case the IRQ is forwarded we select the edge handler (no automaske).
-> >>
-> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> >>
-> >> ---
-> >>
-> >> v2 -> v3:
-> >> - forwarded state was tested in the handler. Now the forwarded state
-> >>   is tested before setting the handler. This definitively limits
-> >>   the dynamics of forwarded state changes but I don't think there is
-> >>   a use case where we need to be able to change the state at any time.
-> > 
-> > user space can change this by calling the VFIO_IRQ_SET_ACTION_TRIGGER
-> > whenever it wants, right?
-> yes the user can set/unset the VFIO signaling (and request_irq/free_irq)
-> using VFIO_IRQ_SET_ACTION_TRIGGER. In this new version I do not allow
-> changing the forwarded state when the handler is attached (request_irq).
-> 
-> Does it answer your interrogation?
-> 
-interrogation?  hopefully it wasn't that bad ;)
+kvm_register_device_ops() may fail, so need process the related failure
+case.
 
-Yes, that answers my question.
+Since it is related with neither vgic_arch_setup() nor on_each_cpu(),
+can move it before them, then simplify the related failure processing
+code.
 
-Thanks,
--Christoffer
+Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+---
+ virt/kvm/arm/vgic.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index cf23c13..814cae2 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -2471,13 +2471,20 @@ int kvm_vgic_hyp_init(void)
+ 		goto out_free_irq;
+ 	}
+ 
++	ret = kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
++				      KVM_DEV_TYPE_ARM_VGIC_V2);
++	if (ret) {
++		__unregister_cpu_notifier(&vgic_cpu_nb);
++		kvm_err("Cannot register vgic device ops\n");
++		goto out_free_irq;
++	}
++
+ 	/* Callback into for arch code for setup */
+ 	vgic_arch_setup(vgic);
+ 
+ 	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
+ 
+-	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+-				       KVM_DEV_TYPE_ARM_VGIC_V2);
++	return 0;
+ 
+ out_free_irq:
+ 	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
+-- 
+1.9.3
