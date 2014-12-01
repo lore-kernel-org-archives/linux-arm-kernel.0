@@ -1,43 +1,97 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 1 Dec 2014 15:59:19 +0530
-Subject: [PATCH v4 0/6] Touchscreen performance related fixes
-In-Reply-To: <547C3C19.5090501@linutronix.de>
-References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
- <20141124115116.GA14997@linutronix.de> <547C3A95.30605@ti.com>
- <547C3C19.5090501@linutronix.de>
-Message-ID: <547C42FF.5010700@ti.com>
+From: tim@krieglstein.org (Tim Sander)
+Date: Mon, 01 Dec 2014 11:32 +0100
+Subject: [PATCH 3.18-rc3 v9 5/5] arm: smp: Handle ipi_cpu_backtrace()
+ using FIQ (if available)
+In-Reply-To: <20141128100828.GQ3836@n2100.arm.linux.org.uk>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <13373554.4deCsZOMXS@dabox> <20141128100828.GQ3836@n2100.arm.linux.org.uk>
+Message-ID: <1633306.naE1qIcAOt@dabox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Russel, Daniel
 
-Hi,
+Am Freitag, 28. November 2014, 10:08:28 schrieb Russell King - ARM Linux:
+> On Fri, Nov 28, 2014 at 10:10:04AM +0100, Tim Sander wrote:
+> > Hi Daniel, Russell
+> > 
+> > Am Mittwoch, 26. November 2014, 16:17:06 schrieb Daniel Thompson:
+> > > On 26/11/14 13:12, Russell King - ARM Linux wrote:
+> > > > On Wed, Nov 26, 2014 at 01:46:52PM +0100, Tim Sander wrote:
+> > > >> Hi Daniel
+> > > >> 
+> > > >> Am Dienstag, 25. November 2014, 17:26:41 schrieb Daniel Thompson:
+> > > >>> Previous changes have introduced both a replacement default FIQ
+> > > >>> handler
+> > > >>> and an implementation of arch_trigger_all_cpu_backtrace for ARM but
+> > > >>> these are currently independent of each other.
+> > > >>> 
+> > > >>> This patch plumbs together these features making it possible, on
+> > > >>> platforms
+> > > >>> that support it, to trigger backtrace using FIQ.
+> > > >> 
+> > > >> Does this ipi handler interfere in any way with set_fiq_handler?
+> > > >> 
+> > > >> As far as i know there is only one FIQ handler vector so i guess
+> > > >> there is
+> > > >> a
+> > > >> potential conflict. But i have not worked with IPI's so i might be
+> > > >> completley wrong.
+> > > > 
+> > > > First, the code in arch/arm/kernel/fiq.c should work with this new FIQ
+> > > > code in that the new FIQ code is used as the "default" handler (as
+> > > > opposed to the original handler which was a total no-op.)
+> > > > 
+> > > > Secondly, use of arch/arm/kernel/fiq.c in a SMP system is really not a
+> > > > good idea: the FIQ registers are private to each CPU in the system,
+> > > > and
+> > > > there is no infrastructure to allow fiq.c to ensure that it loads the
+> > > > right CPU with the register information for the provided handler.
+> > 
+> > Well given the races in the GIC v1. i have seen in the chips on my desk
+> > initializing with for_each_possible_cpu(cpu) work_on_cpu(cpu,..) is rather
+> > easy.
+> > 
+> > > > So, use of arch/arm/kernel/fiq.c and the IPI's use of FIQ /should/ be
+> > > > mutually exclusive.
+> > 
+> > Yes but i digress on the assessment that this a decision between SMP and
+> > non- SMP usage or the availbility of the GIC.
+> 
+> The two things are mutually exclusive.  You can either have FIQ being used
+> for debug purposes, where we decode the FIQ reason and call some function
+> (which means that we will only service one FIQ at a time) or you can use
+> it in exclusive mode (provided by fiq.c) where your handler has sole usage
+> of the vector, and benefits from fast and immediate servicing of the event.
+As far as i am aware, die CONFIG_FIQ symbol is not pulled by all ARM 
+platforms. Since there are ARM platforms which don't use this symbol but the 
+hardware is fully capable of handling FIQ requests i would expect, that adding
+CONFIG_FIQ to a plattform, that this platform honors the set_fiq_handler 
+functionality. 
+> You can't have fast and immediate servicing of the event _and_ debug usage
+> at the same time.
+> 
+> > Well i am not against these features as they assumably improve the
+> > backtrace, but it would be nice to have a config option which switches
+> > between set_fiq_handler usage and the other conflicting usages of the
+> > fiq.
+> You have a config option already.  CONFIG_FIQ.
+Yes, but if the FIQ handler is also used for IPI, set_fiq_handler gets IPI 
+interrupts (with the patch starting this thread)? So i think that the patch 
+needs to look like:
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry 
+handle_fiq_as_nmi(struct pt_regs *regs)
++#ifndef CONFIG_FIQ
+ #ifdef CONFIG_ARM_GIC
+        gic_handle_fiq_ipi();
+ #endif
++#endif
 
-On Monday 01 December 2014 03:29 PM, Sebastian Andrzej Siewior wrote:
-> On 12/01/2014 10:53 AM, Vignesh R wrote:
->> Hi Sebastian,
-> 
-> Hi Vignesh,
-> 
->> I fixed the issue that was triggering the WARN_ON(). I think it would be
->> better if you tested these patches, before I posted them on the
->> mainline. I don't want to clutter the list with too main versions. Here
->> is the link to the tree with latest changes:
-> 
-> awesome, thank you.
-> 
->>
->> git clone -b tsc-devel git://git.ti.com/kernel/tsc-adc.git
->> (tsc-devel branch)
-> 
-> I will and let you know.
-> 
->> Please test the above tree and let me know the results.
->> I will post new version(v5) if there are no issues wrt IIO and TSC
->> working at the same time.
-> 
-> Cool. Were you able to get in touch with someone who has a 5-wire touch?
+As otherwise if the platform has CONFIG_SMP and CONFIG_FIQ and CONFIG_ARM_GIC 
+the GIC will get reprogrammed to deliver FIQ's to the handler set by 
+set_fiq_handler ?
 
-I have asked Jeff Lance to verify 5-wire touch.
-
-Regards
-Vignesh
+Best regards
+Tim
