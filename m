@@ -1,27 +1,42 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 1 Dec 2014 15:35:05 +0100
-Subject: [PATCH v4 0/4] mmc: atmel-mci: cleanup and probe deferring
-Message-ID: <1417444509-15501-1-git-send-email-ludovic.desroches@atmel.com>
+Date: Mon, 1 Dec 2014 15:35:06 +0100
+Subject: [PATCH v4 1/4] mmc: atmel-mci: remove useless DMA stuff for non-dt
+ devices
+In-Reply-To: <1417444509-15501-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1417444509-15501-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1417444509-15501-2-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+All devices with a DMA controller are DT compliant and legacy support
+has been removed. For those reasons, some DMA stuff is useless.
 
-Same as previous series, based on your next branch, and no errors with
-checkpatch so let me know if you still have troubles to apply my patches.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/mmc/host/atmel-mci.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-Changes from v3:
-- keep __init/__exit attributes for atmci_init/exit
-- remove useless variable in atmci_configure_dma function
-
-Ludovic Desroches (4):
-  mmc: atmel-mci: remove useless DMA stuff for non-dt devices
-  mmc: atmel-mci: remove __init/__exit attributes
-  mmc: atmel-mci: stop using specific initcall
-  mmc: atmel-mci: use probe deferring if dma controller is not ready yet
-
- drivers/mmc/host/atmel-mci.c | 76 ++++++++++++++++----------------------------
- 1 file changed, 28 insertions(+), 48 deletions(-)
-
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index de2287c..f187e75 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -2274,17 +2274,9 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
+ 
+ static bool atmci_configure_dma(struct atmel_mci *host)
+ {
+-	struct mci_platform_data	*pdata;
+-	dma_cap_mask_t mask;
+-
+ 	if (host == NULL)
+ 		return false;
+ 
+-	pdata = host->pdev->dev.platform_data;
+-
+-	dma_cap_zero(mask);
+-	dma_cap_set(DMA_SLAVE, mask);
+-
+ 	host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
+ 	if (!host->dma.chan) {
+ 		dev_warn(&host->pdev->dev, "no DMA channel available\n");
 -- 
 2.0.3
