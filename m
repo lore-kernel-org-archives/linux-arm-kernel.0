@@ -1,85 +1,87 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Mon,  1 Dec 2014 16:52:19 +0800
-Subject: [PATCH v10 3/4] ARM: dts: add RK3288 suspend support
-In-Reply-To: <1417423940-1669-1-git-send-email-zyw@rock-chips.com>
-References: <1417423940-1669-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1417423940-1669-4-git-send-email-zyw@rock-chips.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 1 Dec 2014 09:58:58 +0100
+Subject: [PATCH v6 0/3] mtd: nand: gpmi: add proper raw access support
+In-Reply-To: <20141201084709.GI29070@brian-ubuntu>
+References: <1417371030-24015-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20141201084709.GI29070@brian-ubuntu>
+Message-ID: <20141201095858.75ac3889@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add pmu sram node for suspend, add global_pwroff pinctrl.
-The pmu sram is used to store the resume code.
-global_pwroff is held low level at work, it would be pull to high
-when entering suspend. reference this in the board DTS file since
-some boards need it.
+Hi Brian,
 
-Signed-off-by: Tony Xie <xxx@rock-chips.com>
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
+On Mon, 1 Dec 2014 00:47:09 -0800
+Brian Norris <computersforpeace@gmail.com> wrote:
 
----
+> On Sun, Nov 30, 2014 at 07:10:27PM +0100, Boris Brezillon wrote:
+> > Hello,
+> > 
+> > This series provides an implementation for raw accesses taking care of
+> > hidding the specific layout used by the GPMI controller.
+> > 
+> > Best Regards,
+> > 
+> > Boris
+> > 
+> > Changes since v5:
+> >  - rename gpmi_move_bits into gpmi_copy_bits
+> > 
+> > Changes since v4:
+> >  - fixed a few corner cases in gpmi_move_bits (tested it with:
+> >    https://github.com/bbrezillon/gpmi-move-bits-test/blob/master/gpmi-move-bits-test.c)
+> >  - add documentation and comments for the new gpmi functions
+> > 
+> > Changes since v3:
+> >  - add comments to the gpmi_move_bits function
+> >  - extend raw read/write documentation
+> >  - move last part of the raw_page_read function into a conditional block
+> > 
+> > Changes since v2:
+> >  - fixed a bug in gpmi_move_bits
+> >  - add a raw_buffer field to be used when using raw access methods
+> >    (experienced memory corruptions when directly using page_buffer_virt
+> >    buffer)
+> >  - add raw OOB access functions
+> 
+> Applied the series. Thanks!
+> 
+> Out of curiosity, what tests does gpmi-nand.c now pass/fail?
 
-Changes in v10: None
-Changes in v9: None
-Changes in v8:
-- add ddr pinctrl for suspend
+The oobtest is still failing. I started to debug it, but didn't have
+enough time to make it work.
 
-Changes in v7: None
-Changes in v6:
-- change pmu_intmem at ff720000 to sram at ff720000
+The nandbiterrs test is working, though I didn't manage to make the
+incremental test fail (writing the same pattern 10000 times without
+erasing the block between each write does not generate any bit flips) on
+my SLC NAND: MT29F2G08ABAEAH4.
+Can someone with another SLC NAND chip try it ?
 
-Changes in v5:
-- change size to 4k
+> 
+> Also, is it time to yank / fixup some of these comments from
+> gpmi-nand.c?
 
-Changes in v4: None
-Changes in v3: None
-Changes in v2:
-- put "rockchip,rk3288-pmu-sram" to first
+I was asking myself the same question...
 
- arch/arm/boot/dts/rk3288.dtsi | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+> 
+>  ...
+>  * FIXME: The following paragraph is incorrect, now that there exist
+>  * ecc.read_oob_raw and ecc.write_oob_raw functions.
+>  *
+>  * Since MTD assumes the OOB is not covered by ECC, there is no pair of
+>  * ECC-based/raw functions for reading or or writing the OOB. The fact that the
+>  * caller wants an ECC-based or raw view of the page is not propagated down to
+>  * this driver.
+>  */
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 0f50d5d..eede3c6 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -480,6 +480,11 @@
- 		};
- 	};
- 
-+	sram at ff720000 {
-+		compatible = "rockchip,rk3288-pmu-sram", "mmio-sram";
-+		reg = <0xff720000 0x1000>;
-+	};
-+
- 	pmu: power-management at ff730000 {
- 		compatible = "rockchip,rk3288-pmu", "syscon";
- 		reg = <0xff730000 0x100>;
-@@ -703,6 +708,24 @@
- 			bias-disable;
- 		};
- 
-+		sleep {
-+			global_pwroff: global-pwroff {
-+				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+
-+			ddrio_pwroff: ddrio-pwroff {
-+				rockchip,pins = <0 1 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+
-+			ddr0_retention: ddr0-retention {
-+				rockchip,pins = <0 2 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			ddr1_retention: ddr1-retention {
-+				rockchip,pins = <0 3 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+		};
-+
- 		i2c0 {
- 			i2c0_xfer: i2c0-xfer {
- 				rockchip,pins = <0 15 RK_FUNC_1 &pcfg_pull_none>,
+I guess we can remove them.
+Huang can you confirm that the raw access functions introduced in this
+series are covering what's described here ?
+
+Regards,
+
+Boris
+
 -- 
-1.9.1
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
