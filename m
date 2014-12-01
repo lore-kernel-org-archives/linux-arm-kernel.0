@@ -1,97 +1,56 @@
-From: tim@krieglstein.org (Tim Sander)
-Date: Mon, 01 Dec 2014 11:32 +0100
-Subject: [PATCH 3.18-rc3 v9 5/5] arm: smp: Handle ipi_cpu_backtrace()
- using FIQ (if available)
-In-Reply-To: <20141128100828.GQ3836@n2100.arm.linux.org.uk>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <13373554.4deCsZOMXS@dabox> <20141128100828.GQ3836@n2100.arm.linux.org.uk>
-Message-ID: <1633306.naE1qIcAOt@dabox>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon, 1 Dec 2014 11:36:58 +0100
+Subject: [PATCH v3 0/3] SoCFPGA: L3 NIC driver
+In-Reply-To: <20141201100858.GA17070@leverpostej>
+References: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
+ <20141201100858.GA17070@leverpostej>
+Message-ID: <20141201103658.GE6184@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel, Daniel
+Hi Mark!
 
-Am Freitag, 28. November 2014, 10:08:28 schrieb Russell King - ARM Linux:
-> On Fri, Nov 28, 2014 at 10:10:04AM +0100, Tim Sander wrote:
-> > Hi Daniel, Russell
-> > 
-> > Am Mittwoch, 26. November 2014, 16:17:06 schrieb Daniel Thompson:
-> > > On 26/11/14 13:12, Russell King - ARM Linux wrote:
-> > > > On Wed, Nov 26, 2014 at 01:46:52PM +0100, Tim Sander wrote:
-> > > >> Hi Daniel
-> > > >> 
-> > > >> Am Dienstag, 25. November 2014, 17:26:41 schrieb Daniel Thompson:
-> > > >>> Previous changes have introduced both a replacement default FIQ
-> > > >>> handler
-> > > >>> and an implementation of arch_trigger_all_cpu_backtrace for ARM but
-> > > >>> these are currently independent of each other.
-> > > >>> 
-> > > >>> This patch plumbs together these features making it possible, on
-> > > >>> platforms
-> > > >>> that support it, to trigger backtrace using FIQ.
-> > > >> 
-> > > >> Does this ipi handler interfere in any way with set_fiq_handler?
-> > > >> 
-> > > >> As far as i know there is only one FIQ handler vector so i guess
-> > > >> there is
-> > > >> a
-> > > >> potential conflict. But i have not worked with IPI's so i might be
-> > > >> completley wrong.
-> > > > 
-> > > > First, the code in arch/arm/kernel/fiq.c should work with this new FIQ
-> > > > code in that the new FIQ code is used as the "default" handler (as
-> > > > opposed to the original handler which was a total no-op.)
-> > > > 
-> > > > Secondly, use of arch/arm/kernel/fiq.c in a SMP system is really not a
-> > > > good idea: the FIQ registers are private to each CPU in the system,
-> > > > and
-> > > > there is no infrastructure to allow fiq.c to ensure that it loads the
-> > > > right CPU with the register information for the provided handler.
-> > 
-> > Well given the races in the GIC v1. i have seen in the chips on my desk
-> > initializing with for_each_possible_cpu(cpu) work_on_cpu(cpu,..) is rather
-> > easy.
-> > 
-> > > > So, use of arch/arm/kernel/fiq.c and the IPI's use of FIQ /should/ be
-> > > > mutually exclusive.
-> > 
-> > Yes but i digress on the assessment that this a decision between SMP and
-> > non- SMP usage or the availbility of the GIC.
+On Mon, Dec 01, 2014 at 10:08:58AM +0000, Mark Rutland wrote:
+> On Sat, Nov 29, 2014 at 08:14:09PM +0000, Steffen Trumtrar wrote:
+> > Hi!
 > 
-> The two things are mutually exclusive.  You can either have FIQ being used
-> for debug purposes, where we decode the FIQ reason and call some function
-> (which means that we will only service one FIQ at a time) or you can use
-> it in exclusive mode (provided by fiq.c) where your handler has sole usage
-> of the vector, and benefits from fast and immediate servicing of the event.
-As far as i am aware, die CONFIG_FIQ symbol is not pulled by all ARM 
-platforms. Since there are ARM platforms which don't use this symbol but the 
-hardware is fully capable of handling FIQ requests i would expect, that adding
-CONFIG_FIQ to a plattform, that this platform honors the set_fiq_handler 
-functionality. 
-> You can't have fast and immediate servicing of the event _and_ debug usage
-> at the same time.
+> Hi Steffen,
 > 
-> > Well i am not against these features as they assumably improve the
-> > backtrace, but it would be nice to have a config option which switches
-> > between set_fiq_handler usage and the other conflicting usages of the
-> > fiq.
-> You have a config option already.  CONFIG_FIQ.
-Yes, but if the FIQ handler is also used for IPI, set_fiq_handler gets IPI 
-interrupts (with the patch starting this thread)? So i think that the patch 
-needs to look like:
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry 
-handle_fiq_as_nmi(struct pt_regs *regs)
-+#ifndef CONFIG_FIQ
- #ifdef CONFIG_ARM_GIC
-        gic_handle_fiq_ipi();
- #endif
-+#endif
+> > This series adds support for the SoCFPGA L3 NIC. As the memory range has
+> > a lot of holes, where you can not read from, syscon can not be used for
+> > this IP core. Instead add a new driver, that knows about all the allowed
+> > ranges and guards the access via regmap.
+> 
+> I note that while this series plumbs in a set of accessors (via regmap),
+> there are no users as part of this series. What exactly do you intend to
+> use these for? What is going to (re)program the bus, and how?
+>
 
-As otherwise if the platform has CONFIG_SMP and CONFIG_FIQ and CONFIG_ARM_GIC 
-the GIC will get reprogrammed to deliver FIQ's to the handler set by 
-set_fiq_handler ?
+The first thing I want to use this for are the AXI bridges on the SoCFPGA.
+These bridges connect the FPGA to the SoC.
+I need to setup the visibility of the bridges on the L3, so that all L3
+masters can access them.
+Other things that can be configured are e.g.
+	"(...) issuing capability of the preceding switch arbitration
+	 scheme to multiple or single outstanding transactions."
+for the USB0 host. So, this would belong into the USB driver AFAIK.
+Meaning: every L3 AXI slave or master can flip some bits in this register
+space.
 
-Best regards
-Tim
+> I also note that you mention this L3/L4 bus hierarchy is composed of a
+> number of NIC-301s, rather than being a single custom IP block. If
+> that's the case, it would seem like there should be a binding for the
+> NIC-301, and the hierarchy should be described.
+> 
+
+I didn't mean to say that. The NIC-301 is one single IP core AFAICT. See:
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0397f/index.html
+
+Regards,
+Steffen
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
