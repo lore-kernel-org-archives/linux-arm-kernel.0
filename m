@@ -1,34 +1,44 @@
-From: jamesjj.liao@mediatek.com (james liao)
-Date: Mon, 1 Dec 2014 11:41:10 +0800
-Subject: [PATCH 2/4] clk: Add INFRA and PERI clocks for Mediatek MT8135.
-In-Reply-To: <20141128120636.GD25883@leverpostej>
-References: <1417174490-6845-1-git-send-email-jamesjj.liao@mediatek.com>
- <1417174490-6845-3-git-send-email-jamesjj.liao@mediatek.com>
- <20141128120636.GD25883@leverpostej>
-Message-ID: <1417405278.31427.15.camel@mtksdaap41>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 1 Dec 2014 15:22:02 +1100
+Subject: linux-next: manual merge of the mmc-uh tree with the arm-soc tree
+Message-ID: <20141201152202.5a1b4978@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Ulf,
 
-On Fri, 2014-11-28 at 12:06 +0000, Mark Rutland wrote:
-> On Fri, Nov 28, 2014 at 11:34:48AM +0000, James Liao wrote:
-> > This patch adds clock gates support for Mediatek SoCs, and adds clocks of
-> > INFRA sys and PERI sys for MT8135.
-> > 
-> 
-> Please fold the include/dt-bindings changes into the DT documentation
-> patch, and put that earlier in the series.
-> 
+Today's linux-next merge of the mmc-uh tree got a conflict in
+arch/arm/mach-omap2/board-n8x0.c between commit e639cd5bfc03 ("ARM:
+OMAP2+: Prepare to move GPMC to drivers by platform data header") from
+the arm-soc tree and commit 826c71a06588 ("ARM: OMAP2: MMC: include
+mmc-omap platform header directly") from the mmc-uh tree.
 
-OK, I'll send a new patchset later with the following sequence:
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-1. include/dt-bindings + DT documention.
-2. Basic clocks (PLLs + TOPCKGEN).
-3. Basic clocks (INFRA + PERI)
-4. Update device tree to enable clocks.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-
-Best regards,
-
-James
+diff --cc arch/arm/mach-omap2/board-n8x0.c
+index 49c3c25808e7,e0ad64fde20e..000000000000
+--- a/arch/arm/mach-omap2/board-n8x0.c
++++ b/arch/arm/mach-omap2/board-n8x0.c
+@@@ -21,7 -21,10 +21,9 @@@
+  #include <linux/i2c.h>
+  #include <linux/spi/spi.h>
+  #include <linux/usb/musb.h>
++ #include <linux/mmc/host.h>
+  #include <linux/platform_data/spi-omap2-mcspi.h>
+ -#include <linux/platform_data/mtd-onenand-omap2.h>
++ #include <linux/platform_data/mmc-omap.h>
+  #include <linux/mfd/menelaus.h>
+  #include <sound/tlv320aic3x.h>
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/5cd72491/attachment.sig>
