@@ -1,74 +1,56 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 01 Dec 2014 15:07:15 +0000
-Subject: [RFC V1 0/8] CPUFreq: create platform-dev for DT based cpufreq
- drivers
-In-Reply-To: <23115535.r6kXsReHU2@wuerfel>
-References: <cover.1417433163.git.viresh.kumar@linaro.org>
- <CAKohpo=EPOH-WJ4mmAr-1BzzAEpvC-F0Y99Ox_yL7meUcRNx6Q@mail.gmail.com>
- <547C6E9D.2090205@arm.com> <23115535.r6kXsReHU2@wuerfel>
-Message-ID: <547C8423.2090300@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Dec 2014 16:10:26 +0100
+Subject: build regression with "rcar-du: Remove platform data support"
+In-Reply-To: <5028621.aLK7lB68Yl@avalon>
+References: <12234794.nfiRtpFgV8@wuerfel> <5028621.aLK7lB68Yl@avalon>
+Message-ID: <2056933.CSnxJiuQ7X@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 01 December 2014 15:25:06 Laurent Pinchart wrote:
+> On Monday 01 December 2014 14:09:36 Arnd Bergmann wrote:
+> > Hi Laurent,
+> > 
+> > linux-next has failed to build with lager_defconfig and marzen_defconfig for
+> > a while, with this error:
+> > 
+> > arch/arm/mach-shmobile/board-lager.c:35:41: fatal error:
+> > linux/platform_data/rcar-du.h: No such file or directory #include
+> > <linux/platform_data/rcar-du.h>
+> > 
+> > which is evidently the result of your patch
+> > 
+> > commit 2378ad1228d2cdae0ea5448beb4fb2b42ebaf99c
+> > Author: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > Date:   Wed Sep 17 02:07:52 2014 +0300
+> > 
+> >     drm: rcar-du: Remove platform data support
+> > 
+> >     All platforms now instantiate the DU through DT, platform data support
+> >     isn't needed anymore.
+> > 
+> >     Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > 
+> > that removes the header files. I assume some dependency wasn't tracked
+> > right, since linux-next still has these.
+> > 
+> > $ git grep rcar_du_ arch/arm
+> > arch/arm/mach-shmobile/board-lager.c:static struct rcar_du_encoder_data
+> > lager_du_encoders[] = { arch/arm/mach-shmobile/board-lager.c:static const
+> > struct rcar_du_platform_data lager_du_pdata __initconst = {
+> > arch/arm/mach-shmobile/board-marzen.c:static struct rcar_du_encoder_data
+> > du_encoders[] = { arch/arm/mach-shmobile/board-marzen.c:static const struct
+> > rcar_du_platform_data du_pdata __initconst = {
+> > 
+> > Can we please fix this before the merge window? Should the platform
+> > device registration just get removed from the two board files?
+> 
+> That's what I've proposed in
+> 
+> http://www.spinics.net/lists/dri-devel/msg72750.html
 
-
-On 01/12/14 14:11, Arnd Bergmann wrote:
-> On Monday 01 December 2014 13:35:25 Sudeep Holla wrote:
->> On 01/12/14 13:29, Viresh Kumar wrote:
->>> On 1 December 2014 at 18:24, Arnd Bergmann <arnd@arndb.de> wrote:
->>>> Thanks a lot for working on this, we really need to figure it out one day!
->>>
->>>
->>>
->>>> Your patches seem well-implemented, so if everybody thinks the general
->>>> approach is the best solution, we should do that. From my point of view,
->>>> there are two things I would do differently:
->>>>
->>>> - In the DT binding, I would strongly prefer anything but the root compatible
->>>>     property as the key for the new platforms. Clearly we have to keep using
->>>>     it for the backwards-compatibility case, as you do, but I think there
->>>>     are more appropriate places to put it. Sorting from most favorite to least
->>>>     favorite, my list would be:
->>>>           1. a new property in /cpus/
->>>>           2. a new property each /cpus/cpu at ... node.
->>>
->>> I did it this way earlier and named it dvfs-method but probably putting this
->>> into the /cpus/ node is far better. But then Sudeep asked to utilize
->>> compatible property only..
->>>
->>> Are you fine with the name here? "dvfs-method"
->>>
->>
->> That's right, I don't like driver specific method in the cpu node as you
->> initially did. But if it's a property in the chosen node (where we
->> usually put the Linux specific properties), I am fine with
->> that as Arnd has illustrated in his patch.
->
-> I would prefer the /cpus node over the /chosen node because the former
-> describes the hardware while the latter is supposed to be user-settable
-> (on real open-firmware at least). But I think either one is better than
-> using the / node compatible string.
->
-
-Agreed, the main reason for objection was that in the initial proposal
-it was more a Linux configuration rather than hardware property.
-
-<dvfs-method> = "cpufreq-dt";
-
-I don't see anything hardware feature presented with that. On the other
-hand, we could represent the some thing like whether the cpu share
-clock or are they independently clocked as a hardware property in the
-cpu nodes.
-
-> How about a "linux,cpu-dvfs-method" property in the root node? Would
-> that work better for you than a "linux,dvfs-method" in the "/cpus"
-> node?
->
-
-I will leave that to the DT maintainers for specific details though
-my preference is still chosen node as it's more related to Linux and
-it's driver choice and unlikely to be used by other OSes. IMO we just
-need single entry in the DT, so I am fine with either of your choice above.
-
-Regards,
-Sudeep
+Ok, I actually saw that mail the other day but then forgot about
+it when I looked at the build logs.
+ 
+	Arnd
