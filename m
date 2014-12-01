@@ -1,38 +1,51 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 1 Dec 2014 11:26:10 +0100
-Subject: [PATCH V2] PM / Domains: Add pm_genpd_lookup() API to lookup
- domain by firmware node
-In-Reply-To: <5765394.eQjV2VvkSL@vostro.rjw.lan>
-References: <1417171115-5789-1-git-send-email-ulf.hansson@linaro.org>
- <5765394.eQjV2VvkSL@vostro.rjw.lan>
-Message-ID: <CAPDyKFpX5nXR18pKdLrtDrPK60p1y2CEqq+--3z3jczRRmKrqA@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon,  1 Dec 2014 11:27:20 +0100
+Subject: [PATCH v3 04/11] mfd: syscon: Add Atmel SMC binding doc
+In-Reply-To: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1417429647-3419-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 November 2014 at 01:30, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Friday, November 28, 2014 11:38:35 AM Ulf Hansson wrote:
->> In a step to move away from using genpd's name based APIs, such as the
->> pm_genpd_add_subdomain_names(), provide an API to lookup an already
->> initialized generic PM domain by its firmware node.
->>
->> This API would typically be a called from SOC specific code, to fetch a
->> handle to the domain. Especially convenient to configure subdomains and
->> when the hierarchy of the domains are described in DT.
->>
->> Do note, before pm_genpd_init() is invoked to initialize a generic PM
->> domain, it's the callers responsibility to assign the new ->fwnode
->> pointer in the struct generic_pm_domain, to enable pm_genpd_lookup() to
->> find the domain.
->>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->
-> I have no problems with that, but do you have a user for it?
+The SMC registers are used to configure Atmel EBI (External Bus Interface)
+to interface with standard memory devices (NAND, NOR, SRAM or specialized
+devices like FPGAs).
 
-Amit Daniel Kachhap, posted a patchset which is adding subdomains
-configured from DT for Exynos. It's from there the idea to this patch
-comes from. Amit is about to post a new version, based on this patch.
+Declare this memory region as a syscon, so that different drivers can
+configure the SMC interface (mostly timing configuration) according to
+their need.
 
-https://lkml.org/lkml/2014/11/24/290
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+---
+ Documentation/devicetree/bindings/mfd/atmel-smc.txt | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel-smc.txt
 
-Kind regards
-Uffe
+diff --git a/Documentation/devicetree/bindings/mfd/atmel-smc.txt b/Documentation/devicetree/bindings/mfd/atmel-smc.txt
+new file mode 100644
+index 0000000..26eeed3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/atmel-smc.txt
+@@ -0,0 +1,19 @@
++* Device tree bindings for Atmel SMC (Static Memory Controller)
++
++The SMC registers are used to configure Atmel EBI (External Bus Interface)
++to interface with standard memory devices (NAND, NOR, SRAM or specialized
++devices like FPGAs).
++
++Required properties:
++- compatible:		Should be one of the following
++			"atmel,at91sam9260-smc", "syscon"
++			"atmel,sama5d3-smc", "syscon"
++- reg:			Contains offset/length value of the SMC memory
++			region.
++
++Example:
++
++smc: smc at ffffc000 {
++	compatible = "atmel,sama5d3-smc", "syscon";
++	reg = <0xffffc000 0x1000>;
++};
+-- 
+1.9.1
