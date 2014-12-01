@@ -1,72 +1,24 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 01 Dec 2014 18:29:43 +0100
-Subject: [PATCH v2 1/3] power: reset: read priority from device tree
-In-Reply-To: <CAL85gmBq30pWxP0buKbM8so6QqsJq2YojiSK1EWtMPsH_7foeg@mail.gmail.com>
-References: <1417453389-1588-1-git-send-email-stefan@agner.ch>
- <1417453389-1588-2-git-send-email-stefan@agner.ch>
- <CAL85gmBq30pWxP0buKbM8so6QqsJq2YojiSK1EWtMPsH_7foeg@mail.gmail.com>
-Message-ID: <ea4f7a2bfdb9bea45cab9418c211083b@agner.ch>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Mon, 1 Dec 2014 17:34:21 +0000
+Subject: [PATCH v7 0/5] ARM64: Add support for FSL's LS2085A SoC
+In-Reply-To: <20141201163013.GA22708@leverpostej>
+References: <1417443442-17444-1-git-send-email-bhupesh.sharma@freescale.com>
+ <20141201163013.GA22708@leverpostej>
+Message-ID: <CY1PR0301MB074869FD9C91C60AB98B746B877D0@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-01 18:15, Feng Kan wrote:
-> On Mon, Dec 1, 2014 at 9:03 AM, Stefan Agner <stefan@agner.ch> wrote:
->> This patch adds an optional property which allows to specify the
->> reset source priority. This priority is used by the kernel restart
->> handler call chain to sort out the proper reset/restart method.
->> Depending on the power design of a board or other machine/board
->> specific peculiarity, it is not possible to pick a generic priority.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->>  Documentation/devicetree/bindings/power/reset/syscon-reboot.txt | 3 +++
->>  drivers/power/reset/syscon-reboot.c                             | 5 ++++-
->>  2 files changed, 7 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
->> index 1190631..ee41d9c 100644
->> --- a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
->> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
->> @@ -11,6 +11,9 @@ Required properties:
->>  - offset: offset in the register map for the reboot register (in bytes)
->>  - mask: the reset value written to the reboot register (32 bit access)
->>
->> +Optional properties:
->> +- priority: define the priority of the reset (0-255, defaults to 128)
->> +
->>  Default will be little endian mode, 32 bit access only.
->>
->>  Examples:
->> diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
->> index 815b901..3060d6b 100644
->> --- a/drivers/power/reset/syscon-reboot.c
->> +++ b/drivers/power/reset/syscon-reboot.c
->> @@ -67,8 +67,11 @@ static int syscon_reboot_probe(struct platform_device *pdev)
->>         if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
->>                 return -EINVAL;
->>
->> -       ctx->restart_handler.notifier_call = syscon_restart_handle;
->>         ctx->restart_handler.priority = 128;
->> +       of_property_read_u32(pdev->dev.of_node, "priority",
->> +                            &ctx->restart_handler.priority);
 > 
-> What is this for?
+> >   Documentation: DT: Add entry for FSL LS2085A SoC and Simulator model
+> >   Documentation: DT: Add entry for FSL Management Complex
+> 
+> Are there any patches adding support for the management complex? There's
+> nothing in mainline that uses "fsl,qoriq-mc", and nothing in this series
+> adds support.
 
-What do you mean? The moved line "ctx->restart_handler.notifier_call =
-syscon_restart_handle;"? When one reads the diff, it looks like that
-line was moved, in fact I tried to keep the of_property_read function
-calls together. But I had to move the assignation of the default
-priority in front of restart_handler.priority. That's what is the
-outcome...
+Yes.  Patches have been in review for the last few months.  Latest 
+patch series:
+   https://lkml.org/lkml/2014/11/13/482
 
---
-Stefan
-
->> +
->> +       ctx->restart_handler.notifier_call = syscon_restart_handle;
->>         err = register_restart_handler(&ctx->restart_handler);
->>         if (err)
->>                 dev_err(dev, "can't register restart notifier (err=%d)\n", err);
->> --
->> 2.1.3
->>
+Thanks,
+Stuart
