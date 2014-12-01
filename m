@@ -1,45 +1,75 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 1 Dec 2014 15:39:27 +0100
-Subject: [PATCH 1/2] pinctrl: at91: allow disabled gpio controllers
-In-Reply-To: <CACRpkdbXuXyfwAyFTHVDGa4OS88KsHXZeDDAeXf6ZJ_JQmduoQ@mail.gmail.com>
-References: <1417193367-12422-1-git-send-email-ludovic.desroches@atmel.com>
- <CACRpkdbXuXyfwAyFTHVDGa4OS88KsHXZeDDAeXf6ZJ_JQmduoQ@mail.gmail.com>
-Message-ID: <20141201143927.GT2714@ldesroches-Latitude-E6320>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 01 Dec 2014 15:39:24 +0100
+Subject: [PATCH v3 3/8] VFIO: platform: forwarded state tested when
+ selecting IRQ handler
+In-Reply-To: <20141130124730.GD82106@macair>
+References: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
+ <1416767760-14487-4-git-send-email-eric.auger@linaro.org>
+ <20141130124730.GD82106@macair>
+Message-ID: <547C7D9C.7030909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 02:56:22PM +0100, Linus Walleij wrote:
-> On Fri, Nov 28, 2014 at 5:49 PM, Ludovic Desroches
-> <ludovic.desroches@atmel.com> wrote:
+Hi Christoffer,
+On 11/30/2014 01:47 PM, Christoffer Dall wrote:
+> The subject reads strangely, perhaps just:
 > 
-> > This patch allows to have gpio controller with status set to disabled.
-> >
-> > gpio_banks represents all the gpio banks available on the device whereas
-> > nbanks represents the gpio banks used. Having a disabled gpio controller
-> > involves that nbanks value is lower than gpio_banks and that some
-> > pointers in the gpio_chips array are NULL. This patch deals with these
-> > specific cases.
-> >
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> VFIO: platform: test forward state when selecting IRQ handler
+OK
 > 
-> (...)
-> >         /* We will handle a range of GPIO pins */
-> > -       for (i = 0; i < info->nbanks; i++)
-> > -               pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
-> > +       for (i = 0; i < gpio_banks; i++)
-> > +               if (gpio_chips[i])
-> > +                       pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
+> On Sun, Nov 23, 2014 at 07:35:55PM +0100, Eric Auger wrote:
+>> In case the IRQ is forwarded, the VFIO platform IRQ handler does not
+>> need to disable the IRQ anymore.
+>>
+>> When setting the IRQ handler we now also test the forwarded state. In
+>> case the IRQ is forwarded we select the edge handler (no automaske).
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> v2 -> v3:
+>> - forwarded state was tested in the handler. Now the forwarded state
+>>   is tested before setting the handler. This definitively limits
+>>   the dynamics of forwarded state changes but I don't think there is
+>>   a use case where we need to be able to change the state at any time.
 > 
-> I highly suspect the real solution to this problem is to get rid
-> of the pinctrl_add_gpio_range() call from the driver.
-> 
-> Remobe these calls, and instead in at91_gpio_probe() in the same
-> file, call gpiochip_add_pingroup_range() for each GPIO chip.
-> 
-> That way the GPIO ranges are inserted from the GPIO side instead
-> of the pinctrl side, which is way better, since it is more relative,
-> and make you only add ranges for the gpio chips actually there.
+> user space can change this by calling the VFIO_IRQ_SET_ACTION_TRIGGER
+> whenever it wants, right?
+yes the user can set/unset the VFIO signaling (and request_irq/free_irq)
+using VFIO_IRQ_SET_ACTION_TRIGGER. In this new version I do not allow
+changing the forwarded state when the handler is attached (request_irq).
 
-Thanks for your advices, I'll try to do it the way you recommend.
+Does it answer your interrogation?
 
-Ludovic
+Best Regards
+
+Eric
+
+> 
+>> ---
+>>  drivers/vfio/platform/vfio_platform_irq.c | 7 ++++++-
+>>  1 file changed, 6 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+>> index 08d400e..61a2920 100644
+>> --- a/drivers/vfio/platform/vfio_platform_irq.c
+>> +++ b/drivers/vfio/platform/vfio_platform_irq.c
+>> @@ -230,8 +230,13 @@ static int vfio_platform_set_irq_trigger(struct vfio_platform_device *vdev,
+>>  {
+>>  	struct vfio_platform_irq *irq = &vdev->irqs[index];
+>>  	irq_handler_t handler;
+>> +	struct irq_data *d;
+>> +	bool is_forwarded;
+>>  
+>> -	if (vdev->irqs[index].flags & VFIO_IRQ_INFO_MASKABLE)
+>> +	d = irq_get_irq_data(irq->hwirq);
+>> +	is_forwarded = irqd_irq_forwarded(d);
+>> +
+>> +	if ((vdev->irqs[index].flags & VFIO_IRQ_INFO_MASKABLE) && !is_forwarded)
+>>  		handler = vfio_maskable_irq_handler;
+>>  	else
+>>  		handler = vfio_irq_handler;
+>> -- 
+>> 1.9.1
+>>
