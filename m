@@ -1,52 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 1 Dec 2014 10:32:21 +0100
-Subject: Issue found in Armada 370: "No buffer space available" error
- during continuous ping
-In-Reply-To: <20141201092851.GA22304@1wt.eu>
-References: <CAB8gEUvwPJUhDN-=tugTyKe93SdNwqNaGtKMF1DRCb8ZNncmmg@mail.gmail.com>
- <20140721054405.GK21834@1wt.eu>
- <CAB8gEUsK9c3YMpAABifNAWU7zec2ePztSqS4KAYtiT7Sbhadvg@mail.gmail.com>
- <20140721070303.GM21834@1wt.eu>
- <CAB8gEUtmgwfWcuoYZ-wDwHVmzHN0WyOQD9oEOGAZ_gJfbPUm-g@mail.gmail.com>
- <20140723061659.GE30488@1wt.eu>
- <CAB8gEUtO=K-mjie6czsf-9ao1cxiMAV2ScbgUnf+XxqjEfOUvg@mail.gmail.com>
- <CAB8gEUtgo-8nets3tRtqiZ8qRx+SyCq2d8v05scavWNwE5TNXg@mail.gmail.com>
- <20141201072802.GB21731@1wt.eu>
- <CAB8gEUsQ8nSNwB7vpZHBkELEBX2sN1QdWvujBGYQJY9dtCzgww@mail.gmail.com>
- <20141201092851.GA22304@1wt.eu>
-Message-ID: <20141201103221.6268b811@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 1 Dec 2014 10:35:10 +0100
+Subject: [PATCH V3 0/3] PM / Domains: Add initial PM clock support to genpd
+In-Reply-To: <1417163403-7070-1-git-send-email-ulf.hansson@linaro.org>
+References: <1417163403-7070-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAMuHMdXEP2oU60CsavpHZw5y+uw9e8eHRyY4OQcYbhdML5_R5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Willy Tarreau,
+On Fri, Nov 28, 2014 at 9:30 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Changes in v3:
+>         -Fixed comments from Rafael for patch 1.
+>         -Change name of define, affects all patches.
+>
+> Changes in v2:
+>         -Small fixes in patch 1.
+>
+>
+> It's quite common for PM domains to use PM clocks. Typically from SOC specific
+> code, the per device PM clock list is created and pm_clk_suspend|resume() are
+> invoked to handle clock gating/ungating.
+>
+> A step towards consolidation is to integrate PM clock support into genpd, which
+> is what this patchset does.
+>
+> In this initial step, the calls to the pm_clk_suspend|resume() are handled
+> within genpd, but the per device PM clock list still needs to be created from
+> SOC specific code. It seems reasonable to have gendp to handle that as well, but
+> that left to future patchsets to address.
+>
+> It's not every users of genpd that are keen on using PM clocks thus we need
+> to provide this a configuration option for genpd.
+>
+> In patch 2 and patch 3, we convert some of the SH-MOBILE SOCs to start using the
+> new PM clock support in genpd.
+>
+>
+> Ulf Hansson (3):
+>   PM / Domains: Initial PM clock support for genpd
+>   ARM: shmobile: Convert to genpd flags for PM clocks for r8a7779
+>   ARM: shmobile: Convert to genpd flags for PM clocks for R-mobile
+>
+>  arch/arm/mach-shmobile/pm-r8a7779.c | 3 +--
+>  arch/arm/mach-shmobile/pm-rmobile.c | 3 +--
+>  drivers/base/power/domain.c         | 7 +++++++
+>  include/linux/pm_domain.h           | 4 ++++
+>  4 files changed, 13 insertions(+), 4 deletions(-)
 
-On Mon, 1 Dec 2014 10:28:51 +0100, Willy Tarreau wrote:
+For the series:
 
-> > This patch is expected resolve the low throughput and the kernel crash as well?
-> > # Not just the "No buffer space available" error?
-> 
-> Yes absolutely. The low throughput is caused by the use of a timer instead
-> of an interrupt to flush Tx descriptors. The "No buffer space available"
-> is caused by the Tx coalesce of 16 which only flushes the buffers after 16
-> packets have been emitted. When socket buffers are too small for 16 packets
-> (eg: ping) you get the error above. Thus setting Tx coalesce to 1 fixes it
-> for all situations. It's slightly less performant than coalesce 16 but you
-> can change it using ethtool if you want (4 still works with ping and shows
-> better performance).
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-If I understood correctly, on RX the interrupt coalescing can be done
-every X packets, or after N milliseconds. However, on TX, it's only
-after Y packets, there is no way to configure a delay.
+Gr{oetje,eeting}s,
 
-But in any case, with NAPI implemented in software, are these hardware
-interrupt coalescing features very important? As soon as the number of
-interrupts becomes high, the kernel will disable the interrupt and
-switch to polling, no?
+                        Geert
 
-Best regards,
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
