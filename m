@@ -1,125 +1,123 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 1 Dec 2014 12:14:54 -0600
-Subject: [RFC V1 0/8] CPUFreq: create platform-dev for DT based cpufreq
- drivers
-In-Reply-To: <7885354.QleDlR7NUO@wuerfel>
-References: <cover.1417433163.git.viresh.kumar@linaro.org>
- <7885354.QleDlR7NUO@wuerfel>
-Message-ID: <CAL_JsqLgxPf2hoW5Q55P2M1bSg6S+pVwpSyBa2WmZBQvUZfAXA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 1 Dec 2014 18:18:11 +0000
+Subject: [PATCH v2 1/3] power: reset: read priority from device tree
+In-Reply-To: <20141201181255.GA25926@roeck-us.net>
+References: <1417453389-1588-1-git-send-email-stefan@agner.ch>
+ <1417453389-1588-2-git-send-email-stefan@agner.ch>
+ <20141201171126.GB22708@leverpostej>
+ <e5c5a44c84b95c4e48ed01c4dcffd35a@agner.ch>
+ <20141201174100.GC22708@leverpostej>
+ <20141201175134.GC24692@roeck-us.net>
+ <20141201175908.GA22023@leverpostej>
+ <20141201181255.GA25926@roeck-us.net>
+Message-ID: <20141201181811.GB22023@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 1, 2014 at 6:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 01 December 2014 17:11:21 Viresh Kumar wrote:
->>
->> DT based cpufreq drivers doesn't require much support from platform code now a
->> days as most of the stuff is moved behind generic APIs. Like clk APIs for
->> changing clock rates, regulator APIs for changing voltages, etc.
->>
->> One of the bottleneck still left was how to select which cpufreq driver to probe
->> for a given platform as there might be multiple drivers available.
->>
->> Traditionally, we used to create platform devices from machine specific code
->> which binds with a cpufreq driver. And while we moved towards DT based device
->> creation, these devices stayed as is.
->>
->> The problem is getting worse now as we have architectures now with Zero platform
->> specific code. Forcefully these platforms have to create a new file in
->> drivers/cpufreq/ to just add these platform devices in order to use the generic
->> drivers like cpufreq-dt.c.
->>
->> This has been discussed again and again, but with no solution yet. Last it was
->> discussed here:
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256154.html
->>
->> This patch is an attempt towards getting the bindings.
->>
->> We only need to have cpufreq drivers name string present in "compatible"
->> property for the root node.. If a cpufreq driver with DT support exists with
->> that name, then cpufreq core will create a platform device for that.
->>
->> The first patch presents the new binding, second one creates another file
->> responsible for creating platform devices for all DT based cpufreq drivers.
->>
->> And later patches update platforms to migrate to it one by one.
->>
->> A BLACKLIST of platforms already supported by these drivers is also created for
->> backward compatibility of newer kernels with older DTs. And so for such
->> platforms DT files aren't updated.
->>
->> An initial RFC that presented the idea was discussed here:
->> https://www.mail-archive.com/devicetree at vger.kernel.org/msg52509.html
->>
->> Tested-ON: Exynos5250. (The last patch for exynos depends on some commits to be
->> upstreamed in 3.19, presented here just for testing).
->
-> Thanks a lot for working on this, we really need to figure it out one day!
->
-> Your patches seem well-implemented, so if everybody thinks the general
-> approach is the best solution, we should do that. From my point of view,
-> there are two things I would do differently:
+On Mon, Dec 01, 2014 at 06:12:55PM +0000, Guenter Roeck wrote:
+> On Mon, Dec 01, 2014 at 05:59:08PM +0000, Mark Rutland wrote:
+> > On Mon, Dec 01, 2014 at 05:51:34PM +0000, Guenter Roeck wrote:
+> > > On Mon, Dec 01, 2014 at 05:41:00PM +0000, Mark Rutland wrote:
+> > > > On Mon, Dec 01, 2014 at 05:24:37PM +0000, Stefan Agner wrote:
+> > > > > On 2014-12-01 18:11, Mark Rutland wrote:
+> > > > > > On Mon, Dec 01, 2014 at 05:03:07PM +0000, Stefan Agner wrote:
+> > > > > >> This patch adds an optional property which allows to specify the
+> > > > > >> reset source priority. This priority is used by the kernel restart
+> > > > > >> handler call chain to sort out the proper reset/restart method.
+> > > > > >> Depending on the power design of a board or other machine/board
+> > > > > >> specific peculiarity, it is not possible to pick a generic priority.
+> > > > > >>
+> > > > > >> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > > > > >> ---
+> > > > > >>  Documentation/devicetree/bindings/power/reset/syscon-reboot.txt | 3 +++
+> > > > > >>  drivers/power/reset/syscon-reboot.c                             | 5 ++++-
+> > > > > >>  2 files changed, 7 insertions(+), 1 deletion(-)
+> > > > > >>
+> > > > > >> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+> > > > > >> index 1190631..ee41d9c 100644
+> > > > > >> --- a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+> > > > > >> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+> > > > > >> @@ -11,6 +11,9 @@ Required properties:
+> > > > > >>  - offset: offset in the register map for the reboot register (in bytes)
+> > > > > >>  - mask: the reset value written to the reboot register (32 bit access)
+> > > > > >>
+> > > > > >> +Optional properties:
+> > > > > >> +- priority: define the priority of the reset (0-255, defaults to 128)
+> > > > > >> +
+> > > > > > 
+> > > > > > NAK. This is a leak of Linux-internal details.
+> > > > > > 
+> > > > > > What is this necessary for?
+> > > > > > 
+> > > > > > Mark.
+> > > > > 
+> > > > > Hi Mark,
+> > > > > 
+> > > > > In my case, it is necessary to be called ahead of the watchdog, which
+> > > > > has a priority of 128. This syscon-reboot driver currently has a default
+> > > > > priority of 128 too. I could live with a higher default priority for the
+> > > > > syscon-reboot driver, in fact I proposed that in the discussion of v1 of
+> > > > > that patch:
+> > > > > https://lkml.org/lkml/2014/11/28/484
+> > > > 
+> > > > Thanks for the link.
+> > > > 
+> > > > > IMHO, this priority might make sense for most cases, I guess that
+> > > > > dedicated "syscon" capabilities are usually better suited as a reboot
+> > > > > source than watchdog.
+> > > > 
+> > > > I would think likewise.
+> > > > 
+> > > > > If dt, then the question which arises: If there are different
+> > > > > capabilities to reset/reboot a whole system, how do we reflect which is
+> > > > > the best suited one in dt?
+> > > > 
+> > > > I'm not sure, but I don't think that exposing a priority variable in
+> > > > this way is the best, because it implicitly relies on what the kernel
+> > > > may have selected for other devices and/or FW interfaces, which may not
+> > > > have been described in DT.
+> > > > 
+> > > > So if we can get away with a fixed priority for now, then I would prefer
+> > > > that.
+> > > > 
+> > > > Otherwise, I would imagine that most systems have a single preferred
+> > > > mechanism with some possible fallback(s), for which a single
+> > > > preferred-poweroff property might suffice, and has better interaction
+> > > > w.r.t. priority (in that it should _always_ be tried first). Even that's
+> > > > difficult to reconcile with FW bindings though, especially EFI (which we
+> > > > sometimes must use in preference for variable storage and capsule
+> > > > updates).
+> > > > 
+> > > Hi mark,
+> > > 
+> > > reboot, not poweroff, but I like that idea; it is system independent,
+> > > and I agree that there should be only one "preferred-reboot" mechanism.
+> > > If we need more we can always add something like "fallback-reboot".
+> > 
+> > Ah, sorry, I got myself confused regarding reboot/poweroff. Goot to hear
+> > we agree on the preferred-$X (where X is reboot in this case).
+> > 
+> In this context, note that the poweroff handler patchset is abandoned/dead.
+> Neither the power maintainers nor Linus liked the idea of having prioritized
+> poweroff handlers.
 
-I think the changes here for the "legacy" DTs are fine, but they
-should be separated from the DT binding changes.
+I hadn't realised that either. Thanks for letting me know. :)
 
-> - In the DT binding, I would strongly prefer anything but the root compatible
->   property as the key for the new platforms. Clearly we have to keep using
->   it for the backwards-compatibility case, as you do, but I think there
->   are more appropriate places to put it. Sorting from most favorite to least
->   favorite, my list would be:
->         1. a new property in /cpus/
->         2. a new property each /cpus/cpu at ... node.
->         3. the compatible property of the /cpus node
->         4. a top-level device node that gets turned into a platform device
->         5. a new property in the / node
->         6. a new property in the /chosen node
->         7. the compatible property in the / node
+> > > Not sure I understand the reference to EFI. Does EFI install a means
+> > > to restart the system ?
+> > 
+> > Through EFI runtime services there's a mechanism to reset the machine.
+> > In certain cases this must be called so as to allow EFI to set things up
+> > to run after reboot (e.g. capsules for FW updates), while in other cases
+> > it's perfectly fine to call other mechanisms directly.
+> > 
+> Sounds like its priority depends on the context. That might be a bit tricky,
+> but it might be possible if EFI uses the API to register its restart handler
+> and re-registers itself if needed. Would that make sense ?
 
-We already have some properties such as clocks and OPP in the cpu
-nodes. Granted, those are probably not sufficient to bind against. The
-current OPP binding has shown to be insufficient based on some of the
-past proposals on how to handle various different scenarios:
+Sure, I would imagine the EFI code should know when an EFI-handled
+reboot is necessary. It's not something I've looked into in great detail
+hwoever, I'm just aware of the general requirement.
 
-- Different topologies of OPPs: single shared clock vs. independent
-clock per core vs. shared clock per cluster; different OPP per cluster
-- Support for turbo modes
-- Other per OPP settings: transition latencies, disabled status, etc.?
-
-I don't want to see band-aids that only fix one problem here and this
-series is included. We need to define a better way to define OPPs and
-deprecate the existing binding. I think we probably need something
-with a node per OPP so we can add new properties. These can have a
-compatible property including something generic for purposes of
-matching. So something like this:
-
-opp@?? {
-  compatible = "highbank-opp", "generic-cpu-opp";
-  clocks = <&clk-controller 0>;
-  clock-frequency = <1000000000>;
-  opp-supply = <&cpu-supply>;
-  voltage-uV = <1000000>;
-  turbo-mode;
-  status = "disabled";
-};
-
-I've left how to map cpus and clusters with OPPs as an exercise for
-the reader. :)
-
-> - Implementation-wise, I don't think it's helpful to have a global function
->   that registers a platform device to be consumed by the device driver. I'd
->   rather just see a module_init function in each driver that rather than
->   registering a platform_driver scans the DT properties. This is only really
->   necessary when not using DT (omap2, omap3, davinci, loongson) or when
->   passing additional resources or platform_data (kirkwood, but that can
->   look up the "marvell,orion-system-controller" node if necessary).
->   My preferred solution would be to eventually remove the platform_device
->   registration for all DT users. If a driver needs a platform device pointer
->   internally, it can use platform_create_bundle(), but that's probably not
->   even necessary.
-
-This is essentially undoing what has been the general direction for
-cpufreq drivers. Not saying that is wrong, but we should have
-consistent direction here.
-
-Rob
+Thanks,
+Mark.
