@@ -1,56 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Dec 2014 16:10:26 +0100
-Subject: build regression with "rcar-du: Remove platform data support"
-In-Reply-To: <5028621.aLK7lB68Yl@avalon>
-References: <12234794.nfiRtpFgV8@wuerfel> <5028621.aLK7lB68Yl@avalon>
-Message-ID: <2056933.CSnxJiuQ7X@wuerfel>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 01 Dec 2014 16:11:43 +0100
+Subject: [PATCH 1/3] staging: imx-drm: document internal HDMI I2C master
+ controller DT binding
+In-Reply-To: <547C8113.3050100@mentor.com>
+References: <1416073759-19939-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <1416073759-19939-2-git-send-email-vladimir_zapolskiy@mentor.com>
+ <547C8113.3050100@mentor.com>
+Message-ID: <1417446703.4624.18.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 December 2014 15:25:06 Laurent Pinchart wrote:
-> On Monday 01 December 2014 14:09:36 Arnd Bergmann wrote:
-> > Hi Laurent,
-> > 
-> > linux-next has failed to build with lager_defconfig and marzen_defconfig for
-> > a while, with this error:
-> > 
-> > arch/arm/mach-shmobile/board-lager.c:35:41: fatal error:
-> > linux/platform_data/rcar-du.h: No such file or directory #include
-> > <linux/platform_data/rcar-du.h>
-> > 
-> > which is evidently the result of your patch
-> > 
-> > commit 2378ad1228d2cdae0ea5448beb4fb2b42ebaf99c
-> > Author: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > Date:   Wed Sep 17 02:07:52 2014 +0300
-> > 
-> >     drm: rcar-du: Remove platform data support
-> > 
-> >     All platforms now instantiate the DU through DT, platform data support
-> >     isn't needed anymore.
-> > 
-> >     Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > 
-> > that removes the header files. I assume some dependency wasn't tracked
-> > right, since linux-next still has these.
-> > 
-> > $ git grep rcar_du_ arch/arm
-> > arch/arm/mach-shmobile/board-lager.c:static struct rcar_du_encoder_data
-> > lager_du_encoders[] = { arch/arm/mach-shmobile/board-lager.c:static const
-> > struct rcar_du_platform_data lager_du_pdata __initconst = {
-> > arch/arm/mach-shmobile/board-marzen.c:static struct rcar_du_encoder_data
-> > du_encoders[] = { arch/arm/mach-shmobile/board-marzen.c:static const struct
-> > rcar_du_platform_data du_pdata __initconst = {
-> > 
-> > Can we please fix this before the merge window? Should the platform
-> > device registration just get removed from the two board files?
+Am Montag, den 01.12.2014, 16:54 +0200 schrieb Vladimir Zapolskiy:
+> Hi Philipp and Shawn,
 > 
-> That's what I've proposed in
+> On 15.11.2014 19:49, Vladimir Zapolskiy wrote:
+> > Provide information about how to bind internal iMX6Q/DL HDMI DDC I2C
+> > master controller. The property is set as optional one, because iMX6
+> > HDMI DDC bus may be represented by one of general purpose I2C busses
+> > found on SoC.
+> > 
+> > Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+> > Cc: Wolfram Sang <wsa@the-dreams.de>
+> > Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: devicetree at vger.kernel.org
+> > Cc: linux-media at vger.kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-i2c at vger.kernel.org
+> > ---
+> >  Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt |   10 +++++++++-
+> >  1 file changed, 9 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+> > index 1b756cf..43c8924 100644
+> > --- a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+> > +++ b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+> > @@ -10,6 +10,8 @@ Required properties:
+> >   - #address-cells : should be <1>
+> >   - #size-cells : should be <0>
+> >   - compatible : should be "fsl,imx6q-hdmi" or "fsl,imx6dl-hdmi".
+> > +   If internal HDMI DDC I2C master controller is supposed to be used,
+> > +   then "simple-bus" should be added to compatible value.
+> >   - gpr : should be <&gpr>.
+> >     The phandle points to the iomuxc-gpr region containing the HDMI
+> >     multiplexer control register.
+> > @@ -22,6 +24,7 @@ Required properties:
+> >  
+> >  Optional properties:
+> >   - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
+> > + - ddc: internal HDMI DDC I2C master controller
+> >  
+> >  example:
+> >  
+> > @@ -32,7 +35,7 @@ example:
+> >          hdmi: hdmi at 0120000 {
+> >                  #address-cells = <1>;
+> >                  #size-cells = <0>;
+> > -                compatible = "fsl,imx6q-hdmi";
+> > +                compatible = "fsl,imx6q-hdmi", "simple-bus";
+> >                  reg = <0x00120000 0x9000>;
+> >                  interrupts = <0 115 0x04>;
+> >                  gpr = <&gpr>;
+> > @@ -40,6 +43,11 @@ example:
+> >                  clock-names = "iahb", "isfr";
+> >                  ddc-i2c-bus = <&i2c2>;
+> >  
+> > +                hdmi_ddc: ddc {
+> > +                        compatible = "fsl,imx6q-hdmi-ddc";
+> > +                        status = "disabled";
+> > +                };
+> > +
+> >                  port at 0 {
+> >                          reg = <0>;
+> >  
+> > 
 > 
-> http://www.spinics.net/lists/dri-devel/msg72750.html
+> knowing in advance that I2C framework lacks a graceful support of non
+> fully compliant I2C devices, do you have any objections to the proposed
+> iMX HDMI DTS change?
 
-Ok, I actually saw that mail the other day but then forgot about
-it when I looked at the build logs.
- 
-	Arnd
+I'm not sure about this. Have you seen "drm: Decouple EDID parsing from
+I2C adapter"? I feel like in the absence of a ddc-i2c-bus property the
+imx-hdmi/dw-hdmi driver should try to use the internal HDMI DDC I2C
+master controller, bypassing the I2C framework altogether.
+
+regards
+Philipp
