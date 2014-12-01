@@ -1,119 +1,176 @@
-From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
-Date: Mon, 1 Dec 2014 19:56:06 +0000
-Subject: [PATCH v7 0/5] ARM64: Add support for FSL's LS2085A SoC
-In-Reply-To: <20141201163013.GA22708@leverpostej>
-References: <1417443442-17444-1-git-send-email-bhupesh.sharma@freescale.com>
- <20141201163013.GA22708@leverpostej>
-Message-ID: <BY1PR0301MB13038B8AAD5AD03436D235E3827D0@BY1PR0301MB1303.namprd03.prod.outlook.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Mon, 01 Dec 2014 21:11:21 +0100
+Subject: [PATCHv1 6/6] rtc: rtc-isl12057: add alarm support to Intersil
+ ISL12057 RTC driver
+In-Reply-To: <5476ED9F.2070600@kleine-koenig.org> ("Uwe
+ \=\?utf-8\?Q\?Kleine-K\?\= \=\?utf-8\?Q\?\=C3\=B6nig\=22's\?\=
+ message of "Thu, 27 Nov 2014 10:23:43 +0100")
+References: <cover.1416006090.git.arno@natisbad.org>
+ <986ee8d9d3e6862007f398ffddc2a4bb2368933e.1416006090.git.arno@natisbad.org>
+ <5476ED9F.2070600@kleine-koenig.org>
+Message-ID: <87tx1fnn9y.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Uwe,
 
-> -----Original Message-----
-> From: Mark Rutland [mailto:mark.rutland at arm.com]
-> Sent: Monday, December 01, 2014 10:00 PM
-> To: Sharma Bhupesh-B45370
-> Cc: arm at kernel.org; Marc Zyngier; Catalin Marinas; arnd at arndb.de; linux-
-> arm-kernel at lists.infradead.org; grant.likely at secretlab.ca;
-> rob.herring at linaro.org; bhupesh.linux at gmail.com; Yoder Stuart-B08248;
-> arnab_basu at rocketmail.com
-> Subject: Re: [PATCH v7 0/5] ARM64: Add support for FSL's LS2085A SoC
-> 
-> Hi Bhupesh,
-> 
-> The series looks mostly fine to me, though I have a couple of comments
-> below.
-> 
-> On Mon, Dec 01, 2014 at 02:17:17PM +0000, Bhupesh Sharma wrote:
-> > This patchset adds the support for FSL's LS2085A SoC which is based on
-> > ARMv8 architecture.
-> >
-> > This patchset also has patches which address DT compatible strings for
-> > nodes which appear un-documented.
-> >
-> > The enable-method for the CPU nodes is left for the bootloader (u-boot
-> > or UEFI) to patch-up which is expected to be PSCI v0.2
-> >
-> > This patchset has been tested with the following patches which add
-> > PSCI
-> > v0.2 support in ARMv8 u-boot:
-> > http://patchwork.ozlabs.org/patch/383556/
-> > http://patchwork.ozlabs.org/patch/383555/
-> > http://patchwork.ozlabs.org/patch/383557/
-> > http://patchwork.ozlabs.org/patch/383558/
-> > http://patchwork.ozlabs.org/patch/383559/
-> > http://patchwork.ozlabs.org/patch/383560/
-> > http://patchwork.ozlabs.org/patch/383561/
-> > http://patchwork.ozlabs.org/patch/383562/
-> 
-> Has there been any progress on these? last I saw there was some pending
-> rework, and I was holding off a thorough review of the PSCI parts until
-> that had happened.
+Uwe Kleine-K?nig <uwe@kleine-koenig.org> writes:
 
-Arnab Basu has since moved on from Freescale, but he plans to maintain and rework these PSCI related patches
-in u-boot.
+> finally I managed to test this series on my (unmodified) rn104.
+>
+> For patch 1: Maybe point out that the issue with the century bit isn't
+> that critical, because this bit is not expected to be set before year
+> 2100.
 
-> 
-> >
-> > Rebased against cleanup/dts-subdirs branch of the arm-soc tree
-> >
-> > Changes from v6:
-> > ----------------
-> > * Rebased against cleanup/dts-subdirs branch of the arm-soc tree.
-> > * As a result, [PATCH 4/6] and [PATCH 5/6] of the v6 series are
-> squashed
-> >   into one patch ([PATCH 4/5] of this series).
-> >
-> > Note:
-> > -----
-> > Optional GIC-500 regs like GICC, GICH and GICV are currently not
-> > tested and hence are not part of the DTS patch.
-> >
-> > Please review and consider for merge.
-> >
-> > Bhupesh Sharma (5):
-> >   Documentation: DT: Add bindings for FSL NS16550A UART
-> 
-> Regardless of anything else, this patch should be queued given it adds
-> missing documentation for a binding already supported by the kernel.
+It has:
 
-Right.
+    This was tested by putting a device 100 years in the future (using a
+    specific kernel due to the inability of userland tools such as date or
+    hwclock to pass year 2038), rebooting on a kernel w/ this patch applied
+    and verifying the device was still 100 years in the future.
 
-> >   Documentation: DT: Add entry for FSL LS2085A SoC and Simulator model
-> >   Documentation: DT: Add entry for FSL Management Complex
-> 
-> Are there any patches adding support for the management complex? There's
-> nothing in mainline that uses "fsl,qoriq-mc", and nothing in this series
-> adds support.
-> 
 
-Like Stuart mentioned in another thread, the Management Complex related patches 
-are already under review.
+> For patch 3: This patch adds a few dev_err calls that get later amended
+> in patch 5 to also include an error code. IMHO these should already be
+> added in patch 3. Patch 5 should only add it to the already existing
+> strings (if applicable).
 
-> 
-> >   arm64: Add DTS support for FSL's LS2085A SoC
-> >   arm64: Add support for FSL's LS2085A SoC in Kconfig and defconfig
-> >
-> >  Documentation/devicetree/bindings/arm/fsl.txt      |    8 +
-> >  .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |   40 +++++
-> >  .../devicetree/bindings/serial/of-serial.txt       |   12 ++
-> >  arch/arm64/Kconfig                                 |    5 +
-> >  arch/arm64/boot/dts/Makefile                       |    1 +
-> >  arch/arm64/boot/dts/{ => freescale}/Makefile       |    4 +-
-> >  arch/arm64/boot/dts/freescale/fsl-ls2085a-simu.dts |   65 ++++++++
-> >  arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi     |  163
-> ++++++++++++++++++++
-> >  arch/arm64/configs/defconfig                       |    1 +
-> >  9 files changed, 296 insertions(+), 3 deletions(-)  create mode
-> > 100644 Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-> >  copy arch/arm64/boot/dts/{ => freescale}/Makefile (54%)  create mode
-> > 100644 arch/arm64/boot/dts/freescale/fsl-ls2085a-simu.dts
-> >  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
-> >
-> > --
-> > 1.7.9.5
-> >
+will do that next time.
 
-Regards,
-Bhupesh
+> For patch 4: Maybe
+> s/obsolete/for backwards compatibility, don't use in new code/.
+>
+>
+> Some further comments inline ...
+>
+> On 11/15/2014 12:07 AM, Arnaud Ebalard wrote:
+>> The latter is the one found on current 3 kernel users of the chip
+>> for which support was initially developed (Netgear ReadyNAS 102,
+>> 104 and 2120 NAS). On those devices, the IRQ#2 pin of the chip is not
+>> connected to the SoC but to a PMIC. This allows setting an alarm,
+>> powering off the device and have it wake up when the alarm rings.
+>> To support that configuration the driver does the following:
+>> 
+>>  1. it has alarm_irq_enable() function returns -ENOTTY when no IRQ
+>>     is passed to the driver.
+>>  2. it marks the device as a wakeup source in all cases (whether an
+>>     IRQ is passed to the driver or not) to have 'wakealarm' sysfs
+>>     entry created.
+> This is not pretty, but I don't know if there is a nicer alternative.
+> Maybe this should only be done in the presence of a flag in the device
+> tree (say: can-wakeup-machine, a prefix would be nice, but "isil," feels
+> wrong).
+
+I can prepare a v0 patch for a "can-wakeup-machine" property to mark the
+device as a wakeup source when the IRQ is absent. Will fix the prefix
+in a v1.
+
+
+>> [...]
+>> FWIW, if someone is looking for a way to test alarm support on a system
+>> on which the chip IRQ line has the ability to boot the system (e.g.
+>> ReadyNAS 102, 104, etc):
+>> 
+>>     # echo 0 > /sys/class/rtc/rtc0/wakealarm
+> Why is this needed?
+
+It disable the alarm. It's not required.
+
+
+>>     # echo `date '+%s' -d '+ 1 minutes'` > /sys/class/rtc/rtc0/wakealarm
+>>     # shutdown -h now
+>> 
+>> With the commandes above, after a minute, the system comes back to life.
+> s/commandes/commands/
+
+useless french letter.
+
+
+>> +	ret = regmap_update_bits(data->regmap, ISL12057_REG_INT,
+>> +				 ISL12057_REG_INT_A1IE,
+>> +				 enable ? ISL12057_REG_INT_A1IE : 0);
+>> +	if (ret)
+>> +		dev_err(dev, "%s: changing alarm interrupt flag failed (%d)\n",
+>> +			__func__, ret);
+>> +
+>> +	return ret;
+>> +}
+> Maybe point out in the commit log that the first alarm (of two) is used,
+> and the event is signaled on pin $Ididntlookitup.
+> (IIRC the 2nd alarm register set doesn't support seconds, but in return
+> has year and month field.)
+
+I can add that in the documentation.
+
+
+>> [...]
+>> +	/*
+>> +	 * This is needed to have 'wakealarm' sysfs entry available. One
+>> +	 * would expect the device to be marked as a wakeup source only
+>> +	 * when an IRQ pin of the RTC is routed to an interrupt line of the
+>> +	 * CPU. In practice, such an IRQ pin can be connected to a PMIC and
+>> +	 * this allows the device to be powered up when RTC alarm rings.
+> Maybe add the machines you know of that have this setup to the
+> comment.
+
+ditto.
+
+
+>> +	 */
+>> +	device_init_wakeup(dev, true);
+>> +
+>> +	data->rtc = devm_rtc_device_register(dev, DRV_NAME, &rtc_ops,
+>> +					     THIS_MODULE);
+>> +	ret = PTR_ERR_OR_ZERO(data->rtc);
+>> +	if (ret) {
+>> +		dev_err(dev, "%s: unable to register RTC device (%d)\n",
+>> +			__func__, ret);
+>> +		goto err;
+>> +	}
+>> +
+>> +	/* We cannot support UIE mode if we do not have an IRQ line */
+>> +	if (!data->irq)
+>> +		data->rtc->uie_unsupported = 1;
+>> +
+>> +err:
+>> +	return ret;
+>>  }
+>>  
+>> +static int isl12057_remove(struct i2c_client *client)
+>> +{
+>> +	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(&client->dev);
+>> +
+>> +	if (rtc_data->irq > 0)
+>> +		device_init_wakeup(&client->dev, false);
+> I didn't check, but I wonder it that could be/is done by the device
+> core already?
+>
+>> +	return 0;
+>> +}
+>> +
+>> +#ifdef CONFIG_PM_SLEEP
+>> +static int isl12057_rtc_suspend(struct device *dev)
+>> +{
+>> +	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(dev);
+>> +
+>> +	if (device_may_wakeup(dev))
+>> +		return enable_irq_wake(rtc_data->irq);
+> Does this need a check for data->irq?
+>
+>> +	return 0;
+>> +}
+>> +
+>> +static int isl12057_rtc_resume(struct device *dev)
+>> +{
+>> +	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(dev);
+>> +
+>> +	if (device_may_wakeup(dev))
+>> +		return disable_irq_wake(rtc_data->irq);
+> ditto.
+
+Hum, I will take a look at those irq vs wakeup cpabilities when adding
+support for "can-wakeup-machine" property to consolidate the behavior.
+
+Cheers,
+
+a+
