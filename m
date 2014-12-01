@@ -1,42 +1,33 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 1 Dec 2014 13:52:41 +1100
-Subject: linux-next: manual merge of the v4l-dvb tree with the arm-soc tree
-Message-ID: <20141201135241.435ecb37@canb.auug.org.au>
+From: flora.fu@mediatek.com (Flora Fu)
+Date: Mon, 1 Dec 2014 11:19:25 +0800
+Subject: [PATCH v2 8/8] ARM: dts: mt8135: Add support for MT6397 regulator
+In-Reply-To: <20141128153008.GS7712@sirena.org.uk>
+References: <1417146874-5232-1-git-send-email-flora.fu@mediatek.com>
+ <1417146874-5232-9-git-send-email-flora.fu@mediatek.com>
+ <20141128153008.GS7712@sirena.org.uk>
+Message-ID: <1417403967.9547.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+Hi, Mark, 
 
-Today's linux-next merge of the v4l-dvb tree got a conflict in
-arch/arm/mach-omap2/board-rx51-peripherals.c between commit
-e639cd5bfc03 ("ARM: OMAP2+: Prepare to move GPMC to drivers by platform
-data header") from the arm-soc tree and commit 68a3c0433077 ("[media]
-ARM: OMAP2: RX-51: update si4713 platform data") from the v4l-dvb tree.
+On Fri, 2014-11-28 at 15:30 +0000, Mark Brown wrote: 
+> On Fri, Nov 28, 2014 at 11:54:34AM +0800, Flora Fu wrote:
+> 
+> > Add device tree for MT6397 regulators in mt8135.dtsi.
+> > 
+> > Signed-off-by: Flora Fu <flora.fu@mediatek.com>
+> > ---
+> >  arch/arm/boot/dts/mt8135.dtsi | 192 ++++++++++++++++++++++++++++++++++++++++++
+> 
+> This appears to be the DT fragment for a SoC but you are defining the
+> system integration for the PMIC.  That's bad, the PMIC is a separate
+> device so should be hooked up by the board using it.  If there's common
+> elements from a reference design they should be in their own .dtsi.
+> 
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Do you mean that we should add a mt6397.dtsi and include it from
+mt8135.dtsi? For board specific, update them in mt8135.dtsi? 
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-omap2/board-rx51-peripherals.c
-index e2ad48b5d9c0,ec2e4101988b..000000000000
---- a/arch/arm/mach-omap2/board-rx51-peripherals.c
-+++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-@@@ -23,7 -23,7 +23,8 @@@
-  #include <linux/regulator/machine.h>
-  #include <linux/gpio.h>
-  #include <linux/gpio_keys.h>
-+ #include <linux/gpio/machine.h>
- +#include <linux/omap-gpmc.h>
-  #include <linux/mmc/host.h>
-  #include <linux/power/isp1704_charger.h>
-  #include <linux/platform_data/spi-omap2-mcspi.h>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/97d434f4/attachment.sig>
+Thanks,
+Flora
