@@ -1,190 +1,95 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 02 Dec 2014 00:33:21 +0200
-Subject: [PATCH 2/4] media: ov2640: add primary dt support
-In-Reply-To: <1417170507-11172-3-git-send-email-josh.wu@atmel.com>
-References: <1417170507-11172-1-git-send-email-josh.wu@atmel.com>
- <1417170507-11172-3-git-send-email-josh.wu@atmel.com>
-Message-ID: <2588866.n5Pjp1h670@avalon>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 1 Dec 2014 14:35:13 -0800
+Subject: [PATCH v2 1/3] power: reset: read priority from device tree
+In-Reply-To: <3916ca2867ced70e16903d6d44aaae8f@agner.ch>
+References: <1417453389-1588-1-git-send-email-stefan@agner.ch>
+ <1417453389-1588-2-git-send-email-stefan@agner.ch>
+ <CAL85gmBq30pWxP0buKbM8so6QqsJq2YojiSK1EWtMPsH_7foeg@mail.gmail.com>
+ <ea4f7a2bfdb9bea45cab9418c211083b@agner.ch>
+ <CAL85gmBNE7oDbE+LX+V=AFJO61Ta0Gekoq6sDb8TkEnoPsNFVA@mail.gmail.com>
+ <20141201174215.GB24692@roeck-us.net>
+ <3916ca2867ced70e16903d6d44aaae8f@agner.ch>
+Message-ID: <20141201223513.GA32035@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
-
-Thank you for the patch.
-
-On Friday 28 November 2014 18:28:25 Josh Wu wrote:
-> Add device tree support for ov2640.
+On Mon, Dec 01, 2014 at 11:18:47PM +0100, Stefan Agner wrote:
+> On 2014-12-01 18:42, Guenter Roeck wrote:
+> > On Mon, Dec 01, 2014 at 09:38:09AM -0800, Feng Kan wrote:
+> >> On Mon, Dec 1, 2014 at 9:29 AM, Stefan Agner <stefan@agner.ch> wrote:
+> >> > On 2014-12-01 18:15, Feng Kan wrote:
+> >> >> On Mon, Dec 1, 2014 at 9:03 AM, Stefan Agner <stefan@agner.ch> wrote:
+> >> >>> This patch adds an optional property which allows to specify the
+> >> >>> reset source priority. This priority is used by the kernel restart
+> >> >>> handler call chain to sort out the proper reset/restart method.
+> >> >>> Depending on the power design of a board or other machine/board
+> >> >>> specific peculiarity, it is not possible to pick a generic priority.
+> >> >>>
+> >> >>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> >> >>> ---
+> >> >>>  Documentation/devicetree/bindings/power/reset/syscon-reboot.txt | 3 +++
+> >> >>>  drivers/power/reset/syscon-reboot.c                             | 5 ++++-
+> >> >>>  2 files changed, 7 insertions(+), 1 deletion(-)
+> >> >>>
+> >> >>> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+> >> >>> index 1190631..ee41d9c 100644
+> >> >>> --- a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+> >> >>> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+> >> >>> @@ -11,6 +11,9 @@ Required properties:
+> >> >>>  - offset: offset in the register map for the reboot register (in bytes)
+> >> >>>  - mask: the reset value written to the reboot register (32 bit access)
+> >> >>>
+> >> >>> +Optional properties:
+> >> >>> +- priority: define the priority of the reset (0-255, defaults to 128)
+> >> >>> +
+> >> >>>  Default will be little endian mode, 32 bit access only.
+> >> >>>
+> >> >>>  Examples:
+> >> >>> diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
+> >> >>> index 815b901..3060d6b 100644
+> >> >>> --- a/drivers/power/reset/syscon-reboot.c
+> >> >>> +++ b/drivers/power/reset/syscon-reboot.c
+> >> >>> @@ -67,8 +67,11 @@ static int syscon_reboot_probe(struct platform_device *pdev)
+> >> >>>         if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
+> >> >>>                 return -EINVAL;
+> >> >>>
+> >> >>> -       ctx->restart_handler.notifier_call = syscon_restart_handle;
+> >> >>>         ctx->restart_handler.priority = 128;
+> >> >>> +       of_property_read_u32(pdev->dev.of_node, "priority",
+> >> >>> +                            &ctx->restart_handler.priority);
+> >> >>
+> >> >> What is this for?
+> >> >
+> >> > What do you mean? The moved line "ctx->restart_handler.notifier_call =
+> >> > syscon_restart_handle;"? When one reads the diff, it looks like that
+> >> > line was moved, in fact I tried to keep the of_property_read function
+> >> > calls together. But I had to move the assignation of the default
+> >> > priority in front of restart_handler.priority. That's what is the
+> >> > outcome...
+> >>
+> >> I believe Guenter explained above already. Actually this help to solve one of
+> >> my problem. Thanks.
+> > 
+> > Since Mark doesn't seem to be happy with the idea of making the priority
+> > dt-configurable, the alternative might be to just set a higher priority for
+> > syscon triggered resets, as suggested by Stefan. Not as flexible, but it
+> > should be ok for most use cases.
+> > 
 > 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->  drivers/media/i2c/soc_camera/ov2640.c | 95 +++++++++++++++++++++++++++++---
->  1 file changed, 89 insertions(+), 6 deletions(-)
+> I read the other branch of this thread too, but IMHO, this would be the
+> best solution for now. It's a one line change and does the job. After
+> all, we have that priority for a reason, it doesn't makes sense having
+> all of them at a common default. As mentioned in an other reply, I think
+> it is especially reasonable to configure the syscon-reboot driver a bit
+> higher, since this driver is more likely to be used for a dedicated
+> reboot feature provided by the SoC, which usually is the preferred one.
+> If it happens one day that a SoC ends up with conflicting priorities or
+> other priority odds, we can add the DT support then...
 > 
-> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
-> b/drivers/media/i2c/soc_camera/ov2640.c index 9ee910d..6506126 100644
-> --- a/drivers/media/i2c/soc_camera/ov2640.c
-> +++ b/drivers/media/i2c/soc_camera/ov2640.c
-> @@ -18,6 +18,8 @@
->  #include <linux/i2c.h>
->  #include <linux/slab.h>
->  #include <linux/delay.h>
-> +#include <linux/gpio.h>
-> +#include <linux/of_gpio.h>
->  #include <linux/v4l2-mediabus.h>
->  #include <linux/videodev2.h>
+> What do you think, can I go with that for now? (Guenter, Feng, Mark...?)
 > 
-> @@ -283,6 +285,10 @@ struct ov2640_priv {
->  	u32	cfmt_code;
->  	struct v4l2_clk			*clk;
->  	const struct ov2640_win_size	*win;
-> +
-> +	struct soc_camera_subdev_desc	ssdd_dt;
-> +	int reset_pin;
-> +	int pwr_down_pin;
->  };
-> 
->  /*
-> @@ -1047,6 +1053,70 @@ static struct v4l2_subdev_ops ov2640_subdev_ops = {
->  	.video	= &ov2640_subdev_video_ops,
->  };
-> 
-> +/* OF probe functions */
-> +static int ov2640_hw_power(struct device *dev, int on)
-> +{
-> +	struct i2c_client *client = to_i2c_client(dev);
-> +	struct ov2640_priv *priv = to_ov2640(client);
-> +
-> +	dev_dbg(&client->dev, "%s: %s the camera\n",
-> +			__func__, on ? "ENABLE" : "DISABLE");
-> +
-> +	/* enable or disable the camera */
-> +	gpio_direction_output(priv->pwr_down_pin, !on);
+Ok with me. After all, one only needs to remove the entry from the dt file
+if not wanted/needed, so one could argue that its existence already implies
+"preferred".
 
-Isn't there a delay required to wake the chip up ?
-
-> +
-> +	return 0;
-> +}
-> +
-> +static int ov2640_hw_reset(struct device *dev)
-> +{
-> +	struct i2c_client *client = to_i2c_client(dev);
-> +	struct ov2640_priv *priv = to_ov2640(client);
-> +
-
-If the reset GPIO isn't specified you should return immediately without 
-waiting 120ms.
-
-> +	/* If enabled, give a reset impulse */
-> +	gpio_direction_output(priv->reset_pin, 0);
-> +	msleep(20);
-
-Please use usleep_range().
-
-> +	gpio_direction_output(priv->reset_pin, 1);
-> +	msleep(100);
-
-Is the reset delay documented somewhere ? 100ms seems pretty large to me.
-
-> +
-> +	return 0;
-> +}
-> +
-> +static int ov2640_probe_dt(struct i2c_client *client,
-> +		struct ov2640_priv *priv)
-> +{
-> +	struct device_node *np = client->dev.of_node;
-> +	int ret;
-> +
-> +	priv->reset_pin = of_get_named_gpio(np, "reset-gpio", 0);
-> +	priv->pwr_down_pin = of_get_named_gpio(np, "power-down-gpio", 0);
-> +	if (!gpio_is_valid(priv->reset_pin) ||
-> +			!gpio_is_valid(priv->pwr_down_pin))
-> +		return -EINVAL;
-> +
-> +	ret = devm_gpio_request(&client->dev, priv->pwr_down_pin,
-> +			"power-down-pin");
-> +	if (ret < 0) {
-> +		dev_err(&client->dev, "request gpio pin %d failed\n",
-> +				priv->pwr_down_pin);
-> +		return ret;
-> +	}
-> +
-> +	ret = devm_gpio_request(&client->dev, priv->reset_pin, "reset_pin");
-> +	if (ret < 0) {
-> +		dev_err(&client->dev, "request gpio pin %d failed\n",
-> +				priv->reset_pin);
-> +		return ret;
-> +	}
-
-Please use the gpiod API with the devm_gpiod_get_index_optional() function, it 
-will simply your code and take care about GPIO polarity automatically. Don't 
-forget to specify the default state using the GPIOD_* flags.
-
-> +
-> +	/* Initialize the soc_camera_subdev_desc */
-> +	priv->ssdd_dt.power = ov2640_hw_power;
-> +	priv->ssdd_dt.reset = ov2640_hw_reset;
-> +	client->dev.platform_data = &priv->ssdd_dt;
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * i2c_driver functions
->   */
-> @@ -1058,12 +1128,6 @@ static int ov2640_probe(struct i2c_client *client,
->  	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
->  	int			ret;
-> 
-> -	if (!ssdd) {
-> -		dev_err(&adapter->dev,
-> -			"OV2640: Missing platform_data for driver\n");
-> -		return -EINVAL;
-> -	}
-> -
->  	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
->  		dev_err(&adapter->dev,
->  			"OV2640: I2C-Adapter doesn't support SMBUS\n");
-> @@ -1077,6 +1141,18 @@ static int ov2640_probe(struct i2c_client *client,
->  		return -ENOMEM;
->  	}
-> 
-> +	if (!ssdd) {
-> +		if (client->dev.of_node) {
-> +			ret = ov2640_probe_dt(client, priv);
-> +			if (ret)
-> +				return ret;
-> +		} else {
-> +			dev_err(&client->dev,
-> +				"Missing platform_data for driver\n");
-> +			return  -EINVAL;
-> +		}
-> +	}
-> +
->  	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
->  	v4l2_ctrl_handler_init(&priv->hdl, 2);
->  	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
-> @@ -1123,9 +1199,16 @@ static const struct i2c_device_id ov2640_id[] = {
->  };
->  MODULE_DEVICE_TABLE(i2c, ov2640_id);
-> 
-> +static const struct of_device_id ov2640_of_match[] = {
-> +	{.compatible = "omnivision,ov2640", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, ov2640_of_match);
-> +
->  static struct i2c_driver ov2640_i2c_driver = {
->  	.driver = {
->  		.name = "ov2640",
-> +		.of_match_table = of_match_ptr(ov2640_of_match),
->  	},
->  	.probe    = ov2640_probe,
->  	.remove   = ov2640_remove,
-
--- 
-Regards,
-
-Laurent Pinchart
+Guenter
