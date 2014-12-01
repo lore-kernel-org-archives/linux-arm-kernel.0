@@ -1,87 +1,113 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 01 Dec 2014 15:24:36 +0100
-Subject: [PATCH v4 5/6] ARM: zynq: Add OCM controller driver
-In-Reply-To: <CACRpkdbL=yOwjC7j=eacg9K2Mb3rwcKy3b0F8y2H9Nz8RsRRcg@mail.gmail.com>
-References: <cover.1415962281.git.michal.simek@xilinx.com>	<6741d995fbec801d795c5db481e39425bd912f8a.1415962281.git.michal.simek@xilinx.com>	<CACRpkdbZ8Pwy=04dhJq5ONZ1B-SQK1f=eLZjjCDmV7UQ0aHduA@mail.gmail.com>	<857cab03bd6445c59cc345349a00f67c@BL2FFO11FD010.protection.gbl>
- <CACRpkdbL=yOwjC7j=eacg9K2Mb3rwcKy3b0F8y2H9Nz8RsRRcg@mail.gmail.com>
-Message-ID: <547C7A24.8090403@monstr.eu>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 1 Dec 2014 23:34:59 +0900
+Subject: [PATCH v2 3/5] pinctrl: exynos: Fix GPIO setup failure because
+ domain clock being gated
+In-Reply-To: <1417423043.4055.14.camel@AMDC1943>
+References: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
+ <1417011857-10419-4-git-send-email-k.kozlowski@samsung.com>
+ <CACRpkdb8F8YcvFeHPvOKHjx_p4HEpimck3XRabB3oHpZTdmRQQ@mail.gmail.com>
+ <1417183724.18249.36.camel@AMDC1943>
+ <CA+Ln22Ejo51VPWf6DmuRvV_fZr_H=-BXAshSPSOokNE1bz=-QA@mail.gmail.com>
+ <1417423043.4055.14.camel@AMDC1943>
+Message-ID: <CA+Ln22H_a9CWxrYO_i9Esm6keXA8XLLYmE1Vg-8ynamJ1sAwpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2014 04:35 PM, Linus Walleij wrote:
-> On Thu, Nov 27, 2014 at 2:57 PM, Michal Simek <michal.simek@xilinx.com> wrote:
->> On 11/27/2014 02:20 PM, Linus Walleij wrote:
->>> On Fri, Nov 14, 2014 at 11:52 AM, Michal Simek <michal.simek@xilinx.com> wrote:
-> 
->>> (...)
->>>> +       zynq_ocmc->pool = devm_gen_pool_create(&pdev->dev,
->>>> +                                              ilog2(ZYNQ_OCMC_GRANULARITY),
->>>> +                                              -1);
->>>
->>> Do this:
->>>
->>> #include <linux/sizes.h>
->>>
->>> zynq_ocmc->pool = devm_gen_pool_create(&pdev->dev,
->>>                                        ilog2(SZ_64K),
->>>                                        -1);
->>>
->>> And get rid of the #define for ZYNQ_OCMC_GRANULARITY
+2014-12-01 17:37 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+>
+> On nie, 2014-11-30 at 21:19 +0900, Tomasz Figa wrote:
+>> Hi Krzysztof,
 >>
->> ilog2 from 32 is different to ilog2 from ilog2 from 0x10000.
-> 
-> Bah I misread the code, forget this comment.
-> 
-> Maybe it's more like I wanted
-> 
-> +#define ZYNQ_OCMC_BLOCK_SIZE   0x10000
-> 
-> To be replaced with SZ_64K
-> 
-> But it's a petty detail anyway.
-
-I have fixed it.
-
->> Do you have any opinion regarding calling zynq_slcr_get_ocm_config()?
+>> 2014-11-28 23:08 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+>> > On pi?, 2014-11-28 at 15:04 +0100, Linus Walleij wrote:
+>> >> On Wed, Nov 26, 2014 at 3:24 PM, Krzysztof Kozlowski
+>> >> <k.kozlowski@samsung.com> wrote:
+>> >>
+>> >> > The audio subsystem on Exynos 5420 has separate clocks and GPIO. To
+>> >> > operate properly on GPIOs the main block clock 'mau_epll' must be
+>> >> > enabled.
+>> >> >
+>> >> > This was observed on Peach Pi/Pit and Arndale Octa (after enabling i2s0)
+>> >> > after introducing runtime PM to pl330 DMA driver. After that commit the
+>> >> > 'mau_epll' was gated, because the "amba" clock was disabled and there
+>> >> > were no more users of mau_epll.
+>> >> >
+>> >> > The system hang just before probing i2s0 because
+>> >> > samsung_pinmux_setup() tried to access memory from audss block which was
+>> >> > gated.
+>> >> >
+>> >> > Add a clock property to the pinctrl driver and enable the clock during
+>> >> > GPIO setup. During normal GPIO operations (set, get, set_direction) the
+>> >> > clock is not enabled.
 >>
->> Is it better to expose slcr this interface to drivers?
->> Or use regmap and read this value directly?
-> 
-> Depends on what provides that call. The pattern I usually follow
-> is to expose the mixed-registers range as a syscon device
-> using drivers/mfd/syscon.c and then use one of the methods from
-> <linux/mfd/syscon.h> to look up a reference to the regmap and
-> use it to access misc registers.
+>> Could you make sure that possibility of gating this clock is worth the
+>> effort of adding gating code to all affected drivers? If there is no
+>> significant change in power consumption maybe it could be simply keep
+>> running all the time?
+>
+> I had an impression that last time you disliked such idea:
+> http://www.spinics.net/lists/arm-kernel/msg338127.html
+> That's why I developed these patches. Because keeping a clock always on,
+> even when it is unused, is undesirable.
 
-I have tried it and I can just use it without any problem.
-I have sent v5 with origin version but in cover letter there
-is a code for that.
+I was mostly concerned about the particular solution implemented by
+that patch that kept the clocks enabled on all platforms, not only the
+affected one. However...
 
+>
+> Anyway, I did some simple measurements (after booting Arndale Octa
+> to /bin/sh, idle):
+>  - with mau_epll gated: ~523 mA
+>  - with mau_epll always on: ~531 mA
+>
+> Keeping it on increases energy usage by 1.5% in idle (with measurement
+> uncertainty ~0.4%).
+>
 
->> Also I do read for CONFIG_SMP case jump trampoline size - maybe
->> you can have better idea how this can be done.
-> 
-> No I have no clue about that... :(
+...this definitely shows that the effort isn't worthless, which means
+that your patch goes in the right direction.
 
-ok - fair enough. One option is to keep it as is. The second
-option is to allocate any hardcoded size or size passed via DT.
-But run-time detection is the best IMHO.
+>
+>> Also isn't a similar problem happening due to power domains? I believe
+>> the whole maudio block is located in a separate power domain but
+>> somehow it doesn't get turned off?
+>
+> There is Maudio power domain... but I think it is not related here.
 
-Thanks,
-Michal
+Could you somehow check what happens when the maudio power domain is
+turned off and maudio pin controller is accessed? Could you also check
+the difference in power consumption with this domain powered on and
+off?
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+> Pinctrl driver does not have runtime PM and is not attached to a domain.
+> I thought about other solution to this problem (with utilization of
+> power domains):
+>  - add runtime PM to pinctrl and audss clocks,
+>  - attach pinctrl and audss clocks to maudio power domain,
+>  - enable the clock when power domain is turned on.
+> However almost the same changes had to be added to pinctrl and audss
+> clocks drivers (replace clock_enable() with pm_runtime_get_sync()).
 
+Well, if the dependency is there due to hardware design, I think it
+needs to be reflected in the drivers as well.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/b338bd77/attachment.sig>
+Few other issues that came to my mind:
+
+ - Your previous patch added clock control only to pinctrl operations.
+Shouldn't GPIO operations be included as well?
+
+ - If power domain dependency is there too, what happens with GPIO
+pins if the domain is powered off? If they lose their states, wouldn't
+it necessary to keep the domain powered on whenever there is some GPIO
+pin requested (which usually = in use)? (I'd assume that special
+functions shouldn't take a reference on runtime PM, because they are
+related to IP blocks in the same PM domain, which will implicitly keep
+the domain powered on.)
+
+ - Doesn't the clock controller also lose its state whenever the power
+domain is powered off? I guess that would be similar to ISP clock
+controller, issues of which are still not resolved in mainline.
+Sylwester could tell you more about this, I guess.
+
+Best regards,
+Tomasz
