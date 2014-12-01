@@ -1,39 +1,51 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 01 Dec 2014 10:59:53 +0100
-Subject: [PATCH v4 0/6] Touchscreen performance related fixes
-In-Reply-To: <547C3A95.30605@ti.com>
-References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
- <20141124115116.GA14997@linutronix.de> <547C3A95.30605@ti.com>
-Message-ID: <547C3C19.5090501@linutronix.de>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 1 Dec 2014 18:08:04 +0800
+Subject: [GIT PULL] CSR SiRFSOC DT for 3.19
+In-Reply-To: <201411281514.54841.arnd@arndb.de>
+References: <CAGsJ_4yC8bStnYx3ramD=OXA03oihUEwCgcfqsStfWx2rasMqQ@mail.gmail.com>
+ <201411281514.54841.arnd@arndb.de>
+Message-ID: <CAGsJ_4xmDWiJH+sngcdiKJpkRH=xrRQFsArd+UcVoV4WWC=Jtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2014 10:53 AM, Vignesh R wrote:
-> Hi Sebastian,
+2014-11-28 22:14 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday 25 November 2014, Barry Song wrote:
+>> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+>>
+>>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   gitolite.kernel.org:/pub/scm/linux/kernel/git/baohua/linux.git
+>> tags/sirf-dts-for-3.19
+>>
+>> for you to fetch changes up to 294a212faa5bf7cb48fabccec5ee13e836e29ecb:
+>
+> The URL did not work for me, I had to replace it with
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux
+>
+> and I checked that the commit ID is the same. I think you need to
+> configure your git tree to have a separate url and pushurl for
+> your remote, so your pull requests are derived from a publically
+> accessible url.
 
-Hi Vignesh,
+yes. Arnd, i made a mis-operation for remote when i did pull-request.
+thanks very much for your work to fix it.
 
-> I fixed the issue that was triggering the WARN_ON(). I think it would be
-> better if you tested these patches, before I posted them on the
-> mainline. I don't want to clutter the list with too main versions. Here
-> is the link to the tree with latest changes:
+>
+>>   ARM: dts: atlas6: add resets property for SPI nodes (2014-11-25
+>> 18:46:43 +0800)
+>>
+>> ----------------------------------------------------------------
+>> change pinmux pingroup and add some lost node/prop
+>>
+>> 1. add resets properity for some nodes;
+>> 2. change pinctrl groups for audio
+>> 3. add PMU node
+>
+> Pulled into next/dt, thanks!
+>
+>         Arnd
 
-awesome, thank you.
-
-> 
-> git clone -b tsc-devel git://git.ti.com/kernel/tsc-adc.git
-> (tsc-devel branch)
-
-I will and let you know.
-
-> Please test the above tree and let me know the results.
-> I will post new version(v5) if there are no issues wrt IIO and TSC
-> working at the same time.
-
-Cool. Were you able to get in touch with someone who has a 5-wire touch?
-
-> Regards
-> Vignesh
-> 
-
-Sebastian
+-barry
