@@ -1,45 +1,39 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Mon, 1 Dec 2014 10:58:15 +0100
-Subject: Issue found in Armada 370: "No buffer space available" error
- during continuous ping
-In-Reply-To: <20141201103221.6268b811@free-electrons.com>
-References: <CAB8gEUsK9c3YMpAABifNAWU7zec2ePztSqS4KAYtiT7Sbhadvg@mail.gmail.com>
- <20140721070303.GM21834@1wt.eu>
- <CAB8gEUtmgwfWcuoYZ-wDwHVmzHN0WyOQD9oEOGAZ_gJfbPUm-g@mail.gmail.com>
- <20140723061659.GE30488@1wt.eu>
- <CAB8gEUtO=K-mjie6czsf-9ao1cxiMAV2ScbgUnf+XxqjEfOUvg@mail.gmail.com>
- <CAB8gEUtgo-8nets3tRtqiZ8qRx+SyCq2d8v05scavWNwE5TNXg@mail.gmail.com>
- <20141201072802.GB21731@1wt.eu>
- <CAB8gEUsQ8nSNwB7vpZHBkELEBX2sN1QdWvujBGYQJY9dtCzgww@mail.gmail.com>
- <20141201092851.GA22304@1wt.eu> <20141201103221.6268b811@free-electrons.com>
-Message-ID: <20141201095815.GA7949@1wt.eu>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 01 Dec 2014 10:59:53 +0100
+Subject: [PATCH v4 0/6] Touchscreen performance related fixes
+In-Reply-To: <547C3A95.30605@ti.com>
+References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
+ <20141124115116.GA14997@linutronix.de> <547C3A95.30605@ti.com>
+Message-ID: <547C3C19.5090501@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 12/01/2014 10:53 AM, Vignesh R wrote:
+> Hi Sebastian,
 
-On Mon, Dec 01, 2014 at 10:32:21AM +0100, Thomas Petazzoni wrote:
-> If I understood correctly, on RX the interrupt coalescing can be done
-> every X packets, or after N milliseconds. However, on TX, it's only
-> after Y packets, there is no way to configure a delay.
+Hi Vignesh,
 
-That was my understanding of the datasheet as well.
+> I fixed the issue that was triggering the WARN_ON(). I think it would be
+> better if you tested these patches, before I posted them on the
+> mainline. I don't want to clutter the list with too main versions. Here
+> is the link to the tree with latest changes:
 
-> But in any case, with NAPI implemented in software, are these hardware
-> interrupt coalescing features very important? As soon as the number of
-> interrupts becomes high, the kernel will disable the interrupt and
-> switch to polling, no?
+awesome, thank you.
 
-Absolutely, but despite this, the interrupts still impact the system's
-performance, because instead of waking up the driver once the Tx queue
-is about to be empty (let's say twice per Tx queue), we wake up as often
-as the system supports it. The net effect is a performance loss of about
-5% on small packets, which is not huge of course, but would rather be
-spent doing some more useful stuff.
+> 
+> git clone -b tsc-devel git://git.ti.com/kernel/tsc-adc.git
+> (tsc-devel branch)
 
-Uri gave me a contact at Marvell who knows this device well, I'll ask
-him if there's no other way to work with this chip. Sending an interrupt
-at least when the Tx queue is empty would be nice :-/
+I will and let you know.
 
-Best regards,
-Willy
+> Please test the above tree and let me know the results.
+> I will post new version(v5) if there are no issues wrt IIO and TSC
+> working at the same time.
+
+Cool. Were you able to get in touch with someone who has a 5-wire touch?
+
+> Regards
+> Vignesh
+> 
+
+Sebastian
