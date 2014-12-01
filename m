@@ -1,84 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 1 Dec 2014 17:41:00 +0000
-Subject: [PATCH v2 1/3] power: reset: read priority from device tree
-In-Reply-To: <e5c5a44c84b95c4e48ed01c4dcffd35a@agner.ch>
-References: <1417453389-1588-1-git-send-email-stefan@agner.ch>
- <1417453389-1588-2-git-send-email-stefan@agner.ch>
- <20141201171126.GB22708@leverpostej>
- <e5c5a44c84b95c4e48ed01c4dcffd35a@agner.ch>
-Message-ID: <20141201174100.GC22708@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Dec 2014 09:39:33 -0800
+Subject: [PATCH] tty: serial: serial-omap: depend on !8250_omap
+In-Reply-To: <547CA483.3070801@linutronix.de>
+References: <1417039306-2384-1-git-send-email-bigeasy@linutronix.de>
+ <20141129094823.GA10840@linutronix.de>
+ <20141129173418.GY2817@atomide.com>
+ <20141201140914.728aaa46@lxorguk.ukuu.org.uk>
+ <20141201163813.GA2817@atomide.com>
+ <547CA483.3070801@linutronix.de>
+Message-ID: <20141201173932.GB2817@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 05:24:37PM +0000, Stefan Agner wrote:
-> On 2014-12-01 18:11, Mark Rutland wrote:
-> > On Mon, Dec 01, 2014 at 05:03:07PM +0000, Stefan Agner wrote:
-> >> This patch adds an optional property which allows to specify the
-> >> reset source priority. This priority is used by the kernel restart
-> >> handler call chain to sort out the proper reset/restart method.
-> >> Depending on the power design of a board or other machine/board
-> >> specific peculiarity, it is not possible to pick a generic priority.
+* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [141201 09:27]:
+> On 12/01/2014 05:38 PM, Tony Lindgren wrote:
+> > * One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> [141201 06:11]:
+> >>> Well the nightmare userspace switch from ttyS to ttyO few years ago is
+> >>> something we want to avoid.. I think the best solution would be to make
+> >>> serial-omap.c transparently provide support for ttyO using the new 8250
+> >>> code so both ttyS and ttyO devices would just work. Otherwise it will
+> >>> be years of "my serial port stopped working" questions again.
 > >>
-> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> >> ---
-> >>  Documentation/devicetree/bindings/power/reset/syscon-reboot.txt | 3 +++
-> >>  drivers/power/reset/syscon-reboot.c                             | 5 ++++-
-> >>  2 files changed, 7 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
-> >> index 1190631..ee41d9c 100644
-> >> --- a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
-> >> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
-> >> @@ -11,6 +11,9 @@ Required properties:
-> >>  - offset: offset in the register map for the reboot register (in bytes)
-> >>  - mask: the reset value written to the reboot register (32 bit access)
-> >>
-> >> +Optional properties:
-> >> +- priority: define the priority of the reset (0-255, defaults to 128)
-> >> +
+> >> Thata a udev problem not a kernel one surely.
 > > 
-> > NAK. This is a leak of Linux-internal details.
-> > 
-> > What is this necessary for?
-> > 
-> > Mark.
+> > How do you suggest we get people to update their kernel command line
+> > and inittab? Udev may not even be installed.
 > 
-> Hi Mark,
+> There are three use cases that I can think of right now:
+> - people that enable that new driver via oldconfig
+>   I would expect that they read the help message in Kconfig. No worry
+>   about them.
 > 
-> In my case, it is necessary to be called ahead of the watchdog, which
-> has a priority of 128. This syscon-reboot driver currently has a default
-> priority of 128 too. I could live with a higher default priority for the
-> syscon-reboot driver, in fact I proposed that in the discussion of v1 of
-> that patch:
-> https://lkml.org/lkml/2014/11/28/484
+> - people that get a complete system via magic_build_tool (may yocto or
+>   whatever)
+>   If $TOOL decides to use the new driver, then it should update
+>   commandline in bootloader. Those things create usually bootloader +
+>   kernel + rootfile system. If the commandline is saved on flash/mmc
+>   then it won't be reset from default. However udev should help here.
+>   So not a problem either (udev can't fix the kernel boot output but we
+>   should see atleast the login console).
+> 
+> - people that build omap2plus_defconfig and we switch to the new driver
+>   Those people get switched from one driver to the other without
+>   knowing. This is what I tried to bring to everyone's attention. The
+>   defconfig hasn't been changed yet so it is not problem for next
+>   release (yet).
+> 
+> I agree that this is a user problem. We agreed not to introduce a
+> console proxy in kernel _or_ hack the command line in kernel (to
+> replace O with S).
+> So I think the problem boils down to educate the user about this
+> change. Making the old driver disappear was one way of getting the
+> user's attention. Another idea would be to introduce a #warning which is
+> also activated by the defconfig and informs the user about the change.
+> Ideally this #warning could be switched off by Kconfig once the user
+> reads & deactivates it. This requires the pay attention to warnings
+> during build. #error would make sure he does but it breaks auto-builds
+> so it is not an option.
 
-Thanks for the link.
+The problem is the kernel will just mysteriously stop outputting
+anything if we enable the new driver. This is a "flag day" type
+problem that needs the user to somehow coordinate the kernel version,
+kernel .config, kernel cmdline, dev entries, and the inittab.
 
-> IMHO, this priority might make sense for most cases, I guess that
-> dedicated "syscon" capabilities are usually better suited as a reboot
-> source than watchdog.
+Regards,
 
-I would think likewise.
-
-> If dt, then the question which arises: If there are different
-> capabilities to reset/reboot a whole system, how do we reflect which is
-> the best suited one in dt?
-
-I'm not sure, but I don't think that exposing a priority variable in
-this way is the best, because it implicitly relies on what the kernel
-may have selected for other devices and/or FW interfaces, which may not
-have been described in DT.
-
-So if we can get away with a fixed priority for now, then I would prefer
-that.
-
-Otherwise, I would imagine that most systems have a single preferred
-mechanism with some possible fallback(s), for which a single
-preferred-poweroff property might suffice, and has better interaction
-w.r.t. priority (in that it should _always_ be tried first). Even that's
-difficult to reconcile with FW bindings though, especially EFI (which we
-sometimes must use in preference for variable storage and capsule
-updates).
-
-Thanks,
-Mark.
+Tony
