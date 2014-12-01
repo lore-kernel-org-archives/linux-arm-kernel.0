@@ -1,102 +1,45 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 1 Dec 2014 15:35:09 +0100
-Subject: [PATCH v4 4/4] mmc: atmel-mci: use probe deferring if dma controller
- is not ready yet
-In-Reply-To: <1417444509-15501-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1417444509-15501-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1417444509-15501-5-git-send-email-ludovic.desroches@atmel.com>
+Date: Mon, 1 Dec 2014 15:39:27 +0100
+Subject: [PATCH 1/2] pinctrl: at91: allow disabled gpio controllers
+In-Reply-To: <CACRpkdbXuXyfwAyFTHVDGa4OS88KsHXZeDDAeXf6ZJ_JQmduoQ@mail.gmail.com>
+References: <1417193367-12422-1-git-send-email-ludovic.desroches@atmel.com>
+ <CACRpkdbXuXyfwAyFTHVDGa4OS88KsHXZeDDAeXf6ZJ_JQmduoQ@mail.gmail.com>
+Message-ID: <20141201143927.GT2714@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return probe defer if requesting a dma channel without a dma controller
-probed.
+On Mon, Dec 01, 2014 at 02:56:22PM +0100, Linus Walleij wrote:
+> On Fri, Nov 28, 2014 at 5:49 PM, Ludovic Desroches
+> <ludovic.desroches@atmel.com> wrote:
+> 
+> > This patch allows to have gpio controller with status set to disabled.
+> >
+> > gpio_banks represents all the gpio banks available on the device whereas
+> > nbanks represents the gpio banks used. Having a disabled gpio controller
+> > involves that nbanks value is lower than gpio_banks and that some
+> > pointers in the gpio_chips array are NULL. This patch deals with these
+> > specific cases.
+> >
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> (...)
+> >         /* We will handle a range of GPIO pins */
+> > -       for (i = 0; i < info->nbanks; i++)
+> > -               pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
+> > +       for (i = 0; i < gpio_banks; i++)
+> > +               if (gpio_chips[i])
+> > +                       pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
+> 
+> I highly suspect the real solution to this problem is to get rid
+> of the pinctrl_add_gpio_range() call from the driver.
+> 
+> Remobe these calls, and instead in at91_gpio_probe() in the same
+> file, call gpiochip_add_pingroup_range() for each GPIO chip.
+> 
+> That way the GPIO ranges are inserted from the GPIO side instead
+> of the pinctrl side, which is way better, since it is more relative,
+> and make you only add ranges for the gpio chips actually there.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/mmc/host/atmel-mci.c | 47 ++++++++++++++++++++++----------------------
- 1 file changed, 23 insertions(+), 24 deletions(-)
+Thanks for your advices, I'll try to do it the way you recommend.
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 00f6088..1a8e30c 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -2272,29 +2272,24 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
- 	mmc_free_host(slot->mmc);
- }
- 
--static bool atmci_configure_dma(struct atmel_mci *host)
-+static int atmci_configure_dma(struct atmel_mci *host)
- {
--	if (host == NULL)
--		return false;
-+	host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev, "rxtx");
-+	if (IS_ERR(host->dma.chan))
-+		return PTR_ERR(host->dma.chan);
- 
--	host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
--	if (!host->dma.chan) {
--		dev_warn(&host->pdev->dev, "no DMA channel available\n");
--		return false;
--	} else {
--		dev_info(&host->pdev->dev,
--					"using %s for DMA transfers\n",
--					dma_chan_name(host->dma.chan));
--
--		host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
--		host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--		host->dma_conf.src_maxburst = 1;
--		host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
--		host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--		host->dma_conf.dst_maxburst = 1;
--		host->dma_conf.device_fc = false;
--		return true;
--	}
-+	dev_info(&host->pdev->dev, "using %s for DMA transfers\n",
-+		 dma_chan_name(host->dma.chan));
-+
-+	host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
-+	host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	host->dma_conf.src_maxburst = 1;
-+	host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
-+	host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	host->dma_conf.dst_maxburst = 1;
-+	host->dma_conf.device_fc = false;
-+
-+	return 0;
- }
- 
- /*
-@@ -2411,7 +2406,10 @@ static int atmci_probe(struct platform_device *pdev)
- 
- 	/* Get MCI capabilities and set operations according to it */
- 	atmci_get_cap(host);
--	if (atmci_configure_dma(host)) {
-+	ret = atmci_configure_dma(host);
-+	if (ret == -EPROBE_DEFER)
-+		goto err_dma_probe_defer;
-+	if (ret == 0) {
- 		host->prepare_data = &atmci_prepare_data_dma;
- 		host->submit_data = &atmci_submit_data_dma;
- 		host->stop_transfer = &atmci_stop_transfer_dma;
-@@ -2496,8 +2494,9 @@ err_init_slot:
- 	pm_runtime_put_noidle(&pdev->dev);
- 
- 	del_timer_sync(&host->timer);
--	if (host->dma.chan)
-+	if (!IS_ERR(host->dma.chan))
- 		dma_release_channel(host->dma.chan);
-+err_dma_probe_defer:
- 	free_irq(irq, host);
- 	return ret;
- }
-@@ -2523,7 +2522,7 @@ static int atmci_remove(struct platform_device *pdev)
- 	atmci_readl(host, ATMCI_SR);
- 
- 	del_timer_sync(&host->timer);
--	if (host->dma.chan)
-+	if (!IS_ERR(host->dma.chan))
- 		dma_release_channel(host->dma.chan);
- 
- 	free_irq(platform_get_irq(pdev, 0), host);
--- 
-2.0.3
+Ludovic
