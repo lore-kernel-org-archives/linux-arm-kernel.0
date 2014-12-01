@@ -1,52 +1,123 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Dec 2014 15:59:14 +0100
-Subject: [RFC V1 0/8] CPUFreq: create platform-dev for DT based cpufreq
- drivers
-In-Reply-To: <CAKohpomsqCnEcSeuqtZcYOC6bgTrGmc8zXTm6cA72q+hr=LBsQ@mail.gmail.com>
-References: <cover.1417433163.git.viresh.kumar@linaro.org>
- <5607434.rlEIdu4yyh@wuerfel>
- <CAKohpomsqCnEcSeuqtZcYOC6bgTrGmc8zXTm6cA72q+hr=LBsQ@mail.gmail.com>
-Message-ID: <3594266.ci9lGXQ9iA@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 1 Dec 2014 15:02:40 +0000
+Subject: [PATCH 3.18-rc3 v9 5/5] arm: smp: Handle ipi_cpu_backtrace()
+ using FIQ (if available)
+In-Reply-To: <5910085.Y47hdorDAO@dabox>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <1633306.naE1qIcAOt@dabox>
+ <20141201103832.GX3836@n2100.arm.linux.org.uk>
+ <5910085.Y47hdorDAO@dabox>
+Message-ID: <20141201150240.GF3836@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 December 2014 20:18:10 Viresh Kumar wrote:
-> On 1 December 2014 at 19:35, Arnd Bergmann <arnd@arndb.de> wrote:
-> > I guess a string would be better here, the idea here was to
-> > have a different bool property per driver, which would also
-> > work.
+On Mon, Dec 01, 2014 at 02:54:10PM +0100, Tim Sander wrote:
+> Hi Russell
 > 
-> Hmm, I will prefer string as we don't need to define any more bindings then
-> for new drivers.
+> Am Montag, 1. Dezember 2014, 10:38:32 schrieb Russell King - ARM Linux:
+> > That whole paragraph doesn't make much sense to me.
+> > 
+> > Look, in my mind it is very simple.  If you are using CONFIG_FIQ on a
+> > SMP platform, your life will be very difficult.  The FIQ code enabled
+> > by that symbol is not designed to be used on SMP systems, *period*.
+>
+> Well the only extra thing you had to do is set up the FIQ registers on every 
+> cpu, but i would not call that very difficult. Other than that i am not
+> aware of any problems that are not also present on a uniprocessor system.
+> So i have a hard time following your reasoning why SMP is different from
+> UP in regard to the CONFIG_FIQ.
 
-Right. You'd still need to define the known values though, so in
-effect it's not much of a difference. I have no problem with 
-a string property though.
+One of the things which FIQ handlers can do is they have their own private
+registers which they can modify on each invocation of the FIQ handler -
+for example, as a software DMA pointer.
 
-> >> > @@ -367,29 +404,19 @@ static int dt_cpufreq_probe(struct platform_device *pdev)
-> >> >         if (!IS_ERR(cpu_reg))
-> >> >                 regulator_put(cpu_reg);
-> >> >
-> >> > -       dt_cpufreq_driver.driver_data = dev_get_platdata(&pdev->dev);
-> >> > -
-> >>
-> >> We still need this, and its about how clocks are shared between CPUs.
-> >
-> > I didn't see where this comes from. Who is setting up this platform
-> > data?
+Each CPU has its own private set of FIQ registers, so merely copying the
+registers to each CPU will only set their initial state: updates by one
+CPU to the register set will not be seen by a different CPU.
+
+> > If you decide to enable CONFIG_FIQ, and you use that code on a SMP
+> > platform, I'm going to say right now so it's totally clear: if you
+> > encounter a problem, I don't want to know about it.  The code is not
+> > designed for use on that situation.
+> Even with using the FIQ on a Linux SMP system you have not heard from me 
+> before, as i knew that this is not your problem (and that is not to say that 
+> there where none!). The only interface Linux has been making available is 
+> set_fiq_handler. So it was clear that the FIQ is its own domain otherwise 
+> untouched by the kernel.
+
+Correct, because FIQs have very little use in Linux.  They have been used
+in the past to implement:
+- software DMA to floppy disk controllers (see arch/arm/lib/floppydma.S)
+- audio DMA (arch/arm/mach-imx/ssi-fiq.S)
+- s2c24xx SPI DMA (drivers/spi/spi-s3c24xx-fiq.S)
+- Keyboard (yes, how that qualifies for FIQ I don't know
+  (arch/arm/mach-omap1/ams-delta-fiq-handler.S)
+
+The first three do exactly what I describe above, and none of these users
+are SMP platforms.  Hence, the FIQ code which we currently have does exactly
+what we need it to for the platforms we have.
+
+Now, you're talking about using this in a SMP context - that's a totally
+new use for this code which - as I have said several times now - is not
+really something that this code is intended to support.
+
+> And i really don't get it, that neither ARM nor the kernel community
+> sees fast interrupts as a worthwhile usecase. Unfortunatly the interrupt
+> latencies with Linux are at least a order of magnitude higher than the
+> pure hardware even with longer pipelines can deliver. 
+
+First point: fast interrupts won't be fast if you load them up with all
+the interrupt demux and locking that normal interrupts have; if you
+start doing that, then you end up having to make /all/ IRQ-safe locks
+in the kernel not only disable normal interrupts, but also disable the
+FIQs as well.
+
+At that point, FIQs are no longer "fast" - they will be subject to
+exactly the same latencies as normal interrupts.
+
+Second point: we have embraced FIQs where it is appropriate to do so,
+but within the restrictions that FIQs present - that is, to keep them
+fast, we have to avoid the problem in the first point above, which
+means normal C code called from FIQs /can't/ take any kernel lock what
+so ever without potentially causing a deadlock.
+
+Even if you think you can (why would UP have locks if it's not SMP)
+debugging facilities such as the lock validator will bite you if you
+try taking a lock in FIQ context which was already taken in the parent
+context.
+
+Third point: FIQs are not available on a lot of ARM platforms.  Hardware
+which routes interrupts to FIQs is very limited, normally it's only a
+few interrupts which appear there.  Moreover, with more modern platforms
+where the kernel runs in the non-secure side, FIQs are /totally/ and
+/completely/ unavailable there - FIQs are only available for the secure
+monitor to use.
+
+> > No.  With a single zImage kernel, you could very well have SMP and FIQ
+> > both enabled, but have a non-SMP platform using FIQ, but also support
+> > SMP platforms as well.  Your change prevents that happening.
 > 
-> Mvebu is using it to communicate that all CPUs have separate
-> clock lines.
+> Ah, well i have to get used to this "new" devicetree thingy, where one size 
+> fits all...
 
-I still don't see where it does that. All I see for mvebu is
+No, you're conflating different things there.  It doesn't have much
+to do with DT vs non-DT, because this same problem existed before DT
+came along, since there were platforms which could be both UP and SMP.
 
-	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> Still if you boot a single process system which has FIQ available and has a 
+> GIC with such a kernel, then you also reprogramm the IPI's as FIQs. But i 
+> guess thats not a problem as Linux does not self IPI the kernel as other os'es
+> do?
 
-without any platform data. I see this patch
-http://lists.linaro.org/pipermail/linaro-kernel/2014-September/017693.html
-on the mailing list, but it's not in linux-next, and it obviously
-would not work any more with the patch I proposed. Instead I suppose
-you would use a different string to match against for the case of
-separate clocks.
+I'm really sorry, but your above paragraph doesn't make much sense to me.
+"single process system" - if there's only one process, there's no point
+having a scheduler (it has nothing to schedule) and so I guess you're
+not talking about Linux there.
 
-	Arnd
+Or do you mean "single processor system" (in other words, uniprocessor or
+UP).  In that case, the kernel doesn't use IPIs, because, by definition,
+there's no other processors for it to signal to.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
