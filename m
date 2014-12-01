@@ -1,82 +1,75 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Mon, 1 Dec 2014 16:54:11 +0200
-Subject: [PATCH 1/3] staging: imx-drm: document internal HDMI I2C master
- controller DT binding
-In-Reply-To: <1416073759-19939-2-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1416073759-19939-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <1416073759-19939-2-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <547C8113.3050100@mentor.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 01 Dec 2014 15:55:34 +0100
+Subject: [PATCH v3 2/8] KVM: arm64: Enable the KVM-VFIO device
+In-Reply-To: <20141130121402.GC82106@macair>
+References: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
+ <1416767760-14487-3-git-send-email-eric.auger@linaro.org>
+ <20141130121402.GC82106@macair>
+Message-ID: <547C8166.9020401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp and Shawn,
-
-On 15.11.2014 19:49, Vladimir Zapolskiy wrote:
-> Provide information about how to bind internal iMX6Q/DL HDMI DDC I2C
-> master controller. The property is set as optional one, because iMX6
-> HDMI DDC bus may be represented by one of general purpose I2C busses
-> found on SoC.
+On 11/30/2014 01:14 PM, Christoffer Dall wrote:
+> On Sun, Nov 23, 2014 at 07:35:54PM +0100, Eric Auger wrote:
+>> Used by KVM-enabled VFIO-based device passthrough support in QEMU.
+>>
+>> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> Extracted from [RFC PATCH] arm64: KVM: add irqfd support
+>> http://www.spinics.net/lists/kvm-arm/msg10798.html
+>> ---
+>>  arch/arm64/kvm/Kconfig  | 1 +
+>>  arch/arm64/kvm/Makefile | 2 +-
+>>  2 files changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+>> index 09c25c2..2edf926 100644
+>> --- a/arch/arm64/kvm/Kconfig
+>> +++ b/arch/arm64/kvm/Kconfig
+>> @@ -26,6 +26,7 @@ config KVM
+>>  	select KVM_ARM_HOST
+>>  	select KVM_ARM_VGIC
+>>  	select KVM_ARM_TIMER
+>> +	select KVM_VFIO
+>>  	select HAVE_KVM_EVENTFD
+>>  	---help---
+>>  	  Support hosting virtualized guest machines.
+>> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+>> index 2e6b827..81ed091 100644
+>> --- a/arch/arm64/kvm/Makefile
+>> +++ b/arch/arm64/kvm/Makefile
+>> @@ -11,7 +11,7 @@ ARM=../../../arch/arm/kvm
+>>  
+>>  obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
+>>  
+>> -kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
+>> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
+>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
+>>  
+>> -- 
+>> 1.9.1
+>>
 > 
-> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-media at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-i2c at vger.kernel.org
-> ---
->  Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt |   10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
+> Should these patches not be squashed into one?
+Yes I can do.
 > 
-> diff --git a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-> index 1b756cf..43c8924 100644
-> --- a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-> +++ b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-> @@ -10,6 +10,8 @@ Required properties:
->   - #address-cells : should be <1>
->   - #size-cells : should be <0>
->   - compatible : should be "fsl,imx6q-hdmi" or "fsl,imx6dl-hdmi".
-> +   If internal HDMI DDC I2C master controller is supposed to be used,
-> +   then "simple-bus" should be added to compatible value.
->   - gpr : should be <&gpr>.
->     The phandle points to the iomuxc-gpr region containing the HDMI
->     multiplexer control register.
-> @@ -22,6 +24,7 @@ Required properties:
->  
->  Optional properties:
->   - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
-> + - ddc: internal HDMI DDC I2C master controller
->  
->  example:
->  
-> @@ -32,7 +35,7 @@ example:
->          hdmi: hdmi at 0120000 {
->                  #address-cells = <1>;
->                  #size-cells = <0>;
-> -                compatible = "fsl,imx6q-hdmi";
-> +                compatible = "fsl,imx6q-hdmi", "simple-bus";
->                  reg = <0x00120000 0x9000>;
->                  interrupts = <0 115 0x04>;
->                  gpr = <&gpr>;
-> @@ -40,6 +43,11 @@ example:
->                  clock-names = "iahb", "isfr";
->                  ddc-i2c-bus = <&i2c2>;
->  
-> +                hdmi_ddc: ddc {
-> +                        compatible = "fsl,imx6q-hdmi-ddc";
-> +                        status = "disabled";
-> +                };
-> +
->                  port at 0 {
->                          reg = <0>;
->  
+> Also, what do they enable at this point?  Should they be queued by the
+> end of the series instead?
+Well to me this patch should be moved even outside of this series. The
+KVM-VFIO device is loaded when the QEMU VFIO device is instantiated.
+This is used to record the VFIO groups in use. In VFIO platform case, if
+the KVM-VFIO device does not exist, this is not fatal but we get a
+warning in QEMU.
+
+The KVM-VFIO device however is mandatory to enable forwarded irq feature.
+
+Best Regards
+
+Eric
 > 
-
-knowing in advance that I2C framework lacks a graceful support of non
-fully compliant I2C devices, do you have any objections to the proposed
-iMX HDMI DTS change?
-
---
-With best wishes,
-Vladimir
+> -Christoffer
+> 
