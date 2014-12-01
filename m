@@ -1,40 +1,50 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue,  2 Dec 2014 02:47:22 +0300
-Subject: [PATCH v2 0/4] ARM: sa100: use pxa_timer clocksource driver
-Message-ID: <1417477646-14278-1-git-send-email-dbaryshkov@gmail.com>
+Date: Tue,  2 Dec 2014 02:47:23 +0300
+Subject: [PATCH v2 1/4] clocksource: enable pxa_timer for SA-1100 platform
+In-Reply-To: <1417477646-14278-1-git-send-email-dbaryshkov@gmail.com>
+References: <1417477646-14278-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1417477646-14278-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a second iteration of this patch series. Changes since V1:
- - Added OSTIMER0 clock as requested by pxa_timer code.
+SA-11x0 platform used the same IP block as was used on PXA. Consequently
+it makes sense to have only one driver. Enable pxa_timer clocksource for
+StrongARM platform.
 
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
+---
+ drivers/clocksource/Kconfig  | 6 ++++++
+ drivers/clocksource/Makefile | 2 +-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-Thomas has previously blessed that this patchset can go through arm-soc.
-
-The following changes since commit 0df1f2487d2f0d04703f142813d53615d62a1da4:
-
-  Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/dbaryshkov/zaurus.git sa1100-clksrc
-
-for you to fetch changes up to 261fcd132d124b3700ff0b61112fb1b853028901:
-
-  ARM: sa1100: use pxa_timer clocksource driver (2014-12-02 02:42:28 +0300)
-
-----------------------------------------------------------------
-Dmitry Eremin-Solenikov (4):
-      clocksource: enable pxa_timer for SA-1100 platform
-      ARM: sa1100: implement clk_get_rate
-      ARM: sa1100: provide OSTIMER0 clock for pxa_timer
-      ARM: sa1100: use pxa_timer clocksource driver
-
- arch/arm/mach-sa1100/Makefile  |   2 +-
- arch/arm/mach-sa1100/clock.c   |  17 ++++-
- arch/arm/mach-sa1100/generic.c |   6 ++
- arch/arm/mach-sa1100/time.c    | 139 -----------------------------------------
- drivers/clocksource/Kconfig    |   6 ++
- drivers/clocksource/Makefile   |   2 +-
- 6 files changed, 30 insertions(+), 142 deletions(-)
- delete mode 100644 arch/arm/mach-sa1100/time.c
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 9042060..46fdca1 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -223,4 +223,10 @@ config CLKSRC_VERSATILE
+ 	  ARM Versatile, RealView and Versatile Express reference
+ 	  platforms.
+ 
++config CLKSRC_PXA
++	def_bool y if ARCH_PXA || ARCH_SA1100
++	help
++	  This enables OST0 support available on PXA and SA-11x0
++	  platforms.
++
+ endmenu
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 756f6f1..0b55b40 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -21,7 +21,7 @@ obj-$(CONFIG_ARCH_CLPS711X)	+= clps711x-timer.o
+ obj-$(CONFIG_ARCH_MARCO)	+= timer-marco.o
+ obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
+ obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
+-obj-$(CONFIG_ARCH_PXA)		+= pxa_timer.o
++obj-$(CONFIG_CLKSRC_PXA)	+= pxa_timer.o
+ obj-$(CONFIG_ARCH_PRIMA2)	+= timer-prima2.o
+ obj-$(CONFIG_ARCH_U300)		+= timer-u300.o
+ obj-$(CONFIG_SUN4I_TIMER)	+= sun4i_timer.o
+-- 
+2.1.3
