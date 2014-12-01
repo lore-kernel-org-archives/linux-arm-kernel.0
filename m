@@ -1,75 +1,96 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 01 Dec 2014 15:55:34 +0100
-Subject: [PATCH v3 2/8] KVM: arm64: Enable the KVM-VFIO device
-In-Reply-To: <20141130121402.GC82106@macair>
-References: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
- <1416767760-14487-3-git-send-email-eric.auger@linaro.org>
- <20141130121402.GC82106@macair>
-Message-ID: <547C8166.9020401@linaro.org>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Mon, 1 Dec 2014 23:57:01 +0900
+Subject: [PATCH v12 0/3] ARM: rk3288: Add PM Domain support
+In-Reply-To: <1454366.cVgT9MeyeC@diego>
+References: <1416217842-4716-1-git-send-email-caesar.wang@rock-chips.com>
+ <1454366.cVgT9MeyeC@diego>
+Message-ID: <CAAFQd5BvNKsuRmMkh7C9hYPQCwiDFXUuN2SwcxtfLu5KmHdymA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2014 01:14 PM, Christoffer Dall wrote:
-> On Sun, Nov 23, 2014 at 07:35:54PM +0100, Eric Auger wrote:
->> Used by KVM-enabled VFIO-based device passthrough support in QEMU.
->>
->> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>
->> ---
->>
->> Extracted from [RFC PATCH] arm64: KVM: add irqfd support
->> http://www.spinics.net/lists/kvm-arm/msg10798.html
->> ---
->>  arch/arm64/kvm/Kconfig  | 1 +
->>  arch/arm64/kvm/Makefile | 2 +-
->>  2 files changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
->> index 09c25c2..2edf926 100644
->> --- a/arch/arm64/kvm/Kconfig
->> +++ b/arch/arm64/kvm/Kconfig
->> @@ -26,6 +26,7 @@ config KVM
->>  	select KVM_ARM_HOST
->>  	select KVM_ARM_VGIC
->>  	select KVM_ARM_TIMER
->> +	select KVM_VFIO
->>  	select HAVE_KVM_EVENTFD
->>  	---help---
->>  	  Support hosting virtualized guest machines.
->> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
->> index 2e6b827..81ed091 100644
->> --- a/arch/arm64/kvm/Makefile
->> +++ b/arch/arm64/kvm/Makefile
->> @@ -11,7 +11,7 @@ ARM=../../../arch/arm/kvm
->>  
->>  obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
->>  
->> -kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
->> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
->>  kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
->>  kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
->>  
->> -- 
->> 1.9.1
->>
-> 
-> Should these patches not be squashed into one?
-Yes I can do.
-> 
-> Also, what do they enable at this point?  Should they be queued by the
-> end of the series instead?
-Well to me this patch should be moved even outside of this series. The
-KVM-VFIO device is loaded when the QEMU VFIO device is instantiated.
-This is used to record the VFIO groups in use. In VFIO platform case, if
-the KVM-VFIO device does not exist, this is not fatal but we get a
-warning in QEMU.
+On Fri, Nov 28, 2014 at 6:57 PM, Heiko St?bner <heiko@sntech.de> wrote:
+>
+> Am Montag, 17. November 2014, 17:50:38 schrieb Caesar Wang:
+> >     Add power domain drivers based on generic power domain for
+> >     Rockchip platform, and support RK3288.
+> >
+> >     https://chromium-review.googlesource.com/#/c/220253/9
+> >     This is the GPU driver, add the following information in DT,
+> >     and it can support the PMDOMAIN
+>
+> I'm not sure what to do with this series. Kevin had concerns about the clocks
+> being part of the power-domains and I don't see them actually addressed and/or
+> Kevin being satisfied - actually he isn't even on the recipients list of this
+> version of the series.
+>
+>
+> @Ceasar: you should include people being part of important previous
+> conversations in new versions of patchsets - especially when they have voiced
+> concerns.
+>
+>
+> I've added Tomasz whom I remember having previous experience on the Exynos
+> Powerdomains, so maybe he can add some other perspective - new ideas.
+>
 
-The KVM-VFIO device however is mandatory to enable forwarded irq feature.
+Thanks Heiko for adding me to this thread.
 
-Best Regards
+>
+> @Tomasz: this is the part of Kevin's concerns from v10 of the powerdomain
+> series:
+>
+> Am Donnerstag, 13. November 2014, 12:24:47 schrieben Kevin Hilman:
+> > Heiko St?bner <heiko@sntech.de> writes:
+> > > Am Dienstag, 11. November 2014, 08:53:13 schrieb Kevin Hilman:
+> > >> I still don't like having lists of clocks in the power-domain DT.
+> > >>
+> > >> DT is supposed to describe the hardware, and clocks are properties of
+> > >> devices, not power-domains, so the DT description should follow from
+> > >> that.
+> > >
+> > > on the policy side one could argue that if the clock needs to be enabled
+> > > to
+> > > achieve sucessful domain state-changes, that it is also a property of the
+> > > domain itself in addition to the device.
+> >
+> > You could, but from a hardware perspective, the clock is a property of
+> > the device.
+> >
 
-Eric
-> 
-> -Christoffer
-> 
+Well, the system controller which control the power domains is also a
+device. In DT we do not represent the domains alone, but rather the
+system controller, which acts as a power domain provider. If it need
+certain clocks to do its work, then I believe it should have them
+listed in its node. However the dependencies between clocks and power
+domains are not clear to me either, so I don't have any strong opinion
+on whether this would be the best solution.
+
+> > > And on the pratical side we don't have drivers nor bindings for a big part
+> > > of the domain users - and this will probably be true for quite some time.
+> > > This of course makes it very impractical (or impossible) to collect the
+> > > clocks for parts like the gpu (mali), hevc, vcodec (video
+> > > encoder/decoder), rga (2d stuff), iep, isp.
+> >
+> > This doesn't sound impossible at all.
+> >
+> > You have to collect the clocks anyways.  The only debate is whether to
+> > list them in the device node or the power-domain node.
+> >
+> > Even for devices without drivers, you just need a minimal node in the DT if
+> > which lists the clocks and has a phandle to the parent power domain.
+> >
+> > Sounds rather simple to me, and since the DT is supposed to describe the
+> > hardware, doing it this way makes looking at the DT actually help
+> > understand the hardware.
+>
+
+If the dependency between clocks and power domain is kind of "all
+clocks of all devices in this domain should be enabled when performing
+operation on the domain" then IMHO it should be more reasonable to put
+the clocks only in nodes of respective devices and then follow the
+links from the domain to devices inside of it and retrieve the clocks
+from there, so that they don't have to be duplicated. AFAIK, we don't
+like redundancy in DT.
+
+Best regards,
+Tomasz
