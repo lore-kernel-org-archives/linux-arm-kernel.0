@@ -1,203 +1,168 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue,  2 Dec 2014 02:47:26 +0300
-Subject: [PATCH v2 4/4] ARM: sa1100: use pxa_timer clocksource driver
-In-Reply-To: <1417477646-14278-1-git-send-email-dbaryshkov@gmail.com>
-References: <1417477646-14278-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1417477646-14278-5-git-send-email-dbaryshkov@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 1 Dec 2014 17:54:27 -0600
+Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
+ drivers
+In-Reply-To: <1417453034-21379-2-git-send-email-will.deacon@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <1417453034-21379-2-git-send-email-will.deacon@arm.com>
+Message-ID: <CAL_JsqKHvh9KSTYrrs1Pts5Kg=8dA1V6NiW57_2vdDH173qQGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use pxa_timer clocksource driver.
+Adding Grant and Pantelis...
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-sa1100/Makefile  |   2 +-
- arch/arm/mach-sa1100/generic.c |   6 ++
- arch/arm/mach-sa1100/time.c    | 139 -----------------------------------------
- 3 files changed, 7 insertions(+), 140 deletions(-)
- delete mode 100644 arch/arm/mach-sa1100/time.c
+On Mon, Dec 1, 2014 at 10:57 AM, Will Deacon <will.deacon@arm.com> wrote:
+> IOMMU drivers must be initialised before any of their upstream devices,
+> otherwise the relevant iommu_ops won't be configured for the bus in
+> question. To solve this, a number of IOMMU drivers use initcalls to
+> initialise the driver before anything has a chance to be probed.
+>
+> Whilst this solves the immediate problem, it leaves the job of probing
+> the IOMMU completely separate from the iommu_ops to configure the IOMMU,
+> which are called on a per-bus basis and require the driver to figure out
+> exactly which instance of the IOMMU is being requested. In particular,
+> the add_device callback simply passes a struct device to the driver,
+> which then has to parse firmware tables or probe buses to identify the
+> relevant IOMMU instance.
+>
+> This patch takes the first step in addressing this problem by adding an
+> early initialisation pass for IOMMU drivers, giving them the ability to
+> store some per-instance data in their iommu_ops structure and store that
+> in their of_node. This can later be used when parsing OF masters to
+> identify the IOMMU instance in question.
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Joerg Roedel <jroedel@suse.de>
+> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Tested-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/of_iommu.c          | 17 +++++++++++++++++
+>  include/asm-generic/vmlinux.lds.h |  2 ++
+>  include/linux/iommu.h             |  2 ++
+>  include/linux/of_iommu.h          | 25 +++++++++++++++++++++++++
+>  4 files changed, 46 insertions(+)
+>
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index e550ccb7634e..89b903406968 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -22,6 +22,9 @@
+>  #include <linux/of.h>
+>  #include <linux/of_iommu.h>
+>
+> +static const struct of_device_id __iommu_of_table_sentinel
+> +       __used __section(__iommu_of_table_end);
+> +
+>  /**
+>   * of_get_dma_window - Parse *dma-window property and returns 0 if found.
+>   *
+> @@ -89,3 +92,17 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+>         return 0;
+>  }
+>  EXPORT_SYMBOL_GPL(of_get_dma_window);
+> +
+> +void __init of_iommu_init(void)
+> +{
+> +       struct device_node *np;
+> +       const struct of_device_id *match, *matches = &__iommu_of_table;
+> +
+> +       for_each_matching_node_and_match(np, matches, &match) {
+> +               const of_iommu_init_fn init_fn = match->data;
+> +
+> +               if (init_fn(np))
+> +                       pr_err("Failed to initialise IOMMU %s\n",
+> +                               of_node_full_name(np));
+> +       }
+> +}
+> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> index aa70cbda327c..bee5d683074d 100644
+> --- a/include/asm-generic/vmlinux.lds.h
+> +++ b/include/asm-generic/vmlinux.lds.h
+> @@ -164,6 +164,7 @@
+>  #define CLKSRC_OF_TABLES()     OF_TABLE(CONFIG_CLKSRC_OF, clksrc)
+>  #define IRQCHIP_OF_MATCH_TABLE() OF_TABLE(CONFIG_IRQCHIP, irqchip)
+>  #define CLK_OF_TABLES()                OF_TABLE(CONFIG_COMMON_CLK, clk)
+> +#define IOMMU_OF_TABLES()      OF_TABLE(CONFIG_OF_IOMMU, iommu)
+>  #define RESERVEDMEM_OF_TABLES()        OF_TABLE(CONFIG_OF_RESERVED_MEM, reservedmem)
+>  #define CPU_METHOD_OF_TABLES() OF_TABLE(CONFIG_SMP, cpu_method)
+>  #define EARLYCON_OF_TABLES()   OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
+> @@ -497,6 +498,7 @@
+>         CLK_OF_TABLES()                                                 \
+>         RESERVEDMEM_OF_TABLES()                                         \
+>         CLKSRC_OF_TABLES()                                              \
+> +       IOMMU_OF_TABLES()                                               \
+>         CPU_METHOD_OF_TABLES()                                          \
+>         KERNEL_DTB()                                                    \
+>         IRQCHIP_OF_MATCH_TABLE()                                        \
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index e6a7c9ff72f2..7b83f9f8e11d 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -103,6 +103,7 @@ enum iommu_attr {
+>   * @domain_get_attr: Query domain attributes
+>   * @domain_set_attr: Change domain attributes
+>   * @pgsize_bitmap: bitmap of supported page sizes
+> + * @priv: per-instance data private to the iommu driver
+>   */
+>  struct iommu_ops {
+>         bool (*capable)(enum iommu_cap);
+> @@ -133,6 +134,7 @@ struct iommu_ops {
+>         u32 (*domain_get_windows)(struct iommu_domain *domain);
+>
+>         unsigned long pgsize_bitmap;
+> +       void *priv;
+>  };
+>
+>  #define IOMMU_GROUP_NOTIFY_ADD_DEVICE          1 /* Device added */
+> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> index 51a560f34bca..5762cdc8effe 100644
+> --- a/include/linux/of_iommu.h
+> +++ b/include/linux/of_iommu.h
+> @@ -1,12 +1,17 @@
+>  #ifndef __OF_IOMMU_H
+>  #define __OF_IOMMU_H
+>
+> +#include <linux/iommu.h>
+> +#include <linux/of.h>
+> +
+>  #ifdef CONFIG_OF_IOMMU
+>
+>  extern int of_get_dma_window(struct device_node *dn, const char *prefix,
+>                              int index, unsigned long *busno, dma_addr_t *addr,
+>                              size_t *size);
+>
+> +extern void of_iommu_init(void);
+> +
+>  #else
+>
+>  static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+> @@ -16,6 +21,26 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+>         return -EINVAL;
+>  }
+>
+> +static inline void of_iommu_init(void) { }
+> +
+>  #endif /* CONFIG_OF_IOMMU */
+>
+> +static inline void of_iommu_set_ops(struct device_node *np,
+> +                                   const struct iommu_ops *ops)
+> +{
+> +       np->data = (struct iommu_ops *)ops;
+> +}
+> +
+> +static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+> +{
+> +       return np->data;
+> +}
 
-diff --git a/arch/arm/mach-sa1100/Makefile b/arch/arm/mach-sa1100/Makefile
-index f1114d1..61ff91e 100644
---- a/arch/arm/mach-sa1100/Makefile
-+++ b/arch/arm/mach-sa1100/Makefile
-@@ -3,7 +3,7 @@
- #
- 
- # Common support
--obj-y := clock.o generic.o irq.o time.o #nmi-oopser.o
-+obj-y := clock.o generic.o irq.o #nmi-oopser.o
- 
- # Specific board support
- obj-$(CONFIG_SA1100_ASSABET)		+= assabet.o
-diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
-index d4ea142..40e0d86 100644
---- a/arch/arm/mach-sa1100/generic.c
-+++ b/arch/arm/mach-sa1100/generic.c
-@@ -33,6 +33,7 @@
- #include <mach/irqs.h>
- 
- #include "generic.h"
-+#include <clocksource/pxa.h>
- 
- unsigned int reset_status;
- EXPORT_SYMBOL(reset_status);
-@@ -369,6 +370,11 @@ void __init sa1100_map_io(void)
- 	iotable_init(standard_io_desc, ARRAY_SIZE(standard_io_desc));
- }
- 
-+void __init sa1100_timer_init(void)
-+{
-+	pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x90000000), 3686400);
-+}
-+
- /*
-  * Disable the memory bus request/grant signals on the SA1110 to
-  * ensure that we don't receive spurious memory requests.  We set
-diff --git a/arch/arm/mach-sa1100/time.c b/arch/arm/mach-sa1100/time.c
-deleted file mode 100644
-index 1dea6cf..0000000
---- a/arch/arm/mach-sa1100/time.c
-+++ /dev/null
-@@ -1,139 +0,0 @@
--/*
-- * linux/arch/arm/mach-sa1100/time.c
-- *
-- * Copyright (C) 1998 Deborah Wallach.
-- * Twiddles  (C) 1999 Hugo Fiennes <hugo@empeg.com>
-- *
-- * 2000/03/29 (C) Nicolas Pitre <nico@fluxnic.net>
-- *	Rewritten: big cleanup, much simpler, better HZ accuracy.
-- *
-- */
--#include <linux/init.h>
--#include <linux/kernel.h>
--#include <linux/errno.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/timex.h>
--#include <linux/clockchips.h>
--#include <linux/sched_clock.h>
--
--#include <asm/mach/time.h>
--#include <mach/hardware.h>
--#include <mach/irqs.h>
--
--#define SA1100_CLOCK_FREQ 3686400
--#define SA1100_LATCH DIV_ROUND_CLOSEST(SA1100_CLOCK_FREQ, HZ)
--
--static u64 notrace sa1100_read_sched_clock(void)
--{
--	return readl_relaxed(OSCR);
--}
--
--#define MIN_OSCR_DELTA 2
--
--static irqreturn_t sa1100_ost0_interrupt(int irq, void *dev_id)
--{
--	struct clock_event_device *c = dev_id;
--
--	/* Disarm the compare/match, signal the event. */
--	writel_relaxed(readl_relaxed(OIER) & ~OIER_E0, OIER);
--	writel_relaxed(OSSR_M0, OSSR);
--	c->event_handler(c);
--
--	return IRQ_HANDLED;
--}
--
--static int
--sa1100_osmr0_set_next_event(unsigned long delta, struct clock_event_device *c)
--{
--	unsigned long next, oscr;
--
--	writel_relaxed(readl_relaxed(OIER) | OIER_E0, OIER);
--	next = readl_relaxed(OSCR) + delta;
--	writel_relaxed(next, OSMR0);
--	oscr = readl_relaxed(OSCR);
--
--	return (signed)(next - oscr) <= MIN_OSCR_DELTA ? -ETIME : 0;
--}
--
--static void
--sa1100_osmr0_set_mode(enum clock_event_mode mode, struct clock_event_device *c)
--{
--	switch (mode) {
--	case CLOCK_EVT_MODE_ONESHOT:
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_SHUTDOWN:
--		writel_relaxed(readl_relaxed(OIER) & ~OIER_E0, OIER);
--		writel_relaxed(OSSR_M0, OSSR);
--		break;
--
--	case CLOCK_EVT_MODE_RESUME:
--	case CLOCK_EVT_MODE_PERIODIC:
--		break;
--	}
--}
--
--#ifdef CONFIG_PM
--unsigned long osmr[4], oier;
--
--static void sa1100_timer_suspend(struct clock_event_device *cedev)
--{
--	osmr[0] = readl_relaxed(OSMR0);
--	osmr[1] = readl_relaxed(OSMR1);
--	osmr[2] = readl_relaxed(OSMR2);
--	osmr[3] = readl_relaxed(OSMR3);
--	oier = readl_relaxed(OIER);
--}
--
--static void sa1100_timer_resume(struct clock_event_device *cedev)
--{
--	writel_relaxed(0x0f, OSSR);
--	writel_relaxed(osmr[0], OSMR0);
--	writel_relaxed(osmr[1], OSMR1);
--	writel_relaxed(osmr[2], OSMR2);
--	writel_relaxed(osmr[3], OSMR3);
--	writel_relaxed(oier, OIER);
--
--	/*
--	 * OSMR0 is the system timer: make sure OSCR is sufficiently behind
--	 */
--	writel_relaxed(OSMR0 - SA1100_LATCH, OSCR);
--}
--#else
--#define sa1100_timer_suspend NULL
--#define sa1100_timer_resume NULL
--#endif
--
--static struct clock_event_device ckevt_sa1100_osmr0 = {
--	.name		= "osmr0",
--	.features	= CLOCK_EVT_FEAT_ONESHOT,
--	.rating		= 200,
--	.set_next_event	= sa1100_osmr0_set_next_event,
--	.set_mode	= sa1100_osmr0_set_mode,
--	.suspend	= sa1100_timer_suspend,
--	.resume		= sa1100_timer_resume,
--};
--
--static struct irqaction sa1100_timer_irq = {
--	.name		= "ost0",
--	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
--	.handler	= sa1100_ost0_interrupt,
--	.dev_id		= &ckevt_sa1100_osmr0,
--};
--
--void __init sa1100_timer_init(void)
--{
--	writel_relaxed(0, OIER);
--	writel_relaxed(OSSR_M0 | OSSR_M1 | OSSR_M2 | OSSR_M3, OSSR);
--
--	sched_clock_register(sa1100_read_sched_clock, 32, 3686400);
--
--	ckevt_sa1100_osmr0.cpumask = cpumask_of(0);
--
--	setup_irq(IRQ_OST0, &sa1100_timer_irq);
--
--	clocksource_mmio_init(OSCR, "oscr", SA1100_CLOCK_FREQ, 200, 32,
--		clocksource_mmio_readl_up);
--	clockevents_config_and_register(&ckevt_sa1100_osmr0, 3686400,
--					MIN_OSCR_DELTA * 2, 0x7fffffff);
--}
--- 
-2.1.3
+This may collide with other users. While use of it is rare, PPC uses
+it in its PCI code. The OF_DYNAMIC code frees it but never actually
+sets it. There may be some coming usage with the DT overlay code or
+that's just a bug. Pantelis or Grant can comment. If not, I think we
+really should try to get rid of this pointer rather than expand it's
+usage.
+
+I didn't see a user of this. I'm guessing that is coming in a SMMU patch?
+
+Rob
