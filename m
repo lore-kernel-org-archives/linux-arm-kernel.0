@@ -1,59 +1,29 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 01 Dec 2014 15:25:06 +0200
-Subject: build regression with "rcar-du: Remove platform data support"
-In-Reply-To: <12234794.nfiRtpFgV8@wuerfel>
-References: <12234794.nfiRtpFgV8@wuerfel>
-Message-ID: <5028621.aLK7lB68Yl@avalon>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 1 Dec 2014 14:24:37 +0100
+Subject: [PATCH 1/4] ARM: at91/defconfig: add the XDMA driver
+Message-ID: <eb931e7c5534cd949ba61307f0380826e62ceb2c.1417440150.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Add the Atmel eXtended DMA Controller driver option. This driver is first used
+on SAMA5D4 SoCs and only relevant in sama5_defconfig file.
 
-On Monday 01 December 2014 14:09:36 Arnd Bergmann wrote:
-> Hi Laurent,
-> 
-> linux-next has failed to build with lager_defconfig and marzen_defconfig for
-> a while, with this error:
-> 
-> arch/arm/mach-shmobile/board-lager.c:35:41: fatal error:
-> linux/platform_data/rcar-du.h: No such file or directory #include
-> <linux/platform_data/rcar-du.h>
-> 
-> which is evidently the result of your patch
-> 
-> commit 2378ad1228d2cdae0ea5448beb4fb2b42ebaf99c
-> Author: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Date:   Wed Sep 17 02:07:52 2014 +0300
-> 
->     drm: rcar-du: Remove platform data support
-> 
->     All platforms now instantiate the DU through DT, platform data support
->     isn't needed anymore.
-> 
->     Signed-off-by: Laurent Pinchart
-> <laurent.pinchart+renesas@ideasonboard.com>
-> 
-> that removes the header files. I assume some dependency wasn't tracked
-> right, since linux-next still has these.
-> 
-> $ git grep rcar_du_ arch/arm
-> arch/arm/mach-shmobile/board-lager.c:static struct rcar_du_encoder_data
-> lager_du_encoders[] = { arch/arm/mach-shmobile/board-lager.c:static const
-> struct rcar_du_platform_data lager_du_pdata __initconst = {
-> arch/arm/mach-shmobile/board-marzen.c:static struct rcar_du_encoder_data
-> du_encoders[] = { arch/arm/mach-shmobile/board-marzen.c:static const struct
-> rcar_du_platform_data du_pdata __initconst = {
-> 
-> Can we please fix this before the merge window? Should the platform
-> device registration just get removed from the two board files?
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/configs/sama5_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-That's what I've proposed in
-
-http://www.spinics.net/lists/dri-devel/msg72750.html
-
-Dave, could you please reply to that ?
-
+diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+index 12e1fcbc9a2b..d1a2ee5b7b50 100644
+--- a/arch/arm/configs/sama5_defconfig
++++ b/arch/arm/configs/sama5_defconfig
+@@ -177,6 +177,7 @@ CONFIG_LEDS_TRIGGER_GPIO=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_AT91RM9200=y
+ CONFIG_DMADEVICES=y
++CONFIG_AT_XDMAC=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_IIO=y
+ CONFIG_AT91_ADC=y
 -- 
-Regards,
-
-Laurent Pinchart
+2.1.3
