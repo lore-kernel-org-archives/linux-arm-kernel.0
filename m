@@ -1,47 +1,138 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 1 Dec 2014 14:56:24 -0800
-Subject: [PATCH] ARM: zynq: DT: Add USB to device tree
-In-Reply-To: <fb6f17c51aef4a498eb2a3e01a81df34@BN1BFFO11FD017.protection.gbl>
-References: <1417459352-23401-1-git-send-email-soren.brinkmann@xilinx.com>
- <547CCEE3.6020806@suse.de>
- <fb6f17c51aef4a498eb2a3e01a81df34@BN1BFFO11FD017.protection.gbl>
-Message-ID: <e016ae7c103a4fbd844826c9e25fe9c2@BY2FFO11FD036.protection.gbl>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 1 Dec 2014 16:58:09 -0600
+Subject: [PATCH v6 2/8] dma-mapping: replace set_arch_dma_coherent_ops
+ with arch_setup_dma_ops
+In-Reply-To: <1417453034-21379-3-git-send-email-will.deacon@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <1417453034-21379-3-git-send-email-will.deacon@arm.com>
+Message-ID: <CAL_JsqLtN3euwXHM4BzYxkXsgE=Dmn05aXzL+kr_8x23voneZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-12-01 at 01:24PM -0800, S?ren Brinkmann wrote:
-> On Mon, 2014-12-01 at 09:26PM +0100, Andreas F?rber wrote:
-> > Hi S?ren,
-> > 
-> > Am 01.12.2014 um 19:42 schrieb Soren Brinkmann:
-> > > Add USB nodes to zc702, zc706 and zed device trees.
-> > > 
-> > > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > > ---
-> > >  arch/arm/boot/dts/zynq-7000.dtsi | 22 +++++++++++++++++++++-
-> > >  arch/arm/boot/dts/zynq-zc702.dts | 11 +++++++++++
-> > >  arch/arm/boot/dts/zynq-zc706.dts | 10 ++++++++++
-> > >  arch/arm/boot/dts/zynq-zed.dts   | 10 ++++++++++
-> > >  4 files changed, 52 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> > > index ce2ef5bec4f2..9ed60938f301 100644
-> > > --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> > > +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-[...]
-> > > @@ -324,6 +344,6 @@
-> > >  			reg = <0xf8005000 0x1000>;
-> > >  			reset = <0>;
-> > >  			timeout-sec = <10>;
-> > > -		};
-> > > +		} ;
-> > >  	};
-> > >  };
-> > 
-> > Unrelated accidental change here though. :)
+On Mon, Dec 1, 2014 at 10:57 AM, Will Deacon <will.deacon@arm.com> wrote:
+> set_arch_dma_coherent_ops is called from of_dma_configure in order to
+> swizzle the architectural dma-mapping functions over to a cache-coherent
+> implementation. This is currently implemented only for ARM.
+>
+> In anticipation of re-using this mechanism for IOMMU-backed dma-mapping
+> ops too, this patch replaces the function with a broader
+> arch_setup_dma_ops callback which will be extended in future.
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Tested-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Since a v2 is needed now, does this really require a dedicated patch to
-fix this bogus space here or do we just look the other way?
+One comment below, but for the DT parts:
 
-	Thanks,
-	S?ren
+Acked-by: Rob Herring <robh@kernel.org>
+
+> ---
+>  arch/arm/include/asm/dma-mapping.h |  8 ++++----
+>  drivers/of/platform.c              | 31 +++++++++++++------------------
+>  include/linux/dma-mapping.h        |  7 ++-----
+>  3 files changed, 19 insertions(+), 27 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 85738b200023..dc3420e77758 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -121,12 +121,12 @@ static inline unsigned long dma_max_pfn(struct device *dev)
+>  }
+>  #define dma_max_pfn(dev) dma_max_pfn(dev)
+>
+> -static inline int set_arch_dma_coherent_ops(struct device *dev)
+> +static inline void arch_setup_dma_ops(struct device *dev, bool coherent)
+>  {
+> -       set_dma_ops(dev, &arm_coherent_dma_ops);
+> -       return 0;
+> +       if (coherent)
+> +               set_dma_ops(dev, &arm_coherent_dma_ops);
+>  }
+> -#define set_arch_dma_coherent_ops(dev) set_arch_dma_coherent_ops(dev)
+> +#define arch_setup_dma_ops arch_setup_dma_ops
+>
+>  static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+>  {
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 3b64d0bf5bba..ff1f4e9afccb 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -164,6 +164,8 @@ static void of_dma_configure(struct device *dev)
+>  {
+>         u64 dma_addr, paddr, size;
+>         int ret;
+> +       bool coherent;
+> +       unsigned long offset;
+>
+>         /*
+>          * Set default dma-mask to 32 bit. Drivers are expected to setup
+> @@ -178,28 +180,21 @@ static void of_dma_configure(struct device *dev)
+>         if (!dev->dma_mask)
+>                 dev->dma_mask = &dev->coherent_dma_mask;
+>
+> -       /*
+> -        * if dma-coherent property exist, call arch hook to setup
+> -        * dma coherent operations.
+> -        */
+> -       if (of_dma_is_coherent(dev->of_node)) {
+> -               set_arch_dma_coherent_ops(dev);
+> -               dev_dbg(dev, "device is dma coherent\n");
+> -       }
+> -
+> -       /*
+> -        * if dma-ranges property doesn't exist - just return else
+> -        * setup the dma offset
+> -        */
+>         ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+>         if (ret < 0) {
+> -               dev_dbg(dev, "no dma range information to setup\n");
+> -               return;
+> +               dma_addr = offset = 0;
+> +               size = dev->coherent_dma_mask;
+
+It looks like size is not used.
+
+> +       } else {
+> +               offset = PFN_DOWN(paddr - dma_addr);
+> +               dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+>         }
+> +       dev->dma_pfn_offset = offset;
+> +
+> +       coherent = of_dma_is_coherent(dev->of_node);
+> +       dev_dbg(dev, "device is%sdma coherent\n",
+> +               coherent ? " " : " not ");
+>
+> -       /* DMA ranges found. Calculate and set dma_pfn_offset */
+> -       dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
+> -       dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+> +       arch_setup_dma_ops(dev, coherent);
+>  }
+>
+>  /**
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index d5d388160f42..8a1560f95d4a 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -129,11 +129,8 @@ static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
+>
+>  extern u64 dma_get_required_mask(struct device *dev);
+>
+> -#ifndef set_arch_dma_coherent_ops
+> -static inline int set_arch_dma_coherent_ops(struct device *dev)
+> -{
+> -       return 0;
+> -}
+> +#ifndef arch_setup_dma_ops
+> +static inline void arch_setup_dma_ops(struct device *dev, bool coherent) { }
+>  #endif
+>
+>  static inline unsigned int dma_get_max_seg_size(struct device *dev)
+> --
+> 2.1.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
