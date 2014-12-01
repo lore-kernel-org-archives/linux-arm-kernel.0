@@ -1,174 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 1 Dec 2014 10:18:56 +0000
-Subject: =?utf-8?B?562U5aSN?= =?utf-8?Q?=3A?= [PATCH v2 1/2] arm: ls1:
- add CPU hotplug platform support
-In-Reply-To: <CY1PR0301MB0668377EB87A559D3A41D20D897D0@CY1PR0301MB0668.namprd03.prod.outlook.com>
-References: <1416806890-26920-1-git-send-email-Zhuoyu.Zhang@freescale.com>
- <20141128103304.GA25883@leverpostej>
- <CY1PR0301MB0668377EB87A559D3A41D20D897D0@CY1PR0301MB0668.namprd03.prod.outlook.com>
-Message-ID: <20141201101856.GB17070@leverpostej>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 1 Dec 2014 11:26:10 +0100
+Subject: [PATCH V2] PM / Domains: Add pm_genpd_lookup() API to lookup
+ domain by firmware node
+In-Reply-To: <5765394.eQjV2VvkSL@vostro.rjw.lan>
+References: <1417171115-5789-1-git-send-email-ulf.hansson@linaro.org>
+ <5765394.eQjV2VvkSL@vostro.rjw.lan>
+Message-ID: <CAPDyKFpX5nXR18pKdLrtDrPK60p1y2CEqq+--3z3jczRRmKrqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 05:53:16AM +0000, Zhuoyu.Zhang at freescale.com wrote:
-> 
-> 
-> > -----????-----
-> > ???: Mark Rutland [mailto:mark.rutland at arm.com]
-> > ????: Friday, November 28, 2014 6:33 PM
-> > ???: Zhang Zhuoyu-B46552
-> > ??: linux-kernel at vger.kernel.org; kernel at pengutronix.de; linux-arm-
-> > kernel at lists.infradead.org; Li Yang-Leo-R58472; linuxppc-
-> > release at linux.freescale.net; Jin Zhengxiong-R64188; Zhao Chenhui-B35336;
-> > linux at arm.linux.org.uk
-> > ??: Re: [PATCH v2 1/2] arm: ls1: add CPU hotplug platform support
-> > 
-> > On Mon, Nov 24, 2014 at 05:28:09AM +0000, Zhuoyu Zhang wrote:
-> > > From: Zhang Zhuoyu <Zhuoyu.Zhang@freescale.com>
-> > >
-> > > This implements CPU hotplug for ls1. When cpu is down, it will be put
-> > > in WFI state. When cpu is up, it will always soft reset and boots up
-> > > the same path as a cold boot.
-> > >
-> > > Signed-off-by: Zhang Zhuoyu <Zhuoyu.Zhang@freescale.com>
-> > > ---
-> > >  arch/arm/mach-imx/common.h  |   4 ++
-> > >  arch/arm/mach-imx/hotplug.c |  25 +++++++++
-> > > arch/arm/mach-imx/platsmp.c | 132
-> > +++++++++++++++++++++++++++++++++++++++-----
-> > >  arch/arm/mach-imx/src.c     |  21 +++++++
-> > >  4 files changed, 169 insertions(+), 13 deletions(-)
-> > >
-> > 
-> > [...]
-> > 
-> > > +
-> > > +/*
-> > > + * For LS102x platforms, shutdowning a CPU is not supported by hardware.
-> > > + * So we just put the offline CPU into lower-power state here.
-> > > + */
-> > > +void __ref ls1021a_cpu_die(unsigned int cpu) {
-> > > +       v7_exit_coherency_flush(louis);
-> > > +
-> > > +       /* LS1021a platform can't really power down a CPU, so we
-> > > +        * just put it into WFI state here.
-> > > +        */
-> > > +       wfi();
-> > > +}
-> > > +
-> > > +int ls1021a_cpu_kill(unsigned int cpu) {
-> > > +       unsigned long timeout = jiffies + msecs_to_jiffies(50);
-> > > +
-> > > +       while (!ls1_get_cpu_arg(cpu))
-> > > +               if (time_after(jiffies, timeout))
-> > > +                       return 0;
-> > > +       return 1;
-> > > +}
-> > 
-> > While simpler than the last posting [1], this is still no better, and Russell's
-> > comments [2] still apply, so this is still unacceptable.
-> > 
-> > If the CPU does not leave the kernel entirely, it is not CPU hotplug.
-> > As this stands, this is completely incompatible with kexec and suspend.
-> > 
-> 
-> There are some hardware limitation for ls1 platform, core cannot power
-> down, so the only thing we can do here is to put it into low-power
-> state when CPU offline. 
+On 29 November 2014 at 01:30, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Friday, November 28, 2014 11:38:35 AM Ulf Hansson wrote:
+>> In a step to move away from using genpd's name based APIs, such as the
+>> pm_genpd_add_subdomain_names(), provide an API to lookup an already
+>> initialized generic PM domain by its firmware node.
+>>
+>> This API would typically be a called from SOC specific code, to fetch a
+>> handle to the domain. Especially convenient to configure subdomains and
+>> when the hierarchy of the domains are described in DT.
+>>
+>> Do note, before pm_genpd_init() is invoked to initialize a generic PM
+>> domain, it's the callers responsibility to assign the new ->fwnode
+>> pointer in the struct generic_pm_domain, to enable pm_genpd_lookup() to
+>> find the domain.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> I have no problems with that, but do you have a user for it?
 
-Which means that cpu_die/cpu_kill aren't doing their jobs, because the
-CPU is still executing the WFI from the kernel text.
+Amit Daniel Kachhap, posted a patchset which is adding subdomains
+configured from DT for Exynos. It's from there the idea to this patch
+comes from. Amit is about to post a new version, based on this patch.
 
-> For suspend compatibility, I quote Leo's comments in last posting, "I
-> don't think it breaks the system suspend case as tasks and interrupts
-> have been moved out of the non-booting CPU." 
-> 
-> For kexec compatibility, it means we should always reset core and
-> boots up the same path as a cold boot when CPU re-online. That's
-> exactly what we are doing in ls1021a_reset_secondary(). I will explain
-> it in detail below.
+https://lkml.org/lkml/2014/11/24/290
 
-The issues is that until said explicit reset, the CPUs are still
-executing the WFI from original kernel text, which will almost certainly
-be clobbered before any subsequent kernel may attempt to bring them
-online. Any stray interrupt could wake them during this time, leading to
-disaster. 
-
-A WFI may complete for reasons other than an interrupt, as documented in
-the ARM ARM, so a single WFI cannot be relied upon to keep a CPU in a
-low power state even in the absence of interrupts. Given that the
-surrounding text may be clobbered it is not possible to surround the WFI
-in a loop to accomodate this.
-
-> > [...]
-> > 
-> > > +static int ls1021a_reset_secondary(unsigned int cpu) {
-> > > +       u32 tmp;
-> > > +
-> > > +       if (!scfg_base || !dcfg_base)
-> > > +               return -ENOMEM;
-> > > +
-> > > +       writel_relaxed(secondary_pre_boot_entry,
-> > > +                       dcfg_base + DCFG_CCSR_SCRATCHRW1);
-> > > +
-> > > +       /* Apply LS1021A specific to write to the BE SCFG space */
-> > > +       tmp = ioread32be(scfg_base + SCFG_REVCR);
-> > > +       iowrite32be(0xffffffff, scfg_base + SCFG_REVCR);
-> > > +
-> > > +       /* Soft reset secondary core */
-> > > +       iowrite32be(0x80000000, scfg_base + SCFG_CORESRENCR);
-> > > +       iowrite32be(0x80000000, scfg_base +
-> > > +                               SCFG_CORE0_SFT_RST + STRIDE_4B * cpu);
-> > > +
-> > > +       /* Release secondary core */
-> > > +       iowrite32be(1 << cpu, dcfg_base + DCFG_CCSR_BRR);
-> > > +
-> > > +       ls1021a_set_secondary_entry();
-> > > +
-> > > +       /* Disable core soft reset register */
-> > > +       iowrite32be(0x0, scfg_base + SCFG_CORESRENCR);
-> > > +
-> > > +       /* Revert back to the default */
-> > > +       iowrite32be(tmp, scfg_base + SCFG_REVCR);
-> > > +
-> > > +       return 0;
-> > > +}
-> > > +
-> > > +static int ls1021a_boot_secondary(unsigned int cpu, struct
-> > > +task_struct *idle) {
-> > > +       int ret = 0;
-> > > +
-> > > +       if (system_state == SYSTEM_RUNNING)
-> > > +               ret = ls1021a_reset_secondary(cpu);
-> > > +
-> > > +       udelay(1);
-> > > +
-> > > +       arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-> > > +
-> > > +       return ret;
-> > > +}
-> > 
-> > How does this interact with the pseudo-hotplug above?
-> > 
-> > Mark.
-> 
-> 
-> 1) Write 1 to core soft reset register SCFG_CORE1_SFT_RST will reset
-> the secondary core. 
-> Resetting means a totally new start to secondary core, it will
-> re-initialization(TLB, Caches, MMU) just like a cold boot.
-> 
-> 2) The reentry address of secondary core is determined by the
-> DCFG_CCSR_SCRATCHRW1 register.
-> Writing the secondary core reentry physic address to this register to
-> make sure secondary core restart executing a new code section after
-> reset. This can make sure it is compatible with kexec.
-> 
-> 3) Set the corresponding bit of DCFG_CCSR_BRR to release secondary
-> core to re-initialize itself again. 
-
-Thank you for the information. As described above I still do not believe
-that this is sufficient.
-
-Thanks,
-Mark.
+Kind regards
+Uffe
