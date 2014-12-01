@@ -1,33 +1,133 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 1 Dec 2014 17:57:53 +0000
-Subject: [PATCH 5/5] arm/arm64: KVM: Turn off vcpus and flush stage-2
- pgtables on sytem exit events
-In-Reply-To: <CAFEAcA9hRvaWZiXOjTQP3+4B+r7h7W7oqRm6y=cxw+EJKNk-0w@mail.gmail.com>
-References: <1417113660-23610-1-git-send-email-christoffer.dall@linaro.org>
- <1417113660-23610-6-git-send-email-christoffer.dall@linaro.org>
- <CAFEAcA9hRvaWZiXOjTQP3+4B+r7h7W7oqRm6y=cxw+EJKNk-0w@mail.gmail.com>
-Message-ID: <CAFEAcA9kq=Fvhbc5+bTavb1KiaEn6+JYf=c6MaZYihbu_gT9sg@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 01 Dec 2014 17:57:59 +0000
+Subject: [PATCH] ARM: imx6: fix bogus use of irq_get_irq_data
+In-Reply-To: <1417453443-9179-1-git-send-email-marc.zyngier@arm.com>
+References: <1417453443-9179-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <547CAC27.2090200@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 November 2014 at 23:10, Peter Maydell <peter.maydell@linaro.org> wrote:
-> It seems odd to have this unmap happen on attempted system reset/powerdown,
-> not on cpu init/start.
+Hi Marc,
 
-Here's a concrete case that I think requires the unmap to be
-done on cpu init:
- * start a VM and run it for a bit
- * from the QEMU monitor, use "loadvm" to load a VM snapshot
+On 01/12/14 17:04, Marc Zyngier wrote:
+> The imx6 PM code seems to be quite creative in its use of irq_data,
+> using something something that is very much a hardware interrupt
+        ^^^^^^^^^ ^^^^^^^^^
+More "something" here! ;)
 
-This will cause QEMU to do a system reset (including calling
-VCPU_INIT to reset the CPUs), load the contents of guest
-RAM from the snapshot, set guest CPU registers with a pile
-of SET_ONE_REG calls, and then KVM_RUN to start the VM.
+Vladimir
 
-If we don't unmap stage2 on vcpu init,  then what in this
-sequence causes the icaches to be flushed so we execute
-the newly loaded ram contents rather than stale data
-from the first VM run?
-
-thanks
--- PMM
+> number where we expect a virtual one.  Yes, it worked so far, but
+> that's only cheer luck, and it will definitely explode in 3.19.
+> 
+> Fix it by using a pair of helper functions that deal with the
+> actual hardware.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/mach-imx/common.h  |  4 ++--
+>  arch/arm/mach-imx/gpc.c     | 34 ++++++++++++++++++++++------------
+>  arch/arm/mach-imx/pm-imx6.c |  5 ++---
+>  3 files changed, 26 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> index 1dabf43..66662a1 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -108,8 +108,8 @@ void imx_gpc_pre_suspend(bool arm_power_off);
+>  void imx_gpc_post_resume(void);
+>  void imx_gpc_mask_all(void);
+>  void imx_gpc_restore_all(void);
+> -void imx_gpc_irq_mask(struct irq_data *d);
+> -void imx_gpc_irq_unmask(struct irq_data *d);
+> +void imx_gpc_hwirq_mask(unsigned int hwirq);
+> +void imx_gpc_hwirq_unmask(unsigned int hwirq);
+>  void imx_anatop_init(void);
+>  void imx_anatop_pre_suspend(void);
+>  void imx_anatop_post_resume(void);
+> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+> index 1455829..5f3602e 100644
+> --- a/arch/arm/mach-imx/gpc.c
+> +++ b/arch/arm/mach-imx/gpc.c
+> @@ -91,34 +91,44 @@ void imx_gpc_restore_all(void)
+>  		writel_relaxed(gpc_saved_imrs[i], reg_imr1 + i * 4);
+>  }
+>  
+> -void imx_gpc_irq_unmask(struct irq_data *d)
+> +void imx_gpc_hwirq_unmask(unsigned int hwirq)
+>  {
+>  	void __iomem *reg;
+>  	u32 val;
+>  
+> -	/* Sanity check for SPI irq */
+> -	if (d->hwirq < 32)
+> -		return;
+> -
+> -	reg = gpc_base + GPC_IMR1 + (d->hwirq / 32 - 1) * 4;
+> +	reg = gpc_base + GPC_IMR1 + (hwirq / 32 - 1) * 4;
+>  	val = readl_relaxed(reg);
+> -	val &= ~(1 << d->hwirq % 32);
+> +	val &= ~(1 << hwirq % 32);
+>  	writel_relaxed(val, reg);
+>  }
+>  
+> -void imx_gpc_irq_mask(struct irq_data *d)
+> +void imx_gpc_hwirq_mask(unsigned int hwirq)
+>  {
+>  	void __iomem *reg;
+>  	u32 val;
+>  
+> +	reg = gpc_base + GPC_IMR1 + (hwirq / 32 - 1) * 4;
+> +	val = readl_relaxed(reg);
+> +	val |= 1 << (hwirq % 32);
+> +	writel_relaxed(val, reg);
+> +}
+> +
+> +static void imx_gpc_irq_unmask(struct irq_data *d)
+> +{
+> +	/* Sanity check for SPI irq */
+> +	if (d->hwirq < 32)
+> +		return;
+> +
+> +	imx_gpc_hwirq_unmask(d->hwirq);
+> +}
+> +
+> +static void imx_gpc_irq_mask(struct irq_data *d)
+> +{
+>  	/* Sanity check for SPI irq */
+>  	if (d->hwirq < 32)
+>  		return;
+>  
+> -	reg = gpc_base + GPC_IMR1 + (d->hwirq / 32 - 1) * 4;
+> -	val = readl_relaxed(reg);
+> -	val |= 1 << (d->hwirq % 32);
+> -	writel_relaxed(val, reg);
+> +	imx_gpc_hwirq_mask(d->hwirq);
+>  }
+>  
+>  void __init imx_gpc_init(void)
+> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+> index 5c3af8f..d815d1b 100644
+> --- a/arch/arm/mach-imx/pm-imx6.c
+> +++ b/arch/arm/mach-imx/pm-imx6.c
+> @@ -261,7 +261,6 @@ static void imx6q_enable_wb(bool enable)
+>  
+>  int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+>  {
+> -	struct irq_data *iomuxc_irq_data = irq_get_irq_data(32);
+>  	u32 val = readl_relaxed(ccm_base + CLPCR);
+>  
+>  	val &= ~BM_CLPCR_LPM;
+> @@ -316,9 +315,9 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+>  	 * 3) Software should mask IRQ #32 right after CCM Low-Power mode
+>  	 *    is set (set bits 0-1 of CCM_CLPCR).
+>  	 */
+> -	imx_gpc_irq_unmask(iomuxc_irq_data);
+> +	imx_gpc_hwirq_unmask(32);
+>  	writel_relaxed(val, ccm_base + CLPCR);
+> -	imx_gpc_irq_mask(iomuxc_irq_data);
+> +	imx_gpc_hwirq_mask(32);
+>  
+>  	return 0;
+>  }
+> 
