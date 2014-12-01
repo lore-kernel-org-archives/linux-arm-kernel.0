@@ -1,23 +1,60 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 1 Dec 2014 20:18:43 +0530
-Subject: [RFC V1 0/8] CPUFreq: create platform-dev for DT based cpufreq
- drivers
-In-Reply-To: <23115535.r6kXsReHU2@wuerfel>
-References: <cover.1417433163.git.viresh.kumar@linaro.org>
- <CAKohpo=EPOH-WJ4mmAr-1BzzAEpvC-F0Y99Ox_yL7meUcRNx6Q@mail.gmail.com>
- <547C6E9D.2090205@arm.com> <23115535.r6kXsReHU2@wuerfel>
-Message-ID: <CAKohpo=xDrizL5+5zeVAj_x1BhMuidCa8Ed90YOQbzSTQ_yb2A@mail.gmail.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Mon, 1 Dec 2014 16:50:07 +0200
+Subject: [PATCH v3 0/5] pwm: support backward compatibility of DTB
+ extending PWM args
+In-Reply-To: <1416339438-7867-1-git-send-email-vladimir_zapolskiy@mentor.com>
+References: <1416339438-7867-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <547C801F.2010307@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 December 2014 at 19:41, Arnd Bergmann <arnd@arndb.de> wrote:
-> I would prefer the /cpus node over the /chosen node because the former
-> describes the hardware while the latter is supposed to be user-settable
-> (on real open-firmware at least). But I think either one is better than
-> using the / node compatible string.
->
-> How about a "linux,cpu-dvfs-method" property in the root node? Would
-> that work better for you than a "linux,dvfs-method" in the "/cpus"
-> node?
+Hello Thierry,
 
-I will choose "linux,dvfs-method" in the "/cpus" node.
+On 18.11.2014 21:37, Vladimir Zapolskiy wrote:
+> Please review this alternative in-house version of supporting backward
+> compatibility of DTB files (new kernel/PWM driver and old DTS), overcoming
+> a problem that pwms arguments of existing PWM drivers are to be extended
+> with polarity field.
+> 
+> Unfortunately I've firstly created the change and only after that
+> found that Lothar Wa?mann is working on his version, so I won't insist
+> on formal preference, but still I like to share my variant since it
+> technically different from Lothar's one.
+> 
+> Changes from v2 to v3:
+> - improved commit messages
+> - added two more patches removing of_pwm_xlate_with_flags()
+> 
+> Changes from v1 to v2:
+> - corrected the proper kernel log level, thanks to Lothar Wa?mann.
+> 
+> Vladimir Zapolskiy (5):
+>   pwm: process pwm polarity argument in of_pwm_simple_xlate()
+>   pwm: push up dynamic printk level on errors in of_pwm_get()
+>   pwm: set the actual number of pwms arguments defined in board dts
+>   pwm: do not set of_pwm_xlate_with_flags() as a callback
+>   pwm: remove of_pwm_xlate_with_flags() function
+> 
+>  drivers/pwm/core.c            |   42 ++++++++++++-----------------------------
+>  drivers/pwm/pwm-atmel-hlcdc.c |    2 --
+>  drivers/pwm/pwm-atmel-tcb.c   |    2 --
+>  drivers/pwm/pwm-atmel.c       |    6 ------
+>  drivers/pwm/pwm-bcm-kona.c    |    2 --
+>  drivers/pwm/pwm-fsl-ftm.c     |    2 --
+>  drivers/pwm/pwm-renesas-tpu.c |    2 --
+>  drivers/pwm/pwm-rockchip.c    |    5 -----
+>  drivers/pwm/pwm-samsung.c     |    3 ---
+>  drivers/pwm/pwm-tiecap.c      |    2 --
+>  drivers/pwm/pwm-tiehrpwm.c    |    2 --
+>  drivers/pwm/pwm-vt8500.c      |    2 --
+>  include/linux/pwm.h           |    3 ---
+>  13 files changed, 12 insertions(+), 63 deletions(-)
+> 
+
+could you please review this PWM DTB backward compatibility change?
+
+Thank you in advance.
+
+--
+With best wishes,
+Vladimir
