@@ -1,189 +1,364 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Dec 2014 13:54:56 +0100
-Subject: [RFC V1 0/8] CPUFreq: create platform-dev for DT based cpufreq
- drivers
-In-Reply-To: <cover.1417433163.git.viresh.kumar@linaro.org>
-References: <cover.1417433163.git.viresh.kumar@linaro.org>
-Message-ID: <7885354.QleDlR7NUO@wuerfel>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon,  1 Dec 2014 13:59:30 +0100
+Subject: [PATCH] ARM: dts: Add dts file for odroid XU3 board
+Message-ID: <1417438770-28696-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 December 2014 17:11:21 Viresh Kumar wrote:
-> 
-> DT based cpufreq drivers doesn't require much support from platform code now a
-> days as most of the stuff is moved behind generic APIs. Like clk APIs for
-> changing clock rates, regulator APIs for changing voltages, etc.
-> 
-> One of the bottleneck still left was how to select which cpufreq driver to probe
-> for a given platform as there might be multiple drivers available.
-> 
-> Traditionally, we used to create platform devices from machine specific code
-> which binds with a cpufreq driver. And while we moved towards DT based device
-> creation, these devices stayed as is.
-> 
-> The problem is getting worse now as we have architectures now with Zero platform
-> specific code. Forcefully these platforms have to create a new file in
-> drivers/cpufreq/ to just add these platform devices in order to use the generic
-> drivers like cpufreq-dt.c.
-> 
-> This has been discussed again and again, but with no solution yet. Last it was
-> discussed here:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256154.html
-> 
-> This patch is an attempt towards getting the bindings.
-> 
-> We only need to have cpufreq drivers name string present in "compatible"
-> property for the root node.. If a cpufreq driver with DT support exists with
-> that name, then cpufreq core will create a platform device for that.
-> 
-> The first patch presents the new binding, second one creates another file
-> responsible for creating platform devices for all DT based cpufreq drivers.
-> 
-> And later patches update platforms to migrate to it one by one.
-> 
-> A BLACKLIST of platforms already supported by these drivers is also created for
-> backward compatibility of newer kernels with older DTs. And so for such
-> platforms DT files aren't updated.
-> 
-> An initial RFC that presented the idea was discussed here:
-> https://www.mail-archive.com/devicetree at vger.kernel.org/msg52509.html
-> 
-> Tested-ON: Exynos5250. (The last patch for exynos depends on some commits to be
-> upstreamed in 3.19, presented here just for testing).
+Add DTS for the Hardkernel Odroid XU3. The name of the DTS file is kept the
+same as the vendors naming, which means it's prefixed with exynos5422
+instead of exynos5800 as the SoC name even though it includes the
+exyno5800 dtsi.
 
-Thanks a lot for working on this, we really need to figure it out one day!
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+---
+ arch/arm/boot/dts/Makefile                 |   1 +
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts | 325 +++++++++++++++++++++++++++++
+ 2 files changed, 326 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos5422-odroidxu3.dts
 
-Your patches seem well-implemented, so if everybody thinks the general
-approach is the best solution, we should do that. From my point of view,
-there are two things I would do differently:
-
-- In the DT binding, I would strongly prefer anything but the root compatible
-  property as the key for the new platforms. Clearly we have to keep using
-  it for the backwards-compatibility case, as you do, but I think there
-  are more appropriate places to put it. Sorting from most favorite to least
-  favorite, my list would be:
-	1. a new property in /cpus/
-	2. a new property each /cpus/cpu at ... node.
-	3. the compatible property of the /cpus node
-	4. a top-level device node that gets turned into a platform device
-	5. a new property in the / node
-	6. a new property in the /chosen node
-	7. the compatible property in the / node
-
-- Implementation-wise, I don't think it's helpful to have a global function
-  that registers a platform device to be consumed by the device driver. I'd
-  rather just see a module_init function in each driver that rather than
-  registering a platform_driver scans the DT properties. This is only really
-  necessary when not using DT (omap2, omap3, davinci, loongson) or when
-  passing additional resources or platform_data (kirkwood, but that can
-  look up the "marvell,orion-system-controller" node if necessary).
-  My preferred solution would be to eventually remove the platform_device
-  registration for all DT users. If a driver needs a platform device pointer
-  internally, it can use platform_create_bundle(), but that's probably not
-  even necessary.
-
-In short, I would suggest something along the lines of the patch below.
-
-	Arnd
-8<-----
-[PATCH, RFC] cpufreq: dt: simplify and generalize probing
-
-We should not have to create a platform device from platform specific code
-in order to use the completely generic cpufreq-dt driver. This adds
-a simpler method by creating a new standard property of the "/cpus" node
-to look for, with a fallback for existing users. The list of existing
-users needs to be completed, and the same change done for the other
-DT based drivers.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
-index 6f5f5615fbf1..697b4dc47715 100644
---- a/drivers/cpufreq/cpufreq-dt.c
-+++ b/drivers/cpufreq/cpufreq-dt.c
-@@ -345,13 +345,50 @@ static struct cpufreq_driver dt_cpufreq_driver = {
- 	.attr = cpufreq_generic_attr,
- };
- 
--static int dt_cpufreq_probe(struct platform_device *pdev)
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 38c89ca..0a898cc 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -86,6 +86,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+ 	exynos5420-arndale-octa.dtb \
+ 	exynos5420-peach-pit.dtb \
+ 	exynos5420-smdk5420.dtb \
++	exynos5422-odroidxu3.dtb \
+ 	exynos5440-sd5v1.dtb \
+ 	exynos5440-ssdk5440.dtb \
+ 	exynos5800-peach-pi.dtb
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+new file mode 100644
+index 0000000..fe37004
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+@@ -0,0 +1,325 @@
 +/*
-+ * these machines are using the driver but provide no standard
-+ * probing method, only for old machines with existing dtbs.
-+ */
-+static struct of_device_id legacy_machines = {
-+	{ .compatible = "calxeda,highbank" },
-+	{ .compatible = "renesas,sh7372" },
-+	{ .compatible = "renesas,sh73a0"  },
-+	{ .compatible = "samsung,exynos5250" },
-+	{ .compatible = "samsung,exynos4210" },
-+	{ .compatible = "xlnx,zynq-7000" },
++ * Hardkernel Odroid XU3 board device tree source
++ *
++ * Copyright (c) 2014 Collabora Ltd.
++ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/dts-v1/;
++#include "exynos5800.dtsi"
++
++/ {
++	model = "Hardkernel Odroid XU3";
++	compatible = "hardkernel,odroid-xu3", "samsung,exynos5800", "samsung,exynos5";
++
++	memory {
++		reg = <0x20000000 0x80000000>;
++	};
++
++	fimd at 14400000 {
++		status = "okay";
++	};
++
++	firmware at 02073000 {
++		compatible = "samsung,secure-firmware";
++		reg = <0x02073000 0x1000>;
++	};
++
++	fixed-rate-clocks {
++		oscclk {
++			compatible = "samsung,exynos5420-oscclk";
++			clock-frequency = <24000000>;
++		};
++	};
++
++	hsi2c_4: i2c at 12CA0000 {
++		status = "okay";
++
++		s2mps11_pmic at 66 {
++			compatible = "samsung,s2mps11-pmic";
++			reg = <0x66>;
++			s2mps11,buck2-ramp-delay = <12>;
++			s2mps11,buck34-ramp-delay = <12>;
++			s2mps11,buck16-ramp-delay = <12>;
++			s2mps11,buck6-ramp-enable = <1>;
++			s2mps11,buck2-ramp-enable = <1>;
++			s2mps11,buck3-ramp-enable = <1>;
++			s2mps11,buck4-ramp-enable = <1>;
++
++			s2mps11_osc: clocks {
++				#clock-cells = <1>;
++				clock-output-names = "s2mps11_ap",
++						"s2mps11_cp", "s2mps11_bt";
++			};
++
++			regulators {
++				ldo1_reg: LDO1 {
++					regulator-name = "vdd_ldo1";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo3_reg: LDO3 {
++					regulator-name = "vdd_ldo3";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo5_reg: LDO5 {
++					regulator-name = "vdd_ldo5";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo6_reg: LDO6 {
++					regulator-name = "vdd_ldo6";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo7_reg: LDO7 {
++					regulator-name = "vdd_ldo7";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo8_reg: LDO8 {
++					regulator-name = "vdd_ldo8";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo9_reg: LDO9 {
++					regulator-name = "vdd_ldo9";
++					regulator-min-microvolt = <3000000>;
++					regulator-max-microvolt = <3000000>;
++					regulator-always-on;
++				};
++
++				ldo10_reg: LDO10 {
++					regulator-name = "vdd_ldo10";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo11_reg: LDO11 {
++					regulator-name = "vdd_ldo11";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo12_reg: LDO12 {
++					regulator-name = "vdd_ldo12";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo13_reg: LDO13 {
++					regulator-name = "vdd_ldo13";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					regulator-always-on;
++				};
++
++				ldo15_reg: LDO15 {
++					regulator-name = "vdd_ldo15";
++					regulator-min-microvolt = <3100000>;
++					regulator-max-microvolt = <3100000>;
++					regulator-always-on;
++				};
++
++				ldo16_reg: LDO16 {
++					regulator-name = "vdd_ldo16";
++					regulator-min-microvolt = <2200000>;
++					regulator-max-microvolt = <2200000>;
++					regulator-always-on;
++				};
++
++				ldo17_reg: LDO17 {
++					regulator-name = "tsp_avdd";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++				};
++
++				ldo19_reg: LDO19 {
++					regulator-name = "vdd_sd";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					regulator-always-on;
++				};
++
++				ldo24_reg: LDO24 {
++					regulator-name = "tsp_io";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					regulator-always-on;
++				};
++
++				buck1_reg: BUCK1 {
++					regulator-name = "vdd_mif";
++					regulator-min-microvolt = <800000>;
++					regulator-max-microvolt = <1300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck2_reg: BUCK2 {
++					regulator-name = "vdd_arm";
++					regulator-min-microvolt = <800000>;
++					regulator-max-microvolt = <1500000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck3_reg: BUCK3 {
++					regulator-name = "vdd_int";
++					regulator-min-microvolt = <800000>;
++					regulator-max-microvolt = <1400000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck4_reg: BUCK4 {
++					regulator-name = "vdd_g3d";
++					regulator-min-microvolt = <800000>;
++					regulator-max-microvolt = <1400000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck5_reg: BUCK5 {
++					regulator-name = "vdd_mem";
++					regulator-min-microvolt = <800000>;
++					regulator-max-microvolt = <1400000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck6_reg: BUCK6 {
++					regulator-name = "vdd_kfc";
++					regulator-min-microvolt = <800000>;
++					regulator-max-microvolt = <1500000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck7_reg: BUCK7 {
++					regulator-name = "vdd_1.0v_ldo";
++					regulator-min-microvolt = <800000>;
++					regulator-max-microvolt = <1500000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck8_reg: BUCK8 {
++					regulator-name = "vdd_1.8v_ldo";
++					regulator-min-microvolt = <800000>;
++					regulator-max-microvolt = <1500000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck9_reg: BUCK9 {
++					regulator-name = "vdd_2.8v_ldo";
++					regulator-min-microvolt = <3000000>;
++					regulator-max-microvolt = <3750000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck10_reg: BUCK10 {
++					regulator-name = "vdd_vmem";
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++			};
++		};
++	};
++
++	i2c_2: i2c at 12C80000 {
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-max-bus-freq = <66000>;
++		status = "okay";
++
++		hdmiddc at 50 {
++			compatible = "samsung,exynos4210-hdmiddc";
++			reg = <0x50>;
++		};
++	};
++
++	rtc at 101E0000 {
++		status = "okay";
++	};
++
 +};
 +
-+static bool dt_cpufreq_available(void)
-+{
-+	struct device_node *node;
-+	bool ret;
++&hdmi {
++	status = "okay";
++	hpd-gpio = <&gpx3 7 0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&hdmi_hpd_irq>;
 +
-+	node = of_find_node_by_path("/cpus");
-+	if (!node)
-+		return 0;
++	vdd_osc-supply = <&ldo10_reg>;
++	vdd_pll-supply = <&ldo8_reg>;
++	vdd-supply = <&ldo8_reg>;
++};
 +
-+	/* the specific property needs to be debated */
-+	ret = of_property_read_bool("linux,cpu-frequency-scaling");
-+	of_node_put(node);
-+	if (ret)
-+		return 1;
 +
-+	node = of_find_node_by_path("/");
-+	ret = of_match_device(&legacy_machines, node);
-+	of_node_put(node);
++&mmc_0 {
++	status = "okay";
++	broken-cd;
++	card-detect-delay = <200>;
++	samsung,dw-mshc-ciu-div = <3>;
++	samsung,dw-mshc-sdr-timing = <0 4>;
++	samsung,dw-mshc-ddr-timing = <0 2>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
++	bus-width = <8>;
++	cap-mmc-highspeed;
++};
 +
-+	return ret;
-+}
++&mmc_2 {
++	status = "okay";
++	card-detect-delay = <200>;
++	samsung,dw-mshc-ciu-div = <3>;
++	samsung,dw-mshc-sdr-timing = <0 4>;
++	samsung,dw-mshc-ddr-timing = <0 2>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
++	bus-width = <4>;
++	cap-sd-highspeed;
++};
 +
-+static int __init dt_cpufreq_probe(void)
- {
- 	struct device *cpu_dev;
- 	struct regulator *cpu_reg;
- 	struct clk *cpu_clk;
- 	int ret;
- 
-+	if (!dt_cpufreq_available())
-+		return -ENXIO;
- 	/*
- 	 * All per-cluster (CPUs sharing clock/voltages) initialization is done
- 	 * from ->init(). In probe(), we just need to make sure that clk and
-@@ -367,29 +404,19 @@ static int dt_cpufreq_probe(struct platform_device *pdev)
- 	if (!IS_ERR(cpu_reg))
- 		regulator_put(cpu_reg);
- 
--	dt_cpufreq_driver.driver_data = dev_get_platdata(&pdev->dev);
--
- 	ret = cpufreq_register_driver(&dt_cpufreq_driver);
- 	if (ret)
- 		dev_err(cpu_dev, "failed register driver: %d\n", ret);
- 
- 	return ret;
- }
-+module_init(dt_cpufreq_probe);
- 
--static int dt_cpufreq_remove(struct platform_device *pdev)
-+static void __exit dt_cpufreq_remove(void)
- {
- 	cpufreq_unregister_driver(&dt_cpufreq_driver);
--	return 0;
- }
--
--static struct platform_driver dt_cpufreq_platdrv = {
--	.driver = {
--		.name	= "cpufreq-dt",
--	},
--	.probe		= dt_cpufreq_probe,
--	.remove		= dt_cpufreq_remove,
--};
--module_platform_driver(dt_cpufreq_platdrv);
-+module_exit(dt_cpufreq_remove);
- 
- MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
- MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
++&pinctrl_0 {
++	hdmi_hpd_irq: hdmi-hpd-irq {
++		samsung,pins = "gpx3-7";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <1>;
++		samsung,pin-drv = <0>;
++	};
++};
++
++&usbdrd_dwc3_0 {
++	dr_mode = "host";
++};
++
++&usbdrd_dwc3_1 {
++	dr_mode = "otg";
++};
+-- 
+2.1.3
