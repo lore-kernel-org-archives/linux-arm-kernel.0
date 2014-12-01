@@ -1,140 +1,239 @@
-From: Zhuoyu.Zhang@freescale.com (Zhuoyu.Zhang at freescale.com)
-Date: Mon, 1 Dec 2014 05:53:16 +0000
-Subject: =?gb2312?B?tPC4tDogW1BBVENIIHYyIDEvMl0gYXJtOiBsczE6IGFkZCBDUFUgaG90cGx1?=
- =?gb2312?Q?g_platform_support?=
-In-Reply-To: <20141128103304.GA25883@leverpostej>
-References: <1416806890-26920-1-git-send-email-Zhuoyu.Zhang@freescale.com>
- <20141128103304.GA25883@leverpostej>
-Message-ID: <CY1PR0301MB0668377EB87A559D3A41D20D897D0@CY1PR0301MB0668.namprd03.prod.outlook.com>
+From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
+Date: Mon, 1 Dec 2014 14:35:48 +0800
+Subject: Issue found in Armada 370: "No buffer space available" error
+ during continuous ping
+In-Reply-To: <CAB8gEUtO=K-mjie6czsf-9ao1cxiMAV2ScbgUnf+XxqjEfOUvg@mail.gmail.com>
+References: <20140715142431.4eccbcd6@free-electrons.com>
+ <20140715124333.GF12333@1wt.eu>
+ <CAB8gEUt08QVpgW0fs18tNnCkCw36SD6hxgL8O6p6+oOtX0-yJQ@mail.gmail.com>
+ <20140717081527.GJ14723@1wt.eu>
+ <CAB8gEUsLmuDkTzGsq8fVs9dZ90d82Brw2cAPBOnobUTcSgQabA@mail.gmail.com>
+ <CAB8gEUvwPJUhDN-=tugTyKe93SdNwqNaGtKMF1DRCb8ZNncmmg@mail.gmail.com>
+ <20140721054405.GK21834@1wt.eu>
+ <CAB8gEUsK9c3YMpAABifNAWU7zec2ePztSqS4KAYtiT7Sbhadvg@mail.gmail.com>
+ <20140721070303.GM21834@1wt.eu>
+ <CAB8gEUtmgwfWcuoYZ-wDwHVmzHN0WyOQD9oEOGAZ_gJfbPUm-g@mail.gmail.com>
+ <20140723061659.GE30488@1wt.eu>
+ <CAB8gEUtO=K-mjie6czsf-9ao1cxiMAV2ScbgUnf+XxqjEfOUvg@mail.gmail.com>
+Message-ID: <CAB8gEUvVXn_E=X_qSTfRCARVswi2AU4Ax0ePLZqn6UuYfowrRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Willy, Thomas.
+Good day.
 
+I am reopening this discussion because we found an unusual behavior
+after using this combination that we thought was OK as discussed in
+the previous messages of this thread:
 
-> -----????-----
-> ???: Mark Rutland [mailto:mark.rutland at arm.com]
-> ????: Friday, November 28, 2014 6:33 PM
-> ???: Zhang Zhuoyu-B46552
-> ??: linux-kernel at vger.kernel.org; kernel at pengutronix.de; linux-arm-
-> kernel at lists.infradead.org; Li Yang-Leo-R58472; linuxppc-
-> release at linux.freescale.net; Jin Zhengxiong-R64188; Zhao Chenhui-B35336;
-> linux at arm.linux.org.uk
-> ??: Re: [PATCH v2 1/2] arm: ls1: add CPU hotplug platform support
-> 
-> On Mon, Nov 24, 2014 at 05:28:09AM +0000, Zhuoyu Zhang wrote:
-> > From: Zhang Zhuoyu <Zhuoyu.Zhang@freescale.com>
-> >
-> > This implements CPU hotplug for ls1. When cpu is down, it will be put
-> > in WFI state. When cpu is up, it will always soft reset and boots up
-> > the same path as a cold boot.
-> >
-> > Signed-off-by: Zhang Zhuoyu <Zhuoyu.Zhang@freescale.com>
-> > ---
-> >  arch/arm/mach-imx/common.h  |   4 ++
-> >  arch/arm/mach-imx/hotplug.c |  25 +++++++++
-> > arch/arm/mach-imx/platsmp.c | 132
-> +++++++++++++++++++++++++++++++++++++++-----
-> >  arch/arm/mach-imx/src.c     |  21 +++++++
-> >  4 files changed, 169 insertions(+), 13 deletions(-)
-> >
-> 
-> [...]
-> 
-> > +
-> > +/*
-> > + * For LS102x platforms, shutdowning a CPU is not supported by hardware.
-> > + * So we just put the offline CPU into lower-power state here.
-> > + */
-> > +void __ref ls1021a_cpu_die(unsigned int cpu) {
-> > +       v7_exit_coherency_flush(louis);
-> > +
-> > +       /* LS1021a platform can't really power down a CPU, so we
-> > +        * just put it into WFI state here.
-> > +        */
-> > +       wfi();
-> > +}
-> > +
-> > +int ls1021a_cpu_kill(unsigned int cpu) {
-> > +       unsigned long timeout = jiffies + msecs_to_jiffies(50);
-> > +
-> > +       while (!ls1_get_cpu_arg(cpu))
-> > +               if (time_after(jiffies, timeout))
-> > +                       return 0;
-> > +       return 1;
-> > +}
-> 
-> While simpler than the last posting [1], this is still no better, and Russell's
-> comments [2] still apply, so this is still unacceptable.
-> 
-> If the CPU does not leave the kernel entirely, it is not CPU hotplug.
-> As this stands, this is completely incompatible with kexec and suspend.
-> 
+> - use 3.13.9 mvneta.c
+> - apply cd71e246c16b30e3f396a85943d5f596202737ba
+> - revert 4f3a4f701b59a3e4b5c8503ac3d905c0a326f922
 
-There are some hardware limitation for ls1 platform, core cannot power down, so the only thing we can do here is to put it into low-power state when CPU offline. 
+Specifically, if we apply above, the "No buffer space available" error
+during continuous ping does NOT occur anymore.
+# Link to logs: https://app.box.com/s/hq04v0c0j896em9s7nql
 
-For suspend compatibility, I quote Leo's comments in last posting, "I don't think it breaks the system suspend case as tasks and interrupts have been moved out of the non-booting CPU." 
+However, after continuous and further testing, we encounter the ff. issues:
+1. Low throughput during iperf when Armada 370 device is set as iperf
+client. For example, in 1000Mbits/s, we only get below 140Mbits/s.
+Low throughput does NOT occur when device is set as iperf server instead.
+# Link to logs: https://app.box.com/s/09xes3pl2bud38hcftbq
+2. At some point, kernel will crashes and hangs, that device needs to
+be reboot again.
+# Link to logs: https://app.box.com/s/kahj81rnue6wygs7ylvd
 
-For kexec compatibility, it means we should always reset core and boots up the same path as a cold boot when CPU re-online. That's exactly what we are doing in ls1021a_reset_secondary(). I will explain it in detail below.
+If we only use bare 3.13.9 (without patches), we do NOT encounter (1)
+and (2) above, but we have the "No buffer space available" issue back
+again.
+# Link to logs: https://app.box.com/s/x2dkxomhbqor9tzun5b3
 
-> [...]
-> 
-> > +static int ls1021a_reset_secondary(unsigned int cpu) {
-> > +       u32 tmp;
-> > +
-> > +       if (!scfg_base || !dcfg_base)
-> > +               return -ENOMEM;
-> > +
-> > +       writel_relaxed(secondary_pre_boot_entry,
-> > +                       dcfg_base + DCFG_CCSR_SCRATCHRW1);
-> > +
-> > +       /* Apply LS1021A specific to write to the BE SCFG space */
-> > +       tmp = ioread32be(scfg_base + SCFG_REVCR);
-> > +       iowrite32be(0xffffffff, scfg_base + SCFG_REVCR);
-> > +
-> > +       /* Soft reset secondary core */
-> > +       iowrite32be(0x80000000, scfg_base + SCFG_CORESRENCR);
-> > +       iowrite32be(0x80000000, scfg_base +
-> > +                               SCFG_CORE0_SFT_RST + STRIDE_4B * cpu);
-> > +
-> > +       /* Release secondary core */
-> > +       iowrite32be(1 << cpu, dcfg_base + DCFG_CCSR_BRR);
-> > +
-> > +       ls1021a_set_secondary_entry();
-> > +
-> > +       /* Disable core soft reset register */
-> > +       iowrite32be(0x0, scfg_base + SCFG_CORESRENCR);
-> > +
-> > +       /* Revert back to the default */
-> > +       iowrite32be(tmp, scfg_base + SCFG_REVCR);
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int ls1021a_boot_secondary(unsigned int cpu, struct
-> > +task_struct *idle) {
-> > +       int ret = 0;
-> > +
-> > +       if (system_state == SYSTEM_RUNNING)
-> > +               ret = ls1021a_reset_secondary(cpu);
-> > +
-> > +       udelay(1);
-> > +
-> > +       arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-> > +
-> > +       return ret;
-> > +}
-> 
-> How does this interact with the pseudo-hotplug above?
-> 
-> Mark.
+If we use bare 3.13.5 (without patches), we also encounter (1) and (2)
+above, but do NOT encounter "No buffer space available" issue.
+#Just the same behavior with 3.13.9 with patches.
 
+Again we're using the ff. a "customized" board with Armada 370, not a
+"standard" one.
+We based the design on Armada 370 RD Evaluation Board, but we used
+Marvell 88E1512 as Ethernet PHY and Marvell 88F6707 as processor
+instead of the ones in the Armada 370 RD (I think it uses Marvell
+88E1310 as Ethernet PHY and Marvell 88F6W11 as processor).
 
-1) Write 1 to core soft reset register SCFG_CORE1_SFT_RST will reset the secondary core. 
-Resetting means a totally new start to secondary core, it will re-initialization(TLB, Caches, MMU) just like a cold boot.
+Please advise what could be going wrong.
+Basically, we have to fix the "No buffer space available", low
+throughput and kernel crash tendency while sticking to Linux Kernel
+3.13.x.
+We will provide the info you need or do whatever you advise us to so
+that we can hopefully debug this with you.
+# Our suppliers already created 3.13.x-compatible drivers for the
+modules we placed in our board, so we can't shift to 3.14.x (or else,
+we'll have to ask our suppliers to re-create the drivers compatible
+for 3.14.x - which would take resources in both manpower and time
+which we can't afford due to nearing market release of this product).
 
-2) The reentry address of secondary core is determined by the  DCFG_CCSR_SCRATCHRW1 register.
-Writing the secondary core reentry physic address to this register to make sure secondary core restart executing a new code section after reset. This can make sure it is compatible with kexec.
+Hoping for your consideration and assistance.
 
-3) Set the corresponding bit of DCFG_CCSR_BRR to release secondary core to re-initialize itself again. 
+Thank you very much.
 
-Zhuoyu
+Regards,
+Maggie Roxas
+
+On Thu, Jul 24, 2014 at 3:24 PM, Maggie Mae Roxas
+<maggie.mae.roxas@gmail.com> wrote:
+> Hi Willy,
+> Good day.
+>
+>> I have no idea, I remember that this code is deeply burried into the
+>> original neta code. There was also a large code for the network
+>> classifier and something like buffer management in the original
+>> Marvell's driver if my memory serves me correctly, I have no idea
+>> if these ones set up anything special.
+> I also have no idea on this.
+>
+>> Just the original ones. I have a mirabox with its original boot loader :
+>> U-Boot 2009.08 (Sep 16 2012 - 22:50:06)Marvell version: 1.1.2 NQ
+> This, I think, is a 2012_Q4 (QA) release if it's based on 2009.08.
+> We use a 2014_T1 (QA) release based on 2011.12.
+> # So we're using different boot loaders.
+>
+>> I think we could try to dump all of our respective mvneta registers and
+>> compare them, though I have very little time for this today. And if it
+>> comes from extra SoC functions like buffer management or network classifier,
+>> I have no idea how they work nor what to dump :-/
+> Yes, I think the difference in bootloaders especially on mvneta
+> registers' values matter on our difference in behavior.
+>
+> And indeed, it would take much of our time if we need to compare all
+> mvneta register dumps, and we'd need to forward those values directly
+> to a Marvell contact for more effective evaluation since it's more of
+> a hardware stuff. :-/
+>
+> In any case, since performance and Tx interrupts were both still OK on
+> us, I think it's enough.
+> We'll just inform you if we notice some irregularities.
+>
+> Thank you very much for discussing this issue with us! :-)
+>
+> Until our future discussions,
+> Maggie Roxas
+>
+> On Tue, Jul 22, 2014 at 11:16 PM, Willy Tarreau <w@1wt.eu> wrote:
+>> Hi Maggie,
+>>
+>> On Tue, Jul 22, 2014 at 07:24:35PM -0700, Maggie Mae Roxas wrote:
+>>> Hi Willy,
+>>> Good day.
+>>>
+>>> > OK so clearly the issue must be found.
+>>>
+>>> Actually we have 2 products using Armada 370.
+>>> One has only 1 ethernet port, so it is expected to act as Client only.
+>>> The other one has 2 ethernet ports, so it's more router-like.
+>>>
+>>> For the product with one port, we have checked the combination patch
+>>> and it seems like Tx IRQ is increasing so it's OK. We checked this via
+>>> /proc/interrupts and mvneta's value there changed from 500000+ to
+>>> around 900000+ after we perform a 10-iteration iperf to the server.
+>>> The throughput is also OK, we're getting around 850Mbits when we use a
+>>> 1Gbit connection, which is roughly just the same as what we've been
+>>> experiencing when we're still using 3.10.x (even 3.2.x).
+>>
+>> OK.
+>>
+>>> As for the other product with two ports, we do expect that we might be
+>>> encountering the slow performance you mentioned.
+>>> But we are not focusing on this project yet so once it's active again,
+>>> I'll let you know.
+>>>
+>>> > Just thinking about something, do you have a custom boot loader ?
+>>> > It would be possible that in our case, the Tx IRQ works only because some
+>>> > obscure or undocumented bits are set by the boot loader and that in your
+>>> > case it's not pre-initialized.
+>>>
+>>> We are indeed using a "custom" boot loader.
+>>> We are using Marvell u-boot 2014_T1.1 (latest QA release, I think).
+>>> We applied some patches to memory (since we have 1Gb DDR), some bits
+>>> and pieces for the interfaces we're going to support and not to
+>>> support, and of course our own environment variables.
+>>> As for the DDR memory/register patches, they came directly from our
+>>> Marvell contact.
+>>>
+>>> But with what I mentioned above, I think our Tx interrupt is working...?
+>>
+>> Yes, seems so.
+>>
+>>> BTW, for both products we've designed from Armada 370 RD, we didn't
+>>> use a switch. So we removed all switch-related codes in the boot
+>>> loader.
+>>> I'm not sure if not having switch affects the behavior?
+>>
+>> I have no idea, I remember that this code is deeply burried into the
+>> original neta code. There was also a large code for the network
+>> classifier and something like buffer management in the original
+>> Marvell's driver if my memory serves me correctly, I have no idea
+>> if these ones set up anything special.
+>>
+>>> How about you? May I know what boot loader you are using?
+>>
+>> Just the original ones. I have a mirabox with its original boot loader :
+>>
+>>     U-Boot 2009.08 (Sep 16 2012 - 22:50:06)Marvell version: 1.1.2 NQ
+>>     U-Boot Addressing:
+>>            Code:            00600000:006AFFF0
+>>            BSS:             006F8E40
+>>            Stack:           0x5fff70
+>>            PageTable:       0x8e0000
+>>            Heap address:    0x900000:0xe00000
+>>     Board: DB-88F6710-BP
+>>     SoC:   MV6710 A1
+>>     CPU:   Marvell PJ4B v7 UP (Rev 1) LE
+>>            CPU @ 1200Mhz, L2 @ 600Mhz
+>>            DDR @ 600Mhz, TClock @ 200Mhz
+>>            DDR 16Bit Width, FastPath Memory Access
+>>     PEX 0: Detected No Link.
+>>     PEX 1: Root Complex Interface, Detected Link X1
+>>     DRAM:   1 GB
+>>            CS 0: base 0x00000000 size 512 MB
+>>            CS 1: base 0x20000000 size 512 MB
+>>            Addresses 14M - 0M are saved for the U-Boot usage.
+>>     NAND:  1024 MiB
+>>     Bad block table found at page 262016, version 0x01
+>>     Bad block table found at page 261888, version 0x01
+>>     FPU not initialized
+>>     USB 0: Host Mode
+>>     USB 1: Host Mode
+>>     Modules/Interfaces Detected:
+>>            RGMII0 Phy
+>>            RGMII1 Phy
+>>            PEX0 (Lane 0)
+>>            PEX1 (Lane 1)
+>>     phy16= 72
+>>     phy16= 72
+>>     MMC:   MRVL_MMC: 0
+>>     Net:   egiga0 [PRIME], egiga1
+>>     Hit any key to stop autoboot:  0
+>>
+>>> > LTS would probably even interest your customer as it's an LTS version.
+>>> > In this case, always pick the most recent one (3.14.12 today). You may
+>>> > even be interested in 3.15.6 which contains another phy fix supposed to
+>>> > fix cd71e2, but if you're saying that it doesn't change anything for you
+>>> > I guess it will have no effet (might be worth testing for the purpose of
+>>> > helping troubleshooting though).
+>>>
+>>> Thank you for this advise, we'll take note of this.
+>>> We plan to stick on using LTS from now on, as much as possible.
+>>>
+>>> > OK. I still have a hard time imagining how hardware itself could prevent
+>>> > an IRQ from being delivered from a NIC which is located inside the SoC,
+>>> > but there must be an explanation somewhere :-/
+>>> I also would like to know how. :-/
+>>> But maybe it's our difference in boot loader as you speculated.
+>>
+>> I think we could try to dump all of our respective mvneta registers and
+>> compare them, though I have very little time for this today. And if it
+>> comes from extra SoC functions like buffer management or network classifier,
+>> I have no idea how they work nor what to dump :-/
+>>
+>> Regards,
+>> Willy
+>>
