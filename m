@@ -1,123 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Dec 2014 15:02:40 +0000
-Subject: [PATCH 3.18-rc3 v9 5/5] arm: smp: Handle ipi_cpu_backtrace()
- using FIQ (if available)
-In-Reply-To: <5910085.Y47hdorDAO@dabox>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1633306.naE1qIcAOt@dabox>
- <20141201103832.GX3836@n2100.arm.linux.org.uk>
- <5910085.Y47hdorDAO@dabox>
-Message-ID: <20141201150240.GF3836@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 1 Dec 2014 15:05:04 +0000
+Subject: [PATCH v5 0/8] Introduce automatic DMA configuration for IOMMU
+ masters
+In-Reply-To: <2496335.D95hVHbola@wuerfel>
+References: <1417181386-18142-1-git-send-email-will.deacon@arm.com>
+ <2496335.D95hVHbola@wuerfel>
+Message-ID: <20141201150503.GG18466@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 02:54:10PM +0100, Tim Sander wrote:
-> Hi Russell
-> 
-> Am Montag, 1. Dezember 2014, 10:38:32 schrieb Russell King - ARM Linux:
-> > That whole paragraph doesn't make much sense to me.
+On Mon, Dec 01, 2014 at 01:52:57PM +0000, Arnd Bergmann wrote:
+> On Friday 28 November 2014 13:29:38 Will Deacon wrote:
+> > Here is v5 of the patches I've previously sent here:
 > > 
-> > Look, in my mind it is very simple.  If you are using CONFIG_FIQ on a
-> > SMP platform, your life will be very difficult.  The FIQ code enabled
-> > by that symbol is not designed to be used on SMP systems, *period*.
->
-> Well the only extra thing you had to do is set up the FIQ registers on every 
-> cpu, but i would not call that very difficult. Other than that i am not
-> aware of any problems that are not also present on a uniprocessor system.
-> So i have a hard time following your reasoning why SMP is different from
-> UP in regard to the CONFIG_FIQ.
-
-One of the things which FIQ handlers can do is they have their own private
-registers which they can modify on each invocation of the FIQ handler -
-for example, as a software DMA pointer.
-
-Each CPU has its own private set of FIQ registers, so merely copying the
-registers to each CPU will only set their initial state: updates by one
-CPU to the register set will not be seen by a different CPU.
-
-> > If you decide to enable CONFIG_FIQ, and you use that code on a SMP
-> > platform, I'm going to say right now so it's totally clear: if you
-> > encounter a problem, I don't want to know about it.  The code is not
-> > designed for use on that situation.
-> Even with using the FIQ on a Linux SMP system you have not heard from me 
-> before, as i knew that this is not your problem (and that is not to say that 
-> there where none!). The only interface Linux has been making available is 
-> set_fiq_handler. So it was clear that the FIQ is its own domain otherwise 
-> untouched by the kernel.
-
-Correct, because FIQs have very little use in Linux.  They have been used
-in the past to implement:
-- software DMA to floppy disk controllers (see arch/arm/lib/floppydma.S)
-- audio DMA (arch/arm/mach-imx/ssi-fiq.S)
-- s2c24xx SPI DMA (drivers/spi/spi-s3c24xx-fiq.S)
-- Keyboard (yes, how that qualifies for FIQ I don't know
-  (arch/arm/mach-omap1/ams-delta-fiq-handler.S)
-
-The first three do exactly what I describe above, and none of these users
-are SMP platforms.  Hence, the FIQ code which we currently have does exactly
-what we need it to for the platforms we have.
-
-Now, you're talking about using this in a SMP context - that's a totally
-new use for this code which - as I have said several times now - is not
-really something that this code is intended to support.
-
-> And i really don't get it, that neither ARM nor the kernel community
-> sees fast interrupts as a worthwhile usecase. Unfortunatly the interrupt
-> latencies with Linux are at least a order of magnitude higher than the
-> pure hardware even with longer pipelines can deliver. 
-
-First point: fast interrupts won't be fast if you load them up with all
-the interrupt demux and locking that normal interrupts have; if you
-start doing that, then you end up having to make /all/ IRQ-safe locks
-in the kernel not only disable normal interrupts, but also disable the
-FIQs as well.
-
-At that point, FIQs are no longer "fast" - they will be subject to
-exactly the same latencies as normal interrupts.
-
-Second point: we have embraced FIQs where it is appropriate to do so,
-but within the restrictions that FIQs present - that is, to keep them
-fast, we have to avoid the problem in the first point above, which
-means normal C code called from FIQs /can't/ take any kernel lock what
-so ever without potentially causing a deadlock.
-
-Even if you think you can (why would UP have locks if it's not SMP)
-debugging facilities such as the lock validator will bite you if you
-try taking a lock in FIQ context which was already taken in the parent
-context.
-
-Third point: FIQs are not available on a lot of ARM platforms.  Hardware
-which routes interrupts to FIQs is very limited, normally it's only a
-few interrupts which appear there.  Moreover, with more modern platforms
-where the kernel runs in the non-secure side, FIQs are /totally/ and
-/completely/ unavailable there - FIQs are only available for the secure
-monitor to use.
-
-> > No.  With a single zImage kernel, you could very well have SMP and FIQ
-> > both enabled, but have a non-SMP platform using FIQ, but also support
-> > SMP platforms as well.  Your change prevents that happening.
+> >   RFCv1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/283023.html
+> >   RFCv2: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/283752.html
+> >   RFCv3: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/287031.html
+> >   RFCv4: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/302711.html
+> > 
+> > Changes since RFCv4 include:
+> > 
+> >   - Dropped the RFC tag, since has been used by a couple of people now
+> > 
+> >   - Dropped the DMA segment configuration from of_dma_configure, as there
+> >     appear to be assumptions about 64k segments elsewhere in the kernel
+> > 
+> >   - Added acks/tested-bys (thanks to everybody who reviewed the series)
+> > 
+> >   - A few small fixes for issues found by Marek
+> > 
+> > Arnd: Is this too late for 3.19? We could merge the first 6 patches
+> > with no issues, since there aren't any callers of of_iommu_init
+> > without patch 7 anyway.
+> > 
+> > Up to you.
 > 
-> Ah, well i have to get used to this "new" devicetree thingy, where one size 
-> fits all...
+> I think this looks great overall. My only feedback is the exact same
+> comment that Joerg already made:
+> 
+> On Friday 28 November 2014 14:03:36 jroedel at suse.de wrote:
+> > Hmm, I don't like the idea of storing private data in iommu_ops. But
+> > given that this is already an improvement we can build on later, here is
+> > my
+> > 
+> >         Acked-by: Joerg Roedel <jroedel@suse.de>
+> > 
+> > To further improve this we should probably introduce a seperate
+> > iommu-descriptor data-structure later which then describes a single
+> > hardware iommu device.
+> 
+> so I second that and add my
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-No, you're conflating different things there.  It doesn't have much
-to do with DT vs non-DT, because this same problem existed before DT
-came along, since there were platforms which could be both UP and SMP.
+Yup, I'll take a look at that as part of a separate series, since I really
+want to have different pgsize_bitmaps anyway.
 
-> Still if you boot a single process system which has FIQ available and has a 
-> GIC with such a kernel, then you also reprogramm the IPI's as FIQs. But i 
-> guess thats not a problem as Linux does not self IPI the kernel as other os'es
-> do?
+> Now, who should merge this series? I think someone should put all eight
+> patches into linux-next now, and if something goes wrong with the last
+> two, then we skip them for 3.19.
 
-I'm really sorry, but your above paragraph doesn't make much sense to me.
-"single process system" - if there's only one process, there's no point
-having a scheduler (it has nothing to schedule) and so I guess you're
-not talking about Linux there.
+I think it makes most sense to go via arm-soc, but we'd need rmk's ack
+on the last two patches.
 
-Or do you mean "single processor system" (in other words, uniprocessor or
-UP).  In that case, the kernel doesn't use IPIs, because, by definition,
-there's no other processors for it to signal to.
+Russell, are you ok with that plan?
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Will
