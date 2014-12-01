@@ -1,54 +1,30 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon,  1 Dec 2014 14:24:58 +0100
-Subject: [PATCH v5 7/7] ARM: zynq: DT: Add OCM controller node
-In-Reply-To: <cover.1417440250.git.michal.simek@xilinx.com>
-References: <cover.1417440250.git.michal.simek@xilinx.com>
-Message-ID: <897eae026fb7f601dd453941f178fae534ac7216.1417440250.git.michal.simek@xilinx.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 1 Dec 2014 14:24:40 +0100
+Subject: [PATCH 4/4] ARM: at91/defconfig: add DM9000 to at91_dt
+In-Reply-To: <eb931e7c5534cd949ba61307f0380826e62ceb2c.1417440150.git.nicolas.ferre@atmel.com>
+References: <eb931e7c5534cd949ba61307f0380826e62ceb2c.1417440150.git.nicolas.ferre@atmel.com>
+Message-ID: <a810207c369c57acefc5624ff7dfeb4d92de52ff.1417440150.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the on-chip-memory controller node to the Zynq devicetree.
+This chip is present on at91sam9261ek board: add it to the at91_dt_defconfig.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
+ arch/arm/configs/at91_dt_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes in v5: None
-Changes in v4:
-- Use memory-controller at ... instead of ocmc at ...
-
-Changes in v3:
-- Extract from OCM driver
-
-Changes in v2: None
-
- arch/arm/boot/dts/zynq-7000.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index 24036c440440..040f95e817c8 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -151,6 +151,13 @@
- 			reg = <0xf8006000 0x1000>;
- 		} ;
-
-+		ocmc: memory-controller at f800c000 {
-+			compatible = "xlnx,zynq-ocmc-1.0";
-+			interrupt-parent = <&intc>;
-+			interrupts = <0 3 4>;
-+			reg = <0xf800c000 0x1000>;
-+		};
-+
- 		uart0: serial at e0000000 {
- 			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
- 			status = "disabled";
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/2d01ca48/attachment.sig>
+diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+index 6ccf937a60f2..a67375f24b21 100644
+--- a/arch/arm/configs/at91_dt_defconfig
++++ b/arch/arm/configs/at91_dt_defconfig
+@@ -80,6 +80,7 @@ CONFIG_BLK_DEV_SD=y
+ CONFIG_NETDEVICES=y
+ CONFIG_MACB=y
+ # CONFIG_NET_VENDOR_BROADCOM is not set
++CONFIG_DM9000=y
+ # CONFIG_NET_VENDOR_FARADAY is not set
+ # CONFIG_NET_VENDOR_INTEL is not set
+ # CONFIG_NET_VENDOR_MARVELL is not set
+-- 
+2.1.3
