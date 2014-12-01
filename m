@@ -1,58 +1,94 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Dec 2014 17:26:27 +0100
-Subject: [PATCH v3 05/11] memory: add Atmel EBI (External Bus Interface)
- driver
-In-Reply-To: <1417429647-3419-6-git-send-email-boris.brezillon@free-electrons.com>
-References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
- <1417429647-3419-6-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <4214030.Z2iCEM6hVA@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 1 Dec 2014 16:30:13 +0000
+Subject: [PATCH v7 0/5] ARM64: Add support for FSL's LS2085A SoC
+In-Reply-To: <1417443442-17444-1-git-send-email-bhupesh.sharma@freescale.com>
+References: <1417443442-17444-1-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <20141201163013.GA22708@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 December 2014 11:27:21 Boris Brezillon wrote:
-> The EBI (External Bus Interface) is used to access external peripherals
-> (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> Each device is assigned a CS line and an address range and can have its
-> own configuration (timings, access mode, bus width, ...).
-> This driver provides a generic DT binding to configure a device according
-> to its requirements.
-> For specific device controllers (like the NAND one) the SMC timings
-> should be configured by the controller driver through the matrix and
-> smc syscon regmaps.
+Hi Bhupesh,
 
-Nice!
+The series looks mostly fine to me, though I have a couple of comments
+below.
 
-> +
-> +#define AT91_EBICSA_REGFIELD(soc)			\
-> +	REG_FIELD(soc ## _MATRIX_EBICSA_OFF, 0,		\
-> +		  AT91_MATRIX_EBI_NUM_CS - 1)
-> +
-> +#define AT91_MULTI_EBICSA_REGFIELD(soc, n)		\
-> +	REG_FIELD(soc ## _MATRIX_EBI ## n ## CSA_OFF,	\
-> +		  0, AT91_MATRIX_EBI_NUM_CS - 1)
+On Mon, Dec 01, 2014 at 02:17:17PM +0000, Bhupesh Sharma wrote:
+> This patchset adds the support for FSL's LS2085A SoC which is based on
+> ARMv8 architecture.
+> 
+> This patchset also has patches which address DT compatible strings for
+> nodes which appear un-documented.
+> 
+> The enable-method for the CPU nodes is left for the bootloader (u-boot or UEFI)
+> to patch-up which is expected to be PSCI v0.2
+> 
+> This patchset has been tested with the following patches which add PSCI
+> v0.2 support in ARMv8 u-boot:
+> http://patchwork.ozlabs.org/patch/383556/
+> http://patchwork.ozlabs.org/patch/383555/
+> http://patchwork.ozlabs.org/patch/383557/
+> http://patchwork.ozlabs.org/patch/383558/
+> http://patchwork.ozlabs.org/patch/383559/
+> http://patchwork.ozlabs.org/patch/383560/
+> http://patchwork.ozlabs.org/patch/383561/
+> http://patchwork.ozlabs.org/patch/383562/
 
-I don't like the use macros that concatenate symbol names like
-this. Why not do either
+Has there been any progress on these? last I saw there was some pending
+rework, and I was holding off a thorough review of the PSCI parts until
+that had happened.
 
-- open-code the macro contents in the few uses, to allow
-  grepping for them, or
+> 
+> Rebased against cleanup/dts-subdirs branch of the arm-soc tree
+> 
+> Changes from v6:
+> ----------------
+> * Rebased against cleanup/dts-subdirs branch of the arm-soc tree.
+> * As a result, [PATCH 4/6] and [PATCH 5/6] of the v6 series are squashed
+>   into one patch ([PATCH 4/5] of this series).
+> 
+> Note:
+> -----
+> Optional GIC-500 regs like GICC, GICH and GICV are currently
+> not tested and hence are not part of the DTS patch.
+> 
+> Please review and consider for merge.
+> 
+> Bhupesh Sharma (5):
+>   Documentation: DT: Add bindings for FSL NS16550A UART
 
-- put the register number in the syscon reference and look it
-  up from there (this would be slightly more complicated for the
-  second macro)
+Regardless of anything else, this patch should be queued given it adds
+missing documentation for a binding already supported by the kernel.
 
-> +
-> +	np = of_parse_phandle(pdev->dev.of_node, "atmel,smc", 0);
-> +	if (!np)
-> +		return -EINVAL;
-> +
-> +	ebi->smc = syscon_node_to_regmap(np);
-> +	if (IS_ERR(ebi->smc))
-> +		return PTR_ERR(ebi->smc);
+>   Documentation: DT: Add entry for FSL LS2085A SoC and Simulator model
+>   Documentation: DT: Add entry for FSL Management Complex
 
-I think this and the second instance of it can be shortened to
+Are there any patches adding support for the management complex? There's
+nothing in mainline that uses "fsl,qoriq-mc", and nothing in this series
+adds support.
 
-	ebi->smc = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "atmel,smc");
+Thanks,
+Mark.
 
-
-	Arnd
+>   arm64: Add DTS support for FSL's LS2085A SoC
+>   arm64: Add support for FSL's LS2085A SoC in Kconfig and defconfig
+> 
+>  Documentation/devicetree/bindings/arm/fsl.txt      |    8 +
+>  .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |   40 +++++
+>  .../devicetree/bindings/serial/of-serial.txt       |   12 ++
+>  arch/arm64/Kconfig                                 |    5 +
+>  arch/arm64/boot/dts/Makefile                       |    1 +
+>  arch/arm64/boot/dts/{ => freescale}/Makefile       |    4 +-
+>  arch/arm64/boot/dts/freescale/fsl-ls2085a-simu.dts |   65 ++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi     |  163 ++++++++++++++++++++
+>  arch/arm64/configs/defconfig                       |    1 +
+>  9 files changed, 296 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+>  copy arch/arm64/boot/dts/{ => freescale}/Makefile (54%)
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2085a-simu.dts
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+> 
+> -- 
+> 1.7.9.5
+> 
+> 
+> 
