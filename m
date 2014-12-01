@@ -1,38 +1,40 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 1 Dec 2014 15:37:48 -0800
-Subject: [PATCH] mtd: gpmi: properly handle bitflips in erased pages
-In-Reply-To: <20141201211818.4e97f2e2@bbrezillon>
-References: <1417461159-2972-1-git-send-email-boris.brezillon@free-electrons.com>
- <20141201194139.GI21347@ld-irv-0074>
- <20141201211818.4e97f2e2@bbrezillon>
-Message-ID: <20141201233748.GJ21347@ld-irv-0074>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue,  2 Dec 2014 02:47:22 +0300
+Subject: [PATCH v2 0/4] ARM: sa100: use pxa_timer clocksource driver
+Message-ID: <1417477646-14278-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 09:18:18PM +0100, Boris Brezillon wrote:
-> On Mon, 1 Dec 2014 11:41:39 -0800 Brian Norris <computersforpeace@gmail.com> wrote:
-> > On Mon, Dec 01, 2014 at 08:12:39PM +0100, Boris Brezillon wrote:
-> > > Brian, I really like the idea of having a generic implementation for this
-> > > feature (using read_page_raw) as you suggested here [1], but this implies
-> > > having a temporary buffer to store the page read in raw mode and keep the page
-> > > read in normal (HW ECC engine eanbled) mode, and I'm not sure we want to
-> > > allocate more buffers than we already have.
-> > 
-> > Why does this require an additional buffer? If we've already noticed an
-> > ECC error, we're expected to return raw data anyway, so what's the
-> > problem with clobbering the original data with a raw version of the
-> > data?
-> 
-> Well in the GPMI particular case (and more generally all NAND
-> controllers which do not support subpage write) this is true, but if you
-> can do subpage write, then you might have a bit flip in a specific
-> chunk which is still empty, while other chunks are written and are
-> expecting standard ECC correction.
-> In this case you want to keep the 3 chunks with  standard ECC correction
-> and only one in raw mode with 'erased page bitflips' fixed.
+This is a second iteration of this patch series. Changes since V1:
+ - Added OSTIMER0 clock as requested by pxa_timer code.
 
-So the problem's not really with subpage write, exactly; the problem is
-for drivers that support subpage write, we don't have a way to perform a
-raw subpage read without touching the other subpages.
 
-Brian
+Thomas has previously blessed that this patchset can go through arm-soc.
+
+The following changes since commit 0df1f2487d2f0d04703f142813d53615d62a1da4:
+
+  Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/dbaryshkov/zaurus.git sa1100-clksrc
+
+for you to fetch changes up to 261fcd132d124b3700ff0b61112fb1b853028901:
+
+  ARM: sa1100: use pxa_timer clocksource driver (2014-12-02 02:42:28 +0300)
+
+----------------------------------------------------------------
+Dmitry Eremin-Solenikov (4):
+      clocksource: enable pxa_timer for SA-1100 platform
+      ARM: sa1100: implement clk_get_rate
+      ARM: sa1100: provide OSTIMER0 clock for pxa_timer
+      ARM: sa1100: use pxa_timer clocksource driver
+
+ arch/arm/mach-sa1100/Makefile  |   2 +-
+ arch/arm/mach-sa1100/clock.c   |  17 ++++-
+ arch/arm/mach-sa1100/generic.c |   6 ++
+ arch/arm/mach-sa1100/time.c    | 139 -----------------------------------------
+ drivers/clocksource/Kconfig    |   6 ++
+ drivers/clocksource/Makefile   |   2 +-
+ 6 files changed, 30 insertions(+), 142 deletions(-)
+ delete mode 100644 arch/arm/mach-sa1100/time.c
