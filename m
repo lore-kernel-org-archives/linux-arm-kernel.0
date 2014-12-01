@@ -1,63 +1,151 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 1 Dec 2014 11:44:32 +0000
-Subject: [PATCH] irqchip: gic: Allow interrupt level to be set for PPIs.
-In-Reply-To: <20141201112302.GC3836@n2100.arm.linux.org.uk>
-References: <1417197340-27298-1-git-send-email-Liviu.Dudau@arm.com>
- <20141201104145.GY3836@n2100.arm.linux.org.uk>
- <20141201104612.GM828@e106497-lin.cambridge.arm.com>
- <20141201110358.GA3836@n2100.arm.linux.org.uk>
- <547C4ECD.20802@arm.com>
- <20141201112302.GC3836@n2100.arm.linux.org.uk>
-Message-ID: <20141201114432.GP828@e106497-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 1 Dec 2014 11:47:17 +0000
+Subject: [PATCH v2 2/8] mfd: MT6397: Add support for PMIC MT6397 MFD
+In-Reply-To: <1417146874-5232-3-git-send-email-flora.fu@mediatek.com>
+References: <1417146874-5232-1-git-send-email-flora.fu@mediatek.com>
+ <1417146874-5232-3-git-send-email-flora.fu@mediatek.com>
+Message-ID: <20141201114717.GD15845@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 11:23:02AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 01, 2014 at 11:19:41AM +0000, Marc Zyngier wrote:
-> > Hi Russell,
-> > 
-> > On 01/12/14 11:03, Russell King - ARM Linux wrote:
-> > > If all you want to do is to bypass the following check, what's wrong
-> > > with actually doing that:
-> > > 
-> > > -	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
-> > > +	if (gicirq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
-> > > +	    type != IRQ_TYPE_EDGE_RISING)
-> > > 		return -EINVAL;
-> > > 
-> > 
-> > I think that will require some additional changes to gic_configure_irq
-> > (in irq-gic-common.c).
-> 
-> I don't think so - gic_configure_irq() will treat it as a no-op as far
-> as trying to configure the IRQ settings.
-
-Doesn't that assume then that reset value is correct for the type that
-we are trying to program the PPIs?
-
-This is all very academic, as I don't have any real example of a GIC doing
-this, but ...
-
- - if the PPI is set at reset value to be level triggered
- - and we want to set PPIx to be level LOW triggered
-
-with your proposed patch the change will not happen, right?
-
-Best regards,
-Liviu
+On Fri, 28 Nov 2014, Flora Fu wrote:
 
 > 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
+> Add core files for MT6397 MFD driver.
 > 
+> Signed-off-by: Flora Fu <flora.fu@mediatek.com>
+> ---
+>  drivers/mfd/Kconfig                  |  10 +
+>  drivers/mfd/Makefile                 |   1 +
+>  drivers/mfd/mt6397-core.c            |  84 ++++++++
+>  include/linux/mfd/mt6397/core.h      |  23 +++
+>  include/linux/mfd/mt6397/registers.h | 362 +++++++++++++++++++++++++++++++++++
+>  5 files changed, 480 insertions(+)
+>  create mode 100644 drivers/mfd/mt6397-core.c
+>  create mode 100644 include/linux/mfd/mt6397/core.h
+>  create mode 100644 include/linux/mfd/mt6397/registers.h
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 1456ea7..f0b3efc 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -1318,6 +1318,16 @@ config MFD_STW481X
+>  	  in various ST Microelectronics and ST-Ericsson embedded
+>  	  Nomadik series.
+>  
+> +config MFD_MT6397
+> +	tristate "MediaTek MT6397 PMIC Support"
+> +	select MFD_CORE
+> +	select IRQ_DOMAIN
+> +	help
+> +	  Say yes here to add support for MediaTek MT6397 PMIC. This is
+> +	  a Power Management IC. This driver provides common support for
+> +	  accessing the device; additional drivers must be enabled in order
+> +	  to use the functionality of the device.
+> +
+>  menu "Multimedia Capabilities Port drivers"
+>  	depends on ARCH_SA1100
+>  
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index 8bd54b1..7168193 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -177,3 +177,4 @@ obj-$(CONFIG_MFD_HI6421_PMIC)	+= hi6421-pmic-core.o
+>  
+>  intel-soc-pmic-objs		:= intel_soc_pmic_core.o intel_soc_pmic_crc.o
+>  obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
+> +obj-$(CONFIG_MFD_MT6397)	+= mt6397-core.o
+> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+> new file mode 100644
+> index 0000000..d1a6913
+> --- /dev/null
+> +++ b/drivers/mfd/mt6397-core.c
+> @@ -0,0 +1,84 @@
+> +/*
+> + * Copyright (c) 2014 MediaTek Inc.
+> + * Author: Flora Fu <flora.fu@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/mfd/mt6397/core.h>
+> +#include <linux/soc/mediatek/mtk-pmic-wrap.h>
+> +
+> +static const struct mfd_cell mt6397_devs[] = {
+> +	{ .name = "mt6397-rtc" },
+> +	{ .name = "mt6397-regulator" },
+> +	{
+> +		.name = "mt6397-codec",
+> +		.of_compatible = "mediatek,mt6397-codec"
+> +	},
+> +};
+> +
+> +static int mt6397_probe(struct platform_device *pdev)
+> +{
+> +	u32 ret;
+> +	struct mt6397_chip *mt6397;
+> +	struct pmic_wrapper *wrp;
+> +
+> +	/* mt6397 MFD is child device of soc pmic wrapper. */
+> +	wrp = dev_get_drvdata(pdev->dev.parent);
+
+You might want to check this prior to dereferencing it.
+
+> +	mt6397 = devm_kzalloc(&pdev->dev,
+> +			sizeof(*mt6397), GFP_KERNEL);
+
+Why is this wrapped?
+
+> +	if (!mt6397)
+> +		return -ENOMEM;
+> +
+> +	mt6397->dev = &pdev->dev;
+
+Is this used else where?  If not, I think you can remove it.
+
+> +	mt6397->regmap = wrp->regmap;
+> +	platform_set_drvdata(pdev, mt6397);
+
+Then you can platform_set_drvdata(pdev, regmap);
+
+Although I don't see this being used either.  Is it used in the child
+devices?
+
+> +	ret = mfd_add_devices(mt6397->dev, -1, &mt6397_devs[0],
+> +			ARRAY_SIZE(mt6397_devs), NULL, 0, NULL);
+> +	if (ret)
+> +		dev_err(mt6397->dev, "failed to add child devices: %d\n", ret);
+> +
+> +	return ret;
+> +}
+> +
+> +static int mt6397_remove(struct platform_device *pdev)
+> +{
+> +	struct mt6397_chip *mt6397 = platform_get_drvdata(pdev);
+
+No need for this.
+
+> +	mfd_remove_devices(mt6397->dev);
+
+Just use &pdev->dev, as you did when you registered.
+
+> +	return 0;
+> +}
+
+[...]
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
