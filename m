@@ -1,90 +1,45 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Mon, 1 Dec 2014 14:34:12 +0100
-Subject: [PATCH 0/5] Improve PSCI system events and fix reboot bugs
-In-Reply-To: <1417113660-23610-1-git-send-email-christoffer.dall@linaro.org>
-References: <1417113660-23610-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20141201133411.GA5953@hawk.usersys.redhat.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 01 Dec 2014 13:35:25 +0000
+Subject: [RFC V1 0/8] CPUFreq: create platform-dev for DT based cpufreq
+ drivers
+In-Reply-To: <CAKohpo=EPOH-WJ4mmAr-1BzzAEpvC-F0Y99Ox_yL7meUcRNx6Q@mail.gmail.com>
+References: <cover.1417433163.git.viresh.kumar@linaro.org>	<7885354.QleDlR7NUO@wuerfel>
+ <CAKohpo=EPOH-WJ4mmAr-1BzzAEpvC-F0Y99Ox_yL7meUcRNx6Q@mail.gmail.com>
+Message-ID: <547C6E9D.2090205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 07:40:55PM +0100, Christoffer Dall wrote:
-> Several people have reported problems with rebooting ARM VMs, especially
-> on 32-bit ARM.  This is mainly due to the same reason we were seeing
-> boot errors in the past, namely that the ram, dcache, and icache weren't
-> coherent on guest boot with the guest (stage-1) MMU disabled.  We solved
-> this by ensuring coherency when we fault in pages, but since most memory
-> is already mapped after a reboot, we don't do anything.
-> 
-> The solution is to unmap the regular RAM on system events, but we must
-> take care to not unmap the GIC or other IO regions, hence the somehwat
-> complicated solution.
-> 
-> As part of figuring this out, it became clear that some semantics around
-> the KVM_ARM_VCPU_INIT ABI and system event ABI was unclear (what is
-> userspace expected to do when it receives a system event).  This series
-> also clarifies the ABI and changes the kernel functionality to do what
-> userspace expects (turn off VCPUs on a system shutdown event).
-> 
-> The code is avaliable here as well:
-> http://git.linaro.org/people/christoffer.dall/linux-kvm-arm.git vcpu_init_fixes
-> 
-> There is an alternative version with more code reuse for what is patch 4
-> in this series available here:
-> http://git.linaro.org/people/christoffer.dall/linux-kvm-arm.git vcpu_init_fixes-alternative
-> 
-> See patch 4 for more info on this one.
-> 
-> Testing
-> -------
-> This has been tested on CubieBoard, Arndale, TC2, and Juno.  On Arndale
-> and TC2 it was extremely easy to reproduce the setup (just start a VM
-> that runs reboot from /etc/rc.local or similar) and this series clearly
-> fixes the behavior.
 
-We've also seen reboots leading to a stuck vcpu. It appeared to be 100%
-reproducible on a freshly installed guest (first reboot after running
-the installer), and then intermittently afterwards. I've just tested
-this patch series, and it appears to resolve the issue. No stuck vcpu
-after install, and a reboot loop has been running for a while now. I'm
-testing on a mustang. If you like, feel free to add a
 
-Tested-by: Andrew Jones <drjones@redhat.com>
+On 01/12/14 13:29, Viresh Kumar wrote:
+> On 1 December 2014 at 18:24, Arnd Bergmann <arnd@arndb.de> wrote:
+>> Thanks a lot for working on this, we really need to figure it out one day!
+>
+> :)
+>
+>> Your patches seem well-implemented, so if everybody thinks the general
+>> approach is the best solution, we should do that. From my point of view,
+>> there are two things I would do differently:
+>>
+>> - In the DT binding, I would strongly prefer anything but the root compatible
+>>    property as the key for the new platforms. Clearly we have to keep using
+>>    it for the backwards-compatibility case, as you do, but I think there
+>>    are more appropriate places to put it. Sorting from most favorite to least
+>>    favorite, my list would be:
+>>          1. a new property in /cpus/
+>>          2. a new property each /cpus/cpu at ... node.
+>
+> I did it this way earlier and named it dvfs-method but probably putting this
+> into the /cpus/ node is far better. But then Sudeep asked to utilize
+> compatible property only..
+>
+> Are you fine with the name here? "dvfs-method"
+>
 
-drew
+That's right, I don't like driver specific method in the cpu node as you
+initially did. But if it's a property in the chosen node (where we
+usually put the Linux specific properties), I am fine with
+that as Arnd has illustrated in his patch.
 
-> 
-> On Juno we occasionally see lockups of reboot, but I see this both with
-> and without this series.  I have run a VM in a loop where the guest
-> shuts itself down (same code path) a couple of hundred times without
-> seeing any issues, so I think it's safe to merge this and further
-> investigate the Juno reboot issue.
-> 
-> 
-> Christoffer Dall (5):
->   arm/arm64: KVM: Correct KVM_ARM_VCPU_INIT power off option
->   arm/arm64: KVM: Reset the HCR on each vcpu when resetting the vcpu
->   arm/arm64: KVM: Clarify KVM_ARM_VCPU_INIT ABI
->   arm/arm64: KVM: Introduce stage2_unmap_vm
->   arm/arm64: KVM: Turn off vcpus and flush stage-2 pgtables on sytem
->     exit events
-> 
->  Documentation/virtual/kvm/api.txt    | 10 +++++-
->  arch/arm/include/asm/kvm_emulate.h   |  5 +++
->  arch/arm/include/asm/kvm_mmu.h       |  1 +
->  arch/arm/kvm/arm.c                   |  4 +++
->  arch/arm/kvm/guest.c                 |  1 -
->  arch/arm/kvm/mmu.c                   | 65 ++++++++++++++++++++++++++++++++++++
->  arch/arm/kvm/psci.c                  | 18 ++++++++++
->  arch/arm64/include/asm/kvm_emulate.h |  5 +++
->  arch/arm64/include/asm/kvm_host.h    |  1 +
->  arch/arm64/include/asm/kvm_mmu.h     |  1 +
->  arch/arm64/kvm/guest.c               |  1 -
->  11 files changed, 109 insertions(+), 3 deletions(-)
-> 
-> -- 
-> 2.1.2.330.g565301e.dirty
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+Regards,
+Sudeep
