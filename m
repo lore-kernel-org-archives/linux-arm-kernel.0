@@ -1,78 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  1 Dec 2014 16:25:09 +0000
-Subject: [PATCH] ARM: imx: irq: fix buggy usage of irq_data irq field
-Message-ID: <1417451109-30276-1-git-send-email-marc.zyngier@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Dec 2014 17:26:27 +0100
+Subject: [PATCH v3 05/11] memory: add Atmel EBI (External Bus Interface)
+ driver
+In-Reply-To: <1417429647-3419-6-git-send-email-boris.brezillon@free-electrons.com>
+References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1417429647-3419-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <4214030.Z2iCEM6hVA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mach-imx directly references to the irq field in
-struct irq_data, and uses this to directly poke hardware register.
+On Monday 01 December 2014 11:27:21 Boris Brezillon wrote:
+> The EBI (External Bus Interface) is used to access external peripherals
+> (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+> Each device is assigned a CS line and an address range and can have its
+> own configuration (timings, access mode, bus width, ...).
+> This driver provides a generic DT binding to configure a device according
+> to its requirements.
+> For specific device controllers (like the NAND one) the SMC timings
+> should be configured by the controller driver through the matrix and
+> smc syscon regmaps.
 
-But irq is the *virtual* irq number, something that has nothing
-to do with the actual HW irq (stored in the hwirq field). And once
-we put the stacked domain code in action, the whole thing explodes,
-as these two values are *very* different.
+Nice!
 
-Just replacing all instances of irq with hwirq fixes the issue.
+> +
+> +#define AT91_EBICSA_REGFIELD(soc)			\
+> +	REG_FIELD(soc ## _MATRIX_EBICSA_OFF, 0,		\
+> +		  AT91_MATRIX_EBI_NUM_CS - 1)
+> +
+> +#define AT91_MULTI_EBICSA_REGFIELD(soc, n)		\
+> +	REG_FIELD(soc ## _MATRIX_EBI ## n ## CSA_OFF,	\
+> +		  0, AT91_MATRIX_EBI_NUM_CS - 1)
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-imx/gpc.c | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+I don't like the use macros that concatenate symbol names like
+this. Why not do either
 
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index 82ea74e..1455829 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -56,14 +56,14 @@ void imx_gpc_post_resume(void)
- 
- static int imx_gpc_irq_set_wake(struct irq_data *d, unsigned int on)
- {
--	unsigned int idx = d->irq / 32 - 1;
-+	unsigned int idx = d->hwirq / 32 - 1;
- 	u32 mask;
- 
- 	/* Sanity check for SPI irq */
--	if (d->irq < 32)
-+	if (d->hwirq < 32)
- 		return -EINVAL;
- 
--	mask = 1 << d->irq % 32;
-+	mask = 1 << d->hwirq % 32;
- 	gpc_wake_irqs[idx] = on ? gpc_wake_irqs[idx] | mask :
- 				  gpc_wake_irqs[idx] & ~mask;
- 
-@@ -97,12 +97,12 @@ void imx_gpc_irq_unmask(struct irq_data *d)
- 	u32 val;
- 
- 	/* Sanity check for SPI irq */
--	if (d->irq < 32)
-+	if (d->hwirq < 32)
- 		return;
- 
--	reg = gpc_base + GPC_IMR1 + (d->irq / 32 - 1) * 4;
-+	reg = gpc_base + GPC_IMR1 + (d->hwirq / 32 - 1) * 4;
- 	val = readl_relaxed(reg);
--	val &= ~(1 << d->irq % 32);
-+	val &= ~(1 << d->hwirq % 32);
- 	writel_relaxed(val, reg);
- }
- 
-@@ -112,12 +112,12 @@ void imx_gpc_irq_mask(struct irq_data *d)
- 	u32 val;
- 
- 	/* Sanity check for SPI irq */
--	if (d->irq < 32)
-+	if (d->hwirq < 32)
- 		return;
- 
--	reg = gpc_base + GPC_IMR1 + (d->irq / 32 - 1) * 4;
-+	reg = gpc_base + GPC_IMR1 + (d->hwirq / 32 - 1) * 4;
- 	val = readl_relaxed(reg);
--	val |= 1 << (d->irq % 32);
-+	val |= 1 << (d->hwirq % 32);
- 	writel_relaxed(val, reg);
- }
- 
--- 
-2.1.3
+- open-code the macro contents in the few uses, to allow
+  grepping for them, or
+
+- put the register number in the syscon reference and look it
+  up from there (this would be slightly more complicated for the
+  second macro)
+
+> +
+> +	np = of_parse_phandle(pdev->dev.of_node, "atmel,smc", 0);
+> +	if (!np)
+> +		return -EINVAL;
+> +
+> +	ebi->smc = syscon_node_to_regmap(np);
+> +	if (IS_ERR(ebi->smc))
+> +		return PTR_ERR(ebi->smc);
+
+I think this and the second instance of it can be shortened to
+
+	ebi->smc = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "atmel,smc");
+
+
+	Arnd
