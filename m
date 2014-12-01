@@ -1,46 +1,294 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon,  1 Dec 2014 12:50:22 +0100
-Subject: [PATCH V4 2/3] ARM: shmobile: Convert to genpd flags for PM clocks
- for r8a7779
-In-Reply-To: <1417434623-31301-1-git-send-email-ulf.hansson@linaro.org>
-References: <1417434623-31301-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1417434623-31301-3-git-send-email-ulf.hansson@linaro.org>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Mon, 01 Dec 2014 11:52:44 +0000
+Subject: [PATCH 6/7] KVM: arm64: re-factor hyp.S debug register code
+In-Reply-To: <20141130102546.GI23653@cbox>
+References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
+ <1416931805-23223-7-git-send-email-alex.bennee@linaro.org>
+ <20141130102546.GI23653@cbox>
+Message-ID: <87ppc31t9v.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using the dev_ops ->stop|start() callbacks for genpd, let's
-convert to use genpd's flag field and set it to GENPD_FLAG_PM_CLK.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
+Christoffer Dall <christoffer.dall@linaro.org> writes:
 
-Changes in v4:
-        Convert to renamed define.
+> On Tue, Nov 25, 2014 at 04:10:04PM +0000, Alex Benn?e wrote:
+>> This is a pre-cursor to sharing the code with the guest debug support.
+>> This replaces the big macro that fishes data out of a fixed location
+>> with a more general helper macro to restore a set of debug registers. It
+>> uses macro substitution so it can be re-used for debug control and value
+>> registers. It does however rely on the debug registers being 64 bit
+>> aligned (as they happen to be in the hyp ABI).
+>
+> can you enforce that somewhere?
 
-Changes in v3:
-        Convert to renamed define.
+There is a comment in kvm_asm.h:
 
-Changes in v2:
-        None.
----
- arch/arm/mach-shmobile/pm-r8a7779.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+/*
+ * 0 is reserved as an invalid value.
+ * Order *must* be kept in sync with the hyp switch code.
+ */
 
-diff --git a/arch/arm/mach-shmobile/pm-r8a7779.c b/arch/arm/mach-shmobile/pm-r8a7779.c
-index 82fe3d7..44a74c4 100644
---- a/arch/arm/mach-shmobile/pm-r8a7779.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7779.c
-@@ -83,9 +83,8 @@ static void r8a7779_init_pm_domain(struct r8a7779_pm_domain *r8a7779_pd)
- {
- 	struct generic_pm_domain *genpd = &r8a7779_pd->genpd;
- 
-+	genpd->flags = GENPD_FLAG_PM_CLK;
- 	pm_genpd_init(genpd, NULL, false);
--	genpd->dev_ops.stop = pm_clk_suspend;
--	genpd->dev_ops.start = pm_clk_resume;
- 	genpd->dev_ops.active_wakeup = pd_active_wakeup;
- 	genpd->power_off = pd_power_down;
- 	genpd->power_on = pd_power_up;
+But I'm not sure how to enforce it in assembly. Is there a #pragma or
+something I can use?
+
+>
+>> 
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> 
+>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>> index c0bc218..b38ce3d 100644
+>> --- a/arch/arm64/kvm/hyp.S
+>> +++ b/arch/arm64/kvm/hyp.S
+>> @@ -490,65 +490,12 @@
+>>  	msr	mdscr_el1,	x25
+>>  .endm
+>>  
+>> -.macro restore_debug
+>> -	// x2: base address for cpu context
+>> -	// x3: tmp register
+>> -
+>> -	mrs	x26, id_aa64dfr0_el1
+>> -	ubfx	x24, x26, #12, #4	// Extract BRPs
+>> -	ubfx	x25, x26, #20, #4	// Extract WRPs
+>> -	mov	w26, #15
+>> -	sub	w24, w26, w24		// How many BPs to skip
+>> -	sub	w25, w26, w25		// How many WPs to skip
+>> -
+>> -	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
+>> -
+>> -	adr	x26, 1f
+>> -	add	x26, x26, x24, lsl #2
+>> -	br	x26
+>> -1:
+>> -	ldr	x20, [x3, #(15 * 8)]
+>> -	ldr	x19, [x3, #(14 * 8)]
+>> -	ldr	x18, [x3, #(13 * 8)]
+>> -	ldr	x17, [x3, #(12 * 8)]
+>> -	ldr	x16, [x3, #(11 * 8)]
+>> -	ldr	x15, [x3, #(10 * 8)]
+>> -	ldr	x14, [x3, #(9 * 8)]
+>> -	ldr	x13, [x3, #(8 * 8)]
+>> -	ldr	x12, [x3, #(7 * 8)]
+>> -	ldr	x11, [x3, #(6 * 8)]
+>> -	ldr	x10, [x3, #(5 * 8)]
+>> -	ldr	x9, [x3, #(4 * 8)]
+>> -	ldr	x8, [x3, #(3 * 8)]
+>> -	ldr	x7, [x3, #(2 * 8)]
+>> -	ldr	x6, [x3, #(1 * 8)]
+>> -	ldr	x5, [x3, #(0 * 8)]
+>> -
+>> +.macro setup_debug_registers type
+>> +        // x3: pointer to register set
+>> +        // x4: number of registers to copy
+>> +        // x5..x20/x26 trashed
+>
+> does this mean x5 through x20, and x26, get trashed or that potentially
+> x5 thgough x26 get trashed?  I'm assuming the first, so replace the
+> slash with 'and' would be more clear.
+>
+>>  	adr	x26, 1f
+>> -	add	x26, x26, x24, lsl #2
+>> -	br	x26
+>> -1:
+>> -	msr	dbgbcr15_el1, x20
+>> -	msr	dbgbcr14_el1, x19
+>> -	msr	dbgbcr13_el1, x18
+>> -	msr	dbgbcr12_el1, x17
+>> -	msr	dbgbcr11_el1, x16
+>> -	msr	dbgbcr10_el1, x15
+>> -	msr	dbgbcr9_el1, x14
+>> -	msr	dbgbcr8_el1, x13
+>> -	msr	dbgbcr7_el1, x12
+>> -	msr	dbgbcr6_el1, x11
+>> -	msr	dbgbcr5_el1, x10
+>> -	msr	dbgbcr4_el1, x9
+>> -	msr	dbgbcr3_el1, x8
+>> -	msr	dbgbcr2_el1, x7
+>> -	msr	dbgbcr1_el1, x6
+>> -	msr	dbgbcr0_el1, x5
+>> -
+>> -	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
+>> -
+>> -	adr	x26, 1f
+>> -	add	x26, x26, x24, lsl #2
+>> +	add	x26, x26, x4, lsl #2
+>>  	br	x26
+>>  1:
+>>  	ldr	x20, [x3, #(15 * 8)]
+>> @@ -569,116 +516,25 @@
+>>  	ldr	x5, [x3, #(0 * 8)]
+>>  
+>>  	adr	x26, 1f
+>> -	add	x26, x26, x24, lsl #2
+>> -	br	x26
+>> -1:
+>> -	msr	dbgbvr15_el1, x20
+>> -	msr	dbgbvr14_el1, x19
+>> -	msr	dbgbvr13_el1, x18
+>> -	msr	dbgbvr12_el1, x17
+>> -	msr	dbgbvr11_el1, x16
+>> -	msr	dbgbvr10_el1, x15
+>> -	msr	dbgbvr9_el1, x14
+>> -	msr	dbgbvr8_el1, x13
+>> -	msr	dbgbvr7_el1, x12
+>> -	msr	dbgbvr6_el1, x11
+>> -	msr	dbgbvr5_el1, x10
+>> -	msr	dbgbvr4_el1, x9
+>> -	msr	dbgbvr3_el1, x8
+>> -	msr	dbgbvr2_el1, x7
+>> -	msr	dbgbvr1_el1, x6
+>> -	msr	dbgbvr0_el1, x5
+>> -
+>> -	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
+>> -
+>> -	adr	x26, 1f
+>> -	add	x26, x26, x25, lsl #2
+>> +	add	x26, x26, x4, lsl #2
+>>  	br	x26
+>>  1:
+>> -	ldr	x20, [x3, #(15 * 8)]
+>> -	ldr	x19, [x3, #(14 * 8)]
+>> -	ldr	x18, [x3, #(13 * 8)]
+>> -	ldr	x17, [x3, #(12 * 8)]
+>> -	ldr	x16, [x3, #(11 * 8)]
+>> -	ldr	x15, [x3, #(10 * 8)]
+>> -	ldr	x14, [x3, #(9 * 8)]
+>> -	ldr	x13, [x3, #(8 * 8)]
+>> -	ldr	x12, [x3, #(7 * 8)]
+>> -	ldr	x11, [x3, #(6 * 8)]
+>> -	ldr	x10, [x3, #(5 * 8)]
+>> -	ldr	x9, [x3, #(4 * 8)]
+>> -	ldr	x8, [x3, #(3 * 8)]
+>> -	ldr	x7, [x3, #(2 * 8)]
+>> -	ldr	x6, [x3, #(1 * 8)]
+>> -	ldr	x5, [x3, #(0 * 8)]
+>> -
+>> -	adr	x26, 1f
+>> -	add	x26, x26, x25, lsl #2
+>> -	br	x26
+>> -1:
+>> -	msr	dbgwcr15_el1, x20
+>> -	msr	dbgwcr14_el1, x19
+>> -	msr	dbgwcr13_el1, x18
+>> -	msr	dbgwcr12_el1, x17
+>> -	msr	dbgwcr11_el1, x16
+>> -	msr	dbgwcr10_el1, x15
+>> -	msr	dbgwcr9_el1, x14
+>> -	msr	dbgwcr8_el1, x13
+>> -	msr	dbgwcr7_el1, x12
+>> -	msr	dbgwcr6_el1, x11
+>> -	msr	dbgwcr5_el1, x10
+>> -	msr	dbgwcr4_el1, x9
+>> -	msr	dbgwcr3_el1, x8
+>> -	msr	dbgwcr2_el1, x7
+>> -	msr	dbgwcr1_el1, x6
+>> -	msr	dbgwcr0_el1, x5
+>> -
+>> -	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
+>> -
+>> -	adr	x26, 1f
+>> -	add	x26, x26, x25, lsl #2
+>> -	br	x26
+>> -1:
+>> -	ldr	x20, [x3, #(15 * 8)]
+>> -	ldr	x19, [x3, #(14 * 8)]
+>> -	ldr	x18, [x3, #(13 * 8)]
+>> -	ldr	x17, [x3, #(12 * 8)]
+>> -	ldr	x16, [x3, #(11 * 8)]
+>> -	ldr	x15, [x3, #(10 * 8)]
+>> -	ldr	x14, [x3, #(9 * 8)]
+>> -	ldr	x13, [x3, #(8 * 8)]
+>> -	ldr	x12, [x3, #(7 * 8)]
+>> -	ldr	x11, [x3, #(6 * 8)]
+>> -	ldr	x10, [x3, #(5 * 8)]
+>> -	ldr	x9, [x3, #(4 * 8)]
+>> -	ldr	x8, [x3, #(3 * 8)]
+>> -	ldr	x7, [x3, #(2 * 8)]
+>> -	ldr	x6, [x3, #(1 * 8)]
+>> -	ldr	x5, [x3, #(0 * 8)]
+>> -
+>> -	adr	x26, 1f
+>> -	add	x26, x26, x25, lsl #2
+>> -	br	x26
+>> -1:
+>> -	msr	dbgwvr15_el1, x20
+>> -	msr	dbgwvr14_el1, x19
+>> -	msr	dbgwvr13_el1, x18
+>> -	msr	dbgwvr12_el1, x17
+>> -	msr	dbgwvr11_el1, x16
+>> -	msr	dbgwvr10_el1, x15
+>> -	msr	dbgwvr9_el1, x14
+>> -	msr	dbgwvr8_el1, x13
+>> -	msr	dbgwvr7_el1, x12
+>> -	msr	dbgwvr6_el1, x11
+>> -	msr	dbgwvr5_el1, x10
+>> -	msr	dbgwvr4_el1, x9
+>> -	msr	dbgwvr3_el1, x8
+>> -	msr	dbgwvr2_el1, x7
+>> -	msr	dbgwvr1_el1, x6
+>> -	msr	dbgwvr0_el1, x5
+>> -
+>> -	ldr	x21, [x2, #CPU_SYSREG_OFFSET(MDCCINT_EL1)]
+>> -	msr	mdccint_el1, x21
+>> +	msr	\type\()15_el1, x20
+>> +	msr	\type\()14_el1, x19
+>> +	msr	\type\()13_el1, x18
+>> +	msr	\type\()12_el1, x17
+>> +	msr	\type\()11_el1, x16
+>> +	msr	\type\()10_el1, x15
+>> +	msr	\type\()9_el1, x14
+>> +	msr	\type\()8_el1, x13
+>> +	msr	\type\()7_el1, x12
+>> +	msr	\type\()6_el1, x11
+>> +	msr	\type\()5_el1, x10
+>> +	msr	\type\()4_el1, x9
+>> +	msr	\type\()3_el1, x8
+>> +	msr	\type\()2_el1, x7
+>> +	msr	\type\()1_el1, x6
+>> +	msr	\type\()0_el1, x5
+>>  .endm
+>>  
+>>  .macro skip_32bit_state tmp, target
+>> @@ -929,8 +785,34 @@ __save_debug:
+>>  	save_debug
+>>  	ret
+>>  
+>> +/* Restore saved guest debug state */
+>>  __restore_debug:
+>> -	restore_debug
+>> +	// x2: base address for cpu context
+>> +	// x3: ptr to guest registers passed to setup_debug_registers
+>> +	// x5..x20/x26: trashed
+>> +
+>> +	mrs	x26, id_aa64dfr0_el1
+>> +	ubfx	x24, x26, #12, #4	// Extract BRPs
+>> +	ubfx	x25, x26, #20, #4	// Extract WRPs
+>> +	mov	w26, #15
+>> +	sub	w24, w26, w24		// How many BPs to skip
+>> +	sub	w25, w26, w25		// How many WPs to skip
+>> +
+>> +	mov     x4, x24
+>> +	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
+>> +	setup_debug_registers dbgbcr
+>> +	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
+>> +	setup_debug_registers dbgbvr
+>> +
+>> +	mov     x4, x25
+>> +	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
+>> +	setup_debug_registers dbgwcr
+>> +	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
+>> +	setup_debug_registers dbgwvr
+>> +
+>> +	ldr	x21, [x2, #CPU_SYSREG_OFFSET(MDCCINT_EL1)]
+>> +	msr	mdccint_el1, x21
+>> +
+>>  	ret
+>>  
+>>  __save_fpsimd:
+>> -- 
+>> 2.1.3
+>> 
+
 -- 
-1.9.1
+Alex Benn?e
