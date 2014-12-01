@@ -1,48 +1,114 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Mon, 1 Dec 2014 02:38:12 +0000
-Subject: [PATCH 0/4] LS1021A: Add dcfb framebuffer driver support.
-In-Reply-To: <1416824454-28156-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1416824454-28156-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <BY2PR0301MB0613C9A88CF0353C0B41603B9B7D0@BY2PR0301MB0613.namprd03.prod.outlook.com>
+From: flora.fu@mediatek.com (Flora Fu)
+Date: Mon, 1 Dec 2014 10:51:44 +0800
+Subject: [PATCH v2 3/8] regulator: MT6397: Add support for MT6397 regulator
+In-Reply-To: <20141128152247.GR7712@sirena.org.uk>
+References: <1417146874-5232-1-git-send-email-flora.fu@mediatek.com>
+ <1417146874-5232-4-git-send-email-flora.fu@mediatek.com>
+ <20141128152247.GR7712@sirena.org.uk>
+Message-ID: <1417402305.30873.78.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Mark
 
-I'd like to know the status of this patches for internal release needed.
-
-Thanks very much,
-
-BRs
-Xiubo
-
-
-> -----Original Message-----
-> From: Xiubo Li [mailto:Li.Xiubo at freescale.com]
-> Sent: Monday, November 24, 2014 6:21 PM
-> To: plagnioj at jcrosoft.com; tomi.valkeinen at ti.com
-> Cc: shawn.guo at linaro.org; linux-fbdev at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Xiubo Li-B47053
-> Subject: [PATCH 0/4] LS1021A: Add dcfb framebuffer driver support.
+On Fri, 2014-11-28 at 15:22 +0000, Mark Brown wrote:
+> On Fri, Nov 28, 2014 at 11:54:29AM +0800, Flora Fu wrote:
 > 
-> Framebuffer driver for the Freescale SoC Display Controller.
+> > @@ -96,5 +97,4 @@ obj-$(CONFIG_REGULATOR_WM8350) += wm8350-regulator.o
+> >  obj-$(CONFIG_REGULATOR_WM8400) += wm8400-regulator.o
+> >  obj-$(CONFIG_REGULATOR_WM8994) += wm8994-regulator.o
+> >  
+> > -
+> >  ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG
 > 
-> Xiubo Li (4):
->   video: fsl-dcfb: Add dcfb framebuffer driver for LS1021A platform
->   video: fsl-dcfb: Add devicetree binding support
->   ARM: ls1021a: dtsi: Add dt node support for dcfb.
->   ARM: ls1021a: dts: Add and enable dt node for dcfb.
+> Random whitespace change here...
 > 
->  .../devicetree/bindings/video/fsl,dcfb.txt         |  52 ++
->  arch/arm/boot/dts/ls1021a-twr.dts                  |  26 +
->  arch/arm/boot/dts/ls1021a.dtsi                     |  10 +
->  drivers/video/fbdev/Kconfig                        |  19 +
->  drivers/video/fbdev/Makefile                       |   1 +
->  drivers/video/fbdev/fsl-dcfb.c                     | 811
-> +++++++++++++++++++++
->  6 files changed, 919 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/fsl,dcfb.txt
->  create mode 100644 drivers/video/fbdev/fsl-dcfb.c
+> > +	/* For HW design, buck voltage control register has two parts.
+> > +	 * part 1: vsel_reg for register mode
+> > +	 * part 2: voselon_reg or hw control mode
+> > +	 * Both parts should be updated and sync when user set voltage.
+> > +	 */
 > 
-> --
-> 2.1.0.27.g96db324
+> Why does nothing else in the driver know about this "hw control mode" -
+> what does it actually mean, shouldn't it affect some of the other
+> operations?
+
+In the regulator, we have two parts of registers to control the output
+in voltage selection. The mode setting is done in boot loader stage
+before kernel.
+The hw control mode is used for external signal to control voltage
+selection. When the hw control mode is chosen, "voselon" register is the
+action register to do voltage selection if consumer make voltage
+selection. Without hw control mode, vsel_reg is the action register.
+To fit all mode selection, we update and sync two parts of registers in
+regulator framework.
+
+> 
+> > +static int mt6397_buck_get_voltage_sel(struct regulator_dev *rdev)
+> > +{
+> 
+> > +static int mt6397_regulator_is_enabled(struct regulator_dev *rdev)
+> > +{
+> 
+> To repeat my comments on the last version: please use the generic regmap
+> operations rather than copying them.
+> 
+
+The generic helper function does not fit usage of the regulator. 
+In general function, it considers that the vsel_reg for selection
+voltage is also the register for querying voltage selection. The enable
+bit for enable function is the bit for querying the status. 
+
+In the hardware design, the output of voltage selection register is
+different from vsel_reg. Is is located in nivosel. The enable bit is
+locate in the other bit called "qi_mask".  
+Please check comment in MT6397 regulators' information. 
+/*
+ * MT6397 regulators' information
+ *
+ * @desc: standard fields of regulator description.
+ * @voselon_reg: Register sections for hardware control mode of bucks
+ * @nivosel_reg: Register for query output voltage selection of bucks
+ * @qi_mask: Mask for query enable signal status of regulators
+ */
+struct mt6397_regulator_info {
+	struct regulator_desc desc;
+	u32 voselon_reg;
+	u32 nivosel_reg;
+	u32 qi_mask;
+};
+
+That's whey ops ".get_voltage_sel" and ".is_enabled" is not able to use
+generic regamp.
+
+
+> > +	np = of_node_get(pdev->dev.parent->of_node);
+> > +	if (!np)
+> > +		return -EINVAL;
+> > +
+> > +	regulators = of_get_child_by_name(np, "regulators");
+> 
+> To further repeat my
+
+>  previous review comments:
+> 
+> | Define regulators_node and of_match in the regulator desc and you can
+> | remove both this table and all your DT matching code in the driver, the
+> | core will handle it for you.
+> 
+> Please don't ignore review comments.
+
+Sure, I think I completely misunderstood what you meant. Could you give
+more details about the comments?
+In this version, the table for DT matching is removed and merged into
+regulator info in table mt6397_regulators. To register every regulator
+by devm_regulator_register(), the of_node is parsed from
+of_regulator_match() by name. Here is to retrieves the device_node
+"regulators" for of_regulator_match() to get all regulator_init_data and
+corresponding of_node.
+Is any other mechanism I can use to achieve these part without
+of_regulstor_match()?
+
+
+Thanks,
+Flora
