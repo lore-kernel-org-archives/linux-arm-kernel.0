@@ -1,24 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Dec 2014 17:17:30 +0100
-Subject: [PATCH v3 05/11] memory: add Atmel EBI (External Bus Interface)
- driver
-In-Reply-To: <20141201115006.08197c40@bbrezillon>
-References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
- <19172687.eVxczUuuhC@ws-stein> <20141201115006.08197c40@bbrezillon>
-Message-ID: <2417519.MDE3mu6n7n@wuerfel>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 1 Dec 2014 09:21:35 -0700
+Subject: Tegra baseline test results for v3.18-rc7
+Message-ID: <547C958F.1010008@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 December 2014 11:50:06 Boris Brezillon wrote:
-> 
-> I don't have a strong opinion regarding where this driver should
-> live (I even considered putting it in drivers/bus) :-).
-> But note that there are other "external memory interface" drivers
-> in drivers/memory too: TI AEMIF and Marvell DEVBUS  ;-).
-> 
-> Does anyone else think this driver should go in drivers/bus ?
-> 
+Here are some basic Tegra test results for Linux v3.18-rc7.
+Logs and other details at:
 
-I think drivers/memory is better.
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.18-rc7/20141130170104/
 
-	Arnd
+
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.18-rc6 (5d01410fe4d92081f349b013a2e7a95429e4f2c9)):
+    text     data      bss    total  kernel
+    -391     +480        0      +89  multi_v7_defconfig
+    -215     +480        0     +265  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.18-rc6 (5d01410fe4d92081f349b013a2e7a95429e4f2c9))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+       -4k       4k        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+       -4k       4k        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+       -4k       4k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
