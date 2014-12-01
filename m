@@ -1,54 +1,45 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Mon, 1 Dec 2014 09:56:43 +0000
-Subject: [PATCHv4] dmaengine: fsl-edma: fixup reg offset and hw S/G
- support in big-endian model
-References: <1413968035-12855-1-git-send-email-jingchang.lu@freescale.com> 
-Message-ID: <BN3PR0301MB1236DA27ED13519CB8724F26877D0@BN3PR0301MB1236.namprd03.prod.outlook.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Mon, 1 Dec 2014 10:58:15 +0100
+Subject: Issue found in Armada 370: "No buffer space available" error
+ during continuous ping
+In-Reply-To: <20141201103221.6268b811@free-electrons.com>
+References: <CAB8gEUsK9c3YMpAABifNAWU7zec2ePztSqS4KAYtiT7Sbhadvg@mail.gmail.com>
+ <20140721070303.GM21834@1wt.eu>
+ <CAB8gEUtmgwfWcuoYZ-wDwHVmzHN0WyOQD9oEOGAZ_gJfbPUm-g@mail.gmail.com>
+ <20140723061659.GE30488@1wt.eu>
+ <CAB8gEUtO=K-mjie6czsf-9ao1cxiMAV2ScbgUnf+XxqjEfOUvg@mail.gmail.com>
+ <CAB8gEUtgo-8nets3tRtqiZ8qRx+SyCq2d8v05scavWNwE5TNXg@mail.gmail.com>
+ <20141201072802.GB21731@1wt.eu>
+ <CAB8gEUsQ8nSNwB7vpZHBkELEBX2sN1QdWvujBGYQJY9dtCzgww@mail.gmail.com>
+ <20141201092851.GA22304@1wt.eu> <20141201103221.6268b811@free-electrons.com>
+Message-ID: <20141201095815.GA7949@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Vinod,
+Hi Thomas,
 
-  Could you please help review and merge this patch if possible. Thanks.
+On Mon, Dec 01, 2014 at 10:32:21AM +0100, Thomas Petazzoni wrote:
+> If I understood correctly, on RX the interrupt coalescing can be done
+> every X packets, or after N milliseconds. However, on TX, it's only
+> after Y packets, there is no way to configure a delay.
 
-Thanks and Best Regards,
-Jingchang
+That was my understanding of the datasheet as well.
 
->>-----Original Message-----
->>From: Jingchang Lu [mailto:jingchang.lu at freescale.com]
->>Sent: Wednesday, October 22, 2014 4:54 PM
->>To: vinod.koul at intel.com
->>Cc: dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->>linux-kernel at vger.kernel.org; Lu Jingchang-B35083
->>Subject: [PATCHv4] dmaengine: fsl-edma: fixup reg offset and hw S/G
->>support in big-endian model
->>
->>The offset of all 8-/16-bit registers in big-endian eDMA model are
->>swapped in a 32-bit size opposite those in the little-endian model.
->>
->>The hardware Scatter/Gather requires the subsequent TCDs stored in
->>memory in little endian independent of the register endian model, the
->>eDMA engine will do the swap if need.
->>
->>This patch also use regular assignment for tcd variables r/w instead of
->>with io function previously that may not always be true.
->>
->>Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
->>---
->>changes in v4:
->> use __le32/16 define little endian tcd struct explicitly.
->> modify fsl_edma_set_tcd_regs() to simplify parameters.
->> define fsl_edma_fill_tcd() as inline function.
->>
->>changes in v3:
->> use unsigned long instead of u32 in reg offset swap cast to avoid
->warning.
->>
->>changes in v2:
->> simplify register offset swap calculation.
->> use regular assignment for tcd variables r/w instead of io function.
->>
->> drivers/dma/fsl-edma.c | 189
->>+++++++++++++++++++++++++-------------------
->>-----
->> 1 file changed, 96 insertions(+), 93 deletions(-)
+> But in any case, with NAPI implemented in software, are these hardware
+> interrupt coalescing features very important? As soon as the number of
+> interrupts becomes high, the kernel will disable the interrupt and
+> switch to polling, no?
+
+Absolutely, but despite this, the interrupts still impact the system's
+performance, because instead of waking up the driver once the Tx queue
+is about to be empty (let's say twice per Tx queue), we wake up as often
+as the system supports it. The net effect is a performance loss of about
+5% on small packets, which is not huge of course, but would rather be
+spent doing some more useful stuff.
+
+Uri gave me a contact at Marvell who knows this device well, I'll ask
+him if there's no other way to work with this chip. Sending an interrupt
+at least when the Tx queue is empty would be nice :-/
+
+Best regards,
+Willy
