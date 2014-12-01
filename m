@@ -1,294 +1,215 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 1 Dec 2014 11:57:05 -0700
-Subject: [PATCH v13 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <20141127150137.GA7889@red-moon>
-References: <1417065854-37745-1-git-send-email-lina.iyer@linaro.org>
- <1417065854-37745-4-git-send-email-lina.iyer@linaro.org>
- <20141127150137.GA7889@red-moon>
-Message-ID: <20141201185705.GC499@linaro.org>
+Date: Mon, 1 Dec 2014 12:00:22 -0700
+Subject: [PATCH v12 07/10] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <5476E6F0.1080408@linaro.org>
+References: <1417047195-18978-1-git-send-email-lina.iyer@linaro.org>
+ <1417047195-18978-8-git-send-email-lina.iyer@linaro.org>
+ <5476E6F0.1080408@linaro.org>
+Message-ID: <20141201190022.GD499@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27 2014 at 08:01 -0700, Lorenzo Pieralisi wrote:
->On Thu, Nov 27, 2014 at 05:24:07AM +0000, Lina Iyer wrote:
->
->[...]
->
->> +static int spm_set_low_power_mode(enum pm_sleep_mode mode)
->> +{
->> +       struct spm_driver_data *drv = per_cpu(cpu_spm_drv,
->> +                                               smp_processor_id());
->> +       u32 start_index;
->> +       u32 ctl_val;
->> +
->> +       if (!drv)
->> +               return -ENXIO;
->> +
->> +       start_index = drv->reg_data->start_index[mode];
->> +
->> +       ctl_val = spm_register_read(drv, SPM_REG_SPM_CTL);
->> +       ctl_val &= ~(SPM_CTL_INDEX << SPM_CTL_INDEX_SHIFT);
->> +       ctl_val |= start_index << SPM_CTL_INDEX_SHIFT;
->> +       ctl_val |= SPM_CTL_EN;
->> +       spm_register_write(drv, SPM_REG_SPM_CTL, ctl_val);
->> +
->> +       /* Ensure we have written the start address */
->> +       wmb();
->
->Can you explain please what this wmb is meant to achieve ? If it is there
->to make sure the write made it to the SPM that's not a proper way
->to achieve it, the barrier ensures ordering, not write completion.
->
-A write completion would be great, but assuming that the context switch
-using SCM or WFI could ensure the flush, then ordering is probably good
-enough for this.
-
-Is my understanding incorrect?
-
->> +
->> +       return 0;
->> +}
->> +
->> +static int qcom_pm_collapse(unsigned long int unused)
->> +{
->> +       int ret;
->> +       u32 flag;
->> +       int cpu = smp_processor_id();
->> +
->> +       ret = scm_set_warm_boot_addr(cpu_resume, cpu);
->> +       if (ret)
->> +               return ret;
->> +
->> +       flag = SCM_L2_ON & SCM_FLUSH_FLAG_MASK;
->> +       scm_call_atomic1(SCM_SVC_BOOT, SCM_CMD_TERMINATE_PC, flag);
->> +
->> +       /*
->> +        * Returns here only if there was a pending interrupt and we did not
->> +        * power down as a result.
->> +        */
->> +       return 0;
->
->I know the return value is changed by the cpu_suspend implementation to
->signal error when not returning from cpu_resume, but you should not
->return 0 anyway.
->
-Sure. Will do.
->> +}
->> +
->> +static int qcom_cpu_standby(void *unused)
->> +{
->> +       int ret;
->> +
->> +       ret = spm_set_low_power_mode(PM_SLEEP_MODE_STBY);
->> +       if (ret)
->> +               return ret;
->> +
->> +       cpu_do_idle();
->> +
->> +       return 0;
->> +}
->> +
->> +static int qcom_cpu_spc(void *unused)
->> +{      int ret;
->> +
->> +       ret = spm_set_low_power_mode(PM_SLEEP_MODE_STBY);
->> +       if (ret)
->> +               return ret;
->> +
->> +       cpu_pm_enter();
->> +       cpu_suspend(0, qcom_pm_collapse);
->
->You must stash the return value and propagate it.
->
-Sure. Will do.
->> +       cpu_pm_exit();
->> +
->> +       return 0;
->> +}
->> +
->> +static struct spm_driver_data *spm_get_drv(struct platform_device *pdev,
->> +               int *spm_cpu)
->> +{
->> +       struct spm_driver_data *drv = NULL;
->> +       struct device_node *cpu_node, *saw_node;
->> +       int cpu;
->> +       bool found = false;
->> +
->> +       for_each_possible_cpu(cpu) {
->> +               cpu_node = of_cpu_device_node_get(cpu);
->> +               if (!cpu_node)
->> +                       continue;
->> +               saw_node = of_parse_phandle(cpu_node, "qcom,saw", 0);
->
->+               if (saw_node) {
->+                       if (saw_node == pdev->dev.of_node)
->+                               found = true;
->+                       of_node_put(saw_node);
->+               }
->
->can be:
->		found = (saw_node == pdev->dev.of_node);
->		of_node_put(saw_node);
->
-Sure.
-
->Thanks,
->Lorenzo
->
->> +               of_node_put(cpu_node);
->> +               if (found)
->> +                       break;
->> +       }
->> +
->> +       if (found) {
->> +               drv = devm_kzalloc(&pdev->dev, sizeof(*drv), GFP_KERNEL);
->> +               if (drv)
->> +                       *spm_cpu = cpu;
->> +       }
->> +
->> +       return drv;
->> +}
->> +
->> +static const struct of_device_id spm_match_table[] = {
->> +       { .compatible = "qcom,msm8974-saw2-v2.1-cpu",
->> +         .data = &spm_reg_8974_8084_cpu },
->> +       { .compatible = "qcom,apq8084-saw2-v2.1-cpu",
->> +         .data = &spm_reg_8974_8084_cpu },
->> +       { .compatible = "qcom,apq8064-saw2-v1.1-cpu",
->> +         .data = &spm_reg_8064_cpu },
->> +       { },
->> +};
->> +
->> +static const struct qcom_cpu_pm_ops lpm_ops = {
->> +       .standby = qcom_cpu_standby,
->> +       .spc = qcom_cpu_spc,
->> +};
->> +
->> +static int spm_dev_probe(struct platform_device *pdev)
->> +{
->> +       struct spm_driver_data *drv;
->> +       struct resource *res;
->> +       const struct of_device_id *match_id;
->> +       void __iomem *addr;
->> +       int cpu = -EINVAL;
->> +       static bool cpuidle_drv_init;
->> +       const struct platform_device_info qcom_cpuidle_info = {
->> +               .name   = "qcom_cpuidle",
->> +               .id     = -1,
->> +               .data = &lpm_ops,
->> +               .size_data = sizeof(lpm_ops),
->> +       };
->> +
->> +       drv = spm_get_drv(pdev, &cpu);
->> +       if (!drv || cpu < 0)
->> +               return -EINVAL;
->> +
->> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +       drv->reg_base = devm_ioremap_resource(&pdev->dev, res);
->> +       if (IS_ERR(drv->reg_base))
->> +               return PTR_ERR(drv->reg_base);
->> +
->> +       match_id = of_match_node(spm_match_table, pdev->dev.of_node);
->> +       if (!match_id)
->> +               return -ENODEV;
->> +
->> +       drv->reg_data = match_id->data;
->> +
->> +       /* Write the SPM sequences first.. */
->> +       addr = drv->reg_base + drv->reg_data->reg_offset[SPM_REG_SEQ_ENTRY];
->> +       __iowrite32_copy(addr, drv->reg_data->seq,
->> +                       ARRAY_SIZE(drv->reg_data->seq) / 4);
->> +
->> +       /*
->> +        * ..and then the control registers.
->> +        * On some SoC's if the control registers are written first and if the
->> +        * CPU was held in reset, the reset signal could trigger the SPM state
->> +        * machine, before the sequences are completely written.
->> +        */
->> +       spm_register_write(drv, SPM_REG_CFG, drv->reg_data->spm_cfg);
->> +       spm_register_write(drv, SPM_REG_DLY, drv->reg_data->spm_dly);
->> +       spm_register_write(drv, SPM_REG_PMIC_DLY, drv->reg_data->pmic_dly);
->> +
->> +       spm_register_write(drv, SPM_REG_PMIC_DATA_0,
->> +                               drv->reg_data->pmic_data[0]);
->> +       spm_register_write(drv, SPM_REG_PMIC_DATA_1,
->> +                               drv->reg_data->pmic_data[1]);
->> +
->> +       /*
->> +        * Ensure all observers see the above register writes before the
->> +        * cpuidle driver is allowed to use the SPM.
->> +        */
->> +       wmb();
->> +       per_cpu(cpu_spm_drv, cpu) = drv;
->> +
->> +       if (!cpuidle_drv_init) {
->> +               platform_device_register_full(&qcom_cpuidle_info);
->> +               cpuidle_drv_init = true;
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +static struct platform_driver spm_driver = {
->> +       .probe = spm_dev_probe,
->> +       .driver = {
->> +               .name = "saw",
->> +               .of_match_table = spm_match_table,
->> +       },
->> +};
->> +
->> +module_platform_driver(spm_driver);
->> +
->> +MODULE_LICENSE("GPL v2");
->> +MODULE_DESCRIPTION("SAW power controller driver");
->> +MODULE_ALIAS("platform:saw");
->> diff --git a/include/soc/qcom/pm.h b/include/soc/qcom/pm.h
->> new file mode 100644
->> index 0000000..d9a56d7
->> --- /dev/null
->> +++ b/include/soc/qcom/pm.h
->> @@ -0,0 +1,31 @@
->> +/*
->> + * Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
->> + *
->> + * This software is licensed under the terms of the GNU General Public
->> + * License version 2, as published by the Free Software Foundation, and
->> + * may be copied, distributed, and modified under those terms.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + */
->> +
->> +#ifndef __QCOM_PM_H
->> +#define __QCOM_PM_H
->> +
->> +enum pm_sleep_mode {
->> +       PM_SLEEP_MODE_STBY,
->> +       PM_SLEEP_MODE_RET,
->> +       PM_SLEEP_MODE_SPC,
->> +       PM_SLEEP_MODE_PC,
->> +       PM_SLEEP_MODE_NR,
->> +};
->> +
->> +struct qcom_cpu_pm_ops {
->> +       int (*standby)(void *data);
->> +       int (*spc)(void *data);
->> +};
->> +
->> +#endif  /* __QCOM_PM_H */
->> --
->> 2.1.0
+On Thu, Nov 27 2014 at 01:55 -0700, Daniel Lezcano wrote:
+>On 11/27/2014 01:13 AM, Lina Iyer wrote:
+>>Add cpuidle driver interface to allow cpus to go into idle states. Use
+>>the cpuidle DT interface, common across ARM architectures, to provide
+>>the idle state information to the cpuidle framework.
 >>
+>>Supported modes at this time are Standby and Standalone Power Collapse.
 >>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>>Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>---
+>>  .../bindings/arm/msm/qcom,idle-state.txt           | 81 ++++++++++++++++++++++
+>>  drivers/cpuidle/Kconfig.arm                        |  7 ++
+>>  drivers/cpuidle/Makefile                           |  1 +
+>>  drivers/cpuidle/cpuidle-qcom.c                     | 78 +++++++++++++++++++++
+>>  4 files changed, 167 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+>>  create mode 100644 drivers/cpuidle/cpuidle-qcom.c
 >>
->--
->To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
->the body of a message to majordomo at vger.kernel.org
->More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+>>new file mode 100644
+>>index 0000000..ae1b07f
+>>--- /dev/null
+>>+++ b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+>>@@ -0,0 +1,81 @@
+>>+QCOM Idle States for cpuidle driver
+>>+
+>>+ARM provides idle-state node to define the cpuidle states, as defined in [1].
+>>+cpuidle-qcom is the cpuidle driver for Qualcomm SoCs and uses these idle
+>>+states. Idle states have different enter/exit latency and residency values.
+>>+The idle states supported by the QCOM SoC are defined as -
+>>+
+>>+    * Standby
+>>+    * Retention
+>>+    * Standalone Power Collapse (Standalone PC or SPC)
+>>+    * Power Collapse (PC)
+>>+
+>>+Standby: Standby does a little more in addition to architectural clock gating.
+>>+When the WFI instruction is executed the ARM core would gate its internal
+>>+clocks. In addition to gating the clocks, QCOM cpus use this instruction as a
+>>+trigger to execute the SPM state machine. The SPM state machine waits for the
+>>+interrupt to trigger the core back in to active. This triggers the cache
+>>+hierarchy to enter standby states, when all cpus are idle. An interrupt brings
+>>+the SPM state machine out of its wait, the next step is to ensure that the
+>>+cache hierarchy is also out of standby, and then the cpu is allowed to resume
+>>+execution.
+>>+
+>>+Retention: Retention is a low power state where the core is clock gated and
+>>+the memory and the registers associated with the core are retained. The
+>>+voltage may be reduced to the minimum value needed to keep the processor
+>>+registers active. The SPM should be configured to execute the retention
+>>+sequence and would wait for interrupt, before restoring the cpu to execution
+>>+state. Retention may have a slightly higher latency than Standby.
+>>+
+>>+Standalone PC: A cpu can power down and warmboot if there is a sufficient time
+>>+between the time it enters idle and the next known wake up. SPC mode is used
+>>+to indicate a core entering a power down state without consulting any other
+>>+cpu or the system resources. This helps save power only on that core.  The SPM
+>>+sequence for this idle state is programmed to power down the supply to the
+>>+core, wait for the interrupt, restore power to the core, and ensure the
+>>+system state including cache hierarchy is ready before allowing core to
+>>+resume. Applying power and resetting the core causes the core to warmboot
+>>+back into Elevation Level (EL) which trampolines the control back to the
+>>+kernel. Entering a power down state for the cpu, needs to be done by trapping
+>>+into a EL. Failing to do so, would result in a crash enforced by the warm boot
+>>+code in the EL for the SoC. On SoCs with write-back L1 cache, the cache has to
+>>+be flushed in s/w, before powering down the core.
+>>+
+>>+Power Collapse: This state is similar to the SPC mode, but distinguishes
+>>+itself in that the cpu acknowledges and permits the SoC to enter deeper sleep
+>>+modes. In a hierarchical power domain SoC, this means L2 and other caches can
+>>+be flushed, system bus, clocks - lowered, and SoC main XO clock gated and
+>>+voltages reduced, provided all cpus enter this state.  Since the span of low
+>>+power modes possible at this state is vast, the exit latency and the residency
+>>+of this low power mode would be considered high even though at a cpu level,
+>>+this essentially is cpu power down. The SPM in this state also may handshake
+>>+with the Resource power manager processor in the SoC to indicate a complete
+>>+application processor subsystem shut down.
+>>+
+>>+The idle-state for QCOM SoCs are distinguished by the compatible property of
+>>+the idle-states device node.
+>>+The devicetree representation of the idle state should be -
+>>+
+>>+Required properties:
+>>+
+>>+- compatible: Must be one of -
+>>+			"qcom,idle-state-stby",
+>>+			"qcom,idle-state-ret",
+>>+			"qcom,idle-state-spc",
+>>+			"qcom,idle-state-pc",
+>>+		and "arm,idle-state".
+>>+
+>>+Other required and optional properties are specified in [1].
+>>+
+>>+Example:
+>>+
+>>+	idle-states {
+>>+		CPU_SPC: spc {
+>>+			compatible = "qcom,idle-state-spc", "arm,idle-state";
+>>+			entry-latency-us = <150>;
+>>+			exit-latency-us = <200>;
+>>+			min-residency-us = <2000>;
+>>+		};
+>>+	};
+>>+
+>>+[1]. Documentation/devicetree/bindings/arm/idle-states.txt
+>>diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+>>index 8c16ab2..e98993c 100644
+>>--- a/drivers/cpuidle/Kconfig.arm
+>>+++ b/drivers/cpuidle/Kconfig.arm
+>>@@ -63,3 +63,10 @@ config ARM_MVEBU_V7_CPUIDLE
+>>  	depends on ARCH_MVEBU
+>>  	help
+>>  	  Select this to enable cpuidle on Armada 370, 38x and XP processors.
+>>+
+>>+config ARM_QCOM_CPUIDLE
+>>+	bool "CPU Idle drivers for Qualcomm processors"
+>>+	depends on ARCH_QCOM
+>>+	select DT_IDLE_STATES
+>>+	help
+>>+	  Select this to enable cpuidle for QCOM processors
+>>diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+>>index 4d177b9..6c222d5 100644
+>>--- a/drivers/cpuidle/Makefile
+>>+++ b/drivers/cpuidle/Makefile
+>>@@ -17,6 +17,7 @@ obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
+>>  obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
+>>  obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
+>>  obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
+>>+obj-$(CONFIG_ARM_QCOM_CPUIDLE)		+= cpuidle-qcom.o
+>>
+>>  ###############################################################################
+>>  # MIPS drivers
+>>diff --git a/drivers/cpuidle/cpuidle-qcom.c b/drivers/cpuidle/cpuidle-qcom.c
+>>new file mode 100644
+>>index 0000000..5e54d9d
+>>--- /dev/null
+>>+++ b/drivers/cpuidle/cpuidle-qcom.c
+>>@@ -0,0 +1,78 @@
+>>+/*
+>>+ * Copyright (c) 2014, Linaro Limited.
+>>+ *
+>>+ * This program is free software; you can redistribute it and/or modify
+>>+ * it under the terms of the GNU General Public License version 2 and
+>>+ * only version 2 as published by the Free Software Foundation.
+>>+ *
+>>+ * This program is distributed in the hope that it will be useful,
+>>+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>+ * GNU General Public License for more details.
+>>+ *
+>>+ */
+>>+
+>>+#include <linux/cpuidle.h>
+>>+#include <linux/module.h>
+>>+#include <linux/platform_device.h>
+>>+
+>>+#include <soc/qcom/pm.h>
+>>+#include "dt_idle_states.h"
+>>+
+>>+static struct qcom_cpu_pm_ops *lpm_ops;
+>>+
+>>+static int qcom_cpu_stby(struct cpuidle_device *dev,
+>>+				struct cpuidle_driver *drv, int index)
+>>+{
+>>+	if (!lpm_ops->standby(NULL))
+>>+		return -1;
+>>+
+>>+	return index;
+>>+}
+>>+
+>>+static int qcom_cpu_spc(struct cpuidle_device *dev,
+>>+				struct cpuidle_driver *drv, int index)
+>>+{
+>>+	if (!lpm_ops->spc(NULL))
+>>+		return -1;
+>>+
+>>+	return index;
+>>+}
+>
+>
+>Really ? the lpm_ops return NULL on error ?
+>
+>ret = lpm_ops->spc(NULL);
+>if (ret)
+>	return ret;
+>
+Apologize.
+My sanity test on the device, did not reveal the insanity in my code :(
+
+Sorry, will try to not repeat it.
+
+>
+>
+>
+>
+>-- 
+> <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+>Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+><http://twitter.com/#!/linaroorg> Twitter |
+><http://www.linaro.org/linaro-blog/> Blog
+>
