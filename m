@@ -1,80 +1,117 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 1 Dec 2014 14:08:38 -0800
-Subject: [PATCH v10 0/4] This suspend patch is only support cut off the
- power of cpu and some external
-In-Reply-To: <7htx1f409k.fsf@deeprootsystems.com>
-References: <1417423940-1669-1-git-send-email-zyw@rock-chips.com>
- <7htx1f409k.fsf@deeprootsystems.com>
-Message-ID: <CAD=FV=V2go5BMFbiFKu73_aVz5ck949W-kJQ6WLkAQRPJbjPVA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 02 Dec 2014 00:14:57 +0200
+Subject: [PATCH 4/4] media: ov2640: dt: add the device tree binding
+ document
+In-Reply-To: <1417170507-11172-5-git-send-email-josh.wu@atmel.com>
+References: <1417170507-11172-1-git-send-email-josh.wu@atmel.com>
+ <1417170507-11172-5-git-send-email-josh.wu@atmel.com>
+Message-ID: <3353234.ED9pHT6goB@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Josh,
 
-On Mon, Dec 1, 2014 at 11:51 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> Chris Zhong <zyw@rock-chips.com> writes:
->
->> devices, since we still lack power_domain driver, so the other power rail
->> of rk3288 need keep power on.
->> I have tested it on rk3288-evb board, atop next-20141112. goto suspend by type
->> "echo mem > /sys/power/state", vdd_cpu is about 0mv by measuring, so it can be
->> determined in sleep mode, then press power button to wakeup it.
->
-> I tested this on top of today's linux-next (next-20141201) and it
-> suspends, but doesn't wake up from any of the button presses.  What
-> wakeup sources are configured for the rk3288-evb-rk808?
+Thank you for the patch.
 
-Just to close the loop (I talked with Kevin over IM about this, too):
+On Friday 28 November 2014 18:28:27 Josh Wu wrote:
+> Add the document for ov2640 dt.
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+>  .../devicetree/bindings/media/i2c/ov2640.txt       | 43 +++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+> b/Documentation/devicetree/bindings/media/i2c/ov2640.txt new file mode
+> 100644
+> index 0000000..adec147
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+> @@ -0,0 +1,43 @@
+> +* Omnivision ov2640 CMOS sensor
+> +
+> +The Omnivision OV2640 sensor support multiple resolutions output, such as
+> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
+> +output format.
+> +
+> +Required Properties :
+> +- compatible      : Must be "omnivision,ov2640"
 
-I have a huge description of how I tested this as part of my patch at
-<https://patchwork.kernel.org/patch/5414941/>.  Chris:  I think Kevin
-has asked you several times to include information like this in your
-cover letter.  Please, please, please can you try to remember to do
-this?
+The usual practice is to use the company's stock ticker as a prefix. In this 
+case the compatible string would be "ovti,ov2640". You need to add the prefix 
+to Documentation/devicetree/bindings/vendor-prefixes.txt.
 
-For those that don't want to click on my link, I'll include the
-relevant bits here:
+> +- reset-gpio      : reset pin
+> +- power-down-gpio : power down pin
 
----
+That should be reset-gpios and power-down-gpios, even if there's a single 
+GPIO. Furthermore, given that the power down pin is named PWDN you might want 
+to name the property pwdn-gpios.
 
-Total patches atop that version of Linux were:
+The reset and pwdn signals won't be connected on all boards, so the two 
+properties should be optional.
 
-1. https://patchwork.kernel.org/patch/5051881/ - clocksource:
-   arch_timer: Allow the device tree to specify uninitialized timer
-   registers
+> +Optional Properties:
+> +- clocks          : reference master clock, if using external fixed clock,
+> you
+> +                    no need to have such property.
 
-2. https://patchwork.kernel.org/patch/5363671/ - clocksource:
-   arch_timer: Fix code to use physical timers when requested
+The clock is required by the chip, so even when using an external fixed clock 
+the property should be present, and reference a fixed clock node. The clocks 
+and clock-names properties should thus be mandatory.
 
-3. https://patchwork.kernel.org/patch/5382141/ - ARM: dts: rk3288: add
-   arm,cpu-registers-not-fw-configured
+> +- clock-names     : Must be "mck", it means the master clock for ov2640.
 
-4. Revert (b77d439 ARM: dts: rockchip: temporarily disable smp on
-   rk3288)
+The clock input is named xvclk in the datasheet, you should use the same name 
+here.
 
-5. https://patchwork.kernel.org/patch/5325111/ - usb: dwc2: resume
-   root hub when device detect with suspend state
+> +
+> +For further reading of port node refer
+> Documentation/devicetree/bindings/media/
+> +video-interfaces.txt.
 
-6. https://patchwork.kernel.org/patch/5410611/ - ARM: rockchip: add
-   suspend and resume for RK3288
+Even if you reference that document you should still mention what port node(s) 
+these bindings require. Something like the following text should be enough.
 
-7. https://patchwork.kernel.org/patch/5410621/ - ARM: rockchip: Add
-   pmu-sram binding
+"The device node must contain one 'port' child node for its digital output 
+video port, in accordance with the video interface bindings defined in
+Documentation/devicetree/bindings/media/video-interfaces.txt."
 
-8. https://patchwork.kernel.org/patch/5410631/ - ARM: dts: add RK3288
-   suspend support
+> +
+> +Example:
+> +
+> +	i2c1: i2c at f0018000 {
+> +		ov2640: camera at 0x30 {
+> +			compatible = "omnivision,ov2640";
+> +			reg = <0x30>;
+> +
+> +			... ...
 
-9. https://patchwork.kernel.org/patch/5410641/ - ARM: dts: rockchip:
-   add suspend settings for rk3288-evb-rk808
+No need for an ellipsis, what are you trying to hide ? :-)
 
-It looks like my pinctrl patches might be dropped due to cross
-dependency problems, so tomorrow's linux-next will probably also need
-(https://patchwork.kernel.org/patch/5344551/ - pinctrl: rockchip:
-Handle wakeup pins).
+> +
+> +			reset-gpio = <&pioE 24 GPIO_ACTIVE_HIGH>;
+> +			power-down-gpio = <&pioE 29 GPIO_ACTIVE_HIGH>;
+> +
+> +			/* use pck1 for the master clock of ov2640 */
 
-I've also got a local hack to the Rockchip "pm.c" to replace the usage
-of "PMU_ARMINT_WAKEUP_EN" with 0x0e.  There seems to be some sort of
-ARM Interrupt waking us up all the time right when we go to sleep and
-the above will hack it so that only GPIOs + SDMMC Card Detect can wake
-us up.  Someone should track down what's going on there, but for now
-I've used the hack to prove that the basic code actually works.
+I think you can drop the comment.
+
+> +			clocks = <&pck1>;
+> +			clock-names = "mck";
+> +
+> +			port {
+> +				ov2640_0: endpoint {
+> +					remote-endpoint = <&isi_0>;
+> +					bus-width = <8>;
+> +				};
+> +			};
+> +		};
+> +	};
+
+-- 
+Regards,
+
+Laurent Pinchart
