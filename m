@@ -1,55 +1,42 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  1 Dec 2014 18:03:09 +0100
-Subject: [PATCH v2 3/3] ARM: imx_v6_v7_defconfig: add POWER_RESET_SYSCON
-In-Reply-To: <1417453389-1588-1-git-send-email-stefan@agner.ch>
-References: <1417453389-1588-1-git-send-email-stefan@agner.ch>
-Message-ID: <1417453389-1588-4-git-send-email-stefan@agner.ch>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 01 Dec 2014 17:03:20 +0000
+Subject: [PATCH] ARM: imx: irq: fix buggy usage of irq_data irq field
+In-Reply-To: <CAOMZO5DoR57Afc3SH-gV3-dZkHvBab1LXKCWDajpf_sRDKpzSw@mail.gmail.com>
+References: <1417451109-30276-1-git-send-email-marc.zyngier@arm.com>
+ <CAOMZO5DoR57Afc3SH-gV3-dZkHvBab1LXKCWDajpf_sRDKpzSw@mail.gmail.com>
+Message-ID: <547C9F58.5070903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add POWER_RESET_SYSCON since Vybrid SoC's now make use of this
-driver to provide software reset capabilities through the SRC
-module.
+On 01/12/14 17:00, Fabio Estevam wrote:
+> Hi Marc,
+> 
+> On Mon, Dec 1, 2014 at 2:25 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> mach-imx directly references to the irq field in
+>> struct irq_data, and uses this to directly poke hardware register.
+>>
+>> But irq is the *virtual* irq number, something that has nothing
+>> to do with the actual HW irq (stored in the hwirq field). And once
+>> we put the stacked domain code in action, the whole thing explodes,
+>> as these two values are *very* different.
+>>
+>> Just replacing all instances of irq with hwirq fixes the issue.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> I tested your patch and I still have the following problem on a mx6q:
 
-Also regenerated using savedefconfig which removed the config
-BACKLIGHT_LCD_SUPPORT which is now selected by default since
-commit 9c8ee3c734139 ("video: mx3fb: always enable
-BACKLIGHT_LCD_SUPPORT").
+[...]
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/configs/imx_v6_v7_defconfig | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> This issue does not happen on linux-next 20141126, but it stats at 201411267.
+> 
+> I haven't bisect it yet, but if you have any ideas, please let me know. Thanks
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index f707cd2..e928075 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -163,13 +163,14 @@ CONFIG_SPI_IMX=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_MC9S08DZ60=y
- CONFIG_GPIO_STMPE=y
-+CONFIG_POWER_SUPPLY=y
-+CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_IMX=y
-+CONFIG_POWER_RESET_SYSCON=y
- CONFIG_SENSORS_GPIO_FAN=y
- CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
- CONFIG_IMX_THERMAL=y
--CONFIG_POWER_SUPPLY=y
--CONFIG_POWER_RESET=y
--CONFIG_POWER_RESET_IMX=y
- CONFIG_WATCHDOG=y
- CONFIG_IMX2_WDT=y
- CONFIG_MFD_DA9052_I2C=y
-@@ -198,7 +199,6 @@ CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
- CONFIG_DRM_PANEL_SIMPLE=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_L4F00242T03=y
- CONFIG_LCD_PLATFORM=y
+I do have an idea indeed, as well as a patch for this. I'll put you on
+Cc, watch that space.
+
+Thanks,
+
+	M.
 -- 
-2.1.3
+Jazz is not dead. It just smells funny...
