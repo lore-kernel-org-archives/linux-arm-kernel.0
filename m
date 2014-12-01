@@ -1,88 +1,103 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 01 Dec 2014 16:11:43 +0100
-Subject: [PATCH 1/3] staging: imx-drm: document internal HDMI I2C master
- controller DT binding
-In-Reply-To: <547C8113.3050100@mentor.com>
-References: <1416073759-19939-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <1416073759-19939-2-git-send-email-vladimir_zapolskiy@mentor.com>
- <547C8113.3050100@mentor.com>
-Message-ID: <1417446703.4624.18.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Dec 2014 16:31:19 +0100
+Subject: [PATCH v5 6/7] ARM: zynq: Add OCM controller driver
+In-Reply-To: <4788755d350890d81f1bac4bf237c5ddfb68b795.1417440250.git.michal.simek@xilinx.com>
+References: <cover.1417440250.git.michal.simek@xilinx.com>
+ <4788755d350890d81f1bac4bf237c5ddfb68b795.1417440250.git.michal.simek@xilinx.com>
+Message-ID: <4151221.1fPmelvPbd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 01.12.2014, 16:54 +0200 schrieb Vladimir Zapolskiy:
-> Hi Philipp and Shawn,
+On Monday 01 December 2014 14:24:57 Michal Simek wrote:
+> The driver provide memory allocator which can
+> be used by others drivers to allocate memory inside OCM.
+> All locations for 64kB blocks are supported
+> and driver is trying to allocate the largest continuous
+> block of memory.
 > 
-> On 15.11.2014 19:49, Vladimir Zapolskiy wrote:
-> > Provide information about how to bind internal iMX6Q/DL HDMI DDC I2C
-> > master controller. The property is set as optional one, because iMX6
-> > HDMI DDC bus may be represented by one of general purpose I2C busses
-> > found on SoC.
-> > 
-> > Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> > Cc: Wolfram Sang <wsa@the-dreams.de>
-> > Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: linux-media at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-i2c at vger.kernel.org
-> > ---
-> >  Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt |   10 +++++++++-
-> >  1 file changed, 9 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-> > index 1b756cf..43c8924 100644
-> > --- a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-> > +++ b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-> > @@ -10,6 +10,8 @@ Required properties:
-> >   - #address-cells : should be <1>
-> >   - #size-cells : should be <0>
-> >   - compatible : should be "fsl,imx6q-hdmi" or "fsl,imx6dl-hdmi".
-> > +   If internal HDMI DDC I2C master controller is supposed to be used,
-> > +   then "simple-bus" should be added to compatible value.
-> >   - gpr : should be <&gpr>.
-> >     The phandle points to the iomuxc-gpr region containing the HDMI
-> >     multiplexer control register.
-> > @@ -22,6 +24,7 @@ Required properties:
-> >  
-> >  Optional properties:
-> >   - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
-> > + - ddc: internal HDMI DDC I2C master controller
-> >  
-> >  example:
-> >  
-> > @@ -32,7 +35,7 @@ example:
-> >          hdmi: hdmi at 0120000 {
-> >                  #address-cells = <1>;
-> >                  #size-cells = <0>;
-> > -                compatible = "fsl,imx6q-hdmi";
-> > +                compatible = "fsl,imx6q-hdmi", "simple-bus";
-> >                  reg = <0x00120000 0x9000>;
-> >                  interrupts = <0 115 0x04>;
-> >                  gpr = <&gpr>;
-> > @@ -40,6 +43,11 @@ example:
-> >                  clock-names = "iahb", "isfr";
-> >                  ddc-i2c-bus = <&i2c2>;
-> >  
-> > +                hdmi_ddc: ddc {
-> > +                        compatible = "fsl,imx6q-hdmi-ddc";
-> > +                        status = "disabled";
-> > +                };
-> > +
-> >                  port at 0 {
-> >                          reg = <0>;
-> >  
-> > 
+> Checking mpcore addressing filterring is not done here
+> but could be added in future.
 > 
-> knowing in advance that I2C framework lacks a graceful support of non
-> fully compliant I2C devices, do you have any objections to the proposed
-> iMX HDMI DTS change?
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-I'm not sure about this. Have you seen "drm: Decouple EDID parsing from
-I2C adapter"? I feel like in the absence of a ddc-i2c-bus property the
-imx-hdmi/dw-hdmi driver should try to use the internal HDMI DDC I2C
-master controller, bypassing the I2C framework altogether.
+The driver doesn't actually have any interface as far as I can tell,
+so I wonder how you expect it to be used.
 
-regards
-Philipp
+Do you have a list of drivers that would be using it?
+
+How does it relate to the generic "mmio-sram" binding? Is this
+meant as a specialization?
+
+> +/**
+> + * zynq_ocmc_irq_handler - Interrupt service routine of the OCM controller
+> + * @irq:	IRQ number
+> + * @data:	Pointer to the zynq_ocmc_dev structure
+> + *
+> + * Return:     IRQ_HANDLED always
+> + */
+> +static irqreturn_t zynq_ocmc_irq_handler(int irq, void *data)
+> +{
+> +	u32 sts;
+> +	u32 err_addr;
+> +	struct zynq_ocmc_dev *zynq_ocmc = data;
+> +
+> +	/* check status */
+> +	sts = readl(zynq_ocmc->base + ZYNQ_OCMC_IRQ_STS);
+> +	if (sts & ZYNQ_OCMC_IRQ_STS_ERR_MASK) {
+> +		/* check error address */
+> +		err_addr = readl(zynq_ocmc->base + ZYNQ_OCMC_PARITY_ERRADDRESS);
+> +		pr_err("%s: OCM err intr generated at 0x%04x (stat: 0x%08x).",
+> +		       __func__, err_addr, sts & ZYNQ_OCMC_IRQ_STS_ERR_MASK);
+> +	}
+> +	pr_warn("%s: Interrupt generated by OCM, but no error is found.",
+> +		__func__);
+> +
+> +	return IRQ_HANDLED;
+> +}
+
+I'm also puzzled by this: you don't really do anything here but print
+a message. What is the purpose of this interrupt? As this looks unrelated
+to the rest of the driver, maybe this should be part of drivers/edac
+instead?
+
+> +static int zynq_ocmc_probe(struct platform_device *pdev)
+> +{
+> +       int ret;
+> +       struct zynq_ocmc_dev *zynq_ocmc;
+> +       u32 i, ocm_config, curr;
+> +       struct resource *res;
+> +
+> +       ocm_config = zynq_slcr_get_ocm_config();
+> +
+> +       zynq_ocmc = devm_kzalloc(&pdev->dev, sizeof(*zynq_ocmc),
+> GFP_KERNEL);
+> +       if (!zynq_ocmc)
+> +               return -ENOMEM;
+> +
+> +       zynq_ocmc->pool = devm_gen_pool_create(&pdev->dev,
+> +                                              ilog2(ZYNQ_OCMC_GRANULARITY),
+> +                                              -1);
+> +       if (!zynq_ocmc->pool)
+> +               return -ENOMEM;
+> +
+> +       curr = 0; /* For storing current struct resource for OCM */
+> +       for (i = 0; i < ZYNQ_OCMC_BLOCKS; i++) {
+> +               u32 base, start, end;
+> +
+> +               /* Setup base address for 64kB OCM block */
+> +               if (ocm_config & BIT(i))
+> +                       base = ZYNQ_OCMC_HIGHADDR;
+> +               else
+> +                       base = ZYNQ_OCMC_LOWADDR;
+
+You write in the introductory mail that you want to support detecting the
+address from the slcr, and possibly even allow changing it at runtime,
+but I don't understand what that would be good for.
+
+It's not uncommon to describe in DT settings that one can also find
+out from hardware but that are set up by the boot loader in a particular
+way. Why not this one? For all I can tell, that would let you simply
+use one driver for the EDAC and the generic mmio-sram from the memory,
+without the need to do anything further.
+
+	Arnd
