@@ -1,7 +1,7 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon,  1 Dec 2014 12:39:05 +0000
-Subject: [PATCH v2] irqchip: gic: Allow interrupt level to be set for PPIs.
-Message-ID: <1417437545-20766-1-git-send-email-Liviu.Dudau@arm.com>
+Date: Mon,  1 Dec 2014 12:45:09 +0000
+Subject: [PATCH v3] irqchip: gic: Allow interrupt level to be set for PPIs.
+Message-ID: <1417437909-20923-1-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,6 +15,9 @@ of the IP can decide to shoot themselves in the foot at any time.
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 ---
+
+Made a stupid mistake in v2 and got my bit test confused with logical test.
+
  Documentation/devicetree/bindings/arm/gic.txt |  8 ++++++--
  drivers/irqchip/irq-gic-common.c              | 21 +++++++++++++--------
  drivers/irqchip/irq-gic-common.h              |  2 +-
@@ -47,7 +50,7 @@ index 8112d0c..c97484b 100644
  - reg : Specifies base physical address(s) and size of the GIC registers. The
    first region is the GIC distributor register base and size. The 2nd region is
 diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
-index 61541ff..468141d 100644
+index 61541ff..ffee521 100644
 --- a/drivers/irqchip/irq-gic-common.c
 +++ b/drivers/irqchip/irq-gic-common.c
 @@ -21,7 +21,7 @@
@@ -74,10 +77,10 @@ index 61541ff..468141d 100644
 -	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
 -	if (type == IRQ_TYPE_LEVEL_HIGH)
 +	val = oldval = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
-+	if (type && IRQ_TYPE_LEVEL_MASK)
++	if (type & IRQ_TYPE_LEVEL_MASK)
  		val &= ~confmask;
 -	else if (type == IRQ_TYPE_EDGE_RISING)
-+	else if (type && IRQ_TYPE_EDGE_BOTH)
++	else if (type & IRQ_TYPE_EDGE_BOTH)
  		val |= confmask;
  
  	/*
