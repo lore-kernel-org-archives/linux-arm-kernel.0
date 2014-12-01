@@ -1,64 +1,40 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  1 Dec 2014 11:27:16 +0100
-Subject: [PATCH v3 00/11] memory: add Atmel EBI (External Bus Interface) driver
-Message-ID: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon,  1 Dec 2014 11:27:23 +0100
+Subject: [PATCH v3 07/11] ARM: at91: select ATMEL_EBI when compiling a kernel
+ for at91sam9 or sama5d3
+In-Reply-To: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1417429647-3419-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EBI (External Bus Interface) is used to access external peripherals
-(NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-Each device is assigned a CS line and an address range and can have its
-own configuration (timings, access mode, bus width, ...).
-This driver provides a generic DT binding to configure a device according
-to its requirements.
-For specific device controllers (like the NAND one) the SMC timings
-should be configured by the controller driver through the matrix and
-smc syscon regmaps.
+at91sam9* and sama5d* SoCs have an EBI (External Bus Interface).
+Select the ATMEL_EBI driver when support for these SoCs is selected.
 
-The first 4 patches introduce 2 syscon devices needed to configure the
-EBI bus, patch 5 and 6 adds support for the EBI bus, and the remaining
-patches declares the EBI related nodes in sama5d3 dts[i] files.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ arch/arm/mach-at91/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Changes since v2:
-- minor fixes int DT bindings doc
-- fix SMC macros
-- make use of SMC macros defined in include/linux/mfd/syscon/atmel-smc.h
-
-Changes since v1:
-- almost everything :-)
-
-Boris Brezillon (11):
-  mfd: syscon: Add atmel-matrix registers definition
-  mfd: syscon: Add Atmel Matrix bus DT binding documentation
-  mfd: syscon: Add atmel-smc registers definition
-  mfd: syscon: Add Atmel SMC binding doc
-  memory: add Atmel EBI (External Bus Interface) driver
-  memory: atmel-ebi: add DT bindings documentation
-  ARM: at91: select ATMEL_EBI when compiling a kernel for at91sam9 or
-    sama5d3
-  ARM: at91/dt: add HSMC (Static Memory Controller) node in sama5d3 dtsi
-  ARM: at91/dt: add matrix node in sama5d3 dtsi
-  ARM: at91/dt: add EBI (External Bus Interface) node in sama5d3 dtsi
-  ARM: at91/dt: add NOR definition in sama5d3xcm dtsi
-
- .../bindings/memory-controllers/atmel-ebi.txt      | 155 +++++
- .../devicetree/bindings/mfd/atmel-matrix.txt       |  24 +
- .../devicetree/bindings/mfd/atmel-smc.txt          |  19 +
- arch/arm/boot/dts/sama5d3.dtsi                     |  93 +++
- arch/arm/boot/dts/sama5d3xcm.dtsi                  |  34 ++
- arch/arm/mach-at91/Kconfig                         |   2 +
- drivers/memory/Kconfig                             |  11 +
- drivers/memory/Makefile                            |   1 +
- drivers/memory/atmel-ebi.c                         | 627 +++++++++++++++++++++
- include/linux/mfd/syscon/atmel-matrix.h            | 114 ++++
- include/linux/mfd/syscon/atmel-smc.h               |  65 +++
- 11 files changed, 1145 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
- create mode 100644 Documentation/devicetree/bindings/mfd/atmel-matrix.txt
- create mode 100644 Documentation/devicetree/bindings/mfd/atmel-smc.txt
- create mode 100644 drivers/memory/atmel-ebi.c
- create mode 100644 include/linux/mfd/syscon/atmel-matrix.h
- create mode 100644 include/linux/mfd/syscon/atmel-smc.h
-
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 0e6d548..a72402a 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -49,6 +49,7 @@ config SOC_AT91SAM9
+ 	select GENERIC_CLOCKEVENTS
+ 	select MEMORY if USE_OF
+ 	select ATMEL_SDRAMC if USE_OF
++	select ATMEL_EBI if USE_OF
+ 
+ config SOC_SAMA5
+ 	bool
+@@ -58,6 +59,7 @@ config SOC_SAMA5
+ 	select USE_OF
+ 	select MEMORY
+ 	select ATMEL_SDRAMC
++	select ATMEL_EBI
+ 
+ menu "Atmel AT91 System-on-Chip"
+ 
 -- 
 1.9.1
