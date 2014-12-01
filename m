@@ -1,54 +1,68 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  1 Dec 2014 18:03:07 +0100
-Subject: [PATCH v2 1/3] power: reset: read priority from device tree
+Date: Mon,  1 Dec 2014 18:03:08 +0100
+Subject: [PATCH v2 2/3] ARM: dts: vf610: add system reset controller and
+ syscon-reboot
 In-Reply-To: <1417453389-1588-1-git-send-email-stefan@agner.ch>
 References: <1417453389-1588-1-git-send-email-stefan@agner.ch>
-Message-ID: <1417453389-1588-2-git-send-email-stefan@agner.ch>
+Message-ID: <1417453389-1588-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an optional property which allows to specify the
-reset source priority. This priority is used by the kernel restart
-handler call chain to sort out the proper reset/restart method.
-Depending on the power design of a board or other machine/board
-specific peculiarity, it is not possible to pick a generic priority.
+Add the system reset controller (SRC) module and use syscon-reboot
+to register a restart handler which restarts the SoC using the
+SRC SW_RST bit.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- Documentation/devicetree/bindings/power/reset/syscon-reboot.txt | 3 +++
- drivers/power/reset/syscon-reboot.c                             | 5 ++++-
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/vf500.dtsi |  4 ++++
+ arch/arm/boot/dts/vfxxx.dtsi | 13 +++++++++++++
+ 2 files changed, 17 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
-index 1190631..ee41d9c 100644
---- a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
-+++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
-@@ -11,6 +11,9 @@ Required properties:
- - offset: offset in the register map for the reboot register (in bytes)
- - mask: the reset value written to the reboot register (32 bit access)
+diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
+index de67005..3f38f49 100644
+--- a/arch/arm/boot/dts/vf500.dtsi
++++ b/arch/arm/boot/dts/vf500.dtsi
+@@ -130,6 +130,10 @@
+ 	interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+ };
  
-+Optional properties:
-+- priority: define the priority of the reset (0-255, defaults to 128)
++&src {
++	interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
++};
 +
- Default will be little endian mode, 32 bit access only.
+ &uart0 {
+ 	interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ };
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index 505969a..3e696d7 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -43,6 +43,14 @@
+ 		clock-frequency = <32768>;
+ 	};
  
- Examples:
-diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
-index 815b901..3060d6b 100644
---- a/drivers/power/reset/syscon-reboot.c
-+++ b/drivers/power/reset/syscon-reboot.c
-@@ -67,8 +67,11 @@ static int syscon_reboot_probe(struct platform_device *pdev)
- 	if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
- 		return -EINVAL;
- 
--	ctx->restart_handler.notifier_call = syscon_restart_handle;
- 	ctx->restart_handler.priority = 128;
-+	of_property_read_u32(pdev->dev.of_node, "priority",
-+			     &ctx->restart_handler.priority);
++	reboot: syscon-reboot {
++		compatible = "syscon-reboot";
++		regmap = <&src>;
++		offset = <0x0>;
++		mask = <0x1000>;
++		priority = <192>;
++	};
 +
-+	ctx->restart_handler.notifier_call = syscon_restart_handle;
- 	err = register_restart_handler(&ctx->restart_handler);
- 	if (err)
- 		dev_err(dev, "can't register restart notifier (err=%d)\n", err);
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -318,6 +326,11 @@
+ 				clocks = <&clks VF610_CLK_USBC0>;
+ 				status = "disabled";
+ 			};
++
++			src: src at 4006e000 {
++				compatible = "fsl,vf610-src", "syscon";
++				reg = <0x4006e000 0x1000>;
++			};
+ 		};
+ 
+ 		aips1: aips-bus at 40080000 {
 -- 
 2.1.3
