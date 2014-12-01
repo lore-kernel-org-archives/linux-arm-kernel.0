@@ -1,104 +1,57 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 01 Dec 2014 12:56:28 +0100
-Subject: [PATCH 1/2] ARM: at91: remove at91sam9261/at91sam9g10 legacy
- board support
-In-Reply-To: <2e591e7b3ac20c8f686a6099d236d09964d08406.1416568804.git.nicolas.ferre@atmel.com>
-References: <2e591e7b3ac20c8f686a6099d236d09964d08406.1416568804.git.nicolas.ferre@atmel.com>
-Message-ID: <1417434988.30245.33.camel@x220>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Mon, 1 Dec 2014 17:27:39 +0530
+Subject: [PATCH V2] PM / Domains: Add pm_genpd_lookup() API to lookup
+ domain by firmware node
+In-Reply-To: <CAPDyKFpX5nXR18pKdLrtDrPK60p1y2CEqq+--3z3jczRRmKrqA@mail.gmail.com>
+References: <1417171115-5789-1-git-send-email-ulf.hansson@linaro.org>
+ <5765394.eQjV2VvkSL@vostro.rjw.lan>
+ <CAPDyKFpX5nXR18pKdLrtDrPK60p1y2CEqq+--3z3jczRRmKrqA@mail.gmail.com>
+Message-ID: <CADGdYn5aLr69PrqO5RvU4q6HU9pPZ+1tWL27cc=cVazAvSVFpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-11-21 at 12:27 +0100, Nicolas Ferre wrote:
-> Remove legacy support for at91sam9261/at91sam9g10 boards.
-> This include board files removal plus all legacy code for non DT boards
-> support.
-> Use the Device Tree for running this board with newer kernels.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
+On Mon, Dec 1, 2014 at 3:56 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 29 November 2014 at 01:30, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> On Friday, November 28, 2014 11:38:35 AM Ulf Hansson wrote:
+>>> In a step to move away from using genpd's name based APIs, such as the
+>>> pm_genpd_add_subdomain_names(), provide an API to lookup an already
+>>> initialized generic PM domain by its firmware node.
+>>>
+>>> This API would typically be a called from SOC specific code, to fetch a
+>>> handle to the domain. Especially convenient to configure subdomains and
+>>> when the hierarchy of the domains are described in DT.
+>>>
+>>> Do note, before pm_genpd_init() is invoked to initialize a generic PM
+>>> domain, it's the callers responsibility to assign the new ->fwnode
+>>> pointer in the struct generic_pm_domain, to enable pm_genpd_lookup() to
+>>> find the domain.
+>>>
+>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> I have no problems with that, but do you have a user for it?
+>
+> Amit Daniel Kachhap, posted a patchset which is adding subdomains
+> configured from DT for Exynos. It's from there the idea to this patch
+> comes from. Amit is about to post a new version, based on this patch.
 
-There's some further cleanup possible after this patch. I noticed that
-when it landed in today's linux-next (ie, next-20141201) as commit
-2e591e7b3ac2 ("ARM: at91: remove at91sam9261/at91sam9g10 legacy board
-support").
+Hi Ulf,
 
->  arch/arm/configs/at91sam9261_9g10_defconfig |  147 ----
->  arch/arm/mach-at91/Kconfig.non_dt           |   34 -
->  arch/arm/mach-at91/Makefile                 |    5 -
->  arch/arm/mach-at91/at91sam9261.c            |  375 ---------
->  arch/arm/mach-at91/at91sam9261_devices.c    | 1098 ---------------------------
->  arch/arm/mach-at91/board-sam9261ek.c        |  623 ---------------
->  6 files changed, 2282 deletions(-)
->  delete mode 100644 arch/arm/configs/at91sam9261_9g10_defconfig
->  delete mode 100644 arch/arm/mach-at91/at91sam9261_devices.c
->  delete mode 100644 arch/arm/mach-at91/board-sam9261ek.c
-> 
->[...]
-> diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-> deleted file mode 100644
-> index 29baacb5c359..000000000000
-> --- a/arch/arm/mach-at91/at91sam9261_devices.c
-> +++ /dev/null
->[...]
-> -/* --------------------------------------------------------------------
-> - *  RTT
-> - * -------------------------------------------------------------------- */
-> -
-> -static struct resource rtt_resources[] = {
-> -	{
-> -		.start	= AT91SAM9261_BASE_RTT,
-> -		.end	= AT91SAM9261_BASE_RTT + SZ_16 - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	}, {
-> -		.flags	= IORESOURCE_MEM,
-> -	}, {
-> -		.flags  = IORESOURCE_IRQ,
-> -	}
-> -};
-> -
-> -static struct platform_device at91sam9261_rtt_device = {
-> -	.name		= "at91_rtt",
-> -	.id		= 0,
-> -	.resource	= rtt_resources,
-> -};
-> -
-> -#if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
-> -static void __init at91_add_device_rtt_rtc(void)
-> -{
-> -	at91sam9261_rtt_device.name = "rtc-at91sam9";
-> -	/*
-> -	 * The second resource is needed:
-> -	 * GPBR will serve as the storage for RTC time offset
-> -	 */
-> -	at91sam9261_rtt_device.num_resources = 3;
-> -	rtt_resources[1].start = AT91SAM9261_BASE_GPBR +
-> -				 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
+I was trying to use this API but i felt there is a better way of just exporting
+of_genpd_get_from_provider as a similar API is used to register the
+power domain.
 
-This was the only place where the Kconfig symbol RTC_DRV_AT91SAM9_GPBR
-was used. That again matches its help text:
-    This option is only relevant for legacy board support and
-    won't be used when booting a DT board.
+Check if this make sense www.spinics.net/lists/arm-kernel/msg382665.html.
 
-> -	rtt_resources[1].end = rtt_resources[1].start + 3;
-> -	rtt_resources[2].start = NR_IRQS_LEGACY + AT91_ID_SYS;
-> -	rtt_resources[2].end = NR_IRQS_LEGACY + AT91_ID_SYS;
-> -}
-> -#else
-> -static void __init at91_add_device_rtt_rtc(void)
-> -{
-> -	/* Only one resource is needed: RTT not used as RTC */
-> -	at91sam9261_rtt_device.num_resources = 1;
-> -}
-> -#endif
-> -
-> -static void __init at91_add_device_rtt(void)
-> -{
-> -	at91_add_device_rtt_rtc();
-> -	platform_device_register(&at91sam9261_rtt_device);
-> -}
-
-Is a patch to also remove that symbol from drivers/rtc/Kconfig queued
-somewhere?
+Regards,
+Amit
 
 
-Paul Bolle
+>
+> https://lkml.org/lkml/2014/11/24/290
+>
+> Kind regards
+> Uffe
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
