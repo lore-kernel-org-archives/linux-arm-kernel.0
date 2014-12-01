@@ -1,53 +1,146 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Dec 2014 15:47:03 +0100
-Subject: [PATCH v3 1/2] ARM: hip04: set ARCH_NR_GPIO to 128
-In-Reply-To: <CACRpkdb1nZN-vOXLC-QFUAT9wDGM2Nm5YeH0qY_u2JV9toOaVg@mail.gmail.com>
-References: <1417156188-500-1-git-send-email-wangzhou.bry@gmail.com>
- <547971BF.1050706@gmail.com>
- <CACRpkdb1nZN-vOXLC-QFUAT9wDGM2Nm5YeH0qY_u2JV9toOaVg@mail.gmail.com>
-Message-ID: <2571535.P78Okb1jGf@wuerfel>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 01 Dec 2014 15:46:18 +0100
+Subject: [PATCH v3 4/8] KVM: kvm-vfio: User API for IRQ forwarding
+In-Reply-To: <20141130125314.GE82106@macair>
+References: <1416767760-14487-1-git-send-email-eric.auger@linaro.org>
+ <1416767760-14487-5-git-send-email-eric.auger@linaro.org>
+ <20141130125314.GE82106@macair>
+Message-ID: <547C7F3A.2000601@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 December 2014 15:04:49 Linus Walleij wrote:
-> On Sat, Nov 29, 2014 at 8:11 AM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
-> > On 2014?11?28? 17:33, Arnd Bergmann wrote:
-> >> On Friday 28 November 2014 14:29:47 Zhou Wang wrote:
+On 11/30/2014 01:53 PM, Christoffer Dall wrote:
+> On Sun, Nov 23, 2014 at 07:35:56PM +0100, Eric Auger wrote:
+>> This patch adds and document a new KVM_DEV_VFIO_DEVICE group
 > 
-> >>>          default 264 if MACH_H4700
-> >>> +       default 128 if ARCH_HIP04
-> >>>          default 0
-> >>>          help
-> >>>            Maximum number of GPIOs in the system.
-> >>>
-> >>
-> >> If I remember correctly, you don't actually need to set this if all gpio
-> >> clients are using the new gpio descriptor interfaces instead of gpio
-> >> numbers. Would that work for you? You'd have to know which devices
-> >
-> > If I don't set this, it will use the default ARCH_NR_GPIO(512), then
-> > the range of GPIO number will be 384~511 which is very strange to users,
-> > because Hip04 based machines can only support 128 GPIOs.
+> documents
+OK
 > 
-> That is a totally different problem.
+>> and 2 device attributes: KVM_DEV_VFIO_DEVICE_FORWARD_IRQ,
+>> KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ. The purpose is to be able
+>> to set a VFIO device IRQ as forwarded or not forwarded.
+>> the command takes as argument a handle to a new struct named
+>> kvm_arch_forwarded_irq.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> v2 -> v3:
+>> - rework vfio kvm device documentation
+>> - reword commit message and title
+>> - add subindex in kvm_arch_forwarded_irq to be closer to VFIO API
+>> - forwarding state can only be changed with VFIO IRQ signaling is off
+>>
+>> v1 -> v2:
+>> - struct kvm_arch_forwarded_irq moved from arch/arm/include/uapi/asm/kvm.h
+>>   to include/uapi/linux/kvm.h
+>>   also irq_index renamed into index and guest_irq renamed into gsi
+>> - ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
+>> ---
+>>  Documentation/virtual/kvm/devices/vfio.txt | 34 ++++++++++++++++++++++++------
+>>  include/uapi/linux/kvm.h                   | 10 +++++++++
+>>  2 files changed, 38 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/Documentation/virtual/kvm/devices/vfio.txt b/Documentation/virtual/kvm/devices/vfio.txt
+>> index ef51740..f7aff29 100644
+>> --- a/Documentation/virtual/kvm/devices/vfio.txt
+>> +++ b/Documentation/virtual/kvm/devices/vfio.txt
+>> @@ -4,15 +4,24 @@ VFIO virtual device
+>>  Device types supported:
+>>    KVM_DEV_TYPE_VFIO
+>>  
+>> -Only one VFIO instance may be created per VM.  The created device
+>> -tracks VFIO groups in use by the VM and features of those groups
+>> -important to the correctness and acceleration of the VM.  As groups
+>> -are enabled and disabled for use by the VM, KVM should be updated
+>> -about their presence.  When registered with KVM, a reference to the
+>> -VFIO-group is held by KVM.
+>> +Only one VFIO instance may be created per VM.
+>> +
+>> +The created device tracks VFIO groups in use by the VM and features
+>> +of those groups important to the correctness and acceleration of
+>> +the VM.  As groups are enabled and disabled for use by the VM, KVM
+>> +should be updated about their presence.  When registered with KVM,
+>> +a reference to the VFIO-group is held by KVM.
+>> +
+>> +The device also tracks & enable VFIO device forwarded IRQs, if any.
 > 
-> Not that these numbers have ever been stable...
-
-Right, in particular, it would be different between hisi_defconfig
-and multi_v7_defconfig.
-
-> Think of a patch to gpiochip_find_base() in
-> drivers/gpio/gpiolib.c to fix this so that numbers are
-> assigned a better way rather than doing
-> random hacks with numbers like this.
-
-Maybe we can find the highest number that is ever allocated
-statically by any driver (since it's all from source code), and do
-the dynamic allocations forward from that number instead of allocating
-backward?
-
-Or could we try to find the drivers that use DT /and/ allocate a static
-number and then see if we can avoid the need for static numbers for
-those?
-
-	Arnd
+> s/tracks & enable/tracks and enables/
+ok
+> 
+>> +A physical forwarded IRQ is directly completed by the guest. This
+>> +requires HW support in the interrupt controller which must be able
+>> +to automatically complete the physical IRQ when it detects the guest
+>> +has completed the corresponding virtual IRQ. The modality sometimes
+>> +is named direct EOI.
+> 
+> this last sentence is a bit floating out there; perhaps you want to be
+> more specific and say what it is on ARM.
+Well this is naming some people used at the KVM forum. I thought this
+was something known on other archs but I can drop this comment.
+> 
+>>  
+>>  Groups:
+>>    KVM_DEV_VFIO_GROUP
+>> +  KVM_DEV_VFIO_DEVICE
+>>  
+>>  KVM_DEV_VFIO_GROUP attributes:
+>>    KVM_DEV_VFIO_GROUP_ADD: Add a VFIO group to VFIO-KVM device tracking
+>> @@ -20,3 +29,16 @@ KVM_DEV_VFIO_GROUP attributes:
+>>  
+>>  For each, kvm_device_attr.addr points to an int32_t file descriptor
+>>  for the VFIO group.
+>> +
+>> +KVM_DEV_VFIO_DEVICE attributes:
+>> +  KVM_DEV_VFIO_DEVICE_FORWARD_IRQ: set a VFIO device IRQ as forwarded
+>> +  KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ: set a VFIO device IRQ as not forwarded
+>> +
+>> +For each, kvm_device_attr.addr points to a kvm_arch_forwarded_irq struct.
+>> +
+>> +The forwarded state can only be changed when the VFIO signaling mechanism
+>> +for this physical IRQ is not set. In other words, forwarding must be
+>> +activated before VFIO_DEVICE_SET_IRQS has been called to trigger the IRQ
+>> +or associate an eventfd to it. Unforwarding can only be called while the
+>> +signaling has been disabled with VFIO_DEVICE_SET_IRQS. If this condition is
+>> +not satisfied, the command returns an -EBUSY.
+> 
+> s/command/ioctl/
+ok
+> 
+>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>> index 6076882..a269a42 100644
+>> --- a/include/uapi/linux/kvm.h
+>> +++ b/include/uapi/linux/kvm.h
+>> @@ -946,6 +946,9 @@ struct kvm_device_attr {
+>>  #define  KVM_DEV_VFIO_GROUP			1
+>>  #define   KVM_DEV_VFIO_GROUP_ADD			1
+>>  #define   KVM_DEV_VFIO_GROUP_DEL			2
+>> +#define  KVM_DEV_VFIO_DEVICE			2
+>> +#define   KVM_DEV_VFIO_DEVICE_FORWARD_IRQ			1
+>> +#define   KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ			2
+>>  
+>>  enum kvm_device_type {
+>>  	KVM_DEV_TYPE_FSL_MPIC_20	= 1,
+>> @@ -963,6 +966,13 @@ enum kvm_device_type {
+>>  	KVM_DEV_TYPE_MAX,
+>>  };
+>>  
+>> +struct kvm_arch_forwarded_irq {
+>> +	__u32 fd; /* file desciptor of the VFIO device */
+>> +	__u32 index; /* VFIO device IRQ index */
+>> +	__u32 subindex; /* VFIO device IRQ subindex */
+>> +	__u32 gsi; /* gsi, ie. virtual IRQ number */
+>> +};
+>> +
+>>  /*
+>>   * ioctls for VM fds
+>>   */
+>> -- 
+>> 1.9.1
+>>
+> 
+> otherwise this looks reasonable.
+thanks
+Eric
+> 
