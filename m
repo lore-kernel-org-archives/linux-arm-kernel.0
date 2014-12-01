@@ -1,40 +1,52 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 01 Dec 2014 09:07:41 +0100
-Subject: [PATCHv1 6/6] rtc: rtc-isl12057: add alarm support to Intersil
- ISL12057 RTC driver
-In-Reply-To: <5476ED9F.2070600@kleine-koenig.org> ("Uwe
- \=\?utf-8\?Q\?Kleine-K\?\= \=\?utf-8\?Q\?\=C3\=B6nig\=22's\?\=
- message of "Thu, 27 Nov 2014 10:23:43 +0100")
-References: <cover.1416006090.git.arno@natisbad.org>
- <986ee8d9d3e6862007f398ffddc2a4bb2368933e.1416006090.git.arno@natisbad.org>
- <5476ED9F.2070600@kleine-koenig.org>
-Message-ID: <87r3wjkd2q.fsf@natisbad.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 1 Dec 2014 09:05:37 +0100
+Subject: [PATCH] ARM: shmobile: dts: koelsch: Fix flash partition label
+ and size
+In-Reply-To: <20141201003054.GA23212@verge.net.au>
+References: <1416960805-15185-1-git-send-email-horms+renesas@verge.net.au>
+ <5475CCA5.2020300@cogentembedded.com>
+ <20141128002718.GF30850@verge.net.au>
+ <CAMuHMdUUgCGq0igyJLJcRJitcmUR543O9tx399e+4jZfS4zQUg@mail.gmail.com>
+ <20141201003054.GA23212@verge.net.au>
+Message-ID: <CAMuHMdWnMBH1HD3TXxxc7nwcDCUYVSqZnrXThvw3Z5c42hOzPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Simon,
 
-Uwe Kleine-K?nig <uwe@kleine-koenig.org> writes:
+On Mon, Dec 1, 2014 at 1:30 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Nov 28, 2014 at 09:34:05AM +0100, Geert Uytterhoeven wrote:
+>> On Fri, Nov 28, 2014 at 1:27 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > On Wed, Nov 26, 2014 at 03:50:45PM +0300, Sergei Shtylyov wrote:
+>> >> On 11/26/2014 3:13 AM, Simon Horman wrote:
+>> >> >"loader"---0x0000_0000-0x0008_0000 [loader program (readonly)]
+>> >> >"user"  ---0x0008_0000-0x0060_0000 [U-Boot + bootargs + dt + uImage (readonly)]
+>> >> >"flash" ---0x0060_0000-0x0400_0000 [filesystem and free (read/write)]
+>> >>
+>> >> >["user"'s assumed breakdown]
+>> >> >U-boot+ bootargs(0x0008_0000-0x0010_0000) 512KB
+>>
+>> KiB
+>>
+>> You may want to split this explicitly in 256 KiB for U-boot, and 256 KiB for the
+>> U-boot bootargs, to help people needing low-level recovery.
+>
+> Are you suggesting 4 partitions or just an adjustment of the assumption
+> documented in the changelog?
 
-> Hello,
->
-> finally I managed to test this series on my (unmodified) rn104.
->
-> For patch 1: Maybe point out that the issue with the century bit isn't
-> that critical, because this bit is not expected to be set before year 2100.
->
-> For patch 3: This patch adds a few dev_err calls that get later amended
-> in patch 5 to also include an error code. IMHO these should already be
-> added in patch 3. Patch 5 should only add it to the already existing
-> strings (if applicable).
->
-> For patch 4: Maybe
-> s/obsolete/for backwards compatibility, don't use in new code/.
->
-> Some further comments inline ...
+Just the documentation.
 
-Thanks for the tests. I'll take a look at your comments this evening.
+I thought about having more partitions, though. But the two 256 KiB
+blocks are just
+two erase blocks.
 
-Cheers,
+Gr{oetje,eeting}s,
 
-a+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
