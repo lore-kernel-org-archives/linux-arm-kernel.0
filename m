@@ -1,23 +1,23 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 1 Dec 2014 15:13:41 -0200
-Subject: [PATCH] ARM: imx6: fix bogus use of irq_get_irq_data
-In-Reply-To: <1417453443-9179-1-git-send-email-marc.zyngier@arm.com>
-References: <1417453443-9179-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAOMZO5AYAd5UVr7w_XAM0YPRNK0FQDS21QC-xwqq+dCsXogZ1g@mail.gmail.com>
+Date: Mon, 1 Dec 2014 15:14:18 -0200
+Subject: [PATCH] ARM: imx: irq: fix buggy usage of irq_data irq field
+In-Reply-To: <1417451109-30276-1-git-send-email-marc.zyngier@arm.com>
+References: <1417451109-30276-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAOMZO5DQTsc_dWnBrndsenhhVn-6rnjhmvGV_fYTYT8Rug27rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 1, 2014 at 3:04 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> The imx6 PM code seems to be quite creative in its use of irq_data,
-> using something something that is very much a hardware interrupt
-> number where we expect a virtual one.  Yes, it worked so far, but
-> that's only cheer luck, and it will definitely explode in 3.19.
+On Mon, Dec 1, 2014 at 2:25 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> mach-imx directly references to the irq field in
+> struct irq_data, and uses this to directly poke hardware register.
 >
-> Fix it by using a pair of helper functions that deal with the
-> actual hardware.
+> But irq is the *virtual* irq number, something that has nothing
+> to do with the actual HW irq (stored in the hwirq field). And once
+> we put the stacked domain code in action, the whole thing explodes,
+> as these two values are *very* different.
+>
+> Just replacing all instances of irq with hwirq fixes the issue.
 >
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Thanks a lot, Marc! This fixes mx6q boot on linux-next:
 
 Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
