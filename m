@@ -1,123 +1,122 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  1 Dec 2014 16:57:10 +0000
-Subject: [PATCH v6 4/8] iommu: provide helper function to configure an IOMMU
- for an of master
+Date: Mon,  1 Dec 2014 16:57:08 +0000
+Subject: [PATCH v6 2/8] dma-mapping: replace set_arch_dma_coherent_ops with
+ arch_setup_dma_ops
 In-Reply-To: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
 References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1417453034-21379-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1417453034-21379-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic IOMMU device-tree bindings can be used to add arbitrary OF
-masters to an IOMMU with a compliant binding.
+set_arch_dma_coherent_ops is called from of_dma_configure in order to
+swizzle the architectural dma-mapping functions over to a cache-coherent
+implementation. This is currently implemented only for ARM.
 
-This patch introduces of_iommu_configure, which does exactly that.
+In anticipation of re-using this mechanism for IOMMU-backed dma-mapping
+ops too, this patch replaces the function with a broader
+arch_setup_dma_ops callback which will be extended in future.
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Joerg Roedel <jroedel@suse.de>
 Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Tested-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/iommu/Kconfig    |  2 +-
- drivers/iommu/of_iommu.c | 33 +++++++++++++++++++++++++++++++++
- include/linux/of_iommu.h |  6 ++++++
- 3 files changed, 40 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/dma-mapping.h |  8 ++++----
+ drivers/of/platform.c              | 31 +++++++++++++------------------
+ include/linux/dma-mapping.h        |  7 ++-----
+ 3 files changed, 19 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index dd5112265cc9..6d13f962f156 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -15,7 +15,7 @@ if IOMMU_SUPPORT
- 
- config OF_IOMMU
-        def_bool y
--       depends on OF
-+       depends on OF && IOMMU_API
- 
- config FSL_PAMU
- 	bool "Freescale IOMMU support"
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index 89b903406968..73236d3cc955 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -18,6 +18,7 @@
-  */
- 
- #include <linux/export.h>
-+#include <linux/iommu.h>
- #include <linux/limits.h>
- #include <linux/of.h>
- #include <linux/of_iommu.h>
-@@ -93,6 +94,38 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index 85738b200023..dc3420e77758 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -121,12 +121,12 @@ static inline unsigned long dma_max_pfn(struct device *dev)
  }
- EXPORT_SYMBOL_GPL(of_get_dma_window);
+ #define dma_max_pfn(dev) dma_max_pfn(dev)
  
-+struct iommu_ops *of_iommu_configure(struct device *dev)
-+{
-+	struct of_phandle_args iommu_spec;
-+	struct device_node *np;
-+	struct iommu_ops *ops = NULL;
-+	int idx = 0;
-+
-+	/*
-+	 * We don't currently walk up the tree looking for a parent IOMMU.
-+	 * See the `Notes:' section of
-+	 * Documentation/devicetree/bindings/iommu/iommu.txt
-+	 */
-+	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
-+					   "#iommu-cells", idx,
-+					   &iommu_spec)) {
-+		np = iommu_spec.np;
-+		ops = of_iommu_get_ops(np);
-+
-+		if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
-+			goto err_put_node;
-+
-+		of_node_put(np);
-+		idx++;
-+	}
-+
-+	return ops;
-+
-+err_put_node:
-+	of_node_put(np);
-+	return NULL;
-+}
-+
- void __init of_iommu_init(void)
+-static inline int set_arch_dma_coherent_ops(struct device *dev)
++static inline void arch_setup_dma_ops(struct device *dev, bool coherent)
  {
- 	struct device_node *np;
-diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-index 5762cdc8effe..d03abbb11c34 100644
---- a/include/linux/of_iommu.h
-+++ b/include/linux/of_iommu.h
-@@ -1,6 +1,7 @@
- #ifndef __OF_IOMMU_H
- #define __OF_IOMMU_H
+-	set_dma_ops(dev, &arm_coherent_dma_ops);
+-	return 0;
++	if (coherent)
++		set_dma_ops(dev, &arm_coherent_dma_ops);
+ }
+-#define set_arch_dma_coherent_ops(dev)	set_arch_dma_coherent_ops(dev)
++#define arch_setup_dma_ops arch_setup_dma_ops
  
-+#include <linux/device.h>
- #include <linux/iommu.h>
- #include <linux/of.h>
+ static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+ {
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 3b64d0bf5bba..ff1f4e9afccb 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -164,6 +164,8 @@ static void of_dma_configure(struct device *dev)
+ {
+ 	u64 dma_addr, paddr, size;
+ 	int ret;
++	bool coherent;
++	unsigned long offset;
  
-@@ -11,6 +12,7 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
- 			     size_t *size);
+ 	/*
+ 	 * Set default dma-mask to 32 bit. Drivers are expected to setup
+@@ -178,28 +180,21 @@ static void of_dma_configure(struct device *dev)
+ 	if (!dev->dma_mask)
+ 		dev->dma_mask = &dev->coherent_dma_mask;
  
- extern void of_iommu_init(void);
-+extern struct iommu_ops *of_iommu_configure(struct device *dev);
+-	/*
+-	 * if dma-coherent property exist, call arch hook to setup
+-	 * dma coherent operations.
+-	 */
+-	if (of_dma_is_coherent(dev->of_node)) {
+-		set_arch_dma_coherent_ops(dev);
+-		dev_dbg(dev, "device is dma coherent\n");
+-	}
+-
+-	/*
+-	 * if dma-ranges property doesn't exist - just return else
+-	 * setup the dma offset
+-	 */
+ 	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+ 	if (ret < 0) {
+-		dev_dbg(dev, "no dma range information to setup\n");
+-		return;
++		dma_addr = offset = 0;
++		size = dev->coherent_dma_mask;
++	} else {
++		offset = PFN_DOWN(paddr - dma_addr);
++		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+ 	}
++	dev->dma_pfn_offset = offset;
++
++	coherent = of_dma_is_coherent(dev->of_node);
++	dev_dbg(dev, "device is%sdma coherent\n",
++		coherent ? " " : " not ");
  
- #else
- 
-@@ -22,6 +24,10 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+-	/* DMA ranges found. Calculate and set dma_pfn_offset */
+-	dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
+-	dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
++	arch_setup_dma_ops(dev, coherent);
  }
  
- static inline void of_iommu_init(void) { }
-+static inline struct iommu_ops *of_iommu_configure(struct device *dev)
-+{
-+	return NULL;
-+}
+ /**
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index d5d388160f42..8a1560f95d4a 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -129,11 +129,8 @@ static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
  
- #endif	/* CONFIG_OF_IOMMU */
+ extern u64 dma_get_required_mask(struct device *dev);
  
+-#ifndef set_arch_dma_coherent_ops
+-static inline int set_arch_dma_coherent_ops(struct device *dev)
+-{
+-	return 0;
+-}
++#ifndef arch_setup_dma_ops
++static inline void arch_setup_dma_ops(struct device *dev, bool coherent) { }
+ #endif
+ 
+ static inline unsigned int dma_get_max_seg_size(struct device *dev)
 -- 
 2.1.1
