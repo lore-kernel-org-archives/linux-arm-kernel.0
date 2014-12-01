@@ -1,33 +1,70 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 1 Dec 2014 11:41:39 -0800
-Subject: [PATCH] mtd: gpmi: properly handle bitflips in erased pages
-In-Reply-To: <1417461159-2972-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1417461159-2972-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20141201194139.GI21347@ld-irv-0074>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Dec 2014 20:43:31 +0100
+Subject: [PATCH v3 05/11] memory: add Atmel EBI (External Bus Interface)
+ driver
+In-Reply-To: <20141201192923.6a85e52b@bbrezillon>
+References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
+ <4214030.Z2iCEM6hVA@wuerfel> <20141201192923.6a85e52b@bbrezillon>
+Message-ID: <2476626.8iiXDzb2Te@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Monday 01 December 2014 19:29:23 Boris Brezillon wrote:
+> Hi Arnd,
+> 
+> On Mon, 01 Dec 2014 17:26:27 +0100
+> Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > On Monday 01 December 2014 11:27:21 Boris Brezillon wrote:
+> > > The EBI (External Bus Interface) is used to access external peripherals
+> > > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+> > > Each device is assigned a CS line and an address range and can have its
+> > > own configuration (timings, access mode, bus width, ...).
+> > > This driver provides a generic DT binding to configure a device according
+> > > to its requirements.
+> > > For specific device controllers (like the NAND one) the SMC timings
+> > > should be configured by the controller driver through the matrix and
+> > > smc syscon regmaps.
+> > 
+> > Nice!
+> > 
+> > > +
+> > > +#define AT91_EBICSA_REGFIELD(soc)			\
+> > > +	REG_FIELD(soc ## _MATRIX_EBICSA_OFF, 0,		\
+> > > +		  AT91_MATRIX_EBI_NUM_CS - 1)
+> > > +
+> > > +#define AT91_MULTI_EBICSA_REGFIELD(soc, n)		\
+> > > +	REG_FIELD(soc ## _MATRIX_EBI ## n ## CSA_OFF,	\
+> > > +		  0, AT91_MATRIX_EBI_NUM_CS - 1)
+> > 
+> > I don't like the use macros that concatenate symbol names like
+> > this. Why not do either
+> > 
+> > - open-code the macro contents in the few uses, to allow
+> >   grepping for them, or
+> 
+> I'm not sure to get this one, are you suggesting to do something like
+> this:
+> 
+> #define AT91_EBICSA_REGFIELD(off)			\
+> 	REG_FIELD(ebicsa_off, AT91_MATRIX_EBI_NUM_CS - 1)
+> 
 
-On Mon, Dec 01, 2014 at 08:12:39PM +0100, Boris Brezillon wrote:
-> Brian, I really like the idea of having a generic implementation for this
-> feature (using read_page_raw) as you suggested here [1], but this implies
-> having a temporary buffer to store the page read in raw mode and keep the page
-> read in normal (HW ECC engine eanbled) mode, and I'm not sure we want to
-> allocate more buffers than we already have.
+That would be acceptable too, but what I really meant is one step further:
 
-Why does this require an additional buffer? If we've already noticed an
-ECC error, we're expected to return raw data anyway, so what's the
-problem with clobbering the original data with a raw version of the
-data?
+static const struct reg_field at91sam9260_ebi_csa = 
+	REG_FIELD(AT91SAM9260_MATRIX_EBICSA_OFF, 0, AT91_MATRIX_EBI_NUM_CS - 1);
 
-I really *really* do not want to merge another one-off attempt at
-"solving" this problem in the low-level driver, if at all possible.
+> > - put the register number in the syscon reference and look it
+> >   up from there (this would be slightly more complicated for the
+> >   second macro)
+> 
+> I've told several times not to encode register offsets or register ids
+> in the DT :-) (and if I'm not mistaken that's what you're suggesting
+> here).
 
-Brian
+I think it's actually fine for syscon references, although in general
+I would agree with that. The difference in my opinion is that syscon
+by nature is a set of registers.
 
-P.S. Sorry for not following up on my last attempt of a generic
-solution. I don't think I got enough constructive feedback, other than
-"this does not work for me", so I didn't pursue it further. If we have
-the attention of more than one driver developer here (i.e., at least you
-and me), then I'd really like to finish this off for good (?).
+	Arnd
