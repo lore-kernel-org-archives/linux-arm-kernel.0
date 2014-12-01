@@ -1,116 +1,99 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  1 Dec 2014 16:57:12 +0000
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1417453034-21379-7-git-send-email-will.deacon@arm.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 2 Dec 2014 00:58:29 +0800
+Subject: [PATCH 1/2] watchdog: Add driver for Mediatek mt6589 watchdog
+In-Reply-To: <1415705357.1776.11.camel@mtksdaap41>
+References: <1414428092-20725-1-git-send-email-matthias.bgg@gmail.com>
+ <1414428092-20725-2-git-send-email-matthias.bgg@gmail.com>
+ <1415705357.1776.11.camel@mtksdaap41>
+Message-ID: <1417453109.10558.38.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends of_dma_configure so that it sets up the IOMMU for a
-device, as well as the coherent/non-coherent DMA mapping ops.
+On Tue, 2014-11-11 at 19:29 +0800, Eddie Huang wrote:
+> On Tue, 2014-10-28 at 00:41 +0800, Matthias Brugger wrote:
+> > This patch adds a driver for the Mediatek mt6589 SoC integrated
+> > watchdog.
+> > 
+> > Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> > ---
+> >  drivers/watchdog/Kconfig   |  10 ++
+> >  drivers/watchdog/Makefile  |   1 +
+> >  drivers/watchdog/mtk_wdt.c | 264 +++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 275 insertions(+)
+> >  create mode 100644 drivers/watchdog/mtk_wdt.c
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Tested-by: Robin Murphy <robin.murphy@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/dma-mapping.h |  4 +++-
- drivers/of/platform.c              | 21 ++++++++++++++-------
- include/linux/dma-mapping.h        |  8 +++++++-
- 3 files changed, 24 insertions(+), 9 deletions(-)
+> > +
+> > +static int mtk_reset_handler(struct notifier_block *this, unsigned long mode,
+> > +                               void *cmd)
+> > +{
+> > +       struct mtk_wdt_dev *mtk_wdt = container_of(this,
+> > +                                                      struct mtk_wdt_dev,
+> > +                                                      restart_handler);
+> > +       void __iomem *wdt_base = mtk_wdt->wdt_base;
+> > +       u32 reg;
+> > +
+> > +       /* Enable watchdog */
+> > +       reg = readl(wdt_base + WDT_MODE);
+> > +       reg |= WDT_MODE_EN;
+> > +       writel(reg, wdt_base + WDT_MODE);
+> > +
+> > +       /* Reload counter */
+> > +       writel(WDT_RST_RELOAD, wdt_base + WDT_RST);
+> > +
+> > +       /* Reset system */
+> > +       writel(WDT_SWRST_KEY, wdt_base + WDT_SWRST);
+> > +
+> > +       while (1) {
+> > +               mdelay(5);
+> > +               writel(WDT_SWRST_KEY, wdt_base + WDT_SWRST);
+> > +       }
+> > +       return NOTIFY_DONE;
+> > +
+> > +}
+> > +
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index dc3420e77758..f3c0d953f6a2 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -121,7 +121,9 @@ static inline unsigned long dma_max_pfn(struct device *dev)
- }
- #define dma_max_pfn(dev) dma_max_pfn(dev)
- 
--static inline void arch_setup_dma_ops(struct device *dev, bool coherent)
-+static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
-+				      u64 size, struct iommu_ops *iommu,
-+				      bool coherent)
- {
- 	if (coherent)
- 		set_dma_ops(dev, &arm_coherent_dma_ops);
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index ff1f4e9afccb..b89caf8c7586 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -19,6 +19,7 @@
- #include <linux/slab.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
-+#include <linux/of_iommu.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-@@ -166,6 +167,7 @@ static void of_dma_configure(struct device *dev)
- 	int ret;
- 	bool coherent;
- 	unsigned long offset;
-+	struct iommu_ops *iommu;
- 
- 	/*
- 	 * Set default dma-mask to 32 bit. Drivers are expected to setup
-@@ -194,7 +196,16 @@ static void of_dma_configure(struct device *dev)
- 	dev_dbg(dev, "device is%sdma coherent\n",
- 		coherent ? " " : " not ");
- 
--	arch_setup_dma_ops(dev, coherent);
-+	iommu = of_iommu_configure(dev);
-+	dev_dbg(dev, "device is%sbehind an iommu\n",
-+		iommu ? " " : " not ");
-+
-+	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
-+}
-+
-+static void of_dma_deconfigure(struct device *dev)
-+{
-+	arch_teardown_dma_ops(dev);
- }
- 
- /**
-@@ -223,16 +234,12 @@ static struct platform_device *of_platform_device_create_pdata(
- 	if (!dev)
- 		goto err_clear_flag;
- 
--	of_dma_configure(&dev->dev);
- 	dev->dev.bus = &platform_bus_type;
- 	dev->dev.platform_data = platform_data;
--
--	/* We do not fill the DMA ops for platform devices by default.
--	 * This is currently the responsibility of the platform code
--	 * to do such, possibly using a device notifier
--	 */
-+	of_dma_configure(&dev->dev);
- 
- 	if (of_device_add(dev) != 0) {
-+		of_dma_deconfigure(&dev->dev);
- 		platform_device_put(dev);
- 		goto err_clear_flag;
- 	}
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index 8a1560f95d4a..c3007cb4bfa6 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -130,7 +130,13 @@ static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
- extern u64 dma_get_required_mask(struct device *dev);
- 
- #ifndef arch_setup_dma_ops
--static inline void arch_setup_dma_ops(struct device *dev, bool coherent) { }
-+static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
-+				      u64 size, struct iommu_ops *iommu,
-+				      bool coherent) { }
-+#endif
-+
-+#ifndef arch_teardown_dma_ops
-+static inline void arch_teardown_dma_ops(struct device *dev) { }
- #endif
- 
- static inline unsigned int dma_get_max_seg_size(struct device *dev)
--- 
-2.1.1
+you can use "WDT_SWRST_KEY" to trigger reset signal. It is unnecessary
+to enable watchdog and reload counter.
+
+> +
+> > +static int mtk_wdt_start(struct watchdog_device *wdt_dev)
+> > +{
+> > +       u32 reg;
+> > +       struct mtk_wdt_dev *mtk_wdt = watchdog_get_drvdata(wdt_dev);
+> > +       void __iomem *wdt_base = mtk_wdt->wdt_base;
+> > +       u32 ret;
+> > +
+> > +       ret = mtk_wdt_set_timeout(&mtk_wdt->wdt_dev,
+> > +                       mtk_wdt->wdt_dev.timeout);
+> > +       if (ret < 0)
+> > +               return ret;
+> > +
+> > +       reg = ioread32(wdt_base + WDT_MODE);
+> > +       reg |= (WDT_MODE_EN | WDT_MODE_KEY);
+> 
+> According to datasheet, default value of register WDT_MODE bit6 is 1.
+> Which means when reach timeout, still need another timeout time to
+> restart the system. Should clear this bit to disable dual mode:
+>         reg &= ~(WDT_MODE_DUAL_EN);
+> 
+> > +       iowrite32(reg, wdt_base + WDT_MODE);
+> > +
+> > +       return 0;
+> > +}
+
+According to datasheet, default value of register WDT_MODE bit3 and bit
+6 is 1, 1'bit3 means trigger irq instead of reset, bit6 means open
+dual_mode or not.
+
+If you just set bit0 to 1 to enable watchdog, it will be irq +
+dual_mode, which means it will trigger irq first when reach timeout,
+still need another timeout time to trigger reset signal.
+
+If you set bit bit6 to 0, it will be irq only, and when timeout
+reaches,only irq happens, never reset.
+
+So if want to trigger reset only,should clear bit3 and bit6 to disable
+irq or dual_mode.
+       reg &= ~(WDT_MODE_IRQ_EN | WDT_MODE_DUAL_EN);   
+
+I test this patch with above comment ok on my mt8135 tablet platform.
