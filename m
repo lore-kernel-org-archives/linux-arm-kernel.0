@@ -1,160 +1,45 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Sat, 1 Nov 2014 14:47:29 +0900
-Subject: [PATCH 6/8] regulator: max77686: Add external GPIO control
-In-Reply-To: <1414741898.20071.8.camel@AMDC1943>
-References: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
- <1414422226-10948-7-git-send-email-k.kozlowski@samsung.com>
- <544EA4FA.6040704@collabora.co.uk> <1414486356.24949.19.camel@AMDC1943>
- <1414498308.24949.32.camel@AMDC1943> <1414579362.18868.11.camel@AMDC1943>
- <5450C63B.3000602@collabora.co.uk>
- <CAAVeFuLncbkNLGxEAj90yMmugRDNjtjeGoV_QYTMDZ7NVMJCmg@mail.gmail.com>
- <1414681386.26703.6.camel@AMDC1943>
- <CAAVeFuJo1wTyxOo4FEZM3=GTejuSHi+mnr=QV6HUeV5mAOCmqg@mail.gmail.com>
- <1414741898.20071.8.camel@AMDC1943>
-Message-ID: <CAAVeFuL7XiP3e4+pQt_asL+0f-UpffTvj0Mt=D0TPevW4hT=zA@mail.gmail.com>
+From: gang.chen.5i5j@gmail.com (Chen Gang)
+Date: Mon, 01 Dec 2014 22:04:32 +0800
+Subject: [PATCH] kvm: arm: vgic: Let one looping code instead of two
+ looping code
+In-Reply-To: <20141130100718.GA484@cbox>
+References: <547A9A7C.1080508@gmail.com> <20141130100718.GA484@cbox>
+Message-ID: <547C7570.1020006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 4:51 PM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On pi?, 2014-10-31 at 12:31 +0900, Alexandre Courbot wrote:
->> On Fri, Oct 31, 2014 at 12:03 AM, Krzysztof Kozlowski
->> <k.kozlowski@samsung.com> wrote:
->> > On czw, 2014-10-30 at 22:56 +0900, Alexandre Courbot wrote:
->> >> Hi, and thanks for bringing this issue to us!
->> >>
->> >> On Wed, Oct 29, 2014 at 7:49 PM, Javier Martinez Canillas
->> >> <javier.martinez@collabora.co.uk> wrote:
->> >> > [adding Linus and Alexandre to the cc list]
->> >> >
->> >> > Hello Krzysztof,
->> >> >
->> >> > On 10/29/2014 11:42 AM, Krzysztof Kozlowski wrote:
->> >> >> On wto, 2014-10-28 at 13:11 +0100, Krzysztof Kozlowski wrote:
->> >> >>> On wto, 2014-10-28 at 09:52 +0100, Krzysztof Kozlowski wrote:
->> >> >>> > On pon, 2014-10-27 at 21:03 +0100, Javier Martinez Canillas wrote:
->> >> >>> > > Hello Krzysztof,
->> >> >>> > >
->> >> >>> > > On 10/27/2014 04:03 PM, Krzysztof Kozlowski wrote:
->> >> >>> > > > @@ -85,6 +91,9 @@ struct max77686_data {
->> >> >>> > > >        struct max77686_regulator_data *regulators;
->> >> >>> > > >        int num_regulators;
->> >> >>> > > >
->> >> >>> > > > +      /* Array of size num_regulators with GPIOs for external control. */
->> >> >>> > > > +      int *ext_control_gpio;
->> >> >>> > > > +
->> >> >>> > >
->> >> >>> > > The integer-based GPIO API is deprecated in favor of the descriptor-based GPIO
->> >> >>> > > interface (Documentation/gpio/consumer.txt). Could you please use the later?
->> >> >>> >
->> >> >>> > Sure, I can. Please have in mind that regulator core still accepts old
->> >> >>> > GPIO so I will have to use desc_to_gpio(). That should work... and
->> >> >>> > should be future-ready.
->> >> >>>
->> >> >>> It seems I was too hasty... I think usage of the new gpiod API implies
->> >> >>> completely different bindings.
->> >> >>>
->> >> >>> The gpiod_get() gets GPIO from a device level, not from given sub-node
->> >> >>> pointer. This means that you cannot have DTS like this:
->> >> >>> ldo21_reg: ldo21 {
->> >> >>>      regulator-compatible = "LDO21";
->> >> >>>      regulator-name = "VTF_2.8V";
->> >> >>>      regulator-min-microvolt = <2800000>;
->> >> >>>      regulator-max-microvolt = <2800000>;
->> >> >>>      ec-gpio = <&gpy2 0 0>;
->> >> >>> };
->> >> >>>
->> >> >>> ldo22_reg: ldo22 {
->> >> >>>      regulator-compatible = "LDO22";
->> >> >>>      regulator-name = "VMEM_VDD_2.8V";
->> >> >>>      regulator-min-microvolt = <2800000>;
->> >> >>>      regulator-max-microvolt = <2800000>;
->> >> >>>      ec-gpio = <&gpk0 2 0>;
->> >> >>> };
->> >> >>>
->> >> >>>
->> >> >>> I could put GPIOs in device node:
->> >> >>>
->> >> >>> max77686_pmic at 09 {
->> >> >>>      compatible = "maxim,max77686";
->> >> >>>      interrupt-parent = <&gpx0>;
->> >> >>>      interrupts = <7 0>;
->> >> >>>      reg = <0x09>;
->> >> >>>      #clock-cells = <1>;
->> >> >>>      ldo21-gpio = <&gpy2 0 0>;
->> >> >>>      ldo22-gpio = <&gpk0 2 0>;
->> >> >>>
->> >> >>>      ldo21_reg: ldo21 {
->> >> >>>              regulator-compatible = "LDO21";
->> >> >>>              regulator-name = "VTF_2.8V";
->> >> >>>              regulator-min-microvolt = <2800000>;
->> >> >>>              regulator-max-microvolt = <2800000>;
->> >> >>>      };
->> >> >>>
->> >> >>>      ldo22_reg: ldo22 {
->> >> >>>              regulator-compatible = "LDO22";
->> >> >>>              regulator-name = "VMEM_VDD_2.8V";
->> >> >>>              regulator-min-microvolt = <2800000>;
->> >> >>>              regulator-max-microvolt = <2800000>;
->> >> >>>      };
->> >> >>>
->> >> >>> This would work but I don't like it. The properties of a regulator are
->> >> >>> above the node configuring that regulator.
->> >> >>>
->> >> >>> Any ideas?
->> >> >>>
->> >> >>
->> >> >> Continuing talking to myself... I found another problem - GPIO cannot be
->> >> >> requested more than once (-EBUSY). In case of this driver (and board:
->> >> >> Trats2) one GPIO is connected to regulators. The legacy GPIO API and
->> >> >> regulator core handle this.
->> >> >>
->> >> >> With new GPIO API I would have to implement some additional steps in
->> >> >> such case...
->> >> >>
->> >> >> So there are 2 issues:
->> >> >> 1. Cannot put GPIO property in regulator node.
->> >>
->> >> For this problem you will probably want to use the
->> >> dev(m)_get_named_gpiod_from_child() function from the following patch:
->> >>
->> >> https://lkml.org/lkml/2014/10/6/529
->> >>
->> >> It should reach -next soon now.
->> >
->> > Thanks! Probably I would switch to "top" level gpios property anyway
->> > (other reasons) but it would be valuable in some cases to specify them
->> > per child node.
+On 11/30/2014 06:07 PM, Christoffer Dall wrote:
+> On Sun, Nov 30, 2014 at 12:18:04PM +0800, Chen Gang wrote:
+>> Use one looping instead of two, so can let code more simpler and get a
+>> little better performance.
 >>
->> Mmm, but doesn't it make more sense to have them in the child nodes?
->
-> Yes, it makes more sense. Using old way of parsing regulators from DT it
-> was straightforward.
->
-> However new DT style parsing (regulator_of_get_init_data()) does the
-> basic parsing stuff and this removes a lot of code from driver. The
-> driver no longer parses all regulaotrs but the regulator core does it.
-> Unfortunately regulator core does not parse custom bindings (like such
-> GPIOs) so I would have to iterate once again through all regulators just
-> to find "gpios" property.
->
-> It is simpler just to do something like (5 regulators can be controlled
-> by GPIO):
->
-> max77686_pmic_dt_parse_gpio_control(struct platform_device *pdev, *gpio)
-> {
->   gpio[MAX77686_LDO20] = of_get_named_gpio(np, "ldo20-gpios", 0);
->   gpio[MAX77686_LDO21] = of_get_named_gpio(np, "ldo21-gpios", 0);
->   gpio[MAX77686_LDO22] = of_get_named_gpio(np, "ldo22-gpios", 0);
->   gpio[MAX77686_BUCK8] = of_get_named_gpio(np, "buck8-gpios", 0);
->   gpio[MAX77686_BUCK9] = of_get_named_gpio(np, "buck9-gpios", 0);
-> }
+>> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+> 
+> Performance?  Please, this is vgic_create....
+> 
 
-It is simpler from the driver's perspective, but if I understand
-correctly DT bindings are not supposed to be adapted to make life
-easier for a particular implementation. If the driver needs to make an
-additional pass into the child nodes, then so be it, as long as the
-nodes describe the hardware accurately and in a way that is easy to
-understand. You can always adapt the driver core to handle your
-use-case better, but once DT bindings are published, they are set in
-stone.
+I guess your meaning is "this code is not performance sensitive", do not
+mean "1 looping can not get a little better performance than 2 looping".
+If what I guess is incorrect, please let me know.
+
+> This does nothing else than introduce churn.
+> 
+
+I don't think it does nothing, it can let code simpler than before:
+remove the redundant looping -- the 2 looping do the same thing which
+is commented just above the firstly looping.
+
+And I don't know which churn this patch will introduce. At least, no one
+want to waste him/her time resources to intend churn, please provide
+more details about it.
+
+If kvm does not like me, or does not like members to find issues based
+on reading source code, please let me know (no reply means kvm does not
+like me or this way), I will quit, so can save time resources both.
+
+
+Thanks.
+-- 
+Chen Gang
+
+Open share and attitude like air water and life which God blessed
