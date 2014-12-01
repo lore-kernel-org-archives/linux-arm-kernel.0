@@ -1,30 +1,93 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 1 Dec 2014 14:24:40 +0100
-Subject: [PATCH 4/4] ARM: at91/defconfig: add DM9000 to at91_dt
-In-Reply-To: <eb931e7c5534cd949ba61307f0380826e62ceb2c.1417440150.git.nicolas.ferre@atmel.com>
-References: <eb931e7c5534cd949ba61307f0380826e62ceb2c.1417440150.git.nicolas.ferre@atmel.com>
-Message-ID: <a810207c369c57acefc5624ff7dfeb4d92de52ff.1417440150.git.nicolas.ferre@atmel.com>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Mon, 01 Dec 2014 14:29:23 +0100
+Subject: [PATCH 1/4] video: fsl-dcfb: Add dcfb framebuffer driver for
+ LS1021A platform
+In-Reply-To: <1416824454-28156-2-git-send-email-Li.Xiubo@freescale.com>
+References: <1416824454-28156-1-git-send-email-Li.Xiubo@freescale.com>
+ <1416824454-28156-2-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <1645594.e2cfs6JOiv@ws-stein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This chip is present on at91sam9261ek board: add it to the at91_dt_defconfig.
+On Monday 24 November 2014 18:20:51, Xiubo Li wrote:
+> [...]
+> +static int fsl_dcfb_init_fbinfo(struct fb_info *info)
+> +{
+> +	struct fsl_dcfb_mfb_info *mfbi = info->par;
+> +	struct fb_var_screeninfo *var = &info->var;
+> +	struct fsl_dcfb_fb_private *dcfb = mfbi->parent;
+> +	struct device_node *np = dcfb->dev->of_node;
+> +	struct device_node *dnp, *tnp;
+> +	struct display_timings *timings;
+> +	int i, ret;
+> +
+> +	dnp = of_parse_phandle(np, "display", 0);
+> +	if (!dnp) {
+> +		dev_err(dcfb->dev, "failed to find \"display\" phandle.\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	ret = of_property_read_u32(dnp, "bits-per-pixel",
+> +				   &var->bits_per_pixel);
+> +	if (ret < 0) {
+> +		dev_err(dcfb->dev, "failed to get \"bits-per-pixel\" property.\n");
+> +		goto put_dnp;
+> +	}
+> +
+> +	timings = of_get_display_timings(dnp);
+> +	if (!timings) {
+> +		dev_err(dcfb->dev, "failed to get display timings\n");
+> +		return -ENODEV;
+> +		goto put_dnp;
+> +	}
+> +
+> +	tnp = of_find_node_by_name(dnp, "display-timings");
+> +	if (!tnp) {
+> +		dev_err(dcfb->dev, "failed to find \"display-timings\" node\n");
+> +		return -ENODEV;
+> +		goto put_dnp;
+> +	}
+> +
+> +	for (i = 0; i < of_get_child_count(tnp); i++) {
+> +		struct videomode vm;
+> +		struct fb_videomode fb_vm;
+> +
+> +		ret = videomode_from_timings(timings, &vm, i);
+> +		if (ret < 0)
+> +			goto put_tnp;
+> +
+> +		ret = fb_videomode_from_videomode(&vm, &fb_vm);
+> +		if (ret < 0)
+> +			goto put_tnp;
+> +
+> +		fb_add_videomode(&fb_vm, &info->modelist);
+> +	}
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/configs/at91_dt_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Adding each display timing to the modelist here...
 
-diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-index 6ccf937a60f2..a67375f24b21 100644
---- a/arch/arm/configs/at91_dt_defconfig
-+++ b/arch/arm/configs/at91_dt_defconfig
-@@ -80,6 +80,7 @@ CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
- CONFIG_MACB=y
- # CONFIG_NET_VENDOR_BROADCOM is not set
-+CONFIG_DM9000=y
- # CONFIG_NET_VENDOR_FARADAY is not set
- # CONFIG_NET_VENDOR_INTEL is not set
- # CONFIG_NET_VENDOR_MARVELL is not set
+> [...]
+> +	ret = fsl_dcfb_init_fbinfo(info);
+> +	if (ret)
+> +		goto err_cmap;
+> +
+> +	modelist = list_first_entry(&info->modelist,
+> +			struct fb_modelist, list);
+> +	fb_videomode_to_var(&info->var, &modelist->mode);
+
+... and just picking the first here, essentially renders the "native-mode" property in device tree as useless, since only the first in that list is picked (which seems to be the last one inserted).
+
+Best regards,
+Alexander
 -- 
-2.1.3
+Dipl.-Inf. Alexander Stein
+
+SYS TEC electronic GmbH
+Am Windrad 2
+08468 Heinsdorfergrund
+Tel.: 03765 38600-1156
+Fax: 03765 38600-4100
+Email: alexander.stein at systec-electronic.com
+Website: www.systec-electronic.com
+ 
+Managing Director: Dipl.-Phys. Siegmar Schmidt
+Commercial registry: Amtsgericht Chemnitz, HRB 28082
