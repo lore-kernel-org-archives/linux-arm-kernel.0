@@ -1,117 +1,245 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 1 Dec 2014 16:45:13 +0800
-Subject: [PATCH v11 0/7] ARM: kprobes: OPTPROBES and other improvements.
-Message-ID: <1417423513-47161-1-git-send-email-wangnan0@huawei.com>
+Date: Mon, 1 Dec 2014 16:48:15 +0800
+Subject: [PATCH v11 1/7] ARM: probes: move all probe code to dedicate directory
+In-Reply-To: <1417423513-47161-1-git-send-email-wangnan0@huawei.com>
+References: <1417423513-47161-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1417423695-47521-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is version 11 of optprobe related patch series. I decide to merge
-all related patches in one series to make my work easier. This series is
-grouped by 3 different parts:
+In discussion on LKML (https://lkml.org/lkml/2014/11/28/158), Russell
+King suggest to move all probe related code to arch/arm/probes. This
+patch do the work. Due to dependency on 'arch/arm/kernel/patch.h', this
+patch also move patch.h to 'arch/arm/include/asm/patch.h', and related
+'#include' directive are also midified to '#include <asm/patch.h>'.
 
-Patch 1/7 moves all ARM probe related code to arch/arm/probes according
-to suggestion from Russell King.
-
-Patch 2/7 - 5/7 introduce checker framework and use it to detect stack
-consumption for each probed instructions. Previous discussion can
-be found from:
-
-https://lkml.org/lkml/2014/11/22/18
-https://lkml.org/lkml/2014/11/21/55
-https://lkml.org/lkml/2014/11/18/26
-
-Patch 6/7 and 7/7 are for real optprobe work. Previous discussion can
-be found from:
-
-https://lkml.org/lkml/2014/11/19/31
-https://lkml.org/lkml/2014/11/18/41
-https://lkml.org/lkml/2014/10/25/48
-https://lkml.org/lkml/2014/10/22/254
-https://lkml.org/lkml/2014/8/27/255
-https://lkml.org/lkml/2014/8/12/12
-https://lkml.org/lkml/2014/8/8/992
-https://lkml.org/lkml/2014/8/8/5
-https://lkml.org/lkml/2014/8/5/63
-
-The main modifications in this series are reside in patch 7/7. Please refer
-to its own commit message.
-
-Masami Hiramatsu (1):
-  kprobes: Pass the original kprobe for preparing optimized kprobe
-
-Wang Nan (6):
-  ARM: probes: move all probe code to dedicate directory
-  ARM: kprobes: introduces checker
-  ARM: kprobes: collects stack consumption for store instructions
-  ARM: kprobes: disallow probing stack consuming instructions
-  ARM: kprobes: Add test cases for stack consuming instructions
-  ARM: kprobes: enable OPTPROBES for ARM 32
-
- arch/arm/Kconfig                                 |   1 +
- arch/arm/Makefile                                |   1 +
- arch/arm/{kernel => include/asm}/insn.h          |   0
- arch/arm/include/asm/kprobes.h                   |  35 ++-
- arch/arm/{kernel => include/asm}/patch.h         |   0
- arch/arm/include/asm/probes.h                    |  13 +
- arch/arm/kernel/Makefile                         |  16 +-
- arch/arm/kernel/entry-armv.S                     |   3 +-
- arch/arm/kernel/ftrace.c                         |   3 +-
- arch/arm/kernel/jump_label.c                     |   5 +-
- arch/arm/kernel/patch.c                          |   3 +-
- arch/arm/probes/Makefile                         |  16 ++
- arch/arm/{kernel => probes}/kprobes-arm.c        |   3 +
- arch/arm/{kernel => probes}/kprobes-common.c     |   0
- arch/arm/probes/kprobes-opt-arm.c                | 343 +++++++++++++++++++++++
- arch/arm/{kernel => probes}/kprobes-test-arm.c   |  29 +-
- arch/arm/{kernel => probes}/kprobes-test-thumb.c |  12 +
- arch/arm/{kernel => probes}/kprobes-test.c       |   0
- arch/arm/{kernel => probes}/kprobes-test.h       |   0
- arch/arm/{kernel => probes}/kprobes-thumb.c      |   4 +
- arch/arm/{kernel => probes}/kprobes.c            |  17 +-
- arch/arm/{kernel => probes}/kprobes.h            |   7 +-
- arch/arm/{kernel => probes}/probes-arm.c         |   5 +-
- arch/arm/{kernel => probes}/probes-arm.h         |   3 +-
- arch/arm/probes/probes-checkers-arm.c            |  99 +++++++
- arch/arm/probes/probes-checkers-common.c         | 101 +++++++
- arch/arm/probes/probes-checkers-thumb.c          | 110 ++++++++
- arch/arm/probes/probes-checkers.h                |  54 ++++
- arch/arm/{kernel => probes}/probes-thumb.c       |  10 +-
- arch/arm/{kernel => probes}/probes-thumb.h       |   6 +-
- arch/arm/{kernel => probes}/probes.c             |  70 ++++-
- arch/arm/{kernel => probes}/probes.h             |  11 +-
- arch/arm/{kernel => probes}/uprobes-arm.c        |   0
- arch/arm/{kernel => probes}/uprobes.c            |   2 +-
- arch/arm/{kernel => probes}/uprobes.h            |   0
- arch/x86/kernel/kprobes/opt.c                    |   3 +-
- include/linux/kprobes.h                          |   3 +-
- kernel/kprobes.c                                 |   8 +-
- 38 files changed, 942 insertions(+), 54 deletions(-)
- rename arch/arm/{kernel => include/asm}/insn.h (100%)
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+---
+ arch/arm/Makefile                                |  1 +
+ arch/arm/{kernel => include/asm}/patch.h         |  0
+ arch/arm/kernel/Makefile                         | 16 ++--------------
+ arch/arm/kernel/jump_label.c                     |  2 +-
+ arch/arm/kernel/patch.c                          |  3 +--
+ arch/arm/probes/Makefile                         | 15 +++++++++++++++
+ arch/arm/{kernel => probes}/kprobes-arm.c        |  0
+ arch/arm/{kernel => probes}/kprobes-common.c     |  0
+ arch/arm/{kernel => probes}/kprobes-test-arm.c   |  0
+ arch/arm/{kernel => probes}/kprobes-test-thumb.c |  0
+ arch/arm/{kernel => probes}/kprobes-test.c       |  0
+ arch/arm/{kernel => probes}/kprobes-test.h       |  0
+ arch/arm/{kernel => probes}/kprobes-thumb.c      |  0
+ arch/arm/{kernel => probes}/kprobes.c            |  2 +-
+ arch/arm/{kernel => probes}/kprobes.h            |  0
+ arch/arm/{kernel => probes}/probes-arm.c         |  0
+ arch/arm/{kernel => probes}/probes-arm.h         |  0
+ arch/arm/{kernel => probes}/probes-thumb.c       |  0
+ arch/arm/{kernel => probes}/probes-thumb.h       |  0
+ arch/arm/{kernel => probes}/probes.c             |  0
+ arch/arm/{kernel => probes}/probes.h             |  0
+ arch/arm/{kernel => probes}/uprobes-arm.c        |  0
+ arch/arm/{kernel => probes}/uprobes.c            |  0
+ arch/arm/{kernel => probes}/uprobes.h            |  0
+ 24 files changed, 21 insertions(+), 18 deletions(-)
  rename arch/arm/{kernel => include/asm}/patch.h (100%)
  create mode 100644 arch/arm/probes/Makefile
- rename arch/arm/{kernel => probes}/kprobes-arm.c (98%)
+ rename arch/arm/{kernel => probes}/kprobes-arm.c (100%)
  rename arch/arm/{kernel => probes}/kprobes-common.c (100%)
- create mode 100644 arch/arm/probes/kprobes-opt-arm.c
- rename arch/arm/{kernel => probes}/kprobes-test-arm.c (97%)
- rename arch/arm/{kernel => probes}/kprobes-test-thumb.c (98%)
+ rename arch/arm/{kernel => probes}/kprobes-test-arm.c (100%)
+ rename arch/arm/{kernel => probes}/kprobes-test-thumb.c (100%)
  rename arch/arm/{kernel => probes}/kprobes-test.c (100%)
  rename arch/arm/{kernel => probes}/kprobes-test.h (100%)
- rename arch/arm/{kernel => probes}/kprobes-thumb.c (99%)
- rename arch/arm/{kernel => probes}/kprobes.c (97%)
- rename arch/arm/{kernel => probes}/kprobes.h (85%)
- rename arch/arm/{kernel => probes}/probes-arm.c (99%)
- rename arch/arm/{kernel => probes}/probes-arm.h (95%)
- create mode 100644 arch/arm/probes/probes-checkers-arm.c
- create mode 100644 arch/arm/probes/probes-checkers-common.c
- create mode 100644 arch/arm/probes/probes-checkers-thumb.c
- create mode 100644 arch/arm/probes/probes-checkers.h
- rename arch/arm/{kernel => probes}/probes-thumb.c (99%)
- rename arch/arm/{kernel => probes}/probes-thumb.h (92%)
- rename arch/arm/{kernel => probes}/probes.c (86%)
- rename arch/arm/{kernel => probes}/probes.h (97%)
+ rename arch/arm/{kernel => probes}/kprobes-thumb.c (100%)
+ rename arch/arm/{kernel => probes}/kprobes.c (99%)
+ rename arch/arm/{kernel => probes}/kprobes.h (100%)
+ rename arch/arm/{kernel => probes}/probes-arm.c (100%)
+ rename arch/arm/{kernel => probes}/probes-arm.h (100%)
+ rename arch/arm/{kernel => probes}/probes-thumb.c (100%)
+ rename arch/arm/{kernel => probes}/probes-thumb.h (100%)
+ rename arch/arm/{kernel => probes}/probes.c (100%)
+ rename arch/arm/{kernel => probes}/probes.h (100%)
  rename arch/arm/{kernel => probes}/uprobes-arm.c (100%)
- rename arch/arm/{kernel => probes}/uprobes.c (99%)
+ rename arch/arm/{kernel => probes}/uprobes.c (100%)
  rename arch/arm/{kernel => probes}/uprobes.h (100%)
 
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 034a949..a57d9bb 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -266,6 +266,7 @@ core-$(CONFIG_KVM_ARM_HOST) 	+= arch/arm/kvm/
+ 
+ # If we have a machine-specific directory, then include it in the build.
+ core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
++core-y				+= arch/arm/probes/
+ core-y				+= arch/arm/net/
+ core-y				+= arch/arm/crypto/
+ core-y				+= arch/arm/firmware/
+diff --git a/arch/arm/kernel/patch.h b/arch/arm/include/asm/patch.h
+similarity index 100%
+rename from arch/arm/kernel/patch.h
+rename to arch/arm/include/asm/patch.h
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 38ddd9f..40d3e00 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -51,20 +51,8 @@ obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o insn.o
+ obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o insn.o
+ obj-$(CONFIG_JUMP_LABEL)	+= jump_label.o insn.o patch.o
+ obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
+-obj-$(CONFIG_UPROBES)		+= probes.o probes-arm.o uprobes.o uprobes-arm.o
+-obj-$(CONFIG_KPROBES)		+= probes.o kprobes.o kprobes-common.o patch.o
+-ifdef CONFIG_THUMB2_KERNEL
+-obj-$(CONFIG_KPROBES)		+= kprobes-thumb.o probes-thumb.o
+-else
+-obj-$(CONFIG_KPROBES)		+= kprobes-arm.o probes-arm.o
+-endif
+-obj-$(CONFIG_ARM_KPROBES_TEST)	+= test-kprobes.o
+-test-kprobes-objs		:= kprobes-test.o
+-ifdef CONFIG_THUMB2_KERNEL
+-test-kprobes-objs		+= kprobes-test-thumb.o
+-else
+-test-kprobes-objs		+= kprobes-test-arm.o
+-endif
++# Main staffs in KPROBES are in arch/arm/probes/ .
++obj-$(CONFIG_KPROBES)		+= patch.o
+ obj-$(CONFIG_OABI_COMPAT)	+= sys_oabi-compat.o
+ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
+ obj-$(CONFIG_KGDB)		+= kgdb.o
+diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
+index 4ce4f78..c6c73ed 100644
+--- a/arch/arm/kernel/jump_label.c
++++ b/arch/arm/kernel/jump_label.c
+@@ -1,8 +1,8 @@
+ #include <linux/kernel.h>
+ #include <linux/jump_label.h>
++#include <asm/patch.h>
+ 
+ #include "insn.h"
+-#include "patch.h"
+ 
+ #ifdef HAVE_JUMP_LABEL
+ 
+diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+index 07314af..08bcfa1 100644
+--- a/arch/arm/kernel/patch.c
++++ b/arch/arm/kernel/patch.c
+@@ -5,8 +5,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ #include <asm/opcodes.h>
+-
+-#include "patch.h"
++#include <asm/patch.h>
+ 
+ struct patch {
+ 	void *addr;
+diff --git a/arch/arm/probes/Makefile b/arch/arm/probes/Makefile
+new file mode 100644
+index 0000000..34b53b0
+--- /dev/null
++++ b/arch/arm/probes/Makefile
+@@ -0,0 +1,15 @@
++obj-$(CONFIG_UPROBES)		+= probes.o probes-arm.o uprobes.o uprobes-arm.o
++obj-$(CONFIG_KPROBES)		+= probes.o kprobes.o kprobes-common.o
++ifdef CONFIG_THUMB2_KERNEL
++obj-$(CONFIG_KPROBES)		+= kprobes-thumb.o probes-thumb.o
++else
++obj-$(CONFIG_KPROBES)		+= kprobes-arm.o probes-arm.o
++endif
++obj-$(CONFIG_ARM_KPROBES_TEST)	+= test-kprobes.o
++test-kprobes-objs		:= kprobes-test.o
++ifdef CONFIG_THUMB2_KERNEL
++test-kprobes-objs		+= kprobes-test-thumb.o
++else
++test-kprobes-objs		+= kprobes-test-arm.o
++endif
++
+diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/probes/kprobes-arm.c
+similarity index 100%
+rename from arch/arm/kernel/kprobes-arm.c
+rename to arch/arm/probes/kprobes-arm.c
+diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/probes/kprobes-common.c
+similarity index 100%
+rename from arch/arm/kernel/kprobes-common.c
+rename to arch/arm/probes/kprobes-common.c
+diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/probes/kprobes-test-arm.c
+similarity index 100%
+rename from arch/arm/kernel/kprobes-test-arm.c
+rename to arch/arm/probes/kprobes-test-arm.c
+diff --git a/arch/arm/kernel/kprobes-test-thumb.c b/arch/arm/probes/kprobes-test-thumb.c
+similarity index 100%
+rename from arch/arm/kernel/kprobes-test-thumb.c
+rename to arch/arm/probes/kprobes-test-thumb.c
+diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/probes/kprobes-test.c
+similarity index 100%
+rename from arch/arm/kernel/kprobes-test.c
+rename to arch/arm/probes/kprobes-test.c
+diff --git a/arch/arm/kernel/kprobes-test.h b/arch/arm/probes/kprobes-test.h
+similarity index 100%
+rename from arch/arm/kernel/kprobes-test.h
+rename to arch/arm/probes/kprobes-test.h
+diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/probes/kprobes-thumb.c
+similarity index 100%
+rename from arch/arm/kernel/kprobes-thumb.c
+rename to arch/arm/probes/kprobes-thumb.c
+diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/probes/kprobes.c
+similarity index 99%
+rename from arch/arm/kernel/kprobes.c
+rename to arch/arm/probes/kprobes.c
+index 6d64420..43b2488 100644
+--- a/arch/arm/kernel/kprobes.c
++++ b/arch/arm/probes/kprobes.c
+@@ -30,11 +30,11 @@
+ #include <asm/cacheflush.h>
+ #include <linux/percpu.h>
+ #include <linux/bug.h>
++#include <asm/patch.h>
+ 
+ #include "kprobes.h"
+ #include "probes-arm.h"
+ #include "probes-thumb.h"
+-#include "patch.h"
+ 
+ #define MIN_STACK_SIZE(addr) 				\
+ 	min((unsigned long)MAX_STACK_SIZE,		\
+diff --git a/arch/arm/kernel/kprobes.h b/arch/arm/probes/kprobes.h
+similarity index 100%
+rename from arch/arm/kernel/kprobes.h
+rename to arch/arm/probes/kprobes.h
+diff --git a/arch/arm/kernel/probes-arm.c b/arch/arm/probes/probes-arm.c
+similarity index 100%
+rename from arch/arm/kernel/probes-arm.c
+rename to arch/arm/probes/probes-arm.c
+diff --git a/arch/arm/kernel/probes-arm.h b/arch/arm/probes/probes-arm.h
+similarity index 100%
+rename from arch/arm/kernel/probes-arm.h
+rename to arch/arm/probes/probes-arm.h
+diff --git a/arch/arm/kernel/probes-thumb.c b/arch/arm/probes/probes-thumb.c
+similarity index 100%
+rename from arch/arm/kernel/probes-thumb.c
+rename to arch/arm/probes/probes-thumb.c
+diff --git a/arch/arm/kernel/probes-thumb.h b/arch/arm/probes/probes-thumb.h
+similarity index 100%
+rename from arch/arm/kernel/probes-thumb.h
+rename to arch/arm/probes/probes-thumb.h
+diff --git a/arch/arm/kernel/probes.c b/arch/arm/probes/probes.c
+similarity index 100%
+rename from arch/arm/kernel/probes.c
+rename to arch/arm/probes/probes.c
+diff --git a/arch/arm/kernel/probes.h b/arch/arm/probes/probes.h
+similarity index 100%
+rename from arch/arm/kernel/probes.h
+rename to arch/arm/probes/probes.h
+diff --git a/arch/arm/kernel/uprobes-arm.c b/arch/arm/probes/uprobes-arm.c
+similarity index 100%
+rename from arch/arm/kernel/uprobes-arm.c
+rename to arch/arm/probes/uprobes-arm.c
+diff --git a/arch/arm/kernel/uprobes.c b/arch/arm/probes/uprobes.c
+similarity index 100%
+rename from arch/arm/kernel/uprobes.c
+rename to arch/arm/probes/uprobes.c
+diff --git a/arch/arm/kernel/uprobes.h b/arch/arm/probes/uprobes.h
+similarity index 100%
+rename from arch/arm/kernel/uprobes.h
+rename to arch/arm/probes/uprobes.h
 -- 
 1.8.4
