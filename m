@@ -1,95 +1,64 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 1 Dec 2014 14:35:13 -0800
-Subject: [PATCH v2 1/3] power: reset: read priority from device tree
-In-Reply-To: <3916ca2867ced70e16903d6d44aaae8f@agner.ch>
-References: <1417453389-1588-1-git-send-email-stefan@agner.ch>
- <1417453389-1588-2-git-send-email-stefan@agner.ch>
- <CAL85gmBq30pWxP0buKbM8so6QqsJq2YojiSK1EWtMPsH_7foeg@mail.gmail.com>
- <ea4f7a2bfdb9bea45cab9418c211083b@agner.ch>
- <CAL85gmBNE7oDbE+LX+V=AFJO61Ta0Gekoq6sDb8TkEnoPsNFVA@mail.gmail.com>
- <20141201174215.GB24692@roeck-us.net>
- <3916ca2867ced70e16903d6d44aaae8f@agner.ch>
-Message-ID: <20141201223513.GA32035@roeck-us.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 1 Dec 2014 22:50:57 +0000
+Subject: [PATCH] ARM: rockchip: Convert resume code to C
+In-Reply-To: <1417461694-5129-1-git-send-email-dianders@chromium.org>
+References: <1417461694-5129-1-git-send-email-dianders@chromium.org>
+Message-ID: <20141201225057.GA11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 11:18:47PM +0100, Stefan Agner wrote:
-> On 2014-12-01 18:42, Guenter Roeck wrote:
-> > On Mon, Dec 01, 2014 at 09:38:09AM -0800, Feng Kan wrote:
-> >> On Mon, Dec 1, 2014 at 9:29 AM, Stefan Agner <stefan@agner.ch> wrote:
-> >> > On 2014-12-01 18:15, Feng Kan wrote:
-> >> >> On Mon, Dec 1, 2014 at 9:03 AM, Stefan Agner <stefan@agner.ch> wrote:
-> >> >>> This patch adds an optional property which allows to specify the
-> >> >>> reset source priority. This priority is used by the kernel restart
-> >> >>> handler call chain to sort out the proper reset/restart method.
-> >> >>> Depending on the power design of a board or other machine/board
-> >> >>> specific peculiarity, it is not possible to pick a generic priority.
-> >> >>>
-> >> >>> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> >> >>> ---
-> >> >>>  Documentation/devicetree/bindings/power/reset/syscon-reboot.txt | 3 +++
-> >> >>>  drivers/power/reset/syscon-reboot.c                             | 5 ++++-
-> >> >>>  2 files changed, 7 insertions(+), 1 deletion(-)
-> >> >>>
-> >> >>> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
-> >> >>> index 1190631..ee41d9c 100644
-> >> >>> --- a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
-> >> >>> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
-> >> >>> @@ -11,6 +11,9 @@ Required properties:
-> >> >>>  - offset: offset in the register map for the reboot register (in bytes)
-> >> >>>  - mask: the reset value written to the reboot register (32 bit access)
-> >> >>>
-> >> >>> +Optional properties:
-> >> >>> +- priority: define the priority of the reset (0-255, defaults to 128)
-> >> >>> +
-> >> >>>  Default will be little endian mode, 32 bit access only.
-> >> >>>
-> >> >>>  Examples:
-> >> >>> diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
-> >> >>> index 815b901..3060d6b 100644
-> >> >>> --- a/drivers/power/reset/syscon-reboot.c
-> >> >>> +++ b/drivers/power/reset/syscon-reboot.c
-> >> >>> @@ -67,8 +67,11 @@ static int syscon_reboot_probe(struct platform_device *pdev)
-> >> >>>         if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
-> >> >>>                 return -EINVAL;
-> >> >>>
-> >> >>> -       ctx->restart_handler.notifier_call = syscon_restart_handle;
-> >> >>>         ctx->restart_handler.priority = 128;
-> >> >>> +       of_property_read_u32(pdev->dev.of_node, "priority",
-> >> >>> +                            &ctx->restart_handler.priority);
-> >> >>
-> >> >> What is this for?
-> >> >
-> >> > What do you mean? The moved line "ctx->restart_handler.notifier_call =
-> >> > syscon_restart_handle;"? When one reads the diff, it looks like that
-> >> > line was moved, in fact I tried to keep the of_property_read function
-> >> > calls together. But I had to move the assignation of the default
-> >> > priority in front of restart_handler.priority. That's what is the
-> >> > outcome...
-> >>
-> >> I believe Guenter explained above already. Actually this help to solve one of
-> >> my problem. Thanks.
-> > 
-> > Since Mark doesn't seem to be happy with the idea of making the priority
-> > dt-configurable, the alternative might be to just set a higher priority for
-> > syscon triggered resets, as suggested by Stefan. Not as flexible, but it
-> > should be ok for most use cases.
-> > 
-> 
-> I read the other branch of this thread too, but IMHO, this would be the
-> best solution for now. It's a one line change and does the job. After
-> all, we have that priority for a reason, it doesn't makes sense having
-> all of them at a common default. As mentioned in an other reply, I think
-> it is especially reasonable to configure the syscon-reboot driver a bit
-> higher, since this driver is more likely to be used for a dedicated
-> reboot feature provided by the SoC, which usually is the preferred one.
-> If it happens one day that a SoC ends up with conflicting priorities or
-> other priority odds, we can add the DT support then...
-> 
-> What do you think, can I go with that for now? (Guenter, Feng, Mark...?)
-> 
-Ok with me. After all, one only needs to remove the entry from the dt file
-if not wanted/needed, so one could argue that its existence already implies
-"preferred".
+On Mon, Dec 01, 2014 at 11:21:34AM -0800, Doug Anderson wrote:
+> We convert the existing assembly resume code into C as proof that this
+> works and to prepare for linking in SDRAM reinit code.
 
-Guenter
+...
+
+> base my patch atop them.  Why?
+                            ^^^^
+
+That's a very good question...
+
+> +static void __noreturn rk3288_resume_c(void)
+> +{
+> +	if (rk3288_resume_params.l2ctlr_f)
+> +		asm("mcr p15, 1, %0, c9, c0, 2" : :
+> +			"r" (rk3288_resume_params.l2ctlr));
+
+Assembly...
+
+> +static void __naked __noreturn rk3288_resume(void)
+> +{
+> +	/* Make sure we're on CPU0, no IRQs and get a stack setup */
+> +	asm volatile (
+> +			"msr	cpsr_cxf, %0\n"
+> +
+> +			/* Only cpu0 continues to run, the others halt here */
+> +			"mrc	p15, 0, r1, c0, c0, 5\n"
+> +			"and	r1, r1, #0xf\n"
+> +			"cmp	r1, #0\n"
+> +			"beq	cpu0run\n"
+> +		"secondary_loop:\n"
+> +			"wfe\n"
+> +			"b	secondary_loop\n"
+> +
+> +		"cpu0run:\n"
+> +			"mov	sp, %1\n"
+> +		:
+> +		: "i" (INIT_CPSR), "r" (&__stack_start)
+> +		: "cc", "r1", "sp");
+
+Big load of assembly.
+
+What I see here is a load of complexity which achieves very little.
+The result doesn't get rid of much assembly, but it does make stuff
+more complicated.  And the diffstat speaks volumes about this:
+
+ 10 files changed, 275 insertions(+), 94 deletions(-)                           
+
+There's a lot of words in the description, but it's missing the most
+important bit: why do we want to take this approach - what benefits
+does it bring?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
