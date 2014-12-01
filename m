@@ -1,93 +1,104 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 1 Dec 2014 13:53:37 +0000
-Subject: [PATCH 1/4] iommu: introduce generic page table allocation
- framework
-In-Reply-To: <12888062.XNeNCOOP61@avalon>
-References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
- <3337836.UezZ1Klsom@avalon> <20141201121338.GD18466@arm.com>
- <12888062.XNeNCOOP61@avalon>
-Message-ID: <20141201135337.GF18466@arm.com>
+From: tim@krieglstein.org (Tim Sander)
+Date: Mon, 01 Dec 2014 14:54:10 +0100
+Subject: [PATCH 3.18-rc3 v9 5/5] arm: smp: Handle ipi_cpu_backtrace()
+ using FIQ (if available)
+In-Reply-To: <20141201103832.GX3836@n2100.arm.linux.org.uk>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <1633306.naE1qIcAOt@dabox> <20141201103832.GX3836@n2100.arm.linux.org.uk>
+Message-ID: <5910085.Y47hdorDAO@dabox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 01:33:09PM +0000, Laurent Pinchart wrote:
-> On Monday 01 December 2014 12:13:38 Will Deacon wrote:
-> > On Sun, Nov 30, 2014 at 10:00:21PM +0000, Laurent Pinchart wrote:
-> > > On Thursday 27 November 2014 11:51:15 Will Deacon wrote:
-> > > > diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
-> > > > new file mode 100644
-> > > > index 000000000000..82e39a0db94b
-> > > > --- /dev/null
-> > > > +++ b/drivers/iommu/io-pgtable.c
-> > > > @@ -0,0 +1,71 @@
-> > > > +/*
-> > > > + * Generic page table allocator for IOMMUs.
-> > > > + *
-> > > > + * This program is free software; you can redistribute it and/or modify
-> > > > + * it under the terms of the GNU General Public License version 2 as
-> > > > + * published by the Free Software Foundation.
-> > > > + *
-> > > > + * This program is distributed in the hope that it will be useful,
-> > > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > > > + * GNU General Public License for more details.
-> > > > + *
-> > > > + * You should have received a copy of the GNU General Public License
-> > > > + * along with this program; if not, write to the Free Software
-> > > > + * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-> > > > 02111-1307, USA.
-> 
-> By the way you can remove this paragraph, we don't want to update all source 
-> files the day the FSF decides to move to a new address.
+Hi Russell
 
-Yeah, I missed that one (I fixed the lpae file already).
-
-> > > > diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-> > > > new file mode 100644
-> > > > index 000000000000..5ae75d9cae50
-> > > > --- /dev/null
-> > > > +++ b/drivers/iommu/io-pgtable.h
-> > > > @@ -0,0 +1,65 @@
-> > > > +#ifndef __IO_PGTABLE_H
-> > > > +#define __IO_PGTABLE_H
-> > > > +
-> > > > +struct io_pgtable_ops {
-> > > > +	int (*map)(struct io_pgtable_ops *ops, unsigned long iova,
-> > > 
-> > > How about passing a struct io_pgtable * instead of the ops pointer ? This
-> > > would require returning a struct io_pgtable from the alloc function, which
-> > > I suppose you didn't want to do to ensure the caller will not touch the
-> > > struct io_pgtable fields directly. Do we really need to go that far, or
-> > > can we simply document struct io_pgtable as being private to the pg alloc
-> > > framework core and allocators ? Someone who really wants to get hold of
-> > > the io_pgtable instance could use container_of on the ops anyway, like
-> > > the allocators do.
+Am Montag, 1. Dezember 2014, 10:38:32 schrieb Russell King - ARM Linux:
+> On Mon, Dec 01, 2014 at 11:32:00AM +0100, Tim Sander wrote:
+> > Hi Russel, Daniel
 > > 
-> > Hmm, currently the struct io_pgtable is private to the page table allocator,
-> > so I don't like the IOMMU driver having an explicit handle to that.
+> > Am Freitag, 28. November 2014, 10:08:28 schrieb Russell King - ARM Linux:
+> > > The two things are mutually exclusive.  You can either have FIQ being
+> > > used
+> > > for debug purposes, where we decode the FIQ reason and call some
+> > > function
+> > > (which means that we will only service one FIQ at a time) or you can use
+> > > it in exclusive mode (provided by fiq.c) where your handler has sole
+> > > usage
+> > > of the vector, and benefits from fast and immediate servicing of the
+> > > event.
+> > 
+> > As far as i am aware, die CONFIG_FIQ symbol is not pulled by all ARM
+> > platforms. Since there are ARM platforms which don't use this symbol but
+> > the hardware is fully capable of handling FIQ requests i would expect,
+> > that adding CONFIG_FIQ to a plattform, that this platform honors the
+> > set_fiq_handler functionality.
 > 
-> I agree with this, but given that struct io_pgtable is defined in a header 
-> used by the IOMMU driver, and given that it directly embeds struct 
-> io_pgtable_ops, there's no big difference between the two structures.
-
-Right, but you have to do an explicit container_of and, with the kerneldoc
-added, it should be clear that it's not a good idea to mess with things
-like the cookie or the cfg after you've allocated the page tables.
-
-> > I also like having the value returned from alloc_io_pgtable_ops being used
-> > as the handle to pass around -- it keeps things simple for the caller
-> > because there's one structure that you get back and that's the thing you use
-> > as a reference.
+> That whole paragraph doesn't make much sense to me.
 > 
-> I agree with that as well, my proposal was to return a struct io_pgtable from 
-> alloc_io_pgtable_ops.
-> 
-> > What do we gain by returning the struct io_pgtable pointer instead?
-> 
-> The ops structure could be made a const pointer. That's a pretty small 
-> optimization, granted.
+> Look, in my mind it is very simple.  If you are using CONFIG_FIQ on a
+> SMP platform, your life will be very difficult.  The FIQ code enabled
+> by that symbol is not designed to be used on SMP systems, *period*.
+Well the only extra thing you had to do is set up the FIQ registers on every 
+cpu, but i would not call that very difficult. Other than that i am not aware of 
+any problems that are not also present on a uniprocessor system. So i have a 
+hard time following your reasoning why SMP is different from UP in regard to 
+the CONFIG_FIQ.
 
-I still think I'd rather keep things like they are. Let's see how it looks
-in v2, when I've reordered the structures and documented them.
+> If you decide to enable CONFIG_FIQ, and you use that code on a SMP
+> platform, I'm going to say right now so it's totally clear: if you
+> encounter a problem, I don't want to know about it.  The code is not
+> designed for use on that situation.
+Even with using the FIQ on a Linux SMP system you have not heard from me 
+before, as i knew that this is not your problem (and that is not to say that 
+there where none!). The only interface Linux has been making available is 
+set_fiq_handler. So it was clear that the FIQ is its own domain otherwise 
+untouched by the kernel. Now the line gets blurried with the linux kernel 
+moving to use the FIQ. And with the descicions forthcoming its not only 
+grabbing land it also claims a previous public path for its own. So it doesn't 
+help that its planting some flowers along the way. So please be nice to the 
+natural inhabitants...
 
-Will
+And i really don't get it, that neither ARM nor the kernel community sees fast 
+interrupts as a worthwhile usecase. Unfortunatly the interrupt latencies with 
+Linux are at least a order of magnitude higher than the pure hardware even 
+with longer pipelines can deliver. 
+
+> Therefore, as far as I'm concerned, the two facilities are mututally
+> exclusive.
+Well can't have the cake and eat it too.
+
+> I had thought about whether the IPI FIQ should be disabled when a
+> replacement FIQ handler is installed, I deem it not to be a use case
+> that the mainline kernel needs to be concerned about.
+That would be nice.
+
+> > Yes, but if the FIQ handler is also used for IPI, set_fiq_handler gets IPI
+> > interrupts (with the patch starting this thread)? So i think that the
+> > patch
+> > needs to look like:
+> > --- a/arch/arm/kernel/traps.c
+> > +++ b/arch/arm/kernel/traps.c
+> > @@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry
+> > handle_fiq_as_nmi(struct pt_regs *regs)
+> > +#ifndef CONFIG_FIQ
+> > 
+> >  #ifdef CONFIG_ARM_GIC
+> >  
+> >         gic_handle_fiq_ipi();
+> >  
+> >  #endif
+> > 
+> > +#endif
+> 
+> No.  With a single zImage kernel, you could very well have SMP and FIQ
+> both enabled, but have a non-SMP platform using FIQ, but also support
+> SMP platforms as well.  Your change prevents that happening.
+Ah, well i have to get used to this "new" devicetree thingy, where one size 
+fits all...
+
+Still if you boot a single process system which has FIQ available and has a 
+GIC with such a kernel, then you also reprogramm the IPI's as FIQs. But i 
+guess thats not a problem as Linux does not self IPI the kernel as other os'es
+do?
+
+Best regards
+Tim
