@@ -1,40 +1,34 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 1 Dec 2014 11:30:54 +0800
-Subject: [PATCH] clk: sunxi: Fix factor clocks usage for sun9i core clocks
-In-Reply-To: <20141130212920.GA25249@lukather>
-References: <1417080570-5099-1-git-send-email-wens@csie.org>
- <20141130212920.GA25249@lukather>
-Message-ID: <CAGb2v67jri1ahFtf4yRviQ80zpyjStJfe+SNJm3JOysfRv=R_g@mail.gmail.com>
+From: jamesjj.liao@mediatek.com (james liao)
+Date: Mon, 1 Dec 2014 11:41:10 +0800
+Subject: [PATCH 2/4] clk: Add INFRA and PERI clocks for Mediatek MT8135.
+In-Reply-To: <20141128120636.GD25883@leverpostej>
+References: <1417174490-6845-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1417174490-6845-3-git-send-email-jamesjj.liao@mediatek.com>
+ <20141128120636.GD25883@leverpostej>
+Message-ID: <1417405278.31427.15.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 1, 2014 at 5:29 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Thu, Nov 27, 2014 at 05:29:30PM +0800, Chen-Yu Tsai wrote:
->> The sunxi factor clocks usage was changed in
->>
->>     clk: sunxi: Give sunxi_factors_register a registers parameter
->>
->> However the sun9i core clocks were not fixed up in that patch,
->> resulting in breakage. This patch fixes that.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> Cc: Hans de Goede <hdegoede@redhat.com>
->
-> Applied, thanks!
+Hi Mark,
 
-Thanks. Note that I'm tracking patches you've merged for 3.20
-in my own sunxi-next branch on github.
+On Fri, 2014-11-28 at 12:06 +0000, Mark Rutland wrote:
+> On Fri, Nov 28, 2014 at 11:34:48AM +0000, James Liao wrote:
+> > This patch adds clock gates support for Mediatek SoCs, and adds clocks of
+> > INFRA sys and PERI sys for MT8135.
+> > 
+> 
+> Please fold the include/dt-bindings changes into the DT documentation
+> patch, and put that earlier in the series.
+> 
 
->> This patch is for 3.20.
->>
->> A bit of boiler plate code for each clock provider.
->> Maybe we should add a local helper or something?
->
-> Well, isn't that expected since we actually just moved it out?
+OK, I'll send a new patchset later with the following sequence:
 
-I'll look into making a nice macro for this.
+1. include/dt-bindings + DT documention.
+2. Basic clocks (PLLs + TOPCKGEN).
+3. Basic clocks (INFRA + PERI)
+4. Update device tree to enable clocks.
 
-ChenYu
+
+Best regards,
+
+James
