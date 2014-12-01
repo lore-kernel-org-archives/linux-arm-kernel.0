@@ -1,63 +1,72 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 01 Dec 2014 18:25:23 +0100
-Subject: [PATCH] tty: serial: serial-omap: depend on !8250_omap
-In-Reply-To: <20141201163813.GA2817@atomide.com>
-References: <1417039306-2384-1-git-send-email-bigeasy@linutronix.de>
- <20141129094823.GA10840@linutronix.de> <20141129173418.GY2817@atomide.com>
- <20141201140914.728aaa46@lxorguk.ukuu.org.uk>
- <20141201163813.GA2817@atomide.com>
-Message-ID: <547CA483.3070801@linutronix.de>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 01 Dec 2014 18:29:43 +0100
+Subject: [PATCH v2 1/3] power: reset: read priority from device tree
+In-Reply-To: <CAL85gmBq30pWxP0buKbM8so6QqsJq2YojiSK1EWtMPsH_7foeg@mail.gmail.com>
+References: <1417453389-1588-1-git-send-email-stefan@agner.ch>
+ <1417453389-1588-2-git-send-email-stefan@agner.ch>
+ <CAL85gmBq30pWxP0buKbM8so6QqsJq2YojiSK1EWtMPsH_7foeg@mail.gmail.com>
+Message-ID: <ea4f7a2bfdb9bea45cab9418c211083b@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2014 05:38 PM, Tony Lindgren wrote:
-> * One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> [141201 06:11]:
->>> Well the nightmare userspace switch from ttyS to ttyO few years ago is
->>> something we want to avoid.. I think the best solution would be to make
->>> serial-omap.c transparently provide support for ttyO using the new 8250
->>> code so both ttyS and ttyO devices would just work. Otherwise it will
->>> be years of "my serial port stopped working" questions again.
+On 2014-12-01 18:15, Feng Kan wrote:
+> On Mon, Dec 1, 2014 at 9:03 AM, Stefan Agner <stefan@agner.ch> wrote:
+>> This patch adds an optional property which allows to specify the
+>> reset source priority. This priority is used by the kernel restart
+>> handler call chain to sort out the proper reset/restart method.
+>> Depending on the power design of a board or other machine/board
+>> specific peculiarity, it is not possible to pick a generic priority.
 >>
->> Thata a udev problem not a kernel one surely.
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  Documentation/devicetree/bindings/power/reset/syscon-reboot.txt | 3 +++
+>>  drivers/power/reset/syscon-reboot.c                             | 5 ++++-
+>>  2 files changed, 7 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+>> index 1190631..ee41d9c 100644
+>> --- a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+>> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+>> @@ -11,6 +11,9 @@ Required properties:
+>>  - offset: offset in the register map for the reboot register (in bytes)
+>>  - mask: the reset value written to the reboot register (32 bit access)
+>>
+>> +Optional properties:
+>> +- priority: define the priority of the reset (0-255, defaults to 128)
+>> +
+>>  Default will be little endian mode, 32 bit access only.
+>>
+>>  Examples:
+>> diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
+>> index 815b901..3060d6b 100644
+>> --- a/drivers/power/reset/syscon-reboot.c
+>> +++ b/drivers/power/reset/syscon-reboot.c
+>> @@ -67,8 +67,11 @@ static int syscon_reboot_probe(struct platform_device *pdev)
+>>         if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
+>>                 return -EINVAL;
+>>
+>> -       ctx->restart_handler.notifier_call = syscon_restart_handle;
+>>         ctx->restart_handler.priority = 128;
+>> +       of_property_read_u32(pdev->dev.of_node, "priority",
+>> +                            &ctx->restart_handler.priority);
 > 
-> How do you suggest we get people to update their kernel command line
-> and inittab? Udev may not even be installed.
+> What is this for?
 
-There are three use cases that I can think of right now:
-- people that enable that new driver via oldconfig
-  I would expect that they read the help message in Kconfig. No worry
-  about them.
+What do you mean? The moved line "ctx->restart_handler.notifier_call =
+syscon_restart_handle;"? When one reads the diff, it looks like that
+line was moved, in fact I tried to keep the of_property_read function
+calls together. But I had to move the assignation of the default
+priority in front of restart_handler.priority. That's what is the
+outcome...
 
-- people that get a complete system via magic_build_tool (may yocto or
-  whatever)
-  If $TOOL decides to use the new driver, then it should update
-  commandline in bootloader. Those things create usually bootloader +
-  kernel + rootfile system. If the commandline is saved on flash/mmc
-  then it won't be reset from default. However udev should help here.
-  So not a problem either (udev can't fix the kernel boot output but we
-  should see atleast the login console).
+--
+Stefan
 
-- people that build omap2plus_defconfig and we switch to the new driver
-  Those people get switched from one driver to the other without
-  knowing. This is what I tried to bring to everyone's attention. The
-  defconfig hasn't been changed yet so it is not problem for next
-  release (yet).
-
-I agree that this is a user problem. We agreed not to introduce a
-console proxy in kernel _or_ hack the command line in kernel (to
-replace O with S).
-So I think the problem boils down to educate the user about this
-change. Making the old driver disappear was one way of getting the
-user's attention. Another idea would be to introduce a #warning which is
-also activated by the defconfig and informs the user about the change.
-Ideally this #warning could be switched off by Kconfig once the user
-reads & deactivates it. This requires the pay attention to warnings
-during build. #error would make sure he does but it breaks auto-builds
-so it is not an option.
-
-> Regards,
-> 
-> Tony
-> 
-
-Sebastian
+>> +
+>> +       ctx->restart_handler.notifier_call = syscon_restart_handle;
+>>         err = register_restart_handler(&ctx->restart_handler);
+>>         if (err)
+>>                 dev_err(dev, "can't register restart notifier (err=%d)\n", err);
+>> --
+>> 2.1.3
+>>
