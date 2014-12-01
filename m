@@ -1,133 +1,58 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 01 Dec 2014 17:57:59 +0000
-Subject: [PATCH] ARM: imx6: fix bogus use of irq_get_irq_data
-In-Reply-To: <1417453443-9179-1-git-send-email-marc.zyngier@arm.com>
-References: <1417453443-9179-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <547CAC27.2090200@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Dec 2014 18:58:49 +0100
+Subject: [PATCH] arm: ep93xx: add dma_masks for the M2P and M2M DMA
+ controllers
+In-Reply-To: <DC148C5AA1CEBA4E87973D432B1C2D88260702F5@P3PWEX4MB008.ex4.secureserver.net>
+References: <1416590622-7765-1-git-send-email-hsweeten@visionengravers.com>
+ <201411281235.50962.arnd@arndb.de>
+ <DC148C5AA1CEBA4E87973D432B1C2D88260702F5@P3PWEX4MB008.ex4.secureserver.net>
+Message-ID: <4031997.JKQRhrzkna@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Monday 01 December 2014 17:16:18 Hartley Sweeten wrote:
+> On Friday, November 28, 2014 4:36 AM, Arnd Bergmann wrote:
+> > On Friday 21 November 2014, H Hartley Sweeten wrote:
+> >> The dma_mask and coherent_dma_mask need to be set or DMA memory allocations
+> >> will fail with error messages like this:
+> >> 
+> >>   ep93xx-dma ep93xx-dma-m2p: coherent DMA mask is unset
+> >> 
+> >>   ep93xx-dma ep93xx-dma-m2m: coherent DMA mask is unset
+> >> 
+> >> Add the missing information to the ep93xx-dma-m2p and ep93xx-dma-m2m
+> >> devices.
+> >> 
+> >> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> >> Reported-by: Jeremy Moles <cubicool@gmail.com>
+> >> Tested-by: Alexander Sverdlin <subaparts@yandex.ru>
+> >> Cc: Ryan Mallon <rmallon@gmail.com>
+> >
+> > Applied to next/fixes-non-critical. I couldn't tell from your description
+> > whether you want this on 3.18 or even backported to older releases,
+> > which I guess would make sense.
+> >
+> > If you want a backport, let me know.
+> 
+> Arnd,
+> 
+> I think the ep93xx audio got broken around this commit:
+> 
+> commit e27e8a60cb4ca8e3b047c5d6ee9afff9c4c5b61a
+> Author: Lars-Peter Clausen <lars@metafoo.de>
+> Date:   Sat Apr 20 19:29:05 2013 +0200
+> 
+>     ASoC: ep93xx: Use generic dmaengine PCM
+> 
+> But I'm not sure exactly where. I will try to narrow it down.
+> 
+> There appear to be a number of ep93xx users still out there but
+> they are mostly still using 2.6 kernels. It might be ok to just get
+> this fix in for 3.18 and then wait to see if anyone complains about
+> the sound not working in older kernels.
 
-On 01/12/14 17:04, Marc Zyngier wrote:
-> The imx6 PM code seems to be quite creative in its use of irq_data,
-> using something something that is very much a hardware interrupt
-        ^^^^^^^^^ ^^^^^^^^^
-More "something" here! ;)
+Is there any harm in applying the fix on older kernels? If not, I'd just
+mark it as stable for 3.11, which will cause it to get backported to
+3.17, 3.14 and 3.12 but not 3.10 or older longerm releases.
 
-Vladimir
-
-> number where we expect a virtual one.  Yes, it worked so far, but
-> that's only cheer luck, and it will definitely explode in 3.19.
-> 
-> Fix it by using a pair of helper functions that deal with the
-> actual hardware.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/mach-imx/common.h  |  4 ++--
->  arch/arm/mach-imx/gpc.c     | 34 ++++++++++++++++++++++------------
->  arch/arm/mach-imx/pm-imx6.c |  5 ++---
->  3 files changed, 26 insertions(+), 17 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> index 1dabf43..66662a1 100644
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -108,8 +108,8 @@ void imx_gpc_pre_suspend(bool arm_power_off);
->  void imx_gpc_post_resume(void);
->  void imx_gpc_mask_all(void);
->  void imx_gpc_restore_all(void);
-> -void imx_gpc_irq_mask(struct irq_data *d);
-> -void imx_gpc_irq_unmask(struct irq_data *d);
-> +void imx_gpc_hwirq_mask(unsigned int hwirq);
-> +void imx_gpc_hwirq_unmask(unsigned int hwirq);
->  void imx_anatop_init(void);
->  void imx_anatop_pre_suspend(void);
->  void imx_anatop_post_resume(void);
-> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-> index 1455829..5f3602e 100644
-> --- a/arch/arm/mach-imx/gpc.c
-> +++ b/arch/arm/mach-imx/gpc.c
-> @@ -91,34 +91,44 @@ void imx_gpc_restore_all(void)
->  		writel_relaxed(gpc_saved_imrs[i], reg_imr1 + i * 4);
->  }
->  
-> -void imx_gpc_irq_unmask(struct irq_data *d)
-> +void imx_gpc_hwirq_unmask(unsigned int hwirq)
->  {
->  	void __iomem *reg;
->  	u32 val;
->  
-> -	/* Sanity check for SPI irq */
-> -	if (d->hwirq < 32)
-> -		return;
-> -
-> -	reg = gpc_base + GPC_IMR1 + (d->hwirq / 32 - 1) * 4;
-> +	reg = gpc_base + GPC_IMR1 + (hwirq / 32 - 1) * 4;
->  	val = readl_relaxed(reg);
-> -	val &= ~(1 << d->hwirq % 32);
-> +	val &= ~(1 << hwirq % 32);
->  	writel_relaxed(val, reg);
->  }
->  
-> -void imx_gpc_irq_mask(struct irq_data *d)
-> +void imx_gpc_hwirq_mask(unsigned int hwirq)
->  {
->  	void __iomem *reg;
->  	u32 val;
->  
-> +	reg = gpc_base + GPC_IMR1 + (hwirq / 32 - 1) * 4;
-> +	val = readl_relaxed(reg);
-> +	val |= 1 << (hwirq % 32);
-> +	writel_relaxed(val, reg);
-> +}
-> +
-> +static void imx_gpc_irq_unmask(struct irq_data *d)
-> +{
-> +	/* Sanity check for SPI irq */
-> +	if (d->hwirq < 32)
-> +		return;
-> +
-> +	imx_gpc_hwirq_unmask(d->hwirq);
-> +}
-> +
-> +static void imx_gpc_irq_mask(struct irq_data *d)
-> +{
->  	/* Sanity check for SPI irq */
->  	if (d->hwirq < 32)
->  		return;
->  
-> -	reg = gpc_base + GPC_IMR1 + (d->hwirq / 32 - 1) * 4;
-> -	val = readl_relaxed(reg);
-> -	val |= 1 << (d->hwirq % 32);
-> -	writel_relaxed(val, reg);
-> +	imx_gpc_hwirq_mask(d->hwirq);
->  }
->  
->  void __init imx_gpc_init(void)
-> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-> index 5c3af8f..d815d1b 100644
-> --- a/arch/arm/mach-imx/pm-imx6.c
-> +++ b/arch/arm/mach-imx/pm-imx6.c
-> @@ -261,7 +261,6 @@ static void imx6q_enable_wb(bool enable)
->  
->  int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
->  {
-> -	struct irq_data *iomuxc_irq_data = irq_get_irq_data(32);
->  	u32 val = readl_relaxed(ccm_base + CLPCR);
->  
->  	val &= ~BM_CLPCR_LPM;
-> @@ -316,9 +315,9 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
->  	 * 3) Software should mask IRQ #32 right after CCM Low-Power mode
->  	 *    is set (set bits 0-1 of CCM_CLPCR).
->  	 */
-> -	imx_gpc_irq_unmask(iomuxc_irq_data);
-> +	imx_gpc_hwirq_unmask(32);
->  	writel_relaxed(val, ccm_base + CLPCR);
-> -	imx_gpc_irq_mask(iomuxc_irq_data);
-> +	imx_gpc_hwirq_mask(32);
->  
->  	return 0;
->  }
-> 
+	Arnd
