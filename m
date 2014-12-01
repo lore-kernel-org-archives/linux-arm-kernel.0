@@ -1,64 +1,67 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 1 Dec 2014 17:34:03 +0200
-Subject: [PATCH v3 1/5] i2c: i2c-davinci: switch to use platform_get_irq
+Date: Mon, 1 Dec 2014 17:34:04 +0200
+Subject: [PATCH v3 2/5] i2c: davinci: generate STP always when NACK is received
 In-Reply-To: <1417448047-15236-1-git-send-email-grygorii.strashko@ti.com>
 References: <1417448047-15236-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1417448047-15236-2-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1417448047-15236-3-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch Davinci I2C driver to use platform_get_irq(), because
-it is not recommened to use platform_get_resource(pdev, IORESOURCE_IRQ, ..)
-for requesting IRQ resources any more, as they can be not ready yet
-in case of DT-boot.
+According to I2C specification the NACK should be handled as follows:
+"When SDA remains HIGH during this ninth clock pulse, this is defined as the Not
+Acknowledge signal. The master can then generate either a STOP condition to
+abort the transfer, or a repeated START condition to start a new transfer."
+[I2C spec Rev. 6, 3.1.6: http://www.nxp.com/documents/user_manual/UM10204.pdf]
+
+Currently the Davinci i2c driver interrupts the transfer on receipt of a
+NACK but fails to send a STOP in some situations and so makes the bus
+stuck until next I2C IP reset (idle/enable).
+
+For example, the issue will happen during SMBus read transfer which
+consists from two i2c messages write command/address and read data:
+
+S Slave Address Wr A Command Code A Sr Slave Address Rd A D1..Dn A P
+<--- write -----------------------> <--- read --------------------->
+
+The I2C client device will send NACK if it can't recognize "Command Code"
+and it's expected from I2C master to generate STP in this case.
+But now, Davinci i2C driver will just exit with -EREMOTEIO and STP will
+not be generated.
+
+Hence, fix it by generating Stop condition (STP) always when NACK is received.
+
+This patch fixes Davinci I2C in the same way it was done for OMAP I2C
+commit cda2109a26eb ("i2c: omap: query STP always when NACK is received").
 
 CC: Sekhar Nori <nsekhar@ti.com>
 CC: Kevin Hilman <khilman@deeprootsystems.com>
 CC: Santosh Shilimkar <ssantosh@kernel.org>
 CC: Murali Karicheri <m-karicheri2@ti.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Reviewed-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Reported-by: Hein Tibosch <hein_tibosch@yahoo.es>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- drivers/i2c/busses/i2c-davinci.c | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
+ drivers/i2c/busses/i2c-davinci.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
-index 4d96147..25e8e25 100644
+index 25e8e25..17e1203 100644
 --- a/drivers/i2c/busses/i2c-davinci.c
 +++ b/drivers/i2c/busses/i2c-davinci.c
-@@ -640,13 +640,17 @@ static int davinci_i2c_probe(struct platform_device *pdev)
- {
- 	struct davinci_i2c_dev *dev;
- 	struct i2c_adapter *adap;
--	struct resource *mem, *irq;
--	int r;
--
--	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
--	if (!irq) {
--		dev_err(&pdev->dev, "no irq resource?\n");
--		return -ENODEV;
-+	struct resource *mem;
-+	int r, irq;
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq <= 0) {
-+		if (!irq)
-+			irq = -ENXIO;
-+		if (irq != -EPROBE_DEFER)
-+			dev_err(&pdev->dev,
-+				"can't get irq resource ret=%d\n", irq);
-+		return irq;
+@@ -411,11 +411,9 @@ i2c_davinci_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg, int stop)
+ 	if (dev->cmd_err & DAVINCI_I2C_STR_NACK) {
+ 		if (msg->flags & I2C_M_IGNORE_NAK)
+ 			return msg->len;
+-		if (stop) {
+-			w = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
+-			w |= DAVINCI_I2C_MDR_STP;
+-			davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, w);
+-		}
++		w = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
++		w |= DAVINCI_I2C_MDR_STP;
++		davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, w);
+ 		return -EREMOTEIO;
  	}
- 
- 	dev = devm_kzalloc(&pdev->dev, sizeof(struct davinci_i2c_dev),
-@@ -661,7 +665,7 @@ static int davinci_i2c_probe(struct platform_device *pdev)
- 	init_completion(&dev->xfr_complete);
- #endif
- 	dev->dev = &pdev->dev;
--	dev->irq = irq->start;
-+	dev->irq = irq;
- 	dev->pdata = dev_get_platdata(&pdev->dev);
- 	platform_set_drvdata(pdev, dev);
- 
+ 	return -EIO;
 -- 
 1.9.1
