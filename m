@@ -1,41 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Dec 2014 14:09:36 +0100
-Subject: build regression with "rcar-du: Remove platform data support"
-Message-ID: <12234794.nfiRtpFgV8@wuerfel>
+From: Andrew.Jackson@arm.com (Andrew Jackson)
+Date: Mon, 01 Dec 2014 13:19:28 +0000
+Subject: [PATCH] drm: i2c: tda998x: Retry fetching the EDID if it fails
+ first time.
+In-Reply-To: <20141129114102.02366857@armhf>
+References: <546B84C6.3090809@arm.com>	<20141128091905.3e491c39@armhf>	<54783A2F.5010405@arm.com>
+ <20141129114102.02366857@armhf>
+Message-ID: <547C6AE0.80808@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On 11/29/14 10:41, Jean-Francois Moine wrote:
+> On Fri, 28 Nov 2014 09:02:39 +0000
+> Andrew Jackson <Andrew.Jackson@arm.com> wrote:
+> 
+>>> It seems that your patch is deprecated by Laurent Pinchart's
+>>> 	[PATCH] drm: tda998x: Use drm_do_get_edid()
+>>> http://lists.freedesktop.org/archives/dri-devel/2014-November/072906.html
+>>>   
+>>
+>> Thank you for the heads-up, I'd not seen that.  I'll consider how my patch might be modified to suit the new infrastructure.
+> 
+> You don't need any patch: drm_do_get_edid() already loops on reading
+> the EDID.
+> 
 
-linux-next has failed to build with lager_defconfig and marzen_defconfig for a while,
-with this error:
+Thank you again: that saves me work!
 
-arch/arm/mach-shmobile/board-lager.c:35:41: fatal error: linux/platform_data/rcar-du.h: No such file or directory
- #include <linux/platform_data/rcar-du.h>
-
-which is evidently the result of your patch
-
-commit 2378ad1228d2cdae0ea5448beb4fb2b42ebaf99c
-Author: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Date:   Wed Sep 17 02:07:52 2014 +0300
-
-    drm: rcar-du: Remove platform data support
-    
-    All platforms now instantiate the DU through DT, platform data support
-    isn't needed anymore.
-    
-    Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-
-that removes the header files. I assume some dependency wasn't tracked
-right, since linux-next still has these.
-
-$ git grep rcar_du_ arch/arm
-arch/arm/mach-shmobile/board-lager.c:static struct rcar_du_encoder_data lager_du_encoders[] = {
-arch/arm/mach-shmobile/board-lager.c:static const struct rcar_du_platform_data lager_du_pdata __initconst = {
-arch/arm/mach-shmobile/board-marzen.c:static struct rcar_du_encoder_data du_encoders[] = {
-arch/arm/mach-shmobile/board-marzen.c:static const struct rcar_du_platform_data du_pdata __initconst = {
-
-Can we please fix this before the merge window? Should the platform
-device registration just get removed from the two board files?
-
-	Arnd
+   Andrew
