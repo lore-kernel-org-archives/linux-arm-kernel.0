@@ -1,42 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 1 Dec 2014 14:56:22 +0100
-Subject: [PATCH 1/2] pinctrl: at91: allow disabled gpio controllers
-In-Reply-To: <1417193367-12422-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1417193367-12422-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <CACRpkdbXuXyfwAyFTHVDGa4OS88KsHXZeDDAeXf6ZJ_JQmduoQ@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 01 Dec 2014 13:57:39 +0000
+Subject: [PATCH v2] MAINTAINERS: ARM Versatile Express platform
+In-Reply-To: <1417197395.4305.5.camel@perches.com>
+References: <1416939455-1814-2-git-send-email-pawel.moll@arm.com>
+ <1417003985-21564-1-git-send-email-pawel.moll@arm.com>
+ <1417197395.4305.5.camel@perches.com>
+Message-ID: <1417442259.4058.5.camel@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 5:49 PM, Ludovic Desroches
-<ludovic.desroches@atmel.com> wrote:
+On Fri, 2014-11-28 at 17:56 +0000, Joe Perches wrote:
+> On Wed, 2014-11-26 at 12:13 +0000, Pawel Moll wrote:
+> > This patch adds a separate section for the ARM
+> > Versatile Express platform maintainers, listing
+> > all different bits and bobs used by it.
+> > 
+> > Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+> > Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > Acked-by: Michael Turquette <mturquette@linaro.org>
+> > ---
+> >  MAINTAINERS | 12 ++++++++++++
+> >  1 file changed, 12 insertions(+)
+> > 
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index 0ff630d..924454f 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -1503,6 +1503,18 @@ S:	Maintained
+> >  F:	drivers/clk/ux500/
+> >  F:	include/linux/platform_data/clk-ux500.h
+> >  
+> > +ARM/VERSATILE EXPRESS PLATFORM
+> > +M:	Liviu Dudau <liviu.dudau@arm.com>
+> > +M:	Sudeep Holla <sudeep.holla@arm.com>
+> > +M:	Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > +S:	Maintained
+> > +F:	arch/arm/boot/dts/vexpress*
+> > +F:	arch/arm/mach-vexpress/
+> > +F:	*/*/vexpress*
+> > +F:	drivers/clk/versatile/clk-vexpress-osc.c
+> > +F:	drivers/clocksource/versatile.c
+> 
+> Your original submission had:
+> 
+> F:     drivers/power/reset/vexpress-poweroff.c
+> 
+> This file is not matched by:
+> 
+> F:	*/*/vexpress*
 
-> This patch allows to have gpio controller with status set to disabled.
->
-> gpio_banks represents all the gpio banks available on the device whereas
-> nbanks represents the gpio banks used. Having a disabled gpio controller
-> involves that nbanks value is lower than gpio_banks and that some
-> pointers in the gpio_chips array are NULL. This patch deals with these
-> specific cases.
->
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Oh boy, of course. I'll send fix in a second.
 
-(...)
->         /* We will handle a range of GPIO pins */
-> -       for (i = 0; i < info->nbanks; i++)
-> -               pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
-> +       for (i = 0; i < gpio_banks; i++)
-> +               if (gpio_chips[i])
-> +                       pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
-
-I highly suspect the real solution to this problem is to get rid
-of the pinctrl_add_gpio_range() call from the driver.
-
-Remobe these calls, and instead in at91_gpio_probe() in the same
-file, call gpiochip_add_pingroup_range() for each GPIO chip.
-
-That way the GPIO ranges are inserted from the GPIO side instead
-of the pinctrl side, which is way better, since it is more relative,
-and make you only add ranges for the gpio chips actually there.
-
-Yours,
-Linus Walleij
+Pawel
