@@ -1,124 +1,108 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon,  1 Dec 2014 14:24:53 +0100
-Subject: [PATCH v5 2/7] ARM: zynq: Extract slcr related functions out of
- common.h
+Date: Mon,  1 Dec 2014 14:24:54 +0100
+Subject: [PATCH v5 3/7] ARM: zynq: Move slcr.h and smp.h to generic location
 In-Reply-To: <cover.1417440250.git.michal.simek@xilinx.com>
 References: <cover.1417440250.git.michal.simek@xilinx.com>
-Message-ID: <c3392f6122c113c6bd36f3c8eae4065ffdd240ce.1417440250.git.michal.simek@xilinx.com>
+Message-ID: <edff974dd95ea07b0a9c7caa0dedc0f660c15838.1417440250.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create topic headers not to share all functions.
+include/soc/zynq/ is the right location for this header
+to be able to share information from this header with other
+drivers which require it.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
 Changes in v5: None
 Changes in v4:
-- New patch in this series
+- Move only slcr.h and smp.h and keep common.h in platform
+  which is not needed by OCMC driver
+  Based on Arnd request: https://lkml.org/lkml/2014/10/20/268
+  Not all symbols from slcr.h/smp.h will be used by OCMC driver
+  - no problem to remove them if it is needed
+- Add record to MAINTAINERS file
 
 Changes in v3: None
-Changes in v2: None
+Changes in v2:
+- Update pm.c added in 3.17 too - Soren pointed on it
 
- arch/arm/mach-zynq/common.c  |  1 +
- arch/arm/mach-zynq/common.h  |  9 ---------
- arch/arm/mach-zynq/platsmp.c |  1 +
- arch/arm/mach-zynq/slcr.c    |  1 +
- arch/arm/mach-zynq/slcr.h    | 29 +++++++++++++++++++++++++++++
- 5 files changed, 32 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/mach-zynq/slcr.h
+ MAINTAINERS                                     | 1 +
+ arch/arm/mach-zynq/common.c                     | 4 ++--
+ arch/arm/mach-zynq/platsmp.c                    | 5 +++--
+ arch/arm/mach-zynq/slcr.c                       | 3 ++-
+ {arch/arm/mach-zynq => include/soc/zynq}/slcr.h | 0
+ {arch/arm/mach-zynq => include/soc/zynq}/smp.h  | 0
+ 6 files changed, 8 insertions(+), 5 deletions(-)
+ rename {arch/arm/mach-zynq => include/soc/zynq}/slcr.h (100%)
+ rename {arch/arm/mach-zynq => include/soc/zynq}/smp.h (100%)
 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a20df9bf8ab0..7b6ed1f667ad 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1550,6 +1550,7 @@ S:	Supported
+ F:	arch/arm/mach-zynq/
+ F:	drivers/cpuidle/cpuidle-zynq.c
+ F:	drivers/block/xsysace.c
++F:	include/soc/zynq/
+ N:	zynq
+ N:	xilinx
+ F:	drivers/clocksource/cadence_ttc_timer.c
 diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 45cb778b344d..947e72b79496 100644
+index 947e72b79496..d30ecc1a7641 100644
 --- a/arch/arm/mach-zynq/common.c
 +++ b/arch/arm/mach-zynq/common.c
-@@ -43,6 +43,7 @@
+@@ -43,8 +43,8 @@
  #include <asm/hardware/cache-l2x0.h>
 
  #include "common.h"
-+#include "slcr.h"
- #include "smp.h"
+-#include "slcr.h"
+-#include "smp.h"
++#include <soc/zynq/slcr.h>
++#include <soc/zynq/smp.h>
 
  #define ZYNQ_DEVCFG_MCTRL		0x80
-diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-index 0667cc79f179..5557de83058a 100644
---- a/arch/arm/mach-zynq/common.h
-+++ b/arch/arm/mach-zynq/common.h
-@@ -17,15 +17,6 @@
- #ifndef __MACH_ZYNQ_COMMON_H__
- #define __MACH_ZYNQ_COMMON_H__
-
--extern int zynq_slcr_init(void);
--extern int zynq_early_slcr_init(void);
--extern void zynq_slcr_system_reset(void);
--extern void zynq_slcr_cpu_stop(int cpu);
--extern void zynq_slcr_cpu_start(int cpu);
--extern bool zynq_slcr_cpu_state_read(int cpu);
--extern void zynq_slcr_cpu_state_write(int cpu, bool die);
--extern u32 zynq_slcr_get_device_id(void);
--
- extern void __iomem *zynq_scu_base;
-
- void zynq_pm_late_init(void);
+ #define ZYNQ_DEVCFG_PS_VERSION_SHIFT	28
 diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
-index 5aa6b9ee95fc..717ba2b922b1 100644
+index 717ba2b922b1..6d2b8a16b6c3 100644
 --- a/arch/arm/mach-zynq/platsmp.c
 +++ b/arch/arm/mach-zynq/platsmp.c
-@@ -26,6 +26,7 @@
+@@ -25,9 +25,10 @@
+ #include <asm/cacheflush.h>
  #include <asm/smp_scu.h>
  #include <linux/irqchip/arm-gic.h>
++
  #include "common.h"
-+#include "slcr.h"
- #include "smp.h"
+-#include "slcr.h"
+-#include "smp.h"
++#include <soc/zynq/slcr.h>
++#include <soc/zynq/smp.h>
 
  /*
+  * Store number of cores in the system
 diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-index d4cb50cf97c0..40f8d7420334 100644
+index 40f8d7420334..b77e42d999c8 100644
 --- a/arch/arm/mach-zynq/slcr.c
 +++ b/arch/arm/mach-zynq/slcr.c
-@@ -20,6 +20,7 @@
+@@ -20,7 +20,8 @@
  #include <linux/regmap.h>
  #include <linux/clk/zynq.h>
  #include "common.h"
-+#include "slcr.h"
+-#include "slcr.h"
++#include <soc/zynq/slcr.h>
++#include <soc/zynq/smp.h>
 
  /* register offsets */
  #define SLCR_UNLOCK_OFFSET		0x8   /* SCLR unlock register */
-diff --git a/arch/arm/mach-zynq/slcr.h b/arch/arm/mach-zynq/slcr.h
-new file mode 100644
-index 000000000000..7b4edab666ee
---- /dev/null
-+++ b/arch/arm/mach-zynq/slcr.h
-@@ -0,0 +1,29 @@
-+/*
-+ * This file contains common function prototypes to avoid externs
-+ * in the c files.
-+ *
-+ * Copyright (C) 2014 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_ZYNQ_SLCR_H__
-+#define __MACH_ZYNQ_SLCR_H__
-+
-+extern int zynq_slcr_init(void);
-+extern int zynq_early_slcr_init(void);
-+extern void zynq_slcr_system_reset(void);
-+extern void zynq_slcr_cpu_stop(int cpu);
-+extern void zynq_slcr_cpu_start(int cpu);
-+extern bool zynq_slcr_cpu_state_read(int cpu);
-+extern void zynq_slcr_cpu_state_write(int cpu, bool die);
-+extern u32 zynq_slcr_get_device_id(void);
-+
-+#endif
+diff --git a/arch/arm/mach-zynq/slcr.h b/include/soc/zynq/slcr.h
+similarity index 100%
+rename from arch/arm/mach-zynq/slcr.h
+rename to include/soc/zynq/slcr.h
+diff --git a/arch/arm/mach-zynq/smp.h b/include/soc/zynq/smp.h
+similarity index 100%
+rename from arch/arm/mach-zynq/smp.h
+rename to include/soc/zynq/smp.h
 --
 1.8.2.3
 
@@ -128,4 +112,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/6e2e2485/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/c977073f/attachment.sig>
