@@ -1,44 +1,45 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue,  2 Dec 2014 02:47:24 +0300
-Subject: [PATCH v2 2/4] ARM: sa1100: implement clk_get_rate
+Date: Tue,  2 Dec 2014 02:47:25 +0300
+Subject: [PATCH v2 3/4] ARM: sa1100: provide OSTIMER0 clock for pxa_timer
 In-Reply-To: <1417477646-14278-1-git-send-email-dbaryshkov@gmail.com>
 References: <1417477646-14278-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1417477646-14278-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1417477646-14278-4-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide actual implementation of clk_get_rate function for StrongARM
-sa-11x0 SoC family.
+Pxa_timer clocksource requires OSTIMER0 clock to be provided.
+Add dummy clock returning proper rate.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-sa1100/clock.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mach-sa1100/clock.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
-index 9fa6a99..9434766 100644
+index 9434766..32fc5ab 100644
 --- a/arch/arm/mach-sa1100/clock.c
 +++ b/arch/arm/mach-sa1100/clock.c
-@@ -19,6 +19,7 @@
- struct clkops {
- 	void			(*enable)(struct clk *);
- 	void			(*disable)(struct clk *);
-+	unsigned long		(*get_rate)(struct clk *);
+@@ -97,9 +97,21 @@ const struct clkops clk_gpio27_ops = {
+ 
+ static DEFINE_CLK(gpio27, &clk_gpio27_ops);
+ 
++static unsigned long clk_36864_get_rate(struct clk *clk)
++{
++	return 36864000;
++}
++
++static struct clkops clk_36864_ops = {
++	.get_rate	= clk_36864_get_rate,
++};
++
++static DEFINE_CLK(36864, &clk_36864_ops);
++
+ static struct clk_lookup sa11xx_clkregs[] = {
+ 	CLKDEV_INIT("sa1111.0", NULL, &clk_gpio27),
+ 	CLKDEV_INIT("sa1100-rtc", NULL, NULL),
++	CLKDEV_INIT(NULL, "OSTIMER0", &clk_36864),
  };
  
- struct clk {
-@@ -33,9 +34,11 @@ struct clk clk_##_name = {				\
- 
- static DEFINE_SPINLOCK(clocks_lock);
- 
--/* Dummy clk routine to build generic kernel parts that may be using them */
- unsigned long clk_get_rate(struct clk *clk)
- {
-+	if (clk && clk->ops && clk->ops->get_rate)
-+		return clk->ops->get_rate(clk);
-+
- 	return 0;
- }
- EXPORT_SYMBOL(clk_get_rate);
+ static int __init sa11xx_clk_init(void)
 -- 
 2.1.3
