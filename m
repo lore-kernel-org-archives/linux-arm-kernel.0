@@ -1,65 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 1 Dec 2014 10:08:58 +0000
-Subject: [PATCH v3 0/3] SoCFPGA: L3 NIC driver
-In-Reply-To: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20141201100858.GA17070@leverpostej>
+From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
+Date: Mon, 1 Dec 2014 18:15:31 +0800
+Subject: Issue found in Armada 370: "No buffer space available" error
+ during continuous ping
+In-Reply-To: <20141201095815.GA7949@1wt.eu>
+References: <CAB8gEUsK9c3YMpAABifNAWU7zec2ePztSqS4KAYtiT7Sbhadvg@mail.gmail.com>
+ <20140721070303.GM21834@1wt.eu>
+ <CAB8gEUtmgwfWcuoYZ-wDwHVmzHN0WyOQD9oEOGAZ_gJfbPUm-g@mail.gmail.com>
+ <20140723061659.GE30488@1wt.eu>
+ <CAB8gEUtO=K-mjie6czsf-9ao1cxiMAV2ScbgUnf+XxqjEfOUvg@mail.gmail.com>
+ <CAB8gEUtgo-8nets3tRtqiZ8qRx+SyCq2d8v05scavWNwE5TNXg@mail.gmail.com>
+ <20141201072802.GB21731@1wt.eu>
+ <CAB8gEUsQ8nSNwB7vpZHBkELEBX2sN1QdWvujBGYQJY9dtCzgww@mail.gmail.com>
+ <20141201092851.GA22304@1wt.eu>
+ <20141201103221.6268b811@free-electrons.com>
+ <20141201095815.GA7949@1wt.eu>
+Message-ID: <CAB8gEUuW-r8oY=+ku+Cy4ZBKBvO9rF+QApn=WxR3nZFaSoCvTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 29, 2014 at 08:14:09PM +0000, Steffen Trumtrar wrote:
-> Hi!
+Hi Thomas, Willy.
+Good day.
 
-Hi Steffen,
+Thank you for your assistance as always.
 
-> This series adds support for the SoCFPGA L3 NIC. As the memory range has
-> a lot of holes, where you can not read from, syscon can not be used for
-> this IP core. Instead add a new driver, that knows about all the allowed
-> ranges and guards the access via regmap.
+We are currently testing the attached patch + 3.13.9.
+We'll let you know the results as soon as we've conducted enough tests
+- latest tomorrow.
 
-I note that while this series plumbs in a set of accessors (via regmap),
-there are no users as part of this series. What exactly do you intend to
-use these for? What is going to (re)program the bus, and how?
+Will keep you posted.
 
-I also note that you mention this L3/L4 bus hierarchy is composed of a
-number of NIC-301s, rather than being a single custom IP block. If
-that's the case, it would seem like there should be a binding for the
-NIC-301, and the hierarchy should be described.
+Regards,
+Maggie Roxas
 
-Thanks,
-Mark.
 
-> 
-> Changes in v3:
-> 
-> 	- Split out the devicetree binding in its own patch
-> 
-> Regards,
-> Steffen
-> 
-> Steffen Trumtrar (3):
->   Documentation: dt: add Altera L3 NIC bindings
->   ARM: socfpga: Add driver for the L3 interconnect
->   ARM: dts: socfpga: Add l3nic node
-> 
->  .../bindings/soc/socfpga/altr,l3-nic.txt           |  15 ++
->  arch/arm/boot/dts/socfpga.dtsi                     |   5 +
->  drivers/soc/Kconfig                                |   1 +
->  drivers/soc/Makefile                               |   1 +
->  drivers/soc/socfpga/Kconfig                        |  10 +
->  drivers/soc/socfpga/Makefile                       |   1 +
->  drivers/soc/socfpga/l3nic.c                        | 221 +++++++++++++++++++++
->  include/soc/socfpga/gpv.h                          |  63 ++++++
->  include/soc/socfpga/l3regs.h                       | 192 ++++++++++++++++++
->  9 files changed, 509 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
->  create mode 100644 drivers/soc/socfpga/Kconfig
->  create mode 100644 drivers/soc/socfpga/Makefile
->  create mode 100644 drivers/soc/socfpga/l3nic.c
->  create mode 100644 include/soc/socfpga/gpv.h
->  create mode 100644 include/soc/socfpga/l3regs.h
-> 
-> -- 
-> 2.1.3
-> 
-> 
+On Mon, Dec 1, 2014 at 5:58 PM, Willy Tarreau <w@1wt.eu> wrote:
+> Hi Thomas,
+>
+> On Mon, Dec 01, 2014 at 10:32:21AM +0100, Thomas Petazzoni wrote:
+>> If I understood correctly, on RX the interrupt coalescing can be done
+>> every X packets, or after N milliseconds. However, on TX, it's only
+>> after Y packets, there is no way to configure a delay.
+>
+> That was my understanding of the datasheet as well.
+>
+>> But in any case, with NAPI implemented in software, are these hardware
+>> interrupt coalescing features very important? As soon as the number of
+>> interrupts becomes high, the kernel will disable the interrupt and
+>> switch to polling, no?
+>
+> Absolutely, but despite this, the interrupts still impact the system's
+> performance, because instead of waking up the driver once the Tx queue
+> is about to be empty (let's say twice per Tx queue), we wake up as often
+> as the system supports it. The net effect is a performance loss of about
+> 5% on small packets, which is not huge of course, but would rather be
+> spent doing some more useful stuff.
+>
+> Uri gave me a contact at Marvell who knows this device well, I'll ask
+> him if there's no other way to work with this chip. Sending an interrupt
+> at least when the Tx queue is empty would be nice :-/
+>
+> Best regards,
+> Willy
+>
