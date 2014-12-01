@@ -1,60 +1,140 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 01 Dec 2014 09:38:02 +0100
-Subject: [GIT PULL] Xilinx Zynq cleanups for v3.19
-Message-ID: <547C28EA.50003@monstr.eu>
+From: Zhuoyu.Zhang@freescale.com (Zhuoyu.Zhang at freescale.com)
+Date: Mon, 1 Dec 2014 08:40:05 +0000
+Subject: [PATCH v2 1/2] arm: ls1: add CPU hotplug platform support
+In-Reply-To: <20141128103304.GA25883@leverpostej>
+References: <1416806890-26920-1-git-send-email-Zhuoyu.Zhang@freescale.com>
+ <20141128103304.GA25883@leverpostej>
+Message-ID: <CY1PR0301MB0668558136F0EAF9A2D2A717897D0@CY1PR0301MB0668.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-please pull these two cleanups patches to your tree.
-
-Thanks,
-Michal
-
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  https://github.com/Xilinx/linux-xlnx.git tags/zynq-cleanup-for-3.19
-
-for you to fetch changes up to 2b175186fbdaa767327e743bd6215f709379272a:
-
-  ARM: zynq: Remove secondary_startup() declaration from header (2014-12-01 09:32:22 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq cleanup patches for v3.19
-
-- Remove unused file and declaration
-
-----------------------------------------------------------------
-Michal Simek (1):
-      ARM: zynq: Remove secondary_startup() declaration from header
-
-Soren Brinkmann (1):
-      ARM: zynq: Actually remove hotplug.c
-
- arch/arm/mach-zynq/Makefile  |  2 --
- arch/arm/mach-zynq/common.h  |  1 -
- arch/arm/mach-zynq/hotplug.c | 14 --------------
- 3 files changed, 17 deletions(-)
- delete mode 100644 arch/arm/mach-zynq/hotplug.c
 
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: Friday, November 28, 2014 6:33 PM
+> To: Zhang Zhuoyu-B46552
+> Cc: linux-kernel at vger.kernel.org; kernel at pengutronix.de; linux-arm-
+> kernel at lists.infradead.org; Li Yang-Leo-R58472; linuxppc-
+> release at linux.freescale.net; Jin Zhengxiong-R64188; Zhao Chenhui-B35336;
+> linux at arm.linux.org.uk
+> Subject: Re: [PATCH v2 1/2] arm: ls1: add CPU hotplug platform support
+> 
+> On Mon, Nov 24, 2014 at 05:28:09AM +0000, Zhuoyu Zhang wrote:
+> > From: Zhang Zhuoyu <Zhuoyu.Zhang@freescale.com>
+> >
+> > This implements CPU hotplug for ls1. When cpu is down, it will be put
+> > in WFI state. When cpu is up, it will always soft reset and boots up
+> > the same path as a cold boot.
+> >
+> > Signed-off-by: Zhang Zhuoyu <Zhuoyu.Zhang@freescale.com>
+> > ---
+> >  arch/arm/mach-imx/common.h  |   4 ++
+> >  arch/arm/mach-imx/hotplug.c |  25 +++++++++
+> > arch/arm/mach-imx/platsmp.c | 132
+> +++++++++++++++++++++++++++++++++++++++-----
+> >  arch/arm/mach-imx/src.c     |  21 +++++++
+> >  4 files changed, 169 insertions(+), 13 deletions(-)
+> >
+> 
+> [...]
+> 
+> > +
+> > +/*
+> > + * For LS102x platforms, shutdowning a CPU is not supported by hardware.
+> > + * So we just put the offline CPU into lower-power state here.
+> > + */
+> > +void __ref ls1021a_cpu_die(unsigned int cpu) {
+> > +       v7_exit_coherency_flush(louis);
+> > +
+> > +       /* LS1021a platform can't really power down a CPU, so we
+> > +        * just put it into WFI state here.
+> > +        */
+> > +       wfi();
+> > +}
+> > +
+> > +int ls1021a_cpu_kill(unsigned int cpu) {
+> > +       unsigned long timeout = jiffies + msecs_to_jiffies(50);
+> > +
+> > +       while (!ls1_get_cpu_arg(cpu))
+> > +               if (time_after(jiffies, timeout))
+> > +                       return 0;
+> > +       return 1;
+> > +}
+> 
+> While simpler than the last posting [1], this is still no better, and Russell's
+> comments [2] still apply, so this is still unacceptable.
+> 
+> If the CPU does not leave the kernel entirely, it is not CPU hotplug.
+> As this stands, this is completely incompatible with kexec and suspend.
+> 
 
+There are some hardware limitations for ls1 platform, core cannot power down, so the only thing we can do here is to put it into low-power state when CPU offline. 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/d6ccccf8/attachment.sig>
+For suspend compatibility, I quote Leo's comments in last posting, "I don't think it breaks the system suspend case as tasks and interrupts have been moved out of the non-booting CPU." 
+
+For kexec compatibility, it means we should always reset core and boots up the same path as a cold boot when CPU re-online. That's exactly what we are doing in ls1021a_reset_secondary(). I will explain it in detail below.
+
+> [...]
+> 
+> > +static int ls1021a_reset_secondary(unsigned int cpu) {
+> > +       u32 tmp;
+> > +
+> > +       if (!scfg_base || !dcfg_base)
+> > +               return -ENOMEM;
+> > +
+> > +       writel_relaxed(secondary_pre_boot_entry,
+> > +                       dcfg_base + DCFG_CCSR_SCRATCHRW1);
+> > +
+> > +       /* Apply LS1021A specific to write to the BE SCFG space */
+> > +       tmp = ioread32be(scfg_base + SCFG_REVCR);
+> > +       iowrite32be(0xffffffff, scfg_base + SCFG_REVCR);
+> > +
+> > +       /* Soft reset secondary core */
+> > +       iowrite32be(0x80000000, scfg_base + SCFG_CORESRENCR);
+> > +       iowrite32be(0x80000000, scfg_base +
+> > +                               SCFG_CORE0_SFT_RST + STRIDE_4B * cpu);
+> > +
+> > +       /* Release secondary core */
+> > +       iowrite32be(1 << cpu, dcfg_base + DCFG_CCSR_BRR);
+> > +
+> > +       ls1021a_set_secondary_entry();
+> > +
+> > +       /* Disable core soft reset register */
+> > +       iowrite32be(0x0, scfg_base + SCFG_CORESRENCR);
+> > +
+> > +       /* Revert back to the default */
+> > +       iowrite32be(tmp, scfg_base + SCFG_REVCR);
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +static int ls1021a_boot_secondary(unsigned int cpu, struct
+> > +task_struct *idle) {
+> > +       int ret = 0;
+> > +
+> > +       if (system_state == SYSTEM_RUNNING)
+> > +               ret = ls1021a_reset_secondary(cpu);
+> > +
+> > +       udelay(1);
+> > +
+> > +       arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+> > +
+> > +       return ret;
+> > +}
+> 
+> How does this interact with the pseudo-hotplug above?
+> 
+> Mark.
+
+When CPU come online, secondary core reset and boots up the same path as a cold boot:
+
+1) Write 1 to core soft reset register SCFG_CORE1_SFT_RST will reset the secondary core. 
+Resetting means a totally new start to secondary core, it will re-initialization(TLB, Caches, MMU) just like a cold boot.
+
+2) The reentry address of secondary core is determined by the  DCFG_CCSR_SCRATCHRW1 register.
+Writing the secondary core reentry physic address to this register to make sure secondary core restart executing a new code section after reset. This can make sure it is compatible with kexec.
+
+3) Set the corresponding bit of DCFG_CCSR_BRR to release secondary core to re-initialize itself again. 
+
+Zhuoyu
