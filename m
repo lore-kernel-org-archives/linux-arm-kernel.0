@@ -1,72 +1,53 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon,  1 Dec 2014 14:24:55 +0100
-Subject: [PATCH v5 4/7] ARM: zynq: Extend SLCR driver to read OCM configuration
+Date: Mon,  1 Dec 2014 14:24:56 +0100
+Subject: [PATCH v5 5/7] devicetree: bindings: Add zynq ocmc node description
 In-Reply-To: <cover.1417440250.git.michal.simek@xilinx.com>
 References: <cover.1417440250.git.michal.simek@xilinx.com>
-Message-ID: <bda1e7239b421b43caa1c20f9d34f6f8f94458b3.1417440250.git.michal.simek@xilinx.com>
+Message-ID: <a408c70d8ce54e47e1b400dc2523b7886bf7fcef.1417440250.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get OCM configuration from SLCR.
+Add binding for Zynq On Chip Memory controller driver
+which is taking care about On Chip Memory.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+
 ---
 
-Changes in v5: None
-Changes in v4:
-- slcr.h has moved to soc/include/ folder. Move definition there too.
+Changes in v5:
+- Separate binding from the driver
 
+Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/mach-zynq/slcr.c | 15 +++++++++++++++
- include/soc/zynq/slcr.h   |  1 +
- 2 files changed, 16 insertions(+)
+ .../devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt     | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt
 
-diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-index b77e42d999c8..f7c606e57525 100644
---- a/arch/arm/mach-zynq/slcr.c
-+++ b/arch/arm/mach-zynq/slcr.c
-@@ -29,6 +29,7 @@
- #define SLCR_A9_CPU_RST_CTRL_OFFSET	0x244 /* CPU Software Reset Control */
- #define SLCR_REBOOT_STATUS_OFFSET	0x258 /* PS Reboot Status */
- #define SLCR_PSS_IDCODE			0x530 /* PS IDCODE */
-+#define SLCR_OCM_CFG_OFFSET		0x910 /* OCM Address Mapping */
-
- #define SLCR_UNLOCK_MAGIC		0xDF0D
- #define SLCR_A9_CPU_CLKSTOP		0x10
-@@ -128,6 +129,20 @@ void zynq_slcr_system_reset(void)
- }
-
- /**
-+ * zynq_slcr_get_ocm_config - Get SLCR OCM config
-+ *
-+ * Return:	OCM config bits
-+ */
-+u32 zynq_slcr_get_ocm_config(void)
-+{
-+	u32 val;
+diff --git a/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt b/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt
+new file mode 100644
+index 000000000000..dcf221e8a16e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt
+@@ -0,0 +1,17 @@
++Device tree bindings for Zynq's OCM controller
 +
-+	zynq_slcr_read(&val, SLCR_OCM_CFG_OFFSET);
++The OCM is divided to 4 64kB segments which can be separately configured
++to low or high location. Location is controlled via SLCR.
 +
-+	return val;
-+}
++Required properties:
++ compatible: Compatibility string. Must be "xlnx,zynq-ocmc-1.0".
++ reg: Specify the base and size of the OCMC registers in the memory map.
++      E.g.: reg = <0xf800c000 0x1000>;
 +
-+/**
-  * zynq_slcr_cpu_start - Start cpu
-  * @cpu:	cpu number
-  */
-diff --git a/include/soc/zynq/slcr.h b/include/soc/zynq/slcr.h
-index 7b4edab666ee..639723c4f90c 100644
---- a/include/soc/zynq/slcr.h
-+++ b/include/soc/zynq/slcr.h
-@@ -25,5 +25,6 @@ extern void zynq_slcr_cpu_start(int cpu);
- extern bool zynq_slcr_cpu_state_read(int cpu);
- extern void zynq_slcr_cpu_state_write(int cpu, bool die);
- extern u32 zynq_slcr_get_device_id(void);
-+extern u32 zynq_slcr_get_ocm_config(void);
-
- #endif
++Example:
++ocmc: memory-controller at f800c000 {
++	compatible =  "xlnx,zynq-ocmc-1.0";
++	interrupt-parent = <&intc>;
++	interrupts = <0 3 4>;
++	reg = <0xf800c000 0x1000>;
++};
 --
 1.8.2.3
 
@@ -76,4 +57,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/1f3a481f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/7cce9ab8/attachment.sig>
