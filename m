@@ -1,63 +1,89 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Dec 2014 09:41:56 +0000
-Subject: [PATCH 2/4] iommu: add ARM LPAE page table allocator
-In-Reply-To: <2303317.ZEDe4Fptcu@avalon>
-References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
- <3665319.WRLLeiHAYk@avalon> <20141201172315.GI18466@arm.com>
- <2303317.ZEDe4Fptcu@avalon>
-Message-ID: <20141202094156.GB9917@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 2 Dec 2014 17:39:21 +0800
+Subject: Build LSK 3.14 kernel with android-toolchain
+In-Reply-To: <20141202090450.GD2411@dragon>
+References: <CAAQ0ZWRQ05GiCOqV2Q6g2B6n+XN-qs9o6MKOFXiK2wKrW0nvog@mail.gmail.com>
+ <2052560.M0NHOo7Rnz@wuerfel> <20141202090450.GD2411@dragon>
+Message-ID: <20141202173921.314cc869@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 08:21:58PM +0000, Laurent Pinchart wrote:
-> On Monday 01 December 2014 17:23:15 Will Deacon wrote:
-> > On Sun, Nov 30, 2014 at 11:29:46PM +0000, Laurent Pinchart wrote:
-> > > On Thursday 27 November 2014 11:51:16 Will Deacon wrote:
-> > > > +     /* Looking good; allocate a pgd */
-> > > > +     data->pgd = alloc_pages_exact(1UL << data->pg_shift,
-> > > > +                                   GFP_KERNEL | __GFP_ZERO);
+Dear Shawn,
+
+On Tue, 2 Dec 2014 01:04:54 -0800
+Shawn Guo <shawn.guo@linaro.org> wrote:
+
+> + LAKML and more people.
+> 
+> On Mon, Dec 01, 2014 at 05:38:38PM +0100, Arnd Bergmann wrote:
+> > On Monday 01 December 2014 16:32:21 Shawn Guo wrote:
+> > > Is it a valid or supported use case to build LSK 3.14 kernel with
+> > > android-toolchain?  I can build a LSK 3.14 kernel with Linux toolchain
+> > > gcc-linaro-arm-none-eabi-4.9-2014.09, which boots fine on my board.
+> > > When I build the same kernel with
+> > > android-toolchain-eabi-4.9-2014.09-x86, the kernel can be built out
+> > > successfully, but it fails to boot on the board at very early stage
+> > > with only uncompressing message shown up like below.
 > > > 
-> > > data->pg_shift is computed as __ffs(cfg->pgsize_bitmap). 1UL <<
-> > > data->pg_shift will thus be equal to the smallest page size supported by
-> > > the IOMMU. This will thus allocate 4kB, 16kB or 64kB depending on the
-> > > IOMMU configuration. However, if I'm not mistaken the top-level directory
-> > > needs to store one entry per largest supported page size. That's 4, 128
-> > > or 8 entries depending on the configuration. You're thus over-allocating.
+> > > Uncompressing Linux... done, booting the kernel.
+> > > 
+> > > And it's not a LSK 3.14 specific problem, I tried to build mainline
+> > > 3.10, 3.14 and 3.18-rc4 with the android-toolchain, and they all
+> > > failed to boot.
+> > > 
+> > > I need some help to understand if it's a valid use case at all, before
+> > > I try to looking into the problem.
 > > 
-> > Yeah, I'll take a closer look at this. The size of the pgd really depends
-> > on the TxSZ configuration, which in turn depends on the ias and the page
-> > size. There are also alignment constraints to bear in mind, but I'll see
-> > what I can do (as it stands, over-allocating will always work).
+> > I would expect it to work, it's probably a good idea to find out
+> > why it doesn't. For all I know 'arm-none-eabi' is actually /not/
+> > supported for building the kernel, since that doesn't use the Linux
+> > Linux variant of eabi, while 'arm-*-linux-gnueabi' or
+> > 'arm-*-linux-gnueabihf' is the default for Linux these days and
+> > 'arm-*-linux-android' should be compatible with that.
 > 
-> Beside wasting memory, the code also doesn't reflect the requirements. It 
-> works by chance, meaning it could break later.
-
-It won't break, as the maximum size *is* bounded by a page for stage-1
-and we already handle stage-2 concatenation correctly.
-
-> That's why I'd like to see this 
-> being fixed. Can't the size be computed with something like
+> Okay.  Thanks for the info.  It seems that I should download
+> gcc-linaro-arm-linux-gnueabihf-4.9-2014.09 for comparison testing then.
+> Actually, in the very first testing I used arm-linux-gnueabi-gcc 4.7.3
+> shipped with Ubuntu 14.04.
 > 
-> 	size = (1 << (ias - data->levels * data->pg_shift))
-> 	     * sizeof(arm_lpae_iopte);
+> > What is the
+> > exact target triplet you use in those two cases?
 > 
-> (please add a proper detailed comment to explain the computation, as the 
-> meaning is not straightforward)
+> They are arm-none-eabi and arm-linux-androideabi.  And I also replaced
+> the first toolchain with arm-linux-gnueabi one, and got the same result.
+> 
+> > 
+> > A few things you could try:
+> > 
+> > - boot it in qemu using the vexpress or virt platform code, see if
+> >   the symptom is the same. If it is, attach gdb to the qemu gdbstub
+> >   to look at the contents of the _log_buf.
+> > 
+> > - Maybe debug_ll crashes, try disabling that
+> > 
+> > - Maybe debug_ll is disabled already, try enabling it to see if you
+> >   get more output.
+> 
+> I tracked it a little bit with debug_ll routine printch() and found it
+> dies at the first pr_info() call in arch/arm/kernel/setup.c:
+> 
+> 	pr_info("Booting Linux on physical CPU 0x%x\n", mpidr);
+> 
+> And I spent some time to find out that the issue was introduced by
+> commit dad5451a322b (ARM: 7605/1: vmlinux.lds: Move .notes section
+> next to the rodata) since v3.8 release.  Reverting the commit helps me
+> to get a booting kernel that is built by arm-linux-androideabi
+> toolchain.  But I do not have the knowledge to understand what is
+> happening.
+> 
 
-That's actually the easy part. The harder part is getting the correct
-alignment, which means managing by own kmem_cache on a per-ops basis. That
-feels like overkill to me and we also need to make sure that we don't screw
-up the case of concatenated pgds at stage-2. On top of that, since each
-cache would be per-ops, I'm not even sure we'd save anything (the slab
-allocators all operate on pages afaict).
+>From my experience in last several years
 
-If I use alloc_page_exact, we'll still have some wasteage, but it would 
-be less for the case where the CPU page size is smaller than the SMMU page
-size. Do you think that's worth the extra complexity? We allocate full pages
-at all levels after the pgd, so the wasteage is relatively small.
+1. the arm-linux-androideabi- toolchain sets some options by default, PIC for
+example, even -mno-android can't disable all the side effects per my test.
 
-An alternative would be preinitialising some caches for `likely' pgd sizes,
-but that's also horrible, especially if the kernel decides that it doesn't
-need a bunch of the configurations at runtime.
+2. the arm-linux-eandroideabi- toolchain use gold for linker by default. Maybe
+gold can't understand vmlinux.lds correctly?
 
-Will
+Thanks,
+Jisheng
