@@ -1,229 +1,396 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 02 Dec 2014 19:19:11 +0900
-Subject: [PATCHv2] pinctrl: exynos: Add support for Exynos5433
-Message-ID: <1417515551-29981-1-git-send-email-cw00.choi@samsung.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Tue, 2 Dec 2014 18:16:23 +0800
+Subject: [PATCH] ARM: probes: move all probe code to dedicate directory
+In-Reply-To: <547D471B.2070908@hitachi.com>
+References: <547D471B.2070908@hitachi.com>
+Message-ID: <1417515383-79890-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds driver data for Exynos5433 SoC. Exynos5433 includes 228 multi-
-functional input/output port pins and 135 memory port pins. There are 41 general
-port groups and 2 memory port groups.
+In discussion on LKML (https://lkml.org/lkml/2014/11/28/158), Russell
+King suggests to move all probe related code to arch/arm/probes. This
+patch does the work. Due to dependency on 'arch/arm/kernel/patch.h', this
+patch also moves patch.h to 'arch/arm/include/asm/patch.h', and related
+'#include' directives are also midified to '#include <asm/patch.h>'.
 
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Thomas Abraham <thomas.abraham@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
-Acked-by: Inki Dae <inki.dae@samsung.com>
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+
 ---
-Changes from v1:
-- Fix the wrong number of Exynos5433 (four -> ten)
-- Divide pinctrl patch from following patch[1]
- [1] https://lkml.org/lkml/2014/12/2/134
 
- drivers/pinctrl/samsung/pinctrl-exynos.c  | 163 ++++++++++++++++++++++++++++++
- drivers/pinctrl/samsung/pinctrl-samsung.c |   2 +
- drivers/pinctrl/samsung/pinctrl-samsung.h |   1 +
- 3 files changed, 166 insertions(+)
+v1 -> v2:
+ - Names of files are also changes to express their function.
+---
+ arch/arm/Makefile                                        |  1 +
+ arch/arm/{kernel => include/asm}/patch.h                 |  0
+ arch/arm/kernel/Makefile                                 | 16 ++--------------
+ arch/arm/kernel/jump_label.c                             |  2 +-
+ arch/arm/kernel/patch.c                                  |  3 +--
+ arch/arm/probes/Makefile                                 | 15 +++++++++++++++
+ arch/arm/{kernel/probes-arm.c => probes/decode-arm.c}    |  4 ++--
+ arch/arm/{kernel/probes-arm.h => probes/decode-arm.h}    |  0
+ .../arm/{kernel/probes-thumb.c => probes/decode-thumb.c} |  4 ++--
+ .../arm/{kernel/probes-thumb.h => probes/decode-thumb.h} |  0
+ arch/arm/{kernel/probes.c => probes/decode.c}            |  2 +-
+ arch/arm/{kernel/probes.h => probes/decode.h}            |  0
+ .../kprobes-arm.c => probes/kprobes/actions-arm.c}       |  2 +-
+ .../kprobes-common.c => probes/kprobes/actions-common.c} |  0
+ .../kprobes-thumb.c => probes/kprobes/actions-thumb.c}   |  2 +-
+ arch/arm/{kernel => probes/kprobes}/kprobes.c            |  6 +++---
+ arch/arm/{kernel => probes/kprobes}/kprobes.h            |  2 +-
+ .../kprobes-test-arm.c => probes/kprobes/test-arm.c}     |  2 +-
+ .../kprobes-test.c => probes/kprobes/test-core.c}        |  6 +++---
+ .../kprobes-test.h => probes/kprobes/test-core.h}        |  0
+ .../kprobes-test-thumb.c => probes/kprobes/test-thumb.c} |  2 +-
+ .../uprobes-arm.c => probes/uprobes/actions-arm.c}       |  4 ++--
+ arch/arm/{kernel => probes/uprobes}/uprobes.c            |  4 ++--
+ arch/arm/{kernel => probes/uprobes}/uprobes.h            |  0
+ 24 files changed, 40 insertions(+), 37 deletions(-)
+ rename arch/arm/{kernel => include/asm}/patch.h (100%)
+ create mode 100644 arch/arm/probes/Makefile
+ rename arch/arm/{kernel/probes-arm.c => probes/decode-arm.c} (99%)
+ rename arch/arm/{kernel/probes-arm.h => probes/decode-arm.h} (100%)
+ rename arch/arm/{kernel/probes-thumb.c => probes/decode-thumb.c} (99%)
+ rename arch/arm/{kernel/probes-thumb.h => probes/decode-thumb.h} (100%)
+ rename arch/arm/{kernel/probes.c => probes/decode.c} (99%)
+ rename arch/arm/{kernel/probes.h => probes/decode.h} (100%)
+ rename arch/arm/{kernel/kprobes-arm.c => probes/kprobes/actions-arm.c} (99%)
+ rename arch/arm/{kernel/kprobes-common.c => probes/kprobes/actions-common.c} (100%)
+ rename arch/arm/{kernel/kprobes-thumb.c => probes/kprobes/actions-thumb.c} (99%)
+ rename arch/arm/{kernel => probes/kprobes}/kprobes.c (99%)
+ rename arch/arm/{kernel => probes/kprobes}/kprobes.h (98%)
+ rename arch/arm/{kernel/kprobes-test-arm.c => probes/kprobes/test-arm.c} (99%)
+ rename arch/arm/{kernel/kprobes-test.c => probes/kprobes/test-core.c} (99%)
+ rename arch/arm/{kernel/kprobes-test.h => probes/kprobes/test-core.h} (100%)
+ rename arch/arm/{kernel/kprobes-test-thumb.c => probes/kprobes/test-thumb.c} (99%)
+ rename arch/arm/{kernel/uprobes-arm.c => probes/uprobes/actions-arm.c} (99%)
+ rename arch/arm/{kernel => probes/uprobes}/uprobes.c (99%)
+ rename arch/arm/{kernel => probes/uprobes}/uprobes.h (100%)
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index d5d4cfc..67da569 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -1240,6 +1240,169 @@ const struct samsung_pin_ctrl exynos5420_pin_ctrl[] __initconst = {
- 	},
- };
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 034a949..a57d9bb 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -266,6 +266,7 @@ core-$(CONFIG_KVM_ARM_HOST) 	+= arch/arm/kvm/
  
-+/* pin banks of exynos5433 pin-controller - ALIVE */
-+static struct samsung_pin_bank exynos5433_pin_banks0[] = {
-+	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
-+	EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
-+	EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
-+	EXYNOS_PIN_BANK_EINTW(8, 0x060, "gpa3", 0x0c),
-+};
+ # If we have a machine-specific directory, then include it in the build.
+ core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
++core-y				+= arch/arm/probes/
+ core-y				+= arch/arm/net/
+ core-y				+= arch/arm/crypto/
+ core-y				+= arch/arm/firmware/
+diff --git a/arch/arm/kernel/patch.h b/arch/arm/include/asm/patch.h
+similarity index 100%
+rename from arch/arm/kernel/patch.h
+rename to arch/arm/include/asm/patch.h
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 38ddd9f..40d3e00 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -51,20 +51,8 @@ obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o insn.o
+ obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o insn.o
+ obj-$(CONFIG_JUMP_LABEL)	+= jump_label.o insn.o patch.o
+ obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
+-obj-$(CONFIG_UPROBES)		+= probes.o probes-arm.o uprobes.o uprobes-arm.o
+-obj-$(CONFIG_KPROBES)		+= probes.o kprobes.o kprobes-common.o patch.o
+-ifdef CONFIG_THUMB2_KERNEL
+-obj-$(CONFIG_KPROBES)		+= kprobes-thumb.o probes-thumb.o
+-else
+-obj-$(CONFIG_KPROBES)		+= kprobes-arm.o probes-arm.o
+-endif
+-obj-$(CONFIG_ARM_KPROBES_TEST)	+= test-kprobes.o
+-test-kprobes-objs		:= kprobes-test.o
+-ifdef CONFIG_THUMB2_KERNEL
+-test-kprobes-objs		+= kprobes-test-thumb.o
+-else
+-test-kprobes-objs		+= kprobes-test-arm.o
+-endif
++# Main staffs in KPROBES are in arch/arm/probes/ .
++obj-$(CONFIG_KPROBES)		+= patch.o
+ obj-$(CONFIG_OABI_COMPAT)	+= sys_oabi-compat.o
+ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
+ obj-$(CONFIG_KGDB)		+= kgdb.o
+diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
+index 4ce4f78..c6c73ed 100644
+--- a/arch/arm/kernel/jump_label.c
++++ b/arch/arm/kernel/jump_label.c
+@@ -1,8 +1,8 @@
+ #include <linux/kernel.h>
+ #include <linux/jump_label.h>
++#include <asm/patch.h>
+ 
+ #include "insn.h"
+-#include "patch.h"
+ 
+ #ifdef HAVE_JUMP_LABEL
+ 
+diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+index 07314af..08bcfa1 100644
+--- a/arch/arm/kernel/patch.c
++++ b/arch/arm/kernel/patch.c
+@@ -5,8 +5,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ #include <asm/opcodes.h>
+-
+-#include "patch.h"
++#include <asm/patch.h>
+ 
+ struct patch {
+ 	void *addr;
+diff --git a/arch/arm/probes/Makefile b/arch/arm/probes/Makefile
+new file mode 100644
+index 0000000..0b9bd28
+--- /dev/null
++++ b/arch/arm/probes/Makefile
+@@ -0,0 +1,15 @@
++obj-$(CONFIG_UPROBES)		+= decode.o decode-arm.o uprobes/uprobes.o uprobes/actions-arm.o
++obj-$(CONFIG_KPROBES)		+= decode.o kprobes/kprobes.o kprobes/actions-common.o
++ifdef CONFIG_THUMB2_KERNEL
++obj-$(CONFIG_KPROBES)		+= decode-thumb.o kprobes/actions-thumb.o
++else
++obj-$(CONFIG_KPROBES)		+= decode-arm.o kprobes/actions-arm.o
++endif
++obj-$(CONFIG_ARM_KPROBES_TEST)	+= test-kprobes.o
++test-kprobes-objs		:= kprobes/test-core.o
++ifdef CONFIG_THUMB2_KERNEL
++test-kprobes-objs		+= kprobes/test-thumb.o
++else
++test-kprobes-objs		+= kprobes/test-arm.o
++endif
 +
-+/* pin banks of exynos5433 pin-controller - AUD */
-+static struct samsung_pin_bank exynos5433_pin_banks1[] = {
-+	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
-+	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - CPIF */
-+static struct samsung_pin_bank exynos5433_pin_banks2[] = {
-+	EXYNOS_PIN_BANK_EINTG(2, 0x000, "gpv6", 0x00),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - eSE */
-+static struct samsung_pin_bank exynos5433_pin_banks3[] = {
-+	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj2", 0x00),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - FINGER */
-+static struct samsung_pin_bank exynos5433_pin_banks4[] = {
-+	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpd5", 0x00),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - FSYS */
-+static struct samsung_pin_bank exynos5433_pin_banks5[] = {
-+	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gph1", 0x00),
-+	EXYNOS_PIN_BANK_EINTG(7, 0x020, "gpr4", 0x04),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x040, "gpr0", 0x08),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x060, "gpr1", 0x0c),
-+	EXYNOS_PIN_BANK_EINTG(2, 0x080, "gpr2", 0x10),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x0a0, "gpr3", 0x14),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - IMEM */
-+static struct samsung_pin_bank exynos5433_pin_banks6[] = {
-+	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpf0", 0x00),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - NFC */
-+static struct samsung_pin_bank exynos5433_pin_banks7[] = {
-+	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj0", 0x00),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - PERIC */
-+static struct samsung_pin_bank exynos5433_pin_banks8[] = {
-+	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gpv7", 0x00),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x020, "gpb0", 0x04),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpc0", 0x08),
-+	EXYNOS_PIN_BANK_EINTG(2, 0x060, "gpc1", 0x0c),
-+	EXYNOS_PIN_BANK_EINTG(6, 0x080, "gpc2", 0x10),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x0a0, "gpc3", 0x14),
-+	EXYNOS_PIN_BANK_EINTG(2, 0x0c0, "gpg0", 0x18),
-+	EXYNOS_PIN_BANK_EINTG(4, 0x0e0, "gpd0", 0x1c),
-+	EXYNOS_PIN_BANK_EINTG(6, 0x100, "gpd1", 0x20),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x120, "gpd2", 0x24),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x140, "gpd4", 0x28),
-+	EXYNOS_PIN_BANK_EINTG(2, 0x160, "gpd8", 0x2c),
-+	EXYNOS_PIN_BANK_EINTG(7, 0x180, "gpd6", 0x30),
-+	EXYNOS_PIN_BANK_EINTG(3, 0x1a0, "gpd7", 0x34),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x1c0, "gpg1", 0x38),
-+	EXYNOS_PIN_BANK_EINTG(2, 0x1e0, "gpg2", 0x3c),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x200, "gpg3", 0x40),
-+};
-+
-+/* pin banks of exynos5433 pin-controller - TOUCH */
-+static struct samsung_pin_bank exynos5433_pin_banks9[] = {
-+	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj1", 0x00),
-+};
-+
-+/*
-+ * Samsung pinctrl driver data for Exynos5433 SoC. Exynos5433 SoC includes
-+ * ten gpio/pin-mux/pinconfig controllers.
-+ */
-+struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
-+	{
-+		/* pin-controller instance 0 data */
-+		.pin_banks	= exynos5433_pin_banks0,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks0),
-+		.eint_wkup_init = exynos_eint_wkup_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+		.label		= "exynos5433-gpio-ctrl0",
-+	}, {
-+		/* pin-controller instance 1 data */
-+		.pin_banks	= exynos5433_pin_banks1,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks1),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+		.label		= "exynos5433-gpio-ctrl1",
-+	}, {
-+		/* pin-controller instance 2 data */
-+		.pin_banks	= exynos5433_pin_banks2,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks2),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+		.label		= "exynos5433-gpio-ctrl2",
-+	}, {
-+		/* pin-controller instance 3 data */
-+		.pin_banks	= exynos5433_pin_banks3,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks3),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+		.label		= "exynos5433-gpio-ctrl3",
-+	}, {
-+		/* pin-controller instance 4 data */
-+		.pin_banks	= exynos5433_pin_banks4,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks4),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+		.label		= "exynos5433-gpio-ctrl4",
-+	}, {
-+		/* pin-controller instance 5 data */
-+		.pin_banks	= exynos5433_pin_banks5,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks5),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+		.label		= "exynos5433-gpio-ctrl5",
-+	}, {
-+		/* pin-controller instance 6 data */
-+		.pin_banks	= exynos5433_pin_banks6,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks6),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+		.label		= "exynos5433-gpio-ctrl6",
-+	}, {
-+		/* pin-controller instance 7 data */
-+		.pin_banks	= exynos5433_pin_banks7,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks7),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+		.label		= "exynos5433-gpio-ctrl7",
-+	}, {
-+		/* pin-controller instance 8 data */
-+		.pin_banks	= exynos5433_pin_banks8,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks8),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+		.label		= "exynos5433-gpio-ctrl8",
-+	}, {
-+		/* pin-controller instance 9 data */
-+		.pin_banks	= exynos5433_pin_banks9,
-+		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks9),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+		.label		= "exynos5433-gpio-ctrl9",
-+	},
-+};
-+
- /* pin banks of exynos7 pin-controller - ALIVE */
- static const struct samsung_pin_bank_data exynos7_pin_banks0[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index 32940a0..26ac7a1 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -1239,6 +1239,8 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
- 		.data = (void *)exynos5260_pin_ctrl },
- 	{ .compatible = "samsung,exynos5420-pinctrl",
- 		.data = (void *)exynos5420_pin_ctrl },
-+	{ .compatible = "samsung,exynos5433-pinctrl",
-+		.data = (void *)exynos5433_pin_ctrl },
- 	{ .compatible = "samsung,s5pv210-pinctrl",
- 		.data = (void *)s5pv210_pin_ctrl },
- 	{ .compatible = "samsung,exynos7-pinctrl",
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-index 1b8c013..c1239ff 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.h
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-@@ -271,6 +271,7 @@ extern const struct samsung_pin_ctrl exynos4415_pin_ctrl[];
- extern const struct samsung_pin_ctrl exynos5250_pin_ctrl[];
- extern const struct samsung_pin_ctrl exynos5260_pin_ctrl[];
- extern const struct samsung_pin_ctrl exynos5420_pin_ctrl[];
-+extern const struct samsung_pin_ctrl exynos5433_pin_ctrl[];
- extern const struct samsung_pin_ctrl exynos7_pin_ctrl[];
- extern const struct samsung_pin_ctrl s3c64xx_pin_ctrl[];
- extern const struct samsung_pin_ctrl s3c2412_pin_ctrl[];
+diff --git a/arch/arm/kernel/probes-arm.c b/arch/arm/probes/decode-arm.c
+similarity index 99%
+rename from arch/arm/kernel/probes-arm.c
+rename to arch/arm/probes/decode-arm.c
+index 8eaef81..1fb81e7 100644
+--- a/arch/arm/kernel/probes-arm.c
++++ b/arch/arm/probes/decode-arm.c
+@@ -20,8 +20,8 @@
+ #include <linux/stddef.h>
+ #include <linux/ptrace.h>
+ 
+-#include "probes.h"
+-#include "probes-arm.h"
++#include "decode.h"
++#include "decode-arm.h"
+ 
+ #define sign_extend(x, signbit) ((x) | (0 - ((x) & (1 << (signbit)))))
+ 
+diff --git a/arch/arm/kernel/probes-arm.h b/arch/arm/probes/decode-arm.h
+similarity index 100%
+rename from arch/arm/kernel/probes-arm.h
+rename to arch/arm/probes/decode-arm.h
+diff --git a/arch/arm/kernel/probes-thumb.c b/arch/arm/probes/decode-thumb.c
+similarity index 99%
+rename from arch/arm/kernel/probes-thumb.c
+rename to arch/arm/probes/decode-thumb.c
+index 4131351..2cddd18 100644
+--- a/arch/arm/kernel/probes-thumb.c
++++ b/arch/arm/probes/decode-thumb.c
+@@ -12,8 +12,8 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ 
+-#include "probes.h"
+-#include "probes-thumb.h"
++#include "decode.h"
++#include "decode-thumb.h"
+ 
+ 
+ static const union decode_item t32_table_1110_100x_x0xx[] = {
+diff --git a/arch/arm/kernel/probes-thumb.h b/arch/arm/probes/decode-thumb.h
+similarity index 100%
+rename from arch/arm/kernel/probes-thumb.h
+rename to arch/arm/probes/decode-thumb.h
+diff --git a/arch/arm/kernel/probes.c b/arch/arm/probes/decode.c
+similarity index 99%
+rename from arch/arm/kernel/probes.c
+rename to arch/arm/probes/decode.c
+index a8ab540..0141d70 100644
+--- a/arch/arm/kernel/probes.c
++++ b/arch/arm/probes/decode.c
+@@ -17,7 +17,7 @@
+ #include <asm/ptrace.h>
+ #include <linux/bug.h>
+ 
+-#include "probes.h"
++#include "decode.h"
+ 
+ 
+ #ifndef find_str_pc_offset
+diff --git a/arch/arm/kernel/probes.h b/arch/arm/probes/decode.h
+similarity index 100%
+rename from arch/arm/kernel/probes.h
+rename to arch/arm/probes/decode.h
+diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/probes/kprobes/actions-arm.c
+similarity index 99%
+rename from arch/arm/kernel/kprobes-arm.c
+rename to arch/arm/probes/kprobes/actions-arm.c
+index ac300c6..864feac 100644
+--- a/arch/arm/kernel/kprobes-arm.c
++++ b/arch/arm/probes/kprobes/actions-arm.c
+@@ -63,7 +63,7 @@
+ #include <linux/ptrace.h>
+ 
+ #include "kprobes.h"
+-#include "probes-arm.h"
++#include "../decode-arm.h"
+ 
+ #if  __LINUX_ARM_ARCH__ >= 6
+ #define BLX(reg)	"blx	"reg"		\n\t"
+diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/probes/kprobes/actions-common.c
+similarity index 100%
+rename from arch/arm/kernel/kprobes-common.c
+rename to arch/arm/probes/kprobes/actions-common.c
+diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/probes/kprobes/actions-thumb.c
+similarity index 99%
+rename from arch/arm/kernel/kprobes-thumb.c
+rename to arch/arm/probes/kprobes/actions-thumb.c
+index 9495d7f..35d6054 100644
+--- a/arch/arm/kernel/kprobes-thumb.c
++++ b/arch/arm/probes/kprobes/actions-thumb.c
+@@ -14,7 +14,7 @@
+ #include <linux/kprobes.h>
+ 
+ #include "kprobes.h"
+-#include "probes-thumb.h"
++#include "decode-thumb.h"
+ 
+ /* These emulation encodings are functionally equivalent... */
+ #define t32_emulate_rd8rn16rm0ra12_noflags \
+diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/probes/kprobes/kprobes.c
+similarity index 99%
+rename from arch/arm/kernel/kprobes.c
+rename to arch/arm/probes/kprobes/kprobes.c
+index 6d64420..ea77d39 100644
+--- a/arch/arm/kernel/kprobes.c
++++ b/arch/arm/probes/kprobes/kprobes.c
+@@ -30,11 +30,11 @@
+ #include <asm/cacheflush.h>
+ #include <linux/percpu.h>
+ #include <linux/bug.h>
++#include <asm/patch.h>
+ 
+ #include "kprobes.h"
+-#include "probes-arm.h"
+-#include "probes-thumb.h"
+-#include "patch.h"
++#include "decode-arm.h"
++#include "decode-thumb.h"
+ 
+ #define MIN_STACK_SIZE(addr) 				\
+ 	min((unsigned long)MAX_STACK_SIZE,		\
+diff --git a/arch/arm/kernel/kprobes.h b/arch/arm/probes/kprobes/kprobes.h
+similarity index 98%
+rename from arch/arm/kernel/kprobes.h
+rename to arch/arm/probes/kprobes/kprobes.h
+index 9a2712e..7b58ecf 100644
+--- a/arch/arm/kernel/kprobes.h
++++ b/arch/arm/probes/kprobes/kprobes.h
+@@ -19,7 +19,7 @@
+ #ifndef _ARM_KERNEL_KPROBES_H
+ #define _ARM_KERNEL_KPROBES_H
+ 
+-#include "probes.h"
++#include "../decode.h"
+ 
+ /*
+  * These undefined instructions must be unique and
+diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/probes/kprobes/test-arm.c
+similarity index 99%
+rename from arch/arm/kernel/kprobes-test-arm.c
+rename to arch/arm/probes/kprobes/test-arm.c
+index cb14242..d9a1255 100644
+--- a/arch/arm/kernel/kprobes-test-arm.c
++++ b/arch/arm/probes/kprobes/test-arm.c
+@@ -13,7 +13,7 @@
+ #include <asm/system_info.h>
+ #include <asm/opcodes.h>
+ 
+-#include "kprobes-test.h"
++#include "test-core.h"
+ 
+ 
+ #define TEST_ISA "32"
+diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/probes/kprobes/test-core.c
+similarity index 99%
+rename from arch/arm/kernel/kprobes-test.c
+rename to arch/arm/probes/kprobes/test-core.c
+index b206d77..3dcfc58 100644
+--- a/arch/arm/kernel/kprobes-test.c
++++ b/arch/arm/probes/kprobes/test-core.c
+@@ -210,9 +210,9 @@
+ #include <asm/opcodes.h>
+ 
+ #include "kprobes.h"
+-#include "probes-arm.h"
+-#include "probes-thumb.h"
+-#include "kprobes-test.h"
++#include "decode-arm.h"
++#include "decode-thumb.h"
++#include "test-core.h"
+ 
+ 
+ #define BENCHMARKING	1
+diff --git a/arch/arm/kernel/kprobes-test.h b/arch/arm/probes/kprobes/test-core.h
+similarity index 100%
+rename from arch/arm/kernel/kprobes-test.h
+rename to arch/arm/probes/kprobes/test-core.h
+diff --git a/arch/arm/kernel/kprobes-test-thumb.c b/arch/arm/probes/kprobes/test-thumb.c
+similarity index 99%
+rename from arch/arm/kernel/kprobes-test-thumb.c
+rename to arch/arm/probes/kprobes/test-thumb.c
+index 844dd10..d58fa10 100644
+--- a/arch/arm/kernel/kprobes-test-thumb.c
++++ b/arch/arm/probes/kprobes/test-thumb.c
+@@ -12,7 +12,7 @@
+ #include <linux/module.h>
+ #include <asm/opcodes.h>
+ 
+-#include "kprobes-test.h"
++#include "test-core.h"
+ 
+ 
+ #define TEST_ISA "16"
+diff --git a/arch/arm/kernel/uprobes-arm.c b/arch/arm/probes/uprobes/actions-arm.c
+similarity index 99%
+rename from arch/arm/kernel/uprobes-arm.c
+rename to arch/arm/probes/uprobes/actions-arm.c
+index d3b655f..b98a0a8 100644
+--- a/arch/arm/kernel/uprobes-arm.c
++++ b/arch/arm/probes/uprobes/actions-arm.c
+@@ -13,8 +13,8 @@
+ #include <linux/uprobes.h>
+ #include <linux/module.h>
+ 
+-#include "probes.h"
+-#include "probes-arm.h"
++#include "../decode.h"
++#include "../decode-arm.h"
+ #include "uprobes.h"
+ 
+ static int uprobes_substitute_pc(unsigned long *pinsn, u32 oregs)
+diff --git a/arch/arm/kernel/uprobes.c b/arch/arm/probes/uprobes/uprobes.c
+similarity index 99%
+rename from arch/arm/kernel/uprobes.c
+rename to arch/arm/probes/uprobes/uprobes.c
+index 56adf9c..f611989 100644
+--- a/arch/arm/kernel/uprobes.c
++++ b/arch/arm/probes/uprobes/uprobes.c
+@@ -17,8 +17,8 @@
+ #include <asm/opcodes.h>
+ #include <asm/traps.h>
+ 
+-#include "probes.h"
+-#include "probes-arm.h"
++#include "../decode.h"
++#include "../decode-arm.h"
+ #include "uprobes.h"
+ 
+ #define UPROBE_TRAP_NR	UINT_MAX
+diff --git a/arch/arm/kernel/uprobes.h b/arch/arm/probes/uprobes/uprobes.h
+similarity index 100%
+rename from arch/arm/kernel/uprobes.h
+rename to arch/arm/probes/uprobes/uprobes.h
 -- 
-1.8.5.5
+1.8.4
