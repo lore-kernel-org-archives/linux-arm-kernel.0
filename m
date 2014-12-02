@@ -1,65 +1,109 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Dec 2014 13:53:56 +0000
-Subject: [PATCH 0/4] Generic IOMMU page table framework
-In-Reply-To: <1669896.md3tuDH5WL@avalon>
-References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
- <6034238.mfQ54vFFKj@avalon> <20141201120534.GC18466@arm.com>
- <1669896.md3tuDH5WL@avalon>
-Message-ID: <20141202135356.GF9917@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 2 Dec 2014 14:55:13 +0100
+Subject: [PATCH v8 1/4] irqchip: gic: Support hierarchy irq domain.
+In-Reply-To: <547DC0B7.6050600@arm.com>
+References: <1416902662-19281-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1416902662-19281-2-git-send-email-yingjoe.chen@mediatek.com>
+ <CAMuHMdWj0Z66fya=7oN=ZUoz0TQOHFxBe0wyHmkDDVzU8Lafog@mail.gmail.com>
+ <547DC0B7.6050600@arm.com>
+Message-ID: <CAMuHMdVkH_qshTfpXBcHx1FiEzL8055s1TiJqayWLXeFUf97NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02, 2014 at 01:47:41PM +0000, Laurent Pinchart wrote:
-> On Monday 01 December 2014 12:05:34 Will Deacon wrote:
-> > On Sun, Nov 30, 2014 at 10:03:08PM +0000, Laurent Pinchart wrote:
-> > > On Thursday 27 November 2014 11:51:14 Will Deacon wrote:
-> > > > The LPAE code implements support for 4k/2M/1G, 16k/32M and 64k/512M
-> > > > mappings, but I decided not to implement the contiguous bit in the
-> > > > interest of trying to keep the code semi-readable. This could always be
-> > > > added later, if needed.
-> > > 
-> > > Do you have any idea how much the contiguous bit can improve performances
-> > > in real use cases ?
-> > 
-> > It depends on the TLB, really. Given that the contiguous sized map directly
-> > onto block sizes using different granules, I didn't see that the complexity
-> > was worth it.
-> > 
-> > For example:
-> > 
-> >    4k granule : 16 contiguous entries => {64k, 32M, 16G}
-> >   16k granule : 128 contiguous lvl3 entries => 2M
-> >                 32 contiguous lvl2 entries => 1G
-> >   64k granule : 32 contiguous entries => {2M, 16G}
-> > 
-> > If we use block mappings, then we get:
-> > 
-> >    4k granule : 2M @ lvl2, 1G @ lvl1
-> >   16k granule : 32M @ lvl2
-> >   64k granule : 512M @ lvl2
-> > 
-> > so really, we only miss the ability to create 16G mappings.
-> 
-> In the general case maybe, but as far as I know my IOMMU only supports 4kB 
-> granule. Without support for the contiguous bit I loose the ability to create 
-> 64kB mappings, which I believe (but haven't test yet) will have a noticeable 
-> impact.
+Hi Marc,
 
-It would be good if you could confirm that. I'd have thought that you'd end
-up using 2MB mappings most of the time for DMA buffers.
+On Tue, Dec 2, 2014 at 2:37 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 02/12/14 13:27, Geert Uytterhoeven wrote:
+>> On Tue, Nov 25, 2014 at 9:04 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+>>> Add support to use gic as a parent for stacked irq domain.
+>>>
+>>> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+>>
+>> This change (which is now in -next as commit 9a1091ef0017c40a) breaks
+>> booting on r8a7740/armadillo-legacy.
+>>
+>> It hangs because the timers cannot get their interrupts:
+>>
+>> console [tty0] enabled
+>>  sh-tmu.0: ch0: used for clock events
+>>  sh-tmu.0: ch0: used for periodic clock events
+>>  sh-tmu.0: ch0: failed to request irq 230
+>>  sh-tmu.0: ch1: used as clock source
+>>  sh-cmt-48.1: ch0: failed to request irq 90
+>>  sh-cmt-48.1: ch0: registration failed
+>> earlytimer: unable to probe sh-cmt-48 early.
+>> Calibrating delay loop...
+>
+> Grmbl... Are you, by any (lack of) chance, using a setup where the GIC
+> is probed via DT, but the timers have their IRQs hardcoded?
 
-> > I doubt that hardware even implements that size in the TLB (the contiguous
-> > bit is only a hint).
-> >
-> > On top of that, the contiguous bit leads to additional expense on unmap,
-> > since you have extra TLB invalidation splitting the thing into non-
-> > contiguous pages before you can do anything.
-> 
-> That will only be required when doing partial unmaps, which shouldn't be that 
-> frequent. When unmapping a 64kB block there's no need to split the mapping 
-> beforehand.
+Yes, the GIC is declared in arch/arm/boot/dts/r8a7740.dtsi:
 
-Sure. I'm not against having support for the contiguous bit, I just don't
-plan to implement it myself :)
+        gic: interrupt-controller at c2800000 {
+                compatible = "arm,cortex-a9-gic";
+                #interrupt-cells = <3>;
+                interrupt-controller;
+                reg = <0xc2800000 0x1000>,
+                      <0xc2000000 0x1000>;
+        };
 
-Will
+The timers come from legacy C board code in
+arch/arm/mach-shmobile/setup-r8a7740.c:
+
+/* CMT */
+static struct sh_timer_config cmt1_platform_data = {
+        .channels_mask = 0x3f,
+};
+
+static struct resource cmt1_resources[] = {
+        DEFINE_RES_MEM(0xe6138000, 0x170),
+        DEFINE_RES_IRQ(gic_spi(58)),
+};
+
+static struct platform_device cmt1_device = {
+        .name           = "sh-cmt-48",
+        .id             = 1,
+        .dev = {
+                .platform_data  = &cmt1_platform_data,
+        },
+        .resource       = cmt1_resources,
+        .num_resources  = ARRAY_SIZE(cmt1_resources),
+};
+
+/* TMU */
+static struct sh_timer_config tmu0_platform_data = {
+        .channels_mask = 7,
+};
+
+static struct resource tmu0_resources[] = {
+        DEFINE_RES_MEM(0xfff80000, 0x2c),
+        DEFINE_RES_IRQ(gic_spi(198)),
+        DEFINE_RES_IRQ(gic_spi(199)),
+        DEFINE_RES_IRQ(gic_spi(200)),
+};
+
+static struct platform_device tmu0_device = {
+        .name           = "sh-tmu",
+        .id             = 0,
+        .dev = {
+                .platform_data  = &tmu0_platform_data,
+        },
+        .resource       = tmu0_resources,
+        .num_resources  = ARRAY_SIZE(tmu0_resources),
+};
+
+The corresponding r8a7740/armadillo-multiplatform works fine.
+
+Still, I'm wondering why sh73a0/kzm9g-legacy is not impacted by this
+change...
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
