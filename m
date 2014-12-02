@@ -1,118 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 2 Dec 2014 18:39:38 +0000 (UTC)
-Subject: OMAP baseline test results for v3.18-rc7
-Message-ID: <alpine.DEB.2.02.1412021838410.16734@utopia.booyaka.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 2 Dec 2014 20:02:52 +0100
+Subject: [PATCH 3/5] arm/arm64: KVM: Clarify KVM_ARM_VCPU_INIT ABI
+In-Reply-To: <CAFEAcA-k3sUjF--+Q7kn3y7i5gkFQd3+WT1EWGEDyYv4=77z2Q@mail.gmail.com>
+References: <1417113660-23610-1-git-send-email-christoffer.dall@linaro.org>
+ <1417113660-23610-4-git-send-email-christoffer.dall@linaro.org>
+ <CAFEAcA8ysq5UD4WcfuJqSUV=E8zJR259=8v5S9q1o5aVJpPJQQ@mail.gmail.com>
+ <20141202144728.GH545@cbox>
+ <CAFEAcA-k3sUjF--+Q7kn3y7i5gkFQd3+WT1EWGEDyYv4=77z2Q@mail.gmail.com>
+Message-ID: <20141202190252.GK545@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Dec 02, 2014 at 03:39:05PM +0000, Peter Maydell wrote:
+> On 2 December 2014 at 14:47, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > On Thu, Nov 27, 2014 at 10:53:50PM +0000, Peter Maydell wrote:
+> >> On 27 November 2014 at 18:40, Christoffer Dall
+> >> <christoffer.dall@linaro.org> wrote:
+> >> >  Possible features:
+> >> >         - KVM_ARM_VCPU_POWER_OFF: Starts the CPU in a power-off state.
+> >> >           Depends on KVM_CAP_ARM_PSCI.  If not set, the CPU will be powered on
+> >>
+> >> Do you have to use the same set of feature flags for second and
+> >> subsequent VCPU_INIT calls, or can they be different each time?
+> >>
+> > That's a good question.  Do you have any opinion on the matter?
+> 
+> QEMU always will, so I'd be happy if we said it has to be the same
+> set of flags each time. I guess I'd go for "say they have to match";
+> we can always relax later if we need to.
+> 
+> > It seems weird to change the target of a Vcpu from some core to another
+> > core, but there is not reason why you shouldn't be able to set a vCpU to
+> > be powered off when run, just because it wasn't earlier on, is
+> > there?
+> 
+> We need an API for get/set of PSCI power state for migration
+> anyhow, so it's not inherently required to be able to flip
+> this bit on reset.
+> 
+Actually I think the current migration patches rely on being able to
+call the init ioctl to turn off a vcpu, but I guess you could use the
+KVM_SET_MP_STATE for that.
 
-Here are some basic OMAP test results for Linux v3.18-rc7.
-Logs and other details at:
+Alex, any thoughts?
 
-    http://www.pwsan.com/omap/testlogs/test_v3.18-rc7/20141201203859/
-
-
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-som,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
-
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 1/16): 2430sdp
-    skip ( 2/16): 5912osk, 3517evm
-    Pass (13/16): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm, 5430es2uevm,
-		  5430es2sbct54, 2420n800
-
-PM: chip retention via suspend:
-    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
-		  5430es2uevm, 5430es2sbct54
-    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 7/12): am335xbonelt, 4430es2panda, 4460pandaes,
-		  4460varsomom, 2430sdp, 5430es2uevm, 5430es2sbct54
-    Pass ( 5/12): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
-		  3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
-
-
-vmlinux object size
-(delta in bytes from test_v3.18-rc6 (5d01410fe4d92081f349b013a2e7a95429e4f2c9)):
-   text     data      bss    total  kernel
-   +100     +336        0     +436  omap1_defconfig
-   -956     +336        0     -620  omap1_defconfig_1510innovator_only
-   -892     +328        0     -564  omap1_defconfig_5912osk_only
-   -303     +456        0     +153  multi_v7_defconfig
-    -59     +744        0     +685  omap2plus_defconfig
-   -863     +488        0     -375  omap2plus_defconfig_2430sdp_only
-  -4095     +736        0    -3359  omap2plus_defconfig_am33xx_only
-     +5     +744        0     +749  omap2plus_defconfig_am43xx_only
-    -59     +776        0     +717  omap2plus_defconfig_cpupm
-     +5     +736        0     +741  omap2plus_defconfig_dra7xx_only
-   -255     +488        0     +233  omap2plus_defconfig_n800_multi_omap2xxx
-   -287     +456        0     +169  omap2plus_defconfig_n800_only_a
-   +145     +768        0     +913  omap2plus_defconfig_no_pm
-     +5     +776        0     +781  omap2plus_defconfig_omap2_4_only
-     +1     +744        0     +745  omap2plus_defconfig_omap3_4_only
-    -59     +712        0     +653  omap2plus_defconfig_omap5_only
-   -172     +264      +64     +156  rmk_omap3430_ldp_allnoconfig
-    +21     +456        0     +477  rmk_omap3430_ldp_oldconfig
-   -124     +292      +48     +216  rmk_omap4430_sdp_allnoconfig
-  -4007     +648        0    -3359  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.18-rc6 (5d01410fe4d92081f349b013a2e7a95429e4f2c9))
-  avail  rsrvd   high  freed  board          kconfig
-    -4k     4k      .      .  2430sdp        omap2plus_defconfig
-    -4k     4k      .      .  3730beaglexm   omap2plus_defconfig
-    -4k     4k      .      .  3730es12beaglexmomap2plus_defconfig
-     8k    -8k      .    -4k  am335xbone     omap2plus_defconfig_am33xx_only
+-Christoffer
