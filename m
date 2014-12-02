@@ -1,53 +1,104 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 2 Dec 2014 11:10:17 +0000
-Subject: [PATCH v13 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <20141201185705.GC499@linaro.org>
-References: <1417065854-37745-1-git-send-email-lina.iyer@linaro.org>
- <1417065854-37745-4-git-send-email-lina.iyer@linaro.org>
- <20141127150137.GA7889@red-moon> <20141201185705.GC499@linaro.org>
-Message-ID: <20141202111017.GC26306@e104818-lin.cambridge.arm.com>
+From: punnaia@xilinx.com (punnaiah choudary kalluri)
+Date: Tue, 2 Dec 2014 16:47:31 +0530
+Subject: [PATCH v6] edac: synps: Added EDAC support for zynq ddr ecc
+ controller
+In-Reply-To: <20141202103640.GB14649@pd.tnic>
+References: <a1c485c3bb214d5699fdbfc6180f96f8@BN1AFFO11FD044.protection.gbl>
+ <20141201182611.GA4169@pd.tnic>
+ <CAGnW=BaRuZvFYCz0=s_ENn_sbH4YPxZiHt1x4GvRcUAyO0s+Jw@mail.gmail.com>
+ <20141202103640.GB14649@pd.tnic>
+Message-ID: <CAGnW=BZO0Aj1yFJEXc0sZzo1Ym518d_Ges6pRkZsTuSdpWk+-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 06:57:05PM +0000, Lina Iyer wrote:
-> On Thu, Nov 27 2014 at 08:01 -0700, Lorenzo Pieralisi wrote:
-> >On Thu, Nov 27, 2014 at 05:24:07AM +0000, Lina Iyer wrote:
-> >
-> >[...]
-> >
-> >> +static int spm_set_low_power_mode(enum pm_sleep_mode mode)
-> >> +{
-> >> +       struct spm_driver_data *drv = per_cpu(cpu_spm_drv,
-> >> +                                               smp_processor_id());
-> >> +       u32 start_index;
-> >> +       u32 ctl_val;
-> >> +
-> >> +       if (!drv)
-> >> +               return -ENXIO;
-> >> +
-> >> +       start_index = drv->reg_data->start_index[mode];
-> >> +
-> >> +       ctl_val = spm_register_read(drv, SPM_REG_SPM_CTL);
-> >> +       ctl_val &= ~(SPM_CTL_INDEX << SPM_CTL_INDEX_SHIFT);
-> >> +       ctl_val |= start_index << SPM_CTL_INDEX_SHIFT;
-> >> +       ctl_val |= SPM_CTL_EN;
-> >> +       spm_register_write(drv, SPM_REG_SPM_CTL, ctl_val);
-> >> +
-> >> +       /* Ensure we have written the start address */
-> >> +       wmb();
-> >
-> >Can you explain please what this wmb is meant to achieve ? If it is there
-> >to make sure the write made it to the SPM that's not a proper way
-> >to achieve it, the barrier ensures ordering, not write completion.
+On Tue, Dec 2, 2014 at 4:06 PM, Borislav Petkov <bp@alien8.de> wrote:
+> On Tue, Dec 02, 2014 at 10:51:22AM +0530, punnaiah choudary kalluri wrote:
+>> >> +/**
+>> >> + * synps_edac_get_eccstate - Return the controller ecc enable/disable status
+>> >> + * @base:    Pointer to the ddr memory contoller base address
+>> >> + *
+>> >> + * This routine returns the ECC enable/disable status for the controller
+>> >> + *
+>> >> + * Return: a ecc status boolean i.e true/false - enabled/disabled.
+>> >> + */
+>> >> +static bool synps_edac_get_eccstate(void __iomem *base)
+>> >> +{
+>> >> +     enum dev_type dt;
+>> >> +     u32 ecctype;
+>> >> +     bool state = false;
+>> >> +
+>> >> +     dt = synps_edac_get_dtype(base);
+>> >> +     if (dt == DEV_UNKNOWN)
+>> >> +             return state;
+>> >> +
+>> >> +     ecctype = readl(base + SCRUB_OFST) & SCRUB_MODE_MASK;
+>> >> +
+>> >> +     if ((ecctype == SCRUB_MODE_SECDED) && (dt == DEV_X2)) {
+>> >> +             state = true;
+>> >> +             writel(0x0, base + ECC_CTRL_OFST);
+>> >
+>> > Out of curiosity, why is that register write needed here? Maybe
+>> > forgotten? It looks unbalanced...
+>>
+>> This is needed to start capturing the correctable and uncorrectable errors.
+>> Writing 1 to this register bits will clear the counters and writing 0 will start
+>> the counters.
 >
-> A write completion would be great, but assuming that the context switch
-> using SCM or WFI could ensure the flush, then ordering is probably good
-> enough for this.
+> So this definitely doesn't belong here then.
+>
+> It should be the *last* thing you do after having initialized the whole
+> driver entirely and successfully and you're ready to start logging
+> errors.
+>
+> Now you're calling it in synps_edac_mc_probe() so the counters will
+> start before you have even initialized the rest of the driver.
+>
+> What is worse, if one of those things you do on the init path fails, you
+> enter prematurely and the counters are still running. Not good.
 
-I assume you want the write to the device to complete (side-effects are
-observed) before the WFI (which would raise a StandbyWFI signal). The
-safer way is to read back from the device (or check/poll for the device
-state change) rather than a barrier.
+Understood. thanks.
 
--- 
-Catalin
+>
+>> It is crossing 80 cols. so, there is line break here. I feel the other
+>> way as the check patch throws warning for this.
+>
+> And I'm saying you shouldn't follow checkpatch to the letter and think
+> for yourself instead.
+>
+> What do you think is more readable?
+
+Definitely the second one :). I will update accordingly
+
+Thanks,
+Punnaiah
+
+>
+> This:
+>
+>                        dimm = csi->channels[j]->dimm;
+>                        dimm->edac_mode = EDAC_FLAG_SECDED;
+>                        dimm->mtype = synps_edac_get_mtype(priv->baseaddr);
+>                        dimm->nr_pages =
+>                            (size >> PAGE_SHIFT) / csi->nr_channels;
+>                        dimm->grain = SYNPS_EDAC_ERR_GRAIN;
+>                        dimm->dtype = synps_edac_get_dtype(priv->baseaddr);
+>
+> or this:
+>
+>                        dimm             = csi->channels[j]->dimm;
+>                        dimm->mtype      = synps_edac_get_mtype(priv->baseaddr);
+>                        dimm->grain      = SYNPS_EDAC_ERR_GRAIN;
+>                        dimm->dtype      = synps_edac_get_dtype(priv->baseaddr);
+>                        dimm->nr_pages   = (size >> PAGE_SHIFT) / csi->nr_channels;
+>                        dimm->edac_mode  = EDAC_FLAG_SECDED;
+>
+> --
+> Regards/Gruss,
+>     Boris.
+>
+> Sent from a fat crate under my desk. Formatting is fine.
+> --
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-edac" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
