@@ -1,52 +1,23 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Tue,  2 Dec 2014 15:42:44 -0800
-Subject: [PATCH v5 1/4] ARM: OMAP2+: Make sure pandora_wl1251_init_card()
- applies to SDIO only
-In-Reply-To: <1417563767-32181-1-git-send-email-dianders@chromium.org>
-References: <1417563767-32181-1-git-send-email-dianders@chromium.org>
-Message-ID: <1417563767-32181-2-git-send-email-dianders@chromium.org>
+Date: Tue, 2 Dec 2014 15:43:16 -0800
+Subject: [PATCH v4 1/3] mmc: core: Support the optional init_card()
+ callback for MMC and SD
+In-Reply-To: <547E4815.7010100@samsung.com>
+References: <1417553397-460-1-git-send-email-dianders@chromium.org>
+ <1417553397-460-2-git-send-email-dianders@chromium.org>
+ <547E4815.7010100@samsung.com>
+Message-ID: <CAD=FV=VqirunbqKtC7hXTKNXfnDjj2fBMa7sRuJLvdnGeqxUUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for having init_card() called for all card types (not
-just SDIO), change pandora_wl1251_init_card() so it checks whether the
-card type is SDIO.
+Jaehoon,
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Changes in v5:
-- Split fixup to pandora_wl1251_init_card() into its own patch.
+On Tue, Dec 2, 2014 at 3:15 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi Doug.
+>
+> I think good that this patch is separated to two patches.
+> (board file and codes relevant to mmc.)
 
-Changes in v3: None
-Changes in v2: None
+Yes, good idea.  I've spun v5 with this.
 
- arch/arm/mach-omap2/board-omap3pandora.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-index 7f17087..969e100 100644
---- a/arch/arm/mach-omap2/board-omap3pandora.c
-+++ b/arch/arm/mach-omap2/board-omap3pandora.c
-@@ -254,12 +254,14 @@ static void pandora_wl1251_init_card(struct mmc_card *card)
- 	 * We have TI wl1251 attached to MMC3. Pass this information to
- 	 * SDIO core because it can't be probed by normal methods.
- 	 */
--	card->quirks |= MMC_QUIRK_NONSTD_SDIO;
--	card->cccr.wide_bus = 1;
--	card->cis.vendor = 0x104c;
--	card->cis.device = 0x9066;
--	card->cis.blksize = 512;
--	card->cis.max_dtr = 20000000;
-+	if (card->type == MMC_TYPE_SDIO || card->type == MMC_TYPE_SD_COMBO) {
-+		card->quirks |= MMC_QUIRK_NONSTD_SDIO;
-+		card->cccr.wide_bus = 1;
-+		card->cis.vendor = 0x104c;
-+		card->cis.device = 0x9066;
-+		card->cis.blksize = 512;
-+		card->cis.max_dtr = 20000000;
-+	}
- }
- 
- static struct omap2_hsmmc_info omap3pandora_mmc[] = {
--- 
-2.2.0.rc0.207.ga3a616c
+-Doug
