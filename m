@@ -1,42 +1,130 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 02 Dec 2014 09:42:31 +0100
-Subject: [PATCH v3 1/2] ARM: hip04: set ARCH_NR_GPIO to 128
-In-Reply-To: <547D5FA7.3040307@gmail.com>
-References: <1417156188-500-1-git-send-email-wangzhou.bry@gmail.com>
- <CACRpkdb1nZN-vOXLC-QFUAT9wDGM2Nm5YeH0qY_u2JV9toOaVg@mail.gmail.com>
- <547D5FA7.3040307@gmail.com>
-Message-ID: <142367414.tx9doeBDv9@wuerfel>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Tue,  2 Dec 2014 00:46:18 -0800
+Subject: [PATCH v2] ARM: zynq: DT: Add USB to device tree
+Message-ID: <1417509978-19060-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 December 2014 14:43:51 Zhou Wang wrote:
-> 
-> how about a patch like this, we read the base from the dts here.
-> 
-> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> index e8e98ca..0c40f53 100644
-> --- a/drivers/gpio/gpiolib.c
-> +++ b/drivers/gpio/gpiolib.c
-> @@ -107,11 +107,16 @@ struct gpio_chip *gpiod_to_chip(const struct 
-> gpio_desc *desc)
->   EXPORT_SYMBOL_GPL(gpiod_to_chip);
-> 
->   /* dynamic allocation of GPIOs, e.g. on a hotplugged device */
-> -static int gpiochip_find_base(int ngpio)
-> +static int gpiochip_find_base(struct gpio_chip *gpio_chip)
->   {
->          struct gpio_chip *chip;
-> +       int ngpio = gpio_chip->ngpio;
->          int base = ARCH_NR_GPIOS - ngpio;
-> 
-> +       /* just prototype */
-> +       if (!of_property_read_u32(gpio_chip->dev->of_node, "base", &base))
-> +               return base;
-> +
+Add USB nodes to zc702, zc706 and zed device trees.
 
-I don't think that would be appropriate. The concept of a gpio number
-base is implementation specific to current Linux versions and we want
-to get rid of that in the future, so it should not be part of an
-OS-independent spec.
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+v2:
+ - remove '@0' from phy node name
+ - don't add bogus space
+---
+ arch/arm/boot/dts/zynq-7000.dtsi | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/zynq-zc702.dts | 11 +++++++++++
+ arch/arm/boot/dts/zynq-zc706.dts | 10 ++++++++++
+ arch/arm/boot/dts/zynq-zed.dts   | 10 ++++++++++
+ 4 files changed, 51 insertions(+)
 
-	Arnd
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index ce2ef5bec4f2..68096bb027db 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -315,6 +315,26 @@
+ 			clocks = <&clkc 4>;
+ 		};
+ 
++		usb0: usb at e0002000 {
++			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
++			status = "disabled";
++			clocks = <&clkc 28>;
++			interrupt-parent = <&intc>;
++			interrupts = <0 21 4>;
++			reg = <0xe0002000 0x1000>;
++			phy_type = "ulpi";
++		};
++
++		usb1: usb at e0003000 {
++			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
++			status = "disabled";
++			clocks = <&clkc 29>;
++			interrupt-parent = <&intc>;
++			interrupts = <0 44 4>;
++			reg = <0xe0003000 0x1000>;
++			phy_type = "ulpi";
++		};
++
+ 		watchdog0: watchdog at f8005000 {
+ 			clocks = <&clkc 45>;
+ 			compatible = "xlnx,zynq-wdt-r1p2";
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+index 94e2cda6f9b6..f80c6e65f6e8 100644
+--- a/arch/arm/boot/dts/zynq-zc702.dts
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -36,6 +36,11 @@
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
++
++	usb_phy0: usb-phy {
++		compatible = "usb-nop-xceiv";
++		#phy-cells = <0>;
++	};
+ };
+ 
+ &can0 {
+@@ -135,3 +140,9 @@
+ &uart1 {
+ 	status = "okay";
+ };
++
++&usb0 {
++	status = "okay";
++	dr_mode = "host";
++	usb-phy = <&usb_phy0>;
++};
+diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+index a8bbdfbc7093..bece52e47cfe 100644
+--- a/arch/arm/boot/dts/zynq-zc706.dts
++++ b/arch/arm/boot/dts/zynq-zc706.dts
+@@ -27,6 +27,10 @@
+ 		bootargs = "console=ttyPS0,115200 earlyprintk";
+ 	};
+ 
++	usb_phy0: usb-phy {
++		compatible = "usb-nop-xceiv";
++		#phy-cells = <0>;
++	};
+ };
+ 
+ &gem0 {
+@@ -114,3 +118,9 @@
+ &uart1 {
+ 	status = "okay";
+ };
++
++&usb0 {
++	status = "okay";
++	dr_mode = "host";
++	usb-phy = <&usb_phy0>;
++};
+diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
+index 697779a353ed..efecb2379832 100644
+--- a/arch/arm/boot/dts/zynq-zed.dts
++++ b/arch/arm/boot/dts/zynq-zed.dts
+@@ -27,6 +27,10 @@
+ 		bootargs = "console=ttyPS0,115200 earlyprintk";
+ 	};
+ 
++	usb_phy0: usb-phy {
++		compatible = "usb-nop-xceiv";
++		#phy-cells = <0>;
++	};
+ };
+ 
+ &gem0 {
+@@ -46,3 +50,9 @@
+ &uart1 {
+ 	status = "okay";
+ };
++
++&usb0 {
++	status = "okay";
++	dr_mode = "host";
++	usb-phy = <&usb_phy0>;
++};
+-- 
+2.2.0.1.g9ee0458
