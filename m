@@ -1,187 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 2 Dec 2014 15:11:45 +0000
-Subject: [PATCHv5 2/5] arm: socfpga: Enable OCRAM ECC on startup.
-In-Reply-To: <1415751263-1830-3-git-send-email-tthayer@opensource.altera.com>
-References: <1415751263-1830-1-git-send-email-tthayer@opensource.altera.com>
- <1415751263-1830-3-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <20141202151145.GN23671@leverpostej>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 02 Dec 2014 16:12:48 +0100
+Subject: [PATCH 3/4] devicetree: bindings: Add defeature-repeated-start
+ property for Cadence I2C
+In-Reply-To: <20141202141548.GA5883@katana>
+References: <1417514749-24319-1-git-send-email-harinik@xilinx.com>
+ <1417514749-24319-4-git-send-email-harinik@xilinx.com>
+ <20141202111907.GC23671@leverpostej>
+ <CAFcVECLtPx6shBXJbg9Uf_8fnhkMoO1zpoxGcdda7PSA7z_2rA@mail.gmail.com>
+ <20141202125203.GA4072@katana>
+ <CAFcVECJwFoFd6GrmF282CG+fELnYb=FNCTDq=RYKky_dHha=Jg@mail.gmail.com>
+ <20141202131611.GC4072@katana>
+ <CAFcVECKMqACtumHZGHbToUUSjd_dWCcLbu=_ZjNnnGdAZQ_3fg@mail.gmail.com>
+ <20141202141548.GA5883@katana>
+Message-ID: <547DD6F0.6060006@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 12:14:20AM +0000, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
-> 
-> This patch enables the ECC for On-Chip RAM on machine
-> startup.  The ECC has to be enabled before data is
-> is stored in memory otherwise the ECC will fail on
-> reads.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> ---
-> v2: Split OCRAM ECC portion separately. Addition of iounmap()
-> and reorganization of gen_pool_free. Remove defconfig from patch.
-> 
-> v3/4: No change
-> 
-> v5: Remove ocram.h, use io.h instead of clk-provider.h
->     Check prop in correct place. Add ECC EN defines.
-> ---
->  arch/arm/mach-socfpga/Makefile  |    1 +
->  arch/arm/mach-socfpga/core.h    |    1 +
->  arch/arm/mach-socfpga/ocram.c   |   90 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-socfpga/socfpga.c |    9 ++++
->  4 files changed, 101 insertions(+)
->  create mode 100644 arch/arm/mach-socfpga/ocram.c
-> 
-> diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
-> index 142609e..1552ca5 100644
-> --- a/arch/arm/mach-socfpga/Makefile
-> +++ b/arch/arm/mach-socfpga/Makefile
-> @@ -5,3 +5,4 @@
->  obj-y					:= socfpga.o
->  obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
->  obj-$(CONFIG_EDAC_ALTERA_L2C) += l2_cache.o
-> +obj-$(CONFIG_EDAC_ALTERA_OCRAM) += ocram.o
-> diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
-> index 385baba..f3eee32 100644
-> --- a/arch/arm/mach-socfpga/core.h
-> +++ b/arch/arm/mach-socfpga/core.h
-> @@ -45,5 +45,6 @@ extern unsigned long cpu1start_addr;
->  #define SOCFPGA_SCU_VIRT_BASE   0xfffec000
->  
->  void socfpga_init_l2_ecc(void);
-> +void socfpga_init_ocram_ecc(void);
->  
->  #endif
-> diff --git a/arch/arm/mach-socfpga/ocram.c b/arch/arm/mach-socfpga/ocram.c
-> new file mode 100644
-> index 0000000..a83b34f
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/ocram.c
-> @@ -0,0 +1,90 @@
-> +/*
-> + * Copyright Altera Corporation (C) 2014. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#include <linux/io.h>
-> +#include <linux/genalloc.h>
-> +#include <linux/of_platform.h>
-> +
-> +#define ALTR_OCRAM_CLEAR_ECC          0x00000018
-> +#define ALTR_OCRAM_ECC_EN             0x00000019
-> +
-> +void socfpga_init_ocram_ecc(void)
-> +{
-> +	struct device_node *np;
-> +	const __be32 *prop;
+On 12/02/2014 03:15 PM, Wolfram Sang wrote:
+>>> What do you do when disable repeated start? Sending STOP and START? If
+>>> so, this is really something different than repeated start. By using
+>>> I2C_FUNC_I2C a user expects repeated start, so if the HW does not
+>>> support it, we should say so and don't try to emulate it with something
+>>> different.
+>>
+>> Yes, we send stop.
+>
+> As said before, this is wrong. Another master could interfere between
+> the messages when using stop+start. This is no replacement for repeated
+> start.
 
-Please don't use accessors which return raw __be32s in drivers,
-typically it's the wrong thing to do and leaves horrible bugs and/or
-quirks that are painful to fix up.
+More importantly a lot of I2C slaves also reset their internal state machine 
+on a stop. So e.g. if reading a register is implemented by doing 
+start,write,repeated start,read,stop and you replace that with 
+start,write,stop,start,read,stop you'll always read register zero instead of 
+the register you wanted to read.
 
-> +	u32 ocr_edac_addr, iram_addr, len;
-> +	void __iomem  *mapped_ocr_edac_addr;
-> +	size_t size;
-> +	struct gen_pool *gp;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "altr,ocram-edac");
-> +	if (!np) {
-> +		pr_err("SOCFPGA: Unable to find altr,ocram-edac in dtb\n");
-> +		return;
-> +	}
-> +
-> +	prop = of_get_property(np, "reg", &size);
-> +	if (!prop || size < sizeof(*prop)) {
-> +		pr_err("SOCFPGA: Unable to find OCRAM ECC mapping in dtb\n");
-> +		return;
-> +	}
-> +	ocr_edac_addr = be32_to_cpup(prop++);
-> +	len = be32_to_cpup(prop);
-
-Use of_iomap(np, 0). You don't seem to pass the address around, so that
-should be sufficient.
-
-> +
-> +	gp = of_get_named_gen_pool(np, "iram", 0);
-> +	if (!gp) {
-> +		pr_err("SOCFPGA: OCRAM cannot find gen pool\n");
-> +		return;
-> +	}
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "mmio-sram");
-> +	if (!np) {
-> +		pr_err("SOCFPGA: Unable to find mmio-sram in dtb\n");
-> +		return;
-> +	}
-> +
-> +	/* Determine the OCRAM address and size */
-> +	prop = of_get_property(np, "reg", &size);
-> +	if (!prop || size < sizeof(*prop)) {
-> +		pr_err("SOCFPGA: Unable to find OCRAM mapping in dtb\n");
-> +		return;
-> +	}
-> +	iram_addr = be32_to_cpup(prop++);
-> +	len = be32_to_cpup(prop);
-
-This address is overwritten below. What's going on?
-
-> +
-> +	iram_addr = gen_pool_alloc(gp, len);
-> +	if (iram_addr == 0) {
-> +		pr_err("SOCFPGA: cannot alloc from gen pool\n");
-> +		return;
-> +	}
-> +
-> +	memset((void *)iram_addr, 0, len);
-
-How is the iram mapped? Is memset to it safe (e.g. it unaligned accesses
-are made)?
-
-> +
-> +	gen_pool_free(gp, iram_addr, len);
-> +
-> +	mapped_ocr_edac_addr = ioremap(ocr_edac_addr, 4);
-> +	if (!mapped_ocr_edac_addr) {
-> +		pr_err("SOCFPGA: Unable to map OCRAM ecc regs.\n");
-> +		return;
-> +	}
-> +
-> +	/* Clear any pending OCRAM ECC interrupts, then enable ECC */
-> +	writel(ALTR_OCRAM_CLEAR_ECC, mapped_ocr_edac_addr);
-> +	writel(ALTR_OCRAM_ECC_EN, mapped_ocr_edac_addr);
-> +
-> +	iounmap(mapped_ocr_edac_addr);
-> +
-> +	pr_debug("SOCFPGA: Success Initializing OCRAM\n");
-> +}
-> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-> index 0954011..065d80d 100644
-> --- a/arch/arm/mach-socfpga/socfpga.c
-> +++ b/arch/arm/mach-socfpga/socfpga.c
-> @@ -100,6 +100,14 @@ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
->  	writel(temp, rst_manager_base_addr + SOCFPGA_RSTMGR_CTRL);
->  }
->  
-> +static void __init socfpga_cyclone5_init(void)
-> +{
-> +	of_platform_populate(NULL, of_default_bus_match_table,
-> +			     NULL, NULL);
-> +	if (IS_ENABLED(CONFIG_EDAC_ALTERA_OCRAM))
-> +		socfpga_init_ocram_ecc();
-
-If it's safe to do this after probing everything else, why can't this be
-a normal device probe?
-
-Thanks,
-Mark.
+- Lars
