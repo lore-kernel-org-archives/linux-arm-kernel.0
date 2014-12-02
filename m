@@ -1,84 +1,24 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Tue, 02 Dec 2014 15:00:51 -0500
-Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
-In-Reply-To: <547E129C.1090308@redhat.com>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <20141120135851.GA32528@linaro.org> <54759041.9080105@hitachi.com>
- <20141126100325.GA9157@linaro.org> <5476120D.9030703@linaro.org>
- <CAPvkgC3eVOZEn79C9PC9c7TqC_-yCtDhw5LL6ZWUJxr+oQFaow@mail.gmail.com>
- <5476BFB4.2020705@hitachi.com>
- <CAPvkgC0ELPPWfa-8kQ4H_e_O5G1ER4KEKuSWLxh_u-VZgh7W6A@mail.gmail.com>
- <547C36DB.7060903@hitachi.com> <547E129C.1090308@redhat.com>
-Message-ID: <547E1A73.6000805@redhat.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 02 Dec 2014 12:22:07 -0800
+Subject: [PATCH 0/8] arm64 kexec kernel patches V6
+In-Reply-To: <20141127061947.GB2860@darkstar.nay.redhat.com>
+References: <cover.1415926876.git.geoff@infradead.org>
+ <20141127061947.GB2860@darkstar.nay.redhat.com>
+Message-ID: <1417551727.7724.0.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2014 02:27 PM, William Cohen wrote:
+Hi Dave,
 
-> Hi Masami and Dave,
-> 
-> I have applied the suggested patch above to my local kernel. However, I have noticed systemtap testsuite consistently getting panics when running both before AND after applying that patch to the kernel.  Any thoughts on why "perf stat" would cause that? Below is an example output
-> 
-> -Will
+On Thu, 2014-11-27 at 14:19 +0800, Dave Young wrote:
+> Is there any Linaro card for the KVM soft restart issue?
 
-This problem doesn't look like it is related to the kprobes support.  It can be triggered without running kprobes related code such as a "perf stat make" on a user-space build. It's failure looks similar to:
+  https://cards.linaro.org/browse/KWG-611
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265814.html
+I have a skeleton patch for the fix that needs to be filled
+out in both in the Linaro card and in the commit (arm64/kvm:
+Add KVM cpu shutdown) my master branch here:
 
--Will
-> 
-> # perf stat make install
-> 
-> ...
-> 
-> Running ./systemtap/notest.exp ...
-> Running ./systemtap.apps/java.exp ...
-> [ 6734.986063] Bad mode in FIQ handler detected, code 0x56000000
-> [ 6734.991788] CPU: 0 PID: 3968 Comm: stap Tainted: G            E  3.18.0-rc5kp3+ #3
-> [ 6734.999317] Hardware name: APM X-Gene Mustang board (DT)
-> [ 6735.004602] task: fffffe0016c25a00 ti: fffffe03d8aa8000 task.ti: fffffe03d8aa8000
-> [ 6735.012052] PC is at 0x3ff7fc0d1fc
-> [ 6735.015434] LR is at 0x3ff7fc31838
-> [ 6735.018815] pc : [<000003ff7fc0d1fc>] lr : [<000003ff7fc31838>] pstate: 00000000
-> [ 6735.026172] sp : fffffe03d8aabff0
-> [ 6735.029467] x29: 000003fffe4f6460 x28: 000003ff7fb23640 
-> [ 6735.034772] x27: 000003ff7fb23578 x26: 000000000059a420 
-> [ 6735.040074] x25: 000000000000005f x24: 000003ff7fb3f000 
-> [ 6735.045375] x23: 000000004178ee40 x22: 0000000000000006 
-> [ 6735.050680] x21: 0000000000000001 x20: 0000000000008000 
-> [ 6735.055980] x19: 000000004178ee40 x18: 000003fffe4f64a0 
-> [ 6735.061282] x17: 000003ff7fc0d1fc x16: 000003ff7fd00008 
-> [ 6735.066585] x15: 00000013cd9f3df0 x14: 0000000051c4a1f8 
-> [ 6735.071886] x13: 0000000001519f64 x12: 000000000000000e 
-> [ 6735.077187] x11: 646f6d2f62696c2f x10: 6174732f706d742f 
-> [ 6735.082488] x9 : 312e332f73656c75 x8 : 0000000000000038 
-> [ 6735.087790] x7 : 5f34366372617073 x6 : 000000000000007c 
-> [ 6735.093094] x5 : 0000000000000000 x4 : 0000000000000001 
-> [ 6735.098397] x3 : 0000000000000000 x2 : 0000000000000000 
-> [ 6735.103697] x1 : 0000000000000001 x0 : 0000000000008030 
-> [ 6735.108999] 
-> [ 6735.110483] Bad mode in Synchronous Abort handler detected, code 0x8600000f
-> [ 6735.117408] CPU: 0 PID: 3968 Comm: stap Tainted: G            E  3.18.0-rc5kp3+ #3
-> [ 6735.124936] Hardware name: APM X-Gene Mustang board (DT)
-> [ 6735.130220] task: fffffe0016c25a00 ti: fffffe03d8aa8000 task.ti: fffffe03d8aa8000
-> [ 6735.137662] PC is at 0x3ff7fc31838
-> [ 6735.141044] LR is at 0x3ff7fc31838
-> [ 6735.144426] pc : [<000003ff7fc31838>] lr : [<000003ff7fc31838>] pstate: 600003c5
-> [ 6735.151782] sp : fffffe03d8aabed0
-> [ 6735.155077] x29: 000003fffe4f6460 x28: 000003ff7fb23640 
-> [ 6735.160380] x27: 000003ff7fb23578 x26: 000000000059a420 
-> [ 6735.165681] x25: 000000000000005f x24: 000003ff7fb3f000 
-> [ 6735.170983] x23: 0000000000000000 x22: 000003ff7fc0d1fc 
-> [ 6735.176285] x21: fffffe03d8aabff0 x20: 0000000000008000 
-> [ 6735.181587] x19: 000000004178ee40 x18: 000003fffe4f64a0 
-> [ 6735.186888] x17: 000003ff7fc0d1fc x16: 000003ff7fd00008 
-> [ 6735.192189] x15: 00000013cd9f3df0 x14: 30303030203a6574 
-> [ 6735.197490] x13: fffffe00008eda38 x12: cb88537fdc8cb000 
-> [ 6735.202792] x11: fffffe03d8aabb70 x10: fffffe03d8aabb70 
-> [ 6735.208094] x9 : 000000000000015f x8 : 0000000000000000 
-> [ 6735.213395] x7 : 0000000000000200 x6 : fffffe0000095cd4 
-> [ 6735.218698] x5 : fffffe0300030001 x4 : 0000000000000000 
-> [ 6735.224001] x3 : fffffe03d8aabc80 x2 : 000000000000027e 
-> [ 6735.229304] x1 : cb88537fdc8cb000 x0 : cb88537fdc8cb000 
+ http://git.linaro.org/people/geoff.levand/linux-kexec.git
 
-<snip>
+-Geoff
