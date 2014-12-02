@@ -1,54 +1,49 @@
-From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
-Date: Tue, 2 Dec 2014 15:04:15 +0800
-Subject: Issue found in Armada 370: "No buffer space available" error
- during continuous ping
-In-Reply-To: <20141202065631.GA22506@1wt.eu>
-References: <20140723061659.GE30488@1wt.eu>
- <CAB8gEUtO=K-mjie6czsf-9ao1cxiMAV2ScbgUnf+XxqjEfOUvg@mail.gmail.com>
- <CAB8gEUtgo-8nets3tRtqiZ8qRx+SyCq2d8v05scavWNwE5TNXg@mail.gmail.com>
- <20141201072802.GB21731@1wt.eu>
- <CAB8gEUsQ8nSNwB7vpZHBkELEBX2sN1QdWvujBGYQJY9dtCzgww@mail.gmail.com>
- <20141201092851.GA22304@1wt.eu>
- <20141201103221.6268b811@free-electrons.com>
- <20141201095815.GA7949@1wt.eu>
- <CAB8gEUuW-r8oY=+ku+Cy4ZBKBvO9rF+QApn=WxR3nZFaSoCvTg@mail.gmail.com>
- <CAB8gEUuE8GK=Pab1agvJS5y=+fKLwhJ4LYXFpxOd-Frtke5d1w@mail.gmail.com>
- <20141202065631.GA22506@1wt.eu>
-Message-ID: <CAB8gEUsFYArXtX7BYT7fGyDmJU5S8gdS7a-EW4KTZE4y5gD-Tg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 2 Dec 2014 15:53:51 +0800
+Subject: [PATCH] ARM: imx: set system_rev value
+In-Reply-To: <1416484385-22501-1-git-send-email-vladimir_zapolskiy@mentor.com>
+References: <1416484385-22501-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <20141202075350.GB2411@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Willy,
-Good day.
+On Thu, Nov 20, 2014 at 01:53:05PM +0200, Vladimir Zapolskiy wrote:
+> Set system_rev value to chip silicon version USB_ANALOG_DIGPROG.
+> 
+>   root at mx6q:~# cat /proc/cpuinfo | grep Revision
+>   Revision	: 630002
+> 
+> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
 
-No problem. Thanks again!
+Such info can be found by checking soc_id and revision under
+/sys/devices/soc0/.
 
-Regards,
-Maggie Roxas
+Shawn
 
-On Tue, Dec 2, 2014 at 2:56 PM, Willy Tarreau <w@1wt.eu> wrote:
-> Hi Maggie,
->
-> On Tue, Dec 02, 2014 at 12:09:05PM +0800, Maggie Mae Roxas wrote:
->> Hi Willy, Thomas,
->> Good day.
->>
->> This is just to confirm that the patch Willy sent yesterday, patched
->> to 3.13.9 alone, resolves these issues:
->> - "No buffer space available" around 17th packet
->> - Low throughput on iperf as client (ie, ~130 Mbits/s on 1000 Mbits/s)
->> - Kernel crash
->>
->> We confirmed it after quite some testing.
->> # Full logs at:
->> # as iperf client: https://app.box.com/s/5pzh753dmmnqt4q8s5iy
->> # as iperf server: https://app.box.com/s/t9ohxrcphpmnfer9dtj9
->>
->> Thank you very much for your assistance again!!! :)
->
-> thanks for your valuable feedback, I'll add your tested-by and will
-> send it to netdev for inclusion before I switch to something else
-> and forget again!
->
-> Willy
->
+> ---
+>  arch/arm/mach-imx/anatop.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+> index 8259a62..505100f 100644
+> --- a/arch/arm/mach-imx/anatop.c
+> +++ b/arch/arm/mach-imx/anatop.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/of_address.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/regmap.h>
+> +#include <asm/system_info.h>
+>  #include "common.h"
+>  #include "hardware.h"
+>  
+> @@ -123,6 +124,7 @@ void __init imx_init_revision_from_anatop(void)
+>  
+>  	mxc_set_cpu_type(digprog >> 16 & 0xff);
+>  	imx_set_soc_revision(revision);
+> +	system_rev = digprog & 0xffffff;
+>  }
+>  
+>  void __init imx_anatop_init(void)
+> -- 
+> 1.7.10.4
+> 
