@@ -1,85 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Dec 2014 16:01:35 +0100
-Subject: [PATCH v2 1/7] pinctrl: pinconf-generic: Infer map type from DT
- property
-In-Reply-To: <1417137993-8337-2-git-send-email-soren.brinkmann@xilinx.com>
-References: <1417137993-8337-1-git-send-email-soren.brinkmann@xilinx.com>
- <1417137993-8337-2-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <CACRpkdbd2cAD5osYnwKTg4d1MwSjNF9i3Y+6ryjc_qLsg46Wtg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 2 Dec 2014 15:01:18 +0000
+Subject: [RESEND PATCHv5 5/5] arm: dts: Add Altera L2 Cache and OCRAM EDAC
+In-Reply-To: <547CD3ED.1080804@opensource.altera.com>
+References: <1415751263-1830-1-git-send-email-tthayer@opensource.altera.com>
+ <1415751263-1830-6-git-send-email-tthayer@opensource.altera.com>
+ <546BB27A.20405@opensource.altera.com>
+ <547CD3ED.1080804@opensource.altera.com>
+Message-ID: <20141202150118.GM23671@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 2:26 AM, Soren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
+Hi Thor,
 
-> With the new 'groups' property, the DT parser can infer the map type
-> from the fact whether 'pins' or 'groups' is used to specify the pin
-> group to work on.
-> To maintain backwards compatibitliy with current usage of the DT
-> binding, this is only done when an invalid map type is passed to the
-> parsing function.
->
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> Tested-by: Andreas F?rber <afaerber@suse.de>
-> ---
-> Changes since RFC v2:
->  - none
+On Mon, Dec 01, 2014 at 08:47:41PM +0000, Thor Thayer wrote:
+> Hi Boris,
+> 
+> On 11/18/2014 02:56 PM, Thor Thayer wrote:
+> > Hi all,
+> >
+> > On 11/11/2014 06:14 PM, tthayer at opensource.altera.com wrote:
+> >> From: Thor Thayer<tthayer@opensource.altera.com>
+> >>
+> >> Adding the device tree entries and bindings needed to support
+> >> the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
+> >> an earlier patch to declare and setup On-chip RAM properly.
+> >> http://www.spinics.net/lists/devicetree/msg51117.html
+> >
+> > Any comments on these devicetree additions?
+> >
+> > Thanks,
+> > Thor
+> >> Signed-off-by: Thor Thayer<tthayer@opensource.altera.com>
+> >> ---
+> >> v2: Remove OCRAM declaration and reference prior patch.
+> >>
+> >> v3-5: No Change
+> >> ---
+> 
+> I originally submitted this series on November 11, 2014.
+> 
+> I haven't received any comments or ACKs on the device tree patch portion 
+> (patch 5 of 5). According to 
+> Documentation/devicetree/bindings/submitting-patches.txt, if the patch 
+> hasn't been Acked after a couple of weeks, the maintainer can pull the 
+> changes if they are comfortable with those changes.
 
-OK there are problems with this.
+Apologies it has taken so long for this to be looked at. Unfortunately
+my inbox is overflowing (as are all of ours) and things fall by the
+wayside. I am sorry that this has lead to such a delayed response,
+especially given that it was negative.
 
-> @@ -264,6 +264,7 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
->         unsigned reserve;
->         struct property *prop;
->         const char *group;
-> +       const char *dt_pin_specifier = "pins";
+I'll try to keep up with this a bit more actively.
 
-Something called "dt_pin_specifier" contains the string "pins"...
-
->
->         ret = of_property_read_string(np, "function", &function);
->         if (ret < 0) {
-> @@ -284,10 +285,20 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
->                 reserve++;
->         if (num_configs)
->                 reserve++;
-> +
->         ret = of_property_count_strings(np, "pins");
->         if (ret < 0) {
-> -               dev_err(dev, "could not parse property pins\n");
-> -               goto exit;
-> +               ret = of_property_count_strings(np, "groups");
-> +               if (ret < 0) {
-> +                       dev_err(dev, "could not parse property pins/groups\n");
-> +                       goto exit;
-> +               }
-> +               if (type == PIN_MAP_TYPE_INVALID)
-> +                       type = PIN_MAP_TYPE_CONFIGS_GROUP;
-> +               dt_pin_specifier = "groups";
-
-Then suddenly "groups".
-
-The pointer variable should be named something like "subnode_target_type"
-or so.
-
-> +++ b/include/linux/pinctrl/pinconf-generic.h
-> @@ -174,6 +174,13 @@ static inline int pinconf_generic_dt_node_to_map_pin(
->                         PIN_MAP_TYPE_CONFIGS_PIN);
->  }
->
-> +static inline int pinconf_generic_dt_node_to_map_all(
-> +               struct pinctrl_dev *pctldev, struct device_node *np_config,
-> +               struct pinctrl_map **map, unsigned *num_maps)
-> +{
-> +       return pinconf_generic_dt_node_to_map(pctldev, np_config, map, num_maps,
-> +                       PIN_MAP_TYPE_INVALID);
-> +}
-
-First add some comment describing what happens here and why
-INVALID is specified.
-
-Then what does this have to do with the $subject?
-
-Atleast mention in the commit text that a new helper is added, though unused.
-
-Yours,
-Linus Walleij
+Thanks,
+Mark.
