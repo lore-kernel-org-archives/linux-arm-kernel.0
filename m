@@ -1,52 +1,130 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 02 Dec 2014 16:23:57 +0100
-Subject: [PATCH 3/3] clk: samsung: remove unnecessary inclusion of header
- files from clk.h
-In-Reply-To: <1411796519-19417-4-git-send-email-pankaj.dubey@samsung.com>
-References: <1411796519-19417-1-git-send-email-pankaj.dubey@samsung.com>
- <1411796519-19417-4-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <547DD98D.3000101@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 2 Dec 2014 15:25:07 +0000
+Subject: [PATCHv5 4/5] edac: altera: Add Altera L2 Cache and OCRAM EDAC
+ Support
+In-Reply-To: <1415751263-1830-5-git-send-email-tthayer@opensource.altera.com>
+References: <1415751263-1830-1-git-send-email-tthayer@opensource.altera.com>
+ <1415751263-1830-5-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20141202152507.GO23671@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+Hi,
 
-On 27/09/14 07:41, Pankaj Dubey wrote:
-> Let's remove unnecessary include of header files from clk.h and add
-> required one in clk.c
+> +/* MPU L2 Register Defines */
+> +#define ALTR_MPUL2_CONTROL_OFFSET       0x100
+> +#define ALTR_MPUL2_CTL_CACHE_EN_MASK    BIT(0)
+
+These are just standard PL310 register definitions, no?
+
+[...]
+
+> +static void *ocram_alloc_mem(size_t size, void **other)
+> +{
+> +       struct device_node *np;
+> +       struct gen_pool *gp;
+> +       void *sram_addr;
+> +
+> +       np = of_find_compatible_node(NULL, NULL, "altr,ocram-edac");
+> +       if (!np)
+> +               return NULL;
+
+Don't you need to have a corresponding of_node_put?
+
+Is this ever called before the code above has probed? Can't you keep
+this information around rather than probing it every time?
+
+> +
+> +       gp = of_get_named_gen_pool(np, "iram", 0);
+> +       if (!gp)
+> +               return NULL;
+> +
+> +       sram_addr = (void *)gen_pool_alloc(gp, size);
+> +       if (!sram_addr)
+> +               return NULL;
+> +
+> +       memset(sram_addr, 0, size);
+
+Is it safe to do a memset to the sram? How is it mapped?
+
+[...]
+
+> +static void *l2_alloc_mem(size_t size, void **other)
+> +{
+> +       struct device *dev = *other;
+> +       void *ptemp = devm_kzalloc(dev, size, GFP_KERNEL);
+> +
+> +       if (!ptemp)
+> +               return NULL;
+> +
+> +       /* Make sure everything is written out */
+> +       wmb();
+> +       flush_cache_all();
+
+Doesn't this just flush out _to_ the L2 (and not beyond)? Even then I
+don't think that's safe with the MMU enabled.
+
+Why is the flush necessary?
+
+[...]
+
+> +static int altr_l2_dependencies(struct platform_device *pdev,
+> +                               void __iomem *base)
+> +{
+> +       u32 control;
+> +       struct regmap *l2_vbase;
+> +
+> +       control = readl(base) & ALTR_L2_ECC_EN_MASK;
+> +       if (!control) {
+> +               edac_printk(KERN_ERR, EDAC_DEVICE,
+> +                           "L2: No ECC present, or ECC disabled\n");
+> +               return -ENODEV;
+> +       }
+> +
+> +       l2_vbase = syscon_regmap_lookup_by_compatible("arm,pl310-cache");
+> +       if (IS_ERR(l2_vbase)) {
+> +               edac_printk(KERN_ERR, EDAC_DEVICE,
+> +                           "L2:regmap for arm,pl310-cache lookup failed.\n");
+> +               return -ENODEV;
+> +       }
+
+I must NAK any use of the L2 as a syscon device. It's simply not a
+register file that was intended to be shared. I appreciate that you only
+want to check something very simple, but we should use a higher level
+API for that (and we should add one if we do not already have one)
+
+> +
+> +       regmap_read(l2_vbase, ALTR_MPUL2_CONTROL_OFFSET, &control);
+> +       if (!(control & ALTR_MPUL2_CTL_CACHE_EN_MASK)) {
+> +               edac_printk(KERN_ERR, EDAC_DEVICE, "L2: Cache disabled\n");
+> +               return -ENODEV;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +const struct edac_device_prv_data l2ecc_data = {
+> +       .setup = altr_l2_dependencies,
+> +       .ce_clear_mask = 0,
+> +       .ue_clear_mask = 0,
+> +#ifdef CONFIG_EDAC_DEBUG
+> +       .eccmgr_sysfs_attr = altr_l2_sysfs_attributes,
+> +       .alloc_mem = l2_alloc_mem,
+> +       .free_mem = l2_free_mem,
+> +       .ecc_enable_mask = ALTR_L2_ECC_EN_MASK,
+> +       .ce_set_mask = (ALTR_L2_ECC_EN_MASK | ALTR_L2_ECC_INJS_MASK),
+> +       .ue_set_mask = (ALTR_L2_ECC_EN_MASK | ALTR_L2_ECC_INJD_MASK),
+> +       .trig_alloc_sz = ALTR_TRIG_L2C_BYTE_SIZE,
+> +#endif
+> +};
+> +
+> +#endif /* #ifdef CONFIG_EDAC_ALTERA_L2C */
+> +
+>  MODULE_LICENSE("GPL v2");
+>  MODULE_AUTHOR("Thor Thayer");
+> -MODULE_DESCRIPTION("EDAC Driver for Altera SDRAM Controller");
+> +MODULE_DESCRIPTION("EDAC Driver for Altera Memories");
+> --
+> 1.7.9.5
 > 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  drivers/clk/samsung/clk.c |    3 ++-
->  drivers/clk/samsung/clk.h |    4 ----
->  2 files changed, 2 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-> index 31bf391..952f9ec 100644
-> --- a/drivers/clk/samsung/clk.c
-> +++ b/drivers/clk/samsung/clk.c
-> @@ -11,7 +11,8 @@
->   * clock framework for Samsung platforms.
->  */
->  
-> -#include <linux/syscore_ops.h>
-
-I've dropped this change when applying since it causes a build break:
-
-drivers/clk/samsung/clk.c:338:15: error: variable ?samsung_clk_syscore_ops? has initializer but incomplete type
-drivers/clk/samsung/clk.c:339:2: error: unknown field ?suspend? specified in initializer
-drivers/clk/samsung/clk.c:339:2: warning: excess elements in struct initializer [enabled by default]
-drivers/clk/samsung/clk.c:339:2: warning: (near initialization for ?samsung_clk_syscore_ops?) [enabled by default]
-drivers/clk/samsung/clk.c:340:2: error: unknown field ?resume? specified in initializer
-drivers/clk/samsung/clk.c:340:2: warning: excess elements in struct initializer [enabled by default]
-drivers/clk/samsung/clk.c:340:2: warning: (near initialization for ?samsung_clk_syscore_ops?) [enabled by default]  CC      drivers/dma/virt-dma.o
-
-drivers/clk/samsung/clk.c: In function ?samsung_clk_sleep_init?:
-drivers/clk/samsung/clk.c:359:3: error: implicit declaration of function ?register_syscore_ops? [-Werror=implicit-function-declaration]
-
-Please make sure there is no build breaks with various configs when
-sending patches.
-
---
-Regards,
-Sylwester
