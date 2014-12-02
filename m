@@ -1,107 +1,89 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue,  2 Dec 2014 17:59:42 +0100
-Subject: [PATCH] ARM: imx: pllv3: add shift for frequency multiplier
-Message-ID: <1417539582-11387-1-git-send-email-stefan@agner.ch>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 2 Dec 2014 12:03:24 -0500
+Subject: [PATCH] ARM: mvebu: use the cpufreq-dt platform_data for
+ independent clocks
+In-Reply-To: <1417538882-19254-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1417538882-19254-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20141202170324.GY22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add shift capabilties for the frequency multiplier (DIV_SELECT) to
-support Vybrid's USB PLL oddity. The PLL3 and PLL7 are the only
-PLL control registers which have the DIV_SELECT bit shifted by
-one. Be aware, there are known documentation errors in the
-reference manual too.
+Arnd, ThomasP,
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-I first thought of an additional parameter for clk_pllv3_recalc_rate,
-but since this function is used in multiple SoCs it would have made
-the change much larger. By creating a new type for Vybrid's USB PLL
-it is also much more explicit that the USB PLL's on Vybrid are
-different to the others...
+On Tue, Dec 02, 2014 at 05:48:02PM +0100, Thomas Petazzoni wrote:
+> This commit adjusts the registration of the cpufreq-dt driver in the
+> mvebu platform to indicate to the cpufreq driver that the platform has
+> independent clocks for each CPU.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+> Jason, this commit was part of my "[PATCHv2 0/4] cpufreq-dt,
+> platform_data based proposal" series, which included 3 patches for
+> drivers/cpufreq/, and this last patch for mach-mvebu to make use of
+> the new cpufreq feature. However, in order to not confuse the cpufreq
+> maintainer, when I sent "[PATCH v3 0/3] cpufreq: cpufreq-dt:
+> platform_data based proposal", I didn't include this patch for
+> mach-mvebu.
+> 
+> But now, it means that this is the only missing piece to get cpufreq
+> working on Armada XP. Do you think you could squeeze it into the
+> things merged for 3.19 ? It's a very small patch, so hopefully it's
+> still possible to do so.
 
- arch/arm/mach-imx/clk-pllv3.c | 10 +++++++---
- arch/arm/mach-imx/clk-vf610.c |  4 ++--
- arch/arm/mach-imx/clk.h       |  1 +
- 3 files changed, 10 insertions(+), 5 deletions(-)
+I have no problem with it except logistical.  :(  I'm currently on
+travel and my well-tested, but hacked up connection to my development
+box went down.  I've no way to apply this until this weekend at best.
 
-diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
-index 0ad6e54..641ebc5 100644
---- a/arch/arm/mach-imx/clk-pllv3.c
-+++ b/arch/arm/mach-imx/clk-pllv3.c
-@@ -31,6 +31,7 @@
-  * @base:	 base address of PLL registers
-  * @powerup_set: set POWER bit to power up the PLL
-  * @div_mask:	 mask of divider bits
-+ * @div_shift:	 shift of divider bits
-  *
-  * IMX PLL clock version 3, found on i.MX6 series.  Divider for pllv3
-  * is actually a multiplier, and always sits at bit 0.
-@@ -40,6 +41,7 @@ struct clk_pllv3 {
- 	void __iomem	*base;
- 	bool		powerup_set;
- 	u32		div_mask;
-+	u32		div_shift;
- };
- 
- #define to_clk_pllv3(_hw) container_of(_hw, struct clk_pllv3, hw)
-@@ -97,7 +99,7 @@ static unsigned long clk_pllv3_recalc_rate(struct clk_hw *hw,
- 					   unsigned long parent_rate)
- {
- 	struct clk_pllv3 *pll = to_clk_pllv3(hw);
--	u32 div = readl_relaxed(pll->base)  & pll->div_mask;
-+	u32 div = (readl_relaxed(pll->base) >> pll->div_shift)  & pll->div_mask;
- 
- 	return (div == 1) ? parent_rate * 22 : parent_rate * 20;
- }
-@@ -125,8 +127,8 @@ static int clk_pllv3_set_rate(struct clk_hw *hw, unsigned long rate,
- 		return -EINVAL;
- 
- 	val = readl_relaxed(pll->base);
--	val &= ~pll->div_mask;
--	val |= div;
-+	val &= ~(pll->div_mask << pll->div_shift);
-+	val |= (div << pll->div_shift);
- 	writel_relaxed(val, pll->base);
- 
- 	return clk_pllv3_wait_lock(pll);
-@@ -295,6 +297,8 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
- 	case IMX_PLLV3_SYS:
- 		ops = &clk_pllv3_sys_ops;
- 		break;
-+	case IMX_PLLV3_USB_VF610:
-+		pll->div_shift = 1;
- 	case IMX_PLLV3_USB:
- 		ops = &clk_pllv3_ops;
- 		pll->powerup_set = true;
-diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
-index 5937dde..cb21777 100644
---- a/arch/arm/mach-imx/clk-vf610.c
-+++ b/arch/arm/mach-imx/clk-vf610.c
-@@ -172,11 +172,11 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
- 
- 	clk[VF610_CLK_PLL1] = imx_clk_pllv3(IMX_PLLV3_GENERIC, "pll1", "pll1_bypass_src", PLL1_CTRL, 0x1);
- 	clk[VF610_CLK_PLL2] = imx_clk_pllv3(IMX_PLLV3_GENERIC, "pll2", "pll2_bypass_src", PLL2_CTRL, 0x1);
--	clk[VF610_CLK_PLL3] = imx_clk_pllv3(IMX_PLLV3_USB,     "pll3", "pll3_bypass_src", PLL3_CTRL, 0x1);
-+	clk[VF610_CLK_PLL3] = imx_clk_pllv3(IMX_PLLV3_USB_VF610,     "pll3", "pll3_bypass_src", PLL3_CTRL, 0x2);
- 	clk[VF610_CLK_PLL4] = imx_clk_pllv3(IMX_PLLV3_AV,      "pll4", "pll4_bypass_src", PLL4_CTRL, 0x7f);
- 	clk[VF610_CLK_PLL5] = imx_clk_pllv3(IMX_PLLV3_ENET,    "pll5", "pll5_bypass_src", PLL5_CTRL, 0x3);
- 	clk[VF610_CLK_PLL6] = imx_clk_pllv3(IMX_PLLV3_AV,      "pll6", "pll6_bypass_src", PLL6_CTRL, 0x7f);
--	clk[VF610_CLK_PLL7] = imx_clk_pllv3(IMX_PLLV3_USB,     "pll7", "pll7_bypass_src", PLL7_CTRL, 0x1);
-+	clk[VF610_CLK_PLL7] = imx_clk_pllv3(IMX_PLLV3_USB_VF610,     "pll7", "pll7_bypass_src", PLL7_CTRL, 0x2);
- 
- 	clk[VF610_PLL1_BYPASS] = imx_clk_mux_flags("pll1_bypass", PLL1_CTRL, 16, 1, pll1_bypass_sels, ARRAY_SIZE(pll1_bypass_sels), CLK_SET_RATE_PARENT);
- 	clk[VF610_PLL2_BYPASS] = imx_clk_mux_flags("pll2_bypass", PLL2_CTRL, 16, 1, pll2_bypass_sels, ARRAY_SIZE(pll2_bypass_sels), CLK_SET_RATE_PARENT);
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index 5ef82e2..6a07903 100644
---- a/arch/arm/mach-imx/clk.h
-+++ b/arch/arm/mach-imx/clk.h
-@@ -20,6 +20,7 @@ enum imx_pllv3_type {
- 	IMX_PLLV3_GENERIC,
- 	IMX_PLLV3_SYS,
- 	IMX_PLLV3_USB,
-+	IMX_PLLV3_USB_VF610,
- 	IMX_PLLV3_AV,
- 	IMX_PLLV3_ENET,
- };
--- 
-2.1.3
+Acked-by; Jason Cooper <jason@lakedaemon.net>
+
+Arnd, would you mind taking this directly onto mvebu/soc?  I've nothing
+else in the queue (just the one pending pull request for soc-suspend)
+
+Or, would it be acceptable for this to be /fixes-non-critical for -rc1?
+
+
+thx,
+
+Jason.
+
+> The patch is based on mvebu/soc.
+> ---
+>  arch/arm/mach-mvebu/pmsu.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> index 5a757f9..d8ab605 100644
+> --- a/arch/arm/mach-mvebu/pmsu.c
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+> @@ -20,6 +20,7 @@
+>  
+>  #include <linux/clk.h>
+>  #include <linux/cpu_pm.h>
+> +#include <linux/cpufreq-dt.h>
+>  #include <linux/delay.h>
+>  #include <linux/init.h>
+>  #include <linux/io.h>
+> @@ -571,6 +572,10 @@ int mvebu_pmsu_dfs_request(int cpu)
+>  	return 0;
+>  }
+>  
+> +struct cpufreq_dt_platform_data cpufreq_dt_pd = {
+> +	.independent_clocks = true,
+> +};
+> +
+>  static int __init armada_xp_pmsu_cpufreq_init(void)
+>  {
+>  	struct device_node *np;
+> @@ -643,7 +648,8 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
+>  		}
+>  	}
+>  
+> -	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> +	platform_device_register_data(NULL, "cpufreq-dt", -1,
+> +				      &cpufreq_dt_pd, sizeof(cpufreq_dt_pd));
+>  	return 0;
+>  }
+>  
+> -- 
+> 2.1.0
+> 
