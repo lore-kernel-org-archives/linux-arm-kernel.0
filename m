@@ -1,37 +1,67 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue,  2 Dec 2014 18:11:58 +0100
-Subject: [PATCH v3 1/3] power: reset: adjust priority of simple syscon reboot
- driver
+Date: Tue,  2 Dec 2014 18:11:59 +0100
+Subject: [PATCH v3 2/3] ARM: dts: vf610: add system reset controller and
+ syscon-reboot
 In-Reply-To: <1417540320-2385-1-git-send-email-stefan@agner.ch>
 References: <1417540320-2385-1-git-send-email-stefan@agner.ch>
-Message-ID: <1417540320-2385-2-git-send-email-stefan@agner.ch>
+Message-ID: <1417540320-2385-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, all restart handler use the priority 128, including
-watchdogs. Probably most SoC have a watchdog, and some of them
-register it also as a restart handler. But if a SoC specifies
-a dedicated reboot capability using this syscon driver, this is
-usually the preferred reboot method. Hence, raise the priority
-of this driver to 192.
+Add the system reset controller (SRC) module and use syscon-reboot
+to register a restart handler which restarts the SoC using the
+SRC SW_RST bit.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/power/reset/syscon-reboot.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/vf500.dtsi |  4 ++++
+ arch/arm/boot/dts/vfxxx.dtsi | 12 ++++++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
-index 815b901..c4049f4 100644
---- a/drivers/power/reset/syscon-reboot.c
-+++ b/drivers/power/reset/syscon-reboot.c
-@@ -68,7 +68,7 @@ static int syscon_reboot_probe(struct platform_device *pdev)
- 		return -EINVAL;
+diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
+index de67005..3f38f49 100644
+--- a/arch/arm/boot/dts/vf500.dtsi
++++ b/arch/arm/boot/dts/vf500.dtsi
+@@ -130,6 +130,10 @@
+ 	interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+ };
  
- 	ctx->restart_handler.notifier_call = syscon_restart_handle;
--	ctx->restart_handler.priority = 128;
-+	ctx->restart_handler.priority = 192;
- 	err = register_restart_handler(&ctx->restart_handler);
- 	if (err)
- 		dev_err(dev, "can't register restart notifier (err=%d)\n", err);
++&src {
++	interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
++};
++
+ &uart0 {
+ 	interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ };
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index 505969a..dddcd0c 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -43,6 +43,13 @@
+ 		clock-frequency = <32768>;
+ 	};
+ 
++	reboot: syscon-reboot {
++		compatible = "syscon-reboot";
++		regmap = <&src>;
++		offset = <0x0>;
++		mask = <0x1000>;
++	};
++
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -318,6 +325,11 @@
+ 				clocks = <&clks VF610_CLK_USBC0>;
+ 				status = "disabled";
+ 			};
++
++			src: src at 4006e000 {
++				compatible = "fsl,vf610-src", "syscon";
++				reg = <0x4006e000 0x1000>;
++			};
+ 		};
+ 
+ 		aips1: aips-bus at 40080000 {
 -- 
 2.1.3
