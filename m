@@ -1,37 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 02 Dec 2014 10:13:30 +0100
-Subject: [PATCH] ARM: zynq: DT: Add USB to device tree
-In-Reply-To: <71b9e172438946a5ba74efb430d1418c@BN1AFFO11FD060.protection.gbl>
-References: <1417459352-23401-1-git-send-email-soren.brinkmann@xilinx.com>
- <7088901.UGmPabvHQ0@wuerfel>
- <71b9e172438946a5ba74efb430d1418c@BN1AFFO11FD060.protection.gbl>
-Message-ID: <2598972.HWjIWPLUn8@wuerfel>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Tue, 02 Dec 2014 10:18:45 +0100
+Subject: [PATCH v3 05/11] memory: add Atmel EBI (External Bus Interface)
+ driver
+In-Reply-To: <2417519.MDE3mu6n7n@wuerfel>
+References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20141201115006.08197c40@bbrezillon> <2417519.MDE3mu6n7n@wuerfel>
+Message-ID: <1724175.Jqk8gQW3pz@ws-stein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 December 2014 13:51:26 S?ren Brinkmann wrote:
-> Hi Arnd,
-> 
-> On Mon, 2014-12-01 at 10:26PM +0100, Arnd Bergmann wrote:
-> > On Monday 01 December 2014 10:42:32 Soren Brinkmann wrote:
-> > > +       usb_phy0: usb-phy at 0 {
-> > > +               compatible = "usb-nop-xceiv";
-> > > +               #phy-cells = <0>;
-> > > +       };
-> > >  };
+On Monday 01 December 2014 17:17:30, Arnd Bergmann wrote:
+> On Monday 01 December 2014 11:50:06 Boris Brezillon wrote:
 > > 
-> > As discussed in an unrelated thread today, please drop the "@0" in the
-> > node name, since the device has no 'reg' property.
+> > I don't have a strong opinion regarding where this driver should
+> > live (I even considered putting it in drivers/bus) :-).
+> > But note that there are other "external memory interface" drivers
+> > in drivers/memory too: TI AEMIF and Marvell DEVBUS  ;-).
+> > 
+> > Does anyone else think this driver should go in drivers/bus ?
+> > 
 > 
-> What is the best practice for naming such nodes then? On these boards
-> it's not the case, but Zynq has two USB cores. So, there may be DTs that
-> will have two phys in there. Would we just do 'usb-phy-0'?
-> 
-> 
+> I think drivers/memory is better.
 
-Grant recommended naming them "phy0" and "phy1" in this case.
-The recommended node name for a phy is "phy", not "usb-phy" (I didn't
-notice that earlier, but it makes sense to change both), and
-I would not use a dash for the number there.
+I don't mind if it's drivers/bus or drivers/memory. But I'm wondering: When is a driver a bus driver when it is a memory driver? See imx-weim and atmel-ebi. Apparently both add support for devices attached on a bus which can be accessed through memory addresses :)
 
-	Arnd
+Best regards,
+Alexander
+-- 
+Dipl.-Inf. Alexander Stein
+
+SYS TEC electronic GmbH
+Am Windrad 2
+08468 Heinsdorfergrund
+Tel.: 03765 38600-1156
+Fax: 03765 38600-4100
+Email: alexander.stein at systec-electronic.com
+Website: www.systec-electronic.com
+ 
+Managing Director: Dipl.-Phys. Siegmar Schmidt
+Commercial registry: Amtsgericht Chemnitz, HRB 28082
