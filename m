@@ -1,103 +1,103 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 2 Dec 2014 10:42:39 +0000
-Subject: [PATCH 16/19] arm64: dts: exynos: Add dts files for 64-bit
- Exynos5433 SoC
-In-Reply-To: <547BD0BA.7080809@samsung.com>
-References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
- <1417073716-22997-17-git-send-email-cw00.choi@samsung.com>
- <20141127111834.GB857@leverpostej> <54787621.4000503@samsung.com>
- <20141128140059.GH25883@leverpostej> <547BD0BA.7080809@samsung.com>
-Message-ID: <20141202104239.GA23671@leverpostej>
+From: mpeg.blue@free.fr (Mason)
+Date: Tue, 02 Dec 2014 11:42:45 +0100
+Subject: Creating 16 MB super-sections for MMIO
+Message-ID: <547D97A5.4090302@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 02:21:46AM +0000, Chanwoo Choi wrote:
-> Dear Mark,
-> 
-> On 11/28/2014 11:00 PM, Mark Rutland wrote:
-> > On Fri, Nov 28, 2014 at 01:18:25PM +0000, Chanwoo Choi wrote:
-> >> Dear Mark,
-> >>
-> >> On 11/27/2014 08:18 PM, Mark Rutland wrote:
-> >>> On Thu, Nov 27, 2014 at 07:35:13AM +0000, Chanwoo Choi wrote:
-> >>>> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC
-> >>>> based on Octal core CPUs (quad Cortex-A57 and quad Cortex-A53).
-> >>>>
-> >>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> >>>> Cc: Mark Rutland <mark.rutland@arm.com>
-> >>>> Cc: Arnd Bergmann <arnd@arndb.de>
-> >>>> Cc: Olof Johansson <olof@lixom.net>
-> >>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >>>> Cc: Will Deacon <will.deacon@arm.com>
-> >>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> >>>> Acked-by: Inki Dae <inki.dae@samsung.com>
-> >>>> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
-> >>>> ---
-> >>>>  arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi | 698 +++++++++++++++++++++
-> >>>>  arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 523 +++++++++++++++
-> >>>>  2 files changed, 1221 insertions(+)
-> >>>>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
-> >>>>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> >>>
-> >
-> > [...]
-> >
-> >>>> +       cpus {
-> >>>> +               #address-cells = <2>;
-> >>>> +               #size-cells = <0>;
-> >>>> +
-> >>>> +               cpu0: cpu at 100 {
-> >>>> +                       device_type = "cpu";
-> >>>> +                       compatible = "arm,cortex-a53", "arm,armv8";
-> >>>> +                       enable-method = "psci";
-> >>>
-> >>> While the CPU nodes have enable-methods, I didn't spot a PSCI node
-> >>> anywhere, so this dts cannot possibly have been used to bring up an SMP
-> >>> system.
-> >>>
-> >>> How has this dts been tested?
-> >>>
-> >>> What PSCI revision have you implemented? Have have you tested it?
-> >>
-> >> My mistake,
-> >> Exynos5433 supports PSCI v0.1. I'll add following PSCI nodes:
-> >> I tested the boot of secondary cpu.
-> >>
-> >>         psci {
-> >>                 compatible = "arm,psci";
-> >>                 method = "smc";
-> >>                 cpu_off = <0x84000002>;
-> >>                 cpu_on = <0xC4000003>;
-> >>         };
-> >
-> > Ok. I take it _any_ CPU may be hotplugged (including CPU0), given that
-> > you don't have MIGRATE_INFO_TYPE from PSCI 0.2 to tell you that this is
-> > not possible? If not, attempting to hotplug CPU0 will result in a BUG()
-> > and the kernel will explode.
-> >
-> > Has that been tested?
-> 
-> I just tested secondary CPU on during kernel booting after added 'psci' dt node.
-> So, I got the ON state of Octa CPUs.
-> 
-> Maybe I need more time to implement CPU0 and secondary cpu hotplugged dynamically on runtime.
+[Branched from "Code generation involving __raw_readl and __raw_writel" thread]
 
-So currently PSCI CPU_OFF is not implemented at all?
+On 27/11/2014 14:12, Arnd Bergmann wrote:
 
-> > Do all CPUs enter the kernel at EL2?
-> 
-> I didn't consider EL2 for hypervisor mode.
-> First role of this job, I'll implement CPU on/off and suspend by using PSCI.
+> On Thursday 27 November 2014 14:01:41 Mason wrote:
+>
+>> I'm asking because I have an idea in mind: on the bus, the first
+>> 16 MB contains only memory-mapped registers, so I've been thinking
+>> I can map this region at init, and keep it for the lifetime of the
+>> system. It would use only one entry in the TLB, since the CPU
+>> supports 16 MB super-sections.
+>>
+>> I could even lock that entry in the TLB so that these accesses
+>> are guaranteed to never TLB-miss, right?
+>
+> The map_io callback will set up a mapping like that, and when
+> a driver calls ioremap on the same physical address, you will
+> get the correct pointer using that TLB, you just don't communicate
+> the address through a pointer any more.
 
-Is there any reason not to enter the kernel at EL2?
+[NOTE: Initially, the focus of this message was on TLB lockdown,
+but then it changed to creating super-sections]
 
-PSCI 0.2 mandates entering at EL2 if present (and not under a
-hypervisor), and it gives the kernel a lot more flexibility to fix
-things up (and there's less for FW to restore) even when a hypervisor is
-not in use.
+According to the ARM architecture manual:
 
-Implementing all that to EL2 is _simpler_ than implementing it to EL1.
-The kernel will restore what it needs to.
+    The architecture has a concept of an entry locked down in the TLB.
+    The method by which lockdown is achieved is IMPLEMENTATION DEFINED,
+    and an implementation might not support lockdown.
 
-Thanks,
-Mark.
+Does Linux support locking down an entry in the TLB?
+Where are CPU-specific implementations stored in the source tree?
+(I'm using a Cortex A9.)
+
+I glanced at
+
+   arch/arm/mm/tlb-v7.S
+   arch/arm/include/asm/tlbflush.h
+
+but nothing jumped out at me.
+
+arch/arm/mach-tegra/cortex-a9.S (an obsolete file?) did mention
+lockdown (albeit in a comment only).
+
+https://chromium.googlesource.com/chromiumos/third_party/kernel-next/+/0.11.257.B/arch/arm/mach-tegra/cortex-a9.S
+
+[some time passes]
+
+After giving the issue more thought, I think trying to lock the TLB entry
+might be a case of premature optimization. However, it seems worthwhile to
+make sure that Linux correctly sets up the 16 MB mapping, using a single
+TLB entry (instead of 16 section entries).
+
+I traced create_mapping -> alloc_init_pud -> alloc_init_pmd -> __map_init_section
+
+(I think I'm in the right place...)
+However, I was expecting PMD_SECT_SUPER somewhere in there, yet I don't
+see any, so I'm not confident about a super-section being created.
+
+The only two relevant functions appear to be
+
+   create_36bit_mapping()
+   remap_area_supersections()
+
+The first is only called in this case:
+#ifndef CONFIG_ARM_LPAE
+	/*
+	 * Catch 36-bit addresses
+	 */
+	if (md->pfn >= 0x100000) {
+		create_36bit_mapping(md, type);
+		return;
+	}
+#endif
+
+Since I want to map PA 0, I could lie and pretend it is PA 2^32,
+pray for a wrap-around back to 0, and get the super-section mapping.
+That sounds like an ugly hack...
+
+The other function is only called in this case:
+#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
+	if (DOMAIN_IO == 0 &&
+	    (((cpu_architecture() >= CPU_ARCH_ARMv6) && (get_cr() & CR_XP)) ||
+	       cpu_is_xsc3()) && pfn >= 0x100000 &&
+	       !((paddr | size | addr) & ~SUPERSECTION_MASK)) {
+		area->flags |= VM_ARM_SECTION_MAPPING;
+		err = remap_area_supersections(addr, pfn, size, type);
+	} else if (!((paddr | size | addr) & ~PMD_MASK)) {
+		area->flags |= VM_ARM_SECTION_MAPPING;
+		err = remap_area_sections(addr, pfn, size, type);
+	} else
+#endif
+
+But we do define CONFIG_SMP (dual core CPU).
+So no super-sections for me, IIUC?
+
+Regards.
