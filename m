@@ -1,50 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 02 Dec 2014 15:22:19 +0000
-Subject: [PATCH] ARM: imx6: fix bogus use of irq_get_irq_data
-In-Reply-To: <20141202151505.GP2411@dragon>
-References: <1417453443-9179-1-git-send-email-marc.zyngier@arm.com>
- <20141202144759.GO2411@dragon> <547DD254.4090704@arm.com>
- <20141202151505.GP2411@dragon>
-Message-ID: <547DD92B.8090104@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 02 Dec 2014 16:23:57 +0100
+Subject: [PATCH 3/3] clk: samsung: remove unnecessary inclusion of header
+ files from clk.h
+In-Reply-To: <1411796519-19417-4-git-send-email-pankaj.dubey@samsung.com>
+References: <1411796519-19417-1-git-send-email-pankaj.dubey@samsung.com>
+ <1411796519-19417-4-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <547DD98D.3000101@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/14 15:15, Shawn Guo wrote:
-> On Tue, Dec 02, 2014 at 02:53:08PM +0000, Marc Zyngier wrote:
->> Hi Shawn,
->>
->> On 02/12/14 14:48, Shawn Guo wrote:
->>> On Mon, Dec 01, 2014 at 05:04:03PM +0000, Marc Zyngier wrote:
->>>> The imx6 PM code seems to be quite creative in its use of irq_data,
->>>> using something something that is very much a hardware interrupt
->>>> number where we expect a virtual one.  Yes, it worked so far, but
->>>> that's only cheer luck, and it will definitely explode in 3.19.
->>>>
->>>> Fix it by using a pair of helper functions that deal with the
->>>> actual hardware.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>
->>> Acked-by: Shawn Guo <shawn.guo@linaro.org>
->>>
->>> Arnd, Olof,
->>>
->>> To avoid a non-booting 3.19-rc1 on i.MX6, please apply it for 3.19-rc1.
->>
->> The previous patch (ARM: imx: irq: fix buggy usage of irq_data irq
->> field) should also be applied (you cannot apply one without the other
->> anyway).
+Hi Pankaj,
+
+On 27/09/14 07:41, Pankaj Dubey wrote:
+> Let's remove unnecessary include of header files from clk.h and add
+> required one in clk.c
 > 
-> Marc,
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  drivers/clk/samsung/clk.c |    3 ++-
+>  drivers/clk/samsung/clk.h |    4 ----
+>  2 files changed, 2 insertions(+), 5 deletions(-)
 > 
-> Thanks a lot for the fixes.  To ease arm-soc folks' work, you should
-> probably resend the patches with squashing them into one or having them
-> in a series.
+> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+> index 31bf391..952f9ec 100644
+> --- a/drivers/clk/samsung/clk.c
+> +++ b/drivers/clk/samsung/clk.c
+> @@ -11,7 +11,8 @@
+>   * clock framework for Samsung platforms.
+>  */
+>  
+> -#include <linux/syscore_ops.h>
 
-Sure. Can I put your Acked-by on both patches?
+I've dropped this change when applying since it causes a build break:
 
-Thanks,
+drivers/clk/samsung/clk.c:338:15: error: variable ?samsung_clk_syscore_ops? has initializer but incomplete type
+drivers/clk/samsung/clk.c:339:2: error: unknown field ?suspend? specified in initializer
+drivers/clk/samsung/clk.c:339:2: warning: excess elements in struct initializer [enabled by default]
+drivers/clk/samsung/clk.c:339:2: warning: (near initialization for ?samsung_clk_syscore_ops?) [enabled by default]
+drivers/clk/samsung/clk.c:340:2: error: unknown field ?resume? specified in initializer
+drivers/clk/samsung/clk.c:340:2: warning: excess elements in struct initializer [enabled by default]
+drivers/clk/samsung/clk.c:340:2: warning: (near initialization for ?samsung_clk_syscore_ops?) [enabled by default]  CC      drivers/dma/virt-dma.o
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+drivers/clk/samsung/clk.c: In function ?samsung_clk_sleep_init?:
+drivers/clk/samsung/clk.c:359:3: error: implicit declaration of function ?register_syscore_ops? [-Werror=implicit-function-declaration]
+
+Please make sure there is no build breaks with various configs when
+sending patches.
+
+--
+Regards,
+Sylwester
