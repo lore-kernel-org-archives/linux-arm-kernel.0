@@ -1,18 +1,16 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 2 Dec 2014 22:00:53 +0800
-Subject: [PATCH v2] ARM: dts: imx: Update VPU compatible strings
-In-Reply-To: <1417090699-3051-1-git-send-email-festevam@gmail.com>
-References: <1417090699-3051-1-git-send-email-festevam@gmail.com>
-Message-ID: <20141202140051.GG2411@dragon>
+Date: Tue, 2 Dec 2014 22:01:33 +0800
+Subject: [PATCH] ARM: ls1021a: dtsi: add 'big-endian' property for scfg
+ node
+In-Reply-To: <1416820644-10968-1-git-send-email-Li.Xiubo@freescale.com>
+References: <1416820644-10968-1-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20141202140131.GH2411@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 10:18:19AM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Mon, Nov 24, 2014 at 05:17:24PM +0800, Xiubo Li wrote:
+> On LS1021A SoC, the scfg device is in BE mode.
 > 
-> Update the VPU compatible strings to also use "cnm,coda<model>".
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 
 Applied, thanks.
