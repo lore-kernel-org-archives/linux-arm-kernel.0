@@ -1,147 +1,225 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 02 Dec 2014 16:47:05 +0100
-Subject: [PATCH v13 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <20141202153548.GE499@linaro.org>
-References: <1417065854-37745-1-git-send-email-lina.iyer@linaro.org>
- <1417065854-37745-4-git-send-email-lina.iyer@linaro.org>
- <5476E653.4040007@linaro.org> <20141201185023.GB499@linaro.org>
- <547D8C1A.1010204@linaro.org> <20141202153548.GE499@linaro.org>
-Message-ID: <547DDEF9.8020105@linaro.org>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Wed, 3 Dec 2014 00:47:51 +0900
+Subject: [PATCH 14/19] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <20141202121310.GH23671@leverpostej>
+References: <1417510196-6714-1-git-send-email-cw00.choi@samsung.com>
+ <1417510196-6714-15-git-send-email-cw00.choi@samsung.com>
+ <20141202110909.GB23671@leverpostej> <547DA818.2050908@samsung.com>
+ <20141202121310.GH23671@leverpostej>
+Message-ID: <CAGTfZH0vSbiyd4P4JaeQ+pWmxwL=FMjcC475JZAnhFnTG9-M0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2014 04:35 PM, Lina Iyer wrote:
-> On Tue, Dec 02 2014 at 02:53 -0700, Daniel Lezcano wrote:
->> On 12/01/2014 07:50 PM, Lina Iyer wrote:
->>> On Thu, Nov 27 2014 at 01:52 -0700, Daniel Lezcano wrote:
->>>> On 11/27/2014 06:24 AM, Lina Iyer wrote:
->>>
->>>> +    static bool cpuidle_drv_init;
->>>>
->>>>       ^^^^^^^^^
->>>>
->>>> As already said in a previous comment, please find a way to remove
->>>> that.
->>>>
->>> I will look into it. Stephen and I wanted the cpuidle driver to be
->>> probed only after any of the SPMs are ready. And possibly, only for that
->>> cpu, for which the SPM has been probed.
->>>
->>> To achieve the SPM -> CPUIDLE Device relation, I havent found a good way
->>> to do that. Without using CPUIDLE_MULTIPLE_DRIVERS, initializing each
->>> cpuidle device, separate from the cpuidle driver, requires that I update
->>> the cpuidle_driver->cpumask after probing each SPM device, to allow for
->>> only one driver and cpuidle devices only for the probed cpus. Using the
->>> cpuidle_register_driver(), resets the drv->refcnt in
->>> __cpuidle_driver_init.
->>>
->>> I may need something like this in the else clause of
->>> CPUIDLE_MULTIPLE_DRIVERS -
->>>
->>> static inline struct cpuidle_driver *__cpuidle_get_cpu_driver(int cpu)
->>> {
->>>        struct cpuidle_driver *drv = cpuidle_curr_driver;
->>>
->>>        if (drv && !cpumask_test_cpu(cpu, drv->cpumask))
->>>                 drv = NULL;
->>>
->>>        return drv;
->>> }
->>
->> You don't have to deal with the drv->cpumask and
->> CPUIDLE_MULTIPLE_DRIVERS. This field gives the list of the cpus the
->> driver will have to potentially handle.
->>
->> Just register the driver at the first place with the platform device
->> by using cpuidle_register_driver(drv), I suggest somewhere else than
->> the spm code.
->>
->> The underlying code will do:
->>
->>        if (!drv->cpumask)
->>                drv->cpumask = (struct cpumask *)cpu_possible_mask;
->>
->> Until the cpuidle device is not initialized for a specific cpu, the
->> cpuidle code will have no effect for this cpu. If you register the
->> driver but without registering the cpuidle devices that will result in
->> nothing more than a structure initialized but inoperative.
->>
->> For each SPM being probed:
->>
->> struct cpuidle_device *dev = &per_cpu(cpuidle_dev, cpu);
->> dev->cpu = cpu;
->> cpuidle_register_device(dev);
->>
->> Note cpuidle_dev is exported via cpuidle.h, so you don't have to
->> redeclare a per cpu cpuidle device by your own.
->>
->> So rephrasing all that:
->>
->> (1) in cpuidle-qcom register the driver
->> (2) in the spm code register the device for each spm probe
->>
->> (1) being called before (2).
->>
->> If after that in the code you still have a "static bool
->> cpuidle_drv_init", then I guess we have a problem in the init sequence
->> somewhere else.
->>
-> Okay, Thanks. Last night I was able to get a patch working with one
-> cpuidle_register_driver and multiple cpuidle_register_device. The issue
-> using an module_init() was -
+Dear Mark,
+
+On Tue, Dec 2, 2014 at 9:13 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
 >
-> 1. Register a device to probe the cpuidle driver.
-> 2. Register cpuidle devices for every SPM probed.
-
-That's it.
-
-> What used to happen is that the cpuidle driver probe always happens
-> after the cpuidle devices were created.
+>> >> +       psci {
+>> >> +               compatible = "arm,psci";
+>> >> +               method = "smc";
+>> >> +               cpu_off = <0x84000002>;
+>> >> +               cpu_on = <0xC4000003>;
+>> >> +       };
+>> >
+>> > Given your comments on the latest posting, has CPU_OFF been tested, and
+>> > does it work for _all_ CPUs (including CPU0)?
+>>
+>> At current version,
+>> CPU_OFF of Exynos5433 is not working. I'm now working to find the cause of CPU_OFF fail.
+>> (I got CPU_ON of Exynos5433 all cores.)
 >
-> I have a solution where I register for the cpuidle device to probe a
-> driver, at postcore_initcall() at which point, the cpuidle framework
-> would also be available.
+> CPU_OFF should not be described in the DT unless it works.
+
+OK, I'll drop 'cpu_off" property on next patchset. After fixing it,
+I'll re-send separate patch.
+
 >
-> I am not sure how elegant it looks, but thats the latest initcall I
-> could get a consistent driver initialization before the SPM probe
-> (therefore the device registration).
+> [...]
+>
+>> >> +       soc: soc {
+>> >> +               compatible = "simple-bus";
+>> >> +               #address-cells = <1>;
+>> >> +               #size-cells = <1>;
+>> >> +               ranges;
+>> >
+>> > Is that valid when changing the number of cells? The address spaces
+>> > aren't strictly identical in that case, and I'd expect a translation
+>> > something like:
+>> >
+>> >         ranges = <0x0 0x0 0x0 0xff000000>;
+>>
+>> I'll fix it after checking correct spec.
+>
+> Thanks.
+>
+> [...]
+>
+>> >> +               gic:interrupt-controller at 11001000 {
+>> >> +                       compatible = "arm,gic-400";
+>> >> +                       #interrupt-cells = <3>;
+>> >> +                       interrupt-controller;
+>> >> +                       reg =   <0x11001000 0x1000>,
+>> >> +                               <0x11002000 0x1000>,
+>> >> +                               <0x11004000 0x2000>,
+>> >> +                               <0x11006000 0x2000>;
+>> >> +                       interrupts = <1 9 0xf04>;
+>> >> +               };
+>> >
+>> > The GICC needs to be 0x2000 long to map the GICC_DIR, which is at
+>> > 0x1000-0x1003.
+>>
+>> Do you mean that following dt node is right for gic-400?
+>>
+>>                 reg =   <0x11001000 0x1000>,
+>>                         <0x11002000 0x2000>,    <- I changed the the range of GICC.
+>>                         <0x11004000 0x2000>,
+>>                         <0x11006000 0x2000>;
+>
+> Yes.
 
-I don't have the code in front of me but we can probably find a nice 
-place to probe the cpuidle driver. Is there any pm.c file with an init 
-function that can be useful ? In any case, regarding the unusual init 
-sequence for the cpuidle driver, I think the probe would deserve a comment.
+OK. I'll fix it.
 
-> I will send the patch this morning.
+>
+> [...]
+>
+>> >> +               pinctrl_alive: pinctrl at 10580000 {
+>> >> +                       compatible = "samsung,exynos5433-pinctrl";
+>> >> +                       reg = <0x10580000 0x1000>;
+>> >> +
+>> >> +                       wakeup-interrupt-controller {
+>> >> +                               compatible = "samsung,exynos7-wakeup-eint";
+>> >> +                               interrupts = <0 16 0>;
+>> >> +                       };
+>> >> +               };
+>> >
+>> > How exactly does the wakeup interrupt controller interact with the GIC?
+>> > Surely the relationship between the two should be described?
+>>
+>> The pinctrl_alive contains the alive part of GPIO PAD (gpa0~gpa3).
+>>
+>> The each GPA0/GPA1 of pinctrl_alive pad did map to unique SPI number of GIC
+>> amd GPA2/GPA3 use only one interrupt (SPI[16])  as following:
+>>
+>>         +&pinctrl_alive {
+>>         +       gpa0: gpa0 {
+>>         +               gpio-controller;
+>>         +               #gpio-cells = <2>;
+>>         +
+>>         +               interrupt-controller;
+>>         +               interrupt-parent = <&gic>;
+>>         +               interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
+>>         +                            <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>;
+>>         +               #interrupt-cells = <2>;
+>>         +       };
+>>         +
+>>         +       gpa1: gpa1 {
+>>         +               gpio-controller;
+>>         +               #gpio-cells = <2>;
+>>         +
+>>         +               interrupt-controller;
+>>         +               interrupt-parent = <&gic>;
+>>         +               interrupts = <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
+>>         +                            <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
+>>         +               #interrupt-cells = <2>;
+>>         +       };
+>>
+>>         gpa0-0 - SPI[0]
+>>         gpa0-1 - SPI[1]
+>>         gpa0-2 - SPI[2]
+>>         gpa0-3 - SPI[3]
+>>         gpa0-4 - SPI[4]
+>>         gpa0-5 - SPI[5]
+>>         gpa0-6 - SPI[6]
+>>         gpa0-7 - SPI[7]
+>>
+>>         gpa1-0 - SPI[8]
+>>         gpa1-1 - SPI[9]
+>>         gpa1-2 - SPI[10]
+>>         gpa1-3 - SPI[11]
+>>         gpa1-4 - SPI[12]
+>>         gpa1-5 - SPI[13]
+>>         gpa1-6 - SPI[14]
+>>         gpa1-7 - SPI[15]
+>>
+>>         GPA2/GPA3 use only one interrupt (SPI[16]).
+>>
+>> The pinctrl-exynos.c driver initialized external wakeup interrupt
+>> (e.g., GPA0/GPA1/GPA2/GPA3 of Exynos5433) in exynos_eint_wkup_init() function.
+>>
+>> Following patch[1] adds the control for Exynos5433 wakeup irq.The exynos5433_pin_ctrl structure
+>> includes '.eint_wkup_init = exynos_eint_wkup_init;' fields to handle wakeup interrupt of Exynos SoC.
+>>
+>> [PATCHv2] pinctrl: exynos: Add support for Exynos543
+>> - https://lkml.org/lkml/2014/12/2/207
+>>
+>>         +struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
+>>         +       {
+>>         +               /* pin-controller instance 0 data */
+>>         +               .pin_banks      = exynos5433_pin_banks0,
+>>         +               .nr_banks       = ARRAY_SIZE(exynos5433_pin_banks0),
+>>         +               .eint_wkup_init = exynos_eint_wkup_init,
+>>         +               .suspend        = exynos_pinctrl_suspend,
+>>         +               .resume         = exynos_pinctrl_resume,
+>>         +               .label          = "exynos5433-gpio-ctrl0",
+>>         +       }, {
+>>
+>> And,
+>> 'struct exynos_irq_chip exynos7_wkup_irq_chip' handles the external interrupt of Exynos5433 SoC
+>> because Exynos5433 is the same with Exynos7 EINT (External Interrupt) register offset.
+>>
+>> We can check it following patch[1] to control wakeup interrupt for Exynos7/Exynos5433.
+>> - [1] [patch] pinctrl: exynos: Add irq_chip instance for Exynos7 wakeup interrupts
+>>   https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/commit/?h=for-next&id=14c255d35b25126149fb2fd199b030404229af65
+>>
+>>
+>>         +static struct exynos_irq_chip exynos7_wkup_irq_chip __initdata = {
+>>         + .chip = {
+>>         + .name = "exynos7_wkup_irq_chip",
+>>         + .irq_unmask = exynos_irq_unmask,
+>>         + .irq_mask = exynos_irq_mask,
+>>         + .irq_ack = exynos_irq_ack,
+>>         + .irq_set_type = exynos_irq_set_type,
+>>         + .irq_set_wake = exynos_wkup_irq_set_wake,
+>>         + .irq_request_resources = exynos_irq_request_resources,
+>>         + .irq_release_resources = exynos_irq_release_resources,
+>>         + },
+>>         + .eint_con = EXYNOS7_WKUP_ECON_OFFSET,
+>>         + .eint_mask = EXYNOS7_WKUP_EMASK_OFFSET,
+>>         + .eint_pend = EXYNOS7_WKUP_EPEND_OFFSET,
+>>         +};
+>>
+>> If happen external interrupt by pressing power button, the ops of 'struct exynos_irq_chip exynos7_wkup_irq_chip'
+>> would handle the interrupt.
+>>
+>> For exampl, If I use following GPAx as interrupt, I can check it on the result of /proc/interrupts.
+>>         gpa2-7 - power key
+>>         gpa2-0 - volume-up key
+>>         gpa2-1 - volume-up key
+>>         gpa0-7 - s2mps13 pmic irq
+>>
+>> 'exynos7_wkup_irq_chip' would handle the external interrupt(gpa).
+>>
+>> #cat /proc/interrupts
+>>   1:          0          0          0          0          0          0          0  exynos7_wkup_irq_chip   0  volume-up key
+>>   2:          0          0          0          0          0          0          0  exynos7_wkup_irq_chip   1  volume-down key
+>>   7:          0          0          0          0          0          0          0  exynos7_wkup_irq_chip   7  s2mps13
+>>   8:          0          0          0          0          0          0          0  exynos7_wkup_irq_chip   7  power key
+>>
+>>
+>> IMHO,
+>> Happen SPI -> GIC -> Cortex-A57/Cortex-A53 -> pinctrl-exynos.c -> exynos7_wkup_irq_chip -> irq handling
+>
+> So physically interrupts are fed into the wakeup IRQ chip, which routes
+> them to the GIC? And we describe such in DT, as opposed to pretending
+> interrupts are fed straight into the GIC, and bolting the wakeup
+> controller on the side?
 
-Ok, cool.
+GIC is well working with pinctrl-exynos.c for Exynos SoC in mainline kernel.
+Do you want to know the detailed relation between GIC and
+pinctrl-exynos driver or not?
+If I misunderstand, please let me know your question again.
 
-[ ... ]
-
->>>> There is something wrong with the init sequence. Don't you find weird
->>>> you have to backward search for the cpu belonging to the pdev each
->>>> time the probe function is called ?
->>>>
->>>>
->>> Well, it was that or the SPM device node pointing to the CPU that it
->>> references. It seems more common to have an iterator than the doubly
->>> linked device nodes. I dont have a strong preference either way, just
->>> chose the way that made device nodes easier.
->>>
-> This one, I havent addressed. How strongly do you feel about this? I
-> still have to iterate through all the cpus to find the cpu node that
-> matches the handle specified in the SAW node.
-
-IMO, we can live with that if there is no longer any static variable 
-around telling us we initialized something.
-
-Thanks !
-
-   -- Daniel
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Best Regards,
+Chanwoo Choi
