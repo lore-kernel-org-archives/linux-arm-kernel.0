@@ -1,39 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 02 Dec 2014 14:53:08 +0000
-Subject: [PATCH] ARM: imx6: fix bogus use of irq_get_irq_data
-In-Reply-To: <20141202144759.GO2411@dragon>
-References: <1417453443-9179-1-git-send-email-marc.zyngier@arm.com>
- <20141202144759.GO2411@dragon>
-Message-ID: <547DD254.4090704@arm.com>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Tue,  2 Dec 2014 22:52:57 +0800
+Subject: [PATCH 2/2] ASoC: rockchip: i2s: add support for grabbing output
+ clock to codec
+In-Reply-To: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
+References: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1417531977-30094-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+From: Sonny Rao <sonnyrao@chromium.org>
 
-On 02/12/14 14:48, Shawn Guo wrote:
-> On Mon, Dec 01, 2014 at 05:04:03PM +0000, Marc Zyngier wrote:
->> The imx6 PM code seems to be quite creative in its use of irq_data,
->> using something something that is very much a hardware interrupt
->> number where we expect a virtual one.  Yes, it worked so far, but
->> that's only cheer luck, and it will definitely explode in 3.19.
->>
->> Fix it by using a pair of helper functions that deal with the
->> actual hardware.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Arnd, Olof,
-> 
-> To avoid a non-booting 3.19-rc1 on i.MX6, please apply it for 3.19-rc1.
+We need to claim the clock which is driving the codec so that when we enable
+clock gating, we continue to clock the codec when needed.  I make this an
+optional clock since there might be some applications where we don't need it
+but can still use the I2S block.
 
-The previous patch (ARM: imx: irq: fix buggy usage of irq_data irq
-field) should also be applied (you cannot apply one without the other
-anyway).
+Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+---
+ sound/soc/rockchip/rockchip_i2s.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Thanks,
-
-	M.
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index c74ba37..2820ade 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -28,6 +28,7 @@ struct rk_i2s_dev {
+ 
+ 	struct clk *hclk;
+ 	struct clk *mclk;
++	struct clk *oclk;
+ 
+ 	struct snd_dmaengine_dai_dma_data capture_dma_data;
+ 	struct snd_dmaengine_dai_dma_data playback_dma_data;
+@@ -439,6 +440,14 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
+ 		return PTR_ERR(i2s->mclk);
+ 	}
+ 
++	i2s->oclk = devm_clk_get(&pdev->dev, "i2s_clk_out");
++	if (IS_ERR(i2s->oclk)) {
++		dev_dbg(&pdev->dev, "Didn't find output clock\n");
++		i2s->oclk = NULL;
++	}
++	if (i2s->oclk)
++		ret = clk_prepare_enable(i2s->oclk);
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	regs = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(regs))
+@@ -505,6 +514,8 @@ static int rockchip_i2s_remove(struct platform_device *pdev)
+ 	if (!pm_runtime_status_suspended(&pdev->dev))
+ 		i2s_runtime_suspend(&pdev->dev);
+ 
++	if (i2s->oclk)
++		clk_disable_unprepare(i2s->oclk);
+ 	clk_disable_unprepare(i2s->mclk);
+ 	clk_disable_unprepare(i2s->hclk);
+ 	snd_dmaengine_pcm_unregister(&pdev->dev);
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
