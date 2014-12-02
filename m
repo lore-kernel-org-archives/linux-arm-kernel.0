@@ -1,86 +1,95 @@
-From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
-Date: Tue, 2 Dec 2014 12:09:05 +0800
-Subject: Issue found in Armada 370: "No buffer space available" error
- during continuous ping
-In-Reply-To: <CAB8gEUuW-r8oY=+ku+Cy4ZBKBvO9rF+QApn=WxR3nZFaSoCvTg@mail.gmail.com>
-References: <CAB8gEUsK9c3YMpAABifNAWU7zec2ePztSqS4KAYtiT7Sbhadvg@mail.gmail.com>
- <20140721070303.GM21834@1wt.eu>
- <CAB8gEUtmgwfWcuoYZ-wDwHVmzHN0WyOQD9oEOGAZ_gJfbPUm-g@mail.gmail.com>
- <20140723061659.GE30488@1wt.eu>
- <CAB8gEUtO=K-mjie6czsf-9ao1cxiMAV2ScbgUnf+XxqjEfOUvg@mail.gmail.com>
- <CAB8gEUtgo-8nets3tRtqiZ8qRx+SyCq2d8v05scavWNwE5TNXg@mail.gmail.com>
- <20141201072802.GB21731@1wt.eu>
- <CAB8gEUsQ8nSNwB7vpZHBkELEBX2sN1QdWvujBGYQJY9dtCzgww@mail.gmail.com>
- <20141201092851.GA22304@1wt.eu>
- <20141201103221.6268b811@free-electrons.com>
- <20141201095815.GA7949@1wt.eu>
- <CAB8gEUuW-r8oY=+ku+Cy4ZBKBvO9rF+QApn=WxR3nZFaSoCvTg@mail.gmail.com>
-Message-ID: <CAB8gEUuE8GK=Pab1agvJS5y=+fKLwhJ4LYXFpxOd-Frtke5d1w@mail.gmail.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Tue, 2 Dec 2014 04:57:16 +0000
+Subject: [PATCH v5][resend] of: replace Asahi Kasei Corp vendor prefix
+In-Reply-To: <5478603D.1080404@cogentembedded.com>
+References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>
+ <20140922130026.GK3290@leverpostej>
+ <CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>
+ <20140922132743.GM3290@leverpostej>
+ <87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>
+ <1415845309.4269.6.camel@perches.com>
+ <20141113025105.GA16652@verge.net.au>
+ <87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>
+ <20141113110740.GE3815@sirena.org.uk>
+ <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>
+ <20141114093554.GC3810@ulmo>
+ <87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>
+ <5469CD47.3040409@cogentembedded.com>
+ <877fytxsde.wl%kuninori.morimoto.gx@renesas.com>
+ <87egsob2cl.wl%kuninori.morimoto.gx@renesas.com>
+ <5478603D.1080404@cogentembedded.com>
+Message-ID: <87d282sl6w.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Willy, Thomas,
-Good day.
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This is just to confirm that the patch Willy sent yesterday, patched
-to 3.13.9 alone, resolves these issues:
-- "No buffer space available" around 17th packet
-- Low throughput on iperf as client (ie, ~130 Mbits/s on 1000 Mbits/s)
-- Kernel crash
+Current vendor-prefixes.txt already has "ak" prefix for Asahi Kasei Corp
+by ae8c4209af2c(of: Add vendor prefix for Asahi Kasei Corp.)
 
-We confirmed it after quite some testing.
-# Full logs at:
-# as iperf client: https://app.box.com/s/5pzh753dmmnqt4q8s5iy
-# as iperf server: https://app.box.com/s/t9ohxrcphpmnfer9dtj9
+It went through the appropriate review process. But, almost all
+Asahi Kasei chip drivers are using "asahi-kasei" prefix today.
+(arch/arm/boot/dts/tegra20-seaboard.dts only is using "ak,ak8975",
+ but there are instances of "asahi-kasei,ak8975" in other dts files.
+ And drivers/iio/magnetometer/ak8975.c doesn't support "ak,ak8975" prefix)
+So, we made a mistake there.
 
-Thank you very much for your assistance again!!! :)
+In addition, checkpatch.pl reports WARNING if it is using "asahi-kasei"
+prerfix in DT file.
+(DT compatible string vendor "asahi-kasei" appears un-documented)
 
-Regards,
-Maggie Roxas
+Marking it deprecated and warning with checkpatch is certainly
+preferable. So, this patch replace "ak" to "asahi-kasei" in
+vendor-prefixes.txt. (and fixup tegra20-seaboard)
 
-On Mon, Dec 1, 2014 at 6:15 PM, Maggie Mae Roxas
-<maggie.mae.roxas@gmail.com> wrote:
-> Hi Thomas, Willy.
-> Good day.
->
-> Thank you for your assistance as always.
->
-> We are currently testing the attached patch + 3.13.9.
-> We'll let you know the results as soon as we've conducted enough tests
-> - latest tomorrow.
->
-> Will keep you posted.
->
-> Regards,
-> Maggie Roxas
->
->
-> On Mon, Dec 1, 2014 at 5:58 PM, Willy Tarreau <w@1wt.eu> wrote:
->> Hi Thomas,
->>
->> On Mon, Dec 01, 2014 at 10:32:21AM +0100, Thomas Petazzoni wrote:
->>> If I understood correctly, on RX the interrupt coalescing can be done
->>> every X packets, or after N milliseconds. However, on TX, it's only
->>> after Y packets, there is no way to configure a delay.
->>
->> That was my understanding of the datasheet as well.
->>
->>> But in any case, with NAPI implemented in software, are these hardware
->>> interrupt coalescing features very important? As soon as the number of
->>> interrupts becomes high, the kernel will disable the interrupt and
->>> switch to polling, no?
->>
->> Absolutely, but despite this, the interrupts still impact the system's
->> performance, because instead of waking up the driver once the Tx queue
->> is about to be empty (let's say twice per Tx queue), we wake up as often
->> as the system supports it. The net effect is a performance loss of about
->> 5% on small packets, which is not huge of course, but would rather be
->> spent doing some more useful stuff.
->>
->> Uri gave me a contact at Marvell who knows this device well, I'll ask
->> him if there's no other way to work with this chip. Sending an interrupt
->> at least when the Tx queue is empty would be nice :-/
->>
->> Best regards,
->> Willy
->>
+OTOH, Asahi Kasei is usually referred to as "AKM", but this patch
+doesn't care about it. Because no DT is using that today.
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Thierry Reding <treding@nvidia.com>
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+v4 -> v5
+
+ - venter -> vendor on Subject
+ - fixup Acked-by ordering
+
+ .../devicetree/bindings/vendor-prefixes.txt        |    2 +-
+ arch/arm/boot/dts/tegra20-seaboard.dts             |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 723999d..ddcb4cd 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -9,7 +9,6 @@ ad	Avionic Design GmbH
+ adapteva	Adapteva, Inc.
+ adi	Analog Devices, Inc.
+ aeroflexgaisler	Aeroflex Gaisler AB
+-ak	Asahi Kasei Corp.
+ allwinner	Allwinner Technology Co., Ltd.
+ altr	Altera Corp.
+ amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
+@@ -20,6 +19,7 @@ amstaos	AMS-Taos Inc.
+ apm	Applied Micro Circuits Corporation (APM)
+ arm	ARM Ltd.
+ armadeus	ARMadeus Systems SARL
++asahi-kasei	Asahi Kasei Corp.
+ atmel	Atmel Corporation
+ auo	AU Optronics Corporation
+ avago	Avago Technologies
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+index a1d4bf9..7f5cf80 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+@@ -405,7 +405,7 @@
+ 		clock-frequency = <400000>;
+ 
+ 		magnetometer at c {
+-			compatible = "ak,ak8975";
++			compatible = "asahi-kasei,ak8975";
+ 			reg = <0xc>;
+ 			interrupt-parent = <&gpio>;
+ 			interrupts = <TEGRA_GPIO(N, 5) IRQ_TYPE_LEVEL_HIGH>;
+-- 
+1.7.9.5
