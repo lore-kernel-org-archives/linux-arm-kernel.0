@@ -1,48 +1,37 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 2 Dec 2014 14:21:59 +0100
-Subject: [PATCH 1/3] staging: imx-drm: document internal HDMI I2C master
- controller DT binding
-In-Reply-To: <547DBA99.1010703@mentor.com>
-References: <1416073759-19939-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <1416073759-19939-2-git-send-email-vladimir_zapolskiy@mentor.com>
- <547C8113.3050100@mentor.com>
- <1417446703.4624.18.camel@pengutronix.de>
- <547C8B9E.8050605@mentor.com>
- <1417450979.4624.23.camel@pengutronix.de>
- <547D5DE2.2040704@rock-chips.com> <547DBA99.1010703@mentor.com>
-Message-ID: <20141202132158.GD4072@katana>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 2 Dec 2014 14:22:33 +0100
+Subject: [PATCH] arm: perf: Directly handle SMP platforms with one SPI
+In-Reply-To: <1416581603-30557-1-git-send-email-daniel.thompson@linaro.org>
+References: <1416581603-30557-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <CACRpkdaof9hW2rbH4eDNWMCiaW7+aNE_2TNyMbz+B4aqaJfsgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 21, 2014 at 3:53 PM, Daniel Thompson
+<daniel.thompson@linaro.org> wrote:
 
-> Thank you for references.
+> Some ARM platforms mux the PMU interrupt of every core into a single
+> SPI. On such platforms if the PMU of any core except 0 raises an interrupt
+> then it cannot be serviced and eventually, if you are lucky, the spurious
+> irq detection might forcefully disable the interrupt.
+>
+> On these SoCs it is not possible to determine which core raised the
+> interrupt so workaround this issue by queuing irqwork on the other
+> cores whenever the primary interrupt handler is unable to service the
+> interrupt.
+>
+> The u8500 platform has an alternative workaround that dynamically alters
+> the affinity of the PMU interrupt. This workaround logic is no longer
+> required so the original code is removed as is the hook it relied upon.
+>
+> Tested on imx6q (which has fours cores/PMUs all muxed to a single SPI).
+>
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 
-Yes, thank you all. Really great to see this consolidation effort going
-on!
+After som pain I managed to compile and test this with perf.
+Works like a charm.
 
-> I'll try to review all out of i2c/busses/* registered i2c adapters, may
-> be there is something in common between all of them.
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
 
-Yay, cool! Thanks!
-
-> I'll prepare the change of the HDMI DDC support for review (will be able
-> to test it only on iMX6), Wolfram, please skip from your consideration
-> the published version of the i2c bus driver.
-
-Okay, will do.
-
-> Wolfram, by the way is I2C_CLASS_DDC adapter class in operational use or
-> deprecated?
-
-Class based instantiation is NOT deprecated and will stay as far as I
-can see. Many platform bus drivers did set the class flag needlessly, so
-we had a deprecation mechanism to get rid of those flags in drivers in
-order to speed up boot time.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141202/32141fca/attachment-0001.sig>
+Yours,
+Linus Walleij
