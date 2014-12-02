@@ -1,67 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  2 Dec 2014 17:48:02 +0100
-Subject: [PATCH] ARM: mvebu: use the cpufreq-dt platform_data for independent
- clocks
-Message-ID: <1417538882-19254-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Tue, 2 Dec 2014 10:44:07 -0600
+Subject: [PATCH v3 0/3] SoCFPGA: L3 NIC driver
+In-Reply-To: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <547DEC57.6010803@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adjusts the registration of the cpufreq-dt driver in the
-mvebu platform to indicate to the cpufreq driver that the platform has
-independent clocks for each CPU.
++CC: Alan Tull
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-Jason, this commit was part of my "[PATCHv2 0/4] cpufreq-dt,
-platform_data based proposal" series, which included 3 patches for
-drivers/cpufreq/, and this last patch for mach-mvebu to make use of
-the new cpufreq feature. However, in order to not confuse the cpufreq
-maintainer, when I sent "[PATCH v3 0/3] cpufreq: cpufreq-dt:
-platform_data based proposal", I didn't include this patch for
-mach-mvebu.
-
-But now, it means that this is the only missing piece to get cpufreq
-working on Armada XP. Do you think you could squeeze it into the
-things merged for 3.19 ? It's a very small patch, so hopefully it's
-still possible to do so.
-
-The patch is based on mvebu/soc.
----
- arch/arm/mach-mvebu/pmsu.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 5a757f9..d8ab605 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -20,6 +20,7 @@
- 
- #include <linux/clk.h>
- #include <linux/cpu_pm.h>
-+#include <linux/cpufreq-dt.h>
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/io.h>
-@@ -571,6 +572,10 @@ int mvebu_pmsu_dfs_request(int cpu)
- 	return 0;
- }
- 
-+struct cpufreq_dt_platform_data cpufreq_dt_pd = {
-+	.independent_clocks = true,
-+};
-+
- static int __init armada_xp_pmsu_cpufreq_init(void)
- {
- 	struct device_node *np;
-@@ -643,7 +648,8 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
- 		}
- 	}
- 
--	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-+	platform_device_register_data(NULL, "cpufreq-dt", -1,
-+				      &cpufreq_dt_pd, sizeof(cpufreq_dt_pd));
- 	return 0;
- }
- 
--- 
-2.1.0
+On 11/29/2014 02:14 PM, Steffen Trumtrar wrote:
+> Hi!
+> 
+> This series adds support for the SoCFPGA L3 NIC. As the memory range has
+> a lot of holes, where you can not read from, syscon can not be used for
+> this IP core. Instead add a new driver, that knows about all the allowed
+> ranges and guards the access via regmap.
+> 
+> Changes in v3:
+> 
+> 	- Split out the devicetree binding in its own patch
+> 
+> Regards,
+> Steffen
+> 
+> Steffen Trumtrar (3):
+>   Documentation: dt: add Altera L3 NIC bindings
+>   ARM: socfpga: Add driver for the L3 interconnect
+>   ARM: dts: socfpga: Add l3nic node
+> 
+>  .../bindings/soc/socfpga/altr,l3-nic.txt           |  15 ++
+>  arch/arm/boot/dts/socfpga.dtsi                     |   5 +
+>  drivers/soc/Kconfig                                |   1 +
+>  drivers/soc/Makefile                               |   1 +
+>  drivers/soc/socfpga/Kconfig                        |  10 +
+>  drivers/soc/socfpga/Makefile                       |   1 +
+>  drivers/soc/socfpga/l3nic.c                        | 221 +++++++++++++++++++++
+>  include/soc/socfpga/gpv.h                          |  63 ++++++
+>  include/soc/socfpga/l3regs.h                       | 192 ++++++++++++++++++
+>  9 files changed, 509 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
+>  create mode 100644 drivers/soc/socfpga/Kconfig
+>  create mode 100644 drivers/soc/socfpga/Makefile
+>  create mode 100644 drivers/soc/socfpga/l3nic.c
+>  create mode 100644 include/soc/socfpga/gpv.h
+>  create mode 100644 include/soc/socfpga/l3regs.h
+> 
