@@ -1,31 +1,211 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 2 Dec 2014 13:05:39 +0100
-Subject: [PATCH] iommu: Decouple iommu_map_sg from CPU page size
-In-Reply-To: <2d38d270a532b52f73a720572f8f085dfa08321e.1416936761.git.robin.murphy@arm.com>
-References: <2d38d270a532b52f73a720572f8f085dfa08321e.1416936761.git.robin.murphy@arm.com>
-Message-ID: <20141202120539.GB32294@8bytes.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 2 Dec 2014 12:13:10 +0000
+Subject: [PATCH 14/19] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <547DA818.2050908@samsung.com>
+References: <1417510196-6714-1-git-send-email-cw00.choi@samsung.com>
+ <1417510196-6714-15-git-send-email-cw00.choi@samsung.com>
+ <20141202110909.GB23671@leverpostej> <547DA818.2050908@samsung.com>
+Message-ID: <20141202121310.GH23671@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 25, 2014 at 05:50:55PM +0000, Robin Murphy wrote:
-> If the IOMMU supports pages smaller than the CPU page size, segments
-> which lie at offsets within the CPU page may be mapped based on the
-> finer-grained IOMMU page boundaries. This minimises the amount of
-> non-buffer memory between the CPU page boundary and the start of the
-> segment which must be mapped and therefore exposed to the device, and
-> brings the default iommu_map_sg implementation in line with
-> iommu_map/unmap with respect to alignment.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> Hi Joerg,
-> 
-> I noticed this whilst wiring up DMA mapping to this new API - on arm64
-> we anticipate running 4k IOMMU pages with 64k CPU pages, in which case
-> the alignment check ends up being unnecessarily strict.
+Hi,
 
-Applied to the core branch, thanks.
+> >> +       psci {
+> >> +               compatible = "arm,psci";
+> >> +               method = "smc";
+> >> +               cpu_off = <0x84000002>;
+> >> +               cpu_on = <0xC4000003>;
+> >> +       };
+> >
+> > Given your comments on the latest posting, has CPU_OFF been tested, and
+> > does it work for _all_ CPUs (including CPU0)?
+> 
+> At current version,
+> CPU_OFF of Exynos5433 is not working. I'm now working to find the cause of CPU_OFF fail.
+> (I got CPU_ON of Exynos5433 all cores.)
 
+CPU_OFF should not be described in the DT unless it works.
 
-	Joerg
+[...]
+
+> >> +       soc: soc {
+> >> +               compatible = "simple-bus";
+> >> +               #address-cells = <1>;
+> >> +               #size-cells = <1>;
+> >> +               ranges;
+> >
+> > Is that valid when changing the number of cells? The address spaces
+> > aren't strictly identical in that case, and I'd expect a translation
+> > something like:
+> >
+> >         ranges = <0x0 0x0 0x0 0xff000000>;
+> 
+> I'll fix it after checking correct spec.
+
+Thanks.
+
+[...]
+
+> >> +               gic:interrupt-controller at 11001000 {
+> >> +                       compatible = "arm,gic-400";
+> >> +                       #interrupt-cells = <3>;
+> >> +                       interrupt-controller;
+> >> +                       reg =   <0x11001000 0x1000>,
+> >> +                               <0x11002000 0x1000>,
+> >> +                               <0x11004000 0x2000>,
+> >> +                               <0x11006000 0x2000>;
+> >> +                       interrupts = <1 9 0xf04>;
+> >> +               };
+> >
+> > The GICC needs to be 0x2000 long to map the GICC_DIR, which is at
+> > 0x1000-0x1003.
+> 
+> Do you mean that following dt node is right for gic-400?
+> 
+>                 reg =   <0x11001000 0x1000>,
+>                         <0x11002000 0x2000>,    <- I changed the the range of GICC.
+>                         <0x11004000 0x2000>,
+>                         <0x11006000 0x2000>;
+
+Yes.
+
+[...]
+
+> >> +               pinctrl_alive: pinctrl at 10580000 {
+> >> +                       compatible = "samsung,exynos5433-pinctrl";
+> >> +                       reg = <0x10580000 0x1000>;
+> >> +
+> >> +                       wakeup-interrupt-controller {
+> >> +                               compatible = "samsung,exynos7-wakeup-eint";
+> >> +                               interrupts = <0 16 0>;
+> >> +                       };
+> >> +               };
+> >
+> > How exactly does the wakeup interrupt controller interact with the GIC?
+> > Surely the relationship between the two should be described?
+> 
+> The pinctrl_alive contains the alive part of GPIO PAD (gpa0~gpa3).
+> 
+> The each GPA0/GPA1 of pinctrl_alive pad did map to unique SPI number of GIC
+> amd GPA2/GPA3 use only one interrupt (SPI[16])  as following:
+> 
+>         +&pinctrl_alive {
+>         +       gpa0: gpa0 {
+>         +               gpio-controller;
+>         +               #gpio-cells = <2>;
+>         +
+>         +               interrupt-controller;
+>         +               interrupt-parent = <&gic>;
+>         +               interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
+>         +                            <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>;
+>         +               #interrupt-cells = <2>;
+>         +       };
+>         +
+>         +       gpa1: gpa1 {
+>         +               gpio-controller;
+>         +               #gpio-cells = <2>;
+>         +
+>         +               interrupt-controller;
+>         +               interrupt-parent = <&gic>;
+>         +               interrupts = <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
+>         +                            <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
+>         +               #interrupt-cells = <2>;
+>         +       };
+> 
+>         gpa0-0 - SPI[0]
+>         gpa0-1 - SPI[1]
+>         gpa0-2 - SPI[2]
+>         gpa0-3 - SPI[3]
+>         gpa0-4 - SPI[4]
+>         gpa0-5 - SPI[5]
+>         gpa0-6 - SPI[6]
+>         gpa0-7 - SPI[7]
+> 
+>         gpa1-0 - SPI[8]
+>         gpa1-1 - SPI[9]
+>         gpa1-2 - SPI[10]
+>         gpa1-3 - SPI[11]
+>         gpa1-4 - SPI[12]
+>         gpa1-5 - SPI[13]
+>         gpa1-6 - SPI[14]
+>         gpa1-7 - SPI[15]
+> 
+>         GPA2/GPA3 use only one interrupt (SPI[16]).
+> 
+> The pinctrl-exynos.c driver initialized external wakeup interrupt
+> (e.g., GPA0/GPA1/GPA2/GPA3 of Exynos5433) in exynos_eint_wkup_init() function.
+> 
+> Following patch[1] adds the control for Exynos5433 wakeup irq.The exynos5433_pin_ctrl structure
+> includes '.eint_wkup_init = exynos_eint_wkup_init;' fields to handle wakeup interrupt of Exynos SoC.
+> 
+> [PATCHv2] pinctrl: exynos: Add support for Exynos543
+> - https://lkml.org/lkml/2014/12/2/207
+> 
+>         +struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
+>         +       {
+>         +               /* pin-controller instance 0 data */
+>         +               .pin_banks      = exynos5433_pin_banks0,
+>         +               .nr_banks       = ARRAY_SIZE(exynos5433_pin_banks0),
+>         +               .eint_wkup_init = exynos_eint_wkup_init,
+>         +               .suspend        = exynos_pinctrl_suspend,
+>         +               .resume         = exynos_pinctrl_resume,
+>         +               .label          = "exynos5433-gpio-ctrl0",
+>         +       }, {
+> 
+> And,
+> 'struct exynos_irq_chip exynos7_wkup_irq_chip' handles the external interrupt of Exynos5433 SoC
+> because Exynos5433 is the same with Exynos7 EINT (External Interrupt) register offset.
+> 
+> We can check it following patch[1] to control wakeup interrupt for Exynos7/Exynos5433.
+> - [1] [patch] pinctrl: exynos: Add irq_chip instance for Exynos7 wakeup interrupts
+>   https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/commit/?h=for-next&id=14c255d35b25126149fb2fd199b030404229af65
+> 
+> 
+>         +static struct exynos_irq_chip exynos7_wkup_irq_chip __initdata = {
+>         + .chip = {
+>         + .name = "exynos7_wkup_irq_chip",
+>         + .irq_unmask = exynos_irq_unmask,
+>         + .irq_mask = exynos_irq_mask,
+>         + .irq_ack = exynos_irq_ack,
+>         + .irq_set_type = exynos_irq_set_type,
+>         + .irq_set_wake = exynos_wkup_irq_set_wake,
+>         + .irq_request_resources = exynos_irq_request_resources,
+>         + .irq_release_resources = exynos_irq_release_resources,
+>         + },
+>         + .eint_con = EXYNOS7_WKUP_ECON_OFFSET,
+>         + .eint_mask = EXYNOS7_WKUP_EMASK_OFFSET,
+>         + .eint_pend = EXYNOS7_WKUP_EPEND_OFFSET,
+>         +};
+> 
+> If happen external interrupt by pressing power button, the ops of 'struct exynos_irq_chip exynos7_wkup_irq_chip'
+> would handle the interrupt.
+> 
+> For exampl, If I use following GPAx as interrupt, I can check it on the result of /proc/interrupts.
+>         gpa2-7 - power key
+>         gpa2-0 - volume-up key
+>         gpa2-1 - volume-up key
+>         gpa0-7 - s2mps13 pmic irq
+> 
+> 'exynos7_wkup_irq_chip' would handle the external interrupt(gpa).
+> 
+> #cat /proc/interrupts
+>   1:          0          0          0          0          0          0          0  exynos7_wkup_irq_chip   0  volume-up key
+>   2:          0          0          0          0          0          0          0  exynos7_wkup_irq_chip   1  volume-down key
+>   7:          0          0          0          0          0          0          0  exynos7_wkup_irq_chip   7  s2mps13
+>   8:          0          0          0          0          0          0          0  exynos7_wkup_irq_chip   7  power key
+> 
+> 
+> IMHO,
+> Happen SPI -> GIC -> Cortex-A57/Cortex-A53 -> pinctrl-exynos.c -> exynos7_wkup_irq_chip -> irq handling
+
+So physically interrupts are fed into the wakeup IRQ chip, which routes
+them to the GIC? And we describe such in DT, as opposed to pretending
+interrupts are fed straight into the GIC, and bolting the wakeup
+controller on the side?
+
+If so, that sounds fine to me.
+
+Thanks,
+Mark.
