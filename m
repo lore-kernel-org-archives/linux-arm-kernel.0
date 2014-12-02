@@ -1,63 +1,108 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Tue,  2 Dec 2014 12:49:54 -0800
-Subject: [PATCH v4 0/3] Fixes for SDIO interrupts for dw_mmc
-Message-ID: <1417553397-460-1-git-send-email-dianders@chromium.org>
+Date: Tue,  2 Dec 2014 12:49:55 -0800
+Subject: [PATCH v4 1/3] mmc: core: Support the optional init_card() callback
+ for MMC and SD
+In-Reply-To: <1417553397-460-1-git-send-email-dianders@chromium.org>
+References: <1417553397-460-1-git-send-email-dianders@chromium.org>
+Message-ID: <1417553397-460-2-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bing Zhao at Marvell found a problem with dw_mmc where interrupts
-weren't firing sometimes.  He tracked it down to a read-modify-write
-problem with the INTMASK.  These three patches fix the problem.
+In (3fcb027 ARM: MXC: mxcmmc: work around a bug in the SDHC busy line
+handling) the optional init_card() callback was added.  According to
+the original change it was "for now only called from
+mmc_sdio_init_card()".
 
-Note: I've picked up a > 1-year old series here to make another
-attempt at landing it upstream.  These patches have been in shipping
-Chromebooks for the last year.  There are essentially no changes from
-the last v3 other than a rebase.
+This callback really ought to be called from the SD and MMC init
+functions as well.  One current user of this callback
+(mxcmci_init_card) will not work as expected if you insert an SDIO
+card, then eject it and put a normal SD card in.  Specifically the
+normal SD card will not get to run with 4-bit data.
 
-The first patch extends the "init_card()" mechanism of MMC core to
-actually be called for all card types, not just SDIO.  That could be
-applied any time and should fix at least one longstanding bug
-(untested).
+I'd like to use the init_card() callback to handle a similar quirk on
+dw_mmc when using SDIO Interrupts (the "low power" feature of the card
+needs to be disabled), so that will add a second user of the function.
 
-The second patch is a cleanup patch to use init_card() to move things
-around a bit so we don't need to handle SDIO cards in such a strange
-place.  On earlier versions of this patch Seungwon brought up a few
-points which I have _not_ addressed.  See
-<https://patchwork.kernel.org/patch/3049071/>.  Other than talk of
-cards with out of band interrupts maybe being able to gate their
-clocks, he wanted to use MMC_QUIRK_BROKEN_CLK_GATING.  I didn't do
-that because of the ordering of init_card() and when the quirks are
-set.  Some users of init_card() like pandora_wl1251_init_card() rely
-on it being called very early in the process.
-pandora_wl1251_init_card() hardcodes a vendor and device and thus need
-to be called super early.  On the other hand the code that adds quirks
-_reads_ the vendor and device.  It can't possibly move before
-init_card().  If folks are willing to take an additional host op of
-init_card_late() I can certainly go that way, though.
+As part of this change fixup the one place that relied on the callback
+only happening for SDIO cards.
 
-The third patch is (I think) reviewed and ready to go assuming the
-other two land.
-
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Reviewed-by: Grant Grundler <grundler@chromium.org>
+---
 Changes in v3:
 - Add fixup to pandora_wl1251_init_card().
 
 Changes in v2:
 - mmc core change new for this version.
-- Fixed "|" to "&".
-- intmask_lock renamed to irq_lock
 
-Doug Anderson (3):
-  mmc: core: Support the optional init_card() callback for MMC and SD
-  mmc: dw_mmc: Cleanup disable of low power mode w/ SDIO interrupts
-  mmc: dw_mmc: Protect read-modify-write of INTMASK with a lock
+ arch/arm/mach-omap2/board-omap3pandora.c | 14 ++++++++------
+ drivers/mmc/core/mmc.c                   |  6 ++++++
+ drivers/mmc/core/sd.c                    |  7 ++++++-
+ 3 files changed, 20 insertions(+), 7 deletions(-)
 
- arch/arm/mach-omap2/board-omap3pandora.c | 14 +++---
- drivers/mmc/core/mmc.c                   |  6 +++
- drivers/mmc/core/sd.c                    |  7 ++-
- drivers/mmc/host/dw_mmc.c                | 80 +++++++++++++++++++-------------
- drivers/mmc/host/dw_mmc.h                |  1 +
- include/linux/mmc/dw_mmc.h               |  6 +++
- 6 files changed, 74 insertions(+), 40 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
+index 7f17087..969e100 100644
+--- a/arch/arm/mach-omap2/board-omap3pandora.c
++++ b/arch/arm/mach-omap2/board-omap3pandora.c
+@@ -254,12 +254,14 @@ static void pandora_wl1251_init_card(struct mmc_card *card)
+ 	 * We have TI wl1251 attached to MMC3. Pass this information to
+ 	 * SDIO core because it can't be probed by normal methods.
+ 	 */
+-	card->quirks |= MMC_QUIRK_NONSTD_SDIO;
+-	card->cccr.wide_bus = 1;
+-	card->cis.vendor = 0x104c;
+-	card->cis.device = 0x9066;
+-	card->cis.blksize = 512;
+-	card->cis.max_dtr = 20000000;
++	if (card->type == MMC_TYPE_SDIO || card->type == MMC_TYPE_SD_COMBO) {
++		card->quirks |= MMC_QUIRK_NONSTD_SDIO;
++		card->cccr.wide_bus = 1;
++		card->cis.vendor = 0x104c;
++		card->cis.device = 0x9066;
++		card->cis.blksize = 512;
++		card->cis.max_dtr = 20000000;
++	}
+ }
+ 
+ static struct omap2_hsmmc_info omap3pandora_mmc[] = {
+diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+index 02ad792..4a21d66 100644
+--- a/drivers/mmc/core/mmc.c
++++ b/drivers/mmc/core/mmc.c
+@@ -1297,6 +1297,12 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+ 	}
+ 
+ 	/*
++	 * Call the optional HC's init_card function to handle quirks.
++	 */
++	if (host->ops->init_card)
++		host->ops->init_card(host, card);
++
++	/*
+ 	 * For native busses:  set card RCA and quit open drain mode.
+ 	 */
+ 	if (!mmc_host_is_spi(host)) {
+diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
+index d90a6de..29fccdc 100644
+--- a/drivers/mmc/core/sd.c
++++ b/drivers/mmc/core/sd.c
+@@ -933,6 +933,12 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
+ 	}
+ 
+ 	/*
++	 * Call the optional HC's init_card function to handle quirks.
++	 */
++	if (host->ops->init_card)
++		host->ops->init_card(host, card);
++
++	/*
+ 	 * For native busses:  get card RCA and quit open drain mode.
+ 	 */
+ 	if (!mmc_host_is_spi(host)) {
+@@ -1271,4 +1277,3 @@ err:
+ 
+ 	return err;
+ }
+-
 -- 
 2.2.0.rc0.207.ga3a616c
