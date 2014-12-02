@@ -1,130 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 2 Dec 2014 15:25:07 +0000
-Subject: [PATCHv5 4/5] edac: altera: Add Altera L2 Cache and OCRAM EDAC
- Support
-In-Reply-To: <1415751263-1830-5-git-send-email-tthayer@opensource.altera.com>
-References: <1415751263-1830-1-git-send-email-tthayer@opensource.altera.com>
- <1415751263-1830-5-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <20141202152507.GO23671@leverpostej>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 2 Dec 2014 23:30:37 +0800
+Subject: [PATCH] ARM: imx6: fix bogus use of irq_get_irq_data
+In-Reply-To: <547DD92B.8090104@arm.com>
+References: <1417453443-9179-1-git-send-email-marc.zyngier@arm.com>
+ <20141202144759.GO2411@dragon> <547DD254.4090704@arm.com>
+ <20141202151505.GP2411@dragon> <547DD92B.8090104@arm.com>
+Message-ID: <20141202153036.GQ2411@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> +/* MPU L2 Register Defines */
-> +#define ALTR_MPUL2_CONTROL_OFFSET       0x100
-> +#define ALTR_MPUL2_CTL_CACHE_EN_MASK    BIT(0)
-
-These are just standard PL310 register definitions, no?
-
-[...]
-
-> +static void *ocram_alloc_mem(size_t size, void **other)
-> +{
-> +       struct device_node *np;
-> +       struct gen_pool *gp;
-> +       void *sram_addr;
-> +
-> +       np = of_find_compatible_node(NULL, NULL, "altr,ocram-edac");
-> +       if (!np)
-> +               return NULL;
-
-Don't you need to have a corresponding of_node_put?
-
-Is this ever called before the code above has probed? Can't you keep
-this information around rather than probing it every time?
-
-> +
-> +       gp = of_get_named_gen_pool(np, "iram", 0);
-> +       if (!gp)
-> +               return NULL;
-> +
-> +       sram_addr = (void *)gen_pool_alloc(gp, size);
-> +       if (!sram_addr)
-> +               return NULL;
-> +
-> +       memset(sram_addr, 0, size);
-
-Is it safe to do a memset to the sram? How is it mapped?
-
-[...]
-
-> +static void *l2_alloc_mem(size_t size, void **other)
-> +{
-> +       struct device *dev = *other;
-> +       void *ptemp = devm_kzalloc(dev, size, GFP_KERNEL);
-> +
-> +       if (!ptemp)
-> +               return NULL;
-> +
-> +       /* Make sure everything is written out */
-> +       wmb();
-> +       flush_cache_all();
-
-Doesn't this just flush out _to_ the L2 (and not beyond)? Even then I
-don't think that's safe with the MMU enabled.
-
-Why is the flush necessary?
-
-[...]
-
-> +static int altr_l2_dependencies(struct platform_device *pdev,
-> +                               void __iomem *base)
-> +{
-> +       u32 control;
-> +       struct regmap *l2_vbase;
-> +
-> +       control = readl(base) & ALTR_L2_ECC_EN_MASK;
-> +       if (!control) {
-> +               edac_printk(KERN_ERR, EDAC_DEVICE,
-> +                           "L2: No ECC present, or ECC disabled\n");
-> +               return -ENODEV;
-> +       }
-> +
-> +       l2_vbase = syscon_regmap_lookup_by_compatible("arm,pl310-cache");
-> +       if (IS_ERR(l2_vbase)) {
-> +               edac_printk(KERN_ERR, EDAC_DEVICE,
-> +                           "L2:regmap for arm,pl310-cache lookup failed.\n");
-> +               return -ENODEV;
-> +       }
-
-I must NAK any use of the L2 as a syscon device. It's simply not a
-register file that was intended to be shared. I appreciate that you only
-want to check something very simple, but we should use a higher level
-API for that (and we should add one if we do not already have one)
-
-> +
-> +       regmap_read(l2_vbase, ALTR_MPUL2_CONTROL_OFFSET, &control);
-> +       if (!(control & ALTR_MPUL2_CTL_CACHE_EN_MASK)) {
-> +               edac_printk(KERN_ERR, EDAC_DEVICE, "L2: Cache disabled\n");
-> +               return -ENODEV;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +const struct edac_device_prv_data l2ecc_data = {
-> +       .setup = altr_l2_dependencies,
-> +       .ce_clear_mask = 0,
-> +       .ue_clear_mask = 0,
-> +#ifdef CONFIG_EDAC_DEBUG
-> +       .eccmgr_sysfs_attr = altr_l2_sysfs_attributes,
-> +       .alloc_mem = l2_alloc_mem,
-> +       .free_mem = l2_free_mem,
-> +       .ecc_enable_mask = ALTR_L2_ECC_EN_MASK,
-> +       .ce_set_mask = (ALTR_L2_ECC_EN_MASK | ALTR_L2_ECC_INJS_MASK),
-> +       .ue_set_mask = (ALTR_L2_ECC_EN_MASK | ALTR_L2_ECC_INJD_MASK),
-> +       .trig_alloc_sz = ALTR_TRIG_L2C_BYTE_SIZE,
-> +#endif
-> +};
-> +
-> +#endif /* #ifdef CONFIG_EDAC_ALTERA_L2C */
-> +
->  MODULE_LICENSE("GPL v2");
->  MODULE_AUTHOR("Thor Thayer");
-> -MODULE_DESCRIPTION("EDAC Driver for Altera SDRAM Controller");
-> +MODULE_DESCRIPTION("EDAC Driver for Altera Memories");
-> --
-> 1.7.9.5
+On Tue, Dec 02, 2014 at 03:22:19PM +0000, Marc Zyngier wrote:
+> On 02/12/14 15:15, Shawn Guo wrote:
+> > On Tue, Dec 02, 2014 at 02:53:08PM +0000, Marc Zyngier wrote:
+> >> Hi Shawn,
+> >>
+> >> On 02/12/14 14:48, Shawn Guo wrote:
+> >>> On Mon, Dec 01, 2014 at 05:04:03PM +0000, Marc Zyngier wrote:
+> >>>> The imx6 PM code seems to be quite creative in its use of irq_data,
+> >>>> using something something that is very much a hardware interrupt
+> >>>> number where we expect a virtual one.  Yes, it worked so far, but
+> >>>> that's only cheer luck, and it will definitely explode in 3.19.
+> >>>>
+> >>>> Fix it by using a pair of helper functions that deal with the
+> >>>> actual hardware.
+> >>>>
+> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >>>
+> >>> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> >>>
+> >>> Arnd, Olof,
+> >>>
+> >>> To avoid a non-booting 3.19-rc1 on i.MX6, please apply it for 3.19-rc1.
+> >>
+> >> The previous patch (ARM: imx: irq: fix buggy usage of irq_data irq
+> >> field) should also be applied (you cannot apply one without the other
+> >> anyway).
+> > 
+> > Marc,
+> > 
+> > Thanks a lot for the fixes.  To ease arm-soc folks' work, you should
+> > probably resend the patches with squashing them into one or having them
+> > in a series.
 > 
-> 
+> Sure. Can I put your Acked-by on both patches?
+
+Yes, Marc.
+
+Shawn
