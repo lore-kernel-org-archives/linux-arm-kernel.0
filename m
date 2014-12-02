@@ -1,41 +1,43 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Tue, 02 Dec 2014 10:18:45 +0100
-Subject: [PATCH v3 05/11] memory: add Atmel EBI (External Bus Interface)
- driver
-In-Reply-To: <2417519.MDE3mu6n7n@wuerfel>
-References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
- <20141201115006.08197c40@bbrezillon> <2417519.MDE3mu6n7n@wuerfel>
-Message-ID: <1724175.Jqk8gQW3pz@ws-stein>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 02 Dec 2014 10:16:12 +0100
+Subject: [PATCH v6 2/8] dma-mapping: replace set_arch_dma_coherent_ops
+ with arch_setup_dma_ops
+In-Reply-To: <CAL_JsqLtN3euwXHM4BzYxkXsgE=Dmn05aXzL+kr_8x23voneZA@mail.gmail.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <1417453034-21379-3-git-send-email-will.deacon@arm.com>
+ <CAL_JsqLtN3euwXHM4BzYxkXsgE=Dmn05aXzL+kr_8x23voneZA@mail.gmail.com>
+Message-ID: <18789666.A0Z8YWCnk0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 December 2014 17:17:30, Arnd Bergmann wrote:
-> On Monday 01 December 2014 11:50:06 Boris Brezillon wrote:
-> > 
-> > I don't have a strong opinion regarding where this driver should
-> > live (I even considered putting it in drivers/bus) :-).
-> > But note that there are other "external memory interface" drivers
-> > in drivers/memory too: TI AEMIF and Marvell DEVBUS  ;-).
-> > 
-> > Does anyone else think this driver should go in drivers/bus ?
-> > 
+On Monday 01 December 2014 16:58:09 Rob Herring wrote:
+> > @@ -178,28 +180,21 @@ static void of_dma_configure(struct device *dev)
+> >         if (!dev->dma_mask)
+> >                 dev->dma_mask = &dev->coherent_dma_mask;
+> >
+> > -       /*
+> > -        * if dma-coherent property exist, call arch hook to setup
+> > -        * dma coherent operations.
+> > -        */
+> > -       if (of_dma_is_coherent(dev->of_node)) {
+> > -               set_arch_dma_coherent_ops(dev);
+> > -               dev_dbg(dev, "device is dma coherent\n");
+> > -       }
+> > -
+> > -       /*
+> > -        * if dma-ranges property doesn't exist - just return else
+> > -        * setup the dma offset
+> > -        */
+> >         ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+> >         if (ret < 0) {
+> > -               dev_dbg(dev, "no dma range information to setup\n");
+> > -               return;
+> > +               dma_addr = offset = 0;
+> > +               size = dev->coherent_dma_mask;
 > 
-> I think drivers/memory is better.
+> It looks like size is not used.
 
-I don't mind if it's drivers/bus or drivers/memory. But I'm wondering: When is a driver a bus driver when it is a memory driver? See imx-weim and atmel-ebi. Apparently both add support for devices attached on a bus which can be accessed through memory addresses :)
+Catalin has proposed a patch for handling the size right, but it's
+still under discussion.
 
-Best regards,
-Alexander
--- 
-Dipl.-Inf. Alexander Stein
-
-SYS TEC electronic GmbH
-Am Windrad 2
-08468 Heinsdorfergrund
-Tel.: 03765 38600-1156
-Fax: 03765 38600-4100
-Email: alexander.stein at systec-electronic.com
-Website: www.systec-electronic.com
- 
-Managing Director: Dipl.-Phys. Siegmar Schmidt
-Commercial registry: Amtsgericht Chemnitz, HRB 28082
+	Arnd
