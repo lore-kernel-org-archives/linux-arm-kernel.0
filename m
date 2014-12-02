@@ -1,43 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 02 Dec 2014 10:16:12 +0100
-Subject: [PATCH v6 2/8] dma-mapping: replace set_arch_dma_coherent_ops
- with arch_setup_dma_ops
-In-Reply-To: <CAL_JsqLtN3euwXHM4BzYxkXsgE=Dmn05aXzL+kr_8x23voneZA@mail.gmail.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <1417453034-21379-3-git-send-email-will.deacon@arm.com>
- <CAL_JsqLtN3euwXHM4BzYxkXsgE=Dmn05aXzL+kr_8x23voneZA@mail.gmail.com>
-Message-ID: <18789666.A0Z8YWCnk0@wuerfel>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Tue, 2 Dec 2014 17:17:31 +0800
+Subject: [RFC] mm:add zero_page _mapcount when mapped into user space
+Message-ID: <35FD53F367049845BC99AC72306C23D103E688B313DF@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 December 2014 16:58:09 Rob Herring wrote:
-> > @@ -178,28 +180,21 @@ static void of_dma_configure(struct device *dev)
-> >         if (!dev->dma_mask)
-> >                 dev->dma_mask = &dev->coherent_dma_mask;
-> >
-> > -       /*
-> > -        * if dma-coherent property exist, call arch hook to setup
-> > -        * dma coherent operations.
-> > -        */
-> > -       if (of_dma_is_coherent(dev->of_node)) {
-> > -               set_arch_dma_coherent_ops(dev);
-> > -               dev_dbg(dev, "device is dma coherent\n");
-> > -       }
-> > -
-> > -       /*
-> > -        * if dma-ranges property doesn't exist - just return else
-> > -        * setup the dma offset
-> > -        */
-> >         ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
-> >         if (ret < 0) {
-> > -               dev_dbg(dev, "no dma range information to setup\n");
-> > -               return;
-> > +               dma_addr = offset = 0;
-> > +               size = dev->coherent_dma_mask;
-> 
-> It looks like size is not used.
+This patch add/dec zero_page's _mapcount to make sure
+the mapcount is correct for zero_page,
+so that when read from /proc/kpagecount, zero_page's
+mapcount is also correct, userspace process like procrank can
+calculate PSS correctly.
 
-Catalin has proposed a patch for handling the size right, but it's
-still under discussion.
+Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+---
+ mm/memory.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-	Arnd
+diff --git a/mm/memory.c b/mm/memory.c
+index 3e50383..a6309c1 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -2198,6 +2198,7 @@ gotten:
+ 		new_page = alloc_zeroed_user_highpage_movable(vma, address);
+ 		if (!new_page)
+ 			goto oom;
++		atomic_dec(&pfn_to_page(pte_pfn(orig_pte))->_mapcount);
+ 	} else {
+ 		new_page = alloc_page_vma(GFP_HIGHUSER_MOVABLE, vma, address);
+ 		if (!new_page)
+@@ -2647,6 +2648,7 @@ static int do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
+ 		page_table = pte_offset_map_lock(mm, pmd, address, &ptl);
+ 		if (!pte_none(*page_table))
+ 			goto unlock;
++		atomic_inc(&(pfn_to_page(my_zero_pfn(address)))->_mapcount);
+ 		goto setpte;
+ 	}
+ 
+-- 
+2.1.3
