@@ -1,129 +1,82 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  2 Dec 2014 16:05:26 +0000
-Subject: [PATCH v2 2/2] ARM: imx6: fix bogus use of irq_get_irq_data
+Date: Tue,  2 Dec 2014 16:05:25 +0000
+Subject: [PATCH v2 1/2] ARM: imx: irq: fix buggy usage of irq_data irq field
 In-Reply-To: <1417536326-18691-1-git-send-email-marc.zyngier@arm.com>
 References: <1417536326-18691-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1417536326-18691-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1417536326-18691-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx6 PM code seems to be quite creative in its use of irq_data,
-using something that is very much a hardware interrupt number where
-we expect a virtual one.  Yes, it worked so far, but that's only
-luck, and it will definitely explode in 3.19.
+mach-imx directly references to the irq field in
+struct irq_data, and uses this to directly poke hardware register.
 
-Fix it by using a pair of helper functions that deal with the
-actual hardware.
+But irq is the *virtual* irq number, something that has nothing
+to do with the actual HW irq (stored in the hwirq field). And once
+we put the stacked domain code in action, the whole thing explodes,
+as these two values are *very* different.
+
+Just replacing all instances of irq with hwirq fixes the issue.
 
 Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-imx/common.h  |  4 ++--
- arch/arm/mach-imx/gpc.c     | 34 ++++++++++++++++++++++------------
- arch/arm/mach-imx/pm-imx6.c |  5 ++---
- 3 files changed, 26 insertions(+), 17 deletions(-)
+ arch/arm/mach-imx/gpc.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 1dabf43..66662a1 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -108,8 +108,8 @@ void imx_gpc_pre_suspend(bool arm_power_off);
- void imx_gpc_post_resume(void);
- void imx_gpc_mask_all(void);
- void imx_gpc_restore_all(void);
--void imx_gpc_irq_mask(struct irq_data *d);
--void imx_gpc_irq_unmask(struct irq_data *d);
-+void imx_gpc_hwirq_mask(unsigned int hwirq);
-+void imx_gpc_hwirq_unmask(unsigned int hwirq);
- void imx_anatop_init(void);
- void imx_anatop_pre_suspend(void);
- void imx_anatop_post_resume(void);
 diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index 1455829..5f3602e 100644
+index 82ea74e..1455829 100644
 --- a/arch/arm/mach-imx/gpc.c
 +++ b/arch/arm/mach-imx/gpc.c
-@@ -91,34 +91,44 @@ void imx_gpc_restore_all(void)
- 		writel_relaxed(gpc_saved_imrs[i], reg_imr1 + i * 4);
- }
+@@ -56,14 +56,14 @@ void imx_gpc_post_resume(void)
  
--void imx_gpc_irq_unmask(struct irq_data *d)
-+void imx_gpc_hwirq_unmask(unsigned int hwirq)
+ static int imx_gpc_irq_set_wake(struct irq_data *d, unsigned int on)
  {
- 	void __iomem *reg;
+-	unsigned int idx = d->irq / 32 - 1;
++	unsigned int idx = d->hwirq / 32 - 1;
+ 	u32 mask;
+ 
+ 	/* Sanity check for SPI irq */
+-	if (d->irq < 32)
++	if (d->hwirq < 32)
+ 		return -EINVAL;
+ 
+-	mask = 1 << d->irq % 32;
++	mask = 1 << d->hwirq % 32;
+ 	gpc_wake_irqs[idx] = on ? gpc_wake_irqs[idx] | mask :
+ 				  gpc_wake_irqs[idx] & ~mask;
+ 
+@@ -97,12 +97,12 @@ void imx_gpc_irq_unmask(struct irq_data *d)
  	u32 val;
  
--	/* Sanity check for SPI irq */
--	if (d->hwirq < 32)
--		return;
--
--	reg = gpc_base + GPC_IMR1 + (d->hwirq / 32 - 1) * 4;
-+	reg = gpc_base + GPC_IMR1 + (hwirq / 32 - 1) * 4;
+ 	/* Sanity check for SPI irq */
+-	if (d->irq < 32)
++	if (d->hwirq < 32)
+ 		return;
+ 
+-	reg = gpc_base + GPC_IMR1 + (d->irq / 32 - 1) * 4;
++	reg = gpc_base + GPC_IMR1 + (d->hwirq / 32 - 1) * 4;
  	val = readl_relaxed(reg);
--	val &= ~(1 << d->hwirq % 32);
-+	val &= ~(1 << hwirq % 32);
+-	val &= ~(1 << d->irq % 32);
++	val &= ~(1 << d->hwirq % 32);
  	writel_relaxed(val, reg);
  }
  
--void imx_gpc_irq_mask(struct irq_data *d)
-+void imx_gpc_hwirq_mask(unsigned int hwirq)
- {
- 	void __iomem *reg;
+@@ -112,12 +112,12 @@ void imx_gpc_irq_mask(struct irq_data *d)
  	u32 val;
  
-+	reg = gpc_base + GPC_IMR1 + (hwirq / 32 - 1) * 4;
-+	val = readl_relaxed(reg);
-+	val |= 1 << (hwirq % 32);
-+	writel_relaxed(val, reg);
-+}
-+
-+static void imx_gpc_irq_unmask(struct irq_data *d)
-+{
-+	/* Sanity check for SPI irq */
-+	if (d->hwirq < 32)
-+		return;
-+
-+	imx_gpc_hwirq_unmask(d->hwirq);
-+}
-+
-+static void imx_gpc_irq_mask(struct irq_data *d)
-+{
  	/* Sanity check for SPI irq */
- 	if (d->hwirq < 32)
+-	if (d->irq < 32)
++	if (d->hwirq < 32)
  		return;
  
--	reg = gpc_base + GPC_IMR1 + (d->hwirq / 32 - 1) * 4;
--	val = readl_relaxed(reg);
--	val |= 1 << (d->hwirq % 32);
--	writel_relaxed(val, reg);
-+	imx_gpc_hwirq_mask(d->hwirq);
+-	reg = gpc_base + GPC_IMR1 + (d->irq / 32 - 1) * 4;
++	reg = gpc_base + GPC_IMR1 + (d->hwirq / 32 - 1) * 4;
+ 	val = readl_relaxed(reg);
+-	val |= 1 << (d->irq % 32);
++	val |= 1 << (d->hwirq % 32);
+ 	writel_relaxed(val, reg);
  }
  
- void __init imx_gpc_init(void)
-diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index 5c3af8f..d815d1b 100644
---- a/arch/arm/mach-imx/pm-imx6.c
-+++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -261,7 +261,6 @@ static void imx6q_enable_wb(bool enable)
- 
- int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
- {
--	struct irq_data *iomuxc_irq_data = irq_get_irq_data(32);
- 	u32 val = readl_relaxed(ccm_base + CLPCR);
- 
- 	val &= ~BM_CLPCR_LPM;
-@@ -316,9 +315,9 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
- 	 * 3) Software should mask IRQ #32 right after CCM Low-Power mode
- 	 *    is set (set bits 0-1 of CCM_CLPCR).
- 	 */
--	imx_gpc_irq_unmask(iomuxc_irq_data);
-+	imx_gpc_hwirq_unmask(32);
- 	writel_relaxed(val, ccm_base + CLPCR);
--	imx_gpc_irq_mask(iomuxc_irq_data);
-+	imx_gpc_hwirq_mask(32);
- 
- 	return 0;
- }
 -- 
 2.1.3
