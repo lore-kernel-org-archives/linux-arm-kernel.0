@@ -1,108 +1,44 @@
-From: k.kozlowski@samsung.com (=?UTF-8?B?S3J6eXN6dG9mIEtvesWCb3dza2k=?=)
-Date: Tue, 02 Dec 2014 14:33:33 +0100
-Subject: [PATCH] mfd: max77686: Fix parent of rtc device
-In-Reply-To: <1417524339-4604-1-git-send-email-yadi.brar@samsung.com>
-References: <1417523620-4311-1-git-send-email-yadi.brar@samsung.com>
- <1417524339-4604-1-git-send-email-yadi.brar@samsung.com>
-Message-ID: <547DBFAD.30605@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 2 Dec 2014 14:34:32 +0100
+Subject: [PATCH] ARM: rockchip: Convert resume code to C
+In-Reply-To: <25485084.A6ydfR9Xle@wuerfel>
+References: <1417461694-5129-1-git-send-email-dianders@chromium.org>
+ <20141201225057.GA11285@n2100.arm.linux.org.uk>
+ <CAD=FV=VT7gr504-ZgWPfha+40XDX5eShkzZ36bg=-4Oub1S27w@mail.gmail.com>
+ <25485084.A6ydfR9Xle@wuerfel>
+Message-ID: <CACRpkdYd0=TBL3YFaZjn-dq1kH719SFSMG0aCRiRFbiTnxMxcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.12.2014 13:45, Yadwinder Singh Brar wrote:
-> rtc have different i2c client than power(pmic) block. So rtc device should
-> sit under its own i2c client in device hierarchy, which reflects in sysfs also.
-> This patch modifies code to register rtc cell with rtc->dev as parent.
-> 
-> Without this patch :
-> # ls /sys/class/i2c-adapter/i2c-0/0-0009/
-> driver         max77686-pmic  modalias       power          uevent
-> max77686-clk   max77686-rtc   name           subsystem
-> 
-> After applying patch :
-> # ls /sys/class/i2c-adapter/i2c-0/0-0006/
-> driver/        modalias       power/         uevent
-> max77686-rtc/  name           subsystem/
-> 
-> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> ---
-> 
-> Or Can we follow another (exhaustive but more cleaner) approach, which will
-> be more like code refactoring and cleanup rather than only fix:
-> Since rtc uses i2c client, which gets created using i2c_new_dummy() and is not
-> shared by any other cell of max77686. So we can covert rtc platform driver
-> itself to i2c client driver. It will also allow to expilicitly describe
-> max77686-rtc in DT which we can't do now.
-> It can be applicable to some other existing and new mfd pmic drivers.
-> Any suggestion/comments ?
+On Tue, Dec 2, 2014 at 10:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 01 December 2014 15:04:59 Doug Anderson wrote:
 
-Hi,
+>> Adding that code in assembly seems like a very, very bad idea.
+>> Certainly my patch could wait until the DDR code is ready to be posted
+>> upstream if that made sense.  One advantage of waiting is that it's
+>> possible that the DDR code might end up moving elsewhere if it made
+>> sense to have it part of a memory controller driver or something like
+>> that.
+(...)
+> AFAICT, the quantenna implementation is similar to the itcm/dtcm
+> stuff we already have (but are not using upstream), so I wonder
+> why we can't use that here too, see Documentation/arm/tcm.txt
 
-What kind of problem is solved by this patch?
+I agree. The TCM __tcm* macros to tag code and data for the TCM
+can be used by any mechanism by modifying mem_init() in
+arch/arm/mm/init.c
 
-Best regards,
-Krzysztof
+If the name is disturbing the __tcm* function can be renamed
+__onchip* simply.
 
+It will never work on multiplatform however, and if some real change
+shall come to that, something like Russ Dills patches and a
+generic approach to dynamic loading of onchip executables is
+needed.
 
-> 
-> ---
->  drivers/mfd/max77686.c |   22 ++++++++++++++++++++--
->  1 files changed, 20 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
-> index 929795e..22c0948 100644
-> --- a/drivers/mfd/max77686.c
-> +++ b/drivers/mfd/max77686.c
-> @@ -39,10 +39,13 @@
->  
->  static const struct mfd_cell max77686_devs[] = {
->  	{ .name = "max77686-pmic", },
-> -	{ .name = "max77686-rtc", },
->  	{ .name = "max77686-clk", },
->  };
->  
-> +static const struct mfd_cell max77686_rtc_dev[] = {
-> +	{ .name = "max77686-rtc", },
-> +};
-> +
->  static const struct mfd_cell max77802_devs[] = {
->  	{ .name = "max77802-pmic", },
->  	{ .name = "max77802-clk", },
-> @@ -332,14 +335,27 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
->  		goto err_del_irqc;
->  	}
->  
-> +	if (max77686->type == TYPE_MAX77686) {
-> +		ret = mfd_add_devices(&max77686->rtc->dev, -1, max77686_rtc_dev,
-> +			1, NULL, 0, NULL);
-> +		if (ret < 0) {
-> +			dev_err(&max77686->rtc->dev,
-> +				"failed to add RTC device %d\n", ret);
-> +			goto err_del_rtc_irqc;
-> +		}
-> +	}
-> +
->  	ret = mfd_add_devices(max77686->dev, -1, cells, n_devs, NULL, 0, NULL);
->  	if (ret < 0) {
->  		dev_err(&i2c->dev, "failed to add MFD devices: %d\n", ret);
-> -		goto err_del_rtc_irqc;
-> +		goto err_del_rtc_dev;
->  	}
->  
->  	return 0;
->  
-> +err_del_rtc_dev:
-> +	if (max77686->type == TYPE_MAX77686)
-> +		mfd_remove_devices(&max77686->rtc->dev);
->  err_del_rtc_irqc:
->  	regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
->  err_del_irqc:
-> @@ -356,6 +372,8 @@ static int max77686_i2c_remove(struct i2c_client *i2c)
->  	struct max77686_dev *max77686 = i2c_get_clientdata(i2c);
->  
->  	mfd_remove_devices(max77686->dev);
-> +	if (max77686->type == TYPE_MAX77686)
-> +		mfd_remove_devices(&max77686->rtc->dev);
->  
->  	regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
->  	regmap_del_irq_chip(max77686->irq, max77686->irq_data);
-> 
+I had hopes of replacing the TCM mechanism with that
+scheme, people also want to load onchip programs from
+userspace as it happens, that would be the right way to go.
+
+Yours,
+Linus Walleij
