@@ -1,164 +1,117 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 2 Dec 2014 16:05:44 -0700
-Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <1417541958-56907-4-git-send-email-lina.iyer@linaro.org>
-References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
- <1417541958-56907-4-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20141202230544.GG499@linaro.org>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Wed, 03 Dec 2014 08:15:33 +0900
+Subject: [PATCH v4 1/3] mmc: core: Support the optional init_card()
+ callback for MMC and SD
+In-Reply-To: <1417553397-460-2-git-send-email-dianders@chromium.org>
+References: <1417553397-460-1-git-send-email-dianders@chromium.org>
+ <1417553397-460-2-git-send-email-dianders@chromium.org>
+Message-ID: <547E4815.7010100@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02 2014 at 10:40 -0700, Lina Iyer wrote:
-+
-[...]
->+static int spm_dev_probe(struct platform_device *pdev)
->+{
->+	struct spm_driver_data *drv;
->+	struct resource *res;
->+	const struct of_device_id *match_id;
->+	void __iomem *addr;
->+	int cpu;
->+	struct cpuidle_device *dev;
->+
->+	drv = spm_get_drv(pdev, &cpu);
->+	if (!drv)
->+		return -EINVAL;
->+
->+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->+	drv->reg_base = devm_ioremap_resource(&pdev->dev, res);
->+	if (IS_ERR(drv->reg_base))
->+		return PTR_ERR(drv->reg_base);
->+
->+	match_id = of_match_node(spm_match_table, pdev->dev.of_node);
->+	if (!match_id)
->+		return -ENODEV;
->+
->+	drv->reg_data = match_id->data;
->+
->+	/* Write the SPM sequences first.. */
->+	addr = drv->reg_base + drv->reg_data->reg_offset[SPM_REG_SEQ_ENTRY];
->+	__iowrite32_copy(addr, drv->reg_data->seq,
->+			ARRAY_SIZE(drv->reg_data->seq) / 4);
->+
->+	/*
->+	 * ..and then the control registers.
->+	 * On some SoC if the control registers are written first and if the
->+	 * CPU was held in reset, the reset signal could trigger the SPM state
->+	 * machine, before the sequences are completely written.
->+	 */
->+	spm_register_write(drv, SPM_REG_CFG, drv->reg_data->spm_cfg);
->+	spm_register_write(drv, SPM_REG_DLY, drv->reg_data->spm_dly);
->+	spm_register_write(drv, SPM_REG_PMIC_DLY, drv->reg_data->pmic_dly);
->+	spm_register_write(drv, SPM_REG_PMIC_DATA_0,
->+				drv->reg_data->pmic_data[0]);
->+	spm_register_write(drv, SPM_REG_PMIC_DATA_1,
->+				drv->reg_data->pmic_data[1]);
->+
->+	per_cpu(cpu_spm_drv, cpu) = drv;
->+
->+	/* Register the cpuidle device for the cpu, we are ready for cpuidle */
->+	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
->+	if (!dev)
->+		return -ENOMEM;
->+
->+	dev->cpu = cpu;
->+	return cpuidle_register_device(dev);
->+}
->+
->+static struct qcom_cpu_pm_ops lpm_ops = {
->+	.standby = qcom_cpu_standby,
->+	.spc = qcom_cpu_spc,
->+};
->+
->+static struct platform_device qcom_cpuidle_drv = {
->+	.name	= "qcom_cpuidle",
->+	.id	= -1,
->+	.dev.platform_data = &lpm_ops,
->+};
->+
->+static struct platform_driver spm_driver = {
->+	.probe = spm_dev_probe,
->+	.driver = {
->+		.name = "saw",
->+		.of_match_table = spm_match_table,
->+	},
->+};
->+
->+static int __init qcom_spm_init(void)
->+{
->+	int ret;
->+
->+	/*
->+	 * cpuidle driver need to registered before the cpuidle device
->+	 * for any cpu. Register the device for the the cpuidle driver.
->+	 */
->+	ret = platform_device_register(&qcom_cpuidle_drv);
->+	if (ret)
->+		return ret;
-Stephen pointed out that we would have the platform device lying around
-on a non-QCOM device when using multi_v7_defconfig.
+Hi Doug.
 
-So instead of doing this here, we could do this in the probe..
+I think good that this patch is separated to two patches.
+(board file and codes relevant to mmc.)
 
- if (!cpuidle_get_driver()) {
-         int ret = platform_device_register(&qcom_cpuidle_drv);
-         if (ret)
-                 return ret;
- }
+Best Regards,
+Jaehoon Chung
 
-Would that be okay?
-
-The successful probe indicates that we are on a QCOM SoC, and we have not
-registered a cpuidle_driver before this.
-
-Thanks,
-Lina
-
->+
->+	return platform_driver_register(&spm_driver);
->+}
->+module_init(qcom_spm_init);
->+
->+MODULE_LICENSE("GPL v2");
->+MODULE_DESCRIPTION("SAW power controller driver");
->+MODULE_ALIAS("platform:saw");
->diff --git a/include/soc/qcom/pm.h b/include/soc/qcom/pm.h
->new file mode 100644
->index 0000000..d9a56d7
->--- /dev/null
->+++ b/include/soc/qcom/pm.h
->@@ -0,0 +1,31 @@
->+/*
->+ * Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
->+ *
->+ * This software is licensed under the terms of the GNU General Public
->+ * License version 2, as published by the Free Software Foundation, and
->+ * may be copied, distributed, and modified under those terms.
->+ *
->+ * This program is distributed in the hope that it will be useful,
->+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
->+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->+ * GNU General Public License for more details.
->+ *
->+ */
->+
->+#ifndef __QCOM_PM_H
->+#define __QCOM_PM_H
->+
->+enum pm_sleep_mode {
->+	PM_SLEEP_MODE_STBY,
->+	PM_SLEEP_MODE_RET,
->+	PM_SLEEP_MODE_SPC,
->+	PM_SLEEP_MODE_PC,
->+	PM_SLEEP_MODE_NR,
->+};
->+
->+struct qcom_cpu_pm_ops {
->+	int (*standby)(void *data);
->+	int (*spc)(void *data);
->+};
->+
->+#endif  /* __QCOM_PM_H */
->-- 
->2.1.0
->
+On 12/03/2014 05:49 AM, Doug Anderson wrote:
+> In (3fcb027 ARM: MXC: mxcmmc: work around a bug in the SDHC busy line
+> handling) the optional init_card() callback was added.  According to
+> the original change it was "for now only called from
+> mmc_sdio_init_card()".
+> 
+> This callback really ought to be called from the SD and MMC init
+> functions as well.  One current user of this callback
+> (mxcmci_init_card) will not work as expected if you insert an SDIO
+> card, then eject it and put a normal SD card in.  Specifically the
+> normal SD card will not get to run with 4-bit data.
+> 
+> I'd like to use the init_card() callback to handle a similar quirk on
+> dw_mmc when using SDIO Interrupts (the "low power" feature of the card
+> needs to be disabled), so that will add a second user of the function.
+> 
+> As part of this change fixup the one place that relied on the callback
+> only happening for SDIO cards.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Reviewed-by: Grant Grundler <grundler@chromium.org>
+> ---
+> Changes in v3:
+> - Add fixup to pandora_wl1251_init_card().
+> 
+> Changes in v2:
+> - mmc core change new for this version.
+> 
+>  arch/arm/mach-omap2/board-omap3pandora.c | 14 ++++++++------
+>  drivers/mmc/core/mmc.c                   |  6 ++++++
+>  drivers/mmc/core/sd.c                    |  7 ++++++-
+>  3 files changed, 20 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
+> index 7f17087..969e100 100644
+> --- a/arch/arm/mach-omap2/board-omap3pandora.c
+> +++ b/arch/arm/mach-omap2/board-omap3pandora.c
+> @@ -254,12 +254,14 @@ static void pandora_wl1251_init_card(struct mmc_card *card)
+>  	 * We have TI wl1251 attached to MMC3. Pass this information to
+>  	 * SDIO core because it can't be probed by normal methods.
+>  	 */
+> -	card->quirks |= MMC_QUIRK_NONSTD_SDIO;
+> -	card->cccr.wide_bus = 1;
+> -	card->cis.vendor = 0x104c;
+> -	card->cis.device = 0x9066;
+> -	card->cis.blksize = 512;
+> -	card->cis.max_dtr = 20000000;
+> +	if (card->type == MMC_TYPE_SDIO || card->type == MMC_TYPE_SD_COMBO) {
+> +		card->quirks |= MMC_QUIRK_NONSTD_SDIO;
+> +		card->cccr.wide_bus = 1;
+> +		card->cis.vendor = 0x104c;
+> +		card->cis.device = 0x9066;
+> +		card->cis.blksize = 512;
+> +		card->cis.max_dtr = 20000000;
+> +	}
+>  }
+>  
+>  static struct omap2_hsmmc_info omap3pandora_mmc[] = {
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index 02ad792..4a21d66 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1297,6 +1297,12 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+>  	}
+>  
+>  	/*
+> +	 * Call the optional HC's init_card function to handle quirks.
+> +	 */
+> +	if (host->ops->init_card)
+> +		host->ops->init_card(host, card);
+> +
+> +	/*
+>  	 * For native busses:  set card RCA and quit open drain mode.
+>  	 */
+>  	if (!mmc_host_is_spi(host)) {
+> diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
+> index d90a6de..29fccdc 100644
+> --- a/drivers/mmc/core/sd.c
+> +++ b/drivers/mmc/core/sd.c
+> @@ -933,6 +933,12 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
+>  	}
+>  
+>  	/*
+> +	 * Call the optional HC's init_card function to handle quirks.
+> +	 */
+> +	if (host->ops->init_card)
+> +		host->ops->init_card(host, card);
+> +
+> +	/*
+>  	 * For native busses:  get card RCA and quit open drain mode.
+>  	 */
+>  	if (!mmc_host_is_spi(host)) {
+> @@ -1271,4 +1277,3 @@ err:
+>  
+>  	return err;
+>  }
+> -
+> 
