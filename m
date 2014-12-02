@@ -1,584 +1,174 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 2 Dec 2014 17:16:58 +0100
-Subject: [STLinux Kernel] [PATCH v2 1/4] spi: Add new driver for
- STMicroelectronics' SPI Controller
-In-Reply-To: <1417534844-25080-2-git-send-email-lee.jones@linaro.org>
-References: <1417534844-25080-1-git-send-email-lee.jones@linaro.org>
- <1417534844-25080-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <547DE5FA.5000409@st.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 02 Dec 2014 16:24:53 +0000
+Subject: [PATCH v4 15/19] arm/arm64: KVM: add virtual GICv3 distributor
+ emulation
+In-Reply-To: <20141130083014.GA82106@macair>
+References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
+ <1415959683-26027-16-git-send-email-andre.przywara@arm.com>
+ <20141123143841.GB3401@cbox> <5473562E.7060303@arm.com>
+ <20141125104129.GC31297@cbox> <5478939B.8010103@arm.com>
+ <20141130083014.GA82106@macair>
+Message-ID: <547DE7D5.5020205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee
+Hej Christoffer,
 
-Some minors remarks below
+On 30/11/14 08:30, Christoffer Dall wrote:
+> On Fri, Nov 28, 2014 at 03:24:11PM +0000, Andre Przywara wrote:
+>> Hej Christoffer,
+>>
+>> On 25/11/14 10:41, Christoffer Dall wrote:
+>>> Hi Andre,
+>>>
+>>> On Mon, Nov 24, 2014 at 04:00:46PM +0000, Andre Przywara wrote:
+>>>
+>>
 
-Thanks
+[...]
 
-On 12/02/2014 04:40 PM, Lee Jones wrote:
-> This patch adds support for the SPI portion of ST's SSC device.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   drivers/spi/Kconfig       |   7 +
->   drivers/spi/Makefile      |   1 +
->   drivers/spi/spi-st-ssc4.c | 509 ++++++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 517 insertions(+)
->   create mode 100644 drivers/spi/spi-st-ssc4.c
->
-> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-> index 84e7c9e..bd0a10f 100644
-> --- a/drivers/spi/Kconfig
-> +++ b/drivers/spi/Kconfig
-> @@ -488,6 +488,13 @@ config SPI_SIRF
->   	help
->   	  SPI driver for CSR SiRFprimaII SoCs
->   
-> +config SPI_ST_SSC4
-> +	tristate "STMicroelectronics SPI SSC-based driver"
-> +	depends on ARCH_STI || COMPILE_TEST
-> +	help
-> +	  STMicroelectronics SoCs support for SPI. If you say yes to
-> +	  this option, support will be included for the SSC driven SPI.
-> +
->   config SPI_SUN4I
->   	tristate "Allwinner A10 SoCs SPI controller"
->   	depends on ARCH_SUNXI || COMPILE_TEST
-> diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
-> index 78f24ca..c38e28c 100644
-> --- a/drivers/spi/Makefile
-> +++ b/drivers/spi/Makefile
-> @@ -74,6 +74,7 @@ obj-$(CONFIG_SPI_SH_HSPI)		+= spi-sh-hspi.o
->   obj-$(CONFIG_SPI_SH_MSIOF)		+= spi-sh-msiof.o
->   obj-$(CONFIG_SPI_SH_SCI)		+= spi-sh-sci.o
->   obj-$(CONFIG_SPI_SIRF)		+= spi-sirf.o
-> +obj-$(CONFIG_SPI_ST_SSC4)		+= spi-st-ssc4.o
->   obj-$(CONFIG_SPI_SUN4I)			+= spi-sun4i.o
->   obj-$(CONFIG_SPI_SUN6I)			+= spi-sun6i.o
->   obj-$(CONFIG_SPI_TEGRA114)		+= spi-tegra114.o
-> diff --git a/drivers/spi/spi-st-ssc4.c b/drivers/spi/spi-st-ssc4.c
-> new file mode 100644
-> index 0000000..566d86c
-> --- /dev/null
-> +++ b/drivers/spi/spi-st-ssc4.c
-> @@ -0,0 +1,509 @@
-> +/*
-> + *  Copyright (c) 2008-2014 STMicroelectronics Limited
-> + *
-> + *  Author: Angus Clark <Angus.Clark@st.com>
-> + *          Patrice Chotard <patrice.chotard@st.com>
-> + *          Lee Jones <lee.jones@linaro.org>
-> + *
-> + *  SPI master mode controller driver, used in STMicroelectronics devices.
-> + *
-> + *  May be copied or modified under the terms of the GNU General Public
-> + *  License Version 2.0 only.  See linux/COPYING for more information.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/pm_runtime.h>
-> +#include <linux/spi/spi.h>
-> +#include <linux/spi/spi_bitbang.h>
-> +
-> +/* SSC registers */
-> +#define SSC_BRG				0x000
-> +#define SSC_TBUF			0x004
-> +#define SSC_RBUF			0x008
-> +#define SSC_CTL				0x00C
-> +#define SSC_IEN				0x010
-> +#define SSC_I2C				0x018
-> +
-> +/* SSC Control */
-> +#define SSC_CTL_DATA_WIDTH_9		0x8
-> +#define SSC_CTL_DATA_WIDTH_MSK		0xf
-> +#define SSC_CTL_BM			0xf
-> +#define SSC_CTL_HB			BIT(4)
-> +#define SSC_CTL_PH			BIT(5)
-> +#define SSC_CTL_PO			BIT(6)
-> +#define SSC_CTL_SR			BIT(7)
-> +#define SSC_CTL_MS			BIT(8)
-> +#define SSC_CTL_EN			BIT(9)
-> +#define SSC_CTL_LPB			BIT(10)
-> +#define SSC_CTL_EN_TX_FIFO		BIT(11)
-> +#define SSC_CTL_EN_RX_FIFO		BIT(12)
-> +#define SSC_CTL_EN_CLST_RX		BIT(13)
-> +
-> +/* SSC Interrupt Enable */
-> +#define SSC_IEN_TEEN			BIT(2)
-> +
-> +#define FIFO_SIZE			8
-> +
-> +struct spi_st {
-> +	/* SSC SPI Controller */
-> +	void __iomem		*base;
-> +	struct clk		*clk;
-> +	struct device		*dev;
-> +
-> +	/* SSC SPI current transaction */
-> +	const u8		*tx_ptr;
-> +	u8			*rx_ptr;
-> +	u16			bytes_per_word;
-> +	unsigned int		words_remaining;
-> +	unsigned int		baud;
-> +	struct completion	done;
-> +};
-> +
-> +static int spi_st_clk_enable(struct spi_st *spi_st)
-> +{
-> +	/*
-> +	 * Current platforms use one of the core clocks for SPI and I2C.
-> +	 * If we attempt to disable the clock, the system will hang.
-> +	 *
-> +	 * TODO: Remove this when platform supports power domains.
-> +	 */
-> +	return 0;
-> +
-> +	return clk_prepare_enable(spi_st->clk);
-> +}
-> +
-> +static void spi_st_clk_disable(struct spi_st *spi_st)
-> +{
-> +	/*
-> +	 * Current platforms use one of the core clocks for SPI and I2C.
-> +	 * If we attempt to disable the clock, the system will hang.
-> +	 *
-> +	 * TODO: Remove this when platform supports power domains.
-> +	 */
-> +	return;
-> +
-> +	clk_disable_unprepare(spi_st->clk);
-> +}
-> +
-> +/* Load the TX FIFO */
-> +static void ssc_write_tx_fifo(struct spi_st *spi_st)
-> +{
-> +	unsigned int count, i;
-> +	uint32_t word = 0;
-> +
-> +	if (spi_st->words_remaining > FIFO_SIZE)
-> +		count = FIFO_SIZE;
-> +	else
-> +		count = spi_st->words_remaining;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		if (spi_st->tx_ptr) {
-> +			if (spi_st->bytes_per_word == 1) {
-> +				word = *spi_st->tx_ptr++;
-> +			} else {
-> +				word = *spi_st->tx_ptr++;
-> +				word = *spi_st->tx_ptr++ | (word << 8);
-> +			}
-> +		}
-> +		writel_relaxed(word, spi_st->base + SSC_TBUF);
-> +	}
-> +}
-> +
-> +/* Read the RX FIFO */
-> +static void ssc_read_rx_fifo(struct spi_st *spi_st)
-> +{
-> +	unsigned int count, i;
-> +	uint32_t word = 0;
-> +
-> +	if (spi_st->words_remaining > FIFO_SIZE)
-> +		count = FIFO_SIZE;
-> +	else
-> +		count = spi_st->words_remaining;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		word = readl_relaxed(spi_st->base + SSC_RBUF);
-> +
-> +		if (spi_st->rx_ptr) {
-> +			if (spi_st->bytes_per_word == 1) {
-> +				*spi_st->rx_ptr++ = (uint8_t)word;
-> +			} else {
-> +				*spi_st->rx_ptr++ = (word >> 8);
-> +				*spi_st->rx_ptr++ = word & 0xff;
-> +			}
-> +		}
-> +	}
-> +	spi_st->words_remaining -= count;
-> +}
-> +
-> +static int spi_st_transfer_one(struct spi_master *master,
-> +			       struct spi_device *spi, struct spi_transfer *t)
-> +{
-> +	struct spi_st *spi_st = spi_master_get_devdata(master);
-> +	uint32_t ctl = 0;
-> +
-> +	/* Setup transfer */
-> +	spi_st->tx_ptr = t->tx_buf;
-> +	spi_st->rx_ptr = t->rx_buf;
-> +
-> +	if (spi->bits_per_word > 8) {
-> +		/*
-> +		 * Anything greater than 8 bits-per-word requires 2
-> +		 * bytes-per-word in the RX/TX buffers
-> +		 */
-> +		spi_st->bytes_per_word = 2;
-> +		spi_st->words_remaining = t->len / 2;
-> +
-> +	} else if (spi->bits_per_word == 8 && !(t->len & 0x1)) {
-> +		/*
-> +		 * If transfer is even-length, and 8 bits-per-word, then
-> +		 * implement as half-length 16 bits-per-word transfer
-> +		 */
-> +		spi_st->bytes_per_word = 2;
-> +		spi_st->words_remaining = t->len/2;
+>>>>>> +
+>>>>>> +     if (!is_in_range(mmio->phys_addr, mmio->len, rdbase,
+>>>>>> +         GIC_V3_REDIST_SIZE * nrcpus))
+>>>>>> +             return false;
+>>>>>
+>>>>> Did you think more about the contiguous allocation issue here or can you
+>>>>> give me a pointer to the requirement in the spec?
+>>>>
+>>>> 5.4.1 Re-Distributor Addressing
+>>>>
+>>>
+>>> Section 5.4.1 talks about the pages within a single re-distributor having
+>>> to be contiguous, not all the re-deistributor regions having to be
+>>> contiguous, right?
+>>
+>> Ah yes, you are right. But I still think it does not matter:
+>> 1) We are "implementing" the GICv3. So as the spec does not forbid this,
+>> we just state that the redistributor register maps for each VCPU are
+>> contiguous. Also we create the FDT accordingly. I will add a comment in
+>> the documentation to state this.
+>>
+>> 2) The kernel's GICv3 DT bindings assume this allocation is the default.
+>> Although Marc added bindings to work around this (stride), it seems much
+>> more logical to me to not use it.
+> 
+> I don't disagree (and never have) with the fact that it is up to us to
+> decide.
+> 
+> My original question, which we haven't talked about yet, is if it is
+> *reasonable* to assume that all re-distributor regions will always be
+> contiguous?
+> 
+> How will you handle VCPU hotplug for example?
 
-add space around "/"
+As kvmtool does not support hotplug, I haven't thought about this yet.
+To me it looks like userland should just use maxcpus for the allocation.
+If I get the current QEMU code right, there is room for 127 GICv3 VCPUs
+(2*64K per VCPU + 64K for the distributor in 16M space) at the moment.
+Kvmtool uses a different mapping, which allows to share 1G with virtio,
+so the limit is around 8000ish VCPUs here.
+Are there any issues with changing the QEMU virt mapping later?
+Migration, maybe?
+If the UART, the RTC and the virtio regions are moved more towards the
+beginning of the 256MB PCI mapping, then there should be space for a bit
+less than 1024 VCPUs, if I get this right.
 
-> +
-> +		/* Set SSC_CTL to 16 bits-per-word */
-> +		ctl = readl_relaxed(spi_st->base + SSC_CTL);
-> +		writel_relaxed((ctl | 0xf), spi_st->base + SSC_CTL);
-> +
-> +		readl_relaxed(spi_st->base + SSC_RBUF);
-> +
-> +	} else {
-> +		spi_st->bytes_per_word = 1;
-> +		spi_st->words_remaining = t->len;
-> +	}
-> +
-> +	reinit_completion(&spi_st->done);
-> +
-> +	/* Start transfer by writing to the TX FIFO */
-> +	ssc_write_tx_fifo(spi_st);
-> +	writel_relaxed(SSC_IEN_TEEN, spi_st->base + SSC_IEN);
-> +
-> +	/* Wait for transfer to complete */
-> +	wait_for_completion(&spi_st->done);
-> +
-> +	/* Restore SSC_CTL if necessary */
-> +	if (ctl)
-> +		writel_relaxed(ctl, spi_st->base + SSC_CTL);
-> +
-> +	spi_finalize_current_transfer(spi->master);
-> +
-> +	return t->len;
-> +}
-> +
-> +static void spi_st_cleanup(struct spi_device *spi)
-> +{
-> +	int cs = spi->cs_gpio;
-> +
-> +	if (gpio_is_valid(cs))
-> +		devm_gpio_free(&spi->dev, cs);
-> +}
-> +
-> +/* the spi->mode bits understood by this driver: */
-> +#define MODEBITS  (SPI_CPOL | SPI_CPHA | SPI_LSB_FIRST | SPI_LOOP | SPI_CS_HIGH)
-> +static int spi_st_setup(struct spi_device *spi)
-> +{
-> +	struct spi_st *spi_st = spi_master_get_devdata(spi->master);
-> +	u32 spi_st_clk, sscbrg, var;
-> +	u32 hz = spi->max_speed_hz;
-> +	int cs = spi->cs_gpio;
-> +	int ret;
-> +
-> +	if (spi->mode & ~MODEBITS) {
-> +		dev_err(&spi->dev, "unsupported mode bits 0x%x\n",
-> +			spi->mode & ~MODEBITS);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (!hz)  {
-> +		dev_err(&spi->dev, "max_speed_hz unspecified\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (!gpio_is_valid(cs)) {
-> +		dev_err(&spi->dev, "%d is not a valid gpio\n", cs);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (devm_gpio_request(&spi->dev, cs, dev_name(&spi->dev))) {
-> +		dev_err(&spi->dev, "could not request gpio:%d\n", cs);
-> +		return -EINVAL;
-> +	}
-> +
-> +	ret = gpio_direction_output(cs, spi->mode & SPI_CS_HIGH);
-> +	if (ret)
-> +		return ret;
-> +
-> +	spi_st_clk = clk_get_rate(spi_st->clk);
-> +
-> +	/* Set SSC_BRF */
-> +	sscbrg = spi_st_clk / (2 * hz);
-> +	if (sscbrg < 0x07 || sscbrg > (0x1 << 16)) {
+> Where in the guest
+> physical memory map of our various virt machines should these regions
+> sit so that we can allocate anough re-distributors for VCPUs etc.?
 
-(0x1 << 16) can be replaced by BIT(16)
+Various? Are there other mappings than those described in hw/arm/virt.c?
 
+> I just want to make sure we're not limiting ourselves by some amount of
+> functionality or ABI (redistributor base addresses) that will be hard to
+> expand in the future.
 
+If we are flexible with the mapping at VM creation time, QEMU could just
+use a mapping depending on max_cpus:
+< 128 VCPUs: use the current mapping
+128 <= x < 1020: use a more compressed mapping
+>= 1020: map the redistributor somewhere above 4 GB
 
-> +		dev_err(&spi->dev,
-> +			"baudrate %d outside valid range %d\n", sscbrg, hz);
-> +		return -EINVAL;
-> +	}
-> +
-> +	spi_st->baud = spi_st_clk / (2 * sscbrg);
-> +	if (sscbrg == (0x1 << 16)) /* 16-bit counter wraps */
+As the device tree binding for GICv3 just supports a stride value, we
+don't have any other real options beside this, right? So how I see this,
+a contiguous mapping (with possible holes) is the only way.
 
-ditto
+>>>>>> +
+>>>>>> +static int vgic_v3_init(struct kvm *kvm, const struct vgic_params *params)
+>>>>>> +{
+>>>>>> +     struct vgic_dist *dist = &kvm->arch.vgic;
+>>>>>> +     int ret, i;
+>>>>>> +     u32 mpidr;
+>>>>>> +
+>>>>>> +     if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) ||
+>>>>>> +         IS_VGIC_ADDR_UNDEF(dist->vgic_redist_base)) {
+>>>>>> +             kvm_err("Need to set vgic distributor addresses first\n");
+>>>>>> +             return -ENXIO;
+>>>>>> +     }
+>>>>>> +
+>>>>>> +     /*
+>>>>>> +      * FIXME: this should be moved to init_maps time, and may bite
+>>>>>> +      * us when adding save/restore. Add a per-emulation hook?
+>>>>>> +      */
+>>>>>
+>>>>> progress on this fixme?
+>>>>
+>>>> Progress supplies the ISS, but not this piece of code (read: none) ;-)
+>>>> I am more in favour of a follow-up patch on this one ...
+>>>
+>>> hmmm, I'm not a fan of merging code with this kind of a comment in it,
+>>> because it looks scary, and I dont' really understand the problem from
+>>> just reading the comment, so something needs to be done here.
+>>
+>> I see. What about we are moving this unconditionally into vgic_init_maps
+>> and allocate it for both v2 and v3 guests and get rid of the whole
+>> function? It allocates only memory for the irq_spi_mpidr, which is 4
+>> bytes per configured SPI (so at most less than 4 KB, but usually just
+>> 128 Bytes per guest). This would be a pretty quick solution. Does that
+>> sound too hackish?
+>>
+>> After your comments about the per-VM ops function pointers I am a bit
+>> reluctant to introduce another one (which would be the obvious way
+>> following the comment) for just this simple kalloc().
+>> On the other hand the ITS emulation may later make better use of a GICv3
+>> specific allocation function.
+> 
+> What I really disliked was the configuration of a function pointer,
+> which, when invoked, configured other function pointers.  That just made
+> my head spin.  So adding another per-gic-model init_maps method is not
+> that bad, but on the other hand, the only problem with keeping this here
+> is that when we restore the vgic state, then user space wants to be able
+> to populate all the date before running any VCPUs, and we don't create
+> the data structures before the first VCPU is run.
+> 
+> However, Eric has a problem with this "init-when-we-run-the-first-VCPU"
+> approach as well, so one argument is that we need to add a method to
+> both the gicv2 and gicv3 device API to say "VGIC_INIT" which userspace
+> can call after having created all the VCPUs.  And, in fact, we may want
+> to enforce this for the gicv3 right now and only maintain the existing
+> behavior for gicv2.
+> 
+> (Eric's use case is configuring IRQFD, which must logically be done
+> before running the machine, but also needs to be done after the vgic is
+> fully ready.).
+> 
+> Does this make sense?
 
-> +		sscbrg = 0x0;
-> +
-> +	writel_relaxed(sscbrg, spi_st->base + SSC_BRG);
-> +
-> +	dev_dbg(&spi->dev,
-> +		"setting baudrate:target= %u hz, actual= %u hz, sscbrg= %u\n",
-> +		hz, spi_st->baud, sscbrg);
-> +
-> +	 /* Set SSC_CTL and enable SSC */
-> +	 var = readl_relaxed(spi_st->base + SSC_CTL);
-> +	 var |= SSC_CTL_MS;
-> +
-> +	 if (spi->mode & SPI_CPOL)
-> +		var |= SSC_CTL_PO;
-> +	 else
-> +		var &= ~SSC_CTL_PO;
-> +
-> +	 if (spi->mode & SPI_CPHA)
-> +		var |= SSC_CTL_PH;
-> +	 else
-> +		var &= ~SSC_CTL_PH;
-> +
-> +	 if ((spi->mode & SPI_LSB_FIRST) == 0)
-> +		var |= SSC_CTL_HB;
-> +	 else
-> +		var &= ~SSC_CTL_HB;
-> +
-> +	 if (spi->mode & SPI_LOOP)
-> +		var |= SSC_CTL_LPB;
-> +	 else
-> +		var &= ~SSC_CTL_LPB;
-> +
-> +	 var &= ~SSC_CTL_DATA_WIDTH_MSK;
-> +	 var |= (spi->bits_per_word - 1);
-> +
-> +	 var |= SSC_CTL_EN_TX_FIFO | SSC_CTL_EN_RX_FIFO;
-> +	 var |= SSC_CTL_EN;
-> +
-> +	 writel_relaxed(var, spi_st->base + SSC_CTL);
-> +
-> +	 /* Clear the status register */
-> +	 readl_relaxed(spi_st->base + SSC_RBUF);
-> +
-> +	 return 0;
-> +}
-> +
-> +/* Interrupt fired when TX shift register becomes empty */
-> +static irqreturn_t spi_st_irq(int irq, void *dev_id)
-> +{
-> +	struct spi_st *spi_st = (struct spi_st *)dev_id;
-> +
-> +	/* Read RX FIFO */
-> +	ssc_read_rx_fifo(spi_st);
-> +
-> +	/* Fill TX FIFO */
-> +	if (spi_st->words_remaining) {
-> +		ssc_write_tx_fifo(spi_st);
-> +	} else {
-> +		/* TX/RX complete */
-> +		writel_relaxed(0x0, spi_st->base + SSC_IEN);
-> +		/*
-> +		 * read SSC_IEN to ensure that this bit is set
-> +		 * before re-enabling interrupt
-> +		 */
-> +		readl(spi_st->base + SSC_IEN);
-> +		complete(&spi_st->done);
-> +	}
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int spi_st_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct spi_master *master;
-> +	struct resource *res;
-> +	struct spi_st *spi_st;
-> +	int irq, ret = 0;
-> +	u32 var;
-> +
-> +	master = spi_alloc_master(&pdev->dev, sizeof(*spi_st));
-> +	if (!master)
-> +		return -ENOMEM;
-> +
-> +	master->dev.of_node		= np;
-> +	master->mode_bits		= MODEBITS;
-> +	master->setup			= spi_st_setup;
-> +	master->cleanup			= spi_st_cleanup;
-> +	master->transfer_one		= spi_st_transfer_one;
-> +	master->bits_per_word_mask	= SPI_BPW_MASK(8) | SPI_BPW_MASK(16);
-> +	master->auto_runtime_pm		= true;
-> +	master->bus_num			= pdev->id;
-> +	spi_st				= spi_master_get_devdata(master);
-> +
-> +	spi_st->clk = devm_clk_get(&pdev->dev, "ssc");
-> +	if (IS_ERR(spi_st->clk)) {
-> +		dev_err(&pdev->dev, "Unable to request clock\n");
-> +		return PTR_ERR(spi_st->clk);
-> +	}
-> +
-> +	ret = spi_st_clk_enable(spi_st);
-> +	if (ret)
-> +		return ret;
-> +
-> +	init_completion(&spi_st->done);
-> +
-> +	/* Get resources */
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	spi_st->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(spi_st->base)) {
-> +		ret = PTR_ERR(spi_st->base);
-> +		goto clk_disable;
-> +	}
-> +
-> +	/* Disable I2C and Reset SSC */
-> +	writel_relaxed(0x0, spi_st->base + SSC_I2C);
-> +	var = readw_relaxed(spi_st->base + SSC_CTL);
-> +	var |= SSC_CTL_SR;
-> +	writel_relaxed(var, spi_st->base + SSC_CTL);
-> +
-> +	udelay(1);
-> +	var = readl_relaxed(spi_st->base + SSC_CTL);
-> +	var &= ~SSC_CTL_SR;
-> +	writel_relaxed(var, spi_st->base + SSC_CTL);
-> +
-> +	/* Set SSC into slave mode before reconfiguring PIO pins */
-> +	var = readl_relaxed(spi_st->base + SSC_CTL);
-> +	var &= ~SSC_CTL_MS;
-> +	writel_relaxed(var, spi_st->base + SSC_CTL);
-> +
-> +	irq = irq_of_parse_and_map(np, 0);
-> +	if (!irq) {
-> +		dev_err(&pdev->dev, "IRQ missing or invalid\n");
-> +		ret = -EINVAL;
-> +		goto clk_disable;
-> +	}
-> +
-> +	ret = devm_request_irq(&pdev->dev, irq, spi_st_irq, 0,
-> +			       pdev->name, spi_st);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed to request irq %d\n", irq);
-> +		goto clk_disable;
-> +	}
-> +
-> +	/* by default the device is on */
-> +	pm_runtime_set_active(&pdev->dev);
-> +	pm_runtime_enable(&pdev->dev);
-> +
-> +	platform_set_drvdata(pdev, master);
-> +
-> +	ret = devm_spi_register_master(&pdev->dev, master);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed to register master\n");
-> +		goto clk_disable;
-> +	}
-> +
-> +	return 0;
-> +
-> +clk_disable:
-> +	spi_st_clk_disable(spi_st);
-> +
-> +	return ret;
-> +}
-> +
-> +static int spi_st_remove(struct platform_device *pdev)
-> +{
-> +	struct spi_master *master = platform_get_drvdata(pdev);
-> +	struct spi_st *spi_st = spi_master_get_devdata(master);
-> +
-> +	spi_st_clk_disable(spi_st);
-> +
-> +	pinctrl_pm_select_sleep_state(&pdev->dev);
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_PM
-> +static int spi_st_runtime_suspend(struct device *dev)
-> +{
-> +	struct spi_master *master = dev_get_drvdata(dev);
-> +	struct spi_st *spi_st = spi_master_get_devdata(master);
-> +
-> +	writel_relaxed(0, spi_st->base + SSC_IEN);
-> +	pinctrl_pm_select_sleep_state(dev);
-> +
-> +	spi_st_clk_disable(spi_st);
-> +
-> +	return 0;
-> +}
-> +
-> +static int spi_st_runtime_resume(struct device *dev)
-> +{
-> +	struct spi_master *master = dev_get_drvdata(dev);
-> +	struct spi_st *spi_st = spi_master_get_devdata(master);
-> +	int ret;
-> +
-> +	ret = spi_st_clk_enable(spi_st);
-> +	pinctrl_pm_select_default_state(dev);
-> +
-> +	return ret;
-> +}
-> +#endif
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int spi_st_suspend(struct device *dev)
-> +{
-> +	struct spi_master *master = dev_get_drvdata(dev);
-> +	int ret;
-> +
-> +	ret = spi_master_suspend(master);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return pm_runtime_force_suspend(dev);
-> +}
-> +
-> +static int spi_st_resume(struct device *dev)
-> +{
-> +	struct spi_master *master = dev_get_drvdata(dev);
-> +	int ret;
-> +
-> +	ret = spi_master_resume(master);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return pm_runtime_force_resume(dev);
-> +}
-> +#endif
-> +
-> +static const struct dev_pm_ops spi_st_pm = {
-> +	SET_SYSTEM_SLEEP_PM_OPS(spi_st_suspend, spi_st_resume)
-> +	SET_RUNTIME_PM_OPS(spi_st_runtime_suspend, spi_st_runtime_resume, NULL)
-> +};
-> +
-> +static struct of_device_id stm_spi_match[] = {
-> +	{ .compatible = "st,comms-ssc4-spi", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, stm_spi_match);
-> +
-> +static struct platform_driver spi_st_driver = {
-> +	.driver = {
-> +		.name = "spi-st",
-> +		.pm = &spi_st_pm,
-> +		.of_match_table = of_match_ptr(stm_spi_match),
-> +	},
-> +	.probe = spi_st_probe,
-> +	.remove = spi_st_remove,
-> +};
-> +module_platform_driver(spi_st_driver);
-> +
-> +MODULE_AUTHOR("Patrice Chotard <patrice.chotard@st.com>");
-> +MODULE_DESCRIPTION("STM SSC SPI driver");
-> +MODULE_LICENSE("GPL v2");
+So if we would avoid that spooky "detect-if-a-VCPU-has-run" code and
+rely on an explicit ioctl, I am in favor for this. We would need to keep
+the current approach for compatibility, though, right?
+
+So what about we either keep the current GICv3 allocation as it stands
+in my patches right now (or move the GICv3 specific part into the
+general vgic_init_maps()) and adapt that to the VGIC_INIT call once that
+has appeared (or even handle this in that series then).
+
+Does that make sense? What is the time frame for that VGIC_INIT call?
+
+> We could consider scheduling a call for this if you think that would be
+> helpful.
+
+Depends on your answer to the above ;-)
+
+Cheers,
+Andre.
