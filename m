@@ -1,123 +1,156 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 02 Dec 2014 17:32:45 +0000
-Subject: [PATCH v4 15/19] arm/arm64: KVM: add virtual GICv3 distributor
- emulation
-In-Reply-To: <547DF181.8060402@arm.com>
-References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
- <1415959683-26027-16-git-send-email-andre.przywara@arm.com>
- <20141123143841.GB3401@cbox> <5473562E.7060303@arm.com>
- <20141125104129.GC31297@cbox> <5478939B.8010103@arm.com>
- <20141130083014.GA82106@macair> <547DE7D5.5020205@arm.com>
- <547DF181.8060402@arm.com>
-Message-ID: <547DF7BD.1000503@arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 2 Dec 2014 09:36:00 -0800
+Subject: [PATCH] ARM: rockchip: Convert resume code to C
+In-Reply-To: <25485084.A6ydfR9Xle@wuerfel>
+References: <1417461694-5129-1-git-send-email-dianders@chromium.org>
+ <20141201225057.GA11285@n2100.arm.linux.org.uk>
+ <CAD=FV=VT7gr504-ZgWPfha+40XDX5eShkzZ36bg=-4Oub1S27w@mail.gmail.com>
+ <25485084.A6ydfR9Xle@wuerfel>
+Message-ID: <CAD=FV=UFWZEcbO2ty0m+qEGv4Xgq0N=Rs30wBgw=6+OGd5gSpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/14 17:06, Marc Zyngier wrote:
-> On 02/12/14 16:24, Andre Przywara wrote:
->> Hej Christoffer,
->>
->> On 30/11/14 08:30, Christoffer Dall wrote:
->>> On Fri, Nov 28, 2014 at 03:24:11PM +0000, Andre Przywara wrote:
->>>> Hej Christoffer,
->>>>
->>>> On 25/11/14 10:41, Christoffer Dall wrote:
->>>>> Hi Andre,
->>>>>
->>>>> On Mon, Nov 24, 2014 at 04:00:46PM +0000, Andre Przywara wrote:
->>>>>
->>>>
->>
->> [...]
->>
->>>>>>>> +
->>>>>>>> +     if (!is_in_range(mmio->phys_addr, mmio->len, rdbase,
->>>>>>>> +         GIC_V3_REDIST_SIZE * nrcpus))
->>>>>>>> +             return false;
->>>>>>>
->>>>>>> Did you think more about the contiguous allocation issue here or can you
->>>>>>> give me a pointer to the requirement in the spec?
->>>>>>
->>>>>> 5.4.1 Re-Distributor Addressing
->>>>>>
->>>>>
->>>>> Section 5.4.1 talks about the pages within a single re-distributor having
->>>>> to be contiguous, not all the re-deistributor regions having to be
->>>>> contiguous, right?
->>>>
->>>> Ah yes, you are right. But I still think it does not matter:
->>>> 1) We are "implementing" the GICv3. So as the spec does not forbid this,
->>>> we just state that the redistributor register maps for each VCPU are
->>>> contiguous. Also we create the FDT accordingly. I will add a comment in
->>>> the documentation to state this.
->>>>
->>>> 2) The kernel's GICv3 DT bindings assume this allocation is the default.
->>>> Although Marc added bindings to work around this (stride), it seems much
->>>> more logical to me to not use it.
->>>
->>> I don't disagree (and never have) with the fact that it is up to us to
->>> decide.
->>>
->>> My original question, which we haven't talked about yet, is if it is
->>> *reasonable* to assume that all re-distributor regions will always be
->>> contiguous?
->>>
->>> How will you handle VCPU hotplug for example?
->>
->> As kvmtool does not support hotplug, I haven't thought about this yet.
->> To me it looks like userland should just use maxcpus for the allocation.
->> If I get the current QEMU code right, there is room for 127 GICv3 VCPUs
->> (2*64K per VCPU + 64K for the distributor in 16M space) at the moment.
->> Kvmtool uses a different mapping, which allows to share 1G with virtio,
->> so the limit is around 8000ish VCPUs here.
->> Are there any issues with changing the QEMU virt mapping later?
->> Migration, maybe?
->> If the UART, the RTC and the virtio regions are moved more towards the
->> beginning of the 256MB PCI mapping, then there should be space for a bit
->> less than 1024 VCPUs, if I get this right.
->>
->>> Where in the guest
->>> physical memory map of our various virt machines should these regions
->>> sit so that we can allocate anough re-distributors for VCPUs etc.?
->>
->> Various? Are there other mappings than those described in hw/arm/virt.c?
->>
->>> I just want to make sure we're not limiting ourselves by some amount of
->>> functionality or ABI (redistributor base addresses) that will be hard to
->>> expand in the future.
->>
->> If we are flexible with the mapping at VM creation time, QEMU could just
->> use a mapping depending on max_cpus:
->> < 128 VCPUs: use the current mapping
->> 128 <= x < 1020: use a more compressed mapping
->>> = 1020: map the redistributor somewhere above 4 GB
->>
->> As the device tree binding for GICv3 just supports a stride value, we
->> don't have any other real options beside this, right? So how I see this,
->> a contiguous mapping (with possible holes) is the only way.
-> 
-> Not really. The GICv3 binding definitely supports having several regions
-> for the redistributors (see the binding documentation). This allows for
-> the pathological case where you have N regions for N CPUs. Not that we
-> ever want to go there, really.
+Hi,
 
-Ah yes, thanks for pointing that out. I was mixing this up with the
-stride parameter, which is independent of this. Sorry for that.
+On Tue, Dec 2, 2014 at 1:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 01 December 2014 15:04:59 Doug Anderson wrote:
+>> Russel,
+>>
+>> On Mon, Dec 1, 2014 at 2:50 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > What I see here is a load of complexity which achieves very little.
+>> > The result doesn't get rid of much assembly, but it does make stuff
+>> > more complicated.  And the diffstat speaks volumes about this:
+>> >
+>> >  10 files changed, 275 insertions(+), 94 deletions(-)
+>> >
+>> > There's a lot of words in the description, but it's missing the most
+>> > important bit: why do we want to take this approach - what benefits
+>> > does it bring?
+>>
+>> Sure.  I guess the most important words in the description are:
+>>
+>> > We convert the existing assembly resume code into C as proof that this
+>> > works and to prepare for linking in SDRAM reinit code.
+>>
+>> I can't say that the SDRAM reinit code is ready for prime time yet,
+>> but you can get a preview of what it could look like at:
+>>
+>> https://chromium-review.googlesource.com/#/c/227366/25/arch/arm/mach-rockchip/embedded/rk3288_ddr_resume.c
+>>
+>> Adding that code in assembly seems like a very, very bad idea.
+>> Certainly my patch could wait until the DDR code is ready to be posted
+>> upstream if that made sense.  One advantage of waiting is that it's
+>> possible that the DDR code might end up moving elsewhere if it made
+>> sense to have it part of a memory controller driver or something like
+>> that.
+>
+> I recently looked at another vendor tree (quantenna wifi access point,
+> based on arch/arc), which was putting arbitrary functions into SRAM
+> for performance reasons, in their case the entire hot path for network
+> switching. Having at least the infrastructure to do this seems like
+> a great idea, even though it's very hard to do in a general-purpose
+> kernel, as you'd have a hard time squeezing as much code as possible
+> into the available SRAM.
 
-So from a userland point of view we probably would like to have the
-first n VCPU's redistributors mapped at their current places and allow
-for more VCPUs to use memory above 4 GB.
-Which would require quite some changes to the code to support this in a
-very flexible way. I think this could be much easier if we confine
-ourselves to two regions (one contiguous lower (< 4 GB) and one
-contiguous upper region (>4 GB)), so we don't need to support arbitrary
-per VCPU addresses, but could just use the 1st or 2nd map depending on
-the VCPU number.
-Is this too hackish?
-If not, I would add another vgic_addr type (like
-KVM_VGIC_V3_ADDR_TYPE_REDIST_UPPER or so) to be used from userland and
-use that in the handle_mmio region detection.
-Let me know if that sounds reasonable.
+I'm always a fan of seeing general infrastructure introduced, though
+we always need to make sure that the general infrastructure makes
+things easier and not harder.  There's always the danger of adding so
+much abstraction for a small thing that using it is like pulling
+teeth.  I'm not saying that's the case here, but it is always a
+danger.
 
-Cheers,
-Andre.
+Note: I will point out a critical differences between the "hotpath"
+problem and the one I'm solving here.  When you're just trying to
+speed up a hotpath, it's not the end of the world if there's a stray
+access to SDRAM.  If you happen to access a global variable in SDRAM,
+or use a libc function to do division, or have a WARN_ON, those things
+are OK.  It might also be OK if the stack was still in SDRAM.  When
+you're compiling code that has to run with no other kernel function
+present it's really nice to link them into a separate executable.
+
+
+> Unfortunately you already said that you're not that interested in
+> making it completely generic,
+
+Yes.  I felt like a jerk with my list of caveats, but at the same time
+I know that realistically I just don't have time.  It was either send
+it upstream with the caveats or don't send it.  To me it seemed better
+to send it.
+
+Thank you for providing a constructive review despite my caveats!  :)
+
+
+> and I also don't think I want to have
+> the infrastructure for it in mach-rockchip and would want to see that
+> at least shared across arch/arm if it's too hard to do
+> cross-architecture. If you were to include code from drivers/memory/
+> in the blob, you couldn't keep it in mach-rockchip anyway.
+
+I guess I was envisioning that if other places need similar
+functionality that they would copy the ideas here.  Some of the
+Makefile bits could possibly be shared through some type of Makefile
+library.  I know copying code / Makefiles is bad, but sometimes it's
+the cleanest way to do something.  If we start seeing a lot of
+duplication then we can make things common and we can truly evaluate
+whether the common solution is better than the duplication.
+
+
+> AFAICT, the quantenna implementation is similar to the itcm/dtcm
+> stuff we already have (but are not using upstream), so I wonder
+> why we can't use that here too, see Documentation/arm/tcm.txt
+
+I wasn't aware of the TCM stuff.  Thanks for the pointer!  It looks
+pretty neat...
+
+Ah, but the TCM stuff has a critical difference from my problem.  By
+the very definition of TCM you don't need to do relocation.
+
+TCM has the magical property that you can assign the physical address.
+That means that you instantly sidestep multiplatform problems of
+having SRAM at different physical addresses.  You can compile the code
+to assume it's at 0xfffe0000 and it will work on every single machine
+out there that needs TCM.  So if you've got a generic "udelay"
+function you could just mark it as a "tcmfunc" and it will work
+everywhere.  No relocation needed and the compiler knows exactly where
+things will be.
+
+Unfortunately, the rk3288 doesn't have TCM.  I tried enabling it and
+got these nice printouts at boot:
+
+    DTCM    : 0xfffe8000 - 0xfffe8000   (   0 kB)
+    ITCM    : 0xfffe0000 - 0xfffe0000   (   0 kB)
+
+Instead of TCM I'm using the "PMU SRAM" on the rk3288 which is
+designed to keep code and data across deep sleep.  Adding relocation
+to the existing TCM support gets back into the rats nest of issues
+that I was trying to avoid tackling.
+
+A few other TCM thoughts:
+
+1. It sure seems unlikely that the current TCM solution would scale to
+multiplatform.  Oh right, Linus W said this in his reply, too.  If
+you've got SoC_A, SoC_B, and SoC_C all marking their functions
+"tcmfunc" then they'll all be placed in the TCM section, right?
+There's no way to detect that you're on SoC_A and that you only need
+the SoC_A code.  Given the marching orders of multiplatform,
+multiplatform, multiplatform then I _think_ that means we shouldn't
+let anyone merge any code to mainline that uses TCM (unless TCM gets
+revamped).
+
+2. I haven't tried it, but it seems like the compiler still might not
+catch stray (accidental) accesses from the TCM section to the non-TCM
+section.  Again, this isn't a showstopper because you'd just track
+each one down, but it is a nice feature of adding a separate
+executable.
+
+
+As always, please correct me where I'm misunderstanding things.
+
+
+Unless any of the above has changed your minds, feel free to consider
+this patch abandoned and thus we part ways amicably.  :)  At least
+rk3288 looks like it can get _basic_ suspend/resume (without shutting
+off SDRAM) working without this...
+
+-Doug
