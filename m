@@ -1,89 +1,106 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 2 Dec 2014 12:03:24 -0500
-Subject: [PATCH] ARM: mvebu: use the cpufreq-dt platform_data for
- independent clocks
-In-Reply-To: <1417538882-19254-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1417538882-19254-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20141202170324.GY22670@titan.lakedaemon.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 02 Dec 2014 17:06:09 +0000
+Subject: [PATCH v4 15/19] arm/arm64: KVM: add virtual GICv3 distributor
+ emulation
+In-Reply-To: <547DE7D5.5020205@arm.com>
+References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
+ <1415959683-26027-16-git-send-email-andre.przywara@arm.com>
+ <20141123143841.GB3401@cbox> <5473562E.7060303@arm.com>
+ <20141125104129.GC31297@cbox> <5478939B.8010103@arm.com>
+ <20141130083014.GA82106@macair> <547DE7D5.5020205@arm.com>
+Message-ID: <547DF181.8060402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, ThomasP,
-
-On Tue, Dec 02, 2014 at 05:48:02PM +0100, Thomas Petazzoni wrote:
-> This commit adjusts the registration of the cpufreq-dt driver in the
-> mvebu platform to indicate to the cpufreq driver that the platform has
-> independent clocks for each CPU.
+On 02/12/14 16:24, Andre Przywara wrote:
+> Hej Christoffer,
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-> Jason, this commit was part of my "[PATCHv2 0/4] cpufreq-dt,
-> platform_data based proposal" series, which included 3 patches for
-> drivers/cpufreq/, and this last patch for mach-mvebu to make use of
-> the new cpufreq feature. However, in order to not confuse the cpufreq
-> maintainer, when I sent "[PATCH v3 0/3] cpufreq: cpufreq-dt:
-> platform_data based proposal", I didn't include this patch for
-> mach-mvebu.
+> On 30/11/14 08:30, Christoffer Dall wrote:
+>> On Fri, Nov 28, 2014 at 03:24:11PM +0000, Andre Przywara wrote:
+>>> Hej Christoffer,
+>>>
+>>> On 25/11/14 10:41, Christoffer Dall wrote:
+>>>> Hi Andre,
+>>>>
+>>>> On Mon, Nov 24, 2014 at 04:00:46PM +0000, Andre Przywara wrote:
+>>>>
+>>>
 > 
-> But now, it means that this is the only missing piece to get cpufreq
-> working on Armada XP. Do you think you could squeeze it into the
-> things merged for 3.19 ? It's a very small patch, so hopefully it's
-> still possible to do so.
-
-I have no problem with it except logistical.  :(  I'm currently on
-travel and my well-tested, but hacked up connection to my development
-box went down.  I've no way to apply this until this weekend at best.
-
-Acked-by; Jason Cooper <jason@lakedaemon.net>
-
-Arnd, would you mind taking this directly onto mvebu/soc?  I've nothing
-else in the queue (just the one pending pull request for soc-suspend)
-
-Or, would it be acceptable for this to be /fixes-non-critical for -rc1?
-
-
-thx,
-
-Jason.
-
-> The patch is based on mvebu/soc.
-> ---
->  arch/arm/mach-mvebu/pmsu.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
+> [...]
 > 
-> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-> index 5a757f9..d8ab605 100644
-> --- a/arch/arm/mach-mvebu/pmsu.c
-> +++ b/arch/arm/mach-mvebu/pmsu.c
-> @@ -20,6 +20,7 @@
->  
->  #include <linux/clk.h>
->  #include <linux/cpu_pm.h>
-> +#include <linux/cpufreq-dt.h>
->  #include <linux/delay.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
-> @@ -571,6 +572,10 @@ int mvebu_pmsu_dfs_request(int cpu)
->  	return 0;
->  }
->  
-> +struct cpufreq_dt_platform_data cpufreq_dt_pd = {
-> +	.independent_clocks = true,
-> +};
-> +
->  static int __init armada_xp_pmsu_cpufreq_init(void)
->  {
->  	struct device_node *np;
-> @@ -643,7 +648,8 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
->  		}
->  	}
->  
-> -	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-> +	platform_device_register_data(NULL, "cpufreq-dt", -1,
-> +				      &cpufreq_dt_pd, sizeof(cpufreq_dt_pd));
->  	return 0;
->  }
->  
-> -- 
-> 2.1.0
+>>>>>>> +
+>>>>>>> +     if (!is_in_range(mmio->phys_addr, mmio->len, rdbase,
+>>>>>>> +         GIC_V3_REDIST_SIZE * nrcpus))
+>>>>>>> +             return false;
+>>>>>>
+>>>>>> Did you think more about the contiguous allocation issue here or can you
+>>>>>> give me a pointer to the requirement in the spec?
+>>>>>
+>>>>> 5.4.1 Re-Distributor Addressing
+>>>>>
+>>>>
+>>>> Section 5.4.1 talks about the pages within a single re-distributor having
+>>>> to be contiguous, not all the re-deistributor regions having to be
+>>>> contiguous, right?
+>>>
+>>> Ah yes, you are right. But I still think it does not matter:
+>>> 1) We are "implementing" the GICv3. So as the spec does not forbid this,
+>>> we just state that the redistributor register maps for each VCPU are
+>>> contiguous. Also we create the FDT accordingly. I will add a comment in
+>>> the documentation to state this.
+>>>
+>>> 2) The kernel's GICv3 DT bindings assume this allocation is the default.
+>>> Although Marc added bindings to work around this (stride), it seems much
+>>> more logical to me to not use it.
+>>
+>> I don't disagree (and never have) with the fact that it is up to us to
+>> decide.
+>>
+>> My original question, which we haven't talked about yet, is if it is
+>> *reasonable* to assume that all re-distributor regions will always be
+>> contiguous?
+>>
+>> How will you handle VCPU hotplug for example?
 > 
+> As kvmtool does not support hotplug, I haven't thought about this yet.
+> To me it looks like userland should just use maxcpus for the allocation.
+> If I get the current QEMU code right, there is room for 127 GICv3 VCPUs
+> (2*64K per VCPU + 64K for the distributor in 16M space) at the moment.
+> Kvmtool uses a different mapping, which allows to share 1G with virtio,
+> so the limit is around 8000ish VCPUs here.
+> Are there any issues with changing the QEMU virt mapping later?
+> Migration, maybe?
+> If the UART, the RTC and the virtio regions are moved more towards the
+> beginning of the 256MB PCI mapping, then there should be space for a bit
+> less than 1024 VCPUs, if I get this right.
+> 
+>> Where in the guest
+>> physical memory map of our various virt machines should these regions
+>> sit so that we can allocate anough re-distributors for VCPUs etc.?
+> 
+> Various? Are there other mappings than those described in hw/arm/virt.c?
+> 
+>> I just want to make sure we're not limiting ourselves by some amount of
+>> functionality or ABI (redistributor base addresses) that will be hard to
+>> expand in the future.
+> 
+> If we are flexible with the mapping at VM creation time, QEMU could just
+> use a mapping depending on max_cpus:
+> < 128 VCPUs: use the current mapping
+> 128 <= x < 1020: use a more compressed mapping
+>> = 1020: map the redistributor somewhere above 4 GB
+> 
+> As the device tree binding for GICv3 just supports a stride value, we
+> don't have any other real options beside this, right? So how I see this,
+> a contiguous mapping (with possible holes) is the only way.
+
+Not really. The GICv3 binding definitely supports having several regions
+for the redistributors (see the binding documentation). This allows for
+the pathological case where you have N regions for N CPUs. Not that we
+ever want to go there, really.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
