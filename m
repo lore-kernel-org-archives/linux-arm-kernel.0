@@ -1,41 +1,41 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 02 Dec 2014 16:41:35 +0100
-Subject: [PATCH] cpuidle: add MAINTAINERS entry for ARM Exynos cpuidle driver
-Message-ID: <1616359.KRpRrFqxfV@amdc1032>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 2 Dec 2014 15:42:20 +0000
+Subject: [PATCH 5/5] arm/arm64: KVM: Turn off vcpus and flush stage-2
+ pgtables on sytem exit events
+In-Reply-To: <20141202150112.GJ545@cbox>
+References: <1417113660-23610-1-git-send-email-christoffer.dall@linaro.org>
+ <1417113660-23610-6-git-send-email-christoffer.dall@linaro.org>
+ <CAFEAcA9hRvaWZiXOjTQP3+4B+r7h7W7oqRm6y=cxw+EJKNk-0w@mail.gmail.com>
+ <20141202150112.GJ545@cbox>
+Message-ID: <CAFEAcA9kvKejc==0s5Xm7owo59v7+5vEEjU=9FTHBnX9rMnJ2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since there has been quite a lot of development going on for
-ARM Exynos cpuidle driver recently I would like to add separate
-MAINTAINERS entry for it and add myself as the primary maintainer.
+On 2 December 2014 at 15:01, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Thu, Nov 27, 2014 at 11:10:14PM +0000, Peter Maydell wrote:
+>> Also, the clarification we want here should not I think be architecture
+>> specific -- the handling of the exit system event in QEMU is in common
+>> code. What you want to say is something like:
+>>
+>> "Valid values for 'type' are:
+>>   KVM_SYSTEM_EVENT_SHUTDOWN -- the guest has requested a shutdown of the
+>>    VM. Userspace is not obliged to honour this, and if it does honour
+>>    this does not need to destroy the VM synchronously (ie it may call
+>>    KVM_RUN again before shutdown finally occurs).
+>>   KVM_SYSTEM_EVENT_RESET -- the guest has requested a reset of the VM.
+>>    As with SHUTDOWN, userspace is permitted to ignore the request, or
+>>    to schedule the reset to occur in the future and may call KVM_RUN again."
+>
+> ok, this is pretty good, but do we need to say that userspace is
+> permitted to do this or that?  The kernel never relies on user space for
+> correct functionality, so do you mean 'for the run a vm semantics to
+> still otherwise be functional'?
 
-The merging process would remain (almost) unchanged with patches
-going (with my Ack) through Daniel's or Kukjin's tree.
+I meant "permitted" in the sense of "the kernel won't kill the VM,
+return errnos to subsequent KVM_RUN requests or otherwise treat
+this userspace behaviour as buggy". If you want to rephrase it
+somehow I don't object, as long as the docs make it clear that
+it's a valid implementation strategy for userspace to do that.
 
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- MAINTAINERS |   10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-Index: b/MAINTAINERS
-===================================================================
---- a/MAINTAINERS	2014-11-27 18:02:51.988225868 +0100
-+++ b/MAINTAINERS	2014-12-02 15:56:52.792997513 +0100
-@@ -2701,6 +2701,16 @@ T:	git git://git.kernel.org/pub/scm/linu
- S:	Maintained
- F:	drivers/cpuidle/cpuidle-big_little.c
- 
-+CPUIDLE DRIVER - ARM EXYNOS
-+M:	Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-+M:	Daniel Lezcano <daniel.lezcano@linaro.org>
-+M:	Kukjin Kim <kgene@kernel.org>
-+L:	linux-pm at vger.kernel.org
-+L:	linux-samsung-soc at vger.kernel.org
-+S:	Supported
-+F:	drivers/cpuidle/cpuidle-exynos.c
-+F:	arch/arm/mach-exynos/pm.c
-+
- CPUIDLE DRIVERS
- M:	Rafael J. Wysocki <rjw@rjwysocki.net>
- M:	Daniel Lezcano <daniel.lezcano@linaro.org>
+-- PMM
