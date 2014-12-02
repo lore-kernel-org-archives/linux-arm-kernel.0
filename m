@@ -1,39 +1,52 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 2 Dec 2014 09:20:13 +0100
-Subject: [RFC V1 0/8] CPUFreq: create platform-dev for DT based cpufreq
- drivers
-In-Reply-To: <3594266.ci9lGXQ9iA@wuerfel>
-References: <cover.1417433163.git.viresh.kumar@linaro.org>
- <5607434.rlEIdu4yyh@wuerfel>
- <CAKohpomsqCnEcSeuqtZcYOC6bgTrGmc8zXTm6cA72q+hr=LBsQ@mail.gmail.com>
- <3594266.ci9lGXQ9iA@wuerfel>
-Message-ID: <20141202092013.6017a9b0@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 2 Dec 2014 16:20:14 +0800
+Subject: [PATCH 1/2] clk: Do not complain about correctly set read-only
+ muxes when assigning clock parents from device tree
+In-Reply-To: <1417452162-20046-1-git-send-email-p.zabel@pengutronix.de>
+References: <1417452162-20046-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20141202082012.GC2411@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
-
-On Mon, 01 Dec 2014 15:59:14 +0100, Arnd Bergmann wrote:
-
-> I still don't see where it does that. All I see for mvebu is
+On Mon, Dec 01, 2014 at 05:42:42PM +0100, Philipp Zabel wrote:
+> Assigning a clock parent to a mux with the CLK_MUX_READ_ONLY flag causes an
+> error "clk: failed to reparent read_only_mux to already_set_parent: -38"
+> even if the hardware is already set to the correct parent clock.
 > 
-> 	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> This patch avoids the error message by checking whether the correct parent
+> is already set before calling clk_set_parent. This allows to use the
+> assigned-clock-parents device tree binding for clock muxes that are not
+> allowed to be changed anymore at the time of_clk_set_defaults is called.
 > 
-> without any platform data. I see this patch
-> http://lists.linaro.org/pipermail/linaro-kernel/2014-September/017693.html
-> on the mailing list, but it's not in linux-next, and it obviously
-> would not work any more with the patch I proposed. Instead I suppose
-> you would use a different string to match against for the case of
-> separate clocks.
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-Hum, right. Actually, only the cpufreq driver part has been taken, and
-I forgot to resubmit the mach-mvebu part of the solution. I'll do so
-today.
+Philipp,
 
-Best regards,
+The patch should be sent to Mike Turquette <mturquette@linaro.org>.  The
+patch itself makes sense to me, so
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+Shawn
+
+> ---
+>  drivers/clk/clk-conf.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
+> index aad4796..ca8dc86 100644
+> --- a/drivers/clk/clk-conf.c
+> +++ b/drivers/clk/clk-conf.c
+> @@ -62,7 +62,8 @@ static int __set_clk_parents(struct device_node *node, bool clk_supplier)
+>  			goto err;
+>  		}
+>  
+> -		rc = clk_set_parent(clk, pclk);
+> +		if (pclk != __clk_get_parent(clk))
+> +			rc = clk_set_parent(clk, pclk);
+>  		if (rc < 0)
+>  			pr_err("clk: failed to reparent %s to %s: %d\n",
+>  			       __clk_get_name(clk), __clk_get_name(pclk), rc);
+> -- 
+> 2.1.3
+> 
