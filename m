@@ -1,37 +1,63 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  2 Dec 2014 16:58:02 +0000
-Subject: [PATCH 01/16] ARM: tegra: irq: nuke leftovers from non-DT support
+Date: Tue,  2 Dec 2014 16:58:06 +0000
+Subject: [PATCH 05/16] DT: tegra: add binding for the legacy interrupt
+ controller
 In-Reply-To: <1417539497-20101-1-git-send-email-marc.zyngier@arm.com>
 References: <1417539497-20101-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1417539497-20101-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1417539497-20101-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GIC is now always initialized from DT on tegra, and there is
-no point in keeping non-DT init code.
-
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-tegra/irq.c | 8 --------
- 1 file changed, 8 deletions(-)
+ .../interrupt-controller/nvidia,tegra-ictlr.txt    | 39 ++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
 
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index ab95f53..7f87a50 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -283,13 +283,5 @@ void __init tegra_init_irq(void)
- 	gic_arch_extn.irq_set_wake = tegra_set_wake;
- 	gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
- 
--	/*
--	 * Check if there is a devicetree present, since the GIC will be
--	 * initialized elsewhere under DT.
--	 */
--	if (!of_have_populated_dt())
--		gic_init(0, 29, distbase,
--			IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
--
- 	tegra114_gic_cpu_pm_registration();
- }
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
+new file mode 100644
+index 0000000..44fd873
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
+@@ -0,0 +1,39 @@
++NVIDIA Legacy Interrupt Controller
++
++All Tegra SoCs contain a legacy interrupt controller that routes
++interrupts to the GIC, and also serves as a wakeup source. It is also
++refered to as "ictlr", hence the name of the binding.
++
++The HW block exposes a number of frames, each implementing a set of 32
++interrupts.
++
++Reguired properties:
++
++- compatible : should contain at least "nvidia,tegra-ictlr".
++- reg : Specifies base physical address and size of the registers.
++  Each frame must be described separately.
++- interrupt-controller : Identifies the node as an interrupt controller.
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value must be 3.
++- interrupt-parent : a phandle to the GIC these interrupts are routed
++  to.
++
++Notes:
++
++- Because this HW ultimately routes interrupts to the GIC, the
++  interrupt specifier must be that of the GIC.
++- Only SPIs can use the ictlr as an interrupt parent. SGIs and PPIs
++  are explicitely forbiden.
++
++Example:
++
++	ictlr: interrupt-controller at 60004000 {
++		compatible = "nvidia,tegra20-ictlr", "nvidia,tegra-ictlr";
++		reg = <0x60004000 64>,
++		      <0x60004100 64>,
++		      <0x60004200 64>,
++		      <0x60004300 64>;
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&intc>;
++	};
 -- 
 2.1.3
