@@ -1,45 +1,94 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 2 Dec 2014 20:34:59 +0800
-Subject: Build LSK 3.14 kernel with android-toolchain
-In-Reply-To: <20141202182952.01eda0ca@xhacker>
-References: <CAAQ0ZWRQ05GiCOqV2Q6g2B6n+XN-qs9o6MKOFXiK2wKrW0nvog@mail.gmail.com>
- <20141202090450.GD2411@dragon> <20141202173921.314cc869@xhacker>
- <2048273.C5mPR68Ukg@wuerfel> <20141202182952.01eda0ca@xhacker>
-Message-ID: <20141202123458.GF2411@dragon>
+From: yadi.brar@samsung.com (Yadwinder Singh Brar)
+Date: Tue, 02 Dec 2014 18:03:40 +0530
+Subject: [PATCH] mfd: max77686: Fix parent of rtc device
+Message-ID: <1417523620-4311-1-git-send-email-yadi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02, 2014 at 06:29:52PM +0800, Jisheng Zhang wrote:
-> On Tue, 2 Dec 2014 02:24:03 -0800
-> Arnd Bergmann <arnd@arndb.de> wrote:
-> > Yes, that's definitely possible. Any idea how the android folks build their
-> > kernel?
-> 
-> copied from https://android.googlesource.com/toolchain/build/+/HEAD/README
-> 
-> The Android toolchain supports the following targets:
->    a. arm-linux-androideabi
->    b. arm-eabi  (for Android kernel)
->    c. arm-newlib-eabi	(for runnng gcc regression tests)
->    d. i[3456]86-*-linux-gnu, x86_64-*-linux-gnu	(for x86 targets)
-> 
-> So they build android kernel using the arm-eabi- toolchain.
+rtc have different i2c client than power(pmic) block. So rtc device should
+sit under its own i2c client in device hierarchy, which reflects in sysfs also.
+This patch modifies code to register rtc cell with rtc->dev as parent.
 
-Thanks Jisheng for all the information.
+Without this patch :
+driver         max77686-pmic  modalias       power          uevent
+max77686-clk   max77686-rtc   name           subsystem
 
-Yes, I just built my kernel with arm-eabi in android-toolchain-eabi-4.9-2014.09
-and it works fine.  So we basically conclude that we should build kernel
-with arm-eabi rather than arm-linux-androideabi.
+After applying patch :
+driver/        modalias       power/         uevent
+max77686-rtc/  name           subsystem/
 
-One thing to note - with CONFIG_ARM_UNWIND turned on, even arm-eabi
-generate the following warning.  This is one difference between android
-arm-eabi and arm-linux-gnueabi we can see immediately.
+Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+---
 
-  LD      vmlinux
-arm-eabi-ld: warning: unwinding may not work because EXIDX input section 31 of fs/built-in.o is not in EXIDX output section
-arm-eabi-ld: warning: unwinding may not work because EXIDX input section 12 of crypto/built-in.o is not in EXIDX output section
-arm-eabi-ld: warning: unwinding may not work because EXIDX input section 27 of block/built-in.o is not in EXIDX output section
-arm-eabi-ld: warning: unwinding may not work because EXIDX input section 27 of drivers/built-in.o is not in EXIDX output section
-arm-eabi-ld: warning: unwinding may not work because EXIDX input section 33 of net/built-in.o is not in EXIDX output section
+Or Can we follow another (exhaustive but more cleaner) approach, which will
+be more like code refactoring and cleanup rather than only fix:
+Since rtc uses i2c client, which gets created using i2c_new_dummy() and is not
+shared by any other cell of max77686. So we can covert rtc platform driver
+itself to i2c client driver. It will also allow to expilicitly describe
+max77686-rtc in DT which we can't do now.
+It can be applicable to some other existing and new mfd pmic drivers.
+Any suggestion/comments ?
 
-Shawn
+---
+ drivers/mfd/max77686.c |   22 ++++++++++++++++++++--
+ 1 files changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
+index 929795e..22c0948 100644
+--- a/drivers/mfd/max77686.c
++++ b/drivers/mfd/max77686.c
+@@ -39,10 +39,13 @@
+ 
+ static const struct mfd_cell max77686_devs[] = {
+ 	{ .name = "max77686-pmic", },
+-	{ .name = "max77686-rtc", },
+ 	{ .name = "max77686-clk", },
+ };
+ 
++static const struct mfd_cell max77686_rtc_dev[] = {
++	{ .name = "max77686-rtc", },
++};
++
+ static const struct mfd_cell max77802_devs[] = {
+ 	{ .name = "max77802-pmic", },
+ 	{ .name = "max77802-clk", },
+@@ -332,14 +335,27 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
+ 		goto err_del_irqc;
+ 	}
+ 
++	if (max77686->type == TYPE_MAX77686) {
++		ret = mfd_add_devices(&max77686->rtc->dev, -1, max77686_rtc_dev,
++			1, NULL, 0, NULL);
++		if (ret < 0) {
++			dev_err(&max77686->rtc->dev,
++				"failed to add RTC device %d\n", ret);
++			goto err_del_rtc_irqc;
++		}
++	}
++
+ 	ret = mfd_add_devices(max77686->dev, -1, cells, n_devs, NULL, 0, NULL);
+ 	if (ret < 0) {
+ 		dev_err(&i2c->dev, "failed to add MFD devices: %d\n", ret);
+-		goto err_del_rtc_irqc;
++		goto err_del_rtc_dev;
+ 	}
+ 
+ 	return 0;
+ 
++err_del_rtc_dev:
++	if (max77686->type == TYPE_MAX77686)
++		mfd_remove_devices(&max77686->rtc->dev);
+ err_del_rtc_irqc:
+ 	regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
+ err_del_irqc:
+@@ -356,6 +372,8 @@ static int max77686_i2c_remove(struct i2c_client *i2c)
+ 	struct max77686_dev *max77686 = i2c_get_clientdata(i2c);
+ 
+ 	mfd_remove_devices(max77686->dev);
++	if (max77686->type == TYPE_MAX77686)
++		mfd_remove_devices(&max77686->rtc->dev);
+ 
+ 	regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
+ 	regmap_del_irq_chip(max77686->irq, max77686->irq_data);
+-- 
+1.7.0.4
