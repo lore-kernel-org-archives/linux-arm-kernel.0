@@ -1,74 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 2 Dec 2014 17:04:54 +0800
-Subject: Build LSK 3.14 kernel with android-toolchain
-In-Reply-To: <2052560.M0NHOo7Rnz@wuerfel>
-References: <CAAQ0ZWRQ05GiCOqV2Q6g2B6n+XN-qs9o6MKOFXiK2wKrW0nvog@mail.gmail.com>
- <2052560.M0NHOo7Rnz@wuerfel>
-Message-ID: <20141202090450.GD2411@dragon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 02 Dec 2014 10:13:30 +0100
+Subject: [PATCH] ARM: zynq: DT: Add USB to device tree
+In-Reply-To: <71b9e172438946a5ba74efb430d1418c@BN1AFFO11FD060.protection.gbl>
+References: <1417459352-23401-1-git-send-email-soren.brinkmann@xilinx.com>
+ <7088901.UGmPabvHQ0@wuerfel>
+ <71b9e172438946a5ba74efb430d1418c@BN1AFFO11FD060.protection.gbl>
+Message-ID: <2598972.HWjIWPLUn8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ LAKML and more people.
-
-On Mon, Dec 01, 2014 at 05:38:38PM +0100, Arnd Bergmann wrote:
-> On Monday 01 December 2014 16:32:21 Shawn Guo wrote:
-> > Is it a valid or supported use case to build LSK 3.14 kernel with
-> > android-toolchain?  I can build a LSK 3.14 kernel with Linux toolchain
-> > gcc-linaro-arm-none-eabi-4.9-2014.09, which boots fine on my board.
-> > When I build the same kernel with
-> > android-toolchain-eabi-4.9-2014.09-x86, the kernel can be built out
-> > successfully, but it fails to boot on the board at very early stage
-> > with only uncompressing message shown up like below.
+On Monday 01 December 2014 13:51:26 S?ren Brinkmann wrote:
+> Hi Arnd,
+> 
+> On Mon, 2014-12-01 at 10:26PM +0100, Arnd Bergmann wrote:
+> > On Monday 01 December 2014 10:42:32 Soren Brinkmann wrote:
+> > > +       usb_phy0: usb-phy at 0 {
+> > > +               compatible = "usb-nop-xceiv";
+> > > +               #phy-cells = <0>;
+> > > +       };
+> > >  };
 > > 
-> > Uncompressing Linux... done, booting the kernel.
-> > 
-> > And it's not a LSK 3.14 specific problem, I tried to build mainline
-> > 3.10, 3.14 and 3.18-rc4 with the android-toolchain, and they all
-> > failed to boot.
-> > 
-> > I need some help to understand if it's a valid use case at all, before
-> > I try to looking into the problem.
+> > As discussed in an unrelated thread today, please drop the "@0" in the
+> > node name, since the device has no 'reg' property.
 > 
-> I would expect it to work, it's probably a good idea to find out
-> why it doesn't. For all I know 'arm-none-eabi' is actually /not/
-> supported for building the kernel, since that doesn't use the Linux
-> Linux variant of eabi, while 'arm-*-linux-gnueabi' or
-> 'arm-*-linux-gnueabihf' is the default for Linux these days and
-> 'arm-*-linux-android' should be compatible with that.
-
-Okay.  Thanks for the info.  It seems that I should download
-gcc-linaro-arm-linux-gnueabihf-4.9-2014.09 for comparison testing then.
-Actually, in the very first testing I used arm-linux-gnueabi-gcc 4.7.3
-shipped with Ubuntu 14.04.
-
-> What is the
-> exact target triplet you use in those two cases?
-
-They are arm-none-eabi and arm-linux-androideabi.  And I also replaced
-the first toolchain with arm-linux-gnueabi one, and got the same result.
-
+> What is the best practice for naming such nodes then? On these boards
+> it's not the case, but Zynq has two USB cores. So, there may be DTs that
+> will have two phys in there. Would we just do 'usb-phy-0'?
 > 
-> A few things you could try:
 > 
-> - boot it in qemu using the vexpress or virt platform code, see if
->   the symptom is the same. If it is, attach gdb to the qemu gdbstub
->   to look at the contents of the _log_buf.
-> 
-> - Maybe debug_ll crashes, try disabling that
-> 
-> - Maybe debug_ll is disabled already, try enabling it to see if you
->   get more output.
 
-I tracked it a little bit with debug_ll routine printch() and found it
-dies at the first pr_info() call in arch/arm/kernel/setup.c:
+Grant recommended naming them "phy0" and "phy1" in this case.
+The recommended node name for a phy is "phy", not "usb-phy" (I didn't
+notice that earlier, but it makes sense to change both), and
+I would not use a dash for the number there.
 
-	pr_info("Booting Linux on physical CPU 0x%x\n", mpidr);
-
-And I spent some time to find out that the issue was introduced by
-commit dad5451a322b (ARM: 7605/1: vmlinux.lds: Move .notes section
-next to the rodata) since v3.8 release.  Reverting the commit helps me
-to get a booting kernel that is built by arm-linux-androideabi
-toolchain.  But I do not have the knowledge to understand what is
-happening.
-
-Shawn
+	Arnd
