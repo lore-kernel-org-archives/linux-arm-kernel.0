@@ -1,41 +1,62 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 1 Dec 2014 19:51:18 -0600
-Subject: [PATCH] tty: serial: serial-omap: depend on !8250_omap
-In-Reply-To: <20141201231338.GA14524@fuloong-minipc.musicnaut.iki.fi>
-References: <1417039306-2384-1-git-send-email-bigeasy@linutronix.de>
- <20141129094823.GA10840@linutronix.de>
- <20141129173418.GY2817@atomide.com>
- <20141201140914.728aaa46@lxorguk.ukuu.org.uk>
- <20141201231338.GA14524@fuloong-minipc.musicnaut.iki.fi>
-Message-ID: <20141202015118.GA1891@saruman>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 02 Dec 2014 10:53:32 +0900
+Subject: [PATCH] clk: samsung: exynos4415: Fix build with PM_SLEEP disabled
+In-Reply-To: <1417425174-26694-1-git-send-email-k.kozlowski@samsung.com>
+References: <1417425174-26694-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <547D1B9C.9030900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02, 2014 at 01:13:38AM +0200, Aaro Koskinen wrote:
-> Hi,
+On 12/01/2014 06:12 PM, Krzysztof Kozlowski wrote:
+> Fix following build errors when PM_SLEEP is disabled (e.g. by disabling
+> SUSPEND and HIBERNATION):
 > 
-> On Mon, Dec 01, 2014 at 02:09:14PM +0000, One Thousand Gnomes wrote:
-> > > Well the nightmare userspace switch from ttyS to ttyO few years ago is
-> > > something we want to avoid.. I think the best solution would be to make
-> > > serial-omap.c transparently provide support for ttyO using the new 8250
-> > > code so both ttyS and ttyO devices would just work. Otherwise it will
-> > > be years of "my serial port stopped working" questions again.
-> > 
-> > Thata a udev problem not a kernel one surely.
+> drivers/clk/samsung/clk-exynos4415.c: In function ?exynos4415_cmu_init?:
+> drivers/clk/samsung/clk-exynos4415.c:982:2: error: ?exynos4415_ctx? undeclared (first use in this function)
+> drivers/clk/samsung/clk-exynos4415.c:982:2: note: each undeclared identifier is reported only once for each function it appears in
+> drivers/clk/samsung/clk-exynos4415.c: In function ?exynos4415_cmu_dmc_init?:
+> drivers/clk/samsung/clk-exynos4415.c:1123:2: error: ?exynos4415_dmc_ctx? undeclared (first use in this function)
+> make[3]: *** [drivers/clk/samsung/clk-exynos4415.o] Error 1
 > 
-> People also use serial console to observe the early kernel boot before
-> the userspace is started.
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos4415.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos4415.c b/drivers/clk/samsung/clk-exynos4415.c
+> index c7208c7a3add..2123fc251e0f 100644
+> --- a/drivers/clk/samsung/clk-exynos4415.c
+> +++ b/drivers/clk/samsung/clk-exynos4415.c
+> @@ -118,12 +118,13 @@ enum exynos4415_plls {
+>  	nr_plls,
+>  };
+>  
+> +static struct samsung_clk_provider *exynos4415_ctx;
+> +
+>  /*
+>   * Support for CMU save/restore across system suspends
+>   */
+>  #ifdef CONFIG_PM_SLEEP
+>  static struct samsung_clk_reg_dump *exynos4415_clk_regs;
+> -static struct samsung_clk_provider *exynos4415_ctx;
+>  
+>  static unsigned long exynos4415_cmu_clk_regs[] __initdata = {
+>  	SRC_LEFTBUS,
+> @@ -1031,9 +1032,10 @@ enum exynos4415_dmc_plls {
+>  	nr_dmc_plls,
+>  };
+>  
+> +static struct samsung_clk_provider *exynos4415_dmc_ctx;
+> +
+>  #ifdef CONFIG_PM_SLEEP
+>  static struct samsung_clk_reg_dump *exynos4415_dmc_clk_regs;
+> -static struct samsung_clk_provider *exynos4415_dmc_ctx;
+>  
+>  static unsigned long exynos4415_cmu_dmc_clk_regs[] __initdata = {
+>  	MPLL_LOCK,
+> 
 
-right, we need a way to tell the kernel that ttyO%d and ttyS%d are the
-exact same device so that console=ttyO0 and console=ttyS0 mean the same
-thing. That maintains backwards compatibility and lets people move on
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/4f5fda27/attachment.sig>
+Thanks,
+Chanwoo Choi
