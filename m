@@ -1,37 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Dec 2014 14:22:33 +0100
-Subject: [PATCH] arm: perf: Directly handle SMP platforms with one SPI
-In-Reply-To: <1416581603-30557-1-git-send-email-daniel.thompson@linaro.org>
-References: <1416581603-30557-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <CACRpkdaof9hW2rbH4eDNWMCiaW7+aNE_2TNyMbz+B4aqaJfsgw@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 2 Dec 2014 14:23:37 +0100
+Subject: [PATCH 6/7] KVM: arm64: re-factor hyp.S debug register code
+In-Reply-To: <87ppc31t9v.fsf@linaro.org>
+References: <1416931805-23223-1-git-send-email-alex.bennee@linaro.org>
+ <1416931805-23223-7-git-send-email-alex.bennee@linaro.org>
+ <20141130102546.GI23653@cbox> <87ppc31t9v.fsf@linaro.org>
+Message-ID: <20141202132337.GD545@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 3:53 PM, Daniel Thompson
-<daniel.thompson@linaro.org> wrote:
+On Mon, Dec 01, 2014 at 11:52:44AM +0000, Alex Benn?e wrote:
+> 
+> Christoffer Dall <christoffer.dall@linaro.org> writes:
+> 
+> > On Tue, Nov 25, 2014 at 04:10:04PM +0000, Alex Benn?e wrote:
+> >> This is a pre-cursor to sharing the code with the guest debug support.
+> >> This replaces the big macro that fishes data out of a fixed location
+> >> with a more general helper macro to restore a set of debug registers. It
+> >> uses macro substitution so it can be re-used for debug control and value
+> >> registers. It does however rely on the debug registers being 64 bit
+> >> aligned (as they happen to be in the hyp ABI).
+> >
+> > can you enforce that somewhere?
+> 
+> There is a comment in kvm_asm.h:
+> 
+> /*
+>  * 0 is reserved as an invalid value.
+>  * Order *must* be kept in sync with the hyp switch code.
+>  */
+> 
+> But I'm not sure how to enforce it in assembly. Is there a #pragma or
+> something I can use?
+> 
 
-> Some ARM platforms mux the PMU interrupt of every core into a single
-> SPI. On such platforms if the PMU of any core except 0 raises an interrupt
-> then it cannot be serviced and eventually, if you are lucky, the spurious
-> irq detection might forcefully disable the interrupt.
->
-> On these SoCs it is not possible to determine which core raised the
-> interrupt so workaround this issue by queuing irqwork on the other
-> cores whenever the primary interrupt handler is unable to service the
-> interrupt.
->
-> The u8500 platform has an alternative workaround that dynamically alters
-> the affinity of the PMU interrupt. This workaround logic is no longer
-> required so the original code is removed as is the hook it relied upon.
->
-> Tested on imx6q (which has fours cores/PMUs all muxed to a single SPI).
->
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+You can add a BUG_ON somewhere at runtime, but I wouldn't bother, you
+can stick a note in that existing comment just so people don't change
+the declaration of the registers to be 32-bit aligned or something else.
 
-After som pain I managed to compile and test this with perf.
-Works like a charm.
-
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+-Christoffer
