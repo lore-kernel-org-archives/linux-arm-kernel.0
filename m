@@ -1,170 +1,159 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 2 Dec 2014 11:52:08 +0100
-Subject: [PATCH v5 6/7] ARM: zynq: Add OCM controller driver
-In-Reply-To: <4151221.1fPmelvPbd@wuerfel>
-References: <cover.1417440250.git.michal.simek@xilinx.com>
- <4788755d350890d81f1bac4bf237c5ddfb68b795.1417440250.git.michal.simek@xilinx.com>
- <4151221.1fPmelvPbd@wuerfel>
-Message-ID: <cb2f95cd81334264af358b7ca0ac201b@BN1BFFO11FD021.protection.gbl>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 2 Dec 2014 11:09:09 +0000
+Subject: [PATCH 14/19] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <1417510196-6714-15-git-send-email-cw00.choi@samsung.com>
+References: <1417510196-6714-1-git-send-email-cw00.choi@samsung.com>
+ <1417510196-6714-15-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20141202110909.GB23671@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2014 04:31 PM, Arnd Bergmann wrote:
-> On Monday 01 December 2014 14:24:57 Michal Simek wrote:
->> The driver provide memory allocator which can
->> be used by others drivers to allocate memory inside OCM.
->> All locations for 64kB blocks are supported
->> and driver is trying to allocate the largest continuous
->> block of memory.
->>
->> Checking mpcore addressing filterring is not done here
->> but could be added in future.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> 
-> The driver doesn't actually have any interface as far as I can tell,
-> so I wonder how you expect it to be used.
-> 
-> Do you have a list of drivers that would be using it?
+Hi,
 
-For supporting suspend you have to save content to OCM memory
-and you need any driver which is providing generic functionality
-to allocate that memory for it.
+On Tue, Dec 02, 2014 at 08:49:51AM +0000, Chanwoo Choi wrote:
+> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC based on
+> Octal core CPUs (quad Cortex-A57 and quad Cortex-A53). And Exynos5433 supports
+> PSCI (Power State Coordination Interface) v0.1.
+>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Inki Dae <inki.dae@samsung.com>
+> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi | 698 +++++++++++++++++++++
+>  arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 515 +++++++++++++++
+>  2 files changed, 1213 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
 
-Here is example - it is not upstream because we need to get OCM driver
-to mainline first.
-https://github.com/Xilinx/linux-xlnx/blob/master/arch/arm/mach-zynq/pm.c
+[...]
 
-The second example is to use OCM memory for storing BD for ethernet controller.
-OCM is fast memory accessible IRC in one cycle which increase bandwidth.
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               cpu0: cpu at 100 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       enable-method = "psci";
+> +                       reg = <0x100>;
+> +               };
+> +
+> +               cpu1: cpu at 101 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       enable-method = "psci";
+> +                       reg = <0x101>;
+> +               };
+> +
+> +               cpu2: cpu at 102 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       enable-method = "psci";
+> +                       reg = <0x0 0x102>;
+> +               };
+> +
+> +               cpu3: cpu at 103 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       enable-method = "psci";
+> +                       reg = <0x103>;
+> +               };
+> +
+> +               cpu4: cpu at 0 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a57", "arm,armv8";
+> +                       enable-method = "psci";
+> +                       reg = <0x0>;
+> +               };
+> +
+> +               cpu5: cpu at 1 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a57", "arm,armv8";
+> +                       enable-method = "psci";
+> +                       reg = <0x1>;
+> +               };
+> +
+> +               cpu6: cpu at 2 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a57", "arm,armv8";
+> +                       enable-method = "psci";
+> +                       reg = <0x2>;
+> +               };
+> +
+> +               cpu7: cpu at 3 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a57", "arm,armv8";
+> +                       enable-method = "psci";
+> +                       reg = <0x3>;
+> +               };
+> +       };
+> +
+> +       psci {
+> +               compatible = "arm,psci";
+> +               method = "smc";
+> +               cpu_off = <0x84000002>;
+> +               cpu_on = <0xC4000003>;
+> +       };
 
-For all of these you need the driver which provide you the way how to allocate
-memory from OCM.
+Given your comments on the latest posting, has CPU_OFF been tested, and
+does it work for _all_ CPUs (including CPU0)?
 
-> How does it relate to the generic "mmio-sram" binding? Is this
-> meant as a specialization?
+> +
+> +       soc: soc {
+> +               compatible = "simple-bus";
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges;
 
-This driver was based on mmio-sram which does the same. Provide you a way
-how to allocate memory space in any sram memory on chip.
-It is design for static case but not for dynamic one like this one.
+Is that valid when changing the number of cells? The address spaces
+aren't strictly identical in that case, and I'd expect a translation
+something like:
 
-As I pointed in cover letter there could be an option to use mmio-sram driver
-but there must be any way how to create DT description at run-time or choose
-configuration at run-time.
+        ranges = <0x0 0x0 0x0 0xff000000>;
 
->> +/**
->> + * zynq_ocmc_irq_handler - Interrupt service routine of the OCM controller
->> + * @irq:	IRQ number
->> + * @data:	Pointer to the zynq_ocmc_dev structure
->> + *
->> + * Return:     IRQ_HANDLED always
->> + */
->> +static irqreturn_t zynq_ocmc_irq_handler(int irq, void *data)
->> +{
->> +	u32 sts;
->> +	u32 err_addr;
->> +	struct zynq_ocmc_dev *zynq_ocmc = data;
->> +
->> +	/* check status */
->> +	sts = readl(zynq_ocmc->base + ZYNQ_OCMC_IRQ_STS);
->> +	if (sts & ZYNQ_OCMC_IRQ_STS_ERR_MASK) {
->> +		/* check error address */
->> +		err_addr = readl(zynq_ocmc->base + ZYNQ_OCMC_PARITY_ERRADDRESS);
->> +		pr_err("%s: OCM err intr generated at 0x%04x (stat: 0x%08x).",
->> +		       __func__, err_addr, sts & ZYNQ_OCMC_IRQ_STS_ERR_MASK);
->> +	}
->> +	pr_warn("%s: Interrupt generated by OCM, but no error is found.",
->> +		__func__);
->> +
->> +	return IRQ_HANDLED;
->> +}
-> 
-> I'm also puzzled by this: you don't really do anything here but print
-> a message. What is the purpose of this interrupt? As this looks unrelated
-> to the rest of the driver, maybe this should be part of drivers/edac
-> instead?
+Where the final cell is a sufficiently large value to cover all
+addresses in the soc node.
 
-yes - it is just showing that there is error in OCM.
-It can be added to edac - no problem to do so but the driver will be
-really simple that's why not sure if make sense to do it.
+[...]
 
-> 
->> +static int zynq_ocmc_probe(struct platform_device *pdev)
->> +{
->> +       int ret;
->> +       struct zynq_ocmc_dev *zynq_ocmc;
->> +       u32 i, ocm_config, curr;
->> +       struct resource *res;
->> +
->> +       ocm_config = zynq_slcr_get_ocm_config();
->> +
->> +       zynq_ocmc = devm_kzalloc(&pdev->dev, sizeof(*zynq_ocmc),
->> GFP_KERNEL);
->> +       if (!zynq_ocmc)
->> +               return -ENOMEM;
->> +
->> +       zynq_ocmc->pool = devm_gen_pool_create(&pdev->dev,
->> +                                              ilog2(ZYNQ_OCMC_GRANULARITY),
->> +                                              -1);
->> +       if (!zynq_ocmc->pool)
->> +               return -ENOMEM;
->> +
->> +       curr = 0; /* For storing current struct resource for OCM */
->> +       for (i = 0; i < ZYNQ_OCMC_BLOCKS; i++) {
->> +               u32 base, start, end;
->> +
->> +               /* Setup base address for 64kB OCM block */
->> +               if (ocm_config & BIT(i))
->> +                       base = ZYNQ_OCMC_HIGHADDR;
->> +               else
->> +                       base = ZYNQ_OCMC_LOWADDR;
-> 
-> You write in the introductory mail that you want to support detecting the
-> address from the slcr, and possibly even allow changing it at runtime,
-> but I don't understand what that would be good for.
+> +               gic:interrupt-controller at 11001000 {
+> +                       compatible = "arm,gic-400";
+> +                       #interrupt-cells = <3>;
+> +                       interrupt-controller;
+> +                       reg =   <0x11001000 0x1000>,
+> +                               <0x11002000 0x1000>,
+> +                               <0x11004000 0x2000>,
+> +                               <0x11006000 0x2000>;
+> +                       interrupts = <1 9 0xf04>;
+> +               };
 
-Note: PL means programmable logic
+The GICC needs to be 0x2000 long to map the GICC_DIR, which is at
+0x1000-0x1003.
 
-On zynq you can use memory from fixed part which starts from 0 to ddr size.
-That's one configuration.
-The second is to add memory controller just to PL - the use case can be that
-memory controller in PL will provide better bandwidth (because of customization)
-for your application and this memory can't started from 0. Most of the time
-it starts from 0x40000000. But you need to have memory at 0 for adding reset vectors
-or standalone application running on the second ARM core that's why you can
-place there OCM.
+[...]
 
-It means it is up to users what configuration they want/need to use that's why
-OCM is divided to 4 64k blocks which you can place to any location you like.
-it is 16 combinations.
+> +               pinctrl_alive: pinctrl at 10580000 {
+> +                       compatible = "samsung,exynos5433-pinctrl";
+> +                       reg = <0x10580000 0x1000>;
+> +
+> +                       wakeup-interrupt-controller {
+> +                               compatible = "samsung,exynos7-wakeup-eint";
+> +                               interrupts = <0 16 0>;
+> +                       };
+> +               };
 
-Chip can be setup to use any of this combination without any capable bootloader
-that's why relating on bootloader is not solution. Also problematic for upgrading
-the system.
+How exactly does the wakeup interrupt controller interact with the GIC?
+Surely the relationship between the two should be described?
 
-> It's not uncommon to describe in DT settings that one can also find
-> out from hardware but that are set up by the boot loader in a particular
-> way. Why not this one? 
-
-It is 16 combinations how these 4 blocks can be placed together but only
-one reliable way is to check SLCR configuration and based on reg setup.
-
-I can add all these 16 combinations to DTS and detect configuration in SLCR
-and then change any status property for that particular configuration
-but it will be more ugly than this solution.
-
-Note: Just place there 4/8 blocks with low and high locations is not good
-because the maximum allocated size will be just 64k.
-
-> For all I can tell, that would let you simply
-> use one driver for the EDAC and the generic mmio-sram from the memory,
-> without the need to do anything further.
-
-EDAC driver - no problem to do it and make sense.
-Using mmio-sram for one fixed configuration is easy but not sure if this is
-the right thing to do.
-Listing all combinations in DTS file is quite easy to do but mechanism
-to select one combination is the key for it.
+Is it a subcomponent of the pincontrol block?
 
 Thanks,
-Michal
+Mark.
