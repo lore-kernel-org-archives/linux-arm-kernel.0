@@ -1,64 +1,46 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 2 Dec 2014 08:52:59 -0700
-Subject: [PATCH v13 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <20141202111017.GC26306@e104818-lin.cambridge.arm.com>
-References: <1417065854-37745-1-git-send-email-lina.iyer@linaro.org>
- <1417065854-37745-4-git-send-email-lina.iyer@linaro.org>
- <20141127150137.GA7889@red-moon> <20141201185705.GC499@linaro.org>
- <20141202111017.GC26306@e104818-lin.cambridge.arm.com>
-Message-ID: <20141202155259.GF499@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 2 Dec 2014 15:59:27 +0000
+Subject: [PATCHv6 6/8] arm64: use fixmap for text patching when text is RO
+In-Reply-To: <20141126161802.GB1819@leverpostej>
+References: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
+ <1416606645-25633-7-git-send-email-lauraa@codeaurora.org>
+ <20141125170445.GB21525@leverpostej>
+ <5474D056.2050101@codeaurora.org>
+ <20141126161802.GB1819@leverpostej>
+Message-ID: <20141202155927.GD29792@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02 2014 at 04:10 -0700, Catalin Marinas wrote:
->On Mon, Dec 01, 2014 at 06:57:05PM +0000, Lina Iyer wrote:
->> On Thu, Nov 27 2014 at 08:01 -0700, Lorenzo Pieralisi wrote:
->> >On Thu, Nov 27, 2014 at 05:24:07AM +0000, Lina Iyer wrote:
->> >
->> >[...]
->> >
->> >> +static int spm_set_low_power_mode(enum pm_sleep_mode mode)
->> >> +{
->> >> +       struct spm_driver_data *drv = per_cpu(cpu_spm_drv,
->> >> +                                               smp_processor_id());
->> >> +       u32 start_index;
->> >> +       u32 ctl_val;
->> >> +
->> >> +       if (!drv)
->> >> +               return -ENXIO;
->> >> +
->> >> +       start_index = drv->reg_data->start_index[mode];
->> >> +
->> >> +       ctl_val = spm_register_read(drv, SPM_REG_SPM_CTL);
->> >> +       ctl_val &= ~(SPM_CTL_INDEX << SPM_CTL_INDEX_SHIFT);
->> >> +       ctl_val |= start_index << SPM_CTL_INDEX_SHIFT;
->> >> +       ctl_val |= SPM_CTL_EN;
->> >> +       spm_register_write(drv, SPM_REG_SPM_CTL, ctl_val);
->> >> +
->> >> +       /* Ensure we have written the start address */
->> >> +       wmb();
->> >
->> >Can you explain please what this wmb is meant to achieve ? If it is there
->> >to make sure the write made it to the SPM that's not a proper way
->> >to achieve it, the barrier ensures ordering, not write completion.
->>
->> A write completion would be great, but assuming that the context switch
->> using SCM or WFI could ensure the flush, then ordering is probably good
->> enough for this.
->
->I assume you want the write to the device to complete (side-effects are
->observed) before the WFI (which would raise a StandbyWFI signal). The
->safer way is to read back from the device (or check/poll for the device
->state change) rather than a barrier.
+On Wed, Nov 26, 2014 at 04:18:02PM +0000, Mark Rutland wrote:
+> On Tue, Nov 25, 2014 at 06:54:14PM +0000, Laura Abbott wrote:
+> > On 11/25/2014 9:04 AM, Mark Rutland wrote:
+> > > Hi Laura,
+> > >
+> > > It looks like "early" means before we've set up the strict page
+> > > permissions, though as far as I can tell the fixmap will already be
+> > > available before we do any patching. Could we not always use the fixmap
+> > > for patching? Then we only need the patch_{map,unmap} additions, and not
+> > > the changes to distinguish the early cases.
+> > >
+> > >  From testing on Juno with defconfig, all of the early patches were
+> > > avoidable NOP -> NOP changes as part of static key initialisation, which
+> > > I think we can skip similarly to x86 (I'll send a patch shortly). All other
+> > > patches were not early and went via the fixmap.
+> > >
+> > > Even with the avoidable NOP -> NOP patching I did not see a noticeable
+> > > boot time difference from forcing the use of the fixmap.
+> > >
+> > 
+> > I was basing it off of the arm version which needed the early option.
+> > If arm64 doesn't need it I'll drop it.
+> 
+> Given that it only determines whether or not to use the fixmap, and we
+> can always use the fixmap, I think we can drop it.
 
-Polling back to see if the register write was indeed successful, seems
-a bit more than what I would like on a low latency mode like Standby.
-Let me check with the hardware engineers, if a write ordering is
-required. It seems to me like I am not getting much out of the wmb()
-anyways. I will find out what kind of guarantees I would need to ensure
-the SPM write is successful.
+BTW, do we ever expect a write to the temporary POKE0 fixmap to fail? If
+not (I don't think it would fail), we can just override the
+__probe_kernel_write() to use set_fixmap() (maybe only when this feature
+is enabled).
 
-Thanks for your time, Catalin.
-
-Thanks,
-Lina.
+-- 
+Catalin
