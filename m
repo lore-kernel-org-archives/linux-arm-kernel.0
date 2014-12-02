@@ -1,173 +1,67 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 02 Dec 2014 17:49:53 +0900
-Subject: [PATCH 16/19] arm64: dts: exynos: Add SPI/PDMA dt node for Exynos5433
+Date: Tue, 02 Dec 2014 17:49:55 +0900
+Subject: [PATCH 18/19] clocksource: exynos_mct: Add the support for Exynos
+ 64bit SoC
 In-Reply-To: <1417510196-6714-1-git-send-email-cw00.choi@samsung.com>
 References: <1417510196-6714-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1417510196-6714-17-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1417510196-6714-19-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds SPI (Serial Peripheral Interface) dt node for Exynos5433 SoC.
-SPI transfers serial data by using various peripherals. SPI includes
-8-bit/16-bit/32-bit shift registers to transmit and receive data. PDMA is used
-for SPI communication.
+This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
+for Exynos 32bit SoC.
 
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Kukjin Kim <kgene.kim@samsung.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Inki Dae <inki.dae@samsung.com>
-Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
 ---
- arch/arm64/boot/dts/exynos/exynos5433.dtsi | 118 +++++++++++++++++++++++++++++
- 1 file changed, 118 insertions(+)
+ drivers/clocksource/Kconfig      | 1 -
+ drivers/clocksource/exynos_mct.c | 4 ++++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index fef9bbc..22f2df8 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -55,6 +55,11 @@
- 		mshc0 = &mshc_0;
- 		mshc1 = &mshc_1;
- 		mshc2 = &mshc_2;
-+		spi0 = &spi_0;
-+		spi1 = &spi_1;
-+		spi2 = &spi_2;
-+		spi3 = &spi_3;
-+		spi4 = &spi_4;
- 	};
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 9042060..27ef3fa 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -134,7 +134,6 @@ config CLKSRC_METAG_GENERIC
  
- 	cpus {
-@@ -249,6 +254,34 @@
- 			interrupts = <1 9 0xf04>;
- 		};
+ config CLKSRC_EXYNOS_MCT
+ 	def_bool y if ARCH_EXYNOS
+-	depends on !ARM64
+ 	help
+ 	  Support for Multi Core Timer controller on Exynos SoCs.
  
-+		amba {
-+			compatible = "arm,amba-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			pdma0: pdma at 15610000 {
-+				compatible = "arm,pl330", "arm,primecell";
-+				reg = <0x15610000 0x1000>;
-+				interrupts = <0 228 0>;
-+				clocks = <&cmu_fsys CLK_PDMA0>;
-+				clock-names = "apb_pclk";
-+				#dma-cells = <1>;
-+				#dma-channels = <8>;
-+				#dma-requests = <32>;
-+			};
-+
-+			pdma1: pdma at 15600000 {
-+				compatible = "arm,pl330", "arm,primecell";
-+				reg = <0x15600000 0x1000>;
-+				interrupts = <0 246 0>;
-+				clocks = <&cmu_fsys CLK_PDMA1>;
-+				clock-names = "apb_pclk";
-+				#dma-cells = <1>;
-+				#dma-channels = <8>;
-+				#dma-requests = <32>;
-+			};
-+		};
-+
- 		serial_0: serial at 14c10000 {
- 			compatible = "samsung,exynos5433-uart";
- 			reg = <0x14c10000 0x100>;
-@@ -349,6 +382,91 @@
- 			interrupts = <0 442 0>;
- 		};
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 9403061..b840ea1 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -223,6 +223,7 @@ static u64 notrace exynos4_read_sched_clock(void)
+ 	return exynos4_read_count_32();
+ }
  
-+		spi_0: spi at 14d20000 {
-+			compatible = "samsung,exynos7-spi";
-+			reg = <0x14d20000 0x100>;
-+			interrupts = <0 432 0>;
-+			dmas = <&pdma0 9>, <&pdma0 8>;
-+			dma-names = "tx", "rx";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&cmu_peric CLK_PCLK_SPI0>,
-+				 <&cmu_top CLK_SCLK_SPI0_PERIC>;
-+			clock-names = "spi", "spi_busclk0";
-+			samsung,spi-src-clk = <0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi0_bus>;
-+			status = "disabled";
-+		};
-+
-+		spi_1: spi at 14d30000 {
-+			compatible = "samsung,exynos7-spi";
-+			reg = <0x14d30000 0x100>;
-+			interrupts = <0 433 0>;
-+			dmas = <&pdma0 11>, <&pdma0 10>;
-+			dma-names = "tx", "rx";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&cmu_peric CLK_PCLK_SPI1>,
-+				 <&cmu_top CLK_SCLK_SPI1_PERIC>;
-+			clock-names = "spi", "spi_busclk0";
-+			samsung,spi-src-clk = <0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi1_bus>;
-+			status = "disabled";
-+		};
-+
-+		spi_2: spi at 14d40000 {
-+			compatible = "samsung,exynos7-spi";
-+			reg = <0x14d40000 0x100>;
-+			interrupts = <0 434 0>;
-+			dmas = <&pdma0 13>, <&pdma0 12>;
-+			dma-names = "tx", "rx";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&cmu_peric CLK_PCLK_SPI2>,
-+				 <&cmu_top CLK_SCLK_SPI2_PERIC>;
-+			clock-names = "spi", "spi_busclk0";
-+			samsung,spi-src-clk = <0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi2_bus>;
-+			status = "disabled";
-+		};
-+
-+		spi_3: spi at 14d50000 {
-+			compatible = "samsung,exynos7-spi";
-+			reg = <0x14d50000 0x100>;
-+			interrupts = <0 447 0>;
-+			dmas = <&pdma0 23>, <&pdma0 22>;
-+			dma-names = "tx", "rx";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&cmu_peric CLK_PCLK_SPI3>,
-+				 <&cmu_top CLK_SCLK_SPI3_PERIC>;
-+			clock-names = "spi", "spi_busclk0";
-+			samsung,spi-src-clk = <0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi3_bus>;
-+			status = "disabled";
-+		};
-+
-+		spi_4: spi at 14d00000 {
-+			compatible = "samsung,exynos7-spi";
-+			reg = <0x14d00000 0x100>;
-+			interrupts = <0 412 0>;
-+			dmas = <&pdma0 25>, <&pdma0 24>;
-+			dma-names = "tx", "rx";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&cmu_peric CLK_PCLK_SPI4>,
-+				 <&cmu_top CLK_SCLK_SPI4_PERIC>;
-+			clock-names = "spi", "spi_busclk0";
-+			samsung,spi-src-clk = <0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi4_bus>;
-+			status = "disabled";
-+		};
-+
- 		hsi2c_0: hsi2c at 14e40000 {
- 			compatible = "samsung,exynos7-hsi2c";
- 			reg = <0x14e40000 0x1000>;
++#if defined(CONFIG_ARM)
+ static struct delay_timer exynos4_delay_timer;
+ 
+ static cycles_t exynos4_read_current_timer(void)
+@@ -231,14 +232,17 @@ static cycles_t exynos4_read_current_timer(void)
+ 			 "cycles_t needs to move to 32-bit for ARM64 usage");
+ 	return exynos4_read_count_32();
+ }
++#endif
+ 
+ static void __init exynos4_clocksource_init(void)
+ {
+ 	exynos4_mct_frc_start();
+ 
++#if defined(CONFIG_ARM)
+ 	exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
+ 	exynos4_delay_timer.freq = clk_rate;
+ 	register_current_timer_delay(&exynos4_delay_timer);
++#endif
+ 
+ 	if (clocksource_register_hz(&mct_frc, clk_rate))
+ 		panic("%s: can't register clocksource\n", mct_frc.name);
 -- 
 1.8.5.5
