@@ -1,88 +1,37 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 2 Dec 2014 16:41:40 -0500
-Subject: [PATCH v7 0/3] net: Add Keystone NetCP ethernet driver support
-Message-ID: <1417556503-22290-1-git-send-email-m-karicheri2@ti.com>
+Date: Tue, 2 Dec 2014 16:41:43 -0500
+Subject: [PATCH v7 3/3] MAINTAINER: net: Add TI NETCP Ethernet driver entry
+In-Reply-To: <1417556503-22290-1-git-send-email-m-karicheri2@ti.com>
+References: <1417556503-22290-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1417556503-22290-4-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v6->v7
-Fixed some minor documentation error and also modified the netcp driver
-to fix the set* functions to include correct le/be macros.
+CC: David Miller <davem@davemloft.net>
+Signed-off-by: Sandeep Nair <sandeep_n@ti.com>
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ MAINTAINERS |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-v5->v6
-updated version after incorporating comments [6] from David Miller,
-David Laight & Geert Uytterhoeven on v5. I would like get this in
-for v3.19 merge window if the latest version is acceptable.
-
-v4->v5
-Sorry to spin v5 quickly but I missed few check-patch warnings which
-were pointed by Joe Perches(thanks). I folded his changes [5] along with
-few more check-patch warning fixes. I would like get this in for v3.18
-merge window if David is happy with this version.
-
-v3->v4
-Couple of fixes in in error path as pointed [4] out by David. Rest of
-the patches are unchanged from v3. 
-
-v2->v3
-Update v3 after incorporating Jamal and David Miller's comment/suggestion
-from earlier versions [1] [2].  After per the discussion here [3], the
-controversial custom exports have been dropped now. And for future
-future offload support additions, we will plug into generic frameworks
-as an when they are available.
-
-The network coprocessor (NetCP) is a hardware accelerator that processes
-Ethernet packets. NetCP has a gigabit Ethernet (GbE) subsystem with a ethernet
-switch sub-module to send and receive packets. NetCP also includes a packet
-accelerator (PA) module to perform packet classification operations such as
-header matching, and packet modification operations such as checksum
-generation. NetCP can also optionally include a Security Accelerator(SA)
-capable of performing IPSec operations on ingress/egress packets.
-    
-Keystone SoC's also have a 10 Gigabit Ethernet Subsystem (XGbE) which
-includes a 3-port Ethernet switch sub-module capable of 10Gb/s and
-1Gb/s rates per Ethernet port.
-    
-Both GBE and XGBE network processors supported using common driver. It
-is also designed to handle future variants of NetCP.
-
-Cc: David Miller <davem@davemloft.net>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Sandeep Nair <sandeepn02@gmail.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@kernel.org>
-
-Murali Karicheri (1):
-  MAINTAINER: net: Add TI NETCP Ethernet driver entry
-
-Sandeep Nair (2):
-  Documentation: dt: net: Add binding doc for Keystone NetCP ethernet
-    driver
-  net: Add Keystone NetCP ethernet driver
-
- .../devicetree/bindings/net/keystone-netcp.txt     |  197 ++
- MAINTAINERS                                        |    8 +
- drivers/net/ethernet/ti/Kconfig                    |   12 +-
- drivers/net/ethernet/ti/Makefile                   |    4 +
- drivers/net/ethernet/ti/netcp.h                    |  227 ++
- drivers/net/ethernet/ti/netcp_core.c               | 2262 ++++++++++++++++++++
- drivers/net/ethernet/ti/netcp_ethss.c              | 2159 +++++++++++++++++++
- drivers/net/ethernet/ti/netcp_sgmii.c              |  130 ++
- drivers/net/ethernet/ti/netcp_xgbepcsr.c           |  501 +++++
- 9 files changed, 5499 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/net/keystone-netcp.txt
- create mode 100644 drivers/net/ethernet/ti/netcp.h
- create mode 100644 drivers/net/ethernet/ti/netcp_core.c
- create mode 100644 drivers/net/ethernet/ti/netcp_ethss.c
- create mode 100644 drivers/net/ethernet/ti/netcp_sgmii.c
- create mode 100644 drivers/net/ethernet/ti/netcp_xgbepcsr.c
-
-[1] https://lkml.org/lkml/2014/4/22/805
-[2] https://lkml.org/lkml/2014/8/15/218
-[3] https://lkml.org/lkml/2014/9/11/691
-[4] https://lkml.org/lkml/2014/9/15/403
-[5] https://lkml.org/lkml/2014/9/25/332
-[6] https://lkml.org/lkml/2014/9/29/639
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ea4d005..bc876f2 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9337,6 +9337,14 @@ F:	drivers/power/lp8788-charger.c
+ F:	drivers/regulator/lp8788-*.c
+ F:	include/linux/mfd/lp8788*.h
+ 
++TI NETCP ETHERNET DRIVER
++M:	Sandeep Nair <sandeepn02@gmail.com>
++M:	Murali Karicheri <m-karicheri2@ti.com>
++M:	Santosh Shilimkar <santosh.shilimkar@kernel.org>
++L:	netdev at vger.kernel.org
++S:	Maintained
++F:	drivers/net/ethernet/ti/netcp*
++
+ TI TWL4030 SERIES SOC CODEC DRIVER
+ M:	Peter Ujfalusi <peter.ujfalusi@ti.com>
+ L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
 -- 
 1.7.9.5
