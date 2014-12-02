@@ -1,52 +1,32 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 2 Dec 2014 09:28:58 +0100
-Subject: [PATCH] mtd: gpmi: properly handle bitflips in erased pages
-In-Reply-To: <20141201233748.GJ21347@ld-irv-0074>
-References: <1417461159-2972-1-git-send-email-boris.brezillon@free-electrons.com>
- <20141201194139.GI21347@ld-irv-0074>
- <20141201211818.4e97f2e2@bbrezillon>
- <20141201233748.GJ21347@ld-irv-0074>
-Message-ID: <20141202092858.57341105@bbrezillon>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 02 Dec 2014 09:32:16 +0100
+Subject: exynos boot falures in linux-next
+In-Reply-To: <00ae01d00465$10d9edb0$328dc910$@kernel.org>
+References: <E1XqKYI-0000pQ-4b@ip-10-35-177-41.ec2.internal>
+ <7hoas54y7k.fsf@deeprootsystems.com> <7hlhn9zcse.fsf@deeprootsystems.com>
+ <546A83D6.9060504@collabora.co.uk> <7hfvdhyxqi.fsf@deeprootsystems.com>
+ <CAMAWPa8D-oRp2yC=n+Rgw_wtwV4+Go0OQi62y3iGRYxi0sow+g@mail.gmail.com>
+ <546CCE2F.8030108@collabora.co.uk>
+ <00ae01d00465$10d9edb0$328dc910$@kernel.org>
+Message-ID: <547D7910.3020609@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Dec 2014 15:37:48 -0800
-Brian Norris <computersforpeace@gmail.com> wrote:
+Hello Kukjin,
 
-> On Mon, Dec 01, 2014 at 09:18:18PM +0100, Boris Brezillon wrote:
-> > On Mon, 1 Dec 2014 11:41:39 -0800 Brian Norris <computersforpeace@gmail.com> wrote:
-> > > On Mon, Dec 01, 2014 at 08:12:39PM +0100, Boris Brezillon wrote:
-> > > > Brian, I really like the idea of having a generic implementation for this
-> > > > feature (using read_page_raw) as you suggested here [1], but this implies
-> > > > having a temporary buffer to store the page read in raw mode and keep the page
-> > > > read in normal (HW ECC engine eanbled) mode, and I'm not sure we want to
-> > > > allocate more buffers than we already have.
-> > > 
-> > > Why does this require an additional buffer? If we've already noticed an
-> > > ECC error, we're expected to return raw data anyway, so what's the
-> > > problem with clobbering the original data with a raw version of the
-> > > data?
-> > 
-> > Well in the GPMI particular case (and more generally all NAND
-> > controllers which do not support subpage write) this is true, but if you
-> > can do subpage write, then you might have a bit flip in a specific
-> > chunk which is still empty, while other chunks are written and are
-> > expecting standard ECC correction.
-> > In this case you want to keep the 3 chunks with  standard ECC correction
-> > and only one in raw mode with 'erased page bitflips' fixed.
+On 11/20/2014 02:55 AM, Kukjin Kim wrote:
+>>
+> Yeah, it could be a best solution at this moment. Let me revert the commit
+> 0ef76aea7a34 ("ARM: exynos_defconfig: Enable options for display panel
+> support")
+> from -next in samsung tree.
 > 
-> So the problem's not really with subpage write, exactly; the problem is
-> for drivers that support subpage write, we don't have a way to perform a
-> raw subpage read without touching the other subpages.
 
-Yes, that's what I was trying to explain :-), and the only solution I
-see to address that is to have 2 buffers and then pick the most
-appropriate data for a given chunk.
-Do you think we should focus on support for "non subpage write"
-controllers first, and then find an alternative for these controllers
-if someone really needs it ?
+Maybe now that all the issues with the Exynos DRM driver that were causing
+boot failures were found and fixed, we can enable these config options again?
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+After all, the fact that these symbols got enabled is what made the issues
+to be detected in the first place so is useful to find regressions earlier.
+
+Best regards,
+Javier
