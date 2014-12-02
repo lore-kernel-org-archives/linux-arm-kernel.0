@@ -1,83 +1,42 @@
-From: wangzhou.bry@gmail.com (Zhou Wang)
-Date: Tue, 02 Dec 2014 14:43:51 +0800
-Subject: [PATCH v3 1/2] ARM: hip04: set ARCH_NR_GPIO to 128
-In-Reply-To: <CACRpkdb1nZN-vOXLC-QFUAT9wDGM2Nm5YeH0qY_u2JV9toOaVg@mail.gmail.com>
-References: <1417156188-500-1-git-send-email-wangzhou.bry@gmail.com>
- <1417156188-500-2-git-send-email-wangzhou.bry@gmail.com>
- <3094004.3WUKgY6xNz@wuerfel> <547971BF.1050706@gmail.com>
- <CACRpkdb1nZN-vOXLC-QFUAT9wDGM2Nm5YeH0qY_u2JV9toOaVg@mail.gmail.com>
-Message-ID: <547D5FA7.3040307@gmail.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Tue, 2 Dec 2014 07:56:31 +0100
+Subject: Issue found in Armada 370: "No buffer space available" error
+ during continuous ping
+In-Reply-To: <CAB8gEUuE8GK=Pab1agvJS5y=+fKLwhJ4LYXFpxOd-Frtke5d1w@mail.gmail.com>
+References: <20140723061659.GE30488@1wt.eu>
+ <CAB8gEUtO=K-mjie6czsf-9ao1cxiMAV2ScbgUnf+XxqjEfOUvg@mail.gmail.com>
+ <CAB8gEUtgo-8nets3tRtqiZ8qRx+SyCq2d8v05scavWNwE5TNXg@mail.gmail.com>
+ <20141201072802.GB21731@1wt.eu>
+ <CAB8gEUsQ8nSNwB7vpZHBkELEBX2sN1QdWvujBGYQJY9dtCzgww@mail.gmail.com>
+ <20141201092851.GA22304@1wt.eu> <20141201103221.6268b811@free-electrons.com>
+ <20141201095815.GA7949@1wt.eu>
+ <CAB8gEUuW-r8oY=+ku+Cy4ZBKBvO9rF+QApn=WxR3nZFaSoCvTg@mail.gmail.com>
+ <CAB8gEUuE8GK=Pab1agvJS5y=+fKLwhJ4LYXFpxOd-Frtke5d1w@mail.gmail.com>
+Message-ID: <20141202065631.GA22506@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?12?01? 22:04, Linus Walleij wrote:
-> On Sat, Nov 29, 2014 at 8:11 AM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
->> On 2014?11?28? 17:33, Arnd Bergmann wrote:
->>> On Friday 28 November 2014 14:29:47 Zhou Wang wrote:
->
->>>>           default 264 if MACH_H4700
->>>> +       default 128 if ARCH_HIP04
->>>>           default 0
->>>>           help
->>>>             Maximum number of GPIOs in the system.
->>>>
->>>
->>> If I remember correctly, you don't actually need to set this if all gpio
->>> clients are using the new gpio descriptor interfaces instead of gpio
->>> numbers. Would that work for you? You'd have to know which devices
->>
->> If I don't set this, it will use the default ARCH_NR_GPIO(512), then
->> the range of GPIO number will be 384~511 which is very strange to users,
->> because Hip04 based machines can only support 128 GPIOs.
->
-> That is a totally different problem.
->
-> Not that these numbers have ever been stable...
->
-> Think of a patch to gpiochip_find_base() in
-> drivers/gpio/gpiolib.c to fix this so that numbers are
-> assigned a better way rather than doing
-> random hacks with numbers like this.
->
-> Yours,
-> Linus Walleij
->
-Hi Linus,
+Hi Maggie,
 
-how about a patch like this, we read the base from the dts here.
+On Tue, Dec 02, 2014 at 12:09:05PM +0800, Maggie Mae Roxas wrote:
+> Hi Willy, Thomas,
+> Good day.
+> 
+> This is just to confirm that the patch Willy sent yesterday, patched
+> to 3.13.9 alone, resolves these issues:
+> - "No buffer space available" around 17th packet
+> - Low throughput on iperf as client (ie, ~130 Mbits/s on 1000 Mbits/s)
+> - Kernel crash
+> 
+> We confirmed it after quite some testing.
+> # Full logs at:
+> # as iperf client: https://app.box.com/s/5pzh753dmmnqt4q8s5iy
+> # as iperf server: https://app.box.com/s/t9ohxrcphpmnfer9dtj9
+> 
+> Thank you very much for your assistance again!!! :)
 
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index e8e98ca..0c40f53 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -107,11 +107,16 @@ struct gpio_chip *gpiod_to_chip(const struct 
-gpio_desc *desc)
-  EXPORT_SYMBOL_GPL(gpiod_to_chip);
+thanks for your valuable feedback, I'll add your tested-by and will
+send it to netdev for inclusion before I switch to something else
+and forget again!
 
-  /* dynamic allocation of GPIOs, e.g. on a hotplugged device */
--static int gpiochip_find_base(int ngpio)
-+static int gpiochip_find_base(struct gpio_chip *gpio_chip)
-  {
-         struct gpio_chip *chip;
-+       int ngpio = gpio_chip->ngpio;
-         int base = ARCH_NR_GPIOS - ngpio;
-
-+       /* just prototype */
-+       if (!of_property_read_u32(gpio_chip->dev->of_node, "base", &base))
-+               return base;
-+
-         list_for_each_entry_reverse(chip, &gpio_chips, list) {
-                 /* found a free space? */
-                 if (chip->base + chip->ngpio <= base)
-@@ -236,7 +241,7 @@ int gpiochip_add(struct gpio_chip *chip)
-         spin_lock_irqsave(&gpio_lock, flags);
-
-         if (base < 0) {
--               base = gpiochip_find_base(chip->ngpio);
-+               base = gpiochip_find_base(chip);
-                 if (base < 0) {
-                         status = base;
-                         goto unlock;
-
-Best regards,
-Zhou Wang
+Willy
