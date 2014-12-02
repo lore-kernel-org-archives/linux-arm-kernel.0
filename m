@@ -1,141 +1,35 @@
-From: harinik@xilinx.com (Harini Katakam)
-Date: Tue,  2 Dec 2014 15:35:49 +0530
-Subject: [PATCH 4/4] i2c: cadence: Defeature repeated start based on
- devicetree property
-In-Reply-To: <1417514749-24319-1-git-send-email-harinik@xilinx.com>
-References: <1417514749-24319-1-git-send-email-harinik@xilinx.com>
-Message-ID: <1417514749-24319-5-git-send-email-harinik@xilinx.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 2 Dec 2014 11:10:53 +0100
+Subject: [PATCH v4 0/4] mmc: atmel-mci: cleanup and probe deferring
+In-Reply-To: <1417444509-15501-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1417444509-15501-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <CAPDyKFpuDOfw9BtYJhG0Fz6PsqUQP=gBg+4mWt9MRy_S6Yga5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vishnu Motghare <vishnum@xilinx.com>
+On 1 December 2014 at 15:35, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> Hi Ulf,
+>
+> Same as previous series, based on your next branch, and no errors with
+> checkpatch so let me know if you still have troubles to apply my patches.
+>
+> Changes from v3:
+> - keep __init/__exit attributes for atmci_init/exit
+> - remove useless variable in atmci_configure_dma function
+>
+> Ludovic Desroches (4):
+>   mmc: atmel-mci: remove useless DMA stuff for non-dt devices
+>   mmc: atmel-mci: remove __init/__exit attributes
+>   mmc: atmel-mci: stop using specific initcall
+>   mmc: atmel-mci: use probe deferring if dma controller is not ready yet
+>
+>  drivers/mmc/host/atmel-mci.c | 76 ++++++++++++++++----------------------------
+>  1 file changed, 28 insertions(+), 48 deletions(-)
 
-This patch defeatures repeated start in the driver if
-"defeature-repeated-start" property is present in the devicetree.
+Thanks! Applied for next.
 
-This defeature is proposed due to a few bugs in the controller
-- completion indication is not given to the driver at the end of
-a read/receive transfer with HOLD bit set.
-- Invalid read transaction are generated on the bus when HW timeout
-condition occurs with HOLD bit set.
+Patch 4, did have a minor checkpatch warning. I fixed it.
 
-Signed-off-by: Vishnu Motghare <vishnum@xilinx.com>
-Signed-off-by: Harini Katakam <harinik@xilinx.com>
----
- drivers/i2c/busses/i2c-cadence.c |   44 +++++++++++++++++++++++++++-----------
- 1 file changed, 31 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-index 8065205..89335f7 100644
---- a/drivers/i2c/busses/i2c-cadence.c
-+++ b/drivers/i2c/busses/i2c-cadence.c
-@@ -135,6 +135,7 @@
-  * @bus_hold_flag:	Flag used in repeated start for clearing HOLD bit
-  * @clk:		Pointer to struct clk
-  * @clk_rate_change_nb:	Notifier block for clock rate changes
-+ * @defeature_repeated_start:	Flag to de feature repeated start
-  */
- struct cdns_i2c {
- 	void __iomem *membase;
-@@ -154,6 +155,7 @@ struct cdns_i2c {
- 	unsigned int bus_hold_flag;
- 	struct clk *clk;
- 	struct notifier_block clk_rate_change_nb;
-+	unsigned int defeature_repeated_start;
- };
- 
- #define to_cdns_i2c(_nb)	container_of(_nb, struct cdns_i2c, \
-@@ -246,7 +248,7 @@ static irqreturn_t cdns_i2c_isr(int irq, void *ptr)
- 		}
- 
- 		if ((isr_status & CDNS_I2C_IXR_COMP) && !id->recv_count) {
--			if (!id->bus_hold_flag)
-+			if (id->defeature_repeated_start || !id->bus_hold_flag)
- 				cdns_i2c_clear_bus_hold(id);
- 			done_flag = 1;
- 		}
-@@ -283,7 +285,8 @@ static irqreturn_t cdns_i2c_isr(int irq, void *ptr)
- 			 */
- 			done_flag = 1;
- 		}
--		if (!id->send_count && !id->bus_hold_flag)
-+		if ((id->defeature_repeated_start && !id->send_count) ||
-+		    (!id->send_count && !id->bus_hold_flag))
- 			cdns_i2c_clear_bus_hold(id);
- 
- 		status = IRQ_HANDLED;
-@@ -347,10 +350,15 @@ static void cdns_i2c_mrecv(struct cdns_i2c *id)
- 	} else
- 		cdns_i2c_writereg(id->recv_count, CDNS_I2C_XFER_SIZE_OFFSET);
- 	/* Clear the bus hold flag if bytes to receive is less than FIFO size */
--	if (!id->bus_hold_flag &&
--		((id->p_msg->flags & I2C_M_RECV_LEN) != I2C_M_RECV_LEN) &&
--		(id->recv_count <= CDNS_I2C_FIFO_DEPTH))
--			cdns_i2c_clear_bus_hold(id);
-+	if (id->defeature_repeated_start &&
-+	    (((id->p_msg->flags & I2C_M_RECV_LEN) != I2C_M_RECV_LEN) &&
-+	     (id->recv_count <= CDNS_I2C_FIFO_DEPTH)))
-+		cdns_i2c_clear_bus_hold(id);
-+	else if (!id->bus_hold_flag &&
-+		 ((id->p_msg->flags & I2C_M_RECV_LEN) != I2C_M_RECV_LEN) &&
-+		 (id->recv_count <= CDNS_I2C_FIFO_DEPTH))
-+		cdns_i2c_clear_bus_hold(id);
-+
- 	/* Set the slave address in address register - triggers operation */
- 	cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
- 						CDNS_I2C_ADDR_OFFSET);
-@@ -411,8 +419,10 @@ static void cdns_i2c_msend(struct cdns_i2c *id)
- 	 * Clear the bus hold flag if there is no more data
- 	 * and if it is the last message.
- 	 */
--	if (!id->bus_hold_flag && !id->send_count)
-+	 if ((id->defeature_repeated_start && !id->send_count) ||
-+	     (!id->send_count && !id->bus_hold_flag))
- 		cdns_i2c_clear_bus_hold(id);
-+
- 	/* Set the slave address in address register - triggers operation. */
- 	cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
- 						CDNS_I2C_ADDR_OFFSET);
-@@ -520,19 +530,25 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
- 	/*
- 	 * Set the flag to one when multiple messages are to be
- 	 * processed with a repeated start.
-+	 * De feature repeated start when defeature_repeated_start flag is set
- 	 */
--	if (num > 1) {
--		id->bus_hold_flag = 1;
--		reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
--		reg |= CDNS_I2C_CR_HOLD;
--		cdns_i2c_writereg(reg, CDNS_I2C_CR_OFFSET);
-+	if (!id->defeature_repeated_start && num > 1) {
-+			for (count = 0; count < num-1; count++) {
-+				if (msgs[count].flags & I2C_M_RD)
-+					return -EINVAL;
-+			}
-+			id->bus_hold_flag = 1;
-+			reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
-+			reg |= CDNS_I2C_CR_HOLD;
-+			cdns_i2c_writereg(reg, CDNS_I2C_CR_OFFSET);
- 	} else {
- 		id->bus_hold_flag = 0;
- 	}
- 
- 	/* Process the msg one by one */
- 	for (count = 0; count < num; count++, msgs++) {
--		if (count == (num - 1))
-+		if (!id->defeature_repeated_start &&
-+		    (count == (num - 1)))
- 			id->bus_hold_flag = 0;
- 
- 		ret = cdns_i2c_process_msg(id, msgs, adap);
-@@ -840,6 +856,8 @@ static int cdns_i2c_probe(struct platform_device *pdev)
- 	cdns_i2c_writereg(CDNS_I2C_CR_ACK_EN | CDNS_I2C_CR_NEA | CDNS_I2C_CR_MS,
- 			  CDNS_I2C_CR_OFFSET);
- 
-+	of_property_read_u32(pdev->dev.of_node,	"defeature-repeated-start",
-+			     &id->defeature_repeated_start);
- 	ret = cdns_i2c_setclk(id->input_clk, id);
- 	if (ret) {
- 		dev_err(&pdev->dev, "invalid SCL clock: %u Hz\n", id->i2c_clk);
--- 
-1.7.9.5
+Kind regards
+Uffe
