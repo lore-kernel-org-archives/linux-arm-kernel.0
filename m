@@ -1,60 +1,114 @@
-From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Tue,  2 Dec 2014 22:52:57 +0800
-Subject: [PATCH 2/2] ASoC: rockchip: i2s: add support for grabbing output
- clock to codec
-In-Reply-To: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
-References: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1417531977-30094-1-git-send-email-jay.xu@rock-chips.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 2 Dec 2014 14:57:35 +0000
+Subject: [PATCHv5 5/5] arm: dts: Add Altera L2 Cache and OCRAM EDAC
+In-Reply-To: <1415751263-1830-6-git-send-email-tthayer@opensource.altera.com>
+References: <1415751263-1830-1-git-send-email-tthayer@opensource.altera.com>
+ <1415751263-1830-6-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20141202145735.GL23671@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sonny Rao <sonnyrao@chromium.org>
+On Wed, Nov 12, 2014 at 12:14:23AM +0000, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+> 
+> Adding the device tree entries and bindings needed to support
+> the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
+> an earlier patch to declare and setup On-chip RAM properly.
+> http://www.spinics.net/lists/devicetree/msg51117.html
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2: Remove OCRAM declaration and reference prior patch.
+> 
+> v3-5: No Change
+> ---
+>  .../bindings/arm/altera/socfpga-l2-edac.txt        |   15 +++++++++++++++
+>  .../bindings/arm/altera/socfpga-ocram-edac.txt     |   16 ++++++++++++++++
+>  arch/arm/boot/dts/socfpga.dtsi                     |   15 ++++++++++++++-
+>  3 files changed, 45 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
+> new file mode 100644
+> index 0000000..35b19e3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
+> @@ -0,0 +1,15 @@
+> +Altera SoCFPGA L2 cache Error Detection and Correction [EDAC]
+> +
+> +Required Properties:
+> +- compatible : Should be "altr,l2-edac"
+> +- reg : Address and size for ECC error interrupt clear registers.
+> +- interrupts : Should be single bit error interrupt, then double bit error
+> +	interrupt. Note the rising edge type.
+> +
+> +Example:
+> +
+> +	l2edac at ffd08140 {
+> +		compatible = "altr,l2-edac";
+> +		reg = <0xffd08140 0x4>;
+> +		interrupts = <0 36 1>, <0 37 1>;
+> +	};
 
-We need to claim the clock which is driving the codec so that when we enable
-clock gating, we continue to clock the codec when needed.  I make this an
-optional clock since there might be some applications where we don't need it
-but can still use the I2S block.
+Judging by the size of the reg entry, this is part of a larger block
+(the same one the OCRAM EDAC lives in). Why isn't that larger block
+described?
 
-Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
----
- sound/soc/rockchip/rockchip_i2s.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+EDAC is a Linux subsystem name, but typically not the HW block name.
+What HW block does this live in?
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index c74ba37..2820ade 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -28,6 +28,7 @@ struct rk_i2s_dev {
- 
- 	struct clk *hclk;
- 	struct clk *mclk;
-+	struct clk *oclk;
- 
- 	struct snd_dmaengine_dai_dma_data capture_dma_data;
- 	struct snd_dmaengine_dai_dma_data playback_dma_data;
-@@ -439,6 +440,14 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
- 		return PTR_ERR(i2s->mclk);
- 	}
- 
-+	i2s->oclk = devm_clk_get(&pdev->dev, "i2s_clk_out");
-+	if (IS_ERR(i2s->oclk)) {
-+		dev_dbg(&pdev->dev, "Didn't find output clock\n");
-+		i2s->oclk = NULL;
-+	}
-+	if (i2s->oclk)
-+		ret = clk_prepare_enable(i2s->oclk);
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	regs = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(regs))
-@@ -505,6 +514,8 @@ static int rockchip_i2s_remove(struct platform_device *pdev)
- 	if (!pm_runtime_status_suspended(&pdev->dev))
- 		i2s_runtime_suspend(&pdev->dev);
- 
-+	if (i2s->oclk)
-+		clk_disable_unprepare(i2s->oclk);
- 	clk_disable_unprepare(i2s->mclk);
- 	clk_disable_unprepare(i2s->hclk);
- 	snd_dmaengine_pcm_unregister(&pdev->dev);
--- 
-1.9.1
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
+> new file mode 100644
+> index 0000000..31ab205
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
+> @@ -0,0 +1,16 @@
+> +Altera SoCFPGA On-Chip RAM Error Detection and Correction [EDAC]
+> +
+> +OCRAM ECC Required Properties:
+> +- compatible : Should be "altr,ocram-edac"
+> +- reg : Address and size for ECC error interrupt clear registers.
+> +- iram : phandle to On-Chip RAM definition.
+> +- interrupts : Should be single bit error interrupt, then double bit error
+> +	interrupt. Note the rising edge type.
+> +
+> +Example:
+> +	ocramedac at ffd08144 {
+> +		compatible = "altr,ocram-edac";
+> +		reg = <0xffd08144 0x4>;
+> +		iram = <&ocram>;
+> +		interrupts = <0 178 1>, <0 179 1>;
+> +	};
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 6af96ed..32c63a3 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -618,8 +618,21 @@
+>  			interrupts = <0 39 4>;
+>  		};
+>  
+> +		l2edac at ffd08140 {
+> +			compatible = "altr,l2-edac";
+> +			reg = <0xffd08140 0x4>;
+> +			interrupts = <0 36 1>, <0 37 1>;
+> +		};
+> +
+> +		ocramedac at ffd08144 {
+> +			compatible = "altr,ocram-edac";
+> +			reg = <0xffd08144 0x4>;
+> +			iram = <&ocram>;
+> +			interrupts = <0 178 1>, <0 179 1>;
+> +		};
+> +
+>  		L2: l2-cache at fffef000 {
+> -			compatible = "arm,pl310-cache";
+> +			compatible = "arm,pl310-cache", "syscon";
+
+NAK. 
+
+Why are you marking the PL310 as a syscon device? It is most definitely
+_NOT_ a shared set of registers lumped together.
+
+Thanks,
+Mark.
