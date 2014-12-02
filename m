@@ -1,37 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 02 Dec 2014 13:37:59 +0000
-Subject: [PATCH v8 1/4] irqchip: gic: Support hierarchy irq domain.
-In-Reply-To: <CAMuHMdWj0Z66fya=7oN=ZUoz0TQOHFxBe0wyHmkDDVzU8Lafog@mail.gmail.com>
-References: <1416902662-19281-1-git-send-email-yingjoe.chen@mediatek.com>	<1416902662-19281-2-git-send-email-yingjoe.chen@mediatek.com>
- <CAMuHMdWj0Z66fya=7oN=ZUoz0TQOHFxBe0wyHmkDDVzU8Lafog@mail.gmail.com>
-Message-ID: <547DC0B7.6050600@arm.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Tue, 2 Dec 2014 19:11:23 +0530
+Subject: [PATCH] arm64: enable ARCH_HAS_BANDGAP config
+In-Reply-To: <20141128141240.GA4249@localhost>
+References: <1415968254-5182-1-git-send-email-a.kesavan@samsung.com>
+ <CAGOxZ52o-O+=PCsGRfKEGGc0NUg_M+z5_UmbrjBwvW8+x3c22w@mail.gmail.com>
+ <20141128141240.GA4249@localhost>
+Message-ID: <CAGOxZ50bymP5sWCeUfT5LO33DWetov6M+JxJHKOxCFihf0qzKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/14 13:27, Geert Uytterhoeven wrote:
-> On Tue, Nov 25, 2014 at 9:04 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
->> Add support to use gic as a parent for stacked irq domain.
->>
->> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> 
-> This change (which is now in -next as commit 9a1091ef0017c40a) breaks
-> booting on r8a7740/armadillo-legacy.
-> 
-> It hangs because the timers cannot get their interrupts:
-> 
-> console [tty0] enabled
->  sh-tmu.0: ch0: used for clock events
->  sh-tmu.0: ch0: used for periodic clock events
->  sh-tmu.0: ch0: failed to request irq 230
->  sh-tmu.0: ch1: used as clock source
->  sh-cmt-48.1: ch0: failed to request irq 90
->  sh-cmt-48.1: ch0: registration failed
-> earlytimer: unable to probe sh-cmt-48 early.
-> Calibrating delay loop...
+Hi Catalin,
 
-Grmbl... Are you, by any (lack of) chance, using a setup where the GIC
-is probed via DT, but the timers have their IRQs hardcoded?
+On Fri, Nov 28, 2014 at 7:42 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Sun, Nov 23, 2014 at 08:05:05AM +0000, Alim Akhtar wrote:
+>> On Fri, Nov 14, 2014 at 6:00 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+>> > Some of the existing thermal drivers (ti and exynos) have a dependency on
+>> > ARCH_HAS_BANDGAP. Activate ARCH_HAS_BANDGAP config entry for ARM64 so that
+>> > these drivers may be re-used.
+>> >
+>> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> > ---
+>> HAS_BANDGAP was added to ARM to indicate that arch supports a bandgap
+>> device like a thermal management unit, so this looks good to me.
+>
+> But it doesn't look good to me. ARCH_HAS_* kind of implies that the
+> architecture has some feature or the port provides some feature. But in
+> the current use, it simply allows the enabling of the menu config
+> entries for two drivers (EXYNOS_THERMAL and TI_SOC_THERMAL).
+>
+> If you want to specify that the SoC has a device, just use DT and not
+> some random config option that only enables the menu entry for the
+> corresponding driver.
+>
+Well completely agree with you.
+Not sure why this was done for ARM though.
+> --
+> Catalin
 
-	M.
+
+
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Alim
