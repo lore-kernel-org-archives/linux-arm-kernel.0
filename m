@@ -1,53 +1,41 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 01 Dec 2014 17:26:26 -0800
-Subject: [PATCH v10 0/4] This suspend patch is only support cut off the
- power of cpu and some external
-In-Reply-To: <CAD=FV=XuQk17CTNKJY++J+w9Ab9_OUX0ca0A99m7yKPAWSs2=w@mail.gmail.com>
- (Doug Anderson's message of "Mon, 1 Dec 2014 17:07:39 -0800")
-References: <1417423940-1669-1-git-send-email-zyw@rock-chips.com>
- <7htx1f409k.fsf@deeprootsystems.com>
- <CAD=FV=V2go5BMFbiFKu73_aVz5ck949W-kJQ6WLkAQRPJbjPVA@mail.gmail.com>
- <CAD=FV=XuQk17CTNKJY++J+w9Ab9_OUX0ca0A99m7yKPAWSs2=w@mail.gmail.com>
-Message-ID: <7hmw763kql.fsf@deeprootsystems.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 1 Dec 2014 19:51:18 -0600
+Subject: [PATCH] tty: serial: serial-omap: depend on !8250_omap
+In-Reply-To: <20141201231338.GA14524@fuloong-minipc.musicnaut.iki.fi>
+References: <1417039306-2384-1-git-send-email-bigeasy@linutronix.de>
+ <20141129094823.GA10840@linutronix.de>
+ <20141129173418.GY2817@atomide.com>
+ <20141201140914.728aaa46@lxorguk.ukuu.org.uk>
+ <20141201231338.GA14524@fuloong-minipc.musicnaut.iki.fi>
+Message-ID: <20141202015118.GA1891@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug Anderson <dianders@chromium.org> writes:
-
+On Tue, Dec 02, 2014 at 01:13:38AM +0200, Aaro Koskinen wrote:
 > Hi,
->
-> On Mon, Dec 1, 2014 at 2:08 PM, Doug Anderson <dianders@chromium.org> wrote:
->> Hi,
->>
->> On Mon, Dec 1, 2014 at 11:51 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>> Chris Zhong <zyw@rock-chips.com> writes:
->>>
->>>> devices, since we still lack power_domain driver, so the other power rail
->>>> of rk3288 need keep power on.
->>>> I have tested it on rk3288-evb board, atop next-20141112. goto suspend by type
->>>> "echo mem > /sys/power/state", vdd_cpu is about 0mv by measuring, so it can be
->>>> determined in sleep mode, then press power button to wakeup it.
->>>
->>> I tested this on top of today's linux-next (next-20141201) and it
->>> suspends, but doesn't wake up from any of the button presses.  What
->>> wakeup sources are configured for the rk3288-evb-rk808?
->>
->> Just to close the loop (I talked with Kevin over IM about this, too):
->>
->> I have a huge description of how I tested this as part of my patch at
->> <https://patchwork.kernel.org/patch/5414941/>.  Chris:  I think Kevin
->> has asked you several times to include information like this in your
->> cover letter.  Please, please, please can you try to remember to do
->> this?
->
-> Talked to Chris offline.  He said that in his tests the other patches
-> weren't needed, so he didn't list any other patches.  Things just
-> worked for him.  ...so I guess he did post the instructions that
-> worked for him.  Sorry for the complaint.  Possibly things are
-> different on "next-20141112" and that's where Chris said he tested.
+> 
+> On Mon, Dec 01, 2014 at 02:09:14PM +0000, One Thousand Gnomes wrote:
+> > > Well the nightmare userspace switch from ttyS to ttyO few years ago is
+> > > something we want to avoid.. I think the best solution would be to make
+> > > serial-omap.c transparently provide support for ttyO using the new 8250
+> > > code so both ttyS and ttyO devices would just work. Otherwise it will
+> > > be years of "my serial port stopped working" questions again.
+> > 
+> > Thata a udev problem not a kernel one surely.
+> 
+> People also use serial console to observe the early kernel boot before
+> the userspace is started.
 
-This series doesn't apply cleanly to next-20141112.  Manually applying
-(with fuzz), it boots but I have the same results: it suspends, but none
-of the buttons wake it up.
+right, we need a way to tell the kernel that ttyO%d and ttyS%d are the
+exact same device so that console=ttyO0 and console=ttyS0 mean the same
+thing. That maintains backwards compatibility and lets people move on
 
-Kevin
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141201/4f5fda27/attachment.sig>
