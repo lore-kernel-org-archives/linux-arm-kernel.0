@@ -1,46 +1,100 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 02 Dec 2014 15:23:10 +0100
-Subject: [PATCH 2/2] ARM: EXYNOS: Remove ARCH_HAS_BANDGAP selection
-In-Reply-To: <1417502073-6322-2-git-send-email-a.kesavan@samsung.com>
-References: <1417502073-6322-1-git-send-email-a.kesavan@samsung.com>
- <1417502073-6322-2-git-send-email-a.kesavan@samsung.com>
-Message-ID: <4437134.0jfvIRYXSu@amdc1032>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 02 Dec 2014 14:25:34 +0000
+Subject: [PATCH v8 0/3] Qualcomm Resource Power Manager
+In-Reply-To: <1417038661-30209-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1417038661-30209-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <547DCBDE.6020504@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Bjorn,
 
-Hi,
+Thanks for the patches, I tested few regulators which are connected to 
+IO devices with this series on IFC6410 with APQ8064 and they work fine. 
+Except one issue which you already are aware of "regulator dependencies 
+on each other" I guess this is another topic which can be discussed 
+separately to this patchset.
 
-On Tuesday, December 02, 2014 12:04:33 PM Abhilash Kesavan wrote:
-> On removing the samsung thermal driver dependency on ARCH_HAS_BANDGAP,
-> selection of this symbol becomes redundant.
-> 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+Tested-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This has also a nice side-effect of removing TI_SOC_THERMAL availability
-from Exynos only kernel configurations.
 
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> ---
->  arch/arm/mach-exynos/Kconfig |    1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index e4a00ba..6ddfce7 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -9,7 +9,6 @@
->  
->  menuconfig ARCH_EXYNOS
->  	bool "Samsung EXYNOS" if ARCH_MULTI_V7
-> -	select ARCH_HAS_BANDGAP
->  	select ARCH_HAS_HOLES_MEMORYMODEL
->  	select ARCH_REQUIRE_GPIOLIB
->  	select ARM_AMBA
+--srini
+On 26/11/14 21:50, Bjorn Andersson wrote:
+> In order to support the SoC assisted power save features of the Qualcomm
+> platform some changes are most likely needed to the regulator part of the DT
+> bindings provided before.
+>
+> This version of the patchset carries the RPM core part, which allows us to move
+> forward with merging Josh's patches [1] as well as aiding the discussion and
+> development of the additional patches needed to properly implement the power
+> save features being discussed.
+>
+> It also carries the patch to the already merged regulator driver, to make it
+> compile.
+>
+> [1] https://lkml.org/lkml/2014/11/20/629
+>
+> Changes since v7:
+>    - Mark merged the regulator part of the previous series
+>    - Removed regulator part of dt binding, for further discussions
+>
+> Changes since v6:
+>    - Changed filenames from qcom,rpm.{txt,h} to qcom-rpm.{txt,h}
+>
+> Changes since v5:
+>    - Clarified dt binding
+>    - Converted regulator qcom,force-mode to enum instead of multi-boolean
+>    - Remove unecessary version handshake
+>    - Cleaned up naming of RPM resources between different RPM versions
+>    - Updated regulator qcom,force-mode parsing
+>    - Updated regulator qcom,power-mode-* parsing
+>    - Cleanups in rpm driver
+>    - Dropped dev_get_qcom_rpm helper function
+>
+> Changes since v4:
+>    - Moved RPM driver to mfd
+>
+> Changes since v3:
+>    - IPC register is acquired through syscon, as it's shared with others
+>
+> Changes since v2:
+>    - Fix copy-paste error in dt binding
+>    - Correct incomplete move from mfd to soc
+>    - Correct const mistake in regulator driver
+>
+> Changes since v1:
+>    - Moved rpm driver to drivers/soc
+>    - Extracted resource table structs from rpm struct, as per Srinivas request
+>    - Dropped mode setting support for the regulators for now. Unsure if we need
+>      it and it requires some rework from the codeaurora solution.
+>    - Using set_voltage_sel instead of rolling my own "snapping", as per Marks
+>      request
+>    - Split regulator ops in mV, uV and swtich versions as per Marks request.
+>    - Added devicetree property to enable pull down.
+>
+> Bjorn Andersson (3):
+>    mfd: devicetree: bindings: Add Qualcomm RPM DT binding
+>    mfd: qcom-rpm: Driver for the Qualcomm RPM
+>    regulator: qcom-rpm: Add missing state flag in call to RPM
+>
+>   Documentation/devicetree/bindings/mfd/qcom-rpm.txt |  70 +++
+>   drivers/mfd/Kconfig                                |  14 +
+>   drivers/mfd/Makefile                               |   1 +
+>   drivers/mfd/qcom_rpm.c                             | 581 +++++++++++++++++++++
+>   drivers/regulator/qcom_rpm-regulator.c             |   1 +
+>   include/dt-bindings/mfd/qcom-rpm.h                 | 154 ++++++
+>   include/linux/mfd/qcom_rpm.h                       |  13 +
+>   7 files changed, 834 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+>   create mode 100644 drivers/mfd/qcom_rpm.c
+>   create mode 100644 include/dt-bindings/mfd/qcom-rpm.h
+>   create mode 100644 include/linux/mfd/qcom_rpm.h
+>
+> --
+> 1.8.2.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
