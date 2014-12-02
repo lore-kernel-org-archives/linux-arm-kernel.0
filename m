@@ -1,35 +1,44 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 2 Dec 2014 10:46:41 -0600
-Subject: [PATCH v3 3/3] ARM: dts: socfpga: Add l3nic node
-In-Reply-To: <1417292052-12974-4-git-send-email-s.trumtrar@pengutronix.de>
-References: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
- <1417292052-12974-4-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <547DECF1.5040409@opensource.altera.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 02 Dec 2014 17:53:01 +0100
+Subject: [PATCH] dmaengine: fsl-edma: fix calculation of remaining bytes
+In-Reply-To: <1415879762-12177-1-git-send-email-stefan@agner.ch>
+References: <1415879762-12177-1-git-send-email-stefan@agner.ch>
+Message-ID: <5f5e46d80c45693b12c3ad8691d3c90a@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+CC: Alan Tull
-
-On 11/29/2014 02:14 PM, Steffen Trumtrar wrote:
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+On 2014-11-13 12:56, Stefan Agner wrote:
+> If the current transfer control descriptor (TCD) was not yet started,
+> the address will be the same as the initial address. Hence test if the
+> current address is less than or equal to the start address of each TCD.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > ---
->  arch/arm/boot/dts/socfpga.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
+> This bug was discovered during development on a AC97 capable SAI driver,
+> I don't think that this is currently a issue since only a few drivers
+> use DMA on Vybrid so far and don't use the remaining bytes information.
 > 
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index 4472fd92685c..e47b69c9f6cd 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -628,6 +628,11 @@
->  			arm,data-latency = <2 1 1>;
->  		};
+>  drivers/dma/fsl-edma.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+> index 3c5711d..58c6fc7 100644
+> --- a/drivers/dma/fsl-edma.c
+> +++ b/drivers/dma/fsl-edma.c
+> @@ -386,7 +386,7 @@ static size_t fsl_edma_desc_residue(struct
+> fsl_edma_chan *fsl_chan,
+>  					&(edesc->tcd[i].vtcd->daddr));
 >  
-> +		l3regs: gpv at ff800000 {
-> +			compatible = "altr,l3-nic";
-> +			reg = <0xff800000 0x100000>;
-> +		};
-> +
->  		mmc: dwmmc0 at ff704000 {
->  			compatible = "altr,socfpga-dw-mshc";
->  			reg = <0xff704000 0x1000>;
-> 
+>  		len -= size;
+> -		if (cur_addr > dma_addr && cur_addr < dma_addr + size) {
+> +		if (cur_addr >= dma_addr && cur_addr < dma_addr + size) {
+>  			len += dma_addr + size - cur_addr;
+>  			break;
+>  		}
+
+Hi Vinod,
+
+Afaik, this has not been applied yet, any reasons why?
+
+--
+Stefan
