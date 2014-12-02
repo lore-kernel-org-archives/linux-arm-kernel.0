@@ -1,118 +1,89 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 2 Dec 2014 18:29:52 +0800
-Subject: Build LSK 3.14 kernel with android-toolchain
-In-Reply-To: <2048273.C5mPR68Ukg@wuerfel>
-References: <CAAQ0ZWRQ05GiCOqV2Q6g2B6n+XN-qs9o6MKOFXiK2wKrW0nvog@mail.gmail.com>
- <20141202090450.GD2411@dragon> <20141202173921.314cc869@xhacker>
- <2048273.C5mPR68Ukg@wuerfel>
-Message-ID: <20141202182952.01eda0ca@xhacker>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 2 Dec 2014 11:36:40 +0100
+Subject: [PATCH v6] edac: synps: Added EDAC support for zynq ddr ecc
+ controller
+In-Reply-To: <CAGnW=BaRuZvFYCz0=s_ENn_sbH4YPxZiHt1x4GvRcUAyO0s+Jw@mail.gmail.com>
+References: <a1c485c3bb214d5699fdbfc6180f96f8@BN1AFFO11FD044.protection.gbl>
+ <20141201182611.GA4169@pd.tnic>
+ <CAGnW=BaRuZvFYCz0=s_ENn_sbH4YPxZiHt1x4GvRcUAyO0s+Jw@mail.gmail.com>
+Message-ID: <20141202103640.GB14649@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Dec 2014 02:24:03 -0800
-Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Tuesday 02 December 2014 17:39:21 Jisheng Zhang wrote:
-> > 
-> > On Tue, 2 Dec 2014 01:04:54 -0800
-> > Shawn Guo <shawn.guo@linaro.org> wrote:
-> > 
-> > > + LAKML and more people.
-> > > 
-> > > On Mon, Dec 01, 2014 at 05:38:38PM +0100, Arnd Bergmann wrote:
-> > > > On Monday 01 December 2014 16:32:21 Shawn Guo wrote:
-> > > > > Is it a valid or supported use case to build LSK 3.14 kernel with
-> > > > > android-toolchain?  I can build a LSK 3.14 kernel with Linux
-> > > > > toolchain gcc-linaro-arm-none-eabi-4.9-2014.09, which boots fine on
-> > > > > my board. When I build the same kernel with
-> > > > > android-toolchain-eabi-4.9-2014.09-x86, the kernel can be built out
-> > > > > successfully, but it fails to boot on the board at very early stage
-> > > > > with only uncompressing message shown up like below.
-> > > > > 
-> > > > > Uncompressing Linux... done, booting the kernel.
-> > > > > 
-> > > > > And it's not a LSK 3.14 specific problem, I tried to build mainline
-> > > > > 3.10, 3.14 and 3.18-rc4 with the android-toolchain, and they all
-> > > > > failed to boot.
-> > > > > 
-> > > > > I need some help to understand if it's a valid use case at all,
-> > > > > before I try to looking into the problem.
-> > > > 
-> > > > I would expect it to work, it's probably a good idea to find out
-> > > > why it doesn't. For all I know 'arm-none-eabi' is actually /not/
-> > > > supported for building the kernel, since that doesn't use the Linux
-> > > > Linux variant of eabi, while 'arm-*-linux-gnueabi' or
-> > > > 'arm-*-linux-gnueabihf' is the default for Linux these days and
-> > > > 'arm-*-linux-android' should be compatible with that.
-> > > 
-> > > Okay.  Thanks for the info.  It seems that I should download
-> > > gcc-linaro-arm-linux-gnueabihf-4.9-2014.09 for comparison testing then.
-> > > Actually, in the very first testing I used arm-linux-gnueabi-gcc 4.7.3
-> > > shipped with Ubuntu 14.04.
-> > > 
-> > > > What is the
-> > > > exact target triplet you use in those two cases?
-> > > 
-> > > They are arm-none-eabi and arm-linux-androideabi.  And I also replaced
-> > > the first toolchain with arm-linux-gnueabi one, and got the same result.
+On Tue, Dec 02, 2014 at 10:51:22AM +0530, punnaiah choudary kalluri wrote:
+> >> +/**
+> >> + * synps_edac_get_eccstate - Return the controller ecc enable/disable status
+> >> + * @base:    Pointer to the ddr memory contoller base address
+> >> + *
+> >> + * This routine returns the ECC enable/disable status for the controller
+> >> + *
+> >> + * Return: a ecc status boolean i.e true/false - enabled/disabled.
+> >> + */
+> >> +static bool synps_edac_get_eccstate(void __iomem *base)
+> >> +{
+> >> +     enum dev_type dt;
+> >> +     u32 ecctype;
+> >> +     bool state = false;
+> >> +
+> >> +     dt = synps_edac_get_dtype(base);
+> >> +     if (dt == DEV_UNKNOWN)
+> >> +             return state;
+> >> +
+> >> +     ecctype = readl(base + SCRUB_OFST) & SCRUB_MODE_MASK;
+> >> +
+> >> +     if ((ecctype == SCRUB_MODE_SECDED) && (dt == DEV_X2)) {
+> >> +             state = true;
+> >> +             writel(0x0, base + ECC_CTRL_OFST);
+> >
+> > Out of curiosity, why is that register write needed here? Maybe
+> > forgotten? It looks unbalanced...
 > 
-> Ok, so they are really all different.
-> 
-> > > > 
-> > > > A few things you could try:
-> > > > 
-> > > > - boot it in qemu using the vexpress or virt platform code, see if
-> > > >   the symptom is the same. If it is, attach gdb to the qemu gdbstub
-> > > >   to look at the contents of the _log_buf.
-> > > > 
-> > > > - Maybe debug_ll crashes, try disabling that
-> > > > 
-> > > > - Maybe debug_ll is disabled already, try enabling it to see if you
-> > > >   get more output.
-> > > 
-> > > I tracked it a little bit with debug_ll routine printch() and found it
-> > > dies at the first pr_info() call in arch/arm/kernel/setup.c:
-> > > 
-> > >       pr_info("Booting Linux on physical CPU 0x%x\n", mpidr);
-> > > 
-> > > And I spent some time to find out that the issue was introduced by
-> > > commit dad5451a322b (ARM: 7605/1: vmlinux.lds: Move .notes section
-> > > next to the rodata) since v3.8 release.  Reverting the commit helps me
-> > > to get a booting kernel that is built by arm-linux-androideabi
-> > > toolchain.  But I do not have the knowledge to understand what is
-> > > happening.
-> > > 
-> > 
-> > From my experience in last several years
-> > 
-> > 1. the arm-linux-androideabi- toolchain sets some options by default, PIC
-> > for example, even -mno-android can't disable all the side effects per my
-> > test.
-> 
-> Yes, that's definitely possible. Any idea how the android folks build their
-> kernel?
+> This is needed to start capturing the correctable and uncorrectable errors.
+> Writing 1 to this register bits will clear the counters and writing 0 will start
+> the counters.
 
-copied from https://android.googlesource.com/toolchain/build/+/HEAD/README
+So this definitely doesn't belong here then.
 
-The Android toolchain supports the following targets:
-   a. arm-linux-androideabi
-   b. arm-eabi  (for Android kernel)
-   c. arm-newlib-eabi	(for runnng gcc regression tests)
-   d. i[3456]86-*-linux-gnu, x86_64-*-linux-gnu	(for x86 targets)
+It should be the *last* thing you do after having initialized the whole
+driver entirely and successfully and you're ready to start logging
+errors.
 
-So they build android kernel using the arm-eabi- toolchain.
+Now you're calling it in synps_edac_mc_probe() so the counters will
+start before you have even initialized the rest of the driver.
 
-> 
-> > 2. the arm-linux-eandroideabi- toolchain use gold for linker by default.
-> > Maybe gold can't understand vmlinux.lds correctly?
-> 
-> That would be very easy to test, just set LD=${CROSS_COMPILE}ld.bfd on the
-> command line and rebuild. In my testing, I've encountered a number of
-> different bugs in both ld.bfd and ld.gold that prevent you from building
-> the kernel.
+What is worse, if one of those things you do on the init path fails, you
+enter prematurely and the counters are still running. Not good.
 
-That may be caused by issue #1. We encounter weired kernel panics, bugs when
-using the arm-linux-androideabi to build linux kernel. all are gone after
-switching to arm-eabi- or arm-linux-guneabi-
+> It is crossing 80 cols. so, there is line break here. I feel the other
+> way as the check patch throws warning for this.
 
-Thanks
+And I'm saying you shouldn't follow checkpatch to the letter and think
+for yourself instead.
+
+What do you think is more readable?
+
+This:
+
+                       dimm = csi->channels[j]->dimm;
+                       dimm->edac_mode = EDAC_FLAG_SECDED;
+                       dimm->mtype = synps_edac_get_mtype(priv->baseaddr);
+                       dimm->nr_pages =
+                           (size >> PAGE_SHIFT) / csi->nr_channels;
+                       dimm->grain = SYNPS_EDAC_ERR_GRAIN;
+                       dimm->dtype = synps_edac_get_dtype(priv->baseaddr);
+
+or this:
+
+                       dimm		= csi->channels[j]->dimm;
+                       dimm->mtype	= synps_edac_get_mtype(priv->baseaddr);
+                       dimm->grain	= SYNPS_EDAC_ERR_GRAIN;
+                       dimm->dtype	= synps_edac_get_dtype(priv->baseaddr);
+                       dimm->nr_pages	= (size >> PAGE_SHIFT) / csi->nr_channels;
+                       dimm->edac_mode	= EDAC_FLAG_SECDED;
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
