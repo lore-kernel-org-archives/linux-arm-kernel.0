@@ -1,100 +1,44 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 02 Dec 2014 14:25:34 +0000
-Subject: [PATCH v8 0/3] Qualcomm Resource Power Manager
-In-Reply-To: <1417038661-30209-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1417038661-30209-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <547DCBDE.6020504@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 2 Dec 2014 15:33:05 +0100
+Subject: [PATCH 1/5] arm/arm64: KVM: Correct KVM_ARM_VCPU_INIT power off
+ option
+In-Reply-To: <CAFEAcA_=2z+SkjTbU9NQkof-rVDS=fpG+XG4xEGVHkjoxrxrSg@mail.gmail.com>
+References: <1417113660-23610-1-git-send-email-christoffer.dall@linaro.org>
+ <1417113660-23610-2-git-send-email-christoffer.dall@linaro.org>
+ <CAFEAcA_=2z+SkjTbU9NQkof-rVDS=fpG+XG4xEGVHkjoxrxrSg@mail.gmail.com>
+Message-ID: <20141202143305.GG545@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Thu, Nov 27, 2014 at 10:44:29PM +0000, Peter Maydell wrote:
+> On 27 November 2014 at 18:40, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > The implementation of KVM_ARM_VCPU_INIT is currently not doing what
+> > userspace expects, namely making sure that a vcpu which may have been
+> > turned off using PSCI is returned to its initial state, which would be
+> > powered on if userspace does not set the KVM_ARM_VCPU_POWER_OFF flag.
+> >
+> > Implment the expected functionality and clarify the ABI.
+> 
+> ("Implement", if you have to respin.)
+> 
+> > diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> > index 9e193c8..4dcc8c2 100644
+> > --- a/arch/arm/kvm/arm.c
+> > +++ b/arch/arm/kvm/arm.c
+> > @@ -663,6 +663,8 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+> >          */
+> >         if (__test_and_clear_bit(KVM_ARM_VCPU_POWER_OFF, vcpu->arch.features))
+> >                 vcpu->arch.pause = true;
+> > +       else
+> > +               vcpu->arch.pause = false;
+> 
+> Out of curiosity, why do we have to test-and-clear the bit rather than
+> just testing it?
+> 
+No reason, I think we used to do this when we were always testing the
+flag directly instead of through the pause flag.
 
-Thanks for the patches, I tested few regulators which are connected to 
-IO devices with this series on IFC6410 with APQ8064 and they work fine. 
-Except one issue which you already are aware of "regulator dependencies 
-on each other" I guess this is another topic which can be discussed 
-separately to this patchset.
+I'll add a change of this.
 
-Tested-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-
-
---srini
-On 26/11/14 21:50, Bjorn Andersson wrote:
-> In order to support the SoC assisted power save features of the Qualcomm
-> platform some changes are most likely needed to the regulator part of the DT
-> bindings provided before.
->
-> This version of the patchset carries the RPM core part, which allows us to move
-> forward with merging Josh's patches [1] as well as aiding the discussion and
-> development of the additional patches needed to properly implement the power
-> save features being discussed.
->
-> It also carries the patch to the already merged regulator driver, to make it
-> compile.
->
-> [1] https://lkml.org/lkml/2014/11/20/629
->
-> Changes since v7:
->    - Mark merged the regulator part of the previous series
->    - Removed regulator part of dt binding, for further discussions
->
-> Changes since v6:
->    - Changed filenames from qcom,rpm.{txt,h} to qcom-rpm.{txt,h}
->
-> Changes since v5:
->    - Clarified dt binding
->    - Converted regulator qcom,force-mode to enum instead of multi-boolean
->    - Remove unecessary version handshake
->    - Cleaned up naming of RPM resources between different RPM versions
->    - Updated regulator qcom,force-mode parsing
->    - Updated regulator qcom,power-mode-* parsing
->    - Cleanups in rpm driver
->    - Dropped dev_get_qcom_rpm helper function
->
-> Changes since v4:
->    - Moved RPM driver to mfd
->
-> Changes since v3:
->    - IPC register is acquired through syscon, as it's shared with others
->
-> Changes since v2:
->    - Fix copy-paste error in dt binding
->    - Correct incomplete move from mfd to soc
->    - Correct const mistake in regulator driver
->
-> Changes since v1:
->    - Moved rpm driver to drivers/soc
->    - Extracted resource table structs from rpm struct, as per Srinivas request
->    - Dropped mode setting support for the regulators for now. Unsure if we need
->      it and it requires some rework from the codeaurora solution.
->    - Using set_voltage_sel instead of rolling my own "snapping", as per Marks
->      request
->    - Split regulator ops in mV, uV and swtich versions as per Marks request.
->    - Added devicetree property to enable pull down.
->
-> Bjorn Andersson (3):
->    mfd: devicetree: bindings: Add Qualcomm RPM DT binding
->    mfd: qcom-rpm: Driver for the Qualcomm RPM
->    regulator: qcom-rpm: Add missing state flag in call to RPM
->
->   Documentation/devicetree/bindings/mfd/qcom-rpm.txt |  70 +++
->   drivers/mfd/Kconfig                                |  14 +
->   drivers/mfd/Makefile                               |   1 +
->   drivers/mfd/qcom_rpm.c                             | 581 +++++++++++++++++++++
->   drivers/regulator/qcom_rpm-regulator.c             |   1 +
->   include/dt-bindings/mfd/qcom-rpm.h                 | 154 ++++++
->   include/linux/mfd/qcom_rpm.h                       |  13 +
->   7 files changed, 834 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/mfd/qcom-rpm.txt
->   create mode 100644 drivers/mfd/qcom_rpm.c
->   create mode 100644 include/dt-bindings/mfd/qcom-rpm.h
->   create mode 100644 include/linux/mfd/qcom_rpm.h
->
-> --
-> 1.8.2.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+-Christoffer
