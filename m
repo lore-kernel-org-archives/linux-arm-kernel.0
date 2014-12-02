@@ -1,95 +1,59 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 2 Dec 2014 04:57:16 +0000
-Subject: [PATCH v5][resend] of: replace Asahi Kasei Corp vendor prefix
-In-Reply-To: <5478603D.1080404@cogentembedded.com>
-References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>
- <20140922130026.GK3290@leverpostej>
- <CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>
- <20140922132743.GM3290@leverpostej>
- <87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>
- <1415845309.4269.6.camel@perches.com>
- <20141113025105.GA16652@verge.net.au>
- <87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>
- <20141113110740.GE3815@sirena.org.uk>
- <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>
- <20141114093554.GC3810@ulmo>
- <87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>
- <5469CD47.3040409@cogentembedded.com>
- <877fytxsde.wl%kuninori.morimoto.gx@renesas.com>
- <87egsob2cl.wl%kuninori.morimoto.gx@renesas.com>
- <5478603D.1080404@cogentembedded.com>
-Message-ID: <87d282sl6w.wl%kuninori.morimoto.gx@renesas.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Tue, 02 Dec 2014 13:59:07 +0900
+Subject: [PATCH v11 1/7] ARM: probes: move all probe code to dedicate
+ directory
+In-Reply-To: <1417423695-47521-1-git-send-email-wangnan0@huawei.com>
+References: <1417423513-47161-1-git-send-email-wangnan0@huawei.com>
+ <1417423695-47521-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <547D471B.2070908@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+(2014/12/01 17:48), Wang Nan wrote:
+> In discussion on LKML (https://lkml.org/lkml/2014/11/28/158), Russell
+> King suggest to move all probe related code to arch/arm/probes. This
+> patch do the work. Due to dependency on 'arch/arm/kernel/patch.h', this
+> patch also move patch.h to 'arch/arm/include/asm/patch.h', and related
+> '#include' directive are also midified to '#include <asm/patch.h>'.
 
-Current vendor-prefixes.txt already has "ak" prefix for Asahi Kasei Corp
-by ae8c4209af2c(of: Add vendor prefix for Asahi Kasei Corp.)
+Moving is good to me, but renaming files are also required I think.
 
-It went through the appropriate review process. But, almost all
-Asahi Kasei chip drivers are using "asahi-kasei" prefix today.
-(arch/arm/boot/dts/tegra20-seaboard.dts only is using "ak,ak8975",
- but there are instances of "asahi-kasei,ak8975" in other dts files.
- And drivers/iio/magnetometer/ak8975.c doesn't support "ak,ak8975" prefix)
-So, we made a mistake there.
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> ---
+>  arch/arm/Makefile                                |  1 +
+>  arch/arm/{kernel => include/asm}/patch.h         |  0
+>  arch/arm/kernel/Makefile                         | 16 ++--------------
+>  arch/arm/kernel/jump_label.c                     |  2 +-
+>  arch/arm/kernel/patch.c                          |  3 +--
+>  arch/arm/probes/Makefile                         | 15 +++++++++++++++
+>  arch/arm/{kernel => probes}/kprobes-arm.c        |  0
+>  arch/arm/{kernel => probes}/kprobes-common.c     |  0
+>  arch/arm/{kernel => probes}/kprobes-test-arm.c   |  0
+>  arch/arm/{kernel => probes}/kprobes-test-thumb.c |  0
+>  arch/arm/{kernel => probes}/kprobes-test.c       |  0
+>  arch/arm/{kernel => probes}/kprobes-test.h       |  0
+>  arch/arm/{kernel => probes}/kprobes-thumb.c      |  0
+>  arch/arm/{kernel => probes}/kprobes.c            |  2 +-
+>  arch/arm/{kernel => probes}/kprobes.h            |  0
+>  arch/arm/{kernel => probes}/probes-arm.c         |  0
+>  arch/arm/{kernel => probes}/probes-arm.h         |  0
+>  arch/arm/{kernel => probes}/probes-thumb.c       |  0
+>  arch/arm/{kernel => probes}/probes-thumb.h       |  0
+>  arch/arm/{kernel => probes}/probes.c             |  0
+>  arch/arm/{kernel => probes}/probes.h             |  0
+>  arch/arm/{kernel => probes}/uprobes-arm.c        |  0
+>  arch/arm/{kernel => probes}/uprobes.c            |  0
+>  arch/arm/{kernel => probes}/uprobes.h            |  0
 
-In addition, checkpatch.pl reports WARNING if it is using "asahi-kasei"
-prerfix in DT file.
-(DT compatible string vendor "asahi-kasei" appears un-documented)
+As I did on x86, these would be better renamed as expressing what they do.
+I guess most of the files may have emulate-*.c or decode-*.c :)
 
-Marking it deprecated and warning with checkpatch is certainly
-preferable. So, this patch replace "ak" to "asahi-kasei" in
-vendor-prefixes.txt. (and fixup tegra20-seaboard)
+Thank you,
 
-OTOH, Asahi Kasei is usually referred to as "AKM", but this patch
-doesn't care about it. Because no DT is using that today.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
-Acked-by: Alexandre Courbot <acourbot@nvidia.com>
----
-v4 -> v5
 
- - venter -> vendor on Subject
- - fixup Acked-by ordering
-
- .../devicetree/bindings/vendor-prefixes.txt        |    2 +-
- arch/arm/boot/dts/tegra20-seaboard.dts             |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 723999d..ddcb4cd 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -9,7 +9,6 @@ ad	Avionic Design GmbH
- adapteva	Adapteva, Inc.
- adi	Analog Devices, Inc.
- aeroflexgaisler	Aeroflex Gaisler AB
--ak	Asahi Kasei Corp.
- allwinner	Allwinner Technology Co., Ltd.
- altr	Altera Corp.
- amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
-@@ -20,6 +19,7 @@ amstaos	AMS-Taos Inc.
- apm	Applied Micro Circuits Corporation (APM)
- arm	ARM Ltd.
- armadeus	ARMadeus Systems SARL
-+asahi-kasei	Asahi Kasei Corp.
- atmel	Atmel Corporation
- auo	AU Optronics Corporation
- avago	Avago Technologies
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index a1d4bf9..7f5cf80 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -405,7 +405,7 @@
- 		clock-frequency = <400000>;
- 
- 		magnetometer at c {
--			compatible = "ak,ak8975";
-+			compatible = "asahi-kasei,ak8975";
- 			reg = <0xc>;
- 			interrupt-parent = <&gpio>;
- 			interrupts = <TEGRA_GPIO(N, 5) IRQ_TYPE_LEVEL_HIGH>;
 -- 
-1.7.9.5
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
