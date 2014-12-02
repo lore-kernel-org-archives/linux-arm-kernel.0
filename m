@@ -1,60 +1,31 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 2 Dec 2014 13:05:24 +0100
-Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for
- IOMMU drivers
-In-Reply-To: <2039644.fesfKXTybP@wuerfel>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <CAL_JsqKHvh9KSTYrrs1Pts5Kg=8dA1V6NiW57_2vdDH173qQGg@mail.gmail.com>
- <547D84F4.8030204@samsung.com> <2039644.fesfKXTybP@wuerfel>
-Message-ID: <20141202120523.GA7134@ulmo>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 2 Dec 2014 13:05:39 +0100
+Subject: [PATCH] iommu: Decouple iommu_map_sg from CPU page size
+In-Reply-To: <2d38d270a532b52f73a720572f8f085dfa08321e.1416936761.git.robin.murphy@arm.com>
+References: <2d38d270a532b52f73a720572f8f085dfa08321e.1416936761.git.robin.murphy@arm.com>
+Message-ID: <20141202120539.GB32294@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02, 2014 at 10:36:59AM +0100, Arnd Bergmann wrote:
-> On Tuesday 02 December 2014 10:23:00 Marek Szyprowski wrote:
-> > >> +static inline void of_iommu_set_ops(struct device_node *np,
-> > >> +                                   const struct iommu_ops *ops)
-> > >> +{
-> > >> +       np->data = (struct iommu_ops *)ops;
-> > >> +}
-> > >> +
-> > >> +static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
-> > >> +{
-> > >> +       return np->data;
-> > >> +}
-> > > This may collide with other users. While use of it is rare, PPC uses
-> > > it in its PCI code. The OF_DYNAMIC code frees it but never actually
-> > > sets it. There may be some coming usage with the DT overlay code or
-> > > that's just a bug. Pantelis or Grant can comment. If not, I think we
-> > > really should try to get rid of this pointer rather than expand it's
-> > > usage.
-> > 
-> > I think that for the initial version it is ok to use np->data. When 
-> > per-iommu
-> > controller structure is introduced later, it can be reused also for 
-> > performing
-> > of_node to iommu_ops lookup, because IOMMU framework will need to keep track
-> > on all such iommu controllers anyway.
+On Tue, Nov 25, 2014 at 05:50:55PM +0000, Robin Murphy wrote:
+> If the IOMMU supports pages smaller than the CPU page size, segments
+> which lie at offsets within the CPU page may be mapped based on the
+> finer-grained IOMMU page boundaries. This minimises the amount of
+> non-buffer memory between the CPU page boundary and the start of the
+> segment which must be mapped and therefore exposed to the device, and
+> brings the default iommu_map_sg implementation in line with
+> iommu_map/unmap with respect to alignment.
 > 
-> Agreed. I think in the long run, we will have a 'struct iommu' that is
-> added into a global linked list and that contains (among other things)
-> an iommu_ops pointer and a device_node pointer. The of_iommu_get_ops
-> function then walks the list to find the right iommu instance.
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> 
+> Hi Joerg,
+> 
+> I noticed this whilst wiring up DMA mapping to this new API - on arm64
+> we anticipate running 4k IOMMU pages with 64k CPU pages, in which case
+> the alignment check ends up being unnecessarily strict.
 
-If we end up doing that, how is this any different from what Hiroshi and
-I initially proposed over a year ago (and then again earlier this year)?
+Applied to the core branch, thanks.
 
-The only remaining difference would be that this current proposal needs
-IOMMUs to be registered even before other devices are instantiated for
-no apparent reason other than ordering. The original proposal allowed
-the IOMMU driver to register just like any other driver and ordering to
-be handled via deferred probing.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141202/124488df/attachment.sig>
+	Joerg
