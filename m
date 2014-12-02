@@ -1,137 +1,63 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 2 Dec 2014 10:40:28 +0100
-Subject: [PATCH v2] ARM: zynq: DT: Add USB to device tree
-In-Reply-To: <1417509978-19060-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1417509978-19060-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <63f1ea2ffb3f49f29ec46183f3009817@BN1AFFO11FD032.protection.gbl>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 2 Dec 2014 09:41:56 +0000
+Subject: [PATCH 2/4] iommu: add ARM LPAE page table allocator
+In-Reply-To: <2303317.ZEDe4Fptcu@avalon>
+References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
+ <3665319.WRLLeiHAYk@avalon> <20141201172315.GI18466@arm.com>
+ <2303317.ZEDe4Fptcu@avalon>
+Message-ID: <20141202094156.GB9917@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2014 09:46 AM, Soren Brinkmann wrote:
-> Add USB nodes to zc702, zc706 and zed device trees.
+On Mon, Dec 01, 2014 at 08:21:58PM +0000, Laurent Pinchart wrote:
+> On Monday 01 December 2014 17:23:15 Will Deacon wrote:
+> > On Sun, Nov 30, 2014 at 11:29:46PM +0000, Laurent Pinchart wrote:
+> > > On Thursday 27 November 2014 11:51:16 Will Deacon wrote:
+> > > > +     /* Looking good; allocate a pgd */
+> > > > +     data->pgd = alloc_pages_exact(1UL << data->pg_shift,
+> > > > +                                   GFP_KERNEL | __GFP_ZERO);
+> > > 
+> > > data->pg_shift is computed as __ffs(cfg->pgsize_bitmap). 1UL <<
+> > > data->pg_shift will thus be equal to the smallest page size supported by
+> > > the IOMMU. This will thus allocate 4kB, 16kB or 64kB depending on the
+> > > IOMMU configuration. However, if I'm not mistaken the top-level directory
+> > > needs to store one entry per largest supported page size. That's 4, 128
+> > > or 8 entries depending on the configuration. You're thus over-allocating.
+> > 
+> > Yeah, I'll take a closer look at this. The size of the pgd really depends
+> > on the TxSZ configuration, which in turn depends on the ias and the page
+> > size. There are also alignment constraints to bear in mind, but I'll see
+> > what I can do (as it stands, over-allocating will always work).
 > 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> v2:
->  - remove '@0' from phy node name
->  - don't add bogus space
-> ---
->  arch/arm/boot/dts/zynq-7000.dtsi | 20 ++++++++++++++++++++
->  arch/arm/boot/dts/zynq-zc702.dts | 11 +++++++++++
->  arch/arm/boot/dts/zynq-zc706.dts | 10 ++++++++++
->  arch/arm/boot/dts/zynq-zed.dts   | 10 ++++++++++
->  4 files changed, 51 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index ce2ef5bec4f2..68096bb027db 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -315,6 +315,26 @@
->  			clocks = <&clkc 4>;
->  		};
->  
-> +		usb0: usb at e0002000 {
-> +			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
-> +			status = "disabled";
-> +			clocks = <&clkc 28>;
-> +			interrupt-parent = <&intc>;
-> +			interrupts = <0 21 4>;
-> +			reg = <0xe0002000 0x1000>;
-> +			phy_type = "ulpi";
-> +		};
-> +
-> +		usb1: usb at e0003000 {
-> +			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
-> +			status = "disabled";
-> +			clocks = <&clkc 29>;
-> +			interrupt-parent = <&intc>;
-> +			interrupts = <0 44 4>;
-> +			reg = <0xe0003000 0x1000>;
-> +			phy_type = "ulpi";
-> +		};
-> +
->  		watchdog0: watchdog at f8005000 {
->  			clocks = <&clkc 45>;
->  			compatible = "xlnx,zynq-wdt-r1p2";
-> diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-> index 94e2cda6f9b6..f80c6e65f6e8 100644
-> --- a/arch/arm/boot/dts/zynq-zc702.dts
-> +++ b/arch/arm/boot/dts/zynq-zc702.dts
-> @@ -36,6 +36,11 @@
->  			linux,default-trigger = "heartbeat";
->  		};
->  	};
-> +
-> +	usb_phy0: usb-phy {
-> +		compatible = "usb-nop-xceiv";
-> +		#phy-cells = <0>;
-> +	};
->  };
->  
->  &can0 {
-> @@ -135,3 +140,9 @@
->  &uart1 {
->  	status = "okay";
->  };
-> +
-> +&usb0 {
-> +	status = "okay";
-> +	dr_mode = "host";
-> +	usb-phy = <&usb_phy0>;
-> +};
-> diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-> index a8bbdfbc7093..bece52e47cfe 100644
-> --- a/arch/arm/boot/dts/zynq-zc706.dts
-> +++ b/arch/arm/boot/dts/zynq-zc706.dts
-> @@ -27,6 +27,10 @@
->  		bootargs = "console=ttyPS0,115200 earlyprintk";
->  	};
->  
-> +	usb_phy0: usb-phy {
-> +		compatible = "usb-nop-xceiv";
-> +		#phy-cells = <0>;
-> +	};
->  };
->  
->  &gem0 {
-> @@ -114,3 +118,9 @@
->  &uart1 {
->  	status = "okay";
->  };
-> +
-> +&usb0 {
-> +	status = "okay";
-> +	dr_mode = "host";
-> +	usb-phy = <&usb_phy0>;
-> +};
-> diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
-> index 697779a353ed..efecb2379832 100644
-> --- a/arch/arm/boot/dts/zynq-zed.dts
-> +++ b/arch/arm/boot/dts/zynq-zed.dts
-> @@ -27,6 +27,10 @@
->  		bootargs = "console=ttyPS0,115200 earlyprintk";
->  	};
->  
-> +	usb_phy0: usb-phy {
-> +		compatible = "usb-nop-xceiv";
-> +		#phy-cells = <0>;
-> +	};
->  };
->  
->  &gem0 {
-> @@ -46,3 +50,9 @@
->  &uart1 {
->  	status = "okay";
->  };
-> +
-> +&usb0 {
-> +	status = "okay";
-> +	dr_mode = "host";
-> +	usb-phy = <&usb_phy0>;
-> +};
-> 
+> Beside wasting memory, the code also doesn't reflect the requirements. It 
+> works by chance, meaning it could break later.
 
-Based on Arnd comment please fix it and rebase it on the top of zynq/dt branch.
+It won't break, as the maximum size *is* bounded by a page for stage-1
+and we already handle stage-2 concatenation correctly.
 
-Thanks,
-Michal
+> That's why I'd like to see this 
+> being fixed. Can't the size be computed with something like
+> 
+> 	size = (1 << (ias - data->levels * data->pg_shift))
+> 	     * sizeof(arm_lpae_iopte);
+> 
+> (please add a proper detailed comment to explain the computation, as the 
+> meaning is not straightforward)
+
+That's actually the easy part. The harder part is getting the correct
+alignment, which means managing by own kmem_cache on a per-ops basis. That
+feels like overkill to me and we also need to make sure that we don't screw
+up the case of concatenated pgds at stage-2. On top of that, since each
+cache would be per-ops, I'm not even sure we'd save anything (the slab
+allocators all operate on pages afaict).
+
+If I use alloc_page_exact, we'll still have some wasteage, but it would 
+be less for the case where the CPU page size is smaller than the SMMU page
+size. Do you think that's worth the extra complexity? We allocate full pages
+at all levels after the pgd, so the wasteage is relatively small.
+
+An alternative would be preinitialising some caches for `likely' pgd sizes,
+but that's also horrible, especially if the kernel decides that it doesn't
+need a bunch of the configurations at runtime.
+
+Will
