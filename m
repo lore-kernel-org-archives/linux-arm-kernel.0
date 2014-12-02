@@ -1,62 +1,16 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 02 Dec 2014 10:53:32 +0900
-Subject: [PATCH] clk: samsung: exynos4415: Fix build with PM_SLEEP disabled
-In-Reply-To: <1417425174-26694-1-git-send-email-k.kozlowski@samsung.com>
-References: <1417425174-26694-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <547D1B9C.9030900@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 2 Dec 2014 09:16:56 +0530
+Subject: [PATCH 5/8] arm_big_little: free OPP table created during ->init()
+In-Reply-To: <2087619.jKJQDeFADg@vostro.rjw.lan>
+References: <cover.1416910766.git.viresh.kumar@linaro.org>
+ <b5fca3025ec6411bb134306059c119b6b58f5ee2.1416910766.git.viresh.kumar@linaro.org>
+ <CAKohpom2tLb6Krq94xsU9ra22ErNV=j6f5QCoR3ctaRj43=Jcw@mail.gmail.com>
+ <2087619.jKJQDeFADg@vostro.rjw.lan>
+Message-ID: <CAKohpokdwTCi9e_wdZpgv_g9DWpG_gPAtt=MnvJ461_gphkV9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2014 06:12 PM, Krzysztof Kozlowski wrote:
-> Fix following build errors when PM_SLEEP is disabled (e.g. by disabling
-> SUSPEND and HIBERNATION):
-> 
-> drivers/clk/samsung/clk-exynos4415.c: In function ?exynos4415_cmu_init?:
-> drivers/clk/samsung/clk-exynos4415.c:982:2: error: ?exynos4415_ctx? undeclared (first use in this function)
-> drivers/clk/samsung/clk-exynos4415.c:982:2: note: each undeclared identifier is reported only once for each function it appears in
-> drivers/clk/samsung/clk-exynos4415.c: In function ?exynos4415_cmu_dmc_init?:
-> drivers/clk/samsung/clk-exynos4415.c:1123:2: error: ?exynos4415_dmc_ctx? undeclared (first use in this function)
-> make[3]: *** [drivers/clk/samsung/clk-exynos4415.o] Error 1
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos4415.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos4415.c b/drivers/clk/samsung/clk-exynos4415.c
-> index c7208c7a3add..2123fc251e0f 100644
-> --- a/drivers/clk/samsung/clk-exynos4415.c
-> +++ b/drivers/clk/samsung/clk-exynos4415.c
-> @@ -118,12 +118,13 @@ enum exynos4415_plls {
->  	nr_plls,
->  };
->  
-> +static struct samsung_clk_provider *exynos4415_ctx;
-> +
->  /*
->   * Support for CMU save/restore across system suspends
->   */
->  #ifdef CONFIG_PM_SLEEP
->  static struct samsung_clk_reg_dump *exynos4415_clk_regs;
-> -static struct samsung_clk_provider *exynos4415_ctx;
->  
->  static unsigned long exynos4415_cmu_clk_regs[] __initdata = {
->  	SRC_LEFTBUS,
-> @@ -1031,9 +1032,10 @@ enum exynos4415_dmc_plls {
->  	nr_dmc_plls,
->  };
->  
-> +static struct samsung_clk_provider *exynos4415_dmc_ctx;
-> +
->  #ifdef CONFIG_PM_SLEEP
->  static struct samsung_clk_reg_dump *exynos4415_dmc_clk_regs;
-> -static struct samsung_clk_provider *exynos4415_dmc_ctx;
->  
->  static unsigned long exynos4415_cmu_dmc_clk_regs[] __initdata = {
->  	MPLL_LOCK,
-> 
+On 2 December 2014 at 04:07, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> I overlooked this one due to a numbering conflict.  Applied now.
 
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-
-Thanks,
-Chanwoo Choi
+I guessed that :).. Thanks.
