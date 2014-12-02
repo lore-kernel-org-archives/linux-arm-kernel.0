@@ -1,97 +1,190 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 02 Dec 2014 11:24:03 +0100
-Subject: Build LSK 3.14 kernel with android-toolchain
-In-Reply-To: <20141202173921.314cc869@xhacker>
-References: <CAAQ0ZWRQ05GiCOqV2Q6g2B6n+XN-qs9o6MKOFXiK2wKrW0nvog@mail.gmail.com>
- <20141202090450.GD2411@dragon> <20141202173921.314cc869@xhacker>
-Message-ID: <2048273.C5mPR68Ukg@wuerfel>
+From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
+Date: Tue, 2 Dec 2014 12:30:37 +0200
+Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
+ drivers
+In-Reply-To: <CAL_JsqKHvh9KSTYrrs1Pts5Kg=8dA1V6NiW57_2vdDH173qQGg@mail.gmail.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <1417453034-21379-2-git-send-email-will.deacon@arm.com>
+ <CAL_JsqKHvh9KSTYrrs1Pts5Kg=8dA1V6NiW57_2vdDH173qQGg@mail.gmail.com>
+Message-ID: <DCA61A73-5066-4CA1-AE41-2157C6A6C9B6@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 December 2014 17:39:21 Jisheng Zhang wrote:
+
+Hi Rob,
+
+> On Dec 2, 2014, at 01:54 , Rob Herring <robherring2@gmail.com> wrote:
 > 
-> On Tue, 2 Dec 2014 01:04:54 -0800
-> Shawn Guo <shawn.guo@linaro.org> wrote:
+> Adding Grant and Pantelis...
 > 
-> > + LAKML and more people.
-> > 
-> > On Mon, Dec 01, 2014 at 05:38:38PM +0100, Arnd Bergmann wrote:
-> > > On Monday 01 December 2014 16:32:21 Shawn Guo wrote:
-> > > > Is it a valid or supported use case to build LSK 3.14 kernel with
-> > > > android-toolchain?  I can build a LSK 3.14 kernel with Linux toolchain
-> > > > gcc-linaro-arm-none-eabi-4.9-2014.09, which boots fine on my board.
-> > > > When I build the same kernel with
-> > > > android-toolchain-eabi-4.9-2014.09-x86, the kernel can be built out
-> > > > successfully, but it fails to boot on the board at very early stage
-> > > > with only uncompressing message shown up like below.
-> > > > 
-> > > > Uncompressing Linux... done, booting the kernel.
-> > > > 
-> > > > And it's not a LSK 3.14 specific problem, I tried to build mainline
-> > > > 3.10, 3.14 and 3.18-rc4 with the android-toolchain, and they all
-> > > > failed to boot.
-> > > > 
-> > > > I need some help to understand if it's a valid use case at all, before
-> > > > I try to looking into the problem.
-> > > 
-> > > I would expect it to work, it's probably a good idea to find out
-> > > why it doesn't. For all I know 'arm-none-eabi' is actually /not/
-> > > supported for building the kernel, since that doesn't use the Linux
-> > > Linux variant of eabi, while 'arm-*-linux-gnueabi' or
-> > > 'arm-*-linux-gnueabihf' is the default for Linux these days and
-> > > 'arm-*-linux-android' should be compatible with that.
-> > 
-> > Okay.  Thanks for the info.  It seems that I should download
-> > gcc-linaro-arm-linux-gnueabihf-4.9-2014.09 for comparison testing then.
-> > Actually, in the very first testing I used arm-linux-gnueabi-gcc 4.7.3
-> > shipped with Ubuntu 14.04.
-> > 
-> > > What is the
-> > > exact target triplet you use in those two cases?
-> > 
-> > They are arm-none-eabi and arm-linux-androideabi.  And I also replaced
-> > the first toolchain with arm-linux-gnueabi one, and got the same result.
-
-Ok, so they are really all different.
-
-> > > 
-> > > A few things you could try:
-> > > 
-> > > - boot it in qemu using the vexpress or virt platform code, see if
-> > >   the symptom is the same. If it is, attach gdb to the qemu gdbstub
-> > >   to look at the contents of the _log_buf.
-> > > 
-> > > - Maybe debug_ll crashes, try disabling that
-> > > 
-> > > - Maybe debug_ll is disabled already, try enabling it to see if you
-> > >   get more output.
-> > 
-> > I tracked it a little bit with debug_ll routine printch() and found it
-> > dies at the first pr_info() call in arch/arm/kernel/setup.c:
-> > 
-> >       pr_info("Booting Linux on physical CPU 0x%x\n", mpidr);
-> > 
-> > And I spent some time to find out that the issue was introduced by
-> > commit dad5451a322b (ARM: 7605/1: vmlinux.lds: Move .notes section
-> > next to the rodata) since v3.8 release.  Reverting the commit helps me
-> > to get a booting kernel that is built by arm-linux-androideabi
-> > toolchain.  But I do not have the knowledge to understand what is
-> > happening.
-> > 
+> On Mon, Dec 1, 2014 at 10:57 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> IOMMU drivers must be initialised before any of their upstream devices,
+>> otherwise the relevant iommu_ops won't be configured for the bus in
+>> question. To solve this, a number of IOMMU drivers use initcalls to
+>> initialise the driver before anything has a chance to be probed.
+>> 
+>> Whilst this solves the immediate problem, it leaves the job of probing
+>> the IOMMU completely separate from the iommu_ops to configure the IOMMU,
+>> which are called on a per-bus basis and require the driver to figure out
+>> exactly which instance of the IOMMU is being requested. In particular,
+>> the add_device callback simply passes a struct device to the driver,
+>> which then has to parse firmware tables or probe buses to identify the
+>> relevant IOMMU instance.
+>> 
+>> This patch takes the first step in addressing this problem by adding an
+>> early initialisation pass for IOMMU drivers, giving them the ability to
+>> store some per-instance data in their iommu_ops structure and store that
+>> in their of_node. This can later be used when parsing OF masters to
+>> identify the IOMMU instance in question.
+>> 
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> Acked-by: Joerg Roedel <jroedel@suse.de>
+>> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Tested-by: Robin Murphy <robin.murphy@arm.com>
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> ---
+>> drivers/iommu/of_iommu.c          | 17 +++++++++++++++++
+>> include/asm-generic/vmlinux.lds.h |  2 ++
+>> include/linux/iommu.h             |  2 ++
+>> include/linux/of_iommu.h          | 25 +++++++++++++++++++++++++
+>> 4 files changed, 46 insertions(+)
+>> 
+>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>> index e550ccb7634e..89b903406968 100644
+>> --- a/drivers/iommu/of_iommu.c
+>> +++ b/drivers/iommu/of_iommu.c
+>> @@ -22,6 +22,9 @@
+>> #include <linux/of.h>
+>> #include <linux/of_iommu.h>
+>> 
+>> +static const struct of_device_id __iommu_of_table_sentinel
+>> +       __used __section(__iommu_of_table_end);
+>> +
+>> /**
+>>  * of_get_dma_window - Parse *dma-window property and returns 0 if found.
+>>  *
+>> @@ -89,3 +92,17 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+>>        return 0;
+>> }
+>> EXPORT_SYMBOL_GPL(of_get_dma_window);
+>> +
+>> +void __init of_iommu_init(void)
+>> +{
+>> +       struct device_node *np;
+>> +       const struct of_device_id *match, *matches = &__iommu_of_table;
+>> +
+>> +       for_each_matching_node_and_match(np, matches, &match) {
+>> +               const of_iommu_init_fn init_fn = match->data;
+>> +
+>> +               if (init_fn(np))
+>> +                       pr_err("Failed to initialise IOMMU %s\n",
+>> +                               of_node_full_name(np));
+>> +       }
+>> +}
+>> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+>> index aa70cbda327c..bee5d683074d 100644
+>> --- a/include/asm-generic/vmlinux.lds.h
+>> +++ b/include/asm-generic/vmlinux.lds.h
+>> @@ -164,6 +164,7 @@
+>> #define CLKSRC_OF_TABLES()     OF_TABLE(CONFIG_CLKSRC_OF, clksrc)
+>> #define IRQCHIP_OF_MATCH_TABLE() OF_TABLE(CONFIG_IRQCHIP, irqchip)
+>> #define CLK_OF_TABLES()                OF_TABLE(CONFIG_COMMON_CLK, clk)
+>> +#define IOMMU_OF_TABLES()      OF_TABLE(CONFIG_OF_IOMMU, iommu)
+>> #define RESERVEDMEM_OF_TABLES()        OF_TABLE(CONFIG_OF_RESERVED_MEM, reservedmem)
+>> #define CPU_METHOD_OF_TABLES() OF_TABLE(CONFIG_SMP, cpu_method)
+>> #define EARLYCON_OF_TABLES()   OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
+>> @@ -497,6 +498,7 @@
+>>        CLK_OF_TABLES()                                                 \
+>>        RESERVEDMEM_OF_TABLES()                                         \
+>>        CLKSRC_OF_TABLES()                                              \
+>> +       IOMMU_OF_TABLES()                                               \
+>>        CPU_METHOD_OF_TABLES()                                          \
+>>        KERNEL_DTB()                                                    \
+>>        IRQCHIP_OF_MATCH_TABLE()                                        \
+>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+>> index e6a7c9ff72f2..7b83f9f8e11d 100644
+>> --- a/include/linux/iommu.h
+>> +++ b/include/linux/iommu.h
+>> @@ -103,6 +103,7 @@ enum iommu_attr {
+>>  * @domain_get_attr: Query domain attributes
+>>  * @domain_set_attr: Change domain attributes
+>>  * @pgsize_bitmap: bitmap of supported page sizes
+>> + * @priv: per-instance data private to the iommu driver
+>>  */
+>> struct iommu_ops {
+>>        bool (*capable)(enum iommu_cap);
+>> @@ -133,6 +134,7 @@ struct iommu_ops {
+>>        u32 (*domain_get_windows)(struct iommu_domain *domain);
+>> 
+>>        unsigned long pgsize_bitmap;
+>> +       void *priv;
+>> };
+>> 
+>> #define IOMMU_GROUP_NOTIFY_ADD_DEVICE          1 /* Device added */
+>> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+>> index 51a560f34bca..5762cdc8effe 100644
+>> --- a/include/linux/of_iommu.h
+>> +++ b/include/linux/of_iommu.h
+>> @@ -1,12 +1,17 @@
+>> #ifndef __OF_IOMMU_H
+>> #define __OF_IOMMU_H
+>> 
+>> +#include <linux/iommu.h>
+>> +#include <linux/of.h>
+>> +
+>> #ifdef CONFIG_OF_IOMMU
+>> 
+>> extern int of_get_dma_window(struct device_node *dn, const char *prefix,
+>>                             int index, unsigned long *busno, dma_addr_t *addr,
+>>                             size_t *size);
+>> 
+>> +extern void of_iommu_init(void);
+>> +
+>> #else
+>> 
+>> static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+>> @@ -16,6 +21,26 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+>>        return -EINVAL;
+>> }
+>> 
+>> +static inline void of_iommu_init(void) { }
+>> +
+>> #endif /* CONFIG_OF_IOMMU */
+>> 
+>> +static inline void of_iommu_set_ops(struct device_node *np,
+>> +                                   const struct iommu_ops *ops)
+>> +{
+>> +       np->data = (struct iommu_ops *)ops;
+>> +}
+>> +
+>> +static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+>> +{
+>> +       return np->data;
+>> +}
 > 
-> From my experience in last several years
+> This may collide with other users. While use of it is rare, PPC uses
+> it in its PCI code. The OF_DYNAMIC code frees it but never actually
+> sets it. There may be some coming usage with the DT overlay code or
+> that's just a bug. Pantelis or Grant can comment. If not, I think we
+> really should try to get rid of this pointer rather than expand it's
+> usage.
 > 
-> 1. the arm-linux-androideabi- toolchain sets some options by default, PIC for
-> example, even -mno-android can't disable all the side effects per my test.
 
-Yes, that's definitely possible. Any idea how the android folks build their
-kernel?
+That assignment is not good as it is. Under OF_DYNAMIC on of_node_release it will attempt
+to kfree it.
 
-> 2. the arm-linux-eandroideabi- toolchain use gold for linker by default. Maybe
-> gold can't understand vmlinux.lds correctly?
+For now kdup?ing the ops structure should be enough, but I?d like to see this removed eventually.
+  
+This data pointer just has to go. As far as I can tell it is used in CELL PPC and in the 
+freescale timers but IMHO it?s just a bad idea to hang per-driver data in the device node.
 
-That would be very easy to test, just set LD=${CROSS_COMPILE}ld.bfd on the
-command line and rebuild. In my testing, I've encountered a number of different
-bugs in both ld.bfd and ld.gold that prevent you from building the kernel.
+It is simple enough to use an IDR or something when you need to grab data related to the
+device node instead of stashing stuff in the data pointer.  
 
-	Arnd
+> I didn't see a user of this. I'm guessing that is coming in a SMMU patch?
+> 
+> Rob
+
+Regards
+
+? Pantelis
