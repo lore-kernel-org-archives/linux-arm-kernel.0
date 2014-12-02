@@ -1,45 +1,38 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 2 Dec 2014 14:29:43 +0100
-Subject: [PATCH 5/5] arm/arm64: KVM: Turn off vcpus and flush stage-2
- pgtables on sytem exit events
-In-Reply-To: <CAFEAcA9kq=Fvhbc5+bTavb1KiaEn6+JYf=c6MaZYihbu_gT9sg@mail.gmail.com>
-References: <1417113660-23610-1-git-send-email-christoffer.dall@linaro.org>
- <1417113660-23610-6-git-send-email-christoffer.dall@linaro.org>
- <CAFEAcA9hRvaWZiXOjTQP3+4B+r7h7W7oqRm6y=cxw+EJKNk-0w@mail.gmail.com>
- <CAFEAcA9kq=Fvhbc5+bTavb1KiaEn6+JYf=c6MaZYihbu_gT9sg@mail.gmail.com>
-Message-ID: <20141202132943.GF545@cbox>
+From: harinikatakamlinux@gmail.com (Harini Katakam)
+Date: Tue, 2 Dec 2014 19:00:40 +0530
+Subject: [PATCH 3/4] devicetree: bindings: Add defeature-repeated-start
+ property for Cadence I2C
+In-Reply-To: <20141202131611.GC4072@katana>
+References: <1417514749-24319-1-git-send-email-harinik@xilinx.com>
+ <1417514749-24319-4-git-send-email-harinik@xilinx.com>
+ <20141202111907.GC23671@leverpostej>
+ <CAFcVECLtPx6shBXJbg9Uf_8fnhkMoO1zpoxGcdda7PSA7z_2rA@mail.gmail.com>
+ <20141202125203.GA4072@katana>
+ <CAFcVECJwFoFd6GrmF282CG+fELnYb=FNCTDq=RYKky_dHha=Jg@mail.gmail.com>
+ <20141202131611.GC4072@katana>
+Message-ID: <CAFcVECKMqACtumHZGHbToUUSjd_dWCcLbu=_ZjNnnGdAZQ_3fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 05:57:53PM +0000, Peter Maydell wrote:
-> On 27 November 2014 at 23:10, Peter Maydell <peter.maydell@linaro.org> wrote:
-> > It seems odd to have this unmap happen on attempted system reset/powerdown,
-> > not on cpu init/start.
-> 
-> Here's a concrete case that I think requires the unmap to be
-> done on cpu init:
->  * start a VM and run it for a bit
->  * from the QEMU monitor, use "loadvm" to load a VM snapshot
-> 
-> This will cause QEMU to do a system reset (including calling
-> VCPU_INIT to reset the CPUs), load the contents of guest
-> RAM from the snapshot, set guest CPU registers with a pile
-> of SET_ONE_REG calls, and then KVM_RUN to start the VM.
-> 
-> If we don't unmap stage2 on vcpu init,  then what in this
-> sequence causes the icaches to be flushed so we execute
-> the newly loaded ram contents rather than stale data
-> from the first VM run?
-> 
+Hi,
 
-You're absolutely right that it makes more sense to stick it in
-vcpu_init.  I put it only in the shutdown event handler for debugging
-and forgot that was what I was doing :)
+On Tue, Dec 2, 2014 at 6:46 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>
+>> But given the bugs, it will be useful to just disable it if the system doesn't
+>> require repeated start.
+>
+> What do you do when disable repeated start? Sending STOP and START? If
+> so, this is really something different than repeated start. By using
+> I2C_FUNC_I2C a user expects repeated start, so if the HW does not
+> support it, we should say so and don't try to emulate it with something
+> different.
+>
 
-The only down-side is that we'll be trying to free memory that was never
-mapped on initial startup, but it's not in the critical path and we
-could add an explicit check to early-out if the vcpu has never been run,
-which may increase code readibility too (we already have that flag I
-belive).
+Yes, we send stop.
+Using repeated start, when number of messages passed > 1, HOLD bit is set
+by the driver. This is an indication to the controller not to send a STOP.
+If we disable repeated start, the driver will not set HOLD bit.
+All the messages are sent but with START and a STOP for each of them.
 
--Christoffer
+Regards,
+Harini
