@@ -1,31 +1,132 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  2 Dec 2014 16:05:24 +0000
-Subject: [PATCH v2 0/2] ARM: imx: fix irq_data usage
-Message-ID: <1417536326-18691-1-git-send-email-marc.zyngier@arm.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Tue,  2 Dec 2014 08:07:11 -0800
+Subject: [PATCH v3] ARM: zynq: DT: Add USB to device tree
+Message-ID: <1417536431-27759-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IMX has a fairly creative usage of irq_data, which turns into a
-disaster in -next (boards don't even boot).
+Add USB nodes to zc702, zc706 and zed device trees.
 
-These two patches are addressing the most pressing issues, and should
-be merged as early as possible (we've merged a similar patch for tegra
-in 3.18-rc7).
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+v3:
+ - rename phy nodes: usb_phy -> phy0
+ - rebased onto zynq/dt
+v2:
+ - remove '@0' from phy node name
+ - don't add bogus space
+---
+ arch/arm/boot/dts/zynq-7000.dtsi | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/zynq-zc702.dts | 11 +++++++++++
+ arch/arm/boot/dts/zynq-zc706.dts | 10 ++++++++++
+ arch/arm/boot/dts/zynq-zed.dts   | 10 ++++++++++
+ 4 files changed, 51 insertions(+)
 
-Thanks,
-
-	M.
-
->From v1: added provided tags.
-
-Marc Zyngier (2):
-  ARM: imx: irq: fix buggy usage of irq_data irq field
-  ARM: imx6: fix bogus use of irq_get_irq_data
-
- arch/arm/mach-imx/common.h  |  4 ++--
- arch/arm/mach-imx/gpc.c     | 42 ++++++++++++++++++++++++++----------------
- arch/arm/mach-imx/pm-imx6.c |  5 ++---
- 3 files changed, 30 insertions(+), 21 deletions(-)
-
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index f8e4a28adfc0..21aae01a3fe9 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -314,5 +314,25 @@
+ 			reg = <0xf8f00600 0x20>;
+ 			clocks = <&clkc 4>;
+ 		};
++
++		usb0: usb at e0002000 {
++			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
++			status = "disabled";
++			clocks = <&clkc 28>;
++			interrupt-parent = <&intc>;
++			interrupts = <0 21 4>;
++			reg = <0xe0002000 0x1000>;
++			phy_type = "ulpi";
++		};
++
++		usb1: usb at e0003000 {
++			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
++			status = "disabled";
++			clocks = <&clkc 29>;
++			interrupt-parent = <&intc>;
++			interrupts = <0 44 4>;
++			reg = <0xe0003000 0x1000>;
++			phy_type = "ulpi";
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+index 280f02dd4ddc..399fed4d9c19 100644
+--- a/arch/arm/boot/dts/zynq-zc702.dts
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -36,6 +36,11 @@
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
++
++	usb_phy0: phy0 {
++		compatible = "usb-nop-xceiv";
++		#phy-cells = <0>;
++	};
+ };
+ 
+ &can0 {
+@@ -139,3 +144,9 @@
+ &uart1 {
+ 	status = "okay";
+ };
++
++&usb0 {
++	status = "okay";
++	dr_mode = "host";
++	usb-phy = <&usb_phy0>;
++};
+diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+index 34f7812d2ee8..89cc9adc569d 100644
+--- a/arch/arm/boot/dts/zynq-zc706.dts
++++ b/arch/arm/boot/dts/zynq-zc706.dts
+@@ -27,6 +27,10 @@
+ 		bootargs = "console=ttyPS0,115200 earlyprintk";
+ 	};
+ 
++	usb_phy0: phy0 {
++		compatible = "usb-nop-xceiv";
++		#phy-cells = <0>;
++	};
+ };
+ 
+ &clkc {
+@@ -118,3 +122,9 @@
+ &uart1 {
+ 	status = "okay";
+ };
++
++&usb0 {
++	status = "okay";
++	dr_mode = "host";
++	usb-phy = <&usb_phy0>;
++};
+diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
+index 1c7cc990b47a..e20956e5e720 100644
+--- a/arch/arm/boot/dts/zynq-zed.dts
++++ b/arch/arm/boot/dts/zynq-zed.dts
+@@ -27,6 +27,10 @@
+ 		bootargs = "console=ttyPS0,115200 earlyprintk";
+ 	};
+ 
++	usb_phy0: phy0 {
++		compatible = "usb-nop-xceiv";
++		#phy-cells = <0>;
++	};
+ };
+ 
+ &clkc {
+@@ -50,3 +54,9 @@
+ &uart1 {
+ 	status = "okay";
+ };
++
++&usb0 {
++	status = "okay";
++	dr_mode = "host";
++	usb-phy = <&usb_phy0>;
++};
 -- 
-2.1.3
+2.2.0.1.g9ee0458
