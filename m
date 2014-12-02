@@ -1,28 +1,32 @@
 From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Tue,  2 Dec 2014 15:08:57 -0700
-Subject: [PATCH 0/3] ARM: dts: sabrelite I2C and HDMI additions
-Message-ID: <1417558140-16770-1-git-send-email-eric.nelson@boundarydevices.com>
+Date: Tue,  2 Dec 2014 15:08:59 -0700
+Subject: [PATCH 2/3] ARM: dts: sabrelite: add hdmi
+In-Reply-To: <1417558140-16770-1-git-send-email-eric.nelson@boundarydevices.com>
+References: <1417558140-16770-1-git-send-email-eric.nelson@boundarydevices.com>
+Message-ID: <1417558140-16770-3-git-send-email-eric.nelson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches adds support for I2C2/3 busses and HDMI output
-for the SABRE Lite board.
+Signed-off-by: Eric Nelson <eric.nelson@boundarydevices.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-The content was gratuitously copied from the following commits
-for the Nitrogen6X board made by Lucas Stach, Michael Olbrich, 
-and Philipp Zabel at Pengutronix:
-
-	43c3c00 - ARM: dts: nitrogen6x: add i2c2
-	d653620 - ARM: dts: nitrogen6x: add hdmi
-	1dffdd6 - ARM: dts: nitrogen6x: add i2c3
-
-Eric Nelson (3):
-  ARM: dts: sabrelite: add i2c2
-  ARM: dts: sabrelite: add hdmi
-  ARM: dts: sabrelite: add i2c3
-
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 33 ++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
-
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index 37f53f3..3bddc8f 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -173,6 +173,11 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	ddc-i2c-bus = <&i2c2>;
++	status = "okay";
++};
++
+ &i2c1 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
 -- 
 1.9.1
