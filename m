@@ -1,30 +1,48 @@
 From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Tue,  2 Dec 2014 15:37:15 -0700
-Subject: [PATCH 0/3 RESEND] ARM: dts: sabrelite I2C and HDMI additions
-Message-ID: <1417559839-17365-1-git-send-email-eric.nelson@boundarydevices.com>
+Date: Tue,  2 Dec 2014 15:37:16 -0700
+Subject: [PATCH 1/3 RESEND] ARM: dts: sabrelite: add i2c2
+In-Reply-To: <1417559839-17365-1-git-send-email-eric.nelson@boundarydevices.com>
+References: <1417559839-17365-1-git-send-email-eric.nelson@boundarydevices.com>
+Message-ID: <1417559839-17365-2-git-send-email-eric.nelson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches adds support for I2C2/3 busses and HDMI output
-for the SABRE Lite board.
+Signed-off-by: Eric Nelson <eric.nelson@boundarydevices.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-The content was gratuitously copied from the following commits
-for the Nitrogen6X board made by Lucas Stach, Michael Olbrich, 
-and Philipp Zabel at Pengutronix:
-
-	43c3c00 - ARM: dts: nitrogen6x: add i2c2
-	d653620 - ARM: dts: nitrogen6x: add hdmi
-	1dffdd6 - ARM: dts: nitrogen6x: add i2c3
-
-Eric Nelson (3):
-  ARM: dts: sabrelite: add i2c2
-  ARM: dts: sabrelite: add hdmi
-  ARM: dts: sabrelite: add i2c3
-
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 33 ++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
-
-Re-sending to add Shawn Guo to the CC list.
-
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index 0a36129..37f53f3 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -188,6 +188,13 @@
+ 	};
+ };
+ 
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
+ &iomuxc {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_hog>;
+@@ -265,6 +272,13 @@
+ 			>;
+ 		};
+ 
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
++				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
++			>;
++		};
++
+ 		pinctrl_pwm1: pwm1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD1_DAT3__PWM1_OUT 0x1b0b1
 -- 
 1.9.1
