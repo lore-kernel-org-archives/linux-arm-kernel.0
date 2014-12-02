@@ -1,42 +1,34 @@
-From: heesub.shin@samsung.com (Heesub Shin)
-Date: Tue, 02 Dec 2014 15:17:18 +0900
-Subject: [PATCH] ARM: dts: Add dts file for odroid XU3 board
-In-Reply-To: <1417438770-28696-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1417438770-28696-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <547D596E.9000402@samsung.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Tue, 02 Dec 2014 12:04:32 +0530
+Subject: [PATCH 1/2] drivers: thermal: Remove ARCH_HAS_BANDGAP dependency for
+ samsung
+Message-ID: <1417502073-6322-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Simons,
+As samsung thermal support is enabled only for ARCH_EXYNOS, there is no
+need to select ARCH_HAS_BANDGAP from the arch-specific code. Removing this
+dependency will also allow the driver to be enabled on 64-bit SoCs.
 
-On 12/01/2014 09:59 PM, Sjoerd Simons wrote:
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +/dts-v1/;
-> +#include "exynos5800.dtsi"
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+This was based on the discussion regarding adding ARCH_HAS_BANDGAP symbol for
+arm64 here: http://www.spinics.net/lists/arm-kernel/msg377560.html
 
-Looking at exynos5800.dtsi, it derives from exynos5420.dtsi and seems 
-having differences on clock and mfc. Is it proper to include 
-exynos5800.dtsi here, instead of exynos5420.dtsi? It's just my curiosity 
-as I am not in a position to know detailed things on the soc. Only 
-semiconductor guys could answer this.
+ drivers/thermal/samsung/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> +
-> +/ {
-> +	model = "Hardkernel Odroid XU3";
-> +	compatible = "hardkernel,odroid-xu3", "samsung,exynos5800", "samsung,exynos5";
-> +
-> +	memory {
-> +		reg = <0x20000000 0x80000000>;
-> +	};
-
-Start address above should be 0x40000000, not 0x20000000.
-
-One more thing, having bootargs which specifies 'console=xxx' would be 
-better.
-
-regards,
-heesub
+diff --git a/drivers/thermal/samsung/Kconfig b/drivers/thermal/samsung/Kconfig
+index f760389..c43306e 100644
+--- a/drivers/thermal/samsung/Kconfig
++++ b/drivers/thermal/samsung/Kconfig
+@@ -1,6 +1,6 @@
+ config EXYNOS_THERMAL
+ 	tristate "Exynos thermal management unit driver"
+-	depends on ARCH_HAS_BANDGAP && OF
++	depends on OF
+ 	help
+ 	  If you say yes here you get support for the TMU (Thermal Management
+ 	  Unit) driver for SAMSUNG EXYNOS series of SoCs. This driver initialises
+-- 
+1.7.9.5
