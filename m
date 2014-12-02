@@ -1,89 +1,103 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 2 Dec 2014 11:36:40 +0100
-Subject: [PATCH v6] edac: synps: Added EDAC support for zynq ddr ecc
- controller
-In-Reply-To: <CAGnW=BaRuZvFYCz0=s_ENn_sbH4YPxZiHt1x4GvRcUAyO0s+Jw@mail.gmail.com>
-References: <a1c485c3bb214d5699fdbfc6180f96f8@BN1AFFO11FD044.protection.gbl>
- <20141201182611.GA4169@pd.tnic>
- <CAGnW=BaRuZvFYCz0=s_ENn_sbH4YPxZiHt1x4GvRcUAyO0s+Jw@mail.gmail.com>
-Message-ID: <20141202103640.GB14649@pd.tnic>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 2 Dec 2014 10:42:39 +0000
+Subject: [PATCH 16/19] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <547BD0BA.7080809@samsung.com>
+References: <1417073716-22997-1-git-send-email-cw00.choi@samsung.com>
+ <1417073716-22997-17-git-send-email-cw00.choi@samsung.com>
+ <20141127111834.GB857@leverpostej> <54787621.4000503@samsung.com>
+ <20141128140059.GH25883@leverpostej> <547BD0BA.7080809@samsung.com>
+Message-ID: <20141202104239.GA23671@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02, 2014 at 10:51:22AM +0530, punnaiah choudary kalluri wrote:
-> >> +/**
-> >> + * synps_edac_get_eccstate - Return the controller ecc enable/disable status
-> >> + * @base:    Pointer to the ddr memory contoller base address
-> >> + *
-> >> + * This routine returns the ECC enable/disable status for the controller
-> >> + *
-> >> + * Return: a ecc status boolean i.e true/false - enabled/disabled.
-> >> + */
-> >> +static bool synps_edac_get_eccstate(void __iomem *base)
-> >> +{
-> >> +     enum dev_type dt;
-> >> +     u32 ecctype;
-> >> +     bool state = false;
-> >> +
-> >> +     dt = synps_edac_get_dtype(base);
-> >> +     if (dt == DEV_UNKNOWN)
-> >> +             return state;
-> >> +
-> >> +     ecctype = readl(base + SCRUB_OFST) & SCRUB_MODE_MASK;
-> >> +
-> >> +     if ((ecctype == SCRUB_MODE_SECDED) && (dt == DEV_X2)) {
-> >> +             state = true;
-> >> +             writel(0x0, base + ECC_CTRL_OFST);
-> >
-> > Out of curiosity, why is that register write needed here? Maybe
-> > forgotten? It looks unbalanced...
+On Mon, Dec 01, 2014 at 02:21:46AM +0000, Chanwoo Choi wrote:
+> Dear Mark,
 > 
-> This is needed to start capturing the correctable and uncorrectable errors.
-> Writing 1 to this register bits will clear the counters and writing 0 will start
-> the counters.
+> On 11/28/2014 11:00 PM, Mark Rutland wrote:
+> > On Fri, Nov 28, 2014 at 01:18:25PM +0000, Chanwoo Choi wrote:
+> >> Dear Mark,
+> >>
+> >> On 11/27/2014 08:18 PM, Mark Rutland wrote:
+> >>> On Thu, Nov 27, 2014 at 07:35:13AM +0000, Chanwoo Choi wrote:
+> >>>> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC
+> >>>> based on Octal core CPUs (quad Cortex-A57 and quad Cortex-A53).
+> >>>>
+> >>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> >>>> Cc: Mark Rutland <mark.rutland@arm.com>
+> >>>> Cc: Arnd Bergmann <arnd@arndb.de>
+> >>>> Cc: Olof Johansson <olof@lixom.net>
+> >>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >>>> Cc: Will Deacon <will.deacon@arm.com>
+> >>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> >>>> Acked-by: Inki Dae <inki.dae@samsung.com>
+> >>>> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
+> >>>> ---
+> >>>>  arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi | 698 +++++++++++++++++++++
+> >>>>  arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 523 +++++++++++++++
+> >>>>  2 files changed, 1221 insertions(+)
+> >>>>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
+> >>>>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
+> >>>
+> >
+> > [...]
+> >
+> >>>> +       cpus {
+> >>>> +               #address-cells = <2>;
+> >>>> +               #size-cells = <0>;
+> >>>> +
+> >>>> +               cpu0: cpu at 100 {
+> >>>> +                       device_type = "cpu";
+> >>>> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> >>>> +                       enable-method = "psci";
+> >>>
+> >>> While the CPU nodes have enable-methods, I didn't spot a PSCI node
+> >>> anywhere, so this dts cannot possibly have been used to bring up an SMP
+> >>> system.
+> >>>
+> >>> How has this dts been tested?
+> >>>
+> >>> What PSCI revision have you implemented? Have have you tested it?
+> >>
+> >> My mistake,
+> >> Exynos5433 supports PSCI v0.1. I'll add following PSCI nodes:
+> >> I tested the boot of secondary cpu.
+> >>
+> >>         psci {
+> >>                 compatible = "arm,psci";
+> >>                 method = "smc";
+> >>                 cpu_off = <0x84000002>;
+> >>                 cpu_on = <0xC4000003>;
+> >>         };
+> >
+> > Ok. I take it _any_ CPU may be hotplugged (including CPU0), given that
+> > you don't have MIGRATE_INFO_TYPE from PSCI 0.2 to tell you that this is
+> > not possible? If not, attempting to hotplug CPU0 will result in a BUG()
+> > and the kernel will explode.
+> >
+> > Has that been tested?
+> 
+> I just tested secondary CPU on during kernel booting after added 'psci' dt node.
+> So, I got the ON state of Octa CPUs.
+> 
+> Maybe I need more time to implement CPU0 and secondary cpu hotplugged dynamically on runtime.
 
-So this definitely doesn't belong here then.
+So currently PSCI CPU_OFF is not implemented at all?
 
-It should be the *last* thing you do after having initialized the whole
-driver entirely and successfully and you're ready to start logging
-errors.
+> > Do all CPUs enter the kernel at EL2?
+> 
+> I didn't consider EL2 for hypervisor mode.
+> First role of this job, I'll implement CPU on/off and suspend by using PSCI.
 
-Now you're calling it in synps_edac_mc_probe() so the counters will
-start before you have even initialized the rest of the driver.
+Is there any reason not to enter the kernel at EL2?
 
-What is worse, if one of those things you do on the init path fails, you
-enter prematurely and the counters are still running. Not good.
+PSCI 0.2 mandates entering at EL2 if present (and not under a
+hypervisor), and it gives the kernel a lot more flexibility to fix
+things up (and there's less for FW to restore) even when a hypervisor is
+not in use.
 
-> It is crossing 80 cols. so, there is line break here. I feel the other
-> way as the check patch throws warning for this.
+Implementing all that to EL2 is _simpler_ than implementing it to EL1.
+The kernel will restore what it needs to.
 
-And I'm saying you shouldn't follow checkpatch to the letter and think
-for yourself instead.
-
-What do you think is more readable?
-
-This:
-
-                       dimm = csi->channels[j]->dimm;
-                       dimm->edac_mode = EDAC_FLAG_SECDED;
-                       dimm->mtype = synps_edac_get_mtype(priv->baseaddr);
-                       dimm->nr_pages =
-                           (size >> PAGE_SHIFT) / csi->nr_channels;
-                       dimm->grain = SYNPS_EDAC_ERR_GRAIN;
-                       dimm->dtype = synps_edac_get_dtype(priv->baseaddr);
-
-or this:
-
-                       dimm		= csi->channels[j]->dimm;
-                       dimm->mtype	= synps_edac_get_mtype(priv->baseaddr);
-                       dimm->grain	= SYNPS_EDAC_ERR_GRAIN;
-                       dimm->dtype	= synps_edac_get_dtype(priv->baseaddr);
-                       dimm->nr_pages	= (size >> PAGE_SHIFT) / csi->nr_channels;
-                       dimm->edac_mode	= EDAC_FLAG_SECDED;
-
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+Thanks,
+Mark.
