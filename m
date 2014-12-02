@@ -1,84 +1,55 @@
-From: shijie.huang@intel.com (Huang Shijie)
-Date: Tue, 2 Dec 2014 08:47:43 +0800
-Subject: [PATCH v6 0/3] mtd: nand: gpmi: add proper raw access support
-In-Reply-To: <20141201095858.75ac3889@bbrezillon>
-References: <1417371030-24015-1-git-send-email-boris.brezillon@free-electrons.com>
- <20141201084709.GI29070@brian-ubuntu>
- <20141201095858.75ac3889@bbrezillon>
-Message-ID: <20141202004743.GB11370@shldeISGChi005.sh.intel.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 1 Dec 2014 17:07:39 -0800
+Subject: [PATCH v10 0/4] This suspend patch is only support cut off the
+ power of cpu and some external
+In-Reply-To: <CAD=FV=V2go5BMFbiFKu73_aVz5ck949W-kJQ6WLkAQRPJbjPVA@mail.gmail.com>
+References: <1417423940-1669-1-git-send-email-zyw@rock-chips.com>
+ <7htx1f409k.fsf@deeprootsystems.com>
+ <CAD=FV=V2go5BMFbiFKu73_aVz5ck949W-kJQ6WLkAQRPJbjPVA@mail.gmail.com>
+Message-ID: <CAD=FV=XuQk17CTNKJY++J+w9Ab9_OUX0ca0A99m7yKPAWSs2=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 09:58:58AM +0100, Boris Brezillon wrote:
-> Hi Brian,
-> 
-> On Mon, 1 Dec 2014 00:47:09 -0800
-> Brian Norris <computersforpeace@gmail.com> wrote:
-> 
-> > On Sun, Nov 30, 2014 at 07:10:27PM +0100, Boris Brezillon wrote:
-> > > Hello,
-> > > 
-> > > This series provides an implementation for raw accesses taking care of
-> > > hidding the specific layout used by the GPMI controller.
-> > > 
-> > > Best Regards,
-> > > 
-> > > Boris
-> > > 
-> > > Changes since v5:
-> > >  - rename gpmi_move_bits into gpmi_copy_bits
-> > > 
-> > > Changes since v4:
-> > >  - fixed a few corner cases in gpmi_move_bits (tested it with:
-> > >    https://github.com/bbrezillon/gpmi-move-bits-test/blob/master/gpmi-move-bits-test.c)
-> > >  - add documentation and comments for the new gpmi functions
-> > > 
-> > > Changes since v3:
-> > >  - add comments to the gpmi_move_bits function
-> > >  - extend raw read/write documentation
-> > >  - move last part of the raw_page_read function into a conditional block
-> > > 
-> > > Changes since v2:
-> > >  - fixed a bug in gpmi_move_bits
-> > >  - add a raw_buffer field to be used when using raw access methods
-> > >    (experienced memory corruptions when directly using page_buffer_virt
-> > >    buffer)
-> > >  - add raw OOB access functions
-> > 
-> > Applied the series. Thanks!
-> > 
-> > Out of curiosity, what tests does gpmi-nand.c now pass/fail?
-> 
-> The oobtest is still failing. I started to debug it, but didn't have
-> enough time to make it work.
-> 
-> The nandbiterrs test is working, though I didn't manage to make the
-> incremental test fail (writing the same pattern 10000 times without
-> erasing the block between each write does not generate any bit flips) on
-> my SLC NAND: MT29F2G08ABAEAH4.
-> Can someone with another SLC NAND chip try it ?
-> 
-> > 
-> > Also, is it time to yank / fixup some of these comments from
-> > gpmi-nand.c?
-> 
-> I was asking myself the same question...
-> 
-> > 
-> >  ...
-> >  * FIXME: The following paragraph is incorrect, now that there exist
-> >  * ecc.read_oob_raw and ecc.write_oob_raw functions.
-> >  *
-> >  * Since MTD assumes the OOB is not covered by ECC, there is no pair of
-> >  * ECC-based/raw functions for reading or or writing the OOB. The fact that the
-> >  * caller wants an ECC-based or raw view of the page is not propagated down to
-> >  * this driver.
-> >  */
-> 
-> I guess we can remove them.
-> Huang can you confirm that the raw access functions introduced in this
-> series are covering what's described here ?
-I think we can remove these comments now.
+Hi,
 
-thanks
-Huang Shijie
+On Mon, Dec 1, 2014 at 2:08 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Hi,
+>
+> On Mon, Dec 1, 2014 at 11:51 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>> Chris Zhong <zyw@rock-chips.com> writes:
+>>
+>>> devices, since we still lack power_domain driver, so the other power rail
+>>> of rk3288 need keep power on.
+>>> I have tested it on rk3288-evb board, atop next-20141112. goto suspend by type
+>>> "echo mem > /sys/power/state", vdd_cpu is about 0mv by measuring, so it can be
+>>> determined in sleep mode, then press power button to wakeup it.
+>>
+>> I tested this on top of today's linux-next (next-20141201) and it
+>> suspends, but doesn't wake up from any of the button presses.  What
+>> wakeup sources are configured for the rk3288-evb-rk808?
+>
+> Just to close the loop (I talked with Kevin over IM about this, too):
+>
+> I have a huge description of how I tested this as part of my patch at
+> <https://patchwork.kernel.org/patch/5414941/>.  Chris:  I think Kevin
+> has asked you several times to include information like this in your
+> cover letter.  Please, please, please can you try to remember to do
+> this?
+
+Talked to Chris offline.  He said that in his tests the other patches
+weren't needed, so he didn't list any other patches.  Things just
+worked for him.  ...so I guess he did post the instructions that
+worked for him.  Sorry for the complaint.  Possibly things are
+different on "next-20141112" and that's where Chris said he tested.
+
+I know that I personally needed some of the extra patches.  I guess
+the USB one wasn't truly needed (only needed for hotplug), but for me
+things were unhappy without SMP.  It was hanging when trying to turn
+off secondary CPUs.  I didn't dig, though.  The clocksource patches
+are needed for me because I'm using an old bootloader, but I think
+they're also relevant for S2R because (I'm told) we can lose the
+virtual offset at suspend time in certain modes.
+
+-Doug
+
+.
