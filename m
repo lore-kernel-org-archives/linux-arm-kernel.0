@@ -1,49 +1,65 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 2 Dec 2014 23:30:37 +0800
-Subject: [PATCH] ARM: imx6: fix bogus use of irq_get_irq_data
-In-Reply-To: <547DD92B.8090104@arm.com>
-References: <1417453443-9179-1-git-send-email-marc.zyngier@arm.com>
- <20141202144759.GO2411@dragon> <547DD254.4090704@arm.com>
- <20141202151505.GP2411@dragon> <547DD92B.8090104@arm.com>
-Message-ID: <20141202153036.GQ2411@dragon>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue,  2 Dec 2014 16:32:10 +0100
+Subject: [PATCH] leds: netxbig: fix oops at probe time
+Message-ID: <1417534330-13154-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02, 2014 at 03:22:19PM +0000, Marc Zyngier wrote:
-> On 02/12/14 15:15, Shawn Guo wrote:
-> > On Tue, Dec 02, 2014 at 02:53:08PM +0000, Marc Zyngier wrote:
-> >> Hi Shawn,
-> >>
-> >> On 02/12/14 14:48, Shawn Guo wrote:
-> >>> On Mon, Dec 01, 2014 at 05:04:03PM +0000, Marc Zyngier wrote:
-> >>>> The imx6 PM code seems to be quite creative in its use of irq_data,
-> >>>> using something something that is very much a hardware interrupt
-> >>>> number where we expect a virtual one.  Yes, it worked so far, but
-> >>>> that's only cheer luck, and it will definitely explode in 3.19.
-> >>>>
-> >>>> Fix it by using a pair of helper functions that deal with the
-> >>>> actual hardware.
-> >>>>
-> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>>
-> >>> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> >>>
-> >>> Arnd, Olof,
-> >>>
-> >>> To avoid a non-booting 3.19-rc1 on i.MX6, please apply it for 3.19-rc1.
-> >>
-> >> The previous patch (ARM: imx: irq: fix buggy usage of irq_data irq
-> >> field) should also be applied (you cannot apply one without the other
-> >> anyway).
-> > 
-> > Marc,
-> > 
-> > Thanks a lot for the fixes.  To ease arm-soc folks' work, you should
-> > probably resend the patches with squashing them into one or having them
-> > in a series.
-> 
-> Sure. Can I put your Acked-by on both patches?
+This patch fixes a NULL pointer dereference on led_dat->mode_val. Due to
+this bug, a kernel oops can be observed at probe time on the LaCie 2Big
+and 5Big v2 boards:
 
-Yes, Marc.
+Unable to handle kernel NULL pointer dereference at virtual address 00000008
+[...]
+[<c03f244c>] (netxbig_led_probe) from [<c02c8c6c>] (platform_drv_probe+0x4c/0x9c)
+[<c02c8c6c>] (platform_drv_probe) from [<c02c72d0>] (driver_probe_device+0x98/0x25c)
+[<c02c72d0>] (driver_probe_device) from [<c02c7520>] (__driver_attach+0x8c/0x90)
+[<c02c7520>] (__driver_attach) from [<c02c5c24>] (bus_for_each_dev+0x68/0x94)
+[<c02c5c24>] (bus_for_each_dev) from [<c02c6408>] (bus_add_driver+0x124/0x1dc)
+[<c02c6408>] (bus_add_driver) from [<c02c7ac0>] (driver_register+0x78/0xf8)
+[<c02c7ac0>] (driver_register) from [<c000888c>] (do_one_initcall+0x80/0x1cc)
+[<c000888c>] (do_one_initcall) from [<c0733618>] (kernel_init_freeable+0xe4/0x1b4)
+[<c0733618>] (kernel_init_freeable) from [<c058db9c>] (kernel_init+0xc/0xec)
+[<c058db9c>] (kernel_init) from [<c0009850>] (ret_from_fork+0x14/0x24)
+[...]
 
-Shawn
+This bug was introduced by commit 588a6a99286ae30afb1339d8bc2163517b1b7dd1
+("leds: netxbig: fix attribute-creation race").
+
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+Cc: <stable@vger.kernel.org> # 3.17+
+---
+ drivers/leds/leds-netxbig.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/leds/leds-netxbig.c b/drivers/leds/leds-netxbig.c
+index 64fde485dcaa..4c794f15a57f 100644
+--- a/drivers/leds/leds-netxbig.c
++++ b/drivers/leds/leds-netxbig.c
+@@ -330,18 +330,18 @@ create_netxbig_led(struct platform_device *pdev,
+ 	led_dat->sata = 0;
+ 	led_dat->cdev.brightness = LED_OFF;
+ 	led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
+-	/*
+-	 * If available, expose the SATA activity blink capability through
+-	 * a "sata" sysfs attribute.
+-	 */
+-	if (led_dat->mode_val[NETXBIG_LED_SATA] != NETXBIG_LED_INVALID_MODE)
+-		led_dat->cdev.groups = netxbig_led_groups;
+ 	led_dat->mode_addr = template->mode_addr;
+ 	led_dat->mode_val = template->mode_val;
+ 	led_dat->bright_addr = template->bright_addr;
+ 	led_dat->bright_max = (1 << pdata->gpio_ext->num_data) - 1;
+ 	led_dat->timer = pdata->timer;
+ 	led_dat->num_timer = pdata->num_timer;
++	/*
++	 * If available, expose the SATA activity blink capability through
++	 * a "sata" sysfs attribute.
++	 */
++	if (led_dat->mode_val[NETXBIG_LED_SATA] != NETXBIG_LED_INVALID_MODE)
++		led_dat->cdev.groups = netxbig_led_groups;
+ 
+ 	return led_classdev_register(&pdev->dev, &led_dat->cdev);
+ }
+-- 
+2.1.1
