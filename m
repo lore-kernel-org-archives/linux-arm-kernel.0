@@ -1,48 +1,58 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 2 Dec 2014 20:02:52 +0100
-Subject: [PATCH 3/5] arm/arm64: KVM: Clarify KVM_ARM_VCPU_INIT ABI
-In-Reply-To: <CAFEAcA-k3sUjF--+Q7kn3y7i5gkFQd3+WT1EWGEDyYv4=77z2Q@mail.gmail.com>
-References: <1417113660-23610-1-git-send-email-christoffer.dall@linaro.org>
- <1417113660-23610-4-git-send-email-christoffer.dall@linaro.org>
- <CAFEAcA8ysq5UD4WcfuJqSUV=E8zJR259=8v5S9q1o5aVJpPJQQ@mail.gmail.com>
- <20141202144728.GH545@cbox>
- <CAFEAcA-k3sUjF--+Q7kn3y7i5gkFQd3+WT1EWGEDyYv4=77z2Q@mail.gmail.com>
-Message-ID: <20141202190252.GK545@cbox>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Tue, 2 Dec 2014 11:06:18 -0800
+Subject: [PATCH V6 05/12] mailbox: Add NVIDIA Tegra XUSB mailbox driver
+In-Reply-To: <20141202094741.GC6135@ulmo>
+References: <1416874644-12070-1-git-send-email-abrestic@chromium.org>
+ <1416874644-12070-6-git-send-email-abrestic@chromium.org>
+ <20141202094741.GC6135@ulmo>
+Message-ID: <CAL1qeaEN8HjGYyW0+WLyEUzSPgCKiQUo0jRbbsY1rsfamijA3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02, 2014 at 03:39:05PM +0000, Peter Maydell wrote:
-> On 2 December 2014 at 14:47, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > On Thu, Nov 27, 2014 at 10:53:50PM +0000, Peter Maydell wrote:
-> >> On 27 November 2014 at 18:40, Christoffer Dall
-> >> <christoffer.dall@linaro.org> wrote:
-> >> >  Possible features:
-> >> >         - KVM_ARM_VCPU_POWER_OFF: Starts the CPU in a power-off state.
-> >> >           Depends on KVM_CAP_ARM_PSCI.  If not set, the CPU will be powered on
-> >>
-> >> Do you have to use the same set of feature flags for second and
-> >> subsequent VCPU_INIT calls, or can they be different each time?
-> >>
-> > That's a good question.  Do you have any opinion on the matter?
-> 
-> QEMU always will, so I'd be happy if we said it has to be the same
-> set of flags each time. I guess I'd go for "say they have to match";
-> we can always relax later if we need to.
-> 
-> > It seems weird to change the target of a Vcpu from some core to another
-> > core, but there is not reason why you shouldn't be able to set a vCpU to
-> > be powered off when run, just because it wasn't earlier on, is
-> > there?
-> 
-> We need an API for get/set of PSCI power state for migration
-> anyhow, so it's not inherently required to be able to flip
-> this bit on reset.
-> 
-Actually I think the current migration patches rely on being able to
-call the init ioctl to turn off a vcpu, but I guess you could use the
-KVM_SET_MP_STATE for that.
+On Tue, Dec 2, 2014 at 1:47 AM, Thierry Reding <thierry.reding@gmail.com> wrote:
+> On Mon, Nov 24, 2014 at 04:17:17PM -0800, Andrew Bresticker wrote:
+>> The Tegra xHCI controller's firmware communicates requests to the host
+>> processor through a mailbox interface.  While there is only a single
+>> physical channel, messages sent by the controller can be divided
+>> into two groups: those intended for the PHY driver and those intended
+>> for the host-controller driver.  The requesting driver is assigned
+>> one of two virtual channels when the single physical channel is
+>> requested.  All incoming messages are sent to both virtual channels.
+>>
+>> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>> Thierry,
+>>
+>> I've left this as a separate driver because I don't think it should be
+>> combined with the xHCI host.  Stephen and I discussed this earlier in
+>> review of v1 of this series and he agreed that the mailbox belongs in
+>> its own DT node and driver.
+>
+> My objection wasn't strictly against merging the drivers. What I don't
+> want to see is two devices sharing the same memory-mapped regions in DT.
+>
+> That's based on earlier discussion with Stephen as well, because we have
+> had the same problem with USB and USB-PHY before. Unless I completely
+> misinterpreted we came to the conclusion that we should avoid this in
+> the future.
 
-Alex, any thoughts?
+Yes, I understand your objection to having multiple drivers map the
+same IO memory, however Stephen and I discussed this before [1] and
+came to the conclusion that, although mapping the MMIO region in both
+drivers was non-ideal, the alternatives had their own drawbacks as
+well and that the approach I had taken was fine.
 
--Christoffer
+> Like I said, this doesn't mean that both need to be in the same driver.
+> We could use MFD for example, or provide an entry point in the mailbox
+> driver that can be called from the XUSB driver to instantiate the
+> mailbox (which is really the same as MFD).
+
+This does not look like the typical MFD, but I would agree that it's
+the only reasonable alternative.  If Lee is fine with it, then I
+suppose I could go the MFD route...  Lee: for context, the mailbox
+registers live in one of the host-controller's MMIO regions - there
+are no other shared resources.  This has been discussed, along with a
+possible binding, in [1] as well.
+
+[1] https://lkml.org/lkml/2014/8/27/727
