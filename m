@@ -1,49 +1,80 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 2 Dec 2014 22:06:51 +0800
-Subject: [PATCH] MAINTAINERS: add Freescale Vybrid SoC
-In-Reply-To: <1417131235-3077-1-git-send-email-stefan@agner.ch>
-References: <1417131235-3077-1-git-send-email-stefan@agner.ch>
-Message-ID: <20141202140649.GJ2411@dragon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 02 Dec 2014 14:12:03 +0000
+Subject: [PATCH v8 1/4] irqchip: gic: Support hierarchy irq domain.
+In-Reply-To: <CAMuHMdVkH_qshTfpXBcHx1FiEzL8055s1TiJqayWLXeFUf97NQ@mail.gmail.com>
+References: <1416902662-19281-1-git-send-email-yingjoe.chen@mediatek.com>	<1416902662-19281-2-git-send-email-yingjoe.chen@mediatek.com>	<CAMuHMdWj0Z66fya=7oN=ZUoz0TQOHFxBe0wyHmkDDVzU8Lafog@mail.gmail.com>	<547DC0B7.6050600@arm.com>
+ <CAMuHMdVkH_qshTfpXBcHx1FiEzL8055s1TiJqayWLXeFUf97NQ@mail.gmail.com>
+Message-ID: <547DC8B3.1000200@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 12:33:55AM +0100, Stefan Agner wrote:
-> Add Freescale Vybrid family as a own entry, along with an entry for
-> the so far orphan Vybrid device tree files. Also add myself as
-> a designated reviewer.
+On 02/12/14 13:55, Geert Uytterhoeven wrote:
+> Hi Marc,
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> On Tue, Dec 2, 2014 at 2:37 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 02/12/14 13:27, Geert Uytterhoeven wrote:
+>>> On Tue, Nov 25, 2014 at 9:04 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+>>>> Add support to use gic as a parent for stacked irq domain.
+>>>>
+>>>> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+>>>
+>>> This change (which is now in -next as commit 9a1091ef0017c40a) breaks
+>>> booting on r8a7740/armadillo-legacy.
+>>>
+>>> It hangs because the timers cannot get their interrupts:
+>>>
+>>> console [tty0] enabled
+>>>  sh-tmu.0: ch0: used for clock events
+>>>  sh-tmu.0: ch0: used for periodic clock events
+>>>  sh-tmu.0: ch0: failed to request irq 230
+>>>  sh-tmu.0: ch1: used as clock source
+>>>  sh-cmt-48.1: ch0: failed to request irq 90
+>>>  sh-cmt-48.1: ch0: registration failed
+>>> earlytimer: unable to probe sh-cmt-48 early.
+>>> Calibrating delay loop...
+>>
+>> Grmbl... Are you, by any (lack of) chance, using a setup where the GIC
+>> is probed via DT, but the timers have their IRQs hardcoded?
+> 
+> Yes, the GIC is declared in arch/arm/boot/dts/r8a7740.dtsi:
+> 
+>         gic: interrupt-controller at c2800000 {
+>                 compatible = "arm,cortex-a9-gic";
+>                 #interrupt-cells = <3>;
+>                 interrupt-controller;
+>                 reg = <0xc2800000 0x1000>,
+>                       <0xc2000000 0x1000>;
+>         };
+> 
+> The timers come from legacy C board code in
+> arch/arm/mach-shmobile/setup-r8a7740.c:
+> 
+> /* CMT */
+> static struct sh_timer_config cmt1_platform_data = {
+>         .channels_mask = 0x3f,
+> };
+> 
+> static struct resource cmt1_resources[] = {
+>         DEFINE_RES_MEM(0xe6138000, 0x170),
+>         DEFINE_RES_IRQ(gic_spi(58)),
+> };
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Yup. This gic_spi() macro is completely doomed, as it computes a
+hardware interrupt where the kernel expects a virtual one. The only way
+to fix this is to init the GIC outside of DT, so that we stick to a
+legacy irqdomain. You can still use information from DT, but you can't
+rely on irqchip_init() to produce something that a legacy platform can use.
 
-> ---
-> Not sure if this is acceptable, but it would be nice when I get Vybrid
-> related stuff automatically...
-> 
->  MAINTAINERS | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 3c64271..6837f23 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -990,6 +990,16 @@ F:	arch/arm/mach-mxs/
->  F:	arch/arm/boot/dts/imx*
->  F:	arch/arm/configs/imx*_defconfig
->  
-> +ARM/FREESCALE VYBRID ARM ARCHITECTURE
-> +M:	Shawn Guo <shawn.guo@linaro.org>
-> +M:	Sascha Hauer <kernel@pengutronix.de>
-> +R:	Stefan Agner <stefan@agner.ch>
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
-> +F:	arch/arm/mach-imx/*vf610*
-> +F:	arch/arm/boot/dts/vf*
-> +
->  ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -- 
-> 2.1.3
-> 
+> The corresponding r8a7740/armadillo-multiplatform works fine.
+
+OK, that's indeed the expected result.
+
+> Still, I'm wondering why sh73a0/kzm9g-legacy is not impacted by this
+> change...
+
+I'm a bit lost looking at the shmobile code. But I agree, kzm9g should
+die a painful death, as it has the same level of breakage as armadillo.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
