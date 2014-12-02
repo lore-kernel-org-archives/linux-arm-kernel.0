@@ -1,176 +1,67 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Wed, 03 Dec 2014 00:19:12 +0100
-Subject: [PATCH 4/5] ARM: BCM5301X: Add DT for Asus RT-N18U
-In-Reply-To: <1417368513-13808-4-git-send-email-zajec5@gmail.com>
-References: <1417368513-13808-1-git-send-email-zajec5@gmail.com>
- <1417368513-13808-4-git-send-email-zajec5@gmail.com>
-Message-ID: <547E48F0.6010600@hauke-m.de>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue,  2 Dec 2014 15:42:43 -0800
+Subject: [PATCH v5 0/4] Fixes for SDIO interrupts for dw_mmc
+Message-ID: <1417563767-32181-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2014 06:28 PM, Rafa? Mi?ecki wrote:
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile                  |  3 +-
->  arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts | 78 +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/bcm47081.dtsi             | 26 ++++++++++
->  arch/arm/mach-bcm/bcm_5301x.c               |  1 +
->  4 files changed, 107 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
->  create mode 100644 arch/arm/boot/dts/bcm47081.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 18a21d9..db51a31 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -58,7 +58,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b-plus.dtb
->  dtb-$(CONFIG_ARCH_BCM_5301X) += \
->  	bcm4708-buffalo-wzr-1750dhp.dtb \
->  	bcm4708-netgear-r6250.dtb \
-> -	bcm4708-netgear-r6300-v2.dtb
-> +	bcm4708-netgear-r6300-v2.dtb \
-> +	bcm47081-asus-rt-n18u.dtb
->  dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
->  dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
->  	bcm911360k.dtb \
-> diff --git a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-> new file mode 100644
-> index 0000000..c40ad39
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-> @@ -0,0 +1,78 @@
-> +/*
-> + * Broadcom BCM470X / BCM5301X ARM platform code.
-> + * DTS for Asus RT-N18U
-> + *
-> + * Copyright ? 2014 Rafa? Mi?ecki <zajec5@gmail.com>
-> + *
-> + * Licensed under the GNU/GPL. See COPYING for details.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "bcm47081.dtsi"
-> +
-> +/ {
-> +	compatible = "asus,rt-n18u", "brcm,bcm47081";
+Bing Zhao at Marvell found a problem with dw_mmc where interrupts
+weren't firing sometimes.  He tracked it down to a read-modify-write
+problem with the INTMASK.  These patches fix the problem.
 
-Instead of adding bcm47081 to the core code you can do this:
+Note: I've picked up a > 1-year old series here to make another
+attempt at landing it upstream.  These patches have been in shipping
+Chromebooks for the last year.  Note that v3 to v4 has no changes
+other than a rebase and a small commit message update.
 
-compatible = "asus,rt-n18u", "brcm,bcm47081", "brcm,bcm4708";
+The first two patches extend the "init_card()" mechanism of MMC core
+to actually be called for all card types, not just SDIO.  That could
+be applied any time and should fix at least one longstanding bug
+(untested).
 
-If we later need some special handling for bcm47081 we can add this but
-the old dts file will still work. This is more relevant if the dts file
-is in the boot loader.
+The third patch is a cleanup patch to use init_card() to move things
+around a bit so we don't need to handle SDIO cards in such a strange
+place.  On earlier versions of this patch Seungwon brought up a few
+points which I have _not_ addressed.  See
+<https://patchwork.kernel.org/patch/3049071/>.  Other than talk of
+cards with out of band interrupts maybe being able to gate their
+clocks, he wanted to use MMC_QUIRK_BROKEN_CLK_GATING.  I didn't do
+that because of the ordering of init_card() and when the quirks are
+set.  Some users of init_card() like pandora_wl1251_init_card() rely
+on it being called very early in the process.
+pandora_wl1251_init_card() hardcodes a vendor and device and thus need
+to be called super early.  On the other hand the code that adds quirks
+_reads_ the vendor and device.  It can't possibly move before
+init_card().  If folks are willing to take an additional host op of
+init_card_late() I can certainly go that way, though.
 
-> +	model = "Asus RT-N18U (BCM47081)";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200";
-> +	};
-> +
-> +	memory {
-> +		reg = <0x00000000 0x08000000>;
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +
-> +		power {
-> +			label = "bcm53xx:blue:power";
-> +			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
-> +			linux,default-trigger = "default-on";
-> +		};
-> +
-> +		usb2 {
-> +			label = "bcm53xx:blue:usb2";
-> +			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
-> +			linux,default-trigger = "default-off";
-> +		};
-> +
-> +		wan {
-> +			label = "bcm53xx:blue:wan";
-> +			gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
-> +			linux,default-trigger = "default-on";
-> +		};
-> +
-> +		lan {
-> +			label = "bcm53xx:blue:lan";
-> +			gpios = <&chipcommon 9 GPIO_ACTIVE_LOW>;
-> +			linux,default-trigger = "default-on";
-> +		};
-> +
-> +		usb3 {
-> +			label = "bcm53xx:blue:usb3";
-> +			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
-> +			linux,default-trigger = "default-off";
-> +		};
-> +	};
-> +
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		poll-interval = <200>;
-> +
-> +		restart {
-> +			label = "Reset";
-> +			linux,code = <KEY_RESTART>;
-> +			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		wps {
-> +			label = "WPS";
-> +			linux,code = <KEY_WPS_BUTTON>;
-> +			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/bcm47081.dtsi b/arch/arm/boot/dts/bcm47081.dtsi
-> new file mode 100644
-> index 0000000..f720012
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm47081.dtsi
+The fourth patch is (I think) reviewed and ready to go assuming the
+other two land.
 
-This is ok.
+Changes in v5:
+- Split fixup to pandora_wl1251_init_card() into its own patch.
 
-> @@ -0,0 +1,26 @@
-> +/*
-> + * Broadcom BCM470X / BCM5301X ARM platform code.
-> + * DTS for BCM47081 SoC.
-> + *
-> + * Copyright ? 2014 Rafa? Mi?ecki <zajec5@gmail.com>
-> + *
-> + * Licensed under the GNU/GPL. See COPYING for details.
-> + */
-> +
-> +#include "bcm5301x.dtsi"
-> +
-> +/ {
-> +	compatible = "brcm,bcm47081";
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			next-level-cache = <&L2>;
-> +			reg = <0x0>;
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
-> index e9bcbdb..eb487e1 100644
-> --- a/arch/arm/mach-bcm/bcm_5301x.c
-> +++ b/arch/arm/mach-bcm/bcm_5301x.c
-> @@ -45,6 +45,7 @@ static void __init bcm5301x_init_early(void)
->  
->  static const char __initconst *bcm5301x_dt_compat[] = {
->  	"brcm,bcm4708",
-> +	"brcm,bcm47081",
->  	NULL,
->  };
->  
-> 
+Changes in v3:
+- Add fixup to pandora_wl1251_init_card().
+
+Changes in v2:
+- mmc core change new for this version.
+- Fixed "|" to "&".
+- intmask_lock renamed to irq_lock
+
+Doug Anderson (4):
+  ARM: OMAP2+: Make sure pandora_wl1251_init_card() applies to SDIO only
+  mmc: core: Support the optional init_card() callback for MMC and SD
+  mmc: dw_mmc: Cleanup disable of low power mode w/ SDIO interrupts
+  mmc: dw_mmc: Protect read-modify-write of INTMASK with a lock
+
+ arch/arm/mach-omap2/board-omap3pandora.c | 14 +++---
+ drivers/mmc/core/mmc.c                   |  6 +++
+ drivers/mmc/core/sd.c                    |  7 ++-
+ drivers/mmc/host/dw_mmc.c                | 80 +++++++++++++++++++-------------
+ drivers/mmc/host/dw_mmc.h                |  1 +
+ include/linux/mmc/dw_mmc.h               |  6 +++
+ 6 files changed, 74 insertions(+), 40 deletions(-)
+
+-- 
+2.2.0.rc0.207.ga3a616c
