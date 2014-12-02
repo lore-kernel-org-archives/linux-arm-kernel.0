@@ -1,26 +1,63 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Tue, 02 Dec 2014 12:26:04 -0800
-Subject: [PATCH 0/8] arm64 kexec kernel patches V6
-In-Reply-To: <20141128065636.GA3676@darkstar.nay.redhat.com>
-References: <cover.1415926876.git.geoff@infradead.org>
- <20141127061947.GB2860@darkstar.nay.redhat.com>
- <20141128065636.GA3676@darkstar.nay.redhat.com>
-Message-ID: <1417551964.7724.2.camel@infradead.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue,  2 Dec 2014 12:49:54 -0800
+Subject: [PATCH v4 0/3] Fixes for SDIO interrupts for dw_mmc
+Message-ID: <1417553397-460-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+Bing Zhao at Marvell found a problem with dw_mmc where interrupts
+weren't firing sometimes.  He tracked it down to a read-modify-write
+problem with the INTMASK.  These three patches fix the problem.
 
-On Fri, 2014-11-28 at 14:56 +0800, Dave Young wrote:
-> Tested your master branch, works for me with below setup:
-> UEFI boot, CONFIG_KVM=n, maxcpus=1, --lite
-> 
-> But --dtb still does not work if there's no /proc/device-tree, failed as below:
-> unrecoverable error: could not scan "/proc/device-tree/": No such file or directory.
-> 
-> kexec without --lite also does not work, looks like it hangs after "Bye" ..
+Note: I've picked up a > 1-year old series here to make another
+attempt at landing it upstream.  These patches have been in shipping
+Chromebooks for the last year.  There are essentially no changes from
+the last v3 other than a rebase.
 
-I'll be away from the office this week.  I'll look into this when I
-return.
+The first patch extends the "init_card()" mechanism of MMC core to
+actually be called for all card types, not just SDIO.  That could be
+applied any time and should fix at least one longstanding bug
+(untested).
 
--Geoff
+The second patch is a cleanup patch to use init_card() to move things
+around a bit so we don't need to handle SDIO cards in such a strange
+place.  On earlier versions of this patch Seungwon brought up a few
+points which I have _not_ addressed.  See
+<https://patchwork.kernel.org/patch/3049071/>.  Other than talk of
+cards with out of band interrupts maybe being able to gate their
+clocks, he wanted to use MMC_QUIRK_BROKEN_CLK_GATING.  I didn't do
+that because of the ordering of init_card() and when the quirks are
+set.  Some users of init_card() like pandora_wl1251_init_card() rely
+on it being called very early in the process.
+pandora_wl1251_init_card() hardcodes a vendor and device and thus need
+to be called super early.  On the other hand the code that adds quirks
+_reads_ the vendor and device.  It can't possibly move before
+init_card().  If folks are willing to take an additional host op of
+init_card_late() I can certainly go that way, though.
+
+The third patch is (I think) reviewed and ready to go assuming the
+other two land.
+
+Changes in v3:
+- Add fixup to pandora_wl1251_init_card().
+
+Changes in v2:
+- mmc core change new for this version.
+- Fixed "|" to "&".
+- intmask_lock renamed to irq_lock
+
+Doug Anderson (3):
+  mmc: core: Support the optional init_card() callback for MMC and SD
+  mmc: dw_mmc: Cleanup disable of low power mode w/ SDIO interrupts
+  mmc: dw_mmc: Protect read-modify-write of INTMASK with a lock
+
+ arch/arm/mach-omap2/board-omap3pandora.c | 14 +++---
+ drivers/mmc/core/mmc.c                   |  6 +++
+ drivers/mmc/core/sd.c                    |  7 ++-
+ drivers/mmc/host/dw_mmc.c                | 80 +++++++++++++++++++-------------
+ drivers/mmc/host/dw_mmc.h                |  1 +
+ include/linux/mmc/dw_mmc.h               |  6 +++
+ 6 files changed, 74 insertions(+), 40 deletions(-)
+
+-- 
+2.2.0.rc0.207.ga3a616c
