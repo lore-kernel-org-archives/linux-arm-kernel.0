@@ -1,38 +1,108 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Tue, 2 Dec 2014 19:00:40 +0530
-Subject: [PATCH 3/4] devicetree: bindings: Add defeature-repeated-start
- property for Cadence I2C
-In-Reply-To: <20141202131611.GC4072@katana>
-References: <1417514749-24319-1-git-send-email-harinik@xilinx.com>
- <1417514749-24319-4-git-send-email-harinik@xilinx.com>
- <20141202111907.GC23671@leverpostej>
- <CAFcVECLtPx6shBXJbg9Uf_8fnhkMoO1zpoxGcdda7PSA7z_2rA@mail.gmail.com>
- <20141202125203.GA4072@katana>
- <CAFcVECJwFoFd6GrmF282CG+fELnYb=FNCTDq=RYKky_dHha=Jg@mail.gmail.com>
- <20141202131611.GC4072@katana>
-Message-ID: <CAFcVECKMqACtumHZGHbToUUSjd_dWCcLbu=_ZjNnnGdAZQ_3fg@mail.gmail.com>
+From: k.kozlowski@samsung.com (=?UTF-8?B?S3J6eXN6dG9mIEtvesWCb3dza2k=?=)
+Date: Tue, 02 Dec 2014 14:33:33 +0100
+Subject: [PATCH] mfd: max77686: Fix parent of rtc device
+In-Reply-To: <1417524339-4604-1-git-send-email-yadi.brar@samsung.com>
+References: <1417523620-4311-1-git-send-email-yadi.brar@samsung.com>
+ <1417524339-4604-1-git-send-email-yadi.brar@samsung.com>
+Message-ID: <547DBFAD.30605@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 02.12.2014 13:45, Yadwinder Singh Brar wrote:
+> rtc have different i2c client than power(pmic) block. So rtc device should
+> sit under its own i2c client in device hierarchy, which reflects in sysfs also.
+> This patch modifies code to register rtc cell with rtc->dev as parent.
+> 
+> Without this patch :
+> # ls /sys/class/i2c-adapter/i2c-0/0-0009/
+> driver         max77686-pmic  modalias       power          uevent
+> max77686-clk   max77686-rtc   name           subsystem
+> 
+> After applying patch :
+> # ls /sys/class/i2c-adapter/i2c-0/0-0006/
+> driver/        modalias       power/         uevent
+> max77686-rtc/  name           subsystem/
+> 
+> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> ---
+> 
+> Or Can we follow another (exhaustive but more cleaner) approach, which will
+> be more like code refactoring and cleanup rather than only fix:
+> Since rtc uses i2c client, which gets created using i2c_new_dummy() and is not
+> shared by any other cell of max77686. So we can covert rtc platform driver
+> itself to i2c client driver. It will also allow to expilicitly describe
+> max77686-rtc in DT which we can't do now.
+> It can be applicable to some other existing and new mfd pmic drivers.
+> Any suggestion/comments ?
+
 Hi,
 
-On Tue, Dec 2, 2014 at 6:46 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
->
->> But given the bugs, it will be useful to just disable it if the system doesn't
->> require repeated start.
->
-> What do you do when disable repeated start? Sending STOP and START? If
-> so, this is really something different than repeated start. By using
-> I2C_FUNC_I2C a user expects repeated start, so if the HW does not
-> support it, we should say so and don't try to emulate it with something
-> different.
->
+What kind of problem is solved by this patch?
 
-Yes, we send stop.
-Using repeated start, when number of messages passed > 1, HOLD bit is set
-by the driver. This is an indication to the controller not to send a STOP.
-If we disable repeated start, the driver will not set HOLD bit.
-All the messages are sent but with START and a STOP for each of them.
+Best regards,
+Krzysztof
 
-Regards,
-Harini
+
+> 
+> ---
+>  drivers/mfd/max77686.c |   22 ++++++++++++++++++++--
+>  1 files changed, 20 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
+> index 929795e..22c0948 100644
+> --- a/drivers/mfd/max77686.c
+> +++ b/drivers/mfd/max77686.c
+> @@ -39,10 +39,13 @@
+>  
+>  static const struct mfd_cell max77686_devs[] = {
+>  	{ .name = "max77686-pmic", },
+> -	{ .name = "max77686-rtc", },
+>  	{ .name = "max77686-clk", },
+>  };
+>  
+> +static const struct mfd_cell max77686_rtc_dev[] = {
+> +	{ .name = "max77686-rtc", },
+> +};
+> +
+>  static const struct mfd_cell max77802_devs[] = {
+>  	{ .name = "max77802-pmic", },
+>  	{ .name = "max77802-clk", },
+> @@ -332,14 +335,27 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
+>  		goto err_del_irqc;
+>  	}
+>  
+> +	if (max77686->type == TYPE_MAX77686) {
+> +		ret = mfd_add_devices(&max77686->rtc->dev, -1, max77686_rtc_dev,
+> +			1, NULL, 0, NULL);
+> +		if (ret < 0) {
+> +			dev_err(&max77686->rtc->dev,
+> +				"failed to add RTC device %d\n", ret);
+> +			goto err_del_rtc_irqc;
+> +		}
+> +	}
+> +
+>  	ret = mfd_add_devices(max77686->dev, -1, cells, n_devs, NULL, 0, NULL);
+>  	if (ret < 0) {
+>  		dev_err(&i2c->dev, "failed to add MFD devices: %d\n", ret);
+> -		goto err_del_rtc_irqc;
+> +		goto err_del_rtc_dev;
+>  	}
+>  
+>  	return 0;
+>  
+> +err_del_rtc_dev:
+> +	if (max77686->type == TYPE_MAX77686)
+> +		mfd_remove_devices(&max77686->rtc->dev);
+>  err_del_rtc_irqc:
+>  	regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
+>  err_del_irqc:
+> @@ -356,6 +372,8 @@ static int max77686_i2c_remove(struct i2c_client *i2c)
+>  	struct max77686_dev *max77686 = i2c_get_clientdata(i2c);
+>  
+>  	mfd_remove_devices(max77686->dev);
+> +	if (max77686->type == TYPE_MAX77686)
+> +		mfd_remove_devices(&max77686->rtc->dev);
+>  
+>  	regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
+>  	regmap_del_irq_chip(max77686->irq, max77686->irq_data);
+> 
