@@ -1,44 +1,69 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 2 Dec 2014 10:44:57 -0600
-Subject: [PATCH v3 1/3] Documentation: dt: add Altera L3 NIC bindings
-In-Reply-To: <1417292052-12974-2-git-send-email-s.trumtrar@pengutronix.de>
-References: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
- <1417292052-12974-2-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <547DEC89.1060407@opensource.altera.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 2 Dec 2014 10:49:20 -0600
+Subject: [PATCH] ARM: OMAP2+: AM43x: Add ID for ES1.2
+In-Reply-To: <1417145527-31086-1-git-send-email-lokeshvutla@ti.com>
+References: <1417145527-31086-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <547DED90.50504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+CC: Alan Tull
-
-On 11/29/2014 02:14 PM, Steffen Trumtrar wrote:
-> Documentation for the Altera L3 networked interconnect found on the
-> SoCFPGA architecture.
+On 11/27/2014 09:32 PM, Lokesh Vutla wrote:
+> ES1.2 is a minor variant of ES1.1. Major changes since ES1.1 are
+> updating ROM for fixing the following boot modes:
+> - NAND boot
+> - UART boot
+> - Ethernet boot
+> - USB HOST/Client boot
+> This patch adds ID support for AM437x ES1.2 silicon.
+> There are no additional kernel fixes required for ES1.2 silicon.
 > 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Latest Technical Documentation can be found here:
+> http://www.ti.com/lsds/ti/arm/sitara_arm_cortex_a_processor/arm_cortex_a9_core/am437x_arm_cortex_a9/tech_docs.page
+> 
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 > ---
->  .../devicetree/bindings/soc/socfpga/altr,l3-nic.txt       | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
+>  arch/arm/mach-omap2/id.c  | 8 ++++++--
+>  arch/arm/mach-omap2/soc.h | 1 +
+>  2 files changed, 7 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt b/Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
-> new file mode 100644
-> index 000000000000..d9491f14eed3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
-> @@ -0,0 +1,15 @@
-> +Altera SOCFPGA L3 Network Interconnect
-> +--------------------------------------
-> +
-> +The L3 NIC provides access to Global Programmer View (GPV) registers for all
-> +AXI slaves and masters on the SoC.
-> +
-> +Required properties:
-> +- compatible : "altr,l3-nic"
-> +- reg : Should contain 1 register range (address and length)
-> +
-> +Example:
-> +	 gpv at ff800000 {
-> +		compatible = "altr,l3-nic";
-> +		reg = <0xff800000 0x100000>;
-> +	};
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index 53841de..c25feba 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -471,11 +471,15 @@ void __init omap3xxx_check_revision(void)
+>  			cpu_rev = "1.0";
+>  			break;
+>  		case 1:
+> -		/* FALLTHROUGH */
+> -		default:
+>  			omap_revision = AM437X_REV_ES1_1;
+>  			cpu_rev = "1.1";
+>  			break;
+> +		case 2:
+> +		/* FALLTHROUGH */
+> +		default:
+> +			omap_revision = AM437X_REV_ES1_2;
+> +			cpu_rev = "1.2";
+> +			break;
+>  		}
+>  		break;
+>  	case 0xb8f2:
+> diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+> index 4376f59..c1a3b44 100644
+> --- a/arch/arm/mach-omap2/soc.h
+> +++ b/arch/arm/mach-omap2/soc.h
+> @@ -446,6 +446,7 @@ IS_OMAP_TYPE(3430, 0x3430)
+>  #define AM437X_CLASS		0x43700000
+>  #define AM437X_REV_ES1_0	(AM437X_CLASS | (0x10 << 8))
+>  #define AM437X_REV_ES1_1	(AM437X_CLASS | (0x11 << 8))
+> +#define AM437X_REV_ES1_2	(AM437X_CLASS | (0x12 << 8))
+>  
+>  #define OMAP443X_CLASS		0x44300044
+>  #define OMAP4430_REV_ES1_0	(OMAP443X_CLASS | (0x10 << 8))
 > 
+
+Reviewed-by: Nishanth Menon <nm@ti.com>
+
+-- 
+Regards,
+Nishanth Menon
