@@ -1,93 +1,33 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 2 Dec 2014 09:21:50 +0100
-Subject: [PATCH v6 0/3] mtd: nand: gpmi: add proper raw access support
-In-Reply-To: <20141202004743.GB11370@shldeISGChi005.sh.intel.com>
-References: <1417371030-24015-1-git-send-email-boris.brezillon@free-electrons.com>
- <20141201084709.GI29070@brian-ubuntu>
- <20141201095858.75ac3889@bbrezillon>
- <20141202004743.GB11370@shldeISGChi005.sh.intel.com>
-Message-ID: <20141202092150.738a53bb@bbrezillon>
+From: uwe@kleine-koenig.org (=?UTF-8?B?VXdlIEtsZWluZS1Lw7ZuaWc=?=)
+Date: Tue, 02 Dec 2014 09:26:45 +0100
+Subject: [PATCHv1 6/6] rtc: rtc-isl12057: add alarm support to Intersil
+ ISL12057 RTC driver
+In-Reply-To: <87tx1fnn9y.fsf@natisbad.org>
+References: <cover.1416006090.git.arno@natisbad.org>
+ <986ee8d9d3e6862007f398ffddc2a4bb2368933e.1416006090.git.arno@natisbad.org>
+ <5476ED9F.2070600@kleine-koenig.org> <87tx1fnn9y.fsf@natisbad.org>
+Message-ID: <547D77C5.2080705@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Dec 2014 08:47:43 +0800
-Huang Shijie <shijie.huang@intel.com> wrote:
-
-> On Mon, Dec 01, 2014 at 09:58:58AM +0100, Boris Brezillon wrote:
-> > Hi Brian,
-> > 
-> > On Mon, 1 Dec 2014 00:47:09 -0800
-> > Brian Norris <computersforpeace@gmail.com> wrote:
-> > 
-> > > On Sun, Nov 30, 2014 at 07:10:27PM +0100, Boris Brezillon wrote:
-> > > > Hello,
-> > > > 
-> > > > This series provides an implementation for raw accesses taking care of
-> > > > hidding the specific layout used by the GPMI controller.
-> > > > 
-> > > > Best Regards,
-> > > > 
-> > > > Boris
-> > > > 
-> > > > Changes since v5:
-> > > >  - rename gpmi_move_bits into gpmi_copy_bits
-> > > > 
-> > > > Changes since v4:
-> > > >  - fixed a few corner cases in gpmi_move_bits (tested it with:
-> > > >    https://github.com/bbrezillon/gpmi-move-bits-test/blob/master/gpmi-move-bits-test.c)
-> > > >  - add documentation and comments for the new gpmi functions
-> > > > 
-> > > > Changes since v3:
-> > > >  - add comments to the gpmi_move_bits function
-> > > >  - extend raw read/write documentation
-> > > >  - move last part of the raw_page_read function into a conditional block
-> > > > 
-> > > > Changes since v2:
-> > > >  - fixed a bug in gpmi_move_bits
-> > > >  - add a raw_buffer field to be used when using raw access methods
-> > > >    (experienced memory corruptions when directly using page_buffer_virt
-> > > >    buffer)
-> > > >  - add raw OOB access functions
-> > > 
-> > > Applied the series. Thanks!
-> > > 
-> > > Out of curiosity, what tests does gpmi-nand.c now pass/fail?
-> > 
-> > The oobtest is still failing. I started to debug it, but didn't have
-> > enough time to make it work.
-> > 
-> > The nandbiterrs test is working, though I didn't manage to make the
-> > incremental test fail (writing the same pattern 10000 times without
-> > erasing the block between each write does not generate any bit flips) on
-> > my SLC NAND: MT29F2G08ABAEAH4.
-> > Can someone with another SLC NAND chip try it ?
-> > 
-> > > 
-> > > Also, is it time to yank / fixup some of these comments from
-> > > gpmi-nand.c?
-> > 
-> > I was asking myself the same question...
-> > 
-> > > 
-> > >  ...
-> > >  * FIXME: The following paragraph is incorrect, now that there exist
-> > >  * ecc.read_oob_raw and ecc.write_oob_raw functions.
-> > >  *
-> > >  * Since MTD assumes the OOB is not covered by ECC, there is no pair of
-> > >  * ECC-based/raw functions for reading or or writing the OOB. The fact that the
-> > >  * caller wants an ECC-based or raw view of the page is not propagated down to
-> > >  * this driver.
-> > >  */
-> > 
-> > I guess we can remove them.
-> > Huang can you confirm that the raw access functions introduced in this
-> > series are covering what's described here ?
-> I think we can remove these comments now.
-
-Brian, do you want me to send this patch or are you taking care of it ?
 
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+On December 1, 2014 9:11:21 PM CET, arno at natisbad.org wrote:
+>Uwe Kleine-K?nig <uwe@kleine-koenig.org> writes:
+>> For patch 1: Maybe point out that the issue with the century bit
+>isn't
+>> that critical, because this bit is not expected to be set before year
+>> 2100.
+>
+>It has:
+>
+>   This was tested by putting a device 100 years in the future (using a
+> specific kernel due to the inability of userland tools such as date or
+>hwclock to pass year 2038), rebooting on a kernel w/ this patch applied
+>    and verifying the device was still 100 years in the future.
+>
+That describes your test, but it doesn't rule out that someone might use
+the century bit to distinguish 19** and 20**.
+
+Best regards
+Uwe
