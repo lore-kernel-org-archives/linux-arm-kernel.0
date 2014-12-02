@@ -1,48 +1,44 @@
 From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 2 Dec 2014 10:44:07 -0600
-Subject: [PATCH v3 0/3] SoCFPGA: L3 NIC driver
-In-Reply-To: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
+Date: Tue, 2 Dec 2014 10:44:57 -0600
+Subject: [PATCH v3 1/3] Documentation: dt: add Altera L3 NIC bindings
+In-Reply-To: <1417292052-12974-2-git-send-email-s.trumtrar@pengutronix.de>
 References: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <547DEC57.6010803@opensource.altera.com>
+ <1417292052-12974-2-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <547DEC89.1060407@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 +CC: Alan Tull
 
 On 11/29/2014 02:14 PM, Steffen Trumtrar wrote:
-> Hi!
+> Documentation for the Altera L3 networked interconnect found on the
+> SoCFPGA architecture.
 > 
-> This series adds support for the SoCFPGA L3 NIC. As the memory range has
-> a lot of holes, where you can not read from, syscon can not be used for
-> this IP core. Instead add a new driver, that knows about all the allowed
-> ranges and guards the access via regmap.
-> 
-> Changes in v3:
-> 
-> 	- Split out the devicetree binding in its own patch
-> 
-> Regards,
-> Steffen
-> 
-> Steffen Trumtrar (3):
->   Documentation: dt: add Altera L3 NIC bindings
->   ARM: socfpga: Add driver for the L3 interconnect
->   ARM: dts: socfpga: Add l3nic node
-> 
->  .../bindings/soc/socfpga/altr,l3-nic.txt           |  15 ++
->  arch/arm/boot/dts/socfpga.dtsi                     |   5 +
->  drivers/soc/Kconfig                                |   1 +
->  drivers/soc/Makefile                               |   1 +
->  drivers/soc/socfpga/Kconfig                        |  10 +
->  drivers/soc/socfpga/Makefile                       |   1 +
->  drivers/soc/socfpga/l3nic.c                        | 221 +++++++++++++++++++++
->  include/soc/socfpga/gpv.h                          |  63 ++++++
->  include/soc/socfpga/l3regs.h                       | 192 ++++++++++++++++++
->  9 files changed, 509 insertions(+)
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> ---
+>  .../devicetree/bindings/soc/socfpga/altr,l3-nic.txt       | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
 >  create mode 100644 Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
->  create mode 100644 drivers/soc/socfpga/Kconfig
->  create mode 100644 drivers/soc/socfpga/Makefile
->  create mode 100644 drivers/soc/socfpga/l3nic.c
->  create mode 100644 include/soc/socfpga/gpv.h
->  create mode 100644 include/soc/socfpga/l3regs.h
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt b/Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
+> new file mode 100644
+> index 000000000000..d9491f14eed3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
+> @@ -0,0 +1,15 @@
+> +Altera SOCFPGA L3 Network Interconnect
+> +--------------------------------------
+> +
+> +The L3 NIC provides access to Global Programmer View (GPV) registers for all
+> +AXI slaves and masters on the SoC.
+> +
+> +Required properties:
+> +- compatible : "altr,l3-nic"
+> +- reg : Should contain 1 register range (address and length)
+> +
+> +Example:
+> +	 gpv at ff800000 {
+> +		compatible = "altr,l3-nic";
+> +		reg = <0xff800000 0x100000>;
+> +	};
 > 
