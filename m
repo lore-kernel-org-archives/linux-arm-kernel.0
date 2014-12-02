@@ -1,117 +1,130 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 03 Dec 2014 08:15:33 +0900
-Subject: [PATCH v4 1/3] mmc: core: Support the optional init_card()
- callback for MMC and SD
-In-Reply-To: <1417553397-460-2-git-send-email-dianders@chromium.org>
-References: <1417553397-460-1-git-send-email-dianders@chromium.org>
- <1417553397-460-2-git-send-email-dianders@chromium.org>
-Message-ID: <547E4815.7010100@samsung.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Wed, 03 Dec 2014 00:15:56 +0100
+Subject: [PATCH 2/5] ARM: BCM5301X: Add DT for Netgear R6300 V2
+In-Reply-To: <1417368513-13808-2-git-send-email-zajec5@gmail.com>
+References: <1417368513-13808-1-git-send-email-zajec5@gmail.com>
+ <1417368513-13808-2-git-send-email-zajec5@gmail.com>
+Message-ID: <547E482C.4060706@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug.
-
-I think good that this patch is separated to two patches.
-(board file and codes relevant to mmc.)
-
-Best Regards,
-Jaehoon Chung
-
-On 12/03/2014 05:49 AM, Doug Anderson wrote:
-> In (3fcb027 ARM: MXC: mxcmmc: work around a bug in the SDHC busy line
-> handling) the optional init_card() callback was added.  According to
-> the original change it was "for now only called from
-> mmc_sdio_init_card()".
-> 
-> This callback really ought to be called from the SD and MMC init
-> functions as well.  One current user of this callback
-> (mxcmci_init_card) will not work as expected if you insert an SDIO
-> card, then eject it and put a normal SD card in.  Specifically the
-> normal SD card will not get to run with 4-bit data.
-> 
-> I'd like to use the init_card() callback to handle a similar quirk on
-> dw_mmc when using SDIO Interrupts (the "low power" feature of the card
-> needs to be disabled), so that will add a second user of the function.
-> 
-> As part of this change fixup the one place that relied on the callback
-> only happening for SDIO cards.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Reviewed-by: Grant Grundler <grundler@chromium.org>
+On 11/30/2014 06:28 PM, Rafa? Mi?ecki wrote:
+> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 > ---
-> Changes in v3:
-> - Add fixup to pandora_wl1251_init_card().
+>  arch/arm/boot/dts/Makefile                     |  4 +-
+>  arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts | 84 ++++++++++++++++++++++++++
+>  2 files changed, 87 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
 > 
-> Changes in v2:
-> - mmc core change new for this version.
-> 
->  arch/arm/mach-omap2/board-omap3pandora.c | 14 ++++++++------
->  drivers/mmc/core/mmc.c                   |  6 ++++++
->  drivers/mmc/core/sd.c                    |  7 ++++++-
->  3 files changed, 20 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-> index 7f17087..969e100 100644
-> --- a/arch/arm/mach-omap2/board-omap3pandora.c
-> +++ b/arch/arm/mach-omap2/board-omap3pandora.c
-> @@ -254,12 +254,14 @@ static void pandora_wl1251_init_card(struct mmc_card *card)
->  	 * We have TI wl1251 attached to MMC3. Pass this information to
->  	 * SDIO core because it can't be probed by normal methods.
->  	 */
-> -	card->quirks |= MMC_QUIRK_NONSTD_SDIO;
-> -	card->cccr.wide_bus = 1;
-> -	card->cis.vendor = 0x104c;
-> -	card->cis.device = 0x9066;
-> -	card->cis.blksize = 512;
-> -	card->cis.max_dtr = 20000000;
-> +	if (card->type == MMC_TYPE_SDIO || card->type == MMC_TYPE_SD_COMBO) {
-> +		card->quirks |= MMC_QUIRK_NONSTD_SDIO;
-> +		card->cccr.wide_bus = 1;
-> +		card->cis.vendor = 0x104c;
-> +		card->cis.device = 0x9066;
-> +		card->cis.blksize = 512;
-> +		card->cis.max_dtr = 20000000;
-> +	}
->  }
->  
->  static struct omap2_hsmmc_info omap3pandora_mmc[] = {
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index 02ad792..4a21d66 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -1297,6 +1297,12 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
->  	}
->  
->  	/*
-> +	 * Call the optional HC's init_card function to handle quirks.
-> +	 */
-> +	if (host->ops->init_card)
-> +		host->ops->init_card(host, card);
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 35f3e12..22bb87f 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -55,7 +55,9 @@ dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
+>  dtb-$(CONFIG_ARCH_AXXIA) += axm5516-amarillo.dtb
+>  dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+>  dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b-plus.dtb
+> -dtb-$(CONFIG_ARCH_BCM_5301X) += bcm4708-netgear-r6250.dtb
+> +dtb-$(CONFIG_ARCH_BCM_5301X) += \
+> +	bcm4708-netgear-r6250.dtb \
+> +	bcm4708-netgear-r6300-v2.dtb
+
+This part does not apply cleanly on top of v3.18-rc1.
+
+>  dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
+>  dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
+>  	bcm911360k.dtb \
+> diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
+> new file mode 100644
+> index 0000000..e18b636
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
+> @@ -0,0 +1,84 @@
+> +/*
+> + * Broadcom BCM470X / BCM5301X ARM platform code.
+> + * DTS for Netgear R6300 V2
+> + *
+> + * Copyright ? 2014 Rafa? Mi?ecki <zajec5@gmail.com>
+
+Is this ? needed here?
+
+> + *
+> + * Licensed under the GNU/GPL. See COPYING for details.
+> + */
 > +
-> +	/*
->  	 * For native busses:  set card RCA and quit open drain mode.
->  	 */
->  	if (!mmc_host_is_spi(host)) {
-> diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
-> index d90a6de..29fccdc 100644
-> --- a/drivers/mmc/core/sd.c
-> +++ b/drivers/mmc/core/sd.c
-> @@ -933,6 +933,12 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
->  	}
->  
->  	/*
-> +	 * Call the optional HC's init_card function to handle quirks.
-> +	 */
-> +	if (host->ops->init_card)
-> +		host->ops->init_card(host, card);
+> +/dts-v1/;
 > +
-> +	/*
->  	 * For native busses:  get card RCA and quit open drain mode.
->  	 */
->  	if (!mmc_host_is_spi(host)) {
-> @@ -1271,4 +1277,3 @@ err:
->  
->  	return err;
->  }
-> -
+> +#include "bcm4708.dtsi"
+> +
+> +/ {
+> +	compatible = "netgear,r6300v2", "brcm,bcm4708";
+> +	model = "Netgear R6300 V2 (BCM4708)";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x00000000 0x08000000>;
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		logo {
+> +			label = "bcm53xx:white:logo";
+> +			gpios = <&chipcommon 1 GPIO_ACTIVE_HIGH>;
+> +			linux,default-trigger = "default-on";
+> +		};
+> +
+> +		power0 {
+> +			label = "bcm53xx:green:power";
+> +			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
+> +			linux,default-trigger = "default-off";
+> +		};
+> +
+> +		power1 {
+> +			label = "bcm53xx:amber:power";
+> +			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
+> +			linux,default-trigger = "default-on";
+> +		};
+> +
+> +		usb {
+> +			label = "bcm53xx:blue:usb";
+> +			gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
+> +			linux,default-trigger = "default-off";
+> +		};
+> +
+> +		wireless {
+> +			label = "bcm53xx:blue:wireless";
+> +			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
+> +			linux,default-trigger = "default-off";
+> +		};
+> +	};
+> +
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		poll-interval = <200>;
+> +
+> +		wps {
+> +			label = "WPS";
+> +			linux,code = <KEY_WPS_BUTTON>;
+> +			gpios = <&chipcommon 4 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		rfkill {
+> +			label = "WiFi";
+> +			linux,code = <KEY_RFKILL>;
+> +			gpios = <&chipcommon 5 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		restart {
+> +			label = "Reset";
+> +			linux,code = <KEY_RESTART>;
+> +			gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
+> +};
 > 
