@@ -1,47 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Dec 2014 09:43:20 +0000
-Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for
- IOMMU drivers
-In-Reply-To: <2039644.fesfKXTybP@wuerfel>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <CAL_JsqKHvh9KSTYrrs1Pts5Kg=8dA1V6NiW57_2vdDH173qQGg@mail.gmail.com>
- <547D84F4.8030204@samsung.com> <2039644.fesfKXTybP@wuerfel>
-Message-ID: <20141202094320.GC9917@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 2 Dec 2014 10:47:42 +0100
+Subject: [PATCH V6 05/12] mailbox: Add NVIDIA Tegra XUSB mailbox driver
+In-Reply-To: <1416874644-12070-6-git-send-email-abrestic@chromium.org>
+References: <1416874644-12070-1-git-send-email-abrestic@chromium.org>
+ <1416874644-12070-6-git-send-email-abrestic@chromium.org>
+Message-ID: <20141202094741.GC6135@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02, 2014 at 09:36:59AM +0000, Arnd Bergmann wrote:
-> On Tuesday 02 December 2014 10:23:00 Marek Szyprowski wrote:
-> > >> +static inline void of_iommu_set_ops(struct device_node *np,
-> > >> +                                   const struct iommu_ops *ops)
-> > >> +{
-> > >> +       np->data = (struct iommu_ops *)ops;
-> > >> +}
-> > >> +
-> > >> +static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
-> > >> +{
-> > >> +       return np->data;
-> > >> +}
-> > > This may collide with other users. While use of it is rare, PPC uses
-> > > it in its PCI code. The OF_DYNAMIC code frees it but never actually
-> > > sets it. There may be some coming usage with the DT overlay code or
-> > > that's just a bug. Pantelis or Grant can comment. If not, I think we
-> > > really should try to get rid of this pointer rather than expand it's
-> > > usage.
-> > 
-> > I think that for the initial version it is ok to use np->data. When 
-> > per-iommu
-> > controller structure is introduced later, it can be reused also for 
-> > performing
-> > of_node to iommu_ops lookup, because IOMMU framework will need to keep track
-> > on all such iommu controllers anyway.
+On Mon, Nov 24, 2014 at 04:17:17PM -0800, Andrew Bresticker wrote:
+> The Tegra xHCI controller's firmware communicates requests to the host
+> processor through a mailbox interface.  While there is only a single
+> physical channel, messages sent by the controller can be divided
+> into two groups: those intended for the PHY driver and those intended
+> for the host-controller driver.  The requesting driver is assigned
+> one of two virtual channels when the single physical channel is
+> requested.  All incoming messages are sent to both virtual channels.
 > 
-> Agreed. I think in the long run, we will have a 'struct iommu' that is
-> added into a global linked list and that contains (among other things)
-> an iommu_ops pointer and a device_node pointer. The of_iommu_get_ops
-> function then walks the list to find the right iommu instance.
+> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Thierry,
+> 
+> I've left this as a separate driver because I don't think it should be
+> combined with the xHCI host.  Stephen and I discussed this earlier in
+> review of v1 of this series and he agreed that the mailbox belongs in
+> its own DT node and driver.
 
-Yup, I plan to look at that after Christmas because I need it for the
-per-IOMMU instance pgsize_bitmap anyway.
+My objection wasn't strictly against merging the drivers. What I don't
+want to see is two devices sharing the same memory-mapped regions in DT.
 
-Will
+That's based on earlier discussion with Stephen as well, because we have
+had the same problem with USB and USB-PHY before. Unless I completely
+misinterpreted we came to the conclusion that we should avoid this in
+the future.
+
+Like I said, this doesn't mean that both need to be in the same driver.
+We could use MFD for example, or provide an entry point in the mailbox
+driver that can be called from the XUSB driver to instantiate the
+mailbox (which is really the same as MFD).
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141202/e9e9da9b/attachment.sig>
