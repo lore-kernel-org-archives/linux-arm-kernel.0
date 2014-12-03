@@ -1,45 +1,48 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 03 Dec 2014 11:57:05 -0800
-Subject: [PATCH v2 2/7] ARM: Exynos: add support for sub-power domains
-In-Reply-To: <547F065A.5030505@samsung.com> (Marek Szyprowski's message of
- "Wed, 03 Dec 2014 13:47:22 +0100")
-References: <1416814256-24288-3-git-send-email-a.hajda@samsung.com>
- <1417610024-29748-1-git-send-email-m.szyprowski@samsung.com>
- <CAMuHMdWjZTRVrdcdu2toj9FYi5gOgw_Hf23SRh=9-QKwQDJy0g@mail.gmail.com>
- <547F065A.5030505@samsung.com>
-Message-ID: <7hvblsy0a6.fsf@deeprootsystems.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Dec 2014 20:57:50 +0100
+Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
+ drivers
+In-Reply-To: <CACxGe6vyMkyE9ZRj_FQzi19ESEo7OV_RQoVV65xBYpdQV8cRGQ@mail.gmail.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <CAL_JsqKHvh9KSTYrrs1Pts5Kg=8dA1V6NiW57_2vdDH173qQGg@mail.gmail.com>
+ <CACxGe6vyMkyE9ZRj_FQzi19ESEo7OV_RQoVV65xBYpdQV8cRGQ@mail.gmail.com>
+Message-ID: <2579924.PPXuLn3o19@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski <m.szyprowski@samsung.com> writes:
+On Tuesday 02 December 2014 14:16:57 Grant Likely wrote:
+> On Mon, Dec 1, 2014 at 11:54 PM, Rob Herring <robherring2@gmail.com> wrote:
+> > On Mon, Dec 1, 2014 at 10:57 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >>
+> >> +static inline void of_iommu_set_ops(struct device_node *np,
+> >> +                                   const struct iommu_ops *ops)
+> >> +{
+> >> +       np->data = (struct iommu_ops *)ops;
+> >> +}
+> >> +
+> >> +static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+> >> +{
+> >> +       return np->data;
+> >> +}
+> >
+> > This may collide with other users. While use of it is rare, PPC uses
+> > it in its PCI code. The OF_DYNAMIC code frees it but never actually
+> > sets it. There may be some coming usage with the DT overlay code or
+> > that's just a bug. Pantelis or Grant can comment. If not, I think we
+> > really should try to get rid of this pointer rather than expand it's
+> > usage.
+> >
+> > I didn't see a user of this. I'm guessing that is coming in a SMMU patch?
+> 
+> Good catch. This is not good. The data pointer should be avoided since
+> there are no controls over its use. Until a better solution can be
+> implemented, probably the safest thing to do is add a struct iommu_ops
+> pointer to struct device_node. However, assuming that only a small
+> portion of nodes will actually have iommu_ops set, I'd rather see a
+> separate registry that matches device_nodes to iommu_ops.
 
-> Hello,
->
-> On 2014-12-03 13:36, Geert Uytterhoeven wrote:
->> Hi Marek,
->>
->> On Wed, Dec 3, 2014 at 1:33 PM, Marek Szyprowski
->> <m.szyprowski@samsung.com> wrote:
->>> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
->>> index abde1ea8a119..b884358ebb1a 100644
->>> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
->>> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
->>> @@ -22,6 +22,8 @@ Optional Properties:
->>>          - pclkN, clkN: Pairs of parent of input clock and input clock to the
->>>                  devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
->>>                  are supported currently.
->>> +- samsung,power-domain: phandle to a master power domain that the given domain
->>> +                      is a part of
->> For new DTSes I'd recommend using the generic "power-domains" only.
->
-> I think that some consistency in dts style will be really an added
-> value. In my opinion for
-> all existing DTSes we should keep using 'samsung,power-domain' (even
-> for defining a parent
-> power domains) and for all new DTSes, the generic 'power-domains'
-> binding should be used.
+Fair enough. Will, can you take a copy of drivers/dma/of-dma.c and
+adapt it as needed? It should be exactly what we need to start
+out and can be extended and generalized later.
 
-Or even better, convert the existing DTSs to use generic power-domain
-first, and then use generic ones going forward also.
-
-Kevin
+	ARnd
