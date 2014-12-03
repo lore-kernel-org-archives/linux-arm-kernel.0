@@ -1,53 +1,41 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 3 Dec 2014 17:52:04 +0100
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141128202719.GU2817@atomide.com>
-References: <20141027200008.GR2560@atomide.com> <201411270038.01312@pali>
- <20141127011203.GR2817@atomide.com> <201411271232.47231@pali>
- <20141128202719.GU2817@atomide.com>
-Message-ID: <20141203165204.GD26685@amd>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 3 Dec 2014 16:56:32 +0000 (UTC)
+Subject: OMAP baseline test results for v3.18-rc7
+In-Reply-To: <547EB63B.5070200@compulab.co.il>
+References: <alpine.DEB.2.02.1412021838410.16734@utopia.booyaka.com>
+ <547EB63B.5070200@compulab.co.il>
+Message-ID: <alpine.DEB.2.02.1412031655140.8865@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2014-11-28 12:27:19, Tony Lindgren wrote:
-> * Pali Roh?r <pali.rohar@gmail.com> [141127 03:34]:
-> > On Thursday 27 November 2014 02:12:04 Tony Lindgren wrote:
-> > > 
-> > > Thinking about this probably the best long term solution is
-> > > to pass optional board_revision in the kernel cmdline that
-> > > can be parsed early and copied to system_rev variable.
-> > > 
+Hi Igor,
+
+On Wed, 3 Dec 2014, Igor Grinberg wrote:
+
+> On 12/02/14 20:39, Paul Walmsley wrote:
 > > 
-> > Not possible. Our bootloader is closed & proprietary. I tried to 
-> > replace it with u-boot I was not able to do that. So we will use 
-> > that Nokia closed bootloader forever and it can provide data only 
-> > in ATAG structure.
+> > Here are some basic OMAP test results for Linux v3.18-rc7.
+> > Logs and other details at:
+> > 
+> >     http://www.pwsan.com/omap/testlogs/test_v3.18-rc7/20141201203859/
 > 
-> I'm using just mainline u-boot flashed as kernel for nolo that
-> then loads the kernel.
+> [...]
 > 
-> For passing the board revision using the pass through u-boot is
-> probably the best long term solution. U-boot can read the ATAGs
-> from nolo and modify the .dtb for the revision information.
+> > Boot to userspace:
+> >     FAIL ( 1/16): 2430sdp
+> >     skip ( 2/16): 5912osk, 3517evm
+> >     Pass (13/16): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+> > 		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+> > 		  3730beaglexm, 3730es12beaglexm, 5430es2uevm,
+> > 		  5430es2sbct54, 2420n800
 > 
-> Are you saying there are some issues with that?
+> I've looked at the boot log and it seems cm-t3517 is booting just fine...
 
-Plenty :-).
+Thanks for the note.  I will look into this - CM-T3517 should be listed 
+there.  
 
-Basically, u-boot is great for production (select one of kernels and
-boot it), but pretty much unusable for development:
+> A problem with the test/report collecting script?
 
-1) It does not support backlight, so you are interacting blind
+Most likely...
 
-2) Setup to load kernels over usb would probably be interesting
-
-3) It makes kernel fail in interesting ways depending on phase of
-moon.
-
-Please, keep nolo supported. Debugging kernel & user space is bad,
-debugging u-boot & kernel & user space would be even worse.
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+- Paul
