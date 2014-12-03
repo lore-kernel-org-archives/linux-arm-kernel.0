@@ -1,52 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Dec 2014 21:23:14 +0100
-Subject: Data Synchronization Barrier (DSB)
-In-Reply-To: <547F384A.1030809@free.fr>
-References: <547F384A.1030809@free.fr>
-Message-ID: <3745883.NFX517mvTa@wuerfel>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Wed, 3 Dec 2014 12:24:07 -0800
+Subject: [PATCH] ARM: dts: Add dts file for odroid XU3 board
+In-Reply-To: <1417438770-28696-1-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1417438770-28696-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <CANMBJr4B-c-eMCvwexW5_WhfK=xsJ0-Cjo_OApTpUXP3zBG-kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 December 2014 17:20:26 Mason wrote:
-> 
-> In fact, on ARM platforms, __raw_readl does not insert any memory
-> barrier (or compiler barrier for that matter, the only constraints
-> are those imposed by the "volatile" keyword)
-> 
-> static inline u32 __raw_readl(const volatile void __iomem *addr)
-> {
->         u32 val;
->         asm volatile("ldr %1, %0"
->                      : "+Qo" (*(volatile u32 __force *)addr),
->                        "=r" (val));
->         return val;
-> }
-> 
-> If I understand correctly, accessing memory-mapped registers without
-> using memory barriers can lead to subtle bugs, from memory reordering?
-> (This part is really unclear for me.)
+On 1 December 2014 at 04:59, Sjoerd Simons
+<sjoerd.simons@collabora.co.uk> wrote:
+> Add DTS for the Hardkernel Odroid XU3. The name of the DTS file is kept the
+> same as the vendors naming, which means it's prefixed with exynos5422
+> instead of exynos5800 as the SoC name even though it includes the
+> exyno5800 dtsi.
+>
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-The "asm volatile" makes the compiler emit the accesses in the order
-that is given in source code, and we rely on the CPU to send them
-to the bus in the same order, which on ARM is enforced through the
-page table attributes that ioremap sets.
+Tested-by: Tyler Baker <tyler.baker@linaro.org>
 
-The barriers are needed only to ensure ordering between MMIO accesses
-and memory accesses, in particular memory that is seen by a DMA
-bus master device that is controlled using this MMIO.
+Tested this atop of next-20141203 both on exynos_defconfig and
+multi_v7_defconfig. All configurations boot fine on my odroid-xu3
+board, no imprecise aborts observed either.
 
-The classic example for this is writing to a DMA buffer from the
-CPU and then telling a device using writel to fetch the data.
-Without the barrier, that data may still be in a CPU buffer
-by the time that a device reads it.
+Thanks!
 
-> Should I alias my primitives to ioread32 and iowrite32?
-> 
-> NOTE: iowrite32 calls outer_sync() which seems to have somewhat high
-> of an overhead. If I'm writing to 4 consecutive MM registers, do I
-> need to sync after each write?
-
-I think readl_relaxed() is enough for you in this case, as long as
-there are no DMAs.
-
-	Arnd
+Tyler
