@@ -1,161 +1,48 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 3 Dec 2014 20:28:21 +0100
-Subject: [PATCH v3 06/11] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <547F24B6.8070504@atmel.com>
-References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
- <1417429647-3419-7-git-send-email-boris.brezillon@free-electrons.com>
- <547F24B6.8070504@atmel.com>
-Message-ID: <20141203202821.6d15af88@bbrezillon>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Wed, 3 Dec 2014 11:38:13 -0800
+Subject: [PATCH v2 2/2] ASoC: rockchip: i2s: add support for grabbing
+ output clock to codec
+In-Reply-To: <20141203192024.GL7712@sirena.org.uk>
+References: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
+ <1417591118-18695-1-git-send-email-jay.xu@rock-chips.com>
+ <1417591118-18695-3-git-send-email-jay.xu@rock-chips.com>
+ <20141203192024.GL7712@sirena.org.uk>
+Message-ID: <CAPz6YkXRmRzYpW7xuDsq69A9H-Qm2-j6t-a+B1w9+OLOPf_YnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 3 Dec 2014 15:56:54 +0100
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+On Wed, Dec 3, 2014 at 11:20 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Dec 03, 2014 at 03:18:38PM +0800, Jianqun Xu wrote:
+>> From: Sonny Rao <sonnyrao@chromium.org>
+>>
+>> We need to claim the clock which is driving the codec so that when we enable
+>> clock gating, we continue to clock the codec when needed.  I make this an
+>> optional clock since there might be some applications where we don't need it
+>> but can still use the I2S block.
+>
+> I would expect that the clock for the CODEC should be managed by the
+> CODEC if at all possible - that seems more logical than having the CPU
+> I2S controller request and manage it if it's a separate clock.  Why add
+> this to the CPU side driver?
 
-> Le 01/12/2014 11:27, Boris Brezillon a ?crit :
-> > The EBI (External Bus Interface) is used to access external peripherals
-> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> > Each device is assigned a CS line and an address range and can have its
-> > own configuration (timings, access mode, bus width, ...).
-> > This driver provides a generic DT binding to configure a device according
-> > to its requirements.
-> > For specific device controllers (like the NAND one) the SMC timings
-> > should be configured by the controller driver through the matrix and smc
-> > syscon regmaps.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  .../bindings/memory-controllers/atmel-ebi.txt      | 155 +++++++++++++++++++++
-> >  1 file changed, 155 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
-> > new file mode 100644
-> > index 0000000..3749ea1
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
-> > @@ -0,0 +1,155 @@
-> > +* Device tree bindings for Atmel EBI
-> > +
-> > +The External Bus Interface (EBI) controller is a bus where you can connect
-> > +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
-> > +The EBI provides a glue-less interface to asynchronous memories though the SMC
-> > +(Static Memory Controller).
-> > +Synchronous memories (and some asynchronous memories like NANDs) can be
-> > +attached to specialized controllers which are responsible for configuring the
-> > +bus appropriately according to the connected device.
-> > +In the other hand, the bus interface can be automated for simple asynchronous
-> > +devices.
-> > +
-> > +Required properties:
-> > +
-> > +- compatible:		"atmel,at91sam9260-ebi"
-> > +			"atmel,at91sam9261-ebi"
-> > +			"atmel,at91sam9263-ebi0"
-> > +			"atmel,at91sam9263-ebi1"
-> 
-> Ditto: 9263 twice.
+It's a good question.  Right now the way I'm running this stuff we're
+mostly setting all the i2s the clock rates from the codec driver, but
+I think this isn't the correct way to go, and the i2s driver needs to
+set it's rate based on the hw params, but that isn't happening (yet).
 
-Actually that's not a duplicated compatible (see the ebi0/ebi1 at the
-end): sam9263 embeds 2 EBIs, and they have different numbers of chip
-selects, hence the different compatible string.
+This output clock has a mux and can either be a fixed 12Mhz output or
+can be derived from the same fractional divider which drives the i2s
+block.   I thought it was simpler to keep them all the same, but need
+to put ownership in the i2s in anticipation of the i2s driver setting
+it's own clock rate.
 
-I'll add an "atmel,at91sam9rl-ebi" string.
-
-> 
-> > +			"atmel,at91sam9g45-ebi"
-> > +			"atmel,at91sam9x5-ebi"
-> > +			"atmel,sama5d3-ebi"
-> > +
-> > +- reg:			Contains offset/length value for EBI memory mapping.
-> > +			This property might contain several entries if the EBI
-> > +			memory range is not contiguous
-> > +
-> > +- #address-cells:	Must be 2.
-> > +			The first cell encodes the CS.
-> > +			The second cell encode the offset into the CS memory
-> > +			range.
-> > +
-> > +- #size-cells:		Must be set to 1.
-> > +
-> > +- ranges:		Encodes CS to memory region association.
-> > +
-> > +- clocks:		Clock feeding the EBI controller.
-> > +			See clock-bindings.txt
-> > +
-> > +Child chip-select (cs) nodes contain the memory devices nodes connected to
-> > +such as NOR (e.g. cfi-flash) and NAND.
-> > +There might be board specific devices like FPGAs.
-> > +You'll define you device requirements in these child nodes.
-> > +
-> > +Required child cs node properties:
-> > +
-> > +- #address-cells:	Must be 2.
-> > +
-> > +- #size-cells:		Must be 1.
-> > +
-> > +- ranges:		Empty property indicating that child nodes can inherit
-> > +			memory layout.
-> > +
-> > +Optional child cs node properties:
-> > +- atmel,generic-dev		boolean property specifying if the device is
-> > +				a generic device.
-> > +				The following properties are only parsed if
-> > +				this property is present.
-> > +				Specialized devices are attached to specialized
-> > +				controllers which are responsible for
-> > +				configuring the bus appropriately.
-> > +				Here are some examples of specialized
-> > +				controllers: NAND, CompactFlash, SDR-SDRAM.
-> > +
-> > +- atmel,bus-width:		width of the asynchronous device's data bus
-> > +				8, 16 or 32.
-> > +				8 if not present.
-> > +
-> > +- atmel,byte-access-type	"write" or "select" (see Atmel datasheet).
-> > +				"select" if not present.
-> > +
-> > +- atmel,read-mode		"nrd" or "ncs".
-> > +				"ncs" is not present.
-> > +
-> > +- atmel,write-mode		"nwe" or "ncs".
-> > +				"ncs" is not present.
-> > +
-> > +- atmel,exnw-mode		"disabled", "frozen" or "ready".
-> > +				"disabled" if not present.
-> > +
-> > +- atmel,page-mode		enable page mode if present. The provided value
-> > +				defines the page size (supported values: 4, 8,
-> > +				16 and 32).
-> > +
-> > +Optional device timings expressed in nanoseconds (if the property is not
-> > +present 0 is assumed):
-> > +
-> > +- atmel,ncs-rd-setup-ns
-> > +- atmel,nrd-setup-ns
-> > +- atmel,ncs-wr-setup-ns
-> > +- atmel,nwe-setup-ns
-> > +- atmel,ncs-rd-pulse-ns
-> > +- atmel,nrd-pulse-ns
-> > +- atmel,ncs-wr-pulse-ns
-> > +- atmel,nwe-pulse-ns
-> > +- atmel,nwe-cycle-ns
-> > +- atmel,nrd-cycle-ns
-> > +- atmel,tdf-ns
-> > +
-> > +- atmel,tdf-optimized		data float optimized mode. If present the data
-> > +				float time is optimized depending on the next
-> > +				device being accessed (next device setup
-> > +				time is substracted to the current devive data
-> 
-> Typo: subtract, device
-
-Yep, I'll those typos.
+If you think this is an implementation detail and this output clock
+should just be owned by the codec driver, even though I'm guessing it
+will just have to be the same as i2s, then I think we can drop this
+and make sure simple card (or whatever other codec driver) claims this
+clock.
 
 
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>
+> We've not always done this for older systems due to the lack of a usable
+> clock API but that's starting to be addressed.
