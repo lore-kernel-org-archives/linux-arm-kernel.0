@@ -1,46 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Dec 2014 21:32:55 +0100
-Subject: [PATCH 00/16] irqchip: gic: killing gic_arch_extn, slowly
-In-Reply-To: <547F2534.6040104@arm.com>
-References: <1417539497-20101-1-git-send-email-marc.zyngier@arm.com>
- <2236572.MdjJGoEARl@wuerfel> <547F2534.6040104@arm.com>
-Message-ID: <14936022.4dFVyl0YXu@wuerfel>
+Date: Wed, 03 Dec 2014 21:35:34 +0100
+Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <20141203143122.GH499@linaro.org>
+References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
+ <547ED3BD.5090209@linaro.org> <20141203143122.GH499@linaro.org>
+Message-ID: <2596381.rFt35NU3oS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 December 2014 14:59:00 Marc Zyngier wrote:
-> On 03/12/14 14:30, Arnd Bergmann wrote:
-> > On Tuesday 02 December 2014 16:58:01 Marc Zyngier wrote:
-> >>
-> >> - This actively *breaks* existing setups. Once you boot a new kernel
-> >>   with an old DT, suspend/resume *will* be broken. Old kernels on a
-> >>   new DT won't even boot! You've been warned. This really outline the
-> >>   necessity of actually describing the HW in device trees...
-> > 
-> > I wonder if we should take this as the trigger to come up with a
-> > better way of handling incompatible binding changes. The machine_desc
-> > has a .dt_fixup callback that we could use to modify the DT passed
-> > from a boot loader and warn about it, but no platform does this
-> > at the moment.
-> > 
-> > From what I can tell, the required change to get an old dtb working
-> > with a new kernel is to add a particular node and flip a few
-> > interrupt-parent properties, which seems doable as a quirk if
-> > people agree that it's a good idea.
-> 
-> That's probably the only way to avoid the breakage introduced by this
-> kind of changes. A few questions though:
-> - Where do we stop? Eventually, don't we end-up with a full DT in there?
-> - When do we retire such fixup? Or do we keep them forever?
+On Wednesday 03 December 2014 07:31:22 Lina Iyer wrote:
+> >>>+static int __init qcom_spm_init(void)
+> >>>+{
+> >>>+    int ret;
+> >>>+
+> >>>+    /*
+> >>>+     * cpuidle driver need to registered before the cpuidle device
+> >>>+     * for any cpu. Register the device for the the cpuidle driver.
+> >>>+     */
+> >>>+    ret = platform_device_register(&qcom_cpuidle_drv);
+> >>>+    if (ret)
+> >>>+        return ret;
+> >>Stephen pointed out that we would have the platform device lying around
+> >>on a non-QCOM device when using multi_v7_defconfig.
+> >
+> >Perhaps I am missing the point, but this is not supposed to happen, no ?
+> >
+> This would happen, since the file would compile on multi_v7 and we would
+> initialize and register this device regardless. The cpuidle-qcom.c
+> driver probe would bail out looking for a matching compatible property.
+> So we would not register a cpuidle driver but the device would lay
+> around.
 
-Excellent questions. My first reaction to both would be to leave it up
-to the individual platform maintainer, but I'd also limit it to working
-around regressions and never to add device nodes in order to activate
-features that didn't already work with an older kernel.
-
-Also, it would probably be good to control these using a compile-time
-option that easily allows building a kernel with no such hacks, possibly
-even using a versioning system to annotate how far back you want to
-support, though I would not implement that at first.
+I think the problem is registering a platform_device. I've complained
+about this before, but it still seems to get copied all over the
+place. Please don't do this but have a driver that looks at DT to
+figure out whether to access hardware or not.
 
 	Arnd
