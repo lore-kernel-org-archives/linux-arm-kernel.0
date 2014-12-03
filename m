@@ -1,95 +1,97 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 3 Dec 2014 17:31:56 +0100
-Subject: [PATCH 5/8] ARM: at91/clocksource: remove !DT PIT initializations
-In-Reply-To: <60ebb777ae686d2a8c6820f9c891d9a0dd0fd03d.1417541118.git.nicolas.ferre@atmel.com>
-References: <e093d7cf37ec9ff24b0631b0a2e405a7cf7574db.1417541118.git.nicolas.ferre@atmel.com>
- <60ebb777ae686d2a8c6820f9c891d9a0dd0fd03d.1417541118.git.nicolas.ferre@atmel.com>
-Message-ID: <547F3AFC.2050400@atmel.com>
+From: Andrew.Jackson@arm.com (Andrew Jackson)
+Date: Wed, 03 Dec 2014 16:38:46 +0000
+Subject: [PATCH 1/5] ASoC: dwc: Allocate resources with devm_ioremap_resource
+Message-ID: <547F3C96.9070509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/12/2014 18:27, Nicolas Ferre a ?crit :
-> From: Arnd Bergmann <arnd@arndb.de>
-> 
-> As AT91 !DT code is now removed, cleanup the PIT clocksource driver.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> [nicolas.ferre at atmel.com: split patch]
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Prepare for the introduction of device-tree support by re-ordering some
+of the allocations and using devm_iomap_resource to simplify IO mapping.
 
-Hi Daniel,
+Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
+---
+ sound/soc/dwc/designware_i2s.c |   46 ++++++++++++++++-----------------------
+ 1 files changed, 19 insertions(+), 27 deletions(-)
 
-I plan to take this patch with me in a "cleanup" series and send it to
-arm-soc soon. Do you think you can add your Acked-by tag?
-
-I verified and there is no modification between Linus' tree and
-linux-next: it should not conflict with anything queued on your side.
-
-Bye,
-
-> ---
->  arch/arm/mach-at91/generic.h          |  2 --
->  drivers/clocksource/timer-atmel-pit.c | 32 --------------------------------
->  2 files changed, 34 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-> index 8527e8bd675f..d53324210adf 100644
-> --- a/arch/arm/mach-at91/generic.h
-> +++ b/arch/arm/mach-at91/generic.h
-> @@ -31,8 +31,6 @@ extern void __init at91_sysirq_mask_rtt(u32 rtt_base);
->  
->   /* Timer */
->  extern void at91rm9200_timer_init(void);
-> -extern void at91sam926x_ioremap_pit(u32 addr);
-> -extern void at91sam926x_pit_init(int irq);
->  
->  /* idle */
->  extern void at91sam9_idle(void);
-> diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
-> index d5289098b3df..b5b4d4585c9a 100644
-> --- a/drivers/clocksource/timer-atmel-pit.c
-> +++ b/drivers/clocksource/timer-atmel-pit.c
-> @@ -262,35 +262,3 @@ static void __init at91sam926x_pit_dt_init(struct device_node *node)
->  }
->  CLOCKSOURCE_OF_DECLARE(at91sam926x_pit, "atmel,at91sam9260-pit",
->  		       at91sam926x_pit_dt_init);
-> -
-> -static void __iomem *pit_base_addr;
-> -
-> -void __init at91sam926x_pit_init(int irq)
-> -{
-> -	struct pit_data *data;
-> -
-> -	data = kzalloc(sizeof(*data), GFP_KERNEL);
-> -	if (!data)
-> -		panic(pr_fmt("Unable to allocate memory\n"));
-> -
-> -	data->base = pit_base_addr;
-> -
-> -	data->mck = clk_get(NULL, "mck");
-> -	if (IS_ERR(data->mck))
-> -		panic(pr_fmt("Unable to get mck clk\n"));
-> -
-> -	data->irq = irq;
-> -
-> -	at91sam926x_pit_common_init(data);
-> -}
-> -
-> -void __init at91sam926x_ioremap_pit(u32 addr)
-> -{
-> -	if (of_have_populated_dt())
-> -		return;
-> -
-> -	pit_base_addr = ioremap(addr, 16);
-> -
-> -	if (!pit_base_addr)
-> -		panic(pr_fmt("Impossible to ioremap PIT\n"));
-> -}
-> 
-
-
+diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
+index e961388..08f0229 100644
+--- a/sound/soc/dwc/designware_i2s.c
++++ b/sound/soc/dwc/designware_i2s.c
+@@ -338,31 +338,34 @@ static int dw_i2s_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res) {
+-		dev_err(&pdev->dev, "no i2s resource defined\n");
+-		return -ENODEV;
+-	}
+-
+-	if (!devm_request_mem_region(&pdev->dev, res->start,
+-				resource_size(res), pdev->name)) {
+-		dev_err(&pdev->dev, "i2s region already claimed\n");
+-		return -EBUSY;
+-	}
+-
+ 	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
+ 	if (!dev) {
+ 		dev_warn(&pdev->dev, "kzalloc fail\n");
+ 		return -ENOMEM;
+ 	}
+ 
+-	dev->i2s_base = devm_ioremap(&pdev->dev, res->start,
+-			resource_size(res));
+-	if (!dev->i2s_base) {
+-		dev_err(&pdev->dev, "ioremap fail for i2s_region\n");
++	dw_i2s_dai = devm_kzalloc(&pdev->dev, sizeof(*dw_i2s_dai), GFP_KERNEL);
++	if (!dw_i2s_dai) {
++		dev_err(&pdev->dev, "mem allocation failed for dai driver\n");
+ 		return -ENOMEM;
+ 	}
+ 
++	dw_i2s_dai->ops = &dw_i2s_dai_ops;
++	dw_i2s_dai->suspend = dw_i2s_suspend;
++	dw_i2s_dai->resume = dw_i2s_resume;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "no i2s resource defined\n");
++		return -ENODEV;
++	}
++
++	dev->i2s_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(dev->i2s_base)) {
++		dev_err(&pdev->dev, "ioremap fail for i2s_region\n");
++		return PTR_ERR(dev->i2s_base);
++	}
++
+ 	cap = pdata->cap;
+ 	dev->capability = cap;
+ 	dev->i2s_clk_cfg = pdata->i2s_clk_cfg;
+@@ -388,13 +391,6 @@ static int dw_i2s_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		goto err_clk_put;
+ 
+-	dw_i2s_dai = devm_kzalloc(&pdev->dev, sizeof(*dw_i2s_dai), GFP_KERNEL);
+-	if (!dw_i2s_dai) {
+-		dev_err(&pdev->dev, "mem allocation failed for dai driver\n");
+-		ret = -ENOMEM;
+-		goto err_clk_disable;
+-	}
+-
+ 	if (cap & DWC_I2S_PLAY) {
+ 		dev_dbg(&pdev->dev, " designware: play supported\n");
+ 		dw_i2s_dai->playback.channels_min = MIN_CHANNEL_NUM;
+@@ -411,10 +407,6 @@ static int dw_i2s_probe(struct platform_device *pdev)
+ 		dw_i2s_dai->capture.rates = pdata->snd_rates;
+ 	}
+ 
+-	dw_i2s_dai->ops = &dw_i2s_dai_ops;
+-	dw_i2s_dai->suspend = dw_i2s_suspend;
+-	dw_i2s_dai->resume = dw_i2s_resume;
+-
+ 	dev->dev = &pdev->dev;
+ 	dev_set_drvdata(&pdev->dev, dev);
+ 	ret = snd_soc_register_component(&pdev->dev, &dw_i2s_component,
 -- 
-Nicolas Ferre
+1.7.1
