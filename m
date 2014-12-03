@@ -1,60 +1,58 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  3 Dec 2014 15:17:03 +0100
-Subject: [PATCH 0/4] ARM: shmobile: R-Mobile: Add SYSC restart handler
-Message-ID: <1417616227-6715-1-git-send-email-geert+renesas@glider.be>
+From: mpeg.blue@free.fr (Mason)
+Date: Wed, 03 Dec 2014 15:20:01 +0100
+Subject: Creating 16 MB super-sections for MMIO
+In-Reply-To: <20141203103211.GB7373@e104818-lin.cambridge.arm.com>
+References: <547D97A5.4090302@free.fr> <547EDD61.5080907@free.fr>
+ <20141203103211.GB7373@e104818-lin.cambridge.arm.com>
+Message-ID: <547F1C11.5090408@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus, Arnd,
+Hello Catalin,
 
-This patch series extends the PM domain platform driver for the R-Mobile
-System Controller (SYSC) to register a restart handler, and removes the
-restart handler hacks on DT-based R-Mobile A1 (r8a7740) and SH-Mobile AG5
-(sh73a0) platforms.
+On 03/12/2014 11:32, Catalin Marinas wrote:
 
-Note that this supports DT-based platforms only. Legacy platforms keep
-on using the restart callback in struct machine_desc.
+> The reasons behind this proposal aren't clear. Are you trying
+> to optimise mmio register accesses by avoiding TLB misses?
 
-This was tested on r8a7740/armadillo-multiplatform,
-sh73a0/kzm9g-reference, and sh73a0/kzm9g-multiplatform.
+I am trying to minimize TLB "pollution" by using a "huge" page.
 
-Arnd: is this what you had in mind in your response to "[GIT PULL] Third
-Round of Renesas ARM Based Soc Updates for v3.19"
-(http://www.spinics.net/lists/arm-kernel/msg379348.html)?
+The ARM manual states: "Support for Supersections, Sections and
+Large pages enables a large region of memory to be mapped using
+only a single entry in the TLB."
 
-Dependencies:
-  - The first two patches depend on the series "[PATCH v6 0/7] ARM:
-    shmobile: R-Mobile: DT PM domain support", as that series adds the
-    SYSC PM domain platform driver for DT-based platforms and adds the
-    SYSC device node to r8a7740.dtsi,
-  - The last two patches also depend on the series "[PATCH RFC 0/7] ARM:
-    shmobile: sh73a0: DT PM domain support", as that series adds the
-    SYSC device node to sh73a0.dtsi.
+Is it correct that, if I create a virtual-to-physical mapping of
+an 8 MB memory region, then, in the best-case scenario, the kernel
+will create 8 Sections? Thus my mapping would use up to 8 entries
+in the TLB at any given time.
 
-Thanks!
+Instead, if I create a V2P mapping of a 16 MB region, and if the
+kernel supports so-called Super-sections, then the mapping would
+use only a single entry in the TLB. Right?
 
-Geert Uytterhoeven (4):
-  ARM: shmobile: R-Mobile: Add SYSC restart handler
-  ARM: shmobile: r8a7740: Remove restart callback
-  ARM: shmobile: sh73a0: Remove restart callback
-  ARM: shmobile: kzm9g-reference: Remove restart callback
+Thus creating a Super-section leaves more TLB entries available
+for user-space processes and kernel threads, which can only
+improve system performance, AFAIU.
 
- arch/arm/mach-shmobile/board-kzm9g-reference.c |  8 -----
- arch/arm/mach-shmobile/pm-rmobile.c            | 48 +++++++++++++++++++++++++-
- arch/arm/mach-shmobile/setup-r8a7740.c         |  8 -----
- arch/arm/mach-shmobile/setup-sh73a0.c          |  8 -----
- 4 files changed, 47 insertions(+), 25 deletions(-)
+On my SoC, physical addresses 0 to 2^24 are reserved for device
+memory-mapped registers. There are holes in the region (meaning
+addresses that don't map to any register) but the bus is defined
+in such a way that
+- writing to a hole is a NOP,
+-reading from a hole returns 0.
 
--- 
-1.9.1
+So I'd like to map
+physical addresses 0-2^24
+to
+virtual addresses 0xf000_0000 - 0xf100_0000
+using a Super-section.
 
-Gr{oetje,eeting}s,
+And I was hoping that calling iotable_init with a struct map_desc
+entry where length = SZ_16M would create such a super-section.
 
-						Geert
+Did that make sense?
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+As far as I could tell, Linux does not create a super-section in the
+case outlined above. Perhaps I misread the source code?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+Regards.
