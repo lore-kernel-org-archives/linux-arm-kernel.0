@@ -1,57 +1,73 @@
-From: harinik@xilinx.com (Harini Katakam)
-Date: Wed,  3 Dec 2014 18:05:26 +0530
-Subject: [PATCH v2 3/3] i2c: cadence: Check for errata condition involving
- master receive
-In-Reply-To: <1417610126-7957-1-git-send-email-harinik@xilinx.com>
-References: <1417610126-7957-1-git-send-email-harinik@xilinx.com>
-Message-ID: <1417610126-7957-4-git-send-email-harinik@xilinx.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 3 Dec 2014 13:36:44 +0100
+Subject: [PATCH v2 2/7] ARM: Exynos: add support for sub-power domains
+In-Reply-To: <1417610024-29748-1-git-send-email-m.szyprowski@samsung.com>
+References: <1416814256-24288-3-git-send-email-a.hajda@samsung.com>
+ <1417610024-29748-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAMuHMdWjZTRVrdcdu2toj9FYi5gOgw_Hf23SRh=9-QKwQDJy0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cadence I2C controller has the following bugs:
-- completion indication is not given to the driver at the end of
-a read/receive transfer with HOLD bit set.
-- Invalid read transaction are generated on the bus when HW timeout
-condition occurs with HOLD bit set.
+Hi Marek,
 
-As a result of the above, if a set of messages to be transferred with
-repeated start includes any transfer following a read transfer,
-completion is never indicated and timeout occurs.
-Hence a check is implemented to return -EOPNOTSUPP for such sequences.
+On Wed, Dec 3, 2014 at 1:33 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> index abde1ea8a119..b884358ebb1a 100644
+> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> @@ -22,6 +22,8 @@ Optional Properties:
+>         - pclkN, clkN: Pairs of parent of input clock and input clock to the
+>                 devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
+>                 are supported currently.
+> +- samsung,power-domain: phandle to a master power domain that the given domain
+> +                      is a part of
 
-Signed-off-by: Harini Katakam <harinik@xilinx.com>
-Signed-off-by: Vishnu Motghare <vishnum@xilinx.com>
----
+For new DTSes I'd recommend using the generic "power-domains" only.
 
-v2:
-Dont defeteature repeated start. Just check for unsupported conditions in the
-driver and return error.
+Or do you already have a DTS where tv-power-domain at 10023C20 uses
+"samsung,power-domain" in the wild?
 
----
- drivers/i2c/busses/i2c-cadence.c |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+>  Node of a device using power domains must have a samsung,power-domain property
+>  defined with a phandle to respective power domain.
+> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+> index 20f267121b3e..fa9a47ddad81 100644
+> --- a/arch/arm/mach-exynos/pm_domains.c
+> +++ b/arch/arm/mach-exynos/pm_domains.c
+> @@ -108,7 +108,7 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
+>  static __init int exynos4_pm_init_power_domain(void)
+>  {
+>         struct platform_device *pdev;
+> -       struct device_node *np;
+> +       struct device_node *np, *master_np;
+>
+>         for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
+>                 struct exynos_pm_domain *pd;
+> @@ -159,6 +159,15 @@ no_clk:
+>
+>                 pm_genpd_init(&pd->pd, NULL, !on);
+>                 of_genpd_add_provider_simple(np, &pd->pd);
+> +
+> +               /* make master and slave hierarchy */
+> +               master_np = of_parse_phandle(np, "samsung,power-domain", 0);
+> +               if (!master_np)
+> +                       master_np = of_parse_phandle(np, "power-domains", 0);
+> +               if (master_np) {
+> +                       pm_genpd_add_subdomain_names(master_np->name, np->name);
+> +                       of_node_put(master_np);
+> +               }
 
-diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-index 67077c2..f5437e2 100644
---- a/drivers/i2c/busses/i2c-cadence.c
-+++ b/drivers/i2c/busses/i2c-cadence.c
-@@ -522,6 +522,17 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
- 	 * processed with a repeated start.
- 	 */
- 	if (num > 1) {
-+		/*
-+		 * This controller does not give completion interrupt after a
-+		 * master receive transfer if HOLD bit is set (repeated start),
-+		 * resulting in SW timeout. Hence, if a receive transfer is
-+		 * followed by any other transfer, an error is returned
-+		 * indicating that this sequence is not supported.
-+		 */
-+		for (count = 0; count < num-1; count++) {
-+			if (msgs[count].flags & I2C_M_RD)
-+				return -EOPNOTSUPP;
-+		}
- 		id->bus_hold_flag = 1;
- 		reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
- 		reg |= CDNS_I2C_CR_HOLD;
+
+
+
 -- 
-1.7.9.5
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
