@@ -1,22 +1,29 @@
 From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Wed, 03 Dec 2014 16:38:36 +0000
-Subject: [PATCH 0/5] ASoC: dwc: Add device tree support to designware I2S
-Message-ID: <547F3C8C.5000607@arm.com>
+Date: Wed, 03 Dec 2014 16:38:55 +0000
+Subject: [PATCH 2/5] ASoC: dwc: Don't allow negative use counts
+Message-ID: <547F3C9F.8080102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set extends the DesignWare I2S driver to provide device
-tree support and fixes a couple of small faults.
 
-Andrew Jackson (5):
-  ASoC: dwc: Allocate resources with devm_ioremap_resource
-  ASoC: dwc: Don't allow negative use counts
-  ASoC: dwc: Iterate over all channels
-  ASoC: dwc: Add devicetree support for Designware I2S
-  ASoC: dwc: Ensure FIFOs are flushed to prevent channel swap
+Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
+---
+ sound/soc/dwc/designware_i2s.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
- .../devicetree/bindings/sound/designware-i2s.txt   |   32 ++
- sound/soc/dwc/Kconfig                              |    1 +
- sound/soc/dwc/designware_i2s.c                     |  313 ++++++++++++++------
- 3 files changed, 260 insertions(+), 86 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/designware-i2s.txt
+diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
+index 08f0229..f8946bd 100644
+--- a/sound/soc/dwc/designware_i2s.c
++++ b/sound/soc/dwc/designware_i2s.c
+@@ -280,7 +280,8 @@ static int dw_i2s_trigger(struct snd_pcm_substream *substream,
+ 	case SNDRV_PCM_TRIGGER_STOP:
+ 	case SNDRV_PCM_TRIGGER_SUSPEND:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+-		dev->active--;
++		if (dev->active > 0)
++			dev->active--;
+ 		i2s_stop(dev, substream);
+ 		break;
+ 	default:
+-- 
+1.7.1
