@@ -1,62 +1,38 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 3 Dec 2014 12:28:30 +0100
-Subject: [PATCH 2/4] i2c: cadence: Set the hardware time-out register to
- maximum value
-In-Reply-To: <1417514749-24319-3-git-send-email-harinik@xilinx.com>
-References: <1417514749-24319-1-git-send-email-harinik@xilinx.com>
- <1417514749-24319-3-git-send-email-harinik@xilinx.com>
-Message-ID: <20141203112830.GD1039@katana>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed,  3 Dec 2014 12:32:03 +0100
+Subject: [PATCH 04/11] ARM: at91/dt: at91sam9261: fix clocks and clock-names
+ in udc definition
+In-Reply-To: <1417606330-17753-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1417606330-17753-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1417606330-17753-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02, 2014 at 03:35:47PM +0530, Harini Katakam wrote:
-> From: Vishnu Motghare <vishnum@xilinx.com>
-> 
-> Cadence I2C controller has bug wherein it generates invalid read transactions
-> after time-out in master receiver mode. This driver does not use the HW
-> timeout and this interrupt is disabled but the feature itself cannot be
-> disabled. Hence, this patch writes the maximum value (0xFF) to this register.
-> This is one of the workarounds to this bug and it will not avoid the issue
-> completely but reduce the chances of error.
+Peripheral clock is named pclk and system clock is named hclk (those are
+the names expected by the at91_udc driver).
 
-This is a good description and should be in a comment in the driver.
+Drop the deprecated usb_clk (formerly used to configure the usb clock rate
+which is now directly configurable through hclk).
 
-> 
-> Signed-off-by: Vishnu Motghare <vishnum@xilinx.com>
-> Signed-off-by: Harini Katakam <harinik@xilinx.com>
-> ---
->  drivers/i2c/busses/i2c-cadence.c |    4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-> index e54899e..8065205 100644
-> --- a/drivers/i2c/busses/i2c-cadence.c
-> +++ b/drivers/i2c/busses/i2c-cadence.c
-> @@ -111,6 +111,8 @@
->  #define CDNS_I2C_DIVA_MAX	4
->  #define CDNS_I2C_DIVB_MAX	64
->  
-> +#define CDNS_I2C_TIMEOUT_MAX	0xFF
-> +
->  #define cdns_i2c_readreg(offset)       readl_relaxed(id->membase + offset)
->  #define cdns_i2c_writereg(val, offset) writel_relaxed(val, id->membase + offset)
->  
-> @@ -858,6 +860,8 @@ static int cdns_i2c_probe(struct platform_device *pdev)
->  		goto err_clk_dis;
->  	}
->  
-> +	cdns_i2c_writereg(CDNS_I2C_TIMEOUT_MAX, CDNS_I2C_TIME_OUT_OFFSET);
-> +
->  	dev_info(&pdev->dev, "%u kHz mmio %08lx irq %d\n",
->  		 id->i2c_clk / 1000, (unsigned long)r_mem->start, id->irq);
->  
-> -- 
-> 1.7.9.5
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141203/fff8bc0b/attachment.sig>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9261.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+index a81aab4..7119f1f 100644
+--- a/arch/arm/boot/dts/at91sam9261.dtsi
++++ b/arch/arm/boot/dts/at91sam9261.dtsi
+@@ -122,8 +122,8 @@
+ 				compatible = "atmel,at91rm9200-udc";
+ 				reg = <0xfffa4000 0x4000>;
+ 				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 2>;
+-				clocks = <&usb>, <&udc_clk>, <&udpck>;
+-				clock-names = "usb_clk", "udc_clk", "udpck";
++				clocks = <&udc_clk>, <&udpck>;
++				clock-names = "pclk", "hclk";
+ 				status = "disabled";
+ 			};
+ 
+-- 
+1.9.1
