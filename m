@@ -1,58 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Dec 2014 10:11:09 +0000
-Subject: [PATCH v3 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
- support
-In-Reply-To: <3212776.kDbe7yX4eX@wuerfel>
-References: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <54761BFC.4020705@ti.com>
- <CAAfSe-u+g0mYGi9Adrd+YwwZ=q0-s79yCg_paB1UAVqFoufXEA@mail.gmail.com>
- <3212776.kDbe7yX4eX@wuerfel>
-Message-ID: <20141203101109.GB11285@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 3 Dec 2014 10:24:32 +0000
+Subject: [RFC] implement arm64_adjust_dma_zone as arm32 does?
+In-Reply-To: <20141203175855.114d6717@xhacker>
+References: <20141203175855.114d6717@xhacker>
+Message-ID: <20141203102431.GA7373@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03, 2014 at 10:50:17AM +0100, Arnd Bergmann wrote:
-> On Wednesday 03 December 2014 17:17:13 Lyra Zhang wrote:
-> 
-> > 2014-11-27 2:29 GMT+08:00 Murali Karicheri <m-karicheri2@ti.com>:
-> > > How about sorting this includes? asm/irq.h go first followed linux/ in alphabatical order?
-> >
-> > There are a few compile warnings if I moved asm/irq.h to the top of
-> > all included files.
-> 
-> The order that Murali meant is
-> 
-> - first all linux/*.h headers, sorted alphabetically
-> - then all asm/*.h headers, again sorted alphabetically
-> 
-> This is the recommended style in general.
-> 
-> > Warning details are below:
-> > 
-> > In file included from drivers/tty/serial/sprd_serial.c:14:0:
-> > ./arch/arm64/include/asm/irq.h:6:39: warning: ?struct pt_regs?
-> > declared inside parameter list [enabled by default]
-> >  extern void (*handle_arch_irq)(struct pt_regs *);
-> >                                        ^
-> > ./arch/arm64/include/asm/irq.h:6:39: warning: its scope is only this
-> > definition or declaration, which is probably not what you want
-> > [enabled by default]
-> > ./arch/arm64/include/asm/irq.h:8:54: warning: ?struct pt_regs?
-> > declared inside parameter list [enabled by default]
-> >  extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
-> > 
-> 
-> I would consider this a (minor) bug in asm/irq.h. If you don't mind,
-> please submit a patch to add a line with 'struct pt_regs;' to
-> asm/irq.h.
+On Wed, Dec 03, 2014 at 09:58:55AM +0000, Jisheng Zhang wrote:
+> If one platform has one limitation only some banks are DMA-able, for example
+> 0-2GB. Under arm32, we can set the dma_zone_size, then arm_adjust_dma_zone()
+> will set the correct dma zone for us. But under arm64, we can't do it.
 
-A better question is: why is a modern driver using asm/irq.h in the
-first place.
+Do you really have plans for such platform (and it won't have an IOMMU)
+or it's just theoretical? Currently ZONE_DMA is limited to the bottom
+32-bit of RAM. The arm32 dma_zone_size relies on the machine descriptors
+which we don't have on arm64.
 
-We used to include that file when platforms defined IRQ numbers
-statically, but modern platforms don't do that, so it shouldn't be
-required anymore.
+> Or set dma-range in dts, then use swiotlb to bounce?
+
+The problem is that swiotlb is only guaranteed to live in the ZONE_DMA,
+so it doesn't buy you much if dma-ranges specify something smaller than
+ZONE_DMA.
+
+Similarly for CMA (coherent allocations), the reserved CMA area is
+limited to ZONE_DMA (currently 32-bit mask).
+
+> Could you kindly please give one suggestion about how to handle this
+> situation?
+
+First of all I need to know if that's a real case and we don't look into
+it for fun.
+
+What we could do is re-introduce ZONE_DMA32 for 32-bit dma masks and a
+ZONE_DMA for smaller masks. The problem is describing such ZONE_DMA mask
+via DT but very early before we set up the zones. A quick hack would be
+to limit ZONE_DMA to the minimum of 32-bit limit or the end of the first
+memblock, so you describe it as such in DT (but then we penalise
+platforms that can do DMA on all memblocks).
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Catalin
