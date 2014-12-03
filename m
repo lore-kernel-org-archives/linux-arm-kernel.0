@@ -1,56 +1,70 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 03 Dec 2014 13:04:20 +0100
-Subject: [PATCH 3/3] clk: samsung: remove unnecessary inclusion of header
- files from clk.h
-In-Reply-To: <547EF728.90505@samsung.com>
-References: <1411796519-19417-1-git-send-email-pankaj.dubey@samsung.com>
- <1411796519-19417-4-git-send-email-pankaj.dubey@samsung.com>
- <547DD98D.3000101@samsung.com> <547EF728.90505@samsung.com>
-Message-ID: <547EFC44.2030105@samsung.com>
+From: zhang.lyra@gmail.com (Lyra Zhang)
+Date: Wed, 3 Dec 2014 20:08:11 +0800
+Subject: [PATCH v3 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <20141203101109.GB11285@n2100.arm.linux.org.uk>
+References: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <54761BFC.4020705@ti.com>
+ <CAAfSe-u+g0mYGi9Adrd+YwwZ=q0-s79yCg_paB1UAVqFoufXEA@mail.gmail.com>
+ <3212776.kDbe7yX4eX@wuerfel>
+ <20141203101109.GB11285@n2100.arm.linux.org.uk>
+Message-ID: <CAAfSe-tHbBGgi-uaGM6WEGNO1kuf9V+C1pV7P8miQSsj6Pc5dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/14 12:42, Pankaj Dubey wrote:
-> Hi Sylwester,
-> 
-> On Tuesday 02 December 2014 08:53 PM, Sylwester Nawrocki wrote:
->> Hi Pankaj,
+2014-12-03 18:11 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Wed, Dec 03, 2014 at 10:50:17AM +0100, Arnd Bergmann wrote:
+>> On Wednesday 03 December 2014 17:17:13 Lyra Zhang wrote:
 >>
->> On 27/09/14 07:41, Pankaj Dubey wrote:
->>> Let's remove unnecessary include of header files from clk.h and add
->>> required one in clk.c
->>>
->>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>> ---
->>>   drivers/clk/samsung/clk.c |    3 ++-
->>>   drivers/clk/samsung/clk.h |    4 ----
->>>   2 files changed, 2 insertions(+), 5 deletions(-)
->>>
->> Please make sure there is no build breaks with various configs when
->> sending patches.
-> 
-> I am sure that I compile tested this before submitting. Looks like 
-> following commit [1] needs "linux/syscore-ops.h" in clk.c, before that 
-> it was not needed.
-> 
-> 1: clk: samsung: Factor out the common code to clk.c [SHA_ID: 
-> 16a9013b83b5106c83cf]
+>> > 2014-11-27 2:29 GMT+08:00 Murali Karicheri <m-karicheri2@ti.com>:
+>> > > How about sorting this includes? asm/irq.h go first followed linux/ in alphabatical order?
+>> >
+>> > There are a few compile warnings if I moved asm/irq.h to the top of
+>> > all included files.
+>>
+>> The order that Murali meant is
+>>
+>> - first all linux/*.h headers, sorted alphabetically
+>> - then all asm/*.h headers, again sorted alphabetically
+>>
+>> This is the recommended style in general.
+>>
+>> > Warning details are below:
+>> >
+>> > In file included from drivers/tty/serial/sprd_serial.c:14:0:
+>> > ./arch/arm64/include/asm/irq.h:6:39: warning: ?struct pt_regs?
+>> > declared inside parameter list [enabled by default]
+>> >  extern void (*handle_arch_irq)(struct pt_regs *);
+>> >                                        ^
+>> > ./arch/arm64/include/asm/irq.h:6:39: warning: its scope is only this
+>> > definition or declaration, which is probably not what you want
+>> > [enabled by default]
+>> > ./arch/arm64/include/asm/irq.h:8:54: warning: ?struct pt_regs?
+>> > declared inside parameter list [enabled by default]
+>> >  extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+>> >
+>>
+>> I would consider this a (minor) bug in asm/irq.h. If you don't mind,
+>> please submit a patch to add a line with 'struct pt_regs;' to
+>> asm/irq.h.
+>
+> A better question is: why is a modern driver using asm/irq.h in the
+> first place.
+>
+> We used to include that file when platforms defined IRQ numbers
+> statically, but modern platforms don't do that, so it shouldn't be
+> required anymore.
+>
 
-OK, my apologies then for not investigating it further.
+OK, I see. I'll remove it in v4.
 
-> Anyways, I can see patches are not getting cleanly applied so, just now 
-> I resend them [2] after rebasing please have a look.
+I'm very sorry that I didn't check it carefully enough and troubled
+many people for this problem.
+This file included the asm/irq.h before I revised it for upstreaming,
+I also could not find this file was no longer needed to include.
+Thank you for your reminder, I'll avoid making the same mistake, and
+I'll also share my experience with my colleagues to keep them from
+having this mistake in the future.
 
-There is no need to resend, the patches are already applied into
-my tree
-
-git://linuxtv.org/snawrocki/samsung.git for-v3.19/clk-next
-
-I will probably send a second pull request for Mike today.
-Just need to figure out what to do with the patches addressing
-the dependency of the audio clock controller control registers
-on the APLL clock.
-
---
-Regards,
-Sylwester
+Best regards,
+Chunyan
