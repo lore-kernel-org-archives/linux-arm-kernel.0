@@ -1,36 +1,68 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  3 Dec 2014 12:32:07 +0100
-Subject: [PATCH 08/11] usb: gadget: at91_udc: Update DT binding documentation
+Date: Wed,  3 Dec 2014 12:32:10 +0100
+Subject: [PATCH 11/11] ARM: at91/dt: fix at91 udc compatible strings
 In-Reply-To: <1417606330-17753-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1417606330-17753-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1417606330-17753-9-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1417606330-17753-12-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Three compatible strings have been added to the at91_udc driver.
-Update the documentation accordingly.
+The at91rm9200, at91sam9260, at91sam9261 and at91sam9263 SoCs have slightly
+different UDC IPs.
+Those differences were previously handled with cpu_is_at91xx macro which
+are about to be dropped for multi-platform support, thus we need to
+change compatible strings.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- Documentation/devicetree/bindings/usb/atmel-usb.txt | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/at91sam9260.dtsi | 2 +-
+ arch/arm/boot/dts/at91sam9261.dtsi | 3 ++-
+ arch/arm/boot/dts/at91sam9263.dtsi | 2 +-
+ 3 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-index 6007231..54a8121 100644
---- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-@@ -33,7 +33,11 @@ usb1: ehci at 00800000 {
- AT91 USB device controller
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index cb100b0..b43de88 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -848,7 +848,7 @@
+ 			};
  
- Required properties:
-- - compatible: Should be "atmel,at91rm9200-udc"
-+ - compatible: Should be one of the following
-+	       "atmel,at91rm9200-udc"
-+	       "atmel,at91sam9260-udc"
-+	       "atmel,at91sam9261-udc"
-+	       "atmel,at91sam9263-udc"
-  - reg: Address and length of the register set for the device
-  - interrupts: Should contain macb interrupt
-  - clocks: Should reference the peripheral and the AHB clocks
+ 			usb1: gadget at fffa4000 {
+-				compatible = "atmel,at91rm9200-udc";
++				compatible = "atmel,at91sam9260-udc";
+ 				reg = <0xfffa4000 0x4000>;
+ 				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 2>;
+ 				clocks = <&udc_clk>, <&udpck>;
+diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+index e52ae97..90f0b59 100644
+--- a/arch/arm/boot/dts/at91sam9261.dtsi
++++ b/arch/arm/boot/dts/at91sam9261.dtsi
+@@ -119,11 +119,12 @@
+ 			};
+ 
+ 			usb1: gadget at fffa4000 {
+-				compatible = "atmel,at91rm9200-udc";
++				compatible = "atmel,at91sam9261-udc";
+ 				reg = <0xfffa4000 0x4000>;
+ 				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 2>;
+ 				clocks = <&udc_clk>, <&udpck>;
+ 				clock-names = "pclk", "hclk";
++				atmel,matrix = <&matrix>;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index 51416c7d..2c7ed05 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -817,7 +817,7 @@
+ 			};
+ 
+ 			usb1: gadget at fff78000 {
+-				compatible = "atmel,at91rm9200-udc";
++				compatible = "atmel,at91sam9263-udc";
+ 				reg = <0xfff78000 0x4000>;
+ 				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 2>;
+ 				clocks = <&udc_clk>, <&udpck>;
 -- 
 1.9.1
