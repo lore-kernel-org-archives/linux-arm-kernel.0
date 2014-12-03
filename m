@@ -1,37 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 3 Dec 2014 12:55:45 +0000
-Subject: [PATCH 2/2] ASoC: rockchip: i2s: add support for grabbing output
- clock to codec
-In-Reply-To: <CAD=FV=VtYU5Pdz-xvjSdsReyCqMQaMtw=ZXmH4PO5wFnGVPY1g@mail.gmail.com>
-References: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
- <1417531977-30094-1-git-send-email-jay.xu@rock-chips.com>
- <CAD=FV=Uwb1NxxCoXHzHu6DJCpnG_HV2RhCr3JaJaXbJja8kd7A@mail.gmail.com>
- <547E616C.1020503@rock-chips.com>
- <CAD=FV=VtYU5Pdz-xvjSdsReyCqMQaMtw=ZXmH4PO5wFnGVPY1g@mail.gmail.com>
-Message-ID: <20141203125545.GX7712@sirena.org.uk>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Wed, 03 Dec 2014 15:03:32 +0200
+Subject: [PATCH v2 7/7] pinctrl: qcom-spmi-gpio: Migrate to pinconf-generic
+In-Reply-To: <1417137993-8337-8-git-send-email-soren.brinkmann@xilinx.com>
+References: <1417137993-8337-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1417137993-8337-8-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1417611812.30615.28.camel@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02, 2014 at 09:18:35PM -0800, Doug Anderson wrote:
 
-> You still seem to be missing versions in your subject line and missing
-> info on what changed version to version.  The latest version you just
-> sent (v4?) is still missing it.
+On Thu, 2014-11-27 at 17:26 -0800, Soren Brinkmann wrote:
+> Instead of the driver caring about implementation details like device
+> tree, just provide information about driver specific pinconf parameters
+> to pinconf-generic which takes care of parsing the DT.
+> 
+> Signed-off-by: Soren Brinkmann brinkmann at xilinx.com>
+> ---
+> This is compile tested only. So, it's likely that it needs more tweaking
+> to make it actually work on HW. But it illustrates the potential
+> benefits of the pinconf-generic changes in this series.
+> ---
+>  drivers/pinctrl/qcom/pinctrl-spmi-gpio.c | 125 +++----------------------------
+>  1 file changed, 11 insertions(+), 114 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
+> index b863b5080890..2db85e53ef73 100644
+> --- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
+> +++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
+> @@ -131,14 +131,14 @@ struct pmic_gpio_state {
+>         struct gpio_chip chip;
+>  };
+> 
+> -struct pmic_gpio_bindings {
+> -       const char*property;
+> -       unsigned      param;
+> +static const struct pinconf_generic_dt_params pmic_gpio_bindings[] = {
+> +       {"qcom,pull-up-strength",PMIC_GPIO_CONF_PULL_UP,0},
+> +       {"qcom,drive-strength",PMIC_GPIO_CONF_STRENGTH,0},
+>  };
+> 
+> -static struct pmic_gpio_bindings pmic_gpio_bindings[] = {
+> -       {"qcom,pull-up-strength",PMIC_GPIO_CONF_PULL_UP},
+> -       {"qcom,drive-strength",PMIC_GPIO_CONF_STRENGTH},
+> +static const struct pin_config_item pmic_conf_items[] = {
+> +       PCONFDUMP(PMIC_GPIO_CONF_PULL_UP,  "pull-up-strength", NULL, true),
 
-> Unless Mark says so then I don't think you need to spin this series,
-> but please try to add that in the future.
+s/pull-up-strength/qcom,pull-up-strength/
 
-Don't resubmit.  I actually don't care much about any of that stuff and
-mostly ignore it unless the change set is saying something other than
-"addressed review comments".
+> +       PCONFDUMP(PMIC_GPIO_CONF_STRENGTH, "drive-strength", NULL, true),
+>  };
+> 
 
-One thing you should avoid doing is posting new versions in reply to old
-versions as has been done here, that just makes for a confusing and hard
-to follow mail archive with new serieses buried in the middle of threads.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141203/986606f2/attachment.sig>
+
+
+I am not happy that we have to define the same think two times.
+
+Regards,
+Ivan
