@@ -1,121 +1,75 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 03 Dec 2014 17:50:51 +0000
-Subject: [PATCH v4 17/19] arm64: KVM: add SGI generation register emulation
-In-Reply-To: <20141130084516.GB82106@macair>
-References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
- <1415959683-26027-18-git-send-email-andre.przywara@arm.com>
- <20141123150852.GD3401@cbox> <54735EE6.70904@arm.com>
- <20141125110339.GD31297@cbox> <5478975C.5070107@arm.com>
- <20141130084516.GB82106@macair>
-Message-ID: <547F4D7B.1070007@arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 3 Dec 2014 09:53:40 -0800
+Subject: [PATCH v2] i2c: rk3x: fix bug that cause measured high_ns doesn't
+ meet I2C spec
+In-Reply-To: <20141203111518.GB1039@katana>
+References: <1415261514-4051-1-git-send-email-addy.ke@rock-chips.com>
+ <1417574237-4328-1-git-send-email-addy.ke@rock-chips.com>
+ <20141203111518.GB1039@katana>
+Message-ID: <CAD=FV=X5inPWZakhgDX0dX=1CWXygEi3_AH9FVFWXYT3LZA5bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/11/14 08:45, Christoffer Dall wrote:
-> On Fri, Nov 28, 2014 at 03:40:12PM +0000, Andre Przywara wrote:
->> Hej Christoffer,
->>
->> On 25/11/14 11:03, Christoffer Dall wrote:
->>> Hi Andre,
->>>
->>> On Mon, Nov 24, 2014 at 04:37:58PM +0000, Andre Przywara wrote:
->>>> Hi,
->>>>
->>>> On 23/11/14 15:08, Christoffer Dall wrote:
->>>>> On Fri, Nov 14, 2014 at 10:08:01AM +0000, Andre Przywara wrote:
->>>>>> While the generation of a (virtual) inter-processor interrupt (SGI)
->>>>>> on a GICv2 works by writing to a MMIO register, GICv3 uses the system
->>>>>> register ICC_SGI1R_EL1 to trigger them.
->>>>>> Trap that register on ARM64 hosts and handle it in a new handler
->>>>>> function in the GICv3 emulation code.
->>>>>
->>>>> Did you reorder something or does my previous comment still apply that
->>>>> you're not enabling trapping yet, you're just adding the handler - those
->>>>> are two different things.
->>>>
->>>> Yes, I can fix the wording.
->>>>
->>>>> You sort of left my question about access_gic_sgi() not checking if the
->>>>> gicv3 is presetn hanging from the last thread, but I think I'm
->>>>> understanding properly now, that as long as you're not setting the
->>>>> ICC_SRE_EL2.Enable = 1, then we'll never get here, right?
->>>>
->>>> Right, that is the idea. Just to make sure that I got this right from
->>>> the discussion the other day: We will not trap to EL2 as long as
->>>> ICC_SRE_EL2.Enable is 0 - which it should still be at this point, right?
->>>
->>> No, when ICC_SRE_EL2.Enable is 0, then Non-secure EL1 access to
->>> ICC_SRE_EL1 trap to EL2 (See Section 5.7.39 in the spec), which means
->>> that accesses to the ICC_SGIx registers will cause an undefined
->>> exception in the guest because we set ICC_SRE_EL1.SRE to 0 for the
->>> guest and the guest cannot change this.
->>>
->>> Now, when we set ICC_SRE_EL2.Enable to 1, then the guest can set
->>> ICC_SRE_EL1.SRE to 1 (and we also happen to reset it to 1), and we will
->>> indeed trap on guest access to the ICC_SGIx registers, because all
->>> virtual accesses to these registers trap.
->>>
->>> (Going back and checking where 'virtual accesses' is defined in the spec
->>> left me somewhere without any results, but I am guessing that because we
->>> set the ICH_HCR_EL2.En to 1, all accesses will be deemed virtual
->>> accesses, maybe the spec should be clarfied on this matter?).
->>>
->>> Anyhow, to get back to my original question, getting here requires
->>> a situation where the guest copy of the ICC_SRE_EL1.SRE is 1, which we
->>> only allow when we have properly initialized the GICv3 data structures.
->>
->> So to summarize (and check) this: There is no real issue at this point?
->> And the code is totally fine after 19/19?
-> 
-> There is no issue at this point, no.
-> 
->>
->> Would this kind of problem actually matter _inside_ a patch series? To
->> trigger an issue, we would need a bogus guest and bogus userland
->> (because at this point neither of them would see/inject a GICv3 FDT
->> node). I'd assume that running a kernel at this point is just for
->> debugging/bisecting? Where you wouldn't care about every corner case of
->> execution?
-> 
-> The argument about bogus guests / fdts should *never* be considered in
-> the context of these discussions.  If we have code that looks like the
-> guest can kill the host, or do a NULL pointer dereference, then we need
-> to address it.
-> 
-> Your point about it being inside a patch series, sure, it's unlikely
-> that people will run this, but I'm reviewing this patch right now, and
-> honestly not considering how this changes in the subsequent patch.  For
-> this sort of thing, if we were leaving a gaping hole open, that would at
-> least require a clear note in the commit message on why we're doing it.
+Wolfram,
 
-I see, makes sense.
-So I thought about adding a line like this to the very beginning of
-vgic_v3_dispatch_sgi(). This would cover all cases of spurious traps.
-Does that sound useful as a security precaution (though unneeded as
-described)?
-Shall there be a warning before the return?
+On Wed, Dec 3, 2014 at 3:15 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>
+>> + - rise-ns : Number of nanoseconds the signal takes to rise (t(r) in i2c spec).
+>> +          If not specified this is assumed to be the max the spec allows
+>> +          (1000 ns for standard mode, 300 ns for fast mode) which might
+>> +          cause slightly slower communication.
+>> + - fall-ns : Number of nanoseconds the signal takes to fall (t(f) in the i2c0
+>> +          spec).  If not specified this is assumed to be the max the spec
+>> +          allows (300 ns) which might cause slightly slower communication.
+>
+> We already have those bindings from the designware driver:
+>
+>  - i2c-sda-hold-time-ns : should contain the SDA hold time in nanoseconds.
+>  - i2c-scl-falling-time : should contain the SCL falling time in nanoseconds.
+>  - i2c-sda-falling-time : should contain the SDA falling time in nanoseconds.
+>
+> Can you reuse them? Or do you really need a specific rise-time property?
+> If so, please matche the style of the bindings above.
 
-+	/* only valid for an initialized VGICv3 */
-+	if (!vgic_initialized(kvm)  ||
-+	    kvm->arch.vgic.vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
-+		return;
+Ah, doh!  I should have thought to look for existing bindings.  Sorry
+about that.  :(
 
-> Hopefully you understood and agreed with my deduction about the various
-> SRE settings above though?
+If you don't read all the below, my belief is that we should simply
+rename the strings in Addy's patch.  We should change "rise-ns" to
+"i2c-scl-rising-time" and "fall-ns" to "i2c-scl-falling-time".
+Wolfram: can you confirm this is OK?  I'm voting to leave the "-ns"
+off the end of both to avoid asymmetry.
 
-Yes, I got this. We are safe as long as ICC_SRE_EL1.SRE is 0, which is
-true until patch 19/19 allows userland to request a GICv3 guest, which
-will force it to 1.
-I also tested this explicitly, starting with patch 17/19 (for the host
-kernel) and going over the remaining two as well. Starting a guest with
-GICv2 and accessing ICC_SRE_EL1 and ICC_SGI1R_EL1 from a custom module
-inside the guest will always keep ICC_SRE_EL1.SRE to 0 (thanks to your
-recent trap patch), accesses to ICC_SGI1R_EL1 provoke an #UNDEF
-exception in the guest. The host was never bothered.
-Creating a guest with a GICv3 was only successful after patch 19/19, and
-ICC_SRE_EL1.SRE couldn't be cleared.
+---
 
-So I consider this topic done.
+Details:
 
-Cheers,
-Andre.
+Hrm, we seem to need different parameters than designware i2c.  The
+designware bus is specifying "i2c-sda-hold-time-ns".  On Rockchip i2c
+we specify just the number of cycles that the clk line should be high
+and the number of cycles that it should be low.  The adapter does the
+rest of the work.  As I understand it, the data hold time on Rockchip
+i2c is equal to half the low time, for instance.  That was indicated
+by Addy who talked to the IC engineer.
+
+Because of the above, I _think_ that means that specifying
+"i2c-sda-hold-time-ns" is not appropriate for us, or at least not easy
+to convert in a sane way.
+
+We could add a "i2c-scl-hold-time-ns", but if I understand correctly I
+think that the "rise-time" describes the hardware in a cleaner way.
+If you specify the hold time then (I think) that it requires the user
+to tweak it whenever he/she adjusts the bus speed.  In other words if
+you have a bus and you decide to move it from running at 400kHz to
+running at 300kHz (signal integrity issues?) or 100kHz, you need to
+manually modify the hold time.  ...on the other hand the rise time is
+a property of the hardware I think (size of resistor, etc).
+
+For the falling times I guess we should use the "i2c-scl-falling-time"
+and not list the "i2c-sda-falling-time" for now?  As per above the
+controller takes in the high/low period of the clocks and figures out
+the rest itself.  Possibly we will need to account for
+i2c-sda-falling-time eventually, but maybe that can come later?
+
+
+-Doug
