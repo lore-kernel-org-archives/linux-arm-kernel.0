@@ -1,89 +1,68 @@
-From: marek@goldelico.com (Marek Belisko)
-Date: Wed,  3 Dec 2014 22:33:22 +0100
-Subject: [PATCH v4 3/3] arm: dts: omap3-gta04: Add handling for tv output
-In-Reply-To: <1417642402-20538-1-git-send-email-marek@goldelico.com>
-References: <1417642402-20538-1-git-send-email-marek@goldelico.com>
-Message-ID: <1417642402-20538-4-git-send-email-marek@goldelico.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 3 Dec 2014 21:45:59 +0000
+Subject: [PATCH v3 1/3] devicetree: of: Add bindings for chosen node,
+ stdout-path
+In-Reply-To: <547F6881.20400@gmail.com>
+References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
+ <1417110967-16284-2-git-send-email-leif.lindholm@linaro.org>
+ <547E7455.6090009@gmail.com>
+ <CACxGe6vdbURE3=W3Uerwy90piGKhv7-m+-vpUhCiUTKB4AzTsw@mail.gmail.com>
+ <547F6881.20400@gmail.com>
+Message-ID: <CACxGe6ugLyV50gKCe83wCL0=qy+oHeExf9murW+qFuoVQ_TzsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add handling for gta04 tv out chain:
-venc -> opa362 -> svideo
+On Wed, Dec 3, 2014 at 7:46 PM, Frank Rowand <frowand.list@gmail.com> wrote:
+> On 12/3/2014 7:12 AM, Grant Likely wrote:
+>> On Wed, Dec 3, 2014 at 2:24 AM, Frank Rowand <frowand.list@gmail.com> wrote:
+>>> On 11/27/2014 9:56 AM, Leif Lindholm wrote:
+>>>> Add a global binding for the chosen node.
+>>>> Include a description of the stdout-path, and an explicit statement on
+>>>> its extra options in the context of a UART console.
+>>>>
+>>>> Opening description stolen from www.devicetree.org, and part of the
+>>>> remaining text provided by Mark Rutland.
+>>>>
+>>>> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/chosen.txt |   42 ++++++++++++++++++++++++++
+>>>>  1 file changed, 42 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/chosen.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+>>>> new file mode 100644
+>>>> index 0000000..9cd74e9
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/chosen.txt
+>>>> @@ -0,0 +1,42 @@
+>>>> +The chosen node
+>>>> +---------------
+>>>> +
+>>>> +The chosen node does not represent a real device, but serves as a place
+>>>> +for passing data between firmware and the operating system, like boot
+>>>> +arguments. Data in the chosen node does not represent the hardware.
+>>>> +
+>>>> +
+>>>> +stdout-path property
+>>>
+>>> The code in patch 3/3 adds the extra options feature to the properties:
+>>>
+>>>   stdout-path
+>>>   linux,stdout-path
+>>>   stdout  [if (IS_ENABLED(CONFIG_PPC) ... ]
+>>
+>> I don't understand what you mean here. Are you suggesting a change to
+>> this patch? Is there something deficient in it?
+>
+> Assuming that the code change in patch 3 is as desired, then the chosen.txt
+> documentation applies to all three properties, not just stdout-path.  So
+> yes, a change is suggested for the documentation.
 
-Use invert-polarity in venc node because opa362
-is doing polarity inversion also.
+how about if this is added:
 
-Signed-off-by: Marek Belisko <marek@goldelico.com>
----
- arch/arm/boot/dts/omap3-gta04.dtsi | 49 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+Implementation note: Linux will look for the property "linux,stdout-path" or
+on PowerPC "stdout" if "stdout-path" is not found.  However, the
+"linux,stdout-path" and "stdout" properties are deprecated. New platforms
+should only use the "stdout-path" property.
 
-diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-index fd34f91..a6e995b 100644
---- a/arch/arm/boot/dts/omap3-gta04.dtsi
-+++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-@@ -83,6 +83,41 @@
- 		compatible = "usb-nop-xceiv";
- 		reset-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
- 	};
-+
-+	tv0: connector at 1 {
-+		compatible = "svideo-connector";
-+		label = "tv";
-+
-+		port {
-+			tv_connector_in: endpoint {
-+				remote-endpoint = <&opa_out>;
-+			};
-+		};
-+	};
-+
-+	tv_amp: opa362 {
-+		compatible = "ti,opa362";
-+		enable-gpios = <&gpio1 23 0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				opa_in: endpoint at 0 {
-+					remote-endpoint = <&venc_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				opa_out: endpoint at 0 {
-+					remote-endpoint = <&tv_connector_in>;
-+				};
-+			};
-+		};
-+	};
- };
- 
- &omap3_pmx_core {
-@@ -396,6 +431,20 @@
- 	};
- };
- 
-+&venc {
-+	status = "okay";
-+
-+	vdda-supply = <&vdac>;
-+
-+	port {
-+		venc_out: endpoint {
-+			remote-endpoint = <&opa_in>;
-+			ti,channels = <2>;
-+			ti,invert-polarity;
-+		};
-+	};
-+};
-+
- &gpmc {
- 	ranges = <0 0 0x30000000 0x04>; /* CS0: NAND */
- 
--- 
-1.9.1
+g.
