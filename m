@@ -1,84 +1,131 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 03 Dec 2014 10:57:10 +0100
-Subject: [PATCH 2/2] mmc: sdhci-esdhc-imx: enable IPG clock for sdio
- interrupts
-In-Reply-To: <1417598713.2419.1.camel@pengutronix.de>
-References: <1417538845-10867-1-git-send-email-stefan@agner.ch>
- <1417538845-10867-2-git-send-email-stefan@agner.ch>
- <1417598713.2419.1.camel@pengutronix.de>
-Message-ID: <6ff09082f3f43d4b358ec59d7ed8f216@agner.ch>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 3 Dec 2014 17:54:49 +0800
+Subject: [PATCH 3/4] media: ov2640: add a master clock for sensor
+In-Reply-To: <2284801.0jEi8Kph7L@avalon>
+References: <1417170507-11172-1-git-send-email-josh.wu@atmel.com>
+ <1417170507-11172-4-git-send-email-josh.wu@atmel.com>
+ <2284801.0jEi8Kph7L@avalon>
+Message-ID: <547EDDE9.7070107@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-03 10:25, Lucas Stach wrote:
-> Am Dienstag, den 02.12.2014, 17:47 +0100 schrieb Stefan Agner:
->> Enable IPG clock for sdio interrupts while runtime PM, since this
->> clock is needed for register access. The need of this clock has been
->> verified on Vybrid, but this is probably true for i.MX53 and maybe
->> others. The need for bus access during runtime suspend has been
->> introduced with be138554a792 ("mmc: sdhci: allow sdio interrupts
->> while sdhci runtime suspended").
+Hi, Laurent
+
+On 12/2/2014 6:26 AM, Laurent Pinchart wrote:
+> Hi Josh,
+>
+> (CC'ing the devicetree at vger.kernel.org mailing list)
+>
+> Thank you for the patch.
+>
+> On Friday 28 November 2014 18:28:26 Josh Wu wrote:
+>> The master clock can be optional. It's a common clock framework clock.
+>> It can make sensor output a pixel clock to the camera interface.
 >>
-> Am I reading this wrong, or is this commit actually doing something
-> different than what the commit message says?
-> 
-> This does _not_ enable the IPG clock during runtime PM, in fact it is
-> disabling it while suspending even with SDIO ints enabled, which is
-> wrong, as no SDIO interrupts will be delivered with this clock disabled.
-
-You are completely right. What I wanted was what is written in the
-commit message, but I misinterpreted the code!
-
-=> This patch is invalid.
-
-> One thing that seems to be wrong with the current code is that the state
-> of sdhci_sdio_irq_enabled could change between a runtime suspend and
-> resume, so to keep the clocks balanced the driver has to remember if it
-> disabled those two clocks in the suspend path and always enable them in
-> that case in the resume path.
-
-As far as I can see, the only place where that flag changes is in
-sdhci_enable_sdio_irq. But this function makes sure runtime PM is off
-while changing that, so I guess it's ok....
-
---
-Stefan
-
-> 
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> If you just use a external oscillator clock as the master clock, then,
+>> just don't need set 'mck' in dt node.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 >> ---
->>  drivers/mmc/host/sdhci-esdhc-imx.c | 12 ++++++------
->>  1 file changed, 6 insertions(+), 6 deletions(-)
+>>   drivers/media/i2c/soc_camera/ov2640.c | 25 +++++++++++++++++++++++++
+>>   1 file changed, 25 insertions(+)
 >>
->> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
->> index 587ee0e..b7e9ad1 100644
->> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
->> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
->> @@ -1193,10 +1193,10 @@ static int sdhci_esdhc_runtime_suspend(struct device *dev)
+>> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
+>> b/drivers/media/i2c/soc_camera/ov2640.c index 6506126..06c2aa9 100644
+>> --- a/drivers/media/i2c/soc_camera/ov2640.c
+>> +++ b/drivers/media/i2c/soc_camera/ov2640.c
+>> @@ -13,6 +13,7 @@
+>>    * published by the Free Software Foundation.
+>>    */
 >>
->>  	ret = sdhci_runtime_suspend_host(host);
+>> +#include <linux/clk.h>
+>>   #include <linux/init.h>
+>>   #include <linux/module.h>
+>>   #include <linux/i2c.h>
+>> @@ -31,6 +32,8 @@
 >>
->> -	if (!sdhci_sdio_irq_enabled(host)) {
->> +	if (!sdhci_sdio_irq_enabled(host))
->>  		clk_disable_unprepare(imx_data->clk_per);
->> -		clk_disable_unprepare(imx_data->clk_ipg);
->> -	}
+>>   #define VAL_SET(x, mask, rshift, lshift)  \
+>>   		((((x) >> rshift) & mask) << lshift)
+>> +#define DEFAULT_MASTER_CLK_FREQ		25000000
 >> +
->> +	clk_disable_unprepare(imx_data->clk_ipg);
->>  	clk_disable_unprepare(imx_data->clk_ahb);
+>>   /*
+>>    * DSP registers
+>>    * register offset for BANK_SEL == BANK_SEL_DSP
+>> @@ -284,6 +287,7 @@ struct ov2640_priv {
+>>   	struct v4l2_ctrl_handler	hdl;
+>>   	u32	cfmt_code;
+>>   	struct v4l2_clk			*clk;
+>> +	struct clk			*master_clk;
+>>   	const struct ov2640_win_size	*win;
 >>
->>  	return ret;
->> @@ -1208,10 +1208,10 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
->>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->>  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+>>   	struct soc_camera_subdev_desc	ssdd_dt;
+>> @@ -746,6 +750,7 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int
+>> on) struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
+>> struct ov2640_priv *priv = to_ov2640(client);
+>>   	struct v4l2_clk *clk;
+>> +	int ret = 0;
 >>
->> -	if (!sdhci_sdio_irq_enabled(host)) {
->> +	if (!sdhci_sdio_irq_enabled(host))
->>  		clk_prepare_enable(imx_data->clk_per);
->> -		clk_prepare_enable(imx_data->clk_ipg);
->> -	}
+>>   	if (!priv->clk) {
+>>   		clk = v4l2_clk_get(&client->dev, "mclk");
+>> @@ -755,6 +760,16 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int
+>> on) priv->clk = clk;
+>>   	}
+>>
+>> +	if (!IS_ERR(priv->master_clk)) {
+> The clock should be mandatory, you can thus drop this check.
+OK. sure.
+
+>
+>> +		if (on)
+>> +			ret = clk_prepare_enable(priv->master_clk);
+>> +		else
+>> +			clk_disable_unprepare(priv->master_clk);
 >> +
->> +	clk_prepare_enable(imx_data->clk_ipg);
->>  	clk_prepare_enable(imx_data->clk_ahb);
+>> +		if (ret)
+>> +			return ret;
+> You can move the error check inside the first branch of the if and remove the
+> ret = 0 initialization above.
+>
+>> +	}
+>> +
+>>   	return soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
+> If this call fails you should disable or enable the clock to undo the
+> enable/disable above.
+
+ah, I totally forget this. will fix in next version. Thanks.
+
+>
+>>   }
 >>
->>  	return sdhci_runtime_resume_host(host);
+>> @@ -1153,6 +1168,16 @@ static int ov2640_probe(struct i2c_client *client,
+>>   		}
+>>   	}
+>>
+>> +	priv->master_clk = devm_clk_get(&client->dev, "mck");
+>> +	if (!IS_ERR(priv->master_clk)) {
+>> +		/* Set ISI_MCK's frequency, it should be faster than pixel
+>> +		 * clock.
+>> +		 */
+>> +		ret = clk_set_rate(priv->master_clk, DEFAULT_MASTER_CLK_FREQ);
+> The clock frequency should be system-dependent. For the DT case an easy
+> implementation would be to use the assigned-clock-rates to set the desired
+> clock frequency is case of a variable clock, as adding a sensor-specific
+> property to specify the desired clock frequency only to read that property in
+> the driver and call clk_set_rate() seems a bit pointless to me.
+
+I tried assigned-clock-rates and it works fine.
+The only issue is the it cannot used by multiple nodes. But I think I 
+can put a comments in the dt node for this.
+Thanks.
+
+Best Regards,
+Josh Wu
+
+>
+>> +		if (ret < 0)
+>> +			return ret;
+>> +	}
+>> +
+>>   	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
+>>   	v4l2_ctrl_handler_init(&priv->hdl, 2);
+>>   	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
