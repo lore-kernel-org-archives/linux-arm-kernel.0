@@ -1,29 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Dec 2014 11:51:09 +0100
-Subject: [PATCH 06/12] ARM: imx: add support for MSCM interrupt router
-In-Reply-To: <1417565531-4507-7-git-send-email-stefan@agner.ch>
+Date: Wed, 03 Dec 2014 11:52:41 +0100
+Subject: [PATCH 07/12] Documentation: dt: imx: add MSCM documentation
+In-Reply-To: <1417565531-4507-8-git-send-email-stefan@agner.ch>
 References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
- <1417565531-4507-7-git-send-email-stefan@agner.ch>
-Message-ID: <2336832.xq32rHipj9@wuerfel>
+ <1417565531-4507-8-git-send-email-stefan@agner.ch>
+Message-ID: <57320597.hlx9GuXmaF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 December 2014 01:12:05 Stefan Agner wrote:
+On Wednesday 03 December 2014 01:12:06 Stefan Agner wrote:
+> +Freescale Vybrid Miscellaneous System Control Module
 > +
-> +static int vf610_mscm_domain_xlate(struct irq_domain *d,
-> +				struct device_node *controller,
-> +				const u32 *intspec, unsigned int intsize,
-> +				unsigned long *out_hwirq,
-> +				unsigned int *out_type)
-> +{
-> +#ifdef CONFIG_ARM_GIC
-> +	*out_hwirq += 16;
-> +#endif
-> +	return 0;
-> +}
+> +The MSCM IP contains Access Control and TrustZone Security hardware,
+> +CPU Configuration registers and Interrupt Router control.
+> +
+> +Required properties:
+> +- compatible : "fsl,vf610-mscm"
+> +- reg : the register range of the MSCM module
+> +
+> +Example:
+> +       mscm: mscm at 40001000 {                 
+> +               compatible = "fsl,vf610-mscm";
+> +               reg = <0x40001000 0x1000>;    
+> +       };                                    
 
-I don't see how the hwirq should in any way depend on whether the
-kernel also supports an ARM_GIC. This number should only be meaningful
-inside of your irqchip driver.
+This sounds like one of those generic system controller devices.
+Should this be marked as syscon an accessed through
+syscon_regmap_lookup_by_phandle()?
 
-	Arnd
+If you only eve have one driver touching these registers, that
+won't be necessary of course.
+
+	arnd
