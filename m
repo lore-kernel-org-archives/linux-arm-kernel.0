@@ -1,40 +1,40 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 3 Dec 2014 11:35:32 +0100
-Subject: [PATCH] leds: netxbig: fix oops at probe time
-In-Reply-To: <1417534330-13154-1-git-send-email-simon.guinot@sequanux.org>
-References: <1417534330-13154-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20141203103532.GD9664@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Dec 2014 11:43:24 +0100
+Subject: [PATCH v4 1/2] soc: samsung: add exynos chipid driver support
+In-Reply-To: <1417594658-2931-2-git-send-email-pankaj.dubey@samsung.com>
+References: <1417594658-2931-1-git-send-email-pankaj.dubey@samsung.com>
+ <1417594658-2931-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <19026872.NZqUJn3Abb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02, 2014 at 04:32:10PM +0100, Simon Guinot wrote:
-> This patch fixes a NULL pointer dereference on led_dat->mode_val. Due to
-> this bug, a kernel oops can be observed at probe time on the LaCie 2Big
-> and 5Big v2 boards:
+> Exynos SoCs have Chipid, for identification of product IDs
+> and SoC revisions. This patch intendes to provide initialization
+> code for all these functionalites, at the same time it provides some
+> sysfs entries for accessing these information to userspace.
 > 
-> Unable to handle kernel NULL pointer dereference at virtual address 00000008
-> [...]
-> [<c03f244c>] (netxbig_led_probe) from [<c02c8c6c>] (platform_drv_probe+0x4c/0x9c)
-> [<c02c8c6c>] (platform_drv_probe) from [<c02c72d0>] (driver_probe_device+0x98/0x25c)
-> [<c02c72d0>] (driver_probe_device) from [<c02c7520>] (__driver_attach+0x8c/0x90)
-> [<c02c7520>] (__driver_attach) from [<c02c5c24>] (bus_for_each_dev+0x68/0x94)
-> [<c02c5c24>] (bus_for_each_dev) from [<c02c6408>] (bus_add_driver+0x124/0x1dc)
-> [<c02c6408>] (bus_add_driver) from [<c02c7ac0>] (driver_register+0x78/0xf8)
-> [<c02c7ac0>] (driver_register) from [<c000888c>] (do_one_initcall+0x80/0x1cc)
-> [<c000888c>] (do_one_initcall) from [<c0733618>] (kernel_init_freeable+0xe4/0x1b4)
-> [<c0733618>] (kernel_init_freeable) from [<c058db9c>] (kernel_init+0xc/0xec)
-> [<c058db9c>] (kernel_init) from [<c0009850>] (ret_from_fork+0x14/0x24)
-> [...]
-> 
-> This bug was introduced by commit 588a6a99286ae30afb1339d8bc2163517b1b7dd1
-> ("leds: netxbig: fix attribute-creation race").
+> This driver usese existing binding for exnos-chipid.
 
-Ouch.
+Nice!
 
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> Cc: <stable@vger.kernel.org> # 3.17+
+On Wednesday 03 December 2014 13:47:37 Pankaj Dubey wrote:
 
-Acked-by: Johan Hovold <johan@kernel.org>
+> +       soc_dev_attr->soc_id = exynos_product_id_to_name(soc_product_id);
+> +
+> +       soc_dev = soc_device_register(soc_dev_attr);
+> +       if (IS_ERR(soc_dev))
+> +               goto free_rev;
+> +
+> +       device_create_file(soc_device_to_device(soc_dev), &exynos_product_attr);
+> +       device_create_file(soc_device_to_device(soc_dev),
+> +                               &exynos_main_rev_attr);
+> +       device_create_file(soc_device_to_device(soc_dev), &exynos_sub_rev_attr);
+> +
 
-Thanks,
-Johan
+I don't like the idea of having three extra nonstandard properties here,
+especially when you are not using the machine field for anything useful.
+
+Also, all three of these just come from the same register, why expose
+them all as the machine and revision standard properties.
+
+	Arnd
