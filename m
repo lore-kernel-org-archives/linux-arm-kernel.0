@@ -1,54 +1,130 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  3 Dec 2014 15:37:34 +0100
-Subject: [PATCH] [RFC] ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node
-Message-ID: <1417617454-14533-1-git-send-email-geert+renesas@glider.be>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Dec 2014 15:42:50 +0100
+Subject: [PATCH] ARM: rockchip: Convert resume code to C
+In-Reply-To: <CAD=FV=UFWZEcbO2ty0m+qEGv4Xgq0N=Rs30wBgw=6+OGd5gSpg@mail.gmail.com>
+References: <1417461694-5129-1-git-send-email-dianders@chromium.org>
+ <25485084.A6ydfR9Xle@wuerfel>
+ <CAD=FV=UFWZEcbO2ty0m+qEGv4Xgq0N=Rs30wBgw=6+OGd5gSpg@mail.gmail.com>
+Message-ID: <6779994.zYRbhBjLnB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node for the Private Timer and Watchdog, as found in the Cortex-A9
-MPCore.
+On Tuesday 02 December 2014 09:36:00 Doug Anderson wrote:
+> On Tue, Dec 2, 2014 at 1:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 01 December 2014 15:04:59 Doug Anderson wrote:
+> >> On Mon, Dec 1, 2014 at 2:50 PM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > I recently looked at another vendor tree (quantenna wifi access point,
+> > based on arch/arc), which was putting arbitrary functions into SRAM
+> > for performance reasons, in their case the entire hot path for network
+> > switching. Having at least the infrastructure to do this seems like
+> > a great idea, even though it's very hard to do in a general-purpose
+> > kernel, as you'd have a hard time squeezing as much code as possible
+> > into the available SRAM.
+> 
+> I'm always a fan of seeing general infrastructure introduced, though
+> we always need to make sure that the general infrastructure makes
+> things easier and not harder.  There's always the danger of adding so
+> much abstraction for a small thing that using it is like pulling
+> teeth.  I'm not saying that's the case here, but it is always a
+> danger.
+> 
+> Note: I will point out a critical differences between the "hotpath"
+> problem and the one I'm solving here.  When you're just trying to
+> speed up a hotpath, it's not the end of the world if there's a stray
+> access to SDRAM.  If you happen to access a global variable in SDRAM,
+> or use a libc function to do division, or have a WARN_ON, those things
+> are OK.  It might also be OK if the stack was still in SDRAM.  When
+> you're compiling code that has to run with no other kernel function
+> present it's really nice to link them into a separate executable.
 
-Without this, there's no clocksource available during early kernel
-initialization, before cmt1 is initialized, leading to a lock-up if
-CONFIG_CPU_IDLE=y.
+Yes, makes sense. We might be able to use the same trick that we have
+for verifying __init sections though: During the final link of the
+vmlinux or module, check that an SRAM function only calls other
+functions that are in SRAM and accesses global variables that way
+too.
 
-FIXME The clock should be the PERIPH clock, but the sh73a0 CPG driver
-      doesn't have support for that clock yet. Hence we use the ZG
-      clock, which runs at the same frequency.
+It wouldn't cover any pointers you pass using function arguments
+though, and I don't yet understand the requirements for stack accesses.
+How do you currently deal with local variables that are put on the
+stack by a blob?
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Unlike "arm,armv7-timer" (used on R-Car Gen2), "arm,cortex-a9-twd-time"
-does require a clock, which is not documented in its bindings?
----
- arch/arm/boot/dts/sh73a0.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> > and I also don't think I want to have
+> > the infrastructure for it in mach-rockchip and would want to see that
+> > at least shared across arch/arm if it's too hard to do
+> > cross-architecture. If you were to include code from drivers/memory/
+> > in the blob, you couldn't keep it in mach-rockchip anyway.
+> 
+> I guess I was envisioning that if other places need similar
+> functionality that they would copy the ideas here.  Some of the
+> Makefile bits could possibly be shared through some type of Makefile
+> library.  I know copying code / Makefiles is bad, but sometimes it's
+> the cleanest way to do something.  If we start seeing a lot of
+> duplication then we can make things common and we can truly evaluate
+> whether the common solution is better than the duplication.
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index cca22ec59a2edd63..c53b19f40ae0977f 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -11,6 +11,7 @@
- /include/ "skeleton.dtsi"
- 
- #include <dt-bindings/clock/sh73a0-clock.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-@@ -43,6 +44,13 @@
- 		      <0xf0000100 0x100>;
- 	};
- 
-+	timer at f0000600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0xf0000600 0x20>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+		clocks = <&cpg_clocks SH73A0_CLK_ZG>;	// FIXME CLK_PERIPH
-+	};
-+
- 	pmu {
- 		compatible = "arm,cortex-a9-pmu";
- 		interrupts = <0 55 IRQ_TYPE_LEVEL_HIGH>,
--- 
-1.9.1
+The makefile parts should be really easy to share by putting them
+into scripts/Makefile.lib.
+
+> > AFAICT, the quantenna implementation is similar to the itcm/dtcm
+> > stuff we already have (but are not using upstream), so I wonder
+> > why we can't use that here too, see Documentation/arm/tcm.txt
+> 
+> I wasn't aware of the TCM stuff.  Thanks for the pointer!  It looks
+> pretty neat...
+> 
+> Ah, but the TCM stuff has a critical difference from my problem.  By
+> the very definition of TCM you don't need to do relocation.
+> 
+> TCM has the magical property that you can assign the physical address.
+> That means that you instantly sidestep multiplatform problems of
+> having SRAM at different physical addresses.  You can compile the code
+> to assume it's at 0xfffe0000 and it will work on every single machine
+> out there that needs TCM.  So if you've got a generic "udelay"
+> function you could just mark it as a "tcmfunc" and it will work
+> everywhere.  No relocation needed and the compiler knows exactly where
+> things will be.
+
+Ok, I have to admit that I don't actually understand the differences
+myself. Why does the physical address of the TCM matter? Can't we
+just map the SRAM to a sufficiently large well-known virtual address?
+
+> Unfortunately, the rk3288 doesn't have TCM.  I tried enabling it and
+> got these nice printouts at boot:
+> 
+>     DTCM    : 0xfffe8000 - 0xfffe8000   (   0 kB)
+>     ITCM    : 0xfffe0000 - 0xfffe0000   (   0 kB)
+> 
+> Instead of TCM I'm using the "PMU SRAM" on the rk3288 which is
+> designed to keep code and data across deep sleep.  Adding relocation
+> to the existing TCM support gets back into the rats nest of issues
+> that I was trying to avoid tackling.
+> 
+> A few other TCM thoughts:
+> 
+> 1. It sure seems unlikely that the current TCM solution would scale to
+> multiplatform.  Oh right, Linus W said this in his reply, too.  If
+> you've got SoC_A, SoC_B, and SoC_C all marking their functions
+> "tcmfunc" then they'll all be placed in the TCM section, right?
+
+Correct, that would be a problem, at least if the total size grows
+to more than the minimum of any of the chips' physical SRAM.
+
+> There's no way to detect that you're on SoC_A and that you only need
+> the SoC_A code.  Given the marching orders of multiplatform,
+> multiplatform, multiplatform then I _think_ that means we shouldn't
+> let anyone merge any code to mainline that uses TCM (unless TCM gets
+> revamped).
+
+Just out of curiosity, what sizes are we looking at here, for the
+code you currently have and the available SRAM on rk3288?
+
+> 2. I haven't tried it, but it seems like the compiler still might not
+> catch stray (accidental) accesses from the TCM section to the non-TCM
+> section.  Again, this isn't a showstopper because you'd just track
+> each one down, but it is a nice feature of adding a separate
+> executable.
+
+No, the compiler won't care about this, but as mentioned above we
+can have the kernel linker scripts help us a bit here.
+
+	Arnd
