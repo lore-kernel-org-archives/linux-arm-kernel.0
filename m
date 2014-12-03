@@ -1,57 +1,161 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 03 Dec 2014 11:23:26 -0800
-Subject: [PATCH v10 0/4] This suspend patch is only support cut off the
- power of cpu and some external
-In-Reply-To: <547F1639.3030102@rock-chips.com> (Chris Zhong's message of "Wed,
- 03 Dec 2014 21:55:05 +0800")
-References: <1417423940-1669-1-git-send-email-zyw@rock-chips.com>
- <7htx1f409k.fsf@deeprootsystems.com>
- <CAD=FV=V2go5BMFbiFKu73_aVz5ck949W-kJQ6WLkAQRPJbjPVA@mail.gmail.com>
- <CAD=FV=XuQk17CTNKJY++J+w9Ab9_OUX0ca0A99m7yKPAWSs2=w@mail.gmail.com>
- <7hmw763kql.fsf@deeprootsystems.com> <547F1639.3030102@rock-chips.com>
-Message-ID: <7hiohszgep.fsf@deeprootsystems.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 3 Dec 2014 20:28:21 +0100
+Subject: [PATCH v3 06/11] memory: atmel-ebi: add DT bindings documentation
+In-Reply-To: <547F24B6.8070504@atmel.com>
+References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1417429647-3419-7-git-send-email-boris.brezillon@free-electrons.com>
+ <547F24B6.8070504@atmel.com>
+Message-ID: <20141203202821.6d15af88@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris Zhong <zyw@rock-chips.com> writes:
+On Wed, 3 Dec 2014 15:56:54 +0100
+Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-[...]
+> Le 01/12/2014 11:27, Boris Brezillon a ?crit :
+> > The EBI (External Bus Interface) is used to access external peripherals
+> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+> > Each device is assigned a CS line and an address range and can have its
+> > own configuration (timings, access mode, bus width, ...).
+> > This driver provides a generic DT binding to configure a device according
+> > to its requirements.
+> > For specific device controllers (like the NAND one) the SMC timings
+> > should be configured by the controller driver through the matrix and smc
+> > syscon regmaps.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  .../bindings/memory-controllers/atmel-ebi.txt      | 155 +++++++++++++++++++++
+> >  1 file changed, 155 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+> > new file mode 100644
+> > index 0000000..3749ea1
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+> > @@ -0,0 +1,155 @@
+> > +* Device tree bindings for Atmel EBI
+> > +
+> > +The External Bus Interface (EBI) controller is a bus where you can connect
+> > +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
+> > +The EBI provides a glue-less interface to asynchronous memories though the SMC
+> > +(Static Memory Controller).
+> > +Synchronous memories (and some asynchronous memories like NANDs) can be
+> > +attached to specialized controllers which are responsible for configuring the
+> > +bus appropriately according to the connected device.
+> > +In the other hand, the bus interface can be automated for simple asynchronous
+> > +devices.
+> > +
+> > +Required properties:
+> > +
+> > +- compatible:		"atmel,at91sam9260-ebi"
+> > +			"atmel,at91sam9261-ebi"
+> > +			"atmel,at91sam9263-ebi0"
+> > +			"atmel,at91sam9263-ebi1"
+> 
+> Ditto: 9263 twice.
 
-> I have test these patches on evb board base on next-20141128 with a
-> defconfig[0], and with u-boot[1].
-> As Doug said, we need below 3 patches for resume.
->
-> 1.https://patchwork.kernel.org/patch/5051881/  - clocksource:
->    arch_timer: Allow the device tree to specify uninitialized timer
->    registers
->
-> 2.https://patchwork.kernel.org/patch/5363671/  - clocksource:
->    arch_timer: Fix code to use physical timers when requested
->
-> 3.https://patchwork.kernel.org/patch/5382141/  - ARM: dts: rk3288: add
->    arm,cpu-registers-not-fw-configured
->
->
-> And it will auto wakeup, as Heiko said in v8.  
+Actually that's not a duplicated compatible (see the ebi0/ebi1 at the
+end): sam9263 embeds 2 EBIs, and they have different numbers of chip
+selects, hence the different compatible string.
 
-OK, with your series plus those 3 patches on top of next-20141128, I'm
-now seeing it auto-wakeup, either with multi_v7_defconfig or Heiko's
-rk3288_defconfig.
+I'll add an "atmel,at91sam9rl-ebi" string.
 
-> But I have never notice before, since the u-boot never enable edp, and
-> I use the coreboot with edp display.  Actually it is a bug in rk3288,
-> the rk3288 have not 27Mhz clock source, but the edp initially set to
-> this non-existent clock. At this time, edp is working on a unknown
-> state, and it always bring a interrupt, this interrupt avoid system
-> enter suspend. 
+> 
+> > +			"atmel,at91sam9g45-ebi"
+> > +			"atmel,at91sam9x5-ebi"
+> > +			"atmel,sama5d3-ebi"
+> > +
+> > +- reg:			Contains offset/length value for EBI memory mapping.
+> > +			This property might contain several entries if the EBI
+> > +			memory range is not contiguous
+> > +
+> > +- #address-cells:	Must be 2.
+> > +			The first cell encodes the CS.
+> > +			The second cell encode the offset into the CS memory
+> > +			range.
+> > +
+> > +- #size-cells:		Must be set to 1.
+> > +
+> > +- ranges:		Encodes CS to memory region association.
+> > +
+> > +- clocks:		Clock feeding the EBI controller.
+> > +			See clock-bindings.txt
+> > +
+> > +Child chip-select (cs) nodes contain the memory devices nodes connected to
+> > +such as NOR (e.g. cfi-flash) and NAND.
+> > +There might be board specific devices like FPGAs.
+> > +You'll define you device requirements in these child nodes.
+> > +
+> > +Required child cs node properties:
+> > +
+> > +- #address-cells:	Must be 2.
+> > +
+> > +- #size-cells:		Must be 1.
+> > +
+> > +- ranges:		Empty property indicating that child nodes can inherit
+> > +			memory layout.
+> > +
+> > +Optional child cs node properties:
+> > +- atmel,generic-dev		boolean property specifying if the device is
+> > +				a generic device.
+> > +				The following properties are only parsed if
+> > +				this property is present.
+> > +				Specialized devices are attached to specialized
+> > +				controllers which are responsible for
+> > +				configuring the bus appropriately.
+> > +				Here are some examples of specialized
+> > +				controllers: NAND, CompactFlash, SDR-SDRAM.
+> > +
+> > +- atmel,bus-width:		width of the asynchronous device's data bus
+> > +				8, 16 or 32.
+> > +				8 if not present.
+> > +
+> > +- atmel,byte-access-type	"write" or "select" (see Atmel datasheet).
+> > +				"select" if not present.
+> > +
+> > +- atmel,read-mode		"nrd" or "ncs".
+> > +				"ncs" is not present.
+> > +
+> > +- atmel,write-mode		"nwe" or "ncs".
+> > +				"ncs" is not present.
+> > +
+> > +- atmel,exnw-mode		"disabled", "frozen" or "ready".
+> > +				"disabled" if not present.
+> > +
+> > +- atmel,page-mode		enable page mode if present. The provided value
+> > +				defines the page size (supported values: 4, 8,
+> > +				16 and 32).
+> > +
+> > +Optional device timings expressed in nanoseconds (if the property is not
+> > +present 0 is assumed):
+> > +
+> > +- atmel,ncs-rd-setup-ns
+> > +- atmel,nrd-setup-ns
+> > +- atmel,ncs-wr-setup-ns
+> > +- atmel,nwe-setup-ns
+> > +- atmel,ncs-rd-pulse-ns
+> > +- atmel,nrd-pulse-ns
+> > +- atmel,ncs-wr-pulse-ns
+> > +- atmel,nwe-pulse-ns
+> > +- atmel,nwe-cycle-ns
+> > +- atmel,nrd-cycle-ns
+> > +- atmel,tdf-ns
+> > +
+> > +- atmel,tdf-optimized		data float optimized mode. If present the data
+> > +				float time is optimized depending on the next
+> > +				device being accessed (next device setup
+> > +				time is substracted to the current devive data
+> 
+> Typo: subtract, device
 
-I see, good find!
+Yep, I'll those typos.
 
-> So if we want to enter suspend normally, the
-> edp_24m_sel(bit 15) of CRU_CLKSEL28_CON(0xff7600d0) must be set to 1.
 
-I didn't try your u-boot fix, but it sounds like there should be a kernel
-fix for this.  Why doesn't the disabling of unused clocks put the EDP
-into a safe/disabled state?
 
-Kevin
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
