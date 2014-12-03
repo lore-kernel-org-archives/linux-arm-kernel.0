@@ -1,126 +1,52 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 3 Dec 2014 21:22:36 +0100
-Subject: [PATCH v4 17/19] arm64: KVM: add SGI generation register emulation
-In-Reply-To: <547F4D7B.1070007@arm.com>
-References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
- <1415959683-26027-18-git-send-email-andre.przywara@arm.com>
- <20141123150852.GD3401@cbox> <54735EE6.70904@arm.com>
- <20141125110339.GD31297@cbox> <5478975C.5070107@arm.com>
- <20141130084516.GB82106@macair> <547F4D7B.1070007@arm.com>
-Message-ID: <20141203202236.GA29052@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Dec 2014 21:23:14 +0100
+Subject: Data Synchronization Barrier (DSB)
+In-Reply-To: <547F384A.1030809@free.fr>
+References: <547F384A.1030809@free.fr>
+Message-ID: <3745883.NFX517mvTa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03, 2014 at 05:50:51PM +0000, Andre Przywara wrote:
-> On 30/11/14 08:45, Christoffer Dall wrote:
-> > On Fri, Nov 28, 2014 at 03:40:12PM +0000, Andre Przywara wrote:
-> >> Hej Christoffer,
-> >>
-> >> On 25/11/14 11:03, Christoffer Dall wrote:
-> >>> Hi Andre,
-> >>>
-> >>> On Mon, Nov 24, 2014 at 04:37:58PM +0000, Andre Przywara wrote:
-> >>>> Hi,
-> >>>>
-> >>>> On 23/11/14 15:08, Christoffer Dall wrote:
-> >>>>> On Fri, Nov 14, 2014 at 10:08:01AM +0000, Andre Przywara wrote:
-> >>>>>> While the generation of a (virtual) inter-processor interrupt (SGI)
-> >>>>>> on a GICv2 works by writing to a MMIO register, GICv3 uses the system
-> >>>>>> register ICC_SGI1R_EL1 to trigger them.
-> >>>>>> Trap that register on ARM64 hosts and handle it in a new handler
-> >>>>>> function in the GICv3 emulation code.
-> >>>>>
-> >>>>> Did you reorder something or does my previous comment still apply that
-> >>>>> you're not enabling trapping yet, you're just adding the handler - those
-> >>>>> are two different things.
-> >>>>
-> >>>> Yes, I can fix the wording.
-> >>>>
-> >>>>> You sort of left my question about access_gic_sgi() not checking if the
-> >>>>> gicv3 is presetn hanging from the last thread, but I think I'm
-> >>>>> understanding properly now, that as long as you're not setting the
-> >>>>> ICC_SRE_EL2.Enable = 1, then we'll never get here, right?
-> >>>>
-> >>>> Right, that is the idea. Just to make sure that I got this right from
-> >>>> the discussion the other day: We will not trap to EL2 as long as
-> >>>> ICC_SRE_EL2.Enable is 0 - which it should still be at this point, right?
-> >>>
-> >>> No, when ICC_SRE_EL2.Enable is 0, then Non-secure EL1 access to
-> >>> ICC_SRE_EL1 trap to EL2 (See Section 5.7.39 in the spec), which means
-> >>> that accesses to the ICC_SGIx registers will cause an undefined
-> >>> exception in the guest because we set ICC_SRE_EL1.SRE to 0 for the
-> >>> guest and the guest cannot change this.
-> >>>
-> >>> Now, when we set ICC_SRE_EL2.Enable to 1, then the guest can set
-> >>> ICC_SRE_EL1.SRE to 1 (and we also happen to reset it to 1), and we will
-> >>> indeed trap on guest access to the ICC_SGIx registers, because all
-> >>> virtual accesses to these registers trap.
-> >>>
-> >>> (Going back and checking where 'virtual accesses' is defined in the spec
-> >>> left me somewhere without any results, but I am guessing that because we
-> >>> set the ICH_HCR_EL2.En to 1, all accesses will be deemed virtual
-> >>> accesses, maybe the spec should be clarfied on this matter?).
-> >>>
-> >>> Anyhow, to get back to my original question, getting here requires
-> >>> a situation where the guest copy of the ICC_SRE_EL1.SRE is 1, which we
-> >>> only allow when we have properly initialized the GICv3 data structures.
-> >>
-> >> So to summarize (and check) this: There is no real issue at this point?
-> >> And the code is totally fine after 19/19?
-> > 
-> > There is no issue at this point, no.
-> > 
-> >>
-> >> Would this kind of problem actually matter _inside_ a patch series? To
-> >> trigger an issue, we would need a bogus guest and bogus userland
-> >> (because at this point neither of them would see/inject a GICv3 FDT
-> >> node). I'd assume that running a kernel at this point is just for
-> >> debugging/bisecting? Where you wouldn't care about every corner case of
-> >> execution?
-> > 
-> > The argument about bogus guests / fdts should *never* be considered in
-> > the context of these discussions.  If we have code that looks like the
-> > guest can kill the host, or do a NULL pointer dereference, then we need
-> > to address it.
-> > 
-> > Your point about it being inside a patch series, sure, it's unlikely
-> > that people will run this, but I'm reviewing this patch right now, and
-> > honestly not considering how this changes in the subsequent patch.  For
-> > this sort of thing, if we were leaving a gaping hole open, that would at
-> > least require a clear note in the commit message on why we're doing it.
+On Wednesday 03 December 2014 17:20:26 Mason wrote:
 > 
-> I see, makes sense.
-> So I thought about adding a line like this to the very beginning of
-> vgic_v3_dispatch_sgi(). This would cover all cases of spurious traps.
-> Does that sound useful as a security precaution (though unneeded as
-> described)?
-> Shall there be a warning before the return?
+> In fact, on ARM platforms, __raw_readl does not insert any memory
+> barrier (or compiler barrier for that matter, the only constraints
+> are those imposed by the "volatile" keyword)
 > 
-> +	/* only valid for an initialized VGICv3 */
-> +	if (!vgic_initialized(kvm)  ||
-> +	    kvm->arch.vgic.vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
-> +		return;
+> static inline u32 __raw_readl(const volatile void __iomem *addr)
+> {
+>         u32 val;
+>         asm volatile("ldr %1, %0"
+>                      : "+Qo" (*(volatile u32 __force *)addr),
+>                        "=r" (val));
+>         return val;
+> }
 > 
+> If I understand correctly, accessing memory-mapped registers without
+> using memory barriers can lead to subtle bugs, from memory reordering?
+> (This part is really unclear for me.)
 
-If anything you should have a BUG_ON(), but especially when you've
-tested this, it won't happen.
+The "asm volatile" makes the compiler emit the accesses in the order
+that is given in source code, and we rely on the CPU to send them
+to the bus in the same order, which on ARM is enforced through the
+page table attributes that ioremap sets.
 
-> > Hopefully you understood and agreed with my deduction about the various
-> > SRE settings above though?
+The barriers are needed only to ensure ordering between MMIO accesses
+and memory accesses, in particular memory that is seen by a DMA
+bus master device that is controlled using this MMIO.
+
+The classic example for this is writing to a DMA buffer from the
+CPU and then telling a device using writel to fetch the data.
+Without the barrier, that data may still be in a CPU buffer
+by the time that a device reads it.
+
+> Should I alias my primitives to ioread32 and iowrite32?
 > 
-> Yes, I got this. We are safe as long as ICC_SRE_EL1.SRE is 0, which is
-> true until patch 19/19 allows userland to request a GICv3 guest, which
-> will force it to 1.
-> I also tested this explicitly, starting with patch 17/19 (for the host
-> kernel) and going over the remaining two as well. Starting a guest with
-> GICv2 and accessing ICC_SRE_EL1 and ICC_SGI1R_EL1 from a custom module
-> inside the guest will always keep ICC_SRE_EL1.SRE to 0 (thanks to your
-> recent trap patch), accesses to ICC_SGI1R_EL1 provoke an #UNDEF
-> exception in the guest. The host was never bothered.
-> Creating a guest with a GICv3 was only successful after patch 19/19, and
-> ICC_SRE_EL1.SRE couldn't be cleared.
-> 
-> So I consider this topic done.
-> 
-Indeed!
--Christoffer
+> NOTE: iowrite32 calls outer_sync() which seems to have somewhat high
+> of an overhead. If I'm writing to 4 consecutive MM registers, do I
+> need to sync after each write?
+
+I think readl_relaxed() is enough for you in this case, as long as
+there are no DMAs.
+
+	Arnd
