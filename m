@@ -1,49 +1,58 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 03 Dec 2014 18:49:13 +0100
-Subject: [PATCH 07/12] Documentation: dt: imx: add MSCM documentation
-In-Reply-To: <57320597.hlx9GuXmaF@wuerfel>
-References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
- <1417565531-4507-8-git-send-email-stefan@agner.ch>
- <57320597.hlx9GuXmaF@wuerfel>
-Message-ID: <b1d6e3afefac65c6424040c08689b750@agner.ch>
+From: mpeg.blue@free.fr (Mason)
+Date: Wed, 03 Dec 2014 18:47:46 +0100
+Subject: Creating 16 MB super-sections for MMIO
+In-Reply-To: <2452742.elcJohDinR@wuerfel>
+References: <547D97A5.4090302@free.fr>
+ <20141203103211.GB7373@e104818-lin.cambridge.arm.com>
+ <547F1C11.5090408@free.fr> <2452742.elcJohDinR@wuerfel>
+Message-ID: <547F4CC2.2090801@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-03 11:52, Arnd Bergmann wrote:
-> On Wednesday 03 December 2014 01:12:06 Stefan Agner wrote:
->> +Freescale Vybrid Miscellaneous System Control Module
->> +
->> +The MSCM IP contains Access Control and TrustZone Security hardware,
->> +CPU Configuration registers and Interrupt Router control.
->> +
->> +Required properties:
->> +- compatible : "fsl,vf610-mscm"
->> +- reg : the register range of the MSCM module
->> +
->> +Example:
->> +       mscm: mscm at 40001000 {
->> +               compatible = "fsl,vf610-mscm";
->> +               reg = <0x40001000 0x1000>;
->> +       };
-> 
-> This sounds like one of those generic system controller devices.
-> Should this be marked as syscon an accessed through
-> syscon_regmap_lookup_by_phandle()?
-> 
-> If you only eve have one driver touching these registers, that
-> won't be necessary of course.
-> 
+On 03/12/2014 18:06, Arnd Bergmann wrote:
 
-So far, in upstream code the module is not used at all (other than in
-U-Boot setting up the interrupt router in a static manner). I think it
-is not that "miscellaneous" as it sounds, it mainly controls and
-provides information regarding the dual-core stuff, for instance provide
-interrupt flags for the CPU-to-CPU interrupts or exports CPU information
-(beside the interrupt routing thing). I don't know (yet) if and how we
-want export support for that interrupt. We would certainly need it to
-support some message based framework (Freescale used it for their
-out-of-tree MCC (multi-core communication) stuff, probably we would need
-it to implement rpmsg support...).
+> Mason wrote:
+>
+>> As far as I could tell, Linux does not create a super-section in the
+>> case outlined above. Perhaps I misread the source code?
+>
+> I believe you are right, and I also agree that in theory implementing
+> what you say (both 64k and 16M mappings) can only help, but it's not
+> obvious if this makes a measurable difference in the end.
 
---
-Stefan
+It will be an interesting thought experiment to come up with
+a relevant benchmark. TODO.
+
+> MMIO register accesses are usually slow for other reasons, and
+> they tend to be rare,
+
+Reading e.g. the system tick counter on this SoC takes ~65 ns
+(so ~65 cycles from the CPU's PoV) which is roughly twice as
+fast as accessing uncached RAM.
+
+I don't think we can say that MMIO registers accesses are slow
+when they are faster than RAM, right?
+
+> so it's possible that you won't be able
+> to ever tell a difference because the MMIO TLB often gets evicted
+> by user mappings between accesses to different 1MB sections,
+> and the timing difference between a TLB-hot and cold MMIO access
+> might not be that great (depending on the latency of a particular
+> register).
+
+I don't know if other SoCs are built differently, but on this one,
+most drivers are hammering the same 16MB memory region where the
+MMIO registers live. I don't think the entry would ever get evicted
+if there's some kind of LRU-policy in action.
+
+[Seems it might worthwhile to investigate TLB entry lockdown
+(on Cortex A9) after all.]
+
+> I don't think there would be any objections to doing superpage
+> or supersection mappings for early page tables if you can show
+> any benefit whatsoever, but it may be hard to come up with a
+> scenario where it's actually measurable.
+
+I'll have to think about it.
+
+Thanks.
