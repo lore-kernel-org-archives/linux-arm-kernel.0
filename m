@@ -1,122 +1,222 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed, 03 Dec 2014 21:55:05 +0800
-Subject: [PATCH v10 0/4] This suspend patch is only support cut off the
- power of cpu and some external
-In-Reply-To: <7hmw763kql.fsf@deeprootsystems.com>
-References: <1417423940-1669-1-git-send-email-zyw@rock-chips.com>	<7htx1f409k.fsf@deeprootsystems.com>	<CAD=FV=V2go5BMFbiFKu73_aVz5ck949W-kJQ6WLkAQRPJbjPVA@mail.gmail.com>	<CAD=FV=XuQk17CTNKJY++J+w9Ab9_OUX0ca0A99m7yKPAWSs2=w@mail.gmail.com>
- <7hmw763kql.fsf@deeprootsystems.com>
-Message-ID: <547F1639.3030102@rock-chips.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 03 Dec 2014 15:12:47 +0100
+Subject: [PATCH v2 2/5] clk: samsung: Fix clock disable failure because
+ domain being gated
+In-Reply-To: <1417011857-10419-3-git-send-email-k.kozlowski@samsung.com>
+References: <1417011857-10419-1-git-send-email-k.kozlowski@samsung.com>
+ <1417011857-10419-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <547F1A5F.8000502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 26/11/14 15:24, Krzysztof Kozlowski wrote:
+> Audio subsystem clocks are located in separate block. If clock for this
+> block (from main clock domain) 'mau_epll' is gated then any read or
+> write to audss registers will block.
+> 
+> This was observed on Exynos 5420 platforms (Arndale Octa and Peach
+> Pi/Pit) after introducing runtime PM to pl330 DMA driver. After that
+> commit the 'mau_epll' was gated, because the "amba" clock was disabled
+> and there were no more users of mau_epll. The system hang on disabling
+> unused clocks from audss block.
+> 
+> Unfortunately the 'mau_epll' clock is not parent of some of audss clocks.
+> 
+> Whenever system wants to operate on audss clocks it has to enable epll
+> clock. The solution reuses common clk-gate/divider/mux code and duplicates
+> clk_register_*() functions. In the same time the patch tries to limit
+> functional changes of the driver so it does not fix minor issues with existing
+> code (like leaking memory allocated for clk-gate/clk-mux/clk-divider code).
+> This is addressed later.
 
-On 12/02/2014 09:26 AM, Kevin Hilman wrote:
-> Doug Anderson <dianders@chromium.org> writes:
->
->> Hi,
->>
->> On Mon, Dec 1, 2014 at 2:08 PM, Doug Anderson <dianders@chromium.org> wrote:
->>> Hi,
->>>
->>> On Mon, Dec 1, 2014 at 11:51 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>>> Chris Zhong <zyw@rock-chips.com> writes:
->>>>
->>>>> devices, since we still lack power_domain driver, so the other power rail
->>>>> of rk3288 need keep power on.
->>>>> I have tested it on rk3288-evb board, atop next-20141112. goto suspend by type
->>>>> "echo mem > /sys/power/state", vdd_cpu is about 0mv by measuring, so it can be
->>>>> determined in sleep mode, then press power button to wakeup it.
->>>> I tested this on top of today's linux-next (next-20141201) and it
->>>> suspends, but doesn't wake up from any of the button presses.  What
->>>> wakeup sources are configured for the rk3288-evb-rk808?
->>> Just to close the loop (I talked with Kevin over IM about this, too):
->>>
->>> I have a huge description of how I tested this as part of my patch at
->>> <https://patchwork.kernel.org/patch/5414941/>.  Chris:  I think Kevin
->>> has asked you several times to include information like this in your
->>> cover letter.  Please, please, please can you try to remember to do
->>> this?
->> Talked to Chris offline.  He said that in his tests the other patches
->> weren't needed, so he didn't list any other patches.  Things just
->> worked for him.  ...so I guess he did post the instructions that
->> worked for him.  Sorry for the complaint.  Possibly things are
->> different on "next-20141112" and that's where Chris said he tested.
-> This series doesn't apply cleanly to next-20141112.  Manually applying
-> (with fuzz), it boots but I have the same results: it suspends, but none
-> of the buttons wake it up.
->
-> Kevin
->
-Hi, Kevin
+It seems we need separate functions for unregistering the standard
+mux/gate/div clocks.
 
-I have test these patches on evb board base on next-20141128 with a 
-defconfig[0], and with u-boot[1].
-As Doug said, we need below 3 patches for resume.
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Reported-by: Kevin Hilman <khilman@kernel.org>
+> ---
+>  drivers/clk/samsung/clk-exynos-audss.c | 346 +++++++++++++++++++++++++++++----
+>  1 file changed, 311 insertions(+), 35 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+> index 7c4368e75ede..9ec7de866ab4 100644
+> --- a/drivers/clk/samsung/clk-exynos-audss.c
+> +++ b/drivers/clk/samsung/clk-exynos-audss.c
+> @@ -29,6 +29,7 @@ static DEFINE_SPINLOCK(lock);
+>  static struct clk **clk_table;
+>  static void __iomem *reg_base;
+>  static struct clk_onecell_data clk_data;
+> +static struct clk *pll_in;
+>  
+>  #define ASS_CLK_SRC 0x0
+>  #define ASS_CLK_DIV 0x4
+> @@ -75,6 +76,276 @@ static const struct of_device_id exynos_audss_clk_of_match[] = {
+>  	{},
+>  };
+>  
+> +static int pll_clk_enable(void)
+> +{
+> +	if (!IS_ERR(pll_in))
+> +		return clk_enable(pll_in);
+> +
+> +	return 0;
+> +}
+> +
+> +static void pll_clk_disable(void)
+> +{
+> +	if (!IS_ERR(pll_in))
+> +		clk_disable(pll_in);
+> +}
+> +
+> +static int audss_clk_gate_enable(struct clk_hw *hw)
+> +{
+> +	int ret;
+> +
+> +	ret = pll_clk_enable();
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = clk_gate_ops.enable(hw);
+> +
+> +	pll_clk_disable();
+> +
+> +	return ret;
+> +}
+> +
+> +static void audss_clk_gate_disable(struct clk_hw *hw)
+> +{
+> +	int ret;
+> +
+> +	ret = pll_clk_enable();
+> +	if (ret)
+> +		return;
+> +
+> +	clk_gate_ops.disable(hw);
+> +
+> +	pll_clk_disable();
+> +}
+> +
+> +static int audss_clk_gate_is_enabled(struct clk_hw *hw)
+> +{
+> +	int ret;
+> +
+> +	ret = pll_clk_enable();
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = clk_gate_ops.is_enabled(hw);
+> +
+> +	pll_clk_disable();
+> +
+> +	return ret;
+> +}
+> +
+> +static const struct clk_ops audss_clk_gate_ops = {
+> +	.enable = audss_clk_gate_enable,
+> +	.disable = audss_clk_gate_disable,
+> +	.is_enabled = audss_clk_gate_is_enabled,
+> +};
 
-1.https://patchwork.kernel.org/patch/5051881/  - clocksource:
-    arch_timer: Allow the device tree to specify uninitialized timer
-    registers
+As Tomasz suggested a better approach could be to use regmap
+and let it handle the PLL clock. Unfortunately there the regmap
+is not supported for the base clock types in the clock core and
+that would require even more work and more added code.
 
-2.https://patchwork.kernel.org/patch/5363671/  - clocksource:
-    arch_timer: Fix code to use physical timers when requested
+> +/*
+> + * A simplified copy of clk-gate.c:clk_register_gate() to mimic
+> + * clk-gate behavior while using customized ops.
+> + *
+> + * TODO: just like clk-gate it leaks memory for struct clk_gate.
 
-3.https://patchwork.kernel.org/patch/5382141/  - ARM: dts: rk3288: add
-    arm,cpu-registers-not-fw-configured
+Please squash patch 5/5 into this one for the next iteration.
 
+> + */
+> +static struct clk *audss_clk_register_gate(struct device *dev, const char *name,
+> +		const char *parent_name, unsigned long flags, u8 bit_idx)
+> +{
+> +	struct clk_gate *gate;
+> +	struct clk *clk;
+> +	struct clk_init_data init;
+> +
+> +	/* allocate the gate */
+> +	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
+> +	if (!gate)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	init.name = name;
+> +	init.ops = &audss_clk_gate_ops;
+> +	init.flags = flags | CLK_IS_BASIC;
+> +	init.parent_names = (parent_name ? &parent_name : NULL);
+> +	init.num_parents = (parent_name ? 1 : 0);
+> +
+> +	/* struct clk_gate assignments */
+> +	gate->reg = reg_base + ASS_CLK_GATE;
+> +	gate->bit_idx = bit_idx;
+> +	gate->flags = 0;
+> +	gate->lock = &lock;
+> +	gate->hw.init = &init;
+> +
+> +	clk = clk_register(dev, &gate->hw);
+> +
+> +	if (IS_ERR(clk))
+> +		kfree(gate);
+> +
+> +	return clk;
+> +}
+> +
 
-And it will auto wakeup, as Heiko said in v8.  But I have never notice 
-before, since the u-boot never enable edp,
-and I use the coreboot with edp display.
-Actually it is a bug in rk3288, the rk3288 have not 27Mhz clock source, 
-but the edp initially set to this
-non-existent clock. At this time, edp is working on a unknown state, and 
-it always bring a interrupt, this
-interrupt avoid system enter suspend. So if we want to enter suspend 
-normally, the edp_24m_sel(bit 15) of
-CRU_CLKSEL28_CON(0xff7600d0) must be set to 1.
+>  /* register exynos_audss clocks */
+>  static int exynos_audss_clk_probe(struct platform_device *pdev)
+>  {
+> @@ -83,7 +354,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+>  	const char *mout_audss_p[] = {"fin_pll", "fout_epll"};
+>  	const char *mout_i2s_p[] = {"mout_audss", "cdclk0", "sclk_audio0"};
+>  	const char *sclk_pcm_p = "sclk_pcm0";
+> -	struct clk *pll_ref, *pll_in, *cdclk, *sclk_audio, *sclk_pcm_in;
 
-[0] 
-https://github.com/mmind/linux-rockchip/blob/devel/workbench/arch/arm/configs/rk3288_defconfig 
+How about pll_in locally, using a different name for the global pointer
+and ensuring the global pointer is properly initialized to ERR_PTR value
+for cases where we don't need to touch the APLL clock ?
 
-[1] https://githubremotes/origin/u-boot-rk3288
+> +	struct clk *pll_ref, *cdclk, *sclk_audio, *sclk_pcm_in;
+>  	const struct of_device_id *match;
+>  	enum exynos_audss_clk_type variant;
+>  
+> @@ -115,12 +386,21 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+>  	pll_in = devm_clk_get(&pdev->dev, "pll_in");
+>  	if (!IS_ERR(pll_ref))
+>  		mout_audss_p[0] = __clk_get_name(pll_ref);
+> -	if (!IS_ERR(pll_in))
+> +	if (!IS_ERR(pll_in)) {
+>  		mout_audss_p[1] = __clk_get_name(pll_in);
+> -	clk_table[EXYNOS_MOUT_AUDSS] = clk_register_mux(NULL, "mout_audss",
+> +
+> +		ret = clk_prepare(pll_in);
+> +		if (ret) {
+> +			dev_err(&pdev->dev,
+> +				"failed to prepare the pll_in clock\n");
+> +			return ret;
+> +		}
 
-here is my local  work around:
+Let's introduce such chnages only for SoC's where that's really necessary,
+AFAICS it seems to be needed only for "samsung,exynos5420-audss-clock"
+compatible.
 
-diff --git a/arch//cpu/armv7/rk32xx/clock-rk3288.c 
-b/arch/arm/cpu/armv7/rk32xx/clock-rk3288.c
-index cfd0acd..3df0900 100755
---- a/arch/arm/cpu/armv7/rk32xx/clock-rk3288.c
-+++ b/arch/arm/cpu/armv7/rk32xx/clock-rk3288.c
-@@ -1233,7 +1233,6 @@ int rkclk_lcdc_clk_set(uint32 lcdc_id, uint32 dclk_hz)
-         }
-  }
+> +	}
+> +
+> +	clk_table[EXYNOS_MOUT_AUDSS] = audss_clk_register_mux(NULL, "mout_audss",
+>  				mout_audss_p, ARRAY_SIZE(mout_audss_p),
+> -				CLK_SET_RATE_NO_REPARENT,
+> -				reg_base + ASS_CLK_SRC, 0, 1, 0, &lock);
+> +				CLK_SET_RATE_NO_REPARENT, 0, 1);
 
--
-  /*
-   * rkplat set nandc clock div
-   * nandc_id:   nandc id
-@@ -1270,6 +1269,11 @@ int rkclk_set_nandc_div(uint32 nandc_id, uint32 
-pllsrc, uint32 freq)
-         return 0;
-  }
+I would prefer leaving the register's address in the arguments list.
+Now you're passing the bit index but not the actual register.
 
-+void rkclk_init_edp_source(void)
-+{
-+       cru_writel(1<<15 | 1<<31, CRU_CLKSELS_CON(28));
-+}
-+
-  /*
-   * rkplat set sd clock src
-   * 0: codec pll; 1: general pll; 2: 24M
-diff --git a/board/rockchip/rk32xx/rk32xx.c b/board/rockchip/rk32xx/rk32xx.c
-index bfdcf0e..3e19f5d 100755
---- a/board/rockchip/rk32xx/rk32xx.c
-+++ b/board/rockchip/rk32xx/rk32xx.c
-@@ -114,7 +114,7 @@ void rk_backlight_ctrl(int brightness)
+>  	cdclk = devm_clk_get(&pdev->dev, "cdclk");
+>  	sclk_audio = devm_clk_get(&pdev->dev, "sclk_audio");
 
-  void rk_fb_init(unsigned int onoff)
-  {
--
-+       rkclk_init_edp_source();
-  #ifdef CONFIG_OF_LIBFDT
-         if (lcd_node == 0) rk_lcd_parse_dt(gd->fdt_blob);
+--
+Regards,
+Sylwester
