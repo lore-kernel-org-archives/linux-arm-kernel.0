@@ -1,96 +1,47 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Wed, 3 Dec 2014 10:17:54 +0530
-Subject: [PATCH] dmaengine: pl330: Set residue in tx_status callback
-In-Reply-To: <547DF61D.3010909@metafoo.de>
-References: <1416995095-13763-1-git-send-email-padma.v@samsung.com>
- <CAAgF-BfpU72KTJjVd8jWStD8yJ5sSmXOiQm77xQunO2QhC9ExQ@mail.gmail.com>
- <547DF61D.3010909@metafoo.de>
-Message-ID: <CAAgF-BfPyaOhhrA5L8vm2WDnhBYDexJFkGxqL1GsL2TMB8z=Rw@mail.gmail.com>
+From: bisson.gary@gmail.com (Gary Bisson)
+Date: Tue, 2 Dec 2014 21:04:47 -0800
+Subject: [PATCH 0/3 RESEND] ARM: dts: sabrelite I2C and HDMI additions
+In-Reply-To: <1417559839-17365-1-git-send-email-eric.nelson@boundarydevices.com>
+References: <1417559839-17365-1-git-send-email-eric.nelson@boundarydevices.com>
+Message-ID: <CADCpmyN8J0XdUShLZwxny=DoJvpmNGjhNQCuOMZ64ac_VTP7BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lars,
+Eric, All,
 
-[snip]
->>> +
->>> +	ret = dma_cookie_status(chan, cookie, txstate);
->>> +	if (ret == DMA_COMPLETE || !txstate)
->>> +		return ret;
->>> +
->>> +	used = txstate->used;
->>> +
->>> +	spin_lock_irqsave(&pch->lock, flags);
->>> +	sar = readl(regs + SA(thrd->id));
->>> +	dar = readl(regs + DA(thrd->id));
->>> +
->>> +	list_for_each_entry(desc, &pch->work_list, node) {
->>> +		if (desc->status == BUSY) {
->>> +			current_c = desc->txd.cookie;
->>> +			if (first) {
->>> +				first_c = desc->txd.cookie;
->>> +				first = false;
->>> +			}
->>> +
->>> +			if (first_c < current_c)
->>> +				residue += desc->px.bytes;
->>> +			else {
->>> +				if (desc->rqcfg.src_inc && pl330_src_addr_in_desc(desc, sar)) {
->>> +					residue += desc->px.bytes;
->>> +					residue -= sar - desc->px.src_addr;
->>> +				} else if (desc->rqcfg.dst_inc && pl330_dst_addr_in_desc(desc, dar))
->>> {
->>> +					residue += desc->px.bytes;
->>> +					residue -= dar - desc->px.dst_addr;
->>> +				}
->>> +			}
->>> +		} else if (desc->status == PREP)
->>> +			residue += desc->px.bytes;
->>> +
->>> +		if (desc->txd.cookie == used)
->>> +			break;
->>> +	}
->>> +	spin_unlock_irqrestore(&pch->lock, flags);
->>> +	dma_set_residue(txstate, residue);
->>> +	return ret;
->>>   }
-[snip]
->>
->> Any comment on this patch?
+On Tue, Dec 2, 2014 at 2:37 PM, Eric Nelson
+<eric.nelson@boundarydevices.com> wrote:
+> This set of patches adds support for I2C2/3 busses and HDMI output
+> for the SABRE Lite board.
 >
-> Well it doesn't break audio, but I don't think it has the correct haviour
-> for all cases yet.
+> The content was gratuitously copied from the following commits
+> for the Nitrogen6X board made by Lucas Stach, Michael Olbrich,
+> and Philipp Zabel at Pengutronix:
+>
+>         43c3c00 - ARM: dts: nitrogen6x: add i2c2
+>         d653620 - ARM: dts: nitrogen6x: add hdmi
+>         1dffdd6 - ARM: dts: nitrogen6x: add i2c3
+>
+> Eric Nelson (3):
+>   ARM: dts: sabrelite: add i2c2
+>   ARM: dts: sabrelite: add hdmi
+>   ARM: dts: sabrelite: add i2c3
+>
+>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 33 ++++++++++++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>
+> Re-sending to add Shawn Guo to the CC list.
+>
+> --
+> 1.9.1
+>
 
-OK. Any way of testing other cases like scatter-gather and memcopy.  I
-verified memcopy in dmatest but it seems not doing anything with
-residue bytes.
+Tested on a SabreLite (iMX6q rev1.2), it works great once the ldb node
+is removed from imx6qdl-sabrelite.dtsi.
+It is to be noted that I've applied the patches on top of the
+linux-stable tree. Eric, are you using Shawn's tree? I'll try with
+that latter to see if I can keep both ldb and hdmi nodes at the same
+time.
 
->
-> Again, the semantics are that it should return the progress of the transfer
->
-> for which the allocation function returned the cookie that is passe to this
-
-May be my understanding is wrong. For clarification..In the
-snd_dmaengine_pcm_pointer it is subtracting the residue bytes from the
-total buffer bytes not from period bytes. So how it expects
-the progress of the transfer of the passed cookie which just holds period bytes?
-
->
-> function. You have to consider that there might be multiple different
-> descriptors submitted and in the work list, not just the one we want to know
-
-Even though there are multiple descriptors in the work list, at a time
-only two descriptors are in busy state(as per the documentation in the
-driver) and all the descriptors cookie number is in incremental order.
-Not sure for other cases how it will be.
-
->
-> the status of. The big problem with the pl330 driver is that the current
-> structure of the driver makes it not so easy to implement the residue
-> reporting correctly.
->
-> - Lars
-
-Thanks
-Padma
->
->
+Thanks,
+Gary
