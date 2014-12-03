@@ -1,39 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Dec 2014 21:35:34 +0100
-Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <20141203143122.GH499@linaro.org>
-References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
- <547ED3BD.5090209@linaro.org> <20141203143122.GH499@linaro.org>
-Message-ID: <2596381.rFt35NU3oS@wuerfel>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 3 Dec 2014 15:37:39 -0500 (EST)
+Subject: [PATCH] optimize ktime_divns for constant divisors
+In-Reply-To: <87zjb4zdyc.fsf@free.fr>
+References: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
+ <87zjb4zdyc.fsf@free.fr>
+Message-ID: <alpine.LFD.2.11.1412031525320.470@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 December 2014 07:31:22 Lina Iyer wrote:
-> >>>+static int __init qcom_spm_init(void)
-> >>>+{
-> >>>+    int ret;
-> >>>+
-> >>>+    /*
-> >>>+     * cpuidle driver need to registered before the cpuidle device
-> >>>+     * for any cpu. Register the device for the the cpuidle driver.
-> >>>+     */
-> >>>+    ret = platform_device_register(&qcom_cpuidle_drv);
-> >>>+    if (ret)
-> >>>+        return ret;
-> >>Stephen pointed out that we would have the platform device lying around
-> >>on a non-QCOM device when using multi_v7_defconfig.
-> >
-> >Perhaps I am missing the point, but this is not supposed to happen, no ?
-> >
-> This would happen, since the file would compile on multi_v7 and we would
-> initialize and register this device regardless. The cpuidle-qcom.c
-> driver probe would bail out looking for a matching compatible property.
-> So we would not register a cpuidle driver but the device would lay
-> around.
+On Wed, 3 Dec 2014, Robert Jarzmik wrote:
 
-I think the problem is registering a platform_device. I've complained
-about this before, but it still seems to get copied all over the
-place. Please don't do this but have a driver that looks at DT to
-figure out whether to access hardware or not.
+> Nicolas Pitre <nicolas.pitre@linaro.org> writes:
+> 
+> > Let ktime_divns() use do_div() inline whenever the divisor is constant
+> > and small enough.  This will make things like ktime_to_us() and 
+> > ktime_to_ms() much faster.
+> 
+> Hi Nicolas,
+> 
+> I suppose the "small enough" is linked to the "!(div >> 32)" in your patch.  Can
+> I have the rationale which brought up this value, and if that value is universal
+> across architectures (ie. x86/ppc/arm/...) ?
 
-	Arnd
+Yes.  The do_div() function is defined to accept a 32-bit divisor only.  
+The out-of-line ktime_divns code does scale down both the dividend and 
+the divisor until the divisor is within 32 bits of magnitude before 
+calling do_div().  However the constness of the divisor is lost and the 
+optimised do_div (on ARM at least) doesn't get involved.
+
+> And when you say "much faster", do you have figures to add to your commit
+> message ?
+
+No actual figure.  But a wild guess would be around an order of 
+magnitude.  See commit fa4adc6149 for an example of generated code.
+
+
+Nicolas
