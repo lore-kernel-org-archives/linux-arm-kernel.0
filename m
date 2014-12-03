@@ -1,75 +1,62 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Wed, 03 Dec 2014 15:07:49 -0800
-Subject: [PATCH v3 1/3] devicetree: of: Add bindings for chosen node,
- stdout-path
-In-Reply-To: <CACxGe6ugLyV50gKCe83wCL0=qy+oHeExf9murW+qFuoVQ_TzsA@mail.gmail.com>
-References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
- <1417110967-16284-2-git-send-email-leif.lindholm@linaro.org>
- <547E7455.6090009@gmail.com>
- <CACxGe6vdbURE3=W3Uerwy90piGKhv7-m+-vpUhCiUTKB4AzTsw@mail.gmail.com>
- <547F6881.20400@gmail.com>
- <CACxGe6ugLyV50gKCe83wCL0=qy+oHeExf9murW+qFuoVQ_TzsA@mail.gmail.com>
-Message-ID: <547F97C5.7020202@gmail.com>
+From: dgreid@chromium.org (Dylan Reid)
+Date: Wed, 3 Dec 2014 15:22:27 -0800
+Subject: [alsa-devel] [PATCH v2 2/2] ASoC: rockchip: i2s: add support for
+ grabbing output clock to codec
+In-Reply-To: <CAPz6YkWSQhqX-wAp5hZReo==MuG_Tju_0mk+kGrJo9XhjQ3ttA@mail.gmail.com>
+References: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
+ <1417591118-18695-1-git-send-email-jay.xu@rock-chips.com>
+ <1417591118-18695-3-git-send-email-jay.xu@rock-chips.com>
+ <20141203192024.GL7712@sirena.org.uk>
+ <CAPz6YkXRmRzYpW7xuDsq69A9H-Qm2-j6t-a+B1w9+OLOPf_YnA@mail.gmail.com>
+ <20141203200307.GM7712@sirena.org.uk>
+ <CAPz6YkWSQhqX-wAp5hZReo==MuG_Tju_0mk+kGrJo9XhjQ3ttA@mail.gmail.com>
+Message-ID: <CAEUnVG4qbnNaV26N9AgeKDJkEEvqi1QqdcYh=cLwjxY-aPor4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/3/2014 1:45 PM, Grant Likely wrote:
-> On Wed, Dec 3, 2014 at 7:46 PM, Frank Rowand <frowand.list@gmail.com> wrote:
->> On 12/3/2014 7:12 AM, Grant Likely wrote:
->>> On Wed, Dec 3, 2014 at 2:24 AM, Frank Rowand <frowand.list@gmail.com> wrote:
->>>> On 11/27/2014 9:56 AM, Leif Lindholm wrote:
->>>>> Add a global binding for the chosen node.
->>>>> Include a description of the stdout-path, and an explicit statement on
->>>>> its extra options in the context of a UART console.
->>>>>
->>>>> Opening description stolen from www.devicetree.org, and part of the
->>>>> remaining text provided by Mark Rutland.
->>>>>
->>>>> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
->>>>> ---
->>>>>  Documentation/devicetree/bindings/chosen.txt |   42 ++++++++++++++++++++++++++
->>>>>  1 file changed, 42 insertions(+)
->>>>>  create mode 100644 Documentation/devicetree/bindings/chosen.txt
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
->>>>> new file mode 100644
->>>>> index 0000000..9cd74e9
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/chosen.txt
->>>>> @@ -0,0 +1,42 @@
->>>>> +The chosen node
->>>>> +---------------
->>>>> +
->>>>> +The chosen node does not represent a real device, but serves as a place
->>>>> +for passing data between firmware and the operating system, like boot
->>>>> +arguments. Data in the chosen node does not represent the hardware.
->>>>> +
->>>>> +
->>>>> +stdout-path property
->>>>
->>>> The code in patch 3/3 adds the extra options feature to the properties:
->>>>
->>>>   stdout-path
->>>>   linux,stdout-path
->>>>   stdout  [if (IS_ENABLED(CONFIG_PPC) ... ]
->>>
->>> I don't understand what you mean here. Are you suggesting a change to
->>> this patch? Is there something deficient in it?
+On Wed, Dec 3, 2014 at 3:03 PM, Sonny Rao <sonnyrao@chromium.org> wrote:
+> On Wed, Dec 3, 2014 at 12:03 PM, Mark Brown <broonie@kernel.org> wrote:
+>> On Wed, Dec 03, 2014 at 11:38:13AM -0800, Sonny Rao wrote:
+>>> On Wed, Dec 3, 2014 at 11:20 AM, Mark Brown <broonie@kernel.org> wrote:
 >>
->> Assuming that the code change in patch 3 is as desired, then the chosen.txt
->> documentation applies to all three properties, not just stdout-path.  So
->> yes, a change is suggested for the documentation.
-> 
-> how about if this is added:
-> 
-> Implementation note: Linux will look for the property "linux,stdout-path" or
-> on PowerPC "stdout" if "stdout-path" is not found.  However, the
-> "linux,stdout-path" and "stdout" properties are deprecated. New platforms
-> should only use the "stdout-path" property.
-> 
-> g.
-> 
+>>> > I would expect that the clock for the CODEC should be managed by the
+>>> > CODEC if at all possible - that seems more logical than having the CPU
+>>> > I2S controller request and manage it if it's a separate clock.  Why add
+>>> > this to the CPU side driver?
+>>
+>>> This output clock has a mux and can either be a fixed 12Mhz output or
+>>> can be derived from the same fractional divider which drives the i2s
+>>> block.   I thought it was simpler to keep them all the same, but need
+>>> to put ownership in the i2s in anticipation of the i2s driver setting
+>>> it's own clock rate.
+>>
+>>> If you think this is an implementation detail and this output clock
+>>> should just be owned by the codec driver, even though I'm guessing it
+>>> will just have to be the same as i2s, then I think we can drop this
+>>> and make sure simple card (or whatever other codec driver) claims this
+>>> clock.
+>>
+>> simple-card obviously isn't a CODEC driver...
+>
+> Yeah, sorry.
+>
+>> For generality I think
+>> the clock does need to be exposed to the CODEC driver, otherwise this
+>> will work differently to how other systems are working and we can't
+>> substitute in a different clock on the CODEC side so easily if it
+>> doesn't happen to use the output from the I2S block.
+>
+> Ok, then I think what we will do is abandon this patch and I will send
+> something that adds this functionality to the particular codec that
+> I'm interested in -- max98090.
 
-Yep, perfect.
+Sorry I didn't read this earlier.  I don't think that this belongs in
+the max98090.  The original patch description is a bit confusing.  The
+clock being grabbed here is actually i2s mclk.  My understanding is
+that, on this SoC, the mclk is driven from a different IP block than
+the rest of the i2s signals.  The i2s driver needs to be told about
+the clock and enable/disable it at the appropriate times.  I'm
+assuming it's optional because there are boards using this SoC with
+i2s slave mode that don't drive mclk at all.
 
--Frank
+Please correct me if I'm wrong on any of the above.
