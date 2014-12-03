@@ -1,52 +1,54 @@
-From: bisson.gary@gmail.com (Gary Bisson)
-Date: Wed,  3 Dec 2014 15:03:51 -0800
-Subject: [PATCH v2] ARM: clk-imx6q: fix video divider for rev T0 1.0
-Message-ID: <1417647831-30261-1-git-send-email-bisson.gary@gmail.com>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Wed, 3 Dec 2014 15:03:40 -0800
+Subject: [PATCH v2 2/2] ASoC: rockchip: i2s: add support for grabbing
+ output clock to codec
+In-Reply-To: <20141203200307.GM7712@sirena.org.uk>
+References: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
+ <1417591118-18695-1-git-send-email-jay.xu@rock-chips.com>
+ <1417591118-18695-3-git-send-email-jay.xu@rock-chips.com>
+ <20141203192024.GL7712@sirena.org.uk>
+ <CAPz6YkXRmRzYpW7xuDsq69A9H-Qm2-j6t-a+B1w9+OLOPf_YnA@mail.gmail.com>
+ <20141203200307.GM7712@sirena.org.uk>
+Message-ID: <CAPz6YkWSQhqX-wAp5hZReo==MuG_Tju_0mk+kGrJo9XhjQ3ttA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The post dividers do not work on i.MX6Q rev T0 1.0 so they must be fixed
-to 1. As the table index was wrong, a divider a of 4 could still be
-requested which implied the clock not to be set properly. This is the
-root cause of the HDMI not working at high resolution on rev T0 1.0 of
-the SoC.
+On Wed, Dec 3, 2014 at 12:03 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Dec 03, 2014 at 11:38:13AM -0800, Sonny Rao wrote:
+>> On Wed, Dec 3, 2014 at 11:20 AM, Mark Brown <broonie@kernel.org> wrote:
+>
+>> > I would expect that the clock for the CODEC should be managed by the
+>> > CODEC if at all possible - that seems more logical than having the CPU
+>> > I2S controller request and manage it if it's a separate clock.  Why add
+>> > this to the CPU side driver?
+>
+>> This output clock has a mux and can either be a fixed 12Mhz output or
+>> can be derived from the same fractional divider which drives the i2s
+>> block.   I thought it was simpler to keep them all the same, but need
+>> to put ownership in the i2s in anticipation of the i2s driver setting
+>> it's own clock rate.
+>
+>> If you think this is an implementation detail and this output clock
+>> should just be owned by the codec driver, even though I'm guessing it
+>> will just have to be the same as i2s, then I think we can drop this
+>> and make sure simple card (or whatever other codec driver) claims this
+>> clock.
+>
+> simple-card obviously isn't a CODEC driver...
 
-Signed-off-by: Gary Bisson <bisson.gary@gmail.com>
----
-Changes v1->v2:
-- Remove error trace in commit log as it only appears on FSL kernels
-(suggested by Fabio)
+Yeah, sorry.
 
-This patch has been tested with a Sabrelite rev D (5-9-12).
+> For generality I think
+> the clock does need to be exposed to the CODEC driver, otherwise this
+> will work differently to how other systems are working and we can't
+> substitute in a different clock on the CODEC side so easily if it
+> doesn't happen to use the output from the I2S block.
 
-However I've realized this patch doesn't fix the HDMI at 1080p60 but only
-resolutions up to 1080p30. As mainline kernel is forcing the highest
-resolution supported by the monitor it might not work on 1080p60-enable
-displays. This latter issue is being investigated.
+Ok, then I think what we will do is abandon this patch and I will send
+something that adds this functionality to the particular codec that
+I'm interested in -- max98090.
 
-This patch is being integrated into meta-fsl-arm. Fabio suggested to
-submit this patch already as clearly the array index is currently
-wrong and "Better to have some HDMI then no HDMI at all":
-https://lists.yoctoproject.org/pipermail/meta-freescale/2014-December/011796.html
+I'm a little tied up at the moment so I'm not going to send that for a
+little while, but will come eventually.
 
-Thanks,
-Gary
----
- arch/arm/mach-imx/clk-imx6q.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 4e79da7..2aa1b67 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -144,7 +144,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 		post_div_table[1].div = 1;
- 		post_div_table[2].div = 1;
- 		video_div_table[1].div = 1;
--		video_div_table[2].div = 1;
-+		video_div_table[3].div = 1;
- 	};
- 
- 	clk[IMX6QDL_PLL1_BYPASS_SRC] = imx_clk_mux("pll1_bypass_src", base + 0x00, 14, 2, pll_bypass_src_sels, ARRAY_SIZE(pll_bypass_src_sels));
--- 
-2.1.3
+Thanks for the advice!
