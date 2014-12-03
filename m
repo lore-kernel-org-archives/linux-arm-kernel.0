@@ -1,58 +1,56 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Wed, 03 Dec 2014 15:20:01 +0100
-Subject: Creating 16 MB super-sections for MMIO
-In-Reply-To: <20141203103211.GB7373@e104818-lin.cambridge.arm.com>
-References: <547D97A5.4090302@free.fr> <547EDD61.5080907@free.fr>
- <20141203103211.GB7373@e104818-lin.cambridge.arm.com>
-Message-ID: <547F1C11.5090408@free.fr>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 3 Dec 2014 15:23:12 +0100
+Subject: [PATCH] mmc: atmel-mci: use SET_RUNTIME_PM_OPS() macro
+In-Reply-To: <1417614194-28409-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1417614194-28409-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <CAPDyKFp8mgT3T=OnPJHjAKo662yzoVDc6PgeaNHo_qKaOYRJBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Catalin,
++Rafael
 
-On 03/12/2014 11:32, Catalin Marinas wrote:
+On 3 December 2014 at 14:43, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> Use SET_RUNTIME_PM_OPS() since SET_PM_RUNTIME_PM_OPS() has been dropped.
+>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>
+> Hi Ulf,
+>
+> Can you take this patch which fixes a compilation error that has appeared only
+> on next-20141203.
 
-> The reasons behind this proposal aren't clear. Are you trying
-> to optimise mmio register accesses by avoiding TLB misses?
+I would prefer if the fix could be done through Rafael's tree, since
+it's a commit from there that causes the build error.
 
-I am trying to minimize TLB "pollution" by using a "huge" page.
+I have already shared an immutable branch containing the mmc commit,
+which is in conflict with the change in Rafael's linux-pm tree.
 
-The ARM manual states: "Support for Supersections, Sections and
-Large pages enables a large region of memory to be mapped using
-only a single entry in the TLB."
+Kind regards
+Uffe
 
-Is it correct that, if I create a virtual-to-physical mapping of
-an 8 MB memory region, then, in the best-case scenario, the kernel
-will create 8 Sections? Thus my mapping would use up to 8 entries
-in the TLB at any given time.
-
-Instead, if I create a V2P mapping of a 16 MB region, and if the
-kernel supports so-called Super-sections, then the mapping would
-use only a single entry in the TLB. Right?
-
-Thus creating a Super-section leaves more TLB entries available
-for user-space processes and kernel threads, which can only
-improve system performance, AFAIU.
-
-On my SoC, physical addresses 0 to 2^24 are reserved for device
-memory-mapped registers. There are holes in the region (meaning
-addresses that don't map to any register) but the bus is defined
-in such a way that
-- writing to a hole is a NOP,
--reading from a hole returns 0.
-
-So I'd like to map
-physical addresses 0-2^24
-to
-virtual addresses 0xf000_0000 - 0xf100_0000
-using a Super-section.
-
-And I was hoping that calling iotable_init with a struct map_desc
-entry where length = SZ_16M would create such a super-section.
-
-Did that make sense?
-
-As far as I could tell, Linux does not create a super-section in the
-case outlined above. Perhaps I misread the source code?
-
-Regards.
+>
+> Thanks
+>
+> Regards
+>
+>  drivers/mmc/host/atmel-mci.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 62aba9a..03d7c75 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -2561,7 +2561,7 @@ static int atmci_runtime_resume(struct device *dev)
+>  static const struct dev_pm_ops atmci_dev_pm_ops = {
+>         SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+>                                 pm_runtime_force_resume)
+> -       SET_PM_RUNTIME_PM_OPS(atmci_runtime_suspend, atmci_runtime_resume, NULL)
+> +       SET_RUNTIME_PM_OPS(atmci_runtime_suspend, atmci_runtime_resume, NULL)
+>  };
+>
+>  static struct platform_driver atmci_driver = {
+> --
+> 2.0.3
+>
