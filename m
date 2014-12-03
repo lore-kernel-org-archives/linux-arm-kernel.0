@@ -1,55 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 3 Dec 2014 12:17:50 +0000
-Subject: [RFC] implement arm64_adjust_dma_zone as arm32 does?
-In-Reply-To: <20141203190220.4415c21a@xhacker>
-References: <20141203175855.114d6717@xhacker>
- <20141203102431.GA7373@e104818-lin.cambridge.arm.com>
- <20141203190220.4415c21a@xhacker>
-Message-ID: <20141203121750.GC7373@e104818-lin.cambridge.arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 3 Dec 2014 14:18:25 +0200
+Subject: [PATCH v3 2/3] Documentation: DT: Add documentation for ti, opa362
+ bindings
+In-Reply-To: <1417352867-7436-3-git-send-email-marek@goldelico.com>
+References: <1417352867-7436-1-git-send-email-marek@goldelico.com>
+ <1417352867-7436-3-git-send-email-marek@goldelico.com>
+Message-ID: <547EFF91.7040405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03, 2014 at 11:02:20AM +0000, Jisheng Zhang wrote:
-> Dear Catalin,
+On 30/11/14 15:07, Marek Belisko wrote:
+> Signed-off-by: Marek Belisko <marek@goldelico.com>
+> ---
+>  .../devicetree/bindings/video/ti,opa362.txt        | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/ti,opa362.txt
 > 
-> On Wed, 3 Dec 2014 02:24:32 -0800
-> Catalin Marinas <catalin.marinas@arm.com> wrote:
-> 
-> > On Wed, Dec 03, 2014 at 09:58:55AM +0000, Jisheng Zhang wrote:
-> > > If one platform has one limitation only some banks are DMA-able, for
-> > > example 0-2GB. Under arm32, we can set the dma_zone_size, then
-> > > arm_adjust_dma_zone() will set the correct dma zone for us. But under
-> > > arm64, we can't do it.
-> > 
-> > Do you really have plans for such platform (and it won't have an IOMMU)
-> > or it's just theoretical? Currently ZONE_DMA is limited to the bottom
-> > 32-bit of RAM. The arm32 dma_zone_size relies on the machine descriptors
-> > which we don't have on arm64.
-> 
-> Thanks for your detailed clarification. Yes, there's plan for such platform and
-> there's no IOMMU.
-[...]
-> > What we could do is re-introduce ZONE_DMA32 for 32-bit dma masks and a
-> > ZONE_DMA for smaller masks. The problem is describing such ZONE_DMA mask
-> > via DT but very early before we set up the zones. A quick hack would be
-> > to limit ZONE_DMA to the minimum of 32-bit limit or the end of the first
-> > memblock, so you describe it as such in DT (but then we penalise
-> > platforms that can do DMA on all memblocks).
-> 
-> We can keep ZONE_DMA32 out from arm64, just describe the ZONE_DMA mask via.
-> DT as you pointed out, then setup the matching dma zone.
-> 
-> I'm wondering whether setting up ZONE_DMA mask via. DT is acceptable or not?
+> diff --git a/Documentation/devicetree/bindings/video/ti,opa362.txt b/Documentation/devicetree/bindings/video/ti,opa362.txt
+> new file mode 100644
+> index 0000000..4747ef9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/ti,opa362.txt
+> @@ -0,0 +1,38 @@
+> +OPA362 analog video amplifier
+> +
+> +Required properties:
+> +- compatible: "ti,opa362"
+> +- gpio: enable/disable output gpio
 
-That would be better than machine descriptors, but I can't think of a
-nice way to describe this (dma-ranges in the top DT node or a new
-property for the memory node?).
+Either this or the example is wrong. If I'm not mistaken 'gpios' is the
+correct form.
 
-We could try to get the minimum of all dma-ranges specified in the DT
-for those buses which are not hooked to an IOMMU but setting up ZONE_DMA
-needs to be done very early, before even unflattening the DT.
+ Tomi
 
-Cc'ing some arm-soc and DT people.
 
--- 
-Catalin
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141203/caabacf1/attachment.sig>
