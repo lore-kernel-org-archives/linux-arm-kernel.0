@@ -1,99 +1,58 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 3 Dec 2014 18:05:56 +0800
-Subject: [linux-sunxi] Re: [PATCH v7 1/6] mfd: AXP20x: Add bindings
- documentation
-In-Reply-To: <20140630094854.GY7262@leverpostej>
-References: <1404066237-20234-1-git-send-email-carlo@caione.org>
- <1404066237-20234-2-git-send-email-carlo@caione.org>
- <20140630094854.GY7262@leverpostej>
-Message-ID: <CAGb2v67dMVFgNjU95vaQ842BuNSK2AzhTiYTn_EoKjFEn5g1kA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 Dec 2014 10:11:09 +0000
+Subject: [PATCH v3 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <3212776.kDbe7yX4eX@wuerfel>
+References: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <54761BFC.4020705@ti.com>
+ <CAAfSe-u+g0mYGi9Adrd+YwwZ=q0-s79yCg_paB1UAVqFoufXEA@mail.gmail.com>
+ <3212776.kDbe7yX4eX@wuerfel>
+Message-ID: <20141203101109.GB11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wed, Dec 03, 2014 at 10:50:17AM +0100, Arnd Bergmann wrote:
+> On Wednesday 03 December 2014 17:17:13 Lyra Zhang wrote:
+> 
+> > 2014-11-27 2:29 GMT+08:00 Murali Karicheri <m-karicheri2@ti.com>:
+> > > How about sorting this includes? asm/irq.h go first followed linux/ in alphabatical order?
+> >
+> > There are a few compile warnings if I moved asm/irq.h to the top of
+> > all included files.
+> 
+> The order that Murali meant is
+> 
+> - first all linux/*.h headers, sorted alphabetically
+> - then all asm/*.h headers, again sorted alphabetically
+> 
+> This is the recommended style in general.
+> 
+> > Warning details are below:
+> > 
+> > In file included from drivers/tty/serial/sprd_serial.c:14:0:
+> > ./arch/arm64/include/asm/irq.h:6:39: warning: ?struct pt_regs?
+> > declared inside parameter list [enabled by default]
+> >  extern void (*handle_arch_irq)(struct pt_regs *);
+> >                                        ^
+> > ./arch/arm64/include/asm/irq.h:6:39: warning: its scope is only this
+> > definition or declaration, which is probably not what you want
+> > [enabled by default]
+> > ./arch/arm64/include/asm/irq.h:8:54: warning: ?struct pt_regs?
+> > declared inside parameter list [enabled by default]
+> >  extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+> > 
+> 
+> I would consider this a (minor) bug in asm/irq.h. If you don't mind,
+> please submit a patch to add a line with 'struct pt_regs;' to
+> asm/irq.h.
 
-I'm (hopefully) picking up the work for this series.
+A better question is: why is a modern driver using asm/irq.h in the
+first place.
 
-On Mon, Jun 30, 2014 at 5:48 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Sun, Jun 29, 2014 at 07:23:52PM +0100, Carlo Caione wrote:
->> Bindings documentation for the AXP20x driver. In this file also
->> sub-nodes are documented.
->>
->> Signed-off-by: Carlo Caione <carlo@caione.org>
->> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  Documentation/devicetree/bindings/mfd/axp20x.txt | 93 ++++++++++++++++++++++++
->>  1 file changed, 93 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
->> new file mode 100644
->> index 0000000..cc9e01b
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
->> @@ -0,0 +1,93 @@
->> +AXP202/AXP209 device tree bindings
->> +
->> +The axp20x family current members :-
->> +axp202 (X-Powers)
->> +axp209 (X-Powers)
->> +
->> +Required properties:
->> +- compatible: "x-powers,axp202" or "x-powers,axp209"
->> +- reg: The I2C slave address for the AXP chip
->> +- interrupt-parent: The parent interrupt controller
->> +- interrupts: Interrupt specifiers for interrupt sources
->
-> How many, what are they?
+We used to include that file when platforms defined IRQ numbers
+statically, but modern platforms don't do that, so it shouldn't be
+required anymore.
 
-Now reads: SoC external interrupt / NMI connected to the PMIC's IRQ pin
-
->> +- interrupt-controller: axp20x has its own internal IRQs
->> +- #interrupt-cells: Should be set to 1
->> +- acin-supply: The input supply for LDO1
->> +- vin2-supply: The input supply for DCDC2
->> +- vin3-supply: The input supply for DCDC3
->> +- ldo24in-supply: The input supply for LDO2, LDO4
->> +- ldo3in-supply: The input supply for LDO3
->> +- ldo5in-supply: The input supply for LDO5
->> +
->> +- regulators: A node that houses a sub-node for each regulator. The regulators are
->> +           bound using their name as listed here: dcdc2, dcdc3, ldo1, ldo2,
->> +           ldo3, ldo4, ldo5.  The bindings details of individual regulator
->> +           device can be found in:
->> +           Documentation/devicetree/bindings/regulator/regulator.txt with
->> +           the exception of x-powers,dcdc-freq
->> +- x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
->> +                   (range: 750-1875). Default: 1.5MHz
->> +
->> +Optional properties for DCDCs:
->> +- x-powers,dcdc-workmode: 1 for PWM mode, 0 for AUTO mode
->> +                       Default: AUTO mode
->
-> When would I want to select PWM mode, and why should this be in the DT?
-
-Expanded description:
-
-"""
-The DCDC regulators work in a mixed PWM/PFM mode,
-using PFM under light loads and switching to PWM
-for heavier loads. Forcing PWM mode trades efficiency
-under light loads for lower output noise. This
-probably makes sense for HiFi audio related
-applications that aren't battery constrained.
-"""
-
-As I'm not an electronics person, I really can't say under
-what circumstances one would force the PMIC into PWM mode.
-The expanded description is an educated guess based on
-research on the internet about PWM and PFM.
-
-I think it makes sense to put this in the DT. The vendor
-building the board/DT is in the best position to know the
-constraints and requirements of the board, and can decide
-whether the trade off makes sense. As for the boards/DTs
-already out there, we can just leave it in auto mode.
-
-
-Regards
-ChenYu
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
