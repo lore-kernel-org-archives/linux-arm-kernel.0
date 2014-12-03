@@ -1,206 +1,120 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 3 Dec 2014 16:15:36 +0100
-Subject: [PATCH v3 06/11] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <547F24B6.8070504@atmel.com>
-References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
- <1417429647-3419-7-git-send-email-boris.brezillon@free-electrons.com>
- <547F24B6.8070504@atmel.com>
-Message-ID: <547F2918.3070803@atmel.com>
+From: wcohen@redhat.com (William Cohen)
+Date: Wed, 03 Dec 2014 09:54:37 -0500
+Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
+In-Reply-To: <547C36DB.7060903@hitachi.com>
+References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
+ <20141120135851.GA32528@linaro.org> <54759041.9080105@hitachi.com>
+ <20141126100325.GA9157@linaro.org> <5476120D.9030703@linaro.org>
+ <CAPvkgC3eVOZEn79C9PC9c7TqC_-yCtDhw5LL6ZWUJxr+oQFaow@mail.gmail.com>
+ <5476BFB4.2020705@hitachi.com>
+ <CAPvkgC0ELPPWfa-8kQ4H_e_O5G1ER4KEKuSWLxh_u-VZgh7W6A@mail.gmail.com>
+ <547C36DB.7060903@hitachi.com>
+Message-ID: <547F242D.1060705@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/12/2014 15:56, Nicolas Ferre a ?crit :
-> Le 01/12/2014 11:27, Boris Brezillon a ?crit :
->> The EBI (External Bus Interface) is used to access external peripherals
->> (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
->> Each device is assigned a CS line and an address range and can have its
->> own configuration (timings, access mode, bus width, ...).
->> This driver provides a generic DT binding to configure a device according
->> to its requirements.
->> For specific device controllers (like the NAND one) the SMC timings
->> should be configured by the controller driver through the matrix and smc
->> syscon regmaps.
+On 12/01/2014 04:37 AM, Masami Hiramatsu wrote:
+> (2014/11/29 1:01), Steve Capper wrote:
+>> On 27 November 2014 at 06:07, Masami Hiramatsu
+>> <masami.hiramatsu.pt@hitachi.com> wrote:
+>>> (2014/11/27 3:59), Steve Capper wrote:
+>>>> The crash is extremely easy to reproduce.
+>>>>
+>>>> I've not observed any missed events on a kprobe on an arm64 system
+>>>> that's still alive.
+>>>> My (limited!) understanding is that this suggests there could be a
+>>>> problem with how missed events from a recursive call to memcpy are
+>>>> being handled.
+>>>
+>>> I think so too. BTW, could you bisect that? :)
+>>>
 >>
->> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->> ---
->>  .../bindings/memory-controllers/atmel-ebi.txt      | 155 +++++++++++++++++++++
->>  1 file changed, 155 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+>> I can't bisect, but the following functions look suspicious to me
+>> (again I'm new to kprobes...):
+>> kprobes_save_local_irqflag
+>> kprobes_restore_local_irqflag
 >>
->> diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
->> new file mode 100644
->> index 0000000..3749ea1
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
->> @@ -0,0 +1,155 @@
->> +* Device tree bindings for Atmel EBI
->> +
->> +The External Bus Interface (EBI) controller is a bus where you can connect
->> +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
->> +The EBI provides a glue-less interface to asynchronous memories though the SMC
->> +(Static Memory Controller).
->> +Synchronous memories (and some asynchronous memories like NANDs) can be
->> +attached to specialized controllers which are responsible for configuring the
->> +bus appropriately according to the connected device.
->> +In the other hand, the bus interface can be automated for simple asynchronous
->> +devices.
->> +
->> +Required properties:
->> +
->> +- compatible:		"atmel,at91sam9260-ebi"
->> +			"atmel,at91sam9261-ebi"
->> +			"atmel,at91sam9263-ebi0"
->> +			"atmel,at91sam9263-ebi1"
+>> I think these are breaking somehow when nested (i.e. from a recursive probe).
 > 
-> Ditto: 9263 twice.
+> Agreed. On x86, prev_kprobe has old_flags and saved_flags, this
+> at least must have saved_irqflag and save/restore it in
+> save/restore_previous_kprobe().
 > 
->> +			"atmel,at91sam9g45-ebi"
->> +			"atmel,at91sam9x5-ebi"
->> +			"atmel,sama5d3-ebi"
->> +
->> +- reg:			Contains offset/length value for EBI memory mapping.
->> +			This property might contain several entries if the EBI
->> +			memory range is not contiguous
->> +
->> +- #address-cells:	Must be 2.
->> +			The first cell encodes the CS.
->> +			The second cell encode the offset into the CS memory
->> +			range.
->> +
->> +- #size-cells:		Must be set to 1.
->> +
->> +- ranges:		Encodes CS to memory region association.
->> +
->> +- clocks:		Clock feeding the EBI controller.
->> +			See clock-bindings.txt
->> +
->> +Child chip-select (cs) nodes contain the memory devices nodes connected to
->> +such as NOR (e.g. cfi-flash) and NAND.
->> +There might be board specific devices like FPGAs.
->> +You'll define you device requirements in these child nodes.
->> +
->> +Required child cs node properties:
->> +
->> +- #address-cells:	Must be 2.
->> +
->> +- #size-cells:		Must be 1.
->> +
->> +- ranges:		Empty property indicating that child nodes can inherit
->> +			memory layout.
->> +
->> +Optional child cs node properties:
->> +- atmel,generic-dev		boolean property specifying if the device is
->> +				a generic device.
+> What about adding this?
+> 
+>  struct prev_kprobe {
+>  	struct kprobe *kp;
+>  	unsigned int status;
+> +	unsigned long saved_irqflag;
+>  };
+> 
+> and
+> 
+>  static void __kprobes save_previous_kprobe(struct kprobe_ctlblk *kcb)
+>  {
+>  	kcb->prev_kprobe.kp = kprobe_running();
+>  	kcb->prev_kprobe.status = kcb->kprobe_status;
+> +	kcb->prev_kprobe.saved_irqflag = kcb->saved_irqflag;
+>  }
+> 
+>  static void __kprobes restore_previous_kprobe(struct kprobe_ctlblk *kcb)
+>  {
+>  	__this_cpu_write(current_kprobe, kcb->prev_kprobe.kp);
+>  	kcb->kprobe_status = kcb->prev_kprobe.status;
+> +	kcb->saved_irqflag = kcb->prev_kprobe.saved_irqflag;
+>  }
+> 
+> 
 
-Well... no real information, specify right here what a "generic device" is.
+I have noticed with the aarch64 kprobe patches and recent kernel I can get the machine to end up getting stuck and printing out endless strings of
 
->> +				The following properties are only parsed if
->> +				this property is present.
->> +				Specialized devices are attached to specialized
->> +				controllers which are responsible for
->> +				configuring the bus appropriately.
->> +				Here are some examples of specialized
->> +				controllers: NAND, CompactFlash, SDR-SDRAM.
->> +
->> +- atmel,bus-width:		width of the asynchronous device's data bus
->> +				8, 16 or 32.
->> +				8 if not present.
->> +
->> +- atmel,byte-access-type	"write" or "select" (see Atmel datasheet).
->> +				"select" if not present.
->> +
->> +- atmel,read-mode		"nrd" or "ncs".
->> +				"ncs" is not present.
->> +
->> +- atmel,write-mode		"nwe" or "ncs".
->> +				"ncs" is not present.
->> +
->> +- atmel,exnw-mode		"disabled", "frozen" or "ready".
->> +				"disabled" if not present.
->> +
->> +- atmel,page-mode		enable page mode if present. The provided value
->> +				defines the page size (supported values: 4, 8,
->> +				16 and 32).
->> +
->> +Optional device timings expressed in nanoseconds (if the property is not
->> +present 0 is assumed):
->> +
->> +- atmel,ncs-rd-setup-ns
->> +- atmel,nrd-setup-ns
->> +- atmel,ncs-wr-setup-ns
->> +- atmel,nwe-setup-ns
->> +- atmel,ncs-rd-pulse-ns
->> +- atmel,nrd-pulse-ns
->> +- atmel,ncs-wr-pulse-ns
->> +- atmel,nwe-pulse-ns
->> +- atmel,nwe-cycle-ns
->> +- atmel,nrd-cycle-ns
->> +- atmel,tdf-ns
->> +
->> +- atmel,tdf-optimized		data float optimized mode. If present the data
->> +				float time is optimized depending on the next
->> +				device being accessed (next device setup
->> +				time is substracted to the current devive data
+[187694.855843] Unexpected kernel single-step exception at EL1
+[187694.861385] Unexpected kernel single-step exception at EL1
+[187694.866926] Unexpected kernel single-step exception at EL1
+[187694.872467] Unexpected kernel single-step exception at EL1
+[187694.878009] Unexpected kernel single-step exception at EL1
+[187694.883550] Unexpected kernel single-step exception at EL1
+
+I can reproduce this pretty easily on my machine with functioncallcount.stp from https://sourceware.org/systemtap/examples/profiling/functioncallcount.stp and the following steps:
+
+# stap -p4 -k -m mm_probes -w functioncallcount.stp "*@mm/*.c" -c "sleep 1"
+# staprun mm_probes.ko -c "sleep 1"
+
+-Will
+
 > 
-> Typo: subtract, device
 > 
->> +				float time).
->> +
->> +
->> +
->> +Example:
->> +
->> +	ebi: ebi at 10000000 {
->> +		compatible = "atmel,sama5d3-ebi", "simple-bus";
->> +		#address-cells = <2>;
->> +		#size-cells = <1>;
->> +		atmel,smc = <&hsmc>;
->> +		atmel,matrix = <&matrix>;
->> +		reg = <0x10000000 0x10000000
->> +		       0x40000000 0x30000000>;
->> +		ranges = <0x0 0x0 0x10000000 0x10000000
->> +			  0x1 0x0 0x40000000 0x10000000
->> +			  0x2 0x0 0x50000000 0x10000000
->> +			  0x3 0x0 0x60000000 0x10000000>;
->> +		clocks = <&mck>;
->> +
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_ebi_addr>;
->> +
->> +		cs at 0 {
->> +			#address-cells = <2>;
->> +			#size-cells = <1>;
->> +			ranges;
->> +			atmel,generic-dev;
->> +			atmel,read-mode = "nrd";
->> +			atmel,write-mode = "nwe";
->> +			atmel,bus-width = <16>;
->> +			atmel,ncs-rd-setup-ns = <0>;
->> +			atmel,ncs-wr-setup-ns = <0>;
->> +			atmel,nwe-setup-ns = <8>;
->> +			atmel,nrd-setup-ns = <16>;
->> +			atmel,ncs-rd-pulse-ns = <84>;
->> +			atmel,ncs-wr-pulse-ns = <84>;
->> +			atmel,nrd-pulse-ns = <76>;
->> +			atmel,nwe-pulse-ns = <76>;
->> +			atmel,nrd-cycle-ns = <107>;
->> +			atmel,nwe-cycle-ns = <84>;
->> +			atmel,tdf-ns = <16>;
->> +
->> +			nor: flash at 0,0 {
->> +				compatible = "cfi-flash";
->> +				#address-cells = <1>;
->> +				#size-cells = <1>;
->> +				reg = <0x0 0x0 0x1000000>;
->> +				bank-width = <2>;
->> +			};
->> +		};
->> +	};
->> +
+>> That would explain why the state of play of the interrupts is in an
+>> unexpected state in the crash I reported:
+>> "The point of failure in the panic was:
+>> fs/buffer.c:1257
+>>
+>> static inline void check_irqs_on(void)
+>> {
+>> #ifdef irqs_disabled
+>>         BUG_ON(irqs_disabled());
+>> #endif
+>> }
+>> "
+>>
+>> This is all new to me so I'm still at the head-scratching stage.
+> 
+> Ah, I see.
+> 
+> Thank you,
+> 
+>>
+>> David,
+>> Does the above make sense to you? Have you managed to reproduce the crash I get?
+>>
+>> Cheers,
+>> --
+>> Steve
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
 >>
 > 
 > 
-
-
--- 
-Nicolas Ferre
