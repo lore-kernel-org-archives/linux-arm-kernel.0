@@ -1,35 +1,38 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  3 Dec 2014 15:19:13 +0800
-Subject: [PATCH] ARM: dts: sun6i: hummingbird: Add ethernet phy reset gpio
- properties
-Message-ID: <1417591153-27177-1-git-send-email-wens@csie.org>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Wed,  3 Dec 2014 15:18:36 +0800
+Subject: [PATCH v2 0/2] ASoC: rockchip: i2s: driver could output "i2s-clk-out"
+ optionally
+In-Reply-To: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
+References: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1417591118-18695-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Hummingbird A31 board, the RTL8211E ethernet phy has its reset
-line connect to a gpio pin, instead of floating like on other boards.
-Add the stmmac properties for describing the reset gpio.
+Clock generate unit in rockchip SoCs could generate clock named "i2s-clk-out"
+separate from clock named "i2s-hclk", which is for i2s controller.
 
-The reset delays were taken from the RTL8211E datasheet.
+Since there may not need the "i2s-clk-out" outside, we make it optional in
+driver, that could be decided in dts by add "i2s-clk-out" or not.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 3 +++
- 1 file changed, 3 insertions(+)
+Tested on devices based on rk3288 with max98090 codec.
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-index 6e924d9..55a367a 100644
---- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-@@ -139,6 +139,9 @@
- 			pinctrl-0 = <&gmac_pins_rgmii_a>;
- 			phy = <&phy1>;
- 			phy-mode = "rgmii";
-+			snps,reset-gpio = <&pio 0 21 0>;
-+			snps,reset-active-low;
-+			snps,reset-delays-us = <0 10000 30000>;
- 			status = "okay";
- 
- 			phy1: ethernet-phy at 1 {
--- 
-2.1.3
+Jianqun Xu (1):
+  ASoC: dt-bindings: rockchip-i2s: add an optional property
+    "i2s_clk_out"
+
+Sonny Rao (1):
+  ASoC: rockchip: i2s: add support for grabbing output clock to codec
+
+ Documentation/devicetree/bindings/sound/rockchip-i2s.txt |  8 ++++++--
+ sound/soc/rockchip/rockchip_i2s.c                        | 13 +++++++++++++
+ 2 files changed, 19 insertions(+), 2 deletions(-)
+
+--
+changes since v1:
+- rework with patches commit message, reference to old commit message of the
+same related files.
+- generate patch again by apply sonny's patch
+- fix blank line in driver, suggested by Heiko and Doug, so add my owner
+singed-off-by
+
+1.9.1
