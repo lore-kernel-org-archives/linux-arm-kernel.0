@@ -1,23 +1,57 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 2 Dec 2014 15:43:16 -0800
-Subject: [PATCH v4 1/3] mmc: core: Support the optional init_card()
- callback for MMC and SD
-In-Reply-To: <547E4815.7010100@samsung.com>
-References: <1417553397-460-1-git-send-email-dianders@chromium.org>
- <1417553397-460-2-git-send-email-dianders@chromium.org>
- <547E4815.7010100@samsung.com>
-Message-ID: <CAD=FV=VqirunbqKtC7hXTKNXfnDjj2fBMa7sRuJLvdnGeqxUUw@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 03 Dec 2014 01:08:28 +0100
+Subject: [PATCH] cpuidle: add MAINTAINERS entry for ARM Exynos cpuidle
+ driver
+In-Reply-To: <1616359.KRpRrFqxfV@amdc1032>
+References: <1616359.KRpRrFqxfV@amdc1032>
+Message-ID: <1466322.AKaPtIKjPo@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jaehoon,
+On Tuesday, December 02, 2014 04:41:35 PM Bartlomiej Zolnierkiewicz wrote:
+> Since there has been quite a lot of development going on for
+> ARM Exynos cpuidle driver recently I would like to add separate
+> MAINTAINERS entry for it and add myself as the primary maintainer.
+> 
+> The merging process would remain (almost) unchanged with patches
+> going (with my Ack) through Daniel's or Kukjin's tree.
+> 
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-On Tue, Dec 2, 2014 at 3:15 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi Doug.
->
-> I think good that this patch is separated to two patches.
-> (board file and codes relevant to mmc.)
+Daniel, do you want me to apply this, or are you going to do that?
 
-Yes, good idea.  I've spun v5 with this.
+> ---
+>  MAINTAINERS |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> Index: b/MAINTAINERS
+> ===================================================================
+> --- a/MAINTAINERS	2014-11-27 18:02:51.988225868 +0100
+> +++ b/MAINTAINERS	2014-12-02 15:56:52.792997513 +0100
+> @@ -2701,6 +2701,16 @@ T:	git git://git.kernel.org/pub/scm/linu
+>  S:	Maintained
+>  F:	drivers/cpuidle/cpuidle-big_little.c
+>  
+> +CPUIDLE DRIVER - ARM EXYNOS
+> +M:	Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> +M:	Daniel Lezcano <daniel.lezcano@linaro.org>
+> +M:	Kukjin Kim <kgene@kernel.org>
+> +L:	linux-pm at vger.kernel.org
+> +L:	linux-samsung-soc at vger.kernel.org
+> +S:	Supported
+> +F:	drivers/cpuidle/cpuidle-exynos.c
+> +F:	arch/arm/mach-exynos/pm.c
+> +
+>  CPUIDLE DRIVERS
+>  M:	Rafael J. Wysocki <rjw@rjwysocki.net>
+>  M:	Daniel Lezcano <daniel.lezcano@linaro.org>
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
--Doug
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
