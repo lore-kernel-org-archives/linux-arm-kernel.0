@@ -1,135 +1,113 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  3 Dec 2014 16:18:23 +0000
-Subject: [PATCH v2 3/3] irqchip: GICv3: Add support for irq_{get,
- set}_irqchip_state
-In-Reply-To: <1417623503-30261-1-git-send-email-marc.zyngier@arm.com>
-References: <1417623503-30261-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1417623503-30261-4-git-send-email-marc.zyngier@arm.com>
+From: mpeg.blue@free.fr (Mason)
+Date: Wed, 03 Dec 2014 17:20:26 +0100
+Subject: Data Synchronization Barrier (DSB)
+Message-ID: <547F384A.1030809@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the required hooks for the internal state of an interrupt
-to be exposed to other subsystems.
+Hello everyone,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3.c | 83 +++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 70 insertions(+), 13 deletions(-)
+I have several naive questions about memory barriers.
+I've glanced at memory-barriers.txt
+https://www.kernel.org/doc/Documentation/memory-barriers.txt
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 1a146cc..6e73846 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -195,6 +195,19 @@ static void gic_enable_redist(bool enable)
- /*
-  * Routines to disable, enable, EOI and route interrupts
+QUESTION 1
+Are memory ordering issues and caching orthogonal?
+In other words, are memory barriers needed even when accessing
+non-cached memory (actual memory or device registers)?
+
+QUESTION 1.1
+These days, CPUs feature multiple cores, but they often share
+the last level of cache. (Implied assumption: the cores are more
+tightly-coupled than yesterday's SMP systems) Do multi-core
+systems change the need for memory barriers? (Compared to a
+unicore system.)
+
+
+QUESTION 2
+
+On my platform, the MMIO primitives are aliased to __raw_readl
+and __raw_writel.
+
+#define IO_ADDRESS(x)  (0xf0000000 +(x))
+#define gbus_read_reg32(r)      __raw_readl((volatile void __iomem *)IO_ADDRESS(r))
+#define gbus_write_reg32(r, v)  __raw_writel(v, (volatile void __iomem *)IO_ADDRESS(r))
+
+Arnd Bergmann has already pointed out:
+"don't use __raw_readl in driver code, use readl or readl_relaxed"
+
+In fact, on ARM platforms, __raw_readl does not insert any memory
+barrier (or compiler barrier for that matter, the only constraints
+are those imposed by the "volatile" keyword)
+
+static inline u32 __raw_readl(const volatile void __iomem *addr)
+{
+	u32 val;
+	asm volatile("ldr %1, %0"
+		     : "+Qo" (*(volatile u32 __force *)addr),
+		       "=r" (val));
+	return val;
+}
+
+If I understand correctly, accessing memory-mapped registers without
+using memory barriers can lead to subtle bugs, from memory reordering?
+(This part is really unclear for me.)
+
+Should I alias my primitives to ioread32 and iowrite32?
+
+NOTE: iowrite32 calls outer_sync() which seems to have somewhat high
+of an overhead. If I'm writing to 4 consecutive MM registers, do I
+need to sync after each write?
+
+Regards.
+
+
+
+Notes for my own reference...
+
+Comment from barrier.h
+
+/*
+  * Force strict CPU ordering. And yes, this is required on UP too when we're
+  * talking to devices.
+  *
+  * Fall back to compiler barriers if nothing better is provided.
   */
-+static int gic_peek_irq(struct irq_data *d, u32 offset)
-+{
-+	u32 mask = 1 << (gic_irq(d) % 32);
-+	void __iomem *base;
-+
-+	if (gic_irq_in_rdist(d))
-+		base = gic_data_rdist_sgi_base();
-+	else
-+		base = gic_data.dist_base;
-+
-+	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
-+}
-+
- static void gic_poke_irq(struct irq_data *d, u32 offset)
- {
- 	u32 mask = 1 << (gic_irq(d) % 32);
-@@ -223,6 +236,61 @@ static void gic_unmask_irq(struct irq_data *d)
- 	gic_poke_irq(d, GICD_ISENABLER);
- }
- 
-+static int gic_irq_set_irqchip_state(struct irq_data *d,
-+				     enum irqchip_irq_state which, bool val)
-+{
-+	u32 reg;
-+
-+	if (d->hwirq >= gic_data.irq_nr) /* PPI/SPI only */
-+		return -EINVAL;
-+
-+	switch (which) {
-+	case IRQCHIP_STATE_PENDING:
-+		reg = val ? GICD_ISPENDR : GICD_ICPENDR;
-+		break;
-+
-+	case IRQCHIP_STATE_ACTIVE:
-+		reg = val ? GICD_ISACTIVER : GICD_ICACTIVER;
-+		break;
-+
-+	case IRQCHIP_STATE_MASKED:
-+		reg = val ? GICD_ICENABLER : GICD_ISENABLER;
-+		break;
-+
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	gic_poke_irq(d, reg);
-+	return 0;
-+}
-+
-+static int gic_irq_get_irqchip_state(struct irq_data *d,
-+				     enum irqchip_irq_state which, bool *val)
-+{
-+	if (d->hwirq >= gic_data.irq_nr) /* PPI/SPI only */
-+		return -EINVAL;
-+
-+	switch (which) {
-+	case IRQCHIP_STATE_PENDING:
-+		*val = gic_peek_irq(d, GICD_ISPENDR);
-+		break;
-+
-+	case IRQCHIP_STATE_ACTIVE:
-+		*val = gic_peek_irq(d, GICD_ISACTIVER);
-+		break;
-+
-+	case IRQCHIP_STATE_MASKED:
-+		*val = !gic_peek_irq(d, GICD_ISENABLER);
-+		break;
-+
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static void gic_eoi_irq(struct irq_data *d)
- {
- 	gic_write_eoir(gic_irq(d));
-@@ -418,19 +486,6 @@ static void gic_cpu_init(void)
- }
- 
- #ifdef CONFIG_SMP
--static int gic_peek_irq(struct irq_data *d, u32 offset)
--{
--	u32 mask = 1 << (gic_irq(d) % 32);
--	void __iomem *base;
--
--	if (gic_irq_in_rdist(d))
--		base = gic_data_rdist_sgi_base();
--	else
--		base = gic_data.dist_base;
--
--	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
--}
--
- static int gic_secondary_init(struct notifier_block *nfb,
- 			      unsigned long action, void *hcpu)
- {
-@@ -597,6 +652,8 @@ static struct irq_chip gic_chip = {
- 	.irq_eoi		= gic_eoi_irq,
- 	.irq_set_type		= gic_set_type,
- 	.irq_set_affinity	= gic_set_affinity,
-+	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
-+	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
- };
- 
- #define GIC_ID_NR		(1U << gic_data.rdists.id_bits)
--- 
-2.1.3
+
+/* IO barriers */
+#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE /* y */
+#include <asm/barrier.h>
+#define __iormb()		rmb()
+#define __iowmb()		wmb()
+
+#elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
+#define mb()		do { dsb(); outer_sync(); } while (0)
+#define rmb()		dsb()
+#define wmb()		do { dsb(st); outer_sync(); } while (0)
+
+#if __LINUX_ARM_ARCH__ >= 7
+#define dsb(option) __asm__ __volatile__ ("dsb " #option : : : "memory")
+
+#ifdef CONFIG_OUTER_CACHE_SYNC
+static inline void outer_sync(void)
+{
+	if (outer_cache.sync)
+		outer_cache.sync();
+}
+
+static void l2x0_cache_sync(void)
+{
+	unsigned long flags;
+
+	raw_spin_lock_irqsave(&l2x0_lock, flags);
+	cache_sync();
+	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+}
+
+static inline void cache_sync(void)
+{
+	void __iomem *base = l2x0_base;
+
+	writel_relaxed(0, base + sync_reg_offset);
+	cache_wait(base + L2X0_CACHE_SYNC, 1);
+}
