@@ -1,37 +1,37 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  3 Dec 2014 12:32:00 +0100
-Subject: [PATCH 01/11] usb: gadget: at91_udc: Fix clock names
+Date: Wed,  3 Dec 2014 12:32:02 +0100
+Subject: [PATCH 03/11] usb: gadget: at91_udc: Document DT clocks and
+ clock-names property
 In-Reply-To: <1417606330-17753-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1417606330-17753-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1417606330-17753-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1417606330-17753-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver is requesting clock by their global name (those declared in the
-clk_lookup list), but this only works with !CCF kernels.
-
-Now that all SoCs have moved to CCF, fix the driver to use local names
-(hclk and pclk).
+The at91_udc driver request 2 clocks, and thus need them to be defined in
+the device tree.
+Document the clocks and clock-names properties so that everybody use the
+correct names.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/usb/gadget/udc/at91_udc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/usb/atmel-usb.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
-index 0716c19..ca6a4b8 100644
---- a/drivers/usb/gadget/udc/at91_udc.c
-+++ b/drivers/usb/gadget/udc/at91_udc.c
-@@ -1766,8 +1766,8 @@ static int at91udc_probe(struct platform_device *pdev)
- 	udc_reinit(udc);
+diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt b/Documentation/devicetree/bindings/usb/atmel-usb.txt
+index bc2222c..6007231 100644
+--- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
++++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
+@@ -36,6 +36,10 @@ Required properties:
+  - compatible: Should be "atmel,at91rm9200-udc"
+  - reg: Address and length of the register set for the device
+  - interrupts: Should contain macb interrupt
++ - clocks: Should reference the peripheral and the AHB clocks
++ - clock-names: Should contains two strings
++		"pclk" for the peripheral clock
++		"hclk" for the AHB clock
  
- 	/* get interface and function clocks */
--	udc->iclk = clk_get(dev, "udc_clk");
--	udc->fclk = clk_get(dev, "udpck");
-+	udc->iclk = clk_get(dev, "pclk");
-+	udc->fclk = clk_get(dev, "hclk");
- 	if (IS_ENABLED(CONFIG_COMMON_CLK))
- 		udc->uclk = clk_get(dev, "usb_clk");
- 	if (IS_ERR(udc->iclk) || IS_ERR(udc->fclk) ||
+ Optional properties:
+  - atmel,vbus-gpio: If present, specifies a gpio that needs to be
 -- 
 1.9.1
