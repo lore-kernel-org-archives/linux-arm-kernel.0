@@ -1,48 +1,63 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Wed, 3 Dec 2014 11:38:13 -0800
-Subject: [PATCH v2 2/2] ASoC: rockchip: i2s: add support for grabbing
- output clock to codec
-In-Reply-To: <20141203192024.GL7712@sirena.org.uk>
-References: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
- <1417591118-18695-1-git-send-email-jay.xu@rock-chips.com>
- <1417591118-18695-3-git-send-email-jay.xu@rock-chips.com>
- <20141203192024.GL7712@sirena.org.uk>
-Message-ID: <CAPz6YkXRmRzYpW7xuDsq69A9H-Qm2-j6t-a+B1w9+OLOPf_YnA@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 3 Dec 2014 14:43:06 -0500 (EST)
+Subject: [PATCH] optimize ktime_divns for constant divisors
+Message-ID: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 3, 2014 at 11:20 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Dec 03, 2014 at 03:18:38PM +0800, Jianqun Xu wrote:
->> From: Sonny Rao <sonnyrao@chromium.org>
->>
->> We need to claim the clock which is driving the codec so that when we enable
->> clock gating, we continue to clock the codec when needed.  I make this an
->> optional clock since there might be some applications where we don't need it
->> but can still use the I2S block.
->
-> I would expect that the clock for the CODEC should be managed by the
-> CODEC if at all possible - that seems more logical than having the CPU
-> I2S controller request and manage it if it's a separate clock.  Why add
-> this to the CPU side driver?
+At least on ARM, do_div() is optimized to turn constant divisors into
+an inline multiplication by the reciprocal value at compile time. 
+However this optimization is missed entirely whenever ktime_divns() is
+used and the slow out-of-line division code is used all the time.
 
-It's a good question.  Right now the way I'm running this stuff we're
-mostly setting all the i2s the clock rates from the codec driver, but
-I think this isn't the correct way to go, and the i2s driver needs to
-set it's rate based on the hw params, but that isn't happening (yet).
+Let ktime_divns() use do_div() inline whenever the divisor is constant
+and small enough.  This will make things like ktime_to_us() and 
+ktime_to_ms() much faster.
 
-This output clock has a mux and can either be a fixed 12Mhz output or
-can be derived from the same fractional divider which drives the i2s
-block.   I thought it was simpler to keep them all the same, but need
-to put ownership in the i2s in anticipation of the i2s driver setting
-it's own clock rate.
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-If you think this is an implementation detail and this output clock
-should just be owned by the codec driver, even though I'm guessing it
-will just have to be the same as i2s, then I think we can drop this
-and make sure simple card (or whatever other codec driver) claims this
-clock.
-
-
->
-> We've not always done this for older systems due to the lack of a usable
-> clock API but that's starting to be addressed.
+diff --git a/include/linux/ktime.h b/include/linux/ktime.h
+index c9d645ad98..411dd8bfe5 100644
+--- a/include/linux/ktime.h
++++ b/include/linux/ktime.h
+@@ -166,7 +166,17 @@ static inline bool ktime_before(const ktime_t cmp1, const ktime_t cmp2)
+ }
+ 
+ #if BITS_PER_LONG < 64
+-extern u64 ktime_divns(const ktime_t kt, s64 div);
++extern u64 __ktime_divns(const ktime_t kt, s64 div);
++static inline u64 ktime_divns(const ktime_t kt, s64 div)
++{
++	if (__builtin_constant_p(div) && !(div >> 32)) {
++		u64 ns = kt.tv64;
++		do_div(ns, div);
++		return ns;
++	} else {
++		return __ktime_divns(kt, div);
++	}
++}
+ #else /* BITS_PER_LONG < 64 */
+ # define ktime_divns(kt, div)		(u64)((kt).tv64 / (div))
+ #endif
+diff --git a/kernel/time/hrtimer.c b/kernel/time/hrtimer.c
+index 37e50aadd4..890535c41c 100644
+--- a/kernel/time/hrtimer.c
++++ b/kernel/time/hrtimer.c
+@@ -266,7 +266,7 @@ lock_hrtimer_base(const struct hrtimer *timer, unsigned long *flags)
+ /*
+  * Divide a ktime value by a nanosecond value
+  */
+-u64 ktime_divns(const ktime_t kt, s64 div)
++u64 __ktime_divns(const ktime_t kt, s64 div)
+ {
+ 	u64 dclc;
+ 	int sft = 0;
+@@ -282,7 +282,7 @@ u64 ktime_divns(const ktime_t kt, s64 div)
+ 
+ 	return dclc;
+ }
+-EXPORT_SYMBOL_GPL(ktime_divns);
++EXPORT_SYMBOL_GPL(__ktime_divns);
+ #endif /* BITS_PER_LONG >= 64 */
+ 
+ /*
