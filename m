@@ -1,207 +1,84 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 3 Dec 2014 10:53:21 +0100
-Subject: [PATCH 7/8] pinctrl: at91: add registers definitions directly
- into driver
-In-Reply-To: <720f350230a76bb5df0beed7b9a1b7cfd01ab158.1417541118.git.nicolas.ferre@atmel.com>
-References: <e093d7cf37ec9ff24b0631b0a2e405a7cf7574db.1417541118.git.nicolas.ferre@atmel.com>
- <720f350230a76bb5df0beed7b9a1b7cfd01ab158.1417541118.git.nicolas.ferre@atmel.com>
-Message-ID: <547EDD91.2000000@atmel.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 03 Dec 2014 10:57:10 +0100
+Subject: [PATCH 2/2] mmc: sdhci-esdhc-imx: enable IPG clock for sdio
+ interrupts
+In-Reply-To: <1417598713.2419.1.camel@pengutronix.de>
+References: <1417538845-10867-1-git-send-email-stefan@agner.ch>
+ <1417538845-10867-2-git-send-email-stefan@agner.ch>
+ <1417598713.2419.1.camel@pengutronix.de>
+Message-ID: <6ff09082f3f43d4b358ec59d7ed8f216@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/12/2014 18:27, Nicolas Ferre a ?crit :
-> As the old gpio.c driver is gone, we can merge the registers definitions with
-> the pinctrl driver.
-> This also allows us to empty the AT91 include/mach directory.
+On 2014-12-03 10:25, Lucas Stach wrote:
+> Am Dienstag, den 02.12.2014, 17:47 +0100 schrieb Stefan Agner:
+>> Enable IPG clock for sdio interrupts while runtime PM, since this
+>> clock is needed for register access. The need of this clock has been
+>> verified on Vybrid, but this is probably true for i.MX53 and maybe
+>> others. The need for bus access during runtime suspend has been
+>> introduced with be138554a792 ("mmc: sdhci: allow sdio interrupts
+>> while sdhci runtime suspended").
+>>
+> Am I reading this wrong, or is this commit actually doing something
+> different than what the commit message says?
 > 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> This does _not_ enable the IPG clock during runtime PM, in fact it is
+> disabling it while suspending even with SDIO ints enabled, which is
+> wrong, as no SDIO interrupts will be delivered with this clock disabled.
 
-Please disregard this patch as a similar one is already queued in
-pinctrl git tree (pinctrl: at91: use own header) by Alexandre.
+You are completely right. What I wanted was what is written in the
+commit message, but I misinterpreted the code!
 
-The file will be removed after both arm-soc and pinctrl git tree are
-pulled by Linus (T.).
+=> This patch is invalid.
 
-So the -rc1 time-frame seems the good one for this kind of dead code
-removal action...
+> One thing that seems to be wrong with the current code is that the state
+> of sdhci_sdio_irq_enabled could change between a runtime suspend and
+> resume, so to keep the clocks balanced the driver has to remember if it
+> disabled those two clocks in the suspend path and always enable them in
+> that case in the resume path.
 
-Bye,
+As far as I can see, the only place where that flag changes is in
+sdhci_enable_sdio_irq. But this function makes sure runtime PM is off
+while changing that, so I guess it's ok....
 
+--
+Stefan
 
-> ---
->  arch/arm/mach-at91/include/mach/at91_pio.h | 80 ------------------------------
->  drivers/pinctrl/pinctrl-at91.c             | 65 ++++++++++++++++++++++--
->  2 files changed, 62 insertions(+), 83 deletions(-)
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91_pio.h
 > 
-> diff --git a/arch/arm/mach-at91/include/mach/at91_pio.h b/arch/arm/mach-at91/include/mach/at91_pio.h
-> deleted file mode 100644
-> index 7b7366253ceb..000000000000
-> --- a/arch/arm/mach-at91/include/mach/at91_pio.h
-> +++ /dev/null
-> @@ -1,80 +0,0 @@
-> -/*
-> - * arch/arm/mach-at91/include/mach/at91_pio.h
-> - *
-> - * Copyright (C) 2005 Ivan Kokshaysky
-> - * Copyright (C) SAN People
-> - *
-> - * Parallel I/O Controller (PIO) - System peripherals registers.
-> - * Based on AT91RM9200 datasheet revision E.
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> - */
-> -
-> -#ifndef AT91_PIO_H
-> -#define AT91_PIO_H
-> -
-> -#define PIO_PER		0x00	/* Enable Register */
-> -#define PIO_PDR		0x04	/* Disable Register */
-> -#define PIO_PSR		0x08	/* Status Register */
-> -#define PIO_OER		0x10	/* Output Enable Register */
-> -#define PIO_ODR		0x14	/* Output Disable Register */
-> -#define PIO_OSR		0x18	/* Output Status Register */
-> -#define PIO_IFER	0x20	/* Glitch Input Filter Enable */
-> -#define PIO_IFDR	0x24	/* Glitch Input Filter Disable */
-> -#define PIO_IFSR	0x28	/* Glitch Input Filter Status */
-> -#define PIO_SODR	0x30	/* Set Output Data Register */
-> -#define PIO_CODR	0x34	/* Clear Output Data Register */
-> -#define PIO_ODSR	0x38	/* Output Data Status Register */
-> -#define PIO_PDSR	0x3c	/* Pin Data Status Register */
-> -#define PIO_IER		0x40	/* Interrupt Enable Register */
-> -#define PIO_IDR		0x44	/* Interrupt Disable Register */
-> -#define PIO_IMR		0x48	/* Interrupt Mask Register */
-> -#define PIO_ISR		0x4c	/* Interrupt Status Register */
-> -#define PIO_MDER	0x50	/* Multi-driver Enable Register */
-> -#define PIO_MDDR	0x54	/* Multi-driver Disable Register */
-> -#define PIO_MDSR	0x58	/* Multi-driver Status Register */
-> -#define PIO_PUDR	0x60	/* Pull-up Disable Register */
-> -#define PIO_PUER	0x64	/* Pull-up Enable Register */
-> -#define PIO_PUSR	0x68	/* Pull-up Status Register */
-> -#define PIO_ASR		0x70	/* Peripheral A Select Register */
-> -#define PIO_ABCDSR1	0x70	/* Peripheral ABCD Select Register 1 [some sam9 only] */
-> -#define PIO_BSR		0x74	/* Peripheral B Select Register */
-> -#define PIO_ABCDSR2	0x74	/* Peripheral ABCD Select Register 2 [some sam9 only] */
-> -#define PIO_ABSR	0x78	/* AB Status Register */
-> -#define PIO_IFSCDR	0x80	/* Input Filter Slow Clock Disable Register */
-> -#define PIO_IFSCER	0x84	/* Input Filter Slow Clock Enable Register */
-> -#define PIO_IFSCSR	0x88	/* Input Filter Slow Clock Status Register */
-> -#define PIO_SCDR	0x8c	/* Slow Clock Divider Debouncing Register */
-> -#define		PIO_SCDR_DIV	(0x3fff <<  0)		/* Slow Clock Divider Mask */
-> -#define PIO_PPDDR	0x90	/* Pad Pull-down Disable Register */
-> -#define PIO_PPDER	0x94	/* Pad Pull-down Enable Register */
-> -#define PIO_PPDSR	0x98	/* Pad Pull-down Status Register */
-> -#define PIO_OWER	0xa0	/* Output Write Enable Register */
-> -#define PIO_OWDR	0xa4	/* Output Write Disable Register */
-> -#define PIO_OWSR	0xa8	/* Output Write Status Register */
-> -#define PIO_AIMER	0xb0	/* Additional Interrupt Modes Enable Register */
-> -#define PIO_AIMDR	0xb4	/* Additional Interrupt Modes Disable Register */
-> -#define PIO_AIMMR	0xb8	/* Additional Interrupt Modes Mask Register */
-> -#define PIO_ESR		0xc0	/* Edge Select Register */
-> -#define PIO_LSR		0xc4	/* Level Select Register */
-> -#define PIO_ELSR	0xc8	/* Edge/Level Status Register */
-> -#define PIO_FELLSR	0xd0	/* Falling Edge/Low Level Select Register */
-> -#define PIO_REHLSR	0xd4	/* Rising Edge/ High Level Select Register */
-> -#define PIO_FRLHSR	0xd8	/* Fall/Rise - Low/High Status Register */
-> -#define PIO_SCHMITT	0x100	/* Schmitt Trigger Register */
-> -
-> -#define ABCDSR_PERIPH_A	0x0
-> -#define ABCDSR_PERIPH_B	0x1
-> -#define ABCDSR_PERIPH_C	0x2
-> -#define ABCDSR_PERIPH_D	0x3
-> -
-> -#define SAMA5D3_PIO_DRIVER1		0x118  /*PIO Driver 1 register offset*/
-> -#define SAMA5D3_PIO_DRIVER2		0x11C  /*PIO Driver 2 register offset*/
-> -
-> -#define AT91SAM9X5_PIO_DRIVER1	0x114  /*PIO Driver 1 register offset*/
-> -#define AT91SAM9X5_PIO_DRIVER2	0x118  /*PIO Driver 2 register offset*/
-> -
-> -#endif
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 354a81d40925..47d755861b5a 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -25,11 +25,70 @@
->  /* Since we request GPIOs from ourself */
->  #include <linux/pinctrl/consumer.h>
->  
-> -#include <mach/hardware.h>
-> -#include <mach/at91_pio.h>
-> -
->  #include "core.h"
->  
-> +/* PIO register definitions */
-> +#define PIO_PER		0x00	/* Enable Register */
-> +#define PIO_PDR		0x04	/* Disable Register */
-> +#define PIO_PSR		0x08	/* Status Register */
-> +#define PIO_OER		0x10	/* Output Enable Register */
-> +#define PIO_ODR		0x14	/* Output Disable Register */
-> +#define PIO_OSR		0x18	/* Output Status Register */
-> +#define PIO_IFER	0x20	/* Glitch Input Filter Enable */
-> +#define PIO_IFDR	0x24	/* Glitch Input Filter Disable */
-> +#define PIO_IFSR	0x28	/* Glitch Input Filter Status */
-> +#define PIO_SODR	0x30	/* Set Output Data Register */
-> +#define PIO_CODR	0x34	/* Clear Output Data Register */
-> +#define PIO_ODSR	0x38	/* Output Data Status Register */
-> +#define PIO_PDSR	0x3c	/* Pin Data Status Register */
-> +#define PIO_IER		0x40	/* Interrupt Enable Register */
-> +#define PIO_IDR		0x44	/* Interrupt Disable Register */
-> +#define PIO_IMR		0x48	/* Interrupt Mask Register */
-> +#define PIO_ISR		0x4c	/* Interrupt Status Register */
-> +#define PIO_MDER	0x50	/* Multi-driver Enable Register */
-> +#define PIO_MDDR	0x54	/* Multi-driver Disable Register */
-> +#define PIO_MDSR	0x58	/* Multi-driver Status Register */
-> +#define PIO_PUDR	0x60	/* Pull-up Disable Register */
-> +#define PIO_PUER	0x64	/* Pull-up Enable Register */
-> +#define PIO_PUSR	0x68	/* Pull-up Status Register */
-> +#define PIO_ASR		0x70	/* Peripheral A Select Register */
-> +#define PIO_ABCDSR1	0x70	/* Peripheral ABCD Select Register 1 [some SoCs only] */
-> +#define PIO_BSR		0x74	/* Peripheral B Select Register */
-> +#define PIO_ABCDSR2	0x74	/* Peripheral ABCD Select Register 2 [some SoCs only] */
-> +#define PIO_ABSR	0x78	/* AB Status Register */
-> +#define PIO_IFSCDR	0x80	/* Input Filter Slow Clock Disable Register */
-> +#define PIO_IFSCER	0x84	/* Input Filter Slow Clock Enable Register */
-> +#define PIO_IFSCSR	0x88	/* Input Filter Slow Clock Status Register */
-> +#define PIO_SCDR	0x8c	/* Slow Clock Divider Debouncing Register */
-> +#define		PIO_SCDR_DIV	(0x3fff <<  0)		/* Slow Clock Divider Mask */
-> +#define PIO_PPDDR	0x90	/* Pad Pull-down Disable Register */
-> +#define PIO_PPDER	0x94	/* Pad Pull-down Enable Register */
-> +#define PIO_PPDSR	0x98	/* Pad Pull-down Status Register */
-> +#define PIO_OWER	0xa0	/* Output Write Enable Register */
-> +#define PIO_OWDR	0xa4	/* Output Write Disable Register */
-> +#define PIO_OWSR	0xa8	/* Output Write Status Register */
-> +#define PIO_AIMER	0xb0	/* Additional Interrupt Modes Enable Register */
-> +#define PIO_AIMDR	0xb4	/* Additional Interrupt Modes Disable Register */
-> +#define PIO_AIMMR	0xb8	/* Additional Interrupt Modes Mask Register */
-> +#define PIO_ESR		0xc0	/* Edge Select Register */
-> +#define PIO_LSR		0xc4	/* Level Select Register */
-> +#define PIO_ELSR	0xc8	/* Edge/Level Status Register */
-> +#define PIO_FELLSR	0xd0	/* Falling Edge/Low Level Select Register */
-> +#define PIO_REHLSR	0xd4	/* Rising Edge/ High Level Select Register */
-> +#define PIO_FRLHSR	0xd8	/* Fall/Rise - Low/High Status Register */
-> +#define PIO_SCHMITT	0x100	/* Schmitt Trigger Register */
-> +
-> +#define ABCDSR_PERIPH_A	0x0
-> +#define ABCDSR_PERIPH_B	0x1
-> +#define ABCDSR_PERIPH_C	0x2
-> +#define ABCDSR_PERIPH_D	0x3
-> +
-> +#define SAMA5D3_PIO_DRIVER1		0x118  /*PIO Driver 1 register offset*/
-> +#define SAMA5D3_PIO_DRIVER2		0x11C  /*PIO Driver 2 register offset*/
-> +
-> +#define AT91SAM9X5_PIO_DRIVER1	0x114  /*PIO Driver 1 register offset*/
-> +#define AT91SAM9X5_PIO_DRIVER2	0x118  /*PIO Driver 2 register offset*/
-> +
->  #define MAX_GPIO_BANKS		5
->  #define MAX_NB_GPIO_PER_BANK	32
->  
-> 
-
-
--- 
-Nicolas Ferre
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  drivers/mmc/host/sdhci-esdhc-imx.c | 12 ++++++------
+>>  1 file changed, 6 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+>> index 587ee0e..b7e9ad1 100644
+>> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+>> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+>> @@ -1193,10 +1193,10 @@ static int sdhci_esdhc_runtime_suspend(struct device *dev)
+>>
+>>  	ret = sdhci_runtime_suspend_host(host);
+>>
+>> -	if (!sdhci_sdio_irq_enabled(host)) {
+>> +	if (!sdhci_sdio_irq_enabled(host))
+>>  		clk_disable_unprepare(imx_data->clk_per);
+>> -		clk_disable_unprepare(imx_data->clk_ipg);
+>> -	}
+>> +
+>> +	clk_disable_unprepare(imx_data->clk_ipg);
+>>  	clk_disable_unprepare(imx_data->clk_ahb);
+>>
+>>  	return ret;
+>> @@ -1208,10 +1208,10 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
+>>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>>  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+>>
+>> -	if (!sdhci_sdio_irq_enabled(host)) {
+>> +	if (!sdhci_sdio_irq_enabled(host))
+>>  		clk_prepare_enable(imx_data->clk_per);
+>> -		clk_prepare_enable(imx_data->clk_ipg);
+>> -	}
+>> +
+>> +	clk_prepare_enable(imx_data->clk_ipg);
+>>  	clk_prepare_enable(imx_data->clk_ahb);
+>>
+>>  	return sdhci_runtime_resume_host(host);
