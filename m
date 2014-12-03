@@ -1,95 +1,68 @@
-From: jonghwa3.lee@samsung.com (jonghwa3.lee at samsung.com)
-Date: Wed, 03 Dec 2014 14:34:20 +0900
-Subject: [PATCH] soc: samsung: pmu: split up SoC specific PMU data
-In-Reply-To: <1417364162-29981-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1417364162-29981-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <547EA0DC.70800@samsung.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Wed, 3 Dec 2014 06:40:10 +0100
+Subject: [PATCH 4/5] ARM: BCM5301X: Add DT for Asus RT-N18U
+In-Reply-To: <547E48F0.6010600@hauke-m.de>
+References: <1417368513-13808-1-git-send-email-zajec5@gmail.com>
+ <1417368513-13808-4-git-send-email-zajec5@gmail.com>
+ <547E48F0.6010600@hauke-m.de>
+Message-ID: <CACna6rzNTd6dudWqbACsf+oZWacjUcFDAuzDZth=_WN1uBdccg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014? 12? 01? 01:16, Pankaj Dubey wrote:
+On 3 December 2014 at 00:19, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+> On 11/30/2014 06:28 PM, Rafa? Mi?ecki wrote:
+>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/Makefile                  |  3 +-
+>>  arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts | 78 +++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/bcm47081.dtsi             | 26 ++++++++++
+>>  arch/arm/mach-bcm/bcm_5301x.c               |  1 +
+>>  4 files changed, 107 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+>>  create mode 100644 arch/arm/boot/dts/bcm47081.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 18a21d9..db51a31 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -58,7 +58,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b-plus.dtb
+>>  dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>>       bcm4708-buffalo-wzr-1750dhp.dtb \
+>>       bcm4708-netgear-r6250.dtb \
+>> -     bcm4708-netgear-r6300-v2.dtb
+>> +     bcm4708-netgear-r6300-v2.dtb \
+>> +     bcm47081-asus-rt-n18u.dtb
+>>  dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
+>>  dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
+>>       bcm911360k.dtb \
+>> diff --git a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+>> new file mode 100644
+>> index 0000000..c40ad39
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+>> @@ -0,0 +1,78 @@
+>> +/*
+>> + * Broadcom BCM470X / BCM5301X ARM platform code.
+>> + * DTS for Asus RT-N18U
+>> + *
+>> + * Copyright ? 2014 Rafa? Mi?ecki <zajec5@gmail.com>
+>> + *
+>> + * Licensed under the GNU/GPL. See COPYING for details.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +
+>> +#include "bcm47081.dtsi"
+>> +
+>> +/ {
+>> +     compatible = "asus,rt-n18u", "brcm,bcm47081";
+>
+> Instead of adding bcm47081 to the core code you can do this:
+>
+> compatible = "asus,rt-n18u", "brcm,bcm47081", "brcm,bcm4708";
+>
+> If we later need some special handling for bcm47081 we can add this but
+> the old dts file will still work. This is more relevant if the dts file
+> is in the boot loader.
 
-> This patch splits up exynos-pmu.c file, and moves PMU configuration data
-> and functions handing those data into SoC specific PMU files, keeping
-> driver structure and common functionality into exynos-pmu.c.
-> 
-> At the same time it also separates compilation of these different SoC PMU files
-> based on CONFIG_ARM64 and CONFIG_ARM. This way we can reduce overhead of ARM64
-> SoC's PMU getting compiled when kernel is built for ARM and vice-versa.
-> 
-> This patch also removes .owner field from exynos-pmu.c as it's redundant for
-> drivers calling platform_driver_register to register platform_driver.
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
-> This patch is prepared on top of kgene/for-next and following patch [1] from
-> Amit Daniel.
-> 
-> [1]: http://www.spinics.net/lists/linux-samsung-soc/msg39797.html
-> 
-> This patch tries to address some of concerns raised for using exynos-pmu.c for
-> ARM and ARM64 based SoC at these threads [2], [3].
-> 
-> [2]: http://www.spinics.net/lists/linux-samsung-soc/msg39809.html
-> [3]: https://lkml.org/lkml/2014/11/24/322
-> 
-> Since Exynos SoC's has similar PMU IP, and already existing bindings can be
-> used, it makes sense to keep single driver for both ARM and ARM64 based SoCs.
-> All common functionalties are in exynos-pmu.c whereas SoC specific data and 
-> handling are moved into SoC specific exynosNNNN-pmu files.
-> 
-> All changes are compiled tested only. Any improvements/suggestions are most
-> welcome.
-> 
->  drivers/soc/samsung/Makefile         |    9 +-
->  drivers/soc/samsung/exynos-pmu.c     | 1293 +---------------------------------
->  drivers/soc/samsung/exynos-pmu.h     |   63 ++
->  drivers/soc/samsung/exynos3250-pmu.c |  176 +++++
->  drivers/soc/samsung/exynos4-pmu.c    |  223 ++++++
->  drivers/soc/samsung/exynos5250-pmu.c |  196 ++++++
->  drivers/soc/samsung/exynos5420-pmu.c |  298 ++++++++
->  drivers/soc/samsung/exynos7-pmu.c    |  441 ++++++++++++
->  8 files changed, 1412 insertions(+), 1287 deletions(-)
->  create mode 100644 drivers/soc/samsung/exynos-pmu.h
->  create mode 100644 drivers/soc/samsung/exynos3250-pmu.c
->  create mode 100644 drivers/soc/samsung/exynos4-pmu.c
->  create mode 100644 drivers/soc/samsung/exynos5250-pmu.c
->  create mode 100644 drivers/soc/samsung/exynos5420-pmu.c
->  create mode 100644 drivers/soc/samsung/exynos7-pmu.c
-> 
-
-...
-
-> diff --git a/drivers/soc/samsung/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
-> new file mode 100644
-> index 0000000..4adc5a3
-> --- /dev/null
-> +++ b/drivers/soc/samsung/exynos-pmu.h
-> @@ -0,0 +1,63 @@
-> +/*
-> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * Header for EXYNOS PMU Driver support
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __EXYNOSPMU_H
-> +#define __EXYNOSPMU_H
-> +
-> +#include <linux/io.h>
-> +
-> +#define PMU_TABLE_END	(-1U)
-> +
-> +static void __iomem *pmu_base_addr;
-> +
-
-AFAIK, static variable in header file can't be used globally. It would be placed
-in exynos-pmu.c or elsewhere and then only extern declaration is allowed here.
-If I'm wrong, please let me know.
-
-Thanks.
-Jonghwa
+I don't get it. How should I detect there is no second CPU?
