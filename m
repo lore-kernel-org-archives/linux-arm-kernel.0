@@ -1,242 +1,216 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed,  3 Dec 2014 01:12:05 +0100
-Subject: [PATCH 06/12] ARM: imx: add support for MSCM interrupt router
+Date: Wed,  3 Dec 2014 01:12:09 +0100
+Subject: [PATCH 10/12] ARM: vf610m4: add new machine and SoC for Vybrid on
+ Cortex-M4
 In-Reply-To: <1417565531-4507-1-git-send-email-stefan@agner.ch>
 References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
-Message-ID: <1417565531-4507-7-git-send-email-stefan@agner.ch>
+Message-ID: <1417565531-4507-11-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for Vybrids interrupt router for the shared
-peripherals. The router is part of the MSCM (Miscellaneous System
-Control Module).
+This patch adds a new machine MACH_MXCM4 which requires !MMU and
+!MULTIARCH and is meant as machine for the hetregenous multi-core
+Vybrid/i.MX SoC's to run Linux on the Cortex-M4.
+
+The first SoC supported is Vybrid on Cortex-M4 (SOC_VF610M4).
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/mach-imx/Kconfig      |   4 ++
- arch/arm/mach-imx/Makefile     |   1 +
- arch/arm/mach-imx/common.h     |   1 +
- arch/arm/mach-imx/mach-vf610.c |   7 ++
- arch/arm/mach-imx/mscm-vf610.c | 141 +++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 154 insertions(+)
- create mode 100644 arch/arm/mach-imx/mscm-vf610.c
+ arch/arm/Kconfig                  | 12 ++++++++++++
+ arch/arm/Kconfig.debug            |  4 ++--
+ arch/arm/Makefile                 |  1 +
+ arch/arm/mach-imx/Kconfig         | 29 ++++++++++++++++++++++++++---
+ arch/arm/mach-imx/Makefile        |  1 +
+ arch/arm/mach-imx/Makefile.boot   |  0
+ arch/arm/mach-imx/mach-vf610m4.c  | 31 +++++++++++++++++++++++++++++++
+ drivers/mmc/host/Kconfig          |  2 +-
+ drivers/pinctrl/freescale/Kconfig |  2 +-
+ 9 files changed, 75 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/mach-imx/Makefile.boot
+ create mode 100644 arch/arm/mach-imx/mach-vf610m4.c
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 89c4b5c..fdebe18 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -459,6 +459,18 @@ config ARCH_FOOTBRIDGE
+ 	  Support for systems based on the DC21285 companion chip
+ 	  ("FootBridge"), such as the Simtec CATS and the Rebel NetWinder.
+ 
++menuconfig ARCH_MXCM4
++	bool "Freescale Vybrid/i.MX family on Cortex-M4" if !MMU
++	select ARCH_REQUIRE_GPIOLIB
++	select ARM_CPU_SUSPEND if PM
++	select CLKSRC_MMIO
++	select GENERIC_IRQ_CHIP
++	select PINCTRL
++	select PM_OPP if PM
++	select SOC_BUS
++	help
++	  Support for Freescale Vybrid/iMX-based family of processors on Cortex-M4
++
+ config ARCH_NETX
+ 	bool "Hilscher NetX based"
+ 	select ARM_VIC
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 03dc4c1..f479727 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -459,7 +459,7 @@ choice
+ 
+ 	config DEBUG_VF_UART
+ 		bool "Vybrid UART"
+-		depends on SOC_VF610
++		depends on SOC_VF610 || SOC_VF610M4
+ 		help
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on Vybrid based platforms.
+@@ -1026,7 +1026,7 @@ config DEBUG_VF_UART_PORT
+ 	int "Vybrid Debug UART Port Selection" if DEBUG_VF_UART
+ 	default 1
+ 	range 0 3
+-	depends on SOC_VF610
++	depends on SOC_VF610 || SOC_VF610M4
+ 	help
+ 	  Choose UART port on which kernel low-level debug messages
+ 	  should be output.
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 034a949..0b84168 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -174,6 +174,7 @@ machine-$(CONFIG_ARCH_MSM)		+= msm
+ machine-$(CONFIG_ARCH_MV78XX0)		+= mv78xx0
+ machine-$(CONFIG_ARCH_MVEBU)		+= mvebu
+ machine-$(CONFIG_ARCH_MXC)		+= imx
++machine-$(CONFIG_ARCH_MXCM4)		+= imx
+ machine-$(CONFIG_ARCH_MEDIATEK)		+= mediatek
+ machine-$(CONFIG_ARCH_MXS)		+= mxs
+ machine-$(CONFIG_ARCH_NETX)		+= netx
 diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index e8627e0..2935972 100644
+index 2935972..56635d5 100644
 --- a/arch/arm/mach-imx/Kconfig
 +++ b/arch/arm/mach-imx/Kconfig
-@@ -58,6 +58,9 @@ config HAVE_IMX_SRC
- 	def_bool y if SMP
- 	select ARCH_HAS_RESET_CONTROLLER
- 
+@@ -1,3 +1,6 @@
 +config HAVE_VF610_MSCM
 +	bool
 +
+ menuconfig ARCH_MXC
+ 	bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
+ 	select ARCH_REQUIRE_GPIOLIB
+@@ -58,9 +61,6 @@ config HAVE_IMX_SRC
+ 	def_bool y if SMP
+ 	select ARCH_HAS_RESET_CONTROLLER
+ 
+-config HAVE_VF610_MSCM
+-	bool
+-
  config IMX_HAVE_IOMUX_V1
  	bool
  
-@@ -631,6 +634,7 @@ config SOC_IMX6SX
+@@ -677,3 +677,26 @@ endif
+ source "arch/arm/mach-imx/devices/Kconfig"
  
- config SOC_VF610
- 	bool "Vybrid Family VF610 support"
+ endif
++
++if !MMU && ARCH_MXCM4
++
++config SOC_VF610M4
++	bool "Vybrid Family VF610 support for Cortex-M4"
 +	select HAVE_VF610_MSCM
- 	select ARM_GIC
- 	select PINCTRL_VF610
- 	select PL310_ERRATA_769419 if CACHE_L2X0
++	select ARCH_REQUIRE_GPIOLIB
++	select PINCTRL_VF610
++	select PINCTRL_IMX
++	select ARM_NVIC
++	select AUTO_ZRELADDR
++	select CPU_V7M
++	select COMMON_CLK
++	select GENERIC_CLOCKEVENTS
++	select NO_DMA
++	select NO_IOPORT_MAP
++	select SPARSE_IRQ
++	select USE_OF
++	select VF_PIT_TIMER
++	help
++	  Support for Vybrid Familiy VF610's Cortex-M4
++
++endif
 diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index f5ac685..82b1159 100644
+index 82b1159..21fb423 100644
 --- a/arch/arm/mach-imx/Makefile
 +++ b/arch/arm/mach-imx/Makefile
-@@ -108,6 +108,7 @@ obj-$(CONFIG_SOC_IMX50) += mach-imx50.o
- obj-$(CONFIG_SOC_IMX51) += mach-imx51.o
- obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
+@@ -110,6 +110,7 @@ obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
  
-+obj-$(CONFIG_HAVE_VF610_MSCM) += mscm-vf610.o
+ obj-$(CONFIG_HAVE_VF610_MSCM) += mscm-vf610.o
  obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
++obj-$(CONFIG_SOC_VF610M4) += clk-vf610.o mach-vf610m4.o
  
  obj-$(CONFIG_SOC_LS1021A) += mach-ls1021a.o
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 59ce8f3..6b5cad9 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -103,6 +103,7 @@ static inline void imx_smp_prepare(void) {}
- #endif
- void imx_src_init(void);
- void imx_gpc_init(void);
-+void vf610_mscm_init(void);
- void imx_gpc_pre_suspend(bool arm_power_off);
- void imx_gpc_post_resume(void);
- void imx_gpc_mask_all(void);
-diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
-index c11ab6a..d1d200d 100644
---- a/arch/arm/mach-imx/mach-vf610.c
-+++ b/arch/arm/mach-imx/mach-vf610.c
-@@ -12,6 +12,12 @@
- #include <asm/mach/arch.h>
- #include <asm/hardware/cache-l2x0.h>
  
-+static void __init vf610_init_irq(void)
+diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
+new file mode 100644
+index 0000000..e69de29
+diff --git a/arch/arm/mach-imx/mach-vf610m4.c b/arch/arm/mach-imx/mach-vf610m4.c
+new file mode 100644
+index 0000000..245788f
+--- /dev/null
++++ b/arch/arm/mach-imx/mach-vf610m4.c
+@@ -0,0 +1,31 @@
++/*
++ * Copyright 2014 Stefan Agner
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/irqchip.h>
++#include <linux/kernel.h>
++#include <asm/v7m.h>
++#include <asm/mach/arch.h>
++#include "common.h"
++
++static void __init vf610m4_init_irq(void)
 +{
 +	vf610_mscm_init();
 +	irqchip_init();
 +}
 +
- static const char * const vf610_dt_compat[] __initconst = {
- 	"fsl,vf610",
- 	NULL,
-@@ -20,5 +26,6 @@ static const char * const vf610_dt_compat[] __initconst = {
- DT_MACHINE_START(VYBRID_VF610, "Freescale Vybrid VF610 (Device Tree)")
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
-+	.init_irq	= vf610_init_irq,
- 	.dt_compat	= vf610_dt_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/mscm-vf610.c b/arch/arm/mach-imx/mscm-vf610.c
-new file mode 100644
-index 0000000..211ea10
---- /dev/null
-+++ b/arch/arm/mach-imx/mscm-vf610.c
-@@ -0,0 +1,141 @@
-+/*
-+ * Copyright 2014 Stefan Agner
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/cpu_pm.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/irqchip/arm-gic.h>
-+#include <linux/irqchip/arm-nvic.h>
-+#include "common.h"
-+
-+#define MSCM_CPxNUM		0x4
-+#define MSCM_IRSPRC(n)		(0x880 + 2 * (n))
-+#define MSCM_IRSPRC_CPEN_MASK	0x3
-+
-+#define MSCM_IRSPRC_NUM		112
-+
-+#ifdef CONFIG_ARM_GIC
-+#define MSCM_IRQ_OFFSET		32
-+#elif CONFIG_ARM_NVIC
-+#define MSCM_IRQ_OFFSET		0
-+#endif
-+
-+static void __iomem *mscm_base;
-+static u16 mscm_saved_irsprc[MSCM_IRSPRC_NUM];
-+static u16 cpu_id;
-+
-+static int vf610_mscm_notifier(struct notifier_block *self, unsigned long cmd,
-+			       void *v)
-+{
-+	int i;
-+
-+	/* Only the primary (boot CPU) should do suspend/resume */
-+	if (cpu_id > 0)
-+		return NOTIFY_OK;
-+
-+	switch (cmd) {
-+	case CPU_CLUSTER_PM_ENTER:
-+		for (i = 0; i < MSCM_IRSPRC_NUM; i++)
-+			mscm_saved_irsprc[i] =
-+				readw_relaxed(mscm_base + MSCM_IRSPRC(i));
-+		break;
-+	case CPU_CLUSTER_PM_ENTER_FAILED:
-+	case CPU_CLUSTER_PM_EXIT:
-+		for (i = 0; i < MSCM_IRSPRC_NUM; i++)
-+			writew_relaxed(mscm_saved_irsprc[i],
-+				       mscm_base + MSCM_IRSPRC(i));
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block mscm_notifier_block = {
-+	.notifier_call = vf610_mscm_notifier,
++static const char *const vf610m4_compat[] __initconst = {
++	"fsl,vf610m4",
++	NULL
 +};
 +
-+static int vf610_mscm_domain_map(struct irq_domain *d, unsigned int irq,
-+			       irq_hw_number_t hw)
-+{
-+	u16 irsprc;
-+
-+	/* Do not handle non interrupt router IRQs */
-+	if (hw < MSCM_IRQ_OFFSET)
-+		return 0;
-+
-+	hw -= MSCM_IRQ_OFFSET;
-+	irsprc = readw_relaxed(mscm_base + MSCM_IRSPRC(hw));
-+	irsprc &= MSCM_IRSPRC_CPEN_MASK;
-+
-+	WARN_ON(irsprc);
-+
-+	writew_relaxed(0x1 << cpu_id, mscm_base + MSCM_IRSPRC(hw));
-+
-+	return 0;
-+}
-+
-+static void vf610_mscm_domain_unmap(struct irq_domain *d, unsigned int irq)
-+{
-+	irq_hw_number_t hw = irq_get_irq_data(irq)->hwirq;
-+	u16 irsprc;
-+
-+	/* Do not handle non interrupt router IRQs */
-+	if (hw < MSCM_IRQ_OFFSET)
-+		return;
-+
-+	hw -= MSCM_IRQ_OFFSET;
-+	irsprc = readw_relaxed(mscm_base + MSCM_IRSPRC(hw));
-+	irsprc &= MSCM_IRSPRC_CPEN_MASK;
-+
-+	WARN_ON(irsprc & ~(0x1 << cpu_id));
-+
-+	writew_relaxed(0x1 << cpu_id, mscm_base + MSCM_IRSPRC(hw));
-+}
-+
-+static int vf610_mscm_domain_xlate(struct irq_domain *d,
-+				struct device_node *controller,
-+				const u32 *intspec, unsigned int intsize,
-+				unsigned long *out_hwirq,
-+				unsigned int *out_type)
-+{
-+#ifdef CONFIG_ARM_GIC
-+	*out_hwirq += 16;
-+#endif
-+	return 0;
-+}
-+static const struct irq_domain_ops routable_irq_domain_ops = {
-+	.map = vf610_mscm_domain_map,
-+	.unmap = vf610_mscm_domain_unmap,
-+	.xlate = vf610_mscm_domain_xlate,
-+};
-+
-+void __init vf610_mscm_init(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,vf610-mscm");
-+	mscm_base = of_iomap(np, 0);
-+
-+	if (!mscm_base) {
-+		WARN_ON(1);
-+		return;
-+	}
-+
-+	cpu_id = readl_relaxed(mscm_base + MSCM_CPxNUM);
-+
-+	/* Register MSCM as interrupt router */
-+	register_routable_domain_ops(&routable_irq_domain_ops);
-+
-+	cpu_pm_register_notifier(&mscm_notifier_block);
-+}
++DT_MACHINE_START(VF610M4DT, "VF610 on Cortex-M4 (Device Tree Support)")
++	.dt_compat = vf610m4_compat,
++	.init_irq = vf610m4_init_irq,
++	.restart = armv7m_restart,
++MACHINE_END
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 1386065..bfbec2d 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -166,7 +166,7 @@ config MMC_SDHCI_CNS3XXX
+ 
+ config MMC_SDHCI_ESDHC_IMX
+ 	tristate "SDHCI support for the Freescale eSDHC/uSDHC i.MX controller"
+-	depends on ARCH_MXC
++	depends on ARCH_MXC || ARCH_MXCM4
+ 	depends on MMC_SDHCI_PLTFM
+ 	select MMC_SDHCI_IO_ACCESSORS
+ 	help
+diff --git a/drivers/pinctrl/freescale/Kconfig b/drivers/pinctrl/freescale/Kconfig
+index 16aac38..5271ca2 100644
+--- a/drivers/pinctrl/freescale/Kconfig
++++ b/drivers/pinctrl/freescale/Kconfig
+@@ -89,7 +89,7 @@ config PINCTRL_IMX6SX
+ 
+ config PINCTRL_VF610
+ 	bool "Freescale Vybrid VF610 pinctrl driver"
+-	depends on SOC_VF610
++	depends on SOC_VF610 || SOC_VF610M4
+ 	select PINCTRL_IMX
+ 	help
+ 	  Say Y here to enable the Freescale Vybrid VF610 pinctrl driver
 -- 
 2.1.3
