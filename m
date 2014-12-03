@@ -1,81 +1,33 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Tue, 02 Dec 2014 18:24:21 -0800
-Subject: [PATCH v3 1/3] devicetree: of: Add bindings for chosen node,
- stdout-path
-In-Reply-To: <1417110967-16284-2-git-send-email-leif.lindholm@linaro.org>
-References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
- <1417110967-16284-2-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <547E7455.6090009@gmail.com>
+From: orsonzhai@gmail.com (Orson Zhai)
+Date: Wed, 03 Dec 2014 10:35:45 +0800
+Subject: [PATCH v3 3/5] arm64: dts: Add support for Spreadtrum SC9836
+ SoC in dts and Makefile
+In-Reply-To: <20141127115042.GE857@leverpostej>
+References: <Sharkl64-v3>
+ <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1416917818-10506-4-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20141127115042.GE857@leverpostej>
+Message-ID: <547E7701.7030203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2014 9:56 AM, Leif Lindholm wrote:
-> Add a global binding for the chosen node.
-> Include a description of the stdout-path, and an explicit statement on
-> its extra options in the context of a UART console.
-> 
-> Opening description stolen from www.devicetree.org, and part of the
-> remaining text provided by Mark Rutland.
-> 
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> ---
->  Documentation/devicetree/bindings/chosen.txt |   42 ++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/chosen.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
-> new file mode 100644
-> index 0000000..9cd74e9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/chosen.txt
-> @@ -0,0 +1,42 @@
-> +The chosen node
-> +---------------
-> +
-> +The chosen node does not represent a real device, but serves as a place
-> +for passing data between firmware and the operating system, like boot
-> +arguments. Data in the chosen node does not represent the hardware.
-> +
-> +
-> +stdout-path property
+Hi, Mark,
 
-The code in patch 3/3 adds the extra options feature to the properties:
+On 2014?11?27? 19:50, Mark Rutland wrote:
+>> >+       clocks {
+>> >+               clk26mhz: clk26mhz {
+>> >+                       compatible = "fixed-clock";
+>> >+                       #clock-cells = <0>;
+>> >+                       clock-frequency = <26000000>;
+>> >+               };
+>> >+       };
+> Get rid of the "clocks" container node. There's no need for it.
+We are going to add more clk nodes when relative device drivers being 
+committed.
+Could we reserve clocks{} here for future use?
+Or we remove it now and add it back when needed?
 
-  stdout-path
-  linux,stdout-path
-  stdout  [if (IS_ENABLED(CONFIG_PPC) ... ]
-
-> +--------------------
-> +
-> +Device trees may specify the device to be used for boot console output
-> +with a stdout-path property under /chosen, as described in ePAPR, e.g.
-> +
-> +/ {
-> +	chosen {
-> +		stdout-path = "/serial at f00:115200";
-> +	};
-> +
-> +	serial at f00 {
-> +		compatible = "vendor,some-uart";
-> +		reg = <0xf00 0x10>;
-> +	};
-> +};
-> +
-> +If the character ":" is present in the value, this terminates the path.
-> +The meaning of any characters following the ":" is device-specific, and
-> +must be specified in the relevant binding documentation.
-> +
-> +For UART devices, the format supported by uart_parse_options() is the
-> +expected one. In this case, the format of the string is:
-> +
-> +	<baud>{<parity>{<bits>{<flow>}}}
-> +
-> +where
-> +
-> +	baud	- baud rate in decimal
-> +	parity	- 'n' (none), 'o', (odd) or 'e' (even)
-> +	bits	- number of data bits
-> +	flow	- 'r' (rts)
-> +
-> +For example: 115200n8r
-> 
+Thanks,
+Orson
+> Thanks,
+> Mark.
