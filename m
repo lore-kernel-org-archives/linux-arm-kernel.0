@@ -1,45 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Dec 2014 12:28 +0100
-Subject: [PATCH v4 15/19] arm/arm64: KVM: add virtual GICv3 distributor
- emulation
-In-Reply-To: <547EEF9A.9010906@arm.com>
-References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
- <20141203102829.GA17502@cbox> <547EEF9A.9010906@arm.com>
-Message-ID: <2906594.cDZcXzbGMh@wuerfel>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 3 Dec 2014 12:28:30 +0100
+Subject: [PATCH 2/4] i2c: cadence: Set the hardware time-out register to
+ maximum value
+In-Reply-To: <1417514749-24319-3-git-send-email-harinik@xilinx.com>
+References: <1417514749-24319-1-git-send-email-harinik@xilinx.com>
+ <1417514749-24319-3-git-send-email-harinik@xilinx.com>
+Message-ID: <20141203112830.GD1039@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 December 2014 11:10:18 Andre Przywara wrote:
-> On 03/12/14 10:28, Christoffer Dall wrote:
-> > On Tue, Dec 02, 2014 at 04:24:53PM +0000, Andre Przywara wrote:
-> >> On 30/11/14 08:30, Christoffer Dall wrote:
-> >>
-> >> If we are flexible with the mapping at VM creation time, QEMU could just
-> >> use a mapping depending on max_cpus:
-> >> < 128 VCPUs: use the current mapping
-> >> 128 <= x < 1020: use a more compressed mapping
-> >>> = 1020: map the redistributor somewhere above 4 GB
-> > 
-> > I don't understand what the compressed mapping is. 
+On Tue, Dec 02, 2014 at 03:35:47PM +0530, Harini Katakam wrote:
+> From: Vishnu Motghare <vishnum@xilinx.com>
 > 
-> Currently we have in QEMU:
->    0 MB -  128 MB: Flash
->  128 MB -  144 MB: CPU peripherals (GIC for now only)
->  144 MB -  144 MB: UART (64k)
->  144 MB -  144 MB: RTC (64k)
->  160 MB -  256 MB: virtio (32 * 512 Bytes used)
->  256 MB - 1024 MB: PCI
-> 1024 MB - ???? MB: DRAM
+> Cadence I2C controller has bug wherein it generates invalid read transactions
+> after time-out in master receiver mode. This driver does not use the HW
+> timeout and this interrupt is disabled but the feature itself cannot be
+> disabled. Hence, this patch writes the maximum value (0xFF) to this register.
+> This is one of the workarounds to this bug and it will not avoid the issue
+> completely but reduce the chances of error.
+
+This is a good description and should be in a comment in the driver.
+
 > 
-> So we waste quite some space between 144 MB and 256 MB, where we
-> currently use only 3 64K pages. If we would move those three pages
-> closer to the 256 MB region, we could extend the GIC mapping space from
-> 16 MB (127 VCPUs) to almost 128 MB (good for 1022 VCPUs).
-
-Having a more compressed mapping sounds useful, but you could also consider
-carving the GIC registers out of the PCI range and make PCI memory space
-smaller if there are lots of CPUs.
-
-Is there also a 64-bit PCI memory space behind the DRAM?
-
-	Arnd
+> Signed-off-by: Vishnu Motghare <vishnum@xilinx.com>
+> Signed-off-by: Harini Katakam <harinik@xilinx.com>
+> ---
+>  drivers/i2c/busses/i2c-cadence.c |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+> index e54899e..8065205 100644
+> --- a/drivers/i2c/busses/i2c-cadence.c
+> +++ b/drivers/i2c/busses/i2c-cadence.c
+> @@ -111,6 +111,8 @@
+>  #define CDNS_I2C_DIVA_MAX	4
+>  #define CDNS_I2C_DIVB_MAX	64
+>  
+> +#define CDNS_I2C_TIMEOUT_MAX	0xFF
+> +
+>  #define cdns_i2c_readreg(offset)       readl_relaxed(id->membase + offset)
+>  #define cdns_i2c_writereg(val, offset) writel_relaxed(val, id->membase + offset)
+>  
+> @@ -858,6 +860,8 @@ static int cdns_i2c_probe(struct platform_device *pdev)
+>  		goto err_clk_dis;
+>  	}
+>  
+> +	cdns_i2c_writereg(CDNS_I2C_TIMEOUT_MAX, CDNS_I2C_TIME_OUT_OFFSET);
+> +
+>  	dev_info(&pdev->dev, "%u kHz mmio %08lx irq %d\n",
+>  		 id->i2c_clk / 1000, (unsigned long)r_mem->start, id->irq);
+>  
+> -- 
+> 1.7.9.5
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141203/fff8bc0b/attachment.sig>
