@@ -1,50 +1,90 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 3 Dec 2014 16:08:15 +0100
-Subject: [PATCH 1/2] pinctrl: at91: allow disabled gpio controllers
-In-Reply-To: <CACRpkdbXuXyfwAyFTHVDGa4OS88KsHXZeDDAeXf6ZJ_JQmduoQ@mail.gmail.com>
-References: <1417193367-12422-1-git-send-email-ludovic.desroches@atmel.com>
- <CACRpkdbXuXyfwAyFTHVDGa4OS88KsHXZeDDAeXf6ZJ_JQmduoQ@mail.gmail.com>
-Message-ID: <20141203150814.GD2714@ldesroches-Latitude-E6320>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 3 Dec 2014 15:12:03 +0000
+Subject: [PATCH v3 1/3] devicetree: of: Add bindings for chosen node,
+ stdout-path
+In-Reply-To: <547E7455.6090009@gmail.com>
+References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
+ <1417110967-16284-2-git-send-email-leif.lindholm@linaro.org>
+ <547E7455.6090009@gmail.com>
+Message-ID: <CACxGe6vdbURE3=W3Uerwy90piGKhv7-m+-vpUhCiUTKB4AzTsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 01, 2014 at 02:56:22PM +0100, Linus Walleij wrote:
-> On Fri, Nov 28, 2014 at 5:49 PM, Ludovic Desroches
-> <ludovic.desroches@atmel.com> wrote:
-> 
-> > This patch allows to have gpio controller with status set to disabled.
-> >
-> > gpio_banks represents all the gpio banks available on the device whereas
-> > nbanks represents the gpio banks used. Having a disabled gpio controller
-> > involves that nbanks value is lower than gpio_banks and that some
-> > pointers in the gpio_chips array are NULL. This patch deals with these
-> > specific cases.
-> >
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> (...)
-> >         /* We will handle a range of GPIO pins */
-> > -       for (i = 0; i < info->nbanks; i++)
-> > -               pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
-> > +       for (i = 0; i < gpio_banks; i++)
-> > +               if (gpio_chips[i])
-> > +                       pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
-> 
-> I highly suspect the real solution to this problem is to get rid
-> of the pinctrl_add_gpio_range() call from the driver.
-> 
-> Remobe these calls, and instead in at91_gpio_probe() in the same
-> file, call gpiochip_add_pingroup_range() for each GPIO chip.
-> 
-> That way the GPIO ranges are inserted from the GPIO side instead
-> of the pinctrl side, which is way better, since it is more relative,
-> and make you only add ranges for the gpio chips actually there.
+On Wed, Dec 3, 2014 at 2:24 AM, Frank Rowand <frowand.list@gmail.com> wrote:
+> On 11/27/2014 9:56 AM, Leif Lindholm wrote:
+>> Add a global binding for the chosen node.
+>> Include a description of the stdout-path, and an explicit statement on
+>> its extra options in the context of a UART console.
+>>
+>> Opening description stolen from www.devicetree.org, and part of the
+>> remaining text provided by Mark Rutland.
+>>
+>> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+>> ---
+>>  Documentation/devicetree/bindings/chosen.txt |   42 ++++++++++++++++++++++++++
+>>  1 file changed, 42 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/chosen.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+>> new file mode 100644
+>> index 0000000..9cd74e9
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/chosen.txt
+>> @@ -0,0 +1,42 @@
+>> +The chosen node
+>> +---------------
+>> +
+>> +The chosen node does not represent a real device, but serves as a place
+>> +for passing data between firmware and the operating system, like boot
+>> +arguments. Data in the chosen node does not represent the hardware.
+>> +
+>> +
+>> +stdout-path property
+>
+> The code in patch 3/3 adds the extra options feature to the properties:
+>
+>   stdout-path
+>   linux,stdout-path
+>   stdout  [if (IS_ENABLED(CONFIG_PPC) ... ]
 
-I had a quick look to Documentation about that stuff, I totally agree
-that it is a better approach. Before going further I was wondering if it
-would not cause backward compatibility issue with old dtb (it seems I'll
-have to add some properties to gpio controllers).
+I don't understand what you mean here. Are you suggesting a change to
+this patch? Is there something deficient in it?
 
-Regards
+g.
 
-Ludovic
+>
+>> +--------------------
+>> +
+>> +Device trees may specify the device to be used for boot console output
+>> +with a stdout-path property under /chosen, as described in ePAPR, e.g.
+>> +
+>> +/ {
+>> +     chosen {
+>> +             stdout-path = "/serial at f00:115200";
+>> +     };
+>> +
+>> +     serial at f00 {
+>> +             compatible = "vendor,some-uart";
+>> +             reg = <0xf00 0x10>;
+>> +     };
+>> +};
+>> +
+>> +If the character ":" is present in the value, this terminates the path.
+>> +The meaning of any characters following the ":" is device-specific, and
+>> +must be specified in the relevant binding documentation.
+>> +
+>> +For UART devices, the format supported by uart_parse_options() is the
+>> +expected one. In this case, the format of the string is:
+>> +
+>> +     <baud>{<parity>{<bits>{<flow>}}}
+>> +
+>> +where
+>> +
+>> +     baud    - baud rate in decimal
+>> +     parity  - 'n' (none), 'o', (odd) or 'e' (even)
+>> +     bits    - number of data bits
+>> +     flow    - 'r' (rts)
+>> +
+>> +For example: 115200n8r
+>>
+>
