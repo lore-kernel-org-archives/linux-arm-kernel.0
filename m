@@ -1,41 +1,107 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 2 Dec 2014 21:18:35 -0800
-Subject: [PATCH 2/2] ASoC: rockchip: i2s: add support for grabbing output
- clock to codec
-In-Reply-To: <547E616C.1020503@rock-chips.com>
-References: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
- <1417531977-30094-1-git-send-email-jay.xu@rock-chips.com>
- <CAD=FV=Uwb1NxxCoXHzHu6DJCpnG_HV2RhCr3JaJaXbJja8kd7A@mail.gmail.com>
- <547E616C.1020503@rock-chips.com>
-Message-ID: <CAD=FV=VtYU5Pdz-xvjSdsReyCqMQaMtw=ZXmH4PO5wFnGVPY1g@mail.gmail.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Wed, 3 Dec 2014 13:28:41 +0800
+Subject: [PATCH v11 1/7] ARM: probes: move all probe code to dedicate
+ directory
+In-Reply-To: <547E93E3.70209@hitachi.com>
+References: <1417423513-47161-1-git-send-email-wangnan0@huawei.com>
+ <1417423695-47521-1-git-send-email-wangnan0@huawei.com>
+ <547D471B.2070908@hitachi.com> <547D9308.8080403@huawei.com>
+ <547E93E3.70209@hitachi.com>
+Message-ID: <547E9F89.5000601@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 2, 2014 at 5:03 PM, Jianqun <xjq@rock-chips.com> wrote:
-> Hi Doug:
->
-> ? 12/03/2014 01:54 AM, Doug Anderson ??:
->> Jianqun,
+On 2014/12/3 12:38, Masami Hiramatsu wrote:
+> (2014/12/02 19:23), Wang Nan wrote:
+>> On 2014/12/2 12:59, Masami Hiramatsu wrote:
+>>> (2014/12/01 17:48), Wang Nan wrote:
+>>>> In discussion on LKML (https://lkml.org/lkml/2014/11/28/158), Russell
+>>>> King suggest to move all probe related code to arch/arm/probes. This
+>>>> patch do the work. Due to dependency on 'arch/arm/kernel/patch.h', this
+>>>> patch also move patch.h to 'arch/arm/include/asm/patch.h', and related
+>>>> '#include' directive are also midified to '#include <asm/patch.h>'.
+>>>
+>>> Moving is good to me, but renaming files are also required I think.
+>>>
+>>>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+>>>> ---
+>>>>  arch/arm/Makefile                                |  1 +
+>>>>  arch/arm/{kernel => include/asm}/patch.h         |  0
+>>>>  arch/arm/kernel/Makefile                         | 16 ++--------------
+>>>>  arch/arm/kernel/jump_label.c                     |  2 +-
+>>>>  arch/arm/kernel/patch.c                          |  3 +--
+>>>>  arch/arm/probes/Makefile                         | 15 +++++++++++++++
+>>>>  arch/arm/{kernel => probes}/kprobes-arm.c        |  0
+>>>>  arch/arm/{kernel => probes}/kprobes-common.c     |  0
+>>>>  arch/arm/{kernel => probes}/kprobes-test-arm.c   |  0
+>>>>  arch/arm/{kernel => probes}/kprobes-test-thumb.c |  0
+>>>>  arch/arm/{kernel => probes}/kprobes-test.c       |  0
+>>>>  arch/arm/{kernel => probes}/kprobes-test.h       |  0
+>>>>  arch/arm/{kernel => probes}/kprobes-thumb.c      |  0
+>>>>  arch/arm/{kernel => probes}/kprobes.c            |  2 +-
+>>>>  arch/arm/{kernel => probes}/kprobes.h            |  0
+>>>>  arch/arm/{kernel => probes}/probes-arm.c         |  0
+>>>>  arch/arm/{kernel => probes}/probes-arm.h         |  0
+>>>>  arch/arm/{kernel => probes}/probes-thumb.c       |  0
+>>>>  arch/arm/{kernel => probes}/probes-thumb.h       |  0
+>>>>  arch/arm/{kernel => probes}/probes.c             |  0
+>>>>  arch/arm/{kernel => probes}/probes.h             |  0
+>>>>  arch/arm/{kernel => probes}/uprobes-arm.c        |  0
+>>>>  arch/arm/{kernel => probes}/uprobes.c            |  0
+>>>>  arch/arm/{kernel => probes}/uprobes.h            |  0
+>>>
+>>> As I did on x86, these would be better renamed as expressing what they do.
+>>> I guess most of the files may have emulate-*.c or decode-*.c :)
+>>>
+>>> Thank you,
+>>>
 >>
->> This ought to be a "v3" patch and ideally ought to describe
->> differences from v2 (after the cut).  Please have Kever or Chris
->> review your next patch before sending it out since I think they are
->> familiar with the process.
+>> OK. I posted another patch in this thread. The directory tree is as follow:
+>>
+>> arch/arm/probes/
+>> |-- Makefile
+>> |-- decode-arm.c
+>> |-- decode-arm.h
+>> |-- decode-thumb.c
+>> |-- decode-thumb.h
+>> |-- decode.c
+>> |-- decode.h
+>> |-- kprobes
+>> |   |-- actions-arm.c
+>> |   |-- actions-common.c
+>> |   |-- actions-thumb.c
+>> |   |-- kprobes.c
+>> |   |-- kprobes.h
+>> |   |-- test-arm.c
+>> |   |-- test-core.c
+>> |   |-- test-core.h
+>> |   `-- test-thumb.c
+>> `-- uprobes
+>>     |-- actions-arm.c
+>>     |-- uprobes.c
+>>     `-- uprobes.h
+>>
+>> 2 directories, 19 files
+>>
+>> What do you think?
+> 
+> Yeah, that looks better :)
+> 
+> Btw, if you introduce probes/{kprobes,uprobes}/, *probes.c should be core.c too,
+> since the directories already show its name. And also, both dirs should have its
+> own Makefile.
+> 
 
-You still seem to be missing versions in your subject line and missing
-info on what changed version to version.  The latest version you just
-sent (v4?) is still missing it.
+Seprated Makefile may introduce extra complexity. Think about someone try to compile
+kprobe as a module (currently it is impossible due to dependencies between kprobe and
+kernel core, but decoupling is possible), seprated Makefiles may force him to
+create at least 3 modules for kprobe, even if one module is enough.
 
-Unless Mark says so then I don't think you need to spin this series,
-but please try to add that in the future.
+Anyway, there may some features in kernel build system can help him. I'll post
+v12 patch series based on your suggestion.
 
+Thank you.
 
->> You still forgot the blank line here requested by Heiko.  Please try
->> again.  See <https://patchwork.kernel.org/patch/5334991/>
-> Although I thought there needn't a blank ~, I wll add it next patch
-
-That would have been OK, but in that case you should have responded to
-Heiko's patch and explained that you weren't taking his feedback (and
-why you weren't).
-
--Doug
+> Thank you,
+> 
+> 
