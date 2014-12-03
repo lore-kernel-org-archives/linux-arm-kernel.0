@@ -1,114 +1,31 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Wed, 03 Dec 2014 15:27:46 +0900
-Subject: [PATCH v11 1/7] ARM: probes: move all probe code to dedicate
- directory
-In-Reply-To: <547E9F89.5000601@huawei.com>
-References: <1417423513-47161-1-git-send-email-wangnan0@huawei.com>
- <1417423695-47521-1-git-send-email-wangnan0@huawei.com>
- <547D471B.2070908@hitachi.com> <547D9308.8080403@huawei.com>
- <547E93E3.70209@hitachi.com> <547E9F89.5000601@huawei.com>
-Message-ID: <547EAD62.6090706@hitachi.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 3 Dec 2014 12:00:58 +0530
+Subject: [PATCHv3 1/1] thermal: cpu_cooling: check for the readiness of
+ cpufreq layer
+In-Reply-To: <1417186410-24551-1-git-send-email-edubezval@gmail.com>
+References: <1417186410-24551-1-git-send-email-edubezval@gmail.com>
+Message-ID: <CAKohpomv8fXqVEBWkmJTHKrkdVUbZCodV_D_pu3hjRqH0wUEeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2014/12/03 14:28), Wang Nan wrote:
-> On 2014/12/3 12:38, Masami Hiramatsu wrote:
->> (2014/12/02 19:23), Wang Nan wrote:
->>> On 2014/12/2 12:59, Masami Hiramatsu wrote:
->>>> (2014/12/01 17:48), Wang Nan wrote:
->>>>> In discussion on LKML (https://lkml.org/lkml/2014/11/28/158), Russell
->>>>> King suggest to move all probe related code to arch/arm/probes. This
->>>>> patch do the work. Due to dependency on 'arch/arm/kernel/patch.h', this
->>>>> patch also move patch.h to 'arch/arm/include/asm/patch.h', and related
->>>>> '#include' directive are also midified to '#include <asm/patch.h>'.
->>>>
->>>> Moving is good to me, but renaming files are also required I think.
->>>>
->>>>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
->>>>> ---
->>>>>  arch/arm/Makefile                                |  1 +
->>>>>  arch/arm/{kernel => include/asm}/patch.h         |  0
->>>>>  arch/arm/kernel/Makefile                         | 16 ++--------------
->>>>>  arch/arm/kernel/jump_label.c                     |  2 +-
->>>>>  arch/arm/kernel/patch.c                          |  3 +--
->>>>>  arch/arm/probes/Makefile                         | 15 +++++++++++++++
->>>>>  arch/arm/{kernel => probes}/kprobes-arm.c        |  0
->>>>>  arch/arm/{kernel => probes}/kprobes-common.c     |  0
->>>>>  arch/arm/{kernel => probes}/kprobes-test-arm.c   |  0
->>>>>  arch/arm/{kernel => probes}/kprobes-test-thumb.c |  0
->>>>>  arch/arm/{kernel => probes}/kprobes-test.c       |  0
->>>>>  arch/arm/{kernel => probes}/kprobes-test.h       |  0
->>>>>  arch/arm/{kernel => probes}/kprobes-thumb.c      |  0
->>>>>  arch/arm/{kernel => probes}/kprobes.c            |  2 +-
->>>>>  arch/arm/{kernel => probes}/kprobes.h            |  0
->>>>>  arch/arm/{kernel => probes}/probes-arm.c         |  0
->>>>>  arch/arm/{kernel => probes}/probes-arm.h         |  0
->>>>>  arch/arm/{kernel => probes}/probes-thumb.c       |  0
->>>>>  arch/arm/{kernel => probes}/probes-thumb.h       |  0
->>>>>  arch/arm/{kernel => probes}/probes.c             |  0
->>>>>  arch/arm/{kernel => probes}/probes.h             |  0
->>>>>  arch/arm/{kernel => probes}/uprobes-arm.c        |  0
->>>>>  arch/arm/{kernel => probes}/uprobes.c            |  0
->>>>>  arch/arm/{kernel => probes}/uprobes.h            |  0
->>>>
->>>> As I did on x86, these would be better renamed as expressing what they do.
->>>> I guess most of the files may have emulate-*.c or decode-*.c :)
->>>>
->>>> Thank you,
->>>>
->>>
->>> OK. I posted another patch in this thread. The directory tree is as follow:
->>>
->>> arch/arm/probes/
->>> |-- Makefile
->>> |-- decode-arm.c
->>> |-- decode-arm.h
->>> |-- decode-thumb.c
->>> |-- decode-thumb.h
->>> |-- decode.c
->>> |-- decode.h
->>> |-- kprobes
->>> |   |-- actions-arm.c
->>> |   |-- actions-common.c
->>> |   |-- actions-thumb.c
->>> |   |-- kprobes.c
->>> |   |-- kprobes.h
->>> |   |-- test-arm.c
->>> |   |-- test-core.c
->>> |   |-- test-core.h
->>> |   `-- test-thumb.c
->>> `-- uprobes
->>>     |-- actions-arm.c
->>>     |-- uprobes.c
->>>     `-- uprobes.h
->>>
->>> 2 directories, 19 files
->>>
->>> What do you think?
->>
->> Yeah, that looks better :)
->>
->> Btw, if you introduce probes/{kprobes,uprobes}/, *probes.c should be core.c too,
->> since the directories already show its name. And also, both dirs should have its
->> own Makefile.
->>
-> 
-> Seprated Makefile may introduce extra complexity. Think about someone try to compile
-> kprobe as a module (currently it is impossible due to dependencies between kprobe and
-> kernel core, but decoupling is possible), seprated Makefiles may force him to
-> create at least 3 modules for kprobe, even if one module is enough.
+On 28 November 2014 at 20:23, Eduardo Valentin <edubezval@gmail.com> wrote:
+> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+> index 1ab0018..88d2775 100644
+> --- a/drivers/thermal/cpu_cooling.c
+> +++ b/drivers/thermal/cpu_cooling.c
+> @@ -440,6 +440,9 @@ __cpufreq_cooling_register(struct device_node *np,
+>         int ret = 0, i;
+>         struct cpufreq_policy policy;
+>
+> +       if (!cpufreq_frequency_get_table(0))
 
-Hmm, OK, agreed.
+Please add a pr_debug() here, that will be quite useful while debugging.
 
-> 
-> Anyway, there may some features in kernel build system can help him. I'll post
-> v12 patch series based on your suggestion.
+Also, you can't simply pass 0 to get_table() above. We might be
+registering the cooling device for some other cluster as well..
 
-Thanks! :)
+This is what I have done in my patch earlier.
 
+cpufreq_frequency_get_table(cpumask_first(clip_cpus));
 
--- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+And this will work for all cases.
