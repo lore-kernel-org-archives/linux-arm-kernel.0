@@ -1,49 +1,30 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 03 Dec 2014 17:12:32 +0530
-Subject: [PATCH 3/3] clk: samsung: remove unnecessary inclusion of header
- files from clk.h
-In-Reply-To: <547DD98D.3000101@samsung.com>
-References: <1411796519-19417-1-git-send-email-pankaj.dubey@samsung.com>
- <1411796519-19417-4-git-send-email-pankaj.dubey@samsung.com>
- <547DD98D.3000101@samsung.com>
-Message-ID: <547EF728.90505@samsung.com>
+From: rk@ti.com (Ravikumar Kattekola)
+Date: Wed, 3 Dec 2014 17:33:55 +0530
+Subject: [PATCH 0/2] ARM: dts: dra7-evm: Regulator max voltage fixes
+Message-ID: <1417608237-12258-1-git-send-email-rk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Hi,
 
-On Tuesday 02 December 2014 08:53 PM, Sylwester Nawrocki wrote:
-> Hi Pankaj,
->
-> On 27/09/14 07:41, Pankaj Dubey wrote:
->> Let's remove unnecessary include of header files from clk.h and add
->> required one in clk.c
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   drivers/clk/samsung/clk.c |    3 ++-
->>   drivers/clk/samsung/clk.h |    4 ----
->>   2 files changed, 2 insertions(+), 5 deletions(-)
->>
-> Please make sure there is no build breaks with various configs when
-> sending patches.
+This set does a minor fix and an update:
 
-I am sure that I compile tested this before submitting. Looks like 
-following commit [1] needs "linux/syscore-ops.h" in clk.c, before that 
-it was not needed.
+   - Fix a typo in the max voltage property of smps6 (vdd_gpu) regulator node added by
+     the patch : c56a831ca47e ("ARM: dts: DRA7: Add TPS659038 PMIC nodes")
 
-1: clk: samsung: Factor out the common code to clk.c [SHA_ID: 
-16a9013b83b5106c83cf]
+   - Update max voltage property of smps7 (vdd_core) regulator node to align with the 
+     latest Data Manual
 
-Anyways, I can see patches are not getting cleanly applied so, just now 
-I resend them [2] after rebasing please have a look.
+Regards,
+RK
 
-2: http://comments.gmane.org/gmane.linux.kernel.samsung-soc/40639
+Ravikumar Kattekola (2):
+  ARM: dts: dra7-evm: Fix typo in SMPS6 (VDD_GPU) max voltage
+  ARM: dts: dra7-evm: Update SMPS7 (VDD_CORE) max voltage to match DM
 
-Thanks,
-Pankaj Dubey
->
-> --
-> Regards,
-> Sylwester
->
+ arch/arm/boot/dts/dra7-evm.dts  |    4 ++--
+ arch/arm/boot/dts/dra72-evm.dts |    2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+-- 
+1.7.9.5
