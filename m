@@ -1,78 +1,114 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Wed, 3 Dec 2014 07:01:42 +0100
-Subject: [PATCH 4/5] ARM: BCM5301X: Add DT for Asus RT-N18U
-In-Reply-To: <CACna6rzNTd6dudWqbACsf+oZWacjUcFDAuzDZth=_WN1uBdccg@mail.gmail.com>
-References: <1417368513-13808-1-git-send-email-zajec5@gmail.com>
- <1417368513-13808-4-git-send-email-zajec5@gmail.com>
- <547E48F0.6010600@hauke-m.de>
- <CACna6rzNTd6dudWqbACsf+oZWacjUcFDAuzDZth=_WN1uBdccg@mail.gmail.com>
-Message-ID: <CACna6rzhUhzdzCCTKQ=RETb_40XqinwcrY6rzab7xQb_Vm5atw@mail.gmail.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Wed, 03 Dec 2014 15:27:46 +0900
+Subject: [PATCH v11 1/7] ARM: probes: move all probe code to dedicate
+ directory
+In-Reply-To: <547E9F89.5000601@huawei.com>
+References: <1417423513-47161-1-git-send-email-wangnan0@huawei.com>
+ <1417423695-47521-1-git-send-email-wangnan0@huawei.com>
+ <547D471B.2070908@hitachi.com> <547D9308.8080403@huawei.com>
+ <547E93E3.70209@hitachi.com> <547E9F89.5000601@huawei.com>
+Message-ID: <547EAD62.6090706@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 December 2014 at 06:40, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> On 3 December 2014 at 00:19, Hauke Mehrtens <hauke@hauke-m.de> wrote:
->> On 11/30/2014 06:28 PM, Rafa? Mi?ecki wrote:
->>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
->>> ---
->>>  arch/arm/boot/dts/Makefile                  |  3 +-
->>>  arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts | 78 +++++++++++++++++++++++++++++
->>>  arch/arm/boot/dts/bcm47081.dtsi             | 26 ++++++++++
->>>  arch/arm/mach-bcm/bcm_5301x.c               |  1 +
->>>  4 files changed, 107 insertions(+), 1 deletion(-)
->>>  create mode 100644 arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
->>>  create mode 100644 arch/arm/boot/dts/bcm47081.dtsi
+(2014/12/03 14:28), Wang Nan wrote:
+> On 2014/12/3 12:38, Masami Hiramatsu wrote:
+>> (2014/12/02 19:23), Wang Nan wrote:
+>>> On 2014/12/2 12:59, Masami Hiramatsu wrote:
+>>>> (2014/12/01 17:48), Wang Nan wrote:
+>>>>> In discussion on LKML (https://lkml.org/lkml/2014/11/28/158), Russell
+>>>>> King suggest to move all probe related code to arch/arm/probes. This
+>>>>> patch do the work. Due to dependency on 'arch/arm/kernel/patch.h', this
+>>>>> patch also move patch.h to 'arch/arm/include/asm/patch.h', and related
+>>>>> '#include' directive are also midified to '#include <asm/patch.h>'.
+>>>>
+>>>> Moving is good to me, but renaming files are also required I think.
+>>>>
+>>>>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+>>>>> ---
+>>>>>  arch/arm/Makefile                                |  1 +
+>>>>>  arch/arm/{kernel => include/asm}/patch.h         |  0
+>>>>>  arch/arm/kernel/Makefile                         | 16 ++--------------
+>>>>>  arch/arm/kernel/jump_label.c                     |  2 +-
+>>>>>  arch/arm/kernel/patch.c                          |  3 +--
+>>>>>  arch/arm/probes/Makefile                         | 15 +++++++++++++++
+>>>>>  arch/arm/{kernel => probes}/kprobes-arm.c        |  0
+>>>>>  arch/arm/{kernel => probes}/kprobes-common.c     |  0
+>>>>>  arch/arm/{kernel => probes}/kprobes-test-arm.c   |  0
+>>>>>  arch/arm/{kernel => probes}/kprobes-test-thumb.c |  0
+>>>>>  arch/arm/{kernel => probes}/kprobes-test.c       |  0
+>>>>>  arch/arm/{kernel => probes}/kprobes-test.h       |  0
+>>>>>  arch/arm/{kernel => probes}/kprobes-thumb.c      |  0
+>>>>>  arch/arm/{kernel => probes}/kprobes.c            |  2 +-
+>>>>>  arch/arm/{kernel => probes}/kprobes.h            |  0
+>>>>>  arch/arm/{kernel => probes}/probes-arm.c         |  0
+>>>>>  arch/arm/{kernel => probes}/probes-arm.h         |  0
+>>>>>  arch/arm/{kernel => probes}/probes-thumb.c       |  0
+>>>>>  arch/arm/{kernel => probes}/probes-thumb.h       |  0
+>>>>>  arch/arm/{kernel => probes}/probes.c             |  0
+>>>>>  arch/arm/{kernel => probes}/probes.h             |  0
+>>>>>  arch/arm/{kernel => probes}/uprobes-arm.c        |  0
+>>>>>  arch/arm/{kernel => probes}/uprobes.c            |  0
+>>>>>  arch/arm/{kernel => probes}/uprobes.h            |  0
+>>>>
+>>>> As I did on x86, these would be better renamed as expressing what they do.
+>>>> I guess most of the files may have emulate-*.c or decode-*.c :)
+>>>>
+>>>> Thank you,
+>>>>
 >>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index 18a21d9..db51a31 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -58,7 +58,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b-plus.dtb
->>>  dtb-$(CONFIG_ARCH_BCM_5301X) += \
->>>       bcm4708-buffalo-wzr-1750dhp.dtb \
->>>       bcm4708-netgear-r6250.dtb \
->>> -     bcm4708-netgear-r6300-v2.dtb
->>> +     bcm4708-netgear-r6300-v2.dtb \
->>> +     bcm47081-asus-rt-n18u.dtb
->>>  dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
->>>  dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
->>>       bcm911360k.dtb \
->>> diff --git a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
->>> new file mode 100644
->>> index 0000000..c40ad39
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
->>> @@ -0,0 +1,78 @@
->>> +/*
->>> + * Broadcom BCM470X / BCM5301X ARM platform code.
->>> + * DTS for Asus RT-N18U
->>> + *
->>> + * Copyright ? 2014 Rafa? Mi?ecki <zajec5@gmail.com>
->>> + *
->>> + * Licensed under the GNU/GPL. See COPYING for details.
->>> + */
->>> +
->>> +/dts-v1/;
->>> +
->>> +#include "bcm47081.dtsi"
->>> +
->>> +/ {
->>> +     compatible = "asus,rt-n18u", "brcm,bcm47081";
+>>> OK. I posted another patch in this thread. The directory tree is as follow:
+>>>
+>>> arch/arm/probes/
+>>> |-- Makefile
+>>> |-- decode-arm.c
+>>> |-- decode-arm.h
+>>> |-- decode-thumb.c
+>>> |-- decode-thumb.h
+>>> |-- decode.c
+>>> |-- decode.h
+>>> |-- kprobes
+>>> |   |-- actions-arm.c
+>>> |   |-- actions-common.c
+>>> |   |-- actions-thumb.c
+>>> |   |-- kprobes.c
+>>> |   |-- kprobes.h
+>>> |   |-- test-arm.c
+>>> |   |-- test-core.c
+>>> |   |-- test-core.h
+>>> |   `-- test-thumb.c
+>>> `-- uprobes
+>>>     |-- actions-arm.c
+>>>     |-- uprobes.c
+>>>     `-- uprobes.h
+>>>
+>>> 2 directories, 19 files
+>>>
+>>> What do you think?
 >>
->> Instead of adding bcm47081 to the core code you can do this:
+>> Yeah, that looks better :)
 >>
->> compatible = "asus,rt-n18u", "brcm,bcm47081", "brcm,bcm4708";
+>> Btw, if you introduce probes/{kprobes,uprobes}/, *probes.c should be core.c too,
+>> since the directories already show its name. And also, both dirs should have its
+>> own Makefile.
 >>
->> If we later need some special handling for bcm47081 we can add this but
->> the old dts file will still work. This is more relevant if the dts file
->> is in the boot loader.
->
-> I don't get it. How should I detect there is no second CPU?
+> 
+> Seprated Makefile may introduce extra complexity. Think about someone try to compile
+> kprobe as a module (currently it is impossible due to dependencies between kprobe and
+> kernel core, but decoupling is possible), seprated Makefiles may force him to
+> create at least 3 modules for kprobe, even if one module is enough.
 
-Or did you mean using fact that currently we don't boot the second
-CPU? I don't think we can do that. We should describe the hardware,
-not drivers/arch capabilities. We shouldn't change DTS after adding
-support for boooting 2nd CPU core.
+Hmm, OK, agreed.
+
+> 
+> Anyway, there may some features in kernel build system can help him. I'll post
+> v12 patch series based on your suggestion.
+
+Thanks! :)
+
 
 -- 
-Rafa?
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
