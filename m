@@ -1,41 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 03 Dec 2014 14:59:00 +0000
-Subject: [PATCH 00/16] irqchip: gic: killing gic_arch_extn, slowly
-In-Reply-To: <2236572.MdjJGoEARl@wuerfel>
-References: <1417539497-20101-1-git-send-email-marc.zyngier@arm.com>
- <2236572.MdjJGoEARl@wuerfel>
-Message-ID: <547F2534.6040104@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 3 Dec 2014 16:08:15 +0100
+Subject: [PATCH 1/2] pinctrl: at91: allow disabled gpio controllers
+In-Reply-To: <CACRpkdbXuXyfwAyFTHVDGa4OS88KsHXZeDDAeXf6ZJ_JQmduoQ@mail.gmail.com>
+References: <1417193367-12422-1-git-send-email-ludovic.desroches@atmel.com>
+ <CACRpkdbXuXyfwAyFTHVDGa4OS88KsHXZeDDAeXf6ZJ_JQmduoQ@mail.gmail.com>
+Message-ID: <20141203150814.GD2714@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 03/12/14 14:30, Arnd Bergmann wrote:
-> On Tuesday 02 December 2014 16:58:01 Marc Zyngier wrote:
->>
->> - This actively *breaks* existing setups. Once you boot a new kernel
->>   with an old DT, suspend/resume *will* be broken. Old kernels on a
->>   new DT won't even boot! You've been warned. This really outline the
->>   necessity of actually describing the HW in device trees...
+On Mon, Dec 01, 2014 at 02:56:22PM +0100, Linus Walleij wrote:
+> On Fri, Nov 28, 2014 at 5:49 PM, Ludovic Desroches
+> <ludovic.desroches@atmel.com> wrote:
 > 
-> I wonder if we should take this as the trigger to come up with a
-> better way of handling incompatible binding changes. The machine_desc
-> has a .dt_fixup callback that we could use to modify the DT passed
-> from a boot loader and warn about it, but no platform does this
-> at the moment.
+> > This patch allows to have gpio controller with status set to disabled.
+> >
+> > gpio_banks represents all the gpio banks available on the device whereas
+> > nbanks represents the gpio banks used. Having a disabled gpio controller
+> > involves that nbanks value is lower than gpio_banks and that some
+> > pointers in the gpio_chips array are NULL. This patch deals with these
+> > specific cases.
+> >
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 > 
-> From what I can tell, the required change to get an old dtb working
-> with a new kernel is to add a particular node and flip a few
-> interrupt-parent properties, which seems doable as a quirk if
-> people agree that it's a good idea.
+> (...)
+> >         /* We will handle a range of GPIO pins */
+> > -       for (i = 0; i < info->nbanks; i++)
+> > -               pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
+> > +       for (i = 0; i < gpio_banks; i++)
+> > +               if (gpio_chips[i])
+> > +                       pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
+> 
+> I highly suspect the real solution to this problem is to get rid
+> of the pinctrl_add_gpio_range() call from the driver.
+> 
+> Remobe these calls, and instead in at91_gpio_probe() in the same
+> file, call gpiochip_add_pingroup_range() for each GPIO chip.
+> 
+> That way the GPIO ranges are inserted from the GPIO side instead
+> of the pinctrl side, which is way better, since it is more relative,
+> and make you only add ranges for the gpio chips actually there.
 
-That's probably the only way to avoid the breakage introduced by this
-kind of changes. A few questions though:
-- Where do we stop? Eventually, don't we end-up with a full DT in there?
-- When do we retire such fixup? Or do we keep them forever?
+I had a quick look to Documentation about that stuff, I totally agree
+that it is a better approach. Before going further I was wondering if it
+would not cause backward compatibility issue with old dtb (it seems I'll
+have to add some properties to gpio controllers).
 
-Thanks,
+Regards
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Ludovic
