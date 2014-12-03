@@ -1,27 +1,28 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Wed, 3 Dec 2014 12:24:07 -0800
-Subject: [PATCH] ARM: dts: Add dts file for odroid XU3 board
-In-Reply-To: <1417438770-28696-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1417438770-28696-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <CANMBJr4B-c-eMCvwexW5_WhfK=xsJ0-Cjo_OApTpUXP3zBG-kw@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 03 Dec 2014 21:24:22 +0100
+Subject: [PATCH] ARM: pxa: fix lubbock interrupts handling
+In-Reply-To: <CAN1soZzZ7nuvvHguaHVHZc8hXvv8SzvWY9Ejf-fYhA5yfbcM-w@mail.gmail.com>
+ (Haojian Zhuang's message of "Sat, 29 Nov 2014 00:02:15 +0800")
+References: <1417113721-9062-1-git-send-email-robert.jarzmik@free.fr>
+ <alpine.DEB.2.11.1411272258010.3961@nanos> <87r3wn1mhu.fsf@free.fr>
+ <CAN1soZzZ7nuvvHguaHVHZc8hXvv8SzvWY9Ejf-fYhA5yfbcM-w@mail.gmail.com>
+Message-ID: <87r3wgzdl5.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 December 2014 at 04:59, Sjoerd Simons
-<sjoerd.simons@collabora.co.uk> wrote:
-> Add DTS for the Hardkernel Odroid XU3. The name of the DTS file is kept the
-> same as the vendors naming, which means it's prefixed with exynos5422
-> instead of exynos5800 as the SoC name even though it includes the
-> exyno5800 dtsi.
+Haojian Zhuang <haojian.zhuang@gmail.com> writes:
+
 >
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> I think that it's a kind of irq muxing, just like lots of PMIC (power
+> management IC).
+> We should move the lubbock board irqs to a mfd driver, and register them as
+> threaded irqs.
+I will have a look.
 
-Tested-by: Tyler Baker <tyler.baker@linaro.org>
+I didn't consider mfd for motherboard gates, I'll think of it, thanks for the
+idea.
 
-Tested this atop of next-20141203 both on exynos_defconfig and
-multi_v7_defconfig. All configurations boot fine on my odroid-xu3
-board, no imprecise aborts observed either.
+Cheers.
 
-Thanks!
-
-Tyler
+-- 
+Robert
