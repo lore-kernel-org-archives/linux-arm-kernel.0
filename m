@@ -1,83 +1,139 @@
-From: zlim.lnx@gmail.com (Zi Shen Lim)
-Date: Wed,  3 Dec 2014 00:38:01 -0800
-Subject: [PATCH] bpf: arm64: lift restriction on last instruction
-Message-ID: <1417595881-32218-1-git-send-email-zlim.lnx@gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 3 Dec 2014 09:39:45 +0100
+Subject: [PATCH v3] ARM: zynq: DT: Add USB to device tree
+In-Reply-To: <1417536431-27759-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1417536431-27759-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <d78fedd84f354d80985187f851cb3cd1@BN1AFFO11FD055.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Earlier implementation assumed last instruction is BPF_EXIT.
-Since this is no longer a restriction in eBPF, we remove this
-limitation.
+On 12/02/2014 05:07 PM, Soren Brinkmann wrote:
+> Add USB nodes to zc702, zc706 and zed device trees.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+> v3:
+>  - rename phy nodes: usb_phy -> phy0
+>  - rebased onto zynq/dt
+> v2:
+>  - remove '@0' from phy node name
+>  - don't add bogus space
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 20 ++++++++++++++++++++
+>  arch/arm/boot/dts/zynq-zc702.dts | 11 +++++++++++
+>  arch/arm/boot/dts/zynq-zc706.dts | 10 ++++++++++
+>  arch/arm/boot/dts/zynq-zed.dts   | 10 ++++++++++
+>  4 files changed, 51 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index f8e4a28adfc0..21aae01a3fe9 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -314,5 +314,25 @@
+>  			reg = <0xf8f00600 0x20>;
+>  			clocks = <&clkc 4>;
+>  		};
+> +
+> +		usb0: usb at e0002000 {
+> +			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
+> +			status = "disabled";
+> +			clocks = <&clkc 28>;
+> +			interrupt-parent = <&intc>;
+> +			interrupts = <0 21 4>;
+> +			reg = <0xe0002000 0x1000>;
+> +			phy_type = "ulpi";
+> +		};
+> +
+> +		usb1: usb at e0003000 {
+> +			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
+> +			status = "disabled";
+> +			clocks = <&clkc 29>;
+> +			interrupt-parent = <&intc>;
+> +			interrupts = <0 44 4>;
+> +			reg = <0xe0003000 0x1000>;
+> +			phy_type = "ulpi";
+> +		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+> index 280f02dd4ddc..399fed4d9c19 100644
+> --- a/arch/arm/boot/dts/zynq-zc702.dts
+> +++ b/arch/arm/boot/dts/zynq-zc702.dts
+> @@ -36,6 +36,11 @@
+>  			linux,default-trigger = "heartbeat";
+>  		};
+>  	};
+> +
+> +	usb_phy0: phy0 {
+> +		compatible = "usb-nop-xceiv";
+> +		#phy-cells = <0>;
+> +	};
+>  };
+>  
+>  &can0 {
+> @@ -139,3 +144,9 @@
+>  &uart1 {
+>  	status = "okay";
+>  };
+> +
+> +&usb0 {
+> +	status = "okay";
+> +	dr_mode = "host";
+> +	usb-phy = <&usb_phy0>;
+> +};
+> diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+> index 34f7812d2ee8..89cc9adc569d 100644
+> --- a/arch/arm/boot/dts/zynq-zc706.dts
+> +++ b/arch/arm/boot/dts/zynq-zc706.dts
+> @@ -27,6 +27,10 @@
+>  		bootargs = "console=ttyPS0,115200 earlyprintk";
+>  	};
+>  
+> +	usb_phy0: phy0 {
+> +		compatible = "usb-nop-xceiv";
+> +		#phy-cells = <0>;
+> +	};
+>  };
+>  
+>  &clkc {
+> @@ -118,3 +122,9 @@
+>  &uart1 {
+>  	status = "okay";
+>  };
+> +
+> +&usb0 {
+> +	status = "okay";
+> +	dr_mode = "host";
+> +	usb-phy = <&usb_phy0>;
+> +};
+> diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
+> index 1c7cc990b47a..e20956e5e720 100644
+> --- a/arch/arm/boot/dts/zynq-zed.dts
+> +++ b/arch/arm/boot/dts/zynq-zed.dts
+> @@ -27,6 +27,10 @@
+>  		bootargs = "console=ttyPS0,115200 earlyprintk";
+>  	};
+>  
+> +	usb_phy0: phy0 {
+> +		compatible = "usb-nop-xceiv";
+> +		#phy-cells = <0>;
+> +	};
+>  };
+>  
+>  &clkc {
+> @@ -50,3 +54,9 @@
+>  &uart1 {
+>  	status = "okay";
+>  };
+> +
+> +&usb0 {
+> +	status = "okay";
+> +	dr_mode = "host";
+> +	usb-phy = <&usb_phy0>;
+> +};
+> 
 
-Per Alexei Starovoitov [1]:
-> classic BPF has a restriction that last insn is always BPF_RET.
-> eBPF doesn't have BPF_RET instruction and this restriction.
-> It has BPF_EXIT insn which can appear anywhere in the program
-> one or more times and it doesn't have to be last insn.
+Applied to zynq/dt.
 
-[1] https://lkml.org/lkml/2014/11/27/2
-
-Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
-Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
----
- arch/arm64/net/bpf_jit_comp.c | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index 41f1e3e..edba042 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -60,7 +60,7 @@ struct jit_ctx {
- 	const struct bpf_prog *prog;
- 	int idx;
- 	int tmp_used;
--	int body_offset;
-+	int epilogue_offset;
- 	int *offset;
- 	u32 *image;
- };
-@@ -130,8 +130,8 @@ static void jit_fill_hole(void *area, unsigned int size)
- 
- static inline int epilogue_offset(const struct jit_ctx *ctx)
- {
--	int to = ctx->offset[ctx->prog->len - 1];
--	int from = ctx->idx - ctx->body_offset;
-+	int to = ctx->epilogue_offset;
-+	int from = ctx->idx;
- 
- 	return to - from;
- }
-@@ -463,6 +463,8 @@ emit_cond_jmp:
- 	}
- 	/* function return */
- 	case BPF_JMP | BPF_EXIT:
-+		/* Optimization: when last instruction is EXIT,
-+		   simply fallthrough to epilogue. */
- 		if (i == ctx->prog->len - 1)
- 			break;
- 		jmp_offset = epilogue_offset(ctx);
-@@ -685,11 +687,13 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
- 
- 	/* 1. Initial fake pass to compute ctx->idx. */
- 
--	/* Fake pass to fill in ctx->offset. */
-+	/* Fake pass to fill in ctx->offset and ctx->tmp_used. */
- 	if (build_body(&ctx))
- 		goto out;
- 
- 	build_prologue(&ctx);
-+
-+	ctx.epilogue_offset = ctx.idx;
- 	build_epilogue(&ctx);
- 
- 	/* Now we know the actual image size. */
-@@ -706,7 +710,6 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
- 
- 	build_prologue(&ctx);
- 
--	ctx.body_offset = ctx.idx;
- 	if (build_body(&ctx)) {
- 		bpf_jit_binary_free(header);
- 		goto out;
--- 
-1.9.1
+Thanks,
+Michal
