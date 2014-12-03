@@ -1,53 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Dec 2014 11:56:29 +0100
-Subject: [PATCH 10/12] ARM: vf610m4: add new machine and SoC for Vybrid on
+Date: Wed, 03 Dec 2014 12:03:37 +0100
+Subject: [PATCH 11/12] ARM: dts: add support for Vybrid running on
  Cortex-M4
-In-Reply-To: <1417565531-4507-11-git-send-email-stefan@agner.ch>
+In-Reply-To: <1417565531-4507-12-git-send-email-stefan@agner.ch>
 References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
- <1417565531-4507-11-git-send-email-stefan@agner.ch>
-Message-ID: <2188062.Vg1qCai6yo@wuerfel>
+ <1417565531-4507-12-git-send-email-stefan@agner.ch>
+Message-ID: <2994970.DCfUQgtmcD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 December 2014 01:12:09 Stefan Agner wrote:
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 89c4b5c..fdebe18 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -459,6 +459,18 @@ config ARCH_FOOTBRIDGE
->  	  Support for systems based on the DC21285 companion chip
->  	  ("FootBridge"), such as the Simtec CATS and the Rebel NetWinder.
->  
-> +menuconfig ARCH_MXCM4
-> +	bool "Freescale Vybrid/i.MX family on Cortex-M4" if !MMU
-> +	select ARCH_REQUIRE_GPIOLIB
-> +	select ARM_CPU_SUSPEND if PM
-> +	select CLKSRC_MMIO
-> +	select GENERIC_IRQ_CHIP
-> +	select PINCTRL
-> +	select PM_OPP if PM
-> +	select SOC_BUS
-> +	help
-> +	  Support for Freescale Vybrid/iMX-based family of processors on Cortex-M4
+On Wednesday 03 December 2014 01:12:10 Stefan Agner wrote:
+> diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
+> new file mode 100644
+> index 0000000..051ee0f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/vf610m4-colibri.dts
+> @@ -0,0 +1,52 @@
+> +/*
+> + * Device tree for Colibri VF61 Cortex-M4 support
+> + *
+> + * Copyright 2014 Stefan Agner
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
 > +
->  config ARCH_NETX
->  	bool "Hilscher NetX based"
->  	select ARM_VIC
+> +/dts-v1/;
+> +#include "vf610m4.dtsi"
+> +
+> +/ {
+> +       model = "VF610 Cortex-M4";
+> +       compatible = "fsl,vf610m4";
+> +
+> +       chosen {
+> +               bootargs = "console=ttyLP2,115200 ihash_entries=64 dhash_entries=64 earlyprintk clk_ignore_unused init=/linuxrc rw";
+> +       };
+> +
 
-I would really prefer not to see any more standalone machine types,
-but rather have ARMv7-M as one of the options for the
-multiplatform configuration. In particular, that would let us
-do *build* testing on a combined mxcm4/efm32/vexpress kernel,
-although that kernel would clearly not be usable anywhere
-because of the restrictions of nommu machines.
+Starting with v3.19, you should be able to use the earlycon framework on
+arm32, so it would be better to replace earlyprintk with earlycon here
+and add a stdout-path property in chosen that points to the console
+uart.
 
-> +static void __init vf610m4_init_irq(void)
-> +{
-> +	vf610_mscm_init();
-> +	irqchip_init();
-> +}
-
-Can you make vf610_mscm_init get called from irqchip and remove this
-function?
+64 hash table entries sounds extremely small, doesn't that impact
+performance? If you have 50MB of actual RAM available, I don't think
+you need that.
 
 	Arnd
