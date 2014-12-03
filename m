@@ -1,86 +1,153 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  3 Dec 2014 12:32:04 +0100
-Subject: [PATCH 05/11] usb: gadget: at91_udc: Remove non-DT handling code
+Date: Wed,  3 Dec 2014 12:32:08 +0100
+Subject: [PATCH 09/11] usb: gadget: at91_udc: Allocate udc instance
 In-Reply-To: <1417606330-17753-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1417606330-17753-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1417606330-17753-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1417606330-17753-10-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since non-DT board support has been removed from the at91 architecture we
-can safely remove non-DT handling code.
+Allocate udc structure instead of relying on the statically declared
+object.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/usb/gadget/udc/Kconfig    |  1 +
- drivers/usb/gadget/udc/at91_udc.c | 16 ++--------------
- 2 files changed, 3 insertions(+), 14 deletions(-)
+ drivers/usb/gadget/udc/at91_udc.c | 101 ++++++++++----------------------------
+ 1 file changed, 27 insertions(+), 74 deletions(-)
 
-diff --git a/drivers/usb/gadget/udc/Kconfig b/drivers/usb/gadget/udc/Kconfig
-index 217365d..36a598d 100644
---- a/drivers/usb/gadget/udc/Kconfig
-+++ b/drivers/usb/gadget/udc/Kconfig
-@@ -32,6 +32,7 @@ menu "USB Peripheral Controller"
- config USB_AT91
- 	tristate "Atmel AT91 USB Device Port"
- 	depends on ARCH_AT91
-+	depends on OF || COMPILE_TEST
- 	help
- 	   Many Atmel AT91 processors (such as the AT91RM2000) have a
- 	   full speed USB Device Port with support for five configurable
 diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
-index 4ecb576..e7984c0 100644
+index f870c03..2b20dd7 100644
 --- a/drivers/usb/gadget/udc/at91_udc.c
 +++ b/drivers/usb/gadget/udc/at91_udc.c
-@@ -1697,12 +1697,6 @@ static int at91udc_probe(struct platform_device *pdev)
- 	int		retval;
- 	struct resource	*res;
+@@ -59,7 +59,15 @@
+ #define	DRIVER_VERSION	"3 May 2006"
  
--	if (!dev_get_platdata(dev) && !pdev->dev.of_node) {
--		/* small (so we copy it) but critical! */
--		DBG("missing platform_data\n");
--		return -ENODEV;
--	}
+ static const char driver_name [] = "at91_udc";
+-static const char ep0name[] = "ep0";
++static const char * const ep_names[] = {
++	"ep0",
++	"ep1",
++	"ep2",
++	"ep3-int",
++	"ep4",
++	"ep5",
++};
++#define ep0name		ep_names[0]
+ 
+ #define VBUS_POLL_TIMEOUT	msecs_to_jiffies(1000)
+ 
+@@ -1477,78 +1485,6 @@ static void nop_release(struct device *dev)
+ 	/* nothing to free */
+ }
+ 
+-static struct at91_udc controller = {
+-	.gadget = {
+-		.ops	= &at91_udc_ops,
+-		.ep0	= &controller.ep[0].ep,
+-		.name	= driver_name,
+-		.dev	= {
+-			.init_name = "gadget",
+-			.release = nop_release,
+-		}
+-	},
+-	.ep[0] = {
+-		.ep = {
+-			.name	= ep0name,
+-			.ops	= &at91_ep_ops,
+-		},
+-		.udc		= &controller,
+-		.maxpacket	= 8,
+-		.int_mask	= 1 << 0,
+-	},
+-	.ep[1] = {
+-		.ep = {
+-			.name	= "ep1",
+-			.ops	= &at91_ep_ops,
+-		},
+-		.udc		= &controller,
+-		.is_pingpong	= 1,
+-		.maxpacket	= 64,
+-		.int_mask	= 1 << 1,
+-	},
+-	.ep[2] = {
+-		.ep = {
+-			.name	= "ep2",
+-			.ops	= &at91_ep_ops,
+-		},
+-		.udc		= &controller,
+-		.is_pingpong	= 1,
+-		.maxpacket	= 64,
+-		.int_mask	= 1 << 2,
+-	},
+-	.ep[3] = {
+-		.ep = {
+-			/* could actually do bulk too */
+-			.name	= "ep3-int",
+-			.ops	= &at91_ep_ops,
+-		},
+-		.udc		= &controller,
+-		.maxpacket	= 8,
+-		.int_mask	= 1 << 3,
+-	},
+-	.ep[4] = {
+-		.ep = {
+-			.name	= "ep4",
+-			.ops	= &at91_ep_ops,
+-		},
+-		.udc		= &controller,
+-		.is_pingpong	= 1,
+-		.maxpacket	= 256,
+-		.int_mask	= 1 << 4,
+-	},
+-	.ep[5] = {
+-		.ep = {
+-			.name	= "ep5",
+-			.ops	= &at91_ep_ops,
+-		},
+-		.udc		= &controller,
+-		.is_pingpong	= 1,
+-		.maxpacket	= 256,
+-		.int_mask	= 1 << 5,
+-	},
+-	/* ep6 and ep7 are also reserved (custom silicon might use them) */
+-};
 -
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res)
- 		return -ENXIO;
-@@ -1715,11 +1709,7 @@ static int at91udc_probe(struct platform_device *pdev)
+ static void at91_vbus_update(struct at91_udc *udc, unsigned value)
+ {
+ 	value ^= udc->board.vbus_active_low;
+@@ -1859,15 +1795,32 @@ static int at91udc_probe(struct platform_device *pdev)
+ 	struct at91_ep	*ep;
+ 	int		i;
+ 
++	udc = devm_kzalloc(dev, sizeof(*udc), GFP_KERNEL);
++	if (!udc)
++		return -ENOMEM;
++
  	/* init software state */
- 	udc = &controller;
+-	udc = &controller;
  	udc->gadget.dev.parent = dev;
--	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
--		at91udc_of_init(udc, pdev->dev.of_node);
--	else
--		memcpy(&udc->board, dev_get_platdata(dev),
--		       sizeof(struct at91_udc_data));
-+	at91udc_of_init(udc, pdev->dev.of_node);
+ 	at91udc_of_init(udc, pdev->dev.of_node);
  	udc->pdev = pdev;
  	udc->enabled = 0;
  	spin_lock_init(&udc->lock);
-@@ -1955,14 +1945,12 @@ static int at91udc_resume(struct platform_device *pdev)
- #define	at91udc_resume	NULL
- #endif
  
--#if defined(CONFIG_OF)
- static const struct of_device_id at91_udc_dt_ids[] = {
- 	{ .compatible = "atmel,at91rm9200-udc" },
- 	{ /* sentinel */ }
- };
++	udc->gadget.ops = &at91_udc_ops;
++	udc->gadget.ep0 = &udc->ep[0].ep;
++	udc->gadget.name = driver_name;
++	udc->gadget.dev.init_name = "gadget";
++	udc->gadget.dev.release = nop_release;
  
- MODULE_DEVICE_TABLE(of, at91_udc_dt_ids);
--#endif
++	for (i = 0; i < NUM_ENDPOINTS; i++) {
++		ep = &udc->ep[i];
++		ep->ep.name = ep_names[i];
++		ep->ep.ops = &at91_ep_ops;
++		ep->udc = udc;
++		ep->int_mask = BIT(i);
++		if (i != 0 && i != 3)
++			ep->is_pingpong = 1;
++	}
  
- static struct platform_driver at91_udc_driver = {
- 	.remove		= __exit_p(at91udc_remove),
-@@ -1972,7 +1960,7 @@ static struct platform_driver at91_udc_driver = {
- 	.driver		= {
- 		.name	= (char *) driver_name,
- 		.owner	= THIS_MODULE,
--		.of_match_table	= of_match_ptr(at91_udc_dt_ids),
-+		.of_match_table	= at91_udc_dt_ids,
- 	},
- };
- 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	udc->udp_baseaddr = devm_ioremap_resource(dev, res);
 -- 
 1.9.1
