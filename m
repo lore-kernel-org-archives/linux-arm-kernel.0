@@ -1,55 +1,74 @@
-From: rk@ti.com (Ravikumar Kattekola)
-Date: Wed, 3 Dec 2014 17:33:57 +0530
-Subject: [PATCH 2/2] ARM: dts: dra7-evm: Update SMPS7 (VDD_CORE) max voltage
- to match DM
-In-Reply-To: <1417608237-12258-1-git-send-email-rk@ti.com>
-References: <1417608237-12258-1-git-send-email-rk@ti.com>
-Message-ID: <1417608237-12258-3-git-send-email-rk@ti.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 03 Dec 2014 12:03:59 +0000
+Subject: [PATCH v4 15/19] arm/arm64: KVM: add virtual GICv3 distributor
+ emulation
+In-Reply-To: <CAFEAcA9=qB9iyuvxCCjqgx3DpXqw+x2g0acfh9KwDZK7bp2ACg@mail.gmail.com>
+References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
+ <20141203102829.GA17502@cbox> <547EEF9A.9010906@arm.com>
+ <2906594.cDZcXzbGMh@wuerfel>
+ <CAFEAcA9=qB9iyuvxCCjqgx3DpXqw+x2g0acfh9KwDZK7bp2ACg@mail.gmail.com>
+Message-ID: <547EFC2F.1040604@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per the latest Data Manual, for newer samples,
-the nominal voltage required for VDD_CORE at OPP_NOM can be
-upto 1.06V which was 1.03V earlier.
+On 03/12/14 11:39, Peter Maydell wrote:
+> On 3 December 2014 at 11:28, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Wednesday 03 December 2014 11:10:18 Andre Przywara wrote:
+>>> Currently we have in QEMU:
+>>>    0 MB -  128 MB: Flash
+>>>  128 MB -  144 MB: CPU peripherals (GIC for now only)
+>>>  144 MB -  144 MB: UART (64k)
+>>>  144 MB -  144 MB: RTC (64k)
+>>>  160 MB -  256 MB: virtio (32 * 512 Bytes used)
+>>>  256 MB - 1024 MB: PCI
+>>> 1024 MB - ???? MB: DRAM
+>>>
+>>> So we waste quite some space between 144 MB and 256 MB, where we
+>>> currently use only 3 64K pages. If we would move those three pages
+>>> closer to the 256 MB region, we could extend the GIC mapping space from
+>>> 16 MB (127 VCPUs) to almost 128 MB (good for 1022 VCPUs).
+> 
+> Note that part of the reason for that gap is to give us space
+> to add more memory-mapped peripherals as they are needed.
+> For instance the fw_cfg conduit for talking to UEFI firmware
+> is going to need another 64K page in that section.
 
-Update the regulator max voltage constraint for SMPS7,
-connected to VDD_CORE, to meet this requirement.
+Sure, that was just to show the situation in general. We could do
+something like kvmtool and grow the CPU peripheral space and the device
+MMIO pages from different directions to not waste space needlessly.
+So UART, RTC, virtio and future devices use space from 128MB upwards,
+whereas the GIC uses as much space below 256 MB as needed.
 
-Document reference:
-DRA74 Data Manual, SPRS857M - Dec 2012, Revised Oct 2014.
-DRA72 Data Manual, SPRS906G - Dec 2012, revised Oct 2014.
+Btw.: Is there an issue with not aligning each virtio device to a 64K
+page? Will we never need to separate access to virtio devices in a guest
+with MMU help?
 
-Signed-off-by: Ravikumar Kattekola <rk@ti.com>
----
- arch/arm/boot/dts/dra7-evm.dts  |    2 +-
- arch/arm/boot/dts/dra72-evm.dts |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+>> Having a more compressed mapping sounds useful, but you could also consider
+>> carving the GIC registers out of the PCI range and make PCI memory space
+>> smaller if there are lots of CPUs.
+>>
+>> Is there also a 64-bit PCI memory space behind the DRAM?
+> 
+> The "PCI" section at the moment is purely hypothetical -- it's
+> a lump of reserved space in the memory map that I put in so
+> we had a place to put PCI later... The DRAM is just the last
+> thing in the memory map and goes up for as much DRAM as you
+> asked QEMU to provide, so in that sense there's no "behind"
+> there.
+> 
+> We could (at least at the moment) shuffle things around a bit,
+> since guests should all be looking at the DTB to figure where
+> things are. About the only thing we can't do is move the base
+> address of RAM or put the flash somewhere other than 0. If
+> we do need to make changes I'd rather we figured out the new
+> layout and switched to it rather than doing a set of piecemeal
+> tweaks, though.
 
-diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index b6b9286..10b725c 100644
---- a/arch/arm/boot/dts/dra7-evm.dts
-+++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -313,7 +313,7 @@
- 					/* CORE_VDD */
- 					regulator-name = "smps7";
- 					regulator-min-microvolt = <850000>;
--					regulator-max-microvolt = <1030000>;
-+					regulator-max-microvolt = <1060000>;
- 					regulator-always-on;
- 					regulator-boot-on;
- 				};
-diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
-index afc74fd..89085d0 100644
---- a/arch/arm/boot/dts/dra72-evm.dts
-+++ b/arch/arm/boot/dts/dra72-evm.dts
-@@ -160,7 +160,7 @@
- 					/* VDD_CORE */
- 					regulator-name = "smps2";
- 					regulator-min-microvolt = <850000>;
--					regulator-max-microvolt = <1030000>;
-+					regulator-max-microvolt = <1060000>;
- 					regulator-boot-on;
- 					regulator-always-on;
- 				};
--- 
-1.7.9.5
+Agreed. As QEMU does not support GICv3 anyway at the moment, there is no
+need to rush things.
+
+Is there any sign of a PCI host controller emulation for QEMU on the
+horizon?
+
+Cheers,
+Andre.
