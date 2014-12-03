@@ -1,59 +1,40 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Wed, 03 Dec 2014 15:03:32 +0200
-Subject: [PATCH v2 7/7] pinctrl: qcom-spmi-gpio: Migrate to pinconf-generic
-In-Reply-To: <1417137993-8337-8-git-send-email-soren.brinkmann@xilinx.com>
-References: <1417137993-8337-1-git-send-email-soren.brinkmann@xilinx.com>
- <1417137993-8337-8-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1417611812.30615.28.camel@mm-sol.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 3 Dec 2014 07:04:23 -0600
+Subject: [PATCH 0/2] ARM: dts: dra7-evm: Regulator max voltage fixes
+In-Reply-To: <1417608237-12258-1-git-send-email-rk@ti.com>
+References: <1417608237-12258-1-git-send-email-rk@ti.com>
+Message-ID: <547F0A57.7040806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Thu, 2014-11-27 at 17:26 -0800, Soren Brinkmann wrote:
-> Instead of the driver caring about implementation details like device
-> tree, just provide information about driver specific pinconf parameters
-> to pinconf-generic which takes care of parsing the DT.
+On 12/03/2014 06:03 AM, Ravikumar Kattekola wrote:
+> Hi,
 > 
-> Signed-off-by: Soren Brinkmann brinkmann at xilinx.com>
-> ---
-> This is compile tested only. So, it's likely that it needs more tweaking
-> to make it actually work on HW. But it illustrates the potential
-> benefits of the pinconf-generic changes in this series.
-> ---
->  drivers/pinctrl/qcom/pinctrl-spmi-gpio.c | 125 +++----------------------------
->  1 file changed, 11 insertions(+), 114 deletions(-)
+> This set does a minor fix and an update:
 > 
-> diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-> index b863b5080890..2db85e53ef73 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-> @@ -131,14 +131,14 @@ struct pmic_gpio_state {
->         struct gpio_chip chip;
->  };
+>    - Fix a typo in the max voltage property of smps6 (vdd_gpu) regulator node added by
+>      the patch : c56a831ca47e ("ARM: dts: DRA7: Add TPS659038 PMIC nodes")
 > 
-> -struct pmic_gpio_bindings {
-> -       const char*property;
-> -       unsigned      param;
-> +static const struct pinconf_generic_dt_params pmic_gpio_bindings[] = {
-> +       {"qcom,pull-up-strength",PMIC_GPIO_CONF_PULL_UP,0},
-> +       {"qcom,drive-strength",PMIC_GPIO_CONF_STRENGTH,0},
->  };
+>    - Update max voltage property of smps7 (vdd_core) regulator node to align with the 
+>      latest Data Manual
 > 
-> -static struct pmic_gpio_bindings pmic_gpio_bindings[] = {
-> -       {"qcom,pull-up-strength",PMIC_GPIO_CONF_PULL_UP},
-> -       {"qcom,drive-strength",PMIC_GPIO_CONF_STRENGTH},
-> +static const struct pin_config_item pmic_conf_items[] = {
-> +       PCONFDUMP(PMIC_GPIO_CONF_PULL_UP,  "pull-up-strength", NULL, true),
-
-s/pull-up-strength/qcom,pull-up-strength/
-
-> +       PCONFDUMP(PMIC_GPIO_CONF_STRENGTH, "drive-strength", NULL, true),
->  };
+> Regards,
+> RK
 > 
+> Ravikumar Kattekola (2):
+>   ARM: dts: dra7-evm: Fix typo in SMPS6 (VDD_GPU) max voltage
+>   ARM: dts: dra7-evm: Update SMPS7 (VDD_CORE) max voltage to match DM
+> 
+>  arch/arm/boot/dts/dra7-evm.dts  |    4 ++--
+>  arch/arm/boot/dts/dra72-evm.dts |    2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+> 
+These apply to
 
+https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v3.19/dt-v2
 
+Acked-by: Nishanth Menon <nm@ti.com>
 
-I am not happy that we have to define the same think two times.
-
+-- 
 Regards,
-Ivan
+Nishanth Menon
