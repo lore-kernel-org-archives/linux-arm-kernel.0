@@ -1,77 +1,33 @@
-From: zhang.lyra@gmail.com (Lyra Zhang)
-Date: Wed, 3 Dec 2014 17:17:13 +0800
-Subject: [PATCH v3 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
- support
-In-Reply-To: <54761BFC.4020705@ti.com>
-References: <1416917818-10506-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1416917818-10506-6-git-send-email-chunyan.zhang@spreadtrum.com>
- <54761BFC.4020705@ti.com>
-Message-ID: <CAAfSe-u+g0mYGi9Adrd+YwwZ=q0-s79yCg_paB1UAVqFoufXEA@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Xiubo Li)
+Date: Wed, 3 Dec 2014 17:15:58 +0800
+Subject: [PATCHv2 0/4] LS1021A: Add dcfb framebuffer driver support.
+Message-ID: <1417598162-40433-1-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-27 2:29 GMT+08:00 Murali Karicheri <m-karicheri2@ti.com>:
->
-> On 11/25/2014 07:16 AM, Chunyan Zhang wrote:
->>
->> Add a full sc9836-uart driver for SC9836 SoC which is based on the
->> spreadtrum sharkl64 platform.
->> This driver also support earlycon.
->>
->> [...]
+Framebuffer driver for the Freescale SoC Display Controller.
 
 
->>
->> +++ b/drivers/tty/serial/sprd_serial.c
->> @@ -0,0 +1,752 @@
->> +/*
->> + * Copyright (C) 2012 Spreadtrum Communications Inc.
->> + *
->> + * This software is licensed under the terms of the GNU General Public
->> + * License version 2, as published by the Free Software Foundation, and
->> + * may be copied, distributed, and modified under those terms.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include<linux/module.h>
->> +#include<linux/tty.h>
->> +#include<linux/ioport.h>
->> +#include<linux/console.h>
->> +#include<linux/platform_device.h>
->> +#include<linux/tty_flip.h>
->> +#include<linux/serial_core.h>
->> +#include<linux/serial.h>
->> +#include<linux/delay.h>
->> +#include<linux/io.h>
->> +#include<asm/irq.h>
->> +#include<linux/slab.h>
->> +#include<linux/of.h>
->> +#include<linux/kernel.h>
->> +#include<linux/slab.h>
->> +#include<linux/clk.h>
->
-> How about sorting this includes? asm/irq.h go first followed linux/ in alphabatical order?
+Change in V2:
+- Use the native-mode timing as default.
+- Add to_fsl_private().
 
 
-There are a few compile warnings if I moved asm/irq.h to the top of
-all included files.
-Warning details are below:
+Xiubo Li (4):
+  video: fsl-dcfb: Add dcfb framebuffer driver for LS1021A platform
+  video: fsl-dcfb: Add devicetree binding support
+  ARM: ls1021a: dtsi: Add dt node support for dcfb.
+  ARM: ls1021a: dts: Add and enable dt node for dcfb.
 
-In file included from drivers/tty/serial/sprd_serial.c:14:0:
-./arch/arm64/include/asm/irq.h:6:39: warning: ?struct pt_regs?
-declared inside parameter list [enabled by default]
- extern void (*handle_arch_irq)(struct pt_regs *);
-                                       ^
-./arch/arm64/include/asm/irq.h:6:39: warning: its scope is only this
-definition or declaration, which is probably not what you want
-[enabled by default]
-./arch/arm64/include/asm/irq.h:8:54: warning: ?struct pt_regs?
-declared inside parameter list [enabled by default]
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+ .../devicetree/bindings/video/fsl,dcfb.txt         |  52 ++
+ arch/arm/boot/dts/ls1021a-twr.dts                  |  26 +
+ arch/arm/boot/dts/ls1021a.dtsi                     |  10 +
+ drivers/video/fbdev/Kconfig                        |  19 +
+ drivers/video/fbdev/Makefile                       |   1 +
+ drivers/video/fbdev/fsl-dcfb.c                     | 814 +++++++++++++++++++++
+ 6 files changed, 922 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/fsl,dcfb.txt
+ create mode 100644 drivers/video/fbdev/fsl-dcfb.c
 
-Thanks,
-Chunyan
+-- 
+2.1.0.27.g96db324
