@@ -1,76 +1,76 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 03 Dec 2014 10:25:13 +0100
-Subject: [PATCH 2/2] mmc: sdhci-esdhc-imx: enable IPG clock for sdio
- interrupts
-In-Reply-To: <1417538845-10867-2-git-send-email-stefan@agner.ch>
-References: <1417538845-10867-1-git-send-email-stefan@agner.ch>
- <1417538845-10867-2-git-send-email-stefan@agner.ch>
-Message-ID: <1417598713.2419.1.camel@pengutronix.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 03 Dec 2014 10:25:34 +0100
+Subject: [PATCH] mfd: max77686: Fix parent of rtc device
+In-Reply-To: <000001d00ed7$db623bb0$9226b310$%brar@samsung.com>
+References: <1417523620-4311-1-git-send-email-yadi.brar@samsung.com>
+ <1417524339-4604-1-git-send-email-yadi.brar@samsung.com>
+ <547DBFAD.30605@samsung.com>
+ <000001d00ed7$db623bb0$9226b310$%brar@samsung.com>
+Message-ID: <1417598734.23732.11.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 02.12.2014, 17:47 +0100 schrieb Stefan Agner:
-> Enable IPG clock for sdio interrupts while runtime PM, since this
-> clock is needed for register access. The need of this clock has been
-> verified on Vybrid, but this is probably true for i.MX53 and maybe
-> others. The need for bus access during runtime suspend has been
-> introduced with be138554a792 ("mmc: sdhci: allow sdio interrupts
-> while sdhci runtime suspended").
+On ?ro, 2014-12-03 at 14:32 +0530, Yadwinder Singh Brar wrote:
 > 
-Am I reading this wrong, or is this commit actually doing something
-different than what the commit message says?
-
-This does _not_ enable the IPG clock during runtime PM, in fact it is
-disabling it while suspending even with SDIO ints enabled, which is
-wrong, as no SDIO interrupts will be delivered with this clock disabled.
-
-One thing that seems to be wrong with the current code is that the state
-of sdhci_sdio_irq_enabled could change between a runtime suspend and
-resume, so to keep the clocks balanced the driver has to remember if it
-disabled those two clocks in the suspend path and always enable them in
-that case in the resume path.
-
-Regards,
-Lucas
-
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+> On Tuesday, December 02, 2014 7:04 PM, Krzysztof Koz?owski wrote: 
+> > On 02.12.2014 13:45, Yadwinder Singh Brar wrote:
+> > > rtc have different i2c client than power(pmic) block. So rtc device
+> > > should sit under its own i2c client in device hierarchy, which
+> > reflects in sysfs also.
+> > > This patch modifies code to register rtc cell with rtc->dev as
+> > parent.
+> > >
+> > > Without this patch :
+> > > # ls /sys/class/i2c-adapter/i2c-0/0-0009/
+> > > driver         max77686-pmic  modalias       power          uevent
+> > > max77686-clk   max77686-rtc   name           subsystem
+> > >
+> > > After applying patch :
+> > > # ls /sys/class/i2c-adapter/i2c-0/0-0006/
+> > > driver/        modalias       power/         uevent
+> > > max77686-rtc/  name           subsystem/
+> > >
+> > > Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> > > ---
+> > >
+> > > Or Can we follow another (exhaustive but more cleaner) approach,
+> > which
+> > > will be more like code refactoring and cleanup rather than only fix:
+> > > Since rtc uses i2c client, which gets created using i2c_new_dummy()
+> > > and is not shared by any other cell of max77686. So we can covert rtc
+> > > platform driver itself to i2c client driver. It will also allow to
+> > > expilicitly describe max77686-rtc in DT which we can't do now.
+> > > It can be applicable to some other existing and new mfd pmic drivers.
+> > > Any suggestion/comments ?
+> > 
+> > Hi,
+> > 
+> > What kind of problem is solved by this patch?
+> >
 > 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 587ee0e..b7e9ad1 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -1193,10 +1193,10 @@ static int sdhci_esdhc_runtime_suspend(struct device *dev)
->  
->  	ret = sdhci_runtime_suspend_host(host);
->  
-> -	if (!sdhci_sdio_irq_enabled(host)) {
-> +	if (!sdhci_sdio_irq_enabled(host))
->  		clk_disable_unprepare(imx_data->clk_per);
-> -		clk_disable_unprepare(imx_data->clk_ipg);
-> -	}
-> +
-> +	clk_disable_unprepare(imx_data->clk_ipg);
->  	clk_disable_unprepare(imx_data->clk_ahb);
->  
->  	return ret;
-> @@ -1208,10 +1208,10 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
->  
-> -	if (!sdhci_sdio_irq_enabled(host)) {
-> +	if (!sdhci_sdio_irq_enabled(host))
->  		clk_prepare_enable(imx_data->clk_per);
-> -		clk_prepare_enable(imx_data->clk_ipg);
-> -	}
-> +
-> +	clk_prepare_enable(imx_data->clk_ipg);
->  	clk_prepare_enable(imx_data->clk_ahb);
->  
->  	return sdhci_runtime_resume_host(host);
+> Let me try to explain once again :)
+> After seeing a message "i2c i2c-0: .... , addr=0x06, .." in dmesg log,
+> I was not able to find any such device in sysfs as well as device tree.
+> There was no device under /sys/class/i2c-dev/i2c-0/device/0-0006/
+> Isn't something wrong or missing ?
+> 
+> This patch fixes that missing parent child relation, which IMO
+> should be correct always, though it causes any major problem or not.
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+OK, I got your point. I'm fine with both solutions and the patch looks
+good, so:
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+> Still I am thinking, 0-0006 slave device(rtc) shouldn't also appear in DT?
+> As DT should describe the hardware that we are using.
+
+Your patch properly describes the hardware. However from driver
+perspective, the RTC here is not an standalone driver and depends on
+parent (MFD) driver.
+
+Although max77686 RTC could have its own DeviceTree node, I think it
+should still be put under main MFD driver's node, because the parent
+manages stuff like interrupts.
+
+Best regards,
+Krzysztof
