@@ -1,74 +1,62 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  3 Dec 2014 14:35:59 +0800
-Subject: [PATCH 04/10] ARM: dts: sun9i: Add clock-indices property for bus
- gate clocks
+Date: Wed,  3 Dec 2014 14:35:57 +0800
+Subject: [PATCH 02/10] ARM: dts: sun9i: Add mmc module clock nodes for A80
 In-Reply-To: <1417588565-26215-1-git-send-email-wens@csie.org>
 References: <1417588565-26215-1-git-send-email-wens@csie.org>
-Message-ID: <1417588565-26215-5-git-send-email-wens@csie.org>
+Message-ID: <1417588565-26215-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_clk_get_parent_name() uses the clock-indices property to resolve
-clock phandle arguments in case that the argument index does not
-match the clock-output-names sequence.
-
-This is the case on sunxi, where we use the actual bit index as the
-argument to the phandle. Add the clock-indices property so that
-of_clk_get_parent_name() resolves the names correctly.
+The mmc module clocks are A80 specific module 0 (storage) type clocks.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm/boot/dts/sun9i-a80.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/sun9i-a80.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index 33d18dc..f3cac3a 100644
+index 494714f..33d18dc 100644
 --- a/arch/arm/boot/dts/sun9i-a80.dtsi
 +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -252,6 +252,9 @@
+@@ -215,6 +215,38 @@
+ 			clock-output-names = "cci400";
+ 		};
+ 
++		mmc0_clk: clk at 06000410 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun9i-a80-mod0-clk";
++			reg = <0x06000410 0x4>;
++			clocks = <&osc24M>, <&pll4>;
++			clock-output-names = "mmc0";
++		};
++
++		mmc1_clk: clk at 06000414 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun9i-a80-mod0-clk";
++			reg = <0x06000414 0x4>;
++			clocks = <&osc24M>, <&pll4>;
++			clock-output-names = "mmc1";
++		};
++
++		mmc2_clk: clk at 06000418 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun9i-a80-mod0-clk";
++			reg = <0x06000418 0x4>;
++			clocks = <&osc24M>, <&pll4>;
++			clock-output-names = "mmc2";
++		};
++
++		mmc3_clk: clk at 0600041c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun9i-a80-mod0-clk";
++			reg = <0x0600041c 0x4>;
++			clocks = <&osc24M>, <&pll4>;
++			clock-output-names = "mmc3";
++		};
++
+ 		ahb0_gates: clk at 06000580 {
+ 			#clock-cells = <1>;
  			compatible = "allwinner,sun9i-a80-ahb0-gates-clk";
- 			reg = <0x06000580 0x4>;
- 			clocks = <&ahb0>;
-+			clock-indices = <0>, <1>, <3>, <5>, <8>, <12>, <13>,
-+					<14>, <15>, <16>, <18>, <20>, <21>,
-+					<22>, <23>;
- 			clock-output-names = "ahb0_fd", "ahb0_ve", "ahb0_gpu",
- 					"ahb0_ss", "ahb0_sd", "ahb0_nand1",
- 					"ahb0_nand0", "ahb0_sdram",
-@@ -265,6 +268,7 @@
- 			compatible = "allwinner,sun9i-a80-ahb1-gates-clk";
- 			reg = <0x06000584 0x4>;
- 			clocks = <&ahb1>;
-+			clock-indices = <0>, <1>, <17>, <21>, <22>, <23>, <24>;
- 			clock-output-names = "ahb1_usbotg", "ahb1_usbhci",
- 					"ahb1_gmac", "ahb1_msgbox",
- 					"ahb1_spinlock", "ahb1_hstimer",
-@@ -276,6 +280,8 @@
- 			compatible = "allwinner,sun9i-a80-ahb2-gates-clk";
- 			reg = <0x06000588 0x4>;
- 			clocks = <&ahb2>;
-+			clock-indices = <0>, <1>, <2>, <4>, <5>, <7>, <8>,
-+					<11>;
- 			clock-output-names = "ahb2_lcd0", "ahb2_lcd1",
- 					"ahb2_edp", "ahb2_csi", "ahb2_hdmi",
- 					"ahb2_de", "ahb2_mp", "ahb2_mipi_dsi";
-@@ -286,6 +292,8 @@
- 			compatible = "allwinner,sun9i-a80-apb0-gates-clk";
- 			reg = <0x06000590 0x4>;
- 			clocks = <&apb0>;
-+			clock-indices = <1>, <5>, <11>, <12>, <13>, <15>,
-+					<17>, <18>, <19>;
- 			clock-output-names = "apb0_spdif", "apb0_pio",
- 					"apb0_ac97", "apb0_i2s0", "apb0_i2s1",
- 					"apb0_lradc", "apb0_gpadc", "apb0_twd",
-@@ -297,6 +305,8 @@
- 			compatible = "allwinner,sun9i-a80-apb1-gates-clk";
- 			reg = <0x06000594 0x4>;
- 			clocks = <&apb1>;
-+			clock-indices = <0>, <1>, <2>, <3>, <4>,
-+					<16>, <17>, <18>, <19>, <20>, <21>;
- 			clock-output-names = "apb1_i2c0", "apb1_i2c1",
- 					"apb1_i2c2", "apb1_i2c3", "apb1_i2c4",
- 					"apb1_uart0", "apb1_uart1",
 -- 
 2.1.3
