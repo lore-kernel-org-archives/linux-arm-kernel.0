@@ -1,64 +1,59 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 3 Dec 2014 15:32:49 +0100
-Subject: [PATCH v3 02/11] mfd: syscon: Add Atmel Matrix bus DT binding
- documentation
-In-Reply-To: <1417429647-3419-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
- <1417429647-3419-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <547F1F11.5090803@atmel.com>
+From: eric.nelson@boundarydevices.com (Eric Nelson)
+Date: Wed, 03 Dec 2014 07:37:13 -0700
+Subject: [PATCH 0/3 RESEND] ARM: dts: sabrelite I2C and HDMI additions
+In-Reply-To: <CADCpmyN8J0XdUShLZwxny=DoJvpmNGjhNQCuOMZ64ac_VTP7BQ@mail.gmail.com>
+References: <1417559839-17365-1-git-send-email-eric.nelson@boundarydevices.com>
+ <CADCpmyN8J0XdUShLZwxny=DoJvpmNGjhNQCuOMZ64ac_VTP7BQ@mail.gmail.com>
+Message-ID: <547F2019.5060101@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 01/12/2014 11:27, Boris Brezillon a ?crit :
-> The Matrix registers are provided to configure internal bus behavior on
-> at91 SoCs.
-> Some registers might be access by several drivers (e.g. to configure
-> external memory bus timings), hence we declare this register set as a
-> syscon device.
+Hi Gary,
+
+On 12/02/2014 10:04 PM, Gary Bisson wrote:
+> Eric, All,
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  .../devicetree/bindings/mfd/atmel-matrix.txt       | 24 ++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-matrix.txt
+> On Tue, Dec 2, 2014 at 2:37 PM, Eric Nelson
+> <eric.nelson@boundarydevices.com> wrote:
+>> This set of patches adds support for I2C2/3 busses and HDMI output
+>> for the SABRE Lite board.
+>>
+>> The content was gratuitously copied from the following commits
+>> for the Nitrogen6X board made by Lucas Stach, Michael Olbrich,
+>> and Philipp Zabel at Pengutronix:
+>>
+>>         43c3c00 - ARM: dts: nitrogen6x: add i2c2
+>>         d653620 - ARM: dts: nitrogen6x: add hdmi
+>>         1dffdd6 - ARM: dts: nitrogen6x: add i2c3
+>>
+>> Eric Nelson (3):
+>>   ARM: dts: sabrelite: add i2c2
+>>   ARM: dts: sabrelite: add hdmi
+>>   ARM: dts: sabrelite: add i2c3
+>>
+>>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 33 ++++++++++++++++++++++++++++++++
+>>  1 file changed, 33 insertions(+)
+>>
+>> Re-sending to add Shawn Guo to the CC list.
+>>
+>> --
+>> 1.9.1
+>>
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/atmel-matrix.txt b/Documentation/devicetree/bindings/mfd/atmel-matrix.txt
-> new file mode 100644
-> index 0000000..e56e27a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/atmel-matrix.txt
-> @@ -0,0 +1,24 @@
-> +* Device tree bindings for Atmel Bus Matrix
-> +
-> +The Bus Matrix registers are used to configure Atmel SoCs internal bus
-> +behavior (master/slave priorities, undefined burst length type, ...)
-> +
-> +Required properties:
-> +- compatible:		Should be one of the following
-> +			"atmel,at91sam9260-matrix", "syscon"
-> +			"atmel,at91sam9261-matrix", "syscon"
-> +			"atmel,at91sam9263-matrix", "syscon"
-> +			"atmel,at91sam9263-matrix", "syscon"
-
-Same string as the preceding one: shouldn't it be at91sam9rl?
-
-
-> +			"atmel,at91sam9g45-matrix", "syscon"
-> +			"atmel,at91sam9n12-matrix", "syscon"
-> +			"atmel,at91sam9x5-matrix", "syscon"
-> +			"atmel,sama5d3-matrix", "syscon"
-> +- reg:			Contains offset/length value of the Bus Matrix
-> +			memory region.
-> +
-> +Example:
-> +
-> +matrix: matrix at ffffec00 {
-> +	compatible = "atmel,sama5d3-matrix", "syscon";
-> +	reg = <0xffffec00 0x200>;
-> +};
+> Tested on a SabreLite (iMX6q rev1.2), it works great once the ldb node
+> is removed from imx6qdl-sabrelite.dtsi.
+> It is to be noted that I've applied the patches on top of the
+> linux-stable tree. Eric, are you using Shawn's tree? I'll try with
+> that latter to see if I can keep both ldb and hdmi nodes at the same
+> time.
 > 
+The patches were generated based on Shawn's imx/dt branch, but I
+also tested against linux-stable.
+
+I didn't need to remove the LDB node in either case. HDMI just
+worked.
+
+Regards,
 
 
--- 
-Nicolas Ferre
+Eric
