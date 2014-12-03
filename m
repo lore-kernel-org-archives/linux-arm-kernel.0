@@ -1,57 +1,41 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 03 Dec 2014 01:08:28 +0100
-Subject: [PATCH] cpuidle: add MAINTAINERS entry for ARM Exynos cpuidle
- driver
-In-Reply-To: <1616359.KRpRrFqxfV@amdc1032>
-References: <1616359.KRpRrFqxfV@amdc1032>
-Message-ID: <1466322.AKaPtIKjPo@vostro.rjw.lan>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed,  3 Dec 2014 01:12:02 +0100
+Subject: [PATCH 03/12] irqchip: gic: define register_routable_domain_ops
+ conditional
+In-Reply-To: <1417565531-4507-1-git-send-email-stefan@agner.ch>
+References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
+Message-ID: <1417565531-4507-4-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, December 02, 2014 04:41:35 PM Bartlomiej Zolnierkiewicz wrote:
-> Since there has been quite a lot of development going on for
-> ARM Exynos cpuidle driver recently I would like to add separate
-> MAINTAINERS entry for it and add myself as the primary maintainer.
-> 
-> The merging process would remain (almost) unchanged with patches
-> going (with my Ack) through Daniel's or Kukjin's tree.
-> 
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+The inline function register_routable_domain_ops is only usable if
+CONFIG_ARM_GIC is set. Make it depend on this configuration. This
+also allows other SoC interrupt controller to provide such a
+function.
 
-Daniel, do you want me to apply this, or are you going to do that?
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ include/linux/irqchip/arm-gic.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-> ---
->  MAINTAINERS |   10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> Index: b/MAINTAINERS
-> ===================================================================
-> --- a/MAINTAINERS	2014-11-27 18:02:51.988225868 +0100
-> +++ b/MAINTAINERS	2014-12-02 15:56:52.792997513 +0100
-> @@ -2701,6 +2701,16 @@ T:	git git://git.kernel.org/pub/scm/linu
->  S:	Maintained
->  F:	drivers/cpuidle/cpuidle-big_little.c
->  
-> +CPUIDLE DRIVER - ARM EXYNOS
-> +M:	Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> +M:	Daniel Lezcano <daniel.lezcano@linaro.org>
-> +M:	Kukjin Kim <kgene@kernel.org>
-> +L:	linux-pm at vger.kernel.org
-> +L:	linux-samsung-soc at vger.kernel.org
-> +S:	Supported
-> +F:	drivers/cpuidle/cpuidle-exynos.c
-> +F:	arch/arm/mach-exynos/pm.c
-> +
->  CPUIDLE DRIVERS
->  M:	Rafael J. Wysocki <rjw@rjwysocki.net>
->  M:	Daniel Lezcano <daniel.lezcano@linaro.org>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 13eed92..3b1baf1 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -111,11 +111,14 @@ int gic_get_cpu_id(unsigned int cpu);
+ void gic_migrate_target(unsigned int new_cpu_id);
+ unsigned long gic_get_sgir_physaddr(void);
+ 
++#ifdef CONFIG_ARM_GIC
+ extern const struct irq_domain_ops *gic_routable_irq_domain_ops;
+ static inline void __init register_routable_domain_ops
+ 					(const struct irq_domain_ops *ops)
+ {
+ 	gic_routable_irq_domain_ops = ops;
+ }
++#endif /* CONFIG_ARM_GIC */
++
+ #endif /* __ASSEMBLY */
+ #endif
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+2.1.3
