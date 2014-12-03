@@ -1,179 +1,163 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Wed,  3 Dec 2014 11:16:03 +0800
-Subject: [PATCH v3] mmc: dw_mmc: add quirk for broken data transfer over scheme
-In-Reply-To: <1415970338-2637-1-git-send-email-addy.ke@rock-chips.com>
-References: <1415970338-2637-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <1417576563-5033-1-git-send-email-addy.ke@rock-chips.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Wed, 3 Dec 2014 11:22:32 +0800
+Subject: [PATCH v11 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
+In-Reply-To: <1417545498.2430.10.camel@linaro.org>
+References: <1417423513-47161-1-git-send-email-wangnan0@huawei.com>	
+ <1417423751-47872-1-git-send-email-wangnan0@huawei.com>
+ <1417545498.2430.10.camel@linaro.org>
+Message-ID: <547E81F8.3000701@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add a new quirk to add a s/w timer to notify the driver
-to terminate current transfer and report a data timeout to the core,
-if DTO interrupt does NOT come within the given time.
+On 2014/12/3 2:38, Jon Medhurst (Tixy) wrote:
+> On Mon, 2014-12-01 at 16:49 +0800, Wang Nan wrote:
+>> This patch introduce kprobeopt for ARM 32.
+>>
+>> Limitations:
+>>  - Currently only kernel compiled with ARM ISA is supported.
+>>
+>>  - Offset between probe point and optinsn slot must not larger than
+>>    32MiB. Masami Hiramatsu suggests replacing 2 words, it will make
+>>    things complex. Futher patch can make such optimization.
+>>
+>> Kprobe opt on ARM is relatively simpler than kprobe opt on x86 because
+>> ARM instruction is always 4 bytes aligned and 4 bytes long. This patch
+>> replace probed instruction by a 'b', branch to trampoline code and then
+>> calls optimized_callback(). optimized_callback() calls opt_pre_handler()
+>> to execute kprobe handler. It also emulate/simulate replaced instruction.
+>>
+>> When unregistering kprobe, the deferred manner of unoptimizer may leave
+>> branch instruction before optimizer is called. Different from x86_64,
+>> which only copy the probed insn after optprobe_template_end and
+>> reexecute them, this patch call singlestep to emulate/simulate the insn
+>> directly. Futher patch can optimize this behavior.
+>>
+>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+>> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+>> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+>> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>>
+>> ---
+>>
+> [...]
+> 
+>> v10 -> v11:
+>>   - Move to arch/arm/probes/, insn.h is moved to arch/arm/include/asm.
+>>   - Code cleanup.
+>>   - Bugfix based on Tixy's test result:
+>>     - Trampoline deal with ARM -> Thumb transision instructions and
+>>       AEABI stack alignment requirement correctly.
+>>     - Trampoline code buffer should start at 4 byte aligned address.
+>>       We enforces it in this series by using macro to wrap 'code' var.
+> 
+> I'm wondering if this alignment is needed. I'm not familiar with the
+> Linux memory code but following it through...
+> 
+> - kernel/kprobes.c allocates memory for the instruction slots using
+> module_alloc()
+> 
+> - module_alloc calls __vmalloc_node_range and passes in an alignment of
+> 1 byte however...
+> 
+> - __vmalloc_node_range has the comment "Allocate enough pages to cover
+> @size from the page level allocator". And it rounds size up to one page
+> and calls  __get_vm_area_node which also makes sure the size is page
+> aligned and also allocates a guard page afterwards.
+> 
+> So it looks to me as though allocated memory would always be page
+> aligned.
+> 
+> Another reason why I think this must be true is that module_alloc seems
+> to be used to allocate memory for loading modules to (see move_module in
+> kernel/module.c) and that code doesn't seem to align things.
+> 
+> Though, as I already said, I'm not familiar with this code so could well
+> have missed something. And the thing that is giving me most worries is
+> that all the vmalloc code takes an alignment value in bytes.
+> 
+> Anyway, I'll comment on this patch on the assumption that alignment is
+> needed...
+> 
 
-dw_mmc call mmc_request_done func to finish transfer depends on
-DTO interrupt. If DTO interrupt does not come in sending data state,
-the current transfer will be blocked.
+Thanks for your comments.
 
-But this case really exists, when driver reads tuning data from
-card on RK3288-pink2 board. I measured waveforms by oscilloscope
-and found that card clock was always on and data lines were always
-holded high level in sending data state.
+By checking code in mm/vmalloc.c I find that, although the algorithm it uses is possible
+to get unaligned addresses, all users of alloc_vmap_area() allocate full pages, and
+no-page-aligned allocation is forbidden from the first version on that functon.
+Therefore, alignment requirements less than PAGE_SIZE is actually meanless.
+Although module_alloc() requires only 1-byte alignment, it will get a page aligned address.
 
-We got the reply from synopsys:
-There are two counters but both use the same value of [31:8] bits.
-Data timeout counter doesn't wait for stop clock and you should get
-DRTO even when the clock is not stopped.
-Host Starvation timeout counter is triggered with stop clock condition.
+It is true for all architectures except cris, on which use module_alloc() simple kmalloc()
+However, it doesn't support kprobes so we don't need to care about it.
 
-This means that host should get DRTO and DTO interrupt.
+I'll remove the alignment tricks in the next version of code.
 
-But we really don't get any data-related interrupt in RK3X SoCs.
-And driver can't get data transfer state, it can do nothing but wait for.
+> [...]
 
-We don't know why we have this problem, but we need it to fix this problem now.
-And I will post a follow up change when we find the root cause.
+>> +			/*
+>> +			 * AEABI require a 8-bytes alignment stack. If
+>> +			 * SP % 8 == 4, we alloc another 4 bytes here.
+>> +			 */
+>> +			"	tst	sp, #4\n"
+>> +			"	subne	sp, #4\n"
+>> +			"	blx	r2\n"
+>> +
+>> +			/*
+>> +			 * Here is a trick: the called handler should
+>> +			 * return its second param by r0, which is
+>> +			 * happens to be SP before the above AEABI
+>> +			 * adjustment. Therefore, we don't need to save
+>> +			 * and check whether we have done the above
+>> +			 * adjustment. See optimized_callback().
+>> +			 */
+>> +			"	mov	sp, r0\n"
+> 
+> I think this trick is a bit too tricky :-) and might cause unnecessary
+> problems for someone in the future. How about replacing the above 4
+> instruction with these 4 instead...
+> 
+> 			"	and	r4, sp, #4\n"
+> 			"	sub	sp, sp, r4\n"
+> 			"	blx	r2\n"
+> 			"	add	sp, sp, r4\n"
+> 
+> and that actually makes things slightly faster as optimized_callback no
+> longer needs to return a value.
+> 
 
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
-Changes in v2:
-- fix some typo.
-- remove extra timeout value (250ms).
-- remove dw_mci_dto_start_monitor func.
-- use "broken-dto" for new quirk and change Subject for it.
+Your code is better. AAPCS requires subroutines must preserve the contents of
+the registers r4-r8, r10-r11, so we can use them freely in our asm code.
 
-Changes in v3:
-- Remove dts for broken-dto, just add this quirk in dw_mci_rockchip_init
+> 
+>> +			"	ldr	r1, [sp, #64]\n"
+>> +			"	tst	r1, #"__stringify(PSR_T_BIT)"\n"
+>> +			"	ldrne	r2, [sp, #60]\n"
+>> +			"	orrne	r2, #1\n"
+>> +			"	strne	r2, [sp, #60] @ set bit0 of PC for thumb\n"
+>> +			"	msr	cpsr_cxsf, r1\n"
+>> +			"	ldmia	sp, {r0 - r15}\n"
+>> +			".global optprobe_template_val\n"
+>> +			"optprobe_template_val:\n"
+>> +			"1:	.long 0\n"
+>> +			".global optprobe_template_call\n"
+>> +			"optprobe_template_call:\n"
+>> +			"2:	.long 0\n"
+>> +			".global optprobe_template_end\n"
+>> +			"optprobe_template_end:\n");
+>> +
+> 
+> [...]
+> 
+>> +int arch_prepare_optimized_kprobe(struct optimized_kprobe *op, struct kprobe *orig)
+>> +{
+>> +	kprobe_opcode_t *code_unaligned;
+> 
+> kprobe_opcode_t is a u32 and the ABI and compiler expect this to be
+> aligned, so best use a void * instead.
+>
 
- drivers/mmc/host/dw_mmc-rockchip.c |  3 +++
- drivers/mmc/host/dw_mmc.c          | 41 +++++++++++++++++++++++++++++++++++++-
- include/linux/mmc/dw_mmc.h         |  5 +++++
- 3 files changed, 48 insertions(+), 1 deletion(-)
+It is the return value of get_optinsn_slot() and should be that type. However
+I'll remove these unaligned things.
 
-diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
-index 5650ac4..ba92ebd 100644
---- a/drivers/mmc/host/dw_mmc-rockchip.c
-+++ b/drivers/mmc/host/dw_mmc-rockchip.c
-@@ -73,6 +73,9 @@ static int dw_mci_rockchip_init(struct dw_mci *host)
- 	/* It is slot 8 on Rockchip SoCs */
- 	host->sdio_id0 = 8;
- 
-+	/* It needs this quirk on all Rockchip SoCs */
-+	host->pdata->quirks |= DW_MCI_QUIRK_BROKEN_DTO;
-+
- 	return 0;
- }
- 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 67c0451..e222122 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1464,6 +1464,8 @@ static void dw_mci_tasklet_func(unsigned long priv)
- 	enum dw_mci_state state;
- 	enum dw_mci_state prev_state;
- 	unsigned int err;
-+	unsigned int drto_clks;
-+	unsigned int drto_ms;
- 
- 	spin_lock(&host->lock);
- 
-@@ -1529,8 +1531,17 @@ static void dw_mci_tasklet_func(unsigned long priv)
- 			}
- 
- 			if (!test_and_clear_bit(EVENT_XFER_COMPLETE,
--						&host->pending_events))
-+						&host->pending_events)) {
-+				if (host->quirks & DW_MCI_QUIRK_BROKEN_DTO) {
-+					drto_clks = mci_readl(host, TMOUT) >> 8;
-+					drto_ms = DIV_ROUND_UP(drto_clks * 1000,
-+							       host->bus_hz);
-+
-+					mod_timer(&host->dto_timer, jiffies +
-+						msecs_to_jiffies(drto_ms));
-+				}
- 				break;
-+			}
- 
- 			set_bit(EVENT_XFER_COMPLETE, &host->completed_events);
- 
-@@ -2122,6 +2133,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
- 		}
- 
- 		if (pending & SDMMC_INT_DATA_OVER) {
-+			if (host->quirks & DW_MCI_QUIRK_BROKEN_DTO)
-+				del_timer(&host->dto_timer);
-+
- 			mci_writel(host, RINTSTS, SDMMC_INT_DATA_OVER);
- 			if (!host->data_status)
- 				host->data_status = pending;
-@@ -2509,6 +2523,28 @@ ciu_out:
- 	return ret;
- }
- 
-+static void dw_mci_dto_timer(unsigned long arg)
-+{
-+	struct dw_mci *host = (struct dw_mci *)arg;
-+
-+	switch (host->state) {
-+	case STATE_SENDING_DATA:
-+	case STATE_DATA_BUSY:
-+		/*
-+		* If DTO interrupt does NOT come in sending data state,
-+		* we should notify the driver to terminate current transfer
-+		* and report a data timeout to the core.
-+		*/
-+		host->data_status = SDMMC_INT_DRTO;
-+		set_bit(EVENT_DATA_ERROR, &host->pending_events);
-+		set_bit(EVENT_DATA_COMPLETE, &host->pending_events);
-+		tasklet_schedule(&host->tasklet);
-+		break;
-+	default:
-+		break;
-+	}
-+}
-+
- #ifdef CONFIG_OF
- static struct dw_mci_of_quirks {
- 	char *quirk;
-@@ -2661,6 +2697,9 @@ int dw_mci_probe(struct dw_mci *host)
- 
- 	spin_lock_init(&host->lock);
- 	INIT_LIST_HEAD(&host->queue);
-+	if (host->quirks & DW_MCI_QUIRK_BROKEN_DTO)
-+		setup_timer(&host->dto_timer,
-+			    dw_mci_dto_timer, (unsigned long)host);
- 
- 	/*
- 	 * Get the host data width - this assumes that HCON has been set with
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index 42b724e..ff9bd1e 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -98,6 +98,7 @@ struct mmc_data;
-  * @irq_flags: The flags to be passed to request_irq.
-  * @irq: The irq value to be passed to request_irq.
-  * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
-+ * @dto_timer: Timer for broken data transfer over scheme.
-  *
-  * Locking
-  * =======
-@@ -196,6 +197,8 @@ struct dw_mci {
- 	int			irq;
- 
- 	int			sdio_id0;
-+
-+	struct timer_list	dto_timer;
- };
- 
- /* DMA ops for Internal/External DMAC interface */
-@@ -220,6 +223,8 @@ struct dw_mci_dma_ops {
- #define DW_MCI_QUIRK_BROKEN_CARD_DETECTION	BIT(3)
- /* No write protect */
- #define DW_MCI_QUIRK_NO_WRITE_PROTECT		BIT(4)
-+/* Timer for broken data transfer over scheme */
-+#define DW_MCI_QUIRK_BROKEN_DTO			BIT(5)
- 
- /* Slot level quirks */
- /* This slot has no write protect */
--- 
-1.8.3.2
+[...]
