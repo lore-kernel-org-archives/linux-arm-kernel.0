@@ -1,23 +1,24 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  3 Dec 2014 14:41:43 +0100
-Subject: [PATCH v6 3/7] ARM: shmobile: R-Mobile: Enable module clocks if
- !CONFIG_PM_RUNTIME
+Date: Wed,  3 Dec 2014 14:41:47 +0100
+Subject: [PATCH v6 7/7] drivers: sh: Disable PM runtime for multi-platform
+ r8a7740 with genpd
 In-Reply-To: <1417614107-5985-1-git-send-email-geert+renesas@glider.be>
 References: <1417614107-5985-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1417614107-5985-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <1417614107-5985-8-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_PM_RUNTIME is not set, the clocks must be enabled before the
-devices can be used.
+If the default PM domain using PM_CLK is used for PM runtime, the real PM
+domain(s) cannot be registered from DT later.
 
-Currently these clocks are enabled by the !CONFIG_PM_RUNTIME version of
-pm_clk_notify, activated by the hack in drivers/sh/pm_runtime.c, but
-this will go away soon (at least for DT).
+Hence do not enable it when running a multi-platform kernel with genpd
+support on an r8a7740. The R-Mobile PM domain driver will take care of
+PM runtime management of the module clocks.
 
-On detach, disabling the clocks is already handled by pm_clk_destroy().
-On system suspend/resume, disabling/enabling clocks is already handled
-from the genpd->dev_ops.{start,stop}() callbacks.
+The default PM domain is still needed for:
+  - platforms without genpd support,
+  - the legacy (non-DT) case, where genpd may take over later, except
+    for the C5 "always on" PM domain.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
@@ -26,29 +27,28 @@ v6:
 v5:
   - No changes,
 v4:
+  - No changes,
+v3:
+  - Reword,
+v2:
   - New.
 ---
- arch/arm/mach-shmobile/pm-rmobile.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/sh/pm_runtime.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index 168046c355fc8368..6d912ce801aa88bd 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.c
-+++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -118,6 +118,14 @@ static int rmobile_pd_attach_dev(struct generic_pm_domain *domain,
- 		goto fail;
- 	}
- 
-+	if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
-+		error = pm_clk_resume(dev);
-+		if (error) {
-+			dev_err(dev, "pm_clk_resume failed %d\n", error);
-+			goto fail;
-+		}
-+	}
-+
- 	return 0;
- 
- fail:
+diff --git a/drivers/sh/pm_runtime.c b/drivers/sh/pm_runtime.c
+index fe2c2d595f599b2f..85cc89fd3e7d7cb7 100644
+--- a/drivers/sh/pm_runtime.c
++++ b/drivers/sh/pm_runtime.c
+@@ -81,7 +81,9 @@ static int __init sh_pm_runtime_init(void)
+ 		if (!of_machine_is_compatible("renesas,emev2") &&
+ 		    !of_machine_is_compatible("renesas,r7s72100") &&
+ 		    !of_machine_is_compatible("renesas,r8a73a4") &&
++#ifndef CONFIG_PM_GENERIC_DOMAINS_OF
+ 		    !of_machine_is_compatible("renesas,r8a7740") &&
++#endif
+ 		    !of_machine_is_compatible("renesas,r8a7778") &&
+ 		    !of_machine_is_compatible("renesas,r8a7779") &&
+ 		    !of_machine_is_compatible("renesas,r8a7790") &&
 -- 
 1.9.1
