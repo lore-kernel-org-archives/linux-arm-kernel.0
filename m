@@ -1,43 +1,91 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 3 Dec 2014 10:24:32 +0000
-Subject: [RFC] implement arm64_adjust_dma_zone as arm32 does?
-In-Reply-To: <20141203175855.114d6717@xhacker>
-References: <20141203175855.114d6717@xhacker>
-Message-ID: <20141203102431.GA7373@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Dec 2014 11:25:07 +0100
+Subject: [PATCH 2/5] ARM: BCM5301X: Add DT for Netgear R6300 V2
+In-Reply-To: <547ECC88.1080308@hauke-m.de>
+References: <1417368513-13808-1-git-send-email-zajec5@gmail.com>
+ <CACna6rwg7+jqiRy9N+RHKJo9EadRzcq-4-8zJziq_Tvko3LYtg@mail.gmail.com>
+ <547ECC88.1080308@hauke-m.de>
+Message-ID: <4912203.5KJFPHsnGJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03, 2014 at 09:58:55AM +0000, Jisheng Zhang wrote:
-> If one platform has one limitation only some banks are DMA-able, for example
-> 0-2GB. Under arm32, we can set the dma_zone_size, then arm_adjust_dma_zone()
-> will set the correct dma zone for us. But under arm64, we can't do it.
+On Wednesday 03 December 2014 09:40:40 Hauke Mehrtens wrote:
+> On 12/03/2014 06:59 AM, Rafa? Mi?ecki wrote:
+> > On 3 December 2014 at 00:15, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+> >> On 11/30/2014 06:28 PM, Rafa? Mi?ecki wrote:
+> >>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+> >>> ---
+> >>>  arch/arm/boot/dts/Makefile                     |  4 +-
+> >>>  arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts | 84 ++++++++++++++++++++++++++
+> >>>  2 files changed, 87 insertions(+), 1 deletion(-)
+> >>>  create mode 100644 arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
+> >>>
+> >>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >>> index 35f3e12..22bb87f 100644
+> >>> --- a/arch/arm/boot/dts/Makefile
+> >>> +++ b/arch/arm/boot/dts/Makefile
+> >>> @@ -55,7 +55,9 @@ dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
+> >>>  dtb-$(CONFIG_ARCH_AXXIA) += axm5516-amarillo.dtb
+> >>>  dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+> >>>  dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b-plus.dtb
+> >>> -dtb-$(CONFIG_ARCH_BCM_5301X) += bcm4708-netgear-r6250.dtb
+> >>> +dtb-$(CONFIG_ARCH_BCM_5301X) += \
+> >>> +     bcm4708-netgear-r6250.dtb \
+> >>> +     bcm4708-netgear-r6300-v2.dtb
+> >>
+> >> This part does not apply cleanly on top of v3.18-rc1.
+> > 
+> > I think we want these changes to be merged merged into the arm-soc.git
+> > next/dt, right? So I based my changes on that tree. This way Arnd
+> > won't get neither: any conflicts or any unwanted stuff.
+> 
+> Arnd wants the changes based on -rc1, at least the last time.  The
+> merge gets ugly if the changes are based on different versions.
 
-Do you really have plans for such platform (and it won't have an IOMMU)
-or it's just theoretical? Currently ZONE_DMA is limited to the bottom
-32-bit of RAM. The arm32 dma_zone_size relies on the machine descriptors
-which we don't have on arm64.
+If you send multiple pull requests for the same release and the same
+topic branch (e.g. next/dt), you can choose to base on top of -rc1
+or a prior branch as you like.
 
-> Or set dma-range in dts, then use swiotlb to bounce?
+You can also have a cleanup branch based on -rc1 that you send first,
+and then send other patches based on top of that. This makes sense
+in particular when you have patches for multiple branches (e.g. next/soc
+and next/drivers) but also want to restructure your code to make it
+easier to apply those.
 
-The problem is that swiotlb is only guaranteed to live in the ZONE_DMA,
-so it doesn't buy you much if dma-ranges specify something smaller than
-ZONE_DMA.
+Any patches for next/cleanup should be cosmetic only and rearrange stuff
+but not do functional changes.
 
-Similarly for CMA (coherent allocations), the reserved CMA area is
-limited to ZONE_DMA (currently 32-bit mask).
+> >>>  dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
+> >>>  dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
+> >>>       bcm911360k.dtb \
+> >>> diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
+> >>> new file mode 100644
+> >>> index 0000000..e18b636
+> >>> --- /dev/null
+> >>> +++ b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
+> >>> @@ -0,0 +1,84 @@
+> >>> +/*
+> >>> + * Broadcom BCM470X / BCM5301X ARM platform code.
+> >>> + * DTS for Netgear R6300 V2
+> >>> + *
+> >>> + * Copyright ? 2014 Rafa? Mi?ecki <zajec5@gmail.com>
+> >>
+> >> Is this ? needed here?
+> > 
+> > Do you mean the whole line or the "?" sign? I think we usually have
+> > "Copyright" lines in files. I can see using "?" is much less common on
+> > the other hand. I think the most common forms are
+> > 1) Copyright (C) <year>
+> > 2) Copyright <year>
+> > Should I use some of them?
+> > Btw. do you know if this documented anywhere?
+> > 
+> It was just the  "?" sign, it's usage is pretty uncommon and I think it
+> is not an ASCII symbol. I would like if you choose 1 or 2, what exactly
+> does not matter for me.
 
-> Could you kindly please give one suggestion about how to handle this
-> situation?
+If you work for a large company, ask your legal department, they may
+have a strong opinion on this matter one way or another. If you don't
+work for a large company, don't worry about it.
 
-First of all I need to know if that's a real case and we don't look into
-it for fun.
-
-What we could do is re-introduce ZONE_DMA32 for 32-bit dma masks and a
-ZONE_DMA for smaller masks. The problem is describing such ZONE_DMA mask
-via DT but very early before we set up the zones. A quick hack would be
-to limit ZONE_DMA to the minimum of 32-bit limit or the end of the first
-memblock, so you describe it as such in DT (but then we penalise
-platforms that can do DMA on all memblocks).
-
--- 
-Catalin
+	Arnd
