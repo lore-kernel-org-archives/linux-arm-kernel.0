@@ -1,35 +1,38 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed,  3 Dec 2014 01:12:00 +0100
-Subject: [PATCH 01/12] ARM: dts: vf610: add routable-irqs property for gic node
+Date: Wed,  3 Dec 2014 01:12:01 +0100
+Subject: [PATCH 02/12] ARM: dts: vf610: add Miscellaneous System Control
+ Module (MSCM)
 In-Reply-To: <1417565531-4507-1-git-send-email-stefan@agner.ch>
 References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
-Message-ID: <1417565531-4507-2-git-send-email-stefan@agner.ch>
+Message-ID: <1417565531-4507-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Agner <stefan.agner@toradex.com>
-
-To enable proper routable interrupt controller support for
-the GIC driver, the routable-irqs need to be specified.
-Hence add the routable-irqs property with the amount of
-IRQs supported by the GIC controller on the Vybrid SoC.
+Add the Miscellaneous System Control Module (MSCM) to the base
+device tree for Vybrid SoCs. This module contains the peripheral
+interrupt router, which is handling the routing of the interrupts
+between the two cores.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/vf500.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/vfxxx.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
-index de67005..2b0d84d 100644
---- a/arch/arm/boot/dts/vf500.dtsi
-+++ b/arch/arm/boot/dts/vf500.dtsi
-@@ -30,6 +30,7 @@
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index 505969a..85fb697 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -55,6 +55,11 @@
+ 			#size-cells = <1>;
+ 			ranges;
  
- 			intc: interrupt-controller at 40002000 {
- 				compatible = "arm,cortex-a9-gic";
-+				arm,routable-irqs = <144>;
- 				#interrupt-cells = <3>;
- 				interrupt-controller;
- 				reg = <0x40003000 0x1000>,
++			mscm: mscm at 40001000 {
++				compatible = "fsl,vf610-mscm";
++				reg = <0x40001000 0x1000>;
++			};
++
+ 			edma0: dma-controller at 40018000 {
+ 				#dma-cells = <2>;
+ 				compatible = "fsl,vf610-edma";
 -- 
 2.1.3
