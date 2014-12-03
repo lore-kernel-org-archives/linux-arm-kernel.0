@@ -1,74 +1,135 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Wed, 03 Dec 2014 09:40:40 +0100
-Subject: [PATCH 2/5] ARM: BCM5301X: Add DT for Netgear R6300 V2
-In-Reply-To: <CACna6rwg7+jqiRy9N+RHKJo9EadRzcq-4-8zJziq_Tvko3LYtg@mail.gmail.com>
-References: <1417368513-13808-1-git-send-email-zajec5@gmail.com>	<1417368513-13808-2-git-send-email-zajec5@gmail.com>	<547E482C.4060706@hauke-m.de>
- <CACna6rwg7+jqiRy9N+RHKJo9EadRzcq-4-8zJziq_Tvko3LYtg@mail.gmail.com>
-Message-ID: <547ECC88.1080308@hauke-m.de>
+From: yadi.brar@samsung.com (Yadwinder Singh Brar)
+Date: Wed, 03 Dec 2014 14:32:02 +0530
+Subject: [PATCH] mfd: max77686: Fix parent of rtc device
+In-Reply-To: <547DBFAD.30605@samsung.com>
+References: <1417523620-4311-1-git-send-email-yadi.brar@samsung.com>
+ <1417524339-4604-1-git-send-email-yadi.brar@samsung.com>
+ <547DBFAD.30605@samsung.com>
+Message-ID: <000001d00ed7$db623bb0$9226b310$%brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2014 06:59 AM, Rafa? Mi?ecki wrote:
-> On 3 December 2014 at 00:15, Hauke Mehrtens <hauke@hauke-m.de> wrote:
->> On 11/30/2014 06:28 PM, Rafa? Mi?ecki wrote:
->>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
->>> ---
->>>  arch/arm/boot/dts/Makefile                     |  4 +-
->>>  arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts | 84 ++++++++++++++++++++++++++
->>>  2 files changed, 87 insertions(+), 1 deletion(-)
->>>  create mode 100644 arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
->>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index 35f3e12..22bb87f 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -55,7 +55,9 @@ dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
->>>  dtb-$(CONFIG_ARCH_AXXIA) += axm5516-amarillo.dtb
->>>  dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
->>>  dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b-plus.dtb
->>> -dtb-$(CONFIG_ARCH_BCM_5301X) += bcm4708-netgear-r6250.dtb
->>> +dtb-$(CONFIG_ARCH_BCM_5301X) += \
->>> +     bcm4708-netgear-r6250.dtb \
->>> +     bcm4708-netgear-r6300-v2.dtb
->>
->> This part does not apply cleanly on top of v3.18-rc1.
+
+
+On Tuesday, December 02, 2014 7:04 PM, Krzysztof Koz?owski wrote: 
+> On 02.12.2014 13:45, Yadwinder Singh Brar wrote:
+> > rtc have different i2c client than power(pmic) block. So rtc device
+> > should sit under its own i2c client in device hierarchy, which
+> reflects in sysfs also.
+> > This patch modifies code to register rtc cell with rtc->dev as
+> parent.
+> >
+> > Without this patch :
+> > # ls /sys/class/i2c-adapter/i2c-0/0-0009/
+> > driver         max77686-pmic  modalias       power          uevent
+> > max77686-clk   max77686-rtc   name           subsystem
+> >
+> > After applying patch :
+> > # ls /sys/class/i2c-adapter/i2c-0/0-0006/
+> > driver/        modalias       power/         uevent
+> > max77686-rtc/  name           subsystem/
+> >
+> > Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> > ---
+> >
+> > Or Can we follow another (exhaustive but more cleaner) approach,
+> which
+> > will be more like code refactoring and cleanup rather than only fix:
+> > Since rtc uses i2c client, which gets created using i2c_new_dummy()
+> > and is not shared by any other cell of max77686. So we can covert rtc
+> > platform driver itself to i2c client driver. It will also allow to
+> > expilicitly describe max77686-rtc in DT which we can't do now.
+> > It can be applicable to some other existing and new mfd pmic drivers.
+> > Any suggestion/comments ?
 > 
-> I think we want these changes to be merged merged into the arm-soc.git
-> next/dt, right? So I based my changes on that tree. This way Arnd
-> won't get neither: any conflicts or any unwanted stuff.
-
-Arnd wants the changes based on -rc1, at least the last time. ;-) The
-merge gets ugly if the changes are based on different versions.
-
->>>  dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
->>>  dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
->>>       bcm911360k.dtb \
->>> diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
->>> new file mode 100644
->>> index 0000000..e18b636
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
->>> @@ -0,0 +1,84 @@
->>> +/*
->>> + * Broadcom BCM470X / BCM5301X ARM platform code.
->>> + * DTS for Netgear R6300 V2
->>> + *
->>> + * Copyright ? 2014 Rafa? Mi?ecki <zajec5@gmail.com>
->>
->> Is this ? needed here?
+> Hi,
 > 
-> Do you mean the whole line or the "?" sign? I think we usually have
-> "Copyright" lines in files. I can see using "?" is much less common on
-> the other hand. I think the most common forms are
-> 1) Copyright (C) <year>
-> 2) Copyright <year>
-> Should I use some of them?
-> Btw. do you know if this documented anywhere?
+> What kind of problem is solved by this patch?
+>
+
+Let me try to explain once again :)
+After seeing a message "i2c i2c-0: .... , addr=0x06, .." in dmesg log,
+I was not able to find any such device in sysfs as well as device tree.
+There was no device under /sys/class/i2c-dev/i2c-0/device/0-0006/
+Isn't something wrong or missing ?
+
+This patch fixes that missing parent child relation, which IMO
+should be correct always, though it causes any major problem or not.
+
+Still I am thinking, 0-0006 slave device(rtc) shouldn't also appear in DT?
+As DT should describe the hardware that we are using.
+
+Warm regards,
+Yadwinder
+
+> Best regards,
+> Krzysztof
 > 
-It was just the  "?" sign, it's usage is pretty uncommon and I think it
-is not an ASCII symbol. I would like if you choose 1 or 2, what exactly
-does not matter for me.
-
-Hauke
-
-Hauke
+> 
+> >
+> > ---
+> >  drivers/mfd/max77686.c |   22 ++++++++++++++++++++--
+> >  1 files changed, 20 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c index
+> > 929795e..22c0948 100644
+> > --- a/drivers/mfd/max77686.c
+> > +++ b/drivers/mfd/max77686.c
+> > @@ -39,10 +39,13 @@
+> >
+> >  static const struct mfd_cell max77686_devs[] = {
+> >  	{ .name = "max77686-pmic", },
+> > -	{ .name = "max77686-rtc", },
+> >  	{ .name = "max77686-clk", },
+> >  };
+> >
+> > +static const struct mfd_cell max77686_rtc_dev[] = {
+> > +	{ .name = "max77686-rtc", },
+> > +};
+> > +
+> >  static const struct mfd_cell max77802_devs[] = {
+> >  	{ .name = "max77802-pmic", },
+> >  	{ .name = "max77802-clk", },
+> > @@ -332,14 +335,27 @@ static int max77686_i2c_probe(struct i2c_client
+> *i2c,
+> >  		goto err_del_irqc;
+> >  	}
+> >
+> > +	if (max77686->type == TYPE_MAX77686) {
+> > +		ret = mfd_add_devices(&max77686->rtc->dev, -1,
+> max77686_rtc_dev,
+> > +			1, NULL, 0, NULL);
+> > +		if (ret < 0) {
+> > +			dev_err(&max77686->rtc->dev,
+> > +				"failed to add RTC device %d\n", ret);
+> > +			goto err_del_rtc_irqc;
+> > +		}
+> > +	}
+> > +
+> >  	ret = mfd_add_devices(max77686->dev, -1, cells, n_devs, NULL, 0,
+> NULL);
+> >  	if (ret < 0) {
+> >  		dev_err(&i2c->dev, "failed to add MFD devices: %d\n", ret);
+> > -		goto err_del_rtc_irqc;
+> > +		goto err_del_rtc_dev;
+> >  	}
+> >
+> >  	return 0;
+> >
+> > +err_del_rtc_dev:
+> > +	if (max77686->type == TYPE_MAX77686)
+> > +		mfd_remove_devices(&max77686->rtc->dev);
+> >  err_del_rtc_irqc:
+> >  	regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
+> >  err_del_irqc:
+> > @@ -356,6 +372,8 @@ static int max77686_i2c_remove(struct i2c_client
+> *i2c)
+> >  	struct max77686_dev *max77686 = i2c_get_clientdata(i2c);
+> >
+> >  	mfd_remove_devices(max77686->dev);
+> > +	if (max77686->type == TYPE_MAX77686)
+> > +		mfd_remove_devices(&max77686->rtc->dev);
+> >
+> >  	regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
+> >  	regmap_del_irq_chip(max77686->irq, max77686->irq_data);
+> >
