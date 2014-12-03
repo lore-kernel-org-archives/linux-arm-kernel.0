@@ -1,43 +1,64 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 3 Dec 2014 14:18:25 +0200
-Subject: [PATCH v3 2/3] Documentation: DT: Add documentation for ti, opa362
- bindings
-In-Reply-To: <1417352867-7436-3-git-send-email-marek@goldelico.com>
-References: <1417352867-7436-1-git-send-email-marek@goldelico.com>
- <1417352867-7436-3-git-send-email-marek@goldelico.com>
-Message-ID: <547EFF91.7040405@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 03 Dec 2014 13:33:44 +0100
+Subject: [PATCH v2 2/7] ARM: Exynos: add support for sub-power domains
+In-Reply-To: <1416814256-24288-3-git-send-email-a.hajda@samsung.com>
+References: <1416814256-24288-3-git-send-email-a.hajda@samsung.com>
+Message-ID: <1417610024-29748-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/11/14 15:07, Marek Belisko wrote:
-> Signed-off-by: Marek Belisko <marek@goldelico.com>
-> ---
->  .../devicetree/bindings/video/ti,opa362.txt        | 38 ++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/ti,opa362.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/video/ti,opa362.txt b/Documentation/devicetree/bindings/video/ti,opa362.txt
-> new file mode 100644
-> index 0000000..4747ef9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/ti,opa362.txt
-> @@ -0,0 +1,38 @@
-> +OPA362 analog video amplifier
-> +
-> +Required properties:
-> +- compatible: "ti,opa362"
-> +- gpio: enable/disable output gpio
+This patch adds support for making one power domain a sub-domain of
+other domain. This is useful for modeling power dependences for devices
+like TV Mixer or Camera ISP, which needs to have more than one power
+domain enabled to be operational.
 
-Either this or the example is wrong. If I'm not mistaken 'gpios' is the
-correct form.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ Documentation/devicetree/bindings/arm/exynos/power_domain.txt |  2 ++
+ arch/arm/mach-exynos/pm_domains.c                             | 11 ++++++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141203/caabacf1/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+index abde1ea8a119..b884358ebb1a 100644
+--- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
++++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+@@ -22,6 +22,8 @@ Optional Properties:
+ 	- pclkN, clkN: Pairs of parent of input clock and input clock to the
+ 		devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
+ 		are supported currently.
++- samsung,power-domain: phandle to a master power domain that the given domain
++		       is a part of
+ 
+ Node of a device using power domains must have a samsung,power-domain property
+ defined with a phandle to respective power domain.
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index 20f267121b3e..fa9a47ddad81 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -108,7 +108,7 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
+ static __init int exynos4_pm_init_power_domain(void)
+ {
+ 	struct platform_device *pdev;
+-	struct device_node *np;
++	struct device_node *np, *master_np;
+ 
+ 	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
+ 		struct exynos_pm_domain *pd;
+@@ -159,6 +159,15 @@ no_clk:
+ 
+ 		pm_genpd_init(&pd->pd, NULL, !on);
+ 		of_genpd_add_provider_simple(np, &pd->pd);
++
++		/* make master and slave hierarchy */
++		master_np = of_parse_phandle(np, "samsung,power-domain", 0);
++		if (!master_np)
++			master_np = of_parse_phandle(np, "power-domains", 0);
++		if (master_np) {
++			pm_genpd_add_subdomain_names(master_np->name, np->name);
++			of_node_put(master_np);
++		}
+ 	}
+ 
+ 	return 0;
+-- 
+1.9.2
