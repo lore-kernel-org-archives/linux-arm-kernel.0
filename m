@@ -1,59 +1,54 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Wed, 03 Dec 2014 07:37:13 -0700
-Subject: [PATCH 0/3 RESEND] ARM: dts: sabrelite I2C and HDMI additions
-In-Reply-To: <CADCpmyN8J0XdUShLZwxny=DoJvpmNGjhNQCuOMZ64ac_VTP7BQ@mail.gmail.com>
-References: <1417559839-17365-1-git-send-email-eric.nelson@boundarydevices.com>
- <CADCpmyN8J0XdUShLZwxny=DoJvpmNGjhNQCuOMZ64ac_VTP7BQ@mail.gmail.com>
-Message-ID: <547F2019.5060101@boundarydevices.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed,  3 Dec 2014 15:37:34 +0100
+Subject: [PATCH] [RFC] ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node
+Message-ID: <1417617454-14533-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gary,
+Add a node for the Private Timer and Watchdog, as found in the Cortex-A9
+MPCore.
 
-On 12/02/2014 10:04 PM, Gary Bisson wrote:
-> Eric, All,
-> 
-> On Tue, Dec 2, 2014 at 2:37 PM, Eric Nelson
-> <eric.nelson@boundarydevices.com> wrote:
->> This set of patches adds support for I2C2/3 busses and HDMI output
->> for the SABRE Lite board.
->>
->> The content was gratuitously copied from the following commits
->> for the Nitrogen6X board made by Lucas Stach, Michael Olbrich,
->> and Philipp Zabel at Pengutronix:
->>
->>         43c3c00 - ARM: dts: nitrogen6x: add i2c2
->>         d653620 - ARM: dts: nitrogen6x: add hdmi
->>         1dffdd6 - ARM: dts: nitrogen6x: add i2c3
->>
->> Eric Nelson (3):
->>   ARM: dts: sabrelite: add i2c2
->>   ARM: dts: sabrelite: add hdmi
->>   ARM: dts: sabrelite: add i2c3
->>
->>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 33 ++++++++++++++++++++++++++++++++
->>  1 file changed, 33 insertions(+)
->>
->> Re-sending to add Shawn Guo to the CC list.
->>
->> --
->> 1.9.1
->>
-> 
-> Tested on a SabreLite (iMX6q rev1.2), it works great once the ldb node
-> is removed from imx6qdl-sabrelite.dtsi.
-> It is to be noted that I've applied the patches on top of the
-> linux-stable tree. Eric, are you using Shawn's tree? I'll try with
-> that latter to see if I can keep both ldb and hdmi nodes at the same
-> time.
-> 
-The patches were generated based on Shawn's imx/dt branch, but I
-also tested against linux-stable.
+Without this, there's no clocksource available during early kernel
+initialization, before cmt1 is initialized, leading to a lock-up if
+CONFIG_CPU_IDLE=y.
 
-I didn't need to remove the LDB node in either case. HDMI just
-worked.
+FIXME The clock should be the PERIPH clock, but the sh73a0 CPG driver
+      doesn't have support for that clock yet. Hence we use the ZG
+      clock, which runs at the same frequency.
 
-Regards,
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Unlike "arm,armv7-timer" (used on R-Car Gen2), "arm,cortex-a9-twd-time"
+does require a clock, which is not documented in its bindings?
+---
+ arch/arm/boot/dts/sh73a0.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-
-Eric
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index cca22ec59a2edd63..c53b19f40ae0977f 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -11,6 +11,7 @@
+ /include/ "skeleton.dtsi"
+ 
+ #include <dt-bindings/clock/sh73a0-clock.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ 
+ / {
+@@ -43,6 +44,13 @@
+ 		      <0xf0000100 0x100>;
+ 	};
+ 
++	timer at f0000600 {
++		compatible = "arm,cortex-a9-twd-timer";
++		reg = <0xf0000600 0x20>;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
++		clocks = <&cpg_clocks SH73A0_CLK_ZG>;	// FIXME CLK_PERIPH
++	};
++
+ 	pmu {
+ 		compatible = "arm,cortex-a9-pmu";
+ 		interrupts = <0 55 IRQ_TYPE_LEVEL_HIGH>,
+-- 
+1.9.1
