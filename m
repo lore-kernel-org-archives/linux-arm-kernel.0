@@ -1,59 +1,54 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Wed, 03 Dec 2014 11:46:09 -0800
-Subject: [PATCH v3 1/3] devicetree: of: Add bindings for chosen node,
- stdout-path
-In-Reply-To: <CACxGe6vdbURE3=W3Uerwy90piGKhv7-m+-vpUhCiUTKB4AzTsw@mail.gmail.com>
-References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
- <1417110967-16284-2-git-send-email-leif.lindholm@linaro.org>
- <547E7455.6090009@gmail.com>
- <CACxGe6vdbURE3=W3Uerwy90piGKhv7-m+-vpUhCiUTKB4AzTsw@mail.gmail.com>
-Message-ID: <547F6881.20400@gmail.com>
+From: bisson.gary@gmail.com (Gary Bisson)
+Date: Wed,  3 Dec 2014 11:48:05 -0800
+Subject: [PATCH][imx/fixes] ARM: clk-imx6q: fix video divider for rev T0 1.0
+Message-ID: <1417636085-14822-1-git-send-email-bisson.gary@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/3/2014 7:12 AM, Grant Likely wrote:
-> On Wed, Dec 3, 2014 at 2:24 AM, Frank Rowand <frowand.list@gmail.com> wrote:
->> On 11/27/2014 9:56 AM, Leif Lindholm wrote:
->>> Add a global binding for the chosen node.
->>> Include a description of the stdout-path, and an explicit statement on
->>> its extra options in the context of a UART console.
->>>
->>> Opening description stolen from www.devicetree.org, and part of the
->>> remaining text provided by Mark Rutland.
->>>
->>> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
->>> ---
->>>  Documentation/devicetree/bindings/chosen.txt |   42 ++++++++++++++++++++++++++
->>>  1 file changed, 42 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/chosen.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
->>> new file mode 100644
->>> index 0000000..9cd74e9
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/chosen.txt
->>> @@ -0,0 +1,42 @@
->>> +The chosen node
->>> +---------------
->>> +
->>> +The chosen node does not represent a real device, but serves as a place
->>> +for passing data between firmware and the operating system, like boot
->>> +arguments. Data in the chosen node does not represent the hardware.
->>> +
->>> +
->>> +stdout-path property
->>
->> The code in patch 3/3 adds the extra options feature to the properties:
->>
->>   stdout-path
->>   linux,stdout-path
->>   stdout  [if (IS_ENABLED(CONFIG_PPC) ... ]
-> 
-> I don't understand what you mean here. Are you suggesting a change to
-> this patch? Is there something deficient in it?
+The post dividers do not work on i.MX6Q rev T0 1.0 so they must be fixed
+to 1. As the table index was wrong, a divider a of 4 could still be
+requested which implied the clock not to be set properly. This is the
+root cause of the HDMI not working at high resolution on rev T0 1.0 of
+the SoC, giving the following error:
+mxc_sdc_fb fb.27: timeout when waiting for flip irq
 
-Assuming that the code change in patch 3 is as desired, then the chosen.txt
-documentation applies to all three properties, not just stdout-path.  So
-yes, a change is suggested for the documentation.
+See this thread for details:
+https://lists.yoctoproject.org/pipermail/meta-freescale/2014-December/thread.html#11776
 
--Frank
+Signed-off-by: Gary Bisson <bisson.gary@gmail.com>
+---
+Hi,
+
+This patch has been tested with a Sabrelite rev D (5-9-12).
+
+However I've realized this patch doesn't fix the HDMI at 1080p60 but only
+resolutions up to 1080p30. As mainline kernel is forcing the highest
+resolution supported by the monitor it might not work on 1080p60-enable
+displays. This latter issue is being investigated.
+
+This patch is being integrated into meta-fsl-arm. Fabio suggested to
+submit this patch already as clearly the array index is currently
+wrong and "Better to have some HDMI then no HDMI at all":
+https://lists.yoctoproject.org/pipermail/meta-freescale/2014-December/011796.html
+
+Thanks,
+Gary
+---
+ arch/arm/mach-imx/clk-imx6q.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 4e79da7..2aa1b67 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -144,7 +144,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 		post_div_table[1].div = 1;
+ 		post_div_table[2].div = 1;
+ 		video_div_table[1].div = 1;
+-		video_div_table[2].div = 1;
++		video_div_table[3].div = 1;
+ 	};
+ 
+ 	clk[IMX6QDL_PLL1_BYPASS_SRC] = imx_clk_mux("pll1_bypass_src", base + 0x00, 14, 2, pll_bypass_src_sels, ARRAY_SIZE(pll_bypass_src_sels));
+-- 
+2.1.3
