@@ -1,177 +1,85 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 3 Dec 2014 10:39:00 +0100
-Subject: [PATCH 04/12] irqchip: nvic: support routable irq domain ops
-In-Reply-To: <1417565531-4507-5-git-send-email-stefan@agner.ch>
-References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
- <1417565531-4507-5-git-send-email-stefan@agner.ch>
-Message-ID: <20141203093900.GL2129@pengutronix.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 03 Dec 2014 10:49:20 +0100
+Subject: [PATCH 3/9] clk: sunxi: Add prcm mod0 clock driver
+In-Reply-To: <20141202154524.GD30256@lukather>
+References: <20141126211318.GN25249@lukather> <5476E3A5.4000708@redhat.com>
+ <CAGb2v652m0bCdPWFF4LWwjcrCJZvnLibFPw8xXJ3Q-Ge+_-p7g@mail.gmail.com>
+ <5476F8AB.2000601@redhat.com> <20141127190509.GR25249@lukather>
+ <54787A8A.6040209@redhat.com> <20141202154524.GD30256@lukather>
+Message-ID: <547EDCA0.4040805@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stefan,
+Hi,
 
-On Wed, Dec 03, 2014 at 01:12:03AM +0100, Stefan Agner wrote:
-> Add support for routable irq domain ops like the GIC interrupt
-> controller provides. This is useful for asymmetrical multi-
-> processor SoCs, such as Freescale Vybrid (VF6xx) which have
-> a Cortex-M4 alongside a Cortex-A5 and a interrupt router to
-> route the peripheral interrupts between them.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  drivers/irqchip/irq-nvic.c       | 70 +++++++++++++++++++++++++++++++++++++++-
->  include/linux/irqchip/arm-nvic.h | 25 ++++++++++++++
->  2 files changed, 94 insertions(+), 1 deletion(-)
->  create mode 100644 include/linux/irqchip/arm-nvic.h
-> 
-> diff --git a/drivers/irqchip/irq-nvic.c b/drivers/irqchip/irq-nvic.c
-> index 4ff0805..dbfb5be 100644
-> --- a/drivers/irqchip/irq-nvic.c
-> +++ b/drivers/irqchip/irq-nvic.c
-> @@ -40,6 +40,7 @@
->  #define NVIC_MAX_IRQ		((NVIC_MAX_BANKS - 1) * 32 + 16)
->  
->  static struct irq_domain *nvic_irq_domain;
-> +const struct irq_domain_ops *nvic_routable_irq_domain_ops;
-Can you reshuffle the order of functions to make this forward
-declaration unnecessary?
-  
->  asmlinkage void __exception_irq_entry
->  nvic_handle_irq(irq_hw_number_t hwirq, struct pt_regs *regs)
-> @@ -49,6 +50,73 @@ nvic_handle_irq(irq_hw_number_t hwirq, struct pt_regs *regs)
->  	handle_IRQ(irq, regs);
->  }
->  
-> +static int nvic_irq_domain_map(struct irq_domain *d, unsigned int irq,
-> +				irq_hw_number_t hw)
-> +{
-> +	int ret;
-> +
-> +	ret = irq_map_generic_chip(d, irq, hw);
-> +
-> +	if (IS_ERR_VALUE(ret))
-if (ret < 0)
+On 12/02/2014 04:45 PM, Maxime Ripard wrote:
 
-> +		return ret;
-> +
-> +	return nvic_routable_irq_domain_ops->map(d, irq, hw);
-You could save the default implementations if you do:
+ >> Ok, so thinking more about this, I'm still convinced that the MFD
+>> framework is only getting in the way here.
+>
+> You still haven't said of what exactly it's getting in the way of.
 
-	if (nvic_routable_irq_domain_ops)
-		return nvic_routable_irq_domain_ops->map(d, irq, hw);
+Of using of_clk_define to bind to the mod0 clk in the prcm, because the
+ir_clk node does not have its own reg property when the mfd framework is
+used and of_clk_define requires the node to have its own reg property.
 
-(maybe also check for map?)
+>> But I can see having things represented in devicetree properly, with
+>> the clocks, etc. as child nodes of the prcm being something which we
+>> want.
+>
+> Clocks and reset are the only thing set so far, because we need
+> reference to them from the DT itself, nothing more.
+>
+> We could very much have more devices instatiated from the MFD itself.
+>
+>> So since all we are using the MFD for is to instantiate platform
+>> devices under the prcm nodes, and assign an io resource for the regs
+>> to them, why not simply make the prcm node itself a simple-bus.
+>
+> No, this is really not a bus. It shouldn't be described at all as
+> such. It is a device, that has multiple functionnalities in the system
+> => MFD. It really is that simple.
 
-> +}
-> +
-> +static void nvic_irq_domain_unmap(struct irq_domain *d, unsigned int irq)
-> +{
-> +	nvic_routable_irq_domain_ops->unmap(d, irq);
-> +}
-> +
-> +static int nvic_irq_domain_xlate(struct irq_domain *d,
-> +				 struct device_node *controller,
-> +				 const u32 *intspec, unsigned int intsize,
-> +				 unsigned long *out_hwirq,
-> +				 unsigned int *out_type)
-> +{
-> +	*out_hwirq = intspec[0];
-> +	*out_type = IRQ_TYPE_NONE;
-If you demand from the callback to set this, you can just do
+Ok, I can live with that, but likewise the clocks node is not a bus either!
 
-	nvic_irq_domain_ops.xlate = new_callback;
+So it should not have a simple-bus compatible either, and as such we cannot
+simply change the mod0 driver from of_clk_define to a platform driver because
+then we need to instantiate platform devs for the mod0 clock nodes, which
+means making the clock node a simple-bus.
 
-not sure this is sensible though. Up to you.
+I can see your logic in wanting the ir_clk prcm sub-node to use the
+mod0 compatible string, so how about we make the mod0 driver both
+register through of_declare and as a platform driver. Note this means
+that it will try to bind twice to the ir_clk node, since of_clk_declare
+will cause it to try and bind there too AFAIK.
 
-> +	return nvic_routable_irq_domain_ops->xlate(d, controller, intspec,
-> +						  intsize, out_hwirq, out_type);
-> +}
-> +
-> +struct irq_domain_ops nvic_irq_domain_ops = {
-> +	.map	= nvic_irq_domain_map,
-> +	.unmap	= nvic_irq_domain_unmap,
-> +	.xlate	= nvic_irq_domain_xlate,
-> +};
-> +
-> +/* Default functions for routable irq domain */
-> +static int nvic_routable_irq_domain_map(struct irq_domain *d, unsigned int irq,
-> +			      irq_hw_number_t hw)
-> +{
-> +	return 0;
-> +}
-> +
-> +static void nvic_routable_irq_domain_unmap(struct irq_domain *d,
-> +					  unsigned int irq)
-> +{
-> +}
-> +
-> +static int nvic_routable_irq_domain_xlate(struct irq_domain *d,
-> +				struct device_node *controller,
-> +				const u32 *intspec, unsigned int intsize,
-> +				unsigned long *out_hwirq,
-> +				unsigned int *out_type)
-> +{
-> +	return 0;
-> +}
-> +
-> +static const struct irq_domain_ops nvic_default_routable_irq_domain_ops = {
-> +	.map = nvic_routable_irq_domain_map,
-> +	.unmap = nvic_routable_irq_domain_unmap,
-> +	.xlate = nvic_routable_irq_domain_xlate,
-> +};
-> +
-> +const struct irq_domain_ops *nvic_routable_irq_domain_ops =
-> +					&nvic_default_routable_irq_domain_ops;
-> +
->  static int __init nvic_of_init(struct device_node *node,
->  			       struct device_node *parent)
->  {
-> @@ -70,7 +138,7 @@ static int __init nvic_of_init(struct device_node *node,
->  		irqs = NVIC_MAX_IRQ;
->  
->  	nvic_irq_domain =
-> -		irq_domain_add_linear(node, irqs, &irq_generic_chip_ops, NULL);
-> +		irq_domain_add_linear(node, irqs, &nvic_irq_domain_ops, NULL);
->  	if (!nvic_irq_domain) {
->  		pr_warn("Failed to allocate irq domain\n");
->  		return -ENOMEM;
-> diff --git a/include/linux/irqchip/arm-nvic.h b/include/linux/irqchip/arm-nvic.h
-> new file mode 100644
-> index 0000000..0e92a14
-> --- /dev/null
-> +++ b/include/linux/irqchip/arm-nvic.h
-> @@ -0,0 +1,25 @@
-> +/*
-> + *  include/linux/irqchip/arm-nvic.h
-Don't add the filename to a comment. There are more reliable means to
-find it out than looking for that comment.
+The of_clk_declare bind will fail though because there is no regs
+property, so this double bind is not an issue as long as we do not
+log errors on the first bind failure.
 
-> + *
-> + *  Copyright (C) 2014 Stefan Agner
-Is this indented differently to the paragraph below on purpose?
+Note that the ir_clk node will still need an "ir-clk" compatible as
+well for the MFD to find it and assign the proper resources to it.
 
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#ifndef __LINUX_IRQCHIP_ARM_NVIC_H
-> +#define __LINUX_IRQCHIP_ARM_NVIC_H
-> +
-> +#ifndef __ASSEMBLY__
-> +
-> +#ifdef CONFIG_ARM_NVIC
-> +extern const struct irq_domain_ops *nvic_routable_irq_domain_ops;
-> +static inline void __init register_routable_domain_ops
-> +					(const struct irq_domain_ops *ops)
-> +{
-> +		nvic_routable_irq_domain_ops = ops;
-> +}
-> +#endif /* CONFIG_ARM_NVIC */
-> +
-> +#endif /* __ASSEMBLY__ */
-> +#endif /* __LINUX_IRQCHIP_ARM_NVIC_H */
+But this way we will have the clk driver binding to the mod0 clk compatible,
+which is what you want, while having the MFD assign resources on the
+fact that it is the ir-clk node, so that things will still work if
+there are multiple mod0 clks in the prcm.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>> This does everything the MFD prcm driver currently does, without
+>> actually needing a specific kernel driver, and as added bonus this
+>> will move the definition of the mfd function reg offsets out of the
+>> kernel and into the devicetree where they belong in the first place.
+>
+> Which was nacked in the first place because such offsets are not
+> supposed to be in the DT.
+>
+> Really, we have something that work here, there's no need to refactor
+> it.
+
+Ok, but that does bring us back to the original problem wrt the ir-clk,
+see above for how I think we should solve this then. If you agree I
+can implement the proposed fix.
+
+Regards,
+
+Hans
