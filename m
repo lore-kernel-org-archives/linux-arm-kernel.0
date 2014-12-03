@@ -1,95 +1,54 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  3 Dec 2014 14:41:42 +0100
-Subject: [PATCH v6 2/7] ARM: shmobile: R-Mobile: Use
- generic_pm_domain.attach_dev() for pm_clk setup
+Date: Wed,  3 Dec 2014 14:41:43 +0100
+Subject: [PATCH v6 3/7] ARM: shmobile: R-Mobile: Enable module clocks if
+ !CONFIG_PM_RUNTIME
 In-Reply-To: <1417614107-5985-1-git-send-email-geert+renesas@glider.be>
 References: <1417614107-5985-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1417614107-5985-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1417614107-5985-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the just introduced genpd attach/detach callbacks to register the
-devices' module clocks, instead of doing it directly, to make it
-DT-proof.
+If CONFIG_PM_RUNTIME is not set, the clocks must be enabled before the
+devices can be used.
+
+Currently these clocks are enabled by the !CONFIG_PM_RUNTIME version of
+pm_clk_notify, activated by the hack in drivers/sh/pm_runtime.c, but
+this will go away soon (at least for DT).
+
+On detach, disabling the clocks is already handled by pm_clk_destroy().
+On system suspend/resume, disabling/enabling clocks is already handled
+from the genpd->dev_ops.{start,stop}() callbacks.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
 v6:
   - No changes,
 v5:
-  - Update for {at,de}tach_dev() taking a generic_pm_domain pointer
-    again,
+  - No changes,
 v4:
-  - Add Reviewed-by,
-  - Add missing pm_clk_create()/pm_clk_destroy() calls,
-  - Update for attach_dev() returning an error code again,
-v3:
-  - Update for callback signature changes,
-v2:
   - New.
 ---
- arch/arm/mach-shmobile/pm-rmobile.c | 34 ++++++++++++++++++++++++++++++++--
- 1 file changed, 32 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/pm-rmobile.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index 717e6413d29cb998..168046c355fc8368 100644
+index 168046c355fc8368..6d912ce801aa88bd 100644
 --- a/arch/arm/mach-shmobile/pm-rmobile.c
 +++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -101,6 +101,36 @@ static bool rmobile_pd_active_wakeup(struct device *dev)
- 	return true;
- }
+@@ -118,6 +118,14 @@ static int rmobile_pd_attach_dev(struct generic_pm_domain *domain,
+ 		goto fail;
+ 	}
  
-+static int rmobile_pd_attach_dev(struct generic_pm_domain *domain,
-+				 struct device *dev)
-+{
-+	int error;
-+
-+	error = pm_clk_create(dev);
-+	if (error) {
-+		dev_err(dev, "pm_clk_create failed %d\n", error);
-+		return error;
++	if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
++		error = pm_clk_resume(dev);
++		if (error) {
++			dev_err(dev, "pm_clk_resume failed %d\n", error);
++			goto fail;
++		}
 +	}
 +
-+	error = pm_clk_add(dev, NULL);
-+	if (error) {
-+		dev_err(dev, "pm_clk_add failed %d\n", error);
-+		goto fail;
-+	}
-+
-+	return 0;
-+
-+fail:
-+	pm_clk_destroy(dev);
-+	return error;
-+}
-+
-+static void rmobile_pd_detach_dev(struct generic_pm_domain *domain,
-+				  struct device *dev)
-+{
-+	pm_clk_destroy(dev);
-+}
-+
- static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- {
- 	struct generic_pm_domain *genpd = &rmobile_pd->genpd;
-@@ -112,6 +142,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
- 	genpd->power_off		= rmobile_pd_power_down;
- 	genpd->power_on			= rmobile_pd_power_up;
-+	genpd->attach_dev		= rmobile_pd_attach_dev;
-+	genpd->detach_dev		= rmobile_pd_detach_dev;
- 	__rmobile_pd_power_up(rmobile_pd, false);
- }
+ 	return 0;
  
-@@ -130,8 +162,6 @@ void rmobile_add_device_to_domain_td(const char *domain_name,
- 	struct device *dev = &pdev->dev;
- 
- 	__pm_genpd_name_add_device(domain_name, dev, td);
--	if (pm_clk_no_clocks(dev))
--		pm_clk_add(dev, NULL);
- }
- 
- void rmobile_add_devices_to_domains(struct pm_domain_device data[],
+ fail:
 -- 
 1.9.1
