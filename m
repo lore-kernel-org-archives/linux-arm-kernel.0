@@ -1,43 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 3 Dec 2014 17:29:28 +0000
-Subject: [PATCH 3/5] ASoC: dwc: Iterate over all channels
-In-Reply-To: <547F3CA5.2010500@arm.com>
-References: <547F3CA5.2010500@arm.com>
-Message-ID: <20141203172928.GD7712@sirena.org.uk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 03 Dec 2014 18:32:22 +0100
+Subject: [PATCH 04/12] irqchip: nvic: support routable irq domain ops
+In-Reply-To: <4576226.8jDcZiCptE@wuerfel>
+References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
+ <1417565531-4507-5-git-send-email-stefan@agner.ch>
+ <4576226.8jDcZiCptE@wuerfel>
+Message-ID: <2586ebb42daf66877335adaad4b4d3e6@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03, 2014 at 04:39:01PM +0000, Andrew Jackson wrote:
+On 2014-12-03 11:49, Arnd Bergmann wrote:
+> On Wednesday 03 December 2014 01:12:03 Stefan Agner wrote:
+>> +#ifdef CONFIG_ARM_NVIC
+>> +extern const struct irq_domain_ops *nvic_routable_irq_domain_ops;
+>> +static inline void __init register_routable_domain_ops
+>> +                                       (const struct irq_domain_ops *ops)
+>> +{
+>> +               nvic_routable_irq_domain_ops = ops;
+>> +}
+>> +#endif /* CONFIG_ARM_NVIC */
+>>
+> 
+> As you mentioned, this conflicts with the gic specific declaration.
+> Why not remove the #ifdef here and rename the function to
+> nvic_register_routable_domain_ops() ?
+> 
+> If that doesn't work, I guess we need something more generic
+> and move the routable_irq_domain_ops to some common location.
+> 
 
-> +	/* Iterate over set of channels - independently controlled.
-> +	 */
-> +	do {
-> +		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-> +			i2s_write_reg(dev->i2s_base, TCR(ch_reg),
-> +				      xfer_resolution);
-> +			i2s_write_reg(dev->i2s_base, TFCR(ch_reg), 0x02);
-> +			irq = i2s_read_reg(dev->i2s_base, IMR(ch_reg));
-> +			i2s_write_reg(dev->i2s_base, IMR(ch_reg), irq & ~0x30);
-> +			i2s_write_reg(dev->i2s_base, TER(ch_reg), 1);
-> +		} else {
-> +			i2s_write_reg(dev->i2s_base, RCR(ch_reg),
-> +				      xfer_resolution);
-> +			i2s_write_reg(dev->i2s_base, RFCR(ch_reg), 0x07);
-> +			irq = i2s_read_reg(dev->i2s_base, IMR(ch_reg));
-> +			i2s_write_reg(dev->i2s_base, IMR(ch_reg), irq & ~0x03);
-> +			i2s_write_reg(dev->i2s_base, RER(ch_reg), 1);
-> +		}
-> +	} while (ch_reg-- > 0);
+This would move the ifdef to the MSCM driver code. I thought of having a
+generic function to call, no matter what base IRQ chip is used.
 
-The normal way to write an iteration would be with a for loop - why are
-we not doing that?
+Anyway, as tglx suggested in patch 3/12, I will try to use the IRQ
+domain hierarchy stuff...
 
-Also I see that you've not sent these as a single thread - please use
---thread.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141203/4c734ecb/attachment.sig>
+--
+Stefan
