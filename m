@@ -1,30 +1,45 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 03 Dec 2014 11:53:10 -0800
-Subject: [PATCH] ARM: dts: Add dts file for odroid XU3 board
-In-Reply-To: <1417438770-28696-1-git-send-email-sjoerd.simons@collabora.co.uk>
- (Sjoerd Simons's message of "Mon, 1 Dec 2014 13:59:30 +0100")
-References: <1417438770-28696-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <7hzjb4y0gp.fsf@deeprootsystems.com>
+Date: Wed, 03 Dec 2014 11:57:05 -0800
+Subject: [PATCH v2 2/7] ARM: Exynos: add support for sub-power domains
+In-Reply-To: <547F065A.5030505@samsung.com> (Marek Szyprowski's message of
+ "Wed, 03 Dec 2014 13:47:22 +0100")
+References: <1416814256-24288-3-git-send-email-a.hajda@samsung.com>
+ <1417610024-29748-1-git-send-email-m.szyprowski@samsung.com>
+ <CAMuHMdWjZTRVrdcdu2toj9FYi5gOgw_Hf23SRh=9-QKwQDJy0g@mail.gmail.com>
+ <547F065A.5030505@samsung.com>
+Message-ID: <7hvblsy0a6.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sjoerd Simons <sjoerd.simons@collabora.co.uk> writes:
+Marek Szyprowski <m.szyprowski@samsung.com> writes:
 
-> Add DTS for the Hardkernel Odroid XU3. The name of the DTS file is kept the
-> same as the vendors naming, which means it's prefixed with exynos5422
-> instead of exynos5800 as the SoC name even though it includes the
-> exyno5800 dtsi.
+> Hello,
 >
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> On 2014-12-03 13:36, Geert Uytterhoeven wrote:
+>> Hi Marek,
+>>
+>> On Wed, Dec 3, 2014 at 1:33 PM, Marek Szyprowski
+>> <m.szyprowski@samsung.com> wrote:
+>>> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+>>> index abde1ea8a119..b884358ebb1a 100644
+>>> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+>>> @@ -22,6 +22,8 @@ Optional Properties:
+>>>          - pclkN, clkN: Pairs of parent of input clock and input clock to the
+>>>                  devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
+>>>                  are supported currently.
+>>> +- samsung,power-domain: phandle to a master power domain that the given domain
+>>> +                      is a part of
+>> For new DTSes I'd recommend using the generic "power-domains" only.
+>
+> I think that some consistency in dts style will be really an added
+> value. In my opinion for
+> all existing DTSes we should keep using 'samsung,power-domain' (even
+> for defining a parent
+> power domains) and for all new DTSes, the generic 'power-domains'
+> binding should be used.
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
-
-Tried this on top of linux-next (next-20141125 and next20141203) and
-boots fine on my odroid-xu3. 
-
-Thanks for doing this, I've been meaning to get a DTS upstream for this
-platform myself.  I also noticed that the imprecise aborts I've been
-seeing when booting this board with the smdk5420 DTS are gone, so I
-don't have to dig into those now either.  Thanks!  :)
+Or even better, convert the existing DTSs to use generic power-domain
+first, and then use generic ones going forward also.
 
 Kevin
