@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  3 Dec 2014 21:44:10 +0100
-Subject: [PATCH v5 06/11] memory: atmel-ebi: add DT bindings documentation
+Date: Wed,  3 Dec 2014 21:44:09 +0100
+Subject: [PATCH v5 05/11] memory: add Atmel EBI (External Bus Interface) driver
 In-Reply-To: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1417639455-17410-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1417639455-17410-6-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,175 +14,636 @@ own configuration (timings, access mode, bus width, ...).
 This driver provides a generic DT binding to configure a device according
 to its requirements.
 For specific device controllers (like the NAND one) the SMC timings
-should be configured by the controller driver through the matrix and smc
-syscon regmaps.
+should be configured by the controller driver through the matrix and
+smc syscon regmaps.
 
+Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- .../bindings/memory-controllers/atmel-ebi.txt      | 155 +++++++++++++++++++++
- 1 file changed, 155 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+ drivers/memory/Kconfig     |  11 +
+ drivers/memory/Makefile    |   1 +
+ drivers/memory/atmel-ebi.c | 579 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 591 insertions(+)
+ create mode 100644 drivers/memory/atmel-ebi.c
 
-diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+index 6d91c27..dfe24a2 100644
+--- a/drivers/memory/Kconfig
++++ b/drivers/memory/Kconfig
+@@ -17,6 +17,17 @@ config ATMEL_SDRAMC
+ 	  Starting with the at91sam9g45, this controller supports SDR, DDR and
+ 	  LP-DDR memories.
+ 
++config ATMEL_EBI
++	bool "Atmel EBI driver"
++	default y
++	depends on ARCH_AT91 && OF
++	select MFD_SYSCON
++	help
++	  Driver for Atmel EBI controller.
++	  Used to configure the EBI (external bus interface) when the device-
++	  tree is used. This bus supports NANDs, external ethernet controller,
++	  SRAMs, ATA devices, etc.
++
+ config TI_AEMIF
+ 	tristate "Texas Instruments AEMIF driver"
+ 	depends on (ARCH_DAVINCI || ARCH_KEYSTONE) && OF
+diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
+index c32d319..7ca2c19 100644
+--- a/drivers/memory/Makefile
++++ b/drivers/memory/Makefile
+@@ -6,6 +6,7 @@ ifeq ($(CONFIG_DDR),y)
+ obj-$(CONFIG_OF)		+= of_memory.o
+ endif
+ obj-$(CONFIG_ATMEL_SDRAMC)	+= atmel-sdramc.o
++obj-$(CONFIG_ATMEL_EBI)		+= atmel-ebi.o
+ obj-$(CONFIG_TI_AEMIF)		+= ti-aemif.o
+ obj-$(CONFIG_TI_EMIF)		+= emif.o
+ obj-$(CONFIG_FSL_CORENET_CF)	+= fsl-corenet-cf.o
+diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
 new file mode 100644
-index 0000000..3749ea1
+index 0000000..ff6bccd
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
-@@ -0,0 +1,155 @@
-+* Device tree bindings for Atmel EBI
++++ b/drivers/memory/atmel-ebi.c
+@@ -0,0 +1,579 @@
++/*
++ * EBI driver for Atmel chips
++ * inspired by the fsl weim bus driver
++ *
++ * Copyright (C) 2013 JJ Hiblot.
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+The External Bus Interface (EBI) controller is a bus where you can connect
-+asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
-+The EBI provides a glue-less interface to asynchronous memories though the SMC
-+(Static Memory Controller).
-+Synchronous memories (and some asynchronous memories like NANDs) can be
-+attached to specialized controllers which are responsible for configuring the
-+bus appropriately according to the connected device.
-+In the other hand, the bus interface can be automated for simple asynchronous
-+devices.
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/mfd/syscon.h>
++#include <linux/mfd/syscon/atmel-matrix.h>
++#include <linux/mfd/syscon/atmel-smc.h>
++#include <linux/module.h>
++#include <linux/of_device.h>
++#include <linux/regmap.h>
 +
-+Required properties:
++struct at91sam9_smc_timings {
++	u32 ncs_rd_setup_ns;
++	u32 nrd_setup_ns;
++	u32 ncs_wr_setup_ns;
++	u32 nwe_setup_ns;
++	u32 ncs_rd_pulse_ns;
++	u32 nrd_pulse_ns;
++	u32 ncs_wr_pulse_ns;
++	u32 nwe_pulse_ns;
++	u32 nrd_cycle_ns;
++	u32 nwe_cycle_ns;
++	u32 tdf_ns;
++};
 +
-+- compatible:		"atmel,at91sam9260-ebi"
-+			"atmel,at91sam9261-ebi"
-+			"atmel,at91sam9263-ebi0"
-+			"atmel,at91sam9263-ebi1"
-+			"atmel,at91sam9g45-ebi"
-+			"atmel,at91sam9x5-ebi"
-+			"atmel,sama5d3-ebi"
++struct at91sam9_smc_generic_fields {
++	struct regmap_field *setup;
++	struct regmap_field *pulse;
++	struct regmap_field *cycle;
++	struct regmap_field *mode;
++};
 +
-+- reg:			Contains offset/length value for EBI memory mapping.
-+			This property might contain several entries if the EBI
-+			memory range is not contiguous
++struct at91sam9_ebi_dev_config {
++	struct at91sam9_smc_timings timings;
++	u32 mode;
++};
 +
-+- #address-cells:	Must be 2.
-+			The first cell encodes the CS.
-+			The second cell encode the offset into the CS memory
-+			range.
++struct at91_ebi;
 +
-+- #size-cells:		Must be set to 1.
++struct at91_ebi_dev {
++	struct device_node *np;
++	struct at91_smc_timings *timings;
++	struct at91_ebi *ebi;
++	u32 mode;
++	int cs;
++	void *config;
++};
 +
-+- ranges:		Encodes CS to memory region association.
++struct at91_ebi_caps {
++	unsigned int available_cs;
++	const struct reg_field *ebi_csa;
++	int (*xlate_config)(struct at91_ebi_dev *ebid);
++	int (*apply_config)(struct at91_ebi_dev *ebid);
++	int (*init)(struct at91_ebi *ebi);
++};
 +
-+- clocks:		Clock feeding the EBI controller.
-+			See clock-bindings.txt
++struct at91_ebi {
++	struct clk *clk;
++	struct regmap *smc;
++	struct regmap *matrix;
 +
-+Child chip-select (cs) nodes contain the memory devices nodes connected to
-+such as NOR (e.g. cfi-flash) and NAND.
-+There might be board specific devices like FPGAs.
-+You'll define you device requirements in these child nodes.
++	struct regmap_field *ebi_csa;
 +
-+Required child cs node properties:
++	struct device *dev;
++	const struct at91_ebi_caps *caps;
++	struct at91_ebi_dev *devs[AT91_MATRIX_EBI_NUM_CS];
++	void *priv;
++};
 +
-+- #address-cells:	Must be 2.
++static int at91sam9_ebi_apply_config(struct at91_ebi_dev *ebid)
++{
++	unsigned int clk_rate = clk_get_rate(ebid->ebi->clk);
++	struct at91sam9_ebi_dev_config *config = ebid->config;
++	struct at91sam9_smc_timings *timings = &config->timings;
++	struct at91sam9_smc_generic_fields *fields = ebid->ebi->priv;
++	u32 coded_val;
++	u32 val;
 +
-+- #size-cells:		Must be 1.
++	coded_val = at91sam9_smc_setup_ns_to_cycles(clk_rate,
++						    timings->ncs_rd_setup_ns);
++	val = AT91SAM9_SMC_NCS_NRDSETUP(coded_val);
++	coded_val = at91sam9_smc_setup_ns_to_cycles(clk_rate,
++						    timings->nrd_setup_ns);
++	val |= AT91SAM9_SMC_NRDSETUP(coded_val);
++	coded_val = at91sam9_smc_setup_ns_to_cycles(clk_rate,
++						    timings->ncs_wr_setup_ns);
++	val |= AT91SAM9_SMC_NCS_WRSETUP(coded_val);
++	coded_val = at91sam9_smc_setup_ns_to_cycles(clk_rate,
++						    timings->nwe_setup_ns);
++	val |= AT91SAM9_SMC_NWESETUP(coded_val);
++	regmap_fields_write(fields->setup, ebid->cs, val);
 +
-+- ranges:		Empty property indicating that child nodes can inherit
-+			memory layout.
++	coded_val = at91sam9_smc_pulse_ns_to_cycles(clk_rate,
++						    timings->ncs_rd_pulse_ns);
++	val = AT91SAM9_SMC_NCS_NRDPULSE(coded_val);
++	coded_val = at91sam9_smc_pulse_ns_to_cycles(clk_rate,
++						    timings->nrd_pulse_ns);
++	val |= AT91SAM9_SMC_NRDPULSE(coded_val);
++	coded_val = at91sam9_smc_pulse_ns_to_cycles(clk_rate,
++						    timings->ncs_wr_pulse_ns);
++	val |= AT91SAM9_SMC_NCS_WRPULSE(coded_val);
++	coded_val = at91sam9_smc_pulse_ns_to_cycles(clk_rate,
++						    timings->nwe_pulse_ns);
++	val |= AT91SAM9_SMC_NWEPULSE(coded_val);
++	regmap_fields_write(fields->pulse, ebid->cs, val);
 +
-+Optional child cs node properties:
-+- atmel,generic-dev		boolean property specifying if the device is
-+				a generic device.
-+				The following properties are only parsed if
-+				this property is present.
-+				Specialized devices are attached to specialized
-+				controllers which are responsible for
-+				configuring the bus appropriately.
-+				Here are some examples of specialized
-+				controllers: NAND, CompactFlash, SDR-SDRAM.
++	coded_val = at91sam9_smc_cycle_ns_to_cycles(clk_rate,
++						    timings->nrd_cycle_ns);
++	val = AT91SAM9_SMC_NRDCYCLE(coded_val);
++	coded_val = at91sam9_smc_cycle_ns_to_cycles(clk_rate,
++						    timings->nwe_cycle_ns);
++	val |= AT91SAM9_SMC_NWECYCLE(coded_val);
++	regmap_fields_write(fields->cycle, ebid->cs, val);
 +
-+- atmel,bus-width:		width of the asynchronous device's data bus
-+				8, 16 or 32.
-+				8 if not present.
++	val = DIV_ROUND_UP(timings->tdf_ns, clk_rate);
++	if (val > AT91_SMC_TDF_MAX)
++		val = AT91_SMC_TDF_MAX;
++	regmap_fields_write(fields->mode, ebid->cs,
++			    config->mode | AT91_SMC_TDF_(val));
 +
-+- atmel,byte-access-type	"write" or "select" (see Atmel datasheet).
-+				"select" if not present.
++	return 0;
++}
 +
-+- atmel,read-mode		"nrd" or "ncs".
-+				"ncs" is not present.
++static int at91sam9_smc_xslate_timings(struct at91_ebi_dev *ebid)
++{
++	struct at91sam9_ebi_dev_config *config = ebid->config;
++	struct at91sam9_smc_timings *timings;
++	struct device_node *np = ebid->np;
 +
-+- atmel,write-mode		"nwe" or "ncs".
-+				"ncs" is not present.
++	timings = &config->timings;
 +
-+- atmel,exnw-mode		"disabled", "frozen" or "ready".
-+				"disabled" if not present.
++	of_property_read_u32(np, "atmel,ncs-rd-setup-ns",
++			     &timings->ncs_rd_setup_ns);
++	of_property_read_u32(np, "atmel,nrd-setup-ns",
++			     &timings->nrd_setup_ns);
++	of_property_read_u32(np, "atmel,ncs-wr-setup-ns",
++			     &timings->ncs_wr_setup_ns);
++	of_property_read_u32(np, "atmel,nwe-setup-ns",
++			     &timings->nwe_setup_ns);
++	of_property_read_u32(np, "atmel,ncs-rd-pulse-ns",
++			     &timings->ncs_rd_pulse_ns);
++	of_property_read_u32(np, "atmel,nrd-pulse-ns",
++			     &timings->nrd_pulse_ns);
++	of_property_read_u32(np, "atmel,ncs-wr-pulse-ns",
++			     &timings->ncs_wr_pulse_ns);
++	of_property_read_u32(np, "atmel,nwe-pulse-ns", &timings->nwe_pulse_ns);
++	of_property_read_u32(np, "atmel,nwe-cycle-ns", &timings->nwe_cycle_ns);
++	of_property_read_u32(np, "atmel,nrd-cycle-ns", &timings->nrd_cycle_ns);
++	of_property_read_u32(np, "atmel,tdf-ns", &timings->tdf_ns);
 +
-+- atmel,page-mode		enable page mode if present. The provided value
-+				defines the page size (supported values: 4, 8,
-+				16 and 32).
++	return 0;
++}
 +
-+Optional device timings expressed in nanoseconds (if the property is not
-+present 0 is assumed):
++static int at91sam9_ebi_xslate_config(struct at91_ebi_dev *ebid)
++{
++	struct at91sam9_ebi_dev_config *config = ebid->config;
++	struct device_node *np = ebid->np;
++	const char *tmp_str;
++	u32 tmp;
++	int ret;
 +
-+- atmel,ncs-rd-setup-ns
-+- atmel,nrd-setup-ns
-+- atmel,ncs-wr-setup-ns
-+- atmel,nwe-setup-ns
-+- atmel,ncs-rd-pulse-ns
-+- atmel,nrd-pulse-ns
-+- atmel,ncs-wr-pulse-ns
-+- atmel,nwe-pulse-ns
-+- atmel,nwe-cycle-ns
-+- atmel,nrd-cycle-ns
-+- atmel,tdf-ns
++	config = devm_kzalloc(ebid->ebi->dev, sizeof(*config), GFP_KERNEL);
++	if (!config)
++		return -ENOMEM;
 +
-+- atmel,tdf-optimized		data float optimized mode. If present the data
-+				float time is optimized depending on the next
-+				device being accessed (next device setup
-+				time is substracted to the current devive data
-+				float time).
++	ebid->config = config;
 +
++	ret = of_property_read_u32(np, "atmel,bus-width", &tmp);
++	if (ret)
++		return ret;
 +
++	switch (tmp) {
++	case 8:
++		config->mode |= AT91_SMC_DBW_8;
++		break;
 +
-+Example:
++	case 16:
++		config->mode |= AT91_SMC_DBW_16;
++		break;
 +
-+	ebi: ebi at 10000000 {
-+		compatible = "atmel,sama5d3-ebi", "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+		atmel,smc = <&hsmc>;
-+		atmel,matrix = <&matrix>;
-+		reg = <0x10000000 0x10000000
-+		       0x40000000 0x30000000>;
-+		ranges = <0x0 0x0 0x10000000 0x10000000
-+			  0x1 0x0 0x40000000 0x10000000
-+			  0x2 0x0 0x50000000 0x10000000
-+			  0x3 0x0 0x60000000 0x10000000>;
-+		clocks = <&mck>;
++	case 32:
++		config->mode |= AT91_SMC_DBW_32;
++		break;
 +
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ebi_addr>;
++	default:
++		return -EINVAL;
++	}
 +
-+		cs at 0 {
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			ranges;
-+			atmel,generic-dev;
-+			atmel,read-mode = "nrd";
-+			atmel,write-mode = "nwe";
-+			atmel,bus-width = <16>;
-+			atmel,ncs-rd-setup-ns = <0>;
-+			atmel,ncs-wr-setup-ns = <0>;
-+			atmel,nwe-setup-ns = <8>;
-+			atmel,nrd-setup-ns = <16>;
-+			atmel,ncs-rd-pulse-ns = <84>;
-+			atmel,ncs-wr-pulse-ns = <84>;
-+			atmel,nrd-pulse-ns = <76>;
-+			atmel,nwe-pulse-ns = <76>;
-+			atmel,nrd-cycle-ns = <107>;
-+			atmel,nwe-cycle-ns = <84>;
-+			atmel,tdf-ns = <16>;
++	if (of_property_read_bool(np, "atmel,tdf-optimized"))
++		config->mode |= AT91_SMC_TDFMODE_OPTIMIZED;
 +
-+			nor: flash at 0,0 {
-+				compatible = "cfi-flash";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0x0 0x0 0x1000000>;
-+				bank-width = <2>;
-+			};
-+		};
-+	};
++	tmp_str = NULL;
++	of_property_read_string(np, "atmel,byte-access-type", &tmp_str);
++	if (tmp_str && !strcmp(tmp_str, "write"))
++		config->mode |= AT91_SMC_BAT_WRITE;
 +
++	tmp_str = NULL;
++	of_property_read_string(np, "atmel,read-mode", &tmp_str);
++	if (tmp_str && !strcmp(tmp_str, "nrd"))
++		config->mode |= AT91_SMC_READMODE_NRD;
++
++	tmp_str = NULL;
++	of_property_read_string(np, "atmel,write-mode", &tmp_str);
++	if (tmp_str && !strcmp(tmp_str, "nwe"))
++		config->mode |= AT91_SMC_WRITEMODE_NWE;
++
++	tmp_str = NULL;
++	of_property_read_string(np, "atmel,exnw-mode", &tmp_str);
++	if (tmp_str) {
++		if (!strcmp(tmp_str, "frozen"))
++			config->mode |= AT91_SMC_EXNWMODE_FROZEN;
++		else if (!strcmp(tmp_str, "ready"))
++			config->mode |= AT91_SMC_EXNWMODE_READY;
++	}
++
++	tmp = 0;
++	ret = of_property_read_u32(np, "atmel,page-mode", &tmp);
++	if (!ret) {
++		switch (tmp) {
++		case 4:
++			config->mode |= AT91_SMC_PS_4;
++			break;
++
++		case 8:
++			config->mode |= AT91_SMC_PS_8;
++			break;
++
++		case 16:
++			config->mode |= AT91_SMC_PS_16;
++			break;
++
++		case 32:
++			config->mode |= AT91_SMC_PS_32;
++			break;
++
++		default:
++			return -EINVAL;
++		}
++
++		config->mode |= AT91_SMC_PMEN;
++	}
++
++	return at91sam9_smc_xslate_timings(ebid);
++}
++
++static int at91sam9_ebi_init(struct at91_ebi *ebi)
++{
++	struct at91sam9_smc_generic_fields *fields;
++	struct reg_field field = REG_FIELD(0, 0, 31);
++
++	fields = devm_kzalloc(ebi->dev, sizeof(*fields), GFP_KERNEL);
++	if (!fields)
++		return -ENOMEM;
++
++	field.id_size = fls(ebi->caps->available_cs);
++	field.id_offset = AT91SAM9_SMC_GENERIC_BLK_SZ;
++
++	field.reg = AT91SAM9_SMC_SETUP(AT91SAM9_SMC_GENERIC);
++	fields->setup = devm_regmap_field_alloc(ebi->dev, ebi->smc, field);
++	if (IS_ERR(fields->setup))
++		return PTR_ERR(fields->setup);
++
++	field.reg = AT91SAM9_SMC_PULSE(AT91SAM9_SMC_GENERIC);
++	fields->pulse = devm_regmap_field_alloc(ebi->dev, ebi->smc, field);
++	if (IS_ERR(fields->pulse))
++		return PTR_ERR(fields->pulse);
++
++	field.reg = AT91SAM9_SMC_CYCLE(AT91SAM9_SMC_GENERIC);
++	fields->cycle = devm_regmap_field_alloc(ebi->dev, ebi->smc, field);
++	if (IS_ERR(fields->cycle))
++		return PTR_ERR(fields->cycle);
++
++	field.reg = AT91SAM9_SMC_MODE(AT91SAM9_SMC_GENERIC);
++	fields->mode = devm_regmap_field_alloc(ebi->dev, ebi->smc, field);
++	if (IS_ERR(fields->mode))
++		return PTR_ERR(fields->mode);
++
++	ebi->priv = fields;
++
++	return 0;
++}
++
++static int sama5d3_ebi_init(struct at91_ebi *ebi)
++{
++	struct at91sam9_smc_generic_fields *fields;
++	struct reg_field field = REG_FIELD(0, 0, 31);
++
++	fields = devm_kzalloc(ebi->dev, sizeof(*fields), GFP_KERNEL);
++	if (!fields)
++		return -ENOMEM;
++
++	field.id_size = fls(ebi->caps->available_cs);
++	field.id_offset = SAMA5_SMC_GENERIC_BLK_SZ;
++
++	field.reg = AT91SAM9_SMC_SETUP(SAMA5_SMC_GENERIC);
++	fields->setup = devm_regmap_field_alloc(ebi->dev, ebi->smc, field);
++	if (IS_ERR(fields->setup))
++		return PTR_ERR(fields->setup);
++
++	field.reg = AT91SAM9_SMC_PULSE(SAMA5_SMC_GENERIC);
++	fields->pulse = devm_regmap_field_alloc(ebi->dev, ebi->smc, field);
++	if (IS_ERR(fields->pulse))
++		return PTR_ERR(fields->pulse);
++
++	field.reg = AT91SAM9_SMC_CYCLE(SAMA5_SMC_GENERIC);
++	fields->cycle = devm_regmap_field_alloc(ebi->dev, ebi->smc, field);
++	if (IS_ERR(fields->cycle))
++		return PTR_ERR(fields->cycle);
++
++	field.reg = SAMA5_SMC_MODE(SAMA5_SMC_GENERIC);
++	fields->mode = devm_regmap_field_alloc(ebi->dev, ebi->smc, field);
++	if (IS_ERR(fields->mode))
++		return PTR_ERR(fields->mode);
++
++	ebi->priv = fields;
++
++	return 0;
++}
++
++static int at91_ebi_dev_setup(struct at91_ebi *ebi, struct device_node *np)
++{
++	struct device *dev = ebi->dev;
++	struct device_node *dev_np;
++	struct at91_ebi_dev *ebid;
++	u32 tmp;
++	int ret;
++
++	dev_np = of_get_next_child(np, NULL);
++	if (!dev_np)
++		return -EINVAL;
++
++	if (!of_device_is_available(dev_np))
++		return 0;
++
++	ebid = devm_kzalloc(ebi->dev, sizeof(*ebid), GFP_KERNEL);
++	if (!ebid)
++		return -ENOMEM;
++
++	ret = of_property_read_u32(dev_np, "reg" , &tmp);
++	if (ret < 0) {
++		dev_err(dev, "missing mandatory reg property\n");
++		return ret;
++	}
++
++	if (tmp > AT91_MATRIX_EBI_NUM_CS ||
++	    !(BIT(tmp) & ebi->caps->available_cs)) {
++		dev_err(dev, "invalid reg property\n");
++		return -EINVAL;
++	}
++
++	ebid->cs = tmp;
++	ebid->np = np;
++	ebid->ebi = ebi;
++
++	if (of_property_read_bool(np, "atmel,specialized-logic"))
++		goto populate;
++
++	if (ebid->ebi->ebi_csa)
++		regmap_field_update_bits(ebid->ebi->ebi_csa,
++					 BIT(ebid->cs),
++					 ~BIT(ebid->cs));
++
++	ret = ebid->ebi->caps->xlate_config(ebid);
++	if (ret)
++		return ret;
++
++	ret = ebid->ebi->caps->apply_config(ebid);
++	if (ret)
++		return ret;
++	ebi->devs[ebid->cs] = ebid;
++
++populate:
++	return of_platform_populate(np, of_default_bus_match_table, NULL, dev);
++}
++
++static const struct reg_field at91sam9260_ebi_csa =
++				REG_FIELD(AT91SAM9260_MATRIX_EBICSA, 0,
++					  AT91_MATRIX_EBI_NUM_CS - 1);
++
++static const struct at91_ebi_caps at91sam9260_ebi_caps = {
++	.available_cs = 0xff,
++	.ebi_csa = &at91sam9260_ebi_csa,
++	.xlate_config = at91sam9_ebi_xslate_config,
++	.apply_config = at91sam9_ebi_apply_config,
++	.init = at91sam9_ebi_init,
++};
++
++static const struct reg_field at91sam9261_ebi_csa =
++				REG_FIELD(AT91SAM9261_MATRIX_EBICSA, 0,
++					  AT91_MATRIX_EBI_NUM_CS - 1);
++
++static const struct at91_ebi_caps at91sam9261_ebi_caps = {
++	.available_cs = 0xff,
++	.ebi_csa = &at91sam9261_ebi_csa,
++	.xlate_config = at91sam9_ebi_xslate_config,
++	.apply_config = at91sam9_ebi_apply_config,
++	.init = at91sam9_ebi_init,
++};
++
++static const struct reg_field at91sam9263_ebi0_csa =
++				REG_FIELD(AT91SAM9263_MATRIX_EBI0CSA, 0,
++					  AT91_MATRIX_EBI_NUM_CS - 1);
++
++static const struct at91_ebi_caps at91sam9263_ebi0_caps = {
++	.available_cs = 0x3f,
++	.ebi_csa = &at91sam9263_ebi0_csa,
++	.xlate_config = at91sam9_ebi_xslate_config,
++	.apply_config = at91sam9_ebi_apply_config,
++	.init = at91sam9_ebi_init,
++};
++
++static const struct reg_field at91sam9263_ebi1_csa =
++				REG_FIELD(AT91SAM9263_MATRIX_EBI1CSA, 0,
++					  AT91_MATRIX_EBI_NUM_CS - 1);
++
++static const struct at91_ebi_caps at91sam9263_ebi1_caps = {
++	.available_cs = 0x7,
++	.ebi_csa = &at91sam9263_ebi1_csa,
++	.xlate_config = at91sam9_ebi_xslate_config,
++	.apply_config = at91sam9_ebi_apply_config,
++	.init = at91sam9_ebi_init,
++};
++
++static const struct reg_field at91sam9rl_ebi_csa =
++				REG_FIELD(AT91SAM9RL_MATRIX_EBICSA, 0,
++					  AT91_MATRIX_EBI_NUM_CS - 1);
++
++static const struct at91_ebi_caps at91sam9rl_ebi_caps = {
++	.available_cs = 0x3f,
++	.ebi_csa = &at91sam9rl_ebi_csa,
++	.xlate_config = at91sam9_ebi_xslate_config,
++	.apply_config = at91sam9_ebi_apply_config,
++	.init = at91sam9_ebi_init,
++};
++
++static const struct reg_field at91sam9g45_ebi_csa =
++				REG_FIELD(AT91SAM9G45_MATRIX_EBICSA, 0,
++					  AT91_MATRIX_EBI_NUM_CS - 1);
++
++static const struct at91_ebi_caps at91sam9g45_ebi_caps = {
++	.available_cs = 0x3f,
++	.ebi_csa = &at91sam9g45_ebi_csa,
++	.xlate_config = at91sam9_ebi_xslate_config,
++	.apply_config = at91sam9_ebi_apply_config,
++	.init = at91sam9_ebi_init,
++};
++
++static const struct at91_ebi_caps at91sam9x5_ebi_caps = {
++	.available_cs = 0x3f,
++	.ebi_csa = &at91sam9263_ebi0_csa,
++	.xlate_config = at91sam9_ebi_xslate_config,
++	.apply_config = at91sam9_ebi_apply_config,
++	.init = at91sam9_ebi_init,
++};
++
++static const struct at91_ebi_caps sama5d3_ebi_caps = {
++	.available_cs = 0xf,
++	.xlate_config = at91sam9_ebi_xslate_config,
++	.apply_config = at91sam9_ebi_apply_config,
++	.init = sama5d3_ebi_init,
++};
++
++static const struct of_device_id at91_ebi_id_table[] = {
++	{
++		.compatible = "atmel,at91sam9260-ebi",
++		.data = &at91sam9260_ebi_caps,
++	},
++	{
++		.compatible = "atmel,at91sam9261-ebi",
++		.data = &at91sam9261_ebi_caps,
++	},
++	{
++		.compatible = "atmel,at91sam9263-ebi0",
++		.data = &at91sam9263_ebi0_caps,
++	},
++	{
++		.compatible = "atmel,at91sam9263-ebi1",
++		.data = &at91sam9263_ebi1_caps,
++	},
++	{
++		.compatible = "atmel,at91sam9rl-ebi",
++		.data = &at91sam9rl_ebi_caps,
++	},
++	{
++		.compatible = "atmel,at91sam9g45-ebi",
++		.data = &at91sam9g45_ebi_caps,
++	},
++	{
++		.compatible = "atmel,at91sam9x5-ebi",
++		.data = &at91sam9x5_ebi_caps,
++	},
++	{
++		.compatible = "atmel,sama5d3-ebi",
++		.data = &sama5d3_ebi_caps,
++	},
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, at91_ebi_id_table);
++
++static int at91_ebi_probe(struct platform_device *pdev)
++{
++	const struct of_device_id *match;
++	struct device_node *child;
++	struct at91_ebi *ebi;
++	struct clk *clk;
++	int ret;
++
++	match = of_match_device(at91_ebi_id_table, &pdev->dev);
++	if (!match || !match->data)
++		return -EINVAL;
++
++	ebi = devm_kzalloc(&pdev->dev, sizeof(*ebi), GFP_KERNEL);
++	if (!ebi)
++		return -ENOMEM;
++
++	ebi->caps = match->data;
++	ebi->dev = &pdev->dev;
++
++	clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	ebi->clk = clk;
++
++	ebi->smc = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
++						   "atmel,smc");
++	if (IS_ERR(ebi->smc))
++		return PTR_ERR(ebi->smc);
++
++	/*
++	 * The sama5d3 does not provide an EBICSA register and thus does need
++	 * to access the matrix registers.
++	 */
++	if (ebi->caps->ebi_csa) {
++		ebi->matrix =
++			syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
++							"atmel,matrix");
++		if (IS_ERR(ebi->matrix))
++			return PTR_ERR(ebi->matrix);
++
++		ebi->ebi_csa = regmap_field_alloc(ebi->matrix,
++						  *ebi->caps->ebi_csa);
++		if (IS_ERR(ebi->ebi_csa))
++			return PTR_ERR(ebi->ebi_csa);
++	}
++
++	ret = ebi->caps->init(ebi);
++	if (ret)
++		return ret;
++
++	for_each_child_of_node(pdev->dev.of_node, child) {
++		ret = at91_ebi_dev_setup(ebi, child);
++		if (ret)
++			return ret;
++	}
++
++	return ret;
++}
++
++static struct platform_driver at91_ebi_driver = {
++	.driver = {
++		.name = "atmel-ebi",
++		.of_match_table	= at91_ebi_id_table,
++	},
++};
++module_platform_driver_probe(at91_ebi_driver, at91_ebi_probe);
++
++MODULE_AUTHOR("JJ Hiblot");
++MODULE_DESCRIPTION("Atmel's EBI driver");
++MODULE_LICENSE("GPL");
 -- 
 1.9.1
