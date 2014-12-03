@@ -1,34 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 3 Dec 2014 18:04:52 +0000
-Subject: [PATCH] bpf: arm64: lift restriction on last instruction
-In-Reply-To: <CAMEtUuwJHC2eyOh3pD=qDXw1YbfJqx1a7W0o65n5Ur_B_TvNOA@mail.gmail.com>
-References: <1417595881-32218-1-git-send-email-zlim.lnx@gmail.com>
- <CAMEtUuwJHC2eyOh3pD=qDXw1YbfJqx1a7W0o65n5Ur_B_TvNOA@mail.gmail.com>
-Message-ID: <20141203180451.GR7915@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 3 Dec 2014 18:23:51 +0000
+Subject: [PATCH 4/5] ASoC: dwc: Add devicetree support for Designware I2S
+In-Reply-To: <547F3CAC.9050105@arm.com>
+References: <547F3CAC.9050105@arm.com>
+Message-ID: <20141203182351.GF7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03, 2014 at 03:54:32PM +0000, Alexei Starovoitov wrote:
-> On Wed, Dec 3, 2014 at 12:38 AM, Zi Shen Lim <zlim.lnx@gmail.com> wrote:
-> > Earlier implementation assumed last instruction is BPF_EXIT.
-> > Since this is no longer a restriction in eBPF, we remove this
-> > limitation.
-> >
-> > Per Alexei Starovoitov [1]:
-> >> classic BPF has a restriction that last insn is always BPF_RET.
-> >> eBPF doesn't have BPF_RET instruction and this restriction.
-> >> It has BPF_EXIT insn which can appear anywhere in the program
-> >> one or more times and it doesn't have to be last insn.
-> >
-> > [1] https://lkml.org/lkml/2014/11/27/2
-> >
-> > Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
-> > Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
-> 
-> yours is cleaner than my own attempt to fix it.
-> Thanks!
-> Acked-by: Alexei Starovoitov <ast@plumgrid.com>
+On Wed, Dec 03, 2014 at 04:39:08PM +0000, Andrew Jackson wrote:
 
-Cheers, I've applied this for 3.19.
+> Convert to driver to use either platform_data or device-tree for configuration
+> of the device.  When using device-tree, the I2S block's configuration is read
+> from the relevant registers: this reduces the amount of information required in
+> the device tree.
 
-Will
+This really needs to be split into two or more patches, there's a whole
+bunch of refactoring to support this DT stuff which should be separate
+from the DT addition itself.  Right now it's hard to tell what each
+individual bit of the code is supposed to be doing, the patch is far too
+large and doing far too many individual things.
+
+> +	if (dev->using_pd) {
+> +		ret = dev->i2s_clk_cfg(config);
+> +		if (ret < 0) {
+> +			dev_err(dev->dev, "runtime audio clk config fail\n");
+> +			return ret;
+> +		}
+> +	} else {
+> +		u32	bitclk;
+
+Having this whole separate path for using platform data feels icky, we
+don't want to have completely separate flows like this.  Checking for
+the callbacks being there is probably fine but just having totally
+separate code paths is a bit icky.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141203/b0fe93b2/attachment.sig>
