@@ -1,29 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Dec 2014 21:03:48 +0100
-Subject: [PATCH] optimize ktime_divns for constant divisors
-In-Reply-To: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
-References: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
-Message-ID: <3913269.qTFsa05Ysv@wuerfel>
+Date: Wed, 03 Dec 2014 21:13:18 +0100
+Subject: [PATCH 4/5] ASoC: dwc: Add devicetree support for Designware I2S
+In-Reply-To: <547F3CAC.9050105@arm.com>
+References: <547F3CAC.9050105@arm.com>
+Message-ID: <2041200.ZjakFFAZAU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 December 2014 14:43:06 Nicolas Pitre wrote:
-> At least on ARM, do_div() is optimized to turn constant divisors into
-> an inline multiplication by the reciprocal value at compile time. 
-> However this optimization is missed entirely whenever ktime_divns() is
-> used and the slow out-of-line division code is used all the time.
+On Wednesday 03 December 2014 16:39:08 Andrew Jackson wrote:
+> Convert to driver to use either platform_data or device-tree for configuration
+> of the device.  When using device-tree, the I2S block's configuration is read
+> from the relevant registers: this reduces the amount of information required in
+> the device tree.
 > 
-> Let ktime_divns() use do_div() inline whenever the divisor is constant
-> and small enough.  This will make things like ktime_to_us() and 
-> ktime_to_ms() much faster.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
 
-Very cool. I've been thinking about doing something similar for the
-general case but couldn't get the math to work.
+I don't think we even have to worry about the platform_data case here:
+the only platform using this hardware in Linux is arm/mach-spear, and
+it defines a device node with a binding that is similar to the one you
+document here but that is not implemented in the driver.
 
-Can you think of an architecture-independent way to ktime_to_sec,
-ktime_to_ms, and ktime_to_us efficiently based on what you did for
-the ARM do_div implementation?
+So, I think for all practical purposes we can assume that nobody cares
+if you make incompatible changes as long as you don't introduce build
+regression.
+
+Also, please adapt the 	arch/arm/boot/dts/spear13*.dts{,i} files
+as good as you can. They are broken in other ways too that you don't
+have to fix, just make them conform to the binding you add.
 
 	Arnd
