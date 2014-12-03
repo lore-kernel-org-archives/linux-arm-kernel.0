@@ -1,94 +1,150 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed,  3 Dec 2014 22:18:41 +0100
-Subject: [PATCH v2 5/6] arm/arm64: KVM: Turn off vcpus on PSCI shutdown/reboot
+Date: Wed,  3 Dec 2014 22:18:42 +0100
+Subject: [PATCH v2 6/6] arm/arm64: KVM: Introduce stage2_unmap_vm
 In-Reply-To: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
 References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1417641522-29056-6-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1417641522-29056-7-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a vcpu calls SYSTEM_OFF or SYSTEM_RESET with PSCI v0.2, the vcpus
-should really be turned off for the VM adhering to the suggestions in
-the PSCI spec, and it's the sane thing to do.
+Introduce a new function to unmap user RAM regions in the stage2 page
+tables.  This is needed on reboot (or when the guest turns off the MMU)
+to ensure we fault in pages again and make the dcache, RAM, and icache
+coherent.
 
-Also, clarify the behavior and expectations for exits to user space with
-the KVM_EXIT_SYSTEM_EVENT case.
+Using unmap_stage2_range for the whole guest physical range does not
+work, because that unmaps IO regions (such as the GIC) which will not be
+recreated or in the best case faulted in on a page-by-page basis.
+
+Call this function on secondary and subsequent calls to the
+KVM_ARM_VCPU_INIT ioctl so that a reset VCPU will detect the guest
+Stage-1 MMU is off when faulting in pages and make the caches coherent.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- Documentation/virtual/kvm/api.txt |  9 +++++++++
- arch/arm/kvm/psci.c               | 19 +++++++++++++++++++
- arch/arm64/include/asm/kvm_host.h |  1 +
- 3 files changed, 29 insertions(+)
+ arch/arm/include/asm/kvm_mmu.h   |  1 +
+ arch/arm/kvm/arm.c               |  7 +++++
+ arch/arm/kvm/mmu.c               | 65 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/kvm_mmu.h |  1 +
+ 4 files changed, 74 insertions(+)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 81f1b97..228f9cf 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2957,6 +2957,15 @@ HVC instruction based PSCI call from the vcpu. The 'type' field describes
- the system-level event type. The 'flags' field describes architecture
- specific flags for the system-level event.
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index acb0d57..4654c42 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -52,6 +52,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+ void free_boot_hyp_pgd(void);
+ void free_hyp_pgds(void);
  
-+Valid values for 'type' are:
-+  KVM_SYSTEM_EVENT_SHUTDOWN -- the guest has requested a shutdown of the
-+   VM. Userspace is not obliged to honour this, and if it does honour
-+   this does not need to destroy the VM synchronously (ie it may call
-+   KVM_RUN again before shutdown finally occurs).
-+  KVM_SYSTEM_EVENT_RESET -- the guest has requested a reset of the VM.
-+   As with SHUTDOWN, userspace can choose to ignore the request, or
-+   to schedule the reset to occur in the future and may call KVM_RUN again.
++void stage2_unmap_vm(struct kvm *kvm);
+ int kvm_alloc_stage2_pgd(struct kvm *kvm);
+ void kvm_free_stage2_pgd(struct kvm *kvm);
+ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 4043769..da87c07 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -701,6 +701,13 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+ 	if (ret)
+ 		return ret;
+ 
++	/*
++	 * Ensure a rebooted VM will fault in RAM pages and detect if the
++	 * guest MMU is turned off and flush the caches as needed.
++	 */
++	if (vcpu->arch.has_run_once)
++		stage2_unmap_vm(vcpu->kvm);
 +
- 		/* Fix the size of the union. */
- 		char padding[256];
- 	};
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 09cf377..ae0bb91 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -15,6 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+ 	vcpu_reset_hcr(vcpu);
  
-+#include <linux/preempt.h>
- #include <linux/kvm_host.h>
- #include <linux/wait.h>
+ 	/*
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 57a403a..b1f3c9a 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -611,6 +611,71 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+ 	unmap_range(kvm, kvm->arch.pgd, start, size);
+ }
  
-@@ -166,6 +167,24 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
- 
- static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
- {
-+	int i;
-+	struct kvm_vcpu *tmp;
++static void stage2_unmap_memslot(struct kvm *kvm,
++				 struct kvm_memory_slot *memslot)
++{
++	hva_t hva = memslot->userspace_addr;
++	phys_addr_t addr = memslot->base_gfn << PAGE_SHIFT;
++	phys_addr_t size = PAGE_SIZE * memslot->npages;
++	hva_t reg_end = hva + size;
 +
 +	/*
-+	 * The KVM ABI specifies that a system event exit may call KVM_RUN
-+	 * again and may perform shutdown/reboot at a later time that when the
-+	 * actual request is made.  Since we are implementing PSCI and a
-+	 * caller of PSCI reboot and shutdown expects that the system shuts
-+	 * down or reboots immediately, let's make sure that VCPUs are not run
-+	 * after this call is handled and before the VCPUs have been
-+	 * re-initialized.
++	 * A memory region could potentially cover multiple VMAs, and any holes
++	 * between them, so iterate over all of them to find out if we should
++	 * unmap any of them.
++	 *
++	 *     +--------------------------------------------+
++	 * +---------------+----------------+   +----------------+
++	 * |   : VMA 1     |      VMA 2     |   |    VMA 3  :    |
++	 * +---------------+----------------+   +----------------+
++	 *     |               memory region                |
++	 *     +--------------------------------------------+
 +	 */
-+	kvm_for_each_vcpu(i, tmp, vcpu->kvm)
-+		tmp->arch.pause = true;
-+	preempt_disable();
-+	force_vm_exit(cpu_all_mask);
-+	preempt_enable();
++	do {
++		struct vm_area_struct *vma = find_vma(current->mm, hva);
++		hva_t vm_start, vm_end;
 +
- 	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
- 	vcpu->run->system_event.type = type;
- 	vcpu->run->exit_reason = KVM_EXIT_SYSTEM_EVENT;
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 65c6152..0b7dfdb 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -198,6 +198,7 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
- struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
++		if (!vma || vma->vm_start >= reg_end)
++			break;
++
++		/*
++		 * Take the intersection of this VMA with the memory region
++		 */
++		vm_start = max(hva, vma->vm_start);
++		vm_end = min(reg_end, vma->vm_end);
++
++		if (!(vma->vm_flags & VM_PFNMAP)) {
++			gpa_t gpa = addr + (vm_start - memslot->userspace_addr);
++			unmap_stage2_range(kvm, gpa, vm_end - vm_start);
++		}
++		hva = vm_end;
++	} while (hva < reg_end);
++}
++
++/**
++ * stage2_unmap_vm - Unmap Stage-2 RAM mappings
++ * @kvm: The struct kvm pointer
++ *
++ * Go through the memregions and unmap any reguler RAM
++ * backing memory already mapped to the VM.
++ */
++void stage2_unmap_vm(struct kvm *kvm)
++{
++	struct kvm_memslots *slots;
++	struct kvm_memory_slot *memslot;
++	int idx;
++
++	idx = srcu_read_lock(&kvm->srcu);
++	spin_lock(&kvm->mmu_lock);
++
++	slots = kvm_memslots(kvm);
++	kvm_for_each_memslot(memslot, slots)
++		stage2_unmap_memslot(kvm, memslot);
++
++	spin_unlock(&kvm->mmu_lock);
++	srcu_read_unlock(&kvm->srcu, idx);
++}
++
+ /**
+  * kvm_free_stage2_pgd - free all stage-2 tables
+  * @kvm:	The KVM struct pointer for the VM.
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 0caf7a5..061fed7 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -83,6 +83,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+ void free_boot_hyp_pgd(void);
+ void free_hyp_pgds(void);
  
- u64 kvm_call_hyp(void *hypfn, ...);
-+void force_vm_exit(const cpumask_t *mask);
- 
- int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		int exception_index);
++void stage2_unmap_vm(struct kvm *kvm);
+ int kvm_alloc_stage2_pgd(struct kvm *kvm);
+ void kvm_free_stage2_pgd(struct kvm *kvm);
+ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
 -- 
 2.1.2.330.g565301e.dirty
