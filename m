@@ -1,24 +1,36 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 3 Dec 2014 20:06:47 -0200
-Subject: [PATCH][imx/fixes] ARM: clk-imx6q: fix video divider for rev T0
- 1.0
-In-Reply-To: <1417636085-14822-1-git-send-email-bisson.gary@gmail.com>
-References: <1417636085-14822-1-git-send-email-bisson.gary@gmail.com>
-Message-ID: <CAOMZO5Dagh7dXTm0vZ-OYRE_X5hz8yKXedpjuV8v9Ncb8sJa8g@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 3 Dec 2014 22:25:48 +0000 (UTC)
+Subject: OMAP baseline test results for v3.18-rc7
+In-Reply-To: <alpine.DEB.2.02.1412031655140.8865@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1412021838410.16734@utopia.booyaka.com>
+ <547EB63B.5070200@compulab.co.il>
+ <alpine.DEB.2.02.1412031655140.8865@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1412032224240.8865@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gary,
+Hi Igor,
 
-On Wed, Dec 3, 2014 at 5:48 PM, Gary Bisson <bisson.gary@gmail.com> wrote:
-> The post dividers do not work on i.MX6Q rev T0 1.0 so they must be fixed
-> to 1. As the table index was wrong, a divider a of 4 could still be
-> requested which implied the clock not to be set properly. This is the
-> root cause of the HDMI not working at high resolution on rev T0 1.0 of
-> the SoC, giving the following error:
+On Wed, 3 Dec 2014, Paul Walmsley wrote:
 
-Patch looks good, but just a minot comment: I would suggest removing this line:
+> On Wed, 3 Dec 2014, Igor Grinberg wrote:
+> 
+> > I've looked at the boot log and it seems cm-t3517 is booting just fine...
+> 
+> Thanks for the note.  I will look into this - CM-T3517 should be listed 
+> there.  
+> 
+> > A problem with the test/report collecting script?
+> 
+> Most likely...
 
-> mxc_sdc_fb fb.27: timeout when waiting for flip irq
+Well this one turned out to be due to my own stupidity.  It's been fixed 
+and this particular issue should not recur.  
 
-as it is not part of mainline.
+I've reuploaded a new test summary and will reply appropriately to the 
+original message.
+
+Thanks again for pointing it out,
+
+
+- Paul
