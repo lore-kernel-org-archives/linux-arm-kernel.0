@@ -1,34 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Dec 2014 11:52:41 +0100
-Subject: [PATCH 07/12] Documentation: dt: imx: add MSCM documentation
-In-Reply-To: <1417565531-4507-8-git-send-email-stefan@agner.ch>
+Date: Wed, 03 Dec 2014 11:53:31 +0100
+Subject: [PATCH 09/12] ARM: unify MMU/!MMU addruart calls
+In-Reply-To: <1417565531-4507-10-git-send-email-stefan@agner.ch>
 References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
- <1417565531-4507-8-git-send-email-stefan@agner.ch>
-Message-ID: <57320597.hlx9GuXmaF@wuerfel>
+ <1417565531-4507-10-git-send-email-stefan@agner.ch>
+Message-ID: <2260991.G6QM1xu48B@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 December 2014 01:12:06 Stefan Agner wrote:
-> +Freescale Vybrid Miscellaneous System Control Module
-> +
-> +The MSCM IP contains Access Control and TrustZone Security hardware,
-> +CPU Configuration registers and Interrupt Router control.
-> +
-> +Required properties:
-> +- compatible : "fsl,vf610-mscm"
-> +- reg : the register range of the MSCM module
-> +
-> +Example:
-> +       mscm: mscm at 40001000 {                 
-> +               compatible = "fsl,vf610-mscm";
-> +               reg = <0x40001000 0x1000>;    
-> +       };                                    
+On Wednesday 03 December 2014 01:12:08 Stefan Agner wrote:
+> Remove the needless differences between MMU/!MMU addruart calls.
+> This allows to use the same addruart macro on SoC level. Useful
+> for SoC consisting of multiple CPUs with and without MMU such as
+> Freescale Vybrid.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> 
 
-This sounds like one of those generic system controller devices.
-Should this be marked as syscon an accessed through
-syscon_regmap_lookup_by_phandle()?
+I think I had the same patch somewhere hidden in my collection
+of stuff I need to submit one day. Looks good.
 
-If you only eve have one driver touching these registers, that
-won't be necessary of course.
-
-	arnd
+	Arnd
