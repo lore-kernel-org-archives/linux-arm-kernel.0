@@ -1,40 +1,106 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Wed, 03 Dec 2014 10:10:41 +0100
-Subject: ARM: DaVinci: Deletion of an unnecessary check before the function
- call "__clk_disable"
-In-Reply-To: <547EC6B8.6000001@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net> <547EC6B8.6000001@users.sourceforge.net>
-Message-ID: <547ED391.1050507@users.sourceforge.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 03 Dec 2014 10:11:25 +0100
+Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <20141202230544.GG499@linaro.org>
+References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
+ <1417541958-56907-4-git-send-email-lina.iyer@linaro.org>
+ <20141202230544.GG499@linaro.org>
+Message-ID: <547ED3BD.5090209@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The __clk_disable() function tests whether its argument is NULL and then
-> returns immediately. Thus the test around the call is not needed.
+On 12/03/2014 12:05 AM, Lina Iyer wrote:
+> On Tue, Dec 02 2014 at 10:40 -0700, Lina Iyer wrote:
+> +
+> [...]
 
-I was a bit too quick to send you this notification. I stumbled once more
-on the detail that my source code analysis approach is incomplete for
-static functions so far.
+[ ... ]
 
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/mach-davinci/clock.c?id=a7ca2bcf2d2ef15c343a12f2a4c2e06380a0f495#n47
-https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/drivers/clk/clk.c?id=4dc7ed32f398fa76b9e1d243a852420b1dad0150#n846
+>> +static int __init qcom_spm_init(void)
+>> +{
+>> +    int ret;
+>> +
+>> +    /*
+>> +     * cpuidle driver need to registered before the cpuidle device
+>> +     * for any cpu. Register the device for the the cpuidle driver.
+>> +     */
+>> +    ret = platform_device_register(&qcom_cpuidle_drv);
+>> +    if (ret)
+>> +        return ret;
+> Stephen pointed out that we would have the platform device lying around
+> on a non-QCOM device when using multi_v7_defconfig.
 
-I would like to apologise for confusion I introduced here.
+Perhaps I am missing the point, but this is not supposed to happen, no ?
 
-Regards,
-Markus
+> So instead of doing this here, we could do this in the probe..
+>
+> if (!cpuidle_get_driver()) {
+>          int ret = platform_device_register(&qcom_cpuidle_drv);
+>          if (ret)
+>                  return ret;
+> }
+>
+> Would that be okay?
+>
+> The successful probe indicates that we are on a QCOM SoC, and we have not
+> registered a cpuidle_driver before this.
+>
+> Thanks,
+> Lina
+>
+>> +
+>> +    return platform_driver_register(&spm_driver);
+>> +}
+>> +module_init(qcom_spm_init);
+>> +
+>> +MODULE_LICENSE("GPL v2");
+>> +MODULE_DESCRIPTION("SAW power controller driver");
+>> +MODULE_ALIAS("platform:saw");
+>> diff --git a/include/soc/qcom/pm.h b/include/soc/qcom/pm.h
+>> new file mode 100644
+>> index 0000000..d9a56d7
+>> --- /dev/null
+>> +++ b/include/soc/qcom/pm.h
+>> @@ -0,0 +1,31 @@
+>> +/*
+>> + * Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
+>> + *
+>> + * This software is licensed under the terms of the GNU General Public
+>> + * License version 2, as published by the Free Software Foundation, and
+>> + * may be copied, distributed, and modified under those terms.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + */
+>> +
+>> +#ifndef __QCOM_PM_H
+>> +#define __QCOM_PM_H
+>> +
+>> +enum pm_sleep_mode {
+>> +    PM_SLEEP_MODE_STBY,
+>> +    PM_SLEEP_MODE_RET,
+>> +    PM_SLEEP_MODE_SPC,
+>> +    PM_SLEEP_MODE_PC,
+>> +    PM_SLEEP_MODE_NR,
+>> +};
+>> +
+>> +struct qcom_cpu_pm_ops {
+>> +    int (*standby)(void *data);
+>> +    int (*spc)(void *data);
+>> +};
+>> +
+>> +#endif  /* __QCOM_PM_H */
+>> --
+>> 2.1.0
+>>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
