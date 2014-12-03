@@ -1,47 +1,63 @@
-From: bisson.gary@gmail.com (Gary Bisson)
-Date: Tue, 2 Dec 2014 21:04:47 -0800
-Subject: [PATCH 0/3 RESEND] ARM: dts: sabrelite I2C and HDMI additions
-In-Reply-To: <1417559839-17365-1-git-send-email-eric.nelson@boundarydevices.com>
-References: <1417559839-17365-1-git-send-email-eric.nelson@boundarydevices.com>
-Message-ID: <CADCpmyN8J0XdUShLZwxny=DoJvpmNGjhNQCuOMZ64ac_VTP7BQ@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 2 Dec 2014 21:08:57 -0800
+Subject: [PATCH v3] mmc: dw_mmc: add quirk for broken data transfer over
+ scheme
+In-Reply-To: <1417576563-5033-1-git-send-email-addy.ke@rock-chips.com>
+References: <1415970338-2637-1-git-send-email-addy.ke@rock-chips.com>
+ <1417576563-5033-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAD=FV=Vfe_UUT=fTdQESEyrE56Jy4p9NtKh80PkR+C4mDCHDxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric, All,
+Addy,
 
-On Tue, Dec 2, 2014 at 2:37 PM, Eric Nelson
-<eric.nelson@boundarydevices.com> wrote:
-> This set of patches adds support for I2C2/3 busses and HDMI output
-> for the SABRE Lite board.
+On Tue, Dec 2, 2014 at 7:16 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
+> This patch add a new quirk to add a s/w timer to notify the driver
+> to terminate current transfer and report a data timeout to the core,
+> if DTO interrupt does NOT come within the given time.
 >
-> The content was gratuitously copied from the following commits
-> for the Nitrogen6X board made by Lucas Stach, Michael Olbrich,
-> and Philipp Zabel at Pengutronix:
+> dw_mmc call mmc_request_done func to finish transfer depends on
+> DTO interrupt. If DTO interrupt does not come in sending data state,
+> the current transfer will be blocked.
 >
->         43c3c00 - ARM: dts: nitrogen6x: add i2c2
->         d653620 - ARM: dts: nitrogen6x: add hdmi
->         1dffdd6 - ARM: dts: nitrogen6x: add i2c3
+> But this case really exists, when driver reads tuning data from
+> card on RK3288-pink2 board. I measured waveforms by oscilloscope
+> and found that card clock was always on and data lines were always
+> holded high level in sending data state.
 >
-> Eric Nelson (3):
->   ARM: dts: sabrelite: add i2c2
->   ARM: dts: sabrelite: add hdmi
->   ARM: dts: sabrelite: add i2c3
+> We got the reply from synopsys:
+> There are two counters but both use the same value of [31:8] bits.
+> Data timeout counter doesn't wait for stop clock and you should get
+> DRTO even when the clock is not stopped.
+> Host Starvation timeout counter is triggered with stop clock condition.
 >
->  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 33 ++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
+> This means that host should get DRTO and DTO interrupt.
 >
-> Re-sending to add Shawn Guo to the CC list.
+> But we really don't get any data-related interrupt in RK3X SoCs.
+> And driver can't get data transfer state, it can do nothing but wait for.
 >
-> --
-> 1.9.1
+> We don't know why we have this problem, but we need it to fix this problem now.
+> And I will post a follow up change when we find the root cause.
 >
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+> Changes in v2:
+> - fix some typo.
+> - remove extra timeout value (250ms).
+> - remove dw_mci_dto_start_monitor func.
+> - use "broken-dto" for new quirk and change Subject for it.
+>
+> Changes in v3:
+> - Remove dts for broken-dto, just add this quirk in dw_mci_rockchip_init
+>
+>  drivers/mmc/host/dw_mmc-rockchip.c |  3 +++
+>  drivers/mmc/host/dw_mmc.c          | 41 +++++++++++++++++++++++++++++++++++++-
+>  include/linux/mmc/dw_mmc.h         |  5 +++++
+>  3 files changed, 48 insertions(+), 1 deletion(-)
 
-Tested on a SabreLite (iMX6q rev1.2), it works great once the ldb node
-is removed from imx6qdl-sabrelite.dtsi.
-It is to be noted that I've applied the patches on top of the
-linux-stable tree. Eric, are you using Shawn's tree? I'll try with
-that latter to see if I can keep both ldb and hdmi nodes at the same
-time.
+This seems reasonable to me.  I do hope that you can get to a root
+cause, but I don't think this is a terrible bit of code to carry.
+Obviously it's up to the folks who maintain dw_mmc and the mmc
+subsystem, but:
 
-Thanks,
-Gary
+Reviewed-by: Doug Anderson <dianders@chromium.org>
