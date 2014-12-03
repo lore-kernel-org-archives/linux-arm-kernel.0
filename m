@@ -1,41 +1,78 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 3 Dec 2014 09:22:05 +0100
-Subject: [PATCH v4 0/4] mmc: atmel-mci: cleanup and probe deferring
-In-Reply-To: <CAPDyKFpuDOfw9BtYJhG0Fz6PsqUQP=gBg+4mWt9MRy_S6Yga5w@mail.gmail.com>
-References: <1417444509-15501-1-git-send-email-ludovic.desroches@atmel.com>
- <CAPDyKFpuDOfw9BtYJhG0Fz6PsqUQP=gBg+4mWt9MRy_S6Yga5w@mail.gmail.com>
-Message-ID: <20141203082205.GW2714@ldesroches-Latitude-E6320>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 03 Dec 2014 13:47:36 +0530
+Subject: [PATCH v4 0/2] Introducing Exynos ChipId driver
+Message-ID: <1417594658-2931-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02, 2014 at 11:10:53AM +0100, Ulf Hansson wrote:
-> On 1 December 2014 at 15:35, Ludovic Desroches
-> <ludovic.desroches@atmel.com> wrote:
-> > Hi Ulf,
-> >
-> > Same as previous series, based on your next branch, and no errors with
-> > checkpatch so let me know if you still have troubles to apply my patches.
-> >
-> > Changes from v3:
-> > - keep __init/__exit attributes for atmci_init/exit
-> > - remove useless variable in atmci_configure_dma function
-> >
-> > Ludovic Desroches (4):
-> >   mmc: atmel-mci: remove useless DMA stuff for non-dt devices
-> >   mmc: atmel-mci: remove __init/__exit attributes
-> >   mmc: atmel-mci: stop using specific initcall
-> >   mmc: atmel-mci: use probe deferring if dma controller is not ready yet
-> >
-> >  drivers/mmc/host/atmel-mci.c | 76 ++++++++++++++++----------------------------
-> >  1 file changed, 28 insertions(+), 48 deletions(-)
-> 
-> Thanks! Applied for next.
-> 
-> Patch 4, did have a minor checkpatch warning. I fixed it.
+This patch series introduces Exynos Chipid platform driver.
+Each Exynos SoC has ChipID block which can give information about SoC's
+product Id and revision number.
+At the same time it reduces dependency of mach-exynos files from plat-samsung,
+by removing samsung_rev API, similar API is introduced in chipid driver itself
+to get revision number and product id. 
 
-Thanks, yes I see it but I feel it is a bit too constraining when you already
-have a function name doing 32 characters :p
+This patch series is based on Kukjin Kim's for-next having SHA_ID:
+9db7d78aca2c7fbc19a26ce2ef01c805dc010c72
 
-> 
-> Kind regards
-> Uffe
+It can also be cleanly applied on latest (next-20141201) linux-next.
+
+This has been tested against both tree on Exynos3250 and Exynos5250 (SMDK) board.
+
+Revision 3 and it's discussion can be found here
+ - https://lkml.org/lkml/2014/5/10/31
+ - https://lkml.org/lkml/2014/6/10/270
+ - https://lkml.org/lkml/2014/5/11/16
+
+Change since v3: 
+ - This patch set contains 5/6 and 6/6 patch from v3 series.
+ - Made EXYNOS_CHIPID config option non-user selectable,
+   as suggested by Tomasz Figa.
+ - Made uniform macro for EXYNOS4/5_SOC_MASK as EXYNOS_SOC_MASK as
+   suggested by Tomasz Figa.
+ - Made local variables static in chipid driver.
+ - Added existing SoC's product id's.
+ - Added platform driver support.
+
+Changes since v2:
+ - Reorganized patches as suggested by Tomasz Figa.
+ - Addressed review comments of Tomasz Figa in i2c-s3c2410.c file.
+
+Changes since v1:
+ - Added patch to move i2c interrupt re-configuration code from exynos.c
+   to i2c driver, as suggested by Arnd.
+ - After above patch only user of SYS_I2C_CFG register is pm.c so moving
+   save/restore of this register also into i2c driver.
+ - Spiltted up exynos4 and exynos5 machine descriptors to get rid from
+   soc_is_exynos4/exynos5 kind of macros, as suggested by Arnd.
+ - Changed location of chipid driver to "drivers/soc".
+ - Added drivers/base/soc.c provided infrastructure to make SoC specific 
+   information avaible to user space via sysfs entry, as suggested by Arnd.
+
+Pankaj Dubey (2):
+  soc: samsung: add exynos chipid driver support
+  ARM: EXYNOS: refactoring of mach-exynos to enable chipid driver
+
+ arch/arm/mach-exynos/Kconfig                 |    2 +
+ arch/arm/mach-exynos/common.h                |   46 ++----
+ arch/arm/mach-exynos/exynos.c                |   77 ++++-----
+ arch/arm/mach-exynos/include/mach/map.h      |    2 -
+ arch/arm/mach-exynos/platsmp.c               |    2 +-
+ arch/arm/mach-exynos/pm.c                    |    8 +-
+ arch/arm/plat-samsung/cpu.c                  |   14 --
+ arch/arm/plat-samsung/include/plat/cpu.h     |    2 -
+ arch/arm/plat-samsung/include/plat/map-s5p.h |    1 -
+ drivers/soc/Kconfig                          |    1 +
+ drivers/soc/Makefile                         |    1 +
+ drivers/soc/samsung/Kconfig                  |   14 ++
+ drivers/soc/samsung/Makefile                 |    1 +
+ drivers/soc/samsung/exynos-chipid.c          |  218 ++++++++++++++++++++++++++
+ include/linux/soc/samsung/exynos-soc.h       |   53 +++++++
+ 15 files changed, 338 insertions(+), 104 deletions(-)
+ create mode 100644 drivers/soc/samsung/Kconfig
+ create mode 100644 drivers/soc/samsung/Makefile
+ create mode 100644 drivers/soc/samsung/exynos-chipid.c
+ create mode 100644 include/linux/soc/samsung/exynos-soc.h
+
+-- 
+1.7.9.5
