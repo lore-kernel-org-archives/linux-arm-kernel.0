@@ -1,85 +1,118 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 03 Dec 2014 10:49:20 +0100
-Subject: [PATCH 3/9] clk: sunxi: Add prcm mod0 clock driver
-In-Reply-To: <20141202154524.GD30256@lukather>
-References: <20141126211318.GN25249@lukather> <5476E3A5.4000708@redhat.com>
- <CAGb2v652m0bCdPWFF4LWwjcrCJZvnLibFPw8xXJ3Q-Ge+_-p7g@mail.gmail.com>
- <5476F8AB.2000601@redhat.com> <20141127190509.GR25249@lukather>
- <54787A8A.6040209@redhat.com> <20141202154524.GD30256@lukather>
-Message-ID: <547EDCA0.4040805@redhat.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 3 Dec 2014 17:49:34 +0800
+Subject: [PATCH 4/4] media: ov2640: dt: add the device tree binding
+ document
+In-Reply-To: <3353234.ED9pHT6goB@avalon>
+References: <1417170507-11172-1-git-send-email-josh.wu@atmel.com>
+ <1417170507-11172-5-git-send-email-josh.wu@atmel.com>
+ <3353234.ED9pHT6goB@avalon>
+Message-ID: <547EDCAE.50001@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Laurent
 
-On 12/02/2014 04:45 PM, Maxime Ripard wrote:
-
- >> Ok, so thinking more about this, I'm still convinced that the MFD
->> framework is only getting in the way here.
+On 12/2/2014 6:14 AM, Laurent Pinchart wrote:
+> Hi Josh,
 >
-> You still haven't said of what exactly it's getting in the way of.
-
-Of using of_clk_define to bind to the mod0 clk in the prcm, because the
-ir_clk node does not have its own reg property when the mfd framework is
-used and of_clk_define requires the node to have its own reg property.
-
->> But I can see having things represented in devicetree properly, with
->> the clocks, etc. as child nodes of the prcm being something which we
->> want.
+> Thank you for the patch.
 >
-> Clocks and reset are the only thing set so far, because we need
-> reference to them from the DT itself, nothing more.
+> On Friday 28 November 2014 18:28:27 Josh Wu wrote:
+>> Add the document for ov2640 dt.
+>>
+>> Cc: devicetree at vger.kernel.org
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>>   .../devicetree/bindings/media/i2c/ov2640.txt       | 43 +++++++++++++++++++
+>>   1 file changed, 43 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+>> b/Documentation/devicetree/bindings/media/i2c/ov2640.txt new file mode
+>> 100644
+>> index 0000000..adec147
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+>> @@ -0,0 +1,43 @@
+>> +* Omnivision ov2640 CMOS sensor
+>> +
+>> +The Omnivision OV2640 sensor support multiple resolutions output, such as
+>> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
+>> +output format.
+>> +
+>> +Required Properties :
+>> +- compatible      : Must be "omnivision,ov2640"
+> The usual practice is to use the company's stock ticker as a prefix. In this
+> case the compatible string would be "ovti,ov2640". You need to add the prefix
+> to Documentation/devicetree/bindings/vendor-prefixes.txt.
 >
-> We could very much have more devices instatiated from the MFD itself.
+>> +- reset-gpio      : reset pin
+>> +- power-down-gpio : power down pin
+> That should be reset-gpios and power-down-gpios, even if there's a single
+> GPIO. Furthermore, given that the power down pin is named PWDN you might want
+> to name the property pwdn-gpios.
 >
->> So since all we are using the MFD for is to instantiate platform
->> devices under the prcm nodes, and assign an io resource for the regs
->> to them, why not simply make the prcm node itself a simple-bus.
+> The reset and pwdn signals won't be connected on all boards, so the two
+> properties should be optional.
 >
-> No, this is really not a bus. It shouldn't be described at all as
-> such. It is a device, that has multiple functionnalities in the system
-> => MFD. It really is that simple.
-
-Ok, I can live with that, but likewise the clocks node is not a bus either!
-
-So it should not have a simple-bus compatible either, and as such we cannot
-simply change the mod0 driver from of_clk_define to a platform driver because
-then we need to instantiate platform devs for the mod0 clock nodes, which
-means making the clock node a simple-bus.
-
-I can see your logic in wanting the ir_clk prcm sub-node to use the
-mod0 compatible string, so how about we make the mod0 driver both
-register through of_declare and as a platform driver. Note this means
-that it will try to bind twice to the ir_clk node, since of_clk_declare
-will cause it to try and bind there too AFAIK.
-
-The of_clk_declare bind will fail though because there is no regs
-property, so this double bind is not an issue as long as we do not
-log errors on the first bind failure.
-
-Note that the ir_clk node will still need an "ir-clk" compatible as
-well for the MFD to find it and assign the proper resources to it.
-
-But this way we will have the clk driver binding to the mod0 clk compatible,
-which is what you want, while having the MFD assign resources on the
-fact that it is the ir-clk node, so that things will still work if
-there are multiple mod0 clks in the prcm.
-
->> This does everything the MFD prcm driver currently does, without
->> actually needing a specific kernel driver, and as added bonus this
->> will move the definition of the mfd function reg offsets out of the
->> kernel and into the devicetree where they belong in the first place.
+>> +Optional Properties:
+>> +- clocks          : reference master clock, if using external fixed clock,
+>> you
+>> +                    no need to have such property.
+> The clock is required by the chip, so even when using an external fixed clock
+> the property should be present, and reference a fixed clock node. The clocks
+> and clock-names properties should thus be mandatory.
 >
-> Which was nacked in the first place because such offsets are not
-> supposed to be in the DT.
+>> +- clock-names     : Must be "mck", it means the master clock for ov2640.
+> The clock input is named xvclk in the datasheet, you should use the same name
+> here.
 >
-> Really, we have something that work here, there's no need to refactor
-> it.
+>> +
+>> +For further reading of port node refer
+>> Documentation/devicetree/bindings/media/
+>> +video-interfaces.txt.
+> Even if you reference that document you should still mention what port node(s)
+> these bindings require. Something like the following text should be enough.
+>
+> "The device node must contain one 'port' child node for its digital output
+> video port, in accordance with the video interface bindings defined in
+> Documentation/devicetree/bindings/media/video-interfaces.txt."
+>
+>> +
+>> +Example:
+>> +
+>> +	i2c1: i2c at f0018000 {
+>> +		ov2640: camera at 0x30 {
+>> +			compatible = "omnivision,ov2640";
+>> +			reg = <0x30>;
+>> +
+>> +			... ...
+> No need for an ellipsis, what are you trying to hide ? :-)
 
-Ok, but that does bring us back to the original problem wrt the ir-clk,
-see above for how I think we should solve this then. If you agree I
-can implement the proposed fix.
+I just emit the pinctrl property here. Will add it back.
+>
+>> +
+>> +			reset-gpio = <&pioE 24 GPIO_ACTIVE_HIGH>;
+>> +			power-down-gpio = <&pioE 29 GPIO_ACTIVE_HIGH>;
+>> +
+>> +			/* use pck1 for the master clock of ov2640 */
+> I think you can drop the comment.
 
-Regards,
+I will send a new version which will fix all above.
+Thanks for your time to review the patch. That help me a lot.
 
-Hans
+Best Regards,
+Josh Wu
+
+>
+>> +			clocks = <&pck1>;
+>> +			clock-names = "mck";
+>> +
+>> +			port {
+>> +				ov2640_0: endpoint {
+>> +					remote-endpoint = <&isi_0>;
+>> +					bus-width = <8>;
+>> +				};
+>> +			};
+>> +		};
+>> +	};
