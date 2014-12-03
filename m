@@ -1,14 +1,14 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  3 Dec 2014 21:44:13 +0100
-Subject: [PATCH v5 09/11] ARM: at91/dt: add matrix node in sama5d3 dtsi
+Date: Wed,  3 Dec 2014 21:44:12 +0100
+Subject: [PATCH v5 08/11] ARM: at91/dt: add HSMC (Static Memory Controller)
+ node in sama5d3 dtsi
 In-Reply-To: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1417639455-17410-10-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1417639455-17410-9-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add matrix node in sama5d3 dtsi so that it can be referenced by other
-devices.
+Add the SMC node in sama5d3 dtsi.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
@@ -16,20 +16,20 @@ Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
  1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index 9f1eed5..d49dab7 100644
+index 5f4144d..9f1eed5 100644
 --- a/arch/arm/boot/dts/sama5d3.dtsi
 +++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -425,6 +425,11 @@
- 				clock-names = "ddrck", "mpddr";
+@@ -395,6 +395,11 @@
+ 				clock-names = "tdes_clk";
  			};
  
-+			matrix: matrix at ffffec00 {
-+				compatible = "atmel,sama5d3-matrix", "syscon";
-+				reg = <0xffffec00 0x200>;
++			hsmc: hsmc at ffffc000 {
++				compatible = "atmel,sama5d3-smc", "syscon";
++				reg = <0xffffc000 0x1000>;
 +			};
 +
- 			dbgu: serial at ffffee00 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xffffee00 0x200>;
+ 			dma0: dma-controller at ffffe600 {
+ 				compatible = "atmel,at91sam9g45-dma";
+ 				reg = <0xffffe600 0x200>;
 -- 
 1.9.1
