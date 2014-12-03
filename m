@@ -1,60 +1,35 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 03 Dec 2014 09:05:31 +0200
-Subject: OMAP baseline test results for v3.18-rc7
-In-Reply-To: <alpine.DEB.2.02.1412021838410.16734@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1412021838410.16734@utopia.booyaka.com>
-Message-ID: <547EB63B.5070200@compulab.co.il>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed,  3 Dec 2014 15:19:13 +0800
+Subject: [PATCH] ARM: dts: sun6i: hummingbird: Add ethernet phy reset gpio
+ properties
+Message-ID: <1417591153-27177-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On the Hummingbird A31 board, the RTL8211E ethernet phy has its reset
+line connect to a gpio pin, instead of floating like on other boards.
+Add the stmmac properties for describing the reset gpio.
 
-On 12/02/14 20:39, Paul Walmsley wrote:
-> 
-> Here are some basic OMAP test results for Linux v3.18-rc7.
-> Logs and other details at:
-> 
->     http://www.pwsan.com/omap/testlogs/test_v3.18-rc7/20141201203859/
-> 
-> 
-> Test summary
-> ------------
-> 
+The reset delays were taken from the RTL8211E datasheet.
 
-[...]
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 3 +++
+ 1 file changed, 3 insertions(+)
 
-> Build: uImage+dtb:
->     Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-> 		  omap2plus_defconfig/omap4-panda,
-> 		  omap2plus_defconfig/omap4-panda-es,
-> 		  omap2plus_defconfig/omap4-var-som,
-> 		  omap2plus_defconfig/omap3-evm-37xx,
-> 		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-> 		  omap2plus_defconfig/omap2430-sdp,
-> 		  omap2plus_defconfig/am3517-evm,
-> 		  omap2plus_defconfig/omap3-beagle,
-> 		  omap2plus_defconfig/omap3-beagle-xm,
-> 		  omap2plus_defconfig/omap3-sbc-t3517,
-> 		  omap2plus_defconfig/omap5-uevm,
-> 		  omap2plus_defconfig/omap5-sbc-t54
-> 
-
-[...]
-
-> Boot to userspace:
->     FAIL ( 1/16): 2430sdp
->     skip ( 2/16): 5912osk, 3517evm
->     Pass (13/16): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
-> 		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
-> 		  3730beaglexm, 3730es12beaglexm, 5430es2uevm,
-> 		  5430es2sbct54, 2420n800
-
-I've looked at the boot log and it seems cm-t3517 is booting just fine...
-A problem with the test/report collecting script?
-5912osk is not listed by the link above, but there are indeed 16 entries...
-
-[...]
-
+diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+index 6e924d9..55a367a 100644
+--- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
++++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+@@ -139,6 +139,9 @@
+ 			pinctrl-0 = <&gmac_pins_rgmii_a>;
+ 			phy = <&phy1>;
+ 			phy-mode = "rgmii";
++			snps,reset-gpio = <&pio 0 21 0>;
++			snps,reset-active-low;
++			snps,reset-delays-us = <0 10000 30000>;
+ 			status = "okay";
+ 
+ 			phy1: ethernet-phy at 1 {
 -- 
-Regards,
-Igor.
+2.1.3
