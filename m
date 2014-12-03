@@ -1,121 +1,199 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 3 Dec 2014 07:55:08 -0700
-Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <20141203143122.GH499@linaro.org>
-References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
- <1417541958-56907-4-git-send-email-lina.iyer@linaro.org>
- <20141202230544.GG499@linaro.org> <547ED3BD.5090209@linaro.org>
- <20141203143122.GH499@linaro.org>
-Message-ID: <20141203145508.GJ499@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 3 Dec 2014 15:56:54 +0100
+Subject: [PATCH v3 06/11] memory: atmel-ebi: add DT bindings documentation
+In-Reply-To: <1417429647-3419-7-git-send-email-boris.brezillon@free-electrons.com>
+References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1417429647-3419-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <547F24B6.8070504@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03 2014 at 07:31 -0700, Lina Iyer wrote:
->On Wed, Dec 03 2014 at 02:11 -0700, Daniel Lezcano wrote:
->>On 12/03/2014 12:05 AM, Lina Iyer wrote:
->>>On Tue, Dec 02 2014 at 10:40 -0700, Lina Iyer wrote:
->>>+
->>>[...]
->>
->>[ ... ]
->>
->>>>+static int __init qcom_spm_init(void)
->>>>+{
->>>>+    int ret;
->>>>+
->>>>+    /*
->>>>+     * cpuidle driver need to registered before the cpuidle device
->>>>+     * for any cpu. Register the device for the the cpuidle driver.
->>>>+     */
->>>>+    ret = platform_device_register(&qcom_cpuidle_drv);
->>>>+    if (ret)
->>>>+        return ret;
->>>Stephen pointed out that we would have the platform device lying around
->>>on a non-QCOM device when using multi_v7_defconfig.
->>
->>Perhaps I am missing the point, but this is not supposed to happen, no ?
->>
->This would happen, since the file would compile on multi_v7 and we would
->initialize and register this device regardless. The cpuidle-qcom.c
->driver probe would bail out looking for a matching compatible property.
->So we would not register a cpuidle driver but the device would lay
->around.
->
-Not the best thing to do, but I noticed that ACPI driver does reference
-count to register cpuidle driver for the first device and remove them as
-the reference count decreases. I am not sure, if we need to reference
-count here, since the SPM devices themselves are not removable.
+Le 01/12/2014 11:27, Boris Brezillon a ?crit :
+> The EBI (External Bus Interface) is used to access external peripherals
+> (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+> Each device is assigned a CS line and an address range and can have its
+> own configuration (timings, access mode, bus width, ...).
+> This driver provides a generic DT binding to configure a device according
+> to its requirements.
+> For specific device controllers (like the NAND one) the SMC timings
+> should be configured by the controller driver through the matrix and smc
+> syscon regmaps.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  .../bindings/memory-controllers/atmel-ebi.txt      | 155 +++++++++++++++++++++
+>  1 file changed, 155 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+> new file mode 100644
+> index 0000000..3749ea1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+> @@ -0,0 +1,155 @@
+> +* Device tree bindings for Atmel EBI
+> +
+> +The External Bus Interface (EBI) controller is a bus where you can connect
+> +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
+> +The EBI provides a glue-less interface to asynchronous memories though the SMC
+> +(Static Memory Controller).
+> +Synchronous memories (and some asynchronous memories like NANDs) can be
+> +attached to specialized controllers which are responsible for configuring the
+> +bus appropriately according to the connected device.
+> +In the other hand, the bus interface can be automated for simple asynchronous
+> +devices.
+> +
+> +Required properties:
+> +
+> +- compatible:		"atmel,at91sam9260-ebi"
+> +			"atmel,at91sam9261-ebi"
+> +			"atmel,at91sam9263-ebi0"
+> +			"atmel,at91sam9263-ebi1"
 
->>>So instead of doing this here, we could do this in the probe..
->>>
->>>if (!cpuidle_get_driver()) {
->>>        int ret = platform_device_register(&qcom_cpuidle_drv);
->>>        if (ret)
->>>                return ret;
->>>}
->>>
->>>Would that be okay?
->>>
->>>The successful probe indicates that we are on a QCOM SoC, and we have not
->>>registered a cpuidle_driver before this.
->>>
->>>Thanks,
->>>Lina
->>>
->>>>+
->>>>+    return platform_driver_register(&spm_driver);
->>>>+}
->>>>+module_init(qcom_spm_init);
->>>>+
->>>>+MODULE_LICENSE("GPL v2");
->>>>+MODULE_DESCRIPTION("SAW power controller driver");
->>>>+MODULE_ALIAS("platform:saw");
->>>>diff --git a/include/soc/qcom/pm.h b/include/soc/qcom/pm.h
->>>>new file mode 100644
->>>>index 0000000..d9a56d7
->>>>--- /dev/null
->>>>+++ b/include/soc/qcom/pm.h
->>>>@@ -0,0 +1,31 @@
->>>>+/*
->>>>+ * Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
->>>>+ *
->>>>+ * This software is licensed under the terms of the GNU General Public
->>>>+ * License version 2, as published by the Free Software Foundation, and
->>>>+ * may be copied, distributed, and modified under those terms.
->>>>+ *
->>>>+ * This program is distributed in the hope that it will be useful,
->>>>+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>>+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>>+ * GNU General Public License for more details.
->>>>+ *
->>>>+ */
->>>>+
->>>>+#ifndef __QCOM_PM_H
->>>>+#define __QCOM_PM_H
->>>>+
->>>>+enum pm_sleep_mode {
->>>>+    PM_SLEEP_MODE_STBY,
->>>>+    PM_SLEEP_MODE_RET,
->>>>+    PM_SLEEP_MODE_SPC,
->>>>+    PM_SLEEP_MODE_PC,
->>>>+    PM_SLEEP_MODE_NR,
->>>>+};
->>>>+
->>>>+struct qcom_cpu_pm_ops {
->>>>+    int (*standby)(void *data);
->>>>+    int (*spc)(void *data);
->>>>+};
->>>>+
->>>>+#endif  /* __QCOM_PM_H */
->>>>--
->>>>2.1.0
->>>>
->>
->>
->>-- 
->><http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->>
->>Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
->><http://twitter.com/#!/linaroorg> Twitter |
->><http://www.linaro.org/linaro-blog/> Blog
->>
+Ditto: 9263 twice.
+
+> +			"atmel,at91sam9g45-ebi"
+> +			"atmel,at91sam9x5-ebi"
+> +			"atmel,sama5d3-ebi"
+> +
+> +- reg:			Contains offset/length value for EBI memory mapping.
+> +			This property might contain several entries if the EBI
+> +			memory range is not contiguous
+> +
+> +- #address-cells:	Must be 2.
+> +			The first cell encodes the CS.
+> +			The second cell encode the offset into the CS memory
+> +			range.
+> +
+> +- #size-cells:		Must be set to 1.
+> +
+> +- ranges:		Encodes CS to memory region association.
+> +
+> +- clocks:		Clock feeding the EBI controller.
+> +			See clock-bindings.txt
+> +
+> +Child chip-select (cs) nodes contain the memory devices nodes connected to
+> +such as NOR (e.g. cfi-flash) and NAND.
+> +There might be board specific devices like FPGAs.
+> +You'll define you device requirements in these child nodes.
+> +
+> +Required child cs node properties:
+> +
+> +- #address-cells:	Must be 2.
+> +
+> +- #size-cells:		Must be 1.
+> +
+> +- ranges:		Empty property indicating that child nodes can inherit
+> +			memory layout.
+> +
+> +Optional child cs node properties:
+> +- atmel,generic-dev		boolean property specifying if the device is
+> +				a generic device.
+> +				The following properties are only parsed if
+> +				this property is present.
+> +				Specialized devices are attached to specialized
+> +				controllers which are responsible for
+> +				configuring the bus appropriately.
+> +				Here are some examples of specialized
+> +				controllers: NAND, CompactFlash, SDR-SDRAM.
+> +
+> +- atmel,bus-width:		width of the asynchronous device's data bus
+> +				8, 16 or 32.
+> +				8 if not present.
+> +
+> +- atmel,byte-access-type	"write" or "select" (see Atmel datasheet).
+> +				"select" if not present.
+> +
+> +- atmel,read-mode		"nrd" or "ncs".
+> +				"ncs" is not present.
+> +
+> +- atmel,write-mode		"nwe" or "ncs".
+> +				"ncs" is not present.
+> +
+> +- atmel,exnw-mode		"disabled", "frozen" or "ready".
+> +				"disabled" if not present.
+> +
+> +- atmel,page-mode		enable page mode if present. The provided value
+> +				defines the page size (supported values: 4, 8,
+> +				16 and 32).
+> +
+> +Optional device timings expressed in nanoseconds (if the property is not
+> +present 0 is assumed):
+> +
+> +- atmel,ncs-rd-setup-ns
+> +- atmel,nrd-setup-ns
+> +- atmel,ncs-wr-setup-ns
+> +- atmel,nwe-setup-ns
+> +- atmel,ncs-rd-pulse-ns
+> +- atmel,nrd-pulse-ns
+> +- atmel,ncs-wr-pulse-ns
+> +- atmel,nwe-pulse-ns
+> +- atmel,nwe-cycle-ns
+> +- atmel,nrd-cycle-ns
+> +- atmel,tdf-ns
+> +
+> +- atmel,tdf-optimized		data float optimized mode. If present the data
+> +				float time is optimized depending on the next
+> +				device being accessed (next device setup
+> +				time is substracted to the current devive data
+
+Typo: subtract, device
+
+> +				float time).
+> +
+> +
+> +
+> +Example:
+> +
+> +	ebi: ebi at 10000000 {
+> +		compatible = "atmel,sama5d3-ebi", "simple-bus";
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +		atmel,smc = <&hsmc>;
+> +		atmel,matrix = <&matrix>;
+> +		reg = <0x10000000 0x10000000
+> +		       0x40000000 0x30000000>;
+> +		ranges = <0x0 0x0 0x10000000 0x10000000
+> +			  0x1 0x0 0x40000000 0x10000000
+> +			  0x2 0x0 0x50000000 0x10000000
+> +			  0x3 0x0 0x60000000 0x10000000>;
+> +		clocks = <&mck>;
+> +
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_ebi_addr>;
+> +
+> +		cs at 0 {
+> +			#address-cells = <2>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +			atmel,generic-dev;
+> +			atmel,read-mode = "nrd";
+> +			atmel,write-mode = "nwe";
+> +			atmel,bus-width = <16>;
+> +			atmel,ncs-rd-setup-ns = <0>;
+> +			atmel,ncs-wr-setup-ns = <0>;
+> +			atmel,nwe-setup-ns = <8>;
+> +			atmel,nrd-setup-ns = <16>;
+> +			atmel,ncs-rd-pulse-ns = <84>;
+> +			atmel,ncs-wr-pulse-ns = <84>;
+> +			atmel,nrd-pulse-ns = <76>;
+> +			atmel,nwe-pulse-ns = <76>;
+> +			atmel,nrd-cycle-ns = <107>;
+> +			atmel,nwe-cycle-ns = <84>;
+> +			atmel,tdf-ns = <16>;
+> +
+> +			nor: flash at 0,0 {
+> +				compatible = "cfi-flash";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				reg = <0x0 0x0 0x1000000>;
+> +				bank-width = <2>;
+> +			};
+> +		};
+> +	};
+> +
+> 
+
+
+-- 
+Nicolas Ferre
