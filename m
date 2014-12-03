@@ -1,32 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Dec 2014 16:49:52 +0000
-Subject: [PATCH] ARM: rockchip: Convert resume code to C
-In-Reply-To: <CAD=FV=Vn_U6YWFN-hruWcYo-HSHt9=hwduEv32Bb5aP_hzNB8Q@mail.gmail.com>
-References: <1417461694-5129-1-git-send-email-dianders@chromium.org>
- <20141201225057.GA11285@n2100.arm.linux.org.uk>
- <CAD=FV=VT7gr504-ZgWPfha+40XDX5eShkzZ36bg=-4Oub1S27w@mail.gmail.com>
- <25485084.A6ydfR9Xle@wuerfel>
- <CAD=FV=UFWZEcbO2ty0m+qEGv4Xgq0N=Rs30wBgw=6+OGd5gSpg@mail.gmail.com>
- <CACRpkdapVhrQe7n5wDzZbf3fYGGpB-jPzG8Z+A8X6j5ERLxAfg@mail.gmail.com>
- <CAD=FV=Vn_U6YWFN-hruWcYo-HSHt9=hwduEv32Bb5aP_hzNB8Q@mail.gmail.com>
-Message-ID: <20141203164951.GI11285@n2100.arm.linux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 3 Dec 2014 17:52:04 +0100
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <20141128202719.GU2817@atomide.com>
+References: <20141027200008.GR2560@atomide.com> <201411270038.01312@pali>
+ <20141127011203.GR2817@atomide.com> <201411271232.47231@pali>
+ <20141128202719.GU2817@atomide.com>
+Message-ID: <20141203165204.GD26685@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03, 2014 at 08:44:55AM -0800, Doug Anderson wrote:
-> Sure.  I look forward to someone solving it.  ...and as I said, until
-> someone does solve it I think we're blocked from landing deep sleep
-> mode for rk3288 upstream (unless someone decides that my patches are
-> OK).
+On Fri 2014-11-28 12:27:19, Tony Lindgren wrote:
+> * Pali Roh?r <pali.rohar@gmail.com> [141127 03:34]:
+> > On Thursday 27 November 2014 02:12:04 Tony Lindgren wrote:
+> > > 
+> > > Thinking about this probably the best long term solution is
+> > > to pass optional board_revision in the kernel cmdline that
+> > > can be parsed early and copied to system_rev variable.
+> > > 
+> > 
+> > Not possible. Our bootloader is closed & proprietary. I tried to 
+> > replace it with u-boot I was not able to do that. So we will use 
+> > that Nokia closed bootloader forever and it can provide data only 
+> > in ATAG structure.
+> 
+> I'm using just mainline u-boot flashed as kernel for nolo that
+> then loads the kernel.
+> 
+> For passing the board revision using the pass through u-boot is
+> probably the best long term solution. U-boot can read the ATAGs
+> from nolo and modify the .dtb for the revision information.
+> 
+> Are you saying there are some issues with that?
 
-What we definitely don't want to do is to have each SoC doing their
-own thing on this, so we really need it to either be generic across
-all ARMs, or fully generic.
+Plenty :-).
 
-So, if it can be turned into some kind of generic infrastructure, I'd
-be happier with it, because that would help it be re-used across other
-SoCs.
+Basically, u-boot is great for production (select one of kernels and
+boot it), but pretty much unusable for development:
 
+1) It does not support backlight, so you are interacting blind
+
+2) Setup to load kernels over usb would probably be interesting
+
+3) It makes kernel fail in interesting ways depending on phase of
+moon.
+
+Please, keep nolo supported. Debugging kernel & user space is bad,
+debugging u-boot & kernel & user space would be even worse.
+
+									Pavel
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
