@@ -1,28 +1,24 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 03 Dec 2014 21:24:22 +0100
-Subject: [PATCH] ARM: pxa: fix lubbock interrupts handling
-In-Reply-To: <CAN1soZzZ7nuvvHguaHVHZc8hXvv8SzvWY9Ejf-fYhA5yfbcM-w@mail.gmail.com>
- (Haojian Zhuang's message of "Sat, 29 Nov 2014 00:02:15 +0800")
-References: <1417113721-9062-1-git-send-email-robert.jarzmik@free.fr>
- <alpine.DEB.2.11.1411272258010.3961@nanos> <87r3wn1mhu.fsf@free.fr>
- <CAN1soZzZ7nuvvHguaHVHZc8hXvv8SzvWY9Ejf-fYhA5yfbcM-w@mail.gmail.com>
-Message-ID: <87r3wgzdl5.fsf@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Dec 2014 21:26:39 +0100
+Subject: [PATCH v9 0/7] Enable L2 cache support on Exynos4210/4x12 SoCs
+In-Reply-To: <20141203160332.GA11502@n2100.arm.linux.org.uk>
+References: <1416224909-4290-1-git-send-email-m.szyprowski@samsung.com>
+ <3059840.P4aX5Il9dy@wuerfel> <20141203160332.GA11502@n2100.arm.linux.org.uk>
+Message-ID: <10964164.OYZFDUglOR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang <haojian.zhuang@gmail.com> writes:
+On Wednesday 03 December 2014 16:03:32 Russell King - ARM Linux wrote:
+> On Fri, Nov 28, 2014 at 12:11:38PM +0100, Arnd Bergmann wrote:
+> > I'm fine with it either way. Russell, if you like you can merge
+> > http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung v3.19-next/pm-samsung-2
+> 
+> It'd be nicer to have a git URL for it.
 
->
-> I think that it's a kind of irq muxing, just like lots of PMIC (power
-> management IC).
-> We should move the lubbock board irqs to a mfd driver, and register them as
-> threaded irqs.
-I will have a look.
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung v3.19-next/pm-samsung-2
 
-I didn't consider mfd for motherboard gates, I'll think of it, thanks for the
-idea.
+I don't see much difference between the two, but I never cared to look
+into the protocol details. The one I listed first was the URL I got from
+Kukjin, and git could access that.
 
-Cheers.
-
--- 
-Robert
+	Arnd
