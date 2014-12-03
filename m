@@ -1,69 +1,74 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  3 Dec 2014 14:35:56 +0800
-Subject: [PATCH 01/10] clk: sunxi: Add module 0 (storage) style clock support
- for A80
+Date: Wed,  3 Dec 2014 14:35:59 +0800
+Subject: [PATCH 04/10] ARM: dts: sun9i: Add clock-indices property for bus
+ gate clocks
 In-Reply-To: <1417588565-26215-1-git-send-email-wens@csie.org>
 References: <1417588565-26215-1-git-send-email-wens@csie.org>
-Message-ID: <1417588565-26215-2-git-send-email-wens@csie.org>
+Message-ID: <1417588565-26215-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The module 0 style clocks, or storage module clocks as named in the
-official SDK, are almost the same as the module 0 clocks on earlier
-Allwinner SoCs. The only difference is wider mux register bits.
+of_clk_get_parent_name() uses the clock-indices property to resolve
+clock phandle arguments in case that the argument index does not
+match the clock-output-names sequence.
+
+This is the case on sunxi, where we use the actual bit index as the
+argument to the phandle. Add the clock-indices property so that
+of_clk_get_parent_name() resolves the names correctly.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- drivers/clk/sunxi/clk-mod0.c                      | 24 +++++++++++++++++++++++
- 2 files changed, 25 insertions(+)
+ arch/arm/boot/dts/sun9i-a80.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 9dc4f55..d0fb9c5 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -58,6 +58,7 @@ Required properties:
- 	"allwinner,sun4i-a10-mmc-output-clk" - for the MMC output clock on A10
- 	"allwinner,sun4i-a10-mmc-sample-clk" - for the MMC sample clock on A10
- 	"allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
-+	"allwinner,sun9i-a80-mod0-clk" - for module 0 (storage) clocks on A80
- 	"allwinner,sun8i-a23-mbus-clk" - for the MBUS clock on A23
- 	"allwinner,sun7i-a20-out-clk" - for the external output clocks
- 	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
-diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
-index 658d74f..d72063f 100644
---- a/drivers/clk/sunxi/clk-mod0.c
-+++ b/drivers/clk/sunxi/clk-mod0.c
-@@ -93,6 +93,30 @@ static void __init sun4i_a10_mod0_setup(struct device_node *node)
- }
- CLK_OF_DECLARE(sun4i_a10_mod0, "allwinner,sun4i-a10-mod0-clk", sun4i_a10_mod0_setup);
- 
-+static const struct factors_data sun9i_a80_mod0_data __initconst = {
-+	.enable = 31,
-+	.mux = 24,
-+	.muxmask = BIT(3) | BIT(2) | BIT(1) | BIT(0),
-+	.table = &sun4i_a10_mod0_config,
-+	.getter = sun4i_a10_get_mod0_factors,
-+};
-+
-+static void __init sun9i_a80_mod0_setup(struct device_node *node)
-+{
-+	void __iomem *reg;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (!reg) {
-+		pr_err("Could not get registers for mod0-clk: %s\n",
-+		       node->name);
-+		return;
-+	}
-+
-+	sunxi_factors_register(node, &sun9i_a80_mod0_data,
-+			       &sun4i_a10_mod0_lock, reg);
-+}
-+CLK_OF_DECLARE(sun9i_a80_mod0, "allwinner,sun9i-a80-mod0-clk", sun9i_a80_mod0_setup);
-+
- static DEFINE_SPINLOCK(sun5i_a13_mbus_lock);
- 
- static void __init sun5i_a13_mbus_setup(struct device_node *node)
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index 33d18dc..f3cac3a 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -252,6 +252,9 @@
+ 			compatible = "allwinner,sun9i-a80-ahb0-gates-clk";
+ 			reg = <0x06000580 0x4>;
+ 			clocks = <&ahb0>;
++			clock-indices = <0>, <1>, <3>, <5>, <8>, <12>, <13>,
++					<14>, <15>, <16>, <18>, <20>, <21>,
++					<22>, <23>;
+ 			clock-output-names = "ahb0_fd", "ahb0_ve", "ahb0_gpu",
+ 					"ahb0_ss", "ahb0_sd", "ahb0_nand1",
+ 					"ahb0_nand0", "ahb0_sdram",
+@@ -265,6 +268,7 @@
+ 			compatible = "allwinner,sun9i-a80-ahb1-gates-clk";
+ 			reg = <0x06000584 0x4>;
+ 			clocks = <&ahb1>;
++			clock-indices = <0>, <1>, <17>, <21>, <22>, <23>, <24>;
+ 			clock-output-names = "ahb1_usbotg", "ahb1_usbhci",
+ 					"ahb1_gmac", "ahb1_msgbox",
+ 					"ahb1_spinlock", "ahb1_hstimer",
+@@ -276,6 +280,8 @@
+ 			compatible = "allwinner,sun9i-a80-ahb2-gates-clk";
+ 			reg = <0x06000588 0x4>;
+ 			clocks = <&ahb2>;
++			clock-indices = <0>, <1>, <2>, <4>, <5>, <7>, <8>,
++					<11>;
+ 			clock-output-names = "ahb2_lcd0", "ahb2_lcd1",
+ 					"ahb2_edp", "ahb2_csi", "ahb2_hdmi",
+ 					"ahb2_de", "ahb2_mp", "ahb2_mipi_dsi";
+@@ -286,6 +292,8 @@
+ 			compatible = "allwinner,sun9i-a80-apb0-gates-clk";
+ 			reg = <0x06000590 0x4>;
+ 			clocks = <&apb0>;
++			clock-indices = <1>, <5>, <11>, <12>, <13>, <15>,
++					<17>, <18>, <19>;
+ 			clock-output-names = "apb0_spdif", "apb0_pio",
+ 					"apb0_ac97", "apb0_i2s0", "apb0_i2s1",
+ 					"apb0_lradc", "apb0_gpadc", "apb0_twd",
+@@ -297,6 +305,8 @@
+ 			compatible = "allwinner,sun9i-a80-apb1-gates-clk";
+ 			reg = <0x06000594 0x4>;
+ 			clocks = <&apb1>;
++			clock-indices = <0>, <1>, <2>, <3>, <4>,
++					<16>, <17>, <18>, <19>, <20>, <21>;
+ 			clock-output-names = "apb1_i2c0", "apb1_i2c1",
+ 					"apb1_i2c2", "apb1_i2c3", "apb1_i2c4",
+ 					"apb1_uart0", "apb1_uart1",
 -- 
 2.1.3
