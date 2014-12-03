@@ -1,49 +1,51 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  3 Dec 2014 15:17:07 +0100
-Subject: [PATCH 4/4] ARM: shmobile: kzm9g-reference: Remove restart callback
+Date: Wed,  3 Dec 2014 15:17:06 +0100
+Subject: [PATCH 3/4] ARM: shmobile: sh73a0: Remove restart callback
 In-Reply-To: <1417616227-6715-1-git-send-email-geert+renesas@glider.be>
 References: <1417616227-6715-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1417616227-6715-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <1417616227-6715-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the restart handling hack from the kzm9g-reference case.
+Remove the restart handling hack from the sh73a0 generic multiplatform
+case.
 
 Restart on DT-based sh73a0 platforms is now handled through the restart
 handler registered by the R-Mobile System Controller (SYSC) driver.
 
-This reverts commit 534547c036afad3f ("ARM: shmobile: kzm9g-reference:
-Add restart callback").
+This reverts commit cad900819fba0176 ("ARM: shmobile: sh73a0: Add
+restart callback").
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/board-kzm9g-reference.c | 8 --------
+ arch/arm/mach-shmobile/setup-sh73a0.c | 8 --------
  1 file changed, 8 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-index 2e82e44ab85258b7..f2ef759b6e969cc8 100644
---- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-@@ -39,13 +39,6 @@ static void __init kzm_init(void)
- #endif
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 2ec702c51dd25050..9e5e5ebbd1af641d 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -818,13 +818,6 @@ void __init sh73a0_add_standard_devices_dt(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
  }
  
 -#define RESCNT2 IOMEM(0xe6188020)
--static void kzm9g_restart(enum reboot_mode mode, const char *cmd)
+-static void sh73a0_restart(enum reboot_mode mode, const char *cmd)
 -{
 -	/* Do soft power on reset */
 -	writel((1 << 31), RESCNT2);
 -}
 -
- static const char *kzm9g_boards_compat_dt[] __initdata = {
- 	"renesas,kzm9g-reference",
+ static const char *sh73a0_boards_compat_dt[] __initdata = {
+ 	"renesas,sh73a0",
  	NULL,
-@@ -57,6 +50,5 @@ DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
+@@ -836,7 +829,6 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
  	.init_early	= shmobile_init_delay,
- 	.init_machine	= kzm_init,
+ 	.init_machine	= sh73a0_add_standard_devices_dt,
  	.init_late	= shmobile_init_late,
--	.restart	= kzm9g_restart,
- 	.dt_compat	= kzm9g_boards_compat_dt,
+-	.restart	= sh73a0_restart,
+ 	.dt_compat	= sh73a0_boards_compat_dt,
  MACHINE_END
+ #endif /* CONFIG_USE_OF */
 -- 
 1.9.1
