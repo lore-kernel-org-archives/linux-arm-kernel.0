@@ -1,124 +1,33 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 03 Dec 2014 17:54:40 -0500
-Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
-In-Reply-To: <547F242D.1060705@redhat.com>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <20141120135851.GA32528@linaro.org> <54759041.9080105@hitachi.com>
- <20141126100325.GA9157@linaro.org> <5476120D.9030703@linaro.org>
- <CAPvkgC3eVOZEn79C9PC9c7TqC_-yCtDhw5LL6ZWUJxr+oQFaow@mail.gmail.com>
- <5476BFB4.2020705@hitachi.com>
- <CAPvkgC0ELPPWfa-8kQ4H_e_O5G1ER4KEKuSWLxh_u-VZgh7W6A@mail.gmail.com>
- <547C36DB.7060903@hitachi.com> <547F242D.1060705@redhat.com>
-Message-ID: <547F94B0.1000902@linaro.org>
+From: bisson.gary@gmail.com (Gary Bisson)
+Date: Wed, 3 Dec 2014 15:00:43 -0800
+Subject: [PATCH][imx/fixes] ARM: clk-imx6q: fix video divider for rev T0
+ 1.0
+In-Reply-To: <CAOMZO5Dagh7dXTm0vZ-OYRE_X5hz8yKXedpjuV8v9Ncb8sJa8g@mail.gmail.com>
+References: <1417636085-14822-1-git-send-email-bisson.gary@gmail.com>
+ <CAOMZO5Dagh7dXTm0vZ-OYRE_X5hz8yKXedpjuV8v9Ncb8sJa8g@mail.gmail.com>
+Message-ID: <CADCpmyP9-fq1=DYGr0vxvmhSTNLWfq40t0rL9cger-+_wBT6TQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/14 09:54, William Cohen wrote:
-> On 12/01/2014 04:37 AM, Masami Hiramatsu wrote:
->> (2014/11/29 1:01), Steve Capper wrote:
->>> On 27 November 2014 at 06:07, Masami Hiramatsu
->>> <masami.hiramatsu.pt@hitachi.com> wrote:
->>>> (2014/11/27 3:59), Steve Capper wrote:
->>>>> The crash is extremely easy to reproduce.
->>>>>
->>>>> I've not observed any missed events on a kprobe on an arm64 system
->>>>> that's still alive.
->>>>> My (limited!) understanding is that this suggests there could be a
->>>>> problem with how missed events from a recursive call to memcpy are
->>>>> being handled.
->>>>
->>>> I think so too. BTW, could you bisect that? :)
->>>>
->>>
->>> I can't bisect, but the following functions look suspicious to me
->>> (again I'm new to kprobes...):
->>> kprobes_save_local_irqflag
->>> kprobes_restore_local_irqflag
->>>
->>> I think these are breaking somehow when nested (i.e. from a recursive probe).
->>
->> Agreed. On x86, prev_kprobe has old_flags and saved_flags, this
->> at least must have saved_irqflag and save/restore it in
->> save/restore_previous_kprobe().
->>
->> What about adding this?
->>
->>   struct prev_kprobe {
->>   	struct kprobe *kp;
->>   	unsigned int status;
->> +	unsigned long saved_irqflag;
->>   };
->>
->> and
->>
->>   static void __kprobes save_previous_kprobe(struct kprobe_ctlblk *kcb)
->>   {
->>   	kcb->prev_kprobe.kp = kprobe_running();
->>   	kcb->prev_kprobe.status = kcb->kprobe_status;
->> +	kcb->prev_kprobe.saved_irqflag = kcb->saved_irqflag;
->>   }
->>
->>   static void __kprobes restore_previous_kprobe(struct kprobe_ctlblk *kcb)
->>   {
->>   	__this_cpu_write(current_kprobe, kcb->prev_kprobe.kp);
->>   	kcb->kprobe_status = kcb->prev_kprobe.status;
->> +	kcb->saved_irqflag = kcb->prev_kprobe.saved_irqflag;
->>   }
->>
->>
->
-> I have noticed with the aarch64 kprobe patches and recent kernel I can get the machine to end up getting stuck and printing out endless strings of
->
-> [187694.855843] Unexpected kernel single-step exception at EL1
-> [187694.861385] Unexpected kernel single-step exception at EL1
-> [187694.866926] Unexpected kernel single-step exception at EL1
-> [187694.872467] Unexpected kernel single-step exception at EL1
-> [187694.878009] Unexpected kernel single-step exception at EL1
-> [187694.883550] Unexpected kernel single-step exception at EL1
->
-> I can reproduce this pretty easily on my machine with functioncallcount.stp from https://sourceware.org/systemtap/examples/profiling/functioncallcount.stp and the following steps:
->
-> # stap -p4 -k -m mm_probes -w functioncallcount.stp "*@mm/*.c" -c "sleep 1"
-> # staprun mm_probes.ko -c "sleep 1"
->
-> -Will
+Hi Fabio,
 
-I did a fresh checkout and build of systemtap and tried the above.  I'm 
-not yet seeing this problem.  It does remind me of the problem we saw 
-before debug exception handling in entry.S was patched in v3.18-rc1, but 
-you say you are using recent kernel sources.
+On Wed, Dec 3, 2014 at 2:06 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Gary,
+>
+> On Wed, Dec 3, 2014 at 5:48 PM, Gary Bisson <bisson.gary@gmail.com> wrote:
+>> The post dividers do not work on i.MX6Q rev T0 1.0 so they must be fixed
+>> to 1. As the table index was wrong, a divider a of 4 could still be
+>> requested which implied the clock not to be set properly. This is the
+>> root cause of the HDMI not working at high resolution on rev T0 1.0 of
+>> the SoC, giving the following error:
+>
+> Patch looks good, but just a minot comment: I would suggest removing this line:
+>
+>> mxc_sdc_fb fb.27: timeout when waiting for flip irq
+>
+> as it is not part of mainline.
 
->>
->>
->>> That would explain why the state of play of the interrupts is in an
->>> unexpected state in the crash I reported:
->>> "The point of failure in the panic was:
->>> fs/buffer.c:1257
->>>
->>> static inline void check_irqs_on(void)
->>> {
->>> #ifdef irqs_disabled
->>>          BUG_ON(irqs_disabled());
->>> #endif
->>> }
->>> "
->>>
->>> This is all new to me so I'm still at the head-scratching stage.
->>
->> Ah, I see.
->>
->> Thank you,
->>
->>>
->>> David,
->>> Does the above make sense to you? Have you managed to reproduce the crash I get?
->>>
->>> Cheers,
->>> --
->>> Steve
+You are right, this is a good point, let me send a v2.
 
-I have easily produced a crash although it doesn't look to me like the 
-same one.  I'm getting a NULL pointer dereference.  The PMU stuff (used 
-by perf record|stat -e) should be quite independent of kprobes though.
-
--dl
+Thanks,
+Gary
