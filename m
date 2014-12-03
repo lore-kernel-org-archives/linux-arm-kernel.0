@@ -1,38 +1,51 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 3 Dec 2014 15:37:39 -0500 (EST)
-Subject: [PATCH] optimize ktime_divns for constant divisors
-In-Reply-To: <87zjb4zdyc.fsf@free.fr>
-References: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
- <87zjb4zdyc.fsf@free.fr>
-Message-ID: <alpine.LFD.2.11.1412031525320.470@knanqh.ubzr>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed,  3 Dec 2014 21:44:08 +0100
+Subject: [PATCH v5 04/11] mfd: syscon: Add Atmel SMC binding doc
+In-Reply-To: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1417639455-17410-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 3 Dec 2014, Robert Jarzmik wrote:
+The SMC registers are used to configure Atmel EBI (External Bus Interface)
+to interface with standard memory devices (NAND, NOR, SRAM or specialized
+devices like FPGAs).
 
-> Nicolas Pitre <nicolas.pitre@linaro.org> writes:
-> 
-> > Let ktime_divns() use do_div() inline whenever the divisor is constant
-> > and small enough.  This will make things like ktime_to_us() and 
-> > ktime_to_ms() much faster.
-> 
-> Hi Nicolas,
-> 
-> I suppose the "small enough" is linked to the "!(div >> 32)" in your patch.  Can
-> I have the rationale which brought up this value, and if that value is universal
-> across architectures (ie. x86/ppc/arm/...) ?
+Declare this memory region as a syscon, so that different drivers can
+configure the SMC interface (mostly timing configuration) according to
+their need.
 
-Yes.  The do_div() function is defined to accept a 32-bit divisor only.  
-The out-of-line ktime_divns code does scale down both the dividend and 
-the divisor until the divisor is within 32 bits of magnitude before 
-calling do_div().  However the constness of the divisor is lost and the 
-optimised do_div (on ARM at least) doesn't get involved.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+---
+ Documentation/devicetree/bindings/mfd/atmel-smc.txt | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel-smc.txt
 
-> And when you say "much faster", do you have figures to add to your commit
-> message ?
-
-No actual figure.  But a wild guess would be around an order of 
-magnitude.  See commit fa4adc6149 for an example of generated code.
-
-
-Nicolas
+diff --git a/Documentation/devicetree/bindings/mfd/atmel-smc.txt b/Documentation/devicetree/bindings/mfd/atmel-smc.txt
+new file mode 100644
+index 0000000..26eeed3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/atmel-smc.txt
+@@ -0,0 +1,19 @@
++* Device tree bindings for Atmel SMC (Static Memory Controller)
++
++The SMC registers are used to configure Atmel EBI (External Bus Interface)
++to interface with standard memory devices (NAND, NOR, SRAM or specialized
++devices like FPGAs).
++
++Required properties:
++- compatible:		Should be one of the following
++			"atmel,at91sam9260-smc", "syscon"
++			"atmel,sama5d3-smc", "syscon"
++- reg:			Contains offset/length value of the SMC memory
++			region.
++
++Example:
++
++smc: smc at ffffc000 {
++	compatible = "atmel,sama5d3-smc", "syscon";
++	reg = <0xffffc000 0x1000>;
++};
+-- 
+1.9.1
