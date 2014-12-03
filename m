@@ -1,34 +1,42 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Wed, 03 Dec 2014 21:36:11 +0100
-Subject: [PATCH] ARM: dts: Add dts file for odroid XU3 board
-In-Reply-To: <7hzjb4y0gp.fsf@deeprootsystems.com>
-References: <1417438770-28696-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <7hzjb4y0gp.fsf@deeprootsystems.com>
-Message-ID: <1417638971.21830.42.camel@collabora.co.uk>
+From: marek@goldelico.com (Marek Belisko)
+Date: Wed,  3 Dec 2014 22:33:19 +0100
+Subject: [PATCH v4 0/3] omapdss: Add video output support for gta04
+Message-ID: <1417642402-20538-1-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-12-03 at 11:53 -0800, Kevin Hilman wrote:
-> Sjoerd Simons <sjoerd.simons@collabora.co.uk> writes:
-> Tried this on top of linux-next (next-20141125 and next20141203) and
-> boots fine on my odroid-xu3. 
-> 
-> Thanks for doing this, I've been meaning to get a DTS upstream for this
-> platform myself.  I also noticed that the imprecise aborts I've been
-> seeing when booting this board with the smdk5420 DTS are gone, so I
-> don't have to dig into those now either.  Thanks!  :)
+changes from v3:
+- use GPL v2 instead GPL
+- fix wrong gpios property name in doc and DT
+- set gpio to NULL if invalid
+- drop unnecessary header
 
-For completeness, the problem with running the smdk5420 DTS on the XU3
-is that the XU3 runs secure firmware while the SMD5420 doesn't.. Hence
-the imprecise aborts you were seeing.
+changes from v2:
+- rename amplifier-opa362.c to encoder-opa362
+- drop inversion handlign from driver
+- add ti,invert-polarity to venc node
+
+I also drop devconf1 handling patches because discussion how to
+properly implement is not yet finished and this part is independent
+from video driver.
+
+changes from v1:
+- fix opa362 compilation error
+- fix opa362 DT documentation
+- move devconf1 definition to omap3.dtsi
+Marek Belisko (3):
+  video: omapdss: Add opa362 driver
+  Documentation: DT: Add documentation for ti,opa362 bindings
+  arm: dts: omap3-gta04: Add handling for tv output
+
+ .../devicetree/bindings/video/ti,opa362.txt        |  38 +++
+ arch/arm/boot/dts/omap3-gta04.dtsi                 |  49 ++++
+ drivers/video/fbdev/omap2/displays-new/Kconfig     |   6 +
+ drivers/video/fbdev/omap2/displays-new/Makefile    |   1 +
+ .../fbdev/omap2/displays-new/encoder-opa362.c      | 285 +++++++++++++++++++++
+ 5 files changed, 379 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/ti,opa362.txt
+ create mode 100644 drivers/video/fbdev/omap2/displays-new/encoder-opa362.c
 
 -- 
-Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Collabora Ltd.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 6170 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141203/311ef32f/attachment.bin>
+1.9.1
