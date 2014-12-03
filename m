@@ -1,34 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 3 Dec 2014 19:20:24 +0000
-Subject: [PATCH v2 2/2] ASoC: rockchip: i2s: add support for grabbing
- output clock to codec
-In-Reply-To: <1417591118-18695-3-git-send-email-jay.xu@rock-chips.com>
-References: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
- <1417591118-18695-1-git-send-email-jay.xu@rock-chips.com>
- <1417591118-18695-3-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <20141203192024.GL7712@sirena.org.uk>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 03 Dec 2014 11:23:26 -0800
+Subject: [PATCH v10 0/4] This suspend patch is only support cut off the
+ power of cpu and some external
+In-Reply-To: <547F1639.3030102@rock-chips.com> (Chris Zhong's message of "Wed,
+ 03 Dec 2014 21:55:05 +0800")
+References: <1417423940-1669-1-git-send-email-zyw@rock-chips.com>
+ <7htx1f409k.fsf@deeprootsystems.com>
+ <CAD=FV=V2go5BMFbiFKu73_aVz5ck949W-kJQ6WLkAQRPJbjPVA@mail.gmail.com>
+ <CAD=FV=XuQk17CTNKJY++J+w9Ab9_OUX0ca0A99m7yKPAWSs2=w@mail.gmail.com>
+ <7hmw763kql.fsf@deeprootsystems.com> <547F1639.3030102@rock-chips.com>
+Message-ID: <7hiohszgep.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03, 2014 at 03:18:38PM +0800, Jianqun Xu wrote:
-> From: Sonny Rao <sonnyrao@chromium.org>
-> 
-> We need to claim the clock which is driving the codec so that when we enable
-> clock gating, we continue to clock the codec when needed.  I make this an
-> optional clock since there might be some applications where we don't need it
-> but can still use the I2S block.
+Chris Zhong <zyw@rock-chips.com> writes:
 
-I would expect that the clock for the CODEC should be managed by the
-CODEC if at all possible - that seems more logical than having the CPU
-I2S controller request and manage it if it's a separate clock.  Why add
-this to the CPU side driver?
+[...]
 
-We've not always done this for older systems due to the lack of a usable
-clock API but that's starting to be addressed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141203/a1669c61/attachment.sig>
+> I have test these patches on evb board base on next-20141128 with a
+> defconfig[0], and with u-boot[1].
+> As Doug said, we need below 3 patches for resume.
+>
+> 1.https://patchwork.kernel.org/patch/5051881/  - clocksource:
+>    arch_timer: Allow the device tree to specify uninitialized timer
+>    registers
+>
+> 2.https://patchwork.kernel.org/patch/5363671/  - clocksource:
+>    arch_timer: Fix code to use physical timers when requested
+>
+> 3.https://patchwork.kernel.org/patch/5382141/  - ARM: dts: rk3288: add
+>    arm,cpu-registers-not-fw-configured
+>
+>
+> And it will auto wakeup, as Heiko said in v8.  
+
+OK, with your series plus those 3 patches on top of next-20141128, I'm
+now seeing it auto-wakeup, either with multi_v7_defconfig or Heiko's
+rk3288_defconfig.
+
+> But I have never notice before, since the u-boot never enable edp, and
+> I use the coreboot with edp display.  Actually it is a bug in rk3288,
+> the rk3288 have not 27Mhz clock source, but the edp initially set to
+> this non-existent clock. At this time, edp is working on a unknown
+> state, and it always bring a interrupt, this interrupt avoid system
+> enter suspend. 
+
+I see, good find!
+
+> So if we want to enter suspend normally, the
+> edp_24m_sel(bit 15) of CRU_CLKSEL28_CON(0xff7600d0) must be set to 1.
+
+I didn't try your u-boot fix, but it sounds like there should be a kernel
+fix for this.  Why doesn't the disabling of unused clocks put the EDP
+into a safe/disabled state?
+
+Kevin
