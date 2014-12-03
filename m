@@ -1,124 +1,43 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 3 Dec 2014 22:28:28 +0000 (UTC)
-Subject: OMAP baseline test results for v3.18-rc7 (corrected)
-In-Reply-To: <alpine.DEB.2.02.1412021838410.16734@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1412021838410.16734@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1412032226070.8865@utopia.booyaka.com>
+From: vishnupatekar0510@gmail.com (vishnupatekar)
+Date: Thu,  4 Dec 2014 04:09:21 +0530
+Subject: [PATCH 0/3] ARM:sun7i:ps2 added support for A20 PS/2 host controller
+Message-ID: <1417646361-27610-1-git-send-email-VishnuPatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series adds support for Allwinner's A20 PS2 host controller driver.
+I've done basic testing on A20 Lime 2 Board.
+This needs to be further tested.
 
-Here are some basic OMAP test results for Linux v3.18-rc7.
-Logs and other details at:
+Patch 0 Summary: Allwinner A20 PS2 is dual role controller(PS2 host and PS2 device). These modifications are for PS2 host controller.
+IBM compliant IBM PS2 and AT-compatible keyboard and mouse can be connected.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.18-rc7/20141201203859/
+Patch 1 device tree bindings.
 
+Patch 2 adds support for sun7i ps2 driver. 
 
-Test summary
-------------
+Patch 3 device tree support for PS2 controller.
+ 1) Added ps2 nodes to the dtsi 
+ 2) Added ps2 pinmux to the dtsi 
+ 3) Added ps2 nodes to the lime2 dts file.
 
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
+vishnupatekar (3):
+  dts-binding: input: sun7ips2: Device tree bindings for Allwinner
+    sun7i A20 PS2 host controller
+  drivers:input:ps2 Added sunxi A20 ps2 driver, changed makefile and
+    Kconfig
+  ARM:dts:sun7i:ps2 added nodes for Sun7i A20 PS2 controller.     
+    added ps2 nodes in lime2 board dts.
 
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-som,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
+ .../bindings/input/allwinner,sun7i-a20-ps2.txt     |   22 ++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts    |   10 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |   30 +-
+ drivers/input/serio/Kconfig                        |    9 +
+ drivers/input/serio/Makefile                       |    1 +
+ drivers/input/serio/sunxi-ps2.c                    |  305 ++++++++++++++++++++
+ 6 files changed, 376 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/input/allwinner,sun7i-a20-ps2.txt
+ create mode 100644 drivers/input/serio/sunxi-ps2.c
 
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 1/17): 2430sdp
-    skip ( 2/17): 5912osk, 3517evm
-    Pass (14/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
-		  5430es2sbct54, 2420n800
-
-PM: chip retention via suspend:
-    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
-		  5430es2uevm, 5430es2sbct54
-    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 7/12): am335xbonelt, 4430es2panda, 4460pandaes,
-		  4460varsomom, 2430sdp, 5430es2uevm, 5430es2sbct54
-    Pass ( 5/12): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
-		  3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
-
-
-vmlinux object size
-(delta in bytes from test_v3.18-rc6 (5d01410fe4d92081f349b013a2e7a95429e4f2c9)):
-   text     data      bss    total  kernel
-   +100     +336        0     +436  omap1_defconfig
-   -956     +336        0     -620  omap1_defconfig_1510innovator_only
-   -892     +328        0     -564  omap1_defconfig_5912osk_only
-   -303     +456        0     +153  multi_v7_defconfig
-    -59     +744        0     +685  omap2plus_defconfig
-   -863     +488        0     -375  omap2plus_defconfig_2430sdp_only
-  -4095     +736        0    -3359  omap2plus_defconfig_am33xx_only
-     +5     +744        0     +749  omap2plus_defconfig_am43xx_only
-    -59     +776        0     +717  omap2plus_defconfig_cpupm
-     +5     +736        0     +741  omap2plus_defconfig_dra7xx_only
-   -255     +488        0     +233  omap2plus_defconfig_n800_multi_omap2xxx
-   -287     +456        0     +169  omap2plus_defconfig_n800_only_a
-   +145     +768        0     +913  omap2plus_defconfig_no_pm
-     +5     +776        0     +781  omap2plus_defconfig_omap2_4_only
-     +1     +744        0     +745  omap2plus_defconfig_omap3_4_only
-    -59     +712        0     +653  omap2plus_defconfig_omap5_only
-   -172     +264      +64     +156  rmk_omap3430_ldp_allnoconfig
-    +21     +456        0     +477  rmk_omap3430_ldp_oldconfig
-   -124     +292      +48     +216  rmk_omap4430_sdp_allnoconfig
-  -4007     +648        0    -3359  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.18-rc6 (5d01410fe4d92081f349b013a2e7a95429e4f2c9))
-  avail  rsrvd   high  freed  board          kconfig
-    -4k     4k      .      .  2430sdp        omap2plus_defconfig
-    -4k     4k      .      .  3730beaglexm   omap2plus_defconfig
-    -4k     4k      .      .  3730es12beaglexmomap2plus_defconfig
-     8k    -8k      .    -4k  am335xbone     omap2plus_defconfig_am33xx_only
-
-
-The original test report omitted the successful boot test summary 
-report for CM-T3517.
+-- 
+1.7.9.5
