@@ -1,56 +1,28 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 3 Dec 2014 15:23:12 +0100
-Subject: [PATCH] mmc: atmel-mci: use SET_RUNTIME_PM_OPS() macro
-In-Reply-To: <1417614194-28409-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1417614194-28409-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <CAPDyKFp8mgT3T=OnPJHjAKo662yzoVDc6PgeaNHo_qKaOYRJBA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Dec 2014 15:30:32 +0100
+Subject: [PATCH 00/16] irqchip: gic: killing gic_arch_extn, slowly
+In-Reply-To: <1417539497-20101-1-git-send-email-marc.zyngier@arm.com>
+References: <1417539497-20101-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <2236572.MdjJGoEARl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Rafael
+On Tuesday 02 December 2014 16:58:01 Marc Zyngier wrote:
+> 
+> - This actively *breaks* existing setups. Once you boot a new kernel
+>   with an old DT, suspend/resume *will* be broken. Old kernels on a
+>   new DT won't even boot! You've been warned. This really outline the
+>   necessity of actually describing the HW in device trees...
 
-On 3 December 2014 at 14:43, Ludovic Desroches
-<ludovic.desroches@atmel.com> wrote:
-> Use SET_RUNTIME_PM_OPS() since SET_PM_RUNTIME_PM_OPS() has been dropped.
->
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->
-> Hi Ulf,
->
-> Can you take this patch which fixes a compilation error that has appeared only
-> on next-20141203.
+I wonder if we should take this as the trigger to come up with a
+better way of handling incompatible binding changes. The machine_desc
+has a .dt_fixup callback that we could use to modify the DT passed
+from a boot loader and warn about it, but no platform does this
+at the moment.
 
-I would prefer if the fix could be done through Rafael's tree, since
-it's a commit from there that causes the build error.
+>From what I can tell, the required change to get an old dtb working
+with a new kernel is to add a particular node and flip a few
+interrupt-parent properties, which seems doable as a quirk if
+people agree that it's a good idea.
 
-I have already shared an immutable branch containing the mmc commit,
-which is in conflict with the change in Rafael's linux-pm tree.
-
-Kind regards
-Uffe
-
->
-> Thanks
->
-> Regards
->
->  drivers/mmc/host/atmel-mci.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index 62aba9a..03d7c75 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -2561,7 +2561,7 @@ static int atmci_runtime_resume(struct device *dev)
->  static const struct dev_pm_ops atmci_dev_pm_ops = {
->         SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
->                                 pm_runtime_force_resume)
-> -       SET_PM_RUNTIME_PM_OPS(atmci_runtime_suspend, atmci_runtime_resume, NULL)
-> +       SET_RUNTIME_PM_OPS(atmci_runtime_suspend, atmci_runtime_resume, NULL)
->  };
->
->  static struct platform_driver atmci_driver = {
-> --
-> 2.0.3
->
+	Arnd
