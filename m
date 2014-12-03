@@ -1,40 +1,145 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Dec 2014 11:43:24 +0100
-Subject: [PATCH v4 1/2] soc: samsung: add exynos chipid driver support
-In-Reply-To: <1417594658-2931-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1417594658-2931-1-git-send-email-pankaj.dubey@samsung.com>
- <1417594658-2931-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <19026872.NZqUJn3Abb@wuerfel>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 3 Dec 2014 11:45:10 +0100
+Subject: [PATCH] KVM: arm/arm64: vgic: add init entry to VGIC KVM device
+In-Reply-To: <1417541251-20761-1-git-send-email-eric.auger@linaro.org>
+References: <1417541251-20761-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <20141203104510.GE17502@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Exynos SoCs have Chipid, for identification of product IDs
-> and SoC revisions. This patch intendes to provide initialization
-> code for all these functionalites, at the same time it provides some
-> sysfs entries for accessing these information to userspace.
+On Tue, Dec 02, 2014 at 06:27:31PM +0100, Eric Auger wrote:
+> Since the advent of dynamic initialization of VGIC, this latter is
+> initialized very late, on the first vcpu run. This initialization
+> could be initiated much earlier by the user, as soon as it has
+> provided the requested dimensioning parameters:
+> - number of IRQs and number of vCPUs,
+> - DIST and CPU interface base address.
 > 
-> This driver usese existing binding for exnos-chipid.
+> One motivation behind being able to initialize the VGIC sooner is
+> related to the setup of IRQ injection in VFIO use case. The VFIO
+> signaling, especially when used along with irqfd must be set *after*
+> vgic initialization to prevent any virtual IRQ injection before
+> VGIC initialization. If virtual IRQ injection occurs before the VGIC
+> init, the IRQ cannot be injected and subsequent injection is blocked
+> due to VFIO completion mechanism (unmask/mask or forward/unforward).
+> 
+> This patch adds a new entry to the VGIC KVM device that allows
+> the user to manually request the VGIC init:
+> - a new KVM_DEV_ARM_VGIC_GRP_CTRL group is introduced.
+> - Its first attribute is KVM_DEV_ARM_VGIC_CTRL_INIT
+> 
+> The rationale behind introducing a group is to be able to add other
+> controls later on, if needed.
+> 
+> Obviously, as soon as the init is done, the dimensioning parameters
+> cannot be changed.
 
-Nice!
+you would need to add a check in the vcpu_create path, which I don't
+believe we currently have.  That may conflict with Andre's series so we
+need to coordinate.
 
-On Wednesday 03 December 2014 13:47:37 Pankaj Dubey wrote:
+We're also seeing this potentially being useful for migration, so my
+feeling is that the GICv3 patches should be rebased on this patch and
+this patch should include a check in the vcpu create path.
 
-> +       soc_dev_attr->soc_id = exynos_product_id_to_name(soc_product_id);
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> ---
+>  Documentation/virtual/kvm/devices/arm-vgic.txt | 11 +++++++++++
+>  arch/arm/include/uapi/asm/kvm.h                |  2 ++
+>  arch/arm64/include/uapi/asm/kvm.h              |  2 ++
+>  virt/kvm/arm/vgic.c                            | 14 +++++++++++++-
+>  4 files changed, 28 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> index df8b0c7..80db43f 100644
+> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
+> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> @@ -81,3 +81,14 @@ Groups:
+>      -EINVAL: Value set is out of the expected range
+>      -EBUSY: Value has already be set, or GIC has already been initialized
+>              with default values.
 > +
-> +       soc_dev = soc_device_register(soc_dev_attr);
-> +       if (IS_ERR(soc_dev))
-> +               goto free_rev;
-> +
-> +       device_create_file(soc_device_to_device(soc_dev), &exynos_product_attr);
-> +       device_create_file(soc_device_to_device(soc_dev),
-> +                               &exynos_main_rev_attr);
-> +       device_create_file(soc_device_to_device(soc_dev), &exynos_sub_rev_attr);
-> +
+> +  KVM_DEV_ARM_VGIC_GRP_CTRL
+> +  Attributes:
+> +    KVM_DEV_ARM_VGIC_CTRL_INIT
+> +      request the initialization of the VGIC, no additional parameter in
+> +      kvm_device_attr.addr.
+> +  Errors:
+> +    -ENXIO: distributor or CPU interface base address were not set prior
+> +            to that call
 
-I don't like the idea of having three extra nonstandard properties here,
-especially when you are not using the machine field for anything useful.
+this should be more generic to also apply to GICv3, I would suggest:
 
-Also, all three of these just come from the same register, why expose
-them all as the machine and revision standard properties.
+"VGIC not properly configured as required prior to calling this
+attribute."
 
-	Arnd
+alternatively, the attribute should be KVM_DEV_ARM_VGIC_V2_CTRL_INIT.
+
+> +    -EINVAL: number of vcpus is not known
+
+can we have a different error code for this case?  ENODEV for example?
+
+> +    -ENOMEM: memory shortage when allocating vgic internal data
+
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index 77547bb..2499867 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -175,6 +175,8 @@ struct kvm_arch_memory_slot {
+>  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
+>  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
+>  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
+> +#define KVM_DEV_ARM_VGIC_GRP_CTRL       4
+> +#define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
+>  
+>  /* KVM_IRQ_LINE irq field index values */
+>  #define KVM_ARM_IRQ_TYPE_SHIFT		24
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 1ed4417..b35c95a 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -161,6 +161,8 @@ struct kvm_arch_memory_slot {
+>  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
+>  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
+>  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
+> +#define KVM_DEV_ARM_VGIC_GRP_CTRL	4
+> +#define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
+>  
+>  /* KVM_IRQ_LINE irq field index values */
+>  #define KVM_ARM_IRQ_TYPE_SHIFT		24
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index b76c38c..2fe5bdb 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -2474,7 +2474,14 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+>  
+>  		return ret;
+>  	}
+> -
+> +	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
+> +		switch (attr->attr) {
+> +		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+> +			r = kvm_vgic_init(dev->kvm);
+> +			return r;
+> +		}
+> +		break;
+> +	}
+>  	}
+>  
+>  	return -ENXIO;
+> @@ -2553,6 +2560,11 @@ static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+>  		return vgic_has_attr_regs(vgic_cpu_ranges, offset);
+>  	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+>  		return 0;
+> +	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+> +		switch (attr->attr) {
+> +		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+> +			return 0;
+> +		}
+>  	}
+>  	return -ENXIO;
+>  }
+> -- 
+> 1.9.1
+> 
