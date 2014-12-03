@@ -1,150 +1,34 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed,  3 Dec 2014 22:18:42 +0100
-Subject: [PATCH v2 6/6] arm/arm64: KVM: Introduce stage2_unmap_vm
-In-Reply-To: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
-References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1417641522-29056-7-git-send-email-christoffer.dall@linaro.org>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Wed, 03 Dec 2014 21:36:11 +0100
+Subject: [PATCH] ARM: dts: Add dts file for odroid XU3 board
+In-Reply-To: <7hzjb4y0gp.fsf@deeprootsystems.com>
+References: <1417438770-28696-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <7hzjb4y0gp.fsf@deeprootsystems.com>
+Message-ID: <1417638971.21830.42.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new function to unmap user RAM regions in the stage2 page
-tables.  This is needed on reboot (or when the guest turns off the MMU)
-to ensure we fault in pages again and make the dcache, RAM, and icache
-coherent.
+On Wed, 2014-12-03 at 11:53 -0800, Kevin Hilman wrote:
+> Sjoerd Simons <sjoerd.simons@collabora.co.uk> writes:
+> Tried this on top of linux-next (next-20141125 and next20141203) and
+> boots fine on my odroid-xu3. 
+> 
+> Thanks for doing this, I've been meaning to get a DTS upstream for this
+> platform myself.  I also noticed that the imprecise aborts I've been
+> seeing when booting this board with the smdk5420 DTS are gone, so I
+> don't have to dig into those now either.  Thanks!  :)
 
-Using unmap_stage2_range for the whole guest physical range does not
-work, because that unmaps IO regions (such as the GIC) which will not be
-recreated or in the best case faulted in on a page-by-page basis.
+For completeness, the problem with running the smdk5420 DTS on the XU3
+is that the XU3 runs secure firmware while the SMD5420 doesn't.. Hence
+the imprecise aborts you were seeing.
 
-Call this function on secondary and subsequent calls to the
-KVM_ARM_VCPU_INIT ioctl so that a reset VCPU will detect the guest
-Stage-1 MMU is off when faulting in pages and make the caches coherent.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/include/asm/kvm_mmu.h   |  1 +
- arch/arm/kvm/arm.c               |  7 +++++
- arch/arm/kvm/mmu.c               | 65 ++++++++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/kvm_mmu.h |  1 +
- 4 files changed, 74 insertions(+)
-
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index acb0d57..4654c42 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -52,6 +52,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
- void free_boot_hyp_pgd(void);
- void free_hyp_pgds(void);
- 
-+void stage2_unmap_vm(struct kvm *kvm);
- int kvm_alloc_stage2_pgd(struct kvm *kvm);
- void kvm_free_stage2_pgd(struct kvm *kvm);
- int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 4043769..da87c07 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -701,6 +701,13 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
- 	if (ret)
- 		return ret;
- 
-+	/*
-+	 * Ensure a rebooted VM will fault in RAM pages and detect if the
-+	 * guest MMU is turned off and flush the caches as needed.
-+	 */
-+	if (vcpu->arch.has_run_once)
-+		stage2_unmap_vm(vcpu->kvm);
-+
- 	vcpu_reset_hcr(vcpu);
- 
- 	/*
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 57a403a..b1f3c9a 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -611,6 +611,71 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
- 	unmap_range(kvm, kvm->arch.pgd, start, size);
- }
- 
-+static void stage2_unmap_memslot(struct kvm *kvm,
-+				 struct kvm_memory_slot *memslot)
-+{
-+	hva_t hva = memslot->userspace_addr;
-+	phys_addr_t addr = memslot->base_gfn << PAGE_SHIFT;
-+	phys_addr_t size = PAGE_SIZE * memslot->npages;
-+	hva_t reg_end = hva + size;
-+
-+	/*
-+	 * A memory region could potentially cover multiple VMAs, and any holes
-+	 * between them, so iterate over all of them to find out if we should
-+	 * unmap any of them.
-+	 *
-+	 *     +--------------------------------------------+
-+	 * +---------------+----------------+   +----------------+
-+	 * |   : VMA 1     |      VMA 2     |   |    VMA 3  :    |
-+	 * +---------------+----------------+   +----------------+
-+	 *     |               memory region                |
-+	 *     +--------------------------------------------+
-+	 */
-+	do {
-+		struct vm_area_struct *vma = find_vma(current->mm, hva);
-+		hva_t vm_start, vm_end;
-+
-+		if (!vma || vma->vm_start >= reg_end)
-+			break;
-+
-+		/*
-+		 * Take the intersection of this VMA with the memory region
-+		 */
-+		vm_start = max(hva, vma->vm_start);
-+		vm_end = min(reg_end, vma->vm_end);
-+
-+		if (!(vma->vm_flags & VM_PFNMAP)) {
-+			gpa_t gpa = addr + (vm_start - memslot->userspace_addr);
-+			unmap_stage2_range(kvm, gpa, vm_end - vm_start);
-+		}
-+		hva = vm_end;
-+	} while (hva < reg_end);
-+}
-+
-+/**
-+ * stage2_unmap_vm - Unmap Stage-2 RAM mappings
-+ * @kvm: The struct kvm pointer
-+ *
-+ * Go through the memregions and unmap any reguler RAM
-+ * backing memory already mapped to the VM.
-+ */
-+void stage2_unmap_vm(struct kvm *kvm)
-+{
-+	struct kvm_memslots *slots;
-+	struct kvm_memory_slot *memslot;
-+	int idx;
-+
-+	idx = srcu_read_lock(&kvm->srcu);
-+	spin_lock(&kvm->mmu_lock);
-+
-+	slots = kvm_memslots(kvm);
-+	kvm_for_each_memslot(memslot, slots)
-+		stage2_unmap_memslot(kvm, memslot);
-+
-+	spin_unlock(&kvm->mmu_lock);
-+	srcu_read_unlock(&kvm->srcu, idx);
-+}
-+
- /**
-  * kvm_free_stage2_pgd - free all stage-2 tables
-  * @kvm:	The KVM struct pointer for the VM.
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 0caf7a5..061fed7 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -83,6 +83,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
- void free_boot_hyp_pgd(void);
- void free_hyp_pgds(void);
- 
-+void stage2_unmap_vm(struct kvm *kvm);
- int kvm_alloc_stage2_pgd(struct kvm *kvm);
- void kvm_free_stage2_pgd(struct kvm *kvm);
- int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
 -- 
-2.1.2.330.g565301e.dirty
+Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Collabora Ltd.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6170 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141203/311ef32f/attachment.bin>
