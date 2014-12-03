@@ -1,34 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Dec 2014 18:06:08 +0100
-Subject: Creating 16 MB super-sections for MMIO
-In-Reply-To: <547F1C11.5090408@free.fr>
-References: <547D97A5.4090302@free.fr>
- <20141203103211.GB7373@e104818-lin.cambridge.arm.com>
- <547F1C11.5090408@free.fr>
-Message-ID: <2452742.elcJohDinR@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 3 Dec 2014 18:06:34 +0100
+Subject: [PATCH v3 1/3] ARM: at91: Add Special Function Registers binding
+ documentation
+In-Reply-To: <1417197962-19441-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1417197962-19441-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <547F431A.5040804@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 December 2014 15:20:01 Mason wrote:
+Le 28/11/2014 19:06, Alexandre Belloni a ?crit :
+> The special function registers gather some registers that allow to tweak
+> features provided by IPs controlled through another register range.
 > 
-> As far as I could tell, Linux does not create a super-section in the
-> case outlined above. Perhaps I misread the source code?
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-I believe you are right, and I also agree that in theory implementing
-what you say (both 64k and 16M mappings) can only help, but it's not
-obvious if this makes a measurable difference in the end.
+I think that you had the Acked-by tag from Boris, hadn't you?
 
-MMIO register accesses are usually slow for other reasons, and
-they tend to be rare, so it's possible that you won't be able
-to ever tell a difference because the MMIO TLB often gets evicted
-by user mappings between accesses to different 1MB sections,
-and the timing difference between a TLB-hot and cold MMIO access
-might not be that great (depending on the latency of a particular
-register).
+> ---
+>  Documentation/devicetree/bindings/arm/atmel-at91.txt | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> index 562cda9d86d9..a6427de45785 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> @@ -136,3 +136,20 @@ Example:
+>  		compatible = "atmel,at91sam9260-rstc";
+>  		reg = <0xfffffd00 0x10>;
+>  	};
+> +
+> +Special Function Registers (SFR)
+> +
+> +Special Function Registers (SFR) manage specific aspects of the integrated
+> +memory, bridge implementations, processor and other functionality not controlled
+> +elsewhere.
+> +
+> +required properties:
+> +- compatible: Should be "atmel,<chip>-sfr", "syscon".
+> +  <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
 
-I don't think there would be any objections to doing superpage
-or supersection mappings for early page tables if you can show
-any benefit whatsoever, but it may be hard to come up with a
-scenario where it's actually measurable.
+Well, in the following patches you are adding "atmel,sama5d3-sfr" and
+"atmel,sama5d4-sfr" so I suspect more chips must be added here...
 
-	Arnd
+> +- reg: Should contain registers location and length
+> +
+> +	sfr at f0038000 {
+> +		compatible = "atmel,sama5d3-sfr", "syscon";
+> +		reg = <0xf0038000 0x4000>;
+> +	};
+> +
+
+Otherwise, it looks okay.
+
+Bye,
+-- 
+Nicolas Ferre
