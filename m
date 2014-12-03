@@ -1,50 +1,29 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 03 Dec 2014 19:49:34 +0900
-Subject: [GIT PULL 4/4] Samsung exynos7 updates for v3.19
-References: <5476CD88.1030406@kernel.org> <201411281335.55663.arnd@arndb.de>
-Message-ID: <020801d00ee6$d3992380$7acb6a80$@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Dec 2014 11:49:50 +0100
+Subject: [PATCH 04/12] irqchip: nvic: support routable irq domain ops
+In-Reply-To: <1417565531-4507-5-git-send-email-stefan@agner.ch>
+References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
+ <1417565531-4507-5-git-send-email-stefan@agner.ch>
+Message-ID: <4576226.8jDcZiCptE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+On Wednesday 03 December 2014 01:12:03 Stefan Agner wrote:
+> +#ifdef CONFIG_ARM_NVIC
+> +extern const struct irq_domain_ops *nvic_routable_irq_domain_ops;
+> +static inline void __init register_routable_domain_ops
+> +                                       (const struct irq_domain_ops *ops)
+> +{
+> +               nvic_routable_irq_domain_ops = ops;
+> +}
+> +#endif /* CONFIG_ARM_NVIC */
 > 
-> Arnd Bergmann wrote:
-> >
-> > On Thursday 27 November 2014, Kukjin Kim wrote:
-> > > Samsung arch/arm64 DT updates for v3.19
-> > >
-> > > - to support ARMv8 based exynos7 SoC
-> > >   : add initial device tree and add pinctrl, PMU, mmc, i2c, rtc,
-> > >     watchdog, and adc nodes for exynos7 SoC and exynos7 based
-> > >     espresso board.
-> > >
-> > > NOTE that this is including following dependencies
-> > > : cleanup/dts-subdirs in arm-soc for arm64 vendor support
-> > > : tags/samsung-driver for samsung serial
-> > > : for-v3.19/exynos-clk in samsung-clk tree for exynos7 clk
-> > >
-> > > One more NOTE, for support exynos7 we need Liviu's "arm64: Create
-> > > link to include/dt-bindings to enable C preprocessor use" in arm-soc
-> > > tree and arm64 defconfig update should be handled directly.
-> >
-> > I'm confused by the dependencies. I don't see a "for-v3.19/exynos-clk"
-> > in arm-soc, you haven't put the clk maintainer on Cc and I see no indication
-> > that he has this in his tree already, so I'm not pulling this until further
-> > clarification.
-> >
-> Hi,
-> 
-> Sorry for insufficient description.
-> 
-> Since the exynos7 stuff requires regarding clk stuff for kernel build, I talked
-> to Mike, Sylwester and Mike suggested pulling the branch into Samsung tree.
-> 
-> http://www.spinics.net/lists/linux-samsung-soc/msg39368.html
-> 
-> If any problems, please let me know.
-> 
-Hi Arnd,
 
-Do you have any concerns on this?
+As you mentioned, this conflicts with the gic specific declaration.
+Why not remove the #ifdef here and rename the function to
+nvic_register_routable_domain_ops() ?
 
-- Kukjin
+If that doesn't work, I guess we need something more generic
+and move the routable_irq_domain_ops to some common location.
+
+	Arnd
