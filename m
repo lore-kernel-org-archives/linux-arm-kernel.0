@@ -1,68 +1,30 @@
-From: xjq@rock-chips.com (Jianqun)
-Date: Wed, 03 Dec 2014 09:03:40 +0800
-Subject: [PATCH 2/2] ASoC: rockchip: i2s: add support for grabbing output
- clock to codec
-In-Reply-To: <CAD=FV=Uwb1NxxCoXHzHu6DJCpnG_HV2RhCr3JaJaXbJja8kd7A@mail.gmail.com>
-References: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>	<1417531977-30094-1-git-send-email-jay.xu@rock-chips.com>
- <CAD=FV=Uwb1NxxCoXHzHu6DJCpnG_HV2RhCr3JaJaXbJja8kd7A@mail.gmail.com>
-Message-ID: <547E616C.1020503@rock-chips.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 03 Dec 2014 03:21:55 +0100
+Subject: [PATCH] Add ability for PXA2xx CPUFreq to be compiled as a module
+ or, not at all
+In-Reply-To: <CAOh2x==+amATsYbASxr8D6z5x3UOxySLY_kNXzDvoSB4_tycAA@mail.gmail.com>
+References: <5472AD1E.8010005@tul.cz>
+ <CAOh2x==+amATsYbASxr8D6z5x3UOxySLY_kNXzDvoSB4_tycAA@mail.gmail.com>
+Message-ID: <1732555.JfkHq48zY8@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug:
+On Tuesday, November 25, 2014 04:35:27 PM Viresh Kumar wrote:
+> On Mon, Nov 24, 2014 at 9:29 AM, Petr Cvek <petr.cvek@tul.cz> wrote:
+> > Add ability for PXA2xx CPUFreq to be compiled as a module or not at all.
+> >
+> > Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+> > ---
+> >  drivers/cpufreq/Kconfig.arm | 8 ++++++++
+> >  drivers/cpufreq/Makefile    | 3 +--
+> >  2 files changed, 9 insertions(+), 2 deletions(-)
+> 
+> Make sure you cc Maintainers to get quick responses.
+> 
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-? 12/03/2014 01:54 AM, Doug Anderson ??:
-> Jianqun,
-> 
-> This ought to be a "v3" patch and ideally ought to describe
-> differences from v2 (after the cut).  Please have Kever or Chris
-> review your next patch before sending it out since I think they are
-> familiar with the process.
-> 
-> 
-> On Tue, Dec 2, 2014 at 6:52 AM, Jianqun Xu <jay.xu@rock-chips.com> wrote:
->> From: Sonny Rao <sonnyrao@chromium.org>
->>
->> We need to claim the clock which is driving the codec so that when we enable
->> clock gating, we continue to clock the codec when needed.  I make this an
->> optional clock since there might be some applications where we don't need it
->> but can still use the I2S block.
->>
->> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> 
-> You still forgot your own signed-off-by.  Please try again.  See
-> <https://patchwork.kernel.org/patch/5334991/>
-ok, I will add my signed-off-by
-> 
-> 
->> +       i2s->oclk = devm_clk_get(&pdev->dev, "i2s_clk_out");
->> +       if (IS_ERR(i2s->oclk)) {
->> +               dev_dbg(&pdev->dev, "Didn't find output clock\n");
->> +               i2s->oclk = NULL;
->> +       }
-> 
-> You still forgot the blank line here requested by Heiko.  Please try
-> again.  See <https://patchwork.kernel.org/patch/5334991/>
-Although I thought there needn't a blank ~, I wll add it next patch
-> 
-> 
->> +       if (i2s->oclk)
->> +               ret = clk_prepare_enable(i2s->oclk);
->> +
-> 
-> 
-> 
+Patch queued up for 3.19-rc1, thanks!
 
 -- 
-Jianqun Xu
-
-****************************************************************************
-*IMPORTANT NOTICE:*This email is from Fuzhou Rockchip Electronics Co.,
-Ltd .The contents of this email and any attachments may contain
-information that is privileged, confidential and/or exempt from
-disclosure under applicable law and relevant NDA. If you are not the
-intended recipient, you are hereby notified that any disclosure,
-copying, distribution, or use of the information is STRICTLY PROHIBITED.
-Please immediately contact the sender as soon as possible and destroy
-the material in its entirety in any format. Thank you.
-****************************************************************************
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
