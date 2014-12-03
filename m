@@ -1,38 +1,46 @@
 From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Wed,  3 Dec 2014 15:18:36 +0800
-Subject: [PATCH v2 0/2] ASoC: rockchip: i2s: driver could output "i2s-clk-out"
- optionally
-In-Reply-To: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
+Date: Wed,  3 Dec 2014 15:18:37 +0800
+Subject: [PATCH v2 1/2] ASoC: dt-bindings: rockchip-i2s: add an optional
+ property "i2s_clk_out"
+In-Reply-To: <1417591118-18695-1-git-send-email-jay.xu@rock-chips.com>
 References: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1417591118-18695-1-git-send-email-jay.xu@rock-chips.com>
+ <1417591118-18695-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1417591118-18695-2-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clock generate unit in rockchip SoCs could generate clock named "i2s-clk-out"
-separate from clock named "i2s-hclk", which is for i2s controller.
+Add an property "i2s_clk_out", which enables to output clock to outside
+of rockchip SoCs. Let's make it optional since not each board needs it.
 
-Since there may not need the "i2s-clk-out" outside, we make it optional in
-driver, that could be decided in dts by add "i2s-clk-out" or not.
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+---
+ Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Tested on devices based on rk3288 with max98090 codec.
-
-Jianqun Xu (1):
-  ASoC: dt-bindings: rockchip-i2s: add an optional property
-    "i2s_clk_out"
-
-Sonny Rao (1):
-  ASoC: rockchip: i2s: add support for grabbing output clock to codec
-
- Documentation/devicetree/bindings/sound/rockchip-i2s.txt |  8 ++++++--
- sound/soc/rockchip/rockchip_i2s.c                        | 13 +++++++++++++
- 2 files changed, 19 insertions(+), 2 deletions(-)
-
---
-changes since v1:
-- rework with patches commit message, reference to old commit message of the
-same related files.
-- generate patch again by apply sonny's patch
-- fix blank line in driver, suggested by Heiko and Doug, so add my owner
-singed-off-by
-
+diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+index 9b82c20..c8f5ac0 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+@@ -22,6 +22,10 @@ Required properties:
+    - "i2s_hclk": clock for I2S BUS
+    - "i2s_clk" : clock for I2S controller
+ 
++Optional property:
++- "i2s_clk_out" : clock output to outside of chip, usally as master clock for audio
++	codec chip
++
+ Example for rk3288 I2S controller:
+ 
+ i2s at ff890000 {
+@@ -32,6 +36,6 @@ i2s at ff890000 {
+ 	#size-cells = <0>;
+ 	dmas = <&pdma1 0>, <&pdma1 1>;
+ 	dma-names = "tx", "rx";
+-	clock-names = "i2s_hclk", "i2s_clk";
+-	clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
++	clock-names = "i2s_hclk", "i2s_clk", "i2s_clk_out";
++	clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>, <&cru SCLK_I2S0_CLKOUT>;
+ };
+-- 
 1.9.1
