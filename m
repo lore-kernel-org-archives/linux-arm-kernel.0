@@ -1,55 +1,41 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Wed, 03 Dec 2014 09:15:52 +0100
-Subject: [PATCH] ARM: DaVinci: Deletion of an unnecessary check before the
- function call "__clk_disable"
-In-Reply-To: <5317A59D.4@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net>
-Message-ID: <547EC6B8.6000001@users.sourceforge.net>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 3 Dec 2014 09:22:05 +0100
+Subject: [PATCH v4 0/4] mmc: atmel-mci: cleanup and probe deferring
+In-Reply-To: <CAPDyKFpuDOfw9BtYJhG0Fz6PsqUQP=gBg+4mWt9MRy_S6Yga5w@mail.gmail.com>
+References: <1417444509-15501-1-git-send-email-ludovic.desroches@atmel.com>
+ <CAPDyKFpuDOfw9BtYJhG0Fz6PsqUQP=gBg+4mWt9MRy_S6Yga5w@mail.gmail.com>
+Message-ID: <20141203082205.GW2714@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Wed, 3 Dec 2014 09:01:33 +0100
+On Tue, Dec 02, 2014 at 11:10:53AM +0100, Ulf Hansson wrote:
+> On 1 December 2014 at 15:35, Ludovic Desroches
+> <ludovic.desroches@atmel.com> wrote:
+> > Hi Ulf,
+> >
+> > Same as previous series, based on your next branch, and no errors with
+> > checkpatch so let me know if you still have troubles to apply my patches.
+> >
+> > Changes from v3:
+> > - keep __init/__exit attributes for atmci_init/exit
+> > - remove useless variable in atmci_configure_dma function
+> >
+> > Ludovic Desroches (4):
+> >   mmc: atmel-mci: remove useless DMA stuff for non-dt devices
+> >   mmc: atmel-mci: remove __init/__exit attributes
+> >   mmc: atmel-mci: stop using specific initcall
+> >   mmc: atmel-mci: use probe deferring if dma controller is not ready yet
+> >
+> >  drivers/mmc/host/atmel-mci.c | 76 ++++++++++++++++----------------------------
+> >  1 file changed, 28 insertions(+), 48 deletions(-)
+> 
+> Thanks! Applied for next.
+> 
+> Patch 4, did have a minor checkpatch warning. I fixed it.
 
-The __clk_disable() function tests whether its argument is NULL and then
-returns immediately. Thus the test around the call is not needed.
+Thanks, yes I see it but I feel it is a bit too constraining when you already
+have a function name doing 32 characters :p
 
-This issue was detected by using the Coccinelle software.
-
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- arch/arm/mach-davinci/clock.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
-index c70bb0a..8f2c2d8 100644
---- a/arch/arm/mach-davinci/clock.c
-+++ b/arch/arm/mach-davinci/clock.c
-@@ -55,8 +55,7 @@ static void __clk_disable(struct clk *clk)
- 		else if (clk->clk_disable)
- 			clk->clk_disable(clk);
- 	}
--	if (clk->parent)
--		__clk_disable(clk->parent);
-+	__clk_disable(clk->parent);
- }
- 
- int davinci_clk_reset(struct clk *clk, bool reset)
--- 
-2.1.3
+> 
+> Kind regards
+> Uffe
