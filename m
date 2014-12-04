@@ -1,44 +1,24 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 4 Dec 2014 13:53:52 +0100
-Subject: [PATCH 1/4] ARM: shmobile: R-Mobile: Add SYSC restart handler
-In-Reply-To: <CAMuHMdWeFceyn3_TkgsuwakK9UOVUszBFqEv-uRqRC+2a=5XGA@mail.gmail.com>
-References: <1417616227-6715-1-git-send-email-geert+renesas@glider.be>
- <1417616227-6715-2-git-send-email-geert+renesas@glider.be>
- <3671800.E1ZjeAe67g@wuerfel>
- <CAMuHMdWeFceyn3_TkgsuwakK9UOVUszBFqEv-uRqRC+2a=5XGA@mail.gmail.com>
-Message-ID: <CAMuHMdXqY79KkrmEvnG4qqDaw5x8raxRs2eKBM6E-+DyZwFt-A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Dec 2014 13:58:52 +0100
+Subject: [PATCH 0/7] ARM: hisi: enable HiP01 SoC
+In-Reply-To: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
+References: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
+Message-ID: <3601066.g7Jvjk5UFL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Friday 28 November 2014 02:15:43 Wang Long wrote:
+> This series patch enable Hisilicon HiP01 SoC. The HiP01 SoC series
+> chip is designed for networking product, it integrates a rich peripheral
+> interfaces to support network applications and supports both one 
+> core or dual cores and quad cores. The core is Cortex A9. 
 
-On Thu, Dec 4, 2014 at 12:47 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
->> This clearly looks much better than the previous implementation, so that
->> is great. If you can decouple it from the rest of this file, either through
->> syscon or by asserting that sysc_base2 is not going to be needed for
->> anything else, how about moving the new code to a standalon driver in
->> drivers/power/reset?
->
-> Yes, sysc_base2 is used for reset control only (I don't think we need to read
-> the mode strap pins).
->
-> So unless there's a simple solution to the regmap problem, I think moving
-> this driver part to  drivers/power/reset is the most viable option.
+Sorry for the delay in my reply. The patches look good to me, but I'm
+not sure what you expect to happen to them. You have a number of
+people listed as recipients, but it's not clear if you expect any of
+us to apply them into a git tree.
 
-There's another reasone for having a separate driver: if both the SH core and
-the ARM core are in use, the second register bank can only be accessed after
-acquiring the HPB (Peripheral Bus Bridge) semaphore.
-While we don't actively support running anything on the SH core, we don't
-want to prevent users from doing that.
+Is Xu Wei going to pick these up in a git tree and send a pull request
+to arm at kernel.org?
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
