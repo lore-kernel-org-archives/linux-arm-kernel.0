@@ -1,50 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 10:12:24 +0100
-Subject: [PATCH v4 1/2] soc: samsung: add exynos chipid driver support
-In-Reply-To: <547FEA74.1010900@samsung.com>
-References: <1417594658-2931-1-git-send-email-pankaj.dubey@samsung.com>
- <19026872.NZqUJn3Abb@wuerfel> <547FEA74.1010900@samsung.com>
-Message-ID: <4074205.TGQpWxTihh@wuerfel>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Thu, 4 Dec 2014 10:12:40 +0100
+Subject: [PATCH 4/5] ARM: BCM5301X: Add DT for Asus RT-N18U
+In-Reply-To: <CACna6rzNTd6dudWqbACsf+oZWacjUcFDAuzDZth=_WN1uBdccg@mail.gmail.com>
+References: <1417368513-13808-1-git-send-email-zajec5@gmail.com>
+ <1417368513-13808-4-git-send-email-zajec5@gmail.com>
+ <547E48F0.6010600@hauke-m.de>
+ <CACna6rzNTd6dudWqbACsf+oZWacjUcFDAuzDZth=_WN1uBdccg@mail.gmail.com>
+Message-ID: <CACna6ryLtc4nCO8rxDgBLG37VdHyy0pcHky+c11dQHfxsG+FpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 December 2014 10:30:36 Pankaj Dubey wrote:
-> >
-> > On Wednesday 03 December 2014 13:47:37 Pankaj Dubey wrote:
-> >
-> >> +       soc_dev_attr->soc_id = exynos_product_id_to_name(soc_product_id);
-> >> +
-> >> +       soc_dev = soc_device_register(soc_dev_attr);
-> >> +       if (IS_ERR(soc_dev))
-> >> +               goto free_rev;
-> >> +
-> >> +       device_create_file(soc_device_to_device(soc_dev), &exynos_product_attr);
-> >> +       device_create_file(soc_device_to_device(soc_dev),
-> >> +                               &exynos_main_rev_attr);
-> >> +       device_create_file(soc_device_to_device(soc_dev), &exynos_sub_rev_attr);
-> >> +
-> >
-> > I don't like the idea of having three extra nonstandard properties here,
-> > especially when you are not using the machine field for anything useful.
-> >
-> 
-> I did not get you here. Any suggestions how we can use 'machine' field 
-> more useful way.
+On 3 December 2014 at 06:40, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+> On 3 December 2014 at 00:19, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+>> On 11/30/2014 06:28 PM, Rafa? Mi?ecki wrote:
+>>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+>>> ---
+>>>  arch/arm/boot/dts/Makefile                  |  3 +-
+>>>  arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts | 78 +++++++++++++++++++++++++++++
+>>>  arch/arm/boot/dts/bcm47081.dtsi             | 26 ++++++++++
+>>>  arch/arm/mach-bcm/bcm_5301x.c               |  1 +
+>>>  4 files changed, 107 insertions(+), 1 deletion(-)
+>>>  create mode 100644 arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+>>>  create mode 100644 arch/arm/boot/dts/bcm47081.dtsi
+>>>
+>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>> index 18a21d9..db51a31 100644
+>>> --- a/arch/arm/boot/dts/Makefile
+>>> +++ b/arch/arm/boot/dts/Makefile
+>>> @@ -58,7 +58,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b-plus.dtb
+>>>  dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>>>       bcm4708-buffalo-wzr-1750dhp.dtb \
+>>>       bcm4708-netgear-r6250.dtb \
+>>> -     bcm4708-netgear-r6300-v2.dtb
+>>> +     bcm4708-netgear-r6300-v2.dtb \
+>>> +     bcm47081-asus-rt-n18u.dtb
+>>>  dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
+>>>  dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
+>>>       bcm911360k.dtb \
+>>> diff --git a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+>>> new file mode 100644
+>>> index 0000000..c40ad39
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+>>> @@ -0,0 +1,78 @@
+>>> +/*
+>>> + * Broadcom BCM470X / BCM5301X ARM platform code.
+>>> + * DTS for Asus RT-N18U
+>>> + *
+>>> + * Copyright ? 2014 Rafa? Mi?ecki <zajec5@gmail.com>
+>>> + *
+>>> + * Licensed under the GNU/GPL. See COPYING for details.
+>>> + */
+>>> +
+>>> +/dts-v1/;
+>>> +
+>>> +#include "bcm47081.dtsi"
+>>> +
+>>> +/ {
+>>> +     compatible = "asus,rt-n18u", "brcm,bcm47081";
+>>
+>> Instead of adding bcm47081 to the core code you can do this:
+>>
+>> compatible = "asus,rt-n18u", "brcm,bcm47081", "brcm,bcm4708";
+>>
+>> If we later need some special handling for bcm47081 we can add this but
+>> the old dts file will still work. This is more relevant if the dts file
+>> is in the boot loader.
+>
+> I don't get it. How should I detect there is no second CPU?
 
-For instance you could pass the exynos_product_id_to_name() result to
-the machine field instead of the soc_id field, and use the soc_id
-for a more fine-grained distinction.
+Aaaah, you meant not adding *core code*, not the DTS file. I didn't
+notice that in the first place. Now it's clear, thanks!
 
-> > Also, all three of these just come from the same register, why expose
-> > them all as the machine and revision standard properties.
-> >
-> 
-> Agreed. These properties are basically giving same information but with 
-> small modification.
-> As you said these are getting exposed via standard properties as well, 
-> so I have no issue to drop them. Just waiting for more review from 
-> Samsung folks, will take care of this in next version.
-
-Ok.
-
-	Arnd
+-- 
+Rafa?
