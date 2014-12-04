@@ -1,54 +1,71 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 04 Dec 2014 13:30:41 +0100
-Subject: [PATCH] ARM: EXYNOS: Add missing static to file-scope declarations
-Message-ID: <1417696241-26726-1-git-send-email-k.kozlowski@samsung.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Thu, 4 Dec 2014 14:28:13 +0200
+Subject: [RFC V2] mm:add zero_page _mapcount when mapped into user space
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103E688B313E6@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103E688B313E0@CNBJMBX05.corpusers.net>
+ <20141202113014.GA22683@node.dhcp.inet.fi>
+ <35FD53F367049845BC99AC72306C23D103E688B313E6@CNBJMBX05.corpusers.net>
+Message-ID: <20141204122813.GA523@node.dhcp.inet.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'pm_data', 'exynos_release_ret_regs' and
-'exynos5420_release_ret_regs' are not exported nor used outside of
-suspend.c file. Make them static.
+On Thu, Dec 04, 2014 at 02:10:53PM +0800, Wang, Yalin wrote:
+> > -----Original Message-----
+> > From: Kirill A. Shutemov [mailto:kirill at shutemov.name]
+> > Sent: Tuesday, December 02, 2014 7:30 PM
+> > To: Wang, Yalin
+> > Cc: 'linux-kernel at vger.kernel.org'; 'linux-mm at kvack.org'; 'linux-arm-
+> > kernel at lists.infradead.org'
+> > Subject: Re: [RFC V2] mm:add zero_page _mapcount when mapped into user
+> > space
+> > 
+> > On Tue, Dec 02, 2014 at 05:27:36PM +0800, Wang, Yalin wrote:
+> > > This patch add/dec zero_page's _mapcount to make sure the mapcount is
+> > > correct for zero_page, so that when read from /proc/kpagecount,
+> > > zero_page's mapcount is also correct, userspace process like procrank
+> > > can calculate PSS correctly.
+> > 
+> > I don't have specific code path to point to, but I would expect zero page
+> > with non-zero mapcount would cause a problem with rmap.
+> > 
+> > How do you test the change?
+> > 
+> I just test it to see the mapcount from /proc/pid/pagemap  and /proc/kpagecount ,
+> It works well,
 
-This fixes following sparse warnings:
-arch/arm/mach-exynos/suspend.c:83:23: warning: symbol 'pm_data' was not declared. Should it be static?
-arch/arm/mach-exynos/suspend.c:106:14: warning: symbol 'exynos_release_ret_regs' was not declared. Should it be static?
-arch/arm/mach-exynos/suspend.c:117:14: warning: symbol 'exynos5420_release_ret_regs' was not declared. Should it be static?
+I took a closer look and your patch is broken in multiple places:
+ - on zap_pte_range() you don't decrement mapcount;
+ - you don't update rss counters for mm;
+ - copy_one_pte() doesn't increase mapcount;
+ - ...
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/mach-exynos/suspend.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Basically, each and every vm_normal_page() call must be audited. As first
+step. And you totally skip huge zero page.
 
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index f8e7dcd17055..6131c16a4a5d 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -80,7 +80,7 @@ struct exynos_pm_data {
- 	int (*cpu_suspend)(unsigned long);
- };
- 
--struct exynos_pm_data *pm_data;
-+static struct exynos_pm_data *pm_data;
- 
- static int exynos5420_cpu_state;
- static unsigned int exynos_pmu_spare3;
-@@ -103,7 +103,7 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
- 	{ /* sentinel */ },
- };
- 
--unsigned int exynos_release_ret_regs[] = {
-+static unsigned int exynos_release_ret_regs[] = {
- 	S5P_PAD_RET_MAUDIO_OPTION,
- 	S5P_PAD_RET_GPIO_OPTION,
- 	S5P_PAD_RET_UART_OPTION,
-@@ -114,7 +114,7 @@ unsigned int exynos_release_ret_regs[] = {
- 	REG_TABLE_END,
- };
- 
--unsigned int exynos5420_release_ret_regs[] = {
-+static unsigned int exynos5420_release_ret_regs[] = {
- 	EXYNOS_PAD_RET_DRAM_OPTION,
- 	EXYNOS_PAD_RET_MAUDIO_OPTION,
- 	EXYNOS_PAD_RET_JTAG_OPTION,
+Proper mapcount handling for zero page would require a lot more work and I
+don't think it worth it. Gain is too small.
+
+NAK.
+
+> The problem is that when I see /proc/pid/smaps ,
+> The Rss / Pss don't calculate zero_page map,
+> Because smaps_pte_entry() --> vm_normal_page( ),
+> Will return NULL for zero_page,
+> 
+> But when userspace process cat /proc/pid/pagemap  ,
+> It will see zero_page mapped,
+> And will treat as Rss ,  
+> This is weird, should we also omit zero_page in /proc/pid/pagemap ?
+> Or add zero_page as Rss in /proc/pid/smaps ? 
+> 
+> I think we should add zero_page into Rss ,
+> Because it is really mapped into userspace address space.
+> And will let userspace memory analysis more accurate .
+
+It would be easier for userspace to find out pfn of zero page and take it
+into account.
+
+Note: some architectures have multiple zero page due to coloring.
+
 -- 
-1.9.1
+ Kirill A. Shutemov
