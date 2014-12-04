@@ -1,52 +1,82 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 4 Dec 2014 17:18:49 +0000
-Subject: [RFC] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <1417692868.9037.4.camel@pengutronix.de>
-References: <52c403454c3b8fc201abe7ac74cf657638479311.1417691389.git.viresh.kumar@linaro.org>
- <1417692868.9037.4.camel@pengutronix.de>
-Message-ID: <20141204171849.GX7712@sirena.org.uk>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 4 Dec 2014 09:21:13 -0800
+Subject: [PATCH v2 7/7] pinctrl: qcom-spmi-gpio: Migrate to pinconf-generic
+In-Reply-To: <1417685458.22963.1.camel@mm-sol.com>
+References: <1417137993-8337-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1417137993-8337-8-git-send-email-soren.brinkmann@xilinx.com>
+ <1417611812.30615.28.camel@mm-sol.com>
+ <d3d1b263bf6242aa9a1a0876be455cce@BN1BFFO11FD021.protection.gbl>
+ <1417685458.22963.1.camel@mm-sol.com>
+Message-ID: <81806c6b34a940c7a0378ed77c49b495@BN1AFFO11FD048.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 12:34:28PM +0100, Lucas Stach wrote:
-> Am Donnerstag, den 04.12.2014, 16:44 +0530 schrieb Viresh Kumar:
+On Thu, 2014-12-04 at 11:30AM +0200, Ivan T. Ivanov wrote:
+> 
+> On Wed, 2014-12-03 at 09:38 -0800, S?ren Brinkmann wrote:
+> > On Wed, 2014-12-03 at 03:03PM +0200, Ivan T. Ivanov wrote:
+> > > On Thu, 2014-11-27 at 17:26 -0800, Soren Brinkmann wrote:
+> > > > Instead of the driver caring about implementation details like device
+> > > > tree, just provide information about driver specific pinconf parameters
+> > > > to pinconf-generic which takes care of parsing the DT.
+> > > > 
+> > > > Signed-off-by: Soren Brinkmann brinkmann at xilinx.com>
+> > > > ---
+> > > > This is compile tested only. So, it's likely that it needs more tweaking
+> > > > to make it actually work on HW. But it illustrates the potential
+> > > > benefits of the pinconf-generic changes in this series.
+> > > > ---
+> > > >  drivers/pinctrl/qcom/pinctrl-spmi-gpio.c | 125 +++----------------------------
+> > > >  1 file changed, 11 insertions(+), 114 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c b/drivers/pinctrl/qcom/pinctrl-spmi-
+> > > > gpio.c
+> > > > index b863b5080890..2db85e53ef73 100644
+> > > > --- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
+> > > > +++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
+> > > > @@ -131,14 +131,14 @@ struct pmic_gpio_state {
+> > > >         struct gpio_chip chip;
+> > > >  };
+> > > > 
+> > > > -struct pmic_gpio_bindings {
+> > > > -       const char*property;
+> > > > -       unsigned      param;
+> > > > +static const struct pinconf_generic_dt_params pmic_gpio_bindings[] = {
+> > > > +       {"qcom,pull-up-strength",PMIC_GPIO_CONF_PULL_UP,0},
+> > > > +       {"qcom,drive-strength",PMIC_GPIO_CONF_STRENGTH,0},
+> > > >  };
+> > > > 
+> > > > -static struct pmic_gpio_bindings pmic_gpio_bindings[] = {
+> > > > -       {"qcom,pull-up-strength",PMIC_GPIO_CONF_PULL_UP},
+> > > > -       {"qcom,drive-strength",PMIC_GPIO_CONF_STRENGTH},
+> > > > +static const struct pin_config_item pmic_conf_items[] = {
+> > > > +       PCONFDUMP(PMIC_GPIO_CONF_PULL_UP,  "pull-up-strength", NULL, true),
+> > > 
+> > > s/pull-up-strength/qcom,pull-up-strength/
+> > 
+> > This is used for the debugfs output. I don't think you want the qcom
+> > prefix here, do you?
+> 
+> Then at lest lets make it "pull up strength".
 
-> > +  - voltage-tolerance: Specify the CPU voltage tolerance in percentage.
+Ok. Will change it.
 
-> This is extremely ill defined. It doesn't say in which direction the
-> tolerance is to be applied. Can you go below or above the OPP specified
-> voltage? For now everyone just assumes that it has to work both ways.
-> Also with this binding the tolerance is applied for all OPPs, where is
-> very much depends on the individual OPP.
+> 
+> > 
+> > > > +       PCONFDUMP(PMIC_GPIO_CONF_STRENGTH, "drive-strength", NULL, true),
+> > > >  };
+> > > > 
+> > > 
+> > > 
+> > > 
+> > > I am not happy that we have to define the same think two times.
+> > 
+> > It's not really the same thing. One is the actual DT binding the other
+> > how the property is displayed in debugfs. Two different things. It's how
+> > the core does it. That's not new.
+> 
+> This didn't make me more happy :-). Could both be merged?
 
-Almost all specifications for voltages are done as either min/typ/max or
-+/- a target voltage.
+That's definitely beyond the scope of this series.
 
-> If you are going to redefine OPPs anyway I would really like to see this
-> property die and rather have a min/max voltage per OPP. That way you can
-> properly express the OPP constraints. Most OPPs will likely allow a much
-> higher voltage than their minimal specified one, except when you go over
-> thermal limits with a high clock/voltage combination.
-
-If you've got a minimum and maximum you also need to specify a target,
-generally it's going to be better to go for the target voltage which may
-not be the midpoint and is unlikely to be one of the bounds.  I do think
-it's sensible to have the option of doing both to more closely match
-datasheets.
-
-> > +  - clock-latency: Specify the possible maximum transition latency for clock,
-> > +    in unit of nanoseconds.
-
-> Why do we need this? This is property of the clock. We should be able to
-> handle this completely internally in the kernel. I don't know if the
-> clock API has something like this right now, but it should be a trivial
-> addition.
-
-Or have it be part of the clock binding at any rate.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/13f8515b/attachment-0001.sig>
+	Soren
