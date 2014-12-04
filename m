@@ -1,68 +1,81 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Thu,  4 Dec 2014 13:24:24 -0800
-Subject: [PATCH] ARM: multi_v7_defconfig: enable MAX77686 PMIC drivers for
- exynos4412-prime based SoCs
-Message-ID: <1417728264-7268-1-git-send-email-tyler.baker@linaro.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 04 Dec 2014 22:27:50 +0100
+Subject: [PATCH] ARM: pxa: arbitrarily set first interrupt number
+In-Reply-To: <1416867502-6877-1-git-send-email-robert.jarzmik@free.fr> (Robert
+ Jarzmik's message of "Mon, 24 Nov 2014 23:18:22 +0100")
+References: <1416867502-6877-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <87zjb3xfzd.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the MAX77686 PMIC drivers in the multi_v7_defconfig used
-on exynos4412-prime family of SoCs [1]. The exynos4412-prime based boards
-are producing the following runtime errors only on the multi_v7_defconfig [2]:
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-kern.err: deviceless supply vdd_arm not found, using dummy regulator
-kern.err: exynos-cpufreq exynos-cpufreq: failed to set cpu voltage to 1287500
-kern.err: cpufreq: __target_index: Failed to change cpu frequency: -22
+> As IRQ0, the legacy timer interrupt  should not be used as an interrupt
+> number, shift the interrupts by a fixed number.
+>
+> As we had in a special case a shift of 16 when ISA bus was used on a
+> PXA, use that value as the first interrupt number, regardless of ISA or
+> not.
+>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-I reviewed the exynos_defconfig, which does not produce these runtime
-errors. It was obvious that the exynos_defconfig has the PMIC drivers
-enabled, whereas the multi_v7_defconfig does not. This patch has been tested 
-on a odroid-u2 and a odroid-u3 board. It has resolved the runtime errors.
-Therefore, I purpose we enabled these drivers in the multi_v7_defconfig.
+> ---
+>  arch/arm/mach-pxa/Kconfig             | 5 -----
+>  arch/arm/mach-pxa/include/mach/irqs.h | 9 ++-------
+>  2 files changed, 2 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+> index e6690a4..bfca4ead 100644
+> --- a/arch/arm/mach-pxa/Kconfig
+> +++ b/arch/arm/mach-pxa/Kconfig
+> @@ -73,14 +73,12 @@ config ARCH_VIPER
+>  	select I2C_GPIO if I2C=y
+>  	select ISA
+>  	select PXA25x
+> -	select PXA_HAVE_ISA_IRQS
+>  
+>  config MACH_ARCOM_ZEUS
+>  	bool "Arcom/Eurotech ZEUS SBC"
+>  	select ARCOM_PCMCIA
+>  	select ISA
+>  	select PXA27x
+> -	select PXA_HAVE_ISA_IRQS
+>  
+>  config MACH_BALLOON3
+>  	bool "Balloon 3 board"
+> @@ -680,9 +678,6 @@ config SHARPSL_PM_MAX1111
+>  	select SPI
+>  	select SPI_MASTER
+>  
+> -config PXA_HAVE_ISA_IRQS
+> -	bool
+> -
+>  config PXA310_ULPI
+>  	bool
+>  
+> diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
+> index 48c2fd8..83e04d4 100644
+> --- a/arch/arm/mach-pxa/include/mach/irqs.h
+> +++ b/arch/arm/mach-pxa/include/mach/irqs.h
+> @@ -12,14 +12,9 @@
+>  #ifndef __ASM_MACH_IRQS_H
+>  #define __ASM_MACH_IRQS_H
+>  
+> -#ifdef CONFIG_PXA_HAVE_ISA_IRQS
+> -#define PXA_ISA_IRQ(x)	(x)
+> -#define PXA_ISA_IRQ_NUM	(16)
+> -#else
+> -#define PXA_ISA_IRQ_NUM	(0)
+> -#endif
+> +#include <asm/irq.h>
+>  
+> -#define PXA_IRQ(x)	(PXA_ISA_IRQ_NUM + (x))
+> +#define PXA_IRQ(x)	(NR_IRQS_LEGACY + (x))
+>  
+>  #define IRQ_SSP3	PXA_IRQ(0)	/* SSP3 service request */
+>  #define IRQ_MSL		PXA_IRQ(1)	/* MSL Interface interrupt */
 
-[1] http://www.hardkernel.com/main/products/prdt_info.php?g_code=G135270682824
-[2] http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc7-48-g7cc78f8/arm-multi_v7_defconfig/lab-tbaker-00/boot-exynos4412-odroidu3.html
+OK, nobody objected nor acked. I'll queue that up in pxa/for-next then.
 
-Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 930bfcb..d789658 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -280,6 +280,7 @@ CONFIG_MFD_AS3722=y
- CONFIG_MFD_BCM590XX=y
- CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_SPI=y
-+CONFIG_MFD_MAX77686=y
- CONFIG_MFD_MAX8907=y
- CONFIG_MFD_SEC_CORE=y
- CONFIG_MFD_STMPE=y
-@@ -294,6 +295,7 @@ CONFIG_REGULATOR_GPIO=y
- CONFIG_MFD_SYSCON=y
- CONFIG_POWER_RESET_SYSCON=y
- CONFIG_REGULATOR_MAX8907=y
-+CONFIG_REGULATOR_MAX77686=y
- CONFIG_REGULATOR_PALMAS=y
- CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
-@@ -399,6 +401,7 @@ CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_AS3722=y
- CONFIG_RTC_DRV_DS1307=y
- CONFIG_RTC_DRV_MAX8907=y
-+CONFIG_RTC_DRV_MAX77686=y
- CONFIG_RTC_DRV_PALMAS=y
- CONFIG_RTC_DRV_TWL4030=y
- CONFIG_RTC_DRV_TPS6586X=y
-@@ -433,6 +436,7 @@ CONFIG_NVEC_POWER=y
- CONFIG_NVEC_PAZ00=y
- CONFIG_QCOM_GSBI=y
- CONFIG_COMMON_CLK_QCOM=y
-+CONFIG_COMMON_CLK_MAX77686=y
- CONFIG_APQ_MMCC_8084=y
- CONFIG_MSM_GCC_8660=y
- CONFIG_MSM_MMCC_8960=y
 -- 
-2.1.3
+Robert
