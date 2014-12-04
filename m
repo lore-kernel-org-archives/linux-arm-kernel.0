@@ -1,78 +1,50 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 4 Dec 2014 10:34:48 +0100
-Subject: [PATCH v4 15/19] arm/arm64: KVM: add virtual GICv3 distributor
- emulation
-In-Reply-To: <547EFC2F.1040604@arm.com>
-References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
- <20141203102829.GA17502@cbox> <547EEF9A.9010906@arm.com>
- <2906594.cDZcXzbGMh@wuerfel>
- <CAFEAcA9=qB9iyuvxCCjqgx3DpXqw+x2g0acfh9KwDZK7bp2ACg@mail.gmail.com>
- <547EFC2F.1040604@arm.com>
-Message-ID: <20141204093448.GA4526@cbox>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 4 Dec 2014 10:39:59 +0100
+Subject: [PATCH 0/4] ARM: shmobile: R-Mobile: Add SYSC restart handler
+In-Reply-To: <20141204073409.GG25806@verge.net.au>
+References: <1417616227-6715-1-git-send-email-geert+renesas@glider.be>
+ <20141204073409.GG25806@verge.net.au>
+Message-ID: <CAMuHMdWFkz+kZanH47dzAVPnoB_RuTt=KLp72ziohMnZad5ErA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03, 2014 at 12:03:59PM +0000, Andre Przywara wrote:
-> On 03/12/14 11:39, Peter Maydell wrote:
-> > On 3 December 2014 at 11:28, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> On Wednesday 03 December 2014 11:10:18 Andre Przywara wrote:
-> >>> Currently we have in QEMU:
-> >>>    0 MB -  128 MB: Flash
-> >>>  128 MB -  144 MB: CPU peripherals (GIC for now only)
-> >>>  144 MB -  144 MB: UART (64k)
-> >>>  144 MB -  144 MB: RTC (64k)
-> >>>  160 MB -  256 MB: virtio (32 * 512 Bytes used)
-> >>>  256 MB - 1024 MB: PCI
-> >>> 1024 MB - ???? MB: DRAM
-> >>>
-> >>> So we waste quite some space between 144 MB and 256 MB, where we
-> >>> currently use only 3 64K pages. If we would move those three pages
-> >>> closer to the 256 MB region, we could extend the GIC mapping space from
-> >>> 16 MB (127 VCPUs) to almost 128 MB (good for 1022 VCPUs).
-> > 
-> > Note that part of the reason for that gap is to give us space
-> > to add more memory-mapped peripherals as they are needed.
-> > For instance the fw_cfg conduit for talking to UEFI firmware
-> > is going to need another 64K page in that section.
-> 
-> Sure, that was just to show the situation in general. We could do
-> something like kvmtool and grow the CPU peripheral space and the device
-> MMIO pages from different directions to not waste space needlessly.
-> So UART, RTC, virtio and future devices use space from 128MB upwards,
-> whereas the GIC uses as much space below 256 MB as needed.
-> 
-> Btw.: Is there an issue with not aligning each virtio device to a 64K
-> page? Will we never need to separate access to virtio devices in a guest
-> with MMU help?
-> 
-> >> Having a more compressed mapping sounds useful, but you could also consider
-> >> carving the GIC registers out of the PCI range and make PCI memory space
-> >> smaller if there are lots of CPUs.
-> >>
-> >> Is there also a 64-bit PCI memory space behind the DRAM?
-> > 
-> > The "PCI" section at the moment is purely hypothetical -- it's
-> > a lump of reserved space in the memory map that I put in so
-> > we had a place to put PCI later... The DRAM is just the last
-> > thing in the memory map and goes up for as much DRAM as you
-> > asked QEMU to provide, so in that sense there's no "behind"
-> > there.
-> > 
-> > We could (at least at the moment) shuffle things around a bit,
-> > since guests should all be looking at the DTB to figure where
-> > things are. About the only thing we can't do is move the base
-> > address of RAM or put the flash somewhere other than 0. If
-> > we do need to make changes I'd rather we figured out the new
-> > layout and switched to it rather than doing a set of piecemeal
-> > tweaks, though.
-> 
-> Agreed. As QEMU does not support GICv3 anyway at the moment, there is no
-> need to rush things.
-> 
-> Is there any sign of a PCI host controller emulation for QEMU on the
-> horizon?
-> 
-Yes, we need to have this in Q1 2015 latest.  Linaro has scheduled this
-work, but patches are a little while out I'm afraid.
+Hi Simon,
 
--Christoffer
+On Thu, Dec 4, 2014 at 8:34 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Dec 03, 2014 at 03:17:03PM +0100, Geert Uytterhoeven wrote:
+>> This patch series extends the PM domain platform driver for the R-Mobile
+>> System Controller (SYSC) to register a restart handler, and removes the
+>> restart handler hacks on DT-based R-Mobile A1 (r8a7740) and SH-Mobile AG5
+>> (sh73a0) platforms.
+>>
+>> Note that this supports DT-based platforms only. Legacy platforms keep
+>> on using the restart callback in struct machine_desc.
+>>
+>> This was tested on r8a7740/armadillo-multiplatform,
+>> sh73a0/kzm9g-reference, and sh73a0/kzm9g-multiplatform.
+>>
+>> Arnd: is this what you had in mind in your response to "[GIT PULL] Third
+>> Round of Renesas ARM Based Soc Updates for v3.19"
+>> (http://www.spinics.net/lists/arm-kernel/msg379348.html)?
+>>
+>> Dependencies:
+>>   - The first two patches depend on the series "[PATCH v6 0/7] ARM:
+>>     shmobile: R-Mobile: DT PM domain support", as that series adds the
+>>     SYSC PM domain platform driver for DT-based platforms and adds the
+>>     SYSC device node to r8a7740.dtsi,
+>
+> As I have queued up that series I believe I could also queue up
+> the first two patches of this series. Is that worthwhile?
+
+Yes you can, if Arnd doesn't object against the driver.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
