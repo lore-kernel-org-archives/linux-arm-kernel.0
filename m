@@ -1,100 +1,63 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 04 Dec 2014 21:15:09 +0100
-Subject: [PATCH] dmaengine: pl330: Set residue in tx_status callback
-In-Reply-To: <CAAgF-BfPyaOhhrA5L8vm2WDnhBYDexJFkGxqL1GsL2TMB8z=Rw@mail.gmail.com>
-References: <1416995095-13763-1-git-send-email-padma.v@samsung.com>	<CAAgF-BfpU72KTJjVd8jWStD8yJ5sSmXOiQm77xQunO2QhC9ExQ@mail.gmail.com>	<547DF61D.3010909@metafoo.de>
- <CAAgF-BfPyaOhhrA5L8vm2WDnhBYDexJFkGxqL1GsL2TMB8z=Rw@mail.gmail.com>
-Message-ID: <5480C0CD.8050207@metafoo.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 04 Dec 2014 21:41:45 +0100
+Subject: [PATCH 1/3] ARM: pxa: add regulator_has_full_constraints to corgi
+ board file
+In-Reply-To: <1417691402-28166-1-git-send-email-dbaryshkov@gmail.com> (Dmitry
+ Eremin-Solenikov's message of "Thu, 4 Dec 2014 14:10:00 +0300")
+References: <1417691402-28166-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <87iohrywom.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2014 05:47 AM, Padma Venkat wrote:
-> Hi Lars,
+Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+
+> Add regulator_has_full_constraints() call to corgi board file to let
+> regulator core know that we do not have any additional regulators left.
+> This lets it substitute unprovided regulators with dummy ones.
 >
-> [snip]
->>>> +
->>>> +	ret = dma_cookie_status(chan, cookie, txstate);
->>>> +	if (ret == DMA_COMPLETE || !txstate)
->>>> +		return ret;
->>>> +
->>>> +	used = txstate->used;
->>>> +
->>>> +	spin_lock_irqsave(&pch->lock, flags);
->>>> +	sar = readl(regs + SA(thrd->id));
->>>> +	dar = readl(regs + DA(thrd->id));
->>>> +
->>>> +	list_for_each_entry(desc, &pch->work_list, node) {
->>>> +		if (desc->status == BUSY) {
->>>> +			current_c = desc->txd.cookie;
->>>> +			if (first) {
->>>> +				first_c = desc->txd.cookie;
->>>> +				first = false;
->>>> +			}
->>>> +
->>>> +			if (first_c < current_c)
->>>> +				residue += desc->px.bytes;
->>>> +			else {
->>>> +				if (desc->rqcfg.src_inc && pl330_src_addr_in_desc(desc, sar)) {
->>>> +					residue += desc->px.bytes;
->>>> +					residue -= sar - desc->px.src_addr;
->>>> +				} else if (desc->rqcfg.dst_inc && pl330_dst_addr_in_desc(desc, dar))
->>>> {
->>>> +					residue += desc->px.bytes;
->>>> +					residue -= dar - desc->px.dst_addr;
->>>> +				}
->>>> +			}
->>>> +		} else if (desc->status == PREP)
->>>> +			residue += desc->px.bytes;
->>>> +
->>>> +		if (desc->txd.cookie == used)
->>>> +			break;
->>>> +	}
->>>> +	spin_unlock_irqrestore(&pch->lock, flags);
->>>> +	dma_set_residue(txstate, residue);
->>>> +	return ret;
->>>>    }
-> [snip]
->>>
->>> Any comment on this patch?
->>
->> Well it doesn't break audio, but I don't think it has the correct haviour
->> for all cases yet.
+> This fixes the following warnings that can be seen on corgi if
+> regulators are enabled:
 >
-> OK. Any way of testing other cases like scatter-gather and memcopy.  I
-> verified memcopy in dmatest but it seems not doing anything with
-> residue bytes.
-
-E.g. I think your current patch fails if more than one transfer has been 
-submitted. In that case you'll count the bytes for all of them rather than 
-just the one requested.
-
+> ads7846 spi1.0: unable to get regulator: -517
+> spi spi1.0: Driver ads7846 requests probe deferral
+> wm8731 0-001b: Failed to get supply 'AVDD': -517
+> wm8731 0-001b: Failed to request supplies: -517
+> wm8731 0-001b: ASoC: failed to probe component -517
+> corgi-audio corgi-audio: ASoC: failed to instantiate card -517
 >
->>
->> Again, the semantics are that it should return the progress of the transfer
->>
->> for which the allocation function returned the cookie that is passe to this
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>  arch/arm/mach-pxa/corgi.c | 3 +++
+>  1 file changed, 3 insertions(+)
 >
-> May be my understanding is wrong. For clarification..In the
-> snd_dmaengine_pcm_pointer it is subtracting the residue bytes from the
-> total buffer bytes not from period bytes. So how it expects
-> the progress of the transfer of the passed cookie which just holds period bytes?
+> diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
+> index 06022b2..89f790d 100644
+> --- a/arch/arm/mach-pxa/corgi.c
+> +++ b/arch/arm/mach-pxa/corgi.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/i2c.h>
+>  #include <linux/i2c/pxa-i2c.h>
+>  #include <linux/io.h>
+> +#include <linux/regulator/machine.h>
+>  #include <linux/spi/spi.h>
+>  #include <linux/spi/ads7846.h>
+>  #include <linux/spi/corgi_lcd.h>
+> @@ -752,6 +753,8 @@ static void __init corgi_init(void)
+>  		sharpsl_nand_partitions[1].size = 53 * 1024 * 1024;
+>  
+>  	platform_add_devices(devices, ARRAY_SIZE(devices));
+> +
+> +	regulator_has_full_constraints();
+>  }
+>  
+>  static void __init fixup_corgi(struct tag *tags, char **cmdline)
 
-The issue that makes implementing this correctly for the pl330 driver 
-complicated is that the driver allocates one cookie per segment/period, but 
-the external API works with one cookie per transfer. All those cookies that 
-are assigned to the segments/periods that are not the first in a transfer 
-are not externally visible.
+Added Mark for review, as I was thinking regulator_has_full_constraints() was to
+be used to disable unused regulators, a bit like in the clock framework, rather
+than provide a way to provide automatically dummy regulators.
 
-dmaengine_prep_slave_sg() and friends create a transfer and return 
-descriptor for this transfer with a single cookie. If that cookie is passed 
-to dmaengine_tx_status() the function is supposed to report the progress on 
-that one transfer that was previously allocated and returned that cookie 
-number. residue is the total number of bytes that are still left to to be 
-processed for that transfer.
+If Mark acks, I'll take the serie.
 
-I've started reworking the pl330 driver to only have a single cookie per 
-transfer, instead of one per period/segment. This makes implementing the 
-residue reporting a lot easier. I never finished that work though, but I can 
-try to see if I can revive it next week.
-
-- Lars
+-- 
+Robert
