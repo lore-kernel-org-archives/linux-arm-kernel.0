@@ -1,54 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 11:10:17 +0100
-Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
- drivers
-In-Reply-To: <20141204094953.GA13224@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <2579924.PPXuLn3o19@wuerfel> <20141204094953.GA13224@arm.com>
-Message-ID: <3152553.esaQuZiCgi@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 4 Dec 2014 10:11:31 +0000
+Subject: [PATCH] arm64/include/asm: Fixed a warning about 'struct pt_regs'
+In-Reply-To: <1417674575-10855-1-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <zcyirq.h>
+ <1417674575-10855-1-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <20141204101131.GE13224@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 December 2014 09:49:53 Will Deacon wrote:
-> On Wed, Dec 03, 2014 at 07:57:50PM +0000, Arnd Bergmann wrote:
-> > On Tuesday 02 December 2014 14:16:57 Grant Likely wrote:
-> > > On Mon, Dec 1, 2014 at 11:54 PM, Rob Herring <robherring2@gmail.com> wrote:
-> > > > On Mon, Dec 1, 2014 at 10:57 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > > >>
-> > > >> +static inline void of_iommu_set_ops(struct device_node *np,
-> > > >> +                                   const struct iommu_ops *ops)
-> > > >> +{
-> > > >> +       np->data = (struct iommu_ops *)ops;
-> > > >> +}
-> > > >> +
-> > > >> +static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
-> > > >> +{
-> > > >> +       return np->data;
-> > > >> +}
-> > > >
-> > > > This may collide with other users. While use of it is rare, PPC uses
-> > > > it in its PCI code. The OF_DYNAMIC code frees it but never actually
-> > > > sets it. There may be some coming usage with the DT overlay code or
-> > > > that's just a bug. Pantelis or Grant can comment. If not, I think we
-> > > > really should try to get rid of this pointer rather than expand it's
-> > > > usage.
-> > > >
-> > > > I didn't see a user of this. I'm guessing that is coming in a SMMU patch?
-> > > 
-> > > Good catch. This is not good. The data pointer should be avoided since
-> > > there are no controls over its use. Until a better solution can be
-> > > implemented, probably the safest thing to do is add a struct iommu_ops
-> > > pointer to struct device_node. However, assuming that only a small
-> > > portion of nodes will actually have iommu_ops set, I'd rather see a
-> > > separate registry that matches device_nodes to iommu_ops.
-> > 
-> > Fair enough. Will, can you take a copy of drivers/dma/of-dma.c and
-> > adapt it as needed? It should be exactly what we need to start
-> > out and can be extended and generalized later.
+On Thu, Dec 04, 2014 at 06:29:35AM +0000, Chunyan Zhang wrote:
+> If I include asm/irq.h on the top of my code, and set ARCH=arm64,
+> I'll get a compile warning, details are below:
+> warning: ?struct pt_regs?
+> declared inside parameter list [enabled by default]
 > 
-> Sure, I'll add this to my list of stuff to do for 3.20.
+> This patch is suggested by Arnd, see:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/308270.html
+> 
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> ---
+>  arch/arm64/include/asm/irq.h |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
+> index e1f7ecd..acedc7e 100644
+> --- a/arch/arm64/include/asm/irq.h
+> +++ b/arch/arm64/include/asm/irq.h
+> @@ -3,6 +3,8 @@
+>  
+>  #include <asm-generic/irq.h>
+>  
+> +struct pt_regs;
+> +
+>  extern void (*handle_arch_irq)(struct pt_regs *);
+>  extern void migrate_irqs(void);
+>  extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
 
-Does that mean the we don't get any of the patches for 3.19 despite the
-Acks?
+Fair enough, applied with trivial conflict resolution.
 
-	Arnd
+Will
