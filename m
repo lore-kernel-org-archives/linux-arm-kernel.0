@@ -1,89 +1,170 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Thu, 4 Dec 2014 09:15:21 +0530
-Subject: [PATCH v2 2/7] ARM: Exynos: add support for sub-power domains
-In-Reply-To: <1417610024-29748-1-git-send-email-m.szyprowski@samsung.com>
-References: <1416814256-24288-3-git-send-email-a.hajda@samsung.com>
- <1417610024-29748-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CADGdYn5N-hw7P0+0Z4hZk33NeV30UR+h8joHfC1qSo_mRfzofg@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu,  4 Dec 2014 09:41:43 +0530
+Subject: [PATCH V2 01/26] thermal: cpu_cooling: check for the readiness of
+ cpufreq layer
+In-Reply-To: <cover.1417664938.git.viresh.kumar@linaro.org>
+References: <cover.1417664938.git.viresh.kumar@linaro.org>
+Message-ID: <7b8f5ba72ee0aae221a5c64c1ead2044adbf87d1.1417664938.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 3, 2014 at 6:03 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> This patch adds support for making one power domain a sub-domain of
-> other domain. This is useful for modeling power dependences for devices
-> like TV Mixer or Camera ISP, which needs to have more than one power
-> domain enabled to be operational.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  Documentation/devicetree/bindings/arm/exynos/power_domain.txt |  2 ++
->  arch/arm/mach-exynos/pm_domains.c                             | 11 ++++++++++-
->  2 files changed, 12 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> index abde1ea8a119..b884358ebb1a 100644
-> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> @@ -22,6 +22,8 @@ Optional Properties:
->         - pclkN, clkN: Pairs of parent of input clock and input clock to the
->                 devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
->                 are supported currently.
-> +- samsung,power-domain: phandle to a master power domain that the given domain
-> +                      is a part of
->
->  Node of a device using power domains must have a samsung,power-domain property
->  defined with a phandle to respective power domain.
-> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-> index 20f267121b3e..fa9a47ddad81 100644
-> --- a/arch/arm/mach-exynos/pm_domains.c
-> +++ b/arch/arm/mach-exynos/pm_domains.c
-> @@ -108,7 +108,7 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
->  static __init int exynos4_pm_init_power_domain(void)
->  {
->         struct platform_device *pdev;
-> -       struct device_node *np;
-> +       struct device_node *np, *master_np;
->
->         for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
->                 struct exynos_pm_domain *pd;
-> @@ -159,6 +159,15 @@ no_clk:
->
->                 pm_genpd_init(&pd->pd, NULL, !on);
->                 of_genpd_add_provider_simple(np, &pd->pd);
-> +
-> +               /* make master and slave hierarchy */
-> +               master_np = of_parse_phandle(np, "samsung,power-domain", 0);
-> +               if (!master_np)
-> +                       master_np = of_parse_phandle(np, "power-domains", 0);
-> +               if (master_np) {
-> +                       pm_genpd_add_subdomain_names(master_np->name, np->name);
-> +                       of_node_put(master_np);
-> +               }
->         }
-Hi Marek,
+From: Eduardo Valentin <edubezval@gmail.com>
 
-In the my patch series posted earlier i added this feature in a
-slightly different way. (https://lkml.org/lkml/2014/11/24/320)
-Parent PD's are not added in the same loop but in the second loop.
-This will make sure that the parents PD are registered before the
-child PD's and we can get away from the assumption of child/parent
-PD's position in the Device Tree. This is a still a work in progress.
-Also posted a patch earlier regarding this,
-http://www.spinics.net/lists/linux-samsung-soc/msg39836.html.
+In this patch, the cpu_cooling code checks for the usability of cpufreq
+layer before proceeding with the CPU cooling device registration. The
+main reason is: CPU cooling device is not usable if cpufreq cannot
+switch frequencies.
 
-Regards,
-Amit
+Similar checks are spread in thermal drivers. Thus, the advantage now
+is to have the check in a single place: cpu cooling device registration.
+For this reason, this patch also updates the existing drivers that
+depend on CPU cooling to simply propagate the error code of the cpu
+cooling registration call. Therefore, in case cpufreq is not ready, the
+thermal drivers will still return -EPROBE_DEFER, in an attempt to try
+again when cpufreq layer gets ready.
 
+Cc: devicetree at vger.kernel.org
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-pm at vger.kernel.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
+---
+ drivers/thermal/cpu_cooling.c                      | 5 +++++
+ drivers/thermal/db8500_cpufreq_cooling.c           | 5 -----
+ drivers/thermal/imx_thermal.c                      | 5 -----
+ drivers/thermal/samsung/exynos_thermal_common.c    | 8 +++++---
+ drivers/thermal/samsung/exynos_tmu.c               | 5 ++++-
+ drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 6 ------
+ 6 files changed, 14 insertions(+), 20 deletions(-)
 
-
->
->         return 0;
-> --
-> 1.9.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+index ad09e51..f98a763 100644
+--- a/drivers/thermal/cpu_cooling.c
++++ b/drivers/thermal/cpu_cooling.c
+@@ -443,6 +443,11 @@ __cpufreq_cooling_register(struct device_node *np,
+ 	int ret = 0, i;
+ 	struct cpufreq_policy policy;
+ 
++	if (!cpufreq_frequency_get_table(cpumask_first(clip_cpus))) {
++		pr_debug("%s: CPUFreq table not found\n", __func__);
++		return ERR_PTR(-EPROBE_DEFER);
++	}
++
+ 	/* Verify that all the clip cpus have same freq_min, freq_max limit */
+ 	for_each_cpu(i, clip_cpus) {
+ 		/* continue if cpufreq policy not found and not return error */
+diff --git a/drivers/thermal/db8500_cpufreq_cooling.c b/drivers/thermal/db8500_cpufreq_cooling.c
+index 786d192..1ac7ec6 100644
+--- a/drivers/thermal/db8500_cpufreq_cooling.c
++++ b/drivers/thermal/db8500_cpufreq_cooling.c
+@@ -18,7 +18,6 @@
+  */
+ 
+ #include <linux/cpu_cooling.h>
+-#include <linux/cpufreq.h>
+ #include <linux/err.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+@@ -30,10 +29,6 @@ static int db8500_cpufreq_cooling_probe(struct platform_device *pdev)
+ 	struct thermal_cooling_device *cdev;
+ 	struct cpumask mask_val;
+ 
+-	/* make sure cpufreq driver has been initialized */
+-	if (!cpufreq_frequency_get_table(0))
+-		return -EPROBE_DEFER;
+-
+ 	cpumask_set_cpu(0, &mask_val);
+ 	cdev = cpufreq_cooling_register(&mask_val);
+ 
+diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+index 5a1f107..16405b4 100644
+--- a/drivers/thermal/imx_thermal.c
++++ b/drivers/thermal/imx_thermal.c
+@@ -9,7 +9,6 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/cpu_cooling.h>
+-#include <linux/cpufreq.h>
+ #include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/init.h>
+@@ -459,10 +458,6 @@ static int imx_thermal_probe(struct platform_device *pdev)
+ 	int measure_freq;
+ 	int ret;
+ 
+-	if (!cpufreq_get_current_driver()) {
+-		dev_dbg(&pdev->dev, "no cpufreq driver!");
+-		return -EPROBE_DEFER;
+-	}
+ 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+ 	if (!data)
+ 		return -ENOMEM;
+diff --git a/drivers/thermal/samsung/exynos_thermal_common.c b/drivers/thermal/samsung/exynos_thermal_common.c
+index b6be572..50a1f17 100644
+--- a/drivers/thermal/samsung/exynos_thermal_common.c
++++ b/drivers/thermal/samsung/exynos_thermal_common.c
+@@ -371,9 +371,11 @@ int exynos_register_thermal(struct thermal_sensor_conf *sensor_conf)
+ 		th_zone->cool_dev[th_zone->cool_dev_size] =
+ 					cpufreq_cooling_register(&mask_val);
+ 		if (IS_ERR(th_zone->cool_dev[th_zone->cool_dev_size])) {
+-			dev_err(sensor_conf->dev,
+-				"Failed to register cpufreq cooling device\n");
+-			ret = -EINVAL;
++			ret = PTR_ERR(th_zone->cool_dev[th_zone->cool_dev_size]);
++			if (ret != -EPROBE_DEFER)
++				dev_err(sensor_conf->dev,
++					"Failed to register cpufreq cooling device: %d\n",
++					ret);
+ 			goto err_unregister;
+ 		}
+ 		th_zone->cool_dev_size++;
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index 49c0924..2afca9b 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -683,7 +683,10 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+ 	/* Register the sensor with thermal management interface */
+ 	ret = exynos_register_thermal(sensor_conf);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "Failed to register thermal interface\n");
++		if (ret != -EPROBE_DEFER)
++			dev_err(&pdev->dev,
++				"Failed to register thermal interface: %d\n",
++				ret);
+ 		goto err_clk;
+ 	}
+ 	data->reg_conf = sensor_conf;
+diff --git a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+index 9eec26d..5f07d7e 100644
+--- a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
++++ b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+@@ -28,7 +28,6 @@
+ #include <linux/kernel.h>
+ #include <linux/workqueue.h>
+ #include <linux/thermal.h>
+-#include <linux/cpufreq.h>
+ #include <linux/cpumask.h>
+ #include <linux/cpu_cooling.h>
+ #include <linux/of.h>
+@@ -403,11 +402,6 @@ int ti_thermal_register_cpu_cooling(struct ti_bandgap *bgp, int id)
+ 	if (!data)
+ 		return -EINVAL;
+ 
+-	if (!cpufreq_get_current_driver()) {
+-		dev_dbg(bgp->dev, "no cpufreq driver yet\n");
+-		return -EPROBE_DEFER;
+-	}
+-
+ 	/* Register cooling device */
+ 	data->cool_dev = cpufreq_cooling_register(cpu_present_mask);
+ 	if (IS_ERR(data->cool_dev)) {
+-- 
+2.0.3.693.g996b0fd
