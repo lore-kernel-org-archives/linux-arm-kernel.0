@@ -1,62 +1,68 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 03 Dec 2014 19:02:57 -0500
-Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
-In-Reply-To: <547F94B0.1000902@linaro.org>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <20141120135851.GA32528@linaro.org> <54759041.9080105@hitachi.com>
- <20141126100325.GA9157@linaro.org> <5476120D.9030703@linaro.org>
- <CAPvkgC3eVOZEn79C9PC9c7TqC_-yCtDhw5LL6ZWUJxr+oQFaow@mail.gmail.com>
- <5476BFB4.2020705@hitachi.com>
- <CAPvkgC0ELPPWfa-8kQ4H_e_O5G1ER4KEKuSWLxh_u-VZgh7W6A@mail.gmail.com>
- <547C36DB.7060903@hitachi.com> <547F242D.1060705@redhat.com>
- <547F94B0.1000902@linaro.org>
-Message-ID: <547FA4B1.6050200@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 3 Dec 2014 18:33:08 -0600
+Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+In-Reply-To: <201411242319.27481@pali>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <201406182122.29623@pali>
+ <CAL_JsqK5j8PvYfq+tct4RMr63TWDYGfi_TA28k5m4KyG=UuNbg@mail.gmail.com>
+ <201411242319.27481@pali>
+Message-ID: <CAL_JsqJuSa-zHTPynH3vAEOK1D2xYRYtVjZJ5zDR0UHAyGYXuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/14 17:54, David Long wrote:
-> On 12/03/14 09:54, William Cohen wrote:
->> On 12/01/2014 04:37 AM, Masami Hiramatsu wrote:
->>> (2014/11/29 1:01), Steve Capper wrote:
+On Mon, Nov 24, 2014 at 4:19 PM, Pali Roh?r <pali.rohar@gmail.com> wrote:
+> On Wednesday 18 June 2014 22:46:19 Rob Herring wrote:
+>> On Wed, Jun 18, 2014 at 2:22 PM, Pali Roh?r
+> <pali.rohar@gmail.com> wrote:
+>> > On Wednesday 18 June 2014 21:07:35 Rob Herring wrote:
+>> >> On Wed, Jun 18, 2014 at 11:54 AM, Pali Roh?r
+>> >
+>> > <pali.rohar@gmail.com> wrote:
+>> >> > Machine name from board description is some generic name
+>> >> > on DT kernel. DT provides machine name property which is
+>> >> > specific for board, so use it instead generic one when
+>> >> > possible.
+>> >> >
 
 [...]
 
->>>> That would explain why the state of play of the interrupts is in an
->>>> unexpected state in the crash I reported:
->>>> "The point of failure in the panic was:
->>>> fs/buffer.c:1257
->>>>
->>>> static inline void check_irqs_on(void)
->>>> {
->>>> #ifdef irqs_disabled
->>>>          BUG_ON(irqs_disabled());
->>>> #endif
->>>> }
->>>> "
->>>>
->>>> This is all new to me so I'm still at the head-scratching stage.
->>>
->>> Ah, I see.
->>>
->>> Thank you,
->>>
->>>>
->>>> David,
->>>> Does the above make sense to you? Have you managed to reproduce the
->>>> crash I get?
->>>>
->>>> Cheers,
->>>> --
->>>> Steve
+>> > Basically in DT kernel is missing Hardware, Revision and
+>> > probably also Serial key. (Now I used only qemu for testing
+>> > which set serial key to 0). All these informations is used
+>> > by userspace applications which determinate how to behave.
+>>
+>> It is somewhat fragile to expect the name in the DT to match
+>> the old name from the kernel. As your patch to n900 dts
+>> shows, we'd probably have to update every dts file to make
+>> them match. While I think we should work to remove this
+>> string from the kernel, userspace depending on the DT model
+>> string is a bad idea. For example, if you had some platform
+>> with multiple OEMs just rebranding the same base design, they
+>> may all want to put their own model string into each product.
+>> The true h/w id is the compatible string.
+>>
+>> Serial number is easy. There is already a standard although
+>> not widely used property for it with "/serial-number". You
+>> just need to wire it up to cpuinfo.
+>>
 >
-> I have easily produced a crash although it doesn't look to me like the
-> same one.  I'm getting a NULL pointer dereference.  The PMU stuff (used
-> by perf record|stat -e) should be quite independent of kprobes though.
+> There is no "/serial-number" property in kernel:
 >
-> -dl
->
+> $ ls -l -a /sys/bus/soc/devices/soc0/
+> drwxr-xr-x    3 0        0                0 Jan  1 00:00 .
+> drwxr-xr-x   18 0        0                0 Jan  1 00:00 ..
+> -r--r--r--    1 0        0             4096 Jan  1 00:00 family
+> -r--r--r--    1 0        0             4096 Jan  1 00:00 machine
+> drwxr-xr-x    2 0        0                0 Jan  1 00:00 power
+> -r--r--r--    1 0        0             4096 Jan  1 00:00 revision
+> lrwxrwxrwx    1 0        0                0 Jan  1 00:00
+> subsystem -> ../../bus/soc
+> -r--r--r--    1 0        0             4096 Jan  1 00:00 type
+> -rw-r--r--    1 0        0             4096 Jan  1 00:00 uevent
 
-Oops, never mind the above bit.  I see this is not PMU-related, but use 
-of kprobes through perf.  My bad.
+Wrong place. If you put /serial-number in your DT, then it will be in
+/proc/device-tree/serial-number.
 
--dl
+If you want to wire that up to /proc/cpuinfo, I would be fine with that.
+
+Rob
