@@ -1,62 +1,100 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Thu, 04 Dec 2014 21:11:56 +0100
-Subject: [GIT PULL] ARM: BCM5301X: DT changes for v3.19 #2
-Message-ID: <5480C00C.3090709@hauke-m.de>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 04 Dec 2014 21:15:09 +0100
+Subject: [PATCH] dmaengine: pl330: Set residue in tx_status callback
+In-Reply-To: <CAAgF-BfPyaOhhrA5L8vm2WDnhBYDexJFkGxqL1GsL2TMB8z=Rw@mail.gmail.com>
+References: <1416995095-13763-1-git-send-email-padma.v@samsung.com>	<CAAgF-BfpU72KTJjVd8jWStD8yJ5sSmXOiQm77xQunO2QhC9ExQ@mail.gmail.com>	<547DF61D.3010909@metafoo.de>
+ <CAAgF-BfPyaOhhrA5L8vm2WDnhBYDexJFkGxqL1GsL2TMB8z=Rw@mail.gmail.com>
+Message-ID: <5480C0CD.8050207@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+On 12/03/2014 05:47 AM, Padma Venkat wrote:
+> Hi Lars,
+>
+> [snip]
+>>>> +
+>>>> +	ret = dma_cookie_status(chan, cookie, txstate);
+>>>> +	if (ret == DMA_COMPLETE || !txstate)
+>>>> +		return ret;
+>>>> +
+>>>> +	used = txstate->used;
+>>>> +
+>>>> +	spin_lock_irqsave(&pch->lock, flags);
+>>>> +	sar = readl(regs + SA(thrd->id));
+>>>> +	dar = readl(regs + DA(thrd->id));
+>>>> +
+>>>> +	list_for_each_entry(desc, &pch->work_list, node) {
+>>>> +		if (desc->status == BUSY) {
+>>>> +			current_c = desc->txd.cookie;
+>>>> +			if (first) {
+>>>> +				first_c = desc->txd.cookie;
+>>>> +				first = false;
+>>>> +			}
+>>>> +
+>>>> +			if (first_c < current_c)
+>>>> +				residue += desc->px.bytes;
+>>>> +			else {
+>>>> +				if (desc->rqcfg.src_inc && pl330_src_addr_in_desc(desc, sar)) {
+>>>> +					residue += desc->px.bytes;
+>>>> +					residue -= sar - desc->px.src_addr;
+>>>> +				} else if (desc->rqcfg.dst_inc && pl330_dst_addr_in_desc(desc, dar))
+>>>> {
+>>>> +					residue += desc->px.bytes;
+>>>> +					residue -= dar - desc->px.dst_addr;
+>>>> +				}
+>>>> +			}
+>>>> +		} else if (desc->status == PREP)
+>>>> +			residue += desc->px.bytes;
+>>>> +
+>>>> +		if (desc->txd.cookie == used)
+>>>> +			break;
+>>>> +	}
+>>>> +	spin_unlock_irqrestore(&pch->lock, flags);
+>>>> +	dma_set_residue(txstate, residue);
+>>>> +	return ret;
+>>>>    }
+> [snip]
+>>>
+>>> Any comment on this patch?
+>>
+>> Well it doesn't break audio, but I don't think it has the correct haviour
+>> for all cases yet.
+>
+> OK. Any way of testing other cases like scatter-gather and memcopy.  I
+> verified memcopy in dmatest but it seems not doing anything with
+> residue bytes.
 
-This is a late pull request with some dts updates for BCM5301X I hope
-this still can go into 3.19.
+E.g. I think your current patch fails if more than one transfer has been 
+submitted. In that case you'll count the bytes for all of them rather than 
+just the one requested.
 
-It is based onto of my last dt pull request for BCM5301X.
+>
+>>
+>> Again, the semantics are that it should return the progress of the transfer
+>>
+>> for which the allocation function returned the cookie that is passe to this
+>
+> May be my understanding is wrong. For clarification..In the
+> snd_dmaengine_pcm_pointer it is subtracting the residue bytes from the
+> total buffer bytes not from period bytes. So how it expects
+> the progress of the transfer of the passed cookie which just holds period bytes?
 
+The issue that makes implementing this correctly for the pl330 driver 
+complicated is that the driver allocates one cookie per segment/period, but 
+the external API works with one cookie per transfer. All those cookies that 
+are assigned to the segments/periods that are not the first in a transfer 
+are not externally visible.
 
-The following changes since commit dd6d2e5f4bbb828268506e9d6b772fffe101e76c:
+dmaengine_prep_slave_sg() and friends create a transfer and return 
+descriptor for this transfer with a single cookie. If that cookie is passed 
+to dmaengine_tx_status() the function is supposed to report the progress on 
+that one transfer that was previously allocated and returned that cookie 
+number. residue is the total number of bytes that are still left to to be 
+processed for that transfer.
 
-  ARM: BCM5301X: Add LEDs for Netgear R6250 V1 (2014-11-27 22:30:32 +0100)
+I've started reworking the pl330 driver to only have a single cookie per 
+transfer, instead of one per period/segment. This makes implementing the 
+residue reporting a lot easier. I never finished that work though, but I can 
+try to see if I can revive it next week.
 
-are available in the git repository at:
-
-  https://github.com/hauke/linux.git tags/bcm5301x-dt-2014-12-04
-
-for you to fetch changes up to dd7733da69f198f576d7f52f6bc5a860fe24930d:
-
-  ARM: BCM5301X: Add DT for Buffalo WZR-600DHP2 (2014-12-04 20:58:11 +0100)
-
-----------------------------------------------------------------
-ARM: BCM5301X: dts updates
-
-This adds the IRQ number to the main dts file and some new dts files
-for newly added devices.
-
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
-
-----------------------------------------------------------------
-Hauke Mehrtens (1):
-      ARM: BCM5301X: Add IRQs to Broadcom's bus-axi in DTS file
-
-Rafa? Mi?ecki (5):
-      ARM: BCM5301X: Add buttons for Netgear R6250
-      ARM: BCM5301X: Add DT for Netgear R6300 V2
-      ARM: BCM5301X: Add DT for Buffalo WZR-1750DHP
-      ARM: BCM5301X: Add DT for Asus RT-N18U
-      ARM: BCM5301X: Add DT for Buffalo WZR-600DHP2
-
- arch/arm/boot/dts/Makefile                         |  7 +-
- arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 64 +++++++++++++++++
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 25 +++++++
- arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts     | 84
-++++++++++++++++++++++
- arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts        | 78
-++++++++++++++++++++
- arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 57 +++++++++++++++
- arch/arm/boot/dts/bcm47081.dtsi                    | 26 +++++++
- arch/arm/boot/dts/bcm5301x.dtsi                    | 35 +++++++++
- 8 files changed, 375 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
- create mode 100644 arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
- create mode 100644 arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
- create mode 100644 arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
- create mode 100644 arch/arm/boot/dts/bcm47081.dtsi
+- Lars
