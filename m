@@ -1,41 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 13:52:46 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Soc Updates for v3.19
-In-Reply-To: <2367916.IecTPygCF4@avalon>
-References: <cover.1415058939.git.horms+renesas@verge.net.au>
- <201411192205.57149.arnd@arndb.de> <2367916.IecTPygCF4@avalon>
-Message-ID: <2399706.M2S78W9JTO@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 4 Dec 2014 13:53:52 +0100
+Subject: [PATCH 1/4] ARM: shmobile: R-Mobile: Add SYSC restart handler
+In-Reply-To: <CAMuHMdWeFceyn3_TkgsuwakK9UOVUszBFqEv-uRqRC+2a=5XGA@mail.gmail.com>
+References: <1417616227-6715-1-git-send-email-geert+renesas@glider.be>
+ <1417616227-6715-2-git-send-email-geert+renesas@glider.be>
+ <3671800.E1ZjeAe67g@wuerfel>
+ <CAMuHMdWeFceyn3_TkgsuwakK9UOVUszBFqEv-uRqRC+2a=5XGA@mail.gmail.com>
+Message-ID: <CAMuHMdXqY79KkrmEvnG4qqDaw5x8raxRs2eKBM6E-+DyZwFt-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 November 2014 22:48:12 Laurent Pinchart wrote:
-> Hi Arnd,
-> 
-> On Wednesday 19 November 2014 22:05:56 Arnd Bergmann wrote:
-> > On Tuesday 04 November 2014, Simon Horman wrote:
-> > > ----------------------------------------------------------------
-> > > Renesas ARM Based SoC Soc Updates for v3.19
-> > > 
-> > > * Select CONFIG_ZONE_DMA when CONFIG_ARM_LPAE is enabled
-> > > * Add CA7 arch_timer initialization for r8a7794
-> > > * Handle CA7 arch timer delay
-> > > * Add shmobile_init_late() to sh7372
-> > > 
-> > >   - This is consistent with other shmobile SoCs
-> > 
-> > Pulled into next/soc.
-> > 
-> > Note that the CONFIG_ZONE_DMA change might not be the best solution, we
-> > should probably have CONFIG_ZONE_DMA32 instead as some other architectures
-> > do, so you can use the entire lowmem area for DMA allocations.
-> 
-> I might be mistaken, but if the machine description doesn't set the 
-> dma_zone_size field, arm_dma_zone_size and arm_dma_limit are set to 0 and 
-> 0xffffffff respectively. This results in MAX_DMA_ADDRESS being set to 
-> 0xffffffff. Doesn't that allow using the entire lowmem area for DMA 
-> allocations ?
+Hi Arnd,
 
-Sorry for the late reply. I hadn't actually looked at the details this
-far, and I would assume that you are right.
+On Thu, Dec 4, 2014 at 12:47 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+>> This clearly looks much better than the previous implementation, so that
+>> is great. If you can decouple it from the rest of this file, either through
+>> syscon or by asserting that sysc_base2 is not going to be needed for
+>> anything else, how about moving the new code to a standalon driver in
+>> drivers/power/reset?
+>
+> Yes, sysc_base2 is used for reset control only (I don't think we need to read
+> the mode strap pins).
+>
+> So unless there's a simple solution to the regmap problem, I think moving
+> this driver part to  drivers/power/reset is the most viable option.
 
-	Arnd
+There's another reasone for having a separate driver: if both the SH core and
+the ARM core are in use, the second register bank can only be accessed after
+acquiring the HPB (Peripheral Bus Bridge) semaphore.
+While we don't actively support running anything on the SH core, we don't
+want to prevent users from doing that.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
