@@ -1,54 +1,19 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 4 Dec 2014 16:42:16 +0100
-Subject: [PATCH V2] PM / Domains: Add pm_genpd_lookup() API to lookup
- domain by firmware node
-In-Reply-To: <CADGdYn5aLr69PrqO5RvU4q6HU9pPZ+1tWL27cc=cVazAvSVFpQ@mail.gmail.com>
-References: <1417171115-5789-1-git-send-email-ulf.hansson@linaro.org>
- <5765394.eQjV2VvkSL@vostro.rjw.lan>
- <CAPDyKFpX5nXR18pKdLrtDrPK60p1y2CEqq+--3z3jczRRmKrqA@mail.gmail.com>
- <CADGdYn5aLr69PrqO5RvU4q6HU9pPZ+1tWL27cc=cVazAvSVFpQ@mail.gmail.com>
-Message-ID: <CAPDyKFozWmOuCA_uR1b7BAxhYUGUFp48K0b4tTR-cWjzjgR2FQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Dec 2014 16:44:54 +0100
+Subject: [GIT PULL] Broadcom STB GISB bus driver for 3.19 (v2)
+In-Reply-To: <1417220370-469-1-git-send-email-f.fainelli@gmail.com>
+References: <1417220370-469-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <2910464.KM7dWcxCmJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 December 2014 at 12:57, amit daniel kachhap
-<amit.daniel@samsung.com> wrote:
-> On Mon, Dec 1, 2014 at 3:56 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 29 November 2014 at 01:30, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->>> On Friday, November 28, 2014 11:38:35 AM Ulf Hansson wrote:
->>>> In a step to move away from using genpd's name based APIs, such as the
->>>> pm_genpd_add_subdomain_names(), provide an API to lookup an already
->>>> initialized generic PM domain by its firmware node.
->>>>
->>>> This API would typically be a called from SOC specific code, to fetch a
->>>> handle to the domain. Especially convenient to configure subdomains and
->>>> when the hierarchy of the domains are described in DT.
->>>>
->>>> Do note, before pm_genpd_init() is invoked to initialize a generic PM
->>>> domain, it's the callers responsibility to assign the new ->fwnode
->>>> pointer in the struct generic_pm_domain, to enable pm_genpd_lookup() to
->>>> find the domain.
->>>>
->>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>>
->>> I have no problems with that, but do you have a user for it?
->>
->> Amit Daniel Kachhap, posted a patchset which is adding subdomains
->> configured from DT for Exynos. It's from there the idea to this patch
->> comes from. Amit is about to post a new version, based on this patch.
->
-> Hi Ulf,
->
-> I was trying to use this API but i felt there is a better way of just exporting
-> of_genpd_get_from_provider as a similar API is used to register the
-> power domain.
->
-> Check if this make sense www.spinics.net/lists/arm-kernel/msg382665.html.
->
+On Friday 28 November 2014 16:19:30 Florian Fainelli wrote:
+> This pull request contains the following changes to the Broadcom GISB bus
+> arbiter from Kevin Cernekee:
+> 
+> - Extend brcmstb GISB bus driver to work on MIPS (currently ARM-only) and support
+>   65nm and 40nm MIPS-based chips such as: BCM7038, BCM7400 and BCM7435
 
-That makes sense!
+Pulled into next/drivers, thanks!
 
-So, let's drop $subject patch.
-
-Kind regards
-Uffe
+	Arnd
