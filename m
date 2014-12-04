@@ -1,63 +1,31 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 04 Dec 2014 21:41:45 +0100
-Subject: [PATCH 1/3] ARM: pxa: add regulator_has_full_constraints to corgi
- board file
-In-Reply-To: <1417691402-28166-1-git-send-email-dbaryshkov@gmail.com> (Dmitry
- Eremin-Solenikov's message of "Thu, 4 Dec 2014 14:10:00 +0300")
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 4 Dec 2014 20:49:39 +0000
+Subject: [PATCH 1/3] ARM: pxa: add regulator_has_full_constraints to
+ corgi board file
+In-Reply-To: <87iohrywom.fsf@free.fr>
 References: <1417691402-28166-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <87iohrywom.fsf@free.fr>
+ <87iohrywom.fsf@free.fr>
+Message-ID: <20141204204939.GY7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+On Thu, Dec 04, 2014 at 09:41:45PM +0100, Robert Jarzmik wrote:
+> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
 
-> Add regulator_has_full_constraints() call to corgi board file to let
-> regulator core know that we do not have any additional regulators left.
-> This lets it substitute unprovided regulators with dummy ones.
->
-> This fixes the following warnings that can be seen on corgi if
-> regulators are enabled:
->
-> ads7846 spi1.0: unable to get regulator: -517
-> spi spi1.0: Driver ads7846 requests probe deferral
-> wm8731 0-001b: Failed to get supply 'AVDD': -517
-> wm8731 0-001b: Failed to request supplies: -517
-> wm8731 0-001b: ASoC: failed to probe component -517
-> corgi-audio corgi-audio: ASoC: failed to instantiate card -517
->
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> ---
->  arch/arm/mach-pxa/corgi.c | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-> index 06022b2..89f790d 100644
-> --- a/arch/arm/mach-pxa/corgi.c
-> +++ b/arch/arm/mach-pxa/corgi.c
-> @@ -26,6 +26,7 @@
->  #include <linux/i2c.h>
->  #include <linux/i2c/pxa-i2c.h>
->  #include <linux/io.h>
-> +#include <linux/regulator/machine.h>
->  #include <linux/spi/spi.h>
->  #include <linux/spi/ads7846.h>
->  #include <linux/spi/corgi_lcd.h>
-> @@ -752,6 +753,8 @@ static void __init corgi_init(void)
->  		sharpsl_nand_partitions[1].size = 53 * 1024 * 1024;
->  
->  	platform_add_devices(devices, ARRAY_SIZE(devices));
-> +
-> +	regulator_has_full_constraints();
->  }
->  
->  static void __init fixup_corgi(struct tag *tags, char **cmdline)
+> > +	regulator_has_full_constraints();
 
-Added Mark for review, as I was thinking regulator_has_full_constraints() was to
-be used to disable unused regulators, a bit like in the clock framework, rather
-than provide a way to provide automatically dummy regulators.
+> Added Mark for review, as I was thinking regulator_has_full_constraints() was to
+> be used to disable unused regulators, a bit like in the clock framework, rather
+> than provide a way to provide automatically dummy regulators.
 
-If Mark acks, I'll take the serie.
+> If Mark acks, I'll take the serie.
 
--- 
-Robert
+It's both, it's telling the core that the board has told it about all
+the regulator mappings it's ever going to tell it about.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/a6120d72/attachment.sig>
