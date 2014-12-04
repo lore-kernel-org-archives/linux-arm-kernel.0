@@ -1,27 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 10:55:55 +0100
-Subject: [PATCH 4/5] ASoC: dwc: Add devicetree support for Designware I2S
-In-Reply-To: <20141203201905.GO7712@sirena.org.uk>
-References: <547F3CAC.9050105@arm.com> <2041200.ZjakFFAZAU@wuerfel>
- <20141203201905.GO7712@sirena.org.uk>
-Message-ID: <2240364.fL8B0EDbFB@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 4 Dec 2014 09:58:06 +0000
+Subject: [PATCH] arm64: Provide a namespace to NCAPS
+In-Reply-To: <1417655821-22892-1-git-send-email-festevam@gmail.com>
+References: <1417655821-22892-1-git-send-email-festevam@gmail.com>
+Message-ID: <20141204095806.GD13224@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 December 2014 20:19:05 Mark Brown wrote:
-> On Wed, Dec 03, 2014 at 09:13:18PM +0100, Arnd Bergmann wrote:
+On Thu, Dec 04, 2014 at 01:17:01AM +0000, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> > I don't think we even have to worry about the platform_data case here:
-> > the only platform using this hardware in Linux is arm/mach-spear, and
-> > it defines a device node with a binding that is similar to the one you
-> > document here but that is not implemented in the driver.
+> Building arm64.allmodconfig leads to the following warning:
 > 
-> Not all the world uses DT, this is a DesignWare IP so it's likely to get
-> deployed widely - potentially on PCI cards and things like that.
+> usb/gadget/function/f_ncm.c:203:0: warning: "NCAPS" redefined
+>  #define NCAPS (USB_CDC_NCM_NCAP_ETH_FILTER | USB_CDC_NCM_NCAP_CRC_MODE)
+>  ^
+> In file included from /home/build/work/batch/arch/arm64/include/asm/io.h:32:0,
+>                  from /home/build/work/batch/include/linux/clocksource.h:19,
+>                  from /home/build/work/batch/include/clocksource/arm_arch_timer.h:19,
+>                  from /home/build/work/batch/arch/arm64/include/asm/arch_timer.h:27,
+>                  from /home/build/work/batch/arch/arm64/include/asm/timex.h:19,
+>                  from /home/build/work/batch/include/linux/timex.h:65,
+>                  from /home/build/work/batch/include/linux/sched.h:19,
+>                  from /home/build/work/batch/arch/arm64/include/asm/compat.h:25,
+>                  from /home/build/work/batch/arch/arm64/include/asm/stat.h:23,
+>                  from /home/build/work/batch/include/linux/stat.h:5,
+>                  from /home/build/work/batch/include/linux/module.h:10,
+>                  from /home/build/work/batch/drivers/usb/gadget/function/f_ncm.c:19:
+> arch/arm64/include/asm/cpufeature.h:27:0: note: this is the location of the previous definition
+>  #define NCAPS     2
+> 
+> So add a ARM64 prefix to avoid such problem.
 
-It's not really new though, and we are only seeing the second user.
-Maybe this one just isn't as common as a lot of the other designware IP?
+Thanks, applied.
 
-
-
-	Arnd
+Will
