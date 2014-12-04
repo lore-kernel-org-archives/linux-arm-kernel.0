@@ -1,37 +1,50 @@
-From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Thu, 04 Dec 2014 09:07:51 +0000
-Subject: [PATCH 2/5] ASoC: dwc: Don't allow negative use counts
-In-Reply-To: <CAA7nrth+h32Un2C4z106wL181eru7hwFDxMdS00X55h5Zw=-Vg@mail.gmail.com>
-References: <547F3C9F.8080102@arm.com>	<20141203172526.GC7712@sirena.org.uk>	<CAA7nrtjrQ5SpDrZRPb58zqmZrWahY3XOMWnmdH70WLr3q46_bA@mail.gmail.com>
- <CAA7nrth+h32Un2C4z106wL181eru7hwFDxMdS00X55h5Zw=-Vg@mail.gmail.com>
-Message-ID: <54802467.4000702@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Dec 2014 10:12:24 +0100
+Subject: [PATCH v4 1/2] soc: samsung: add exynos chipid driver support
+In-Reply-To: <547FEA74.1010900@samsung.com>
+References: <1417594658-2931-1-git-send-email-pankaj.dubey@samsung.com>
+ <19026872.NZqUJn3Abb@wuerfel> <547FEA74.1010900@samsung.com>
+Message-ID: <4074205.TGQpWxTihh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/14 06:43, rajeev kumar wrote:
-> On Thu, Dec 4, 2014 at 12:10 PM, rajeev kumar
-> <rajeevkumar.linux@gmail.com> wrote:
->> On Wed, Dec 3, 2014 at 10:55 PM, Mark Brown <broonie@kernel.org> wrote:
->>> On Wed, Dec 03, 2014 at 04:38:55PM +0000, Andrew Jackson wrote:
->>>
->>>>       case SNDRV_PCM_TRIGGER_STOP:
->>>>       case SNDRV_PCM_TRIGGER_SUSPEND:
->>>>       case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
->>>> -             dev->active--;
->>>> +             if (dev->active > 0)
->>>> +                     dev->active--;
->>>
->>> How is this triggering - this sounds like you're papering over some
->>> other bug somewhere?
+On Thursday 04 December 2014 10:30:36 Pankaj Dubey wrote:
+> >
+> > On Wednesday 03 December 2014 13:47:37 Pankaj Dubey wrote:
+> >
+> >> +       soc_dev_attr->soc_id = exynos_product_id_to_name(soc_product_id);
+> >> +
+> >> +       soc_dev = soc_device_register(soc_dev_attr);
+> >> +       if (IS_ERR(soc_dev))
+> >> +               goto free_rev;
+> >> +
+> >> +       device_create_file(soc_device_to_device(soc_dev), &exynos_product_attr);
+> >> +       device_create_file(soc_device_to_device(soc_dev),
+> >> +                               &exynos_main_rev_attr);
+> >> +       device_create_file(soc_device_to_device(soc_dev), &exynos_sub_rev_attr);
+> >> +
+> >
+> > I don't like the idea of having three extra nonstandard properties here,
+> > especially when you are not using the machine field for anything useful.
+> >
 > 
-> This check can be removed as it is not going to triggered.
+> I did not get you here. Any suggestions how we can use 'machine' field 
+> more useful way.
 
-As I said in my email to Mark, I couldn't convince myself that STOP/SUSPEND would only be called once so it seemed like a loophole which /might/ result in the device not functioning correctly.
+For instance you could pass the exynos_product_id_to_name() result to
+the machine field instead of the soc_id field, and use the soc_id
+for a more fine-grained distinction.
 
-If this can never happen, I'll drop the patch.
-
-	Andrew
-
-> B'rgds
-> ~Rajeev
+> > Also, all three of these just come from the same register, why expose
+> > them all as the machine and revision standard properties.
+> >
 > 
+> Agreed. These properties are basically giving same information but with 
+> small modification.
+> As you said these are getting exposed via standard properties as well, 
+> so I have no issue to drop them. Just waiting for more review from 
+> Samsung folks, will take care of this in next version.
+
+Ok.
+
+	Arnd
