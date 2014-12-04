@@ -1,170 +1,36 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu,  4 Dec 2014 09:41:43 +0530
-Subject: [PATCH V2 01/26] thermal: cpu_cooling: check for the readiness of
- cpufreq layer
-In-Reply-To: <cover.1417664938.git.viresh.kumar@linaro.org>
-References: <cover.1417664938.git.viresh.kumar@linaro.org>
-Message-ID: <7b8f5ba72ee0aae221a5c64c1ead2044adbf87d1.1417664938.git.viresh.kumar@linaro.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 03 Dec 2014 20:40:04 -0800
+Subject: [PATCH] ARM: dts: Add dts file for odroid XU3 board
+In-Reply-To: <1417638971.21830.42.camel@collabora.co.uk> (Sjoerd Simons's
+ message of "Wed, 03 Dec 2014 21:36:11 +0100")
+References: <1417438770-28696-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <7hzjb4y0gp.fsf@deeprootsystems.com>
+ <1417638971.21830.42.camel@collabora.co.uk>
+Message-ID: <7hlhmoxc2j.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eduardo Valentin <edubezval@gmail.com>
+Sjoerd Simons <sjoerd.simons@collabora.co.uk> writes:
 
-In this patch, the cpu_cooling code checks for the usability of cpufreq
-layer before proceeding with the CPU cooling device registration. The
-main reason is: CPU cooling device is not usable if cpufreq cannot
-switch frequencies.
+> On Wed, 2014-12-03 at 11:53 -0800, Kevin Hilman wrote:
+>> Sjoerd Simons <sjoerd.simons@collabora.co.uk> writes:
+>> Tried this on top of linux-next (next-20141125 and next20141203) and
+>> boots fine on my odroid-xu3. 
+>> 
+>> Thanks for doing this, I've been meaning to get a DTS upstream for this
+>> platform myself.  I also noticed that the imprecise aborts I've been
+>> seeing when booting this board with the smdk5420 DTS are gone, so I
+>> don't have to dig into those now either.  Thanks!  :)
+>
+> For completeness, the problem with running the smdk5420 DTS on the XU3
+> is that the XU3 runs secure firmware while the SMD5420 doesn't.. Hence
+> the imprecise aborts you were seeing.
 
-Similar checks are spread in thermal drivers. Thus, the advantage now
-is to have the check in a single place: cpu cooling device registration.
-For this reason, this patch also updates the existing drivers that
-depend on CPU cooling to simply propagate the error code of the cpu
-cooling registration call. Therefore, in case cpufreq is not ready, the
-thermal drivers will still return -EPROBE_DEFER, in an attempt to try
-again when cpufreq layer gets ready.
+OK, that's what I suspected but didn't take the time to verify.  Thanks
+for the update.
 
-Cc: devicetree at vger.kernel.org
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-pm at vger.kernel.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
----
- drivers/thermal/cpu_cooling.c                      | 5 +++++
- drivers/thermal/db8500_cpufreq_cooling.c           | 5 -----
- drivers/thermal/imx_thermal.c                      | 5 -----
- drivers/thermal/samsung/exynos_thermal_common.c    | 8 +++++---
- drivers/thermal/samsung/exynos_tmu.c               | 5 ++++-
- drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 6 ------
- 6 files changed, 14 insertions(+), 20 deletions(-)
+BTW, I'll have some DTS updates for the xu3 to enable the on-board
+INA2xx current sensors for easy power measurements without external
+instrumentation.  Will send a patch for those soon.
 
-diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
-index ad09e51..f98a763 100644
---- a/drivers/thermal/cpu_cooling.c
-+++ b/drivers/thermal/cpu_cooling.c
-@@ -443,6 +443,11 @@ __cpufreq_cooling_register(struct device_node *np,
- 	int ret = 0, i;
- 	struct cpufreq_policy policy;
- 
-+	if (!cpufreq_frequency_get_table(cpumask_first(clip_cpus))) {
-+		pr_debug("%s: CPUFreq table not found\n", __func__);
-+		return ERR_PTR(-EPROBE_DEFER);
-+	}
-+
- 	/* Verify that all the clip cpus have same freq_min, freq_max limit */
- 	for_each_cpu(i, clip_cpus) {
- 		/* continue if cpufreq policy not found and not return error */
-diff --git a/drivers/thermal/db8500_cpufreq_cooling.c b/drivers/thermal/db8500_cpufreq_cooling.c
-index 786d192..1ac7ec6 100644
---- a/drivers/thermal/db8500_cpufreq_cooling.c
-+++ b/drivers/thermal/db8500_cpufreq_cooling.c
-@@ -18,7 +18,6 @@
-  */
- 
- #include <linux/cpu_cooling.h>
--#include <linux/cpufreq.h>
- #include <linux/err.h>
- #include <linux/module.h>
- #include <linux/of.h>
-@@ -30,10 +29,6 @@ static int db8500_cpufreq_cooling_probe(struct platform_device *pdev)
- 	struct thermal_cooling_device *cdev;
- 	struct cpumask mask_val;
- 
--	/* make sure cpufreq driver has been initialized */
--	if (!cpufreq_frequency_get_table(0))
--		return -EPROBE_DEFER;
--
- 	cpumask_set_cpu(0, &mask_val);
- 	cdev = cpufreq_cooling_register(&mask_val);
- 
-diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
-index 5a1f107..16405b4 100644
---- a/drivers/thermal/imx_thermal.c
-+++ b/drivers/thermal/imx_thermal.c
-@@ -9,7 +9,6 @@
- 
- #include <linux/clk.h>
- #include <linux/cpu_cooling.h>
--#include <linux/cpufreq.h>
- #include <linux/delay.h>
- #include <linux/device.h>
- #include <linux/init.h>
-@@ -459,10 +458,6 @@ static int imx_thermal_probe(struct platform_device *pdev)
- 	int measure_freq;
- 	int ret;
- 
--	if (!cpufreq_get_current_driver()) {
--		dev_dbg(&pdev->dev, "no cpufreq driver!");
--		return -EPROBE_DEFER;
--	}
- 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
- 	if (!data)
- 		return -ENOMEM;
-diff --git a/drivers/thermal/samsung/exynos_thermal_common.c b/drivers/thermal/samsung/exynos_thermal_common.c
-index b6be572..50a1f17 100644
---- a/drivers/thermal/samsung/exynos_thermal_common.c
-+++ b/drivers/thermal/samsung/exynos_thermal_common.c
-@@ -371,9 +371,11 @@ int exynos_register_thermal(struct thermal_sensor_conf *sensor_conf)
- 		th_zone->cool_dev[th_zone->cool_dev_size] =
- 					cpufreq_cooling_register(&mask_val);
- 		if (IS_ERR(th_zone->cool_dev[th_zone->cool_dev_size])) {
--			dev_err(sensor_conf->dev,
--				"Failed to register cpufreq cooling device\n");
--			ret = -EINVAL;
-+			ret = PTR_ERR(th_zone->cool_dev[th_zone->cool_dev_size]);
-+			if (ret != -EPROBE_DEFER)
-+				dev_err(sensor_conf->dev,
-+					"Failed to register cpufreq cooling device: %d\n",
-+					ret);
- 			goto err_unregister;
- 		}
- 		th_zone->cool_dev_size++;
-diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index 49c0924..2afca9b 100644
---- a/drivers/thermal/samsung/exynos_tmu.c
-+++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -683,7 +683,10 @@ static int exynos_tmu_probe(struct platform_device *pdev)
- 	/* Register the sensor with thermal management interface */
- 	ret = exynos_register_thermal(sensor_conf);
- 	if (ret) {
--		dev_err(&pdev->dev, "Failed to register thermal interface\n");
-+		if (ret != -EPROBE_DEFER)
-+			dev_err(&pdev->dev,
-+				"Failed to register thermal interface: %d\n",
-+				ret);
- 		goto err_clk;
- 	}
- 	data->reg_conf = sensor_conf;
-diff --git a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
-index 9eec26d..5f07d7e 100644
---- a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
-+++ b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
-@@ -28,7 +28,6 @@
- #include <linux/kernel.h>
- #include <linux/workqueue.h>
- #include <linux/thermal.h>
--#include <linux/cpufreq.h>
- #include <linux/cpumask.h>
- #include <linux/cpu_cooling.h>
- #include <linux/of.h>
-@@ -403,11 +402,6 @@ int ti_thermal_register_cpu_cooling(struct ti_bandgap *bgp, int id)
- 	if (!data)
- 		return -EINVAL;
- 
--	if (!cpufreq_get_current_driver()) {
--		dev_dbg(bgp->dev, "no cpufreq driver yet\n");
--		return -EPROBE_DEFER;
--	}
--
- 	/* Register cooling device */
- 	data->cool_dev = cpufreq_cooling_register(cpu_present_mask);
- 	if (IS_ERR(data->cool_dev)) {
--- 
-2.0.3.693.g996b0fd
+Kevin
