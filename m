@@ -1,134 +1,82 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu,  4 Dec 2014 15:02:24 +0000
-Subject: [PATCH] vgic: move reset initialization into vgic_init_maps()
-Message-ID: <1417705344-747-1-git-send-email-peter.maydell@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Dec 2014 16:03:49 +0100
+Subject: [GIT PULL v2 1/4] ARM: tegra: IOMMU support for v3.19
+In-Reply-To: <20141204144354.GA31464@ulmo.nvidia.com>
+References: <1416570832-6220-1-git-send-email-thierry.reding@gmail.com>
+ <2157417.mTprjOdEjk@wuerfel> <20141204144354.GA31464@ulmo.nvidia.com>
+Message-ID: <3327156.hTO1VnvNbE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VGIC initialization currently happens in three phases:
- (1) kvm_vgic_create() (triggered by userspace GIC creation)
- (2) vgic_init_maps() (triggered by userspace GIC register read/write
-     requests, or from kvm_vgic_init() if not already run)
- (3) kvm_vgic_init() (triggered by first VM run)
+On Thursday 04 December 2014 15:43:56 Thierry Reding wrote:
+> We discussed this on IRC and come to the conclusion that this approach
+> (encoding the table in the driver) was indeed the best for this
+> particular type of setup. For the record I'll try to explain the same
+> here and provide more details.
 
-We were doing initialization of some state to correspond with the
-state of a freshly-reset GIC in kvm_vgic_init(); this is too late,
-since it will overwrite changes made by userspace using the
-register access APIs before the VM is run. Move this initialization
-earlier, into the vgic_init_maps() phase.
+Yes, thanks a lot!
 
-This fixes a bug where QEMU could successfully restore a saved
-VM state snapshot into a VM that had already been run, but could
-not restore it "from cold" using the -loadvm command line option
-(the symptoms being that the restored VM would run but interrupts
-were ignored).
+> > I was assuming that you'd have one 'struct device' per client in all
+> > cases, so you'd have a unique association between a swgroup/id tuple
+> > and the device pointer that you pass into the dma-mapping and IOMMU APIs.
+> 
+> The majority of devices have two clients: one for read transactions,
+> another for write transactions. These are typically named <module>r and
+> <module>w, respectively. But each such module is a single device and
+> represented by a single device tree node.
+> 
+> The display controllers are somewhat exceptional in that they only read
+> data, so there are no write clients. But they also have a couple of
+> clients, one for each display window (or overlay). Like you said, this
+> looks really like each client is a unidirectional special-purpose DMA
+> master.
+> 
+> Some examples:
+> 
+> 	HDA: 2 clients: hdar and hdaw
+> 	SATA: 2 clients: satar and satar
+> 	DC: 6 clients: display{0a,0b,0c,hc,t,d}
+> 	DCB: 4 clients: display{0ab,0bb,0cb,hcb}
+> 
+> Each of those is a single IP block, and each has a SWGROUP that contains
+> the set of all the memory clients.
 
-Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
----
-You could make a good argument for renaming vgic_init_maps() and
-kvm_vgic_init() (eg vgic_init() and vgic_first_run() ?)...
+Yep
 
- virt/kvm/arm/vgic.c | 49 ++++++++++++++++---------------------------------
- 1 file changed, 16 insertions(+), 33 deletions(-)
+> > > There are patches in the works to add support for EMC frequency scaling
+> > > and also latency allowance programming.
+> > 
+> > Ok, I see. The part that I'm missing here is how the client driver
+> > knows its number, as you write that we don't have a device node per
+> > client. Do you have a particular binding in mind already?
+> 
+> I was thinking that each device tree node would get an additional
+> property, maybe something like the below. I'm not sure if it makes sense
+> to turn this into a generic binding, given that this is likely to be
+> implemented fairly differently on other SoCs, or perhaps other SoCs
+> don't even have an equivalent of it.
+> 
+> 	mc: memory-controller at 70019000 {
+> 		compatible = "nvidia,tegra124-mc";
+> 		...
+> 
+> 		#nvidia,memory-client-cells = <1>;
+> 	};
+> 
+> 	dc at 54200000 {
+> 		compatible = "nvidia,tegra124-dc";
+> 
+> 		...
+> 
+> 		nvidia,memory-client = <&mc 1 &mc 3 &mc 5 &mc 16 &mc 90 &mc 115>;
+> 	};
+> 
+> Maybe we'd even need something like nvidia,memory-client-names so that
+> drivers can determine for which specific clients to set the latency
+> allowance.
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 3aaca49..d2bc745 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1726,39 +1726,14 @@ static int vgic_vcpu_init_maps(struct kvm_vcpu *vcpu, int nr_irqs)
- 
- 	int sz = (nr_irqs - VGIC_NR_PRIVATE_IRQS) / 8;
- 	vgic_cpu->pending_shared = kzalloc(sz, GFP_KERNEL);
--	vgic_cpu->vgic_irq_lr_map = kzalloc(nr_irqs, GFP_KERNEL);
-+	vgic_cpu->vgic_irq_lr_map = kmalloc(nr_irqs, GFP_KERNEL);
- 
- 	if (!vgic_cpu->pending_shared || !vgic_cpu->vgic_irq_lr_map) {
- 		kvm_vgic_vcpu_destroy(vcpu);
- 		return -ENOMEM;
- 	}
- 
--	return 0;
--}
--
--/**
-- * kvm_vgic_vcpu_init - Initialize per-vcpu VGIC state
-- * @vcpu: pointer to the vcpu struct
-- *
-- * Initialize the vgic_cpu struct and vgic_dist struct fields pertaining to
-- * this vcpu and enable the VGIC for this VCPU
-- */
--static void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
--{
--	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
--	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
--	int i;
--
--	for (i = 0; i < dist->nr_irqs; i++) {
--		if (i < VGIC_NR_PPIS)
--			vgic_bitmap_set_irq_val(&dist->irq_enabled,
--						vcpu->vcpu_id, i, 1);
--		if (i < VGIC_NR_PRIVATE_IRQS)
--			vgic_bitmap_set_irq_val(&dist->irq_cfg,
--						vcpu->vcpu_id, i, VGIC_CFG_EDGE);
--
--		vgic_cpu->vgic_irq_lr_map[i] = LR_EMPTY;
--	}
-+	memset(vgic_cpu->vgic_irq_lr_map, LR_EMPTY, nr_irqs);
- 
- 	/*
- 	 * Store the number of LRs per vcpu, so we don't have to go
-@@ -1767,7 +1742,7 @@ static void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
- 	 */
- 	vgic_cpu->nr_lr = vgic->nr_lr;
- 
--	vgic_enable(vcpu);
-+	return 0;
- }
- 
- void kvm_vgic_destroy(struct kvm *kvm)
-@@ -1865,11 +1840,23 @@ static int vgic_init_maps(struct kvm *kvm)
- 			kvm_err("VGIC: Failed to allocate vcpu memory\n");
- 			break;
- 		}
-+		for (i = 0; i < dist->nr_irqs; i++) {
-+			if (i < VGIC_NR_PPIS)
-+				vgic_bitmap_set_irq_val(&dist->irq_enabled,
-+							vcpu->vcpu_id, i, 1);
-+			if (i < VGIC_NR_PRIVATE_IRQS)
-+				vgic_bitmap_set_irq_val(&dist->irq_cfg,
-+							vcpu->vcpu_id, i,
-+							VGIC_CFG_EDGE);
-+		}
- 	}
- 
- 	for (i = VGIC_NR_PRIVATE_IRQS; i < dist->nr_irqs; i += 4)
- 		vgic_set_target_reg(kvm, 0, i);
- 
-+	kvm_for_each_vcpu(i, vcpu, kvm)
-+		vgic_enable(vcpu);
-+
- out:
- 	if (ret)
- 		kvm_vgic_destroy(kvm);
-@@ -1888,8 +1875,7 @@ out:
-  */
- int kvm_vgic_init(struct kvm *kvm)
- {
--	struct kvm_vcpu *vcpu;
--	int ret = 0, i;
-+	int ret = 0;
- 
- 	if (!irqchip_in_kernel(kvm))
- 		return 0;
-@@ -1920,9 +1906,6 @@ int kvm_vgic_init(struct kvm *kvm)
- 		goto out;
- 	}
- 
--	kvm_for_each_vcpu(i, vcpu, kvm)
--		kvm_vgic_vcpu_init(vcpu);
--
- 	kvm->arch.vgic.ready = true;
- out:
- 	if (ret)
--- 
-2.1.1
+Yes. We'd have to discuss the binding with some of the other SoC maintainers
+to see if they might have a use for this too, but this certainly makes
+sense.
+
+	Arnd
