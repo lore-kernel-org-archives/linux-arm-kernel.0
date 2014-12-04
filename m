@@ -1,30 +1,67 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 12:17:15 +0100
-Subject: [PATCH 4/5] ASoC: dwc: Add devicetree support for Designware I2S
-In-Reply-To: <20141204110746.GR7712@sirena.org.uk>
-References: <547F3CAC.9050105@arm.com> <2240364.fL8B0EDbFB@wuerfel>
- <20141204110746.GR7712@sirena.org.uk>
-Message-ID: <2090131.rL6S1lx8Ky@wuerfel>
+Date: Thu, 04 Dec 2014 12:19:32 +0100
+Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
+ drivers
+In-Reply-To: <20141204102127.GF13224@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <3152553.esaQuZiCgi@wuerfel> <20141204102127.GF13224@arm.com>
+Message-ID: <5643715.BADzWxcqOQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 December 2014 11:07:46 Mark Brown wrote:
-> On Thu, Dec 04, 2014 at 10:55:55AM +0100, Arnd Bergmann wrote:
-> > On Wednesday 03 December 2014 20:19:05 Mark Brown wrote:
+On Thursday 04 December 2014 10:21:27 Will Deacon wrote:
+> On Thu, Dec 04, 2014 at 10:10:17AM +0000, Arnd Bergmann wrote:
+> > On Thursday 04 December 2014 09:49:53 Will Deacon wrote:
+> > > On Wed, Dec 03, 2014 at 07:57:50PM +0000, Arnd Bergmann wrote:
+> > > > On Tuesday 02 December 2014 14:16:57 Grant Likely wrote:
+> > > > > On Mon, Dec 1, 2014 at 11:54 PM, Rob Herring <robherring2@gmail.com> wrote:
+> > > > > > On Mon, Dec 1, 2014 at 10:57 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > > > > >>
+> > > > > >> +static inline void of_iommu_set_ops(struct device_node *np,
+> > > > > >> +                                   const struct iommu_ops *ops)
+> > > > > >> +{
+> > > > > >> +       np->data = (struct iommu_ops *)ops;
+> > > > > >> +}
+> > > > > >> +
+> > > > > >> +static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+> > > > > >> +{
+> > > > > >> +       return np->data;
+> > > > > >> +}
+> > > > > >
+> > > > > > This may collide with other users. While use of it is rare, PPC uses
+> > > > > > it in its PCI code. The OF_DYNAMIC code frees it but never actually
+> > > > > > sets it. There may be some coming usage with the DT overlay code or
+> > > > > > that's just a bug. Pantelis or Grant can comment. If not, I think we
+> > > > > > really should try to get rid of this pointer rather than expand it's
+> > > > > > usage.
+> > > > > >
+> > > > > > I didn't see a user of this. I'm guessing that is coming in a SMMU patch?
+> > > > > 
+> > > > > Good catch. This is not good. The data pointer should be avoided since
+> > > > > there are no controls over its use. Until a better solution can be
+> > > > > implemented, probably the safest thing to do is add a struct iommu_ops
+> > > > > pointer to struct device_node. However, assuming that only a small
+> > > > > portion of nodes will actually have iommu_ops set, I'd rather see a
+> > > > > separate registry that matches device_nodes to iommu_ops.
+> > > > 
+> > > > Fair enough. Will, can you take a copy of drivers/dma/of-dma.c and
+> > > > adapt it as needed? It should be exactly what we need to start
+> > > > out and can be extended and generalized later.
+> > > 
+> > > Sure, I'll add this to my list of stuff to do for 3.20.
+> > 
+> > Does that mean the we don't get any of the patches for 3.19 despite the
+> > Acks?
 > 
-> > > Not all the world uses DT, this is a DesignWare IP so it's likely to get
-> > > deployed widely - potentially on PCI cards and things like that.
+> Hmm, I don't know how useful they are without the get/set ops and I don't
+> think I can get those ready for 3.19 given where we currently are.
 > 
-> > It's not really new though, and we are only seeing the second user.
-> > Maybe this one just isn't as common as a lot of the other designware IP?
-> 
-> It's relatively common with newer companies - it's like UARTs, any
-> company that's been around for a long time will have a homebrew IP
-> already but places that don't (or get fed up with their existing IP)
-> will tend to buy something in.
+> Grant's suggestion of adding an iommu_ops pointer to device_node would work
+> as a temporary hack, but anything more advanced is going to need proper
+> review.
 
-I see, but are any of the newer designs going to use platform_data?
-My general feeling was that the only places that still depend on that
-are legacy platforms and architectures.
+Right. I guess it doesn't hurt much if we put the new pointer inside
+#ifdef CONFIG_OF_IOMMU, then at least there is no significant size
+increase in most DT based platforms.
 
 	Arnd
