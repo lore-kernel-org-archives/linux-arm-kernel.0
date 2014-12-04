@@ -1,77 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 19:20:34 +0100
-Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <20141204162834.GA2995@linaro.org>
-References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
- <8625951.Wbs2MxLnhi@wuerfel> <20141204162834.GA2995@linaro.org>
-Message-ID: <2519415.GklIQeMgWR@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 4 Dec 2014 18:20:49 +0000
+Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
+In-Reply-To: <1417707993-82290-1-git-send-email-agraf@suse.de>
+References: <1417707993-82290-1-git-send-email-agraf@suse.de>
+Message-ID: <20141204182049.GB7749@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 December 2014 09:28:34 Lina Iyer wrote:
-> On Thu, Dec 04 2014 at 02:02 -0700, Arnd Bergmann wrote:
-> >On Thursday 04 December 2014 09:52:39 Daniel Lezcano wrote:
-> >> On 12/03/2014 09:35 PM, Arnd Bergmann wrote:
-> >> > On Wednesday 03 December 2014 07:31:22 Lina Iyer wrote:
-> >> >>>>> +static int __init qcom_spm_init(void)
-> >> >>>>> +{
-> >> >>>>> +    int ret;
-> >> >>>>> +
-> >> >>>>> +    /*
-> >> >>>>> +     * cpuidle driver need to registered before the cpuidle device
-> >> >>>>> +     * for any cpu. Register the device for the the cpuidle driver.
-> >> >>>>> +     */
-> >> >>>>> +    ret = platform_device_register(&qcom_cpuidle_drv);
-> >> >>>>> +    if (ret)
-> >> >>>>> +        return ret;
-> >> >>>> Stephen pointed out that we would have the platform device lying around
-> >> >>>> on a non-QCOM device when using multi_v7_defconfig.
-> >> >>>
-> >> >>> Perhaps I am missing the point, but this is not supposed to happen, no ?
-> >> >>>
-> >> >> This would happen, since the file would compile on multi_v7 and we would
-> >> >> initialize and register this device regardless. The cpuidle-qcom.c
-> >> >> driver probe would bail out looking for a matching compatible property.
-> >> >> So we would not register a cpuidle driver but the device would lay
-> >> >> around.
-> >> >
-> >> > I think the problem is registering a platform_device. I've complained
-> >> > about this before, but it still seems to get copied all over the
-> >> > place. Please don't do this but have a driver that looks at DT to
-> >> > figure out whether to access hardware or not.
-> >>
-> >> We did this approach but, I can remember why, someone was complaining
-> >> about it also
-> >>
-> >> The platform device/driver paradigm allowed us to split the arch
-> >> specific parts by passing the pm ops through the platform data.
-> >>
-> >> Would make sense to have a single common place for the ARM arch where we
-> >> initialize the platform device for cpuidle ?
-> >
-> >No. It's really not a device, and if you pretend that it is, you get
-> >into problems like this.
+On Thu, Dec 04, 2014 at 03:46:33PM +0000, Alexander Graf wrote:
+> With binutils 2.25 the default alignment for 32bit arm sections changed to
+> have everything 64k aligned. Armv7 binaries built with this binutils version
+> run successfully on an arm64 system.
 > 
-> Arnd, the problem is that the provides function pointers to the SoC code
-> that the cpuilde driver uses to call based on the idle state.
+> Since effectively there is now the chance to run armv7 code on arm64 even
+> with 64k page size, it doesn't make sense to block people from enabling
+> CONFIG_COMPAT on those configurations.
+
+Is there a distro available that is built with a recent enough binutils for
+this? I'd really like to run our regression tests to check that page-size
+assumptions don't exist for things like shm.
+
+Will
+
 > 
-> After much discussions, we came down to using function pointers from
-> translating from DT strings, other than using that again, I dont see a
-> good way of achieving the ability of cpuidle driver staying a separate
-> driver from the SPM driver.
+> Signed-off-by: Alexander Graf <agraf@suse.de>
+> ---
+>  arch/arm64/Kconfig | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> Daniel, thoughts?
-
-Maybe the problem is trying too hard to separate two things that really
-belong together then. In general, the strategy of coming up with subsystems
-for a class of devices and them turning platform code into drivers for
-that subsystem has worked out really well, but I think for cpufreq, cpuidle
-and smp, it really hasn't, and in the third case we haven't even tried
-coming up with a subsystem for that reason.
-
-Having all cpuidle code generally live in drivers/cpuidle is still a good
-idea IMO, but using a platform device just for the purpose of passing
-data between some platform specific code and another platform specific
-driver hasn't worked out that well here.
-
-	Arnd
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 9532f8d..3cf4f238 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -409,7 +409,6 @@ source "fs/Kconfig.binfmt"
+>  
+>  config COMPAT
+>  	bool "Kernel support for 32-bit EL0"
+> -	depends on !ARM64_64K_PAGES
+>  	select COMPAT_BINFMT_ELF
+>  	select HAVE_UID16
+>  	select OLD_SIGSUSPEND3
+> -- 
+> 1.7.12.4
+> 
+> 
