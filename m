@@ -1,50 +1,42 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 4 Dec 2014 10:39:59 +0100
-Subject: [PATCH 0/4] ARM: shmobile: R-Mobile: Add SYSC restart handler
-In-Reply-To: <20141204073409.GG25806@verge.net.au>
-References: <1417616227-6715-1-git-send-email-geert+renesas@glider.be>
- <20141204073409.GG25806@verge.net.au>
-Message-ID: <CAMuHMdWFkz+kZanH47dzAVPnoB_RuTt=KLp72ziohMnZad5ErA@mail.gmail.com>
+From: Andrew.Jackson@arm.com (Andrew Jackson)
+Date: Thu, 04 Dec 2014 09:42:13 +0000
+Subject: [PATCH 4/5] ASoC: dwc: Add devicetree support for Designware I2S
+In-Reply-To: <20141203182351.GF7712@sirena.org.uk>
+References: <547F3CAC.9050105@arm.com> <20141203182351.GF7712@sirena.org.uk>
+Message-ID: <54802C75.9060609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On 12/03/14 18:23, Mark Brown wrote:
+> On Wed, Dec 03, 2014 at 04:39:08PM +0000, Andrew Jackson wrote:
+> 
+>> Convert to driver to use either platform_data or device-tree for configuration
+>> of the device.  When using device-tree, the I2S block's configuration is read
+>> from the relevant registers: this reduces the amount of information required in
+>> the device tree.
+> 
+> This really needs to be split into two or more patches, there's a whole
+> bunch of refactoring to support this DT stuff which should be separate
+> from the DT addition itself.  Right now it's hard to tell what each
+> individual bit of the code is supposed to be doing, the patch is far too
+> large and doing far too many individual things.
 
-On Thu, Dec 4, 2014 at 8:34 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Dec 03, 2014 at 03:17:03PM +0100, Geert Uytterhoeven wrote:
->> This patch series extends the PM domain platform driver for the R-Mobile
->> System Controller (SYSC) to register a restart handler, and removes the
->> restart handler hacks on DT-based R-Mobile A1 (r8a7740) and SH-Mobile AG5
->> (sh73a0) platforms.
->>
->> Note that this supports DT-based platforms only. Legacy platforms keep
->> on using the restart callback in struct machine_desc.
->>
->> This was tested on r8a7740/armadillo-multiplatform,
->> sh73a0/kzm9g-reference, and sh73a0/kzm9g-multiplatform.
->>
->> Arnd: is this what you had in mind in your response to "[GIT PULL] Third
->> Round of Renesas ARM Based Soc Updates for v3.19"
->> (http://www.spinics.net/lists/arm-kernel/msg379348.html)?
->>
->> Dependencies:
->>   - The first two patches depend on the series "[PATCH v6 0/7] ARM:
->>     shmobile: R-Mobile: DT PM domain support", as that series adds the
->>     SYSC PM domain platform driver for DT-based platforms and adds the
->>     SYSC device node to r8a7740.dtsi,
->
-> As I have queued up that series I believe I could also queue up
-> the first two patches of this series. Is that worthwhile?
+I will have look at how it might be split.  The majority of the new code is in reading and processing the device's configuration: I didn't want to change the platform data handling to do that because some of the comments in the driver suggested that there were ST specific changes to the Designware IP.  I wasn't in a position to know whether, if I changed the configuration reading, the driver would still function correctly on the SPEAR platform.
 
-Yes you can, if Arnd doesn't object against the driver.
+>> +	if (dev->using_pd) {
+>> +		ret = dev->i2s_clk_cfg(config);
+>> +		if (ret < 0) {
+>> +			dev_err(dev->dev, "runtime audio clk config fail\n");
+>> +			return ret;
+>> +		}
+>> +	} else {
+>> +		u32	bitclk;
+> 
+> Having this whole separate path for using platform data feels icky, we
+> don't want to have completely separate flows like this.  Checking for
+> the callbacks being there is probably fine but just having totally
+> separate code paths is a bit icky.
 
-Gr{oetje,eeting}s,
+I wasn't very happy either but making the test explicit seemed reasonable at the time.  I'll change the code to test for the presence of the callback instead.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Andrew
