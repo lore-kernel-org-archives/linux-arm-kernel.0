@@ -1,82 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 16:03:49 +0100
-Subject: [GIT PULL v2 1/4] ARM: tegra: IOMMU support for v3.19
-In-Reply-To: <20141204144354.GA31464@ulmo.nvidia.com>
-References: <1416570832-6220-1-git-send-email-thierry.reding@gmail.com>
- <2157417.mTprjOdEjk@wuerfel> <20141204144354.GA31464@ulmo.nvidia.com>
-Message-ID: <3327156.hTO1VnvNbE@wuerfel>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 4 Dec 2014 09:05:38 -0600
+Subject: [PATCH 3/3] arm: boot: dts: am437x-sk: fix lcd enable pin mux data
+In-Reply-To: <20141204144325.GA17269@saruman>
+References: <1413311335-25083-1-git-send-email-balbi@ti.com>
+ <1413311335-25083-3-git-send-email-balbi@ti.com>
+ <543E6774.8000406@ti.com> <20141204144325.GA17269@saruman>
+Message-ID: <20141204150538.GE18045@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 December 2014 15:43:56 Thierry Reding wrote:
-> We discussed this on IRC and come to the conclusion that this approach
-> (encoding the table in the driver) was indeed the best for this
-> particular type of setup. For the record I'll try to explain the same
-> here and provide more details.
-
-Yes, thanks a lot!
-
-> > I was assuming that you'd have one 'struct device' per client in all
-> > cases, so you'd have a unique association between a swgroup/id tuple
-> > and the device pointer that you pass into the dma-mapping and IOMMU APIs.
+On Thu, Dec 04, 2014 at 08:43:25AM -0600, Felipe Balbi wrote:
+> HI,
 > 
-> The majority of devices have two clients: one for read transactions,
-> another for write transactions. These are typically named <module>r and
-> <module>w, respectively. But each such module is a single device and
-> represented by a single device tree node.
-> 
-> The display controllers are somewhat exceptional in that they only read
-> data, so there are no write clients. But they also have a couple of
-> clients, one for each display window (or overlay). Like you said, this
-> looks really like each client is a unidirectional special-purpose DMA
-> master.
-> 
-> Some examples:
-> 
-> 	HDA: 2 clients: hdar and hdaw
-> 	SATA: 2 clients: satar and satar
-> 	DC: 6 clients: display{0a,0b,0c,hc,t,d}
-> 	DCB: 4 clients: display{0ab,0bb,0cb,hcb}
-> 
-> Each of those is a single IP block, and each has a SWGROUP that contains
-> the set of all the memory clients.
-
-Yep
-
-> > > There are patches in the works to add support for EMC frequency scaling
-> > > and also latency allowance programming.
+> On Wed, Oct 15, 2014 at 03:24:20PM +0300, Tomi Valkeinen wrote:
+> > On 14/10/14 21:28, Felipe Balbi wrote:
+> > > Caused by a copy & paste error. Note that even with
+> > > this bug AM437x SK display still works because GPIO
+> > > mux mode is always enabled. It's still wrong to mux
+> > > somebody else's pin.
+> > > 
+> > > Luckily ball D25 (offset 0x238 - gpio5_8) on AM437x
+> > > isn't used for anything.
+> > > 
+> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > ---
+> > >  arch/arm/boot/dts/am437x-sk-evm.dts | 3 +--
+> > >  1 file changed, 1 insertion(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
+> > > index 859ff3d..681be00 100644
+> > > --- a/arch/arm/boot/dts/am437x-sk-evm.dts
+> > > +++ b/arch/arm/boot/dts/am437x-sk-evm.dts
+> > > @@ -320,8 +320,7 @@
+> > >  
+> > >  	lcd_pins: lcd_pins {
+> > >  		pinctrl-single,pins = <
+> > > -			/* GPIO 5_8 to select LCD / HDMI */
+> > > -			0x238 (PIN_OUTPUT_PULLUP | MUX_MODE7)
+> > > +			0x1c (PIN_OUTPUT_PULLUP | MUX_MODE7) /* gpcm_ad7.gpio1_7 */
+> > >  		>;
+> > >  	};
+> > >  };
 > > 
-> > Ok, I see. The part that I'm missing here is how the client driver
-> > knows its number, as you write that we don't have a device node per
-> > client. Do you have a particular binding in mind already?
+> > I didn't verify the offset, but based on the comments this looks fine to me.
+> > 
+> > Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 > 
-> I was thinking that each device tree node would get an additional
-> property, maybe something like the below. I'm not sure if it makes sense
-> to turn this into a generic binding, given that this is likely to be
-> implemented fairly differently on other SoCs, or perhaps other SoCs
-> don't even have an equivalent of it.
-> 
-> 	mc: memory-controller at 70019000 {
-> 		compatible = "nvidia,tegra124-mc";
-> 		...
-> 
-> 		#nvidia,memory-client-cells = <1>;
-> 	};
-> 
-> 	dc at 54200000 {
-> 		compatible = "nvidia,tegra124-dc";
-> 
-> 		...
-> 
-> 		nvidia,memory-client = <&mc 1 &mc 3 &mc 5 &mc 16 &mc 90 &mc 115>;
-> 	};
-> 
-> Maybe we'd even need something like nvidia,memory-client-names so that
-> drivers can determine for which specific clients to set the latency
-> allowance.
+> Tony, are you taking this patch ? Looks like it has been forgotten and
+> now it needs to be backported to v3.17 and v3.18 (assuming it's too late
+> for v3.18).
 
-Yes. We'd have to discuss the binding with some of the other SoC maintainers
-to see if they might have a use for this too, but this certainly makes
-sense.
+I'll send a new version and Cc stable.
 
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/65c5030a/attachment-0001.sig>
