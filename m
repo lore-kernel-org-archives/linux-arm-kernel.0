@@ -1,130 +1,91 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Wed, 03 Dec 2014 20:16:13 -0500
-Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
-In-Reply-To: <547F94B0.1000902@linaro.org>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <20141120135851.GA32528@linaro.org> <54759041.9080105@hitachi.com>
- <20141126100325.GA9157@linaro.org> <5476120D.9030703@linaro.org>
- <CAPvkgC3eVOZEn79C9PC9c7TqC_-yCtDhw5LL6ZWUJxr+oQFaow@mail.gmail.com>
- <5476BFB4.2020705@hitachi.com>
- <CAPvkgC0ELPPWfa-8kQ4H_e_O5G1ER4KEKuSWLxh_u-VZgh7W6A@mail.gmail.com>
- <547C36DB.7060903@hitachi.com> <547F242D.1060705@redhat.com>
- <547F94B0.1000902@linaro.org>
-Message-ID: <547FB5DD.901@redhat.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  3 Dec 2014 23:17:01 -0200
+Subject: [PATCH] arm64: Provide a namespace to NCAPS
+Message-ID: <1417655821-22892-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2014 05:54 PM, David Long wrote:
-> On 12/03/14 09:54, William Cohen wrote:
->> On 12/01/2014 04:37 AM, Masami Hiramatsu wrote:
->>> (2014/11/29 1:01), Steve Capper wrote:
->>>> On 27 November 2014 at 06:07, Masami Hiramatsu
->>>> <masami.hiramatsu.pt@hitachi.com> wrote:
->>>>> (2014/11/27 3:59), Steve Capper wrote:
->>>>>> The crash is extremely easy to reproduce.
->>>>>>
->>>>>> I've not observed any missed events on a kprobe on an arm64 system
->>>>>> that's still alive.
->>>>>> My (limited!) understanding is that this suggests there could be a
->>>>>> problem with how missed events from a recursive call to memcpy are
->>>>>> being handled.
->>>>>
->>>>> I think so too. BTW, could you bisect that? :)
->>>>>
->>>>
->>>> I can't bisect, but the following functions look suspicious to me
->>>> (again I'm new to kprobes...):
->>>> kprobes_save_local_irqflag
->>>> kprobes_restore_local_irqflag
->>>>
->>>> I think these are breaking somehow when nested (i.e. from a recursive probe).
->>>
->>> Agreed. On x86, prev_kprobe has old_flags and saved_flags, this
->>> at least must have saved_irqflag and save/restore it in
->>> save/restore_previous_kprobe().
->>>
->>> What about adding this?
->>>
->>>   struct prev_kprobe {
->>>       struct kprobe *kp;
->>>       unsigned int status;
->>> +    unsigned long saved_irqflag;
->>>   };
->>>
->>> and
->>>
->>>   static void __kprobes save_previous_kprobe(struct kprobe_ctlblk *kcb)
->>>   {
->>>       kcb->prev_kprobe.kp = kprobe_running();
->>>       kcb->prev_kprobe.status = kcb->kprobe_status;
->>> +    kcb->prev_kprobe.saved_irqflag = kcb->saved_irqflag;
->>>   }
->>>
->>>   static void __kprobes restore_previous_kprobe(struct kprobe_ctlblk *kcb)
->>>   {
->>>       __this_cpu_write(current_kprobe, kcb->prev_kprobe.kp);
->>>       kcb->kprobe_status = kcb->prev_kprobe.status;
->>> +    kcb->saved_irqflag = kcb->prev_kprobe.saved_irqflag;
->>>   }
->>>
->>>
->>
->> I have noticed with the aarch64 kprobe patches and recent kernel I can get the machine to end up getting stuck and printing out endless strings of
->>
->> [187694.855843] Unexpected kernel single-step exception at EL1
->> [187694.861385] Unexpected kernel single-step exception at EL1
->> [187694.866926] Unexpected kernel single-step exception at EL1
->> [187694.872467] Unexpected kernel single-step exception at EL1
->> [187694.878009] Unexpected kernel single-step exception at EL1
->> [187694.883550] Unexpected kernel single-step exception at EL1
->>
->> I can reproduce this pretty easily on my machine with functioncallcount.stp from https://sourceware.org/systemtap/examples/profiling/functioncallcount.stp and the following steps:
->>
->> # stap -p4 -k -m mm_probes -w functioncallcount.stp "*@mm/*.c" -c "sleep 1"
->> # staprun mm_probes.ko -c "sleep 1"
->>
->> -Will
-> 
-> I did a fresh checkout and build of systemtap and tried the above.  I'm not yet seeing this problem.  It does remind me of the problem we saw before debug exception handling in entry.S was patched in v3.18-rc1, but you say you are using recent kernel sources.
-> 
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Hi Dave,
+Building arm64.allmodconfig leads to the following warning:
 
-I saw this problem with a 3.18.0-rc5 based kernel.  Today I built a kernel based on  3.18.0-0.rc6.git0.1.x1 with the patches and I didn't see the problem with the unexpected kernel single-step exception.  I am not sure if maybe there was some problem function being probed in the 3.18.0-rc5 kernel but not with the 3.18.0-rc6 kernel or maybe some difference in the config between the kernels. It seemed wiser to mention it.
+usb/gadget/function/f_ncm.c:203:0: warning: "NCAPS" redefined
+ #define NCAPS (USB_CDC_NCM_NCAP_ETH_FILTER | USB_CDC_NCM_NCAP_CRC_MODE)
+ ^
+In file included from /home/build/work/batch/arch/arm64/include/asm/io.h:32:0,
+                 from /home/build/work/batch/include/linux/clocksource.h:19,
+                 from /home/build/work/batch/include/clocksource/arm_arch_timer.h:19,
+                 from /home/build/work/batch/arch/arm64/include/asm/arch_timer.h:27,
+                 from /home/build/work/batch/arch/arm64/include/asm/timex.h:19,
+                 from /home/build/work/batch/include/linux/timex.h:65,
+                 from /home/build/work/batch/include/linux/sched.h:19,
+                 from /home/build/work/batch/arch/arm64/include/asm/compat.h:25,
+                 from /home/build/work/batch/arch/arm64/include/asm/stat.h:23,
+                 from /home/build/work/batch/include/linux/stat.h:5,
+                 from /home/build/work/batch/include/linux/module.h:10,
+                 from /home/build/work/batch/drivers/usb/gadget/function/f_ncm.c:19:
+arch/arm64/include/asm/cpufeature.h:27:0: note: this is the location of the previous definition
+ #define NCAPS     2
 
->>>
->>>
->>>> That would explain why the state of play of the interrupts is in an
->>>> unexpected state in the crash I reported:
->>>> "The point of failure in the panic was:
->>>> fs/buffer.c:1257
->>>>
->>>> static inline void check_irqs_on(void)
->>>> {
->>>> #ifdef irqs_disabled
->>>>          BUG_ON(irqs_disabled());
->>>> #endif
->>>> }
->>>> "
->>>>
->>>> This is all new to me so I'm still at the head-scratching stage.
->>>
->>> Ah, I see.
->>>
->>> Thank you,
->>>
->>>>
->>>> David,
->>>> Does the above make sense to you? Have you managed to reproduce the crash I get?
->>>>
->>>> Cheers,
->>>> -- 
->>>> Steve
-> 
-> I have easily produced a crash although it doesn't look to me like the same one.  I'm getting a NULL pointer dereference.  The PMU stuff (used by perf record|stat -e) should be quite independent of kprobes though.
-> 
-> -dl
+So add a ARM64 prefix to avoid such problem.
 
-The perf issue seems to be independent and can be reproduced without using any kprobe support.  I need to get a simple reproducer and mention it on the linux-perf-user list.
+Reported-by: Olof's autobuilder <build@lixom.net>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm64/include/asm/cpufeature.h | 10 +++++-----
+ arch/arm64/kernel/setup.c           |  2 +-
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
--Will
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 0362f80..07547cc 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -24,11 +24,11 @@
+ #define ARM64_WORKAROUND_CLEAN_CACHE		0
+ #define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	1
+ 
+-#define NCAPS					2
++#define ARM64_NCAPS				2
+ 
+ #ifndef __ASSEMBLY__
+ 
+-extern DECLARE_BITMAP(cpu_hwcaps, NCAPS);
++extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 
+ static inline bool cpu_have_feature(unsigned int num)
+ {
+@@ -37,16 +37,16 @@ static inline bool cpu_have_feature(unsigned int num)
+ 
+ static inline bool cpus_have_cap(unsigned int num)
+ {
+-	if (num >= NCAPS)
++	if (num >= ARM64_NCAPS)
+ 		return false;
+ 	return test_bit(num, cpu_hwcaps);
+ }
+ 
+ static inline void cpus_set_cap(unsigned int num)
+ {
+-	if (num >= NCAPS)
++	if (num >= ARM64_NCAPS)
+ 		pr_warn("Attempt to set an illegal CPU capability (%d >= %d)\n",
+-			num, NCAPS);
++			num, ARM64_NCAPS);
+ 	else
+ 		__set_bit(num, cpu_hwcaps);
+ }
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 1de0e8a..b809911 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -80,7 +80,7 @@ unsigned int compat_elf_hwcap __read_mostly = COMPAT_ELF_HWCAP_DEFAULT;
+ unsigned int compat_elf_hwcap2 __read_mostly;
+ #endif
+ 
+-DECLARE_BITMAP(cpu_hwcaps, NCAPS);
++DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 
+ static const char *cpu_name;
+ phys_addr_t __fdt_pointer __initdata;
+-- 
+1.9.1
