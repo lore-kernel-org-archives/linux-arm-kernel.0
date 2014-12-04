@@ -1,26 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 4 Dec 2014 22:41:41 +0000
-Subject: [STLinux Kernel] [PATCH v2 1/4] spi: Add new driver for
- STMicroelectronics' SPI Controller
-In-Reply-To: <20141203091707.GH22522@x1>
-References: <1417534844-25080-1-git-send-email-lee.jones@linaro.org>
- <1417534844-25080-2-git-send-email-lee.jones@linaro.org>
- <547DE5FA.5000409@st.com> <20141203091707.GH22522@x1>
-Message-ID: <20141204224140.GB11764@sirena.org.uk>
+From: agraf@suse.de (Alexander Graf)
+Date: Fri, 05 Dec 2014 00:37:59 +0100
+Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
+In-Reply-To: <20141204182049.GB7749@arm.com>
+References: <1417707993-82290-1-git-send-email-agraf@suse.de>
+ <20141204182049.GB7749@arm.com>
+Message-ID: <5480F057.9010203@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03, 2014 at 09:17:07AM +0000, Lee Jones wrote:
 
->   Would you mind casting your eye over this submission prior to
-> the v3 please?
 
-This all seems fine (which also means that the DT updates are good to
-go).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/324664b8/attachment.sig>
+On 04.12.14 19:20, Will Deacon wrote:
+> On Thu, Dec 04, 2014 at 03:46:33PM +0000, Alexander Graf wrote:
+>> With binutils 2.25 the default alignment for 32bit arm sections changed to
+>> have everything 64k aligned. Armv7 binaries built with this binutils version
+>> run successfully on an arm64 system.
+>>
+>> Since effectively there is now the chance to run armv7 code on arm64 even
+>> with 64k page size, it doesn't make sense to block people from enabling
+>> CONFIG_COMPAT on those configurations.
+> 
+> Is there a distro available that is built with a recent enough binutils for
+> this? I'd really like to run our regression tests to check that page-size
+> assumptions don't exist for things like shm.
+
+I don't have a full distribution for you yet, but we'll start to switch
+to the 2.25 branch soon.
+
+Michael, what are you plans on when a first armv7 Factory build based on
+2.25 would be available?
+
+
+Alex
