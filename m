@@ -1,42 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 16:41:13 +0100
-Subject: [PATCH] arm: omap2: rx51-peripherals: fix build warning
-In-Reply-To: <20141204152411.GF18045@saruman>
-References: <1417033655-32332-1-git-send-email-balbi@ti.com>
- <20141204152411.GF18045@saruman>
-Message-ID: <3261416.DL88JFJXUF@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 4 Dec 2014 16:42:16 +0100
+Subject: [PATCH V2] PM / Domains: Add pm_genpd_lookup() API to lookup
+ domain by firmware node
+In-Reply-To: <CADGdYn5aLr69PrqO5RvU4q6HU9pPZ+1tWL27cc=cVazAvSVFpQ@mail.gmail.com>
+References: <1417171115-5789-1-git-send-email-ulf.hansson@linaro.org>
+ <5765394.eQjV2VvkSL@vostro.rjw.lan>
+ <CAPDyKFpX5nXR18pKdLrtDrPK60p1y2CEqq+--3z3jczRRmKrqA@mail.gmail.com>
+ <CADGdYn5aLr69PrqO5RvU4q6HU9pPZ+1tWL27cc=cVazAvSVFpQ@mail.gmail.com>
+Message-ID: <CAPDyKFozWmOuCA_uR1b7BAxhYUGUFp48K0b4tTR-cWjzjgR2FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 December 2014 09:24:11 Felipe Balbi wrote:
-> On Wed, Nov 26, 2014 at 02:27:35PM -0600, Felipe Balbi wrote:
-> > commit 68a3c04 ([media] ARM: OMAP2: RX-51: update
-> > si4713 platform data) updated board-rx51-peripherals.c
-> > so that si4713 could be easily used on DT boot, but
-> > it ended up introducing a build warning whenever
-> > si4713 isn't enabled.
-> > 
-> > This patches fixes that warning:
-> > 
-> > arch/arm/mach-omap2/board-rx51-peripherals.c:1000:36: warning: \
-> > 	?rx51_si4713_platform_data? defined but not used [-Wunused-variable]
-> >  static struct si4713_platform_data rx51_si4713_platform_data = {
-> > 
-> > Cc: Sebastian Reichel <sre@kernel.org>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Hans Verkuil <hans.verkuil@cisco.com>
-> > Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> 
-> a gentle reminder on this one.
-> 
+On 1 December 2014 at 12:57, amit daniel kachhap
+<amit.daniel@samsung.com> wrote:
+> On Mon, Dec 1, 2014 at 3:56 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> On 29 November 2014 at 01:30, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>>> On Friday, November 28, 2014 11:38:35 AM Ulf Hansson wrote:
+>>>> In a step to move away from using genpd's name based APIs, such as the
+>>>> pm_genpd_add_subdomain_names(), provide an API to lookup an already
+>>>> initialized generic PM domain by its firmware node.
+>>>>
+>>>> This API would typically be a called from SOC specific code, to fetch a
+>>>> handle to the domain. Especially convenient to configure subdomains and
+>>>> when the hierarchy of the domains are described in DT.
+>>>>
+>>>> Do note, before pm_genpd_init() is invoked to initialize a generic PM
+>>>> domain, it's the callers responsibility to assign the new ->fwnode
+>>>> pointer in the struct generic_pm_domain, to enable pm_genpd_lookup() to
+>>>> find the domain.
+>>>>
+>>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>>
+>>> I have no problems with that, but do you have a user for it?
+>>
+>> Amit Daniel Kachhap, posted a patchset which is adding subdomains
+>> configured from DT for Exynos. It's from there the idea to this patch
+>> comes from. Amit is about to post a new version, based on this patch.
+>
+> Hi Ulf,
+>
+> I was trying to use this API but i felt there is a better way of just exporting
+> of_genpd_get_from_provider as a similar API is used to register the
+> power domain.
+>
+> Check if this make sense www.spinics.net/lists/arm-kernel/msg382665.html.
+>
 
-Let me add my
+That makes sense!
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+So, let's drop $subject patch.
 
-You didn't say who you expect to pick up the patch. I assume Mauro
-should take it because he took the patch that caused the problem,
-but he might not be aware that he should look at this now.
-
-	Arnd
+Kind regards
+Uffe
