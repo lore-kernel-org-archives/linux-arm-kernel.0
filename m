@@ -1,36 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 16:46:16 +0100
-Subject: [PATCH] ARM: defconfig: imx_v6_v7_defconfig updates
-In-Reply-To: <20141130145447.GA2411@dragon>
-References: <1416614103-21237-1-git-send-email-shawn.guo@linaro.org>
- <20141130145447.GA2411@dragon>
-Message-ID: <3685070.EAgBTWZY1G@wuerfel>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu,  4 Dec 2014 16:46:33 +0100
+Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
+Message-ID: <1417707993-82290-1-git-send-email-agraf@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 30 November 2014 22:54:51 Shawn Guo wrote:
-> Hi Arnd, Olof,
-> 
-> On Sat, Nov 22, 2014 at 07:55:03AM +0800, Shawn Guo wrote:
-> > From: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
-> > 
-> > This is a squash of several imx_v6_v7_defconfig update patches.
-> > 
-> >  - Enable tlv320aic3x audio codec by default (Phytec PBAB01 board)
-> >  - Enable DS1307 rtc and gpio fan by default (TBS2910 board)
-> >  - Select thermal related drivers
-> >  - Add SNVS power off driver
-> > 
-> > Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
-> > Signed-off-by: Soeren Moch <smoch@web.de>
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > Signed-off-by: Robin Gong <b38343@freescale.com>
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> I haven't found this patch on arm-soc next/defconfig branch.  Can you
-> please apply it?  Thanks.
-> 
+With binutils 2.25 the default alignment for 32bit arm sections changed to
+have everything 64k aligned. Armv7 binaries built with this binutils version
+run successfully on an arm64 system.
 
-Applied now, thanks for the reminder!
+Since effectively there is now the chance to run armv7 code on arm64 even
+with 64k page size, it doesn't make sense to block people from enabling
+CONFIG_COMPAT on those configurations.
 
-	Arnd
+Signed-off-by: Alexander Graf <agraf@suse.de>
+---
+ arch/arm64/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9532f8d..3cf4f238 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -409,7 +409,6 @@ source "fs/Kconfig.binfmt"
+ 
+ config COMPAT
+ 	bool "Kernel support for 32-bit EL0"
+-	depends on !ARM64_64K_PAGES
+ 	select COMPAT_BINFMT_ELF
+ 	select HAVE_UID16
+ 	select OLD_SIGSUSPEND3
+-- 
+1.7.12.4
