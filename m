@@ -1,74 +1,110 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 4 Dec 2014 18:52:00 +0100
-Subject: [GIT PULL] at91: cleanup for 3.19 #5
-Message-ID: <1417715520-30412-1-git-send-email-nicolas.ferre@atmel.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Thu, 4 Dec 2014 18:57:48 +0100
+Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+In-Reply-To: <CAL_JsqKYpDD1Rq2n92FcspPWGJeQvtA4eRYPDK=xYPQN0=uQTg@mail.gmail.com>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <201412040148.31033@pali>
+ <CAL_JsqKYpDD1Rq2n92FcspPWGJeQvtA4eRYPDK=xYPQN0=uQTg@mail.gmail.com>
+Message-ID: <201412041857.49341@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Thursday 04 December 2014 17:49:40 Rob Herring wrote:
+> On Wed, Dec 3, 2014 at 6:48 PM, Pali Roh?r 
+<pali.rohar@gmail.com> wrote:
+> > On Thursday 04 December 2014 01:33:08 Rob Herring wrote:
+> >> On Mon, Nov 24, 2014 at 4:19 PM, Pali Roh?r
+> > 
+> > <pali.rohar@gmail.com> wrote:
+> >> > On Wednesday 18 June 2014 22:46:19 Rob Herring wrote:
+> >> >> On Wed, Jun 18, 2014 at 2:22 PM, Pali Roh?r
+> >> > 
+> >> > <pali.rohar@gmail.com> wrote:
+> >> >> > On Wednesday 18 June 2014 21:07:35 Rob Herring wrote:
+> >> >> >> On Wed, Jun 18, 2014 at 11:54 AM, Pali Roh?r
+> >> >> > 
+> >> >> > <pali.rohar@gmail.com> wrote:
+> >> >> >> > Machine name from board description is some generic
+> >> >> >> > name on DT kernel. DT provides machine name
+> >> >> >> > property which is specific for board, so use it
+> >> >> >> > instead generic one when possible.
+> >> 
+> >> [...]
+> >> 
+> >> >> > Basically in DT kernel is missing Hardware, Revision
+> >> >> > and probably also Serial key. (Now I used only qemu
+> >> >> > for testing which set serial key to 0). All these
+> >> >> > informations is used by userspace applications which
+> >> >> > determinate how to behave.
+> >> >> 
+> >> >> It is somewhat fragile to expect the name in the DT to
+> >> >> match the old name from the kernel. As your patch to
+> >> >> n900 dts shows, we'd probably have to update every dts
+> >> >> file to make them match. While I think we should work
+> >> >> to remove this string from the kernel, userspace
+> >> >> depending on the DT model string is a bad idea. For
+> >> >> example, if you had some platform with multiple OEMs
+> >> >> just rebranding the same base design, they may all want
+> >> >> to put their own model string into each product. The
+> >> >> true h/w id is the compatible string.
+> >> >> 
+> >> >> Serial number is easy. There is already a standard
+> >> >> although not widely used property for it with
+> >> >> "/serial-number". You just need to wire it up to
+> >> >> cpuinfo.
+> >> > 
+> >> > There is no "/serial-number" property in kernel:
+> >> > 
+> >> > $ ls -l -a /sys/bus/soc/devices/soc0/
+> >> > drwxr-xr-x    3 0        0                0 Jan  1 00:00
+> >> > . drwxr-xr-x   18 0        0                0 Jan  1
+> >> > 00:00 .. -r--r--r--    1 0        0             4096 Jan
+> >> >  1 00:00 family -r--r--r--    1 0        0            
+> >> > 4096 Jan  1 00:00 machine drwxr-xr-x    2 0        0    
+> >> >            0 Jan  1 00:00 power -r--r--r--    1 0       
+> >> > 0
+> >> > 4096 Jan  1 00:00 revision lrwxrwxrwx    1 0        0
+> >> > 
+> >> >          0 Jan  1 00:00 subsystem -> ../../bus/soc
+> >> > 
+> >> > -r--r--r--    1 0        0             4096 Jan  1 00:00
+> >> > type -rw-r--r--    1 0        0             4096 Jan  1
+> >> > 00:00 uevent
+> >> 
+> >> Wrong place. If you put /serial-number in your DT, then it
+> >> will be in /proc/device-tree/serial-number.
+> >> 
+> >> If you want to wire that up to /proc/cpuinfo, I would be
+> >> fine with that.
+> >> 
+> >> Rob
+> > 
+> > I cannot hardcode it into DT, because it is set by
+> > bootloader. And bootloader tell it to kernel via ATAGs
+> > structure. Bootloader is closed and proprietary and cannot
+> > be replaced (there is no documentation for hw init).
+> 
+> Either the bootloader can put the serial number into the DTB
+> instead of ATAGs or the kernel decompressor can copy it from
+> ATAGs to DTB like is done already for other ATAGs. I presume
+> you cannot update the bootloader and will need the latter.
+> 
+> Rob
 
-This is the last "cleanup" pull-request for 3.19 on my side. Most of the work
-was done by Arnd actually ;-)
-This simplifies even more the mach-at91 directory and remove a bunch of dead
-code. Arnd also wrote some more cleanup patches that I will keep for 3.20 as
-they modify files in a larger extent.
+Rob, thanks for info! Btw, theoretically I can update bootloader 
+if someone write it. So in practise I need to use second option.
 
-Thanks, best regards,
-
-The following changes since commit 4a109c50d1958a2783df01980b55508fe47bb79c:
-
-  ARM: at91: remove unused IRQ function declarations (2014-11-27 16:33:06 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup5
-
-for you to fetch changes up to ba62a8593d15f3f353acdc8ab32c18dd40a275bb:
-
-  ARM: at91: remove unused board.h file (2014-12-03 14:16:07 +0100)
-
-----------------------------------------------------------------
-Fifth batch of cleanup/SoC for 3.19:
-- removal of now dead code and AT91-specific driver
-- removal of !DT initialization in some core AT91 drivers
-- simplification of Kconfig DT board file selection: now automatic
-
-----------------------------------------------------------------
-Arnd Bergmann (6):
-      ARM: at91/Kconfig: select board files automatically
-      ARM: at91: cleanup initilisation code by removing dead code
-      ARM: at91: remove old AT91-specific drivers
-      ARM: at91: at91rm9200 ST initialization is now DT only
-      ARM: at91/clocksource: remove !DT PIT initializations
-      ARM: at91: remove unused board.h file
-
-Nicolas Ferre (1):
-      ARM: at91: remove unneeded header files
-
- arch/arm/mach-at91/Kconfig                 |  14 +-
- arch/arm/mach-at91/Makefile                |   5 +-
- arch/arm/mach-at91/at91_tc.h               | 146 -----
- arch/arm/mach-at91/at91rm9200_time.c       |  23 -
- arch/arm/mach-at91/board-dt-rm9200.c       |   2 -
- arch/arm/mach-at91/board-dt-sam9.c         |   1 -
- arch/arm/mach-at91/board.h                 | 123 ----
- arch/arm/mach-at91/generic.h               |  33 -
- arch/arm/mach-at91/gpio.c                  | 982 -----------------------------
- arch/arm/mach-at91/gpio.h                  | 214 -------
- arch/arm/mach-at91/gsia18s.h               |  33 -
- arch/arm/mach-at91/include/mach/hardware.h |   5 -
- arch/arm/mach-at91/leds.c                  |  56 --
- arch/arm/mach-at91/pm.c                    |  11 +-
- arch/arm/mach-at91/setup.c                 |  54 --
- arch/arm/mach-at91/soc.h                   |   6 -
- drivers/clocksource/timer-atmel-pit.c      |  32 -
- 17 files changed, 5 insertions(+), 1735 deletions(-)
- delete mode 100644 arch/arm/mach-at91/at91_tc.h
- delete mode 100644 arch/arm/mach-at91/board.h
- delete mode 100644 arch/arm/mach-at91/gpio.c
- delete mode 100644 arch/arm/mach-at91/gpio.h
- delete mode 100644 arch/arm/mach-at91/gsia18s.h
- delete mode 100644 arch/arm/mach-at91/leds.c
+Can you tell me which CONFIG_ needs to be enabled for kernel 
+decompressor (so it copy some ATAGs) and where to start looking 
+at code (for adding new code for copying other ATAGs)?
 
 -- 
-Nicolas Ferre
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/fa7d9132/attachment-0001.sig>
