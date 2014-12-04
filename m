@@ -1,37 +1,48 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu,  4 Dec 2014 10:48:03 +0100
-Subject: [PATCH v2 3/4] KVM: arm/arm64: check vgic_initialized before VCPU
- creation
+Date: Thu,  4 Dec 2014 10:48:04 +0100
+Subject: [PATCH v2 4/4] KVM: arm/arm64: vgic: check vgic_initialized in
+ KVM_DEV_ARM_VGIC_GRP_ADDR
 In-Reply-To: <1417686484-20828-1-git-send-email-eric.auger@linaro.org>
 References: <1417686484-20828-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1417686484-20828-4-git-send-email-eric.auger@linaro.org>
+Message-ID: <1417686484-20828-5-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that user-space can initiate VGIC initialization independently
-on the first vcpu run, let's check the user-space does not attempt
-to create a VCPU after this initialization.
+This patch prevents user-space from changing VGIC base addresses
+if the vgic already is initialized.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- arch/arm/kvm/arm.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ Documentation/virtual/kvm/devices/arm-vgic.txt | 2 ++
+ virt/kvm/arm/vgic.c                            | 3 +++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index b5401f7..edcc66b 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -216,6 +216,11 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
- 	int err;
- 	struct kvm_vcpu *vcpu;
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+index 30f5427..8492715 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+@@ -19,6 +19,8 @@ Groups:
+     KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
+       Base address in the guest physical address space of the GIC virtual cpu
+       interface register mappings.
++  Errors:
++    -EBUSY: VGIC already is initialized
  
-+	if (unlikely(vgic_initialized(kvm))) {
-+		err = -EBUSY;
-+		goto out;
-+	}
+   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+   Attributes:
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 89dca86..652e0bb 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -2427,6 +2427,9 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 		u64 addr;
+ 		unsigned long type = (unsigned long)attr->attr;
+ 
++		if (vgic_initialized(dev->kvm))
++			return -EBUSY;
 +
- 	vcpu = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
- 	if (!vcpu) {
- 		err = -ENOMEM;
+ 		if (copy_from_user(&addr, uaddr, sizeof(addr)))
+ 			return -EFAULT;
+ 
 -- 
 1.9.1
