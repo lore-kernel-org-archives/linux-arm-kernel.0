@@ -1,66 +1,93 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 4 Dec 2014 11:33:39 +0100
-Subject: [PATCH] mmc: atmel-mci: use SET_RUNTIME_PM_OPS() macro
-In-Reply-To: <CAPDyKFp8mgT3T=OnPJHjAKo662yzoVDc6PgeaNHo_qKaOYRJBA@mail.gmail.com>
-References: <1417614194-28409-1-git-send-email-ludovic.desroches@atmel.com>
- <CAPDyKFp8mgT3T=OnPJHjAKo662yzoVDc6PgeaNHo_qKaOYRJBA@mail.gmail.com>
-Message-ID: <20141204103339.GF2714@ldesroches-Latitude-E6320>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 4 Dec 2014 11:34:27 +0100
+Subject: [PATCH v5 07/11] ARM: at91: select ATMEL_EBI when compiling a
+ kernel for at91sam9 or sama5d3
+In-Reply-To: <1417639455-17410-8-git-send-email-boris.brezillon@free-electrons.com>
+References: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1417639455-17410-8-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <548038B3.3080105@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+Le 03/12/2014 21:44, Boris Brezillon a ?crit :
+> at91sam9* and sama5d* SoCs have an EBI (External Bus Interface).
+> Select the ATMEL_EBI driver when support for these SoCs is selected.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  .../bindings/memory-controllers/atmel-ebi.txt          | 18 +++++++++---------
+>  arch/arm/mach-at91/Kconfig                             |  2 ++
+>  2 files changed, 11 insertions(+), 9 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+> index 3749ea1..68af1ad 100644
+> --- a/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+> +++ b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+> @@ -16,6 +16,7 @@ Required properties:
+>  			"atmel,at91sam9261-ebi"
+>  			"atmel,at91sam9263-ebi0"
+>  			"atmel,at91sam9263-ebi1"
+> +			"atmel,at91sam9rl-ebi"
+>  			"atmel,at91sam9g45-ebi"
+>  			"atmel,at91sam9x5-ebi"
+>  			"atmel,sama5d3-ebi"
+> @@ -51,15 +52,14 @@ Required child cs node properties:
+>  			memory layout.
+>  
+>  Optional child cs node properties:
+> -- atmel,generic-dev		boolean property specifying if the device is
+> -				a generic device.
+> +- atmel,specialized-logic	boolean property specifying if the device is
+> +				a connected to a specialized logic:
+> +				NAND, Compact Flash, SDR-SDRAM.
 
-Do you agree to take it in your tree?
+Ah, ok, seen it here.
 
-Regards
+>  				The following properties are only parsed if
+> -				this property is present.
+> -				Specialized devices are attached to specialized
+> -				controllers which are responsible for
+> -				configuring the bus appropriately.
+> -				Here are some examples of specialized
+> -				controllers: NAND, CompactFlash, SDR-SDRAM.
+> +				this property is absent.
+> +				If this property is set, specialized controller
+> +				drivers are responsible for configuring the bus
+> +				appropriately.
+>  
+>  - atmel,bus-width:		width of the asynchronous device's data bus
+>  				8, 16 or 32.
+> @@ -99,7 +99,7 @@ present 0 is assumed):
+>  - atmel,tdf-optimized		data float optimized mode. If present the data
+>  				float time is optimized depending on the next
+>  				device being accessed (next device setup
+> -				time is substracted to the current devive data
+> +				time is subtracted to the current device data
+>  				float time).
+>  
+>  
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 0e6d548..78b1412 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -49,6 +49,7 @@ config SOC_AT91SAM9
+>  	select GENERIC_CLOCKEVENTS
+>  	select MEMORY if USE_OF
+>  	select ATMEL_SDRAMC if USE_OF
+> +	select ATMEL_EBI
+>  
+>  config SOC_SAMA5
+>  	bool
+> @@ -58,6 +59,7 @@ config SOC_SAMA5
+>  	select USE_OF
+>  	select MEMORY
+>  	select ATMEL_SDRAMC
+> +	select ATMEL_EBI
+>  
+>  menu "Atmel AT91 System-on-Chip"
+>  
+> 
 
-Ludovic
 
-On Wed, Dec 03, 2014 at 03:23:12PM +0100, Ulf Hansson wrote:
-> +Rafael
-> 
-> On 3 December 2014 at 14:43, Ludovic Desroches
-> <ludovic.desroches@atmel.com> wrote:
-> > Use SET_RUNTIME_PM_OPS() since SET_PM_RUNTIME_PM_OPS() has been dropped.
-> >
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > ---
-> >
-> > Hi Ulf,
-> >
-> > Can you take this patch which fixes a compilation error that has appeared only
-> > on next-20141203.
-> 
-> I would prefer if the fix could be done through Rafael's tree, since
-> it's a commit from there that causes the build error.
-> 
-> I have already shared an immutable branch containing the mmc commit,
-> which is in conflict with the change in Rafael's linux-pm tree.
-> 
-> Kind regards
-> Uffe
-> 
-> >
-> > Thanks
-> >
-> > Regards
-> >
-> >  drivers/mmc/host/atmel-mci.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> > index 62aba9a..03d7c75 100644
-> > --- a/drivers/mmc/host/atmel-mci.c
-> > +++ b/drivers/mmc/host/atmel-mci.c
-> > @@ -2561,7 +2561,7 @@ static int atmci_runtime_resume(struct device *dev)
-> >  static const struct dev_pm_ops atmci_dev_pm_ops = {
-> >         SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-> >                                 pm_runtime_force_resume)
-> > -       SET_PM_RUNTIME_PM_OPS(atmci_runtime_suspend, atmci_runtime_resume, NULL)
-> > +       SET_RUNTIME_PM_OPS(atmci_runtime_suspend, atmci_runtime_resume, NULL)
-> >  };
-> >
-> >  static struct platform_driver atmci_driver = {
-> > --
-> > 2.0.3
-> >
+-- 
+Nicolas Ferre
