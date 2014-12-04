@@ -1,155 +1,68 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 04 Dec 2014 11:04:49 +0100
-Subject: [PATCH] KVM: arm/arm64: vgic: add init entry to VGIC KVM device
-In-Reply-To: <20141203104510.GE17502@cbox>
-References: <1417541251-20761-1-git-send-email-eric.auger@linaro.org>
- <20141203104510.GE17502@cbox>
-Message-ID: <548031C1.9020701@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Dec 2014 11:08:04 +0100
+Subject: [PATCH 1/4] ARM: shmobile: R-Mobile: Add SYSC restart handler
+In-Reply-To: <1417616227-6715-2-git-send-email-geert+renesas@glider.be>
+References: <1417616227-6715-1-git-send-email-geert+renesas@glider.be>
+ <1417616227-6715-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <3671800.E1ZjeAe67g@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer
-On 12/03/2014 11:45 AM, Christoffer Dall wrote:
-> On Tue, Dec 02, 2014 at 06:27:31PM +0100, Eric Auger wrote:
->> Since the advent of dynamic initialization of VGIC, this latter is
->> initialized very late, on the first vcpu run. This initialization
->> could be initiated much earlier by the user, as soon as it has
->> provided the requested dimensioning parameters:
->> - number of IRQs and number of vCPUs,
->> - DIST and CPU interface base address.
->>
->> One motivation behind being able to initialize the VGIC sooner is
->> related to the setup of IRQ injection in VFIO use case. The VFIO
->> signaling, especially when used along with irqfd must be set *after*
->> vgic initialization to prevent any virtual IRQ injection before
->> VGIC initialization. If virtual IRQ injection occurs before the VGIC
->> init, the IRQ cannot be injected and subsequent injection is blocked
->> due to VFIO completion mechanism (unmask/mask or forward/unforward).
->>
->> This patch adds a new entry to the VGIC KVM device that allows
->> the user to manually request the VGIC init:
->> - a new KVM_DEV_ARM_VGIC_GRP_CTRL group is introduced.
->> - Its first attribute is KVM_DEV_ARM_VGIC_CTRL_INIT
->>
->> The rationale behind introducing a group is to be able to add other
->> controls later on, if needed.
->>
->> Obviously, as soon as the init is done, the dimensioning parameters
->> cannot be changed.
+On Wednesday 03 December 2014 15:17:04 Geert Uytterhoeven wrote:
+> Extend the PM domain platform driver for the R-Mobile System
+> Controller (SYSC) to register a restart handler, to be used on various
+> Renesas ARM SoCs (e.g. R-Mobile A1 (r8a7740) and APE6 (r8a73a4), and
+> SH-Mobile AP4 (sh7372) and AG5 (sh73a0)).
 > 
-> you would need to add a check in the vcpu_create path,
-check added in v2
- which I don't
-> believe we currently have.  That may conflict with Andre's series so we
-> need to coordinate.
+> Note that this supports DT-based platforms only.
 > 
-> We're also seeing this potentially being useful for migration, so my
-> feeling is that the GICv3 patches should be rebased on this patch and
-> this patch should include a check in the vcpu create path.
-> 
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> ---
->>  Documentation/virtual/kvm/devices/arm-vgic.txt | 11 +++++++++++
->>  arch/arm/include/uapi/asm/kvm.h                |  2 ++
->>  arch/arm64/include/uapi/asm/kvm.h              |  2 ++
->>  virt/kvm/arm/vgic.c                            | 14 +++++++++++++-
->>  4 files changed, 28 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
->> index df8b0c7..80db43f 100644
->> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
->> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
->> @@ -81,3 +81,14 @@ Groups:
->>      -EINVAL: Value set is out of the expected range
->>      -EBUSY: Value has already be set, or GIC has already been initialized
->>              with default values.
->> +
->> +  KVM_DEV_ARM_VGIC_GRP_CTRL
->> +  Attributes:
->> +    KVM_DEV_ARM_VGIC_CTRL_INIT
->> +      request the initialization of the VGIC, no additional parameter in
->> +      kvm_device_attr.addr.
->> +  Errors:
->> +    -ENXIO: distributor or CPU interface base address were not set prior
->> +            to that call
-> 
-> this should be more generic to also apply to GICv3, I would suggest:
-> 
-> "VGIC not properly configured as required prior to calling this
-> attribute."
-corrected
-> 
-> alternatively, the attribute should be KVM_DEV_ARM_VGIC_V2_CTRL_INIT.
-> 
->> +    -EINVAL: number of vcpus is not known
-> 
-> can we have a different error code for this case?  ENODEV for example?
-corrected
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks
-Eric
-> 
->> +    -ENOMEM: memory shortage when allocating vgic internal data
-> 
->> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
->> index 77547bb..2499867 100644
->> --- a/arch/arm/include/uapi/asm/kvm.h
->> +++ b/arch/arm/include/uapi/asm/kvm.h
->> @@ -175,6 +175,8 @@ struct kvm_arch_memory_slot {
->>  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
->>  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
->>  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
->> +#define KVM_DEV_ARM_VGIC_GRP_CTRL       4
->> +#define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
->>  
->>  /* KVM_IRQ_LINE irq field index values */
->>  #define KVM_ARM_IRQ_TYPE_SHIFT		24
->> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->> index 1ed4417..b35c95a 100644
->> --- a/arch/arm64/include/uapi/asm/kvm.h
->> +++ b/arch/arm64/include/uapi/asm/kvm.h
->> @@ -161,6 +161,8 @@ struct kvm_arch_memory_slot {
->>  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
->>  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
->>  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
->> +#define KVM_DEV_ARM_VGIC_GRP_CTRL	4
->> +#define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
->>  
->>  /* KVM_IRQ_LINE irq field index values */
->>  #define KVM_ARM_IRQ_TYPE_SHIFT		24
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index b76c38c..2fe5bdb 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -2474,7 +2474,14 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
->>  
->>  		return ret;
->>  	}
->> -
->> +	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
->> +		switch (attr->attr) {
->> +		case KVM_DEV_ARM_VGIC_CTRL_INIT:
->> +			r = kvm_vgic_init(dev->kvm);
->> +			return r;
->> +		}
->> +		break;
->> +	}
->>  	}
->>  
->>  	return -ENXIO;
->> @@ -2553,6 +2560,11 @@ static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
->>  		return vgic_has_attr_regs(vgic_cpu_ranges, offset);
->>  	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
->>  		return 0;
->> +	case KVM_DEV_ARM_VGIC_GRP_CTRL:
->> +		switch (attr->attr) {
->> +		case KVM_DEV_ARM_VGIC_CTRL_INIT:
->> +			return 0;
->> +		}
->>  	}
->>  	return -ENXIO;
->>  }
->> -- 
->> 1.9.1
->>
+Is this one of the typical system controllers that contains lots of
+random registers? Maybe you could mark it as "syscon" in DT and just
+use the existing drivers/power/reset/syscon-reboot.c driver?
+
+> +static void __iomem *sysc_base2;
+> +
+> +static void rmobile_sysc_restart(enum reboot_mode reboot_mode, const char *cmd)
+> +{
+> +	pr_debug("%s %u/%s\n", __func__, reboot_mode, cmd);
+> +
+> +	writel(RESCNT2_PRES, sysc_base2 + RESCNT2);
+> +}
+> +
+> +static int rmobile_sysc_probe(struct platform_device *pdev)
+> +{
+> +	dev_dbg(&pdev->dev, "%s\n", __func__);
+> +
+> +	sysc_base2 = of_iomap(pdev->dev.of_node, 1);
+> +	if (!sysc_base2)
+> +		return -ENODEV;
+> +
+> +	arm_pm_restart = rmobile_sysc_restart;
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id rmobile_sysc_of_match[] = {
+> +	{ .compatible = "renesas,sysc-rmobile", },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static struct platform_driver rmobile_sysc_driver = {
+> +	.probe = rmobile_sysc_probe,
+> +	.driver = {
+> +		.name = "rmobile_sysc",
+> +		.of_match_table = rmobile_sysc_of_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(rmobile_sysc_driver);
+
+This clearly looks much better than the previous implementation, so that
+is great. If you can decouple it from the rest of this file, either through
+syscon or by asserting that sysc_base2 is not going to be needed for
+anything else, how about moving the new code to a standalon driver in
+drivers/power/reset?
+
+	Arnd
