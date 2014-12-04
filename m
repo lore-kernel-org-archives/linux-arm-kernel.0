@@ -1,41 +1,202 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu,  4 Dec 2014 14:10:02 +0300
-Subject: [PATCH 3/3] ARM: pxa: add regulator_has_full_constraints to spitz
- board file
-In-Reply-To: <1417691402-28166-1-git-send-email-dbaryshkov@gmail.com>
-References: <1417691402-28166-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1417691402-28166-3-git-send-email-dbaryshkov@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu,  4 Dec 2014 16:44:03 +0530
+Subject: [RFC] OPP: Redefine bindings to overcome shortcomings
+Message-ID: <52c403454c3b8fc201abe7ac74cf657638479311.1417691389.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add regulator_has_full_constraints() call to spitz board file to let
-regulator core know that we do not have any additional regulators left.
-This lets it substitute unprovided regulators with dummy ones.
+Hi Rob, et al..
 
-This fixes the following warnings that can be seen on spitz if
-regulators are enabled:
+Current OPP (Operating performance point) DT bindings are proven to be
+insufficient at multiple instances.
 
-ads7846 spi2.0: unable to get regulator: -517
-spi spi2.0: Driver ads7846 requests probe deferral
+There had been multiple band-aid approaches to get them fixed (The latest one
+being: http://www.mail-archive.com/devicetree at vger.kernel.org/msg53398.html).
+For obvious reasons Rob rejected them and shown the right path forward. And this
+is the first try to get those with a pen and paper.
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+The shortcomings we are trying to solve here:
+
+- Some kind of compatibility string to probe the right cpufreq driver for
+  platforms, when multiple drivers are available. For example: how to choose
+  between cpufreq-dt and arm_big_little drivers.
+
+- Getting clock sharing information between CPUs. Single shared clock vs.
+  independent clock per core vs. shared clock per cluster.
+
+- Support for turbo modes
+
+- Other per OPP settings: transition latencies, disabled status, etc.?
+
+The below document should be enough to describe how I am trying to fix these.
+Please let me know what all I need to fix, surely there would be lots of
+obstacles. I am prepared to get beaten up :)
+
+I accept in advance that naming is extremely bad here, I need some suggestions
+for sure.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-pxa/spitz.c | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/power/opp.txt | 147 ++++++++++++++++++++++++
+ 1 file changed, 147 insertions(+)
 
-diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-index 840c3a4..f4f713b 100644
---- a/arch/arm/mach-pxa/spitz.c
-+++ b/arch/arm/mach-pxa/spitz.c
-@@ -970,6 +970,8 @@ static void __init spitz_init(void)
- 	spitz_nor_init();
- 	spitz_nand_init();
- 	spitz_i2c_init();
-+
-+	regulator_has_full_constraints();
- }
+diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
+index 74499e5..5efd8d4 100644
+--- a/Documentation/devicetree/bindings/power/opp.txt
++++ b/Documentation/devicetree/bindings/power/opp.txt
+@@ -4,6 +4,153 @@ SoCs have a standard set of tuples consisting of frequency and
+ voltage pairs that the device will support per voltage domain. These
+ are called Operating Performance Points or OPPs.
  
- static void __init spitz_fixup(struct tag *tags, char **cmdline)
++This documents defines OPP bindings with its required/optional properties.
++OPPs can be defined for any device, this file uses CPU device as an example to
++illustrate how to define OPPs.
++
++linux,operating-points, opp-lists and opps:
++
++- linux,operating-points:
++  Container of all OPP nodes.
++
++  Required properties:
++  - opp nodes (explained below)
++
++  Optional properties:
++  - compatible: allow OPPs to express their compatibility with devices
++
++
++- opp-list@*:
++  List of nodes defining performance points. Following belong to the nodes
++  within the opp-lists.
++
++  Required properties:
++  - frequency-kHz: Frequency in kHz
++  - voltage-uV: voltage in micro Volts
++
++  Optional properties:
++  - turbo-mode: Marks the volt-freq pair as turbo pair.
++  - status: Marks the node enabled/disabled.
++
++
++- opp@*:
++  Operating performance point node per device. Multiple devices sharing it can
++  use its phandle in their 'opp' property.
++
++  Required properties:
++  - opp-list: phandle to opp-list defined above.
++
++  Optional properties:
++  - clocks: Tuple of clock providers
++  - clock-names: Clock names
++  - opp-supply: phandle to the parent supply/regulator node
++  - voltage-tolerance: Specify the CPU voltage tolerance in percentage.
++  - clock-latency: Specify the possible maximum transition latency for clock,
++    in unit of nanoseconds.
++
++Example: Multi-cluster system with separate clock lines for clusters. All CPUs
++         in the clusters share same clock lines.
++
++/ {
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		linux,operating-points {
++			compatible = "linux,cpufreq-dt";
++
++			opp-list0: opp-list at 0 {
++				{
++					frequency-kHz = <1000000>;
++					voltage-uV = <975000>;
++					status = "okay";
++				};
++				{
++					frequency-kHz = <1100000>;
++					voltage-uV = <1000000>;
++					status = "okay";
++				};
++				{
++					frequency-kHz = <1200000>;
++					voltage-uV = <1025000>;
++					status = "okay";
++					turbo-mode;
++				};
++			};
++
++			opp-list1: opp-list at 1 {
++				{
++					frequency-kHz = <1300000>;
++					voltage-uV = <1050000>;
++					status = "okay";
++				};
++				{
++					frequency-kHz = <1400000>;
++					voltage-uV = <1075000>;
++					status = "disabled";
++				};
++				{
++					frequency-kHz = <1500000>;
++					voltage-uV = <1100000>;
++					status = "okay";
++					turbo-mode;
++				};
++			};
++
++			opp0: opp at 0 {
++				clocks = <&clk-controller 0>;
++				clock-names = "cpu";
++				opp-supply = <&cpu-supply0>;
++				voltage-tolerance = <2>; /* percentage */
++				clock-latency = <300000>;
++				opp-list = <&opp-list0>;
++			};
++
++			opp1: opp at 1 {
++				clocks = <&clk-controller 1>;
++				clock-names = "cpu";
++				opp-supply = <&cpu-supply1>;
++				voltage-tolerance = <2>; /* percentage */
++				clock-latency = <400000>;
++				opp-list = <&opp-list1>;
++			};
++		};
++
++		cpu at 0 {
++			compatible = "arm,cortex-a7";
++			reg = <0>;
++			next-level-cache = <&L2>;
++			opps = <opp0>;
++		};
++
++		cpu at 1 {
++			compatible = "arm,cortex-a7";
++			reg = <1>;
++			next-level-cache = <&L2>;
++			opps = <opp0>;
++		};
++
++		cpu at 100 {
++			compatible = "arm,cortex-a15";
++			reg = <100>;
++			next-level-cache = <&L2>;
++			opps = <opp1>;
++		};
++
++		cpu at 101 {
++			compatible = "arm,cortex-a15";
++			reg = <101>;
++			next-level-cache = <&L2>;
++			opps = <opp1>;
++		};
++	};
++};
++
++
++
++Deprecated Bindings
++-------------------
++
+ Properties:
+ - operating-points: An array of 2-tuples items, and each item consists
+   of frequency and voltage like <freq-kHz vol-uV>.
 -- 
-2.1.3
+2.0.3.693.g996b0fd
