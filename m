@@ -1,60 +1,123 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 04 Dec 2014 11:22:01 +0000
-Subject: [PATCH] ARM: kbuild: Fix forced rebuild after 'make dtbs'
-In-Reply-To: <547C7364.8000009@suse.cz>
-References: <CACRpkdYmJWy1_vs0tWRA7SvkQnvbXXKqf7pHpH5b5tZ6vR+KJg@mail.gmail.com>
- <1414961549-31666-1-git-send-email-jason@lakedaemon.net>
- <5474F78F.2060906@suse.cz> <20141125235150.GH3836@n2100.arm.linux.org.uk>
- <20141126005710.GE22670@titan.lakedaemon.net>
- <CACRpkdZJoWbQeuZ4ZXGbQr0+SNG_9ZA+cQkAA0C2F9rnZDYtyQ@mail.gmail.com>
- <20141126144153.GK3836@n2100.arm.linux.org.uk>
- <CACRpkdYwQT3+RLxP_b_kYJoHV4L7sZ7yiU=JZWVq_zHKz0EY_g@mail.gmail.com>
- <547C7364.8000009@suse.cz>
-Message-ID: <20141204112201.C824AC40992@trevor.secretlab.ca>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  4 Dec 2014 11:22:20 +0000
+Subject: [PATCH] arm64: respect mem= for EFI
+Message-ID: <1417692140-29796-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 01 Dec 2014 14:55:48 +0100
-, Michal Marek <mmarek@suse.cz>
- wrote:
-> On 2014-11-28 15:10, Linus Walleij wrote:
-> > On Wed, Nov 26, 2014 at 3:41 PM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> >> On Wed, Nov 26, 2014 at 02:57:42PM +0100, Linus Walleij wrote:
-> >>> make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-> >>> KBUILD_OUTPUT=build-u300 u300_defconfig
-> >>> make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-> >>> KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
-> >>> make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-> >>> KBUILD_OUTPUT=build-u300 dtbs
-> >>> make -f Makefile -j5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-> >>> KBUILD_OUTPUT=build-u300 zImage CONFIG_DEBUG_SECTION_MISMATCH=y
-> >>>
-> >>> -> Rebuilds everything.
-> >>>
-> >>> This doesn't occur before the offending commit. So it only happens
-> >>> when specifying extra environment variables on the command line.
-> >>
-> >> I suspect if you also provide the CONFIG_DEBUG_SECTION_MISMATCH=y on the
-> >> dtbs line, everything will work properly.
-> > 
-> > Yay, it works! :)
-> > 
-> >> The problem is that dtbs line executes a prepare, which I guess rebuilds
-> >> the bounds stuff.  So, the dtbs target results in it being rebuilt without
-> >> the section mismatch, and then you re-execute a make with it, causing
-> >> the bounds stuff to be rebuilt again.
-> > 
-> > Yep. Not very intuitive to require passing section mismatch debug
-> > flags to DTB rebuilding but whatever, it's not so bad I can't live with
-> > it.
-> 
-> Still, the dependency on the 'prepare' target is superfluous, if the
-> only requirement is that $(KERNELRELEASE) be set properly.
+Hi all,
 
-So, I've lost track of where things stand on this issue. What is the
-current proposed fix? Make dtbs depend on 'scripts' and dtbs_install
-depend on 'prepare scripts'? Or is there a better way to make sure
-KERNELRELEASE is set for the dtbs_install target?
+While trying to debug a userspace test failure, I noticed that the mem=
+option didn't work when booting via EFI due to some unfortunate init
+ordering.
 
-g.
+However, with that alone fixed (patch below) things blow up early if a
+mem= option is passed to the kernel, because of the way we currently map
+the EFI runtime services.
+
+I've given this patch a spin atop of Ard's rework of the runtime
+services mapping [1], and that's far happier; I can boot to userspace
+and memory is limited int he way I expect.
+
+Assuming people are fine with this, would this make sense to append to
+the runtime services mapping series?
+
+Cheers,
+Mark.
+
+[1] https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/efi-for-arm64
+
+---->8----
+When booting with EFI, we acquire the EFI memory map after parsing the
+early params. This unfortuantely renders the option useless as we call
+memblock_enforce_memory_limit (which uses memblock_remove_range behind
+the scenes) before we've added any memblocks. We end up removing
+nothing, then adding all of memory later when efi_init calls
+reserve_regions.
+
+Instead, we can log the limit and apply this later when we do the rest
+of the memblock work in memblock_init, which should work regardless of
+the presence of EFI. At the same time we may as well move the early
+parameter into arm64's mm/init.c, close to arm64_memblock_init.
+
+Any memory which must be mapped (e.g. for use by EFI runtime services)
+must be mapped explicitly reather than relying on the linear mapping,
+which may be truncated as a result of a mem= option passed on the kernel
+command line.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Leif Lindholm <leif.lindholm@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/setup.c | 19 -------------------
+ arch/arm64/mm/init.c      | 19 +++++++++++++++++++
+ 2 files changed, 19 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 4c9b0e0..00137ef 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -322,25 +322,6 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ 	dump_stack_set_arch_desc("%s (DT)", of_flat_dt_get_machine_name());
+ }
+ 
+-/*
+- * Limit the memory size that was specified via FDT.
+- */
+-static int __init early_mem(char *p)
+-{
+-	phys_addr_t limit;
+-
+-	if (!p)
+-		return 1;
+-
+-	limit = memparse(p, &p) & PAGE_MASK;
+-	pr_notice("Memory limited to %lldMB\n", limit >> 20);
+-
+-	memblock_enforce_memory_limit(limit);
+-
+-	return 0;
+-}
+-early_param("mem", early_mem);
+-
+ static void __init request_standard_resources(void)
+ {
+ 	struct memblock_region *region;
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index bac492c..11c7b70 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -136,10 +136,29 @@ static void arm64_memory_present(void)
+ }
+ #endif
+ 
++static phys_addr_t memory_limit = (phys_addr_t)ULLONG_MAX;
++
++/*
++ * Limit the memory size that was specified via FDT.
++ */
++static int __init early_mem(char *p)
++{
++	if (!p)
++		return 1;
++
++	memory_limit = memparse(p, &p) & PAGE_MASK;
++	pr_notice("Memory limited to %lldMB\n", memory_limit >> 20);
++
++	return 0;
++}
++early_param("mem", early_mem);
++
+ void __init arm64_memblock_init(void)
+ {
+ 	phys_addr_t dma_phys_limit = 0;
+ 
++	memblock_enforce_memory_limit(memory_limit);
++
+ 	/*
+ 	 * Register the kernel text, kernel data, initrd, and initial
+ 	 * pagetables with memblock.
+-- 
+1.9.1
