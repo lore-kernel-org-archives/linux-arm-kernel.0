@@ -1,82 +1,52 @@
 From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 4 Dec 2014 09:21:13 -0800
-Subject: [PATCH v2 7/7] pinctrl: qcom-spmi-gpio: Migrate to pinconf-generic
-In-Reply-To: <1417685458.22963.1.camel@mm-sol.com>
+Date: Thu, 4 Dec 2014 09:28:17 -0800
+Subject: [PATCH v2 0/7] Pinctrl support for Zynq
+In-Reply-To: <CACRpkdbYPmMksbqciiXv4hHBqx9=b8toA5MgCwGSLteUh+NkZA@mail.gmail.com>
 References: <1417137993-8337-1-git-send-email-soren.brinkmann@xilinx.com>
- <1417137993-8337-8-git-send-email-soren.brinkmann@xilinx.com>
- <1417611812.30615.28.camel@mm-sol.com>
- <d3d1b263bf6242aa9a1a0876be455cce@BN1BFFO11FD021.protection.gbl>
- <1417685458.22963.1.camel@mm-sol.com>
-Message-ID: <81806c6b34a940c7a0378ed77c49b495@BN1AFFO11FD048.protection.gbl>
+ <CACRpkdbYPmMksbqciiXv4hHBqx9=b8toA5MgCwGSLteUh+NkZA@mail.gmail.com>
+Message-ID: <053edb05cd874daf9232cd5e4930df92@BN1BFFO11FD042.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-12-04 at 11:30AM +0200, Ivan T. Ivanov wrote:
-> 
-> On Wed, 2014-12-03 at 09:38 -0800, S?ren Brinkmann wrote:
-> > On Wed, 2014-12-03 at 03:03PM +0200, Ivan T. Ivanov wrote:
-> > > On Thu, 2014-11-27 at 17:26 -0800, Soren Brinkmann wrote:
-> > > > Instead of the driver caring about implementation details like device
-> > > > tree, just provide information about driver specific pinconf parameters
-> > > > to pinconf-generic which takes care of parsing the DT.
-> > > > 
-> > > > Signed-off-by: Soren Brinkmann brinkmann at xilinx.com>
-> > > > ---
-> > > > This is compile tested only. So, it's likely that it needs more tweaking
-> > > > to make it actually work on HW. But it illustrates the potential
-> > > > benefits of the pinconf-generic changes in this series.
-> > > > ---
-> > > >  drivers/pinctrl/qcom/pinctrl-spmi-gpio.c | 125 +++----------------------------
-> > > >  1 file changed, 11 insertions(+), 114 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c b/drivers/pinctrl/qcom/pinctrl-spmi-
-> > > > gpio.c
-> > > > index b863b5080890..2db85e53ef73 100644
-> > > > --- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-> > > > +++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-> > > > @@ -131,14 +131,14 @@ struct pmic_gpio_state {
-> > > >         struct gpio_chip chip;
-> > > >  };
-> > > > 
-> > > > -struct pmic_gpio_bindings {
-> > > > -       const char*property;
-> > > > -       unsigned      param;
-> > > > +static const struct pinconf_generic_dt_params pmic_gpio_bindings[] = {
-> > > > +       {"qcom,pull-up-strength",PMIC_GPIO_CONF_PULL_UP,0},
-> > > > +       {"qcom,drive-strength",PMIC_GPIO_CONF_STRENGTH,0},
-> > > >  };
-> > > > 
-> > > > -static struct pmic_gpio_bindings pmic_gpio_bindings[] = {
-> > > > -       {"qcom,pull-up-strength",PMIC_GPIO_CONF_PULL_UP},
-> > > > -       {"qcom,drive-strength",PMIC_GPIO_CONF_STRENGTH},
-> > > > +static const struct pin_config_item pmic_conf_items[] = {
-> > > > +       PCONFDUMP(PMIC_GPIO_CONF_PULL_UP,  "pull-up-strength", NULL, true),
-> > > 
-> > > s/pull-up-strength/qcom,pull-up-strength/
-> > 
-> > This is used for the debugfs output. I don't think you want the qcom
-> > prefix here, do you?
-> 
-> Then at lest lets make it "pull up strength".
+Hi Linus,
 
-Ok. Will change it.
-
+On Thu, 2014-12-04 at 10:44AM +0100, Linus Walleij wrote:
+> On Fri, Nov 28, 2014 at 2:26 AM, Soren Brinkmann
+> <soren.brinkmann@xilinx.com> wrote:
 > 
-> > 
-> > > > +       PCONFDUMP(PMIC_GPIO_CONF_STRENGTH, "drive-strength", NULL, true),
-> > > >  };
-> > > > 
-> > > 
-> > > 
-> > > 
-> > > I am not happy that we have to define the same think two times.
-> > 
-> > It's not really the same thing. One is the actual DT binding the other
-> > how the property is displayed in debugfs. Two different things. It's how
-> > the core does it. That's not new.
+> > here is v2 of this series. On the functional side, adding the support
+> > for USB mux groups is probably the biggest change. Most other changes
+> > are mostly cosmetic (typos, function names, documentation, ...).
+> > More detailed changelogs are included with the respective patches.
 > 
-> This didn't make me more happy :-). Could both be merged?
+> Unfortunately we are late in the merge cycle.
+> 
+> But I am *very* fond of this series, and I appreciate your patches
+> as *lot* S?ren.
+> 
+> So my plan is to merge your v3 patch set after the merge window
+> or whenever you have it ready, with the Zynq driver on top and
+> the dependent AMlogic driver too.
+> 
+> Then we spend the next kernel cycle hashing this out and
+> putting some polished generic code in place so we get some
+> order.
+> 
+> This will likely set the pattern for how we expect ACPI pin controllers
+> to behave too, so it is work of great importance.
+> 
+> I hope I can count on you to hang in there and keep driving
+> those patches!
+> 
+> I'll try to provide a deeper look at the indivudual patches now.
 
-That's definitely beyond the scope of this series.
+Sounds great! After bringing it so far, I wasn't planning of giving up
+now :)
 
-	Soren
+The approach you chose sounds good to me. I was currently waiting to see
+whether there are a few more change requests coming before sending v3.
+The few comments that came in so far I have already fixed up. Since it's
+not going to make it into this merge window there may be some more time
+now, but in general, I could send v3 any time.
+
+	S?ren
