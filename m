@@ -1,30 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 4 Dec 2014 11:07:46 +0000
-Subject: [PATCH 4/5] ASoC: dwc: Add devicetree support for Designware I2S
-In-Reply-To: <2240364.fL8B0EDbFB@wuerfel>
-References: <547F3CAC.9050105@arm.com> <2041200.ZjakFFAZAU@wuerfel>
- <20141203201905.GO7712@sirena.org.uk> <2240364.fL8B0EDbFB@wuerfel>
-Message-ID: <20141204110746.GR7712@sirena.org.uk>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu,  4 Dec 2014 14:10:00 +0300
+Subject: [PATCH 1/3] ARM: pxa: add regulator_has_full_constraints to corgi
+ board file
+Message-ID: <1417691402-28166-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 10:55:55AM +0100, Arnd Bergmann wrote:
-> On Wednesday 03 December 2014 20:19:05 Mark Brown wrote:
+Add regulator_has_full_constraints() call to corgi board file to let
+regulator core know that we do not have any additional regulators left.
+This lets it substitute unprovided regulators with dummy ones.
 
-> > Not all the world uses DT, this is a DesignWare IP so it's likely to get
-> > deployed widely - potentially on PCI cards and things like that.
+This fixes the following warnings that can be seen on corgi if
+regulators are enabled:
 
-> It's not really new though, and we are only seeing the second user.
-> Maybe this one just isn't as common as a lot of the other designware IP?
+ads7846 spi1.0: unable to get regulator: -517
+spi spi1.0: Driver ads7846 requests probe deferral
+wm8731 0-001b: Failed to get supply 'AVDD': -517
+wm8731 0-001b: Failed to request supplies: -517
+wm8731 0-001b: ASoC: failed to probe component -517
+corgi-audio corgi-audio: ASoC: failed to instantiate card -517
 
-It's relatively common with newer companies - it's like UARTs, any
-company that's been around for a long time will have a homebrew IP
-already but places that don't (or get fed up with their existing IP)
-will tend to buy something in.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/06cc091b/attachment.sig>
+Cc: stable at vger.kernel.org
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ arch/arm/mach-pxa/corgi.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
+index 06022b2..89f790d 100644
+--- a/arch/arm/mach-pxa/corgi.c
++++ b/arch/arm/mach-pxa/corgi.c
+@@ -26,6 +26,7 @@
+ #include <linux/i2c.h>
+ #include <linux/i2c/pxa-i2c.h>
+ #include <linux/io.h>
++#include <linux/regulator/machine.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/ads7846.h>
+ #include <linux/spi/corgi_lcd.h>
+@@ -752,6 +753,8 @@ static void __init corgi_init(void)
+ 		sharpsl_nand_partitions[1].size = 53 * 1024 * 1024;
+ 
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
++
++	regulator_has_full_constraints();
+ }
+ 
+ static void __init fixup_corgi(struct tag *tags, char **cmdline)
+-- 
+2.1.3
