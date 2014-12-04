@@ -1,24 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 13:58:52 +0100
-Subject: [PATCH 0/7] ARM: hisi: enable HiP01 SoC
-In-Reply-To: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
-References: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
-Message-ID: <3601066.g7Jvjk5UFL@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 4 Dec 2014 14:12:31 +0100
+Subject: [PATCH v2] pwm: atmel-hlcdc: add at91sam9x5 and sama5d3 errata
+ handling
+In-Reply-To: <1416407589-8157-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1416407589-8157-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141204131229.GA7262@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 November 2014 02:15:43 Wang Long wrote:
-> This series patch enable Hisilicon HiP01 SoC. The HiP01 SoC series
-> chip is designed for networking product, it integrates a rich peripheral
-> interfaces to support network applications and supports both one 
-> core or dual cores and quad cores. The core is Cortex A9. 
+On Wed, Nov 19, 2014 at 03:33:09PM +0100, Boris Brezillon wrote:
+> at91sam9x5 has an errata forbidding the use of slow clk as a clk source and
+> sama5d3 SoCs has another errata forbidding the use of div1 prescaler.
+> 
+> Take both of these erratas into account.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+> Hi Thierry,
+> 
+> I've addressed the "erratas stored in of_device_id data" part, but still
+> haven't modified the compatible strings of the HLCDC subdevices.
+> 
+> Please let me know if you really want to handle erratas through pwm
+> compatibles instead of parent device compatibles.
+> 
+> Regards,
+> 
+> Boris
+> 
+> Changes since v1:
+> - use data field in of_device_id to attach erratas to an IP revision
+> 
+>  drivers/pwm/pwm-atmel-hlcdc.c | 50 ++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 45 insertions(+), 5 deletions(-)
 
-Sorry for the delay in my reply. The patches look good to me, but I'm
-not sure what you expect to happen to them. You have a number of
-people listed as recipients, but it's not clear if you expect any of
-us to apply them into a git tree.
+I applied this, but this was really much more difficult than I would've
+wanted. Since the MFD driver hasn't been merged into Linus' tree yet I
+wasn't able to actually build test this driver at all without manually
+pulling in the patches that add the MFD support. I went through this
+trouble this time because it's what we had agreed upon, but for the
+record, next time I'll request a stable branch that I can pull into the
+PWM tree to resolve this kind of dependency. Or patches will have to
+wait until the next merge window. I don't want to have to jump through
+hoops just to make sure the code in my tree actually compiles.
 
-Is Xu Wei going to pick these up in a git tree and send a pull request
-to arm at kernel.org?
+Oh, and it's good that I do compile tests because...
 
-	Arnd
+> diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
+[...]
+> +const struct atmel_hlcdc_pwm_erratas atmel_hlcdc_pwm_at91sam9x5_erratas = {
+> +	.slow_clk_errata = true,
+> +};
+> +
+> +const struct atmel_hlcdc_pwm_erratas atmel_hlcdc_pwm_sama5d3_erratas = {
+> +	.div1_clk_errata = true,
+> +};
+
+... these actually should be static.
+
+Also I took the liberty of substituting "erratum" for "errata" and
+"errata" for "erratas".
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/fb2eedf3/attachment-0001.sig>
