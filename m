@@ -1,46 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 4 Dec 2014 18:20:49 +0000
-Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
-In-Reply-To: <1417707993-82290-1-git-send-email-agraf@suse.de>
-References: <1417707993-82290-1-git-send-email-agraf@suse.de>
-Message-ID: <20141204182049.GB7749@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 4 Dec 2014 19:28:28 +0100
+Subject: [PATCH v3 2/5] i2c: davinci: generate STP always when NACK is
+ received
+In-Reply-To: <1417448047-15236-3-git-send-email-grygorii.strashko@ti.com>
+References: <1417448047-15236-1-git-send-email-grygorii.strashko@ti.com>
+ <1417448047-15236-3-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20141204182828.GG7944@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 03:46:33PM +0000, Alexander Graf wrote:
-> With binutils 2.25 the default alignment for 32bit arm sections changed to
-> have everything 64k aligned. Armv7 binaries built with this binutils version
-> run successfully on an arm64 system.
+On Mon, Dec 01, 2014 at 05:34:04PM +0200, Grygorii Strashko wrote:
+> According to I2C specification the NACK should be handled as follows:
+> "When SDA remains HIGH during this ninth clock pulse, this is defined as the Not
+> Acknowledge signal. The master can then generate either a STOP condition to
+> abort the transfer, or a repeated START condition to start a new transfer."
+> [I2C spec Rev. 6, 3.1.6: http://www.nxp.com/documents/user_manual/UM10204.pdf]
 > 
-> Since effectively there is now the chance to run armv7 code on arm64 even
-> with 64k page size, it doesn't make sense to block people from enabling
-> CONFIG_COMPAT on those configurations.
+> Currently the Davinci i2c driver interrupts the transfer on receipt of a
+> NACK but fails to send a STOP in some situations and so makes the bus
+> stuck until next I2C IP reset (idle/enable).
+> 
+> For example, the issue will happen during SMBus read transfer which
+> consists from two i2c messages write command/address and read data:
+> 
+> S Slave Address Wr A Command Code A Sr Slave Address Rd A D1..Dn A P
 
-Is there a distro available that is built with a recent enough binutils for
-this? I'd really like to run our regression tests to check that page-size
-assumptions don't exist for things like shm.
+Applied to for-current, thanks!
 
-Will
-
-> 
-> Signed-off-by: Alexander Graf <agraf@suse.de>
-> ---
->  arch/arm64/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 9532f8d..3cf4f238 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -409,7 +409,6 @@ source "fs/Kconfig.binfmt"
->  
->  config COMPAT
->  	bool "Kernel support for 32-bit EL0"
-> -	depends on !ARM64_64K_PAGES
->  	select COMPAT_BINFMT_ELF
->  	select HAVE_UID16
->  	select OLD_SIGSUSPEND3
-> -- 
-> 1.7.12.4
-> 
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/780d400f/attachment.sig>
