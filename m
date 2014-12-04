@@ -1,185 +1,81 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 04 Dec 2014 10:36:59 +0000
-Subject: [RFC PATCH v2] drivers: pci: move PCI domain assignment
- =?iso-8859-1?Q?to=0D?= generic PCI code
-In-Reply-To: <20141119093948.GA8751@red-moon>
-References: <1415637706-2195-1-git-send-email-lorenzo.pieralisi@arm.com>
- <546C5FF2.5090903@huawei.com> <20141119093948.GA8751@red-moon>
-Message-ID: <20141204103659.34A77C40992@trevor.secretlab.ca>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 04 Dec 2014 10:39:14 +0000
+Subject: [PATCH v3 1/3] devicetree: of: Add bindings for chosen
+ =?iso-8859-1?Q?node=2C=0D?= stdout-path
+In-Reply-To: <547F97C5.7020202@gmail.com>
+References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
+ <1417110967-16284-2-git-send-email-leif.lindholm@linaro.org>
+ <547E7455.6090009@gmail.com>
+ <CACxGe6vdbURE3=W3Uerwy90piGKhv7-m+-vpUhCiUTKB4AzTsw@mail.gmail.com>
+ <547F6881.20400@gmail.com>
+ <CACxGe6ugLyV50gKCe83wCL0=qy+oHeExf9murW+qFuoVQ_TzsA@mail.gmail.com>
+ <547F97C5.7020202@gmail.com>
+Message-ID: <20141204103914.B2BACC40992@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Nov 2014 09:39:48 +0000
-, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+On Wed, 03 Dec 2014 15:07:49 -0800
+, Frank Rowand <frowand.list@gmail.com>
  wrote:
-> On Wed, Nov 19, 2014 at 09:16:34AM +0000, Yijing Wang wrote:
-> > Hi Lorenzo,
-> >    You should send this to Bjorn instead of cc. Other, why put the OF related
-> > function in PCI core. Why not move it in drivers/of/of_pci.c ?
+> On 12/3/2014 1:45 PM, Grant Likely wrote:
+> > On Wed, Dec 3, 2014 at 7:46 PM, Frank Rowand <frowand.list@gmail.com> wrote:
+> >> On 12/3/2014 7:12 AM, Grant Likely wrote:
+> >>> On Wed, Dec 3, 2014 at 2:24 AM, Frank Rowand <frowand.list@gmail.com> wrote:
+> >>>> On 11/27/2014 9:56 AM, Leif Lindholm wrote:
+> >>>>> Add a global binding for the chosen node.
+> >>>>> Include a description of the stdout-path, and an explicit statement on
+> >>>>> its extra options in the context of a UART console.
+> >>>>>
+> >>>>> Opening description stolen from www.devicetree.org, and part of the
+> >>>>> remaining text provided by Mark Rutland.
+> >>>>>
+> >>>>> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> >>>>> ---
+> >>>>>  Documentation/devicetree/bindings/chosen.txt |   42 ++++++++++++++++++++++++++
+> >>>>>  1 file changed, 42 insertions(+)
+> >>>>>  create mode 100644 Documentation/devicetree/bindings/chosen.txt
+> >>>>>
+> >>>>> diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+> >>>>> new file mode 100644
+> >>>>> index 0000000..9cd74e9
+> >>>>> --- /dev/null
+> >>>>> +++ b/Documentation/devicetree/bindings/chosen.txt
+> >>>>> @@ -0,0 +1,42 @@
+> >>>>> +The chosen node
+> >>>>> +---------------
+> >>>>> +
+> >>>>> +The chosen node does not represent a real device, but serves as a place
+> >>>>> +for passing data between firmware and the operating system, like boot
+> >>>>> +arguments. Data in the chosen node does not represent the hardware.
+> >>>>> +
+> >>>>> +
+> >>>>> +stdout-path property
+> >>>>
+> >>>> The code in patch 3/3 adds the extra options feature to the properties:
+> >>>>
+> >>>>   stdout-path
+> >>>>   linux,stdout-path
+> >>>>   stdout  [if (IS_ENABLED(CONFIG_PPC) ... ]
+> >>>
+> >>> I don't understand what you mean here. Are you suggesting a change to
+> >>> this patch? Is there something deficient in it?
+> >>
+> >> Assuming that the code change in patch 3 is as desired, then the chosen.txt
+> >> documentation applies to all three properties, not just stdout-path.  So
+> >> yes, a change is suggested for the documentation.
+> > 
+> > how about if this is added:
+> > 
+> > Implementation note: Linux will look for the property "linux,stdout-path" or
+> > on PowerPC "stdout" if "stdout-path" is not found.  However, the
+> > "linux,stdout-path" and "stdout" properties are deprecated. New platforms
+> > should only use the "stdout-path" property.
+> > 
+> > g.
+> > 
 > 
-> I did, you missed v1, and the problem is that with ACPI forthcoming we
-> do not want to have domain assignment scattered in different places,
-> but part of core code (ie a single function that prevents mixed
-> initialization from DT/counter and so on).
+> Yep, perfect.
 
-Bus specific OF code has generally been moving into the individual
-subsystems. SPI and I2C are the prime examples. It's easier to
-coordinate with the generic subsystem code when it lives in the same
-place. The PCI code still lives in drivers/of/ simply because nobody has
-been motivated enough to refactor it.
+Great, thanks. Merged.
 
-> 
-> Bjorn, are you fine with this patch ? Do you want me to resend it as
-> part of the ARM 32 PCI domain refactoring [1] ? [1] depends on this
-> patch going in first.
-> 
-> Thanks,
-> Lorenzo
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg375423.html
-> 
-> > On 2014/11/11 0:41, Lorenzo Pieralisi wrote:
-> > > The current logic used for PCI domain assignment in arm64
-> > > pci_bus_assign_domain_nr() is flawed in that, depending on the host
-> > > controllers configuration for a platform and the respective initialization
-> > > sequence, core code may end up allocating PCI domain numbers from both DT and
-> > > the core code generic domain counter, which would result in PCI domain
-> > > allocation aliases/errors.
-> > > 
-> > > This patch fixes the logic behind the PCI domain number assignment and
-> > > moves the resulting code to generic PCI core code so that the same domain
-> > > allocation logic is used on all platforms selecting
-> > > 
-> > > CONFIG_PCI_DOMAINS_GENERIC
-> > > 
-> > > instead of resorting to an arch specific implementation that might end up
-> > > duplicating the PCI domain assignment logic wrongly.
-> > > 
-> > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: Liviu Dudau <liviu.dudau@arm.com>
-> > > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > > Cc: Rob Herring <robh+dt@kernel.org>
-> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > ---
-> > > v1 => v2:
-> > > 
-> > > - Moved generic pci_bus_assign_domain_nr() code to PCI core instead of
-> > >   adding an OF layer API
-> > > - Updated commit log and code comments
-> > > 
-> > >  arch/arm64/kernel/pci.c | 22 ----------------------
-> > >  drivers/pci/pci.c       | 50 +++++++++++++++++++++++++++++++++++++++++++++++++
-> > >  2 files changed, 50 insertions(+), 22 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> > > index ce5836c..6f93c24 100644
-> > > --- a/arch/arm64/kernel/pci.c
-> > > +++ b/arch/arm64/kernel/pci.c
-> > > @@ -46,25 +46,3 @@ int pcibios_add_device(struct pci_dev *dev)
-> > >  
-> > >  	return 0;
-> > >  }
-> > > -
-> > > -
-> > > -#ifdef CONFIG_PCI_DOMAINS_GENERIC
-> > > -static bool dt_domain_found = false;
-> > > -
-> > > -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> > > -{
-> > > -	int domain = of_get_pci_domain_nr(parent->of_node);
-> > > -
-> > > -	if (domain >= 0) {
-> > > -		dt_domain_found = true;
-> > > -	} else if (dt_domain_found == true) {
-> > > -		dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
-> > > -			parent->of_node->full_name);
-> > > -		return;
-> > > -	} else {
-> > > -		domain = pci_get_new_domain_nr();
-> > > -	}
-> > > -
-> > > -	bus->domain_nr = domain;
-> > > -}
-> > > -#endif
-> > > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> > > index 625a4ac..2279414 100644
-> > > --- a/drivers/pci/pci.c
-> > > +++ b/drivers/pci/pci.c
-> > > @@ -10,6 +10,8 @@
-> > >  #include <linux/kernel.h>
-> > >  #include <linux/delay.h>
-> > >  #include <linux/init.h>
-> > > +#include <linux/of.h>
-> > > +#include <linux/of_pci.h>
-> > >  #include <linux/pci.h>
-> > >  #include <linux/pm.h>
-> > >  #include <linux/slab.h>
-> > > @@ -4447,6 +4449,54 @@ int pci_get_new_domain_nr(void)
-> > >  {
-> > >  	return atomic_inc_return(&__domain_nr);
-> > >  }
-> > > +
-> > > +#ifdef CONFIG_PCI_DOMAINS_GENERIC
-> > > +
-> > > +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> > > +{
-> > > +	static int use_dt_domains = -1;
-> > > +	int domain = of_get_pci_domain_nr(parent->of_node);
-> > > +
-> > > +	/*
-> > > +	 * Check DT domain and use_dt_domains values.
-> > > +	 *
-> > > +	 * If DT domain property is valid (domain >= 0) and
-> > > +	 * use_dt_domains != 0, the DT assignment is valid since this means
-> > > +	 * we have not previously allocated a domain number by using
-> > > +	 * pci_get_new_domain_nr(); we should also update use_dt_domains to
-> > > +	 * 1, to indicate that we have just assigned a domain number from
-> > > +	 * DT.
-> > > +	 *
-> > > +	 * If DT domain property value is not valid (ie domain < 0), and we
-> > > +	 * have not previously assigned a domain number from DT
-> > > +	 * (use_dt_domains != 1) we should assign a domain number by
-> > > +	 * using the:
-> > > +	 *
-> > > +	 * pci_get_new_domain_nr()
-> > > +	 *
-> > > +	 * API and update the use_dt_domains value to keep track of method we
-> > > +	 * are using to assign domain numbers (use_dt_domains = 0).
-> > > +	 *
-> > > +	 * All other combinations imply we have a platform that is trying
-> > > +	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
-> > > +	 * which is a recipe for domain mishandling and it is prevented by
-> > > +	 * invalidating the domain value (domain = -1) and printing a
-> > > +	 * corresponding error.
-> > > +	 */
-> > > +	if (domain >= 0 && use_dt_domains) {
-> > > +		use_dt_domains = 1;
-> > > +	} else if (domain < 0 && use_dt_domains != 1) {
-> > > +		use_dt_domains = 0;
-> > > +		domain = pci_get_new_domain_nr();
-> > > +	} else {
-> > > +		dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
-> > > +			parent->of_node->full_name);
-> > > +		domain = -1;
-> > > +	}
-> > > +
-> > > +	bus->domain_nr = domain;
-> > > +}
-> > > +#endif
-> > >  #endif
-> > >  
-> > >  /**
-> > > 
-> > 
-> > 
-> > -- 
-> > Thanks!
-> > Yijing
-> > 
-> > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+g.
