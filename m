@@ -1,43 +1,23 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 4 Dec 2014 17:33:05 +0100
-Subject: [GIT PULL] at91: defconfig for 3.19 #1
-In-Reply-To: <3905790.gg6cCb9BU6@wuerfel>
-References: <1417537711-15608-1-git-send-email-nicolas.ferre@atmel.com>
- <3905790.gg6cCb9BU6@wuerfel>
-Message-ID: <54808CC1.2010502@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Dec 2014 17:34:14 +0100
+Subject: [GIT PULL] last dts changes for 3.19
+In-Reply-To: <2096313.yXUQoznUHp@diego>
+References: <2096313.yXUQoznUHp@diego>
+Message-ID: <2282374.qS0uxfjhQc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 04/12/2014 17:28, Arnd Bergmann a ?crit :
-> On Tuesday 02 December 2014 17:28:31 Nicolas Ferre wrote:
->>
->> The following changes since commit 0df1f2487d2f0d04703f142813d53615d62a1da4:
->>
->>   Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-defconfig
->>
->> for you to fetch changes up to 4cd275f762a21cf21768e327873ba2883c839281:
->>
->>   ARM: at91/defconfig: add DM9000 to at91_dt (2014-12-01 16:30:00 +0100)
->>
->> ----------------------------------------------------------------
->> First batch of defconfigs for AT91 / 3.19:
->> - use NEON for all C-A5, neon code handles the !NEON case
->> - add new XDMA driver
->> - add some useful drivers as we only have a single defconfig for all
->>   AT91SAM9/RM9200
+On Tuesday 02 December 2014 18:10:28 Heiko St?bner wrote:
 > 
-> I just noticed that this is based on -rc3, while the next/defconfig branch
-> so far is based on -rc1. If you don't mind, could you rebase your
-> branch on -rc1 as well and send it again so I can avoid the backmerge?
+>   ARM: dts: rockchip: Add input voltage supply regulators in pmic for Marsboard (2014-12-02 17:58:39 +0100)
+> 
+> ----------------------------------------------------------------
+> - rk3288 thermal driver that got accepted into the thermal tree
+> - mmc fifo sizes for Cortex-A9 SoCs
+> - labels for the leds on the RadxaRock
+> - core system supply for the Marsboard
+> 
 
-Sure, I do it right now.
+Pulled into next/dt, thanks!
 
-Stay tuned ;-)
-
-Bye,
--- 
-Nicolas Ferre
+	Arnd
