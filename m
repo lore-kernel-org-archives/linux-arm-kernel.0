@@ -1,65 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 4 Dec 2014 10:27:09 +0000
-Subject: [PATCH v2 2/2] arm64: perf: Prevent wraparound during overflow
-In-Reply-To: <1416587067-3220-3-git-send-email-daniel.thompson@linaro.org>
-References: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
- <1416587067-3220-1-git-send-email-daniel.thompson@linaro.org>
- <1416587067-3220-3-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20141204102709.GC14519@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu,  4 Dec 2014 10:21:48 +0000
+Subject: [PATCH v2 RESEND 07/11] mtd: st_spi_fsm: Update Spansion device
+ entries
+In-Reply-To: <1417688512-7644-1-git-send-email-lee.jones@linaro.org>
+References: <1417688512-7644-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1417688512-7644-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 04:24:27PM +0000, Daniel Thompson wrote:
-> If the overflow threshold for a counter is set above or near the
-> 0xffffffff boundary then the kernel may lose track of the overflow
-> causing only events that occur *after* the overflow to be recorded.
-> Specifically the problem occurs when the value of the performance counter
-> overtakes its original programmed value due to wrap around.
-> 
-> Typical solutions to this problem are either to avoid programming in
-> values likely to be overtaken or to treat the overflow bit as the 33rd
-> bit of the counter.
-> 
-> Its somewhat fiddly to refactor the code to correctly handle the 33rd bit
-> during irqsave sections (context switches for example) so instead we take
-> the simpler approach of avoiding values likely to be overtaken.
-> 
-> We set the limit to half of max_period because this matches the limit
-> imposed in __hw_perf_event_init(). This causes a doubling of the interrupt
-> rate for large threshold values, however even with a very fast counter
-> ticking at 4GHz the interrupt rate would only be ~1Hz.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> ---
->  arch/arm64/kernel/perf_event.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
+From: Angus Clark <angus.clark@st.com>
 
-Thanks, applied.
+This patch updates various Spansion device entries in the flash_types[] table:
+  - Define full 6-byte READIDs for S25FL128Sx devices (and fix the 4th
+    byte). This allows us to differentiate between S25FL129P and S25FL128S
+    devices.
+  - Add S25FL128Px device entries.
 
-Will
+Signed-off-by: Angus Clark <angus.clark@st.com>
+Signed-off-by: Carmelo Amoroso <carmelo.amoroso@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mtd/devices/st_spi_fsm.c | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index aa29ecb4f800..25a5308744b1 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -169,8 +169,14 @@ armpmu_event_set_period(struct perf_event *event,
->  		ret = 1;
->  	}
->  
-> -	if (left > (s64)armpmu->max_period)
-> -		left = armpmu->max_period;
-> +	/*
-> +	 * Limit the maximum period to prevent the counter value
-> +	 * from overtaking the one we are about to program. In
-> +	 * effect we are reducing max_period to account for
-> +	 * interrupt latency (and we are being very conservative).
-> +	 */
-> +	if (left > (armpmu->max_period >> 1))
-> +		left = armpmu->max_period >> 1;
->  
->  	local64_set(&hwc->prev_count, (u64)-left);
->  
-> -- 
-> 1.9.3
-> 
-> 
+diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+index 33dfb0e..0501a57 100644
+--- a/drivers/mtd/devices/st_spi_fsm.c
++++ b/drivers/mtd/devices/st_spi_fsm.c
+@@ -444,6 +444,7 @@ static struct flash_info flash_types[] = {
+ 	/*
+ 	 * Spansion S25FLxxxP
+ 	 *     - 256KiB and 64KiB sector variants (identified by ext. JEDEC)
++	 *     - S25FL128Px devices do not support DUAL or QUAD I/O
+ 	 */
+ #define S25FLXXXP_FLAG (FLASH_FLAG_READ_WRITE  |	\
+ 			FLASH_FLAG_READ_1_1_2   |	\
+@@ -454,6 +455,12 @@ static struct flash_info flash_types[] = {
+ 			FLASH_FLAG_READ_FAST)
+ 	RDID_INFO("s25fl032p", RDID({0x01, 0x02, 0x15, 0x4d, 0x00}), 5,
+ 		  64 * 1024,  64, S25FLXXXP_FLAG, 80, stfsm_s25fl_config),
++	RDID_INFO("s25fl128p1", RDID({0x01, 0x20, 0x18, 0x03, 0x00}), 5,
++		  256 * 1024, 64,
++		  (FLASH_FLAG_READ_WRITE | FLASH_FLAG_READ_FAST), 104, NULL),
++	RDID_INFO("s25fl128p0", RDID({0x01, 0x20, 0x18, 0x03, 0x01}), 5,
++		  64 * 1024, 256,
++		  (FLASH_FLAG_READ_WRITE | FLASH_FLAG_READ_FAST), 104, NULL),
+ 	RDID_INFO("s25fl129p0", RDID({0x01, 0x20, 0x18, 0x4d, 0x00}), 5,
+ 		  256 * 1024,  64, S25FLXXXP_FLAG, 80, stfsm_s25fl_config),
+ 	RDID_INFO("s25fl129p1", RDID({0x01, 0x20, 0x18, 0x4d, 0x01}), 5,
+@@ -467,17 +474,18 @@ static struct flash_info flash_types[] = {
+ 	 *       so this information is captured in the board's flags.
+ 	 *     - Supports 'DYB' sector protection. Depending on variant, sectors
+ 	 *       may default to locked state on power-on.
++	 *     - S25FL127Sx handled as S25FL128Sx
+ 	 */
+ #define S25FLXXXS_FLAG (S25FLXXXP_FLAG         |	\
+ 			FLASH_FLAG_RESET        |	\
+ 			FLASH_FLAG_DYB_LOCKING)
+-	RDID_INFO("s25fl128s0", RDID({0x01, 0x20, 0x18, 0x03, 0x00}), 5,
++	RDID_INFO("s25fl128s0", RDID({0x01, 0x20, 0x18, 0x4d, 0x00, 0x80}), 6,
+ 		  256 * 1024, 64, S25FLXXXS_FLAG, 80, stfsm_s25fl_config),
+-	RDID_INFO("s25fl128s1", RDID({0x01, 0x20, 0x18, 0x03, 0x01}), 5,
++	RDID_INFO("s25fl128s1", RDID({0x01, 0x20, 0x18, 0x4d, 0x01, 0x80}), 6,
+ 		  64 * 1024, 256, S25FLXXXS_FLAG, 80, stfsm_s25fl_config),
+-	RDID_INFO("s25fl256s0", RDID({0x01, 0x02, 0x19, 0x4d, 0x00}), 5,
++	RDID_INFO("s25fl256s0", RDID({0x01, 0x02, 0x19, 0x4d, 0x00, 0x80}), 6,
+ 		  256 * 1024, 128, S25FLXXXS_FLAG, 80, stfsm_s25fl_config),
+-	RDID_INFO("s25fl256s1", RDID({0x01, 0x02, 0x19, 0x4d, 0x01}), 5,
++	RDID_INFO("s25fl256s1", RDID({0x01, 0x02, 0x19, 0x4d, 0x01, 0x80}), 6,
+ 		  64 * 1024, 512, S25FLXXXS_FLAG, 80, stfsm_s25fl_config),
+ 
+ #define W25X_FLAG (FLASH_FLAG_READ_WRITE       |	\
+-- 
+1.9.1
