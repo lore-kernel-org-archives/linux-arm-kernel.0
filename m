@@ -1,26 +1,53 @@
-From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Thu, 04 Dec 2014 09:00:35 +0000
-Subject: [PATCH 2/5] ASoC: dwc: Don't allow negative use counts
-In-Reply-To: <20141203172526.GC7712@sirena.org.uk>
-References: <547F3C9F.8080102@arm.com> <20141203172526.GC7712@sirena.org.uk>
-Message-ID: <548022B3.8050105@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Dec 2014 10:01:56 +0100
+Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <548020D7.8030003@linaro.org>
+References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
+ <2596381.rFt35NU3oS@wuerfel> <548020D7.8030003@linaro.org>
+Message-ID: <8625951.Wbs2MxLnhi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/14 17:25, Mark Brown wrote:
-> On Wed, Dec 03, 2014 at 04:38:55PM +0000, Andrew Jackson wrote:
+On Thursday 04 December 2014 09:52:39 Daniel Lezcano wrote:
+> On 12/03/2014 09:35 PM, Arnd Bergmann wrote:
+> > On Wednesday 03 December 2014 07:31:22 Lina Iyer wrote:
+> >>>>> +static int __init qcom_spm_init(void)
+> >>>>> +{
+> >>>>> +    int ret;
+> >>>>> +
+> >>>>> +    /*
+> >>>>> +     * cpuidle driver need to registered before the cpuidle device
+> >>>>> +     * for any cpu. Register the device for the the cpuidle driver.
+> >>>>> +     */
+> >>>>> +    ret = platform_device_register(&qcom_cpuidle_drv);
+> >>>>> +    if (ret)
+> >>>>> +        return ret;
+> >>>> Stephen pointed out that we would have the platform device lying around
+> >>>> on a non-QCOM device when using multi_v7_defconfig.
+> >>>
+> >>> Perhaps I am missing the point, but this is not supposed to happen, no ?
+> >>>
+> >> This would happen, since the file would compile on multi_v7 and we would
+> >> initialize and register this device regardless. The cpuidle-qcom.c
+> >> driver probe would bail out looking for a matching compatible property.
+> >> So we would not register a cpuidle driver but the device would lay
+> >> around.
+> >
+> > I think the problem is registering a platform_device. I've complained
+> > about this before, but it still seems to get copied all over the
+> > place. Please don't do this but have a driver that looks at DT to
+> > figure out whether to access hardware or not.
 > 
->>  	case SNDRV_PCM_TRIGGER_STOP:
->>  	case SNDRV_PCM_TRIGGER_SUSPEND:
->>  	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
->> -		dev->active--;
->> +		if (dev->active > 0)
->> +			dev->active--;
+> We did this approach but, I can remember why, someone was complaining 
+> about it also 
 > 
-> How is this triggering - this sounds like you're papering over some
-> other bug somewhere?
+> The platform device/driver paradigm allowed us to split the arch 
+> specific parts by passing the pm ops through the platform data.
 > 
+> Would make sense to have a single common place for the ARM arch where we 
+> initialize the platform device for cpuidle ?
 
-When I looked at the code paths I couldn't convince myself that STOP wouldn't be called more than once.  Then actuve would be negative and the device might not be restartable.  I didn't have a problem per se, it was just that it seemed to be something of a loophole.
+No. It's really not a device, and if you pretend that it is, you get
+into problems like this.
 
-   Andrew
+	Arnd
