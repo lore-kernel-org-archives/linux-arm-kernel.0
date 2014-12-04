@@ -1,57 +1,55 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 04 Dec 2014 09:52:39 +0100
-Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <2596381.rFt35NU3oS@wuerfel>
-References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
- <547ED3BD.5090209@linaro.org> <20141203143122.GH499@linaro.org>
- <2596381.rFt35NU3oS@wuerfel>
-Message-ID: <548020D7.8030003@linaro.org>
+From: Andrew.Jackson@arm.com (Andrew Jackson)
+Date: Thu, 04 Dec 2014 08:57:06 +0000
+Subject: [alsa-devel] [PATCH 1/5] ASoC: dwc: Allocate resources with
+ devm_ioremap_resource
+In-Reply-To: <547F3DD0.10405@metafoo.de>
+References: <547F3C96.9070509@arm.com> <547F3DD0.10405@metafoo.de>
+Message-ID: <548021E2.2080506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2014 09:35 PM, Arnd Bergmann wrote:
-> On Wednesday 03 December 2014 07:31:22 Lina Iyer wrote:
->>>>> +static int __init qcom_spm_init(void)
->>>>> +{
->>>>> +    int ret;
->>>>> +
->>>>> +    /*
->>>>> +     * cpuidle driver need to registered before the cpuidle device
->>>>> +     * for any cpu. Register the device for the the cpuidle driver.
->>>>> +     */
->>>>> +    ret = platform_device_register(&qcom_cpuidle_drv);
->>>>> +    if (ret)
->>>>> +        return ret;
->>>> Stephen pointed out that we would have the platform device lying around
->>>> on a non-QCOM device when using multi_v7_defconfig.
->>>
->>> Perhaps I am missing the point, but this is not supposed to happen, no ?
->>>
->> This would happen, since the file would compile on multi_v7 and we would
->> initialize and register this device regardless. The cpuidle-qcom.c
->> driver probe would bail out looking for a matching compatible property.
->> So we would not register a cpuidle driver but the device would lay
->> around.
->
-> I think the problem is registering a platform_device. I've complained
-> about this before, but it still seems to get copied all over the
-> place. Please don't do this but have a driver that looks at DT to
-> figure out whether to access hardware or not.
+On 12/03/14 16:44, Lars-Peter Clausen wrote:
+> On 12/03/2014 05:38 PM, Andrew Jackson wrote:
+> [,,,[
+>> +	dw_i2s_dai = devm_kzalloc(&pdev->dev, sizeof(*dw_i2s_dai), GFP_KERNEL);
+>> +	if (!dw_i2s_dai) {
+>> +		dev_err(&pdev->dev, "mem allocation failed for dai driver\n");
+> 
+> All the memory alloc functions already print a error message.
 
-We did this approach but, I can remember why, someone was complaining 
-about it also :)
+I will remove the error message(s).
 
-The platform device/driver paradigm allowed us to split the arch 
-specific parts by passing the pm ops through the platform data.
+>>   		return -ENOMEM;
+>>   	}
+>>
+>> +	dw_i2s_dai->ops = &dw_i2s_dai_ops;
+>> +	dw_i2s_dai->suspend = dw_i2s_suspend;
+>> +	dw_i2s_dai->resume = dw_i2s_resume;
+> 
+> This seems to be separate from the devm_ioremap_resource() change.
 
-Would make sense to have a single common place for the ARM arch where we 
-initialize the platform device for cpuidle ?
+It seemed reasonable to assign these known values to the dw_i2s_dai as soon as it had been allocated. Would you prefer this in a separate patch?
 
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	if (!res) {
+> 
+> You don't actually have to check it devm_ioremap_resource does this for you.
 
+Oh, thanks, paranoia was taking over.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+>> +		dev_err(&pdev->dev, "no i2s resource defined\n");
+>> +		return -ENODEV;
+>> +	}
+>> +
+>> +	dev->i2s_base = devm_ioremap_resource(&pdev->dev, res);
+>> +	if (IS_ERR(dev->i2s_base)) {
+>> +		dev_err(&pdev->dev, "ioremap fail for i2s_region\n");
+> 
+> Same here devm_ioremap_resource() will already print a appropriate error 
+> message.
+> 
+>> +		return PTR_ERR(dev->i2s_base);
+>> +	}
+> 
+> 
