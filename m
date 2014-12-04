@@ -1,46 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 17:00:42 +0100
-Subject: [GIT PULL] Reset controller changes for v3.19
-In-Reply-To: <1417426996.4624.4.camel@pengutronix.de>
-References: <1417424646.4624.2.camel@pengutronix.de>
- <1417426996.4624.4.camel@pengutronix.de>
-Message-ID: <22096876.byu7bonZ1i@wuerfel>
+Date: Thu, 04 Dec 2014 17:02:14 +0100
+Subject: [PATCH] MAINTAINERS: ARM Versatile Express platform,
+ add missing pattern
+In-Reply-To: <1417443393-16704-1-git-send-email-pawel.moll@arm.com>
+References: <1417442259.4058.5.camel@arm.com>
+ <1417443393-16704-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <3271324.hJMe55l8NY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 December 2014 10:43:16 Philipp Zabel wrote:
-> Am Montag, den 01.12.2014, 10:04 +0100 schrieb Philipp Zabel:
-> > Hi Arnd, Olof,
-> > 
-> > The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-> > 
-> >   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.pengutronix.de/pza/linux.git reset-for-3.19-2
+On Monday 01 December 2014 14:16:33 Pawel Moll wrote:
+> VE's reset driver lives at the third level of the directories:
 > 
-> Sorry, that should be
+> 	drivers/power/reset/vexpress-poweroff.c
 > 
->    git://git.pengutronix.de/git/pza/linux.git reset-for-3.19-2
->                             ^^^^
+> and wasn't matched by the */*/vexpress* pattern.
 > 
+> Added additional pattern for all files at this level. This should be
+> enough for a while...
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 924454f..4a00598 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1512,6 +1512,7 @@ S:	Maintained
+>  F:	arch/arm/boot/dts/vexpress*
+>  F:	arch/arm/mach-vexpress/
+>  F:	*/*/vexpress*
+> +F:	*/*/*/vexpress*
+>  F:	drivers/clk/versatile/clk-vexpress-osc.c
+>  F:	drivers/clocksource/versatile.c
 
-
-Sorry for not seeing this first, my mistake.
-
-Pulled into next/drivers now.
-
-One detail though: in the future please add a high-level description
-of the branch contents when you send a pull request. This is what
-I added:
-
-    This adds a new driver for the sti soc family, and creates
-    a reset_control_status interface, which is added to the existing
-    drivers.
-    
-but I would normally expect a higher detail level.
-
-Thanks,
+Applied to next/fixes-non-critical, thanks!
 
 	Arnd
