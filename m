@@ -1,302 +1,107 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 4 Dec 2014 13:58:12 +0000
-Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
- drivers
-In-Reply-To: <54806504.20507@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <CAL_JsqKHvh9KSTYrrs1Pts5Kg=8dA1V6NiW57_2vdDH173qQGg@mail.gmail.com>
- <CACxGe6vyMkyE9ZRj_FQzi19ESEo7OV_RQoVV65xBYpdQV8cRGQ@mail.gmail.com>
- <2579924.PPXuLn3o19@wuerfel> <54805312.6000402@arm.com>
- <CACxGe6uR5J4Cjdh_xYhBPoQRgeYwHPv5=AnuRmQKSD3yZrMK9Q@mail.gmail.com>
- <54806504.20507@arm.com>
-Message-ID: <CACxGe6taZiAJdf6s0Y5uXtu7=276d1U8hOQEpAwP+k-n44Ndqw@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 4 Dec 2014 19:37:11 +0530
+Subject: [RFC] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <1417692868.9037.4.camel@pengutronix.de>
+References: <52c403454c3b8fc201abe7ac74cf657638479311.1417691389.git.viresh.kumar@linaro.org>
+ <1417692868.9037.4.camel@pengutronix.de>
+Message-ID: <CAKohponP3PXd5b=YY7bpBK6FTNc5_Y7RU=X7q7dP1bYELcW6Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 4, 2014 at 1:43 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> Hi Grant, thanks for the advice - silly micro-optimisations removed, and
-> I'll make a note to do so from my in-development code, too ;)
->
-> I didn't much like the casting either, so rather than push it elsewhere or
-> out to the caller I've just changed the prototype to obviate it completely.
-> Since we're also expecting to churn this again to use something more
-> suitable than iommu_ops as the private data, I think keeping things simple
-> wins over const-correctness for now.
->
-> Thanks,
-> Robin
->
-> --->8---
-> From b2e8c91ac49bef4008661e4628cd6b7249d84af5 Mon Sep 17 00:00:00 2001
-> Message-Id:
-> <b2e8c91ac49bef4008661e4628cd6b7249d84af5.1417698001.git.robin.murphy@arm.com>
-> From: Robin Murphy <robin.murphy@arm.com>
-> Date: Thu, 4 Dec 2014 11:53:13 +0000
-> Subject: [PATCH v2] iommu: store DT-probed IOMMU data privately
->
-> Since the data pointer in the DT node is public and may be overwritten
-> by conflicting code, move the DT-probed IOMMU ops to a private list
-> where they will be safe.
->
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Hi Lucas,
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
+On 4 December 2014 at 17:04, Lucas Stach <l.stach@pengutronix.de> wrote:
 
-> ---
->  drivers/iommu/of_iommu.c | 40 ++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_iommu.h | 12 ++----------
->  2 files changed, 42 insertions(+), 10 deletions(-)
+>> +- opp-list@*:
+>> +  List of nodes defining performance points. Following belong to the nodes
+>> +  within the opp-lists.
+>> +
+>> +  Required properties:
+>> +  - frequency-kHz: Frequency in kHz
+>> +  - voltage-uV: voltage in micro Volts
+>> +
+>> +  Optional properties:
+>> +  - turbo-mode: Marks the volt-freq pair as turbo pair.
+>> +  - status: Marks the node enabled/disabled.
 >
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index 73236d3..c7078f6 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -94,6 +94,46 @@ int of_get_dma_window(struct device_node *dn, const char
-> *prefix, int index,
->  }
->  EXPORT_SYMBOL_GPL(of_get_dma_window);
+> What about devices with multiple different turbo states? We have seen
+
+You mean that a state may or maynot be turbo at some point of time ?
+
+> CPUs that boost to different states in the x86 world, surely we will
+> encounter something like this in the ARM world too. Do we just mark them
+> all as turbo OPPs and let the driver decide what to do? If we want to
+
+Maybe yes. But the good thing about binding this time is, it is expandable.
+So, if there is a future need that we can't think of today, then we can surely
+do incremental changes here.
+
+> keep using cpufreq-dt for as much devices as possible is it really
+
+Its not about cpufreq-dt alone. We maybe using other drivers as well..
+
+> sufficient to know that this is a turbo state, without knowing the
+> conditions required for activating the state?
+
+Can you elaborate more on this? If something is required and we
+know what exactly it is, then we can put up the right binding right
+now as well..
+
+>> +- opp@*:
+>> +  Operating performance point node per device. Multiple devices sharing it can
+>> +  use its phandle in their 'opp' property.
+>> +
+>> +  Required properties:
+>> +  - opp-list: phandle to opp-list defined above.
+>> +
+>> +  Optional properties:
+>> +  - clocks: Tuple of clock providers
+>> +  - clock-names: Clock names
+>> +  - opp-supply: phandle to the parent supply/regulator node
+>> +  - voltage-tolerance: Specify the CPU voltage tolerance in percentage.
 >
-> +struct of_iommu_node {
-> +       struct list_head list;
-> +       struct device_node *np;
-> +       struct iommu_ops *ops;
-> +};
-> +static LIST_HEAD(of_iommu_list);
-> +static DEFINE_SPINLOCK(of_iommu_lock);
-> +
-> +void of_iommu_set_ops(struct device_node *np, struct iommu_ops *ops)
-> +{
-> +       struct of_iommu_node *iommu = kzalloc(sizeof(*iommu), GFP_KERNEL);
-> +
-> +       if (!iommu) {
-> +               __WARN();
-> +               return;
-> +       }
-> +
-> +       INIT_LIST_HEAD(&iommu->list);
-> +       iommu->np = np;
-> +       iommu->ops = ops;
-> +       spin_lock(&of_iommu_lock);
-> +       list_add_tail(&iommu->list, &of_iommu_list);
-> +       spin_unlock(&of_iommu_lock);
-> +}
-> +
-> +struct iommu_ops *of_iommu_get_ops(struct device_node *np)
-> +{
-> +       struct of_iommu_node *node;
-> +       struct iommu_ops *ops = NULL;
-> +
-> +       spin_lock(&of_iommu_lock);
-> +       list_for_each_entry(node, &of_iommu_list, list)
-> +               if (node->np == np) {
-> +                       ops = node->ops;
-> +                       break;
-> +               }
-> +       spin_unlock(&of_iommu_lock);
-> +       return ops;
-> +}
-> +
->  struct iommu_ops *of_iommu_configure(struct device *dev)
->  {
->         struct of_phandle_args iommu_spec;
-> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-> index d03abbb..16c7554 100644
-> --- a/include/linux/of_iommu.h
-> +++ b/include/linux/of_iommu.h
-> @@ -31,16 +31,8 @@ static inline struct iommu_ops *of_iommu_configure(struct
-> device *dev)
+> This is extremely ill defined. It doesn't say in which direction the
+> tolerance is to be applied. Can you go below or above the OPP specified
+> voltage? For now everyone just assumes that it has to work both ways.
+
+Yes, the binding is as per today's requirements (or rather implementations).
+So it is both ways. But if everybody agrees on it, we can improve it..
+
+> Also with this binding the tolerance is applied for all OPPs, where is
+> very much depends on the individual OPP.
+
+Hmm, Not only this but the same is true for clock latency as well. We
+*may* need that per opp node sometime..
+
+> If you are going to redefine OPPs anyway I would really like to see this
+> property die and rather have a min/max voltage per OPP. That way you can
+
+Maybe yes.
+
+> properly express the OPP constraints. Most OPPs will likely allow a much
+> higher voltage than their minimal specified one, except when you go over
+> thermal limits with a high clock/voltage combination.
+
+Yes.
+
+>> +  - clock-latency: Specify the possible maximum transition latency for clock,
+>> +    in unit of nanoseconds.
 >
->  #endif /* CONFIG_OF_IOMMU */
->
-> -static inline void of_iommu_set_ops(struct device_node *np,
-> -                                   const struct iommu_ops *ops)
-> -{
-> -       np->data = (struct iommu_ops *)ops;
-> -}
-> -
-> -static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
-> -{
-> -       return np->data;
-> -}
-> +void of_iommu_set_ops(struct device_node *np, struct iommu_ops *ops);
-> +struct iommu_ops *of_iommu_get_ops(struct device_node *np);
->
->  extern struct of_device_id __iommu_of_table;
->
-> --
-> 1.9.1
->
-> On 04/12/14 12:42, Grant Likely wrote:
->>
->> On Thu, Dec 4, 2014 at 12:26 PM, Robin Murphy <robin.murphy@arm.com>
->> wrote:
->>>
->>> Hi Arnd,
->>>
->>> On 03/12/14 19:57, Arnd Bergmann wrote:
->>> [...]
->>>>>
->>>>>
->>>>> Good catch. This is not good. The data pointer should be avoided since
->>>>> there are no controls over its use. Until a better solution can be
->>>>> implemented, probably the safest thing to do is add a struct iommu_ops
->>>>> pointer to struct device_node. However, assuming that only a small
->>>>> portion of nodes will actually have iommu_ops set, I'd rather see a
->>>>> separate registry that matches device_nodes to iommu_ops.
->>>>
->>>>
->>>>
->>>> Fair enough. Will, can you take a copy of drivers/dma/of-dma.c and
->>>> adapt it as needed? It should be exactly what we need to start
->>>> out and can be extended and generalized later.
->>>
->>>
->>>
->>> I'm quite keen to see this series go in, since I'm depending on it to
->>> make
->>> arm64 IOMMU DMA ops "just work". Will and I came to the conclusion the
->>> other
->>> day that we pretty much need to build up some kind of bus abstraction
->>> based
->>> on the probe data in order to be able to assign IOMMU groups correctly,
->>> which can also subsume this particular problem in the long run. Since
->>> I've
->>> made a start on that already, I've hacked the following short-term fix
->>> out
->>> of it. Tested on my Juno - admittedly with only two SMMUs and one master
->>> (EHCI) being probed, but it didn't blow up or regress anything.
->>>
->>> Regards,
->>> Robin.
->>>
->>> --->8---
->>>  From 1f3d2612682c239e53f2c20e2ac5d19ef3f5387c Mon Sep 17 00:00:00 2001
->>> Message-Id:
->>>
->>> <1f3d2612682c239e53f2c20e2ac5d19ef3f5387c.1417695078.git.robin.murphy@arm.com>
->>> From: Robin Murphy <robin.murphy@arm.com>
->>> Date: Thu, 4 Dec 2014 11:53:13 +0000
->>> Subject: [PATCH] iommu: store DT-probed IOMMU data privately
->>>
->>> Since the data pointer in the DT node is public and may be overwritten
->>> by conflicting code, move the DT-probed IOMMU ops to a private list
->>> where they will be safe.
->>>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>
->>
->> Looks reasonable to me. Comments below...
->>
->>> ---
->>>   drivers/iommu/of_iommu.c | 38 ++++++++++++++++++++++++++++++++++++++
->>>   include/linux/of_iommu.h | 12 ++----------
->>>   2 files changed, 40 insertions(+), 10 deletions(-)
->>>
->>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
->>> index 73236d3..5cd451c 100644
->>> --- a/drivers/iommu/of_iommu.c
->>> +++ b/drivers/iommu/of_iommu.c
->>> @@ -94,6 +94,44 @@ int of_get_dma_window(struct device_node *dn, const
->>> char
->>> *prefix, int index,
->>>   }
->>>   EXPORT_SYMBOL_GPL(of_get_dma_window);
->>>
->>> +struct of_iommu_node {
->>> +       struct hlist_node list;
->>> +       struct device_node *np;
->>> +       const struct iommu_ops *ops;
->>> +};
->>> +static HLIST_HEAD(of_iommu_list);
->>
->>
->> Just use a list_head. hlist_head merely saves one pointer in this case.
->>
->>> +static DEFINE_SPINLOCK(of_iommu_lock);
->>> +
->>> +void of_iommu_set_ops(struct device_node *np, const struct iommu_ops
->>> *ops)
->>> +{
->>> +       struct of_iommu_node *iommu = kmalloc(sizeof(*iommu),
->>> GFP_KERNEL);
->>
->>
->> kzalloc()
->>
->>> +
->>> +       if (!iommu)
->>> +               return;
->>
->>
->> Shouldn't there be a WARN() here on failure? I don't think failing
->> silently is desired.
->>
->>> +
->>> +       INIT_HLIST_NODE(&iommu->list);
->>> +       iommu->np = np;
->>> +       iommu->ops = ops;
->>> +       spin_lock(&of_iommu_lock);
->>> +       hlist_add_head(&iommu->list, &of_iommu_list);
->>> +       spin_unlock(&of_iommu_lock);
->>> +}
->>> +
->>> +struct iommu_ops *of_iommu_get_ops(struct device_node *np)
->>> +{
->>> +       struct of_iommu_node *node;
->>> +       const struct iommu_ops *ops = NULL;
->>> +
->>> +       spin_lock(&of_iommu_lock);
->>> +       hlist_for_each_entry(node, &of_iommu_list, list)
->>> +               if (node->np == np) {
->>> +                       ops = node->ops;
->>> +                       break;
->>> +               }
->>> +       spin_unlock(&of_iommu_lock);
->>> +       return (struct iommu_ops *)ops;
->>
->>
->> The cast looks fishy. If you need to use a cast, then the data types
->> are probably wrong. If you drop the const from *ops here and in the
->> structure then it should probably work fine. Due to the way it is
->> being used, there isn't any advantage to using const (unless you
->> changes of_iommu_get_ops() to return a const pointer, then const would
->> make sense).
->>
->>> +}
->>> +
->>>   struct iommu_ops *of_iommu_configure(struct device *dev)
->>>   {
->>>          struct of_phandle_args iommu_spec;
->>> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
->>> index d03abbb..e27c53a 100644
->>> --- a/include/linux/of_iommu.h
->>> +++ b/include/linux/of_iommu.h
->>> @@ -31,16 +31,8 @@ static inline struct iommu_ops
->>> *of_iommu_configure(struct
->>> device *dev)
->>>
->>>   #endif /* CONFIG_OF_IOMMU */
->>>
->>> -static inline void of_iommu_set_ops(struct device_node *np,
->>> -                                   const struct iommu_ops *ops)
->>> -{
->>> -       np->data = (struct iommu_ops *)ops;
->>> -}
->>> -
->>> -static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
->>> -{
->>> -       return np->data;
->>> -}
->>> +void of_iommu_set_ops(struct device_node *np, const struct iommu_ops
->>> *ops);
->>> +struct iommu_ops *of_iommu_get_ops(struct device_node *np);
->>>
->>>   extern struct of_device_id __iommu_of_table;
->>>
->>> --
->>> 1.9.1
->>>
->>>
->>
->
->
+> Why do we need this? This is property of the clock. We should be able to
+> handle this completely internally in the kernel. I don't know if the
+> clock API has something like this right now, but it should be a trivial
+> addition.
+
+This is not only clock's latency, but is somehow named this way. This should
+give the time it takes to change from frequency A to frequency B, which include
+change in supplies as well.. So, this probably is dvfs-latency ..
+
+This is required by cpufreq right now, but would be useful for the energy aware
+scheduler as well. So, yes this is important. Also, it might also be required to
+be per OPP...
+
+Probably we can use voltage-tolerance and clock-latency at both
+levels. list-level
+and OPP level. list level being at higher priority ?
+
+Thanks for your quick comments :)
