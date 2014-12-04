@@ -1,76 +1,56 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 4 Dec 2014 10:12:40 +0100
-Subject: [PATCH 4/5] ARM: BCM5301X: Add DT for Asus RT-N18U
-In-Reply-To: <CACna6rzNTd6dudWqbACsf+oZWacjUcFDAuzDZth=_WN1uBdccg@mail.gmail.com>
-References: <1417368513-13808-1-git-send-email-zajec5@gmail.com>
- <1417368513-13808-4-git-send-email-zajec5@gmail.com>
- <547E48F0.6010600@hauke-m.de>
- <CACna6rzNTd6dudWqbACsf+oZWacjUcFDAuzDZth=_WN1uBdccg@mail.gmail.com>
-Message-ID: <CACna6ryLtc4nCO8rxDgBLG37VdHyy0pcHky+c11dQHfxsG+FpA@mail.gmail.com>
+From: Andrew.Jackson@arm.com (Andrew Jackson)
+Date: Thu, 04 Dec 2014 09:13:01 +0000
+Subject: [PATCH 3/5] ASoC: dwc: Iterate over all channels
+In-Reply-To: <CAA7nrthuG_4837JArAmmEkcBqfqRRUM5rzyZ1UcH3TqhfF79bg@mail.gmail.com>
+References: <547F3CA5.2010500@arm.com>	<20141203172928.GD7712@sirena.org.uk>
+ <CAA7nrthuG_4837JArAmmEkcBqfqRRUM5rzyZ1UcH3TqhfF79bg@mail.gmail.com>
+Message-ID: <5480259D.6040106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 December 2014 at 06:40, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> On 3 December 2014 at 00:19, Hauke Mehrtens <hauke@hauke-m.de> wrote:
->> On 11/30/2014 06:28 PM, Rafa? Mi?ecki wrote:
->>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
->>> ---
->>>  arch/arm/boot/dts/Makefile                  |  3 +-
->>>  arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts | 78 +++++++++++++++++++++++++++++
->>>  arch/arm/boot/dts/bcm47081.dtsi             | 26 ++++++++++
->>>  arch/arm/mach-bcm/bcm_5301x.c               |  1 +
->>>  4 files changed, 107 insertions(+), 1 deletion(-)
->>>  create mode 100644 arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
->>>  create mode 100644 arch/arm/boot/dts/bcm47081.dtsi
->>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index 18a21d9..db51a31 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -58,7 +58,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b-plus.dtb
->>>  dtb-$(CONFIG_ARCH_BCM_5301X) += \
->>>       bcm4708-buffalo-wzr-1750dhp.dtb \
->>>       bcm4708-netgear-r6250.dtb \
->>> -     bcm4708-netgear-r6300-v2.dtb
->>> +     bcm4708-netgear-r6300-v2.dtb \
->>> +     bcm47081-asus-rt-n18u.dtb
->>>  dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
->>>  dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
->>>       bcm911360k.dtb \
->>> diff --git a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
->>> new file mode 100644
->>> index 0000000..c40ad39
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
->>> @@ -0,0 +1,78 @@
->>> +/*
->>> + * Broadcom BCM470X / BCM5301X ARM platform code.
->>> + * DTS for Asus RT-N18U
->>> + *
->>> + * Copyright ? 2014 Rafa? Mi?ecki <zajec5@gmail.com>
->>> + *
->>> + * Licensed under the GNU/GPL. See COPYING for details.
->>> + */
->>> +
->>> +/dts-v1/;
->>> +
->>> +#include "bcm47081.dtsi"
->>> +
->>> +/ {
->>> +     compatible = "asus,rt-n18u", "brcm,bcm47081";
+On 12/04/14 06:55, rajeev kumar wrote:
+> On Wed, Dec 3, 2014 at 10:59 PM, Mark Brown <broonie@kernel.org> wrote:
+>> On Wed, Dec 03, 2014 at 04:39:01PM +0000, Andrew Jackson wrote:
 >>
->> Instead of adding bcm47081 to the core code you can do this:
+>>> +     /* Iterate over set of channels - independently controlled.
+>>> +      */
+>>> +     do {
+>>> +             if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+>>> +                     i2s_write_reg(dev->i2s_base, TCR(ch_reg),
+>>> +                                   xfer_resolution);
+>>> +                     i2s_write_reg(dev->i2s_base, TFCR(ch_reg), 0x02);
+>>> +                     irq = i2s_read_reg(dev->i2s_base, IMR(ch_reg));
+>>> +                     i2s_write_reg(dev->i2s_base, IMR(ch_reg), irq & ~0x30);
+>>> +                     i2s_write_reg(dev->i2s_base, TER(ch_reg), 1);
+>>> +             } else {
+>>> +                     i2s_write_reg(dev->i2s_base, RCR(ch_reg),
+>>> +                                   xfer_resolution);
+>>> +                     i2s_write_reg(dev->i2s_base, RFCR(ch_reg), 0x07);
+>>> +                     irq = i2s_read_reg(dev->i2s_base, IMR(ch_reg));
+>>> +                     i2s_write_reg(dev->i2s_base, IMR(ch_reg), irq & ~0x03);
+>>> +                     i2s_write_reg(dev->i2s_base, RER(ch_reg), 1);
+>>> +             }
+>>> +     } while (ch_reg-- > 0);
 >>
->> compatible = "asus,rt-n18u", "brcm,bcm47081", "brcm,bcm4708";
+>> The normal way to write an iteration would be with a for loop - why are
+>> we not doing that?
 >>
->> If we later need some special handling for bcm47081 we can add this but
->> the old dts file will still work. This is more relevant if the dts file
->> is in the boot loader.
->
-> I don't get it. How should I detect there is no second CPU?
+>> Also I see that you've not sent these as a single thread - please use
+>> --thread.
+> 
+> designware i2s has individual register for channel support. It is like
+> TCR(0), TCR(1) and so on.. So a macro is defined to capture these
+> please check below #define
+> 
+> #define TCR(x)      (0x40 * x + 0x034)
+> 
+> and the same is true for capture also. So there is no need for
+> iteration. Only writing to the particular register will do the work.
 
-Aaaah, you meant not adding *core code*, not the DTS file. I didn't
-notice that in the first place. Now it's clear, thanks!
+However params_channels returns the number of channels that the device needs to configure.  So, for example, when there are four channels two sets of channel registers need to be programmed.
 
--- 
-Rafa?
+
+	Andrew
+> 
+> ~Rajeev
+> 
