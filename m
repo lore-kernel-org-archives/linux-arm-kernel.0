@@ -1,43 +1,63 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 4 Dec 2014 09:10:21 -0600
-Subject: [PATCH] arm: boot: dts: am437x-sk: fix lcd enable pin mux data
-In-Reply-To: <20141204144325.GA17269@saruman>
-References: <20141204144325.GA17269@saruman>
-Message-ID: <1417705821-21847-1-git-send-email-balbi@ti.com>
+Date: Thu, 4 Dec 2014 09:24:11 -0600
+Subject: [PATCH] arm: omap2: rx51-peripherals: fix build warning
+In-Reply-To: <1417033655-32332-1-git-send-email-balbi@ti.com>
+References: <1417033655-32332-1-git-send-email-balbi@ti.com>
+Message-ID: <20141204152411.GF18045@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caused by a copy & paste error. Note that even with
-this bug AM437x SK display still works because GPIO
-mux mode is always enabled. It's still wrong to mux
-somebody else's pin.
+On Wed, Nov 26, 2014 at 02:27:35PM -0600, Felipe Balbi wrote:
+> commit 68a3c04 ([media] ARM: OMAP2: RX-51: update
+> si4713 platform data) updated board-rx51-peripherals.c
+> so that si4713 could be easily used on DT boot, but
+> it ended up introducing a build warning whenever
+> si4713 isn't enabled.
+> 
+> This patches fixes that warning:
+> 
+> arch/arm/mach-omap2/board-rx51-peripherals.c:1000:36: warning: \
+> 	?rx51_si4713_platform_data? defined but not used [-Wunused-variable]
+>  static struct si4713_platform_data rx51_si4713_platform_data = {
+> 
+> Cc: Sebastian Reichel <sre@kernel.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Hans Verkuil <hans.verkuil@cisco.com>
+> Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-Luckily ball D25 (offset 0x238 - gpio5_8) on AM437x
-isn't used for anything.
+a gentle reminder on this one.
 
-While at that, also replace a pullup with a pulldown
-as that gpio should be normally low, not high.
+> ---
+>  arch/arm/mach-omap2/board-rx51-peripherals.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+> index d18a5cf..bda20c5 100644
+> --- a/arch/arm/mach-omap2/board-rx51-peripherals.c
+> +++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+> @@ -997,9 +997,11 @@ static struct aic3x_pdata rx51_aic3x_data2 = {
+>  	.gpio_reset = 60,
+>  };
+>  
+> +#if IS_ENABLED(CONFIG_I2C_SI4713) && IS_ENABLED(CONFIG_PLATFORM_SI4713)
+>  static struct si4713_platform_data rx51_si4713_platform_data = {
+>  	.is_platform_device = true
+>  };
+> +#endif
+>  
+>  static struct i2c_board_info __initdata rx51_peripherals_i2c_board_info_2[] = {
+>  #if IS_ENABLED(CONFIG_I2C_SI4713) && IS_ENABLED(CONFIG_PLATFORM_SI4713)
+> -- 
+> 2.1.0.GIT
+> 
 
-Cc: <stable@vger.kernel.org> # v3.17+
-Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/boot/dts/am437x-sk-evm.dts | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-index f7f77a7..0eceb8a 100644
---- a/arch/arm/boot/dts/am437x-sk-evm.dts
-+++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-@@ -320,8 +320,7 @@
- 
- 	lcd_pins: lcd_pins {
- 		pinctrl-single,pins = <
--			/* GPIO 5_8 to select LCD / HDMI */
--			0x238 (PIN_OUTPUT_PULLUP | MUX_MODE7)
-+			0x1c (PIN_OUTPUT_PULLDOWN | MUX_MODE7) /* gpcm_ad7.gpio1_7 */
- 		>;
- 	};
- };
 -- 
-2.1.0.GIT
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/2085bc1e/attachment.sig>
