@@ -1,86 +1,72 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 4 Dec 2014 10:49:40 -0600
-Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-In-Reply-To: <201412040148.31033@pali>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <201411242319.27481@pali>
- <CAL_JsqJuSa-zHTPynH3vAEOK1D2xYRYtVjZJ5zDR0UHAyGYXuA@mail.gmail.com>
- <201412040148.31033@pali>
-Message-ID: <CAL_JsqKYpDD1Rq2n92FcspPWGJeQvtA4eRYPDK=xYPQN0=uQTg@mail.gmail.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Thu, 4 Dec 2014 15:00:12 -0200
+Subject: [PATCH] arm: omap2: rx51-peripherals: fix build warning
+In-Reply-To: <20141204163930.GF2817@atomide.com>
+References: <1417033655-32332-1-git-send-email-balbi@ti.com>
+ <20141204152411.GF18045@saruman> <3261416.DL88JFJXUF@wuerfel>
+ <20141204154835.GH18045@saruman>
+ <20141204163930.GF2817@atomide.com>
+Message-ID: <20141204150012.2fb75907@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 3, 2014 at 6:48 PM, Pali Roh?r <pali.rohar@gmail.com> wrote:
-> On Thursday 04 December 2014 01:33:08 Rob Herring wrote:
->> On Mon, Nov 24, 2014 at 4:19 PM, Pali Roh?r
-> <pali.rohar@gmail.com> wrote:
->> > On Wednesday 18 June 2014 22:46:19 Rob Herring wrote:
->> >> On Wed, Jun 18, 2014 at 2:22 PM, Pali Roh?r
->> >
->> > <pali.rohar@gmail.com> wrote:
->> >> > On Wednesday 18 June 2014 21:07:35 Rob Herring wrote:
->> >> >> On Wed, Jun 18, 2014 at 11:54 AM, Pali Roh?r
->> >> >
->> >> > <pali.rohar@gmail.com> wrote:
->> >> >> > Machine name from board description is some generic
->> >> >> > name on DT kernel. DT provides machine name property
->> >> >> > which is specific for board, so use it instead
->> >> >> > generic one when possible.
->>
->> [...]
->>
->> >> > Basically in DT kernel is missing Hardware, Revision and
->> >> > probably also Serial key. (Now I used only qemu for
->> >> > testing which set serial key to 0). All these
->> >> > informations is used by userspace applications which
->> >> > determinate how to behave.
->> >>
->> >> It is somewhat fragile to expect the name in the DT to
->> >> match the old name from the kernel. As your patch to n900
->> >> dts shows, we'd probably have to update every dts file to
->> >> make them match. While I think we should work to remove
->> >> this string from the kernel, userspace depending on the DT
->> >> model string is a bad idea. For example, if you had some
->> >> platform with multiple OEMs just rebranding the same base
->> >> design, they may all want to put their own model string
->> >> into each product. The true h/w id is the compatible
->> >> string.
->> >>
->> >> Serial number is easy. There is already a standard although
->> >> not widely used property for it with "/serial-number". You
->> >> just need to wire it up to cpuinfo.
->> >
->> > There is no "/serial-number" property in kernel:
->> >
->> > $ ls -l -a /sys/bus/soc/devices/soc0/
->> > drwxr-xr-x    3 0        0                0 Jan  1 00:00 .
->> > drwxr-xr-x   18 0        0                0 Jan  1 00:00 ..
->> > -r--r--r--    1 0        0             4096 Jan  1 00:00
->> > family -r--r--r--    1 0        0             4096 Jan  1
->> > 00:00 machine drwxr-xr-x    2 0        0                0
->> > Jan  1 00:00 power -r--r--r--    1 0        0
->> > 4096 Jan  1 00:00 revision lrwxrwxrwx    1 0        0
->> >          0 Jan  1 00:00 subsystem -> ../../bus/soc
->> > -r--r--r--    1 0        0             4096 Jan  1 00:00
->> > type -rw-r--r--    1 0        0             4096 Jan  1
->> > 00:00 uevent
->>
->> Wrong place. If you put /serial-number in your DT, then it
->> will be in /proc/device-tree/serial-number.
->>
->> If you want to wire that up to /proc/cpuinfo, I would be fine
->> with that.
->>
->> Rob
->
-> I cannot hardcode it into DT, because it is set by bootloader.
-> And bootloader tell it to kernel via ATAGs structure. Bootloader
-> is closed and proprietary and cannot be replaced (there is no
-> documentation for hw init).
+Em Thu, 04 Dec 2014 08:39:31 -0800
+Tony Lindgren <tony@atomide.com> escreveu:
 
-Either the bootloader can put the serial number into the DTB instead
-of ATAGs or the kernel decompressor can copy it from ATAGs to DTB like
-is done already for other ATAGs. I presume you cannot update the
-bootloader and will need the latter.
+> * Felipe Balbi <balbi@ti.com> [141204 07:50]:
+> > Hi,
+> > 
+> > On Thu, Dec 04, 2014 at 04:41:13PM +0100, Arnd Bergmann wrote:
+> > > On Thursday 04 December 2014 09:24:11 Felipe Balbi wrote:
+> > > > On Wed, Nov 26, 2014 at 02:27:35PM -0600, Felipe Balbi wrote:
+> > > > > commit 68a3c04 ([media] ARM: OMAP2: RX-51: update
+> > > > > si4713 platform data) updated board-rx51-peripherals.c
+> > > > > so that si4713 could be easily used on DT boot, but
+> > > > > it ended up introducing a build warning whenever
+> > > > > si4713 isn't enabled.
+> > > > > 
+> > > > > This patches fixes that warning:
+> > > > > 
+> > > > > arch/arm/mach-omap2/board-rx51-peripherals.c:1000:36: warning: \
+> > > > > 	?rx51_si4713_platform_data? defined but not used [-Wunused-variable]
+> > > > >  static struct si4713_platform_data rx51_si4713_platform_data = {
+> > > > > 
+> > > > > Cc: Sebastian Reichel <sre@kernel.org>
+> > > > > Cc: Tony Lindgren <tony@atomide.com>
+> > > > > Cc: Hans Verkuil <hans.verkuil@cisco.com>
+> > > > > Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> > > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > > 
+> > > > a gentle reminder on this one.
+> > > > 
+> > > 
+> > > Let me add my
+> > > 
+> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > 
+> > > You didn't say who you expect to pick up the patch. I assume Mauro
+> > 
+> > patch author now decides who takes the patch ? That's new :-)
 
-Rob
+Well, for patches that cross subsystem boundaries, like this one,
+the best is to give a hint about whom you expect to pick it.
+
+In this specific case, as commit 68a3c04 is in my tree, the best is
+to merge the patch on it, as the patch may not even apply at Tony's
+tree.
+
+> > 
+> > > should take it because he took the patch that caused the problem,
+> > > but he might not be aware that he should look at this now.
+> > 
+> > He is in Cc, let's ask him :-)
+> 
+> Best that this one goes in along with the other si4713 patches
+> to avoid dependencies between trees:
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
+
+Thanks! I'll merge it via my tree.
+
+Regards,
+Mauro
