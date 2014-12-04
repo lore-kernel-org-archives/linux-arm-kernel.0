@@ -1,53 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 10:01:56 +0100
-Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <548020D7.8030003@linaro.org>
-References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
- <2596381.rFt35NU3oS@wuerfel> <548020D7.8030003@linaro.org>
-Message-ID: <8625951.Wbs2MxLnhi@wuerfel>
+From: Andrew.Jackson@arm.com (Andrew Jackson)
+Date: Thu, 04 Dec 2014 09:03:17 +0000
+Subject: [PATCH 3/5] ASoC: dwc: Iterate over all channels
+In-Reply-To: <20141203172928.GD7712@sirena.org.uk>
+References: <547F3CA5.2010500@arm.com> <20141203172928.GD7712@sirena.org.uk>
+Message-ID: <54802355.4070500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 December 2014 09:52:39 Daniel Lezcano wrote:
-> On 12/03/2014 09:35 PM, Arnd Bergmann wrote:
-> > On Wednesday 03 December 2014 07:31:22 Lina Iyer wrote:
-> >>>>> +static int __init qcom_spm_init(void)
-> >>>>> +{
-> >>>>> +    int ret;
-> >>>>> +
-> >>>>> +    /*
-> >>>>> +     * cpuidle driver need to registered before the cpuidle device
-> >>>>> +     * for any cpu. Register the device for the the cpuidle driver.
-> >>>>> +     */
-> >>>>> +    ret = platform_device_register(&qcom_cpuidle_drv);
-> >>>>> +    if (ret)
-> >>>>> +        return ret;
-> >>>> Stephen pointed out that we would have the platform device lying around
-> >>>> on a non-QCOM device when using multi_v7_defconfig.
-> >>>
-> >>> Perhaps I am missing the point, but this is not supposed to happen, no ?
-> >>>
-> >> This would happen, since the file would compile on multi_v7 and we would
-> >> initialize and register this device regardless. The cpuidle-qcom.c
-> >> driver probe would bail out looking for a matching compatible property.
-> >> So we would not register a cpuidle driver but the device would lay
-> >> around.
-> >
-> > I think the problem is registering a platform_device. I've complained
-> > about this before, but it still seems to get copied all over the
-> > place. Please don't do this but have a driver that looks at DT to
-> > figure out whether to access hardware or not.
+On 12/03/14 17:29, Mark Brown wrote:
+> On Wed, Dec 03, 2014 at 04:39:01PM +0000, Andrew Jackson wrote:
 > 
-> We did this approach but, I can remember why, someone was complaining 
-> about it also 
+>> +	/* Iterate over set of channels - independently controlled.
+>> +	 */
+>> +	do {
+>> +		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+>> +			i2s_write_reg(dev->i2s_base, TCR(ch_reg),
+>> +				      xfer_resolution);
+>> +			i2s_write_reg(dev->i2s_base, TFCR(ch_reg), 0x02);
+>> +			irq = i2s_read_reg(dev->i2s_base, IMR(ch_reg));
+>> +			i2s_write_reg(dev->i2s_base, IMR(ch_reg), irq & ~0x30);
+>> +			i2s_write_reg(dev->i2s_base, TER(ch_reg), 1);
+>> +		} else {
+>> +			i2s_write_reg(dev->i2s_base, RCR(ch_reg),
+>> +				      xfer_resolution);
+>> +			i2s_write_reg(dev->i2s_base, RFCR(ch_reg), 0x07);
+>> +			irq = i2s_read_reg(dev->i2s_base, IMR(ch_reg));
+>> +			i2s_write_reg(dev->i2s_base, IMR(ch_reg), irq & ~0x03);
+>> +			i2s_write_reg(dev->i2s_base, RER(ch_reg), 1);
+>> +		}
+>> +	} while (ch_reg-- > 0);
 > 
-> The platform device/driver paradigm allowed us to split the arch 
-> specific parts by passing the pm ops through the platform data.
-> 
-> Would make sense to have a single common place for the ARM arch where we 
-> initialize the platform device for cpuidle ?
+> The normal way to write an iteration would be with a for loop - why are
+> we not doing that?
 
-No. It's really not a device, and if you pretend that it is, you get
-into problems like this.
+The intention was to minimise the changes, excluding whitespace, between this version and the original.  Also, it is a perfectly valid looping construct.  I'm happy to rework it into a for loop.
 
-	Arnd
+> Also I see that you've not sent these as a single thread - please use
+> --thread.
+> 
+
+	Andrew
