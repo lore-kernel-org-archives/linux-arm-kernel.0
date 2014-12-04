@@ -1,97 +1,113 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Thu, 4 Dec 2014 19:34:15 +0800
-Subject: [PATCH v4 0/5] Add Spreadtrum Sharkl64 Platform support
-In-Reply-To: <sc9836v4>
-References: <sc9836v4>
-Message-ID: <1417692860-18841-1-git-send-email-chunyan.zhang@spreadtrum.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 4 Dec 2014 12:47:00 +0100
+Subject: [PATCH 1/4] ARM: shmobile: R-Mobile: Add SYSC restart handler
+In-Reply-To: <3671800.E1ZjeAe67g@wuerfel>
+References: <1417616227-6715-1-git-send-email-geert+renesas@glider.be>
+ <1417616227-6715-2-git-send-email-geert+renesas@glider.be>
+ <3671800.E1ZjeAe67g@wuerfel>
+Message-ID: <CAMuHMdWeFceyn3_TkgsuwakK9UOVUszBFqEv-uRqRC+2a=5XGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Spreadtrum is a rapid growing chip vendor providing smart phone total solutions.
+Hi Arnd,
 
-Sharkl64 Platform is nominated as a SoC infrastructure that supports 4G/3G/2G
-standards based on ARMv8 multiple core architecture.Now we have only one
-SoC(SC9836) based on this Platform in developing.
+On Thu, Dec 4, 2014 at 11:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 03 December 2014 15:17:04 Geert Uytterhoeven wrote:
+>> Extend the PM domain platform driver for the R-Mobile System
+>> Controller (SYSC) to register a restart handler, to be used on various
+>> Renesas ARM SoCs (e.g. R-Mobile A1 (r8a7740) and APE6 (r8a73a4), and
+>> SH-Mobile AP4 (sh7372) and AG5 (sh73a0)).
+>>
+>> Note that this supports DT-based platforms only.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> Is this one of the typical system controllers that contains lots of
+> random registers? Maybe you could mark it as "syscon" in DT and just
+> use the existing drivers/power/reset/syscon-reboot.c driver?
 
-This patchset adds Sharkl64 support in arm64 device tree and the serial driver
-of SC9836-UART.
+The hardware block has two register ranges.
+The first one handles boot mode and power management,
+the second handles reset control and allows to read the mode strap pins.
 
-This patchset also has patches which address "sprd" prefix and DT compatible
-strings for nodes which appear un-documented.
+The PM domain driver uses the first range, the reset handler uses the second
+range.
 
-This version code was tesed both on Fast Mode and sc9836-fpga board.
-We use the latest boot-wrapper-aarch64 as the bootloader.
+I tried using syscon and syscon-reboot, but that needs some changes to the
+syscon framework, as it currently provides access to the first register
+range only. Providing access to the second region requires either:
 
-Changes from v3:
-* Addressed review comments:
-	- Added the description of clock property for sc9836-uart
-	- Revised the size of GICC to be 8KiB
-	- Added another compatible string for psci-0.1
-	- Removed the clock-frequency property of timer in DT
-	- Removed ARCH_SHARKL64, just left ARCH_SPRD only
-	- sprd_serial.c: Removed .owner of platform_driver.driver
-	- sprd_serial.c: Removed all usages of unlikely
-	- sprd_serial.c: Used the .port member of sprd_port instead of the cast
-	- sprd_serial.c: Used dynamic allocation for major/minor device id
-	- sprd_serial.c: Added a timeout and a cpu_relax for clearing rx/tx fifo
-	- sprd_serial.c: clear CMSPAR in termios->c_cflag
-	- sprd_serial.c: Set the resulting baud back into the termios
-	- sprd_serial.c: Implemented a shared interrupt handler
+  1. Extending the regmap to cover all ranges.
+     Does regmap support multiple ranges? It seems regmap_range_cfg handles
+     only virtual ranges (switchable by writing to a register), not
+     always-mapped discontiguous ranges?
 
-Changes from v2:
-* Addressed review comments:
-	- Added a specific compitible string 'sc9836-uart' for the serial
-	- Added a full serial driver
-	- Added the property 'clock-frequency' for timer node in dtsi.
-	- Replaceed the old macro prefix 'UART_' with 'SPRD_' in the 
-	  Spreadtrum serial driver code.
-* Revised the name of SoC and board from 'sharkl3' to 'sc9836'
-* Used dual-license for DTS files
-* Added a menuconfig 'ARCH_SPRD' in arch/arm64/Kconfig
+  2. Providing multiple regmaps, one for each register range.
+     This needs modifications to look up ranges using a phandle and an
+     (optional for backwards compatibility) index, and updates to drivers
+     and bindings.
 
-Changes from v1:
-* Addressed review comments:
-        - Added "sprd" prefix to vendor-prefixes.txt
-        - Created serial/sprd-serial.txt and remove the properties for serial-sprd
-          from of-serial.txt to it.
-        - Renamed of-serial.txt to 8250.txt according to Arnd's review comments
-        - Splited and revised .dts for Sharkl64 Platform
-        - Changed to PSCI method for cpu power management
-        - Revised Kconfig Makefile to match the alphabetical ordering
-        - Renamed serial-sprd-earlycon.c to serial-sprd.c
+Am I missing an option?
 
-Chunyan Zhang (3):
-  Documentation: DT: Renamed of-serial.txt to 8250.txt
-  Documentation: DT: Add bindings for Spreadtrum SoC Platform
-  tty/serial: Add Spreadtrum sc9836-uart driver support
+>> +static void __iomem *sysc_base2;
+>> +
+>> +static void rmobile_sysc_restart(enum reboot_mode reboot_mode, const char *cmd)
+>> +{
+>> +     pr_debug("%s %u/%s\n", __func__, reboot_mode, cmd);
+>> +
+>> +     writel(RESCNT2_PRES, sysc_base2 + RESCNT2);
+>> +}
+>> +
+>> +static int rmobile_sysc_probe(struct platform_device *pdev)
+>> +{
+>> +     dev_dbg(&pdev->dev, "%s\n", __func__);
+>> +
+>> +     sysc_base2 = of_iomap(pdev->dev.of_node, 1);
+>> +     if (!sysc_base2)
+>> +             return -ENODEV;
+>> +
+>> +     arm_pm_restart = rmobile_sysc_restart;
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static const struct of_device_id rmobile_sysc_of_match[] = {
+>> +     { .compatible = "renesas,sysc-rmobile", },
+>> +     { /* sentinel */ }
+>> +};
+>> +
+>> +static struct platform_driver rmobile_sysc_driver = {
+>> +     .probe = rmobile_sysc_probe,
+>> +     .driver = {
+>> +             .name = "rmobile_sysc",
+>> +             .of_match_table = rmobile_sysc_of_match,
+>> +     },
+>> +};
+>> +
+>> +module_platform_driver(rmobile_sysc_driver);
+>
+> This clearly looks much better than the previous implementation, so that
+> is great. If you can decouple it from the rest of this file, either through
+> syscon or by asserting that sysc_base2 is not going to be needed for
+> anything else, how about moving the new code to a standalon driver in
+> drivers/power/reset?
 
-Zhizhou Zhang (2):
-  arm64: dts: Add support for Spreadtrum SC9836 SoC in dts and Makefile
-  arm64: Add support for Spreadtrum's Sharkl64 Platform in Kconfig and
-    defconfig
+Yes, sysc_base2 is used for reset control only (I don't think we need to read
+the mode strap pins).
 
- Documentation/devicetree/bindings/arm/sprd.txt     |   11 +
- .../bindings/serial/{of-serial.txt => 8250.txt}    |    0
- .../devicetree/bindings/serial/sprd-uart.txt       |    9 +
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- arch/arm64/Kconfig                                 |    6 +
- arch/arm64/boot/dts/Makefile                       |    1 +
- arch/arm64/boot/dts/sprd-sc9836-openphone.dts      |   85 +++
- arch/arm64/boot/dts/sprd-sc9836.dtsi               |  102 +++
- arch/arm64/boot/dts/sprd-sharkl64.dtsi             |  105 +++
- arch/arm64/configs/defconfig                       |    1 +
- drivers/tty/serial/Kconfig                         |   18 +
- drivers/tty/serial/Makefile                        |    1 +
- drivers/tty/serial/sprd_serial.c                   |  761 ++++++++++++++++++++
- include/uapi/linux/serial_core.h                   |    3 +
- 14 files changed, 1104 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
- rename Documentation/devicetree/bindings/serial/{of-serial.txt => 8250.txt} (100%)
- create mode 100644 Documentation/devicetree/bindings/serial/sprd-uart.txt
- create mode 100644 arch/arm64/boot/dts/sprd-sc9836-openphone.dts
- create mode 100644 arch/arm64/boot/dts/sprd-sc9836.dtsi
- create mode 100644 arch/arm64/boot/dts/sprd-sharkl64.dtsi
- create mode 100644 drivers/tty/serial/sprd_serial.c
+So unless there's a simple solution to the regmap problem, I think moving
+this driver part to  drivers/power/reset is the most viable option.
 
--- 
-1.7.9.5
+Anyway, thanks for the syscon hint! I think it'll be useful for reset on
+R-Car Gen2.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
