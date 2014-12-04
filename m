@@ -1,35 +1,23 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Thu, 4 Dec 2014 13:56:11 -0800
-Subject: [PATCH 4/4] ARM: dts: enable pinctrl for Broadcom Cygnus
-In-Reply-To: <1417730171-30455-1-git-send-email-rjui@broadcom.com>
-References: <Ray Jui <rjui@broadcom.com>
- <1417730171-30455-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1417730171-30455-5-git-send-email-rjui@broadcom.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 4 Dec 2014 22:58:20 +0100 (CET)
+Subject: [PATCH v3 09/13] irqchip: GICv3: ITS: MSI support
+In-Reply-To: <CALRxmdAULDXqx5oNUGQx9y2oUegULKO7=gWQWMRkFOzFo9XS8A@mail.gmail.com>
+References: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
+ <1416839720-18400-10-git-send-email-marc.zyngier@arm.com>
+ <CALRxmdAULDXqx5oNUGQx9y2oUegULKO7=gWQWMRkFOzFo9XS8A@mail.gmail.com>
+Message-ID: <alpine.DEB.2.11.1412042257000.16275@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the pinctrl support for Broadcom Cygnus SoC
+On Thu, 4 Dec 2014, Stuart Yoder wrote:
+> On Mon, Nov 24, 2014 at 8:35 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> 
+> > +/*
+> > + * We need a value to serve as a irq-type for LPIs. Choose one that will
+> > + * hopefully pique the interest of the reviewer.
+> > + */
+> > +#define GIC_IRQ_TYPE_LPI               0xa110c8ed
+> 
+> Ok, my interest is piqued.  Why this value?
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
----
- arch/arm/boot/dts/bcm-cygnus.dtsi |    5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 5126f9e..4c6bf4d 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -54,6 +54,11 @@
- 
- 	/include/ "bcm-cygnus-clock.dtsi"
- 
-+	pinctrl: pinctrl at 0x0301d0c8 {
-+		compatible = "brcm,cygnus-pinctrl";
-+		reg = <0x0301d0c8 0x2c>;
-+	};
-+
- 	amba {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-1.7.9.5
+Hint: 0x1337
