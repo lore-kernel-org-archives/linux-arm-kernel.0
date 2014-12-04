@@ -1,57 +1,104 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Thu,  4 Dec 2014 10:49:35 +0800
-Subject: [PATCH] ARM: dts: rockchip: set dw_mmc max-freq 150Mhz
-Message-ID: <1417661375-2872-1-git-send-email-addy.ke@rock-chips.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Thu, 04 Dec 2014 09:02:22 +0530
+Subject: [PATCH] soc: samsung: pmu: split up SoC specific PMU data
+In-Reply-To: <547EA0DC.70800@samsung.com>
+References: <1417364162-29981-1-git-send-email-pankaj.dubey@samsung.com>
+ <547EA0DC.70800@samsung.com>
+Message-ID: <547FD5C6.3030308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All of mmc controllers include SDMMC, SDIO0, SDIO1, and EMMC on RK3288
-are limited to 150Mhz. It was mainly caused by two reasons:
-- RK3288's IO pad(except DDR IO pad) is generic, which can only support
-  the max of 150Mhz.
-- Mmc controller was designed at 150Mhz, and the pressure test by IC team
-  was based on this freequency point.
+On Wednesday 03 December 2014 11:04 AM, jonghwa3.lee at samsung.com wrote:
+> On 2014? 12? 01? 01:16, Pankaj Dubey wrote:
+>
+>> This patch splits up exynos-pmu.c file, and moves PMU configuration data
+>> and functions handing those data into SoC specific PMU files, keeping
+>> driver structure and common functionality into exynos-pmu.c.
+>>
+>> At the same time it also separates compilation of these different SoC PMU files
+>> based on CONFIG_ARM64 and CONFIG_ARM. This way we can reduce overhead of ARM64
+>> SoC's PMU getting compiled when kernel is built for ARM and vice-versa.
+>>
+>> This patch also removes .owner field from exynos-pmu.c as it's redundant for
+>> drivers calling platform_driver_register to register platform_driver.
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>> This patch is prepared on top of kgene/for-next and following patch [1] from
+>> Amit Daniel.
+>>
+>> [1]: http://www.spinics.net/lists/linux-samsung-soc/msg39797.html
+>>
+>> This patch tries to address some of concerns raised for using exynos-pmu.c for
+>> ARM and ARM64 based SoC at these threads [2], [3].
+>>
+>> [2]: http://www.spinics.net/lists/linux-samsung-soc/msg39809.html
+>> [3]: https://lkml.org/lkml/2014/11/24/322
+>>
+>> Since Exynos SoC's has similar PMU IP, and already existing bindings can be
+>> used, it makes sense to keep single driver for both ARM and ARM64 based SoCs.
+>> All common functionalties are in exynos-pmu.c whereas SoC specific data and
+>> handling are moved into SoC specific exynosNNNN-pmu files.
+>>
+>> All changes are compiled tested only. Any improvements/suggestions are most
+>> welcome.
+>>
+>>   drivers/soc/samsung/Makefile         |    9 +-
+>>   drivers/soc/samsung/exynos-pmu.c     | 1293 +---------------------------------
+>>   drivers/soc/samsung/exynos-pmu.h     |   63 ++
+>>   drivers/soc/samsung/exynos3250-pmu.c |  176 +++++
+>>   drivers/soc/samsung/exynos4-pmu.c    |  223 ++++++
+>>   drivers/soc/samsung/exynos5250-pmu.c |  196 ++++++
+>>   drivers/soc/samsung/exynos5420-pmu.c |  298 ++++++++
+>>   drivers/soc/samsung/exynos7-pmu.c    |  441 ++++++++++++
+>>   8 files changed, 1412 insertions(+), 1287 deletions(-)
+>>   create mode 100644 drivers/soc/samsung/exynos-pmu.h
+>>   create mode 100644 drivers/soc/samsung/exynos3250-pmu.c
+>>   create mode 100644 drivers/soc/samsung/exynos4-pmu.c
+>>   create mode 100644 drivers/soc/samsung/exynos5250-pmu.c
+>>   create mode 100644 drivers/soc/samsung/exynos5420-pmu.c
+>>   create mode 100644 drivers/soc/samsung/exynos7-pmu.c
+>>
+>
+> ...
+>
+>> diff --git a/drivers/soc/samsung/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
+>> new file mode 100644
+>> index 0000000..4adc5a3
+>> --- /dev/null
+>> +++ b/drivers/soc/samsung/exynos-pmu.h
+>> @@ -0,0 +1,63 @@
+>> +/*
+>> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+>> + *		http://www.samsung.com
+>> + *
+>> + * Header for EXYNOS PMU Driver support
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#ifndef __EXYNOSPMU_H
+>> +#define __EXYNOSPMU_H
+>> +
+>> +#include <linux/io.h>
+>> +
+>> +#define PMU_TABLE_END	(-1U)
+>> +
+>> +static void __iomem *pmu_base_addr;
+>> +
+>
+> AFAIK, static variable in header file can't be used globally. It would be placed
+> in exynos-pmu.c or elsewhere and then only extern declaration is allowed here.
+> If I'm wrong, please let me know.
+>
 
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
- arch/arm/boot/dts/rk3288.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+Thanks for review.
+You are right. I will change this.
+I am waiting for review from other concerned people so that if any 
+suggestions or improvements I can do it in next version.
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index acb6a2f..9c35a1d 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -149,6 +149,7 @@
- 
- 	sdmmc: dwmmc at ff0c0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
-+		clock-freq-min-max = <400000 150000000>;
- 		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
- 		clock-names = "biu", "ciu";
- 		fifo-depth = <0x100>;
-@@ -159,6 +160,7 @@
- 
- 	sdio0: dwmmc at ff0d0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
-+		clock-freq-min-max = <400000 150000000>;
- 		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>;
- 		clock-names = "biu", "ciu";
- 		fifo-depth = <0x100>;
-@@ -169,6 +171,7 @@
- 
- 	sdio1: dwmmc at ff0e0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
-+		clock-freq-min-max = <400000 150000000>;
- 		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>;
- 		clock-names = "biu", "ciu";
- 		fifo-depth = <0x100>;
-@@ -179,6 +182,7 @@
- 
- 	emmc: dwmmc at ff0f0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
-+		clock-freq-min-max = <400000 150000000>;
- 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
- 		clock-names = "biu", "ciu";
- 		fifo-depth = <0x100>;
--- 
-1.8.3.2
+> Thanks.
+> Jonghwa
+>
