@@ -1,60 +1,51 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 04 Dec 2014 06:51:49 -0800
-Subject: [PATCH v7 08/11] arm/arm64: Unexport restart handlers
-In-Reply-To: <CAMuHMdX-WsVErpiZ_EbFSGxeJEfpu3cRaZzitupiSAA2hXEJ8g@mail.gmail.com>
-References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>	<1408495538-27480-9-git-send-email-linux@roeck-us.net>	<CAMuHMdVqCa+m1oMkuRHcTZKw2CWNHJVotWBwfTnfBNT11UPEjw@mail.gmail.com>	<54806F2A.7070107@roeck-us.net>
- <CAMuHMdX-WsVErpiZ_EbFSGxeJEfpu3cRaZzitupiSAA2hXEJ8g@mail.gmail.com>
-Message-ID: <54807505.2000406@roeck-us.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Dec 2014 15:56:47 +0100
+Subject: [PATCH] optimize ktime_divns for constant divisors
+In-Reply-To: <alpine.LFD.2.11.1412040837130.470@knanqh.ubzr>
+References: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
+ <2165831.DQoLFmGhIf@wuerfel> <alpine.LFD.2.11.1412040837130.470@knanqh.ubzr>
+Message-ID: <2362381.LDAGLC19vb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2014 06:44 AM, Geert Uytterhoeven wrote:
-> Hi G?nther,
->
-> On Thu, Dec 4, 2014 at 3:26 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->> On 12/04/2014 05:36 AM, Geert Uytterhoeven wrote:
->>> On Wed, Aug 20, 2014 at 2:45 AM, Guenter Roeck <linux@roeck-us.net> wrote:
->>>> Implementing a restart handler in a module don't make sense
->>>> as there would be no guarantee that the module is loaded when
->>>> a restart is needed. Unexport arm_pm_restart to ensure that
->>>> no one gets the idea to do it anyway.
->>>
->>> Why not? I was just going to do that, but I got greeted by:
->>
->> Because you should register a restart handler instead, like the other
->> drivers in the same directory now do.
->
-> That's a different thing. "there would be no guarantee that the module is
-> loaded when a restart is needed" is also valid for restart handlers...
->
+On Thursday 04 December 2014 08:46:27 Nicolas Pitre wrote:
+> On Thu, 4 Dec 2014, Arnd Bergmann wrote:
+> Note the above code is for 32-bit architectures that support a 32x32=64 
+> bit multiply instruction.  And even then, what kills performances is the 
+> inhability to efficiently deal with carry bits from C code.  Hence the 
+> far better output from do_div() on ARM.
+> 
+> If x86-64 has a 64x64=128 bit multiply instruction then the above may 
+> greatly be simplified to a single multiply and a shift.  That would 
+> possibly outperform do_div().
 
-Not really, because you are supposed to unregister the restart handler
-on unload. Sure, you can instead clear arm_pm_reastart and leave the system
-with no means to restart ...
+I was trying this in 32-bit mode to see how it would work in x86-32
+kernels. Since that architecture has a 64-by-32 divide instruction,
+that gets used here.
 
-Guenter
+x86-64 has a 64x64=128 multiply instruction and gcc uses that for
+any 64-bit division by constant, so that's what already happens
+in do_div. I assume for any 64-bit architecture, the result will
+be similar.
 
->>> ERROR: "arm_pm_restart" [drivers/power/reset/rmobile-reset.ko] undefined!
->>>
->>> So now we have to make sure all reset drivers for a zillion different
->>> hardware devices are builtin, and can't be modular?
->>>
->> No. All those drivers need to do is to register a restart handler using
->> the API provided in the patch series.
->>
->> Ultimately all restart handlers should do that and arm_pm_restart should
->> go away entirely. That was the point of the patch series.
->
-> Good. That's what I'm doing right know ;-)
->
-> Gr{oetje,eeting}s,
->
->                          Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                  -- Linus Torvalds
->
+I guess the only architectures that would benefit from your implementation
+above are the ones that do not have any optimization for constant
+64-by-32-bit division and just call do_div.
+
+> > On a related note, I wonder if we can come up with a more efficient
+> > implementation for do_div on ARMv7ve, and I think we should add the
+> > Makefile logic to build with -march=armv7ve when we know that we do
+> > not need to support processors without idiv.
+> 
+> Multiplications will always be faster than divisions.  However the idiv 
+> instruction would come very handy in the slow path when the divisor is 
+> not constant.
+
+Makes sense. I also just checked the gcc sources and it seems that the
+idiv/udiv instructions on ARM are not even used for implementing
+__aeabi_uldivmod there. Not sure if that's intentional, but we probably
+don't need to bother optimizing this in the kernel before user space
+does. Building with -march=armv7ve still sounds helpful to avoid the
+__aeabi_uidiv calls though.
+
+	Arnd
