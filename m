@@ -1,108 +1,62 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 4 Dec 2014 11:47:57 +0100
-Subject: [PATCH v5 06/11] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <548037CF.7090500@atmel.com>
-References: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
- <1417639455-17410-7-git-send-email-boris.brezillon@free-electrons.com>
- <548037CF.7090500@atmel.com>
-Message-ID: <20141204114757.1fa5cd9a@bbrezillon>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 04 Dec 2014 11:47:52 +0100
+Subject: [PATCH v3 0/3] Fix Arndale Octa/Peach Pi boot on Audio subsystem
+ clocks
+Message-ID: <1417690075-13483-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 4 Dec 2014 11:30:39 +0100
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+Hi,
 
-> Le 03/12/2014 21:44, Boris Brezillon a ?crit :
-> > The EBI (External Bus Interface) is used to access external peripherals
-> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> > Each device is assigned a CS line and an address range and can have its
-> > own configuration (timings, access mode, bus width, ...).
-> > This driver provides a generic DT binding to configure a device according
-> > to its requirements.
-> > For specific device controllers (like the NAND one) the SMC timings
-> > should be configured by the controller driver through the matrix and smc
-> > syscon regmaps.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  .../bindings/memory-controllers/atmel-ebi.txt      | 155 +++++++++++++++++++++
-> >  1 file changed, 155 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
-> > new file mode 100644
-> > index 0000000..3749ea1
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
-> > @@ -0,0 +1,155 @@
-> > +* Device tree bindings for Atmel EBI
-> > +
-> > +The External Bus Interface (EBI) controller is a bus where you can connect
-> > +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
-> > +The EBI provides a glue-less interface to asynchronous memories though the SMC
-> > +(Static Memory Controller).
-> > +Synchronous memories (and some asynchronous memories like NANDs) can be
-> > +attached to specialized controllers which are responsible for configuring the
-> > +bus appropriately according to the connected device.
-> > +In the other hand, the bus interface can be automated for simple asynchronous
-> > +devices.
-> > +
-> > +Required properties:
-> > +
-> > +- compatible:		"atmel,at91sam9260-ebi"
-> > +			"atmel,at91sam9261-ebi"
-> > +			"atmel,at91sam9263-ebi0"
-> > +			"atmel,at91sam9263-ebi1"
-> > +			"atmel,at91sam9g45-ebi"
-> > +			"atmel,at91sam9x5-ebi"
-> > +			"atmel,sama5d3-ebi"
-> > +
-> > +- reg:			Contains offset/length value for EBI memory mapping.
-> > +			This property might contain several entries if the EBI
-> > +			memory range is not contiguous
-> > +
-> > +- #address-cells:	Must be 2.
-> > +			The first cell encodes the CS.
-> > +			The second cell encode the offset into the CS memory
-> > +			range.
-> > +
-> > +- #size-cells:		Must be set to 1.
-> > +
-> > +- ranges:		Encodes CS to memory region association.
-> > +
-> > +- clocks:		Clock feeding the EBI controller.
-> > +			See clock-bindings.txt
-> > +
-> > +Child chip-select (cs) nodes contain the memory devices nodes connected to
-> > +such as NOR (e.g. cfi-flash) and NAND.
-> > +There might be board specific devices like FPGAs.
-> > +You'll define you device requirements in these child nodes.
-> > +
-> > +Required child cs node properties:
-> > +
-> > +- #address-cells:	Must be 2.
-> > +
-> > +- #size-cells:		Must be 1.
-> > +
-> > +- ranges:		Empty property indicating that child nodes can inherit
-> > +			memory layout.
-> > +
-> > +Optional child cs node properties:
-> > +- atmel,generic-dev		boolean property specifying if the device is
-> > +				a generic device.
-> 
-> Here, you mean: "atmel,specialized-logic" and the corresponding text...
-> 
 
-Yep, apparently I squashed the doc fixes in the wrong commit :-(.
-I'll fix that.
+Changes since v2
+================
+1. Patch 1 applied ("clk: samsung: Fix double add of syscore ops after
+   driver rebind"), remove it.
+2. Squash patch 5 with "clk: samsung: Fix clock disable
+   failure because domain being gated". Suggested by Sylwester.
+3. Patch 1/3: Fix issues pointed by Sylwester.
+4. Patch 2/3: Fix redundant clk_disable when removing driver (clk is
+   already disabled). Add missing check !=null when removing driver.
+5. Patch 3/3: Extend commit message.
 
-Thanks,
+Changes since v1
+================
+1. clocks-audss: Reimplement own clock register functions instead
+   changing clk API. Minor fixes. (after idea from Tomasz Figa)
+2. Add new patches: fix for pinctrl and minor fixes in clk-audss.
 
-Boris
+Description
+===========
+This patchset tries to solve dependency between AudioSS components
+(clocks and GPIO) and main clock controller on Exynos 5420 platform.
 
+This solves boot failure of Peach Pi/Pit and Arndale Octa [1].
+
+Any access to memory of audss block (like checking if clock is enabled
+or configuring GPIO) will hang if main audss clock is gated.
+
+Tested on Arndale Octa board.
+
+[1] http://www.spinics.net/lists/linux-samsung-soc/msg39331.html
+
+Best regards,
+Krzysztof Kozlowski
+
+
+Krzysztof Kozlowski (3):
+  clk: samsung: Fix clock disable failure because domain being gated
+  pinctrl: exynos: Fix GPIO setup failure because domain clock being
+    gated
+  ARM: dts: exynos5420: Add clock for audss pinctrl (fixing GPIO setup
+    failure)
+
+ .../bindings/pinctrl/samsung-pinctrl.txt           |   6 +
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |   3 +
+ drivers/clk/samsung/clk-exynos-audss.c             | 357 ++++++++++++++++++---
+ drivers/pinctrl/samsung/pinctrl-samsung.c          | 111 ++++++-
+ drivers/pinctrl/samsung/pinctrl-samsung.h          |   2 +
+ 5 files changed, 436 insertions(+), 43 deletions(-)
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
