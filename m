@@ -1,62 +1,117 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 04 Dec 2014 10:30:36 +0530
-Subject: [PATCH v4 1/2] soc: samsung: add exynos chipid driver support
-In-Reply-To: <19026872.NZqUJn3Abb@wuerfel>
-References: <1417594658-2931-1-git-send-email-pankaj.dubey@samsung.com>
- <1417594658-2931-2-git-send-email-pankaj.dubey@samsung.com>
- <19026872.NZqUJn3Abb@wuerfel>
-Message-ID: <547FEA74.1010900@samsung.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Thu, 4 Dec 2014 13:32:52 +0800
+Subject: [PATCH v12 0/7] ARM: kprobes: OPTPROBES and other improvements.
+Message-ID: <1417671172-52915-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+This is v12 of optprobe related patch series. In this series, code in
+optprobe is improvemented; the kprobe related files names are changed
+to represent their functions.
 
-On Wednesday 03 December 2014 04:13 PM, Arnd Bergmann wrote:
->> Exynos SoCs have Chipid, for identification of product IDs
->> and SoC revisions. This patch intendes to provide initialization
->> code for all these functionalites, at the same time it provides some
->> sysfs entries for accessing these information to userspace.
->>
->> This driver usese existing binding for exnos-chipid.
->
-> Nice!
+Patch 1/7 moves all ARM probe related code to arch/arm/probes according
+to suggestion from Russell King and Masami Hiramatsu.
 
-Thanks for review.
+Patch 2/7 - 5/7 introduce checker framework and use it to detect stack
+consumption for each probed instructions.
 
->
-> On Wednesday 03 December 2014 13:47:37 Pankaj Dubey wrote:
->
->> +       soc_dev_attr->soc_id = exynos_product_id_to_name(soc_product_id);
->> +
->> +       soc_dev = soc_device_register(soc_dev_attr);
->> +       if (IS_ERR(soc_dev))
->> +               goto free_rev;
->> +
->> +       device_create_file(soc_device_to_device(soc_dev), &exynos_product_attr);
->> +       device_create_file(soc_device_to_device(soc_dev),
->> +                               &exynos_main_rev_attr);
->> +       device_create_file(soc_device_to_device(soc_dev), &exynos_sub_rev_attr);
->> +
->
-> I don't like the idea of having three extra nonstandard properties here,
-> especially when you are not using the machine field for anything useful.
->
+Patch 6/7 and 7/7 are for real optprobe work.
 
-I did not get you here. Any suggestions how we can use 'machine' field 
-more useful way.
+Previous discussion can be found from:
 
-> Also, all three of these just come from the same register, why expose
-> them all as the machine and revision standard properties.
->
+https://lkml.org/lkml/2014/11/22/18
+https://lkml.org/lkml/2014/11/21/55
+https://lkml.org/lkml/2014/11/18/26
+https://lkml.org/lkml/2014/11/19/31
+https://lkml.org/lkml/2014/11/18/41
+https://lkml.org/lkml/2014/10/25/48
+https://lkml.org/lkml/2014/10/22/254
+https://lkml.org/lkml/2014/8/27/255
+https://lkml.org/lkml/2014/8/12/12
+https://lkml.org/lkml/2014/8/8/992
+https://lkml.org/lkml/2014/8/8/5
+https://lkml.org/lkml/2014/8/5/63
 
-Agreed. These properties are basically giving same information but with 
-small modification.
-As you said these are getting exposed via standard properties as well, 
-so I have no issue to drop them. Just waiting for more review from 
-Samsung folks, will take care of this in next version.
+Masami Hiramatsu (1):
+  kprobes: Pass the original kprobe for preparing optimized kprobe
 
+Wang Nan (6):
+  ARM: probes: move all probe code to dedicate directory
+  ARM: kprobes: introduces checker
+  ARM: kprobes: collects stack consumption for store instructions
+  ARM: kprobes: disallow probing stack consuming instructions
+  ARM: kprobes: Add test cases for stack consuming instructions
+  ARM: kprobes: enable OPTPROBES for ARM 32
 
-Thanks,
-Pankaj Dubey
-> 	Arnd
->
+ arch/arm/Kconfig                                   |   1 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/{kernel => include/asm}/insn.h            |   0
+ arch/arm/include/asm/kprobes.h                     |  35 ++-
+ arch/arm/{kernel => include/asm}/patch.h           |   0
+ arch/arm/include/asm/probes.h                      |  13 +
+ arch/arm/kernel/Makefile                           |  16 +-
+ arch/arm/kernel/entry-armv.S                       |   3 +-
+ arch/arm/kernel/ftrace.c                           |   3 +-
+ arch/arm/kernel/jump_label.c                       |   5 +-
+ arch/arm/kernel/patch.c                            |   3 +-
+ arch/arm/probes/Makefile                           |   7 +
+ .../{kernel/probes-arm.c => probes/decode-arm.c}   |  12 +-
+ .../{kernel/probes-arm.h => probes/decode-arm.h}   |   7 +-
+ .../probes-thumb.c => probes/decode-thumb.c}       |  16 +-
+ .../probes-thumb.h => probes/decode-thumb.h}       |  10 +-
+ arch/arm/{kernel/probes.c => probes/decode.c}      |  74 ++++-
+ arch/arm/{kernel/probes.h => probes/decode.h}      |  13 +-
+ arch/arm/probes/kprobes/Makefile                   |  12 +
+ .../kprobes-arm.c => probes/kprobes/actions-arm.c} |   9 +-
+ .../kprobes/actions-common.c}                      |   4 +-
+ .../kprobes/actions-thumb.c}                       |  10 +-
+ arch/arm/probes/kprobes/checkers-arm.c             |  99 +++++++
+ arch/arm/probes/kprobes/checkers-common.c          | 101 +++++++
+ arch/arm/probes/kprobes/checkers-thumb.c           | 110 +++++++
+ arch/arm/probes/kprobes/checkers.h                 |  54 ++++
+ .../{kernel/kprobes.c => probes/kprobes/core.c}    |  24 +-
+ .../{kernel/kprobes.h => probes/kprobes/core.h}    |  10 +-
+ arch/arm/probes/kprobes/opt-arm.c                  | 322 +++++++++++++++++++++
+ .../kprobes/test-arm.c}                            |  31 +-
+ .../kprobes-test.c => probes/kprobes/test-core.c}  |   8 +-
+ .../kprobes-test.h => probes/kprobes/test-core.h}  |   2 +-
+ .../kprobes/test-thumb.c}                          |  16 +-
+ arch/arm/probes/uprobes/Makefile                   |   2 +
+ .../uprobes-arm.c => probes/uprobes/actions-arm.c} |   6 +-
+ .../{kernel/uprobes.c => probes/uprobes/core.c}    |   8 +-
+ .../{kernel/uprobes.h => probes/uprobes/core.h}    |   0
+ arch/x86/kernel/kprobes/opt.c                      |   3 +-
+ include/linux/kprobes.h                            |   3 +-
+ kernel/kprobes.c                                   |   4 +-
+ 40 files changed, 966 insertions(+), 91 deletions(-)
+ rename arch/arm/{kernel => include/asm}/insn.h (100%)
+ rename arch/arm/{kernel => include/asm}/patch.h (100%)
+ create mode 100644 arch/arm/probes/Makefile
+ rename arch/arm/{kernel/probes-arm.c => probes/decode-arm.c} (99%)
+ rename arch/arm/{kernel/probes-arm.h => probes/decode-arm.h} (93%)
+ rename arch/arm/{kernel/probes-thumb.c => probes/decode-thumb.c} (98%)
+ rename arch/arm/{kernel/probes-thumb.h => probes/decode-thumb.h} (90%)
+ rename arch/arm/{kernel/probes.c => probes/decode.c} (85%)
+ rename arch/arm/{kernel/probes.h => probes/decode.h} (97%)
+ create mode 100644 arch/arm/probes/kprobes/Makefile
+ rename arch/arm/{kernel/kprobes-arm.c => probes/kprobes/actions-arm.c} (98%)
+ rename arch/arm/{kernel/kprobes-common.c => probes/kprobes/actions-common.c} (98%)
+ rename arch/arm/{kernel/kprobes-thumb.c => probes/kprobes/actions-thumb.c} (98%)
+ create mode 100644 arch/arm/probes/kprobes/checkers-arm.c
+ create mode 100644 arch/arm/probes/kprobes/checkers-common.c
+ create mode 100644 arch/arm/probes/kprobes/checkers-thumb.c
+ create mode 100644 arch/arm/probes/kprobes/checkers.h
+ rename arch/arm/{kernel/kprobes.c => probes/kprobes/core.c} (96%)
+ rename arch/arm/{kernel/kprobes.h => probes/kprobes/core.h} (83%)
+ create mode 100644 arch/arm/probes/kprobes/opt-arm.c
+ rename arch/arm/{kernel/kprobes-test-arm.c => probes/kprobes/test-arm.c} (97%)
+ rename arch/arm/{kernel/kprobes-test.c => probes/kprobes/test-core.c} (99%)
+ rename arch/arm/{kernel/kprobes-test.h => probes/kprobes/test-core.h} (99%)
+ rename arch/arm/{kernel/kprobes-test-thumb.c => probes/kprobes/test-thumb.c} (98%)
+ create mode 100644 arch/arm/probes/uprobes/Makefile
+ rename arch/arm/{kernel/uprobes-arm.c => probes/uprobes/actions-arm.c} (98%)
+ rename arch/arm/{kernel/uprobes.c => probes/uprobes/core.c} (97%)
+ rename arch/arm/{kernel/uprobes.h => probes/uprobes/core.h} (100%)
+
+-- 
+1.8.4
