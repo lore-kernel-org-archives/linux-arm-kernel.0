@@ -1,253 +1,234 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Thu,  4 Dec 2014 20:12:09 +0800
-Subject: [PATCH 2/3] gpio: sx150x: add support for sx1506 gpio expander device
+Date: Thu,  4 Dec 2014 20:12:10 +0800
+Subject: [PATCH 3/3] gpio: sx150x: add dts support for sx150x driver
 In-Reply-To: <1417695130-5712-1-git-send-email-21cnbao@gmail.com>
 References: <1417695130-5712-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1417695130-5712-2-git-send-email-21cnbao@gmail.com>
+Message-ID: <1417695130-5712-3-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wei Chen <Wei.Chen@csr.com>
 
-semtech has two series of sx150x gpio expanders: sx150x-456 and
-sx150x-789.
-
-The current gpio-150x driver in linux only support sx1508 and
-sx1509.
-
-We added sx1506 support code into this driver.
+Current sx150x gpio expander driver doesn't support DT. Now we added DT support
+for this driver.
 
 Signed-off-by: Wei Chen <Wei.Chen@csr.com>
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- drivers/gpio/gpio-sx150x.c | 157 ++++++++++++++++++++++++++++++++-------------
- 1 file changed, 112 insertions(+), 45 deletions(-)
+ .../devicetree/bindings/gpio/gpio-sx150x.txt       | 69 ++++++++++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ drivers/gpio/gpio-sx150x.c                         | 83 +++++++++++++++++++++-
+ 3 files changed, 151 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-sx150x.txt
 
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-sx150x.txt b/Documentation/devicetree/bindings/gpio/gpio-sx150x.txt
+new file mode 100644
+index 0000000..7f8a61b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-sx150x.txt
+@@ -0,0 +1,69 @@
++SEMTECH SX150x GPIO expander bindings
++
++
++Required properties:
++
++- compatible: should be "semtech,sx1506q",
++			"semtech,sx1508q",
++			"semtech,sx1509q".
++
++- reg: The I2C slave address for this device.
++
++- interrupt-parent: phandle of the parent interrupt controller.
++
++- interrupts: Interrupt specifier for the controllers interrupt.
++
++- #gpio-cells: Should be 2. The first cell is the GPIO number and the
++		second cell is used to specify optional parameters:
++		bit 0: polarity (0: normal, 1: inverted)
++
++- gpio-controller: Marks the device as a GPIO controller.
++
++- interrupt-controller: Marks the device as a interrupt controller.
++
++Optional properties:
++- oscio_is_gpo: Boolean.
++	Whether the HW considers OSCIO as a GPO instead of as an
++	oscillator.
++
++- reset_during_probe: Boolean.
++	Whether the HW supports full reset of the chip at the beginning
++	of the probe.
++
++-pullup_ena:A bit-mask which enables or disables the pull-up resistor
++	for each IO line in the expander. = <0x0>;
++
++-pulldn_ena:A bit-mask which enables-or disables the pull-down resistor
++	for each IO line in the expander.
++
++-open_drain_ena:A bit-mask which enables-or disables open-drain
++	operation for each IO line in the expander.
++
++-polarity: A bit-mask which enables polarity inversion for each IO line
++	in the expander.
++
++The GPIO expander can optionally be used as an interrupt controller, in
++which case it uses the default two cell specifier as described in
++Documentation/devicetree/bindings/interrupt-controller/interrupts.txt.
++
++Example:
++
++	i2c_gpio_expander at 20{
++		#gpio-cells = <2>;
++		#interrupt-cells = <2>;
++		compatible = "semtech,sx1506q";
++		reg = <0x20>;
++		interrupt-parent = <&gpio_1>;
++		interrupts = <16 0>;
++
++		gpio-controller;
++		interrupt-controller;
++
++		oscio_is_gpo;
++		reset_during_probe;
++
++		pullup_ena = <0x01>;
++		pulldn_ena = <0x10>;
++		open_drain_ena = <0x40>;
++		polarity = <0x02>;
++	};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index c177cd7..6968148 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -140,6 +140,7 @@ sandisk	Sandisk Corporation
+ sbs	Smart Battery System
+ schindler	Schindler
+ seagate	Seagate Technology PLC
++semtech	Semtech Corporation
+ sil	Silicon Image
+ silabs	Silicon Laboratories
+ simtek
 diff --git a/drivers/gpio/gpio-sx150x.c b/drivers/gpio/gpio-sx150x.c
-index 0bc61c2..b32fb38 100644
+index b32fb38..28d2f03 100644
 --- a/drivers/gpio/gpio-sx150x.c
 +++ b/drivers/gpio/gpio-sx150x.c
-@@ -26,20 +26,43 @@
+@@ -23,6 +23,11 @@
+ #include <linux/mutex.h>
+ #include <linux/slab.h>
+ #include <linux/i2c/sx150x.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/of_gpio.h>
++#include <linux/of_device.h>
  
  #define NO_UPDATE_PENDING	-1
  
-+/* The chip models of sx150x */
-+#define SX150X_456 0
-+#define SX150X_789 1
-+
-+struct sx150x_456_pri {
-+	u8 reg_pld_mode;
-+	u8 reg_pld_table0;
-+	u8 reg_pld_table1;
-+	u8 reg_pld_table2;
-+	u8 reg_pld_table3;
-+	u8 reg_pld_table4;
-+	u8 reg_advance;
-+};
-+
-+struct sx150x_789_pri {
-+	u8 reg_drain;
-+	u8 reg_polarity;
-+	u8 reg_clock;
-+	u8 reg_misc;
-+	u8 reg_reset;
-+	u8 ngpios;
-+};
-+
- struct sx150x_device_data {
-+	u8 model;
- 	u8 reg_pullup;
- 	u8 reg_pulldn;
--	u8 reg_drain;
--	u8 reg_polarity;
- 	u8 reg_dir;
- 	u8 reg_data;
- 	u8 reg_irq_mask;
- 	u8 reg_irq_src;
- 	u8 reg_sense;
--	u8 reg_clock;
--	u8 reg_misc;
--	u8 reg_reset;
- 	u8 ngpios;
-+	union {
-+		struct sx150x_456_pri x456;
-+		struct sx150x_789_pri x789;
-+	} pri;
- };
- 
- struct sx150x_chip {
-@@ -59,40 +82,67 @@ struct sx150x_chip {
- 
- static const struct sx150x_device_data sx150x_devices[] = {
- 	[0] = { /* sx1508q */
--		.reg_pullup   = 0x03,
--		.reg_pulldn   = 0x04,
--		.reg_drain    = 0x05,
--		.reg_polarity = 0x06,
--		.reg_dir      = 0x07,
--		.reg_data     = 0x08,
--		.reg_irq_mask = 0x09,
--		.reg_irq_src  = 0x0c,
--		.reg_sense    = 0x0b,
--		.reg_clock    = 0x0f,
--		.reg_misc     = 0x10,
--		.reg_reset    = 0x7d,
--		.ngpios       = 8
-+		.model = SX150X_789,
-+		.reg_pullup	= 0x03,
-+		.reg_pulldn	= 0x04,
-+		.reg_dir	= 0x07,
-+		.reg_data	= 0x08,
-+		.reg_irq_mask	= 0x09,
-+		.reg_irq_src	= 0x0c,
-+		.reg_sense	= 0x0b,
-+		.pri.x789 = {
-+			.reg_drain	= 0x05,
-+			.reg_polarity	= 0x06,
-+			.reg_clock	= 0x0f,
-+			.reg_misc	= 0x10,
-+			.reg_reset	= 0x7d,
-+		},
-+		.ngpios = 8,
- 	},
- 	[1] = { /* sx1509q */
--		.reg_pullup   = 0x07,
--		.reg_pulldn   = 0x09,
--		.reg_drain    = 0x0b,
--		.reg_polarity = 0x0d,
--		.reg_dir      = 0x0f,
--		.reg_data     = 0x11,
--		.reg_irq_mask = 0x13,
--		.reg_irq_src  = 0x19,
--		.reg_sense    = 0x17,
--		.reg_clock    = 0x1e,
--		.reg_misc     = 0x1f,
--		.reg_reset    = 0x7d,
--		.ngpios       = 16
-+		.model = SX150X_789,
-+		.reg_pullup	= 0x07,
-+		.reg_pulldn	= 0x09,
-+		.reg_dir	= 0x0f,
-+		.reg_data	= 0x11,
-+		.reg_irq_mask	= 0x13,
-+		.reg_irq_src	= 0x19,
-+		.reg_sense	= 0x17,
-+		.pri.x789 = {
-+			.reg_drain	= 0x0b,
-+			.reg_polarity	= 0x0d,
-+			.reg_clock	= 0x1e,
-+			.reg_misc	= 0x1f,
-+			.reg_reset	= 0x7d,
-+		},
-+		.ngpios	= 16
-+	},
-+	[2] = { /* sx1506q */
-+		.model = SX150X_456,
-+		.reg_pullup	= 0x05,
-+		.reg_pulldn	= 0x07,
-+		.reg_dir	= 0x03,
-+		.reg_data	= 0x01,
-+		.reg_irq_mask	= 0x09,
-+		.reg_irq_src	= 0x0f,
-+		.reg_sense	= 0x0d,
-+		.pri.x456 = {
-+			.reg_pld_mode	= 0x21,
-+			.reg_pld_table0	= 0x23,
-+			.reg_pld_table1	= 0x25,
-+			.reg_pld_table2	= 0x27,
-+			.reg_pld_table3	= 0x29,
-+			.reg_pld_table4	= 0x2b,
-+			.reg_advance	= 0xad,
-+		},
-+		.ngpios	= 16
- 	},
- };
- 
- static const struct i2c_device_id sx150x_id[] = {
- 	{"sx1508q", 0},
- 	{"sx1509q", 1},
-+	{"sx1506q", 2},
- 	{}
+@@ -147,6 +152,13 @@ static const struct i2c_device_id sx150x_id[] = {
  };
  MODULE_DEVICE_TABLE(i2c, sx150x_id);
-@@ -191,7 +241,7 @@ static int sx150x_get_io(struct sx150x_chip *chip, unsigned offset)
- static void sx150x_set_oscio(struct sx150x_chip *chip, int val)
+ 
++static const struct of_device_id sx150x_dt_id[] = {
++	{ .compatible = "semtech,sx1508q", .data = &sx150x_devices[0]},
++	{ .compatible = "semtech,sx1509q", .data = &sx150x_devices[1]},
++	{ .compatible = "semtech,sx1506q", .data = &sx150x_devices[2]},
++	{},
++};
++
+ static s32 sx150x_i2c_write(struct i2c_client *client, u8 reg, u8 val)
  {
- 	sx150x_i2c_write(chip->client,
--			chip->dev_cfg->reg_clock,
-+			chip->dev_cfg->pri.x789.reg_clock,
- 			(val ? 0x1f : 0x10));
- }
+ 	s32 err = i2c_smbus_write_byte_data(client, reg, val);
+@@ -472,6 +484,8 @@ static void sx150x_init_chip(struct sx150x_chip *chip,
+ 	chip->gpio_chip.base             = pdata->gpio_base;
+ 	chip->gpio_chip.can_sleep        = true;
+ 	chip->gpio_chip.ngpio            = chip->dev_cfg->ngpios;
++	chip->gpio_chip.of_node          = client->dev.of_node;
++	chip->gpio_chip.of_gpio_n_cells  = 2;
+ 	if (pdata->oscio_is_gpo)
+ 		++chip->gpio_chip.ngpio;
  
-@@ -455,13 +505,13 @@ static int sx150x_reset(struct sx150x_chip *chip)
- 	int err;
- 
- 	err = i2c_smbus_write_byte_data(chip->client,
--					chip->dev_cfg->reg_reset,
-+					chip->dev_cfg->pri.x789.reg_reset,
- 					0x12);
- 	if (err < 0)
- 		return err;
- 
- 	err = i2c_smbus_write_byte_data(chip->client,
--					chip->dev_cfg->reg_reset,
-+					chip->dev_cfg->pri.x789.reg_reset,
- 					0x34);
+@@ -607,6 +621,66 @@ static int sx150x_install_irq_chip(struct sx150x_chip *chip,
  	return err;
  }
-@@ -477,9 +527,14 @@ static int sx150x_init_hw(struct sx150x_chip *chip,
- 			return err;
- 	}
  
--	err = sx150x_i2c_write(chip->client,
--			chip->dev_cfg->reg_misc,
--			0x01);
-+	if (chip->dev_cfg->model == SX150X_789)
-+		err = sx150x_i2c_write(chip->client,
-+				chip->dev_cfg->pri.x789.reg_misc,
-+				0x01);
-+	else
-+		err = sx150x_i2c_write(chip->client,
-+				chip->dev_cfg->pri.x456.reg_advance,
-+				0x04);
- 	if (err < 0)
- 		return err;
- 
-@@ -493,15 +548,27 @@ static int sx150x_init_hw(struct sx150x_chip *chip,
- 	if (err < 0)
- 		return err;
- 
--	err = sx150x_init_io(chip, chip->dev_cfg->reg_drain,
--			pdata->io_open_drain_ena);
--	if (err < 0)
--		return err;
-+	if (chip->dev_cfg->model == SX150X_789) {
-+		err = sx150x_init_io(chip,
-+				chip->dev_cfg->pri.x789.reg_drain,
-+				pdata->io_open_drain_ena);
-+		if (err < 0)
-+			return err;
++static struct sx150x_platform_data *of_sx150x_get_platdata(
++					struct i2c_client *client)
++{
++	int rc, gpio;
++	struct sx150x_platform_data *pdata;
++	struct device_node *np;
 +
-+		err = sx150x_init_io(chip,
-+				chip->dev_cfg->pri.x789.reg_polarity,
-+				pdata->io_polarity);
-+		if (err < 0)
-+			return err;
-+	} else {
-+		/* Set all pins to work in normal mode */
-+		err = sx150x_init_io(chip,
-+				chip->dev_cfg->pri.x456.reg_pld_mode,
-+				0);
-+		if (err < 0)
-+			return err;
++	if (!client->dev.of_node)
++		return NULL;
++
++	np = client->dev.of_node;
++
++	pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata)
++		return ERR_PTR(-ENOMEM);
++
++	gpio = of_get_named_gpio(np, "int-gpios", 0);
++	if (gpio_is_valid(gpio)) {
++		rc = devm_gpio_request_one(&client->dev, gpio,
++			GPIOF_DIR_IN, "sx150x_interrupt");
++		if (rc)
++			return ERR_PTR(rc);
++	}
++
++	pdata->irq_summary = irq_of_parse_and_map(np, 0);
++	if (!pdata->irq_summary)
++		return ERR_PTR(-EPROBE_DEFER);
++
++	pdata->oscio_is_gpo = of_property_read_bool(np, "oscio_is_gpo");
++	pdata->reset_during_probe =
++			of_property_read_bool(np, "reset_during_probe");
++
++	rc = of_property_read_u16(np, "pullup_ena",
++				&pdata->io_pullup_ena);
++	if (rc)
++		pdata->io_pullup_ena = 0;
++
++	rc = of_property_read_u16(np, "pulldn_ena",
++				&pdata->io_pulldn_ena);
++	if (rc)
++		pdata->io_pulldn_ena = 0;
++
++	rc = of_property_read_u16(np, "open_drain_ena",
++				&pdata->io_open_drain_ena);
++	if (rc)
++		pdata->io_open_drain_ena = 0;
++
++	rc = of_property_read_u16(np, "polarity",
++				&pdata->io_polarity);
++	if (rc)
++		pdata->io_polarity = 0;
++
++	/* Let OF gpiochip_add to detect dynamical gpio_base & irq_base */
++	pdata->gpio_base = -1;
++	/* We should use the dynamical irq_base */
++	pdata->irq_base = 0;
++
++	return pdata;
++}
++
+ static int sx150x_probe(struct i2c_client *client,
+ 				const struct i2c_device_id *id)
+ {
+@@ -617,8 +691,13 @@ static int sx150x_probe(struct i2c_client *client,
+ 	int rc;
+ 
+ 	pdata = dev_get_platdata(&client->dev);
+-	if (!pdata)
+-		return -EINVAL;
++	if (!pdata) {
++		pdata = of_sx150x_get_platdata(client);
++		if (!pdata)
++			return -EINVAL;
++		else if (IS_ERR(pdata))
++			return PTR_ERR(pdata);
 +	}
  
--	err = sx150x_init_io(chip, chip->dev_cfg->reg_polarity,
--			pdata->io_polarity);
--	if (err < 0)
--		return err;
- 
- 	if (pdata->oscio_is_gpo)
- 		sx150x_set_oscio(chip, 0);
+ 	if (!i2c_check_functionality(client->adapter, i2c_funcs))
+ 		return -ENOSYS;
 -- 
 2.2.0
