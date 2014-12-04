@@ -1,166 +1,144 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 4 Dec 2014 15:59:11 -0600
-Subject: [PATCH v2] ARM: dts: am57xx-beagle-x15: Add dual ethernet
-In-Reply-To: <1417726977-2496-1-git-send-email-balbi@ti.com>
-References: <5480CADE.5010200@ti.com>
- <1417726977-2496-1-git-send-email-balbi@ti.com>
-Message-ID: <5480D92F.8050505@ti.com>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Thu, 4 Dec 2014 23:16:30 +0100
+Subject: [PATCH 1/4] pinctrl: Broadcom Cygnus pinctrl device tree binding
+In-Reply-To: <1417730171-30455-2-git-send-email-rjui@broadcom.com>
+References: <rjui@broadcom.com>
+ <1417730171-30455-1-git-send-email-rjui@broadcom.com>
+ <1417730171-30455-2-git-send-email-rjui@broadcom.com>
+Message-ID: <CAAfyv37Z=Bs1Ggydg5bX5z=005P+LOXNp0qNMA43a3BsAPSA7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2014 03:02 PM, Felipe Balbi wrote:
-> Add CPSW DT binding to beagle X15 DTS in order to
-> get ethernet working with this board.
-> 
-> Note that we're also adding sleep state which will
-> place all pins in mux mode 15 - which means "driver
-> off" - thus conserving power.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+On Thu, Dec 4, 2014 at 10:56 PM, Ray Jui <rjui@broadcom.com> wrote:
+> Device tree binding documentation for Broadcom Cygnus pinctrl driver
+>
+> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
 > ---
-> 
-> Changes since v1:
-> 	- removed duplicated SoB from myself
-> 	- Fixed s/Slave 1/Slave2/ in one comment
-> 	- slightly improved commit log
-> 
->  arch/arm/boot/dts/am57xx-beagle-x15.dts | 106 ++++++++++++++++++++++++++++++++
->  1 file changed, 106 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> index 49edbda..6c2e8e4 100644
-> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> @@ -140,6 +140,86 @@
->  		>;
->  	};
->  
-> +	cpsw_pins_default: cpsw_pins_default {
-> +		pinctrl-single,pins = <
-> +			/* Slave 1 */
-> +			0x250 (PIN_OUTPUT | MUX_MODE0)	/* rgmii1_tclk */
-> +			0x254 (PIN_OUTPUT | MUX_MODE0)	/* rgmii1_tctl */
-> +			0x258 (PIN_OUTPUT | MUX_MODE0)	/* rgmii1_td3 */
-> +			0x25c (PIN_OUTPUT | MUX_MODE0)	/* rgmii1_td2 */
-> +			0x260 (PIN_OUTPUT | MUX_MODE0)	/* rgmii1_td1 */
-> +			0x264 (PIN_OUTPUT | MUX_MODE0)	/* rgmii1_td0 */
-> +			0x268 (PIN_INPUT | MUX_MODE0)	/* rgmii1_rclk */
-> +			0x26c (PIN_INPUT | MUX_MODE0)	/* rgmii1_rctl */
-> +			0x270 (PIN_INPUT | MUX_MODE0)	/* rgmii1_rd3 */
-> +			0x274 (PIN_INPUT | MUX_MODE0)	/* rgmii1_rd2 */
-> +			0x278 (PIN_INPUT | MUX_MODE0)	/* rgmii1_rd1 */
-> +			0x27c (PIN_INPUT | MUX_MODE0)	/* rgmii1_rd0 */
+>  .../bindings/pinctrl/brcm,cygnus-pinctrl.txt       |   92 ++++++++++++++++++++
+>  1 file changed, 92 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
+>
+> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
+> new file mode 100644
+> index 0000000..86e4579
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
+> @@ -0,0 +1,92 @@
+> +Broadcom Cygnus Pin Controller
 > +
-> +			/* Slave 2 */
-> +			0x198 (PIN_OUTPUT | MUX_MODE3)	/* rgmii2_tclk */
-> +			0x19c (PIN_OUTPUT | MUX_MODE3)	/* rgmii2_tctl */
-> +			0x1a0 (PIN_OUTPUT | MUX_MODE3)	/* rgmii2_td3 */
-> +			0x1a4 (PIN_OUTPUT | MUX_MODE3)	/* rgmii2_td2 */
-> +			0x1a8 (PIN_OUTPUT | MUX_MODE3)	/* rgmii2_td1 */
-> +			0x1ac (PIN_OUTPUT | MUX_MODE3)	/* rgmii2_td0 */
-> +			0x1b0 (PIN_INPUT | MUX_MODE3)	/* rgmii2_rclk */
-> +			0x1b4 (PIN_INPUT | MUX_MODE3)	/* rgmii2_rctl */
-> +			0x1b8 (PIN_INPUT | MUX_MODE3)	/* rgmii2_rd3 */
-> +			0x1bc (PIN_INPUT | MUX_MODE3)	/* rgmii2_rd2 */
-> +			0x1c0 (PIN_INPUT | MUX_MODE3)	/* rgmii2_rd1 */
-> +			0x1c4 (PIN_INPUT | MUX_MODE3)	/* rgmii2_rd0 */
-> +		>;
+> +The Cygnus pin controller supports setting the alternate functions of groups
+> +of pins. Pinmux configuration on individual pins is not supported by the
+> +Cygnus A0 SoC.
 > +
-> +	};
+> +Required properties:
 > +
-> +	cpsw_pins_sleep: cpsw_pins_sleep {
-> +		pinctrl-single,pins = <
-> +			/* Slave 1 */
-> +			0x250 (PIN_INPUT | MUX_MODE15)
-> +			0x254 (PIN_INPUT | MUX_MODE15)
-> +			0x258 (PIN_INPUT | MUX_MODE15)
-> +			0x25c (PIN_INPUT | MUX_MODE15)
-> +			0x260 (PIN_INPUT | MUX_MODE15)
-> +			0x264 (PIN_INPUT | MUX_MODE15)
-> +			0x268 (PIN_INPUT | MUX_MODE15)
-> +			0x26c (PIN_INPUT | MUX_MODE15)
-> +			0x270 (PIN_INPUT | MUX_MODE15)
-> +			0x274 (PIN_INPUT | MUX_MODE15)
-> +			0x278 (PIN_INPUT | MUX_MODE15)
-> +			0x27c (PIN_INPUT | MUX_MODE15)
+> +- compatible:
+> +    Must be "brcm,cygnus-pinctrl"
 > +
-> +			/* Slave 2 */
-> +			0x198 (PIN_INPUT | MUX_MODE15)
-> +			0x19c (PIN_INPUT | MUX_MODE15)
-> +			0x1a0 (PIN_INPUT | MUX_MODE15)
-> +			0x1a4 (PIN_INPUT | MUX_MODE15)
-> +			0x1a8 (PIN_INPUT | MUX_MODE15)
-> +			0x1ac (PIN_INPUT | MUX_MODE15)
-> +			0x1b0 (PIN_INPUT | MUX_MODE15)
-> +			0x1b4 (PIN_INPUT | MUX_MODE15)
-> +			0x1b8 (PIN_INPUT | MUX_MODE15)
-> +			0x1bc (PIN_INPUT | MUX_MODE15)
-> +			0x1c0 (PIN_INPUT | MUX_MODE15)
-> +			0x1c4 (PIN_INPUT | MUX_MODE15)
-> +		>;
-> +	};
+> +- reg:
+> +    Define the base and range of the I/O address space that contain the Cygnus
+> +pin control registers
 > +
-> +	davinci_mdio_pins_default: davinci_mdio_pins_default {
-> +		pinctrl-single,pins = <
-> +			/* MDIO */
-> +			0x23c (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* mdio_mclk */
-> +			0x240 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mdio_d */
-> +		>;
-> +	};
+> +- brcm,groups:
+> +    This can be strings of one or more group names. This defines the group(s)
+> +that one wants to configure
 > +
-> +	davinci_mdio_pins_sleep: davinci_mdio_pins_sleep {
-> +		pinctrl-single,pins = <
-> +			0x23c (PIN_INPUT | MUX_MODE15)
-> +			0x240 (PIN_INPUT | MUX_MODE15)
-> +		>;
-> +	};
+> +- brcm,function:
+> +    This is the alternate function that one wants to configure to. Valid
+> +alternate functions are "alt1", "alt2", "alt3", "alt4"
 > +
->  	tps659038_pins_default: tps659038_pins_default {
->  		pinctrl-single,pins = <
->  			0x418 (PIN_INPUT_PULLUP | MUX_MODE14)	/* wakeup0.gpio1_0 */
-> @@ -365,6 +445,32 @@
->  	pinctrl-0 = <&uart3_pins_default>;
->  };
->  
-> +&mac {
-> +	status = "okay";
-> +	pinctrl-names = "default", "sleep";
-> +	pinctrl-0 = <&cpsw_pins_default>;
-> +	pinctrl-1 = <&cpsw_pins_sleep>;
-> +	dual_emac;
-> +};
+> +Each child node represents a configuration. Client devices reference the the
+> +child node to enable the mux configuration.
 > +
-> +&cpsw_emac0 {
-> +	phy_id = <&davinci_mdio>, <1>;
-> +	phy-mode = "rgmii";
-> +	dual_emac_res_vlan = <1>;
-> +};
+> +For example:
 > +
-> +&cpsw_emac1 {
-> +	phy_id = <&davinci_mdio>, <2>;
-> +	phy-mode = "rgmii";
-> +	dual_emac_res_vlan = <2>;
-> +};
+> +       pinctrl: pinctrl at 0x0301d0c8 {
+> +               compatible = "brcm,cygnus-pinctrl";
+> +               reg = <0x0301d0c8 0x2c>;
 > +
-> +&davinci_mdio {
-> +	pinctrl-names = "default", "sleep";
-> +	pinctrl-0 = <&davinci_mdio_pins_default>;
-> +	pinctrl-1 = <&davinci_mdio_pins_sleep>;
-> +};
+> +               i2s_0: i2s_0 {
+> +                       brcm,groups = "smart_card0", "smart_card0_fcb";
+> +                       brcm,function = "alt2";
+> +               };
 > +
->  &mmc1 {
->  	status = "okay";
->  
-> 
-Yep, looks better thanks.
+> +               i2s_1: i2s_1 {
+> +                       brcm,groups = "smart_card1", "smart_card1_fcb";
+> +                       brcm,function = "alt2";
+> +               };
+> +
+> +               spi_0: spi_0 {
+> +                       brcm,groups = "spi0";
+> +                       brcm,function = "alt1";
+> +               };
+> +       }
+> +
+> +       spi0 at 18028000 {
+> +                       compatible = "arm,pl022", "arm,primecell";
+> +                       reg = <0x18028000 0x1000>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
+> +                       pinctrl-0 = <&spi_0>;
+> +                       clocks = <&axi81_clk>;
+> +                       clock-names = "apb_pclk";
+> +       };
+> +
+> +Consider the following snapshot of Cygnus pinmux table:
+> +
+> +number    pin            group              alt1             alt2        alt3        alt4
+> +------    ---            ----               ----             ----        ----        ----
+> +42        sc0_clk        smart_card0        SMART CARD0      I2S_0       N/A         chip_gpio24
+> +43        sc0_cmdvcc_l   smart_card0        SMART CARD0      I2S_0       N/A         STRAP
+> +44        sc0_detect     smart_card0        SMART CARD0      I2S_0       N/A         chip_gpio25
+> +45        sc0_fcb        smart_card0_fcb    SMART CARD0_FCB  I2S_0       N/A         chip_gpio26
+> +46        sc0_io         smart_card0        SMART CARD0      I2S_0       N/A         chip_gpio27
+> +47        sc0_rst_l      smart_card0        SMART CARD0      SPDIF       N/A         STRAP
+> +
+> +Note due to limitation of the Cygnus hardware, pinmux configuration can only
+> +be group based. To enable I2S_0 function, one needs the following child node
+> +configuration:
+> +
+> +       i2s_0: i2s_0 {
+> +               brcm,groups = "smart_card0", "smart_card0_fcb";
+> +               brcm,function = "alt2";
+> +       };
+> +
+> +This tells the Cygnus pin controller to configure groups "smart_card0" and
+> +"smart_card0_fcb" to I2S_0. With this configuration, pins 42, 43, 44, 45, 46
+> +become I2C_0, and pin 47 becomes SPDIF
+                  ^^^^ typo - should be I2S_0
+> +
+> +Consider another example, that one wants to configure the above pins as GPIO:
+> +
+> +       gpio_24_27: gpio_24_27 {
+> +               brcm,groups = "smart_card0", "smart_card0_fcb";
+> +               brcm,function = "alt4";
+> +       };
+> +
+> +With the above configuration, pins 42, 44, 45, 46 become GPIO, and 43 and 47
+> +become reserved for STRAP
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-depends on the ethernet dts and x15 patches queued previously for 3.19.
+BR,
 
-https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v3.19/dt-v2
-
+marek
 
 -- 
-Regards,
-Nishanth Menon
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
+
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+twitter: #opennandra
+web: http://open-nandra.com
