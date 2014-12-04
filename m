@@ -1,123 +1,35 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  4 Dec 2014 11:22:20 +0000
-Subject: [PATCH] arm64: respect mem= for EFI
-Message-ID: <1417692140-29796-1-git-send-email-mark.rutland@arm.com>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Thu, 4 Dec 2014 19:23:17 +0800
+Subject: [PATCH] arm64/include/asm: Fixed a warning about 'struct pt_regs'
+Message-ID: <1417692197-18518-1-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+If I include asm/irq.h on the top of my code, and set ARCH=arm64,
+I'll get a compile warning, details are below:
+warning: ?struct pt_regs?
+declared inside parameter list [enabled by default]
 
-While trying to debug a userspace test failure, I noticed that the mem=
-option didn't work when booting via EFI due to some unfortunate init
-ordering.
+This patch is suggested by Arnd, see:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/308270.html
 
-However, with that alone fixed (patch below) things blow up early if a
-mem= option is passed to the kernel, because of the way we currently map
-the EFI runtime services.
-
-I've given this patch a spin atop of Ard's rework of the runtime
-services mapping [1], and that's far happier; I can boot to userspace
-and memory is limited int he way I expect.
-
-Assuming people are fine with this, would this make sense to append to
-the runtime services mapping series?
-
-Cheers,
-Mark.
-
-[1] https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/efi-for-arm64
-
----->8----
-When booting with EFI, we acquire the EFI memory map after parsing the
-early params. This unfortuantely renders the option useless as we call
-memblock_enforce_memory_limit (which uses memblock_remove_range behind
-the scenes) before we've added any memblocks. We end up removing
-nothing, then adding all of memory later when efi_init calls
-reserve_regions.
-
-Instead, we can log the limit and apply this later when we do the rest
-of the memblock work in memblock_init, which should work regardless of
-the presence of EFI. At the same time we may as well move the early
-parameter into arm64's mm/init.c, close to arm64_memblock_init.
-
-Any memory which must be mapped (e.g. for use by EFI runtime services)
-must be mapped explicitly reather than relying on the linear mapping,
-which may be truncated as a result of a mem= option passed on the kernel
-command line.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Leif Lindholm <leif.lindholm@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 ---
- arch/arm64/kernel/setup.c | 19 -------------------
- arch/arm64/mm/init.c      | 19 +++++++++++++++++++
- 2 files changed, 19 insertions(+), 19 deletions(-)
+ arch/arm64/include/asm/irq.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 4c9b0e0..00137ef 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -322,25 +322,6 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
- 	dump_stack_set_arch_desc("%s (DT)", of_flat_dt_get_machine_name());
- }
+diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
+index e1f7ecd..acedc7e 100644
+--- a/arch/arm64/include/asm/irq.h
++++ b/arch/arm64/include/asm/irq.h
+@@ -3,6 +3,8 @@
  
--/*
-- * Limit the memory size that was specified via FDT.
-- */
--static int __init early_mem(char *p)
--{
--	phys_addr_t limit;
--
--	if (!p)
--		return 1;
--
--	limit = memparse(p, &p) & PAGE_MASK;
--	pr_notice("Memory limited to %lldMB\n", limit >> 20);
--
--	memblock_enforce_memory_limit(limit);
--
--	return 0;
--}
--early_param("mem", early_mem);
--
- static void __init request_standard_resources(void)
- {
- 	struct memblock_region *region;
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index bac492c..11c7b70 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -136,10 +136,29 @@ static void arm64_memory_present(void)
- }
- #endif
+ #include <asm-generic/irq.h>
  
-+static phys_addr_t memory_limit = (phys_addr_t)ULLONG_MAX;
++struct pt_regs;
 +
-+/*
-+ * Limit the memory size that was specified via FDT.
-+ */
-+static int __init early_mem(char *p)
-+{
-+	if (!p)
-+		return 1;
-+
-+	memory_limit = memparse(p, &p) & PAGE_MASK;
-+	pr_notice("Memory limited to %lldMB\n", memory_limit >> 20);
-+
-+	return 0;
-+}
-+early_param("mem", early_mem);
-+
- void __init arm64_memblock_init(void)
- {
- 	phys_addr_t dma_phys_limit = 0;
- 
-+	memblock_enforce_memory_limit(memory_limit);
-+
- 	/*
- 	 * Register the kernel text, kernel data, initrd, and initial
- 	 * pagetables with memblock.
+ extern void (*handle_arch_irq)(struct pt_regs *);
+ extern void migrate_irqs(void);
+ extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
 -- 
-1.9.1
+1.7.9.5
