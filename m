@@ -1,37 +1,60 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 04 Dec 2014 06:26:50 -0800
-Subject: [PATCH v7 08/11] arm/arm64: Unexport restart handlers
-In-Reply-To: <CAMuHMdVqCa+m1oMkuRHcTZKw2CWNHJVotWBwfTnfBNT11UPEjw@mail.gmail.com>
-References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>	<1408495538-27480-9-git-send-email-linux@roeck-us.net>
- <CAMuHMdVqCa+m1oMkuRHcTZKw2CWNHJVotWBwfTnfBNT11UPEjw@mail.gmail.com>
-Message-ID: <54806F2A.7070107@roeck-us.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 4 Dec 2014 08:43:25 -0600
+Subject: [PATCH 3/3] arm: boot: dts: am437x-sk: fix lcd enable pin mux data
+In-Reply-To: <543E6774.8000406@ti.com>
+References: <1413311335-25083-1-git-send-email-balbi@ti.com>
+ <1413311335-25083-3-git-send-email-balbi@ti.com>
+ <543E6774.8000406@ti.com>
+Message-ID: <20141204144325.GA17269@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2014 05:36 AM, Geert Uytterhoeven wrote:
-> Hi G?nther,
->
-> On Wed, Aug 20, 2014 at 2:45 AM, Guenter Roeck <linux@roeck-us.net> wrote:
->> Implementing a restart handler in a module don't make sense
->> as there would be no guarantee that the module is loaded when
->> a restart is needed. Unexport arm_pm_restart to ensure that
->> no one gets the idea to do it anyway.
->
-> Why not? I was just going to do that, but I got greeted by:
->
+HI,
 
-Because you should register a restart handler instead, like the other
-drivers in the same directory now do.
+On Wed, Oct 15, 2014 at 03:24:20PM +0300, Tomi Valkeinen wrote:
+> On 14/10/14 21:28, Felipe Balbi wrote:
+> > Caused by a copy & paste error. Note that even with
+> > this bug AM437x SK display still works because GPIO
+> > mux mode is always enabled. It's still wrong to mux
+> > somebody else's pin.
+> > 
+> > Luckily ball D25 (offset 0x238 - gpio5_8) on AM437x
+> > isn't used for anything.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >  arch/arm/boot/dts/am437x-sk-evm.dts | 3 +--
+> >  1 file changed, 1 insertion(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
+> > index 859ff3d..681be00 100644
+> > --- a/arch/arm/boot/dts/am437x-sk-evm.dts
+> > +++ b/arch/arm/boot/dts/am437x-sk-evm.dts
+> > @@ -320,8 +320,7 @@
+> >  
+> >  	lcd_pins: lcd_pins {
+> >  		pinctrl-single,pins = <
+> > -			/* GPIO 5_8 to select LCD / HDMI */
+> > -			0x238 (PIN_OUTPUT_PULLUP | MUX_MODE7)
+> > +			0x1c (PIN_OUTPUT_PULLUP | MUX_MODE7) /* gpcm_ad7.gpio1_7 */
+> >  		>;
+> >  	};
+> >  };
+> 
+> I didn't verify the offset, but based on the comments this looks fine to me.
+> 
+> Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-> ERROR: "arm_pm_restart" [drivers/power/reset/rmobile-reset.ko] undefined!
->
-> So now we have to make sure all reset drivers for a zillion different
-> hardware devices are builtin, and can't be modular?
->
-No. All those drivers need to do is to register a restart handler using
-the API provided in the patch series.
+Tony, are you taking this patch ? Looks like it has been forgotten and
+now it needs to be backported to v3.17 and v3.18 (assuming it's too late
+for v3.18).
 
-Ultimately all restart handlers should do that and arm_pm_restart should
-go away entirely. That was the point of the patch series.
-
-Guenter
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/b4a5dbe3/attachment.sig>
