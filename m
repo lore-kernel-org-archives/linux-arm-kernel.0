@@ -1,52 +1,78 @@
-From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
-Date: Thu, 4 Dec 2014 14:56:20 +0100
-Subject: [PATCH V2] arm64: optimized copy_to_user and copy_from_user
- assembly code
-In-Reply-To: <CAPvkgC2Ofz-hPO=bOFoOdFJPTRuhaZxNE7PCz1YoHqnBqndRcA@mail.gmail.com>
-References: <1407538940-9167-1-git-send-email-fkan@apm.com>
- <20141127114322.GA20659@linaro.org>
- <CALdTtnt_AGmTSYmL37rJbVs8r4fvvhXKzFMW4k8KP2j6N7dvCg@mail.gmail.com>
- <CAKp6GAseBB-gPNV-o+NhEFifUpuSUx=FdyZisE2F-ZS83mXGXQ@mail.gmail.com>
- <CAPvkgC2Ofz-hPO=bOFoOdFJPTRuhaZxNE7PCz1YoHqnBqndRcA@mail.gmail.com>
-Message-ID: <A044731C-F47E-4CB2-ACBE-CA73FC950F4D@theobroma-systems.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 04 Dec 2014 13:58:04 +0000
+Subject: [PATCH v2 1/2] arm: perf: Prevent wraparound during overflow
+In-Reply-To: <20141204102612.GB14519@arm.com>
+References: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
+ <1416587067-3220-1-git-send-email-daniel.thompson@linaro.org>
+ <1416587067-3220-2-git-send-email-daniel.thompson@linaro.org>
+ <20141204102612.GB14519@arm.com>
+Message-ID: <5480686C.2070205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Craig/Steve/Dann,
-
-trying to understand what went wrong and when, I just went back to my original mail (May 1st, 2013) providing the original optimized functions for an iperf run at APM? this had two separate error-handling paths for _to_user and _from_user, where the _to_user case didn?t zeroize.
-
-I can?t quite track when these two paths were unified (or by who)? but I can confirm that only the _from_user path was designed to zeroize the buffer on error.
-
-@Craig: I?ll also forward you the original files, which I had earlier sent to Dann on Jul 3rd 2014. This should provide a point-of-reference for resolving this.
-
-Best,
-Philipp.
-
-> On 04 Dec 2014, at 13:27, Steve Capper <steve.capper@linaro.org> wrote:
+On 04/12/14 10:26, Will Deacon wrote:
+> On Fri, Nov 21, 2014 at 04:24:26PM +0000, Daniel Thompson wrote:
+>> If the overflow threshold for a counter is set above or near the
+>> 0xffffffff boundary then the kernel may lose track of the overflow
+>> causing only events that occur *after* the overflow to be recorded.
+>> Specifically the problem occurs when the value of the performance counter
+>> overtakes its original programmed value due to wrap around.
+>>
+>> Typical solutions to this problem are either to avoid programming in
+>> values likely to be overtaken or to treat the overflow bit as the 33rd
+>> bit of the counter.
+>>
+>> Its somewhat fiddly to refactor the code to correctly handle the 33rd bit
+>> during irqsave sections (context switches for example) so instead we take
+>> the simpler approach of avoiding values likely to be overtaken.
+>>
+>> We set the limit to half of max_period because this matches the limit
+>> imposed in __hw_perf_event_init(). This causes a doubling of the interrupt
+>> rate for large threshold values, however even with a very fast counter
+>> ticking at 4GHz the interrupt rate would only be ~1Hz.
+>>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 > 
-> On 3 December 2014 at 20:01, Craig Magina <craig.magina@canonical.com> wrote:
-> [...]
->> 
->> Could you provide the steps you used to reproduce this issue? I have
->> already submitted an SRU to revert this patch, but would like to have
->> the method you used to reproduce it for testing. Thanks for reporting
->> this.
->> 
->> --
->> Craig Magina
+>   Acked-by: Will Deacon <will.deacon@arm.com>
 > 
-> Hi Craig,
-> It's not easy to reproduce as the problem occurs when the kernel is
-> copying memory to userspace and experiences a page fault.
-> 
-> I have come across it whilst running "perf record -a" on a system that
-> is swapping.
-> 
-> Also, building source code under memory pressure (i.e. kernel compile
-> just after the system has swapped out pages), gave me this problem
-> too.
+> You'll probably need to refresh this at -rc1 as there are a bunch of
+> changes queued for this file already. Then you can stick it into rmk's
+> patch system.
+
+I'll do that. Thanks.
+
+
 > 
 > Cheers,
-> --
-> Steve
+> 
+> Will
+> 
+>> ---
+>>  arch/arm/kernel/perf_event.c | 10 ++++++++--
+>>  1 file changed, 8 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+>> index 266cba46db3e..ab68833c1e31 100644
+>> --- a/arch/arm/kernel/perf_event.c
+>> +++ b/arch/arm/kernel/perf_event.c
+>> @@ -115,8 +115,14 @@ int armpmu_event_set_period(struct perf_event *event)
+>>  		ret = 1;
+>>  	}
+>>  
+>> -	if (left > (s64)armpmu->max_period)
+>> -		left = armpmu->max_period;
+>> +	/*
+>> +	 * Limit the maximum period to prevent the counter value
+>> +	 * from overtaking the one we are about to program. In
+>> +	 * effect we are reducing max_period to account for
+>> +	 * interrupt latency (and we are being very conservative).
+>> +	 */
+>> +	if (left > (armpmu->max_period >> 1))
+>> +		left = armpmu->max_period >> 1;
+>>  
+>>  	local64_set(&hwc->prev_count, (u64)-left);
+>>  
+>> -- 
+>> 1.9.3
+>>
+>>
