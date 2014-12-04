@@ -1,48 +1,37 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Thu, 4 Dec 2014 14:10:53 +0800
-Subject: [RFC V2] mm:add zero_page _mapcount when mapped into user space
-In-Reply-To: <20141202113014.GA22683@node.dhcp.inet.fi>
-References: <35FD53F367049845BC99AC72306C23D103E688B313E0@CNBJMBX05.corpusers.net>
- <20141202113014.GA22683@node.dhcp.inet.fi>
-Message-ID: <35FD53F367049845BC99AC72306C23D103E688B313E6@CNBJMBX05.corpusers.net>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Thu, 4 Dec 2014 14:29:35 +0800
+Subject: [PATCH] arm64/include/asm: Fixed a warning about 'struct pt_regs'
+In-Reply-To: <zcyirq.h>
+References: <zcyirq.h>
+Message-ID: <1417674575-10855-1-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Kirill A. Shutemov [mailto:kirill at shutemov.name]
-> Sent: Tuesday, December 02, 2014 7:30 PM
-> To: Wang, Yalin
-> Cc: 'linux-kernel at vger.kernel.org'; 'linux-mm at kvack.org'; 'linux-arm-
-> kernel at lists.infradead.org'
-> Subject: Re: [RFC V2] mm:add zero_page _mapcount when mapped into user
-> space
-> 
-> On Tue, Dec 02, 2014 at 05:27:36PM +0800, Wang, Yalin wrote:
-> > This patch add/dec zero_page's _mapcount to make sure the mapcount is
-> > correct for zero_page, so that when read from /proc/kpagecount,
-> > zero_page's mapcount is also correct, userspace process like procrank
-> > can calculate PSS correctly.
-> 
-> I don't have specific code path to point to, but I would expect zero page
-> with non-zero mapcount would cause a problem with rmap.
-> 
-> How do you test the change?
-> 
-I just test it to see the mapcount from /proc/pid/pagemap  and /proc/kpagecount ,
-It works well,
-The problem is that when I see /proc/pid/smaps ,
-The Rss / Pss don't calculate zero_page map,
-Because smaps_pte_entry() --> vm_normal_page( ),
-Will return NULL for zero_page,
+If I include asm/irq.h on the top of my code, and set ARCH=arm64,
+I'll get a compile warning, details are below:
+warning: ?struct pt_regs?
+declared inside parameter list [enabled by default]
 
-But when userspace process cat /proc/pid/pagemap  ,
-It will see zero_page mapped,
-And will treat as Rss ,  
-This is weird, should we also omit zero_page in /proc/pid/pagemap ?
-Or add zero_page as Rss in /proc/pid/smaps ? 
+This patch is suggested by Arnd, see:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/308270.html
 
-I think we should add zero_page into Rss ,
-Because it is really mapped into userspace address space.
-And will let userspace memory analysis more accurate .
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+---
+ arch/arm64/include/asm/irq.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Thanks
+diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
+index e1f7ecd..acedc7e 100644
+--- a/arch/arm64/include/asm/irq.h
++++ b/arch/arm64/include/asm/irq.h
+@@ -3,6 +3,8 @@
+ 
+ #include <asm-generic/irq.h>
+ 
++struct pt_regs;
++
+ extern void (*handle_arch_irq)(struct pt_regs *);
+ extern void migrate_irqs(void);
+ extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+-- 
+1.7.9.5
