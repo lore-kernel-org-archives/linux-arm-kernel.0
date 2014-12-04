@@ -1,144 +1,49 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Thu, 4 Dec 2014 23:16:30 +0100
-Subject: [PATCH 1/4] pinctrl: Broadcom Cygnus pinctrl device tree binding
-In-Reply-To: <1417730171-30455-2-git-send-email-rjui@broadcom.com>
-References: <rjui@broadcom.com>
- <1417730171-30455-1-git-send-email-rjui@broadcom.com>
- <1417730171-30455-2-git-send-email-rjui@broadcom.com>
-Message-ID: <CAAfyv37Z=Bs1Ggydg5bX5z=005P+LOXNp0qNMA43a3BsAPSA7w@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu,  4 Dec 2014 23:30:10 +0100
+Subject: [PATCH 0/4] mtd: nand: atmel: Rework DT representation of NFC/NAND
+Message-ID: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 4, 2014 at 10:56 PM, Ray Jui <rjui@broadcom.com> wrote:
-> Device tree binding documentation for Broadcom Cygnus pinctrl driver
->
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> ---
->  .../bindings/pinctrl/brcm,cygnus-pinctrl.txt       |   92 ++++++++++++++++++++
->  1 file changed, 92 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
->
-> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
-> new file mode 100644
-> index 0000000..86e4579
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
-> @@ -0,0 +1,92 @@
-> +Broadcom Cygnus Pin Controller
-> +
-> +The Cygnus pin controller supports setting the alternate functions of groups
-> +of pins. Pinmux configuration on individual pins is not supported by the
-> +Cygnus A0 SoC.
-> +
-> +Required properties:
-> +
-> +- compatible:
-> +    Must be "brcm,cygnus-pinctrl"
-> +
-> +- reg:
-> +    Define the base and range of the I/O address space that contain the Cygnus
-> +pin control registers
-> +
-> +- brcm,groups:
-> +    This can be strings of one or more group names. This defines the group(s)
-> +that one wants to configure
-> +
-> +- brcm,function:
-> +    This is the alternate function that one wants to configure to. Valid
-> +alternate functions are "alt1", "alt2", "alt3", "alt4"
-> +
-> +Each child node represents a configuration. Client devices reference the the
-> +child node to enable the mux configuration.
-> +
-> +For example:
-> +
-> +       pinctrl: pinctrl at 0x0301d0c8 {
-> +               compatible = "brcm,cygnus-pinctrl";
-> +               reg = <0x0301d0c8 0x2c>;
-> +
-> +               i2s_0: i2s_0 {
-> +                       brcm,groups = "smart_card0", "smart_card0_fcb";
-> +                       brcm,function = "alt2";
-> +               };
-> +
-> +               i2s_1: i2s_1 {
-> +                       brcm,groups = "smart_card1", "smart_card1_fcb";
-> +                       brcm,function = "alt2";
-> +               };
-> +
-> +               spi_0: spi_0 {
-> +                       brcm,groups = "spi0";
-> +                       brcm,function = "alt1";
-> +               };
-> +       }
-> +
-> +       spi0 at 18028000 {
-> +                       compatible = "arm,pl022", "arm,primecell";
-> +                       reg = <0x18028000 0x1000>;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
-> +                       pinctrl-0 = <&spi_0>;
-> +                       clocks = <&axi81_clk>;
-> +                       clock-names = "apb_pclk";
-> +       };
-> +
-> +Consider the following snapshot of Cygnus pinmux table:
-> +
-> +number    pin            group              alt1             alt2        alt3        alt4
-> +------    ---            ----               ----             ----        ----        ----
-> +42        sc0_clk        smart_card0        SMART CARD0      I2S_0       N/A         chip_gpio24
-> +43        sc0_cmdvcc_l   smart_card0        SMART CARD0      I2S_0       N/A         STRAP
-> +44        sc0_detect     smart_card0        SMART CARD0      I2S_0       N/A         chip_gpio25
-> +45        sc0_fcb        smart_card0_fcb    SMART CARD0_FCB  I2S_0       N/A         chip_gpio26
-> +46        sc0_io         smart_card0        SMART CARD0      I2S_0       N/A         chip_gpio27
-> +47        sc0_rst_l      smart_card0        SMART CARD0      SPDIF       N/A         STRAP
-> +
-> +Note due to limitation of the Cygnus hardware, pinmux configuration can only
-> +be group based. To enable I2S_0 function, one needs the following child node
-> +configuration:
-> +
-> +       i2s_0: i2s_0 {
-> +               brcm,groups = "smart_card0", "smart_card0_fcb";
-> +               brcm,function = "alt2";
-> +       };
-> +
-> +This tells the Cygnus pin controller to configure groups "smart_card0" and
-> +"smart_card0_fcb" to I2S_0. With this configuration, pins 42, 43, 44, 45, 46
-> +become I2C_0, and pin 47 becomes SPDIF
-                  ^^^^ typo - should be I2S_0
-> +
-> +Consider another example, that one wants to configure the above pins as GPIO:
-> +
-> +       gpio_24_27: gpio_24_27 {
-> +               brcm,groups = "smart_card0", "smart_card0_fcb";
-> +               brcm,function = "alt4";
-> +       };
-> +
-> +With the above configuration, pins 42, 44, 45, 46 become GPIO, and 43 and 47
-> +become reserved for STRAP
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Hello,
 
-BR,
+While working on the EBI driver [1] I noticed that the relationship between
+the NFC (NAND Flash Controller) and the NAND chip it is attached to would
+make things harder to represent when moving the NAND node under the EBI bus
+(another useless 'ranges' definition).
 
-marek
+Actually this representation might be even more problematic if one wants
+decide to connect two NAND chips on his sama5 based board, because the NFC
+node is a child of the NAND chip node, and thus can only be attached to a
+single NAND chip.
+
+To address this problem the current series moves the NFC node outside of
+the NAND chip device which then reference the NFC using the "atmel,nfc"
+property.
+
+The series does not implement multi-chip support, but at least the new
+representation should make it possible.
+
+Best Regards,
+
+Boris
+
+[1]https://lkml.org/lkml/2014/12/3/806
+
+Boris Brezillon (4):
+  mtd: nand: atmel: Rework driver to separate nfc and nand nodes
+  mtd: nand: atmel: Update DT documentation after splitting NFC and NAND
+  ARM: at91/dt: sama5: move NFC nodes outside of NAND nodes
+  ARM: at91/dt: sama5: move NAND nodes into board dts/dtsi
+
+ .../devicetree/bindings/mtd/atmel-nand.txt         | 46 +++++++------
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts        | 18 ++++-
+ arch/arm/boot/dts/at91-sama5d4ek.dts               | 16 ++++-
+ arch/arm/boot/dts/sama5d3.dtsi                     | 36 ++--------
+ arch/arm/boot/dts/sama5d3xcm.dtsi                  | 18 ++++-
+ arch/arm/boot/dts/sama5d4.dtsi                     | 36 ++--------
+ drivers/mtd/nand/atmel_nand.c                      | 76 +++++++++++++++++-----
+ 7 files changed, 149 insertions(+), 97 deletions(-)
 
 -- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
-
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+1.9.1
