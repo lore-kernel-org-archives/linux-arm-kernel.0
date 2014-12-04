@@ -1,71 +1,84 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 4 Dec 2014 14:12:31 +0100
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 4 Dec 2014 14:29:23 +0100
 Subject: [PATCH v2] pwm: atmel-hlcdc: add at91sam9x5 and sama5d3 errata
  handling
-In-Reply-To: <1416407589-8157-1-git-send-email-boris.brezillon@free-electrons.com>
+In-Reply-To: <20141204131229.GA7262@ulmo.nvidia.com>
 References: <1416407589-8157-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20141204131229.GA7262@ulmo.nvidia.com>
+ <20141204131229.GA7262@ulmo.nvidia.com>
+Message-ID: <20141204142923.29eecfc6@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 03:33:09PM +0100, Boris Brezillon wrote:
-> at91sam9x5 has an errata forbidding the use of slow clk as a clk source and
-> sama5d3 SoCs has another errata forbidding the use of div1 prescaler.
-> 
-> Take both of these erratas into account.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
-> Hi Thierry,
-> 
-> I've addressed the "erratas stored in of_device_id data" part, but still
-> haven't modified the compatible strings of the HLCDC subdevices.
-> 
-> Please let me know if you really want to handle erratas through pwm
-> compatibles instead of parent device compatibles.
-> 
-> Regards,
-> 
-> Boris
-> 
-> Changes since v1:
-> - use data field in of_device_id to attach erratas to an IP revision
-> 
->  drivers/pwm/pwm-atmel-hlcdc.c | 50 ++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 45 insertions(+), 5 deletions(-)
+Hi Thierry
 
-I applied this, but this was really much more difficult than I would've
-wanted. Since the MFD driver hasn't been merged into Linus' tree yet I
-wasn't able to actually build test this driver at all without manually
-pulling in the patches that add the MFD support. I went through this
-trouble this time because it's what we had agreed upon, but for the
-record, next time I'll request a stable branch that I can pull into the
-PWM tree to resolve this kind of dependency. Or patches will have to
-wait until the next merge window. I don't want to have to jump through
-hoops just to make sure the code in my tree actually compiles.
+On Thu, 4 Dec 2014 14:12:31 +0100
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-Oh, and it's good that I do compile tests because...
+> On Wed, Nov 19, 2014 at 03:33:09PM +0100, Boris Brezillon wrote:
+> > at91sam9x5 has an errata forbidding the use of slow clk as a clk source and
+> > sama5d3 SoCs has another errata forbidding the use of div1 prescaler.
+> > 
+> > Take both of these erratas into account.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> > Hi Thierry,
+> > 
+> > I've addressed the "erratas stored in of_device_id data" part, but still
+> > haven't modified the compatible strings of the HLCDC subdevices.
+> > 
+> > Please let me know if you really want to handle erratas through pwm
+> > compatibles instead of parent device compatibles.
+> > 
+> > Regards,
+> > 
+> > Boris
+> > 
+> > Changes since v1:
+> > - use data field in of_device_id to attach erratas to an IP revision
+> > 
+> >  drivers/pwm/pwm-atmel-hlcdc.c | 50 ++++++++++++++++++++++++++++++++++++++-----
+> >  1 file changed, 45 insertions(+), 5 deletions(-)
+> 
+> I applied this, but this was really much more difficult than I would've
+> wanted. Since the MFD driver hasn't been merged into Linus' tree yet I
+> wasn't able to actually build test this driver at all without manually
+> pulling in the patches that add the MFD support. I went through this
+> trouble this time because it's what we had agreed upon, but for the
+> record, next time I'll request a stable branch that I can pull into the
+> PWM tree to resolve this kind of dependency. Or patches will have to
+> wait until the next merge window. I don't want to have to jump through
+> hoops just to make sure the code in my tree actually compiles.
 
-> diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
-[...]
-> +const struct atmel_hlcdc_pwm_erratas atmel_hlcdc_pwm_at91sam9x5_erratas = {
-> +	.slow_clk_errata = true,
-> +};
-> +
-> +const struct atmel_hlcdc_pwm_erratas atmel_hlcdc_pwm_sama5d3_erratas = {
-> +	.div1_clk_errata = true,
-> +};
+Thanks for doing that.
+Just for my understanding, am I the one responsible for providing this
+stable branch, or were you expecting Lee to provide it ?
 
-... these actually should be static.
+> 
+> Oh, and it's good that I do compile tests because...
+> 
+> > diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
+> [...]
+> > +const struct atmel_hlcdc_pwm_erratas atmel_hlcdc_pwm_at91sam9x5_erratas = {
+> > +	.slow_clk_errata = true,
+> > +};
+> > +
+> > +const struct atmel_hlcdc_pwm_erratas atmel_hlcdc_pwm_sama5d3_erratas = {
+> > +	.div1_clk_errata = true,
+> > +};
+> 
+> ... these actually should be static.
+> 
+> Also I took the liberty of substituting "erratum" for "errata" and
+> "errata" for "erratas".
 
-Also I took the liberty of substituting "erratum" for "errata" and
-"errata" for "erratas".
+Indeed, thanks for fixing those problems.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/fb2eedf3/attachment-0001.sig>
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
