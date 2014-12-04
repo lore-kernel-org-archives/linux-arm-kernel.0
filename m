@@ -1,27 +1,30 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 4 Dec 2014 11:31:58 +0000
-Subject: Patch 8190/1: introduce is_device_dma_coherent
-In-Reply-To: <20141203234133.GK11285@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.02.1412031700240.30971@kaball.uk.xensource.com>
- <20141203234133.GK11285@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1412041131400.30971@kaball.uk.xensource.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 4 Dec 2014 11:33:46 +0000
+Subject: [PATCH 4/5] ASoC: dwc: Add devicetree support for Designware I2S
+In-Reply-To: <2090131.rL6S1lx8Ky@wuerfel>
+References: <547F3CAC.9050105@arm.com> <2240364.fL8B0EDbFB@wuerfel>
+ <20141204110746.GR7712@sirena.org.uk> <2090131.rL6S1lx8Ky@wuerfel>
+Message-ID: <20141204113346.GT7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 3 Dec 2014, Russell King - ARM Linux wrote:
-> On Wed, Dec 03, 2014 at 05:07:06PM +0000, Stefano Stabellini wrote:
-> > Hello Russell,
-> > thanks for taking the patch.
-> > However I was thinking that it might be easier to send it as part of my
-> > pull request to make sure to avoid build issues (I have follow-up
-> > patches that call is_device_dma_coherent).
-> > Otherwise if you prefer to handle the patch, I'll remove it from my
-> > for-linus branch and I'll make sure to send out the pull request to
-> > Linus after yours. I would rather not rebase on your branch because
-> > rebasing has proven to be unpopular in the past.
-> 
-> If you have patches which depend on this one, it probably makes sense for
-> it to go through your tree instead, in which case I should drop this patch
-> from my tree.  I'll do that tomorrow (provided I remember.)
+On Thu, Dec 04, 2014 at 12:17:15PM +0100, Arnd Bergmann wrote:
+> On Thursday 04 December 2014 11:07:46 Mark Brown wrote:
 
-All right, thanks.
+> > It's relatively common with newer companies - it's like UARTs, any
+> > company that's been around for a long time will have a homebrew IP
+> > already but places that don't (or get fed up with their existing IP)
+> > will tend to buy something in.
+
+> I see, but are any of the newer designs going to use platform_data?
+> My general feeling was that the only places that still depend on that
+> are legacy platforms and architectures.
+
+And x86 which does have things like PCI cards.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/e36f4d68/attachment.sig>
