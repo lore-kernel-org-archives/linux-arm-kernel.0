@@ -1,36 +1,62 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 03 Dec 2014 20:40:04 -0800
-Subject: [PATCH] ARM: dts: Add dts file for odroid XU3 board
-In-Reply-To: <1417638971.21830.42.camel@collabora.co.uk> (Sjoerd Simons's
- message of "Wed, 03 Dec 2014 21:36:11 +0100")
-References: <1417438770-28696-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <7hzjb4y0gp.fsf@deeprootsystems.com>
- <1417638971.21830.42.camel@collabora.co.uk>
-Message-ID: <7hlhmoxc2j.fsf@deeprootsystems.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Thu, 04 Dec 2014 10:30:36 +0530
+Subject: [PATCH v4 1/2] soc: samsung: add exynos chipid driver support
+In-Reply-To: <19026872.NZqUJn3Abb@wuerfel>
+References: <1417594658-2931-1-git-send-email-pankaj.dubey@samsung.com>
+ <1417594658-2931-2-git-send-email-pankaj.dubey@samsung.com>
+ <19026872.NZqUJn3Abb@wuerfel>
+Message-ID: <547FEA74.1010900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sjoerd Simons <sjoerd.simons@collabora.co.uk> writes:
+Hi Arnd,
 
-> On Wed, 2014-12-03 at 11:53 -0800, Kevin Hilman wrote:
->> Sjoerd Simons <sjoerd.simons@collabora.co.uk> writes:
->> Tried this on top of linux-next (next-20141125 and next20141203) and
->> boots fine on my odroid-xu3. 
->> 
->> Thanks for doing this, I've been meaning to get a DTS upstream for this
->> platform myself.  I also noticed that the imprecise aborts I've been
->> seeing when booting this board with the smdk5420 DTS are gone, so I
->> don't have to dig into those now either.  Thanks!  :)
+On Wednesday 03 December 2014 04:13 PM, Arnd Bergmann wrote:
+>> Exynos SoCs have Chipid, for identification of product IDs
+>> and SoC revisions. This patch intendes to provide initialization
+>> code for all these functionalites, at the same time it provides some
+>> sysfs entries for accessing these information to userspace.
+>>
+>> This driver usese existing binding for exnos-chipid.
 >
-> For completeness, the problem with running the smdk5420 DTS on the XU3
-> is that the XU3 runs secure firmware while the SMD5420 doesn't.. Hence
-> the imprecise aborts you were seeing.
+> Nice!
 
-OK, that's what I suspected but didn't take the time to verify.  Thanks
-for the update.
+Thanks for review.
 
-BTW, I'll have some DTS updates for the xu3 to enable the on-board
-INA2xx current sensors for easy power measurements without external
-instrumentation.  Will send a patch for those soon.
+>
+> On Wednesday 03 December 2014 13:47:37 Pankaj Dubey wrote:
+>
+>> +       soc_dev_attr->soc_id = exynos_product_id_to_name(soc_product_id);
+>> +
+>> +       soc_dev = soc_device_register(soc_dev_attr);
+>> +       if (IS_ERR(soc_dev))
+>> +               goto free_rev;
+>> +
+>> +       device_create_file(soc_device_to_device(soc_dev), &exynos_product_attr);
+>> +       device_create_file(soc_device_to_device(soc_dev),
+>> +                               &exynos_main_rev_attr);
+>> +       device_create_file(soc_device_to_device(soc_dev), &exynos_sub_rev_attr);
+>> +
+>
+> I don't like the idea of having three extra nonstandard properties here,
+> especially when you are not using the machine field for anything useful.
+>
 
-Kevin
+I did not get you here. Any suggestions how we can use 'machine' field 
+more useful way.
+
+> Also, all three of these just come from the same register, why expose
+> them all as the machine and revision standard properties.
+>
+
+Agreed. These properties are basically giving same information but with 
+small modification.
+As you said these are getting exposed via standard properties as well, 
+so I have no issue to drop them. Just waiting for more review from 
+Samsung folks, will take care of this in next version.
+
+
+Thanks,
+Pankaj Dubey
+> 	Arnd
+>
