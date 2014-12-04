@@ -1,71 +1,57 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Thu, 4 Dec 2014 14:28:13 +0200
-Subject: [RFC V2] mm:add zero_page _mapcount when mapped into user space
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E688B313E6@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103E688B313E0@CNBJMBX05.corpusers.net>
- <20141202113014.GA22683@node.dhcp.inet.fi>
- <35FD53F367049845BC99AC72306C23D103E688B313E6@CNBJMBX05.corpusers.net>
-Message-ID: <20141204122813.GA523@node.dhcp.inet.fi>
+From: zhang.lyra@gmail.com (Lyra Zhang)
+Date: Thu, 4 Dec 2014 20:37:56 +0800
+Subject: [PATCH] arm64/include/asm: Fixed a warning about 'struct pt_regs'
+In-Reply-To: <1417692197-18518-1-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <1417692197-18518-1-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <CAAfSe-umuaCJ947FtiTWjQSjfwHPiwg9ZEine+=vbdGg2EK8qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 02:10:53PM +0800, Wang, Yalin wrote:
-> > -----Original Message-----
-> > From: Kirill A. Shutemov [mailto:kirill at shutemov.name]
-> > Sent: Tuesday, December 02, 2014 7:30 PM
-> > To: Wang, Yalin
-> > Cc: 'linux-kernel at vger.kernel.org'; 'linux-mm at kvack.org'; 'linux-arm-
-> > kernel at lists.infradead.org'
-> > Subject: Re: [RFC V2] mm:add zero_page _mapcount when mapped into user
-> > space
-> > 
-> > On Tue, Dec 02, 2014 at 05:27:36PM +0800, Wang, Yalin wrote:
-> > > This patch add/dec zero_page's _mapcount to make sure the mapcount is
-> > > correct for zero_page, so that when read from /proc/kpagecount,
-> > > zero_page's mapcount is also correct, userspace process like procrank
-> > > can calculate PSS correctly.
-> > 
-> > I don't have specific code path to point to, but I would expect zero page
-> > with non-zero mapcount would cause a problem with rmap.
-> > 
-> > How do you test the change?
-> > 
-> I just test it to see the mapcount from /proc/pid/pagemap  and /proc/kpagecount ,
-> It works well,
+Hi, All
 
-I took a closer look and your patch is broken in multiple places:
- - on zap_pte_range() you don't decrement mapcount;
- - you don't update rss counters for mm;
- - copy_one_pte() doesn't increase mapcount;
- - ...
+I'm sorry that this is an accident from our IT-service, because they
+all use M$ software, and didn't familiar with git send-email.
+You can ignore this email.
+.
+Please forgive that persons who are only able to use M$ products.
 
-Basically, each and every vm_normal_page() call must be audited. As first
-step. And you totally skip huge zero page.
 
-Proper mapcount handling for zero page would require a lot more work and I
-don't think it worth it. Gain is too small.
+Thanks,
+Chunyan
 
-NAK.
 
-> The problem is that when I see /proc/pid/smaps ,
-> The Rss / Pss don't calculate zero_page map,
-> Because smaps_pte_entry() --> vm_normal_page( ),
-> Will return NULL for zero_page,
-> 
-> But when userspace process cat /proc/pid/pagemap  ,
-> It will see zero_page mapped,
-> And will treat as Rss ,  
-> This is weird, should we also omit zero_page in /proc/pid/pagemap ?
-> Or add zero_page as Rss in /proc/pid/smaps ? 
-> 
-> I think we should add zero_page into Rss ,
-> Because it is really mapped into userspace address space.
-> And will let userspace memory analysis more accurate .
-
-It would be easier for userspace to find out pfn of zero page and take it
-into account.
-
-Note: some architectures have multiple zero page due to coloring.
-
--- 
- Kirill A. Shutemov
+2014-12-04 19:23 GMT+08:00 Chunyan Zhang <chunyan.zhang@spreadtrum.com>:
+> If I include asm/irq.h on the top of my code, and set ARCH=arm64,
+> I'll get a compile warning, details are below:
+> warning: ?struct pt_regs?
+> declared inside parameter list [enabled by default]
+>
+> This patch is suggested by Arnd, see:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/308270.html
+>
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> ---
+>  arch/arm64/include/asm/irq.h |    2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
+> index e1f7ecd..acedc7e 100644
+> --- a/arch/arm64/include/asm/irq.h
+> +++ b/arch/arm64/include/asm/irq.h
+> @@ -3,6 +3,8 @@
+>
+>  #include <asm-generic/irq.h>
+>
+> +struct pt_regs;
+> +
+>  extern void (*handle_arch_irq)(struct pt_regs *);
+>  extern void migrate_irqs(void);
+>  extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
