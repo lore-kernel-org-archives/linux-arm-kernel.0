@@ -1,25 +1,71 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Thu, 4 Dec 2014 15:15:49 +0800
-Subject: [PATCH v2 0/4] clk: mediatek: Add common clock support for
- Mediatek MT8135.
-In-Reply-To: <1417675942-10502-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1417675942-10502-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1417677349.31427.26.camel@mtksdaap41>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 4 Dec 2014 02:23:37 -0500 (EST)
+Subject: [PATCH] optimize ktime_divns for constant divisors
+In-Reply-To: <3913269.qTFsa05Ysv@wuerfel>
+References: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
+ <3913269.qTFsa05Ysv@wuerfel>
+Message-ID: <alpine.LFD.2.11.1412040143260.470@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 3 Dec 2014, Arnd Bergmann wrote:
 
-On Thu, 2014-12-04 at 14:52 +0800, James Liao wrote:
-> This patchset contains the initial common clock support for Mediatek SoCs.
-> Mediatek SoC's clock architecture comprises of various PLLs, dividers,
-> muxes and clock gates.
+> On Wednesday 03 December 2014 14:43:06 Nicolas Pitre wrote:
+> > At least on ARM, do_div() is optimized to turn constant divisors into
+> > an inline multiplication by the reciprocal value at compile time. 
+> > However this optimization is missed entirely whenever ktime_divns() is
+> > used and the slow out-of-line division code is used all the time.
+> > 
+> > Let ktime_divns() use do_div() inline whenever the divisor is constant
+> > and small enough.  This will make things like ktime_to_us() and 
+> > ktime_to_ms() much faster.
+> > 
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
 > 
-> This patchset also contains a basic clock support for Mediatek MT8135.
+> Very cool. I've been thinking about doing something similar for the
+> general case but couldn't get the math to work.
 > 
-> This driver is based on 3.18-rc1 + MT8135 basic support.
-> 
+> Can you think of an architecture-independent way to ktime_to_sec,
+> ktime_to_ms, and ktime_to_us efficiently based on what you did for
+> the ARM do_div implementation?
 
-Changein v2:
-- Re-ordered patchset. Fold include/dt-bindings and DT document in 1st
-patch.
+Sure.  gcc generates rather shitty code on ARM compared to the output 
+from my do_div() implementation. But here it is:
+
+u64 ktime_to_us(ktime_t kt)
+{
+	u64 ns = ktime_to_ns(kt);
+	u32 x_lo, x_hi, y_lo, y_hi;
+	u64 res, carry;
+
+	x_hi = ns >> 32;
+	x_lo = ns;
+	y_hi = 0x83126e97;
+	y_lo = 0x8d4fdf3b;
+
+	res = (u64)x_lo * y_lo;
+	carry = (u64)(u32)res + y_lo;
+	res = (res >> 32) + (carry >> 32);
+
+	res += (u64)x_lo * y_hi;
+	carry = (u64)(u32)res + (u64)x_hi * y_lo;
+	res = (res >> 32) + (carry >> 32);
+
+	res += (u64)x_hi * y_hi;
+	return res >> 9;
+}
+
+For ktime_to_ms() the constants would be as follows:
+
+	y_hi = 0x8637bd05;
+	y_lo = 0xaf6c69b5;
+	final shift = 19
+
+For ktime_to_sec() that would be:
+
+	y_hi = 0x89705f41;
+	y_lo = 0x36b4a597;
+	final shift = 29
+
+
+Nicolas
