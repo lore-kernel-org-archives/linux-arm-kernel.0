@@ -1,40 +1,22 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 04 Dec 2014 08:57:47 +0000
-Subject: [PATCH 13/16] ARM: shmobile: remove use of
- gic_arch_extn.irq_set_wake
-In-Reply-To: <20141204063909.GF19568@verge.net.au>
-References: <1417539497-20101-1-git-send-email-marc.zyngier@arm.com>
- <1417539497-20101-14-git-send-email-marc.zyngier@arm.com>
- <20141204063909.GF19568@verge.net.au>
-Message-ID: <5480220B.1020909@arm.com>
+From: Andrew.Jackson@arm.com (Andrew Jackson)
+Date: Thu, 04 Dec 2014 08:57:58 +0000
+Subject: [PATCH 0/5] ASoC: dwc: Add device tree support to designware I2S
+In-Reply-To: <20141203172111.GB7712@sirena.org.uk>
+References: <547F3C8C.5000607@arm.com> <20141203172111.GB7712@sirena.org.uk>
+Message-ID: <54802216.8030908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On 04/12/14 06:39, Simon Horman wrote:
-> On Tue, Dec 02, 2014 at 04:58:14PM +0000, Marc Zyngier wrote:
->> shmobile only uses gic_arch_extn.irq_set_wake to prevent the GIC
->> from returning -ENXIO when receiving a wake-up configuration request.
->>
->> It is a lot simpler to tell the irq layer that we don't need any
->> configuration by using the IRQCHIP_SKIP_SET_WAKE, thanks to the
->> new gic_set_irqchip_flags function.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On 12/03/14 17:21, Mark Brown wrote:
+> On Wed, Dec 03, 2014 at 04:38:36PM +0000, Andrew Jackson wrote:
+>> This patch set extends the DesignWare I2S driver to provide device
+>> tree support and fixes a couple of small faults.
 > 
-> Hi Marc,
+> If you're sending fixes the fixes should be the first things in the
+> series - the idea is that we should be able to send the fixes to Linus
+> and stable separate to any new features.
 > 
-> this looks reasonable to me. Should I take it through my tree
-> (in v3.20) or did you have another path in mind?
 
-As you can see, there is a dependency on the GIC itself, and other
-platforms are affected to. So I'd think that an arm-soc branch
-containing all the required patches would be more appropriate, assuming
-that you're happy to Ack this patch.
+Oh, sorry about that, I will reorder the patches before resubmission.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+   Andrew
