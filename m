@@ -1,52 +1,82 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 4 Dec 2014 09:28:17 -0800
-Subject: [PATCH v2 0/7] Pinctrl support for Zynq
-In-Reply-To: <CACRpkdbYPmMksbqciiXv4hHBqx9=b8toA5MgCwGSLteUh+NkZA@mail.gmail.com>
-References: <1417137993-8337-1-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkdbYPmMksbqciiXv4hHBqx9=b8toA5MgCwGSLteUh+NkZA@mail.gmail.com>
-Message-ID: <053edb05cd874daf9232cd5e4930df92@BN1BFFO11FD042.protection.gbl>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 04 Dec 2014 17:42:33 +0000
+Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
+ drivers
+In-Reply-To: <20141204144925.GB31464@ulmo.nvidia.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <CAL_JsqKHvh9KSTYrrs1Pts5Kg=8dA1V6NiW57_2vdDH173qQGg@mail.gmail.com>
+ <CACxGe6vyMkyE9ZRj_FQzi19ESEo7OV_RQoVV65xBYpdQV8cRGQ@mail.gmail.com>
+ <2579924.PPXuLn3o19@wuerfel> <54805312.6000402@arm.com>
+ <CACxGe6uR5J4Cjdh_xYhBPoQRgeYwHPv5=AnuRmQKSD3yZrMK9Q@mail.gmail.com>
+ <54806504.20507@arm.com> <20141204144925.GB31464@ulmo.nvidia.com>
+Message-ID: <54809D09.2050406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Thierry,
 
-On Thu, 2014-12-04 at 10:44AM +0100, Linus Walleij wrote:
-> On Fri, Nov 28, 2014 at 2:26 AM, Soren Brinkmann
-> <soren.brinkmann@xilinx.com> wrote:
-> 
-> > here is v2 of this series. On the functional side, adding the support
-> > for USB mux groups is probably the biggest change. Most other changes
-> > are mostly cosmetic (typos, function names, documentation, ...).
-> > More detailed changelogs are included with the respective patches.
-> 
-> Unfortunately we are late in the merge cycle.
-> 
-> But I am *very* fond of this series, and I appreciate your patches
-> as *lot* S?ren.
-> 
-> So my plan is to merge your v3 patch set after the merge window
-> or whenever you have it ready, with the Zynq driver on top and
-> the dependent AMlogic driver too.
-> 
-> Then we spend the next kernel cycle hashing this out and
-> putting some polished generic code in place so we get some
-> order.
-> 
-> This will likely set the pattern for how we expect ACPI pin controllers
-> to behave too, so it is work of great importance.
-> 
-> I hope I can count on you to hang in there and keep driving
-> those patches!
-> 
-> I'll try to provide a deeper look at the indivudual patches now.
+On 04/12/14 14:49, Thierry Reding wrote:
+> On Thu, Dec 04, 2014 at 01:43:32PM +0000, Robin Murphy wrote:
+>> Hi Grant, thanks for the advice - silly micro-optimisations removed, and
+>> I'll make a note to do so from my in-development code, too ;)
+>>
+>> I didn't much like the casting either, so rather than push it elsewhere or
+>> out to the caller I've just changed the prototype to obviate it completely.
+>> Since we're also expecting to churn this again to use something more
+>> suitable than iommu_ops as the private data, I think keeping things simple
+>> wins over const-correctness for now.
+>>
+>> Thanks,
+>> Robin
+>>
+>> --->8---
+>>  From b2e8c91ac49bef4008661e4628cd6b7249d84af5 Mon Sep 17 00:00:00 2001
+>> Message-Id: <b2e8c91ac49bef4008661e4628cd6b7249d84af5.1417698001.git.robin.murphy@arm.com>
+>> From: Robin Murphy <robin.murphy@arm.com>
+>> Date: Thu, 4 Dec 2014 11:53:13 +0000
+>> Subject: [PATCH v2] iommu: store DT-probed IOMMU data privately
+>>
+>> Since the data pointer in the DT node is public and may be overwritten
+>> by conflicting code, move the DT-probed IOMMU ops to a private list
+>> where they will be safe.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>   drivers/iommu/of_iommu.c | 40 ++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/of_iommu.h | 12 ++----------
+>>   2 files changed, 42 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>> index 73236d3..c7078f6 100644
+>> --- a/drivers/iommu/of_iommu.c
+>> +++ b/drivers/iommu/of_iommu.c
+>> @@ -94,6 +94,46 @@ int of_get_dma_window(struct device_node *dn, const char
+>> *prefix, int index,
+>>   }
+>>   EXPORT_SYMBOL_GPL(of_get_dma_window);
+>>
+>> +struct of_iommu_node {
+>> +	struct list_head list;
+>> +	struct device_node *np;
+>> +	struct iommu_ops *ops;
+>
+> Why can't this be const? Why would anyone ever need to modify it? Also
+> drivers do define their iommu_ops structures const these days, so you'll
+> either still have to cast away at some point or the compiler will
+> complain once you start calling this from drivers.
+>
 
-Sounds great! After bringing it so far, I wasn't planning of giving up
-now :)
+...whereas if we make everything const then the drivers that _do_ want 
+to use the private data introduced by this series and thus pass mutable 
+per-instance iommu_ops will be the ones having to cast. We have no users 
+either way until this series is merged, and the need to stash the 
+per-instance data somewhere other than np->data is in the way of getting 
+it merged - this is just a quick hack to address that. I think we've 
+already agreed that mutable per-instance iommu_ops holding private data 
+aren't particularly pleasant and will (hopefully) go away in the next 
+iteration[1], at which point this all changes anyway.
 
-The approach you chose sounds good to me. I was currently waiting to see
-whether there are a few more change requests coming before sending v3.
-The few comments that came in so far I have already fixed up. Since it's
-not going to make it into this merge window there may be some more time
-now, but in general, I could send v3 any time.
+Regards,
+Robin.
 
-	S?ren
+[1]:http://article.gmane.org/gmane.linux.kernel.iommu/7554
