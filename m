@@ -1,78 +1,302 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 04 Dec 2014 13:58:04 +0000
-Subject: [PATCH v2 1/2] arm: perf: Prevent wraparound during overflow
-In-Reply-To: <20141204102612.GB14519@arm.com>
-References: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
- <1416587067-3220-1-git-send-email-daniel.thompson@linaro.org>
- <1416587067-3220-2-git-send-email-daniel.thompson@linaro.org>
- <20141204102612.GB14519@arm.com>
-Message-ID: <5480686C.2070205@linaro.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 4 Dec 2014 13:58:12 +0000
+Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
+ drivers
+In-Reply-To: <54806504.20507@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <CAL_JsqKHvh9KSTYrrs1Pts5Kg=8dA1V6NiW57_2vdDH173qQGg@mail.gmail.com>
+ <CACxGe6vyMkyE9ZRj_FQzi19ESEo7OV_RQoVV65xBYpdQV8cRGQ@mail.gmail.com>
+ <2579924.PPXuLn3o19@wuerfel> <54805312.6000402@arm.com>
+ <CACxGe6uR5J4Cjdh_xYhBPoQRgeYwHPv5=AnuRmQKSD3yZrMK9Q@mail.gmail.com>
+ <54806504.20507@arm.com>
+Message-ID: <CACxGe6taZiAJdf6s0Y5uXtu7=276d1U8hOQEpAwP+k-n44Ndqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/14 10:26, Will Deacon wrote:
-> On Fri, Nov 21, 2014 at 04:24:26PM +0000, Daniel Thompson wrote:
->> If the overflow threshold for a counter is set above or near the
->> 0xffffffff boundary then the kernel may lose track of the overflow
->> causing only events that occur *after* the overflow to be recorded.
->> Specifically the problem occurs when the value of the performance counter
->> overtakes its original programmed value due to wrap around.
->>
->> Typical solutions to this problem are either to avoid programming in
->> values likely to be overtaken or to treat the overflow bit as the 33rd
->> bit of the counter.
->>
->> Its somewhat fiddly to refactor the code to correctly handle the 33rd bit
->> during irqsave sections (context switches for example) so instead we take
->> the simpler approach of avoiding values likely to be overtaken.
->>
->> We set the limit to half of max_period because this matches the limit
->> imposed in __hw_perf_event_init(). This causes a doubling of the interrupt
->> rate for large threshold values, however even with a very fast counter
->> ticking at 4GHz the interrupt rate would only be ~1Hz.
->>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> You'll probably need to refresh this at -rc1 as there are a bunch of
-> changes queued for this file already. Then you can stick it into rmk's
-> patch system.
+On Thu, Dec 4, 2014 at 1:43 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> Hi Grant, thanks for the advice - silly micro-optimisations removed, and
+> I'll make a note to do so from my in-development code, too ;)
+>
+> I didn't much like the casting either, so rather than push it elsewhere or
+> out to the caller I've just changed the prototype to obviate it completely.
+> Since we're also expecting to churn this again to use something more
+> suitable than iommu_ops as the private data, I think keeping things simple
+> wins over const-correctness for now.
+>
+> Thanks,
+> Robin
+>
+> --->8---
+> From b2e8c91ac49bef4008661e4628cd6b7249d84af5 Mon Sep 17 00:00:00 2001
+> Message-Id:
+> <b2e8c91ac49bef4008661e4628cd6b7249d84af5.1417698001.git.robin.murphy@arm.com>
+> From: Robin Murphy <robin.murphy@arm.com>
+> Date: Thu, 4 Dec 2014 11:53:13 +0000
+> Subject: [PATCH v2] iommu: store DT-probed IOMMU data privately
+>
+> Since the data pointer in the DT node is public and may be overwritten
+> by conflicting code, move the DT-probed IOMMU ops to a private list
+> where they will be safe.
+>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-I'll do that. Thanks.
+Acked-by: Grant Likely <grant.likely@linaro.org>
 
-
-> 
-> Cheers,
-> 
-> Will
-> 
->> ---
->>  arch/arm/kernel/perf_event.c | 10 ++++++++--
->>  1 file changed, 8 insertions(+), 2 deletions(-)
+> ---
+>  drivers/iommu/of_iommu.c | 40 ++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_iommu.h | 12 ++----------
+>  2 files changed, 42 insertions(+), 10 deletions(-)
+>
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 73236d3..c7078f6 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -94,6 +94,46 @@ int of_get_dma_window(struct device_node *dn, const char
+> *prefix, int index,
+>  }
+>  EXPORT_SYMBOL_GPL(of_get_dma_window);
+>
+> +struct of_iommu_node {
+> +       struct list_head list;
+> +       struct device_node *np;
+> +       struct iommu_ops *ops;
+> +};
+> +static LIST_HEAD(of_iommu_list);
+> +static DEFINE_SPINLOCK(of_iommu_lock);
+> +
+> +void of_iommu_set_ops(struct device_node *np, struct iommu_ops *ops)
+> +{
+> +       struct of_iommu_node *iommu = kzalloc(sizeof(*iommu), GFP_KERNEL);
+> +
+> +       if (!iommu) {
+> +               __WARN();
+> +               return;
+> +       }
+> +
+> +       INIT_LIST_HEAD(&iommu->list);
+> +       iommu->np = np;
+> +       iommu->ops = ops;
+> +       spin_lock(&of_iommu_lock);
+> +       list_add_tail(&iommu->list, &of_iommu_list);
+> +       spin_unlock(&of_iommu_lock);
+> +}
+> +
+> +struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+> +{
+> +       struct of_iommu_node *node;
+> +       struct iommu_ops *ops = NULL;
+> +
+> +       spin_lock(&of_iommu_lock);
+> +       list_for_each_entry(node, &of_iommu_list, list)
+> +               if (node->np == np) {
+> +                       ops = node->ops;
+> +                       break;
+> +               }
+> +       spin_unlock(&of_iommu_lock);
+> +       return ops;
+> +}
+> +
+>  struct iommu_ops *of_iommu_configure(struct device *dev)
+>  {
+>         struct of_phandle_args iommu_spec;
+> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> index d03abbb..16c7554 100644
+> --- a/include/linux/of_iommu.h
+> +++ b/include/linux/of_iommu.h
+> @@ -31,16 +31,8 @@ static inline struct iommu_ops *of_iommu_configure(struct
+> device *dev)
+>
+>  #endif /* CONFIG_OF_IOMMU */
+>
+> -static inline void of_iommu_set_ops(struct device_node *np,
+> -                                   const struct iommu_ops *ops)
+> -{
+> -       np->data = (struct iommu_ops *)ops;
+> -}
+> -
+> -static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+> -{
+> -       return np->data;
+> -}
+> +void of_iommu_set_ops(struct device_node *np, struct iommu_ops *ops);
+> +struct iommu_ops *of_iommu_get_ops(struct device_node *np);
+>
+>  extern struct of_device_id __iommu_of_table;
+>
+> --
+> 1.9.1
+>
+> On 04/12/14 12:42, Grant Likely wrote:
 >>
->> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
->> index 266cba46db3e..ab68833c1e31 100644
->> --- a/arch/arm/kernel/perf_event.c
->> +++ b/arch/arm/kernel/perf_event.c
->> @@ -115,8 +115,14 @@ int armpmu_event_set_period(struct perf_event *event)
->>  		ret = 1;
->>  	}
->>  
->> -	if (left > (s64)armpmu->max_period)
->> -		left = armpmu->max_period;
->> +	/*
->> +	 * Limit the maximum period to prevent the counter value
->> +	 * from overtaking the one we are about to program. In
->> +	 * effect we are reducing max_period to account for
->> +	 * interrupt latency (and we are being very conservative).
->> +	 */
->> +	if (left > (armpmu->max_period >> 1))
->> +		left = armpmu->max_period >> 1;
->>  
->>  	local64_set(&hwc->prev_count, (u64)-left);
->>  
->> -- 
->> 1.9.3
+>> On Thu, Dec 4, 2014 at 12:26 PM, Robin Murphy <robin.murphy@arm.com>
+>> wrote:
+>>>
+>>> Hi Arnd,
+>>>
+>>> On 03/12/14 19:57, Arnd Bergmann wrote:
+>>> [...]
+>>>>>
+>>>>>
+>>>>> Good catch. This is not good. The data pointer should be avoided since
+>>>>> there are no controls over its use. Until a better solution can be
+>>>>> implemented, probably the safest thing to do is add a struct iommu_ops
+>>>>> pointer to struct device_node. However, assuming that only a small
+>>>>> portion of nodes will actually have iommu_ops set, I'd rather see a
+>>>>> separate registry that matches device_nodes to iommu_ops.
+>>>>
+>>>>
+>>>>
+>>>> Fair enough. Will, can you take a copy of drivers/dma/of-dma.c and
+>>>> adapt it as needed? It should be exactly what we need to start
+>>>> out and can be extended and generalized later.
+>>>
+>>>
+>>>
+>>> I'm quite keen to see this series go in, since I'm depending on it to
+>>> make
+>>> arm64 IOMMU DMA ops "just work". Will and I came to the conclusion the
+>>> other
+>>> day that we pretty much need to build up some kind of bus abstraction
+>>> based
+>>> on the probe data in order to be able to assign IOMMU groups correctly,
+>>> which can also subsume this particular problem in the long run. Since
+>>> I've
+>>> made a start on that already, I've hacked the following short-term fix
+>>> out
+>>> of it. Tested on my Juno - admittedly with only two SMMUs and one master
+>>> (EHCI) being probed, but it didn't blow up or regress anything.
+>>>
+>>> Regards,
+>>> Robin.
+>>>
+>>> --->8---
+>>>  From 1f3d2612682c239e53f2c20e2ac5d19ef3f5387c Mon Sep 17 00:00:00 2001
+>>> Message-Id:
+>>>
+>>> <1f3d2612682c239e53f2c20e2ac5d19ef3f5387c.1417695078.git.robin.murphy@arm.com>
+>>> From: Robin Murphy <robin.murphy@arm.com>
+>>> Date: Thu, 4 Dec 2014 11:53:13 +0000
+>>> Subject: [PATCH] iommu: store DT-probed IOMMU data privately
+>>>
+>>> Since the data pointer in the DT node is public and may be overwritten
+>>> by conflicting code, move the DT-probed IOMMU ops to a private list
+>>> where they will be safe.
+>>>
+>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 >>
 >>
+>> Looks reasonable to me. Comments below...
+>>
+>>> ---
+>>>   drivers/iommu/of_iommu.c | 38 ++++++++++++++++++++++++++++++++++++++
+>>>   include/linux/of_iommu.h | 12 ++----------
+>>>   2 files changed, 40 insertions(+), 10 deletions(-)
+>>>
+>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>>> index 73236d3..5cd451c 100644
+>>> --- a/drivers/iommu/of_iommu.c
+>>> +++ b/drivers/iommu/of_iommu.c
+>>> @@ -94,6 +94,44 @@ int of_get_dma_window(struct device_node *dn, const
+>>> char
+>>> *prefix, int index,
+>>>   }
+>>>   EXPORT_SYMBOL_GPL(of_get_dma_window);
+>>>
+>>> +struct of_iommu_node {
+>>> +       struct hlist_node list;
+>>> +       struct device_node *np;
+>>> +       const struct iommu_ops *ops;
+>>> +};
+>>> +static HLIST_HEAD(of_iommu_list);
+>>
+>>
+>> Just use a list_head. hlist_head merely saves one pointer in this case.
+>>
+>>> +static DEFINE_SPINLOCK(of_iommu_lock);
+>>> +
+>>> +void of_iommu_set_ops(struct device_node *np, const struct iommu_ops
+>>> *ops)
+>>> +{
+>>> +       struct of_iommu_node *iommu = kmalloc(sizeof(*iommu),
+>>> GFP_KERNEL);
+>>
+>>
+>> kzalloc()
+>>
+>>> +
+>>> +       if (!iommu)
+>>> +               return;
+>>
+>>
+>> Shouldn't there be a WARN() here on failure? I don't think failing
+>> silently is desired.
+>>
+>>> +
+>>> +       INIT_HLIST_NODE(&iommu->list);
+>>> +       iommu->np = np;
+>>> +       iommu->ops = ops;
+>>> +       spin_lock(&of_iommu_lock);
+>>> +       hlist_add_head(&iommu->list, &of_iommu_list);
+>>> +       spin_unlock(&of_iommu_lock);
+>>> +}
+>>> +
+>>> +struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+>>> +{
+>>> +       struct of_iommu_node *node;
+>>> +       const struct iommu_ops *ops = NULL;
+>>> +
+>>> +       spin_lock(&of_iommu_lock);
+>>> +       hlist_for_each_entry(node, &of_iommu_list, list)
+>>> +               if (node->np == np) {
+>>> +                       ops = node->ops;
+>>> +                       break;
+>>> +               }
+>>> +       spin_unlock(&of_iommu_lock);
+>>> +       return (struct iommu_ops *)ops;
+>>
+>>
+>> The cast looks fishy. If you need to use a cast, then the data types
+>> are probably wrong. If you drop the const from *ops here and in the
+>> structure then it should probably work fine. Due to the way it is
+>> being used, there isn't any advantage to using const (unless you
+>> changes of_iommu_get_ops() to return a const pointer, then const would
+>> make sense).
+>>
+>>> +}
+>>> +
+>>>   struct iommu_ops *of_iommu_configure(struct device *dev)
+>>>   {
+>>>          struct of_phandle_args iommu_spec;
+>>> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+>>> index d03abbb..e27c53a 100644
+>>> --- a/include/linux/of_iommu.h
+>>> +++ b/include/linux/of_iommu.h
+>>> @@ -31,16 +31,8 @@ static inline struct iommu_ops
+>>> *of_iommu_configure(struct
+>>> device *dev)
+>>>
+>>>   #endif /* CONFIG_OF_IOMMU */
+>>>
+>>> -static inline void of_iommu_set_ops(struct device_node *np,
+>>> -                                   const struct iommu_ops *ops)
+>>> -{
+>>> -       np->data = (struct iommu_ops *)ops;
+>>> -}
+>>> -
+>>> -static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+>>> -{
+>>> -       return np->data;
+>>> -}
+>>> +void of_iommu_set_ops(struct device_node *np, const struct iommu_ops
+>>> *ops);
+>>> +struct iommu_ops *of_iommu_get_ops(struct device_node *np);
+>>>
+>>>   extern struct of_device_id __iommu_of_table;
+>>>
+>>> --
+>>> 1.9.1
+>>>
+>>>
+>>
+>
+>
