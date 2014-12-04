@@ -1,72 +1,39 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Thu, 4 Dec 2014 19:34:17 +0800
-Subject: [PATCH v4 2/5] Documentation: DT: Add bindings for Spreadtrum SoC
- Platform
-In-Reply-To: <1417692860-18841-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <sc9836v4>
- <1417692860-18841-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1417692860-18841-3-git-send-email-chunyan.zhang@spreadtrum.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 4 Dec 2014 20:46:11 +0900
+Subject: [PATCH 13/16] ARM: shmobile: remove use of
+ gic_arch_extn.irq_set_wake
+In-Reply-To: <5480220B.1020909@arm.com>
+References: <1417539497-20101-1-git-send-email-marc.zyngier@arm.com>
+ <1417539497-20101-14-git-send-email-marc.zyngier@arm.com>
+ <20141204063909.GF19568@verge.net.au> <5480220B.1020909@arm.com>
+Message-ID: <20141204114610.GC19465@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds Spreadtrum's prefix "sprd" to vendor-prefixes file.
-Adds the devicetree binding documentations for Spreadtrum's sc9836-uart
-and SC9836 SoC based on the Sharkl64 Platform which is a 64-bit SoC
-Platform of Spreadtrum.
+On Thu, Dec 04, 2014 at 08:57:47AM +0000, Marc Zyngier wrote:
+> Hi Simon,
+> 
+> On 04/12/14 06:39, Simon Horman wrote:
+> > On Tue, Dec 02, 2014 at 04:58:14PM +0000, Marc Zyngier wrote:
+> >> shmobile only uses gic_arch_extn.irq_set_wake to prevent the GIC
+> >> from returning -ENXIO when receiving a wake-up configuration request.
+> >>
+> >> It is a lot simpler to tell the irq layer that we don't need any
+> >> configuration by using the IRQCHIP_SKIP_SET_WAKE, thanks to the
+> >> new gic_set_irqchip_flags function.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > 
+> > Hi Marc,
+> > 
+> > this looks reasonable to me. Should I take it through my tree
+> > (in v3.20) or did you have another path in mind?
+> 
+> As you can see, there is a dependency on the GIC itself, and other
+> platforms are affected to. So I'd think that an arm-soc branch
+> containing all the required patches would be more appropriate, assuming
+> that you're happy to Ack this patch.
 
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
----
- Documentation/devicetree/bindings/arm/sprd.txt     |   11 +++++++++++
- .../devicetree/bindings/serial/sprd-uart.txt       |    9 +++++++++
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- 3 files changed, 21 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
- create mode 100644 Documentation/devicetree/bindings/serial/sprd-uart.txt
+Sure, that is fine by me.
 
-diff --git a/Documentation/devicetree/bindings/arm/sprd.txt b/Documentation/devicetree/bindings/arm/sprd.txt
-new file mode 100644
-index 0000000..31a629d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/sprd.txt
-@@ -0,0 +1,11 @@
-+Spreadtrum SoC Platforms Device Tree Bindings
-+----------------------------------------------------
-+
-+Sharkl64 is a Spreadtrum's SoC Platform which is based
-+on ARM 64-bit processor.
-+
-+SC9836 openphone board with SC9836 SoC based on the
-+Sharkl64 Platform shall have the following properties.
-+
-+Required root node properties:
-+        - compatible = "sprd,sc9836-openphone", "sprd,sc9836";
-diff --git a/Documentation/devicetree/bindings/serial/sprd-uart.txt b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-new file mode 100644
-index 0000000..9000e2e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-@@ -0,0 +1,9 @@
-+* Spreadtrum serial UART
-+
-+Required properties:
-+- compatible: must be "sprd,sc9836-uart"
-+- reg: offset and length of the register set for the device
-+- interrupts: exactly one interrupt specifier
-+
-+Optional properties:
-+- clocks: phandles to input clocks.
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 723999d..ce99ecdfb 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -142,6 +142,7 @@ snps 	Synopsys, Inc.
- solidrun	SolidRun
- sony	Sony Corporation
- spansion	Spansion Inc.
-+sprd	Spreadtrum Communications Inc.
- st	STMicroelectronics
- ste	ST-Ericsson
- stericsson	ST-Ericsson
--- 
-1.7.9.5
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
