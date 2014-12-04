@@ -1,37 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 17:28:19 +0100
-Subject: [GIT PULL] at91: defconfig for 3.19 #1
-In-Reply-To: <1417537711-15608-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1417537711-15608-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <3905790.gg6cCb9BU6@wuerfel>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 04 Dec 2014 16:28:28 +0000
+Subject: [PATCH v12 6/7] kprobes: Pass the original kprobe for preparing
+ optimized kprobe
+In-Reply-To: <1417671350-53346-1-git-send-email-wangnan0@huawei.com>
+References: <1417671172-52915-1-git-send-email-wangnan0@huawei.com>
+ <1417671350-53346-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1417710508.2239.14.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 December 2014 17:28:31 Nicolas Ferre wrote:
+On Thu, 2014-12-04 at 13:35 +0800, Wang Nan wrote:
+> From: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
 > 
-> The following changes since commit 0df1f2487d2f0d04703f142813d53615d62a1da4:
+> Pass the original kprobe for preparing an optimized kprobe arch-dep
+> part, since for some architecture (e.g. ARM32) requires the information
+> in original kprobe.
 > 
->   Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-defconfig
-> 
-> for you to fetch changes up to 4cd275f762a21cf21768e327873ba2883c839281:
-> 
->   ARM: at91/defconfig: add DM9000 to at91_dt (2014-12-01 16:30:00 +0100)
-> 
-> ----------------------------------------------------------------
-> First batch of defconfigs for AT91 / 3.19:
-> - use NEON for all C-A5, neon code handles the !NEON case
-> - add new XDMA driver
-> - add some useful drivers as we only have a single defconfig for all
->   AT91SAM9/RM9200
+> Signed-off-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+> Cc: Wang Nan <wangnan0@huawei.com>
 
-I just noticed that this is based on -rc3, while the next/defconfig branch
-so far is based on -rc1. If you don't mind, could you rebase your
-branch on -rc1 as well and send it again so I can avoid the backmerge?
+Seems strange cc'ing yourself :-) That should be Signed-off-by instead,
+as you're the person sending out the patch.
 
-Thanks,
+[rest of patch trimmed]
 
-	Arnd
+-- 
+Tixy
