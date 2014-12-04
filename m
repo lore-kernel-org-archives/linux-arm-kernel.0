@@ -1,63 +1,43 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 4 Dec 2014 09:28:34 -0700
-Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <8625951.Wbs2MxLnhi@wuerfel>
-References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
- <2596381.rFt35NU3oS@wuerfel> <548020D7.8030003@linaro.org>
- <8625951.Wbs2MxLnhi@wuerfel>
-Message-ID: <20141204162834.GA2995@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Dec 2014 17:30:58 +0100
+Subject: [PATCH v3 0/3] SoCFPGA: L3 NIC driver
+In-Reply-To: <20141130205331.GR20688@pengutronix.de>
+References: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
+ <14512010.yFXFS4V07x@wuerfel> <20141130205331.GR20688@pengutronix.de>
+Message-ID: <2134330.94UNhqfuFY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04 2014 at 02:02 -0700, Arnd Bergmann wrote:
->On Thursday 04 December 2014 09:52:39 Daniel Lezcano wrote:
->> On 12/03/2014 09:35 PM, Arnd Bergmann wrote:
->> > On Wednesday 03 December 2014 07:31:22 Lina Iyer wrote:
->> >>>>> +static int __init qcom_spm_init(void)
->> >>>>> +{
->> >>>>> +    int ret;
->> >>>>> +
->> >>>>> +    /*
->> >>>>> +     * cpuidle driver need to registered before the cpuidle device
->> >>>>> +     * for any cpu. Register the device for the the cpuidle driver.
->> >>>>> +     */
->> >>>>> +    ret = platform_device_register(&qcom_cpuidle_drv);
->> >>>>> +    if (ret)
->> >>>>> +        return ret;
->> >>>> Stephen pointed out that we would have the platform device lying around
->> >>>> on a non-QCOM device when using multi_v7_defconfig.
->> >>>
->> >>> Perhaps I am missing the point, but this is not supposed to happen, no ?
->> >>>
->> >> This would happen, since the file would compile on multi_v7 and we would
->> >> initialize and register this device regardless. The cpuidle-qcom.c
->> >> driver probe would bail out looking for a matching compatible property.
->> >> So we would not register a cpuidle driver but the device would lay
->> >> around.
->> >
->> > I think the problem is registering a platform_device. I've complained
->> > about this before, but it still seems to get copied all over the
->> > place. Please don't do this but have a driver that looks at DT to
->> > figure out whether to access hardware or not.
->>
->> We did this approach but, I can remember why, someone was complaining
->> about it also
->>
->> The platform device/driver paradigm allowed us to split the arch
->> specific parts by passing the pm ops through the platform data.
->>
->> Would make sense to have a single common place for the ARM arch where we
->> initialize the platform device for cpuidle ?
->
->No. It's really not a device, and if you pretend that it is, you get
->into problems like this.
+On Sunday 30 November 2014 21:53:31 Robert Schwebel wrote:
+> On Sun, Nov 30, 2014 at 12:51:58PM +0100, Arnd Bergmann wrote:
+> > > This series adds support for the SoCFPGA L3 NIC. As the memory range has
+> > > a lot of holes, where you can not read from, syscon can not be used for
+> > > this IP core. Instead add a new driver, that knows about all the allowed
+> > > ranges and guards the access via regmap.
+> > 
+> > What is an L3 NIC?
+> 
+> Fron the SoCFPGA manual:
+> 
+> "
+> The hard processor system (HPS) level 3 (L3) interconnect and level 4
+> (L4) peripheral buses are implemented with the ARM CoreLinkTM Network
+> Interconnect (NIC-301). The NIC-301 provides a foundation for a
+> high-performance HPS interconnect based on the ARM Advanced
+> Microcontroller Bus Architecture (AMBA) Advanced eXtensible Interface
+> (AXI), Advanced High-Performance Bus (AHBTM), and Advanced Peripheral
+> Bus (APBTM) protocols. The L3 interconnect implements a multilayer,
+> nonblocking architecture that supports multiple simultaneous
+> transactions between masters and slaves, including the Cortex-A9
+> microprocessor unit (MPU) subsystem. The interconnect provides five
+> independent L4 buses to access control and status registers (CSRs) of
+> peripherals, managers, and memory controllers Related Information
+> http://infocenter.arm.com/ Additional information is available in the
+> AMBA Network Interconnect (NIC-301) Technical Reference Manual, revision
+> r2p3, which you can download from the ARM info center website.
 
-Arnd, the problem is that the provides function pointers to the SoC code
-that the cpuilde driver uses to call based on the idle state.
+Please put something like this in the introductory mail and later
+into the pull request then. If the l3-nic is an ARM nic-301, shouldn't
+the compatible string be "arm,nic-301"?
 
-After much discussions, we came down to using function pointers from
-translating from DT strings, other than using that again, I dont see a
-good way of achieving the ability of cpuidle driver staying a separate
-driver from the SPM driver.
-
-Daniel, thoughts?
+	Arnd
