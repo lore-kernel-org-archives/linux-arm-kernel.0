@@ -1,134 +1,85 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 4 Dec 2014 14:45:41 +0100
-Subject: [PATCH v2] mmc: sdhci-sirf: add sirf tuning function (cmd 19)
-In-Reply-To: <1417694960-5664-1-git-send-email-21cnbao@gmail.com>
-References: <1417694960-5664-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CAPDyKFqVYU0t2COtkr-z9uWeS4BJXy4Cmc4=_U4VGjCmRsdoTw@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 4 Dec 2014 08:46:27 -0500 (EST)
+Subject: [PATCH] optimize ktime_divns for constant divisors
+In-Reply-To: <2165831.DQoLFmGhIf@wuerfel>
+References: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
+ <3913269.qTFsa05Ysv@wuerfel> <alpine.LFD.2.11.1412040143260.470@knanqh.ubzr>
+ <2165831.DQoLFmGhIf@wuerfel>
+Message-ID: <alpine.LFD.2.11.1412040837130.470@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 December 2014 at 13:09, Barry Song <21cnbao@gmail.com> wrote:
-> From: Minda Chen <Minda.Chen@csr.com>
->
-> Add manual tuning function in CSR atlas7 SoC. It is mainly used
-> for the UHS-I SD card working SDR50 SDR104 mode.
->
-> The tuning principle can be seen in SD spec part1 v3.01 4.2.4.5
-> (tuning command).
->
-> SD host send the cmd19 and set the delay value(0-127).
-> and the sdcard return 64 bytes data. If the data is same with
-> the tuning data. The delay value is valid. Execute this commmand
-> 128 times. And calculate the longest window of the valid values.
-> The value in the middle of this window is the best value.
->
-> Signed-off-by: Minda Chen <Minda.Chen@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  drivers/mmc/host/sdhci-sirf.c | 71 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 71 insertions(+)
->
-> diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
-> index dd29d47..e458d18 100644
-> --- a/drivers/mmc/host/sdhci-sirf.c
-> +++ b/drivers/mmc/host/sdhci-sirf.c
-> @@ -15,7 +15,9 @@
->  #include <linux/mmc/slot-gpio.h>
->  #include "sdhci-pltfm.h"
->
-> +#define SDHCI_CLK_DELAY_SETTING 0x4C
->  #define SDHCI_SIRF_8BITBUS BIT(3)
-> +#define SIRF_TUNING_COUNT 128
->
->  struct sdhci_sirf_priv {
->         struct clk *clk;
-> @@ -49,7 +51,76 @@ static void sdhci_sirf_set_bus_width(struct sdhci_host *host, int width)
->         sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
->  }
->
-> +static int sdhci_sirf_execute_tuning(struct sdhci_host *host, u32 opcode)
-> +{
-> +       int tuning_seq_cnt = 3;
-> +       u8 phase, tuned_phases[SIRF_TUNING_COUNT];
-> +       u8 tuned_phase_cnt = 0;
-> +       int rc, longest_range = 0;
-> +       int start = -1, end = 0, tuning_value = -1, range = 0;
-> +       u16 clock_setting;
-> +       struct mmc_host *mmc = host->mmc;
-> +
-> +       clock_setting = sdhci_readw(host, SDHCI_CLK_DELAY_SETTING);
-> +       clock_setting &= ~0x3fff;
-> +
-> +retry:
-> +       phase = 0;
-> +       do {
-> +               sdhci_writel(host,
-> +                       clock_setting | phase | (phase << 7) | (phase << 16),
-> +                       SDHCI_CLK_DELAY_SETTING);
-> +
-> +               if (!mmc_send_tuning(mmc->card)) {
-> +                       /* Tuning is successful at this tuning point */
-> +                       tuned_phases[tuned_phase_cnt++] = phase;
-> +                       dev_dbg(mmc_dev(mmc), "%s: Found good phase = %d\n",
-> +                                mmc_hostname(mmc), phase);
-> +                       if (start == -1)
-> +                               start = phase;
-> +                       end = phase;
-> +                       range++;
-> +                       if (phase == (SIRF_TUNING_COUNT - 1)
-> +                               && range > longest_range)
-> +                               tuning_value = (start + end) / 2;
-> +               } else {
+On Thu, 4 Dec 2014, Arnd Bergmann wrote:
 
-I have some thoughts around the returned error code from mmc_send_tuning().
+> On Thursday 04 December 2014 02:23:37 Nicolas Pitre wrote:
+> > On Wed, 3 Dec 2014, Arnd Bergmann wrote:
+> > 
+> > > On Wednesday 03 December 2014 14:43:06 Nicolas Pitre wrote:
+> > > > At least on ARM, do_div() is optimized to turn constant divisors into
+> > > > an inline multiplication by the reciprocal value at compile time. 
+> > > > However this optimization is missed entirely whenever ktime_divns() is
+> > > > used and the slow out-of-line division code is used all the time.
+> > > > 
+> > > > Let ktime_divns() use do_div() inline whenever the divisor is constant
+> > > > and small enough.  This will make things like ktime_to_us() and 
+> > > > ktime_to_ms() much faster.
+> > > > 
+> > > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > > 
+> > > Very cool. I've been thinking about doing something similar for the
+> > > general case but couldn't get the math to work.
+> > > 
+> > > Can you think of an architecture-independent way to ktime_to_sec,
+> > > ktime_to_ms, and ktime_to_us efficiently based on what you did for
+> > > the ARM do_div implementation?
+> > 
+> > Sure.  gcc generates rather shitty code on ARM compared to the output 
+> > from my do_div() implementation. But here it is:
+> > 
+> > u64 ktime_to_us(ktime_t kt)
+> > {
+> >         u64 ns = ktime_to_ns(kt);
+> >         u32 x_lo, x_hi, y_lo, y_hi;
+> >         u64 res, carry;
+> > 
+> >         x_hi = ns >> 32;
+> >         x_lo = ns;
+> >         y_hi = 0x83126e97;
+> >         y_lo = 0x8d4fdf3b;
+> > 
+> >         res = (u64)x_lo * y_lo;
+> >         carry = (u64)(u32)res + y_lo;
+> >         res = (res >> 32) + (carry >> 32);
+> > 
+> >         res += (u64)x_lo * y_hi;
+> >         carry = (u64)(u32)res + (u64)x_hi * y_lo;
+> >         res = (res >> 32) + (carry >> 32);
+> > 
+> >         res += (u64)x_hi * y_hi;
+> >         return res >> 9;
+> > }
+> 
+> Ok, I see, thanks for the example. I also tried this on x86, and it takes
+> about twice as long as do_div on my Opteron, so it wouldn't be as helpful
+> as I hoped.
 
-Don't you think we need to act differently depending on what error
-mmc_send_tuning() returns? For example, if the request is handled
-successfully but the patterns doesn't match? Or it doesn't matter?
+Note the above code is for 32-bit architectures that support a 32x32=64 
+bit multiply instruction.  And even then, what kills performances is the 
+inhability to efficiently deal with carry bits from C code.  Hence the 
+far better output from do_div() on ARM.
 
-> +                       dev_dbg(mmc_dev(mmc), "%s: Found bad phase = %d\n",
-> +                                mmc_hostname(mmc), phase);
-> +                       if (range > longest_range) {
-> +                               tuning_value = (start + end) / 2;
-> +                               longest_range = range;
-> +                       }
-> +                       start = -1;
-> +                       end = range = 0;
-> +               }
-> +       } while (++phase < ARRAY_SIZE(tuned_phases));
-> +
-> +       if (tuned_phase_cnt && tuning_value > 0) {
-> +               /*
-> +                * Finally set the selected phase in delay
-> +                * line hw block.
-> +                */
-> +               phase = tuning_value;
-> +               sdhci_writel(host,
-> +                       clock_setting | phase | (phase << 7) | (phase << 16),
-> +                       SDHCI_CLK_DELAY_SETTING);
-> +
-> +               dev_dbg(mmc_dev(mmc), "%s: Setting the tuning phase to %d\n",
-> +                        mmc_hostname(mmc), phase);
-> +       } else {
-> +               if (--tuning_seq_cnt)
-> +                       goto retry;
-> +               /* Tuning failed */
-> +               dev_dbg(mmc_dev(mmc), "%s: No tuning point found\n",
-> +                      mmc_hostname(mmc));
-> +               rc = -EIO;
-> +       }
-> +
-> +       return rc;
-> +}
-> +
->  static struct sdhci_ops sdhci_sirf_ops = {
-> +       .platform_execute_tuning = sdhci_sirf_execute_tuning,
->         .set_clock = sdhci_set_clock,
->         .get_max_clock  = sdhci_sirf_get_max_clk,
->         .set_bus_width = sdhci_sirf_set_bus_width,
-> --
-> 2.2.0
->
+If x86-64 has a 64x64=128 bit multiply instruction then the above may 
+greatly be simplified to a single multiply and a shift.  That would 
+possibly outperform do_div().
 
-Kind regards
-Uffe
+> On a related note, I wonder if we can come up with a more efficient
+> implementation for do_div on ARMv7ve, and I think we should add the
+> Makefile logic to build with -march=armv7ve when we know that we do
+> not need to support processors without idiv.
+
+Multiplications will always be faster than divisions.  However the idiv 
+instruction would come very handy in the slow path when the divisor is 
+not constant.
+
+
+Nicolas
