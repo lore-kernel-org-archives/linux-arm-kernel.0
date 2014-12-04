@@ -1,91 +1,185 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 4 Dec 2014 11:35:58 +0100
-Subject: [PATCH v5 00/11] memory: add Atmel EBI (External Bus Interface)
- driver
-In-Reply-To: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <5480390E.5050408@atmel.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 04 Dec 2014 10:36:59 +0000
+Subject: [RFC PATCH v2] drivers: pci: move PCI domain assignment
+ =?iso-8859-1?Q?to=0D?= generic PCI code
+In-Reply-To: <20141119093948.GA8751@red-moon>
+References: <1415637706-2195-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <546C5FF2.5090903@huawei.com> <20141119093948.GA8751@red-moon>
+Message-ID: <20141204103659.34A77C40992@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/12/2014 21:44, Boris Brezillon a ?crit :
-> The EBI (External Bus Interface) is used to access external peripherals
-> (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> Each device is assigned a CS line and an address range and can have its
-> own configuration (timings, access mode, bus width, ...).
-> This driver provides a generic DT binding to configure a device according
-> to its requirements.
-> For specific device controllers (like the NAND one) the SMC timings
-> should be configured by the controller driver through the matrix and
-> smc syscon regmaps.
+On Wed, 19 Nov 2014 09:39:48 +0000
+, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+ wrote:
+> On Wed, Nov 19, 2014 at 09:16:34AM +0000, Yijing Wang wrote:
+> > Hi Lorenzo,
+> >    You should send this to Bjorn instead of cc. Other, why put the OF related
+> > function in PCI core. Why not move it in drivers/of/of_pci.c ?
 > 
-> The first 4 patches introduce 2 syscon devices needed to configure the
-> EBI bus, patch 5 and 6 adds support for the EBI bus, and the remaining
-> patches declares the EBI related nodes in sama5d3 dts[i] files.
-> 
-> Changes since v4:
-> - fix inconsistencies in SMC and MATRIX registers definition
-> - add missing compatible strings for at91sam9rl SoC
-> - fix DT bindings documentation
-> - replace "atmel,generic-dev" property by "atmel,specialized-logic"
-> 
-> Changes since v3:
-> - added AT91_MATRIX_USBPUCR_PUON definition
-> - removed useless macros (those directly returning SoC specific register
->   offsets)
-> - use syscon_regmap_lookup_by_phandle instead of of_parse_phandle +
->   syscon_node_to_regmap
-> - drop AT91_EBICSA_REGFIELD and AT91_MULTI_EBICSA_REGFIELD macros
-> 
-> Changes since v2:
-> - minor fixes int DT bindings doc
-> - fix SMC macros
-> - make use of SMC macros defined in include/linux/mfd/syscon/atmel-smc.h
-> 
-> Changes since v1:
-> - almost everything :-)
-> 
-> Boris Brezillon (11):
->   mfd: syscon: Add atmel-matrix registers definition
->   mfd: syscon: Add Atmel Matrix bus DT binding documentation
->   mfd: syscon: Add atmel-smc registers definition
->   mfd: syscon: Add Atmel SMC binding doc
->   memory: add Atmel EBI (External Bus Interface) driver
->   memory: atmel-ebi: add DT bindings documentation
->   ARM: at91: select ATMEL_EBI when compiling a kernel for at91sam9 or
->     sama5d3
->   ARM: at91/dt: add HSMC (Static Memory Controller) node in sama5d3 dtsi
->   ARM: at91/dt: add matrix node in sama5d3 dtsi
->   ARM: at91/dt: add EBI (External Bus Interface) node in sama5d3 dtsi
->   ARM: at91/dt: add NOR definition in sama5d3xcm dtsi
+> I did, you missed v1, and the problem is that with ACPI forthcoming we
+> do not want to have domain assignment scattered in different places,
+> but part of core code (ie a single function that prevents mixed
+> initialization from DT/counter and so on).
 
-The whole series seems okay.
+Bus specific OF code has generally been moving into the individual
+subsystems. SPI and I2C are the prime examples. It's easier to
+coordinate with the generic subsystem code when it lives in the same
+place. The PCI code still lives in drivers/of/ simply because nobody has
+been motivated enough to refactor it.
 
-If you reorder the content of the patches as noted, you can add my:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks bye.
-
->  .../bindings/memory-controllers/atmel-ebi.txt      | 155 ++++++
->  .../devicetree/bindings/mfd/atmel-matrix.txt       |  24 +
->  .../devicetree/bindings/mfd/atmel-smc.txt          |  19 +
->  arch/arm/boot/dts/sama5d3.dtsi                     |  93 ++++
->  arch/arm/boot/dts/sama5d3xcm.dtsi                  |  33 ++
->  arch/arm/mach-at91/Kconfig                         |   2 +
->  drivers/memory/Kconfig                             |  11 +
->  drivers/memory/Makefile                            |   1 +
->  drivers/memory/atmel-ebi.c                         | 579 +++++++++++++++++++++
->  include/linux/mfd/syscon/atmel-matrix.h            | 117 +++++
->  include/linux/mfd/syscon/atmel-smc.h               | 173 ++++++
->  11 files changed, 1207 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-matrix.txt
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-smc.txt
->  create mode 100644 drivers/memory/atmel-ebi.c
->  create mode 100644 include/linux/mfd/syscon/atmel-matrix.h
->  create mode 100644 include/linux/mfd/syscon/atmel-smc.h
 > 
-
-
--- 
-Nicolas Ferre
+> Bjorn, are you fine with this patch ? Do you want me to resend it as
+> part of the ARM 32 PCI domain refactoring [1] ? [1] depends on this
+> patch going in first.
+> 
+> Thanks,
+> Lorenzo
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg375423.html
+> 
+> > On 2014/11/11 0:41, Lorenzo Pieralisi wrote:
+> > > The current logic used for PCI domain assignment in arm64
+> > > pci_bus_assign_domain_nr() is flawed in that, depending on the host
+> > > controllers configuration for a platform and the respective initialization
+> > > sequence, core code may end up allocating PCI domain numbers from both DT and
+> > > the core code generic domain counter, which would result in PCI domain
+> > > allocation aliases/errors.
+> > > 
+> > > This patch fixes the logic behind the PCI domain number assignment and
+> > > moves the resulting code to generic PCI core code so that the same domain
+> > > allocation logic is used on all platforms selecting
+> > > 
+> > > CONFIG_PCI_DOMAINS_GENERIC
+> > > 
+> > > instead of resorting to an arch specific implementation that might end up
+> > > duplicating the PCI domain assignment logic wrongly.
+> > > 
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Liviu Dudau <liviu.dudau@arm.com>
+> > > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > ---
+> > > v1 => v2:
+> > > 
+> > > - Moved generic pci_bus_assign_domain_nr() code to PCI core instead of
+> > >   adding an OF layer API
+> > > - Updated commit log and code comments
+> > > 
+> > >  arch/arm64/kernel/pci.c | 22 ----------------------
+> > >  drivers/pci/pci.c       | 50 +++++++++++++++++++++++++++++++++++++++++++++++++
+> > >  2 files changed, 50 insertions(+), 22 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> > > index ce5836c..6f93c24 100644
+> > > --- a/arch/arm64/kernel/pci.c
+> > > +++ b/arch/arm64/kernel/pci.c
+> > > @@ -46,25 +46,3 @@ int pcibios_add_device(struct pci_dev *dev)
+> > >  
+> > >  	return 0;
+> > >  }
+> > > -
+> > > -
+> > > -#ifdef CONFIG_PCI_DOMAINS_GENERIC
+> > > -static bool dt_domain_found = false;
+> > > -
+> > > -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> > > -{
+> > > -	int domain = of_get_pci_domain_nr(parent->of_node);
+> > > -
+> > > -	if (domain >= 0) {
+> > > -		dt_domain_found = true;
+> > > -	} else if (dt_domain_found == true) {
+> > > -		dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
+> > > -			parent->of_node->full_name);
+> > > -		return;
+> > > -	} else {
+> > > -		domain = pci_get_new_domain_nr();
+> > > -	}
+> > > -
+> > > -	bus->domain_nr = domain;
+> > > -}
+> > > -#endif
+> > > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> > > index 625a4ac..2279414 100644
+> > > --- a/drivers/pci/pci.c
+> > > +++ b/drivers/pci/pci.c
+> > > @@ -10,6 +10,8 @@
+> > >  #include <linux/kernel.h>
+> > >  #include <linux/delay.h>
+> > >  #include <linux/init.h>
+> > > +#include <linux/of.h>
+> > > +#include <linux/of_pci.h>
+> > >  #include <linux/pci.h>
+> > >  #include <linux/pm.h>
+> > >  #include <linux/slab.h>
+> > > @@ -4447,6 +4449,54 @@ int pci_get_new_domain_nr(void)
+> > >  {
+> > >  	return atomic_inc_return(&__domain_nr);
+> > >  }
+> > > +
+> > > +#ifdef CONFIG_PCI_DOMAINS_GENERIC
+> > > +
+> > > +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> > > +{
+> > > +	static int use_dt_domains = -1;
+> > > +	int domain = of_get_pci_domain_nr(parent->of_node);
+> > > +
+> > > +	/*
+> > > +	 * Check DT domain and use_dt_domains values.
+> > > +	 *
+> > > +	 * If DT domain property is valid (domain >= 0) and
+> > > +	 * use_dt_domains != 0, the DT assignment is valid since this means
+> > > +	 * we have not previously allocated a domain number by using
+> > > +	 * pci_get_new_domain_nr(); we should also update use_dt_domains to
+> > > +	 * 1, to indicate that we have just assigned a domain number from
+> > > +	 * DT.
+> > > +	 *
+> > > +	 * If DT domain property value is not valid (ie domain < 0), and we
+> > > +	 * have not previously assigned a domain number from DT
+> > > +	 * (use_dt_domains != 1) we should assign a domain number by
+> > > +	 * using the:
+> > > +	 *
+> > > +	 * pci_get_new_domain_nr()
+> > > +	 *
+> > > +	 * API and update the use_dt_domains value to keep track of method we
+> > > +	 * are using to assign domain numbers (use_dt_domains = 0).
+> > > +	 *
+> > > +	 * All other combinations imply we have a platform that is trying
+> > > +	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
+> > > +	 * which is a recipe for domain mishandling and it is prevented by
+> > > +	 * invalidating the domain value (domain = -1) and printing a
+> > > +	 * corresponding error.
+> > > +	 */
+> > > +	if (domain >= 0 && use_dt_domains) {
+> > > +		use_dt_domains = 1;
+> > > +	} else if (domain < 0 && use_dt_domains != 1) {
+> > > +		use_dt_domains = 0;
+> > > +		domain = pci_get_new_domain_nr();
+> > > +	} else {
+> > > +		dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
+> > > +			parent->of_node->full_name);
+> > > +		domain = -1;
+> > > +	}
+> > > +
+> > > +	bus->domain_nr = domain;
+> > > +}
+> > > +#endif
+> > >  #endif
+> > >  
+> > >  /**
+> > > 
+> > 
+> > 
+> > -- 
+> > Thanks!
+> > Yijing
+> > 
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
