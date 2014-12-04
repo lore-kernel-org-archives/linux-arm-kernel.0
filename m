@@ -1,42 +1,37 @@
 From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Thu, 04 Dec 2014 09:42:13 +0000
+Date: Thu, 04 Dec 2014 09:43:57 +0000
 Subject: [PATCH 4/5] ASoC: dwc: Add devicetree support for Designware I2S
-In-Reply-To: <20141203182351.GF7712@sirena.org.uk>
-References: <547F3CAC.9050105@arm.com> <20141203182351.GF7712@sirena.org.uk>
-Message-ID: <54802C75.9060609@arm.com>
+In-Reply-To: <2041200.ZjakFFAZAU@wuerfel>
+References: <547F3CAC.9050105@arm.com> <2041200.ZjakFFAZAU@wuerfel>
+Message-ID: <54802CDD.6080000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/14 18:23, Mark Brown wrote:
-> On Wed, Dec 03, 2014 at 04:39:08PM +0000, Andrew Jackson wrote:
-> 
+On 12/03/14 20:13, Arnd Bergmann wrote:
+> On Wednesday 03 December 2014 16:39:08 Andrew Jackson wrote:
 >> Convert to driver to use either platform_data or device-tree for configuration
 >> of the device.  When using device-tree, the I2S block's configuration is read
 >> from the relevant registers: this reduces the amount of information required in
 >> the device tree.
+>>
+>> Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
 > 
-> This really needs to be split into two or more patches, there's a whole
-> bunch of refactoring to support this DT stuff which should be separate
-> from the DT addition itself.  Right now it's hard to tell what each
-> individual bit of the code is supposed to be doing, the patch is far too
-> large and doing far too many individual things.
-
-I will have look at how it might be split.  The majority of the new code is in reading and processing the device's configuration: I didn't want to change the platform data handling to do that because some of the comments in the driver suggested that there were ST specific changes to the Designware IP.  I wasn't in a position to know whether, if I changed the configuration reading, the driver would still function correctly on the SPEAR platform.
-
->> +	if (dev->using_pd) {
->> +		ret = dev->i2s_clk_cfg(config);
->> +		if (ret < 0) {
->> +			dev_err(dev->dev, "runtime audio clk config fail\n");
->> +			return ret;
->> +		}
->> +	} else {
->> +		u32	bitclk;
+> I don't think we even have to worry about the platform_data case here:
+> the only platform using this hardware in Linux is arm/mach-spear, and
+> it defines a device node with a binding that is similar to the one you
+> document here but that is not implemented in the driver.
 > 
-> Having this whole separate path for using platform data feels icky, we
-> don't want to have completely separate flows like this.  Checking for
-> the callbacks being there is probably fine but just having totally
-> separate code paths is a bit icky.
+> So, I think for all practical purposes we can assume that nobody cares
+> if you make incompatible changes as long as you don't introduce build
+> regression.
+> 
+> Also, please adapt the 	arch/arm/boot/dts/spear13*.dts{,i} files
+> as good as you can. They are broken in other ways too that you don't
+> have to fix, just make them conform to the binding you add.
+> 
 
-I wasn't very happy either but making the test explicit seemed reasonable at the time.  I'll change the code to test for the presence of the callback instead.
+Will do.  Although I had noticed those DT entries, I couldn't find anything in support of them.  I wasn't sure whether someone else was waiting in the wings (so as to speak) with a DT enabled Designware I2S driver. 
 
-	Andrew
+> 	Arnd
+> 
+> 
