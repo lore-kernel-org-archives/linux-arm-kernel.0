@@ -1,40 +1,76 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 4 Dec 2014 10:51:21 +0000
-Subject: [PATCH 2/5] ASoC: dwc: Don't allow negative use counts
-In-Reply-To: <548022B3.8050105@arm.com>
-References: <547F3C9F.8080102@arm.com> <20141203172526.GC7712@sirena.org.uk>
- <548022B3.8050105@arm.com>
-Message-ID: <20141204105121.GQ7712@sirena.org.uk>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 04 Dec 2014 11:52:43 +0100
+Subject: [PATCH v3 0/3] Fix Arndale Octa/Peach Pi boot on Audio subsystem
+ clocks
+In-Reply-To: <1417690075-13483-1-git-send-email-k.kozlowski@samsung.com>
+References: <1417690075-13483-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1417690363.3314.7.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 09:00:35AM +0000, Andrew Jackson wrote:
-> On 12/03/14 17:25, Mark Brown wrote:
-> > On Wed, Dec 03, 2014 at 04:38:55PM +0000, Andrew Jackson wrote:
+On czw, 2014-12-04 at 11:47 +0100, Krzysztof Kozlowski wrote:
+> Hi,
+> 
+> 
+> Changes since v2
+> ================
+> 1. Patch 1 applied ("clk: samsung: Fix double add of syscore ops after
+>    driver rebind"), remove it.
+> 2. Squash patch 5 with "clk: samsung: Fix clock disable
+>    failure because domain being gated". Suggested by Sylwester.
+> 3. Patch 1/3: Fix issues pointed by Sylwester.
+> 4. Patch 2/3: Fix redundant clk_disable when removing driver (clk is
+>    already disabled). Add missing check !=null when removing driver.
+> 5. Patch 3/3: Extend commit message.
 
-> >>  	case SNDRV_PCM_TRIGGER_STOP:
-> >>  	case SNDRV_PCM_TRIGGER_SUSPEND:
-> >>  	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-> >> -		dev->active--;
-> >> +		if (dev->active > 0)
-> >> +			dev->active--;
 
-> > How is this triggering - this sounds like you're papering over some
-> > other bug somewhere?
+Aaa, I forgot to add tested-by Javier Martinez Canillas
+<javier.martinez@collabora.co.uk>
+https://lkml.org/lkml/2014/11/26/420
 
-> When I looked at the code paths I couldn't convince myself that STOP
-> wouldn't be called more than once.  Then actuve would be negative and
-> the device might not be restartable.  I didn't have a problem per se,
-> it was just that it seemed to be something of a loophole.
+These are minor changes so I think the "tested-by" still applies.
+If patches are OK and someone applies the, please don't forget about
+that tag.
 
-If you're just adding the check on the off chance that it might fire you
-need to add a warning message as well - what your change does is make
-the code look like it's supposed to have broken reference counting since
-it has a check to silently fix up and ignore problems.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/151cc26e/attachment.sig>
+Best regards,
+Krzysztof
+
+> 
+> Changes since v1
+> ================
+> 1. clocks-audss: Reimplement own clock register functions instead
+>    changing clk API. Minor fixes. (after idea from Tomasz Figa)
+> 2. Add new patches: fix for pinctrl and minor fixes in clk-audss.
+> 
+> Description
+> ===========
+> This patchset tries to solve dependency between AudioSS components
+> (clocks and GPIO) and main clock controller on Exynos 5420 platform.
+> 
+> This solves boot failure of Peach Pi/Pit and Arndale Octa [1].
+> 
+> Any access to memory of audss block (like checking if clock is enabled
+> or configuring GPIO) will hang if main audss clock is gated.
+> 
+> Tested on Arndale Octa board.
+> 
+> [1] http://www.spinics.net/lists/linux-samsung-soc/msg39331.html
+> 
+> Best regards,
+> Krzysztof Kozlowski
+> 
+> 
+> Krzysztof Kozlowski (3):
+>   clk: samsung: Fix clock disable failure because domain being gated
+>   pinctrl: exynos: Fix GPIO setup failure because domain clock being
+>     gated
+>   ARM: dts: exynos5420: Add clock for audss pinctrl (fixing GPIO setup
+>     failure)
+> 
+>  .../bindings/pinctrl/samsung-pinctrl.txt           |   6 +
+>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |   3 +
+>  drivers/clk/samsung/clk-exynos-audss.c             | 357 ++++++++++++++++++---
+>  drivers/pinctrl/samsung/pinctrl-samsung.c          | 111 ++++++-
+>  drivers/pinctrl/samsung/pinctrl-samsung.h          |   2 +
+>  5 files changed, 436 insertions(+), 43 deletions(-)
+> 
