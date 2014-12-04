@@ -1,126 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 4 Dec 2014 11:52:55 +0000
-Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for
- IOMMU drivers
-In-Reply-To: <CACxGe6v4ZVHHGcc3Lhp8+FgKakyCkJFRAT2ufj-3DGWa=wmGkA@mail.gmail.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <3152553.esaQuZiCgi@wuerfel> <20141204102127.GF13224@arm.com>
- <5643715.BADzWxcqOQ@wuerfel>
- <CACxGe6v4ZVHHGcc3Lhp8+FgKakyCkJFRAT2ufj-3DGWa=wmGkA@mail.gmail.com>
-Message-ID: <20141204115254.GF14519@arm.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Thu, 04 Dec 2014 20:53:03 +0900
+Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
+In-Reply-To: <CAPvkgC26-CprjLVH55=7z73JtxTumFFZ4W7itevXxMwReVqQ1g@mail.gmail.com>
+References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
+ <20141120135851.GA32528@linaro.org> <54759041.9080105@hitachi.com>
+ <20141126100325.GA9157@linaro.org> <5476120D.9030703@linaro.org>
+ <CAPvkgC3eVOZEn79C9PC9c7TqC_-yCtDhw5LL6ZWUJxr+oQFaow@mail.gmail.com>
+ <5476BFB4.2020705@hitachi.com>
+ <CAPvkgC0ELPPWfa-8kQ4H_e_O5G1ER4KEKuSWLxh_u-VZgh7W6A@mail.gmail.com>
+ <547C36DB.7060903@hitachi.com> <547F242D.1060705@redhat.com>
+ <547F94B0.1000902@linaro.org> <547FB5DD.901@redhat.com>
+ <547FCB73.1010707@linaro.org>
+ <CAPvkgC3=KKKMa1hWdOYOcV7D7kQSLtnNnXLBB64_P-V+_qUwTw@mail.gmail.com>
+ <54803ADD.2090201@hitachi.com>
+ <CAPvkgC26-CprjLVH55=7z73JtxTumFFZ4W7itevXxMwReVqQ1g@mail.gmail.com>
+Message-ID: <54804B1F.3020703@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 11:25:35AM +0000, Grant Likely wrote:
-> On Thu, Dec 4, 2014 at 11:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 04 December 2014 10:21:27 Will Deacon wrote:
-> >> > > Sure, I'll add this to my list of stuff to do for 3.20.
-> >> >
-> >> > Does that mean the we don't get any of the patches for 3.19 despite the
-> >> > Acks?
-> >>
-> >> Hmm, I don't know how useful they are without the get/set ops and I don't
-> >> think I can get those ready for 3.19 given where we currently are.
-> >>
-> >> Grant's suggestion of adding an iommu_ops pointer to device_node would work
-> >> as a temporary hack, but anything more advanced is going to need proper
-> >> review.
-> >
-> > Right. I guess it doesn't hurt much if we put the new pointer inside
-> > #ifdef CONFIG_OF_IOMMU, then at least there is no significant size
-> > increase in most DT based platforms.
+(2014/12/04 20:29), Steve Capper wrote:
+
+>> I'd like to ask you to try my fix on your machine, with my reproducing
+>> methods. (do not use sytemtap nor perf, those can have other issues)
+>>
 > 
-> Yes, I can live with that hack on the proviso that it will be removed by v3.20
+> Thank you Masami,
 > 
-> Oh, and please put an ugly /* */ comment block in the #ifdef
-> CONFIG_OF_IOMMU section that makes it really clear that it is an ugly
-> hack and will be removed in the next release. I don't want anyone
-> getting ideas that adding pointers to struct device_node is a good
-> idea.
+> I tried the following commands:
+> 
+> echo "p:trace_event_buffer_lock_reserve
+> trace_event_buffer_lock_reserve" >
+> /sys/kernel/debug/tracing/kprobe_events
+> echo 1 > /sys/kernel/debug/tracing/events/kprobes/enable
+> echo 1 > /sys/kernel/debug/tracing/events/sched/sched_process_exec/enable
+> 
+> The system appeared okay, I then cat'ed out:
+> # cat /sys/kernel/debug/tracing/kprobe_profile
+>    trace_event_buffer_lock_reserve                           25              25
+> 
+> I got similar output (i.e. no crashes) both with and without the
+> interrupt fix you recommended.
+> 
+> I'm not sure how to interpret this, please let me know if you would
+> like me to run any other tests?
+> 
+> (I did also try your proposed fix with perf + memcpy and that crashed
+> in a similar way as before).
 
-Something like the mess below?
+Hmm, then the bug is still there, and the bug may not be in the recursive
+call path... We need to find another suspicious code in the patch.
 
-Will
 
---->8
+Thank you,
 
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 29f0adc5f3e4..6f85c02bc1a6 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -43,6 +43,9 @@ struct property {
- #if defined(CONFIG_SPARC)
- struct of_irq_controller;
- #endif
-+#ifdef CONFIG_OF_IOMMU
-+struct iommu_ops;
-+#endif
- 
- struct device_node {
- 	const char *name;
-@@ -65,6 +68,19 @@ struct device_node {
- 	unsigned int unique_id;
- 	struct of_irq_controller *irq_trans;
- #endif
-+#ifdef CONFIG_OF_IOMMU
-+/*
-+ * HACK! HACK! HACK!
-+ *
-+ * This is a temporary hack to associate a device_node for an
-+ * IOMMU with its set of iommu_ops so that we can probe its upstream DMA
-+ * masters on the platform bus by parsing the "iommus" property directly.
-+ *
-+ * This is going away in 3.20. Please use the of_iommu_{get,set}_ops
-+ * functions to get hold of this data.
-+ */
-+	struct iommu_ops *__iommu_ops_use_accessors;
-+#endif
- };
- 
- #define MAX_PHANDLE_ARGS 16
-diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-index d03abbb11c34..392ec5f212db 100644
---- a/include/linux/of_iommu.h
-+++ b/include/linux/of_iommu.h
-@@ -14,6 +14,17 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
- extern void of_iommu_init(void);
- extern struct iommu_ops *of_iommu_configure(struct device *dev);
- 
-+static inline void of_iommu_set_ops(struct device_node *np,
-+				    const struct iommu_ops *ops)
-+{
-+	np->__iommu_ops_use_accessors = ops;
-+}
-+
-+static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
-+{
-+	return np->__iommu_ops_use_accessors;
-+}
-+
- #else
- 
- static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
-@@ -29,19 +40,15 @@ static inline struct iommu_ops *of_iommu_configure(struct device *dev)
- 	return NULL;
- }
- 
--#endif	/* CONFIG_OF_IOMMU */
--
- static inline void of_iommu_set_ops(struct device_node *np,
--				    const struct iommu_ops *ops)
--{
--	np->data = (struct iommu_ops *)ops;
--}
--
-+				    const struct iommu_ops *ops) { }
- static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
- {
--	return np->data;
-+	return NULL;
- }
- 
-+#endif	/* CONFIG_OF_IOMMU */
-+
- extern struct of_device_id __iommu_of_table;
- 
- typedef int (*of_iommu_init_fn)(struct device_node *);
+
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
