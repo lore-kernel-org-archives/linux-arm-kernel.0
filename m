@@ -1,58 +1,75 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 04 Dec 2014 14:35:25 +0100
-Subject: [PATCH 03/12] irqchip: gic: define =?UTF-8?Q?register=5Frouta?=
- =?UTF-8?Q?ble=5Fdomain=5Fops=20conditional?=
-In-Reply-To: <547F5EBD.6040705@arm.com>
-References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
- <1417565531-4507-4-git-send-email-stefan@agner.ch>
- <5174649.NxPq80uDz8@wuerfel> <alpine.DEB.2.11.1412031303000.16275@nanos>
- <8eccedc781df2636a132dae449cbe774@agner.ch> <547F5EBD.6040705@arm.com>
-Message-ID: <a62b856866915f6939da79bdbcdabb39@agner.ch>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 4 Dec 2014 14:36:27 +0100
+Subject: [PATCH v7 08/11] arm/arm64: Unexport restart handlers
+In-Reply-To: <1408495538-27480-9-git-send-email-linux@roeck-us.net>
+References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
+ <1408495538-27480-9-git-send-email-linux@roeck-us.net>
+Message-ID: <CAMuHMdVqCa+m1oMkuRHcTZKw2CWNHJVotWBwfTnfBNT11UPEjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-03 20:04, Marc Zyngier wrote:
-<snip>
->> What do you mean by the shared state in the drawing above? Currently, I
->> check whether a interrupt is already used by the other core by reading
->> the register (do this configuration register reflect the "shared state"
->> in your drawing?).
-> 
-> I think that is basically it. It should only be the register that
-> decides on the actual routing. BTW, how do you arbitrate between
-> concurrent accesses to this register? Or is only the A5 allowed to
-> change it?
- 
-No arbitration so far... The whole Vybrid on M4 stuff is quite a hack
-right now. For instance also the concurrent access to the clock
-registers is not handled. Currently, I start the M4 from a booted A5
-Linux. To avoid half of the clocks get turned of by the M4 clock driver,
-I need to specify clk_ignore_unused. Beside that, peripherals have to be
-enabled/disabled in a non conflicting manor in the device trees...
+Hi G?nther,
 
-For the interrupt router in MSCM, it would be nice if the access could
-be done an atomic way, which would avoid the use of a lock mechanism.
-But I guess this is not possible, since peripherals only support
-standard ldr/str...?
+On Wed, Aug 20, 2014 at 2:45 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+> Implementing a restart handler in a module don't make sense
+> as there would be no guarantee that the module is loaded when
+> a restart is needed. Unexport arm_pm_restart to ensure that
+> no one gets the idea to do it anyway.
 
-There is the SEMA4 module which provides hardware semaphores. I'm aware
-of the hardware spinlock drivers (drivers/hwspinlock/), I started to
-implement such a driver for Vybrid. But so far a grep through the kernel
-does not show one usage of that framework... I guess we could add dt
-support for that, so we can assign the locks to individual drivers.
+Why not? I was just going to do that, but I got greeted by:
 
-I also plan to have a deeper look into remoteproc/rpmsg, not sure if
-locking of shared peripherals is part (or planned to be part) of that
-framework.
+ERROR: "arm_pm_restart" [drivers/power/reset/rmobile-reset.ko] undefined!
 
-For the clock stuff, the problem is more complex: I guess the would need
-some kind of master/slave definition, where we disallow the change of
-the shared clocks for the slave.
+So now we have to make sure all reset drivers for a zillion different
+hardware devices are builtin, and can't be modular?
 
-If you are aware of patches/solutions, I'm happy to hear it...
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> v7: No change
+> v6: No change
+> v5: No change
+> v4: No change
+> v3: No change
+> v2: No change
+>
+>  arch/arm/kernel/process.c   | 1 -
+>  arch/arm64/kernel/process.c | 1 -
+>  2 files changed, 2 deletions(-)
+>
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index ea279f7..250b6f6 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -121,7 +121,6 @@ void (*pm_power_off)(void);
+>  EXPORT_SYMBOL(pm_power_off);
+>
+>  void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+> -EXPORT_SYMBOL_GPL(arm_pm_restart);
+>
+>  /*
+>   * This is our default idle handler.
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 0d3fb9f..398ab05 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -98,7 +98,6 @@ void (*pm_power_off)(void);
+>  EXPORT_SYMBOL_GPL(pm_power_off);
+>
+>  void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+> -EXPORT_SYMBOL_GPL(arm_pm_restart);
+>
+>  /*
+>   * This is our default idle handler.
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 --
-Stefan
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-
-<snip>
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
