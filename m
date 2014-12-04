@@ -1,43 +1,57 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 4 Dec 2014 08:11:08 -0800
-Subject: [PATCH v7 08/11] arm/arm64: Unexport restart handlers
-In-Reply-To: <3875532.ABOh5kXkPb@wuerfel>
-References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
- <CAMuHMdX-WsVErpiZ_EbFSGxeJEfpu3cRaZzitupiSAA2hXEJ8g@mail.gmail.com>
- <54807505.2000406@roeck-us.net> <3875532.ABOh5kXkPb@wuerfel>
-Message-ID: <20141204161108.GA7385@roeck-us.net>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu,  4 Dec 2014 17:14:40 +0100
+Subject: [PATCH v3 0/3] Add support for Tegra Activity Monitor
+Message-ID: <1417709696-29281-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 04:06:22PM +0100, Arnd Bergmann wrote:
-> On Thursday 04 December 2014 06:51:49 Guenter Roeck wrote:
-> > On 12/04/2014 06:44 AM, Geert Uytterhoeven wrote:
-> > > On Thu, Dec 4, 2014 at 3:26 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> > >> On 12/04/2014 05:36 AM, Geert Uytterhoeven wrote:
-> > >>> On Wed, Aug 20, 2014 at 2:45 AM, Guenter Roeck <linux@roeck-us.net> wrote:
-> > >>>> Implementing a restart handler in a module don't make sense
-> > >>>> as there would be no guarantee that the module is loaded when
-> > >>>> a restart is needed. Unexport arm_pm_restart to ensure that
-> > >>>> no one gets the idea to do it anyway.
-> > >>>
-> > >>> Why not? I was just going to do that, but I got greeted by:
-> > >>
-> > >> Because you should register a restart handler instead, like the other
-> > >> drivers in the same directory now do.
-> > >
-> > > That's a different thing. "there would be no guarantee that the module is
-> > > loaded when a restart is needed" is also valid for restart handlers...
-> > >
-> > 
-> > Not really, because you are supposed to unregister the restart handler
-> > on unload. Sure, you can instead clear arm_pm_reastart and leave the system
-> > with no means to restart ...
-> 
-> I agree with Geert that your commit message was confusing, it sounds like
-> you were referring to drivers that are not yet loaded, while the problem
-> that you are really address is drivers that have been unloaded later.
-> 
-Yes, I realize that now. I should probably have added the rationale
-for the entire series to this commit. I'll try to do better next time.
+Hello,
 
-Guenter
+this v3 addresses the comments that the devfreq implementation got, namely:
+
+* Address misc. style issues found by Thierry and Alexander
+* Added helpers for register i/o
+* Further documented the structs
+* Enable the ACTMON after the IRQ handler has been installed
+* Disable the ACTMON before removing the IRQ handler
+* Add governor in a subsys initcall
+
+There's an open question on whether some functionality currently in this
+devfreq driver should be moved into the devfreq framework, but without knowing
+of other SoC family that would benefit from it, I'm reticent. It would be
+great to hear from the devfreq maintainers if they have any plans regarding
+this, or if they have any suggestion.
+
+These patches implement support for setting the rate of the EMC clock based on
+stats collected from the ACTMON, a piece of hw in the Tegra124 that counts
+memory accesses (among others).
+
+It depends on the following in-flight patches:
+
+* EMC driver: http://thread.gmane.org/gmane.linux.drivers.devicetree/99304
+* CPUFreq driver: http://thread.gmane.org/gmane.linux.kernel/1812962
+
+I have pushed a branch here for testing:
+
+http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=actmon-v3
+
+Regards,
+
+Tomeu
+
+Tomeu Vizoso (3):
+  of: Add binding for NVIDIA Tegra ACTMON node
+  PM / devfreq: tegra: add devfreq driver for Tegra Activity Monitor
+  ARM: tegra: Add Tegra124 ACTMON support
+
+ .../devicetree/bindings/arm/tegra/actmon.txt       |  38 +
+ arch/arm/boot/dts/tegra124.dtsi                    |  23 +
+ drivers/devfreq/Kconfig                            |   9 +
+ drivers/devfreq/Makefile                           |   1 +
+ drivers/devfreq/tegra-actmon-devfreq.c             | 777 +++++++++++++++++++++
+ 5 files changed, 848 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/tegra/actmon.txt
+ create mode 100644 drivers/devfreq/tegra-actmon-devfreq.c
+
+-- 
+1.9.3
