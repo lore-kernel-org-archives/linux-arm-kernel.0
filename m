@@ -1,55 +1,40 @@
-From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Thu, 04 Dec 2014 08:57:06 +0000
-Subject: [alsa-devel] [PATCH 1/5] ASoC: dwc: Allocate resources with
- devm_ioremap_resource
-In-Reply-To: <547F3DD0.10405@metafoo.de>
-References: <547F3C96.9070509@arm.com> <547F3DD0.10405@metafoo.de>
-Message-ID: <548021E2.2080506@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 04 Dec 2014 08:57:47 +0000
+Subject: [PATCH 13/16] ARM: shmobile: remove use of
+ gic_arch_extn.irq_set_wake
+In-Reply-To: <20141204063909.GF19568@verge.net.au>
+References: <1417539497-20101-1-git-send-email-marc.zyngier@arm.com>
+ <1417539497-20101-14-git-send-email-marc.zyngier@arm.com>
+ <20141204063909.GF19568@verge.net.au>
+Message-ID: <5480220B.1020909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/14 16:44, Lars-Peter Clausen wrote:
-> On 12/03/2014 05:38 PM, Andrew Jackson wrote:
-> [,,,[
->> +	dw_i2s_dai = devm_kzalloc(&pdev->dev, sizeof(*dw_i2s_dai), GFP_KERNEL);
->> +	if (!dw_i2s_dai) {
->> +		dev_err(&pdev->dev, "mem allocation failed for dai driver\n");
-> 
-> All the memory alloc functions already print a error message.
+Hi Simon,
 
-I will remove the error message(s).
-
->>   		return -ENOMEM;
->>   	}
+On 04/12/14 06:39, Simon Horman wrote:
+> On Tue, Dec 02, 2014 at 04:58:14PM +0000, Marc Zyngier wrote:
+>> shmobile only uses gic_arch_extn.irq_set_wake to prevent the GIC
+>> from returning -ENXIO when receiving a wake-up configuration request.
 >>
->> +	dw_i2s_dai->ops = &dw_i2s_dai_ops;
->> +	dw_i2s_dai->suspend = dw_i2s_suspend;
->> +	dw_i2s_dai->resume = dw_i2s_resume;
+>> It is a lot simpler to tell the irq layer that we don't need any
+>> configuration by using the IRQCHIP_SKIP_SET_WAKE, thanks to the
+>> new gic_set_irqchip_flags function.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> This seems to be separate from the devm_ioremap_resource() change.
+> Hi Marc,
+> 
+> this looks reasonable to me. Should I take it through my tree
+> (in v3.20) or did you have another path in mind?
 
-It seemed reasonable to assign these known values to the dw_i2s_dai as soon as it had been allocated. Would you prefer this in a separate patch?
+As you can see, there is a dependency on the GIC itself, and other
+platforms are affected to. So I'd think that an arm-soc branch
+containing all the required patches would be more appropriate, assuming
+that you're happy to Ack this patch.
 
->> +
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	if (!res) {
-> 
-> You don't actually have to check it devm_ioremap_resource does this for you.
+Thanks,
 
-Oh, thanks, paranoia was taking over.
-
->> +		dev_err(&pdev->dev, "no i2s resource defined\n");
->> +		return -ENODEV;
->> +	}
->> +
->> +	dev->i2s_base = devm_ioremap_resource(&pdev->dev, res);
->> +	if (IS_ERR(dev->i2s_base)) {
->> +		dev_err(&pdev->dev, "ioremap fail for i2s_region\n");
-> 
-> Same here devm_ioremap_resource() will already print a appropriate error 
-> message.
-> 
->> +		return PTR_ERR(dev->i2s_base);
->> +	}
-> 
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
