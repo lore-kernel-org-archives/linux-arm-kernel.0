@@ -1,59 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 4 Dec 2014 13:06:44 -0800
-Subject: [PATCH v5 1/4] ARM: OMAP2+: Make sure pandora_wl1251_init_card()
- applies to SDIO only
-In-Reply-To: <1417563767-32181-2-git-send-email-dianders@chromium.org>
-References: <1417563767-32181-1-git-send-email-dianders@chromium.org>
- <1417563767-32181-2-git-send-email-dianders@chromium.org>
-Message-ID: <20141204210644.GJ2817@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 4 Dec 2014 13:15:12 -0800
+Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
+In-Reply-To: <1417707993-82290-1-git-send-email-agraf@suse.de>
+References: <1417707993-82290-1-git-send-email-agraf@suse.de>
+Message-ID: <CAOesGMhv+0_SZb2eSiwCGaD77hd=a6EhMp6tVvcrZoBnrHKQjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Doug Anderson <dianders@chromium.org> [141202 15:45]:
-> In preparation for having init_card() called for all card types (not
-> just SDIO), change pandora_wl1251_init_card() so it checks whether the
-> card type is SDIO.
-
-Seems OK to me and should not conflict with linux-omap patches:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
-
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+On Thu, Dec 4, 2014 at 7:46 AM, Alexander Graf <agraf@suse.de> wrote:
+> With binutils 2.25 the default alignment for 32bit arm sections changed to
+> have everything 64k aligned. Armv7 binaries built with this binutils version
+> run successfully on an arm64 system.
+>
+> Since effectively there is now the chance to run armv7 code on arm64 even
+> with 64k page size, it doesn't make sense to block people from enabling
+> CONFIG_COMPAT on those configurations.
+>
+> Signed-off-by: Alexander Graf <agraf@suse.de>
 > ---
-> Changes in v5:
-> - Split fixup to pandora_wl1251_init_card() into its own patch.
-> 
-> Changes in v3: None
-> Changes in v2: None
-> 
->  arch/arm/mach-omap2/board-omap3pandora.c | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-> index 7f17087..969e100 100644
-> --- a/arch/arm/mach-omap2/board-omap3pandora.c
-> +++ b/arch/arm/mach-omap2/board-omap3pandora.c
-> @@ -254,12 +254,14 @@ static void pandora_wl1251_init_card(struct mmc_card *card)
->  	 * We have TI wl1251 attached to MMC3. Pass this information to
->  	 * SDIO core because it can't be probed by normal methods.
->  	 */
-> -	card->quirks |= MMC_QUIRK_NONSTD_SDIO;
-> -	card->cccr.wide_bus = 1;
-> -	card->cis.vendor = 0x104c;
-> -	card->cis.device = 0x9066;
-> -	card->cis.blksize = 512;
-> -	card->cis.max_dtr = 20000000;
-> +	if (card->type == MMC_TYPE_SDIO || card->type == MMC_TYPE_SD_COMBO) {
-> +		card->quirks |= MMC_QUIRK_NONSTD_SDIO;
-> +		card->cccr.wide_bus = 1;
-> +		card->cis.vendor = 0x104c;
-> +		card->cis.device = 0x9066;
-> +		card->cis.blksize = 512;
-> +		card->cis.max_dtr = 20000000;
-> +	}
->  }
->  
->  static struct omap2_hsmmc_info omap3pandora_mmc[] = {
-> -- 
-> 2.2.0.rc0.207.ga3a616c
-> 
+>  arch/arm64/Kconfig | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 9532f8d..3cf4f238 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -409,7 +409,6 @@ source "fs/Kconfig.binfmt"
+>
+>  config COMPAT
+>         bool "Kernel support for 32-bit EL0"
+> -       depends on !ARM64_64K_PAGES
+>         select COMPAT_BINFMT_ELF
+>         select HAVE_UID16
+>         select OLD_SIGSUSPEND3
+
+This is hardly "compat". Sure, it's great to have a new binutils that
+has larger alignment, but practically not a single existing binary
+will work today if someone tries to do this.
+
+So, it seems very premature to take this off. At the very least
+document it like Will requested, and make it depend on !ARM_64K_PAGES
+|| EXPERT.
+
+
+-Olof
