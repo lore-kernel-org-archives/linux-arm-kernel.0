@@ -1,15 +1,15 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 4 Dec 2014 10:26:12 +0000
-Subject: [PATCH v2 1/2] arm: perf: Prevent wraparound during overflow
-In-Reply-To: <1416587067-3220-2-git-send-email-daniel.thompson@linaro.org>
+Date: Thu, 4 Dec 2014 10:27:09 +0000
+Subject: [PATCH v2 2/2] arm64: perf: Prevent wraparound during overflow
+In-Reply-To: <1416587067-3220-3-git-send-email-daniel.thompson@linaro.org>
 References: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
  <1416587067-3220-1-git-send-email-daniel.thompson@linaro.org>
- <1416587067-3220-2-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20141204102612.GB14519@arm.com>
+ <1416587067-3220-3-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20141204102709.GC14519@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 04:24:26PM +0000, Daniel Thompson wrote:
+On Fri, Nov 21, 2014 at 04:24:27PM +0000, Daniel Thompson wrote:
 > If the overflow threshold for a counter is set above or near the
 > 0xffffffff boundary then the kernel may lose track of the overflow
 > causing only events that occur *after* the overflow to be recorded.
@@ -30,26 +30,19 @@ On Fri, Nov 21, 2014 at 04:24:26PM +0000, Daniel Thompson wrote:
 > ticking at 4GHz the interrupt rate would only be ~1Hz.
 > 
 > Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> ---
+>  arch/arm64/kernel/perf_event.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-You'll probably need to refresh this at -rc1 as there are a bunch of
-changes queued for this file already. Then you can stick it into rmk's
-patch system.
-
-Cheers,
+Thanks, applied.
 
 Will
 
-> ---
->  arch/arm/kernel/perf_event.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index 266cba46db3e..ab68833c1e31 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -115,8 +115,14 @@ int armpmu_event_set_period(struct perf_event *event)
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index aa29ecb4f800..25a5308744b1 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -169,8 +169,14 @@ armpmu_event_set_period(struct perf_event *event,
 >  		ret = 1;
 >  	}
 >  
