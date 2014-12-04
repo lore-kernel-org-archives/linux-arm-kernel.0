@@ -1,107 +1,26 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 04 Dec 2014 21:04:19 +0100
-Subject: [linux-sunxi] [PATCH 3/3] ARM:dts:sun7i:ps2 added nodes for Sun7i
- A20 PS2 controller. 	added ps2 nodes in lime2 board dts.
-In-Reply-To: <1417647963-28077-1-git-send-email-VishnuPatekar0510@gmail.com>
-References: <1417647963-28077-1-git-send-email-VishnuPatekar0510@gmail.com>
-Message-ID: <5480BE43.9050308@redhat.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Thu, 4 Dec 2014 12:07:01 -0800
+Subject: [PATCH v2] ARM: dts: Add dts file for odroid XU3 board
+In-Reply-To: <1417721269-19342-1-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1417721269-19342-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <CANMBJr5e_tc9P8g=kh5ARJ1ARnLG2RX2AKVbd2j-=4X8x1uARg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 12/04/2014 12:06 AM, vishnupatekar wrote:
-> ---
->   arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts |   10 ++++++++
->   arch/arm/boot/dts/sun7i-a20.dtsi                |   30 ++++++++++++++++++++++-
->   2 files changed, 39 insertions(+), 1 deletion(-)
+On 4 December 2014 at 11:27, Sjoerd Simons
+<sjoerd.simons@collabora.co.uk> wrote:
+> Add DTS for the Hardkernel Odroid XU3. The name of the DTS file is kept the
+> same as the vendors naming, which means it's prefixed with exynos5422
+> instead of exynos5800 as the SoC name even though it includes the
+> exyno5800 dtsi.
 >
-> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> index ed364d5..374897b 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> @@ -112,6 +112,16 @@
->   			pinctrl-0 = <&uart0_pins_a>;
->   			status = "okay";
->   		};
-> +		ps20: ps2 at 0x01c2a000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&ps2_0_pins>;
-> +			status = "okay";
-> +		};
-> +		ps21: ps2 at 0x01c2a400 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&ps2_1_pins>;
-> +			status = "okay";
-> +		};
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-I don't think this should be enabled by default, since there
-is no ps2 connector on the board, and the pins can be used
-in a different manner too.
+Tested-by: Tyler Baker <tyler.baker@linaro.org>
 
-I do think it is useful to have it in there as an example for people who want to use
-it, but commented out, please also add a comment stating that using ps20 conflicts
-with using the hdmi connector.
+Tested this atop of next-20141204, both on exynos_defconfig and
+multi_v7_defconfig. All configurations boot fine on my odroid-xu3
+board.
 
-Regards,
-
-Hans
-
->
->   		i2c0: i2c at 01c2ac00 {
->   			pinctrl-names = "default";
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index 8605f2b..c77635d 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -357,7 +357,7 @@
->
->   		usb_clk: clk at 01c200cc {
->   			#clock-cells = <1>;
-> -		        #reset-cells = <1>;
-> +			#reset-cells = <1>;
->   			compatible = "allwinner,sun4i-a10-usb-clk";
->   			reg = <0x01c200cc 0x4>;
->   			clocks = <&pll6 1>;
-> @@ -852,6 +852,19 @@
->   				    allwinner,drive = <0>;
->   				    allwinner,pull = <0>;
->   			};
-> +			ps2_0_pins: ps2_0 at 0 {
-> +				    allwinner,pins = "PI20","PI21";
-> +				    allwinner,function = "ps2";
-> +				    allwinner,drive = <0>;
-> +				    allwinner,pull = <0>;
-> +			};
-> +			ps2_1_pins: ps2_1 at 0 {
-> +				    allwinner,pins = "PH12","PH13";
-> +				    allwinner,function = "ps2";
-> +				    allwinner,drive = <0>;
-> +				    allwinner,pull = <0>;
-> +			};
-> +
->   		};
->
->   		timer at 01c20c00 {
-> @@ -1079,5 +1092,20 @@
->   			#interrupt-cells = <3>;
->   			interrupts = <1 9 0xf04>;
->   		};
-> +		ps20: ps2 at 0x01c2a000 {
-> +			compatible = "allwinner,sun7i-a20-ps2";
-> +			reg = <0x01c2a000 0x400>;
-> +			interrupts = <0 62 4>;
-> +			clocks = <&apb1_gates 6>;
-> +			status = "disabled";
-> +		};
-> +		ps21: ps2 at 0x01c2a400 {
-> +			compatible = "allwinner,sun7i-a20-ps2";
-> +			reg = <0x01c2a400 0x400>;
-> +			interrupts = <0 63 4>;
-> +			clocks = <&apb1_gates 7>;
-> +			status = "disabled";
-> +		};
-> +
->   	};
->   };
->
+Cheers,
+Tyler
