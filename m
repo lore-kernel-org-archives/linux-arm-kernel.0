@@ -1,38 +1,57 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 03 Dec 2014 21:48:19 -0500
-Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
-In-Reply-To: <547FB5DD.901@redhat.com>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <20141120135851.GA32528@linaro.org> <54759041.9080105@hitachi.com>
- <20141126100325.GA9157@linaro.org> <5476120D.9030703@linaro.org>
- <CAPvkgC3eVOZEn79C9PC9c7TqC_-yCtDhw5LL6ZWUJxr+oQFaow@mail.gmail.com>
- <5476BFB4.2020705@hitachi.com>
- <CAPvkgC0ELPPWfa-8kQ4H_e_O5G1ER4KEKuSWLxh_u-VZgh7W6A@mail.gmail.com>
- <547C36DB.7060903@hitachi.com> <547F242D.1060705@redhat.com>
- <547F94B0.1000902@linaro.org> <547FB5DD.901@redhat.com>
-Message-ID: <547FCB73.1010707@linaro.org>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Thu,  4 Dec 2014 10:49:35 +0800
+Subject: [PATCH] ARM: dts: rockchip: set dw_mmc max-freq 150Mhz
+Message-ID: <1417661375-2872-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/14 20:16, William Cohen wrote:
+All of mmc controllers include SDMMC, SDIO0, SDIO1, and EMMC on RK3288
+are limited to 150Mhz. It was mainly caused by two reasons:
+- RK3288's IO pad(except DDR IO pad) is generic, which can only support
+  the max of 150Mhz.
+- Mmc controller was designed at 150Mhz, and the pressure test by IC team
+  was based on this freequency point.
 
-[...]
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+---
+ arch/arm/boot/dts/rk3288.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
->
-> The perf issue seems to be independent and can be reproduced without using any kprobe support.  I need to get a simple reproducer and mention it on the linux-perf-user list.
->
-> -Will
->
-
-
-OK, my confusion came from all the different things perf can use.  I 
-have not yet been able to reproduce the "perf stat" failure, but I do 
-see the failure with Steve's example using tracepoints.  I had thought 
-that was using kprobes, but apparently it just uses tracepoints.  These 
-look like two different failures to me:  One related to tracepoints, and 
-one in the PMU driver.
-
-Since this seems unrelated to kprobes I don't plan on pursuing these 
-particular problems.
-
--dl
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index acb6a2f..9c35a1d 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -149,6 +149,7 @@
+ 
+ 	sdmmc: dwmmc at ff0c0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
++		clock-freq-min-max = <400000 150000000>;
+ 		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
+ 		clock-names = "biu", "ciu";
+ 		fifo-depth = <0x100>;
+@@ -159,6 +160,7 @@
+ 
+ 	sdio0: dwmmc at ff0d0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
++		clock-freq-min-max = <400000 150000000>;
+ 		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>;
+ 		clock-names = "biu", "ciu";
+ 		fifo-depth = <0x100>;
+@@ -169,6 +171,7 @@
+ 
+ 	sdio1: dwmmc at ff0e0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
++		clock-freq-min-max = <400000 150000000>;
+ 		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>;
+ 		clock-names = "biu", "ciu";
+ 		fifo-depth = <0x100>;
+@@ -179,6 +182,7 @@
+ 
+ 	emmc: dwmmc at ff0f0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
++		clock-freq-min-max = <400000 150000000>;
+ 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
+ 		clock-names = "biu", "ciu";
+ 		fifo-depth = <0x100>;
+-- 
+1.8.3.2
