@@ -1,20 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 19:12:31 +0100
-Subject: [GIT PULL] at91: cleanup for 3.19 #5
-In-Reply-To: <1417715520-30412-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1417715520-30412-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <2294210.BDk2p4U6CY@wuerfel>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 04 Dec 2014 10:18:27 -0800
+Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
+In-Reply-To: <1417707993-82290-1-git-send-email-agraf@suse.de>
+References: <1417707993-82290-1-git-send-email-agraf@suse.de>
+Message-ID: <5480A573.4090801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 December 2014 18:52:00 Nicolas Ferre wrote:
-> This is the last "cleanup" pull-request for 3.19 on my side. Most of the work
-> was done by Arnd actually 
-> This simplifies even more the mach-at91 directory and remove a bunch of dead
-> code. Arnd also wrote some more cleanup patches that I will keep for 3.20 as
-> they modify files in a larger extent.
-> 
+On 12/4/2014 7:46 AM, Alexander Graf wrote:
+> With binutils 2.25 the default alignment for 32bit arm sections changed to
+> have everything 64k aligned. Armv7 binaries built with this binutils version
+> run successfully on an arm64 system.
+>
+> Since effectively there is now the chance to run armv7 code on arm64 even
+> with 64k page size, it doesn't make sense to block people from enabling
+> CONFIG_COMPAT on those configurations.
+>
 
-Pulled into next/cleanup, thanks for organizing my draft patches properly!
+It's good to see this restriction dropped. Can we put a note somewhere
+in the actual Kconfig about the binutils requirement so the requirements
+are more obvious?
 
-	Arnd
+Thanks,
+Laura
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
