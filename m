@@ -1,52 +1,155 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 4 Dec 2014 11:03:57 +0100
-Subject: Do I need to invalidate caches before enabling (on ARMv7)?
-Message-ID: <20141204100357.GO2129@pengutronix.de>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 04 Dec 2014 11:04:49 +0100
+Subject: [PATCH] KVM: arm/arm64: vgic: add init entry to VGIC KVM device
+In-Reply-To: <20141203104510.GE17502@cbox>
+References: <1417541251-20761-1-git-send-email-eric.auger@linaro.org>
+ <20141203104510.GE17502@cbox>
+Message-ID: <548031C1.9020701@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Christoffer
+On 12/03/2014 11:45 AM, Christoffer Dall wrote:
+> On Tue, Dec 02, 2014 at 06:27:31PM +0100, Eric Auger wrote:
+>> Since the advent of dynamic initialization of VGIC, this latter is
+>> initialized very late, on the first vcpu run. This initialization
+>> could be initiated much earlier by the user, as soon as it has
+>> provided the requested dimensioning parameters:
+>> - number of IRQs and number of vCPUs,
+>> - DIST and CPU interface base address.
+>>
+>> One motivation behind being able to initialize the VGIC sooner is
+>> related to the setup of IRQ injection in VFIO use case. The VFIO
+>> signaling, especially when used along with irqfd must be set *after*
+>> vgic initialization to prevent any virtual IRQ injection before
+>> VGIC initialization. If virtual IRQ injection occurs before the VGIC
+>> init, the IRQ cannot be injected and subsequent injection is blocked
+>> due to VFIO completion mechanism (unmask/mask or forward/unforward).
+>>
+>> This patch adds a new entry to the VGIC KVM device that allows
+>> the user to manually request the VGIC init:
+>> - a new KVM_DEV_ARM_VGIC_GRP_CTRL group is introduced.
+>> - Its first attribute is KVM_DEV_ARM_VGIC_CTRL_INIT
+>>
+>> The rationale behind introducing a group is to be able to add other
+>> controls later on, if needed.
+>>
+>> Obviously, as soon as the init is done, the dimensioning parameters
+>> cannot be changed.
+> 
+> you would need to add a check in the vcpu_create path,
+check added in v2
+ which I don't
+> believe we currently have.  That may conflict with Andre's series so we
+> need to coordinate.
+> 
+> We're also seeing this potentially being useful for migration, so my
+> feeling is that the GICv3 patches should be rebased on this patch and
+> this patch should include a check in the vcpu create path.
+> 
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> ---
+>>  Documentation/virtual/kvm/devices/arm-vgic.txt | 11 +++++++++++
+>>  arch/arm/include/uapi/asm/kvm.h                |  2 ++
+>>  arch/arm64/include/uapi/asm/kvm.h              |  2 ++
+>>  virt/kvm/arm/vgic.c                            | 14 +++++++++++++-
+>>  4 files changed, 28 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> index df8b0c7..80db43f 100644
+>> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> @@ -81,3 +81,14 @@ Groups:
+>>      -EINVAL: Value set is out of the expected range
+>>      -EBUSY: Value has already be set, or GIC has already been initialized
+>>              with default values.
+>> +
+>> +  KVM_DEV_ARM_VGIC_GRP_CTRL
+>> +  Attributes:
+>> +    KVM_DEV_ARM_VGIC_CTRL_INIT
+>> +      request the initialization of the VGIC, no additional parameter in
+>> +      kvm_device_attr.addr.
+>> +  Errors:
+>> +    -ENXIO: distributor or CPU interface base address were not set prior
+>> +            to that call
+> 
+> this should be more generic to also apply to GICv3, I would suggest:
+> 
+> "VGIC not properly configured as required prior to calling this
+> attribute."
+corrected
+> 
+> alternatively, the attribute should be KVM_DEV_ARM_VGIC_V2_CTRL_INIT.
+> 
+>> +    -EINVAL: number of vcpus is not known
+> 
+> can we have a different error code for this case?  ENODEV for example?
+corrected
 
-(first I have to admit that originally my question is a bit off-topic
-because I'm currently looking into the cache handling of barebox, but it
-also applies to Linux, so I guess it's fine to ask here.)
-
-Reading through ARMARM for v7-A and v7-R (ARM DDI 0406C.c, p1269) I
-found:
-
- ==== Behavior of the caches at reset ====
- [...]
- * An implementation can require the use of a specific cache
-   initialization routine to invalidate its storage array before it is
-   enabled.
-
-The breakage I'm currently seeing in barebox might well be explained by
-stale I-cache entries and barebox (as of now) doesn't invalidate the
-i-cache before enabling it. Looking into how Linux enables the I-cache
-in the decompressor for v7[1] revealed that the caches are not cleaned
-there either. (So my plan to copy from Linux failed :-)
-
-Now I wonder if that is only an unlikely (or even theoretical) issue
-that wasn't noticed up to now or if I'm missing something.
-
-In the paragraph that the above quote is taken from, furthermore the
-following is written:
-
- It is IMPLEMENTATION DEFINED whether an access can generate a cache hit
- when the cache is disabled.
-
-So stale entries in the cache might even hurt before the cache is
-enabled?! This would mean that you want to invalidate/flush the cache at
-disable-time. Still I think doing it before enabling it in Linux would
-be a good idea. And if it's only because bootloaders and (maybe worse)
-boot roms cannot be trusted in this area.
-
-What do you think?
-
-Best regards
-Uwe
-
-[1] __armv7_mmu_cache_on in arch/arm/boot/compressed/head.S
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks
+Eric
+> 
+>> +    -ENOMEM: memory shortage when allocating vgic internal data
+> 
+>> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+>> index 77547bb..2499867 100644
+>> --- a/arch/arm/include/uapi/asm/kvm.h
+>> +++ b/arch/arm/include/uapi/asm/kvm.h
+>> @@ -175,6 +175,8 @@ struct kvm_arch_memory_slot {
+>>  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
+>>  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
+>>  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
+>> +#define KVM_DEV_ARM_VGIC_GRP_CTRL       4
+>> +#define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
+>>  
+>>  /* KVM_IRQ_LINE irq field index values */
+>>  #define KVM_ARM_IRQ_TYPE_SHIFT		24
+>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+>> index 1ed4417..b35c95a 100644
+>> --- a/arch/arm64/include/uapi/asm/kvm.h
+>> +++ b/arch/arm64/include/uapi/asm/kvm.h
+>> @@ -161,6 +161,8 @@ struct kvm_arch_memory_slot {
+>>  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
+>>  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
+>>  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
+>> +#define KVM_DEV_ARM_VGIC_GRP_CTRL	4
+>> +#define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
+>>  
+>>  /* KVM_IRQ_LINE irq field index values */
+>>  #define KVM_ARM_IRQ_TYPE_SHIFT		24
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index b76c38c..2fe5bdb 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -2474,7 +2474,14 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+>>  
+>>  		return ret;
+>>  	}
+>> -
+>> +	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
+>> +		switch (attr->attr) {
+>> +		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+>> +			r = kvm_vgic_init(dev->kvm);
+>> +			return r;
+>> +		}
+>> +		break;
+>> +	}
+>>  	}
+>>  
+>>  	return -ENXIO;
+>> @@ -2553,6 +2560,11 @@ static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+>>  		return vgic_has_attr_regs(vgic_cpu_ranges, offset);
+>>  	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+>>  		return 0;
+>> +	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+>> +		switch (attr->attr) {
+>> +		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+>> +			return 0;
+>> +		}
+>>  	}
+>>  	return -ENXIO;
+>>  }
+>> -- 
+>> 1.9.1
+>>
