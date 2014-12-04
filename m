@@ -1,72 +1,30 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Thu, 4 Dec 2014 15:00:12 -0200
-Subject: [PATCH] arm: omap2: rx51-peripherals: fix build warning
-In-Reply-To: <20141204163930.GF2817@atomide.com>
-References: <1417033655-32332-1-git-send-email-balbi@ti.com>
- <20141204152411.GF18045@saruman> <3261416.DL88JFJXUF@wuerfel>
- <20141204154835.GH18045@saruman>
- <20141204163930.GF2817@atomide.com>
-Message-ID: <20141204150012.2fb75907@recife.lan>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 4 Dec 2014 11:01:53 -0600
+Subject: [PATCH 0/6] arm: boot: dts: am437x-sk: DTS pinmux fixes
+Message-ID: <1417712519-4615-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, 04 Dec 2014 08:39:31 -0800
-Tony Lindgren <tony@atomide.com> escreveu:
+Here's a small series of non-critical fixes and improvements
+for AM437x Starter Kit DTS.
 
-> * Felipe Balbi <balbi@ti.com> [141204 07:50]:
-> > Hi,
-> > 
-> > On Thu, Dec 04, 2014 at 04:41:13PM +0100, Arnd Bergmann wrote:
-> > > On Thursday 04 December 2014 09:24:11 Felipe Balbi wrote:
-> > > > On Wed, Nov 26, 2014 at 02:27:35PM -0600, Felipe Balbi wrote:
-> > > > > commit 68a3c04 ([media] ARM: OMAP2: RX-51: update
-> > > > > si4713 platform data) updated board-rx51-peripherals.c
-> > > > > so that si4713 could be easily used on DT boot, but
-> > > > > it ended up introducing a build warning whenever
-> > > > > si4713 isn't enabled.
-> > > > > 
-> > > > > This patches fixes that warning:
-> > > > > 
-> > > > > arch/arm/mach-omap2/board-rx51-peripherals.c:1000:36: warning: \
-> > > > > 	?rx51_si4713_platform_data? defined but not used [-Wunused-variable]
-> > > > >  static struct si4713_platform_data rx51_si4713_platform_data = {
-> > > > > 
-> > > > > Cc: Sebastian Reichel <sre@kernel.org>
-> > > > > Cc: Tony Lindgren <tony@atomide.com>
-> > > > > Cc: Hans Verkuil <hans.verkuil@cisco.com>
-> > > > > Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> > > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > > 
-> > > > a gentle reminder on this one.
-> > > > 
-> > > 
-> > > Let me add my
-> > > 
-> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > 
-> > > You didn't say who you expect to pick up the patch. I assume Mauro
-> > 
-> > patch author now decides who takes the patch ? That's new :-)
+Basically I'm removing unnecessary pulls and adding explicit
+pinmux for a couple interfaces which were missing.
 
-Well, for patches that cross subsystem boundaries, like this one,
-the best is to give a hint about whom you expect to pick it.
+All patches tested on top of commit 1ca7c60 (Add linux-next
+specific files for 20141204). Boot logs will be attached as
+a reply here.
 
-In this specific case, as commit 68a3c04 is in my tree, the best is
-to merge the patch on it, as the patch may not even apply at Tony's
-tree.
+Felipe Balbi (6):
+  arm: boot: dts: am437x-sk: remove internal pulls from QSPI
+  arm: boot: dts: am437x-sk: add explicit MMC0 pinmux
+  arm: boot: dts: am437x-sk: remove ethernet pulls
+  arm: boot: dts: am437x-sk: add explicit pinmux for both USB instances
+  arm: boot: dts: am437x-sk: remove internal i2c pullups
+  arm: boot: dts: am437x-sk: remove DSS pulls
 
-> > 
-> > > should take it because he took the patch that caused the problem,
-> > > but he might not be aware that he should look at this now.
-> > 
-> > He is in Cc, let's ask him :-)
-> 
-> Best that this one goes in along with the other si4713 patches
-> to avoid dependencies between trees:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+ arch/arm/boot/dts/am437x-sk-evm.dts | 150 +++++++++++++++++++++---------------
+ 1 file changed, 86 insertions(+), 64 deletions(-)
 
-Thanks! I'll merge it via my tree.
-
-Regards,
-Mauro
+-- 
+2.1.0.GIT
