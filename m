@@ -1,29 +1,107 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Thu,  4 Dec 2014 20:55:04 +0100
-Subject: [PATCH] ARM: EXYNOS: Recognize Samsung MFC v8 devices
-Message-ID: <1417722904-3171-1-git-send-email-sjoerd.simons@collabora.co.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 04 Dec 2014 21:04:19 +0100
+Subject: [linux-sunxi] [PATCH 3/3] ARM:dts:sun7i:ps2 added nodes for Sun7i
+ A20 PS2 controller. 	added ps2 nodes in lime2 board dts.
+In-Reply-To: <1417647963-28077-1-git-send-email-VishnuPatekar0510@gmail.com>
+References: <1417647963-28077-1-git-send-email-VishnuPatekar0510@gmail.com>
+Message-ID: <5480BE43.9050308@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also setup memory allocations for version 8 of the MFC as present in
-Samsung Exynos 5422/5800 SoCs
+Hi,
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
----
- arch/arm/mach-exynos/exynos.c | 1 +
- 1 file changed, 1 insertion(+)
+On 12/04/2014 12:06 AM, vishnupatekar wrote:
+> ---
+>   arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts |   10 ++++++++
+>   arch/arm/boot/dts/sun7i-a20.dtsi                |   30 ++++++++++++++++++++++-
+>   2 files changed, 39 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+> index ed364d5..374897b 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+> @@ -112,6 +112,16 @@
+>   			pinctrl-0 = <&uart0_pins_a>;
+>   			status = "okay";
+>   		};
+> +		ps20: ps2 at 0x01c2a000 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&ps2_0_pins>;
+> +			status = "okay";
+> +		};
+> +		ps21: ps2 at 0x01c2a400 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&ps2_1_pins>;
+> +			status = "okay";
+> +		};
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index c13d083..b343a1a 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -282,6 +282,7 @@ static void __init exynos_reserve(void)
- 		"samsung,mfc-v5",
- 		"samsung,mfc-v6",
- 		"samsung,mfc-v7",
-+		"samsung,mfc-v8",
- 	};
- 
- 	for (i = 0; i < ARRAY_SIZE(mfc_mem); i++)
--- 
-2.1.3
+I don't think this should be enabled by default, since there
+is no ps2 connector on the board, and the pins can be used
+in a different manner too.
+
+I do think it is useful to have it in there as an example for people who want to use
+it, but commented out, please also add a comment stating that using ps20 conflicts
+with using the hdmi connector.
+
+Regards,
+
+Hans
+
+>
+>   		i2c0: i2c at 01c2ac00 {
+>   			pinctrl-names = "default";
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 8605f2b..c77635d 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -357,7 +357,7 @@
+>
+>   		usb_clk: clk at 01c200cc {
+>   			#clock-cells = <1>;
+> -		        #reset-cells = <1>;
+> +			#reset-cells = <1>;
+>   			compatible = "allwinner,sun4i-a10-usb-clk";
+>   			reg = <0x01c200cc 0x4>;
+>   			clocks = <&pll6 1>;
+> @@ -852,6 +852,19 @@
+>   				    allwinner,drive = <0>;
+>   				    allwinner,pull = <0>;
+>   			};
+> +			ps2_0_pins: ps2_0 at 0 {
+> +				    allwinner,pins = "PI20","PI21";
+> +				    allwinner,function = "ps2";
+> +				    allwinner,drive = <0>;
+> +				    allwinner,pull = <0>;
+> +			};
+> +			ps2_1_pins: ps2_1 at 0 {
+> +				    allwinner,pins = "PH12","PH13";
+> +				    allwinner,function = "ps2";
+> +				    allwinner,drive = <0>;
+> +				    allwinner,pull = <0>;
+> +			};
+> +
+>   		};
+>
+>   		timer at 01c20c00 {
+> @@ -1079,5 +1092,20 @@
+>   			#interrupt-cells = <3>;
+>   			interrupts = <1 9 0xf04>;
+>   		};
+> +		ps20: ps2 at 0x01c2a000 {
+> +			compatible = "allwinner,sun7i-a20-ps2";
+> +			reg = <0x01c2a000 0x400>;
+> +			interrupts = <0 62 4>;
+> +			clocks = <&apb1_gates 6>;
+> +			status = "disabled";
+> +		};
+> +		ps21: ps2 at 0x01c2a400 {
+> +			compatible = "allwinner,sun7i-a20-ps2";
+> +			reg = <0x01c2a400 0x400>;
+> +			interrupts = <0 63 4>;
+> +			clocks = <&apb1_gates 7>;
+> +			status = "disabled";
+> +		};
+> +
+>   	};
+>   };
+>
