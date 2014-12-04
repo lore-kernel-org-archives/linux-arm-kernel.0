@@ -1,54 +1,55 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 4 Dec 2014 17:38:02 +0100
-Subject: [GIT PULL] at91: defconfig for 3.19 #1 (bis)
-In-Reply-To: <3905790.gg6cCb9BU6@wuerfel>
-References: <3905790.gg6cCb9BU6@wuerfel>
-Message-ID: <1417711082-27680-1-git-send-email-nicolas.ferre@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 4 Dec 2014 08:39:31 -0800
+Subject: [PATCH] arm: omap2: rx51-peripherals: fix build warning
+In-Reply-To: <20141204154835.GH18045@saruman>
+References: <1417033655-32332-1-git-send-email-balbi@ti.com>
+ <20141204152411.GF18045@saruman> <3261416.DL88JFJXUF@wuerfel>
+ <20141204154835.GH18045@saruman>
+Message-ID: <20141204163930.GF2817@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+* Felipe Balbi <balbi@ti.com> [141204 07:50]:
+> Hi,
+> 
+> On Thu, Dec 04, 2014 at 04:41:13PM +0100, Arnd Bergmann wrote:
+> > On Thursday 04 December 2014 09:24:11 Felipe Balbi wrote:
+> > > On Wed, Nov 26, 2014 at 02:27:35PM -0600, Felipe Balbi wrote:
+> > > > commit 68a3c04 ([media] ARM: OMAP2: RX-51: update
+> > > > si4713 platform data) updated board-rx51-peripherals.c
+> > > > so that si4713 could be easily used on DT boot, but
+> > > > it ended up introducing a build warning whenever
+> > > > si4713 isn't enabled.
+> > > > 
+> > > > This patches fixes that warning:
+> > > > 
+> > > > arch/arm/mach-omap2/board-rx51-peripherals.c:1000:36: warning: \
+> > > > 	?rx51_si4713_platform_data? defined but not used [-Wunused-variable]
+> > > >  static struct si4713_platform_data rx51_si4713_platform_data = {
+> > > > 
+> > > > Cc: Sebastian Reichel <sre@kernel.org>
+> > > > Cc: Tony Lindgren <tony@atomide.com>
+> > > > Cc: Hans Verkuil <hans.verkuil@cisco.com>
+> > > > Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > 
+> > > a gentle reminder on this one.
+> > > 
+> > 
+> > Let me add my
+> > 
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > You didn't say who you expect to pick up the patch. I assume Mauro
+> 
+> patch author now decides who takes the patch ? That's new :-)
+> 
+> > should take it because he took the patch that caused the problem,
+> > but he might not be aware that he should look at this now.
+> 
+> He is in Cc, let's ask him :-)
 
-This is the updated version of the 3.19 defconfig pull-request. It is now based
-on 3.18-rc1 per Arnd's request.
+Best that this one goes in along with the other si4713 patches
+to avoid dependencies between trees:
 
-Here is a pull-request for updating the AT91 defconfig files. Note that we only
-have two now that the per-SoC defconfigs are gone.
-
-Thanks, bye,
-
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-defconfig
-
-for you to fetch changes up to 51756cbd407b760858a16341eb37ee527be178fd:
-
-  ARM: at91/defconfig: add DM9000 to at91_dt (2014-12-04 17:32:01 +0100)
-
-----------------------------------------------------------------
-First batch of defconfigs for AT91 / 3.19:
-- use NEON for all C-A5, neon code handles the !NEON case
-- add new XDMA driver
-- add some useful drivers as we only have a single defconfig for all
-  AT91SAM9/RM9200
-
-----------------------------------------------------------------
-Ludovic Desroches (1):
-      ARM: at91: sama5: update defconfig
-
-Nicolas Ferre (4):
-      ARM: at91/defconfig: add the XDMA driver
-      ARM: at91/defconfig: add TCB PWM driver selection
-      ARM: at91/defconfig: add QT1070 to at91_dt
-      ARM: at91/defconfig: add DM9000 to at91_dt
-
- arch/arm/configs/at91_dt_defconfig | 3 +++
- arch/arm/configs/sama5_defconfig   | 6 +++++-
- 2 files changed, 8 insertions(+), 1 deletion(-)
-
--- 
-Nicolas Ferre
+Acked-by: Tony Lindgren <tony@atomide.com>
