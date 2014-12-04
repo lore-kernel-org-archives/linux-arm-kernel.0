@@ -1,51 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 15:56:47 +0100
-Subject: [PATCH] optimize ktime_divns for constant divisors
-In-Reply-To: <alpine.LFD.2.11.1412040837130.470@knanqh.ubzr>
-References: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
- <2165831.DQoLFmGhIf@wuerfel> <alpine.LFD.2.11.1412040837130.470@knanqh.ubzr>
-Message-ID: <2362381.LDAGLC19vb@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 4 Dec 2014 16:00:02 +0100
+Subject: [PATCH V4 1/3] PM / Domains: Initial PM clock support for genpd
+In-Reply-To: <7h7fya502u.fsf@deeprootsystems.com>
+References: <1417434623-31301-1-git-send-email-ulf.hansson@linaro.org>
+ <1417434623-31301-2-git-send-email-ulf.hansson@linaro.org>
+ <7h7fya502u.fsf@deeprootsystems.com>
+Message-ID: <CAPDyKFpPFismu2Cv4DBX7Eao5EBx4xXXz4K_6pfbitavfGZLTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 December 2014 08:46:27 Nicolas Pitre wrote:
-> On Thu, 4 Dec 2014, Arnd Bergmann wrote:
-> Note the above code is for 32-bit architectures that support a 32x32=64 
-> bit multiply instruction.  And even then, what kills performances is the 
-> inhability to efficiently deal with carry bits from C code.  Hence the 
-> far better output from do_div() on ARM.
-> 
-> If x86-64 has a 64x64=128 bit multiply instruction then the above may 
-> greatly be simplified to a single multiply and a shift.  That would 
-> possibly outperform do_div().
+On 2 December 2014 at 02:09, Kevin Hilman <khilman@kernel.org> wrote:
+> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>
+>> It's quite common for PM domains to use PM clocks. Typically from SOC
+>> specific code, the per device PM clock list is created and
+>> pm_clk_suspend|resume() are invoked to handle clock gating/ungating.
+>>
+>> A step towards consolidation is to integrate PM clock support into
+>> genpd, which is what this patch does.
+>>
+>> In this initial step, the calls to the pm_clk_suspend|resume() are
+>> handled within genpd, but the per device PM clock list still needs to
+>> be created from SOC specific code. It seems reasonable to have gendp to
+>> handle that as well, but that left to future patches to address.
+>>
+>> It's not every users of genpd that are keen on using PM clocks, thus we
+>> need to provide this a configuration option for genpd. Therefore let's
+>> add flag field in the genpd struct to keep this information and define
+>> a new GENDP_FLAG_PM_CLK bit for it.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> Acked-by: Kevin Hilman <khilman@linaro.org>
+>
+> Are you also planning to add a way to enable this option from DT?
 
-I was trying this in 32-bit mode to see how it would work in x86-32
-kernels. Since that architecture has a 64-by-32 divide instruction,
-that gets used here.
+I am thinking of that, yes. Though I wanted the discussion around how
+to deal with creating the PM clock lists while using PM domains to
+settle first.
 
-x86-64 has a 64x64=128 multiply instruction and gcc uses that for
-any 64-bit division by constant, so that's what already happens
-in do_div. I assume for any 64-bit architecture, the result will
-be similar.
-
-I guess the only architectures that would benefit from your implementation
-above are the ones that do not have any optimization for constant
-64-by-32-bit division and just call do_div.
-
-> > On a related note, I wonder if we can come up with a more efficient
-> > implementation for do_div on ARMv7ve, and I think we should add the
-> > Makefile logic to build with -march=armv7ve when we know that we do
-> > not need to support processors without idiv.
-> 
-> Multiplications will always be faster than divisions.  However the idiv 
-> instruction would come very handy in the slow path when the divisor is 
-> not constant.
-
-Makes sense. I also just checked the gcc sources and it seems that the
-idiv/udiv instructions on ARM are not even used for implementing
-__aeabi_uldivmod there. Not sure if that's intentional, but we probably
-don't need to bother optimizing this in the kernel before user space
-does. Building with -march=armv7ve still sounds helpful to avoid the
-__aeabi_uidiv calls though.
-
-	Arnd
+Kind regards
+Uffe
