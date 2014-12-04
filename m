@@ -1,27 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 13:51:25 +0100
-Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
- drivers
-In-Reply-To: <54805312.6000402@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <2579924.PPXuLn3o19@wuerfel> <54805312.6000402@arm.com>
-Message-ID: <2542658.tyv3UdgsYi@wuerfel>
+Date: Thu, 04 Dec 2014 13:52:46 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Soc Updates for v3.19
+In-Reply-To: <2367916.IecTPygCF4@avalon>
+References: <cover.1415058939.git.horms+renesas@verge.net.au>
+ <201411192205.57149.arnd@arndb.de> <2367916.IecTPygCF4@avalon>
+Message-ID: <2399706.M2S78W9JTO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 December 2014 12:26:58 Robin Murphy wrote:
+On Thursday 27 November 2014 22:48:12 Laurent Pinchart wrote:
+> Hi Arnd,
 > 
-> +struct of_iommu_node {
-> +       struct hlist_node list;
-> +       struct device_node *np;
-> +       const struct iommu_ops *ops;
-> +};
-> +static HLIST_HEAD(of_iommu_list);
-> +static DEFINE_SPINLOCK(of_iommu_lock);
+> On Wednesday 19 November 2014 22:05:56 Arnd Bergmann wrote:
+> > On Tuesday 04 November 2014, Simon Horman wrote:
+> > > ----------------------------------------------------------------
+> > > Renesas ARM Based SoC Soc Updates for v3.19
+> > > 
+> > > * Select CONFIG_ZONE_DMA when CONFIG_ARM_LPAE is enabled
+> > > * Add CA7 arch_timer initialization for r8a7794
+> > > * Handle CA7 arch timer delay
+> > > * Add shmobile_init_late() to sh7372
+> > > 
+> > >   - This is consistent with other shmobile SoCs
+> > 
+> > Pulled into next/soc.
+> > 
+> > Note that the CONFIG_ZONE_DMA change might not be the best solution, we
+> > should probably have CONFIG_ZONE_DMA32 instead as some other architectures
+> > do, so you can use the entire lowmem area for DMA allocations.
+> 
+> I might be mistaken, but if the machine description doesn't set the 
+> dma_zone_size field, arm_dma_zone_size and arm_dma_limit are set to 0 and 
+> 0xffffffff respectively. This results in MAX_DMA_ADDRESS being set to 
+> 0xffffffff. Doesn't that allow using the entire lowmem area for DMA 
+> allocations ?
 
-Looks good to me. For 3.20, I would hope to get consensus on renaming this
-structure to 'struct iommmu' and adding additional members into it as needed,
-but let's do that another day. Please address Grant's feedback and send
-a new version.
+Sorry for the late reply. I hadn't actually looked at the details this
+far, and I would assume that you are right.
 
 	Arnd
