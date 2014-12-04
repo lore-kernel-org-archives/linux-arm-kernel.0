@@ -1,65 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 4 Dec 2014 17:33:09 +0100
-Subject: [PATCH 5/5] ARM: dts: sun6i: Add dts file for CSQ CS908 board
-In-Reply-To: <5475962A.4090508@redhat.com>
-References: <1416747283-13489-1-git-send-email-hdegoede@redhat.com>
- <1416747283-13489-6-git-send-email-hdegoede@redhat.com>
- <20141125182147.GD25249@lukather> <5475962A.4090508@redhat.com>
-Message-ID: <20141204163309.GS30256@lukather>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 4 Dec 2014 17:36:39 +0100
+Subject: [GIT PULL v3 1/4] ARM: tegra: IOMMU support for v3.19
+In-Reply-To: <2182969.Fashf5lCE4@wuerfel>
+References: <1416570832-6220-1-git-send-email-thierry.reding@gmail.com>
+ <1417707950-7633-1-git-send-email-thierry.reding@gmail.com>
+ <2182969.Fashf5lCE4@wuerfel>
+Message-ID: <20141204163637.GA16914@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Dec 04, 2014 at 05:21:27PM +0100, Arnd Bergmann wrote:
+> On Thursday 04 December 2014 16:45:49 Thierry Reding wrote:
+> > Hi ARM SoC maintainers,
+> > 
+> > The following changes since commit 0690cbd2e55a72a8eae557c389d1a136ed9fa142:
+> > 
+> >   powerpc/iommu: Rename iommu_[un]map_sg functions (2014-11-18 11:30:01 +0100)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.19-iommu
+> > 
+> > for you to fetch changes up to 8918465163171322c77a19d5258a95f56d89d2e4:
+> > 
+> >   memory: Add NVIDIA Tegra memory controller support (2014-12-04 16:11:47 +0100)
+> > 
+> > Here's a version of the pull request rebased on top of Joerg's core
+> > branch from the IOMMU tree. It has the advantage of having resolved
+> > the merge conflicts and the disadvantage of pulling in v3.18-rc3.
+> > It also contains an updated commit description with some details
+> > that ensued from a discussion regarding the DT binding as well as
+> > the memory-client to SWGROUP mapping tables.
+> > 
+> > This pull request also contains fixes for a build error reported by the
+> > 0-day builder as well as a couple of issues in the IOMMU domain detach
+> > path that I've found since v2 while doing extensive driver unload and
+> > reload stress testing.
+> 
+> Pulled into next/drivers, thanks for you patience!
 
-On Wed, Nov 26, 2014 at 09:58:18AM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 11/25/2014 07:21 PM, Maxime Ripard wrote:
-> >On Sun, Nov 23, 2014 at 01:54:43PM +0100, Hans de Goede wrote:
-> >>The CSQ CS908 is an A31s based top-set box, with 1G RAM, 8G NAND,
-> >>rtl8188etv usb wifi, 2 USB A receptacles (1 connected through the OTG
-> >>controller), ethernet, 3.5 mm jack with a/v out and hdmi out:
-> >>
-> >>http://www.geekbuying.com/item/CS908-Allwinner-A31S-Quad-Core-1-2GHz-Android-4-4-Mini-TV-Box-HDMI-HDD-Player-1G-8G-WIFI-Miracast---Black-333395.html
-> >>
-> >>Note it has no sdcard slot and therefore can only be fel booted.
-> >
-> >Thanks a lot for working on this!
-> >
-> >I also bought another board with an A31s, but it ended up having
-> >neither USB OTG or MMC, which rendered it pretty useless.
-> 
-> Are you sure ? The cs908 also does not have an otg connector,
-> as said it has 2 usb-a receptacles, with the following usb "routing":
-> 
-> usb0 (otg): usb-a receptacle 1 (labeled 1 on the box, 0 on the print)
-> usb1 (ehci): routed to internal wifi
-> usb2 (ehci): usb-a receptacle 2 (labeled 2 on both the box and the print)
-> 
-> I'm using fel mode with an usb-a <-> usb-a cable connected to usb0 on
-> the cs908. The cs908 has no fel button, so I've hooked up the serial console,
-> and then keep 2 pressed on the serial console while inserting the usb-a into
-> the PC (which will also power the board). boot0 from the nand will then jump
-> into fel mode when it sees the 2 keypress.
-> 
-> This was an interesting exercise to confirm that everything on the A31s just
-> works with A31 code, but now that is confirms A31s devices are not all that
-> interesting anymore :)
-
-Ah, that's very interesting... I'll dig this board out then, and try
-both USB-A connector. It might very well be just that.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/c7df56da/attachment.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/8e8e2763/attachment.sig>
