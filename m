@@ -1,39 +1,97 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 4 Dec 2014 20:46:11 +0900
-Subject: [PATCH 13/16] ARM: shmobile: remove use of
- gic_arch_extn.irq_set_wake
-In-Reply-To: <5480220B.1020909@arm.com>
-References: <1417539497-20101-1-git-send-email-marc.zyngier@arm.com>
- <1417539497-20101-14-git-send-email-marc.zyngier@arm.com>
- <20141204063909.GF19568@verge.net.au> <5480220B.1020909@arm.com>
-Message-ID: <20141204114610.GC19465@verge.net.au>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Thu, 4 Dec 2014 19:34:15 +0800
+Subject: [PATCH v4 0/5] Add Spreadtrum Sharkl64 Platform support
+In-Reply-To: <sc9836v4>
+References: <sc9836v4>
+Message-ID: <1417692860-18841-1-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 08:57:47AM +0000, Marc Zyngier wrote:
-> Hi Simon,
-> 
-> On 04/12/14 06:39, Simon Horman wrote:
-> > On Tue, Dec 02, 2014 at 04:58:14PM +0000, Marc Zyngier wrote:
-> >> shmobile only uses gic_arch_extn.irq_set_wake to prevent the GIC
-> >> from returning -ENXIO when receiving a wake-up configuration request.
-> >>
-> >> It is a lot simpler to tell the irq layer that we don't need any
-> >> configuration by using the IRQCHIP_SKIP_SET_WAKE, thanks to the
-> >> new gic_set_irqchip_flags function.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > 
-> > Hi Marc,
-> > 
-> > this looks reasonable to me. Should I take it through my tree
-> > (in v3.20) or did you have another path in mind?
-> 
-> As you can see, there is a dependency on the GIC itself, and other
-> platforms are affected to. So I'd think that an arm-soc branch
-> containing all the required patches would be more appropriate, assuming
-> that you're happy to Ack this patch.
+Spreadtrum is a rapid growing chip vendor providing smart phone total solutions.
 
-Sure, that is fine by me.
+Sharkl64 Platform is nominated as a SoC infrastructure that supports 4G/3G/2G
+standards based on ARMv8 multiple core architecture.Now we have only one
+SoC(SC9836) based on this Platform in developing.
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+This patchset adds Sharkl64 support in arm64 device tree and the serial driver
+of SC9836-UART.
+
+This patchset also has patches which address "sprd" prefix and DT compatible
+strings for nodes which appear un-documented.
+
+This version code was tesed both on Fast Mode and sc9836-fpga board.
+We use the latest boot-wrapper-aarch64 as the bootloader.
+
+Changes from v3:
+* Addressed review comments:
+	- Added the description of clock property for sc9836-uart
+	- Revised the size of GICC to be 8KiB
+	- Added another compatible string for psci-0.1
+	- Removed the clock-frequency property of timer in DT
+	- Removed ARCH_SHARKL64, just left ARCH_SPRD only
+	- sprd_serial.c: Removed .owner of platform_driver.driver
+	- sprd_serial.c: Removed all usages of unlikely
+	- sprd_serial.c: Used the .port member of sprd_port instead of the cast
+	- sprd_serial.c: Used dynamic allocation for major/minor device id
+	- sprd_serial.c: Added a timeout and a cpu_relax for clearing rx/tx fifo
+	- sprd_serial.c: clear CMSPAR in termios->c_cflag
+	- sprd_serial.c: Set the resulting baud back into the termios
+	- sprd_serial.c: Implemented a shared interrupt handler
+
+Changes from v2:
+* Addressed review comments:
+	- Added a specific compitible string 'sc9836-uart' for the serial
+	- Added a full serial driver
+	- Added the property 'clock-frequency' for timer node in dtsi.
+	- Replaceed the old macro prefix 'UART_' with 'SPRD_' in the 
+	  Spreadtrum serial driver code.
+* Revised the name of SoC and board from 'sharkl3' to 'sc9836'
+* Used dual-license for DTS files
+* Added a menuconfig 'ARCH_SPRD' in arch/arm64/Kconfig
+
+Changes from v1:
+* Addressed review comments:
+        - Added "sprd" prefix to vendor-prefixes.txt
+        - Created serial/sprd-serial.txt and remove the properties for serial-sprd
+          from of-serial.txt to it.
+        - Renamed of-serial.txt to 8250.txt according to Arnd's review comments
+        - Splited and revised .dts for Sharkl64 Platform
+        - Changed to PSCI method for cpu power management
+        - Revised Kconfig Makefile to match the alphabetical ordering
+        - Renamed serial-sprd-earlycon.c to serial-sprd.c
+
+Chunyan Zhang (3):
+  Documentation: DT: Renamed of-serial.txt to 8250.txt
+  Documentation: DT: Add bindings for Spreadtrum SoC Platform
+  tty/serial: Add Spreadtrum sc9836-uart driver support
+
+Zhizhou Zhang (2):
+  arm64: dts: Add support for Spreadtrum SC9836 SoC in dts and Makefile
+  arm64: Add support for Spreadtrum's Sharkl64 Platform in Kconfig and
+    defconfig
+
+ Documentation/devicetree/bindings/arm/sprd.txt     |   11 +
+ .../bindings/serial/{of-serial.txt => 8250.txt}    |    0
+ .../devicetree/bindings/serial/sprd-uart.txt       |    9 +
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ arch/arm64/Kconfig                                 |    6 +
+ arch/arm64/boot/dts/Makefile                       |    1 +
+ arch/arm64/boot/dts/sprd-sc9836-openphone.dts      |   85 +++
+ arch/arm64/boot/dts/sprd-sc9836.dtsi               |  102 +++
+ arch/arm64/boot/dts/sprd-sharkl64.dtsi             |  105 +++
+ arch/arm64/configs/defconfig                       |    1 +
+ drivers/tty/serial/Kconfig                         |   18 +
+ drivers/tty/serial/Makefile                        |    1 +
+ drivers/tty/serial/sprd_serial.c                   |  761 ++++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |    3 +
+ 14 files changed, 1104 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
+ rename Documentation/devicetree/bindings/serial/{of-serial.txt => 8250.txt} (100%)
+ create mode 100644 Documentation/devicetree/bindings/serial/sprd-uart.txt
+ create mode 100644 arch/arm64/boot/dts/sprd-sc9836-openphone.dts
+ create mode 100644 arch/arm64/boot/dts/sprd-sc9836.dtsi
+ create mode 100644 arch/arm64/boot/dts/sprd-sharkl64.dtsi
+ create mode 100644 drivers/tty/serial/sprd_serial.c
+
+-- 
+1.7.9.5
