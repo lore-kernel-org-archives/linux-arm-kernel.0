@@ -1,77 +1,70 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Wed, 3 Dec 2014 15:52:59 -0800
-Subject: [alsa-devel] [PATCH v2 2/2] ASoC: rockchip: i2s: add support for
- grabbing output clock to codec
-In-Reply-To: <CAEUnVG4qbnNaV26N9AgeKDJkEEvqi1QqdcYh=cLwjxY-aPor4w@mail.gmail.com>
-References: <1417531766-29669-1-git-send-email-jay.xu@rock-chips.com>
- <1417591118-18695-1-git-send-email-jay.xu@rock-chips.com>
- <1417591118-18695-3-git-send-email-jay.xu@rock-chips.com>
- <20141203192024.GL7712@sirena.org.uk>
- <CAPz6YkXRmRzYpW7xuDsq69A9H-Qm2-j6t-a+B1w9+OLOPf_YnA@mail.gmail.com>
- <20141203200307.GM7712@sirena.org.uk>
- <CAPz6YkWSQhqX-wAp5hZReo==MuG_Tju_0mk+kGrJo9XhjQ3ttA@mail.gmail.com>
- <CAEUnVG4qbnNaV26N9AgeKDJkEEvqi1QqdcYh=cLwjxY-aPor4w@mail.gmail.com>
-Message-ID: <CAPz6YkULCXPL=E+Kabp8S7LuH4dzwtQUb-Hbm+uMzOW8=Scq0A@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 4 Dec 2014 01:03:10 +0100 (CET)
+Subject: [PATCH 03/12] irqchip: gic: define register_routable_domain_ops
+ conditional
+In-Reply-To: <547F5EBD.6040705@arm.com>
+References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
+ <1417565531-4507-4-git-send-email-stefan@agner.ch>
+ <5174649.NxPq80uDz8@wuerfel> <alpine.DEB.2.11.1412031303000.16275@nanos>
+ <8eccedc781df2636a132dae449cbe774@agner.ch>
+ <547F5EBD.6040705@arm.com>
+Message-ID: <alpine.DEB.2.11.1412040057090.16275@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 3, 2014 at 3:22 PM, Dylan Reid <dgreid@chromium.org> wrote:
-> On Wed, Dec 3, 2014 at 3:03 PM, Sonny Rao <sonnyrao@chromium.org> wrote:
->> On Wed, Dec 3, 2014 at 12:03 PM, Mark Brown <broonie@kernel.org> wrote:
->>> On Wed, Dec 03, 2014 at 11:38:13AM -0800, Sonny Rao wrote:
->>>> On Wed, Dec 3, 2014 at 11:20 AM, Mark Brown <broonie@kernel.org> wrote:
->>>
->>>> > I would expect that the clock for the CODEC should be managed by the
->>>> > CODEC if at all possible - that seems more logical than having the CPU
->>>> > I2S controller request and manage it if it's a separate clock.  Why add
->>>> > this to the CPU side driver?
->>>
->>>> This output clock has a mux and can either be a fixed 12Mhz output or
->>>> can be derived from the same fractional divider which drives the i2s
->>>> block.   I thought it was simpler to keep them all the same, but need
->>>> to put ownership in the i2s in anticipation of the i2s driver setting
->>>> it's own clock rate.
->>>
->>>> If you think this is an implementation detail and this output clock
->>>> should just be owned by the codec driver, even though I'm guessing it
->>>> will just have to be the same as i2s, then I think we can drop this
->>>> and make sure simple card (or whatever other codec driver) claims this
->>>> clock.
->>>
->>> simple-card obviously isn't a CODEC driver...
->>
->> Yeah, sorry.
->>
->>> For generality I think
->>> the clock does need to be exposed to the CODEC driver, otherwise this
->>> will work differently to how other systems are working and we can't
->>> substitute in a different clock on the CODEC side so easily if it
->>> doesn't happen to use the output from the I2S block.
->>
->> Ok, then I think what we will do is abandon this patch and I will send
->> something that adds this functionality to the particular codec that
->> I'm interested in -- max98090.
->
-> Sorry I didn't read this earlier.  I don't think that this belongs in
-> the max98090.  The original patch description is a bit confusing.  The
-> clock being grabbed here is actually i2s mclk.  My understanding is
-> that, on this SoC, the mclk is driven from a different IP block than
-> the rest of the i2s signals.  The i2s driver needs to be told about
-> the clock and enable/disable it at the appropriate times.  I'm
-> assuming it's optional because there are boards using this SoC with
-> i2s slave mode that don't drive mclk at all.
->
-> Please correct me if I'm wrong on any of the above.
+On Wed, 3 Dec 2014, Marc Zyngier wrote:
+> On 03/12/14 17:28, Stefan Agner wrote:
+> > On 2014-12-03 14:04, Thomas Gleixner wrote:
+> >> The shared interrupts are allocated through the router domain which
+> >> decides whether the interrupt can be assigned to a particular core or
+> >> not. If it can be assigned it allocates the corresponding interrupt in
+> >> the parent domain, sets up the routing and everything just works.
+> > 
+> > What do you mean by the shared state in the drawing above? Currently, I
+> > check whether a interrupt is already used by the other core by reading
+> > the register (do this configuration register reflect the "shared state"
+> > in your drawing?).
+> 
+> I think that is basically it. It should only be the register that
+> decides on the actual routing. BTW, how do you arbitrate between
+> concurrent accesses to this register? Or is only the A5 allowed to
+> change it?
 
-I don't think you're wrong, and I'm an audio/i2s neophyte so I think
-you're probably right and hopefully Mark can confirm that this is how
-we want it.
+What I meant with 'shared state' is basically the configuration
+register space. Plus depending on the mechanism you want to use for
+correlating the routing between the A5 and the M4 some shared memory
+state, locking, IPC or whatever you need for this.
+ 
+> >> http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/log/?h=irq/irqdomain-arm
+> >>
+> > 
+> > Thanks for the link. So my work would involve to support domain
+> > hierarchy for NVIC (proper irq_domain_ops, introduce arm,routable-irqs
+> > property, anything else?) and then make use of the hierarchy code in my
+> > MSCM driver like for instance the mtk-sysirq driver...?
+> 
+> I don't think we need the arm,routable-irq property at all, and I'm
+> looking at refactoring the crossbar thingy to remove most of its
+> entanglement with the GIC.
+> 
+> All you need to know is the range of interrupts you're allowed to
+> request through the "routable" domain. The inner-most irqchip shouldn't
+> even know about it (after all, they are just wires coming in). It should
+> be the duty of the outer-most irqchip (the "router") to generate the
+> correct request to the GIC/NVIC. So all the knowledge should be at the
+> router level.
+> 
+> The mtk-sysrq code is indeed a good example of what you can do.
 
-One important thing to point out, which might be causing confusion, is
-that this driver is claiming a clock which it internally calls "mclk"
-but the way it's specified for rk3288 in the DT, that one is just the
-one which drives the internal logic and has a gate.
+The gic-v2m MSI stuff is probably helpful as well.
+ 
+> > What is the state of the IRQ domain hierarchy, when will it go upstream?
+> 
+> Scheduled for 3.19, if everything goes according to plan. Don't think we
+> can go back anyway... ;-)
 
-This clock I'm adding is the actual mclk which is being driven to the
-i2s slave device, and it has it's own gate and also has a mux, and we
-need to claim both to be able to enable proper clock gating.
+Indeed. That would be a major headache...
+
+Thanks,
+
+	tglx
