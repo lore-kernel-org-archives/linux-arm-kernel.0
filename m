@@ -1,353 +1,126 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Thu, 4 Dec 2014 19:34:18 +0800
-Subject: [PATCH v4 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC in
- dts and Makefile
-In-Reply-To: <1417692860-18841-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <sc9836v4>
- <1417692860-18841-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1417692860-18841-4-git-send-email-chunyan.zhang@spreadtrum.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 4 Dec 2014 11:52:55 +0000
+Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for
+ IOMMU drivers
+In-Reply-To: <CACxGe6v4ZVHHGcc3Lhp8+FgKakyCkJFRAT2ufj-3DGWa=wmGkA@mail.gmail.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <3152553.esaQuZiCgi@wuerfel> <20141204102127.GF13224@arm.com>
+ <5643715.BADzWxcqOQ@wuerfel>
+ <CACxGe6v4ZVHHGcc3Lhp8+FgKakyCkJFRAT2ufj-3DGWa=wmGkA@mail.gmail.com>
+Message-ID: <20141204115254.GF14519@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
+On Thu, Dec 04, 2014 at 11:25:35AM +0000, Grant Likely wrote:
+> On Thu, Dec 4, 2014 at 11:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 04 December 2014 10:21:27 Will Deacon wrote:
+> >> > > Sure, I'll add this to my list of stuff to do for 3.20.
+> >> >
+> >> > Does that mean the we don't get any of the patches for 3.19 despite the
+> >> > Acks?
+> >>
+> >> Hmm, I don't know how useful they are without the get/set ops and I don't
+> >> think I can get those ready for 3.19 given where we currently are.
+> >>
+> >> Grant's suggestion of adding an iommu_ops pointer to device_node would work
+> >> as a temporary hack, but anything more advanced is going to need proper
+> >> review.
+> >
+> > Right. I guess it doesn't hurt much if we put the new pointer inside
+> > #ifdef CONFIG_OF_IOMMU, then at least there is no significant size
+> > increase in most DT based platforms.
+> 
+> Yes, I can live with that hack on the proviso that it will be removed by v3.20
+> 
+> Oh, and please put an ugly /* */ comment block in the #ifdef
+> CONFIG_OF_IOMMU section that makes it really clear that it is an ugly
+> hack and will be removed in the next release. I don't want anyone
+> getting ideas that adding pointers to struct device_node is a good
+> idea.
 
-Adds the device tree support for Spreadtrum SC9836 SoC which is based on
-Sharkl64 platform.
+Something like the mess below?
 
-Sharkl64 platform contains the common nodes of Spreadtrum's arm64-based SoCs.
+Will
 
-Signed-off-by: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
----
- arch/arm64/boot/dts/Makefile                  |    1 +
- arch/arm64/boot/dts/sprd-sc9836-openphone.dts |   85 ++++++++++++++++++++
- arch/arm64/boot/dts/sprd-sc9836.dtsi          |  102 ++++++++++++++++++++++++
- arch/arm64/boot/dts/sprd-sharkl64.dtsi        |  105 +++++++++++++++++++++++++
- 4 files changed, 293 insertions(+)
- create mode 100644 arch/arm64/boot/dts/sprd-sc9836-openphone.dts
- create mode 100644 arch/arm64/boot/dts/sprd-sc9836.dtsi
- create mode 100644 arch/arm64/boot/dts/sprd-sharkl64.dtsi
+--->8
 
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index f8001a6..d0aff8a 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
-+dtb-$(CONFIG_ARCH_SHARKL64) += sprd-sc9836-openphone.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
- dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 29f0adc5f3e4..6f85c02bc1a6 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -43,6 +43,9 @@ struct property {
+ #if defined(CONFIG_SPARC)
+ struct of_irq_controller;
+ #endif
++#ifdef CONFIG_OF_IOMMU
++struct iommu_ops;
++#endif
  
-diff --git a/arch/arm64/boot/dts/sprd-sc9836-openphone.dts b/arch/arm64/boot/dts/sprd-sc9836-openphone.dts
-new file mode 100644
-index 0000000..484d714
---- /dev/null
-+++ b/arch/arm64/boot/dts/sprd-sc9836-openphone.dts
-@@ -0,0 +1,85 @@
+ struct device_node {
+ 	const char *name;
+@@ -65,6 +68,19 @@ struct device_node {
+ 	unsigned int unique_id;
+ 	struct of_irq_controller *irq_trans;
+ #endif
++#ifdef CONFIG_OF_IOMMU
 +/*
-+ * Spreadtrum SC9836 openphone board DTS file
++ * HACK! HACK! HACK!
 + *
-+ * Copyright (C) 2014, Spreadtrum Communications Inc.
++ * This is a temporary hack to associate a device_node for an
++ * IOMMU with its set of iommu_ops so that we can probe its upstream DMA
++ * masters on the platform bus by parsing the "iommus" property directly.
 + *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
++ * This is going away in 3.20. Please use the of_iommu_{get,set}_ops
++ * functions to get hold of this data.
 + */
++	struct iommu_ops *__iommu_ops_use_accessors;
++#endif
+ };
+ 
+ #define MAX_PHANDLE_ARGS 16
+diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+index d03abbb11c34..392ec5f212db 100644
+--- a/include/linux/of_iommu.h
++++ b/include/linux/of_iommu.h
+@@ -14,6 +14,17 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
+ extern void of_iommu_init(void);
+ extern struct iommu_ops *of_iommu_configure(struct device *dev);
+ 
++static inline void of_iommu_set_ops(struct device_node *np,
++				    const struct iommu_ops *ops)
++{
++	np->__iommu_ops_use_accessors = ops;
++}
 +
-+/dts-v1/;
++static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
++{
++	return np->__iommu_ops_use_accessors;
++}
 +
-+#include "sprd-sc9836.dtsi"
+ #else
+ 
+ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+@@ -29,19 +40,15 @@ static inline struct iommu_ops *of_iommu_configure(struct device *dev)
+ 	return NULL;
+ }
+ 
+-#endif	/* CONFIG_OF_IOMMU */
+-
+ static inline void of_iommu_set_ops(struct device_node *np,
+-				    const struct iommu_ops *ops)
+-{
+-	np->data = (struct iommu_ops *)ops;
+-}
+-
++				    const struct iommu_ops *ops) { }
+ static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+ {
+-	return np->data;
++	return NULL;
+ }
+ 
++#endif	/* CONFIG_OF_IOMMU */
 +
-+/ {
-+	model = "Spreadtrum,SC9836 Openphone Board";
-+
-+	compatible = "sprd,sc9836-openphone", "sprd,sc9836";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+	};
-+
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0 0x80000000 0 0x20000000>;
-+	};
-+
-+	chosen {
-+		stdout-path = &uart0;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/sprd-sc9836.dtsi b/arch/arm64/boot/dts/sprd-sc9836.dtsi
-new file mode 100644
-index 0000000..1abf897
---- /dev/null
-+++ b/arch/arm64/boot/dts/sprd-sc9836.dtsi
-@@ -0,0 +1,102 @@
-+/*
-+ * Spreadtrum SC9836 SoC DTS file
-+ *
-+ * Copyright (C) 2014, Spreadtrum Communications Inc.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "sprd-sharkl64.dtsi"
-+
-+/ {
-+	compatible = "sprd,sc9836";
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+		};
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+		};
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+		};
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	gic: interrupt-controller at 12001000 {
-+		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0 0x12001000 0 0x1000>,
-+		      <0 0x12002000 0 0x2000>,
-+		      <0 0x12004000 0 0x2000>,
-+		      <0 0x12006000 0 0x2000>;
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2", "arm,psci";
-+		method = "smc";
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <1 13 0xff01>,
-+			     <1 14 0xff01>,
-+			     <1 11 0xff01>,
-+			     <1 10 0xff01>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/sprd-sharkl64.dtsi b/arch/arm64/boot/dts/sprd-sharkl64.dtsi
-new file mode 100644
-index 0000000..d9ecfe9
---- /dev/null
-+++ b/arch/arm64/boot/dts/sprd-sharkl64.dtsi
-@@ -0,0 +1,105 @@
-+/*
-+ * Spreadtrum Sharkl64 platform DTS file
-+ *
-+ * Copyright (C) 2014, Spreadtrum Communications Inc.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/ {
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	soc {
-+		compatible = "simple-bus";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		ap_apb: apb at 70000000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0x70000000 0x0 0x10000000>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+
-+			uart0: serial at 70000000 {
-+				compatible = "sprd,sc9836-uart";
-+				reg = <0 0x70000000 0 0x100>;
-+				interrupts = <0 2 0xf04>;
-+				clocks = <&clk26mhz>;
-+				status = "disabled";
-+			};
-+
-+			uart1: serial at 70100000 {
-+				compatible = "sprd,sc9836-uart";
-+				reg = <0 0x70100000 0 0x100>;
-+				interrupts = <0 3 0xf04>;
-+				clocks = <&clk26mhz>;
-+				status = "disabled";
-+			};
-+
-+			uart2: serial at 70200000 {
-+				compatible = "sprd,sc9836-uart";
-+				reg = <0 0x70200000 0 0x100>;
-+				interrupts = <0 2 0xf04>;
-+				clocks = <&clk26mhz>;
-+				status = "disabled";
-+			};
-+
-+			uart3: serial at 70300000 {
-+				compatible = "sprd,sc9836-uart";
-+				reg = <0 0x70300000 0 0x100>;
-+				interrupts = <0 3 0xf04>;
-+				clocks = <&clk26mhz>;
-+				status = "disabled";
-+			};
-+		};
-+	};
-+
-+	clocks {
-+		clk26mhz: clk26mhz {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <26000000>;
-+		};
-+	};
-+};
--- 
-1.7.9.5
+ extern struct of_device_id __iommu_of_table;
+ 
+ typedef int (*of_iommu_init_fn)(struct device_node *);
