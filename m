@@ -1,40 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 4 Dec 2014 11:24:48 +0000
-Subject: [PATCH] ARM: kbuild: Fix forced rebuild after 'make dtbs'
-In-Reply-To: <20141204112201.C824AC40992@trevor.secretlab.ca>
-References: <CACRpkdYmJWy1_vs0tWRA7SvkQnvbXXKqf7pHpH5b5tZ6vR+KJg@mail.gmail.com>
- <1414961549-31666-1-git-send-email-jason@lakedaemon.net>
- <5474F78F.2060906@suse.cz>
- <20141125235150.GH3836@n2100.arm.linux.org.uk>
- <20141126005710.GE22670@titan.lakedaemon.net>
- <CACRpkdZJoWbQeuZ4ZXGbQr0+SNG_9ZA+cQkAA0C2F9rnZDYtyQ@mail.gmail.com>
- <20141126144153.GK3836@n2100.arm.linux.org.uk>
- <CACRpkdYwQT3+RLxP_b_kYJoHV4L7sZ7yiU=JZWVq_zHKz0EY_g@mail.gmail.com>
- <547C7364.8000009@suse.cz>
- <20141204112201.C824AC40992@trevor.secretlab.ca>
-Message-ID: <20141204112448.GN11285@n2100.arm.linux.org.uk>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Thu, 4 Dec 2014 19:24:24 +0800
+Subject: [PATCH] arm64/include/asm: Fixed a warning about 'struct pt_regs'
+Message-ID: <1417692264-18553-1-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 11:22:01AM +0000, Grant Likely wrote:
-> On Mon, 01 Dec 2014 14:55:48 +0100, Michal Marek <mmarek@suse.cz> wrote:
-> > Still, the dependency on the 'prepare' target is superfluous, if the
-> > only requirement is that $(KERNELRELEASE) be set properly.
-> 
-> So, I've lost track of where things stand on this issue. What is the
-> current proposed fix? Make dtbs depend on 'scripts' and dtbs_install
-> depend on 'prepare scripts'? Or is there a better way to make sure
-> KERNELRELEASE is set for the dtbs_install target?
+If I include asm/irq.h on the top of my code, and set ARCH=arm64,
+I'll get a compile warning, details are below:
+warning: ?struct pt_regs?
+declared inside parameter list [enabled by default]
 
-Marek's first reply in the thread contains the solution:
+This patch is suggested by Arnd, see:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/308270.html
 
-  if you only need
-  the KERNELRELEASE variable, then you do not need to depend on prepare.
-  The main Makefile makes sure that silentoldconfig is ran and therefore
-  KERNELRELEASE set for all targets except make *config.
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+---
+ arch/arm64/include/asm/irq.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-which seems to suggest that "prepare" is not needed for either target.
-
+diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
+index e1f7ecd..acedc7e 100644
+--- a/arch/arm64/include/asm/irq.h
++++ b/arch/arm64/include/asm/irq.h
+@@ -3,6 +3,8 @@
+ 
+ #include <asm-generic/irq.h>
+ 
++struct pt_regs;
++
+ extern void (*handle_arch_irq)(struct pt_regs *);
+ extern void migrate_irqs(void);
+ extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.7.9.5
