@@ -1,72 +1,60 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 4 Dec 2014 15:49:26 +0100
-Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for
- IOMMU drivers
-In-Reply-To: <54806504.20507@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <CAL_JsqKHvh9KSTYrrs1Pts5Kg=8dA1V6NiW57_2vdDH173qQGg@mail.gmail.com>
- <CACxGe6vyMkyE9ZRj_FQzi19ESEo7OV_RQoVV65xBYpdQV8cRGQ@mail.gmail.com>
- <2579924.PPXuLn3o19@wuerfel> <54805312.6000402@arm.com>
- <CACxGe6uR5J4Cjdh_xYhBPoQRgeYwHPv5=AnuRmQKSD3yZrMK9Q@mail.gmail.com>
- <54806504.20507@arm.com>
-Message-ID: <20141204144925.GB31464@ulmo.nvidia.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 04 Dec 2014 06:51:49 -0800
+Subject: [PATCH v7 08/11] arm/arm64: Unexport restart handlers
+In-Reply-To: <CAMuHMdX-WsVErpiZ_EbFSGxeJEfpu3cRaZzitupiSAA2hXEJ8g@mail.gmail.com>
+References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>	<1408495538-27480-9-git-send-email-linux@roeck-us.net>	<CAMuHMdVqCa+m1oMkuRHcTZKw2CWNHJVotWBwfTnfBNT11UPEjw@mail.gmail.com>	<54806F2A.7070107@roeck-us.net>
+ <CAMuHMdX-WsVErpiZ_EbFSGxeJEfpu3cRaZzitupiSAA2hXEJ8g@mail.gmail.com>
+Message-ID: <54807505.2000406@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 01:43:32PM +0000, Robin Murphy wrote:
-> Hi Grant, thanks for the advice - silly micro-optimisations removed, and
-> I'll make a note to do so from my in-development code, too ;)
-> 
-> I didn't much like the casting either, so rather than push it elsewhere or
-> out to the caller I've just changed the prototype to obviate it completely.
-> Since we're also expecting to churn this again to use something more
-> suitable than iommu_ops as the private data, I think keeping things simple
-> wins over const-correctness for now.
-> 
-> Thanks,
-> Robin
-> 
-> --->8---
-> From b2e8c91ac49bef4008661e4628cd6b7249d84af5 Mon Sep 17 00:00:00 2001
-> Message-Id: <b2e8c91ac49bef4008661e4628cd6b7249d84af5.1417698001.git.robin.murphy@arm.com>
-> From: Robin Murphy <robin.murphy@arm.com>
-> Date: Thu, 4 Dec 2014 11:53:13 +0000
-> Subject: [PATCH v2] iommu: store DT-probed IOMMU data privately
-> 
-> Since the data pointer in the DT node is public and may be overwritten
-> by conflicting code, move the DT-probed IOMMU ops to a private list
-> where they will be safe.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/of_iommu.c | 40 ++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_iommu.h | 12 ++----------
->  2 files changed, 42 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index 73236d3..c7078f6 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -94,6 +94,46 @@ int of_get_dma_window(struct device_node *dn, const char
-> *prefix, int index,
->  }
->  EXPORT_SYMBOL_GPL(of_get_dma_window);
-> 
-> +struct of_iommu_node {
-> +	struct list_head list;
-> +	struct device_node *np;
-> +	struct iommu_ops *ops;
+On 12/04/2014 06:44 AM, Geert Uytterhoeven wrote:
+> Hi G?nther,
+>
+> On Thu, Dec 4, 2014 at 3:26 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>> On 12/04/2014 05:36 AM, Geert Uytterhoeven wrote:
+>>> On Wed, Aug 20, 2014 at 2:45 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+>>>> Implementing a restart handler in a module don't make sense
+>>>> as there would be no guarantee that the module is loaded when
+>>>> a restart is needed. Unexport arm_pm_restart to ensure that
+>>>> no one gets the idea to do it anyway.
+>>>
+>>> Why not? I was just going to do that, but I got greeted by:
+>>
+>> Because you should register a restart handler instead, like the other
+>> drivers in the same directory now do.
+>
+> That's a different thing. "there would be no guarantee that the module is
+> loaded when a restart is needed" is also valid for restart handlers...
+>
 
-Why can't this be const? Why would anyone ever need to modify it? Also
-drivers do define their iommu_ops structures const these days, so you'll
-either still have to cast away at some point or the compiler will
-complain once you start calling this from drivers.
+Not really, because you are supposed to unregister the restart handler
+on unload. Sure, you can instead clear arm_pm_reastart and leave the system
+with no means to restart ...
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/88e4256b/attachment-0001.sig>
+Guenter
+
+>>> ERROR: "arm_pm_restart" [drivers/power/reset/rmobile-reset.ko] undefined!
+>>>
+>>> So now we have to make sure all reset drivers for a zillion different
+>>> hardware devices are builtin, and can't be modular?
+>>>
+>> No. All those drivers need to do is to register a restart handler using
+>> the API provided in the patch series.
+>>
+>> Ultimately all restart handlers should do that and arm_pm_restart should
+>> go away entirely. That was the point of the patch series.
+>
+> Good. That's what I'm doing right know ;-)
+>
+> Gr{oetje,eeting}s,
+>
+>                          Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                  -- Linus Torvalds
+>
