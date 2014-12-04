@@ -1,76 +1,52 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Thu, 4 Dec 2014 15:12:48 -0200
-Subject: [PATCH] arm: omap2: rx51-peripherals: fix build warning
-In-Reply-To: <20141204170353.GK18045@saruman>
-References: <1417033655-32332-1-git-send-email-balbi@ti.com>
- <20141204152411.GF18045@saruman> <3261416.DL88JFJXUF@wuerfel>
- <20141204154835.GH18045@saruman>
- <20141204163930.GF2817@atomide.com>
- <20141204150012.2fb75907@recife.lan>
- <20141204170353.GK18045@saruman>
-Message-ID: <20141204151248.7f41afe0@recife.lan>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 4 Dec 2014 17:18:49 +0000
+Subject: [RFC] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <1417692868.9037.4.camel@pengutronix.de>
+References: <52c403454c3b8fc201abe7ac74cf657638479311.1417691389.git.viresh.kumar@linaro.org>
+ <1417692868.9037.4.camel@pengutronix.de>
+Message-ID: <20141204171849.GX7712@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, 04 Dec 2014 11:03:53 -0600
-Felipe Balbi <balbi@ti.com> escreveu:
+On Thu, Dec 04, 2014 at 12:34:28PM +0100, Lucas Stach wrote:
+> Am Donnerstag, den 04.12.2014, 16:44 +0530 schrieb Viresh Kumar:
 
-> Hi,
-> 
-> On Thu, Dec 04, 2014 at 03:00:12PM -0200, Mauro Carvalho Chehab wrote:
-> > Em Thu, 04 Dec 2014 08:39:31 -0800
-> > Tony Lindgren <tony@atomide.com> escreveu:
-> > 
-> > > * Felipe Balbi <balbi@ti.com> [141204 07:50]:
-> > > > Hi,
-> > > > 
-> > > > On Thu, Dec 04, 2014 at 04:41:13PM +0100, Arnd Bergmann wrote:
-> > > > > On Thursday 04 December 2014 09:24:11 Felipe Balbi wrote:
-> > > > > > On Wed, Nov 26, 2014 at 02:27:35PM -0600, Felipe Balbi wrote:
-> > > > > > > commit 68a3c04 ([media] ARM: OMAP2: RX-51: update
-> > > > > > > si4713 platform data) updated board-rx51-peripherals.c
-> > > > > > > so that si4713 could be easily used on DT boot, but
-> > > > > > > it ended up introducing a build warning whenever
-> > > > > > > si4713 isn't enabled.
-> > > > > > > 
-> > > > > > > This patches fixes that warning:
-> > > > > > > 
-> > > > > > > arch/arm/mach-omap2/board-rx51-peripherals.c:1000:36: warning: \
-> > > > > > > 	?rx51_si4713_platform_data? defined but not used [-Wunused-variable]
-> > > > > > >  static struct si4713_platform_data rx51_si4713_platform_data = {
-> > > > > > > 
-> > > > > > > Cc: Sebastian Reichel <sre@kernel.org>
-> > > > > > > Cc: Tony Lindgren <tony@atomide.com>
-> > > > > > > Cc: Hans Verkuil <hans.verkuil@cisco.com>
-> > > > > > > Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> > > > > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > > > > 
-> > > > > > a gentle reminder on this one.
-> > > > > > 
-> > > > > 
-> > > > > Let me add my
-> > > > > 
-> > > > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > > > 
-> > > > > You didn't say who you expect to pick up the patch. I assume Mauro
-> > > > 
-> > > > patch author now decides who takes the patch ? That's new :-)
-> > 
-> > Well, for patches that cross subsystem boundaries, like this one,
-> > the best is to give a hint about whom you expect to pick it.
-> > 
-> > In this specific case, as commit 68a3c04 is in my tree, the best is
-> > to merge the patch on it, as the patch may not even apply at Tony's
-> > tree.
-> 
-> pointing to the commit that caused the problem really isn't enough ? The
-> commit short description (which is also on my commit log) clearly
-> mentions "[media]".
-> 
-> Anyway, I'll do that next time.
+> > +  - voltage-tolerance: Specify the CPU voltage tolerance in percentage.
 
-Ah, and please c/c linux-media ML next time, as I use patchwork there
-to track patches for the media tree.
+> This is extremely ill defined. It doesn't say in which direction the
+> tolerance is to be applied. Can you go below or above the OPP specified
+> voltage? For now everyone just assumes that it has to work both ways.
+> Also with this binding the tolerance is applied for all OPPs, where is
+> very much depends on the individual OPP.
 
-Thanks,
-Mauro.
+Almost all specifications for voltages are done as either min/typ/max or
++/- a target voltage.
+
+> If you are going to redefine OPPs anyway I would really like to see this
+> property die and rather have a min/max voltage per OPP. That way you can
+> properly express the OPP constraints. Most OPPs will likely allow a much
+> higher voltage than their minimal specified one, except when you go over
+> thermal limits with a high clock/voltage combination.
+
+If you've got a minimum and maximum you also need to specify a target,
+generally it's going to be better to go for the target voltage which may
+not be the midpoint and is unlikely to be one of the bounds.  I do think
+it's sensible to have the option of doing both to more closely match
+datasheets.
+
+> > +  - clock-latency: Specify the possible maximum transition latency for clock,
+> > +    in unit of nanoseconds.
+
+> Why do we need this? This is property of the clock. We should be able to
+> handle this completely internally in the kernel. I don't know if the
+> clock API has something like this right now, but it should be a trivial
+> addition.
+
+Or have it be part of the clock binding at any rate.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141204/13f8515b/attachment-0001.sig>
