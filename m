@@ -1,96 +1,52 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 04 Dec 2014 11:02:04 +0100
-Subject: [PATCH v4 15/19] arm/arm64: KVM: add virtual GICv3 distributor
- emulation
-In-Reply-To: <20141204093448.GA4526@cbox>
-References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
- <20141203102829.GA17502@cbox> <547EEF9A.9010906@arm.com>
- <2906594.cDZcXzbGMh@wuerfel>
- <CAFEAcA9=qB9iyuvxCCjqgx3DpXqw+x2g0acfh9KwDZK7bp2ACg@mail.gmail.com>
- <547EFC2F.1040604@arm.com> <20141204093448.GA4526@cbox>
-Message-ID: <5480311C.9080803@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 4 Dec 2014 11:03:57 +0100
+Subject: Do I need to invalidate caches before enabling (on ARMv7)?
+Message-ID: <20141204100357.GO2129@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2014 10:34 AM, Christoffer Dall wrote:
-> On Wed, Dec 03, 2014 at 12:03:59PM +0000, Andre Przywara wrote:
->> On 03/12/14 11:39, Peter Maydell wrote:
->>> On 3 December 2014 at 11:28, Arnd Bergmann <arnd@arndb.de> wrote:
->>>> On Wednesday 03 December 2014 11:10:18 Andre Przywara wrote:
->>>>> Currently we have in QEMU:
->>>>>    0 MB -  128 MB: Flash
->>>>>  128 MB -  144 MB: CPU peripherals (GIC for now only)
->>>>>  144 MB -  144 MB: UART (64k)
->>>>>  144 MB -  144 MB: RTC (64k)
->>>>>  160 MB -  256 MB: virtio (32 * 512 Bytes used)
->>>>>  256 MB - 1024 MB: PCI
->>>>> 1024 MB - ???? MB: DRAM
->>>>>
->>>>> So we waste quite some space between 144 MB and 256 MB, where we
->>>>> currently use only 3 64K pages. If we would move those three pages
->>>>> closer to the 256 MB region, we could extend the GIC mapping space from
->>>>> 16 MB (127 VCPUs) to almost 128 MB (good for 1022 VCPUs).
->>>
->>> Note that part of the reason for that gap is to give us space
->>> to add more memory-mapped peripherals as they are needed.
->>> For instance the fw_cfg conduit for talking to UEFI firmware
->>> is going to need another 64K page in that section.
+Hello,
 
-Hi,
+(first I have to admit that originally my question is a bit off-topic
+because I'm currently looking into the cache handling of barebox, but it
+also applies to Linux, so I guess it's fine to ask here.)
 
-For info I also planned to use 4MB between RTC and virtio for platform
-bus (all dynamically instantiated sysbus devices including VFIO platform
-devices), currently plugged at 148MB
-(http://lists.gnu.org/archive/html/qemu-devel/2014-11/msg04346.html)
+Reading through ARMARM for v7-A and v7-R (ARM DDI 0406C.c, p1269) I
+found:
 
-Best Regards
+ ==== Behavior of the caches at reset ====
+ [...]
+ * An implementation can require the use of a specific cache
+   initialization routine to invalidate its storage array before it is
+   enabled.
 
-Eric
+The breakage I'm currently seeing in barebox might well be explained by
+stale I-cache entries and barebox (as of now) doesn't invalidate the
+i-cache before enabling it. Looking into how Linux enables the I-cache
+in the decompressor for v7[1] revealed that the caches are not cleaned
+there either. (So my plan to copy from Linux failed :-)
 
->>
->> Sure, that was just to show the situation in general. We could do
->> something like kvmtool and grow the CPU peripheral space and the device
->> MMIO pages from different directions to not waste space needlessly.
->> So UART, RTC, virtio and future devices use space from 128MB upwards,
->> whereas the GIC uses as much space below 256 MB as needed.
->>
->> Btw.: Is there an issue with not aligning each virtio device to a 64K
->> page? Will we never need to separate access to virtio devices in a guest
->> with MMU help?
->>
->>>> Having a more compressed mapping sounds useful, but you could also consider
->>>> carving the GIC registers out of the PCI range and make PCI memory space
->>>> smaller if there are lots of CPUs.
->>>>
->>>> Is there also a 64-bit PCI memory space behind the DRAM?
->>>
->>> The "PCI" section at the moment is purely hypothetical -- it's
->>> a lump of reserved space in the memory map that I put in so
->>> we had a place to put PCI later... The DRAM is just the last
->>> thing in the memory map and goes up for as much DRAM as you
->>> asked QEMU to provide, so in that sense there's no "behind"
->>> there.
->>>
->>> We could (at least at the moment) shuffle things around a bit,
->>> since guests should all be looking at the DTB to figure where
->>> things are. About the only thing we can't do is move the base
->>> address of RAM or put the flash somewhere other than 0. If
->>> we do need to make changes I'd rather we figured out the new
->>> layout and switched to it rather than doing a set of piecemeal
->>> tweaks, though.
->>
->> Agreed. As QEMU does not support GICv3 anyway at the moment, there is no
->> need to rush things.
->>
->> Is there any sign of a PCI host controller emulation for QEMU on the
->> horizon?
->>
-> Yes, we need to have this in Q1 2015 latest.  Linaro has scheduled this
-> work, but patches are a little while out I'm afraid.
-> 
-> -Christoffer
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
+Now I wonder if that is only an unlikely (or even theoretical) issue
+that wasn't noticed up to now or if I'm missing something.
+
+In the paragraph that the above quote is taken from, furthermore the
+following is written:
+
+ It is IMPLEMENTATION DEFINED whether an access can generate a cache hit
+ when the cache is disabled.
+
+So stale entries in the cache might even hurt before the cache is
+enabled?! This would mean that you want to invalidate/flush the cache at
+disable-time. Still I think doing it before enabling it in Linux would
+be a good idea. And if it's only because bootloaders and (maybe worse)
+boot roms cannot be trusted in this area.
+
+What do you think?
+
+Best regards
+Uwe
+
+[1] __armv7_mmu_cache_on in arch/arm/boot/compressed/head.S
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
