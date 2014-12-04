@@ -1,383 +1,169 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Thu,  4 Dec 2014 20:27:49 +0100
-Subject: [PATCH v2] ARM: dts: Add dts file for odroid XU3 board
-Message-ID: <1417721269-19342-1-git-send-email-sjoerd.simons@collabora.co.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 04 Dec 2014 19:42:28 +0000
+Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
+ drivers
+In-Reply-To: <CACxGe6tpFHdP1-5NWiNVAqzXx-diN1xfRbu0AQDyVJ6AU_4RXg@mail.gmail.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <CAL_JsqKHvh9KSTYrrs1Pts5Kg=8dA1V6NiW57_2vdDH173qQGg@mail.gmail.com>
+ <CACxGe6vyMkyE9ZRj_FQzi19ESEo7OV_RQoVV65xBYpdQV8cRGQ@mail.gmail.com>
+ <2579924.PPXuLn3o19@wuerfel> <54805312.6000402@arm.com>
+ <CACxGe6uR5J4Cjdh_xYhBPoQRgeYwHPv5=AnuRmQKSD3yZrMK9Q@mail.gmail.com>
+ <54806504.20507@arm.com> <20141204144925.GB31464@ulmo.nvidia.com>
+ <54809D09.2050406@arm.com>
+ <CACxGe6tpFHdP1-5NWiNVAqzXx-diN1xfRbu0AQDyVJ6AU_4RXg@mail.gmail.com>
+Message-ID: <5480B924.2010205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DTS for the Hardkernel Odroid XU3. The name of the DTS file is kept the
-same as the vendors naming, which means it's prefixed with exynos5422
-instead of exynos5800 as the SoC name even though it includes the
-exyno5800 dtsi.
+Hi Grant,
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+On 04/12/14 17:58, Grant Likely wrote:
+[...]
+>>>> +struct of_iommu_node {
+>>>> +       struct list_head list;
+>>>> +       struct device_node *np;
+>>>> +       struct iommu_ops *ops;
+>>>
+>>>
+>>> Why can't this be const? Why would anyone ever need to modify it? Also
+>>> drivers do define their iommu_ops structures const these days, so you'll
+>>> either still have to cast away at some point or the compiler will
+>>> complain once you start calling this from drivers.
+>>>
+>>
+>> ...whereas if we make everything const then the drivers that _do_ want to
+>> use the private data introduced by this series and thus pass mutable
+>> per-instance iommu_ops will be the ones having to cast. We have no users
+>> either way until this series is merged, and the need to stash the
+>> per-instance data somewhere other than np->data is in the way of getting it
+>> merged - this is just a quick hack to address that. I think we've already
+>> agreed that mutable per-instance iommu_ops holding private data aren't
+>> particularly pleasant and will (hopefully) go away in the next iteration[1],
+>> at which point this all changes anyway.
+>
+> Do you expect drivers to modify that *priv pointer after the ops
+> structure is registered? I'd be very surprised if that was the use
+> case. It's fine for the driver to register a non-const version, but
+> once it is registered, the infrastructure can treat it as const from
+> then on.
+
+Possibly not - certainly my current port of the ARM SMMU which makes use 
+of *priv is only ever reading it - although we did also wave around 
+reasons for mutable ops like dynamically changing the pgsize_bitmap and 
+possibly even swizzling individual ops for runtime reconfiguration. On 
+consideration though, I'd agree that things like that are mad enough to 
+stay well within individual drivers if they did ever happen, and 
+certainly shouldn't apply to this bit of the infrastructure at any rate.
+
+Here's a respin the other way - making the get/set infrastructure fully 
+const and fixing up the callsite in of_iommu_configure instead to avoid 
+the warning. Trying to chase const-correctness beyond that quickly got 
+too invasive and out of scope for this fix - I'm just keen to get the 
+merge-blocker out of the way.
+
+Regards,
+Robin.
+
+--->8---
+ From 9eba5081aaf4fa8ed5158675a6e622be11a64ae2 Mon Sep 17 00:00:00 2001
+Message-Id: 
+<9eba5081aaf4fa8ed5158675a6e622be11a64ae2.1417719305.git.robin.murphy@arm.com>
+From: Robin Murphy <robin.murphy@arm.com>
+Date: Thu, 4 Dec 2014 11:53:13 +0000
+Subject: [PATCH v3] iommu: store DT-probed IOMMU data privately
+
+Since the data pointer in the DT node is public and may be overwritten
+by conflicting code, move the DT-probed IOMMU ops to a private list
+where they will be safe.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
-Changes since v1:
-  * Add chosen/linux,stdout-path to point the serial console device
-  * Change memory start offset to 0x40000000 to match the vendors DTS (pointed
-    out by Heesub Shin)
-  * Declare base address & size for the memory banks to be used by the MFC
+  drivers/iommu/of_iommu.c | 40 +++++++++++++++++++++++++++++++++++++++-
+  include/linux/of_iommu.h | 12 ++----------
+  2 files changed, 41 insertions(+), 11 deletions(-)
 
-Kevin, Tyler, even though the changes are small i didn't want to just stick
-your Tested-By on. Could you both be so kind to retest this on your XU3's ?
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 73236d3..39f581f 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -94,6 +94,44 @@ int of_get_dma_window(struct device_node *dn, const 
+char *prefix, int index,
+  }
+  EXPORT_SYMBOL_GPL(of_get_dma_window);
 
-Heesub, I would still love to know the reason for having the memory start
-address at 0x40000000 for this board?
++struct of_iommu_node {
++	struct list_head list;
++	struct device_node *np;
++	const struct iommu_ops *ops;
++};
++static LIST_HEAD(of_iommu_list);
++static DEFINE_SPINLOCK(of_iommu_lock);
++
++void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops)
++{
++	struct of_iommu_node *iommu = kzalloc(sizeof(*iommu), GFP_KERNEL);
++
++	if (WARN_ON(!iommu))
++		return;
++
++	INIT_LIST_HEAD(&iommu->list);
++	iommu->np = np;
++	iommu->ops = ops;
++	spin_lock(&of_iommu_lock);
++	list_add_tail(&iommu->list, &of_iommu_list);
++	spin_unlock(&of_iommu_lock);
++}
++
++const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
++{
++	struct of_iommu_node *node;
++	const struct iommu_ops *ops = NULL;
++
++	spin_lock(&of_iommu_lock);
++	list_for_each_entry(node, &of_iommu_list, list)
++		if (node->np == np) {
++			ops = node->ops;
++			break;
++		}
++	spin_unlock(&of_iommu_lock);
++	return ops;
++}
++
+  struct iommu_ops *of_iommu_configure(struct device *dev)
+  {
+  	struct of_phandle_args iommu_spec;
+@@ -110,7 +148,7 @@ struct iommu_ops *of_iommu_configure(struct device *dev)
+  					   "#iommu-cells", idx,
+  					   &iommu_spec)) {
+  		np = iommu_spec.np;
+-		ops = of_iommu_get_ops(np);
++		ops = (struct iommu_ops *)of_iommu_get_ops(np);
 
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/exynos5422-odroidxu3.dts | 332 +++++++++++++++++++++++++++++
- 2 files changed, 333 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos5422-odroidxu3.dts
+  		if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
+  			goto err_put_node;
+diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+index d03abbb..83f6d0b 100644
+--- a/include/linux/of_iommu.h
++++ b/include/linux/of_iommu.h
+@@ -31,16 +31,8 @@ static inline struct iommu_ops 
+*of_iommu_configure(struct device *dev)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 38c89ca..0a898cc 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -86,6 +86,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- 	exynos5420-arndale-octa.dtb \
- 	exynos5420-peach-pit.dtb \
- 	exynos5420-smdk5420.dtb \
-+	exynos5422-odroidxu3.dtb \
- 	exynos5440-sd5v1.dtb \
- 	exynos5440-ssdk5440.dtb \
- 	exynos5800-peach-pi.dtb
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-new file mode 100644
-index 0000000..0dc9cf8
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-@@ -0,0 +1,332 @@
-+/*
-+ * Hardkernel Odroid XU3 board device tree source
-+ *
-+ * Copyright (c) 2014 Collabora Ltd.
-+ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+#include "exynos5800.dtsi"
-+
-+/ {
-+	model = "Hardkernel Odroid XU3";
-+	compatible = "hardkernel,odroid-xu3", "samsung,exynos5800", "samsung,exynos5";
-+
-+	memory {
-+		reg = <0x40000000 0x80000000>;
-+	};
-+
-+	chosen {
-+		linux,stdout-path = &serial_2;
-+	};
-+
-+	fimd at 14400000 {
-+		status = "okay";
-+	};
-+
-+	firmware at 02073000 {
-+		compatible = "samsung,secure-firmware";
-+		reg = <0x02073000 0x1000>;
-+	};
-+
-+	fixed-rate-clocks {
-+		oscclk {
-+			compatible = "samsung,exynos5420-oscclk";
-+			clock-frequency = <24000000>;
-+		};
-+	};
-+
-+	hsi2c_4: i2c at 12CA0000 {
-+		status = "okay";
-+
-+		s2mps11_pmic at 66 {
-+			compatible = "samsung,s2mps11-pmic";
-+			reg = <0x66>;
-+			s2mps11,buck2-ramp-delay = <12>;
-+			s2mps11,buck34-ramp-delay = <12>;
-+			s2mps11,buck16-ramp-delay = <12>;
-+			s2mps11,buck6-ramp-enable = <1>;
-+			s2mps11,buck2-ramp-enable = <1>;
-+			s2mps11,buck3-ramp-enable = <1>;
-+			s2mps11,buck4-ramp-enable = <1>;
-+
-+			s2mps11_osc: clocks {
-+				#clock-cells = <1>;
-+				clock-output-names = "s2mps11_ap",
-+						"s2mps11_cp", "s2mps11_bt";
-+			};
-+
-+			regulators {
-+				ldo1_reg: LDO1 {
-+					regulator-name = "vdd_ldo1";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo3_reg: LDO3 {
-+					regulator-name = "vdd_ldo3";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo5_reg: LDO5 {
-+					regulator-name = "vdd_ldo5";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo6_reg: LDO6 {
-+					regulator-name = "vdd_ldo6";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo7_reg: LDO7 {
-+					regulator-name = "vdd_ldo7";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo8_reg: LDO8 {
-+					regulator-name = "vdd_ldo8";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo9_reg: LDO9 {
-+					regulator-name = "vdd_ldo9";
-+					regulator-min-microvolt = <3000000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo10_reg: LDO10 {
-+					regulator-name = "vdd_ldo10";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo11_reg: LDO11 {
-+					regulator-name = "vdd_ldo11";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo12_reg: LDO12 {
-+					regulator-name = "vdd_ldo12";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo13_reg: LDO13 {
-+					regulator-name = "vdd_ldo13";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo15_reg: LDO15 {
-+					regulator-name = "vdd_ldo15";
-+					regulator-min-microvolt = <3100000>;
-+					regulator-max-microvolt = <3100000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo16_reg: LDO16 {
-+					regulator-name = "vdd_ldo16";
-+					regulator-min-microvolt = <2200000>;
-+					regulator-max-microvolt = <2200000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo17_reg: LDO17 {
-+					regulator-name = "tsp_avdd";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo19_reg: LDO19 {
-+					regulator-name = "vdd_sd";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo24_reg: LDO24 {
-+					regulator-name = "tsp_io";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+					regulator-always-on;
-+				};
-+
-+				buck1_reg: BUCK1 {
-+					regulator-name = "vdd_mif";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1300000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck2_reg: BUCK2 {
-+					regulator-name = "vdd_arm";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1500000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck3_reg: BUCK3 {
-+					regulator-name = "vdd_int";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1400000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck4_reg: BUCK4 {
-+					regulator-name = "vdd_g3d";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1400000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck5_reg: BUCK5 {
-+					regulator-name = "vdd_mem";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1400000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck6_reg: BUCK6 {
-+					regulator-name = "vdd_kfc";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1500000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck7_reg: BUCK7 {
-+					regulator-name = "vdd_1.0v_ldo";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1500000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck8_reg: BUCK8 {
-+					regulator-name = "vdd_1.8v_ldo";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1500000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck9_reg: BUCK9 {
-+					regulator-name = "vdd_2.8v_ldo";
-+					regulator-min-microvolt = <3000000>;
-+					regulator-max-microvolt = <3750000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck10_reg: BUCK10 {
-+					regulator-name = "vdd_vmem";
-+					regulator-min-microvolt = <2850000>;
-+					regulator-max-microvolt = <2850000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+			};
-+		};
-+	};
-+
-+	i2c_2: i2c at 12C80000 {
-+		samsung,i2c-sda-delay = <100>;
-+		samsung,i2c-max-bus-freq = <66000>;
-+		status = "okay";
-+
-+		hdmiddc at 50 {
-+			compatible = "samsung,exynos4210-hdmiddc";
-+			reg = <0x50>;
-+		};
-+	};
-+
-+	rtc at 101E0000 {
-+		status = "okay";
-+	};
-+};
-+
-+&hdmi {
-+	status = "okay";
-+	hpd-gpio = <&gpx3 7 0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_hpd_irq>;
-+
-+	vdd_osc-supply = <&ldo10_reg>;
-+	vdd_pll-supply = <&ldo8_reg>;
-+	vdd-supply = <&ldo8_reg>;
-+};
-+
-+&mfc {
-+	samsung,mfc-r = <0x43000000 0x800000>;
-+	samsung,mfc-l = <0x51000000 0x800000>;
-+};
-+
-+&mmc_0 {
-+	status = "okay";
-+	broken-cd;
-+	card-detect-delay = <200>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <0 4>;
-+	samsung,dw-mshc-ddr-timing = <0 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+};
-+
-+&mmc_2 {
-+	status = "okay";
-+	card-detect-delay = <200>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <0 4>;
-+	samsung,dw-mshc-ddr-timing = <0 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-+	bus-width = <4>;
-+	cap-sd-highspeed;
-+};
-+
-+&pinctrl_0 {
-+	hdmi_hpd_irq: hdmi-hpd-irq {
-+		samsung,pins = "gpx3-7";
-+		samsung,pin-function = <0>;
-+		samsung,pin-pud = <1>;
-+		samsung,pin-drv = <0>;
-+	};
-+};
-+
-+&usbdrd_dwc3_0 {
-+	dr_mode = "host";
-+};
-+
-+&usbdrd_dwc3_1 {
-+	dr_mode = "otg";
-+};
+  #endif	/* CONFIG_OF_IOMMU */
+
+-static inline void of_iommu_set_ops(struct device_node *np,
+-				    const struct iommu_ops *ops)
+-{
+-	np->data = (struct iommu_ops *)ops;
+-}
+-
+-static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+-{
+-	return np->data;
+-}
++void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
++const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
+
+  extern struct of_device_id __iommu_of_table;
+
 -- 
-2.1.3
+1.9.1
