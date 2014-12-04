@@ -1,178 +1,191 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  4 Dec 2014 23:30:11 +0100
-Subject: [PATCH 1/4] mtd: nand: atmel: Rework driver to separate nfc and nand
- nodes
+Date: Thu,  4 Dec 2014 23:30:14 +0100
+Subject: [PATCH 4/4] ARM: at91/dt: sama5: move NAND nodes into board dts/dtsi
 In-Reply-To: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1417732214-3292-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1417732214-3292-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mtd: nand: atmel: Update DT documentation after splitting NFC and NAND
-
-The NAND and NFC (NAND Flash Controller) were linked together with a
-parent <-> child relationship.
-
-This model has several drawbacks:
-- it does not allow for multiple NAND chip handling while the controller
-  support multi-chip (even though the driver is not ready yet)
-- it mixes NAND partitions and NFC nodes at the same level (which is a bit
-  disturbing)
-- the introduction of the EBI bus implies defining NAND chips under the
-  EBI node, and the ranges available under the EBI node should be
-  restricted to EBI address space, while the NFC references several
-  registers outside of these EBI ranges.
-
-Move the NFC node outside of the NAND node, to get a more future-proof
-DT representation.
+sama5d3 and sama5d4 SoCs provides several CS to interface with external
+memories, and in particular NAND chips.
+The NAND flash controller embedded in the these SoCs can connect to any of
+the available CS (each CS is assigned a memory range, hence the nand at xxx
+you're seeing in the DT), thus the NAND chip definition should be part of
+the board description because we cannot guess at the SoC level which CS
+will be chosen by the board designer.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/atmel_nand.c | 76 ++++++++++++++++++++++++++++++++++---------
- 1 file changed, 61 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts | 18 +++++++++++++++++-
+ arch/arm/boot/dts/at91-sama5d4ek.dts        | 16 +++++++++++++++-
+ arch/arm/boot/dts/sama5d3.dtsi              | 21 ---------------------
+ arch/arm/boot/dts/sama5d3xcm.dtsi           | 18 +++++++++++++++++-
+ arch/arm/boot/dts/sama5d4.dtsi              | 19 -------------------
+ 5 files changed, 49 insertions(+), 43 deletions(-)
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 19d1e9d..0239fe6 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -123,6 +123,7 @@ struct atmel_nand_host {
- 	struct dma_chan		*dma_chan;
+diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+index fec1fca..860258b 100644
+--- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+@@ -213,13 +213,29 @@
+ 		};
  
- 	struct atmel_nfc	*nfc;
-+	bool			wait_for_nfc;
+ 		nand0: nand at 60000000 {
++			compatible = "atmel,at91rm9200-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			reg = <	0x60000000 0x01000000	/* EBI CS3 */
++				0xffffc070 0x00000490	/* SMC PMECC regs */
++				0xffffc500 0x00000100	/* SMC PMECC Error Location regs */
++				0x00110000 0x00018000	/* ROM code */
++				>;
++			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
++			atmel,nand-addr-offset = <21>;
++			atmel,nand-cmd-offset = <22>;
++			atmel,nand-has-dma;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
++			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
++			atmel,nfc = <&nfc>;
+ 			nand-bus-width = <8>;
+ 			nand-ecc-mode = "hw";
+ 			atmel,has-pmecc;
+ 			atmel,pmecc-cap = <4>;
+ 			atmel,pmecc-sector-size = <512>;
+ 			nand-on-flash-bbt;
+-			status = "okay";
  
- 	bool			has_pmecc;
- 	u8			pmecc_corr_cap;
-@@ -1423,6 +1424,12 @@ static void atmel_nand_hwctl(struct mtd_info *mtd, int mode)
- 		ecc_writel(host->ecc, CR, ATMEL_ECC_RST);
- }
+ 			at91bootstrap at 0 {
+ 				label = "at91bootstrap";
+diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
+index b5b8400..5de0d2d 100644
+--- a/arch/arm/boot/dts/at91-sama5d4ek.dts
++++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
+@@ -204,11 +204,25 @@
+ 		};
  
-+static const struct of_device_id atmel_nand_nfc_match[] = {
-+	{ .compatible = "atmel,sama5d3-nfc" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, atmel_nand_nfc_match);
-+
- static int atmel_of_init_port(struct atmel_nand_host *host,
- 			      struct device_node *np)
- {
-@@ -1431,6 +1438,7 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
- 	int ecc_mode;
- 	struct atmel_nand_data *board = &host->board;
- 	enum of_gpio_flags flags = 0;
-+	struct device_node *child;
+ 		nand0: nand at 80000000 {
++			compatible = "atmel,at91rm9200-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			reg = <	0x80000000 0x08000000	/* EBI CS3 */
++				0xfc05c070 0x00000490	/* SMC PMECC regs */
++				0xfc05c500 0x00000100	/* SMC PMECC Error Location regs */
++				>;
++			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 6>;
++			atmel,nand-addr-offset = <21>;
++			atmel,nand-cmd-offset = <22>;
++			atmel,nand-has-dma;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand>;
++			atmel,nfc = <&nfc>;
+ 			nand-bus-width = <8>;
+ 			nand-ecc-mode = "hw";
+ 			nand-on-flash-bbt;
+ 			atmel,has-pmecc;
+-			status = "okay";
  
- 	if (of_property_read_u32(np, "atmel,nand-addr-offset", &val) == 0) {
- 		if (val >= 32) {
-@@ -1467,8 +1475,30 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
+ 			at91bootstrap at 0 {
+ 				label = "at91bootstrap";
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index 1749853..0a944e0 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -1397,27 +1397,6 @@
+ 			status = "disabled";
+ 		};
  
- 	host->has_pmecc = of_property_read_bool(np, "atmel,has-pmecc");
- 
--	/* load the nfc driver if there is */
--	of_platform_populate(np, NULL, NULL, host->dev);
-+	/*
-+	 * Backward compatibility with DTs defining the NFC node as their
-+	 * child.
-+	 * The new model reference the NFC so that we can define several
-+	 * chip controlled by the same controller.
-+	 */
-+	for_each_available_child_of_node(np, child) {
-+		/*
-+		 * If we find an NFC node under the NAND node, then populate
-+		 * the device so that it can be probed, and wait for it.
-+		 */
-+		if (of_match_node(atmel_nand_nfc_match, child)) {
-+			of_platform_populate(np, NULL, NULL, host->dev);
-+			host->wait_for_nfc = true;
-+			break;
-+		}
-+	}
-+
-+	/*
-+	 * If there's an atmel,nfc property we should access the NAND
-+	 * through the NFC.
-+	 */
-+	if (of_property_read_bool(np, "atmel,nfc"))
-+		host->wait_for_nfc = true;
- 
- 	if (!(board->ecc_mode == NAND_ECC_HW) || !host->has_pmecc)
- 		return 0;	/* Not using PMECC */
-@@ -2032,10 +2062,6 @@ static int atmel_nand_probe(struct platform_device *pdev)
- 	if (!host)
- 		return -ENOMEM;
- 
--	res = platform_driver_register(&atmel_nand_nfc_driver);
--	if (res)
--		dev_err(&pdev->dev, "atmel_nand: can't register NFC driver\n");
+-		nand0: nand at 60000000 {
+-			compatible = "atmel,at91rm9200-nand";
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-			ranges;
+-			reg = <	0x60000000 0x01000000	/* EBI CS3 */
+-				0xffffc070 0x00000490	/* SMC PMECC regs */
+-				0xffffc500 0x00000100	/* SMC PMECC Error Location regs */
+-				0x00110000 0x00018000	/* ROM code */
+-				>;
+-			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
+-			atmel,nand-addr-offset = <21>;
+-			atmel,nand-cmd-offset = <22>;
+-			atmel,nand-has-dma;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
+-			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
+-			atmel,nfc = <&nfc>;
+-			status = "disabled";
+-		};
 -
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	host->io_base = devm_ioremap_resource(&pdev->dev, mem);
- 	if (IS_ERR(host->io_base)) {
-@@ -2089,6 +2115,13 @@ static int atmel_nand_probe(struct platform_device *pdev)
- 			goto err_nand_ioremap;
- 		}
- 	} else {
-+		/*
-+		 * If the NFC is not initialized (or not probed) and the device
-+		 * is asking to be accessed through the NFC then defer the
-+		 * probe.
-+		 */
-+		if (host->wait_for_nfc)
-+			return -EPROBE_DEFER;
- 		res = atmel_nand_set_enable_ready_pins(mtd);
- 		if (res)
- 			goto err_nand_ioremap;
-@@ -2230,8 +2263,6 @@ static int atmel_nand_remove(struct platform_device *pdev)
- 	if (host->dma_chan)
- 		dma_release_channel(host->dma_chan);
+ 		nfc: nfc at 70000000 {
+ 			compatible = "atmel,sama5d3-nfc";
+ 			reg = <0x70000000 0x10000000	/* NFC Command Registers */
+diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+index cfcd200..e6c2aec 100644
+--- a/arch/arm/boot/dts/sama5d3xcm.dtsi
++++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+@@ -76,13 +76,29 @@
+ 		};
  
--	platform_driver_unregister(&atmel_nand_nfc_driver);
+ 		nand0: nand@60000000 {
++			compatible = "atmel,at91rm9200-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			reg = <	0x60000000 0x01000000	/* EBI CS3 */
++				0xffffc070 0x00000490	/* SMC PMECC regs */
++				0xffffc500 0x00000100	/* SMC PMECC Error Location regs */
++				0x00110000 0x00018000	/* ROM code */
++				>;
++			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
++			atmel,nand-addr-offset = <21>;
++			atmel,nand-cmd-offset = <22>;
++			atmel,nand-has-dma;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
++			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
++			atmel,nfc = <&nfc>;
+ 			nand-bus-width = <8>;
+ 			nand-ecc-mode = "hw";
+ 			atmel,has-pmecc;
+ 			atmel,pmecc-cap = <4>;
+ 			atmel,pmecc-sector-size = <512>;
+ 			nand-on-flash-bbt;
+-			status = "okay";
+ 
+ 			at91bootstrap at 0 {
+ 				label = "at91bootstrap";
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index 3b5e9f1..8647eb3 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -265,25 +265,6 @@
+ 			cache-level = <2>;
+ 		};
+ 
+-		nand0: nand at 80000000 {
+-			compatible = "atmel,at91rm9200-nand";
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-			ranges;
+-			reg = <	0x80000000 0x08000000	/* EBI CS3 */
+-				0xfc05c070 0x00000490	/* SMC PMECC regs */
+-				0xfc05c500 0x00000100	/* SMC PMECC Error Location regs */
+-				>;
+-			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 6>;
+-			atmel,nand-addr-offset = <21>;
+-			atmel,nand-cmd-offset = <22>;
+-			atmel,nand-has-dma;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_nand>;
+-			atmel,nfc = <&nfc>;
+-			status = "disabled";
+-		};
 -
- 	return 0;
- }
- 
-@@ -2303,12 +2334,6 @@ static int atmel_nand_nfc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static const struct of_device_id atmel_nand_nfc_match[] = {
--	{ .compatible = "atmel,sama5d3-nfc" },
--	{ /* sentinel */ }
--};
--MODULE_DEVICE_TABLE(of, atmel_nand_nfc_match);
--
- static struct platform_driver atmel_nand_nfc_driver = {
- 	.driver = {
- 		.name = "atmel_nand_nfc",
-@@ -2329,7 +2354,28 @@ static struct platform_driver atmel_nand_driver = {
- 	},
- };
- 
--module_platform_driver(atmel_nand_driver);
-+static int __init atmel_nand_init(void)
-+{
-+	int ret;
-+
-+	ret = platform_driver_register(&atmel_nand_nfc_driver);
-+	if (ret)
-+		return ret;
-+
-+	ret = platform_driver_register(&atmel_nand_driver);
-+	if (ret)
-+		platform_driver_unregister(&atmel_nand_nfc_driver);
-+
-+	return ret;
-+}
-+module_init(atmel_nand_init);
-+
-+static void __exit atmel_nand_exit(void)
-+{
-+	platform_driver_unregister(&atmel_nand_driver);
-+	platform_driver_unregister(&atmel_nand_nfc_driver);
-+}
-+module_exit(atmel_nand_exit);
- 
- MODULE_LICENSE("GPL");
- MODULE_AUTHOR("Rick Bronson");
+ 		nfc: nfc at 90000000 {
+ 			compatible = "atmel,sama5d3-nfc";
+ 			reg = <0x90000000 0x10000000	/* NFC Command Registers */
 -- 
 1.9.1
