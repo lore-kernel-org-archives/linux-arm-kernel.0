@@ -1,68 +1,54 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Dec 2014 11:08:04 +0100
-Subject: [PATCH 1/4] ARM: shmobile: R-Mobile: Add SYSC restart handler
-In-Reply-To: <1417616227-6715-2-git-send-email-geert+renesas@glider.be>
-References: <1417616227-6715-1-git-send-email-geert+renesas@glider.be>
- <1417616227-6715-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <3671800.E1ZjeAe67g@wuerfel>
+Date: Thu, 04 Dec 2014 11:10:17 +0100
+Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
+ drivers
+In-Reply-To: <20141204094953.GA13224@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <2579924.PPXuLn3o19@wuerfel> <20141204094953.GA13224@arm.com>
+Message-ID: <3152553.esaQuZiCgi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 December 2014 15:17:04 Geert Uytterhoeven wrote:
-> Extend the PM domain platform driver for the R-Mobile System
-> Controller (SYSC) to register a restart handler, to be used on various
-> Renesas ARM SoCs (e.g. R-Mobile A1 (r8a7740) and APE6 (r8a73a4), and
-> SH-Mobile AP4 (sh7372) and AG5 (sh73a0)).
+On Thursday 04 December 2014 09:49:53 Will Deacon wrote:
+> On Wed, Dec 03, 2014 at 07:57:50PM +0000, Arnd Bergmann wrote:
+> > On Tuesday 02 December 2014 14:16:57 Grant Likely wrote:
+> > > On Mon, Dec 1, 2014 at 11:54 PM, Rob Herring <robherring2@gmail.com> wrote:
+> > > > On Mon, Dec 1, 2014 at 10:57 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > > >>
+> > > >> +static inline void of_iommu_set_ops(struct device_node *np,
+> > > >> +                                   const struct iommu_ops *ops)
+> > > >> +{
+> > > >> +       np->data = (struct iommu_ops *)ops;
+> > > >> +}
+> > > >> +
+> > > >> +static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+> > > >> +{
+> > > >> +       return np->data;
+> > > >> +}
+> > > >
+> > > > This may collide with other users. While use of it is rare, PPC uses
+> > > > it in its PCI code. The OF_DYNAMIC code frees it but never actually
+> > > > sets it. There may be some coming usage with the DT overlay code or
+> > > > that's just a bug. Pantelis or Grant can comment. If not, I think we
+> > > > really should try to get rid of this pointer rather than expand it's
+> > > > usage.
+> > > >
+> > > > I didn't see a user of this. I'm guessing that is coming in a SMMU patch?
+> > > 
+> > > Good catch. This is not good. The data pointer should be avoided since
+> > > there are no controls over its use. Until a better solution can be
+> > > implemented, probably the safest thing to do is add a struct iommu_ops
+> > > pointer to struct device_node. However, assuming that only a small
+> > > portion of nodes will actually have iommu_ops set, I'd rather see a
+> > > separate registry that matches device_nodes to iommu_ops.
+> > 
+> > Fair enough. Will, can you take a copy of drivers/dma/of-dma.c and
+> > adapt it as needed? It should be exactly what we need to start
+> > out and can be extended and generalized later.
 > 
-> Note that this supports DT-based platforms only.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Sure, I'll add this to my list of stuff to do for 3.20.
 
-Is this one of the typical system controllers that contains lots of
-random registers? Maybe you could mark it as "syscon" in DT and just
-use the existing drivers/power/reset/syscon-reboot.c driver?
-
-> +static void __iomem *sysc_base2;
-> +
-> +static void rmobile_sysc_restart(enum reboot_mode reboot_mode, const char *cmd)
-> +{
-> +	pr_debug("%s %u/%s\n", __func__, reboot_mode, cmd);
-> +
-> +	writel(RESCNT2_PRES, sysc_base2 + RESCNT2);
-> +}
-> +
-> +static int rmobile_sysc_probe(struct platform_device *pdev)
-> +{
-> +	dev_dbg(&pdev->dev, "%s\n", __func__);
-> +
-> +	sysc_base2 = of_iomap(pdev->dev.of_node, 1);
-> +	if (!sysc_base2)
-> +		return -ENODEV;
-> +
-> +	arm_pm_restart = rmobile_sysc_restart;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id rmobile_sysc_of_match[] = {
-> +	{ .compatible = "renesas,sysc-rmobile", },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +static struct platform_driver rmobile_sysc_driver = {
-> +	.probe = rmobile_sysc_probe,
-> +	.driver = {
-> +		.name = "rmobile_sysc",
-> +		.of_match_table = rmobile_sysc_of_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(rmobile_sysc_driver);
-
-This clearly looks much better than the previous implementation, so that
-is great. If you can decouple it from the rest of this file, either through
-syscon or by asserting that sysc_base2 is not going to be needed for
-anything else, how about moving the new code to a standalon driver in
-drivers/power/reset?
+Does that mean the we don't get any of the patches for 3.19 despite the
+Acks?
 
 	Arnd
