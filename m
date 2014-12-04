@@ -1,134 +1,27 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 4 Dec 2014 12:43:29 +0000
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Dec 2014 13:51:25 +0100
 Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
  drivers
-In-Reply-To: <20141204115254.GF14519@arm.com>
+In-Reply-To: <54805312.6000402@arm.com>
 References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <3152553.esaQuZiCgi@wuerfel> <20141204102127.GF13224@arm.com>
- <5643715.BADzWxcqOQ@wuerfel>
- <CACxGe6v4ZVHHGcc3Lhp8+FgKakyCkJFRAT2ufj-3DGWa=wmGkA@mail.gmail.com>
- <20141204115254.GF14519@arm.com>
-Message-ID: <CACxGe6s2nfe5ezt58PGkyEsXPf8Y_B4ORcUna+XkyL8ysk_Agg@mail.gmail.com>
+ <2579924.PPXuLn3o19@wuerfel> <54805312.6000402@arm.com>
+Message-ID: <2542658.tyv3UdgsYi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 4, 2014 at 11:52 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Dec 04, 2014 at 11:25:35AM +0000, Grant Likely wrote:
->> On Thu, Dec 4, 2014 at 11:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Thursday 04 December 2014 10:21:27 Will Deacon wrote:
->> >> > > Sure, I'll add this to my list of stuff to do for 3.20.
->> >> >
->> >> > Does that mean the we don't get any of the patches for 3.19 despite the
->> >> > Acks?
->> >>
->> >> Hmm, I don't know how useful they are without the get/set ops and I don't
->> >> think I can get those ready for 3.19 given where we currently are.
->> >>
->> >> Grant's suggestion of adding an iommu_ops pointer to device_node would work
->> >> as a temporary hack, but anything more advanced is going to need proper
->> >> review.
->> >
->> > Right. I guess it doesn't hurt much if we put the new pointer inside
->> > #ifdef CONFIG_OF_IOMMU, then at least there is no significant size
->> > increase in most DT based platforms.
->>
->> Yes, I can live with that hack on the proviso that it will be removed by v3.20
->>
->> Oh, and please put an ugly /* */ comment block in the #ifdef
->> CONFIG_OF_IOMMU section that makes it really clear that it is an ugly
->> hack and will be removed in the next release. I don't want anyone
->> getting ideas that adding pointers to struct device_node is a good
->> idea.
->
-> Something like the mess below?
+On Thursday 04 December 2014 12:26:58 Robin Murphy wrote:
+> 
+> +struct of_iommu_node {
+> +       struct hlist_node list;
+> +       struct device_node *np;
+> +       const struct iommu_ops *ops;
+> +};
+> +static HLIST_HEAD(of_iommu_list);
+> +static DEFINE_SPINLOCK(of_iommu_lock);
 
-Yes... Although it looks like Robin's patch does what is needed
-without the hack.
+Looks good to me. For 3.20, I would hope to get consensus on renaming this
+structure to 'struct iommmu' and adding additional members into it as needed,
+but let's do that another day. Please address Grant's feedback and send
+a new version.
 
-g.
-
->
-> Will
->
-> --->8
->
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 29f0adc5f3e4..6f85c02bc1a6 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -43,6 +43,9 @@ struct property {
->  #if defined(CONFIG_SPARC)
->  struct of_irq_controller;
->  #endif
-> +#ifdef CONFIG_OF_IOMMU
-> +struct iommu_ops;
-> +#endif
->
->  struct device_node {
->         const char *name;
-> @@ -65,6 +68,19 @@ struct device_node {
->         unsigned int unique_id;
->         struct of_irq_controller *irq_trans;
->  #endif
-> +#ifdef CONFIG_OF_IOMMU
-> +/*
-> + * HACK! HACK! HACK!
-> + *
-> + * This is a temporary hack to associate a device_node for an
-> + * IOMMU with its set of iommu_ops so that we can probe its upstream DMA
-> + * masters on the platform bus by parsing the "iommus" property directly.
-> + *
-> + * This is going away in 3.20. Please use the of_iommu_{get,set}_ops
-> + * functions to get hold of this data.
-> + */
-> +       struct iommu_ops *__iommu_ops_use_accessors;
-> +#endif
->  };
->
->  #define MAX_PHANDLE_ARGS 16
-> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-> index d03abbb11c34..392ec5f212db 100644
-> --- a/include/linux/of_iommu.h
-> +++ b/include/linux/of_iommu.h
-> @@ -14,6 +14,17 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
->  extern void of_iommu_init(void);
->  extern struct iommu_ops *of_iommu_configure(struct device *dev);
->
-> +static inline void of_iommu_set_ops(struct device_node *np,
-> +                                   const struct iommu_ops *ops)
-> +{
-> +       np->__iommu_ops_use_accessors = ops;
-> +}
-> +
-> +static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
-> +{
-> +       return np->__iommu_ops_use_accessors;
-> +}
-> +
->  #else
->
->  static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
-> @@ -29,19 +40,15 @@ static inline struct iommu_ops *of_iommu_configure(struct device *dev)
->         return NULL;
->  }
->
-> -#endif /* CONFIG_OF_IOMMU */
-> -
->  static inline void of_iommu_set_ops(struct device_node *np,
-> -                                   const struct iommu_ops *ops)
-> -{
-> -       np->data = (struct iommu_ops *)ops;
-> -}
-> -
-> +                                   const struct iommu_ops *ops) { }
->  static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
->  {
-> -       return np->data;
-> +       return NULL;
->  }
->
-> +#endif /* CONFIG_OF_IOMMU */
-> +
->  extern struct of_device_id __iommu_of_table;
->
->  typedef int (*of_iommu_init_fn)(struct device_node *);
+	Arnd
