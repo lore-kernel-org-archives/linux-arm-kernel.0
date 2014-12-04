@@ -1,29 +1,120 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 4 Dec 2014 12:07:59 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic: add init entry to VGIC KVM device
-In-Reply-To: <54804D27.1020901@linaro.org>
-References: <1417541251-20761-1-git-send-email-eric.auger@linaro.org>
- <CAFEAcA9YmAVYAOFbmV53Y3zBdcmK9MGSVR4gaLCjKxbyrZ6Xaw@mail.gmail.com>
- <547DFCD6.3000406@linaro.org>
- <CAFEAcA_pSiMXX52xUhNBCwiNdZomspFhr_Y+9+F2yb7P_D26bg@mail.gmail.com>
- <54804D27.1020901@linaro.org>
-Message-ID: <CAFEAcA_moz=PBJX23Ghj53oYTObNN-Hh8DGZ1Oa=mMKWgM7Emw@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu,  4 Dec 2014 20:09:20 +0800
+Subject: [PATCH v2] mmc: sdhci-sirf: add sirf tuning function (cmd 19)
+Message-ID: <1417694960-5664-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 December 2014 at 12:01, Eric Auger <eric.auger@linaro.org> wrote:
-> Here is the sequence:
-> 1) The VGIC early initialization is initiated in a machine init done
-> notifier. This notifier is registered in kvm_arm_gic_realize
-> (http://lists.gnu.org/archive/html/qemu-devel/2014-12/msg00220.html). It
-> executes after vcpu instantiations + dist/cpu interface base address
-> setting + nb irq setting.
-> 2) the VFIO signaling and irqfd setup is done in a reset notifier
-> http://lists.gnu.org/archive/html/qemu-devel/2014-11/msg04365.html
+From: Minda Chen <Minda.Chen@csr.com>
 
-OK. And on x86 VFIO how does this work? Obviously x86's GIC just
-initializes as soon as it's created, but do we do the irqfd setup
-in a reset notifier there too?
+Add manual tuning function in CSR atlas7 SoC. It is mainly used
+for the UHS-I SD card working SDR50 SDR104 mode.
 
-thanks
--- PMM
+The tuning principle can be seen in SD spec part1 v3.01 4.2.4.5
+(tuning command).
+
+SD host send the cmd19 and set the delay value(0-127).
+and the sdcard return 64 bytes data. If the data is same with
+the tuning data. The delay value is valid. Execute this commmand
+128 times. And calculate the longest window of the valid values.
+The value in the middle of this window is the best value.
+
+Signed-off-by: Minda Chen <Minda.Chen@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/mmc/host/sdhci-sirf.c | 71 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
+
+diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
+index dd29d47..e458d18 100644
+--- a/drivers/mmc/host/sdhci-sirf.c
++++ b/drivers/mmc/host/sdhci-sirf.c
+@@ -15,7 +15,9 @@
+ #include <linux/mmc/slot-gpio.h>
+ #include "sdhci-pltfm.h"
+ 
++#define SDHCI_CLK_DELAY_SETTING 0x4C
+ #define SDHCI_SIRF_8BITBUS BIT(3)
++#define SIRF_TUNING_COUNT 128
+ 
+ struct sdhci_sirf_priv {
+ 	struct clk *clk;
+@@ -49,7 +51,76 @@ static void sdhci_sirf_set_bus_width(struct sdhci_host *host, int width)
+ 	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+ }
+ 
++static int sdhci_sirf_execute_tuning(struct sdhci_host *host, u32 opcode)
++{
++	int tuning_seq_cnt = 3;
++	u8 phase, tuned_phases[SIRF_TUNING_COUNT];
++	u8 tuned_phase_cnt = 0;
++	int rc, longest_range = 0;
++	int start = -1, end = 0, tuning_value = -1, range = 0;
++	u16 clock_setting;
++	struct mmc_host *mmc = host->mmc;
++
++	clock_setting = sdhci_readw(host, SDHCI_CLK_DELAY_SETTING);
++	clock_setting &= ~0x3fff;
++
++retry:
++	phase = 0;
++	do {
++		sdhci_writel(host,
++			clock_setting | phase | (phase << 7) | (phase << 16),
++			SDHCI_CLK_DELAY_SETTING);
++
++		if (!mmc_send_tuning(mmc->card)) {
++			/* Tuning is successful at this tuning point */
++			tuned_phases[tuned_phase_cnt++] = phase;
++			dev_dbg(mmc_dev(mmc), "%s: Found good phase = %d\n",
++				 mmc_hostname(mmc), phase);
++			if (start == -1)
++				start = phase;
++			end = phase;
++			range++;
++			if (phase == (SIRF_TUNING_COUNT - 1)
++				&& range > longest_range)
++				tuning_value = (start + end) / 2;
++		} else {
++			dev_dbg(mmc_dev(mmc), "%s: Found bad phase = %d\n",
++				 mmc_hostname(mmc), phase);
++			if (range > longest_range) {
++				tuning_value = (start + end) / 2;
++				longest_range = range;
++			}
++			start = -1;
++			end = range = 0;
++		}
++	} while (++phase < ARRAY_SIZE(tuned_phases));
++
++	if (tuned_phase_cnt && tuning_value > 0) {
++		/*
++		 * Finally set the selected phase in delay
++		 * line hw block.
++		 */
++		phase = tuning_value;
++		sdhci_writel(host,
++			clock_setting | phase | (phase << 7) | (phase << 16),
++			SDHCI_CLK_DELAY_SETTING);
++
++		dev_dbg(mmc_dev(mmc), "%s: Setting the tuning phase to %d\n",
++			 mmc_hostname(mmc), phase);
++	} else {
++		if (--tuning_seq_cnt)
++			goto retry;
++		/* Tuning failed */
++		dev_dbg(mmc_dev(mmc), "%s: No tuning point found\n",
++		       mmc_hostname(mmc));
++		rc = -EIO;
++	}
++
++	return rc;
++}
++
+ static struct sdhci_ops sdhci_sirf_ops = {
++	.platform_execute_tuning = sdhci_sirf_execute_tuning,
+ 	.set_clock = sdhci_set_clock,
+ 	.get_max_clock	= sdhci_sirf_get_max_clk,
+ 	.set_bus_width = sdhci_sirf_set_bus_width,
+-- 
+2.2.0
