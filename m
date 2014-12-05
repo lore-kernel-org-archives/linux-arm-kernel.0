@@ -1,29 +1,25 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 05 Dec 2014 13:34:24 +0100
-Subject: [PATCH v4 1/3] clk: samsung: Fix clock disable failure because
- domain being gated
-In-Reply-To: <5481955A.9000703@samsung.com>
-References: <1417777254-26579-1-git-send-email-k.kozlowski@samsung.com>
- <1417777254-26579-2-git-send-email-k.kozlowski@samsung.com>
- <5481955A.9000703@samsung.com>
-Message-ID: <5481A650.8020408@collabora.co.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri,  5 Dec 2014 12:34:53 +0000
+Subject: [PATCH 0/2] arm64: mm: dump: a couple of fixes
+Message-ID: <1417782895-13657-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sylwester,
+While using the mm dump code, I spotted a couple of issues; one build warning
+and one theoretical failure on systems endowed with plenty of RAM (as with ARM
+[1], though arm64 requires a slightly different resolution). These patches
+(based on next-20141205), fix those issues.
 
-On 12/05/2014 12:22 PM, Sylwester Nawrocki wrote:
->> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> 
-> Can you confirm sound works with this patch on exynos5420 ? Or does
-> your Tested-by refer only to successful booting ?
-> 
+Mark.
 
-I tested latest linux-next + "clk: samsung: Fix double add of syscore
-ops after driver rebind" [0] + this series and I confirm that sound is
-also working on my Exynos5420 Peach Pit Chromebook.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/308952.html
 
-Best regards,
-Javier
+Mark Rutland (2):
+  arm64: mm: dump: fix shift warning
+  arm64: mm: dump: don't skip final region
 
-[0]: https://lkml.org/lkml/2014/11/26/290
+ arch/arm64/mm/dump.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+-- 
+1.9.1
