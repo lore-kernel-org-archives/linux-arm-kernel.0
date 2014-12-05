@@ -1,60 +1,49 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 5 Dec 2014 22:17:58 +0530
-Subject: [PATCH RESEND] Documentation: devicetree: Fix Xilinx VDMA
- specification
-In-Reply-To: <bd47278216b64375b32cdc9ed66fe907@BN1BFFO11FD024.protection.gbl>
-References: <1415800277-6817-1-git-send-email-afaerber@suse.de>
- <6067bede14b9421fa87db96bdc66dc66@BN1AFFO11FD040.protection.gbl>
- <5463A0F4.6060300@suse.de>
- <bd47278216b64375b32cdc9ed66fe907@BN1BFFO11FD024.protection.gbl>
-Message-ID: <20141205164758.GR3411@intel.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Fri, 5 Dec 2014 08:49:41 -0800
+Subject: [PATCH] ARM: multi_v7_defconfig: enable MAX77686 PMIC drivers for
+ exynos4412-prime based SoCs
+In-Reply-To: <20141205071717.GA29274@quad.lixom.net>
+References: <1417728264-7268-1-git-send-email-tyler.baker@linaro.org>
+ <20141205071717.GA29274@quad.lixom.net>
+Message-ID: <CANMBJr54f3_DfK2pJBsx=LR8ZmM36yDCterpn5XxYSU-FYKPPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 10:26:03AM -0800, S?ren Brinkmann wrote:
-> On Wed, 2014-11-12 at 07:03PM +0100, Andreas F?rber wrote:
-> > Am 12.11.2014 um 16:57 schrieb S?ren Brinkmann:
-> > > On Wed, 2014-11-12 at 02:51PM +0100, Andreas F?rber wrote:
-> > >> The specification requires xlnx,data-width, but example and driver use
-> > >> xlnx,datawidth. Change the specification to match the implementation.
-> > > 
-> > > Isn't this the wrong way around? The bindings are considered API, so
-> > > shouldn't the driver be fixed to match the spec?
-> > 
-> > In theory, patch review should've never let the two differ... ;)
-> > 
-> > It's not my driver, so I fixed the perceived inconsistency the least
-> > invasive way; Michal and Srikanth seemed to concur at the time.
-> > 
-> > https://patchwork.kernel.org/patch/4620261/
-> > 
-> > > Are there already dts files out there using either of these options?
-> > 
-> > In upstream, no. microblaze and virtex440 use a
-> > xlnx,include-datawidth-matching-0 property as precedence for the
-> > spelling, whereas there is an fsl,data-width and an unused msix-data-width.
-> > 
-> > Downstream, yes: Beyond my own patch derived from the Parallella tree,
-> > there's some in the ADI tree. None in the Xilinx tree on quick check.
-> > 
-> > I haven't encountered any using the documented xlnx,data-width - but
-> > this patch was authored pre 3.17, haven't ran a full Web search again.
-> 
-> grepping through linux-next shows some usage of xlnx,datawidth, but
-> only the single hit in  Documentation for xlnx,data-width.
-> Other than VDMA the other hit seems to be just some DT
-> documentation which I can't find a driver for...
-> Anyhow, this patch is probably the best way of fixing this.
-the driver had issues so want applied, I havent seen repot though. 
-Will apply this now
+On 4 December 2014 at 23:17, Olof Johansson <olof@lixom.net> wrote:
+> On Thu, Dec 04, 2014 at 01:24:24PM -0800, Tyler Baker wrote:
+>> This patch enables the MAX77686 PMIC drivers in the multi_v7_defconfig used
+>> on exynos4412-prime family of SoCs [1]. The exynos4412-prime based boards
+>> are producing the following runtime errors only on the multi_v7_defconfig [2]:
+>>
+>> kern.err: deviceless supply vdd_arm not found, using dummy regulator
+>> kern.err: exynos-cpufreq exynos-cpufreq: failed to set cpu voltage to 1287500
+>> kern.err: cpufreq: __target_index: Failed to change cpu frequency: -22
+>>
+>> I reviewed the exynos_defconfig, which does not produce these runtime
+>> errors. It was obvious that the exynos_defconfig has the PMIC drivers
+>> enabled, whereas the multi_v7_defconfig does not. This patch has been tested
+>> on a odroid-u2 and a odroid-u3 board. It has resolved the runtime errors.
+>> Therefore, I purpose we enabled these drivers in the multi_v7_defconfig.
+>>
+>> [1] http://www.hardkernel.com/main/products/prdt_info.php?g_code=G135270682824
+>> [2] http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc7-48-g7cc78f8/arm-multi_v7_defconfig/lab-tbaker-00/boot-exynos4412-odroidu3.html
+>>
+>
+> FWIW, the 5250-based Samsung Chromebook also uses 77686.
 
--- 
-~Vinod
+After you pointed this out, I took a look at your boot logs for snow
+[1] and indeed it does show the same runtime errors described in this
+patch.
 
-> 
-> Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> 
-> 	Thanks,
-> 	S?ren
+>
+> Applied to next/defconfig for 3.19 after fixing up some fuzz.
 
--- 
+Thanks!
+
+>
+>
+> -Olof
+
+Tyler
+
+[1] http://arm-soc.lixom.net/bootlogs/arm-soc/v3.18-rc7-1140-g9c6e242/snow-arm-multi_v7_defconfig.html
