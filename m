@@ -1,76 +1,55 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Fri, 5 Dec 2014 12:53:55 +0800
-Subject: [PATCH v13 6/7] kprobes: Pass the original kprobe for preparing
- optimized kprobe
-In-Reply-To: <1417755128-71318-1-git-send-email-wangnan0@huawei.com>
-References: <1417755128-71318-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1417755235-71724-1-git-send-email-wangnan0@huawei.com>
+From: yadi.hu@windriver.com (yhu2)
+Date: Fri, 5 Dec 2014 13:02:58 +0800
+Subject: zynq-edac reports error
+Message-ID: <54813C82.4060204@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+We see the following error printout from kernel:
 
-Pass the original kprobe for preparing an optimized kprobe arch-dep
-part, since for some architecture (e.g. ARM32) requires the information
-in original kprobe.
+[2000-01-01 00:00:05.365891] ERROR: xmu03 kernel:[ 5.828996] zynq-edac 
+f8006000.ps7-ddrc: ecc not enabled
 
-Signed-off-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
+We don't use ECC so the printout is valid. However, it should not be an 
+ERROR priority on this. The edac driver should
+look at the "xlnx,has-ecc" property and take appropriate action.
+
+Any comments would be appreciated!
+
 ---
- arch/x86/kernel/kprobes/opt.c | 3 ++-
- include/linux/kprobes.h       | 3 ++-
- kernel/kprobes.c              | 4 ++--
- 3 files changed, 6 insertions(+), 4 deletions(-)
+drivers/edac/zynq_edac.c | 11 +++++++++++
+  1 file changed, 11 insertions(+)
 
-diff --git a/arch/x86/kernel/kprobes/opt.c b/arch/x86/kernel/kprobes/opt.c
-index f1314d0..7028296 100644
---- a/arch/x86/kernel/kprobes/opt.c
-+++ b/arch/x86/kernel/kprobes/opt.c
-@@ -320,7 +320,8 @@ void arch_remove_optimized_kprobe(struct optimized_kprobe *op)
-  * Target instructions MUST be relocatable (checked inside)
-  * This is called when new aggr(opt)probe is allocated or reused.
-  */
--int arch_prepare_optimized_kprobe(struct optimized_kprobe *op)
-+int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
-+				  struct kprobe *__unused)
- {
- 	u8 *buf;
- 	int ret;
-diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
-index f7296e5..7ab2c93 100644
---- a/include/linux/kprobes.h
-+++ b/include/linux/kprobes.h
-@@ -308,7 +308,8 @@ struct optimized_kprobe {
- /* Architecture dependent functions for direct jump optimization */
- extern int arch_prepared_optinsn(struct arch_optimized_insn *optinsn);
- extern int arch_check_optimized_kprobe(struct optimized_kprobe *op);
--extern int arch_prepare_optimized_kprobe(struct optimized_kprobe *op);
-+extern int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
-+					 struct kprobe *orig);
- extern void arch_remove_optimized_kprobe(struct optimized_kprobe *op);
- extern void arch_optimize_kprobes(struct list_head *oplist);
- extern void arch_unoptimize_kprobes(struct list_head *oplist,
-diff --git a/kernel/kprobes.c b/kernel/kprobes.c
-index 3995f54..9f28aa7 100644
---- a/kernel/kprobes.c
-+++ b/kernel/kprobes.c
-@@ -717,7 +717,7 @@ static void prepare_optimized_kprobe(struct kprobe *p)
- 	struct optimized_kprobe *op;
- 
- 	op = container_of(p, struct optimized_kprobe, kp);
--	arch_prepare_optimized_kprobe(op);
-+	arch_prepare_optimized_kprobe(op, p);
- }
- 
- /* Allocate new optimized_kprobe and try to prepare optimized instructions */
-@@ -731,7 +731,7 @@ static struct kprobe *alloc_aggr_kprobe(struct kprobe *p)
- 
- 	INIT_LIST_HEAD(&op->list);
- 	op->kp.addr = p->addr;
--	arch_prepare_optimized_kprobe(op);
-+	arch_prepare_optimized_kprobe(op, p);
- 
- 	return &op->kp;
- }
+diff --git a/drivers/edac/zynq_edac.c b/drivers/edac/zynq_edac.c
+index 2b7635f..cec3203 100644
+--- a/drivers/edac/zynq_edac.c
++++ b/drivers/edac/zynq_edac.c
+@@ -19,6 +19,7 @@
+   */
+
+  #include <linux/edac.h>
++#include <linux/of.h>
+  #include <linux/module.h>
+  #include <linux/platform_device.h>
+
+@@ -507,6 +508,16 @@ static int zynq_edac_mc_probe(struct 
+platform_device *pdev)
+      int rc;
+      struct resource *res;
+      void __iomem *baseaddr;
++   struct device_node *np = pdev->dev.of_node;
++   u32 *edac_enable;
++
++   if (!np || !of_device_is_available(np))
++        return -ENODEV;
++
++   edac_enable = (u32 *)of_get_property(np, "xlnx,has-ecc", NULL);
++   if (!edac_enable || !(*edac_enable))/* property has-ecc disenabled 
+or no exist */
++        return -ENODEV;
++
+
+      /* Get the data from the platform device */
+      res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 -- 
-1.8.4
+1.8.5.2.233.g932f7e4
