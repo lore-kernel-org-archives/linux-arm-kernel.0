@@ -1,92 +1,117 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 5 Dec 2014 10:38:49 -0800
-Subject: regression: Clock changes in next-20141205 break at least omap4
-In-Reply-To: <5481F79D.4010504@codeaurora.org>
-References: <20141205165539.GA30437@atomide.com>
- <5481F79D.4010504@codeaurora.org>
-Message-ID: <20141205183849.GB30437@atomide.com>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Fri, 05 Dec 2014 20:42:07 +0200
+Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
+In-Reply-To: <20141205151221.0ee1e814@bbrezillon>
+References: <5465C00E.4030808@offcode.fi>	<1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>	<20141127200036.2c65df62@bbrezillon>	<5481ABA1.9030408@offcode.fi>
+ <20141205151221.0ee1e814@bbrezillon>
+Message-ID: <5481FC7F.3000105@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Boyd <sboyd@codeaurora.org> [141205 10:23]:
-> On 12/05/2014 08:55 AM, Tony Lindgren wrote:
-> > Hi,
-> >
-> > Looks like commit 646cafc6aa4d ("clk: Change clk_ops->determine_rate
-> > to return a clk_hw as the best parent") breaks booting at least for
-> > omap4.
-> 
-> Do you get a compilation warning in arch/arm/mach-omap2/dpll3xxx.c ?
+On 05.12.2014 16:12, Boris Brezillon wrote:
+> Hi Timo,
+>
+> On Fri, 05 Dec 2014 14:57:05 +0200
+> Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
+>
+>> On 27.11.2014 21:00, Boris Brezillon wrote:
+>>> Hi Timo,
+>>>
+>>> Sorry for the late reply.
+>>>
+>>> On Fri, 21 Nov 2014 14:23:30 +0200
+>>> Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
+>>>
+>>>> By default the driver will start a kernel timer which keeps on kicking
+>>>> the watchdog HW until user space has opened the watchdog
+>>>> device. Usually this is desirable as the watchdog HW is running by
+>>>> default and the user space may not have any watchdog daemon running at
+>>>> all.
+>>>>
+>>>> However, on production systems it may be mandatory that also early
+>>>> crashes and lockups will lead to a watchdog reset, even if they happen
+>>>> before the user space has opened the watchdog device.
+>>>>
+>>>> To resolve the issue, add a new device tree property
+>>>> "enable-early-reset" which will prevent the kernel timer from pinging
+>>>> the watchdog HW on behalf of user space. The default is still to use
+>>>> kernel timer, but more strict behavior can be enabled via the device
+>>>> tree property.
+>>>>
+>>>> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+>>>> ---
+>>>>    Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
+>>>>    drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
+>>>>    2 files changed, 9 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>>> index f90e294..a0b7b75 100644
+>>>> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>>> @@ -28,6 +28,10 @@ Optional properties:
+>>>>    	entering idle state.
+>>>>    - atmel,dbg-halt : Should be present if you want to stop the watchdog when
+>>>>    	entering debug state.
+>>>> +- enable-early-reset : Should be present if you want to let the
+>>>> +	watchdog timer to expire even before user space has opened the
+>>>> +	device. If not set, a kernel timer will keep on pinging the
+>>>> +	watchdog until it is opened.
+>>>
+>>> If you want to make this property generic, maybe you should document it
+>>> in a generic binding doc
+>>> (Documentation/devicetree/bindings/watchdog/watchdog.txt ?).
+>>> Once you're at it, maybe you could document the generic timeout-sec
+>>> property in this file.
+>>> Moreover, you might want to parse this property in watchdog_core.c and
+>>> store the information in the watchdog_device struct.
+>>
+>> I gave a little thought about this today and we could maybe have it like
+>> watchdog_init_timeout() is today. But I can't really think of any
+>> generic handling for this property, anything else except storing the
+>> parsed value to a variable in watchdog_device struct. Everything else is
+>> HW specific, except how we read the variable.. If we had some logic or
+>> checking for this variable (other than to check it is not negative)
+>> maybe then it would make sense.
+>
+> Okay, I'm fine with keeping this DT property parsing out of the core.
 
-Yes so it seems.
+Ok, good.
 
-> From what I can tell omap3_noncore_dpll_determine_rate() hasn't been
-> updated to take a clk_hw pointer instead of clk pointer. It was there in
-> the original patch and I'm not sure why Mike dropped that part while
-> applying.
+>>
+>> So I could write a patch to document generic watchdog properties in
+>> Documentation/devicetree/bindings/watchdog/watchdog.txt (anything else
+>> generic that would go there except timeout-sec and enable-early-reset?)
+>
+> I'm not sure you and Guenter agreed on the 'early-keepalive-sec'
+> property (and this one won't be used in atmel driver since you can't
+> change the timeout once set), so I'd say the timeout-sec and
+> enable-early-reset are the only common properties for now.
 
-OK that makes sense, Mike should apply that part too. Note that also
-include/linux/clk/ti.h needs changed accordingly for struct clk_hw,
-which you probably had in your orignal patch too. Assuming that's there,
-please feel free to add:
+Actually it can be done in Atmel driver as well. It already has a timer 
+that keeps on pinging the watchdog until user space opens it. We just 
+modify the code so that it keeps on pinging the watchdog until 
+early-keepalive-sec has expired. No need to change the HW timeouts at 
+all. And I rather have it implemented that way anyway, the 16 second 
+timeout is a little tight if there happens to be a lot of stuff already 
+in the early user space.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
-> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-> index 20e120d..c2da2a0 100644
-> --- a/arch/arm/mach-omap2/dpll3xxx.c
-> +++ b/arch/arm/mach-omap2/dpll3xxx.c
-> @@ -474,7 +474,7 @@ void omap3_noncore_dpll_disable(struct clk_hw *hw)
->   */
->  long omap3_noncore_dpll_determine_rate(struct clk_hw *hw, unsigned long rate,
->  				       unsigned long *best_parent_rate,
-> -				       struct clk **best_parent_clk)
-> +				       struct clk_hw **best_parent_clk)
->  {
->  	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
->  	struct dpll_data *dd;
-> @@ -488,10 +488,10 @@ long omap3_noncore_dpll_determine_rate(struct clk_hw *hw, unsigned long rate,
->  
->  	if (__clk_get_rate(dd->clk_bypass) == rate &&
->  	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
-> -		*best_parent_clk = dd->clk_bypass;
-> +		*best_parent_clk = __clk_get_hw(dd->clk_bypass);
->  	} else {
->  		rate = omap2_dpll_round_rate(hw, rate, best_parent_rate);
-> -		*best_parent_clk = dd->clk_ref;
-> +		*best_parent_clk = __clk_get_hw(dd->clk_ref);
->  	}
->  
->  	*best_parent_rate = rate;
-> diff --git a/arch/arm/mach-omap2/dpll44xx.c b/arch/arm/mach-omap2/dpll44xx.c
-> index 535822f..0e58e5a 100644
-> --- a/arch/arm/mach-omap2/dpll44xx.c
-> +++ b/arch/arm/mach-omap2/dpll44xx.c
-> @@ -223,7 +223,7 @@ out:
->   */
->  long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw, unsigned long rate,
->  					unsigned long *best_parent_rate,
-> -					struct clk **best_parent_clk)
-> +					struct clk_hw **best_parent_clk)
->  {
->  	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
->  	struct dpll_data *dd;
-> @@ -237,11 +237,11 @@ long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw, unsigned long rate,
->  
->  	if (__clk_get_rate(dd->clk_bypass) == rate &&
->  	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
-> -		*best_parent_clk = dd->clk_bypass;
-> +		*best_parent_clk = __clk_get_hw(dd->clk_bypass);
->  	} else {
->  		rate = omap4_dpll_regm4xen_round_rate(hw, rate,
->  						      best_parent_rate);
-> -		*best_parent_clk = dd->clk_ref;
-> +		*best_parent_clk = __clk_get_hw(dd->clk_ref);
->  	}
->  
->  	*best_parent_rate = rate;
-> 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
+Yeah, I didn't get anything back from Guenter about my 
+early-keepalive-sec property proposal. Frankly, I already forgot about 
+it my self already. I guess I'll get back to you with v3 set once I get 
+time for it. Probably easiest to continue from there.
+
+Thanks for the feedback!
+
+-Timo
+
+>> and change this patch so that it doesn't document anything in
+>> atmel-wdt.txt as we already have it documented in generic watchdog.txt.
+>>
+>> Sounds good?
+>
+> Yes, sounds good to me.
+>
+> Regards,
+>
+> Boris
+>
