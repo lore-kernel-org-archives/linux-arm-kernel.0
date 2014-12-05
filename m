@@ -1,67 +1,45 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 5 Dec 2014 16:08:08 +0000
-Subject: [PATCH 2/2] arm64: mm: dump: don't skip final region
-In-Reply-To: <1417782895-13657-3-git-send-email-mark.rutland@arm.com>
-References: <1417782895-13657-1-git-send-email-mark.rutland@arm.com>
- <1417782895-13657-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAPvkgC3zZRUF7-APiRHaJCH-1Hr2rYiJ9MuUUWWjik0f53JYJg@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 5 Dec 2014 10:10:59 -0600
+Subject: regression: OMAP4 (next-20141204) (bisect to: ARM: 8208/1: l2c:
+ Refactor the driver to use commit-like)
+Message-ID: <5481D913.9040109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 December 2014 at 12:34, Mark Rutland <mark.rutland@arm.com> wrote:
-> If the final page table entry we walk is a valid mapping, the page table
-> dumping code will not log the region this entry is part of, as the final
-> note_page call in ptdump_show will trigger an early return. Luckily this
-> isn't seen on contemporary systems as they typically don't have enough
-> RAM to extend the linear mapping right to the end of the address space.
->
-> In note_page, we log a region  when we reach its end (i.e. we hit an
-> entry immediately afterwards which has different prot bits or is
-> invalid). The final entry has no subsequent entry, so we will not log
-> this immediately. We try to cater for this with a subsequent call to
-> note_page in ptdump_show, but this returns early as 0 < LOWEST_ADDR, and
-> hence we will skip a valid mapping if it spans to the final entry we
-> note.
->
-> Unlike 32-bit ARM, the pgd with the kernel mapping is never shared with
-> user mappings, so we do not need the check to ensure we don't log user
-> page tables. Due to the way addr is constructed in the walk_* functions,
-> it can never be less than LOWEST_ADDR when walking the page tables, so
-> it is not necessary to avoid dereferencing invalid table addresses. The
-> existing checks for st->current_prot and st->marker[1].start_address are
-> sufficient to ensure we will not print and/or dereference garbage when
-> trying to log information.
->
-> This patch removes the unnecessary check against LOWEST_ADDR, ensuring
-> we log all regions in the kernel page table, including those which span
-> right to the end of the address space.
->
+next-20141204 fails to boot, but next-20141203 boots fine with
+omap2plus_defconfig.
 
-Acked-by: Steve Capper <steve.capper@linaro.org>
+Panda-ES(4460):
+https://github.com/nmenon/kernel-test-logs/blob/next-20141204/omap2plus_defconfig/pandaboard-es.txt
+Panda(4430):
+https://github.com/nmenon/kernel-test-logs/blob/next-20141204/omap2plus_defconfig/pandaboard-vanilla.txt
 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Laura Abbott <lauraa@codeaurora.org>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/mm/dump.c | 3 ---
->  1 file changed, 3 deletions(-)
->
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> index a546776..cf33f33 100644
-> --- a/arch/arm64/mm/dump.c
-> +++ b/arch/arm64/mm/dump.c
-> @@ -182,9 +182,6 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
->         static const char units[] = "KMGTPE";
->         u64 prot = val & pg_level[level].mask;
->
-> -       if (addr < LOWEST_ADDR)
-> -               return;
-> -
->         if (!st->level) {
->                 st->level = level;
->                 st->current_prot = prot;
-> --
-> 1.9.1
->
+at the point of hang (JTAG):
+ pandaboard-es:
+	cpu0: http://slexy.org/view/s2eIFqkRd5
+	cpu1: http://slexy.org/view/s2Tysb6gpL
+
+Case #1:
+Disabling CPUIDLE allows boot to proceed. there does not seem to have
+been any change in drivers/cpuidle and arch/arm/mach-omap2 w.r.t this.
+
+Case #2: Reverting the following allows boot.
+
+>From next-20141204
+10df7d5 ARM: 8211/1: l2c: Add support for overriding prefetch settings
+revert this  -> boot still fails
+
+d42ced0 ARM: 8210/1: l2c: Get outer cache .write_sec callback from
+mach_desc only if not NULL
+revert this  -> boot still fails
+
+46b9af8 ARM: 8209/1: l2c: Add interface to ask hypervisor to configure L2C
+revert this  -> boot still fails
+
+c94e325 ARM: 8208/1: l2c: Refactor the driver to use commit-like
+revert this  -> boot passed (first bad commit).
+
+
+-- 
+Regards,
+Nishanth Menon
