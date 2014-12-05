@@ -1,46 +1,59 @@
-From: yamada.m@jp.panasonic.com (Masahiro Yamada)
-Date: Fri, 05 Dec 2014 12:29:39 +0900
-Subject: [PATCH] clk: remove unnecessary substitution
-In-Reply-To: <1390889387-24137-1-git-send-email-yamada.m@jp.panasonic.com>
-References: <1390889387-24137-1-git-send-email-yamada.m@jp.panasonic.com>
-Message-ID: <20141205122939.E213.AA925319@jp.panasonic.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Fri, 5 Dec 2014 11:38:06 +0800
+Subject: [PATCH v12 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
+In-Reply-To: <1417710073.2239.10.camel@linaro.org>
+References: <1417671172-52915-1-git-send-email-wangnan0@huawei.com>	
+ <1417671360-53399-1-git-send-email-wangnan0@huawei.com>
+ <1417710073.2239.10.camel@linaro.org>
+Message-ID: <5481289E.4060504@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Mike Turquette
-
-I posted this trivial fix about 10 months ago.
-
-Is it applicable?
-
-
-
-On Tue, 28 Jan 2014 15:09:47 +0900
-Masahiro Yamada <yamada.m@jp.panasonic.com> wrote:
-
-> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
-> ---
->  drivers/clk/clk.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On 2014/12/5 0:21, Jon Medhurst (Tixy) wrote:
+> On Thu, 2014-12-04 at 13:36 +0800, Wang Nan wrote:
 > 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 2b38dc9..d97b313 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1637,7 +1637,7 @@ static struct clk *__clk_init_parent(struct clk *clk)
+
+[trim some text]
+
+> 
+> I have retested this patch and on one of the arm test cases I get an
+> undefined instruction exception in kprobe_arm_test_cases. When this
+> happens PC points to the second nop below. 
+> 
+> 
+> 80028a38:	e320f000 	nop	{0}
+> 80028a3c:	e11000b2 	ldrh	r0, [r0, -r2]
+> 80028a40:	e320f000 	nop	{0}
+> 
+> As all three instructions will have probes on them during testing, and
+> un-optimised probes are implemented by using an undefined instruction to
+> act as a breakpoint, my first thought was that we have a race condition
+> somewhere with adding, removing or optimizing probes. Though a reboot a
+> retest failed in the same way on the same instruction, so I'm not 100%
+> convinced about strictly timing related bugs.
 >  
->  	if (clk->num_parents == 1) {
->  		if (IS_ERR_OR_NULL(clk->parent))
-> -			ret = clk->parent = __clk_lookup(clk->parent_names[0]);
-> +			clk->parent = __clk_lookup(clk->parent_names[0]);
->  		ret = clk->parent;
->  		goto out;
->  	}
-> -- 
-> 1.8.3.2
+
+Does the problem appear in your platform in each time? Currently I have only
+QEMU machine for testing and haven't seen problem like this before. Could
+you please provide a detail steps for me to reproduce it? Or do you just
+enable kprobe test code when booting and this exception simply appear twice?
+
+> Meanwhile, I have some review comments of the code below...
+> 
+
+[trim some code]
+
+>> +	/*
+>> +	 * Add more 4 byte for potential AEABI requirement. If probing is triggered
+>> +	 * when SP % 8 == 4, we sub SP by another 4 bytes.
+>> +	 */
+>> +	stack_protect += orig->ainsn.stack_space + 4;
+> 
+> The above comment and code don't match up any more with the code in
+> optprobe_template_entry, it should be '+ 7' here. Alternatively, change
+> the code in optprobe_template_entry back to use 4 as I suggested.
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Looks like we don't really need this 4 bytes. ASM code should operate SP correctly in
+each case.
