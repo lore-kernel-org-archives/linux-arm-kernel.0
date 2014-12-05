@@ -1,33 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  5 Dec 2014 12:13:22 -0200
-Subject: [PATCH 3/3] ARM: imx_v6_v7_defconfig: Select SPI_FSL_QUADSPI by
- default
-In-Reply-To: <1417788802-13219-1-git-send-email-festevam@gmail.com>
-References: <1417788802-13219-1-git-send-email-festevam@gmail.com>
-Message-ID: <1417788802-13219-3-git-send-email-festevam@gmail.com>
+From: alexanders83@web.de (Alexander Stein)
+Date: Fri,  5 Dec 2014 15:16:56 +0100
+Subject: [PATCH 2/2] ARM: at91/dt: sam9263: Add missing clocks to ac97 node
+In-Reply-To: <1417789016-20001-1-git-send-email-alexanders83@web.de>
+References: <1417789016-20001-1-git-send-email-alexanders83@web.de>
+Message-ID: <1417789016-20001-2-git-send-email-alexanders83@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+The clock node specifying 'ac97_clk' was missing.
 
-SPI_FSL_QUADSPI can be used by Vybrid and mx6sx, so select it by default.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Alexander Stein <alexanders83@web.de>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/at91sam9263.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 6790f1b..c405a04 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -97,6 +97,7 @@ CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_GPMI_NAND=y
- CONFIG_MTD_NAND_MXC=y
- CONFIG_MTD_SPI_NOR=y
-+CONFIG_SPI_FSL_QUADSPI=y
- CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index 5ed2810..2d9d0ad 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -821,6 +821,8 @@
+ 				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ac97>;
++				clocks = <&ac97_clk>;
++				clock-names = "ac97_clk";
+ 				status = "disabled";
+ 			};
+ 
 -- 
-1.9.1
+2.2.0
