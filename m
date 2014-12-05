@@ -1,34 +1,24 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 5 Dec 2014 23:10:45 +0530
-Subject: [PATCH] DMA: Fix allocation size for PL330 data buffer depth.
-In-Reply-To: <20141114123301.GK12037@e106497-lin.cambridge.arm.com>
-References: <1415294412-13818-1-git-send-email-Liviu.Dudau@arm.com>
- <20141112093952.GD24582@intel.com>
- <20141114123301.GK12037@e106497-lin.cambridge.arm.com>
-Message-ID: <20141205174045.GU3411@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 05 Dec 2014 18:41:37 +0100
+Subject: [GIT PULL] Automatic DMA configuration for OF-based IOMMU masters
+In-Reply-To: <20141205163506.GQ1630@arm.com>
+References: <20141205163506.GQ1630@arm.com>
+Message-ID: <2761372.pAE6Jsk679@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 12:33:01PM +0000, Liviu Dudau wrote:
-> On Wed, Nov 12, 2014 at 09:39:52AM +0000, Vinod Koul wrote:
-> > On Thu, Nov 06, 2014 at 05:20:12PM +0000, Liviu Dudau wrote:
-> > > The datasheet for PL330 says that the data buffer value in the CRD
-> > > register is 10bits wide. However, the value stored is "minus one",
-> > > which the driver corrects for. Maximum value that the data buffer
-> > > depth can have is 1024 lines, which requires 11 bits for storage.
-> > > 
-> > > While making updates I found printing the peripheral ID as a hex
-> > > value to be more useful as the datasheet shows the values that way.
-> > 
-> > Applied, thanks
+On Friday 05 December 2014 16:35:06 Will Deacon wrote:
+> Hi Olof,
 > 
-> Thanks!
+> Please consider pulling the following series for 3.19. I appreciate that
+> this is late in the day, but the patches have been around for a while and
+> have collected all the Acks that they need. Marek has already been finding
+> the series useful with the Exynos IOMMU, so it seems a pity to hold the
+> patches up any longer.
 > 
-> > 
-> > Please snure you use the right subsytem name
-> 
-> Sorry about that. Just for clarity, it should've been 'dmaengine', right?
-Yes...
 
--- 
-~vinod
+I've pulled it into a separate next/iommu-config branch in case we have
+to take it out again for some reason. The autobuilder has not found any
+regressions, so that's a good sign.
+
+	Arnd
