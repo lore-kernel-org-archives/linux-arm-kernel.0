@@ -1,77 +1,33 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  5 Dec 2014 12:13:21 -0200
-Subject: [PATCH 2/3] ARM: dts: imx6sx-sdb: Add QSPI support
+Date: Fri,  5 Dec 2014 12:13:22 -0200
+Subject: [PATCH 3/3] ARM: imx_v6_v7_defconfig: Select SPI_FSL_QUADSPI by
+ default
 In-Reply-To: <1417788802-13219-1-git-send-email-festevam@gmail.com>
 References: <1417788802-13219-1-git-send-email-festevam@gmail.com>
-Message-ID: <1417788802-13219-2-git-send-email-festevam@gmail.com>
+Message-ID: <1417788802-13219-3-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-imx6sx-sdb has two s25fl128s quad spi flash. Add support for them.
+SPI_FSL_QUADSPI can be used by Vybrid and mx6sx, so select it by default.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx6sx-sdb.dts | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-index 1e6e5cc..cdffe84 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -340,6 +340,28 @@
- 	status = "okay";
- };
- 
-+&qspi2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_qspi2>;
-+	status = "okay";
-+
-+	flash0: s25fl128s at 0 {
-+		reg = <0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "spansion,s25fl128s";
-+		spi-max-frequency = <66000000>;
-+	};
-+
-+	flash1: s25fl128s at 1 {
-+		reg = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "spansion,s25fl128s";
-+		spi-max-frequency = <66000000>;
-+	};
-+};
-+
- &ssi2 {
- 	status = "okay";
- };
-@@ -524,6 +546,23 @@
- 			>;
- 		};
- 
-+		pinctrl_qspi2: qspi2grp {
-+			fsl,pins = <
-+				MX6SX_PAD_NAND_WP_B__QSPI2_A_DATA_0     0x70f1
-+				MX6SX_PAD_NAND_READY_B__QSPI2_A_DATA_1  0x70f1
-+				MX6SX_PAD_NAND_CE0_B__QSPI2_A_DATA_2    0x70f1
-+				MX6SX_PAD_NAND_CE1_B__QSPI2_A_DATA_3    0x70f1
-+				MX6SX_PAD_NAND_CLE__QSPI2_A_SCLK        0x70f1
-+				MX6SX_PAD_NAND_ALE__QSPI2_A_SS0_B       0x70f1
-+				MX6SX_PAD_NAND_DATA01__QSPI2_B_DATA_0   0x70f1
-+				MX6SX_PAD_NAND_DATA00__QSPI2_B_DATA_1   0x70f1
-+				MX6SX_PAD_NAND_WE_B__QSPI2_B_DATA_2     0x70f1
-+				MX6SX_PAD_NAND_RE_B__QSPI2_B_DATA_3     0x70f1
-+				MX6SX_PAD_NAND_DATA02__QSPI2_B_SCLK     0x70f1
-+				MX6SX_PAD_NAND_DATA03__QSPI2_B_SS0_B    0x70f1
-+			>;
-+		};
-+
- 		pinctrl_vcc_sd3: vccsd3grp {
- 			fsl,pins = <
- 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 6790f1b..c405a04 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -97,6 +97,7 @@ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_GPMI_NAND=y
+ CONFIG_MTD_NAND_MXC=y
+ CONFIG_MTD_SPI_NOR=y
++CONFIG_SPI_FSL_QUADSPI=y
+ CONFIG_MTD_UBI=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
 -- 
 1.9.1
