@@ -1,51 +1,33 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 05 Dec 2014 03:14:54 +0100
-Subject: [PATCH V4 0/3] PM / Domains: Add initial PM clock support to genpd
-In-Reply-To: <1417434623-31301-1-git-send-email-ulf.hansson@linaro.org>
-References: <1417434623-31301-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <4377493.dchgvn3k6f@vostro.rjw.lan>
+From: wangyufen@huawei.com (wangyufen)
+Date: Fri, 5 Dec 2014 10:07:41 +0800
+Subject: arm64:  dose arm64 support the sysfs system call?
+In-Reply-To: <118663792.1vhfOdg7Rq@wuerfel>
+References: <546EE946.1020905@huawei.com> <118663792.1vhfOdg7Rq@wuerfel>
+Message-ID: <5481136D.4030303@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 01, 2014 12:50:20 PM Ulf Hansson wrote:
-> Changes in v4:
-> 	-Applied acks/tested by tags.
-> 	-Change name of define, affects all patches.
+On 2014/11/21 19:10, Arnd Bergmann wrote:
+> On Friday 21 November 2014 15:27:02 wangyufen wrote:
+>> Hi,
+>>
+>> I did ltp test on arm64, the sysfs testcases failed:
+>>
+>>     sysfs01     0  TWARN  :  This test can only run on kernels that support the sysfs system call
+>>
+>> because the __NR_sysfs didn't define in aarch64
+>>
+>> Dose anyone know what number the sysfs system call is in aarch64?
 > 
-> Changes in v3:
-> 	-Fixed comments from Rafael for patch 1.
-> 	-Change name of define, affects all patches.
+> It's disabled of course, because we don't support ancient libc
+> implementations. No modern Linux port has this.
 > 
-> Changes in v2:
-> 	-Small fixes in patch 1.
-> 
-> 
-> It's quite common for PM domains to use PM clocks. Typically from SOC specific
-> code, the per device PM clock list is created and pm_clk_suspend|resume() are
-> invoked to handle clock gating/ungating.
-> 
-> A step towards consolidation is to integrate PM clock support into genpd, which
-> is what this patchset does.
-> 
-> In this initial step, the calls to the pm_clk_suspend|resume() are handled
-> within genpd, but the per device PM clock list still needs to be created from
-> SOC specific code. It seems reasonable to have gendp to handle that as well, but
-> that left to future patchsets to address.
-> 
-> It's not every users of genpd that are keen on using PM clocks thus we need
-> to provide this a configuration option for genpd.
-> 
-> In patch 2 and patch 3, we convert some of the SH-MOBILE SOCs to start using the
-> new PM clock support in genpd.
+> 	Arnd
 > 
 > 
-> Ulf Hansson (3):
->   PM / Domains: Initial PM clock support for genpd
->   ARM: shmobile: Convert to genpd flags for PM clocks for r8a7779
->   ARM: shmobile: Convert to genpd flags for PM clocks for R-mobile
 
-All queued up for 3.19-rc1, thanks!
+__NR__lchown32?__NR_lstat?__NR__sysctl?__NR_vserver have similar problems.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Dose aarch64 support those system call?
+
+ How I distinguish the ancient libc implementations.
