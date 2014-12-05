@@ -1,86 +1,44 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  5 Dec 2014 15:44:54 +0100
-Subject: [PATCH 1/5] ARM: mvebu: Rename DEBUG_LL to indicate UART index
+Date: Fri,  5 Dec 2014 15:44:57 +0100
+Subject: [PATCH 4/5] pinctrl: mvebu: a38x: Add UART1 muxing options
 In-Reply-To: <1417790698-9792-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1417790698-9792-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1417790698-9792-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1417790698-9792-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvebu SoCs actually have more UARTs than just the one exposed in DEBUG_LL
-yet.
+The MPP19 and MMP20 pins also have the ability to be muxed to the uart1
+function.
 
-In order to differentiate them, Add the index in the configuration options and
-their help.
+Add this case to the pinctrl driver.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/Kconfig.debug | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ drivers/pinctrl/mvebu/pinctrl-armada-38x.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index d8f6a2ec3d4e..b0945d6b32b3 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -423,13 +423,13 @@ choice
- 		  Please adjust DEBUG_UART_PHYS and DEBUG_UART_BASE configuration
- 		  options based on your needs.
- 
--	config DEBUG_MVEBU_UART
--		bool "Kernel low-level debugging messages via MVEBU UART (old bootloaders)"
-+	config DEBUG_MVEBU_UART0
-+		bool "Kernel low-level debugging messages via MVEBU UART0 (old bootloaders)"
- 		depends on ARCH_MVEBU
- 		select DEBUG_UART_8250
- 		help
- 		  Say Y here if you want kernel low-level debugging support
--		  on MVEBU based platforms.
-+		  on MVEBU based platforms on UART0.
- 
- 		  This option should be used with the old bootloaders
- 		  that left the internal registers mapped at
-@@ -442,13 +442,13 @@ choice
- 		  when u-boot hands over to the kernel, the system
- 		  silently crashes, with no serial output at all.
- 
--	config DEBUG_MVEBU_UART_ALTERNATE
--		bool "Kernel low-level debugging messages via MVEBU UART (new bootloaders)"
-+	config DEBUG_MVEBU_UART0_ALTERNATE
-+		bool "Kernel low-level debugging messages via MVEBU UART0 (new bootloaders)"
- 		depends on ARCH_MVEBU
- 		select DEBUG_UART_8250
- 		help
- 		  Say Y here if you want kernel low-level debugging support
--		  on MVEBU based platforms.
-+		  on MVEBU based platforms on UART0.
- 
- 		  This option should be used with the new bootloaders
- 		  that remap the internal registers at 0xf1000000.
-@@ -1146,14 +1146,14 @@ config DEBUG_UART_PHYS
- 	default 0xc8000000 if ARCH_IXP4XX && !CPU_BIG_ENDIAN
- 	default 0xc8000003 if ARCH_IXP4XX && CPU_BIG_ENDIAN
- 	default 0xd0000000 if ARCH_SPEAR3XX || ARCH_SPEAR6XX
--	default 0xd0012000 if DEBUG_MVEBU_UART
-+	default 0xd0012000 if DEBUG_MVEBU_UART0
- 	default 0xc81004c0 if DEBUG_MESON_UARTAO
- 	default 0xd4017000 if DEBUG_MMP_UART2
- 	default 0xd4018000 if DEBUG_MMP_UART3
- 	default 0xe0000000 if ARCH_SPEAR13XX
- 	default 0xe4007000 if DEBUG_HIP04_UART
- 	default 0xf0000be0 if ARCH_EBSA110
--	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
-+	default 0xf1012000 if DEBUG_MVEBU_UART0_ALTERNATE
- 	default 0xf1012000 if ARCH_DOVE || ARCH_MV78XX0 || \
- 				ARCH_ORION5X
- 	default 0xf7fc9000 if DEBUG_BERLIN_UART
-@@ -1223,7 +1223,7 @@ config DEBUG_UART_VIRT
- 	default 0xfeb30c00 if DEBUG_KEYSTONE_UART0
- 	default 0xfeb31000 if DEBUG_KEYSTONE_UART1
- 	default 0xfec02000 if DEBUG_SOCFPGA_UART
--	default 0xfec12000 if DEBUG_MVEBU_UART || DEBUG_MVEBU_UART_ALTERNATE
-+	default 0xfec12000 if DEBUG_MVEBU_UART0 || DEBUG_MVEBU_UART0_ALTERNATE
- 	default 0xfec20000 if DEBUG_DAVINCI_DMx_UART0
- 	default 0xfec90000 if DEBUG_RK32_UART2
- 	default 0xfed0c000 if DEBUG_DAVINCI_DA8XX_UART1
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+index 1049f82fb62f..fd743fab07f5 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+@@ -145,14 +145,16 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(2, "ptp",   "event_req",  V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "pcie0", "clkreq",     V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "sata1", "prsnt",      V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "ua0",   "cts",        V_88F6810_PLUS)),
++		 MPP_VAR_FUNCTION(5, "ua0",   "cts",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(6, "ua1",   "rxd",        V_88F6810_PLUS)),
+ 	MPP_MODE(20,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "ge0",   "txclk",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "ptp",   "clk",        V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "sata0", "prsnt",      V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "ua0",   "rts",        V_88F6810_PLUS)),
++		 MPP_VAR_FUNCTION(5, "ua0",   "rts",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(6, "ua1",   "txd",        V_88F6810_PLUS)),
+ 	MPP_MODE(21,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "spi0",  "cs1",        V_88F6810_PLUS),
 -- 
 2.2.0
