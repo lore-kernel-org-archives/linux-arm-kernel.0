@@ -1,81 +1,298 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Fri, 05 Dec 2014 16:27:53 +0530
-Subject: [PATCH] arm: ls1021a: setup hrtimer based tick broadcast
-In-Reply-To: <20141205102714.GD11889@leverpostej>
-References: <1417770449-3492-1-git-send-email-jingchang.lu@freescale.com>
- <20141205102714.GD11889@leverpostej>
-Message-ID: <54818FB1.9010901@linux.vnet.ibm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 05 Dec 2014 12:00:53 +0100
+Subject: [PATCH v4 2/3] pinctrl: exynos: Fix GPIO setup failure because domain
+ clock being gated
+In-Reply-To: <1417777254-26579-1-git-send-email-k.kozlowski@samsung.com>
+References: <1417777254-26579-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1417777254-26579-3-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2014 03:57 PM, Mark Rutland wrote:
-> Hi,
-> 
-> On Fri, Dec 05, 2014 at 09:07:29AM +0000, Jingchang Lu wrote:
->> This adds setup of hrtimer based tick broadcast to utilize
->> the hrtimer in SMP without other broadcast tick devices.
->>
->> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> 
-> This shouldn't live in board code.
-> 
-> Similarly to what happens with the generic dummy timer on all arches
-> that select it (and the broadcast hrtimer on all arches that use it so
-> far), we should just unconditionally register the broadcast hrtimer.
-> 
-> A real broadcast-capable clock event device will take preference if
-> present, so we don't need to add board-specific code to only register
-> this in certain conditions.
+The audio subsystem on Exynos 5420 has separate clocks and GPIO. To
+operate properly on GPIOs the main block clock 'mau_epll' must be
+enabled.
 
-Hmm.. this makes sense to me. Let me send out a patch to do this.
+This was observed on Peach Pi/Pit and Arndale Octa (after enabling i2s0)
+after introducing runtime PM to pl330 DMA driver. After that commit the
+'mau_epll' was gated, because the "amba" clock was disabled and there
+were no more users of mau_epll.
 
-Regards
-Preeti U Murthy
-> 
-> Mark.
-> 
->> ---
->>  arch/arm/mach-imx/mach-ls1021a.c | 12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>
->> diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
->> index b89c858..4d074cf 100644
->> --- a/arch/arm/mach-imx/mach-ls1021a.c
->> +++ b/arch/arm/mach-imx/mach-ls1021a.c
->> @@ -7,6 +7,10 @@
->>   * (at your option) any later version.
->>   */
->>  
->> +#include <linux/clockchips.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/clocksource.h>
->> +
->>  #include <asm/mach/arch.h>
->>  
->>  #include "common.h"
->> @@ -16,7 +20,15 @@ static const char * const ls1021a_dt_compat[] __initconst = {
->>  	NULL,
->>  };
->>  
->> +static void __init ls1021a_init_time(void)
->> +{
->> +	of_clk_init(NULL);
->> +	clocksource_of_init();
->> +	tick_setup_hrtimer_broadcast();
->> +}
->> +
->>  DT_MACHINE_START(LS1021A, "Freescale LS1021A")
->>  	.smp		= smp_ops(ls1021a_smp_ops),
->> +	.init_time	= ls1021a_init_time,
->>  	.dt_compat	= ls1021a_dt_compat,
->>  MACHINE_END
->> -- 
->> 1.8.0
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
+The system hang just before probing i2s0 because
+samsung_pinmux_setup() tried to access memory from audss block which was
+gated.
+
+Add a clock property to the pinctrl driver and enable the clock during
+GPIO setup. During normal GPIO operations (set, get, set_direction) the
+clock is not enabled.
+
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ .../bindings/pinctrl/samsung-pinctrl.txt           |   6 ++
+ drivers/pinctrl/samsung/pinctrl-samsung.c          | 111 +++++++++++++++++++--
+ drivers/pinctrl/samsung/pinctrl-samsung.h          |   2 +
+ 3 files changed, 112 insertions(+), 7 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+index 8425838a6dff..eb121daabe9d 100644
+--- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+@@ -93,6 +93,12 @@ Required Properties:
+   pin configuration should use the bindings listed in the "pinctrl-bindings.txt"
+   file.
+ 
++Optional Properties:
++- clocks: Optional clock needed to access the block. Will be enabled/disabled
++  during GPIO configuration, suspend and resume but not during GPIO operations
++  (like set, get, set direction).
++- clock-names: Must be "block".
++
+ External GPIO and Wakeup Interrupts:
+ 
+ The controller supports two types of external interrupts over gpio. The first
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index ec580af35856..85e487fe43ec 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -24,6 +24,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
++#include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/gpio.h>
+ #include <linux/irqdomain.h>
+@@ -55,6 +56,32 @@ static LIST_HEAD(drvdata_list);
+ 
+ static unsigned int pin_base;
+ 
++static int pctl_clk_enable(struct pinctrl_dev *pctldev)
++{
++	struct samsung_pinctrl_drv_data *drvdata;
++	int ret;
++
++	drvdata = pinctrl_dev_get_drvdata(pctldev);
++	if (!drvdata->clk)
++		return 0;
++
++	ret = clk_enable(drvdata->clk);
++	if (ret)
++		dev_err(pctldev->dev, "failed to enable clock: %d\n", ret);
++
++	return ret;
++}
++
++static void pctl_clk_disable(struct pinctrl_dev *pctldev)
++{
++	struct samsung_pinctrl_drv_data *drvdata;
++
++	drvdata = pinctrl_dev_get_drvdata(pctldev);
++
++	/* clk/core.c does the check if clk != NULL */
++	clk_disable(drvdata->clk);
++}
++
+ static inline struct samsung_pin_bank *gc_to_pin_bank(struct gpio_chip *gc)
+ {
+ 	return container_of(gc, struct samsung_pin_bank, gpio_chip);
+@@ -374,7 +401,9 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
+ 	const struct samsung_pmx_func *func;
+ 	const struct samsung_pin_group *grp;
+ 
++	pctl_clk_enable(pctldev);
+ 	drvdata = pinctrl_dev_get_drvdata(pctldev);
++
+ 	func = &drvdata->pmx_functions[selector];
+ 	grp = &drvdata->pin_groups[group];
+ 
+@@ -398,6 +427,8 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
+ 	writel(data, reg + type->reg_offset[PINCFG_TYPE_FUNC]);
+ 
+ 	spin_unlock_irqrestore(&bank->slock, flags);
++
++	pctl_clk_disable(pctldev);
+ }
+ 
+ /* enable a specified pinmux by writing to registers */
+@@ -469,20 +500,37 @@ static int samsung_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
+ {
+ 	int i, ret;
+ 
++	ret = pctl_clk_enable(pctldev);
++	if (ret)
++		goto out;
++
+ 	for (i = 0; i < num_configs; i++) {
+ 		ret = samsung_pinconf_rw(pctldev, pin, &configs[i], true);
+ 		if (ret < 0)
+-			return ret;
++			goto out;
+ 	} /* for each config */
+ 
+-	return 0;
++out:
++	pctl_clk_disable(pctldev);
++
++	return ret;
+ }
+ 
+ /* get the pin config settings for a specified pin */
+ static int samsung_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin,
+ 					unsigned long *config)
+ {
+-	return samsung_pinconf_rw(pctldev, pin, config, false);
++	int ret;
++
++	ret = pctl_clk_enable(pctldev);
++	if (ret)
++		return ret;
++
++	ret = samsung_pinconf_rw(pctldev, pin, config, false);
++
++	pctl_clk_disable(pctldev);
++
++	return ret;
+ }
+ 
+ /* set the pin config settings for a specified pin group */
+@@ -1057,10 +1105,23 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
+ 	}
+ 	drvdata->dev = dev;
+ 
++	drvdata->clk = clk_get(&pdev->dev, "block");
++	if (!IS_ERR(drvdata->clk)) {
++		ret = clk_prepare_enable(drvdata->clk);
++		if (ret) {
++			dev_err(dev, "failed to enable clk: %d\n", ret);
++			return ret;
++		}
++	} else {
++		drvdata->clk = NULL;
++	}
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	drvdata->virt_base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(drvdata->virt_base))
+-		return PTR_ERR(drvdata->virt_base);
++	if (IS_ERR(drvdata->virt_base)) {
++		ret = PTR_ERR(drvdata->virt_base);
++		goto err;
++	}
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+ 	if (res)
+@@ -1068,12 +1129,12 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
+ 
+ 	ret = samsung_gpiolib_register(pdev, drvdata);
+ 	if (ret)
+-		return ret;
++		goto err;
+ 
+ 	ret = samsung_pinctrl_register(pdev, drvdata);
+ 	if (ret) {
+ 		samsung_gpiolib_unregister(pdev, drvdata);
+-		return ret;
++		goto err;
+ 	}
+ 
+ 	if (ctrl->eint_gpio_init)
+@@ -1085,6 +1146,23 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
+ 
+ 	/* Add to the global list */
+ 	list_add_tail(&drvdata->node, &drvdata_list);
++	clk_disable(drvdata->clk); /* Leave prepared */
++
++	return 0;
++
++err:
++	if (drvdata->clk)
++		clk_disable_unprepare(drvdata->clk);
++
++	return ret;
++}
++
++static int samsung_pinctrl_remove(struct platform_device *pdev)
++{
++	struct samsung_pinctrl_drv_data *drvdata = platform_get_drvdata(pdev);
++
++	if (drvdata->clk)
++		clk_unprepare(drvdata->clk);
+ 
+ 	return 0;
+ }
+@@ -1102,6 +1180,13 @@ static void samsung_pinctrl_suspend_dev(
+ 	void __iomem *virt_base = drvdata->virt_base;
+ 	int i;
+ 
++	if (drvdata->clk) {
++		if (clk_enable(drvdata->clk)) {
++			dev_err(drvdata->dev, "failed to enable clock\n");
++			return;
++		}
++	}
++
+ 	for (i = 0; i < drvdata->nr_banks; i++) {
+ 		struct samsung_pin_bank *bank = &drvdata->pin_banks[i];
+ 		void __iomem *reg = virt_base + bank->pctl_offset;
+@@ -1133,6 +1218,8 @@ static void samsung_pinctrl_suspend_dev(
+ 
+ 	if (drvdata->suspend)
+ 		drvdata->suspend(drvdata);
++
++	clk_disable(drvdata->clk);
+ }
+ 
+ /**
+@@ -1148,6 +1235,13 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
+ 	void __iomem *virt_base = drvdata->virt_base;
+ 	int i;
+ 
++	if (drvdata->clk) {
++		if (clk_enable(drvdata->clk)) {
++			dev_err(drvdata->dev, "failed to enable clock\n");
++			return;
++		}
++	}
++
+ 	if (drvdata->resume)
+ 		drvdata->resume(drvdata);
+ 
+@@ -1181,6 +1275,8 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
+ 			if (widths[type])
+ 				writel(bank->pm_save[type], reg + offs[type]);
+ 	}
++
++	clk_disable(drvdata->clk);
+ }
+ 
+ /**
+@@ -1264,6 +1360,7 @@ MODULE_DEVICE_TABLE(of, samsung_pinctrl_dt_match);
+ 
+ static struct platform_driver samsung_pinctrl_driver = {
+ 	.probe		= samsung_pinctrl_probe,
++	.remove		= samsung_pinctrl_remove,
+ 	.driver = {
+ 		.name	= "samsung-pinctrl",
+ 		.of_match_table = samsung_pinctrl_dt_match,
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
+index 1b8c0139d604..666cb23eb9f2 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.h
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
+@@ -201,6 +201,7 @@ struct samsung_pin_ctrl {
+  * struct samsung_pinctrl_drv_data: wrapper for holding driver data together.
+  * @node: global list node
+  * @virt_base: register base address of the controller.
++ * @clk: Optional clock to enable/disable during setup. May be NULL.
+  * @dev: device instance representing the controller.
+  * @irq: interrpt number used by the controller to notify gpio interrupts.
+  * @ctrl: pin controller instance managed by the driver.
+@@ -218,6 +219,7 @@ struct samsung_pinctrl_drv_data {
+ 	void __iomem			*virt_base;
+ 	struct device			*dev;
+ 	int				irq;
++	struct clk			*clk;
+ 
+ 	struct pinctrl_desc		pctl;
+ 	struct pinctrl_dev		*pctl_dev;
+-- 
+1.9.1
