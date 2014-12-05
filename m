@@ -1,78 +1,63 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 5 Dec 2014 13:21:31 +0000
-Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
- drivers
-In-Reply-To: <20141205131815.GA18747@ulmo.nvidia.com>
-References: <54805312.6000402@arm.com>
- <CACxGe6uR5J4Cjdh_xYhBPoQRgeYwHPv5=AnuRmQKSD3yZrMK9Q@mail.gmail.com>
- <54806504.20507@arm.com> <20141204144925.GB31464@ulmo.nvidia.com>
- <54809D09.2050406@arm.com>
- <CACxGe6tpFHdP1-5NWiNVAqzXx-diN1xfRbu0AQDyVJ6AU_4RXg@mail.gmail.com>
- <5480B924.2010205@arm.com> <20141205121037.GI1630@arm.com>
- <5481A688.4030606@arm.com>
- <CACxGe6vppOQj-hJnqEEtLwDuSr4bzcbTgEFj8=x4ULu=yxswpg@mail.gmail.com>
- <20141205131815.GA18747@ulmo.nvidia.com>
-Message-ID: <CACxGe6vqstoCBiJ7TLvhNt+40TUJRB2ORoRKKtorhM-ETHXu0A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Dec 2014 13:23:32 +0000
+Subject: using DMA-API on ARM
+In-Reply-To: <F51492713EF10846800D8C0ED37A7DCE019016E1@SJEXCHMB15.corp.ad.broadcom.com>
+References: <5481794E.4050406@broadcom.com>
+ <20141205094507.GP11285@n2100.arm.linux.org.uk>
+ <20141205122423.GK1630@arm.com>
+ <F51492713EF10846800D8C0ED37A7DCE019016E1@SJEXCHMB15.corp.ad.broadcom.com>
+Message-ID: <20141205132332.GS11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 5, 2014 at 1:18 PM, Thierry Reding <thierry.reding@gmail.com> wrote:
-> On Fri, Dec 05, 2014 at 01:06:52PM +0000, Grant Likely wrote:
->> On Fri, Dec 5, 2014 at 12:35 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->> > Hi Will,
->> >
->> > On 05/12/14 12:10, Will Deacon wrote:
->> > [...]
->> >>>>
->> >>>> Do you expect drivers to modify that *priv pointer after the ops
->> >>>> structure is registered? I'd be very surprised if that was the use
->> >>>> case. It's fine for the driver to register a non-const version, but
->> >>>> once it is registered, the infrastructure can treat it as const from
->> >>>> then on.
->> >>>
->> >>>
->> >>> Possibly not - certainly my current port of the ARM SMMU which makes use
->> >>> of *priv is only ever reading it - although we did also wave around
->> >>> reasons for mutable ops like dynamically changing the pgsize_bitmap and
->> >>> possibly even swizzling individual ops for runtime reconfiguration. On
->> >>> consideration though, I'd agree that things like that are mad enough to
->> >>> stay well within individual drivers if they did ever happen, and
->> >>> certainly shouldn't apply to this bit of the infrastructure at any rate.
->> >>
->> >>
->> >> I certainly need to update the pgsize_bitmap at runtime because I don't
->> >> know the supported page sizes until I've both (a) probed the hardware
->> >> and (b) allocated page tables for a domain. We've already discussed
->> >> moving the pgsize_bitmap out of the ops, but moving it somewhere where
->> >> it remains const doesn't really help.
->> >
->> >
->> > We can safely cast the call to get_ops in the SMMU driver though, since
->> > we'll know that we put a mutable per-instance ops in there in the first
->> > place. At least that way drivers that aren't taking advantage and just pass
->> > their static const ops around shouldn't provoke warnings. I deliberately
->> > didn't touch anything beyond get_ops as that would be too disruptive.
->> >
->> >> Can I just take the patch that Grant acked, in the interest of getting
->> >> something merged? As you say, there's plenty of planned changes in this
->> >> area anyway. I plan to send Olof a pull request this afternoon.
->> >
->> >
->> > Grant, Thierry? Personally I'm not fussed either way - the sooner something
->> > goes in, the sooner I can carry on working at replacing it :D
->>
->> I've already acked it. Why are we still talking about it?  :-D
->
-> Am I missing something? Why is there a need to rush things? Are there
-> actually drivers that depend on this that will be merged during the 3.19
-> merge window? It seems like that'd be cutting it really close given
-> where we are in the release cycle.
->
-> If that's not the case, why even bother getting this hack into 3.19 if
-> nobody uses it and we're going to change it in 3.20 anyway?
+Please wrap your message - replying to a message which looks like this in
+my editor is far from easy, and gives me much more work to /manually/
+reformat it before I can reply to it:
 
-I also acked the non-hack version, the patch that doesn't try to make
-everything const. I assumed that was the one that we are talking about
-merging.
+On Fri, Dec 05, 2014 at 12:56:45PM +0000, Hante Meuleman wrote:
+> The problem is with data coming from device, so DMA from device to host. The $
+>
+> However: this indicates that dma_alloc_coherent on an ARM target may result i$
+>
+> Regards,
+> Hante
 
-g.
+Thanks.
+
+On Fri, Dec 05, 2014 at 12:56:45PM +0000, Hante Meuleman wrote:
+> However: this indicates that dma_alloc_coherent on an ARM target may
+> result in a memory buffer which can be cached which conflicts with
+> the API of this function.
+
+If the memory has an alias which is cacheable, it is possible for cache
+lines to get allocated via that alias, even if the alias has no explicit
+accesses to it.
+
+This is something which I've been going on for quite literally /years/ -
+mismatched cache attributes can cause unpredictable behaviour.  I've had
+a lot of push back from people who are of the opinion that "if it works
+for me, then there isn't a problem" and I eventually gave up fighting
+the battle, especially as the ARM architecture people weakened my
+reasoning behind it by publishing a relaxation of the "no differing
+attributes" issue.  This was particularly true of those who wanted to
+use ioremap() on system memory - and cases such as
+dma_init_coherent_memory().
+
+So, I never fixed this problem in the original DMA allocator code; I
+basically gave up with it.  It's a latent bug which did need to be fixed,
+and is still present today in the non-CMA case.
+
+The symptoms which you are reporting sound very much like this kind of
+problem - the virtual address for the memory returned by
+dma_alloc_coherent() will not be cacheable memory - it will have been
+remapped using map_vm_area().  However, there could very well be a fully
+cacheable lowmem mapping of that memory, which if a read (speculative or
+otherwise) will bring a cache line in, and because the caches are VIPT
+or PIPT, that cache line can be hit via the non-cacheable mapping too.
+
+What I /really/ need is more evidence of this to tell those disbelievers
+where to stick their flawed arguments. :)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
