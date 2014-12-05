@@ -1,89 +1,61 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Fri, 5 Dec 2014 18:24:25 +0100
-Subject: [PATCH v2 0/6] Improve PSCI system events and fix reboot bugs
-In-Reply-To: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
-References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20141205172425.GA3563@hawk.usersys.redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Dec 2014 17:27:02 +0000
+Subject: [RFC v2] arm:extend the reserved mrmory for initrd to be page
+ aligned
+In-Reply-To: <20141205170745.GA31222@e104818-lin.cambridge.arm.com>
+References: <35FD53F367049845BC99AC72306C23D103D6DB491609@CNBJMBX05.corpusers.net>
+ <20140915113325.GD12361@n2100.arm.linux.org.uk>
+ <20141204120305.GC17783@e104818-lin.cambridge.arm.com>
+ <20141205120506.GH1630@arm.com>
+ <20141205170745.GA31222@e104818-lin.cambridge.arm.com>
+Message-ID: <20141205172701.GW11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03, 2014 at 10:18:36PM +0100, Christoffer Dall wrote:
-> Several people have reported problems with rebooting ARM VMs, especially
-> on 32-bit ARM.  This is mainly due to the same reason we were seeing
-> boot errors in the past, namely that the ram, dcache, and icache weren't
-> coherent on guest boot with the guest (stage-1) MMU disabled.  We solved
-> this by ensuring coherency when we fault in pages, but since most memory
-> is already mapped after a reboot, we don't do anything.
+On Fri, Dec 05, 2014 at 05:07:45PM +0000, Catalin Marinas wrote:
+> On Fri, Dec 05, 2014 at 12:05:06PM +0000, Will Deacon wrote:
+> > Care to submit this as a proper patch? We should at least fix Peter's issue
+> > before doing things like extending headers, which won't work for older
+> > kernels anyway.
 > 
-> The solution is to unmap the regular RAM on VCPU init, but we must
-> take care to not unmap the GIC or other IO regions, hence the somehwat
-> complicated solution.
-> 
-> As part of figuring this out, it became clear that some semantics around
-> the KVM_ARM_VCPU_INIT ABI and system event ABI was unclear (what is
-> userspace expected to do when it receives a system event).  This series
-> also clarifies the ABI and changes the kernel functionality to do what
-> userspace expects (turn off VCPUs on a system shutdown event).
-> 
-> The code is avaliable here as well:
-> http://git.linaro.org/people/christoffer.dall/linux-kvm-arm.git vcpu_init_fixes-v2
-> 
-> There is an alternative version with more code-reuse for the unmapping
-> implementation for the previous version of this patch series available
-> in the following git repo:
-> 
-> http://git.linaro.org/people/christoffer.dall/linux-kvm-arm.git vcpu_init_fixes-alternative
-> 
-> Testing
-> -------
-> This has been tested on CubieBoard, Arndale, TC2, and Juno.  On Arndale
-> and TC2 it was extremely easy to reproduce the problem (just start a VM
-> that runs reboot from /etc/rc.local or similar) and this series clearly
-> fixes the behavior.  For the previous version of this series, I was
-> seeing some problems on Juno, but it turned out to be because I wasn't
-> limiting my testing to one of the clusters, and since we don't support
-> re-initing a VCPU on a different physical host CPU (big.LITTLE), it was
-> failing.  For this version of the patch series, it has been running a
-> reboot loop on Juno for hours.
+> Quick fix is the revert of the whole patch, together with removing
+> PAGE_ALIGN(end) in poison_init_mem() on arm32. If Russell is ok with
+> this patch, we can take it via the arm64 tree, otherwise I'll send you a
+> partial revert only for the arm64 part.
 
-Just tested this version. Looks good. No problems after install nor
-after many, many reboots.
+Not really.  Let's look at the history.
 
-drew
+For years, we've been poisoning memory, page aligning the end pointer.
+This has never been an issue.
 
+However, patch 8167/1 changed things so we freed the overlapping pages.
+Since we've always poisoned up to the end of the final page, freeing it
+should not be a problem, especially as (I said above) we've been poisoning
+it for years.
+
+The issue is more about what happens at the start.
+
+In any case:
+
+> >From 8e317c6be00abe280de4dcdd598d2e92009174b6 Mon Sep 17 00:00:00 2001
+> From: Catalin Marinas <catalin.marinas@arm.com>
+> Date: Fri, 5 Dec 2014 16:41:52 +0000
+> Subject: [PATCH] Revert "ARM: 8167/1: extend the reserved memory for initrd to
+>  be page aligned"
 > 
-> Changelog
-> ---------
-> Changes v1->v2:
->  - New patch to not clear the VCPU_POWER_OFF flag
->  - Fixed spelling error in commit message
->  - Adapted ABI texts based on Peter's feedback
->  - Check for changed parameters to KVM_ARM_VCPU_INIT
->  - Now unmap the Stage-2 RAM mappings at VCPU init instead of at PSCI
->    system event time.
+> This reverts commit 421520ba98290a73b35b7644e877a48f18e06004. There is
+> no guarantee that the boot-loader places other images like dtb in a
+> different page than initrd start/end. When this happens, such pages must
+> not be freed. The free_reserved_area() already takes care of rounding up
+> "start" and rounding down "end" to avoid freeing partially used pages.
 > 
-> Christoffer Dall (6):
->   arm/arm64: KVM: Don't clear the VCPU_POWER_OFF flag
->   arm/arm64: KVM: Correct KVM_ARM_VCPU_INIT power off option
->   arm/arm64: KVM: Reset the HCR on each vcpu when resetting the vcpu
->   arm/arm64: KVM: Clarify KVM_ARM_VCPU_INIT ABI
->   arm/arm64: KVM: Turn off vcpus on PSCI shutdown/reboot
->   arm/arm64: KVM: Introduce stage2_unmap_vm
-> 
->  Documentation/virtual/kvm/api.txt    | 17 +++++++++-
->  arch/arm/include/asm/kvm_emulate.h   |  5 +++
->  arch/arm/include/asm/kvm_host.h      |  2 --
->  arch/arm/include/asm/kvm_mmu.h       |  1 +
->  arch/arm/kvm/arm.c                   | 56 ++++++++++++++++++++++++++++++-
->  arch/arm/kvm/guest.c                 | 26 ---------------
->  arch/arm/kvm/mmu.c                   | 65 ++++++++++++++++++++++++++++++++++++
->  arch/arm/kvm/psci.c                  | 19 +++++++++++
->  arch/arm64/include/asm/kvm_emulate.h |  5 +++
->  arch/arm64/include/asm/kvm_host.h    |  3 +-
->  arch/arm64/include/asm/kvm_mmu.h     |  1 +
->  arch/arm64/kvm/guest.c               | 26 ---------------
->  12 files changed, 168 insertions(+), 58 deletions(-)
-> 
-> -- 
-> 2.1.2.330.g565301e.dirty
-> 
+> In addition to the revert, this patch also removes the arm32
+> PAGE_ALIGN(end) when calculating the size of the memory to be poisoned.
+
+which makes the summary line rather misleading, and I really don't think
+we need to do this on ARM for the simple reason that we've been doing it
+for soo long that it can't be an issue.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
