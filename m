@@ -1,24 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Dec 2014 18:41:37 +0100
-Subject: [GIT PULL] Automatic DMA configuration for OF-based IOMMU masters
-In-Reply-To: <20141205163506.GQ1630@arm.com>
-References: <20141205163506.GQ1630@arm.com>
-Message-ID: <2761372.pAE6Jsk679@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 5 Dec 2014 11:48:52 -0600
+Subject: [PATCH V2] ARM: dts: am57xx-beagle-x15: Add GPIO controlled fan node
+In-Reply-To: <1417800739-13146-1-git-send-email-nm@ti.com>
+References: <1417800739-13146-1-git-send-email-nm@ti.com>
+Message-ID: <1417801732-24620-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 December 2014 16:35:06 Will Deacon wrote:
-> Hi Olof,
-> 
-> Please consider pulling the following series for 3.19. I appreciate that
-> this is late in the day, but the patches have been around for a while and
-> have collected all the Acks that they need. Marek has already been finding
-> the series useful with the Exynos IOMMU, so it seems a pity to hold the
-> patches up any longer.
-> 
+TPS gpio now controls a 5v 500mA TL5209 regulator which may be supply
+a fan (such as AFB02505HHB) over J1 connector for various purposes.
+Provide device tree node to enable the same.
 
-I've pulled it into a separate next/iommu-config branch in case we have
-to take it out again for some reason. The autobuilder has not found any
-regressions, so that's a good sign.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 
-	Arnd
+V2: review comment updates
+	review comments update
+		- Sanitized outlook-ified name back to normal ;) 
+		- removed unnecessary pinctrl-names property.
+V1: https://patchwork.kernel.org/patch/5444911/
+
+
+Depends on the following:
+https://patchwork.kernel.org/patch/5439201/
+https://patchwork.kernel.org/patch/5439191/
+
+enable and disable can be controlled by (post the RPM, it finds
+closest match - even a 1 will do)
+
+echo '13000' > /sys/class/hwmon/hwmon0/fan1_target
+and
+echo '0' > /sys/class/hwmon/hwmon0/fan1_target
+
+Test log: http://slexy.org/view/s2T0ajh46z
+
+requires CONFIG_GPIO_PALMAS and CONFIG_SENSORS_GPIO_FAN to be operational
+Applies on 
+https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v3.19/dt-v2
+
+ arch/arm/boot/dts/am57xx-beagle-x15.dts |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index 49edbda..4e55e94 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -80,6 +80,14 @@
+ 			default-state = "off";
+ 		};
+ 	};
++
++	gpio_fan {
++		/* Based on 5v 500mA AFB02505HHB */
++		compatible = "gpio-fan";
++		gpios =  <&tps659038_gpio 1 GPIO_ACTIVE_HIGH>;
++		gpio-fan,speed-map = <0    0
++				      13000 1>;
++	};
+ };
+ 
+ &dra7_pmx_core {
+@@ -314,6 +322,12 @@
+ 			wakeup-source;
+ 			ti,palmas-long-press-seconds = <12>;
+ 		};
++
++		tps659038_gpio: tps659038_gpio {
++			compatible = "ti,palmas-gpio";
++			gpio-controller;
++			#gpio-cells = <2>;
++		};
+ 	};
+ 
+ 	tmp102: tmp102 at 48 {
+-- 
+1.7.9.5
