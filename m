@@ -1,30 +1,73 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Fri, 5 Dec 2014 18:22:33 +0800
-Subject: [RFC] mm:add KPF_ZERO_PAGE flag for /proc/kpageflags
-In-Reply-To: <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
-References: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
- <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
-Message-ID: <35FD53F367049845BC99AC72306C23D103E688B313F2@CNBJMBX05.corpusers.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 5 Dec 2014 10:27:14 +0000
+Subject: [PATCH] arm: ls1021a: setup hrtimer based tick broadcast
+In-Reply-To: <1417770449-3492-1-git-send-email-jingchang.lu@freescale.com>
+References: <1417770449-3492-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <20141205102714.GD11889@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Konstantin Khlebnikov [mailto:koct9i at gmail.com]
-> Sent: Friday, December 05, 2014 5:21 PM
-> To: Wang, Yalin
-> Cc: linux-kernel at vger.kernel.org; linux-mm at kvack.org; linux-arm-
-> kernel at lists.infradead.org; akpm at linux-foundation.org; n-
-> horiguchi at ah.jp.nec.com
-> Subject: Re: [RFC] mm:add KPF_ZERO_PAGE flag for /proc/kpageflags
+Hi,
+
+On Fri, Dec 05, 2014 at 09:07:29AM +0000, Jingchang Lu wrote:
+> This adds setup of hrtimer based tick broadcast to utilize
+> the hrtimer in SMP without other broadcast tick devices.
 > 
-> On Fri, Dec 5, 2014 at 11:57 AM, Wang, Yalin <Yalin.Wang@sonymobile.com>
-> wrote:
-> > This patch add KPF_ZERO_PAGE flag for zero_page, so that userspace
-> > process can notice zero_page from /proc/kpageflags, and then do memory
-> > analysis more accurately.
+> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+
+This shouldn't live in board code.
+
+Similarly to what happens with the generic dummy timer on all arches
+that select it (and the broadcast hrtimer on all arches that use it so
+far), we should just unconditionally register the broadcast hrtimer.
+
+A real broadcast-capable clock event device will take preference if
+present, so we don't need to add board-specific code to only register
+this in certain conditions.
+
+Mark.
+
+> ---
+>  arch/arm/mach-imx/mach-ls1021a.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
-> It would be nice to mark also huge_zero_page. See (completely
-> untested) patch in attachment.
+> diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
+> index b89c858..4d074cf 100644
+> --- a/arch/arm/mach-imx/mach-ls1021a.c
+> +++ b/arch/arm/mach-imx/mach-ls1021a.c
+> @@ -7,6 +7,10 @@
+>   * (at your option) any later version.
+>   */
+>  
+> +#include <linux/clockchips.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/clocksource.h>
+> +
+>  #include <asm/mach/arch.h>
+>  
+>  #include "common.h"
+> @@ -16,7 +20,15 @@ static const char * const ls1021a_dt_compat[] __initconst = {
+>  	NULL,
+>  };
+>  
+> +static void __init ls1021a_init_time(void)
+> +{
+> +	of_clk_init(NULL);
+> +	clocksource_of_init();
+> +	tick_setup_hrtimer_broadcast();
+> +}
+> +
+>  DT_MACHINE_START(LS1021A, "Freescale LS1021A")
+>  	.smp		= smp_ops(ls1021a_smp_ops),
+> +	.init_time	= ls1021a_init_time,
+>  	.dt_compat	= ls1021a_dt_compat,
+>  MACHINE_END
+> -- 
+> 1.8.0
 > 
-Got it,
-Thanks for your patch.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
