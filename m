@@ -1,88 +1,35 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 5 Dec 2014 08:45:26 -0700
-Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <2519415.GklIQeMgWR@wuerfel>
-References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
- <8625951.Wbs2MxLnhi@wuerfel> <20141204162834.GA2995@linaro.org>
- <2519415.GklIQeMgWR@wuerfel>
-Message-ID: <20141205154526.GC2995@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 05 Dec 2014 16:50:18 +0100
+Subject: [PATCH 2/3] drivers:input:ps2 Added sunxi A20 ps2 driver,
+ changed makefile and Kconfig
+In-Reply-To: <63D786FF-B293-4FC1-AD71-D99515DE8E3D@gmail.com>
+References: <1417647224-27950-1-git-send-email-VishnuPatekar0510@gmail.com>
+ <12237550.afophX20rO@wuerfel>
+ <63D786FF-B293-4FC1-AD71-D99515DE8E3D@gmail.com>
+Message-ID: <2906898.Fr1ixVkiAI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04 2014 at 11:20 -0700, Arnd Bergmann wrote:
->On Thursday 04 December 2014 09:28:34 Lina Iyer wrote:
->> On Thu, Dec 04 2014 at 02:02 -0700, Arnd Bergmann wrote:
->> >On Thursday 04 December 2014 09:52:39 Daniel Lezcano wrote:
->> >> On 12/03/2014 09:35 PM, Arnd Bergmann wrote:
->> >> > On Wednesday 03 December 2014 07:31:22 Lina Iyer wrote:
->> >> >>>>> +static int __init qcom_spm_init(void)
->> >> >>>>> +{
->> >> >>>>> +    int ret;
->> >> >>>>> +
->> >> >>>>> +    /*
->> >> >>>>> +     * cpuidle driver need to registered before the cpuidle device
->> >> >>>>> +     * for any cpu. Register the device for the the cpuidle driver.
->> >> >>>>> +     */
->> >> >>>>> +    ret = platform_device_register(&qcom_cpuidle_drv);
->> >> >>>>> +    if (ret)
->> >> >>>>> +        return ret;
->> >> >>>> Stephen pointed out that we would have the platform device lying around
->> >> >>>> on a non-QCOM device when using multi_v7_defconfig.
->> >> >>>
->> >> >>> Perhaps I am missing the point, but this is not supposed to happen, no ?
->> >> >>>
->> >> >> This would happen, since the file would compile on multi_v7 and we would
->> >> >> initialize and register this device regardless. The cpuidle-qcom.c
->> >> >> driver probe would bail out looking for a matching compatible property.
->> >> >> So we would not register a cpuidle driver but the device would lay
->> >> >> around.
->> >> >
->> >> > I think the problem is registering a platform_device. I've complained
->> >> > about this before, but it still seems to get copied all over the
->> >> > place. Please don't do this but have a driver that looks at DT to
->> >> > figure out whether to access hardware or not.
->> >>
->> >> We did this approach but, I can remember why, someone was complaining
->> >> about it also
->> >>
->> >> The platform device/driver paradigm allowed us to split the arch
->> >> specific parts by passing the pm ops through the platform data.
->> >>
->> >> Would make sense to have a single common place for the ARM arch where we
->> >> initialize the platform device for cpuidle ?
->> >
->> >No. It's really not a device, and if you pretend that it is, you get
->> >into problems like this.
->>
->> Arnd, the problem is that the provides function pointers to the SoC code
->> that the cpuilde driver uses to call based on the idle state.
->>
->> After much discussions, we came down to using function pointers from
->> translating from DT strings, other than using that again, I dont see a
->> good way of achieving the ability of cpuidle driver staying a separate
->> driver from the SPM driver.
->>
->> Daniel, thoughts?
->
->Maybe the problem is trying too hard to separate two things that really
->belong together then. In general, the strategy of coming up with subsystems
->for a class of devices and them turning platform code into drivers for
->that subsystem has worked out really well, but I think for cpufreq, cpuidle
->and smp, it really hasn't, and in the third case we haven't even tried
->coming up with a subsystem for that reason.
->
->Having all cpuidle code generally live in drivers/cpuidle is still a good
->idea IMO, but using a platform device just for the purpose of passing
->data between some platform specific code and another platform specific
->driver hasn't worked out that well here.
->
-To achieve both, I cant think of a better way to initialize the cpuidle
-driver without the use of reference count (0 ==>
-platform_driver_register).
+On Friday 05 December 2014 07:01:17 Dmitry Torokhov wrote:
+> 
+> On December 5, 2014 2:33:11 AM PST, Arnd Bergmann <arnd@arndb.de> wrote:
+> >On Thursday 04 December 2014 04:23:44 vishnupatekar wrote:
+> >> +
+> >> +struct sunxips2data {
+> >> +    int irq;
+> >> +    spinlock_t ps2_lock;
+> >> +    void __iomem *base_address;     /* virt address of control registers*/
+> >> +    struct serio *serio;            /* serio*/
+> >> +    struct device *dev;
+> >> +    struct  clk     *pclk;
+> >> +};
+> >
+> >As this is dynamically allocated, better embed the serio member
+> >directly to avoid allocating both separately.
+> 
+> That would be wrong - serio is refcounted and it may outlive instance of sunxips2data you embedded it into.
 
-I tried creating dummy platform device in the DT but something or
-another gives in to an ugly implementation.
+Ok, I see. I guess in this case the use of devm_kzalloc for serio is a bug,
+because that would lead to a double free upon module unload, right?
 
-Any other ideas?
-
-Lina.
+	Arnd
