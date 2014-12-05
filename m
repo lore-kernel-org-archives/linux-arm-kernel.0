@@ -1,49 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 5 Dec 2014 10:40:09 +0000
-Subject: [PATCH v4 0/5] Add Spreadtrum Sharkl64 Platform support
-In-Reply-To: <1417692860-18841-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <sc9836v4>
- <1417692860-18841-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <20141205104009.GE11889@leverpostej>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 5 Dec 2014 18:41:04 +0800
+Subject: [PATCH v5] clocksource: arch_timer: Fix code to use physical
+ timers when requested
+In-Reply-To: <1416812564-26465-1-git-send-email-sonnyrao@chromium.org>
+References: <1416812564-26465-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <1417776064.14380.17.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Dec 04, 2014 at 11:34:15AM +0000, Chunyan Zhang wrote:
-> Spreadtrum is a rapid growing chip vendor providing smart phone total solutions.
+On Sun, 2014-11-23 at 23:02 -0800, Sonny Rao wrote: 
+> This is a bug fix for using physical arch timers when
+> the arch_timer_use_virtual boolean is false.  It restores the
+> arch_counter_get_cntpct() function after removal in
 > 
-> Sharkl64 Platform is nominated as a SoC infrastructure that supports 4G/3G/2G
-> standards based on ARMv8 multiple core architecture.Now we have only one
-> SoC(SC9836) based on this Platform in developing.
+> 0d651e4e "clocksource: arch_timer: use virtual counters"
 > 
-> This patchset adds Sharkl64 support in arm64 device tree and the serial driver
-> of SC9836-UART.
-> 
-> This patchset also has patches which address "sprd" prefix and DT compatible
-> strings for nodes which appear un-documented.
-> 
-> This version code was tesed both on Fast Mode and sc9836-fpga board.
-> We use the latest boot-wrapper-aarch64 as the bootloader.
-> 
-> Changes from v3:
-> * Addressed review comments:
-> 	- Added the description of clock property for sc9836-uart
-> 	- Revised the size of GICC to be 8KiB
-> 	- Added another compatible string for psci-0.1
+> We need this on certain ARMv7 systems which are architected like this:
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index f190971..b1fa4e6 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -104,6 +104,15 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+>  	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+>  }
+>  
+> +static inline u64 arch_counter_get_cntpct(void)
+> +{
+> +	/*
+> +	 * AArch64 kernel and user space mandate the use of CNTVCT.
+> +	 */
+> +	BUG();
+> +	return 0;
+> +}
+> +
+>  static inline u64 arch_counter_get_cntvct(void)
+>  {
+>  	u64 cval;
 
-I had open questions on v3 regarding your PSCI imlpementation. You
-mentioned that you are using the aarch64 bootwrapper, but your DT
-describes PSCI 0.2, and the (upstream) bootwrapper does not implement
-PSCI 0.2. Adding the old PSCI compatible string is _not_ sufficient if
-you do not have a full PSCI 0.2 implementation.
+I tested this on an arm64 platform and system fail to boot when apply
+this patch.
 
-Given that PSCI 0.2 requires more functionality to be implemented, I'd
-like to know that your implementation is spec-compliant (implementing
-the mandatory functions, nters the kernel in the correct state, etc),
-and that it has been tested.
+The boot loader start kernel at EL2, so is_hyp_mode_available() will be
+true and we will use physical timer. Without this patch,
+arch_timer_read_counter set to arch_counter_get_cntvct even when we use
+physical timer which is incorrect but at least system will boot.
 
-Would you be able to look at my comments from the last posting please?
+I think we still need this function on arm64. We should add BUG() to
+arch_timer_init instead, maybe something like this:
 
-Thanks,
-Mark.
+
+@@ -708,9 +708,12 @@ static void __init arch_timer_init(struct device_node *np)
+ 	 * If we cannot rely on firmware initializing the timer registers then
+ 	 * we should use the physical timers instead.
+ 	 */
+-	if (IS_ENABLED(CONFIG_ARM) &&
+-	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
++	if (of_property_read_bool(np, "arm,cpu-registers-not-fw-configured")) {
++		if (IS_ENABLED(CONFIG_ARM64))
++			BUG();
++		else
+ 			arch_timer_use_virtual = false;
++	}
+
+Joe.C
