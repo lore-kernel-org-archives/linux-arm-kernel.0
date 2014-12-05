@@ -1,48 +1,28 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Fri, 5 Dec 2014 17:07:29 +0800
-Subject: [PATCH] arm: ls1021a: setup hrtimer based tick broadcast
-Message-ID: <1417770449-3492-1-git-send-email-jingchang.lu@freescale.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 5 Dec 2014 11:01:46 +0100
+Subject: [PATCH] ARM: shmobile: r8a7794: Add USB clocks to device tree
+In-Reply-To: <1417748472-23700-1-git-send-email-horms+renesas@verge.net.au>
+References: <1417748472-23700-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWeBK9wwEnm=t99mnQbOabznZr_+xW86p208iG6rrrvww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds setup of hrtimer based tick broadcast to utilize
-the hrtimer in SMP without other broadcast tick devices.
+On Fri, Dec 5, 2014 at 4:01 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+>
+> Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+> [horms: resolved conflicts]
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
----
- arch/arm/mach-imx/mach-ls1021a.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
-index b89c858..4d074cf 100644
---- a/arch/arm/mach-imx/mach-ls1021a.c
-+++ b/arch/arm/mach-imx/mach-ls1021a.c
-@@ -7,6 +7,10 @@
-  * (at your option) any later version.
-  */
- 
-+#include <linux/clockchips.h>
-+#include <linux/clk-provider.h>
-+#include <linux/clocksource.h>
-+
- #include <asm/mach/arch.h>
- 
- #include "common.h"
-@@ -16,7 +20,15 @@ static const char * const ls1021a_dt_compat[] __initconst = {
- 	NULL,
- };
- 
-+static void __init ls1021a_init_time(void)
-+{
-+	of_clk_init(NULL);
-+	clocksource_of_init();
-+	tick_setup_hrtimer_broadcast();
-+}
-+
- DT_MACHINE_START(LS1021A, "Freescale LS1021A")
- 	.smp		= smp_ops(ls1021a_smp_ops),
-+	.init_time	= ls1021a_init_time,
- 	.dt_compat	= ls1021a_dt_compat,
- MACHINE_END
--- 
-1.8.0
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
