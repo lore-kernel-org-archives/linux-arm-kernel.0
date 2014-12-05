@@ -1,38 +1,23 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 05 Dec 2014 10:10:29 +0000
-Subject: [PATCH v3 09/13] irqchip: GICv3: ITS: MSI support
-In-Reply-To: <CALRxmdAULDXqx5oNUGQx9y2oUegULKO7=gWQWMRkFOzFo9XS8A@mail.gmail.com>
-References: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>	<1416839720-18400-10-git-send-email-marc.zyngier@arm.com>
- <CALRxmdAULDXqx5oNUGQx9y2oUegULKO7=gWQWMRkFOzFo9XS8A@mail.gmail.com>
-Message-ID: <54818495.5010700@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 05 Dec 2014 11:13:03 +0100
+Subject: [PATCH v3 1/8] soc: mediatek: Add PMIC wrapper for MT8135 and
+ MT6397 SoC
+In-Reply-To: <1417752479-4749-2-git-send-email-flora.fu@mediatek.com>
+References: <1417752479-4749-1-git-send-email-flora.fu@mediatek.com>
+ <1417752479-4749-2-git-send-email-flora.fu@mediatek.com>
+Message-ID: <2751641.o51TuZRl88@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stuart,
-
-On 04/12/14 21:52, Stuart Yoder wrote:
-> On Mon, Nov 24, 2014 at 8:35 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+On Friday 05 December 2014 12:07:52 Flora Fu wrote:
+> Add PMIC wrapper of MT8135 to access MT6397 MFD.
 > 
->> +/*
->> + * We need a value to serve as a irq-type for LPIs. Choose one that will
->> + * hopefully pique the interest of the reviewer.
->> + */
->> +#define GIC_IRQ_TYPE_LPI               0xa110c8ed
+> Signed-off-by: Flora Fu <flora.fu@mediatek.com>
 > 
-> Ok, my interest is piqued.  Why this value?
 
-See the xlate function in the main GICv3 driver.
+Please explain what a PMIC wrapper is and why you need one for MT8135.
+I don't understand the purpose of this code at all. Is this just another
+way of accessing the MT6397 when not using i2c or spi like other
+PMIC drivers do?
 
-We need something to indicate that we want it to allocate an LPI, but
-this function is mostly DT-specific, and we don't have an LPI type in
-the binding just yet (I've purposely pushed back on it until we have a
-clear idea of where we want to take LPIs).
-
-So this value is just a made up thing that is unlikely to ever find its
-place in a DT binding.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
