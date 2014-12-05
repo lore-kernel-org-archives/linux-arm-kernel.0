@@ -1,48 +1,54 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Fri, 5 Dec 2014 16:08:42 +0800
-Subject: [RFC V2] mm:add zero_page _mapcount when mapped into user space
-In-Reply-To: <CALYGNiPWw6=tryWn_kCs+6H1uSjApBDnqORxuNEd=DuGCo71qA@mail.gmail.com>
-References: <35FD53F367049845BC99AC72306C23D103E688B313E0@CNBJMBX05.corpusers.net>
- <20141202113014.GA22683@node.dhcp.inet.fi>
- <35FD53F367049845BC99AC72306C23D103E688B313E6@CNBJMBX05.corpusers.net>
- <20141204122813.GA523@node.dhcp.inet.fi>
- <CALYGNiPWw6=tryWn_kCs+6H1uSjApBDnqORxuNEd=DuGCo71qA@mail.gmail.com>
-Message-ID: <35FD53F367049845BC99AC72306C23D103E688B313EC@CNBJMBX05.corpusers.net>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 5 Dec 2014 09:15:29 +0100
+Subject: [PATCH v2 1/3] i2c: cadence: Handle > 252 byte transfers
+In-Reply-To: <CAA7nrtg_G+U2EVxy0joZC+fBGyXS_uOwe1RZ8PyoDv7icu6OBw@mail.gmail.com>
+References: <1417610126-7957-1-git-send-email-harinik@xilinx.com>
+ <1417610126-7957-2-git-send-email-harinik@xilinx.com>
+ <CAA7nrtg_G+U2EVxy0joZC+fBGyXS_uOwe1RZ8PyoDv7icu6OBw@mail.gmail.com>
+Message-ID: <66a490c827bc47d98a0118a58d7060e7@BN1BFFO11FD054.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Konstantin Khlebnikov [mailto:koct9i at gmail.com]
-> Sent: Friday, December 05, 2014 2:39 PM
-> To: Kirill A. Shutemov
-> Cc: Wang, Yalin; linux-kernel at vger.kernel.org; linux-mm at kvack.org; linux-
-> arm-kernel at lists.infradead.org
-> Subject: Re: [RFC V2] mm:add zero_page _mapcount when mapped into user
-> space
+On 12/05/2014 06:41 AM, rajeev kumar wrote:
+> On Wed, Dec 3, 2014 at 6:05 PM, Harini Katakam <harinik@xilinx.com> wrote:
+>> The I2C controller sends a NACK to the slave when transfer size register
+>> reaches zero, irrespective of the hold bit. So, in order to handle transfers
+>> greater than 252 bytes, the transfer size register has to be maintained at a
+>> value >= 1. This patch implements the same.
 > 
-> On Thu, Dec 4, 2014 at 3:28 PM, Kirill A. Shutemov <kirill@shutemov.name>
-> wrote:
-> > On Thu, Dec 04, 2014 at 02:10:53PM +0800, Wang, Yalin wrote:
-> >> > -----Original Message-----
-> >> > From: Kirill A. Shutemov [mailto:kirill at shutemov.name]
-> >> > Sent: Tuesday, December 02, 2014 7:30 PM
-> >> > To: Wang, Yalin
-> >> > Cc: 'linux-kernel at vger.kernel.org'; 'linux-mm at kvack.org';
-> >> > 'linux-arm- kernel at lists.infradead.org'
-> >> > Subject: Re: [RFC V2] mm:add zero_page _mapcount when mapped into
-> >> > user space
-> >> >
-> >> > On Tue, Dec 02, 2014 at 05:27:36PM +0800, Wang, Yalin wrote:
-> >> > > This patch add/dec zero_page's _mapcount to make sure the
-> >> > > mapcount is correct for zero_page, so that when read from
-> >> > > /proc/kpagecount, zero_page's mapcount is also correct, userspace
-> >> > > process like procrank can calculate PSS correctly.
+> Why 252 Bytes ?  Is it word allign or what ?
 > 
-> Instead of tweaking mapcount you could mark zero-pages in /proc/kpageflags
-> and handle them accordingly in userspace. Or mark zero pages with special
-> magic _mapcount and detect it in /proc/kpagecount.
+>> The interrupt status is cleared at the beginning of the isr instead of
+>> the end, to avoid missing any interrupts - this is in sync with the new
+>> transfer handling.
+>>
 > 
-I think add KPF_ZERO_PAGE in kpageflags is better.
-I will make another patch for review .
+> No need to write this, actually this is the correct way of handling interrupt.
+> 
+>> Signed-off-by: Harini Katakam <harinik@xilinx.com>
+>> ---
+>>
+>> v2:
+>> No changes
+>>
+>> ---
+>>  drivers/i2c/busses/i2c-cadence.c |  156 ++++++++++++++++++++------------------
+>>  1 file changed, 81 insertions(+), 75 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+>> index 63f3f03..e54899e 100644
+>> --- a/drivers/i2c/busses/i2c-cadence.c
+>> +++ b/drivers/i2c/busses/i2c-cadence.c
+>> @@ -126,6 +126,7 @@
+>>   * @suspended:         Flag holding the device's PM status
+>>   * @send_count:                Number of bytes still expected to send
+>>   * @recv_count:                Number of bytes still expected to receive
+>> + * @curr_recv_count:   Number of bytes to be received in current transfer
+> 
+> Please do the alignment properly
 
-Thanks
+Alignments are correct when you apply this patch.
+Please let us know if you see any problem.
+
+Thanks,
+Michal
