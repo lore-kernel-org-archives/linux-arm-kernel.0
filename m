@@ -1,41 +1,37 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Fri,  5 Dec 2014 20:21:57 +0100
-Subject: [PATCH] serial: of-serial: fetch line number from DT
-Message-ID: <1417807317-30580-1-git-send-email-dev@lynxeye.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Dec 2014 19:25:44 +0000
+Subject: using DMA-API on ARM
+In-Reply-To: <548205DD.4080101@broadcom.com>
+References: <5481794E.4050406@broadcom.com>
+ <20141205094507.GP11285@n2100.arm.linux.org.uk>
+ <20141205122423.GK1630@arm.com>
+ <F51492713EF10846800D8C0ED37A7DCE019016E1@SJEXCHMB15.corp.ad.broadcom.com>
+ <20141205132332.GS11285@n2100.arm.linux.org.uk>
+ <20141205150648.GT11285@n2100.arm.linux.org.uk>
+ <20141205182851.GC31222@e104818-lin.cambridge.arm.com>
+ <548205DD.4080101@broadcom.com>
+Message-ID: <20141205192544.GY11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The general agreed way to specify a fixed line number
-for a serial console is to provide a "serial" alias
-in the devicetree. Start parsing this property in
-of_serial.
+On Fri, Dec 05, 2014 at 08:22:05PM +0100, Arend van Spriel wrote:
+> On 12/05/14 19:28, Catalin Marinas wrote:
+> >This is solved by using a pre-allocated, pre-mapped atomic_pool which
+> >avoids any further mapping. __dma_alloc() calls __alloc_from_pool() when
+> >!__GFP_WAIT.
+> 
+> So we are actually calling dma_alloc_coherent() with GFP_KERNEL during
+> device probe. That last paragraph Russell pointed out seems to suggest this
+> is not allowed.
 
-Signed-off-by: Lucas Stach <dev@lynxeye.de>
-Acked-by: Olof Johansson <olof@lixom.net>
----
-As 3.16-rc6 landed the fix to avoid the regression that this patch
-was causing on Tegra it should be safe to reapply it.
+device probe is a schedulable, sleepable context, so dma_alloc_coherent()
+is fine there.  As Catalin points out, and as I realised after sending
+them ail, it does check for __GFP_WAIT and uses a smaller atomic pool
+for those allocations.  This explains why no one has hit any warnings in
+map_vm_area.
 
-v2: move assignment outside if clause
----
- drivers/tty/serial/of_serial.c | 5 +++++
- 1 file changed, 5 insertions(+)
+So, it's safe from atomic contexts after all.
 
-diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
-index 8bc2563..8225960 100644
---- a/drivers/tty/serial/of_serial.c
-+++ b/drivers/tty/serial/of_serial.c
-@@ -101,6 +101,11 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
- 	if (of_property_read_u32(np, "fifo-size", &prop) == 0)
- 		port->fifosize = prop;
- 
-+	/* Check for a fixed line number */
-+	ret = of_alias_get_id(np, "serial");
-+	if (ret >= 0)
-+		port->line = ret;
-+
- 	port->irq = irq_of_parse_and_map(np, 0);
- 	port->iotype = UPIO_MEM;
- 	if (of_property_read_u32(np, "reg-io-width", &prop) == 0) {
 -- 
-2.1.0
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
