@@ -1,8 +1,8 @@
 From: flora.fu@mediatek.com (Flora Fu)
-Date: Fri, 5 Dec 2014 11:57:39 +0800
+Date: Fri, 5 Dec 2014 12:07:51 +0800
 Subject: [PATCH v3 0/8] Add Support for MediaTek PMIC MT6397 MFD Core and
  Regulator
-Message-ID: <1417751867-13235-1-git-send-email-flora.fu@mediatek.com>
+Message-ID: <1417752479-4749-1-git-send-email-flora.fu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
