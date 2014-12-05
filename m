@@ -1,66 +1,61 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 5 Dec 2014 18:37:43 +0800
-Subject: [GIT PULL]Hisilicon hip01 soc and development board updates for 3.19
-Message-ID: <54818AF7.5040801@hisilicon.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 05 Dec 2014 11:39:40 +0100
+Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
+In-Reply-To: <CAOesGMi-sVTxdo8f7vNnYMgd+meBF+Gsf3Pk5VbHEPxv5Q6iDA@mail.gmail.com>
+References: <1417707993-82290-1-git-send-email-agraf@suse.de>
+ <5480F12D.90007@suse.de>
+ <CAOesGMi-sVTxdo8f7vNnYMgd+meBF+Gsf3Pk5VbHEPxv5Q6iDA@mail.gmail.com>
+Message-ID: <3551792.oHatG1W6W1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+On Thursday 04 December 2014 15:48:50 Olof Johansson wrote:
+> On Thu, Dec 4, 2014 at 3:41 PM, Alexander Graf <agraf@suse.de> wrote:
+> > On 04.12.14 22:15, Olof Johansson wrote:
+> >> On Thu, Dec 4, 2014 at 7:46 AM, Alexander Graf <agraf@suse.de> wrote:
+> >>> With binutils 2.25 the default alignment for 32bit arm sections changed to
+> >>> have everything 64k aligned. Armv7 binaries built with this binutils version
+> >>> run successfully on an arm64 system.
+> >>>
+> >>> Since effectively there is now the chance to run armv7 code on arm64 even
+> >>> with 64k page size, it doesn't make sense to block people from enabling
+> >>> CONFIG_COMPAT on those configurations.
+> >>>
+> >>> Signed-off-by: Alexander Graf <agraf@suse.de>
+> >>> ---
+> >>>  arch/arm64/Kconfig | 1 -
+> >>>  1 file changed, 1 deletion(-)
+> >>>
+> >>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >>> index 9532f8d..3cf4f238 100644
+> >>> --- a/arch/arm64/Kconfig
+> >>> +++ b/arch/arm64/Kconfig
+> >>> @@ -409,7 +409,6 @@ source "fs/Kconfig.binfmt"
+> >>>
+> >>>  config COMPAT
+> >>>         bool "Kernel support for 32-bit EL0"
+> >>> -       depends on !ARM64_64K_PAGES
+> >>>         select COMPAT_BINFMT_ELF
+> >>>         select HAVE_UID16
+> >>>         select OLD_SIGSUSPEND3
+> >>
+> >> This is hardly "compat". Sure, it's great to have a new binutils that
+> >> has larger alignment, but practically not a single existing binary
+> >> will work today if someone tries to do this.
+> >
+> > Yes, but IMHO that's an implementation detail. The same applies for
+> > 32bit PPC binaries if you use 4k aligned segments. If your applications
+> > are not aligned for your page size, you can't run them. The only
+> > platform that managed nevertheless FWIW was IA64 ;).
+> 
+> Yes, but there the binutils change happened early enough that by the
+> time the kernel change went in, all major distros had binaries that
+> were compatible.
 
-Could you please help to merge pull request for hisilicon hip01 soc and development board updates for 3.19?
-I have tested it and it is OK.
-Thanks!
+What is the exact symptom you see when running an unaligned user
+space binary on 64k-pages? Do we at least print a helpful error
+message somewhere or does it just crash?
 
-Best Regards,
-Wei
+Should we add support for 64k-pages in the arm32 kernel as well now?
 
-
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hip01-for-3.19
-
-for you to fetch changes up to 1512478332521bec0143e0632766400422752c17:
-
-  ARM: hisi: enable smp for HiP01 (2014-12-05 18:05:40 +0800)
-
-----------------------------------------------------------------
-ARM: mach-hisi: Hisilicon hip01 soc and development board updates for 3.19
-
-- Add hip01 debug UART
-- Add hip01 DT_MACHINE and ARCH_HIP01 configure for it
-- Add dts file for Hisilicon hip01 ca9x2 board
-- Enable ARCH_HIP01 in the hisi_defconfig and multi_v7_defconfig
-- Add a common smp_prepares_cpus function
-- Rename hix5hd2_secondary_startup to hisi_secondary_startup
-- Enable smp for HiP01
-
-----------------------------------------------------------------
-Wang Long (7):
-      ARM: debug: add HiP01 debug uart
-      ARM: hisi: enable HiP01 SoC
-      ARM: dts: Add hip01-ca9x2 dts file
-      ARM: config: enable ARCH_HIP01
-      ARM: hisi: add a common smp_prepares_cpus function
-      ARM: hisi: rename secondary_startup function
-      ARM: hisi: enable smp for HiP01
-
- Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt |  25 +++++++++++++++++++++++++
- arch/arm/Kconfig.debug                                        |  10 ++++++++++
- arch/arm/boot/dts/Makefile                                    |   1 +
- arch/arm/boot/dts/hip01-ca9x2.dts                             |  52 +++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/hip01.dtsi                                  | 110 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/configs/hisi_defconfig                               |   1 +
- arch/arm/configs/multi_v7_defconfig                           |   1 +
- arch/arm/mach-hisi/Kconfig                                    |   8 ++++++++
- arch/arm/mach-hisi/core.h                                     |   5 ++++-
- arch/arm/mach-hisi/headsmp.S                                  |   2 +-
- arch/arm/mach-hisi/hisilicon.c                                |  10 ++++++++++
- arch/arm/mach-hisi/hotplug.c                                  |  31 +++++++++++++++++++++++++++++++
- arch/arm/mach-hisi/platsmp.c                                  |  56 ++++++++++++++++++++++++++++++++++++++++++++++++++++---
- 13 files changed, 307 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/boot/dts/hip01-ca9x2.dts
- create mode 100644 arch/arm/boot/dts/hip01.dtsi
+	Arnd
