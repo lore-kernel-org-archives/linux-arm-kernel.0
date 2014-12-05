@@ -1,74 +1,38 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 05 Dec 2014 14:49:01 +0100
-Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
- drivers
-In-Reply-To: <20141205131815.GA18747@ulmo.nvidia.com>
-References: <54805312.6000402@arm.com>
- <CACxGe6uR5J4Cjdh_xYhBPoQRgeYwHPv5=AnuRmQKSD3yZrMK9Q@mail.gmail.com>
- <54806504.20507@arm.com> <20141204144925.GB31464@ulmo.nvidia.com>
- <54809D09.2050406@arm.com>
- <CACxGe6tpFHdP1-5NWiNVAqzXx-diN1xfRbu0AQDyVJ6AU_4RXg@mail.gmail.com>
- <5480B924.2010205@arm.com> <20141205121037.GI1630@arm.com>
- <5481A688.4030606@arm.com>
- <CACxGe6vppOQj-hJnqEEtLwDuSr4bzcbTgEFj8=x4ULu=yxswpg@mail.gmail.com>
- <20141205131815.GA18747@ulmo.nvidia.com>
-Message-ID: <5481B7CD.80106@samsung.com>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Fri, 5 Dec 2014 13:51:33 +0000
+Subject: [PATCH] tty: serial: serial-omap: depend on !8250_omap
+In-Reply-To: <20141202015118.GA1891@saruman>
+References: <1417039306-2384-1-git-send-email-bigeasy@linutronix.de>
+ <20141129094823.GA10840@linutronix.de>
+ <20141129173418.GY2817@atomide.com>
+ <20141201140914.728aaa46@lxorguk.ukuu.org.uk>
+ <20141201231338.GA14524@fuloong-minipc.musicnaut.iki.fi>
+ <20141202015118.GA1891@saruman>
+Message-ID: <20141205135133.37fb96f6@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, 1 Dec 2014 19:51:18 -0600
+Felipe Balbi <balbi@ti.com> wrote:
 
-On 2014-12-05 14:18, Thierry Reding wrote:
-> On Fri, Dec 05, 2014 at 01:06:52PM +0000, Grant Likely wrote:
->> On Fri, Dec 5, 2014 at 12:35 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->>> Hi Will,
->>>
->>> On 05/12/14 12:10, Will Deacon wrote:
->>> [...]
->>>>>> Do you expect drivers to modify that *priv pointer after the ops
->>>>>> structure is registered? I'd be very surprised if that was the use
->>>>>> case. It's fine for the driver to register a non-const version, but
->>>>>> once it is registered, the infrastructure can treat it as const from
->>>>>> then on.
->>>>>
->>>>> Possibly not - certainly my current port of the ARM SMMU which makes use
->>>>> of *priv is only ever reading it - although we did also wave around
->>>>> reasons for mutable ops like dynamically changing the pgsize_bitmap and
->>>>> possibly even swizzling individual ops for runtime reconfiguration. On
->>>>> consideration though, I'd agree that things like that are mad enough to
->>>>> stay well within individual drivers if they did ever happen, and
->>>>> certainly shouldn't apply to this bit of the infrastructure at any rate.
->>>>
->>>> I certainly need to update the pgsize_bitmap at runtime because I don't
->>>> know the supported page sizes until I've both (a) probed the hardware
->>>> and (b) allocated page tables for a domain. We've already discussed
->>>> moving the pgsize_bitmap out of the ops, but moving it somewhere where
->>>> it remains const doesn't really help.
->>>
->>> We can safely cast the call to get_ops in the SMMU driver though, since
->>> we'll know that we put a mutable per-instance ops in there in the first
->>> place. At least that way drivers that aren't taking advantage and just pass
->>> their static const ops around shouldn't provoke warnings. I deliberately
->>> didn't touch anything beyond get_ops as that would be too disruptive.
->>>
->>>> Can I just take the patch that Grant acked, in the interest of getting
->>>> something merged? As you say, there's plenty of planned changes in this
->>>> area anyway. I plan to send Olof a pull request this afternoon.
->>>
->>> Grant, Thierry? Personally I'm not fussed either way - the sooner something
->>> goes in, the sooner I can carry on working at replacing it :D
->> I've already acked it. Why are we still talking about it?  :-D
-> Am I missing something? Why is there a need to rush things? Are there
-> actually drivers that depend on this that will be merged during the 3.19
-> merge window? It seems like that'd be cutting it really close given
-> where we are in the release cycle.
->
-> If that's not the case, why even bother getting this hack into 3.19 if
-> nobody uses it and we're going to change it in 3.20 anyway?
+> On Tue, Dec 02, 2014 at 01:13:38AM +0200, Aaro Koskinen wrote:
+> > Hi,
+> > 
+> > On Mon, Dec 01, 2014 at 02:09:14PM +0000, One Thousand Gnomes wrote:
+> > > > Well the nightmare userspace switch from ttyS to ttyO few years ago is
+> > > > something we want to avoid.. I think the best solution would be to make
+> > > > serial-omap.c transparently provide support for ttyO using the new 8250
+> > > > code so both ttyS and ttyO devices would just work. Otherwise it will
+> > > > be years of "my serial port stopped working" questions again.
+> > > 
+> > > Thata a udev problem not a kernel one surely.
+> > 
+> > People also use serial console to observe the early kernel boot before
+> > the userspace is started.
+> 
+> right, we need a way to tell the kernel that ttyO%d and ttyS%d are the
+> exact same device so that console=ttyO0 and console=ttyS0 mean the same
+> thing. That maintains backwards compatibility and lets people move on
 
-There are Exynos SYSMMU patches ready & waiting for this gets merged...
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Yes.. and that possibly also means a temporary char driver that claims
+ttyO* and simply redirects the calls into the tty.
