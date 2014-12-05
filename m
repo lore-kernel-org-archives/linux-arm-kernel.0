@@ -1,40 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 Dec 2014 12:11:25 +0000
-Subject: [PATCH v6 0/8] Introduce automatic DMA configuration for IOMMU
- masters
-In-Reply-To: <CAOesGMg9BpL3AyDjuAvH_H5fOm-uga+_CZuJZ5p8zpHpJLg0qA@mail.gmail.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <CAOesGMg9BpL3AyDjuAvH_H5fOm-uga+_CZuJZ5p8zpHpJLg0qA@mail.gmail.com>
-Message-ID: <20141205121125.GJ1630@arm.com>
+From: n.nikolaev@virtualopensystems.com (Nikolay Nikolaev)
+Date: Fri, 5 Dec 2014 14:14:35 +0200
+Subject: [RFC PATCH 4/5] ARM: enable linking against eventfd and irqchip
+In-Reply-To: <20141129112933.GF13623@macair>
+References: <20141124212240.10605.46770.stgit@i3820>
+ <20141124212706.10605.50148.stgit@i3820>
+ <20141129112933.GF13623@macair>
+Message-ID: <CADDJ2=Ptc3yC7AQdcr0yx7R2uf0pa+6zDdJhGZKczJ8VxJ1Gng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 05, 2014 at 07:12:24AM +0000, Olof Johansson wrote:
-> On Mon, Dec 1, 2014 at 8:57 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > Hello again,
-> >
-> > This is version 6 of the patches previously posted here:
-> >
-> >   RFCv1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/283023.html
-> >   RFCv2: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/283752.html
-> >   RFCv3: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/287031.html
-> >   RFCv4: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/302711.html
-> >      v5: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/307213.html
-> >
-> > The only change since v5 is the addition of acks from various maintainers.
-> >
-> > Now that the ARM bits have rmk's ack and the IOMMU bits have joro's ack,
-> > I think this is good for merging via the arm-soc tree.
-> >
-> > Please let me know if a pull request would be preferable.
-> 
-> 
-> Hi,
-> 
-> Yes, please collect the acks from the discussion in the last day or so
-> and send a pull request (and include Robin's patch, obviously).
+On Sat, Nov 29, 2014 at 1:29 PM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> Inidicate KVM in the subject please.
+>
+> On Mon, Nov 24, 2014 at 11:27:06PM +0200, Nikolay Nikolaev wrote:
+>> This enables compilation of the eventfd feature on ARM.
+>
+> does this enable anything else than the ioeventfd stuff so that
+> everything is in place to do this safely now?
+Inspecting the eventfd.c I see that there is the IRQFD code
+conditionally compiled when CONFIG_HAVE_KVM_IRQFD is defined.
+ I think this is enabled for arm/arm64 in Eric's IRQFD patcheries, so
+we should be safe now.
 
-Sure, I'm just working out which of Robin's patches to take (if I don't hear
-otherwise, it will be the one with Grant's ack on it).
+regards,
+Nikolay Nikolaev
 
-Will
+>
+> -Christoffer
