@@ -1,44 +1,34 @@
 From: wangzhou.bry@gmail.com (Zhou Wang)
-Date: Fri,  5 Dec 2014 11:38:38 +0800
-Subject: [PATCH v4 0/4] ARM: hip04: add GPIO support
-Message-ID: <1417750722-14027-1-git-send-email-wangzhou.bry@gmail.com>
+Date: Fri,  5 Dec 2014 11:38:39 +0800
+Subject: [PATCH v4 1/4] ARM: hip04: add GPIO configure in hisi_defconfig
+In-Reply-To: <1417750722-14027-1-git-send-email-wangzhou.bry@gmail.com>
+References: <1417750722-14027-1-git-send-email-wangzhou.bry@gmail.com>
+Message-ID: <1417750722-14027-2-git-send-email-wangzhou.bry@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add the support for the GPIOs of Hisilicon Soc hip04. Hip04 uses
-synopsis' GPIO IP, and we use the dwapb GPIO driver here. This series add the
-corresponding dts.
+The GPIO controller of Hisilicon hip04 Soc uses the IP from Sysnopsis,
+gpio-dwapb.c can be reused to support this GPIO controller. This patch
+adds related configure items in hisi_defconfig.
 
-The 3/4 patch supports to find GPIO base number in increasing order,
-if gpio-number-forward is defined in related dts nodes. If there are some
-GPIO controllers in one Soc, all related GPIO dts node should contain
-gpio-number-forward property. If not, error will come out.
+Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
+---
+ arch/arm/configs/hisi_defconfig |    3 +++
+ 1 file changed, 3 insertions(+)
 
-Change in v4:
-- Delete "default 128 if ARCH_HIP04" in arch/arm/Kconfig
-- add a new patch to support find GPIO base number in increasing order
-- add gpio-number-forward property in snps gpio binding doc
-Change in v3:
-- Move CONFIG_GPIO_DWAPB to hisi_defconfig
-- Add CONFIG_GPIOLIB, CONFIG_GPIO_SYSFS in hisi_defconfig
-Change in v2:
-- Add select GPIO_DWAPB in arch/arm/mach-hisi/Kconfig
-
-Link for v3:
-- http://www.spinics.net/lists/devicetree/msg60324.html
-
-Zhou Wang (4):
-  ARM: hip04: add GPIO configure in hisi_defconfig
-  ARM: dts: hip04: add GPIO pieces
-  gpio: Add find base in a increasing order
-  Documentation: dt: gpio: Add gpio-number-forward property in snps
-    gpio binding doc
-
- .../devicetree/bindings/gpio/snps-dwapb-gpio.txt   |    2 +
- arch/arm/boot/dts/hip04.dtsi                       |   79 ++++++++++++++++++++
- arch/arm/configs/hisi_defconfig                    |    3 +
- drivers/gpio/gpiolib.c                             |   63 +++++++++++++---
- 4 files changed, 138 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
+index 1772505..130292b 100644
+--- a/arch/arm/configs/hisi_defconfig
++++ b/arch/arm/configs/hisi_defconfig
+@@ -41,6 +41,9 @@ CONFIG_SPI_PL022=y
+ CONFIG_PINCTRL_SINGLE=y
+ CONFIG_GPIO_GENERIC_PLATFORM=y
+ CONFIG_REGULATOR_GPIO=y
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_DWAPB=y
++CONFIG_GPIO_SYSFS=y
+ CONFIG_DRM=y
+ CONFIG_FB_SIMPLE=y
+ CONFIG_USB=y
 -- 
 1.7.9.5
