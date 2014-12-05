@@ -1,26 +1,53 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Fri, 5 Dec 2014 16:39:46 +0800
-Subject: [PATCH] arm64: remove the unnecessary arm64_swiotlb_init()
-Message-ID: <54816F52.5040206@huawei.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 5 Dec 2014 09:52:09 +0100
+Subject: [PATCH] mmc: atmel-mci: use SET_RUNTIME_PM_OPS() macro
+In-Reply-To: <1417614194-28409-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1417614194-28409-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <CAPDyKFpoe1U_rS9TdXvj1UYr6pwODJSYqLjER1MnnRAKWSVAFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 3690951fc6d42f3a0903987677d0e592c49dd8db
-(arm64: Use swiotlb late initialisation)
-switches the DMA mapping code to swiotlb_tlb_late_init_with_default_size(),
-the arm64_swiotlb_init() will not used anymore, so remove this function.
+On 3 December 2014 at 14:43, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> Use SET_RUNTIME_PM_OPS() since SET_PM_RUNTIME_PM_OPS() has been dropped.
+>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
----
- arch/arm64/mm/mm.h | 1 -
- 1 file changed, 1 deletion(-)
+Rafael have solved the issue in linux-next by:
+#define SET_PM_RUNTIME_PM_OPS  SET_RUNTIME_PM_OPS
 
-diff --git a/arch/arm64/mm/mm.h b/arch/arm64/mm/mm.h
-index d519f4f..50c3351 100644
---- a/arch/arm64/mm/mm.h
-+++ b/arch/arm64/mm/mm.h
-@@ -1,2 +1 @@
- extern void __init bootmem_init(void);
--extern void __init arm64_swiotlb_init(void);
--- 
-1.8.0
+For $subject patch, I will queued it up as fix for 3.19 rc[n].
+
+Kind regards
+Uffe
+
+> ---
+>
+> Hi Ulf,
+>
+> Can you take this patch which fixes a compilation error that has appeared only
+> on next-20141203.
+>
+> Thanks
+>
+> Regards
+>
+>  drivers/mmc/host/atmel-mci.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 62aba9a..03d7c75 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -2561,7 +2561,7 @@ static int atmci_runtime_resume(struct device *dev)
+>  static const struct dev_pm_ops atmci_dev_pm_ops = {
+>         SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+>                                 pm_runtime_force_resume)
+> -       SET_PM_RUNTIME_PM_OPS(atmci_runtime_suspend, atmci_runtime_resume, NULL)
+> +       SET_RUNTIME_PM_OPS(atmci_runtime_suspend, atmci_runtime_resume, NULL)
+>  };
+>
+>  static struct platform_driver atmci_driver = {
+> --
+> 2.0.3
+>
