@@ -1,99 +1,18 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Fri, 05 Dec 2014 00:08:02 -0500
-Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
-In-Reply-To: <547FB5DD.901@redhat.com>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <20141120135851.GA32528@linaro.org> <54759041.9080105@hitachi.com>
- <20141126100325.GA9157@linaro.org> <5476120D.9030703@linaro.org>
- <CAPvkgC3eVOZEn79C9PC9c7TqC_-yCtDhw5LL6ZWUJxr+oQFaow@mail.gmail.com>
- <5476BFB4.2020705@hitachi.com>
- <CAPvkgC0ELPPWfa-8kQ4H_e_O5G1ER4KEKuSWLxh_u-VZgh7W6A@mail.gmail.com>
- <547C36DB.7060903@hitachi.com> <547F242D.1060705@redhat.com>
- <547F94B0.1000902@linaro.org> <547FB5DD.901@redhat.com>
-Message-ID: <54813DB2.5060002@redhat.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 5 Dec 2014 10:54:49 +0530
+Subject: [RFC] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <CAKohponP3PXd5b=YY7bpBK6FTNc5_Y7RU=X7q7dP1bYELcW6Dw@mail.gmail.com>
+References: <52c403454c3b8fc201abe7ac74cf657638479311.1417691389.git.viresh.kumar@linaro.org>
+ <1417692868.9037.4.camel@pengutronix.de>
+ <CAKohponP3PXd5b=YY7bpBK6FTNc5_Y7RU=X7q7dP1bYELcW6Dw@mail.gmail.com>
+Message-ID: <CAKohpomO1HdoCJPSK8RHYozBhBTxwE4kQLYK48Ub4fFVV0mt-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2014 08:16 PM, William Cohen wrote:
-> On 12/03/2014 05:54 PM, David Long wrote:
->> On 12/03/14 09:54, William Cohen wrote:
->>> On 12/01/2014 04:37 AM, Masami Hiramatsu wrote:
->>>> (2014/11/29 1:01), Steve Capper wrote:
->>>>> On 27 November 2014 at 06:07, Masami Hiramatsu
->>>>> <masami.hiramatsu.pt@hitachi.com> wrote:
->>>>>> (2014/11/27 3:59), Steve Capper wrote:
->>>>>>> The crash is extremely easy to reproduce.
->>>>>>>
->>>>>>> I've not observed any missed events on a kprobe on an arm64 system
->>>>>>> that's still alive.
->>>>>>> My (limited!) understanding is that this suggests there could be a
->>>>>>> problem with how missed events from a recursive call to memcpy are
->>>>>>> being handled.
->>>>>>
->>>>>> I think so too. BTW, could you bisect that? :)
->>>>>>
->>>>>
->>>>> I can't bisect, but the following functions look suspicious to me
->>>>> (again I'm new to kprobes...):
->>>>> kprobes_save_local_irqflag
->>>>> kprobes_restore_local_irqflag
->>>>>
->>>>> I think these are breaking somehow when nested (i.e. from a recursive probe).
->>>>
->>>> Agreed. On x86, prev_kprobe has old_flags and saved_flags, this
->>>> at least must have saved_irqflag and save/restore it in
->>>> save/restore_previous_kprobe().
->>>>
->>>> What about adding this?
->>>>
->>>>   struct prev_kprobe {
->>>>       struct kprobe *kp;
->>>>       unsigned int status;
->>>> +    unsigned long saved_irqflag;
->>>>   };
->>>>
->>>> and
->>>>
->>>>   static void __kprobes save_previous_kprobe(struct kprobe_ctlblk *kcb)
->>>>   {
->>>>       kcb->prev_kprobe.kp = kprobe_running();
->>>>       kcb->prev_kprobe.status = kcb->kprobe_status;
->>>> +    kcb->prev_kprobe.saved_irqflag = kcb->saved_irqflag;
->>>>   }
->>>>
->>>>   static void __kprobes restore_previous_kprobe(struct kprobe_ctlblk *kcb)
->>>>   {
->>>>       __this_cpu_write(current_kprobe, kcb->prev_kprobe.kp);
->>>>       kcb->kprobe_status = kcb->prev_kprobe.status;
->>>> +    kcb->saved_irqflag = kcb->prev_kprobe.saved_irqflag;
->>>>   }
->>>>
->>>>
->>>
->>> I have noticed with the aarch64 kprobe patches and recent kernel I can get the machine to end up getting stuck and printing out endless strings of
->>>
->>> [187694.855843] Unexpected kernel single-step exception at EL1
->>> [187694.861385] Unexpected kernel single-step exception at EL1
->>> [187694.866926] Unexpected kernel single-step exception at EL1
->>> [187694.872467] Unexpected kernel single-step exception at EL1
->>> [187694.878009] Unexpected kernel single-step exception at EL1
->>> [187694.883550] Unexpected kernel single-step exception at EL1
->>>
->>> I can reproduce this pretty easily on my machine with functioncallcount.stp from https://sourceware.org/systemtap/examples/profiling/functioncallcount.stp and the following steps:
->>>
->>> # stap -p4 -k -m mm_probes -w functioncallcount.stp "*@mm/*.c" -c "sleep 1"
->>> # staprun mm_probes.ko -c "sleep 1"
->>>
->>> -Will
->>
->> I did a fresh checkout and build of systemtap and tried the above.  I'm not yet seeing this problem.  It does remind me of the problem we saw before debug exception handling in entry.S was patched in v3.18-rc1, but you say you are using recent kernel sources.
->>
-> 
-> Hi Dave,
-> 
-> I saw this problem with a 3.18.0-rc5 based kernel.  Today I built a kernel based on  3.18.0-0.rc6.git0.1.x1 with the patches and I didn't see the problem with the unexpected kernel single-step exception.  I am not sure if maybe there was some problem function being probed in the 3.18.0-rc5 kernel but not with the 3.18.0-rc6 kernel or maybe some difference in the config between the kernels. It seemed wiser to mention it.
-> 
+On 4 December 2014 at 19:37, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> This is not only clock's latency, but is somehow named this way. This should
+> give the time it takes to change from frequency A to frequency B, which include
+> change in supplies as well.. So, this probably is dvfs-latency ..
 
-I saw this problem with the 3.18.0-rc6 kernel today. Note that this kernel did not have the patch for save_irqflag masami suggested above.  It seems to be an intermittent problem and doesn't occur every time.  The particular systemtap test that is triggering the problem installs a lot of probe points and this could be triggering some problem with nested kprobes.
-
--Will
+Oops. No this is just clock-latency. We are calculating voltage-latency
+separately.
