@@ -1,72 +1,90 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 Dec 2014 12:05:06 +0000
-Subject: [RFC v2] arm:extend the reserved mrmory for initrd to be page
- aligned
-In-Reply-To: <20141204120305.GC17783@e104818-lin.cambridge.arm.com>
-References: <35FD53F367049845BC99AC72306C23D103D6DB491609@CNBJMBX05.corpusers.net>
- <20140915113325.GD12361@n2100.arm.linux.org.uk>
- <20141204120305.GC17783@e104818-lin.cambridge.arm.com>
-Message-ID: <20141205120506.GH1630@arm.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Fri, 05 Dec 2014 13:06:10 +0100
+Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
+In-Reply-To: <3551792.oHatG1W6W1@wuerfel>
+References: <1417707993-82290-1-git-send-email-agraf@suse.de>
+ <5480F12D.90007@suse.de>
+ <CAOesGMi-sVTxdo8f7vNnYMgd+meBF+Gsf3Pk5VbHEPxv5Q6iDA@mail.gmail.com>
+ <3551792.oHatG1W6W1@wuerfel>
+Message-ID: <54819FB2.6000408@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 12:03:05PM +0000, Catalin Marinas wrote:
-> On Mon, Sep 15, 2014 at 12:33:25PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Sep 15, 2014 at 07:07:20PM +0800, Wang, Yalin wrote:
-> > > @@ -636,6 +646,11 @@ static int keep_initrd;
-> > >  void free_initrd_mem(unsigned long start, unsigned long end)
-> > >  {
-> > >  	if (!keep_initrd) {
-> > > +		if (start == initrd_start)
-> > > +			start = round_down(start, PAGE_SIZE);
-> > > +		if (end == initrd_end)
-> > > +			end = round_up(end, PAGE_SIZE);
-> > > +
-> > >  		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
-> > >  		free_reserved_area((void *)start, (void *)end, -1, "initrd");
-> > >  	}
-> > 
-> > is the only bit of code you likely need to achieve your goal.
-> > 
-> > Thinking about this, I think that you are quite right to align these.
-> > The memory around the initrd is defined to be system memory, and we
-> > already free the pages around it, so it *is* wrong not to free the
-> > partial initrd pages.
-> 
-> Actually, I think we have a problem, at least on arm64 (raised by Peter
-> Maydell). There is no guarantee that the page around start/end of initrd
-> is free, it may contain the dtb for example. This is even more obvious
-> when we have a 64KB page kernel (the boot loader doesn't know the page
-> size that the kernel is going to use).
-> 
-> The bug was there before as we had poison_init_mem() already (not it
-> disappeared since free_reserved_area does the poisoning).
-> 
-> So as a quick fix I think we need the rounding the other way (and in the
-> general case we probably lose a page at the end of initrd):
-> 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 494297c698ca..39fd080683e7 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -335,9 +335,9 @@ void free_initrd_mem(unsigned long start, unsigned long end)
->  {
->  	if (!keep_initrd) {
->  		if (start == initrd_start)
-> -			start = round_down(start, PAGE_SIZE);
-> +			start = round_up(start, PAGE_SIZE);
->  		if (end == initrd_end)
-> -			end = round_up(end, PAGE_SIZE);
-> +			end = round_down(end, PAGE_SIZE);
->  
->  		free_reserved_area((void *)start, (void *)end, 0, "initrd");
->  	}
-> 
-> A better fix would be to check what else is around the start/end of
-> initrd.
 
-Care to submit this as a proper patch? We should at least fix Peter's issue
-before doing things like extending headers, which won't work for older
-kernels anyway.
 
-Will
+On 05.12.14 11:39, Arnd Bergmann wrote:
+> On Thursday 04 December 2014 15:48:50 Olof Johansson wrote:
+>> On Thu, Dec 4, 2014 at 3:41 PM, Alexander Graf <agraf@suse.de> wrote:
+>>> On 04.12.14 22:15, Olof Johansson wrote:
+>>>> On Thu, Dec 4, 2014 at 7:46 AM, Alexander Graf <agraf@suse.de> wrote:
+>>>>> With binutils 2.25 the default alignment for 32bit arm sections changed to
+>>>>> have everything 64k aligned. Armv7 binaries built with this binutils version
+>>>>> run successfully on an arm64 system.
+>>>>>
+>>>>> Since effectively there is now the chance to run armv7 code on arm64 even
+>>>>> with 64k page size, it doesn't make sense to block people from enabling
+>>>>> CONFIG_COMPAT on those configurations.
+>>>>>
+>>>>> Signed-off-by: Alexander Graf <agraf@suse.de>
+>>>>> ---
+>>>>>  arch/arm64/Kconfig | 1 -
+>>>>>  1 file changed, 1 deletion(-)
+>>>>>
+>>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>>>> index 9532f8d..3cf4f238 100644
+>>>>> --- a/arch/arm64/Kconfig
+>>>>> +++ b/arch/arm64/Kconfig
+>>>>> @@ -409,7 +409,6 @@ source "fs/Kconfig.binfmt"
+>>>>>
+>>>>>  config COMPAT
+>>>>>         bool "Kernel support for 32-bit EL0"
+>>>>> -       depends on !ARM64_64K_PAGES
+>>>>>         select COMPAT_BINFMT_ELF
+>>>>>         select HAVE_UID16
+>>>>>         select OLD_SIGSUSPEND3
+>>>>
+>>>> This is hardly "compat". Sure, it's great to have a new binutils that
+>>>> has larger alignment, but practically not a single existing binary
+>>>> will work today if someone tries to do this.
+>>>
+>>> Yes, but IMHO that's an implementation detail. The same applies for
+>>> 32bit PPC binaries if you use 4k aligned segments. If your applications
+>>> are not aligned for your page size, you can't run them. The only
+>>> platform that managed nevertheless FWIW was IA64 ;).
+>>
+>> Yes, but there the binutils change happened early enough that by the
+>> time the kernel change went in, all major distros had binaries that
+>> were compatible.
+> 
+> What is the exact symptom you see when running an unaligned user
+> space binary on 64k-pages? Do we at least print a helpful error
+> message somewhere or does it just crash?
+
+It simply doesn't start:
+
+init-4.2# /hello.binutils-2.23
+init-4.2# echo $?
+139
+init-4.2# /hello.binutils-2.25
+
+
+
+
+
+Hello world!
+
+
+
+
+
+init-4.2# echo $?
+0
+init-4.2#
+
+
+I'm not sure how to give the user an actually helpful error output here
+though. The only real handle we have for executing a binary is to return
+an error code.
+
+
+Alex
