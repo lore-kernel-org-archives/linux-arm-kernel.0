@@ -1,77 +1,47 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 5 Dec 2014 11:48:52 -0600
-Subject: [PATCH V2] ARM: dts: am57xx-beagle-x15: Add GPIO controlled fan node
-In-Reply-To: <1417800739-13146-1-git-send-email-nm@ti.com>
-References: <1417800739-13146-1-git-send-email-nm@ti.com>
-Message-ID: <1417801732-24620-1-git-send-email-nm@ti.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 5 Dec 2014 17:52:41 +0000
+Subject: [RFC v2] arm:extend the reserved mrmory for initrd to be page
+ aligned
+In-Reply-To: <20141205172701.GW11285@n2100.arm.linux.org.uk>
+References: <35FD53F367049845BC99AC72306C23D103D6DB491609@CNBJMBX05.corpusers.net>
+ <20140915113325.GD12361@n2100.arm.linux.org.uk>
+ <20141204120305.GC17783@e104818-lin.cambridge.arm.com>
+ <20141205120506.GH1630@arm.com>
+ <20141205170745.GA31222@e104818-lin.cambridge.arm.com>
+ <20141205172701.GW11285@n2100.arm.linux.org.uk>
+Message-ID: <CAFEAcA912Cgbs-zr+=YfBBQzK625bmbrgQwYCs4DMqPEF58e8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TPS gpio now controls a 5v 500mA TL5209 regulator which may be supply
-a fan (such as AFB02505HHB) over J1 connector for various purposes.
-Provide device tree node to enable the same.
+On 5 December 2014 at 17:27, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Dec 05, 2014 at 05:07:45PM +0000, Catalin Marinas wrote:
+>> On Fri, Dec 05, 2014 at 12:05:06PM +0000, Will Deacon wrote:
+>> > Care to submit this as a proper patch? We should at least fix Peter's issue
+>> > before doing things like extending headers, which won't work for older
+>> > kernels anyway.
+>>
+>> Quick fix is the revert of the whole patch, together with removing
+>> PAGE_ALIGN(end) in poison_init_mem() on arm32. If Russell is ok with
+>> this patch, we can take it via the arm64 tree, otherwise I'll send you a
+>> partial revert only for the arm64 part.
+>
+> Not really.  Let's look at the history.
+>
+> For years, we've been poisoning memory, page aligning the end pointer.
+> This has never been an issue.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
+Depends what you mean by "never been an issue". I had to change
+QEMU (commit 98ed805c, January 2013) for 32-bit ARM back when the
+kernel started trashing the tail end of the page after the initrd
+with the poisoning, to 4K-align the dtb so it didn't share a page
+with the initrd-tail. That nobody else complained suggests that most
+bootloaders don't in practice overlap the two, though (ie that
+QEMU is an outlier in how it chooses to arrange things in memory).
 
-V2: review comment updates
-	review comments update
-		- Sanitized outlook-ified name back to normal ;) 
-		- removed unnecessary pinctrl-names property.
-V1: https://patchwork.kernel.org/patch/5444911/
+I should probably have reported the breakage at the time, but
+I took the pragmatic (lazy?) approach of just changing our
+bootloader code.
 
-
-Depends on the following:
-https://patchwork.kernel.org/patch/5439201/
-https://patchwork.kernel.org/patch/5439191/
-
-enable and disable can be controlled by (post the RPM, it finds
-closest match - even a 1 will do)
-
-echo '13000' > /sys/class/hwmon/hwmon0/fan1_target
-and
-echo '0' > /sys/class/hwmon/hwmon0/fan1_target
-
-Test log: http://slexy.org/view/s2T0ajh46z
-
-requires CONFIG_GPIO_PALMAS and CONFIG_SENSORS_GPIO_FAN to be operational
-Applies on 
-https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v3.19/dt-v2
-
- arch/arm/boot/dts/am57xx-beagle-x15.dts |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index 49edbda..4e55e94 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -80,6 +80,14 @@
- 			default-state = "off";
- 		};
- 	};
-+
-+	gpio_fan {
-+		/* Based on 5v 500mA AFB02505HHB */
-+		compatible = "gpio-fan";
-+		gpios =  <&tps659038_gpio 1 GPIO_ACTIVE_HIGH>;
-+		gpio-fan,speed-map = <0    0
-+				      13000 1>;
-+	};
- };
- 
- &dra7_pmx_core {
-@@ -314,6 +322,12 @@
- 			wakeup-source;
- 			ti,palmas-long-press-seconds = <12>;
- 		};
-+
-+		tps659038_gpio: tps659038_gpio {
-+			compatible = "ti,palmas-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
- 	};
- 
- 	tmp102: tmp102 at 48 {
--- 
-1.7.9.5
+thanks
+-- PMM
