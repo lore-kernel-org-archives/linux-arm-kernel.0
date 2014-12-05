@@ -1,86 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 5 Dec 2014 14:41:35 +0000
-Subject: [RFC v2] arm:extend the reserved mrmory for initrd to be page
- aligned
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E688B313EA@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103D6DB491609@CNBJMBX05.corpusers.net>
- <20140915113325.GD12361@n2100.arm.linux.org.uk>
- <20141204120305.GC17783@e104818-lin.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D103E688B313EA@CNBJMBX05.corpusers.net>
-Message-ID: <20141205144134.GC7695@localhost>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri,  5 Dec 2014 15:44:55 +0100
+Subject: [PATCH 2/5] ARM: mvebu: Add UART1 as DEBUG_LL possible target
+In-Reply-To: <1417790698-9792-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1417790698-9792-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1417790698-9792-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 05, 2014 at 02:35:29AM +0000, Wang, Yalin wrote:
-> > -----Original Message-----
-> > From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> > Sent: Thursday, December 04, 2014 8:03 PM
-> > To: Russell King - ARM Linux
-> > Cc: Wang, Yalin; 'linux-mm at kvack.org'; Will Deacon; 'linux-
-> > kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'; 'linux-
-> > arm-msm at vger.kernel.org'; Peter Maydell
-> > Subject: Re: [RFC v2] arm:extend the reserved mrmory for initrd to be page
-> > aligned
-> > 
-> > On Mon, Sep 15, 2014 at 12:33:25PM +0100, Russell King - ARM Linux wrote:
-> > > On Mon, Sep 15, 2014 at 07:07:20PM +0800, Wang, Yalin wrote:
-> > > > @@ -636,6 +646,11 @@ static int keep_initrd;  void
-> > > > free_initrd_mem(unsigned long start, unsigned long end)  {
-> > > >  	if (!keep_initrd) {
-> > > > +		if (start == initrd_start)
-> > > > +			start = round_down(start, PAGE_SIZE);
-> > > > +		if (end == initrd_end)
-> > > > +			end = round_up(end, PAGE_SIZE);
-> > > > +
-> > > >  		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
-> > > >  		free_reserved_area((void *)start, (void *)end, -1, "initrd");
-> > > >  	}
-> > >
-> > > is the only bit of code you likely need to achieve your goal.
-> > >
-> > > Thinking about this, I think that you are quite right to align these.
-> > > The memory around the initrd is defined to be system memory, and we
-> > > already free the pages around it, so it *is* wrong not to free the
-> > > partial initrd pages.
-> > 
-> > Actually, I think we have a problem, at least on arm64 (raised by Peter
-> > Maydell). There is no guarantee that the page around start/end of initrd is
-> > free, it may contain the dtb for example. This is even more obvious when we
-> > have a 64KB page kernel (the boot loader doesn't know the page size that
-> > the kernel is going to use).
-> > 
-> > The bug was there before as we had poison_init_mem() already (not it
-> > disappeared since free_reserved_area does the poisoning).
-> > 
-> > So as a quick fix I think we need the rounding the other way (and in the
-> > general case we probably lose a page at the end of initrd):
-> > 
-> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c index
-> > 494297c698ca..39fd080683e7 100644
-> > --- a/arch/arm64/mm/init.c
-> > +++ b/arch/arm64/mm/init.c
-> > @@ -335,9 +335,9 @@ void free_initrd_mem(unsigned long start, unsigned long
-> > end)  {
-> >  	if (!keep_initrd) {
-> >  		if (start == initrd_start)
-> > -			start = round_down(start, PAGE_SIZE);
-> > +			start = round_up(start, PAGE_SIZE);
-> >  		if (end == initrd_end)
-> > -			end = round_up(end, PAGE_SIZE);
-> > +			end = round_down(end, PAGE_SIZE);
-> > 
-> >  		free_reserved_area((void *)start, (void *)end, 0, "initrd");
-> >  	}
-> > 
-> > A better fix would be to check what else is around the start/end of initrd.
-> I think a better way is add some head info in Image header,
-> So that bootloader  can know the kernel CONFIG_PAGE_SIZE ,
-> For example we can add PAGE_SIZE in zImage header .
-> How about this way?
+Some mvebu boards have the UART1 more easily accessible than the other UARTs
+found on the system.
 
-The problem is that we don't know how many boot loaders are affected. We
-could simply mandate in booting.txt that the dtb and initrd are not
-closer than 64KB but we have the same issue, existing boot loaders.
+Add a debug_ll option for this case.
 
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/Kconfig.debug | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b0945d6b32b3..8f119f5ffcdd 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -457,6 +457,21 @@ choice
+ 		  when u-boot hands over to the kernel, the system
+ 		  silently crashes, with no serial output at all.
+ 
++	config DEBUG_MVEBU_UART1_ALTERNATE
++		bool "Kernel low-level debugging messages via MVEBU UART1 (new bootloaders)"
++		depends on ARCH_MVEBU
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on MVEBU based platforms on UART1.
++
++		  This option should be used with the new bootloaders
++		  that remap the internal registers at 0xf1000000.
++
++		  If the wrong DEBUG_MVEBU_UART* option is selected,
++		  when u-boot hands over to the kernel, the system
++		  silently crashes, with no serial output at all.
++
+ 	config DEBUG_VF_UART
+ 		bool "Vybrid UART"
+ 		depends on SOC_VF610
+@@ -1154,6 +1169,7 @@ config DEBUG_UART_PHYS
+ 	default 0xe4007000 if DEBUG_HIP04_UART
+ 	default 0xf0000be0 if ARCH_EBSA110
+ 	default 0xf1012000 if DEBUG_MVEBU_UART0_ALTERNATE
++	default 0xf1012100 if DEBUG_MVEBU_UART1_ALTERNATE
+ 	default 0xf1012000 if ARCH_DOVE || ARCH_MV78XX0 || \
+ 				ARCH_ORION5X
+ 	default 0xf7fc9000 if DEBUG_BERLIN_UART
+@@ -1224,6 +1240,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfeb31000 if DEBUG_KEYSTONE_UART1
+ 	default 0xfec02000 if DEBUG_SOCFPGA_UART
+ 	default 0xfec12000 if DEBUG_MVEBU_UART0 || DEBUG_MVEBU_UART0_ALTERNATE
++	default 0xfec12100 if DEBUG_MVEBU_UART1_ALTERNATE
+ 	default 0xfec20000 if DEBUG_DAVINCI_DMx_UART0
+ 	default 0xfec90000 if DEBUG_RK32_UART2
+ 	default 0xfed0c000 if DEBUG_DAVINCI_DA8XX_UART1
 -- 
-Catalin
+2.2.0
