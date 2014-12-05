@@ -1,49 +1,123 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Fri, 5 Dec 2014 08:49:41 -0800
-Subject: [PATCH] ARM: multi_v7_defconfig: enable MAX77686 PMIC drivers for
- exynos4412-prime based SoCs
-In-Reply-To: <20141205071717.GA29274@quad.lixom.net>
-References: <1417728264-7268-1-git-send-email-tyler.baker@linaro.org>
- <20141205071717.GA29274@quad.lixom.net>
-Message-ID: <CANMBJr54f3_DfK2pJBsx=LR8ZmM36yDCterpn5XxYSU-FYKPPw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 5 Dec 2014 16:53:56 +0000
+Subject: [RFC 1/3] devfreq: dt-bindings: Document Exynos3250 devfreq driver
+In-Reply-To: <1417797988-29225-2-git-send-email-k.kozlowski@samsung.com>
+References: <1417797988-29225-1-git-send-email-k.kozlowski@samsung.com>
+ <1417797988-29225-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20141205165356.GC12849@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 December 2014 at 23:17, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, Dec 04, 2014 at 01:24:24PM -0800, Tyler Baker wrote:
->> This patch enables the MAX77686 PMIC drivers in the multi_v7_defconfig used
->> on exynos4412-prime family of SoCs [1]. The exynos4412-prime based boards
->> are producing the following runtime errors only on the multi_v7_defconfig [2]:
->>
->> kern.err: deviceless supply vdd_arm not found, using dummy regulator
->> kern.err: exynos-cpufreq exynos-cpufreq: failed to set cpu voltage to 1287500
->> kern.err: cpufreq: __target_index: Failed to change cpu frequency: -22
->>
->> I reviewed the exynos_defconfig, which does not produce these runtime
->> errors. It was obvious that the exynos_defconfig has the PMIC drivers
->> enabled, whereas the multi_v7_defconfig does not. This patch has been tested
->> on a odroid-u2 and a odroid-u3 board. It has resolved the runtime errors.
->> Therefore, I purpose we enabled these drivers in the multi_v7_defconfig.
->>
->> [1] http://www.hardkernel.com/main/products/prdt_info.php?g_code=G135270682824
->> [2] http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc7-48-g7cc78f8/arm-multi_v7_defconfig/lab-tbaker-00/boot-exynos4412-odroidu3.html
->>
->
-> FWIW, the 5250-based Samsung Chromebook also uses 77686.
+On Fri, Dec 05, 2014 at 04:46:26PM +0000, Krzysztof Kozlowski wrote:
+> Add documentation for bindings used by Exynos3250 devfreq driver.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  .../bindings/arm/samsung/exynos3250-devfreq.txt    | 66 ++++++++++++++++++++++
+>  1 file changed, 66 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt b/Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt
+> new file mode 100644
+> index 000000000000..047955e9e371
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt
+> @@ -0,0 +1,66 @@
+> +Samsung Exynos3250 devfreq driver
 
-After you pointed this out, I took a look at your boot logs for snow
-[1] and indeed it does show the same runtime errors described in this
-patch.
+The binding should describe the hardware, not a particular driver of
+that hardware. Please write the binding (and its documentation) with
+that in mind, and drop references to the driver and "busfreq".
 
->
-> Applied to next/defconfig for 3.19 after fixing up some fuzz.
+With an adequate binding we can probe the device and forward the
+information to relevant driver(s) as necessary.
 
-Thanks!
+> +=================================
+> +
+> +The driver support changing frequencies and voltage for:
+> + - memory controller and bus,
+> + - peripheral buses (left and right).
 
->
->
-> -Olof
 
-Tyler
+What do left and right mean in this context?
 
-[1] http://arm-soc.lixom.net/bootlogs/arm-soc/v3.18-rc7-1140-g9c6e242/snow-arm-multi_v7_defconfig.html
+> +
+> +Memory controller and bus
+> +=========================
+> +Required properties:
+> + - compatible : should be "samsung,exynos3250-busfreq-mif"
+> + - reg : two sets (offset and length of the register) for PPMU registers
+> +	used by this devfreq driver
+> + - clock-names : one clock of name "dmc" to manage frequency
+> + - clocks : phandle and specifier for clock listed in clock-names property
+> + - vdd_mif-supply : phandle to MIF voltage regulator
+
+s/_/-/ in property names please.
+
+> +
+> +Peripheral buses
+> +================
+> +Required properties:
+> + - compatible : should be "samsung,exynos3250-busfreq-int"
+
+What does "int" mean here?
+
+> + - reg : two sets (offset and length of the register) for PPMU registers
+> +	used by this devfreq driver
+> + - clock-names : names for PPMU clocks and bus clocks to manage frequencies;
+> +	All following clock names (and corresponding phandles) must be
+> +	provided:
+> +	- "ppmu_left", "ppmu_right",
+> +	- "aclk_400", "aclk_266", "aclk_200", "aclk_160", "aclk_gdl", "aclk_gdr", "mfc";
+> + - clocks : phandles and specifiers for clocks listed in clock-names property
+> + - vdd_mif-supply : phandle to INT voltage regulator
+
+s/_/-/ here too.
+
+Thanks,
+Mark.
+
+> +
+> +Example
+> +=======
+> +	busfreq_mif: busfreq at 106A0000 {
+> +		compatible = "samsung,exynos3250-busfreq-mif";
+> +		reg = <0x106A0000 0x2000>, <0x106B0000 0x2000>;
+> +		clocks = <&cmu_dmc CLK_DIV_DMC>;
+> +		clock-names = "dmc";
+> +		vdd_mif-supply = <&buck1_reg>;
+> +		status = "okay";
+> +	};
+> +
+> +	busfreq_int: busfreq at 116A0000 {
+> +		compatible = "samsung,exynos3250-busfreq-int";
+> +		reg = <0x116A0000 0x2000>, <0x112A0000 0x2000>;
+> +		clocks = <&cmu CLK_PPMULEFT>,
+> +			<&cmu CLK_PPMURIGHT>,
+> +			<&cmu CLK_DIV_ACLK_400_MCUISP>,
+> +			<&cmu CLK_DIV_ACLK_266>,
+> +			<&cmu CLK_DIV_ACLK_200>,
+> +			<&cmu CLK_DIV_ACLK_160>,
+> +			<&cmu CLK_DIV_GDL>,
+> +			<&cmu CLK_DIV_GDR>,
+> +			<&cmu CLK_DIV_MFC>;
+> +		clock-names = "ppmuleft",
+> +			"ppmuright",
+> +			"aclk_400",
+> +			"aclk_266",
+> +			"aclk_200",
+> +			"aclk_160",
+> +			"aclk_gdl",
+> +			"aclk_gdr",
+> +			"mfc";
+> +		vdd_int-supply = <&buck3_reg>;
+> +		status = "okay";
+> +	};
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
