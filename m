@@ -1,99 +1,50 @@
-From: orsonzhai@gmail.com (Orson Zhai)
-Date: Fri, 5 Dec 2014 22:13:32 +0800
-Subject: [PATCH v4 0/5] Add Spreadtrum Sharkl64 Platform support
-In-Reply-To: <CAAfSe-uz534FiZufojKa8MdBi=VFqhuoFLwof7K+FqXG--AGaw@mail.gmail.com>
-References: <1417692860-18841-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <20141205104009.GE11889@leverpostej>
- <CAAfSe-uz534FiZufojKa8MdBi=VFqhuoFLwof7K+FqXG--AGaw@mail.gmail.com>
-Message-ID: <CA+H2tpF0pJ1w-MibuOv=HiXJy6pCqUJ2fDUwxLs49y0y4LEd5w@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  5 Dec 2014 12:13:20 -0200
+Subject: [PATCH 1/3] ARM: imx6sx: Set PLL2 as parent of QSPI clocks
+Message-ID: <1417788802-13219-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Mark,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Fri, Dec 5, 2014 at 8:27 PM, Lyra Zhang <zhang.lyra@gmail.com> wrote:
-> On Fri, Dec 5, 2014 at 6:40 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> Hi,
->>
->> On Thu, Dec 04, 2014 at 11:34:15AM +0000, Chunyan Zhang wrote:
->>> Spreadtrum is a rapid growing chip vendor providing smart phone total solutions.
->>>
->>> Sharkl64 Platform is nominated as a SoC infrastructure that supports 4G/3G/2G
->>> standards based on ARMv8 multiple core architecture.Now we have only one
->>> SoC(SC9836) based on this Platform in developing.
->>>
->>> This patchset adds Sharkl64 support in arm64 device tree and the serial driver
->>> of SC9836-UART.
->>>
->>> This patchset also has patches which address "sprd" prefix and DT compatible
->>> strings for nodes which appear un-documented.
->>>
->>> This version code was tesed both on Fast Mode and sc9836-fpga board.
->>> We use the latest boot-wrapper-aarch64 as the bootloader.
->>>
->>> Changes from v3:
->>> * Addressed review comments:
->>>       - Added the description of clock property for sc9836-uart
->>>       - Revised the size of GICC to be 8KiB
->>>       - Added another compatible string for psci-0.1
->>
->> I had open questions on v3 regarding your PSCI imlpementation. You
->> mentioned that you are using the aarch64 bootwrapper, but your DT
->> describes PSCI 0.2, and the (upstream) bootwrapper does not implement
->> PSCI 0.2. Adding the old PSCI compatible string is _not_ sufficient if
->> you do not have a full PSCI 0.2 implementation.
->>
->> Given that PSCI 0.2 requires more functionality to be implemented, I'd
->> like to know that your implementation is spec-compliant (implementing
->> the mandatory functions, nters the kernel in the correct state, etc),
->> and that it has been tested.
->>
->> Would you be able to look at my comments from the last posting please?
+Provide a proper parent for QSPI clocks to avoid a kernel oops:
 
-I'd like to show you more technical details of our psci implementation.
+[    1.037920] Division by zero in kernel.
+[    1.041807] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.18.0-rc7-next-20141204-00002-g5aa23e1 #2143
+[    1.050967] Hardware name: Freescale i.MX6 SoloX (Device Tree)
+[    1.056853] Backtrace:
+[    1.059360] [<80011ea0>] (dump_backtrace) from [<8001203c>] (show_stack+0x18/0x1c)
+[    1.066982]  r6:00000000 r5:00000000 r4:00000000 r3:00000000
+[    1.072754] [<80012024>] (show_stack) from [<806b7100>] (dump_stack+0x88/0xa4)
+[    1.080038] [<806b7078>] (dump_stack) from [<80011d20>] (__div0+0x18/0x20)
+[    1.086958]  r5:be018500 r4:be017c00
+[    1.090600] [<80011d08>] (__div0) from [<802aa418>] (Ldiv0+0x8/0x10)
+[    1.097012] [<80504fbc>] (clk_divider_set_rate) from [<80503ddc>] (clk_change_rate+0x14c/0x17c)
+[    1.105759]  r7:00000000 r6:00000000 r5:be018500 r4:00000000
+[    1.111516] [<80503c90>] (clk_change_rate) from [<80503ea0>] (clk_set_rate+0x94/0x98)
+[    1.119391]  r8:be7e0368 r7:00000000 r6:be11a000 r5:be018500 r4:00000000 r3:00000000
+[    1.127290] [<80503e0c>] (clk_set_rate) from [<80410558>] (fsl_qspi_probe+0x23c/0x75c)
+[    1.135260]  r5:be11a010 r4:be350010
+[    1.138900] [<8041031c>] (fsl_qspi_probe) from [<80385a18>] (platform_drv_probe+0x50/0xac)
 
-Here the dt code is fresh from our engineering repository.
-As far as I  know our engineers are testing on psci currently.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6sx.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800   98)        psci {
-04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800   99)
- compatible = "arm,psci";
-04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800  100)
- method = "smc";
-04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800  101)
- cpu_on  = <0xc4000003>;
-04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800  102)
- cpu_off = <0x84000002>;
-04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800  103)
- cpu_suspend = <0xc4000001>;
-04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800  104)        };
-
-Does it reveal the information as you concern?
-It's no doubt that we'll implement psci-v0.2 eventually.
-Considering that the code might be upstreamed in few weeks later, we
-submit a psci-v0.2 dts in advanced.
-
-Thanks,
-Orson
-
->>
->> Thanks,
->> Mark.
->> --
->
-> Hi, Mark
->
-> Ok, I'll check it again with our related engineers.
->
-> Actually, I had read all of your comments carefully before sending
-> each version of patches, and I replied you a few days early, I guess
-> you may miss it :)
->
-> If we just implemented psci-0.1 until now, can we submit this path
-> without "compatible = "arm,psci-0.2"", but only with " compatible =
-> "arm,psci" ".
->
->
->
-> Thanks,
-> Chunyan
+diff --git a/arch/arm/mach-imx/clk-imx6sx.c b/arch/arm/mach-imx/clk-imx6sx.c
+index 17354a1..5a3e5a1 100644
+--- a/arch/arm/mach-imx/clk-imx6sx.c
++++ b/arch/arm/mach-imx/clk-imx6sx.c
+@@ -558,6 +558,9 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
+ 	clk_set_parent(clks[IMX6SX_CLK_GPU_CORE_SEL], clks[IMX6SX_CLK_PLL3_PFD0]);
+ 	clk_set_parent(clks[IMX6SX_CLK_GPU_AXI_SEL], clks[IMX6SX_CLK_PLL3_PFD0]);
+ 
++	clk_set_parent(clks[IMX6SX_CLK_QSPI1_SEL], clks[IMX6SX_CLK_PLL2_BUS]);
++	clk_set_parent(clks[IMX6SX_CLK_QSPI2_SEL], clks[IMX6SX_CLK_PLL2_BUS]);
++
+ 	/* Set initial power mode */
+ 	imx6q_set_lpm(WAIT_CLOCKED);
+ }
+-- 
+1.9.1
