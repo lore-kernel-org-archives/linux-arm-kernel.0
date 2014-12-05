@@ -1,117 +1,57 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 5 Dec 2014 11:02:47 -0800
-Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
-In-Reply-To: <5481FC7F.3000105@offcode.fi>
-References: <5465C00E.4030808@offcode.fi>
- <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
- <20141127200036.2c65df62@bbrezillon> <5481ABA1.9030408@offcode.fi>
- <20141205151221.0ee1e814@bbrezillon> <5481FC7F.3000105@offcode.fi>
-Message-ID: <20141205190247.GA25455@roeck-us.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 5 Dec 2014 19:12:35 +0000
+Subject: [PATCH] arm64: respect mem= for EFI
+In-Reply-To: <1417692140-29796-1-git-send-email-mark.rutland@arm.com>
+References: <1417692140-29796-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20141205191235.GH31222@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 05, 2014 at 08:42:07PM +0200, Timo Kokkonen wrote:
-> On 05.12.2014 16:12, Boris Brezillon wrote:
-> >Hi Timo,
-> >
-> >On Fri, 05 Dec 2014 14:57:05 +0200
-> >Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
-> >
-> >>On 27.11.2014 21:00, Boris Brezillon wrote:
-> >>>Hi Timo,
-> >>>
-> >>>Sorry for the late reply.
-> >>>
-> >>>On Fri, 21 Nov 2014 14:23:30 +0200
-> >>>Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
-> >>>
-> >>>>By default the driver will start a kernel timer which keeps on kicking
-> >>>>the watchdog HW until user space has opened the watchdog
-> >>>>device. Usually this is desirable as the watchdog HW is running by
-> >>>>default and the user space may not have any watchdog daemon running at
-> >>>>all.
-> >>>>
-> >>>>However, on production systems it may be mandatory that also early
-> >>>>crashes and lockups will lead to a watchdog reset, even if they happen
-> >>>>before the user space has opened the watchdog device.
-> >>>>
-> >>>>To resolve the issue, add a new device tree property
-> >>>>"enable-early-reset" which will prevent the kernel timer from pinging
-> >>>>the watchdog HW on behalf of user space. The default is still to use
-> >>>>kernel timer, but more strict behavior can be enabled via the device
-> >>>>tree property.
-> >>>>
-> >>>>Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
-> >>>>---
-> >>>>   Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
-> >>>>   drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
-> >>>>   2 files changed, 9 insertions(+), 1 deletion(-)
-> >>>>
-> >>>>diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> >>>>index f90e294..a0b7b75 100644
-> >>>>--- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> >>>>+++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> >>>>@@ -28,6 +28,10 @@ Optional properties:
-> >>>>   	entering idle state.
-> >>>>   - atmel,dbg-halt : Should be present if you want to stop the watchdog when
-> >>>>   	entering debug state.
-> >>>>+- enable-early-reset : Should be present if you want to let the
-> >>>>+	watchdog timer to expire even before user space has opened the
-> >>>>+	device. If not set, a kernel timer will keep on pinging the
-> >>>>+	watchdog until it is opened.
-> >>>
-> >>>If you want to make this property generic, maybe you should document it
-> >>>in a generic binding doc
-> >>>(Documentation/devicetree/bindings/watchdog/watchdog.txt ?).
-> >>>Once you're at it, maybe you could document the generic timeout-sec
-> >>>property in this file.
-> >>>Moreover, you might want to parse this property in watchdog_core.c and
-> >>>store the information in the watchdog_device struct.
-> >>
-> >>I gave a little thought about this today and we could maybe have it like
-> >>watchdog_init_timeout() is today. But I can't really think of any
-> >>generic handling for this property, anything else except storing the
-> >>parsed value to a variable in watchdog_device struct. Everything else is
-> >>HW specific, except how we read the variable.. If we had some logic or
-> >>checking for this variable (other than to check it is not negative)
-> >>maybe then it would make sense.
-> >
-> >Okay, I'm fine with keeping this DT property parsing out of the core.
+On Thu, Dec 04, 2014 at 11:22:20AM +0000, Mark Rutland wrote:
+> Hi all,
 > 
-> Ok, good.
+> While trying to debug a userspace test failure, I noticed that the mem=
+> option didn't work when booting via EFI due to some unfortunate init
+> ordering.
 > 
-> >>
-> >>So I could write a patch to document generic watchdog properties in
-> >>Documentation/devicetree/bindings/watchdog/watchdog.txt (anything else
-> >>generic that would go there except timeout-sec and enable-early-reset?)
-> >
-> >I'm not sure you and Guenter agreed on the 'early-keepalive-sec'
-> >property (and this one won't be used in atmel driver since you can't
-> >change the timeout once set), so I'd say the timeout-sec and
-> >enable-early-reset are the only common properties for now.
+> However, with that alone fixed (patch below) things blow up early if a
+> mem= option is passed to the kernel, because of the way we currently map
+> the EFI runtime services.
 > 
-> Actually it can be done in Atmel driver as well. It already has a
-> timer that keeps on pinging the watchdog until user space opens it.
-> We just modify the code so that it keeps on pinging the watchdog
-> until early-keepalive-sec has expired. No need to change the HW
-> timeouts at all. And I rather have it implemented that way anyway,
-> the 16 second timeout is a little tight if there happens to be a lot
-> of stuff already in the early user space.
+> I've given this patch a spin atop of Ard's rework of the runtime
+> services mapping [1], and that's far happier; I can boot to userspace
+> and memory is limited int he way I expect.
 > 
-> Yeah, I didn't get anything back from Guenter about my
-> early-keepalive-sec property proposal. Frankly, I already forgot
-> about it my self already. I guess I'll get back to you with v3 set
-> once I get time for it. Probably easiest to continue from there.
+> Assuming people are fine with this, would this make sense to append to
+> the runtime services mapping series?
 > 
-Sorry for that, folks. I have been a bit overwhelmed in the last cycle.
+> Cheers,
+> Mark.
+> 
+> [1] https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/efi-for-arm64
+> 
+> ---->8----
+> When booting with EFI, we acquire the EFI memory map after parsing the
+> early params. This unfortuantely renders the option useless as we call
+> memblock_enforce_memory_limit (which uses memblock_remove_range behind
+> the scenes) before we've added any memblocks. We end up removing
+> nothing, then adding all of memory later when efi_init calls
+> reserve_regions.
+> 
+> Instead, we can log the limit and apply this later when we do the rest
+> of the memblock work in memblock_init, which should work regardless of
+> the presence of EFI. At the same time we may as well move the early
+> parameter into arm64's mm/init.c, close to arm64_memblock_init.
+> 
+> Any memory which must be mapped (e.g. for use by EFI runtime services)
+> must be mapped explicitly reather than relying on the linear mapping,
+> which may be truncated as a result of a mem= option passed on the kernel
+> command line.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Leif Lindholm <leif.lindholm@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-early-timeout-sec seems to be the best property name to me right now.
-It is aligned with the existing timeout-sec. early-keepalive-sec seems
-kind of different just for the purpose of being different.
-
-Not sure about how to name enable-early-reset. I'd prefer to have something
-generic, even if only implemented in a single driver for now, but I don't
-really know right now what that might/should look like. Maybe just
-"enable-early" to indicate that the watchdog should be enabled during init ?
-
-Guenter
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
