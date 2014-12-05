@@ -1,47 +1,71 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 5 Dec 2014 17:52:41 +0000
-Subject: [RFC v2] arm:extend the reserved mrmory for initrd to be page
- aligned
-In-Reply-To: <20141205172701.GW11285@n2100.arm.linux.org.uk>
-References: <35FD53F367049845BC99AC72306C23D103D6DB491609@CNBJMBX05.corpusers.net>
- <20140915113325.GD12361@n2100.arm.linux.org.uk>
- <20141204120305.GC17783@e104818-lin.cambridge.arm.com>
- <20141205120506.GH1630@arm.com>
- <20141205170745.GA31222@e104818-lin.cambridge.arm.com>
- <20141205172701.GW11285@n2100.arm.linux.org.uk>
-Message-ID: <CAFEAcA912Cgbs-zr+=YfBBQzK625bmbrgQwYCs4DMqPEF58e8Q@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 5 Dec 2014 13:00:22 -0500 (EST)
+Subject: [PATCH] optimize ktime_divns for constant divisors
+In-Reply-To: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
+References: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
+Message-ID: <alpine.LFD.2.11.1412051251280.470@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 December 2014 at 17:27, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Dec 05, 2014 at 05:07:45PM +0000, Catalin Marinas wrote:
->> On Fri, Dec 05, 2014 at 12:05:06PM +0000, Will Deacon wrote:
->> > Care to submit this as a proper patch? We should at least fix Peter's issue
->> > before doing things like extending headers, which won't work for older
->> > kernels anyway.
->>
->> Quick fix is the revert of the whole patch, together with removing
->> PAGE_ALIGN(end) in poison_init_mem() on arm32. If Russell is ok with
->> this patch, we can take it via the arm64 tree, otherwise I'll send you a
->> partial revert only for the arm64 part.
->
-> Not really.  Let's look at the history.
->
-> For years, we've been poisoning memory, page aligning the end pointer.
-> This has never been an issue.
+BTW this is worth applying despite the on-going discussion with Arnd 
+on a separate optimization.
 
-Depends what you mean by "never been an issue". I had to change
-QEMU (commit 98ed805c, January 2013) for 32-bit ARM back when the
-kernel started trashing the tail end of the page after the initrd
-with the poisoning, to 4K-align the dtb so it didn't share a page
-with the initrd-tail. That nobody else complained suggests that most
-bootloaders don't in practice overlap the two, though (ie that
-QEMU is an outlier in how it chooses to arrange things in memory).
+On Wed, 3 Dec 2014, Nicolas Pitre wrote:
 
-I should probably have reported the breakage at the time, but
-I took the pragmatic (lazy?) approach of just changing our
-bootloader code.
-
-thanks
--- PMM
+> At least on ARM, do_div() is optimized to turn constant divisors into
+> an inline multiplication by the reciprocal value at compile time. 
+> However this optimization is missed entirely whenever ktime_divns() is
+> used and the slow out-of-line division code is used all the time.
+> 
+> Let ktime_divns() use do_div() inline whenever the divisor is constant
+> and small enough.  This will make things like ktime_to_us() and 
+> ktime_to_ms() much faster.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> 
+> diff --git a/include/linux/ktime.h b/include/linux/ktime.h
+> index c9d645ad98..411dd8bfe5 100644
+> --- a/include/linux/ktime.h
+> +++ b/include/linux/ktime.h
+> @@ -166,7 +166,17 @@ static inline bool ktime_before(const ktime_t cmp1, const ktime_t cmp2)
+>  }
+>  
+>  #if BITS_PER_LONG < 64
+> -extern u64 ktime_divns(const ktime_t kt, s64 div);
+> +extern u64 __ktime_divns(const ktime_t kt, s64 div);
+> +static inline u64 ktime_divns(const ktime_t kt, s64 div)
+> +{
+> +	if (__builtin_constant_p(div) && !(div >> 32)) {
+> +		u64 ns = kt.tv64;
+> +		do_div(ns, div);
+> +		return ns;
+> +	} else {
+> +		return __ktime_divns(kt, div);
+> +	}
+> +}
+>  #else /* BITS_PER_LONG < 64 */
+>  # define ktime_divns(kt, div)		(u64)((kt).tv64 / (div))
+>  #endif
+> diff --git a/kernel/time/hrtimer.c b/kernel/time/hrtimer.c
+> index 37e50aadd4..890535c41c 100644
+> --- a/kernel/time/hrtimer.c
+> +++ b/kernel/time/hrtimer.c
+> @@ -266,7 +266,7 @@ lock_hrtimer_base(const struct hrtimer *timer, unsigned long *flags)
+>  /*
+>   * Divide a ktime value by a nanosecond value
+>   */
+> -u64 ktime_divns(const ktime_t kt, s64 div)
+> +u64 __ktime_divns(const ktime_t kt, s64 div)
+>  {
+>  	u64 dclc;
+>  	int sft = 0;
+> @@ -282,7 +282,7 @@ u64 ktime_divns(const ktime_t kt, s64 div)
+>  
+>  	return dclc;
+>  }
+> -EXPORT_SYMBOL_GPL(ktime_divns);
+> +EXPORT_SYMBOL_GPL(__ktime_divns);
+>  #endif /* BITS_PER_LONG >= 64 */
+>  
+>  /*
+> 
