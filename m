@@ -1,24 +1,39 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Dec 2014 15:49:27 -0800
-Subject: [PATCH v2] arm64: Enable CONFIG_COMPAT also for 64k page size
-In-Reply-To: <1417736899-115619-1-git-send-email-agraf@suse.de>
-References: <1417736899-115619-1-git-send-email-agraf@suse.de>
-Message-ID: <CAOesGMgATgU6TnrGvr2OH+x7R750bQ7X02WGL5Sqc1F2vhvZHA@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 5 Dec 2014 08:34:02 +0800
+Subject: [PATCH 0/7] ARM: hisi: enable HiP01 SoC
+In-Reply-To: <3601066.g7Jvjk5UFL@wuerfel>
+References: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
+ <3601066.g7Jvjk5UFL@wuerfel>
+Message-ID: <5480FD7A.6030802@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 4, 2014 at 3:48 PM, Alexander Graf <agraf@suse.de> wrote:
-> With binutils 2.25 the default alignment for 32bit arm sections changed to
-> have everything 64k aligned. Armv7 binaries built with this binutils version
-> run successfully on an arm64 system.
->
-> Since effectively there is now the chance to run armv7 code on arm64 even
-> with 64k page size, it doesn't make sense to block people from enabling
-> CONFIG_COMPAT on those configurations.
->
-> Signed-off-by: Alexander Graf <agraf@suse.de>
-
-Acked-by: Olof Johansson <olof@lixom.net>
 
 
--Olof
+On 2014/12/4 20:58, Arnd Bergmann wrote:
+> On Friday 28 November 2014 02:15:43 Wang Long wrote:
+>> This series patch enable Hisilicon HiP01 SoC. The HiP01 SoC series
+>> chip is designed for networking product, it integrates a rich peripheral
+>> interfaces to support network applications and supports both one 
+>> core or dual cores and quad cores. The core is Cortex A9. 
+> 
+> Sorry for the delay in my reply. The patches look good to me, but I'm
+> not sure what you expect to happen to them. You have a number of
+> people listed as recipients, but it's not clear if you expect any of
+> us to apply them into a git tree.
+
+Hi Arnd,
+
+> Is Xu Wei going to pick these up in a git tree and send a pull request
+> to arm at kernel.org?
+
+I will send a pull request about it.
+Thanks!
+
+Best Regards,
+Wei
+
+> 	Arnd
+> 
+> .
+> 
