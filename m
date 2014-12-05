@@ -1,64 +1,102 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 5 Dec 2014 13:06:52 +0000
-Subject: [PATCH v6 1/8] iommu: provide early initialisation hook for IOMMU
- drivers
-In-Reply-To: <5481A688.4030606@arm.com>
-References: <CAL_JsqKHvh9KSTYrrs1Pts5Kg=8dA1V6NiW57_2vdDH173qQGg@mail.gmail.com>
- <CACxGe6vyMkyE9ZRj_FQzi19ESEo7OV_RQoVV65xBYpdQV8cRGQ@mail.gmail.com>
- <2579924.PPXuLn3o19@wuerfel> <54805312.6000402@arm.com>
- <CACxGe6uR5J4Cjdh_xYhBPoQRgeYwHPv5=AnuRmQKSD3yZrMK9Q@mail.gmail.com>
- <54806504.20507@arm.com> <20141204144925.GB31464@ulmo.nvidia.com>
- <54809D09.2050406@arm.com>
- <CACxGe6tpFHdP1-5NWiNVAqzXx-diN1xfRbu0AQDyVJ6AU_4RXg@mail.gmail.com>
- <5480B924.2010205@arm.com> <20141205121037.GI1630@arm.com>
- <5481A688.4030606@arm.com>
-Message-ID: <CACxGe6vppOQj-hJnqEEtLwDuSr4bzcbTgEFj8=x4ULu=yxswpg@mail.gmail.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri,  5 Dec 2014 18:44:56 +0530
+Subject: [PATCH] dma: pl330: revert commit 04abf5daf7d
+Message-ID: <1417785296-4435-1-git-send-email-jaswinder.singh@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 5, 2014 at 12:35 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> Hi Will,
->
-> On 05/12/14 12:10, Will Deacon wrote:
-> [...]
->>>>
->>>> Do you expect drivers to modify that *priv pointer after the ops
->>>> structure is registered? I'd be very surprised if that was the use
->>>> case. It's fine for the driver to register a non-const version, but
->>>> once it is registered, the infrastructure can treat it as const from
->>>> then on.
->>>
->>>
->>> Possibly not - certainly my current port of the ARM SMMU which makes use
->>> of *priv is only ever reading it - although we did also wave around
->>> reasons for mutable ops like dynamically changing the pgsize_bitmap and
->>> possibly even swizzling individual ops for runtime reconfiguration. On
->>> consideration though, I'd agree that things like that are mad enough to
->>> stay well within individual drivers if they did ever happen, and
->>> certainly shouldn't apply to this bit of the infrastructure at any rate.
->>
->>
->> I certainly need to update the pgsize_bitmap at runtime because I don't
->> know the supported page sizes until I've both (a) probed the hardware
->> and (b) allocated page tables for a domain. We've already discussed
->> moving the pgsize_bitmap out of the ops, but moving it somewhere where
->> it remains const doesn't really help.
->
->
-> We can safely cast the call to get_ops in the SMMU driver though, since
-> we'll know that we put a mutable per-instance ops in there in the first
-> place. At least that way drivers that aren't taking advantage and just pass
-> their static const ops around shouldn't provoke warnings. I deliberately
-> didn't touch anything beyond get_ops as that would be too disruptive.
->
->> Can I just take the patch that Grant acked, in the interest of getting
->> something merged? As you say, there's plenty of planned changes in this
->> area anyway. I plan to send Olof a pull request this afternoon.
->
->
-> Grant, Thierry? Personally I'm not fussed either way - the sooner something
-> goes in, the sooner I can carry on working at replacing it :D
+>From Documentation/crypto/async-tx-api.txt
+  "... Once a driver-specific threshold is met the driver
+automatically issues pending operations.  An application can force
+this event by calling async_tx_issue_pending_all() ..."
+ That is, the DMA controller drivers may buffer transfer requests
+for optimization. However it is perfectly legal to start dma as soon
+as the user calls .tx_submit() on the descriptor, as the documentation
+specifies in include/linux/dmaengine.h
 
-I've already acked it. Why are we still talking about it?  :-D
+It is also consistent with the expected behaviour. For example, if a
+channel is already active when a client submits a request, we do not
+expect the channel to stop after the current request is done and wait
+for explicit issue_pending() from the user (the user has already done
+prep() and submit()) on the last request.
 
-g.
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+---
+ drivers/dma/pl330.c | 24 ++++--------------------
+ 1 file changed, 4 insertions(+), 20 deletions(-)
+
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 19a9974..8ec5f1f 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -411,9 +411,7 @@ struct dma_pl330_chan {
+ 	/* DMA-Engine Channel */
+ 	struct dma_chan chan;
+ 
+-	/* List of submitted descriptors */
+-	struct list_head submitted_list;
+-	/* List of issued descriptors */
++	/* List of to be xfered descriptors */
+ 	struct list_head work_list;
+ 	/* List of completed descriptors */
+ 	struct list_head completed_list;
+@@ -2084,11 +2082,6 @@ static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned
+ 		pch->thread->req_running = -1;
+ 
+ 		/* Mark all desc done */
+-		list_for_each_entry(desc, &pch->submitted_list, node) {
+-			desc->status = FREE;
+-			dma_cookie_complete(&desc->txd);
+-		}
+-
+ 		list_for_each_entry(desc, &pch->work_list , node) {
+ 			desc->status = FREE;
+ 			dma_cookie_complete(&desc->txd);
+@@ -2099,7 +2092,6 @@ static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned
+ 			dma_cookie_complete(&desc->txd);
+ 		}
+ 
+-		list_splice_tail_init(&pch->submitted_list, &pl330->desc_pool);
+ 		list_splice_tail_init(&pch->work_list, &pl330->desc_pool);
+ 		list_splice_tail_init(&pch->completed_list, &pl330->desc_pool);
+ 		spin_unlock_irqrestore(&pch->lock, flags);
+@@ -2158,14 +2150,7 @@ pl330_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+ 
+ static void pl330_issue_pending(struct dma_chan *chan)
+ {
+-	struct dma_pl330_chan *pch = to_pchan(chan);
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&pch->lock, flags);
+-	list_splice_tail_init(&pch->submitted_list, &pch->work_list);
+-	spin_unlock_irqrestore(&pch->lock, flags);
+-
+-	pl330_tasklet((unsigned long)pch);
++	pl330_tasklet((unsigned long) to_pchan(chan));
+ }
+ 
+ /*
+@@ -2192,11 +2177,11 @@ static dma_cookie_t pl330_tx_submit(struct dma_async_tx_descriptor *tx)
+ 
+ 		dma_cookie_assign(&desc->txd);
+ 
+-		list_move_tail(&desc->node, &pch->submitted_list);
++		list_move_tail(&desc->node, &pch->work_list);
+ 	}
+ 
+ 	cookie = dma_cookie_assign(&last->txd);
+-	list_add_tail(&last->node, &pch->submitted_list);
++	list_add_tail(&last->node, &pch->work_list);
+ 	spin_unlock_irqrestore(&pch->lock, flags);
+ 
+ 	return cookie;
+@@ -2680,7 +2665,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		else
+ 			pch->chan.private = adev->dev.of_node;
+ 
+-		INIT_LIST_HEAD(&pch->submitted_list);
+ 		INIT_LIST_HEAD(&pch->work_list);
+ 		INIT_LIST_HEAD(&pch->completed_list);
+ 		spin_lock_init(&pch->lock);
+-- 
+1.9.1
