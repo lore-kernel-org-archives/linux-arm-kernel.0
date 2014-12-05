@@ -1,35 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Dec 2014 23:24:02 -0800
-Subject: [PATCH v4 0/5] Add Spreadtrum Sharkl64 Platform support
-In-Reply-To: <1417692860-18841-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <sc9836v4>
- <1417692860-18841-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <20141205072402.GC29274@quad.lixom.net>
+Date: Thu, 4 Dec 2014 23:25:14 -0800
+Subject: [PATCH v2 0/2] ARM: imx: fix irq_data usage
+In-Reply-To: <1417536326-18691-1-git-send-email-marc.zyngier@arm.com>
+References: <1417536326-18691-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20141205072514.GD29274@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 07:34:15PM +0800, Chunyan Zhang wrote:
-> Spreadtrum is a rapid growing chip vendor providing smart phone total solutions.
+On Tue, Dec 02, 2014 at 04:05:24PM +0000, Marc Zyngier wrote:
+> IMX has a fairly creative usage of irq_data, which turns into a
+> disaster in -next (boards don't even boot).
 > 
-> Sharkl64 Platform is nominated as a SoC infrastructure that supports 4G/3G/2G
-> standards based on ARMv8 multiple core architecture.Now we have only one
-> SoC(SC9836) based on this Platform in developing.
+> These two patches are addressing the most pressing issues, and should
+> be merged as early as possible (we've merged a similar patch for tegra
+> in 3.18-rc7).
 > 
-> This patchset adds Sharkl64 support in arm64 device tree and the serial driver
-> of SC9836-UART.
+> Thanks,
 > 
-> This patchset also has patches which address "sprd" prefix and DT compatible
-> strings for nodes which appear un-documented.
+> 	M.
 > 
-> This version code was tesed both on Fast Mode and sc9836-fpga board.
-> We use the latest boot-wrapper-aarch64 as the bootloader.
+> From v1: added provided tags.
 
 Hi,
 
-We only got 3 of the 5 patches of this version (1, 2 and 4). Can you
-resend the dts patch to us (I'm guessing the serial one will go through Greg).
+Applied to next/fixes-non-critical for 3.19, should hopefully go in pretty
+early during the merge window.
 
-
-Thanks,
 
 -Olof
