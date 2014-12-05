@@ -1,81 +1,83 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Fri, 5 Dec 2014 15:47:03 +0100
-Subject: using DMA-API on ARM
-In-Reply-To: <F51492713EF10846800D8C0ED37A7DCE01901765@SJEXCHMB15.corp.ad.broadcom.com>
-References: <5481794E.4050406@broadcom.com>
- <20141205094507.GP11285@n2100.arm.linux.org.uk>
- <20141205122423.GK1630@arm.com>
- <F51492713EF10846800D8C0ED37A7DCE019016E1@SJEXCHMB15.corp.ad.broadcom.com>
- <20141205132332.GS11285@n2100.arm.linux.org.uk>
- <F51492713EF10846800D8C0ED37A7DCE01901765@SJEXCHMB15.corp.ad.broadcom.com>
-Message-ID: <5481C567.9040108@broadcom.com>
+From: moon.linux@yahoo.com (Anand Moon)
+Date: Fri,  5 Dec 2014 20:21:06 +0530
+Subject: [PATCH] do_work_pending: Enable interrupts in do_work_pending()
+Message-ID: <1417791066-5458-1-git-send-email-moon.linux@yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/14 15:20, Hante Meuleman wrote:
-> Ok, I'll add the necessary debug to get all the information out,
-> but it will take some time to get it done, so I won't have anything
-> before Monday.
->
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: vrijdag 5 december 2014 14:24
-> To: Hante Meuleman
-> Cc: Will Deacon; Arend Van Spriel; Marek Szyprowski; linux-arm-kernel at lists.infradead.org; David Miller; linux-kernel at vger.kernel.org; brcm80211-dev-list; linux-wireless
-> Subject: Re: using DMA-API on ARM
->
-> Please wrap your message - replying to a message which looks like this in
-> my editor is far from easy, and gives me much more work to /manually/
-> reformat it before I can reply to it:
+A recent change triggered a WARN_ON that interrupts were disabled,
+and in fact other architectures enable interrupts uniformly for their
+related do_work_pending() type code, and all the things we call from
+this routine appear to expect interrupts to be enabled.  So, enable them.
+Below is the warning.
 
-That's what happens with corporate IT forcing to use Outlook. We can 
-workaround that using Thunderbird on Citrix. I will enlighten Hante 
-about that option :-)
+[   12.094106] systemd-udevd[1643]: starting version 204
+[   13.466537] ------------[ cut here ]------------
+[   13.469750] WARNING: CPU: 1 PID: 1645 at kernel/locking/lockdep.c:3536 check_flags+0x7c/0x1d0()
+[   13.478397] DEBUG_LOCKS_WARN_ON(current->hardirqs_enabled)
+[   13.483663] Modules linked in:
+[   13.486863] CPU: 1 PID: 1645 Comm: systemd-udevd Not tainted 3.17.4-arm7 #6
+[   13.493851] [<c0013dc8>] (unwind_backtrace) from [<c0011208>] (show_stack+0x10/0x14)
+[   13.501563] [<c0011208>] (show_stack) from [<c05df5f0>] (dump_stack+0x80/0xac)
+[   13.508753] [<c05df5f0>] (dump_stack) from [<c0024594>] (warn_slowpath_common+0x60/0x84)
+[   13.516808] [<c0024594>] (warn_slowpath_common) from [<c00245e4>] (warn_slowpath_fmt+0x2c/0x3c)
+[   13.525463] [<c00245e4>] (warn_slowpath_fmt) from [<c006c508>] (check_flags+0x7c/0x1d0)
+[   13.533447] [<c006c508>] (check_flags) from [<c006cf60>] (lock_is_held+0x34/0x60)
+[   13.540884] [<c006cf60>] (lock_is_held) from [<c05e0500>] (__schedule+0x98/0x7cc)
+[   13.548342] [<c05e0500>] (__schedule) from [<c0010adc>] (do_work_pending+0x28/0xbc)
+[   13.555962] [<c0010adc>] (do_work_pending) from [<c000dd38>] (work_pending+0xc/0x20)
+[   13.563663] ---[ end trace 33bbfa4173cfa520 ]---
+[   13.568238] possible reason: unannotated irqs-off.
+[   13.573005] irq event stamp: 5227
+[   13.576293] hardirqs last  enabled at (5227): [<c000dd04>] ret_fast_syscall+0x24/0x48
+[   13.584096] hardirqs last disabled at (5226): [<c000dcec>] ret_fast_syscall+0xc/0x48
+[   13.591823] softirqs last  enabled at (5222): [<c00283b0>] __do_softirq+0x1e8/0x270
+[   13.599447] softirqs last disabled at (5205): [<c00286f4>] irq_exit+0x84/0xf4
+[   13.656634] random: nonblocking pool is initialized
 
-Regards,
-Arend
+Signed-off-by: Anand Moon <moon.linux@yahoo.com>
+---
+ arch/arm/kernel/signal.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-> On Fri, Dec 05, 2014 at 12:56:45PM +0000, Hante Meuleman wrote:
->> The problem is with data coming from device, so DMA from device to host. The $
->>
->> However: this indicates that dma_alloc_coherent on an ARM target may result i$
->>
->> Regards,
->> Hante
->
-> Thanks.
->
-> On Fri, Dec 05, 2014 at 12:56:45PM +0000, Hante Meuleman wrote:
->> However: this indicates that dma_alloc_coherent on an ARM target may
->> result in a memory buffer which can be cached which conflicts with
->> the API of this function.
->
-> If the memory has an alias which is cacheable, it is possible for cache
-> lines to get allocated via that alias, even if the alias has no explicit
-> accesses to it.
->
-> This is something which I've been going on for quite literally /years/ -
-> mismatched cache attributes can cause unpredictable behaviour.  I've had
-> a lot of push back from people who are of the opinion that "if it works
-> for me, then there isn't a problem" and I eventually gave up fighting
-> the battle, especially as the ARM architecture people weakened my
-> reasoning behind it by publishing a relaxation of the "no differing
-> attributes" issue.  This was particularly true of those who wanted to
-> use ioremap() on system memory - and cases such as
-> dma_init_coherent_memory().
->
-> So, I never fixed this problem in the original DMA allocator code; I
-> basically gave up with it.  It's a latent bug which did need to be fixed,
-> and is still present today in the non-CMA case.
->
-> The symptoms which you are reporting sound very much like this kind of
-> problem - the virtual address for the memory returned by
-> dma_alloc_coherent() will not be cacheable memory - it will have been
-> remapped using map_vm_area().  However, there could very well be a fully
-> cacheable lowmem mapping of that memory, which if a read (speculative or
-> otherwise) will bring a cache line in, and because the caches are VIPT
-> or PIPT, that cache line can be hit via the non-cacheable mapping too.
->
-> What I /really/ need is more evidence of this to tell those disbelievers
-> where to stick their flawed arguments. :)
->
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index bd19834..52bc9d6 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -476,7 +476,7 @@ setup_rt_frame(struct ksignal *ksig, sigset_t *set, struct pt_regs *regs)
+ 
+ /*
+  * OK, we're invoking a handler
+- */	
++ */
+ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
+ {
+ 	sigset_t *oldset = sigmask_to_save();
+@@ -574,12 +574,14 @@ asmlinkage int
+ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
+ {
+ 	do {
++		if (unlikely(!user_mode(regs)))
++			return 0;
++		/* Enable interrupts; they are disabled again on return to
++		 * caller. */
++		local_irq_enable();
+ 		if (likely(thread_flags & _TIF_NEED_RESCHED)) {
+ 			schedule();
+ 		} else {
+-			if (unlikely(!user_mode(regs)))
+-				return 0;
+-			local_irq_enable();
+ 			if (thread_flags & _TIF_SIGPENDING) {
+ 				int restart = do_signal(regs, syscall);
+ 				if (unlikely(restart)) {
+@@ -588,6 +590,7 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
+ 					 * Deal with it without leaving
+ 					 * the kernel space.
+ 					 */
++					local_irq_disable();
+ 					return restart;
+ 				}
+ 				syscall = 0;
+-- 
+2.1.0
