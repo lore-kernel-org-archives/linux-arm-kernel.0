@@ -1,50 +1,73 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 05 Dec 2014 13:43:59 +0100
-Subject: [PATCH v4 1/3] clk: samsung: Fix clock disable failure because
- domain being gated
-In-Reply-To: <1417777254-26579-2-git-send-email-k.kozlowski@samsung.com>
-References: <1417777254-26579-1-git-send-email-k.kozlowski@samsung.com>
- <1417777254-26579-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5481A88F.9090308@samsung.com>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Fri, 05 Dec 2014 18:17:57 +0530
+Subject: [PATCH] tick-broadcast: Register for hrtimer based broadcast as the
+ default broadcast mode
+Message-ID: <20141205124756.25803.4988.stgit@preeti.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Commit 5d1638acb9f62fa7 added a hrtimer based broadcast mode for those
+platforms in which local timers stop when CPUs enter deep idle states. The
+commit expected the platforms to register for this mode explicitly when they
+lacked a better external device to wake up CPUs in deep idle. Given that
+more platforms are beginning to use this mode, we can avoid the call to
+set it up on every platform that requires it, by registering for the hrtimer
+based broadcast mode in the core code before clock devices begin to get
+initialized.
 
-On 05/12/14 12:00, Krzysztof Kozlowski wrote:
-> Audio subsystem clocks are located in separate block. If clock for this
-> block (from main clock domain) 'mau_epll' is gated then any read or
-> write to audss registers will block.
-> 
-> This was observed on Exynos 5420 platforms (Arndale Octa and Peach
-> Pi/Pit) after introducing runtime PM to pl330 DMA driver. After that
-> commit the 'mau_epll' was gated, because the "amba" clock was disabled
-> and there were no more users of mau_epll. The system hang on disabling
-> unused clocks from audss block.
-> 
-> Unfortunately the 'mau_epll' clock is not parent of some of audss clocks.
-> 
-> Whenever system wants to operate on audss clocks it has to enable epll
-> clock. The solution reuses common clk-gate/divider/mux code and duplicates
-> clk_register_*() functions.
-> 
-> Additionally this patch fixes memory leak of clock gate/divider/mux
-> structures. The leak exists in generic clk_register_*() functions. Patch
-> replaces them with custom code with managed allocation.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Reported-by: Kevin Hilman <khilman@kernel.org>
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+So if there exists a better broadcast device, it will overide the hrtimer
+based one; else there is a backup mechanism when a wakeup device is required.
+This commit also helps detect cases where the platform fails to register for
+a broadcast device but invokes the help of one when entering deep idle states.
+Currently we do not handle this situation at all and invoke the help of the
+broadcast clock device without checking for its existence. Registering a default
+broadcast mode will handle such buggy cases properly.
 
-Instead of this big patch perhaps for v3.19 we could just add
-a clk_enable() call in exynos5420 clock controller driver, to make
-sure the required clock is always enabled, as it was before you have
-added runtime PM support to the PL330 DMA controller driver ?
+Signed-off-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+---
 
-It sounds like a workaround but wouldn't be as intrusive as this
-patch.
+ arch/arm64/kernel/time.c   |    2 --
+ arch/powerpc/kernel/time.c |    1 -
+ kernel/time/timekeeping.c  |    4 ++++
+ 3 files changed, 4 insertions(+), 3 deletions(-)
 
---
-Regards,
-Sylwester
+diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+index 1a7125c..47baaa8 100644
+--- a/arch/arm64/kernel/time.c
++++ b/arch/arm64/kernel/time.c
+@@ -70,8 +70,6 @@ void __init time_init(void)
+ 	of_clk_init(NULL);
+ 	clocksource_of_init();
+ 
+-	tick_setup_hrtimer_broadcast();
+-
+ 	arch_timer_rate = arch_timer_get_rate();
+ 	if (!arch_timer_rate)
+ 		panic("Unable to initialise architected timer.\n");
+diff --git a/arch/powerpc/kernel/time.c b/arch/powerpc/kernel/time.c
+index 7505599..51433a8 100644
+--- a/arch/powerpc/kernel/time.c
++++ b/arch/powerpc/kernel/time.c
+@@ -942,7 +942,6 @@ void __init time_init(void)
+ 	clocksource_init();
+ 
+ 	init_decrementer_clockevent();
+-	tick_setup_hrtimer_broadcast();
+ }
+ 
+ 
+diff --git a/kernel/time/timekeeping.c b/kernel/time/timekeeping.c
+index ec1791f..6044a51 100644
+--- a/kernel/time/timekeeping.c
++++ b/kernel/time/timekeeping.c
+@@ -1016,6 +1016,10 @@ void __init timekeeping_init(void)
+ 		boot.tv_sec = 0;
+ 		boot.tv_nsec = 0;
+ 	}
++	/* Register for hrtimer based broadcast as the default timekeeping
++	 * mode in deep idle states.
++	 */
++	tick_setup_hrtimer_broadcast();
+ 
+ 	raw_spin_lock_irqsave(&timekeeper_lock, flags);
+ 	write_seqcount_begin(&tk_core.seq);
