@@ -1,61 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Dec 2014 17:27:02 +0000
-Subject: [RFC v2] arm:extend the reserved mrmory for initrd to be page
- aligned
-In-Reply-To: <20141205170745.GA31222@e104818-lin.cambridge.arm.com>
-References: <35FD53F367049845BC99AC72306C23D103D6DB491609@CNBJMBX05.corpusers.net>
- <20140915113325.GD12361@n2100.arm.linux.org.uk>
- <20141204120305.GC17783@e104818-lin.cambridge.arm.com>
- <20141205120506.GH1630@arm.com>
- <20141205170745.GA31222@e104818-lin.cambridge.arm.com>
-Message-ID: <20141205172701.GW11285@n2100.arm.linux.org.uk>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 5 Dec 2014 11:32:18 -0600
+Subject: [PATCH] ARM: dts: am57xx-beagle-x15: Add GPIO controlled fan node
+Message-ID: <1417800739-13146-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 05, 2014 at 05:07:45PM +0000, Catalin Marinas wrote:
-> On Fri, Dec 05, 2014 at 12:05:06PM +0000, Will Deacon wrote:
-> > Care to submit this as a proper patch? We should at least fix Peter's issue
-> > before doing things like extending headers, which won't work for older
-> > kernels anyway.
-> 
-> Quick fix is the revert of the whole patch, together with removing
-> PAGE_ALIGN(end) in poison_init_mem() on arm32. If Russell is ok with
-> this patch, we can take it via the arm64 tree, otherwise I'll send you a
-> partial revert only for the arm64 part.
+From: "Menon, Nishanth" <nm@ti.com>
 
-Not really.  Let's look at the history.
+TPS gpio now controls a 5v 500mA TL5209 regulator which may be supply
+a fan (such as AFB02505HHB) over J1 connector for various purposes.
+Provide device tree node to enable the same.
 
-For years, we've been poisoning memory, page aligning the end pointer.
-This has never been an issue.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+Depends on the following:
+https://patchwork.kernel.org/patch/5439201/
+https://patchwork.kernel.org/patch/5439191/
 
-However, patch 8167/1 changed things so we freed the overlapping pages.
-Since we've always poisoned up to the end of the final page, freeing it
-should not be a problem, especially as (I said above) we've been poisoning
-it for years.
+enable and disable can be controlled by
+echo '1' > /sys/class/hwmon/hwmon0/fan1_target
+and
+echo '0' > /sys/class/hwmon/hwmon0/fan1_target
 
-The issue is more about what happens at the start.
+requires CONFIG_GPIO_PALMAS and CONFIG_SENSORS_GPIO_FAN to be operational
+Applies on 
+https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v3.19/dt-v2
 
-In any case:
+ arch/arm/boot/dts/am57xx-beagle-x15.dts |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-> >From 8e317c6be00abe280de4dcdd598d2e92009174b6 Mon Sep 17 00:00:00 2001
-> From: Catalin Marinas <catalin.marinas@arm.com>
-> Date: Fri, 5 Dec 2014 16:41:52 +0000
-> Subject: [PATCH] Revert "ARM: 8167/1: extend the reserved memory for initrd to
->  be page aligned"
-> 
-> This reverts commit 421520ba98290a73b35b7644e877a48f18e06004. There is
-> no guarantee that the boot-loader places other images like dtb in a
-> different page than initrd start/end. When this happens, such pages must
-> not be freed. The free_reserved_area() already takes care of rounding up
-> "start" and rounding down "end" to avoid freeing partially used pages.
-> 
-> In addition to the revert, this patch also removes the arm32
-> PAGE_ALIGN(end) when calculating the size of the memory to be poisoned.
-
-which makes the summary line rather misleading, and I really don't think
-we need to do this on ARM for the simple reason that we've been doing it
-for soo long that it can't be an issue.
-
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index 49edbda..7fe82ef 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -80,6 +80,15 @@
+ 			default-state = "off";
+ 		};
+ 	};
++
++	gpio_fan {
++		/* Based on 5v 500mA AFB02505HHB */
++		compatible = "gpio-fan";
++		pinctrl-names = "default";
++		gpios =  <&tps659038_gpio 1 GPIO_ACTIVE_HIGH>;
++		gpio-fan,speed-map = <0    0
++				      13000 1>;
++	};
+ };
+ 
+ &dra7_pmx_core {
+@@ -314,6 +323,12 @@
+ 			wakeup-source;
+ 			ti,palmas-long-press-seconds = <12>;
+ 		};
++
++		tps659038_gpio: tps659038_gpio {
++			compatible = "ti,palmas-gpio";
++			gpio-controller;
++			#gpio-cells = <2>;
++		};
+ 	};
+ 
+ 	tmp102: tmp102 at 48 {
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.7.9.5
