@@ -1,36 +1,81 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  5 Dec 2014 15:44:53 +0100
-Subject: [PATCH 0/5] ARM: mvebu: Add Armada 385 AP support
-Message-ID: <1417790698-9792-1-git-send-email-maxime.ripard@free-electrons.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Fri, 5 Dec 2014 15:47:03 +0100
+Subject: using DMA-API on ARM
+In-Reply-To: <F51492713EF10846800D8C0ED37A7DCE01901765@SJEXCHMB15.corp.ad.broadcom.com>
+References: <5481794E.4050406@broadcom.com>
+ <20141205094507.GP11285@n2100.arm.linux.org.uk>
+ <20141205122423.GK1630@arm.com>
+ <F51492713EF10846800D8C0ED37A7DCE019016E1@SJEXCHMB15.corp.ad.broadcom.com>
+ <20141205132332.GS11285@n2100.arm.linux.org.uk>
+ <F51492713EF10846800D8C0ED37A7DCE01901765@SJEXCHMB15.corp.ad.broadcom.com>
+Message-ID: <5481C567.9040108@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On 12/05/14 15:20, Hante Meuleman wrote:
+> Ok, I'll add the necessary debug to get all the information out,
+> but it will take some time to get it done, so I won't have anything
+> before Monday.
+>
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: vrijdag 5 december 2014 14:24
+> To: Hante Meuleman
+> Cc: Will Deacon; Arend Van Spriel; Marek Szyprowski; linux-arm-kernel at lists.infradead.org; David Miller; linux-kernel at vger.kernel.org; brcm80211-dev-list; linux-wireless
+> Subject: Re: using DMA-API on ARM
+>
+> Please wrap your message - replying to a message which looks like this in
+> my editor is far from easy, and gives me much more work to /manually/
+> reformat it before I can reply to it:
 
-This set of patches add the support for the Armada 385 AP board.
+That's what happens with corporate IT forcing to use Outlook. We can 
+workaround that using Thunderbird on Citrix. I will enlighten Hante 
+about that option :-)
 
-It also adds a few clean ups here and there, a few missing pin
-functions needed for the board, etc.
+Regards,
+Arend
 
-Maxime
-
-Maxime Ripard (5):
-  ARM: mvebu: Rename DEBUG_LL to indicate UART index
-  ARM: mvebu: Add UART1 as DEBUG_LL possible target
-  ARM: mvebu: a38x: Fix node names
-  pinctrl: mvebu: a38x: Add UART1 muxing options
-  ARM: mvebu: Add Armada 385 Access Point Development Board support
-
- arch/arm/Kconfig.debug                     |  35 +++--
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/armada-385-ap.dts        | 200 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/armada-385-db.dts        |   2 +-
- arch/arm/boot/dts/armada-385-rd.dts        |   2 +-
- arch/arm/boot/dts/armada-385.dtsi          |   2 +-
- arch/arm/boot/dts/armada-38x.dtsi          |   4 +-
- drivers/pinctrl/mvebu/pinctrl-armada-38x.c |   6 +-
- 8 files changed, 236 insertions(+), 16 deletions(-)
- create mode 100644 arch/arm/boot/dts/armada-385-ap.dts
-
--- 
-2.2.0
+> On Fri, Dec 05, 2014 at 12:56:45PM +0000, Hante Meuleman wrote:
+>> The problem is with data coming from device, so DMA from device to host. The $
+>>
+>> However: this indicates that dma_alloc_coherent on an ARM target may result i$
+>>
+>> Regards,
+>> Hante
+>
+> Thanks.
+>
+> On Fri, Dec 05, 2014 at 12:56:45PM +0000, Hante Meuleman wrote:
+>> However: this indicates that dma_alloc_coherent on an ARM target may
+>> result in a memory buffer which can be cached which conflicts with
+>> the API of this function.
+>
+> If the memory has an alias which is cacheable, it is possible for cache
+> lines to get allocated via that alias, even if the alias has no explicit
+> accesses to it.
+>
+> This is something which I've been going on for quite literally /years/ -
+> mismatched cache attributes can cause unpredictable behaviour.  I've had
+> a lot of push back from people who are of the opinion that "if it works
+> for me, then there isn't a problem" and I eventually gave up fighting
+> the battle, especially as the ARM architecture people weakened my
+> reasoning behind it by publishing a relaxation of the "no differing
+> attributes" issue.  This was particularly true of those who wanted to
+> use ioremap() on system memory - and cases such as
+> dma_init_coherent_memory().
+>
+> So, I never fixed this problem in the original DMA allocator code; I
+> basically gave up with it.  It's a latent bug which did need to be fixed,
+> and is still present today in the non-CMA case.
+>
+> The symptoms which you are reporting sound very much like this kind of
+> problem - the virtual address for the memory returned by
+> dma_alloc_coherent() will not be cacheable memory - it will have been
+> remapped using map_vm_area().  However, there could very well be a fully
+> cacheable lowmem mapping of that memory, which if a read (speculative or
+> otherwise) will bring a cache line in, and because the caches are VIPT
+> or PIPT, that cache line can be hit via the non-cacheable mapping too.
+>
+> What I /really/ need is more evidence of this to tell those disbelievers
+> where to stick their flawed arguments. :)
+>
