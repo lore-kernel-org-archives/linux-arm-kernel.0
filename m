@@ -1,102 +1,99 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 5 Dec 2014 15:12:21 +0100
-Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
-In-Reply-To: <5481ABA1.9030408@offcode.fi>
-References: <5465C00E.4030808@offcode.fi>
- <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
- <20141127200036.2c65df62@bbrezillon> <5481ABA1.9030408@offcode.fi>
-Message-ID: <20141205151221.0ee1e814@bbrezillon>
+From: orsonzhai@gmail.com (Orson Zhai)
+Date: Fri, 5 Dec 2014 22:13:32 +0800
+Subject: [PATCH v4 0/5] Add Spreadtrum Sharkl64 Platform support
+In-Reply-To: <CAAfSe-uz534FiZufojKa8MdBi=VFqhuoFLwof7K+FqXG--AGaw@mail.gmail.com>
+References: <1417692860-18841-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20141205104009.GE11889@leverpostej>
+ <CAAfSe-uz534FiZufojKa8MdBi=VFqhuoFLwof7K+FqXG--AGaw@mail.gmail.com>
+Message-ID: <CA+H2tpF0pJ1w-MibuOv=HiXJy6pCqUJ2fDUwxLs49y0y4LEd5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timo,
+Hi, Mark,
 
-On Fri, 05 Dec 2014 14:57:05 +0200
-Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
+On Fri, Dec 5, 2014 at 8:27 PM, Lyra Zhang <zhang.lyra@gmail.com> wrote:
+> On Fri, Dec 5, 2014 at 6:40 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> Hi,
+>>
+>> On Thu, Dec 04, 2014 at 11:34:15AM +0000, Chunyan Zhang wrote:
+>>> Spreadtrum is a rapid growing chip vendor providing smart phone total solutions.
+>>>
+>>> Sharkl64 Platform is nominated as a SoC infrastructure that supports 4G/3G/2G
+>>> standards based on ARMv8 multiple core architecture.Now we have only one
+>>> SoC(SC9836) based on this Platform in developing.
+>>>
+>>> This patchset adds Sharkl64 support in arm64 device tree and the serial driver
+>>> of SC9836-UART.
+>>>
+>>> This patchset also has patches which address "sprd" prefix and DT compatible
+>>> strings for nodes which appear un-documented.
+>>>
+>>> This version code was tesed both on Fast Mode and sc9836-fpga board.
+>>> We use the latest boot-wrapper-aarch64 as the bootloader.
+>>>
+>>> Changes from v3:
+>>> * Addressed review comments:
+>>>       - Added the description of clock property for sc9836-uart
+>>>       - Revised the size of GICC to be 8KiB
+>>>       - Added another compatible string for psci-0.1
+>>
+>> I had open questions on v3 regarding your PSCI imlpementation. You
+>> mentioned that you are using the aarch64 bootwrapper, but your DT
+>> describes PSCI 0.2, and the (upstream) bootwrapper does not implement
+>> PSCI 0.2. Adding the old PSCI compatible string is _not_ sufficient if
+>> you do not have a full PSCI 0.2 implementation.
+>>
+>> Given that PSCI 0.2 requires more functionality to be implemented, I'd
+>> like to know that your implementation is spec-compliant (implementing
+>> the mandatory functions, nters the kernel in the correct state, etc),
+>> and that it has been tested.
+>>
+>> Would you be able to look at my comments from the last posting please?
 
-> On 27.11.2014 21:00, Boris Brezillon wrote:
-> > Hi Timo,
-> >
-> > Sorry for the late reply.
-> >
-> > On Fri, 21 Nov 2014 14:23:30 +0200
-> > Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
-> >
-> >> By default the driver will start a kernel timer which keeps on kicking
-> >> the watchdog HW until user space has opened the watchdog
-> >> device. Usually this is desirable as the watchdog HW is running by
-> >> default and the user space may not have any watchdog daemon running at
-> >> all.
-> >>
-> >> However, on production systems it may be mandatory that also early
-> >> crashes and lockups will lead to a watchdog reset, even if they happen
-> >> before the user space has opened the watchdog device.
-> >>
-> >> To resolve the issue, add a new device tree property
-> >> "enable-early-reset" which will prevent the kernel timer from pinging
-> >> the watchdog HW on behalf of user space. The default is still to use
-> >> kernel timer, but more strict behavior can be enabled via the device
-> >> tree property.
-> >>
-> >> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
-> >> ---
-> >>   Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
-> >>   drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
-> >>   2 files changed, 9 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> >> index f90e294..a0b7b75 100644
-> >> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> >> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> >> @@ -28,6 +28,10 @@ Optional properties:
-> >>   	entering idle state.
-> >>   - atmel,dbg-halt : Should be present if you want to stop the watchdog when
-> >>   	entering debug state.
-> >> +- enable-early-reset : Should be present if you want to let the
-> >> +	watchdog timer to expire even before user space has opened the
-> >> +	device. If not set, a kernel timer will keep on pinging the
-> >> +	watchdog until it is opened.
-> >
-> > If you want to make this property generic, maybe you should document it
-> > in a generic binding doc
-> > (Documentation/devicetree/bindings/watchdog/watchdog.txt ?).
-> > Once you're at it, maybe you could document the generic timeout-sec
-> > property in this file.
-> > Moreover, you might want to parse this property in watchdog_core.c and
-> > store the information in the watchdog_device struct.
-> 
-> I gave a little thought about this today and we could maybe have it like 
-> watchdog_init_timeout() is today. But I can't really think of any 
-> generic handling for this property, anything else except storing the 
-> parsed value to a variable in watchdog_device struct. Everything else is 
-> HW specific, except how we read the variable.. If we had some logic or 
-> checking for this variable (other than to check it is not negative) 
-> maybe then it would make sense.
+I'd like to show you more technical details of our psci implementation.
 
-Okay, I'm fine with keeping this DT property parsing out of the core.
+Here the dt code is fresh from our engineering repository.
+As far as I  know our engineers are testing on psci currently.
 
-> 
-> So I could write a patch to document generic watchdog properties in 
-> Documentation/devicetree/bindings/watchdog/watchdog.txt (anything else 
-> generic that would go there except timeout-sec and enable-early-reset?)
+04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800   98)        psci {
+04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800   99)
+ compatible = "arm,psci";
+04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800  100)
+ method = "smc";
+04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800  101)
+ cpu_on  = <0xc4000003>;
+04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800  102)
+ cpu_off = <0x84000002>;
+04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800  103)
+ cpu_suspend = <0xc4000001>;
+04b8b5a5 (zhiqiang.zhang 2014-12-04 15:27:17 +0800  104)        };
 
-I'm not sure you and Guenter agreed on the 'early-keepalive-sec'
-property (and this one won't be used in atmel driver since you can't
-change the timeout once set), so I'd say the timeout-sec and
-enable-early-reset are the only common properties for now.
- 
-> and change this patch so that it doesn't document anything in 
-> atmel-wdt.txt as we already have it documented in generic watchdog.txt.
-> 
-> Sounds good?
+Does it reveal the information as you concern?
+It's no doubt that we'll implement psci-v0.2 eventually.
+Considering that the code might be upstreamed in few weeks later, we
+submit a psci-v0.2 dts in advanced.
 
-Yes, sounds good to me.
+Thanks,
+Orson
 
-Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>>
+>> Thanks,
+>> Mark.
+>> --
+>
+> Hi, Mark
+>
+> Ok, I'll check it again with our related engineers.
+>
+> Actually, I had read all of your comments carefully before sending
+> each version of patches, and I replied you a few days early, I guess
+> you may miss it :)
+>
+> If we just implemented psci-0.1 until now, can we submit this path
+> without "compatible = "arm,psci-0.2"", but only with " compatible =
+> "arm,psci" ".
+>
+>
+>
+> Thanks,
+> Chunyan
