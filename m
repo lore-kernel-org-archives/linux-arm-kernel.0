@@ -1,36 +1,30 @@
 From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Fri, 5 Dec 2014 09:42:30 +0530
-Subject: [PATCH v2 3/3] i2c: cadence: Check for errata condition involving
- master receive
-In-Reply-To: <20141204183406.GK7944@katana>
+Date: Fri, 5 Dec 2014 09:50:04 +0530
+Subject: [PATCH v2 1/3] i2c: cadence: Handle > 252 byte transfers
+In-Reply-To: <20141204183242.GJ7944@katana>
 References: <1417610126-7957-1-git-send-email-harinik@xilinx.com>
- <1417610126-7957-4-git-send-email-harinik@xilinx.com>
- <20141204183406.GK7944@katana>
-Message-ID: <CAFcVECL0ShFp-qSHmO8era3okebA4oO85iz+QRWP6fKAEMiN7A@mail.gmail.com>
+ <1417610126-7957-2-git-send-email-harinik@xilinx.com>
+ <20141204183242.GJ7944@katana>
+Message-ID: <CAFcVEC+mpfjYB2K5eci-BFfjyKXvbxOOBVX_CH=ck1xJ+V9goQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Dec 5, 2014 at 12:04 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+On Fri, Dec 5, 2014 at 12:02 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
 >
 >> +             /*
->> +              * This controller does not give completion interrupt after a
->> +              * master receive transfer if HOLD bit is set (repeated start),
->> +              * resulting in SW timeout. Hence, if a receive transfer is
->> +              * followed by any other transfer, an error is returned
->> +              * indicating that this sequence is not supported.
+>> +              * If the device is sending data If there is further
+>> +              * data to be sent. Calculate the available space
+>> +              * in FIFO and fill the FIFO with that many bytes.
 >> +              */
->> +             for (count = 0; count < num-1; count++) {
->> +                     if (msgs[count].flags & I2C_M_RD)
->> +                             return -EOPNOTSUPP;
->> +             }
 >
-> Yeah, a lot better. Probably it would be good to inform the user with a
-> warning what went wrong?
+> This comment looks broken. In general, I think there should be more
+> comments explaining why things have to be done this way.
 >
 
-Sure. I'll add that.
+There's some grammatical errors here. Let me correct it and add more
+comments.
 
 Regards,
 Harini
