@@ -1,132 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 5 Dec 2014 10:01:01 +0100
-Subject: [PATCH] arm64: respect mem= for EFI
-In-Reply-To: <1417692140-29796-1-git-send-email-mark.rutland@arm.com>
-References: <1417692140-29796-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAKv+Gu8X6XDDLeEiSn-rAtJyP2+yMSvXa=4Y=70o0ZusJ_P1gQ@mail.gmail.com>
+From: koct9i@gmail.com (Konstantin Khlebnikov)
+Date: Fri, 5 Dec 2014 13:20:37 +0400
+Subject: [RFC] mm:add KPF_ZERO_PAGE flag for /proc/kpageflags
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
+Message-ID: <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 December 2014 at 12:22, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi all,
->
-> While trying to debug a userspace test failure, I noticed that the mem=
-> option didn't work when booting via EFI due to some unfortunate init
-> ordering.
->
-> However, with that alone fixed (patch below) things blow up early if a
-> mem= option is passed to the kernel, because of the way we currently map
-> the EFI runtime services.
->
-> I've given this patch a spin atop of Ard's rework of the runtime
-> services mapping [1], and that's far happier; I can boot to userspace
-> and memory is limited int he way I expect.
->
-> Assuming people are fine with this, would this make sense to append to
-> the runtime services mapping series?
->
+On Fri, Dec 5, 2014 at 11:57 AM, Wang, Yalin <Yalin.Wang@sonymobile.com> wrote:
+> This patch add KPF_ZERO_PAGE flag for zero_page,
+> so that userspace process can notice zero_page from
+> /proc/kpageflags, and then do memory analysis more accurately.
 
-I think the patch is good. If people agree, I can carry it along when
-I send out the next UEFI virtmap for kexec series.
+It would be nice to mark also huge_zero_page. See (completely
+untested) patch in attachment.
 
--- 
-Ard.
-
-
-> [1] https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/efi-for-arm64
 >
-> ---->8----
-> When booting with EFI, we acquire the EFI memory map after parsing the
-> early params. This unfortuantely renders the option useless as we call
-> memblock_enforce_memory_limit (which uses memblock_remove_range behind
-> the scenes) before we've added any memblocks. We end up removing
-> nothing, then adding all of memory later when efi_init calls
-> reserve_regions.
->
-> Instead, we can log the limit and apply this later when we do the rest
-> of the memblock work in memblock_init, which should work regardless of
-> the presence of EFI. At the same time we may as well move the early
-> parameter into arm64's mm/init.c, close to arm64_memblock_init.
->
-> Any memory which must be mapped (e.g. for use by EFI runtime services)
-> must be mapped explicitly reather than relying on the linear mapping,
-> which may be truncated as a result of a mem= option passed on the kernel
-> command line.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Leif Lindholm <leif.lindholm@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
 > ---
->  arch/arm64/kernel/setup.c | 19 -------------------
->  arch/arm64/mm/init.c      | 19 +++++++++++++++++++
->  2 files changed, 19 insertions(+), 19 deletions(-)
+>  fs/proc/page.c                         | 3 +++
+>  include/uapi/linux/kernel-page-flags.h | 1 +
+>  2 files changed, 4 insertions(+)
 >
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 4c9b0e0..00137ef 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -322,25 +322,6 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
->         dump_stack_set_arch_desc("%s (DT)", of_flat_dt_get_machine_name());
->  }
+> diff --git a/fs/proc/page.c b/fs/proc/page.c
+> index 1e3187d..120dbf7 100644
+> --- a/fs/proc/page.c
+> +++ b/fs/proc/page.c
+> @@ -136,6 +136,9 @@ u64 stable_page_flags(struct page *page)
+>         if (PageBalloon(page))
+>                 u |= 1 << KPF_BALLOON;
 >
-> -/*
-> - * Limit the memory size that was specified via FDT.
-> - */
-> -static int __init early_mem(char *p)
-> -{
-> -       phys_addr_t limit;
-> -
-> -       if (!p)
-> -               return 1;
-> -
-> -       limit = memparse(p, &p) & PAGE_MASK;
-> -       pr_notice("Memory limited to %lldMB\n", limit >> 20);
-> -
-> -       memblock_enforce_memory_limit(limit);
-> -
-> -       return 0;
-> -}
-> -early_param("mem", early_mem);
-> -
->  static void __init request_standard_resources(void)
->  {
->         struct memblock_region *region;
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index bac492c..11c7b70 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -136,10 +136,29 @@ static void arm64_memory_present(void)
->  }
->  #endif
+> +       if (is_zero_pfn(page_to_pfn(page)))
+> +               u |= 1 << KPF_ZERO_PAGE;
+> +
+>         u |= kpf_copy_bit(k, KPF_LOCKED,        PG_locked);
 >
-> +static phys_addr_t memory_limit = (phys_addr_t)ULLONG_MAX;
-> +
-> +/*
-> + * Limit the memory size that was specified via FDT.
-> + */
-> +static int __init early_mem(char *p)
-> +{
-> +       if (!p)
-> +               return 1;
-> +
-> +       memory_limit = memparse(p, &p) & PAGE_MASK;
-> +       pr_notice("Memory limited to %lldMB\n", memory_limit >> 20);
-> +
-> +       return 0;
-> +}
-> +early_param("mem", early_mem);
-> +
->  void __init arm64_memblock_init(void)
->  {
->         phys_addr_t dma_phys_limit = 0;
+>         u |= kpf_copy_bit(k, KPF_SLAB,          PG_slab);
+> diff --git a/include/uapi/linux/kernel-page-flags.h b/include/uapi/linux/kernel-page-flags.h
+> index 2f96d23..a6c4962 100644
+> --- a/include/uapi/linux/kernel-page-flags.h
+> +++ b/include/uapi/linux/kernel-page-flags.h
+> @@ -32,6 +32,7 @@
+>  #define KPF_KSM                        21
+>  #define KPF_THP                        22
+>  #define KPF_BALLOON            23
+> +#define KPF_ZERO_PAGE          24
 >
-> +       memblock_enforce_memory_limit(memory_limit);
-> +
->         /*
->          * Register the kernel text, kernel data, initrd, and initial
->          * pagetables with memblock.
+>
+>  #endif /* _UAPILINUX_KERNEL_PAGE_FLAGS_H */
 > --
-> 1.9.1
->
+> 2.1.3
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: kpageflags-zero-huge-page
+Type: application/octet-stream
+Size: 2626 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141205/6e1ec2ab/attachment.obj>
