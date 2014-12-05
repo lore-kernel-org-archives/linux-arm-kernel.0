@@ -1,98 +1,365 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 5 Dec 2014 16:18:01 -0600
-Subject: [PATCH v3 0/3] SoCFPGA: L3 NIC driver
-In-Reply-To: <54819742.3000009@arm.com>
-References: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
- <14512010.yFXFS4V07x@wuerfel> <20141130205331.GR20688@pengutronix.de>
- <2134330.94UNhqfuFY@wuerfel> <20141204183730.GB11889@leverpostej>
- <54819742.3000009@arm.com>
-Message-ID: <CAL_JsqJPS16eSkPp8ckXMJP1amv5693=hnSv=pMpqyy0z2nMRA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 5 Dec 2014 16:31:12 -0600
+Subject: [RFC/PATCH] arm: omap: hwmod: add debugfs interface
+Message-ID: <1417818672-11586-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 5, 2014 at 5:30 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> Hi Mark,
->
->
-> On 04/12/14 18:37, Mark Rutland wrote:
->>
->> On Thu, Dec 04, 2014 at 04:30:58PM +0000, Arnd Bergmann wrote:
->>>
->>> On Sunday 30 November 2014 21:53:31 Robert Schwebel wrote:
->>>>
->>>> On Sun, Nov 30, 2014 at 12:51:58PM +0100, Arnd Bergmann wrote:
->>>>>>
->>>>>> This series adds support for the SoCFPGA L3 NIC. As the memory range
->>>>>> has
->>>>>> a lot of holes, where you can not read from, syscon can not be used
->>>>>> for
->>>>>> this IP core. Instead add a new driver, that knows about all the
->>>>>> allowed
->>>>>> ranges and guards the access via regmap.
->>>>>
->>>>>
->>>>> What is an L3 NIC?
->>>>
->>>>
->>>> Fron the SoCFPGA manual:
->>>>
->>>> "
->>>> The hard processor system (HPS) level 3 (L3) interconnect and level 4
->>>> (L4) peripheral buses are implemented with the ARM CoreLinkTM Network
->>>> Interconnect (NIC-301). The NIC-301 provides a foundation for a
->>>> high-performance HPS interconnect based on the ARM Advanced
->>>> Microcontroller Bus Architecture (AMBA) Advanced eXtensible Interface
->>>> (AXI), Advanced High-Performance Bus (AHBTM), and Advanced Peripheral
->>>> Bus (APBTM) protocols. The L3 interconnect implements a multilayer,
->>>> nonblocking architecture that supports multiple simultaneous
->>>> transactions between masters and slaves, including the Cortex-A9
->>>> microprocessor unit (MPU) subsystem. The interconnect provides five
->>>> independent L4 buses to access control and status registers (CSRs) of
->>>> peripherals, managers, and memory controllers Related Information
->>>> http://infocenter.arm.com/ Additional information is available in the
->>>> AMBA Network Interconnect (NIC-301) Technical Reference Manual, revision
->>>> r2p3, which you can download from the ARM info center website.
->>>
->>>
->>> Please put something like this in the introductory mail and later
->>> into the pull request then. If the l3-nic is an ARM nic-301, shouldn't
->>> the compatible string be "arm,nic-301"?
->
->
-> A common binding like that might work for earlier NIC301 revisions which
-> were a fairly straightforward N-masters-to-M-slaves IP block. NIC301r2 (and
-> NIC400 after it) is a rather different beast which is massively configurable
-> and allows manually wiring together various master and slave ports with
-> switches, register blocks, etc. willy-nilly like some kind of RTL Lego set.
-> Given that, bindings for individual implementations make a lot more sense
-> than first appears.
->
->>
->> We should also treat the device as a bus, with it's child devices as
->> nodes underneath it (rather than a block on the side referred to by
->> phandle).
->
->
-> At the risk of reigniting the big hairy topology discussion, a "single" NIC
-> of this flavour can have multiple unconnected paths through it (as sounds
-> like may be the case here), with the master ports having entirely unrelated
-> address maps, so from Linux's point of view it could look like several
-> different buses which just happen to share a power domain. Add to that the
-> fun possibility of things like having GPV registers only visible on one
-> "bus" but controlling remapping of another "bus", and I think
-> implementation-specific bindings are probably the only way for us to stay
-> remotely sane.
+By exposing the details of hwmod structures
+to debugfs we can much more easily verify
+that changes to hwmod data is correct and won't
+cause regressions.
 
-At least on the instance I worked on, most of the configuration is
-secure/non-secure related and hence configurable secure mode only
-(hopefully). We've already taken the stance that secure-only setup
-(e.g. errata work-arounds) should not be in the kernel. Does the same
-apply here? What configuration needs to be done at run-time?
+The idea is that this can be used to check the
+state of one hwmod, verify hwmod sysc fields, etc.
 
-> [Disclaimer: this comes from working on the end-user configuration tool, so
-> I know more about that than the hardware itself]
+For example, this will be used to move some of
+the sysc fields to DT and later verify that they
+are correct pre- and post-patch.
 
-Generated RTL is fun for software. Especially, one vendor who's
-register layout shifts depending on the IP configuration.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
 
-Rob
+The idea behind this is that I'll be moving some more of hwmod
+data to DT and this will help diff pre- and post-patch boots
+to see if data remained the same.
+
+Tested with AM437x SK, logs here:
+
+http://hastebin.com/ukahuvipiz
+
+ arch/arm/mach-omap2/Makefile             |   2 +-
+ arch/arm/mach-omap2/omap_hwmod.c         |   1 +
+ arch/arm/mach-omap2/omap_hwmod.h         |   6 +
+ arch/arm/mach-omap2/omap_hwmod_debugfs.c | 280 +++++++++++++++++++++++++++++++
+ 4 files changed, 288 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_debugfs.c
+
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 5d27dfd..68c9ae5 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -11,7 +11,7 @@ obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o timer.o pm.o \
+ 	 omap_device.o sram.o drm.o
+ 
+ hwmod-common				= omap_hwmod.o omap_hwmod_reset.o \
+-					  omap_hwmod_common_data.o
++					  omap_hwmod_common_data.o omap_hwmod_debugfs.o
+ clock-common				= clock.o clock_common_data.o \
+ 					  clkt_dpll.o clkt_clksel.o
+ secure-common				= omap-smc.o omap-secure.o
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index cbb908d..a01caa4 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -3314,6 +3314,7 @@ static int __init omap_hwmod_setup_all(void)
+ 
+ 	omap_hwmod_for_each(_init, NULL);
+ 	omap_hwmod_for_each(_setup, NULL);
++	omap_hwmod_debug_init();
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+index 35ca6ef..49f1d82 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.h
++++ b/arch/arm/mach-omap2/omap_hwmod.h
+@@ -768,4 +768,10 @@ int am43xx_hwmod_init(void);
+ 
+ extern int __init omap_hwmod_register_links(struct omap_hwmod_ocp_if **ois);
+ 
++#if IS_ENABLED(CONFIG_DEBUG_FS)
++extern int __init omap_hwmod_debug_init(void);
++#else
++static inline int __int omap_hwmod_debug_init(void) { return 0; }
++#endif
++
+ #endif
+diff --git a/arch/arm/mach-omap2/omap_hwmod_debugfs.c b/arch/arm/mach-omap2/omap_hwmod_debugfs.c
+new file mode 100644
+index 0000000..eb120a4
+--- /dev/null
++++ b/arch/arm/mach-omap2/omap_hwmod_debugfs.c
+@@ -0,0 +1,280 @@
++/*
++ * omap_hwmod debugfs view
++ *
++ * Copyright (C) 2014 Texas Instruments, Incorporated - http://www.ti.com
++ * Author: Felipe Balbi <balbi@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#undef DEBUG
++
++#include <linux/kernel.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++#include <linux/err.h>
++#include <linux/fs.h>
++#include <linux/list.h>
++#include <linux/mutex.h>
++#include <linux/spinlock.h>
++#include <linux/debugfs.h>
++#include <linux/seq_file.h>
++
++#include "clock.h"
++#include "omap_hwmod.h"
++
++#include "soc.h"
++#include "common.h"
++#include "clockdomain.h"
++#include "powerdomain.h"
++#include "cm2xxx.h"
++#include "cm3xxx.h"
++#include "cm33xx.h"
++#include "prm.h"
++#include "prm3xxx.h"
++#include "prm44xx.h"
++#include "prm33xx.h"
++#include "prminst44xx.h"
++#include "mux.h"
++#include "pm.h"
++
++#if IS_ENABLED(CONFIG_DEBUG_FS)
++static int __init omap_hwmod_create_files(struct omap_hwmod *oh,
++		struct dentry *dir)
++{
++	struct dentry *file;
++
++	file = debugfs_create_u16("flags", S_IRUGO, dir, &oh->flags);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_u8("mpu_rt_idx", S_IRUGO, dir, &oh->mpu_rt_idx);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_u8("response_lat", S_IRUGO, dir,
++			&oh->response_lat);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_u8("rst_lines_cnt", S_IRUGO, dir,
++			&oh->rst_lines_cnt);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_u8("opt_clks_cnt", S_IRUGO, dir,
++			&oh->opt_clks_cnt);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_u8("masters_cnt", S_IRUGO, dir, &oh->masters_cnt);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_u8("slaves_cnt", S_IRUGO, dir, &oh->slaves_cnt);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_u8("hwmods_cnt", S_IRUGO, dir, &oh->hwmods_cnt);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_u8("_int_flags", S_IRUGO, dir, &oh->_int_flags);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_u8("_state", S_IRUGO, dir, &oh->_state);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_u8("_postsetup_state", S_IRUGO, dir,
++			&oh->_postsetup_state);
++	if (!file)
++		return -ENOMEM;
++
++	return 0;
++}
++
++static int __init
++omap_hwmod_create_sysc_files(struct omap_hwmod_class_sysconfig *sysc, struct
++		dentry *dir)
++{
++	struct dentry *subdir;
++	struct dentry *file;
++
++	if (!sysc)
++		return 0;
++
++	subdir = debugfs_create_dir("sysc", dir);
++	if (!subdir)
++		return -ENOMEM;
++
++	file = debugfs_create_x32("rev_offs", S_IRUGO, subdir,
++			&sysc->rev_offs);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_x32("sysc_offs", S_IRUGO, subdir,
++			&sysc->sysc_offs);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_x32("syss_offs", S_IRUGO, subdir,
++			&sysc->syss_offs);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_x16("sysc_flags", S_IRUGO, subdir,
++			&sysc->sysc_flags);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_u8("srst_udelay", S_IRUGO, subdir,
++			&sysc->srst_udelay);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_x8("idlemodes", S_IRUGO, subdir, &sysc->idlemodes);
++	if (!file)
++		return -ENOMEM;
++
++	file = debugfs_create_u8("clockact", S_IRUGO, subdir, &sysc->clockact);
++	if (!file)
++		return -ENOMEM;
++
++	return 0;
++}
++
++static int __init omap_hwmod_create_class_files(struct omap_hwmod_class *class,
++		struct dentry *dir)
++{
++	struct dentry *subdir;
++	struct dentry *file;
++	int ret;
++
++	if (!class)
++		return 0;
++
++	subdir = debugfs_create_dir("class", dir);
++	if (!subdir)
++		return -ENOMEM;
++
++	file = debugfs_create_u32("rev", S_IRUGO, subdir, &class->rev);
++	if (!file)
++		return -ENOMEM;
++
++	ret = omap_hwmod_create_sysc_files(class->sysc, subdir);
++	if (ret)
++		return -ENOMEM;
++
++	return 0;
++}
++
++static int __init omap_hwmod_create_irq_files(struct omap_hwmod_irq_info *irqs,
++		struct dentry *dir)
++{
++	struct dentry *subdir;
++	int i = 0;
++
++	if (!irqs)
++		return 0;
++
++	subdir = debugfs_create_dir("irqs", dir);
++	if (!subdir)
++		return -ENOMEM;
++
++	while (irqs[i].irq != -1) {
++		struct dentry *file;
++
++		file = debugfs_create_u16(irqs[i].name, S_IRUGO, subdir,
++				&irqs[i].irq);
++		if (!file)
++			return -ENOMEM;
++		i++;
++	}
++
++	return 0;
++}
++
++static int __init omap_hwmod_create_dma_files(struct omap_hwmod_dma_info *dmas,
++		struct dentry *dir)
++{
++	struct dentry *subdir;
++	int i = 0;
++
++	if (!dmas)
++		return 0;
++
++	subdir = debugfs_create_dir("dmas", dir);
++	if (!subdir)
++		return -ENOMEM;
++
++	while (dmas[i].dma_req != -1) {
++		struct dentry *file;
++
++		file = debugfs_create_u16(dmas[i].name, S_IRUGO, subdir,
++				&dmas[i].dma_req);
++		if (!file)
++			return -ENOMEM;
++		i++;
++	}
++
++	return 0;
++}
++
++static int __init omap_hwmod_debugfs_create_subdir(struct omap_hwmod *oh,
++		void *data)
++{
++	struct dentry *root = data;
++	struct dentry *dir;
++	int ret;
++
++	dir = debugfs_create_dir(oh->name, root);
++	if (!dir)
++		return -ENOMEM;
++
++	ret = omap_hwmod_create_files(oh, dir);
++	if (ret)
++		return ret;
++
++	ret = omap_hwmod_create_class_files(oh->class, dir);
++	if (ret)
++		return ret;
++
++	ret = omap_hwmod_create_irq_files(oh->mpu_irqs, dir);
++	if (ret)
++		return ret;
++
++	ret = omap_hwmod_create_dma_files(oh->sdma_reqs, dir);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
++static int __init omap_hwmod_debugfs_create_subdirs(struct dentry *root)
++{
++	return omap_hwmod_for_each(omap_hwmod_debugfs_create_subdir, root);
++}
++
++int __init omap_hwmod_debug_init(void)
++{
++	struct dentry *root;
++	int ret;
++
++	root = debugfs_create_dir("omap_hwmod", NULL);
++	if (!root) {
++		pr_debug("omap_hwmod: unable to initialize debugfs\n");
++		return 0;
++	}
++
++	ret = omap_hwmod_debugfs_create_subdirs(root);
++	if (ret < 0) {
++		pr_debug("omap_hwmod: unable to initialize debugfs\n");
++		debugfs_remove_recursive(root);
++	}
++
++	return ret;
++}
++#endif
+-- 
+2.2.0
