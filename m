@@ -1,18 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 5 Dec 2014 17:38:39 +0000
-Subject: using DMA-API on ARM
-In-Reply-To: <20141205111114.GQ11285@n2100.arm.linux.org.uk>
-References: <5481794E.4050406@broadcom.com> <4565667.WCBuNmaazQ@wuerfel>
- <20141205111114.GQ11285@n2100.arm.linux.org.uk>
-Message-ID: <20141205173839.GB31222@e104818-lin.cambridge.arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 5 Dec 2014 23:10:45 +0530
+Subject: [PATCH] DMA: Fix allocation size for PL330 data buffer depth.
+In-Reply-To: <20141114123301.GK12037@e106497-lin.cambridge.arm.com>
+References: <1415294412-13818-1-git-send-email-Liviu.Dudau@arm.com>
+ <20141112093952.GD24582@intel.com>
+ <20141114123301.GK12037@e106497-lin.cambridge.arm.com>
+Message-ID: <20141205174045.GU3411@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 05, 2014 at 11:11:14AM +0000, Russell King - ARM Linux wrote:
-> In any case, wouldn't using a u64 type for "address" be better - isn't
-> "long long" 128-bit on 64-bit architectures?
-
-No, it's still 64-bit. There is no 128-bit integer in the C standard.
+On Fri, Nov 14, 2014 at 12:33:01PM +0000, Liviu Dudau wrote:
+> On Wed, Nov 12, 2014 at 09:39:52AM +0000, Vinod Koul wrote:
+> > On Thu, Nov 06, 2014 at 05:20:12PM +0000, Liviu Dudau wrote:
+> > > The datasheet for PL330 says that the data buffer value in the CRD
+> > > register is 10bits wide. However, the value stored is "minus one",
+> > > which the driver corrects for. Maximum value that the data buffer
+> > > depth can have is 1024 lines, which requires 11 bits for storage.
+> > > 
+> > > While making updates I found printing the peripheral ID as a hex
+> > > value to be more useful as the datasheet shows the values that way.
+> > 
+> > Applied, thanks
+> 
+> Thanks!
+> 
+> > 
+> > Please snure you use the right subsytem name
+> 
+> Sorry about that. Just for clarity, it should've been 'dmaengine', right?
+Yes...
 
 -- 
-Catalin
+~vinod
