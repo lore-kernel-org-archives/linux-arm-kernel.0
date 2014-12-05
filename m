@@ -1,17 +1,17 @@
 From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 5 Dec 2014 14:03:13 +1100
-Subject: linux-next: manual merge of the v4l-dvb tree with the arm-soc tree
-Message-ID: <20141205140313.7d0242a6@canb.auug.org.au>
+Date: Fri, 5 Dec 2014 14:17:17 +1100
+Subject: linux-next: manual merge of the kbuild tree with the arm-soc tree
+Message-ID: <20141205141717.24ab3546@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+Hi Michal,
 
-Today's linux-next merge of the v4l-dvb tree got a conflict in
-arch/arm/boot/dts/meson.dtsi between commit 8fba96fac1c4 ("ARM: dts:
-meson: add I2C controller nodes") from the arm-soc tree and commit
-ac61e3787315 ("[media] ARM: dts: meson: add IR receiver node") from the
-v4l-dvb tree.
+Today's linux-next merge of the kbuild tree got a conflict in
+scripts/Kbuild.include between commit 9fb5e5372208 ("dts, kbuild:
+Factor out dtbs install rules to Makefile.dtbinst") from the arm-soc
+tree and commit 1846dfbde3e8 ("kbuild: remove redundant -rR flag of
+hdr-inst") from the kbuild tree.
 
 I fixed it up (see below) and can carry the fix as necessary (no action
 is required).
@@ -20,56 +20,38 @@ is required).
 Cheers,
 Stephen Rothwell                    sfr at canb.auug.org.au
 
-diff --cc arch/arm/boot/dts/meson.dtsi
-index 03bcff87bd27,6a37f15e8627..000000000000
---- a/arch/arm/boot/dts/meson.dtsi
-+++ b/arch/arm/boot/dts/meson.dtsi
-@@@ -114,34 -107,11 +114,41 @@@
-  			status = "disabled";
-  		};
+diff --cc scripts/Kbuild.include
+index 5374b1bdf02f,353dcf09dd18..000000000000
+--- a/scripts/Kbuild.include
++++ b/scripts/Kbuild.include
+@@@ -180,11 -180,17 +180,23 @@@ build := -f $(srctree)/scripts/Makefile
+  modbuiltin := -f $(srctree)/scripts/Makefile.modbuiltin obj
   
- +		i2c_AO: i2c at c8100500 {
- +			compatible = "amlogic,meson6-i2c";
- +			reg = <0xc8100500 0x20>;
- +			interrupts = <0 92 1>;
- +			clocks = <&clk81>;
- +			#address-cells = <1>;
- +			#size-cells = <0>;
- +			status = "disabled";
- +		};
+  ###
+ +# Shorthand for $(Q)$(MAKE) -f scripts/Makefile.dtbinst obj=
+ +# Usage:
+ +# $(Q)$(MAKE) $(dtbinst)=dir
+ +dtbinst := -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.dtbinst obj
  +
- +		i2c_A: i2c at c1108500 {
- +			compatible = "amlogic,meson6-i2c";
- +			reg = <0xc1108500 0x20>;
- +			interrupts = <0 21 1>;
- +			clocks = <&clk81>;
- +			#address-cells = <1>;
- +			#size-cells = <0>;
- +			status = "disabled";
- +		};
- +
- +		i2c_B: i2c at c11087c0 {
- +			compatible = "amlogic,meson6-i2c";
- +			reg = <0xc11087c0 0x20>;
- +			interrupts = <0 128 1>;
- +			clocks = <&clk81>;
- +			#address-cells = <1>;
- +			#size-cells = <0>;
- +			status = "disabled";
- +		};
-++
-+ 		ir_receiver: ir-receiver at c8100480 {
-+ 			compatible= "amlogic,meson6-ir";
-+ 			reg = <0xc8100480 0x20>;
-+ 			interrupts = <0 15 1>;
-+ 			status = "disabled";
-+ 		};
-  	};
-  }; /* end of / */
+++###
++ # Shorthand for $(Q)$(MAKE) -f scripts/Makefile.clean obj=
++ # Usage:
++ # $(Q)$(MAKE) $(clean)=dir
++ clean := -f $(srctree)/scripts/Makefile.clean obj
++ 
++ ###
++ # Shorthand for $(Q)$(MAKE) -f scripts/Makefile.headersinst obj=
++ # Usage:
++ # $(Q)$(MAKE) $(hdr-inst)=dir
++ hdr-inst := -f $(srctree)/scripts/Makefile.headersinst obj
++ 
+  # Prefix -I with $(srctree) if it is not an absolute path.
+  # skip if -I has no parameter
+  addtree = $(if $(patsubst -I%,%,$(1)), \
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141205/9726ffdc/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141205/195124df/attachment-0001.sig>
