@@ -1,46 +1,30 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 05 Dec 2014 11:22:32 +0100
-Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <1417514366.21830.22.camel@collabora.co.uk>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1417514366.21830.22.camel@collabora.co.uk>
-Message-ID: <54818768.3080303@samsung.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Fri, 5 Dec 2014 18:22:33 +0800
+Subject: [RFC] mm:add KPF_ZERO_PAGE flag for /proc/kpageflags
+In-Reply-To: <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
+References: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
+ <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
+Message-ID: <35FD53F367049845BC99AC72306C23D103E688B313F2@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On 2014-12-02 10:59, Sjoerd Simons wrote:
-> Hey Marek, Inki,
->
-> On Wed, 2014-11-19 at 12:15 +0100, Marek Szyprowski wrote:
->> Hello Everyone,
->>
->> This is another attempt to finally make Exynos SYSMMU driver fully
->> integrated with DMA-mapping subsystem. The main change from previous
->> version is a rebase onto latest "automatic DMA configuration for IOMMU
->> masters" patches from Will Deacon.
-> Do you happen to know if anyone is working on iommu/dma-mapping patches
-> for Exynos 5 based on this patchset?
-
-I hope to add Exynos5 SYSMMU patches to the next iteration of my patchset,
-but I doubt it will get into v3.19-rc1.
-
-> For some background to that question, We (re-)discovered yesterday that
-> the out-of-tree exynos-reference kernel iommu patches are required to
-> get HDMI out working on exynos 5 boards. The current situation in
-> mainline is rather broken, HDMI output without CONFIG_DRM_EXYNOS_IOMMU
-> results in just displaying stripes[0]. While turning on
-> CONFIG_DRM_EXYNOS_IOMMU causes a kernel oops at boot....
-
-We have observed similar issues with Exynos4 based boards, when LCD0 power
-domain was turned off and only TV power domain has been powered on. Please
-check the power domain configuration. Maybe in case of Exynos5 the same 
-issue
-is caused by the interaction between DISP1 and GSCL domains.
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+> -----Original Message-----
+> From: Konstantin Khlebnikov [mailto:koct9i at gmail.com]
+> Sent: Friday, December 05, 2014 5:21 PM
+> To: Wang, Yalin
+> Cc: linux-kernel at vger.kernel.org; linux-mm at kvack.org; linux-arm-
+> kernel at lists.infradead.org; akpm at linux-foundation.org; n-
+> horiguchi at ah.jp.nec.com
+> Subject: Re: [RFC] mm:add KPF_ZERO_PAGE flag for /proc/kpageflags
+> 
+> On Fri, Dec 5, 2014 at 11:57 AM, Wang, Yalin <Yalin.Wang@sonymobile.com>
+> wrote:
+> > This patch add KPF_ZERO_PAGE flag for zero_page, so that userspace
+> > process can notice zero_page from /proc/kpageflags, and then do memory
+> > analysis more accurately.
+> 
+> It would be nice to mark also huge_zero_page. See (completely
+> untested) patch in attachment.
+> 
+Got it,
+Thanks for your patch.
