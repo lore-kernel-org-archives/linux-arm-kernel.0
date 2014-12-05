@@ -1,45 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 5 Dec 2014 08:55:39 -0800
-Subject: regression: Clock changes in next-20141205 break at least omap4
-Message-ID: <20141205165539.GA30437@atomide.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 5 Dec 2014 18:07:08 +0100
+Subject: [PATCH 0/4] mtd: nand: atmel: Rework DT representation of NFC/NAND
+In-Reply-To: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <5481E63C.5020208@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Le 04/12/2014 23:30, Boris Brezillon a ?crit :
+> Hello,
+> 
+> While working on the EBI driver [1] I noticed that the relationship between
+> the NFC (NAND Flash Controller) and the NAND chip it is attached to would
+> make things harder to represent when moving the NAND node under the EBI bus
+> (another useless 'ranges' definition).
+> 
+> Actually this representation might be even more problematic if one wants
+> decide to connect two NAND chips on his sama5 based board, because the NFC
+> node is a child of the NAND chip node, and thus can only be attached to a
+> single NAND chip.
+> 
+> To address this problem the current series moves the NFC node outside of
+> the NAND chip device which then reference the NFC using the "atmel,nfc"
+> property.
+> 
+> The series does not implement multi-chip support, but at least the new
+> representation should make it possible.
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> [1]https://lkml.org/lkml/2014/12/3/806
 
-Looks like commit 646cafc6aa4d ("clk: Change clk_ops->determine_rate
-to return a clk_hw as the best parent") breaks booting at least for
-omap4.
+Boris,
 
-Below is the output from omap4-sdp with DEBUG_LL and earlyprintk
-enabled.
+It sounds promising and for sure we have to think about a way to deal
+with SMC (EBI interface) and the NAND controller with its attributes
+(PMECC) or flavors (plain SMC or NFC).
 
-Regards,
+Let's consider this as a RFC and discuss how to deal with the DT
+modifications and the representation hierarchy all together.
 
-Tony
+Thanks, bye.
 
-[    1.670806] clock: dpll_abe_ck failed transition to 'locked'
-[    2.966735] clock: dpll_abe_ck failed transition to 'locked'
-[    4.262634] clock: dpll_abe_ck failed transition to 'locked'
-[    4.268554] ------------[ cut here ]------------
-[    4.273406] WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:846 clk_disable+0x24/0x30()
-[    4.281341] Modules linked in:
-[    4.284576] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.18.0-rc7-next-20141205-00004-g24aaa63b #141
-[    4.293945] Hardware name: Generic OMAP4 (Flattened Device Tree)
-[    4.300231] [<c0015614>] (unwind_backtrace) from [<c0011cdc>] (show_stack+0x10/0x14)
-[    4.308288] [<c0011cdc>] (show_stack) from [<c05b7fb8>] (dump_stack+0x80/0x9c)
-[    4.315795] [<c05b7fb8>] (dump_stack) from [<c003e4e8>] (warn_slowpath_common+0x78/0xb4)
-[    4.324188] [<c003e4e8>] (warn_slowpath_common) from [<c003e540>] (warn_slowpath_null+0x1c/0x24)
-[    4.333282] [<c003e540>] (warn_slowpath_null) from [<c04c386c>] (clk_disable+0x24/0x30)
-[    4.341583] [<c04c386c>] (clk_disable) from [<c00252a0>] (_disable_clocks+0x18/0x68)
-[    4.349609] [<c00252a0>] (_disable_clocks) from [<c0026810>] (_idle+0x15c/0x240)
-[    4.357299] [<c0026810>] (_idle) from [<c0844cb8>] (_setup+0x174/0x22c)
-[    4.364166] [<c0844cb8>] (_setup) from [<c0026c4c>] (omap_hwmod_for_each+0x30/0x5c)
-[    4.372131] [<c0026c4c>] (omap_hwmod_for_each) from [<c08450c4>] (__omap_hwmod_setup_all+0x30/0x40)
-[    4.381500] [<c08450c4>] (__omap_hwmod_setup_all) from [<c0008b44>] (do_one_initcall+0x80/0x1d4)
-[    4.390594] [<c0008b44>] (do_one_initcall) from [<c0837e9c>] (kernel_init_freeable+0x1f4/0x2cc)
-[    4.399627] [<c0837e9c>] (kernel_init_freeable) from [<c05b211c>] (kernel_init+0x8/0xe4)
-[    4.408020] [<c05b211c>] (kernel_init) from [<c000ea48>] (ret_from_fork+0x14/0x2c)
-[    4.415954] ---[ end trace f968bc068c5b0ccc ]---
-[    5.710815] clock: dpll_abe_ck failed transition to 'locked'
-[    7.006744] clock: dpll_abe_ck failed transition to 'locked'
+> Boris Brezillon (4):
+>   mtd: nand: atmel: Rework driver to separate nfc and nand nodes
+>   mtd: nand: atmel: Update DT documentation after splitting NFC and NAND
+>   ARM: at91/dt: sama5: move NFC nodes outside of NAND nodes
+>   ARM: at91/dt: sama5: move NAND nodes into board dts/dtsi
+> 
+>  .../devicetree/bindings/mtd/atmel-nand.txt         | 46 +++++++------
+>  arch/arm/boot/dts/at91-sama5d3_xplained.dts        | 18 ++++-
+>  arch/arm/boot/dts/at91-sama5d4ek.dts               | 16 ++++-
+>  arch/arm/boot/dts/sama5d3.dtsi                     | 36 ++--------
+>  arch/arm/boot/dts/sama5d3xcm.dtsi                  | 18 ++++-
+>  arch/arm/boot/dts/sama5d4.dtsi                     | 36 ++--------
+>  drivers/mtd/nand/atmel_nand.c                      | 76 +++++++++++++++++-----
+>  7 files changed, 149 insertions(+), 97 deletions(-)
+> 
+
+
+-- 
+Nicolas Ferre
