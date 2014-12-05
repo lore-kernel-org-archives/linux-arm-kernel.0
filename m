@@ -1,31 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Dec 2014 22:03:31 +0100
-Subject: [PATCH] optimize ktime_divns for constant divisors
-In-Reply-To: <alpine.LFD.2.11.1412051251280.470@knanqh.ubzr>
-References: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
- <alpine.LFD.2.11.1412051251280.470@knanqh.ubzr>
-Message-ID: <2110446.Lbe6oKjkNj@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 05 Dec 2014 22:40:29 +0100
+Subject: [PATCH] clk: rockchip: Add CLK_SET_RATE_PARENT to sclk_uart clocks
+In-Reply-To: <1417728785-18054-1-git-send-email-dianders@chromium.org>
+References: <1417728785-18054-1-git-send-email-dianders@chromium.org>
+Message-ID: <5769551.kTdgyxWvD4@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 December 2014 13:00:22 Nicolas Pitre wrote:
+Am Donnerstag, 4. Dezember 2014, 13:33:05 schrieb Doug Anderson:
+> We'd like to be able to set the clock rate of the sclk_uart clocks and
+> actually be able to achieve clock rates greater than 24MHz.  To do
+> this we need to be able to pass rate changes upward.
 > 
-> BTW this is worth applying despite the on-going discussion with Arnd 
-> on a separate optimization.
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-Agreed
+applied this to my wip clk branch for 3.20 (on github)
 
-> On Wed, 3 Dec 2014, Nicolas Pitre wrote:
-> 
-> > At least on ARM, do_div() is optimized to turn constant divisors into
-> > an inline multiplication by the reciprocal value at compile time. 
-> > However this optimization is missed entirely whenever ktime_divns() is
-> > used and the slow out-of-line division code is used all the time.
-> > 
-> > Let ktime_divns() use do_div() inline whenever the divisor is constant
-> > and small enough.  This will make things like ktime_to_us() and 
-> > ktime_to_ms() much faster.
-> > 
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Thanks
+Heiko
