@@ -1,25 +1,24 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 5 Dec 2014 15:40:02 -0600
-Subject: [PATCH] ARM: dts: qcom: Correct IPQ tlmm interrupt
-In-Reply-To: <1417812813-12804-1-git-send-email-sboyd@codeaurora.org>
-References: <1417812813-12804-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20141205214002.GB14438@qualcomm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 05 Dec 2014 22:45:53 +0100
+Subject: [PATCH] ARM: dts: rockchip: set dw_mmc max-freq 150Mhz
+In-Reply-To: <1417661375-2872-1-git-send-email-addy.ke@rock-chips.com>
+References: <1417661375-2872-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <2413230.2M6GRRu59M@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 05, 2014 at 12:53:33PM -0800, Stephen Boyd wrote:
-> The interrupt is 16, not 32 (which it would be if we include PPIs
-> in the count of interrupts).
+Am Donnerstag, 4. Dezember 2014, 10:49:35 schrieb Addy Ke:
+> All of mmc controllers include SDMMC, SDIO0, SDIO1, and EMMC on RK3288
+> are limited to 150Mhz. It was mainly caused by two reasons:
+> - RK3288's IO pad(except DDR IO pad) is generic, which can only support
+>   the max of 150Mhz.
+> - Mmc controller was designed at 150Mhz, and the pressure test by IC team
+>   was based on this freequency point.
 > 
-> Cc: Andy Gross <agross@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
 
-This fixed my issue!
+applied to my wip dts branch for 3.20 (on github)
 
-Reviewed-by: Andy Gross <agross@codeaurora.org>
-Tested-by: Andy Gross <agross@codeaurora.org>
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks
+Heiko
