@@ -1,50 +1,57 @@
 From: flora.fu@mediatek.com (Flora Fu)
-Date: Fri, 5 Dec 2014 12:07:56 +0800
-Subject: [PATCH v3 5/8] dt-bindings: Add document for MT6397 MFD
+Date: Fri, 5 Dec 2014 12:07:55 +0800
+Subject: [PATCH v3 4/8] dt-bindings:: Add document for MT8135 PMIC Wrapper
 In-Reply-To: <1417752479-4749-1-git-send-email-flora.fu@mediatek.com>
 References: <1417752479-4749-1-git-send-email-flora.fu@mediatek.com>
-Message-ID: <1417752479-4749-6-git-send-email-flora.fu@mediatek.com>
+Message-ID: <1417752479-4749-5-git-send-email-flora.fu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Signed-off-by: Flora Fu <flora.fu@mediatek.com>
 ---
- Documentation/devicetree/bindings/mfd/mt6397.txt | 75 ++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/mt6397.txt
+ .../soc/mediatek/mediatek,mt8135-pwrap.txt         | 51 ++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,mt8135-pwrap.txt
 
-diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/mediatek,mt8135-pwrap.txt b/Documentation/devicetree/bindings/soc/mediatek/mediatek,mt8135-pwrap.txt
 new file mode 100644
-index 0000000..64ef408
+index 0000000..d630fa0
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
-@@ -0,0 +1,75 @@
-+MediaTek MT6397 Multifunction Device Driver
++++ b/Documentation/devicetree/bindings/soc/mediatek/mediatek,mt8135-pwrap.txt
+@@ -0,0 +1,51 @@
++MediaTek MT8135 PMIC Wrapper Driver
 +
-+MT6397 is a multifunction device with the following sub modules:
-+- Regulator
-+- RTC
-+- Audio codec
-+- GPIO
-+- Clock
++MediaTek PMIC MFD is interfaced to host controller using SPI interface
++by a proprietary hardware called PMIC wrapper or pwrap.
 +
-+It is interfaced to host controller using SPI interface by a proprietary hardware
-+called PMIC wrapper or pwrap. MT6397 MFD is a child device of pwrap.
-+See the following for pwarp node definitions:
-+Documentation/devicetree/bindings/soc/mediatek,mt8135-pwrap.txt
+++-----------------+           +---------------+
++|                 |           |               |
++| Mediatek AP SoC |           |               |
++| (ex. MT8135)    |           |    MT6397     |
++|                 |           |               |
++|      +--------+ | (SPI bus) | +--------+    |
++|      |        | |-----------| |        |    |
++|      |  PMIC  | |-----------| |  PMIC  |    |
++|      | Wrapper| |-----------| | Wrapper|    |
++|      |        | |-----------| |        |    |
++|      +--------+ |           | +--------+    |
++|                 |           |               |
+++-----------------+           +---------------+
 +
-+This document describes the binding for mfd device and its sub module.
++This document describes the binding for MT8135 PMIC wrapper.
 +
-+Required properties:
-+compatible: "mediatek,mt6397"
++Required properties in pwrap device node.
++- compatible:"mediatek,mt8135-pwrap"
++- interrupts: IRQ for pwrap in SOC
++- reg: address range for pwrap registers
++- resets: reset bit for pwrap
++- clock: clock frequency selection in SPI bus
 +
-+Optional properties:
-+- codec: Audio codec
-+- pinctrl: GPIO in mt6397
-+- rtc: RTC
-+- clock: clocks in mt6397
-+- regulators: regulators in mt6397
++Optional properities:
++- pmic: Mediatek PMIC MFD is the child device of pwrap
++  See the following for child node definitions:
++  Documentation/devicetree/bindings/mfd/mt6397.txt
 +
 +Example:
 +	pwrap: pwrap at 1000f000 {
@@ -62,37 +69,6 @@ index 0000000..64ef408
 +
 +		pmic {
 +			compatible = "mediatek,mt6397";
-+
-+			codec: mt6397codec {
-+				compatible = "mediatek,mt6397-codec";
-+			};
-+
-+			pinctrl at 0x0000C000 {
-+				compatible = "mediatek,mt6397-pinctrl";
-+				reg = <0 0x0000C000 0 0x0108>;
-+				gpio-controller;
-+			};
-+
-+			mt6397regulator: mt6397regulator {
-+				compatible = "mediatek,mt6397-regulator";
-+
-+				mt6397_vpca15_reg: buck_vpca15 {
-+					regulator-compatible = "buck_vpca15";
-+					regulator-name = "vpca15";
-+					regulator-min-microvolt = < 850000>;
-+					regulator-max-microvolt = <1400000>;
-+					regulator-ramp-delay = <12500>;
-+					regulator-always-on;
-+				};
-+
-+				mt6397_vgp4_reg: ldo_vgp4 {
-+					regulator-compatible = "ldo_vgp4";
-+					regulator-name = "vgp4";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-enable-ramp-delay = <218>;
-+				};
-+			};
 +		};
 +	};
 -- 
