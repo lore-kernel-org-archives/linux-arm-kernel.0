@@ -1,64 +1,48 @@
-From: harinik@xilinx.com (Harini Katakam)
-Date: Fri,  5 Dec 2014 13:38:04 +0530
-Subject: [PATCH v3 2/2] i2c: cadence: Check for errata condition involving
- master receive
-In-Reply-To: <1417766884-8383-1-git-send-email-harinik@xilinx.com>
-References: <1417766884-8383-1-git-send-email-harinik@xilinx.com>
-Message-ID: <1417766884-8383-3-git-send-email-harinik@xilinx.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Fri, 5 Dec 2014 16:08:42 +0800
+Subject: [RFC V2] mm:add zero_page _mapcount when mapped into user space
+In-Reply-To: <CALYGNiPWw6=tryWn_kCs+6H1uSjApBDnqORxuNEd=DuGCo71qA@mail.gmail.com>
+References: <35FD53F367049845BC99AC72306C23D103E688B313E0@CNBJMBX05.corpusers.net>
+ <20141202113014.GA22683@node.dhcp.inet.fi>
+ <35FD53F367049845BC99AC72306C23D103E688B313E6@CNBJMBX05.corpusers.net>
+ <20141204122813.GA523@node.dhcp.inet.fi>
+ <CALYGNiPWw6=tryWn_kCs+6H1uSjApBDnqORxuNEd=DuGCo71qA@mail.gmail.com>
+Message-ID: <35FD53F367049845BC99AC72306C23D103E688B313EC@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cadence I2C controller has the following bugs:
-- completion indication is not given to the driver at the end of
-a read/receive transfer with HOLD bit set.
-- Invalid read transaction are generated on the bus when HW timeout
-condition occurs with HOLD bit set.
+> -----Original Message-----
+> From: Konstantin Khlebnikov [mailto:koct9i at gmail.com]
+> Sent: Friday, December 05, 2014 2:39 PM
+> To: Kirill A. Shutemov
+> Cc: Wang, Yalin; linux-kernel at vger.kernel.org; linux-mm at kvack.org; linux-
+> arm-kernel at lists.infradead.org
+> Subject: Re: [RFC V2] mm:add zero_page _mapcount when mapped into user
+> space
+> 
+> On Thu, Dec 4, 2014 at 3:28 PM, Kirill A. Shutemov <kirill@shutemov.name>
+> wrote:
+> > On Thu, Dec 04, 2014 at 02:10:53PM +0800, Wang, Yalin wrote:
+> >> > -----Original Message-----
+> >> > From: Kirill A. Shutemov [mailto:kirill at shutemov.name]
+> >> > Sent: Tuesday, December 02, 2014 7:30 PM
+> >> > To: Wang, Yalin
+> >> > Cc: 'linux-kernel at vger.kernel.org'; 'linux-mm at kvack.org';
+> >> > 'linux-arm- kernel at lists.infradead.org'
+> >> > Subject: Re: [RFC V2] mm:add zero_page _mapcount when mapped into
+> >> > user space
+> >> >
+> >> > On Tue, Dec 02, 2014 at 05:27:36PM +0800, Wang, Yalin wrote:
+> >> > > This patch add/dec zero_page's _mapcount to make sure the
+> >> > > mapcount is correct for zero_page, so that when read from
+> >> > > /proc/kpagecount, zero_page's mapcount is also correct, userspace
+> >> > > process like procrank can calculate PSS correctly.
+> 
+> Instead of tweaking mapcount you could mark zero-pages in /proc/kpageflags
+> and handle them accordingly in userspace. Or mark zero pages with special
+> magic _mapcount and detect it in /proc/kpagecount.
+> 
+I think add KPF_ZERO_PAGE in kpageflags is better.
+I will make another patch for review .
 
-As a result of the above, if a set of messages to be transferred with
-repeated start includes any transfer following a read transfer,
-completion is never indicated and timeout occurs.
-Hence a check is implemented to return -EOPNOTSUPP for such sequences.
-
-Signed-off-by: Harini Katakam <harinik@xilinx.com>
-Signed-off-by: Vishnu Motghare <vishnum@xilinx.com>
----
-
-v3:
-Add warning in case of unsupported transfer.
-
-v2:
-Dont defeteature repeated start. Just check for unsupported conditions in the
-driver and return error.
-
----
- drivers/i2c/busses/i2c-cadence.c |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-index 5f5d4fa..3ea3b7a 100644
---- a/drivers/i2c/busses/i2c-cadence.c
-+++ b/drivers/i2c/busses/i2c-cadence.c
-@@ -541,6 +541,21 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
- 	 * processed with a repeated start.
- 	 */
- 	if (num > 1) {
-+		/*
-+		 * This controller does not give completion interrupt after a
-+		 * master receive transfer if HOLD bit is set (repeated start),
-+		 * resulting in SW timeout. Hence, if a receive transfer is
-+		 * followed by any other transfer, an error is returned
-+		 * indicating that this sequence is not supported.
-+		 */
-+		for (count = 0; count < num-1; count++) {
-+			if (msgs[count].flags & I2C_M_RD)
-+				dev_warn(adap->dev.parent,
-+					"No support for repeated start when\t");
-+				dev_warn(adap->dev.parent,
-+					"receive is followed by a transfer\n");
-+				return -EOPNOTSUPP;
-+		}
- 		id->bus_hold_flag = 1;
- 		reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
- 		reg |= CDNS_I2C_CR_HOLD;
--- 
-1.7.9.5
+Thanks
