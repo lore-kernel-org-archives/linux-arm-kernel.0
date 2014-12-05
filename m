@@ -1,61 +1,84 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  5 Dec 2014 15:44:55 +0100
-Subject: [PATCH 2/5] ARM: mvebu: Add UART1 as DEBUG_LL possible target
+Date: Fri,  5 Dec 2014 15:44:54 +0100
+Subject: [PATCH 1/5] ARM: mvebu: Rename DEBUG_LL to indicate UART index
 In-Reply-To: <1417790698-9792-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1417790698-9792-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1417790698-9792-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1417790698-9792-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some mvebu boards have the UART1 more easily accessible than the other UARTs
-found on the system.
+The mvebu SoCs actually have more UARTs than just the one exposed in DEBUG_LL
+yet.
 
-Add a debug_ll option for this case.
+In order to differentiate them, Add the index in the configuration options and
+their help.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/Kconfig.debug | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/Kconfig.debug | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b0945d6b32b3..8f119f5ffcdd 100644
+index d8f6a2ec3d4e..b0945d6b32b3 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -457,6 +457,21 @@ choice
+@@ -423,13 +423,13 @@ choice
+ 		  Please adjust DEBUG_UART_PHYS and DEBUG_UART_BASE configuration
+ 		  options based on your needs.
+ 
+-	config DEBUG_MVEBU_UART
+-		bool "Kernel low-level debugging messages via MVEBU UART (old bootloaders)"
++	config DEBUG_MVEBU_UART0
++		bool "Kernel low-level debugging messages via MVEBU UART0 (old bootloaders)"
+ 		depends on ARCH_MVEBU
+ 		select DEBUG_UART_8250
+ 		help
+ 		  Say Y here if you want kernel low-level debugging support
+-		  on MVEBU based platforms.
++		  on MVEBU based platforms on UART0.
+ 
+ 		  This option should be used with the old bootloaders
+ 		  that left the internal registers mapped at
+@@ -442,13 +442,13 @@ choice
  		  when u-boot hands over to the kernel, the system
  		  silently crashes, with no serial output at all.
  
-+	config DEBUG_MVEBU_UART1_ALTERNATE
-+		bool "Kernel low-level debugging messages via MVEBU UART1 (new bootloaders)"
-+		depends on ARCH_MVEBU
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on MVEBU based platforms on UART1.
-+
-+		  This option should be used with the new bootloaders
-+		  that remap the internal registers at 0xf1000000.
-+
-+		  If the wrong DEBUG_MVEBU_UART* option is selected,
-+		  when u-boot hands over to the kernel, the system
-+		  silently crashes, with no serial output at all.
-+
- 	config DEBUG_VF_UART
- 		bool "Vybrid UART"
- 		depends on SOC_VF610
-@@ -1154,6 +1169,7 @@ config DEBUG_UART_PHYS
+-	config DEBUG_MVEBU_UART_ALTERNATE
+-		bool "Kernel low-level debugging messages via MVEBU UART (new bootloaders)"
++	config DEBUG_MVEBU_UART0_ALTERNATE
++		bool "Kernel low-level debugging messages via MVEBU UART0 (new bootloaders)"
+ 		depends on ARCH_MVEBU
+ 		select DEBUG_UART_8250
+ 		help
+ 		  Say Y here if you want kernel low-level debugging support
+-		  on MVEBU based platforms.
++		  on MVEBU based platforms on UART0.
+ 
+ 		  This option should be used with the new bootloaders
+ 		  that remap the internal registers at 0xf1000000.
+@@ -1146,14 +1146,14 @@ config DEBUG_UART_PHYS
+ 	default 0xc8000000 if ARCH_IXP4XX && !CPU_BIG_ENDIAN
+ 	default 0xc8000003 if ARCH_IXP4XX && CPU_BIG_ENDIAN
+ 	default 0xd0000000 if ARCH_SPEAR3XX || ARCH_SPEAR6XX
+-	default 0xd0012000 if DEBUG_MVEBU_UART
++	default 0xd0012000 if DEBUG_MVEBU_UART0
+ 	default 0xc81004c0 if DEBUG_MESON_UARTAO
+ 	default 0xd4017000 if DEBUG_MMP_UART2
+ 	default 0xd4018000 if DEBUG_MMP_UART3
+ 	default 0xe0000000 if ARCH_SPEAR13XX
  	default 0xe4007000 if DEBUG_HIP04_UART
  	default 0xf0000be0 if ARCH_EBSA110
- 	default 0xf1012000 if DEBUG_MVEBU_UART0_ALTERNATE
-+	default 0xf1012100 if DEBUG_MVEBU_UART1_ALTERNATE
+-	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
++	default 0xf1012000 if DEBUG_MVEBU_UART0_ALTERNATE
  	default 0xf1012000 if ARCH_DOVE || ARCH_MV78XX0 || \
  				ARCH_ORION5X
  	default 0xf7fc9000 if DEBUG_BERLIN_UART
-@@ -1224,6 +1240,7 @@ config DEBUG_UART_VIRT
+@@ -1223,7 +1223,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfeb30c00 if DEBUG_KEYSTONE_UART0
  	default 0xfeb31000 if DEBUG_KEYSTONE_UART1
  	default 0xfec02000 if DEBUG_SOCFPGA_UART
- 	default 0xfec12000 if DEBUG_MVEBU_UART0 || DEBUG_MVEBU_UART0_ALTERNATE
-+	default 0xfec12100 if DEBUG_MVEBU_UART1_ALTERNATE
+-	default 0xfec12000 if DEBUG_MVEBU_UART || DEBUG_MVEBU_UART_ALTERNATE
++	default 0xfec12000 if DEBUG_MVEBU_UART0 || DEBUG_MVEBU_UART0_ALTERNATE
  	default 0xfec20000 if DEBUG_DAVINCI_DMx_UART0
  	default 0xfec90000 if DEBUG_RK32_UART2
  	default 0xfed0c000 if DEBUG_DAVINCI_DA8XX_UART1
