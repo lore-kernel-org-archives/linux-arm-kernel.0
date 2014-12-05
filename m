@@ -1,56 +1,72 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 05 Dec 2014 13:04:36 +0100
-Subject: [GIT PULL] samsung clk cleanups and fixes for v3.19
-Message-ID: <54819F54.1060705@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 5 Dec 2014 12:05:06 +0000
+Subject: [RFC v2] arm:extend the reserved mrmory for initrd to be page
+ aligned
+In-Reply-To: <20141204120305.GC17783@e104818-lin.cambridge.arm.com>
+References: <35FD53F367049845BC99AC72306C23D103D6DB491609@CNBJMBX05.corpusers.net>
+ <20140915113325.GD12361@n2100.arm.linux.org.uk>
+ <20141204120305.GC17783@e104818-lin.cambridge.arm.com>
+Message-ID: <20141205120506.GH1630@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Dec 04, 2014 at 12:03:05PM +0000, Catalin Marinas wrote:
+> On Mon, Sep 15, 2014 at 12:33:25PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Sep 15, 2014 at 07:07:20PM +0800, Wang, Yalin wrote:
+> > > @@ -636,6 +646,11 @@ static int keep_initrd;
+> > >  void free_initrd_mem(unsigned long start, unsigned long end)
+> > >  {
+> > >  	if (!keep_initrd) {
+> > > +		if (start == initrd_start)
+> > > +			start = round_down(start, PAGE_SIZE);
+> > > +		if (end == initrd_end)
+> > > +			end = round_up(end, PAGE_SIZE);
+> > > +
+> > >  		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
+> > >  		free_reserved_area((void *)start, (void *)end, -1, "initrd");
+> > >  	}
+> > 
+> > is the only bit of code you likely need to achieve your goal.
+> > 
+> > Thinking about this, I think that you are quite right to align these.
+> > The memory around the initrd is defined to be system memory, and we
+> > already free the pages around it, so it *is* wrong not to free the
+> > partial initrd pages.
+> 
+> Actually, I think we have a problem, at least on arm64 (raised by Peter
+> Maydell). There is no guarantee that the page around start/end of initrd
+> is free, it may contain the dtb for example. This is even more obvious
+> when we have a 64KB page kernel (the boot loader doesn't know the page
+> size that the kernel is going to use).
+> 
+> The bug was there before as we had poison_init_mem() already (not it
+> disappeared since free_reserved_area does the poisoning).
+> 
+> So as a quick fix I think we need the rounding the other way (and in the
+> general case we probably lose a page at the end of initrd):
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 494297c698ca..39fd080683e7 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -335,9 +335,9 @@ void free_initrd_mem(unsigned long start, unsigned long end)
+>  {
+>  	if (!keep_initrd) {
+>  		if (start == initrd_start)
+> -			start = round_down(start, PAGE_SIZE);
+> +			start = round_up(start, PAGE_SIZE);
+>  		if (end == initrd_end)
+> -			end = round_up(end, PAGE_SIZE);
+> +			end = round_down(end, PAGE_SIZE);
+>  
+>  		free_reserved_area((void *)start, (void *)end, 0, "initrd");
+>  	}
+> 
+> A better fix would be to check what else is around the start/end of
+> initrd.
 
-Hi Mike,
+Care to submit this as a proper patch? We should at least fix Peter's issue
+before doing things like extending headers, which won't work for older
+kernels anyway.
 
-This includes a few bug fix and cleanup patches for clk/samsung.
-Please pull for 3.19 if it looks OK.
-
-The following changes since commit 2e41b9fc11f2d242f39b36ceba833471629ba3d5:
-
-  clk: samsung: Spelling s/bwtween/between/ (2014-12-02 12:28:20 +0100)
-
-are available in the git repository at:
-
-  git://linuxtv.org/snawrocki/samsung.git tags/for-v3.19-exynos-clk-2
-
-for you to fetch changes up to c31844ffdbd4e73a16c66e9d7df8ec290ab4b159:
-
-  clk: samsung: Fix double add of syscore ops after driver rebind (2014-12-02
-16:22:59 +0100)
-
-----------------------------------------------------------------
-- exynos4415 and exynos audio subsystem clk driver (build
-  with PM_SLEEP disabled, resource release) fixes
-- minor cleanups in drivers/clk/samsung/clk.c (spelling,
-  includes)
-- modification of the exynos4 HDMI PHY clock definition to
-  model dependency of "sclk_hdmiphy" on the "hdmi" clock
-
-----------------------------------------------------------------
-Andrzej Hajda (1):
-      clk: samsung: exynos4: set parent of sclk_hdmiphy to hdmi
-
-Krzysztof Kozlowski (2):
-      clk: samsung: exynos4415: Fix build with PM_SLEEP disabled
-      clk: samsung: Fix double add of syscore ops after driver rebind
-
-Pankaj Dubey (2):
-      clk: samsung: remove unnecessary CONFIG_OF from clk.c
-      clk: samsung: remove unnecessary inclusion of header files from clk.h
-
- drivers/clk/samsung/clk-exynos-audss.c |    4 ++++
- drivers/clk/samsung/clk-exynos4.c      |    2 +-
- drivers/clk/samsung/clk-exynos4415.c   |    6 ++++--
- drivers/clk/samsung/clk.c              |    4 ++--
- drivers/clk/samsung/clk.h              |    4 ----
- 5 files changed, 11 insertions(+), 9 deletions(-)
-
---
-Thanks,
-Sylwester
+Will
