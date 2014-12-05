@@ -1,107 +1,114 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 4 Dec 2014 23:30:08 -0500 (EST)
-Subject: [PATCH] optimize ktime_divns for constant divisors
-In-Reply-To: <OF0EDEDB1C.C03829F7-ON48257DA5.00062083-48257DA5.0007628B@zte.com.cn>
-References: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
- <3913269.qTFsa05Ysv@wuerfel> <alpine.LFD.2.11.1412040143260.470@knanqh.ubzr>
- <OF0EDEDB1C.C03829F7-ON48257DA5.00062083-48257DA5.0007628B@zte.com.cn>
-Message-ID: <alpine.LFD.2.11.1412042056240.470@knanqh.ubzr>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Fri, 5 Dec 2014 12:52:08 +0800
+Subject: [PATCH v13 0/7] ARM: kprobes: OPTPROBES and other improvements.
+Message-ID: <1417755128-71318-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Dec 2014, pang.xunlei at zte.com.cn wrote:
+This is v12 of optprobe related patch series. Most of this series are
+comments and commit message fixes, except a minor modification in opt-arm.c
+related on stack operations. Also, author of one patch is fixed.
 
-> Nicolas,
-> 
-> On Thursday 04 December 2014 15:23:37: Nicolas Pitre wrote:
-> > Nicolas Pitre <nicolas.pitre@linaro.org> 
-> > 
-> > u64 ktime_to_us(ktime_t kt)
-> > {
-> >    u64 ns = ktime_to_ns(kt);
-> >    u32 x_lo, x_hi, y_lo, y_hi;
-> >    u64 res, carry;
-> > 
-> >    x_hi = ns >> 32;
-> >    x_lo = ns;
-> >    y_hi = 0x83126e97;
-> >    y_lo = 0x8d4fdf3b;
-> > 
-> >    res = (u64)x_lo * y_lo;
-> >    carry = (u64)(u32)res + y_lo;
-> >    res = (res >> 32) + (carry >> 32);
-> > 
-> >    res += (u64)x_lo * y_hi;
-> >    carry = (u64)(u32)res + (u64)x_hi * y_lo;
-> >    res = (res >> 32) + (carry >> 32);
-> > 
-> >    res += (u64)x_hi * y_hi;
-> >    return res >> 9;
-> > }
-> 
-> What's the first carry operation for?
+Previous discussions can be found:
 
-Hmmm... OK there is a bug.
-
-The code should actually be:
-
-	res = (u64)x_lo * y_lo;
-	carry = (u64)(u32)res + y_lo;
-	res = (res >> 32) + (carry >> 32) + y_hi;
-
-(the addition of y_hi was missing on the third line of the above block)
-
-The equation is: res = (y + x*y) >> 9
-
-> Moreover, I think the carry operations can be omitted, like below:
-> u64 ktime_to_us(ktime_t kt)
-> {
->          u64 ns = ktime_to_ns(kt);
->          u32 x_lo, x_hi, y_lo, y_hi;
->          u64 res;
-> 
->          x_hi = ns >> 32;
->          x_lo = ns;
->          y_hi = 0x83126e97;
->          y_lo = 0x8d4fdf3b;
-> 
->          res = (u64)x_lo * y_lo;
->          res = (res >> 32);
-
-See above. y must be added to res before shifting, and that may cause an 
-overflow.
-
->          res += (u64)x_lo * y_hi + (u64)x_hi * y_lo;
-
-That, too, risk overflowing.
-
-Let's say x_lo = 0xffffffff and x_hi = 0xffffffff.  You get:
-
-	0xffffffff * 0x83126e97 ->  0x83126e967ced9169
-	0xffffffff * 0x8d4fdf3b ->  0x8d4fdf3a72b020c5
-	                           -------------------
-	                           0x110624dd0ef9db22e
-
-Therefore the sum doesn't fit into a u64 variable.
-
-It is possible to skip carry handling but only when the MSB of both 
-constants are zero.  Here it is not the case.
-
->          res = (res >> 32);
-> 
->          res += (u64)x_hi * y_hi;
-> 
->          return res >> 9;
-> }
-> 
-> Also, I ran this code using ktime "122500000000", and it results as
-> 122499999 due to the y_lo deviation,
-
-Please see bug fix above.
-
-> maybe can use 0x8d4fdf3c instead?
-
-No, that won't work with 0xfffffffffffffd97 for example.
+https://lkml.org/lkml/2014/12/4/4
+https://lkml.org/lkml/2014/12/1/64
+https://lkml.org/lkml/2014/11/22/18
+https://lkml.org/lkml/2014/11/21/55
+https://lkml.org/lkml/2014/11/18/26
+https://lkml.org/lkml/2014/11/19/31
+https://lkml.org/lkml/2014/11/18/41
+https://lkml.org/lkml/2014/10/25/48
+https://lkml.org/lkml/2014/10/22/254
+https://lkml.org/lkml/2014/8/27/255
+https://lkml.org/lkml/2014/8/12/12
+https://lkml.org/lkml/2014/8/8/992
+https://lkml.org/lkml/2014/8/8/5
+https://lkml.org/lkml/2014/8/5/63
 
 
-Nicolas
+Jon Medhurst (1):
+  ARM: kprobes: Add test cases for stack consuming instructions
+
+Masami Hiramatsu (1):
+  kprobes: Pass the original kprobe for preparing optimized kprobe
+
+Wang Nan (5):
+  ARM: probes: move all probe code to dedicate directory
+  ARM: kprobes: introduces checker
+  ARM: kprobes: collects stack consumption for store instructions
+  ARM: kprobes: disallow probing stack consuming instructions
+  ARM: kprobes: enable OPTPROBES for ARM 32
+
+ arch/arm/Kconfig                                   |   1 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/{kernel => include/asm}/insn.h            |   0
+ arch/arm/include/asm/kprobes.h                     |  30 +-
+ arch/arm/{kernel => include/asm}/patch.h           |   0
+ arch/arm/include/asm/probes.h                      |  13 +
+ arch/arm/kernel/Makefile                           |  16 +-
+ arch/arm/kernel/entry-armv.S                       |   3 +-
+ arch/arm/kernel/ftrace.c                           |   3 +-
+ arch/arm/kernel/jump_label.c                       |   5 +-
+ arch/arm/kernel/patch.c                            |   3 +-
+ arch/arm/probes/Makefile                           |   7 +
+ .../{kernel/probes-arm.c => probes/decode-arm.c}   |  12 +-
+ .../{kernel/probes-arm.h => probes/decode-arm.h}   |   7 +-
+ .../probes-thumb.c => probes/decode-thumb.c}       |  16 +-
+ .../probes-thumb.h => probes/decode-thumb.h}       |  10 +-
+ arch/arm/{kernel/probes.c => probes/decode.c}      |  74 ++++-
+ arch/arm/{kernel/probes.h => probes/decode.h}      |  13 +-
+ arch/arm/probes/kprobes/Makefile                   |  12 +
+ .../kprobes-arm.c => probes/kprobes/actions-arm.c} |   9 +-
+ .../kprobes/actions-common.c}                      |   4 +-
+ .../kprobes/actions-thumb.c}                       |  10 +-
+ arch/arm/probes/kprobes/checkers-arm.c             |  99 +++++++
+ arch/arm/probes/kprobes/checkers-common.c          | 101 +++++++
+ arch/arm/probes/kprobes/checkers-thumb.c           | 110 ++++++++
+ arch/arm/probes/kprobes/checkers.h                 |  54 ++++
+ .../{kernel/kprobes.c => probes/kprobes/core.c}    |  23 +-
+ .../{kernel/kprobes.h => probes/kprobes/core.h}    |  10 +-
+ arch/arm/probes/kprobes/opt-arm.c                  | 313 +++++++++++++++++++++
+ .../kprobes/test-arm.c}                            |  31 +-
+ .../kprobes-test.c => probes/kprobes/test-core.c}  |   8 +-
+ .../kprobes-test.h => probes/kprobes/test-core.h}  |   2 +-
+ .../kprobes/test-thumb.c}                          |  16 +-
+ arch/arm/probes/uprobes/Makefile                   |   2 +
+ .../uprobes-arm.c => probes/uprobes/actions-arm.c} |   6 +-
+ .../{kernel/uprobes.c => probes/uprobes/core.c}    |   8 +-
+ .../{kernel/uprobes.h => probes/uprobes/core.h}    |   0
+ arch/x86/kernel/kprobes/opt.c                      |   3 +-
+ include/linux/kprobes.h                            |   3 +-
+ kernel/kprobes.c                                   |   4 +-
+ 40 files changed, 951 insertions(+), 91 deletions(-)
+ rename arch/arm/{kernel => include/asm}/insn.h (100%)
+ rename arch/arm/{kernel => include/asm}/patch.h (100%)
+ create mode 100644 arch/arm/probes/Makefile
+ rename arch/arm/{kernel/probes-arm.c => probes/decode-arm.c} (99%)
+ rename arch/arm/{kernel/probes-arm.h => probes/decode-arm.h} (93%)
+ rename arch/arm/{kernel/probes-thumb.c => probes/decode-thumb.c} (98%)
+ rename arch/arm/{kernel/probes-thumb.h => probes/decode-thumb.h} (90%)
+ rename arch/arm/{kernel/probes.c => probes/decode.c} (85%)
+ rename arch/arm/{kernel/probes.h => probes/decode.h} (97%)
+ create mode 100644 arch/arm/probes/kprobes/Makefile
+ rename arch/arm/{kernel/kprobes-arm.c => probes/kprobes/actions-arm.c} (98%)
+ rename arch/arm/{kernel/kprobes-common.c => probes/kprobes/actions-common.c} (98%)
+ rename arch/arm/{kernel/kprobes-thumb.c => probes/kprobes/actions-thumb.c} (98%)
+ create mode 100644 arch/arm/probes/kprobes/checkers-arm.c
+ create mode 100644 arch/arm/probes/kprobes/checkers-common.c
+ create mode 100644 arch/arm/probes/kprobes/checkers-thumb.c
+ create mode 100644 arch/arm/probes/kprobes/checkers.h
+ rename arch/arm/{kernel/kprobes.c => probes/kprobes/core.c} (96%)
+ rename arch/arm/{kernel/kprobes.h => probes/kprobes/core.h} (83%)
+ create mode 100644 arch/arm/probes/kprobes/opt-arm.c
+ rename arch/arm/{kernel/kprobes-test-arm.c => probes/kprobes/test-arm.c} (97%)
+ rename arch/arm/{kernel/kprobes-test.c => probes/kprobes/test-core.c} (99%)
+ rename arch/arm/{kernel/kprobes-test.h => probes/kprobes/test-core.h} (99%)
+ rename arch/arm/{kernel/kprobes-test-thumb.c => probes/kprobes/test-thumb.c} (98%)
+ create mode 100644 arch/arm/probes/uprobes/Makefile
+ rename arch/arm/{kernel/uprobes-arm.c => probes/uprobes/actions-arm.c} (98%)
+ rename arch/arm/{kernel/uprobes.c => probes/uprobes/core.c} (97%)
+ rename arch/arm/{kernel/uprobes.h => probes/uprobes/core.h} (100%)
+
+-- 
+1.8.4
