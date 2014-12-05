@@ -1,88 +1,56 @@
-From: meuleman@broadcom.com (Hante Meuleman)
-Date: Fri, 5 Dec 2014 11:49:48 +0000
-Subject: using DMA-API on ARM
-In-Reply-To: <20141205111114.GQ11285@n2100.arm.linux.org.uk>
-References: <5481794E.4050406@broadcom.com> <4565667.WCBuNmaazQ@wuerfel>
- <20141205111114.GQ11285@n2100.arm.linux.org.uk>
-Message-ID: <F51492713EF10846800D8C0ED37A7DCE01901691@SJEXCHMB15.corp.ad.broadcom.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 05 Dec 2014 13:04:36 +0100
+Subject: [GIT PULL] samsung clk cleanups and fixes for v3.19
+Message-ID: <54819F54.1060705@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you for investigating. Your analysis matches what was intended to be done. Regarding the cast, you're right, I'll improve it. My idea was that long long is always 64bit, but when casting directly to long long I get a compiler (when using C=2) warning: "warning: right shift by bigger than source value". Probably I concluded wrongly that I should cast it to long first. On the targets used the high address was always 0, so I got away with it thusfar, but indeed it should and shall be fixed.
 
-Regards,
-Hante
+Hi Mike,
 
------Original Message-----
-From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-Sent: vrijdag 5 december 2014 12:11
-To: Arnd Bergmann
-Cc: linux-arm-kernel at lists.infradead.org; Arend Van Spriel; linux-wireless; brcm80211-dev-list; David Miller; linux-kernel at vger.kernel.org
-Subject: Re: using DMA-API on ARM
+This includes a few bug fix and cleanup patches for clk/samsung.
+Please pull for 3.19 if it looks OK.
 
-On Fri, Dec 05, 2014 at 10:52:02AM +0100, Arnd Bergmann wrote:
-> I'm still puzzled why you'd need a single dma_sync_single_for_cpu()
-> after dma_alloc_coherent though, you should not need any. Is it possible
-> that the driver accidentally uses __raw_readl() instead of readl()
-> in some places and you are just lacking an appropriate barrier?
+The following changes since commit 2e41b9fc11f2d242f39b36ceba833471629ba3d5:
 
-Digging into the driver, it looks like individual DMA buffers are
-allocated (via brcmf_pcie_init_dmabuffer_for_device) and registered
-into a "commonring" layer.
+  clk: samsung: Spelling s/bwtween/between/ (2014-12-02 12:28:20 +0100)
 
-Whenever the buffer is written to, space is first allocated via a call
-to brcmf_commonring_reserve_for_write() or
-brcmf_commonring_reserve_for_write_multiple(), data written to the
-buffer, followed by a call to brcmf_commonring_write_complete().
+are available in the git repository at:
 
-brcmf_commonring_write_complete() calls two methods at that point:
-cr_write_wptr() and cr_ring_bell(), which will be
-brcmf_pcie_ring_mb_write_wptr() and brcmf_pcie_ring_mb_ring_bell().
+  git://linuxtv.org/snawrocki/samsung.git tags/for-v3.19-exynos-clk-2
 
-The first calls brcmf_pcie_write_tcm16(), which uses iowrite16(),
-which contains the appropriate barrier.  The bell ringing functions
-also use ioread*/iowrite*().
+for you to fetch changes up to c31844ffdbd4e73a16c66e9d7df8ec290ab4b159:
 
-So, on the write side, it looks fine from the barrier perspective.
+  clk: samsung: Fix double add of syscore ops after driver rebind (2014-12-02
+16:22:59 +0100)
 
-On the read side, brcmf_commonring_get_read_ptr() is used before
-a read access to the ring - which calls the cr_update_wptr() method,
-which in turn uses an ioread16() call.  After the CPU has read data
-from the ring, brcmf_commonring_read_complete() is used, which uses
-iowrite16().
+----------------------------------------------------------------
+- exynos4415 and exynos audio subsystem clk driver (build
+  with PM_SLEEP disabled, resource release) fixes
+- minor cleanups in drivers/clk/samsung/clk.c (spelling,
+  includes)
+- modification of the exynos4 HDMI PHY clock definition to
+  model dependency of "sclk_hdmiphy" on the "hdmi" clock
 
-So, I don't see a barrier problem on the read side.
+----------------------------------------------------------------
+Andrzej Hajda (1):
+      clk: samsung: exynos4: set parent of sclk_hdmiphy to hdmi
 
-However, I did trip over this:
+Krzysztof Kozlowski (2):
+      clk: samsung: exynos4415: Fix build with PM_SLEEP disabled
+      clk: samsung: Fix double add of syscore ops after driver rebind
 
-static void *
-brcmf_pcie_init_dmabuffer_for_device(struct brcmf_pciedev_info *devinfo,
-                                     u32 size, u32 tcm_dma_phys_addr,
-                                     dma_addr_t *dma_handle)
-{
-        void *ring;
-        long long address;
+Pankaj Dubey (2):
+      clk: samsung: remove unnecessary CONFIG_OF from clk.c
+      clk: samsung: remove unnecessary inclusion of header files from clk.h
 
-        ring = dma_alloc_coherent(&devinfo->pdev->dev, size, dma_handle,
-                                  GFP_KERNEL);
-        if (!ring)
-                return NULL;
+ drivers/clk/samsung/clk-exynos-audss.c |    4 ++++
+ drivers/clk/samsung/clk-exynos4.c      |    2 +-
+ drivers/clk/samsung/clk-exynos4415.c   |    6 ++++--
+ drivers/clk/samsung/clk.c              |    4 ++--
+ drivers/clk/samsung/clk.h              |    4 ----
+ 5 files changed, 11 insertions(+), 9 deletions(-)
 
-        address = (long long)(long)*dma_handle;
-
-Casting to (long) will truncate the DMA handle to 32-bits on a 32-bit
-architecture, even if it supports 64-bit DMA addresses.  There's a couple
-of other places where this same truncation occurs:
-
-        address = (long long)(long)devinfo->shared.scratch_dmahandle;
-
-and
-
-        address = (long long)(long)devinfo->shared.ringupd_dmahandle;
-
-In any case, wouldn't using a u64 type for "address" be better - isn't
-"long long" 128-bit on 64-bit architectures?
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+--
+Thanks,
+Sylwester
