@@ -1,39 +1,51 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 5 Dec 2014 08:34:02 +0800
-Subject: [PATCH 0/7] ARM: hisi: enable HiP01 SoC
-In-Reply-To: <3601066.g7Jvjk5UFL@wuerfel>
-References: <1417140950-67103-1-git-send-email-long.wanglong@huawei.com>
- <3601066.g7Jvjk5UFL@wuerfel>
-Message-ID: <5480FD7A.6030802@hisilicon.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 05 Dec 2014 03:14:54 +0100
+Subject: [PATCH V4 0/3] PM / Domains: Add initial PM clock support to genpd
+In-Reply-To: <1417434623-31301-1-git-send-email-ulf.hansson@linaro.org>
+References: <1417434623-31301-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <4377493.dchgvn3k6f@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2014/12/4 20:58, Arnd Bergmann wrote:
-> On Friday 28 November 2014 02:15:43 Wang Long wrote:
->> This series patch enable Hisilicon HiP01 SoC. The HiP01 SoC series
->> chip is designed for networking product, it integrates a rich peripheral
->> interfaces to support network applications and supports both one 
->> core or dual cores and quad cores. The core is Cortex A9. 
+On Monday, December 01, 2014 12:50:20 PM Ulf Hansson wrote:
+> Changes in v4:
+> 	-Applied acks/tested by tags.
+> 	-Change name of define, affects all patches.
 > 
-> Sorry for the delay in my reply. The patches look good to me, but I'm
-> not sure what you expect to happen to them. You have a number of
-> people listed as recipients, but it's not clear if you expect any of
-> us to apply them into a git tree.
-
-Hi Arnd,
-
-> Is Xu Wei going to pick these up in a git tree and send a pull request
-> to arm at kernel.org?
-
-I will send a pull request about it.
-Thanks!
-
-Best Regards,
-Wei
-
-> 	Arnd
+> Changes in v3:
+> 	-Fixed comments from Rafael for patch 1.
+> 	-Change name of define, affects all patches.
 > 
-> .
+> Changes in v2:
+> 	-Small fixes in patch 1.
 > 
+> 
+> It's quite common for PM domains to use PM clocks. Typically from SOC specific
+> code, the per device PM clock list is created and pm_clk_suspend|resume() are
+> invoked to handle clock gating/ungating.
+> 
+> A step towards consolidation is to integrate PM clock support into genpd, which
+> is what this patchset does.
+> 
+> In this initial step, the calls to the pm_clk_suspend|resume() are handled
+> within genpd, but the per device PM clock list still needs to be created from
+> SOC specific code. It seems reasonable to have gendp to handle that as well, but
+> that left to future patchsets to address.
+> 
+> It's not every users of genpd that are keen on using PM clocks thus we need
+> to provide this a configuration option for genpd.
+> 
+> In patch 2 and patch 3, we convert some of the SH-MOBILE SOCs to start using the
+> new PM clock support in genpd.
+> 
+> 
+> Ulf Hansson (3):
+>   PM / Domains: Initial PM clock support for genpd
+>   ARM: shmobile: Convert to genpd flags for PM clocks for r8a7779
+>   ARM: shmobile: Convert to genpd flags for PM clocks for R-mobile
+
+All queued up for 3.19-rc1, thanks!
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
