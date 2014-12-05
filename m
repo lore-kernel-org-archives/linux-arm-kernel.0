@@ -1,158 +1,40 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 5 Dec 2014 20:26:42 +0530
-Subject: [PATCH v5 34/61] dmaengine: omap: Split device_control
-In-Reply-To: <20141205143359.GV30256@lukather>
-References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
- <1416231775-31252-35-git-send-email-maxime.ripard@free-electrons.com>
- <20141205142702.GF3411@intel.com> <20141205143359.GV30256@lukather>
-Message-ID: <20141205145642.GI3411@intel.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 05 Dec 2014 14:59:52 +0000
+Subject: [PATCH v12 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
+In-Reply-To: <1417774227.2232.1.camel@linaro.org>
+References: <1417671172-52915-1-git-send-email-wangnan0@huawei.com>
+ <1417671360-53399-1-git-send-email-wangnan0@huawei.com>
+ <1417710073.2239.10.camel@linaro.org> <5481289E.4060504@huawei.com>
+ <1417774227.2232.1.camel@linaro.org>
+Message-ID: <1417791592.2232.5.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 05, 2014 at 03:33:59PM +0100, Maxime Ripard wrote:
-> Hi Vinod,
-> 
-> On Fri, Dec 05, 2014 at 07:57:02PM +0530, Vinod Koul wrote:
-> > On Mon, Nov 17, 2014 at 02:42:28PM +0100, Maxime Ripard wrote:
-> > > Split the device_control callback of the TI OMAP DMA driver to make use
-> > > of the newly introduced callbacks, that will eventually be used to retrieve
-> > > slave capabilities.
-> > > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > ---
-> > >  drivers/dma/omap-dma.c | 51 +++++++++++++++-----------------------------------
-> > >  1 file changed, 15 insertions(+), 36 deletions(-)
-> > > 
-> > > diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-> > > index a8aa5b6bb5e2..1cadf812f3b3 100644
-> > > --- a/drivers/dma/omap-dma.c
-> > > +++ b/drivers/dma/omap-dma.c
-> > > @@ -948,8 +948,10 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
-> > >  	return vchan_tx_prep(&c->vc, &d->vd, flags);
-> > >  }
-> > >  
-> > > -static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *cfg)
-> > > +static int omap_dma_slave_config(struct dma_chan *chan, struct dma_slave_config *cfg)
-> > >  {
-> > > +	struct omap_chan *c = to_omap_dma_chan(chan);
-> > > +
-> > >  	if (cfg->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
-> > >  	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
-> > >  		return -EINVAL;
-> > > @@ -959,8 +961,9 @@ static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *c
-> > >  	return 0;
-> > >  }
-> > >  
-> > > -static int omap_dma_terminate_all(struct omap_chan *c)
-> > > +static int omap_dma_terminate_all(struct dma_chan *chan)
-> > >  {
-> > > +	struct omap_chan *c = to_omap_dma_chan(chan);
-> > >  	struct omap_dmadev *d = to_omap_dma_dev(c->vc.chan.device);
-> > >  	unsigned long flags;
-> > >  	LIST_HEAD(head);
-> > > @@ -996,8 +999,10 @@ static int omap_dma_terminate_all(struct omap_chan *c)
-> > >  	return 0;
-> > >  }
-> > >  
-> > > -static int omap_dma_pause(struct omap_chan *c)
-> > > +static int omap_dma_pause(struct dma_chan *chan)
-> > >  {
-> > > +	struct omap_chan *c = to_omap_dma_chan(chan);
-> > > +
-> > >  	/* Pause/Resume only allowed with cyclic mode */
-> > >  	if (!c->cyclic)
-> > >  		return -EINVAL;
-> > > @@ -1010,8 +1015,10 @@ static int omap_dma_pause(struct omap_chan *c)
-> > >  	return 0;
-> > >  }
-> > >  
-> > > -static int omap_dma_resume(struct omap_chan *c)
-> > > +static int omap_dma_resume(struct dma_chan *chan)
-> > >  {
-> > > +	struct omap_chan *c = to_omap_dma_chan(chan);
-> > > +
-> > >  	/* Pause/Resume only allowed with cyclic mode */
-> > >  	if (!c->cyclic)
-> > >  		return -EINVAL;
-> > > @@ -1029,37 +1036,6 @@ static int omap_dma_resume(struct omap_chan *c)
-> > >  	return 0;
-> > >  }
-> > >  
-> > > -static int omap_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> > > -	unsigned long arg)
-> > > -{
-> > > -	struct omap_chan *c = to_omap_dma_chan(chan);
-> > > -	int ret;
-> > > -
-> > > -	switch (cmd) {
-> > > -	case DMA_SLAVE_CONFIG:
-> > > -		ret = omap_dma_slave_config(c, (struct dma_slave_config *)arg);
-> > > -		break;
-> > > -
-> > > -	case DMA_TERMINATE_ALL:
-> > > -		ret = omap_dma_terminate_all(c);
-> > > -		break;
-> > > -
-> > > -	case DMA_PAUSE:
-> > > -		ret = omap_dma_pause(c);
-> > > -		break;
-> > > -
-> > > -	case DMA_RESUME:
-> > > -		ret = omap_dma_resume(c);
-> > > -		break;
-> > > -
-> > > -	default:
-> > > -		ret = -ENXIO;
-> > > -		break;
-> > > -	}
-> > > -
-> > > -	return ret;
-> > > -}
-> > > -
-> > >  static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
-> > >  {
-> > >  	struct omap_chan *c;
-> > > @@ -1136,7 +1112,10 @@ static int omap_dma_probe(struct platform_device *pdev)
-> > >  	od->ddev.device_issue_pending = omap_dma_issue_pending;
-> > >  	od->ddev.device_prep_slave_sg = omap_dma_prep_slave_sg;
-> > >  	od->ddev.device_prep_dma_cyclic = omap_dma_prep_dma_cyclic;
-> > > -	od->ddev.device_control = omap_dma_control;
-> > this should be assigned to omap_dma_slave_config. omap_dma_control is not
-> > here :(
-> 
-> I'm not sure what you mean here. I'm removing this line, together with
-> the whole omap_dma_control function.
-Sorry wrong quote and not good explanations. the lines i quoted is
-wrong one... 
+On Fri, 2014-12-05 at 10:10 +0000, Jon Medhurst (Tixy) wrote:
+[...]
+> I'm worried because this whole optimised kprobes has some rather
+> complicated interactions, e.g. can the background thread that changes
+> breakpoints to jumps (or back again?) could occur at the same time
+> another CPU is processing a kprobe that's been hit, or is in the process
+> of removing a probe.
 
--       od->ddev.device_control = omap_dma_control;
-+       od->ddev.device_config = omap_dma_config;
-this is troubling line here...
+I think that is a plausible theory. We can have this situation...
 
-we dont have omap_dma_config. It should be omap_dma_slave_config instead
+1. CPU A executes a probe's 'breakpoint' instruction and the undefined
+instruction exception handler is triggered.
+
+2. CPU B is executing the kprobes optimisation thread and replaces the
+'breakpoint' with a branch instruction.
+
+3. CPU A reads the invalid instruction from memory and because this is
+now the branch instruction it doesn't match
+KPROBE_ARM_BREAKPOINT_INSTRUCTION which kprobes registered to handle.
+This means the undefined instruction exception is treated as just that,
+execution of an undefined instruction.
+
+The above scenario is the exact reason why arch_disarm_kprobe is
+implemented to always use stop_machine to modify the code and we need to
+ensure the same happens with arch_optimize_kprobes.
 
 -- 
-~Vinod
-
-+       od->ddev.device_pause = omap_dma_pause;
-+       od->ddev.device_resume = omap_dma_resume;
-+       od->ddev.device_terminate_all = omap_dma_terminate_all;
-
-> 
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
-
-
-
--- 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141205/70f9c321/attachment-0001.sig>
+Tixy
