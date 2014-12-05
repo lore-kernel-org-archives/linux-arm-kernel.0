@@ -1,37 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Dec 2014 19:25:44 +0000
-Subject: using DMA-API on ARM
-In-Reply-To: <548205DD.4080101@broadcom.com>
-References: <5481794E.4050406@broadcom.com>
- <20141205094507.GP11285@n2100.arm.linux.org.uk>
- <20141205122423.GK1630@arm.com>
- <F51492713EF10846800D8C0ED37A7DCE019016E1@SJEXCHMB15.corp.ad.broadcom.com>
- <20141205132332.GS11285@n2100.arm.linux.org.uk>
- <20141205150648.GT11285@n2100.arm.linux.org.uk>
- <20141205182851.GC31222@e104818-lin.cambridge.arm.com>
- <548205DD.4080101@broadcom.com>
-Message-ID: <20141205192544.GY11285@n2100.arm.linux.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 5 Dec 2014 11:31:47 -0800
+Subject: [PATCH v2] i2c: rk3x: fix bug that cause measured high_ns doesn't
+ meet I2C spec
+In-Reply-To: <20141204190342.GM7944@katana>
+References: <1415261514-4051-1-git-send-email-addy.ke@rock-chips.com>
+ <1417574237-4328-1-git-send-email-addy.ke@rock-chips.com>
+ <20141203111518.GB1039@katana>
+ <CAD=FV=X5inPWZakhgDX0dX=1CWXygEi3_AH9FVFWXYT3LZA5bg@mail.gmail.com>
+ <20141204184046.GL7944@katana>
+ <CAD=FV=Vp3hwxbDzb+FUhNXy8qW8fTCkgd67jRDV3foT0o9HQuQ@mail.gmail.com>
+ <20141204190342.GM7944@katana>
+Message-ID: <CAD=FV=XViU9divqK1etjHfyjwXyfFMyuwgcVh=NDyvEZfgE0dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 05, 2014 at 08:22:05PM +0100, Arend van Spriel wrote:
-> On 12/05/14 19:28, Catalin Marinas wrote:
-> >This is solved by using a pre-allocated, pre-mapped atomic_pool which
-> >avoids any further mapping. __dma_alloc() calls __alloc_from_pool() when
-> >!__GFP_WAIT.
-> 
-> So we are actually calling dma_alloc_coherent() with GFP_KERNEL during
-> device probe. That last paragraph Russell pointed out seems to suggest this
-> is not allowed.
+Hi,
 
-device probe is a schedulable, sleepable context, so dma_alloc_coherent()
-is fine there.  As Catalin points out, and as I realised after sending
-them ail, it does check for __GFP_WAIT and uses a smaller atomic pool
-for those allocations.  This explains why no one has hit any warnings in
-map_vm_area.
+On Thu, Dec 4, 2014 at 11:03 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>
+>> > New binding should have the "-ns" suffix, right? So, I'd vote to add the
+>> > suffix to the new bindings and deprecate the ones used in the designware
+>> > driver: "i2c-scl-rising-time-ns" and "i2c-scl-falling-time-ns"
+>> >
+>> > It might be a little more work now, but it will help us in the future,
+>> > because it is the correct way to do it.
+>>
+>> OK, that sounds fair.  You're OK with my proposal otherwise?
+>
+> Yes.
 
-So, it's safe from atomic contexts after all.
+OK, for simplicity I put my requested changes in
+<https://chromium-review.googlesource.com/#/c/232774/3>
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+
+>> Are you looking for Addy or me to submit a patch supporting the "-ns"
+>> suffix on the Designware i2c driver, or should we just use the "-ns"
+>> suffix in the Rockchip driver and assume someone will later add
+>> support for the new binding in the Designware i2c driver?
+>
+> I'd be really happy if you can do it. I'd love to have consistency right
+> away.
+
+Well that was easy.  https://patchwork.kernel.org/patch/5445231/
+
+-Doug
