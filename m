@@ -1,72 +1,77 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  5 Dec 2014 11:28:28 +0900
-Subject: [PATCH v2] ARM: shmobile: dts: koelsch: Fix flash partition label and
- size
-Message-ID: <1417746508-14557-1-git-send-email-horms+renesas@verge.net.au>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Fri, 5 Dec 2014 10:35:29 +0800
+Subject: [RFC v2] arm:extend the reserved mrmory for initrd to be page
+ aligned
+In-Reply-To: <20141204120305.GC17783@e104818-lin.cambridge.arm.com>
+References: <35FD53F367049845BC99AC72306C23D103D6DB491609@CNBJMBX05.corpusers.net>
+ <20140915113325.GD12361@n2100.arm.linux.org.uk>
+ <20141204120305.GC17783@e104818-lin.cambridge.arm.com>
+Message-ID: <35FD53F367049845BC99AC72306C23D103E688B313EA@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the size and names of flash partitions to match the
-expectations of the loader which are as follows:
-
-"loader"---0x0000_0000-0x0008_0000 [loader program (readonly)]
-"user"  ---0x0008_0000-0x0060_0000 [U-Boot + bootargs + dt + uImage (readonly)]
-"flash" ---0x0060_0000-0x0400_0000 [filesystem and free (read/write)]
-
-["user"'s assumed breakdown]
-U-boot       (0x0008_0000-0x000c_0000) 256KiB
-bootargs     (0x000c_0000-0x0010_0000) 256KiB
-Device tree  (0x0010_0000-0x0014_0000) 256KiB
-zImage       (0x0014_0000-0x0060_0000) 4.75MiB
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
----
-
-v2
-* As suggested by Geert Uytterhoeven
-  - Break out U-boot and bootargs into separate areas within the user
-    partition description in the changelog
-  - Refer to zImage rather than uImage in the changelog
-* As suggested by Sergei Shtylyov
-  - Correct base address of partition nodes to match the base address of
-    their register
-
-This replaces a patch that I previously posted, "shmobile: koelsch: Fix
-flash partition label and size in device tree", which has the same aim but
-does so for an older version of the loader which to my knowledge is not
-found in the wild.
-
-I plan to post a similar patch for Lager if this one goes well.
-
-I have been informed that the flash layout should also be the same
-for Alt (which currently does not have flash in its dts file in mainline).
----
- arch/arm/boot/dts/r8a7791-koelsch.dts | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index bf58c79..6938377 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -452,13 +452,13 @@
- 			read-only;
- 		};
- 		partition at 80000 {
--			label = "bootenv";
--			reg = <0x00080000 0x00080000>;
-+			label = "user";
-+			reg = <0x00080000 0x00580000>;
- 			read-only;
- 		};
--		partition at 100000 {
--			label = "data";
--			reg = <0x00100000 0x03f00000>;
-+		partition at 600000 {
-+			label = "flash";
-+			reg = <0x00600000 0x03a00000>;
- 		};
- 	};
- };
--- 
-2.1.3
+> -----Original Message-----
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Thursday, December 04, 2014 8:03 PM
+> To: Russell King - ARM Linux
+> Cc: Wang, Yalin; 'linux-mm at kvack.org'; Will Deacon; 'linux-
+> kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'; 'linux-
+> arm-msm at vger.kernel.org'; Peter Maydell
+> Subject: Re: [RFC v2] arm:extend the reserved mrmory for initrd to be page
+> aligned
+> 
+> On Mon, Sep 15, 2014 at 12:33:25PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Sep 15, 2014 at 07:07:20PM +0800, Wang, Yalin wrote:
+> > > @@ -636,6 +646,11 @@ static int keep_initrd;  void
+> > > free_initrd_mem(unsigned long start, unsigned long end)  {
+> > >  	if (!keep_initrd) {
+> > > +		if (start == initrd_start)
+> > > +			start = round_down(start, PAGE_SIZE);
+> > > +		if (end == initrd_end)
+> > > +			end = round_up(end, PAGE_SIZE);
+> > > +
+> > >  		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
+> > >  		free_reserved_area((void *)start, (void *)end, -1, "initrd");
+> > >  	}
+> >
+> > is the only bit of code you likely need to achieve your goal.
+> >
+> > Thinking about this, I think that you are quite right to align these.
+> > The memory around the initrd is defined to be system memory, and we
+> > already free the pages around it, so it *is* wrong not to free the
+> > partial initrd pages.
+> 
+> Actually, I think we have a problem, at least on arm64 (raised by Peter
+> Maydell). There is no guarantee that the page around start/end of initrd is
+> free, it may contain the dtb for example. This is even more obvious when we
+> have a 64KB page kernel (the boot loader doesn't know the page size that
+> the kernel is going to use).
+> 
+> The bug was there before as we had poison_init_mem() already (not it
+> disappeared since free_reserved_area does the poisoning).
+> 
+> So as a quick fix I think we need the rounding the other way (and in the
+> general case we probably lose a page at the end of initrd):
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c index
+> 494297c698ca..39fd080683e7 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -335,9 +335,9 @@ void free_initrd_mem(unsigned long start, unsigned long
+> end)  {
+>  	if (!keep_initrd) {
+>  		if (start == initrd_start)
+> -			start = round_down(start, PAGE_SIZE);
+> +			start = round_up(start, PAGE_SIZE);
+>  		if (end == initrd_end)
+> -			end = round_up(end, PAGE_SIZE);
+> +			end = round_down(end, PAGE_SIZE);
+> 
+>  		free_reserved_area((void *)start, (void *)end, 0, "initrd");
+>  	}
+> 
+> A better fix would be to check what else is around the start/end of initrd.
+I think a better way is add some head info in Image header,
+So that bootloader  can know the kernel CONFIG_PAGE_SIZE ,
+For example we can add PAGE_SIZE in zImage header .
+How about this way?
