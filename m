@@ -1,67 +1,100 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 5 Dec 2014 09:11:03 -0800
-Subject: [PATCH v3 2/2] i2c: cadence: Check for errata condition
- involving master receive
-In-Reply-To: <1417766884-8383-3-git-send-email-harinik@xilinx.com>
-References: <1417766884-8383-1-git-send-email-harinik@xilinx.com>
- <1417766884-8383-3-git-send-email-harinik@xilinx.com>
-Message-ID: <655928d0462248b6a8e4821b5245bc57@BN1BFFO11FD016.protection.gbl>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 5 Dec 2014 12:15:58 -0500 (EST)
+Subject: [PATCH] optimize ktime_divns for constant divisors
+In-Reply-To: <2145860.PBxl6kLNRF@wuerfel>
+References: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
+ <OF0EDEDB1C.C03829F7-ON48257DA5.00062083-48257DA5.0007628B@zte.com.cn>
+ <alpine.LFD.2.11.1412042056240.470@knanqh.ubzr> <2145860.PBxl6kLNRF@wuerfel>
+Message-ID: <alpine.LFD.2.11.1412051052090.470@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Harini,
+On Fri, 5 Dec 2014, Arnd Bergmann wrote:
 
-On Fri, 2014-12-05 at 01:38PM +0530, Harini Katakam wrote:
-> Cadence I2C controller has the following bugs:
-> - completion indication is not given to the driver at the end of
-> a read/receive transfer with HOLD bit set.
-> - Invalid read transaction are generated on the bus when HW timeout
-> condition occurs with HOLD bit set.
-> 
-> As a result of the above, if a set of messages to be transferred with
-> repeated start includes any transfer following a read transfer,
-> completion is never indicated and timeout occurs.
-> Hence a check is implemented to return -EOPNOTSUPP for such sequences.
-> 
-> Signed-off-by: Harini Katakam <harinik@xilinx.com>
-> Signed-off-by: Vishnu Motghare <vishnum@xilinx.com>
-> ---
-> 
-> v3:
-> Add warning in case of unsupported transfer.
-> 
-> v2:
-> Dont defeteature repeated start. Just check for unsupported conditions in the
-> driver and return error.
-> 
-> ---
->  drivers/i2c/busses/i2c-cadence.c |   15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-> index 5f5d4fa..3ea3b7a 100644
-> --- a/drivers/i2c/busses/i2c-cadence.c
-> +++ b/drivers/i2c/busses/i2c-cadence.c
-> @@ -541,6 +541,21 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
->  	 * processed with a repeated start.
->  	 */
->  	if (num > 1) {
-> +		/*
-> +		 * This controller does not give completion interrupt after a
-> +		 * master receive transfer if HOLD bit is set (repeated start),
-> +		 * resulting in SW timeout. Hence, if a receive transfer is
-> +		 * followed by any other transfer, an error is returned
-> +		 * indicating that this sequence is not supported.
-> +		 */
-> +		for (count = 0; count < num-1; count++) {
-> +			if (msgs[count].flags & I2C_M_RD)
-> +				dev_warn(adap->dev.parent,
-> +					"No support for repeated start when\t");
-> +				dev_warn(adap->dev.parent,
-> +					"receive is followed by a transfer\n");
 
-Please make this a single dev_warn without a line break in the string.
-That way you can grep for the message in the sources.
+> > 
+> > That, too, risk overflowing.
+> > 
+> > Let's say x_lo = 0xffffffff and x_hi = 0xffffffff.  You get:
+> > 
+> >         0xffffffff * 0x83126e97 ->  0x83126e967ced9169
+> >         0xffffffff * 0x8d4fdf3b ->  0x8d4fdf3a72b020c5
+> >                                    -------------------
+> >                                    0x110624dd0ef9db22e
+> > 
+> > Therefore the sum doesn't fit into a u64 variable.
+> > 
+> > It is possible to skip carry handling but only when the MSB of both 
+> > constants are zero.  Here it is not the case.
+> 
+> If I understand this right, there are two possible optimizations to
+> avoid the overflow:
+> 
+> - for anything using monotonic time, or elapsed time, we can guarantee
+>   that the upper bits are zero. Relying on monotonic time is a bit
+>   dangerous, because that would mean introducing an API that works
+>   with ktime_get() but not ktime_get_real(), and risk introducing
+>   subtle bugs.
+>   However, ktime_us_delta() could be optimized, and we can introduce
+>   similar ktime_sec_delta() and ktime_ms_delta() functions with
+>   the same properties.
 
-	Thanks,
-	S?ren
+Well, as Pang mentioned, ktime_t.tv64 is signed.  So if a negative value 
+were to be passed to the current version of ktime_divns() you wouldn't 
+get the expected answer as the first thing it does is
+
+	u64 dclc = ktime_to_ns(kt);
+
+And do_div() works with unsigned values.
+
+So to say that we can assume that currently and for the forseeable 
+future, the top bit of ktime_t will never be set.  And if it does due to 
+a negative value then the code is already buggy.
+
+With that assumption in mind, we now have a maximum value of 
+0x7fffffffffffffff to divide i.e. 63 rather than 64 bits.  That means we 
+don't need the initial bias anymore to get correct results.  And the 
+constant looses its MSB too, removing the possibility for overflows in 
+the cross product.
+
+Therefore the code becomes:
+
+u64 ktime_to_us(ktime_t kt)
+{
+        u64 ns = ktime_to_ns(kt);
+        u32 x_lo, x_hi, y_lo, y_hi;
+        u64 res;
+
+        x_hi = ns >> 32;
+        x_lo = ns;
+        y_hi = 0x4189374b;
+        y_lo = 0xc6a7ef9e;
+
+        res =  (u64)x_lo * y_lo;
+        res >>= 32;
+        res += (u64)x_lo * y_hi;
+        res += (u64)x_hi * y_lo;
+        res >>= 32;
+        res += (u64)x_hi * y_hi;
+
+        return res >> 8;
+}
+
+This is probably the best that can be done portably.
+
+> - one could always pre-shift the ktime_t value. For a division by
+>   1000, we can shift right by 3 bits first, then do the multiplication
+>   and then do another shift. Not sure if that helps at all or if
+>   the extra shift operation makes this counterproductive.
+
+It could help in the full 64-bit range case as the remaining dividend 
+doesn't require a full 64-bit reciprocal constant, avoiding once again 
+the need for the initial bias and the carry handling.  Depending on the 
+actual reciprocal bit pattern this may not always be necessary.  It also 
+depends how cheap shifting a 64-bit value is (on ARM this requires 3 
+instructions and 3 registers).
+
+But in the specific case above this provides no gain.
+
+
+Nicolas
