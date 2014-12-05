@@ -1,156 +1,67 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 5 Dec 2014 18:07:44 +0100
-Subject: [PATCH v5 34/61] dmaengine: omap: Split device_control
-In-Reply-To: <20141205145642.GI3411@intel.com>
-References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
- <1416231775-31252-35-git-send-email-maxime.ripard@free-electrons.com>
- <20141205142702.GF3411@intel.com> <20141205143359.GV30256@lukather>
- <20141205145642.GI3411@intel.com>
-Message-ID: <20141205170744.GW30256@lukather>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 5 Dec 2014 09:11:03 -0800
+Subject: [PATCH v3 2/2] i2c: cadence: Check for errata condition
+ involving master receive
+In-Reply-To: <1417766884-8383-3-git-send-email-harinik@xilinx.com>
+References: <1417766884-8383-1-git-send-email-harinik@xilinx.com>
+ <1417766884-8383-3-git-send-email-harinik@xilinx.com>
+Message-ID: <655928d0462248b6a8e4821b5245bc57@BN1BFFO11FD016.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 05, 2014 at 08:26:42PM +0530, Vinod Koul wrote:
-> On Fri, Dec 05, 2014 at 03:33:59PM +0100, Maxime Ripard wrote:
-> > Hi Vinod,
-> > 
-> > On Fri, Dec 05, 2014 at 07:57:02PM +0530, Vinod Koul wrote:
-> > > On Mon, Nov 17, 2014 at 02:42:28PM +0100, Maxime Ripard wrote:
-> > > > Split the device_control callback of the TI OMAP DMA driver to make use
-> > > > of the newly introduced callbacks, that will eventually be used to retrieve
-> > > > slave capabilities.
-> > > > 
-> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > > ---
-> > > >  drivers/dma/omap-dma.c | 51 +++++++++++++++-----------------------------------
-> > > >  1 file changed, 15 insertions(+), 36 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-> > > > index a8aa5b6bb5e2..1cadf812f3b3 100644
-> > > > --- a/drivers/dma/omap-dma.c
-> > > > +++ b/drivers/dma/omap-dma.c
-> > > > @@ -948,8 +948,10 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
-> > > >  	return vchan_tx_prep(&c->vc, &d->vd, flags);
-> > > >  }
-> > > >  
-> > > > -static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *cfg)
-> > > > +static int omap_dma_slave_config(struct dma_chan *chan, struct dma_slave_config *cfg)
-> > > >  {
-> > > > +	struct omap_chan *c = to_omap_dma_chan(chan);
-> > > > +
-> > > >  	if (cfg->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
-> > > >  	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
-> > > >  		return -EINVAL;
-> > > > @@ -959,8 +961,9 @@ static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *c
-> > > >  	return 0;
-> > > >  }
-> > > >  
-> > > > -static int omap_dma_terminate_all(struct omap_chan *c)
-> > > > +static int omap_dma_terminate_all(struct dma_chan *chan)
-> > > >  {
-> > > > +	struct omap_chan *c = to_omap_dma_chan(chan);
-> > > >  	struct omap_dmadev *d = to_omap_dma_dev(c->vc.chan.device);
-> > > >  	unsigned long flags;
-> > > >  	LIST_HEAD(head);
-> > > > @@ -996,8 +999,10 @@ static int omap_dma_terminate_all(struct omap_chan *c)
-> > > >  	return 0;
-> > > >  }
-> > > >  
-> > > > -static int omap_dma_pause(struct omap_chan *c)
-> > > > +static int omap_dma_pause(struct dma_chan *chan)
-> > > >  {
-> > > > +	struct omap_chan *c = to_omap_dma_chan(chan);
-> > > > +
-> > > >  	/* Pause/Resume only allowed with cyclic mode */
-> > > >  	if (!c->cyclic)
-> > > >  		return -EINVAL;
-> > > > @@ -1010,8 +1015,10 @@ static int omap_dma_pause(struct omap_chan *c)
-> > > >  	return 0;
-> > > >  }
-> > > >  
-> > > > -static int omap_dma_resume(struct omap_chan *c)
-> > > > +static int omap_dma_resume(struct dma_chan *chan)
-> > > >  {
-> > > > +	struct omap_chan *c = to_omap_dma_chan(chan);
-> > > > +
-> > > >  	/* Pause/Resume only allowed with cyclic mode */
-> > > >  	if (!c->cyclic)
-> > > >  		return -EINVAL;
-> > > > @@ -1029,37 +1036,6 @@ static int omap_dma_resume(struct omap_chan *c)
-> > > >  	return 0;
-> > > >  }
-> > > >  
-> > > > -static int omap_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> > > > -	unsigned long arg)
-> > > > -{
-> > > > -	struct omap_chan *c = to_omap_dma_chan(chan);
-> > > > -	int ret;
-> > > > -
-> > > > -	switch (cmd) {
-> > > > -	case DMA_SLAVE_CONFIG:
-> > > > -		ret = omap_dma_slave_config(c, (struct dma_slave_config *)arg);
-> > > > -		break;
-> > > > -
-> > > > -	case DMA_TERMINATE_ALL:
-> > > > -		ret = omap_dma_terminate_all(c);
-> > > > -		break;
-> > > > -
-> > > > -	case DMA_PAUSE:
-> > > > -		ret = omap_dma_pause(c);
-> > > > -		break;
-> > > > -
-> > > > -	case DMA_RESUME:
-> > > > -		ret = omap_dma_resume(c);
-> > > > -		break;
-> > > > -
-> > > > -	default:
-> > > > -		ret = -ENXIO;
-> > > > -		break;
-> > > > -	}
-> > > > -
-> > > > -	return ret;
-> > > > -}
-> > > > -
-> > > >  static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
-> > > >  {
-> > > >  	struct omap_chan *c;
-> > > > @@ -1136,7 +1112,10 @@ static int omap_dma_probe(struct platform_device *pdev)
-> > > >  	od->ddev.device_issue_pending = omap_dma_issue_pending;
-> > > >  	od->ddev.device_prep_slave_sg = omap_dma_prep_slave_sg;
-> > > >  	od->ddev.device_prep_dma_cyclic = omap_dma_prep_dma_cyclic;
-> > > > -	od->ddev.device_control = omap_dma_control;
-> > > this should be assigned to omap_dma_slave_config. omap_dma_control is not
-> > > here :(
-> > 
-> > I'm not sure what you mean here. I'm removing this line, together with
-> > the whole omap_dma_control function.
-> Sorry wrong quote and not good explanations. the lines i quoted is
-> wrong one... 
+Hi Harini,
+
+On Fri, 2014-12-05 at 01:38PM +0530, Harini Katakam wrote:
+> Cadence I2C controller has the following bugs:
+> - completion indication is not given to the driver at the end of
+> a read/receive transfer with HOLD bit set.
+> - Invalid read transaction are generated on the bus when HW timeout
+> condition occurs with HOLD bit set.
 > 
-> -       od->ddev.device_control = omap_dma_control;
-> +       od->ddev.device_config = omap_dma_config;
-> this is troubling line here...
+> As a result of the above, if a set of messages to be transferred with
+> repeated start includes any transfer following a read transfer,
+> completion is never indicated and timeout occurs.
+> Hence a check is implemented to return -EOPNOTSUPP for such sequences.
 > 
-> we dont have omap_dma_config. It should be omap_dma_slave_config instead
+> Signed-off-by: Harini Katakam <harinik@xilinx.com>
+> Signed-off-by: Vishnu Motghare <vishnum@xilinx.com>
+> ---
+> 
+> v3:
+> Add warning in case of unsupported transfer.
+> 
+> v2:
+> Dont defeteature repeated start. Just check for unsupported conditions in the
+> driver and return error.
+> 
+> ---
+>  drivers/i2c/busses/i2c-cadence.c |   15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+> index 5f5d4fa..3ea3b7a 100644
+> --- a/drivers/i2c/busses/i2c-cadence.c
+> +++ b/drivers/i2c/busses/i2c-cadence.c
+> @@ -541,6 +541,21 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+>  	 * processed with a repeated start.
+>  	 */
+>  	if (num > 1) {
+> +		/*
+> +		 * This controller does not give completion interrupt after a
+> +		 * master receive transfer if HOLD bit is set (repeated start),
+> +		 * resulting in SW timeout. Hence, if a receive transfer is
+> +		 * followed by any other transfer, an error is returned
+> +		 * indicating that this sequence is not supported.
+> +		 */
+> +		for (count = 0; count < num-1; count++) {
+> +			if (msgs[count].flags & I2C_M_RD)
+> +				dev_warn(adap->dev.parent,
+> +					"No support for repeated start when\t");
+> +				dev_warn(adap->dev.parent,
+> +					"receive is followed by a transfer\n");
 
-Ah, right.
+Please make this a single dev_warn without a line break in the string.
+That way you can grep for the message in the sources.
 
-I have no idea why it haven't been picked up by intel's build bot
-thuough.
-
-Anyway. Do you want me to send a new version of these patches for this
-trivial fix and the mxs one, or do you want me to send a follow-up?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141205/65142da4/attachment.sig>
+	Thanks,
+	S?ren
