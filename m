@@ -1,200 +1,46 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 5 Dec 2014 18:17:44 +0800
-Subject: [PATCH 2/4] media: ov2640: add primary dt support
-In-Reply-To: <2588866.n5Pjp1h670@avalon>
-References: <1417170507-11172-1-git-send-email-josh.wu@atmel.com>
- <1417170507-11172-3-git-send-email-josh.wu@atmel.com>
- <2588866.n5Pjp1h670@avalon>
-Message-ID: <54818648.8030601@atmel.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 05 Dec 2014 11:22:32 +0100
+Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <1417514366.21830.22.camel@collabora.co.uk>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1417514366.21830.22.camel@collabora.co.uk>
+Message-ID: <54818768.3080303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Laurent
+Hello,
 
-On 12/2/2014 6:33 AM, Laurent Pinchart wrote:
-> Hi Josh,
+On 2014-12-02 10:59, Sjoerd Simons wrote:
+> Hey Marek, Inki,
 >
-> Thank you for the patch.
->
-> On Friday 28 November 2014 18:28:25 Josh Wu wrote:
->> Add device tree support for ov2640.
+> On Wed, 2014-11-19 at 12:15 +0100, Marek Szyprowski wrote:
+>> Hello Everyone,
 >>
->> Cc:devicetree at vger.kernel.org
->> Signed-off-by: Josh Wu<josh.wu@atmel.com>
->> ---
->>   drivers/media/i2c/soc_camera/ov2640.c | 95 +++++++++++++++++++++++++++++---
->>   1 file changed, 89 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
->> b/drivers/media/i2c/soc_camera/ov2640.c index 9ee910d..6506126 100644
->> --- a/drivers/media/i2c/soc_camera/ov2640.c
->> +++ b/drivers/media/i2c/soc_camera/ov2640.c
->> @@ -18,6 +18,8 @@
->>   #include <linux/i2c.h>
->>   #include <linux/slab.h>
->>   #include <linux/delay.h>
->> +#include <linux/gpio.h>
->> +#include <linux/of_gpio.h>
->>   #include <linux/v4l2-mediabus.h>
->>   #include <linux/videodev2.h>
->>
->> @@ -283,6 +285,10 @@ struct ov2640_priv {
->>   	u32	cfmt_code;
->>   	struct v4l2_clk			*clk;
->>   	const struct ov2640_win_size	*win;
->> +
->> +	struct soc_camera_subdev_desc	ssdd_dt;
->> +	int reset_pin;
->> +	int pwr_down_pin;
->>   };
->>
->>   /*
->> @@ -1047,6 +1053,70 @@ static struct v4l2_subdev_ops ov2640_subdev_ops = {
->>   	.video	= &ov2640_subdev_video_ops,
->>   };
->>
->> +/* OF probe functions */
->> +static int ov2640_hw_power(struct device *dev, int on)
->> +{
->> +	struct i2c_client *client = to_i2c_client(dev);
->> +	struct ov2640_priv *priv = to_ov2640(client);
->> +
->> +	dev_dbg(&client->dev, "%s: %s the camera\n",
->> +			__func__, on ? "ENABLE" : "DISABLE");
->> +
->> +	/* enable or disable the camera */
->> +	gpio_direction_output(priv->pwr_down_pin, !on);
-> Isn't there a delay required to wake the chip up ?
-I don't see any document mention a delay is needed when waked up.
+>> This is another attempt to finally make Exynos SYSMMU driver fully
+>> integrated with DMA-mapping subsystem. The main change from previous
+>> version is a rebase onto latest "automatic DMA configuration for IOMMU
+>> masters" patches from Will Deacon.
+> Do you happen to know if anyone is working on iommu/dma-mapping patches
+> for Exynos 5 based on this patchset?
 
->
->> +
->> +	return 0;
->> +}
->> +
->> +static int ov2640_hw_reset(struct device *dev)
->> +{
->> +	struct i2c_client *client = to_i2c_client(dev);
->> +	struct ov2640_priv *priv = to_ov2640(client);
->> +
-> If the reset GPIO isn't specified you should return immediately without
-> waiting 120ms.
+I hope to add Exynos5 SYSMMU patches to the next iteration of my patchset,
+but I doubt it will get into v3.19-rc1.
 
-I find some document that said the reset pulse need >= 3ms. So I think 
-use 3~5ms is enough.
+> For some background to that question, We (re-)discovered yesterday that
+> the out-of-tree exynos-reference kernel iommu patches are required to
+> get HDMI out working on exynos 5 boards. The current situation in
+> mainline is rather broken, HDMI output without CONFIG_DRM_EXYNOS_IOMMU
+> results in just displaying stripes[0]. While turning on
+> CONFIG_DRM_EXYNOS_IOMMU causes a kernel oops at boot....
 
->
->> +	/* If enabled, give a reset impulse */
->> +	gpio_direction_output(priv->reset_pin, 0);
->> +	msleep(20);
-> Please use usleep_range().
+We have observed similar issues with Exynos4 based boards, when LCD0 power
+domain was turned off and only TV power domain has been powered on. Please
+check the power domain configuration. Maybe in case of Exynos5 the same 
+issue
+is caused by the interaction between DISP1 and GSCL domains.
 
-ok.
->
->> +	gpio_direction_output(priv->reset_pin, 1);
->> +	msleep(100);
-> Is the reset delay documented somewhere ? 100ms seems pretty large to me.
-
-It seems no need to wait another delay after the reset pulse is generated.
-I will remove this line: msleep(100);
->> +
->> +	return 0;
->> +}
->> +
->> +static int ov2640_probe_dt(struct i2c_client *client,
->> +		struct ov2640_priv *priv)
->> +{
->> +	struct device_node *np = client->dev.of_node;
->> +	int ret;
->> +
->> +	priv->reset_pin = of_get_named_gpio(np, "reset-gpio", 0);
->> +	priv->pwr_down_pin = of_get_named_gpio(np, "power-down-gpio", 0);
->> +	if (!gpio_is_valid(priv->reset_pin) ||
->> +			!gpio_is_valid(priv->pwr_down_pin))
->> +		return -EINVAL;
->> +
->> +	ret = devm_gpio_request(&client->dev, priv->pwr_down_pin,
->> +			"power-down-pin");
->> +	if (ret < 0) {
->> +		dev_err(&client->dev, "request gpio pin %d failed\n",
->> +				priv->pwr_down_pin);
->> +		return ret;
->> +	}
->> +
->> +	ret = devm_gpio_request(&client->dev, priv->reset_pin, "reset_pin");
->> +	if (ret < 0) {
->> +		dev_err(&client->dev, "request gpio pin %d failed\n",
->> +				priv->reset_pin);
->> +		return ret;
->> +	}
-> Please use the gpiod API with the devm_gpiod_get_index_optional() function, it
-> will simply your code and take care about GPIO polarity automatically. Don't
-> forget to specify the default state using the GPIOD_* flags.
-
-Thank, I will use it.
-It seems in this case, use devm_gpiod_get_optional() is enough.
-
-Best Regards,
-Josh Wu
->
->> +
->> +	/* Initialize the soc_camera_subdev_desc */
->> +	priv->ssdd_dt.power = ov2640_hw_power;
->> +	priv->ssdd_dt.reset = ov2640_hw_reset;
->> +	client->dev.platform_data = &priv->ssdd_dt;
->> +
->> +	return 0;
->> +}
->> +
->>   /*
->>    * i2c_driver functions
->>    */
->> @@ -1058,12 +1128,6 @@ static int ov2640_probe(struct i2c_client *client,
->>   	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
->>   	int			ret;
->>
->> -	if (!ssdd) {
->> -		dev_err(&adapter->dev,
->> -			"OV2640: Missing platform_data for driver\n");
->> -		return -EINVAL;
->> -	}
->> -
->>   	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
->>   		dev_err(&adapter->dev,
->>   			"OV2640: I2C-Adapter doesn't support SMBUS\n");
->> @@ -1077,6 +1141,18 @@ static int ov2640_probe(struct i2c_client *client,
->>   		return -ENOMEM;
->>   	}
->>
->> +	if (!ssdd) {
->> +		if (client->dev.of_node) {
->> +			ret = ov2640_probe_dt(client, priv);
->> +			if (ret)
->> +				return ret;
->> +		} else {
->> +			dev_err(&client->dev,
->> +				"Missing platform_data for driver\n");
->> +			return  -EINVAL;
->> +		}
->> +	}
->> +
->>   	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
->>   	v4l2_ctrl_handler_init(&priv->hdl, 2);
->>   	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
->> @@ -1123,9 +1199,16 @@ static const struct i2c_device_id ov2640_id[] = {
->>   };
->>   MODULE_DEVICE_TABLE(i2c, ov2640_id);
->>
->> +static const struct of_device_id ov2640_of_match[] = {
->> +	{.compatible = "omnivision,ov2640", },
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(of, ov2640_of_match);
->> +
->>   static struct i2c_driver ov2640_i2c_driver = {
->>   	.driver = {
->>   		.name = "ov2640",
->> +		.of_match_table = of_match_ptr(ov2640_of_match),
->>   	},
->>   	.probe    = ov2640_probe,
->>   	.remove   = ov2640_remove,
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
