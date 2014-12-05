@@ -1,82 +1,38 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 05 Dec 2014 10:10:27 +0000
-Subject: [PATCH v12 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
-In-Reply-To: <5481289E.4060504@huawei.com>
-References: <1417671172-52915-1-git-send-email-wangnan0@huawei.com>
- <1417671360-53399-1-git-send-email-wangnan0@huawei.com>
- <1417710073.2239.10.camel@linaro.org> <5481289E.4060504@huawei.com>
-Message-ID: <1417774227.2232.1.camel@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 05 Dec 2014 10:10:29 +0000
+Subject: [PATCH v3 09/13] irqchip: GICv3: ITS: MSI support
+In-Reply-To: <CALRxmdAULDXqx5oNUGQx9y2oUegULKO7=gWQWMRkFOzFo9XS8A@mail.gmail.com>
+References: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>	<1416839720-18400-10-git-send-email-marc.zyngier@arm.com>
+ <CALRxmdAULDXqx5oNUGQx9y2oUegULKO7=gWQWMRkFOzFo9XS8A@mail.gmail.com>
+Message-ID: <54818495.5010700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-12-05 at 11:38 +0800, Wang Nan wrote:
-> On 2014/12/5 0:21, Jon Medhurst (Tixy) wrote:
-> > On Thu, 2014-12-04 at 13:36 +0800, Wang Nan wrote:
-> > 
+Hi Stuart,
+
+On 04/12/14 21:52, Stuart Yoder wrote:
+> On Mon, Nov 24, 2014 at 8:35 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 > 
-> [trim some text]
+>> +/*
+>> + * We need a value to serve as a irq-type for LPIs. Choose one that will
+>> + * hopefully pique the interest of the reviewer.
+>> + */
+>> +#define GIC_IRQ_TYPE_LPI               0xa110c8ed
 > 
-> > 
-> > I have retested this patch and on one of the arm test cases I get an
-> > undefined instruction exception in kprobe_arm_test_cases. When this
-> > happens PC points to the second nop below. 
-> > 
-> > 
-> > 80028a38:	e320f000 	nop	{0}
-> > 80028a3c:	e11000b2 	ldrh	r0, [r0, -r2]
-> > 80028a40:	e320f000 	nop	{0}
-> > 
-> > As all three instructions will have probes on them during testing, and
-> > un-optimised probes are implemented by using an undefined instruction to
-> > act as a breakpoint, my first thought was that we have a race condition
-> > somewhere with adding, removing or optimizing probes. Though a reboot a
-> > retest failed in the same way on the same instruction, so I'm not 100%
-> > convinced about strictly timing related bugs.
-> >  
-> 
-> Does the problem appear in your platform in each time?
+> Ok, my interest is piqued.  Why this value?
 
-Three times out of three tries yes. Though the third try was built
-differently and the problem occurred on a different test case.
+See the xlate function in the main GICv3 driver.
 
+We need something to indicate that we want it to allocate an LPI, but
+this function is mostly DT-specific, and we don't have an LPI type in
+the binding just yet (I've purposely pushed back on it until we have a
+clear idea of where we want to take LPIs).
 
->  Currently I have only
-> QEMU machine for testing and haven't seen problem like this before.
+So this value is just a made up thing that is unlikely to ever find its
+place in a DT binding.
 
-I don't know much about QEMU and have never used it, but I'm assuming
-QEMU doesn't make any attempt to simulate caches like the data cache,
-instruction cache, TLBs, branch predictor? Does it even emulate multiple
-CPUs with multiple host CPU threads? Basically, I very much doubt QEMU
-is a very good test of kernel code in general, and especially code that
-modifies code and has multiple cpus running in parallel.
+Thanks,
 
-Do you not have access to any kind of ARM board to try some testing on?
-
-
->  Could
-> you please provide a detail steps for me to reproduce it? Or do you just
-> enable kprobe test code when booting and this exception simply appear twice?
-
-I applied the patches on top of Linux 3.18-rc5 and set VERBOSE in
-arm/probes/kprobes/test-core.h to 1. Then built a kernel configured
-using vexpress_defconfig and enabled
-
-CONFIG_KPROBES=y
-CONFIG_ARM_KPROBES_TEST=y
-CONFIG_DEBUG_INFO=y
-
-then booted on a Versatile Express board with a TC2 CoreTile (A15/A7
-big.LITTLE CPU).
-
-The Oops I described happened on two consecutive boots of the board. I
-then tried again setting VERBOSE to 0 and I got a similar OOPs but on a
-different test case.
-
-I'm worried because this whole optimised kprobes has some rather
-complicated interactions, e.g. can the background thread that changes
-breakpoints to jumps (or back again?) could occur at the same time
-another CPU is processing a kprobe that's been hit, or is in the process
-of removing a probe.
-
+	M.
 -- 
-Tixy
+Jazz is not dead. It just smells funny...
