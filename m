@@ -1,87 +1,66 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Fri, 05 Dec 2014 14:57:05 +0200
-Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
-In-Reply-To: <20141127200036.2c65df62@bbrezillon>
-References: <5465C00E.4030808@offcode.fi>	<1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
- <20141127200036.2c65df62@bbrezillon>
-Message-ID: <5481ABA1.9030408@offcode.fi>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Dec 2014 12:59:32 +0000
+Subject: using DMA-API on ARM
+In-Reply-To: <5481A855.6000603@broadcom.com>
+References: <5481794E.4050406@broadcom.com>
+ <20141205094507.GP11285@n2100.arm.linux.org.uk>
+ <5481A855.6000603@broadcom.com>
+Message-ID: <20141205125932.GR11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.11.2014 21:00, Boris Brezillon wrote:
-> Hi Timo,
->
-> Sorry for the late reply.
->
-> On Fri, 21 Nov 2014 14:23:30 +0200
-> Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
->
->> By default the driver will start a kernel timer which keeps on kicking
->> the watchdog HW until user space has opened the watchdog
->> device. Usually this is desirable as the watchdog HW is running by
->> default and the user space may not have any watchdog daemon running at
->> all.
->>
->> However, on production systems it may be mandatory that also early
->> crashes and lockups will lead to a watchdog reset, even if they happen
->> before the user space has opened the watchdog device.
->>
->> To resolve the issue, add a new device tree property
->> "enable-early-reset" which will prevent the kernel timer from pinging
->> the watchdog HW on behalf of user space. The default is still to use
->> kernel timer, but more strict behavior can be enabled via the device
->> tree property.
->>
->> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
->> ---
->>   Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
->>   drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
->>   2 files changed, 9 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->> index f90e294..a0b7b75 100644
->> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->> @@ -28,6 +28,10 @@ Optional properties:
->>   	entering idle state.
->>   - atmel,dbg-halt : Should be present if you want to stop the watchdog when
->>   	entering debug state.
->> +- enable-early-reset : Should be present if you want to let the
->> +	watchdog timer to expire even before user space has opened the
->> +	device. If not set, a kernel timer will keep on pinging the
->> +	watchdog until it is opened.
->
-> If you want to make this property generic, maybe you should document it
-> in a generic binding doc
-> (Documentation/devicetree/bindings/watchdog/watchdog.txt ?).
-> Once you're at it, maybe you could document the generic timeout-sec
-> property in this file.
-> Moreover, you might want to parse this property in watchdog_core.c and
-> store the information in the watchdog_device struct.
+On Fri, Dec 05, 2014 at 01:43:01PM +0100, Arend van Spriel wrote:
+> Ok. You already had a peek in our code checking the memory barriers, which
+> does not have the dma_sync_single_for_cpu() "workaround" yet. So here some
+> more background. The problem is in DMA_FROM_DEVICE direction. Because of the
+> possible reordering issue we first tried using rmb() in the retry loop but
+> that did not solve it. Another experiment was to ignore the failed ring
+> descriptor entry and proceed. So we get interrupt from device and access the
+> ring descriptor entry. This should contain expected value X, however we get
+> X-1 back. When proceeding everything works find until hitting the same ring
+> descriptor entry again reading X-1 when X+1 would be valid. This lead us to
+> the assumption that somehow this entry ended up in cache lines. The issue
+> goes away using the dma_sync_single_for_cpu() with DMA_FROM_DEVICE in
+> direction parameter.
 
-I gave a little thought about this today and we could maybe have it like 
-watchdog_init_timeout() is today. But I can't really think of any 
-generic handling for this property, anything else except storing the 
-parsed value to a variable in watchdog_device struct. Everything else is 
-HW specific, except how we read the variable.. If we had some logic or 
-checking for this variable (other than to check it is not negative) 
-maybe then it would make sense.
+Can you give some further detail - I think it would help understanding
+if you could give:
 
-So I could write a patch to document generic watchdog properties in 
-Documentation/devicetree/bindings/watchdog/watchdog.txt (anything else 
-generic that would go there except timeout-sec and enable-early-reset?) 
-and change this patch so that it doesn't document anything in 
-atmel-wdt.txt as we already have it documented in generic watchdog.txt.
+- the initial numerical state of the descriptor (presumably setup by
+  msgbuf.c calling brcmf_commonring_reserve_for_write(), and then
+  writing the contents into the ring buffer, followed by
+  brcmf_commonring_write_complete().
 
-Sounds good?
+- time passes, the hardware processes the entry
 
-Thanks,
--Timo
+- the numerical state of the descriptor (which is in error) which you
+  read back
 
-> Apart from that, I'm not opposed to the approach, and I'm fine with the
-> current implementation.
->
-> Regards,
->
-> Boris
->
+- the expected numerical state of the descriptor
+
+> So is there any function interface to verify cache status.
+
+There isn't, but if you dump the virtual address, and you have debugfs
+enabled, along with CONFIG_ARM_PTDUMP, you should be able to find the
+mapping in /sys/kernel/debug/kernel_page_tables, which will tell you
+the attributes that it's mapped using.
+
+What it won't tell you is whether there's an alias of the mapping with
+differing attributes.  If you use dma_to_pfn() to convert the DMA handle
+into a PFN, we can use that to see whether there could be another mapping
+from the kernel page table dump (by checking whether the PFN would be a
+lowmem PFN, and therefore whether it's already mapped at it's lowmem
+address.)
+
+If you'd like to mail me (in addition to the ring contents above):
+
+- the kernel_page_tables dump
+- virtual address of the ring buffer
+- dma_to_pfn() converted DMA handle of the ring buffer
+- PHYS_PFN_OFFSET for your platform
+
+then I can see whether there is.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
