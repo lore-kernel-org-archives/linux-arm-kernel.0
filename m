@@ -1,57 +1,46 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 5 Dec 2014 14:17:17 +1100
-Subject: linux-next: manual merge of the kbuild tree with the arm-soc tree
-Message-ID: <20141205141717.24ab3546@canb.auug.org.au>
+From: yamada.m@jp.panasonic.com (Masahiro Yamada)
+Date: Fri, 05 Dec 2014 12:29:39 +0900
+Subject: [PATCH] clk: remove unnecessary substitution
+In-Reply-To: <1390889387-24137-1-git-send-email-yamada.m@jp.panasonic.com>
+References: <1390889387-24137-1-git-send-email-yamada.m@jp.panasonic.com>
+Message-ID: <20141205122939.E213.AA925319@jp.panasonic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Hi, Mike Turquette
 
-Today's linux-next merge of the kbuild tree got a conflict in
-scripts/Kbuild.include between commit 9fb5e5372208 ("dts, kbuild:
-Factor out dtbs install rules to Makefile.dtbinst") from the arm-soc
-tree and commit 1846dfbde3e8 ("kbuild: remove redundant -rR flag of
-hdr-inst") from the kbuild tree.
+I posted this trivial fix about 10 months ago.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Is it applicable?
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
 
-diff --cc scripts/Kbuild.include
-index 5374b1bdf02f,353dcf09dd18..000000000000
---- a/scripts/Kbuild.include
-+++ b/scripts/Kbuild.include
-@@@ -180,11 -180,17 +180,23 @@@ build := -f $(srctree)/scripts/Makefile
-  modbuiltin := -f $(srctree)/scripts/Makefile.modbuiltin obj
-  
-  ###
- +# Shorthand for $(Q)$(MAKE) -f scripts/Makefile.dtbinst obj=
- +# Usage:
- +# $(Q)$(MAKE) $(dtbinst)=dir
- +dtbinst := -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.dtbinst obj
- +
-++###
-+ # Shorthand for $(Q)$(MAKE) -f scripts/Makefile.clean obj=
-+ # Usage:
-+ # $(Q)$(MAKE) $(clean)=dir
-+ clean := -f $(srctree)/scripts/Makefile.clean obj
-+ 
-+ ###
-+ # Shorthand for $(Q)$(MAKE) -f scripts/Makefile.headersinst obj=
-+ # Usage:
-+ # $(Q)$(MAKE) $(hdr-inst)=dir
-+ hdr-inst := -f $(srctree)/scripts/Makefile.headersinst obj
-+ 
-  # Prefix -I with $(srctree) if it is not an absolute path.
-  # skip if -I has no parameter
-  addtree = $(if $(patsubst -I%,%,$(1)), \
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141205/195124df/attachment-0001.sig>
+
+On Tue, 28 Jan 2014 15:09:47 +0900
+Masahiro Yamada <yamada.m@jp.panasonic.com> wrote:
+
+> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
+> ---
+>  drivers/clk/clk.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 2b38dc9..d97b313 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1637,7 +1637,7 @@ static struct clk *__clk_init_parent(struct clk *clk)
+>  
+>  	if (clk->num_parents == 1) {
+>  		if (IS_ERR_OR_NULL(clk->parent))
+> -			ret = clk->parent = __clk_lookup(clk->parent_names[0]);
+> +			clk->parent = __clk_lookup(clk->parent_names[0]);
+>  		ret = clk->parent;
+>  		goto out;
+>  	}
+> -- 
+> 1.8.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
