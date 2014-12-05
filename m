@@ -1,31 +1,46 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 5 Dec 2014 20:40:14 +0530
-Subject: [PATCH] dmaengine: pl330: Set residue in tx_status callback
-In-Reply-To: <547DF61D.3010909@metafoo.de>
-References: <1416995095-13763-1-git-send-email-padma.v@samsung.com>
- <CAAgF-BfpU72KTJjVd8jWStD8yJ5sSmXOiQm77xQunO2QhC9ExQ@mail.gmail.com>
- <547DF61D.3010909@metafoo.de>
-Message-ID: <20141205151014.GK3411@intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Dec 2014 15:13:55 +0000
+Subject: [PATCH] do_work_pending: Enable interrupts in do_work_pending()
+In-Reply-To: <1417791066-5458-1-git-send-email-moon.linux@yahoo.com>
+References: <1417791066-5458-1-git-send-email-moon.linux@yahoo.com>
+Message-ID: <20141205151355.GU11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 02, 2014 at 06:25:49PM +0100, Lars-Peter Clausen wrote:
-> On 12/02/2014 06:38 AM, Padma Venkat wrote:
-> 
-> Well it doesn't break audio, but I don't think it has the correct
-> haviour for all cases yet.
-> 
-> Again, the semantics are that it should return the progress of the
-> transfer for which the allocation function returned the cookie that
-> is passe to this function. You have to consider that there might be
-> multiple different descriptors submitted and in the work list, not
-> just the one we want to know the status of. The big problem with the
-> pl330 driver is that the current structure of the driver makes it
-> not so easy to implement the residue reporting correctly.
+On Fri, Dec 05, 2014 at 08:21:06PM +0530, Anand Moon wrote:
+> @@ -574,12 +574,14 @@ asmlinkage int
+>  do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
+>  {
+>  	do {
+> +		if (unlikely(!user_mode(regs)))
+> +			return 0;
+> +		/* Enable interrupts; they are disabled again on return to
+> +		 * caller. */
+> +		local_irq_enable();
+>  		if (likely(thread_flags & _TIF_NEED_RESCHED)) {
+>  			schedule();
+>  		} else {
+> -			if (unlikely(!user_mode(regs)))
+> -				return 0;
+> -			local_irq_enable();
+>  			if (thread_flags & _TIF_SIGPENDING) {
+>  				int restart = do_signal(regs, syscall);
+>  				if (unlikely(restart)) {
 
-well you can use the completed_cookie as hint. This was last trasaction
-which was issues, so calculate remianing bytes for this and subsequent ones
-resiude would only be size of transaction
+I'm happy with the hunk above, but:
+
+> @@ -588,6 +590,7 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
+>  					 * Deal with it without leaving
+>  					 * the kernel space.
+>  					 */
+> +					local_irq_disable();
+>  					return restart;
+
+not this one.  The code expects in the non-zero return case, that
+interrupts will be enabled, otherwise we will be restarting the syscall
+with IRQs disabled, and calling into the syscall function with IRQs
+disabled.
 
 -- 
-~Vinod
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
