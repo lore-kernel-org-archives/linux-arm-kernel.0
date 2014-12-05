@@ -1,34 +1,92 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 5 Dec 2014 18:39:45 +0000
-Subject: using DMA-API on ARM
-In-Reply-To: <5481794E.4050406@broadcom.com>
-References: <5481794E.4050406@broadcom.com>
-Message-ID: <20141205183945.GE31222@e104818-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 5 Dec 2014 10:38:49 -0800
+Subject: regression: Clock changes in next-20141205 break at least omap4
+In-Reply-To: <5481F79D.4010504@codeaurora.org>
+References: <20141205165539.GA30437@atomide.com>
+ <5481F79D.4010504@codeaurora.org>
+Message-ID: <20141205183849.GB30437@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 05, 2014 at 09:22:22AM +0000, Arend van Spriel wrote:
-> For our brcm80211 development we are working on getting brcmfmac driver
-> up and running on a Broadcom ARM-based platform. The wireless device is
-> a PCIe device, which is hooked up to the system behind a PCIe host
-> bridge, and we transfer information between host and device using a
-> descriptor ring buffer allocated using dma_alloc_coherent(). We mostly
-> tested on x86 and seen no issue. However, on this ARM platform
-> (single-core A9) we detect occasionally that the descriptor content is
-> invalid. When this occurs we do a dma_sync_single_for_cpu() and this is
-> retried a number of times if the problem persists. Actually, found out
-> that someone made a mistake by using virt_to_dma(va) to get the
-> dma_handle parameter. So probably we only provided a delay in the retry
-> loop. After fixing that a single call to dma_sync_single_for_cpu() is
-> sufficient. The DMA-API-HOWTO clearly states that:
+* Stephen Boyd <sboyd@codeaurora.org> [141205 10:23]:
+> On 12/05/2014 08:55 AM, Tony Lindgren wrote:
+> > Hi,
+> >
+> > Looks like commit 646cafc6aa4d ("clk: Change clk_ops->determine_rate
+> > to return a clk_hw as the best parent") breaks booting at least for
+> > omap4.
+> 
+> Do you get a compilation warning in arch/arm/mach-omap2/dpll3xxx.c ?
 
-Does your system have an L2 cache? What's the SoC topology, can PCIe see
-such L2 cache (or snoop the L1 caches)?
+Yes so it seems.
 
-Also, are you certain that dma_alloc_coherent() ends up creating a
-non-cacheable mapping in Linux (this call translates to a function
-pointer call which may or may not create non-cacheable memory, depending
-on the "dma-coherent" property passed via DT).
+> From what I can tell omap3_noncore_dpll_determine_rate() hasn't been
+> updated to take a clk_hw pointer instead of clk pointer. It was there in
+> the original patch and I'm not sure why Mike dropped that part while
+> applying.
 
--- 
-Catalin
+OK that makes sense, Mike should apply that part too. Note that also
+include/linux/clk/ti.h needs changed accordingly for struct clk_hw,
+which you probably had in your orignal patch too. Assuming that's there,
+please feel free to add:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+ 
+> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+> index 20e120d..c2da2a0 100644
+> --- a/arch/arm/mach-omap2/dpll3xxx.c
+> +++ b/arch/arm/mach-omap2/dpll3xxx.c
+> @@ -474,7 +474,7 @@ void omap3_noncore_dpll_disable(struct clk_hw *hw)
+>   */
+>  long omap3_noncore_dpll_determine_rate(struct clk_hw *hw, unsigned long rate,
+>  				       unsigned long *best_parent_rate,
+> -				       struct clk **best_parent_clk)
+> +				       struct clk_hw **best_parent_clk)
+>  {
+>  	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+>  	struct dpll_data *dd;
+> @@ -488,10 +488,10 @@ long omap3_noncore_dpll_determine_rate(struct clk_hw *hw, unsigned long rate,
+>  
+>  	if (__clk_get_rate(dd->clk_bypass) == rate &&
+>  	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
+> -		*best_parent_clk = dd->clk_bypass;
+> +		*best_parent_clk = __clk_get_hw(dd->clk_bypass);
+>  	} else {
+>  		rate = omap2_dpll_round_rate(hw, rate, best_parent_rate);
+> -		*best_parent_clk = dd->clk_ref;
+> +		*best_parent_clk = __clk_get_hw(dd->clk_ref);
+>  	}
+>  
+>  	*best_parent_rate = rate;
+> diff --git a/arch/arm/mach-omap2/dpll44xx.c b/arch/arm/mach-omap2/dpll44xx.c
+> index 535822f..0e58e5a 100644
+> --- a/arch/arm/mach-omap2/dpll44xx.c
+> +++ b/arch/arm/mach-omap2/dpll44xx.c
+> @@ -223,7 +223,7 @@ out:
+>   */
+>  long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw, unsigned long rate,
+>  					unsigned long *best_parent_rate,
+> -					struct clk **best_parent_clk)
+> +					struct clk_hw **best_parent_clk)
+>  {
+>  	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+>  	struct dpll_data *dd;
+> @@ -237,11 +237,11 @@ long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw, unsigned long rate,
+>  
+>  	if (__clk_get_rate(dd->clk_bypass) == rate &&
+>  	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
+> -		*best_parent_clk = dd->clk_bypass;
+> +		*best_parent_clk = __clk_get_hw(dd->clk_bypass);
+>  	} else {
+>  		rate = omap4_dpll_regm4xen_round_rate(hw, rate,
+>  						      best_parent_rate);
+> -		*best_parent_clk = dd->clk_ref;
+> +		*best_parent_clk = __clk_get_hw(dd->clk_ref);
+>  	}
+>  
+>  	*best_parent_rate = rate;
+> 
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
