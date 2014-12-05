@@ -1,123 +1,45 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 5 Dec 2014 16:53:56 +0000
-Subject: [RFC 1/3] devfreq: dt-bindings: Document Exynos3250 devfreq driver
-In-Reply-To: <1417797988-29225-2-git-send-email-k.kozlowski@samsung.com>
-References: <1417797988-29225-1-git-send-email-k.kozlowski@samsung.com>
- <1417797988-29225-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20141205165356.GC12849@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 5 Dec 2014 08:55:39 -0800
+Subject: regression: Clock changes in next-20141205 break at least omap4
+Message-ID: <20141205165539.GA30437@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 05, 2014 at 04:46:26PM +0000, Krzysztof Kozlowski wrote:
-> Add documentation for bindings used by Exynos3250 devfreq driver.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  .../bindings/arm/samsung/exynos3250-devfreq.txt    | 66 ++++++++++++++++++++++
->  1 file changed, 66 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt b/Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt
-> new file mode 100644
-> index 000000000000..047955e9e371
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt
-> @@ -0,0 +1,66 @@
-> +Samsung Exynos3250 devfreq driver
+Hi,
 
-The binding should describe the hardware, not a particular driver of
-that hardware. Please write the binding (and its documentation) with
-that in mind, and drop references to the driver and "busfreq".
+Looks like commit 646cafc6aa4d ("clk: Change clk_ops->determine_rate
+to return a clk_hw as the best parent") breaks booting at least for
+omap4.
 
-With an adequate binding we can probe the device and forward the
-information to relevant driver(s) as necessary.
+Below is the output from omap4-sdp with DEBUG_LL and earlyprintk
+enabled.
 
-> +=================================
-> +
-> +The driver support changing frequencies and voltage for:
-> + - memory controller and bus,
-> + - peripheral buses (left and right).
+Regards,
 
+Tony
 
-What do left and right mean in this context?
-
-> +
-> +Memory controller and bus
-> +=========================
-> +Required properties:
-> + - compatible : should be "samsung,exynos3250-busfreq-mif"
-> + - reg : two sets (offset and length of the register) for PPMU registers
-> +	used by this devfreq driver
-> + - clock-names : one clock of name "dmc" to manage frequency
-> + - clocks : phandle and specifier for clock listed in clock-names property
-> + - vdd_mif-supply : phandle to MIF voltage regulator
-
-s/_/-/ in property names please.
-
-> +
-> +Peripheral buses
-> +================
-> +Required properties:
-> + - compatible : should be "samsung,exynos3250-busfreq-int"
-
-What does "int" mean here?
-
-> + - reg : two sets (offset and length of the register) for PPMU registers
-> +	used by this devfreq driver
-> + - clock-names : names for PPMU clocks and bus clocks to manage frequencies;
-> +	All following clock names (and corresponding phandles) must be
-> +	provided:
-> +	- "ppmu_left", "ppmu_right",
-> +	- "aclk_400", "aclk_266", "aclk_200", "aclk_160", "aclk_gdl", "aclk_gdr", "mfc";
-> + - clocks : phandles and specifiers for clocks listed in clock-names property
-> + - vdd_mif-supply : phandle to INT voltage regulator
-
-s/_/-/ here too.
-
-Thanks,
-Mark.
-
-> +
-> +Example
-> +=======
-> +	busfreq_mif: busfreq at 106A0000 {
-> +		compatible = "samsung,exynos3250-busfreq-mif";
-> +		reg = <0x106A0000 0x2000>, <0x106B0000 0x2000>;
-> +		clocks = <&cmu_dmc CLK_DIV_DMC>;
-> +		clock-names = "dmc";
-> +		vdd_mif-supply = <&buck1_reg>;
-> +		status = "okay";
-> +	};
-> +
-> +	busfreq_int: busfreq at 116A0000 {
-> +		compatible = "samsung,exynos3250-busfreq-int";
-> +		reg = <0x116A0000 0x2000>, <0x112A0000 0x2000>;
-> +		clocks = <&cmu CLK_PPMULEFT>,
-> +			<&cmu CLK_PPMURIGHT>,
-> +			<&cmu CLK_DIV_ACLK_400_MCUISP>,
-> +			<&cmu CLK_DIV_ACLK_266>,
-> +			<&cmu CLK_DIV_ACLK_200>,
-> +			<&cmu CLK_DIV_ACLK_160>,
-> +			<&cmu CLK_DIV_GDL>,
-> +			<&cmu CLK_DIV_GDR>,
-> +			<&cmu CLK_DIV_MFC>;
-> +		clock-names = "ppmuleft",
-> +			"ppmuright",
-> +			"aclk_400",
-> +			"aclk_266",
-> +			"aclk_200",
-> +			"aclk_160",
-> +			"aclk_gdl",
-> +			"aclk_gdr",
-> +			"mfc";
-> +		vdd_int-supply = <&buck3_reg>;
-> +		status = "okay";
-> +	};
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+[    1.670806] clock: dpll_abe_ck failed transition to 'locked'
+[    2.966735] clock: dpll_abe_ck failed transition to 'locked'
+[    4.262634] clock: dpll_abe_ck failed transition to 'locked'
+[    4.268554] ------------[ cut here ]------------
+[    4.273406] WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:846 clk_disable+0x24/0x30()
+[    4.281341] Modules linked in:
+[    4.284576] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.18.0-rc7-next-20141205-00004-g24aaa63b #141
+[    4.293945] Hardware name: Generic OMAP4 (Flattened Device Tree)
+[    4.300231] [<c0015614>] (unwind_backtrace) from [<c0011cdc>] (show_stack+0x10/0x14)
+[    4.308288] [<c0011cdc>] (show_stack) from [<c05b7fb8>] (dump_stack+0x80/0x9c)
+[    4.315795] [<c05b7fb8>] (dump_stack) from [<c003e4e8>] (warn_slowpath_common+0x78/0xb4)
+[    4.324188] [<c003e4e8>] (warn_slowpath_common) from [<c003e540>] (warn_slowpath_null+0x1c/0x24)
+[    4.333282] [<c003e540>] (warn_slowpath_null) from [<c04c386c>] (clk_disable+0x24/0x30)
+[    4.341583] [<c04c386c>] (clk_disable) from [<c00252a0>] (_disable_clocks+0x18/0x68)
+[    4.349609] [<c00252a0>] (_disable_clocks) from [<c0026810>] (_idle+0x15c/0x240)
+[    4.357299] [<c0026810>] (_idle) from [<c0844cb8>] (_setup+0x174/0x22c)
+[    4.364166] [<c0844cb8>] (_setup) from [<c0026c4c>] (omap_hwmod_for_each+0x30/0x5c)
+[    4.372131] [<c0026c4c>] (omap_hwmod_for_each) from [<c08450c4>] (__omap_hwmod_setup_all+0x30/0x40)
+[    4.381500] [<c08450c4>] (__omap_hwmod_setup_all) from [<c0008b44>] (do_one_initcall+0x80/0x1d4)
+[    4.390594] [<c0008b44>] (do_one_initcall) from [<c0837e9c>] (kernel_init_freeable+0x1f4/0x2cc)
+[    4.399627] [<c0837e9c>] (kernel_init_freeable) from [<c05b211c>] (kernel_init+0x8/0xe4)
+[    4.408020] [<c05b211c>] (kernel_init) from [<c000ea48>] (ret_from_fork+0x14/0x2c)
+[    4.415954] ---[ end trace f968bc068c5b0ccc ]---
+[    5.710815] clock: dpll_abe_ck failed transition to 'locked'
+[    7.006744] clock: dpll_abe_ck failed transition to 'locked'
