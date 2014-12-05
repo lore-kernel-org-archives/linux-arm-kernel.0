@@ -1,57 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 5 Dec 2014 19:12:35 +0000
-Subject: [PATCH] arm64: respect mem= for EFI
-In-Reply-To: <1417692140-29796-1-git-send-email-mark.rutland@arm.com>
-References: <1417692140-29796-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20141205191235.GH31222@e104818-lin.cambridge.arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri,  5 Dec 2014 11:15:43 -0800
+Subject: [PATCH for-next] bus: brcmstb_gisb: use gdev_{read,
+ write} in suspend/resume paths
+Message-ID: <1417806943-1200-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 11:22:20AM +0000, Mark Rutland wrote:
-> Hi all,
-> 
-> While trying to debug a userspace test failure, I noticed that the mem=
-> option didn't work when booting via EFI due to some unfortunate init
-> ordering.
-> 
-> However, with that alone fixed (patch below) things blow up early if a
-> mem= option is passed to the kernel, because of the way we currently map
-> the EFI runtime services.
-> 
-> I've given this patch a spin atop of Ard's rework of the runtime
-> services mapping [1], and that's far happier; I can boot to userspace
-> and memory is limited int he way I expect.
-> 
-> Assuming people are fine with this, would this make sense to append to
-> the runtime services mapping series?
-> 
-> Cheers,
-> Mark.
-> 
-> [1] https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/efi-for-arm64
-> 
-> ---->8----
-> When booting with EFI, we acquire the EFI memory map after parsing the
-> early params. This unfortuantely renders the option useless as we call
-> memblock_enforce_memory_limit (which uses memblock_remove_range behind
-> the scenes) before we've added any memblocks. We end up removing
-> nothing, then adding all of memory later when efi_init calls
-> reserve_regions.
-> 
-> Instead, we can log the limit and apply this later when we do the rest
-> of the memblock work in memblock_init, which should work regardless of
-> the presence of EFI. At the same time we may as well move the early
-> parameter into arm64's mm/init.c, close to arm64_memblock_init.
-> 
-> Any memory which must be mapped (e.g. for use by EFI runtime services)
-> must be mapped explicitly reather than relying on the linear mapping,
-> which may be truncated as a result of a mem= option passed on the kernel
-> command line.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Leif Lindholm <leif.lindholm@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
+This patch fixes a small merge issue between:
+Commit 2b53eadcea05 ("bus: brcmstb_gisb: Introduce wrapper functions for
+MMIO accesses") and 203bb85ed605 ("bus: brcmstb_gisb: save and restore
+GISB timeout"), the former introducing wrapper I/O accessors to be
+decoupled from the register offsets and use table, while the latter had
+not been converted to using these wrapper.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+Arnd, Olof,
+
+This applies on top of your arm-soc/for-next branch as of
+921caee4a849443bcda286f903b6ec01c5aa7fd8 ("arm-soc: document merges")
+
+Thanks!
+
+ drivers/bus/brcmstb_gisb.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+index fa7b3cd09fc0..46de8dc39eb4 100644
+--- a/drivers/bus/brcmstb_gisb.c
++++ b/drivers/bus/brcmstb_gisb.c
+@@ -359,7 +359,7 @@ static int brcmstb_gisb_arb_suspend(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct brcmstb_gisb_arb_device *gdev = platform_get_drvdata(pdev);
+ 
+-	gdev->saved_timeout = ioread32(gdev->base + ARB_TIMER);
++	gdev->saved_timeout = gisb_read(gdev, ARB_TIMER);
+ 
+ 	return 0;
+ }
+@@ -372,7 +372,7 @@ static int brcmstb_gisb_arb_resume_noirq(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct brcmstb_gisb_arb_device *gdev = platform_get_drvdata(pdev);
+ 
+-	iowrite32(gdev->saved_timeout, gdev->base + ARB_TIMER);
++	gisb_write(gdev, gdev->saved_timeout, ARB_TIMER);
+ 
+ 	return 0;
+ }
+-- 
+2.1.0
