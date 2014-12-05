@@ -1,40 +1,36 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 05 Dec 2014 14:59:52 +0000
-Subject: [PATCH v12 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
-In-Reply-To: <1417774227.2232.1.camel@linaro.org>
-References: <1417671172-52915-1-git-send-email-wangnan0@huawei.com>
- <1417671360-53399-1-git-send-email-wangnan0@huawei.com>
- <1417710073.2239.10.camel@linaro.org> <5481289E.4060504@huawei.com>
- <1417774227.2232.1.camel@linaro.org>
-Message-ID: <1417791592.2232.5.camel@linaro.org>
+From: alexanders83@web.de (Alexander Stein)
+Date: Fri, 05 Dec 2014 16:00:27 +0100
+Subject: [PATCH 1/2] ARM: at91/dt: sam9263: Fix typo: ac91_clk -> ac97_clk
+In-Reply-To: <1417789016-20001-1-git-send-email-alexanders83@web.de>
+References: <1417789016-20001-1-git-send-email-alexanders83@web.de>
+Message-ID: <2676241.BfXNcaGQ7Q@kongar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-12-05 at 10:10 +0000, Jon Medhurst (Tixy) wrote:
-[...]
-> I'm worried because this whole optimised kprobes has some rather
-> complicated interactions, e.g. can the background thread that changes
-> breakpoints to jumps (or back again?) could occur at the same time
-> another CPU is processing a kprobe that's been hit, or is in the process
-> of removing a probe.
+On Friday 05 December 2014, 15:16:55 wrote Alexander Stein:
+> That clock should be called ac97_clk.
+> 
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
+> ---
+>  arch/arm/boot/dts/at91sam9263.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+> index 7989756..5ed2810 100644
+> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+> @@ -294,7 +294,7 @@
+>  						reg = <17>;
+>  					};
+>  
+> -					ac91_clk: ac97_clk {
+> +					ac97_clk: ac97_clk {
+>  						#clock-cells = <0>;
+>  						reg = <18>;
+>  					};
+> 
 
-I think that is a plausible theory. We can have this situation...
+Please ignore those 2 patches for now. I made a mistake during local rebase.
 
-1. CPU A executes a probe's 'breakpoint' instruction and the undefined
-instruction exception handler is triggered.
-
-2. CPU B is executing the kprobes optimisation thread and replaces the
-'breakpoint' with a branch instruction.
-
-3. CPU A reads the invalid instruction from memory and because this is
-now the branch instruction it doesn't match
-KPROBE_ARM_BREAKPOINT_INSTRUCTION which kprobes registered to handle.
-This means the undefined instruction exception is treated as just that,
-execution of an undefined instruction.
-
-The above scenario is the exact reason why arch_disarm_kprobe is
-implemented to always use stop_machine to modify the code and we need to
-ensure the same happens with arch_optimize_kprobes.
-
--- 
-Tixy
+Best regards,
+Alexander
