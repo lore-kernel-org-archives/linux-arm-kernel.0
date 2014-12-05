@@ -1,74 +1,70 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 5 Dec 2014 16:23:47 +0000
-Subject: [PATCH] arm: mm: dump: don't skip final region
-In-Reply-To: <1417782016-11825-1-git-send-email-mark.rutland@arm.com>
-References: <1417782016-11825-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAPvkgC1oOU_3D03ZV-uZqTW_DX8J74oGEKQZTTi2YrC+oSqJyA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 5 Dec 2014 16:35:06 +0000
+Subject: [GIT PULL] Automatic DMA configuration for OF-based IOMMU masters
+Message-ID: <20141205163506.GQ1630@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 December 2014 at 12:20, Mark Rutland <mark.rutland@arm.com> wrote:
-> If the final page table entry we walk is a valid mapping, the page table
-> dumping code will not log the region this entry is part of, as the final
-> note_page call in walk_pgd will trigger an early return. Luckily this
-> isn't seen on contemporary systems as they typically don't have enough
-> RAM to extend the linear mapping right to the end of the address space.
->
-> In note_page, we log a region when we reach its end (i.e. we hit an
-> entry immediately afterwards which has different prot bits or is
-> invalid). The final entry has no subsequent entry, so we will not log
-> this immediately. We try to cater for this with a subsequent call to
-> note_page in ptdump_show, but this returns early as 0 is less than
-> USER_PGTABLES_CEILING, and hence we will skip a valid mapping if it
-> spans to the final entry we note.
->
-> Luckily, the final note_page call has level == 0, while all prior calls
-> have a non-zero level, so if we also check level we will both skip user
-> entries and handle the final note_page call correctly. Due to the way
-> addr is constructed in the walk_* functions, it can never be less than
-> LOWEST_ADDR when walking the page tables, so it is not necessary to
-> avoid dereferencing invalid table addresses. The existing checks for
-> st->current_prot and st->marker[1].start_address are sufficient to
-> ensure we will not print and/or dereference garbage when trying to log
-> information.
+Hi Olof,
 
-Do you mean USER_PGTABLES_CEILING instead of LOWEST_ADDR?
+Please consider pulling the following series for 3.19. I appreciate that
+this is late in the day, but the patches have been around for a while and
+have collected all the Acks that they need. Marek has already been finding
+the series useful with the Exynos IOMMU, so it seems a pity to hold the
+patches up any longer.
 
->
-> This patch adds the aformentioned check for level, ensuring we log all
-> regions in the kernel mappings, including those which span right to the
-> end of the address space.
->
+Cheers,
 
-One comment above, then:
-Acked-by: Steve Capper <steve.capper@linaro.org>
+Will
 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/mm/dump.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> I found this via inspection, rather than being hit by the problem described
-> above, but it seemed worthwhile to fix this up (otherwise the final note_page
-> call is pointless).
->
-> diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
-> index 5942493..f459c0d 100644
-> --- a/arch/arm/mm/dump.c
-> +++ b/arch/arm/mm/dump.c
-> @@ -220,7 +220,7 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level, u
->         static const char units[] = "KMGTPE";
->         u64 prot = val & pg_level[level].mask;
->
-> -       if (addr < USER_PGTABLES_CEILING)
-> +       if (level && addr < USER_PGTABLES_CEILING)
->                 return;
->
->         if (!st->level) {
-> --
-> 1.9.1
->
+--->8
+
+The following changes since commit 5d01410fe4d92081f349b013a2e7a95429e4f2c9:
+
+  Linux 3.18-rc6 (2014-11-23 15:25:20 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git tags/of-iommu-configure
+
+for you to fetch changes up to a42a7a1fb5f1f9004b023594609dc22da02fc08b:
+
+  iommu: store DT-probed IOMMU data privately (2014-12-05 14:35:52 +0000)
+
+----------------------------------------------------------------
+This series adds automatic IOMMU and DMA-mapping configuration for
+OF-based DMA masters described using the generic IOMMU devicetree
+bindings. Although there is plenty of future work around splitting up
+iommu_ops, adding default IOMMU domains and sorting out automatic IOMMU
+group creation for the platform_bus, this is already useful enough for
+people to port over their IOMMU drivers and start using the new probing
+infrastructure (indeed, Marek has patches queued for the Exynos IOMMU).
+
+----------------------------------------------------------------
+Marek Szyprowski (1):
+      iommu: fix initialization without 'add_device' callback
+
+Robin Murphy (1):
+      iommu: store DT-probed IOMMU data privately
+
+Will Deacon (7):
+      iommu: provide early initialisation hook for IOMMU drivers
+      dma-mapping: replace set_arch_dma_coherent_ops with arch_setup_dma_ops
+      iommu: add new iommu_ops callback for adding an OF device
+      iommu: provide helper function to configure an IOMMU for an of master
+      dma-mapping: detect and configure IOMMU in of_dma_configure
+      arm: call iommu_init before of_platform_populate
+      arm: dma-mapping: plumb our iommu mapping ops into arch_setup_dma_ops
+
+ arch/arm/include/asm/dma-mapping.h | 12 ++---
+ arch/arm/kernel/setup.c            |  2 +
+ arch/arm/mm/dma-mapping.c          | 83 ++++++++++++++++++++++++++++++++---
+ drivers/iommu/Kconfig              |  2 +-
+ drivers/iommu/iommu.c              |  2 +-
+ drivers/iommu/of_iommu.c           | 89 ++++++++++++++++++++++++++++++++++++++
+ drivers/of/platform.c              | 50 +++++++++++----------
+ include/asm-generic/vmlinux.lds.h  |  2 +
+ include/linux/dma-mapping.h        | 13 +++---
+ include/linux/iommu.h              |  8 ++++
+ include/linux/of_iommu.h           | 23 ++++++++++
+ 11 files changed, 242 insertions(+), 44 deletions(-)
