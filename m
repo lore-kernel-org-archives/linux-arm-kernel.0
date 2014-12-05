@@ -1,21 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Dec 2014 23:20:54 -0800
-Subject: [GIT PULL] ARM: BCM5301X: DT changes for v3.19 #2
-In-Reply-To: <5480C00C.3090709@hauke-m.de>
-References: <5480C00C.3090709@hauke-m.de>
-Message-ID: <20141205072054.GB29274@quad.lixom.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 04 Dec 2014 23:23:49 -0800
+Subject: [GIT PULL] Broadcom STB GISB bus driver for 3.19 (v2)
+In-Reply-To: <2910464.KM7dWcxCmJ@wuerfel>
+References: <1417220370-469-1-git-send-email-f.fainelli@gmail.com>
+ <2910464.KM7dWcxCmJ@wuerfel>
+Message-ID: <54815D85.7090409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 09:11:56PM +0100, Hauke Mehrtens wrote:
-> Hi Olof, Hi Arnd,
+Le 04/12/2014 07:44, Arnd Bergmann a ?crit :
+> On Friday 28 November 2014 16:19:30 Florian Fainelli wrote:
+>> This pull request contains the following changes to the Broadcom GISB bus
+>> arbiter from Kevin Cernekee:
+>>
+>> - Extend brcmstb GISB bus driver to work on MIPS (currently ARM-only) and support
+>>   65nm and 40nm MIPS-based chips such as: BCM7038, BCM7400 and BCM7435
 > 
-> This is a late pull request with some dts updates for BCM5301X I hope
-> this still can go into 3.19.
-> 
-> It is based onto of my last dt pull request for BCM5301X.
+> Pulled into next/drivers, thanks!
 
-Merged into next/dt. Thanks!
+Thanks! You may have to resolve a conflict when you merge
+brcm/stb-smp-uart with next/drivers for this file, especially with the
+commit below:
+
+203bb85ed605e43eadca62afb3a8cd128a8ec10a ("bus: brcmstb_gisb: save and
+restore GISB timeout")
+
+for brcmstb_gisb_arb_suspend() and
+brcmstb_gisb_arb_resume_noirq() which still use the ioread32/iowrite32
+accessors instead of those introduced later on by Kevin: gisb_read() and
+gisb_write. The merge resolution looks like this:
 
 
--Olof
+#ifdef CONFIG_PM_SLEEP
+static int brcmstb_gisb_arb_suspend(struct device *dev)
+{
+        struct platform_device *pdev = to_platform_device(dev);
+        struct brcmstb_gisb_arb_device *gdev = platform_get_drvdata(pdev);
+
+        gdev->saved_timeout = gisb_read(gdev, ARB_TIMER);
+
+        return 0;
+}
+
+/* Make sure we provide the same timeout value that was configured
+before, and
+ * do this before the GISB timeout interrupt handler has any chance to run.
+ */
+static int brcmstb_gisb_arb_resume_noirq(struct device *dev)
+{
+        struct platform_device *pdev = to_platform_device(dev);
+        struct brcmstb_gisb_arb_device *gdev = platform_get_drvdata(pdev);
+
+        gisb_write(gdev, gdev->saved_timeout, ARB_TIMER);
+
+        return 0;
+}
+
+--
+Florian
