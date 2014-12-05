@@ -1,74 +1,50 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Fri, 5 Dec 2014 13:43:01 +0100
-Subject: using DMA-API on ARM
-In-Reply-To: <20141205094507.GP11285@n2100.arm.linux.org.uk>
-References: <5481794E.4050406@broadcom.com>
- <20141205094507.GP11285@n2100.arm.linux.org.uk>
-Message-ID: <5481A855.6000603@broadcom.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 05 Dec 2014 13:43:59 +0100
+Subject: [PATCH v4 1/3] clk: samsung: Fix clock disable failure because
+ domain being gated
+In-Reply-To: <1417777254-26579-2-git-send-email-k.kozlowski@samsung.com>
+References: <1417777254-26579-1-git-send-email-k.kozlowski@samsung.com>
+ <1417777254-26579-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5481A88F.9090308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05-12-14 10:45, Russell King - ARM Linux wrote:
-> On Fri, Dec 05, 2014 at 10:22:22AM +0100, Arend van Spriel wrote:
->> For our brcm80211 development we are working on getting brcmfmac driver
->> up and running on a Broadcom ARM-based platform. The wireless device is
->> a PCIe device, which is hooked up to the system behind a PCIe host
->> bridge, and we transfer information between host and device using a
->> descriptor ring buffer allocated using dma_alloc_coherent(). We mostly
->> tested on x86 and seen no issue. However, on this ARM platform
->> (single-core A9) we detect occasionally that the descriptor content is
->> invalid. When this occurs we do a dma_sync_single_for_cpu() and this is
->> retried a number of times if the problem persists. Actually, found out
->> that someone made a mistake by using virt_to_dma(va) to get the
->> dma_handle parameter. So probably we only provided a delay in the retry
->> loop. After fixing that a single call to dma_sync_single_for_cpu() is
->> sufficient. The DMA-API-HOWTO clearly states that:
->>
->> """
->> the hardware should guarantee that the device and the CPU can access the
->> data in parallel and will see updates made by each other without any
->> explicit software flushing.
->> """
->>
->> So it seems incorrect that we would need to do a dma_sync for this
->> memory. That we do need it seems like this memory can end up in
->> cache(?), or whatever happens, in some rare condition. Is there anyway
->> to investigate this situation either through DMA-API or some low-level
->> ARM specific functions.
->
-> It's been a long while since I looked at the code, and the code for
-> dma_alloc_coherent() has completely changed since then with the
-> addition of CMA.  I'm afraid that anything I would say about it would
-> not be accurate without research into the possible paths through that
-> code - it's no longer just a simple allocator.
+Hi Krzysztof,
 
-I know. On this particular platform we are not using CMA.
+On 05/12/14 12:00, Krzysztof Kozlowski wrote:
+> Audio subsystem clocks are located in separate block. If clock for this
+> block (from main clock domain) 'mau_epll' is gated then any read or
+> write to audss registers will block.
+> 
+> This was observed on Exynos 5420 platforms (Arndale Octa and Peach
+> Pi/Pit) after introducing runtime PM to pl330 DMA driver. After that
+> commit the 'mau_epll' was gated, because the "amba" clock was disabled
+> and there were no more users of mau_epll. The system hang on disabling
+> unused clocks from audss block.
+> 
+> Unfortunately the 'mau_epll' clock is not parent of some of audss clocks.
+> 
+> Whenever system wants to operate on audss clocks it has to enable epll
+> clock. The solution reuses common clk-gate/divider/mux code and duplicates
+> clk_register_*() functions.
+> 
+> Additionally this patch fixes memory leak of clock gate/divider/mux
+> structures. The leak exists in generic clk_register_*() functions. Patch
+> replaces them with custom code with managed allocation.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Reported-by: Kevin Hilman <khilman@kernel.org>
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-> What you say is correct however: the memory should not have any cache
-> lines associated with it, if it does, there's a bug somewhere.
->
-> Also, the memory will be weakly ordered, which means that writes to such
-> memory can be reordered.  If ordering matters, barriers should be used.
-> rmb() and wmb() can be used for this.
+Instead of this big patch perhaps for v3.19 we could just add
+a clk_enable() call in exynos5420 clock controller driver, to make
+sure the required clock is always enabled, as it was before you have
+added runtime PM support to the PL330 DMA controller driver ?
 
-Ok. You already had a peek in our code checking the memory barriers, 
-which does not have the dma_sync_single_for_cpu() "workaround" yet. So 
-here some more background. The problem is in DMA_FROM_DEVICE direction. 
-Because of the possible reordering issue we first tried using rmb() in 
-the retry loop but that did not solve it. Another experiment was to 
-ignore the failed ring descriptor entry and proceed. So we get interrupt 
-from device and access the ring descriptor entry. This should contain 
-expected value X, however we get X-1 back. When proceeding everything 
-works find until hitting the same ring descriptor entry again reading 
-X-1 when X+1 would be valid. This lead us to the assumption that somehow 
-this entry ended up in cache lines. The issue goes away using the 
-dma_sync_single_for_cpu() with DMA_FROM_DEVICE in direction parameter. 
-We are not longer using virt_to_dma() so that is no longer an issue. So 
-is there any function interface to verify cache status.
+It sounds like a workaround but wouldn't be as intrusive as this
+patch.
 
+--
 Regards,
-Arend
-
-> (Added Marek for comment on dma_alloc_coherent(), Will for comment on
-> barrier stuff.)
->
+Sylwester
