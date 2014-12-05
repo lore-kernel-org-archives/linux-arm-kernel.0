@@ -1,90 +1,86 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 05 Dec 2014 13:06:10 +0100
-Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
-In-Reply-To: <3551792.oHatG1W6W1@wuerfel>
-References: <1417707993-82290-1-git-send-email-agraf@suse.de>
- <5480F12D.90007@suse.de>
- <CAOesGMi-sVTxdo8f7vNnYMgd+meBF+Gsf3Pk5VbHEPxv5Q6iDA@mail.gmail.com>
- <3551792.oHatG1W6W1@wuerfel>
-Message-ID: <54819FB2.6000408@suse.de>
+From: n.nikolaev@virtualopensystems.com (Nikolay Nikolaev)
+Date: Fri, 5 Dec 2014 14:06:33 +0200
+Subject: [RFC PATCH 2/5] ARM: on IO mem abort - route the call to KVM MMIO
+ bus
+In-Reply-To: <20141129112858.GB13623@macair>
+References: <20141124212240.10605.46770.stgit@i3820>
+ <20141124212651.10605.58116.stgit@i3820>
+ <20141129112858.GB13623@macair>
+Message-ID: <CADDJ2=OB-HjB5xjZbuDNXuTTXwjJ2aG9WE4wEmP7ep+eF0VGyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 05.12.14 11:39, Arnd Bergmann wrote:
-> On Thursday 04 December 2014 15:48:50 Olof Johansson wrote:
->> On Thu, Dec 4, 2014 at 3:41 PM, Alexander Graf <agraf@suse.de> wrote:
->>> On 04.12.14 22:15, Olof Johansson wrote:
->>>> On Thu, Dec 4, 2014 at 7:46 AM, Alexander Graf <agraf@suse.de> wrote:
->>>>> With binutils 2.25 the default alignment for 32bit arm sections changed to
->>>>> have everything 64k aligned. Armv7 binaries built with this binutils version
->>>>> run successfully on an arm64 system.
->>>>>
->>>>> Since effectively there is now the chance to run armv7 code on arm64 even
->>>>> with 64k page size, it doesn't make sense to block people from enabling
->>>>> CONFIG_COMPAT on those configurations.
->>>>>
->>>>> Signed-off-by: Alexander Graf <agraf@suse.de>
->>>>> ---
->>>>>  arch/arm64/Kconfig | 1 -
->>>>>  1 file changed, 1 deletion(-)
->>>>>
->>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>>>> index 9532f8d..3cf4f238 100644
->>>>> --- a/arch/arm64/Kconfig
->>>>> +++ b/arch/arm64/Kconfig
->>>>> @@ -409,7 +409,6 @@ source "fs/Kconfig.binfmt"
->>>>>
->>>>>  config COMPAT
->>>>>         bool "Kernel support for 32-bit EL0"
->>>>> -       depends on !ARM64_64K_PAGES
->>>>>         select COMPAT_BINFMT_ELF
->>>>>         select HAVE_UID16
->>>>>         select OLD_SIGSUSPEND3
->>>>
->>>> This is hardly "compat". Sure, it's great to have a new binutils that
->>>> has larger alignment, but practically not a single existing binary
->>>> will work today if someone tries to do this.
->>>
->>> Yes, but IMHO that's an implementation detail. The same applies for
->>> 32bit PPC binaries if you use 4k aligned segments. If your applications
->>> are not aligned for your page size, you can't run them. The only
->>> platform that managed nevertheless FWIW was IA64 ;).
+On Sat, Nov 29, 2014 at 1:28 PM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Mon, Nov 24, 2014 at 11:26:51PM +0200, Nikolay Nikolaev wrote:
+>> On IO memory abort, try to handle the MMIO access thorugh the KVM
+>> registered read/write callbacks. This is done by invoking the relevant
+>> kvm_io_bus_* API.
 >>
->> Yes, but there the binutils change happened early enough that by the
->> time the kernel change went in, all major distros had binaries that
->> were compatible.
-> 
-> What is the exact symptom you see when running an unaligned user
-> space binary on 64k-pages? Do we at least print a helpful error
-> message somewhere or does it just crash?
+>> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+>> ---
+>>  arch/arm/kvm/mmio.c |   33 +++++++++++++++++++++++++++++++++
+>>  1 file changed, 33 insertions(+)
+>>
+>> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+>> index 4cb5a93..81230da 100644
+>> --- a/arch/arm/kvm/mmio.c
+>> +++ b/arch/arm/kvm/mmio.c
+>> @@ -162,6 +162,36 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>       return 0;
+>>  }
+>>
+>> +/**
+>> + * kvm_handle_mmio - handle an in-kernel MMIO access
+>> + * @vcpu:    pointer to the vcpu performing the access
+>> + * @run:     pointer to the kvm_run structure
+>> + * @mmio:    pointer to the data describing the access
+>> + *
+>> + * returns true if the MMIO access has been performed in kernel space,
+>> + * and false if it needs to be emulated in user space.
+>> + */
+>> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>> +             struct kvm_exit_mmio *mmio)
+>> +{
+>> +     int ret;
+>> +
+>> +     if (mmio->is_write) {
+>> +             ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
+>> +                             mmio->len, &mmio->data);
+>> +
+>> +     } else {
+>> +             ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
+>> +                             mmio->len, &mmio->data);
+>> +     }
+>> +     if (!ret) {
+>> +             kvm_prepare_mmio(run, mmio);
+>> +             kvm_handle_mmio_return(vcpu, run);
+>> +     }
+>> +
+>> +     return !ret;
+>> +}
+>> +
+>>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>                phys_addr_t fault_ipa)
+>>  {
+>> @@ -200,6 +230,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>       if (vgic_handle_mmio(vcpu, run, &mmio))
+>>               return 1;
+>>
+>> +     if (handle_kernel_mmio(vcpu, run, &mmio))
+>> +             return 1;
+>> +
+>
+> Is this stuff always synchronously handled so that the mmio is properly
+> populated upon handle_kernel_mmio on reads?
 
-It simply doesn't start:
+If I get it right the kvm_io_bus_ API is intended to work
+synchronously. Of course it probably depends
+on how the registered device handles the read/write call.
+Or maybe I misunderstand your question? Please clarify in that case.
 
-init-4.2# /hello.binutils-2.23
-init-4.2# echo $?
-139
-init-4.2# /hello.binutils-2.25
+regards,
+Nikolay Nikolaev
 
-
-
-
-
-Hello world!
-
-
-
-
-
-init-4.2# echo $?
-0
-init-4.2#
-
-
-I'm not sure how to give the user an actually helpful error output here
-though. The only real handle we have for executing a binary is to return
-an error code.
-
-
-Alex
+>
+> -Christoffer
