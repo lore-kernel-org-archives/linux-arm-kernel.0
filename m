@@ -1,220 +1,125 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Fri, 5 Dec 2014 21:19:33 +0100
-Subject: [PATCH v3 2/3] ARM: socfpga: Add driver for the L3 interconnect
-In-Reply-To: <alpine.DEB.2.02.1412051349080.15664@linuxheads99>
-References: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
- <1417292052-12974-3-git-send-email-s.trumtrar@pengutronix.de>
- <547DECB8.3070801@opensource.altera.com>
- <alpine.DEB.2.02.1412051349080.15664@linuxheads99>
-Message-ID: <20141205201933.GC28110@pengutronix.de>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Fri, 05 Dec 2014 22:32:48 +0200
+Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
+In-Reply-To: <20141205190247.GA25455@roeck-us.net>
+References: <5465C00E.4030808@offcode.fi>
+ <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
+ <20141127200036.2c65df62@bbrezillon> <5481ABA1.9030408@offcode.fi>
+ <20141205151221.0ee1e814@bbrezillon> <5481FC7F.3000105@offcode.fi>
+ <20141205190247.GA25455@roeck-us.net>
+Message-ID: <54821670.9030602@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 05.12.2014 21:02, Guenter Roeck wrote:
+> On Fri, Dec 05, 2014 at 08:42:07PM +0200, Timo Kokkonen wrote:
+>> On 05.12.2014 16:12, Boris Brezillon wrote:
+>>> Hi Timo,
+>>>
+>>> On Fri, 05 Dec 2014 14:57:05 +0200
+>>> Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
+>>>
+>>>> On 27.11.2014 21:00, Boris Brezillon wrote:
+>>>>> Hi Timo,
+>>>>>
+>>>>> Sorry for the late reply.
+>>>>>
+>>>>> On Fri, 21 Nov 2014 14:23:30 +0200
+>>>>> Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
+>>>>>
+>>>>>> By default the driver will start a kernel timer which keeps on kicking
+>>>>>> the watchdog HW until user space has opened the watchdog
+>>>>>> device. Usually this is desirable as the watchdog HW is running by
+>>>>>> default and the user space may not have any watchdog daemon running at
+>>>>>> all.
+>>>>>>
+>>>>>> However, on production systems it may be mandatory that also early
+>>>>>> crashes and lockups will lead to a watchdog reset, even if they happen
+>>>>>> before the user space has opened the watchdog device.
+>>>>>>
+>>>>>> To resolve the issue, add a new device tree property
+>>>>>> "enable-early-reset" which will prevent the kernel timer from pinging
+>>>>>> the watchdog HW on behalf of user space. The default is still to use
+>>>>>> kernel timer, but more strict behavior can be enabled via the device
+>>>>>> tree property.
+>>>>>>
+>>>>>> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+>>>>>> ---
+>>>>>>    Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
+>>>>>>    drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
+>>>>>>    2 files changed, 9 insertions(+), 1 deletion(-)
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>>>>> index f90e294..a0b7b75 100644
+>>>>>> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>>>>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>>>>> @@ -28,6 +28,10 @@ Optional properties:
+>>>>>>    	entering idle state.
+>>>>>>    - atmel,dbg-halt : Should be present if you want to stop the watchdog when
+>>>>>>    	entering debug state.
+>>>>>> +- enable-early-reset : Should be present if you want to let the
+>>>>>> +	watchdog timer to expire even before user space has opened the
+>>>>>> +	device. If not set, a kernel timer will keep on pinging the
+>>>>>> +	watchdog until it is opened.
+>>>>>
+>>>>> If you want to make this property generic, maybe you should document it
+>>>>> in a generic binding doc
+>>>>> (Documentation/devicetree/bindings/watchdog/watchdog.txt ?).
+>>>>> Once you're at it, maybe you could document the generic timeout-sec
+>>>>> property in this file.
+>>>>> Moreover, you might want to parse this property in watchdog_core.c and
+>>>>> store the information in the watchdog_device struct.
+>>>>
+>>>> I gave a little thought about this today and we could maybe have it like
+>>>> watchdog_init_timeout() is today. But I can't really think of any
+>>>> generic handling for this property, anything else except storing the
+>>>> parsed value to a variable in watchdog_device struct. Everything else is
+>>>> HW specific, except how we read the variable.. If we had some logic or
+>>>> checking for this variable (other than to check it is not negative)
+>>>> maybe then it would make sense.
+>>>
+>>> Okay, I'm fine with keeping this DT property parsing out of the core.
+>>
+>> Ok, good.
+>>
+>>>>
+>>>> So I could write a patch to document generic watchdog properties in
+>>>> Documentation/devicetree/bindings/watchdog/watchdog.txt (anything else
+>>>> generic that would go there except timeout-sec and enable-early-reset?)
+>>>
+>>> I'm not sure you and Guenter agreed on the 'early-keepalive-sec'
+>>> property (and this one won't be used in atmel driver since you can't
+>>> change the timeout once set), so I'd say the timeout-sec and
+>>> enable-early-reset are the only common properties for now.
+>>
+>> Actually it can be done in Atmel driver as well. It already has a
+>> timer that keeps on pinging the watchdog until user space opens it.
+>> We just modify the code so that it keeps on pinging the watchdog
+>> until early-keepalive-sec has expired. No need to change the HW
+>> timeouts at all. And I rather have it implemented that way anyway,
+>> the 16 second timeout is a little tight if there happens to be a lot
+>> of stuff already in the early user space.
+>>
+>> Yeah, I didn't get anything back from Guenter about my
+>> early-keepalive-sec property proposal. Frankly, I already forgot
+>> about it my self already. I guess I'll get back to you with v3 set
+>> once I get time for it. Probably easiest to continue from there.
+>>
+> Sorry for that, folks. I have been a bit overwhelmed in the last cycle.
+>
+> early-timeout-sec seems to be the best property name to me right now.
+> It is aligned with the existing timeout-sec. early-keepalive-sec seems
+> kind of different just for the purpose of being different.
 
-On Fri, Dec 05, 2014 at 01:51:48PM -0600, atull wrote:
-> On Tue, 2 Dec 2014, Dinh Nguyen wrote:
-> 
-> > +CC: Alan Tull
-> > 
-> > On 11/29/2014 02:14 PM, Steffen Trumtrar wrote:
-> > > The L3 interconnect provides Global Programmer View (GPV) registers for every
-> > > AXI master and slave on the SoC.
-> > > Although this is just a bunch of bits, syscon is not the right approach for
-> > > this IP core.
-> > > The L3 interconnect is configured with a lot of reserved "holes" in its memory
-> > > space. Just mapping this with regmap, what syscon would do, would lead to the
-> > > system completely hanging, if one of those areas would be touched.
-> > > One example for when this might happen is the regmap registers dump in the
-> > > debugfs.
-> > > 
-> > > This driver specifies also the valid readable and writable ranges of the L3
-> > > interconnect. Other drivers that want to access their GPV registers can do
-> > > so with this driver via socfpga_l3nic_regmap_by_phandle.
-> > > 
-> > > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > > ---
-> > >  drivers/soc/Kconfig          |   1 +
-> > >  drivers/soc/Makefile         |   1 +
-> > >  drivers/soc/socfpga/Kconfig  |  10 ++
-> > >  drivers/soc/socfpga/Makefile |   1 +
-> > >  drivers/soc/socfpga/l3nic.c  | 221 +++++++++++++++++++++++++++++++++++++++++++
-> > >  include/soc/socfpga/gpv.h    |  63 ++++++++++++
-> > >  include/soc/socfpga/l3regs.h | 192 +++++++++++++++++++++++++++++++++++++
-> > >  7 files changed, 489 insertions(+)
-> > >  create mode 100644 drivers/soc/socfpga/Kconfig
-> > >  create mode 100644 drivers/soc/socfpga/Makefile
-> > >  create mode 100644 drivers/soc/socfpga/l3nic.c
-> > >  create mode 100644 include/soc/socfpga/gpv.h
-> > >  create mode 100644 include/soc/socfpga/l3regs.h
-> > > 
-> > > diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-> > > index 76d6bd4da138..11db07da894f 100644
-> > > --- a/drivers/soc/Kconfig
-> > > +++ b/drivers/soc/Kconfig
-> > > @@ -1,6 +1,7 @@
-> > >  menu "SOC (System On Chip) specific Drivers"
-> > >  
-> > >  source "drivers/soc/qcom/Kconfig"
-> > > +source "drivers/soc/socfpga/Kconfig"
-> > >  source "drivers/soc/ti/Kconfig"
-> > >  source "drivers/soc/versatile/Kconfig"
-> > >  
-> > > diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-> > > index 063113d0bd38..0f89173e328a 100644
-> > > --- a/drivers/soc/Makefile
-> > > +++ b/drivers/soc/Makefile
-> > > @@ -3,6 +3,7 @@
-> > >  #
-> > >  
-> > >  obj-$(CONFIG_ARCH_QCOM)		+= qcom/
-> > > +obj-$(CONFIG_ARCH_SOCFPGA)	+= socfpga/
-> > >  obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
-> > >  obj-$(CONFIG_SOC_TI)		+= ti/
-> > >  obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
-> > > diff --git a/drivers/soc/socfpga/Kconfig b/drivers/soc/socfpga/Kconfig
-> > > new file mode 100644
-> > > index 000000000000..533c59449fb8
-> > > --- /dev/null
-> > > +++ b/drivers/soc/socfpga/Kconfig
-> > > @@ -0,0 +1,10 @@
-> > > +#
-> > > +# SoCFPGA Soc drivers
-> > > +#
-> > > +
-> > > +config SOCFPGA_L3NIC
-> > > +	tristate "SoCFPGA L3 NIC-301 driver"
-> > > +	depends on ARCH_SOCFPGA
-> > > +	select REGMAP_MMIO
-> > > +	help
-> > > +	  Enable configuration support for the SoCFPGA L3 AMBA Network Interconnect.
-> > > diff --git a/drivers/soc/socfpga/Makefile b/drivers/soc/socfpga/Makefile
-> > > new file mode 100644
-> > > index 000000000000..e6616d079226
-> > > --- /dev/null
-> > > +++ b/drivers/soc/socfpga/Makefile
-> > > @@ -0,0 +1 @@
-> > > +obj-$(CONFIG_SOCFPGA_L3NIC) += l3nic.o
-> > > diff --git a/drivers/soc/socfpga/l3nic.c b/drivers/soc/socfpga/l3nic.c
-> > > new file mode 100644
-> > > index 000000000000..c1f36e2ec9cb
-> > > --- /dev/null
-> > > +++ b/drivers/soc/socfpga/l3nic.c
-> > > @@ -0,0 +1,221 @@
-> > > +/*
-> > > + * Copyright 2014 Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > > + *
-> > > + * This program is free software; you can redistribute it and/or modify
-> > > + * it under the terms of the GNU General Public License as published by
-> > > + * the Free Software Foundation; either version 2 of the License, or
-> > > + * (at your option) any later version.
-> > > + */
-> > > +
-> > > +#include <linux/clk.h>
-> > > +#include <linux/err.h>
-> > > +#include <linux/io.h>
-> > > +#include <linux/module.h>
-> > > +#include <linux/of.h>
-> > > +#include <linux/of_device.h>
-> > > +#include <linux/platform_device.h>
-> > > +#include <linux/regmap.h>
-> > > +#include <linux/types.h>
-> > > +#include <soc/socfpga/gpv.h>
-> > > +#include <soc/socfpga/l3regs.h>
-> > > +
-> > > +static const struct regmap_range l3nic_write_regs_range[] = {
-> > > +	regmap_reg_range(L3NIC_REMAP, L3NIC_REMAP),
-> > > +	regmap_reg_range(L3NIC_L4MAIN, L3NIC_LWHPS2FPGAREGS),
-> > > +	regmap_reg_range(L3NIC_USB1, L3NIC_NANDDATA),
-> > > +	regmap_reg_range(L3NIC_USB0, L3NIC_SDRDATA),
-> > > +	regmap_reg_range(L3NIC_L4_MAIN_FN_MOD_BM_ISS, L3NIC_L4_MAIN_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_L4_SP_FN_MOD_BM_ISS, L3NIC_L4_SP_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_L4_MP_FN_MOD_BM_ISS, L3NIC_L4_MP_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_L4_OSC1_FN_MOD_BM_ISS, L3NIC_L4_OSC1_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_L4_SPIM_FN_MOD_BM_ISS, L3NIC_L4_SPIM_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_STM_FN_MOD_BM_ISS, L3NIC_STM_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_STM_FN_MOD, L3NIC_STM_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_LWHPS2FPGA_FN_MOD_BM_ISS, L3NIC_LWHPS2FPGA_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_LWHPS2FPGA_FN_MOD, L3NIC_LWHPS2FPGA_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_USB1_FN_MOD_BM_ISS, L3NIC_USB1_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_USB1_AHB_CNTL, L3NIC_USB1_AHB_CNTL),
-> > > +	regmap_reg_range(L3NIC_NANDDATA_FN_MOD_BM_ISS, L3NIC_NANDDATA_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_NANDDATA_FN_MOD, L3NIC_NANDDATA_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_USB0_FN_MOD_BM_ISS, L3NIC_USB0_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_USB0_AHB_CNTL, L3NIC_USB0_AHB_CNTL),
-> > > +	regmap_reg_range(L3NIC_QSPIDATA_FN_MOD_BM_ISS, L3NIC_QSPIDATA_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_QSPIDATA_AHB_CNTL, L3NIC_QSPIDATA_AHB_CNTL),
-> > > +	regmap_reg_range(L3NIC_FPGAMGRDATA_FN_MOD_BM_ISS, L3NIC_FPGAMGRDATA_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_FPGAMGRDATA_WR_TIDEMARK, L3NIC_FPGAMGRDATA_WR_TIDEMARK),
-> > > +	regmap_reg_range(L3NIC_FPGAMGRDATA_FN_MOD, L3NIC_FPGAMGRDATA_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_HPS2FPGA_FN_MOD_BM_ISS, L3NIC_HPS2FPGA_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_HPS2FPGA_WR_TIDEMARK, L3NIC_HPS2FPGA_WR_TIDEMARK),
-> > > +	regmap_reg_range(L3NIC_HPS2FPGA_FN_MOD, L3NIC_HPS2FPGA_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_ACP_FN_MOD_BM_ISS, L3NIC_ACP_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_ACP_FN_MOD, L3NIC_ACP_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_BOOT_ROM_FN_MOD_BM_ISS, L3NIC_BOOT_ROM_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_BOOT_ROM_FN_MOD, L3NIC_BOOT_ROM_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_OCRAM_FN_MOD_BM_ISS, L3NIC_OCRAM_FN_MOD_BM_ISS),
-> > > +	regmap_reg_range(L3NIC_OCRAM_WR_TIDEMARK, L3NIC_OCRAM_WR_TIDEMARK),
-> > > +	regmap_reg_range(L3NIC_OCRAM_FN_MOD, L3NIC_OCRAM_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_DAP_FN_MOD2, L3NIC_DAP_FN_MOD_AHB),
-> > > +	regmap_reg_range(L3NIC_DAP_READ_QOS, L3NIC_DAP_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_MPU_READ_QOS, L3NIC_MPU_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_SDMMC_FN_MOD_AHB, L3NIC_SDMMC_FN_MOD_AHB),
-> > > +	regmap_reg_range(L3NIC_SDMMC_READ_QOS, L3NIC_SDMMC_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_DMA_READ_QOS, L3NIC_DMA_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_FPGA2HPS_WR_TIDEMARK, L3NIC_FPGA2HPS_WR_TIDEMARK),
-> > > +	regmap_reg_range(L3NIC_FPGA2HPS_READ_QOS, L3NIC_FPGA2HPS_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_ETR_READ_QOS, L3NIC_ETR_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_EMAC0_READ_QOS, L3NIC_EMAC0_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_EMAC1_READ_QOS, L3NIC_EMAC1_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_USB0_FN_MOD_AHB, L3NIC_USB0_FN_MOD_AHB),
-> > > +	regmap_reg_range(L3NIC_USB0_READ_QOS, L3NIC_USB0_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_NAND_READ_QOS, L3NIC_NAND_FN_MOD),
-> > > +	regmap_reg_range(L3NIC_USB1_FN_MOD_AHB, L3NIC_USB1_FN_MOD_AHB),
-> > > +	regmap_reg_range(L3NIC_USB1_READ_QOS, L3NIC_USB1_FN_MOD),
-> > > +};
-> > > +
-> > > +static const struct regmap_range l3nic_read_regs_range[] = {
-> > > +	regmap_reg_range(L3NIC_REMAP, L3NIC_REMAP),
-> 
-> Hi Steffen,
-> 
-> We may have discussed this a bit, but I want to make sure that this is
-> made obvious here: some of these registers are not readable. L3NIC_REMAP
-> is one of these for example.
-> 
+early-timeout-sec sounds good to me. I'll go with that.
 
-You can read just fine from the register, but you will always
-get a 0 back.
+> Not sure about how to name enable-early-reset. I'd prefer to have something
+> generic, even if only implemented in a single driver for now, but I don't
+> really know right now what that might/should look like. Maybe just
+> "enable-early" to indicate that the watchdog should be enabled during init ?
 
-> So please mark the appropriate registers as not being readable. Then
-> anyone who does a regmap_update_bits() will get an error, which is
-> what we want.
-> 
-> It would probably be good to add a note to the patch header warning
-> people that some of these regs are write-only.
-> 
+Do we need the enable-early or such property at all? Just leave 
+early-timeout-sec to zero and then let it behave just like enable-early 
+would do?
 
-Regmap has a cache for the value. When you do a read on these
-registers, you get the cached value, consequently you can also
-do a regmap_update_bits from different drivers and will always
-have the correct value written to the register.
-
-The registers you can NOT read from are the ones not in the
-specified ranges and the whole reason why I wrote this driver.
-
-> I also would request that you post future versions, please keep me and all
-> the other people who originally had replied to v1, v2, etc in the cc.
-> 
-
-Yes, I forgot to add you. Sorry.
-
-Regards,
-Steffen
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-Timo
