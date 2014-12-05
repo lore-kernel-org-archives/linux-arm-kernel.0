@@ -1,46 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Dec 2014 11:08:07 +0100
-Subject: [PATCH] optimize ktime_divns for constant divisors
-In-Reply-To: <alpine.LFD.2.11.1412042056240.470@knanqh.ubzr>
-References: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
- <OF0EDEDB1C.C03829F7-ON48257DA5.00062083-48257DA5.0007628B@zte.com.cn>
- <alpine.LFD.2.11.1412042056240.470@knanqh.ubzr>
-Message-ID: <2145860.PBxl6kLNRF@wuerfel>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 05 Dec 2014 10:10:27 +0000
+Subject: [PATCH v12 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
+In-Reply-To: <5481289E.4060504@huawei.com>
+References: <1417671172-52915-1-git-send-email-wangnan0@huawei.com>
+ <1417671360-53399-1-git-send-email-wangnan0@huawei.com>
+ <1417710073.2239.10.camel@linaro.org> <5481289E.4060504@huawei.com>
+Message-ID: <1417774227.2232.1.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 December 2014 23:30:08 Nicolas Pitre wrote:
-> >          res += (u64)x_lo * y_hi + (u64)x_hi * y_lo;
+On Fri, 2014-12-05 at 11:38 +0800, Wang Nan wrote:
+> On 2014/12/5 0:21, Jon Medhurst (Tixy) wrote:
+> > On Thu, 2014-12-04 at 13:36 +0800, Wang Nan wrote:
+> > 
 > 
-> That, too, risk overflowing.
+> [trim some text]
 > 
-> Let's say x_lo = 0xffffffff and x_hi = 0xffffffff.  You get:
+> > 
+> > I have retested this patch and on one of the arm test cases I get an
+> > undefined instruction exception in kprobe_arm_test_cases. When this
+> > happens PC points to the second nop below. 
+> > 
+> > 
+> > 80028a38:	e320f000 	nop	{0}
+> > 80028a3c:	e11000b2 	ldrh	r0, [r0, -r2]
+> > 80028a40:	e320f000 	nop	{0}
+> > 
+> > As all three instructions will have probes on them during testing, and
+> > un-optimised probes are implemented by using an undefined instruction to
+> > act as a breakpoint, my first thought was that we have a race condition
+> > somewhere with adding, removing or optimizing probes. Though a reboot a
+> > retest failed in the same way on the same instruction, so I'm not 100%
+> > convinced about strictly timing related bugs.
+> >  
 > 
->         0xffffffff * 0x83126e97 ->  0x83126e967ced9169
->         0xffffffff * 0x8d4fdf3b ->  0x8d4fdf3a72b020c5
->                                    -------------------
->                                    0x110624dd0ef9db22e
-> 
-> Therefore the sum doesn't fit into a u64 variable.
-> 
-> It is possible to skip carry handling but only when the MSB of both 
-> constants are zero.  Here it is not the case.
+> Does the problem appear in your platform in each time?
 
-If I understand this right, there are two possible optimizations to
-avoid the overflow:
+Three times out of three tries yes. Though the third try was built
+differently and the problem occurred on a different test case.
 
-- for anything using monotonic time, or elapsed time, we can guarantee
-  that the upper bits are zero. Relying on monotonic time is a bit
-  dangerous, because that would mean introducing an API that works
-  with ktime_get() but not ktime_get_real(), and risk introducing
-  subtle bugs.
-  However, ktime_us_delta() could be optimized, and we can introduce
-  similar ktime_sec_delta() and ktime_ms_delta() functions with
-  the same properties.
 
-- one could always pre-shift the ktime_t value. For a division by
-  1000, we can shift right by 3 bits first, then do the multiplication
-  and then do another shift. Not sure if that helps at all or if
-  the extra shift operation makes this counterproductive.
+>  Currently I have only
+> QEMU machine for testing and haven't seen problem like this before.
 
-	Arnd
+I don't know much about QEMU and have never used it, but I'm assuming
+QEMU doesn't make any attempt to simulate caches like the data cache,
+instruction cache, TLBs, branch predictor? Does it even emulate multiple
+CPUs with multiple host CPU threads? Basically, I very much doubt QEMU
+is a very good test of kernel code in general, and especially code that
+modifies code and has multiple cpus running in parallel.
+
+Do you not have access to any kind of ARM board to try some testing on?
+
+
+>  Could
+> you please provide a detail steps for me to reproduce it? Or do you just
+> enable kprobe test code when booting and this exception simply appear twice?
+
+I applied the patches on top of Linux 3.18-rc5 and set VERBOSE in
+arm/probes/kprobes/test-core.h to 1. Then built a kernel configured
+using vexpress_defconfig and enabled
+
+CONFIG_KPROBES=y
+CONFIG_ARM_KPROBES_TEST=y
+CONFIG_DEBUG_INFO=y
+
+then booted on a Versatile Express board with a TC2 CoreTile (A15/A7
+big.LITTLE CPU).
+
+The Oops I described happened on two consecutive boots of the board. I
+then tried again setting VERBOSE to 0 and I got a similar OOPs but on a
+different test case.
+
+I'm worried because this whole optimised kprobes has some rather
+complicated interactions, e.g. can the background thread that changes
+breakpoints to jumps (or back again?) could occur at the same time
+another CPU is processing a kprobe that's been hit, or is in the process
+of removing a probe.
+
+-- 
+Tixy
