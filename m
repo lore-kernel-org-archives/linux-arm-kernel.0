@@ -1,50 +1,77 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  5 Dec 2014 12:13:20 -0200
-Subject: [PATCH 1/3] ARM: imx6sx: Set PLL2 as parent of QSPI clocks
-Message-ID: <1417788802-13219-1-git-send-email-festevam@gmail.com>
+Date: Fri,  5 Dec 2014 12:13:21 -0200
+Subject: [PATCH 2/3] ARM: dts: imx6sx-sdb: Add QSPI support
+In-Reply-To: <1417788802-13219-1-git-send-email-festevam@gmail.com>
+References: <1417788802-13219-1-git-send-email-festevam@gmail.com>
+Message-ID: <1417788802-13219-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Provide a proper parent for QSPI clocks to avoid a kernel oops:
-
-[    1.037920] Division by zero in kernel.
-[    1.041807] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.18.0-rc7-next-20141204-00002-g5aa23e1 #2143
-[    1.050967] Hardware name: Freescale i.MX6 SoloX (Device Tree)
-[    1.056853] Backtrace:
-[    1.059360] [<80011ea0>] (dump_backtrace) from [<8001203c>] (show_stack+0x18/0x1c)
-[    1.066982]  r6:00000000 r5:00000000 r4:00000000 r3:00000000
-[    1.072754] [<80012024>] (show_stack) from [<806b7100>] (dump_stack+0x88/0xa4)
-[    1.080038] [<806b7078>] (dump_stack) from [<80011d20>] (__div0+0x18/0x20)
-[    1.086958]  r5:be018500 r4:be017c00
-[    1.090600] [<80011d08>] (__div0) from [<802aa418>] (Ldiv0+0x8/0x10)
-[    1.097012] [<80504fbc>] (clk_divider_set_rate) from [<80503ddc>] (clk_change_rate+0x14c/0x17c)
-[    1.105759]  r7:00000000 r6:00000000 r5:be018500 r4:00000000
-[    1.111516] [<80503c90>] (clk_change_rate) from [<80503ea0>] (clk_set_rate+0x94/0x98)
-[    1.119391]  r8:be7e0368 r7:00000000 r6:be11a000 r5:be018500 r4:00000000 r3:00000000
-[    1.127290] [<80503e0c>] (clk_set_rate) from [<80410558>] (fsl_qspi_probe+0x23c/0x75c)
-[    1.135260]  r5:be11a010 r4:be350010
-[    1.138900] [<8041031c>] (fsl_qspi_probe) from [<80385a18>] (platform_drv_probe+0x50/0xac)
+imx6sx-sdb has two s25fl128s quad spi flash. Add support for them.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx6sx.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/imx6sx-sdb.dts | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/arch/arm/mach-imx/clk-imx6sx.c b/arch/arm/mach-imx/clk-imx6sx.c
-index 17354a1..5a3e5a1 100644
---- a/arch/arm/mach-imx/clk-imx6sx.c
-+++ b/arch/arm/mach-imx/clk-imx6sx.c
-@@ -558,6 +558,9 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
- 	clk_set_parent(clks[IMX6SX_CLK_GPU_CORE_SEL], clks[IMX6SX_CLK_PLL3_PFD0]);
- 	clk_set_parent(clks[IMX6SX_CLK_GPU_AXI_SEL], clks[IMX6SX_CLK_PLL3_PFD0]);
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+index 1e6e5cc..cdffe84 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+@@ -340,6 +340,28 @@
+ 	status = "okay";
+ };
  
-+	clk_set_parent(clks[IMX6SX_CLK_QSPI1_SEL], clks[IMX6SX_CLK_PLL2_BUS]);
-+	clk_set_parent(clks[IMX6SX_CLK_QSPI2_SEL], clks[IMX6SX_CLK_PLL2_BUS]);
++&qspi2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_qspi2>;
++	status = "okay";
 +
- 	/* Set initial power mode */
- 	imx6q_set_lpm(WAIT_CLOCKED);
- }
++	flash0: s25fl128s at 0 {
++		reg = <0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "spansion,s25fl128s";
++		spi-max-frequency = <66000000>;
++	};
++
++	flash1: s25fl128s at 1 {
++		reg = <1>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "spansion,s25fl128s";
++		spi-max-frequency = <66000000>;
++	};
++};
++
+ &ssi2 {
+ 	status = "okay";
+ };
+@@ -524,6 +546,23 @@
+ 			>;
+ 		};
+ 
++		pinctrl_qspi2: qspi2grp {
++			fsl,pins = <
++				MX6SX_PAD_NAND_WP_B__QSPI2_A_DATA_0     0x70f1
++				MX6SX_PAD_NAND_READY_B__QSPI2_A_DATA_1  0x70f1
++				MX6SX_PAD_NAND_CE0_B__QSPI2_A_DATA_2    0x70f1
++				MX6SX_PAD_NAND_CE1_B__QSPI2_A_DATA_3    0x70f1
++				MX6SX_PAD_NAND_CLE__QSPI2_A_SCLK        0x70f1
++				MX6SX_PAD_NAND_ALE__QSPI2_A_SS0_B       0x70f1
++				MX6SX_PAD_NAND_DATA01__QSPI2_B_DATA_0   0x70f1
++				MX6SX_PAD_NAND_DATA00__QSPI2_B_DATA_1   0x70f1
++				MX6SX_PAD_NAND_WE_B__QSPI2_B_DATA_2     0x70f1
++				MX6SX_PAD_NAND_RE_B__QSPI2_B_DATA_3     0x70f1
++				MX6SX_PAD_NAND_DATA02__QSPI2_B_SCLK     0x70f1
++				MX6SX_PAD_NAND_DATA03__QSPI2_B_SS0_B    0x70f1
++			>;
++		};
++
+ 		pinctrl_vcc_sd3: vccsd3grp {
+ 			fsl,pins = <
+ 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
 -- 
 1.9.1
