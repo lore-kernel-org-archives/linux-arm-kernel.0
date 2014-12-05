@@ -1,103 +1,168 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Dec 2014 17:05:29 +0100
-Subject: [RFC PATCH] ARM64: PCI: inherit root controller's dma-coherent
-In-Reply-To: <5481B283.6030407@ti.com>
-References: <1417066891-16789-1-git-send-email-ming.lei@canonical.com>
- <CACVXFVPgchwZKQYdBWu+q0b21zeB6Lob-rD2C8mzTWb7dpZ86g@mail.gmail.com>
- <5481B283.6030407@ti.com>
-Message-ID: <7705416.b49xSXIHeP@wuerfel>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 5 Dec 2014 17:07:26 +0100
+Subject: [PATCH 5/5] ARM: mvebu: Add Armada 385 Access Point Development
+ Board support
+In-Reply-To: <1417790698-9792-6-git-send-email-maxime.ripard@free-electrons.com>
+References: <1417790698-9792-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1417790698-9792-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20141205170726.2e2335af@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 December 2014 15:26:27 Grygorii Strashko wrote:
-> ---
-> From 5e078b1ba148aa280181c4f695e567875a0f4ae9 Mon Sep 17 00:00:00 2001
-> From: Grygorii Strashko <grygorii.strashko@ti.com>
-> Date: Fri, 28 Feb 2014 19:11:39 +0200
-> Subject: [RFC PATCH] common: dma-mapping: introduce dma_init_dev_from_parent() helper
-> 
-> Now, in Kernel, Parent device's DMA configuration has to by applied
-> to the child as is, to enable DMA support for this device. Usually, this
-> is happened in places where child device is manually instantiated by
-> Parent device device using Platform APIs
-> (see drivers/usb/dwc3/host.c or drivers/pci/probe.c:pci_device_add()
->  for example).
-> 
-> The DMA configuration is represented in Device data structure was
-> extended recently (dma_pfn_offset was added) and going to extended
-> in future to support IOMMU. Therefore, the code used by drivers to
-> copy DMA configuration from parent to child device isn't working
-> properly, for example:
-> (drivers/usb/dwc3/host.c)
->    	dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
-> 
-> 	xhci->dev.parent	= dwc->dev;
-> 	xhci->dev.dma_mask	= dwc->dev->dma_mask;
-> 	xhci->dev.dma_parms	= dwc->dev->dma_parms;
-> above code will miss to copy dma_pfn_offset.
+Dear Maxime Ripard,
 
+On Fri,  5 Dec 2014 15:44:58 +0100, Maxime Ripard wrote:
 
-I'm not too thrilled about this implementation either. It immediately
-breaks as soon as we have IOMMU support, as the IOMMU configuration
-is by definition device dependent, and you have introduced a few bugs
-by copying the pointers to dma_mask and dma_parms.
+> +	soc {
+> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+> +			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
+> +			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000	/* CESA0: PHYS=0xf1100000
+> +									   size 64K */
+> +			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;	/* CESA1: PHYS=0xf1110000
+> +									   size 64K */
 
-> Hence, intoroduce common dma_init_dev_from_parent() helper to
-> initialize device's DMA parameters using from parent device's configuration,
-> use __weak to allow arches to overwrite it if needed.
-> 
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
->  drivers/base/dma-mapping.c  | 25 +++++++++++++++++++++++++
->  include/linux/dma-mapping.h |  3 +++
->  2 files changed, 28 insertions(+)
-> 
-> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-> index 9e8bbdd..4556698 100644
-> --- a/drivers/base/dma-mapping.c
-> +++ b/drivers/base/dma-mapping.c
-> @@ -270,6 +270,31 @@ int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
->  }
->  EXPORT_SYMBOL(dma_common_mmap);
->  
-> +/*
-> + * Initialize device's DMA parameters using parent device
-> + * @dev: Device to be configured
-> + * @parent: Pointer on parent device to get DMA configuration from
-> + *
-> + * parent can be NULL - then DMA configuration will be teken from dev->parent.
-> + */
-> +void __weak dma_init_dev_from_parent(struct device *dev, struct device *parent)
-> +{
+Those two last ranges are not needed, and may not necessarily match what
+we decide to do with the crypto engine support later on.
 
-Please let's try to avoid weak functions
+> +			mdio at 72004 {
+> +				pinctrl-names = <&phy_pins>;
 
-> +	struct device *parent_dev = parent;
+These are not really "PHY" pins, but rather MDIO pins.
 
-One of these two is not needed.
+> +			pinctrl at 18000 {
+> +				ge0_pins: ge-pins-0 {
+> +					marvell,pins = "mpp6", "mpp7", "mpp8",
+> +						       "mpp9", "mpp10", "mpp11",
+> +						       "mpp12", "mpp13", "mpp14",
+> +						       "mpp15", "mpp16", "mpp17";
+> +					marvell,function = "ge0";
+> +				};
 
-> +	/* if parent is NULL assume, dev->parent is the one to use */
-> +	if (!parent_dev)
-> +		parent_dev = dev->parent;
+This seems like the normal pin muxing for RGMII, so maybe we should
+simply do like we did for Armada 370: have a ge0-rgmii-pins definition
+in the .dtsi file.
+
+> +				i2c0_pins: i2c-pins-0 {
+> +					marvell,pins = "mpp2", "mpp3";
+> +					marvell,function = "i2c0";
+> +				};
+
+Same question here, maybe define it in .dtsi ?
+
 > +
-> +	if (is_device_dma_capable(parent_dev)) {
-> +		dev->dma_mask	= parent_dev->dma_mask;
+> +				phy_pins: phy-pins {
+> +					marvell,pins = "mpp4", "mpp5";
+> +					marvell,function = "ge";
+> +				};
 
-This is always wrong: dev->dma_mask is a pointer!
+Same here.
 
-> +		dev->coherent_dma_mask = parent_dev->coherent_dma_mask;
+> +
+> +				ref_clk0_pins: ref-clk-pins-0 {
+> +					marvell,pins = "mpp45";
+> +					marvell,function = "ref";
+> +				};
+> +
+> +				spi1_pins: spi-pins-1 {
+> +					marvell,pins = "mpp56", "mpp57", "mpp58",
+> +						       "mpp59";
+> +					marvell,function = "spi1";
+> +				};
+> +
+> +				uart0_pins: uart-pins-0 {
+> +					marvell,pins = "mpp0", "mpp1";
+> +					marvell,function = "ua0";
+> +				};
+> +
+> +				uart1_pins: uart-pins-1 {
+> +					marvell,pins = "mpp19", "mpp20";
+> +					marvell,function = "ua1";
+> +				};
+> +
+> +				xhci0_vbus_pins: xhci0-vbus-pins {
+> +					marvell,pins = "mpp44";
+> +					marvell,function = "gpio";
+> +				};
+> +			};
+> +
+> +			ethernet at 30000 {
+> +				status = "okay";
+> +				phy = <&phy1>;
+> +				phy-mode = "sgmii";
+> +			};
+> +
+> +			ethernet at 34000 {
+> +				status = "okay";
+> +				phy = <&phy2>;
+> +				phy-mode = "sgmii";
+> +			};
+> +
+> +			ethernet at 70000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&ge0_pins>, <&ref_clk0_pins>;
 
-What if someone has already set a mask that is greater than 32-bit?
+Maybe a short comment about what this ref_clk0_pins is useful for would
+be nice.
 
-> +		dev->dma_parms	= parent_dev->dma_parms;
+> +				status = "okay";
+> +				phy = <&phy0>;
+> +				phy-mode = "rgmii-id";
+> +			};
+> +
+> +			usb3 at f0000 {
+> +				status = "okay";
+> +			};
 
-same  problem here.
+The board also has an USB2 connector, did you try enabling it?
 
-> +		dev->dma_pfn_offset = parent_dev->dma_pfn_offset;
-> +		set_dma_ops(dev, get_dma_ops(parent_dev));
-> +	}
-> +}
-> +EXPORT_SYMBOL(dma_init_dev_from_parent);
+> +		};
+> +
+> +		pcie-controller {
+> +			status = "okay";
+> +			/*
+> +			 * The two PCIe units are accessible through
+> +			 * standard PCIe slots on the board.
 
-	Arnd
+Two, or three ? :-)
+
+> +			 */
+> +			pcie at 1,0 {
+> +				/* Port 0, Lane 0 */
+> +				status = "okay";
+> +			};
+> +
+> +			pcie at 2,0 {
+> +				/* Port 1, Lane 0 */
+> +				status = "okay";
+> +			};
+> +
+> +			pcie at 3,0 {
+> +				/* Port 2, Lane 0 */
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +
+> +	reg_xhci0_vbus: xhci0-vbus {
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&xhci0_vbus_pins>;
+> +		regulator-name = "xhci0-vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		enable-active-high;
+> +		regulator-always-on;
+> +		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+> +	};
+
+Maybe you could connect this to the USB controller by using the
+usb-nop-xceiv thing (which acts as a dummy USB PHY, if I understood
+correctly) ?
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
