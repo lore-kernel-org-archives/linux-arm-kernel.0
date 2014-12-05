@@ -1,36 +1,156 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 5 Dec 2014 09:08:21 -0800
-Subject: [PATCH v2 7/7] pinctrl: qcom-spmi-gpio: Migrate to pinconf-generic
-In-Reply-To: <1417766393.22963.9.camel@mm-sol.com>
-References: <1417137993-8337-1-git-send-email-soren.brinkmann@xilinx.com>
- <1417137993-8337-8-git-send-email-soren.brinkmann@xilinx.com>
- <1417766393.22963.9.camel@mm-sol.com>
-Message-ID: <bc08b9044a3f46f5a575dca2fa18a663@BY2FFO11FD057.protection.gbl>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 5 Dec 2014 18:07:44 +0100
+Subject: [PATCH v5 34/61] dmaengine: omap: Split device_control
+In-Reply-To: <20141205145642.GI3411@intel.com>
+References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1416231775-31252-35-git-send-email-maxime.ripard@free-electrons.com>
+ <20141205142702.GF3411@intel.com> <20141205143359.GV30256@lukather>
+ <20141205145642.GI3411@intel.com>
+Message-ID: <20141205170744.GW30256@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-12-05 at 09:59AM +0200, Ivan T. Ivanov wrote:
-> 
-> On Thu, 2014-11-27 at 17:26 -0800, Soren Brinkmann wrote:
+On Fri, Dec 05, 2014 at 08:26:42PM +0530, Vinod Koul wrote:
+> On Fri, Dec 05, 2014 at 03:33:59PM +0100, Maxime Ripard wrote:
+> > Hi Vinod,
 > > 
-> >  static const struct pinconf_ops pmic_gpio_pinconf_ops = {
-> > +       .is_generic= true,
-> >         .pin_config_group_get= pmic_gpio_config_get,
-> >         .pin_config_group_set= pmic_gpio_config_set,
-> >         .pin_config_group_dbg_show= pmic_gpio_config_dbg_show,
-> > @@ -848,6 +742,9 @@ static int pmic_gpio_probe(struct platform_device *pdev)
-> >         pctrldesc->name = dev_name(dev);
-> >         pctrldesc->pins = pindesc;
-> >         pctrldesc->npins = npins;
-> > +       pctrldesc->num_dt_params = ARRAY_SIZE(pmic_gpio_bindings);
-> > +       pctrldesc->params = pmic_gpio_bindings;
-> > +       pctrldesc->conf_items = pmic_conf_items;
+> > On Fri, Dec 05, 2014 at 07:57:02PM +0530, Vinod Koul wrote:
+> > > On Mon, Nov 17, 2014 at 02:42:28PM +0100, Maxime Ripard wrote:
+> > > > Split the device_control callback of the TI OMAP DMA driver to make use
+> > > > of the newly introduced callbacks, that will eventually be used to retrieve
+> > > > slave capabilities.
+> > > > 
+> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > > ---
+> > > >  drivers/dma/omap-dma.c | 51 +++++++++++++++-----------------------------------
+> > > >  1 file changed, 15 insertions(+), 36 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+> > > > index a8aa5b6bb5e2..1cadf812f3b3 100644
+> > > > --- a/drivers/dma/omap-dma.c
+> > > > +++ b/drivers/dma/omap-dma.c
+> > > > @@ -948,8 +948,10 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
+> > > >  	return vchan_tx_prep(&c->vc, &d->vd, flags);
+> > > >  }
+> > > >  
+> > > > -static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *cfg)
+> > > > +static int omap_dma_slave_config(struct dma_chan *chan, struct dma_slave_config *cfg)
+> > > >  {
+> > > > +	struct omap_chan *c = to_omap_dma_chan(chan);
+> > > > +
+> > > >  	if (cfg->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
+> > > >  	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
+> > > >  		return -EINVAL;
+> > > > @@ -959,8 +961,9 @@ static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *c
+> > > >  	return 0;
+> > > >  }
+> > > >  
+> > > > -static int omap_dma_terminate_all(struct omap_chan *c)
+> > > > +static int omap_dma_terminate_all(struct dma_chan *chan)
+> > > >  {
+> > > > +	struct omap_chan *c = to_omap_dma_chan(chan);
+> > > >  	struct omap_dmadev *d = to_omap_dma_dev(c->vc.chan.device);
+> > > >  	unsigned long flags;
+> > > >  	LIST_HEAD(head);
+> > > > @@ -996,8 +999,10 @@ static int omap_dma_terminate_all(struct omap_chan *c)
+> > > >  	return 0;
+> > > >  }
+> > > >  
+> > > > -static int omap_dma_pause(struct omap_chan *c)
+> > > > +static int omap_dma_pause(struct dma_chan *chan)
+> > > >  {
+> > > > +	struct omap_chan *c = to_omap_dma_chan(chan);
+> > > > +
+> > > >  	/* Pause/Resume only allowed with cyclic mode */
+> > > >  	if (!c->cyclic)
+> > > >  		return -EINVAL;
+> > > > @@ -1010,8 +1015,10 @@ static int omap_dma_pause(struct omap_chan *c)
+> > > >  	return 0;
+> > > >  }
+> > > >  
+> > > > -static int omap_dma_resume(struct omap_chan *c)
+> > > > +static int omap_dma_resume(struct dma_chan *chan)
+> > > >  {
+> > > > +	struct omap_chan *c = to_omap_dma_chan(chan);
+> > > > +
+> > > >  	/* Pause/Resume only allowed with cyclic mode */
+> > > >  	if (!c->cyclic)
+> > > >  		return -EINVAL;
+> > > > @@ -1029,37 +1036,6 @@ static int omap_dma_resume(struct omap_chan *c)
+> > > >  	return 0;
+> > > >  }
+> > > >  
+> > > > -static int omap_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+> > > > -	unsigned long arg)
+> > > > -{
+> > > > -	struct omap_chan *c = to_omap_dma_chan(chan);
+> > > > -	int ret;
+> > > > -
+> > > > -	switch (cmd) {
+> > > > -	case DMA_SLAVE_CONFIG:
+> > > > -		ret = omap_dma_slave_config(c, (struct dma_slave_config *)arg);
+> > > > -		break;
+> > > > -
+> > > > -	case DMA_TERMINATE_ALL:
+> > > > -		ret = omap_dma_terminate_all(c);
+> > > > -		break;
+> > > > -
+> > > > -	case DMA_PAUSE:
+> > > > -		ret = omap_dma_pause(c);
+> > > > -		break;
+> > > > -
+> > > > -	case DMA_RESUME:
+> > > > -		ret = omap_dma_resume(c);
+> > > > -		break;
+> > > > -
+> > > > -	default:
+> > > > -		ret = -ENXIO;
+> > > > -		break;
+> > > > -	}
+> > > > -
+> > > > -	return ret;
+> > > > -}
+> > > > -
+> > > >  static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
+> > > >  {
+> > > >  	struct omap_chan *c;
+> > > > @@ -1136,7 +1112,10 @@ static int omap_dma_probe(struct platform_device *pdev)
+> > > >  	od->ddev.device_issue_pending = omap_dma_issue_pending;
+> > > >  	od->ddev.device_prep_slave_sg = omap_dma_prep_slave_sg;
+> > > >  	od->ddev.device_prep_dma_cyclic = omap_dma_prep_dma_cyclic;
+> > > > -	od->ddev.device_control = omap_dma_control;
+> > > this should be assigned to omap_dma_slave_config. omap_dma_control is not
+> > > here :(
 > > 
+> > I'm not sure what you mean here. I'm removing this line, together with
+> > the whole omap_dma_control function.
+> Sorry wrong quote and not good explanations. the lines i quoted is
+> wrong one... 
 > 
-> What will happen if number of conf_items is less than number of params?
+> -       od->ddev.device_control = omap_dma_control;
+> +       od->ddev.device_config = omap_dma_config;
+> this is troubling line here...
+> 
+> we dont have omap_dma_config. It should be omap_dma_slave_config instead
 
-I suppose bad things :) You're right, that should probably be checked
-somewhere. Let me see whether I find a good place to put such a check.
+Ah, right.
 
-	Thanks,
-	S?ren
+I have no idea why it haven't been picked up by intel's build bot
+thuough.
+
+Anyway. Do you want me to send a new version of these patches for this
+trivial fix and the mxs one, or do you want me to send a follow-up?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141205/65142da4/attachment.sig>
