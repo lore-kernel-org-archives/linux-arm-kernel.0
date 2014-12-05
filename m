@@ -1,47 +1,60 @@
-From: parkch98@gmail.com (Chanho Park)
-Date: Fri, 5 Dec 2014 11:45:19 +0900
-Subject: arm64: dose arm64 support the sysfs system call?
-In-Reply-To: <5481136D.4030303@huawei.com>
-References: <546EE946.1020905@huawei.com> <118663792.1vhfOdg7Rq@wuerfel>
- <5481136D.4030303@huawei.com>
-Message-ID: <CAPTzV14_vBMMXWczuewYp8UORU1ZLUOucfmcQuAgDBVPrHBMyA@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  5 Dec 2014 12:01:12 +0900
+Subject: [PATCH] ARM: shmobile: r8a7794: Add USB clocks to device tree
+Message-ID: <1417748472-23700-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
 
-2014-12-05 11:07 GMT+09:00 wangyufen <wangyufen@huawei.com>:
->
-> On 2014/11/21 19:10, Arnd Bergmann wrote:
-> > On Friday 21 November 2014 15:27:02 wangyufen wrote:
-> >> Hi,
-> >>
-> >> I did ltp test on arm64, the sysfs testcases failed:
-> >>
-> >>     sysfs01     0  TWARN  :  This test can only run on kernels that support the sysfs system call
-> >>
-> >> because the __NR_sysfs didn't define in aarch64
-> >>
-> >> Dose anyone know what number the sysfs system call is in aarch64?
-> >
-> > It's disabled of course, because we don't support ancient libc
-> > implementations. No modern Linux port has this.
-> >
-> >       Arnd
-> >
-> >
->
-> __NR__lchown32?__NR_lstat?__NR__sysctl?__NR_vserver have similar problems.
->
-> Dose aarch64 support those system call?
->
->  How I distinguish the ancient libc implementations.
+Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+[horms: resolved conflicts]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7794.dtsi            | 5 ++++-
+ include/dt-bindings/clock/r8a7794-clock.h | 2 ++
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-You can find the syscalls from include/uapi/asm-generic/unistd.h.
-Please note below definitions are not defined on aarch64.
-__ARCH_WANT_SYSCALL_NO_AT
-__ARCH_WANT_SYSCALL_NO_FLAGS
-__ARCH_WANT_SYSCALL_DEPRECATED
+Based on the renesas-devel-20141205-v3.18-rc7 tag
+of my renesas tree.
 
-Best Regards,
-Chanho Park
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 1801bb4..7fd40f3 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -504,16 +504,19 @@
+ 		mstp7_clks: mstp7_clks at e615014c {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
+-			clocks = <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
++			clocks = <&mp_clk>, <&mp_clk>,
++				 <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
+ 				 <&zs_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
++				R8A7794_CLK_EHCI R8A7794_CLK_HSUSB
+ 				R8A7794_CLK_HSCIF2 R8A7794_CLK_SCIF5
+ 				R8A7794_CLK_SCIF4 R8A7794_CLK_HSCIF1 R8A7794_CLK_HSCIF0
+ 				R8A7794_CLK_SCIF3 R8A7794_CLK_SCIF2 R8A7794_CLK_SCIF1
+ 				R8A7794_CLK_SCIF0
+ 			>;
+ 			clock-output-names =
++				"ehci", "hsusb",
+ 				"hscif2", "scif5", "scif4", "hscif1", "hscif0",
+ 				"scif3", "scif2", "scif1", "scif0";
+ 		};
+diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
+index aa9c286..94e2bbf 100644
+--- a/include/dt-bindings/clock/r8a7794-clock.h
++++ b/include/dt-bindings/clock/r8a7794-clock.h
+@@ -57,6 +57,8 @@
+ #define R8A7794_CLK_PWM			23
+ 
+ /* MSTP7 */
++#define R8A7794_CLK_EHCI		3
++#define R8A7794_CLK_HSUSB		4
+ #define R8A7794_CLK_HSCIF2		13
+ #define R8A7794_CLK_SCIF5		14
+ #define R8A7794_CLK_SCIF4		15
+-- 
+2.1.3
