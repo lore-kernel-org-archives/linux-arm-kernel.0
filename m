@@ -1,56 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 Dec 2014 11:35:42 +0000
-Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
-In-Reply-To: <20141205111455.GC28339@e104818-lin.cambridge.arm.com>
-References: <1417707993-82290-1-git-send-email-agraf@suse.de>
- <CAOesGMhv+0_SZb2eSiwCGaD77hd=a6EhMp6tVvcrZoBnrHKQjA@mail.gmail.com>
- <20141205111455.GC28339@e104818-lin.cambridge.arm.com>
-Message-ID: <20141205113541.GB1630@arm.com>
+From: meuleman@broadcom.com (Hante Meuleman)
+Date: Fri, 5 Dec 2014 11:49:48 +0000
+Subject: using DMA-API on ARM
+In-Reply-To: <20141205111114.GQ11285@n2100.arm.linux.org.uk>
+References: <5481794E.4050406@broadcom.com> <4565667.WCBuNmaazQ@wuerfel>
+ <20141205111114.GQ11285@n2100.arm.linux.org.uk>
+Message-ID: <F51492713EF10846800D8C0ED37A7DCE01901691@SJEXCHMB15.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 05, 2014 at 11:14:55AM +0000, Catalin Marinas wrote:
-> On Thu, Dec 04, 2014 at 09:15:12PM +0000, Olof Johansson wrote:
-> > On Thu, Dec 4, 2014 at 7:46 AM, Alexander Graf <agraf@suse.de> wrote:
-> > > With binutils 2.25 the default alignment for 32bit arm sections changed to
-> > > have everything 64k aligned. Armv7 binaries built with this binutils version
-> > > run successfully on an arm64 system.
-> > >
-> > > Since effectively there is now the chance to run armv7 code on arm64 even
-> > > with 64k page size, it doesn't make sense to block people from enabling
-> > > CONFIG_COMPAT on those configurations.
-> > >
-> > > Signed-off-by: Alexander Graf <agraf@suse.de>
-> > > ---
-> > >  arch/arm64/Kconfig | 1 -
-> > >  1 file changed, 1 deletion(-)
-> > >
-> > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > > index 9532f8d..3cf4f238 100644
-> > > --- a/arch/arm64/Kconfig
-> > > +++ b/arch/arm64/Kconfig
-> > > @@ -409,7 +409,6 @@ source "fs/Kconfig.binfmt"
-> > >
-> > >  config COMPAT
-> > >         bool "Kernel support for 32-bit EL0"
-> > > -       depends on !ARM64_64K_PAGES
-> > >         select COMPAT_BINFMT_ELF
-> > >         select HAVE_UID16
-> > >         select OLD_SIGSUSPEND3
-> > 
-> > This is hardly "compat". Sure, it's great to have a new binutils that
-> > has larger alignment, but practically not a single existing binary
-> > will work today if someone tries to do this.
-> > 
-> > So, it seems very premature to take this off. At the very least
-> > document it like Will requested, and make it depend on !ARM_64K_PAGES
-> > || EXPERT.
-> 
-> That would work for me. We need to be clear that most existing 32-bit
-> binaries will fail.
+Thank you for investigating. Your analysis matches what was intended to be done. Regarding the cast, you're right, I'll improve it. My idea was that long long is always 64bit, but when casting directly to long long I get a compiler (when using C=2) warning: "warning: right shift by bigger than source value". Probably I concluded wrongly that I should cast it to long first. On the targets used the high address was always 0, so I got away with it thusfar, but indeed it should and shall be fixed.
 
-I'd still like to run some regression tests to make sure we don't back
-ourselves into corners with things like SHMLBA, which would now be less
-than a page size.
+Regards,
+Hante
 
-Will
+-----Original Message-----
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+Sent: vrijdag 5 december 2014 12:11
+To: Arnd Bergmann
+Cc: linux-arm-kernel at lists.infradead.org; Arend Van Spriel; linux-wireless; brcm80211-dev-list; David Miller; linux-kernel at vger.kernel.org
+Subject: Re: using DMA-API on ARM
+
+On Fri, Dec 05, 2014 at 10:52:02AM +0100, Arnd Bergmann wrote:
+> I'm still puzzled why you'd need a single dma_sync_single_for_cpu()
+> after dma_alloc_coherent though, you should not need any. Is it possible
+> that the driver accidentally uses __raw_readl() instead of readl()
+> in some places and you are just lacking an appropriate barrier?
+
+Digging into the driver, it looks like individual DMA buffers are
+allocated (via brcmf_pcie_init_dmabuffer_for_device) and registered
+into a "commonring" layer.
+
+Whenever the buffer is written to, space is first allocated via a call
+to brcmf_commonring_reserve_for_write() or
+brcmf_commonring_reserve_for_write_multiple(), data written to the
+buffer, followed by a call to brcmf_commonring_write_complete().
+
+brcmf_commonring_write_complete() calls two methods at that point:
+cr_write_wptr() and cr_ring_bell(), which will be
+brcmf_pcie_ring_mb_write_wptr() and brcmf_pcie_ring_mb_ring_bell().
+
+The first calls brcmf_pcie_write_tcm16(), which uses iowrite16(),
+which contains the appropriate barrier.  The bell ringing functions
+also use ioread*/iowrite*().
+
+So, on the write side, it looks fine from the barrier perspective.
+
+On the read side, brcmf_commonring_get_read_ptr() is used before
+a read access to the ring - which calls the cr_update_wptr() method,
+which in turn uses an ioread16() call.  After the CPU has read data
+from the ring, brcmf_commonring_read_complete() is used, which uses
+iowrite16().
+
+So, I don't see a barrier problem on the read side.
+
+However, I did trip over this:
+
+static void *
+brcmf_pcie_init_dmabuffer_for_device(struct brcmf_pciedev_info *devinfo,
+                                     u32 size, u32 tcm_dma_phys_addr,
+                                     dma_addr_t *dma_handle)
+{
+        void *ring;
+        long long address;
+
+        ring = dma_alloc_coherent(&devinfo->pdev->dev, size, dma_handle,
+                                  GFP_KERNEL);
+        if (!ring)
+                return NULL;
+
+        address = (long long)(long)*dma_handle;
+
+Casting to (long) will truncate the DMA handle to 32-bits on a 32-bit
+architecture, even if it supports 64-bit DMA addresses.  There's a couple
+of other places where this same truncation occurs:
+
+        address = (long long)(long)devinfo->shared.scratch_dmahandle;
+
+and
+
+        address = (long long)(long)devinfo->shared.ringupd_dmahandle;
+
+In any case, wouldn't using a u64 type for "address" be better - isn't
+"long long" 128-bit on 64-bit architectures?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
