@@ -1,62 +1,35 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Fri, 5 Dec 2014 16:40:07 -0800
-Subject: [PATCH 4/5] ARM: dts: enable GPIO for Broadcom Cygnus
+Date: Fri, 5 Dec 2014 16:40:08 -0800
+Subject: [PATCH 5/5] MAINTAINERS: Entry for Cygnus GPIO driver
 In-Reply-To: <1417826408-1600-1-git-send-email-rjui@broadcom.com>
 References: <Ray Jui <rjui@broadcom.com>
  <1417826408-1600-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1417826408-1600-5-git-send-email-rjui@broadcom.com>
+Message-ID: <1417826408-1600-6-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables all 3 GPIO controllers including the ASIU GPIO, the
-chipcommonG GPIO, and the ALWAYS-ON GPIO, for Broadcom Cygnus SoC
-
 Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- arch/arm/boot/dts/bcm-cygnus.dtsi |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ MAINTAINERS |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 5126f9e..c7587c1 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -54,6 +54,36 @@
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7b712d8..5d67204 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2174,6 +2174,13 @@ N:	bcm9583*
+ N:	bcm583*
+ N:	bcm113*
  
- 	/include/ "bcm-cygnus-clock.dtsi"
- 
-+	gpio_ccm: gpio at 1800a000 {
-+		compatible = "brcm,cygnus-ccm-gpio";
-+		reg = <0x1800a000 0x50>,
-+			<0x0301d164 0x20>;
-+		ngpios = <24>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-controller;
-+	};
++BROADCOM CYGNUS GPIO DRIVER
++M:	Ray Jui <rjui@broadcom.com>
++L:	bcm-kernel-feedback-list at broadcom.com
++S:	Supported
++F:	drivers/gpio/gpio-bcm-cygnus.c
++F:	Documentation/devicetree/bindings/gpio/brcm,cygnus-gpio.txt
 +
-+	gpio_asiu: gpio at 180a5000 {
-+		compatible = "brcm,cygnus-asiu-gpio";
-+		reg = <0x180a5000 0x668>;
-+		ngpios = <122>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		interrupt-controller;
-+		interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
-+	gpio_crmu: gpio at 03024800 {
-+		compatible = "brcm,cygnus-crmu-gpio";
-+		reg = <0x03024800 0x50>;
-+		ngpios = <6>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		no-interrupt;
-+	};
-+
- 	amba {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+ BROADCOM KONA GPIO DRIVER
+ M:	Ray Jui <rjui@broadcom.com>
+ L:	bcm-kernel-feedback-list at broadcom.com
 -- 
 1.7.9.5
