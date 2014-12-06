@@ -1,31 +1,80 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Sat, 06 Dec 2014 18:23:59 +0100
-Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
-In-Reply-To: <20141204182049.GB7749@arm.com>
-References: <1417707993-82290-1-git-send-email-agraf@suse.de>
- <20141204182049.GB7749@arm.com>
-Message-ID: <54833BAF.1030405@suse.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 6 Dec 2014 18:24:49 +0100
+Subject: [PATCH 02/10] ARM: dts: sun9i: Add mmc module clock nodes for A80
+In-Reply-To: <1417588565-26215-3-git-send-email-wens@csie.org>
+References: <1417588565-26215-1-git-send-email-wens@csie.org>
+ <1417588565-26215-3-git-send-email-wens@csie.org>
+Message-ID: <20141206172449.GC12434@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 04.12.14 19:20, Will Deacon wrote:
-> On Thu, Dec 04, 2014 at 03:46:33PM +0000, Alexander Graf wrote:
->> With binutils 2.25 the default alignment for 32bit arm sections changed to
->> have everything 64k aligned. Armv7 binaries built with this binutils version
->> run successfully on an arm64 system.
->>
->> Since effectively there is now the chance to run armv7 code on arm64 even
->> with 64k page size, it doesn't make sense to block people from enabling
->> CONFIG_COMPAT on those configurations.
+On Wed, Dec 03, 2014 at 02:35:57PM +0800, Chen-Yu Tsai wrote:
+> The mmc module clocks are A80 specific module 0 (storage) type clocks.
 > 
-> Is there a distro available that is built with a recent enough binutils for
-> this? I'd really like to run our regression tests to check that page-size
-> assumptions don't exist for things like shm.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  arch/arm/boot/dts/sun9i-a80.dtsi | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+> index 494714f..33d18dc 100644
+> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
+> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+> @@ -215,6 +215,38 @@
+>  			clock-output-names = "cci400";
+>  		};
+>  
+> +		mmc0_clk: clk at 06000410 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun9i-a80-mod0-clk";
+> +			reg = <0x06000410 0x4>;
+> +			clocks = <&osc24M>, <&pll4>;
+> +			clock-output-names = "mmc0";
+> +		};
+> +
+> +		mmc1_clk: clk at 06000414 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun9i-a80-mod0-clk";
+> +			reg = <0x06000414 0x4>;
+> +			clocks = <&osc24M>, <&pll4>;
+> +			clock-output-names = "mmc1";
+> +		};
+> +
+> +		mmc2_clk: clk at 06000418 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun9i-a80-mod0-clk";
+> +			reg = <0x06000418 0x4>;
+> +			clocks = <&osc24M>, <&pll4>;
+> +			clock-output-names = "mmc2";
+> +		};
+> +
+> +		mmc3_clk: clk at 0600041c {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun9i-a80-mod0-clk";
+> +			reg = <0x0600041c 0x4>;
+> +			clocks = <&osc24M>, <&pll4>;
+> +			clock-output-names = "mmc3";
+> +		};
+> +
 
-So how much of a distro do you need? I could probably assemble a simple
-very minimalistic rootfs with only bash if that helps.
+How is the phase stuff supposed to work? Is this still used on the A80?
 
+Also, wasn't the mux supposed to have 4 bits (so something like at
+least 9 parent clocks?) given your previous patch?
 
-Alex
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141206/65168323/attachment.sig>
