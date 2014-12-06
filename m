@@ -1,82 +1,70 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat,  6 Dec 2014 13:46:11 +0000
-Subject: [PATCH 0/5] irqchip: kill the GIC routable domain
-Message-ID: <1417873576-10463-1-git-send-email-marc.zyngier@arm.com>
+Date: Sat,  6 Dec 2014 13:46:14 +0000
+Subject: [PATCH 3/5] DT: update ti,irq-crossbar binding
+In-Reply-To: <1417873576-10463-1-git-send-email-marc.zyngier@arm.com>
+References: <1417873576-10463-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1417873576-10463-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After my series removing the gic_arch_extn hack, I figured that the
-next step was to expunge the GIC driver of the routable domain horror.
+Make it look like a real interrupt controller.
 
-There is a few reasons for this:
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ .../devicetree/bindings/arm/omap/crossbar.txt          | 18 +++++-------------
+ 1 file changed, 5 insertions(+), 13 deletions(-)
 
-- The allocation of interrupts in this domain is fairly similar to
-  what we do for MSI (see the GICv2m driver), and stacked domains have
-  proved to be a fitting solution.
-
-- The current description in DT is currently entierely inaccurate, and
-  as we already broke it for the OMAP WUGEN block, we might as well do
-  it again for the TI crossbar.
-
-- The way crossbar, WUGEN and GIC interract is quite complex (this is
-  effectively a stack of three interrupt controllers with interesting
-  exceptions and braindead routing), and stacked domains are the right
-  abstraction for that.
-
-- Other platforms (Freescale Vybrid) are starting to come up with the
-  same type of things, and it'd be good to avoid them following the
-  same broken model.
-
-- It removes a few lines from the code base so it can't completely be
-  a bad idea!
-
-So this patch series does exactly that: make the crossbar a stacked
-interrupt controller that only takes care of setting up the routing,
-fix the DTs to represent the actual HW, and remove a bit of the
-craziness from the GIC code.
-
-As for the previous series:
-
-- I haven't been able to test this at all, I don't have access to the
-  HW. TI people, please test and post fixes, as I expect I introduced
-  a few bugs.
-
-- This actively *breaks* existing setups. If you boot a new kernel
-  with an old DT, interrupt routing *will* be broken. Old kernels on a
-  new DT won't boot either! You've been warned. This really outline
-  the necessity of actually describing the HW in device trees...
-
-As for the patches, they are on top of 3.18-rc7 + tip/irq/irqdomain-arm +
-the gic_arch_extn removal series.
-
-I've pushed the code to:
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/die-gic-arch-extn-die-die-die
-
-Comments welcome,
-
-	 M.
-
-Marc Zyngier (5):
-  genirq: Add irqchip_set_wake_parent
-  irqchip: crossbar: convert dra7 crossbar to stacked domains
-  DT: update ti,irq-crossbar binding
-  irqchip: GIC: get rid of routable domain
-  DT: arm,gic: kill arm,routable-irqs
-
- Documentation/devicetree/bindings/arm/gic.txt      |   6 -
- .../devicetree/bindings/arm/omap/crossbar.txt      |  18 +-
- arch/arm/boot/dts/dra7.dtsi                        |  10 +-
- arch/arm/boot/dts/dra72x.dtsi                      |   3 +-
- arch/arm/boot/dts/dra74x.dtsi                      |   5 +-
- arch/arm/mach-omap2/omap4-common.c                 |   4 -
- drivers/irqchip/irq-crossbar.c                     | 202 ++++++++++++---------
- drivers/irqchip/irq-gic.c                          |  59 +-----
- include/linux/irq.h                                |   1 +
- include/linux/irqchip/arm-gic.h                    |   6 -
- include/linux/irqchip/irq-crossbar.h               |  11 --
- kernel/irq/chip.c                                  |  16 ++
- 12 files changed, 153 insertions(+), 188 deletions(-)
- delete mode 100644 include/linux/irqchip/irq-crossbar.h
-
+diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+index 4139db3..a9b28d7 100644
+--- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
++++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+@@ -9,7 +9,9 @@ inputs.
+ Required properties:
+ - compatible : Should be "ti,irq-crossbar"
+ - reg: Base address and the size of the crossbar registers.
+-- ti,max-irqs: Total number of irqs available at the interrupt controller.
++- interrupt-controller: indicates that this block is an interrupt controller.
++- interrupt-parent: the interrupt controller this block is connected to.
++- ti,max-irqs: Total number of irqs available at the parent interrupt controller.
+ - ti,max-crossbar-sources: Maximum number of crossbar sources that can be routed.
+ - ti,reg-size: Size of a individual register in bytes. Every individual
+ 	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
+@@ -27,13 +29,13 @@ Optional properties:
+   when the interrupt controller irq is unused (when not provided, default is 0)
+ 
+ Examples:
+-		crossbar_mpu: @4a020000 {
++		crossbar_mpu: crossbar at 4a002a48 {
+ 			compatible = "ti,irq-crossbar";
+ 			reg = <0x4a002a48 0x130>;
+ 			ti,max-irqs = <160>;
+ 			ti,max-crossbar-sources = <400>;
+ 			ti,reg-size = <2>;
+-			ti,irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
++			ti,irqs-reserved = <0 1 2 3 5 6 131 132>;
+ 			ti,irqs-skip = <10 133 139 140>;
+ 		};
+ 
+@@ -44,10 +46,6 @@ Documentation/devicetree/bindings/arm/gic.txt for further details.
+ 
+ An interrupt consumer on an SoC using crossbar will use:
+ 	interrupts = <GIC_SPI request_number interrupt_level>
+-When the request number is between 0 to that described by
+-"ti,max-crossbar-sources", it is assumed to be a crossbar mapping. If the
+-request_number is greater than "ti,max-crossbar-sources", then it is mapped as a
+-quirky hardware mapping direct to GIC.
+ 
+ Example:
+ 	device_x at 0x4a023000 {
+@@ -55,9 +53,3 @@ Example:
+ 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+ 		...
+ 	};
+-
+-	device_y at 0x4a033000 {
+-		/* Direct mapped GIC SPI 1 used */
+-		interrupts = <GIC_SPI DIRECT_IRQ(1) IRQ_TYPE_LEVEL_HIGH>;
+-		...
+-	};
 -- 
 2.1.3
