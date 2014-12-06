@@ -1,94 +1,50 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Sat, 06 Dec 2014 12:11:33 +0200
-Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
-In-Reply-To: <20141205213946.GA2802@roeck-us.net>
-References: <5465C00E.4030808@offcode.fi>
- <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
- <20141127200036.2c65df62@bbrezillon> <5481ABA1.9030408@offcode.fi>
- <20141205151221.0ee1e814@bbrezillon> <5481FC7F.3000105@offcode.fi>
- <20141205190247.GA25455@roeck-us.net> <54821670.9030602@offcode.fi>
- <20141205213946.GA2802@roeck-us.net>
-Message-ID: <5482D655.8000700@offcode.fi>
+From: moon.linux@yahoo.com (Anand Moon)
+Date: Sat, 06 Dec 2014 15:43:44 +0530
+Subject: [PATCH] do_work_pending: Enable interrupts in do_work_pending()
+In-Reply-To: <20141205151355.GU11285@n2100.arm.linux.org.uk>
+References: <1417791066-5458-1-git-send-email-moon.linux@yahoo.com>
+ <20141205151355.GU11285@n2100.arm.linux.org.uk>
+Message-ID: <5482D6D8.5090804@yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.12.2014 23:39, Guenter Roeck wrote:
-> On Fri, Dec 05, 2014 at 10:32:48PM +0200, Timo Kokkonen wrote:
->> On 05.12.2014 21:02, Guenter Roeck wrote:
+hi Russell King,
 
->>> Not sure about how to name enable-early-reset. I'd prefer to have something
->>> generic, even if only implemented in a single driver for now, but I don't
->>> really know right now what that might/should look like. Maybe just
->>> "enable-early" to indicate that the watchdog should be enabled during init ?
->>
->> Do we need the enable-early or such property at all? Just leave
->> early-timeout-sec to zero and then let it behave just like
->> enable-early would do?
->>
+I was experiencing the same problem. You mention.
+I realized later after few application failure an system slowdown.
+
+-Anand Moon
+
+On 12/5/2014 8:43 PM, Russell King - ARM Linux wrote:
+> On Fri, Dec 05, 2014 at 08:21:06PM +0530, Anand Moon wrote:
+>> @@ -574,12 +574,14 @@ asmlinkage int
+>>   do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
+>>   {
+>>   	do {
+>> +		if (unlikely(!user_mode(regs)))
+>> +			return 0;
+>> +		/* Enable interrupts; they are disabled again on return to
+>> +		 * caller. */
+>> +		local_irq_enable();
+>>   		if (likely(thread_flags & _TIF_NEED_RESCHED)) {
+>>   			schedule();
+>>   		} else {
+>> -			if (unlikely(!user_mode(regs)))
+>> -				return 0;
+>> -			local_irq_enable();
+>>   			if (thread_flags & _TIF_SIGPENDING) {
+>>   				int restart = do_signal(regs, syscall);
+>>   				if (unlikely(restart)) {
+> I'm happy with the hunk above, but:
 >
-> Problem is that the possible conditions are all over the place
-> for "early" watchdog handling.
+>> @@ -588,6 +590,7 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
+>>   					 * Deal with it without leaving
+>>   					 * the kernel space.
+>>   					 */
+>> +					local_irq_disable();
+>>   					return restart;
+> not this one.  The code expects in the non-zero return case, that
+> interrupts will be enabled, otherwise we will be restarting the syscall
+> with IRQs disabled, and calling into the syscall function with IRQs
+> disabled.
 >
-> - Disable watchdog
-> - Enable watchdog (or keep it enabled), and keep it alive
->    until user space kicks in (ie possibly forever)
-> - Enable watchdog or keep it enabled, and keep it alive
->    for a specified period of time.
-> - Keep watchdog enabled if it is already enabled, otherwise
->    keep it disabled.
->
-> There are probably more conditions which I don't recall right now.
-> Which of those conditions would you address with "early-timeout = <0>;" ?
-> "enable watchdog early and keep it alive until user space kicks in",
-> or "keep watchdog enabled if already running, and set specified early
-> timeout" ? One could argue either way which one of the two meanings
-> it should be.
-
-Okay, let me elaborate my point of view a bit.
-
-The use case we are concerned about is that we have a device that we 
-rather not let freeze up at any point. This is what we use the watchdog 
-for. The only missing corner case right now is the point where kernel 
-driver initializes the watchdog hardware and pings it on behalf of user 
-space until a watchdog daemon opens it and starts kicking. This is kind 
-of bad as kernel might lock up or user space might crash before we get 
-to the point where the daemon starts taking care of petting the 
-watchdog. So this is what we are trying to fix.
-
-Right. Some other hardware behave differently to the one in Atmel. They 
-might have watchdog stopped by bootloader or it might not be running at 
-all until someone starts it. What do do with such case? If we are still 
-concerned about the same use case I described above, I would say the 
-reasonable thing to do is to make sure the watchdog is started as early 
-as possible and not stopped at any point at all, if possible. If it 
-needs to be explicitly enabled, bootloader should do it. If it didn't do 
-it, then kernel should do it.
-
-Now that I think of it, what we really are interested in is to defer 
-starting of the watchdog to give user space more time to start up. In 
-Atmel HW it's more tricky as the driver can't be stopped. And in other 
-hardware we could simply disable it altogether until we enable it after 
-specific timeout, but we might crash before the timeout expires, in 
-which case we would not get a chance to enable it. So the right thing to 
-do is to enable the watchdog as early as possible, kick it on behalf of 
-the user space until the timeout expires. Special case would be when the 
-timeout is zero, when we just ensure watchdog is running but we don't do 
-anything to prolong the first expiration.
-
-I can't think of any other use case someone would be interested in, but 
-I'm positive that there are plenty of products on the market right now 
-that have the requirement for race free guarantee that watchdog never stops.
-
-So given the conditions you listed, what I think is really important to 
-fix is "Enable watchdog or keep it enabled, and keep it alive for a 
-specified period of time". The only other choice we have right now is 
-"Disable watchdog and let user space enabled it later, if ever". Yeah, 
-maybe we could cover those other use cases too. Maybe someone is using 
-bootloader to decide what to do with watchdog and kernel should somehow 
-respect that. I don't know if that makes sense or if it would be 
-reasonable assumption..
-
-Any more thoughts?
-
-Thanks,
--Timo
