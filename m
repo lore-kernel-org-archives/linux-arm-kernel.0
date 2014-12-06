@@ -1,41 +1,27 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Sat, 06 Dec 2014 11:51:49 +0800
-Subject: [PATCH] soc: ti: Make knav_acc_range_ops and knav_gp_range_ops static
-Message-ID: <1417837909.29417.1.camel@phoenix>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 05 Dec 2014 20:24:25 -0800
+Subject: [PATCH 2/5] gpio: Cygnus: add GPIO driver
+In-Reply-To: <54827B07.3000707@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+ <1417826408-1600-1-git-send-email-rjui@broadcom.com>
+ <1417826408-1600-3-git-send-email-rjui@broadcom.com>
+ <1417829282.31745.3.camel@perches.com> <5482668F.1040907@broadcom.com>
+ <1417833291.31745.5.camel@perches.com> <54827B07.3000707@broadcom.com>
+Message-ID: <1417839865.31745.10.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
- drivers/soc/ti/knav_qmss_acc.c   | 2 +-
- drivers/soc/ti/knav_qmss_queue.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+On Fri, 2014-12-05 at 19:41 -0800, Ray Jui wrote:
+> On 12/5/2014 6:34 PM, Joe Perches wrote:
+> > On Fri, 2014-12-05 at 18:14 -0800, Ray Jui wrote:
+> >> On 12/5/2014 5:28 PM, Joe Perches wrote:
+> >>> On Fri, 2014-12-05 at 16:40 -0800, Ray Jui wrote:
+> >>>> +			for_each_set_bit(bit, &val, 32) {
+[]
+> Actually, by reviewing the code more deeply, I'm not sure why using 
+> for_each_set_bit here is 'endian unsafe'.
 
-diff --git a/drivers/soc/ti/knav_qmss_acc.c b/drivers/soc/ti/knav_qmss_acc.c
-index 6fbfde6e..f94d6ac 100644
---- a/drivers/soc/ti/knav_qmss_acc.c
-+++ b/drivers/soc/ti/knav_qmss_acc.c
-@@ -463,7 +463,7 @@ static int knav_acc_free_range(struct knav_range_info *range)
- 	return 0;
- }
- 
--struct knav_range_ops knav_acc_range_ops = {
-+static struct knav_range_ops knav_acc_range_ops = {
- 	.set_notify	= knav_acc_set_notify,
- 	.init_queue	= knav_acc_init_queue,
- 	.open_queue	= knav_acc_open_queue,
-diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-index 8e6a95d..a9a565a 100644
---- a/drivers/soc/ti/knav_qmss_queue.c
-+++ b/drivers/soc/ti/knav_qmss_queue.c
-@@ -393,7 +393,7 @@ static int knav_gp_close_queue(struct knav_range_info *range,
- 	return 0;
- }
- 
--struct knav_range_ops knav_gp_range_ops = {
-+static struct knav_range_ops knav_gp_range_ops = {
- 	.set_notify	= knav_gp_set_notify,
- 	.open_queue	= knav_gp_open_queue,
- 	.close_queue	= knav_gp_close_queue,
--- 
-1.9.1
+It's not.  The 32 confused me as it was long
+and sizeof(long) isn't necessarily 32.
+
+Maybe the 32 should be a #define
