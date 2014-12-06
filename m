@@ -1,78 +1,51 @@
-From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
-Date: Sun,  7 Dec 2014 00:02:08 +0100
-Subject: [PATCH] arch: arm: mach-davinci: cdce949.c:  Remove unused function
-Message-ID: <1417906928-5728-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+From: vishnupatekar0510@gmail.com (vishnupatekar)
+Date: Sun,  7 Dec 2014 04:45:16 +0530
+Subject: [PATCHv2 0/3] ARM:sunxi:ps2 Added support for A10/A20 ps2 controller.
+Message-ID: <1417907719-26775-1-git-send-email-VishnuPatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the function cdce_set_rate() that is not used anywhere.
+Here is v2 of SUNXI PS2 controller support patch-set as with v1.
 
-This was partially found by using a static code analysis program called cppcheck.
+Changes in v2: 
+1. added default n depends on ARCH_SUNXI || COMPILE_TEST in Kconfig.
+2. handled errors and free resources on errors.
+3. used BIT(x), DIV_ROUND_UP macros.
+4. corrected style errors.
+5. added support for A10 also, A10 and A2 have same properties of PS2 controller.
+6. by default commented ps20 and ps21 nodes,as ps20 pins conflict with HDMI
+   connector on Lime2 Board.
+7. added compatible as allwinner,sun4i-a10-ps2.
+8. corrected the possible race condition.
 
-Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
----
- arch/arm/mach-davinci/cdce949.c              |   37 --------------------------
- arch/arm/mach-davinci/include/mach/cdce949.h |    2 --
- 2 files changed, 39 deletions(-)
+Patch 0 Summary: Allwinner A10/A20 PS2 controller. These modifications are
+	for PS2 host controller. IBM compliant IBM PS2 and AT-compatible 
+	keyboard and mouse can be connected.
 
-diff --git a/arch/arm/mach-davinci/cdce949.c b/arch/arm/mach-davinci/cdce949.c
-index abafb92..bccac4a 100644
---- a/arch/arm/mach-davinci/cdce949.c
-+++ b/arch/arm/mach-davinci/cdce949.c
-@@ -212,43 +212,6 @@ static struct cdce_output output_list[] = {
- 	[5]	= { cdce_y5_freqs, ARRAY_SIZE(cdce_y5_freqs) },
- };
- 
--int cdce_set_rate(struct clk *clk, unsigned long rate)
--{
--	int i, ret = 0;
--	struct cdce_freq *freq_table = output_list[clk->lpsc].freq_table;
--	struct cdce_reg  *regs = NULL;
--
--	if (!cdce_i2c_client)
--		return -ENODEV;
--
--	if (!freq_table)
--		return -EINVAL;
--
--	for (i = 0; i < output_list[clk->lpsc].size; i++) {
--		if (freq_table[i].frequency == rate / 1000) {
--			regs = freq_table[i].reglist;
--			break;
--		}
--	}
--
--	if (!regs)
--		return -EINVAL;
--
--	mutex_lock(&cdce_mutex);
--	for (i = 0; regs[i].addr; i++) {
--		ret = i2c_smbus_write_byte_data(cdce_i2c_client,
--					regs[i].addr | 0x80, regs[i].val);
--		if (ret)
--			break;
--	}
--	mutex_unlock(&cdce_mutex);
--
--	if (!ret)
--		clk->rate = rate;
--
--	return ret;
--}
--
- static int cdce_probe(struct i2c_client *client,
- 					const struct i2c_device_id *id)
- {
-diff --git a/arch/arm/mach-davinci/include/mach/cdce949.h b/arch/arm/mach-davinci/include/mach/cdce949.h
-index c73331f..2280e0b 100644
---- a/arch/arm/mach-davinci/include/mach/cdce949.h
-+++ b/arch/arm/mach-davinci/include/mach/cdce949.h
-@@ -14,6 +14,4 @@
- 
- #include <mach/clock.h>
- 
--int cdce_set_rate(struct clk *clk, unsigned long rate);
--
- #endif
+Patch 1 device tree bindings.
+
+Patch 2 adds support for sun7i ps2 driver.
+
+Patch 3 device tree support for PS2 controller.
+ 1) Added A10/A20 ps2 nodes to the dtsi
+ 2) Added A10/A20 ps2 pinmux to the dtsi
+ 3) Added ps2 nodes to the lime2 dts file
+
+vishnupatekar (3):
+  sunxi:dts-bindings:input:ps2 bindings for A10/A20 ps2.
+  sunxi:drivers:input:ps2 Added sunxi A10/A20 ps2 driver
+  ARM:dts:sunxi:ps2 dt nodes for A10/A20 PS2 controller.
+
+ .../bindings/input/allwinner,sunxi-ps2.txt         |   23 ++
+ arch/arm/boot/dts/sun4i-a10.dtsi                   |   27 ++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts    |   13 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |   29 ++
+ drivers/input/serio/Kconfig                        |   10 +
+ drivers/input/serio/Makefile                       |    1 +
+ drivers/input/serio/sunxi-ps2.c                    |  364 ++++++++++++++++++++
+ 7 files changed, 467 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/allwinner,sunxi-ps2.txt
+ create mode 100644 drivers/input/serio/sunxi-ps2.c
+
 -- 
-1.7.10.4
+1.7.9.5
