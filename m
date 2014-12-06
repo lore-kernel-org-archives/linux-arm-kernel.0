@@ -1,80 +1,91 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 6 Dec 2014 18:24:49 +0100
-Subject: [PATCH 02/10] ARM: dts: sun9i: Add mmc module clock nodes for A80
-In-Reply-To: <1417588565-26215-3-git-send-email-wens@csie.org>
-References: <1417588565-26215-1-git-send-email-wens@csie.org>
- <1417588565-26215-3-git-send-email-wens@csie.org>
-Message-ID: <20141206172449.GC12434@lukather>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 6 Dec 2014 18:35:27 +0100
+Subject: N900: fixing MMC at boot
+Message-ID: <20141206173526.GA7964@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi!
 
-On Wed, Dec 03, 2014 at 02:35:57PM +0800, Chen-Yu Tsai wrote:
-> The mmc module clocks are A80 specific module 0 (storage) type clocks.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  arch/arm/boot/dts/sun9i-a80.dtsi | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-> index 494714f..33d18dc 100644
-> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
-> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-> @@ -215,6 +215,38 @@
->  			clock-output-names = "cci400";
->  		};
->  
-> +		mmc0_clk: clk at 06000410 {
-> +			#clock-cells = <0>;
-> +			compatible = "allwinner,sun9i-a80-mod0-clk";
-> +			reg = <0x06000410 0x4>;
-> +			clocks = <&osc24M>, <&pll4>;
-> +			clock-output-names = "mmc0";
-> +		};
-> +
-> +		mmc1_clk: clk at 06000414 {
-> +			#clock-cells = <0>;
-> +			compatible = "allwinner,sun9i-a80-mod0-clk";
-> +			reg = <0x06000414 0x4>;
-> +			clocks = <&osc24M>, <&pll4>;
-> +			clock-output-names = "mmc1";
-> +		};
-> +
-> +		mmc2_clk: clk at 06000418 {
-> +			#clock-cells = <0>;
-> +			compatible = "allwinner,sun9i-a80-mod0-clk";
-> +			reg = <0x06000418 0x4>;
-> +			clocks = <&osc24M>, <&pll4>;
-> +			clock-output-names = "mmc2";
-> +		};
-> +
-> +		mmc3_clk: clk at 0600041c {
-> +			#clock-cells = <0>;
-> +			compatible = "allwinner,sun9i-a80-mod0-clk";
-> +			reg = <0x0600041c 0x4>;
-> +			clocks = <&osc24M>, <&pll4>;
-> +			clock-output-names = "mmc3";
-> +		};
-> +
+For a long time, MMC was not working during boot... (making the box
+unusable without nfsroot). It seems problem is in the regulators,
+because with diff below, I was able to mount root on SD card for a
+first time ... in a long time.
 
-How is the phase stuff supposed to work? Is this still used on the A80?
+Signed-off-by: Pavel Machek <pavel@ucw.cz> [but not for upstream]
 
-Also, wasn't the mux supposed to have 4 bits (so something like at
-least 9 parent clocks?) given your previous patch?
-
-Maxime
+diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
+index 8607433..07791c6 100644
+--- a/Documentation/devicetree/bindings/regulator/regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/regulator.txt
+@@ -4,7 +4,8 @@ Optional properties:
+ - regulator-name: A string used as a descriptive name for regulator outputs
+ - regulator-min-microvolt: smallest voltage consumers may set
+ - regulator-max-microvolt: largest voltage consumers may set
+-- regulator-microvolt-offset: Offset applied to voltages to compensate for voltage drops
++- regulator-microvolt-offset: Offset applied to voltages to compensate for 
++  voltage drops
+ - regulator-min-microamp: smallest current consumers may set
+ - regulator-max-microamp: largest current consumers may set
+ - regulator-always-on: boolean, regulator should never be disabled
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index 11d8afd..707928d 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -287,31 +287,35 @@
+ 	regulator-name = "V28";
+ 	regulator-min-microvolt = <2800000>;
+ 	regulator-max-microvolt = <2800000>;
+-	regulator-always-on; /* due battery cover sensor */
++	regulator-always-on; /* due to battery cover sensor */
+ };
+ 
+ &vaux2 {
+ 	regulator-name = "VCSI";
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <1800000>;
++	regulator-always-on; /* FIXME */
+ };
+ 
+ &vaux3 {
+ 	regulator-name = "VMMC2_30";
+ 	regulator-min-microvolt = <2800000>;
+ 	regulator-max-microvolt = <3000000>;
++	regulator-always-on; /* FIXME */
+ };
+ 
+ &vaux4 {
+ 	regulator-name = "VCAM_ANA_28";
+ 	regulator-min-microvolt = <2800000>;
+ 	regulator-max-microvolt = <2800000>;
++	regulator-always-on; /* FIXME */
+ };
+ 
+ &vmmc1 {
+ 	regulator-name = "VMMC1";
+ 	regulator-min-microvolt = <1850000>;
+ 	regulator-max-microvolt = <3150000>;
++	regulator-always-on; /* FIXME */
+ };
+ 
+ &vmmc2 {
+@@ -339,13 +343,14 @@
+ 	regulator-name = "VMMC2_IO_18";
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <1800000>;
++	regulator-always-on; /* FIXME */
+ };
+ 
+ &vio {
+ 	regulator-name = "VIO";
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <1800000>;
+-
++	regulator-always-on; /* FIXME */
+ };
+ 
+ &vintana1 {
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141206/65168323/attachment.sig>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
