@@ -1,70 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat,  6 Dec 2014 13:46:14 +0000
-Subject: [PATCH 3/5] DT: update ti,irq-crossbar binding
-In-Reply-To: <1417873576-10463-1-git-send-email-marc.zyngier@arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 06 Dec 2014 16:34:53 +0100
+Subject: [PATCH 1/5] genirq: Add =?UTF-8?Q?irqchip=5Fset=5Fwake=5Fpare?=
+ =?UTF-8?Q?nt?=
+In-Reply-To: <1417873576-10463-2-git-send-email-marc.zyngier@arm.com>
 References: <1417873576-10463-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1417873576-10463-4-git-send-email-marc.zyngier@arm.com>
+ <1417873576-10463-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <b3d72e4d562eb4f1e21a8c4953a6c12b@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it look like a real interrupt controller.
+Thanks for the CC, interesting read for me, good preparation for the
+next revision of my Vybrid patchset. One thing I stumbled upon below:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- .../devicetree/bindings/arm/omap/crossbar.txt          | 18 +++++-------------
- 1 file changed, 5 insertions(+), 13 deletions(-)
+On 2014-12-06 14:46, Marc Zyngier wrote:
+> This proves to be usefull with stacked domains.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  include/linux/irq.h |  1 +
+>  kernel/irq/chip.c   | 16 ++++++++++++++++
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/include/linux/irq.h b/include/linux/irq.h
+> index 8badf34..7de85b8 100644
+> --- a/include/linux/irq.h
+> +++ b/include/linux/irq.h
+> @@ -459,6 +459,7 @@ extern void irq_chip_eoi_parent(struct irq_data *data);
+>  extern int irq_chip_set_affinity_parent(struct irq_data *data,
+>  					const struct cpumask *dest,
+>  					bool force);
+> +extern int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on);
+>  #endif
+>  
+>  static inline void irq_chip_write_msi_msg(struct irq_data *data,
+> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+> index 6f1c7a5..96c190b 100644
+> --- a/kernel/irq/chip.c
+> +++ b/kernel/irq/chip.c
+> @@ -948,6 +948,22 @@ int irq_chip_retrigger_hierarchy(struct irq_data *data)
+>  
+>  	return -ENOSYS;
+>  }
+> +
+> +/**
+> + * irq_chip_set_wake - Set/reset wake-up on the parent interrupt
+                       ^
+This should be irq_chip_set_wake_parent I guess...
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-index 4139db3..a9b28d7 100644
---- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-@@ -9,7 +9,9 @@ inputs.
- Required properties:
- - compatible : Should be "ti,irq-crossbar"
- - reg: Base address and the size of the crossbar registers.
--- ti,max-irqs: Total number of irqs available at the interrupt controller.
-+- interrupt-controller: indicates that this block is an interrupt controller.
-+- interrupt-parent: the interrupt controller this block is connected to.
-+- ti,max-irqs: Total number of irqs available at the parent interrupt controller.
- - ti,max-crossbar-sources: Maximum number of crossbar sources that can be routed.
- - ti,reg-size: Size of a individual register in bytes. Every individual
- 	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
-@@ -27,13 +29,13 @@ Optional properties:
-   when the interrupt controller irq is unused (when not provided, default is 0)
- 
- Examples:
--		crossbar_mpu: @4a020000 {
-+		crossbar_mpu: crossbar at 4a002a48 {
- 			compatible = "ti,irq-crossbar";
- 			reg = <0x4a002a48 0x130>;
- 			ti,max-irqs = <160>;
- 			ti,max-crossbar-sources = <400>;
- 			ti,reg-size = <2>;
--			ti,irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
-+			ti,irqs-reserved = <0 1 2 3 5 6 131 132>;
- 			ti,irqs-skip = <10 133 139 140>;
- 		};
- 
-@@ -44,10 +46,6 @@ Documentation/devicetree/bindings/arm/gic.txt for further details.
- 
- An interrupt consumer on an SoC using crossbar will use:
- 	interrupts = <GIC_SPI request_number interrupt_level>
--When the request number is between 0 to that described by
--"ti,max-crossbar-sources", it is assumed to be a crossbar mapping. If the
--request_number is greater than "ti,max-crossbar-sources", then it is mapped as a
--quirky hardware mapping direct to GIC.
- 
- Example:
- 	device_x at 0x4a023000 {
-@@ -55,9 +53,3 @@ Example:
- 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 		...
- 	};
--
--	device_y at 0x4a033000 {
--		/* Direct mapped GIC SPI 1 used */
--		interrupts = <GIC_SPI DIRECT_IRQ(1) IRQ_TYPE_LEVEL_HIGH>;
--		...
--	};
--- 
-2.1.3
+
+> + * @data:	Pointer to interrupt specific data
+> + * @on:		Whether to set or reset the wake-up capability of this irq
+> + *
+> + * Conditional, as the underlying parent chip might not implement it.
+> + */
+> +int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on)
+> +{
+> +	data = data->parent_data;
+> +	if (data->chip->irq_set_wake)
+> +		return data->chip->irq_set_wake(data, on);
+> +
+> +	return -ENOSYS;
+> +}
+>  #endif
+>  
+>  /**
