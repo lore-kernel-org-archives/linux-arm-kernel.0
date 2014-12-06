@@ -1,122 +1,66 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 06 Dec 2014 03:50:03 +0100
-Subject: [PATCH] ARM / PM: Replace CONFIG_PM_RUNTIME with CONFIG_PM
-Message-ID: <2407638.dfZGaT4vm1@vostro.rjw.lan>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 05 Dec 2014 18:34:51 -0800
+Subject: [PATCH 2/5] gpio: Cygnus: add GPIO driver
+In-Reply-To: <5482668F.1040907@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+ <1417826408-1600-1-git-send-email-rjui@broadcom.com>
+ <1417826408-1600-3-git-send-email-rjui@broadcom.com>
+ <1417829282.31745.3.camel@perches.com> <5482668F.1040907@broadcom.com>
+Message-ID: <1417833291.31745.5.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+On Fri, 2014-12-05 at 18:14 -0800, Ray Jui wrote:
+> On 12/5/2014 5:28 PM, Joe Perches wrote:
+> > On Fri, 2014-12-05 at 16:40 -0800, Ray Jui wrote:
+> >> +static void bcm_cygnus_gpio_irq_handler(unsigned int irq,
+> >> +		struct irq_desc *desc)
+> >> +{
+> >> +	struct bcm_cygnus_gpio *cygnus_gpio;
+> >> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+> >> +	int i, bit;
+> >> +
+> >> +	chained_irq_enter(chip, desc);
+> >> +
+> >> +	cygnus_gpio = irq_get_handler_data(irq);
+> >> +
+> >> +	/* go through the entire GPIO banks and handle all interrupts */
+> >> +	for (i = 0; i < cygnus_gpio->num_banks; i++) {
+> >> +		unsigned long val = readl(cygnus_gpio->base +
+> >> +				(i * GPIO_BANK_SIZE) +
+> >> +				CYGNUS_GPIO_INT_MSTAT_OFFSET);
+> >> +		if (val) {
+> >
+> > This if (val) and indentation isn't really necessary
+> >
+> 
+> Note for_each_set_bit in this case iterates 32 times searching for bits 
+> that are set.
 
-After commit b2b49ccbdd54 (PM: Kconfig: Set PM_RUNTIME if PM_SLEEP is
-selected) PM_RUNTIME is always set if PM is set, so #ifdef blocks
-depending on CONFIG_PM_RUNTIME may now be changed to depend on
-CONFIG_PM.
+No it doesn't.
 
-Replace CONFIG_PM_RUNTIME with CONFIG_PM everywhere in the code under
-arch/arm/ (the defconfig files will be modified later).
+#define for_each_set_bit(bit, addr, size) \
+	for ((bit) = find_first_bit((addr), (size));		\
+	     (bit) < (size);					\
+	     (bit) = find_next_bit((addr), (size), (bit) + 1))
 
-Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
----
+find_first_bit:
 
-Note: This depends on commit b2b49ccbdd54 (PM: Kconfig: Set PM_RUNTIME if
-PM_SLEEP is selected) which is only in linux-next at the moment (via the
-linux-pm tree).
+ * Returns the bit number of the first set bit.
+ * If no bits are set, returns @size.
 
-Please let me know if it is OK to take this one into linux-pm.
+>  By having the if (val) check here, it can potentially save 
+> some of such processing in the ISR. I agree with you that it introduces 
+> one extra indent here but I think it's required.
+> 
+> >> +			for_each_set_bit(bit, &val, 32) {
+> >
+> > for_each_set_bit will effectively do the if above.
+> >
+> > 32 bit only code?
+> > otherwise isn't this endian unsafe?
+> >
+> 
+> Will change 'unsigned long val' to 'u32 val'.
 
----
- arch/arm/kernel/perf_event.c       |    2 +-
- arch/arm/mach-davinci/pm_domain.c  |    2 +-
- arch/arm/mach-keystone/pm_domain.c |    2 +-
- arch/arm/mach-omap1/pm_bus.c       |    4 ++--
- arch/arm/mach-omap2/io.c           |    2 +-
- arch/arm/mach-omap2/omap_device.c  |    2 +-
- 6 files changed, 7 insertions(+), 7 deletions(-)
-
-Index: linux-pm/arch/arm/kernel/perf_event.c
-===================================================================
---- linux-pm.orig/arch/arm/kernel/perf_event.c
-+++ linux-pm/arch/arm/kernel/perf_event.c
-@@ -481,7 +481,7 @@ static void armpmu_disable(struct pmu *p
- 	armpmu->stop(armpmu);
- }
- 
--#ifdef CONFIG_PM_RUNTIME
-+#ifdef CONFIG_PM
- static int armpmu_runtime_resume(struct device *dev)
- {
- 	struct arm_pmu_platdata *plat = dev_get_platdata(dev);
-Index: linux-pm/arch/arm/mach-davinci/pm_domain.c
-===================================================================
---- linux-pm.orig/arch/arm/mach-davinci/pm_domain.c
-+++ linux-pm/arch/arm/mach-davinci/pm_domain.c
-@@ -14,7 +14,7 @@
- #include <linux/pm_clock.h>
- #include <linux/platform_device.h>
- 
--#ifdef CONFIG_PM_RUNTIME
-+#ifdef CONFIG_PM
- static int davinci_pm_runtime_suspend(struct device *dev)
- {
- 	int ret;
-Index: linux-pm/arch/arm/mach-keystone/pm_domain.c
-===================================================================
---- linux-pm.orig/arch/arm/mach-keystone/pm_domain.c
-+++ linux-pm/arch/arm/mach-keystone/pm_domain.c
-@@ -19,7 +19,7 @@
- #include <linux/clk-provider.h>
- #include <linux/of.h>
- 
--#ifdef CONFIG_PM_RUNTIME
-+#ifdef CONFIG_PM
- static int keystone_pm_runtime_suspend(struct device *dev)
- {
- 	int ret;
-Index: linux-pm/arch/arm/mach-omap1/pm_bus.c
-===================================================================
---- linux-pm.orig/arch/arm/mach-omap1/pm_bus.c
-+++ linux-pm/arch/arm/mach-omap1/pm_bus.c
-@@ -21,7 +21,7 @@
- 
- #include "soc.h"
- 
--#ifdef CONFIG_PM_RUNTIME
-+#ifdef CONFIG_PM
- static int omap1_pm_runtime_suspend(struct device *dev)
- {
- 	int ret;
-@@ -59,7 +59,7 @@ static struct dev_pm_domain default_pm_d
- #define OMAP1_PM_DOMAIN (&default_pm_domain)
- #else
- #define OMAP1_PM_DOMAIN NULL
--#endif /* CONFIG_PM_RUNTIME */
-+#endif /* CONFIG_PM */
- 
- static struct pm_clk_notifier_block platform_bus_notifier = {
- 	.pm_domain = OMAP1_PM_DOMAIN,
-Index: linux-pm/arch/arm/mach-omap2/io.c
-===================================================================
---- linux-pm.orig/arch/arm/mach-omap2/io.c
-+++ linux-pm/arch/arm/mach-omap2/io.c
-@@ -359,7 +359,7 @@ static void __init omap_hwmod_init_posts
- 	u8 postsetup_state;
- 
- 	/* Set the default postsetup state for all hwmods */
--#ifdef CONFIG_PM_RUNTIME
-+#ifdef CONFIG_PM
- 	postsetup_state = _HWMOD_STATE_IDLE;
- #else
- 	postsetup_state = _HWMOD_STATE_ENABLED;
-Index: linux-pm/arch/arm/mach-omap2/omap_device.c
-===================================================================
---- linux-pm.orig/arch/arm/mach-omap2/omap_device.c
-+++ linux-pm/arch/arm/mach-omap2/omap_device.c
-@@ -588,7 +588,7 @@ odbs_exit:
- 	return ERR_PTR(ret);
- }
- 
--#ifdef CONFIG_PM_RUNTIME
-+#ifdef CONFIG_PM
- static int _od_runtime_suspend(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
+All the bit operations only work on long *
