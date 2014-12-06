@@ -1,42 +1,39 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Sat, 6 Dec 2014 19:08:46 +0100
-Subject: N900: fixing MMC at boot
-In-Reply-To: <20141206180429.GA312@amd>
-References: <20141206173526.GA7964@amd> <201412061840.16157@pali>
- <20141206180429.GA312@amd>
-Message-ID: <201412061908.46854@pali>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Sat, 6 Dec 2014 10:50:57 -0800
+Subject: [RFC PATCH v2 4/4] arm64:numa: adding numa support for arm64
+ platforms.
+In-Reply-To: <5482ce36.c9e2420a.5d40.71c7SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <1416605010-10442-5-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <5482ce36.c9e2420a.5d40.71c7SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <CAFpQJXU89uwAkHyi+dvHmbZOvadO_EyQbrG8jMo5G3tnWP5qcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 06 December 2014 19:04:29 Pavel Machek wrote:
-> On Sat 2014-12-06 18:40:16, Pali Roh?r wrote:
-> > On Saturday 06 December 2014 18:35:27 Pavel Machek wrote:
-> > > Hi!
-> > > 
-> > > For a long time, MMC was not working during boot...
-> > > (making the box unusable without nfsroot). It seems
-> > > problem is in the regulators, because with diff below, I
-> > > was able to mount root on SD card for a first time ... in
-> > > a long time.
-> > 
-> > Hi, do you mean external SD card or internal eMMC (MyDocs)?
-> 
-> I mean u-SD card. But it is strange. I reverted the patch now,
-> and it still works. Not sure why or what I've done
-> differently.
-> 
-> 									Pavel
+On Sat, Dec 6, 2014 at 1:36 AM, Ashok Kumar <ashoks@broadcom.com> wrote:
+> On Sat, Nov 22, 2014 at 02:53:30AM +0530, Ganapatrao Kulkarni wrote:
+>> Adding numa support for arm64 based platforms.
+>> creating numa mapping by parsing the dt node numa-map.
+>>
+>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
+> Ganapat,
+>
+> Can we get a simple version of this patchset with just the associativity parameter for the cpu and memory nodes
+> upstream? The initial patchset can be with the assumption of a simple full mesh topology for the distance.  The
+> hierarchical complex topologies and the DT nodes and properties for that can be added in a later patch, once the
+> standard for that is agreed upon.
+> We are planning to support ACPI based NUMA for                                                                        Broadcom Vulcan processors(http://www.broadcom.com/press/release.php?id=s797235).
+> I am working on a patch to add support for the SRAT and SLIT ACPI tables based on your patch and I will post that
+> patchset soon, so it will be helpful if the core changes are upstream.
+>
+to implement, ibm/ppc like implementation, we need efi-stub patch to
+not remove the memory node from the dt.
+current efi-stub parses dt file and removes memory nodes.
+can i get the efi-stub patch to start with please?
 
-Remove battery wait some time and try again. Maybe you configured 
-something which can be cleared only after full device shutdown...
+> Thanks,
+> Ashok
+>
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141206/2653f272/attachment.sig>
+thanks
+ganapat
