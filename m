@@ -1,39 +1,58 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Sat, 6 Dec 2014 10:50:57 -0800
-Subject: [RFC PATCH v2 4/4] arm64:numa: adding numa support for arm64
- platforms.
-In-Reply-To: <5482ce36.c9e2420a.5d40.71c7SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1416605010-10442-5-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <5482ce36.c9e2420a.5d40.71c7SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <CAFpQJXU89uwAkHyi+dvHmbZOvadO_EyQbrG8jMo5G3tnWP5qcw@mail.gmail.com>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Sun, 7 Dec 2014 02:30:31 +0530
+Subject: Do I need to invalidate caches before enabling (on ARMv7)?
+In-Reply-To: <20141204100357.GO2129@pengutronix.de>
+References: <20141204100357.GO2129@pengutronix.de>
+Message-ID: <20141206210031.GA1758@afzal-ThinkPad-R50e>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 6, 2014 at 1:36 AM, Ashok Kumar <ashoks@broadcom.com> wrote:
-> On Sat, Nov 22, 2014 at 02:53:30AM +0530, Ganapatrao Kulkarni wrote:
->> Adding numa support for arm64 based platforms.
->> creating numa mapping by parsing the dt node numa-map.
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
-> Ganapat,
->
-> Can we get a simple version of this patchset with just the associativity parameter for the cpu and memory nodes
-> upstream? The initial patchset can be with the assumption of a simple full mesh topology for the distance.  The
-> hierarchical complex topologies and the DT nodes and properties for that can be added in a later patch, once the
-> standard for that is agreed upon.
-> We are planning to support ACPI based NUMA for                                                                        Broadcom Vulcan processors(http://www.broadcom.com/press/release.php?id=s797235).
-> I am working on a patch to add support for the SRAT and SLIT ACPI tables based on your patch and I will post that
-> patchset soon, so it will be helpful if the core changes are upstream.
->
-to implement, ibm/ppc like implementation, we need efi-stub patch to
-not remove the memory node from the dt.
-current efi-stub parses dt file and removes memory nodes.
-can i get the efi-stub patch to start with please?
+Hi Uwe,
 
-> Thanks,
-> Ashok
->
+On Thu, Dec 04, 2014 at 11:03:57AM +0100, Uwe Kleine-K?nig wrote:
 
-thanks
-ganapat
+> The breakage I'm currently seeing in barebox might well be explained by
+> stale I-cache entries and barebox (as of now) doesn't invalidate the
+> i-cache before enabling it. Looking into how Linux enables the I-cache
+> in the decompressor for v7[1] revealed that the caches are not cleaned
+> there either. (So my plan to copy from Linux failed :-)
+> 
+> Now I wonder if that is only an unlikely (or even theoretical) issue
+> that wasn't noticed up to now or if I'm missing something.
+
+> So stale entries in the cache might even hurt before the cache is
+> enabled?! This would mean that you want to invalidate/flush the cache at
+> disable-time. Still I think doing it before enabling it in Linux would
+> be a good idea. And if it's only because bootloaders and (maybe worse)
+> boot roms cannot be trusted in this area.
+
+Are you sure that stale I-cache is causing the issue ?, but
+D-cache should not have stale data - it is a pre-requisite for
+booting the Kernel [1,2] (though not in Booting documentation)
+
+We were troubled by this issue when Kernel was loaded directly w/o
+bootloader, since D-cache was not invalidated, upon enabling,
+due to stale data Kernel was crashing randomly
+
+Did want to patch it for long time, but then with cash invalidation
+and all it never happened ;)
+
+Regards
+Afzal
+
+[1] http://www.arm.linux.org.uk/developer/booting.php
+[2] http://comments.gmane.org/gmane.linux.ports.arm.kernel/77718
+
+---------------------------------8<--------------------------------------
+diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
+index 371814a36719..c4c423164d5e 100644
+--- a/Documentation/arm/Booting
++++ b/Documentation/arm/Booting
+@@ -193,6 +193,7 @@ In any case, the following conditions must be met:
+   The MMU must be off.
+   Instruction cache may be on or off.
+   Data cache must be off.
++  Data cache should be invalidated.
+ 
+   If the kernel is entered in HYP mode, the above requirements apply to
+   the HYP mode configuration in addition to the ordinary PL1 (privileged
