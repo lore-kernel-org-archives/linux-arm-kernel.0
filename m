@@ -1,66 +1,397 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 06 Dec 2014 16:34:53 +0100
-Subject: [PATCH 1/5] genirq: Add =?UTF-8?Q?irqchip=5Fset=5Fwake=5Fpare?=
- =?UTF-8?Q?nt?=
-In-Reply-To: <1417873576-10463-2-git-send-email-marc.zyngier@arm.com>
-References: <1417873576-10463-1-git-send-email-marc.zyngier@arm.com>
- <1417873576-10463-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <b3d72e4d562eb4f1e21a8c4953a6c12b@agner.ch>
+Date: Sat, 06 Dec 2014 17:08:29 +0100
+Subject: [PATCH 09/16] ARM: imx6: convert wakeupgen to stacked domains
+In-Reply-To: <1417539497-20101-10-git-send-email-marc.zyngier@arm.com>
+References: <1417539497-20101-1-git-send-email-marc.zyngier@arm.com>
+ <1417539497-20101-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <67e8ccd2cb9fbcc3598904a441c8a2d0@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the CC, interesting read for me, good preparation for the
-next revision of my Vybrid patchset. One thing I stumbled upon below:
-
-On 2014-12-06 14:46, Marc Zyngier wrote:
-> This proves to be usefull with stacked domains.
+On 2014-12-02 17:58, Marc Zyngier wrote:
+> IMX6 has been (ab)using the gic_arch_extn to provide
+> wakeup from suspend, and it makes a lot of sense to convert
+> this code to use stacked domains instead.
 > 
+> This patch does just this, updating the DT files to actually
+> reflect what the HW provides.
+> 
+> BIG FAT WARNING: because the DTs were so far lying by not
+> exposing the fact that the GPC block is actually the first
+> interrupt controller in the chain, kernels with this patch
+> applied wont have any suspend-resume facility when booted
+> with old DTs, and old kernels with updated DTs won't even boot.
+> 
+
+Not sure this is entirely true. I don't think that GPC block is really
+in the chain of the interrupts for normal interrupt delivery. This is
+tested to be _not_ true for Vybird (which has also a GPC block and seems
+to be quite similar). I can mask an interrupt in GPC_IMR2 for instance
+and it still gets delivered to the GIC. However, the registers need to
+be unmasked to deliver wake-up events.
+
+In the GPC_IMRx register description of Vybrid this sentence actually
+states what I observe: "This register is used to mask certain interrupts
+if they are not desired to be a source of
+wake up during STOP mode.". However, this sentence is not there in the
+i.MX6 RM. But the drawing in Chapter 27.1 (GPC, Overview) suggests to
+me, that it is implemented like I see it in Vybrid. So I'm not
+completely sure about this, and I don't have hardware handy to test
+this...
+
+I'm aware that the code did something different before. Not sure whether
+this refactoring would look differently if my suspicion holds true. I
+guess even if it is only wake-up capabilities, we would use stacked IRQ
+domain and just implement the wake-up part...?
+
+--
+Stefan
+
+
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  include/linux/irq.h |  1 +
->  kernel/irq/chip.c   | 16 ++++++++++++++++
->  2 files changed, 17 insertions(+)
+>  arch/arm/boot/dts/imx6qdl.dtsi  |   6 +-
+>  arch/arm/boot/dts/imx6sl.dtsi   |   5 +-
+>  arch/arm/boot/dts/imx6sx.dtsi   |   5 +-
+>  arch/arm/mach-imx/common.h      |   1 -
+>  arch/arm/mach-imx/gpc.c         | 127 ++++++++++++++++++++++++++++++++--------
+>  arch/arm/mach-imx/mach-imx6q.c  |   1 -
+>  arch/arm/mach-imx/mach-imx6sl.c |   1 -
+>  arch/arm/mach-imx/mach-imx6sx.c |   1 -
+>  8 files changed, 116 insertions(+), 31 deletions(-)
 > 
-> diff --git a/include/linux/irq.h b/include/linux/irq.h
-> index 8badf34..7de85b8 100644
-> --- a/include/linux/irq.h
-> +++ b/include/linux/irq.h
-> @@ -459,6 +459,7 @@ extern void irq_chip_eoi_parent(struct irq_data *data);
->  extern int irq_chip_set_affinity_parent(struct irq_data *data,
->  					const struct cpumask *dest,
->  					bool force);
-> +extern int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on);
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index 9596ed5..b7b4ee8 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -53,6 +53,7 @@
+>  		interrupt-controller;
+>  		reg = <0x00a01000 0x1000>,
+>  		      <0x00a00100 0x100>;
+> +		interrupt-parent = <&intc>;
+>  	};
+>  
+>  	clocks {
+> @@ -82,7 +83,7 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+>  		compatible = "simple-bus";
+> -		interrupt-parent = <&intc>;
+> +		interrupt-parent = <&gpc>;
+>  		ranges;
+>  
+>  		dma_apbh: dma-apbh at 00110000 {
+> @@ -122,6 +123,7 @@
+>  			compatible = "arm,cortex-a9-twd-timer";
+>  			reg = <0x00a00600 0x20>;
+>  			interrupts = <1 13 0xf01>;
+> +			interrupt-parent = <&intc>;
+>  			clocks = <&clks IMX6QDL_CLK_TWD>;
+>  		};
+>  
+> @@ -680,8 +682,10 @@
+>  			gpc: gpc at 020dc000 {
+>  				compatible = "fsl,imx6q-gpc";
+>  				reg = <0x020dc000 0x4000>;
+> +				interrupt-controller;
+>  				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
+>  					     <0 90 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupt-parent = <&intc>;
+>  			};
+>  
+>  			gpr: iomuxc-gpr at 020e0000 {
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index dfd83e6..802507e 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -72,6 +72,7 @@
+>  		interrupt-controller;
+>  		reg = <0x00a01000 0x1000>,
+>  		      <0x00a00100 0x100>;
+> +		interrupt-parent = <&intc>;
+>  	};
+>  
+>  	clocks {
+> @@ -95,7 +96,7 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+>  		compatible = "simple-bus";
+> -		interrupt-parent = <&intc>;
+> +		interrupt-parent = <&gpc>;
+>  		ranges;
+>  
+>  		ocram: sram at 00900000 {
+> @@ -597,7 +598,9 @@
+>  			gpc: gpc at 020dc000 {
+>  				compatible = "fsl,imx6sl-gpc", "fsl,imx6q-gpc";
+>  				reg = <0x020dc000 0x4000>;
+> +				interrupt-controller;
+>  				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupt-parent = <&intc>;
+>  			};
+>  
+>  			gpr: iomuxc-gpr at 020e0000 {
+> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+> index f3e88c0..75ca610 100644
+> --- a/arch/arm/boot/dts/imx6sx.dtsi
+> +++ b/arch/arm/boot/dts/imx6sx.dtsi
+> @@ -88,6 +88,7 @@
+>  		interrupt-controller;
+>  		reg = <0x00a01000 0x1000>,
+>  		      <0x00a00100 0x100>;
+> +		interrupt-parent = <&intc>;
+>  	};
+>  
+>  	clocks {
+> @@ -131,7 +132,7 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+>  		compatible = "simple-bus";
+> -		interrupt-parent = <&intc>;
+> +		interrupt-parent = <&gpc>;
+>  		ranges;
+>  
+>  		pmu {
+> @@ -694,7 +695,9 @@
+>  			gpc: gpc at 020dc000 {
+>  				compatible = "fsl,imx6sx-gpc", "fsl,imx6q-gpc";
+>  				reg = <0x020dc000 0x4000>;
+> +				interrupt-controller;
+>  				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupt-parent = <&intc>;
+>  			};
+>  
+>  			iomuxc: iomuxc at 020e0000 {
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> index 66662a1..ac65dd5 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -103,7 +103,6 @@ static inline void imx_scu_map_io(void) {}
+>  static inline void imx_smp_prepare(void) {}
 >  #endif
+>  void imx_src_init(void);
+> -void imx_gpc_init(void);
+>  void imx_gpc_pre_suspend(bool arm_power_off);
+>  void imx_gpc_post_resume(void);
+>  void imx_gpc_mask_all(void);
+> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+> index 5f3602e..240109b 100644
+> --- a/arch/arm/mach-imx/gpc.c
+> +++ b/arch/arm/mach-imx/gpc.c
+> @@ -22,6 +22,7 @@
+>  #define GPC_PGC_CPU_PDN		0x2a0
 >  
->  static inline void irq_chip_write_msi_msg(struct irq_data *data,
-> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-> index 6f1c7a5..96c190b 100644
-> --- a/kernel/irq/chip.c
-> +++ b/kernel/irq/chip.c
-> @@ -948,6 +948,22 @@ int irq_chip_retrigger_hierarchy(struct irq_data *data)
+>  #define IMR_NUM			4
+> +#define GPC_MAX_IRQS		(IMR_NUM * 32)
 >  
->  	return -ENOSYS;
+>  static void __iomem *gpc_base;
+>  static u32 gpc_wake_irqs[IMR_NUM];
+> @@ -56,17 +57,17 @@ void imx_gpc_post_resume(void)
+>  
+>  static int imx_gpc_irq_set_wake(struct irq_data *d, unsigned int on)
+>  {
+> -	unsigned int idx = d->hwirq / 32 - 1;
+> +	unsigned int idx = d->hwirq / 32;
+>  	u32 mask;
+>  
+> -	/* Sanity check for SPI irq */
+> -	if (d->hwirq < 32)
+> -		return -EINVAL;
+> -
+>  	mask = 1 << d->hwirq % 32;
+>  	gpc_wake_irqs[idx] = on ? gpc_wake_irqs[idx] | mask :
+>  				  gpc_wake_irqs[idx] & ~mask;
+>  
+> +	/*
+> +	 * Do *not* call into the parent, as the GIC doesn't have any
+> +	 * wake-up facility...
+> +	 */
+>  	return 0;
+>  }
+>  
+> @@ -96,7 +97,7 @@ void imx_gpc_hwirq_unmask(unsigned int hwirq)
+>  	void __iomem *reg;
+>  	u32 val;
+>  
+> -	reg = gpc_base + GPC_IMR1 + (hwirq / 32 - 1) * 4;
+> +	reg = gpc_base + GPC_IMR1 + hwirq / 32 * 4;
+>  	val = readl_relaxed(reg);
+>  	val &= ~(1 << hwirq % 32);
+>  	writel_relaxed(val, reg);
+> @@ -107,7 +108,7 @@ void imx_gpc_hwirq_mask(unsigned int hwirq)
+>  	void __iomem *reg;
+>  	u32 val;
+>  
+> -	reg = gpc_base + GPC_IMR1 + (hwirq / 32 - 1) * 4;
+> +	reg = gpc_base + GPC_IMR1 + hwirq / 32 * 4;
+>  	val = readl_relaxed(reg);
+>  	val |= 1 << (hwirq % 32);
+>  	writel_relaxed(val, reg);
+> @@ -115,37 +116,115 @@ void imx_gpc_hwirq_mask(unsigned int hwirq)
+>  
+>  static void imx_gpc_irq_unmask(struct irq_data *d)
+>  {
+> -	/* Sanity check for SPI irq */
+> -	if (d->hwirq < 32)
+> -		return;
+> -
+>  	imx_gpc_hwirq_unmask(d->hwirq);
+> +	irq_chip_unmask_parent(d);
+>  }
+>  
+>  static void imx_gpc_irq_mask(struct irq_data *d)
+>  {
+> -	/* Sanity check for SPI irq */
+> -	if (d->hwirq < 32)
+> -		return;
+> -
+>  	imx_gpc_hwirq_mask(d->hwirq);
+> +	irq_chip_mask_parent(d);
+> +}
+> +
+> +static struct irq_chip imx_gpc_chip = {
+> +	.name		= "GPC",
+> +	.irq_eoi	= irq_chip_eoi_parent,
+> +	.irq_mask	= imx_gpc_irq_mask,
+> +	.irq_unmask	= imx_gpc_irq_unmask,
+> +	.irq_retrigger	= irq_chip_retrigger_hierarchy,
+> +	.irq_set_wake	= imx_gpc_irq_set_wake,
+> +};
+> +
+> +static int imx_gpc_domain_xlate(struct irq_domain *domain,
+> +				struct device_node *controller,
+> +				const u32 *intspec,
+> +				unsigned int intsize,
+> +				unsigned long *out_hwirq,
+> +				unsigned int *out_type)
+> +{
+> +	if (domain->of_node != controller)
+> +		return -EINVAL;	/* Shouldn't happen, really... */
+> +	if (intsize != 3)
+> +		return -EINVAL;	/* Not GIC compliant */
+> +	if (intspec[0] != 0)
+> +		return -EINVAL;	/* No PPI should point to this domain */
+> +
+> +	*out_hwirq = intspec[1];
+> +	*out_type = intspec[2];
+> +	return 0;
+> +}
+> +
+> +static int imx_gpc_domain_alloc(struct irq_domain *domain,
+> +				  unsigned int virq,
+> +				  unsigned int nr_irqs, void *data)
+> +{
+> +	struct of_phandle_args *args = data;
+> +	struct of_phandle_args parent_args;
+> +	irq_hw_number_t hwirq;
+> +	int i;
+> +
+> +	if (args->args_count != 3)
+> +		return -EINVAL;	/* Not GIC compliant */
+> +	if (args->args[0] != 0)
+> +		return -EINVAL;	/* No PPI should point to this domain */
+> +
+> +	hwirq = args->args[1];
+> +	if (hwirq >= GPC_MAX_IRQS)
+> +		return -EINVAL;	/* Can't deal with this */
+> +
+> +	for (i = 0; i < nr_irqs; i++)
+> +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
+> +					      &imx_gpc_chip, NULL);
+> +
+> +	parent_args = *args;
+> +	parent_args.np = domain->parent->of_node;
+> +	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &parent_args);
+>  }
+>  
+> -void __init imx_gpc_init(void)
+> +static struct irq_domain_ops imx_gpc_domain_ops = {
+> +	.xlate	= imx_gpc_domain_xlate,
+> +	.alloc	= imx_gpc_domain_alloc,
+> +	.free	= irq_domain_free_irqs_common,
+> +};
+> +
+> +static int __init imx_gpc_init(struct device_node *node,
+> +			       struct device_node *parent)
+>  {
+> -	struct device_node *np;
+> +	struct irq_domain *parent_domain, *domain;
+>  	int i;
+>  
+> -	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
+> -	gpc_base = of_iomap(np, 0);
+> -	WARN_ON(!gpc_base);
+> +	if (!parent) {
+> +		pr_err("%s: no parent, giving up\n", node->full_name);
+> +		return -ENODEV;
+> +	}
+> +
+> +	parent_domain = irq_find_host(parent);
+> +	if (!parent_domain) {
+> +		pr_err("%s: unable to obtain parent domain\n", node->full_name);
+> +		return -ENXIO;
+> +	}
+> +
+> +	gpc_base = of_iomap(node, 0);
+> +	if (WARN_ON(!gpc_base))
+> +	        return -ENOMEM;
+> +
+> +	domain = irq_domain_add_hierarchy(parent_domain, 0, GPC_MAX_IRQS,
+> +					  node, &imx_gpc_domain_ops,
+> +					  NULL);
+> +	if (!domain) {
+> +		iounmap(gpc_base);
+> +		return -ENOMEM;
+> +	}
+>  
+>  	/* Initially mask all interrupts */
+>  	for (i = 0; i < IMR_NUM; i++)
+>  		writel_relaxed(~0, gpc_base + GPC_IMR1 + i * 4);
+>  
+> -	/* Register GPC as the secondary interrupt controller behind GIC */
+> -	gic_arch_extn.irq_mask = imx_gpc_irq_mask;
+> -	gic_arch_extn.irq_unmask = imx_gpc_irq_unmask;
+> -	gic_arch_extn.irq_set_wake = imx_gpc_irq_set_wake;
+> +	return 0;
 >  }
 > +
-> +/**
-> + * irq_chip_set_wake - Set/reset wake-up on the parent interrupt
-                       ^
-This should be irq_chip_set_wake_parent I guess...
-
-
-> + * @data:	Pointer to interrupt specific data
-> + * @on:		Whether to set or reset the wake-up capability of this irq
-> + *
-> + * Conditional, as the underlying parent chip might not implement it.
+> +/*
+> + * We cannot use the IRQCHIP_DECLARE macro that lives in
+> + * drivers/irqchip, so we're forced to roll our own. Not very nice.
 > + */
-> +int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on)
-> +{
-> +	data = data->parent_data;
-> +	if (data->chip->irq_set_wake)
-> +		return data->chip->irq_set_wake(data, on);
-> +
-> +	return -ENOSYS;
-> +}
->  #endif
+> +OF_DECLARE_2(irqchip, imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index d51c6e9..5242a9c 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -392,7 +392,6 @@ static void __init imx6q_init_irq(void)
+>  	imx_init_revision_from_anatop();
+>  	imx_init_l2cache();
+>  	imx_src_init();
+> -	imx_gpc_init();
+>  	irqchip_init();
+>  }
 >  
->  /**
+> diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+> index ed263a2..49c4e22 100644
+> --- a/arch/arm/mach-imx/mach-imx6sl.c
+> +++ b/arch/arm/mach-imx/mach-imx6sl.c
+> @@ -66,7 +66,6 @@ static void __init imx6sl_init_irq(void)
+>  	imx_init_revision_from_anatop();
+>  	imx_init_l2cache();
+>  	imx_src_init();
+> -	imx_gpc_init();
+>  	irqchip_init();
+>  }
+>  
+> diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
+> index 3de3b73..dc0df73 100644
+> --- a/arch/arm/mach-imx/mach-imx6sx.c
+> +++ b/arch/arm/mach-imx/mach-imx6sx.c
+> @@ -35,7 +35,6 @@ static void __init imx6sx_init_irq(void)
+>  	imx_init_revision_from_anatop();
+>  	imx_init_l2cache();
+>  	imx_src_init();
+> -	imx_gpc_init();
+>  	irqchip_init();
+>  }
