@@ -1,32 +1,62 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Fri, 5 Dec 2014 16:40:06 -0800
-Subject: [PATCH 3/5] ARM: mach-bcm: Enable GPIO support for Cygnus
+Date: Fri, 5 Dec 2014 16:40:07 -0800
+Subject: [PATCH 4/5] ARM: dts: enable GPIO for Broadcom Cygnus
 In-Reply-To: <1417826408-1600-1-git-send-email-rjui@broadcom.com>
 References: <Ray Jui <rjui@broadcom.com>
  <1417826408-1600-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1417826408-1600-4-git-send-email-rjui@broadcom.com>
+Message-ID: <1417826408-1600-5-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable GPIO driver for Broadcom Cygnus SoC by selecting GPIO_BCM_CYGNUS
+This enables all 3 GPIO controllers including the ASIU GPIO, the
+chipcommonG GPIO, and the ALWAYS-ON GPIO, for Broadcom Cygnus SoC
 
 Signed-off-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- arch/arm/mach-bcm/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/bcm-cygnus.dtsi |   30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index aaeec78..5066d5d 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -29,6 +29,7 @@ config ARCH_BCM_IPROC
- config ARCH_BCM_CYGNUS
- 	bool "Broadcom Cygnus Support" if ARCH_MULTI_V7
- 	select ARCH_BCM_IPROC
-+	select GPIO_BCM_CYGNUS
- 	help
- 	  Enable support for the Cygnus family,
- 	  which includes the following variants:
+diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+index 5126f9e..c7587c1 100644
+--- a/arch/arm/boot/dts/bcm-cygnus.dtsi
++++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+@@ -54,6 +54,36 @@
+ 
+ 	/include/ "bcm-cygnus-clock.dtsi"
+ 
++	gpio_ccm: gpio at 1800a000 {
++		compatible = "brcm,cygnus-ccm-gpio";
++		reg = <0x1800a000 0x50>,
++			<0x0301d164 0x20>;
++		ngpios = <24>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-controller;
++	};
++
++	gpio_asiu: gpio at 180a5000 {
++		compatible = "brcm,cygnus-asiu-gpio";
++		reg = <0x180a5000 0x668>;
++		ngpios = <122>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		interrupt-controller;
++		interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	gpio_crmu: gpio at 03024800 {
++		compatible = "brcm,cygnus-crmu-gpio";
++		reg = <0x03024800 0x50>;
++		ngpios = <6>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		no-interrupt;
++	};
++
+ 	amba {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 1.7.9.5
