@@ -1,97 +1,199 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Sun, 07 Dec 2014 01:42:33 +0100
-Subject: [PATCH v8 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <1397869980-21187-4-git-send-email-zhangfei.gao@linaro.org>
-References: <1397869980-21187-1-git-send-email-zhangfei.gao@linaro.org>
- <1397869980-21187-4-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <5483A279.5000503@suse.de>
+From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
+Date: Sun,  7 Dec 2014 02:12:20 +0100
+Subject: [PATCH] arch: arm: mach-msm: smd.c:  Remove some unused functions
+Message-ID: <1417914740-8390-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.04.14 03:13, Zhangfei Gao wrote:
-> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
-> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
-> 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Removes some functions that are not used anywhere:
+smsm_set_sleep_duration() smsm_get_state() smd_wait_until_writable()
+smd_wait_until_readable() smd_write_atomic() smd_sleep_exit()
 
-Is this driver still supposed to go upstream? I presume this was the
-last submission and it's been quite some time ago :)
+This was partially found by using a static code analysis program called cppcheck.
 
-> ---
->  drivers/net/ethernet/hisilicon/Makefile    |    2 +-
->  drivers/net/ethernet/hisilicon/hip04_eth.c |  846 ++++++++++++++++++++++++++++
->  2 files changed, 847 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/net/ethernet/hisilicon/hip04_eth.c
-> 
-> diff --git a/drivers/net/ethernet/hisilicon/Makefile b/drivers/net/ethernet/hisilicon/Makefile
-> index 1d6eb6e..17dec03 100644
+Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+---
+ arch/arm/mach-msm/include/mach/msm_smd.h |    9 ---
+ arch/arm/mach-msm/smd.c                  |  105 ------------------------------
+ arch/arm/mach-msm/smd_private.h          |    2 -
+ 3 files changed, 116 deletions(-)
 
-[...]
-
-> +static irqreturn_t hip04_mac_interrupt(int irq, void *dev_id)
-> +{
-> +	struct net_device *ndev = (struct net_device *) dev_id;
-> +	struct hip04_priv *priv = netdev_priv(ndev);
-> +	struct net_device_stats *stats = &ndev->stats;
-> +	u32 ists = readl_relaxed(priv->base + PPE_INTSTS);
-> +
-> +	writel_relaxed(DEF_INT_MASK, priv->base + PPE_RINT);
-> +
-> +	if (unlikely(ists & DEF_INT_ERR)) {
-> +		if (ists & (RCV_NOBUF | RCV_DROP))
-> +			stats->rx_errors++;
-> +			stats->rx_dropped++;
-> +			netdev_err(ndev, "rx drop\n");
-
-Why would a user want to see this as a dmesg error? We already have
-stats for packet drops, no?
-
-> +		if (ists & TX_DROP) {
-> +			stats->tx_dropped++;
-> +			netdev_err(ndev, "tx drop\n");
-
-Same here.
-
-> +		}
-> +	}
-> +
-> +	if (ists & RCV_INT) {
-> +		/* disable rx interrupt */
-> +		priv->reg_inten &= ~(RCV_INT);
-> +		writel_relaxed(priv->reg_inten, priv->base + PPE_INTEN);
-> +		napi_schedule(&priv->napi);
-> +	}
-> +
-> +	return IRQ_HANDLED;
-> +}
-
-[...]
-
-> +
-> +static const struct of_device_id hip04_mac_match[] = {
-> +	{ .compatible = "hisilicon,hip04-mac" },
-> +	{ }
-> +};
-
-This is missing the magic macro that actually would make module aliases
-work.
-
-
-Alex
-
-> +
-> +static struct platform_driver hip04_mac_driver = {
-> +	.probe	= hip04_mac_probe,
-> +	.remove	= hip04_remove,
-> +	.driver	= {
-> +		.name		= DRV_NAME,
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= hip04_mac_match,
-> +	},
-> +};
-> +module_platform_driver(hip04_mac_driver);
-> +
-> +MODULE_DESCRIPTION("HISILICON P04 Ethernet driver");
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_ALIAS("platform:hip04-ether");
-> 
+diff --git a/arch/arm/mach-msm/include/mach/msm_smd.h b/arch/arm/mach-msm/include/mach/msm_smd.h
+index 029463e..48ddef98 100644
+--- a/arch/arm/mach-msm/include/mach/msm_smd.h
++++ b/arch/arm/mach-msm/include/mach/msm_smd.h
+@@ -40,7 +40,6 @@ int smd_read(smd_channel_t *ch, void *data, int len);
+ ** it will return the requested length written or an error.
+ */
+ int smd_write(smd_channel_t *ch, const void *data, int len);
+-int smd_write_atomic(smd_channel_t *ch, const void *data, int len);
+ 
+ int smd_write_avail(smd_channel_t *ch);
+ int smd_read_avail(smd_channel_t *ch);
+@@ -57,14 +56,6 @@ int smd_cur_packet_size(smd_channel_t *ch);
+ void smd_kick(smd_channel_t *ch);
+ 
+ 
+-#if 0
+-/* these are interruptable waits which will block you until the specified
+-** number of bytes are readable or writable.
+-*/
+-int smd_wait_until_readable(smd_channel_t *ch, int bytes);
+-int smd_wait_until_writable(smd_channel_t *ch, int bytes);
+-#endif
+-
+ typedef enum {
+ 	SMD_PORT_DS = 0,
+ 	SMD_PORT_DIAG,
+diff --git a/arch/arm/mach-msm/smd.c b/arch/arm/mach-msm/smd.c
+index b1588a1..4bc1e71 100644
+--- a/arch/arm/mach-msm/smd.c
++++ b/arch/arm/mach-msm/smd.c
+@@ -401,36 +401,6 @@ static inline int smd_need_int(struct smd_channel *ch)
+ 	return 0;
+ }
+ 
+-void smd_sleep_exit(void)
+-{
+-	unsigned long flags;
+-	struct smd_channel *ch;
+-	int need_int = 0;
+-
+-	spin_lock_irqsave(&smd_lock, flags);
+-	list_for_each_entry(ch, &smd_ch_list_modem, ch_list) {
+-		if (smd_need_int(ch)) {
+-			need_int = 1;
+-			break;
+-		}
+-	}
+-	list_for_each_entry(ch, &smd_ch_list_dsp, ch_list) {
+-		if (smd_need_int(ch)) {
+-			need_int = 1;
+-			break;
+-		}
+-	}
+-	spin_unlock_irqrestore(&smd_lock, flags);
+-	do_smd_probe();
+-
+-	if (need_int) {
+-		if (msm_smd_debug_mask & MSM_SMD_DEBUG)
+-			pr_info("smd_sleep_exit need interrupt\n");
+-		tasklet_schedule(&smd_fake_irq_tasklet);
+-	}
+-}
+-
+-
+ void smd_kick(smd_channel_t *ch)
+ {
+ 	unsigned long flags;
+@@ -747,16 +717,6 @@ int smd_write(smd_channel_t *ch, const void *data, int len)
+ 	return ch->write(ch, data, len);
+ }
+ 
+-int smd_write_atomic(smd_channel_t *ch, const void *data, int len)
+-{
+-	unsigned long flags;
+-	int res;
+-	spin_lock_irqsave(&smd_lock, flags);
+-	res = ch->write(ch, data, len);
+-	spin_unlock_irqrestore(&smd_lock, flags);
+-	return res;
+-}
+-
+ int smd_read_avail(smd_channel_t *ch)
+ {
+ 	return ch->read_avail(ch);
+@@ -767,16 +727,6 @@ int smd_write_avail(smd_channel_t *ch)
+ 	return ch->write_avail(ch);
+ }
+ 
+-int smd_wait_until_readable(smd_channel_t *ch, int bytes)
+-{
+-	return -1;
+-}
+-
+-int smd_wait_until_writable(smd_channel_t *ch, int bytes)
+-{
+-	return -1;
+-}
+-
+ int smd_cur_packet_size(smd_channel_t *ch)
+ {
+ 	return ch->current_packet;
+@@ -875,61 +825,6 @@ int smsm_change_state(enum smsm_state_item item,
+ 	return 0;
+ }
+ 
+-uint32_t smsm_get_state(enum smsm_state_item item)
+-{
+-	unsigned long flags;
+-	uint32_t rv;
+-
+-	spin_lock_irqsave(&smem_lock, flags);
+-
+-	rv = readl(smd_info.state + item * 4);
+-
+-	if (item == SMSM_STATE_MODEM && (rv & SMSM_RESET))
+-		handle_modem_crash();
+-
+-	spin_unlock_irqrestore(&smem_lock, flags);
+-
+-	return rv;
+-}
+-
+-#ifdef CONFIG_ARCH_MSM_SCORPION
+-
+-int smsm_set_sleep_duration(uint32_t delay)
+-{
+-	struct msm_dem_slave_data *ptr;
+-
+-	ptr = smem_find(SMEM_APPS_DEM_SLAVE_DATA, sizeof(*ptr));
+-	if (ptr == NULL) {
+-		pr_err("smsm_set_sleep_duration <SM NO APPS_DEM_SLAVE_DATA>\n");
+-		return -EIO;
+-	}
+-	if (msm_smd_debug_mask & MSM_SMSM_DEBUG)
+-		pr_info("smsm_set_sleep_duration %d -> %d\n",
+-		       ptr->sleep_time, delay);
+-	ptr->sleep_time = delay;
+-	return 0;
+-}
+-
+-#else
+-
+-int smsm_set_sleep_duration(uint32_t delay)
+-{
+-	uint32_t *ptr;
+-
+-	ptr = smem_find(SMEM_SMSM_SLEEP_DELAY, sizeof(*ptr));
+-	if (ptr == NULL) {
+-		pr_err("smsm_set_sleep_duration <SM NO SLEEP_DELAY>\n");
+-		return -EIO;
+-	}
+-	if (msm_smd_debug_mask & MSM_SMSM_DEBUG)
+-		pr_info("smsm_set_sleep_duration %d -> %d\n",
+-		       *ptr, delay);
+-	*ptr = delay;
+-	return 0;
+-}
+-
+-#endif
+-
+ int smd_core_init(void)
+ {
+ 	int r;
+diff --git a/arch/arm/mach-msm/smd_private.h b/arch/arm/mach-msm/smd_private.h
+index 727bfe6..702f34e 100644
+--- a/arch/arm/mach-msm/smd_private.h
++++ b/arch/arm/mach-msm/smd_private.h
+@@ -148,8 +148,6 @@ enum smsm_state_item {
+ 
+ void *smem_alloc(unsigned id, unsigned size);
+ int smsm_change_state(enum smsm_state_item item, uint32_t clear_mask, uint32_t set_mask);
+-uint32_t smsm_get_state(enum smsm_state_item item);
+-int smsm_set_sleep_duration(uint32_t delay);
+ void smsm_print_sleep_info(void);
+ 
+ #define SMEM_NUM_SMD_CHANNELS        64
+-- 
+1.7.10.4
