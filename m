@@ -1,114 +1,68 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Sun, 7 Dec 2014 11:28:55 +0800
-Subject: [PATCH v8 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <5483A279.5000503@suse.de>
-References: <1397869980-21187-1-git-send-email-zhangfei.gao@linaro.org>
- <1397869980-21187-4-git-send-email-zhangfei.gao@linaro.org>
- <5483A279.5000503@suse.de>
-Message-ID: <5483C977.2060308@huawei.com>
+From: n.nikolaev@virtualopensystems.com (Nikolay Nikolaev)
+Date: Sun, 07 Dec 2014 11:37:34 +0200
+Subject: [PATCH v2 0/5] ARM: KVM: Enable the ioeventfd capability of KVM on ARM
+Message-ID: <20141207093641.17563.84226.stgit@i3820>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/12/7 8:42, Alexander Graf wrote:
-> On 19.04.14 03:13, Zhangfei Gao wrote:
->> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
->> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
->>
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> 
-> Is this driver still supposed to go upstream? I presume this was the
-> last submission and it's been quite some time ago :)
-> 
+The IOEVENTFD KVM capability is a prerequisite for vhost support.
 
-yes, it is really a long time, but The hip04 did not support tx irq, 
-we couldn't get any better idea to fix this defect, do you have any suggestion?
+This series enables the ioeventfd KVM capability on ARM.
 
-Regards
-Ding
+The implementation routes MMIO access in the IO abort handler to the KVM IO bus.
+If there is already a registered ioeventfd handler for this address, the file
+descriptor will be triggered.
 
->> ---
->>  drivers/net/ethernet/hisilicon/Makefile    |    2 +-
->>  drivers/net/ethernet/hisilicon/hip04_eth.c |  846 ++++++++++++++++++++++++++++
->>  2 files changed, 847 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/net/ethernet/hisilicon/hip04_eth.c
->>
->> diff --git a/drivers/net/ethernet/hisilicon/Makefile b/drivers/net/ethernet/hisilicon/Makefile
->> index 1d6eb6e..17dec03 100644
-> 
-> [...]
-> 
->> +static irqreturn_t hip04_mac_interrupt(int irq, void *dev_id)
->> +{
->> +	struct net_device *ndev = (struct net_device *) dev_id;
->> +	struct hip04_priv *priv = netdev_priv(ndev);
->> +	struct net_device_stats *stats = &ndev->stats;
->> +	u32 ists = readl_relaxed(priv->base + PPE_INTSTS);
->> +
->> +	writel_relaxed(DEF_INT_MASK, priv->base + PPE_RINT);
->> +
->> +	if (unlikely(ists & DEF_INT_ERR)) {
->> +		if (ists & (RCV_NOBUF | RCV_DROP))
->> +			stats->rx_errors++;
->> +			stats->rx_dropped++;
->> +			netdev_err(ndev, "rx drop\n");
-> 
-> Why would a user want to see this as a dmesg error? We already have
-> stats for packet drops, no?
-> 
->> +		if (ists & TX_DROP) {
->> +			stats->tx_dropped++;
->> +			netdev_err(ndev, "tx drop\n");
-> 
-> Same here.
-> 
->> +		}
->> +	}
->> +
->> +	if (ists & RCV_INT) {
->> +		/* disable rx interrupt */
->> +		priv->reg_inten &= ~(RCV_INT);
->> +		writel_relaxed(priv->reg_inten, priv->base + PPE_INTEN);
->> +		napi_schedule(&priv->napi);
->> +	}
->> +
->> +	return IRQ_HANDLED;
->> +}
-> 
-> [...]
-> 
->> +
->> +static const struct of_device_id hip04_mac_match[] = {
->> +	{ .compatible = "hisilicon,hip04-mac" },
->> +	{ }
->> +};
-> 
-> This is missing the magic macro that actually would make module aliases
-> work.
-> 
-> 
-> Alex
-> 
->> +
->> +static struct platform_driver hip04_mac_driver = {
->> +	.probe	= hip04_mac_probe,
->> +	.remove	= hip04_remove,
->> +	.driver	= {
->> +		.name		= DRV_NAME,
->> +		.owner		= THIS_MODULE,
->> +		.of_match_table	= hip04_mac_match,
->> +	},
->> +};
->> +module_platform_driver(hip04_mac_driver);
->> +
->> +MODULE_DESCRIPTION("HISILICON P04 Ethernet driver");
->> +MODULE_LICENSE("GPL v2");
->> +MODULE_ALIAS("platform:hip04-ether");
->>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
+We extended the KVM IO bus API to expose the VCPU struct pointer. Now the VGIC
+MMIO access is done through this API. For this to operate the VGIC registers a
+kvm_io_device which represents the whole dist MMIO region.
+
+The patches are implemented on top of the latest Andre's vGICv3 work from here:
+http://www.linux-arm.org/git?p=linux-ap.git;a=shortlog;h=refs/heads/kvm-gicv3/v4
+
+The code was tested on Dual Cortex-A15 Exynos5250 (ARM Chromebook).
+ARM64 build was verified, but not run on actual HW.
+
+Changes since v1:
+ - fixed x86 compilation
+ - GICv3/GICv3 dist base selection
+ - added vgic_unregister_kvm_io_dev to free the iodev resources
+ - enable eventfd on ARM64
+
+---
+
+Nikolay Nikolaev (5):
+      KVM: Redesign kvm_io_bus_ API to pass VCPU structure to the callbacks.
+      KVM: ARM: on IO mem abort - route the call to KVM MMIO bus
+      KVM: ARM VGIC add kvm_io_bus_ frontend
+      ARM/ARM64: enable linking against eventfd
+      ARM: enable KVM_CAP_IOEVENTFD
+
+
+ arch/arm/kvm/Kconfig       |    1 
+ arch/arm/kvm/Makefile      |    2 -
+ arch/arm/kvm/arm.c         |    3 +
+ arch/arm/kvm/mmio.c        |   32 +++++++++++
+ arch/arm64/kvm/Kconfig     |    1 
+ arch/arm64/kvm/Makefile    |    2 -
+ arch/ia64/kvm/kvm-ia64.c   |    4 +
+ arch/powerpc/kvm/mpic.c    |   10 ++-
+ arch/powerpc/kvm/powerpc.c |    4 +
+ arch/s390/kvm/diag.c       |    2 -
+ arch/x86/kvm/i8254.c       |   14 +++--
+ arch/x86/kvm/i8259.c       |   12 ++--
+ arch/x86/kvm/lapic.c       |    4 +
+ arch/x86/kvm/vmx.c         |    2 -
+ arch/x86/kvm/x86.c         |   13 ++---
+ include/kvm/arm_vgic.h     |    3 -
+ include/linux/kvm_host.h   |   10 ++-
+ virt/kvm/arm/vgic.c        |  127 +++++++++++++++++++++++++++++++++++++++++---
+ virt/kvm/coalesced_mmio.c  |    5 +-
+ virt/kvm/eventfd.c         |    4 +
+ virt/kvm/ioapic.c          |    8 +--
+ virt/kvm/iodev.h           |   23 +++++---
+ virt/kvm/kvm_main.c        |   32 ++++++-----
+ 23 files changed, 237 insertions(+), 81 deletions(-)
+
+--
+Signature
