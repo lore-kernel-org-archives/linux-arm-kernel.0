@@ -1,74 +1,106 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 7 Dec 2014 18:46:16 +0100
-Subject: [PATCH 09/10] ARM: dts: sun9i: Add pinmux settings for mmc2
-In-Reply-To: <CAGb2v64X8AvnqMFxxeHLa28G_7sF9vYjqU_D7R_=L4NJ+=ae7Q@mail.gmail.com>
-References: <1417588565-26215-1-git-send-email-wens@csie.org>
- <1417588565-26215-10-git-send-email-wens@csie.org>
- <20141207150353.GH12434@lukather>
- <CAGb2v64X8AvnqMFxxeHLa28G_7sF9vYjqU_D7R_=L4NJ+=ae7Q@mail.gmail.com>
-Message-ID: <20141207174616.GN12434@lukather>
+From: nm@ti.com (Nishanth Menon)
+Date: Sun, 7 Dec 2014 12:03:22 -0600
+Subject: [PATCH 0/5] irqchip: kill the GIC routable domain
+In-Reply-To: <20141207171646.GA12049@kahuna>
+References: <1417873576-10463-1-git-send-email-marc.zyngier@arm.com>
+ <20141207171646.GA12049@kahuna>
+Message-ID: <20141207180322.GA15688@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 07, 2014 at 11:11:06PM +0800, Chen-Yu Tsai wrote:
-> On Sun, Dec 7, 2014 at 11:03 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Wed, Dec 03, 2014 at 02:36:04PM +0800, Chen-Yu Tsai wrote:
-> >> mmc2 is available on port C. Add a pinmux setting for usual 4 bit
-> >> wide bus, as well as one with the 4 extra pins for 8 bit wide bus.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> >> ---
-> >>  arch/arm/boot/dts/sun9i-a80.dtsi | 15 +++++++++++++++
-> >>  1 file changed, 15 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-> >> index f5b5645..fc866d8 100644
-> >> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
-> >> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-> >> @@ -466,6 +466,21 @@
-> >>                               allwinner,pull = <0>;
-> >>                       };
-> >>
-> >> +                     mmc2_pins: mmc2 {
-> >> +                             allwinner,pins = "PC6","PC7","PC8","PC9",
-> >> +                                              "PC10","PC11";
-> >> +                             allwinner,function = "mmc2";
-> >> +                             allwinner,drive = <2>;
-> >> +                             allwinner,pull = <1>;
-> >> +                     };
-> >> +
-> >> +                     mmc2_8bit_pins: mmc2_8bit {
-> >> +                             allwinner,pins = "PC12","PC13","PC14","PC15";
-> >> +                             allwinner,function = "mmc2";
-> >> +                             allwinner,drive = <2>;
-> >> +                             allwinner,pull = <1>;
-> >> +                     };
-> >> +
-> >
-> > Hmmm, how is that 8 bits? There's only 4 pins here.
+Marc,
+
+On 11:16-20141207, Nishanth Menon wrote:
+> On 13:46-20141206, Marc Zyngier wrote:
+> > After my series removing the gic_arch_extn hack, I figured that the
+> > next step was to expunge the GIC driver of the routable domain horror.
+> > 
+> > There is a few reasons for this:
+> > 
+> > - The allocation of interrupts in this domain is fairly similar to
+> >   what we do for MSI (see the GICv2m driver), and stacked domains have
+> >   proved to be a fitting solution.
+> > 
+> > - The current description in DT is currently entierely inaccurate, and
+> >   as we already broke it for the OMAP WUGEN block, we might as well do
+> >   it again for the TI crossbar.
+> > 
+> > - The way crossbar, WUGEN and GIC interract is quite complex (this is
+> >   effectively a stack of three interrupt controllers with interesting
+> >   exceptions and braindead routing), and stacked domains are the right
+> >   abstraction for that.
+> > 
+> > - Other platforms (Freescale Vybrid) are starting to come up with the
+> >   same type of things, and it'd be good to avoid them following the
+> >   same broken model.
+> > 
+> > - It removes a few lines from the code base so it can't completely be
+> >   a bad idea!
+> > 
+> > So this patch series does exactly that: make the crossbar a stacked
+> > interrupt controller that only takes care of setting up the routing,
+> > fix the DTs to represent the actual HW, and remove a bit of the
+> > craziness from the GIC code.
+> > 
+> > As for the previous series:
+> > 
+> > - I haven't been able to test this at all, I don't have access to the
+> >   HW. TI people, please test and post fixes, as I expect I introduced
+> >   a few bugs.
+> > 
+> > - This actively *breaks* existing setups. If you boot a new kernel
+> >   with an old DT, interrupt routing *will* be broken. Old kernels on a
+> >   new DT won't boot either! You've been warned. This really outline
+> >   the necessity of actually describing the HW in device trees...
+> > 
+> > As for the patches, they are on top of 3.18-rc7 + tip/irq/irqdomain-arm +
+> > the gic_arch_extn removal series.
+> > 
+> > I've pushed the code to:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/die-gic-arch-extn-die-die-die
+> > 
+> > Comments welcome,
+> > 
+> > 	 M.
+> > 
+> > Marc Zyngier (5):
+> >   genirq: Add irqchip_set_wake_parent
+> >   irqchip: crossbar: convert dra7 crossbar to stacked domains
+> >   DT: update ti,irq-crossbar binding
+> >   irqchip: GIC: get rid of routable domain
+> >   DT: arm,gic: kill arm,routable-irqs
+> > 
+> >  Documentation/devicetree/bindings/arm/gic.txt      |   6 -
+> >  .../devicetree/bindings/arm/omap/crossbar.txt      |  18 +-
+> >  arch/arm/boot/dts/dra7.dtsi                        |  10 +-
+> >  arch/arm/boot/dts/dra72x.dtsi                      |   3 +-
+> >  arch/arm/boot/dts/dra74x.dtsi                      |   5 +-
+> >  arch/arm/mach-omap2/omap4-common.c                 |   4 -
+> >  drivers/irqchip/irq-crossbar.c                     | 202 ++++++++++++---------
+> >  drivers/irqchip/irq-gic.c                          |  59 +-----
+> >  include/linux/irq.h                                |   1 +
+> >  include/linux/irqchip/arm-gic.h                    |   6 -
+> >  include/linux/irqchip/irq-crossbar.h               |  11 --
+> >  kernel/irq/chip.c                                  |  16 ++
+> >  12 files changed, 153 insertions(+), 188 deletions(-)
+> >  delete mode 100644 include/linux/irqchip/irq-crossbar.h
+> > 
+> > -- 
+> > 2.1.3
+> > 
 > 
-> The 8bit setting only includes the upper 4 bits.
-> Using both settings together you get an 8 bit bus,
-> along with CMD and CLK pins, for a total of 10 pins.
-> 
-> Or is this the wrong way?
+> 	Patches are available here:
+> 	https://patchwork.kernel.org/patch/5449231/
+> 	https://patchwork.kernel.org/patch/5449241/
+> 	https://patchwork.kernel.org/patch/5449271/
+> 	https://patchwork.kernel.org/patch/5449261/
+> 	https://patchwork.kernel.org/patch/5449251/
 
-The way it's usually done is that you have two standalone nodes. Just
-like what's done for the UARTs for example.
+dra7xx-evm(3.18-rc7):  Boot PASS: http://slexy.org/raw/s2PXWFB47A
+dra7xx-evm(irq branch):  Boot FAIL: http://slexy.org/raw/s2xMgD4zkP
 
-Maxime
-
+Would you want me to debug more - dts changes perhaps?
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141207/f30b618c/attachment-0001.sig>
+Regards,
+Nishanth Menon
