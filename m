@@ -1,22 +1,97 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 07 Dec 2014 17:03:25 +0100
-Subject: [PATCH 1/3] ARM: pxa: add regulator_has_full_constraints to corgi
- board file
-In-Reply-To: <874mtbyuvc.fsf@free.fr> (Robert Jarzmik's message of "Thu, 04
- Dec 2014 22:20:55 +0100")
-References: <1417691402-28166-1-git-send-email-dbaryshkov@gmail.com>
- <87iohrywom.fsf@free.fr> <20141204204939.GY7712@sirena.org.uk>
- <874mtbyuvc.fsf@free.fr>
-Message-ID: <87zjazcur6.fsf@free.fr>
+From: nm@ti.com (Nishanth Menon)
+Date: Sun, 7 Dec 2014 11:16:47 -0600
+Subject: [PATCH 0/5] irqchip: kill the GIC routable domain
+In-Reply-To: <1417873576-10463-1-git-send-email-marc.zyngier@arm.com>
+References: <1417873576-10463-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20141207171646.GA12049@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+On 13:46-20141206, Marc Zyngier wrote:
+> After my series removing the gic_arch_extn hack, I figured that the
+> next step was to expunge the GIC driver of the routable domain horror.
+> 
+> There is a few reasons for this:
+> 
+> - The allocation of interrupts in this domain is fairly similar to
+>   what we do for MSI (see the GICv2m driver), and stacked domains have
+>   proved to be a fitting solution.
+> 
+> - The current description in DT is currently entierely inaccurate, and
+>   as we already broke it for the OMAP WUGEN block, we might as well do
+>   it again for the TI crossbar.
+> 
+> - The way crossbar, WUGEN and GIC interract is quite complex (this is
+>   effectively a stack of three interrupt controllers with interesting
+>   exceptions and braindead routing), and stacked domains are the right
+>   abstraction for that.
+> 
+> - Other platforms (Freescale Vybrid) are starting to come up with the
+>   same type of things, and it'd be good to avoid them following the
+>   same broken model.
+> 
+> - It removes a few lines from the code base so it can't completely be
+>   a bad idea!
+> 
+> So this patch series does exactly that: make the crossbar a stacked
+> interrupt controller that only takes care of setting up the routing,
+> fix the DTs to represent the actual HW, and remove a bit of the
+> craziness from the GIC code.
+> 
+> As for the previous series:
+> 
+> - I haven't been able to test this at all, I don't have access to the
+>   HW. TI people, please test and post fixes, as I expect I introduced
+>   a few bugs.
+> 
+> - This actively *breaks* existing setups. If you boot a new kernel
+>   with an old DT, interrupt routing *will* be broken. Old kernels on a
+>   new DT won't boot either! You've been warned. This really outline
+>   the necessity of actually describing the HW in device trees...
+> 
+> As for the patches, they are on top of 3.18-rc7 + tip/irq/irqdomain-arm +
+> the gic_arch_extn removal series.
+> 
+> I've pushed the code to:
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/die-gic-arch-extn-die-die-die
+> 
+> Comments welcome,
+> 
+> 	 M.
+> 
+> Marc Zyngier (5):
+>   genirq: Add irqchip_set_wake_parent
+>   irqchip: crossbar: convert dra7 crossbar to stacked domains
+>   DT: update ti,irq-crossbar binding
+>   irqchip: GIC: get rid of routable domain
+>   DT: arm,gic: kill arm,routable-irqs
+> 
+>  Documentation/devicetree/bindings/arm/gic.txt      |   6 -
+>  .../devicetree/bindings/arm/omap/crossbar.txt      |  18 +-
+>  arch/arm/boot/dts/dra7.dtsi                        |  10 +-
+>  arch/arm/boot/dts/dra72x.dtsi                      |   3 +-
+>  arch/arm/boot/dts/dra74x.dtsi                      |   5 +-
+>  arch/arm/mach-omap2/omap4-common.c                 |   4 -
+>  drivers/irqchip/irq-crossbar.c                     | 202 ++++++++++++---------
+>  drivers/irqchip/irq-gic.c                          |  59 +-----
+>  include/linux/irq.h                                |   1 +
+>  include/linux/irqchip/arm-gic.h                    |   6 -
+>  include/linux/irqchip/irq-crossbar.h               |  11 --
+>  kernel/irq/chip.c                                  |  16 ++
+>  12 files changed, 153 insertions(+), 188 deletions(-)
+>  delete mode 100644 include/linux/irqchip/irq-crossbar.h
+> 
+> -- 
+> 2.1.3
+> 
 
-> Mark Brown <broonie@kernel.org> writes:
-> OK, I'll take that as an Acked-by then.
-Queued the 3 of them in pxa/for-next, thanks.
+	Patches are available here:
+	https://patchwork.kernel.org/patch/5449231/
+	https://patchwork.kernel.org/patch/5449241/
+	https://patchwork.kernel.org/patch/5449271/
+	https://patchwork.kernel.org/patch/5449261/
+	https://patchwork.kernel.org/patch/5449251/
 
-Cheers.
 -- 
-Robert
+Regards,
+Nishanth Menon
