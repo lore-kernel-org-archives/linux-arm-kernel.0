@@ -1,62 +1,46 @@
-From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
-Date: Sun,  7 Dec 2014 23:30:13 +0100
-Subject: [PATCH] arch: arm: mach-omap2: dpll44xx.c:  Remove unused function
-Message-ID: <1417991413-20077-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+From: richard.weinberger@gmail.com (Richard Weinberger)
+Date: Sun, 7 Dec 2014 23:48:26 +0100
+Subject: [PATCH 1/20] mtd: s3c2410: fix misspelling of current function in
+ string
+In-Reply-To: <1417980062-25151-2-git-send-email-Julia.Lawall@lip6.fr>
+References: <1417980062-25151-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1417980062-25151-2-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <CAFLxGvyiqxQ6U6p-A-JW8Nv8OvXFGsna93afUu-Gek0EV3gATA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the function omap4_dpllmx_gatectrl_read() that is not used anywhere.
+On Sun, Dec 7, 2014 at 8:20 PM, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
+> Replace a misspelled function name by %s and then __func__.
+>
+> s3c2410 is the name of the file, but using the exact function name should
+> make it easier to connect the error message to the code.
+>
+> This was done using Coccinelle, including the use of Levenshtein distance,
+> as proposed by Rasmus Villemoes.
+>
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+>
+> ---
+> The semantic patch is difficult to summarize, but is available in the cover
+> letter of this patch series.
+>
+>  drivers/mtd/nand/s3c2410.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+> index 35aef5e..0a9c41f 100644
+> --- a/drivers/mtd/nand/s3c2410.c
+> +++ b/drivers/mtd/nand/s3c2410.c
+> @@ -948,7 +948,7 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+>
+>         cpu_type = platform_get_device_id(pdev)->driver_data;
+>
+> -       pr_debug("s3c2410_nand_probe(%p)\n", pdev);
+> +       pr_debug("%s(%p)\n", __func__, pdev);
 
-This was partially found by using a static code analysis program called cppcheck.
+I think we can drop the line completely.
+We have ftrace to trace function calls...
 
-Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
----
- arch/arm/mach-omap2/clock.h    |    1 -
- arch/arm/mach-omap2/dpll44xx.c |   20 --------------------
- 2 files changed, 21 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index 4592a27..88cc816 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -177,7 +177,6 @@ struct clksel {
- u32 omap3_dpll_autoidle_read(struct clk_hw_omap *clk);
- void omap3_dpll_allow_idle(struct clk_hw_omap *clk);
- void omap3_dpll_deny_idle(struct clk_hw_omap *clk);
--int omap4_dpllmx_gatectrl_read(struct clk_hw_omap *clk);
- void omap4_dpllmx_allow_gatectrl(struct clk_hw_omap *clk);
- void omap4_dpllmx_deny_gatectrl(struct clk_hw_omap *clk);
- 
-diff --git a/arch/arm/mach-omap2/dpll44xx.c b/arch/arm/mach-omap2/dpll44xx.c
-index 4613f1e..6b6db49 100644
---- a/arch/arm/mach-omap2/dpll44xx.c
-+++ b/arch/arm/mach-omap2/dpll44xx.c
-@@ -36,26 +36,6 @@
- /* Static rate multiplier for OMAP4 REGM4XEN clocks */
- #define OMAP4430_REGM4XEN_MULT				4
- 
--/* Supported only on OMAP4 */
--int omap4_dpllmx_gatectrl_read(struct clk_hw_omap *clk)
--{
--	u32 v;
--	u32 mask;
--
--	if (!clk || !clk->clksel_reg)
--		return -EINVAL;
--
--	mask = clk->flags & CLOCK_CLKOUTX2 ?
--			OMAP4430_DPLL_CLKOUTX2_GATE_CTRL_MASK :
--			OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK;
--
--	v = omap2_clk_readl(clk, clk->clksel_reg);
--	v &= mask;
--	v >>= __ffs(mask);
--
--	return v;
--}
--
- void omap4_dpllmx_allow_gatectrl(struct clk_hw_omap *clk)
- {
- 	u32 v;
 -- 
-1.7.10.4
+Thanks,
+//richard
