@@ -1,22 +1,28 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Sun, 7 Dec 2014 16:56:56 +0530
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 7 Dec 2014 12:27:19 +0100
 Subject: Do I need to invalidate caches before enabling (on ARMv7)?
-In-Reply-To: <20141207100124.GT2129@pengutronix.de>
+In-Reply-To: <20141207111103.GV2129@pengutronix.de>
 References: <20141204100357.GO2129@pengutronix.de>
  <20141206210031.GA1758@afzal-ThinkPad-R50e>
  <20141207100124.GT2129@pengutronix.de>
-Message-ID: <20141207112656.GA5673@afzal-ThinkPad-R50e>
+ <20141207105823.GA21341@lunn.ch>
+ <20141207111103.GV2129@pengutronix.de>
+Message-ID: <20141207112719.GB21341@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> Even handling the cache being on would be possible, that would result in
+> something like:
 
-On Sun, Dec 07, 2014 at 11:01:24AM +0100, Uwe Kleine-K?nig wrote:
+We came to the conclusion it is not possible to handle it. Something
+to do with the MMU i think, but i don't remember. There is a thread in
+the archive, and for the platform which i know is broken, the dts file
+points to:
 
-> > Did want to patch it for long time, but then with cash invalidation
-> What is cash invalidation? Do you rupture bank notes? (SCNR)
+https://lists.debian.org/debian-arm/2012/08/msg00128.html
 
-cash = contract
+which contains instructions how to append a few bytes of code to the
+front of the image to turn the cache off.
 
-Regards
-Afzal
+
+	Andrew
