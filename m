@@ -1,34 +1,329 @@
-From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
-Date: Sun,  7 Dec 2014 02:19:27 +0100
-Subject: [PATCH] arch: arm: mach-mxs: mach-mxs.c:  Remove unused function
-Message-ID: <1417915167-8750-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 7 Dec 2014 09:30:34 +0800
+Subject: [PATCH 03/10] clk: sunxi: Add driver for A80 MMC config
+ clocks/resets
+In-Reply-To: <20141206180144.GD12434@lukather>
+References: <1417588565-26215-1-git-send-email-wens@csie.org>
+ <1417588565-26215-4-git-send-email-wens@csie.org>
+ <20141206180144.GD12434@lukather>
+Message-ID: <CAGb2v66kWnGh1t6wCjH1_uiWr0Px_O7x_camWSGhkGw2DzHc2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the function __mxs_togl() that is not used anywhere.
+Hi,
 
-This was partially found by using a static code analysis program called cppcheck.
+On Sun, Dec 7, 2014 at 2:01 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Wed, Dec 03, 2014 at 02:35:58PM +0800, Chen-Yu Tsai wrote:
+>> On the A80 SoC, the 4 mmc controllers each have a separate register
+>> controlling their register access clocks and reset controls. These
+>> registers in turn share a ahb clock gate and reset control.
+>>
+>> This patch adds a platform device driver for these controls. It
+>> requires both clocks and reset controls to be available, so using
+>> CLK_OF_DECLARE might not be the best way.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
+>>  drivers/clk/sunxi/Makefile                        |   1 +
+>>  drivers/clk/sunxi/clk-sun9i-mmc.c                 | 228 ++++++++++++++++++++++
+>>  3 files changed, 230 insertions(+)
+>>  create mode 100644 drivers/clk/sunxi/clk-sun9i-mmc.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> index d0fb9c5..2de90ea 100644
+>> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+>> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> @@ -65,6 +65,7 @@ Required properties:
+>>       "allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
+>>       "allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
+>>       "allwinner,sun6i-a31-usb-clk" - for usb gates + resets on A31
+>> +     "allwinner,sun9i-a80-mmc-clk" - for mmc gates + resets on A80
+>
+> Please document the arguments required for this clock as well.
 
-Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
----
- arch/arm/mach-mxs/mach-mxs.c |    5 -----
- 1 file changed, 5 deletions(-)
+Ok.
 
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 2e7cec8..3362f48 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -72,11 +72,6 @@ static inline void __mxs_clrl(u32 mask, void __iomem *reg)
- 	__raw_writel(mask, reg + MXS_CLR_ADDR);
- }
- 
--static inline void __mxs_togl(u32 mask, void __iomem *reg)
--{
--	__raw_writel(mask, reg + MXS_TOG_ADDR);
--}
--
- #define OCOTP_WORD_OFFSET		0x20
- #define OCOTP_WORD_COUNT		0x20
- 
--- 
-1.7.10.4
+>>
+>>  Required properties for all clocks:
+>>  - reg : shall be the control register address for the clock.
+>> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+>> index a66953c..3a5292e 100644
+>> --- a/drivers/clk/sunxi/Makefile
+>> +++ b/drivers/clk/sunxi/Makefile
+>> @@ -8,6 +8,7 @@ obj-y += clk-a20-gmac.o
+>>  obj-y += clk-mod0.o
+>>  obj-y += clk-sun8i-mbus.o
+>>  obj-y += clk-sun9i-core.o
+>> +obj-y += clk-sun9i-mmc.o
+>>
+>>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
+>>       clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
+>> diff --git a/drivers/clk/sunxi/clk-sun9i-mmc.c b/drivers/clk/sunxi/clk-sun9i-mmc.c
+>> new file mode 100644
+>> index 0000000..7569625
+>> --- /dev/null
+>> +++ b/drivers/clk/sunxi/clk-sun9i-mmc.c
+>> @@ -0,0 +1,228 @@
+>> +/*
+>> + * Copyright 2013 Chen-Yu Tsai
+>> + *
+>> + * Chen-Yu Tsai      <wens@csie.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/clkdev.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/reset.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/reset-controller.h>
+>> +#include <linux/spinlock.h>
+>> +
+>> +#define SUN9I_MMC_WIDTH              4
+>> +
+>> +#define SUN9I_MMC_GATE_BIT   16
+>> +#define SUN9I_MMC_RESET_BIT  18
+>> +
+>> +struct sun9i_mmc_clk_data {
+>> +     spinlock_t                      lock;
+>> +     void __iomem                    *membase;
+>> +     struct clk                      *clk;
+>> +     struct reset_control            *reset;
+>> +     struct clk_onecell_data         clk_data;
+>> +     struct reset_controller_dev     rcdev;
+>> +};
+>> +
+>> +static int sun9i_mmc_reset_assert(struct reset_controller_dev *rcdev,
+>> +                           unsigned long id)
+>> +{
+>> +     struct sun9i_mmc_clk_data *data = container_of(rcdev,
+>> +                                                    struct sun9i_mmc_clk_data,
+>> +                                                    rcdev);
+>> +     unsigned long flags;
+>> +     void __iomem *reg = data->membase + SUN9I_MMC_WIDTH * id;
+>> +     u32 val;
+>> +
+>> +     spin_lock_irqsave(&data->lock, flags);
+>> +
+>> +     val = readl(reg);
+>> +     writel(val & ~BIT(SUN9I_MMC_RESET_BIT), reg);
+>> +
+>> +     spin_unlock_irqrestore(&data->lock, flags);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int sun9i_mmc_reset_deassert(struct reset_controller_dev *rcdev,
+>> +                             unsigned long id)
+>> +{
+>> +     struct sun9i_mmc_clk_data *data = container_of(rcdev,
+>> +                                                    struct sun9i_mmc_clk_data,
+>> +                                                    rcdev);
+>> +     unsigned long flags;
+>> +     void __iomem *reg = data->membase + SUN9I_MMC_WIDTH * id;
+>> +     u32 val;
+>> +
+>> +     spin_lock_irqsave(&data->lock, flags);
+>> +
+>> +     val = readl(reg);
+>> +     writel(val | BIT(SUN9I_MMC_RESET_BIT), reg);
+>> +
+>> +     spin_unlock_irqrestore(&data->lock, flags);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static struct reset_control_ops sun9i_mmc_reset_ops = {
+>> +     .assert         = sun9i_mmc_reset_assert,
+>> +     .deassert       = sun9i_mmc_reset_deassert,
+>> +};
+>> +
+>> +static int sun9i_a80_mmc_clk_probe(struct platform_device *pdev)
+>> +{
+>> +     struct device_node *np = pdev->dev.of_node;
+>> +     struct sun9i_mmc_clk_data *data;
+>> +     struct clk_onecell_data *clk_data;
+>> +     const char *clk_name = np->name;
+>> +     const char *clk_parent;
+>> +     struct resource *r;
+>> +     int count, i, ret;
+>> +
+>> +     data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+>> +     if (!data)
+>> +             return -ENOMEM;
+>> +
+>> +     spin_lock_init(&data->lock);
+>> +
+>> +     r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +     /* one clock/reset pair per word */
+>> +     count = (r->end - r->start + 1) / SUN9I_MMC_WIDTH;
+>
+> div_round_up(resource_size(r), sizeof(u32)) ?
+
+Will fix.
+
+>> +     data->membase = devm_ioremap_resource(&pdev->dev, r);
+>> +     if (IS_ERR(data->membase))
+>> +             return PTR_ERR(data->membase);
+>> +
+>> +     clk_data = &data->clk_data;
+>> +     clk_data->clk_num = count;
+>> +     clk_data->clks = devm_kcalloc(&pdev->dev, count, sizeof(struct clk *),
+>> +                                   GFP_KERNEL);
+>> +     if (!clk_data->clks)
+>> +             return -ENOMEM;
+>> +
+>> +     clk_parent = of_clk_get_parent_name(np, 0);
+>> +     if (!clk_parent)
+>> +             return -EINVAL;
+>> +
+>> +     data->clk = devm_clk_get(&pdev->dev, NULL);
+>> +     if (IS_ERR(data->clk)) {
+>> +             dev_err(&pdev->dev, "Could not get clock\n");
+>> +             return PTR_ERR(data->clk);
+>> +     }
+>> +
+>> +     data->reset = devm_reset_control_get(&pdev->dev, NULL);
+>> +     if (IS_ERR(data->reset)) {
+>> +             dev_err(&pdev->dev, "Could not get reset control\n");
+>> +             return PTR_ERR(data->reset);
+>> +     }
+>> +
+>> +     ret = clk_prepare_enable(data->clk);
+>> +     if (ret) {
+>> +             dev_err(&pdev->dev, "Clock enable err %d\n", ret);
+>> +             return ret;
+>> +     }
+>
+> So that means that the clock will always be enabled, even if there's
+> no downstream users?
+
+Yes.
+
+> Having the either clk_prepare_enable (or clk_enable if you're in
+> atomic context) in the assert/deassert seems more logical.
+
+I'll try it out and see if it works. Didn't work so well with the
+USB clocks...
+
+>> +     ret = reset_control_deassert(data->reset);
+>> +     if (ret) {
+>> +             dev_err(&pdev->dev, "Reset deassert err %d\n", ret);
+>> +             goto err_reset;
+>> +     }
+>> +
+>> +     for (i = 0; i < count; i++) {
+>> +             of_property_read_string_index(np, "clock-output-names",
+>> +                                           i, &clk_name);
+>> +
+>> +             clk_data->clks[i] = clk_register_gate(&pdev->dev, clk_name,
+>> +                                                   clk_parent, 0,
+>> +                                                   data->membase + SUN9I_MMC_WIDTH * i,
+>> +                                                   SUN9I_MMC_GATE_BIT, 0,
+>> +                                                   &data->lock);
+>> +
+>> +             if (IS_ERR(clk_data->clks[i])) {
+>> +                     ret = PTR_ERR(clk_data->clks[i]);
+>> +                     goto err_clk_register;
+>> +             }
+>> +     }
+>> +
+>> +     ret = of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
+>> +     if (ret)
+>> +             goto err_clk_provider;
+>> +
+>> +     data->rcdev.owner = THIS_MODULE;
+>> +     data->rcdev.nr_resets = count;
+>> +     data->rcdev.ops = &sun9i_mmc_reset_ops;
+>> +     data->rcdev.of_node = pdev->dev.of_node;
+>> +
+>> +     ret = reset_controller_register(&data->rcdev);
+>> +     if (ret)
+>> +             goto err_rc_reg;
+>> +
+>> +     platform_set_drvdata(pdev, data);
+>> +
+>> +     return 0;
+>> +
+>> +err_rc_reg:
+>> +     of_clk_del_provider(np);
+>> +
+>> +err_clk_provider:
+>> +     for (i = 0; i < count; i++)
+>> +             clk_unregister(clk_data->clks[i]);
+>> +
+>> +err_clk_register:
+>> +     reset_control_assert(data->reset);
+>> +
+>> +err_reset:
+>> +     clk_disable_unprepare(data->clk);
+>> +
+>> +     return ret;
+>> +}
+>> +
+>> +static int sun9i_a80_mmc_clk_remove(struct platform_device *pdev)
+>> +{
+>> +     struct device_node *np = pdev->dev.of_node;
+>> +     struct sun9i_mmc_clk_data *data = platform_get_drvdata(pdev);
+>> +     struct clk_onecell_data *clk_data = &data->clk_data;
+>> +     int i;
+>> +
+>> +     reset_controller_unregister(&data->rcdev);
+>> +     of_clk_del_provider(np);
+>> +     for (i = 0; i < clk_data->clk_num; i++)
+>> +             clk_unregister(clk_data->clks[i]);
+>> +
+>> +     reset_control_assert(data->reset);
+>> +     clk_disable_unprepare(data->clk);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static const struct of_device_id sun9i_a80_mmc_clk_dt_ids[] = {
+>> +     { .compatible = "allwinner,sun9i-a80-mmc-clk" },
+>> +     { /* sentinel */ }
+>> +};
+>> +
+>> +static struct platform_driver sun9i_a80_mmc_clk_driver = {
+>> +     .driver = {
+>> +             .name = "sun9i-a80-mmc-clk",
+>> +             .of_match_table = sun9i_a80_mmc_clk_dt_ids,
+>> +     },
+>> +     .probe = sun9i_a80_mmc_clk_probe,
+>> +     .remove = sun9i_a80_mmc_clk_remove,
+>> +};
+>> +module_platform_driver(sun9i_a80_mmc_clk_driver);
+>> +
+>> +MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
+>> +MODULE_DESCRIPTION("Allwinner A80 MMC clock/reset Driver");
+>> +MODULE_LICENSE("GPL v2");
+>
+> What's the real benefit of enabling it as a platform driver? the reset
+> framework is set up early enough that you can use OF_CLK_DECLARE.
+
+This clock/reset block also requires a reset control de-asserted. The
+reset controllers are currently setup using platform devices. Are you
+suggesting I use "allwinner,sun6i-a31-ahb1-reset" instead? That would
+also imply having a .init_time callback for sun9i, and having
+sun6i_reset_init() before of_clk_init(). Kind of confusing (not sure
+this is the right word) for something not so critical.
+
+Also we get to use devres, but that's just a bonus.
+
+Thanks
+ChenYu
