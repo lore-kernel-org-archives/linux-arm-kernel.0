@@ -1,194 +1,39 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun,  7 Dec 2014 20:20:42 +0100
-Subject: [PATCH 0/20] fix misspelling of current function in string
-Message-ID: <1417980062-25151-1-git-send-email-Julia.Lawall@lip6.fr>
+Date: Sun,  7 Dec 2014 20:20:44 +0100
+Subject: [PATCH 2/20] PCI: keystone: fix misspelling of current function in
+ string
+In-Reply-To: <1417980062-25151-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1417980062-25151-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1417980062-25151-3-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches replace what appears to be a reference to the name of the
-current function but is misspelled in some way by either the name of the
-function itself, or by %s and then __func__ in an argument list.
+Replace a misspelled function name by %s and then __func__.
 
-// <smpl>
-// sudo apt-get install python-pip
-// sudo pip install python-Levenshtein
-// spatch requires the argument --in-place
+The function name contains pcie, not pci as in the string.
 
-virtual after_start
+This was done using Coccinelle, including the use of Levenshtein distance,
+as proposed by Rasmus Villemoes.
 
-@initialize:ocaml@
-@@
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-let extensible_functions = ref ([] : string list)
-let restarted = ref false
+---
+The semantic patch is difficult to summarize, but is available in the cover
+letter of this patch series.
 
-let restart _ =
-  restarted := true;
-  let it = new iteration() in
-  it#add_virtual_rule After_start;
-  Printf.eprintf "restarting\n";
-  it#register()
+ drivers/pci/host/pci-keystone.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-@initialize:python@
-@@
-import re
-from Levenshtein import distance
-mindist = 1 // 1 to find only misspellings
-maxdist = 2
-ignore_leading = True
-
-// ---------------------------------------------------------------------
-
-@r0@
-constant char [] c;
-identifier f;
-@@
-
-f(...,c,...)
-
-@script:ocaml@
-c << r0.c;
-f << r0.f;
-@@
-
-(if not !restarted then restart());
-match Str.split_delim (Str.regexp "%") c with
-  _::_::_ ->
-    if not (List.mem f !extensible_functions)
-    then extensible_functions := f :: !extensible_functions
-| _ -> ()
-
-// ---------------------------------------------------------------------
-
-@r depends on after_start@
-constant char [] c;
-position p;
-identifier f;
-@@
-
-f(...,c at p,...)
-
-@script:python flt@
-c << r.c;
-p << r.p;
-matched;
-@@
-
-func = p[0].current_element
-wpattern = "[a-zA-Z_][a-zA-Z0-9_]*"
-if ignore_leading:
-   func = func.strip("_")
-   wpattern = "[a-zA-Z][a-zA-Z0-9_]*"
-lf = len(func)
-cocci.include_match(False)
-// ignore extremely short function names
-if lf > 3:
-   words = [w for w in re.findall(wpattern, c) if abs(len(w) - lf) <= maxdist]
-   for w in words:
-       d = distance(w, func) 
-       if mindist <= d and d <= maxdist:
-          coccinelle.matched = w
-          cocci.include_match(True)
-     	  //print "%s:%d:%s():%d: %s" % (p[0].file, int(p[0].line), func, d, c)
-	  break
-
-@script:ocaml r2@
-c << r.c;
-f << r.f;
-matched << flt.matched;
-fixed;
-@@
-
-let pieces = Str.split_delim (Str.regexp_string matched) c in
-match pieces with
-  [before;after] ->
-    let preceeding =
-      List.length(Str.split (Str.regexp_string "%") before) > 1 in
-    if preceeding
-    then Coccilib.include_match false
-    else
-      if List.mem f !extensible_functions
-      then fixed := before ^ "%s" ^ after
-      else Coccilib.include_match false
-| _ -> Coccilib.include_match false
-
-@changed1@
-constant char [] r.c;
-identifier r2.fixed;
-position r.p;
-identifier r.f;
-@@
-
-f(...,
--c at p
-+fixed,__func__
- ,...)
-
-// -------------------------------------------------------------------
-
-@s depends on after_start@
-constant char [] c;
-position p;
-identifier f;
-@@
-
-f(...,c at p,...)
-
-@script:python flt2@
-c << s.c;
-p << s.p;
-matched;
-@@
-
-func = p[0].current_element
-wpattern = "[a-zA-Z_][a-zA-Z0-9_]*"
-if ignore_leading:
-   func = func.strip("_")
-   wpattern = "[a-zA-Z][a-zA-Z0-9_]*"
-lf = len(func)
-cocci.include_match(False)
-// ignore extremely short function names
-if lf > 3:
-   words = [w for w in re.findall(wpattern, c) if abs(len(w) - lf) <= maxdist]
-   for w in words:
-       d = distance(w, func) 
-       if mindist <= d and d <= maxdist:
-          coccinelle.matched = w
-          cocci.include_match(True)
-     	  //print "%s:%d:%s():%d: %s" % (p[0].file, int(p[0].line), func, d, c)
-	  break
-
-@script:ocaml s2@
-c << s.c;
-f << s.f;
-p << s.p;
-matched << flt2.matched;
-fixed;
-@@
-
-let ce = (List.hd p).current_element in
-let pieces = Str.split_delim (Str.regexp_string matched) c in
-match pieces with
-  [before;after] ->
-    let preceeding =
-      List.length(Str.split (Str.regexp_string "%") before) > 1 in
-    if preceeding
-    then Coccilib.include_match false
-    else
-      if List.mem f !extensible_functions
-      then Coccilib.include_match false
-      else fixed := before ^ ce ^ after
-| _ -> Coccilib.include_match false
-
-@changed2@
-constant char [] s.c;
-identifier s2.fixed;
-position s.p;
-identifier s.f;
-@@
-
-f(...,
--c at p
-+fixed
- ,...)
-// </smpl>
+diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+index 78f79e3..e2f600e 100644
+--- a/drivers/pci/host/pci-keystone.c
++++ b/drivers/pci/host/pci-keystone.c
+@@ -119,7 +119,7 @@ static void ks_pcie_msi_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	struct pcie_port *pp = &ks_pcie->pp;
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 
+-	dev_dbg(pp->dev, "ks_pci_msi_irq_handler, irq %d\n", irq);
++	dev_dbg(pp->dev, "%s, irq %d\n", __func__, irq);
+ 
+ 	/*
+ 	 * The chained irq handler installation would have replaced normal
