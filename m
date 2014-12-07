@@ -1,39 +1,76 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 7 Dec 2014 16:00:39 +0100
-Subject: [PATCH 05/10] ARM: dts: sun9i: Add mmc config clock nodes
-In-Reply-To: <1417588565-26215-6-git-send-email-wens@csie.org>
+Date: Sun, 7 Dec 2014 16:02:49 +0100
+Subject: [PATCH 08/10] ARM: dts: sun9i: Enable mmc0 on A80 Optimus Board
+In-Reply-To: <1417588565-26215-9-git-send-email-wens@csie.org>
 References: <1417588565-26215-1-git-send-email-wens@csie.org>
- <1417588565-26215-6-git-send-email-wens@csie.org>
-Message-ID: <20141207150039.GE12434@lukather>
+ <1417588565-26215-9-git-send-email-wens@csie.org>
+Message-ID: <20141207150249.GG12434@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Dec 03, 2014 at 02:36:00PM +0800, Chen-Yu Tsai wrote:
-> Add the device tree nodes for the mmc config clock nodes.
+On Wed, Dec 03, 2014 at 02:36:03PM +0800, Chen-Yu Tsai wrote:
+> Enable the micro-sd slot on the A80 Optimus Board, which is connected to
+> mmc0. This adds the card-detect gpio and enables mmc0.
+> 
+> This patch also adds a 3V fixed regulator, which is the default I/O
+> voltage level.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
->  arch/arm/boot/dts/sun9i-a80.dtsi | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+>  arch/arm/boot/dts/sun9i-a80-optimus.dts | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-> index f3cac3a..f425d9d 100644
-> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
-> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-> @@ -325,6 +325,19 @@
->  		 */
->  		ranges = <0 0 0 0x20000000>;
+> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> index 506948f..02a4aa7 100644
+> --- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> @@ -59,6 +59,16 @@
+>  	};
 >  
-> +		mmc_config_clk: clk at 01c23000 {
-> +			compatible = "allwinner,sun9i-a80-mmc-clk";
-> +			reg = <0x01c13000 0x10>;
+>  	soc {
+> +		mmc0: mmc at 01c0f000 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&mmc0_pins>, <&mmc0_cd_pin_optimus>;
+> +			vmmc-supply = <&reg_vcc3v0>;
+> +			bus-width = <4>;
+> +			cd-gpios = <&pio 7 18 0>; /* PH8 */
+> +			cd-inverted;
+> +			status = "okay";
+> +		};
+> +
+>  		pio: pinctrl at 06000800 {
+>  			i2c3_pins_a: i2c3 at 0 {
+>  				/* Enable internal pull-up */
+> @@ -72,6 +82,13 @@
+>  				allwinner,pull = <0>;
+>  			};
+>  
+> +			mmc0_cd_pin_optimus: mmc0_cd_pin at 0 {
+> +				allwinner,pins = "PH18";
+> +				allwinner,function = "gpio_in";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <1>;
+> +			};
+> +
+>  			uart4_pins_a: uart4 at 0 {
+>  				/* Enable internal pull-up */
+>  				allwinner,pull = <1>;
+> @@ -116,4 +133,11 @@
+>  			gpios = <&pio 7 0 0>;
+>  		};
+>  	};
+> +
+> +	reg_vcc3v0: vcc3v0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc3v0";
+> +		regulator-min-microvolt = <3000000>;
+> +		regulator-max-microvolt = <3000000>;
+> +	};
 
-The reg and the unit-address don't match.
-
-Also, this used to be defined in the clocks node for the USB case, it
-would be good to do the same here.
+There's already such a regulator in sunxi-common-regulators.
 
 Maxime
 
@@ -47,4 +84,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141207/c349f392/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141207/9d729f61/attachment.sig>
