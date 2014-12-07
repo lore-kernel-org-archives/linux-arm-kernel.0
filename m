@@ -1,199 +1,82 @@
-From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
-Date: Sun,  7 Dec 2014 02:12:20 +0100
-Subject: [PATCH] arch: arm: mach-msm: smd.c:  Remove some unused functions
-Message-ID: <1417914740-8390-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 7 Dec 2014 09:11:17 +0800
+Subject: [PATCH 02/10] ARM: dts: sun9i: Add mmc module clock nodes for A80
+In-Reply-To: <20141206172449.GC12434@lukather>
+References: <1417588565-26215-1-git-send-email-wens@csie.org>
+ <1417588565-26215-3-git-send-email-wens@csie.org>
+ <20141206172449.GC12434@lukather>
+Message-ID: <CAGb2v64S7Wa5La5gS3yR2uvhc+y5szrUvapMK=cCZvHHRAPT0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removes some functions that are not used anywhere:
-smsm_set_sleep_duration() smsm_get_state() smd_wait_until_writable()
-smd_wait_until_readable() smd_write_atomic() smd_sleep_exit()
+Hi,
 
-This was partially found by using a static code analysis program called cppcheck.
+On Sun, Dec 7, 2014 at 1:24 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Wed, Dec 03, 2014 at 02:35:57PM +0800, Chen-Yu Tsai wrote:
+>> The mmc module clocks are A80 specific module 0 (storage) type clocks.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  arch/arm/boot/dts/sun9i-a80.dtsi | 32 ++++++++++++++++++++++++++++++++
+>>  1 file changed, 32 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+>> index 494714f..33d18dc 100644
+>> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
+>> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+>> @@ -215,6 +215,38 @@
+>>                       clock-output-names = "cci400";
+>>               };
+>>
+>> +             mmc0_clk: clk at 06000410 {
+>> +                     #clock-cells = <0>;
+>> +                     compatible = "allwinner,sun9i-a80-mod0-clk";
+>> +                     reg = <0x06000410 0x4>;
+>> +                     clocks = <&osc24M>, <&pll4>;
+>> +                     clock-output-names = "mmc0";
+>> +             };
+>> +
+>> +             mmc1_clk: clk at 06000414 {
+>> +                     #clock-cells = <0>;
+>> +                     compatible = "allwinner,sun9i-a80-mod0-clk";
+>> +                     reg = <0x06000414 0x4>;
+>> +                     clocks = <&osc24M>, <&pll4>;
+>> +                     clock-output-names = "mmc1";
+>> +             };
+>> +
+>> +             mmc2_clk: clk at 06000418 {
+>> +                     #clock-cells = <0>;
+>> +                     compatible = "allwinner,sun9i-a80-mod0-clk";
+>> +                     reg = <0x06000418 0x4>;
+>> +                     clocks = <&osc24M>, <&pll4>;
+>> +                     clock-output-names = "mmc2";
+>> +             };
+>> +
+>> +             mmc3_clk: clk at 0600041c {
+>> +                     #clock-cells = <0>;
+>> +                     compatible = "allwinner,sun9i-a80-mod0-clk";
+>> +                     reg = <0x0600041c 0x4>;
+>> +                     clocks = <&osc24M>, <&pll4>;
+>> +                     clock-output-names = "mmc3";
+>> +             };
+>> +
+>
+> How is the phase stuff supposed to work? Is this still used on the A80?
 
-Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
----
- arch/arm/mach-msm/include/mach/msm_smd.h |    9 ---
- arch/arm/mach-msm/smd.c                  |  105 ------------------------------
- arch/arm/mach-msm/smd_private.h          |    2 -
- 3 files changed, 116 deletions(-)
+It is. This time, the register bits are actually documented.
 
-diff --git a/arch/arm/mach-msm/include/mach/msm_smd.h b/arch/arm/mach-msm/include/mach/msm_smd.h
-index 029463e..48ddef98 100644
---- a/arch/arm/mach-msm/include/mach/msm_smd.h
-+++ b/arch/arm/mach-msm/include/mach/msm_smd.h
-@@ -40,7 +40,6 @@ int smd_read(smd_channel_t *ch, void *data, int len);
- ** it will return the requested length written or an error.
- */
- int smd_write(smd_channel_t *ch, const void *data, int len);
--int smd_write_atomic(smd_channel_t *ch, const void *data, int len);
- 
- int smd_write_avail(smd_channel_t *ch);
- int smd_read_avail(smd_channel_t *ch);
-@@ -57,14 +56,6 @@ int smd_cur_packet_size(smd_channel_t *ch);
- void smd_kick(smd_channel_t *ch);
- 
- 
--#if 0
--/* these are interruptable waits which will block you until the specified
--** number of bytes are readable or writable.
--*/
--int smd_wait_until_readable(smd_channel_t *ch, int bytes);
--int smd_wait_until_writable(smd_channel_t *ch, int bytes);
--#endif
--
- typedef enum {
- 	SMD_PORT_DS = 0,
- 	SMD_PORT_DIAG,
-diff --git a/arch/arm/mach-msm/smd.c b/arch/arm/mach-msm/smd.c
-index b1588a1..4bc1e71 100644
---- a/arch/arm/mach-msm/smd.c
-+++ b/arch/arm/mach-msm/smd.c
-@@ -401,36 +401,6 @@ static inline int smd_need_int(struct smd_channel *ch)
- 	return 0;
- }
- 
--void smd_sleep_exit(void)
--{
--	unsigned long flags;
--	struct smd_channel *ch;
--	int need_int = 0;
--
--	spin_lock_irqsave(&smd_lock, flags);
--	list_for_each_entry(ch, &smd_ch_list_modem, ch_list) {
--		if (smd_need_int(ch)) {
--			need_int = 1;
--			break;
--		}
--	}
--	list_for_each_entry(ch, &smd_ch_list_dsp, ch_list) {
--		if (smd_need_int(ch)) {
--			need_int = 1;
--			break;
--		}
--	}
--	spin_unlock_irqrestore(&smd_lock, flags);
--	do_smd_probe();
--
--	if (need_int) {
--		if (msm_smd_debug_mask & MSM_SMD_DEBUG)
--			pr_info("smd_sleep_exit need interrupt\n");
--		tasklet_schedule(&smd_fake_irq_tasklet);
--	}
--}
--
--
- void smd_kick(smd_channel_t *ch)
- {
- 	unsigned long flags;
-@@ -747,16 +717,6 @@ int smd_write(smd_channel_t *ch, const void *data, int len)
- 	return ch->write(ch, data, len);
- }
- 
--int smd_write_atomic(smd_channel_t *ch, const void *data, int len)
--{
--	unsigned long flags;
--	int res;
--	spin_lock_irqsave(&smd_lock, flags);
--	res = ch->write(ch, data, len);
--	spin_unlock_irqrestore(&smd_lock, flags);
--	return res;
--}
--
- int smd_read_avail(smd_channel_t *ch)
- {
- 	return ch->read_avail(ch);
-@@ -767,16 +727,6 @@ int smd_write_avail(smd_channel_t *ch)
- 	return ch->write_avail(ch);
- }
- 
--int smd_wait_until_readable(smd_channel_t *ch, int bytes)
--{
--	return -1;
--}
--
--int smd_wait_until_writable(smd_channel_t *ch, int bytes)
--{
--	return -1;
--}
--
- int smd_cur_packet_size(smd_channel_t *ch)
- {
- 	return ch->current_packet;
-@@ -875,61 +825,6 @@ int smsm_change_state(enum smsm_state_item item,
- 	return 0;
- }
- 
--uint32_t smsm_get_state(enum smsm_state_item item)
--{
--	unsigned long flags;
--	uint32_t rv;
--
--	spin_lock_irqsave(&smem_lock, flags);
--
--	rv = readl(smd_info.state + item * 4);
--
--	if (item == SMSM_STATE_MODEM && (rv & SMSM_RESET))
--		handle_modem_crash();
--
--	spin_unlock_irqrestore(&smem_lock, flags);
--
--	return rv;
--}
--
--#ifdef CONFIG_ARCH_MSM_SCORPION
--
--int smsm_set_sleep_duration(uint32_t delay)
--{
--	struct msm_dem_slave_data *ptr;
--
--	ptr = smem_find(SMEM_APPS_DEM_SLAVE_DATA, sizeof(*ptr));
--	if (ptr == NULL) {
--		pr_err("smsm_set_sleep_duration <SM NO APPS_DEM_SLAVE_DATA>\n");
--		return -EIO;
--	}
--	if (msm_smd_debug_mask & MSM_SMSM_DEBUG)
--		pr_info("smsm_set_sleep_duration %d -> %d\n",
--		       ptr->sleep_time, delay);
--	ptr->sleep_time = delay;
--	return 0;
--}
--
--#else
--
--int smsm_set_sleep_duration(uint32_t delay)
--{
--	uint32_t *ptr;
--
--	ptr = smem_find(SMEM_SMSM_SLEEP_DELAY, sizeof(*ptr));
--	if (ptr == NULL) {
--		pr_err("smsm_set_sleep_duration <SM NO SLEEP_DELAY>\n");
--		return -EIO;
--	}
--	if (msm_smd_debug_mask & MSM_SMSM_DEBUG)
--		pr_info("smsm_set_sleep_duration %d -> %d\n",
--		       *ptr, delay);
--	*ptr = delay;
--	return 0;
--}
--
--#endif
--
- int smd_core_init(void)
- {
- 	int r;
-diff --git a/arch/arm/mach-msm/smd_private.h b/arch/arm/mach-msm/smd_private.h
-index 727bfe6..702f34e 100644
---- a/arch/arm/mach-msm/smd_private.h
-+++ b/arch/arm/mach-msm/smd_private.h
-@@ -148,8 +148,6 @@ enum smsm_state_item {
- 
- void *smem_alloc(unsigned id, unsigned size);
- int smsm_change_state(enum smsm_state_item item, uint32_t clear_mask, uint32_t set_mask);
--uint32_t smsm_get_state(enum smsm_state_item item);
--int smsm_set_sleep_duration(uint32_t delay);
- void smsm_print_sleep_info(void);
- 
- #define SMEM_NUM_SMD_CHANNELS        64
--- 
-1.7.10.4
+> Also, wasn't the mux supposed to have 4 bits (so something like at
+> least 9 parent clocks?) given your previous patch?
+
+The mux has 4 bits of valid settings. But only the first 2 have
+valid parent clocks. I suppose I should make it clear in the bindings?
+
+Some of the other module clocks have parents on the first 2 and last
+2 valid settings, so we'll need to use a mux table for them.
+
+
+ChenYu
