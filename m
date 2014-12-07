@@ -1,30 +1,38 @@
-From: n.nikolaev@virtualopensystems.com (Nikolay Nikolaev)
-Date: Sun, 07 Dec 2014 11:38:11 +0200
-Subject: [PATCH v2 5/5] ARM: enable KVM_CAP_IOEVENTFD
-In-Reply-To: <20141207093641.17563.84226.stgit@i3820>
-References: <20141207093641.17563.84226.stgit@i3820>
-Message-ID: <20141207093811.17563.43688.stgit@i3820>
+From: agraf@suse.de (Alexander Graf)
+Date: Sun, 07 Dec 2014 10:49:12 +0100
+Subject: [PATCH v8 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <5483C977.2060308@huawei.com>
+References: <1397869980-21187-1-git-send-email-zhangfei.gao@linaro.org>
+ <1397869980-21187-4-git-send-email-zhangfei.gao@linaro.org>
+ <5483A279.5000503@suse.de> <5483C977.2060308@huawei.com>
+Message-ID: <54842298.2010007@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM on arm will support the eventfd extension.
 
-Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
----
- arch/arm/kvm/arm.c |    3 +++
- 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index c3d0fbd..266b618 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -197,6 +197,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_MAX_VCPUS:
- 		r = KVM_MAX_VCPUS;
- 		break;
-+	case KVM_CAP_IOEVENTFD:
-+		r = 1;
-+		break;
- 	default:
- 		r = kvm_arch_dev_ioctl_check_extension(ext);
- 		break;
+On 07.12.14 04:28, Ding Tianhong wrote:
+> On 2014/12/7 8:42, Alexander Graf wrote:
+>> On 19.04.14 03:13, Zhangfei Gao wrote:
+>>> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
+>>> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
+>>>
+>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>
+>> Is this driver still supposed to go upstream? I presume this was the
+>> last submission and it's been quite some time ago :)
+>>
+> 
+> yes, it is really a long time, but The hip04 did not support tx irq, 
+> we couldn't get any better idea to fix this defect, do you have any suggestion?
+
+Well, if hardware doesn't have a TX irq I don't see there's anything we
+can do to fix that ;).
+
+Dave, what's your take here? Should we keep a driver from going upstream
+just because the hardware is partly broken? I'd really prefer to have an
+upstream driver on that SoC rather than some random (eventually even
+more broken) downstream code.
+
+
+Alex
