@@ -1,87 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 7 Dec 2014 16:02:49 +0100
-Subject: [PATCH 08/10] ARM: dts: sun9i: Enable mmc0 on A80 Optimus Board
-In-Reply-To: <1417588565-26215-9-git-send-email-wens@csie.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 7 Dec 2014 23:11:06 +0800
+Subject: [PATCH 09/10] ARM: dts: sun9i: Add pinmux settings for mmc2
+In-Reply-To: <20141207150353.GH12434@lukather>
 References: <1417588565-26215-1-git-send-email-wens@csie.org>
- <1417588565-26215-9-git-send-email-wens@csie.org>
-Message-ID: <20141207150249.GG12434@lukather>
+ <1417588565-26215-10-git-send-email-wens@csie.org>
+ <20141207150353.GH12434@lukather>
+Message-ID: <CAGb2v64X8AvnqMFxxeHLa28G_7sF9vYjqU_D7R_=L4NJ+=ae7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Dec 7, 2014 at 11:03 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Wed, Dec 03, 2014 at 02:36:04PM +0800, Chen-Yu Tsai wrote:
+>> mmc2 is available on port C. Add a pinmux setting for usual 4 bit
+>> wide bus, as well as one with the 4 extra pins for 8 bit wide bus.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  arch/arm/boot/dts/sun9i-a80.dtsi | 15 +++++++++++++++
+>>  1 file changed, 15 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+>> index f5b5645..fc866d8 100644
+>> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
+>> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+>> @@ -466,6 +466,21 @@
+>>                               allwinner,pull = <0>;
+>>                       };
+>>
+>> +                     mmc2_pins: mmc2 {
+>> +                             allwinner,pins = "PC6","PC7","PC8","PC9",
+>> +                                              "PC10","PC11";
+>> +                             allwinner,function = "mmc2";
+>> +                             allwinner,drive = <2>;
+>> +                             allwinner,pull = <1>;
+>> +                     };
+>> +
+>> +                     mmc2_8bit_pins: mmc2_8bit {
+>> +                             allwinner,pins = "PC12","PC13","PC14","PC15";
+>> +                             allwinner,function = "mmc2";
+>> +                             allwinner,drive = <2>;
+>> +                             allwinner,pull = <1>;
+>> +                     };
+>> +
+>
+> Hmmm, how is that 8 bits? There's only 4 pins here.
 
-On Wed, Dec 03, 2014 at 02:36:03PM +0800, Chen-Yu Tsai wrote:
-> Enable the micro-sd slot on the A80 Optimus Board, which is connected to
-> mmc0. This adds the card-detect gpio and enables mmc0.
-> 
-> This patch also adds a 3V fixed regulator, which is the default I/O
-> voltage level.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  arch/arm/boot/dts/sun9i-a80-optimus.dts | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-> index 506948f..02a4aa7 100644
-> --- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
-> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-> @@ -59,6 +59,16 @@
->  	};
->  
->  	soc {
-> +		mmc0: mmc at 01c0f000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&mmc0_pins>, <&mmc0_cd_pin_optimus>;
-> +			vmmc-supply = <&reg_vcc3v0>;
-> +			bus-width = <4>;
-> +			cd-gpios = <&pio 7 18 0>; /* PH8 */
-> +			cd-inverted;
-> +			status = "okay";
-> +		};
-> +
->  		pio: pinctrl at 06000800 {
->  			i2c3_pins_a: i2c3 at 0 {
->  				/* Enable internal pull-up */
-> @@ -72,6 +82,13 @@
->  				allwinner,pull = <0>;
->  			};
->  
-> +			mmc0_cd_pin_optimus: mmc0_cd_pin at 0 {
-> +				allwinner,pins = "PH18";
-> +				allwinner,function = "gpio_in";
-> +				allwinner,drive = <0>;
-> +				allwinner,pull = <1>;
-> +			};
-> +
->  			uart4_pins_a: uart4 at 0 {
->  				/* Enable internal pull-up */
->  				allwinner,pull = <1>;
-> @@ -116,4 +133,11 @@
->  			gpios = <&pio 7 0 0>;
->  		};
->  	};
-> +
-> +	reg_vcc3v0: vcc3v0 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc3v0";
-> +		regulator-min-microvolt = <3000000>;
-> +		regulator-max-microvolt = <3000000>;
-> +	};
+The 8bit setting only includes the upper 4 bits.
+Using both settings together you get an 8 bit bus,
+along with CMD and CLK pins, for a total of 10 pins.
 
-There's already such a regulator in sunxi-common-regulators.
+Or is this the wrong way?
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141207/9d729f61/attachment.sig>
+ChenYu
