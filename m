@@ -1,39 +1,49 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun,  7 Dec 2014 20:20:44 +0100
-Subject: [PATCH 2/20] PCI: keystone: fix misspelling of current function in
- string
-In-Reply-To: <1417980062-25151-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1417980062-25151-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1417980062-25151-3-git-send-email-Julia.Lawall@lip6.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 07 Dec 2014 21:09:22 +0100
+Subject: [PATCH v8 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <54842298.2010007@suse.de>
+References: <1397869980-21187-1-git-send-email-zhangfei.gao@linaro.org>
+ <5483C977.2060308@huawei.com> <54842298.2010007@suse.de>
+Message-ID: <2619239.NTtdNaZCJM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace a misspelled function name by %s and then __func__.
+On Sunday 07 December 2014 10:49:12 Alexander Graf wrote:
+> On 07.12.14 04:28, Ding Tianhong wrote:
+> > On 2014/12/7 8:42, Alexander Graf wrote:
+> >> On 19.04.14 03:13, Zhangfei Gao wrote:
+> >>> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
+> >>> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
+> >>>
+> >>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> >>
+> >> Is this driver still supposed to go upstream? I presume this was the
+> >> last submission and it's been quite some time ago 
+> >>
+> > 
+> > yes, it is really a long time, but The hip04 did not support tx irq, 
+> > we couldn't get any better idea to fix this defect, do you have any suggestion?
+> 
+> Well, if hardware doesn't have a TX irq I don't see there's anything we
+> can do to fix that ;).
 
-The function name contains pcie, not pci as in the string.
+I don't know if it's related to the ethernet on hip01, but I would assume
+it is, and that platform is currently being submitted for inclusion, so
+I'd definitely hope to see this driver get merged too eventually.
 
-This was done using Coccinelle, including the use of Levenshtein distance,
-as proposed by Rasmus Villemoes.
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
-The semantic patch is difficult to summarize, but is available in the cover
-letter of this patch series.
-
- drivers/pci/host/pci-keystone.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-index 78f79e3..e2f600e 100644
---- a/drivers/pci/host/pci-keystone.c
-+++ b/drivers/pci/host/pci-keystone.c
-@@ -119,7 +119,7 @@ static void ks_pcie_msi_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	struct pcie_port *pp = &ks_pcie->pp;
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
+IIRC, the last revision of the patch set had basically fixed the problem,
+except for a race that would still allow the napi poll function to exit
+with poll_complete() but a full queue of TX descriptors and no fallback
+to clean them up. There was also still an open question about whether or
+not the driver should use skb_orphan, but I may be misremembering that part.
  
--	dev_dbg(pp->dev, "ks_pci_msi_irq_handler, irq %d\n", irq);
-+	dev_dbg(pp->dev, "%s, irq %d\n", __func__, irq);
- 
- 	/*
- 	 * The chained irq handler installation would have replaced normal
+> Dave, what's your take here? Should we keep a driver from going upstream
+> just because the hardware is partly broken? I'd really prefer to have an
+> upstream driver on that SoC rather than some random (eventually even
+> more broken) downstream code.
+
+We can certainly have a slow driver for this hardware, and I'd much
+prefer slow over broken. I'd guess that some of the performance impact
+of the missing interrupts can now be offset with the xmit_more	 logic.
+
+	Arnd
