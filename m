@@ -1,42 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 8 Dec 2014 12:22:35 +0000
-Subject: regression: OMAP4 (next-20141204) (bisect to: ARM: 8208/1: l2c:
- Refactor the driver to use commit-like)
-In-Reply-To: <CA+Ln22EFKRm_9HPaVvL7zFdmmB5Zz5RnJKbZkESVOBOLPvUnGA@mail.gmail.com>
-References: <5481D913.9040109@ti.com> <5481D9BF.2090007@ti.com>
- <20141205162312.GB11502@n2100.arm.linux.org.uk>
- <CA+Ln22EFKRm_9HPaVvL7zFdmmB5Zz5RnJKbZkESVOBOLPvUnGA@mail.gmail.com>
-Message-ID: <20141208122235.GC11502@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 8 Dec 2014 12:25:49 +0000
+Subject: [alsa-devel] Question on arm64 unaligned faults during playback
+In-Reply-To: <54858868.70708@metafoo.de>
+References: <CAM4voa=kiLsiLEzUbo3D+f1go5px78fXBSjSi7kGK4QCdnwPyQ@mail.gmail.com>
+ <54856621.8090107@ladisch.de> <s5hppbumnis.wl-tiwai@suse.de>
+ <54858868.70708@metafoo.de>
+Message-ID: <20141208122549.GF16185@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 08:54:18PM +0900, Tomasz Figa wrote:
-> 2014-12-06 1:23 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > Given where we are in the cycle (-final likely this weekend) the only
-> > thing we can do right now is to drop the patch set; exynos (and mvebu)
-> > will have to wait another cycle until this patch set (hopefully in a
-> > revised form) can be merged.
-> 
-> Or a fix could be queued on top of this. Since (I believe) this series
-> has been queued for 3.19, we have 6 or 7 RC releases ahead, which
-> could be used for the purpose of fixing things (as they are supposed
-> to?).
+On Mon, Dec 08, 2014 at 11:15:52AM +0000, Lars-Peter Clausen wrote:
+> Added ARM64 folks to Cc.
 
-They were merged on 27th November, so they would've been in linux-next
-from about last Monday.  Nishanth reported a failure on Friday, the
-last week day before the merge window opens.  There's no time to try
-and fix this before the merge window, which is why I decided to drop
-it.  They have already been dropped.  They were dropped immediately
-after my message on Friday was sent.  So they've not been in linux-next
-over this past weekend.
+Thanks.
 
-We don't push known broken code in during the merge window.  The merge
-window is the exact time when subtle bugs are likely to be introduced,
-and is the exact time that you want bisect to work.  If we push known
-broken patches into the kernel during that period, we break the ability
-to use bisect to find problems, especially where it causes a platform
-to become unbootable.
+> On 12/08/2014 11:41 AM, Takashi Iwai wrote:
+> > At Mon, 08 Dec 2014 09:49:37 +0100,
+> > Clemens Ladisch wrote:
+> >>
+> >> Abhilash Kesavan wrote:
+> >>> I am working on a 64-bit ARM SoC (Samsung's Exynos7) and have observed
+> >>> unaligned faults while testing certain sound streams with aplay.
+> >>>
+> >>> [   24.535661] snd_pcm_lib_write_transfer:sound/core/pcm_lib.c hwbuf is ffffff8000085624, runtime->dma_area is ffffff8000080000, hwoff is 5513, frames_to_bytes is 22052, frames is 5513
+> >>> [   24.551244] Unhandled fault: alignment fault (0x96000061) at 0xffffff8000085624
+> >>> [   24.579944] PC is at __copy_from_user+0x14/0x60
+> >>> [   24.584450] LR is at snd_pcm_lib_write_transfer+0xe4/0x104
+> >>> [   24.922054] Call trace:
+> >>> [   24.924488] [<ffffffc0002d4784>] __copy_from_user+0x14/0x60
+> >>> [   24.930040] [<ffffffc0004b7574>] snd_pcm_lib_write1+0x1fc/0x384
+
+I can see copy_from_user() here, I assume the source is a user space
+buffer and the destination is the ioremap'ed SRAM (which causes the
+unaligned fault). Such function is not supposed copy into device memory
+(its prototype does not specify __iomem for the destination pointer).
+
+If you really want Device memory for the SRAM, I think we need some
+other API. memcpy_toio() could copy into such buffer but the source must
+be kernel. Maybe something like copy_from_user_toio()?
+
+Otherwise, if you can remap the buffer as Normal (non-cacheable) memory,
+you could use something like vmap() with pgprot_writecombine for the
+mapping. Even though ioremap_wc() returns (currently) Normal
+non-cacheable memory, such pointer (__iomem) should only be used with
+specific IO accessors (though I can see this assumption broken in a few
+places in the kernel).
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Catalin
