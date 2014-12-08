@@ -1,67 +1,48 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 8 Dec 2014 21:58:43 +0530
-Subject: [PATCH v5 00/61] dmaengine: Implement generic slave capabilities
- retrieval
-In-Reply-To: <20141208141807.GC8739@lukather>
-References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
- <20141208061746.GD16827@intel.com> <20141208141807.GC8739@lukather>
-Message-ID: <20141208162843.GP16827@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 08 Dec 2014 17:38:57 +0100
+Subject: using DMA-API on ARM
+In-Reply-To: <5485D054.7090109@broadcom.com>
+References: <5481794E.4050406@broadcom.com> <2863746.4sUSEYqahB@wuerfel>
+ <5485D054.7090109@broadcom.com>
+Message-ID: <2048819.2EPzBi8E3T@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 03:18:07PM +0100, Maxime Ripard wrote:
-> On Mon, Dec 08, 2014 at 11:47:46AM +0530, Vinod Koul wrote:
-> > On Mon, Nov 17, 2014 at 02:41:54PM +0100, Maxime Ripard wrote:
-> > > Hi,
-> > > 
-> > > As we discussed a couple of weeks ago, this is the third attempt at
-> > > creating a generic behaviour for slave capabilities retrieval so that
-> > > generic layers using dmaengine can actually rely on that.
-> > > 
-> > > That has been done mostly through two steps: by moving out the
-> > > sub-commands of the device_control callback, so that the dmaengine
-> > > core can then infer from that wether a sub-command is implemented, and
-> > > then by moving the slave properties, such as the supported buswidth,
-> > > to the structure dma_device itself.
-> > 
-> > Okay managed to get this done. Apart from the two issues identified didn't
-> > find anything so applied and pushed to a branch
-> > "topic/slave_caps_device_control_fix"
-> > 
-> > Today did some compile tests and found few warnings, were trivial but I
-> > am worried about the testing of this code. Has anyone tested this, if so
-> > which platforms are covered Since I pushed base branch last night, Feng's
-> > bot covered it and all was OK. Looks like Feng's bot doesn't have wide
-> > coverage of arm platforms, wasn't there one run by arm guys which tries to
-> > test and boot, if so can we get this tested there please.
-> > 
-> > So bit sceptical for merging now. I will send the patches which I have
-> > applied on top of this
+On Monday 08 December 2014 17:22:44 Arend van Spriel wrote:
+> >> The log: first the ring allocation info is printed. Starting at
+> >> 16.124847, ring 2, 3 and 4 are rings used for device to host. In this
+> >> log the failure is on a read of ring 3. Ring 3 is 1024 entries of each
+> >> 16 bytes. The next thing printed is the kernel page tables. Then some
+> >> OpenWRT info and the logging of part of the connection setup. Then at
+> >> 1780.130752 the logging of the failure starts. The sequence number is
+> >> modulo 253 with ring size of 1024 matches an "old" entry (read 40,
+> >> expected 52). Then the different pointers are printed followed by
+> >> the kernel page table. The code does then a cache invalidate on the
+> >> dma_handle and the next read the sequence number is correct.
+> >
+> > How do you invalidate the cache? A dma_handle is of type dma_addr_t
+> > and we don't define an operation for that, nor does it make sense
+> > on an allocation from dma_alloc_coherent(). What happens if you
+> > take out the invalidate?
 > 
-> Which is why I wanted to merge this at the *beginning* of the
-> development cycle in the first place....
-> 
-> These patches have been sent more than 2 weeks ago, and were exactly
-> the same as the ones send at the end of October, rebased and updated
-> to take into account the drivers that were merged in between.
-> 
-> In short, these patches have been hanging around since 6 weeks. I
-> relied probably too much on the intel's build bot. This is not a
-> mistake I'll repeat. But blaming it on me because they came too late
-> is *very* unfair.
-as a first step one is expected to compile the patches we send. That is very
-basic stuff which should not be avoided. given that we had build failures on
-v5 rev of the series and serious failures flagged off by compilers doesn't
-inspire a lot of confidence. And lastly noone blamed you for being late, if
-things were rosy they would have been merged over the weekend and been in
-today's next, but...
+> dma_sync_single_for_cpu(, DMA_FROM_DEVICE) which ends up invalidating 
+> the cache (or that is our suspicion).
 
--- 
-~Vinod
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141208/d617fd04/attachment.sig>
+I'm not sure about that:
+
+static void arm_dma_sync_single_for_cpu(struct device *dev,
+                dma_addr_t handle, size_t size, enum dma_data_direction dir)
+{
+        unsigned int offset = handle & (PAGE_SIZE - 1);
+        struct page *page = pfn_to_page(dma_to_pfn(dev, handle-offset));
+        __dma_page_dev_to_cpu(page, offset, size, dir);
+}
+
+Assuming a noncoherent linear (no IOMMU, no swiotlb, no dmabounce) mapping,
+dma_to_pfn will return the correct pfn here, but pfn_to_page will return a
+page pointer into the kernel linear mapping, which is not the same
+as the pointer you get from __alloc_remap_buffer(). The pointer that
+was returned from dma_alloc_coherent is a) non-cachable, and b) not the
+same that you flush here.
+
+	Arnd
