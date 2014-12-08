@@ -1,157 +1,106 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 8 Dec 2014 20:31:40 +0800
-Subject: [PATCH v14 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
-In-Reply-To: <54859454.30603@huawei.com>
-References: <1418020040-68977-1-git-send-email-wangnan0@huawei.com>		
- <1418020131-69375-1-git-send-email-wangnan0@huawei.com>	
- <1418036666.3647.33.camel@linaro.org> <5485886E.2060303@huawei.com>
- <1418039451.3647.48.camel@linaro.org> <54859454.30603@huawei.com>
-Message-ID: <54859A2C.8030009@huawei.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon,  8 Dec 2014 12:37:37 +0000
+Subject: [PATCH v5 02/19] arm/arm64: KVM: pass down user space provided GIC
+ type into vGIC code
+In-Reply-To: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
+References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1418042274-3246-3-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/12/8 20:06, Wang Nan wrote:
-> On 2014/12/8 19:50, Jon Medhurst (Tixy) wrote:
->> On Mon, 2014-12-08 at 19:15 +0800, Wang Nan wrote:
->>> On 2014/12/8 19:04, Jon Medhurst (Tixy) wrote:
->>>> On Mon, 2014-12-08 at 14:28 +0800, Wang Nan wrote:
-[...]
->>
->> so another CPU could find and delete next before this one has finished
->> doing so. Would the list end up in a consistent state where no loops
->> develop and no probes are missed? I don't know the answer and a full
->> analysis would be complicated, but my gut feeling is that if a cpu can
->> observe the links in the list in an inconsistent state then only bad
->> things can result.
->>
-> 
-> I see the problem.
-> 
-> I'm thinking about making core.c and opt-arm.c to share stop_machine() code.
-> stop_machine() is required when removing breakpoint, so I'd like to define
-> a "remove_breakpoint" function in core.c and make opt-arm.c to call it.
-> Do you think it is a good idea?
-> 
-> 
+With the introduction of a second emulated GIC model we need to let
+userspace specify the GIC model to use for each VM. Pass the
+userspace provided value down into the vGIC code and store it there
+to differentiate later.
 
-What I mean is something like this:
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+Changelog v4...v5:
+ (none)
 
-diff --git a/arch/arm/probes/kprobes/core.c b/arch/arm/probes/kprobes/core.c
-index 3a58db4..efd8ab1 100644
---- a/arch/arm/probes/kprobes/core.c
-+++ b/arch/arm/probes/kprobes/core.c
-@@ -163,19 +163,31 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
-  * memory. It is also needed to atomically set the two half-words of a 32-bit
-  * Thumb breakpoint.
-  */
--int __kprobes __arch_disarm_kprobe(void *p)
--{
--	struct kprobe *kp = p;
--	void *addr = (void *)((uintptr_t)kp->addr & ~1);
--
--	__patch_text(addr, kp->opcode);
-+struct patch {
-+	void *addr;
-+	unsigned int insn;
-+};
+Changelog v3...v4:
+- added Acked-by
 
-+static int __remove_breakpoint(void *data)
-+{
-+	struct patch *p = data;
-+	__patch_text(p->addr, p->insn);
- 	return 0;
- }
+ arch/arm/kvm/arm.c     |    2 +-
+ include/kvm/arm_vgic.h |    7 +++++--
+ virt/kvm/arm/vgic.c    |    5 +++--
+ 3 files changed, 9 insertions(+), 5 deletions(-)
 
-+void __kprobes remove_breakpoint(void *addr, unsigned int insn)
-+{
-+	struct patch p = {
-+		.addr = addr,
-+		.insn = insn,
-+	};
-+	stop_machine(__remove_breakpoint, &p, cpu_online_mask);
-+}
-+
- void __kprobes arch_disarm_kprobe(struct kprobe *p)
- {
--	stop_machine(__arch_disarm_kprobe, p, cpu_online_mask);
-+	remove_breakpoint((void *)((uintptr_t)p->addr & ~1),
-+			p->opcode);
- }
-
- void __kprobes arch_remove_kprobe(struct kprobe *p)
-diff --git a/arch/arm/probes/kprobes/core.h b/arch/arm/probes/kprobes/core.h
-index f88c79f..7b7c334 100644
---- a/arch/arm/probes/kprobes/core.h
-+++ b/arch/arm/probes/kprobes/core.h
-@@ -30,6 +30,8 @@
- #define KPROBE_THUMB16_BREAKPOINT_INSTRUCTION	0xde18
- #define KPROBE_THUMB32_BREAKPOINT_INSTRUCTION	0xf7f0a018
-
-+extern void remove_breakpoint(void *addr, unsigned int insn);
-+
- enum probes_insn __kprobes
- kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_probes_insn *asi,
- 		const struct decode_header *h);
-diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
-index afbfeef..a1a1882 100644
---- a/arch/arm/probes/kprobes/opt-arm.c
-+++ b/arch/arm/probes/kprobes/opt-arm.c
-@@ -28,8 +28,9 @@
- #include <asm/insn.h>
- /* for patch_text */
- #include <asm/patch.h>
--/* for stop_machine */
--#include <linux/stop_machine.h>
-+
-+#include "core.h"
-+
- /*
-  * NOTE: the first sub and add instruction will be modified according
-  * to the stack cost of the instruction.
-@@ -245,13 +246,8 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op, struct kprobe *or
- 	return 0;
- }
-
--/*
-- * Similar to __arch_disarm_kprobe, operations which removing
-- * breakpoints must be wrapped by stop_machine to avoid racing.
-- */
--static __kprobes int __arch_optimize_kprobes(void *p)
-+void __kprobes arch_optimize_kprobes(struct list_head *oplist)
- {
--	struct list_head *oplist = p;
- 	struct optimized_kprobe *op, *tmp;
-
- 	list_for_each_entry_safe(op, tmp, oplist, list) {
-@@ -277,16 +273,15 @@ static __kprobes int __arch_optimize_kprobes(void *p)
- 			  op->optinsn.copied_insn[0]) & 0xf0000000) |
- 			(insn & 0x0fffffff);
-
--		patch_text(op->kp.addr, insn);
-+		/*
-+		 * Similar to __arch_disarm_kprobe, operations which
-+		 * removing breakpoints must be wrapped by stop_machine
-+		 * to avoid racing.
-+		 */
-+		remove_breakpoint(op->kp.addr, insn);
-
- 		list_del_init(&op->list);
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index c2a5c69..8817fbd 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -753,7 +753,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
+ 	switch (ioctl) {
+ 	case KVM_CREATE_IRQCHIP: {
+ 		if (vgic_present)
+-			return kvm_vgic_create(kvm);
++			return kvm_vgic_create(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
+ 		else
+ 			return -ENXIO;
  	}
--	return 0;
--}
--
--void arch_optimize_kprobes(struct list_head *oplist)
--{
--	stop_machine(__arch_optimize_kprobes, oplist, cpu_online_mask);
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 206dcc3..dde5a00 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -140,6 +140,9 @@ struct vgic_dist {
+ 	bool			in_kernel;
+ 	bool			ready;
+ 
++	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
++	u32			vgic_model;
++
+ 	int			nr_cpus;
+ 	int			nr_irqs;
+ 
+@@ -275,7 +278,7 @@ struct kvm_exit_mmio;
+ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+ int kvm_vgic_hyp_init(void);
+ int kvm_vgic_init(struct kvm *kvm);
+-int kvm_vgic_create(struct kvm *kvm);
++int kvm_vgic_create(struct kvm *kvm, u32 type);
+ void kvm_vgic_destroy(struct kvm *kvm);
+ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
+ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+@@ -326,7 +329,7 @@ static inline int kvm_vgic_init(struct kvm *kvm)
+ 	return 0;
  }
-
- void arch_unoptimize_kprobe(struct optimized_kprobe *op)
-
-
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+ 
+-static inline int kvm_vgic_create(struct kvm *kvm)
++static inline int kvm_vgic_create(struct kvm *kvm, u32 type)
+ {
+ 	return 0;
+ }
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index aacdb59..c2e0795 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1931,7 +1931,7 @@ out:
+ 	return ret;
+ }
+ 
+-int kvm_vgic_create(struct kvm *kvm)
++int kvm_vgic_create(struct kvm *kvm, u32 type)
+ {
+ 	int i, vcpu_lock_idx = -1, ret;
+ 	struct kvm_vcpu *vcpu;
+@@ -1963,6 +1963,7 @@ int kvm_vgic_create(struct kvm *kvm)
+ 
+ 	spin_lock_init(&kvm->arch.vgic.lock);
+ 	kvm->arch.vgic.in_kernel = true;
++	kvm->arch.vgic.vgic_model = type;
+ 	kvm->arch.vgic.vctrl_base = vgic->vctrl_base;
+ 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+@@ -2388,7 +2389,7 @@ static void vgic_destroy(struct kvm_device *dev)
+ 
+ static int vgic_create(struct kvm_device *dev, u32 type)
+ {
+-	return kvm_vgic_create(dev->kvm);
++	return kvm_vgic_create(dev->kvm, type);
+ }
+ 
+ static struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+-- 
+1.7.9.5
