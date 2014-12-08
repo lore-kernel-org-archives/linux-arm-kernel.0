@@ -1,59 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 08 Dec 2014 11:47:24 +0000
-Subject: [PATCH v2 2/6] arm/arm64: KVM: Correct KVM_ARM_VCPU_INIT power
- off option
-In-Reply-To: <1417641522-29056-3-git-send-email-christoffer.dall@linaro.org>
-References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
- <1417641522-29056-3-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <54858FCC.8060508@arm.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Mon, 8 Dec 2014 13:46:01 +0200
+Subject: [RFC V4] mm:add KPF_ZERO_PAGE flag for /proc/kpageflags
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103E688B313F4@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
+ <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D103E688B313F2@CNBJMBX05.corpusers.net>
+ <20141205143134.37139da2208c654a0d3cd942@linux-foundation.org>
+ <35FD53F367049845BC99AC72306C23D103E688B313F4@CNBJMBX05.corpusers.net>
+Message-ID: <20141208114601.GA28846@node.dhcp.inet.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/14 21:18, Christoffer Dall wrote:
-> The implementation of KVM_ARM_VCPU_INIT is currently not doing what
-> userspace expects, namely making sure that a vcpu which may have been
-> turned off using PSCI is returned to its initial state, which would be
-> powered on if userspace does not set the KVM_ARM_VCPU_POWER_OFF flag.
+On Mon, Dec 08, 2014 at 10:00:50AM +0800, Wang, Yalin wrote:
+> This patch add KPF_ZERO_PAGE flag for zero_page,
+> so that userspace process can notice zero_page from
+> /proc/kpageflags, and then do memory analysis more accurately.
 > 
-> Implement the expected functionality and clarify the ABI.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
 > ---
->  Documentation/virtual/kvm/api.txt | 3 ++-
->  arch/arm/kvm/arm.c                | 2 ++
->  2 files changed, 4 insertions(+), 1 deletion(-)
+>  Documentation/vm/pagemap.txt           |  5 +++++
+>  fs/proc/page.c                         | 16 +++++++++++++---
+>  include/linux/huge_mm.h                | 12 ++++++++++++
+>  include/uapi/linux/kernel-page-flags.h |  1 +
+>  mm/huge_memory.c                       |  7 +------
+>  5 files changed, 32 insertions(+), 9 deletions(-)
 > 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index 7610eaa..bb82a90 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -2455,7 +2455,8 @@ should be created before this ioctl is invoked.
+> diff --git a/Documentation/vm/pagemap.txt b/Documentation/vm/pagemap.txt
+> index 5948e45..fdeb06e 100644
+> --- a/Documentation/vm/pagemap.txt
+> +++ b/Documentation/vm/pagemap.txt
+> @@ -62,6 +62,8 @@ There are three components to pagemap:
+>      20. NOPAGE
+>      21. KSM
+>      22. THP
+> +    23. BALLOON
+> +    24. ZERO_PAGE
 >  
->  Possible features:
->  	- KVM_ARM_VCPU_POWER_OFF: Starts the CPU in a power-off state.
-> -	  Depends on KVM_CAP_ARM_PSCI.
-> +	  Depends on KVM_CAP_ARM_PSCI.  If not set, the CPU will be powered on
-> +	  and execute guest code when KVM_RUN is called.
->  	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
->  	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
->  	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 for the CPU.
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index b160bea..edc1964 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -663,6 +663,8 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
->  	 */
->  	if (test_bit(KVM_ARM_VCPU_POWER_OFF, vcpu->arch.features))
->  		vcpu->arch.pause = true;
-> +	else
-> +		vcpu->arch.pause = false;
+>  Short descriptions to the page flags:
 >  
->  	return 0;
->  }
-> 
+> @@ -102,6 +104,9 @@ Short descriptions to the page flags:
+>  22. THP
+>      contiguous pages which construct transparent hugepages
+>  
+> +24. ZERO_PAGE
+> +    zero page for pfn_zero or huge_zero page
+> +
+>      [IO related page flags]
+>   1. ERROR     IO error occurred
+>   3. UPTODATE  page has up-to-date data
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Would be nice to document BALLOON while you're there.
+Otherwise looks good to me.
 
-	M.
+Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+
 -- 
-Jazz is not dead. It just smells funny...
+ Kirill A. Shutemov
