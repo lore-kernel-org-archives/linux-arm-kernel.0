@@ -1,37 +1,104 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Mon, 8 Dec 2014 07:43:16 +0100 (CET)
-Subject: [PATCH 0/20] fix misspelling of current function in string
-In-Reply-To: <CAGRGNgWDJqV=XD+6q26Ma=m1sEi1kvLWsjq6=RjRVSFTxow0Qg@mail.gmail.com>
-References: <1417980062-25151-1-git-send-email-Julia.Lawall@lip6.fr>
- <CAGRGNgWDJqV=XD+6q26Ma=m1sEi1kvLWsjq6=RjRVSFTxow0Qg@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1412080738210.2100@localhost6.localdomain6>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Mon, 08 Dec 2014 12:25:43 +0530
+Subject: [PATCH V2] tick-broadcast: Register for hrtimer based broadcast as
+ the fallback broadcast mode
+Message-ID: <20141208065513.3075.48721.stgit@preeti.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Dec 2014, Julian Calaby wrote:
+Commit 5d1638acb9f6 ('tick: Introduce hrtimer based broadcast') added a
+hrtimer based broadcast mode for those platforms in which local timers stop
+when CPUs enter deep idle states. The commit expected the platforms to
+register for this mode explicitly when they lacked a better external device
+to wake up CPUs in deep idle. Given that more platforms are beginning to use
+this mode, we can avoid the call to set it up on every platform that requires
+it, by registering for the hrtimer based broadcast mode in the core code if
+no better broadcast device is available.
 
-> Hi Julia,
-> 
-> On Mon, Dec 8, 2014 at 6:20 AM, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
-> > These patches replace what appears to be a reference to the name of the
-> > current function but is misspelled in some way by either the name of the
-> > function itself, or by %s and then __func__ in an argument list.
-> 
-> Would there be any value in doing this for _all_ cases where the
-> function name is written in a format string?
+This commit also helps detect cases where the platform fails to register for
+a broadcast device but invokes the help of one when entering deep idle states.
+Currently we do not handle this situation at all and call the broadcast clock
+device without checking for its existence. This patch will handle such buggy
+cases properly.
 
-Probably.  But there are a lot of them.  Even for the misspellings, I have 
-only don about 1/3 of the cases.
+Signed-off-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+---
+Changes from V1: https://lkml.org/lkml/2014/12/5/261
+1.Moved registering the hrtimer based broadcast from timekeeping code
+to an early_initcall.
 
-On the other hand, the misspelling have to be checked carefully, because a 
-misspelling of one thing could be the correct spelling of the thing thst 
-was actually intended.
+ arch/arm64/kernel/time.c             |    2 --
+ arch/powerpc/kernel/time.c           |    1 -
+ include/linux/clockchips.h           |    6 +++---
+ kernel/time/tick-broadcast-hrtimer.c |    4 +++-
+ 4 files changed, 6 insertions(+), 7 deletions(-)
 
-Joe, however, points out that a lot of these prints are just for function 
-tracing, and could be removed.  I worked on another semantic patch that 
-tries to do that.  It might be better to remove those prints completely, 
-rather than sending one patch to transform them and then one patch to 
-remove them after that.  That is why for this series I did only the ones 
-where there was actually a problem.
-
-julia
+diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+index 1a7125c..47baaa8 100644
+--- a/arch/arm64/kernel/time.c
++++ b/arch/arm64/kernel/time.c
+@@ -70,8 +70,6 @@ void __init time_init(void)
+ 	of_clk_init(NULL);
+ 	clocksource_of_init();
+ 
+-	tick_setup_hrtimer_broadcast();
+-
+ 	arch_timer_rate = arch_timer_get_rate();
+ 	if (!arch_timer_rate)
+ 		panic("Unable to initialise architected timer.\n");
+diff --git a/arch/powerpc/kernel/time.c b/arch/powerpc/kernel/time.c
+index 7505599..51433a8 100644
+--- a/arch/powerpc/kernel/time.c
++++ b/arch/powerpc/kernel/time.c
+@@ -942,7 +942,6 @@ void __init time_init(void)
+ 	clocksource_init();
+ 
+ 	init_decrementer_clockevent();
+-	tick_setup_hrtimer_broadcast();
+ }
+ 
+ 
+diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+index 2e4cb67..91754b0 100644
+--- a/include/linux/clockchips.h
++++ b/include/linux/clockchips.h
+@@ -187,11 +187,11 @@ extern int tick_receive_broadcast(void);
+ #endif
+ 
+ #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) && defined(CONFIG_TICK_ONESHOT)
+-extern void tick_setup_hrtimer_broadcast(void);
++extern int __init tick_setup_hrtimer_broadcast(void);
+ extern int tick_check_broadcast_expired(void);
+ #else
+ static inline int tick_check_broadcast_expired(void) { return 0; }
+-static inline void tick_setup_hrtimer_broadcast(void) {};
++static inline int __init tick_setup_hrtimer_broadcast(void) { return 0; }
+ #endif
+ 
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS
+@@ -207,7 +207,7 @@ static inline void clockevents_resume(void) {}
+ 
+ static inline int clockevents_notify(unsigned long reason, void *arg) { return 0; }
+ static inline int tick_check_broadcast_expired(void) { return 0; }
+-static inline void tick_setup_hrtimer_broadcast(void) {};
++static inline int __init tick_setup_hrtimer_broadcast(void) { return 0; }
+ 
+ #endif
+ 
+diff --git a/kernel/time/tick-broadcast-hrtimer.c b/kernel/time/tick-broadcast-hrtimer.c
+index eb682d5..5c35995 100644
+--- a/kernel/time/tick-broadcast-hrtimer.c
++++ b/kernel/time/tick-broadcast-hrtimer.c
+@@ -98,9 +98,11 @@ static enum hrtimer_restart bc_handler(struct hrtimer *t)
+ 	return HRTIMER_RESTART;
+ }
+ 
+-void tick_setup_hrtimer_broadcast(void)
++int __init tick_setup_hrtimer_broadcast(void)
+ {
+ 	hrtimer_init(&bctimer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+ 	bctimer.function = bc_handler;
+ 	clockevents_register_device(&ce_broadcast_hrtimer);
++	return 0;
+ }
++early_initcall(tick_setup_hrtimer_broadcast);
