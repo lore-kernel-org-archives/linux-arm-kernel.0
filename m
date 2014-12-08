@@ -1,106 +1,303 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  8 Dec 2014 12:37:37 +0000
-Subject: [PATCH v5 02/19] arm/arm64: KVM: pass down user space provided GIC
- type into vGIC code
+Date: Mon,  8 Dec 2014 12:37:40 +0000
+Subject: [PATCH v5 05/19] arm/arm64: KVM: introduce per-VM ops
 In-Reply-To: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
 References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1418042274-3246-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <1418042274-3246-6-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of a second emulated GIC model we need to let
-userspace specify the GIC model to use for each VM. Pass the
-userspace provided value down into the vGIC code and store it there
-to differentiate later.
+Currently we only have one virtual GIC model supported, so all guests
+use the same emulation code. With the addition of another model we
+end up with different guests using potentially different vGIC models,
+so we have to split up some functions to be per VM.
+Introduce a vgic_vm_ops struct to hold function pointers for those
+functions that are different and provide the necessary code to
+initialize them.
+Also split up the kvm_vgic_init() function to separate out VGIC model
+specific functionality into a separate function, which will later be
+different for a GICv3 model.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 Changelog v4...v5:
- (none)
+- add vgic_init_maps() function pointer
 
 Changelog v3...v4:
-- added Acked-by
+- add accessor functions for vm_ops members
+- introduce init_vgic_model() to differentiate between guest GIC models
+- simplify vgic_v2_init_emulation() 
+- help debugging by hinting on handle_mmio codeflow in comment
 
- arch/arm/kvm/arm.c     |    2 +-
- include/kvm/arm_vgic.h |    7 +++++--
- virt/kvm/arm/vgic.c    |    5 +++--
- 3 files changed, 9 insertions(+), 5 deletions(-)
+ include/kvm/arm_vgic.h |   11 +++++
+ virt/kvm/arm/vgic.c    |  127 +++++++++++++++++++++++++++++++++++++++---------
+ 2 files changed, 115 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index c2a5c69..8817fbd 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -753,7 +753,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 	switch (ioctl) {
- 	case KVM_CREATE_IRQCHIP: {
- 		if (vgic_present)
--			return kvm_vgic_create(kvm);
-+			return kvm_vgic_create(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
- 		else
- 			return -ENXIO;
- 	}
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 206dcc3..dde5a00 100644
+index dde5a00..e691932 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -140,6 +140,9 @@ struct vgic_dist {
- 	bool			in_kernel;
- 	bool			ready;
+@@ -134,6 +134,15 @@ struct vgic_params {
+ 	void __iomem	*vctrl_base;
+ };
  
-+	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
-+	u32			vgic_model;
++struct vgic_vm_ops {
++	bool	(*handle_mmio)(struct kvm_vcpu *, struct kvm_run *,
++			       struct kvm_exit_mmio *);
++	bool	(*queue_sgi)(struct kvm_vcpu *, int irq);
++	void	(*add_sgi_source)(struct kvm_vcpu *, int irq, int source);
++	int	(*vgic_init)(struct kvm *, const struct vgic_params *);
++	int	(*vgic_init_maps)(struct kvm *);
++};
 +
- 	int			nr_cpus;
- 	int			nr_irqs;
+ struct vgic_dist {
+ #ifdef CONFIG_KVM_ARM_VGIC
+ 	spinlock_t		lock;
+@@ -215,6 +224,8 @@ struct vgic_dist {
  
-@@ -275,7 +278,7 @@ struct kvm_exit_mmio;
- int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
- int kvm_vgic_hyp_init(void);
- int kvm_vgic_init(struct kvm *kvm);
--int kvm_vgic_create(struct kvm *kvm);
-+int kvm_vgic_create(struct kvm *kvm, u32 type);
- void kvm_vgic_destroy(struct kvm *kvm);
- void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
- void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
-@@ -326,7 +329,7 @@ static inline int kvm_vgic_init(struct kvm *kvm)
- 	return 0;
- }
+ 	/* Bitmap indicating which CPU has something pending */
+ 	unsigned long		*irq_pending_on_cpu;
++
++	struct vgic_vm_ops	vm_ops;
+ #endif
+ };
  
--static inline int kvm_vgic_create(struct kvm *kvm)
-+static inline int kvm_vgic_create(struct kvm *kvm, u32 type)
- {
- 	return 0;
- }
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index aacdb59..c2e0795 100644
+index bc2546e..8c55fb8 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1931,7 +1931,7 @@ out:
+@@ -105,6 +105,26 @@ static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ static const struct vgic_ops *vgic_ops;
+ static const struct vgic_params *vgic;
+ 
++static void add_sgi_source(struct kvm_vcpu *vcpu, int irq, int source)
++{
++	vcpu->kvm->arch.vgic.vm_ops.add_sgi_source(vcpu, irq, source);
++}
++
++static bool queue_sgi(struct kvm_vcpu *vcpu, int irq)
++{
++	return vcpu->kvm->arch.vgic.vm_ops.queue_sgi(vcpu, irq);
++}
++
++static int vgic_init(struct kvm *kvm, const struct vgic_params *params)
++{
++	return kvm->arch.vgic.vm_ops.vgic_init(kvm, params);
++}
++
++static int vgic_init_maps(struct kvm *kvm)
++{
++	return kvm->arch.vgic.vm_ops.vgic_init_maps(kvm);
++}
++
+ /*
+  * struct vgic_bitmap contains a bitmap made of unsigned longs, but
+  * extracts u32s out of them.
+@@ -761,6 +781,13 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
+ 	return false;
+ }
+ 
++static void vgic_v2_add_sgi_source(struct kvm_vcpu *vcpu, int irq, int source)
++{
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++
++	*vgic_get_sgi_sources(dist, vcpu->vcpu_id, irq) |= 1 << source;
++}
++
+ /**
+  * vgic_unqueue_irqs - move pending IRQs from LRs to the distributor
+  * @vgic_cpu: Pointer to the vgic_cpu struct holding the LRs
+@@ -775,9 +802,7 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
+  */
+ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+ {
+-	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+-	int vcpu_id = vcpu->vcpu_id;
+ 	int i;
+ 
+ 	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
+@@ -804,7 +829,7 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+ 		 */
+ 		vgic_dist_irq_set_pending(vcpu, lr.irq);
+ 		if (lr.irq < VGIC_NR_SGIS)
+-			*vgic_get_sgi_sources(dist, vcpu_id, lr.irq) |= 1 << lr.source;
++			add_sgi_source(vcpu, lr.irq, lr.source);
+ 		lr.state &= ~LR_STATE_PENDING;
+ 		vgic_set_lr(vcpu, i, lr);
+ 
+@@ -1158,6 +1183,7 @@ static bool vgic_v2_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+  *
+  * returns true if the MMIO access has been performed in kernel space,
+  * and false if it needs to be emulated in user space.
++ * Calls the actual handling routine for the selected VGIC model.
+  */
+ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		      struct kvm_exit_mmio *mmio)
+@@ -1165,7 +1191,12 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	if (!irqchip_in_kernel(vcpu->kvm))
+ 		return false;
+ 
+-	return vgic_v2_handle_mmio(vcpu, run, mmio);
++	/*
++	 * This will currently call either vgic_v2_handle_mmio() or
++	 * vgic_v3_handle_mmio(), which in turn will call
++	 * vgic_handle_mmio_range() defined above.
++	 */
++	return vcpu->kvm->arch.vgic.vm_ops.handle_mmio(vcpu, run, mmio);
+ }
+ 
+ static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi)
+@@ -1417,7 +1448,7 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+ 	return true;
+ }
+ 
+-static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
++static bool vgic_v2_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+ {
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	unsigned long sources;
+@@ -1492,7 +1523,7 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 
+ 	/* SGIs */
+ 	for_each_set_bit(i, vgic_cpu->pending_percpu, VGIC_NR_SGIS) {
+-		if (!vgic_queue_sgi(vcpu, i))
++		if (!queue_sgi(vcpu, i))
+ 			overflow = 1;
+ 	}
+ 
+@@ -1884,7 +1915,7 @@ void kvm_vgic_destroy(struct kvm *kvm)
+  * Allocate and initialize the various data structures. Must be called
+  * with kvm->lock held!
+  */
+-static int vgic_init_maps(struct kvm *kvm)
++static int vgic_init_common_maps(struct kvm *kvm)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	struct kvm_vcpu *vcpu;
+@@ -1947,9 +1978,6 @@ static int vgic_init_maps(struct kvm *kvm)
+ 		}
+ 	}
+ 
+-	for (i = VGIC_NR_PRIVATE_IRQS; i < dist->nr_irqs; i += 4)
+-		vgic_set_target_reg(kvm, 0, i);
+-
+ out:
+ 	if (ret)
+ 		kvm_vgic_destroy(kvm);
+@@ -1957,6 +1985,37 @@ out:
  	return ret;
  }
  
--int kvm_vgic_create(struct kvm *kvm)
-+int kvm_vgic_create(struct kvm *kvm, u32 type)
- {
- 	int i, vcpu_lock_idx = -1, ret;
- 	struct kvm_vcpu *vcpu;
-@@ -1963,6 +1963,7 @@ int kvm_vgic_create(struct kvm *kvm)
++static int vgic_v2_init_maps(struct kvm *kvm)
++{
++	return vgic_init_common_maps(kvm);
++}
++
++static int vgic_v2_init(struct kvm *kvm, const struct vgic_params *params)
++{
++	struct vgic_dist *dist = &kvm->arch.vgic;
++	int ret, i;
++
++	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) ||
++	    IS_VGIC_ADDR_UNDEF(dist->vgic_cpu_base)) {
++		kvm_err("Need to set vgic distributor addresses first\n");
++		return -ENXIO;
++	}
++
++	ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
++				    params->vcpu_base,
++				    KVM_VGIC_V2_CPU_SIZE, true);
++	if (ret) {
++		kvm_err("Unable to remap VGIC CPU to VCPU\n");
++		return ret;
++	}
++
++	/* Initialize the target VCPUs for each IRQ to VCPU 0 */
++	for (i = VGIC_NR_PRIVATE_IRQS; i < dist->nr_irqs; i += 4)
++		vgic_set_target_reg(kvm, 0, i);
++
++	return 0;
++}
++
+ /**
+  * kvm_vgic_init - Initialize global VGIC state before running any VCPUs
+  * @kvm: pointer to the kvm struct
+@@ -1979,26 +2038,15 @@ int kvm_vgic_init(struct kvm *kvm)
+ 	if (vgic_initialized(kvm))
+ 		goto out;
  
- 	spin_lock_init(&kvm->arch.vgic.lock);
- 	kvm->arch.vgic.in_kernel = true;
-+	kvm->arch.vgic.vgic_model = type;
- 	kvm->arch.vgic.vctrl_base = vgic->vctrl_base;
- 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
- 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
-@@ -2388,7 +2389,7 @@ static void vgic_destroy(struct kvm_device *dev)
+-	if (IS_VGIC_ADDR_UNDEF(kvm->arch.vgic.vgic_dist_base) ||
+-	    IS_VGIC_ADDR_UNDEF(kvm->arch.vgic.vgic_cpu_base)) {
+-		kvm_err("Need to set vgic cpu and dist addresses first\n");
+-		ret = -ENXIO;
+-		goto out;
+-	}
+-
+ 	ret = vgic_init_maps(kvm);
+ 	if (ret) {
+ 		kvm_err("Unable to allocate maps\n");
+ 		goto out;
+ 	}
  
- static int vgic_create(struct kvm_device *dev, u32 type)
- {
--	return kvm_vgic_create(dev->kvm);
-+	return kvm_vgic_create(dev->kvm, type);
+-	ret = kvm_phys_addr_ioremap(kvm, kvm->arch.vgic.vgic_cpu_base,
+-				    vgic->vcpu_base, KVM_VGIC_V2_CPU_SIZE,
+-				    true);
+-	if (ret) {
+-		kvm_err("Unable to remap VGIC CPU to VCPU\n");
++	ret = vgic_init(kvm, vgic);
++	if (ret)
+ 		goto out;
+-	}
+ 
+ 	kvm_for_each_vcpu(i, vcpu, kvm)
+ 		kvm_vgic_vcpu_init(vcpu);
+@@ -2011,6 +2059,35 @@ out:
+ 	return ret;
  }
  
- static struct kvm_device_ops kvm_arm_vgic_v2_ops = {
++static int vgic_v2_init_emulation(struct kvm *kvm)
++{
++	struct vgic_dist *dist = &kvm->arch.vgic;
++
++	dist->vm_ops.handle_mmio = vgic_v2_handle_mmio;
++	dist->vm_ops.queue_sgi = vgic_v2_queue_sgi;
++	dist->vm_ops.add_sgi_source = vgic_v2_add_sgi_source;
++	dist->vm_ops.vgic_init = vgic_v2_init;
++	dist->vm_ops.vgic_init_maps = vgic_v2_init_maps;
++
++	return 0;
++}
++
++static int init_vgic_model(struct kvm *kvm, int type)
++{
++	int ret;
++
++	switch (type) {
++	case KVM_DEV_TYPE_ARM_VGIC_V2:
++		ret = vgic_v2_init_emulation(kvm);
++		break;
++	default:
++		ret = -ENODEV;
++		break;
++	}
++
++	return ret;
++}
++
+ int kvm_vgic_create(struct kvm *kvm, u32 type)
+ {
+ 	int i, vcpu_lock_idx = -1, ret;
+@@ -2041,6 +2118,10 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
+ 	}
+ 	ret = 0;
+ 
++	ret = init_vgic_model(kvm, type);
++	if (ret)
++		goto out_unlock;
++
+ 	spin_lock_init(&kvm->arch.vgic.lock);
+ 	kvm->arch.vgic.in_kernel = true;
+ 	kvm->arch.vgic.vgic_model = type;
 -- 
 1.7.9.5
