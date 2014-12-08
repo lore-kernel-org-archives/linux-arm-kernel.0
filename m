@@ -1,40 +1,54 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Mon, 08 Dec 2014 10:16:37 +0100
-Subject: [PATCH 1/20] mtd: s3c2410: fix misspelling of current function
- in string
-In-Reply-To: <alpine.DEB.2.02.1412080809400.2100@localhost6.localdomain6>
-References: <1417980062-25151-1-git-send-email-Julia.Lawall@lip6.fr>
- <1417980062-25151-2-git-send-email-Julia.Lawall@lip6.fr>
- <CAFLxGvyiqxQ6U6p-A-JW8Nv8OvXFGsna93afUu-Gek0EV3gATA@mail.gmail.com>
- <alpine.DEB.2.02.1412080809400.2100@localhost6.localdomain6>
-Message-ID: <54856C75.1050309@nod.at>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 8 Dec 2014 10:32:47 +0100
+Subject: [PATCH v5 00/61] dmaengine: Implement generic slave capabilities
+ retrieval
+In-Reply-To: <20141208061746.GD16827@intel.com>
+References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141208061746.GD16827@intel.com>
+Message-ID: <20141208093246.GB27228@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.12.2014 um 08:11 schrieb Julia Lawall:
->>> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
->>> index 35aef5e..0a9c41f 100644
->>> --- a/drivers/mtd/nand/s3c2410.c
->>> +++ b/drivers/mtd/nand/s3c2410.c
->>> @@ -948,7 +948,7 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
->>>
->>>         cpu_type = platform_get_device_id(pdev)->driver_data;
->>>
->>> -       pr_debug("s3c2410_nand_probe(%p)\n", pdev);
->>> +       pr_debug("%s(%p)\n", __func__, pdev);
->>
->> I think we can drop the line completely.
->> We have ftrace to trace function calls...
+On Mon, Dec 08, 2014 at 11:47:46AM +0530, Vinod Koul wrote:
+> On Mon, Nov 17, 2014 at 02:41:54PM +0100, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > As we discussed a couple of weeks ago, this is the third attempt at
+> > creating a generic behaviour for slave capabilities retrieval so that
+> > generic layers using dmaengine can actually rely on that.
+> > 
+> > That has been done mostly through two steps: by moving out the
+> > sub-commands of the device_control callback, so that the dmaengine
+> > core can then infer from that wether a sub-command is implemented, and
+> > then by moving the slave properties, such as the supported buswidth,
+> > to the structure dma_device itself.
 > 
-> Should the "initialised ok" at the end of the function be remove as well?
+> Okay managed to get this done. Apart from the two issues identified didn't
+> find anything so applied and pushed to a branch
+> "topic/slave_caps_device_control_fix"
 > 
-> Will it be confusing if this cleanup is done in this function, but not in 
-> others where it may be useful?  Perhaps s3c2410_nand_update_chip, for 
-> example?
+> Today did some compile tests and found few warnings, were trivial but I
+> am worried about the testing of this code. Has anyone tested this, if so
+> which platforms are covered Since I pushed base branch last night, Feng's
+> bot covered it and all was OK. Looks like Feng's bot doesn't have wide
+> coverage of arm platforms, wasn't there one run by arm guys which tries to
+> test and boot, if so can we get this tested there please.
 
-Hmm, this driver seems to have a lot of debugging printks().
-IMHO we can remove them.
-Let's see what Brain says.
+Tested with your branch on sama5d3 and sama5d4 so at_hdmac and at xdmac.
 
-Thanks,
-//richard
+I have also sent some patches based on Maxime's series for at_xdmac.
+
+Ludovic
+
+> 
+> So bit sceptical for merging now. I will send the patches which I have
+> applied on top of this
+> 
+> Thanks
+> -- 
+> ~Vinod
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
