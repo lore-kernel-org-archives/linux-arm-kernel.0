@@ -1,29 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 8 Dec 2014 09:47:47 -0800
-Subject: [PATCH v7 0/5] ARM64: Add support for FSL's LS2085A SoC
-In-Reply-To: <BY1PR0301MB13032F9A5B59585272458F3C82640@BY1PR0301MB1303.namprd03.prod.outlook.com>
-References: <1417443442-17444-1-git-send-email-bhupesh.sharma@freescale.com>
- <20141201163013.GA22708@leverpostej>
- <BY1PR0301MB13032F9A5B59585272458F3C82640@BY1PR0301MB1303.namprd03.prod.outlook.com>
-Message-ID: <CAOesGMjQkM367iMfrvRbo--jaXr++ytt7j0LFHuAbGnmhd64Yg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 8 Dec 2014 17:55:03 +0000
+Subject: [PATCH] arm: mm: dump: don't skip final region
+In-Reply-To: <CAPvkgC1HbuezEjmdUwVCM_Mic7Z5rF5BofSryQegiVOA08NwaA@mail.gmail.com>
+References: <1417782016-11825-1-git-send-email-mark.rutland@arm.com>
+ <CAPvkgC1oOU_3D03ZV-uZqTW_DX8J74oGEKQZTTi2YrC+oSqJyA@mail.gmail.com>
+ <20141208120537.GB21680@leverpostej>
+ <CAPvkgC1HbuezEjmdUwVCM_Mic7Z5rF5BofSryQegiVOA08NwaA@mail.gmail.com>
+Message-ID: <20141208175503.GI11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Dec 08, 2014 at 05:46:45PM +0000, Steve Capper wrote:
+> After some head scratching....
+> 
+> Basically, the swapper_pg_dir will only contain kernel pgd entries. So
+> at the beginning where one would normally user-space entries in a pgd
+> table, there should be null entries that are skipped over. So yes, I
+> agree, we should be able to remove the USER_PGTABLES_CEILING check.
 
-On Mon, Dec 8, 2014 at 7:09 AM, bhupesh.sharma at freescale.com
-<bhupesh.sharma@freescale.com> wrote:
-> Hi Arm Maintainers,
->
-> Its been some time since I posted v7 of this series.
->
-> If there are no other reviews comments on the series, can this be pulled into
-> the ARM SoC tree (arm-soc.git) for merge.
+The check is there to avoid noting anything about the lower entries.
+There is the possibility for lower entries to contain something (the
+low vector mapping), though you're probably right that we should
+report those too.
 
-The merge window just opened, so please repost the series to
-arm at kernel.org once it has closed (when 3.19-rc1 is out).
-
-
-Thanks,
-
--Olof
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
