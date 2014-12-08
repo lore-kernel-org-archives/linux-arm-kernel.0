@@ -1,105 +1,34 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 08 Dec 2014 20:59:17 +0200
-Subject: [PATCH 5/5] media: ov2640: dt: add the device tree binding
- document
-In-Reply-To: <1418038147-13221-6-git-send-email-josh.wu@atmel.com>
-References: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>
- <1418038147-13221-6-git-send-email-josh.wu@atmel.com>
-Message-ID: <7239028.nL31Mosllm@avalon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 8 Dec 2014 20:06:45 +0100
+Subject: [PATCH] ARM: dts: sun6i: hummingbird: Add ethernet phy reset
+ gpio properties
+In-Reply-To: <1417591153-27177-1-git-send-email-wens@csie.org>
+References: <1417591153-27177-1-git-send-email-wens@csie.org>
+Message-ID: <20141208190645.GH8739@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
-
-Thank you for the patch.
-
-On Monday 08 December 2014 19:29:07 Josh Wu wrote:
-> Add the document for ov2640 dt.
+On Wed, Dec 03, 2014 at 03:19:13PM +0800, Chen-Yu Tsai wrote:
+> On the Hummingbird A31 board, the RTL8211E ethernet phy has its reset
+> line connect to a gpio pin, instead of floating like on other boards.
+> Add the stmmac properties for describing the reset gpio.
 > 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
-> v1 -> v2:
->   1. change the compatible string to be consistent with verdor file.
-
-That's nice, but you still need to send a patch to add the ovti vendor prefix 
-to Documentation/devicetree/bindings/vendor-prefixes.txt. It's not there yet.
-
->   2. change the clock and pins' name.
->   3. add missed pinctrl in example.
+> The reset delays were taken from the RTL8211E datasheet.
 > 
->  .../devicetree/bindings/media/i2c/ov2640.txt       | 44 +++++++++++++++++++
->  1 file changed, 44 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt
-> b/Documentation/devicetree/bindings/media/i2c/ov2640.txt new file mode
-> 100644
-> index 0000000..15be3cb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
-> @@ -0,0 +1,44 @@
-> +* Omnivision ov2640 CMOS sensor
-> +
-> +The Omnivision OV2640 sensor support multiple resolutions output, such as
-> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
-> +output format.
-> +
-> +Required Properties :
-> +- compatible: Must be "ovti,ov2640"
-> +- clocks: reference master clock, if using external fixed clock, you
-> +          no need to have such property.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-That's not true anymore, the clocks property is mandatory in all cases. Just 
-describe it as
+Queued, thanks.
 
-- clocks: reference to the xvclk input clock.
-
-> +- clock-names: Must be "xvclk", it means the master clock for ov2640.
-
-I would drop "it means the master clock for ov2640".
-
-> +Optional Properties:
-> +- resetb-gpios: reset pin
-
-- resetb-gpios: reference to the GPIO connected to the resetb pin, if any.
-
-> +- pwdn-gpios: power down pin
-
-- pwdn-gpios: reference to the GPIO connected to the pwdn pin, if any.
-
-> +
-> +The device node must contain one 'port' child node for its digital output
-> +video port, in accordance with the video interface bindings defined in
-> +Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +
-> +Example:
-> +
-> +	i2c1: i2c at f0018000 {
-> +		ov2640: camera at 0x30 {
-> +			compatible = "ovti,ov2640";
-> +			reg = <0x30>;
-> +
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_pck1 &pinctrl_ov2640_pwdn 
-&pinctrl_ov2640_reset>;
-> +
-> +			resetb-gpios = <&pioE 24 GPIO_ACTIVE_HIGH>;
-> +			pwdn-gpios = <&pioE 29 GPIO_ACTIVE_HIGH>;
-> +
-> +			clocks = <&pck1>;
-> +			clock-names = "xvclk";
-> +
-> +			port {
-> +				ov2640_0: endpoint {
-> +					remote-endpoint = <&isi_0>;
-> +					bus-width = <8>;
-> +				};
-> +			};
-> +		};
-> +	};
+Maxime
 
 -- 
-Regards,
-
-Laurent Pinchart
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141208/a345d5c7/attachment.sig>
