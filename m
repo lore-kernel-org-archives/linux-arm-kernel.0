@@ -1,40 +1,32 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 8 Dec 2014 16:54:05 +0530
-Subject: [PATCH] ARM / PM: Replace CONFIG_PM_RUNTIME with CONFIG_PM
-In-Reply-To: <2407638.dfZGaT4vm1@vostro.rjw.lan>
-References: <2407638.dfZGaT4vm1@vostro.rjw.lan>
-Message-ID: <54858A55.8010005@ti.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 8 Dec 2014 11:24:27 +0000
+Subject: [PATCH v2 0/6] Improve PSCI system events and fix reboot bugs
+In-Reply-To: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
+References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <CAFEAcA_K7p0h1EgAxqcg5EqN8VXC60XoHsttbVtbxUAxuceziQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 06 December 2014 08:20 AM, Rafael J. Wysocki wrote:
-> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> 
-> After commit b2b49ccbdd54 (PM: Kconfig: Set PM_RUNTIME if PM_SLEEP is
-> selected) PM_RUNTIME is always set if PM is set, so #ifdef blocks
-> depending on CONFIG_PM_RUNTIME may now be changed to depend on
-> CONFIG_PM.
-> 
-> Replace CONFIG_PM_RUNTIME with CONFIG_PM everywhere in the code under
-> arch/arm/ (the defconfig files will be modified later).
-> 
-> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> ---
-> 
-> Note: This depends on commit b2b49ccbdd54 (PM: Kconfig: Set PM_RUNTIME if
-> PM_SLEEP is selected) which is only in linux-next at the moment (via the
-> linux-pm tree).
-> 
-> Please let me know if it is OK to take this one into linux-pm.
-> 
-> ---
->  arch/arm/kernel/perf_event.c       |    2 +-
->  arch/arm/mach-davinci/pm_domain.c  |    2 +-
+On 3 December 2014 at 21:18, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> Several people have reported problems with rebooting ARM VMs, especially
+> on 32-bit ARM.  This is mainly due to the same reason we were seeing
+> boot errors in the past, namely that the ram, dcache, and icache weren't
+> coherent on guest boot with the guest (stage-1) MMU disabled.  We solved
+> this by ensuring coherency when we fault in pages, but since most memory
+> is already mapped after a reboot, we don't do anything.
+>
+> The solution is to unmap the regular RAM on VCPU init, but we must
+> take care to not unmap the GIC or other IO regions, hence the somehwat
+> complicated solution.
+>
+> As part of figuring this out, it became clear that some semantics around
+> the KVM_ARM_VCPU_INIT ABI and system event ABI was unclear (what is
+> userspace expected to do when it receives a system event).  This series
+> also clarifies the ABI and changes the kernel functionality to do what
+> userspace expects (turn off VCPUs on a system shutdown event).
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+Userspace ABI documentation clarifications:
+Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
 
-for the mach-davinci change. I have nothing conflicting queued, so feel
-free to take this through your tree.
-
-Thanks,
-Sekhar
+-- PMM
