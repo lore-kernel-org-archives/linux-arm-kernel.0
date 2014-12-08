@@ -1,65 +1,96 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 08 Dec 2014 09:19:02 +0100
-Subject: [PATCH 3/9] clk: sunxi: Add prcm mod0 clock driver
-In-Reply-To: <20141207180808.GO12434@lukather>
-References: <20141126211318.GN25249@lukather> <5476E3A5.4000708@redhat.com>
- <CAGb2v652m0bCdPWFF4LWwjcrCJZvnLibFPw8xXJ3Q-Ge+_-p7g@mail.gmail.com>
- <5476F8AB.2000601@redhat.com> <20141127190509.GR25249@lukather>
- <54787A8A.6040209@redhat.com> <20141202154524.GD30256@lukather>
- <547EDCA0.4040805@redhat.com> <20141207180808.GO12434@lukather>
-Message-ID: <54855EF6.1000900@redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 8 Dec 2014 09:33:16 +0100
+Subject: [PATCH/RFC] ARM: shmobile: lager: Fix SPI mode of SPI-Flash into
+ mode3
+In-Reply-To: <20141208003105.GC7420@verge.net.au>
+References: <1414648551-30318-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdVQ0s35sW=kvf80c0s++R-5uNuJQtxMcX1R5ogxNwkp9w@mail.gmail.com>
+ <20141112082242.GU9007@verge.net.au>
+ <20141208003105.GC7420@verge.net.au>
+Message-ID: <CAMuHMdWcu2JAHUZpymA61SPW82PvaRYZuyp-qMLyTNH8xGuFVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Simon,
 
-On 07-12-14 19:08, Maxime Ripard wrote:
-> On Wed, Dec 03, 2014 at 10:49:20AM +0100, Hans de Goede wrote:
+On Mon, Dec 8, 2014 at 1:31 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Nov 12, 2014 at 05:22:43PM +0900, Simon Horman wrote:
+>> On Thu, Oct 30, 2014 at 10:26:33AM +0100, Geert Uytterhoeven wrote:
+>> > On Thu, Oct 30, 2014 at 6:55 AM, Simon Horman
+>> > <horms+renesas@verge.net.au> wrote:
+>> > > From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+>> > >
+>> > > In order to change into mode3, CPOL and CPHA bit of SPCMD register
+>> > > of MSIOF is changed. Mode3 can avoid intermediate voltage.
+>> >
+>> > This is the QSPI node, not MSIOF?
+>>
+>> Indeed.
+>>
+>> Nakamura-san's patch, which I up-ported, was against the QSPI node
+>> but the version I posted below is indeed against the MSIOF.
+>>
+>> Furthermore, I see that spi-cpol and spi-cpha are already present
+>> in the MSIOF node in mainline. I would like to withdraw this patch.
+>
+> Hi Geert,
+>
+> coming back to this I'm a little confused.
+>
+> I believe that the patch below is for the QSPI node and that was
+> intended by it. Is such a change appropriate for mainline?
 
-<snip>
+OK. So please change MSIOF to QSPI in the description.
 
->> So it should not have a simple-bus compatible either, and as such we cannot
->> simply change the mod0 driver from of_clk_define to a platform driver because
->> then we need to instantiate platform devs for the mod0 clock nodes, which
->> means making the clock node a simple-bus.
+> Should I confirm some details with Nakamura-san?
 >
-> I guess we can do that as a temporary measure until we get things
-> right on that front. I'm totally open to doing that work, so I'm not
-> asking you to do it.
->
->> I can see your logic in wanting the ir_clk prcm sub-node to use the
->> mod0 compatible string, so how about we make the mod0 driver both
->> register through of_declare and as a platform driver. Note this means
->> that it will try to bind twice to the ir_clk node, since of_clk_declare
->> will cause it to try and bind there too AFAIK.
->
-> Hmmm, I could live with that for a while too. That shouldn't even
-> require too much work, since the first thing we check in the mod0 code
-> is that we actually have something in reg, which will not be the case
-> in the OF_CLK_DECLARE case.
->
->> The of_clk_declare bind will fail though because there is no regs
->> property, so this double bind is not an issue as long as we do not
->> log errors on the first bind failure.
->
-> Yep, exactly.
->
->> Note that the ir_clk node will still need an "ir-clk" compatible as
->> well for the MFD to find it and assign the proper resources to it.
->
-> No, it really doesn't. At least for now, we have a single mod0 clock
-> under the PRCM MFD. If (and only if) one day, we find ourselves in a
-> position where we have two mod0 clocks under the PRCM, then we'll fix
-> the MFD code to deal with that, because it really should deal with it.
+> In mainline spi-cpol and spi-cpha are currently set in the
+> MSIOF node but not the QSPI node. I believe the same holds for koelsch too.
 
-Ok, using only the mod0 compat string works for me. I'll respin my
-patch-set (minus the one patch you've already merged) to make the modo
-clk driver use both of_clk_declare and make it a platfrom driver, and
-use the mod0 compat string for the ir-clk node.
+According to the Spansion S25FL512S datasheet both mode 0 and mode 3
+are supported:
 
-Not sure when I'll get this done exactly though, but we still have
-a while before 3.20 :)
+"The difference between the two modes is the clock polarity when the bus
+ master is in standby mode and not transferring any data.
+   - SCK will stay at logic low state with CPOL = 0, CPHA = 0
+   - SCK will stay at logic high state with CPOL = 1, CPHA = 1"
 
-Regards,
+So this looks OK to me.
 
-Hans
+I gave it a try with a similar change to Koelsch, and it seems to work fine.
+
+>> > > Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+>> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> > > ---
+>> > > Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
+>> > >
+>> > >  arch/arm/boot/dts/r8a7790-lager.dts | 2 ++
+>> > >  1 file changed, 2 insertions(+)
+>> > >
+>> > > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+>> > > index 830f2e8..1606fad 100644
+>> > > --- a/arch/arm/boot/dts/r8a7790-lager.dts
+>> > > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
+>> > > @@ -343,6 +343,8 @@
+>> > >                 spi-tx-bus-width = <4>;
+>> > >                 spi-rx-bus-width = <4>;
+>> > >                 m25p,fast-read;
+>> > > +               spi-cpol;
+>> > > +               spi-cpha;
+
+Please keep the spi-* properties together, and alphabetically sorted,
+i.e. insert
+the new ones before spi-max-frequency.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
