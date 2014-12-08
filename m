@@ -1,39 +1,112 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Sun, 7 Dec 2014 18:38:31 -0800
-Subject: [PATCH v2 0/5] Add gpio support to Broadcom Cygnus SoC
-In-Reply-To: <Ray Jui <rjui@broadcom.com>
+Date: Sun, 7 Dec 2014 18:38:32 -0800
+Subject: [PATCH v2 1/5] gpio: Cygnus: define Broadcom Cygnus GPIO binding
+In-Reply-To: <1418006316-324-1-git-send-email-rjui@broadcom.com>
 References: <Ray Jui <rjui@broadcom.com>
-Message-ID: <1418006316-324-1-git-send-email-rjui@broadcom.com>
+ <1418006316-324-1-git-send-email-rjui@broadcom.com>
+Message-ID: <1418006316-324-2-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset contains the initial GPIO support for the Broadcom Cygnus SoC.
-Cygnus has 3 GPIO controllers: 1) the ASIU GPIO; 2) the chipCommonG GPIO;
-and 3) the ALWAYS-ON GPIO. All 3 types of GPIO controllers are supported by
-the same Cygnus GPIO driver
+Document the GPIO device tree binding for Broadcom Cygnus SoC
 
-Changes from v1:
- - Get rid of inline qualifier
- - Get rid of redundant check in the ISR
- - Other minor fixes to imrove code readability
-
-Ray Jui (5):
-  gpio: Cygnus: define Broadcom Cygnus GPIO binding
-  gpio: Cygnus: add GPIO driver
-  ARM: mach-bcm: Enable GPIO support for Cygnus
-  ARM: dts: enable GPIO for Broadcom Cygnus
-  MAINTAINERS: Entry for Cygnus GPIO driver
-
- .../devicetree/bindings/gpio/brcm,cygnus-gpio.txt  |   85 +++
- MAINTAINERS                                        |    7 +
- arch/arm/boot/dts/bcm-cygnus.dtsi                  |   30 +
- arch/arm/mach-bcm/Kconfig                          |    1 +
- drivers/gpio/Kconfig                               |   11 +
- drivers/gpio/Makefile                              |    1 +
- drivers/gpio/gpio-bcm-cygnus.c                     |  712 ++++++++++++++++++++
- 7 files changed, 847 insertions(+)
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
+---
+ .../devicetree/bindings/gpio/brcm,cygnus-gpio.txt  |   85 ++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/gpio/brcm,cygnus-gpio.txt
- create mode 100644 drivers/gpio/gpio-bcm-cygnus.c
 
+diff --git a/Documentation/devicetree/bindings/gpio/brcm,cygnus-gpio.txt b/Documentation/devicetree/bindings/gpio/brcm,cygnus-gpio.txt
+new file mode 100644
+index 0000000..24a1513
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/brcm,cygnus-gpio.txt
+@@ -0,0 +1,85 @@
++Broadcom Cygnus GPIO Controller
++
++Required properties:
++
++- compatible:
++    Currently supported Cygnus GPIO controllers include:
++    "brcm,cygnus-ccm-gpio": ChipcommonG GPIO controller
++    "brcm,cygnus-asiu-gpio": ASIU GPIO controller
++    "brcm,cygnus-crmu-gpio": CRMU GPIO controller
++
++- reg:
++    Define the base and range of the I/O address space that contain the Cygnus
++GPIO controller registers
++
++- ngpios:
++    Total number of GPIOs the controller provides
++
++- #gpio-cells:
++    Must be two. The first cell is the GPIO pin number (within the
++controller's domain) and the second cell is used for the following:
++    bit[0]: polarity (0 for normal and 1 for inverted)
++    bit[18:16]: internal pull up/down: 0 - pull up/down disabled
++                                       1 - pull up enabled
++                                       2 - pull down enabled
++    bit[22:20]: drive strength: 0 - 2 mA
++                                1 - 4 mA
++                                2 - 6 mA
++                                3 - 8 mA
++                                4 - 10 mA
++                                5 - 12 mA
++                                6 - 14 mA
++                                7 - 16 mA
++
++- gpio-controller:
++    Specifies that the node is a GPIO controller
++
++Optional properties:
++
++- interrupt-controller:
++    Specifies that the node is an interrupt controller. Not all Cygnus GPIO
++interfaces support interrupt, e.g., the CRMU GPIO controller does not have its
++interrupt routed to the main processor's GIC
++
++- interrupts:
++    The interrupt outputs from the GPIO controller.
++
++- no-interrupt:
++    Specifies that the GPIO interface does not support interrupt
++
++Example:
++	gpio_asiu: gpio at 180a5000 {
++		compatible = "brcm,cygnus-asiu-gpio";
++		reg = <0x180a5000 0x668>;
++		ngpios = <122>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		interrupt-controller;
++		interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	gpio_crmu: gpio at 03024800 {
++		compatible = "brcm,cygnus-crmu-gpio";
++		reg = <0x03024800 0x50>;
++		ngpios = <6>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		no-interrupt;
++	};
++
++	/*
++	 * Touchscreen that uses the ASIU GPIO 100, with internal pull-up
++	 * enabled
++	 */
++	tsc {
++		...
++		...
++		gpio-event = <&gpio_asiu 100 0x10000>;
++	};
++
++	/* Bluetooth that uses the CRMU GPIO 2, with polarity inverted */
++	bluetooth {
++		...
++		...
++		bcm,rfkill-bank-sel = <&gpio_crmu 2 1>
++	}
 -- 
 1.7.9.5
