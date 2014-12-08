@@ -1,102 +1,159 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 08 Dec 2014 17:00:05 +0530
-Subject: [PATCH 01/19] clk: samsung: exynos5433: Add clocks using common
- clock framework
-In-Reply-To: <1417510196-6714-2-git-send-email-cw00.choi@samsung.com>
-References: <1417510196-6714-1-git-send-email-cw00.choi@samsung.com>
- <1417510196-6714-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <54858BBD.5060002@samsung.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 8 Dec 2014 19:29:05 +0800
+Subject: [PATCH 3/5] media: ov2640: add primary dt support
+In-Reply-To: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>
+References: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1418038147-13221-4-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+Add device tree support for ov2640.
 
-On Tuesday 02 December 2014 02:19 PM, Chanwoo Choi wrote:
-> This patch adds the support for CMU (Clock Management Units) of Exynos5433
-> which is 64bit SoC and has Octa-cores. This patch supports necessary clocks
-> (PLL/MMC/UART/MCT/I2C/SPI) for kernel boot and includes binding documentation
-> for Exynos5433 clock controller.
->
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Inki Dae <inki.dae@samsung.com>
-> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
-> ---
->   .../devicetree/bindings/clock/exynos5433-clock.txt | 106 +++
->   drivers/clk/samsung/Makefile                       |   1 +
->   drivers/clk/samsung/clk-exynos5433.c               | 967 +++++++++++++++++++++
->   include/dt-bindings/clock/exynos5433.h             | 199 +++++
->   4 files changed, 1273 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/clock/exynos5433-clock.txt
->   create mode 100644 drivers/clk/samsung/clk-exynos5433.c
->   create mode 100644 include/dt-bindings/clock/exynos5433.h
->
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+v1 -> v2:
+  1. use gpiod APIs.
+  2. change the gpio pin's name according to datasheet.
+  3. reduce the delay for .reset() function.
 
-[snip]
+ drivers/media/i2c/soc_camera/ov2640.c | 86 ++++++++++++++++++++++++++++++++---
+ 1 file changed, 80 insertions(+), 6 deletions(-)
 
-> +
-> +static struct samsung_div_clock top_div_clks[] __initdata = {
-> +	/* DIV_TOP2 */
-> +	DIV(CLK_DIV_ACLK_FSYS_200, "div_aclk_fsys_200", "mout_bus_pll_user",
-> +			DIV_TOP2, 0, 3),
-> +
-> +	/* DIV_TOP3 */
-> +	DIV(CLK_DIV_ACLK_IMEM_SSSX, "div_aclk_imem_sssx",
-
-As per UM, this clock name should be imem_sssx_266
-
-> +			"mout_bus_pll_user", DIV_TOP3, 24, 3),
-> +	DIV(CLK_DIV_ACLK_IMEM_200, "div_aclk_imem_200",
-> +			"mout_bus_pll_user", DIV_TOP3, 20, 3),
-> +	DIV(CLK_DIV_ACLK_IMEM_266, "div_aclk_imem_266",
-> +			"mout_bus_pll_user", DIV_TOP3, 16, 3),
-> +	DIV(CLK_DIV_ACLK_PERIC_66_B, "div_aclk_peric_66_b",
-> +			"div_aclk_peric_66_a", DIV_TOP3, 12, 3),
-> +	DIV(CLK_DIV_ACLK_PERIC_66_A, "div_aclk_peric_66_a",
-> +			"mout_bus_pll_user", DIV_TOP3, 8, 3),
-> +	DIV(CLK_DIV_ACLK_PERIS_66_B, "div_aclk_peris_66_b",
-> +			"div_aclk_peris_66_a", DIV_TOP3, 4, 3),
-> +	DIV(CLK_DIV_ACLK_PERIS_66_A, "div_aclk_peris_66_a",
-
-[snip]
-
-> +
-> +static void __init exynos5433_cmu_mif_init(struct device_node *np)
-> +{
-> +	samsung_cmu_register_one(np, &mif_cmu_info);
-> +}
-> +CLK_OF_DECLARE(exynos5433_cmu_mif, "samsung,exynos5433-cmu-mif",
-> +		exynos5433_cmu_mif_init);
-> +
-> +/*
-> + * Register offset definitions for CMU_PERIC
-> + */
-> +#define DIV_PERIC			0x0600
-> +#define ENABLE_ACLK_PERIC		0x0800
-> +#define ENABLE_PCLK_PERIC0		0x0900
-> +#define ENABLE_PCLK_PERIC1		0x0904
-> +#define ENABLE_SCLK_PERIC		0x0A00
-> +#define ENABLE_IP_PERIC0		0x0B00
-> +#define ENABLE_IP_PERIC1		0x0B04
-> +#define ENABLE_IP_PERIC2		0x0B08
-> +
-
-nit: Just for consistency, all these offset should be in small case.
-
-> +static unsigned long peric_clk_regs[] __initdata = {
-> +	DIV_PERIC,
-> +	ENABLE_ACLK_PERIC,
-> +	ENABLE_PCLK_PERIC0,
-> +	ENABLE_PCLK_PERIC1,
-> +	ENABLE_SCLK_PERIC,
-> +	ENABLE_IP_PERIC0,
-> +	ENABLE_IP_PERIC1,
-> +	ENABLE_IP_PERIC2,
-> +};
-> +
-
-[snip]
-
-Thanks,
-Pankaj Dubey
+diff --git a/drivers/media/i2c/soc_camera/ov2640.c b/drivers/media/i2c/soc_camera/ov2640.c
+index 9ee910d..2a57979 100644
+--- a/drivers/media/i2c/soc_camera/ov2640.c
++++ b/drivers/media/i2c/soc_camera/ov2640.c
+@@ -18,6 +18,8 @@
+ #include <linux/i2c.h>
+ #include <linux/slab.h>
+ #include <linux/delay.h>
++#include <linux/gpio.h>
++#include <linux/of_gpio.h>
+ #include <linux/v4l2-mediabus.h>
+ #include <linux/videodev2.h>
+ 
+@@ -283,6 +285,10 @@ struct ov2640_priv {
+ 	u32	cfmt_code;
+ 	struct v4l2_clk			*clk;
+ 	const struct ov2640_win_size	*win;
++
++	struct soc_camera_subdev_desc	ssdd_dt;
++	struct gpio_desc *resetb_gpio;
++	struct gpio_desc *pwdn_gpio;
+ };
+ 
+ /*
+@@ -1047,6 +1053,61 @@ static struct v4l2_subdev_ops ov2640_subdev_ops = {
+ 	.video	= &ov2640_subdev_video_ops,
+ };
+ 
++/* OF probe functions */
++static int ov2640_hw_power(struct device *dev, int on)
++{
++	struct i2c_client *client = to_i2c_client(dev);
++	struct ov2640_priv *priv = to_ov2640(client);
++
++	dev_dbg(&client->dev, "%s: %s the camera\n",
++			__func__, on ? "ENABLE" : "DISABLE");
++
++	if (priv->pwdn_gpio && !IS_ERR(priv->pwdn_gpio))
++		gpiod_direction_output(priv->pwdn_gpio, !on);
++
++	return 0;
++}
++
++static int ov2640_hw_reset(struct device *dev)
++{
++	struct i2c_client *client = to_i2c_client(dev);
++	struct ov2640_priv *priv = to_ov2640(client);
++
++	/* If enabled, give a reset impulse */
++	if (priv->resetb_gpio && !IS_ERR(priv->resetb_gpio)) {
++		gpiod_direction_output(priv->resetb_gpio, 0);
++		usleep_range(3000, 5000);
++		gpiod_direction_output(priv->resetb_gpio, 1);
++	}
++
++	return 0;
++}
++
++static int ov2640_probe_dt(struct i2c_client *client,
++		struct ov2640_priv *priv)
++{
++	priv->resetb_gpio = devm_gpiod_get_optional(&client->dev, "resetb",
++			GPIOD_OUT_HIGH);
++	if (!priv->resetb_gpio)
++		dev_warn(&client->dev, "resetb gpio not found!\n");
++	else if (IS_ERR(priv->resetb_gpio))
++		return -EINVAL;
++
++	priv->pwdn_gpio = devm_gpiod_get_optional(&client->dev, "pwdn",
++			GPIOD_OUT_HIGH);
++	if (!priv->pwdn_gpio)
++		dev_warn(&client->dev, "pwdn gpio not found!\n");
++	else if (IS_ERR(priv->pwdn_gpio))
++		return -EINVAL;
++
++	/* Initialize the soc_camera_subdev_desc */
++	priv->ssdd_dt.power = ov2640_hw_power;
++	priv->ssdd_dt.reset = ov2640_hw_reset;
++	client->dev.platform_data = &priv->ssdd_dt;
++
++	return 0;
++}
++
+ /*
+  * i2c_driver functions
+  */
+@@ -1058,12 +1119,6 @@ static int ov2640_probe(struct i2c_client *client,
+ 	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
+ 	int			ret;
+ 
+-	if (!ssdd) {
+-		dev_err(&adapter->dev,
+-			"OV2640: Missing platform_data for driver\n");
+-		return -EINVAL;
+-	}
+-
+ 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
+ 		dev_err(&adapter->dev,
+ 			"OV2640: I2C-Adapter doesn't support SMBUS\n");
+@@ -1077,6 +1132,18 @@ static int ov2640_probe(struct i2c_client *client,
+ 		return -ENOMEM;
+ 	}
+ 
++	if (!ssdd) {
++		if (client->dev.of_node) {
++			ret = ov2640_probe_dt(client, priv);
++			if (ret)
++				return ret;
++		} else {
++			dev_err(&client->dev,
++				"Missing platform_data for driver\n");
++			return  -EINVAL;
++		}
++	}
++
+ 	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
+ 	v4l2_ctrl_handler_init(&priv->hdl, 2);
+ 	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
+@@ -1123,9 +1190,16 @@ static const struct i2c_device_id ov2640_id[] = {
+ };
+ MODULE_DEVICE_TABLE(i2c, ov2640_id);
+ 
++static const struct of_device_id ov2640_of_match[] = {
++	{.compatible = "ovti,ov2640", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, ov2640_of_match);
++
+ static struct i2c_driver ov2640_i2c_driver = {
+ 	.driver = {
+ 		.name = "ov2640",
++		.of_match_table = of_match_ptr(ov2640_of_match),
+ 	},
+ 	.probe    = ov2640_probe,
+ 	.remove   = ov2640_remove,
+-- 
+1.9.1
