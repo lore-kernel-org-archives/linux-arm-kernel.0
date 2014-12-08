@@ -1,68 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 8 Dec 2014 19:38:53 +0100
-Subject: [PATCH v5 00/61] dmaengine: Implement generic slave capabilities
- retrieval
-In-Reply-To: <20141208162843.GP16827@intel.com>
-References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
- <20141208061746.GD16827@intel.com> <20141208141807.GC8739@lukather>
- <20141208162843.GP16827@intel.com>
-Message-ID: <20141208183853.GG8739@lukather>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 8 Dec 2014 10:47:42 -0800
+Subject: [PATCH v3 0/5] Add gpio support to Broadcom Cygnus SoC
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+Message-ID: <1418064468-8512-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 09:58:43PM +0530, Vinod Koul wrote:
-> > > So bit sceptical for merging now. I will send the patches which I have
-> > > applied on top of this
-> > 
-> > Which is why I wanted to merge this at the *beginning* of the
-> > development cycle in the first place....
-> > 
-> > These patches have been sent more than 2 weeks ago, and were exactly
-> > the same as the ones send at the end of October, rebased and updated
-> > to take into account the drivers that were merged in between.
-> > 
-> > In short, these patches have been hanging around since 6 weeks. I
-> > relied probably too much on the intel's build bot. This is not a
-> > mistake I'll repeat. But blaming it on me because they came too late
-> > is *very* unfair.
->
-> as a first step one is expected to compile the patches we send. That is very
-> basic stuff which should not be avoided.
+This patchset contains the initial GPIO support for the Broadcom Cygnus SoC.
+Cygnus has 3 GPIO controllers: 1) the ASIU GPIO; 2) the chipCommonG GPIO;
+and 3) the ALWAYS-ON GPIO. All 3 types of GPIO controllers are supported by
+the same Cygnus GPIO driver
 
-Indeed. My mistake, it won't happen again.
+Changes from v2:
+ - Consolidate different compatible IDs into "brcm,cygnus-gpio"
+ - Get rid of redundant "no-interrupt" property
 
-> given that we had build failures on v5 rev of the series and serious
-> failures flagged off by compilers doesn't inspire a lot of
-> confidence.
+Changes from v1:
+ - Get rid of inline qualifier
+ - Get rid of redundant check in the ISR
+ - Other minor fixes to imrove code readability
 
-v5 that you never reviewed, just like the v4, v3 and v2 before it.
+Ray Jui (5):
+  gpio: Cygnus: define Broadcom Cygnus GPIO binding
+  gpio: Cygnus: add GPIO driver
+  ARM: mach-bcm: Enable GPIO support for Cygnus
+  ARM: dts: enable GPIO for Broadcom Cygnus
+  MAINTAINERS: Entry for Cygnus GPIO driver
 
-> And lastly noone blamed you for being late, if things were rosy they
-> would have been merged over the weekend and been in today's next,
-> but...
-
-I totally understand your point. And I actually am a bit uncomfortable
-merging this so late too, and I'd actually prefer to have it merged
-for 3.20. But this is a huge patchset, and I'd really like to avoid
-rebasing it forever.
-
-I'll send a v6, with your patches, as soon as 3.19-rc1 is out. This
-will be my last rebase of this serie. If these patches are not merged
-then, then I will just give up on this cleanup, and probably any
-subsequent ones.
-
-I'm sorry, but I just don't care enough.
-
-Maxime.
+ .../devicetree/bindings/gpio/brcm,cygnus-gpio.txt  |   82 +++
+ MAINTAINERS                                        |    7 +
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   30 +
+ arch/arm/mach-bcm/Kconfig                          |    1 +
+ drivers/gpio/Kconfig                               |   11 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-bcm-cygnus.c                     |  705 ++++++++++++++++++++
+ 7 files changed, 837 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/brcm,cygnus-gpio.txt
+ create mode 100644 drivers/gpio/gpio-bcm-cygnus.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141208/cc8866b3/attachment.sig>
+1.7.9.5
