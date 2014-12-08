@@ -1,36 +1,194 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Mon, 08 Dec 2014 10:14:46 -0800
-Subject: [PATCH] ARM / PM: Replace CONFIG_PM_RUNTIME with CONFIG_PM
-In-Reply-To: <2407638.dfZGaT4vm1@vostro.rjw.lan>
-References: <2407638.dfZGaT4vm1@vostro.rjw.lan>
-Message-ID: <5485EA96.4000806@oracle.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 08 Dec 2014 20:39:05 +0200
+Subject: [PATCH 3/5] media: ov2640: add primary dt support
+In-Reply-To: <1418038147-13221-4-git-send-email-josh.wu@atmel.com>
+References: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>
+ <1418038147-13221-4-git-send-email-josh.wu@atmel.com>
+Message-ID: <13013762.Jqm1jQRnFM@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/5/2014 6:50 PM, Rafael J. Wysocki wrote:
-> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->
-> After commit b2b49ccbdd54 (PM: Kconfig: Set PM_RUNTIME if PM_SLEEP is
-> selected) PM_RUNTIME is always set if PM is set, so #ifdef blocks
-> depending on CONFIG_PM_RUNTIME may now be changed to depend on
-> CONFIG_PM.
->
-> Replace CONFIG_PM_RUNTIME with CONFIG_PM everywhere in the code under
-> arch/arm/ (the defconfig files will be modified later).
->
-> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Hi Josh,
+
+Thank you for the patch.
+
+On Monday 08 December 2014 19:29:05 Josh Wu wrote:
+> Add device tree support for ov2640.
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 > ---
->
-> Note: This depends on commit b2b49ccbdd54 (PM: Kconfig: Set PM_RUNTIME if
-> PM_SLEEP is selected) which is only in linux-next at the moment (via the
-> linux-pm tree).
->
-> Please let me know if it is OK to take this one into linux-pm.
->
-> ---
+> v1 -> v2:
+>   1. use gpiod APIs.
+>   2. change the gpio pin's name according to datasheet.
+>   3. reduce the delay for .reset() function.
+> 
+>  drivers/media/i2c/soc_camera/ov2640.c | 86 +++++++++++++++++++++++++++++---
+>  1 file changed, 80 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
+> b/drivers/media/i2c/soc_camera/ov2640.c index 9ee910d..2a57979 100644
+> --- a/drivers/media/i2c/soc_camera/ov2640.c
+> +++ b/drivers/media/i2c/soc_camera/ov2640.c
+> @@ -18,6 +18,8 @@
+>  #include <linux/i2c.h>
+>  #include <linux/slab.h>
+>  #include <linux/delay.h>
+> +#include <linux/gpio.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/v4l2-mediabus.h>
+>  #include <linux/videodev2.h>
+> 
+> @@ -283,6 +285,10 @@ struct ov2640_priv {
+>  	u32	cfmt_code;
+>  	struct v4l2_clk			*clk;
+>  	const struct ov2640_win_size	*win;
+> +
+> +	struct soc_camera_subdev_desc	ssdd_dt;
+> +	struct gpio_desc *resetb_gpio;
+> +	struct gpio_desc *pwdn_gpio;
+>  };
+> 
+>  /*
+> @@ -1047,6 +1053,61 @@ static struct v4l2_subdev_ops ov2640_subdev_ops = {
+>  	.video	= &ov2640_subdev_video_ops,
+>  };
+> 
+> +/* OF probe functions */
+> +static int ov2640_hw_power(struct device *dev, int on)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct ov2640_priv *priv = to_ov2640(client);
+> +
+> +	dev_dbg(&client->dev, "%s: %s the camera\n",
+> +			__func__, on ? "ENABLE" : "DISABLE");
+> +
+> +	if (priv->pwdn_gpio && !IS_ERR(priv->pwdn_gpio))
 
->   arch/arm/mach-keystone/pm_domain.c |    2 +-
+No need to test for IS_ERR, as the probe function would have failed in that 
+case.
 
-Looks fine to me. For keystone parts.
+> +		gpiod_direction_output(priv->pwdn_gpio, !on);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ov2640_hw_reset(struct device *dev)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct ov2640_priv *priv = to_ov2640(client);
+> +
+> +	/* If enabled, give a reset impulse */
+> +	if (priv->resetb_gpio && !IS_ERR(priv->resetb_gpio)) {
 
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+Same here.
+
+> +		gpiod_direction_output(priv->resetb_gpio, 0);
+
+Given that your DT should specify the active low GPIO flag, and that the gpiod 
+API inverts the value in that case, you should set the value to 1 here.
+
+> +		usleep_range(3000, 5000);
+> +		gpiod_direction_output(priv->resetb_gpio, 1);
+
+And to 0 here.
+
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int ov2640_probe_dt(struct i2c_client *client,
+> +		struct ov2640_priv *priv)
+> +{
+> +	priv->resetb_gpio = devm_gpiod_get_optional(&client->dev, "resetb",
+> +			GPIOD_OUT_HIGH);
+> +	if (!priv->resetb_gpio)
+> +		dev_warn(&client->dev, "resetb gpio not found!\n");
+
+No need to warn here, it's perfectly fine if the reset signal isn't connected 
+to a GPIO.
+
+> +	else if (IS_ERR(priv->resetb_gpio))
+> +		return -EINVAL;
+> +
+> +	priv->pwdn_gpio = devm_gpiod_get_optional(&client->dev, "pwdn",
+> +			GPIOD_OUT_HIGH);
+> +	if (!priv->pwdn_gpio)
+> +		dev_warn(&client->dev, "pwdn gpio not found!\n");
+
+Same here.
+
+> +	else if (IS_ERR(priv->pwdn_gpio))
+> +		return -EINVAL;
+> +
+> +	/* Initialize the soc_camera_subdev_desc */
+> +	priv->ssdd_dt.power = ov2640_hw_power;
+> +	priv->ssdd_dt.reset = ov2640_hw_reset;
+> +	client->dev.platform_data = &priv->ssdd_dt;
+> +
+> +	return 0;
+> +}
+> +
+>  /*
+>   * i2c_driver functions
+>   */
+> @@ -1058,12 +1119,6 @@ static int ov2640_probe(struct i2c_client *client,
+>  	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
+>  	int			ret;
+> 
+> -	if (!ssdd) {
+> -		dev_err(&adapter->dev,
+> -			"OV2640: Missing platform_data for driver\n");
+> -		return -EINVAL;
+> -	}
+> -
+>  	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
+>  		dev_err(&adapter->dev,
+>  			"OV2640: I2C-Adapter doesn't support SMBUS\n");
+> @@ -1077,6 +1132,18 @@ static int ov2640_probe(struct i2c_client *client,
+>  		return -ENOMEM;
+>  	}
+> 
+> +	if (!ssdd) {
+> +		if (client->dev.of_node) {
+> +			ret = ov2640_probe_dt(client, priv);
+> +			if (ret)
+> +				return ret;
+> +		} else {
+> +			dev_err(&client->dev,
+> +				"Missing platform_data for driver\n");
+> +			return  -EINVAL;
+> +		}
+
+I would test for !client->dev.of_node and return the error, you could then get 
+rid of the else and lower the indentation level for the call to 
+ov2640_probe_dt().
+
+> +	}
+> +
+>  	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
+>  	v4l2_ctrl_handler_init(&priv->hdl, 2);
+>  	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
+> @@ -1123,9 +1190,16 @@ static const struct i2c_device_id ov2640_id[] = {
+>  };
+>  MODULE_DEVICE_TABLE(i2c, ov2640_id);
+> 
+> +static const struct of_device_id ov2640_of_match[] = {
+> +	{.compatible = "ovti,ov2640", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, ov2640_of_match);
+> +
+>  static struct i2c_driver ov2640_i2c_driver = {
+>  	.driver = {
+>  		.name = "ov2640",
+> +		.of_match_table = of_match_ptr(ov2640_of_match),
+>  	},
+>  	.probe    = ov2640_probe,
+>  	.remove   = ov2640_remove,
+
+-- 
+Regards,
+
+Laurent Pinchart
