@@ -1,218 +1,179 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  8 Dec 2014 12:37:54 +0000
-Subject: [PATCH v5 19/19] arm/arm64: KVM: allow userland to request a virtual
- GICv3
-In-Reply-To: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
-References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1418042274-3246-20-git-send-email-andre.przywara@arm.com>
+Date: Mon,  8 Dec 2014 12:37:35 +0000
+Subject: [PATCH v5 00/19] KVM GICv3 emulation
+Message-ID: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With all of the GICv3 code in place now we allow userland to ask the
-kernel for using a virtual GICv3 in the guest.
-Also we provide the necessary support for guests setting the memory
-addresses for the virtual distributor and redistributors.
-This requires some userland code to make use of that feature and
-explicitly ask for a virtual GICv3.
+This is version 5 of the GICv3 guest emulation series (not for 3.19).
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
-Changelog v4...v5:
-- improving documentation text
+As the changes this time were much smaller, I updated to tree to
+3.18.0, as it includes some bug fixes in the VGIC.
 
-Changelog v3...v4:
-- refine commit message
-- add documentation of new GICv3 KVM device
+I addressed the remaining comments from Christoffer and Eric, thanks
+for the review! The changes this times were much smaller, most of them
+cosmetic or rewordings of commit messages and comments.
+I updated the kvm-gicv3/v4 branch in my repo[1] to carry all the delta
+patches. Those patches are just for reference to see what has changed
+between v4 and v5. For review and all other purposes please use the
+v5 branch.
 
- Documentation/virtual/kvm/devices/arm-vgic.txt |   22 ++++++++++--
- arch/arm64/include/uapi/asm/kvm.h              |    7 ++++
- include/kvm/arm_vgic.h                         |    4 +--
- virt/kvm/arm/vgic-v3-emul.c                    |    3 ++
- virt/kvm/arm/vgic.c                            |   46 +++++++++++++++++-------
- 5 files changed, 65 insertions(+), 17 deletions(-)
+For a changelog summary see below, also each patch carries a changelog
+now.
+Only patches 05, 08, 12, 15, 17, 18 and 19 have been changed compared
+to v4. I dropped Christoffer's Reviewed-by: tag from 05/19 because of
+the newly added function, but added the respective tags to the other
+commit messages.
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
-index df8b0c7..563463e 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
-@@ -3,22 +3,38 @@ ARM Virtual Generic Interrupt Controller (VGIC)
- 
- Device types supported:
-   KVM_DEV_TYPE_ARM_VGIC_V2     ARM Generic Interrupt Controller v2.0
-+  KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
- 
- Only one VGIC instance may be instantiated through either this API or the
- legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
- controller, requiring emulated user-space devices to inject interrupts to the
- VGIC instead of directly to CPUs.
- 
-+Creating a guest GICv3 device requires a host GICv3 as well.
-+GICv3 implementations with hardware compatibility support allow a guest GICv2
-+as well.
-+
- Groups:
-   KVM_DEV_ARM_VGIC_GRP_ADDR
-   Attributes:
-     KVM_VGIC_V2_ADDR_TYPE_DIST (rw, 64-bit)
-       Base address in the guest physical address space of the GIC distributor
--      register mappings.
-+      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
- 
-     KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
-       Base address in the guest physical address space of the GIC virtual cpu
--      interface register mappings.
-+      interface register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
-+
-+    KVM_VGIC_V3_ADDR_TYPE_DIST (rw, 64-bit)
-+      Base address in the guest physical address space of the GICv3 distributor
-+      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
-+
-+    KVM_VGIC_V3_ADDR_TYPE_REDIST (rw, 64-bit)
-+      Base address in the guest physical address space of the GICv3
-+      redistributor register mappings. There are two 64K pages for each
-+      VCPU and all of the redistributor pages are contiguous.
-+      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
-+
- 
-   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-   Attributes:
-@@ -36,6 +52,7 @@ Groups:
-     the register.
-   Limitations:
-     - Priorities are not implemented, and registers are RAZ/WI
-+    - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
-   Errors:
-     -ENODEV: Getting or setting this register is not yet supported
-     -EBUSY: One or more VCPUs are running
-@@ -68,6 +85,7 @@ Groups:
- 
-   Limitations:
-     - Priorities are not implemented, and registers are RAZ/WI
-+    - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
-   Errors:
-     -ENODEV: Getting or setting this register is not yet supported
-     -EBUSY: One or more VCPUs are running
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 8e38878..2ed873a 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -78,6 +78,13 @@ struct kvm_regs {
- #define KVM_VGIC_V2_DIST_SIZE		0x1000
- #define KVM_VGIC_V2_CPU_SIZE		0x2000
- 
-+/* Supported VGICv3 address types  */
-+#define KVM_VGIC_V3_ADDR_TYPE_DIST	2
-+#define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
-+
-+#define KVM_VGIC_V3_DIST_SIZE		SZ_64K
-+#define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
-+
- #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
- #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
- #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index b8dc144..655d0fa 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -36,8 +36,8 @@
- #define VGIC_V2_MAX_CPUS	8
- 
- /* Sanity checks... */
--#if (KVM_MAX_VCPUS > 8)
--#error	Invalid number of CPU interfaces
-+#if (KVM_MAX_VCPUS > 255)
-+#error Too many KVM VCPUs, the VGIC only supports up to 255 VCPUs for now
- #endif
- 
- #if (VGIC_NR_IRQS_LEGACY & 31)
-diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-index ff0126d..ef57c6d 100644
---- a/virt/kvm/arm/vgic-v3-emul.c
-+++ b/virt/kvm/arm/vgic-v3-emul.c
-@@ -989,6 +989,9 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
- 		case KVM_VGIC_V2_ADDR_TYPE_DIST:
- 		case KVM_VGIC_V2_ADDR_TYPE_CPU:
- 			return -ENXIO;
-+		case KVM_VGIC_V3_ADDR_TYPE_DIST:
-+		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
-+			return 0;
- 		}
- 		break;
- 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index a57d139..0983329 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1699,7 +1699,7 @@ static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
- /**
-  * kvm_vgic_addr - set or get vgic VM base addresses
-  * @kvm:   pointer to the vm struct
-- * @type:  the VGIC addr type, one of KVM_VGIC_V2_ADDR_TYPE_XXX
-+ * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
-  * @addr:  pointer to address value
-  * @write: if true set the address in the VM address space, if false read the
-  *          address
-@@ -1713,29 +1713,49 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- {
- 	int r = 0;
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
-+	int type_needed;
-+	phys_addr_t *addr_ptr, block_size;
- 
- 	mutex_lock(&kvm->lock);
- 	switch (type) {
- 	case KVM_VGIC_V2_ADDR_TYPE_DIST:
--		if (write) {
--			r = vgic_ioaddr_assign(kvm, &vgic->vgic_dist_base,
--					       *addr, KVM_VGIC_V2_DIST_SIZE);
--		} else {
--			*addr = vgic->vgic_dist_base;
--		}
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-+		addr_ptr = &vgic->vgic_dist_base;
-+		block_size = KVM_VGIC_V2_DIST_SIZE;
- 		break;
- 	case KVM_VGIC_V2_ADDR_TYPE_CPU:
--		if (write) {
--			r = vgic_ioaddr_assign(kvm, &vgic->vgic_cpu_base,
--					       *addr, KVM_VGIC_V2_CPU_SIZE);
--		} else {
--			*addr = vgic->vgic_cpu_base;
--		}
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-+		addr_ptr = &vgic->vgic_cpu_base;
-+		block_size = KVM_VGIC_V2_CPU_SIZE;
- 		break;
-+#ifdef CONFIG_ARM_GIC_V3
-+	case KVM_VGIC_V3_ADDR_TYPE_DIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-+		addr_ptr = &vgic->vgic_dist_base;
-+		block_size = KVM_VGIC_V3_DIST_SIZE;
-+		break;
-+	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-+		addr_ptr = &vgic->vgic_redist_base;
-+		block_size = KVM_VGIC_V3_REDIST_SIZE;
-+		break;
-+#endif
- 	default:
- 		r = -ENODEV;
-+		goto out;
-+	}
-+
-+	if (vgic->vgic_model != type_needed) {
-+		r = -ENODEV;
-+		goto out;
- 	}
- 
-+	if (write)
-+		r = vgic_ioaddr_assign(kvm, addr_ptr, *addr, block_size);
-+	else
-+		*addr = *addr_ptr;
-+
-+out:
- 	mutex_unlock(&kvm->lock);
- 	return r;
- }
+I quickly tested this version with a GICv3 capable fast model in all
+endianness modes (LE guest on LE host, BE on LE, LE on BE, BE on BE).
+Both a GICv2 and a GICv3 guest were booted in all four combinations.
+
+A git repo hosting all these patches lives in the kvm-gicv3/v5 branch
+of:
+http://www.linux-arm.org/git?p=linux-ap.git
+git://linux-arm.org/linux-ap.git
+-----
+
+GICv3 is the ARM generic interrupt controller designed to overcome
+some limits of the prevalent GICv2. Most notably it lifts the 8-CPU
+limit. Though with Linux-3.17 Marc introduced support for hosts to
+use a GICv3, the CPU limitation still applies to KVM guests, since
+the current code emulates a GICv2 only.
+Also, GICv2 backward compatibility being optional in GICv3, a number
+of systems won't be able to run GICv2 guests.
+
+This patch series provides code to emulate a GICv3 distributor and
+redistributor for any KVM guest. It requires a GICv3 in the host to
+work. With those patches one can run guests efficiently on any GICv3
+host. It has the following features:
+- Affinity routing (support for up to 255 VCPUs, more possible)
+- System registers (as opposed to MMIO access)
+- No ITS
+- No priority support (as the GICv2 emulation)
+- No save / restore support so far (will be added soon)
+- Only Group1 interrupts support
+
+The first patches actually refactor the current VGIC code to make
+room for a different VGIC model to be dropped in with Patch 16.
+The remaining patches connect the new model to the kernel backend and
+the userland facing code.
+
+The series goes on top of v3.18.0.
+The necessary patches for kvmtool to enable the guest's GICv3 have
+been posted here before [2], an updated version will follow soon.
+
+There was some testing on the fast model with some I/O and interrupt
+affinity shuffling in a Linux guest with a varying number of VCPUs as
+well as some testing on a Juno board (GICv2 only, to spot regressions).
+
+Please review and test.
+I would be grateful for people to test for GICv2 regressions also
+(so on a GICv2 host with current kvmtool/qemu), as there is quite
+some refactoring on that front.
+
+Much of the code was inspired by MarcZ, also kudos to him for doing
+the rather painful rebase on top of v3.17-rc1.
+
+Cheers,
+Andre.
+
+[1] http://www.linux-arm.org/git?p=linux-ap.git
+[2] https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/010086.html
+
+Changes v4 ... v5:
+* fix size of GICD_IROUTER region
+* fix compilation on ARM with VGIC not configured
+* properly fix the remaining FIXME at the GICv3 memory allocation
+* minor style changes, comments and commit messages fixes
+
+Changes v3 ... v4:
+* bug-fix in handling GICv3 redistributor CFG register
+* move set/get_lr from gic_vm_ops back to vgic_ops (get rid of v3 06/19)
+* getting rid of init_emul() at all
+* rework guest GIC model initialization
+* use non-atomic bit-set and bit-clear functions
+* split up handle_mmio_misc* into multiple functions
+* refine handling of some reserved registers
+* use symbolic names for ICC_SGI1R_EL1 register fields (new patch 16/19)
+* move private parameter from MMIO accessors to struct kvm_mmio_exit
+* added documentation of new GICv3 guest device
+* added lots of comments
+* some renaming of identifiers
+* minor changes in style and code flow of various functions
+
+Changes v2 ... v3:
+* rebase to v3.18-rc2
+* adapt to new kvm_register_device() function
+* split up vm_ops patch and the GICv2 split-off patch to ease review
+* various smaller changes due to Christoffer's review
+* fix compilation for arm
+* remove support for trapping SGI sysreg accesses on arm hosts
+
+Changes v1 ... v2:
+* rebase to v3.17-rc1, caused quite some changes to the init code
+* new 9/15 patch to make 10/15 smaller
+* fix wrongly ordered cp15 register trap entry (MarcZ)
+* fix SGI broadcast (thanks to wanghaibin for spotting)
+* fix broken bailout path in kvm_vgic_create (wanghaibin)
+* check return value of init_emulation_ops() (wanghaibin)
+* fix return value check in vgic_[sg]et_attr()
+* add header inclusion guards
+* remove double definition of VCPU_NOT_ALLOCATED
+* some code move-around
+* whitespace fixes
+
+Andre Przywara (19):
+  arm/arm64: KVM: rework MPIDR assignment and add accessors
+  arm/arm64: KVM: pass down user space provided GIC type into vGIC code
+  arm/arm64: KVM: refactor vgic_handle_mmio() function
+  arm/arm64: KVM: wrap 64 bit MMIO accesses with two 32 bit ones
+  arm/arm64: KVM: introduce per-VM ops
+  arm/arm64: KVM: move kvm_register_device_ops() into vGIC probing
+  arm/arm64: KVM: dont rely on a valid GICH base address
+  arm/arm64: KVM: make the maximum number of vCPUs a per-VM value
+  arm/arm64: KVM: make the value of ICC_SRE_EL1 a per-VM variable
+  arm/arm64: KVM: refactor MMIO accessors
+  arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
+  arm/arm64: KVM: add vgic.h header file
+  arm/arm64: KVM: split GICv2 specific emulation code from vgic.c
+  arm/arm64: KVM: add opaque private pointer to MMIO data
+  arm/arm64: KVM: add virtual GICv3 distributor emulation
+  arm64: GICv3: introduce symbolic names for GICv3 ICC_SGI1R_EL1 fields
+  arm64: KVM: add SGI generation register emulation
+  arm/arm64: KVM: enable kernel side of GICv3 emulation
+  arm/arm64: KVM: allow userland to request a virtual GICv3
+
+ Documentation/virtual/kvm/devices/arm-vgic.txt |   22 +-
+ arch/arm/include/asm/kvm_emulate.h             |    5 +-
+ arch/arm/include/asm/kvm_host.h                |    3 +
+ arch/arm/include/asm/kvm_mmio.h                |    1 +
+ arch/arm/kvm/Makefile                          |    1 +
+ arch/arm/kvm/arm.c                             |   23 +-
+ arch/arm/kvm/psci.c                            |   17 +-
+ arch/arm64/include/asm/kvm_emulate.h           |    5 +-
+ arch/arm64/include/asm/kvm_host.h              |    5 +
+ arch/arm64/include/asm/kvm_mmio.h              |    1 +
+ arch/arm64/include/uapi/asm/kvm.h              |    7 +
+ arch/arm64/kernel/asm-offsets.c                |    1 +
+ arch/arm64/kvm/Makefile                        |    2 +
+ arch/arm64/kvm/sys_regs.c                      |   39 +-
+ arch/arm64/kvm/vgic-v3-switch.S                |   14 +-
+ drivers/irqchip/irq-gic-v3.c                   |   14 +-
+ include/kvm/arm_vgic.h                         |   41 +-
+ include/linux/irqchip/arm-gic-v3.h             |   44 +
+ include/linux/kvm_host.h                       |    2 +
+ include/uapi/linux/kvm.h                       |    2 +
+ virt/kvm/arm/vgic-v2-emul.c                    |  811 ++++++++++++++++++
+ virt/kvm/arm/vgic-v2.c                         |    3 +
+ virt/kvm/arm/vgic-v3-emul.c                    | 1013 ++++++++++++++++++++++
+ virt/kvm/arm/vgic-v3.c                         |   90 +-
+ virt/kvm/arm/vgic.c                            | 1070 ++++++------------------
+ virt/kvm/arm/vgic.h                            |  122 +++
+ 26 files changed, 2485 insertions(+), 873 deletions(-)
+ create mode 100644 virt/kvm/arm/vgic-v2-emul.c
+ create mode 100644 virt/kvm/arm/vgic-v3-emul.c
+ create mode 100644 virt/kvm/arm/vgic.h
+
 -- 
 1.7.9.5
