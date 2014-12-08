@@ -1,40 +1,39 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Mon, 8 Dec 2014 14:53:39 +0100
-Subject: [STLinux Kernel] [PATCH v3 0/4] spi: st: New driver for ST's
- SPI Controller
-In-Reply-To: <11694915.sCOqLZA7N1@wuerfel>
-References: <1418043214-14324-1-git-send-email-lee.jones@linaro.org>
- <11694915.sCOqLZA7N1@wuerfel>
-Message-ID: <5485AD63.6090308@st.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 8 Dec 2014 07:54:08 -0600
+Subject: regression: OMAP4 (next-20141204) (bisect to: ARM: 8208/1: l2c:
+ Refactor the driver to use commit-like)
+In-Reply-To: <20141208122235.GC11502@n2100.arm.linux.org.uk>
+References: <5481D913.9040109@ti.com> <5481D9BF.2090007@ti.com>
+ <20141205162312.GB11502@n2100.arm.linux.org.uk>
+ <CA+Ln22EFKRm_9HPaVvL7zFdmmB5Zz5RnJKbZkESVOBOLPvUnGA@mail.gmail.com>
+ <20141208122235.GC11502@n2100.arm.linux.org.uk>
+Message-ID: <5485AD80.1050008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 12/08/2014 02:22 PM, Arnd Bergmann wrote:
-> On Monday 08 December 2014 12:53:30 Lee Jones wrote:
->> This is a new driver which controls the SPI component of ST's
->> Synchronous Serial Controller (SSC).
+On 12/08/2014 06:22 AM, Russell King - ARM Linux wrote:
+> On Mon, Dec 08, 2014 at 08:54:18PM +0900, Tomasz Figa wrote:
+>> 2014-12-06 1:23 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>>> Given where we are in the cycle (-final likely this weekend) the only
+>>> thing we can do right now is to drop the patch set; exynos (and mvebu)
+>>> will have to wait another cycle until this patch set (hopefully in a
+>>> revised form) can be merged.
 >>
-> How does this related to the i2c driver for drivers/i2c/busses/i2c-st.c?
-> Could you have the same piece of hardware do one or the other mode
-> depending on pin configuration, or is each instance hardwired to
-> a particular mode?
-This is the same IP, that can be configured either in SPI or I2C.
+>> Or a fix could be queued on top of this. Since (I believe) this series
+>> has been queued for 3.19, we have 6 or 7 RC releases ahead, which
+>> could be used for the purpose of fixing things (as they are supposed
+>> to?).
+> 
+> They were merged on 27th November, so they would've been in linux-next
+> from about last Monday.  Nishanth reported a failure on Friday, the
 
->
-> Is there any code worth sharing between the two drivers?
-No, except a couple of registers, they are managed in a ways.
+For what ever it is worth, the l2c changes actually appeared on
+Thursday CST (next-20141204). Found the regression against
+next-20141203 tag and it took me a day to track it down (after looking
+at a few other regressions as well)..
 
-The way it is used, a single SSC instance can only be used either in SPI 
-or I2C mode on a board,
-so I think it wouldn't make sense to create a MFD driver to manage it.
+Anyways...
 
-Kr,
-Maxime
->
-> 	Arnd
->
-> _______________________________________________
-> Kernel mailing list
-> Kernel at stlinux.com
-> http://www.stlinux.com/mailman/listinfo/kernel
+-- 
+Regards,
+Nishanth Menon
