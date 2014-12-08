@@ -1,65 +1,66 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Mon, 8 Dec 2014 09:48:07 +0800
-Subject: [PATCH v8 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <2619239.NTtdNaZCJM@wuerfel>
-References: <1397869980-21187-1-git-send-email-zhangfei.gao@linaro.org>
- <5483C977.2060308@huawei.com> <54842298.2010007@suse.de>
- <2619239.NTtdNaZCJM@wuerfel>
-Message-ID: <54850357.802@huawei.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Sun, 7 Dec 2014 17:59:57 -0800
+Subject: [PATCH 2/5] gpio: Cygnus: add GPIO driver
+In-Reply-To: <5482668F.1040907@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>	
+ <1417826408-1600-1-git-send-email-rjui@broadcom.com>	
+ <1417826408-1600-3-git-send-email-rjui@broadcom.com>
+ <1417829282.31745.3.camel@perches.com> <5482668F.1040907@broadcom.com>
+Message-ID: <5485061D.1060302@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/12/8 4:09, Arnd Bergmann wrote:
-> On Sunday 07 December 2014 10:49:12 Alexander Graf wrote:
->> On 07.12.14 04:28, Ding Tianhong wrote:
->>> On 2014/12/7 8:42, Alexander Graf wrote:
->>>> On 19.04.14 03:13, Zhangfei Gao wrote:
->>>>> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
->>>>> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
->>>>>
->>>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->>>>
->>>> Is this driver still supposed to go upstream? I presume this was the
->>>> last submission and it's been quite some time ago 
->>>>
->>>
->>> yes, it is really a long time, but The hip04 did not support tx irq, 
->>> we couldn't get any better idea to fix this defect, do you have any suggestion?
+
+
+On 12/5/2014 6:14 PM, Ray Jui wrote:
+>>> +static struct irq_chip bcm_cygnus_gpio_irq_chip = {
+>>> +    .name = "bcm-cygnus-gpio",
+>>> +    .irq_ack = bcm_cygnus_gpio_irq_ack,
+>>> +    .irq_mask = bcm_cygnus_gpio_irq_mask,
+>>> +    .irq_unmask = bcm_cygnus_gpio_irq_unmask,
+>>> +    .irq_set_type = bcm_cygnus_gpio_irq_set_type,
+>>> +};
 >>
->> Well, if hardware doesn't have a TX irq I don't see there's anything we
->> can do to fix that ;).
-> 
-> I don't know if it's related to the ethernet on hip01, but I would assume
-> it is, and that platform is currently being submitted for inclusion, so
-> I'd definitely hope to see this driver get merged too eventually.
-> 
-> IIRC, the last revision of the patch set had basically fixed the problem,
-> except for a race that would still allow the napi poll function to exit
-> with poll_complete() but a full queue of TX descriptors and no fallback
-> to clean them up. There was also still an open question about whether or
-> not the driver should use skb_orphan, but I may be misremembering that part.
->  
->> Dave, what's your take here? Should we keep a driver from going upstream
->> just because the hardware is partly broken? I'd really prefer to have an
->> upstream driver on that SoC rather than some random (eventually even
->> more broken) downstream code.
-> 
-> We can certainly have a slow driver for this hardware, and I'd much
-> prefer slow over broken. I'd guess that some of the performance impact
-> of the missing interrupts can now be offset with the xmit_more	 logic.
-> 
-> 	Arnd
+>> const?
+>>
+>
+>
+> Sure, will add const to bcm_cygnus_gpio_irq_chip
+>
+>>> +static struct irq_domain_ops bcm_cygnus_irq_ops = {
+>>> +    .map = bcm_cygnus_gpio_irq_map,
+>>> +    .unmap = bcm_cygnus_gpio_irq_unmap,
+>>> +    .xlate = irq_domain_xlate_twocell,
+>>> +};
+>>
+>> const here too?
+>>
+>
+> Yes, will make bcm_cygnus_irq_ops const.
+>
+Actually, I cannot make them const here. Note they are passed into other 
+APIs which can potentially modifies their values internally.
 
-Ok, if so, I can modify this patch set and send them again base on zhangfei's last version
-just for reviewing.
-
-Regards
-Ding
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
+drivers/gpio/gpio-bcm-cygnus.c: In function ?bcm_cygnus_gpio_irq_map?:
+drivers/gpio/gpio-bcm-cygnus.c:430:4: warning: passing argument 2 of 
+?irq_set_chip_and_handler? discards ?const? qualifier from pointer 
+target type [enabled by default]
+     handle_simple_irq);
+     ^
+In file included from drivers/gpio/gpio-bcm-cygnus.c:17:0:
+include/linux/irq.h:461:20: note: expected ?struct irq_chip *? but 
+argument is of type ?const struct irq_chip *?
+  static inline void irq_set_chip_and_handler(unsigned int irq, struct 
+irq_chip *chip,
+                     ^
+drivers/gpio/gpio-bcm-cygnus.c: In function ?bcm_cygnus_gpio_probe?:
+drivers/gpio/gpio-bcm-cygnus.c:679:5: warning: passing argument 2 of 
+?irq_set_chip_and_handler? discards ?const? qualifier from pointer 
+target type [enabled by default]
+      handle_simple_irq);
+      ^
+In file included from drivers/gpio/gpio-bcm-cygnus.c:17:0:
+include/linux/irq.h:461:20: note: expected ?struct irq_chip *? but 
+argument is of type ?const struct irq_chip *?
+  static inline void irq_set_chip_and_handler(unsigned int irq, struct 
+irq_chip *chip,
