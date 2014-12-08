@@ -1,22 +1,17 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Dec 2014 14:22:11 +0100
-Subject: [PATCH v3 0/4] spi: st: New driver for ST's SPI Controller
-In-Reply-To: <1418043214-14324-1-git-send-email-lee.jones@linaro.org>
-References: <1418043214-14324-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <11694915.sCOqLZA7N1@wuerfel>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Dec 2014 18:44:12 +0530
+Subject: [PATCH] dmaengine: fsl-edma: fix calculation of remaining bytes
+In-Reply-To: <1415879762-12177-1-git-send-email-stefan@agner.ch>
+References: <1415879762-12177-1-git-send-email-stefan@agner.ch>
+Message-ID: <20141208131412.GL16827@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 December 2014 12:53:30 Lee Jones wrote:
-> This is a new driver which controls the SPI component of ST's
-> Synchronous Serial Controller (SSC).
-> 
+On Thu, Nov 13, 2014 at 12:56:02PM +0100, Stefan Agner wrote:
+> If the current transfer control descriptor (TCD) was not yet started,
+> the address will be the same as the initial address. Hence test if the
+> current address is less than or equal to the start address of each TCD.
+Applied, thanks
 
-How does this related to the i2c driver for drivers/i2c/busses/i2c-st.c?
-Could you have the same piece of hardware do one or the other mode
-depending on pin configuration, or is each instance hardwired to
-a particular mode?
-
-Is there any code worth sharing between the two drivers?
-
-	Arnd
+-- 
+~Vinod
