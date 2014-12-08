@@ -1,39 +1,36 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 8 Dec 2014 21:04:15 +0100
-Subject: [PATCH v3] i2c: rk3x: fix bug that cause measured high_ns
- doesn't meet I2C spec
-In-Reply-To: <CAD=FV=WQypHthEDPGUqVX3kzfFBSdj4H+_QY_=WYA3R77H+WiQ@mail.gmail.com>
-References: <1415261514-4051-1-git-send-email-addy.ke@rock-chips.com>
- <1418007589-3688-1-git-send-email-addy.ke@rock-chips.com>
- <20141208085202.GA13486@pengutronix.de>
- <CAD=FV=V=PDPiDhDmd+j8ePsF43EvuFP-LxKgMKo7ZRBzSMyOJA@mail.gmail.com>
- <20141208173432.GA5732@katana>
- <CAD=FV=WQypHthEDPGUqVX3kzfFBSdj4H+_QY_=WYA3R77H+WiQ@mail.gmail.com>
-Message-ID: <20141208200415.GC13486@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  8 Dec 2014 20:12:21 +0000
+Subject: [PATCH 4/6] PCI/MSI: Let pci_msi_get_domain use struct device's
+ msi_domain
+In-Reply-To: <1418069543-21969-1-git-send-email-marc.zyngier@arm.com>
+References: <1418069543-21969-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1418069543-21969-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Now that we can easily find which MSI domain a PCI device is
+using, use dev_get_msi_domain as a way to retrieve the information.
 
-On Mon, Dec 08, 2014 at 10:53:44AM -0800, Doug Anderson wrote:
-> So just to summarize for Addy, I think you're being asked to spin one more time.
-> 
-> 1. Update the patch description as per Uwe.  Fix other typos pointed out by him.
-> 
-> 2. Since you're spinning anyway, adjust "i2c" capitalization to "I2C".
-> 
-> 3. If you agree with Uwe, rename spec_max_data_hold_ns to
-> spec_data_valid_ns.  If not, we should debate in a followup patch.
-> 
-> 4. If you think spec_data_hold_buffer_ns could be better represented
-> in another way (should this be i2c-sda-falling-time-ns"?), please do
-> so.  If not, we should debate in a followup patch.
-Sounds all reasonable. I'd not address 3 and 4 in this patch, but do
-this in separate one. (That's what I intended from the beginning, just
-failed to point that out explicitly.)
+The original code is still used as a fallback.
 
-Uwe
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/pci/msi.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index fd60806..003040b 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -41,7 +41,8 @@ static struct irq_domain *pci_msi_get_domain(struct pci_dev *dev)
+ {
+ 	struct irq_domain *domain = NULL;
+ 
+-	if (dev->bus->msi)
++	domain = dev_get_msi_domain(&dev->dev);
++	if (!domain && dev->bus->msi)
+ 		domain = dev->bus->msi->domain;
+ 	if (!domain)
+ 		domain = arch_get_pci_msi_domain(dev);
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.1.3
