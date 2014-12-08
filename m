@@ -1,44 +1,36 @@
 From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 08 Dec 2014 10:43:33 +0100
-Subject: [PATCH 1/2] drivers: thermal: Remove ARCH_HAS_BANDGAP dependency
- for samsung
-In-Reply-To: <1417502073-6322-1-git-send-email-a.kesavan@samsung.com>
+Date: Mon, 08 Dec 2014 10:44:12 +0100
+Subject: [PATCH 2/2] ARM: EXYNOS: Remove ARCH_HAS_BANDGAP selection
+In-Reply-To: <1417502073-6322-2-git-send-email-a.kesavan@samsung.com>
 References: <1417502073-6322-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <20141208104333.0e044c58@amdc2363>
+ <1417502073-6322-2-git-send-email-a.kesavan@samsung.com>
+Message-ID: <20141208104412.76c3023d@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Abhilash,
 
-> As samsung thermal support is enabled only for ARCH_EXYNOS, there is
-> no need to select ARCH_HAS_BANDGAP from the arch-specific code.
-> Removing this dependency will also allow the driver to be enabled on
-> 64-bit SoCs.
+> On removing the samsung thermal driver dependency on ARCH_HAS_BANDGAP,
+> selection of this symbol becomes redundant.
 > 
 > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 > ---
-> This was based on the discussion regarding adding ARCH_HAS_BANDGAP
-> symbol for arm64 here:
-> http://www.spinics.net/lists/arm-kernel/msg377560.html
+>  arch/arm/mach-exynos/Kconfig |    1 -
+>  1 file changed, 1 deletion(-)
 > 
->  drivers/thermal/samsung/Kconfig |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/thermal/samsung/Kconfig
-> b/drivers/thermal/samsung/Kconfig index f760389..c43306e 100644
-> --- a/drivers/thermal/samsung/Kconfig
-> +++ b/drivers/thermal/samsung/Kconfig
-> @@ -1,6 +1,6 @@
->  config EXYNOS_THERMAL
->  	tristate "Exynos thermal management unit driver"
-> -	depends on ARCH_HAS_BANDGAP && OF
-> +	depends on OF
->  	help
->  	  If you say yes here you get support for the TMU (Thermal
-> Management Unit) driver for SAMSUNG EXYNOS series of SoCs. This
-> driver initialises
+> diff --git a/arch/arm/mach-exynos/Kconfig
+> b/arch/arm/mach-exynos/Kconfig index e4a00ba..6ddfce7 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -9,7 +9,6 @@
+>  
+>  menuconfig ARCH_EXYNOS
+>  	bool "Samsung EXYNOS" if ARCH_MULTI_V7
+> -	select ARCH_HAS_BANDGAP
+>  	select ARCH_HAS_HOLES_MEMORYMODEL
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select ARM_AMBA
 
-Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
 Acked-by: Lukasz Majewski <l.majewski@samsung.com>
 
 -- 
