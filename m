@@ -1,35 +1,36 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 8 Dec 2014 12:41:59 -0800
-Subject: [PATCH v4 5/5] MAINTAINERS: Entry for Cygnus GPIO driver
-In-Reply-To: <1418071319-11779-1-git-send-email-rjui@broadcom.com>
-References: <Ray Jui <rjui@broadcom.com>
- <1418071319-11779-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1418071319-11779-6-git-send-email-rjui@broadcom.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 8 Dec 2014 21:47:35 +0100
+Subject: nokia_h4p on 3.16+
+Message-ID: <20141208204735.GA21599@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
----
- MAINTAINERS |    7 +++++++
- 1 file changed, 7 insertions(+)
+Hi!
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index e6bff3a..8473422 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2202,6 +2202,13 @@ N:	bcm9583*
- N:	bcm583*
- N:	bcm113*
- 
-+BROADCOM CYGNUS GPIO DRIVER
-+M:	Ray Jui <rjui@broadcom.com>
-+L:	bcm-kernel-feedback-list at broadcom.com
-+S:	Supported
-+F:	drivers/gpio/gpio-bcm-cygnus.c
-+F:	Documentation/devicetree/bindings/gpio/brcm,cygnus-gpio.txt
-+
- BROADCOM KONA GPIO DRIVER
- M:	Ray Jui <rjui@broadcom.com>
- L:	bcm-kernel-feedback-list at broadcom.com
+It seems commit:
+
+commit bd5dc09f557547399cd44d0a1224df7ff64e4a6b
+Author: Felipe Balbi <balbi@ti.com>
+Date:   Wed Apr 23 09:58:28 2014 -0500
+
+    serial: fix UART_IIR_ID
+
+    UART IRQ Identification bitfield is 3
+        bits long (bits 3:1) but current mask only
+	    masks 2 bits. Fix it.
+
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+breaks bluetooth driver on n900. (drivers/staging/nokia_h4p).
+
+Pali, you may want to revert the patch.
+
+That is good news, because reverting it on 3.18-rcX brings h4p back,
+too (and as machine boots on nfsroot, debugging should be possible.)
+
+Best regards,
+									Pavel
 -- 
-1.7.9.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
