@@ -1,33 +1,85 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Mon, 8 Dec 2014 08:11:48 +0100 (CET)
-Subject: [PATCH 1/20] mtd: s3c2410: fix misspelling of current function
- in string
-In-Reply-To: <CAFLxGvyiqxQ6U6p-A-JW8Nv8OvXFGsna93afUu-Gek0EV3gATA@mail.gmail.com>
-References: <1417980062-25151-1-git-send-email-Julia.Lawall@lip6.fr>
- <1417980062-25151-2-git-send-email-Julia.Lawall@lip6.fr>
- <CAFLxGvyiqxQ6U6p-A-JW8Nv8OvXFGsna93afUu-Gek0EV3gATA@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1412080809400.2100@localhost6.localdomain6>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Mon, 08 Dec 2014 08:13:54 +0100
+Subject: [PATCH 6/6] pci, acpi: Share ACPI PCI config space accessors.
+In-Reply-To: <2178540.dTppAIY2rE@wuerfel>
+References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+ <3957412.IooRKpIXjW@wuerfel> <20141121180825.GD6578@google.com>
+ <2178540.dTppAIY2rE@wuerfel>
+Message-ID: <54854FB2.8080206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-> > index 35aef5e..0a9c41f 100644
-> > --- a/drivers/mtd/nand/s3c2410.c
-> > +++ b/drivers/mtd/nand/s3c2410.c
-> > @@ -948,7 +948,7 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
-> >
-> >         cpu_type = platform_get_device_id(pdev)->driver_data;
-> >
-> > -       pr_debug("s3c2410_nand_probe(%p)\n", pdev);
-> > +       pr_debug("%s(%p)\n", __func__, pdev);
-> 
-> I think we can drop the line completely.
-> We have ftrace to trace function calls...
+W dniu 24.11.2014 o 11:41, Arnd Bergmann pisze:
+> On Friday 21 November 2014 11:08:25 Bjorn Helgaas wrote:
+>> On Fri, Nov 21, 2014 at 01:24:52PM +0100, Arnd Bergmann wrote:
+>>> On Thursday 20 November 2014 21:00:17 Myron Stowe wrote:
+>>>> On Thu, Nov 20, 2014 at 3:26 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>>
+>>>>> That's interesting.  I would have said exactly the opposite -- I think the
+>>>>> extra Kconfiggery is harder to follow than weak/strong functions
+>>>>>
+>>>>> But consistency is better than my personal opinion.  Is there a consensus
+>>>>> that we should use the Kconfig strategy instead of __weak?
+>>>>
+>>>> I too find weak/strong functions easier to follow than "Kconfiggery" (nice term
+>>>> invention there).
+>>>
+>>> I don't think there is a universal consensus, but the majority of
+>>> maintainers seems to avoid them for the same reasons that I think
+>>> __weak is problematic.
+>>>
+>>> We have some uses of __weak in the core kernel, but there is
+>>> basically none in drivers outside of PCI, and the most common
+>>> uses are all providing an empty __weak function that can be
+>>> overridden with a function that actually does something, unlike
+>>> the code above.
+>>
+>> One thing I like better about __weak (when used correctly) is that you have
+>> exactly one declaration, and the role of each definition (weak default
+>> implementation or strong override) is obvious from looking at it.
+>
+> Right.
+>
+>> In your #ifdef example, the extern declaration and the inline definition
+>> are never compiled together, so you have to repeat the signature and the
+>> compiler doesn't enforce that they match.  So you end up with the extern
+>> and the inline in one file, a #define in an arch header file or Kconfig,
+>> and an arch definition in a third file.
+>>
+>> But it's certainly true that everybody knows how #ifdef works, and the fact
+>> that __weak on a declaration affects all in-scope definitions is definitely
+>> a land mine (multiple weak definitions with no strong one is a disaster).
+>>
+>>> My pragmatic approach so far has been to advocate __weak for
+>>> drivers/pci patches but discourage it elsewhere when I review
+>>> patches, in order to maintain consistency. I also think it
+>>> would be nice to change the way that PCI handles architecture
+>>> specific overrides in the process of unifying the host bridge
+>>> handling.
+>>>
+>>> I wouldn't use Kconfig symbols in most cases though. My preferred
+>>> choice would be to turn a lot of the __weak symbols into function
+>>> pointers within a per-hostbridge structure. As an example, we could
+>>> replace pcibios_add_device() with a pointer in pci_host_bridge->ops
+>>> that gets set by all the architectures and host drivers that currently
+>>> override it, and replace the one caller with
+>>>
+>>> 	if (pci_host_bridge->ops->add_device)
+>>> 		pci_host_bridge->ops->add_device(dev);
+>>
+>> I definitely agree with this part, but I think it's orthogonal to the
+>> __weak question.  In this case, we'd like to support multiple host bridges,
+>> each with a different flavor of add_device().  We can't do that at all with
+>> either __weak or #ifdef.
+>
+> What we currently have though is a a __weak definition of add_device,
+> which some architectures override, and some of them (ARM in particular)
+> by implementing their own abstraction. I suspect for the majority of
+> what we currently define as __weak functions, we could use a similar
+> approach and kill off the global symbols entirely.
 
-Should the "initialised ok" at the end of the function be remove as well?
+What would be next steps regarding this patch set? I am not sure we have 
+reached a consensus on weak vs #ifdef choice.
 
-Will it be confusing if this cleanup is done in this function, but not in 
-others where it may be useful?  Perhaps s3c2410_nand_update_chip, for 
-example?
-
-julia
+Regards,
+Tomasz
