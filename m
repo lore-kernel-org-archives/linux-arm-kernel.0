@@ -1,36 +1,32 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Mon, 8 Dec 2014 17:59:46 +0800
-Subject: [PATCH V3] mm:add VM_BUG_ON_PAGE() for page_mapcount()
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E688B313F9@CNBJMBX05.corpusers.net>
-References: <010b01d012ca$05244060$0f6cc120$@alibaba-inc.com>
- <35FD53F367049845BC99AC72306C23D103E688B313F9@CNBJMBX05.corpusers.net>
-Message-ID: <35FD53F367049845BC99AC72306C23D103E688B313FA@CNBJMBX05.corpusers.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 8 Dec 2014 10:10:26 +0000
+Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
+In-Reply-To: <54833BAF.1030405@suse.de>
+References: <1417707993-82290-1-git-send-email-agraf@suse.de>
+ <20141204182049.GB7749@arm.com> <54833BAF.1030405@suse.de>
+Message-ID: <20141208101026.GD27367@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add VM_BUG_ON_PAGE() for slab page,
-because _mapcount is an union with slab struct in struct page,
-avoid access _mapcount if this page is a slab page.
-Also remove the unneeded bracket.
+On Sat, Dec 06, 2014 at 05:23:59PM +0000, Alexander Graf wrote:
+> On 04.12.14 19:20, Will Deacon wrote:
+> > On Thu, Dec 04, 2014 at 03:46:33PM +0000, Alexander Graf wrote:
+> >> With binutils 2.25 the default alignment for 32bit arm sections changed to
+> >> have everything 64k aligned. Armv7 binaries built with this binutils version
+> >> run successfully on an arm64 system.
+> >>
+> >> Since effectively there is now the chance to run armv7 code on arm64 even
+> >> with 64k page size, it doesn't make sense to block people from enabling
+> >> CONFIG_COMPAT on those configurations.
+> > 
+> > Is there a distro available that is built with a recent enough binutils for
+> > this? I'd really like to run our regression tests to check that page-size
+> > assumptions don't exist for things like shm.
+> 
+> So how much of a distro do you need? I could probably assemble a simple
+> very minimalistic rootfs with only bash if that helps.
 
-Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
----
- include/linux/mm.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+I'd like to run LTP, so I'd probably need slightly more than that but I
+certainly don't need the whole world.
 
-diff --git a/include/linux/mm.h b/include/linux/mm.h
-index b464611..a117527 100644
---- a/include/linux/mm.h
-+++ b/include/linux/mm.h
-@@ -449,7 +449,8 @@ static inline void page_mapcount_reset(struct page *page)
- 
- static inline int page_mapcount(struct page *page)
- {
--	return atomic_read(&(page)->_mapcount) + 1;
-+	VM_BUG_ON_PAGE(PageSlab(page), page);
-+	return atomic_read(&page->_mapcount) + 1;
- }
- 
- static inline int page_count(struct page *page)
--- 
-2.1.3
+Will
