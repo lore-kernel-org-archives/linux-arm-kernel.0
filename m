@@ -1,76 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 8 Dec 2014 11:31:19 +0000
-Subject: [alsa-devel] Question on arm64 unaligned faults during playback
-In-Reply-To: <54858868.70708@metafoo.de>
-References: <CAM4voa=kiLsiLEzUbo3D+f1go5px78fXBSjSi7kGK4QCdnwPyQ@mail.gmail.com>
- <54856621.8090107@ladisch.de> <s5hppbumnis.wl-tiwai@suse.de>
- <54858868.70708@metafoo.de>
-Message-ID: <20141208113119.GL27367@arm.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 8 Dec 2014 19:29:03 +0800
+Subject: [PATCH 1/5] media: soc-camera: use icd->control instead of icd->pdev
+ for reset()
+In-Reply-To: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>
+References: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1418038147-13221-2-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 11:15:52AM +0000, Lars-Peter Clausen wrote:
-> Added ARM64 folks to Cc.
-> 
-> On 12/08/2014 11:41 AM, Takashi Iwai wrote:
-> > At Mon, 08 Dec 2014 09:49:37 +0100,
-> > Clemens Ladisch wrote:
-> >>
-> >> Abhilash Kesavan wrote:
-> >>> I am working on a 64-bit ARM SoC (Samsung's Exynos7) and have observed
-> >>> unaligned faults while testing certain sound streams with aplay.
-> >>>
-> >>> [   24.535661] snd_pcm_lib_write_transfer:sound/core/pcm_lib.c hwbuf is ffffff8000085624, runtime->dma_area is ffffff8000080000, hwoff is 5513, frames_to_bytes is 22052, frames is 5513
-> >>> [   24.551244] Unhandled fault: alignment fault (0x96000061) at 0xffffff8000085624
-> >>> [   24.579944] PC is at __copy_from_user+0x14/0x60
-> >>> [   24.584450] LR is at snd_pcm_lib_write_transfer+0xe4/0x104
-> >>> [   24.922054] Call trace:
-> >>> [   24.924488] [<ffffffc0002d4784>] __copy_from_user+0x14/0x60
-> >>> [   24.930040] [<ffffffc0004b7574>] snd_pcm_lib_write1+0x1fc/0x384
-> >>>
-> >>> We are using the internal sram available for sound, for DMA buffer
-> >>> allocation, using the generic SRAM driver. From the above log, the
-> >>> buffer address offset is not 8-byte aligned and as we are using the
-> >>> SRAM driver which maps the memory as device memory we are getting an
-> >>> unaligned fault. Is it incorrect to use the generic sram driver for
-> >>> arm64 or am I missing something ?
-> >>
-> >> When you give the ALSA framework a memory buffer, it is assumed that it
-> >> is general-purpose memory, i.e., can be accessed with any alignment.
-> >>
-> >> If your memory does not allow such accesses, you have to do all the
-> >> accesses in your driver, i.e., do everything in the .copy/.silence
-> >> callbacks.  (You also have to add constraints so that periods and buffer
-> >> are correctly aligned.)
-> >
-> > You can set runtime->min_align in the own hw_params callback so that
-> > the PCM core handle it well, at least, for non-mmap mode.
-> >
-> > But this feature has been rarely used (currently no driver sets it
-> > explicitly), so there might be still some bugs there, too :)
-> 
-> As far as I can see min_align only aligns the hardware pointer, but not the 
-> application pointer. The later causes the issue here.
-> 
-> E.g. if a application writes a unaligned amount of bytes the next write will 
-> start at an unaligned buffer address.
-> 
-> How safe is it in general to use IO mapped memory as general purpose memory 
-> on ARM64? Are there maybe even more constraints than just that access has to 
-> be aligned? Maybe the driver should rather use copy_from_user_toio() instead 
-> of copy_from_user() to make sure that things work correctly.
+icd->control is the sub device dev, i.e. i2c device.
+icd->pdev is the soc camera device's device.
 
-If you're simply mapping RAM as device memory, then you need to ensure:
+To be consitent with power() function, we will call reset() with
+icd->control as well.
 
-  - Naturally aligned access
-  - No exclusive instructions (e.g atomics, locks, semaphores ...)
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+ drivers/media/platform/soc_camera/soc_camera.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-Out of interest, why are you using device mappings for memory? By design,
-they prohibit speculation (and, depending on the subtype, re-ordering,
-gathering and early write response) and will be significantly slower than
-normal memory accesses.
-
-Could you use something like ioremap_wc, which will give you normal,
-non-cacheable memory instead?
-
-Will
+diff --git a/drivers/media/platform/soc_camera/soc_camera.c b/drivers/media/platform/soc_camera/soc_camera.c
+index f4be2a1..1a3fcb5 100644
+--- a/drivers/media/platform/soc_camera/soc_camera.c
++++ b/drivers/media/platform/soc_camera/soc_camera.c
+@@ -688,7 +688,7 @@ static int soc_camera_open(struct file *file)
+ 
+ 		/* The camera could have been already on, try to reset */
+ 		if (sdesc->subdev_desc.reset)
+-			sdesc->subdev_desc.reset(icd->pdev);
++			sdesc->subdev_desc.reset(icd->control);
+ 
+ 		ret = soc_camera_add_device(icd);
+ 		if (ret < 0) {
+@@ -1174,8 +1174,10 @@ static void scan_add_host(struct soc_camera_host *ici)
+ 			struct soc_camera_subdev_desc *ssdd = &sdesc->subdev_desc;
+ 
+ 			/* The camera could have been already on, try to reset */
+-			if (ssdd->reset)
+-				ssdd->reset(icd->pdev);
++			if (ssdd->reset) {
++				if (icd->control)
++					ssdd->reset(icd->control);
++			}
+ 
+ 			icd->parent = ici->v4l2_dev.dev;
+ 
+@@ -1461,7 +1463,7 @@ static int soc_camera_async_bound(struct v4l2_async_notifier *notifier,
+ 				memcpy(&sdesc->subdev_desc, ssdd,
+ 				       sizeof(sdesc->subdev_desc));
+ 				if (ssdd->reset)
+-					ssdd->reset(icd->pdev);
++					ssdd->reset(&client->dev);
+ 			}
+ 
+ 			icd->control = &client->dev;
+-- 
+1.9.1
