@@ -1,82 +1,65 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  8 Dec 2014 12:53:33 +0000
-Subject: [PATCH v3 3/4] ARM: sti: Provide DT nodes for SSC[0..4]
+Date: Mon,  8 Dec 2014 12:53:32 +0000
+Subject: [PATCH v3 2/4] spi: st: Provide Device Tree binding documentation
 In-Reply-To: <1418043214-14324-1-git-send-email-lee.jones@linaro.org>
 References: <1418043214-14324-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1418043214-14324-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1418043214-14324-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Synchronous Serial Controller is used to provide SPI.
+This patch adds DT documentation for the SPI portion of ST's SSC device.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih407.dtsi | 54 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+ Documentation/devicetree/bindings/spi/spi-st.txt | 40 ++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-st.txt
 
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-index 50637f5..90bc090 100644
---- a/arch/arm/boot/dts/stih407.dtsi
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -275,5 +275,59 @@
- 
- 			status = "disabled";
- 		};
+diff --git a/Documentation/devicetree/bindings/spi/spi-st.txt b/Documentation/devicetree/bindings/spi/spi-st.txt
+new file mode 100644
+index 0000000..fe54959
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/spi-st.txt
+@@ -0,0 +1,40 @@
++STMicroelectronics SSC (SPI) Controller
++---------------------------------------
 +
-+		spi at 9840000 {
-+			compatible = "st,comms-ssc4-spi";
-+			reg = <0x9840000 0x110>;
-+			interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
-+			clock-names = "ssc";
-+			pinctrl-0 = <&pinctrl_spi0_default>;
-+			pinctrl-names = "default";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++Required properties:
++- compatible	: "st,comms-ssc4-spi"
++- reg		: Offset and length of the device's register set
++- interrupts	: The interrupt specifier
++- clock-names	: Must contain "ssc"
++- clocks	: Must contain an entry for each name in clock-names
++		    See ../clk/*
++- pinctrl-names	: Uses "default", can use "sleep" if provided
++		    See ../pinctrl/pinctrl-binding.txt
 +
-+			status = "disabled";
++Optional properties:
++- cs-gpios	: List of GPIO chip selects
++		    See ../spi/spi-bus.txt
++
++Child nodes represent devices on the SPI bus
++  See ../spi/spi-bus.txt
++
++Example:
++	spi at 9840000 {
++		compatible	= "st,comms-ssc4-spi";
++		reg		= <0x9840000 0x110>;
++		interrupts	= <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
++		clocks		= <&clk_s_c0_flexgen CLK_EXT2F_A9>;
++		clock-names	= "ssc";
++		pinctrl-0	= <&pinctrl_spi0_default>;
++		pinctrl-names	= "default";
++		cs-gpios	= <&pio17 5 0>;
++		#address-cells	= <1>;
++		#size-cells	= <0>;
++
++		st95hf at 0{
++			compatible		= "st,st95hf";
++			reg			= <0>;
++			spi-max-frequency	= <1000000>;
++			interrupts		= <2 IRQ_TYPE_EDGE_FALLING>;
 +		};
-+
-+		spi at 9841000 {
-+			compatible = "st,comms-ssc4-spi";
-+			reg = <0x9841000 0x110>;
-+			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
-+			clock-names = "ssc";
-+
-+			status = "disabled";
-+		};
-+
-+		spi at 9842000 {
-+			compatible = "st,comms-ssc4-spi";
-+			reg = <0x9842000 0x110>;
-+			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
-+			clock-names = "ssc";
-+
-+			status = "disabled";
-+		};
-+
-+		spi at 9843000 {
-+			compatible = "st,comms-ssc4-spi";
-+			reg = <0x9843000 0x110>;
-+			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
-+			clock-names = "ssc";
-+
-+			status = "disabled";
-+		};
-+
-+		spi at 9844000 {
-+			compatible = "st,comms-ssc4-spi";
-+			reg = <0x9844000 0x110>;
-+			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
-+			clock-names = "ssc";
-+
-+			status = "disabled";
-+		};
- 	};
- };
++	};
 -- 
 1.9.1
