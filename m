@@ -1,47 +1,32 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 8 Dec 2014 12:41:54 -0800
-Subject: [PATCH v4 0/5] Add gpio support to Broadcom Cygnus SoC
-In-Reply-To: <Ray Jui <rjui@broadcom.com>
+Date: Mon, 8 Dec 2014 12:41:57 -0800
+Subject: [PATCH v4 3/5] ARM: mach-bcm: Enable GPIO support for Cygnus
+In-Reply-To: <1418071319-11779-1-git-send-email-rjui@broadcom.com>
 References: <Ray Jui <rjui@broadcom.com>
-Message-ID: <1418071319-11779-1-git-send-email-rjui@broadcom.com>
+ <1418071319-11779-1-git-send-email-rjui@broadcom.com>
+Message-ID: <1418071319-11779-4-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset contains the initial GPIO support for the Broadcom Cygnus SoC.
-Cygnus has 3 GPIO controllers: 1) the ASIU GPIO; 2) the chipCommonG GPIO;
-and 3) the ALWAYS-ON GPIO. All 3 types of GPIO controllers are supported by
-the same Cygnus GPIO driver
+Enable GPIO driver for Broadcom Cygnus SoC by selecting GPIO_BCM_CYGNUS
 
-Changes from v3:
- - Fix dt property tpyo
- - Fix incorrect GPIO compatible ID in device tree binding document example
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
+---
+ arch/arm/mach-bcm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-Changes from v2:
- - Consolidate different compatible IDs into "brcm,cygnus-gpio"
- - Get rid of redundant "no-interrupt" property
-
-Changes from v1:
- - Get rid of inline qualifier
- - Get rid of redundant check in the ISR
- - Other minor fixes to imrove code readability
-
-Ray Jui (5):
-  gpio: Cygnus: define Broadcom Cygnus GPIO binding
-  gpio: Cygnus: add GPIO driver
-  ARM: mach-bcm: Enable GPIO support for Cygnus
-  ARM: dts: enable GPIO for Broadcom Cygnus
-  MAINTAINERS: Entry for Cygnus GPIO driver
-
- .../devicetree/bindings/gpio/brcm,cygnus-gpio.txt  |   82 +++
- MAINTAINERS                                        |    7 +
- arch/arm/boot/dts/bcm-cygnus.dtsi                  |   30 +
- arch/arm/mach-bcm/Kconfig                          |    1 +
- drivers/gpio/Kconfig                               |   11 +
- drivers/gpio/Makefile                              |    1 +
- drivers/gpio/gpio-bcm-cygnus.c                     |  705 ++++++++++++++++++++
- 7 files changed, 837 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/brcm,cygnus-gpio.txt
- create mode 100644 drivers/gpio/gpio-bcm-cygnus.c
-
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index aaeec78..5066d5d 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -29,6 +29,7 @@ config ARCH_BCM_IPROC
+ config ARCH_BCM_CYGNUS
+ 	bool "Broadcom Cygnus Support" if ARCH_MULTI_V7
+ 	select ARCH_BCM_IPROC
++	select GPIO_BCM_CYGNUS
+ 	help
+ 	  Enable support for the Cygnus family,
+ 	  which includes the following variants:
 -- 
 1.7.9.5
