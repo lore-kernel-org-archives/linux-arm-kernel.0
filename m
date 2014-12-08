@@ -1,194 +1,68 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 08 Dec 2014 20:39:05 +0200
-Subject: [PATCH 3/5] media: ov2640: add primary dt support
-In-Reply-To: <1418038147-13221-4-git-send-email-josh.wu@atmel.com>
-References: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>
- <1418038147-13221-4-git-send-email-josh.wu@atmel.com>
-Message-ID: <13013762.Jqm1jQRnFM@avalon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 8 Dec 2014 19:38:53 +0100
+Subject: [PATCH v5 00/61] dmaengine: Implement generic slave capabilities
+ retrieval
+In-Reply-To: <20141208162843.GP16827@intel.com>
+References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141208061746.GD16827@intel.com> <20141208141807.GC8739@lukather>
+ <20141208162843.GP16827@intel.com>
+Message-ID: <20141208183853.GG8739@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+On Mon, Dec 08, 2014 at 09:58:43PM +0530, Vinod Koul wrote:
+> > > So bit sceptical for merging now. I will send the patches which I have
+> > > applied on top of this
+> > 
+> > Which is why I wanted to merge this at the *beginning* of the
+> > development cycle in the first place....
+> > 
+> > These patches have been sent more than 2 weeks ago, and were exactly
+> > the same as the ones send at the end of October, rebased and updated
+> > to take into account the drivers that were merged in between.
+> > 
+> > In short, these patches have been hanging around since 6 weeks. I
+> > relied probably too much on the intel's build bot. This is not a
+> > mistake I'll repeat. But blaming it on me because they came too late
+> > is *very* unfair.
+>
+> as a first step one is expected to compile the patches we send. That is very
+> basic stuff which should not be avoided.
 
-Thank you for the patch.
+Indeed. My mistake, it won't happen again.
 
-On Monday 08 December 2014 19:29:05 Josh Wu wrote:
-> Add device tree support for ov2640.
-> 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
-> v1 -> v2:
->   1. use gpiod APIs.
->   2. change the gpio pin's name according to datasheet.
->   3. reduce the delay for .reset() function.
-> 
->  drivers/media/i2c/soc_camera/ov2640.c | 86 +++++++++++++++++++++++++++++---
->  1 file changed, 80 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
-> b/drivers/media/i2c/soc_camera/ov2640.c index 9ee910d..2a57979 100644
-> --- a/drivers/media/i2c/soc_camera/ov2640.c
-> +++ b/drivers/media/i2c/soc_camera/ov2640.c
-> @@ -18,6 +18,8 @@
->  #include <linux/i2c.h>
->  #include <linux/slab.h>
->  #include <linux/delay.h>
-> +#include <linux/gpio.h>
-> +#include <linux/of_gpio.h>
->  #include <linux/v4l2-mediabus.h>
->  #include <linux/videodev2.h>
-> 
-> @@ -283,6 +285,10 @@ struct ov2640_priv {
->  	u32	cfmt_code;
->  	struct v4l2_clk			*clk;
->  	const struct ov2640_win_size	*win;
-> +
-> +	struct soc_camera_subdev_desc	ssdd_dt;
-> +	struct gpio_desc *resetb_gpio;
-> +	struct gpio_desc *pwdn_gpio;
->  };
-> 
->  /*
-> @@ -1047,6 +1053,61 @@ static struct v4l2_subdev_ops ov2640_subdev_ops = {
->  	.video	= &ov2640_subdev_video_ops,
->  };
-> 
-> +/* OF probe functions */
-> +static int ov2640_hw_power(struct device *dev, int on)
-> +{
-> +	struct i2c_client *client = to_i2c_client(dev);
-> +	struct ov2640_priv *priv = to_ov2640(client);
-> +
-> +	dev_dbg(&client->dev, "%s: %s the camera\n",
-> +			__func__, on ? "ENABLE" : "DISABLE");
-> +
-> +	if (priv->pwdn_gpio && !IS_ERR(priv->pwdn_gpio))
+> given that we had build failures on v5 rev of the series and serious
+> failures flagged off by compilers doesn't inspire a lot of
+> confidence.
 
-No need to test for IS_ERR, as the probe function would have failed in that 
-case.
+v5 that you never reviewed, just like the v4, v3 and v2 before it.
 
-> +		gpiod_direction_output(priv->pwdn_gpio, !on);
-> +
-> +	return 0;
-> +}
-> +
-> +static int ov2640_hw_reset(struct device *dev)
-> +{
-> +	struct i2c_client *client = to_i2c_client(dev);
-> +	struct ov2640_priv *priv = to_ov2640(client);
-> +
-> +	/* If enabled, give a reset impulse */
-> +	if (priv->resetb_gpio && !IS_ERR(priv->resetb_gpio)) {
+> And lastly noone blamed you for being late, if things were rosy they
+> would have been merged over the weekend and been in today's next,
+> but...
 
-Same here.
+I totally understand your point. And I actually am a bit uncomfortable
+merging this so late too, and I'd actually prefer to have it merged
+for 3.20. But this is a huge patchset, and I'd really like to avoid
+rebasing it forever.
 
-> +		gpiod_direction_output(priv->resetb_gpio, 0);
+I'll send a v6, with your patches, as soon as 3.19-rc1 is out. This
+will be my last rebase of this serie. If these patches are not merged
+then, then I will just give up on this cleanup, and probably any
+subsequent ones.
 
-Given that your DT should specify the active low GPIO flag, and that the gpiod 
-API inverts the value in that case, you should set the value to 1 here.
+I'm sorry, but I just don't care enough.
 
-> +		usleep_range(3000, 5000);
-> +		gpiod_direction_output(priv->resetb_gpio, 1);
-
-And to 0 here.
-
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int ov2640_probe_dt(struct i2c_client *client,
-> +		struct ov2640_priv *priv)
-> +{
-> +	priv->resetb_gpio = devm_gpiod_get_optional(&client->dev, "resetb",
-> +			GPIOD_OUT_HIGH);
-> +	if (!priv->resetb_gpio)
-> +		dev_warn(&client->dev, "resetb gpio not found!\n");
-
-No need to warn here, it's perfectly fine if the reset signal isn't connected 
-to a GPIO.
-
-> +	else if (IS_ERR(priv->resetb_gpio))
-> +		return -EINVAL;
-> +
-> +	priv->pwdn_gpio = devm_gpiod_get_optional(&client->dev, "pwdn",
-> +			GPIOD_OUT_HIGH);
-> +	if (!priv->pwdn_gpio)
-> +		dev_warn(&client->dev, "pwdn gpio not found!\n");
-
-Same here.
-
-> +	else if (IS_ERR(priv->pwdn_gpio))
-> +		return -EINVAL;
-> +
-> +	/* Initialize the soc_camera_subdev_desc */
-> +	priv->ssdd_dt.power = ov2640_hw_power;
-> +	priv->ssdd_dt.reset = ov2640_hw_reset;
-> +	client->dev.platform_data = &priv->ssdd_dt;
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * i2c_driver functions
->   */
-> @@ -1058,12 +1119,6 @@ static int ov2640_probe(struct i2c_client *client,
->  	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
->  	int			ret;
-> 
-> -	if (!ssdd) {
-> -		dev_err(&adapter->dev,
-> -			"OV2640: Missing platform_data for driver\n");
-> -		return -EINVAL;
-> -	}
-> -
->  	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
->  		dev_err(&adapter->dev,
->  			"OV2640: I2C-Adapter doesn't support SMBUS\n");
-> @@ -1077,6 +1132,18 @@ static int ov2640_probe(struct i2c_client *client,
->  		return -ENOMEM;
->  	}
-> 
-> +	if (!ssdd) {
-> +		if (client->dev.of_node) {
-> +			ret = ov2640_probe_dt(client, priv);
-> +			if (ret)
-> +				return ret;
-> +		} else {
-> +			dev_err(&client->dev,
-> +				"Missing platform_data for driver\n");
-> +			return  -EINVAL;
-> +		}
-
-I would test for !client->dev.of_node and return the error, you could then get 
-rid of the else and lower the indentation level for the call to 
-ov2640_probe_dt().
-
-> +	}
-> +
->  	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
->  	v4l2_ctrl_handler_init(&priv->hdl, 2);
->  	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
-> @@ -1123,9 +1190,16 @@ static const struct i2c_device_id ov2640_id[] = {
->  };
->  MODULE_DEVICE_TABLE(i2c, ov2640_id);
-> 
-> +static const struct of_device_id ov2640_of_match[] = {
-> +	{.compatible = "ovti,ov2640", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, ov2640_of_match);
-> +
->  static struct i2c_driver ov2640_i2c_driver = {
->  	.driver = {
->  		.name = "ov2640",
-> +		.of_match_table = of_match_ptr(ov2640_of_match),
->  	},
->  	.probe    = ov2640_probe,
->  	.remove   = ov2640_remove,
+Maxime.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141208/cc8866b3/attachment.sig>
