@@ -1,246 +1,63 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 8 Dec 2014 13:49:36 +0000
-Subject: [RFC PATCH] hw/arm/virt: Add support for NUMA on ARM64
-In-Reply-To: <1417524986-9196-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1417524986-9196-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <CAFEAcA85pW2J1JjjxxKGeN3fC-u4ZJ7PLYPiX3jWMjtdOfamsA@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 8 Dec 2014 13:52:23 +0000
+Subject: [STLinux Kernel] [PATCH v2 RESEND 02/11] mtd: st_spi_fsm: Obtain
+ and use EMI clock if provided
+In-Reply-To: <1417688512-7644-3-git-send-email-lee.jones@linaro.org>
+References: <1417688512-7644-1-git-send-email-lee.jones@linaro.org>
+ <1417688512-7644-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20141208135223.GB29220@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 December 2014 at 12:56, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> Add support for NUMA on ARM64. Tested successfully running a guest
-> Linux kernel with the following patch applied:
+Hi Lee,
 
-I'm still hoping for review from somebody who better understands
-how QEMU and NUMA should interact, but in the meantime some comments
-at a code level:
+On Thu, 04 Dec 2014, Lee Jones wrote:
 
->  hw/arm/boot.c |   25 ------------
->  hw/arm/virt.c |  120 +++++++++++++++++++++++++++++++++++++++++++++++++++++---
->  2 files changed, 113 insertions(+), 32 deletions(-)
->
-> diff --git a/hw/arm/boot.c b/hw/arm/boot.c
-> index 0014c34..c20fee4 100644
-> --- a/hw/arm/boot.c
-> +++ b/hw/arm/boot.c
-> @@ -335,7 +335,6 @@ static int load_dtb(hwaddr addr, const struct arm_boot_info *binfo,
->  {
->      void *fdt = NULL;
->      int size, rc;
-> -    uint32_t acells, scells;
->
->      if (binfo->dtb_filename) {
->          char *filename;
-> @@ -369,30 +368,6 @@ static int load_dtb(hwaddr addr, const struct arm_boot_info *binfo,
->          return 0;
->      }
->
-> -    acells = qemu_fdt_getprop_cell(fdt, "/", "#address-cells");
-> -    scells = qemu_fdt_getprop_cell(fdt, "/", "#size-cells");
-> -    if (acells == 0 || scells == 0) {
-> -        fprintf(stderr, "dtb file invalid (#address-cells or #size-cells 0)\n");
-> -        goto fail;
-> -    }
-> -
-> -    if (scells < 2 && binfo->ram_size >= (1ULL << 32)) {
-> -        /* This is user error so deserves a friendlier error message
-> -         * than the failure of setprop_sized_cells would provide
-> -         */
-> -        fprintf(stderr, "qemu: dtb file not compatible with "
-> -                "RAM size > 4GB\n");
-> -        goto fail;
-> -    }
-> -
-> -    rc = qemu_fdt_setprop_sized_cells(fdt, "/memory", "reg",
-> -                                      acells, binfo->loader_start,
-> -                                      scells, binfo->ram_size);
-> -    if (rc < 0) {
-> -        fprintf(stderr, "couldn't set /memory/reg\n");
-> -        goto fail;
-> -    }
-> -
+> ST's Common Clk Framework is now available. This patch ensures the FSM
+> makes use of it by obtaining and enabling the EMI clock if provided. If
+> system fails to provide the EMI clock FSM uses its original default
+> rate.
 
-This patchset seems to be moving the initialization of a lot of
-the dtb from this generic code into the virt board. That doesn't
-seem right to me -- why would NUMA support be specific to the
-virt board? I would expect support for this to be in the generic
-code (possibly controlled with a board option for "I support NUMA").
-As it is your patch will break support for every other
-board that uses device trees, because they rely on this code
-which you've deleted here.
+<snip>
 
->      if (binfo->kernel_cmdline && *binfo->kernel_cmdline) {
->          rc = qemu_fdt_setprop_string(fdt, "/chosen", "bootargs",
->                                       binfo->kernel_cmdline);
-> diff --git a/hw/arm/virt.c b/hw/arm/virt.c
-> index 78f618d..9d18a91 100644
-> --- a/hw/arm/virt.c
-> +++ b/hw/arm/virt.c
-> @@ -170,8 +170,6 @@ static void create_fdt(VirtBoardInfo *vbi)
->       * to fill in necessary properties later
->       */
->      qemu_fdt_add_subnode(fdt, "/chosen");
-> -    qemu_fdt_add_subnode(fdt, "/memory");
-> -    qemu_fdt_setprop_string(fdt, "/memory", "device_type", "memory");
->
->      /* Clock node, for the benefit of the UART. The kernel device tree
->       * binding documentation claims the PL011 node clock properties are
-> @@ -235,6 +233,116 @@ static void fdt_add_psci_node(const VirtBoardInfo *vbi)
->      qemu_fdt_setprop_cell(fdt, "/psci", "migrate", migrate_fn);
->  }
->
-> +static int virt_memory_init(MachineState *machine,
-> +                            MemoryRegion *system_memory,
-> +                            const VirtBoardInfo *vbi)
-> +{
-> +    MemoryRegion *ram = g_new(MemoryRegion, 1);
-> +    CPUState *cpu;
-> +    int min_cpu = 0, max_cpu = 0;
-> +    int i, j, count, len;
-> +    uint32_t acells, scells;
-> +
-> +    acells = qemu_fdt_getprop_cell(vbi->fdt, "/", "#address-cells");
-> +    scells = qemu_fdt_getprop_cell(vbi->fdt, "/", "#size-cells");
-> +    if (acells == 0 || scells == 0) {
-> +        fprintf(stderr, "dtb file invalid (#address-cells or #size-cells 0)\n");
-> +        goto fail;
-> +    }
-> +
-> +    if (scells < 2 && machine->ram_size >= (1ULL << 32)) {
-> +        /* This is user error so deserves a friendlier error message
-> +         * than the failure of setprop_sized_cells would provide
-> +         */
-> +        fprintf(stderr, "qemu: dtb file not compatible with "
-> +                "RAM size > 4GB\n");
-> +        goto fail;
-> +    }
-> +
-> +    memory_region_allocate_system_memory(ram, NULL, "mach-virt.ram",
-> +                                         machine->ram_size);
-> +    memory_region_add_subregion(system_memory, vbi->memmap[VIRT_MEM].base, ram);
-> +
-> +    hwaddr mem_base = vbi->memmap[VIRT_MEM].base;
-> +
-> +    if (!nb_numa_nodes) {
-> +        qemu_fdt_add_subnode(vbi->fdt, "/memory");
-> +        qemu_fdt_setprop_string(vbi->fdt, "/memory", "device_type", "memory");
-> +        qemu_fdt_setprop_sized_cells(vbi->fdt, "/memory", "reg",
-> +                                      acells, mem_base,
-> +                                      scells, machine->ram_size);
-> +        return 0;
-> +    }
-> +
-> +    qemu_fdt_add_subnode(vbi->fdt, "/numa-map");
-> +    qemu_fdt_setprop_cell(vbi->fdt, "/numa-map", "#address-cells", 0x2);
-> +    qemu_fdt_setprop_cell(vbi->fdt, "/numa-map", "#size-cells", 0x1);
-> +    qemu_fdt_setprop_cell(vbi->fdt, "/numa-map", "#node-count", 0x2);
-> +
-> +    uint64_t *mem_map = g_malloc0(nb_numa_nodes * sizeof(uint64_t) * 6);
-> +    uint64_t *cpu_map = g_malloc0(nb_numa_nodes * sizeof(uint64_t) * 6);
-> +    uint64_t *node_matrix = g_malloc0(nb_numa_nodes * nb_numa_nodes
-> +                                      * sizeof(uint64_t) * 6);
+I'm not sure I understand this patch. Now that common clock framework
+is available for STI platforms, why would the emi clock ever not be available?
 
-g_new0() is usually better than g_malloc0(count * sizeof(thing));
+If it is to maintain DT compatability then we are already breaking this with the
+syscfg 'reg' DT changes which are coming up, and this was deemed OK as the platform
+is WIP.
 
-> +
-> +    for (i = 0; i < nb_numa_nodes; i++) {
-> +        uint64_t buffer[6] = {1, 0x00000000, 1, mem_base, 1, i};
-> +        char *nodename;
-> +        nodename = g_strdup_printf("/memory@%" PRIx64, mem_base);
-> +        qemu_fdt_add_subnode(vbi->fdt, nodename);
-> +        qemu_fdt_setprop_string(vbi->fdt, nodename, "device_type", "memory");
-> +        qemu_fdt_setprop_sized_cells(vbi->fdt, nodename, "reg",
-> +                                      acells, mem_base,
-> +                                      scells, numa_info[i].node_mem-1);
-> +        memcpy(mem_map + 6 * i, buffer, 6 * sizeof(*buffer));
+IMO keeping this legacy code which assumes the bootloader / JTAG has enabled and configured
+the emi clock correctly is not worth it now that CCF is available for the platform.
 
-Why do we create a local buffer array and then immediately do nothing
-with it but memcpy() it somewhere else? I suspect this code would
-be clearer if you defined a type (possibly a struct) where you're
-currently using raw uint64_t array[6]. Then you could make your
-mem_map, cpu_map and node_matrix variables have more sensible types
-than raw uint64_t*, and you could just set the right element in them
-using C array syntax rather than these memcpy calls.
+> -	/* TODO: Make this dynamic */
+> -	emi_freq = STFSM_DEFAULT_EMI_FREQ;
+> +	if (!fsm->clk) {
+> +		dev_warn(fsm->dev,
+> +			 "No EMI clock available. Using default 100MHz.\n");
+> +
+> +		emi_freq = STFSM_DEFAULT_EMI_FREQ;
+> +	} else
+> +		emi_freq = clk_get_rate(fsm->clk);
+>  
+>  	/*
+>  	 * Calculate clk_div - values between 2 and 128
+> @@ -2057,6 +2064,15 @@ static int stfsm_probe(struct platform_device *pdev)
+>  		return PTR_ERR(fsm->base);
+>  	}
+>  
+> +	fsm->clk = devm_clk_get(&pdev->dev, "emi_clk");
+> +	if (IS_ERR(fsm->clk)) {
+> +		dev_warn(fsm->dev, "Couldn't find EMI clock.\n");
+> +		fsm->clk = NULL;
+> +	} else if (clk_prepare_enable(fsm->clk)) {
+> +		dev_warn(fsm->dev, "Failed to enable EMI clock.\n");
 
-> +        mem_base += numa_info[i].node_mem;
-> +        g_free(nodename);
-> +    }
-> +    qemu_fdt_setprop_sized_cells_from_array(vbi->fdt, "/numa-map", "mem-map",
-> +                        (nb_numa_nodes * 6) / 2, mem_map);
+If a clock has been provided and we fail to enable it, then surely that is game over?
 
-Lots of unnecessary hardcoded 6s here (and above and below).
+As the code currently is it then goes onto assume in stfsm_set_freq() that the rate
+is STFSM_DEFAULT_EMI_FREQ which can't be true if it can't enable the clock.
 
-> +
-> +    for (i = 0; i < nb_numa_nodes; i++) {
-> +        CPU_FOREACH(cpu) {
-> +            if (test_bit(cpu->cpu_index, numa_info[i].node_cpu)) {
-> +                if (cpu->cpu_index < min_cpu) {
-> +                    min_cpu = cpu->cpu_index;
-> +                }
-> +                if (cpu->cpu_index > max_cpu) {
-> +                    max_cpu = cpu->cpu_index;
-> +                }
-> +            }
-> +        }
-> +
-> +        uint64_t buffer[6] = {1, min_cpu, 1, max_cpu, 1, i};
-> +        memcpy(cpu_map + 6 * i, buffer, 6 * sizeof(*buffer));
-> +        min_cpu = max_cpu + 1;
-> +    }
-> +
-> +    qemu_fdt_setprop_sized_cells_from_array(vbi->fdt, "/numa-map", "cpu-map",
-> +                        (nb_numa_nodes * 6) / 2, cpu_map);
-> +    count = 0;
-> +    for (i = 0; i < nb_numa_nodes; i++) {
-> +        for (j = 0; j < nb_numa_nodes; j++) {
-> +            len = 20;
-> +            if (i == j) {
-> +                len = 10;
-> +            }
-> +            uint64_t buffer[6] = {1, i, 1, j, 1, len};
-> +            memcpy(node_matrix + 6 * count, buffer, 6 * sizeof(*buffer));
-> +            count++;
-> +        }
-> +    }
-> +    qemu_fdt_setprop_sized_cells_from_array(vbi->fdt, "/numa-map",
-> +        "node-matrix", (nb_numa_nodes * nb_numa_nodes * 6) / 2, node_matrix);
-> +
-> +    g_free(mem_map);
-> +    g_free(cpu_map);
-> +    g_free(node_matrix);
-> +
-> +    return 0;
-> +fail:
-> +    return -1;
-> +}
-> +
->  static void fdt_add_timer_nodes(const VirtBoardInfo *vbi)
->  {
->      /* Note that on A15 h/w these interrupts are level-triggered,
-> @@ -532,7 +640,6 @@ static void machvirt_init(MachineState *machine)
->      qemu_irq pic[NUM_IRQS];
->      MemoryRegion *sysmem = get_system_memory();
->      int n;
-> -    MemoryRegion *ram = g_new(MemoryRegion, 1);
->      const char *cpu_model = machine->cpu_model;
->      VirtBoardInfo *vbi;
->
-> @@ -585,10 +692,9 @@ static void machvirt_init(MachineState *machine)
->      fdt_add_cpu_nodes(vbi);
->      fdt_add_psci_node(vbi);
->
-> -    memory_region_init_ram(ram, NULL, "mach-virt.ram", machine->ram_size,
-> -                           &error_abort);
-> -    vmstate_register_ram_global(ram);
-> -    memory_region_add_subregion(sysmem, vbi->memmap[VIRT_MEM].base, ram);
-> +    if (virt_memory_init(machine, sysmem, vbi) < 0) {
-> +        exit(1);
-> +    }
->
->      create_flash(vbi);
->
-> --
-> 1.7.1
+regards,
 
-thanks
--- PMM
+Peter.
