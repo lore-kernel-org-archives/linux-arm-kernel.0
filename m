@@ -1,39 +1,100 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Mon, 08 Dec 2014 11:47:00 +0100
-Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
-In-Reply-To: <20141208101026.GD27367@arm.com>
-References: <1417707993-82290-1-git-send-email-agraf@suse.de>
- <20141204182049.GB7749@arm.com> <54833BAF.1030405@suse.de>
- <20141208101026.GD27367@arm.com>
-Message-ID: <548581A4.1010206@suse.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 Dec 2014 10:48:29 +0000
+Subject: [PATCH V2] tick-broadcast: Register for hrtimer based broadcast
+ as the fallback broadcast mode
+In-Reply-To: <20141208065513.3075.48721.stgit@preeti.in.ibm.com>
+References: <20141208065513.3075.48721.stgit@preeti.in.ibm.com>
+Message-ID: <20141208104828.GA21680@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Preeti,
 
-
-On 08.12.14 11:10, Will Deacon wrote:
-> On Sat, Dec 06, 2014 at 05:23:59PM +0000, Alexander Graf wrote:
->> On 04.12.14 19:20, Will Deacon wrote:
->>> On Thu, Dec 04, 2014 at 03:46:33PM +0000, Alexander Graf wrote:
->>>> With binutils 2.25 the default alignment for 32bit arm sections changed to
->>>> have everything 64k aligned. Armv7 binaries built with this binutils version
->>>> run successfully on an arm64 system.
->>>>
->>>> Since effectively there is now the chance to run armv7 code on arm64 even
->>>> with 64k page size, it doesn't make sense to block people from enabling
->>>> CONFIG_COMPAT on those configurations.
->>>
->>> Is there a distro available that is built with a recent enough binutils for
->>> this? I'd really like to run our regression tests to check that page-size
->>> assumptions don't exist for things like shm.
->>
->> So how much of a distro do you need? I could probably assemble a simple
->> very minimalistic rootfs with only bash if that helps.
+On Mon, Dec 08, 2014 at 06:55:43AM +0000, Preeti U Murthy wrote:
+> Commit 5d1638acb9f6 ('tick: Introduce hrtimer based broadcast') added a
+> hrtimer based broadcast mode for those platforms in which local timers stop
+> when CPUs enter deep idle states. The commit expected the platforms to
+> register for this mode explicitly when they lacked a better external device
+> to wake up CPUs in deep idle. Given that more platforms are beginning to use
+> this mode, we can avoid the call to set it up on every platform that requires
+> it, by registering for the hrtimer based broadcast mode in the core code if
+> no better broadcast device is available.
 > 
-> I'd like to run LTP, so I'd probably need slightly more than that but I
-> certainly don't need the whole world.
+> This commit also helps detect cases where the platform fails to register for
+> a broadcast device but invokes the help of one when entering deep idle states.
+> Currently we do not handle this situation at all and call the broadcast clock
+> device without checking for its existence. This patch will handle such buggy
+> cases properly.
+> 
+> Signed-off-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
 
-Let me check with a few folks what we can easily assemble :).
+I've just given this a go on an arm64 platform (Juno) without any
+system-wide clock_event_devices registered, and everything works well
+with CPUs entering and exiting idle states where the cpu-local timers
+lose state. So:
 
+Tested-by: Mark Rutland <mark.rutland@arm.com>
 
-Alex
+One minor thing I noticed when testing was that
+/sys/devices/system/clockevents/broadcast/name contained "(null)",
+because we never set the name field on the clock_event_device. It's
+always been that way, but now might be a good time to change that to
+something like "broadcast_hrtimer".
+
+[...]
+
+> diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+> index 2e4cb67..91754b0 100644
+> --- a/include/linux/clockchips.h
+> +++ b/include/linux/clockchips.h
+> @@ -187,11 +187,11 @@ extern int tick_receive_broadcast(void);
+>  #endif
+>  
+>  #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) && defined(CONFIG_TICK_ONESHOT)
+> -extern void tick_setup_hrtimer_broadcast(void);
+> +extern int __init tick_setup_hrtimer_broadcast(void);
+>  extern int tick_check_broadcast_expired(void);
+>  #else
+>  static inline int tick_check_broadcast_expired(void) { return 0; }
+> -static inline void tick_setup_hrtimer_broadcast(void) {};
+> +static inline int __init tick_setup_hrtimer_broadcast(void) { return 0; }
+>  #endif
+>  
+>  #ifdef CONFIG_GENERIC_CLOCKEVENTS
+> @@ -207,7 +207,7 @@ static inline void clockevents_resume(void) {}
+>  
+>  static inline int clockevents_notify(unsigned long reason, void *arg) { return 0; }
+>  static inline int tick_check_broadcast_expired(void) { return 0; }
+> -static inline void tick_setup_hrtimer_broadcast(void) {};
+> +static inline int __init tick_setup_hrtimer_broadcast(void) { return 0; }
+
+With the initcall moved to the driver we have no external users of
+tick_setup_hrtimer_broadcast, so I think we can remove the prototype
+entirely from clockchips.h...
+
+>  #endif
+>  
+> diff --git a/kernel/time/tick-broadcast-hrtimer.c b/kernel/time/tick-broadcast-hrtimer.c
+> index eb682d5..5c35995 100644
+> --- a/kernel/time/tick-broadcast-hrtimer.c
+> +++ b/kernel/time/tick-broadcast-hrtimer.c
+> @@ -98,9 +98,11 @@ static enum hrtimer_restart bc_handler(struct hrtimer *t)
+>  	return HRTIMER_RESTART;
+>  }
+>  
+> -void tick_setup_hrtimer_broadcast(void)
+> +int __init tick_setup_hrtimer_broadcast(void)
+
+...and make it static here.
+
+>  {
+>  	hrtimer_init(&bctimer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+>  	bctimer.function = bc_handler;
+>  	clockevents_register_device(&ce_broadcast_hrtimer);
+> +	return 0;
+>  }
+> +early_initcall(tick_setup_hrtimer_broadcast);
+
+Otherwise this looks good to me, thanks for putting this together!
+
+Mark.
