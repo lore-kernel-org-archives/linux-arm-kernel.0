@@ -1,95 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Dec 2014 20:12:22 +0000
-Subject: [PATCH 5/6] irqchip: GICv2m: Get rid of struct msi_controller
-In-Reply-To: <1418069543-21969-1-git-send-email-marc.zyngier@arm.com>
-References: <1418069543-21969-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1418069543-21969-6-git-send-email-marc.zyngier@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 8 Dec 2014 21:30:51 +0100 (CET)
+Subject: [PATCH] irqchip: mediatek: Fix error return code detection
+In-Reply-To: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <alpine.DEB.2.11.1412082114340.16275@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GICv2m only uses the msi_controller structure as a way to match
-the PHB with its MSI HW, and thus the msi_domain. But now that
-we can directly associate an msi_domain with a device, there is
-no use keeping this msi_controller around.
+On Mon, 8 Dec 2014, Yingjoe Chen wrote:
 
-Just remove all traces of msi_controller from the driver.
+> This fix an error handling bug reported by Beniamino, this is based on
+> mtk intpol patches [1]
+>
+> Joe.C
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305808.html
+> 
+> ====================
+> of_io_request_and_map() return ERR_PTR wrapped error code instead of
+> NULL when fail, fix code in mtk_sysirq_of_init() to correctly handle
+> this.
+> 
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v2m.c | 26 +++++++++-----------------
- 1 file changed, 9 insertions(+), 17 deletions(-)
+This is not a proper changelog. Let me write up a proper one:
 
-diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-index fdf7065..a76b802 100644
---- a/drivers/irqchip/irq-gic-v2m.c
-+++ b/drivers/irqchip/irq-gic-v2m.c
-@@ -45,7 +45,6 @@
- 
- struct v2m_data {
- 	spinlock_t msi_cnt_lock;
--	struct msi_controller mchip;
- 	struct resource res;	/* GICv2m resource */
- 	void __iomem *base;	/* GICv2m virt address */
- 	u32 spi_start;		/* The SPI number that MSIs start */
-@@ -218,6 +217,7 @@ static int __init gicv2m_init_one(struct device_node *node,
- {
- 	int ret;
- 	struct v2m_data *v2m;
-+	struct irq_domain *inner_domain;
- 
- 	v2m = kzalloc(sizeof(struct v2m_data), GFP_KERNEL);
- 	if (!v2m) {
-@@ -261,19 +261,17 @@ static int __init gicv2m_init_one(struct device_node *node,
- 		goto err_iounmap;
- 	}
- 
--	v2m->domain = irq_domain_add_tree(NULL, &gicv2m_domain_ops, v2m);
--	if (!v2m->domain) {
-+	inner_domain = irq_domain_add_tree(NULL, &gicv2m_domain_ops, v2m);
-+	if (!inner_domain) {
- 		pr_err("Failed to create GICv2m domain\n");
- 		ret = -ENOMEM;
- 		goto err_free_bm;
- 	}
- 
--	v2m->domain->parent = parent;
--	v2m->mchip.of_node = node;
--	v2m->mchip.domain = pci_msi_create_irq_domain(node,
--						      &gicv2m_msi_domain_info,
--						      v2m->domain);
--	if (!v2m->mchip.domain) {
-+	inner_domain->parent = parent;
-+	v2m->domain = pci_msi_create_irq_domain(node, &gicv2m_msi_domain_info,
-+						inner_domain);
-+	if (!v2m->domain) {
- 		pr_err("Failed to create MSI domain\n");
- 		ret = -ENOMEM;
- 		goto err_free_domains;
-@@ -281,12 +279,6 @@ static int __init gicv2m_init_one(struct device_node *node,
- 
- 	spin_lock_init(&v2m->msi_cnt_lock);
- 
--	ret = of_pci_msi_chip_add(&v2m->mchip);
--	if (ret) {
--		pr_err("Failed to add msi_chip.\n");
--		goto err_free_domains;
--	}
--
- 	pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", node->name,
- 		(unsigned long)v2m->res.start, (unsigned long)v2m->res.end,
- 		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
-@@ -294,10 +286,10 @@ static int __init gicv2m_init_one(struct device_node *node,
- 	return 0;
- 
- err_free_domains:
--	if (v2m->mchip.domain)
--		irq_domain_remove(v2m->mchip.domain);
- 	if (v2m->domain)
- 		irq_domain_remove(v2m->domain);
-+	if (inner_domain)
-+		irq_domain_remove(inner_domain);
- err_free_bm:
- 	kfree(v2m->bm);
- err_iounmap:
--- 
-2.1.3
+Subject: irqchip: mediatek: Use IS_ERR() instead of NULL pointer check
+
+Beniamino reported a kernel oops caused by an invalid DT file for the
+mediatek interrupt polarity extension.
+
+The reason is that the interrupt polarity support for mediatek chips
+merily checks for at NULL pointer instead of a casted error return
+value in mtk_sysirq_of_init() so any other casted error value passes
+the NULL pointer check and causes a kernel panic when dereferenced.
+
+Use IS_ERR() and return the error value via PTR_ERR().
+
+Reported-and-tested-by: Beniamino Galvani <b.galvani@gmail.com>
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+
+Can you see the difference?
+
+Thanks,
+
+	tglx
