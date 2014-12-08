@@ -1,43 +1,32 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 8 Dec 2014 13:45:48 +0100
-Subject: [PATCH] ARM / PM: Replace CONFIG_PM_RUNTIME with CONFIG_PM
-In-Reply-To: <2407638.dfZGaT4vm1@vostro.rjw.lan>
-References: <2407638.dfZGaT4vm1@vostro.rjw.lan>
-Message-ID: <CAPDyKFpk3XW43e+7b0Py80a-RAUnbbZ3t+w7B9Sm8KdeyMZ5Ag@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Dec 2014 18:19:17 +0530
+Subject: [PATCH 3/3] ARM: edma: Split up header file to platform_data and
+ API file
+In-Reply-To: <1417084891-17990-4-git-send-email-peter.ujfalusi@ti.com>
+References: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>
+ <1417084891-17990-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20141208124917.GI16827@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 December 2014 at 03:50, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->
-> After commit b2b49ccbdd54 (PM: Kconfig: Set PM_RUNTIME if PM_SLEEP is
-> selected) PM_RUNTIME is always set if PM is set, so #ifdef blocks
-> depending on CONFIG_PM_RUNTIME may now be changed to depend on
-> CONFIG_PM.
->
-> Replace CONFIG_PM_RUNTIME with CONFIG_PM everywhere in the code under
-> arch/arm/ (the defconfig files will be modified later).
->
-> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+On Thu, Nov 27, 2014 at 12:41:31PM +0200, Peter Ujfalusi wrote:
+> include/linux/platform_data/ is not a correct place to keep the API
+> definitions for edma, it is meant to be only for the pdata for the device.
+> Clean up this by moving the API to include/linux/edma.h
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > ---
->
-> Note: This depends on commit b2b49ccbdd54 (PM: Kconfig: Set PM_RUNTIME if
-> PM_SLEEP is selected) which is only in linux-next at the moment (via the
-> linux-pm tree).
->
-> Please let me know if it is OK to take this one into linux-pm.
->
-> ---
->  arch/arm/kernel/perf_event.c       |    2 +-
->  arch/arm/mach-davinci/pm_domain.c  |    2 +-
->  arch/arm/mach-keystone/pm_domain.c |    2 +-
->  arch/arm/mach-omap1/pm_bus.c       |    4 ++--
->  arch/arm/mach-omap2/io.c           |    2 +-
->  arch/arm/mach-omap2/omap_device.c  |    2 +-
->  6 files changed, 7 insertions(+), 7 deletions(-)
+>  arch/arm/common/edma.c                     |   3 +-
+>  arch/arm/mach-davinci/devices.c            |   1 +
+>  arch/arm/mach-davinci/include/mach/da8xx.h |   1 +
+>  drivers/dma/edma.c                         |   2 +-
+>  include/linux/edma.h                       | 153 +++++++++++++++++++++++++++++
+>  include/linux/platform_data/edma.h         | 148 ++--------------------------
+>  sound/soc/davinci/davinci-pcm.h            |   1 +
+>  7 files changed, 165 insertions(+), 144 deletions(-)
+>  create mode 100644 include/linux/edma.h
+I was hoping that this will have delete for platform_data/edma.h, do we
+still need that and why shouldn't we get rid of this :)
 
-There are a bunch of Kconfig options that "selects/depends" on
-"PM_RUNTIME". I suppose you should change them into "PM" as well.
-
-Kind regards
-Uffe
+-- 
+~Vinod
