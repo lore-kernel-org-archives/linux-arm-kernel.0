@@ -1,58 +1,105 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Mon, 8 Dec 2014 13:46:01 +0200
-Subject: [RFC V4] mm:add KPF_ZERO_PAGE flag for /proc/kpageflags
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E688B313F4@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
- <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D103E688B313F2@CNBJMBX05.corpusers.net>
- <20141205143134.37139da2208c654a0d3cd942@linux-foundation.org>
- <35FD53F367049845BC99AC72306C23D103E688B313F4@CNBJMBX05.corpusers.net>
-Message-ID: <20141208114601.GA28846@node.dhcp.inet.fi>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 08 Dec 2014 11:49:30 +0000
+Subject: [PATCH v2 3/6] arm/arm64: KVM: Reset the HCR on each vcpu when
+ resetting the vcpu
+In-Reply-To: <1417641522-29056-4-git-send-email-christoffer.dall@linaro.org>
+References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
+ <1417641522-29056-4-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <5485904A.30005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 10:00:50AM +0800, Wang, Yalin wrote:
-> This patch add KPF_ZERO_PAGE flag for zero_page,
-> so that userspace process can notice zero_page from
-> /proc/kpageflags, and then do memory analysis more accurately.
+On 03/12/14 21:18, Christoffer Dall wrote:
+> When userspace resets the vcpu using KVM_ARM_VCPU_INIT, we should also
+> reset the HCR, because we now modify the HCR dynamically to
+> enable/disable trapping of guest accesses to the VM registers.
 > 
-> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+> This is crucial for reboot of VMs working since otherwise we will not be
+> doing the necessary cache maintenance operations when faulting in pages
+> with the guest MMU off.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
->  Documentation/vm/pagemap.txt           |  5 +++++
->  fs/proc/page.c                         | 16 +++++++++++++---
->  include/linux/huge_mm.h                | 12 ++++++++++++
->  include/uapi/linux/kernel-page-flags.h |  1 +
->  mm/huge_memory.c                       |  7 +------
->  5 files changed, 32 insertions(+), 9 deletions(-)
+>  arch/arm/include/asm/kvm_emulate.h   | 5 +++++
+>  arch/arm/kvm/arm.c                   | 2 ++
+>  arch/arm/kvm/guest.c                 | 1 -
+>  arch/arm64/include/asm/kvm_emulate.h | 5 +++++
+>  arch/arm64/kvm/guest.c               | 1 -
+>  5 files changed, 12 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/vm/pagemap.txt b/Documentation/vm/pagemap.txt
-> index 5948e45..fdeb06e 100644
-> --- a/Documentation/vm/pagemap.txt
-> +++ b/Documentation/vm/pagemap.txt
-> @@ -62,6 +62,8 @@ There are three components to pagemap:
->      20. NOPAGE
->      21. KSM
->      22. THP
-> +    23. BALLOON
-> +    24. ZERO_PAGE
+> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> index b9db269..66ce176 100644
+> --- a/arch/arm/include/asm/kvm_emulate.h
+> +++ b/arch/arm/include/asm/kvm_emulate.h
+> @@ -33,6 +33,11 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu);
+>  void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
+>  void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
 >  
->  Short descriptions to the page flags:
->  
-> @@ -102,6 +104,9 @@ Short descriptions to the page flags:
->  22. THP
->      contiguous pages which construct transparent hugepages
->  
-> +24. ZERO_PAGE
-> +    zero page for pfn_zero or huge_zero page
+> +static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+> +{
+> +	vcpu->arch.hcr = HCR_GUEST_MASK;
+> +}
 > +
->      [IO related page flags]
->   1. ERROR     IO error occurred
->   3. UPTODATE  page has up-to-date data
+>  static inline bool vcpu_mode_is_32bit(struct kvm_vcpu *vcpu)
+>  {
+>  	return 1;
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index edc1964..24c9ca4 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -658,6 +658,8 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+>  	if (ret)
+>  		return ret;
+>  
+> +	vcpu_reset_hcr(vcpu);
+> +
+>  	/*
+>  	 * Handle the "start in power-off" case by marking the VCPU as paused.
+>  	 */
+> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+> index cc0b787..8c97208 100644
+> --- a/arch/arm/kvm/guest.c
+> +++ b/arch/arm/kvm/guest.c
+> @@ -38,7 +38,6 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
+>  
+>  int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
+>  {
+> -	vcpu->arch.hcr = HCR_GUEST_MASK;
+>  	return 0;
+>  }
+>  
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index 5674a55..8127e45 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -38,6 +38,11 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu);
+>  void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
+>  void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+>  
+> +static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+> +{
+> +	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
+> +}
+> +
+>  static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
+>  {
+>  	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
+> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> index 7679469..84d5959 100644
+> --- a/arch/arm64/kvm/guest.c
+> +++ b/arch/arm64/kvm/guest.c
+> @@ -38,7 +38,6 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
+>  
+>  int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
+>  {
+> -	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
+>  	return 0;
+>  }
+>  
+> 
 
-Would be nice to document BALLOON while you're there.
-Otherwise looks good to me.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-
+	M.
 -- 
- Kirill A. Shutemov
+Jazz is not dead. It just smells funny...
