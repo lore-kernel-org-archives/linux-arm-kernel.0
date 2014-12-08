@@ -1,42 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon,  8 Dec 2014 13:45:48 -0800
-Subject: [PATCH] ARM: bcm: fix __iomem annotation on kona_smc
-Message-ID: <1418075148-8752-1-git-send-email-olof@lixom.net>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 08 Dec 2014 22:49:56 +0100
+Subject: [PATCH v5 00/61] dmaengine: Implement generic slave capabilities
+ retrieval
+In-Reply-To: <20141208183853.GG8739@lukather>
+References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141208061746.GD16827@intel.com> <20141208141807.GC8739@lukather>
+ <20141208162843.GP16827@intel.com> <20141208183853.GG8739@lukather>
+Message-ID: <54861D04.8000102@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the following sparse warning:
-arch/arm/mach-bcm/bcm_kona_smc.c:145:21: warning: incorrect type in initializer (different address spaces)
-arch/arm/mach-bcm/bcm_kona_smc.c:145:21:    expected unsigned int [usertype] *args
-arch/arm/mach-bcm/bcm_kona_smc.c:145:21:    got void [noderef] <asn:2>*static [toplevel] [assigned] bcm_smc_buffer
-arch/arm/mach-bcm/bcm_kona_smc.c:151:9: warning: incorrect type in argument 2 (different address spaces)
-arch/arm/mach-bcm/bcm_kona_smc.c:151:9:    expected void volatile [noderef] <asn:2>*addr
-arch/arm/mach-bcm/bcm_kona_smc.c:151:9:    got unsigned int [usertype] *
-[+ 2 more instances]
+On 12/08/2014 07:38 PM, Maxime Ripard wrote:
+[...]
+>> And lastly noone blamed you for being late, if things were rosy they
+>> would have been merged over the weekend and been in today's next,
+>> but...
+>
+> I totally understand your point. And I actually am a bit uncomfortable
+> merging this so late too, and I'd actually prefer to have it merged
+> for 3.20. But this is a huge patchset, and I'd really like to avoid
+> rebasing it forever.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
+We don't have to pull in the whole series at once. I think everybody agrees 
+that the approach is the right one, so the first couple of patches that work 
+on the framework should be good to go in. Same goes for the drivers that 
+have been acked and tested.
 
-Florian, should we just apply this directly on arm-soc?
-
-
--Olof
-
- arch/arm/mach-bcm/bcm_kona_smc.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
-index a55a7ec..d506d17 100644
---- a/arch/arm/mach-bcm/bcm_kona_smc.c
-+++ b/arch/arm/mach-bcm/bcm_kona_smc.c
-@@ -142,7 +142,7 @@ static int bcm_kona_do_smc(u32 service_id, u32 buffer_phys)
- static void __bcm_kona_smc(void *info)
- {
- 	struct bcm_kona_smc_data *data = info;
--	u32 *args = bcm_smc_buffer;
-+	u32 __iomem *args = bcm_smc_buffer;
- 
- 	BUG_ON(smp_processor_id() != 0);
- 	BUG_ON(!args);
--- 
-1.7.10.4
+- Lars
