@@ -1,70 +1,105 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 8 Dec 2014 10:53:44 -0800
-Subject: [PATCH v3] i2c: rk3x: fix bug that cause measured high_ns doesn't
- meet I2C spec
-In-Reply-To: <20141208173432.GA5732@katana>
-References: <1415261514-4051-1-git-send-email-addy.ke@rock-chips.com>
- <1418007589-3688-1-git-send-email-addy.ke@rock-chips.com>
- <20141208085202.GA13486@pengutronix.de>
- <CAD=FV=V=PDPiDhDmd+j8ePsF43EvuFP-LxKgMKo7ZRBzSMyOJA@mail.gmail.com>
- <20141208173432.GA5732@katana>
-Message-ID: <CAD=FV=WQypHthEDPGUqVX3kzfFBSdj4H+_QY_=WYA3R77H+WiQ@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 08 Dec 2014 20:59:17 +0200
+Subject: [PATCH 5/5] media: ov2640: dt: add the device tree binding
+ document
+In-Reply-To: <1418038147-13221-6-git-send-email-josh.wu@atmel.com>
+References: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>
+ <1418038147-13221-6-git-send-email-josh.wu@atmel.com>
+Message-ID: <7239028.nL31Mosllm@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Josh,
 
-On Mon, Dec 8, 2014 at 9:34 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
->
->> > There are different capitalisation of i2c in the patch and the commit log. I
->> > don't know what Wolfram prefers here, but using the same spelling
->> > everywhere would be nice.
->>
->> Can you please point out?  IIRC you should always capitalize I2C in
->> prose (descriptions, comments, documentation, etc).  However when used
->> in places which specific capitalization standards it should be
->> lowercase.  That means file names, directory names, device tree
->> property names, etc should be lower case.
->
-> This is what I prefer, too. However, I am not too strict about it.
-> I mean, both are readable.
+Thank you for the patch.
 
-Glad my understanding is OK.  :)
+On Monday 08 December 2014 19:29:07 Josh Wu wrote:
+> Add the document for ov2640 dt.
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+> v1 -> v2:
+>   1. change the compatible string to be consistent with verdor file.
 
->
->> >> +     /* Read rise and fall ns; if not there use the default max from spec */
->> >> +     if (of_property_read_u32(pdev->dev.of_node, "i2c-scl-rising-time-ns",
->> >> +                              &i2c->rise_ns)) {
->> >> +             if (i2c->scl_frequency <= 100000)
->> >> +                     i2c->rise_ns = 1000;
->> >> +             else
->> >> +                     i2c->rise_ns = 300;
->> >> +     }
->> >> +     if (of_property_read_u32(pdev->dev.of_node, "i2c-scl-falling-time-ns",
->> >> +                              &i2c->fall_ns))
->> >> +             i2c->fall_ns = 300;
->> >> +
->> > I don't know if other drivers do the same (I assume they should). If so,
->> > moving this logic into the core would be nice. I guess this can still be
->> > done later.
->
-> Let's leave that for later. If we do it, we should start with bus speed
-> setting first, probably.
+That's nice, but you still need to send a patch to add the ovti vendor prefix 
+to Documentation/devicetree/bindings/vendor-prefixes.txt. It's not there yet.
 
-OK, great.
+>   2. change the clock and pins' name.
+>   3. add missed pinctrl in example.
+> 
+>  .../devicetree/bindings/media/i2c/ov2640.txt       | 44 +++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+> b/Documentation/devicetree/bindings/media/i2c/ov2640.txt new file mode
+> 100644
+> index 0000000..15be3cb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+> @@ -0,0 +1,44 @@
+> +* Omnivision ov2640 CMOS sensor
+> +
+> +The Omnivision OV2640 sensor support multiple resolutions output, such as
+> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
+> +output format.
+> +
+> +Required Properties :
+> +- compatible: Must be "ovti,ov2640"
+> +- clocks: reference master clock, if using external fixed clock, you
+> +          no need to have such property.
 
+That's not true anymore, the clocks property is mandatory in all cases. Just 
+describe it as
 
-So just to summarize for Addy, I think you're being asked to spin one more time.
+- clocks: reference to the xvclk input clock.
 
-1. Update the patch description as per Uwe.  Fix other typos pointed out by him.
+> +- clock-names: Must be "xvclk", it means the master clock for ov2640.
 
-2. Since you're spinning anyway, adjust "i2c" capitalization to "I2C".
+I would drop "it means the master clock for ov2640".
 
-3. If you agree with Uwe, rename spec_max_data_hold_ns to
-spec_data_valid_ns.  If not, we should debate in a followup patch.
+> +Optional Properties:
+> +- resetb-gpios: reset pin
 
-4. If you think spec_data_hold_buffer_ns could be better represented
-in another way (should this be i2c-sda-falling-time-ns"?), please do
-so.  If not, we should debate in a followup patch.
+- resetb-gpios: reference to the GPIO connected to the resetb pin, if any.
 
--Doug
+> +- pwdn-gpios: power down pin
+
+- pwdn-gpios: reference to the GPIO connected to the pwdn pin, if any.
+
+> +
+> +The device node must contain one 'port' child node for its digital output
+> +video port, in accordance with the video interface bindings defined in
+> +Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +
+> +Example:
+> +
+> +	i2c1: i2c at f0018000 {
+> +		ov2640: camera at 0x30 {
+> +			compatible = "ovti,ov2640";
+> +			reg = <0x30>;
+> +
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_pck1 &pinctrl_ov2640_pwdn 
+&pinctrl_ov2640_reset>;
+> +
+> +			resetb-gpios = <&pioE 24 GPIO_ACTIVE_HIGH>;
+> +			pwdn-gpios = <&pioE 29 GPIO_ACTIVE_HIGH>;
+> +
+> +			clocks = <&pck1>;
+> +			clock-names = "xvclk";
+> +
+> +			port {
+> +				ov2640_0: endpoint {
+> +					remote-endpoint = <&isi_0>;
+> +					bus-width = <8>;
+> +				};
+> +			};
+> +		};
+> +	};
+
+-- 
+Regards,
+
+Laurent Pinchart
