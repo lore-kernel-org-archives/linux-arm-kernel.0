@@ -1,58 +1,30 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  8 Dec 2014 09:54:36 +0900
-Subject: [PATCH] ARM: shmobile: r8a7794: Add USBDMAC[01] clocks to device tree
-Message-ID: <1418000076-28780-1-git-send-email-horms+renesas@verge.net.au>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 8 Dec 2014 12:06:19 +1100
+Subject: linux-next: manual merge of the bcm2835 tree with the arm-soc tree
+Message-ID: <20141208120619.68287b54@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+Hi Stephen,
 
-Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-[horms: merged per-clock patches]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Today's linux-next merge of the bcm2835 tree got a conflict in
+arch/arm/boot/dts/Makefile between commit 302a5ef29d49 ("ARM: BCM5301X:
+Add DT for Netgear R6300 V2") from the arm-soc tree and commit
+6298ed17a404 ("ARM: bcm2835: Add device tree for Raspberry Pi model
+B+") from the bcm2835 tree.
 
----
+I fixed it up (the bcm2835 tree patch is also in the arm-soc tree as
+commit ba2a1d6959ac ("ARM: bcm2835: Add device tree for Raspberry Pi
+model B+"), so I just used the arm-soc version) and can carry the fix
+as necessary (no action is required).
 
-Based on the renesas-devel-20141208-v3.18 tag of my renesas tree.
----
- arch/arm/boot/dts/r8a7794.dtsi            | 7 ++++---
- include/dt-bindings/clock/r8a7794-clock.h | 2 ++
- 2 files changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 7fd40f3..cad97512 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -493,13 +493,14 @@
- 		mstp3_clks: mstp3_clks at e615013c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
--			clocks = <&rclk_clk>;
-+			clocks = <&rclk_clk>, <&hp_clk>, <&hp_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
--				R8A7794_CLK_CMT1
-+				R8A7794_CLK_CMT1 R8A7794_CLK_USBDMAC0
-+				R8A7794_CLK_USBDMAC1
- 			>;
- 			clock-output-names =
--				"cmt1";
-+				"cmt1", "usbdmac0", "usbdmac1";
- 		};
- 		mstp7_clks: mstp7_clks at e615014c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-index 94e2bbf..52492d8 100644
---- a/include/dt-bindings/clock/r8a7794-clock.h
-+++ b/include/dt-bindings/clock/r8a7794-clock.h
-@@ -51,6 +51,8 @@
- 
- /* MSTP3 */
- #define R8A7794_CLK_CMT1		29
-+#define R8A7794_CLK_USBDMAC0		30
-+#define R8A7794_CLK_USBDMAC1		31
- 
- /* MSTP5 */
- #define R8A7794_CLK_THERMAL		22
 -- 
-2.1.3
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141208/3efc234a/attachment.sig>
