@@ -1,55 +1,58 @@
 From: ankit.jindal@linaro.org (Ankit Jindal)
-Date: Mon, 8 Dec 2014 18:12:15 +0530
-Subject: [PATCH v5 5/6] Documentation: dt-bindings: Add binding info for
- X-Gene QMTM UIO driver
-In-Reply-To: <1503477.DVdkExccIe@wuerfel>
+Date: Mon, 8 Dec 2014 18:13:28 +0530
+Subject: [PATCH v5 2/6] uio: Add new UIO_MEM_PHYS_CACHE type for mem
+ regions
+In-Reply-To: <20141127000147.GC5313@kroah.com>
 References: <1416220572-13381-1-git-send-email-ankit.jindal@linaro.org>
- <2279061.naADrHDgyn@wuerfel>
- <CAPTm99WYNyxtY-NCVN8pB0HwNPn+EFx-7w7yEevaEK1z7-Zqxg@mail.gmail.com>
- <1503477.DVdkExccIe@wuerfel>
-Message-ID: <CAPTm99V1qP5dAgDV04i3m_yR1ri9h=b8fDXBDxmPfpZG_P268g@mail.gmail.com>
+ <1416220572-13381-3-git-send-email-ankit.jindal@linaro.org>
+ <20141127000147.GC5313@kroah.com>
+Message-ID: <CAPTm99WWk6XZnEjwjiDoxxGZdR6WccFXZBAjOfpWNq1dWrBfjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 November 2014 at 18:40, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 18 November 2014 14:59:54 Ankit Jindal wrote:
->> On 17 November 2014 16:47, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Monday 17 November 2014 16:06:11 Ankit Jindal wrote:
->> >> +
->> >> +       qmtm1_uio: qmtm_uio at 1f200000 {
->> >> +               compatible = "apm,xgene-qmtm";
->> >> +               status = "disabled";
->> >> +               reg = <0x0 0x1f200000 0x0 0x10000>,
->> >> +                     <0x0 0x1b000000 0x0 0x400000>;
->> >> +               reg-names = "csr", "fabric";
->> >> +               qpool-memory = <&qmtm1_uio_qpool>;
->> >> +               clocks = <&qmtm1clk 0>;
->> >> +               num-queues = <0x400>;
->> >> +               devid = <1>;
->> >> +       };
->> >> +
->> >
->> > To make my previous review comments clearer:
->> >
->> > NAK
->> >
->> > Do not create device nodes that are meant for a specific use case in
->> > software and that are not usable for the common case. I don't think
->> > it makes any sense to keep on submitting a UIO driver for this until
->> > we have a proper network driver that uses this so we can make sure we
->> > have a working binding.
+On 27 November 2014 at 05:31, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Mon, Nov 17, 2014 at 04:06:08PM +0530, Ankit Jindal wrote:
+>> Currently, three types of mem regions are supported: UIO_MEM_PHYS,
+>> UIO_MEM_LOGICAL and UIO_MEM_VIRTUAL. Among these UIO_MEM_PHYS helps
+>> UIO driver export physcial memory to user space as non-cacheable
+>> user memory. Typcially memory-mapped registers of a device are exported
+>> to user space as UIO_MEM_PHYS type mem region. The UIO_MEM_PHYS type
+>> is not efficient if dma-capable devices are capable of maintaining coherency
+>> with CPU caches.
+>
+> Not efficient in what way?
+Sorry, I will rephrase this.
+>
+>> This patch adds new type UIO_MEM_PHYS_CACHE for mem regions to enable
+>> cacheable access to physical memory from user space.
 >>
->> The dataplane frameworks like OpenDataPlane etc, need to have access
->> to complete subsystem from the user space. Hence, we would like to
->> have this driver and some other UIO drivers to be the part of kernel
->> to have data plane frameworks working on our platform.
+>> Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
+>> Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
+>> ---
+>>  drivers/uio/uio.c          |   11 ++++++++---
+>>  include/linux/uio_driver.h |    1 +
+>>  2 files changed, 9 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/uio/uio.c b/drivers/uio/uio.c
+>> index 97e6444..120a84b 100644
+>> --- a/drivers/uio/uio.c
+>> +++ b/drivers/uio/uio.c
+>> @@ -644,7 +644,7 @@ static const struct vm_operations_struct uio_physical_vm_ops = {
+>>  #endif
+>>  };
+>>
+>> -static int uio_mmap_physical(struct vm_area_struct *vma)
+>> +static int uio_mmap_physical(struct vm_area_struct *vma, bool cacheable)
 >
-> Please work with the people that do the in-kernel QMTM driver to come
-> up with a common binding then.
-Thanks Arnd, I have synced with them, and in future our dt bindings
-for this device is going to be inline with the one mentioned in the
-patchset.
+> I despise "bool" flags in a function, as they don't give any idea of
+> what is going on when you see the function being called.  Please create
+> a new function that does this properly, with a correct name, if it's
+> needed.
+Sure, will take care of this in next revision.
 >
->         Arnd
+> thanks,
+>
+> greg k-h
 Thanks,
 Ankit
