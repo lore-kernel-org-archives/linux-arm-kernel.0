@@ -1,43 +1,59 @@
-From: lyz@rock-chips.com (Yunzhi Li)
-Date: Mon, 08 Dec 2014 12:12:26 +0800
-Subject: [PATCH v2 1/5] phy: add a driver for the Rockchip SoC internal
- USB2.0 PHY.
-In-Reply-To: <CABgxDoLe2RxCjD53uvTgYZ=tNOKHLeGoZE5Aa5XvaUYvNX=HYw@mail.gmail.com>
-References: <1417783941-2418-1-git-send-email-lyz@rock-chips.com>	<1417783941-2418-2-git-send-email-lyz@rock-chips.com>
- <CABgxDoLe2RxCjD53uvTgYZ=tNOKHLeGoZE5Aa5XvaUYvNX=HYw@mail.gmail.com>
-Message-ID: <5485252A.90308@rock-chips.com>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Mon, 08 Dec 2014 10:59:31 +0530
+Subject: [PATCH] tick-broadcast: Register for hrtimer based broadcast
+ as the default broadcast mode
+In-Reply-To: <20141205133908.GA21313@leverpostej>
+References: <20141205124756.25803.4988.stgit@preeti.in.ibm.com>
+ <20141205133908.GA21313@leverpostej>
+Message-ID: <5485373B.302@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain :
+On 12/05/2014 07:09 PM, Mark Rutland wrote:
+> Hi Preeti,
+> 
+> Moving this out of the architecture code looks good to me!
+> 
+> I have a couple of minor comments below.
+<snip>
 
-On 2014/12/5 21:38, Romain Perier wrote:
-> Hi,
->
-> Some quick comments
->
-> 2014-12-05 13:52 GMT+01:00 Yunzhi Li <lyz@rock-chips.com>:
->> [...]
->>
->> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->> index ccad880..e3a5857 100644
->> --- a/drivers/phy/Kconfig
->> +++ b/drivers/phy/Kconfig
->> @@ -239,6 +239,13 @@ config PHY_QCOM_IPQ806X_SATA
->>          depends on OF
->>          select GENERIC_PHY
->>
->> +config PHY_ROCKCHIP_RK3288_USB2
->> +       tristate "Rockchip USB2 RK3288 PHY Driver"
->> +       depends on ARCH_ROCKCHIP && OF
->> +       select GENERIC_PHY
->> +       help
->> +         Enable this to support the Rockchip USB 2.0 PHY.
->> +
->
-> The C module is named phy-rockchip-usb.c, why did you call the config
-> entry PHY_ROCKCHIP_RK3288_USB2 ? why RK3288 ? this driver might be
-> ported to old SoCs later.
-> I think that PHY_ROCKCHIP_USB would be enough.
-Right, this driver will be ported to old SoCs like RK3188 or RK3066, 
-this will be renamed to PHY_ROCKCHIP_USB in the next version.
+>>  
+>> diff --git a/kernel/time/timekeeping.c b/kernel/time/timekeeping.c
+>> index ec1791f..6044a51 100644
+>> --- a/kernel/time/timekeeping.c
+>> +++ b/kernel/time/timekeeping.c
+>> @@ -1016,6 +1016,10 @@ void __init timekeeping_init(void)
+>>  		boot.tv_sec = 0;
+>>  		boot.tv_nsec = 0;
+>>  	}
+>> +	/* Register for hrtimer based broadcast as the default timekeeping
+>> +	 * mode in deep idle states.
+>> +	 */
+> 
+> Nit: for code style this should have a newline after the '/*' (and we
+> should probably have a newline before that anyway.
+> 
+>> +	tick_setup_hrtimer_broadcast();
+> 
+> We register the generic dummy timer via an early_initcall, which keeps
+> all the logic in the dummy timer driver. Are we able to do the same of
+> the broadcast hrtimer? Or is there some ordering constraint we need to
+> meet?
+
+Yes this is doable. There are no ordering constraints. Placing it in an
+early_initcall() will enable it to run before initializing SMP and
+cpuidle, which is perfect (we do not have any per-cpu initializations
+and we do not want cpus to begin entering idle states before this
+hrtimer is initialized).
+
+It also runs after the hrtimer/clockevents infrastructure has been
+initialized, which is good since we need them. The broadcast hrtimer
+will thus only get registered as a broadcast device if no other clock
+device has managed to register itself as one.
+
+Let me send out a V2.
+
+Thanks
+
+Regards
+Preeti U Murthy
