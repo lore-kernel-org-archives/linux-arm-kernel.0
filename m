@@ -1,57 +1,141 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Dec 2014 16:08:14 +0100
-Subject: linux-next: manual merge of the bcm2835 tree with the arm-soc tree
-In-Reply-To: <20141208134903.GN3951@x1>
-References: <20141208120619.68287b54@canb.auug.org.au>
- <3348703.0b5FTH9Sa3@wuerfel> <20141208134903.GN3951@x1>
-Message-ID: <27886656.dlK0fV8eSK@wuerfel>
+From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
+Date: Mon, 8 Dec 2014 15:09:29 +0000
+Subject: [PATCH v7 0/5] ARM64: Add support for FSL's LS2085A SoC
+References: <1417443442-17444-1-git-send-email-bhupesh.sharma@freescale.com>
+ <20141201163013.GA22708@leverpostej>
+Message-ID: <BY1PR0301MB13032F9A5B59585272458F3C82640@BY1PR0301MB1303.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 December 2014 13:49:03 Lee Jones wrote:
-> On Mon, 08 Dec 2014, Arnd Bergmann wrote:
-> 
-> > On Monday 08 December 2014 13:00:09 Lee Jones wrote:
-> > > On Mon, 08 Dec 2014, Arnd Bergmann wrote:
-> > > 
-> > > > On Monday 08 December 2014 12:06:19 Stephen Rothwell wrote:
-> > > > > Hi Stephen,
-> > > > > 
-> > > > > Today's linux-next merge of the bcm2835 tree got a conflict in
-> > > > > arch/arm/boot/dts/Makefile between commit 302a5ef29d49 ("ARM: BCM5301X:
-> > > > > Add DT for Netgear R6300 V2") from the arm-soc tree and commit
-> > > > > 6298ed17a404 ("ARM: bcm2835: Add device tree for Raspberry Pi model
-> > > > > B+") from the bcm2835 tree.
-> > > > > 
-> > > > > I fixed it up (the bcm2835 tree patch is also in the arm-soc tree as
-> > > > > commit ba2a1d6959ac ("ARM: bcm2835: Add device tree for Raspberry Pi
-> > > > > model B+"), so I just used the arm-soc version) and can carry the fix
-> > > > > as necessary (no action is required).
-> > > > 
-> > > > Thanks a lot for the notification!
-> > > > 
-> > > > Lee, do you know what is going on? Did you accidentally rebase a commit
-> > > > that you already sent for inclusion in arm-soc?
-> > > 
-> > > Nope.  The branch hasn't changed at all.
-> > > 
-> > > OOI why would a re-base affect anything?  I sent you it in patch form.
-> > 
-> > Ah, I looked at the wrong branch and didn't see that I applied a patch
-> > instead of a pull request. It's all fine then, as long as you never
-> > intend to send any pull requests based on top of your current branch.
-> > 
-> > You can possibly make Stephen's life a tiny bit simpler if you just
-> > drop all patches from your for-next branch as soon as we've picked
-> > them up into arm-soc.
-> 
-> That is something I thought about, but I believe we have users of that
-> branch.  I guess we could always point them to ARM-SoC, or reset the
-> branch to the aforementioned.
+Hi Arm Maintainers,
 
-How about adding another branch then, which contains everything you
-expect to get merged into the next kernel and that you can provide
-to your users but that is potentially separate from the one that Stephen
-pulls into linux-next?
+Its been some time since I posted v7 of this series.
 
-	ARnd
+If there are no other reviews comments on the series, can this be pulled into
+the ARM SoC tree (arm-soc.git) for merge.
+
+> -----Original Message-----
+> From: Sharma Bhupesh-B45370
+> Sent: Tuesday, December 02, 2014 1:26 AM
+> To: 'Mark Rutland'
+> Cc: arm at kernel.org; Marc Zyngier; Catalin Marinas; arnd at arndb.de; linux-
+> arm-kernel at lists.infradead.org; grant.likely at secretlab.ca;
+> rob.herring at linaro.org; bhupesh.linux at gmail.com; Yoder Stuart-B08248;
+> arnab_basu at rocketmail.com
+> Subject: RE: [PATCH v7 0/5] ARM64: Add support for FSL's LS2085A SoC
+> 
+> Hi Mark,
+> 
+> > -----Original Message-----
+> > From: Mark Rutland [mailto:mark.rutland at arm.com]
+> > Sent: Monday, December 01, 2014 10:00 PM
+> > To: Sharma Bhupesh-B45370
+> > Cc: arm at kernel.org; Marc Zyngier; Catalin Marinas; arnd at arndb.de;
+> > linux- arm-kernel at lists.infradead.org; grant.likely at secretlab.ca;
+> > rob.herring at linaro.org; bhupesh.linux at gmail.com; Yoder Stuart-B08248;
+> > arnab_basu at rocketmail.com
+> > Subject: Re: [PATCH v7 0/5] ARM64: Add support for FSL's LS2085A SoC
+> >
+> > Hi Bhupesh,
+> >
+> > The series looks mostly fine to me, though I have a couple of comments
+> > below.
+> >
+> > On Mon, Dec 01, 2014 at 02:17:17PM +0000, Bhupesh Sharma wrote:
+> > > This patchset adds the support for FSL's LS2085A SoC which is based
+> > > on
+> > > ARMv8 architecture.
+> > >
+> > > This patchset also has patches which address DT compatible strings
+> > > for nodes which appear un-documented.
+> > >
+> > > The enable-method for the CPU nodes is left for the bootloader
+> > > (u-boot or UEFI) to patch-up which is expected to be PSCI v0.2
+> > >
+> > > This patchset has been tested with the following patches which add
+> > > PSCI
+> > > v0.2 support in ARMv8 u-boot:
+> > > http://patchwork.ozlabs.org/patch/383556/
+> > > http://patchwork.ozlabs.org/patch/383555/
+> > > http://patchwork.ozlabs.org/patch/383557/
+> > > http://patchwork.ozlabs.org/patch/383558/
+> > > http://patchwork.ozlabs.org/patch/383559/
+> > > http://patchwork.ozlabs.org/patch/383560/
+> > > http://patchwork.ozlabs.org/patch/383561/
+> > > http://patchwork.ozlabs.org/patch/383562/
+> >
+> > Has there been any progress on these? last I saw there was some
+> > pending rework, and I was holding off a thorough review of the PSCI
+> > parts until that had happened.
+> 
+> Arnab Basu has since moved on from Freescale, but he plans to maintain
+> and rework these PSCI related patches in u-boot.
+> 
+> >
+> > >
+> > > Rebased against cleanup/dts-subdirs branch of the arm-soc tree
+> > >
+> > > Changes from v6:
+> > > ----------------
+> > > * Rebased against cleanup/dts-subdirs branch of the arm-soc tree.
+> > > * As a result, [PATCH 4/6] and [PATCH 5/6] of the v6 series are
+> > squashed
+> > >   into one patch ([PATCH 4/5] of this series).
+> > >
+> > > Note:
+> > > -----
+> > > Optional GIC-500 regs like GICC, GICH and GICV are currently not
+> > > tested and hence are not part of the DTS patch.
+> > >
+> > > Please review and consider for merge.
+> > >
+> > > Bhupesh Sharma (5):
+> > >   Documentation: DT: Add bindings for FSL NS16550A UART
+> >
+> > Regardless of anything else, this patch should be queued given it adds
+> > missing documentation for a binding already supported by the kernel.
+> 
+> Right.
+> 
+> > >   Documentation: DT: Add entry for FSL LS2085A SoC and Simulator
+> model
+> > >   Documentation: DT: Add entry for FSL Management Complex
+> >
+> > Are there any patches adding support for the management complex?
+> > There's nothing in mainline that uses "fsl,qoriq-mc", and nothing in
+> > this series adds support.
+> >
+> 
+> Like Stuart mentioned in another thread, the Management Complex related
+> patches are already under review.
+> 
+> >
+> > >   arm64: Add DTS support for FSL's LS2085A SoC
+> > >   arm64: Add support for FSL's LS2085A SoC in Kconfig and defconfig
+> > >
+> > >  Documentation/devicetree/bindings/arm/fsl.txt      |    8 +
+> > >  .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |   40 +++++
+> > >  .../devicetree/bindings/serial/of-serial.txt       |   12 ++
+> > >  arch/arm64/Kconfig                                 |    5 +
+> > >  arch/arm64/boot/dts/Makefile                       |    1 +
+> > >  arch/arm64/boot/dts/{ => freescale}/Makefile       |    4 +-
+> > >  arch/arm64/boot/dts/freescale/fsl-ls2085a-simu.dts |   65 ++++++++
+> > >  arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi     |  163
+> > ++++++++++++++++++++
+> > >  arch/arm64/configs/defconfig                       |    1 +
+> > >  9 files changed, 296 insertions(+), 3 deletions(-)  create mode
+> > > 100644 Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+> > >  copy arch/arm64/boot/dts/{ => freescale}/Makefile (54%)  create
+> > > mode
+> > > 100644 arch/arm64/boot/dts/freescale/fsl-ls2085a-simu.dts
+> > >  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+> > >
+> > > --
+> > > 1.7.9.5
+> > >
+> 
+> Regards,
+> Bhupesh
+
+Regards,
+Bhupesh
