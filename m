@@ -1,193 +1,245 @@
-From: addy.ke@rock-chips.com (addy ke)
-Date: Mon, 08 Dec 2014 11:06:15 +0800
-Subject: [PATCH v3] i2c: rk3x: fix bug that cause measured high_ns doesn't
- meet I2C spec
-In-Reply-To: <1418007589-3688-1-git-send-email-addy.ke@rock-chips.com>
-References: <1415261514-4051-1-git-send-email-addy.ke@rock-chips.com>
- <1418007589-3688-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <548515A7.9050702@rock-chips.com>
+From: wuyun.wu@huawei.com (Yun Wu (Abel))
+Date: Mon, 8 Dec 2014 11:28:15 +0800
+Subject: [PATCH v3 09/13] irqchip: GICv3: ITS: MSI support
+In-Reply-To: <1416839720-18400-10-git-send-email-marc.zyngier@arm.com>
+References: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
+ <1416839720-18400-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <54851ACF.2090204@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/12/8 10:59, Addy Ke wrote:
-> high_ns calculated from the low division of CLKDIV register is the sum
-> of actual measured high_ns and rise_ns. The rise time which related to
-> external pull-up resistor can be up to the maximum rise time in I2C spec.
+Hi Marc,
+On 2014/11/24 22:35, Marc Zyngier wrote:
+
+> Now, the bit of code that allow us to use the ITS as a MSI controller.
+> Both MSI and MSI-X are supported.
 > 
-> In my test, if external pull-up resistor is 4.7K, rise_ns is about
-> 700ns. So the actual measured high_ns is about 3900ns, which is less
-> than 4000ns(the minimum high_ns in I2C spec).
-> 
-> To fix this bug, min_low_ns should include fall time and min_high_ns
-> should include rise time too.
-> 
-> This patch merged the patch that Doug submitted to chromium, which
-> can get the rise and fall times for signals from the device tree.
-> This allows us to more accurately calculate timings. see:
-> https://chromium-review.googlesource.com/#/c/232774/
-> 
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
-> Changes in v2:
-> - merged the patch that Doug submitted to chromium
-> Changes in v3:
-> - merged the patch that Doug submitted to chromium to change bindins
->   see: https://chromium-review.googlesource.com/#/c/232775/
-Sorry, see https://chromium-review.googlesource.com/#/c/232774/ not 232775
+>  drivers/irqchip/irq-gic-v3-its.c   | 176 +++++++++++++++++++++++++++++++++++++
+>  include/linux/irqchip/arm-gic-v3.h |   6 ++
+>  2 files changed, 182 insertions(+)
 > 
->  Documentation/devicetree/bindings/i2c/i2c-rk3x.txt | 11 +++++
->  drivers/i2c/busses/i2c-rk3x.c                      | 57 +++++++++++++++-------
->  2 files changed, 50 insertions(+), 18 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
-> index dde6c22..925d6eb 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
-> @@ -21,6 +21,14 @@ Required on RK3066, RK3188 :
->  Optional properties :
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index d687fd4..532c6df 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -587,12 +587,47 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>  	return IRQ_SET_MASK_OK_DONE;
+>  }
 >  
->   - clock-frequency : SCL frequency to use (in Hz). If omitted, 100kHz is used.
-> + - i2c-scl-rising-time-ns : Number of nanoseconds the signal takes to rise
-> +	(t(r) in i2c spec). If not specified this is assumed to be the max the
-> +	spec allows(1000 ns for standard mode, 300 ns for fast mode) which
-> +	might cause slightly slower communication.
-> + - i2c-scl-falling-time-ns : Number of nanoseconds the signal takes to fall
-> +	(t(f) in the i2c0 spec).  If not specified this is assumed to be the
-> +	max the spec allows (300 ns) which might cause slightly slower
-> +	communication.
->  
->  Example:
->  
-> @@ -39,4 +47,7 @@ i2c0: i2c at 2002d000 {
->  
->  	clock-names = "i2c";
->  	clocks = <&cru PCLK_I2C0>;
+> +static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+> +{
+> +	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+> +	struct its_node *its;
+> +	u64 addr;
 > +
-> +	i2c-scl-rising-time-ns = <800>;
-> +	i2c-scl-falling-time-ns = <100>;
+> +	its = its_dev->its;
+> +	addr = its->phys_base + GITS_TRANSLATER;
+> +
+> +	msg->address_lo		= addr & ((1UL << 32) - 1);
+> +	msg->address_hi		= addr >> 32;
+> +	msg->data		= its_get_event_id(d);
+> +}
+> +
+>  static struct irq_chip its_irq_chip = {
+>  	.name			= "ITS",
+>  	.irq_mask		= its_mask_irq,
+>  	.irq_unmask		= its_unmask_irq,
+>  	.irq_eoi		= its_eoi_irq,
+>  	.irq_set_affinity	= its_set_affinity,
+> +	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
+> +};
+> +
+> +static void its_mask_msi_irq(struct irq_data *d)
+> +{
+> +	pci_msi_mask_irq(d);
+> +	irq_chip_mask_parent(d);
+> +}
+> +
+> +static void its_unmask_msi_irq(struct irq_data *d)
+> +{
+> +	pci_msi_unmask_irq(d);
+> +	irq_chip_unmask_parent(d);
+> +}
+> +
+> +static struct irq_chip its_msi_irq_chip = {
+> +	.name			= "ITS-MSI",
+> +	.irq_unmask		= its_unmask_msi_irq,
+> +	.irq_mask		= its_mask_msi_irq,
+> +	.irq_eoi		= irq_chip_eoi_parent,
+> +	.irq_write_msi_msg	= pci_msi_domain_write_msg,
 >  };
-> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> index 0ee5802..50c1678 100644
-> --- a/drivers/i2c/busses/i2c-rk3x.c
-> +++ b/drivers/i2c/busses/i2c-rk3x.c
-> @@ -102,6 +102,8 @@ struct rk3x_i2c {
 >  
->  	/* Settings */
->  	unsigned int scl_frequency;
-> +	unsigned int rise_ns;
-> +	unsigned int fall_ns;
->  
->  	/* Synchronization & notification */
->  	spinlock_t lock;
-> @@ -435,6 +437,8 @@ out:
->   *
->   * @clk_rate: I2C input clock rate
->   * @scl_rate: Desired SCL rate
-> + * @rise_ns: How many ns it takes for signals to rise.
-> + * @fall_ns: How many ns it takes for signals to fall.
->   * @div_low: Divider output for low
->   * @div_high: Divider output for high
->   *
-> @@ -443,11 +447,14 @@ out:
->   * too high, we silently use the highest possible rate.
->   */
->  static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
-> +			      unsigned long rise_ns, unsigned long fall_ns,
->  			      unsigned long *div_low, unsigned long *div_high)
->  {
-> +	unsigned long spec_min_low_ns, spec_min_high_ns;
-> +	unsigned long spec_max_data_hold_ns;
-> +	unsigned long spec_data_hold_buffer_ns;
+>  /*
+> @@ -1055,3 +1090,144 @@ static void its_free_device(struct its_device *its_dev)
+>  	kfree(its_dev->itt);
+>  	kfree(its_dev);
+>  }
 > +
->  	unsigned long min_low_ns, min_high_ns;
-> -	unsigned long max_data_hold_ns;
-> -	unsigned long data_hold_buffer_ns;
->  	unsigned long max_low_ns, min_total_ns;
->  
->  	unsigned long clk_rate_khz, scl_rate_khz;
-> @@ -470,28 +477,30 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
->  
->  	/*
->  	 * min_low_ns:  The minimum number of ns we need to hold low
-> -	 *		to meet i2c spec
-> +	 *		to meet i2c spec, should include fall time.
->  	 * min_high_ns: The minimum number of ns we need to hold high
-> -	 *		to meet i2c spec
-> +	 *		to meet i2c spec, should include rise time.
->  	 * max_low_ns:  The maximum number of ns we can hold low
-> -	 *		to meet i2c spec
-> +	 *		to meet i2c spec.
->  	 *
->  	 * Note: max_low_ns should be (max data hold time * 2 - buffer)
->  	 *	 This is because the i2c host on Rockchip holds the data line
->  	 *	 for half the low time.
->  	 */
->  	if (scl_rate <= 100000) {
-> -		min_low_ns = 4700;
-> -		min_high_ns = 4000;
-> -		max_data_hold_ns = 3450;
-> -		data_hold_buffer_ns = 50;
-> +		spec_min_low_ns = 4700;
-> +		spec_min_high_ns = 4000;
-> +		spec_max_data_hold_ns = 3450;
-> +		spec_data_hold_buffer_ns = 50;
->  	} else {
-> -		min_low_ns = 1300;
-> -		min_high_ns = 600;
-> -		max_data_hold_ns = 900;
-> -		data_hold_buffer_ns = 50;
-> +		spec_min_low_ns = 1300;
-> +		spec_min_high_ns = 600;
-> +		spec_max_data_hold_ns = 900;
-> +		spec_data_hold_buffer_ns = 50;
->  	}
-> -	max_low_ns = max_data_hold_ns * 2 - data_hold_buffer_ns;
-> +	min_low_ns = spec_min_low_ns + fall_ns;
-> +	min_high_ns = spec_min_high_ns + rise_ns;
-> +	max_low_ns = spec_max_data_hold_ns * 2 - spec_data_hold_buffer_ns;
->  	min_total_ns = min_low_ns + min_high_ns;
->  
->  	/* Adjust to avoid overflow */
-> @@ -588,8 +597,8 @@ static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
->  	u64 t_low_ns, t_high_ns;
->  	int ret;
->  
-> -	ret = rk3x_i2c_calc_divs(clk_rate, i2c->scl_frequency, &div_low,
-> -				 &div_high);
-> +	ret = rk3x_i2c_calc_divs(clk_rate, i2c->scl_frequency, i2c->rise_ns,
-> +				 i2c->fall_ns, &div_low, &div_high);
->  
->  	WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->scl_frequency);
->  
-> @@ -633,9 +642,9 @@ static int rk3x_i2c_clk_notifier_cb(struct notifier_block *nb, unsigned long
->  	switch (event) {
->  	case PRE_RATE_CHANGE:
->  		if (rk3x_i2c_calc_divs(ndata->new_rate, i2c->scl_frequency,
-> -				      &div_low, &div_high) != 0) {
-> +				       i2c->rise_ns, i2c->fall_ns, &div_low,
-> +				       &div_high) != 0)
->  			return NOTIFY_STOP;
-> -		}
->  
->  		/* scale up */
->  		if (ndata->new_rate > ndata->old_rate)
-> @@ -859,6 +868,18 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
->  		i2c->scl_frequency = DEFAULT_SCL_RATE;
->  	}
->  
-> +	/* Read rise and fall ns; if not there use the default max from spec */
-> +	if (of_property_read_u32(pdev->dev.of_node, "i2c-scl-rising-time-ns",
-> +				 &i2c->rise_ns)) {
-> +		if (i2c->scl_frequency <= 100000)
-> +			i2c->rise_ns = 1000;
-> +		else
-> +			i2c->rise_ns = 300;
+> +static int its_alloc_device_irq(struct its_device *dev, irq_hw_number_t *hwirq)
+> +{
+> +	int idx;
+> +
+> +	idx = find_first_zero_bit(dev->lpi_map, dev->nr_lpis);
+> +	if (idx == dev->nr_lpis)
+> +		return -ENOSPC;
+> +
+> +	*hwirq = dev->lpi_base + idx;
+> +	set_bit(idx, dev->lpi_map);
+> +
+> +	/* Map the GIC irq ID to the device */
+> +	its_send_mapvi(dev, *hwirq, idx);
+
+It would be better if we do hardware-level initialization in domain.{activate,deactivate}.
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
+> +			   int nvec, msi_alloc_info_t *info)
+> +{
+> +	struct pci_dev *pdev;
+> +	struct its_node *its;
+> +	u32 dev_id;
+> +	struct its_device *its_dev;
+> +
+> +	if (!dev_is_pci(dev))
+> +		return -EINVAL;
+> +
+> +	pdev = to_pci_dev(dev);
+> +	dev_id = PCI_DEVID(pdev->bus->number, pdev->devfn);
+> +	its = domain->parent->host_data;
+> +
+> +	its_dev = its_find_device(its, dev_id);
+> +	if (WARN_ON(its_dev))
+> +		return -EINVAL;
+> +
+> +	its_dev = its_create_device(its, dev_id, nvec);
+> +	if (!its_dev)
+> +		return -ENOMEM;
+> +
+> +	dev_dbg(&pdev->dev, "ITT %d entries, %d bits\n", nvec, ilog2(nvec));
+> +
+> +	info->scratchpad[0].ptr = its_dev;
+> +	info->scratchpad[1].ptr = dev;
+> +	return 0;
+> +}
+> +
+> +static struct msi_domain_ops its_pci_msi_ops = {
+> +	.msi_prepare	= its_msi_prepare,
+> +};
+> +
+> +static struct msi_domain_info its_pci_msi_domain_info = {
+> +	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+> +		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
+> +	.ops	= &its_pci_msi_ops,
+> +	.chip	= &its_msi_irq_chip,
+> +};
+> +
+> +static int its_irq_gic_domain_alloc(struct irq_domain *domain,
+> +				    unsigned int virq,
+> +				    irq_hw_number_t hwirq)
+> +{
+> +	struct of_phandle_args args;
+> +
+> +	args.np = domain->parent->of_node;
+> +	args.args_count = 3;
+> +	args.args[0] = GIC_IRQ_TYPE_LPI;
+> +	args.args[1] = hwirq;
+> +	args.args[2] = IRQ_TYPE_EDGE_RISING;
+> +
+> +	return irq_domain_alloc_irqs_parent(domain, virq, 1, &args);
+> +}
+> +
+> +static int its_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+> +				unsigned int nr_irqs, void *args)
+> +{
+> +	msi_alloc_info_t *info = args;
+> +	struct its_device *its_dev = info->scratchpad[0].ptr;
+> +	irq_hw_number_t hwirq;
+> +	int err;
+> +	int i;
+> +
+> +	for (i = 0; i < nr_irqs; i++) {
+> +		err = its_alloc_device_irq(its_dev, &hwirq);
+> +		if (err)
+> +			return err;
+> +
+> +		err = its_irq_gic_domain_alloc(domain, virq + i, hwirq);
+> +		if (err)
+> +			return err;
+> +
+> +		irq_domain_set_hwirq_and_chip(domain, virq + i,
+> +					      hwirq, &its_irq_chip, its_dev);
+> +		dev_dbg(info->scratchpad[1].ptr, "ID:%d pID:%d vID:%d\n",
+> +			(int)(hwirq - its_dev->lpi_base), (int)hwirq, virq + i);
 > +	}
-> +	if (of_property_read_u32(pdev->dev.of_node, "i2c-scl-falling-time-ns",
-> +				 &i2c->fall_ns))
-> +		i2c->fall_ns = 300;
 > +
->  	strlcpy(i2c->adap.name, "rk3x-i2c", sizeof(i2c->adap.name));
->  	i2c->adap.owner = THIS_MODULE;
->  	i2c->adap.algo = &rk3x_i2c_algorithm;
-> 
+> +	return 0;
+> +}
+> +
+> +static void its_irq_domain_free(struct irq_domain *domain, unsigned int virq,
+> +				unsigned int nr_irqs)
+> +{
+> +	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
+> +	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+> +	int i;
+> +
+> +	for (i = 0; i < nr_irqs; i++) {
+> +		struct irq_data *data = irq_domain_get_irq_data(domain,
+> +								virq + i);
+> +		int event = its_get_event_id(data);
+> +
+> +		/* Stop the delivery of interrupts */
+> +		its_send_discard(its_dev, event);
+> +
+> +		/* Mark interrupt index as unused */
+> +		clear_bit(event, its_dev->lpi_map);
+> +
+> +		/* Nuke the entry in the domain */
+> +		irq_domain_reset_irq_data(d);
+
+I think you mean "data" here, instead of "d"?
+
+Regards,
+	Abel
+
+> +	}
+> +
+> +	/* If all interrupts have been freed, start mopping the floor */
+> +	if (bitmap_empty(its_dev->lpi_map, its_dev->nr_lpis)) {
+> +		its_lpi_free(its_dev->lpi_map,
+> +			     its_dev->lpi_base,
+> +			     its_dev->nr_lpis);
+> +
+> +		/* Unmap device/itt */
+> +		its_send_mapd(its_dev, 0);
+> +		its_free_device(its_dev);
+> +	}
+> +
+> +	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
+> +}
+> +
+> +static const struct irq_domain_ops its_domain_ops = {
+> +	.alloc			= its_irq_domain_alloc,
+> +	.free			= its_irq_domain_free,
+> +};
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index 21c9d70..0ed30d7 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -295,6 +295,12 @@
+>  
+>  #include <linux/stringify.h>
+>  
+> +/*
+> + * We need a value to serve as a irq-type for LPIs. Choose one that will
+> + * hopefully pique the interest of the reviewer.
+> + */
+> +#define GIC_IRQ_TYPE_LPI		0xa110c8ed
+> +
+>  struct rdists {
+>  	struct {
+>  		void __iomem	*rd_base;
