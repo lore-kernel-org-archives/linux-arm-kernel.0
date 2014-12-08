@@ -1,111 +1,94 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Mon,  8 Dec 2014 19:28:20 +0800
-Subject: [PATCH] dmaengine: pl330: fix bug that cause start the same descs in
- cyclic
-Message-ID: <1418038100-4316-1-git-send-email-addy.ke@rock-chips.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 8 Dec 2014 19:29:04 +0800
+Subject: [PATCH 2/5] media: ov2640: add async probe function
+In-Reply-To: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>
+References: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1418038147-13221-3-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This bug will cause NULL pointer after commit dfac17, and cause
-wrong package in I2S DMA transfer before commit dfac17.
+To support async probe for ov2640, we need remove the code to get 'mclk'
+in ov2640_probe() function. oterwise, if soc_camera host is not probed
+in the moment, then we will fail to get 'mclk' and quit the ov2640_probe()
+function.
 
-Tested on RK3288-pinky2 board.
+So in this patch, we move such 'mclk' getting code to ov2640_s_power()
+function. That make ov2640 survive, as we can pass a NULL (priv-clk) to
+soc_camera_set_power() function.
 
-Detail:
-I2S DMA transfer(sound/core/pcm_dmaengine.c):
-dmaengine_pcm_prepare_and_submit -->
-dmaengine_prep_dma_cyclic -->
-pl330_prep_dma_cyclic -->
-the case:
-1. pl330_submit_req(desc0): thrd->req[0].desc = desc0, thrd->lstenq = 0
-2. pl330_submit_req(desc1): thrd->req[1].desc = desc1, thrd->lstenq = 1
-3. _start(desc0) by submit_req: thrd->req_running = 0
-   because: idx = 1 - thrd->lstenq = 0
-4. pl330_update(desc0 OK): thrd->req[0].desc = NULL, desc0 to req_done list
-   because: idx = active = thrd->req_running = 0
-5. _start(desc1) by pl330_update: thrd->req_running = 1
-   because:
-   idx = 1 - thrd->lstenq = 0, but thrd->req[0].desc == NULL,
-   so:
-   idx = thrd->lstenq = 1
-6. pl330_submit_req(desc2): thrd->req[0].desc = desc2, thrd->lstenq = 0
-7. _start(desc1) by submit_req: thrd->req_running = 1
-   because: idx = 1 - thrd->lstenq = 1
-   Note: _start started the same descs
-         _start should start desc2 here, NOT desc1
+And if soc_camera host is probed, the when ov2640_s_power() is called,
+then we can get the 'mclk' and that make us enable/disable soc_camera
+host's clock as well.
 
-8. pl330_update(desc1 OK): thrd->req[1].desc = NULL, desc1 to req_done list
-   because: idx = active = thrd->req_running = 1
-9. _start(desc2) by pl330_update : thrd->req_running = 0
-   because: idx = 1 - thrd->lstenq = 0
-10.pl330_update(desc1 OK, NOT desc2): thrd->req[0].desc = NULL,
-   desc2 to req_done list
-   because: idx = active = thrd->req_running = 0
-
-11.pl330_submit_req(desc3): thrd->req[0].desc = desc3, thrd->lstenq = 0
-12.pl330_submit_req(desc4): thrd->req[1].desc = desc4, thrd->lstenq = 1
-13._start(desc3) by submit_req: thrd->req_running = 0
-   because: idx = 1 - thrd->lstenq = 0
-14.pl330_update(desc2 OK NOT desc3): thrd->req[0].desc = NULL
-   desc3 to req_done list
-   because: idx = active = thrd->req_running = 0
-15._start(desc4) by pl330_update: thrd->req_running = 1
-   because:
-   idx = 1 - thrd->lstenq = 0, but thrd->req[0].desc == NULL,
-   so:
-   idx = thrd->lstenq = 1
-16.pl330_submit_req(desc5): thrd->req[0].desc = desc5, thrd->lstenq = 0
-17._start(desc4) by submit_req: thrd->req_running = 1
-   because: idx = 1 - thrd->lstenq = 1
-18.pl330_update(desc3 OK NOT desc4): thrd->req[1].desc = NULL
-   desc4 to req_done list
-   because: idx = active = thrd->req_running = 1
-19._start(desc4) by pl330_update: thrd->req_running = 0
-   because:
-   idx = 1 - thrd->lstenq = 1, but thrd->req[1].desc == NULL,
-   so:
-   idx = thrd->lstenq = 0
-20.pl330_update(desc4 OK): thrd->req[0].desc = NULL, desc5 to req_done list
-   because: idx = active = thrd->req_running = 0
-21.pl330_update(desc4 OK):
-   1) before commit dfac17(set req_running -1 in pl330_update/mark_free()):
-      because: active = -1, abort
-      result: desc0-desc5's callback are all called,
-	      but step 10 and step 18 go wrong.
-   2) before commit dfac17:
-      idx = active = thrd->req_runnig = 0 -->
-      descdone = thrd->req[0] = NULL -->
-      list_add_tail(&descdone->rqd, &pl330->req_done); -->
-      got NULL pointer!!!
-
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
- drivers/dma/pl330.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+v1 -> v2:
+  no changes.
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 025b905..0773832 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -1044,6 +1044,10 @@ static bool _trigger(struct pl330_thread *thrd)
- 	if (!req)
- 		return true;
- 
-+	/* Return if req is running */
-+	if (idx == thrd->req_running)
-+		return true;
+ drivers/media/i2c/soc_camera/ov2640.c | 31 +++++++++++++++++++++----------
+ 1 file changed, 21 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/media/i2c/soc_camera/ov2640.c b/drivers/media/i2c/soc_camera/ov2640.c
+index 1fdce2f..9ee910d 100644
+--- a/drivers/media/i2c/soc_camera/ov2640.c
++++ b/drivers/media/i2c/soc_camera/ov2640.c
+@@ -739,6 +739,15 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int on)
+ 	struct i2c_client *client = v4l2_get_subdevdata(sd);
+ 	struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
+ 	struct ov2640_priv *priv = to_ov2640(client);
++	struct v4l2_clk *clk;
 +
- 	desc = req->desc;
++	if (!priv->clk) {
++		clk = v4l2_clk_get(&client->dev, "mclk");
++		if (IS_ERR(clk))
++			dev_warn(&client->dev, "Cannot get the mclk. maybe soc-camera host is not probed yet.\n");
++		else
++			priv->clk = clk;
++	}
  
- 	ns = desc->rqcfg.nonsecure ? 1 : 0;
-@@ -1583,6 +1587,8 @@ static int pl330_update(struct pl330_dmac *pl330)
- 			descdone = thrd->req[active].desc;
- 			thrd->req[active].desc = NULL;
+ 	return soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
+ }
+@@ -1078,21 +1087,21 @@ static int ov2640_probe(struct i2c_client *client,
+ 	if (priv->hdl.error)
+ 		return priv->hdl.error;
  
-+			thrd->req_running = -1;
+-	priv->clk = v4l2_clk_get(&client->dev, "mclk");
+-	if (IS_ERR(priv->clk)) {
+-		ret = PTR_ERR(priv->clk);
+-		goto eclkget;
+-	}
+-
+ 	ret = ov2640_video_probe(client);
+ 	if (ret) {
+-		v4l2_clk_put(priv->clk);
+-eclkget:
+-		v4l2_ctrl_handler_free(&priv->hdl);
++		goto evideoprobe;
+ 	} else {
+ 		dev_info(&adapter->dev, "OV2640 Probed\n");
+ 	}
+ 
++	ret = v4l2_async_register_subdev(&priv->subdev);
++	if (ret < 0)
++		goto evideoprobe;
 +
- 			/* Get going again ASAP */
- 			_start(thrd);
++	return 0;
++
++evideoprobe:
++	v4l2_ctrl_handler_free(&priv->hdl);
+ 	return ret;
+ }
  
+@@ -1100,7 +1109,9 @@ static int ov2640_remove(struct i2c_client *client)
+ {
+ 	struct ov2640_priv       *priv = to_ov2640(client);
+ 
+-	v4l2_clk_put(priv->clk);
++	v4l2_async_unregister_subdev(&priv->subdev);
++	if (priv->clk)
++		v4l2_clk_put(priv->clk);
+ 	v4l2_device_unregister_subdev(&priv->subdev);
+ 	v4l2_ctrl_handler_free(&priv->hdl);
+ 	return 0;
 -- 
-1.8.3.2
+1.9.1
