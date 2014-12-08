@@ -1,41 +1,115 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 08 Dec 2014 10:44:12 +0100
-Subject: [PATCH 2/2] ARM: EXYNOS: Remove ARCH_HAS_BANDGAP selection
-In-Reply-To: <1417502073-6322-2-git-send-email-a.kesavan@samsung.com>
-References: <1417502073-6322-1-git-send-email-a.kesavan@samsung.com>
- <1417502073-6322-2-git-send-email-a.kesavan@samsung.com>
-Message-ID: <20141208104412.76c3023d@amdc2363>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 08 Dec 2014 10:46:17 +0100
+Subject: [RFC 1/3] devfreq: dt-bindings: Document Exynos3250 devfreq driver
+In-Reply-To: <1647680679.696101418015213383.JavaMail.weblogic@epmlwas04c>
+References: <1647680679.696101418015213383.JavaMail.weblogic@epmlwas04c>
+Message-ID: <1418031977.6084.13.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhilash,
-
-> On removing the samsung thermal driver dependency on ARCH_HAS_BANDGAP,
-> selection of this symbol becomes redundant.
+On pon, 2014-12-08 at 05:06 +0000, MyungJoo Ham wrote:
+> >   
+> >  Add documentation for bindings used by Exynos3250 devfreq driver.
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >  .../bindings/arm/samsung/exynos3250-devfreq.txt    | 66 ++++++++++++++++++++++
+> >  1 file changed, 66 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt b/Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt
+> > new file mode 100644
+> > index 000000000000..047955e9e371
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt
+> > @@ -0,0 +1,66 @@
+> > +Samsung Exynos3250 devfreq driver
+> > +=================================
+> > +
+> > +The driver support changing frequencies and voltage for:
+> > + - memory controller and bus,
+> > + - peripheral buses (left and right).
+> > +
+> > +Memory controller and bus
+> > +=========================
+> > +Required properties:
+> > + - compatible : should be "samsung,exynos3250-busfreq-mif"
+> > + - reg : two sets (offset and length of the register) for PPMU registers
+> > +	used by this devfreq driver
+> > + - clock-names : one clock of name "dmc" to manage frequency
+> > + - clocks : phandle and specifier for clock listed in clock-names property
+> > + - vdd_mif-supply : phandle to MIF voltage regulator
+> > +
+> > +Peripheral buses
+> > +================
+> > +Required properties:
+> > + - compatible : should be "samsung,exynos3250-busfreq-int"
+> > + - reg : two sets (offset and length of the register) for PPMU registers
+> > +	used by this devfreq driver
+> > + - clock-names : names for PPMU clocks and bus clocks to manage frequencies;
+> > +	All following clock names (and corresponding phandles) must be
+> > +	provided:
+> > +	- "ppmu_left", "ppmu_right",
+> > +	- "aclk_400", "aclk_266", "aclk_200", "aclk_160", "aclk_gdl", "aclk_gdr", "mfc";
+> > + - clocks : phandles and specifiers for clocks listed in clock-names property
+> > + - vdd_mif-supply : phandle to INT voltage regulator
+> > +
+> > +Example
+> > +=======
+> > +	busfreq_mif: busfreq at 106A0000 {
+> > +		compatible = "samsung,exynos3250-busfreq-mif";
+> > +		reg = <0x106A0000 0x2000>, <0x106B0000 0x2000>;
+> > +		clocks = <&cmu_dmc CLK_DIV_DMC>;
+> > +		clock-names = "dmc";
+> > +		vdd_mif-supply = <&buck1_reg>;
+> > +		status = "okay";
+> > +	};
 > 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig |    1 -
->  1 file changed, 1 deletion(-)
+> The hardware you are binding hereby is "Exynos PPMU".
+> You may consider to bind PPMU (DMC PPMU or BUS PPMU whichever hardware
+> you want to use) with DT and then let exynos bus devfreq driver use
+> the already-bound devices if found, ... in principle.
+> In other words or point of view, you may implement PPMU driver in
+> devfreq class device driver so that you let it bind PPMU device with DT.
+> It may be done similarly with the device below.
+
+Yes, you're right. I saw also similar case for Tegra Activity Monitor. 
+
+Thanks for pointing this,
+Krzysztof
+
+
 > 
-> diff --git a/arch/arm/mach-exynos/Kconfig
-> b/arch/arm/mach-exynos/Kconfig index e4a00ba..6ddfce7 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -9,7 +9,6 @@
->  
->  menuconfig ARCH_EXYNOS
->  	bool "Samsung EXYNOS" if ARCH_MULTI_V7
-> -	select ARCH_HAS_BANDGAP
->  	select ARCH_HAS_HOLES_MEMORYMODEL
->  	select ARCH_REQUIRE_GPIOLIB
->  	select ARM_AMBA
-
-Acked-by: Lukasz Majewski <l.majewski@samsung.com>
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+> 
+> Cheers,
+> MyungJoo.
+> 
+> 
+> > +
+> > +	busfreq_int: busfreq at 116A0000 {
+> > +		compatible = "samsung,exynos3250-busfreq-int";
+> > +		reg = <0x116A0000 0x2000>, <0x112A0000 0x2000>;
+> > +		clocks = <&cmu CLK_PPMULEFT>,
+> > +			<&cmu CLK_PPMURIGHT>,
+> > +			<&cmu CLK_DIV_ACLK_400_MCUISP>,
+> > +			<&cmu CLK_DIV_ACLK_266>,
+> > +			<&cmu CLK_DIV_ACLK_200>,
+> > +			<&cmu CLK_DIV_ACLK_160>,
+> > +			<&cmu CLK_DIV_GDL>,
+> > +			<&cmu CLK_DIV_GDR>,
+> > +			<&cmu CLK_DIV_MFC>;
+> > +		clock-names = "ppmuleft",
+> > +			"ppmuright",
+> > +			"aclk_400",
+> > +			"aclk_266",
+> > +			"aclk_200",
+> > +			"aclk_160",
+> > +			"aclk_gdl",
+> > +			"aclk_gdr",
+> > +			"mfc";
+> > +		vdd_int-supply = <&buck3_reg>;
+> > +		status = "okay";
+> > +	};
+> > -- 
+> > 1.9.1
+> > 
