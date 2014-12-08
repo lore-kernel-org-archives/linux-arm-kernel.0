@@ -1,86 +1,62 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Dec 2014 20:12:20 +0000
-Subject: [PATCH 3/6] PCI/MSI: of: add support for OF-provided msi_domain
-In-Reply-To: <1418069543-21969-1-git-send-email-marc.zyngier@arm.com>
-References: <1418069543-21969-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1418069543-21969-4-git-send-email-marc.zyngier@arm.com>
+Date: Mon,  8 Dec 2014 20:12:17 +0000
+Subject: [PATCH 0/6] Introducing per-device MSI domain
+Message-ID: <1418069543-21969-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to populate the PHB msi_domain, use the "msi-parent"
-attribute to lookup a corresponding irq domain. If found,
-this is our MSI domain.
+MSI-like interrupts are starting to creep out of the PCI world, and
+can now be seen into a number of "platform"-type busses. The MSI
+domain patches recognise that fact, and start providing a way to
+implement this.
 
-This gets plugged into the core PCI code.
+Another problem we have to solve is to identify which MSI domain a
+device is "connected" to. Currently, PCI gets away with a mixture of
+arch-specific callbacks, and a msi_controller structure that can
+optionally carry a pointer to an MSI domain. As we add new bus types
+and start dealing with topologies that do not map to what PCI does,
+this doesn't scale anymore.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/pci/of.c    | 15 +++++++++++++++
- drivers/pci/probe.c |  1 +
- include/linux/pci.h |  2 ++
- 3 files changed, 18 insertions(+)
+This patch series tries to address some of it by providing a basic
+link between 'struct device' and an MSI domain. It also adds (yet
+another) way for PCI to propagate the domain pointer through the PCI
+device hierarchy, provides a method for OF to kickstart the
+propagation process, and finally allows the PCI/MSI layer to use that
+information. Hopefully this can serve as a model to implement support
+for different but types.
 
-diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-index f092993..d8d1274 100644
---- a/drivers/pci/of.c
-+++ b/drivers/pci/of.c
-@@ -9,6 +9,7 @@
-  * 2 of the License, or (at your option) any later version.
-  */
- 
-+#include <linux/irqdomain.h>
- #include <linux/kernel.h>
- #include <linux/pci.h>
- #include <linux/of.h>
-@@ -59,3 +60,17 @@ struct device_node * __weak pcibios_get_phb_of_node(struct pci_bus *bus)
- 		return of_node_get(bus->bridge->parent->of_node);
- 	return NULL;
- }
-+
-+void pci_set_phb_of_msi_domain(struct pci_bus *bus)
-+{
-+#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
-+	struct device_node *np;
-+
-+	if (!bus->dev.of_node)
-+		return;
-+	np = of_parse_phandle(bus->dev.of_node, "msi-parent", 0);
-+	if (!np)
-+		return;
-+	dev_set_msi_domain(&bus->dev, irq_find_host(np));
-+#endif
-+}
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index d1009a2..65600e5 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -672,6 +672,7 @@ static void pci_set_bus_speed(struct pci_bus *bus)
- 
- void __weak pcibios_set_phb_msi_domain(struct pci_bus *bus)
- {
-+	pci_set_phb_of_msi_domain(bus);
- }
- 
- static void pci_set_bus_msi_domain(struct pci_bus *bus)
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 3266764..6a9713f 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1825,6 +1825,7 @@ void pci_set_of_node(struct pci_dev *dev);
- void pci_release_of_node(struct pci_dev *dev);
- void pci_set_bus_of_node(struct pci_bus *bus);
- void pci_release_bus_of_node(struct pci_bus *bus);
-+void pci_set_phb_of_msi_domain(struct pci_bus *bus);
- 
- /* Arch may override this (weak) */
- struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus);
-@@ -1845,6 +1846,7 @@ static inline void pci_set_of_node(struct pci_dev *dev) { }
- static inline void pci_release_of_node(struct pci_dev *dev) { }
- static inline void pci_set_bus_of_node(struct pci_bus *bus) { }
- static inline void pci_release_bus_of_node(struct pci_bus *bus) { }
-+static inline void pci_set_phb_of_msi_domain(struct pci_bus *bus) {}
- #endif  /* CONFIG_OF */
- 
- #ifdef CONFIG_EEH
+Additionally, the last two patches use all the above to remove any
+trace of the msi_controller structure from the two GIC interrupt
+controllers we use on arm64, so that they solely rely on the above
+infrastructure.
+
+This has been tested on arm64 with GICv2m (AMD Seattle) and GICv3 ITS
+(FVP model).
+
+Patches are on top of 3.18-rc7 + tip/irq/irq-domain-arm, and available at:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/msi_domain
+
+As always, comments most welcome.
+
+	M.
+
+Marc Zyngier (6):
+  device core: Introduce per-device MSI domain pointer
+  PCI/MSI: add hooks to populate the msi_domain field
+  PCI/MSI: of: add support for OF-provided msi_domain
+  PCI/MSI: Let pci_msi_get_domain use struct device's msi_domain
+  irqchip: GICv2m: Get rid of struct msi_controller
+  irqchip: gicv3-its: Get rid of struct msi_controller
+
+ drivers/irqchip/irq-gic-v2m.c    | 26 +++++++++-----------------
+ drivers/irqchip/irq-gic-v3-its.c | 29 ++++++++++++-----------------
+ drivers/pci/msi.c                |  3 ++-
+ drivers/pci/of.c                 | 15 +++++++++++++++
+ drivers/pci/probe.c              | 25 +++++++++++++++++++++++++
+ include/linux/device.h           | 20 ++++++++++++++++++++
+ include/linux/pci.h              |  3 +++
+ 7 files changed, 86 insertions(+), 35 deletions(-)
+
 -- 
 2.1.3
