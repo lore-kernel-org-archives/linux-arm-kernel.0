@@ -1,75 +1,36 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 8 Dec 2014 19:29:07 +0800
-Subject: [PATCH 5/5] media: ov2640: dt: add the device tree binding document
-In-Reply-To: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>
-References: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1418038147-13221-6-git-send-email-josh.wu@atmel.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 08 Dec 2014 17:02:12 +0530
+Subject: [PATCH 04/19] clk: samsung: exynos5433: Add clocks for CMU_PERIS
+ domain
+In-Reply-To: <1417510196-6714-5-git-send-email-cw00.choi@samsung.com>
+References: <1417510196-6714-1-git-send-email-cw00.choi@samsung.com>
+ <1417510196-6714-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <54858C3C.9020701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the document for ov2640 dt.
+Hi Chanwoo,
 
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
-v1 -> v2:
-  1. change the compatible string to be consistent with verdor file.
-  2. change the clock and pins' name.
-  3. add missed pinctrl in example.
+On Tuesday 02 December 2014 02:19 PM, Chanwoo Choi wrote:
+> This patch adds missing gate clocks of CMU_PERIS domain
+> which includes TMU/TZPC/SECKEY/CHIPID/TOPRTC/EFUSE IPs.
+> The special clocks of CMU_PERIS use fin_pll source clock directly.
+>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Inki Dae <inki.dae@samsung.com>
+> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
+> ---
+>   drivers/clk/samsung/clk-exynos5433.c   | 146 ++++++++++++++++++++++++++++++++-
+>   include/dt-bindings/clock/exynos5433.h |  33 +++++++-
+>   2 files changed, 176 insertions(+), 3 deletions(-)
+>
 
- .../devicetree/bindings/media/i2c/ov2640.txt       | 44 ++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
+Verified all registers and clock relationship against UM I have, and 
+changes are OK.
 
-diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
-new file mode 100644
-index 0000000..15be3cb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
-@@ -0,0 +1,44 @@
-+* Omnivision ov2640 CMOS sensor
-+
-+The Omnivision OV2640 sensor support multiple resolutions output, such as
-+CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
-+output format.
-+
-+Required Properties :
-+- compatible: Must be "ovti,ov2640"
-+- clocks: reference master clock, if using external fixed clock, you
-+          no need to have such property.
-+- clock-names: Must be "xvclk", it means the master clock for ov2640.
-+
-+Optional Properties:
-+- resetb-gpios: reset pin
-+- pwdn-gpios: power down pin
-+
-+The device node must contain one 'port' child node for its digital output
-+video port, in accordance with the video interface bindings defined in
-+Documentation/devicetree/bindings/media/video-interfaces.txt.
-+
-+Example:
-+
-+	i2c1: i2c at f0018000 {
-+		ov2640: camera at 0x30 {
-+			compatible = "ovti,ov2640";
-+			reg = <0x30>;
-+
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_pck1 &pinctrl_ov2640_pwdn &pinctrl_ov2640_reset>;
-+
-+			resetb-gpios = <&pioE 24 GPIO_ACTIVE_HIGH>;
-+			pwdn-gpios = <&pioE 29 GPIO_ACTIVE_HIGH>;
-+
-+			clocks = <&pck1>;
-+			clock-names = "xvclk";
-+
-+			port {
-+				ov2640_0: endpoint {
-+					remote-endpoint = <&isi_0>;
-+					bus-width = <8>;
-+				};
-+			};
-+		};
-+	};
--- 
-1.9.1
+Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+
+Thanks,
+Pankaj Dubey
