@@ -1,50 +1,157 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 8 Dec 2014 12:25:49 +0000
-Subject: [alsa-devel] Question on arm64 unaligned faults during playback
-In-Reply-To: <54858868.70708@metafoo.de>
-References: <CAM4voa=kiLsiLEzUbo3D+f1go5px78fXBSjSi7kGK4QCdnwPyQ@mail.gmail.com>
- <54856621.8090107@ladisch.de> <s5hppbumnis.wl-tiwai@suse.de>
- <54858868.70708@metafoo.de>
-Message-ID: <20141208122549.GF16185@e104818-lin.cambridge.arm.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Mon, 8 Dec 2014 20:31:40 +0800
+Subject: [PATCH v14 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
+In-Reply-To: <54859454.30603@huawei.com>
+References: <1418020040-68977-1-git-send-email-wangnan0@huawei.com>		
+ <1418020131-69375-1-git-send-email-wangnan0@huawei.com>	
+ <1418036666.3647.33.camel@linaro.org> <5485886E.2060303@huawei.com>
+ <1418039451.3647.48.camel@linaro.org> <54859454.30603@huawei.com>
+Message-ID: <54859A2C.8030009@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 11:15:52AM +0000, Lars-Peter Clausen wrote:
-> Added ARM64 folks to Cc.
+On 2014/12/8 20:06, Wang Nan wrote:
+> On 2014/12/8 19:50, Jon Medhurst (Tixy) wrote:
+>> On Mon, 2014-12-08 at 19:15 +0800, Wang Nan wrote:
+>>> On 2014/12/8 19:04, Jon Medhurst (Tixy) wrote:
+>>>> On Mon, 2014-12-08 at 14:28 +0800, Wang Nan wrote:
+[...]
+>>
+>> so another CPU could find and delete next before this one has finished
+>> doing so. Would the list end up in a consistent state where no loops
+>> develop and no probes are missed? I don't know the answer and a full
+>> analysis would be complicated, but my gut feeling is that if a cpu can
+>> observe the links in the list in an inconsistent state then only bad
+>> things can result.
+>>
+> 
+> I see the problem.
+> 
+> I'm thinking about making core.c and opt-arm.c to share stop_machine() code.
+> stop_machine() is required when removing breakpoint, so I'd like to define
+> a "remove_breakpoint" function in core.c and make opt-arm.c to call it.
+> Do you think it is a good idea?
+> 
+> 
 
-Thanks.
+What I mean is something like this:
 
-> On 12/08/2014 11:41 AM, Takashi Iwai wrote:
-> > At Mon, 08 Dec 2014 09:49:37 +0100,
-> > Clemens Ladisch wrote:
-> >>
-> >> Abhilash Kesavan wrote:
-> >>> I am working on a 64-bit ARM SoC (Samsung's Exynos7) and have observed
-> >>> unaligned faults while testing certain sound streams with aplay.
-> >>>
-> >>> [   24.535661] snd_pcm_lib_write_transfer:sound/core/pcm_lib.c hwbuf is ffffff8000085624, runtime->dma_area is ffffff8000080000, hwoff is 5513, frames_to_bytes is 22052, frames is 5513
-> >>> [   24.551244] Unhandled fault: alignment fault (0x96000061) at 0xffffff8000085624
-> >>> [   24.579944] PC is at __copy_from_user+0x14/0x60
-> >>> [   24.584450] LR is at snd_pcm_lib_write_transfer+0xe4/0x104
-> >>> [   24.922054] Call trace:
-> >>> [   24.924488] [<ffffffc0002d4784>] __copy_from_user+0x14/0x60
-> >>> [   24.930040] [<ffffffc0004b7574>] snd_pcm_lib_write1+0x1fc/0x384
+diff --git a/arch/arm/probes/kprobes/core.c b/arch/arm/probes/kprobes/core.c
+index 3a58db4..efd8ab1 100644
+--- a/arch/arm/probes/kprobes/core.c
++++ b/arch/arm/probes/kprobes/core.c
+@@ -163,19 +163,31 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
+  * memory. It is also needed to atomically set the two half-words of a 32-bit
+  * Thumb breakpoint.
+  */
+-int __kprobes __arch_disarm_kprobe(void *p)
+-{
+-	struct kprobe *kp = p;
+-	void *addr = (void *)((uintptr_t)kp->addr & ~1);
+-
+-	__patch_text(addr, kp->opcode);
++struct patch {
++	void *addr;
++	unsigned int insn;
++};
 
-I can see copy_from_user() here, I assume the source is a user space
-buffer and the destination is the ioremap'ed SRAM (which causes the
-unaligned fault). Such function is not supposed copy into device memory
-(its prototype does not specify __iomem for the destination pointer).
++static int __remove_breakpoint(void *data)
++{
++	struct patch *p = data;
++	__patch_text(p->addr, p->insn);
+ 	return 0;
+ }
 
-If you really want Device memory for the SRAM, I think we need some
-other API. memcpy_toio() could copy into such buffer but the source must
-be kernel. Maybe something like copy_from_user_toio()?
++void __kprobes remove_breakpoint(void *addr, unsigned int insn)
++{
++	struct patch p = {
++		.addr = addr,
++		.insn = insn,
++	};
++	stop_machine(__remove_breakpoint, &p, cpu_online_mask);
++}
++
+ void __kprobes arch_disarm_kprobe(struct kprobe *p)
+ {
+-	stop_machine(__arch_disarm_kprobe, p, cpu_online_mask);
++	remove_breakpoint((void *)((uintptr_t)p->addr & ~1),
++			p->opcode);
+ }
 
-Otherwise, if you can remap the buffer as Normal (non-cacheable) memory,
-you could use something like vmap() with pgprot_writecombine for the
-mapping. Even though ioremap_wc() returns (currently) Normal
-non-cacheable memory, such pointer (__iomem) should only be used with
-specific IO accessors (though I can see this assumption broken in a few
-places in the kernel).
+ void __kprobes arch_remove_kprobe(struct kprobe *p)
+diff --git a/arch/arm/probes/kprobes/core.h b/arch/arm/probes/kprobes/core.h
+index f88c79f..7b7c334 100644
+--- a/arch/arm/probes/kprobes/core.h
++++ b/arch/arm/probes/kprobes/core.h
+@@ -30,6 +30,8 @@
+ #define KPROBE_THUMB16_BREAKPOINT_INSTRUCTION	0xde18
+ #define KPROBE_THUMB32_BREAKPOINT_INSTRUCTION	0xf7f0a018
 
--- 
-Catalin
++extern void remove_breakpoint(void *addr, unsigned int insn);
++
+ enum probes_insn __kprobes
+ kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_probes_insn *asi,
+ 		const struct decode_header *h);
+diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
+index afbfeef..a1a1882 100644
+--- a/arch/arm/probes/kprobes/opt-arm.c
++++ b/arch/arm/probes/kprobes/opt-arm.c
+@@ -28,8 +28,9 @@
+ #include <asm/insn.h>
+ /* for patch_text */
+ #include <asm/patch.h>
+-/* for stop_machine */
+-#include <linux/stop_machine.h>
++
++#include "core.h"
++
+ /*
+  * NOTE: the first sub and add instruction will be modified according
+  * to the stack cost of the instruction.
+@@ -245,13 +246,8 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op, struct kprobe *or
+ 	return 0;
+ }
+
+-/*
+- * Similar to __arch_disarm_kprobe, operations which removing
+- * breakpoints must be wrapped by stop_machine to avoid racing.
+- */
+-static __kprobes int __arch_optimize_kprobes(void *p)
++void __kprobes arch_optimize_kprobes(struct list_head *oplist)
+ {
+-	struct list_head *oplist = p;
+ 	struct optimized_kprobe *op, *tmp;
+
+ 	list_for_each_entry_safe(op, tmp, oplist, list) {
+@@ -277,16 +273,15 @@ static __kprobes int __arch_optimize_kprobes(void *p)
+ 			  op->optinsn.copied_insn[0]) & 0xf0000000) |
+ 			(insn & 0x0fffffff);
+
+-		patch_text(op->kp.addr, insn);
++		/*
++		 * Similar to __arch_disarm_kprobe, operations which
++		 * removing breakpoints must be wrapped by stop_machine
++		 * to avoid racing.
++		 */
++		remove_breakpoint(op->kp.addr, insn);
+
+ 		list_del_init(&op->list);
+ 	}
+-	return 0;
+-}
+-
+-void arch_optimize_kprobes(struct list_head *oplist)
+-{
+-	stop_machine(__arch_optimize_kprobes, oplist, cpu_online_mask);
+ }
+
+ void arch_unoptimize_kprobe(struct optimized_kprobe *op)
+
+
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
