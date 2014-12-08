@@ -1,61 +1,145 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 08 Dec 2014 12:15:52 +0100
-Subject: [alsa-devel] Question on arm64 unaligned faults during playback
-In-Reply-To: <s5hppbumnis.wl-tiwai@suse.de>
-References: <CAM4voa=kiLsiLEzUbo3D+f1go5px78fXBSjSi7kGK4QCdnwPyQ@mail.gmail.com>	<54856621.8090107@ladisch.de>
- <s5hppbumnis.wl-tiwai@suse.de>
-Message-ID: <54858868.70708@metafoo.de>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Mon, 8 Dec 2014 19:15:58 +0800
+Subject: [PATCH v14 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
+In-Reply-To: <1418036666.3647.33.camel@linaro.org>
+References: <1418020040-68977-1-git-send-email-wangnan0@huawei.com>	
+ <1418020131-69375-1-git-send-email-wangnan0@huawei.com>
+ <1418036666.3647.33.camel@linaro.org>
+Message-ID: <5485886E.2060303@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added ARM64 folks to Cc.
-
-On 12/08/2014 11:41 AM, Takashi Iwai wrote:
-> At Mon, 08 Dec 2014 09:49:37 +0100,
-> Clemens Ladisch wrote:
+On 2014/12/8 19:04, Jon Medhurst (Tixy) wrote:
+> On Mon, 2014-12-08 at 14:28 +0800, Wang Nan wrote:
+>> This patch introduce kprobeopt for ARM 32.
 >>
->> Abhilash Kesavan wrote:
->>> I am working on a 64-bit ARM SoC (Samsung's Exynos7) and have observed
->>> unaligned faults while testing certain sound streams with aplay.
->>>
->>> [   24.535661] snd_pcm_lib_write_transfer:sound/core/pcm_lib.c hwbuf is ffffff8000085624, runtime->dma_area is ffffff8000080000, hwoff is 5513, frames_to_bytes is 22052, frames is 5513
->>> [   24.551244] Unhandled fault: alignment fault (0x96000061) at 0xffffff8000085624
->>> [   24.579944] PC is at __copy_from_user+0x14/0x60
->>> [   24.584450] LR is at snd_pcm_lib_write_transfer+0xe4/0x104
->>> [   24.922054] Call trace:
->>> [   24.924488] [<ffffffc0002d4784>] __copy_from_user+0x14/0x60
->>> [   24.930040] [<ffffffc0004b7574>] snd_pcm_lib_write1+0x1fc/0x384
->>>
->>> We are using the internal sram available for sound, for DMA buffer
->>> allocation, using the generic SRAM driver. From the above log, the
->>> buffer address offset is not 8-byte aligned and as we are using the
->>> SRAM driver which maps the memory as device memory we are getting an
->>> unaligned fault. Is it incorrect to use the generic sram driver for
->>> arm64 or am I missing something ?
+>> Limitations:
+>>  - Currently only kernel compiled with ARM ISA is supported.
 >>
->> When you give the ALSA framework a memory buffer, it is assumed that it
->> is general-purpose memory, i.e., can be accessed with any alignment.
+>>  - Offset between probe point and optinsn slot must not larger than
+>>    32MiB. Masami Hiramatsu suggests replacing 2 words, it will make
+>>    things complex. Futher patch can make such optimization.
 >>
->> If your memory does not allow such accesses, you have to do all the
->> accesses in your driver, i.e., do everything in the .copy/.silence
->> callbacks.  (You also have to add constraints so that periods and buffer
->> are correctly aligned.)
->
-> You can set runtime->min_align in the own hw_params callback so that
-> the PCM core handle it well, at least, for non-mmap mode.
->
-> But this feature has been rarely used (currently no driver sets it
-> explicitly), so there might be still some bugs there, too :)
+>> Kprobe opt on ARM is relatively simpler than kprobe opt on x86 because
+>> ARM instruction is always 4 bytes aligned and 4 bytes long. This patch
+>> replace probed instruction by a 'b', branch to trampoline code and then
+>> calls optimized_callback(). optimized_callback() calls opt_pre_handler()
+>> to execute kprobe handler. It also emulate/simulate replaced instruction.
+>>
+>> When unregistering kprobe, the deferred manner of unoptimizer may leave
+>> branch instruction before optimizer is called. Different from x86_64,
+>> which only copy the probed insn after optprobe_template_end and
+>> reexecute them, this patch call singlestep to emulate/simulate the insn
+>> directly. Futher patch can optimize this behavior.
+>>
+>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+>> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+>> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+>> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> ---
+> [...]
+>> v13 -> v14:
+>>   - Use stop_machine to wrap arch_optimize_kprobes to avoid a racing.
+> 
+> Think we need to use stop_machine differently, see comments on code
+> below.
 
-As far as I can see min_align only aligns the hardware pointer, but not the 
-application pointer. The later causes the issue here.
+Well, yes, I experienced one deadlock at serval minutes before.
+I'm not very sure the reason and working on it now. I think it may caused
+by recursivly stop_machine().
 
-E.g. if a application writes a unaligned amount of bytes the next write will 
-start at an unaligned buffer address.
+> 
+>> ---
+>>  arch/arm/Kconfig                        |   1 +
+>>  arch/arm/{kernel => include/asm}/insn.h |   0
+>>  arch/arm/include/asm/kprobes.h          |  29 +++
+>>  arch/arm/kernel/Makefile                |   2 +-
+>>  arch/arm/kernel/ftrace.c                |   3 +-
+>>  arch/arm/kernel/jump_label.c            |   3 +-
+>>  arch/arm/probes/kprobes/Makefile        |   1 +
+>>  arch/arm/probes/kprobes/opt-arm.c       | 322 ++++++++++++++++++++++++++++++++
+>>  samples/kprobes/kprobe_example.c        |   2 +-
+> 
+> The change kprobe_example.c doesn't apply and I guess wasn't meant to be
+> included in the patch?
+> 
 
-How safe is it in general to use IO mapped memory as general purpose memory 
-on ARM64? Are there maybe even more constraints than just that access has to 
-be aligned? Maybe the driver should rather use copy_from_user_toio() instead 
-of copy_from_user() to make sure that things work correctly.
+Yes. These 2 lines are introduced by mistake.
 
-- Lars
+> [...]
+>> +/*
+>> + * Similar to __arch_disarm_kprobe, operations which removing
+>> + * breakpoints must be wrapped by stop_machine to avoid racing.
+>> + */
+>> +static __kprobes int __arch_optimize_kprobes(void *p)
+>> +{
+>> +	struct list_head *oplist = p;
+>> +	struct optimized_kprobe *op, *tmp;
+>> +
+>> +	list_for_each_entry_safe(op, tmp, oplist, list) {
+>> +		unsigned long insn;
+>> +		WARN_ON(kprobe_disabled(&op->kp));
+>> +
+>> +		/*
+>> +		 * Backup instructions which will be replaced
+>> +		 * by jump address
+>> +		 */
+>> +		memcpy(op->optinsn.copied_insn, op->kp.addr,
+>> +				RELATIVEJUMP_SIZE);
+>> +
+>> +		insn = arm_gen_branch((unsigned long)op->kp.addr,
+>> +				(unsigned long)op->optinsn.insn);
+>> +		BUG_ON(insn == 0);
+>> +
+>> +		/*
+>> +		 * Make it a conditional branch if replaced insn
+>> +		 * is consitional
+>> +		 */
+>> +		insn = (__mem_to_opcode_arm(
+>> +			  op->optinsn.copied_insn[0]) & 0xf0000000) |
+>> +			(insn & 0x0fffffff);
+>> +
+>> +		patch_text(op->kp.addr, insn);
+> 
+> patch_text() itself may use stop_machine under certain circumstances,
+> and if it were to do so, I believe that would cause the system to
+> lock/panic. So, this should be __patch_text() instead, but we would also
+> need to take care of the cache_ops_need_broadcast() case, where all
+> CPU's need to invalidate their own caches and we can't rely on just one
+> CPU executing the code patching whilst other CPUs spin and wait. Though
+> to make life easier, we could just not optimise kprobes in the legacy
+> cache_ops_need_broadcast() case.
+> 
+>> +
+>> +		list_del_init(&op->list);
+>> +	}
+>> +	return 0;
+>> +}
+>> +
+>> +void arch_optimize_kprobes(struct list_head *oplist)
+>> +{
+>> +	stop_machine(__arch_optimize_kprobes, oplist, cpu_online_mask);
+>> +}
+> 
+> I believe passing cpu_online_mask above will cause
+> __arch_optimize_kprobes to be executed on every CPU, is this safe? If it
+> is, it's a serendipitous optimisation if each CPU can process different
+> probes in the list. If it's not safe, this needs to be NULL instead so
+> only one CPU executes the code.
+> 
+
+This stop_machine() call is copied from arch_disarm_kprobe, I think their
+senario should be similar.
+
+> However, I wonder if optimising all probes under a single stop_machine
+> call is the best thing to do because stop_machine does what it says and
+> prevents everything else in the system from running, including interrupt
+> handlers. Perhaps for system responsiveness this should be a single
+> stop_machine per kprobe? Though of course that compounds the overhead of
+> stop_machine use and puts another delay of one scheduler tick per probe.
+> (stop_machine waits for the next tick to schedule the threads to perform
+> the work which is why the test code takes so long to run).
+>  
+> What do people think?
+> 
