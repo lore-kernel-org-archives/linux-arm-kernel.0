@@ -1,109 +1,100 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 08 Dec 2014 12:04:53 +0000
-Subject: [PATCH v2 5/6] arm/arm64: KVM: Turn off vcpus on PSCI
- shutdown/reboot
-In-Reply-To: <1417641522-29056-6-git-send-email-christoffer.dall@linaro.org>
-References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
- <1417641522-29056-6-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <548593E5.7070101@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 Dec 2014 12:05:37 +0000
+Subject: [PATCH] arm: mm: dump: don't skip final region
+In-Reply-To: <CAPvkgC1oOU_3D03ZV-uZqTW_DX8J74oGEKQZTTi2YrC+oSqJyA@mail.gmail.com>
+References: <1417782016-11825-1-git-send-email-mark.rutland@arm.com>
+ <CAPvkgC1oOU_3D03ZV-uZqTW_DX8J74oGEKQZTTi2YrC+oSqJyA@mail.gmail.com>
+Message-ID: <20141208120537.GB21680@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/14 21:18, Christoffer Dall wrote:
-> When a vcpu calls SYSTEM_OFF or SYSTEM_RESET with PSCI v0.2, the vcpus
-> should really be turned off for the VM adhering to the suggestions in
-> the PSCI spec, and it's the sane thing to do.
+On Fri, Dec 05, 2014 at 04:23:47PM +0000, Steve Capper wrote:
+> On 5 December 2014 at 12:20, Mark Rutland <mark.rutland@arm.com> wrote:
+> > If the final page table entry we walk is a valid mapping, the page table
+> > dumping code will not log the region this entry is part of, as the final
+> > note_page call in walk_pgd will trigger an early return. Luckily this
+> > isn't seen on contemporary systems as they typically don't have enough
+> > RAM to extend the linear mapping right to the end of the address space.
+> >
+> > In note_page, we log a region when we reach its end (i.e. we hit an
+> > entry immediately afterwards which has different prot bits or is
+> > invalid). The final entry has no subsequent entry, so we will not log
+> > this immediately. We try to cater for this with a subsequent call to
+> > note_page in ptdump_show, but this returns early as 0 is less than
+> > USER_PGTABLES_CEILING, and hence we will skip a valid mapping if it
+> > spans to the final entry we note.
+> >
+> > Luckily, the final note_page call has level == 0, while all prior calls
+> > have a non-zero level, so if we also check level we will both skip user
+> > entries and handle the final note_page call correctly. Due to the way
+> > addr is constructed in the walk_* functions, it can never be less than
+> > LOWEST_ADDR when walking the page tables, so it is not necessary to
+> > avoid dereferencing invalid table addresses. The existing checks for
+> > st->current_prot and st->marker[1].start_address are sufficient to
+> > ensure we will not print and/or dereference garbage when trying to log
+> > information.
 > 
-> Also, clarify the behavior and expectations for exits to user space with
-> the KVM_EXIT_SYSTEM_EVENT case.
+> Do you mean USER_PGTABLES_CEILING instead of LOWEST_ADDR?
+
+Yes; sorry about that.
+
+Looking at this again my commit message is bogus: we can construct an
+address below USER_PGTABLES_CEILING in walk_pmd in the case of LPAE, as
+USER_PGTABLES_CEILING isn't pgd_t aligned in that case.
+
+As the swapper_pg_dir only contains kernel entries, the handling of
+USER_PGTABLES_CEILING is just an optimisation to skip some entries that
+we expect to be empty in the kernel page tables. We can handle them in
+note_page as we do for other *_none() entries and don't need to skip
+them early.
+
+So I can entirely remove the check against USER_PGTABLES_CEILING in
+note_page. Would that make sense to you?
+
+I also think we should remove pgdoff from walk_pgd. It's only non-zero
+for LPAE kernels, so currently if we corrupt the tables somehow and have
+entries below pgdoff we won't note them, making that case harder to
+spot.
+
+Thanks,
+Mark.
+
+> >
+> > This patch adds the aformentioned check for level, ensuring we log all
+> > regions in the kernel mappings, including those which span right to the
+> > end of the address space.
+> >
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  Documentation/virtual/kvm/api.txt |  9 +++++++++
->  arch/arm/kvm/psci.c               | 19 +++++++++++++++++++
->  arch/arm64/include/asm/kvm_host.h |  1 +
->  3 files changed, 29 insertions(+)
+> One comment above, then:
+> Acked-by: Steve Capper <steve.capper@linaro.org>
 > 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index 81f1b97..228f9cf 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -2957,6 +2957,15 @@ HVC instruction based PSCI call from the vcpu. The 'type' field describes
->  the system-level event type. The 'flags' field describes architecture
->  specific flags for the system-level event.
->  
-> +Valid values for 'type' are:
-> +  KVM_SYSTEM_EVENT_SHUTDOWN -- the guest has requested a shutdown of the
-> +   VM. Userspace is not obliged to honour this, and if it does honour
-> +   this does not need to destroy the VM synchronously (ie it may call
-> +   KVM_RUN again before shutdown finally occurs).
-> +  KVM_SYSTEM_EVENT_RESET -- the guest has requested a reset of the VM.
-> +   As with SHUTDOWN, userspace can choose to ignore the request, or
-> +   to schedule the reset to occur in the future and may call KVM_RUN again.
-> +
->  		/* Fix the size of the union. */
->  		char padding[256];
->  	};
-> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> index 09cf377..ae0bb91 100644
-> --- a/arch/arm/kvm/psci.c
-> +++ b/arch/arm/kvm/psci.c
-> @@ -15,6 +15,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/preempt.h>
->  #include <linux/kvm_host.h>
->  #include <linux/wait.h>
->  
-> @@ -166,6 +167,24 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
->  
->  static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
->  {
-> +	int i;
-> +	struct kvm_vcpu *tmp;
-> +
-> +	/*
-> +	 * The KVM ABI specifies that a system event exit may call KVM_RUN
-> +	 * again and may perform shutdown/reboot at a later time that when the
-> +	 * actual request is made.  Since we are implementing PSCI and a
-> +	 * caller of PSCI reboot and shutdown expects that the system shuts
-> +	 * down or reboots immediately, let's make sure that VCPUs are not run
-> +	 * after this call is handled and before the VCPUs have been
-> +	 * re-initialized.
-> +	 */
-> +	kvm_for_each_vcpu(i, tmp, vcpu->kvm)
-> +		tmp->arch.pause = true;
-> +	preempt_disable();
-> +	force_vm_exit(cpu_all_mask);
-> +	preempt_enable();
-> +
-
-I'm slightly uneasy about this force_vm_exit, as this is something that
-is directly triggered by the guest. I suppose it is almost impossible to
-find out which CPUs we're actually using...
-
->  	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
->  	vcpu->run->system_event.type = type;
->  	vcpu->run->exit_reason = KVM_EXIT_SYSTEM_EVENT;
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 65c6152..0b7dfdb 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -198,6 +198,7 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
->  struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
->  
->  u64 kvm_call_hyp(void *hypfn, ...);
-> +void force_vm_exit(const cpumask_t *mask);
->  
->  int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		int exception_index);
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Kees Cook <keescook@chromium.org>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Steve Capper <steve.capper@linaro.org>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm/mm/dump.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > I found this via inspection, rather than being hit by the problem described
+> > above, but it seemed worthwhile to fix this up (otherwise the final note_page
+> > call is pointless).
+> >
+> > diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+> > index 5942493..f459c0d 100644
+> > --- a/arch/arm/mm/dump.c
+> > +++ b/arch/arm/mm/dump.c
+> > @@ -220,7 +220,7 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level, u
+> >         static const char units[] = "KMGTPE";
+> >         u64 prot = val & pg_level[level].mask;
+> >
+> > -       if (addr < USER_PGTABLES_CEILING)
+> > +       if (level && addr < USER_PGTABLES_CEILING)
+> >                 return;
+> >
+> >         if (!st->level) {
+> > --
+> > 1.9.1
+> >
 > 
-
-Other than that,
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
