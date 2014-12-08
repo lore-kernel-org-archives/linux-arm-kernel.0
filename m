@@ -1,63 +1,90 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 08 Dec 2014 09:08:34 -0700
-Subject: linux-next: manual merge of the bcm2835 tree with the arm-soc tree
-In-Reply-To: <20141208134903.GN3951@x1>
-References: <20141208120619.68287b54@canb.auug.org.au>
- <2406890.FlzRjyvuXd@wuerfel> <20141208130009.GL3951@x1>
- <3348703.0b5FTH9Sa3@wuerfel> <20141208134903.GN3951@x1>
-Message-ID: <5485CD02.7010903@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 8 Dec 2014 16:21:40 +0000
+Subject: [PATCH v5] clocksource: arch_timer: Fix code to use physical
+ timers when requested
+In-Reply-To: <1417776064.14380.17.camel@mtksdaap41>
+References: <1416812564-26465-1-git-send-email-sonnyrao@chromium.org>
+ <1417776064.14380.17.camel@mtksdaap41>
+Message-ID: <20141208162140.GN16185@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2014 06:49 AM, Lee Jones wrote:
-> On Mon, 08 Dec 2014, Arnd Bergmann wrote:
->
->> On Monday 08 December 2014 13:00:09 Lee Jones wrote:
->>> On Mon, 08 Dec 2014, Arnd Bergmann wrote:
->>>
->>>> On Monday 08 December 2014 12:06:19 Stephen Rothwell wrote:
->>>>> Hi Stephen,
->>>>>
->>>>> Today's linux-next merge of the bcm2835 tree got a conflict in
->>>>> arch/arm/boot/dts/Makefile between commit 302a5ef29d49 ("ARM: BCM5301X:
->>>>> Add DT for Netgear R6300 V2") from the arm-soc tree and commit
->>>>> 6298ed17a404 ("ARM: bcm2835: Add device tree for Raspberry Pi model
->>>>> B+") from the bcm2835 tree.
->>>>>
->>>>> I fixed it up (the bcm2835 tree patch is also in the arm-soc tree as
->>>>> commit ba2a1d6959ac ("ARM: bcm2835: Add device tree for Raspberry Pi
->>>>> model B+"), so I just used the arm-soc version) and can carry the fix
->>>>> as necessary (no action is required).
->>>>
->>>> Thanks a lot for the notification!
->>>>
->>>> Lee, do you know what is going on? Did you accidentally rebase a commit
->>>> that you already sent for inclusion in arm-soc?
->>>
->>> Nope.  The branch hasn't changed at all.
->>>
->>> OOI why would a re-base affect anything?  I sent you it in patch form.
->>
->> Ah, I looked at the wrong branch and didn't see that I applied a patch
->> instead of a pull request. It's all fine then, as long as you never
->> intend to send any pull requests based on top of your current branch.
->>
->> You can possibly make Stephen's life a tiny bit simpler if you just
->> drop all patches from your for-next branch as soon as we've picked
->> them up into arm-soc.
->
-> That is something I thought about, but I believe we have users of that
-> branch.  I guess we could always point them to ARM-SoC, or reset the
-> branch to the aforementioned.
+On Fri, Dec 05, 2014 at 10:41:04AM +0000, Yingjoe Chen wrote:
+> On Sun, 2014-11-23 at 23:02 -0800, Sonny Rao wrote: 
+> > This is a bug fix for using physical arch timers when
+> > the arch_timer_use_virtual boolean is false.  It restores the
+> > arch_counter_get_cntpct() function after removal in
+> > 
+> > 0d651e4e "clocksource: arch_timer: use virtual counters"
+> > 
+> > We need this on certain ARMv7 systems which are architected like this:
+> > diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> > index f190971..b1fa4e6 100644
+> > --- a/arch/arm64/include/asm/arch_timer.h
+> > +++ b/arch/arm64/include/asm/arch_timer.h
+> > @@ -104,6 +104,15 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+> >  	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+> >  }
+> >  
+> > +static inline u64 arch_counter_get_cntpct(void)
+> > +{
+> > +	/*
+> > +	 * AArch64 kernel and user space mandate the use of CNTVCT.
+> > +	 */
+> > +	BUG();
+> > +	return 0;
+> > +}
+> > +
+> >  static inline u64 arch_counter_get_cntvct(void)
+> >  {
+> >  	u64 cval;
+> 
+> I tested this on an arm64 platform and system fail to boot when apply
+> this patch.
+> 
+> The boot loader start kernel at EL2, so is_hyp_mode_available() will be
+> true and we will use physical timer. Without this patch,
+> arch_timer_read_counter set to arch_counter_get_cntvct even when we use
+> physical timer which is incorrect but at least system will boot.
 
-The primary purpose of the kernel.org linux-rpi.git repo is for staging 
-patches into arm-soc/linux-next. As such, just like any other similar 
-repo, users should expect at least the for-xxx (e.g. for-next) branches 
-to get reset as kernel versions tick over, in order to contain the 
-content for the next kernel. Anyone using those branches for anything 
-else (e.g. local development) simply has to be prepared to do a rebase 
-themselves when that happens.
+So on arm64 we want to use CNTVCT all the time, even if we start the
+kernel at EL2. This is the counter that gets exposed to user via vdso.
+When the kernel boots at EL2, we initialise CNTVOFF to 0, so we know
+that CNTVCT == CNTPCT. However, I would still prefer to use CNTVCT even
+in such case to spot possible firmware issues with not restoring CNTVOFF
+when coming out of suspend (one particular case of suspend which does
+not require a different kernel entry point).
 
-Equally, and patches that get sent to arm-soc should probably never be 
-applied to linux-rpi.git; anything that gets applied to linux-rpi.git 
-should get sent to arm-soc as a pull request. That avoids duplicate commits.
+> I think we still need this function on arm64. We should add BUG() to
+> arch_timer_init instead, maybe something like this:
+> 
+> @@ -708,9 +708,12 @@ static void __init arch_timer_init(struct device_node *np)
+>  	 * If we cannot rely on firmware initializing the timer registers then
+>  	 * we should use the physical timers instead.
+>  	 */
+> -	if (IS_ENABLED(CONFIG_ARM) &&
+> -	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
+> +	if (of_property_read_bool(np, "arm,cpu-registers-not-fw-configured")) {
+> +		if (IS_ENABLED(CONFIG_ARM64))
+> +			BUG();
+> +		else
+>  			arch_timer_use_virtual = false;
+> +	}
+
+We could be more tolerant (give people a chance to check their DT):
+
+	if (!WARN_ON(IS_ENABLED(CONFIG_ARM64)))
+		arch_timer_use_virtual = false;
+
+In addition, we can define arch_counter_get_cntpct to always read CNTVCT
+(not that nice but maybe it looks better with a comment):
+
+/*
+ * AArch64 kernel and user space mandate the use of CNTVCT.
+ */
+#define arch_counter_get_cntpct	arch_counter_get_cntvct
+
+(or any better suggestion to avoid reading CNTPCT on arm64)
+
+-- 
+Catalin
