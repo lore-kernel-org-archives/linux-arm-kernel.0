@@ -1,102 +1,210 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 8 Dec 2014 08:46:29 +0000
-Subject: [PATCH v3 2/8] mfd: MT6397: Add support for PMIC MT6397 MFD
-In-Reply-To: <1417752479-4749-3-git-send-email-flora.fu@mediatek.com>
-References: <1417752479-4749-1-git-send-email-flora.fu@mediatek.com>
- <1417752479-4749-3-git-send-email-flora.fu@mediatek.com>
-Message-ID: <20141208084629.GB3951@x1>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 8 Dec 2014 09:52:02 +0100
+Subject: [PATCH v3] i2c: rk3x: fix bug that cause measured high_ns
+ doesn't meet I2C spec
+In-Reply-To: <1418007589-3688-1-git-send-email-addy.ke@rock-chips.com>
+References: <1415261514-4051-1-git-send-email-addy.ke@rock-chips.com>
+ <1418007589-3688-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <20141208085202.GA13486@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 05 Dec 2014, Flora Fu wrote:
+Hello Addy,
 
-> Add core files for MT6397 MFD driver.
+On Mon, Dec 08, 2014 at 10:59:49AM +0800, Addy Ke wrote:
+> high_ns calculated from the low division of CLKDIV register is the sum
+> of actual measured high_ns and rise_ns. The rise time which related to
+I think "actual measured" is misleading here. (The driver doesn't
+dermine these parameters automatically, right?)
+
+Maybe something like the following is more correct and understandable?:
+
+	The number of clock cycles to be written into the XYZ register
+	that determines the i2c clk high phase includes the rise time.
+	So to meet the timing requirements defined in the i2c
+	specification which defines the minimal time SCL has to be high,
+	the rise time has to taken into account. The same applies to the
+	low phase with falling time.
+
+> external pull-up resistor can be up to the maximum rise time in I2C spec.
 > 
-> Signed-off-by: Flora Fu <flora.fu@mediatek.com>
+> In my test, if external pull-up resistor is 4.7K, rise_ns is about
+It would be nice to point out the actual board you used (if it's a
+publically available machine).
+
+> 700ns. So the actual measured high_ns is about 3900ns, which is less
+> than 4000ns(the minimum high_ns in I2C spec).
+s/s(/s (/;
+s/spec/specification for Standard-mode/
+
+There are different capitalisation of i2c in the patch and the commit log. I
+don't know what Wolfram prefers here, but using the same spelling
+everywhere would be nice.
+
+> To fix this bug, min_low_ns should include fall time and min_high_ns
+> should include rise time too.
+> 
+> This patch merged the patch that Doug submitted to chromium, which
+Isn't Chromium a web browser? Does it really contain i2c stuff?
+I bet it's about Chromium OS.
+
+> can get the rise and fall times for signals from the device tree.
+> This allows us to more accurately calculate timings. see:
+> https://chromium-review.googlesource.com/#/c/232774/
+> 
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
 > ---
->  drivers/mfd/Kconfig                  |  10 +
->  drivers/mfd/Makefile                 |   1 +
->  drivers/mfd/mt6397-core.c            |  87 +++++++++
->  include/linux/mfd/mt6397/core.h      |  23 +++
->  include/linux/mfd/mt6397/registers.h | 362 +++++++++++++++++++++++++++++++++++
->  5 files changed, 483 insertions(+)
->  create mode 100644 drivers/mfd/mt6397-core.c
->  create mode 100644 include/linux/mfd/mt6397/core.h
->  create mode 100644 include/linux/mfd/mt6397/registers.h
+> Changes in v2:
+> - merged the patch that Doug submitted to chromium
+> Changes in v3:
+> - merged the patch that Doug submitted to chromium to change bindins
+>   see: https://chromium-review.googlesource.com/#/c/232775/
+> 
+>  Documentation/devicetree/bindings/i2c/i2c-rk3x.txt | 11 +++++
+>  drivers/i2c/busses/i2c-rk3x.c                      | 57 +++++++++++++++-------
+>  2 files changed, 50 insertions(+), 18 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> index dde6c22..925d6eb 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> @@ -21,6 +21,14 @@ Required on RK3066, RK3188 :
+>  Optional properties :
+>  
+>   - clock-frequency : SCL frequency to use (in Hz). If omitted, 100kHz is used.
+> + - i2c-scl-rising-time-ns : Number of nanoseconds the signal takes to rise
+> +	(t(r) in i2c spec). If not specified this is assumed to be the max the
+s/spec/specification/; s/max/maximum/
 
-[...]
+> +	spec allows(1000 ns for standard mode, 300 ns for fast mode) which
+s/s(/s (/; s/standard mode/Standard-mode/; s/fast mode/Fast-mode/;
 
-> +++ b/drivers/mfd/mt6397-core.c
-> @@ -0,0 +1,87 @@
-> +/*
-> + * Copyright (c) 2014 MediaTek Inc.
-> + * Author: Flora Fu <flora.fu@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
+
+> +	might cause slightly slower communication.
+> + - i2c-scl-falling-time-ns : Number of nanoseconds the signal takes to fall
+> +	(t(f) in the i2c0 spec).  If not specified this is assumed to be the
+s/i2c0/i2c/
+
+> +	max the spec allows (300 ns) which might cause slightly slower
+> +	communication.
+>  
+>  Example:
+>  
+> @@ -39,4 +47,7 @@ i2c0: i2c at 2002d000 {
+>  
+>  	clock-names = "i2c";
+>  	clocks = <&cru PCLK_I2C0>;
 > +
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/mfd/core.h>
-> +#include <linux/mfd/mt6397/core.h>
-> +#include <linux/soc/mediatek/mtk-pmic-wrap.h>
+> +	i2c-scl-rising-time-ns = <800>;
+> +	i2c-scl-falling-time-ns = <100>;
+>  };
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index 0ee5802..50c1678 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -470,28 +477,30 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
+>  
+>  	/*
+>  	 * min_low_ns:  The minimum number of ns we need to hold low
+> -	 *		to meet i2c spec
+> +	 *		to meet i2c spec, should include fall time.
+>  	 * min_high_ns: The minimum number of ns we need to hold high
+> -	 *		to meet i2c spec
+> +	 *		to meet i2c spec, should include rise time.
+>  	 * max_low_ns:  The maximum number of ns we can hold low
+> -	 *		to meet i2c spec
+> +	 *		to meet i2c spec.
+>  	 *
+>  	 * Note: max_low_ns should be (max data hold time * 2 - buffer)
+>  	 *	 This is because the i2c host on Rockchip holds the data line
+>  	 *	 for half the low time.
+>  	 */
+>  	if (scl_rate <= 100000) {
+		/* Standard-mode */
+> -		min_low_ns = 4700;
+> -		min_high_ns = 4000;
+> -		max_data_hold_ns = 3450;
+> -		data_hold_buffer_ns = 50;
+> +		spec_min_low_ns = 4700;
+> +		spec_min_high_ns = 4000;
+> +		spec_max_data_hold_ns = 3450;
+The specification calls this "data valid time" (t_(VD;DAT)).
+> +		spec_data_hold_buffer_ns = 50;
+I didn't find this parameter in the spec, also it doesn't differ for
+Standard-mode vs. Fast-mode. What is this?
+
+>  	} else {
+		/* Fast-mode */
+> -		min_low_ns = 1300;
+> -		min_high_ns = 600;
+> -		max_data_hold_ns = 900;
+> -		data_hold_buffer_ns = 50;
+> +		spec_min_low_ns = 1300;
+> +		spec_min_high_ns = 600;
+> +		spec_max_data_hold_ns = 900;
+> +		spec_data_hold_buffer_ns = 50;
+>  	}
+> -	max_low_ns = max_data_hold_ns * 2 - data_hold_buffer_ns;
+> +	min_low_ns = spec_min_low_ns + fall_ns;
+> +	min_high_ns = spec_min_high_ns + rise_ns;
+> +	max_low_ns = spec_max_data_hold_ns * 2 - spec_data_hold_buffer_ns;
+>  	min_total_ns = min_low_ns + min_high_ns;
+>  
+>  	/* Adjust to avoid overflow */
+> @@ -588,8 +597,8 @@ static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
+>  	u64 t_low_ns, t_high_ns;
+>  	int ret;
+>  
+> -	ret = rk3x_i2c_calc_divs(clk_rate, i2c->scl_frequency, &div_low,
+> -				 &div_high);
+> +	ret = rk3x_i2c_calc_divs(clk_rate, i2c->scl_frequency, i2c->rise_ns,
+> +				 i2c->fall_ns, &div_low, &div_high);
+>  
+>  	WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->scl_frequency);
+>  
+> @@ -633,9 +642,9 @@ static int rk3x_i2c_clk_notifier_cb(struct notifier_block *nb, unsigned long
+>  	switch (event) {
+>  	case PRE_RATE_CHANGE:
+>  		if (rk3x_i2c_calc_divs(ndata->new_rate, i2c->scl_frequency,
+> -				      &div_low, &div_high) != 0) {
+> +				       i2c->rise_ns, i2c->fall_ns, &div_low,
+> +				       &div_high) != 0)
+>  			return NOTIFY_STOP;
+> -		}
+>  
+>  		/* scale up */
+>  		if (ndata->new_rate > ndata->old_rate)
+> @@ -859,6 +868,18 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
+>  		i2c->scl_frequency = DEFAULT_SCL_RATE;
+>  	}
+>  
+> +	/* Read rise and fall ns; if not there use the default max from spec */
+> +	if (of_property_read_u32(pdev->dev.of_node, "i2c-scl-rising-time-ns",
+> +				 &i2c->rise_ns)) {
+> +		if (i2c->scl_frequency <= 100000)
+> +			i2c->rise_ns = 1000;
+> +		else
+> +			i2c->rise_ns = 300;
+> +	}
+> +	if (of_property_read_u32(pdev->dev.of_node, "i2c-scl-falling-time-ns",
+> +				 &i2c->fall_ns))
+> +		i2c->fall_ns = 300;
 > +
-> +static const struct mfd_cell mt6397_devs[] = {
-> +	{ .name = "mt6397-rtc" },
-> +	{
-> +		.name = "mt6397-regulator",
-> +		.of_compatible = "mediatek,mt6397-regulator",
-> +	},
-> +	{
-> +		.name = "mt6397-codec",
-> +		.of_compatible = "mediatek,mt6397-codec",
-> +	},
-> +};
-> +
-> +static int mt6397_probe(struct platform_device *pdev)
-> +{
-> +	u32 ret;
-> +	struct mt6397_chip *mt6397;
-> +	struct pmic_wrapper *wrp;
-> +
-> +	/* mt6397 MFD is child device of soc pmic wrapper. */
-> +	if (!pdev->dev.parent)
-> +		return -ENODEV;
-> +
-> +	wrp = dev_get_drvdata(pdev->dev.parent);
+I don't know if other drivers do the same (I assume they should). If so,
+moving this logic into the core would be nice. I guess this can still be
+done later.
 
-You're _still_ not checking the return value prior to dereferencing.
+The i2c specification also has a minimum for t(r) and t(f). I don't know
+why these are limited, but I think it would be good to check for these
+limits, too.
 
-> +	mt6397 = devm_kzalloc(&pdev->dev, sizeof(*mt6397), GFP_KERNEL);
-> +	if (!mt6397)
-> +		return -ENOMEM;
-> +
-> +	mt6397->dev = &pdev->dev;
-> +	mt6397->regmap = wrp->regmap;
+>  	strlcpy(i2c->adap.name, "rk3x-i2c", sizeof(i2c->adap.name));
+>  	i2c->adap.owner = THIS_MODULE;
+>  	i2c->adap.algo = &rk3x_i2c_algorithm;
 
-> +	platform_set_drvdata(pdev, mt6397);
-> +
-> +	ret = mfd_add_devices(&pdev->dev, -1, &mt6397_devs[0],
-
-Just mt6397_devs here.
-
-> +			ARRAY_SIZE(mt6397_devs), NULL, 0, NULL);
-> +	if (ret)
-> +		dev_err(&pdev->dev, "failed to add child devices: %d\n", ret);
-
-There is no point in printing ret.  The kernel will do that for you.
-
-[...]
+Best regards
+Uwe
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
