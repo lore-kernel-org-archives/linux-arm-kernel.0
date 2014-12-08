@@ -1,88 +1,213 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 8 Dec 2014 16:51:27 +0000
-Subject: linux-next: manual merge of the bcm2835 tree with the arm-soc tree
-In-Reply-To: <5485CD02.7010903@wwwdotorg.org>
-References: <20141208120619.68287b54@canb.auug.org.au>
- <2406890.FlzRjyvuXd@wuerfel> <20141208130009.GL3951@x1>
- <3348703.0b5FTH9Sa3@wuerfel> <20141208134903.GN3951@x1>
- <5485CD02.7010903@wwwdotorg.org>
-Message-ID: <20141208165127.GP3951@x1>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 9 Dec 2014 00:53:35 +0800
+Subject: [PATCH 1/4] clk: sunxi: Rework MMC phase clocks
+In-Reply-To: <1417972868-12055-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1417972868-12055-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1417972868-12055-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65Q17qacuV0bxWyCyweAPiUCwapqmiYCtYME6ONNN-Jug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 08 Dec 2014, Stephen Warren wrote:
-> On 12/08/2014 06:49 AM, Lee Jones wrote:
-> >On Mon, 08 Dec 2014, Arnd Bergmann wrote:
-> >
-> >>On Monday 08 December 2014 13:00:09 Lee Jones wrote:
-> >>>On Mon, 08 Dec 2014, Arnd Bergmann wrote:
-> >>>
-> >>>>On Monday 08 December 2014 12:06:19 Stephen Rothwell wrote:
-> >>>>>Hi Stephen,
-> >>>>>
-> >>>>>Today's linux-next merge of the bcm2835 tree got a conflict in
-> >>>>>arch/arm/boot/dts/Makefile between commit 302a5ef29d49 ("ARM: BCM5301X:
-> >>>>>Add DT for Netgear R6300 V2") from the arm-soc tree and commit
-> >>>>>6298ed17a404 ("ARM: bcm2835: Add device tree for Raspberry Pi model
-> >>>>>B+") from the bcm2835 tree.
-> >>>>>
-> >>>>>I fixed it up (the bcm2835 tree patch is also in the arm-soc tree as
-> >>>>>commit ba2a1d6959ac ("ARM: bcm2835: Add device tree for Raspberry Pi
-> >>>>>model B+"), so I just used the arm-soc version) and can carry the fix
-> >>>>>as necessary (no action is required).
-> >>>>
-> >>>>Thanks a lot for the notification!
-> >>>>
-> >>>>Lee, do you know what is going on? Did you accidentally rebase a commit
-> >>>>that you already sent for inclusion in arm-soc?
-> >>>
-> >>>Nope.  The branch hasn't changed at all.
-> >>>
-> >>>OOI why would a re-base affect anything?  I sent you it in patch form.
-> >>
-> >>Ah, I looked at the wrong branch and didn't see that I applied a patch
-> >>instead of a pull request. It's all fine then, as long as you never
-> >>intend to send any pull requests based on top of your current branch.
-> >>
-> >>You can possibly make Stephen's life a tiny bit simpler if you just
-> >>drop all patches from your for-next branch as soon as we've picked
-> >>them up into arm-soc.
-> >
-> >That is something I thought about, but I believe we have users of that
-> >branch.  I guess we could always point them to ARM-SoC, or reset the
-> >branch to the aforementioned.
-> 
-> The primary purpose of the kernel.org linux-rpi.git repo is for
-> staging patches into arm-soc/linux-next. As such, just like any
-> other similar repo, users should expect at least the for-xxx (e.g.
-> for-next) branches to get reset as kernel versions tick over, in
-> order to contain the content for the next kernel. Anyone using those
-> branches for anything else (e.g. local development) simply has to be
-> prepared to do a rebase themselves when that happens.
+On Mon, Dec 8, 2014 at 1:21 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Instead of having three different clocks for the main MMC clock and the two
+> phase sub-clocks, which involved having three different drivers sharing the
+> same register, rework it to have the same single driver registering three
+> different clocks.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/clk/sunxi/clk-mod0.c | 129 ++++++++++++++++++++++---------------------
+>  1 file changed, 67 insertions(+), 62 deletions(-)
+>
+> diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+> index 658d74f39451..24522c5b94ae 100644
+> --- a/drivers/clk/sunxi/clk-mod0.c
+> +++ b/drivers/clk/sunxi/clk-mod0.c
+> @@ -115,19 +115,17 @@ static void __init sun5i_a13_mbus_setup(struct device_node *node)
+>  }
+>  CLK_OF_DECLARE(sun5i_a13_mbus, "allwinner,sun5i-a13-mbus-clk", sun5i_a13_mbus_setup);
+>
+> -struct mmc_phase_data {
+> -       u8      offset;
+> -};
+> -
+>  struct mmc_phase {
+>         struct clk_hw           hw;
+> +       u8                      offset;
+>         void __iomem            *reg;
+> -       struct mmc_phase_data   *data;
+>         spinlock_t              *lock;
+>  };
+>
+>  #define to_mmc_phase(_hw) container_of(_hw, struct mmc_phase, hw)
+>
+> +static DEFINE_SPINLOCK(sun4i_a10_mmc_lock);
+> +
 
-I agree with this.
+I'd move this to just above the setup function.
+The get/set_phase callbacks don't need it.
 
-> Equally, and patches that get sent to arm-soc should probably never
-> be applied to linux-rpi.git; anything that gets applied to
-> linux-rpi.git should get sent to arm-soc as a pull request. That
-> avoids duplicate commits.
+>  static int mmc_get_phase(struct clk_hw *hw)
+>  {
+>         struct clk *mmc, *mmc_parent, *clk = hw->clk;
+> @@ -138,7 +136,7 @@ static int mmc_get_phase(struct clk_hw *hw)
+>         u8 delay;
+>
+>         value = readl(phase->reg);
+> -       delay = (value >> phase->data->offset) & 0x3;
+> +       delay = (value >> phase->offset) & 0x3;
+>
+>         if (!delay)
+>                 return 180;
+> @@ -226,8 +224,8 @@ static int mmc_set_phase(struct clk_hw *hw, int degrees)
+>
+>         spin_lock_irqsave(phase->lock, flags);
+>         value = readl(phase->reg);
+> -       value &= ~GENMASK(phase->data->offset + 3, phase->data->offset);
+> -       value |= delay << phase->data->offset;
+> +       value &= ~GENMASK(phase->offset + 3, phase->offset);
+> +       value |= delay << phase->offset;
+>         writel(value, phase->reg);
+>         spin_unlock_irqrestore(phase->lock, flags);
+>
+> @@ -239,66 +237,73 @@ static const struct clk_ops mmc_clk_ops = {
+>         .set_phase      = mmc_set_phase,
+>  };
+>
+> -static void __init sun4i_a10_mmc_phase_setup(struct device_node *node,
+> -                                            struct mmc_phase_data *data)
+> +static void __init sun4i_a10_mmc_setup(struct device_node *node)
+>  {
+> -       const char *parent_names[1] = { of_clk_get_parent_name(node, 0) };
+> -       struct clk_init_data init = {
+> -               .num_parents    = 1,
+> -               .parent_names   = parent_names,
+> -               .ops            = &mmc_clk_ops,
+> -       };
+> -
+> -       struct mmc_phase *phase;
+> -       struct clk *clk;
+> -
+> -       phase = kmalloc(sizeof(*phase), GFP_KERNEL);
+> -       if (!phase)
+> -               return;
+> -
+> -       phase->hw.init = &init;
+> -
+> -       phase->reg = of_iomap(node, 0);
+> -       if (!phase->reg)
+> -               goto err_free;
+> +       struct clk_onecell_data *clk_data;
+> +       const char *parent;
+> +       void __iomem *reg;
+> +       int i;
+>
+> -       phase->data = data;
+> -       phase->lock = &sun4i_a10_mod0_lock;
+> +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+> +       if (IS_ERR(reg)) {
+> +               pr_err("Couldn't map the %s clock registers\n", node->name);
+> +               return;
+> +       }
+>
+> -       if (of_property_read_string(node, "clock-output-names", &init.name))
+> -               init.name = node->name;
+> +       clk_data = kmalloc(sizeof(*clk_data), GFP_KERNEL);
+> +       if (!clk_data)
+> +               return;
+>
+> -       clk = clk_register(NULL, &phase->hw);
+> -       if (IS_ERR(clk))
+> -               goto err_unmap;
+> +       clk_data->clks = kcalloc(3, sizeof(*clk_data->clks), GFP_KERNEL);
+> +       if (!clk_data->clks)
+> +               goto err_free_data;
+> +
+> +       clk_data->clk_num = 3;
+> +       clk_data->clks[0] = sunxi_factors_register(node,
+> +                                                  &sun4i_a10_mod0_data,
+> +                                                  &sun4i_a10_mmc_lock, reg);
+> +       if (!clk_data->clks[0])
+> +               goto err_free_clks;
+> +
+> +       parent = __clk_get_name(clk_data->clks[0]);
+> +
+> +       for (i = 1; i < 3; i++) {
+> +               struct clk_init_data init = {
+> +                       .num_parents    = 1,
+> +                       .parent_names   = &parent,
+> +                       .ops            = &mmc_clk_ops,
+> +               };
+> +               struct mmc_phase *phase;
+> +
+> +               phase = kmalloc(sizeof(*phase), GFP_KERNEL);
+> +               if (!phase)
+> +                       continue;
+> +
+> +               phase->hw.init = &init;
+> +               phase->reg = reg;
+> +               phase->lock = &sun4i_a10_mmc_lock;
+> +
+> +               if (i == 1)
+> +                       phase->offset = 8;
+> +               else
+> +                       phase->offset = 20;
+> +
+> +               if (of_property_read_string_index(node, "clock-output-names",
+> +                                                 i, &init.name))
+> +                       init.name = node->name;
 
-I'm okay to follow this rule if my perception of the tree is changed.
-The current view is that this repo can be used by engineers/hobbyists
-as a single resource to pick up RPi patches which are yet to complete
-their full transition into Mainline.
+You could assign first, then call of_property_read_string_index.
+It won't touch the string unless a valid string is found.
 
-Arnd and I had a discussion where I flagged my concerns about these
-kinds of conflicts.  The outcome was that as long as the patches were
-simple enough, then no conflict should arise.  Unfortunately this
-turned out not to be quite true.
+> +
+> +               clk_data->clks[i] = clk_register(NULL, &phase->hw);
+> +               if (IS_ERR(clk_data->clks[i]))
+> +                       continue;
 
-So I'm happy with whatever.  Stephen, the repo is your concept.  I'll
-play it however you want me to play it.  As the merge-window is now
-open I'm going to eradicate rpi/for-next in any case.
+I'm a bit skeptical about partial success/failure, though I don't
+have a strong argument for or against it yet.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+ChenYu
+
+> +       }
+>
+> -       of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +       of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+>
+>         return;
+>
+> -err_unmap:
+> -       iounmap(phase->reg);
+> -err_free:
+> -       kfree(phase);
+> -}
+> -
+> -
+> -static struct mmc_phase_data mmc_output_clk = {
+> -       .offset = 8,
+> -};
+> -
+> -static struct mmc_phase_data mmc_sample_clk = {
+> -       .offset = 20,
+> -};
+> -
+> -static void __init sun4i_a10_mmc_output_setup(struct device_node *node)
+> -{
+> -       sun4i_a10_mmc_phase_setup(node, &mmc_output_clk);
+> -}
+> -CLK_OF_DECLARE(sun4i_a10_mmc_output, "allwinner,sun4i-a10-mmc-output-clk", sun4i_a10_mmc_output_setup);
+> -
+> -static void __init sun4i_a10_mmc_sample_setup(struct device_node *node)
+> -{
+> -       sun4i_a10_mmc_phase_setup(node, &mmc_sample_clk);
+> +err_free_clks:
+> +       kfree(clk_data->clks);
+> +err_free_data:
+> +       kfree(clk_data);
+>  }
+> -CLK_OF_DECLARE(sun4i_a10_mmc_sample, "allwinner,sun4i-a10-mmc-sample-clk", sun4i_a10_mmc_sample_setup);
+> +CLK_OF_DECLARE(sun4i_a10_mmc, "allwinner,sun4i-a10-mmc-clk", sun4i_a10_mmc_setup);
+> --
+> 2.2.0
