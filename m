@@ -1,35 +1,29 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Mon, 8 Dec 2014 17:58:14 +0800
-Subject: [PATCH V2] mm:add VM_BUG_ON() for page_mapcount()
-In-Reply-To: <010b01d012ca$05244060$0f6cc120$@alibaba-inc.com>
-References: <010b01d012ca$05244060$0f6cc120$@alibaba-inc.com>
-Message-ID: <35FD53F367049845BC99AC72306C23D103E688B313F9@CNBJMBX05.corpusers.net>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 8 Dec 2014 10:59:32 +0100
+Subject: [PATCH] ARM: shmobile: r8a7794: Add USBDMAC[01] clocks to device
+ tree
+In-Reply-To: <1418000076-28780-1-git-send-email-horms+renesas@verge.net.au>
+References: <1418000076-28780-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdU9sZvrCyLh0NURNx4axt5hzUyEJgUMe09ZSMxYwegMKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add VM_BUG_ON_PAGE() for slab page,
-because _mapcount is an union with slab struct in struct page,
-avoid access _mapcount if this page is a slab page.
-Also remove the unneeded bracket.
+On Mon, Dec 8, 2014 at 1:54 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+>
+> Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+> [horms: merged per-clock patches]
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
----
- include/linux/mm.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-diff --git a/include/linux/mm.h b/include/linux/mm.h
-index b464611..a117527 100644
---- a/include/linux/mm.h
-+++ b/include/linux/mm.h
-@@ -449,7 +449,8 @@ static inline void page_mapcount_reset(struct page *page)
- 
- static inline int page_mapcount(struct page *page)
- {
--	return atomic_read(&(page)->_mapcount) + 1;
-+	VM_BUG_ON_PAGE(PageSlab(page), page);
-+	return atomic_read(&page->_mapcount) + 1;
- }
- 
- static inline int page_count(struct page *page)
--- 
-2.1.3
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
