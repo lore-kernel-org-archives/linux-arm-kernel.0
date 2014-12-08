@@ -1,122 +1,65 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Mon, 08 Dec 2014 17:32:55 +0530
-Subject: [PATCH V2] tick-broadcast: Register for hrtimer based broadcast
- as the fallback broadcast mode
-In-Reply-To: <20141208104828.GA21680@leverpostej>
-References: <20141208065513.3075.48721.stgit@preeti.in.ibm.com>
- <20141208104828.GA21680@leverpostej>
-Message-ID: <5485936F.20901@linux.vnet.ibm.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Mon, 08 Dec 2014 13:04:33 +0100
+Subject: [alsa-devel] Question on arm64 unaligned faults during playback
+In-Reply-To: <54858868.70708@metafoo.de>
+References: <CAM4voa=kiLsiLEzUbo3D+f1go5px78fXBSjSi7kGK4QCdnwPyQ@mail.gmail.com>
+ <54856621.8090107@ladisch.de> <s5hppbumnis.wl-tiwai@suse.de>
+ <54858868.70708@metafoo.de>
+Message-ID: <s5ha92y9wku.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2014 04:18 PM, Mark Rutland wrote:
-> Hi Preeti,
+At Mon, 08 Dec 2014 12:15:52 +0100,
+Lars-Peter Clausen wrote:
 > 
-> On Mon, Dec 08, 2014 at 06:55:43AM +0000, Preeti U Murthy wrote:
->> Commit 5d1638acb9f6 ('tick: Introduce hrtimer based broadcast') added a
->> hrtimer based broadcast mode for those platforms in which local timers stop
->> when CPUs enter deep idle states. The commit expected the platforms to
->> register for this mode explicitly when they lacked a better external device
->> to wake up CPUs in deep idle. Given that more platforms are beginning to use
->> this mode, we can avoid the call to set it up on every platform that requires
->> it, by registering for the hrtimer based broadcast mode in the core code if
->> no better broadcast device is available.
->>
->> This commit also helps detect cases where the platform fails to register for
->> a broadcast device but invokes the help of one when entering deep idle states.
->> Currently we do not handle this situation at all and call the broadcast clock
->> device without checking for its existence. This patch will handle such buggy
->> cases properly.
->>
->> Signed-off-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+> Added ARM64 folks to Cc.
 > 
-> I've just given this a go on an arm64 platform (Juno) without any
-> system-wide clock_event_devices registered, and everything works well
-> with CPUs entering and exiting idle states where the cpu-local timers
-> lose state. So:
+> On 12/08/2014 11:41 AM, Takashi Iwai wrote:
+> > At Mon, 08 Dec 2014 09:49:37 +0100,
+> > Clemens Ladisch wrote:
+> >>
+> >> Abhilash Kesavan wrote:
+> >>> I am working on a 64-bit ARM SoC (Samsung's Exynos7) and have observed
+> >>> unaligned faults while testing certain sound streams with aplay.
+> >>>
+> >>> [   24.535661] snd_pcm_lib_write_transfer:sound/core/pcm_lib.c hwbuf is ffffff8000085624, runtime->dma_area is ffffff8000080000, hwoff is 5513, frames_to_bytes is 22052, frames is 5513
+> >>> [   24.551244] Unhandled fault: alignment fault (0x96000061) at 0xffffff8000085624
+> >>> [   24.579944] PC is at __copy_from_user+0x14/0x60
+> >>> [   24.584450] LR is at snd_pcm_lib_write_transfer+0xe4/0x104
+> >>> [   24.922054] Call trace:
+> >>> [   24.924488] [<ffffffc0002d4784>] __copy_from_user+0x14/0x60
+> >>> [   24.930040] [<ffffffc0004b7574>] snd_pcm_lib_write1+0x1fc/0x384
+> >>>
+> >>> We are using the internal sram available for sound, for DMA buffer
+> >>> allocation, using the generic SRAM driver. From the above log, the
+> >>> buffer address offset is not 8-byte aligned and as we are using the
+> >>> SRAM driver which maps the memory as device memory we are getting an
+> >>> unaligned fault. Is it incorrect to use the generic sram driver for
+> >>> arm64 or am I missing something ?
+> >>
+> >> When you give the ALSA framework a memory buffer, it is assumed that it
+> >> is general-purpose memory, i.e., can be accessed with any alignment.
+> >>
+> >> If your memory does not allow such accesses, you have to do all the
+> >> accesses in your driver, i.e., do everything in the .copy/.silence
+> >> callbacks.  (You also have to add constraints so that periods and buffer
+> >> are correctly aligned.)
+> >
+> > You can set runtime->min_align in the own hw_params callback so that
+> > the PCM core handle it well, at least, for non-mmap mode.
+> >
+> > But this feature has been rarely used (currently no driver sets it
+> > explicitly), so there might be still some bugs there, too :)
 > 
-> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> As far as I can see min_align only aligns the hardware pointer, but not the 
+> application pointer. The later causes the issue here.
+> 
+> E.g. if a application writes a unaligned amount of bytes the next write will 
+> start at an unaligned buffer address.
 
-Thanks!
+Oh right, and I think we should fix the alignment of applptr, too.
+We can set min_align zero as default and allow the unaligned applptr
+update while aligning to the size if given explicitly.
 
-> 
-> One minor thing I noticed when testing was that
-> /sys/devices/system/clockevents/broadcast/name contained "(null)",
-> because we never set the name field on the clock_event_device. It's
-> always been that way, but now might be a good time to change that to
-> something like "broadcast_hrtimer".
 
-You mean /sys/devices/system/clockevents/broadcast/current_device right?
-
-> 
-> [...]
-> 
->> diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
->> index 2e4cb67..91754b0 100644
->> --- a/include/linux/clockchips.h
->> +++ b/include/linux/clockchips.h
->> @@ -187,11 +187,11 @@ extern int tick_receive_broadcast(void);
->>  #endif
->>  
->>  #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) && defined(CONFIG_TICK_ONESHOT)
->> -extern void tick_setup_hrtimer_broadcast(void);
->> +extern int __init tick_setup_hrtimer_broadcast(void);
->>  extern int tick_check_broadcast_expired(void);
->>  #else
->>  static inline int tick_check_broadcast_expired(void) { return 0; }
->> -static inline void tick_setup_hrtimer_broadcast(void) {};
->> +static inline int __init tick_setup_hrtimer_broadcast(void) { return 0; }
->>  #endif
->>  
->>  #ifdef CONFIG_GENERIC_CLOCKEVENTS
->> @@ -207,7 +207,7 @@ static inline void clockevents_resume(void) {}
->>  
->>  static inline int clockevents_notify(unsigned long reason, void *arg) { return 0; }
->>  static inline int tick_check_broadcast_expired(void) { return 0; }
->> -static inline void tick_setup_hrtimer_broadcast(void) {};
->> +static inline int __init tick_setup_hrtimer_broadcast(void) { return 0; }
-> 
-> With the initcall moved to the driver we have no external users of
-> tick_setup_hrtimer_broadcast, so I think we can remove the prototype
-> entirely from clockchips.h...
-> 
->>  #endif
->>  
->> diff --git a/kernel/time/tick-broadcast-hrtimer.c b/kernel/time/tick-broadcast-hrtimer.c
->> index eb682d5..5c35995 100644
->> --- a/kernel/time/tick-broadcast-hrtimer.c
->> +++ b/kernel/time/tick-broadcast-hrtimer.c
->> @@ -98,9 +98,11 @@ static enum hrtimer_restart bc_handler(struct hrtimer *t)
->>  	return HRTIMER_RESTART;
->>  }
->>  
->> -void tick_setup_hrtimer_broadcast(void)
->> +int __init tick_setup_hrtimer_broadcast(void)
-> 
-> ...and make it static here.
-
-Yep will do. Sorry I overlooked this.
-
-> 
->>  {
->>  	hrtimer_init(&bctimer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
->>  	bctimer.function = bc_handler;
->>  	clockevents_register_device(&ce_broadcast_hrtimer);
->> +	return 0;
->>  }
->> +early_initcall(tick_setup_hrtimer_broadcast);
-> 
-> Otherwise this looks good to me, thanks for putting this together!
-
-Thanks a lot for the review! Will send out the patch with the above
-corrections.
-
-Regards
-Preeti U Murthy
-> 
-> Mark.
-> _______________________________________________
-> Linuxppc-dev mailing list
-> Linuxppc-dev at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/linuxppc-dev
-> 
+Takashi
