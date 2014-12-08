@@ -1,73 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 8 Dec 2014 23:15:09 +0100
-Subject: [PATCHv2 1/3] sunxi:dts-bindings:input:ps2 bindings for A10/A20
- ps2.
-In-Reply-To: <1417907719-26775-2-git-send-email-VishnuPatekar0510@gmail.com>
-References: <1417907719-26775-1-git-send-email-VishnuPatekar0510@gmail.com>
- <1417907719-26775-2-git-send-email-VishnuPatekar0510@gmail.com>
-Message-ID: <20141208221509.GM8739@lukather>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 08 Dec 2014 14:22:16 -0800
+Subject: [PATCH] ARM: bcm: fix __iomem annotation on kona_smc
+In-Reply-To: <1418075148-8752-1-git-send-email-olof@lixom.net>
+References: <1418075148-8752-1-git-send-email-olof@lixom.net>
+Message-ID: <54862498.8080101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Dec 07, 2014 at 04:45:17AM +0530, vishnupatekar wrote:
-> A10 and A20 have same PS2 addresses, clocks, interrupts.
-> added compatible as allwinner,sun4i-a10-ps2.
+On 08/12/14 13:45, Olof Johansson wrote:
+> Fixes the following sparse warning:
+> arch/arm/mach-bcm/bcm_kona_smc.c:145:21: warning: incorrect type in initializer (different address spaces)
+> arch/arm/mach-bcm/bcm_kona_smc.c:145:21:    expected unsigned int [usertype] *args
+> arch/arm/mach-bcm/bcm_kona_smc.c:145:21:    got void [noderef] <asn:2>*static [toplevel] [assigned] bcm_smc_buffer
+> arch/arm/mach-bcm/bcm_kona_smc.c:151:9: warning: incorrect type in argument 2 (different address spaces)
+> arch/arm/mach-bcm/bcm_kona_smc.c:151:9:    expected void volatile [noderef] <asn:2>*addr
+> arch/arm/mach-bcm/bcm_kona_smc.c:151:9:    got unsigned int [usertype] *
+> [+ 2 more instances]
 > 
-> Signed-off-by: vishnupatekar <VishnuPatekar0510@gmail.com>
-
-You should have your real name here.
-
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 > ---
->  .../bindings/input/allwinner,sunxi-ps2.txt         |   23 ++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/allwinner,sunxi-ps2.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/input/allwinner,sunxi-ps2.txt b/Documentation/devicetree/bindings/input/allwinner,sunxi-ps2.txt
-> new file mode 100644
-> index 0000000..3a8919a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/allwinner,sunxi-ps2.txt
-> @@ -0,0 +1,23 @@
-> +* Device tree bindings for Allwinner A10, A20 PS2 host controller
+> Florian, should we just apply this directly on arm-soc?
 
-> +A20 PS2 is dual role controller(PS2 host and PS2 device). These
-> +bindings are for PS2 host controller. IBM compliant IBM PS2 and
-> AT-compatible keyboard and mouse can be connected.
+Yes please.
 
-This should be wrapped to 80 chars.
-
-> +Required properties:
-> +
-> + - reg             : Offset and length of the register set for the device.
-> + - compatible      : Should one of the following:
-> +                     - "allwinner,sun7i-a20-ps2"
-> +                     - "allwinner,sun4i-a10-ps2"
-> + - interrupts      : The interrupt line connected to the PS2.
-> + - clocks          : The gate clk connected to the PS2.
-> +
-> +
-> +Example:
-> +	ps20: ps2 at 0x01c2a000 {
-> +		compatible = "allwinner,sun7i-a20-ps2";
-> +		reg = <0x01c2a000 0x400>;
-> +		interrupts = <0 62 4>;
-> +		clocks = <&apb1_gates 6>;
-> +		status = "disabled";
-> +	};
-> -- 
-> 1.7.9.5
 > 
+> 
+> -Olof
+> 
+>  arch/arm/mach-bcm/bcm_kona_smc.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
+> index a55a7ec..d506d17 100644
+> --- a/arch/arm/mach-bcm/bcm_kona_smc.c
+> +++ b/arch/arm/mach-bcm/bcm_kona_smc.c
+> @@ -142,7 +142,7 @@ static int bcm_kona_do_smc(u32 service_id, u32 buffer_phys)
+>  static void __bcm_kona_smc(void *info)
+>  {
+>  	struct bcm_kona_smc_data *data = info;
+> -	u32 *args = bcm_smc_buffer;
+> +	u32 __iomem *args = bcm_smc_buffer;
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141208/3b63a824/attachment.sig>
+Your fix looks good to me, although the original code sounds a little
+dubious, especially in LPAE environment.
+
+>  
+>  	BUG_ON(smp_processor_id() != 0);
+>  	BUG_ON(!args);
+> 
