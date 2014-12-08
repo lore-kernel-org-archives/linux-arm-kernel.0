@@ -1,157 +1,120 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 08 Dec 2014 12:08:19 +0000
-Subject: [PATCH v2 6/6] arm/arm64: KVM: Introduce stage2_unmap_vm
-In-Reply-To: <1417641522-29056-7-git-send-email-christoffer.dall@linaro.org>
-References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
- <1417641522-29056-7-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <548594B3.8040507@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 Dec 2014 12:11:10 +0000
+Subject: [PATCH V2] tick-broadcast: Register for hrtimer based broadcast
+ as the fallback broadcast mode
+In-Reply-To: <5485936F.20901@linux.vnet.ibm.com>
+References: <20141208065513.3075.48721.stgit@preeti.in.ibm.com>
+ <20141208104828.GA21680@leverpostej>
+ <5485936F.20901@linux.vnet.ibm.com>
+Message-ID: <20141208121110.GC21680@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/14 21:18, Christoffer Dall wrote:
-> Introduce a new function to unmap user RAM regions in the stage2 page
-> tables.  This is needed on reboot (or when the guest turns off the MMU)
-> to ensure we fault in pages again and make the dcache, RAM, and icache
-> coherent.
+On Mon, Dec 08, 2014 at 12:02:55PM +0000, Preeti U Murthy wrote:
+> On 12/08/2014 04:18 PM, Mark Rutland wrote:
+> > Hi Preeti,
+> > 
+> > On Mon, Dec 08, 2014 at 06:55:43AM +0000, Preeti U Murthy wrote:
+> >> Commit 5d1638acb9f6 ('tick: Introduce hrtimer based broadcast') added a
+> >> hrtimer based broadcast mode for those platforms in which local timers stop
+> >> when CPUs enter deep idle states. The commit expected the platforms to
+> >> register for this mode explicitly when they lacked a better external device
+> >> to wake up CPUs in deep idle. Given that more platforms are beginning to use
+> >> this mode, we can avoid the call to set it up on every platform that requires
+> >> it, by registering for the hrtimer based broadcast mode in the core code if
+> >> no better broadcast device is available.
+> >>
+> >> This commit also helps detect cases where the platform fails to register for
+> >> a broadcast device but invokes the help of one when entering deep idle states.
+> >> Currently we do not handle this situation at all and call the broadcast clock
+> >> device without checking for its existence. This patch will handle such buggy
+> >> cases properly.
+> >>
+> >> Signed-off-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+> > 
+> > I've just given this a go on an arm64 platform (Juno) without any
+> > system-wide clock_event_devices registered, and everything works well
+> > with CPUs entering and exiting idle states where the cpu-local timers
+> > lose state. So:
+> > 
+> > Tested-by: Mark Rutland <mark.rutland@arm.com>
 > 
-> Using unmap_stage2_range for the whole guest physical range does not
-> work, because that unmaps IO regions (such as the GIC) which will not be
-> recreated or in the best case faulted in on a page-by-page basis.
+> Thanks!
 > 
-> Call this function on secondary and subsequent calls to the
-> KVM_ARM_VCPU_INIT ioctl so that a reset VCPU will detect the guest
-> Stage-1 MMU is off when faulting in pages and make the caches coherent.
+> > 
+> > One minor thing I noticed when testing was that
+> > /sys/devices/system/clockevents/broadcast/name contained "(null)",
+> > because we never set the name field on the clock_event_device. It's
+> > always been that way, but now might be a good time to change that to
+> > something like "broadcast_hrtimer".
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm/include/asm/kvm_mmu.h   |  1 +
->  arch/arm/kvm/arm.c               |  7 +++++
->  arch/arm/kvm/mmu.c               | 65 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm64/include/asm/kvm_mmu.h |  1 +
->  4 files changed, 74 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index acb0d57..4654c42 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -52,6 +52,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
->  void free_boot_hyp_pgd(void);
->  void free_hyp_pgds(void);
->  
-> +void stage2_unmap_vm(struct kvm *kvm);
->  int kvm_alloc_stage2_pgd(struct kvm *kvm);
->  void kvm_free_stage2_pgd(struct kvm *kvm);
->  int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 4043769..da87c07 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -701,6 +701,13 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
->  	if (ret)
->  		return ret;
->  
-> +	/*
-> +	 * Ensure a rebooted VM will fault in RAM pages and detect if the
-> +	 * guest MMU is turned off and flush the caches as needed.
-> +	 */
-> +	if (vcpu->arch.has_run_once)
-> +		stage2_unmap_vm(vcpu->kvm);
-> +
->  	vcpu_reset_hcr(vcpu);
->  
->  	/*
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 57a403a..b1f3c9a 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -611,6 +611,71 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
->  	unmap_range(kvm, kvm->arch.pgd, start, size);
->  }
->  
-> +static void stage2_unmap_memslot(struct kvm *kvm,
-> +				 struct kvm_memory_slot *memslot)
-> +{
-> +	hva_t hva = memslot->userspace_addr;
-> +	phys_addr_t addr = memslot->base_gfn << PAGE_SHIFT;
-> +	phys_addr_t size = PAGE_SIZE * memslot->npages;
-> +	hva_t reg_end = hva + size;
-> +
-> +	/*
-> +	 * A memory region could potentially cover multiple VMAs, and any holes
-> +	 * between them, so iterate over all of them to find out if we should
-> +	 * unmap any of them.
-> +	 *
-> +	 *     +--------------------------------------------+
-> +	 * +---------------+----------------+   +----------------+
-> +	 * |   : VMA 1     |      VMA 2     |   |    VMA 3  :    |
-> +	 * +---------------+----------------+   +----------------+
-> +	 *     |               memory region                |
-> +	 *     +--------------------------------------------+
-> +	 */
-> +	do {
-> +		struct vm_area_struct *vma = find_vma(current->mm, hva);
-> +		hva_t vm_start, vm_end;
-> +
-> +		if (!vma || vma->vm_start >= reg_end)
-> +			break;
-> +
-> +		/*
-> +		 * Take the intersection of this VMA with the memory region
-> +		 */
-> +		vm_start = max(hva, vma->vm_start);
-> +		vm_end = min(reg_end, vma->vm_end);
-> +
-> +		if (!(vma->vm_flags & VM_PFNMAP)) {
-> +			gpa_t gpa = addr + (vm_start - memslot->userspace_addr);
-> +			unmap_stage2_range(kvm, gpa, vm_end - vm_start);
-> +		}
-> +		hva = vm_end;
-> +	} while (hva < reg_end);
-> +}
-> +
-> +/**
-> + * stage2_unmap_vm - Unmap Stage-2 RAM mappings
-> + * @kvm: The struct kvm pointer
-> + *
-> + * Go through the memregions and unmap any reguler RAM
-> + * backing memory already mapped to the VM.
-> + */
-> +void stage2_unmap_vm(struct kvm *kvm)
-> +{
-> +	struct kvm_memslots *slots;
-> +	struct kvm_memory_slot *memslot;
-> +	int idx;
-> +
-> +	idx = srcu_read_lock(&kvm->srcu);
-> +	spin_lock(&kvm->mmu_lock);
-> +
-> +	slots = kvm_memslots(kvm);
-> +	kvm_for_each_memslot(memslot, slots)
-> +		stage2_unmap_memslot(kvm, memslot);
-> +
-> +	spin_unlock(&kvm->mmu_lock);
-> +	srcu_read_unlock(&kvm->srcu, idx);
-> +}
-> +
->  /**
->   * kvm_free_stage2_pgd - free all stage-2 tables
->   * @kvm:	The KVM struct pointer for the VM.
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 0caf7a5..061fed7 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -83,6 +83,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
->  void free_boot_hyp_pgd(void);
->  void free_hyp_pgds(void);
->  
-> +void stage2_unmap_vm(struct kvm *kvm);
->  int kvm_alloc_stage2_pgd(struct kvm *kvm);
->  void kvm_free_stage2_pgd(struct kvm *kvm);
->  int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
-> 
+> You mean /sys/devices/system/clockevents/broadcast/current_device right?
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Whoops, yes I did.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> > [...]
+> > 
+> >> diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+> >> index 2e4cb67..91754b0 100644
+> >> --- a/include/linux/clockchips.h
+> >> +++ b/include/linux/clockchips.h
+> >> @@ -187,11 +187,11 @@ extern int tick_receive_broadcast(void);
+> >>  #endif
+> >>  
+> >>  #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) && defined(CONFIG_TICK_ONESHOT)
+> >> -extern void tick_setup_hrtimer_broadcast(void);
+> >> +extern int __init tick_setup_hrtimer_broadcast(void);
+> >>  extern int tick_check_broadcast_expired(void);
+> >>  #else
+> >>  static inline int tick_check_broadcast_expired(void) { return 0; }
+> >> -static inline void tick_setup_hrtimer_broadcast(void) {};
+> >> +static inline int __init tick_setup_hrtimer_broadcast(void) { return 0; }
+> >>  #endif
+> >>  
+> >>  #ifdef CONFIG_GENERIC_CLOCKEVENTS
+> >> @@ -207,7 +207,7 @@ static inline void clockevents_resume(void) {}
+> >>  
+> >>  static inline int clockevents_notify(unsigned long reason, void *arg) { return 0; }
+> >>  static inline int tick_check_broadcast_expired(void) { return 0; }
+> >> -static inline void tick_setup_hrtimer_broadcast(void) {};
+> >> +static inline int __init tick_setup_hrtimer_broadcast(void) { return 0; }
+> > 
+> > With the initcall moved to the driver we have no external users of
+> > tick_setup_hrtimer_broadcast, so I think we can remove the prototype
+> > entirely from clockchips.h...
+> > 
+> >>  #endif
+> >>  
+> >> diff --git a/kernel/time/tick-broadcast-hrtimer.c b/kernel/time/tick-broadcast-hrtimer.c
+> >> index eb682d5..5c35995 100644
+> >> --- a/kernel/time/tick-broadcast-hrtimer.c
+> >> +++ b/kernel/time/tick-broadcast-hrtimer.c
+> >> @@ -98,9 +98,11 @@ static enum hrtimer_restart bc_handler(struct hrtimer *t)
+> >>  	return HRTIMER_RESTART;
+> >>  }
+> >>  
+> >> -void tick_setup_hrtimer_broadcast(void)
+> >> +int __init tick_setup_hrtimer_broadcast(void)
+> > 
+> > ...and make it static here.
+> 
+> Yep will do. Sorry I overlooked this.
+> 
+> > 
+> >>  {
+> >>  	hrtimer_init(&bctimer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+> >>  	bctimer.function = bc_handler;
+> >>  	clockevents_register_device(&ce_broadcast_hrtimer);
+> >> +	return 0;
+> >>  }
+> >> +early_initcall(tick_setup_hrtimer_broadcast);
+> > 
+> > Otherwise this looks good to me, thanks for putting this together!
+> 
+> Thanks a lot for the review! Will send out the patch with the above
+> corrections.
+
+Cheers!
+
+Thanks,
+Mark.
