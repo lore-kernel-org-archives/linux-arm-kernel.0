@@ -1,26 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 8 Dec 2014 16:03:16 +0000
-Subject: using DMA-API on ARM
-In-Reply-To: <2863746.4sUSEYqahB@wuerfel>
-References: <5481794E.4050406@broadcom.com>
- <F51492713EF10846800D8C0ED37A7DCE01901765@SJEXCHMB15.corp.ad.broadcom.com>
- <F51492713EF10846800D8C0ED37A7DCE01902076@SJEXCHMB15.corp.ad.broadcom.com>
- <2863746.4sUSEYqahB@wuerfel>
-Message-ID: <20141208160316.GM16185@e104818-lin.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 08 Dec 2014 09:08:34 -0700
+Subject: linux-next: manual merge of the bcm2835 tree with the arm-soc tree
+In-Reply-To: <20141208134903.GN3951@x1>
+References: <20141208120619.68287b54@canb.auug.org.au>
+ <2406890.FlzRjyvuXd@wuerfel> <20141208130009.GL3951@x1>
+ <3348703.0b5FTH9Sa3@wuerfel> <20141208134903.GN3951@x1>
+Message-ID: <5485CD02.7010903@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 03:01:32PM +0000, Arnd Bergmann wrote:
-> [    0.000000] PL310 OF: cache setting yield illegal associativity
-> [    0.000000] PL310 OF: -1069781724 calculated, only 8 and 16 legal
-> [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
-> [    0.000000] L2C-310 full line of zeros enabled for Cortex-A9
-> [    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
-> [    0.000000] L2C-310 cache controller enabled, 16 ways, 256 kB
-> [    0.000000] L2C-310: CACHE_ID 0x410000c8, AUX_CTRL 0x4e130001
+On 12/08/2014 06:49 AM, Lee Jones wrote:
+> On Mon, 08 Dec 2014, Arnd Bergmann wrote:
+>
+>> On Monday 08 December 2014 13:00:09 Lee Jones wrote:
+>>> On Mon, 08 Dec 2014, Arnd Bergmann wrote:
+>>>
+>>>> On Monday 08 December 2014 12:06:19 Stephen Rothwell wrote:
+>>>>> Hi Stephen,
+>>>>>
+>>>>> Today's linux-next merge of the bcm2835 tree got a conflict in
+>>>>> arch/arm/boot/dts/Makefile between commit 302a5ef29d49 ("ARM: BCM5301X:
+>>>>> Add DT for Netgear R6300 V2") from the arm-soc tree and commit
+>>>>> 6298ed17a404 ("ARM: bcm2835: Add device tree for Raspberry Pi model
+>>>>> B+") from the bcm2835 tree.
+>>>>>
+>>>>> I fixed it up (the bcm2835 tree patch is also in the arm-soc tree as
+>>>>> commit ba2a1d6959ac ("ARM: bcm2835: Add device tree for Raspberry Pi
+>>>>> model B+"), so I just used the arm-soc version) and can carry the fix
+>>>>> as necessary (no action is required).
+>>>>
+>>>> Thanks a lot for the notification!
+>>>>
+>>>> Lee, do you know what is going on? Did you accidentally rebase a commit
+>>>> that you already sent for inclusion in arm-soc?
+>>>
+>>> Nope.  The branch hasn't changed at all.
+>>>
+>>> OOI why would a re-base affect anything?  I sent you it in patch form.
+>>
+>> Ah, I looked at the wrong branch and didn't see that I applied a patch
+>> instead of a pull request. It's all fine then, as long as you never
+>> intend to send any pull requests based on top of your current branch.
+>>
+>> You can possibly make Stephen's life a tiny bit simpler if you just
+>> drop all patches from your for-next branch as soon as we've picked
+>> them up into arm-soc.
+>
+> That is something I thought about, but I believe we have users of that
+> branch.  I guess we could always point them to ARM-SoC, or reset the
+> branch to the aforementioned.
 
-If the above value is correct, they should make sure bit 22 is set in
-AUX_CTRL.
+The primary purpose of the kernel.org linux-rpi.git repo is for staging 
+patches into arm-soc/linux-next. As such, just like any other similar 
+repo, users should expect at least the for-xxx (e.g. for-next) branches 
+to get reset as kernel versions tick over, in order to contain the 
+content for the next kernel. Anyone using those branches for anything 
+else (e.g. local development) simply has to be prepared to do a rebase 
+themselves when that happens.
 
--- 
-Catalin
+Equally, and patches that get sent to arm-soc should probably never be 
+applied to linux-rpi.git; anything that gets applied to linux-rpi.git 
+should get sent to arm-soc as a pull request. That avoids duplicate commits.
