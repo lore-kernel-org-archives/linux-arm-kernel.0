@@ -1,45 +1,47 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 8 Dec 2014 14:30:14 +0100
-Subject: [PATCH] clk: shmobile: Add r8a7793 support
-In-Reply-To: <CAH1o70JgXPfRVQ+EyeQVA6Sa9irDb3hVBn7vAbDDuu7k=Z7x3w@mail.gmail.com>
-References: <1418035363-3678-1-git-send-email-ykaneko0929@gmail.com>
- <CAMuHMdVDA4PwUZ8A0WPumEN9nYrQyX+UNYp7Dt=0TxO9nCuZrg@mail.gmail.com>
- <CAH1o70JgXPfRVQ+EyeQVA6Sa9irDb3hVBn7vAbDDuu7k=Z7x3w@mail.gmail.com>
-Message-ID: <CAMuHMdVdFii0rxO8NrdcWiCO0HWQYrv-y3W0Dh6zt_31tTG81g@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Dec 2014 19:00:47 +0530
+Subject: [PATCH v5 00/61] dmaengine: Implement generic slave capabilities
+ retrieval
+In-Reply-To: <20141208093246.GB27228@ldesroches-Latitude-E6320>
+References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141208061746.GD16827@intel.com>
+ <20141208093246.GB27228@ldesroches-Latitude-E6320>
+Message-ID: <20141208133047.GM16827@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kaneko-san,
+On Mon, Dec 08, 2014 at 10:32:47AM +0100, Ludovic Desroches wrote:
+> On Mon, Dec 08, 2014 at 11:47:46AM +0530, Vinod Koul wrote:
+> > On Mon, Nov 17, 2014 at 02:41:54PM +0100, Maxime Ripard wrote:
+> > > Hi,
+> > > 
+> > > As we discussed a couple of weeks ago, this is the third attempt at
+> > > creating a generic behaviour for slave capabilities retrieval so that
+> > > generic layers using dmaengine can actually rely on that.
+> > > 
+> > > That has been done mostly through two steps: by moving out the
+> > > sub-commands of the device_control callback, so that the dmaengine
+> > > core can then infer from that wether a sub-command is implemented, and
+> > > then by moving the slave properties, such as the supported buswidth,
+> > > to the structure dma_device itself.
+> > 
+> > Okay managed to get this done. Apart from the two issues identified didn't
+> > find anything so applied and pushed to a branch
+> > "topic/slave_caps_device_control_fix"
+> > 
+> > Today did some compile tests and found few warnings, were trivial but I
+> > am worried about the testing of this code. Has anyone tested this, if so
+> > which platforms are covered Since I pushed base branch last night, Feng's
+> > bot covered it and all was OK. Looks like Feng's bot doesn't have wide
+> > coverage of arm platforms, wasn't there one run by arm guys which tries to
+> > test and boot, if so can we get this tested there please.
+> 
+> Tested with your branch on sama5d3 and sama5d4 so at_hdmac and at xdmac.
+> 
+> I have also sent some patches based on Maxime's series for at_xdmac.
+Thank You!
 
-On Mon, Dec 8, 2014 at 12:53 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> 2014-12-08 20:13 GMT+09:00 Geert Uytterhoeven <geert@linux-m68k.org>:
->> On Mon, Dec 8, 2014 at 11:42 AM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
->>> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
->>>
->>> R-Car M2N (r8a7793) clock is handled in R-Car Gen2 clock driver.
->>
->> Thanks for your patch!
->>
->>> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
->>> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
->>
->> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>
->> Can you please also send a patch to update the binding documentation in
->> Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt?
->
-> This patch updates Makefile only, not added dtsi for r8a7793.
-> Is the update of the document necessary?
+Anymore voluteers? I am looking at omap, mxs, tegra ones (these had issues)
 
-Not at this moment. I was just trying to be proactive ;-)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+~Vinod
