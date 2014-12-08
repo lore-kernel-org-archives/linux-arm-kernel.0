@@ -1,170 +1,157 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 8 Dec 2014 20:06:44 +0800
-Subject: [PATCH v14 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
-In-Reply-To: <1418039451.3647.48.camel@linaro.org>
-References: <1418020040-68977-1-git-send-email-wangnan0@huawei.com>		
- <1418020131-69375-1-git-send-email-wangnan0@huawei.com>	
- <1418036666.3647.33.camel@linaro.org> <5485886E.2060303@huawei.com>
- <1418039451.3647.48.camel@linaro.org>
-Message-ID: <54859454.30603@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 08 Dec 2014 12:08:19 +0000
+Subject: [PATCH v2 6/6] arm/arm64: KVM: Introduce stage2_unmap_vm
+In-Reply-To: <1417641522-29056-7-git-send-email-christoffer.dall@linaro.org>
+References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
+ <1417641522-29056-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <548594B3.8040507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/12/8 19:50, Jon Medhurst (Tixy) wrote:
-> On Mon, 2014-12-08 at 19:15 +0800, Wang Nan wrote:
->> On 2014/12/8 19:04, Jon Medhurst (Tixy) wrote:
->>> On Mon, 2014-12-08 at 14:28 +0800, Wang Nan wrote:
->>>> This patch introduce kprobeopt for ARM 32.
->>>>
->>>> Limitations:
->>>>  - Currently only kernel compiled with ARM ISA is supported.
->>>>
->>>>  - Offset between probe point and optinsn slot must not larger than
->>>>    32MiB. Masami Hiramatsu suggests replacing 2 words, it will make
->>>>    things complex. Futher patch can make such optimization.
->>>>
->>>> Kprobe opt on ARM is relatively simpler than kprobe opt on x86 because
->>>> ARM instruction is always 4 bytes aligned and 4 bytes long. This patch
->>>> replace probed instruction by a 'b', branch to trampoline code and then
->>>> calls optimized_callback(). optimized_callback() calls opt_pre_handler()
->>>> to execute kprobe handler. It also emulate/simulate replaced instruction.
->>>>
->>>> When unregistering kprobe, the deferred manner of unoptimizer may leave
->>>> branch instruction before optimizer is called. Different from x86_64,
->>>> which only copy the probed insn after optprobe_template_end and
->>>> reexecute them, this patch call singlestep to emulate/simulate the insn
->>>> directly. Futher patch can optimize this behavior.
->>>>
->>>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
->>>> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
->>>> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
->>>> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
->>>> Cc: Will Deacon <will.deacon@arm.com>
->>>> ---
->>> [...]
->>>> v13 -> v14:
->>>>   - Use stop_machine to wrap arch_optimize_kprobes to avoid a racing.
->>>
->>> Think we need to use stop_machine differently, see comments on code
->>> below.
->>
->> Well, yes, I experienced one deadlock at serval minutes before.
->> I'm not very sure the reason and working on it now. I think it may caused
->> by recursivly stop_machine().
->>
->>>
->>>> ---
->>>>  arch/arm/Kconfig                        |   1 +
->>>>  arch/arm/{kernel => include/asm}/insn.h |   0
->>>>  arch/arm/include/asm/kprobes.h          |  29 +++
->>>>  arch/arm/kernel/Makefile                |   2 +-
->>>>  arch/arm/kernel/ftrace.c                |   3 +-
->>>>  arch/arm/kernel/jump_label.c            |   3 +-
->>>>  arch/arm/probes/kprobes/Makefile        |   1 +
->>>>  arch/arm/probes/kprobes/opt-arm.c       | 322 ++++++++++++++++++++++++++++++++
->>>>  samples/kprobes/kprobe_example.c        |   2 +-
->>>
->>> The change kprobe_example.c doesn't apply and I guess wasn't meant to be
->>> included in the patch?
->>>
->>
->> Yes. These 2 lines are introduced by mistake.
->>
->>> [...]
->>>> +/*
->>>> + * Similar to __arch_disarm_kprobe, operations which removing
->>>> + * breakpoints must be wrapped by stop_machine to avoid racing.
->>>> + */
->>>> +static __kprobes int __arch_optimize_kprobes(void *p)
->>>> +{
->>>> +	struct list_head *oplist = p;
->>>> +	struct optimized_kprobe *op, *tmp;
->>>> +
->>>> +	list_for_each_entry_safe(op, tmp, oplist, list) {
->>>> +		unsigned long insn;
->>>> +		WARN_ON(kprobe_disabled(&op->kp));
->>>> +
->>>> +		/*
->>>> +		 * Backup instructions which will be replaced
->>>> +		 * by jump address
->>>> +		 */
->>>> +		memcpy(op->optinsn.copied_insn, op->kp.addr,
->>>> +				RELATIVEJUMP_SIZE);
->>>> +
->>>> +		insn = arm_gen_branch((unsigned long)op->kp.addr,
->>>> +				(unsigned long)op->optinsn.insn);
->>>> +		BUG_ON(insn == 0);
->>>> +
->>>> +		/*
->>>> +		 * Make it a conditional branch if replaced insn
->>>> +		 * is consitional
->>>> +		 */
->>>> +		insn = (__mem_to_opcode_arm(
->>>> +			  op->optinsn.copied_insn[0]) & 0xf0000000) |
->>>> +			(insn & 0x0fffffff);
->>>> +
->>>> +		patch_text(op->kp.addr, insn);
->>>
->>> patch_text() itself may use stop_machine under certain circumstances,
->>> and if it were to do so, I believe that would cause the system to
->>> lock/panic. So, this should be __patch_text() instead, but we would also
->>> need to take care of the cache_ops_need_broadcast() case, where all
->>> CPU's need to invalidate their own caches and we can't rely on just one
->>> CPU executing the code patching whilst other CPUs spin and wait. Though
->>> to make life easier, we could just not optimise kprobes in the legacy
->>> cache_ops_need_broadcast() case.
->>>
->>>> +
->>>> +		list_del_init(&op->list);
->>>> +	}
->>>> +	return 0;
->>>> +}
->>>> +
->>>> +void arch_optimize_kprobes(struct list_head *oplist)
->>>> +{
->>>> +	stop_machine(__arch_optimize_kprobes, oplist, cpu_online_mask);
->>>> +}
->>>
->>> I believe passing cpu_online_mask above will cause
->>> __arch_optimize_kprobes to be executed on every CPU, is this safe? If it
->>> is, it's a serendipitous optimisation if each CPU can process different
->>> probes in the list. If it's not safe, this needs to be NULL instead so
->>> only one CPU executes the code.
->>>
->>
->> This stop_machine() call is copied from arch_disarm_kprobe, I think their
->> senario should be similar.
+On 03/12/14 21:18, Christoffer Dall wrote:
+> Introduce a new function to unmap user RAM regions in the stage2 page
+> tables.  This is needed on reboot (or when the guest turns off the MMU)
+> to ensure we fault in pages again and make the dcache, RAM, and icache
+> coherent.
 > 
-> arch_disarm_kprobe is just executing __patch_text on each cpu, which
-> pokes a word of memory with a new value and flushes caches for it.
+> Using unmap_stage2_range for the whole guest physical range does not
+> work, because that unmaps IO regions (such as the GIC) which will not be
+> recreated or in the best case faulted in on a page-by-page basis.
 > 
-> arch_optimize_kprobes is calling __arch_optimize_kprobes, which is
-> iterating over a list of probes and removing each one in turn, if this
-> is happening on multiple cpu's simultaneously, it's not clear to me that
-> such an operation is safe. list_del_init calls __list_del which does
+> Call this function on secondary and subsequent calls to the
+> KVM_ARM_VCPU_INIT ioctl so that a reset VCPU will detect the guest
+> Stage-1 MMU is off when faulting in pages and make the caches coherent.
 > 
-> 	next->prev = prev;
-> 	prev->next = next;
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_mmu.h   |  1 +
+>  arch/arm/kvm/arm.c               |  7 +++++
+>  arch/arm/kvm/mmu.c               | 65 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/include/asm/kvm_mmu.h |  1 +
+>  4 files changed, 74 insertions(+)
 > 
-> so what happens if another cpu is at the same time updating any of those
-> list entries? Without even fully analysing the code I can see that with
-> the fact that the list handling helpers have no memory barriers, that
-> the above two lines could be seen to execute in the reverse order, e.g.
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index acb0d57..4654c42 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -52,6 +52,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+>  void free_boot_hyp_pgd(void);
+>  void free_hyp_pgds(void);
 >  
-> 	prev->next = next;
-> 	next->prev = prev;
-> 
-> so another CPU could find and delete next before this one has finished
-> doing so. Would the list end up in a consistent state where no loops
-> develop and no probes are missed? I don't know the answer and a full
-> analysis would be complicated, but my gut feeling is that if a cpu can
-> observe the links in the list in an inconsistent state then only bad
-> things can result.
+> +void stage2_unmap_vm(struct kvm *kvm);
+>  int kvm_alloc_stage2_pgd(struct kvm *kvm);
+>  void kvm_free_stage2_pgd(struct kvm *kvm);
+>  int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 4043769..da87c07 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -701,6 +701,13 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+>  	if (ret)
+>  		return ret;
+>  
+> +	/*
+> +	 * Ensure a rebooted VM will fault in RAM pages and detect if the
+> +	 * guest MMU is turned off and flush the caches as needed.
+> +	 */
+> +	if (vcpu->arch.has_run_once)
+> +		stage2_unmap_vm(vcpu->kvm);
+> +
+>  	vcpu_reset_hcr(vcpu);
+>  
+>  	/*
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 57a403a..b1f3c9a 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -611,6 +611,71 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>  	unmap_range(kvm, kvm->arch.pgd, start, size);
+>  }
+>  
+> +static void stage2_unmap_memslot(struct kvm *kvm,
+> +				 struct kvm_memory_slot *memslot)
+> +{
+> +	hva_t hva = memslot->userspace_addr;
+> +	phys_addr_t addr = memslot->base_gfn << PAGE_SHIFT;
+> +	phys_addr_t size = PAGE_SIZE * memslot->npages;
+> +	hva_t reg_end = hva + size;
+> +
+> +	/*
+> +	 * A memory region could potentially cover multiple VMAs, and any holes
+> +	 * between them, so iterate over all of them to find out if we should
+> +	 * unmap any of them.
+> +	 *
+> +	 *     +--------------------------------------------+
+> +	 * +---------------+----------------+   +----------------+
+> +	 * |   : VMA 1     |      VMA 2     |   |    VMA 3  :    |
+> +	 * +---------------+----------------+   +----------------+
+> +	 *     |               memory region                |
+> +	 *     +--------------------------------------------+
+> +	 */
+> +	do {
+> +		struct vm_area_struct *vma = find_vma(current->mm, hva);
+> +		hva_t vm_start, vm_end;
+> +
+> +		if (!vma || vma->vm_start >= reg_end)
+> +			break;
+> +
+> +		/*
+> +		 * Take the intersection of this VMA with the memory region
+> +		 */
+> +		vm_start = max(hva, vma->vm_start);
+> +		vm_end = min(reg_end, vma->vm_end);
+> +
+> +		if (!(vma->vm_flags & VM_PFNMAP)) {
+> +			gpa_t gpa = addr + (vm_start - memslot->userspace_addr);
+> +			unmap_stage2_range(kvm, gpa, vm_end - vm_start);
+> +		}
+> +		hva = vm_end;
+> +	} while (hva < reg_end);
+> +}
+> +
+> +/**
+> + * stage2_unmap_vm - Unmap Stage-2 RAM mappings
+> + * @kvm: The struct kvm pointer
+> + *
+> + * Go through the memregions and unmap any reguler RAM
+> + * backing memory already mapped to the VM.
+> + */
+> +void stage2_unmap_vm(struct kvm *kvm)
+> +{
+> +	struct kvm_memslots *slots;
+> +	struct kvm_memory_slot *memslot;
+> +	int idx;
+> +
+> +	idx = srcu_read_lock(&kvm->srcu);
+> +	spin_lock(&kvm->mmu_lock);
+> +
+> +	slots = kvm_memslots(kvm);
+> +	kvm_for_each_memslot(memslot, slots)
+> +		stage2_unmap_memslot(kvm, memslot);
+> +
+> +	spin_unlock(&kvm->mmu_lock);
+> +	srcu_read_unlock(&kvm->srcu, idx);
+> +}
+> +
+>  /**
+>   * kvm_free_stage2_pgd - free all stage-2 tables
+>   * @kvm:	The KVM struct pointer for the VM.
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 0caf7a5..061fed7 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -83,6 +83,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+>  void free_boot_hyp_pgd(void);
+>  void free_hyp_pgds(void);
+>  
+> +void stage2_unmap_vm(struct kvm *kvm);
+>  int kvm_alloc_stage2_pgd(struct kvm *kvm);
+>  void kvm_free_stage2_pgd(struct kvm *kvm);
+>  int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
 > 
 
-I see the problem.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I'm thinking about making core.c and opt-arm.c to share stop_machine() code.
-stop_machine() is required when removing breakpoint, so I'd like to define
-a "remove_breakpoint" function in core.c and make opt-arm.c to call it.
-Do you think it is a good idea?
+	M.
+-- 
+Jazz is not dead. It just smells funny...
