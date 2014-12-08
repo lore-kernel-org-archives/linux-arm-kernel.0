@@ -1,47 +1,47 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 8 Dec 2014 21:30:51 +0100 (CET)
-Subject: [PATCH] irqchip: mediatek: Fix error return code detection
-In-Reply-To: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
-References: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <alpine.DEB.2.11.1412082114340.16275@nanos>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 8 Dec 2014 12:41:54 -0800
+Subject: [PATCH v4 0/5] Add gpio support to Broadcom Cygnus SoC
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+Message-ID: <1418071319-11779-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Dec 2014, Yingjoe Chen wrote:
+This patchset contains the initial GPIO support for the Broadcom Cygnus SoC.
+Cygnus has 3 GPIO controllers: 1) the ASIU GPIO; 2) the chipCommonG GPIO;
+and 3) the ALWAYS-ON GPIO. All 3 types of GPIO controllers are supported by
+the same Cygnus GPIO driver
 
-> This fix an error handling bug reported by Beniamino, this is based on
-> mtk intpol patches [1]
->
-> Joe.C
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305808.html
-> 
-> ====================
-> of_io_request_and_map() return ERR_PTR wrapped error code instead of
-> NULL when fail, fix code in mtk_sysirq_of_init() to correctly handle
-> this.
-> 
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+Changes from v3:
+ - Fix dt property tpyo
+ - Fix incorrect GPIO compatible ID in device tree binding document example
 
-This is not a proper changelog. Let me write up a proper one:
+Changes from v2:
+ - Consolidate different compatible IDs into "brcm,cygnus-gpio"
+ - Get rid of redundant "no-interrupt" property
 
-Subject: irqchip: mediatek: Use IS_ERR() instead of NULL pointer check
+Changes from v1:
+ - Get rid of inline qualifier
+ - Get rid of redundant check in the ISR
+ - Other minor fixes to imrove code readability
 
-Beniamino reported a kernel oops caused by an invalid DT file for the
-mediatek interrupt polarity extension.
+Ray Jui (5):
+  gpio: Cygnus: define Broadcom Cygnus GPIO binding
+  gpio: Cygnus: add GPIO driver
+  ARM: mach-bcm: Enable GPIO support for Cygnus
+  ARM: dts: enable GPIO for Broadcom Cygnus
+  MAINTAINERS: Entry for Cygnus GPIO driver
 
-The reason is that the interrupt polarity support for mediatek chips
-merily checks for at NULL pointer instead of a casted error return
-value in mtk_sysirq_of_init() so any other casted error value passes
-the NULL pointer check and causes a kernel panic when dereferenced.
+ .../devicetree/bindings/gpio/brcm,cygnus-gpio.txt  |   82 +++
+ MAINTAINERS                                        |    7 +
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   30 +
+ arch/arm/mach-bcm/Kconfig                          |    1 +
+ drivers/gpio/Kconfig                               |   11 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-bcm-cygnus.c                     |  705 ++++++++++++++++++++
+ 7 files changed, 837 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/brcm,cygnus-gpio.txt
+ create mode 100644 drivers/gpio/gpio-bcm-cygnus.c
 
-Use IS_ERR() and return the error value via PTR_ERR().
-
-Reported-and-tested-by: Beniamino Galvani <b.galvani@gmail.com>
-Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-
-Can you see the difference?
-
-Thanks,
-
-	tglx
+-- 
+1.7.9.5
