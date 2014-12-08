@@ -1,36 +1,66 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Dec 2014 20:12:21 +0000
-Subject: [PATCH 4/6] PCI/MSI: Let pci_msi_get_domain use struct device's
- msi_domain
+Date: Mon,  8 Dec 2014 20:12:18 +0000
+Subject: [PATCH 1/6] device core: Introduce per-device MSI domain pointer
 In-Reply-To: <1418069543-21969-1-git-send-email-marc.zyngier@arm.com>
 References: <1418069543-21969-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1418069543-21969-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1418069543-21969-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can easily find which MSI domain a PCI device is
-using, use dev_get_msi_domain as a way to retrieve the information.
-
-The original code is still used as a fallback.
+As MSI-type features are creeping into non-PCI devices, it is
+starting to make sense to give our struct device some form of
+support for this, by allowing a pointer to an MSI irq domain to
+be set/retrieved.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/msi.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ include/linux/device.h | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index fd60806..003040b 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -41,7 +41,8 @@ static struct irq_domain *pci_msi_get_domain(struct pci_dev *dev)
- {
- 	struct irq_domain *domain = NULL;
+diff --git a/include/linux/device.h b/include/linux/device.h
+index ce1f2160..f3aaaf6 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -690,6 +690,7 @@ struct acpi_dev_node {
+  * 		along with subsystem-level and driver-level callbacks.
+  * @pins:	For device pin management.
+  *		See Documentation/pinctrl.txt for details.
++ * @msi_domain: The generic MSI domain this device is using.
+  * @numa_node:	NUMA node this device is close to.
+  * @dma_mask:	Dma mask (if dma'ble device).
+  * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
+@@ -750,6 +751,9 @@ struct device {
+ 	struct dev_pm_info	power;
+ 	struct dev_pm_domain	*pm_domain;
  
--	if (dev->bus->msi)
-+	domain = dev_get_msi_domain(&dev->dev);
-+	if (!domain && dev->bus->msi)
- 		domain = dev->bus->msi->domain;
- 	if (!domain)
- 		domain = arch_get_pci_msi_domain(dev);
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	struct irq_domain	*msi_domain; /* MSI domain device uses */
++#endif
+ #ifdef CONFIG_PINCTRL
+ 	struct dev_pin_info	*pins;
+ #endif
+@@ -837,6 +841,22 @@ static inline void set_dev_node(struct device *dev, int node)
+ }
+ #endif
+ 
++static inline struct irq_domain *dev_get_msi_domain(const struct device *dev)
++{
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	return dev->msi_domain;
++#else
++	return NULL;
++#endif
++}
++
++static inline void dev_set_msi_domain(struct device *dev, struct irq_domain *d)
++{
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	dev->msi_domain = d;
++#endif
++}
++
+ static inline void *dev_get_drvdata(const struct device *dev)
+ {
+ 	return dev->driver_data;
 -- 
 2.1.3
