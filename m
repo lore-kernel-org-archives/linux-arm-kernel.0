@@ -1,32 +1,29 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 8 Dec 2014 11:24:27 +0000
-Subject: [PATCH v2 0/6] Improve PSCI system events and fix reboot bugs
-In-Reply-To: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
-References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <CAFEAcA_K7p0h1EgAxqcg5EqN8VXC60XoHsttbVtbxUAxuceziQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 08 Dec 2014 12:25:01 +0100
+Subject: linux-next: manual merge of the bcm2835 tree with the arm-soc tree
+In-Reply-To: <20141208120619.68287b54@canb.auug.org.au>
+References: <20141208120619.68287b54@canb.auug.org.au>
+Message-ID: <2406890.FlzRjyvuXd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 December 2014 at 21:18, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> Several people have reported problems with rebooting ARM VMs, especially
-> on 32-bit ARM.  This is mainly due to the same reason we were seeing
-> boot errors in the past, namely that the ram, dcache, and icache weren't
-> coherent on guest boot with the guest (stage-1) MMU disabled.  We solved
-> this by ensuring coherency when we fault in pages, but since most memory
-> is already mapped after a reboot, we don't do anything.
->
-> The solution is to unmap the regular RAM on VCPU init, but we must
-> take care to not unmap the GIC or other IO regions, hence the somehwat
-> complicated solution.
->
-> As part of figuring this out, it became clear that some semantics around
-> the KVM_ARM_VCPU_INIT ABI and system event ABI was unclear (what is
-> userspace expected to do when it receives a system event).  This series
-> also clarifies the ABI and changes the kernel functionality to do what
-> userspace expects (turn off VCPUs on a system shutdown event).
+On Monday 08 December 2014 12:06:19 Stephen Rothwell wrote:
+> Hi Stephen,
+> 
+> Today's linux-next merge of the bcm2835 tree got a conflict in
+> arch/arm/boot/dts/Makefile between commit 302a5ef29d49 ("ARM: BCM5301X:
+> Add DT for Netgear R6300 V2") from the arm-soc tree and commit
+> 6298ed17a404 ("ARM: bcm2835: Add device tree for Raspberry Pi model
+> B+") from the bcm2835 tree.
+> 
+> I fixed it up (the bcm2835 tree patch is also in the arm-soc tree as
+> commit ba2a1d6959ac ("ARM: bcm2835: Add device tree for Raspberry Pi
+> model B+"), so I just used the arm-soc version) and can carry the fix
+> as necessary (no action is required).
 
-Userspace ABI documentation clarifications:
-Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
+Thanks a lot for the notification!
 
--- PMM
+Lee, do you know what is going on? Did you accidentally rebase a commit
+that you already sent for inclusion in arm-soc?
+
+	Arnd
