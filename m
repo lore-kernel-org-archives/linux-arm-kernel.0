@@ -1,138 +1,81 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  8 Dec 2014 12:37:38 +0000
-Subject: [PATCH v5 03/19] arm/arm64: KVM: refactor vgic_handle_mmio() function
+Date: Mon,  8 Dec 2014 12:37:51 +0000
+Subject: [PATCH v5 16/19] arm64: GICv3: introduce symbolic names for GICv3
+ ICC_SGI1R_EL1 fields
 In-Reply-To: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
 References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1418042274-3246-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <1418042274-3246-17-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we only need to deal with one MMIO region for the GIC
-emulation (the GICv2 distributor), but we soon need to extend this.
-Refactor the existing code to allow easier addition of different
-ranges without code duplication.
+The gic_send_sgi() function used hardcoded bit shift values to
+generate the ICC_SGI1R_EL1 register value.
+Replace this with symbolic names to allow reusing them later.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 Changelog v4...v5:
- (none)
+ (add Reviewed-by:)
 
 Changelog v3...v4:
-- simplify is_in_range()
-- added Reviewed-by:
+- (new patch)
 
- virt/kvm/arm/vgic.c |   73 +++++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 53 insertions(+), 20 deletions(-)
+ drivers/irqchip/irq-gic-v3.c       |   14 +++++++++-----
+ include/linux/irqchip/arm-gic-v3.h |   12 ++++++++++++
+ 2 files changed, 21 insertions(+), 5 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index c2e0795..9822735 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1033,36 +1033,27 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index aa17ae8..e163749 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -467,15 +467,19 @@ out:
+ 	return tlist;
  }
  
- /**
-- * vgic_handle_mmio - handle an in-kernel MMIO access
-+ * vgic_handle_mmio_range - handle an in-kernel MMIO access
-  * @vcpu:	pointer to the vcpu performing the access
-  * @run:	pointer to the kvm_run structure
-  * @mmio:	pointer to the data describing the access
-+ * @ranges:	array of MMIO ranges in a given region
-+ * @mmio_base:	base address of that region
-  *
-- * returns true if the MMIO access has been performed in kernel space,
-- * and false if it needs to be emulated in user space.
-+ * returns true if the MMIO access could be performed
++#define MPIDR_TO_SGI_AFFINITY(cluster_id, level) \
++	(MPIDR_AFFINITY_LEVEL(cluster_id, level) \
++		<< ICC_SGI1R_AFFINITY_## level ##_SHIFT)
++
+ static void gic_send_sgi(u64 cluster_id, u16 tlist, unsigned int irq)
+ {
+ 	u64 val;
+ 
+-	val = (MPIDR_AFFINITY_LEVEL(cluster_id, 3) << 48	|
+-	       MPIDR_AFFINITY_LEVEL(cluster_id, 2) << 32	|
+-	       irq << 24			    		|
+-	       MPIDR_AFFINITY_LEVEL(cluster_id, 1) << 16	|
+-	       tlist);
++	val = (MPIDR_TO_SGI_AFFINITY(cluster_id, 3)	|
++	       MPIDR_TO_SGI_AFFINITY(cluster_id, 2)	|
++	       irq << ICC_SGI1R_SGI_ID_SHIFT		|
++	       MPIDR_TO_SGI_AFFINITY(cluster_id, 1)	|
++	       tlist << ICC_SGI1R_TARGET_LIST_SHIFT);
+ 
+ 	pr_debug("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
+ 	gic_write_sgi1r(val);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 726d898..b7946c3 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -174,6 +174,18 @@
+ #define ICC_SRE_EL2_SRE			(1 << 0)
+ #define ICC_SRE_EL2_ENABLE		(1 << 3)
+ 
++#define ICC_SGI1R_TARGET_LIST_SHIFT	0
++#define ICC_SGI1R_TARGET_LIST_MASK	(0xffff << ICC_SGI1R_TARGET_LIST_SHIFT)
++#define ICC_SGI1R_AFFINITY_1_SHIFT	16
++#define ICC_SGI1R_AFFINITY_1_MASK	(0xff << ICC_SGI1R_AFFINITY_1_SHIFT)
++#define ICC_SGI1R_SGI_ID_SHIFT		24
++#define ICC_SGI1R_SGI_ID_MASK		(0xff << ICC_SGI1R_SGI_ID_SHIFT)
++#define ICC_SGI1R_AFFINITY_2_SHIFT	32
++#define ICC_SGI1R_AFFINITY_2_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
++#define ICC_SGI1R_IRQ_ROUTING_MODE_BIT	40
++#define ICC_SGI1R_AFFINITY_3_SHIFT	48
++#define ICC_SGI1R_AFFINITY_3_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
++
+ /*
+  * System register definitions
   */
--bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
--		      struct kvm_exit_mmio *mmio)
-+static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+			    struct kvm_exit_mmio *mmio,
-+			    const struct mmio_range *ranges,
-+			    unsigned long mmio_base)
- {
- 	const struct mmio_range *range;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
--	unsigned long base = dist->vgic_dist_base;
- 	bool updated_state;
- 	unsigned long offset;
- 
--	if (!irqchip_in_kernel(vcpu->kvm) ||
--	    mmio->phys_addr < base ||
--	    (mmio->phys_addr + mmio->len) > (base + KVM_VGIC_V2_DIST_SIZE))
--		return false;
--
--	/* We don't support ldrd / strd or ldm / stm to the emulated vgic */
--	if (mmio->len > 4) {
--		kvm_inject_dabt(vcpu, mmio->phys_addr);
--		return true;
--	}
--
--	offset = mmio->phys_addr - base;
--	range = find_matching_range(vgic_dist_ranges, mmio, offset);
-+	offset = mmio->phys_addr - mmio_base;
-+	range = find_matching_range(ranges, mmio, offset);
- 	if (unlikely(!range || !range->handle_mmio)) {
- 		pr_warn("Unhandled access %d %08llx %d\n",
- 			mmio->is_write, mmio->phys_addr, mmio->len);
-@@ -1070,7 +1061,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	}
- 
- 	spin_lock(&vcpu->kvm->arch.vgic.lock);
--	offset = mmio->phys_addr - range->base - base;
-+	offset -= range->base;
- 	if (vgic_validate_access(dist, range, offset)) {
- 		updated_state = range->handle_mmio(vcpu, mmio, offset);
- 	} else {
-@@ -1088,6 +1079,48 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	return true;
- }
- 
-+static inline bool is_in_range(phys_addr_t addr, unsigned long len,
-+			       phys_addr_t baseaddr, unsigned long size)
-+{
-+	return (addr >= baseaddr) && (addr + len <= baseaddr + size);
-+}
-+
-+static bool vgic_v2_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+				struct kvm_exit_mmio *mmio)
-+{
-+	unsigned long base = vcpu->kvm->arch.vgic.vgic_dist_base;
-+
-+	if (!is_in_range(mmio->phys_addr, mmio->len, base,
-+			 KVM_VGIC_V2_DIST_SIZE))
-+		return false;
-+
-+	/* GICv2 does not support accesses wider than 32 bits */
-+	if (mmio->len > 4) {
-+		kvm_inject_dabt(vcpu, mmio->phys_addr);
-+		return true;
-+	}
-+
-+	return vgic_handle_mmio_range(vcpu, run, mmio, vgic_dist_ranges, base);
-+}
-+
-+/**
-+ * vgic_handle_mmio - handle an in-kernel MMIO access for the GIC emulation
-+ * @vcpu:      pointer to the vcpu performing the access
-+ * @run:       pointer to the kvm_run structure
-+ * @mmio:      pointer to the data describing the access
-+ *
-+ * returns true if the MMIO access has been performed in kernel space,
-+ * and false if it needs to be emulated in user space.
-+ */
-+bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+		      struct kvm_exit_mmio *mmio)
-+{
-+	if (!irqchip_in_kernel(vcpu->kvm))
-+		return false;
-+
-+	return vgic_v2_handle_mmio(vcpu, run, mmio);
-+}
-+
- static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi)
- {
- 	return dist->irq_sgi_sources + vcpu_id * VGIC_NR_SGIS + sgi;
 -- 
 1.7.9.5
