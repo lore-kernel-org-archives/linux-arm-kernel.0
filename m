@@ -1,34 +1,23 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 8 Dec 2014 20:06:45 +0100
-Subject: [PATCH] ARM: dts: sun6i: hummingbird: Add ethernet phy reset
- gpio properties
-In-Reply-To: <1417591153-27177-1-git-send-email-wens@csie.org>
-References: <1417591153-27177-1-git-send-email-wens@csie.org>
-Message-ID: <20141208190645.GH8739@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 08 Dec 2014 20:38:15 +0100
+Subject: [PATCH v3 1/5] gpio: Cygnus: define Broadcom Cygnus GPIO binding
+In-Reply-To: <1418064468-8512-3-git-send-email-rjui@broadcom.com>
+References: <1418064468-8512-3-git-send-email-rjui@broadcom.com>
+Message-ID: <2129851.JzMQjVqeL2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03, 2014 at 03:19:13PM +0800, Chen-Yu Tsai wrote:
-> On the Hummingbird A31 board, the RTL8211E ethernet phy has its reset
-> line connect to a gpio pin, instead of floating like on other boards.
-> Add the stmmac properties for describing the reset gpio.
+On Monday 08 December 2014 10:47:44 Ray Jui wrote:
+> +
+> +- no-drv-stregnth:
+> +    Specifies the GPIO controller does not support drive strength configuration
+> +
 > 
-> The reset delays were taken from the RTL8211E datasheet.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Queued, thanks.
+Typo:
 
-Maxime
+	strength, not stregnth
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141208/a345d5c7/attachment.sig>
+Otherwise looks good.
+
+	Arnd
