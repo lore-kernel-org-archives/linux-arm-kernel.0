@@ -1,93 +1,55 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  8 Dec 2014 12:37:41 +0000
-Subject: [PATCH v5 06/19] arm/arm64: KVM: move kvm_register_device_ops() into
- vGIC probing
-In-Reply-To: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
-References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1418042274-3246-7-git-send-email-andre.przywara@arm.com>
+From: ankit.jindal@linaro.org (Ankit Jindal)
+Date: Mon, 8 Dec 2014 18:12:15 +0530
+Subject: [PATCH v5 5/6] Documentation: dt-bindings: Add binding info for
+ X-Gene QMTM UIO driver
+In-Reply-To: <1503477.DVdkExccIe@wuerfel>
+References: <1416220572-13381-1-git-send-email-ankit.jindal@linaro.org>
+ <2279061.naADrHDgyn@wuerfel>
+ <CAPTm99WYNyxtY-NCVN8pB0HwNPn+EFx-7w7yEevaEK1z7-Zqxg@mail.gmail.com>
+ <1503477.DVdkExccIe@wuerfel>
+Message-ID: <CAPTm99V1qP5dAgDV04i3m_yR1ri9h=b8fDXBDxmPfpZG_P268g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we unconditionally register the GICv2 emulation device
-during the host's KVM initialization. Since with GICv3 support we
-may end up with only v2 or only v3 or both supported, we move the
-registration into the GIC probing function, where we will later know
-which combination is valid.
-
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-Changelog v4...v5:
- (none)
-
-Changelog v3...v4:
-- add Acked-by
-
- include/linux/kvm_host.h |    1 +
- virt/kvm/arm/vgic-v2.c   |    2 ++
- virt/kvm/arm/vgic-v3.c   |    1 +
- virt/kvm/arm/vgic.c      |    5 ++---
- 4 files changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index a6059bd..e674693 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -1084,6 +1084,7 @@ void kvm_unregister_device_ops(u32 type);
- 
- extern struct kvm_device_ops kvm_mpic_ops;
- extern struct kvm_device_ops kvm_xics_ops;
-+extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
- 
- #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
- 
-diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
-index 2935405..e1cd3cb 100644
---- a/virt/kvm/arm/vgic-v2.c
-+++ b/virt/kvm/arm/vgic-v2.c
-@@ -229,6 +229,8 @@ int vgic_v2_probe(struct device_node *vgic_node,
- 		goto out_unmap;
- 	}
- 
-+	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
-+
- 	vgic->vcpu_base = vcpu_res.start;
- 
- 	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index 1c2c8ee..d14c75f 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -230,6 +230,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
- 		ret = -ENXIO;
- 		goto out;
- 	}
-+	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
- 
- 	vgic->vcpu_base = vcpu_res.start;
- 	vgic->vctrl_base = NULL;
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 8c55fb8..38f48ca 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -2553,7 +2553,7 @@ static int vgic_create(struct kvm_device *dev, u32 type)
- 	return kvm_vgic_create(dev->kvm, type);
- }
- 
--static struct kvm_device_ops kvm_arm_vgic_v2_ops = {
-+struct kvm_device_ops kvm_arm_vgic_v2_ops = {
- 	.name = "kvm-arm-vgic",
- 	.create = vgic_create,
- 	.destroy = vgic_destroy,
-@@ -2632,8 +2632,7 @@ int kvm_vgic_hyp_init(void)
- 
- 	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
- 
--	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
--				       KVM_DEV_TYPE_ARM_VGIC_V2);
-+	return 0;
- 
- out_free_irq:
- 	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
--- 
-1.7.9.5
+On 18 November 2014 at 18:40, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 18 November 2014 14:59:54 Ankit Jindal wrote:
+>> On 17 November 2014 16:47, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Monday 17 November 2014 16:06:11 Ankit Jindal wrote:
+>> >> +
+>> >> +       qmtm1_uio: qmtm_uio at 1f200000 {
+>> >> +               compatible = "apm,xgene-qmtm";
+>> >> +               status = "disabled";
+>> >> +               reg = <0x0 0x1f200000 0x0 0x10000>,
+>> >> +                     <0x0 0x1b000000 0x0 0x400000>;
+>> >> +               reg-names = "csr", "fabric";
+>> >> +               qpool-memory = <&qmtm1_uio_qpool>;
+>> >> +               clocks = <&qmtm1clk 0>;
+>> >> +               num-queues = <0x400>;
+>> >> +               devid = <1>;
+>> >> +       };
+>> >> +
+>> >
+>> > To make my previous review comments clearer:
+>> >
+>> > NAK
+>> >
+>> > Do not create device nodes that are meant for a specific use case in
+>> > software and that are not usable for the common case. I don't think
+>> > it makes any sense to keep on submitting a UIO driver for this until
+>> > we have a proper network driver that uses this so we can make sure we
+>> > have a working binding.
+>>
+>> The dataplane frameworks like OpenDataPlane etc, need to have access
+>> to complete subsystem from the user space. Hence, we would like to
+>> have this driver and some other UIO drivers to be the part of kernel
+>> to have data plane frameworks working on our platform.
+>
+> Please work with the people that do the in-kernel QMTM driver to come
+> up with a common binding then.
+Thanks Arnd, I have synced with them, and in future our dt bindings
+for this device is going to be inline with the one mentioned in the
+patchset.
+>
+>         Arnd
+Thanks,
+Ankit
