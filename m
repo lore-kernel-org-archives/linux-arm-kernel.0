@@ -1,59 +1,40 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Mon, 08 Dec 2014 10:59:31 +0530
-Subject: [PATCH] tick-broadcast: Register for hrtimer based broadcast
- as the default broadcast mode
-In-Reply-To: <20141205133908.GA21313@leverpostej>
-References: <20141205124756.25803.4988.stgit@preeti.in.ibm.com>
- <20141205133908.GA21313@leverpostej>
-Message-ID: <5485373B.302@linux.vnet.ibm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Dec 2014 11:47:46 +0530
+Subject: [PATCH v5 00/61] dmaengine: Implement generic slave capabilities
+ retrieval
+In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20141208061746.GD16827@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2014 07:09 PM, Mark Rutland wrote:
-> Hi Preeti,
+On Mon, Nov 17, 2014 at 02:41:54PM +0100, Maxime Ripard wrote:
+> Hi,
 > 
-> Moving this out of the architecture code looks good to me!
+> As we discussed a couple of weeks ago, this is the third attempt at
+> creating a generic behaviour for slave capabilities retrieval so that
+> generic layers using dmaengine can actually rely on that.
 > 
-> I have a couple of minor comments below.
-<snip>
+> That has been done mostly through two steps: by moving out the
+> sub-commands of the device_control callback, so that the dmaengine
+> core can then infer from that wether a sub-command is implemented, and
+> then by moving the slave properties, such as the supported buswidth,
+> to the structure dma_device itself.
 
->>  
->> diff --git a/kernel/time/timekeeping.c b/kernel/time/timekeeping.c
->> index ec1791f..6044a51 100644
->> --- a/kernel/time/timekeeping.c
->> +++ b/kernel/time/timekeeping.c
->> @@ -1016,6 +1016,10 @@ void __init timekeeping_init(void)
->>  		boot.tv_sec = 0;
->>  		boot.tv_nsec = 0;
->>  	}
->> +	/* Register for hrtimer based broadcast as the default timekeeping
->> +	 * mode in deep idle states.
->> +	 */
-> 
-> Nit: for code style this should have a newline after the '/*' (and we
-> should probably have a newline before that anyway.
-> 
->> +	tick_setup_hrtimer_broadcast();
-> 
-> We register the generic dummy timer via an early_initcall, which keeps
-> all the logic in the dummy timer driver. Are we able to do the same of
-> the broadcast hrtimer? Or is there some ordering constraint we need to
-> meet?
+Okay managed to get this done. Apart from the two issues identified didn't
+find anything so applied and pushed to a branch
+"topic/slave_caps_device_control_fix"
 
-Yes this is doable. There are no ordering constraints. Placing it in an
-early_initcall() will enable it to run before initializing SMP and
-cpuidle, which is perfect (we do not have any per-cpu initializations
-and we do not want cpus to begin entering idle states before this
-hrtimer is initialized).
+Today did some compile tests and found few warnings, were trivial but I
+am worried about the testing of this code. Has anyone tested this, if so
+which platforms are covered Since I pushed base branch last night, Feng's
+bot covered it and all was OK. Looks like Feng's bot doesn't have wide
+coverage of arm platforms, wasn't there one run by arm guys which tries to
+test and boot, if so can we get this tested there please.
 
-It also runs after the hrtimer/clockevents infrastructure has been
-initialized, which is good since we need them. The broadcast hrtimer
-will thus only get registered as a broadcast device if no other clock
-device has managed to register itself as one.
-
-Let me send out a V2.
+So bit sceptical for merging now. I will send the patches which I have
+applied on top of this
 
 Thanks
-
-Regards
-Preeti U Murthy
+-- 
+~Vinod
