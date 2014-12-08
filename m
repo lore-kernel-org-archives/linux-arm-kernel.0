@@ -1,163 +1,217 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 08 Dec 2014 11:50:51 +0000
-Subject: [PATCH v14 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
-In-Reply-To: <5485886E.2060303@huawei.com>
-References: <1418020040-68977-1-git-send-email-wangnan0@huawei.com>
- <1418020131-69375-1-git-send-email-wangnan0@huawei.com>
- <1418036666.3647.33.camel@linaro.org> <5485886E.2060303@huawei.com>
-Message-ID: <1418039451.3647.48.camel@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 08 Dec 2014 11:52:17 +0000
+Subject: [PATCH v2 4/6] arm/arm64: KVM: Clarify KVM_ARM_VCPU_INIT ABI
+In-Reply-To: <1417641522-29056-5-git-send-email-christoffer.dall@linaro.org>
+References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
+ <1417641522-29056-5-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <548590F1.8000306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-12-08 at 19:15 +0800, Wang Nan wrote:
-> On 2014/12/8 19:04, Jon Medhurst (Tixy) wrote:
-> > On Mon, 2014-12-08 at 14:28 +0800, Wang Nan wrote:
-> >> This patch introduce kprobeopt for ARM 32.
-> >>
-> >> Limitations:
-> >>  - Currently only kernel compiled with ARM ISA is supported.
-> >>
-> >>  - Offset between probe point and optinsn slot must not larger than
-> >>    32MiB. Masami Hiramatsu suggests replacing 2 words, it will make
-> >>    things complex. Futher patch can make such optimization.
-> >>
-> >> Kprobe opt on ARM is relatively simpler than kprobe opt on x86 because
-> >> ARM instruction is always 4 bytes aligned and 4 bytes long. This patch
-> >> replace probed instruction by a 'b', branch to trampoline code and then
-> >> calls optimized_callback(). optimized_callback() calls opt_pre_handler()
-> >> to execute kprobe handler. It also emulate/simulate replaced instruction.
-> >>
-> >> When unregistering kprobe, the deferred manner of unoptimizer may leave
-> >> branch instruction before optimizer is called. Different from x86_64,
-> >> which only copy the probed insn after optprobe_template_end and
-> >> reexecute them, this patch call singlestep to emulate/simulate the insn
-> >> directly. Futher patch can optimize this behavior.
-> >>
-> >> Signed-off-by: Wang Nan <wangnan0@huawei.com>
-> >> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-> >> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
-> >> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> ---
-> > [...]
-> >> v13 -> v14:
-> >>   - Use stop_machine to wrap arch_optimize_kprobes to avoid a racing.
-> > 
-> > Think we need to use stop_machine differently, see comments on code
-> > below.
+On 03/12/14 21:18, Christoffer Dall wrote:
+> It is not clear that this ioctl can be called multiple times for a given
+> vcpu.  Userspace already does this, so clarify the ABI.
 > 
-> Well, yes, I experienced one deadlock at serval minutes before.
-> I'm not very sure the reason and working on it now. I think it may caused
-> by recursivly stop_machine().
+> Also specify that userspace is expected to always make secondary and
+> subsequent calls to the ioctl with the same parameters for the VCPU as
+> the initial call (which userspace also already does).
 > 
-> > 
-> >> ---
-> >>  arch/arm/Kconfig                        |   1 +
-> >>  arch/arm/{kernel => include/asm}/insn.h |   0
-> >>  arch/arm/include/asm/kprobes.h          |  29 +++
-> >>  arch/arm/kernel/Makefile                |   2 +-
-> >>  arch/arm/kernel/ftrace.c                |   3 +-
-> >>  arch/arm/kernel/jump_label.c            |   3 +-
-> >>  arch/arm/probes/kprobes/Makefile        |   1 +
-> >>  arch/arm/probes/kprobes/opt-arm.c       | 322 ++++++++++++++++++++++++++++++++
-> >>  samples/kprobes/kprobe_example.c        |   2 +-
-> > 
-> > The change kprobe_example.c doesn't apply and I guess wasn't meant to be
-> > included in the patch?
-> > 
+> Add code to check that userspace doesn't violate that ABI in the future,
+> and move the kvm_vcpu_set_target() function which is currently
+> duplicated between the 32-bit and 64-bit versions in guest.c to a common
+> static function in arm.c, shared between both architectures.
 > 
-> Yes. These 2 lines are introduced by mistake.
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  Documentation/virtual/kvm/api.txt |  5 +++++
+>  arch/arm/include/asm/kvm_host.h   |  2 --
+>  arch/arm/kvm/arm.c                | 43 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/kvm/guest.c              | 25 -----------------------
+>  arch/arm64/include/asm/kvm_host.h |  2 --
+>  arch/arm64/kvm/guest.c            | 25 -----------------------
+>  6 files changed, 48 insertions(+), 54 deletions(-)
 > 
-> > [...]
-> >> +/*
-> >> + * Similar to __arch_disarm_kprobe, operations which removing
-> >> + * breakpoints must be wrapped by stop_machine to avoid racing.
-> >> + */
-> >> +static __kprobes int __arch_optimize_kprobes(void *p)
-> >> +{
-> >> +	struct list_head *oplist = p;
-> >> +	struct optimized_kprobe *op, *tmp;
-> >> +
-> >> +	list_for_each_entry_safe(op, tmp, oplist, list) {
-> >> +		unsigned long insn;
-> >> +		WARN_ON(kprobe_disabled(&op->kp));
-> >> +
-> >> +		/*
-> >> +		 * Backup instructions which will be replaced
-> >> +		 * by jump address
-> >> +		 */
-> >> +		memcpy(op->optinsn.copied_insn, op->kp.addr,
-> >> +				RELATIVEJUMP_SIZE);
-> >> +
-> >> +		insn = arm_gen_branch((unsigned long)op->kp.addr,
-> >> +				(unsigned long)op->optinsn.insn);
-> >> +		BUG_ON(insn == 0);
-> >> +
-> >> +		/*
-> >> +		 * Make it a conditional branch if replaced insn
-> >> +		 * is consitional
-> >> +		 */
-> >> +		insn = (__mem_to_opcode_arm(
-> >> +			  op->optinsn.copied_insn[0]) & 0xf0000000) |
-> >> +			(insn & 0x0fffffff);
-> >> +
-> >> +		patch_text(op->kp.addr, insn);
-> > 
-> > patch_text() itself may use stop_machine under certain circumstances,
-> > and if it were to do so, I believe that would cause the system to
-> > lock/panic. So, this should be __patch_text() instead, but we would also
-> > need to take care of the cache_ops_need_broadcast() case, where all
-> > CPU's need to invalidate their own caches and we can't rely on just one
-> > CPU executing the code patching whilst other CPUs spin and wait. Though
-> > to make life easier, we could just not optimise kprobes in the legacy
-> > cache_ops_need_broadcast() case.
-> > 
-> >> +
-> >> +		list_del_init(&op->list);
-> >> +	}
-> >> +	return 0;
-> >> +}
-> >> +
-> >> +void arch_optimize_kprobes(struct list_head *oplist)
-> >> +{
-> >> +	stop_machine(__arch_optimize_kprobes, oplist, cpu_online_mask);
-> >> +}
-> > 
-> > I believe passing cpu_online_mask above will cause
-> > __arch_optimize_kprobes to be executed on every CPU, is this safe? If it
-> > is, it's a serendipitous optimisation if each CPU can process different
-> > probes in the list. If it's not safe, this needs to be NULL instead so
-> > only one CPU executes the code.
-> > 
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index bb82a90..81f1b97 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2453,6 +2453,11 @@ return ENOEXEC for that vcpu.
+>  Note that because some registers reflect machine topology, all vcpus
+>  should be created before this ioctl is invoked.
+>  
+> +Userspace can call this function multiple times for a given vcpu, including
+> +after the vcpu has been run. This will reset the vcpu to its initial
+> +state. All calls to this function after the initial call must use the same
+> +target and same set of feature flags, otherwise EINVAL will be returned.
+> +
+>  Possible features:
+>  	- KVM_ARM_VCPU_POWER_OFF: Starts the CPU in a power-off state.
+>  	  Depends on KVM_CAP_ARM_PSCI.  If not set, the CPU will be powered on
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 53036e2..254e065 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -150,8 +150,6 @@ struct kvm_vcpu_stat {
+>  	u32 halt_wakeup;
+>  };
+>  
+> -int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+> -			const struct kvm_vcpu_init *init);
+>  int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
+>  unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
+>  int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 24c9ca4..4043769 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -263,6 +263,7 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+>  {
+>  	/* Force users to call KVM_ARM_VCPU_INIT */
+>  	vcpu->arch.target = -1;
+> +	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
+>  
+>  	/* Set up the timer */
+>  	kvm_timer_vcpu_init(vcpu);
+> @@ -649,6 +650,48 @@ int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level,
+>  	return -EINVAL;
+>  }
+>  
+> +static int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+> +			       const struct kvm_vcpu_init *init)
+> +{
+> +	unsigned int i;
+> +	int phys_target = kvm_target_cpu();
+> +
+> +	if (init->target != phys_target)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * Secondary and subsequent calls to KVM_ARM_VCPU_INIT must
+> +	 * use the same target.
+> +	 */
+> +	if (vcpu->arch.target != -1 && vcpu->arch.target != init->target)
+> +		return -EINVAL;
+> +
+> +	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
+> +	for (i = 0; i < sizeof(init->features) * 8; i++) {
+> +		bool set = (init->features[i / 32] & (1 << (i % 32)));
+> +
+> +		if (set && i >= KVM_VCPU_MAX_FEATURES)
+> +			return -ENOENT;
+> +
+> +		/*
+> +		 * Secondary and subsequent calls to KVM_ARM_VCPU_INIT must
+> +		 * use the same feature set.
+> +		 */
+> +		if (vcpu->arch.target != -1 && i < KVM_VCPU_MAX_FEATURES &&
+> +		    test_bit(i, vcpu->arch.features) != set)
+> +			return -EINVAL;
+> +
+> +		if (set)
+> +			set_bit(i, vcpu->arch.features);
+> +	}
+> +
+> +	vcpu->arch.target = phys_target;
+> +
+> +	/* Now we know what it is, we can reset it. */
+> +	return kvm_reset_vcpu(vcpu);
+> +}
+> +
+> +
+>  static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+>  					 struct kvm_vcpu_init *init)
+>  {
+> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+> index 8c97208..384bab6 100644
+> --- a/arch/arm/kvm/guest.c
+> +++ b/arch/arm/kvm/guest.c
+> @@ -273,31 +273,6 @@ int __attribute_const__ kvm_target_cpu(void)
+>  	}
+>  }
+>  
+> -int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+> -			const struct kvm_vcpu_init *init)
+> -{
+> -	unsigned int i;
+> -
+> -	/* We can only cope with guest==host and only on A15/A7 (for now). */
+> -	if (init->target != kvm_target_cpu())
+> -		return -EINVAL;
+> -
+> -	vcpu->arch.target = init->target;
+> -	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
+> -
+> -	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
+> -	for (i = 0; i < sizeof(init->features) * 8; i++) {
+> -		if (test_bit(i, (void *)init->features)) {
+> -			if (i >= KVM_VCPU_MAX_FEATURES)
+> -				return -ENOENT;
+> -			set_bit(i, vcpu->arch.features);
+> -		}
+> -	}
+> -
+> -	/* Now we know what it is, we can reset it. */
+> -	return kvm_reset_vcpu(vcpu);
+> -}
+> -
+>  int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
+>  {
+>  	int target = kvm_target_cpu();
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 2012c4b..65c6152 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -165,8 +165,6 @@ struct kvm_vcpu_stat {
+>  	u32 halt_wakeup;
+>  };
+>  
+> -int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+> -			const struct kvm_vcpu_init *init);
+>  int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
+>  unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
+>  int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
+> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> index 84d5959..9535bd5 100644
+> --- a/arch/arm64/kvm/guest.c
+> +++ b/arch/arm64/kvm/guest.c
+> @@ -296,31 +296,6 @@ int __attribute_const__ kvm_target_cpu(void)
+>  	return -EINVAL;
+>  }
+>  
+> -int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+> -			const struct kvm_vcpu_init *init)
+> -{
+> -	unsigned int i;
+> -	int phys_target = kvm_target_cpu();
+> -
+> -	if (init->target != phys_target)
+> -		return -EINVAL;
+> -
+> -	vcpu->arch.target = phys_target;
+> -	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
+> -
+> -	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
+> -	for (i = 0; i < sizeof(init->features) * 8; i++) {
+> -		if (init->features[i / 32] & (1 << (i % 32))) {
+> -			if (i >= KVM_VCPU_MAX_FEATURES)
+> -				return -ENOENT;
+> -			set_bit(i, vcpu->arch.features);
+> -		}
+> -	}
+> -
+> -	/* Now we know what it is, we can reset it. */
+> -	return kvm_reset_vcpu(vcpu);
+> -}
+> -
+>  int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
+>  {
+>  	int target = kvm_target_cpu();
 > 
-> This stop_machine() call is copied from arch_disarm_kprobe, I think their
-> senario should be similar.
 
-arch_disarm_kprobe is just executing __patch_text on each cpu, which
-pokes a word of memory with a new value and flushes caches for it.
+Very nice cleanup.
 
-arch_optimize_kprobes is calling __arch_optimize_kprobes, which is
-iterating over a list of probes and removing each one in turn, if this
-is happening on multiple cpu's simultaneously, it's not clear to me that
-such an operation is safe. list_del_init calls __list_del which does
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-	next->prev = prev;
-	prev->next = next;
-
-so what happens if another cpu is at the same time updating any of those
-list entries? Without even fully analysing the code I can see that with
-the fact that the list handling helpers have no memory barriers, that
-the above two lines could be seen to execute in the reverse order, e.g.
- 
-	prev->next = next;
-	next->prev = prev;
-
-so another CPU could find and delete next before this one has finished
-doing so. Would the list end up in a consistent state where no loops
-develop and no probes are missed? I don't know the answer and a full
-analysis would be complicated, but my gut feeling is that if a cpu can
-observe the links in the list in an inconsistent state then only bad
-things can result.
-
+	M.
 -- 
-Tixy
+Jazz is not dead. It just smells funny...
