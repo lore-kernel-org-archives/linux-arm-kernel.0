@@ -1,81 +1,58 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 8 Dec 2014 09:31:05 +0900
-Subject: [PATCH/RFC] ARM: shmobile: lager: Fix SPI mode of SPI-Flash into
- mode3
-In-Reply-To: <20141112082242.GU9007@verge.net.au>
-References: <1414648551-30318-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdVQ0s35sW=kvf80c0s++R-5uNuJQtxMcX1R5ogxNwkp9w@mail.gmail.com>
- <20141112082242.GU9007@verge.net.au>
-Message-ID: <20141208003105.GC7420@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon,  8 Dec 2014 09:54:36 +0900
+Subject: [PATCH] ARM: shmobile: r8a7794: Add USBDMAC[01] clocks to device tree
+Message-ID: <1418000076-28780-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 05:22:43PM +0900, Simon Horman wrote:
-> On Thu, Oct 30, 2014 at 10:26:33AM +0100, Geert Uytterhoeven wrote:
-> > On Thu, Oct 30, 2014 at 6:55 AM, Simon Horman
-> > <horms+renesas@verge.net.au> wrote:
-> > > From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> > >
-> > > In order to change into mode3, CPOL and CPHA bit of SPCMD register
-> > > of MSIOF is changed. Mode3 can avoid intermediate voltage.
-> > 
-> > This is the QSPI node, not MSIOF?
-> 
-> Indeed.
-> 
-> Nakamura-san's patch, which I up-ported, was against the QSPI node
-> but the version I posted below is indeed against the MSIOF.
-> 
-> Furthermore, I see that spi-cpol and spi-cpha are already present
-> in the MSIOF node in mainline. I would like to withdraw this patch.
+From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
 
-Hi Geert,
+Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+[horms: merged per-clock patches]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-coming back to this I'm a little confused.
+---
 
-I believe that the patch below is for the QSPI node and that was
-intended by it. Is such a change appropriate for mainline?
-Should I confirm some details with Nakamura-san?
+Based on the renesas-devel-20141208-v3.18 tag of my renesas tree.
+---
+ arch/arm/boot/dts/r8a7794.dtsi            | 7 ++++---
+ include/dt-bindings/clock/r8a7794-clock.h | 2 ++
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-In mainline spi-cpol and spi-cpha are currently set in the
-MSIOF node but not the QSPI node. I believe the same holds for koelsch too.
-
-> 
-> > > Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > ---
-> > > Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
-> > >
-> > >  arch/arm/boot/dts/r8a7790-lager.dts | 2 ++
-> > >  1 file changed, 2 insertions(+)
-> > >
-> > > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-> > > index 830f2e8..1606fad 100644
-> > > --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> > > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-> > > @@ -343,6 +343,8 @@
-> > >                 spi-tx-bus-width = <4>;
-> > >                 spi-rx-bus-width = <4>;
-> > >                 m25p,fast-read;
-> > > +               spi-cpol;
-> > > +               spi-cpha;
-> > >
-> > >                 partition at 0 {
-> > >                         label = "loader";
-> > 
-> > Gr{oetje,eeting}s,
-> > 
-> >                         Geert
-> > 
-> > --
-> > Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> > 
-> > In personal conversations with technical people, I call myself a hacker. But
-> > when I'm talking to journalists I just say "programmer" or something like that.
-> >                                 -- Linus Torvalds
-> > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 7fd40f3..cad97512 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -493,13 +493,14 @@
+ 		mstp3_clks: mstp3_clks at e615013c {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+-			clocks = <&rclk_clk>;
++			clocks = <&rclk_clk>, <&hp_clk>, <&hp_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+-				R8A7794_CLK_CMT1
++				R8A7794_CLK_CMT1 R8A7794_CLK_USBDMAC0
++				R8A7794_CLK_USBDMAC1
+ 			>;
+ 			clock-output-names =
+-				"cmt1";
++				"cmt1", "usbdmac0", "usbdmac1";
+ 		};
+ 		mstp7_clks: mstp7_clks at e615014c {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
+index 94e2bbf..52492d8 100644
+--- a/include/dt-bindings/clock/r8a7794-clock.h
++++ b/include/dt-bindings/clock/r8a7794-clock.h
+@@ -51,6 +51,8 @@
+ 
+ /* MSTP3 */
+ #define R8A7794_CLK_CMT1		29
++#define R8A7794_CLK_USBDMAC0		30
++#define R8A7794_CLK_USBDMAC1		31
+ 
+ /* MSTP5 */
+ #define R8A7794_CLK_THERMAL		22
+-- 
+2.1.3
