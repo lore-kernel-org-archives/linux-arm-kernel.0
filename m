@@ -1,23 +1,42 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 8 Dec 2014 21:56:30 +0100
-Subject: Mainline kernel really hates bateries in N900
-Message-ID: <20141208205630.GA28391@amd>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon,  8 Dec 2014 13:45:48 -0800
+Subject: [PATCH] ARM: bcm: fix __iomem annotation on kona_smc
+Message-ID: <1418075148-8752-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Fixes the following sparse warning:
+arch/arm/mach-bcm/bcm_kona_smc.c:145:21: warning: incorrect type in initializer (different address spaces)
+arch/arm/mach-bcm/bcm_kona_smc.c:145:21:    expected unsigned int [usertype] *args
+arch/arm/mach-bcm/bcm_kona_smc.c:145:21:    got void [noderef] <asn:2>*static [toplevel] [assigned] bcm_smc_buffer
+arch/arm/mach-bcm/bcm_kona_smc.c:151:9: warning: incorrect type in argument 2 (different address spaces)
+arch/arm/mach-bcm/bcm_kona_smc.c:151:9:    expected void volatile [noderef] <asn:2>*addr
+arch/arm/mach-bcm/bcm_kona_smc.c:151:9:    got unsigned int [usertype] *
+[+ 2 more instances]
 
-So... I thought leaving N900 with mainline kernel on USB connection
-was bad... (end result was battery at 2.97V). Well... now I left the
-machine idle without the charger ... and result was 2.85V on battery.
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
 
-Li-ion batteries should not be discharged below 3.4V. As may batteries
-are already reported as 5mAh total capacity from time to time, I'll
-just have to get new ones... but perhaps you should not repeat those
-experiments.
+Florian, should we just apply this directly on arm-soc?
 
-Best regards,
-									Pavel
+
+-Olof
+
+ arch/arm/mach-bcm/bcm_kona_smc.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
+index a55a7ec..d506d17 100644
+--- a/arch/arm/mach-bcm/bcm_kona_smc.c
++++ b/arch/arm/mach-bcm/bcm_kona_smc.c
+@@ -142,7 +142,7 @@ static int bcm_kona_do_smc(u32 service_id, u32 buffer_phys)
+ static void __bcm_kona_smc(void *info)
+ {
+ 	struct bcm_kona_smc_data *data = info;
+-	u32 *args = bcm_smc_buffer;
++	u32 __iomem *args = bcm_smc_buffer;
+ 
+ 	BUG_ON(smp_processor_id() != 0);
+ 	BUG_ON(!args);
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.7.10.4
