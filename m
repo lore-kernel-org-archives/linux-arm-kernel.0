@@ -1,134 +1,158 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 08 Dec 2014 13:19:15 +0000
-Subject: [PATCH v2 5/6] arm/arm64: KVM: Turn off vcpus on PSCI
- shutdown/reboot
-In-Reply-To: <20141208125836.GE8936@cbox>
-References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
- <1417641522-29056-6-git-send-email-christoffer.dall@linaro.org>
- <548593E5.7070101@arm.com> <20141208125836.GE8936@cbox>
-Message-ID: <5485A553.4070607@arm.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 08 Dec 2014 13:22:14 +0000
+Subject: [PATCH v14 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
+In-Reply-To: <54859A2C.8030009@huawei.com>
+References: <1418020040-68977-1-git-send-email-wangnan0@huawei.com>
+ <1418020131-69375-1-git-send-email-wangnan0@huawei.com>
+ <1418036666.3647.33.camel@linaro.org> <5485886E.2060303@huawei.com>
+ <1418039451.3647.48.camel@linaro.org> <54859454.30603@huawei.com>
+ <54859A2C.8030009@huawei.com>
+Message-ID: <1418044934.3647.61.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/14 12:58, Christoffer Dall wrote:
-> On Mon, Dec 08, 2014 at 12:04:53PM +0000, Marc Zyngier wrote:
->> On 03/12/14 21:18, Christoffer Dall wrote:
->>> When a vcpu calls SYSTEM_OFF or SYSTEM_RESET with PSCI v0.2, the vcpus
->>> should really be turned off for the VM adhering to the suggestions in
->>> the PSCI spec, and it's the sane thing to do.
->>>
->>> Also, clarify the behavior and expectations for exits to user space with
->>> the KVM_EXIT_SYSTEM_EVENT case.
->>>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> ---
->>>  Documentation/virtual/kvm/api.txt |  9 +++++++++
->>>  arch/arm/kvm/psci.c               | 19 +++++++++++++++++++
->>>  arch/arm64/include/asm/kvm_host.h |  1 +
->>>  3 files changed, 29 insertions(+)
->>>
->>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->>> index 81f1b97..228f9cf 100644
->>> --- a/Documentation/virtual/kvm/api.txt
->>> +++ b/Documentation/virtual/kvm/api.txt
->>> @@ -2957,6 +2957,15 @@ HVC instruction based PSCI call from the vcpu. The 'type' field describes
->>>  the system-level event type. The 'flags' field describes architecture
->>>  specific flags for the system-level event.
->>>  
->>> +Valid values for 'type' are:
->>> +  KVM_SYSTEM_EVENT_SHUTDOWN -- the guest has requested a shutdown of the
->>> +   VM. Userspace is not obliged to honour this, and if it does honour
->>> +   this does not need to destroy the VM synchronously (ie it may call
->>> +   KVM_RUN again before shutdown finally occurs).
->>> +  KVM_SYSTEM_EVENT_RESET -- the guest has requested a reset of the VM.
->>> +   As with SHUTDOWN, userspace can choose to ignore the request, or
->>> +   to schedule the reset to occur in the future and may call KVM_RUN again.
->>> +
->>>  		/* Fix the size of the union. */
->>>  		char padding[256];
->>>  	};
->>> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
->>> index 09cf377..ae0bb91 100644
->>> --- a/arch/arm/kvm/psci.c
->>> +++ b/arch/arm/kvm/psci.c
->>> @@ -15,6 +15,7 @@
->>>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>>   */
->>>  
->>> +#include <linux/preempt.h>
->>>  #include <linux/kvm_host.h>
->>>  #include <linux/wait.h>
->>>  
->>> @@ -166,6 +167,24 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
->>>  
->>>  static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
->>>  {
->>> +	int i;
->>> +	struct kvm_vcpu *tmp;
->>> +
->>> +	/*
->>> +	 * The KVM ABI specifies that a system event exit may call KVM_RUN
->>> +	 * again and may perform shutdown/reboot at a later time that when the
->>> +	 * actual request is made.  Since we are implementing PSCI and a
->>> +	 * caller of PSCI reboot and shutdown expects that the system shuts
->>> +	 * down or reboots immediately, let's make sure that VCPUs are not run
->>> +	 * after this call is handled and before the VCPUs have been
->>> +	 * re-initialized.
->>> +	 */
->>> +	kvm_for_each_vcpu(i, tmp, vcpu->kvm)
->>> +		tmp->arch.pause = true;
->>> +	preempt_disable();
->>> +	force_vm_exit(cpu_all_mask);
->>> +	preempt_enable();
->>> +
->>
->> I'm slightly uneasy about this force_vm_exit, as this is something that
->> is directly triggered by the guest. I suppose it is almost impossible to
->> find out which CPUs we're actually using...
->>
-> Ah, you mean we should only IPI the CPUs that are actually running a
-> VCPU belonging to this VM?
+On Mon, 2014-12-08 at 20:31 +0800, Wang Nan wrote:
+> On 2014/12/8 20:06, Wang Nan wrote:
+> > On 2014/12/8 19:50, Jon Medhurst (Tixy) wrote:
+> >> On Mon, 2014-12-08 at 19:15 +0800, Wang Nan wrote:
+> >>> On 2014/12/8 19:04, Jon Medhurst (Tixy) wrote:
+> >>>> On Mon, 2014-12-08 at 14:28 +0800, Wang Nan wrote:
+> [...]
+> >>
+> >> so another CPU could find and delete next before this one has finished
+> >> doing so. Would the list end up in a consistent state where no loops
+> >> develop and no probes are missed? I don't know the answer and a full
+> >> analysis would be complicated, but my gut feeling is that if a cpu can
+> >> observe the links in the list in an inconsistent state then only bad
+> >> things can result.
+> >>
+> > 
+> > I see the problem.
+> > 
+> > I'm thinking about making core.c and opt-arm.c to share stop_machine() code.
+> > stop_machine() is required when removing breakpoint, so I'd like to define
+> > a "remove_breakpoint" function in core.c and make opt-arm.c to call it.
+> > Do you think it is a good idea?
+> > 
+> > 
 > 
-> I guess I could replace it with:
-> 
-> 	kvm_for_each_vcpu(i, tmp, vcpu->kvm) {
-> 		tmp->arch.pause = true;
-> 		kvm_vcpu_kick(tmp);
-> 	}
+> What I mean is something like this:
 
-Ah, that's even simpler than I thought. Yeah, looks good to me.
+Yes, that should work, though as remove_breakpoint is a globally visible
+symbol, I suggest a less generic name for it, perhaps
+remove_kprobe_breakpoint ?
 
-> 
-> or a slightly more optimized "half-open-coded-kvm_vcpu_kick":
-> 
-> 	me = get_cpu();
-> 	kvm_for_each_vcpu(i, tmp, vcpu->kvm) {
-> 		tmp->arch.pause = true;
-> 		if (tmp->cpu != me && (unsigned)tmp->cpu < nr_cpu_ids &&
-> 		    cpu_online(tmp->cpu)  && kvm_arch_vcpu_should_kick(tmp))
-> 			smp_send_reschedule(tmp->cpu);
-> 	}
-> 
-> which should save us waking up vcpu threads that are parked on
-> waitqueues.  Not sure it's worth it, maybe it is for 100s of vcpu
-> systems?
-
-Probably not worth it at the moment.
-
-> Can we actually replace force_vm_exit() with the more optimized
-> open-coded version?  That messes with VMID allocation so it really needs
-> a lot of testing though...
-
-VMID reallocation almost never occurs, and that's a system-wide event,
-not triggered by a guest. I'd rather not mess with that just yet.
-
-> Preferences?
-
-I think your first version is very nice, provided that it doesn't
-introduce any unforeseen regression.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Tixy
+
+
+> diff --git a/arch/arm/probes/kprobes/core.c b/arch/arm/probes/kprobes/core.c
+> index 3a58db4..efd8ab1 100644
+> --- a/arch/arm/probes/kprobes/core.c
+> +++ b/arch/arm/probes/kprobes/core.c
+> @@ -163,19 +163,31 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
+>   * memory. It is also needed to atomically set the two half-words of a 32-bit
+>   * Thumb breakpoint.
+>   */
+> -int __kprobes __arch_disarm_kprobe(void *p)
+> -{
+> -	struct kprobe *kp = p;
+> -	void *addr = (void *)((uintptr_t)kp->addr & ~1);
+> -
+> -	__patch_text(addr, kp->opcode);
+> +struct patch {
+> +	void *addr;
+> +	unsigned int insn;
+> +};
+> 
+> +static int __remove_breakpoint(void *data)
+> +{
+> +	struct patch *p = data;
+> +	__patch_text(p->addr, p->insn);
+>  	return 0;
+>  }
+> 
+> +void __kprobes remove_breakpoint(void *addr, unsigned int insn)
+> +{
+> +	struct patch p = {
+> +		.addr = addr,
+> +		.insn = insn,
+> +	};
+> +	stop_machine(__remove_breakpoint, &p, cpu_online_mask);
+> +}
+> +
+>  void __kprobes arch_disarm_kprobe(struct kprobe *p)
+>  {
+> -	stop_machine(__arch_disarm_kprobe, p, cpu_online_mask);
+> +	remove_breakpoint((void *)((uintptr_t)p->addr & ~1),
+> +			p->opcode);
+>  }
+> 
+>  void __kprobes arch_remove_kprobe(struct kprobe *p)
+> diff --git a/arch/arm/probes/kprobes/core.h b/arch/arm/probes/kprobes/core.h
+> index f88c79f..7b7c334 100644
+> --- a/arch/arm/probes/kprobes/core.h
+> +++ b/arch/arm/probes/kprobes/core.h
+> @@ -30,6 +30,8 @@
+>  #define KPROBE_THUMB16_BREAKPOINT_INSTRUCTION	0xde18
+>  #define KPROBE_THUMB32_BREAKPOINT_INSTRUCTION	0xf7f0a018
+> 
+> +extern void remove_breakpoint(void *addr, unsigned int insn);
+> +
+>  enum probes_insn __kprobes
+>  kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_probes_insn *asi,
+>  		const struct decode_header *h);
+> diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
+> index afbfeef..a1a1882 100644
+> --- a/arch/arm/probes/kprobes/opt-arm.c
+> +++ b/arch/arm/probes/kprobes/opt-arm.c
+> @@ -28,8 +28,9 @@
+>  #include <asm/insn.h>
+>  /* for patch_text */
+>  #include <asm/patch.h>
+> -/* for stop_machine */
+> -#include <linux/stop_machine.h>
+> +
+> +#include "core.h"
+> +
+>  /*
+>   * NOTE: the first sub and add instruction will be modified according
+>   * to the stack cost of the instruction.
+> @@ -245,13 +246,8 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op, struct kprobe *or
+>  	return 0;
+>  }
+> 
+> -/*
+> - * Similar to __arch_disarm_kprobe, operations which removing
+> - * breakpoints must be wrapped by stop_machine to avoid racing.
+> - */
+> -static __kprobes int __arch_optimize_kprobes(void *p)
+> +void __kprobes arch_optimize_kprobes(struct list_head *oplist)
+>  {
+> -	struct list_head *oplist = p;
+>  	struct optimized_kprobe *op, *tmp;
+> 
+>  	list_for_each_entry_safe(op, tmp, oplist, list) {
+> @@ -277,16 +273,15 @@ static __kprobes int __arch_optimize_kprobes(void *p)
+>  			  op->optinsn.copied_insn[0]) & 0xf0000000) |
+>  			(insn & 0x0fffffff);
+> 
+> -		patch_text(op->kp.addr, insn);
+> +		/*
+> +		 * Similar to __arch_disarm_kprobe, operations which
+> +		 * removing breakpoints must be wrapped by stop_machine
+> +		 * to avoid racing.
+> +		 */
+> +		remove_breakpoint(op->kp.addr, insn);
+> 
+>  		list_del_init(&op->list);
+>  	}
+> -	return 0;
+> -}
+> -
+> -void arch_optimize_kprobes(struct list_head *oplist)
+> -{
+> -	stop_machine(__arch_optimize_kprobes, oplist, cpu_online_mask);
+>  }
+> 
+>  void arch_unoptimize_kprobe(struct optimized_kprobe *op)
