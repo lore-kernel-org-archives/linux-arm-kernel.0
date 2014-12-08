@@ -1,43 +1,35 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 8 Dec 2014 10:47:42 -0800
-Subject: [PATCH v3 0/5] Add gpio support to Broadcom Cygnus SoC
-In-Reply-To: <Ray Jui <rjui@broadcom.com>
+Date: Mon, 8 Dec 2014 10:47:48 -0800
+Subject: [PATCH v3 5/5] MAINTAINERS: Entry for Cygnus GPIO driver
+In-Reply-To: <1418064468-8512-1-git-send-email-rjui@broadcom.com>
 References: <Ray Jui <rjui@broadcom.com>
-Message-ID: <1418064468-8512-1-git-send-email-rjui@broadcom.com>
+ <1418064468-8512-1-git-send-email-rjui@broadcom.com>
+Message-ID: <1418064468-8512-7-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset contains the initial GPIO support for the Broadcom Cygnus SoC.
-Cygnus has 3 GPIO controllers: 1) the ASIU GPIO; 2) the chipCommonG GPIO;
-and 3) the ALWAYS-ON GPIO. All 3 types of GPIO controllers are supported by
-the same Cygnus GPIO driver
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+---
+ MAINTAINERS |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Changes from v2:
- - Consolidate different compatible IDs into "brcm,cygnus-gpio"
- - Get rid of redundant "no-interrupt" property
-
-Changes from v1:
- - Get rid of inline qualifier
- - Get rid of redundant check in the ISR
- - Other minor fixes to imrove code readability
-
-Ray Jui (5):
-  gpio: Cygnus: define Broadcom Cygnus GPIO binding
-  gpio: Cygnus: add GPIO driver
-  ARM: mach-bcm: Enable GPIO support for Cygnus
-  ARM: dts: enable GPIO for Broadcom Cygnus
-  MAINTAINERS: Entry for Cygnus GPIO driver
-
- .../devicetree/bindings/gpio/brcm,cygnus-gpio.txt  |   82 +++
- MAINTAINERS                                        |    7 +
- arch/arm/boot/dts/bcm-cygnus.dtsi                  |   30 +
- arch/arm/mach-bcm/Kconfig                          |    1 +
- drivers/gpio/Kconfig                               |   11 +
- drivers/gpio/Makefile                              |    1 +
- drivers/gpio/gpio-bcm-cygnus.c                     |  705 ++++++++++++++++++++
- 7 files changed, 837 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/brcm,cygnus-gpio.txt
- create mode 100644 drivers/gpio/gpio-bcm-cygnus.c
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e6bff3a..8473422 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2202,6 +2202,13 @@ N:	bcm9583*
+ N:	bcm583*
+ N:	bcm113*
+ 
++BROADCOM CYGNUS GPIO DRIVER
++M:	Ray Jui <rjui@broadcom.com>
++L:	bcm-kernel-feedback-list at broadcom.com
++S:	Supported
++F:	drivers/gpio/gpio-bcm-cygnus.c
++F:	Documentation/devicetree/bindings/gpio/brcm,cygnus-gpio.txt
++
+ BROADCOM KONA GPIO DRIVER
+ M:	Ray Jui <rjui@broadcom.com>
+ L:	bcm-kernel-feedback-list at broadcom.com
 -- 
 1.7.9.5
