@@ -1,115 +1,46 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 08 Dec 2014 10:46:17 +0100
-Subject: [RFC 1/3] devfreq: dt-bindings: Document Exynos3250 devfreq driver
-In-Reply-To: <1647680679.696101418015213383.JavaMail.weblogic@epmlwas04c>
-References: <1647680679.696101418015213383.JavaMail.weblogic@epmlwas04c>
-Message-ID: <1418031977.6084.13.camel@AMDC1943>
+From: lyz@rock-chips.com (Yunzhi Li)
+Date: Mon,  8 Dec 2014 17:46:23 +0800
+Subject: [PATCH v3 0/5] 
+Message-ID: <1418031988-2700-1-git-send-email-lyz@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pon, 2014-12-08 at 05:06 +0000, MyungJoo Ham wrote:
-> >   
-> >  Add documentation for bindings used by Exynos3250 devfreq driver.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > ---
-> >  .../bindings/arm/samsung/exynos3250-devfreq.txt    | 66 ++++++++++++++++++++++
-> >  1 file changed, 66 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt b/Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt
-> > new file mode 100644
-> > index 000000000000..047955e9e371
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/samsung/exynos3250-devfreq.txt
-> > @@ -0,0 +1,66 @@
-> > +Samsung Exynos3250 devfreq driver
-> > +=================================
-> > +
-> > +The driver support changing frequencies and voltage for:
-> > + - memory controller and bus,
-> > + - peripheral buses (left and right).
-> > +
-> > +Memory controller and bus
-> > +=========================
-> > +Required properties:
-> > + - compatible : should be "samsung,exynos3250-busfreq-mif"
-> > + - reg : two sets (offset and length of the register) for PPMU registers
-> > +	used by this devfreq driver
-> > + - clock-names : one clock of name "dmc" to manage frequency
-> > + - clocks : phandle and specifier for clock listed in clock-names property
-> > + - vdd_mif-supply : phandle to MIF voltage regulator
-> > +
-> > +Peripheral buses
-> > +================
-> > +Required properties:
-> > + - compatible : should be "samsung,exynos3250-busfreq-int"
-> > + - reg : two sets (offset and length of the register) for PPMU registers
-> > +	used by this devfreq driver
-> > + - clock-names : names for PPMU clocks and bus clocks to manage frequencies;
-> > +	All following clock names (and corresponding phandles) must be
-> > +	provided:
-> > +	- "ppmu_left", "ppmu_right",
-> > +	- "aclk_400", "aclk_266", "aclk_200", "aclk_160", "aclk_gdl", "aclk_gdr", "mfc";
-> > + - clocks : phandles and specifiers for clocks listed in clock-names property
-> > + - vdd_mif-supply : phandle to INT voltage regulator
-> > +
-> > +Example
-> > +=======
-> > +	busfreq_mif: busfreq at 106A0000 {
-> > +		compatible = "samsung,exynos3250-busfreq-mif";
-> > +		reg = <0x106A0000 0x2000>, <0x106B0000 0x2000>;
-> > +		clocks = <&cmu_dmc CLK_DIV_DMC>;
-> > +		clock-names = "dmc";
-> > +		vdd_mif-supply = <&buck1_reg>;
-> > +		status = "okay";
-> > +	};
-> 
-> The hardware you are binding hereby is "Exynos PPMU".
-> You may consider to bind PPMU (DMC PPMU or BUS PPMU whichever hardware
-> you want to use) with DT and then let exynos bus devfreq driver use
-> the already-bound devices if found, ... in principle.
-> In other words or point of view, you may implement PPMU driver in
-> devfreq class device driver so that you let it bind PPMU device with DT.
-> It may be done similarly with the device below.
+Patches to add support for Rockchip usb phys.Add a new Rockchip
+usb phy driver and modify dwc2 controller driver to make dwc2
+platform devices support a generic PHY framework driver. This
+patch set has been tested on my rk3288-evb and power off the usb
+phys would reduce about 60mW power budget in total during sustem
+suspend.
 
-Yes, you're right. I saw also similar case for Tegra Activity Monitor. 
+Changes in v3:
+- Use BIT macro instead of bit shift ops.
+- Rename the config entry to PHY_ROCKCHIP_USB.
+- Fix coding style: both branches of the if() which only one
+  branch of the conditional statement is a single statement should
+  have braces.
+- No need to test dwc2->phy for NULL before calling generic phy
+  APIs.
+- Add more context about the changes in the long description.
 
-Thanks for pointing this,
-Krzysztof
+Yunzhi Li (5):
+  phy: add a driver for the Rockchip SoC internal USB2.0 PHY
+  Documentation: bindings: add doc for the Rockchip usb PHY
+  usb: dwc2: add generic PHY framework support for dwc2 usb    
+    controler platform driver.
+  ARM: dts: add rk3288 usb PHY
+  ARM: dts: Enable usb PHY on rk3288-evb board
 
+ .../devicetree/bindings/phy/rockchip-usb-phy.txt   |  22 +++
+ arch/arm/boot/dts/rk3288-evb.dtsi                  |   4 +
+ arch/arm/boot/dts/rk3288.dtsi                      |  13 ++
+ drivers/phy/Kconfig                                |   7 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-rockchip-usb.c                     | 179 +++++++++++++++++++++
+ drivers/usb/dwc2/gadget.c                          |  33 ++--
+ drivers/usb/dwc2/platform.c                        |  36 ++++-
+ 8 files changed, 272 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+ create mode 100644 drivers/phy/phy-rockchip-usb.c
 
-> 
-> 
-> Cheers,
-> MyungJoo.
-> 
-> 
-> > +
-> > +	busfreq_int: busfreq at 116A0000 {
-> > +		compatible = "samsung,exynos3250-busfreq-int";
-> > +		reg = <0x116A0000 0x2000>, <0x112A0000 0x2000>;
-> > +		clocks = <&cmu CLK_PPMULEFT>,
-> > +			<&cmu CLK_PPMURIGHT>,
-> > +			<&cmu CLK_DIV_ACLK_400_MCUISP>,
-> > +			<&cmu CLK_DIV_ACLK_266>,
-> > +			<&cmu CLK_DIV_ACLK_200>,
-> > +			<&cmu CLK_DIV_ACLK_160>,
-> > +			<&cmu CLK_DIV_GDL>,
-> > +			<&cmu CLK_DIV_GDR>,
-> > +			<&cmu CLK_DIV_MFC>;
-> > +		clock-names = "ppmuleft",
-> > +			"ppmuright",
-> > +			"aclk_400",
-> > +			"aclk_266",
-> > +			"aclk_200",
-> > +			"aclk_160",
-> > +			"aclk_gdl",
-> > +			"aclk_gdr",
-> > +			"mfc";
-> > +		vdd_int-supply = <&buck3_reg>;
-> > +		status = "okay";
-> > +	};
-> > -- 
-> > 1.9.1
-> > 
+-- 
+2.0.0
