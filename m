@@ -1,65 +1,109 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Mon, 08 Dec 2014 13:04:33 +0100
-Subject: [alsa-devel] Question on arm64 unaligned faults during playback
-In-Reply-To: <54858868.70708@metafoo.de>
-References: <CAM4voa=kiLsiLEzUbo3D+f1go5px78fXBSjSi7kGK4QCdnwPyQ@mail.gmail.com>
- <54856621.8090107@ladisch.de> <s5hppbumnis.wl-tiwai@suse.de>
- <54858868.70708@metafoo.de>
-Message-ID: <s5ha92y9wku.wl-tiwai@suse.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 08 Dec 2014 12:04:53 +0000
+Subject: [PATCH v2 5/6] arm/arm64: KVM: Turn off vcpus on PSCI
+ shutdown/reboot
+In-Reply-To: <1417641522-29056-6-git-send-email-christoffer.dall@linaro.org>
+References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
+ <1417641522-29056-6-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <548593E5.7070101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Mon, 08 Dec 2014 12:15:52 +0100,
-Lars-Peter Clausen wrote:
+On 03/12/14 21:18, Christoffer Dall wrote:
+> When a vcpu calls SYSTEM_OFF or SYSTEM_RESET with PSCI v0.2, the vcpus
+> should really be turned off for the VM adhering to the suggestions in
+> the PSCI spec, and it's the sane thing to do.
 > 
-> Added ARM64 folks to Cc.
+> Also, clarify the behavior and expectations for exits to user space with
+> the KVM_EXIT_SYSTEM_EVENT case.
 > 
-> On 12/08/2014 11:41 AM, Takashi Iwai wrote:
-> > At Mon, 08 Dec 2014 09:49:37 +0100,
-> > Clemens Ladisch wrote:
-> >>
-> >> Abhilash Kesavan wrote:
-> >>> I am working on a 64-bit ARM SoC (Samsung's Exynos7) and have observed
-> >>> unaligned faults while testing certain sound streams with aplay.
-> >>>
-> >>> [   24.535661] snd_pcm_lib_write_transfer:sound/core/pcm_lib.c hwbuf is ffffff8000085624, runtime->dma_area is ffffff8000080000, hwoff is 5513, frames_to_bytes is 22052, frames is 5513
-> >>> [   24.551244] Unhandled fault: alignment fault (0x96000061) at 0xffffff8000085624
-> >>> [   24.579944] PC is at __copy_from_user+0x14/0x60
-> >>> [   24.584450] LR is at snd_pcm_lib_write_transfer+0xe4/0x104
-> >>> [   24.922054] Call trace:
-> >>> [   24.924488] [<ffffffc0002d4784>] __copy_from_user+0x14/0x60
-> >>> [   24.930040] [<ffffffc0004b7574>] snd_pcm_lib_write1+0x1fc/0x384
-> >>>
-> >>> We are using the internal sram available for sound, for DMA buffer
-> >>> allocation, using the generic SRAM driver. From the above log, the
-> >>> buffer address offset is not 8-byte aligned and as we are using the
-> >>> SRAM driver which maps the memory as device memory we are getting an
-> >>> unaligned fault. Is it incorrect to use the generic sram driver for
-> >>> arm64 or am I missing something ?
-> >>
-> >> When you give the ALSA framework a memory buffer, it is assumed that it
-> >> is general-purpose memory, i.e., can be accessed with any alignment.
-> >>
-> >> If your memory does not allow such accesses, you have to do all the
-> >> accesses in your driver, i.e., do everything in the .copy/.silence
-> >> callbacks.  (You also have to add constraints so that periods and buffer
-> >> are correctly aligned.)
-> >
-> > You can set runtime->min_align in the own hw_params callback so that
-> > the PCM core handle it well, at least, for non-mmap mode.
-> >
-> > But this feature has been rarely used (currently no driver sets it
-> > explicitly), so there might be still some bugs there, too :)
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  Documentation/virtual/kvm/api.txt |  9 +++++++++
+>  arch/arm/kvm/psci.c               | 19 +++++++++++++++++++
+>  arch/arm64/include/asm/kvm_host.h |  1 +
+>  3 files changed, 29 insertions(+)
 > 
-> As far as I can see min_align only aligns the hardware pointer, but not the 
-> application pointer. The later causes the issue here.
-> 
-> E.g. if a application writes a unaligned amount of bytes the next write will 
-> start at an unaligned buffer address.
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index 81f1b97..228f9cf 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2957,6 +2957,15 @@ HVC instruction based PSCI call from the vcpu. The 'type' field describes
+>  the system-level event type. The 'flags' field describes architecture
+>  specific flags for the system-level event.
+>  
+> +Valid values for 'type' are:
+> +  KVM_SYSTEM_EVENT_SHUTDOWN -- the guest has requested a shutdown of the
+> +   VM. Userspace is not obliged to honour this, and if it does honour
+> +   this does not need to destroy the VM synchronously (ie it may call
+> +   KVM_RUN again before shutdown finally occurs).
+> +  KVM_SYSTEM_EVENT_RESET -- the guest has requested a reset of the VM.
+> +   As with SHUTDOWN, userspace can choose to ignore the request, or
+> +   to schedule the reset to occur in the future and may call KVM_RUN again.
+> +
+>  		/* Fix the size of the union. */
+>  		char padding[256];
+>  	};
+> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+> index 09cf377..ae0bb91 100644
+> --- a/arch/arm/kvm/psci.c
+> +++ b/arch/arm/kvm/psci.c
+> @@ -15,6 +15,7 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+> +#include <linux/preempt.h>
+>  #include <linux/kvm_host.h>
+>  #include <linux/wait.h>
+>  
+> @@ -166,6 +167,24 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
+>  
+>  static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
+>  {
+> +	int i;
+> +	struct kvm_vcpu *tmp;
+> +
+> +	/*
+> +	 * The KVM ABI specifies that a system event exit may call KVM_RUN
+> +	 * again and may perform shutdown/reboot at a later time that when the
+> +	 * actual request is made.  Since we are implementing PSCI and a
+> +	 * caller of PSCI reboot and shutdown expects that the system shuts
+> +	 * down or reboots immediately, let's make sure that VCPUs are not run
+> +	 * after this call is handled and before the VCPUs have been
+> +	 * re-initialized.
+> +	 */
+> +	kvm_for_each_vcpu(i, tmp, vcpu->kvm)
+> +		tmp->arch.pause = true;
+> +	preempt_disable();
+> +	force_vm_exit(cpu_all_mask);
+> +	preempt_enable();
+> +
 
-Oh right, and I think we should fix the alignment of applptr, too.
-We can set min_align zero as default and allow the unaligned applptr
-update while aligning to the size if given explicitly.
+I'm slightly uneasy about this force_vm_exit, as this is something that
+is directly triggered by the guest. I suppose it is almost impossible to
+find out which CPUs we're actually using...
 
+>  	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
+>  	vcpu->run->system_event.type = type;
+>  	vcpu->run->exit_reason = KVM_EXIT_SYSTEM_EVENT;
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 65c6152..0b7dfdb 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -198,6 +198,7 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+>  struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
+>  
+>  u64 kvm_call_hyp(void *hypfn, ...);
+> +void force_vm_exit(const cpumask_t *mask);
+>  
+>  int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  		int exception_index);
+> 
 
-Takashi
+Other than that,
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
