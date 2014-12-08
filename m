@@ -1,76 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Dec 2014 16:01:32 +0100
-Subject: using DMA-API on ARM
-In-Reply-To: <F51492713EF10846800D8C0ED37A7DCE01902076@SJEXCHMB15.corp.ad.broadcom.com>
-References: <5481794E.4050406@broadcom.com>
- <F51492713EF10846800D8C0ED37A7DCE01901765@SJEXCHMB15.corp.ad.broadcom.com>
- <F51492713EF10846800D8C0ED37A7DCE01902076@SJEXCHMB15.corp.ad.broadcom.com>
-Message-ID: <2863746.4sUSEYqahB@wuerfel>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Mon, 8 Dec 2014 23:03:09 +0800
+Subject: [PATCH] irqchip: mediatek: Fix error return code detection
+Message-ID: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 December 2014 13:47:38 Hante Meuleman wrote:
-> Still using outlook, but will limit the line length, I hope that works for the
-> moment. Attached is a log with the requested information, it is a little
-> bit non-standard though. The dump code from the mm was copied in
-> the driver and called from there, mapping the prints back to our local
-> printf, but it should produce the same. I did this because I didn't realize
-> the table is static.
-> 
-> Some background on the test setup: I'm using a Broadcom reference 
-> design AP platform with an BRCM 4708 host SOC.
+This fix an error handling bug reported by Beniamino, this is based on
+mtk intpol patches [1]
 
-I think you are using the wrong dtb file, the log says this is
-a "Buffalo WZR-1750DHP", not the reference design.
+Joe.C
 
-> For the AP router 
-> platform the opensource packet OpenWRT was used. Some small
-> modifications were made to get it to work on our HW. Only one core
-> is enabled for the moment (no time to figure out how to enable the
-> other one). Openwrt was configured to use kernel 3.18-rc2 and 
-> the brcmfmac of the compat-wireless code was updated with our 
-> latest code (minor patches, which have been submitted already). 
-> The device used is 43602 pcie device. Some modifications to the build
-> system were made to enable PCIE. The test is to connect with a 
-> client to the AP and run iperf (TCP). The test can run for many hours
-> without a problem, but sometimes fails very quickly.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305808.html
 
-The bcm4708 platform is maintained by Hauke Mehrtens, adding him to Cc.
+====================
+of_io_request_and_map() return ERR_PTR wrapped error code instead of
+NULL when fail, fix code in mtk_sysirq_of_init() to correctly handle
+this.
 
-In your log, I see this message:
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+---
+ drivers/irqchip/irq-mtk-sysirq.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-[    0.000000] PL310 OF: cache setting yield illegal associativity
-[    0.000000] PL310 OF: -1069781724 calculated, only 8 and 16 legal
-[    0.000000] L2C-310 enabling early BRESP for Cortex-A9
-[    0.000000] L2C-310 full line of zeros enabled for Cortex-A9
-[    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
-[    0.000000] L2C-310 cache controller enabled, 16 ways, 256 kB
-[    0.000000] L2C-310: CACHE_ID 0x410000c8, AUX_CTRL 0x4e130001
-
-Evidently the cache controller information in DT is incorrect and
-the setup may be wrong as a consequence, which may explain cache
-coherency problems.
-
-Can you verify that the AUX_CTRL value is the same one you see
-in a working kernel?
-
-> The log: first the ring allocation info is printed. Starting at
-> 16.124847, ring 2, 3 and 4 are rings used for device to host. In this
-> log the failure is on a read of ring 3. Ring 3 is 1024 entries of each
-> 16 bytes. The next thing printed is the kernel page tables. Then some 
-> OpenWRT info and the logging of part of the connection setup. Then at 
-> 1780.130752 the logging of the failure starts. The sequence number is 
-> modulo 253 with ring size of 1024 matches an "old" entry (read 40, 
-> expected 52). Then the different pointers are printed followed by 
-> the kernel page table. The code does then a cache invalidate on the 
-> dma_handle and the next read the sequence number is correct.
-
-How do you invalidate the cache? A dma_handle is of type dma_addr_t
-and we don't define an operation for that, nor does it make sense
-on an allocation from dma_alloc_coherent(). What happens if you
-take out the invalidate?
-
-Can you post the patch that you use (both platform and driver) relative
-to the snapshot of the the mainline kernel you are basing on?
-
-	Arnd
+diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
+index 7e342df..0b0d2c0 100644
+--- a/drivers/irqchip/irq-mtk-sysirq.c
++++ b/drivers/irqchip/irq-mtk-sysirq.c
+@@ -137,9 +137,9 @@ static int __init mtk_sysirq_of_init(struct device_node *node,
+ 		return -ENOMEM;
+ 
+ 	chip_data->intpol_base = of_io_request_and_map(node, 0, "intpol");
+-	if (!chip_data->intpol_base) {
++	if (IS_ERR(chip_data->intpol_base)) {
+ 		pr_err("mtk_sysirq: unable to map sysirq register\n");
+-		ret = -ENOMEM;
++		ret = PTR_ERR(chip_data->intpol_base);
+ 		goto out_free;
+ 	}
+ 
+-- 
+1.8.1.1.dirty
