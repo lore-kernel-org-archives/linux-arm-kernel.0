@@ -1,142 +1,174 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 9 Dec 2014 16:58:07 +0000
-Subject: [PATCH v5] clocksource: arch_timer: Fix code to use physical
- timers when requested
-In-Reply-To: <1418106718.32622.31.camel@mtksdaap41>
-References: <1416812564-26465-1-git-send-email-sonnyrao@chromium.org>
- <1417776064.14380.17.camel@mtksdaap41>
- <20141208162140.GN16185@e104818-lin.cambridge.arm.com>
- <1418106718.32622.31.camel@mtksdaap41>
-Message-ID: <20141209165807.GJ31129@e104818-lin.cambridge.arm.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 09 Dec 2014 17:11:11 +0000
+Subject: [PATCH v3] ARM: kprobes: Add test cases for stack consuming
+ instructions
+In-Reply-To: <1418143407.3641.47.camel@linaro.org>
+References: <1418047765-53197-1-git-send-email-wangnan0@huawei.com>
+ <1418047765-53197-6-git-send-email-wangnan0@huawei.com>
+ <1418143407.3641.47.camel@linaro.org>
+Message-ID: <1418145071.3641.60.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 09, 2014 at 06:31:58AM +0000, Yingjoe Chen wrote:
-> On Mon, 2014-12-08 at 16:21 +0000, Catalin Marinas wrote:
-> > On Fri, Dec 05, 2014 at 10:41:04AM +0000, Yingjoe Chen wrote:
-> > > On Sun, 2014-11-23 at 23:02 -0800, Sonny Rao wrote: 
-> > > > This is a bug fix for using physical arch timers when
-> > > > the arch_timer_use_virtual boolean is false.  It restores the
-> > > > arch_counter_get_cntpct() function after removal in
-> > > > 
-> > > > 0d651e4e "clocksource: arch_timer: use virtual counters"
-> > > > 
-> > > > We need this on certain ARMv7 systems which are architected like this:
-> > > > diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> > > > index f190971..b1fa4e6 100644
-> > > > --- a/arch/arm64/include/asm/arch_timer.h
-> > > > +++ b/arch/arm64/include/asm/arch_timer.h
-> > > > @@ -104,6 +104,15 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
-> > > >  	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
-> > > >  }
-> > > >  
-> > > > +static inline u64 arch_counter_get_cntpct(void)
-> > > > +{
-> > > > +	/*
-> > > > +	 * AArch64 kernel and user space mandate the use of CNTVCT.
-> > > > +	 */
-> > > > +	BUG();
-> > > > +	return 0;
-> > > > +}
-> > > > +
-> > > >  static inline u64 arch_counter_get_cntvct(void)
-> > > >  {
-> > > >  	u64 cval;
-> > > 
-> > > I tested this on an arm64 platform and system fail to boot when apply
-> > > this patch.
-> > > 
-> > > The boot loader start kernel at EL2, so is_hyp_mode_available() will be
-> > > true and we will use physical timer. Without this patch,
-> > > arch_timer_read_counter set to arch_counter_get_cntvct even when we use
-> > > physical timer which is incorrect but at least system will boot.
-> > 
-> > So on arm64 we want to use CNTVCT all the time, even if we start the
-> > kernel at EL2. This is the counter that gets exposed to user via vdso.
-> > When the kernel boots at EL2, we initialise CNTVOFF to 0, so we know
-> > that CNTVCT == CNTPCT. However, I would still prefer to use CNTVCT even
-> > in such case to spot possible firmware issues with not restoring CNTVOFF
-> > when coming out of suspend (one particular case of suspend which does
-> > not require a different kernel entry point).
-> > 
-> > > I think we still need this function on arm64. We should add BUG() to
-> > > arch_timer_init instead, maybe something like this:
-> > > 
-> > > @@ -708,9 +708,12 @@ static void __init arch_timer_init(struct device_node *np)
-> > >  	 * If we cannot rely on firmware initializing the timer registers then
-> > >  	 * we should use the physical timers instead.
-> > >  	 */
-> > > -	if (IS_ENABLED(CONFIG_ARM) &&
-> > > -	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
-> > > +	if (of_property_read_bool(np, "arm,cpu-registers-not-fw-configured")) {
-> > > +		if (IS_ENABLED(CONFIG_ARM64))
-> > > +			BUG();
-> > > +		else
-> > >  			arch_timer_use_virtual = false;
-> > > +	}
-> > 
-> > We could be more tolerant (give people a chance to check their DT):
-> > 
-> > 	if (!WARN_ON(IS_ENABLED(CONFIG_ARM64)))
-> > 		arch_timer_use_virtual = false;
-> > 
-> > In addition, we can define arch_counter_get_cntpct to always read CNTVCT
-> > (not that nice but maybe it looks better with a comment):
-> > 
-> > /*
-> >  * AArch64 kernel and user space mandate the use of CNTVCT.
-> >  */
-> > #define arch_counter_get_cntpct	arch_counter_get_cntvct
-> > 
-> > (or any better suggestion to avoid reading CNTPCT on arm64)
-> > 
-> 
-> I'm not sure about this. arch_timer_use_virtual is false, indicate we
-> are using physical timer, the function name suggest it will read
-> physical timer, but actually it is reading virtual timer. It sure will
-> create confusion when one need to debug.
+These have extra 'checker' functions associated with them so lets make
+sure those get covered by testing. As they may create uninitialised
+space on the stack we also update the test code to ensure such space is
+consistent between test runs. This is done by disabling interrupts in
+setup_test_context().
 
-You mix timer and counter terms here. Anyway, of we use physical timer,
-you could argue that it makes sense to use the corresponding physical
-counter (CNTPCT). However, on arm64 we only expose CNTVCT to user VDSO
-and we want to use the same in the kernel. When booting at EL2, CNTVCT
-== CNTPCT because we control CNTVOFF, that's unless we have some broken
-firmware that does not restore CNTVOFF correctly. That's what we want
-to spot early, hence the aim to always use the virtual counter (but not
-the timer, use use the physical timer as it makes it easier for KVM).
-
-So the patch below, on top of linux-next, should solve the BUG():
-
----------------------8<------------------------------
-
->From 9be3c61788eff2e7d010d627582118fa6aae1d9c Mon Sep 17 00:00:00 2001
-From: Catalin Marinas <catalin.marinas@arm.com>
-Date: Tue, 9 Dec 2014 16:44:06 +0000
-Subject: [PATCH] clocksource: arch_timer: Only use the virtual counter
- (CNTVCT) on arm64
-
-The arm64 kernel uses CNTVCT in VDSO. When booting in EL2, the kernel
-switches to the physical timers to make things easier for KVM but it
-continues to use the virtual counter both in user and kernel. While in
-such scenario CNTVCT == CNTPCT (since CNTVOFF is initialised by the
-kernel to 0), we want to spot firmware bugs corrupting CNTVOFF early
-(which would affect CNTVCT).
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
 ---
- drivers/clocksource/arm_arch_timer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 6a79fc4f900c..095c1774592c 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -462,7 +462,7 @@ static void __init arch_counter_register(unsigned type)
+Sorry for the extra noise, sent this new version to correct whitespace
+and spelling errors in previous one.
+
+ arch/arm/probes/kprobes/test-arm.c   | 17 +++++++++++++++--
+ arch/arm/probes/kprobes/test-core.c  |  9 +++++++++
+ arch/arm/probes/kprobes/test-thumb.c | 12 ++++++++++++
+ 3 files changed, 36 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/probes/kprobes/test-arm.c b/arch/arm/probes/kprobes/test-arm.c
+index fdeb300..9b3b1b4 100644
+--- a/arch/arm/probes/kprobes/test-arm.c
++++ b/arch/arm/probes/kprobes/test-arm.c
+@@ -12,6 +12,7 @@
+ #include <linux/module.h>
+ #include <asm/system_info.h>
+ #include <asm/opcodes.h>
++#include <asm/probes.h>
  
- 	/* Register the CP15 based counter if we have one */
- 	if (type & ARCH_CP15_TIMER) {
--		if (arch_timer_use_virtual)
-+		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_use_virtual)
- 			arch_timer_read_counter = arch_counter_get_cntvct;
- 		else
- 			arch_timer_read_counter = arch_counter_get_cntpct;
+ #include "test-core.h"
+ 
+@@ -478,6 +479,7 @@ void kprobe_arm_test_cases(void)
+ 	TEST_RPR(  "strh	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")
+ 	TEST_RPR(  "streqh	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")
+ 	TEST_UNSUPPORTED(  "streqh	r14, [r13, r12]")
++	TEST_UNSUPPORTED(  "streqh	r14, [r12, r13]")
+ 	TEST_RPR(  "strh	r",1, VAL1,", [r",2, 24,", r",3,  48,"]!")
+ 	TEST_RPR(  "strneh	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")
+ 	TEST_RPR(  "strh	r",2, VAL1,", [r",3, 24,"], r",4, 48,"")
+@@ -502,6 +504,9 @@ void kprobe_arm_test_cases(void)
+ 	TEST_RP(   "strplh	r",12,VAL2,", [r",11,24,", #-4]!")
+ 	TEST_RP(   "strh	r",2, VAL1,", [r",3, 24,"], #48")
+ 	TEST_RP(   "strh	r",10,VAL2,", [r",9, 64,"], #-48")
++	TEST_RP(   "strh	r",3, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
++	TEST_UNSUPPORTED("strh r3, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
++	TEST_RP(   "strh	r",4, VAL1,", [r",14,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
+ 	TEST_UNSUPPORTED(__inst_arm(0xe1efc3b0) "	@ strh r12, [pc, #48]!")
+ 	TEST_UNSUPPORTED(__inst_arm(0xe0c9f3b0) "	@ strh pc, [r9], #48")
+ 
+@@ -568,6 +573,7 @@ void kprobe_arm_test_cases(void)
+ 	TEST_RPR(  "strd	r",0, VAL1,", [r",1, 48,", -r",2,24,"]")
+ 	TEST_RPR(  "strccd	r",8, VAL2,", [r",11,0, ", r",12,48,"]")
+ 	TEST_UNSUPPORTED(  "strccd r8, [r13, r12]")
++	TEST_UNSUPPORTED(  "strccd r8, [r12, r13]")
+ 	TEST_RPR(  "strd	r",4, VAL1,", [r",2, 24,", r",3, 48,"]!")
+ 	TEST_RPR(  "strcsd	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")
+ 	TEST_RPR(  "strd	r",2, VAL1,", [r",5, 24,"], r",4,48,"")
+@@ -591,6 +597,9 @@ void kprobe_arm_test_cases(void)
+ 	TEST_RP(   "strvcd	r",12,VAL2,", [r",11,24,", #-16]!")
+ 	TEST_RP(   "strd	r",2, VAL1,", [r",4, 24,"], #48")
+ 	TEST_RP(   "strd	r",10,VAL2,", [r",9, 64,"], #-48")
++	TEST_RP(   "strd	r",6, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
++	TEST_UNSUPPORTED("strd r6, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
++	TEST_RP(   "strd	r",4, VAL1,", [r",12,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
+ 	TEST_UNSUPPORTED(__inst_arm(0xe1efc3f0) "	@ strd r12, [pc, #48]!")
+ 
+ 	TEST_P(	   "ldrd	r0, [r",0, 24,", #-8]")
+@@ -639,16 +648,20 @@ void kprobe_arm_test_cases(void)
+ 	TEST_RP( "str"byte"	r",12,VAL2,", [r",11,24,", #-4]!")		\
+ 	TEST_RP( "str"byte"	r",2, VAL1,", [r",3, 24,"], #48")		\
+ 	TEST_RP( "str"byte"	r",10,VAL2,", [r",9, 64,"], #-48")		\
++	TEST_RP( "str"byte"	r",3, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!") \
++	TEST_UNSUPPORTED("str"byte" r3, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")				\
++	TEST_RP( "str"byte"	r",4, VAL1,", [r",10,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!") \
+ 	TEST_RPR("str"byte"	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")	\
+ 	TEST_RPR("str"byte"	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")	\
+-	TEST_UNSUPPORTED("str"byte" r14, [r13, r12]")	\
++	TEST_UNSUPPORTED("str"byte" r14, [r13, r12]")				\
++	TEST_UNSUPPORTED("str"byte" r14, [r12, r13]")				\
+ 	TEST_RPR("str"byte"	r",1, VAL1,", [r",2, 24,", r",3,  48,"]!")	\
+ 	TEST_RPR("str"byte"	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")	\
+ 	TEST_RPR("str"byte"	r",2, VAL1,", [r",3, 24,"], r",4, 48,"")	\
+ 	TEST_RPR("str"byte"	r",10,VAL2,", [r",9, 48,"], -r",11,24,"")	\
+ 	TEST_RPR("str"byte"	r",0, VAL1,", [r",1, 24,", r",2,  32,", asl #1]")\
+ 	TEST_RPR("str"byte"	r",14,VAL2,", [r",11,0, ", r",12, 32,", lsr #2]")\
+-	TEST_UNSUPPORTED("str"byte"	r14, [r13, r12, lsr #2]")\
++	TEST_UNSUPPORTED("str"byte"	r14, [r13, r12, lsr #2]")		\
+ 	TEST_RPR("str"byte"	r",1, VAL1,", [r",2, 24,", r",3,  32,", asr #3]!")\
+ 	TEST_RPR("str"byte"	r",12,VAL2,", [r",11,24,", r",10, 4,", ror #31]!")\
+ 	TEST_P(  "ldr"byte"	r0, [r",0,  24,", #-2]")			\
+diff --git a/arch/arm/probes/kprobes/test-core.c b/arch/arm/probes/kprobes/test-core.c
+index 7ab633d..7c5ddd5 100644
+--- a/arch/arm/probes/kprobes/test-core.c
++++ b/arch/arm/probes/kprobes/test-core.c
+@@ -1196,6 +1196,13 @@ static void setup_test_context(struct pt_regs *regs)
+ 			regs->uregs[arg->reg] =
+ 				(unsigned long)current_stack + arg->val;
+ 			memory_needs_checking = true;
++			/*
++			 * Test memory at an address below SP is in danger of
++			 * being altered by an interrupt occurring and pushing
++			 * data onto the stack. Disable interrupts to stop this.
++			 */
++			if (arg->reg == 13)
++				regs->ARM_cpsr |= PSR_I_BIT;
+ 			break;
+ 		}
+ 		case ARG_TYPE_MEM: {
+@@ -1272,6 +1279,8 @@ test_after_pre_handler(struct kprobe *p, struct pt_regs *regs)
+ 
+ 	/* Undo any changes done to SP by the test case */
+ 	regs->ARM_sp = (unsigned long)current_stack;
++	/* Enable interrupts in case setup_test_context disabled them */
++	regs->ARM_cpsr &= ~PSR_I_BIT;
+ 
+ 	container_of(p, struct test_probe, kprobe)->hit = test_instance;
+ 	return 0;
+diff --git a/arch/arm/probes/kprobes/test-thumb.c b/arch/arm/probes/kprobes/test-thumb.c
+index 6c6e9a9..e8cf193 100644
+--- a/arch/arm/probes/kprobes/test-thumb.c
++++ b/arch/arm/probes/kprobes/test-thumb.c
+@@ -11,6 +11,7 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <asm/opcodes.h>
++#include <asm/probes.h>
+ 
+ #include "test-core.h"
+ 
+@@ -416,6 +417,9 @@ void kprobe_thumb32_test_cases(void)
+ 	TEST_RR( "strd	r",14,VAL2,", r",12,VAL1,", [sp, #16]!")
+ 	TEST_RRP("strd	r",1, VAL1,", r",0, VAL2,", [r",7, 24,"], #16")
+ 	TEST_RR( "strd	r",7, VAL2,", r",8, VAL1,", [sp], #-16")
++	TEST_RRP("strd	r",6, VAL1,", r",7, VAL2,", [r",13, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
++	TEST_UNSUPPORTED("strd r6, r7, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
++	TEST_RRP("strd	r",4, VAL1,", r",5, VAL2,", [r",14, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
+ 	TEST_UNSUPPORTED(__inst_thumb32(0xe9efec04) "	@ strd	r14, r12, [pc, #16]!")
+ 	TEST_UNSUPPORTED(__inst_thumb32(0xe8efec04) "	@ strd	r14, r12, [pc], #16")
+ 
+@@ -821,14 +825,22 @@ CONDITION_INSTRUCTIONS(22,
+ 	TEST_RP( "str"size"	r",14,VAL2,", [r",1, 256,  ", #-128]!")		\
+ 	TEST_RPR("str"size".w	r",0, VAL1,", [r",1, 0,", r",2, 4,"]")		\
+ 	TEST_RPR("str"size"	r",14,VAL2,", [r",10,0,", r",11,4,", lsl #1]")	\
++	TEST_UNSUPPORTED("str"size"	r0, [r13, r1]")				\
+ 	TEST_R(  "str"size".w	r",7, VAL1,", [sp, #24]")			\
+ 	TEST_RP( "str"size".w	r",0, VAL2,", [r",0,0, "]")			\
++	TEST_RP( "str"size"	r",6, VAL1,", [r",13, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!") \
++	TEST_UNSUPPORTED("str"size"	r6, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")			\
++	TEST_RP( "str"size"	r",4, VAL2,", [r",12, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!") \
+ 	TEST_UNSUPPORTED("str"size"t	r0, [r1, #4]")
+ 
+ 	SINGLE_STORE("b")
+ 	SINGLE_STORE("h")
+ 	SINGLE_STORE("")
+ 
++	TEST_UNSUPPORTED(__inst_thumb32(0xf801000d) "	@ strb	r0, [r1, r13]")
++	TEST_UNSUPPORTED(__inst_thumb32(0xf821000d) "	@ strh	r0, [r1, r13]")
++	TEST_UNSUPPORTED(__inst_thumb32(0xf841000d) "	@ str	r0, [r1, r13]")
++
+ 	TEST("str	sp, [sp]")
+ 	TEST_UNSUPPORTED(__inst_thumb32(0xf8cfe000) "	@ str	r14, [pc]")
+ 	TEST_UNSUPPORTED(__inst_thumb32(0xf8cef000) "	@ str	pc, [r14]")
+-- 
+2.1.3
