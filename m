@@ -1,121 +1,95 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 9 Dec 2014 10:53:26 +0800
-Subject: [RFC PATCH] ARM64: PCI: inherit root controller's dma-coherent
-In-Reply-To: <7705416.b49xSXIHeP@wuerfel>
-References: <1417066891-16789-1-git-send-email-ming.lei@canonical.com>
- <CACVXFVPgchwZKQYdBWu+q0b21zeB6Lob-rD2C8mzTWb7dpZ86g@mail.gmail.com>
- <5481B283.6030407@ti.com> <7705416.b49xSXIHeP@wuerfel>
-Message-ID: <CACVXFVOfyQNGw+w_GTx1VmN89RKcvykh7DaFm=OcFGJ1f-EYxg@mail.gmail.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Tue, 9 Dec 2014 08:26:52 +0530
+Subject: [alsa-devel] Question on arm64 unaligned faults during playback
+In-Reply-To: <20141208113119.GL27367@arm.com>
+References: <CAM4voa=kiLsiLEzUbo3D+f1go5px78fXBSjSi7kGK4QCdnwPyQ@mail.gmail.com>
+ <54856621.8090107@ladisch.de> <s5hppbumnis.wl-tiwai@suse.de>
+ <54858868.70708@metafoo.de> <20141208113119.GL27367@arm.com>
+Message-ID: <CAM4voanE_P-P=4q+ctL2gwa++FOOSrXYcoUN936wuMscBKF6jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 6, 2014 at 12:05 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 05 December 2014 15:26:27 Grygorii Strashko wrote:
->> ---
->> From 5e078b1ba148aa280181c4f695e567875a0f4ae9 Mon Sep 17 00:00:00 2001
->> From: Grygorii Strashko <grygorii.strashko@ti.com>
->> Date: Fri, 28 Feb 2014 19:11:39 +0200
->> Subject: [RFC PATCH] common: dma-mapping: introduce dma_init_dev_from_parent() helper
+Hi Will,
+
+On Mon, Dec 8, 2014 at 5:01 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Dec 08, 2014 at 11:15:52AM +0000, Lars-Peter Clausen wrote:
+>> Added ARM64 folks to Cc.
 >>
->> Now, in Kernel, Parent device's DMA configuration has to by applied
->> to the child as is, to enable DMA support for this device. Usually, this
->> is happened in places where child device is manually instantiated by
->> Parent device device using Platform APIs
->> (see drivers/usb/dwc3/host.c or drivers/pci/probe.c:pci_device_add()
->>  for example).
+>> On 12/08/2014 11:41 AM, Takashi Iwai wrote:
+>> > At Mon, 08 Dec 2014 09:49:37 +0100,
+>> > Clemens Ladisch wrote:
+>> >>
+>> >> Abhilash Kesavan wrote:
+>> >>> I am working on a 64-bit ARM SoC (Samsung's Exynos7) and have observed
+>> >>> unaligned faults while testing certain sound streams with aplay.
+>> >>>
+>> >>> [   24.535661] snd_pcm_lib_write_transfer:sound/core/pcm_lib.c hwbuf is ffffff8000085624, runtime->dma_area is ffffff8000080000, hwoff is 5513, frames_to_bytes is 22052, frames is 5513
+>> >>> [   24.551244] Unhandled fault: alignment fault (0x96000061) at 0xffffff8000085624
+>> >>> [   24.579944] PC is at __copy_from_user+0x14/0x60
+>> >>> [   24.584450] LR is at snd_pcm_lib_write_transfer+0xe4/0x104
+>> >>> [   24.922054] Call trace:
+>> >>> [   24.924488] [<ffffffc0002d4784>] __copy_from_user+0x14/0x60
+>> >>> [   24.930040] [<ffffffc0004b7574>] snd_pcm_lib_write1+0x1fc/0x384
+>> >>>
+>> >>> We are using the internal sram available for sound, for DMA buffer
+>> >>> allocation, using the generic SRAM driver. From the above log, the
+>> >>> buffer address offset is not 8-byte aligned and as we are using the
+>> >>> SRAM driver which maps the memory as device memory we are getting an
+>> >>> unaligned fault. Is it incorrect to use the generic sram driver for
+>> >>> arm64 or am I missing something ?
+>> >>
+>> >> When you give the ALSA framework a memory buffer, it is assumed that it
+>> >> is general-purpose memory, i.e., can be accessed with any alignment.
+>> >>
+>> >> If your memory does not allow such accesses, you have to do all the
+>> >> accesses in your driver, i.e., do everything in the .copy/.silence
+>> >> callbacks.  (You also have to add constraints so that periods and buffer
+>> >> are correctly aligned.)
+>> >
+>> > You can set runtime->min_align in the own hw_params callback so that
+>> > the PCM core handle it well, at least, for non-mmap mode.
+>> >
+>> > But this feature has been rarely used (currently no driver sets it
+>> > explicitly), so there might be still some bugs there, too :)
 >>
->> The DMA configuration is represented in Device data structure was
->> extended recently (dma_pfn_offset was added) and going to extended
->> in future to support IOMMU. Therefore, the code used by drivers to
->> copy DMA configuration from parent to child device isn't working
->> properly, for example:
->> (drivers/usb/dwc3/host.c)
->>       dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
+>> As far as I can see min_align only aligns the hardware pointer, but not the
+>> application pointer. The later causes the issue here.
 >>
->>       xhci->dev.parent        = dwc->dev;
->>       xhci->dev.dma_mask      = dwc->dev->dma_mask;
->>       xhci->dev.dma_parms     = dwc->dev->dma_parms;
->> above code will miss to copy dma_pfn_offset.
->
->
-> I'm not too thrilled about this implementation either. It immediately
-> breaks as soon as we have IOMMU support, as the IOMMU configuration
-> is by definition device dependent, and you have introduced a few bugs
-> by copying the pointers to dma_mask and dma_parms.
-
-Using devm_kmalloc() for allocating dma_mask might be helpful for
-the issue, but still need to support the default setting to be overrided
-by IOMMU code, which is related with the timing of calling
-dma_init_dev_from_parent().
-
->
->> Hence, intoroduce common dma_init_dev_from_parent() helper to
->> initialize device's DMA parameters using from parent device's configuration,
->> use __weak to allow arches to overwrite it if needed.
+>> E.g. if a application writes a unaligned amount of bytes the next write will
+>> start at an unaligned buffer address.
 >>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> ---
->>  drivers/base/dma-mapping.c  | 25 +++++++++++++++++++++++++
->>  include/linux/dma-mapping.h |  3 +++
->>  2 files changed, 28 insertions(+)
->>
->> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
->> index 9e8bbdd..4556698 100644
->> --- a/drivers/base/dma-mapping.c
->> +++ b/drivers/base/dma-mapping.c
->> @@ -270,6 +270,31 @@ int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
->>  }
->>  EXPORT_SYMBOL(dma_common_mmap);
->>
->> +/*
->> + * Initialize device's DMA parameters using parent device
->> + * @dev: Device to be configured
->> + * @parent: Pointer on parent device to get DMA configuration from
->> + *
->> + * parent can be NULL - then DMA configuration will be teken from dev->parent.
->> + */
->> +void __weak dma_init_dev_from_parent(struct device *dev, struct device *parent)
->> +{
+>> How safe is it in general to use IO mapped memory as general purpose memory
+>> on ARM64? Are there maybe even more constraints than just that access has to
+>> be aligned? Maybe the driver should rather use copy_from_user_toio() instead
+>> of copy_from_user() to make sure that things work correctly.
 >
-> Please let's try to avoid weak functions
+> If you're simply mapping RAM as device memory, then you need to ensure:
+>
+>   - Naturally aligned access
+>   - No exclusive instructions (e.g atomics, locks, semaphores ...)
+>
+> Out of interest, why are you using device mappings for memory? By design,
+> they prohibit speculation (and, depending on the subtype, re-ordering,
+> gathering and early write response) and will be significantly slower than
+> normal memory accesses.
 
-Yes, __weak isn't friendly at all.
+Thanks for the comments.
+
+We are using the generic SRAM allocation driver (drivers/misc/sram.c)
+to use the internal audio SRAM for buffer allocation. The generic
+driver ioremaps the sram and exposes the obtained pool via the
+genalloc API to other drivers such as audio. There already exists
+support for internal sram in the audio framework. The specific use
+case is in an Exynos7 low power state where the DRAM cannot be used.
 
 >
->> +     struct device *parent_dev = parent;
->
-> One of these two is not needed.
->
->> +     /* if parent is NULL assume, dev->parent is the one to use */
->> +     if (!parent_dev)
->> +             parent_dev = dev->parent;
->> +
->> +     if (is_device_dma_capable(parent_dev)) {
->> +             dev->dma_mask   = parent_dev->dma_mask;
->
-> This is always wrong: dev->dma_mask is a pointer!
->
->> +             dev->coherent_dma_mask = parent_dev->coherent_dma_mask;
->
-> What if someone has already set a mask that is greater than 32-bit?
+> Could you use something like ioremap_wc, which will give you normal,
+> non-cacheable memory instead?
 
-Yes, that is a bit complicated because there may be default
-dma_mask which was setup before creating the device.
+Modifying ioremap to ioremap_wc gets rid of the crash. Do you think
+the sram driver ioremap usage should be modified to use ioremap_wc ?
 
+Regards,
+Abhilash
 >
->> +             dev->dma_parms  = parent_dev->dma_parms;
->
-> same  problem here.
->
->> +             dev->dma_pfn_offset = parent_dev->dma_pfn_offset;
->> +             set_dma_ops(dev, get_dma_ops(parent_dev));
->> +     }
->> +}
->> +EXPORT_SYMBOL(dma_init_dev_from_parent);
-
-Arnd, given it isn't easy to figure out one good solution for moving
-dma configuration into generic code(driver core, pci, .) now, could
-the issue be fixed first?
-
-Thanks,
+> Will
