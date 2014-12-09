@@ -1,42 +1,23 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 9 Dec 2014 11:57:22 +0900
-Subject: [PATCH] ARM: DMA: Fix kzalloc flags in __iommu_alloc_buffer()
-In-Reply-To: <10532762.PXKTQM8KjH@wuerfel>
-References: <1418027967-12923-1-git-send-email-acourbot@nvidia.com>
- <10532762.PXKTQM8KjH@wuerfel>
-Message-ID: <CAAVeFuKOaN5c2OkUDRWYQ_QVH8E1Q0JByRSSrbY_g13takWdAw@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 9 Dec 2014 11:03:40 +0800
+Subject: [PATCH 4/5] media: ov2640: add a master clock for sensor
+In-Reply-To: <CAOMZO5ASNUCz908esJ3iTQ6VEQGeNi-HOmqMOf12c633Q8pavw@mail.gmail.com>
+References: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>	<1418038147-13221-5-git-send-email-josh.wu@atmel.com>
+ <CAOMZO5ASNUCz908esJ3iTQ6VEQGeNi-HOmqMOf12c633Q8pavw@mail.gmail.com>
+Message-ID: <5486668C.3000808@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 8, 2014 at 7:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 08 December 2014 17:39:27 Alexandre Courbot wrote:
->> There doesn't seem to be any valid reason to allocate the pages array
->> with the same flags as the buffer itself. Doing so can eventually lead
->> to the following safeguard in mm/slab.c to be hit:
->>
->> BUG_ON(flags & GFP_SLAB_BUG_MASK);
->>
->> This happens when buffers are allocated with __GFP_DMA32 or
->> __GFP_HIGHMEM.
->>
->> Fix this by allocating the pages array with GFP_KERNEL to follow what is
->> done elsewhere in this file. Using GFP_KERNEL in __iommu_alloc_buffer()
->> is safe because atomic allocations are handled by __iommu_alloc_atomic().
->>
+Hi, Fabio
+
+On 12/8/2014 11:10 PM, Fabio Estevam wrote:
+> On Mon, Dec 8, 2014 at 9:29 AM, Josh Wu <josh.wu@atmel.com> wrote:
 >
-> I think you need to carry over the GFP_ATOMIC flag if that is set by the
-> caller, but not the GFP_HIGHMEM or GFP_DMA32. Not sure if it's better
-> to mask out flags from the caller mask, or to start with GFP_KERNEL
-> and adding in extra bits.
+>> +       priv->master_clk = devm_clk_get(&client->dev, "xvclk");
+>> +       if (IS_ERR(priv->master_clk))
+>> +               return -EINVAL;
+> You should return PTR_ERR(priv->master_clk) instead.
+sure. I'll fix it in next version. Thanks.
 
-I thought the issue of atomicity is already handled by
-__iommu_alloc_buffer's caller (arm_iommu_alloc_attrs):
-
-    if (!(gfp & __GFP_WAIT))
-        return __iommu_alloc_atomic(dev, size, handle);
-    ....
-    pages = __iommu_alloc_buffer(dev, size, gfp, attrs);
-
-Isn't the interesting property about GFP_ATOMIC that it does not
-include __GFP_WAIT? I may very well misunderstand the issue, sorry if
-that's the case.
+Best Regards,
+Josh Wu
