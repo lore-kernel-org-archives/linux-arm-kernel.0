@@ -1,92 +1,45 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  9 Dec 2014 16:44:01 +0100
-Subject: [PATCH 2/5] arm/arm64: KVM: Rename vgic_initialized to vgic_ready
+Date: Tue,  9 Dec 2014 16:44:03 +0100
+Subject: [PATCH 4/5] arm/arm64: KVM: Don't allow creating VCPUs after
+ vgic_initialized
 In-Reply-To: <1418139844-27892-1-git-send-email-christoffer.dall@linaro.org>
 References: <1418139844-27892-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1418139844-27892-3-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1418139844-27892-5-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vgic_initialized() macro currently returns the state of the
-vgic->ready flag, which indicates if the vgic is ready to be used when
-running a VM, not specifically if its internal state has been
-initialized.
+When the vgic initializes its internal state it does so based on the
+number of VCPUs available at the time.  If we allow KVM to create more
+VCPUs after the VGIC has been initialized, we are likely to error out in
+unfortunate ways later, perform buffer overflows etc.
 
-Rename the macro accordingly in preparation for a more nuanced
-initialization flow.
-
+Cc: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/arm.c     | 2 +-
- include/kvm/arm_vgic.h | 4 ++--
- virt/kvm/arm/vgic.c    | 6 +++---
- 3 files changed, 6 insertions(+), 6 deletions(-)
+This replaces Eric Auger's previous patch
+(https://lists.cs.columbia.edu/pipermail/kvmarm/2014-December/012646.html),
+because it fits better with testing to include it in this series and I
+realized that we need to add a check against irqchip_in_kernel() as
+well.
+
+ arch/arm/kvm/arm.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index a56cbb5..a9d005f 100644
+index a9d005f..d4da244 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -430,7 +430,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- 	 * Map the VGIC hardware resources before running a vcpu the first
- 	 * time on this VM.
- 	 */
--	if (unlikely(!vgic_initialized(vcpu->kvm))) {
-+	if (unlikely(!vgic_ready(vcpu->kvm))) {
- 		ret = kvm_vgic_map_resources(vcpu->kvm);
- 		if (ret)
- 			return ret;
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index fe9783b..3e262b9 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -287,7 +287,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		      struct kvm_exit_mmio *mmio);
+@@ -213,6 +213,11 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
+ 	int err;
+ 	struct kvm_vcpu *vcpu;
  
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
--#define vgic_initialized(k)	((k)->arch.vgic.ready)
-+#define vgic_ready(k)		((k)->arch.vgic.ready)
- 
- int vgic_v2_probe(struct device_node *vgic_node,
- 		  const struct vgic_ops **ops,
-@@ -369,7 +369,7 @@ static inline int irqchip_in_kernel(struct kvm *kvm)
- 	return 0;
- }
- 
--static inline bool vgic_initialized(struct kvm *kvm)
-+static inline bool vgic_ready(struct kvm *kvm)
- {
- 	return true;
- }
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 91e6bfc..6293349 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1693,7 +1693,7 @@ out:
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
- 			bool level)
- {
--	if (likely(vgic_initialized(kvm)) &&
-+	if (likely(vgic_ready(kvm)) &&
- 	    vgic_update_irq_pending(kvm, cpuid, irq_num, level))
- 		vgic_kick_vcpus(kvm);
- 
-@@ -1882,7 +1882,7 @@ int kvm_vgic_map_resources(struct kvm *kvm)
- 
- 	mutex_lock(&kvm->lock);
- 
--	if (vgic_initialized(kvm))
-+	if (vgic_ready(kvm))
- 		goto out;
- 
- 	if (IS_VGIC_ADDR_UNDEF(kvm->arch.vgic.vgic_dist_base) ||
-@@ -2276,7 +2276,7 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 
- 		mutex_lock(&dev->kvm->lock);
- 
--		if (vgic_initialized(dev->kvm) || dev->kvm->arch.vgic.nr_irqs)
-+		if (vgic_ready(dev->kvm) || dev->kvm->arch.vgic.nr_irqs)
- 			ret = -EBUSY;
- 		else
- 			dev->kvm->arch.vgic.nr_irqs = val;
++	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm)) {
++		err = -EBUSY;
++		goto out;
++	}
++
+ 	vcpu = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
+ 	if (!vcpu) {
+ 		err = -ENOMEM;
 -- 
 2.1.2.330.g565301e.dirty
