@@ -1,80 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 9 Dec 2014 09:51:37 +0100
-Subject: [PATCH 3/9] clk: sunxi: Add prcm mod0 clock driver
-In-Reply-To: <54855EF6.1000900@redhat.com>
-References: <20141126211318.GN25249@lukather> <5476E3A5.4000708@redhat.com>
- <CAGb2v652m0bCdPWFF4LWwjcrCJZvnLibFPw8xXJ3Q-Ge+_-p7g@mail.gmail.com>
- <5476F8AB.2000601@redhat.com> <20141127190509.GR25249@lukather>
- <54787A8A.6040209@redhat.com> <20141202154524.GD30256@lukather>
- <547EDCA0.4040805@redhat.com> <20141207180808.GO12434@lukather>
- <54855EF6.1000900@redhat.com>
-Message-ID: <20141209085137.GQ8739@lukather>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue,  9 Dec 2014 09:56:52 +0100
+Subject: [PATCH v2] ARM: i.MX53: dts: add sahara module
+Message-ID: <1418115412-20691-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 09:19:02AM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 07-12-14 19:08, Maxime Ripard wrote:
-> >On Wed, Dec 03, 2014 at 10:49:20AM +0100, Hans de Goede wrote:
-> 
-> <snip>
-> 
-> >>So it should not have a simple-bus compatible either, and as such we cannot
-> >>simply change the mod0 driver from of_clk_define to a platform driver because
-> >>then we need to instantiate platform devs for the mod0 clock nodes, which
-> >>means making the clock node a simple-bus.
-> >
-> >I guess we can do that as a temporary measure until we get things
-> >right on that front. I'm totally open to doing that work, so I'm not
-> >asking you to do it.
-> >
-> >>I can see your logic in wanting the ir_clk prcm sub-node to use the
-> >>mod0 compatible string, so how about we make the mod0 driver both
-> >>register through of_declare and as a platform driver. Note this means
-> >>that it will try to bind twice to the ir_clk node, since of_clk_declare
-> >>will cause it to try and bind there too AFAIK.
-> >
-> >Hmmm, I could live with that for a while too. That shouldn't even
-> >require too much work, since the first thing we check in the mod0 code
-> >is that we actually have something in reg, which will not be the case
-> >in the OF_CLK_DECLARE case.
-> >
-> >>The of_clk_declare bind will fail though because there is no regs
-> >>property, so this double bind is not an issue as long as we do not
-> >>log errors on the first bind failure.
-> >
-> >Yep, exactly.
-> >
-> >>Note that the ir_clk node will still need an "ir-clk" compatible as
-> >>well for the MFD to find it and assign the proper resources to it.
-> >
-> >No, it really doesn't. At least for now, we have a single mod0 clock
-> >under the PRCM MFD. If (and only if) one day, we find ourselves in a
-> >position where we have two mod0 clocks under the PRCM, then we'll fix
-> >the MFD code to deal with that, because it really should deal with it.
-> 
-> Ok, using only the mod0 compat string works for me. I'll respin my
-> patch-set (minus the one patch you've already merged) to make the modo
-> clk driver use both of_clk_declare and make it a platfrom driver, and
-> use the mod0 compat string for the ir-clk node.
-> 
-> Not sure when I'll get this done exactly though, but we still have
-> a while before 3.20 :)
+The i.MX53 has a SAHARA v4 core. Add it to the dtsi.
 
-Indeed :)
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+Changes since v1:
+	- remove status property
 
-Thanks!
-Maxime
+ arch/arm/boot/dts/imx53.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index b96213ba0671..ff4fa7ecacd8 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -765,6 +765,15 @@
+ 				resets = <&src 1>;
+ 				iram = <&ocram>;
+ 			};
++
++			sahara: crypto at 63ff8000 {
++				compatible = "fsl,imx53-sahara";
++				reg = <0x63ff8000 0x4000>;
++				interrupts = <19 20>;
++				clocks = <&clks IMX5_CLK_SAHARA_IPG_GATE>,
++				         <&clks IMX5_CLK_SAHARA_IPG_GATE>;
++				clock-names = "ipg", "ahb";
++			};
+ 		};
+ 
+ 		ocram: sram at f8000000 {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141209/3dd26c2f/attachment-0001.sig>
+2.1.3
