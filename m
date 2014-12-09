@@ -1,56 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Dec 2014 09:23:18 +0100
-Subject: [PATCH v3 1/8] soc: mediatek: Add PMIC wrapper for MT8135 and
- MT6397 SoC
-In-Reply-To: <1418091337.5663.9.camel@mtksdaap41>
-References: <1417752479-4749-1-git-send-email-flora.fu@mediatek.com>
- <2751641.o51TuZRl88@wuerfel> <1418091337.5663.9.camel@mtksdaap41>
-Message-ID: <2248330.M654Toyebg@wuerfel>
+Date: Tue, 09 Dec 2014 09:27:13 +0100
+Subject: [RFC PATCH v2 1/4] arm64: defconfig: increase NR_CPUS range to
+ 2-128
+In-Reply-To: <CAMDttNe33ie9vgyEn8GHz+8isadaDfXXUJcp5mQM-42_mx3Pbw@mail.gmail.com>
+References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <3519779.ILzEnWe9lP@wuerfel>
+ <CAMDttNe33ie9vgyEn8GHz+8isadaDfXXUJcp5mQM-42_mx3Pbw@mail.gmail.com>
+Message-ID: <2054688.iIEQnOEqVy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 December 2014 10:15:37 Flora Fu wrote:
-> Hi, Arnd,
+On Monday 08 December 2014 17:57:03 Zi Shen Lim wrote:
+> Hi Arnd,
 > 
-> On Fri, 2014-12-05 at 11:13 +0100, Arnd Bergmann wrote:
-> > On Friday 05 December 2014 12:07:52 Flora Fu wrote:
-> > > Add PMIC wrapper of MT8135 to access MT6397 MFD.
-> > > 
-> > > Signed-off-by: Flora Fu <flora.fu@mediatek.com>
-> > > 
-> > 
-> > Please explain what a PMIC wrapper is and why you need one for MT8135.
-> > I don't understand the purpose of this code at all. Is this just another
-> > way of accessing the MT6397 when not using i2c or spi like other
-> > PMIC drivers do?
-> > 
+> On Mon, Nov 24, 2014 at 3:53 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> > On Saturday 22 November 2014 02:53:27 Ganapatrao Kulkarni wrote:
+> > > Raising the maximum limit to 128. This is needed for Cavium's
+> > > Thunder system that will have 96 cores on Multi-node system.
+> > >
+> > > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
+> > >
+> >
+> > Could we please raise the compile-time limit to the highest number that
+> > you are able to boot successfully on some existing machine?
+> >
+> > There isn't much point in doubling this every few months.
 > 
-> Yes, MT8135 uses a proprietary hardware to communicate with MT6397. 
-> The hardware is called PMIC Wrapper or PWRAP.
-> Since it is not standard i2c or spi protocols, a soc related software
-> driver is implemented to handle access protocols in AP side.
+> Agreed. If we look back at [1], Mark Rutland has actually compiled and
+> boot-tested NR_CPUS=4096 on Juno.
 > 
-> +-----------------+           +---------------+
-> |                 |           |               |
-> | Mediatek AP SoC |           |               |
-> | (ex. MT8135)    |           |    MT6397     |
-> |                 |           |               |
-> |      +--------+ | (SPI bus) | +--------+    |
-> |      |        | |-----------| |        |    |
-> |      |  PMIC  | |-----------| |  PMIC  |    |
-> |      | Wrapper| |-----------| | Wrapper|    |
-> |      |        | |-----------| |        |    |
-> |      +--------+ |           | +--------+    |
-> |                 |           |               |
-> +-----------------+           +---------------+
-> 
+> [1] https://lkml.org/lkml/2014/9/8/537
 
-I think we have had a similar case recently where a controller wasn't
-actually using I2C, but the sofware protocol was close enough so we decided
-to make it appear as i2c in Linux.
+Ok, 4096 sounds like a good NR_CPUS limit then, it should last for a while.
 
-Would that work for you, i.e. register the pmic wrapper as a fake spi
-master driver in drivers/spi/ and register the rtc/regulator/codec
-as SPI clients from DT?
+For the defconfig, we probably want a much smaller value, either one that
+covers all known machines (96 at this time), or something that covers
+95% of all users (maybe 32?) and does not have an serious impact on
+memory consumption or performance on small machines.
 
 	Arnd
