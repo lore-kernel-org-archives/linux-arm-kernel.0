@@ -1,351 +1,149 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 9 Dec 2014 16:27:46 -0600
-Subject: [RFC/PATCH 1/7] arm: omap: hwmod: add debugfs interface
+Date: Tue, 9 Dec 2014 16:27:50 -0600
+Subject: [RFC/PATCH 5/7] arm: omap: hwmod: allow for registration of
+ class-less hwmods
 In-Reply-To: <1418164072-19087-1-git-send-email-balbi@ti.com>
 References: <1418164072-19087-1-git-send-email-balbi@ti.com>
-Message-ID: <1418164072-19087-2-git-send-email-balbi@ti.com>
+Message-ID: <1418164072-19087-6-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By exposing the details of hwmod structures
-to debugfs we can much more easily verify
-that changes to hwmod data is correct and won't
-cause regressions.
+Before this patch, HWMOD requires the existence
+of a struct omap_hwmod_class very early. It just
+so happens that we're moving that data to DeviceTree
+in a follow-up commit so we need to allow the
+registration of HWMODs with a valid omap_hwmod_class
+pointer.
 
-The idea is that this can be used to check the
-state of one hwmod, verify hwmod sysc fields, etc.
-
-For example, this will be used to move some of
-the sysc fields to DT and later verify that they
-are correct pre- and post-patch.
+When the device is built from DT, we will allocate and
+populate struct omap_hwmod_class based on DT data.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/Makefile             |   2 +-
- arch/arm/mach-omap2/omap_device.c        |   2 +
- arch/arm/mach-omap2/omap_hwmod.h         |   9 ++
- arch/arm/mach-omap2/omap_hwmod_debugfs.c | 269 +++++++++++++++++++++++++++++++
- 4 files changed, 281 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_debugfs.c
+ arch/arm/mach-omap2/omap_hwmod.c | 30 ++++++++++++++++++------------
+ 1 file changed, 18 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 5d27dfd..68c9ae5 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -11,7 +11,7 @@ obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o timer.o pm.o \
- 	 omap_device.o sram.o drm.o
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index cbb908d..2355764 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -504,6 +504,9 @@ static int _set_dmadisable(struct omap_hwmod *oh)
+ 	u32 v;
+ 	u32 dmadisable_mask;
  
- hwmod-common				= omap_hwmod.o omap_hwmod_reset.o \
--					  omap_hwmod_common_data.o
-+					  omap_hwmod_common_data.o omap_hwmod_debugfs.o
- clock-common				= clock.o clock_common_data.o \
- 					  clkt_dpll.o clkt_clksel.o
- secure-common				= omap-smc.o omap-secure.o
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index 8c58b71..abd622b 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -156,6 +156,8 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
- 		hwmods[i] = oh;
- 		if (oh->flags & HWMOD_INIT_NO_IDLE)
- 			device_active = true;
++	if (!oh->class)
++		return -EINVAL;
 +
-+		omap_hwmod_register_debugfs(oh);
+ 	if (!oh->class->sysc ||
+ 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_DMADISABLE))
+ 		return -EINVAL;
+@@ -1843,7 +1846,7 @@ static int _ocp_softreset(struct omap_hwmod *oh)
+ 	int c = 0;
+ 	int ret = 0;
+ 
+-	if (!oh->class->sysc ||
++	if (!oh->class || !oh->class->sysc ||
+ 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_SOFTRESET))
+ 		return -ENOENT;
+ 
+@@ -1937,12 +1940,13 @@ static int _reset(struct omap_hwmod *oh)
+ 
+ 	pr_debug("omap_hwmod: %s: resetting\n", oh->name);
+ 
+-	if (oh->class->reset) {
++	if (oh->class && oh->class->reset) {
+ 		r = oh->class->reset(oh);
+ 	} else {
+ 		if (oh->rst_lines_cnt > 0) {
+-			for (i = 0; i < oh->rst_lines_cnt; i++)
++			for (i = 0; i < oh->rst_lines_cnt; i++) {
+ 				_assert_hardreset(oh, oh->rst_lines[i].name);
++			}
+ 			return 0;
+ 		} else {
+ 			r = _ocp_softreset(oh);
+@@ -1958,7 +1962,7 @@ static int _reset(struct omap_hwmod *oh)
+ 	 * softreset.  The _enable() function should be split to avoid
+ 	 * the rewrite of the OCP_SYSCONFIG register.
+ 	 */
+-	if (oh->class->sysc) {
++	if (oh->class && oh->class->sysc) {
+ 		_update_sysc_cache(oh);
+ 		_enable_sysc(oh);
+ 	}
+@@ -2036,7 +2040,7 @@ static int _omap4_get_context_lost(struct omap_hwmod *oh)
+  */
+ static int _enable_preprogram(struct omap_hwmod *oh)
+ {
+-	if (!oh->class->enable_preprogram)
++	if (!oh->class || !oh->class->enable_preprogram)
+ 		return 0;
+ 
+ 	return oh->class->enable_preprogram(oh);
+@@ -2145,7 +2149,7 @@ static int _enable(struct omap_hwmod *oh)
+ 		oh->_state = _HWMOD_STATE_ENABLED;
+ 
+ 		/* Access the sysconfig only if the target is ready */
+-		if (oh->class->sysc) {
++		if (oh->class && oh->class->sysc) {
+ 			if (!(oh->_int_flags & _HWMOD_SYSCONFIG_LOADED))
+ 				_update_sysc_cache(oh);
+ 			_enable_sysc(oh);
+@@ -2186,7 +2190,7 @@ static int _idle(struct omap_hwmod *oh)
+ 	if (_are_all_hardreset_lines_asserted(oh))
+ 		return 0;
+ 
+-	if (oh->class->sysc)
++	if (oh->class && oh->class->sysc)
+ 		_idle_sysc(oh);
+ 	_del_initiator_dep(oh, mpu_oh);
+ 
+@@ -2244,7 +2248,7 @@ static int _shutdown(struct omap_hwmod *oh)
+ 
+ 	pr_debug("omap_hwmod: %s: disabling\n", oh->name);
+ 
+-	if (oh->class->pre_shutdown) {
++	if (oh->class && oh->class->pre_shutdown) {
+ 		prev_state = oh->_state;
+ 		if (oh->_state == _HWMOD_STATE_IDLE)
+ 			_enable(oh);
+@@ -2256,7 +2260,7 @@ static int _shutdown(struct omap_hwmod *oh)
+ 		}
  	}
  
- 	od = omap_device_alloc(pdev, hwmods, oh_cnt);
-diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
-index 35ca6ef..fcf55f5 100644
---- a/arch/arm/mach-omap2/omap_hwmod.h
-+++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -768,4 +768,13 @@ int am43xx_hwmod_init(void);
+-	if (oh->class->sysc) {
++	if (oh->class && oh->class->sysc) {
+ 		if (oh->_state == _HWMOD_STATE_IDLE)
+ 			_enable(oh);
+ 		_shutdown_sysc(oh);
+@@ -2451,7 +2455,7 @@ static int __init _init(struct omap_hwmod *oh, void *data)
+ 				oh->name, np->name);
+ 	}
  
- extern int __init omap_hwmod_register_links(struct omap_hwmod_ocp_if **ois);
+-	if (oh->class->sysc) {
++	if (oh->class && oh->class->sysc) {
+ 		r = _init_mpu_rt_base(oh, NULL, index, np);
+ 		if (r < 0) {
+ 			WARN(1, "omap_hwmod: %s: doesn't have mpu register target base\n",
+@@ -2684,8 +2688,7 @@ static int __init _setup(struct omap_hwmod *oh, void *data)
+  */
+ static int __init _register(struct omap_hwmod *oh)
+ {
+-	if (!oh || !oh->name || !oh->class || !oh->class->name ||
+-	    (oh->_state != _HWMOD_STATE_UNKNOWN))
++	if (!oh || !oh->name || (oh->_state != _HWMOD_STATE_UNKNOWN))
+ 		return -EINVAL;
  
-+#if IS_ENABLED(CONFIG_DEBUG_FS)
-+extern int omap_hwmod_register_debugfs(struct omap_hwmod *oh);
-+#else
-+static inline int omap_hwmod_register_debugfs(struct omap_hwmod *oh)
-+{
-+	return 0;
-+}
-+#endif
+ 	pr_debug("omap_hwmod: %s: registering\n", oh->name);
+@@ -3942,6 +3945,9 @@ int omap_hwmod_for_each_by_class(const char *classname,
+ 		 __func__, classname);
+ 
+ 	list_for_each_entry(temp_oh, &omap_hwmod_list, node) {
++		if (!temp_oh->class)
++			continue;
 +
- #endif
-diff --git a/arch/arm/mach-omap2/omap_hwmod_debugfs.c b/arch/arm/mach-omap2/omap_hwmod_debugfs.c
-new file mode 100644
-index 0000000..cc9533b
---- /dev/null
-+++ b/arch/arm/mach-omap2/omap_hwmod_debugfs.c
-@@ -0,0 +1,269 @@
-+/*
-+ * omap_hwmod debugfs view
-+ *
-+ * Copyright (C) 2014 Texas Instruments, Incorporated - http://www.ti.com
-+ * Author: Felipe Balbi <balbi@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#undef DEBUG
-+
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/io.h>
-+#include <linux/err.h>
-+#include <linux/fs.h>
-+#include <linux/list.h>
-+#include <linux/mutex.h>
-+#include <linux/spinlock.h>
-+#include <linux/debugfs.h>
-+#include <linux/seq_file.h>
-+
-+#include "clock.h"
-+#include "omap_hwmod.h"
-+
-+#include "soc.h"
-+#include "common.h"
-+#include "clockdomain.h"
-+#include "powerdomain.h"
-+#include "cm2xxx.h"
-+#include "cm3xxx.h"
-+#include "cm33xx.h"
-+#include "prm.h"
-+#include "prm3xxx.h"
-+#include "prm44xx.h"
-+#include "prm33xx.h"
-+#include "prminst44xx.h"
-+#include "mux.h"
-+#include "pm.h"
-+
-+#if IS_ENABLED(CONFIG_DEBUG_FS)
-+static struct dentry *omap_hwmod_debugfs_root;
-+
-+static int __init omap_hwmod_create_files(struct omap_hwmod *oh,
-+		struct dentry *dir)
-+{
-+	struct dentry *file;
-+
-+	file = debugfs_create_u16("flags", S_IRUGO, dir, &oh->flags);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_u8("mpu_rt_idx", S_IRUGO, dir, &oh->mpu_rt_idx);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_u8("response_lat", S_IRUGO, dir,
-+			&oh->response_lat);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_u8("rst_lines_cnt", S_IRUGO, dir,
-+			&oh->rst_lines_cnt);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_u8("opt_clks_cnt", S_IRUGO, dir,
-+			&oh->opt_clks_cnt);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_u8("masters_cnt", S_IRUGO, dir, &oh->masters_cnt);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_u8("slaves_cnt", S_IRUGO, dir, &oh->slaves_cnt);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_u8("hwmods_cnt", S_IRUGO, dir, &oh->hwmods_cnt);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_u8("_int_flags", S_IRUGO, dir, &oh->_int_flags);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_u8("_state", S_IRUGO, dir, &oh->_state);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_u8("_postsetup_state", S_IRUGO, dir,
-+			&oh->_postsetup_state);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	return 0;
-+}
-+
-+static int __init
-+omap_hwmod_create_sysc_files(struct omap_hwmod_class_sysconfig *sysc,
-+		struct dentry *dir)
-+{
-+	struct dentry *subdir;
-+	struct dentry *file;
-+
-+	if (!sysc)
-+		return 0;
-+
-+	subdir = debugfs_create_dir("sysc", dir);
-+	if (!subdir)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_x32("rev_offs", S_IRUGO, subdir,
-+			&sysc->rev_offs);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_x32("sysc_offs", S_IRUGO, subdir,
-+			&sysc->sysc_offs);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_x32("syss_offs", S_IRUGO, subdir,
-+			&sysc->syss_offs);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_x16("sysc_flags", S_IRUGO, subdir,
-+			&sysc->sysc_flags);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_u8("srst_udelay", S_IRUGO, subdir,
-+			&sysc->srst_udelay);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_x8("idlemodes", S_IRUGO, subdir,
-+			&sysc->idlemodes);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_u8("clockact", S_IRUGO, subdir, &sysc->clockact);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	return 0;
-+}
-+
-+static int __init omap_hwmod_create_class_files(struct omap_hwmod_class *class,
-+		struct dentry *dir)
-+{
-+	struct dentry *subdir;
-+	struct dentry *file;
-+	int ret;
-+
-+	if (!class)
-+		return 0;
-+
-+	subdir = debugfs_create_dir("class", dir);
-+	if (!subdir)
-+		return -ENOMEM;
-+
-+	file = debugfs_create_u32("rev", S_IRUGO, subdir, &class->rev);
-+	if (!file)
-+		return -ENOMEM;
-+
-+	ret = omap_hwmod_create_sysc_files(class->sysc, subdir);
-+	if (ret)
-+		return -ENOMEM;
-+
-+	return 0;
-+}
-+
-+static int __init omap_hwmod_create_irq_files(struct omap_hwmod_irq_info *irqs,
-+		struct dentry *dir)
-+{
-+	struct dentry *subdir;
-+	int i = 0;
-+
-+	if (!irqs)
-+		return 0;
-+
-+	subdir = debugfs_create_dir("irqs", dir);
-+	if (!subdir)
-+		return -ENOMEM;
-+
-+	while (irqs[i].irq != -1) {
-+		struct dentry *file;
-+
-+		file = debugfs_create_u16(irqs[i].name, S_IRUGO, subdir,
-+				&irqs[i].irq);
-+		if (!file)
-+			return -ENOMEM;
-+		i++;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init omap_hwmod_create_dma_files(struct omap_hwmod_dma_info *dmas,
-+		struct dentry *dir)
-+{
-+	struct dentry *subdir;
-+	int i = 0;
-+
-+	if (!dmas)
-+		return 0;
-+
-+	subdir = debugfs_create_dir("dmas", dir);
-+	if (!subdir)
-+		return -ENOMEM;
-+
-+	while (dmas[i].dma_req != -1) {
-+		struct dentry *file;
-+
-+		file = debugfs_create_u16(dmas[i].name, S_IRUGO, subdir,
-+				&dmas[i].dma_req);
-+		if (!file)
-+			return -ENOMEM;
-+		i++;
-+	}
-+
-+	return 0;
-+}
-+
-+int omap_hwmod_register_debugfs(struct omap_hwmod *oh)
-+{
-+	struct dentry *root;
-+	struct dentry *dir;
-+	int ret;
-+
-+	if (!omap_hwmod_debugfs_root) {
-+		root = debugfs_create_dir("omap_hwmod", NULL);
-+		if (!root ) {
-+			pr_debug("omap_hwmod: unable to initialize debugfs\n");
-+			return 0;
-+		}
-+
-+		omap_hwmod_debugfs_root = root;
-+	} else {
-+		root = omap_hwmod_debugfs_root;
-+	}
-+
-+	dir = debugfs_create_dir(oh->name, root);
-+	if (!dir)
-+		return -ENOMEM;
-+
-+	ret = omap_hwmod_create_files(oh, dir);
-+	if (ret)
-+		return ret;
-+
-+	ret = omap_hwmod_create_class_files(oh->class, dir);
-+	if (ret)
-+		return ret;
-+
-+	ret = omap_hwmod_create_irq_files(oh->mpu_irqs, dir);
-+	if (ret)
-+		return ret;
-+
-+	ret = omap_hwmod_create_dma_files(oh->sdma_reqs, dir);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+#endif
+ 		if (!strcmp(temp_oh->class->name, classname)) {
+ 			pr_debug("omap_hwmod: %s: %s: calling callback fn\n",
+ 				 __func__, temp_oh->name);
 -- 
 2.2.0
