@@ -1,67 +1,38 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  9 Dec 2014 12:25:59 +0100
-Subject: [GIT PULL 0/9] KVM/ARM Changes for v3.19
-Message-ID: <1418124368-28418-1-git-send-email-christoffer.dall@linaro.org>
+Date: Tue,  9 Dec 2014 12:26:00 +0100
+Subject: [GIT PULL 1/9] KVM: ARM: VGIC: Optimize the vGIC
+ vgic_update_irq_pending function.
+In-Reply-To: <1418124368-28418-1-git-send-email-christoffer.dall@linaro.org>
+References: <1418124368-28418-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1418124368-28418-2-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo,
+From: wanghaibin <wanghaibin.wang@huawei.com>
 
-The following changes since commit f62c95fd4041d669159dd76ac0bb2a7f86b5b05d:
+When vgic_update_irq_pending with level-sensitive false, it is need to
+deactivates an interrupt, and, it can go to out directly.
+Here return a false value, because it will be not need to kick.
 
-  Merge tag 'kvm-s390-next-20141028' of git://git.kernel.org/pub/scm/linux/kernel/git/kvms390/linux into HEAD (2014-10-29 13:31:32 +0100)
+Signed-off-by: wanghaibin <wanghaibin.wang@huawei.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-for-3.19
-
-for you to fetch changes up to 016ed39c54b8a3db680e5c6a43419f806133caf2:
-
-  arm/arm64: KVM: vgic: kick the specific vcpu instead of iterating through all (2014-11-26 10:19:37 +0000)
-
-Thanks,
--Christoffer
-
-----------------------------------------------------------------
-Changes for KVM for arm/arm64 for v3.19 including mmio mapping fixups
-(already in kvm/next, apologies about duplicate commits), vgic cleanup
-and optimizations, and an MMIO path cleanup.
-
-----------------------------------------------------------------
-
-
-Andre Przywara (1):
-  arm/arm64: KVM: avoid unnecessary guest register mangling on MMIO read
-
-Ard Biesheuvel (4):
-  arm/arm64: kvm: drop inappropriate use of kvm_is_mmio_pfn()
-  kvm: fix kvm_is_mmio_pfn() and rename to kvm_is_reserved_pfn()
-  kvm: add a memslot flag for incoherent memory regions
-  arm, arm64: KVM: handle potential incoherency of readonly memslots
-
-Christoffer Dall (1):
-  arm/arm64: vgic: Remove unreachable irq_clear_pending
-
-Laszlo Ersek (1):
-  arm, arm64: KVM: allow forced dcache flush on page faults
-
-Shannon Zhao (1):
-  arm/arm64: KVM: vgic: kick the specific vcpu instead of iterating
-    through all
-
-wanghaibin (1):
-  KVM: ARM: VGIC: Optimize the vGIC vgic_update_irq_pending function.
-
- arch/arm/include/asm/kvm_mmu.h   |  5 +++--
- arch/arm/kvm/mmio.c              | 15 +++++++++------
- arch/arm/kvm/mmu.c               | 34 +++++++++++++++++++++++++++-------
- arch/arm64/include/asm/kvm_mmu.h |  5 +++--
- arch/ia64/kvm/kvm-ia64.c         |  2 +-
- arch/x86/kvm/mmu.c               |  6 +++---
- include/linux/kvm_host.h         |  3 ++-
- virt/kvm/arm/vgic.c              | 20 +++++++++++++-------
- virt/kvm/kvm_main.c              | 16 ++++++++--------
- 9 files changed, 69 insertions(+), 37 deletions(-)
-
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 3aaca49..5acf2c9 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1646,6 +1646,9 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+ 		} else {
+ 			vgic_dist_irq_clear_pending(vcpu, irq_num);
+ 		}
++
++		ret = false;
++		goto out;
+ 	}
+ 
+ 	enabled = vgic_irq_is_enabled(vcpu, irq_num);
 -- 
 2.1.2.330.g565301e.dirty
