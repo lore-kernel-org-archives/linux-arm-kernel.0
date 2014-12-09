@@ -1,8 +1,8 @@
 From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Tue,  9 Dec 2014 21:12:58 +0800
-Subject: [PATCH -next] coresight-funnel: use module_amba_driver to simplify
- the code
-Message-ID: <1418130778-26900-1-git-send-email-weiyj_lk@163.com>
+Date: Tue,  9 Dec 2014 21:13:12 +0800
+Subject: [PATCH -next] coresight-tmc: use module_amba_driver to simplify the
+ code
+Message-ID: <1418130792-27195-1-git-send-email-weiyj_lk@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,29 +13,29 @@ boilerplate code.
 
 Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- drivers/coresight/coresight-funnel.c | 12 +-----------
+ drivers/coresight/coresight-tmc.c | 12 +-----------
  1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/coresight/coresight-funnel.c b/drivers/coresight/coresight-funnel.c
-index 2108edf..3db36f7 100644
---- a/drivers/coresight/coresight-funnel.c
-+++ b/drivers/coresight/coresight-funnel.c
-@@ -252,17 +252,7 @@ static struct amba_driver funnel_driver = {
- 	.id_table	= funnel_ids,
+diff --git a/drivers/coresight/coresight-tmc.c b/drivers/coresight/coresight-tmc.c
+index ce2c293..3ff232f 100644
+--- a/drivers/coresight/coresight-tmc.c
++++ b/drivers/coresight/coresight-tmc.c
+@@ -760,17 +760,7 @@ static struct amba_driver tmc_driver = {
+ 	.id_table	= tmc_ids,
  };
  
--static int __init funnel_init(void)
+-static int __init tmc_init(void)
 -{
--	return amba_driver_register(&funnel_driver);
+-	return amba_driver_register(&tmc_driver);
 -}
--module_init(funnel_init);
+-module_init(tmc_init);
 -
--static void __exit funnel_exit(void)
+-static void __exit tmc_exit(void)
 -{
--	amba_driver_unregister(&funnel_driver);
+-	amba_driver_unregister(&tmc_driver);
 -}
--module_exit(funnel_exit);
-+module_amba_driver(funnel_driver);
+-module_exit(tmc_exit);
++module_amba_driver(tmc_driver);
  
  MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("CoreSight Funnel driver");
+ MODULE_DESCRIPTION("CoreSight Trace Memory Controller driver");
