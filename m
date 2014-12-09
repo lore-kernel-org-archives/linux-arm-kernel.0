@@ -1,61 +1,122 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 9 Dec 2014 18:16:52 +0000
-Subject: [RFC 0/2] Qualcomm RPM sleep states
-In-Reply-To: <20141208205502.GC3268@sonymobile.com>
-References: <5473A0F3.6080405@codeaurora.org>
- <20141125204430.GN7712@sirena.org.uk>
- <20141126233447.GD2872@sonymobile.com>
- <20141127190233.GF7712@sirena.org.uk>
- <CAJAp7OgBepNL6j4D6_MvXJ5PTRDUFNt6paskkP=q=h8W_YNP_Q@mail.gmail.com>
- <20141128201613.GB7712@sirena.org.uk>
- <5480CEEF.7000906@codeaurora.org>
- <20141208180635.GB3268@sonymobile.com>
- <20141208193935.GD11764@sirena.org.uk>
- <20141208205502.GC3268@sonymobile.com>
-Message-ID: <20141209181652.GG11764@sirena.org.uk>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 9 Dec 2014 12:17:20 -0600
+Subject: [PATCH 0/5] irqchip: kill the GIC routable domain
+In-Reply-To: <5486C6A6.8060702@arm.com>
+References: <1417873576-10463-1-git-send-email-marc.zyngier@arm.com>
+ <20141207171646.GA12049@kahuna> <20141207180322.GA15688@kahuna>
+ <54856B21.6070104@arm.com> <20141208224116.GA2538@kahuna>
+ <5486C6A6.8060702@arm.com>
+Message-ID: <20141209181719.GA2569@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 12:55:03PM -0800, Bjorn Andersson wrote:
-> On Mon 08 Dec 11:39 PST 2014, Mark Brown wrote:
+On 09:53-20141209, Marc Zyngier wrote:
+> On 08/12/14 22:41, Nishanth Menon wrote:
+> 
+> > Anyways.. The following diff[1] on top of your branch makes DRA7 work - I
+> > assume you will squash as needed and repost with linux-omap mailing list
+> > in CC.
+> 
+> Brilliant. I'll squash that into my tree and repost at some point.
 
-> > Now I'm confused again.  I thought entry and exit was all done
-> > separately so it was just about saying what should happen if the device
-> > were to idle?
+K, it will be nice to have a reflow of the series based on v3.19-rc1
+since there are dts dependencies and we dont want folks to have
+regressions on their platforms of choice..
 
-> But how do you actually expose that control to the consumers?
+Obviously, my tests are basic boot tests and should get a few weeks(as
+you already mentioned) on linux-next to get properly soaked
 
-I think having an idle state (or possibly just using the suspend state,
-I'm still foggy if the two states are actually different) seems to make
-sense?
+> 
+> > I increased the scope of testing knowing that WUGEN is present in many
+> > A9 based TI platforms as well.. and at least OMAP4 showed flakiness in
+> > my testing.. Also a few notes:
+> > 
+> > Stuff like: am437x is a bit questionable (interrupt-parent probably should be wugen?)
+> > 175:          0       GIC  39  tps65218 
+> > 
+> > OMAP5: (should be wugen?)
+> > 308:       4323          0       GIC 106  OMAP UART2
+> > 411:          0          0       GIC 151  twl6040
+> > 405:          1          0       GIC  39  palmas
+> 
+> Well, I can't really tell. Someone with access to the documentation
+> should be able to find out.
 
-> > That's what should happen, we just don't currently really support doing
-> > this configuration dynamically (practically speaking I suspect anyone
-> > who cares just doesn't have a suspend mode for affected regulators at
-> > the minute).
+AM437x: http://www.ti.com/lit/pdf/spruhl7
+OMAP5: http://www.ti.com/lit/pdf/swpu249
 
-> What would such configuration look like?
+yeah, we should be able to do them as well - trivially since they follow
+the same structure as other SoCs without crossbar.
 
-> In the suspend case you could introduce an api for setting parameters of the
-> suspend state, but that means that the individual drivers needs to be written
-> with awareness of the system state. Our proposal is to use the same api, but
-> with a different regulator*, but how should that acquired (and expressed in dt).
+> 
+> > OMAP4 serial port is flaky -> not sure if it is due to routing of GIC to UART2 and not via WUGEN
+> > IRQ branch: with my fix applied:
+> > ---------------------------------
+> 
+> [...]
+> 
+> > 18: pandaboard-es:  Boot FAIL: http://slexy.org/raw/s20ty0Z6i5 (not expected)
+> > 19: pandaboard-vanilla:  Boot FAIL: http://slexy.org/raw/s20BYfaMd2 (not expected)
+> 
+> If I read the log correctly, the serial port stops responding after a while?
 
-We already have an API for the suspend state, we just don't enable its
-use in DT yet other than static configuration.  I'm not sure I see the
-connection to the system state in the consumer API here - I thought this
-was pretty much just setting the state when the device is turned off
-which seems device specific?
+yeah - dug at the omap4 ones a bit, obviously once the deeper c states
+are hit, we'd like wakeupgen to wakeup CPU else we will be "sluggish" in
+the sense that the event is detected when some other wakeupgen enabled
+interrupt takes place.
 
-> In our case, as most things change the both state (or active only if no
-> both/sleep), the standard regulator api would have to affect the both state.
-> Would we then have a separate api to modify the active state?
+Adding the following makes my panda work fine.
+1: pandaboard-es:  Boot PASS: http://slexy.org/raw/s20o8DaBvh
+2: pandaboard-vanilla:  Boot PASS: http://slexy.org/raw/s222JndDdh
 
-Why would we need to introduce a new API for the active state?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141209/4bc5766f/attachment.sig>
+
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index 1505135..8b6d50e 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -371,8 +371,8 @@
+ 	twl: twl at 48 {
+ 		reg = <0x48>;
+ 		/* IRQ# = 7 */
+-		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>; /* IRQ_SYS_1N cascaded to gic */
+-		interrupt-parent = <&gic>;
++		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>; /* IRQ_SYS_1N cascaded to wakeupgen to gic */
++		interrupt-parent = <&wakeupgen>;
+ 	};
+ 
+ 	twl6040: twl at 4b {
+@@ -383,8 +383,8 @@
+ 		pinctrl-0 = <&twl6040_pins>;
+ 
+ 		/* IRQ# = 119 */
+-		interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>; /* IRQ_SYS_2N cascaded to gic */
+-		interrupt-parent = <&gic>;
++		interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>; /* IRQ_SYS_2N cascaded to wakeupgen to gic */
++		interrupt-parent = <&wakeupgen>;
+ 		ti,audpwron-gpio = <&gpio4 31 GPIO_ACTIVE_HIGH>;  /* gpio line 127 */
+ 
+ 		vio-supply = <&v1v8>;
+@@ -479,17 +479,17 @@
+ };
+ 
+ &uart2 {
+-	interrupts-extended = <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH
++	interrupts-extended = <&wakeupgen GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH
+ 			       &omap4_pmx_core OMAP4_UART2_RX>;
+ };
+ 
+ &uart3 {
+-	interrupts-extended = <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH
++	interrupts-extended = <&wakeupgen GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH
+ 			       &omap4_pmx_core OMAP4_UART3_RX>;
+ };
+ 
+ &uart4 {
+-	interrupts-extended = <&gic GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH
++	interrupts-extended = <&wakeupgen GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH
+ 			       &omap4_pmx_core OMAP4_UART4_RX>;
+ };
+ 
+-- 
+Regards,
+Nishanth Menon
