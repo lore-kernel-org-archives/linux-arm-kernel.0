@@ -1,157 +1,207 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Tue, 09 Dec 2014 22:35:56 +0800
-Subject: [PATCH 2/6] PCI/MSI: add hooks to populate the msi_domain field
-In-Reply-To: <548706E9.8080701@arm.com>
-References: <1418069543-21969-1-git-send-email-marc.zyngier@arm.com>
- <1418069543-21969-3-git-send-email-marc.zyngier@arm.com>
- <5486585B.40000@huawei.com> <5486C8BA.8030608@arm.com>
- <5486E3BF.70703@huawei.com> <5486E747.4010804@arm.com>
- <5486EF4E.5020704@linux.intel.com> <5487012B.4040505@arm.com>
- <54870302.5050703@linux.intel.com> <548706E9.8080701@arm.com>
-Message-ID: <548708CC.5000405@linux.intel.com>
+From: dwalker@fifo99.com (dwalker at fifo99.com)
+Date: Tue, 9 Dec 2014 14:46:03 +0000
+Subject: [PATCH] arch: arm: mach-msm: smd.c: Remove some unused functions
+In-Reply-To: <1417914740-8390-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+References: <1417914740-8390-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Message-ID: <20141209144602.GB5376@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/12/9 22:27, Marc Zyngier wrote:
-> On 09/12/14 14:11, Jiang Liu wrote:
->> On 2014/12/9 22:03, Marc Zyngier wrote:
->>> Hi Gerry,
->>>
->>> On 09/12/14 12:47, Jiang Liu wrote:
->>>> On 2014/12/9 20:12, Marc Zyngier wrote:
->>>>> Yijing,
->>>>>
->>>>> On 09/12/14 11:57, Yijing Wang wrote:
->>>>>>>>> +void __weak pcibios_set_phb_msi_domain(struct pci_bus *bus)
->>>>>>>>> +{
->>>>>>>>> +}
->>>>>>>>> +
->>>>>>>>> +static void pci_set_bus_msi_domain(struct pci_bus *bus)
->>>>>>>>> +{
->>>>>>>>> +	struct pci_dev *bridge = bus->self;
->>>>>>>>> +
->>>>>>>>> +	if (!bridge)
->>>>>>>>> +		pcibios_set_phb_msi_domain(bus);
->>>>>>>>> +	else
->>>>>>>>> +		dev_set_msi_domain(&bus->dev, dev_get_msi_domain(&bridge->dev));
->>>>>>>>> +}
->>>>>>>>
->>>>>>>>
->>>>>>>> Hi Marc, we can not assume pci devices under same phb share the same msi irq domain,
->>>>>>>> now in x86, pci devices under the same phb may associate different msi irq domain.
->>>>>>
->>>>>> Hi Marc,
->>>>>>
->>>>>>>
->>>>>>> Well, this is not supposed to be a perfect solution yet, but instead a
->>>>>>> basis for discussion. What I'd like to find out is:
->>>>>>>
->>>>>>> - What is the minimum granularity for associating a device with its MSI
->>>>>>> domain in existing platforms?
->>>>>>
->>>>>> PCI device, after Gerry's msi irq domain patchset which now in linux-next,
->>>>>> in x86, we will find msi irq domain by pci_dev.
->>>>>
->>>>> Are you *really* associating the MSI domain on a per pci-device basis?
->>>>> That is, you have devices on the same PCI bus talking to different MSI hw?
->>>> Hi Marc,
->>>> 	This is a little wild:(
->>>> 	On x86 platform with Intel VT-d(not the case for AMD-v),
->>>> interrupt remapping is tight to DMA remapping (IOMMU) unit.
->>>> For most common cases, IOMMU unit manages PCI bus and its sub-hierarchy.
->>>> But it may also manage a specific PCI device. This is typically used to
->>>> provide QoS for audio device by using dedicated IOMMU unit to avoid
->>>> resource contention on DMA remapping tables. BIOS uses ACPI table to
->>>> report PCI bus/device to IOMMU unit mapping relationship. (To be honest,
->>>> I have no really experience with such a hardware platform yet, just for
->>>> theoretical analysis)
->>>> 	On the other hand, we now support hierarchy irqdomain. So to
->>>> support per-PCI IOMMU unit case, we need maintain irqdomain at PCI
->>>> device level.
->>>> 	This piece of code from your [4/6] is flexible enough, which
->>>> retrieves msi_domain from PCI device, then fallback to PCI bus,
->>>> then fallback to platform specific method.
->>>> 	domain = dev_get_msi_domain(&dev->dev);
->>>> 	if (!domain && dev->bus->msi)
->>>>  		domain = dev->bus->msi->domain;
->>>>  	if (!domain)
->>>>  		domain = arch_get_pci_msi_domain(dev);
->>>
->>> OK. But what I'd really like to see is a way to setup the
->>> device<->domain binding as early as possible, without having to use more
->>> conditional code in pci_msi_get_domain.
->>>
->>> IOW, can we do something similar to what pci_set_bus_msi_domain and
->>> pci_set_msi_domain do in this patch?
->> Hi Marc,
->> 	I have checked x86 code, we could set pci_dev->msi_domain
->> when creating PCI devices, just need to find some hook points
->> into PCI core next step. If arch code doesn't set pci_dev->msi_domain,
->> PCI MSI core may provide a default way to set pci_dev->msi_domain.
->> This may make the implementation simpler, I guess:)
-> 
-> Right. So following your earlier suggestion, I could make
-> pci_set_msi_domain a weak symbol and let arch code override this.
-> 
-> My preference would have been to have arch code to create a set of
-> arch-independent data structures describing the topology, and use that
-> for everything, but maybe that's a bit ambitious for a start.
-> 
-> I'll rework the series to make the symbols weak.
-Hi Marc,
-	I think we may not need the weak symbol at all. With following
-draft patch, the PCI MSI core may simply do:
-	if (pci_dev->dev.msi_domain == NULL)
-		dev_set_msi_domain(&dev->dev,
-			 dev_get_msi_domain(&dev->bus->dev));
------------------------------------------------------------------------
-Note: the patch won't pass compilation, just to show the key idea:)
 
-diff --git a/arch/x86/kernel/apic/msi.c b/arch/x86/kernel/apic/msi.c
-index da163da5fdee..8147d25d4349 100644
---- a/arch/x86/kernel/apic/msi.c
-+++ b/arch/x86/kernel/apic/msi.c
-@@ -67,6 +67,23 @@ static struct irq_chip pci_msi_controller = {
-        .flags                  = IRQCHIP_SKIP_SET_WAKE,
- };
-
-+struct irq_domain *x86_get_pci_msi_domain(struct pci_dev *dev)
-+{
-+       struct irq_domain *domain;
-+       struct irq_alloc_info info;
-+
-+       init_irq_alloc_info(&info, NULL);
-+       info.type = X86_IRQ_ALLOC_TYPE_MSI;
-+       info.msi_dev = dev;
-+       domain = irq_remapping_get_irq_domain(&info);
-+       if (domain == NULL)
-+               domain = msi_default_domain;
-+       if (domain == NULL)
-+               domain = ERR_PTR(-ENOSYS);
-+
-+       return domain;
-+}
-+
- int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- {
-        struct irq_domain *domain;
-diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
-index 7b20bccf3648..a26f30a8bb8f 100644
---- a/arch/x86/pci/common.c
-+++ b/arch/x86/pci/common.c
-@@ -652,6 +652,9 @@ int pcibios_add_device(struct pci_dev *dev)
-                pa_data = data->next;
-                iounmap(data);
-        }
-+
-+       dev->dev.msi_domain = x86_get_pci_msi_domain(dev);
-+
-        return 0;
- }
+Seems ok to me. These files, and functions, are also in drivers/staging/dream/
+are you removing them there also ?
 
 
+On Sun, Dec 07, 2014 at 02:12:20AM +0100, Rickard Strandqvist wrote:
+> Removes some functions that are not used anywhere:
+> smsm_set_sleep_duration() smsm_get_state() smd_wait_until_writable()
+> smd_wait_until_readable() smd_write_atomic() smd_sleep_exit()
 > 
-> Thanks,
+> This was partially found by using a static code analysis program called cppcheck.
 > 
-> 	M.
+> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+> ---
+>  arch/arm/mach-msm/include/mach/msm_smd.h |    9 ---
+>  arch/arm/mach-msm/smd.c                  |  105 ------------------------------
+>  arch/arm/mach-msm/smd_private.h          |    2 -
+>  3 files changed, 116 deletions(-)
 > 
+> diff --git a/arch/arm/mach-msm/include/mach/msm_smd.h b/arch/arm/mach-msm/include/mach/msm_smd.h
+> index 029463e..48ddef98 100644
+> --- a/arch/arm/mach-msm/include/mach/msm_smd.h
+> +++ b/arch/arm/mach-msm/include/mach/msm_smd.h
+> @@ -40,7 +40,6 @@ int smd_read(smd_channel_t *ch, void *data, int len);
+>  ** it will return the requested length written or an error.
+>  */
+>  int smd_write(smd_channel_t *ch, const void *data, int len);
+> -int smd_write_atomic(smd_channel_t *ch, const void *data, int len);
+>  
+>  int smd_write_avail(smd_channel_t *ch);
+>  int smd_read_avail(smd_channel_t *ch);
+> @@ -57,14 +56,6 @@ int smd_cur_packet_size(smd_channel_t *ch);
+>  void smd_kick(smd_channel_t *ch);
+>  
+>  
+> -#if 0
+> -/* these are interruptable waits which will block you until the specified
+> -** number of bytes are readable or writable.
+> -*/
+> -int smd_wait_until_readable(smd_channel_t *ch, int bytes);
+> -int smd_wait_until_writable(smd_channel_t *ch, int bytes);
+> -#endif
+> -
+>  typedef enum {
+>  	SMD_PORT_DS = 0,
+>  	SMD_PORT_DIAG,
+> diff --git a/arch/arm/mach-msm/smd.c b/arch/arm/mach-msm/smd.c
+> index b1588a1..4bc1e71 100644
+> --- a/arch/arm/mach-msm/smd.c
+> +++ b/arch/arm/mach-msm/smd.c
+> @@ -401,36 +401,6 @@ static inline int smd_need_int(struct smd_channel *ch)
+>  	return 0;
+>  }
+>  
+> -void smd_sleep_exit(void)
+> -{
+> -	unsigned long flags;
+> -	struct smd_channel *ch;
+> -	int need_int = 0;
+> -
+> -	spin_lock_irqsave(&smd_lock, flags);
+> -	list_for_each_entry(ch, &smd_ch_list_modem, ch_list) {
+> -		if (smd_need_int(ch)) {
+> -			need_int = 1;
+> -			break;
+> -		}
+> -	}
+> -	list_for_each_entry(ch, &smd_ch_list_dsp, ch_list) {
+> -		if (smd_need_int(ch)) {
+> -			need_int = 1;
+> -			break;
+> -		}
+> -	}
+> -	spin_unlock_irqrestore(&smd_lock, flags);
+> -	do_smd_probe();
+> -
+> -	if (need_int) {
+> -		if (msm_smd_debug_mask & MSM_SMD_DEBUG)
+> -			pr_info("smd_sleep_exit need interrupt\n");
+> -		tasklet_schedule(&smd_fake_irq_tasklet);
+> -	}
+> -}
+> -
+> -
+>  void smd_kick(smd_channel_t *ch)
+>  {
+>  	unsigned long flags;
+> @@ -747,16 +717,6 @@ int smd_write(smd_channel_t *ch, const void *data, int len)
+>  	return ch->write(ch, data, len);
+>  }
+>  
+> -int smd_write_atomic(smd_channel_t *ch, const void *data, int len)
+> -{
+> -	unsigned long flags;
+> -	int res;
+> -	spin_lock_irqsave(&smd_lock, flags);
+> -	res = ch->write(ch, data, len);
+> -	spin_unlock_irqrestore(&smd_lock, flags);
+> -	return res;
+> -}
+> -
+>  int smd_read_avail(smd_channel_t *ch)
+>  {
+>  	return ch->read_avail(ch);
+> @@ -767,16 +727,6 @@ int smd_write_avail(smd_channel_t *ch)
+>  	return ch->write_avail(ch);
+>  }
+>  
+> -int smd_wait_until_readable(smd_channel_t *ch, int bytes)
+> -{
+> -	return -1;
+> -}
+> -
+> -int smd_wait_until_writable(smd_channel_t *ch, int bytes)
+> -{
+> -	return -1;
+> -}
+> -
+>  int smd_cur_packet_size(smd_channel_t *ch)
+>  {
+>  	return ch->current_packet;
+> @@ -875,61 +825,6 @@ int smsm_change_state(enum smsm_state_item item,
+>  	return 0;
+>  }
+>  
+> -uint32_t smsm_get_state(enum smsm_state_item item)
+> -{
+> -	unsigned long flags;
+> -	uint32_t rv;
+> -
+> -	spin_lock_irqsave(&smem_lock, flags);
+> -
+> -	rv = readl(smd_info.state + item * 4);
+> -
+> -	if (item == SMSM_STATE_MODEM && (rv & SMSM_RESET))
+> -		handle_modem_crash();
+> -
+> -	spin_unlock_irqrestore(&smem_lock, flags);
+> -
+> -	return rv;
+> -}
+> -
+> -#ifdef CONFIG_ARCH_MSM_SCORPION
+> -
+> -int smsm_set_sleep_duration(uint32_t delay)
+> -{
+> -	struct msm_dem_slave_data *ptr;
+> -
+> -	ptr = smem_find(SMEM_APPS_DEM_SLAVE_DATA, sizeof(*ptr));
+> -	if (ptr == NULL) {
+> -		pr_err("smsm_set_sleep_duration <SM NO APPS_DEM_SLAVE_DATA>\n");
+> -		return -EIO;
+> -	}
+> -	if (msm_smd_debug_mask & MSM_SMSM_DEBUG)
+> -		pr_info("smsm_set_sleep_duration %d -> %d\n",
+> -		       ptr->sleep_time, delay);
+> -	ptr->sleep_time = delay;
+> -	return 0;
+> -}
+> -
+> -#else
+> -
+> -int smsm_set_sleep_duration(uint32_t delay)
+> -{
+> -	uint32_t *ptr;
+> -
+> -	ptr = smem_find(SMEM_SMSM_SLEEP_DELAY, sizeof(*ptr));
+> -	if (ptr == NULL) {
+> -		pr_err("smsm_set_sleep_duration <SM NO SLEEP_DELAY>\n");
+> -		return -EIO;
+> -	}
+> -	if (msm_smd_debug_mask & MSM_SMSM_DEBUG)
+> -		pr_info("smsm_set_sleep_duration %d -> %d\n",
+> -		       *ptr, delay);
+> -	*ptr = delay;
+> -	return 0;
+> -}
+> -
+> -#endif
+> -
+>  int smd_core_init(void)
+>  {
+>  	int r;
+> diff --git a/arch/arm/mach-msm/smd_private.h b/arch/arm/mach-msm/smd_private.h
+> index 727bfe6..702f34e 100644
+> --- a/arch/arm/mach-msm/smd_private.h
+> +++ b/arch/arm/mach-msm/smd_private.h
+> @@ -148,8 +148,6 @@ enum smsm_state_item {
+>  
+>  void *smem_alloc(unsigned id, unsigned size);
+>  int smsm_change_state(enum smsm_state_item item, uint32_t clear_mask, uint32_t set_mask);
+> -uint32_t smsm_get_state(enum smsm_state_item item);
+> -int smsm_set_sleep_duration(uint32_t delay);
+>  void smsm_print_sleep_info(void);
+>  
+>  #define SMEM_NUM_SMD_CHANNELS        64
+> -- 
+> 1.7.10.4
