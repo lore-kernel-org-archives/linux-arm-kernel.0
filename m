@@ -1,243 +1,329 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Dec 2014 22:23:54 +0100
-Subject: [GIT PULL 2/9] ARM: SoC cleanup on mach-at91 for 3.19
+Date: Tue, 09 Dec 2014 22:30:33 +0100
+Subject: [GIT PULL 3/9] ARM: SoC cleanups for 3.19
 In-Reply-To: <4491193.a6KEQb1tZH@wuerfel>
 References: <4491193.a6KEQb1tZH@wuerfel>
-Message-ID: <7004548.0btfAVyUzv@wuerfel>
+Message-ID: <2717417.VGWlWGOuHy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
-
-  Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/at91-cleanup-for-linus
-
-for you to fetch changes up to ba62a8593d15f3f353acdc8ab32c18dd40a275bb:
+The following changes since commit ba62a8593d15f3f353acdc8ab32c18dd40a275bb:
 
   ARM: at91: remove unused board.h file (2014-12-03 14:16:07 +0100)
 
-----------------------------------------------------------------
-ARM: SoC cleanup on mach-at91 for 3.19
+are available in the git repository at:
 
-On Atmel AT91, the conversion to device tree is now considered complete,
-and all machines that were not already converted in 3.18 are assumed to
-be unused and dropped by the maintainer.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/cleanup-for-linus
 
-All remaining board files that were written in C are dropped, and the
-ancient at91x40 sub-platform (based on an MMU-less ARM7) is removed
-altogether.  Cleaning up the last pieces was great fun, so I took the
-time to do some of the coding myself and removed several hundred code
-lines that ended up unused after the board files were done.
+for you to fetch changes up to ef1dfa7332e9205b532da1c2d286757ce511cd1d:
 
-There are still a couple of AT91 specific device drivers that are not
-converted to DT (CF, USB-OTG) and currently not working, and the platform
-itself is not "multiplatform"-enabled, but both issues are going to be
-taken care of in the 3.20 cycle.
-
-This is split out from the other cleanups purely based on the size
-of the branch.
+  Merge tag 'at91-cleanup5' of git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91 into next/cleanup (2014-12-04 19:11:03 +0100)
 
 ----------------------------------------------------------------
-Alexandre Belloni (2):
-      ARM: at91: remove CONFIG_MACH_SAMA5_DT
-      ARM: at91: move sdramc/ddrsdr header to include/soc/at91
+ARM: SoC cleanups for 3.19
 
-Arnd Bergmann (6):
-      ARM: at91/Kconfig: select board files automatically
-      ARM: at91: cleanup initilisation code by removing dead code
-      ARM: at91: remove old AT91-specific drivers
-      ARM: at91: at91rm9200 ST initialization is now DT only
-      ARM: at91/clocksource: remove !DT PIT initializations
-      ARM: at91: remove unused board.h file
+The remaining cleanups for 3.19 are to a large part result of
+devicetree conversion nearing completion on two other platforms
+besides AT91:
+
+* Like AT91, Renesas shmobile is in the process to migrate to DT and
+  multiplatform, but using a different approach of doing it one
+  SoC at a time. For 3.19, the r8a7791 platform and associated\
+  "Koelsch" board are considered complete and we remove the non-DT
+  non-multiplatform support for this.
+
+* The ARM Versatile Express has supported DT and multiplatform
+  for a long time, but we have still kept the legacy board files
+  around, because not all drivers were fully working before. We
+  have finally taken the last step to remove the board files.
+
+Other changes in this branch are preparation for the later branches
+or just unrelated to the more interesting changes:
+* The dts files for arm64 get moved into per-vendor directories for
+  a clearer structure.
+* Some dead code removal (zynq, exynos, davinci, imx)
+* Using pr_*() macros more consistently instead of printk(KERN_*)
+  in some platform code.
+
+----------------------------------------------------------------
+Arnd Bergmann (13):
+      Merge tag 'renesas-boards-cleanups2-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
+      Merge tag 'renesas-dt-du-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
+      Merge tag 'renesas-dt-cleanups-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
+      Merge tag 'renesas-koelsch-board-removal-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
+      Merge tag 'at91-cleanup2' of git://git.kernel.org/.../nferre/linux-at91 into next/cleanup
+      Merge tag 'davinci-for-v3.19/cleanup' of git://git.kernel.org/.../nsekhar/linux-davinci into next/cleanup
+      Merge tag 'renesas-soc-cleanups2-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
+      Merge tag 'samsung-cleanup-2' of git://git.kernel.org/.../kgene/linux-samsung into next/cleanup
+      Merge tag 'imx-cleanup-3.19' of git://git.kernel.org/.../shawnguo/linux into next/cleanup
+      Merge tag 'at91-cleanup3' of git://git.kernel.org/.../nferre/linux-at91 into next/cleanup
+      Merge tag 'at91-cleanup4' of git://git.kernel.org/.../nferre/linux-at91 into next/cleanup
+      Merge tag 'zynq-cleanup-for-3.19' of https://github.com/Xilinx/linux-xlnx into next/cleanup
+      Merge tag 'at91-cleanup5' of git://git.kernel.org/.../nferre/linux-at91 into next/cleanup
 
 Boris Brezillon (1):
       ARM: at91: remove useless init_time for DT-only SoCs
 
-Nicolas Ferre (23):
-      ARM: at91: remove no-MMU at91x40 support
-      ARM: at91: remove at91sam9g45/9m10 legacy board support
-      ARM: at91: remove at91sam9rl legacy board support
-      ARM: at91: remove unused CONFIG_ARCH_AT91SAM9G45 option
-      ARM: at91/at91sam9g45: remove useless header file
-      ARM: at91: remove at91sam9263 legacy board support
-      ARM: at91: remove at91sam9260/at91sam9g20 legacy boards files
-      ARM: at91: remove at91sam9260/at91sam9g20 legacy board support
-      ARM: at91/Kconfig: remove unused config options
-      ARM: at91: remove at91sam9261/at91sam9g10 legacy board support
-      ARM: at91/Kconfig: remove useless fbdev Kconfig options
-      ARM: at91: remove at91rm9200 legacy boards files
-      ARM: at91: remove at91rm9200 legacy board support
-      ARM: at91: switch configuration option to SOC_AT91RM9200
-      ARM: at91/Kconfig: remove ARCH_AT91RM9200 option for drivers
-      ARM: at91: always USE_OF from now on
-      ARM: at91/trivial: update Kconfig comment to mention SAMA5
-      ARM: at91: remove all !DT related configuration options
-      ARM: at91: remove clock data in at91sam9n12.c and at91sam9x5.c files
-      ARM: at91: remove old at91-specific clock driver
-      ARM: at91: remove legacy IRQ driver and related code
-      ARM: at91: remove unused IRQ function declarations
-      ARM: at91: remove unneeded header files
+Dmitry Voytik (3):
+      ARM: imx6q: drop unnecessary semicolon
+      ARM: imx: simplify clk_pllv3_prepare()
+      ARM: imx: refactor mxc_iomux_mode()
 
-Olof Johansson (1):
+Fabio Estevam (4):
+      ARM: dts: imx6qdl-sabresd: Use IMX6QDL_CLK_CKO define
+      ARM: dts: imx6qdl-gw5x: Remove unneeded 'fsl,mode' property
+      ARM: dts: imx6qdl-rex: Remove unneeded 'fsl,mode' property
+      ARM: dts: imx6qdl-sabresd: Fix the microphone route
+
+Geert Uytterhoeven (24):
+      ARM: dts: Sort SHMOBILE dtbs alphabetically
+      ARM: shmobile: r7s72100: Remove r7s72100-genmai.dtb for ARCH_SHMOBILE_LEGACY
+      ARM: shmobile: emev2 dtsi: Use generic names for device nodes
+      ARM: shmobile: emev2 dtsi: Add uart* labels for easier referencing
+      ARM: shmobile: genmai dts: Add chosen/stdout-path
+      ARM: shmobile: ape6evm-reference dts: Add chosen/stdout-path
+      ARM: shmobile: armadillo800eva dts: Add chosen/stdout-path
+      ARM: shmobile: bockw-reference dts: Add chosen/stdout-path
+      ARM: shmobile: marzen dts: Add chosen/stdout-path
+      ARM: shmobile: lager dts: Add chosen/stdout-path
+      ARM: shmobile: henninger dts: Add chosen/stdout-path
+      ARM: shmobile: koelsch dts: Add chosen/stdout-path
+      ARM: shmobile: alt dts: Add chosen/stdout-path
+      ARM: shmobile: kzm9g-reference dts: Add chosen/stdout-path
+      ARM: shmobile: kzm9d dts: Add chosen/stdout-path
+      ARM: shmobile: r8a7778: Remove wrapper r8a7778_init_delay()
+      ARM: shmobile: sh73a0: Remove wrapper sh73a0_init_delay()
+      MAINTAINERS: Remove reference to shmobile / koelsch_defconfig
+      ARM: dts: koelsch: Stop building r8a7791-koelsch.dtb in legacy builds
+      ARM: shmobile: koelsch dts: Drop console= bootargs parameter
+      ARM: shmobile: sh73a0: Spelling/grammar s/entity map/identity mapping/
+      ARM: shmobile: sh7372: Spelling/grammar s/entity map/identity mapping/
+      ARM: shmobile: r8a7779: Spelling/grammar s/entity/identity/, s/map/mapping/
+      ARM: imx: Remove unneeded .map_io initialization
+
+Jingchang Lu (1):
+      ARM: imx: clean up machine mxc_arch_reset_init_dt reset init
+
+Joe Perches (1):
+      ARM: davinci: Use standard logging styles
+
+Krzysztof Kozlowski (3):
+      ARM: EXYNOS: Move code from hotplug.c to platsmp.c
+      ARM: EXYNOS: Remove unneeded __ref annotation for cpu_die function
+      ARM: EXYNOS: Fix CPU idle clock down after CPU off
+
+Laurent Pinchart (15):
+      ARM: shmobile: Remove FSF address from copyright headers
+      ARM: shmobile: r8a7779: Add DU node to device tree
+      ARM: shmobile: r8a7790: Add DU node to device tree
+      ARM: shmobile: r8a7791: Add DU node to device tree
+      ARM: shmobile: dts: Add common file for AA104XD12 panel
+      ARM: shmobile: marzen: Enable DU device in DT
+      ARM: shmobile: lager-reference: Remove DU platform device
+      ARM: shmobile: lager: Enable DU device in DT
+      ARM: shmobile: koelsch-reference: Remove DU platform device
+      ARM: shmobile: koelsch: Enable DU device in DT
+      ARM: shmobile: marzen-reference: Don't include legacy clock.h
+      ARM: shmobile: Remove shmobile_clk_workaround() implementation
+      ARM: shmobile: koelsch: Remove legacy C board code
+      ARM: shmobile: r8a7791: Remove legacy code
+      ARM: shmobile: koelsch: Remove reference board code
+
+Michal Simek (1):
+      ARM: zynq: Remove secondary_startup() declaration from header
+
+Olof Johansson (8):
+      Merge tag 'dts-subdirs-for-arm-soc-v3.19' of git://git.kernel.org/.../rric/linux into next/cleanup
+      Merge tag 'samsung-cleanup' of git://git.kernel.org/.../kgene/linux-samsung into next/cleanup
+      Merge tag 'renesas-kconfig-cleanups-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
+      Merge tag 'renesas-boards-cleanups-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
+      Merge tag 'renesas-soc-cleanups-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
+      Merge tag 'renesas-cleanup-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
+      Merge tag 'at91-cleanup' of git://git.kernel.org/.../nferre/linux-at91 into next/cleanup
       ARM: at91: fix build breakage due to legacy board removals
 
- MAINTAINERS                                        |    1 +
- arch/arm/Kconfig                                   |    5 +-
- arch/arm/configs/at91rm9200_defconfig              |  161 --
- arch/arm/configs/at91sam9260_9g20_defconfig        |  145 --
- arch/arm/configs/at91sam9261_9g10_defconfig        |  147 --
- arch/arm/configs/at91sam9263_defconfig             |  151 --
- arch/arm/configs/at91sam9g45_defconfig             |  175 --
- arch/arm/configs/at91sam9rl_defconfig              |   92 -
- arch/arm/configs/at91x40_defconfig                 |   48 -
- arch/arm/configs/sama5_defconfig                   |    1 -
- arch/arm/mach-at91/Kconfig                         |   72 +-
- arch/arm/mach-at91/Kconfig.non_dt                  |  344 ----
- arch/arm/mach-at91/Makefile                        |   67 +-
- arch/arm/mach-at91/Makefile.boot                   |    6 -
- arch/arm/mach-at91/at91_aic.h                      |   99 -
- arch/arm/mach-at91/at91_tc.h                       |  146 --
- arch/arm/mach-at91/at91rm9200.c                    |  341 ----
- arch/arm/mach-at91/at91rm9200_devices.c            | 1212 -------------
- arch/arm/mach-at91/at91rm9200_time.c               |   23 -
- arch/arm/mach-at91/at91sam9260.c                   |  397 ----
- arch/arm/mach-at91/at91sam9260_devices.c           | 1364 --------------
- arch/arm/mach-at91/at91sam9261.c                   |  375 ----
- arch/arm/mach-at91/at91sam9261_devices.c           | 1098 -----------
- arch/arm/mach-at91/at91sam9263.c                   |  399 ----
- arch/arm/mach-at91/at91sam9263_devices.c           | 1538 ----------------
- arch/arm/mach-at91/at91sam9g45.c                   |  455 -----
- arch/arm/mach-at91/at91sam9g45_devices.c           | 1915 --------------------
- arch/arm/mach-at91/at91sam9n12.c                   |  213 +--
- arch/arm/mach-at91/at91sam9rl.c                    |  377 ----
- arch/arm/mach-at91/at91sam9rl_devices.c            | 1260 -------------
- arch/arm/mach-at91/at91sam9x5.c                    |  311 +---
- arch/arm/mach-at91/at91x40.c                       |   93 -
- arch/arm/mach-at91/at91x40_time.c                  |   85 -
- arch/arm/mach-at91/board-1arm.c                    |   99 -
- arch/arm/mach-at91/board-afeb-9260v1.c             |  223 ---
- arch/arm/mach-at91/board-cam60.c                   |  199 --
- arch/arm/mach-at91/board-carmeva.c                 |  167 --
- arch/arm/mach-at91/board-cpu9krea.c                |  386 ----
- arch/arm/mach-at91/board-cpuat91.c                 |  189 --
- arch/arm/mach-at91/board-csb337.c                  |  260 ---
- arch/arm/mach-at91/board-csb637.c                  |  142 --
- arch/arm/mach-at91/board-dt-rm9200.c               |    3 -
- arch/arm/mach-at91/board-dt-sam9.c                 |    2 -
- arch/arm/mach-at91/board-dt-sama5.c                |    1 -
- arch/arm/mach-at91/board-eb01.c                    |   52 -
- arch/arm/mach-at91/board-eb9200.c                  |  126 --
- arch/arm/mach-at91/board-ecbat91.c                 |  191 --
- arch/arm/mach-at91/board-eco920.c                  |  160 --
- arch/arm/mach-at91/board-flexibity.c               |  171 --
- arch/arm/mach-at91/board-gsia18s.c                 |  585 ------
- arch/arm/mach-at91/board-kafa.c                    |  113 --
- arch/arm/mach-at91/board-kb9202.c                  |  159 --
- arch/arm/mach-at91/board-pcontrol-g20.c            |  228 ---
- arch/arm/mach-at91/board-picotux200.c              |  129 --
- arch/arm/mach-at91/board-rm9200ek.c                |  196 --
- arch/arm/mach-at91/board-sam9-l9260.c              |  230 ---
- arch/arm/mach-at91/board-sam9260ek.c               |  354 ----
- arch/arm/mach-at91/board-sam9261ek.c               |  623 -------
- arch/arm/mach-at91/board-sam9263ek.c               |  493 -----
- arch/arm/mach-at91/board-sam9g20ek.c               |  429 -----
- arch/arm/mach-at91/board-sam9m10g45ek.c            |  527 ------
- arch/arm/mach-at91/board-sam9rlek.c                |  333 ----
- arch/arm/mach-at91/board-snapper9260.c             |  191 --
- arch/arm/mach-at91/board-stamp9g20.c               |  294 ---
- arch/arm/mach-at91/board-yl-9200.c                 |  597 ------
- arch/arm/mach-at91/board.h                         |  127 --
- arch/arm/mach-at91/clock.c                         |  977 ----------
- arch/arm/mach-at91/clock.h                         |   49 -
- arch/arm/mach-at91/generic.h                       |   53 -
- arch/arm/mach-at91/gpio.c                          |  982 ----------
- arch/arm/mach-at91/gpio.h                          |  214 ---
- arch/arm/mach-at91/gsia18s.h                       |   33 -
- arch/arm/mach-at91/include/mach/at91_dbgu.h        |    3 -
- arch/arm/mach-at91/include/mach/at91_ramc.h        |    6 +-
- arch/arm/mach-at91/include/mach/at91x40.h          |   60 -
- arch/arm/mach-at91/include/mach/cpu.h              |    1 -
- arch/arm/mach-at91/include/mach/hardware.h         |   10 -
- arch/arm/mach-at91/include/mach/uncompress.h       |    7 -
- arch/arm/mach-at91/irq.c                           |  296 ---
- arch/arm/mach-at91/leds.c                          |   56 -
- arch/arm/mach-at91/pm.c                            |   33 +-
- arch/arm/mach-at91/pm.h                            |    1 -
- arch/arm/mach-at91/setup.c                         |   67 -
- arch/arm/mach-at91/soc.h                           |    6 -
- arch/arm/mach-at91/stamp9g20.h                     |    7 -
- drivers/clocksource/timer-atmel-pit.c              |   32 -
- drivers/misc/Kconfig                               |    2 +-
- drivers/net/ethernet/cadence/Kconfig               |    2 +-
- drivers/power/reset/at91-reset.c                   |    4 +-
- drivers/rtc/Kconfig                                |    6 +-
- drivers/video/backlight/Kconfig                    |    1 -
- drivers/video/fbdev/Kconfig                        |   17 -
- drivers/watchdog/Kconfig                           |    4 +-
- .../mach => include/soc/at91}/at91rm9200_sdramc.h  |    0
- .../mach => include/soc/at91}/at91sam9_ddrsdr.h    |    0
- .../mach => include/soc/at91}/at91sam9_sdramc.h    |    0
- 96 files changed, 34 insertions(+), 23990 deletions(-)
- delete mode 100644 arch/arm/configs/at91rm9200_defconfig
- delete mode 100644 arch/arm/configs/at91sam9260_9g20_defconfig
- delete mode 100644 arch/arm/configs/at91sam9261_9g10_defconfig
- delete mode 100644 arch/arm/configs/at91sam9263_defconfig
- delete mode 100644 arch/arm/configs/at91sam9g45_defconfig
- delete mode 100644 arch/arm/configs/at91sam9rl_defconfig
- delete mode 100644 arch/arm/configs/at91x40_defconfig
- delete mode 100644 arch/arm/mach-at91/Kconfig.non_dt
- delete mode 100644 arch/arm/mach-at91/at91_aic.h
- delete mode 100644 arch/arm/mach-at91/at91_tc.h
- delete mode 100644 arch/arm/mach-at91/at91rm9200_devices.c
- delete mode 100644 arch/arm/mach-at91/at91sam9260_devices.c
- delete mode 100644 arch/arm/mach-at91/at91sam9261_devices.c
- delete mode 100644 arch/arm/mach-at91/at91sam9263_devices.c
- delete mode 100644 arch/arm/mach-at91/at91sam9g45_devices.c
- delete mode 100644 arch/arm/mach-at91/at91sam9rl_devices.c
- delete mode 100644 arch/arm/mach-at91/at91x40.c
- delete mode 100644 arch/arm/mach-at91/at91x40_time.c
- delete mode 100644 arch/arm/mach-at91/board-1arm.c
- delete mode 100644 arch/arm/mach-at91/board-afeb-9260v1.c
- delete mode 100644 arch/arm/mach-at91/board-cam60.c
- delete mode 100644 arch/arm/mach-at91/board-carmeva.c
- delete mode 100644 arch/arm/mach-at91/board-cpu9krea.c
- delete mode 100644 arch/arm/mach-at91/board-cpuat91.c
- delete mode 100644 arch/arm/mach-at91/board-csb337.c
- delete mode 100644 arch/arm/mach-at91/board-csb637.c
- delete mode 100644 arch/arm/mach-at91/board-eb01.c
- delete mode 100644 arch/arm/mach-at91/board-eb9200.c
- delete mode 100644 arch/arm/mach-at91/board-ecbat91.c
- delete mode 100644 arch/arm/mach-at91/board-eco920.c
- delete mode 100644 arch/arm/mach-at91/board-flexibity.c
- delete mode 100644 arch/arm/mach-at91/board-gsia18s.c
- delete mode 100644 arch/arm/mach-at91/board-kafa.c
- delete mode 100644 arch/arm/mach-at91/board-kb9202.c
- delete mode 100644 arch/arm/mach-at91/board-pcontrol-g20.c
- delete mode 100644 arch/arm/mach-at91/board-picotux200.c
- delete mode 100644 arch/arm/mach-at91/board-rm9200ek.c
- delete mode 100644 arch/arm/mach-at91/board-sam9-l9260.c
- delete mode 100644 arch/arm/mach-at91/board-sam9260ek.c
- delete mode 100644 arch/arm/mach-at91/board-sam9261ek.c
- delete mode 100644 arch/arm/mach-at91/board-sam9263ek.c
- delete mode 100644 arch/arm/mach-at91/board-sam9g20ek.c
- delete mode 100644 arch/arm/mach-at91/board-sam9m10g45ek.c
- delete mode 100644 arch/arm/mach-at91/board-sam9rlek.c
- delete mode 100644 arch/arm/mach-at91/board-snapper9260.c
- delete mode 100644 arch/arm/mach-at91/board-stamp9g20.c
- delete mode 100644 arch/arm/mach-at91/board-yl-9200.c
- delete mode 100644 arch/arm/mach-at91/board.h
- delete mode 100644 arch/arm/mach-at91/clock.c
- delete mode 100644 arch/arm/mach-at91/clock.h
- delete mode 100644 arch/arm/mach-at91/gpio.c
- delete mode 100644 arch/arm/mach-at91/gpio.h
- delete mode 100644 arch/arm/mach-at91/gsia18s.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91x40.h
- delete mode 100644 arch/arm/mach-at91/irq.c
- delete mode 100644 arch/arm/mach-at91/leds.c
- delete mode 100644 arch/arm/mach-at91/stamp9g20.h
- rename {arch/arm/mach-at91/include/mach => include/soc/at91}/at91rm9200_sdramc.h (100%)
- rename {arch/arm/mach-at91/include/mach => include/soc/at91}/at91sam9_ddrsdr.h (100%)
- rename {arch/arm/mach-at91/include/mach => include/soc/at91}/at91sam9_sdramc.h (100%)
+Pankaj Dubey (1):
+      ARM: EXYNOS: Remove unused static iomapping
+
+Paul Bolle (1):
+      ARM: shmobile: Remove ARCH_HAS_OPP completely
+
+Pawel Moll (2):
+      ARM: vexpress: Remove non-DT code
+      ARM: vexpress: Enable regulator framework when MMCI is in use
+
+Rasmus Villemoes (1):
+      ARM: davinci: Remove redundant casts
+
+Robert Richter (6):
+      dts, arm64: Add dtbs_install make target
+      dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
+      dts, arm/arm64: Remove dtbs build rules in sub-makes
+      dts, kbuild: Implement support for dtb vendor subdirs
+      dts, arm64: Move dts files to vendor subdirs
+      dts, arm: Remove $(MACHINE) variable from dtbs make recipes
+
+Simon Horman (3):
+      ARM: shmobile: r8a73a4: Remove spurious dma-multiplexer base addresses
+      ARM: shmobile: armadillo800eva: Sort includes
+      Merge tag 'renesas-dt-cleanups-for-v3.19' into koelsch-board-removal-for-v3.19.base
+
+Soren Brinkmann (1):
+      ARM: zynq: Actually remove hotplug.c
+
+Ulrich Hecht (3):
+      ARM: shmobile: r7s72100: sort dtsi file by address
+      ARM: shmobile: kzm9d: sort dts file by address
+      ARM: shmobile: r8a73a4: sort dtsi file by address
+
+
+ MAINTAINERS                                        |   1 -
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Makefile                                  |   8 +-
+ arch/arm/boot/dts/Makefile                         |  27 +-
+ arch/arm/boot/dts/emev2-kzm9d.dts                  |  63 +--
+ arch/arm/boot/dts/emev2.dtsi                       |  12 +-
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi              |   1 -
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi              |   1 -
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi              |   2 -
+ arch/arm/boot/dts/imx6qdl-rex.dtsi                 |   1 -
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |   8 +-
+ arch/arm/boot/dts/r7s72100-genmai.dts              |   3 +-
+ arch/arm/boot/dts/r7s72100.dtsi                    | 202 ++++----
+ arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts    |   3 +-
+ arch/arm/boot/dts/r8a73a4.dtsi                     | 232 ++++-----
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts      |   1 +
+ arch/arm/boot/dts/r8a7778-bockw-reference.dts      |   3 +-
+ arch/arm/boot/dts/r8a7779-marzen.dts               |  84 ++++
+ arch/arm/boot/dts/r8a7779.dtsi                     |  24 +
+ arch/arm/boot/dts/r8a7790-lager.dts                |  54 ++-
+ arch/arm/boot/dts/r8a7790.dtsi                     |  90 ++++
+ arch/arm/boot/dts/r8a7791-henninger.dts            |   1 +
+ arch/arm/boot/dts/r8a7791-koelsch.dts              |  19 +-
+ arch/arm/boot/dts/r8a7791.dtsi                     |  69 +++
+ arch/arm/boot/dts/r8a7794-alt.dts                  |   1 +
+ arch/arm/boot/dts/r8a77xx-aa104xd12-panel.dtsi     |  41 ++
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       |   1 +
+ arch/arm/configs/koelsch_defconfig                 | 113 -----
+ arch/arm/configs/shmobile_defconfig                |   1 -
+ arch/arm/mach-at91/at91sam9g45.c                   |   1 +
+ arch/arm/mach-at91/at91sam9rl.c                    |   1 +
+ arch/arm/mach-davinci/board-da830-evm.c            |  89 ++--
+ arch/arm/mach-davinci/board-da850-evm.c            |   9 +-
+ arch/arm/mach-davinci/board-dm644x-evm.c           |  10 +-
+ arch/arm/mach-davinci/board-mityomapl138.c         |  45 +-
+ arch/arm/mach-davinci/board-neuros-osd2.c          |   5 +-
+ arch/arm/mach-davinci/clock.c                      |   2 +-
+ arch/arm/mach-davinci/mux.c                        |  15 +-
+ arch/arm/mach-davinci/time.c                       |  13 +-
+ arch/arm/mach-exynos/Makefile                      |   3 -
+ arch/arm/mach-exynos/common.h                      |   2 -
+ arch/arm/mach-exynos/exynos.c                      |  50 --
+ arch/arm/mach-exynos/hotplug.c                     |  91 ----
+ arch/arm/mach-exynos/include/mach/map.h            |  23 -
+ arch/arm/mach-exynos/platsmp.c                     | 113 +++++
+ arch/arm/mach-exynos/regs-pmu.h                    |   3 +
+ arch/arm/mach-imx/clk-imx6q.c                      |   2 +-
+ arch/arm/mach-imx/clk-pllv3.c                      |   7 +-
+ arch/arm/mach-imx/common.h                         |   1 -
+ arch/arm/mach-imx/imx25-dt.c                       |   9 -
+ arch/arm/mach-imx/imx27-dt.c                       |   3 -
+ arch/arm/mach-imx/imx31-dt.c                       |   9 -
+ arch/arm/mach-imx/imx35-dt.c                       |  10 -
+ arch/arm/mach-imx/iomux-imx31.c                    |   8 +-
+ arch/arm/mach-imx/iomux-mx3.h                      |   2 +-
+ arch/arm/mach-imx/mach-imx50.c                     |   9 -
+ arch/arm/mach-imx/mach-imx51.c                     |   2 -
+ arch/arm/mach-imx/mach-imx53.c                     |   2 -
+ arch/arm/mach-imx/mach-imx6q.c                     |   3 -
+ arch/arm/mach-imx/mach-imx6sl.c                    |   4 -
+ arch/arm/mach-imx/mach-imx6sx.c                    |   4 -
+ arch/arm/mach-imx/mach-vf610.c                     |  10 -
+ arch/arm/mach-imx/system.c                         |  15 -
+ arch/arm/mach-shmobile/Kconfig                     |  20 -
+ arch/arm/mach-shmobile/Makefile                    |   5 +-
+ arch/arm/mach-shmobile/Makefile.boot               |   1 -
+ arch/arm/mach-shmobile/board-ape6evm-reference.c   |   4 -
+ arch/arm/mach-shmobile/board-ape6evm.c             |   4 -
+ arch/arm/mach-shmobile/board-armadillo800eva.c     |  45 +-
+ arch/arm/mach-shmobile/board-bockw-reference.c     |   4 -
+ arch/arm/mach-shmobile/board-bockw.c               |   4 -
+ arch/arm/mach-shmobile/board-koelsch-reference.c   | 117 -----
+ arch/arm/mach-shmobile/board-koelsch.c             | 527 ---------------------
+ arch/arm/mach-shmobile/board-kzm9g-reference.c     |   4 -
+ arch/arm/mach-shmobile/board-kzm9g.c               |   4 -
+ arch/arm/mach-shmobile/board-lager-reference.c     |  84 ----
+ arch/arm/mach-shmobile/board-lager.c               |   4 -
+ arch/arm/mach-shmobile/board-mackerel.c            |   4 -
+ arch/arm/mach-shmobile/board-marzen-reference.c    |   5 -
+ arch/arm/mach-shmobile/board-marzen.c              |   4 -
+ arch/arm/mach-shmobile/clock-r8a73a4.c             |   4 -
+ arch/arm/mach-shmobile/clock-r8a7740.c             |   4 -
+ arch/arm/mach-shmobile/clock-r8a7778.c             |   4 -
+ arch/arm/mach-shmobile/clock-r8a7779.c             |   4 -
+ arch/arm/mach-shmobile/clock-r8a7790.c             |   4 -
+ arch/arm/mach-shmobile/clock-r8a7791.c             | 342 -------------
+ arch/arm/mach-shmobile/clock-sh7372.c              |   4 -
+ arch/arm/mach-shmobile/clock-sh73a0.c              |   4 -
+ arch/arm/mach-shmobile/clock.c                     |  36 +-
+ arch/arm/mach-shmobile/clock.h                     |  14 -
+ arch/arm/mach-shmobile/console.c                   |   4 -
+ arch/arm/mach-shmobile/headsmp-scu.S               |   5 -
+ arch/arm/mach-shmobile/intc-sh7372.c               |   4 -
+ arch/arm/mach-shmobile/intc-sh73a0.c               |   4 -
+ arch/arm/mach-shmobile/r8a7740.h                   |   4 -
+ arch/arm/mach-shmobile/r8a7778.h                   |   5 -
+ arch/arm/mach-shmobile/r8a7791.h                   |   3 -
+ arch/arm/mach-shmobile/setup-emev2.c               |   4 -
+ arch/arm/mach-shmobile/setup-r7s72100.c            |   4 -
+ arch/arm/mach-shmobile/setup-r8a73a4.c             |   4 -
+ arch/arm/mach-shmobile/setup-r8a7740.c             |   4 -
+ arch/arm/mach-shmobile/setup-r8a7778.c             |  11 +-
+ arch/arm/mach-shmobile/setup-r8a7779.c             |  10 +-
+ arch/arm/mach-shmobile/setup-r8a7790.c             |   4 -
+ arch/arm/mach-shmobile/setup-r8a7791.c             | 185 +-------
+ arch/arm/mach-shmobile/setup-rcar-gen2.c           |   4 -
+ arch/arm/mach-shmobile/setup-sh7372.c              |   6 +-
+ arch/arm/mach-shmobile/setup-sh73a0.c              |  15 +-
+ arch/arm/mach-shmobile/sh73a0.h                    |   1 -
+ arch/arm/mach-shmobile/sleep-sh7372.S              |   5 -
+ arch/arm/mach-shmobile/smp-emev2.c                 |   4 -
+ arch/arm/mach-shmobile/smp-r8a7779.c               |   4 -
+ arch/arm/mach-shmobile/smp-sh73a0.c                |   4 -
+ arch/arm/mach-shmobile/timer.c                     |   5 -
+ arch/arm/mach-vexpress/Kconfig                     |   4 +-
+ arch/arm/mach-vexpress/Makefile                    |   3 +-
+ arch/arm/mach-vexpress/core.h                      |   7 -
+ arch/arm/mach-vexpress/ct-ca9x4.c                  | 212 ---------
+ arch/arm/mach-vexpress/include/mach/ct-ca9x4.h     |  47 --
+ arch/arm/mach-vexpress/include/mach/hardware.h     |   1 -
+ arch/arm/mach-vexpress/include/mach/irqs.h         |   6 -
+ arch/arm/mach-vexpress/include/mach/motherboard.h  |  88 ----
+ arch/arm/mach-vexpress/platsmp.c                   |  42 --
+ arch/arm/mach-vexpress/v2m.c                       | 374 ---------------
+ arch/arm/mach-zynq/Makefile                        |   2 -
+ arch/arm/mach-zynq/common.h                        |   1 -
+ arch/arm/mach-zynq/hotplug.c                       |  14 -
+ arch/arm/plat-samsung/include/plat/map-s5p.h       |  21 -
+ arch/arm/plat-versatile/Kconfig                    |   2 +-
+ arch/arm64/Makefile                                |  10 +-
+ arch/arm64/boot/dts/Makefile                       |  15 +-
+ arch/arm64/boot/dts/apm/Makefile                   |   5 +
+ arch/arm64/boot/dts/{ => apm}/apm-mustang.dts      |   0
+ arch/arm64/boot/dts/{ => apm}/apm-storm.dtsi       |   0
+ arch/arm64/boot/dts/arm/Makefile                   |   6 +
+ arch/arm64/boot/dts/{ => arm}/foundation-v8.dts    |   0
+ arch/arm64/boot/dts/{ => arm}/rtsm_ve-aemv8a.dts   |   0
+ .../boot/dts/{ => arm}/rtsm_ve-motherboard.dtsi    |   0
+ arch/arm64/boot/dts/cavium/Makefile                |   5 +
+ arch/arm64/boot/dts/{ => cavium}/thunder-88xx.dts  |   0
+ arch/arm64/boot/dts/{ => cavium}/thunder-88xx.dtsi |   0
+ drivers/clk/versatile/Makefile                     |   1 -
+ drivers/clk/versatile/clk-vexpress-osc.c           |   7 -
+ drivers/clk/versatile/clk-vexpress.c               |  86 ----
+ drivers/misc/vexpress-syscfg.c                     |  60 +--
+ include/linux/vexpress.h                           |  19 -
+ scripts/Kbuild.include                             |   6 +
+ scripts/Makefile.dtbinst                           |  51 ++
+ scripts/Makefile.lib                               |  12 -
+ 149 files changed, 1004 insertions(+), 3309 deletions(-)
