@@ -1,65 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  9 Dec 2014 20:21:31 +0000
-Subject: [PATCH v4 2/2] spi: st: Provide Device Tree binding documentation
-In-Reply-To: <1418156491-26613-1-git-send-email-lee.jones@linaro.org>
-References: <1418156491-26613-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1418156491-26613-3-git-send-email-lee.jones@linaro.org>
+From: peter@korsgaard.com (Peter Korsgaard)
+Date: Tue, 09 Dec 2014 21:22:03 +0100
+Subject: [PATCH] Route keyboard LEDs through the generic LEDs layer.
+In-Reply-To: <201412091812.08575@pali> ("Pali =?utf-8?Q?Roh=C3=A1r=22's?=
+ message of "Tue, 9 Dec 2014 18:12:08 +0100")
+References: <20140331122323.GC6044@type.bordeaux.inria.fr>
+ <20141015231545.GD3719@type.youpi.perso.aquilenet.fr>
+ <201410160129.22012@pali> <201412091812.08575@pali>
+Message-ID: <87mw6wshec.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DT documentation for the SPI portion of ST's SSC device.
+>>>>> "Pali" == Pali Roh?r <pali.rohar@gmail.com> writes:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/devicetree/bindings/spi/spi-st.txt | 40 ++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-st.txt
+Hi,
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-st.txt b/Documentation/devicetree/bindings/spi/spi-st.txt
-new file mode 100644
-index 0000000..fe54959
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi-st.txt
-@@ -0,0 +1,40 @@
-+STMicroelectronics SSC (SPI) Controller
-+---------------------------------------
-+
-+Required properties:
-+- compatible	: "st,comms-ssc4-spi"
-+- reg		: Offset and length of the device's register set
-+- interrupts	: The interrupt specifier
-+- clock-names	: Must contain "ssc"
-+- clocks	: Must contain an entry for each name in clock-names
-+		    See ../clk/*
-+- pinctrl-names	: Uses "default", can use "sleep" if provided
-+		    See ../pinctrl/pinctrl-binding.txt
-+
-+Optional properties:
-+- cs-gpios	: List of GPIO chip selects
-+		    See ../spi/spi-bus.txt
-+
-+Child nodes represent devices on the SPI bus
-+  See ../spi/spi-bus.txt
-+
-+Example:
-+	spi at 9840000 {
-+		compatible	= "st,comms-ssc4-spi";
-+		reg		= <0x9840000 0x110>;
-+		interrupts	= <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks		= <&clk_s_c0_flexgen CLK_EXT2F_A9>;
-+		clock-names	= "ssc";
-+		pinctrl-0	= <&pinctrl_spi0_default>;
-+		pinctrl-names	= "default";
-+		cs-gpios	= <&pio17 5 0>;
-+		#address-cells	= <1>;
-+		#size-cells	= <0>;
-+
-+		st95hf at 0{
-+			compatible		= "st,st95hf";
-+			reg			= <0>;
-+			spi-max-frequency	= <1000000>;
-+			interrupts		= <2 IRQ_TYPE_EDGE_FALLING>;
-+		};
-+	};
+>> There are more people who would like to see this patch in
+ >> mainline kernel and we are waiting for you.
+
+ > Dmitry: ping!
+
+ > I would like you to remind you this patch which is waiting for 
+ > your review since April 2014!
+
+Hah, I'm pretty sure it dates back to 2010 atleast.
+
 -- 
-1.9.1
+Bye, Peter Korsgaard
