@@ -1,30 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Dec 2014 09:51:38 +0100
-Subject: [PATCH] ARM: bcm: fix __iomem annotation on kona_smc
-In-Reply-To: <54862498.8080101@gmail.com>
-References: <1418075148-8752-1-git-send-email-olof@lixom.net>
- <54862498.8080101@gmail.com>
-Message-ID: <3044718.ZPFEmzteVb@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 9 Dec 2014 09:53:04 +0100
+Subject: [PATCH] ARM: shmobile: koelsch: Fix QSPI mode of SPI-Flash into
+ mode3
+In-Reply-To: <1418085432-20374-1-git-send-email-horms+renesas@verge.net.au>
+References: <1418085432-20374-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXj9N3tL_9ttw+jU7fxjC8x=JJwXQynMkjOAJp38=L4ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 December 2014 14:22:16 Florian Fainelli wrote:
-> > diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
-> > index a55a7ec..d506d17 100644
-> > --- a/arch/arm/mach-bcm/bcm_kona_smc.c
-> > +++ b/arch/arm/mach-bcm/bcm_kona_smc.c
-> > @@ -142,7 +142,7 @@ static int bcm_kona_do_smc(u32 service_id, u32 buffer_phys)
-> >  static void __bcm_kona_smc(void *info)
-> >  {
-> >       struct bcm_kona_smc_data *data = info;
-> > -     u32 *args = bcm_smc_buffer;
-> > +     u32 __iomem *args = bcm_smc_buffer;
-> 
-> Your fix looks good to me, although the original code sounds a little
-> dubious, especially in LPAE environment.
+On Tue, Dec 9, 2014 at 1:37 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+>
+> In order to change into mode3, CPOL and CPHA bit of SPCMD register
+> of QSPI is changed. Mode3 can avoid intermediate voltage.
+>
+> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> [horms: Updated changelog and re-ordered properties]
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Right, I think it could just use of_iomap() and drop the size
-check. If you want to keep the check, using of_address_to_resource()
-will do the right thing.
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-	Arnd
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
