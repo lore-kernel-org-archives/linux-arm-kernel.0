@@ -1,54 +1,31 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Tue, 9 Dec 2014 13:23:27 +0800
-Subject: [PATCH V2] fix build error for vm tools
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E688B313FC@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103E688B313FC@CNBJMBX05.corpusers.net>
-Message-ID: <35FD53F367049845BC99AC72306C23D103E688B313FD@CNBJMBX05.corpusers.net>
+From: b20788@freescale.com (Anson Huang)
+Date: Tue, 9 Dec 2014 13:28:38 +0800
+Subject: [PATCH 1/2] arm: imx: remove unnecessary setting for DSM
+Message-ID: <1418102919-29950-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix the build error when make like this:
-make O=/xx/x vm
+Now we support DSM in OCRAM for all i.MX6 SoCs,
+the resume entry point is set in asm code of
+suspend-imx6.S, so no need to set the resume
+entry point for SRC in pre-suspend flow.
 
-use $(OUTPUT) to generate to the right place.
-
-Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
- tools/vm/Makefile | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/mach-imx/pm-imx6.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/tools/vm/Makefile b/tools/vm/Makefile
-index 3d907da..2847345 100644
---- a/tools/vm/Makefile
-+++ b/tools/vm/Makefile
-@@ -1,22 +1,24 @@
- # Makefile for vm tools
- #
-+include ../scripts/Makefile.include
- TARGETS=page-types slabinfo
- 
- LIB_DIR = ../lib/api
--LIBS = $(LIB_DIR)/libapikfs.a
-+LIBS = $(OUTPUT)../lib/api/libapikfs.a
- 
- CC = $(CROSS_COMPILE)gcc
- CFLAGS = -Wall -Wextra -I../lib/
- LDFLAGS = $(LIBS)
- 
-+all: $(TARGETS)
- $(TARGETS): $(LIBS)
- 
- $(LIBS):
--	make -C $(LIB_DIR)
-+	$(call descend,../lib/api libapikfs.a)
- 
- %: %.c
--	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
-+	$(CC) $(CFLAGS) -o $(OUTPUT)$@ $< $(LDFLAGS)
- 
- clean:
--	$(RM) page-types slabinfo
-+	$(RM) $(OUTPUT)page-types $(OUTPUT)slabinfo
- 	make -C $(LIB_DIR) clean
+diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+index c653dd4..671e2a9 100644
+--- a/arch/arm/mach-imx/pm-imx6.c
++++ b/arch/arm/mach-imx/pm-imx6.c
+@@ -363,7 +363,6 @@ static int imx6q_pm_enter(suspend_state_t state)
+ 			imx6q_enable_rbc(true);
+ 		imx_gpc_pre_suspend(true);
+ 		imx_anatop_pre_suspend();
+-		imx_set_cpu_jump(0, v7_cpu_resume);
+ 		/* Zzz ... */
+ 		cpu_suspend(0, imx6q_suspend_finish);
+ 		if (cpu_is_imx6q() || cpu_is_imx6dl())
 -- 
-2.1.3
+1.7.9.5
