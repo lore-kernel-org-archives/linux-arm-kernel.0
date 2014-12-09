@@ -1,49 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Dec 2014 09:14:36 +0100
-Subject: [PATCH] ARM: DMA: Fix kzalloc flags in __iommu_alloc_buffer()
-In-Reply-To: <CAAVeFuKOaN5c2OkUDRWYQ_QVH8E1Q0JByRSSrbY_g13takWdAw@mail.gmail.com>
-References: <1418027967-12923-1-git-send-email-acourbot@nvidia.com>
- <10532762.PXKTQM8KjH@wuerfel>
- <CAAVeFuKOaN5c2OkUDRWYQ_QVH8E1Q0JByRSSrbY_g13takWdAw@mail.gmail.com>
-Message-ID: <34381031.ms2E1cJuQN@wuerfel>
+From: clemens@ladisch.de (Clemens Ladisch)
+Date: Tue, 09 Dec 2014 09:19:55 +0100
+Subject: [alsa-devel] Question on arm64 unaligned faults during playback
+In-Reply-To: <CAM4voam0h4e1Z8q3eqNpgMhhfw-zJpfh7fi4iznX_Y0bj98nKA@mail.gmail.com>
+References: <CAM4voa=kiLsiLEzUbo3D+f1go5px78fXBSjSi7kGK4QCdnwPyQ@mail.gmail.com>	<54856621.8090107@ladisch.de>
+ <s5hppbumnis.wl-tiwai@suse.de>	<54858868.70708@metafoo.de>	<20141208122549.GF16185@e104818-lin.cambridge.arm.com>
+ <CAM4voam0h4e1Z8q3eqNpgMhhfw-zJpfh7fi4iznX_Y0bj98nKA@mail.gmail.com>
+Message-ID: <5486B0AB.7000109@ladisch.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 December 2014 11:57:22 Alexandre Courbot wrote:
-> On Mon, Dec 8, 2014 at 7:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 08 December 2014 17:39:27 Alexandre Courbot wrote:
-> >> There doesn't seem to be any valid reason to allocate the pages array
-> >> with the same flags as the buffer itself. Doing so can eventually lead
-> >> to the following safeguard in mm/slab.c to be hit:
-> >>
-> >> BUG_ON(flags & GFP_SLAB_BUG_MASK);
-> >>
-> >> This happens when buffers are allocated with __GFP_DMA32 or
-> >> __GFP_HIGHMEM.
-> >>
-> >> Fix this by allocating the pages array with GFP_KERNEL to follow what is
-> >> done elsewhere in this file. Using GFP_KERNEL in __iommu_alloc_buffer()
-> >> is safe because atomic allocations are handled by __iommu_alloc_atomic().
-> >>
-> >
-> > I think you need to carry over the GFP_ATOMIC flag if that is set by the
-> > caller, but not the GFP_HIGHMEM or GFP_DMA32. Not sure if it's better
-> > to mask out flags from the caller mask, or to start with GFP_KERNEL
-> > and adding in extra bits.
-> 
-> I thought the issue of atomicity is already handled by
-> __iommu_alloc_buffer's caller (arm_iommu_alloc_attrs):
-> 
->     if (!(gfp & __GFP_WAIT))
->         return __iommu_alloc_atomic(dev, size, handle);
->     ....
->     pages = __iommu_alloc_buffer(dev, size, gfp, attrs);
-> 
-> Isn't the interesting property about GFP_ATOMIC that it does not
-> include __GFP_WAIT? I may very well misunderstand the issue, sorry if
-> that's the case.
+Abhilash Kesavan wrote:
+> Currently, if I continue to use the SRAM allocation driver, two
+> options are working:
+> 1) ioremap to ioremap_wc in drivers/misc/sram.c.
+> 2) copy_from_user to copy_from_user_toio in sound/core/pcm_lib.c
+>
+> Which would be the preferred option ?
 
-No, I think you are right, I wasn't looking at the whole call chain,
-just at your patch, and it looks good to me now.
+I don't know how to tell the SRAM allocator to hand out WC memory, but
+copy_from_user_toio() is what you would put into your .copy callback.
 
-	Arnd
+
+Regards,
+Clemens
