@@ -1,87 +1,70 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Tue, 09 Dec 2014 23:59:22 +0100
-Subject: ARM page tables
-In-Reply-To: <20141209172729.GK11285@n2100.arm.linux.org.uk>
-References: <54872F9C.2080005@free.fr>
- <20141209172729.GK11285@n2100.arm.linux.org.uk>
-Message-ID: <54877ECA.6050501@free.fr>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 9 Dec 2014 15:45:58 -0800
+Subject: [GIT PULL 6/9] ARM: SoC DT updates for 3.19
+In-Reply-To: <14657639.RrnLVWDtO6@wuerfel>
+References: <4491193.a6KEQb1tZH@wuerfel>
+	<14657639.RrnLVWDtO6@wuerfel>
+Message-ID: <CA+55aFwkkP9wFdJUHMsnrd=eDYNsGKm7ujyktEWh+GMzQinzxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russel,
+On Tue, Dec 9, 2014 at 1:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> ARM: SoC DT updates for 3.19
+>
+>  267 files changed, 18516 insertions(+), 2823 deletions(-)
 
-On 09/12/2014 18:27, Russell King - ARM Linux wrote:
-> On Tue, Dec 09, 2014 at 06:21:32PM +0100, Mason wrote:
->> On my SoC, we have two MMIO regions mapped at init:
->>
->>  {
->>   .virtual = (0xf0000000 + 0x00800000),
->>   .pfn =((unsigned long)((0x20000000) >> 12)),
->>   .length = 0x00200000,
->>   .type = 0,
->>  },
->>  {
->>   .virtual = (0xf0000000 +(0)),
->>   .pfn =((unsigned long)((0) >> 12)),
->>   .length = 0x00800000,
->>   .type = 0,
->>  },
->>
->> I dumped the L1 page table descriptors, expecting to find
->> entries for the MMIO regions:
->> (AFAICT, the page table starts at 0xc0007000)
-> 
-> No, it starts at 0xc0004000.
+Hmm. This is not what I get. I get
 
-I should have suspected that I had the wrong start address. Thanks!
-What's the name of the symbolic constant for that address?
++ 297 files changed, 20490 insertions(+), 3332 deletions(-)
 
-The page table is allocated in pgd_alloc, right?
-  new_pgd = __pgd_alloc();
-#define __pgd_alloc()   (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_REPEAT, 2)
+largely due to
 
-If that's the correct init code, how does it guarantee to always
-return 0xc0004000?
++ arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi          |  41 +-
++ arch/arm/boot/dts/omap-zoom-common.dtsi            |  62 +-
++ arch/arm/boot/dts/omap2420-n8x0-common.dtsi        |   4 +-
++ arch/arm/boot/dts/omap2420.dtsi                    |   1 +
++ arch/arm/boot/dts/omap2430-sdp.dts                 |  28 +-
++ arch/arm/boot/dts/omap2430.dtsi                    |   1 +
++ arch/arm/boot/dts/omap3-cm-t3517.dts               |  11 +
++ arch/arm/boot/dts/omap3-cm-t3530.dts               |  11 +
++ arch/arm/boot/dts/omap3-cm-t3730.dts               |  24 +
++ arch/arm/boot/dts/omap3-cm-t3x.dtsi                | 151 ++++
++ arch/arm/boot/dts/omap3-devkit8000.dts             |   4 +-
++ arch/arm/boot/dts/omap3-evm-37xx.dts               |   5 +-
++ arch/arm/boot/dts/omap3-gta04.dtsi                 |  86 +-
++ arch/arm/boot/dts/omap3-igep.dtsi                  | 103 ++-
++ arch/arm/boot/dts/omap3-igep0020-common.dtsi       | 246 ++++++
++ arch/arm/boot/dts/omap3-igep0020-rev-f.dts         |  45 +
++ arch/arm/boot/dts/omap3-igep0020.dts               | 285 +------
++ arch/arm/boot/dts/omap3-igep0030-common.dtsi       |  60 ++
++ arch/arm/boot/dts/omap3-igep0030-rev-g.dts         |  67 ++
++ arch/arm/boot/dts/omap3-igep0030.dts               | 123 +--
++ arch/arm/boot/dts/omap3-ldp.dts                    |   3 +-
++ arch/arm/boot/dts/omap3-lilly-a83x.dtsi            |   2 +-
++ arch/arm/boot/dts/omap3-n900.dts                   |  51 +-
++ arch/arm/boot/dts/omap3-n950-n9.dtsi               |   4 +-
++ arch/arm/boot/dts/omap3-sb-t35.dtsi                | 126 ++-
++ arch/arm/boot/dts/omap3-sbc-t3517.dts              |  15 +
++ arch/arm/boot/dts/omap3-sbc-t3530.dts              |  15 +
++ arch/arm/boot/dts/omap3-sbc-t3730.dts              |  15 +
++ arch/arm/boot/dts/omap3-tao3530.dtsi               |   2 +-
++ arch/arm/boot/dts/omap3.dtsi                       |   1 +
++ arch/arm/boot/dts/omap3430-sdp.dts                 |   8 +-
++ arch/arm/boot/dts/omap4.dtsi                       |   1 +
++ arch/arm/boot/dts/omap5.dtsi                       |   1 +
 
->> col_1 = entry number (hex)
->> col_2 = entry value
->> col_3 = string for (desc & 3)
->>
->> 300 00011452 SECTION
->> 301 00111452 SECTION
->> 302 00211452 SECTION
->> 303 00311452 SECTION
->> 304 00411452 SECTION
->> 305 00511452 SECTION
->> 306 00611452 SECTION
->> 307 00711452 SECTION
->> 308 20011452 SECTION
->> 309 20111452 SECTION
->>
->> If I understand correctly, entry 308 means:
->> VIRTUAL ADDRESS 0x3080_0000 is mapped to PHYSICAL ADDRESS 0x2000_0000
->> (Is my reading correct?)
-> 
-> No.  If you're talking about 0x308 from an offset of 0x3000 into the
-> page table, that's 0x308 * 1MB + 0xc0000000 = 0xf0800000.
-> 
->> But we asked to map PA 0x2000_0000 to VA 0xf080_0000 in iotable_init,
->> so I'm confused...
-> 
-> So, with the right starting point, it works out correctly.
+much of which seems to have come in through that
 
-Indeed!
+      Merge tag 'omap-for-v3.19/dt-part1' of
+git://git.kernel.org/.../tmlind/linux-omap into next/dt
 
-I am investigating this issue:
+but the diffstat isn't there, nor are the actual commits are mentioned
+in the shortlog.
 
-As I described, we map PA 0-8MB. But some code actually accesses
-address 0xf0920000 (from kernel space) and I was expecting very
-nasty things, like the equivalent of SIGSEGV in the kernel.
-But nothing happens, no page fault, no BUG_ON, no panic, no
-implosion... (Writes seem ignored, and reads always return 0)
+Hmm?
 
-I don't understand how it is possible to access unmapped virtual
-addresses without the MMU throwing a fit... That's why I'm looking
-at the page table.
+I've applied 1-5, but I'm going to stop here waiting for confirmation
+of what's going on..
 
-Regards.
+                      Linus
