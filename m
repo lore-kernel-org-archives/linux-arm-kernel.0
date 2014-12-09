@@ -1,77 +1,95 @@
-From: zhichang.yuan@linaro.org (zhichang.yuan at linaro.org)
-Date: Tue,  9 Dec 2014 15:26:47 +0800
-Subject: [PATCHv2] arm64:mm: free the useless initial page table
-Message-ID: <1418110007-13270-1-git-send-email-zhichang.yuan@linaro.org>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 09 Dec 2014 13:18:24 +0530
+Subject: [PATCH 12/19] clk: samsung: exynos5433: Add clocks for CMU_GSCL
+ domain
+In-Reply-To: <1417510196-6714-13-git-send-email-cw00.choi@samsung.com>
+References: <1417510196-6714-1-git-send-email-cw00.choi@samsung.com>
+ <1417510196-6714-13-git-send-email-cw00.choi@samsung.com>
+Message-ID: <5486A948.7010906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "zhichang.yuan" <zhichang.yuan@linaro.org>
+Hi Chanwoo,
 
-For 64K page system, after mapping a PMD section, the corresponding initial
-page table is not needed any more. That page can be freed.
+On Tuesday 02 December 2014 02:19 PM, Chanwoo Choi wrote:
+> This patch adds the divider/gate of CMU_GSCL domain which contains gscaler
+> clocks.
+>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Inki Dae <inki.dae@samsung.com>
+> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
+> ---
+>   .../devicetree/bindings/clock/exynos5433-clock.txt |   8 ++
+>   drivers/clk/samsung/clk-exynos5433.c               | 144 +++++++++++++++++++++
+>   include/dt-bindings/clock/exynos5433.h             |  37 +++++-
+>   3 files changed, 188 insertions(+), 1 deletion(-)
+>
 
-Changes since v1:
+[snip]
 
-* make consistent code between alloc_init_pmd and alloc_init_pud;
-* flush the TLB before the unused page table is freed;
+>   }
+>   CLK_OF_DECLARE(exynos5433_cmu_g3d, "samsung,exynos5433-cmu-g3d",
+>   		exynos5433_cmu_g3d_init);
+> +
+> +/*
+> + * Register offset definitions for CMU_GSCL
+> + */
+> +#define MUX_SEL_GSCL				0x0200
+> +#define MUX_ENABLE_GSCL				0x0300
+> +#define	MUX_STAT_GSCL				0x0400
+> +#define	ENABLE_ACLK_GSCL			0x0800
+> +#define	ENABLE_ACLK_GSCL_SECURE_SMMU_GSCL0	0x0804
+> +#define	ENABLE_ACLK_GSCL_SECURE_SMMU_GSCL1	0x0808
+> +#define	ENABLE_ACLK_GSCL_SECURE_SMMU_GSCL2	0x080c
+> +#define	ENABLE_PCLK_GSCL			0x0900
+> +#define	ENABLE_PCLK_GSCL_SECURE_SMMU_GSCL0	0x0904
+> +#define	ENABLE_PCLK_GSCL_SECURE_SMMU_GSCL1	0x0908
+> +#define	ENABLE_PCLK_GSCL_SECURE_SMMU_GSCL2	0x090c
+> +#define	ENABLE_IP_GSCL0				0x0b00
+> +#define	ENABLE_IP_GSCL1				0x0b04
+> +#define	ENABLE_IP_GSCL_SECURE_SMMU_GSCL0	0x0b08
+> +#define	ENABLE_IP_GSCL_SECURE_SMMU_GSCL1	0x0b0c
+> +#define	ENABLE_IP_GSCL_SECURE_SMMU_GSCL2	0x0b10
+> +
 
-Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
----
- arch/arm64/include/asm/pgtable.h |    3 +++
- arch/arm64/mm/mmu.c              |   15 ++++++++++++---
- 2 files changed, 15 insertions(+), 3 deletions(-)
+nit: tabspace after #define should be changed to one whitespace.
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 41a43bf..8a135b6 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -337,9 +337,12 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 
- #ifdef CONFIG_ARM64_64K_PAGES
- #define pud_sect(pud)		(0)
-+#define pud_table(pud)		(1)
- #else
- #define pud_sect(pud)		((pud_val(pud) & PUD_TYPE_MASK) == \
- 				 PUD_TYPE_SECT)
-+#define pud_table(pud)		((pud_val(pud) & PUD_TYPE_MASK) == \
-+					PUD_TYPE_TABLE)
- #endif
- 
- static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index f4f8b50..515f75b 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -191,8 +191,14 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- 			 * Check for previous table entries created during
- 			 * boot (__create_page_tables) and flush them.
- 			 */
--			if (!pmd_none(old_pmd))
-+			if (!pmd_none(old_pmd)) {
- 				flush_tlb_all();
-+				if (pmd_table(old_pmd)) {
-+					phys_addr_t table = __pa(pte_offset_map(&old_pmd, 0));
-+
-+					memblock_free(table, PAGE_SIZE);
-+				}
-+			}
- 		} else {
- 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
- 				       prot_pte);
-@@ -234,9 +240,12 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
- 			 * Look up the old pmd table and free it.
- 			 */
- 			if (!pud_none(old_pud)) {
--				phys_addr_t table = __pa(pmd_offset(&old_pud, 0));
--				memblock_free(table, PAGE_SIZE);
- 				flush_tlb_all();
-+				if (pud_table(old_pud)) {
-+					phys_addr_t table = __pa(pmd_offset(&old_pud, 0));
-+
-+					memblock_free(table, PAGE_SIZE);
-+				}
- 			}
- 		} else {
- 			alloc_init_pmd(pud, addr, next, phys, map_io);
--- 
-1.7.9.5
+> +static unsigned long gscl_clk_regs[] __initdata = {
+> +	MUX_SEL_GSCL,
+> +	MUX_ENABLE_GSCL,
+> +	MUX_STAT_GSCL,
+> +	ENABLE_ACLK_GSCL,
+> +	ENABLE_ACLK_GSCL_SECURE_SMMU_GSCL0,
+> +	ENABLE_ACLK_GSCL_SECURE_SMMU_GSCL1,
+> +	ENABLE_ACLK_GSCL_SECURE_SMMU_GSCL2,
+> +	ENABLE_PCLK_GSCL,
+> +	ENABLE_PCLK_GSCL_SECURE_SMMU_GSCL0,
+> +	ENABLE_PCLK_GSCL_SECURE_SMMU_GSCL1,
+> +	ENABLE_PCLK_GSCL_SECURE_SMMU_GSCL2,
+> +	ENABLE_IP_GSCL0,
+> +	ENABLE_IP_GSCL1,
+> +	ENABLE_IP_GSCL_SECURE_SMMU_GSCL0,
+> +	ENABLE_IP_GSCL_SECURE_SMMU_GSCL1,
+> +	ENABLE_IP_GSCL_SECURE_SMMU_GSCL2,
+> +};
+> +
+> +/* list of all parent clock list */
+> +PNAME(aclk_gscl_111_user_p)	= { "fin_pll", "aclk_gscl_111", };
+> +PNAME(aclk_gscl_333_user_p)	= { "fin_pll", "aclk_gscl_333", };
+> +
+> +static struct samsung_mux_clock gscl_mux_clks[] __initdata = {
+> +	/* MUX_SEL_GSCL */
+> +	MUX(CLK_MOUT_ACLK_GSCL_111_USER, "mout_aclk_gscl_111_user",
+> +			aclk_gscl_111_user_p, MUX_SEL_GSCL, 4, 1),
+> +	MUX(CLK_MOUT_ACLK_GSCL_333_USER, "mout_aclk_gscl_333_user",
+> +			aclk_gscl_333_user_p, MUX_SEL_GSCL, 4, 1),
+
+aclk_gscl_333_user mux clock has a shift of '0'.
+
+> +};
+> +
+
+Thanks,
+Pankaj Dubey
