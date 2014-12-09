@@ -1,105 +1,30 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 09 Dec 2014 11:26:21 +0100
-Subject: [PATCH v4 4/5] ARM: dts: add rk3288 usb PHY
-In-Reply-To: <1418093554-30671-1-git-send-email-lyz@rock-chips.com>
-References: <1418093554-30671-1-git-send-email-lyz@rock-chips.com>
-Message-ID: <1433902.kJO8gnlzYm@phil>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 9 Dec 2014 10:29:05 +0000
+Subject: using DMA-API on ARM
+In-Reply-To: <5486CCBC.3@broadcom.com>
+References: <5481794E.4050406@broadcom.com>
+ <F51492713EF10846800D8C0ED37A7DCE01901765@SJEXCHMB15.corp.ad.broadcom.com>
+ <F51492713EF10846800D8C0ED37A7DCE01902076@SJEXCHMB15.corp.ad.broadcom.com>
+ <2863746.4sUSEYqahB@wuerfel>
+ <20141208160316.GM16185@e104818-lin.cambridge.arm.com>
+ <5485D97D.1040404@broadcom.com> <5486CCBC.3@broadcom.com>
+Message-ID: <20141209102904.GJ11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Dec 09, 2014 at 11:19:40AM +0100, Arend van Spriel wrote:
+> The issue did not trigger overnight so it seems setting bit 22 <Shared
+> Attribute _Override_ Enable> solves the issue over here. Now the question is
+> how to move forward with this. As I understood from Catalin this patch was
+> not included as it was not considered responsibility of the linux kernel.
 
-Am Dienstag, 9. Dezember 2014, 10:52:34 schrieb Yunzhi Li:
-> This patch adds a device_node for RK3288 SoC usb phy. It also
-> defines the phy to be used by three usb controllers: usb_host0/1
-> and usb_otg.
-> 
-> Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
-> 
-> ---
-> 
-> Changes in v4:
-> - Add phy subnodes.
-> 
-> Changes in v3: None
-> 
->  arch/arm/boot/dts/rk3288.dtsi | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 874e66d..2db2d12 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -329,12 +329,35 @@
->  		status = "disabled";
->  	};
-> 
-> +	usbphy: phy {
+It is preferable for firmware to configure the L2 cache appropriately,
+which includes things like the prefetch offsets as well as feature bits
+like bit 22.
 
-the nodes in the dts are ordered by address, please move it accordingly. I 
-guess a good position might be to have the "phy" before the "pinctrl" node.
+I think what I'll do is queue up a patch which adds a warning if bit 22
+is not set, suggesting that firmware is updated to set this bit.
 
-Also please reorder the properties a bit to have the "compatible" at the top 
-of the list, like
-
-		compatible = "rockchip,rk3288-usb-phy";
-		rockchip,grf = <&grf>;
-		#phy-cells = <1>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-		status = "disabled";
-
-		subnodes...
-
-
-Thanks
-Heiko
-
-> +		#phy-cells = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "rockchip,rk3288-usb-phy";
-> +		rockchip,grf = <&grf>;
-> +		status = "disabled";
-> +
-> +		usb-phy at 0 {
-> +			reg = <0>;
-> +		};
-> +
-> +		usb-phy at 1 {
-> +			reg = <1>;
-> +		};
-> +
-> +		usb-phy at 2 {
-> +			reg = <2>;
-> +		};
-> +	};
-> +
->  	usb_host0_ehci: usb at ff500000 {
->  		compatible = "generic-ehci";
->  		reg = <0xff500000 0x100>;
->  		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
->  		clocks = <&cru HCLK_USBHOST0>;
->  		clock-names = "usbhost";
-> +		phys = <&usbphy 1>;
-> +		phy-names = "usb";
->  		status = "disabled";
->  	};
-> 
-> @@ -347,6 +370,8 @@
->  		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
->  		clocks = <&cru HCLK_USBHOST1>;
->  		clock-names = "otg";
-> +		phys = <&usbphy 2>;
-> +		phy-names = "usb2-phy";
->  		status = "disabled";
->  	};
-> 
-> @@ -357,6 +382,8 @@
->  		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
->  		clocks = <&cru HCLK_OTG0>;
->  		clock-names = "otg";
-> +		phys = <&usbphy 0>;
-> +		phy-names = "usb2-phy";
->  		status = "disabled";
->  	};
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
