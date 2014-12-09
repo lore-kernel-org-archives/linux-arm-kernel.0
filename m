@@ -1,71 +1,72 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Tue, 9 Dec 2014 14:39:23 +0800
-Subject: [PATCH V3] fix build error for vm tools
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E688B313FD@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103E688B313FC@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E688B313FD@CNBJMBX05.corpusers.net>
-Message-ID: <35FD53F367049845BC99AC72306C23D103E688B313FF@CNBJMBX05.corpusers.net>
+From: ankit.jindal@linaro.org (Ankit Jindal)
+Date: Tue, 9 Dec 2014 12:03:08 +0530
+Subject: [PATCH v5 5/6] Documentation: dt-bindings: Add binding info for
+ X-Gene QMTM UIO driver
+In-Reply-To: <CAL_Jsq+F5GepyyZbpJOAKLtQsvJOF9wZzf2GyjA6sDe2nr4SrQ@mail.gmail.com>
+References: <1416220572-13381-1-git-send-email-ankit.jindal@linaro.org>
+ <2279061.naADrHDgyn@wuerfel>
+ <CAPTm99WYNyxtY-NCVN8pB0HwNPn+EFx-7w7yEevaEK1z7-Zqxg@mail.gmail.com>
+ <1503477.DVdkExccIe@wuerfel>
+ <CAPTm99V1qP5dAgDV04i3m_yR1ri9h=b8fDXBDxmPfpZG_P268g@mail.gmail.com>
+ <CAL_Jsq+F5GepyyZbpJOAKLtQsvJOF9wZzf2GyjA6sDe2nr4SrQ@mail.gmail.com>
+Message-ID: <CAPTm99WYOOaDFWN6Cj+NPhvUUTW3=nexua1tO4QbtNy00dp2Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix the build error when make like this:
-make O=/xx/x vm
+On 8 December 2014 at 22:45, Rob Herring <robherring2@gmail.com> wrote:
+> On Mon, Dec 8, 2014 at 6:42 AM, Ankit Jindal <ankit.jindal@linaro.org> wrote:
+>> On 18 November 2014 at 18:40, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> On Tuesday 18 November 2014 14:59:54 Ankit Jindal wrote:
+>>>> On 17 November 2014 16:47, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> > On Monday 17 November 2014 16:06:11 Ankit Jindal wrote:
+>>>> >> +
+>>>> >> +       qmtm1_uio: qmtm_uio at 1f200000 {
+>>>> >> +               compatible = "apm,xgene-qmtm";
+>>>> >> +               status = "disabled";
+>>>> >> +               reg = <0x0 0x1f200000 0x0 0x10000>,
+>>>> >> +                     <0x0 0x1b000000 0x0 0x400000>;
+>>>> >> +               reg-names = "csr", "fabric";
+>>>> >> +               qpool-memory = <&qmtm1_uio_qpool>;
+>>>> >> +               clocks = <&qmtm1clk 0>;
+>>>> >> +               num-queues = <0x400>;
+>>>> >> +               devid = <1>;
+>>>> >> +       };
+>>>> >> +
+>>>> >
+>>>> > To make my previous review comments clearer:
+>>>> >
+>>>> > NAK
+>>>> >
+>>>> > Do not create device nodes that are meant for a specific use case in
+>>>> > software and that are not usable for the common case. I don't think
+>>>> > it makes any sense to keep on submitting a UIO driver for this until
+>>>> > we have a proper network driver that uses this so we can make sure we
+>>>> > have a working binding.
+>
+> +1
+>
+>>>> The dataplane frameworks like OpenDataPlane etc, need to have access
+>>>> to complete subsystem from the user space. Hence, we would like to
+>>>> have this driver and some other UIO drivers to be the part of kernel
+>>>> to have data plane frameworks working on our platform.
+>>>
+>>> Please work with the people that do the in-kernel QMTM driver to come
+>>> up with a common binding then.
+>> Thanks Arnd, I have synced with them, and in future our dt bindings
+>> for this device is going to be inline with the one mentioned in the
+>> patchset.
+>
+> What does "in the future" mean? Is there already a QMTM binding? If
+> so, you need to figure out how to either align with it or deprecate
+> it. This patch at a minimum needs to be fixed to not refer to UIO.
 
-use $(OUTPUT) to generate to the right place.
+There is no QMTM dt binding as of now, and the kernel QMTM driver will
+also use the same dt binding.
+I will remove all references to the UIO from this patch, and move this
+binding under the misc folder.
 
-Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
----
- tools/lib/api/Makefile |  2 +-
- tools/vm/Makefile      | 14 +++++++++-----
- 2 files changed, 10 insertions(+), 6 deletions(-)
+>
+> Rob
 
-diff --git a/tools/lib/api/Makefile b/tools/lib/api/Makefile
-index 36c08b1..a1c598d 100644
---- a/tools/lib/api/Makefile
-+++ b/tools/lib/api/Makefile
-@@ -44,6 +44,6 @@ $(OUTPUT)%.o: %.S libapi_dirs
- 	$(QUIET_CC)$(CC) -o $@ -c $(ALL_CFLAGS) $<
- 
- clean:
--	$(call QUIET_CLEAN, libapi) $(RM) $(LIB_OBJS) $(LIBFILE)
-+	$(call QUIET_CLEAN, libapi) $(RM) $(LIB_OBJS) $(OUTPUT)$(LIBFILE)
- 
- .PHONY: clean
-diff --git a/tools/vm/Makefile b/tools/vm/Makefile
-index 3d907da..7e3fc9f 100644
---- a/tools/vm/Makefile
-+++ b/tools/vm/Makefile
-@@ -1,22 +1,26 @@
- # Makefile for vm tools
- #
-+include ../scripts/Makefile.include
- TARGETS=page-types slabinfo
- 
- LIB_DIR = ../lib/api
--LIBS = $(LIB_DIR)/libapikfs.a
-+LIBS = $(OUTPUT)../lib/api/libapikfs.a
- 
- CC = $(CROSS_COMPILE)gcc
- CFLAGS = -Wall -Wextra -I../lib/
- LDFLAGS = $(LIBS)
- 
-+all: $(TARGETS)
- $(TARGETS): $(LIBS)
- 
- $(LIBS):
--	make -C $(LIB_DIR)
-+	$(call descend,../lib/api libapikfs.a)
- 
- %: %.c
--	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
-+	$(CC) $(CFLAGS) -o $(OUTPUT)$@ $< $(LDFLAGS)
- 
- clean:
--	$(RM) page-types slabinfo
--	make -C $(LIB_DIR) clean
-+	$(RM) $(OUTPUT)page-types $(OUTPUT)slabinfo
-+	$(call descend,../lib/api clean)
-+
-+.PHONY: all clean
--- 
-2.1.3
+Thanks,
+Ankit
