@@ -1,41 +1,56 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 9 Dec 2014 09:23:39 +0900
-Subject: [PATCH] clk: shmobile: Add r8a7793 support
-In-Reply-To: <CAMuHMdVdFii0rxO8NrdcWiCO0HWQYrv-y3W0Dh6zt_31tTG81g@mail.gmail.com>
-References: <1418035363-3678-1-git-send-email-ykaneko0929@gmail.com>
- <CAMuHMdVDA4PwUZ8A0WPumEN9nYrQyX+UNYp7Dt=0TxO9nCuZrg@mail.gmail.com>
- <CAH1o70JgXPfRVQ+EyeQVA6Sa9irDb3hVBn7vAbDDuu7k=Z7x3w@mail.gmail.com>
- <CAMuHMdVdFii0rxO8NrdcWiCO0HWQYrv-y3W0Dh6zt_31tTG81g@mail.gmail.com>
-Message-ID: <20141209002338.GB8897@verge.net.au>
+Date: Tue, 9 Dec 2014 09:29:06 +0900
+Subject: [PATCH/RFC 0/4] ARM: shmobile: Correct masks for GIC PPI
+ interrupts
+In-Reply-To: <CAMuHMdW0ZhRQKuckNkRv3WWQ-6sUez6VP9U3D-W6kpbaqkZaOQ@mail.gmail.com>
+References: <1417085839-22836-1-git-send-email-geert+renesas@glider.be>
+ <20141208001345.GA11177@verge.net.au>
+ <CAMuHMdW0ZhRQKuckNkRv3WWQ-6sUez6VP9U3D-W6kpbaqkZaOQ@mail.gmail.com>
+Message-ID: <20141209002905.GD8897@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 02:30:14PM +0100, Geert Uytterhoeven wrote:
-> Hi Kaneko-san,
+On Mon, Dec 08, 2014 at 09:04:16AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> On Mon, Dec 8, 2014 at 12:53 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> > 2014-12-08 20:13 GMT+09:00 Geert Uytterhoeven <geert@linux-m68k.org>:
-> >> On Mon, Dec 8, 2014 at 11:42 AM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> >>> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> >>>
-> >>> R-Car M2N (r8a7793) clock is handled in R-Car Gen2 clock driver.
+> On Mon, Dec 8, 2014 at 1:13 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Nov 27, 2014 at 11:57:15AM +0100, Geert Uytterhoeven wrote:
+> >> This patch series corrects the masks in the second interrupt cells for
+> >> Private Peripheral Interrupts in dtsi files for the shmobile family of
+> >> SoCs.
 > >>
-> >> Thanks for your patch!
+> >> It's my understanding this mask should reflect the actual number of CPU
+> >> cores the interrupt is wired too.
+> >> Is that correct?
 > >>
-> >>> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> >>> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> >>   - Hence it should be "GIC_CPU_MASK_SIMPLE(2)" on dual-core CPUs, like
+> >>     r8a7791 and r8a7794 (the first two patches),
+> >>   - Should it be "GIC_CPU_MASK_SIMPLE(8)" on big.LITTLE configurations
+> >>     with four Cortex-A15 cores and four Cortex-A7 cores?
+> >>     Or should the interrupts be delivered to the four Cortex-A15 cores
+> >>     only by default?
+> >>     The last two RFC-patches implement the former for r8a7790 and
+> >>     r8a73a4.
 > >>
-> >> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> Note that incorrect masks for GIC PPI interrupts are not limited to
+> >> shmobile. Presumably the interrupt specifiers got copied around a lot,
+> >> cfr. the proliferation of "GIC_CPU_MASK_SIMPLE(4)" (and the older
+> >> hardcoded "0xf0x" variant) in various dtsi files, not always limited to
+> >> quad-core CPUs.
 > >>
-> >> Can you please also send a patch to update the binding documentation in
-> >> Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt?
+> >> This was tested on r8a7791/koelsch, which uses the arch timer interrupt.
+> >>
+> >> Thanks for your feedback!
+> >>
+> >> Geert Uytterhoeven (4):
+> >>   ARM: shmobile: r8a7791: Correct mask for GIC PPI interrupts
+> >>   ARM: shmobile: r8a7794: Correct mask for GIC PPI interrupts
 > >
-> > This patch updates Makefile only, not added dtsi for r8a7793.
-> > Is the update of the document necessary?
+> > Hi Geert,
+> >
+> > the above two patches seem like they could be queued up.
+> > Shall I do so?
 > 
-> Not at this moment. I was just trying to be proactive ;-)
+> I think it's safe. Thanks!
 
-Kaneko-san,
-
-I think that the update to renesas,rcar-gen2-cpg-clocks.txt should be a
-one line change. I can prepare a patch if you prefer not to.
+Thanks, I have done so.
