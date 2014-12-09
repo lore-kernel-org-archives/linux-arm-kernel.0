@@ -1,99 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Dec 2014 22:46:21 +0100
-Subject: [GIT PULL 9/9] ARM64: SoC changes for 3.19
-In-Reply-To: <4491193.a6KEQb1tZH@wuerfel>
-References: <4491193.a6KEQb1tZH@wuerfel>
-Message-ID: <2482441.CQUhI8rqR1@wuerfel>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 9 Dec 2014 14:50:05 -0700
+Subject: [PATCH 6/6] pci, acpi: Share ACPI PCI config space accessors.
+In-Reply-To: <54854FB2.8080206@linaro.org>
+References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+ <3957412.IooRKpIXjW@wuerfel> <20141121180825.GD6578@google.com>
+ <2178540.dTppAIY2rE@wuerfel> <54854FB2.8080206@linaro.org>
+Message-ID: <CAErSpo6cUuEK41wD33Uyzb5Y5yFp+jKVVvWLrZ0dO1iuYv8GjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 0df1f2487d2f0d04703f142813d53615d62a1da4:
+On Mon, Dec 8, 2014 at 12:13 AM, Tomasz Nowicki
+<tomasz.nowicki@linaro.org> wrote:
 
-  Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
+> What would be next steps regarding this patch set? I am not sure we have
+> reached a consensus on weak vs #ifdef choice.
 
-are available in the git repository at:
+I work through the list at
+https://patchwork.ozlabs.org/project/linux-pci/list/ in FIFO order, so
+you don't need to do anything else except poke me to move faster :)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/arm64-for-linus
+The weak/ifdef question is relatively minor and easily changed, so I
+wouldn't worry about it yet.
 
-for you to fetch changes up to 70bcc9ba15690f1e616fd5f60831f4602dd39670:
-
-  arm64: amd-seattle: Fix PCI bus range due to SMMU limitation (2014-12-04 17:10:34 +0100)
-
-----------------------------------------------------------------
-ARM64: SoC changes for 3.19
-
-This adds support for two new ARM64 platforms:
-
-* ARM Juno
-* AMD Seattle
-
-We had submissions for a number of additional platforms
-from Samsung, Freescale and Spreadtrum but are still working
-out the best process for getting these merged.
-
-----------------------------------------------------------------
-
-I forgot to mention in my introductory mail that there are a couple more pull
-requests queued up in the arm-soc tree that are waiting for dependencies or
-were added very late before the merge window and are given more time for
-things to settle down. I plan to submit them in a few days, but there is not
-much missing at this point.
-
-Arnd Bergmann (1):
-      Merge branch 'cleanup/dts-subdirs' into next/arm64
-
-Liviu Dudau (3):
-      arm64: Create link to include/dt-bindings to enable C preprocessor use.
-      arm64: Add Juno board device tree.
-      arm64: ARM: Fix the Generic Timers interrupt active level description
-
-Suravee Suthikulpanit (2):
-      arm64: amd-seattle: Adding device tree for AMD Seattle platform
-      arm64: amd-seattle: Fix PCI bus range due to SMMU limitation
-
- arch/arm/Makefile                                  |   8 +-
- arch/arm/boot/dts/Makefile                         |  12 +-
- arch/arm64/Kconfig                                 |   5 +
- arch/arm64/Makefile                                |  10 +-
- arch/arm64/boot/dts/Makefile                       |  16 +-
- arch/arm64/boot/dts/amd/Makefile                   |   5 +
- arch/arm64/boot/dts/amd/amd-overdrive.dts          |  66 +++++++
- arch/arm64/boot/dts/amd/amd-seattle-clks.dtsi      |  54 +++++
- arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi       | 172 ++++++++++++++++
- arch/arm64/boot/dts/apm/Makefile                   |   5 +
- arch/arm64/boot/dts/{ => apm}/apm-mustang.dts      |   0
- arch/arm64/boot/dts/{ => apm}/apm-storm.dtsi       |   0
- arch/arm64/boot/dts/arm/Makefile                   |   7 +
- arch/arm64/boot/dts/{ => arm}/foundation-v8.dts    |   8 +-
- arch/arm64/boot/dts/arm/juno-clocks.dtsi           |  44 +++++
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi      | 129 ++++++++++++
- arch/arm64/boot/dts/arm/juno.dts                   | 218 +++++++++++++++++++++
- arch/arm64/boot/dts/{ => arm}/rtsm_ve-aemv8a.dts   |   8 +-
- .../boot/dts/{ => arm}/rtsm_ve-motherboard.dtsi    |   0
- arch/arm64/boot/dts/cavium/Makefile                |   5 +
- arch/arm64/boot/dts/{ => cavium}/thunder-88xx.dts  |   0
- arch/arm64/boot/dts/{ => cavium}/thunder-88xx.dtsi |   0
- arch/arm64/boot/dts/include/dt-bindings            |   1 +
- scripts/Kbuild.include                             |   6 +
- scripts/Makefile.dtbinst                           |  51 +++++
- scripts/Makefile.lib                               |  12 --
- 26 files changed, 799 insertions(+), 43 deletions(-)
- create mode 100644 arch/arm64/boot/dts/amd/Makefile
- create mode 100644 arch/arm64/boot/dts/amd/amd-overdrive.dts
- create mode 100644 arch/arm64/boot/dts/amd/amd-seattle-clks.dtsi
- create mode 100644 arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
- create mode 100644 arch/arm64/boot/dts/apm/Makefile
- rename arch/arm64/boot/dts/{ => apm}/apm-mustang.dts (100%)
- rename arch/arm64/boot/dts/{ => apm}/apm-storm.dtsi (100%)
- create mode 100644 arch/arm64/boot/dts/arm/Makefile
- rename arch/arm64/boot/dts/{ => arm}/foundation-v8.dts (98%)
- create mode 100644 arch/arm64/boot/dts/arm/juno-clocks.dtsi
- create mode 100644 arch/arm64/boot/dts/arm/juno-motherboard.dtsi
- create mode 100644 arch/arm64/boot/dts/arm/juno.dts
- rename arch/arm64/boot/dts/{ => arm}/rtsm_ve-aemv8a.dts (97%)
- rename arch/arm64/boot/dts/{ => arm}/rtsm_ve-motherboard.dtsi (100%)
- create mode 100644 arch/arm64/boot/dts/cavium/Makefile
- rename arch/arm64/boot/dts/{ => cavium}/thunder-88xx.dts (100%)
- rename arch/arm64/boot/dts/{ => cavium}/thunder-88xx.dtsi (100%)
- create mode 120000 arch/arm64/boot/dts/include/dt-bindings
- create mode 100644 scripts/Makefile.dtbinst
+Bjorn
