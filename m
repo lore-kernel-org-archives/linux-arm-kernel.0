@@ -1,124 +1,89 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Tue, 9 Dec 2014 15:58:05 +0800
-Subject: [PATCH] arm: imx: correct the hardware clock gate setting for shared
- nodes
-Message-ID: <1418111885-3623-1-git-send-email-b20788@freescale.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 09 Dec 2014 10:07:47 +0200
+Subject: [PATCH 3/5] media: ov2640: add primary dt support
+In-Reply-To: <54866809.7020402@atmel.com>
+References: <1418038147-13221-1-git-send-email-josh.wu@atmel.com>
+ <13013762.Jqm1jQRnFM@avalon> <54866809.7020402@atmel.com>
+Message-ID: <4259882.xUnFntZnaF@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For those clk gates which hold share count, since its is_enabled
-callback is only checking the share count rather than reading
-the hardware register setting, in the late phase of kernel bootup,
-the clk_disable_unused action will NOT handle the scenario of
-share_count is 0 but the hardware setting is enabled, actually,
-uboot normally enables all clk gates, then those shared clk gates
-will be always enabled until they are used by some modules.
+Hi Josh,
 
-So the problem would be: when kernel boot up, the usecount cat
-from clk tree is 0, but the clk gates actually is enabled in
-hardware register, it will confuse user and bring unnecessary power
-consumption, take i.MX6SX for example, the ESAI clk info
-is as below, the use count is 0, but the hardware register read
-from CCM_CCGR1_CG8 is ungated.
+On Tuesday 09 December 2014 11:10:01 Josh Wu wrote:
+> On 12/9/2014 2:39 AM, Laurent Pinchart wrote:
+> > Hi Josh,
+> > 
+> > Thank you for the patch.
+> > 
+> > On Monday 08 December 2014 19:29:05 Josh Wu wrote:
+> >> Add device tree support for ov2640.
+> >> 
+> >> Cc: devicetree at vger.kernel.org
+> >> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> >> ---
+> >> 
+> >> v1 -> v2:
+> >>    1. use gpiod APIs.
+> >>    2. change the gpio pin's name according to datasheet.
+> >>    3. reduce the delay for .reset() function.
+> >>   
+> >>   drivers/media/i2c/soc_camera/ov2640.c | 86 +++++++++++++++++++++++++---
+> >>   1 file changed, 80 insertions(+), 6 deletions(-)
+> >> 
+> >> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
+> >> b/drivers/media/i2c/soc_camera/ov2640.c index 9ee910d..2a57979 100644
+> >> --- a/drivers/media/i2c/soc_camera/ov2640.c
+> >> +++ b/drivers/media/i2c/soc_camera/ov2640.c
 
-cat /sys/kernel/debug/clk/clk_summary | grep esai
+[snip]
 
-esai_sel            0            0   393216000          0 0
-   esai_pred           0            0   196608000          0 0
-      esai_podf           0            0    24576000          0 0
-         esai_extal           0            0    24576000          0 0
-      esai_mem           0            0   132000000          0 0
-      esai_ipg           0            0   132000000          0 0
+> >> +static int ov2640_probe_dt(struct i2c_client *client,
+> >> +		struct ov2640_priv *priv)
+> >> +{
+> >> +	priv->resetb_gpio = devm_gpiod_get_optional(&client->dev, "resetb",
+> >> +			GPIOD_OUT_HIGH);
+> >> +	if (!priv->resetb_gpio)
+> >> +		dev_warn(&client->dev, "resetb gpio not found!\n");
+> > 
+> > No need to warn here, it's perfectly fine if the reset signal isn't
+> > connected to a GPIO.
+> 
+> I want to print some information if no GPIO is assigned. So I'd like use
+> dev_dbg() here.
+> What do you feel?
 
-Read CCM_CCGR1:
+If you want to print a message in that case dev_dbg is the most appropriate 
+log level. I would skip it completely, but that's up to you.
 
-0x020C406C:  F33FFF00
+> >> +	else if (IS_ERR(priv->resetb_gpio))
+> >> +		return -EINVAL;
+> >> +
+> >> +	priv->pwdn_gpio = devm_gpiod_get_optional(&client->dev, "pwdn",
+> >> +			GPIOD_OUT_HIGH);
+> >> +	if (!priv->pwdn_gpio)
+> >> +		dev_warn(&client->dev, "pwdn gpio not found!\n");
+> > 
+> > Same here.
+> 
+> ditto.
+> 
+> >> +	else if (IS_ERR(priv->pwdn_gpio))
+> >> +		return -EINVAL;
+> >> +
+> >> +	/* Initialize the soc_camera_subdev_desc */
+> >> +	priv->ssdd_dt.power = ov2640_hw_power;
+> >> +	priv->ssdd_dt.reset = ov2640_hw_reset;
+> >> +	client->dev.platform_data = &priv->ssdd_dt;
+> >> +
+> >> +	return 0;
+> >> +}
+> >> +
+> >>   /*
+> >>    * i2c_driver functions
+> >>    */
 
-This patch disables all those clk gates which hold share count
-before registering them, then the hardware status will match the
-clk tree info.
-
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/mach-imx/clk-imx6q.c  |    6 ++++++
- arch/arm/mach-imx/clk-imx6sl.c |    2 ++
- arch/arm/mach-imx/clk-imx6sx.c |    6 ++++++
- 3 files changed, 14 insertions(+)
-
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 5951660..fe53473 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -369,6 +369,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 
- 	/*                                            name             parent_name          reg         shift */
- 	clk[IMX6QDL_CLK_APBH_DMA]     = imx_clk_gate2("apbh_dma",      "usdhc3",            base + 0x68, 4);
-+	/* make sure the initial clock gate setting of share_count is off */
-+	writel_relaxed(readl_relaxed(base + 0x68) & (~(0x3 << 6)), base + 0x68);
- 	clk[IMX6QDL_CLK_ASRC]         = imx_clk_gate2_shared("asrc",         "asrc_podf",   base + 0x68, 6, &share_count_asrc);
- 	clk[IMX6QDL_CLK_ASRC_IPG]     = imx_clk_gate2_shared("asrc_ipg",     "ahb",         base + 0x68, 6, &share_count_asrc);
- 	clk[IMX6QDL_CLK_ASRC_MEM]     = imx_clk_gate2_shared("asrc_mem",     "ahb",         base + 0x68, 6, &share_count_asrc);
-@@ -385,6 +387,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	else
- 		clk[IMX6Q_CLK_ECSPI5] = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
- 	clk[IMX6QDL_CLK_ENET]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
-+	/* make sure the initial clock gate setting of share_count is off */
-+	writel_relaxed(readl_relaxed(base + 0x6c) & (~(0x3 << 16)), base + 0x6c);
- 	clk[IMX6QDL_CLK_ESAI_EXTAL]   = imx_clk_gate2_shared("esai_extal",   "esai_podf",   base + 0x6c, 16, &share_count_esai);
- 	clk[IMX6QDL_CLK_ESAI_IPG]     = imx_clk_gate2_shared("esai_ipg",   "ipg",           base + 0x6c, 16, &share_count_esai);
- 	clk[IMX6QDL_CLK_ESAI_MEM]     = imx_clk_gate2_shared("esai_mem", "ahb",             base + 0x6c, 16, &share_count_esai);
-@@ -443,6 +447,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_SDMA]         = imx_clk_gate2("sdma",          "ahb",               base + 0x7c, 6);
- 	clk[IMX6QDL_CLK_SPBA]         = imx_clk_gate2("spba",          "ipg",               base + 0x7c, 12);
- 	clk[IMX6QDL_CLK_SPDIF]        = imx_clk_gate2("spdif",         "spdif_podf",        base + 0x7c, 14);
-+	/* make sure the initial clock gate setting of share_count is off */
-+	writel_relaxed(readl_relaxed(base + 0x7c) & (~(0x3f << 18)), base + 0x7c);
- 	clk[IMX6QDL_CLK_SSI1_IPG]     = imx_clk_gate2_shared("ssi1_ipg",      "ipg",        base + 0x7c, 18, &share_count_ssi1);
- 	clk[IMX6QDL_CLK_SSI2_IPG]     = imx_clk_gate2_shared("ssi2_ipg",      "ipg",        base + 0x7c, 20, &share_count_ssi2);
- 	clk[IMX6QDL_CLK_SSI3_IPG]     = imx_clk_gate2_shared("ssi3_ipg",      "ipg",        base + 0x7c, 22, &share_count_ssi3);
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index e982ebe..6af14a8 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -396,6 +396,8 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SL_CLK_SDMA]         = imx_clk_gate2("sdma",         "ipg",               base + 0x7c, 6);
- 	clks[IMX6SL_CLK_SPBA]         = imx_clk_gate2("spba",         "ipg",               base + 0x7c, 12);
- 	clks[IMX6SL_CLK_SPDIF]        = imx_clk_gate2("spdif",        "spdif0_podf",       base + 0x7c, 14);
-+	/* make sure the initial clock gate setting of share_count is off */
-+	writel_relaxed(readl_relaxed(base + 0x7c) & (~(0x3f << 18)), base + 0x7c);
- 	clks[IMX6SL_CLK_SSI1_IPG]     = imx_clk_gate2_shared("ssi1_ipg",     "ipg",        base + 0x7c, 18, &share_count_ssi1);
- 	clks[IMX6SL_CLK_SSI2_IPG]     = imx_clk_gate2_shared("ssi2_ipg",     "ipg",        base + 0x7c, 20, &share_count_ssi2);
- 	clks[IMX6SL_CLK_SSI3_IPG]     = imx_clk_gate2_shared("ssi3_ipg",     "ipg",        base + 0x7c, 22, &share_count_ssi3);
-diff --git a/arch/arm/mach-imx/clk-imx6sx.c b/arch/arm/mach-imx/clk-imx6sx.c
-index 17354a1..e42052e 100644
---- a/arch/arm/mach-imx/clk-imx6sx.c
-+++ b/arch/arm/mach-imx/clk-imx6sx.c
-@@ -379,6 +379,8 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SX_CLK_AIPS_TZ1]     = imx_clk_gate2("aips_tz1",      "ahb",               base + 0x68, 0);
- 	clks[IMX6SX_CLK_AIPS_TZ2]     = imx_clk_gate2("aips_tz2",      "ahb",               base + 0x68, 2);
- 	clks[IMX6SX_CLK_APBH_DMA]     = imx_clk_gate2("apbh_dma",      "usdhc3",            base + 0x68, 4);
-+	/* make sure the initial clock gate setting of share_count is off */
-+	writel_relaxed(readl_relaxed(base + 0x68) & (~(0x3 << 6)), base + 0x68);
- 	clks[IMX6SX_CLK_ASRC_MEM]     = imx_clk_gate2_shared("asrc_mem", "ahb",             base + 0x68, 6, &share_count_asrc);
- 	clks[IMX6SX_CLK_ASRC_IPG]     = imx_clk_gate2_shared("asrc_ipg", "ahb",             base + 0x68, 6, &share_count_asrc);
- 	clks[IMX6SX_CLK_CAAM_MEM]     = imx_clk_gate2("caam_mem",      "ahb",               base + 0x68, 8);
-@@ -400,6 +402,8 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SX_CLK_ECSPI5]       = imx_clk_gate2("ecspi5",        "ecspi_podf",        base + 0x6c, 8);
- 	clks[IMX6SX_CLK_EPIT1]        = imx_clk_gate2("epit1",         "perclk",            base + 0x6c, 12);
- 	clks[IMX6SX_CLK_EPIT2]        = imx_clk_gate2("epit2",         "perclk",            base + 0x6c, 14);
-+	/* make sure the initial clock gate setting of share_count is off */
-+	writel_relaxed(readl_relaxed(base + 0x6c) & (~(0x3 << 16)), base + 0x6c);
- 	clks[IMX6SX_CLK_ESAI_EXTAL]   = imx_clk_gate2_shared("esai_extal", "esai_podf",     base + 0x6c, 16, &share_count_esai);
- 	clks[IMX6SX_CLK_ESAI_IPG]     = imx_clk_gate2_shared("esai_ipg",   "ahb",           base + 0x6c, 16, &share_count_esai);
- 	clks[IMX6SX_CLK_ESAI_MEM]     = imx_clk_gate2_shared("esai_mem",   "ahb",           base + 0x6c, 16, &share_count_esai);
-@@ -455,6 +459,8 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SX_CLK_ROM]          = imx_clk_gate2("rom",           "ahb",               base + 0x7c, 0);
- 	clks[IMX6SX_CLK_SDMA]         = imx_clk_gate2("sdma",          "ahb",               base + 0x7c, 6);
- 	clks[IMX6SX_CLK_SPBA]         = imx_clk_gate2("spba",          "ipg",               base + 0x7c, 12);
-+	/* make sure the initial clock gate setting of share_count is off */
-+	writel_relaxed(readl_relaxed(base + 0x7c) & (~(0x3 << 14)) & (~(0x3f << 18)), base + 0x7c);
- 	clks[IMX6SX_CLK_AUDIO]        = imx_clk_gate2_shared("audio",  "audio_podf",        base + 0x7c, 14, &share_count_audio);
- 	clks[IMX6SX_CLK_SPDIF]        = imx_clk_gate2_shared("spdif",  "spdif_podf",        base + 0x7c, 14, &share_count_audio);
- 	clks[IMX6SX_CLK_SSI1_IPG]     = imx_clk_gate2_shared("ssi1_ipg",      "ipg",        base + 0x7c, 18, &share_count_ssi1);
 -- 
-1.7.9.5
+Regards,
+
+Laurent Pinchart
