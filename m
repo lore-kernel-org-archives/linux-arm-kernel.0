@@ -1,93 +1,134 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Dec 2014 22:42:11 +0100
-Subject: [GIT PULL 7/9] ARM: SoC/OMAP GPMC driver cleanup and move for 3.19
+Date: Tue, 09 Dec 2014 22:43:38 +0100
+Subject: [GIT PULL 8/9] ARM: SoC defconfig changes for 3.19
 In-Reply-To: <4491193.a6KEQb1tZH@wuerfel>
 References: <4491193.a6KEQb1tZH@wuerfel>
-Message-ID: <6113188.8lGm6IAWL0@wuerfel>
+Message-ID: <3558682.jkN2tlsPNy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 065bd7fe50de5e6d0fd5034cbc87120a558a1219:
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-  ARM: dts: DRA7: Add aliases for all serial ports (2014-11-12 07:04:37 -0800)
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/omap-gpmc-for-linus
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/defconfig-for-linus
 
-for you to fetch changes up to 1306b20daa38c1429dabacc9ec8b437cb585e427:
+for you to fetch changes up to d04169870b1022556473627f7cc3e17db5a3e29c:
 
-  Merge tag 'omap-for-v3.19/gpmc-move-v2' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into next/omap-gpmc (2014-11-28 23:24:12 +0100)
-
-----------------------------------------------------------------
-ARM: SoC/OMAP GPMC driver cleanup and move for 3.19
-
-The GPMC driver has traditionally been considered a part of the
-OMAP platform code and tightly interweaved with some of the boards.
-
-With this cleanup, it has finally come to the point where it makes
-sense to move it out of arch/arm into drivers/memory, where we already
-have other drivers for similar hardware. The cleanups are still
-ongoing, with the goal of eventually having a standalone driver
-that does not require an interface to architecture code.
-
-This is a separate branch because of dependencies on multiple other
-branches, and to keep the drivers changes separate from the normal
-cleanups.
+  ARM: omap2plus_defconfig: enable ECAP and EHRPWM (2014-12-05 17:38:04 +0100)
 
 ----------------------------------------------------------------
-Arnd Bergmann (4):
-      Merge branch 'omap/dt' into next/omap-gpmc
-      Merge tag 'omap-for-v3.19/gpmc-timings' of git://git.kernel.org/.../tmlind/linux-omap into next/omap-gpmc
-      Merge tag 'omap-for-v3.19/cleanup-part1' of git://git.kernel.org/.../tmlind/linux-omap into next/omap-gpmc
-      Merge tag 'omap-for-v3.19/gpmc-move-v2' of git://git.kernel.org/.../tmlind/linux-omap into next/omap-gpmc
+ARM: SoC defconfig changes for 3.19
 
-Javier Martinez Canillas (1):
-      ARM: OMAP2+: Remove unnecesary include in GPMC driver
+This is a collection of the various changes to defconfig files,
+most importantly enabling some additional platforms in the
+multi_v7_defconfig file. These are split out into a separate
+branch to avoid most of the merge conflicts in the defconfig
+files.
 
-Roger Quadros (5):
-      ARM: OMAP2+: gpmc: Print error message in set_gpmc_timing_reg()
-      ARM: OMAP2+: gpmc: Error out if timings fail in gpmc_probe_generic_child()
-      ARM: OMAP2+: gpmc: Always enable A26-A11 for non NAND devices
-      ARM: OMAP2+: gpmc: Keep Chip Select disabled while configuring it
-      ARM: OMAP2+: gpmc: Sanity check GPMC fck on probe
+This also touches 12 other defconfig files for shmobile,
+at91, hisilicon, keystone, mvebu, omap, and tegra.
 
-Tony Lindgren (10):
-      ARM: OMAP2+: Fix support for multiple devices on a GPMC chip select
-      ARM: OMAP2+: Show bootloader GPMC timings to allow configuring the .dts file
-      ARM: OMAP2+: Require proper GPMC timings for devices
-      ARM: OMAP2+: Drop legacy code for gpmc-smc91x.c
-      Merge branch 'for-v3.19/gpmc-omap' of github.com:rogerq/linux into omap-for-v3.19/gpmc
-      ARM: OMAP2+: Drop board file for ti8168evm
-      ARM: OMAP2+: Drop board file for 3430sdp
-      ARM: OMAP2+: Prepare to move GPMC to drivers by platform data header
-      ARM: OMAP2+: Move GPMC initcall to devices.c
-      memory: gpmc: Move omap gpmc code to live under drivers
+----------------------------------------------------------------
+Andrew Lunn (3):
+      ARM: mvebu: Add DLINK DIR665 options to mvebu_v5_defconfig
+      ARM: config: Add DLINK DIR665 options to multi_v5_defconfig
+      ARM: mvebu: defconfig: Enable the mv88E6171 switch driver
 
- MAINTAINERS                                        |   8 +
- arch/arm/mach-omap2/Kconfig                        |  18 +-
- arch/arm/mach-omap2/Makefile                       |   8 +-
- arch/arm/mach-omap2/board-3430sdp.c                | 632 ---------------------
- arch/arm/mach-omap2/board-am3517crane.c            |   1 +
- arch/arm/mach-omap2/board-cm-t35.c                 |   3 +-
- arch/arm/mach-omap2/board-cm-t3517.c               |   3 +-
- arch/arm/mach-omap2/board-flash.c                  |   3 +-
- arch/arm/mach-omap2/board-flash.h                  |   1 -
- arch/arm/mach-omap2/board-n8x0.c                   |   2 -
- arch/arm/mach-omap2/board-omap3pandora.c           |   2 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c       |  32 +-
- arch/arm/mach-omap2/board-ti8168evm.c              |  62 --
- arch/arm/mach-omap2/devices.c                      |  26 +
- arch/arm/mach-omap2/gpmc-nand.c                    |   3 +-
- arch/arm/mach-omap2/gpmc-nand.h                    |  27 -
- arch/arm/mach-omap2/gpmc-onenand.c                 |   3 +-
- arch/arm/mach-omap2/gpmc-onenand.h                 |  24 -
- arch/arm/mach-omap2/gpmc-smc91x.c                  | 186 ------
- arch/arm/mach-omap2/gpmc-smc91x.h                  |  42 --
- arch/arm/mach-omap2/gpmc.h                         | 227 +-------
- arch/arm/mach-omap2/pm34xx.c                       |   2 +-
- drivers/memory/Kconfig                             |   8 +
- drivers/memory/Makefile                            |   1 +
- .../gpmc.c => drivers/memory/omap-gpmc.c           | 385 ++++++++++---
- include/linux/omap-gpmc.h                          | 199 +++++++
- 26 files changed, 553 insertions(+), 1355 deletions(-)
+Arnd Bergmann (8):
+      Merge tag 'renesas-defconfig-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/defconfig
+      Merge tag 'hix5hd2-config-for-3.19' of git://github.com/hisilicon/linux-hisi into next/defconfig
+      Merge tag 'mvebu-defconfig-3.19' of git://git.infradead.org/linux-mvebu into next/defconfig
+      Merge tag 'keystone-soc' of git://git.kernel.org/.../ssantosh/linux-keystone into next/defconfig
+      Merge tag 'sti-defconfig-for-v3.19-1' of git://git.stlinux.com/devel/kernel/linux-sti into next/defconfig
+      Merge tag 'mvebu-defconfig-3.19-2' of git://git.infradead.org/linux-mvebu into next/defconfig
+      Merge tag 'tegra-for-3.19-defconfig' of git://git.kernel.org/.../tegra/linux into next/defconfig
+      Merge tag 'at91-defconfig' of git://git.kernel.org/.../nferre/linux-at91 into next/defconfig
+
+Dmitry Lavnikevich (1):
+      ARM: defconfig: imx_v6_v7_defconfig updates
+
+Felipe Balbi (5):
+      ARM: omap2plus_defconfig: remove unwanted ethernet drivers
+      ARM: omap2plus_defconfig: enable EDT FT5X06 touchscreen
+      ARM: omap2plus_defconfig: enable AM33XX SoC sound
+      ARM: omap2plus_defconfig: enable XHCI
+      ARM: omap2plus_defconfig: enable ECAP and EHRPWM
+
+Grygorii Strashko (2):
+      ARM: keystone_defconfig: enable dsp irq and gpio support
+      ARM: keystone_defconfig: enable mdio and marvell eth phys
+
+Krzysztof Kozlowski (1):
+      ARM: exynos_defconfig: Use 16 minors per MMC block device
+
+Kuninori Morimoto (3):
+      ARM: shmobile: multiplatform: add R-Car DMAC support on defconfig
+      ARM: shmobile: multiplatform: add Audo DMAC peri peri support on defconfig
+      ARM: shmobile: multiplatform: add AK4642 support on defconfig
+
+Ludovic Desroches (1):
+      ARM: at91: sama5: update defconfig
+
+Marcin Wojtas (2):
+      ARM: mvebu: re-enable SDHCI driver for Armada 38x SoC in v7 defconfig
+      ARM: mvebu: enable i2c device in mvebu_v7_defconfig
+
+Murali Karicheri (2):
+      ARM: keystone: add pcie related options
+      ARM: keystone: defconfig: add options to enable PCI controller
+
+Nicolas Ferre (4):
+      ARM: at91/defconfig: add the XDMA driver
+      ARM: at91/defconfig: add TCB PWM driver selection
+      ARM: at91/defconfig: add QT1070 to at91_dt
+      ARM: at91/defconfig: add DM9000 to at91_dt
+
+Peter Griffin (2):
+      ARM: multi_v7_defconfig: Enable st ohci and ehci HCD drivers.
+      ARM: multi_v7_defconfig: Enable stih415/6 usb2 phy driver.
+
+Ray Jui (1):
+      ARM: multi_v7_defconfig: Enable Broadcom Cygnus
+
+Scott Branden (1):
+      ARM: multi_v7_defconfig: remove one level of menu from Kconfig
+
+Simon Horman (1):
+      ARM: shmobile: ape6evm: Enable PM Runtime in defconfig
+
+Soren Brinkmann (1):
+      ARM: multi_v7_defconfig: Enable cgroups
+
+Thierry Reding (1):
+      ARM: tegra: Regenerate default configuration
+
+Thomas Petazzoni (2):
+      ARM: mvebu: update mvebu_v7_defconfig for Armada 370 audio
+      ARM: mvebu: add MTD_BLOCK to mvebu_v7_defconfig
+
+Tyler Baker (1):
+      ARM: multi_v7_defconfig: enable MAX77686 PMIC drivers for exynos4412-prime based SoCs
+
+Zhangfei Gao (2):
+      ARM: hisi_defconfig: add driver support for hix5hd2
+      ARM: multi_v7_defconfig: add driver support for hix5hd2
+
+ arch/arm/configs/ape6evm_defconfig   |  1 +
+ arch/arm/configs/at91_dt_defconfig   |  3 +++
+ arch/arm/configs/exynos_defconfig    |  1 +
+ arch/arm/configs/hisi_defconfig      | 19 +++++++++++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig | 10 +++++++++-
+ arch/arm/configs/keystone_defconfig  |  7 +++++++
+ arch/arm/configs/multi_v5_defconfig  |  2 ++
+ arch/arm/configs/multi_v7_defconfig  | 36 +++++++++++++++++++++++++++++++++++-
+ arch/arm/configs/mvebu_v5_defconfig  |  2 ++
+ arch/arm/configs/mvebu_v7_defconfig  |  9 ++++++++-
+ arch/arm/configs/omap2plus_defconfig | 22 ++++++++++++++++++++++
+ arch/arm/configs/sama5_defconfig     |  6 +++++-
+ arch/arm/configs/shmobile_defconfig  |  3 +++
+ arch/arm/configs/tegra_defconfig     |  2 --
+ arch/arm/mach-keystone/Kconfig       |  2 ++
+ 15 files changed, 119 insertions(+), 6 deletions(-)
