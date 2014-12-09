@@ -1,62 +1,92 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  9 Dec 2014 16:44:02 +0100
-Subject: [PATCH 3/5] arm/arm64: KVM: Add (new) vgic_initialized macro
+Date: Tue,  9 Dec 2014 16:44:01 +0100
+Subject: [PATCH 2/5] arm/arm64: KVM: Rename vgic_initialized to vgic_ready
 In-Reply-To: <1418139844-27892-1-git-send-email-christoffer.dall@linaro.org>
 References: <1418139844-27892-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1418139844-27892-4-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1418139844-27892-3-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some code paths will need to check to see if the internal state of the
-vgic has been initialized (such as when creating new VCPUs), so
-introduce such a macro that checks the nr_cpus field which is set when
-the vgic has been initialized.
+The vgic_initialized() macro currently returns the state of the
+vgic->ready flag, which indicates if the vgic is ready to be used when
+running a VM, not specifically if its internal state has been
+initialized.
 
-Also set nr_cpus = 0 in kvm_vgic_destroy, because the error path in
-vgic_init() will call this function, and code should never errornously
-assume the vgic to be properly initialized after an error.
+Rename the macro accordingly in preparation for a more nuanced
+initialization flow.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/kvm/arm_vgic.h | 6 ++++++
- virt/kvm/arm/vgic.c    | 1 +
- 2 files changed, 7 insertions(+)
+ arch/arm/kvm/arm.c     | 2 +-
+ include/kvm/arm_vgic.h | 4 ++--
+ virt/kvm/arm/vgic.c    | 6 +++---
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index a56cbb5..a9d005f 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -430,7 +430,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ 	 * Map the VGIC hardware resources before running a vcpu the first
+ 	 * time on this VM.
+ 	 */
+-	if (unlikely(!vgic_initialized(vcpu->kvm))) {
++	if (unlikely(!vgic_ready(vcpu->kvm))) {
+ 		ret = kvm_vgic_map_resources(vcpu->kvm);
+ 		if (ret)
+ 			return ret;
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 3e262b9..ac4888d 100644
+index fe9783b..3e262b9 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -287,6 +287,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+@@ -287,7 +287,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
  		      struct kvm_exit_mmio *mmio);
  
  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
-+#define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
- #define vgic_ready(k)		((k)->arch.vgic.ready)
+-#define vgic_initialized(k)	((k)->arch.vgic.ready)
++#define vgic_ready(k)		((k)->arch.vgic.ready)
  
  int vgic_v2_probe(struct device_node *vgic_node,
-@@ -369,6 +370,11 @@ static inline int irqchip_in_kernel(struct kvm *kvm)
+ 		  const struct vgic_ops **ops,
+@@ -369,7 +369,7 @@ static inline int irqchip_in_kernel(struct kvm *kvm)
  	return 0;
  }
  
-+static inline bool vgic_initialized(struct kvm *kvm)
-+{
-+	return true;
-+}
-+
- static inline bool vgic_ready(struct kvm *kvm)
+-static inline bool vgic_initialized(struct kvm *kvm)
++static inline bool vgic_ready(struct kvm *kvm)
  {
  	return true;
+ }
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 6293349..c98cc6b 100644
+index 91e6bfc..6293349 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1774,6 +1774,7 @@ void kvm_vgic_destroy(struct kvm *kvm)
- 	dist->irq_spi_cpu = NULL;
- 	dist->irq_spi_target = NULL;
- 	dist->irq_pending_on_cpu = NULL;
-+	dist->nr_cpus = 0;
- }
+@@ -1693,7 +1693,7 @@ out:
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 			bool level)
+ {
+-	if (likely(vgic_initialized(kvm)) &&
++	if (likely(vgic_ready(kvm)) &&
+ 	    vgic_update_irq_pending(kvm, cpuid, irq_num, level))
+ 		vgic_kick_vcpus(kvm);
  
- /*
+@@ -1882,7 +1882,7 @@ int kvm_vgic_map_resources(struct kvm *kvm)
+ 
+ 	mutex_lock(&kvm->lock);
+ 
+-	if (vgic_initialized(kvm))
++	if (vgic_ready(kvm))
+ 		goto out;
+ 
+ 	if (IS_VGIC_ADDR_UNDEF(kvm->arch.vgic.vgic_dist_base) ||
+@@ -2276,7 +2276,7 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 
+ 		mutex_lock(&dev->kvm->lock);
+ 
+-		if (vgic_initialized(dev->kvm) || dev->kvm->arch.vgic.nr_irqs)
++		if (vgic_ready(dev->kvm) || dev->kvm->arch.vgic.nr_irqs)
+ 			ret = -EBUSY;
+ 		else
+ 			dev->kvm->arch.vgic.nr_irqs = val;
 -- 
 2.1.2.330.g565301e.dirty
