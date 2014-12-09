@@ -1,108 +1,116 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Tue, 09 Dec 2014 20:57:59 +0800
-Subject: [PATCH 2/6] PCI/MSI: add hooks to populate the msi_domain field
-In-Reply-To: <1418069543-21969-3-git-send-email-marc.zyngier@arm.com>
-References: <1418069543-21969-1-git-send-email-marc.zyngier@arm.com>
- <1418069543-21969-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <5486F1D7.9090401@linux.intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 09 Dec 2014 13:59:42 +0100
+Subject: [PATCH] clk: samsung: Fix Exynos 5420 pinctrl setup and clock
+ disable failure due to domain being gated
+In-Reply-To: <1417788934-23447-1-git-send-email-k.kozlowski@samsung.com>
+References: <1417788934-23447-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1418129982.19339.6.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2014/12/9 4:12, Marc Zyngier wrote:
-> In order to be able to populate the device msi_domain field,
-> add the necesary hooks to propagate the PHB msi_domain across
-> secondary busses to devices.
+On pi?, 2014-12-05 at 15:15 +0100, Krzysztof Kozlowski wrote:
+> Audio subsystem clocks are located in separate block. On Exynos 5420 if
+> clock for this block (from main clock domain) 'mau_epll' is gated then
+> any read or write to audss registers will block.
 > 
-> So far, nobody populates the initial msi_domain.
+> This kind of boot hang was observed on Arndale Octa and Peach Pi/Pit
+> after introducing runtime PM to pl330 DMA driver. After that commit the
+> 'mau_epll' was gated, because the "amba" clock was disabled and there
+> were no more users of mau_epll.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> The system hang on one of steps:
+> 1. Disabling unused clocks from audss block.
+> 2. During audss GPIO setup (just before probing i2s0 because
+>    samsung_pinmux_setup() tried to access memory from audss block which was
+>    gated.
+> 
+> Add a workaround for this by enabling the 'mau_epll' clock in probe.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  drivers/pci/probe.c | 24 ++++++++++++++++++++++++
->  include/linux/pci.h |  1 +
->  2 files changed, 25 insertions(+)
-> 
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index c8ca98c..d1009a2 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -670,6 +670,20 @@ static void pci_set_bus_speed(struct pci_bus *bus)
->  	}
->  }
->  
-> +void __weak pcibios_set_phb_msi_domain(struct pci_bus *bus)
-> +{
-> +}
-> +
-> +static void pci_set_bus_msi_domain(struct pci_bus *bus)
-> +{
-> +	struct pci_dev *bridge = bus->self;
-> +
-> +	if (!bridge)
-> +		pcibios_set_phb_msi_domain(bus);
-> +	else
-> +		dev_set_msi_domain(&bus->dev, dev_get_msi_domain(&bridge->dev));
-> +}
-> +
->  static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
->  					   struct pci_dev *bridge, int busnr)
->  {
-> @@ -723,6 +737,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
->  	bridge->subordinate = child;
->  
->  add_dev:
-> +	pci_set_bus_msi_domain(child);
->  	ret = device_register(&child->dev);
->  	WARN_ON(ret < 0);
->  
-> @@ -1517,6 +1532,11 @@ static void pci_init_capabilities(struct pci_dev *dev)
->  	pci_enable_acs(dev);
->  }
->  
-> +static void pci_set_msi_domain(struct pci_dev *dev)
-> +{
-> +	dev_set_msi_domain(&dev->dev, dev_get_msi_domain(&dev->bus->dev));
-> +}
-> +
-Hi Marc,
-	The default implementation of pci_set_msi_domain() conflicts
-with interrupt mapping based on x86 Intel VT-d:(
-	If pci_set_msi_domain() is weak, thing gets perfect.
-Regards!
-Gerry
+>  drivers/clk/samsung/clk-exynos-audss.c | 29 ++++++++++++++++++++++++++++-
+>  1 file changed, 28 insertions(+), 1 deletion(-)
 
->  void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
->  {
->  	int ret;
-> @@ -1546,6 +1566,9 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
->  	/* Initialize various capabilities */
->  	pci_init_capabilities(dev);
+Sorry for pinging so quick but merge window is open and it looks like
+booting Exynos542x boards will be broken (because pl330 will no longer
+hold adma clock enabled so whole audss domain will be gated).
+
+This is a non-intrusive workaround for that issue, as wanted by
+Sylwester:
+https://lkml.org/lkml/2014/12/5/223
+
+Any comments on this?
+
+Best regards,
+Krzysztof
+
+
+> diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+> index acce708ace18..0916a81fa932 100644
+> --- a/drivers/clk/samsung/clk-exynos-audss.c
+> +++ b/drivers/clk/samsung/clk-exynos-audss.c
+> @@ -29,6 +29,13 @@ static DEFINE_SPINLOCK(lock);
+>  static struct clk **clk_table;
+>  static void __iomem *reg_base;
+>  static struct clk_onecell_data clk_data;
+> +/*
+> + * On Exynos5420 this will be a clock which has to be enabled before any
+> + * access to audss registers. Typically a child of EPLL.
+> + *
+> + * On other platforms this will be -ENODEV.
+> + */
+> +static struct clk *epll;
 >  
-> +	/* Setup MSI irq domain */
-> +	pci_set_msi_domain(dev);
+>  #define ASS_CLK_SRC 0x0
+>  #define ASS_CLK_DIV 0x4
+> @@ -98,6 +105,8 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+>  		dev_err(&pdev->dev, "failed to map audss registers\n");
+>  		return PTR_ERR(reg_base);
+>  	}
+> +	/* EPLL don't have to be enabled for boards other than Exynos5420 */
+> +	epll = ERR_PTR(-ENODEV);
+>  
+>  	clk_table = devm_kzalloc(&pdev->dev,
+>  				sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
+> @@ -115,8 +124,20 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+>  	pll_in = devm_clk_get(&pdev->dev, "pll_in");
+>  	if (!IS_ERR(pll_ref))
+>  		mout_audss_p[0] = __clk_get_name(pll_ref);
+> -	if (!IS_ERR(pll_in))
+> +	if (!IS_ERR(pll_in)) {
+>  		mout_audss_p[1] = __clk_get_name(pll_in);
 > +
->  	/*
->  	 * Add the device to our list of discovered devices
->  	 * and the bus list for fixup functions, etc.
-> @@ -1947,6 +1970,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
->  	b->bridge = get_device(&bridge->dev);
->  	device_enable_async_suspend(b->bridge);
->  	pci_set_bus_of_node(b);
-> +	pci_set_bus_msi_domain(b);
+> +		if (variant == TYPE_EXYNOS5420) {
+> +			epll = pll_in;
+> +
+> +			ret = clk_prepare_enable(epll);
+> +			if (ret) {
+> +				dev_err(&pdev->dev,
+> +						"failed to prepare the epll clock\n");
+> +				return ret;
+> +			}
+> +		}
+> +	}
+>  	clk_table[EXYNOS_MOUT_AUDSS] = clk_register_mux(NULL, "mout_audss",
+>  				mout_audss_p, ARRAY_SIZE(mout_audss_p),
+>  				CLK_SET_RATE_NO_REPARENT,
+> @@ -203,6 +224,9 @@ unregister:
+>  			clk_unregister(clk_table[i]);
+>  	}
 >  
->  	if (!parent)
->  		set_dev_node(b->bridge, pcibus_to_node(b));
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index a523cee..3266764 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1637,6 +1637,7 @@ int pcibios_set_pcie_reset_state(struct pci_dev *dev,
->  int pcibios_add_device(struct pci_dev *dev);
->  void pcibios_release_device(struct pci_dev *dev);
->  void pcibios_penalize_isa_irq(int irq, int active);
-> +void pcibios_set_phb_msi_domain(struct pci_bus *bus);
+> +	if (!IS_ERR(epll))
+> +		clk_disable_unprepare(epll);
+> +
+>  	return ret;
+>  }
 >  
->  #ifdef CONFIG_HIBERNATE_CALLBACKS
->  extern struct dev_pm_ops pcibios_pm_ops;
-> 
+> @@ -217,6 +241,9 @@ static int exynos_audss_clk_remove(struct platform_device *pdev)
+>  			clk_unregister(clk_table[i]);
+>  	}
+>  
+> +	if (!IS_ERR(epll))
+> +		clk_disable_unprepare(epll);
+> +
+>  	return 0;
+>  }
+>  
