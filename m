@@ -1,25 +1,112 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 9 Dec 2014 14:50:05 -0700
-Subject: [PATCH 6/6] pci, acpi: Share ACPI PCI config space accessors.
-In-Reply-To: <54854FB2.8080206@linaro.org>
-References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
- <3957412.IooRKpIXjW@wuerfel> <20141121180825.GD6578@google.com>
- <2178540.dTppAIY2rE@wuerfel> <54854FB2.8080206@linaro.org>
-Message-ID: <CAErSpo6cUuEK41wD33Uyzb5Y5yFp+jKVVvWLrZ0dO1iuYv8GjQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Dec 2014 23:01:03 +0100
+Subject: [GIT PULL] asm-generic: asm/io.h rewrite
+Message-ID: <4703362.Atfd0HgCCK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 8, 2014 at 12:13 AM, Tomasz Nowicki
-<tomasz.nowicki@linaro.org> wrote:
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-> What would be next steps regarding this patch set? I am not sure we have
-> reached a consensus on weak vs #ifdef choice.
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
-I work through the list at
-https://patchwork.ozlabs.org/project/linux-pci/list/ in FIFO order, so
-you don't need to do anything else except poke me to move faster :)
+are available in the git repository at:
 
-The weak/ifdef question is relatively minor and easily changed, so I
-wouldn't worry about it yet.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arnd/asm-generic.git tags/asm-generic-for-linus
 
-Bjorn
+for you to fetch changes up to cb61f6769b8836081940ba26249f1b756400c7df:
+
+  ARM64: use GENERIC_PCI_IOMAP (2014-11-19 14:09:07 +0100)
+
+----------------------------------------------------------------
+asm-generic: asm/io.h rewrite
+
+While there normally is no reason to have a pull request for asm-generic
+but have all changes get merged through whichever tree needs them, I do
+have a series for 3.19. There are two sets of patches that change
+significant portions of asm/io.h, and this branch contains both in order
+to resolve the conflicts:
+
+- Will Deacon has done a set of patches to ensure that all architectures
+  define {read,write}{b,w,l,q}_relaxed() functions or get them by
+  including asm-generic/io.h. These functions are commonly used on ARM
+  specific drivers to avoid expensive L2 cache synchronization implied by
+  the normal {read,write}{b,w,l,q}, but we need to define them on all
+  architectures in order to share the drivers across architectures and
+  to enable CONFIG_COMPILE_TEST configurations for them
+
+- Thierry Reding has done an unrelated set of patches that extends
+  the asm-generic/io.h file to the degree necessary to make it useful
+  on ARM64 and potentially other architectures.
+
+----------------------------------------------------------------
+Arnd Bergmann (5):
+      ARM: ixp4xx: Fix build with IXP4XX_INDIRECT_PCI
+      Merge branch 'asm-generic-io' of https://github.com/thierryreding/linux into asm-generic
+      Merge branch 'io' of git://git.kernel.org/.../will/linux into asm-generic
+      sparc: io: remove duplicate relaxed accessors on sparc32
+      ARM64: use GENERIC_PCI_IOMAP
+
+Thierry Reding (10):
+      ARC: Remove redundant PCI_IOBASE declaration
+      ARM: ebsa110: Properly override I/O accessors
+      ARM: ixp4xx: Properly override I/O accessors
+      Change xlate_dev_{kmem,mem}_ptr() prototypes
+      /dev/mem: Use more consistent data types
+      asm-generic/io.h: Reconcile I/O accessor overrides
+      asm-generic/io.h: Implement generic {read,write}s*()
+      ARM: Use include/asm-generic/io.h
+      arm64: Use include/asm-generic/io.h
+      ARM: sa11x0: Use void __iomem * in MMIO accessors
+
+Will Deacon (16):
+      asm-generic: io: implement relaxed accessor macros as conditional wrappers
+      microblaze: io: remove dummy relaxed accessor macros
+      s390: io: remove dummy relaxed accessor macros for reads
+      xtensa: io: remove dummy relaxed accessor macros for reads
+      frv: io: implement dummy relaxed accessor macros for writes
+      cris: io: implement dummy relaxed accessor macros for writes
+      ia64: io: implement dummy relaxed accessor macros for writes
+      m32r: io: implement dummy relaxed accessor macros for writes
+      m68k: io: implement dummy relaxed accessor macros for writes
+      mn10300: io: implement dummy relaxed accessor macros for writes
+      parisc: io: implement dummy relaxed accessor macros for writes
+      powerpc: io: implement dummy relaxed accessor macros for writes
+      sparc: io: implement dummy relaxed accessor macros for writes
+      tile: io: implement dummy relaxed accessor macros for writes
+      x86: io: implement dummy relaxed accessor macros for writes
+      documentation: memory-barriers: clarify relaxed io accessor semantics
+
+ Documentation/memory-barriers.txt       |  13 +-
+ arch/arc/include/asm/io.h               |   2 -
+ arch/arm/include/asm/io.h               |  89 ++--
+ arch/arm/include/asm/memory.h           |   4 +
+ arch/arm/mach-ebsa110/include/mach/io.h |  25 +-
+ arch/arm/mach-ebsa110/io.c              |  14 +-
+ arch/arm/mach-ixp4xx/common.c           |   2 +-
+ arch/arm/mach-ixp4xx/include/mach/io.h  |  28 +-
+ arch/arm/mach-sa1100/pci-nanoengine.c   |   8 +-
+ arch/arm64/Kconfig                      |   2 +-
+ arch/arm64/include/asm/io.h             | 122 ++----
+ arch/arm64/include/asm/memory.h         |   2 +
+ arch/cris/include/asm/io.h              |   3 +
+ arch/frv/include/asm/io.h               |   3 +
+ arch/ia64/include/asm/io.h              |   4 +
+ arch/ia64/include/asm/uaccess.h         |  16 +-
+ arch/m32r/include/asm/io.h              |   3 +
+ arch/m68k/include/asm/io.h              |   8 +
+ arch/m68k/include/asm/io_no.h           |   4 -
+ arch/microblaze/include/asm/io.h        |   8 -
+ arch/mn10300/include/asm/io.h           |   4 +
+ arch/parisc/include/asm/io.h            |  12 +-
+ arch/powerpc/include/asm/io.h           |  12 +-
+ arch/s390/include/asm/io.h              |  10 +-
+ arch/s390/mm/maccess.c                  |   4 +-
+ arch/sparc/include/asm/io_32.h          |   4 -
+ arch/sparc/include/asm/io_64.h          |  14 +-
+ arch/tile/include/asm/io.h              |   4 +
+ arch/x86/include/asm/io.h               |   8 +-
+ arch/x86/mm/ioremap.c                   |   4 +-
+ arch/xtensa/include/asm/io.h            |   7 -
+ drivers/char/mem.c                      |  13 +-
+ include/asm-generic/io.h                | 751 ++++++++++++++++++++++++++------
+ 33 files changed, 837 insertions(+), 370 deletions(-)
