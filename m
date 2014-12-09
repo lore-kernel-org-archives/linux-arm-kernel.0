@@ -1,83 +1,121 @@
-From: lyz@rock-chips.com (Yunzhi Li)
-Date: Tue,  9 Dec 2014 10:52:34 +0800
-Subject: [PATCH v4 4/5] ARM: dts: add rk3288 usb PHY
-Message-ID: <1418093554-30671-1-git-send-email-lyz@rock-chips.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 9 Dec 2014 10:53:26 +0800
+Subject: [RFC PATCH] ARM64: PCI: inherit root controller's dma-coherent
+In-Reply-To: <7705416.b49xSXIHeP@wuerfel>
+References: <1417066891-16789-1-git-send-email-ming.lei@canonical.com>
+ <CACVXFVPgchwZKQYdBWu+q0b21zeB6Lob-rD2C8mzTWb7dpZ86g@mail.gmail.com>
+ <5481B283.6030407@ti.com> <7705416.b49xSXIHeP@wuerfel>
+Message-ID: <CACVXFVOfyQNGw+w_GTx1VmN89RKcvykh7DaFm=OcFGJ1f-EYxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a device_node for RK3288 SoC usb phy. It also
-defines the phy to be used by three usb controllers: usb_host0/1
-and usb_otg.
+On Sat, Dec 6, 2014 at 12:05 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 05 December 2014 15:26:27 Grygorii Strashko wrote:
+>> ---
+>> From 5e078b1ba148aa280181c4f695e567875a0f4ae9 Mon Sep 17 00:00:00 2001
+>> From: Grygorii Strashko <grygorii.strashko@ti.com>
+>> Date: Fri, 28 Feb 2014 19:11:39 +0200
+>> Subject: [RFC PATCH] common: dma-mapping: introduce dma_init_dev_from_parent() helper
+>>
+>> Now, in Kernel, Parent device's DMA configuration has to by applied
+>> to the child as is, to enable DMA support for this device. Usually, this
+>> is happened in places where child device is manually instantiated by
+>> Parent device device using Platform APIs
+>> (see drivers/usb/dwc3/host.c or drivers/pci/probe.c:pci_device_add()
+>>  for example).
+>>
+>> The DMA configuration is represented in Device data structure was
+>> extended recently (dma_pfn_offset was added) and going to extended
+>> in future to support IOMMU. Therefore, the code used by drivers to
+>> copy DMA configuration from parent to child device isn't working
+>> properly, for example:
+>> (drivers/usb/dwc3/host.c)
+>>       dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
+>>
+>>       xhci->dev.parent        = dwc->dev;
+>>       xhci->dev.dma_mask      = dwc->dev->dma_mask;
+>>       xhci->dev.dma_parms     = dwc->dev->dma_parms;
+>> above code will miss to copy dma_pfn_offset.
+>
+>
+> I'm not too thrilled about this implementation either. It immediately
+> breaks as soon as we have IOMMU support, as the IOMMU configuration
+> is by definition device dependent, and you have introduced a few bugs
+> by copying the pointers to dma_mask and dma_parms.
 
-Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
+Using devm_kmalloc() for allocating dma_mask might be helpful for
+the issue, but still need to support the default setting to be overrided
+by IOMMU code, which is related with the timing of calling
+dma_init_dev_from_parent().
 
----
+>
+>> Hence, intoroduce common dma_init_dev_from_parent() helper to
+>> initialize device's DMA parameters using from parent device's configuration,
+>> use __weak to allow arches to overwrite it if needed.
+>>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> ---
+>>  drivers/base/dma-mapping.c  | 25 +++++++++++++++++++++++++
+>>  include/linux/dma-mapping.h |  3 +++
+>>  2 files changed, 28 insertions(+)
+>>
+>> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+>> index 9e8bbdd..4556698 100644
+>> --- a/drivers/base/dma-mapping.c
+>> +++ b/drivers/base/dma-mapping.c
+>> @@ -270,6 +270,31 @@ int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
+>>  }
+>>  EXPORT_SYMBOL(dma_common_mmap);
+>>
+>> +/*
+>> + * Initialize device's DMA parameters using parent device
+>> + * @dev: Device to be configured
+>> + * @parent: Pointer on parent device to get DMA configuration from
+>> + *
+>> + * parent can be NULL - then DMA configuration will be teken from dev->parent.
+>> + */
+>> +void __weak dma_init_dev_from_parent(struct device *dev, struct device *parent)
+>> +{
+>
+> Please let's try to avoid weak functions
 
-Changes in v4:
-- Add phy subnodes.
+Yes, __weak isn't friendly at all.
 
-Changes in v3: None
+>
+>> +     struct device *parent_dev = parent;
+>
+> One of these two is not needed.
+>
+>> +     /* if parent is NULL assume, dev->parent is the one to use */
+>> +     if (!parent_dev)
+>> +             parent_dev = dev->parent;
+>> +
+>> +     if (is_device_dma_capable(parent_dev)) {
+>> +             dev->dma_mask   = parent_dev->dma_mask;
+>
+> This is always wrong: dev->dma_mask is a pointer!
+>
+>> +             dev->coherent_dma_mask = parent_dev->coherent_dma_mask;
+>
+> What if someone has already set a mask that is greater than 32-bit?
 
- arch/arm/boot/dts/rk3288.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+Yes, that is a bit complicated because there may be default
+dma_mask which was setup before creating the device.
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 874e66d..2db2d12 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -329,12 +329,35 @@
- 		status = "disabled";
- 	};
- 
-+	usbphy: phy {
-+		#phy-cells = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "rockchip,rk3288-usb-phy";
-+		rockchip,grf = <&grf>;
-+		status = "disabled";
-+
-+		usb-phy at 0 {
-+			reg = <0>;
-+		};
-+
-+		usb-phy at 1 {
-+			reg = <1>;
-+		};
-+
-+		usb-phy at 2 {
-+			reg = <2>;
-+		};
-+	};
-+
- 	usb_host0_ehci: usb at ff500000 {
- 		compatible = "generic-ehci";
- 		reg = <0xff500000 0x100>;
- 		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru HCLK_USBHOST0>;
- 		clock-names = "usbhost";
-+		phys = <&usbphy 1>;
-+		phy-names = "usb";
- 		status = "disabled";
- 	};
- 
-@@ -347,6 +370,8 @@
- 		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru HCLK_USBHOST1>;
- 		clock-names = "otg";
-+		phys = <&usbphy 2>;
-+		phy-names = "usb2-phy";
- 		status = "disabled";
- 	};
- 
-@@ -357,6 +382,8 @@
- 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru HCLK_OTG0>;
- 		clock-names = "otg";
-+		phys = <&usbphy 0>;
-+		phy-names = "usb2-phy";
- 		status = "disabled";
- 	};
- 
--- 
-2.0.0
+>
+>> +             dev->dma_parms  = parent_dev->dma_parms;
+>
+> same  problem here.
+>
+>> +             dev->dma_pfn_offset = parent_dev->dma_pfn_offset;
+>> +             set_dma_ops(dev, get_dma_ops(parent_dev));
+>> +     }
+>> +}
+>> +EXPORT_SYMBOL(dma_init_dev_from_parent);
+
+Arnd, given it isn't easy to figure out one good solution for moving
+dma configuration into generic code(driver core, pci, .) now, could
+the issue be fixed first?
+
+Thanks,
