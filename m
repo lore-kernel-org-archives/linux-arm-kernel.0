@@ -1,54 +1,73 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 9 Dec 2014 23:18:49 +0900
-Subject: [PATCH v3 0/3] Add support for Tegra Activity Monitor
-In-Reply-To: <548703C4.1030300@collabora.com>
-References: <1417709696-29281-1-git-send-email-tomeu.vizoso@collabora.com>
- <CAAVeFuJkpuWocEDTfSAK7_UfhZvqOfYJY6sLgsy9i+KcMAkbCQ@mail.gmail.com>
- <548703C4.1030300@collabora.com>
-Message-ID: <CAAVeFuJY_31ayqnoY65uCoP9AadvucEARmuv4jr_DoS6Aj5rGA@mail.gmail.com>
+From: dave.long@linaro.org (David Long)
+Date: Tue, 09 Dec 2014 09:27:18 -0500
+Subject: [PATCH v3 0/5] ARM64: Add kernel probes(Kprobes) support
+In-Reply-To: <20141209133340.GA20265@linaro.org>
+References: <CAPvkgC0ELPPWfa-8kQ4H_e_O5G1ER4KEKuSWLxh_u-VZgh7W6A@mail.gmail.com>
+ <547C36DB.7060903@hitachi.com> <547F242D.1060705@redhat.com>
+ <547F94B0.1000902@linaro.org> <547FB5DD.901@redhat.com>
+ <547FCB73.1010707@linaro.org>
+ <CAPvkgC3=KKKMa1hWdOYOcV7D7kQSLtnNnXLBB64_P-V+_qUwTw@mail.gmail.com>
+ <54803ADD.2090201@hitachi.com>
+ <CAPvkgC26-CprjLVH55=7z73JtxTumFFZ4W7itevXxMwReVqQ1g@mail.gmail.com>
+ <54804B1F.3020703@hitachi.com> <20141209133340.GA20265@linaro.org>
+Message-ID: <548706C6.2050105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 9, 2014 at 11:14 PM, Tomeu Vizoso
-<tomeu.vizoso@collabora.com> wrote:
-> On 12/09/2014 06:38 AM, Alexandre Courbot wrote:
->> On Fri, Dec 5, 2014 at 1:14 AM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
->>> Hello,
->>>
->>> this v3 addresses the comments that the devfreq implementation got, namely:
->>>
->>> * Address misc. style issues found by Thierry and Alexander
->>> * Added helpers for register i/o
->>> * Further documented the structs
->>> * Enable the ACTMON after the IRQ handler has been installed
->>> * Disable the ACTMON before removing the IRQ handler
->>> * Add governor in a subsys initcall
->>>
->>> There's an open question on whether some functionality currently in this
->>> devfreq driver should be moved into the devfreq framework, but without knowing
->>> of other SoC family that would benefit from it, I'm reticent. It would be
->>> great to hear from the devfreq maintainers if they have any plans regarding
->>> this, or if they have any suggestion.
+On 12/09/14 08:33, Steve Capper wrote:
+> On Thu, Dec 04, 2014 at 08:53:03PM +0900, Masami Hiramatsu wrote:
+>> (2014/12/04 20:29), Steve Capper wrote:
 >>
->> I cannot make a thorough review because of the problem I mentioned in
->> patch 3/3, but I am guessing this series is converging towards what we
->> want. Now the main question will be how we can leverage Arto's
->> watermark series for this one. I am ready to bet that doing so can
->> reduce quite a lot of code.
+>>>> I'd like to ask you to try my fix on your machine, with my reproducing
+>>>> methods. (do not use sytemtap nor perf, those can have other issues)
+>>>>
+>>>
+>>> Thank you Masami,
+>>>
+>>> I tried the following commands:
+>>>
+>>> echo "p:trace_event_buffer_lock_reserve
+>>> trace_event_buffer_lock_reserve" >
+>>> /sys/kernel/debug/tracing/kprobe_events
+>>> echo 1 > /sys/kernel/debug/tracing/events/kprobes/enable
+>>> echo 1 > /sys/kernel/debug/tracing/events/sched/sched_process_exec/enable
+>>>
+>>> The system appeared okay, I then cat'ed out:
+>>> # cat /sys/kernel/debug/tracing/kprobe_profile
+>>>     trace_event_buffer_lock_reserve                           25              25
+>>>
+>>> I got similar output (i.e. no crashes) both with and without the
+>>> interrupt fix you recommended.
+>>>
+>>> I'm not sure how to interpret this, please let me know if you would
+>>> like me to run any other tests?
+>>>
+>>> (I did also try your proposed fix with perf + memcpy and that crashed
+>>> in a similar way as before).
 >>
->> Since you are likely to be the first user of the watermarking feature,
->> could you comment on its potential shortcomings and whatever needs to
->> be fixed to best implement ACTMON support using it? I will try to push
->> it myself, but you are obviously in a better position to understand
->> what is needed.
+>> Hmm, then the bug is still there, and the bug may not be in the recursive
+>> call path... We need to find another suspicious code in the patch.
+>>
 >
-> Sure, I'm still playing with the idea, but I have sent a few questions
-> to that thread already.
+> Not sure if this is helpful, but the following also caused a crash for
+> me:
+>
+> echo "p:trace_event_buffer_lock_reserve trace_event_buffer_lock_reserve" > /sys/kernel/debug/tracing/kprobe_events
+> echo "p:memcpy memcpy" >> /sys/kernel/debug/tracing/kprobe_events
+> echo 1 > /sys/kernel/debug/tracing/events/kprobes/enable
+>
+> [immediate crash]
+>
+> The crash point for me is in the arm64 ASID allocator, it again looks
+> like the interrupts are in an unexpected state.
+> (check_and_switch_context goes down the irqs disabled code path, I
+> think incorrectly).
+>
+> This occurred for me both with and without the proposed irq saving fix.
+>
+> I will do some more digging.
+>
 
-Seen that, thanks! After seeing your comments I come to thing that
-maybe we should merge ACTMON support first and then adapt it to use
-watermarking afterwards. I'm all for incremental changes and after 4
-iterations this series should be close to completion now - would be
-sad to go back to the design board at this stage.
+Thanks, more information is good.
 
-Reviewing your v4 is on my schedule for tomorrow, thanks for your patience!
+-dl
