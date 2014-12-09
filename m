@@ -1,41 +1,59 @@
-From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Tue,  9 Dec 2014 21:13:23 +0800
-Subject: [PATCH -next] coresight-tpiu: use module_amba_driver to simplify the
- code
-Message-ID: <1418130803-27443-1-git-send-email-weiyj_lk@163.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue,  9 Dec 2014 14:15:03 +0100
+Subject: [PATCH v4 0/3] Add support for Tegra Activity Monitor
+Message-ID: <1418130912-24725-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Hello,
 
-module_amba_driver() makes the code simpler by eliminating
-boilerplate code.
+this v4 just fixes a botched rename in v3. The original cover letter for v3 follows:
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/coresight/coresight-tpiu.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+this v3 addresses the comments that the devfreq implementation got, namely:
 
-diff --git a/drivers/coresight/coresight-tpiu.c b/drivers/coresight/coresight-tpiu.c
-index ae10108..3b33af2 100644
---- a/drivers/coresight/coresight-tpiu.c
-+++ b/drivers/coresight/coresight-tpiu.c
-@@ -201,17 +201,7 @@ static struct amba_driver tpiu_driver = {
- 	.id_table	= tpiu_ids,
- };
- 
--static int __init tpiu_init(void)
--{
--	return amba_driver_register(&tpiu_driver);
--}
--module_init(tpiu_init);
--
--static void __exit tpiu_exit(void)
--{
--	amba_driver_unregister(&tpiu_driver);
--}
--module_exit(tpiu_exit);
-+module_amba_driver(tpiu_driver);
- 
- MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("CoreSight Trace Port Interface Unit driver");
+* Address misc. style issues found by Thierry and Alexander
+* Added helpers for register i/o
+* Further documented the structs
+* Enable the ACTMON after the IRQ handler has been installed
+* Disable the ACTMON before removing the IRQ handler
+* Add governor in a subsys initcall
+
+There's an open question on whether some functionality currently in this
+devfreq driver should be moved into the devfreq framework, but without knowing
+of other SoC family that would benefit from it, I'm reticent. It would be
+great to hear from the devfreq maintainers if they have any plans regarding
+this, or if they have any suggestion.
+
+These patches implement support for setting the rate of the EMC clock based on
+stats collected from the ACTMON, a piece of hw in the Tegra124 that counts
+memory accesses (among others).
+
+It depends on the following in-flight patches:
+
+* EMC driver: http://thread.gmane.org/gmane.linux.drivers.devicetree/99304
+* CPUFreq driver: http://thread.gmane.org/gmane.linux.kernel/1812962
+
+I have pushed a branch here for testing:
+
+http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=actmon-v4
+
+Regards,
+
+Tomeu
+
+Tomeu Vizoso (3):
+  of: Add binding for NVIDIA Tegra ACTMON node
+  PM / devfreq: tegra: add devfreq driver for Tegra Activity Monitor
+  ARM: tegra: Add Tegra124 ACTMON support
+
+ .../devicetree/bindings/arm/tegra/actmon.txt       |  38 +
+ arch/arm/boot/dts/tegra124.dtsi                    |  23 +
+ drivers/devfreq/Kconfig                            |   9 +
+ drivers/devfreq/Makefile                           |   1 +
+ drivers/devfreq/tegra-actmon-devfreq.c             | 777 +++++++++++++++++++++
+ 5 files changed, 848 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/tegra/actmon.txt
+ create mode 100644 drivers/devfreq/tegra-actmon-devfreq.c
+
+-- 
+1.9.3
