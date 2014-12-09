@@ -1,44 +1,87 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 9 Dec 2014 15:38:09 -0700
-Subject: [PATCH] PCI: keystone: fix error handling of irq_of_parse_and_map
-In-Reply-To: <20141114221903.GA38539@dtor-ws>
-References: <20141114221903.GA38539@dtor-ws>
-Message-ID: <20141209223809.GB6692@google.com>
+From: mpeg.blue@free.fr (Mason)
+Date: Tue, 09 Dec 2014 23:59:22 +0100
+Subject: ARM page tables
+In-Reply-To: <20141209172729.GK11285@n2100.arm.linux.org.uk>
+References: <54872F9C.2080005@free.fr>
+ <20141209172729.GK11285@n2100.arm.linux.org.uk>
+Message-ID: <54877ECA.6050501@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 02:19:03PM -0800, Dmitry Torokhov wrote:
-> Return value of irq_of_parse_and_map() is unsigned int, with 0
-> indicating failure, so testing for negative result never works.
-> 
-> Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
+Hello Russel,
 
-Applied with Murali's ack to next-pci/host-keystone for v3.19.  This
-branch will be rebased to v3.19-rc1.
+On 09/12/2014 18:27, Russell King - ARM Linux wrote:
+> On Tue, Dec 09, 2014 at 06:21:32PM +0100, Mason wrote:
+>> On my SoC, we have two MMIO regions mapped at init:
+>>
+>>  {
+>>   .virtual = (0xf0000000 + 0x00800000),
+>>   .pfn =((unsigned long)((0x20000000) >> 12)),
+>>   .length = 0x00200000,
+>>   .type = 0,
+>>  },
+>>  {
+>>   .virtual = (0xf0000000 +(0)),
+>>   .pfn =((unsigned long)((0) >> 12)),
+>>   .length = 0x00800000,
+>>   .type = 0,
+>>  },
+>>
+>> I dumped the L1 page table descriptors, expecting to find
+>> entries for the MMIO regions:
+>> (AFAICT, the page table starts at 0xc0007000)
+> 
+> No, it starts at 0xc0004000.
 
-> ---
+I should have suspected that I had the wrong start address. Thanks!
+What's the name of the symbolic constant for that address?
+
+The page table is allocated in pgd_alloc, right?
+  new_pgd = __pgd_alloc();
+#define __pgd_alloc()   (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_REPEAT, 2)
+
+If that's the correct init code, how does it guarantee to always
+return 0xc0004000?
+
+>> col_1 = entry number (hex)
+>> col_2 = entry value
+>> col_3 = string for (desc & 3)
+>>
+>> 300 00011452 SECTION
+>> 301 00111452 SECTION
+>> 302 00211452 SECTION
+>> 303 00311452 SECTION
+>> 304 00411452 SECTION
+>> 305 00511452 SECTION
+>> 306 00611452 SECTION
+>> 307 00711452 SECTION
+>> 308 20011452 SECTION
+>> 309 20111452 SECTION
+>>
+>> If I understand correctly, entry 308 means:
+>> VIRTUAL ADDRESS 0x3080_0000 is mapped to PHYSICAL ADDRESS 0x2000_0000
+>> (Is my reading correct?)
 > 
-> Not tested, found by casual code inspection.
+> No.  If you're talking about 0x308 from an offset of 0x3000 into the
+> page table, that's 0x308 * 1MB + 0xc0000000 = 0xf0800000.
 > 
->  drivers/pci/host/pci-keystone.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>> But we asked to map PA 0x2000_0000 to VA 0xf080_0000 in iotable_init,
+>> so I'm confused...
 > 
-> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-> index 8a27078..f2bd48d 100644
-> --- a/drivers/pci/host/pci-keystone.c
-> +++ b/drivers/pci/host/pci-keystone.c
-> @@ -197,7 +197,7 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
->  	 */
->  	for (temp = 0; temp < max_host_irqs; temp++) {
->  		host_irqs[temp] = irq_of_parse_and_map(*np_temp, temp);
-> -		if (host_irqs[temp] < 0)
-> +		if (!host_irqs[temp])
->  			break;
->  	}
->  	if (temp) {
-> -- 
-> 2.1.0.rc2.206.gedb03e5
-> 
-> 
-> -- 
-> Dmitry
+> So, with the right starting point, it works out correctly.
+
+Indeed!
+
+I am investigating this issue:
+
+As I described, we map PA 0-8MB. But some code actually accesses
+address 0xf0920000 (from kernel space) and I was expecting very
+nasty things, like the equivalent of SIGSEGV in the kernel.
+But nothing happens, no page fault, no BUG_ON, no panic, no
+implosion... (Writes seem ignored, and reads always return 0)
+
+I don't understand how it is possible to access unmapped virtual
+addresses without the MMU throwing a fit... That's why I'm looking
+at the page table.
+
+Regards.
