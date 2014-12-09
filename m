@@ -1,113 +1,116 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 09 Dec 2014 15:30:32 +0900
-Subject: [PATCH 03/19] clk: samsung: exynos5433: Add clocks for CMU_PERIC
- domain
-In-Reply-To: <548692ED.4080301@samsung.com>
-References: <1417510196-6714-1-git-send-email-cw00.choi@samsung.com>
- <1417510196-6714-4-git-send-email-cw00.choi@samsung.com>
- <54858C13.8020704@samsung.com> <54864C90.9040205@samsung.com>
- <548692ED.4080301@samsung.com>
-Message-ID: <54869708.6000303@samsung.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 9 Dec 2014 14:31:58 +0800
+Subject: [PATCH v5] clocksource: arch_timer: Fix code to use physical
+ timers when requested
+In-Reply-To: <20141208162140.GN16185@e104818-lin.cambridge.arm.com>
+References: <1416812564-26465-1-git-send-email-sonnyrao@chromium.org>
+ <1417776064.14380.17.camel@mtksdaap41>
+ <20141208162140.GN16185@e104818-lin.cambridge.arm.com>
+Message-ID: <1418106718.32622.31.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2014 03:13 PM, Pankaj Dubey wrote:
+On Mon, 2014-12-08 at 16:21 +0000, Catalin Marinas wrote:
+> On Fri, Dec 05, 2014 at 10:41:04AM +0000, Yingjoe Chen wrote:
+> > On Sun, 2014-11-23 at 23:02 -0800, Sonny Rao wrote: 
+> > > This is a bug fix for using physical arch timers when
+> > > the arch_timer_use_virtual boolean is false.  It restores the
+> > > arch_counter_get_cntpct() function after removal in
+> > > 
+> > > 0d651e4e "clocksource: arch_timer: use virtual counters"
+> > > 
+> > > We need this on certain ARMv7 systems which are architected like this:
+> > > diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> > > index f190971..b1fa4e6 100644
+> > > --- a/arch/arm64/include/asm/arch_timer.h
+> > > +++ b/arch/arm64/include/asm/arch_timer.h
+> > > @@ -104,6 +104,15 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+> > >  	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+> > >  }
+> > >  
+> > > +static inline u64 arch_counter_get_cntpct(void)
+> > > +{
+> > > +	/*
+> > > +	 * AArch64 kernel and user space mandate the use of CNTVCT.
+> > > +	 */
+> > > +	BUG();
+> > > +	return 0;
+> > > +}
+> > > +
+> > >  static inline u64 arch_counter_get_cntvct(void)
+> > >  {
+> > >  	u64 cval;
+> > 
+> > I tested this on an arm64 platform and system fail to boot when apply
+> > this patch.
+> > 
+> > The boot loader start kernel at EL2, so is_hyp_mode_available() will be
+> > true and we will use physical timer. Without this patch,
+> > arch_timer_read_counter set to arch_counter_get_cntvct even when we use
+> > physical timer which is incorrect but at least system will boot.
 > 
+> So on arm64 we want to use CNTVCT all the time, even if we start the
+> kernel at EL2. This is the counter that gets exposed to user via vdso.
+> When the kernel boots at EL2, we initialise CNTVOFF to 0, so we know
+> that CNTVCT == CNTPCT. However, I would still prefer to use CNTVCT even
+> in such case to spot possible firmware issues with not restoring CNTVOFF
+> when coming out of suspend (one particular case of suspend which does
+> not require a different kernel entry point).
 > 
-> On Tuesday 09 December 2014 06:42 AM, Chanwoo Choi wrote:
->> Hi Pankaj,
->>
->> On 12/08/2014 08:31 PM, Pankaj Dubey wrote:
->>> Hi Chanwoo,
->>>
->>> On Tuesday 02 December 2014 02:19 PM, Chanwoo Choi wrote:
->>>> This patch adds missing divider/gate clocks of CMU_PERIC domain
->>>> which includes I2S/PCM/SPDIF/PWM/SLIMBUS IPs. The SPI/I2S may use
->>>> external input clock which has 'ioclk_*' prefix.
->>>>
->>>> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
->>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>> [ideal.song: Change clk flags of to pclk_gpio_* clk, pclk_gpio_* should be always on.]
->>>> Signed-off-by: Inha Song <ideal.song@samsung.com>
->>>> Acked-by: Inki Dae <inki.dae@samsung.com>
->>>> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
->>>> ---
->>>>    drivers/clk/samsung/clk-exynos5433.c   | 80 +++++++++++++++++++++++++++++++++-
->>>>    include/dt-bindings/clock/exynos5433.h | 34 ++++++++++++++-
->>>>    2 files changed, 112 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
->>>> index 88e8cac..a48b36c 100644
->>>> --- a/drivers/clk/samsung/clk-exynos5433.c
->>>> +++ b/drivers/clk/samsung/clk-exynos5433.c
->>>> @@ -256,6 +256,14 @@ static struct samsung_fixed_rate_clock top_fixed_clks[] __initdata = {
->>>>        FRATE(0, "ioclk_audiocdclk0", NULL, CLK_IS_ROOT, 100000000),
->>>>        /* Xi2s1SDI input clock for SPDIF */
->>>>        FRATE(0, "ioclk_spdif_extclk", NULL, CLK_IS_ROOT, 100000000),
->>>> +    /* XspiCLK[4:0] input clock for SPI */
->>>> +    FRATE(0, "ioclk_spi4_clk_in", NULL, CLK_IS_ROOT, 50000000),
->>>> +    FRATE(0, "ioclk_spi3_clk_in", NULL, CLK_IS_ROOT, 50000000),
->>>> +    FRATE(0, "ioclk_spi2_clk_in", NULL, CLK_IS_ROOT, 50000000),
->>>> +    FRATE(0, "ioclk_spi1_clk_in", NULL, CLK_IS_ROOT, 50000000),
->>>> +    FRATE(0, "ioclk_spi0_clk_in", NULL, CLK_IS_ROOT, 50000000),
->>>> +    /* Xi2s1SCLK input clock for I2S1_BCLK */
->>>> +    FRATE(0, "ioclk_i2s1_bclk_in", NULL, CLK_IS_ROOT, 12288000),
->>>>    };
->>>>
->>>>    static struct samsung_mux_clock top_mux_clks[] __initdata = {
->>>> @@ -760,6 +768,7 @@ CLK_OF_DECLARE(exynos5433_cmu_mif, "samsung,exynos5433-cmu-mif",
->>>>     * Register offset definitions for CMU_PERIC
->>>>     */
->>>>    #define DIV_PERIC            0x0600
->>>> +#define DIV_STAT_PERIC            0x0700
->>>>    #define ENABLE_ACLK_PERIC        0x0800
->>>>    #define ENABLE_PCLK_PERIC0        0x0900
->>>>    #define ENABLE_PCLK_PERIC1        0x0904
->>>> @@ -770,6 +779,7 @@ CLK_OF_DECLARE(exynos5433_cmu_mif, "samsung,exynos5433-cmu-mif",
->>>>
->>>>    static unsigned long peric_clk_regs[] __initdata = {
->>>>        DIV_PERIC,
->>>> +    DIV_STAT_PERIC,
->>>
->>> IMO, this line should have been added in first place itself when you added peric_clk_regs.
->>
->> Why? I want to locate it according to address base.
+> > I think we still need this function on arm64. We should add BUG() to
+> > arch_timer_init instead, maybe something like this:
+> > 
+> > @@ -708,9 +708,12 @@ static void __init arch_timer_init(struct device_node *np)
+> >  	 * If we cannot rely on firmware initializing the timer registers then
+> >  	 * we should use the physical timers instead.
+> >  	 */
+> > -	if (IS_ENABLED(CONFIG_ARM) &&
+> > -	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
+> > +	if (of_property_read_bool(np, "arm,cpu-registers-not-fw-configured")) {
+> > +		if (IS_ENABLED(CONFIG_ARM64))
+> > +			BUG();
+> > +		else
+> >  			arch_timer_use_virtual = false;
+> > +	}
 > 
-> Since DIV_PERIC and DIV_STAT_PERIC both has same address base, why not to add DIV_STAT_PERIC at the same place when you added DIV_PERIC?
+> We could be more tolerant (give people a chance to check their DT):
+> 
+> 	if (!WARN_ON(IS_ENABLED(CONFIG_ARM64)))
+> 		arch_timer_use_virtual = false;
+> 
+> In addition, we can define arch_counter_get_cntpct to always read CNTVCT
+> (not that nice but maybe it looks better with a comment):
+> 
+> /*
+>  * AArch64 kernel and user space mandate the use of CNTVCT.
+>  */
+> #define arch_counter_get_cntpct	arch_counter_get_cntvct
+> 
+> (or any better suggestion to avoid reading CNTPCT on arm64)
+> 
 
-I mean the register offset instead of address base.
-DIV_PERIC(0x0600) is less than DIV_STAT_PERIC(0x0700).
-So, I want to locate DIV_STAT_PERIC on behind DIV_PERIC in ascending order.
+I'm not sure about this. arch_timer_use_virtual is false, indicate we
+are using physical timer, the function name suggest it will read
+physical timer, but actually it is reading virtual timer. It sure will
+create confusion when one need to debug.
 
-But, It is just minor issue.
+We are using physical timer because arch_timer_init() will check
+is_hyp_mode_available(), and use physical timer if it is avaliable. For
+arm64, if we want to use virtual timer even in HYP mode, how about this
+change:
 
-Best Regards,
-Chanwoo Choi
+@@ -720,7 +723,8 @@ static void __init arch_timer_init(struct device_node *np)
+         * If no interrupt provided for virtual timer, we'll have to
+         * stick to the physical timer. It'd better be accessible...
+         */
+-       if (is_hyp_mode_available() || !arch_timer_ppi[VIRT_PPI]) {
++       if ((IS_ENABLED(CONFIG_ARM) && is_hyp_mode_available()) ||
++           !arch_timer_ppi[VIRT_PPI]) {
+                arch_timer_use_virtual = false;
 
-> 
-> Anyways, this was just my opinion as I don't see any dependency why we should add it here? I left this up to you.
-> 
->>
->>>
->>>>        ENABLE_ACLK_PERIC,
->>>>        ENABLE_PCLK_PERIC0,
->>>>        ENABLE_PCLK_PERIC1,
->>>> @@ -779,14 +789,57 @@ static unsigned long peric_clk_regs[] __initdata = {
->>>>        ENABLE_IP_PERIC2,
->>>>    };
->>>>
->>>> +static struct samsung_div_clock peric_div_clks[] __initdata = {
->>>> +    /* DIV_PERIC */
->>>> +    DIV(CLK_DIV_SCLK_SCI, "div_sclk_sci", "fin_pll", DIV_PERIC, 4, 8),
->>>
->>> As per UM I have DIV_SCLK_SCI has 4 bit wide as [7:4] please cross verify.
->>
->> You're right. It is my mistake. I'll fix it.
->>
->> Best Regards,
->> Chanwoo Choi
->>
-> Thanks,
-> Pankaj Dubey
-> 
+                if (!arch_timer_ppi[PHYS_SECURE_PPI] ||
+
+Maybe also add some WARN_ON for arm64 here to make sure we never set
+arch_timer_use_virtual to false for ARM64.
+
+Joe.C
