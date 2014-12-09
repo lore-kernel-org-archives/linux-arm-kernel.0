@@ -1,130 +1,142 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 9 Dec 2014 10:57:46 -0600
-Subject: regression: OMAP4 (next-20141204) (bisect to: ARM: 8208/1: l2c:
- Refactor the driver to use commit-like)
-In-Reply-To: <5481D9BF.2090007@ti.com>
-References: <5481D913.9040109@ti.com>
- <5481D9BF.2090007@ti.com>
-Message-ID: <20141209165746.GA29935@kahuna>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 9 Dec 2014 16:58:07 +0000
+Subject: [PATCH v5] clocksource: arch_timer: Fix code to use physical
+ timers when requested
+In-Reply-To: <1418106718.32622.31.camel@mtksdaap41>
+References: <1416812564-26465-1-git-send-email-sonnyrao@chromium.org>
+ <1417776064.14380.17.camel@mtksdaap41>
+ <20141208162140.GN16185@e104818-lin.cambridge.arm.com>
+ <1418106718.32622.31.camel@mtksdaap41>
+Message-ID: <20141209165807.GJ31129@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:13-20141205, Nishanth Menon wrote:
-> On 12/05/2014 10:10 AM, Nishanth Menon wrote:
-> > next-20141204 fails to boot, but next-20141203 boots fine with
-> > omap2plus_defconfig.
+On Tue, Dec 09, 2014 at 06:31:58AM +0000, Yingjoe Chen wrote:
+> On Mon, 2014-12-08 at 16:21 +0000, Catalin Marinas wrote:
+> > On Fri, Dec 05, 2014 at 10:41:04AM +0000, Yingjoe Chen wrote:
+> > > On Sun, 2014-11-23 at 23:02 -0800, Sonny Rao wrote: 
+> > > > This is a bug fix for using physical arch timers when
+> > > > the arch_timer_use_virtual boolean is false.  It restores the
+> > > > arch_counter_get_cntpct() function after removal in
+> > > > 
+> > > > 0d651e4e "clocksource: arch_timer: use virtual counters"
+> > > > 
+> > > > We need this on certain ARMv7 systems which are architected like this:
+> > > > diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> > > > index f190971..b1fa4e6 100644
+> > > > --- a/arch/arm64/include/asm/arch_timer.h
+> > > > +++ b/arch/arm64/include/asm/arch_timer.h
+> > > > @@ -104,6 +104,15 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+> > > >  	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+> > > >  }
+> > > >  
+> > > > +static inline u64 arch_counter_get_cntpct(void)
+> > > > +{
+> > > > +	/*
+> > > > +	 * AArch64 kernel and user space mandate the use of CNTVCT.
+> > > > +	 */
+> > > > +	BUG();
+> > > > +	return 0;
+> > > > +}
+> > > > +
+> > > >  static inline u64 arch_counter_get_cntvct(void)
+> > > >  {
+> > > >  	u64 cval;
+> > > 
+> > > I tested this on an arm64 platform and system fail to boot when apply
+> > > this patch.
+> > > 
+> > > The boot loader start kernel at EL2, so is_hyp_mode_available() will be
+> > > true and we will use physical timer. Without this patch,
+> > > arch_timer_read_counter set to arch_counter_get_cntvct even when we use
+> > > physical timer which is incorrect but at least system will boot.
 > > 
-> > Panda-ES(4460):
-> > https://github.com/nmenon/kernel-test-logs/blob/next-20141204/omap2plus_defconfig/pandaboard-es.txt
-> > Panda(4430):
-> > https://github.com/nmenon/kernel-test-logs/blob/next-20141204/omap2plus_defconfig/pandaboard-vanilla.txt
+> > So on arm64 we want to use CNTVCT all the time, even if we start the
+> > kernel at EL2. This is the counter that gets exposed to user via vdso.
+> > When the kernel boots at EL2, we initialise CNTVOFF to 0, so we know
+> > that CNTVCT == CNTPCT. However, I would still prefer to use CNTVCT even
+> > in such case to spot possible firmware issues with not restoring CNTVOFF
+> > when coming out of suspend (one particular case of suspend which does
+> > not require a different kernel entry point).
 > > 
-> > at the point of hang (JTAG):
-> >  pandaboard-es:
-> > 	cpu0: http://slexy.org/view/s2eIFqkRd5
-> > 	cpu1: http://slexy.org/view/s2Tysb6gpL
+> > > I think we still need this function on arm64. We should add BUG() to
+> > > arch_timer_init instead, maybe something like this:
+> > > 
+> > > @@ -708,9 +708,12 @@ static void __init arch_timer_init(struct device_node *np)
+> > >  	 * If we cannot rely on firmware initializing the timer registers then
+> > >  	 * we should use the physical timers instead.
+> > >  	 */
+> > > -	if (IS_ENABLED(CONFIG_ARM) &&
+> > > -	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
+> > > +	if (of_property_read_bool(np, "arm,cpu-registers-not-fw-configured")) {
+> > > +		if (IS_ENABLED(CONFIG_ARM64))
+> > > +			BUG();
+> > > +		else
+> > >  			arch_timer_use_virtual = false;
+> > > +	}
 > > 
-> > Case #1:
-> > Disabling CPUIDLE allows boot to proceed. there does not seem to have
-> > been any change in drivers/cpuidle and arch/arm/mach-omap2 w.r.t this.
+> > We could be more tolerant (give people a chance to check their DT):
 > > 
-> > Case #2: Reverting the following allows boot.
+> > 	if (!WARN_ON(IS_ENABLED(CONFIG_ARM64)))
+> > 		arch_timer_use_virtual = false;
 > > 
-> > From next-20141204
-> > 10df7d5 ARM: 8211/1: l2c: Add support for overriding prefetch settings
-> > revert this  -> boot still fails
+> > In addition, we can define arch_counter_get_cntpct to always read CNTVCT
+> > (not that nice but maybe it looks better with a comment):
 > > 
-> > d42ced0 ARM: 8210/1: l2c: Get outer cache .write_sec callback from
-> > mach_desc only if not NULL
-> > revert this  -> boot still fails
+> > /*
+> >  * AArch64 kernel and user space mandate the use of CNTVCT.
+> >  */
+> > #define arch_counter_get_cntpct	arch_counter_get_cntvct
 > > 
-> > 46b9af8 ARM: 8209/1: l2c: Add interface to ask hypervisor to configure L2C
-> > revert this  -> boot still fails
-> > 
-> > c94e325 ARM: 8208/1: l2c: Refactor the driver to use commit-like
-> > revert this  -> boot passed (first bad commit).
-> > 
+> > (or any better suggestion to avoid reading CNTPCT on arm64)
 > > 
 > 
-> + linux-samsung soc and updated Thomaz's mail ID (gmail now).
+> I'm not sure about this. arch_timer_use_virtual is false, indicate we
+> are using physical timer, the function name suggest it will read
+> physical timer, but actually it is reading virtual timer. It sure will
+> create confusion when one need to debug.
 
-Spend a few mins trying to track this down and it does look like commit
-c94e325 does a kmemdup for the data as part of l2x0_of_init->__l2c_init
+You mix timer and counter terms here. Anyway, of we use physical timer,
+you could argue that it makes sense to use the corresponding physical
+counter (CNTPCT). However, on arm64 we only expose CNTVCT to user VDSO
+and we want to use the same in the kernel. When booting at EL2, CNTVCT
+== CNTPCT because we control CNTVOFF, that's unless we have some broken
+firmware that does not restore CNTVOFF correctly. That's what we want
+to spot early, hence the aim to always use the virtual counter (but not
+the timer, use use the physical timer as it makes it easier for KVM).
 
-This fails since the invocation is in early_init. doing it a bit later
-as the following hack makes it work
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 608079a..0bc6bd9 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -170,12 +170,19 @@ static const char *const omap4_boards_compat[] __initconst = {
- 	NULL,
- };
- 
-+
-+static void tmp_init_irq(void)
-+{
-+	omap_l2_cache_init();
-+	omap_gic_of_init();
-+}
-+
- DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.smp		= smp_ops(omap4_smp_ops),
- 	.map_io		= omap4_map_io,
- 	.init_early	= omap4430_init_early,
--	.init_irq	= omap_gic_of_init,
-+	.init_irq	= tmp_init_irq,
- 	.init_machine	= omap_generic_init,
- 	.init_late	= omap4430_init_late,
- 	.init_time	= omap4_local_timer_init,
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 03cbb16..f97847d 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -627,7 +627,6 @@ void __init omap4430_init_early(void)
- 	omap44xx_clockdomains_init();
- 	omap44xx_hwmod_init();
- 	omap_hwmod_init_postsetup();
--	omap_l2_cache_init();
- 	omap_clk_soc_init = omap4xxx_dt_clk_init;
- }
- 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index e5948c5..0ca90db 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -848,8 +848,11 @@ static int __init __l2c_init(const struct l2c_init_data *data,
- 	 * context from callers can access the structure.
- 	 */
- 	l2x0_data = kmemdup(data, sizeof(*data), GFP_KERNEL);
--	if (!l2x0_data)
-+	if (!l2x0_data) {
-+		pr_err("%s no mem %d\n", __func__, sizeof(*data));
-+		dump_stack();
- 		return -ENOMEM;
-+	}
- 
- 	/*
- 	 * Sanity check the aux values.  aux_mask is the bits we preserve
-@@ -1647,6 +1650,7 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
- 	struct device_node *np;
- 	struct resource res;
- 	u32 cache_id, old_aux;
-+	int r;
- 
- 	np = of_find_matching_node(NULL, l2x0_ids);
- 	if (!np)
-@@ -1693,6 +1697,8 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
- 	else
- 		cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
- 
--	return __l2c_init(data, aux_val, aux_mask, cache_id);
-+	r = __l2c_init(data, aux_val, aux_mask, cache_id);
-+	pr_err("%s: %d\n", __func__, r);
-+	return r;
- }
+So the patch below, on top of linux-next, should solve the BUG():
 
--- 
-Regards,
-Nishanth Menon
+---------------------8<------------------------------
+
+>From 9be3c61788eff2e7d010d627582118fa6aae1d9c Mon Sep 17 00:00:00 2001
+From: Catalin Marinas <catalin.marinas@arm.com>
+Date: Tue, 9 Dec 2014 16:44:06 +0000
+Subject: [PATCH] clocksource: arch_timer: Only use the virtual counter
+ (CNTVCT) on arm64
+
+The arm64 kernel uses CNTVCT in VDSO. When booting in EL2, the kernel
+switches to the physical timers to make things easier for KVM but it
+continues to use the virtual counter both in user and kernel. While in
+such scenario CNTVCT == CNTPCT (since CNTVOFF is initialised by the
+kernel to 0), we want to spot firmware bugs corrupting CNTVOFF early
+(which would affect CNTVCT).
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ drivers/clocksource/arm_arch_timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 6a79fc4f900c..095c1774592c 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -462,7 +462,7 @@ static void __init arch_counter_register(unsigned type)
+ 
+ 	/* Register the CP15 based counter if we have one */
+ 	if (type & ARCH_CP15_TIMER) {
+-		if (arch_timer_use_virtual)
++		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_use_virtual)
+ 			arch_timer_read_counter = arch_counter_get_cntvct;
+ 		else
+ 			arch_timer_read_counter = arch_counter_get_cntpct;
