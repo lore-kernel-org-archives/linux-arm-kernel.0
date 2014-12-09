@@ -1,67 +1,66 @@
-From: moon.linux@yahoo.com (Anand Moon)
-Date: Tue,  9 Dec 2014 15:33:18 +0530
-Subject: [PATCH v2] do_work_pending: Enable interrupts in do_work_pending()
-Message-ID: <1418119398-5112-1-git-send-email-moon.linux@yahoo.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 9 Dec 2014 11:04:24 +0100
+Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
+In-Reply-To: <20141006102129.GA14286@e102568-lin.cambridge.arm.com>
+References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141006083821.GB4090@lukather>
+ <20141006102129.GA14286@e102568-lin.cambridge.arm.com>
+Message-ID: <20141209100424.GT8739@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent change triggered a WARN_ON that interrupts were disabled,
-and in fact other architectures enable interrupts uniformly for their
-related do_work_pending() type code, and all the things we call from
-this routine appear to expect interrupts to be enabled.  So, enable them.
-Below is the warning.
+Hi Lorenzo,
 
-v2 Remove the call of local_irq_disable during restart of signal.
+On Mon, Oct 06, 2014 at 11:21:29AM +0100, Lorenzo Pieralisi wrote:
+> Hi Maxime,
+> 
+> sorry for the delay in repling.
+> 
+> On Mon, Oct 06, 2014 at 09:38:21AM +0100, Maxime Ripard wrote:
+> > Hi Lorenzo,
+> > 
+> > On Tue, Sep 02, 2014 at 08:21:05PM +0200, Maxime Ripard wrote:
+> > > The current GPL only licensing on the DTSI makes it very impractical for other
+> > > software components licensed under another license.
+> > > 
+> > > In order to make it easier for them to reuse our device trees, relicense our
+> > > DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
+> > > 
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Carlo Caione <carlo.caione@gmail.com>
+> > > Cc: Chen-Yu Tsai <wens@csie.org>
+> > > Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+> > > Cc: Emilio L?pez <emilio@elopez.com.ar>
+> > > Cc: Hans de Goede <hdegoede@redhat.com>
+> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Cc: Oliver Schinagl <oliver@schinagl.nl>
+> > > Cc: Roman Byshko <rbyshko@gmail.com>
+> > > Cc: Stefan Roese <sr@denx.de>
+> > 
+> > We need your approval for this license change, otherwise we won't be
+> > able to merge it.
+> > 
+> > What's your feeling about this?
+> 
+> My feeling does not matter much here, I have to ask for approval and to
+> be honest I am not in a position to provide you with a firm date/time for
+> this to happen, I will try to get an answer asap.
 
-[   12.094106] systemd-udevd[1643]: starting version 204
-[   13.466537] ------------[ cut here ]------------
-[   13.469750] WARNING: CPU: 1 PID: 1645 at kernel/locking/lockdep.c:3536 check_flags+0x7c/0x1d0()
-[   13.478397] DEBUG_LOCKS_WARN_ON(current->hardirqs_enabled)
-[   13.483663] Modules linked in:
-[   13.486863] CPU: 1 PID: 1645 Comm: systemd-udevd Not tainted 3.17.4-arm7 #6
-[   13.493851] [<c0013dc8>] (unwind_backtrace) from [<c0011208>] (show_stack+0x10/0x14)
-[   13.501563] [<c0011208>] (show_stack) from [<c05df5f0>] (dump_stack+0x80/0xac)
-[   13.508753] [<c05df5f0>] (dump_stack) from [<c0024594>] (warn_slowpath_common+0x60/0x84)
-[   13.516808] [<c0024594>] (warn_slowpath_common) from [<c00245e4>] (warn_slowpath_fmt+0x2c/0x3c)
-[   13.525463] [<c00245e4>] (warn_slowpath_fmt) from [<c006c508>] (check_flags+0x7c/0x1d0)
-[   13.533447] [<c006c508>] (check_flags) from [<c006cf60>] (lock_is_held+0x34/0x60)
-[   13.540884] [<c006cf60>] (lock_is_held) from [<c05e0500>] (__schedule+0x98/0x7cc)
-[   13.548342] [<c05e0500>] (__schedule) from [<c0010adc>] (do_work_pending+0x28/0xbc)
-[   13.555962] [<c0010adc>] (do_work_pending) from [<c000dd38>] (work_pending+0xc/0x20)
-[   13.563663] ---[ end trace 33bbfa4173cfa520 ]---
-[   13.568238] possible reason: unannotated irqs-off.
-[   13.573005] irq event stamp: 5227
-[   13.576293] hardirqs last  enabled at (5227): [<c000dd04>] ret_fast_syscall+0x24/0x48
-[   13.584096] hardirqs last disabled at (5226): [<c000dcec>] ret_fast_syscall+0xc/0x48
-[   13.591823] softirqs last  enabled at (5222): [<c00283b0>] __do_softirq+0x1e8/0x270
-[   13.599447] softirqs last disabled at (5205): [<c00286f4>] irq_exit+0x84/0xf4
-[   13.656634] random: nonblocking pool is initialized
+Do you have any update on this?
 
-Signed-off-by: Anand Moon <moon.linux@yahoo.com>
----
- arch/arm/kernel/signal.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+Thanks,
+Maxime
 
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index bd19834..195745a 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -574,12 +574,13 @@ asmlinkage int
- do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
- {
- 	do {
-+		if (unlikely(!user_mode(regs)))
-+			return 0;
-+
-+		local_irq_enable();
- 		if (likely(thread_flags & _TIF_NEED_RESCHED)) {
- 			schedule();
- 		} else {
--			if (unlikely(!user_mode(regs)))
--				return 0;
--			local_irq_enable();
- 			if (thread_flags & _TIF_SIGPENDING) {
- 				int restart = do_signal(regs, syscall);
- 				if (unlikely(restart)) {
 -- 
-2.1.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141209/04eaaf7e/attachment.sig>
