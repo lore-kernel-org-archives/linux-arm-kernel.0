@@ -1,54 +1,63 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Wed, 10 Dec 2014 00:13:19 +0900
-Subject: [PATCH v14 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
-In-Reply-To: <1418121037.3641.22.camel@linaro.org>
-References: <1418020040-68977-1-git-send-email-wangnan0@huawei.com>
- <1418020131-69375-1-git-send-email-wangnan0@huawei.com>
- <1418036666.3647.33.camel@linaro.org> <5485886E.2060303@huawei.com>
- <1418039451.3647.48.camel@linaro.org> <5486CB9F.6030804@hitachi.com>
- <1418121037.3641.22.camel@linaro.org>
-Message-ID: <5487118F.4010606@hitachi.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Tue, 9 Dec 2014 20:48:04 +0530
+Subject: [PATCH] dmaengine: pl330: Set residue in tx_status callback
+In-Reply-To: <20141208130727.GK16827@intel.com>
+References: <1416995095-13763-1-git-send-email-padma.v@samsung.com>
+ <CAAgF-BfpU72KTJjVd8jWStD8yJ5sSmXOiQm77xQunO2QhC9ExQ@mail.gmail.com>
+ <547DF61D.3010909@metafoo.de>
+ <CAAgF-BfPyaOhhrA5L8vm2WDnhBYDexJFkGxqL1GsL2TMB8z=Rw@mail.gmail.com>
+ <CAJe_Zhd2-vBgAoJsBt7JCOYDuTZrBCScSZ1HaNO3gNTZ-P6A9A@mail.gmail.com>
+ <20141205151843.GV11285@n2100.arm.linux.org.uk>
+ <CAJe_ZhfDsfehCXHB6pCuQ6672kXBYFxh687cZT1qaSCOyLy76g@mail.gmail.com>
+ <20141208130727.GK16827@intel.com>
+Message-ID: <CAJe_ZhfKFdrV8=oMiH0hJeOmGAmPNbZ7rUXsqN+Ak7PvOnZEmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2014/12/09 19:30), Jon Medhurst (Tixy) wrote:
-> On Tue, 2014-12-09 at 19:14 +0900, Masami Hiramatsu wrote:
->> (2014/12/08 20:50), Jon Medhurst (Tixy) wrote:> arch_optimize_kprobes is calling __arch_optimize_kprobes, which is
->>> iterating over a list of probes and removing each one in turn, if this
->>> is happening on multiple cpu's simultaneously, it's not clear to me that
->>> such an operation is safe. list_del_init calls __list_del which does
->>>
->>> 	next->prev = prev;
->>> 	prev->next = next;
->>>
->>> so what happens if another cpu is at the same time updating any of those
->>> list entries? Without even fully analysing the code I can see that with
->>> the fact that the list handling helpers have no memory barriers, that
->>> the above two lines could be seen to execute in the reverse order, e.g.
->>>
->>> 	prev->next = next;
->>> 	next->prev = prev;
->>>
->>> so another CPU could find and delete next before this one has finished
->>> doing so. Would the list end up in a consistent state where no loops
->>> develop and no probes are missed? I don't know the answer and a full
->>> analysis would be complicated, but my gut feeling is that if a cpu can
->>> observe the links in the list in an inconsistent state then only bad
->>> things can result.
+On 8 December 2014 at 18:37, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Sat, Dec 06, 2014 at 12:31:01PM +0530, Jassi Brar wrote:
+>> It does, though, create an "awkward situation" when a channel is
+>> active while new requests are submitted - why would the channel want
+>> to stop after current transfer and await fresh issue_pending()? It's
+>> not that the request can be modified after submission.
 >>
->> Just a comment, arch_optimize_kprobes() are only called under
->> kprobe_mutex held. No concurrent update happens :)
-> 
-> Except in the case of the code I was commenting on which was using
-> stop_machine to make all cpu's simultaneously do the work of
-> arch_optimize_kprobes :-)
+>> And it isn't that tx_submit() is meant for 'sleepable' preparation for
+>> the transfer and we need another call to be issued from atomic
+>> context. From what I see most drivers don't need to sleep in
+>> tx_submit(). In fact, from a quick look most clients seem to suffer
+>> from the ritual i.e, there's nothing between tx_submit() and
+>> issue_pending() calls. And when there is indeed some code, it seems
+>> that can be moved just before tx_submit().
+>>
+>> Last and apparently the least of all, we can never enforce the same
+>> behavior of the api on Async dma and have uniform behavior over the
+>> api.
+>>
+>> So, if all tx_submit() does is put the request in controller driver's
+>> internal queue and the client can't touch the request after
+>> tx_submit(), why not merge the tx_submit() and issue_pending()?
+> You are thinking from an API point and not what can be done with this API.
+>
+"awkward situation" and "ritual suffering" above, are two practical
+issues that we see.
 
-Ah, right! stop_machine with cpu_online_mask cause that problem.
+> Today this API allows you to collate all pending txn and start while
+> dmaengine driver can collate and submit as a batch to hardware and not waste
+> time in getting irq and then setting next one. Sadly none of the drivers use
+> this feature...
+>
+So we at least agree that the "feature" is unused so far.
+And I doubt if it would ever make sense to batch transfers in slave
+dma (unlike offloading on async-dma) because the user has to also
+setup the master for each queued request, mostly if not always.
 
-Thanks,
+> I actually like the split model, you can also prepare txn ahead of time and
+> submit them when needed. If you don't like this, then please do as most
+> implementation do today, call prepare and submit in series. Flexiblity in
+> API is a better option IMO
+>
+As Russell pointed out, that ain't the case either.
+So we are yet to figure out benefits of having explicit
+issue_pending() after tx_submit().
 
--- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+-Jassi
