@@ -1,46 +1,49 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Tue, 09 Dec 2014 19:14:55 +0900
-Subject: [PATCH v14 7/7] ARM: kprobes: enable OPTPROBES for ARM
- 32
-In-Reply-To: <1418039451.3647.48.camel@linaro.org>
-References: <1418020040-68977-1-git-send-email-wangnan0@huawei.com>
- <1418020131-69375-1-git-send-email-wangnan0@huawei.com>
- <1418036666.3647.33.camel@linaro.org> <5485886E.2060303@huawei.com>
- <1418039451.3647.48.camel@linaro.org>
-Message-ID: <5486CB9F.6030804@hitachi.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Tue, 9 Dec 2014 11:19:40 +0100
+Subject: using DMA-API on ARM
+In-Reply-To: <5485D97D.1040404@broadcom.com>
+References: <5481794E.4050406@broadcom.com>
+ <F51492713EF10846800D8C0ED37A7DCE01901765@SJEXCHMB15.corp.ad.broadcom.com>
+ <F51492713EF10846800D8C0ED37A7DCE01902076@SJEXCHMB15.corp.ad.broadcom.com>
+ <2863746.4sUSEYqahB@wuerfel>
+ <20141208160316.GM16185@e104818-lin.cambridge.arm.com>
+ <5485D97D.1040404@broadcom.com>
+Message-ID: <5486CCBC.3@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2014/12/08 20:50), Jon Medhurst (Tixy) wrote:> arch_optimize_kprobes is calling __arch_optimize_kprobes, which is
-> iterating over a list of probes and removing each one in turn, if this
-> is happening on multiple cpu's simultaneously, it's not clear to me that
-> such an operation is safe. list_del_init calls __list_del which does
+On 12/08/14 18:01, Arend van Spriel wrote:
+> On 12/08/14 17:03, Catalin Marinas wrote:
+>> On Mon, Dec 08, 2014 at 03:01:32PM +0000, Arnd Bergmann wrote:
+>>> [ 0.000000] PL310 OF: cache setting yield illegal associativity
+>>> [ 0.000000] PL310 OF: -1069781724 calculated, only 8 and 16 legal
+>>> [ 0.000000] L2C-310 enabling early BRESP for Cortex-A9
+>>> [ 0.000000] L2C-310 full line of zeros enabled for Cortex-A9
+>>> [ 0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
+>>> [ 0.000000] L2C-310 cache controller enabled, 16 ways, 256 kB
+>>> [ 0.000000] L2C-310: CACHE_ID 0x410000c8, AUX_CTRL 0x4e130001
+>>
+>> If the above value is correct, they should make sure bit 22 is set in
+>> AUX_CTRL.
 >
-> 	next->prev = prev;
-> 	prev->next = next;
+> Hante applied the patch and it now says:
 >
-> so what happens if another cpu is at the same time updating any of those
-> list entries? Without even fully analysing the code I can see that with
-> the fact that the list handling helpers have no memory barriers, that
-> the above two lines could be seen to execute in the reverse order, e.g.
+> [ 0.000000] PL310 OF: cache setting yield illegal associativity
+> [ 0.000000] PL310 OF: -1069781724 calculated, only 8 and 16 legal
+> [ 0.000000] L2C-310 enabling early BRESP for Cortex-A9
+> [ 0.000000] L2C-310 full line of zeros enabled for Cortex-A9
+> [ 0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
+> [ 0.000000] L2C-310 cache controller enabled, 16 ways, 256 kB
+> [ 0.000000] L2C-310: CACHE_ID 0x410000c8, AUX_CTRL 0x4e530001
 >
-> 	prev->next = next;
-> 	next->prev = prev;
->
-> so another CPU could find and delete next before this one has finished
-> doing so. Would the list end up in a consistent state where no loops
-> develop and no probes are missed? I don't know the answer and a full
-> analysis would be complicated, but my gut feeling is that if a cpu can
-> observe the links in the list in an inconsistent state then only bad
-> things can result.
+> He started running a test overnight. So will see if it hits the failure
+> with this L2 cache configuration.
 
-Just a comment, arch_optimize_kprobes() are only called under
-kprobe_mutex held. No concurrent update happens :)
+The issue did not trigger overnight so it seems setting bit 22 <Shared 
+Attribute _Override_ Enable> solves the issue over here. Now the 
+question is how to move forward with this. As I understood from Catalin 
+this patch was not included as it was not considered responsibility of 
+the linux kernel.
 
-Thank you,
-
--- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+Regards,
+Arend
