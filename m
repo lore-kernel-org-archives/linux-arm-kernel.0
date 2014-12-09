@@ -1,33 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Dec 2014 13:29:29 +0100
-Subject: [PATCH] arm64: psci: Fix build breakage without PM_SLEEP
-In-Reply-To: <1418125716-18528-1-git-send-email-k.kozlowski@samsung.com>
-References: <1418125716-18528-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <2290734.BRljGaICu4@wuerfel>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 9 Dec 2014 13:38:14 +0100
+Subject: [GIT PULL 2/9] arm/arm64: kvm: drop inappropriate use of
+ kvm_is_mmio_pfn()
+In-Reply-To: <CAKv+Gu8Y+gQmDBGCwiLYGpTtE9MnNpu6YnNJDEJjBoi+XBxV2g@mail.gmail.com>
+References: <1418124368-28418-1-git-send-email-christoffer.dall@linaro.org>
+ <1418124368-28418-3-git-send-email-christoffer.dall@linaro.org>
+ <CAKv+Gu8Y+gQmDBGCwiLYGpTtE9MnNpu6YnNJDEJjBoi+XBxV2g@mail.gmail.com>
+Message-ID: <20141209123814.GA15880@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 December 2014 12:48:36 Krzysztof Kozlowski wrote:
-> Fix build failure of defconfig when PM_SLEEP is disabled (e.g. by
-> disabling SUSPEND) and CPU_IDLE enabled:
+On Tue, Dec 09, 2014 at 01:29:52PM +0100, Ard Biesheuvel wrote:
+> On 9 December 2014 at 12:26, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >
+> > Instead of using kvm_is_mmio_pfn() to decide whether a host region
+> > should be stage 2 mapped with device attributes, add a new static
+> > function kvm_is_device_pfn() that disregards RAM pages with the
+> > reserved bit set, as those should usually not be mapped as device
+> > memory.
+> >
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> arch/arm64/kernel/psci.c:543:2: error: unknown field ?cpu_suspend? specified in initializer
->   .cpu_suspend = cpu_psci_cpu_suspend,
->   ^
-> arch/arm64/kernel/psci.c:543:2: warning: initialization from incompatible pointer type [enabled by default]
-> arch/arm64/kernel/psci.c:543:2: warning: (near initialization for ?cpu_psci_ops.cpu_prepare?) [enabled by default]
-> make[1]: *** [arch/arm64/kernel/psci.o] Error 1
+> As I mentioned last week, this patch (and the next one) are already in
+> 3.18 so unless there is some policy I am unaware of, these do not have
+> to be submitted again.
 > 
-> The cpu_operations.cpu_suspend field exists only if ARM64_CPU_SUSPEND is
-> defined, not CPU_IDLE.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
+They're in kvmarm/next, which is a stable branch (doesn't rebase) so our
+only choice would be to revert this commit specifically in kvmarm/next
+before sending the pull request.  Since that would be more confusing
+than help anything, and Paolo said to just include the duplicate commit
+in the pull request, here it is.
 
-No objection to fixing this obvious build bug, but why do we even have
-an ARM64_CPU_SUSPEND option? On ARM32 we only have the respective option
-because we have a random collection of platform specific drivers that
-use the symbols, but that's not the case on ARM64.
+As we can see in linux-next, it's not really a problem.
 
-
-	Arnd
+-Christoffer
