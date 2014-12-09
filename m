@@ -1,13 +1,48 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Tue, 9 Dec 2014 10:14:10 +0800
-Subject: [RESEND][PATCH v15 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
-In-Reply-To: 1418047765-53197-8-git-send-email-wangnan0@huawei.com
-Message-ID: <54865AF2.5040707@huawei.com>
+From: flora.fu@mediatek.com (Flora Fu)
+Date: Tue, 9 Dec 2014 10:15:37 +0800
+Subject: [PATCH v3 1/8] soc: mediatek: Add PMIC wrapper for MT8135 and
+ MT6397 SoC
+In-Reply-To: <2751641.o51TuZRl88@wuerfel>
+References: <1417752479-4749-1-git-send-email-flora.fu@mediatek.com>
+ <1417752479-4749-2-git-send-email-flora.fu@mediatek.com>
+ <2751641.o51TuZRl88@wuerfel>
+Message-ID: <1418091337.5663.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi, Arnd,
 
-Looks like v15 patch solves the problems found in patch v13 and v14. I run Tixy's test
-cases in a loop for a whole night on two real unpublished Hisilicon ARM A15 SoCs (I
-backported kprobes to 3.10 kernel), no problem arise, they are still running now.
+On Fri, 2014-12-05 at 11:13 +0100, Arnd Bergmann wrote:
+> On Friday 05 December 2014 12:07:52 Flora Fu wrote:
+> > Add PMIC wrapper of MT8135 to access MT6397 MFD.
+> > 
+> > Signed-off-by: Flora Fu <flora.fu@mediatek.com>
+> > 
+> 
+> Please explain what a PMIC wrapper is and why you need one for MT8135.
+> I don't understand the purpose of this code at all. Is this just another
+> way of accessing the MT6397 when not using i2c or spi like other
+> PMIC drivers do?
+> 
+
+Yes, MT8135 uses a proprietary hardware to communicate with MT6397. 
+The hardware is called PMIC Wrapper or PWRAP.
+Since it is not standard i2c or spi protocols, a soc related software
+driver is implemented to handle access protocols in AP side.
+
++-----------------+           +---------------+
+|                 |           |               |
+| Mediatek AP SoC |           |               |
+| (ex. MT8135)    |           |    MT6397     |
+|                 |           |               |
+|      +--------+ | (SPI bus) | +--------+    |
+|      |        | |-----------| |        |    |
+|      |  PMIC  | |-----------| |  PMIC  |    |
+|      | Wrapper| |-----------| | Wrapper|    |
+|      |        | |-----------| |        |    |
+|      +--------+ |           | +--------+    |
+|                 |           |               |
++-----------------+           +---------------+
+
+Thanks,
+Flora
