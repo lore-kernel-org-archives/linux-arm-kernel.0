@@ -1,39 +1,56 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 9 Dec 2014 11:40:03 +0530
-Subject: [PATCH] dmaengine: pl330: Set residue in tx_status callback
-In-Reply-To: <20141208142321.GE11285@n2100.arm.linux.org.uk>
-References: <1416995095-13763-1-git-send-email-padma.v@samsung.com>
- <CAAgF-BfpU72KTJjVd8jWStD8yJ5sSmXOiQm77xQunO2QhC9ExQ@mail.gmail.com>
- <547DF61D.3010909@metafoo.de>
- <CAAgF-BfPyaOhhrA5L8vm2WDnhBYDexJFkGxqL1GsL2TMB8z=Rw@mail.gmail.com>
- <CAJe_Zhd2-vBgAoJsBt7JCOYDuTZrBCScSZ1HaNO3gNTZ-P6A9A@mail.gmail.com>
- <20141205151843.GV11285@n2100.arm.linux.org.uk>
- <CAJe_ZhfDsfehCXHB6pCuQ6672kXBYFxh687cZT1qaSCOyLy76g@mail.gmail.com>
- <20141208130727.GK16827@intel.com>
- <20141208142321.GE11285@n2100.arm.linux.org.uk>
-Message-ID: <20141209061003.GX16827@intel.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 9 Dec 2014 14:11:29 +0800
+Subject: [PATCH] irqchip: mediatek: Fix error return code detection
+In-Reply-To: <alpine.DEB.2.11.1412082114340.16275@nanos>
+References: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
+ <alpine.DEB.2.11.1412082114340.16275@nanos>
+Message-ID: <1418105489.32622.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 02:23:21PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 08, 2014 at 06:37:27PM +0530, Vinod Koul wrote:
-> > I actually like the split model, you can also prepare txn ahead of time and
-> > submit them when needed.
+On Mon, 2014-12-08 at 21:30 +0100, Thomas Gleixner wrote:
+> On Mon, 8 Dec 2014, Yingjoe Chen wrote:
 > 
-> Actually, you can't - that's not permitted.  I have email(s) from Dan
-> explicitly stating that it is permitted for a driver to take a spinlock
-> in their prepare callback, and release it when the descriptor is
-> submitted.  Several DMA engine drivers (particularly those in for
-> async_tx) do exactly that.
+> > This fix an error handling bug reported by Beniamino, this is based on
+> > mtk intpol patches [1]
+> >
+> > Joe.C
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305808.html
+> > 
+> > ====================
+> > of_io_request_and_map() return ERR_PTR wrapped error code instead of
+> > NULL when fail, fix code in mtk_sysirq_of_init() to correctly handle
+> > this.
+> > 
+> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 > 
-> The reason that submit is separate from prepare is to allow DMA engine
-> users to set a callback - if it weren't for that, there wouldn't be a
-> submit step, prepare would have done everything.
-Yes thats right.
+> This is not a proper changelog. Let me write up a proper one:
+> 
+> Subject: irqchip: mediatek: Use IS_ERR() instead of NULL pointer check
+> 
+> Beniamino reported a kernel oops caused by an invalid DT file for the
+> mediatek interrupt polarity extension.
+> 
+> The reason is that the interrupt polarity support for mediatek chips
+> merily checks for at NULL pointer instead of a casted error return
+> value in mtk_sysirq_of_init() so any other casted error value passes
+> the NULL pointer check and causes a kernel panic when dereferenced.
+> 
+> Use IS_ERR() and return the error value via PTR_ERR().
+> 
+> Reported-and-tested-by: Beniamino Galvani <b.galvani@gmail.com>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> 
+> Can you see the difference?
+> 
+> Thanks,
+> 
+> 	tglx
 
-Do you mind pointing to thread Dan replied, I would like to add these bits
-and anything else missing to Documentation
+Thanks for the review.
 
-Thanks
--- 
-~Vinod
+This changelog describe issue and why we need this change more clearly.
+I'll prepare a new patch with this changelog, Thanks.
+
+Joe.C
