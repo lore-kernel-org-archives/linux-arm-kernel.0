@@ -1,464 +1,574 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 09 Dec 2014 23:13:03 +0900
-Subject: [RFC PATCHv2 4/7] devfreq: event: Add exynos-ppmu devfreq event driver
+Date: Tue, 09 Dec 2014 23:13:00 +0900
+Subject: [RFC PATCHv2 1/7] devfreq: event: Add new devfreq_event class to
+ provide basic data for devfreq governor
 In-Reply-To: <1418134386-14681-1-git-send-email-cw00.choi@samsung.com>
 References: <1418134386-14681-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1418134386-14681-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1418134386-14681-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add exynos-ppmu devfreq event driver to provider raw data about
-the utilization of each IP in Exynos SoC series.
+This patch add new devfreq_event class for devfreq_event device which provide
+raw data (e.g., memory bus utilization/GPU utilization). This raw data from
+devfreq_event data would be used for the governor of devfreq subsystem.
+- devfreq_event device : Provide raw data for governor of existing devfreq device
+- devfreq device       : Monitor device state and change frequency/voltage of device
+                         using the raw data from devfreq_event device
+
+The devfreq subsystem support generic DVFS(Dynamic Voltage/Frequency Scaling)
+for Non-CPU Devices. The devfreq device would dertermine current device state
+using various governor (e.g., ondemand, performance, powersave). After completed
+determination of system state, devfreq device would change the frequency/voltage
+of devfreq device according to the result of governor.
+
+But, devfreq governor must need basic data which indicates current device state.
+Existing devfreq subsystem only consider devfreq device which check current system
+state and determine proper system state using basic data. There is no subsystem
+for device providing basic data to devfreq device.
+
+The devfreq subsystem must need devfreq_event device(data-provider device) for
+existing devfreq device. So, this patch add new devfreq_event class for
+devfreq_event device which read various basic data(e.g, memory bus utilization,
+GPU utilization) and provide measured data to existing devfreq device through
+standard APIs of devfreq_event class.
+
+The following description explains the feature of two kind of devfreq class:
+- devfreq class (existing)
+ : devfreq consumer device use raw data from devfreq_event device for
+   determining proper current system state and change voltage/frequency
+   dynamically using various governors.
+
+- devfreq_event class (new)
+ : Provide measured raw data to devfreq device for governor
 
 Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
 Cc: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/devfreq/Kconfig             |   9 +
- drivers/devfreq/event/Makefile      |   1 +
- drivers/devfreq/event/exynos-ppmu.c | 409 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 419 insertions(+)
- create mode 100644 drivers/devfreq/event/exynos-ppmu.c
+ drivers/devfreq/Kconfig         |   2 +
+ drivers/devfreq/Makefile        |   5 +-
+ drivers/devfreq/devfreq-event.c | 302 ++++++++++++++++++++++++++++++++++++++++
+ drivers/devfreq/event/Makefile  |   1 +
+ include/linux/devfreq.h         | 141 +++++++++++++++++++
+ 5 files changed, 450 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/devfreq/devfreq-event.c
+ create mode 100644 drivers/devfreq/event/Makefile
 
 diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
-index 4d15b62..d4559f7 100644
+index faf4e70..4d15b62 100644
 --- a/drivers/devfreq/Kconfig
 +++ b/drivers/devfreq/Kconfig
-@@ -89,4 +89,13 @@ config ARM_EXYNOS5_BUS_DEVFREQ
+@@ -87,4 +87,6 @@ config ARM_EXYNOS5_BUS_DEVFREQ
+ 	  It reads PPMU counters of memory controllers and adjusts the
+ 	  operating frequencies and voltages with OPP support.
  
- comment "DEVFREQ Event Drivers"
- 
-+config DEVFREQ_EVENT_EXYNOS_PPMU
-+	bool "EXYNOS PPMU (Performance Profiling Monitoring Unit) DEVFREQ event Driver"
-+	depends on ARCH_EXYNOS
-+	select PM_OPP
-+	help
-+	 This add the DEVFREQ event driver for Exynos SoC. It provides PPMU
-+	 (Performance Profiling Monitoring Unit) counters to estimate the
-+	 utilization of each module.
++comment "DEVFREQ Event Drivers"
 +
  endif # PM_DEVFREQ
-diff --git a/drivers/devfreq/event/Makefile b/drivers/devfreq/event/Makefile
-index dc56005..be146ea 100644
---- a/drivers/devfreq/event/Makefile
-+++ b/drivers/devfreq/event/Makefile
-@@ -1 +1,2 @@
- # Exynos DEVFREQ Event Drivers
-+obj-$(CONFIG_DEVFREQ_EVENT_EXYNOS_PPMU) += exynos-ppmu.o
-diff --git a/drivers/devfreq/event/exynos-ppmu.c b/drivers/devfreq/event/exynos-ppmu.c
+diff --git a/drivers/devfreq/Makefile b/drivers/devfreq/Makefile
+index 16138c9..a1ffabe 100644
+--- a/drivers/devfreq/Makefile
++++ b/drivers/devfreq/Makefile
+@@ -1,4 +1,4 @@
+-obj-$(CONFIG_PM_DEVFREQ)	+= devfreq.o
++obj-$(CONFIG_PM_DEVFREQ)		+= devfreq.o devfreq-event.o
+ obj-$(CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND)	+= governor_simpleondemand.o
+ obj-$(CONFIG_DEVFREQ_GOV_PERFORMANCE)	+= governor_performance.o
+ obj-$(CONFIG_DEVFREQ_GOV_POWERSAVE)	+= governor_powersave.o
+@@ -7,3 +7,6 @@ obj-$(CONFIG_DEVFREQ_GOV_USERSPACE)	+= governor_userspace.o
+ # DEVFREQ Drivers
+ obj-$(CONFIG_ARM_EXYNOS4_BUS_DEVFREQ)	+= exynos/
+ obj-$(CONFIG_ARM_EXYNOS5_BUS_DEVFREQ)	+= exynos/
++
++# DEVFREQ Event Drivers
++obj-$(CONFIG_PM_DEVFREQ)		+= event/
+diff --git a/drivers/devfreq/devfreq-event.c b/drivers/devfreq/devfreq-event.c
 new file mode 100644
-index 0000000..2706f23
+index 0000000..b47329f
 --- /dev/null
-+++ b/drivers/devfreq/event/exynos-ppmu.c
-@@ -0,0 +1,409 @@
++++ b/drivers/devfreq/devfreq-event.c
+@@ -0,0 +1,302 @@
 +/*
-+ * exynos_ppmu.c - EXYNOS PPMU (Performance Profiling Monitoring Units) support
++ * devfreq-event: Generic DEVFREQ Event class driver
 + *
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ * Author : Chanwoo Choi <cw00.choi@samsung.com>
++ * Copyright (C) 2014 Samsung Electronics
++ * Chanwoo Choi <cw00.choi@samsung.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
-+ * This driver is based on drivers/devfreq/exynos/exynos_ppmu.c
++ * This driver is based on drivers/devfreq/devfreq.c
 + */
 +
-+#include <linux/clk.h>
-+#include <linux/io.h>
 +#include <linux/kernel.h>
++#include <linux/sched.h>
++#include <linux/errno.h>
++#include <linux/err.h>
++#include <linux/init.h>
 +#include <linux/module.h>
-+#include <linux/mutex.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/suspend.h>
++#include <linux/slab.h>
++#include <linux/stat.h>
++#include <linux/pm_opp.h>
 +#include <linux/devfreq.h>
++#include <linux/workqueue.h>
++#include <linux/platform_device.h>
++#include <linux/list.h>
++#include <linux/printk.h>
++#include <linux/hrtimer.h>
++#include <linux/of.h>
++#include "governor.h"
 +
-+#define PPMU_ENABLE             BIT(0)
-+#define PPMU_DISABLE            0x0
-+#define PPMU_CYCLE_RESET        BIT(1)
-+#define PPMU_COUNTER_RESET      BIT(2)
++static struct class *devfreq_event_class;
 +
-+#define PPMU_ENABLE_COUNT0      BIT(0)
-+#define PPMU_ENABLE_COUNT1      BIT(1)
-+#define PPMU_ENABLE_COUNT2      BIT(2)
-+#define PPMU_ENABLE_COUNT3      BIT(3)
-+#define PPMU_ENABLE_CYCLE       BIT(31)
++/* The list of all devfreq event list */
++static LIST_HEAD(devfreq_event_list);
++static DEFINE_MUTEX(devfreq_event_list_lock);
 +
-+#define PPMU_CNTENS		0x10
-+#define PPMU_FLAG		0x50
-+#define PPMU_CCNT_OVERFLOW	BIT(31)
-+#define PPMU_CCNT		0x100
++#define to_devfreq_event(DEV) container_of(DEV, struct devfreq_event_dev, dev)
 +
-+#define PPMU_PMCNT0		0x110
-+#define PPMU_PMCNT_OFFSET	0x10
-+#define PMCNT_OFFSET(x)		(PPMU_PMCNT0 + (PPMU_PMCNT_OFFSET * x))
-+
-+#define PPMU_BEVT0SEL		0x1000
-+#define PPMU_BEVTSEL_OFFSET	0x100
-+#define PPMU_BEVTSEL(x)		(PPMU_BEVT0SEL + (x * PPMU_BEVTSEL_OFFSET))
-+
-+#define RD_DATA_COUNT		0x5
-+#define WR_DATA_COUNT		0x6
-+#define RDWR_DATA_COUNT		0x7
-+
-+enum ppmu_counter {
-+	PPMU_PMNCNT0,
-+	PPMU_PMNCNT1,
-+	PPMU_PMNCNT2,
-+	PPMU_PMNCNT3,
-+	PPMU_PMNCNT_MAX,
-+};
-+
-+/* Platform data */
-+struct exynos_ppmu_data {
-+	struct devfreq *devfreq;
-+	struct devfreq_event_dev **event_dev;
-+	struct devfreq_event_desc *desc;
-+	unsigned int num_events;
-+
-+	struct device *dev;
-+	struct clk *clk_ppmu;
-+	struct mutex lock;
-+
-+	struct __exynos_ppmu {
-+		void __iomem *hw_base;
-+		unsigned int ccnt;
-+		unsigned int event[PPMU_PMNCNT_MAX];
-+		unsigned int count[PPMU_PMNCNT_MAX];
-+		unsigned long long ns;
-+		ktime_t reset_time;
-+		bool ccnt_overflow;
-+		bool count_overflow[PPMU_PMNCNT_MAX];
-+	} ppmu;
-+};
-+
-+struct __exynos_ppmu_events {
-+	char *name;
-+	int id;
-+} ppmu_events[] = {
-+	{ "ppmu-dmc0-pmcnt0", PPMU_PMNCNT0 },
-+	{ "ppmu-dmc0-pmcnt1", PPMU_PMNCNT1 },
-+	{ "ppmu-dmc0-pmcnt2", PPMU_PMNCNT2 },
-+	{ "ppmu-dmc0-pmcnt3", PPMU_PMNCNT3 },
-+
-+	{ "ppmu-dmc1-pmcnt0", PPMU_PMNCNT0 },
-+	{ "ppmu-dmc1-pmcnt1", PPMU_PMNCNT1 },
-+	{ "ppmu-dmc1-pmcnt2", PPMU_PMNCNT2 },
-+	{ "ppmu-dmc1-pmcnt3", PPMU_PMNCNT3 },
-+
-+	{ "ppmu-cpu-pmcnt0", PPMU_PMNCNT0 },
-+	{ "ppmu-cpu-pmcnt1", PPMU_PMNCNT1 },
-+	{ "ppmu-cpu-pmcnt2", PPMU_PMNCNT2 },
-+	{ "ppmu-cpu-pmcnt3", PPMU_PMNCNT3 },
-+
-+	{ "ppmu-rightbus-pmcnt0", PPMU_PMNCNT0 },
-+	{ "ppmu-rightbus-pmcnt1", PPMU_PMNCNT1 },
-+	{ "ppmu-rightbus-pmcnt2", PPMU_PMNCNT2 },
-+	{ "ppmu-rightbus-pmcnt3", PPMU_PMNCNT3 },
-+
-+	{ "ppmu-leftbus-pmcnt0", PPMU_PMNCNT0 },
-+	{ "ppmu-leftbus-pmcnt1", PPMU_PMNCNT1 },
-+	{ "ppmu-leftbus-pmcnt2", PPMU_PMNCNT2 },
-+	{ "ppmu-leftbus-pmcnt3", PPMU_PMNCNT3 },
-+
-+	{ "ppmu-camif-pmcnt0", PPMU_PMNCNT0 },
-+	{ "ppmu-camif-pmcnt1", PPMU_PMNCNT1 },
-+	{ "ppmu-camif-pmcnt2", PPMU_PMNCNT2 },
-+	{ "ppmu-camif-pmcnt3", PPMU_PMNCNT3 },
-+
-+	{ "ppmu-lcd0-pmcnt0", PPMU_PMNCNT0 },
-+	{ "ppmu-lcd0-pmcnt1", PPMU_PMNCNT1 },
-+	{ "ppmu-lcd0-pmcnt2", PPMU_PMNCNT2 },
-+	{ "ppmu-lcd0-pmcnt3", PPMU_PMNCNT3 },
-+
-+	{ "ppmu-g3d-pmcnt0", PPMU_PMNCNT0 },
-+	{ "ppmu-g3d-pmcnt1", PPMU_PMNCNT1 },
-+	{ "ppmu-g3d-pmcnt2", PPMU_PMNCNT2 },
-+	{ "ppmu-g3d-pmcnt3", PPMU_PMNCNT3 },
-+
-+	{ "ppmu-mfc-pmcnt0", PPMU_PMNCNT0 },
-+	{ "ppmu-mfc-pmcnt1", PPMU_PMNCNT1 },
-+	{ "ppmu-mfc-pmcnt2", PPMU_PMNCNT2 },
-+	{ "ppmu-mfc-pmcnt3", PPMU_PMNCNT3 },
-+
-+	{ "ppmu-fsys-pmcnt0", PPMU_PMNCNT0 },
-+	{ "ppmu-fsys-pmcnt1", PPMU_PMNCNT1 },
-+	{ "ppmu-fsys-pmcnt2", PPMU_PMNCNT2 },
-+	{ "ppmu-fsys-pmcnt3", PPMU_PMNCNT3 },
-+	{ /* sentinel */ },
-+};
-+
-+static int exynos_ppmu_enable(struct devfreq_event_dev *event_dev)
++struct devfreq_event_dev *devfreq_add_event_device(struct device *dev,
++					struct devfreq_event_desc *desc)
 +{
-+	struct exynos_ppmu_data *exynos_ppmu = event_dev_get_drvdata(event_dev);
++	struct devfreq_event_dev *event_dev;
++	static atomic_t event_no = ATOMIC_INIT(0);
++	int ret;
 +
-+	__raw_writel(PPMU_ENABLE, exynos_ppmu->ppmu.hw_base);
++	if (!dev || !desc)
++		return ERR_PTR(-EINVAL);
 +
-+	return 0;
++	if (!desc->name || !desc->ops)
++		return ERR_PTR(-EINVAL);
++
++	event_dev = kzalloc(sizeof(struct devfreq_event_dev), GFP_KERNEL);
++	if (!event_dev)
++		return ERR_PTR(-ENOMEM);
++
++	mutex_lock(&devfreq_event_list_lock);
++
++	mutex_init(&event_dev->lock);
++	event_dev->desc = desc;
++	event_dev->dev.parent = dev;
++	event_dev->dev.class = devfreq_event_class;
++
++	dev_set_name(&event_dev->dev, "event.%d",
++		     atomic_inc_return(&event_no) - 1);
++	ret = device_register(&event_dev->dev);
++	if (ret != 0) {
++		put_device(&event_dev->dev);
++		goto err;
++	}
++	dev_set_drvdata(&event_dev->dev, event_dev);
++
++	/* Add devfreq event device to devfreq_event_list */
++	INIT_LIST_HEAD(&event_dev->node);
++	list_add(&event_dev->node, &devfreq_event_list);
++
++	mutex_unlock(&devfreq_event_list_lock);
++
++	return event_dev;
++err:
++	kfree(event_dev);
++	return ERR_PTR(ret);
 +}
++EXPORT_SYMBOL(devfreq_add_event_device);
 +
-+static int exynos_ppmu_disable(struct devfreq_event_dev *event_dev)
++struct devfreq_event_dev *devfreq_get_event_dev(const char *event_dev_name)
 +{
-+	struct exynos_ppmu_data *exynos_ppmu = event_dev_get_drvdata(event_dev);
++	struct devfreq_event_dev *event_dev;
 +
-+	__raw_writel(PPMU_DISABLE, exynos_ppmu->ppmu.hw_base);
++	mutex_lock(&devfreq_event_list_lock);
++	list_for_each_entry(event_dev, &devfreq_event_list, node) {
++		if (!strcmp(event_dev->desc->name, event_dev_name))
++			goto out;
++	}
++	event_dev = NULL;
++out:
++	mutex_unlock(&devfreq_event_list_lock);
 +
-+	return 0;
++	return event_dev;
 +}
++EXPORT_SYMBOL_GPL(devfreq_get_event_dev);
 +
-+static bool exynos_ppmu_is_enabled(struct devfreq_event_dev *event_dev)
++struct devfreq_event_dev *devfreq_get_event_dev_by_phandle(struct device *dev,
++						      int index)
 +{
-+	struct exynos_ppmu_data *exynos_ppmu = event_dev_get_drvdata(event_dev);
-+	int val;
++	struct device_node *node;
++	struct devfreq_event_dev *event_dev;
 +
-+	val = __raw_readl(exynos_ppmu->ppmu.hw_base);
-+	if (val & PPMU_ENABLE)
-+		return true;
-+
-+	return false;
-+}
-+
-+static int exynos_ppmu_find_ppmu_id(struct devfreq_event_dev *event_dev)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(ppmu_events); i++)
-+		if (!strcmp(event_dev->desc->name, ppmu_events[i].name))
-+			return ppmu_events[i].id;
-+
-+	return -EINVAL;
-+}
-+
-+static int exynos_ppmu_set_event(struct devfreq_event_dev *event_dev,
-+				enum devfreq_event_type event_type)
-+{
-+	struct exynos_ppmu_data *exynos_ppmu = event_dev_get_drvdata(event_dev);
-+	void __iomem *ppmu_base = exynos_ppmu->ppmu.hw_base;
-+	int id = exynos_ppmu_find_ppmu_id(event_dev);
-+
-+	__raw_writel(RDWR_DATA_COUNT, ppmu_base + PPMU_BEVTSEL(id));
-+
-+	return 0;
-+}
-+
-+static int exynos_ppmu_get_event(struct devfreq_event_dev *event_dev,
-+				enum devfreq_event_type event_type,
-+				int *total_event)
-+{
-+	struct exynos_ppmu_data *exynos_ppmu = event_dev_get_drvdata(event_dev);
-+	void __iomem *ppmu_base = exynos_ppmu->ppmu.hw_base;
-+	int id = exynos_ppmu_find_ppmu_id(event_dev);
-+	int cnt, total_cnt;
-+
-+	total_cnt = __raw_readl(ppmu_base + PPMU_CCNT);
-+
-+	if (id == PPMU_PMNCNT3)
-+		cnt = ((__raw_readl(ppmu_base + PMCNT_OFFSET(id)) << 8) |
-+			  __raw_readl(ppmu_base + PMCNT_OFFSET(id + 1)));
-+	else
-+		cnt = __raw_readl(ppmu_base + PMCNT_OFFSET(id));
-+
-+	*total_event = total_cnt;
-+
-+	return cnt;
-+}
-+
-+static int exynos_ppmu_reset(struct devfreq_event_dev *event_dev)
-+{
-+	struct exynos_ppmu_data *exynos_ppmu = event_dev_get_drvdata(event_dev);
-+	void __iomem *ppmu_base = exynos_ppmu->ppmu.hw_base;
-+
-+	__raw_writel(PPMU_CYCLE_RESET | PPMU_COUNTER_RESET, ppmu_base);
-+	__raw_writel(PPMU_ENABLE_CYCLE  |
-+		     PPMU_ENABLE_COUNT0 |
-+		     PPMU_ENABLE_COUNT1 |
-+		     PPMU_ENABLE_COUNT2 |
-+		     PPMU_ENABLE_COUNT3,
-+		     ppmu_base + PPMU_CNTENS);
-+	__raw_writel(PPMU_ENABLE, exynos_ppmu->ppmu.hw_base);
-+
-+	return 0;
-+}
-+
-+static struct devfreq_event_ops exynos_ppmu_ops = {
-+	.enable		= exynos_ppmu_enable,
-+	.disable	= exynos_ppmu_disable,
-+	.is_enabled	= exynos_ppmu_is_enabled,
-+	.set_event	= exynos_ppmu_set_event,
-+	.get_event	= exynos_ppmu_get_event,
-+	.reset		= exynos_ppmu_reset,
-+};
-+
-+static int of_get_devfreq_events(struct device_node *np,
-+				struct exynos_ppmu_data *exynos_ppmu)
-+{
-+	struct devfreq_event_desc *desc;
-+	struct device *dev = exynos_ppmu->dev;
-+	struct device_node *events_np, *node;
-+	int i, j, count;
-+
-+	events_np = of_find_node_by_name(np, "events");
-+	if (!events_np) {
-+		dev_err(dev, "Failed to find ppmus sub-node\n");
-+		return -EINVAL;
++	if (!dev->of_node) {
++		dev_err(dev, "device does not have a device node entry\n");
++		return ERR_PTR(-EINVAL);
 +	}
 +
-+	count = of_get_child_count(events_np);
-+	desc = devm_kzalloc(dev, sizeof(struct devfreq_event_desc) * count,
-+			      GFP_KERNEL);
-+	if (!desc)
-+		return -ENOMEM;
-+	exynos_ppmu->num_events = count;
-+
-+	j = 0;
-+	for_each_child_of_node(events_np, node) {
-+		for (i = 0; i < ARRAY_SIZE(ppmu_events); i++) {
-+			if (!of_node_cmp(node->name, ppmu_events[i].name))
-+				break;
-+		}
-+
-+		if (i == ARRAY_SIZE(ppmu_events)) {
-+			dev_warn(dev,
-+				"don't know how to configure events : %s\n",
-+				node->name);
-+			continue;
-+		}
-+		desc[j].ops = &exynos_ppmu_ops;
-+		desc[j].driver_data = exynos_ppmu;
-+		desc[j].event_type |= DEVFREQ_EVENT_TYPE_RAW_DATA;
-+		of_property_read_string(node, "event-name", &desc[j].name);
-+		j++;
++	node = of_parse_phandle(dev->of_node, "devfreq-events", index);
++	if (!node) {
++		dev_err(dev, "failed to get phandle in %s node\n",
++			dev->of_node->full_name);
++		return ERR_PTR(-ENODEV);
 +	}
-+	exynos_ppmu->desc = desc;
 +
++	event_dev = devfreq_get_event_dev(node->name);
++	if (!event_dev) {
++		dev_err(dev, "unable to get devfreq-event device : %s\n",
++			node->name);
++		return ERR_PTR(-ENODEV);
++	}
++
++	return event_dev;
++}
++EXPORT_SYMBOL_GPL(devfreq_get_event_dev_by_phandle);
++
++int devfreq_put_event_dev(struct devfreq_event_dev *event_dev)
++{
 +	return 0;
 +}
++EXPORT_SYMBOL_GPL(devfreq_put_event_dev);
 +
-+static int exynos_ppmu_parse_dt(struct exynos_ppmu_data *exynos_ppmu)
++int devfreq_enable_event_dev(struct devfreq_event_dev *event_dev)
 +{
-+	struct device *dev = exynos_ppmu->dev;
-+	struct device_node *np = dev->of_node;
 +	int ret = 0;
 +
-+	if (!np) {
-+		dev_err(dev, "Failed to find devicetree node\n");
++	if (!event_dev || !event_dev->desc)
 +		return -EINVAL;
++
++	mutex_lock(&event_dev->lock);
++	if (event_dev->desc->ops && event_dev->desc->ops->enable) {
++		ret = event_dev->desc->ops->enable(event_dev);
++		if (ret < 0)
++			goto err;
 +	}
-+
-+	/* Maps the memory mapped IO to control PPMU register */
-+	exynos_ppmu->ppmu.hw_base = of_iomap(np, 0);
-+	if (IS_ERR_OR_NULL(exynos_ppmu->ppmu.hw_base)) {
-+		dev_err(dev, "Failed to map memory region\n");
-+		ret = -EINVAL;
-+		goto err_iomap;
-+	}
-+
-+	/* FIXME: Get the clock of ppmu and enable this clock */
-+	exynos_ppmu->clk_ppmu = devm_clk_get(dev, "ppmu");
-+	if (IS_ERR(exynos_ppmu->clk_ppmu))
-+		dev_warn(dev, "Failed to get PPMU clock\n");
-+
-+	ret = of_get_devfreq_events(np, exynos_ppmu);
-+	if (ret < 0) {
-+		dev_err(dev, "Failed to parse exynos ppmu dt node\n");
-+		goto err_clock;
-+	}
-+
-+	return 0;
-+
-+err_clock:
-+	clk_disable_unprepare(exynos_ppmu->clk_ppmu);
-+err_iomap:
-+	iounmap(exynos_ppmu->ppmu.hw_base);
++	event_dev->enable_count++;
++err:
++	mutex_unlock(&event_dev->lock);
 +
 +	return ret;
 +}
++EXPORT_SYMBOL_GPL(devfreq_enable_event_dev);
 +
-+static int exynos_ppmu_probe(struct platform_device *pdev)
++int devfreq_disable_event_dev(struct devfreq_event_dev *event_dev)
 +{
-+	struct exynos_ppmu_data *exynos_ppmu;
-+	struct devfreq_event_dev **event_dev;
-+	struct devfreq_event_desc *desc;
-+	int i, ret = 0, size;
++	int ret = 0;
 +
-+	/* Allocate the memory of exynos_ppmu_data and initialize it */
-+	exynos_ppmu = devm_kzalloc(&pdev->dev, sizeof(struct exynos_ppmu_data),
-+				   GFP_KERNEL);
-+	if (!exynos_ppmu)
-+		return -ENOMEM;
++	if (!event_dev || !event_dev->desc)
++		return -EINVAL;
 +
-+	mutex_init(&exynos_ppmu->lock);
-+	exynos_ppmu->dev = &pdev->dev;
-+
-+	/* Parse dt data to get resource */
-+	ret = exynos_ppmu_parse_dt(exynos_ppmu);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Failed to parse DT node for resource\n");
-+		return ret;
++	mutex_lock(&event_dev->lock);
++	if (event_dev->enable_count > 0) {
++		event_dev->enable_count--;
++	} else {
++		dev_warn(&event_dev->dev, "unbalanced enable_count\n");
++		ret = -EINVAL;
++		goto err;
 +	}
-+	desc = exynos_ppmu->desc;
 +
-+	size = sizeof(struct devfreq_event_dev *) * exynos_ppmu->num_events;
-+	exynos_ppmu->event_dev = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
-+	if (!exynos_ppmu->event_dev) {
-+		dev_err(&pdev->dev,
-+			"Failed to allocate memory devfreq_event_dev list\n");
-+		return -ENOMEM;
-+	}
-+	event_dev = exynos_ppmu->event_dev;
-+	platform_set_drvdata(pdev, exynos_ppmu);
-+
-+	for (i = 0; i < exynos_ppmu->num_events; i++) {
-+		event_dev[i] = devfreq_add_event_device(&pdev->dev, &desc[i]);
-+		if (IS_ERR(event_dev)) {
-+			ret = PTR_ERR(event_dev);
-+			dev_err(&pdev->dev, "Failed to add devfreq evt dev\n");
++	if (event_dev->desc->ops && event_dev->desc->ops->disable) {
++		ret = event_dev->desc->ops->disable(event_dev);
++		if (ret < 0) {
++			event_dev->enable_count++;
 +			goto err;
 +		}
 +	}
-+
-+	return 0;
 +err:
-+	clk_disable_unprepare(exynos_ppmu->clk_ppmu);
-+	iounmap(exynos_ppmu->ppmu.hw_base);
++	mutex_unlock(&event_dev->lock);
 +
 +	return ret;
 +}
++EXPORT_SYMBOL_GPL(devfreq_disable_event_dev);
 +
-+static int exynos_ppmu_remove(struct platform_device *pdev)
++bool devfreq_is_enabled_event_dev(struct devfreq_event_dev *event_dev)
 +{
-+	struct exynos_ppmu_data *exynos_ppmu = platform_get_drvdata(pdev);
++	bool enabled = false;
 +
-+	clk_disable_unprepare(exynos_ppmu->clk_ppmu);
-+	iounmap(exynos_ppmu->ppmu.hw_base);
++	if (!event_dev || !event_dev->desc)
++		return enabled;
 +
-+	/* Remove devfreq instance */
-+	devfreq_remove_device(exynos_ppmu->devfreq);
++	if (!(event_dev->enable_count > 0))
++		return enabled;
++
++	if (event_dev->desc->ops && event_dev->desc->ops->is_enabled)
++		enabled = event_dev->desc->ops->is_enabled(event_dev);
++
++	return enabled;
++}
++EXPORT_SYMBOL_GPL(devfreq_is_enabled_event_dev);
++
++int devfreq_set_event_event_dev(struct devfreq_event_dev *event_dev)
++{
++	if (!event_dev || !event_dev->desc)
++		return -EINVAL;
++
++	if (!devfreq_is_enabled_event_dev(event_dev))
++		return -EPERM;
++
++	if (event_dev->desc->ops && event_dev->desc->ops->set_event)
++		return event_dev->desc->ops->set_event(event_dev);
++
++	return -EINVAL;
++}
++EXPORT_SYMBOL_GPL(devfreq_set_event_event_dev);
++
++int devfreq_get_event_event_dev(struct devfreq_event_dev *event_dev,
++				int *total_event)
++{
++	if (!event_dev || !event_dev->desc)
++		return -EINVAL;
++
++	if (!devfreq_is_enabled_event_dev(event_dev))
++		return -EPERM;
++
++	if (event_dev->desc->ops && event_dev->desc->ops->get_event)
++		return event_dev->desc->ops->get_event(event_dev, total_event);
++
++	return -EINVAL;
++}
++EXPORT_SYMBOL_GPL(devfreq_get_event_event_dev);
++
++int devfreq_reset_event_dev(struct devfreq_event_dev *event_dev)
++{
++	if (!event_dev || !event_dev->desc)
++		return -EINVAL;
++
++	if (!devfreq_is_enabled_event_dev(event_dev))
++		return -EPERM;
++
++	if (event_dev->desc->ops && event_dev->desc->ops->reset)
++		return event_dev->desc->ops->reset(event_dev);
++
++	return -EINVAL;
++}
++EXPORT_SYMBOL_GPL(devfreq_reset_event_dev);
++
++void *event_dev_get_drvdata(struct devfreq_event_dev *event_dev)
++{
++	return event_dev->desc->driver_data;
++}
++EXPORT_SYMBOL_GPL(event_dev_get_drvdata);
++
++/*
++ * Device Attribues for devfreq event class
++ */
++static ssize_t name_show(struct device *dev,
++				       struct device_attribute *attr,
++				       char *buf)
++{
++	struct devfreq_event_dev *event_dev = to_devfreq_event(dev);
++
++	if (!event_dev || !event_dev->desc)
++		return -EINVAL;
++
++	return sprintf(buf, "%s\n", event_dev->desc->name);
++}
++static DEVICE_ATTR_RO(name);
++
++static struct attribute *devfreq_event_attrs[] = {
++	&dev_attr_name.attr,
++	NULL,
++};
++ATTRIBUTE_GROUPS(devfreq_event);
++
++static int __init devfreq_event_init(void)
++{
++	devfreq_event_class = class_create(THIS_MODULE, "devfreq_event");
++	if (IS_ERR(devfreq_event_class)) {
++		pr_err("%s: couldn't create class\n", __FILE__);
++		return PTR_ERR(devfreq_event_class);
++	}
++
++	devfreq_event_class->dev_groups = devfreq_event_groups;
 +
 +	return 0;
 +}
++subsys_initcall(devfreq_event_init);
 +
-+static struct of_device_id exynos_ppmu_id_match[] = {
-+	{ .compatible = "samsung,exynos-ppmu", },
-+	{ /* sentinel */ },
-+};
++static void __exit devfreq_event_exit(void)
++{
++	class_destroy(devfreq_event_class);
++}
++module_exit(devfreq_event_exit);
 +
-+static struct platform_driver exynos_ppmu_driver = {
-+	.probe	= exynos_ppmu_probe,
-+	.remove	= exynos_ppmu_remove,
-+	.driver = {
-+		.name	= "exynos-ppmu",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = exynos_ppmu_id_match,
-+	},
-+};
-+
-+module_platform_driver(exynos_ppmu_driver);
-+
-+MODULE_DESCRIPTION("EXYNOS PPMU(Performance Profiling Monitoring Unit) driver");
 +MODULE_AUTHOR("Chanwoo Choi <cw00.choi@samsung.com>");
++MODULE_DESCRIPTION("devfreq-event class support");
 +MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:exynos-ppmu");
+diff --git a/drivers/devfreq/event/Makefile b/drivers/devfreq/event/Makefile
+new file mode 100644
+index 0000000..dc56005
+--- /dev/null
++++ b/drivers/devfreq/event/Makefile
+@@ -0,0 +1 @@
++# Exynos DEVFREQ Event Drivers
+diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
+index f1863dc..3c5f233 100644
+--- a/include/linux/devfreq.h
++++ b/include/linux/devfreq.h
+@@ -175,6 +175,68 @@ struct devfreq {
+ 	unsigned long last_stat_updated;
+ };
+ 
++/**
++ * struct devfreq_event_dev - the devfreq-event device 
++ *
++ * @node	: Contain the devfreq-event device that have been registered.
++ * @dev		: the device registered by devfreq-event class. dev.parent is
++ *		  the device using devfreq-event.
++ * @lock	: a mutex to protect accessing devfreq-event.
++ * @enable_count: the number of enable function have been called.
++ * @desc	: the description for devfreq-event device.
++ *
++ * This structure contains devfreq-event device information.
++ */
++struct devfreq_event_dev {
++	struct list_head node;
++
++	struct device dev;
++	struct mutex lock;
++	u32 enable_count;
++
++	const struct devfreq_event_desc *desc;
++};
++
++/**
++ * struct devfreq_event_ops - the operations of devfreq-event device
++ *
++ * @enable	: Enable the devfreq-event device.
++ * @disable	: Disable the devfreq-event device.
++ * @is_enabled	: Return true if the devfreq-event is enabled, false if not.
++ * @set_event	: Set the specific event type for the devfreq-event device.
++ * @get_event	: Get the result of the devfreq-event devie with specific
++ *		  event type.
++ * @reset	: Reset all setting of the devfreq-event device.
++ *
++ * This structure contains devfreq-event device operations which can be
++ * implemented by devfreq-event device drivers.
++ */
++struct devfreq_event_ops {
++	int (*enable)(struct devfreq_event_dev *event_dev);
++	int (*disable)(struct devfreq_event_dev *event_dev);
++	bool (*is_enabled)(struct devfreq_event_dev *event_dev);
++	int (*set_event)(struct devfreq_event_dev *event_dev);
++	int (*get_event)(struct devfreq_event_dev *event_dev, int *total_event);
++	int (*reset)(struct devfreq_event_dev *event_dev);
++};
++
++/**
++ * struct devfreq_event_desc - the descriptor of devfreq-event device
++ *
++ * @name	: the name of devfreq-event device.
++ * @driver_data	: the private data for devfreq-event driver.
++ * @ops		: the operation to control devfreq-event device.
++ *
++ * Each devfreq-event device is described with a this structure.
++ * This structure contains the various data for devfreq-event device.
++ */
++struct devfreq_event_desc {
++	const char *name;
++	void *driver_data;
++
++	struct devfreq_event_ops *ops;
++};
++
+ #if defined(CONFIG_PM_DEVFREQ)
+ extern struct devfreq *devfreq_add_device(struct device *dev,
+ 				  struct devfreq_dev_profile *profile,
+@@ -204,6 +266,22 @@ extern int devm_devfreq_register_opp_notifier(struct device *dev,
+ extern void devm_devfreq_unregister_opp_notifier(struct device *dev,
+ 						struct devfreq *devfreq);
+ 
++/* Functions for devfreq event device */
++extern struct devfreq_event_dev *devfreq_add_event_device(struct device *dev,
++				struct devfreq_event_desc *desc);
++extern void *event_dev_get_drvdata(struct devfreq_event_dev *event_dev);
++extern struct devfreq_event_dev *devfreq_get_event_dev(const char *name);
++extern struct devfreq_event_dev *devfreq_get_event_dev_by_phandle(
++				struct device *dev, int index);
++extern int devfreq_put_event_dev(struct devfreq_event_dev *event_dev);
++extern int devfreq_enable_event_dev(struct devfreq_event_dev *event_dev);
++extern int devfreq_disable_event_dev(struct devfreq_event_dev *event_dev);
++extern bool devfreq_is_enabled_event_dev(struct devfreq_event_dev *event_dev);
++extern int devfreq_set_event_event_dev(struct devfreq_event_dev *event_dev);
++extern int devfreq_get_event_event_dev(struct devfreq_event_dev *event_dev,
++					int *total_event);
++extern int devfreq_reset_event_dev(struct devfreq_event_dev *event_dev);
++
+ #if IS_ENABLED(CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND)
+ /**
+  * struct devfreq_simple_ondemand_data - void *data fed to struct devfreq
+@@ -233,6 +311,13 @@ static inline struct devfreq *devfreq_add_device(struct device *dev,
+ 	return ERR_PTR(-ENOSYS);
+ }
+ 
++static inline struct devfreq_event_dev *devfreq_add_event_device(
++					struct device *dev,
++					struct devfreq_event_desc *desc);
++{
++	return ERR_PTR(-ENODEV);
++}
++
+ static inline int devfreq_remove_device(struct devfreq *devfreq)
+ {
+ 	return 0;
+@@ -289,6 +374,62 @@ static inline void devm_devfreq_unregister_opp_notifier(struct device *dev,
+ 							struct devfreq *devfreq)
+ {
+ }
++
++static inline void *event_dev_get_drvdata(struct devfreq_event_dev *event_dev)
++{
++	return ERR_PTR(-EINVAL);
++}
++
++static inline struct devfreq_event_dev *devfreq_get_event_dev(const char *name)
++{
++	return ERR_PTR(-ENODEV);
++}
++
++struct devfreq_event_dev *devfreq_get_event_dev_by_phandle(struct device *dev,
++						      int index)
++{
++	return ERR_PTR(-ENODEV);
++}
++
++static inline int devfreq_put_event_dev(struct devfreq_event_dev *event_dev)
++{
++	return -EINVAL;
++}
++
++static inline int devfreq_enable_event_dev(struct devfreq_event_dev *event_dev)
++{
++	return -EINVAL;
++}
++
++static inline int devfreq_disable_event_dev(
++				struct devfreq_event_dev *event_dev)
++{
++	return -EINVAL;
++}
++
++static inline bool devfreq_is_enabled_event_dev(
++				struct devfreq_event_dev *event_dev)
++{
++	return false;
++}
++
++static inline int devfreq_set_event_event_dev(
++				struct devfreq_event_dev *event_dev)
++{
++	return -EINVAL;
++}
++
++static inline int devfreq_get_event_event_dev(
++				struct devfreq_event_dev *event_dev,
++				int *total_event);
++{
++	return -EINVAL;
++}
++
++static inline int devfreq_reset_event_dev(struct devfreq_event_dev *event_dev)
++{
++	return -EINVAL;
++}
+ #endif /* CONFIG_PM_DEVFREQ */
+ 
+ #endif /* __LINUX_DEVFREQ_H__ */
 -- 
 1.8.5.5
