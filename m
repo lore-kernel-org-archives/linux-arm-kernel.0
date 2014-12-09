@@ -1,151 +1,102 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 9 Dec 2014 11:43:08 +0530
-Subject: [PATCH 2/3] dmaengine: at_xdmac: simplify channel configuration
- stuff
-In-Reply-To: <20141208140500.GF27228@ldesroches-Latitude-E6320>
-References: <1417018949-24246-1-git-send-email-ludovic.desroches@atmel.com>
- <1417018949-24246-3-git-send-email-ludovic.desroches@atmel.com>
- <20141208103918.GF16827@intel.com>
- <20141208140500.GF27228@ldesroches-Latitude-E6320>
-Message-ID: <20141209061308.GY16827@intel.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 09 Dec 2014 11:43:01 +0530
+Subject: [PATCH 03/19] clk: samsung: exynos5433: Add clocks for CMU_PERIC
+ domain
+In-Reply-To: <54864C90.9040205@samsung.com>
+References: <1417510196-6714-1-git-send-email-cw00.choi@samsung.com>
+ <1417510196-6714-4-git-send-email-cw00.choi@samsung.com>
+ <54858C13.8020704@samsung.com> <54864C90.9040205@samsung.com>
+Message-ID: <548692ED.4080301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 03:05:00PM +0100, Ludovic Desroches wrote:
-> On Mon, Dec 08, 2014 at 04:09:18PM +0530, Vinod Koul wrote:
-> > On Wed, Nov 26, 2014 at 05:22:28PM +0100, Ludovic Desroches wrote:
-> > > Using the cc field of the descriptor simplifies the management of the channel
-> > > configuration.
-> > > 
-> > > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > > ---
-> > >  drivers/dma/at_xdmac.c | 33 +++++++++++++--------------------
-> > >  1 file changed, 13 insertions(+), 20 deletions(-)
-> > > 
-> > > diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-> > > index bc4b018..94b714e 100644
-> > > --- a/drivers/dma/at_xdmac.c
-> > > +++ b/drivers/dma/at_xdmac.c
-> > > @@ -200,6 +200,7 @@ struct at_xdmac_chan {
-> > >  	u8				memif;		/* Memory Interface */
-> > >  	u32				per_src_addr;
-> > >  	u32				per_dst_addr;
-> > > +	u32				save_cc;
-> > >  	u32				save_cim;
-> > >  	u32				save_cnda;
-> > >  	u32				save_cndc;
-> > > @@ -357,14 +358,7 @@ static void at_xdmac_start_xfer(struct at_xdmac_chan *atchan,
-> > >  	 */
-> > >  	if (is_slave_direction(first->direction)) {
-> > >  		reg = AT_XDMAC_CNDC_NDVIEW_NDV1;
-> > > -		if (first->direction == DMA_MEM_TO_DEV)
-> > > -			atchan->cfg[AT_XDMAC_CUR_CFG] =
-> > > -				atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG];
-> > > -		else
-> > > -			atchan->cfg[AT_XDMAC_CUR_CFG] =
-> > > -				atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG];
-> > > -		at_xdmac_chan_write(atchan, AT_XDMAC_CC,
-> > > -				    atchan->cfg[AT_XDMAC_CUR_CFG]);
-> > > +		at_xdmac_chan_write(atchan, AT_XDMAC_CC, first->lld.mbr_cfg);
-> > how is this related to adding cc field?
-> 
-> It is not directly related to adding save_cc field but to use the lld cc
-> field which is lld.mbr_cfg instead of cfg[AT_XDMAC_CUR_CFG].
-> 
-> > 
-> > >  	} else {
-> > >  		/*
-> > >  		 * No need to write AT_XDMAC_CC reg, it will be done when the
-> > > @@ -568,7 +562,6 @@ at_xdmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
-> > >  	struct at_xdmac_desc	*first = NULL, *prev = NULL;
-> > >  	struct scatterlist	*sg;
-> > >  	int			i;
-> > > -	u32			cfg;
-> > >  	unsigned int		xfer_size = 0;
-> > >  
-> > >  	if (!sgl)
-> > > @@ -615,17 +608,17 @@ at_xdmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
-> > >  		if (direction == DMA_DEV_TO_MEM) {
-> > >  			desc->lld.mbr_sa = atchan->per_src_addr;
-> > >  			desc->lld.mbr_da = mem;
-> > > -			cfg = atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG];
-> > > +			desc->lld.mbr_cfg = atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG];
-> > >  		} else {
-> > >  			desc->lld.mbr_sa = mem;
-> > >  			desc->lld.mbr_da = atchan->per_dst_addr;
-> > > -			cfg = atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG];
-> > > +			desc->lld.mbr_cfg = atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG];
-> > >  		}
-> > > -		desc->lld.mbr_ubc = AT_XDMAC_MBR_UBC_NDV1		/* next descriptor view */
-> > > -			| AT_XDMAC_MBR_UBC_NDEN				/* next descriptor dst parameter update */
-> > > -			| AT_XDMAC_MBR_UBC_NSEN				/* next descriptor src parameter update */
-> > > -			| (i == sg_len - 1 ? 0 : AT_XDMAC_MBR_UBC_NDE)	/* descriptor fetch */
-> > > -			| len / (1 << at_xdmac_get_dwidth(cfg));	/* microblock length */
-> > > +		desc->lld.mbr_ubc = AT_XDMAC_MBR_UBC_NDV1			/* next descriptor view */
-> > > +			| AT_XDMAC_MBR_UBC_NDEN					/* next descriptor dst parameter update */
-> > > +			| AT_XDMAC_MBR_UBC_NSEN					/* next descriptor src parameter update */
-> > > +			| (i == sg_len - 1 ? 0 : AT_XDMAC_MBR_UBC_NDE)		/* descriptor fetch */
-> > > +			| len / (1 << at_xdmac_get_dwidth(desc->lld.mbr_cfg));	/* microblock length */
-> > >  		dev_dbg(chan2dev(chan),
-> > >  			 "%s: lld: mbr_sa=%pad, mbr_da=%pad, mbr_ubc=0x%08x\n",
-> > >  			 __func__, &desc->lld.mbr_sa, &desc->lld.mbr_da, desc->lld.mbr_ubc);
-> > > @@ -889,7 +882,7 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
-> > >  	enum dma_status		ret;
-> > >  	int			residue;
-> > >  	u32			cur_nda, mask, value;
-> > > -	u8			dwidth = at_xdmac_get_dwidth(atchan->cfg[AT_XDMAC_CUR_CFG]);
-> > > +	u8			dwidth = 0;
-> > >  
-> > >  	ret = dma_cookie_status(chan, cookie, txstate);
-> > >  	if (ret == DMA_COMPLETE)
-> > > @@ -933,6 +926,7 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
-> > >  	 */
-> > >  	descs_list = &desc->descs_list;
-> > >  	list_for_each_entry_safe(desc, _desc, descs_list, desc_node) {
-> > > +		dwidth = at_xdmac_get_dwidth(desc->lld.mbr_cfg);
-> > >  		residue -= (desc->lld.mbr_ubc & 0xffffff) << dwidth;
-> > >  		if ((desc->lld.mbr_nda & 0xfffffffc) == cur_nda)
-> > >  			break;
-> > > @@ -1276,6 +1270,7 @@ static int atmel_xdmac_suspend(struct device *dev)
-> > >  	list_for_each_entry_safe(chan, _chan, &atxdmac->dma.channels, device_node) {
-> > >  		struct at_xdmac_chan	*atchan = to_at_xdmac_chan(chan);
-> > >  
-> > > +		atchan->save_cc = at_xdmac_chan_read(atchan, AT_XDMAC_CC);
-> > okay finally we end us using the new field, the code before that seems to
-> > use existing lld.mbr_cfg, shouldnt this be another change explaining the
-> > changes...
-> 
-> This patch is not only about adding save_cc field but trying to simplify
-> the way cc register is managed. In my mind, both parts are tied, I have
-> added the save_cc field because I thought it is easier and probably
-> safer to do it in this way instead of relying on cfg[AT_XDMAC_CUR_CFG].
-> 
-> > 
-> > >  		if (at_xdmac_chan_is_cyclic(atchan)) {
-> > >  			if (!at_xdmac_chan_is_paused(atchan))
-> > >  				at_xdmac_device_pause(chan);
-> > > @@ -1298,7 +1293,6 @@ static int atmel_xdmac_resume(struct device *dev)
-> > >  	struct at_xdmac_chan	*atchan;
-> > >  	struct dma_chan		*chan, *_chan;
-> > >  	int			i;
-> > > -	u32			cfg;
-> > >  
-> > >  	clk_prepare_enable(atxdmac->clk);
-> > >  
-> > > @@ -1313,8 +1307,7 @@ static int atmel_xdmac_resume(struct device *dev)
-> > >  	at_xdmac_write(atxdmac, AT_XDMAC_GE, atxdmac->save_gs);
-> > >  	list_for_each_entry_safe(chan, _chan, &atxdmac->dma.channels, device_node) {
-> > >  		atchan = to_at_xdmac_chan(chan);
-> > > -		cfg = atchan->cfg[AT_XDMAC_CUR_CFG];
-> > > -		at_xdmac_chan_write(atchan, AT_XDMAC_CC, cfg);
-> > > +		at_xdmac_chan_write(atchan, AT_XDMAC_CC, atchan->save_cc);
-> > only thing here wer are saving and restoring from save_cc. How does that
-> > impact rest of the code above?
-this part is the only one which is clear. I think right way would be to
-split these changes and explain in each one why we are doing them. Down
-the line when someone is working on this will know precisely why this change
-was made. Two years is a long time, even we will forget. So good changelog
-and splitting patches to do just one thing is very helpful
 
--- 
-~Vinod
+
+On Tuesday 09 December 2014 06:42 AM, Chanwoo Choi wrote:
+> Hi Pankaj,
+>
+> On 12/08/2014 08:31 PM, Pankaj Dubey wrote:
+>> Hi Chanwoo,
+>>
+>> On Tuesday 02 December 2014 02:19 PM, Chanwoo Choi wrote:
+>>> This patch adds missing divider/gate clocks of CMU_PERIC domain
+>>> which includes I2S/PCM/SPDIF/PWM/SLIMBUS IPs. The SPI/I2S may use
+>>> external input clock which has 'ioclk_*' prefix.
+>>>
+>>> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> [ideal.song: Change clk flags of to pclk_gpio_* clk, pclk_gpio_* should be always on.]
+>>> Signed-off-by: Inha Song <ideal.song@samsung.com>
+>>> Acked-by: Inki Dae <inki.dae@samsung.com>
+>>> Acked-by: Geunsik Lim <geunsik.lim@samsung.com>
+>>> ---
+>>>    drivers/clk/samsung/clk-exynos5433.c   | 80 +++++++++++++++++++++++++++++++++-
+>>>    include/dt-bindings/clock/exynos5433.h | 34 ++++++++++++++-
+>>>    2 files changed, 112 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
+>>> index 88e8cac..a48b36c 100644
+>>> --- a/drivers/clk/samsung/clk-exynos5433.c
+>>> +++ b/drivers/clk/samsung/clk-exynos5433.c
+>>> @@ -256,6 +256,14 @@ static struct samsung_fixed_rate_clock top_fixed_clks[] __initdata = {
+>>>        FRATE(0, "ioclk_audiocdclk0", NULL, CLK_IS_ROOT, 100000000),
+>>>        /* Xi2s1SDI input clock for SPDIF */
+>>>        FRATE(0, "ioclk_spdif_extclk", NULL, CLK_IS_ROOT, 100000000),
+>>> +    /* XspiCLK[4:0] input clock for SPI */
+>>> +    FRATE(0, "ioclk_spi4_clk_in", NULL, CLK_IS_ROOT, 50000000),
+>>> +    FRATE(0, "ioclk_spi3_clk_in", NULL, CLK_IS_ROOT, 50000000),
+>>> +    FRATE(0, "ioclk_spi2_clk_in", NULL, CLK_IS_ROOT, 50000000),
+>>> +    FRATE(0, "ioclk_spi1_clk_in", NULL, CLK_IS_ROOT, 50000000),
+>>> +    FRATE(0, "ioclk_spi0_clk_in", NULL, CLK_IS_ROOT, 50000000),
+>>> +    /* Xi2s1SCLK input clock for I2S1_BCLK */
+>>> +    FRATE(0, "ioclk_i2s1_bclk_in", NULL, CLK_IS_ROOT, 12288000),
+>>>    };
+>>>
+>>>    static struct samsung_mux_clock top_mux_clks[] __initdata = {
+>>> @@ -760,6 +768,7 @@ CLK_OF_DECLARE(exynos5433_cmu_mif, "samsung,exynos5433-cmu-mif",
+>>>     * Register offset definitions for CMU_PERIC
+>>>     */
+>>>    #define DIV_PERIC            0x0600
+>>> +#define DIV_STAT_PERIC            0x0700
+>>>    #define ENABLE_ACLK_PERIC        0x0800
+>>>    #define ENABLE_PCLK_PERIC0        0x0900
+>>>    #define ENABLE_PCLK_PERIC1        0x0904
+>>> @@ -770,6 +779,7 @@ CLK_OF_DECLARE(exynos5433_cmu_mif, "samsung,exynos5433-cmu-mif",
+>>>
+>>>    static unsigned long peric_clk_regs[] __initdata = {
+>>>        DIV_PERIC,
+>>> +    DIV_STAT_PERIC,
+>>
+>> IMO, this line should have been added in first place itself when you added peric_clk_regs.
+>
+> Why? I want to locate it according to address base.
+
+Since DIV_PERIC and DIV_STAT_PERIC both has same address base, why not 
+to add DIV_STAT_PERIC at the same place when you added DIV_PERIC?
+
+Anyways, this was just my opinion as I don't see any dependency why we 
+should add it here? I left this up to you.
+
+>
+>>
+>>>        ENABLE_ACLK_PERIC,
+>>>        ENABLE_PCLK_PERIC0,
+>>>        ENABLE_PCLK_PERIC1,
+>>> @@ -779,14 +789,57 @@ static unsigned long peric_clk_regs[] __initdata = {
+>>>        ENABLE_IP_PERIC2,
+>>>    };
+>>>
+>>> +static struct samsung_div_clock peric_div_clks[] __initdata = {
+>>> +    /* DIV_PERIC */
+>>> +    DIV(CLK_DIV_SCLK_SCI, "div_sclk_sci", "fin_pll", DIV_PERIC, 4, 8),
+>>
+>> As per UM I have DIV_SCLK_SCI has 4 bit wide as [7:4] please cross verify.
+>
+> You're right. It is my mistake. I'll fix it.
+>
+> Best Regards,
+> Chanwoo Choi
+>
+Thanks,
+Pankaj Dubey
