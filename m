@@ -1,115 +1,165 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 09 Dec 2014 23:12:59 +0900
-Subject: [RFC PATCHv2 0/7] devfreq: Add devfreq-event class to provide raw data
- for devfreq device
-Message-ID: <1418134386-14681-1-git-send-email-cw00.choi@samsung.com>
+Date: Tue, 09 Dec 2014 23:13:01 +0900
+Subject: [RFC PATCHv2 2/7] devfreq: event: Add the list of supported
+ devfreq-event type
+In-Reply-To: <1418134386-14681-1-git-send-email-cw00.choi@samsung.com>
+References: <1418134386-14681-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1418134386-14681-3-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset add new devfreq_event class to provide raw data to determine
-current utilization of device  which is used for devfreq governor.
+This patch adds the list of supported devfreq-event type as following.
+Each devfreq-event device driver would support the various devfreq-event type
+for devfreq governor at the same time.
+- DEVFREQ_EVENT_TYPE_RAW_DATA
+- DEVFREQ_EVENT_TYPE_UTILIZATION
+- DEVFREQ_EVENT_TYPE_BANDWIDTH
+- DEVFREQ_EVENT_TYPE_LATENCY
 
-[Description of devfreq-event class]
-This patchset add new devfreq_event class for devfreq_event device which provide
-raw data (e.g., memory bus utilization/GPU utilization). This raw data from
-devfreq_event data would be used for the governor of devfreq subsystem.
-- devfreq_event device : Provide raw data for governor of existing devfreq device
-- devfreq device       : Monitor device state and change frequency/voltage of device
-                         using the raw data from devfreq_event device
+Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ drivers/devfreq/devfreq-event.c | 23 ++++++++++++++++++++---
+ include/linux/devfreq.h         | 28 ++++++++++++++++++++++++----
+ 2 files changed, 44 insertions(+), 7 deletions(-)
 
-The devfreq subsystem support generic DVFS(Dynamic Voltage/Frequency Scaling)
-for Non-CPU Devices. The devfreq device would dertermine current device state
-using various governor (e.g., ondemand, performance, powersave). After completed
-determination of system state, devfreq device would change the frequency/voltage
-of devfreq device according to the result of governor.
-
-But, devfreq governor must need basic data which indicates current device state.
-Existing devfreq subsystem only consider devfreq device which check current system
-state and determine proper system state using basic data. There is no subsystem
-for device providing basic data to devfreq device.
-
-The devfreq subsystem must need devfreq_event device(data-provider device) for
-existing devfreq device. So, this patch add new devfreq_event class for
-devfreq_event device which read various basic data(e.g, memory bus utilization,
-GPU utilization) and provide measured data to existing devfreq device through
-standard APIs of devfreq_event class.
-
-The following description explains the feature of two kind of devfreq class:
-- devfreq class (existing)
- : devfreq consumer device use raw data from devfreq_event device for
-   determining proper current system state and change voltage/frequency
-   dynamically using various governors.
-- devfreq_event class (new)
- : Provide measured raw data to devfreq device for governor
-
-Also, the devfreq-event device would support various type event as following:
- : DEVFREQ_EVENT_TYPE_RAW_DATA
- : DEVFREQ_EVENT_TYPE_UTILIZATION
- : DEVFREQ_EVENT_TYPE_BANDWIDTH
- : DEVFREQ_EVENT_TYPE_LATENCY
-
-[For example]
-If board dts includes PPMU_DMC0/DMC1/CPU event node,
-would show following sysfs entry. Also devfreq driver(e.g., exynos4_bus.c)
-can get the instance of devfreq-event device by using provided API and then
-get raw data which reflect the current state of device.
-
--sh-3.2# pwd
-/sys/class/devfreq_event
--sh-3.2# ls -al
-total 0
-drwxr-xr-x  2 root root 0 Jan  7 11:10 .
-drwxr-xr-x 37 root root 0 Jan  7 11:10 ..
-lrwxrwxrwx  1 root root 0 Jan  7 11:10 event.0 -> ../../devices/soc/106a0000.ppmu_dmc0/devfreq_event/event.0
-lrwxrwxrwx  1 root root 0 Jan  7 11:10 event.1 -> ../../devices/soc/106a0000.ppmu_dmc0/devfreq_event/event.1
-lrwxrwxrwx  1 root root 0 Jan  7 11:10 event.2 -> ../../devices/soc/106a0000.ppmu_dmc0/devfreq_event/event.2
-lrwxrwxrwx  1 root root 0 Jan  7 11:10 event.3 -> ../../devices/soc/106a0000.ppmu_dmc0/devfreq_event/event.3
-lrwxrwxrwx  1 root root 0 Jan  7 11:10 event.4 -> ../../devices/soc/106b0000.ppmu_dmc1/devfreq_event/event.4
-lrwxrwxrwx  1 root root 0 Jan  7 11:10 event.5 -> ../../devices/soc/106c0000.ppmu_cpu/devfreq_event/event.5
-lrwxrwxrwx  1 root root 0 Jan  7 11:10 event.6 -> ../../devices/soc/106c0000.ppmu_cpu/devfreq_event/event.6
-lrwxrwxrwx  1 root root 0 Jan  7 11:10 event.7 -> ../../devices/soc/106c0000.ppmu_cpu/devfreq_event/event.7
-lrwxrwxrwx  1 root root 0 Jan  7 11:10 event.8 -> ../../devices/soc/106c0000.ppmu_cpu/devfreq_event/event.8
-
-Changes from v1:
-- Code clean
-- Add the description of devfreq-event structure
-- Add 'is_enabled' function to devfreq_event_ops structure
-- Add 'enable_count' field to devfreq_event_dev structure
-- Check whether devfreq-event device is enabled or not
-  during calling devfreq_event API
-- Define the type of devfreq-event device as following
-  : DEVFREQ_EVENT_TYPE_RAW_DATA
-  : DEVFREQ_EVENT_TYPE_UTILIZATION
-  : DEVFREQ_EVENT_TYPE_BANDWIDTH
-  : DEVFREQ_EVENT_TYPE_LATENCY
-- Add the exclusive feature of devfreq-event device.
-  If devfreq-event device is used on only on devfreq driver,
-  should used 'devfreq_enable_event_dev_exclusive()' function
-- Add new patch6 for test on Exynos3250-based Rinato board
-
-Chanwoo Choi (7):
-  devfreq: event: Add new devfreq_event class to provide basic data for devfreq governor
-  devfreq: event: Add the list of supported devfreq-event type
-  devfreq: event: Add the exclusive flag for devfreq-event device
-  devfreq: event: Add exynos-ppmu devfreq event driver
-  ARM: dts: Add PPMU dt node for Exynos3250
-  ARM: dts: Add PPMU dt node for Exynos4 SoC
-  ARM: dts: exynos: Add PPMU dt node to Exynos3250-based Rinato board
-
- arch/arm/boot/dts/exynos3250-rinato.dts |  55 +++++
- arch/arm/boot/dts/exynos3250.dtsi       |  66 ++++++
- arch/arm/boot/dts/exynos4.dtsi          |  96 ++++++++
- arch/arm/boot/dts/exynos4210.dtsi       |   8 +
- drivers/devfreq/Kconfig                 |  11 +
- drivers/devfreq/Makefile                |   5 +-
- drivers/devfreq/devfreq-event.c         | 363 ++++++++++++++++++++++++++++
- drivers/devfreq/event/Makefile          |   2 +
- drivers/devfreq/event/exynos-ppmu.c     | 409 ++++++++++++++++++++++++++++++++
- include/linux/devfreq.h                 | 178 ++++++++++++++
- 10 files changed, 1192 insertions(+), 1 deletion(-)
- create mode 100644 drivers/devfreq/devfreq-event.c
- create mode 100644 drivers/devfreq/event/Makefile
- create mode 100644 drivers/devfreq/event/exynos-ppmu.c
-
+diff --git a/drivers/devfreq/devfreq-event.c b/drivers/devfreq/devfreq-event.c
+index b47329f..a71fcee 100644
+--- a/drivers/devfreq/devfreq-event.c
++++ b/drivers/devfreq/devfreq-event.c
+@@ -203,7 +203,8 @@ bool devfreq_is_enabled_event_dev(struct devfreq_event_dev *event_dev)
+ }
+ EXPORT_SYMBOL_GPL(devfreq_is_enabled_event_dev);
+ 
+-int devfreq_set_event_event_dev(struct devfreq_event_dev *event_dev)
++int devfreq_set_event_event_dev(struct devfreq_event_dev *event_dev,
++				enum devfreq_event_type event_type)
+ {
+ 	if (!event_dev || !event_dev->desc)
+ 		return -EINVAL;
+@@ -211,14 +212,22 @@ int devfreq_set_event_event_dev(struct devfreq_event_dev *event_dev)
+ 	if (!devfreq_is_enabled_event_dev(event_dev))
+ 		return -EPERM;
+ 
++	if ((event_dev->desc->event_type & event_type) == 0) {
++		dev_err(&event_dev->dev, "unsupported of devfreq-event type\n");
++		return -EINVAL;
++	}
++
+ 	if (event_dev->desc->ops && event_dev->desc->ops->set_event)
+-		return event_dev->desc->ops->set_event(event_dev);
++		return event_dev->desc->ops->set_event(event_dev, event_type);
++
++	dev_err(&event_dev->dev, "failed to set devfreq-event\n");
+ 
+ 	return -EINVAL;
+ }
+ EXPORT_SYMBOL_GPL(devfreq_set_event_event_dev);
+ 
+ int devfreq_get_event_event_dev(struct devfreq_event_dev *event_dev,
++				enum devfreq_event_type event_type,
+ 				int *total_event)
+ {
+ 	if (!event_dev || !event_dev->desc)
+@@ -227,8 +236,16 @@ int devfreq_get_event_event_dev(struct devfreq_event_dev *event_dev,
+ 	if (!devfreq_is_enabled_event_dev(event_dev))
+ 		return -EPERM;
+ 
++	if ((event_dev->desc->event_type & event_type) == 0) {
++		dev_err(&event_dev->dev, "unsupported of devfreq-event type\n");
++		return -EINVAL;
++	}
++
+ 	if (event_dev->desc->ops && event_dev->desc->ops->get_event)
+-		return event_dev->desc->ops->get_event(event_dev, total_event);
++		return event_dev->desc->ops->get_event(event_dev, event_type,
++							total_event);
++
++	dev_err(&event_dev->dev, "failed to get devfreq-event\n");
+ 
+ 	return -EINVAL;
+ }
+diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
+index 3c5f233..f6d44b7 100644
+--- a/include/linux/devfreq.h
++++ b/include/linux/devfreq.h
+@@ -197,6 +197,15 @@ struct devfreq_event_dev {
+ 	const struct devfreq_event_desc *desc;
+ };
+ 
++/* The supported type by devfreq-event device */
++enum devfreq_event_type {
++	DEVFREQ_EVENT_TYPE_NONE		= BIT(0),
++	DEVFREQ_EVENT_TYPE_RAW_DATA	= BIT(1),
++	DEVFREQ_EVENT_TYPE_UTILIZATION	= BIT(2),
++	DEVFREQ_EVENT_TYPE_BANDWIDTH	= BIT(3),
++	DEVFREQ_EVENT_TYPE_LATENCY	= BIT(4),
++};
++
+ /**
+  * struct devfreq_event_ops - the operations of devfreq-event device
+  *
+@@ -215,8 +224,10 @@ struct devfreq_event_ops {
+ 	int (*enable)(struct devfreq_event_dev *event_dev);
+ 	int (*disable)(struct devfreq_event_dev *event_dev);
+ 	bool (*is_enabled)(struct devfreq_event_dev *event_dev);
+-	int (*set_event)(struct devfreq_event_dev *event_dev);
+-	int (*get_event)(struct devfreq_event_dev *event_dev, int *total_event);
++	int (*set_event)(struct devfreq_event_dev *event_dev,
++			enum devfreq_event_type);
++	int (*get_event)(struct devfreq_event_dev *event_dev,
++			enum devfreq_event_type, int *total_event);
+ 	int (*reset)(struct devfreq_event_dev *event_dev);
+ };
+ 
+@@ -225,6 +236,10 @@ struct devfreq_event_ops {
+  *
+  * @name	: the name of devfreq-event device.
+  * @driver_data	: the private data for devfreq-event driver.
++ * @event_type	: the supported devfreq-event type among as following
++ *		  - DEVFREQ_EVENT_TYPE_UTILIZATION
++ *		  - DEVFREQ_EVENT_TYPE_BANDWIDTH
++ *		  - DEVFREQ_EVENT_TYPE_LATENCY
+  * @ops		: the operation to control devfreq-event device.
+  *
+  * Each devfreq-event device is described with a this structure.
+@@ -233,6 +248,7 @@ struct devfreq_event_ops {
+ struct devfreq_event_desc {
+ 	const char *name;
+ 	void *driver_data;
++	enum devfreq_event_type event_type;
+ 
+ 	struct devfreq_event_ops *ops;
+ };
+@@ -277,8 +293,10 @@ extern int devfreq_put_event_dev(struct devfreq_event_dev *event_dev);
+ extern int devfreq_enable_event_dev(struct devfreq_event_dev *event_dev);
+ extern int devfreq_disable_event_dev(struct devfreq_event_dev *event_dev);
+ extern bool devfreq_is_enabled_event_dev(struct devfreq_event_dev *event_dev);
+-extern int devfreq_set_event_event_dev(struct devfreq_event_dev *event_dev);
++extern int devfreq_set_event_event_dev(struct devfreq_event_dev *event_dev,
++					enum devfreq_event_type event_type);
+ extern int devfreq_get_event_event_dev(struct devfreq_event_dev *event_dev,
++					enum devfreq_event_type event_type,
+ 					int *total_event);
+ extern int devfreq_reset_event_dev(struct devfreq_event_dev *event_dev);
+ 
+@@ -414,13 +432,15 @@ static inline bool devfreq_is_enabled_event_dev(
+ }
+ 
+ static inline int devfreq_set_event_event_dev(
+-				struct devfreq_event_dev *event_dev)
++				struct devfreq_event_dev *event_dev,
++				enum devfreq_event_type event_type);
+ {
+ 	return -EINVAL;
+ }
+ 
+ static inline int devfreq_get_event_event_dev(
+ 				struct devfreq_event_dev *event_dev,
++				enum devfreq_event_type event_type,
+ 				int *total_event);
+ {
+ 	return -EINVAL;
 -- 
 1.8.5.5
