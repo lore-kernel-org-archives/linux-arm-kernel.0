@@ -1,74 +1,55 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  9 Dec 2014 12:26:05 +0100
-Subject: [GIT PULL 6/9] arm,
- arm64: KVM: handle potential incoherency of readonly memslots
+Date: Tue,  9 Dec 2014 12:26:06 +0100
+Subject: [GIT PULL 7/9] arm/arm64: KVM: avoid unnecessary guest register
+ mangling on MMIO read
 In-Reply-To: <1418124368-28418-1-git-send-email-christoffer.dall@linaro.org>
 References: <1418124368-28418-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1418124368-28418-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1418124368-28418-8-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+From: Andre Przywara <andre.przywara@arm.com>
 
-Readonly memslots are often used to implement emulation of ROMs and
-NOR flashes, in which case the guest may legally map these regions as
-uncached.
-To deal with the incoherency associated with uncached guest mappings,
-treat all readonly memslots as incoherent, and ensure that pages that
-belong to regions tagged as such are flushed to DRAM before being passed
-to the guest.
+Currently we mangle the endianness of the guest's register even on an
+MMIO _read_, where it is completely useless, because we will not use
+the value of that register.
+Rework the io_mem_abort() function to clearly separate between reads
+and writes and only do the endianness mangling on MMIO writes.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/mmu.c | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
+ arch/arm/kvm/mmio.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index cb924c6..f2a9874 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -919,7 +919,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	if (!hugetlb && !force_pte)
- 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+index 4cb5a93..5d3bfc0 100644
+--- a/arch/arm/kvm/mmio.c
++++ b/arch/arm/kvm/mmio.c
+@@ -187,15 +187,18 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	}
  
--	fault_ipa_uncached = false;
-+	fault_ipa_uncached = memslot->flags & KVM_MEMSLOT_INCOHERENT;
+ 	rt = vcpu->arch.mmio_decode.rt;
+-	data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt), mmio.len);
  
- 	if (hugetlb) {
- 		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
-@@ -1298,11 +1298,12 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
- 		hva = vm_end;
- 	} while (hva < reg_end);
+-	trace_kvm_mmio((mmio.is_write) ? KVM_TRACE_MMIO_WRITE :
+-					 KVM_TRACE_MMIO_READ_UNSATISFIED,
+-			mmio.len, fault_ipa,
+-			(mmio.is_write) ? data : 0);
++	if (mmio.is_write) {
++		data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt),
++					       mmio.len);
  
--	if (ret) {
--		spin_lock(&kvm->mmu_lock);
-+	spin_lock(&kvm->mmu_lock);
-+	if (ret)
- 		unmap_stage2_range(kvm, mem->guest_phys_addr, mem->memory_size);
--		spin_unlock(&kvm->mmu_lock);
--	}
-+	else
-+		stage2_flush_memslot(kvm, memslot);
-+	spin_unlock(&kvm->mmu_lock);
- 	return ret;
- }
+-	if (mmio.is_write)
++		trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, mmio.len,
++			       fault_ipa, data);
+ 		mmio_write_buf(mmio.data, mmio.len, data);
++	} else {
++		trace_kvm_mmio(KVM_TRACE_MMIO_READ_UNSATISFIED, mmio.len,
++			       fault_ipa, 0);
++	}
  
-@@ -1314,6 +1315,15 @@ void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
- int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
- 			    unsigned long npages)
- {
-+	/*
-+	 * Readonly memslots are not incoherent with the caches by definition,
-+	 * but in practice, they are used mostly to emulate ROMs or NOR flashes
-+	 * that the guest may consider devices and hence map as uncached.
-+	 * To prevent incoherency issues in these cases, tag all readonly
-+	 * regions as incoherent.
-+	 */
-+	if (slot->flags & KVM_MEM_READONLY)
-+		slot->flags |= KVM_MEMSLOT_INCOHERENT;
- 	return 0;
- }
- 
+ 	if (vgic_handle_mmio(vcpu, run, &mmio))
+ 		return 1;
 -- 
 2.1.2.330.g565301e.dirty
