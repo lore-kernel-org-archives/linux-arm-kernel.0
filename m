@@ -1,55 +1,37 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  9 Dec 2014 12:26:06 +0100
-Subject: [GIT PULL 7/9] arm/arm64: KVM: avoid unnecessary guest register
- mangling on MMIO read
+Date: Tue,  9 Dec 2014 12:26:07 +0100
+Subject: [GIT PULL 8/9] arm/arm64: vgic: Remove unreachable irq_clear_pending
 In-Reply-To: <1418124368-28418-1-git-send-email-christoffer.dall@linaro.org>
 References: <1418124368-28418-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1418124368-28418-8-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1418124368-28418-9-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+When 'injecting' an edge-triggered interrupt with a falling edge we
+shouldn't clear the pending state on the distributor.  In fact, we
+don't, because the check in vgic_validate_injection would prevent us
+from ever reaching this bit of code.
 
-Currently we mangle the endianness of the guest's register even on an
-MMIO _read_, where it is completely useless, because we will not use
-the value of that register.
-Rework the io_mem_abort() function to clearly separate between reads
-and writes and only do the endianness mangling on MMIO writes.
+Remove the unreachable snippet.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/mmio.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ virt/kvm/arm/vgic.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-index 4cb5a93..5d3bfc0 100644
---- a/arch/arm/kvm/mmio.c
-+++ b/arch/arm/kvm/mmio.c
-@@ -187,15 +187,18 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	}
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 5acf2c9..631a472 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1643,8 +1643,6 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+ 			vgic_dist_irq_clear_level(vcpu, irq_num);
+ 			if (!vgic_dist_irq_soft_pend(vcpu, irq_num))
+ 				vgic_dist_irq_clear_pending(vcpu, irq_num);
+-		} else {
+-			vgic_dist_irq_clear_pending(vcpu, irq_num);
+ 		}
  
- 	rt = vcpu->arch.mmio_decode.rt;
--	data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt), mmio.len);
- 
--	trace_kvm_mmio((mmio.is_write) ? KVM_TRACE_MMIO_WRITE :
--					 KVM_TRACE_MMIO_READ_UNSATISFIED,
--			mmio.len, fault_ipa,
--			(mmio.is_write) ? data : 0);
-+	if (mmio.is_write) {
-+		data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt),
-+					       mmio.len);
- 
--	if (mmio.is_write)
-+		trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, mmio.len,
-+			       fault_ipa, data);
- 		mmio_write_buf(mmio.data, mmio.len, data);
-+	} else {
-+		trace_kvm_mmio(KVM_TRACE_MMIO_READ_UNSATISFIED, mmio.len,
-+			       fault_ipa, 0);
-+	}
- 
- 	if (vgic_handle_mmio(vcpu, run, &mmio))
- 		return 1;
+ 		ret = false;
 -- 
 2.1.2.330.g565301e.dirty
