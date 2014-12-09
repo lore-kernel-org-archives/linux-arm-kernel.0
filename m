@@ -1,100 +1,108 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Tue, 09 Dec 2014 20:47:10 +0800
+Date: Tue, 09 Dec 2014 20:57:59 +0800
 Subject: [PATCH 2/6] PCI/MSI: add hooks to populate the msi_domain field
-In-Reply-To: <5486E747.4010804@arm.com>
+In-Reply-To: <1418069543-21969-3-git-send-email-marc.zyngier@arm.com>
 References: <1418069543-21969-1-git-send-email-marc.zyngier@arm.com>
  <1418069543-21969-3-git-send-email-marc.zyngier@arm.com>
- <5486585B.40000@huawei.com> <5486C8BA.8030608@arm.com>
- <5486E3BF.70703@huawei.com> <5486E747.4010804@arm.com>
-Message-ID: <5486EF4E.5020704@linux.intel.com>
+Message-ID: <5486F1D7.9090401@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/12/9 20:12, Marc Zyngier wrote:
-> Yijing,
+
+
+On 2014/12/9 4:12, Marc Zyngier wrote:
+> In order to be able to populate the device msi_domain field,
+> add the necesary hooks to propagate the PHB msi_domain across
+> secondary busses to devices.
 > 
-> On 09/12/14 11:57, Yijing Wang wrote:
->>>>> +void __weak pcibios_set_phb_msi_domain(struct pci_bus *bus)
->>>>> +{
->>>>> +}
->>>>> +
->>>>> +static void pci_set_bus_msi_domain(struct pci_bus *bus)
->>>>> +{
->>>>> +	struct pci_dev *bridge = bus->self;
->>>>> +
->>>>> +	if (!bridge)
->>>>> +		pcibios_set_phb_msi_domain(bus);
->>>>> +	else
->>>>> +		dev_set_msi_domain(&bus->dev, dev_get_msi_domain(&bridge->dev));
->>>>> +}
->>>>
->>>>
->>>> Hi Marc, we can not assume pci devices under same phb share the same msi irq domain,
->>>> now in x86, pci devices under the same phb may associate different msi irq domain.
->>
->> Hi Marc,
->>
->>>
->>> Well, this is not supposed to be a perfect solution yet, but instead a
->>> basis for discussion. What I'd like to find out is:
->>>
->>> - What is the minimum granularity for associating a device with its MSI
->>> domain in existing platforms?
->>
->> PCI device, after Gerry's msi irq domain patchset which now in linux-next,
->> in x86, we will find msi irq domain by pci_dev.
+> So far, nobody populates the initial msi_domain.
 > 
-> Are you *really* associating the MSI domain on a per pci-device basis?
-> That is, you have devices on the same PCI bus talking to different MSI hw?
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/pci/probe.c | 24 ++++++++++++++++++++++++
+>  include/linux/pci.h |  1 +
+>  2 files changed, 25 insertions(+)
+> 
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index c8ca98c..d1009a2 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -670,6 +670,20 @@ static void pci_set_bus_speed(struct pci_bus *bus)
+>  	}
+>  }
+>  
+> +void __weak pcibios_set_phb_msi_domain(struct pci_bus *bus)
+> +{
+> +}
+> +
+> +static void pci_set_bus_msi_domain(struct pci_bus *bus)
+> +{
+> +	struct pci_dev *bridge = bus->self;
+> +
+> +	if (!bridge)
+> +		pcibios_set_phb_msi_domain(bus);
+> +	else
+> +		dev_set_msi_domain(&bus->dev, dev_get_msi_domain(&bridge->dev));
+> +}
+> +
+>  static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+>  					   struct pci_dev *bridge, int busnr)
+>  {
+> @@ -723,6 +737,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+>  	bridge->subordinate = child;
+>  
+>  add_dev:
+> +	pci_set_bus_msi_domain(child);
+>  	ret = device_register(&child->dev);
+>  	WARN_ON(ret < 0);
+>  
+> @@ -1517,6 +1532,11 @@ static void pci_init_capabilities(struct pci_dev *dev)
+>  	pci_enable_acs(dev);
+>  }
+>  
+> +static void pci_set_msi_domain(struct pci_dev *dev)
+> +{
+> +	dev_set_msi_domain(&dev->dev, dev_get_msi_domain(&dev->bus->dev));
+> +}
+> +
 Hi Marc,
-	This is a little wild:(
-	On x86 platform with Intel VT-d(not the case for AMD-v),
-interrupt remapping is tight to DMA remapping (IOMMU) unit.
-For most common cases, IOMMU unit manages PCI bus and its sub-hierarchy.
-But it may also manage a specific PCI device. This is typically used to
-provide QoS for audio device by using dedicated IOMMU unit to avoid
-resource contention on DMA remapping tables. BIOS uses ACPI table to
-report PCI bus/device to IOMMU unit mapping relationship. (To be honest,
-I have no really experience with such a hardware platform yet, just for
-theoretical analysis)
-	On the other hand, we now support hierarchy irqdomain. So to
-support per-PCI IOMMU unit case, we need maintain irqdomain at PCI
-device level.
-	This piece of code from your [4/6] is flexible enough, which
-retrieves msi_domain from PCI device, then fallback to PCI bus,
-then fallback to platform specific method.
-	domain = dev_get_msi_domain(&dev->dev);
-	if (!domain && dev->bus->msi)
- 		domain = dev->bus->msi->domain;
- 	if (!domain)
- 		domain = arch_get_pci_msi_domain(dev);
-Thanks!
+	The default implementation of pci_set_msi_domain() conflicts
+with interrupt mapping based on x86 Intel VT-d:(
+	If pci_set_msi_domain() is weak, thing gets perfect.
+Regards!
 Gerry
-> 
->> I generally agree your first patch which associate basic device with msi irq domain.
->>
->>> - What topology data structures do you use to find out what MSI
->>> controller a device should be matched with?
->>
->> Now only arm and arm64 use msi controller to setup/teardown msi irqs,
->> in arm, now msi controller saved in pci_sys_data, and for arm64, it seems
->> to be saved in pci_bus. For a more common method to find msi controller/irq domain,
->> I prefer pci_dev/device.
-> 
-> Forget about msi_controller, the whole goal of this series is to make it
-> obsolete. On your x86 platform, what how do you identify which MSI
-> domain should be associated with a given PCI device? Surely you must
-> have a set of data structures or ACPI tables which give you that
-> information.
-> 
->>> - What in-tree platform already has this requirements?
->>
->> As mentioned above, x86 does.
-> 
-> Let me rephrase that in a non-ambiguous manner: can you point me to a
-> file implementing this in mainline?
-> 
-> Thanks,
-> 
-> 	M.
+
+>  void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+>  {
+>  	int ret;
+> @@ -1546,6 +1566,9 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+>  	/* Initialize various capabilities */
+>  	pci_init_capabilities(dev);
+>  
+> +	/* Setup MSI irq domain */
+> +	pci_set_msi_domain(dev);
+> +
+>  	/*
+>  	 * Add the device to our list of discovered devices
+>  	 * and the bus list for fixup functions, etc.
+> @@ -1947,6 +1970,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+>  	b->bridge = get_device(&bridge->dev);
+>  	device_enable_async_suspend(b->bridge);
+>  	pci_set_bus_of_node(b);
+> +	pci_set_bus_msi_domain(b);
+>  
+>  	if (!parent)
+>  		set_dev_node(b->bridge, pcibus_to_node(b));
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index a523cee..3266764 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1637,6 +1637,7 @@ int pcibios_set_pcie_reset_state(struct pci_dev *dev,
+>  int pcibios_add_device(struct pci_dev *dev);
+>  void pcibios_release_device(struct pci_dev *dev);
+>  void pcibios_penalize_isa_irq(int irq, int active);
+> +void pcibios_set_phb_msi_domain(struct pci_bus *bus);
+>  
+>  #ifdef CONFIG_HIBERNATE_CALLBACKS
+>  extern struct dev_pm_ops pcibios_pm_ops;
 > 
