@@ -1,192 +1,57 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 09 Dec 2014 17:11:31 +0000
-Subject: [PATCH] ARM: dove: fix legacy dove IRQ numbers for 3.18
-Message-ID: <E1XyOJv-0003kd-2y@rmk-PC.arm.linux.org.uk>
+From: mpeg.blue@free.fr (Mason)
+Date: Tue, 09 Dec 2014 18:21:32 +0100
+Subject: ARM page tables
+Message-ID: <54872F9C.2080005@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v3.18 changed handle_IRQ() to call __handle_domain_irq(), which now
-rejects attempts to deliver IRQ0.  Since IRQ 0 is used as the timer
-interrupt (just like the PIT on x86), this causes boot to fail as the
-bogomips calibration never completes.
+Hello everyone,
 
-Fix this by shuffling all interrupts up by one.
+On my SoC, we have two MMIO regions mapped at init:
 
-Fixes: a71b092a9c68 ("ARM: Convert handle_IRQ to use __handle_domain_irq")
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-dove/include/mach/irqs.h | 118 ++++++++++++++++-----------------
- arch/arm/mach-dove/irq.c               |   8 +--
- 2 files changed, 63 insertions(+), 63 deletions(-)
+  {
+   .virtual = (0xf0000000 + 0x00800000),
+   .pfn =((unsigned long)((0x20000000) >> 12)),
+   .length = 0x00200000,
+   .type = 0,
+  },
+  {
+   .virtual = (0xf0000000 +(0)),
+   .pfn =((unsigned long)((0) >> 12)),
+   .length = 0x00800000,
+   .type = 0,
+  },
 
-diff --git a/arch/arm/mach-dove/include/mach/irqs.h b/arch/arm/mach-dove/include/mach/irqs.h
-index 0c5ee443d801..2db09f1cf1fc 100644
---- a/arch/arm/mach-dove/include/mach/irqs.h
-+++ b/arch/arm/mach-dove/include/mach/irqs.h
-@@ -14,73 +14,73 @@
- /*
-  * Dove Low Interrupt Controller
-  */
--#define IRQ_DOVE_BRIDGE		0
--#define IRQ_DOVE_H2C		1
--#define IRQ_DOVE_C2H		2
--#define IRQ_DOVE_NAND		3
--#define IRQ_DOVE_PDMA		4
--#define IRQ_DOVE_SPI1		5
--#define IRQ_DOVE_SPI0		6
--#define IRQ_DOVE_UART_0		7
--#define IRQ_DOVE_UART_1		8
--#define IRQ_DOVE_UART_2		9
--#define IRQ_DOVE_UART_3		10
--#define IRQ_DOVE_I2C		11
--#define IRQ_DOVE_GPIO_0_7	12
--#define IRQ_DOVE_GPIO_8_15	13
--#define IRQ_DOVE_GPIO_16_23	14
--#define IRQ_DOVE_PCIE0_ERR	15
--#define IRQ_DOVE_PCIE0		16
--#define IRQ_DOVE_PCIE1_ERR	17
--#define IRQ_DOVE_PCIE1		18
--#define IRQ_DOVE_I2S0		19
--#define IRQ_DOVE_I2S0_ERR	20
--#define IRQ_DOVE_I2S1		21
--#define IRQ_DOVE_I2S1_ERR	22
--#define IRQ_DOVE_USB_ERR	23
--#define IRQ_DOVE_USB0		24
--#define IRQ_DOVE_USB1		25
--#define IRQ_DOVE_GE00_RX	26
--#define IRQ_DOVE_GE00_TX	27
--#define IRQ_DOVE_GE00_MISC	28
--#define IRQ_DOVE_GE00_SUM	29
--#define IRQ_DOVE_GE00_ERR	30
--#define IRQ_DOVE_CRYPTO		31
-+#define IRQ_DOVE_BRIDGE		(1 + 0)
-+#define IRQ_DOVE_H2C		(1 + 1)
-+#define IRQ_DOVE_C2H		(1 + 2)
-+#define IRQ_DOVE_NAND		(1 + 3)
-+#define IRQ_DOVE_PDMA		(1 + 4)
-+#define IRQ_DOVE_SPI1		(1 + 5)
-+#define IRQ_DOVE_SPI0		(1 + 6)
-+#define IRQ_DOVE_UART_0		(1 + 7)
-+#define IRQ_DOVE_UART_1		(1 + 8)
-+#define IRQ_DOVE_UART_2		(1 + 9)
-+#define IRQ_DOVE_UART_3		(1 + 10)
-+#define IRQ_DOVE_I2C		(1 + 11)
-+#define IRQ_DOVE_GPIO_0_7	(1 + 12)
-+#define IRQ_DOVE_GPIO_8_15	(1 + 13)
-+#define IRQ_DOVE_GPIO_16_23	(1 + 14)
-+#define IRQ_DOVE_PCIE0_ERR	(1 + 15)
-+#define IRQ_DOVE_PCIE0		(1 + 16)
-+#define IRQ_DOVE_PCIE1_ERR	(1 + 17)
-+#define IRQ_DOVE_PCIE1		(1 + 18)
-+#define IRQ_DOVE_I2S0		(1 + 19)
-+#define IRQ_DOVE_I2S0_ERR	(1 + 20)
-+#define IRQ_DOVE_I2S1		(1 + 21)
-+#define IRQ_DOVE_I2S1_ERR	(1 + 22)
-+#define IRQ_DOVE_USB_ERR	(1 + 23)
-+#define IRQ_DOVE_USB0		(1 + 24)
-+#define IRQ_DOVE_USB1		(1 + 25)
-+#define IRQ_DOVE_GE00_RX	(1 + 26)
-+#define IRQ_DOVE_GE00_TX	(1 + 27)
-+#define IRQ_DOVE_GE00_MISC	(1 + 28)
-+#define IRQ_DOVE_GE00_SUM	(1 + 29)
-+#define IRQ_DOVE_GE00_ERR	(1 + 30)
-+#define IRQ_DOVE_CRYPTO		(1 + 31)
- 
- /*
-  * Dove High Interrupt Controller
-  */
--#define IRQ_DOVE_AC97		32
--#define IRQ_DOVE_PMU		33
--#define IRQ_DOVE_CAM		34
--#define IRQ_DOVE_SDIO0		35
--#define IRQ_DOVE_SDIO1		36
--#define IRQ_DOVE_SDIO0_WAKEUP	37
--#define IRQ_DOVE_SDIO1_WAKEUP	38
--#define IRQ_DOVE_XOR_00		39
--#define IRQ_DOVE_XOR_01		40
--#define IRQ_DOVE_XOR0_ERR	41
--#define IRQ_DOVE_XOR_10		42
--#define IRQ_DOVE_XOR_11		43
--#define IRQ_DOVE_XOR1_ERR	44
--#define IRQ_DOVE_LCD_DCON	45
--#define IRQ_DOVE_LCD1		46
--#define IRQ_DOVE_LCD0		47
--#define IRQ_DOVE_GPU		48
--#define IRQ_DOVE_PERFORM_MNTR	49
--#define IRQ_DOVE_VMETA_DMA1	51
--#define IRQ_DOVE_SSP_TIMER	54
--#define IRQ_DOVE_SSP		55
--#define IRQ_DOVE_MC_L2_ERR	56
--#define IRQ_DOVE_CRYPTO_ERR	59
--#define IRQ_DOVE_GPIO_24_31	60
--#define IRQ_DOVE_HIGH_GPIO	61
--#define IRQ_DOVE_SATA		62
-+#define IRQ_DOVE_AC97		(1 + 32)
-+#define IRQ_DOVE_PMU		(1 + 33)
-+#define IRQ_DOVE_CAM		(1 + 34)
-+#define IRQ_DOVE_SDIO0		(1 + 35)
-+#define IRQ_DOVE_SDIO1		(1 + 36)
-+#define IRQ_DOVE_SDIO0_WAKEUP	(1 + 37)
-+#define IRQ_DOVE_SDIO1_WAKEUP	(1 + 38)
-+#define IRQ_DOVE_XOR_00		(1 + 39)
-+#define IRQ_DOVE_XOR_01		(1 + 40)
-+#define IRQ_DOVE_XOR0_ERR	(1 + 41)
-+#define IRQ_DOVE_XOR_10		(1 + 42)
-+#define IRQ_DOVE_XOR_11		(1 + 43)
-+#define IRQ_DOVE_XOR1_ERR	(1 + 44)
-+#define IRQ_DOVE_LCD_DCON	(1 + 45)
-+#define IRQ_DOVE_LCD1		(1 + 46)
-+#define IRQ_DOVE_LCD0		(1 + 47)
-+#define IRQ_DOVE_GPU		(1 + 48)
-+#define IRQ_DOVE_PERFORM_MNTR	(1 + 49)
-+#define IRQ_DOVE_VMETA_DMA1	(1 + 51)
-+#define IRQ_DOVE_SSP_TIMER	(1 + 54)
-+#define IRQ_DOVE_SSP		(1 + 55)
-+#define IRQ_DOVE_MC_L2_ERR	(1 + 56)
-+#define IRQ_DOVE_CRYPTO_ERR	(1 + 59)
-+#define IRQ_DOVE_GPIO_24_31	(1 + 60)
-+#define IRQ_DOVE_HIGH_GPIO	(1 + 61)
-+#define IRQ_DOVE_SATA		(1 + 62)
- 
- /*
-  * DOVE General Purpose Pins
-  */
--#define IRQ_DOVE_GPIO_START	64
-+#define IRQ_DOVE_GPIO_START	65
- #define NR_GPIO_IRQS		64
- 
- /*
-diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
-index 01ae4da3d8b4..2be572595a10 100644
---- a/arch/arm/mach-dove/irq.c
-+++ b/arch/arm/mach-dove/irq.c
-@@ -55,14 +55,14 @@ __exception_irq_entry dove_legacy_handle_irq(struct pt_regs *regs)
- 	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_LOW_OFF);
- 	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_LOW_OFF);
- 	if (stat) {
--		unsigned int hwirq = __fls(stat);
-+		unsigned int hwirq = 1 + __fls(stat);
- 		handle_IRQ(hwirq, regs);
- 		return;
- 	}
- 	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_HIGH_OFF);
- 	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_HIGH_OFF);
- 	if (stat) {
--		unsigned int hwirq = 32 + __fls(stat);
-+		unsigned int hwirq = 33 + __fls(stat);
- 		handle_IRQ(hwirq, regs);
- 		return;
- 	}
-@@ -71,8 +71,8 @@ __exception_irq_entry dove_legacy_handle_irq(struct pt_regs *regs)
- 
- void __init dove_init_irq(void)
- {
--	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
--	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
-+	orion_irq_init(1, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
-+	orion_irq_init(33, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
- 
- #ifdef CONFIG_MULTI_IRQ_HANDLER
- 	set_handle_irq(dove_legacy_handle_irq);
--- 
-1.8.3.1
+I dumped the L1 page table descriptors, expecting to find
+entries for the MMIO regions:
+(AFAICT, the page table starts at 0xc0007000)
+
+col_1 = entry number (hex)
+col_2 = entry value
+col_3 = string for (desc & 3)
+
+300 00011452 SECTION
+301 00111452 SECTION
+302 00211452 SECTION
+303 00311452 SECTION
+304 00411452 SECTION
+305 00511452 SECTION
+306 00611452 SECTION
+307 00711452 SECTION
+308 20011452 SECTION
+309 20111452 SECTION
+
+If I understand correctly, entry 308 means:
+VIRTUAL ADDRESS 0x3080_0000 is mapped to PHYSICAL ADDRESS 0x2000_0000
+(Is my reading correct?)
+
+But we asked to map PA 0x2000_0000 to VA 0xf080_0000 in iotable_init,
+so I'm confused...
+
+Also, looking at entry 300:
+VA 0x3000_0000 to PA 0
+but we asked for VA 0xf000_0000 didn't we?
+
+Can someone clear my confusion?
+
+Regards.
