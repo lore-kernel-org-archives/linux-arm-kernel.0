@@ -1,108 +1,80 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 09 Dec 2014 18:40:35 +0000
-Subject: [PATCH 0/5] irqchip: kill the GIC routable domain
-In-Reply-To: <20141209181719.GA2569@kahuna>
-References: <1417873576-10463-1-git-send-email-marc.zyngier@arm.com>
- <20141207171646.GA12049@kahuna> <20141207180322.GA15688@kahuna>
- <54856B21.6070104@arm.com> <20141208224116.GA2538@kahuna>
- <5486C6A6.8060702@arm.com> <20141209181719.GA2569@kahuna>
-Message-ID: <54874223.2000805@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 9 Dec 2014 20:02:10 +0100
+Subject: __hci_cmd_sync() not suitable for nokia h4p
+Message-ID: <20141209190210.GA15641@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/14 18:17, Nishanth Menon wrote:
-> On 09:53-20141209, Marc Zyngier wrote:
->> On 08/12/14 22:41, Nishanth Menon wrote:
->>
->>> Anyways.. The following diff[1] on top of your branch makes DRA7 work - I
->>> assume you will squash as needed and repost with linux-omap mailing list
->>> in CC.
->>
->> Brilliant. I'll squash that into my tree and repost at some point.
-> 
-> K, it will be nice to have a reflow of the series based on v3.19-rc1
-> since there are dts dependencies and we dont want folks to have
-> regressions on their platforms of choice..
-> 
-> Obviously, my tests are basic boot tests and should get a few weeks(as
-> you already mentioned) on linux-next to get properly soaked
-> 
->>
->>> I increased the scope of testing knowing that WUGEN is present in many
->>> A9 based TI platforms as well.. and at least OMAP4 showed flakiness in
->>> my testing.. Also a few notes:
->>>
->>> Stuff like: am437x is a bit questionable (interrupt-parent probably should be wugen?)
->>> 175:          0       GIC  39  tps65218 
->>>
->>> OMAP5: (should be wugen?)
->>> 308:       4323          0       GIC 106  OMAP UART2
->>> 411:          0          0       GIC 151  twl6040
->>> 405:          1          0       GIC  39  palmas
->>
->> Well, I can't really tell. Someone with access to the documentation
->> should be able to find out.
-> 
-> AM437x: http://www.ti.com/lit/pdf/spruhl7
-> OMAP5: http://www.ti.com/lit/pdf/swpu249
-> 
-> yeah, we should be able to do them as well - trivially since they follow
-> the same structure as other SoCs without crossbar.
+Hi!
 
-Done some stuff in that department.
+Major problem with Nokia H4P driver was, that it uses custom functions
+instead of __hci_cmd_sync().
 
->>
->>> OMAP4 serial port is flaky -> not sure if it is due to routing of GIC to UART2 and not via WUGEN
->>> IRQ branch: with my fix applied:
->>> ---------------------------------
->>
->> [...]
->>
->>> 18: pandaboard-es:  Boot FAIL: http://slexy.org/raw/s20ty0Z6i5 (not expected)
->>> 19: pandaboard-vanilla:  Boot FAIL: http://slexy.org/raw/s20BYfaMd2 (not expected)
->>
->> If I read the log correctly, the serial port stops responding after a while?
-> 
-> yeah - dug at the omap4 ones a bit, obviously once the deeper c states
-> are hit, we'd like wakeupgen to wakeup CPU else we will be "sluggish" in
-> the sense that the event is detected when some other wakeupgen enabled
-> interrupt takes place.
+To recap, code was something like this: (You can see ifdefs with old
+code and my new replacements).
 
-I realised that as well once I got a panda up and running.
+....
+	len = sizeof(*neg_cmd) + sizeof(*neg_hdr) + H4_TYPE_SIZE;
+#undef OLD 
+#ifdef OLD
+	skb = bt_skb_alloc(len, GFP_KERNEL);
+	if (!skb)
+		return -ENOMEM;
 
-> Adding the following makes my panda work fine.
-> 1: pandaboard-es:  Boot PASS: http://slexy.org/raw/s20o8DaBvh
-> 2: pandaboard-vanilla:  Boot PASS: http://slexy.org/raw/s222JndDdh
-> 
-> 
-> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> index 1505135..8b6d50e 100644
-> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> @@ -371,8 +371,8 @@
->  	twl: twl at 48 {
->  		reg = <0x48>;
->  		/* IRQ# = 7 */
-> -		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>; /* IRQ_SYS_1N cascaded to gic */
-> -		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>; /* IRQ_SYS_1N cascaded to wakeupgen to gic */
-> +		interrupt-parent = <&wakeupgen>;
->  	};
+	memset(skb->data, 0x00, len);
+	*skb_put(skb, 1) = H4_NEG_PKT;
+	neg_hdr = (struct hci_h4p_neg_hdr *)skb_put(skb, sizeof(*neg_hdr));
+	neg_cmd = (struct hci_h4p_neg_cmd *)skb_put(skb, sizeof(*neg_cmd));
+	neg_hdr->dlen = sizeof(*neg_cmd);
+#else      
+	struct {
+		struct hci_h4p_neg_cmd neg_cmd;
+	} data;
 
-[...]
+	memset(&data, 0, len-1);
+	neg_cmd = &data.neg_cmd;
+#endif
 
-I already fixed those in my tree, in a slightly different way: no need
-to have an interrupt parent at all, as we're going to inherit the
-default anyway.
+	neg_cmd->ack = H4P_NEG_REQ;
+	neg_cmd->baud = cpu_to_le16(BT_BAUDRATE_DIVIDER/MAX_BAUD_RATE);
+	neg_cmd->proto = H4P_PROTO_BYTE;
+	neg_cmd->sys_clk = cpu_to_le16(sysclk);
 
-I've pushed another version of the branch, with the crossbar rework
-sitting *before* the WUGEN hacks. That should hopefully make bisection work.
+	hci_h4p_change_speed(info, INIT_SPEED);
 
-If you can give it a shake, that'd be most appreciated. I'll repost the
-branch in a couple of days.
+	printk("Setting up packet\n");
+	hci_h4p_set_rts(info, 1);
+	info->init_error = 0;
+	init_completion(&info->init_completion);
+	printk("skb_queue_tail\n");
 
-Thanks,
+#ifdef OLD
+	skb_queue_tail(&info->txq, skb);
 
-	M.
+	spin_lock_irqsave(&info->lock, flags);
+	hci_h4p_outb(info, UART_IER, hci_h4p_inb(info, UART_IER) |
+		     UART_IER_THRI);
+	spin_unlock_irqrestore(&info->lock, flags);
+#else
+	printk("hci_cmd_sync\n");
+//	set_bit(HCI_RUNNING, &info->hdev->flags);
+
+	info->initing = 2;
+	
+	skb = __hci_cmd_sync(info->hdev, H4_NEG_PKT << 8, sizeof(*neg_cmd), ((void *) &data), 20);
+
+...but there's problem with __hci_cmd_sync(): the packet it produces
+is one byte too long; for initialization, I can work around that with
+<< 8, so the added zero is@the begining (and device will be still
+initialized), but that is a) an extreme hack, b) only works for first
+packet and c) means that __hci_cmd_sync() will not recognize the
+reply, meaning it does not really help.
+
+Are there different variants of the protocol I should switch to? Any
+ideas? Should I forget about __hci_cmd_sync()?
+
+Best regards,
+									Pavel
 -- 
-Jazz is not dead. It just smells funny...
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
