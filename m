@@ -1,112 +1,116 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Dec 2014 23:01:03 +0100
-Subject: [GIT PULL] asm-generic: asm/io.h rewrite
-Message-ID: <4703362.Atfd0HgCCK@wuerfel>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue,  9 Dec 2014 14:03:33 -0800
+Subject: [PATCH 1/2] clockevents: introduce ->set_dev_mode() which can return
+ error
+In-Reply-To: <1418162614-19182-1-git-send-email-khilman@kernel.org>
+References: <1418162614-19182-1-git-send-email-khilman@kernel.org>
+Message-ID: <1418162614-19182-2-git-send-email-khilman@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+From: Viresh Kumar <viresh.kumar@linaro.org>
 
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+Currently, the ->set_mode() method of a clockevent device is not
+allowed to fail, so it has no return value.  In order to add new
+clockevent modes, and allow the setting of those modes to fail, we
+need the clockevent core to be able to detect when setting a mode
+fails.
 
-are available in the git repository at:
+To allow detection of mode setting failures, introduce a new method
+->set_dev_mode() which can return an error if the given mode is not
+supported or fails.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arnd/asm-generic.git tags/asm-generic-for-linus
+Since all current modes are still not allowed to fail, the core code
+simply WARNs if any modes fail.  Future patches that add new mode
+support will add proper error recovery based on failure conditions.
 
-for you to fetch changes up to cb61f6769b8836081940ba26249f1b756400c7df:
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+[khilman: rework changelogs, minor formatting/checkpatch cleanups]
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ include/linux/clockchips.h |  5 ++++-
+ kernel/time/clockevents.c  | 21 ++++++++++++++++++---
+ kernel/time/timer_list.c   |  5 ++++-
+ 3 files changed, 26 insertions(+), 5 deletions(-)
 
-  ARM64: use GENERIC_PCI_IOMAP (2014-11-19 14:09:07 +0100)
-
-----------------------------------------------------------------
-asm-generic: asm/io.h rewrite
-
-While there normally is no reason to have a pull request for asm-generic
-but have all changes get merged through whichever tree needs them, I do
-have a series for 3.19. There are two sets of patches that change
-significant portions of asm/io.h, and this branch contains both in order
-to resolve the conflicts:
-
-- Will Deacon has done a set of patches to ensure that all architectures
-  define {read,write}{b,w,l,q}_relaxed() functions or get them by
-  including asm-generic/io.h. These functions are commonly used on ARM
-  specific drivers to avoid expensive L2 cache synchronization implied by
-  the normal {read,write}{b,w,l,q}, but we need to define them on all
-  architectures in order to share the drivers across architectures and
-  to enable CONFIG_COMPILE_TEST configurations for them
-
-- Thierry Reding has done an unrelated set of patches that extends
-  the asm-generic/io.h file to the degree necessary to make it useful
-  on ARM64 and potentially other architectures.
-
-----------------------------------------------------------------
-Arnd Bergmann (5):
-      ARM: ixp4xx: Fix build with IXP4XX_INDIRECT_PCI
-      Merge branch 'asm-generic-io' of https://github.com/thierryreding/linux into asm-generic
-      Merge branch 'io' of git://git.kernel.org/.../will/linux into asm-generic
-      sparc: io: remove duplicate relaxed accessors on sparc32
-      ARM64: use GENERIC_PCI_IOMAP
-
-Thierry Reding (10):
-      ARC: Remove redundant PCI_IOBASE declaration
-      ARM: ebsa110: Properly override I/O accessors
-      ARM: ixp4xx: Properly override I/O accessors
-      Change xlate_dev_{kmem,mem}_ptr() prototypes
-      /dev/mem: Use more consistent data types
-      asm-generic/io.h: Reconcile I/O accessor overrides
-      asm-generic/io.h: Implement generic {read,write}s*()
-      ARM: Use include/asm-generic/io.h
-      arm64: Use include/asm-generic/io.h
-      ARM: sa11x0: Use void __iomem * in MMIO accessors
-
-Will Deacon (16):
-      asm-generic: io: implement relaxed accessor macros as conditional wrappers
-      microblaze: io: remove dummy relaxed accessor macros
-      s390: io: remove dummy relaxed accessor macros for reads
-      xtensa: io: remove dummy relaxed accessor macros for reads
-      frv: io: implement dummy relaxed accessor macros for writes
-      cris: io: implement dummy relaxed accessor macros for writes
-      ia64: io: implement dummy relaxed accessor macros for writes
-      m32r: io: implement dummy relaxed accessor macros for writes
-      m68k: io: implement dummy relaxed accessor macros for writes
-      mn10300: io: implement dummy relaxed accessor macros for writes
-      parisc: io: implement dummy relaxed accessor macros for writes
-      powerpc: io: implement dummy relaxed accessor macros for writes
-      sparc: io: implement dummy relaxed accessor macros for writes
-      tile: io: implement dummy relaxed accessor macros for writes
-      x86: io: implement dummy relaxed accessor macros for writes
-      documentation: memory-barriers: clarify relaxed io accessor semantics
-
- Documentation/memory-barriers.txt       |  13 +-
- arch/arc/include/asm/io.h               |   2 -
- arch/arm/include/asm/io.h               |  89 ++--
- arch/arm/include/asm/memory.h           |   4 +
- arch/arm/mach-ebsa110/include/mach/io.h |  25 +-
- arch/arm/mach-ebsa110/io.c              |  14 +-
- arch/arm/mach-ixp4xx/common.c           |   2 +-
- arch/arm/mach-ixp4xx/include/mach/io.h  |  28 +-
- arch/arm/mach-sa1100/pci-nanoengine.c   |   8 +-
- arch/arm64/Kconfig                      |   2 +-
- arch/arm64/include/asm/io.h             | 122 ++----
- arch/arm64/include/asm/memory.h         |   2 +
- arch/cris/include/asm/io.h              |   3 +
- arch/frv/include/asm/io.h               |   3 +
- arch/ia64/include/asm/io.h              |   4 +
- arch/ia64/include/asm/uaccess.h         |  16 +-
- arch/m32r/include/asm/io.h              |   3 +
- arch/m68k/include/asm/io.h              |   8 +
- arch/m68k/include/asm/io_no.h           |   4 -
- arch/microblaze/include/asm/io.h        |   8 -
- arch/mn10300/include/asm/io.h           |   4 +
- arch/parisc/include/asm/io.h            |  12 +-
- arch/powerpc/include/asm/io.h           |  12 +-
- arch/s390/include/asm/io.h              |  10 +-
- arch/s390/mm/maccess.c                  |   4 +-
- arch/sparc/include/asm/io_32.h          |   4 -
- arch/sparc/include/asm/io_64.h          |  14 +-
- arch/tile/include/asm/io.h              |   4 +
- arch/x86/include/asm/io.h               |   8 +-
- arch/x86/mm/ioremap.c                   |   4 +-
- arch/xtensa/include/asm/io.h            |   7 -
- drivers/char/mem.c                      |  13 +-
- include/asm-generic/io.h                | 751 ++++++++++++++++++++++++++------
- 33 files changed, 837 insertions(+), 370 deletions(-)
+diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+index 2e4cb67f6e56..d969659cf688 100644
+--- a/include/linux/clockchips.h
++++ b/include/linux/clockchips.h
+@@ -81,7 +81,8 @@ enum clock_event_mode {
+  * @mode:		operating mode assigned by the management code
+  * @features:		features
+  * @retries:		number of forced programming retries
+- * @set_mode:		set mode function
++ * @set_dev_mode:	set dev mode function
++ * @set_mode:		set mode function (deprecated, use set_dev_mode instead)
+  * @broadcast:		function to broadcast events
+  * @min_delta_ticks:	minimum delta value in ticks stored for reconfiguration
+  * @max_delta_ticks:	maximum delta value in ticks stored for reconfiguration
+@@ -109,6 +110,8 @@ struct clock_event_device {
+ 	unsigned long		retries;
+ 
+ 	void			(*broadcast)(const struct cpumask *mask);
++	int			(*set_dev_mode)(enum clock_event_mode mode,
++						struct clock_event_device *);
+ 	void			(*set_mode)(enum clock_event_mode mode,
+ 					    struct clock_event_device *);
+ 	void			(*suspend)(struct clock_event_device *);
+diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
+index 55449909f114..f7614041240e 100644
+--- a/kernel/time/clockevents.c
++++ b/kernel/time/clockevents.c
+@@ -105,7 +105,16 @@ void clockevents_set_mode(struct clock_event_device *dev,
+ 				 enum clock_event_mode mode)
+ {
+ 	if (dev->mode != mode) {
+-		dev->set_mode(mode, dev);
++		if (dev->set_dev_mode) {
++			int ret = dev->set_dev_mode(mode, dev);
++
++			/* Currently available modes shouldn't fail */
++			WARN_ONCE(ret, "Requested mode: %d, error: %d\n",
++				  mode, ret);
++		} else {
++			dev->set_mode(mode, dev);
++		}
++
+ 		dev->mode = mode;
+ 
+ 		/*
+@@ -448,8 +457,14 @@ int __clockevents_update_freq(struct clock_event_device *dev, u32 freq)
+ 	if (dev->mode == CLOCK_EVT_MODE_ONESHOT)
+ 		return clockevents_program_event(dev, dev->next_event, false);
+ 
+-	if (dev->mode == CLOCK_EVT_MODE_PERIODIC)
+-		dev->set_mode(CLOCK_EVT_MODE_PERIODIC, dev);
++	if (dev->mode == CLOCK_EVT_MODE_PERIODIC) {
++		/* Shouldn't fail while switching to PERIODIC MODE */
++		if (dev->set_dev_mode)
++			WARN_ON_ONCE(dev->set_dev_mode(CLOCK_EVT_MODE_PERIODIC,
++						       dev));
++		else
++			dev->set_mode(CLOCK_EVT_MODE_PERIODIC, dev);
++	}
+ 
+ 	return 0;
+ }
+diff --git a/kernel/time/timer_list.c b/kernel/time/timer_list.c
+index 61ed862cdd37..957a04951ef0 100644
+--- a/kernel/time/timer_list.c
++++ b/kernel/time/timer_list.c
+@@ -229,7 +229,10 @@ print_tickdevice(struct seq_file *m, struct tick_device *td, int cpu)
+ 	SEQ_printf(m, "\n");
+ 
+ 	SEQ_printf(m, " set_mode:       ");
+-	print_name_offset(m, dev->set_mode);
++	if (dev->set_dev_mode)
++		print_name_offset(m, dev->set_dev_mode);
++	else
++		print_name_offset(m, dev->set_mode);
+ 	SEQ_printf(m, "\n");
+ 
+ 	SEQ_printf(m, " event_handler:  ");
+-- 
+2.1.3
