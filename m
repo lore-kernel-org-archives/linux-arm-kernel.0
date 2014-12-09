@@ -1,48 +1,47 @@
-From: flora.fu@mediatek.com (Flora Fu)
-Date: Tue, 9 Dec 2014 10:15:37 +0800
-Subject: [PATCH v3 1/8] soc: mediatek: Add PMIC wrapper for MT8135 and
- MT6397 SoC
-In-Reply-To: <2751641.o51TuZRl88@wuerfel>
-References: <1417752479-4749-1-git-send-email-flora.fu@mediatek.com>
- <1417752479-4749-2-git-send-email-flora.fu@mediatek.com>
- <2751641.o51TuZRl88@wuerfel>
-Message-ID: <1418091337.5663.9.camel@mtksdaap41>
+From: lyz@rock-chips.com (Yunzhi Li)
+Date: Tue,  9 Dec 2014 10:43:16 +0800
+Subject: [PATCH v4 0/5] Patches to add support for Rockchip usb PHYs.
+Message-ID: <1418093001-30443-1-git-send-email-lyz@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd,
 
-On Fri, 2014-12-05 at 11:13 +0100, Arnd Bergmann wrote:
-> On Friday 05 December 2014 12:07:52 Flora Fu wrote:
-> > Add PMIC wrapper of MT8135 to access MT6397 MFD.
-> > 
-> > Signed-off-by: Flora Fu <flora.fu@mediatek.com>
-> > 
-> 
-> Please explain what a PMIC wrapper is and why you need one for MT8135.
-> I don't understand the purpose of this code at all. Is this just another
-> way of accessing the MT6397 when not using i2c or spi like other
-> PMIC drivers do?
-> 
+Patches to add support for Rockchip usb phys.Add a new Rockchip
+usb phy driver and modify dwc2 controller driver to make dwc2
+platform devices support a generic PHY framework driver. This
+patch set has been tested on my rk3288-evb and power off the usb
+phys would reduce about 60mW power budget in total during sustem
+suspend.
 
-Yes, MT8135 uses a proprietary hardware to communicate with MT6397. 
-The hardware is called PMIC Wrapper or PWRAP.
-Since it is not standard i2c or spi protocols, a soc related software
-driver is implemented to handle access protocols in AP side.
+Changes in v4:
+- Get number of PHYs from device tree.
+- Model each PHY as subnode of the phy provider node.
+- Updata description for phy device tree subnode.
+- Add phy subnodes.
 
-+-----------------+           +---------------+
-|                 |           |               |
-| Mediatek AP SoC |           |               |
-| (ex. MT8135)    |           |    MT6397     |
-|                 |           |               |
-|      +--------+ | (SPI bus) | +--------+    |
-|      |        | |-----------| |        |    |
-|      |  PMIC  | |-----------| |  PMIC  |    |
-|      | Wrapper| |-----------| | Wrapper|    |
-|      |        | |-----------| |        |    |
-|      +--------+ |           | +--------+    |
-|                 |           |               |
-+-----------------+           +---------------+
+Changes in v3:
+- Use BIT macro instead of bit shift ops.
+- Rename the config entry to PHY_ROCKCHIP_USB.
 
-Thanks,
-Flora
+Yunzhi Li (5):
+  phy: add a driver for the Rockchip SoC internal USB2.0 PHY
+  Documentation: bindings: add doc for the Rockchip usb PHY
+  usb: dwc2: add generic PHY framework support for dwc2 usb controler
+    platform driver.
+  ARM: dts: add rk3288 usb PHY
+  ARM: dts: Enable usb PHY on rk3288-evb board
+
+ .../devicetree/bindings/phy/rockchip-usb-phy.txt   |  32 ++++
+ arch/arm/boot/dts/rk3288-evb.dtsi                  |   4 +
+ arch/arm/boot/dts/rk3288.dtsi                      |  27 +++
+ drivers/phy/Kconfig                                |   7 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-rockchip-usb.c                     | 211 +++++++++++++++++++++
+ drivers/usb/dwc2/gadget.c                          |  33 ++--
+ drivers/usb/dwc2/platform.c                        |  36 +++-
+ 8 files changed, 328 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+ create mode 100644 drivers/phy/phy-rockchip-usb.c
+
+-- 
+2.0.0
