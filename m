@@ -1,82 +1,105 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Tue, 09 Dec 2014 19:25:06 +0900
-Subject: [RESEND][PATCH v15 7/7] ARM: kprobes: enable OPTPROBES
- for ARM 32
-In-Reply-To: <1418116450.3641.7.camel@linaro.org>
-References: <1418047765-53197-1-git-send-email-wangnan0@huawei.com>
- <1418047765-53197-8-git-send-email-wangnan0@huawei.com>
- <54869B1C.6050401@hitachi.com> <1418116450.3641.7.camel@linaro.org>
-Message-ID: <5486CE02.5070808@hitachi.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 09 Dec 2014 11:26:21 +0100
+Subject: [PATCH v4 4/5] ARM: dts: add rk3288 usb PHY
+In-Reply-To: <1418093554-30671-1-git-send-email-lyz@rock-chips.com>
+References: <1418093554-30671-1-git-send-email-lyz@rock-chips.com>
+Message-ID: <1433902.kJO8gnlzYm@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2014/12/09 18:14), Jon Medhurst (Tixy) wrote:
-[...]
->>> diff --git a/arch/arm/probes/kprobes/core.c b/arch/arm/probes/kprobes/core.c
->>> index 3a58db4..a4ec240 100644
->>> --- a/arch/arm/probes/kprobes/core.c
->>> +++ b/arch/arm/probes/kprobes/core.c
->>> @@ -163,19 +163,31 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
->>>   * memory. It is also needed to atomically set the two half-words of a 32-bit
->>>   * Thumb breakpoint.
->>>   */
->>> -int __kprobes __arch_disarm_kprobe(void *p)
->>> -{
->>> -	struct kprobe *kp = p;
->>> -	void *addr = (void *)((uintptr_t)kp->addr & ~1);
->>> -
->>> -	__patch_text(addr, kp->opcode);
->>> +struct patch {
->>> +	void *addr;
->>> +	unsigned int insn;
->>> +};
->>>  
->>> +static int __kprobes_remove_breakpoint(void *data)
->>> +{
->>> +	struct patch *p = data;
->>> +	__patch_text(p->addr, p->insn);
->>>  	return 0;
->>>  }
->>>  
->>> +void __kprobes kprobes_remove_breakpoint(void *addr, unsigned int insn)
->>> +{
->>> +	struct patch p = {
->>> +		.addr = addr,
->>> +		.insn = insn,
->>> +	};
->>> +	stop_machine(__kprobes_remove_breakpoint, &p, cpu_online_mask);
->>> +}
->>
->> Hmm, I think finally we should fix patch_text() in patch.c to forcibly use stop_machine
->> by adding "bool stop" parameter, instead of introducing new another patch_text()
->> implementation, because we'd better avoid two private "patch" data structures.
+Hi,
+
+Am Dienstag, 9. Dezember 2014, 10:52:34 schrieb Yunzhi Li:
+> This patch adds a device_node for RK3288 SoC usb phy. It also
+> defines the phy to be used by three usb controllers: usb_host0/1
+> and usb_otg.
 > 
-> That was my first thought too, then I realised that breaks encapsulation
-> of the patch_text implementation, because its use of stop_machine is an
-> implementation detail and it could be rewritten to not use stop machine.
-> (That is sort of on my long term todo list
-> https://lkml.org/lkml/2014/9/4/188)
+> Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
+> 
+> ---
+> 
+> Changes in v4:
+> - Add phy subnodes.
+> 
+> Changes in v3: None
+> 
+>  arch/arm/boot/dts/rk3288.dtsi | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 874e66d..2db2d12 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -329,12 +329,35 @@
+>  		status = "disabled";
+>  	};
+> 
+> +	usbphy: phy {
 
-Indeed. OK, now let it goes. :)
+the nodes in the dts are ordered by address, please move it accordingly. I 
+guess a good position might be to have the "phy" before the "pinctrl" node.
 
-> Whereas stop machine is used by kprobes to avoid race conditions with
-> the undefined instruction exception handler and something like that
-> would be needed even if patch_text didn't use stop_machine.
+Also please reorder the properties a bit to have the "compatible" at the top 
+of the list, like
 
-At this point, it's OK.
+		compatible = "rockchip,rk3288-usb-phy";
+		rockchip,grf = <&grf>;
+		#phy-cells = <1>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		status = "disabled";
 
-However, I'm not convinced completely. Perhaps, it depends on cache-coherent bus
-implementation, but there may be some implementations which can allow us to
-change one instruction atomically without stop_machine.
-
-I'm actually interested in PREEMPT_RT on arm32, and this stop_machine() is a barrier
-to apply kprobes on real-time systems.
-
-Thank you,
+		subnodes...
 
 
--- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+Thanks
+Heiko
+
+> +		#phy-cells = <1>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "rockchip,rk3288-usb-phy";
+> +		rockchip,grf = <&grf>;
+> +		status = "disabled";
+> +
+> +		usb-phy at 0 {
+> +			reg = <0>;
+> +		};
+> +
+> +		usb-phy at 1 {
+> +			reg = <1>;
+> +		};
+> +
+> +		usb-phy at 2 {
+> +			reg = <2>;
+> +		};
+> +	};
+> +
+>  	usb_host0_ehci: usb at ff500000 {
+>  		compatible = "generic-ehci";
+>  		reg = <0xff500000 0x100>;
+>  		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+>  		clocks = <&cru HCLK_USBHOST0>;
+>  		clock-names = "usbhost";
+> +		phys = <&usbphy 1>;
+> +		phy-names = "usb";
+>  		status = "disabled";
+>  	};
+> 
+> @@ -347,6 +370,8 @@
+>  		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+>  		clocks = <&cru HCLK_USBHOST1>;
+>  		clock-names = "otg";
+> +		phys = <&usbphy 2>;
+> +		phy-names = "usb2-phy";
+>  		status = "disabled";
+>  	};
+> 
+> @@ -357,6 +382,8 @@
+>  		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+>  		clocks = <&cru HCLK_OTG0>;
+>  		clock-names = "otg";
+> +		phys = <&usbphy 0>;
+> +		phy-names = "usb2-phy";
+>  		status = "disabled";
+>  	};
