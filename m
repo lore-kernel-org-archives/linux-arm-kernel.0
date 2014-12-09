@@ -1,9 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Dec 2014 22:30:33 +0100
-Subject: [GIT PULL 3/9] ARM: SoC cleanups for 3.19
+Date: Tue, 09 Dec 2014 22:36:27 +0100
+Subject: [GIT PULL 5/9] ARM: SoC driver updates for 3.19
 In-Reply-To: <4491193.a6KEQb1tZH@wuerfel>
 References: <4491193.a6KEQb1tZH@wuerfel>
-Message-ID: <2717417.VGWlWGOuHy@wuerfel>
+Message-ID: <3846874.YrNpAixfKY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,317 +13,231 @@ The following changes since commit ba62a8593d15f3f353acdc8ab32c18dd40a275bb:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/cleanup-for-linus
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/drivers-for-linus
 
-for you to fetch changes up to ef1dfa7332e9205b532da1c2d286757ce511cd1d:
+for you to fetch changes up to 5db45002576f7d60c5bf7b23e277845cd3e806be:
 
-  Merge tag 'at91-cleanup5' of git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91 into next/cleanup (2014-12-04 19:11:03 +0100)
-
-----------------------------------------------------------------
-ARM: SoC cleanups for 3.19
-
-The remaining cleanups for 3.19 are to a large part result of
-devicetree conversion nearing completion on two other platforms
-besides AT91:
-
-* Like AT91, Renesas shmobile is in the process to migrate to DT and
-  multiplatform, but using a different approach of doing it one
-  SoC at a time. For 3.19, the r8a7791 platform and associated\
-  "Koelsch" board are considered complete and we remove the non-DT
-  non-multiplatform support for this.
-
-* The ARM Versatile Express has supported DT and multiplatform
-  for a long time, but we have still kept the legacy board files
-  around, because not all drivers were fully working before. We
-  have finally taken the last step to remove the board files.
-
-Other changes in this branch are preparation for the later branches
-or just unrelated to the more interesting changes:
-* The dts files for arm64 get moved into per-vendor directories for
-  a clearer structure.
-* Some dead code removal (zynq, exynos, davinci, imx)
-* Using pr_*() macros more consistently instead of printk(KERN_*)
-  in some platform code.
+  Merge branch 'at91/cleanup5' into next/drivers (2014-12-08 18:29:20 +0100)
 
 ----------------------------------------------------------------
+ARM: SoC driver updates for 3.19
+
+These are changes for drivers that are intimately tied to some SoC
+and for some reason could not get merged through the respective
+subsystem maintainer tree.
+
+The largest single change here this time around is the Tegra
+iommu/memory controller driver, which gets updated to the new
+iommu DT binding. More drivers like this are likely to follow
+for the following merge window, but we should be able to do
+those through the iommu maintainer.
+
+Other notable changes are:
+* reset controller drivers from the reset maintainer (socfpga, sti, berlin)
+* fixes for the keystone navigator driver merged last time
+* at91 rtc driver changes related to the at91 cleanups
+* ARM perf driver changes from Will Deacon
+* updates for the brcmstb_gisb driver
+
+----------------------------------------------------------------
+Antoine T?nart (1):
+      reset: add the Berlin reset controller driver
+
 Arnd Bergmann (13):
-      Merge tag 'renesas-boards-cleanups2-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
-      Merge tag 'renesas-dt-du-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
-      Merge tag 'renesas-dt-cleanups-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
-      Merge tag 'renesas-koelsch-board-removal-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
-      Merge tag 'at91-cleanup2' of git://git.kernel.org/.../nferre/linux-at91 into next/cleanup
-      Merge tag 'davinci-for-v3.19/cleanup' of git://git.kernel.org/.../nsekhar/linux-davinci into next/cleanup
-      Merge tag 'renesas-soc-cleanups2-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
-      Merge tag 'samsung-cleanup-2' of git://git.kernel.org/.../kgene/linux-samsung into next/cleanup
-      Merge tag 'imx-cleanup-3.19' of git://git.kernel.org/.../shawnguo/linux into next/cleanup
-      Merge tag 'at91-cleanup3' of git://git.kernel.org/.../nferre/linux-at91 into next/cleanup
-      Merge tag 'at91-cleanup4' of git://git.kernel.org/.../nferre/linux-at91 into next/cleanup
-      Merge tag 'zynq-cleanup-for-3.19' of https://github.com/Xilinx/linux-xlnx into next/cleanup
-      Merge tag 'at91-cleanup5' of git://git.kernel.org/.../nferre/linux-at91 into next/cleanup
+      Merge tag 'omap-for-v3.19/w1-and-l3-noc' of git://git.kernel.org/.../tmlind/linux-omap into next/drivers
+      Merge tag 'keystone-driver-soc' of git://git.kernel.org/.../ssantosh/linux-keystone into next/drivers
+      Merge tag 'at91-drivers' of git://git.kernel.org/.../nferre/linux-at91 into next/drivers
+      Merge tag 'arm-perf-3.19' of git://git.kernel.org/.../will/linux into next/drivers
+      Merge branch 'at91/cleanup' into next/drivers
+      Merge tag 'davinci-for-v3.19/edma' of git://git.kernel.org/.../nsekhar/linux-davinci into next/drivers
+      ARM: common: edma: edma_pm_resume may be unused
+      Merge tag 'samsung-driver' of git://git.kernel.org/.../kgene/linux-samsung into next/drivers
+      Merge tag 'arm-soc/for-3.19/brcmstb-drivers' of https://github.com/brcm/linux into next/drivers
+      Merge tag 'reset-for-3.19-2' of git://git.pengutronix.de/git/pza/linux into next/drivers
+      Merge tag 'tegra-for-3.19-iommu' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge branch 'brcm/stb-smp-uart' into next/drivers
+      Merge branch 'at91/cleanup5' into next/drivers
 
-Boris Brezillon (1):
-      ARM: at91: remove useless init_time for DT-only SoCs
+Axel Lin (4):
+      soc: ti: Use list_first_entry_or_null() at appropriate places
+      soc: ti: knav_qmss_queue: Fix unbalanced locking ins knav_pool_create()
+      soc: ti: knav_qmss_queue: Return proper error if devm_kzalloc fails
+      soc: ti: knav_qmss_queue: Use list_for_each_entry_safe to prevent use after free
 
-Dmitry Voytik (3):
-      ARM: imx6q: drop unnecessary semicolon
-      ARM: imx: simplify clk_pllv3_prepare()
-      ARM: imx: refactor mxc_iomux_mode()
+Boris BREZILLON (9):
+      rtc: at91sam9: remove references to mach specific headers
+      rtc: at91sam9: use standard readl/writel functions instead of raw versions
+      rtc: at91sam9: replace devm_ioremap by devm_ioremap_resource
+      rtc: at91sam9: add DT support
+      rtc: at91sam9: make use of syscon/regmap to access GPBR registers
+      rtc: at91sam9: rework the Kconfig description
+      ARM: at91: add clk_lookup entry for RTT devices
+      rtc: at91sam9: use clk API instead of relying on AT91_SLOW_CLOCK
+      rtc: at91sam9: add DT bindings documentation
 
-Fabio Estevam (4):
-      ARM: dts: imx6qdl-sabresd: Use IMX6QDL_CLK_CKO define
-      ARM: dts: imx6qdl-gw5x: Remove unneeded 'fsl,mode' property
-      ARM: dts: imx6qdl-rex: Remove unneeded 'fsl,mode' property
-      ARM: dts: imx6qdl-sabresd: Fix the microphone route
+Daniel Mack (1):
+      ARM: common: edma: add suspend resume hook
 
-Geert Uytterhoeven (24):
-      ARM: dts: Sort SHMOBILE dtbs alphabetically
-      ARM: shmobile: r7s72100: Remove r7s72100-genmai.dtb for ARCH_SHMOBILE_LEGACY
-      ARM: shmobile: emev2 dtsi: Use generic names for device nodes
-      ARM: shmobile: emev2 dtsi: Add uart* labels for easier referencing
-      ARM: shmobile: genmai dts: Add chosen/stdout-path
-      ARM: shmobile: ape6evm-reference dts: Add chosen/stdout-path
-      ARM: shmobile: armadillo800eva dts: Add chosen/stdout-path
-      ARM: shmobile: bockw-reference dts: Add chosen/stdout-path
-      ARM: shmobile: marzen dts: Add chosen/stdout-path
-      ARM: shmobile: lager dts: Add chosen/stdout-path
-      ARM: shmobile: henninger dts: Add chosen/stdout-path
-      ARM: shmobile: koelsch dts: Add chosen/stdout-path
-      ARM: shmobile: alt dts: Add chosen/stdout-path
-      ARM: shmobile: kzm9g-reference dts: Add chosen/stdout-path
-      ARM: shmobile: kzm9d dts: Add chosen/stdout-path
-      ARM: shmobile: r8a7778: Remove wrapper r8a7778_init_delay()
-      ARM: shmobile: sh73a0: Remove wrapper sh73a0_init_delay()
-      MAINTAINERS: Remove reference to shmobile / koelsch_defconfig
-      ARM: dts: koelsch: Stop building r8a7791-koelsch.dtb in legacy builds
-      ARM: shmobile: koelsch dts: Drop console= bootargs parameter
-      ARM: shmobile: sh73a0: Spelling/grammar s/entity map/identity mapping/
-      ARM: shmobile: sh7372: Spelling/grammar s/entity map/identity mapping/
-      ARM: shmobile: r8a7779: Spelling/grammar s/entity/identity/, s/map/mapping/
-      ARM: imx: Remove unneeded .map_io initialization
+Dinh Nguyen (2):
+      reset: add reset_control_status helper function
+      reset: add socfpga_reset_status
 
-Jingchang Lu (1):
-      ARM: imx: clean up machine mxc_arch_reset_init_dt reset init
+Doug Anderson (1):
+      clocksource: arch_timer: Allow the device tree to specify uninitialized timer registers
 
-Joe Perches (1):
-      ARM: davinci: Use standard logging styles
+Florian Fainelli (1):
+      bus: brcmstb_gisb: resolve section mismatch
 
-Krzysztof Kozlowski (3):
-      ARM: EXYNOS: Move code from hotplug.c to platsmp.c
-      ARM: EXYNOS: Remove unneeded __ref annotation for cpu_die function
-      ARM: EXYNOS: Fix CPU idle clock down after CPU off
+Heiko St?bner (1):
+      iommu: Improve error handling when setting bus iommu
 
-Laurent Pinchart (15):
-      ARM: shmobile: Remove FSF address from copyright headers
-      ARM: shmobile: r8a7779: Add DU node to device tree
-      ARM: shmobile: r8a7790: Add DU node to device tree
-      ARM: shmobile: r8a7791: Add DU node to device tree
-      ARM: shmobile: dts: Add common file for AA104XD12 panel
-      ARM: shmobile: marzen: Enable DU device in DT
-      ARM: shmobile: lager-reference: Remove DU platform device
-      ARM: shmobile: lager: Enable DU device in DT
-      ARM: shmobile: koelsch-reference: Remove DU platform device
-      ARM: shmobile: koelsch: Enable DU device in DT
-      ARM: shmobile: marzen-reference: Don't include legacy clock.h
-      ARM: shmobile: Remove shmobile_clk_workaround() implementation
-      ARM: shmobile: koelsch: Remove legacy C board code
-      ARM: shmobile: r8a7791: Remove legacy code
-      ARM: shmobile: koelsch: Remove reference board code
+Joerg Roedel (2):
+      iommu: Do more input validation in iommu_map_sg()
+      powerpc/iommu: Rename iommu_[un]map_sg functions
 
-Michal Simek (1):
-      ARM: zynq: Remove secondary_startup() declaration from header
+Keerthy (2):
+      bus: omap_l3_noc: Add resume hook to restore context
+      bus: omap_l3_noc: Correct returning IRQ_HANDLED unconditionally in the irq handler
 
-Olof Johansson (8):
-      Merge tag 'dts-subdirs-for-arm-soc-v3.19' of git://git.kernel.org/.../rric/linux into next/cleanup
-      Merge tag 'samsung-cleanup' of git://git.kernel.org/.../kgene/linux-samsung into next/cleanup
-      Merge tag 'renesas-kconfig-cleanups-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
-      Merge tag 'renesas-boards-cleanups-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
-      Merge tag 'renesas-soc-cleanups-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
-      Merge tag 'renesas-cleanup-for-v3.19' of git://git.kernel.org/.../horms/renesas into next/cleanup
-      Merge tag 'at91-cleanup' of git://git.kernel.org/.../nferre/linux-at91 into next/cleanup
-      ARM: at91: fix build breakage due to legacy board removals
+Kevin Cernekee (4):
+      bus: brcmstb_gisb: Make the driver buildable on MIPS
+      bus: brcmstb_gisb: Introduce wrapper functions for MMIO accesses
+      bus: brcmstb_gisb: Look up register offsets in a table
+      bus: brcmstb_gisb: Add register offset tables for older chips
+
+Mark Rutland (10):
+      bus: cci: move away from arm_pmu framework
+      arm: perf: factor out callchain code
+      arm: perf: add missing pr_info newlines
+      arm: perf: make PMU probing data-driven
+      arm: perf: use IDR types for CPU PMUs
+      arm: perf: limit size of accounting data
+      arm: perf: kill get_hw_events()
+      arm: perf: fold percpu_pmu into pmu_hw_events
+      arm: perf: dynamically allocate cpu hardware data
+      arm: perf: fold hotplug notifier into arm_pmu
+
+Maxime Coquelin (1):
+      reset: stih407: Add reset controllers DT bindings
+
+NeilBrown (1):
+      w1: omap-hdq: support device probing with device-tree
+
+Olav Haugan (1):
+      iommu: Add iommu_map_sg() function
+
+Olof Johansson (2):
+      Merge tag 'berlin-driver-3.19-1' of git://git.infradead.org/users/hesselba/linux-berlin into next/drivers
+      Merge branch 'clocksource/physical-timers' into next/drivers
 
 Pankaj Dubey (1):
-      ARM: EXYNOS: Remove unused static iomapping
+      serial: samsung: Fix serial config dependencies for exynos7
 
-Paul Bolle (1):
-      ARM: shmobile: Remove ARCH_HAS_OPP completely
+Peter Griffin (2):
+      reset: stih407: Add softreset, powerdown and picophy controllers
+      reset: sti: Document sti-picophyreset controllers bindings.
 
-Pawel Moll (2):
-      ARM: vexpress: Remove non-DT code
-      ARM: vexpress: Enable regulator framework when MMCI is in use
+Philipp Zabel (1):
+      Merge tag 'sti-reset-for-v3.19-1' of git://git.stlinux.com/devel/kernel/linux-sti into reset/for_v3.19
 
-Rasmus Villemoes (1):
-      ARM: davinci: Remove redundant casts
+Sonny Rao (1):
+      clocksource: arch_timer: Fix code to use physical timers when requested
 
-Robert Richter (6):
-      dts, arm64: Add dtbs_install make target
-      dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
-      dts, arm/arm64: Remove dtbs build rules in sub-makes
-      dts, kbuild: Implement support for dtb vendor subdirs
-      dts, arm64: Move dts files to vendor subdirs
-      dts, arm: Remove $(MACHINE) variable from dtbs make recipes
+Thierry Reding (6):
+      Merge branch 'core' of git://git.kernel.org/.../joro/iommu
+      clk: tegra: Implement memory-controller clock
+      amba: Add Kconfig file
+      ARM: tegra: Move AHB Kconfig to drivers/amba
+      of: Add NVIDIA Tegra memory controller binding
+      memory: Add NVIDIA Tegra memory controller support
 
-Simon Horman (3):
-      ARM: shmobile: r8a73a4: Remove spurious dma-multiplexer base addresses
-      ARM: shmobile: armadillo800eva: Sort includes
-      Merge tag 'renesas-dt-cleanups-for-v3.19' into koelsch-board-removal-for-v3.19.base
+Will Deacon (1):
+      ARM: perf: use pr_* instead of printk
 
-Soren Brinkmann (1):
-      ARM: zynq: Actually remove hotplug.c
+chai wen (1):
+      ARM: perf: remove useless return and check of idx in counter handling
 
-Ulrich Hecht (3):
-      ARM: shmobile: r7s72100: sort dtsi file by address
-      ARM: shmobile: kzm9d: sort dts file by address
-      ARM: shmobile: r8a73a4: sort dtsi file by address
-
-
- MAINTAINERS                                        |   1 -
- arch/arm/Kconfig                                   |   2 +
- arch/arm/Makefile                                  |   8 +-
- arch/arm/boot/dts/Makefile                         |  27 +-
- arch/arm/boot/dts/emev2-kzm9d.dts                  |  63 +--
- arch/arm/boot/dts/emev2.dtsi                       |  12 +-
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi              |   1 -
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi              |   1 -
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi              |   2 -
- arch/arm/boot/dts/imx6qdl-rex.dtsi                 |   1 -
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |   8 +-
- arch/arm/boot/dts/r7s72100-genmai.dts              |   3 +-
- arch/arm/boot/dts/r7s72100.dtsi                    | 202 ++++----
- arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts    |   3 +-
- arch/arm/boot/dts/r8a73a4.dtsi                     | 232 ++++-----
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts      |   1 +
- arch/arm/boot/dts/r8a7778-bockw-reference.dts      |   3 +-
- arch/arm/boot/dts/r8a7779-marzen.dts               |  84 ++++
- arch/arm/boot/dts/r8a7779.dtsi                     |  24 +
- arch/arm/boot/dts/r8a7790-lager.dts                |  54 ++-
- arch/arm/boot/dts/r8a7790.dtsi                     |  90 ++++
- arch/arm/boot/dts/r8a7791-henninger.dts            |   1 +
- arch/arm/boot/dts/r8a7791-koelsch.dts              |  19 +-
- arch/arm/boot/dts/r8a7791.dtsi                     |  69 +++
- arch/arm/boot/dts/r8a7794-alt.dts                  |   1 +
- arch/arm/boot/dts/r8a77xx-aa104xd12-panel.dtsi     |  41 ++
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       |   1 +
- arch/arm/configs/koelsch_defconfig                 | 113 -----
- arch/arm/configs/shmobile_defconfig                |   1 -
- arch/arm/mach-at91/at91sam9g45.c                   |   1 +
- arch/arm/mach-at91/at91sam9rl.c                    |   1 +
- arch/arm/mach-davinci/board-da830-evm.c            |  89 ++--
- arch/arm/mach-davinci/board-da850-evm.c            |   9 +-
- arch/arm/mach-davinci/board-dm644x-evm.c           |  10 +-
- arch/arm/mach-davinci/board-mityomapl138.c         |  45 +-
- arch/arm/mach-davinci/board-neuros-osd2.c          |   5 +-
- arch/arm/mach-davinci/clock.c                      |   2 +-
- arch/arm/mach-davinci/mux.c                        |  15 +-
- arch/arm/mach-davinci/time.c                       |  13 +-
- arch/arm/mach-exynos/Makefile                      |   3 -
- arch/arm/mach-exynos/common.h                      |   2 -
- arch/arm/mach-exynos/exynos.c                      |  50 --
- arch/arm/mach-exynos/hotplug.c                     |  91 ----
- arch/arm/mach-exynos/include/mach/map.h            |  23 -
- arch/arm/mach-exynos/platsmp.c                     | 113 +++++
- arch/arm/mach-exynos/regs-pmu.h                    |   3 +
- arch/arm/mach-imx/clk-imx6q.c                      |   2 +-
- arch/arm/mach-imx/clk-pllv3.c                      |   7 +-
- arch/arm/mach-imx/common.h                         |   1 -
- arch/arm/mach-imx/imx25-dt.c                       |   9 -
- arch/arm/mach-imx/imx27-dt.c                       |   3 -
- arch/arm/mach-imx/imx31-dt.c                       |   9 -
- arch/arm/mach-imx/imx35-dt.c                       |  10 -
- arch/arm/mach-imx/iomux-imx31.c                    |   8 +-
- arch/arm/mach-imx/iomux-mx3.h                      |   2 +-
- arch/arm/mach-imx/mach-imx50.c                     |   9 -
- arch/arm/mach-imx/mach-imx51.c                     |   2 -
- arch/arm/mach-imx/mach-imx53.c                     |   2 -
- arch/arm/mach-imx/mach-imx6q.c                     |   3 -
- arch/arm/mach-imx/mach-imx6sl.c                    |   4 -
- arch/arm/mach-imx/mach-imx6sx.c                    |   4 -
- arch/arm/mach-imx/mach-vf610.c                     |  10 -
- arch/arm/mach-imx/system.c                         |  15 -
- arch/arm/mach-shmobile/Kconfig                     |  20 -
- arch/arm/mach-shmobile/Makefile                    |   5 +-
- arch/arm/mach-shmobile/Makefile.boot               |   1 -
- arch/arm/mach-shmobile/board-ape6evm-reference.c   |   4 -
- arch/arm/mach-shmobile/board-ape6evm.c             |   4 -
- arch/arm/mach-shmobile/board-armadillo800eva.c     |  45 +-
- arch/arm/mach-shmobile/board-bockw-reference.c     |   4 -
- arch/arm/mach-shmobile/board-bockw.c               |   4 -
- arch/arm/mach-shmobile/board-koelsch-reference.c   | 117 -----
- arch/arm/mach-shmobile/board-koelsch.c             | 527 ---------------------
- arch/arm/mach-shmobile/board-kzm9g-reference.c     |   4 -
- arch/arm/mach-shmobile/board-kzm9g.c               |   4 -
- arch/arm/mach-shmobile/board-lager-reference.c     |  84 ----
- arch/arm/mach-shmobile/board-lager.c               |   4 -
- arch/arm/mach-shmobile/board-mackerel.c            |   4 -
- arch/arm/mach-shmobile/board-marzen-reference.c    |   5 -
- arch/arm/mach-shmobile/board-marzen.c              |   4 -
- arch/arm/mach-shmobile/clock-r8a73a4.c             |   4 -
- arch/arm/mach-shmobile/clock-r8a7740.c             |   4 -
- arch/arm/mach-shmobile/clock-r8a7778.c             |   4 -
- arch/arm/mach-shmobile/clock-r8a7779.c             |   4 -
- arch/arm/mach-shmobile/clock-r8a7790.c             |   4 -
- arch/arm/mach-shmobile/clock-r8a7791.c             | 342 -------------
- arch/arm/mach-shmobile/clock-sh7372.c              |   4 -
- arch/arm/mach-shmobile/clock-sh73a0.c              |   4 -
- arch/arm/mach-shmobile/clock.c                     |  36 +-
- arch/arm/mach-shmobile/clock.h                     |  14 -
- arch/arm/mach-shmobile/console.c                   |   4 -
- arch/arm/mach-shmobile/headsmp-scu.S               |   5 -
- arch/arm/mach-shmobile/intc-sh7372.c               |   4 -
- arch/arm/mach-shmobile/intc-sh73a0.c               |   4 -
- arch/arm/mach-shmobile/r8a7740.h                   |   4 -
- arch/arm/mach-shmobile/r8a7778.h                   |   5 -
- arch/arm/mach-shmobile/r8a7791.h                   |   3 -
- arch/arm/mach-shmobile/setup-emev2.c               |   4 -
- arch/arm/mach-shmobile/setup-r7s72100.c            |   4 -
- arch/arm/mach-shmobile/setup-r8a73a4.c             |   4 -
- arch/arm/mach-shmobile/setup-r8a7740.c             |   4 -
- arch/arm/mach-shmobile/setup-r8a7778.c             |  11 +-
- arch/arm/mach-shmobile/setup-r8a7779.c             |  10 +-
- arch/arm/mach-shmobile/setup-r8a7790.c             |   4 -
- arch/arm/mach-shmobile/setup-r8a7791.c             | 185 +-------
- arch/arm/mach-shmobile/setup-rcar-gen2.c           |   4 -
- arch/arm/mach-shmobile/setup-sh7372.c              |   6 +-
- arch/arm/mach-shmobile/setup-sh73a0.c              |  15 +-
- arch/arm/mach-shmobile/sh73a0.h                    |   1 -
- arch/arm/mach-shmobile/sleep-sh7372.S              |   5 -
- arch/arm/mach-shmobile/smp-emev2.c                 |   4 -
- arch/arm/mach-shmobile/smp-r8a7779.c               |   4 -
- arch/arm/mach-shmobile/smp-sh73a0.c                |   4 -
- arch/arm/mach-shmobile/timer.c                     |   5 -
- arch/arm/mach-vexpress/Kconfig                     |   4 +-
- arch/arm/mach-vexpress/Makefile                    |   3 +-
- arch/arm/mach-vexpress/core.h                      |   7 -
- arch/arm/mach-vexpress/ct-ca9x4.c                  | 212 ---------
- arch/arm/mach-vexpress/include/mach/ct-ca9x4.h     |  47 --
- arch/arm/mach-vexpress/include/mach/hardware.h     |   1 -
- arch/arm/mach-vexpress/include/mach/irqs.h         |   6 -
- arch/arm/mach-vexpress/include/mach/motherboard.h  |  88 ----
- arch/arm/mach-vexpress/platsmp.c                   |  42 --
- arch/arm/mach-vexpress/v2m.c                       | 374 ---------------
- arch/arm/mach-zynq/Makefile                        |   2 -
- arch/arm/mach-zynq/common.h                        |   1 -
- arch/arm/mach-zynq/hotplug.c                       |  14 -
- arch/arm/plat-samsung/include/plat/map-s5p.h       |  21 -
- arch/arm/plat-versatile/Kconfig                    |   2 +-
- arch/arm64/Makefile                                |  10 +-
- arch/arm64/boot/dts/Makefile                       |  15 +-
- arch/arm64/boot/dts/apm/Makefile                   |   5 +
- arch/arm64/boot/dts/{ => apm}/apm-mustang.dts      |   0
- arch/arm64/boot/dts/{ => apm}/apm-storm.dtsi       |   0
- arch/arm64/boot/dts/arm/Makefile                   |   6 +
- arch/arm64/boot/dts/{ => arm}/foundation-v8.dts    |   0
- arch/arm64/boot/dts/{ => arm}/rtsm_ve-aemv8a.dts   |   0
- .../boot/dts/{ => arm}/rtsm_ve-motherboard.dtsi    |   0
- arch/arm64/boot/dts/cavium/Makefile                |   5 +
- arch/arm64/boot/dts/{ => cavium}/thunder-88xx.dts  |   0
- arch/arm64/boot/dts/{ => cavium}/thunder-88xx.dtsi |   0
- drivers/clk/versatile/Makefile                     |   1 -
- drivers/clk/versatile/clk-vexpress-osc.c           |   7 -
- drivers/clk/versatile/clk-vexpress.c               |  86 ----
- drivers/misc/vexpress-syscfg.c                     |  60 +--
- include/linux/vexpress.h                           |  19 -
- scripts/Kbuild.include                             |   6 +
- scripts/Makefile.dtbinst                           |  51 ++
- scripts/Makefile.lib                               |  12 -
- 149 files changed, 1004 insertions(+), 3309 deletions(-)
+ .../devicetree/bindings/arm/arch_timer.txt         |    8 +
+ .../devicetree/bindings/bus/brcm,gisb-arb.txt      |    6 +-
+ .../memory-controllers/nvidia,tegra-mc.txt         |   36 +
+ .../bindings/reset/st,sti-picophyreset.txt         |   42 +
+ .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt |   23 +
+ Documentation/devicetree/bindings/w1/omap-hdq.txt  |   17 +
+ arch/arm/Kconfig                                   |    3 -
+ arch/arm/common/edma.c                             |   54 +-
+ arch/arm/include/asm/arch_timer.h                  |    9 +
+ arch/arm/include/asm/perf_event.h                  |    2 +-
+ arch/arm/include/asm/pmu.h                         |   36 +-
+ arch/arm/kernel/Makefile                           |    2 +-
+ arch/arm/kernel/perf_callchain.c                   |  136 ++
+ arch/arm/kernel/perf_event.c                       |  162 +-
+ arch/arm/kernel/perf_event_cpu.c                   |  181 ++-
+ arch/arm/kernel/perf_event_v6.c                    |   12 +-
+ arch/arm/kernel/perf_event_v7.c                    |   72 +-
+ arch/arm/kernel/perf_event_xscale.c                |   20 +-
+ arch/arm/mach-tegra/Kconfig                        |    9 +-
+ arch/arm64/Kconfig                                 |    3 -
+ arch/arm64/include/asm/arch_timer.h                |    9 +
+ arch/powerpc/include/asm/iommu.h                   |   17 +-
+ arch/powerpc/kernel/dma-iommu.c                    |    8 +-
+ arch/powerpc/kernel/iommu.c                        |   16 +-
+ arch/powerpc/platforms/cell/iommu.c                |    9 +-
+ drivers/Kconfig                                    |    2 +
+ drivers/amba/Kconfig                               |   14 +
+ drivers/bus/Kconfig                                |    2 +-
+ drivers/bus/arm-cci.c                              |  552 +++++--
+ drivers/bus/brcmstb_gisb.c                         |  130 +-
+ drivers/bus/omap_l3_noc.c                          |   63 +-
+ drivers/clk/tegra/clk-divider.c                    |   13 +
+ drivers/clk/tegra/clk-tegra114.c                   |    7 +-
+ drivers/clk/tegra/clk-tegra124.c                   |    7 +-
+ drivers/clk/tegra/clk-tegra20.c                    |    8 +-
+ drivers/clk/tegra/clk-tegra30.c                    |    7 +-
+ drivers/clk/tegra/clk.h                            |    2 +
+ drivers/clocksource/arm_arch_timer.c               |   13 +-
+ drivers/iommu/Kconfig                              |   12 +-
+ drivers/iommu/amd_iommu.c                          |    1 +
+ drivers/iommu/arm-smmu.c                           |    1 +
+ drivers/iommu/exynos-iommu.c                       |    1 +
+ drivers/iommu/intel-iommu.c                        |    1 +
+ drivers/iommu/iommu.c                              |   50 +-
+ drivers/iommu/ipmmu-vmsa.c                         |    1 +
+ drivers/iommu/msm_iommu.c                          |    1 +
+ drivers/iommu/omap-iommu.c                         |    1 +
+ drivers/iommu/shmobile-iommu.c                     |    1 +
+ drivers/iommu/tegra-smmu.c                         | 1609 +++++++-------------
+ drivers/memory/Kconfig                             |   12 +-
+ drivers/memory/Makefile                            |    3 +-
+ drivers/memory/tegra/Kconfig                       |    7 +
+ drivers/memory/tegra/Makefile                      |    7 +
+ drivers/memory/tegra/mc.c                          |  301 ++++
+ drivers/memory/tegra/mc.h                          |   40 +
+ drivers/memory/tegra/tegra114.c                    |  948 ++++++++++++
+ drivers/memory/tegra/tegra124.c                    |  995 ++++++++++++
+ drivers/memory/tegra/tegra30.c                     |  970 ++++++++++++
+ drivers/memory/tegra30-mc.c                        |  378 -----
+ drivers/reset/Makefile                             |    1 +
+ drivers/reset/core.c                               |   15 +
+ drivers/reset/reset-berlin.c                       |  131 ++
+ drivers/reset/reset-socfpga.c                      |   15 +
+ drivers/reset/sti/Kconfig                          |    4 +
+ drivers/reset/sti/Makefile                         |    1 +
+ drivers/reset/sti/reset-stih407.c                  |  158 ++
+ drivers/rtc/Kconfig                                |   24 +-
+ drivers/rtc/rtc-at91sam9.c                         |  138 +-
+ drivers/soc/ti/knav_qmss.h                         |    8 +-
+ drivers/soc/ti/knav_qmss_queue.c                   |   13 +-
+ drivers/tty/serial/Kconfig                         |    4 +-
+ drivers/w1/masters/omap_hdq.c                      |    7 +
+ include/dt-bindings/clock/tegra114-car.h           |    2 +-
+ include/dt-bindings/clock/tegra124-car.h           |    2 +-
+ include/dt-bindings/clock/tegra20-car.h            |    2 +-
+ include/dt-bindings/memory/tegra114-mc.h           |   25 +
+ include/dt-bindings/memory/tegra124-mc.h           |   31 +
+ include/dt-bindings/memory/tegra30-mc.h            |   24 +
+ .../dt-bindings/reset-controller/stih407-resets.h  |   61 +
+ include/linux/iommu.h                              |   22 +
+ include/linux/reset-controller.h                   |    2 +
+ include/linux/reset.h                              |    7 +
+ include/soc/tegra/mc.h                             |  107 ++
+ 83 files changed, 5846 insertions(+), 2010 deletions(-)
