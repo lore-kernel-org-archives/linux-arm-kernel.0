@@ -1,45 +1,61 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 09 Dec 2014 10:30:37 +0000
-Subject: [PATCH v14 7/7] ARM: kprobes: enable OPTPROBES for ARM 32
-In-Reply-To: <5486CB9F.6030804@hitachi.com>
-References: <1418020040-68977-1-git-send-email-wangnan0@huawei.com>
- <1418020131-69375-1-git-send-email-wangnan0@huawei.com>
- <1418036666.3647.33.camel@linaro.org> <5485886E.2060303@huawei.com>
- <1418039451.3647.48.camel@linaro.org> <5486CB9F.6030804@hitachi.com>
-Message-ID: <1418121037.3641.22.camel@linaro.org>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Tue, 9 Dec 2014 11:41:36 +0100
+Subject: [PATCH v4 1/5] phy: add a driver for the Rockchip SoC internal
+ USB2.0 PHY
+In-Reply-To: <1418093001-30443-2-git-send-email-lyz@rock-chips.com>
+References: <1418093001-30443-1-git-send-email-lyz@rock-chips.com>
+ <1418093001-30443-2-git-send-email-lyz@rock-chips.com>
+Message-ID: <CABgxDoJRA4cQBqNBTCSGnnLpcOHqqTuBqcyWQosVv4A_Gx315g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-12-09 at 19:14 +0900, Masami Hiramatsu wrote:
-> (2014/12/08 20:50), Jon Medhurst (Tixy) wrote:> arch_optimize_kprobes is calling __arch_optimize_kprobes, which is
-> > iterating over a list of probes and removing each one in turn, if this
-> > is happening on multiple cpu's simultaneously, it's not clear to me that
-> > such an operation is safe. list_del_init calls __list_del which does
-> >
-> > 	next->prev = prev;
-> > 	prev->next = next;
-> >
-> > so what happens if another cpu is at the same time updating any of those
-> > list entries? Without even fully analysing the code I can see that with
-> > the fact that the list handling helpers have no memory barriers, that
-> > the above two lines could be seen to execute in the reverse order, e.g.
-> >
-> > 	prev->next = next;
-> > 	next->prev = prev;
-> >
-> > so another CPU could find and delete next before this one has finished
-> > doing so. Would the list end up in a consistent state where no loops
-> > develop and no probes are missed? I don't know the answer and a full
-> > analysis would be complicated, but my gut feeling is that if a cpu can
-> > observe the links in the list in an inconsistent state then only bad
-> > things can result.
-> 
-> Just a comment, arch_optimize_kprobes() are only called under
-> kprobe_mutex held. No concurrent update happens :)
+Hi,
 
-Except in the case of the code I was commenting on which was using
-stop_machine to make all cpu's simultaneously do the work of
-arch_optimize_kprobes :-)
+2014-12-09 3:43 GMT+01:00 Yunzhi Li <lyz@rock-chips.com>:
+> Changes in v3:
+> - Use BIT macro instead of bit shift ops.
+> - Rename the config entry to PHY_ROCKCHIP_USB.
 
--- 
-Tixy
+Contradiction between this , [1] and [2]
+>
+>  drivers/phy/Kconfig            |   7 ++
+>  drivers/phy/Makefile           |   1 +
+>  drivers/phy/phy-rockchip-usb.c | 211 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 219 insertions(+)
+>  create mode 100644 drivers/phy/phy-rockchip-usb.c
+>
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index ccad880..8a39d2a 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -239,6 +239,13 @@ config PHY_QCOM_IPQ806X_SATA
+>         depends on OF
+>         select GENERIC_PHY
+>
+> +config PHY_ROCKCHIP_USB2
+> +       tristate "Rockchip USB2 PHY Driver"
+> +       depends on ARCH_ROCKCHIP && OF
+> +       select GENERIC_PHY
+> +       help
+> +         Enable this to support the Rockchip USB 2.0 PHY.
+> +
+
+1. The config entry ends by "USB2". Explain that your driver is for
+usb 2.0 in the description is enough, imho.
+
+>  config PHY_ST_SPEAR1310_MIPHY
+>         tristate "ST SPEAR1310-MIPHY driver"
+>         select GENERIC_PHY
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index aa74f96..8a13f72 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -28,6 +28,7 @@ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2) += phy-exynos5250-usb2.o
+>  phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)     += phy-s5pv210-usb2.o
+>  obj-$(CONFIG_PHY_EXYNOS5_USBDRD)       += phy-exynos5-usbdrd.o
+>  obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)    += phy-qcom-apq8064-sata.o
+> +obj-$(CONFIG_PHY_ROCKCHIP_USB2) += phy-rockchip-usb.o
+
+2. and... this :)
+
+Romain
