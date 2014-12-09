@@ -1,191 +1,130 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 09 Dec 2014 16:43:27 +0000
-Subject: [PATCH v2] ARM: kprobes: Add test cases for stack consuming
- instructions
-In-Reply-To: <1418047765-53197-6-git-send-email-wangnan0@huawei.com>
-References: <1418047765-53197-1-git-send-email-wangnan0@huawei.com>
- <1418047765-53197-6-git-send-email-wangnan0@huawei.com>
-Message-ID: <1418143407.3641.47.camel@linaro.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 9 Dec 2014 10:57:46 -0600
+Subject: regression: OMAP4 (next-20141204) (bisect to: ARM: 8208/1: l2c:
+ Refactor the driver to use commit-like)
+In-Reply-To: <5481D9BF.2090007@ti.com>
+References: <5481D913.9040109@ti.com>
+ <5481D9BF.2090007@ti.com>
+Message-ID: <20141209165746.GA29935@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These have extra 'checker' functions associated with them so lets make
-sure those get covered by testing. As they may create uninitialised
-space on the stack we also update the test code to ensure such space is
-consistent between test runs. This is done by disabling interrupts in
-setup_test_context().
+On 10:13-20141205, Nishanth Menon wrote:
+> On 12/05/2014 10:10 AM, Nishanth Menon wrote:
+> > next-20141204 fails to boot, but next-20141203 boots fine with
+> > omap2plus_defconfig.
+> > 
+> > Panda-ES(4460):
+> > https://github.com/nmenon/kernel-test-logs/blob/next-20141204/omap2plus_defconfig/pandaboard-es.txt
+> > Panda(4430):
+> > https://github.com/nmenon/kernel-test-logs/blob/next-20141204/omap2plus_defconfig/pandaboard-vanilla.txt
+> > 
+> > at the point of hang (JTAG):
+> >  pandaboard-es:
+> > 	cpu0: http://slexy.org/view/s2eIFqkRd5
+> > 	cpu1: http://slexy.org/view/s2Tysb6gpL
+> > 
+> > Case #1:
+> > Disabling CPUIDLE allows boot to proceed. there does not seem to have
+> > been any change in drivers/cpuidle and arch/arm/mach-omap2 w.r.t this.
+> > 
+> > Case #2: Reverting the following allows boot.
+> > 
+> > From next-20141204
+> > 10df7d5 ARM: 8211/1: l2c: Add support for overriding prefetch settings
+> > revert this  -> boot still fails
+> > 
+> > d42ced0 ARM: 8210/1: l2c: Get outer cache .write_sec callback from
+> > mach_desc only if not NULL
+> > revert this  -> boot still fails
+> > 
+> > 46b9af8 ARM: 8209/1: l2c: Add interface to ask hypervisor to configure L2C
+> > revert this  -> boot still fails
+> > 
+> > c94e325 ARM: 8208/1: l2c: Refactor the driver to use commit-like
+> > revert this  -> boot passed (first bad commit).
+> > 
+> > 
+> 
+> + linux-samsung soc and updated Thomaz's mail ID (gmail now).
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
+Spend a few mins trying to track this down and it does look like commit
+c94e325 does a kmemdup for the data as part of l2x0_of_init->__l2c_init
 
-OK, so I lied in [1] when I said I won't be looking at the test failure
-for a few days, I had a sudden inspiration on how to fix things and the
-changes to test-core.c in this patch are the result. Rest of the patch
-is the same as the version posted in Wang Nan's v15 patch set [2]
-
-With this change the kprobe test code passes on my TC2 with both ARM and
-Thumb kernels and both with and without optprobes forced using
-wait_for_kprobe_optimizer() hacks.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/309574.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/309399.html
-
-
- arch/arm/probes/kprobes/test-arm.c   | 17 +++++++++++++++--
- arch/arm/probes/kprobes/test-core.c  | 10 ++++++++++
- arch/arm/probes/kprobes/test-thumb.c | 12 ++++++++++++
- 3 files changed, 37 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/probes/kprobes/test-arm.c b/arch/arm/probes/kprobes/test-arm.c
-index fdeb300..9b3b1b4 100644
---- a/arch/arm/probes/kprobes/test-arm.c
-+++ b/arch/arm/probes/kprobes/test-arm.c
-@@ -12,6 +12,7 @@
- #include <linux/module.h>
- #include <asm/system_info.h>
- #include <asm/opcodes.h>
-+#include <asm/probes.h>
+This fails since the invocation is in early_init. doing it a bit later
+as the following hack makes it work
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 608079a..0bc6bd9 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -170,12 +170,19 @@ static const char *const omap4_boards_compat[] __initconst = {
+ 	NULL,
+ };
  
- #include "test-core.h"
- 
-@@ -478,6 +479,7 @@ void kprobe_arm_test_cases(void)
- 	TEST_RPR(  "strh	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")
- 	TEST_RPR(  "streqh	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")
- 	TEST_UNSUPPORTED(  "streqh	r14, [r13, r12]")
-+	TEST_UNSUPPORTED(  "streqh	r14, [r12, r13]")
- 	TEST_RPR(  "strh	r",1, VAL1,", [r",2, 24,", r",3,  48,"]!")
- 	TEST_RPR(  "strneh	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")
- 	TEST_RPR(  "strh	r",2, VAL1,", [r",3, 24,"], r",4, 48,"")
-@@ -502,6 +504,9 @@ void kprobe_arm_test_cases(void)
- 	TEST_RP(   "strplh	r",12,VAL2,", [r",11,24,", #-4]!")
- 	TEST_RP(   "strh	r",2, VAL1,", [r",3, 24,"], #48")
- 	TEST_RP(   "strh	r",10,VAL2,", [r",9, 64,"], #-48")
-+	TEST_RP(   "strh	r",3, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
-+	TEST_UNSUPPORTED("strh r3, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
-+	TEST_RP(   "strh	r",4, VAL1,", [r",14,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
- 	TEST_UNSUPPORTED(__inst_arm(0xe1efc3b0) "	@ strh r12, [pc, #48]!")
- 	TEST_UNSUPPORTED(__inst_arm(0xe0c9f3b0) "	@ strh pc, [r9], #48")
- 
-@@ -568,6 +573,7 @@ void kprobe_arm_test_cases(void)
- 	TEST_RPR(  "strd	r",0, VAL1,", [r",1, 48,", -r",2,24,"]")
- 	TEST_RPR(  "strccd	r",8, VAL2,", [r",11,0, ", r",12,48,"]")
- 	TEST_UNSUPPORTED(  "strccd r8, [r13, r12]")
-+	TEST_UNSUPPORTED(  "strccd r8, [r12, r13]")
- 	TEST_RPR(  "strd	r",4, VAL1,", [r",2, 24,", r",3, 48,"]!")
- 	TEST_RPR(  "strcsd	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")
- 	TEST_RPR(  "strd	r",2, VAL1,", [r",5, 24,"], r",4,48,"")
-@@ -591,6 +597,9 @@ void kprobe_arm_test_cases(void)
- 	TEST_RP(   "strvcd	r",12,VAL2,", [r",11,24,", #-16]!")
- 	TEST_RP(   "strd	r",2, VAL1,", [r",4, 24,"], #48")
- 	TEST_RP(   "strd	r",10,VAL2,", [r",9, 64,"], #-48")
-+	TEST_RP(   "strd	r",6, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
-+	TEST_UNSUPPORTED("strd r6, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
-+	TEST_RP(   "strd	r",4, VAL1,", [r",12,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
- 	TEST_UNSUPPORTED(__inst_arm(0xe1efc3f0) "	@ strd r12, [pc, #48]!")
- 
- 	TEST_P(	   "ldrd	r0, [r",0, 24,", #-8]")
-@@ -639,16 +648,20 @@ void kprobe_arm_test_cases(void)
- 	TEST_RP( "str"byte"	r",12,VAL2,", [r",11,24,", #-4]!")		\
- 	TEST_RP( "str"byte"	r",2, VAL1,", [r",3, 24,"], #48")		\
- 	TEST_RP( "str"byte"	r",10,VAL2,", [r",9, 64,"], #-48")		\
-+	TEST_RP( "str"byte"	r",3, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!") \
-+	TEST_UNSUPPORTED("str"byte" r3, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")				\
-+	TEST_RP( "str"byte"	r",4, VAL1,", [r",10,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!") \
- 	TEST_RPR("str"byte"	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")	\
- 	TEST_RPR("str"byte"	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")	\
--	TEST_UNSUPPORTED("str"byte" r14, [r13, r12]")	\
-+	TEST_UNSUPPORTED("str"byte" r14, [r13, r12]")				\
-+	TEST_UNSUPPORTED("str"byte" r14, [r12, r13]")				\
- 	TEST_RPR("str"byte"	r",1, VAL1,", [r",2, 24,", r",3,  48,"]!")	\
- 	TEST_RPR("str"byte"	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")	\
- 	TEST_RPR("str"byte"	r",2, VAL1,", [r",3, 24,"], r",4, 48,"")	\
- 	TEST_RPR("str"byte"	r",10,VAL2,", [r",9, 48,"], -r",11,24,"")	\
- 	TEST_RPR("str"byte"	r",0, VAL1,", [r",1, 24,", r",2,  32,", asl #1]")\
- 	TEST_RPR("str"byte"	r",14,VAL2,", [r",11,0, ", r",12, 32,", lsr #2]")\
--	TEST_UNSUPPORTED("str"byte"	r14, [r13, r12, lsr #2]")\
-+	TEST_UNSUPPORTED("str"byte"	r14, [r13, r12, lsr #2]")		\
- 	TEST_RPR("str"byte"	r",1, VAL1,", [r",2, 24,", r",3,  32,", asr #3]!")\
- 	TEST_RPR("str"byte"	r",12,VAL2,", [r",11,24,", r",10, 4,", ror #31]!")\
- 	TEST_P(  "ldr"byte"	r0, [r",0,  24,", #-2]")			\
-diff --git a/arch/arm/probes/kprobes/test-core.c b/arch/arm/probes/kprobes/test-core.c
-index 7ab633d..2b854ed 100644
---- a/arch/arm/probes/kprobes/test-core.c
-+++ b/arch/arm/probes/kprobes/test-core.c
-@@ -1196,6 +1196,13 @@ static void setup_test_context(struct pt_regs *regs)
- 			regs->uregs[arg->reg] =
- 				(unsigned long)current_stack + arg->val;
- 			memory_needs_checking = true;
-+			/*
-+			 * Test memory at an address below SP is in danger of
-+			 * being altered by an interrupt occurring and pushing
-+			 * data onto the stack. Disable interrupts to stop this.
-+			 */
-+			if (arg->reg == 13)
-+				regs->ARM_cpsr |= PSR_I_BIT;
- 			break;
- 		}
- 		case ARG_TYPE_MEM: {
-@@ -1206,6 +1213,7 @@ static void setup_test_context(struct pt_regs *regs)
- 		default:
- 			break;
- 		}
 +
++static void tmp_init_irq(void)
++{
++	omap_l2_cache_init();
++	omap_gic_of_init();
++}
++
+ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.smp		= smp_ops(omap4_smp_ops),
+ 	.map_io		= omap4_map_io,
+ 	.init_early	= omap4430_init_early,
+-	.init_irq	= omap_gic_of_init,
++	.init_irq	= tmp_init_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.init_late	= omap4430_init_late,
+ 	.init_time	= omap4_local_timer_init,
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 03cbb16..f97847d 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -627,7 +627,6 @@ void __init omap4430_init_early(void)
+ 	omap44xx_clockdomains_init();
+ 	omap44xx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_l2_cache_init();
+ 	omap_clk_soc_init = omap4xxx_dt_clk_init;
  }
  
- struct test_probe {
-@@ -1272,6 +1280,8 @@ test_after_pre_handler(struct kprobe *p, struct pt_regs *regs)
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index e5948c5..0ca90db 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -848,8 +848,11 @@ static int __init __l2c_init(const struct l2c_init_data *data,
+ 	 * context from callers can access the structure.
+ 	 */
+ 	l2x0_data = kmemdup(data, sizeof(*data), GFP_KERNEL);
+-	if (!l2x0_data)
++	if (!l2x0_data) {
++		pr_err("%s no mem %d\n", __func__, sizeof(*data));
++		dump_stack();
+ 		return -ENOMEM;
++	}
  
- 	/* Undo any changes done to SP by the test case */
- 	regs->ARM_sp = (unsigned long)current_stack;
-+	/* Enable interrupts in case setup_test_context diabled them */
-+	regs->ARM_cpsr &= ~PSR_I_BIT;
+ 	/*
+ 	 * Sanity check the aux values.  aux_mask is the bits we preserve
+@@ -1647,6 +1650,7 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 	struct device_node *np;
+ 	struct resource res;
+ 	u32 cache_id, old_aux;
++	int r;
  
- 	container_of(p, struct test_probe, kprobe)->hit = test_instance;
- 	return 0;
-diff --git a/arch/arm/probes/kprobes/test-thumb.c b/arch/arm/probes/kprobes/test-thumb.c
-index 6c6e9a9..e8cf193 100644
---- a/arch/arm/probes/kprobes/test-thumb.c
-+++ b/arch/arm/probes/kprobes/test-thumb.c
-@@ -11,6 +11,7 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <asm/opcodes.h>
-+#include <asm/probes.h>
+ 	np = of_find_matching_node(NULL, l2x0_ids);
+ 	if (!np)
+@@ -1693,6 +1697,8 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 	else
+ 		cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
  
- #include "test-core.h"
- 
-@@ -416,6 +417,9 @@ void kprobe_thumb32_test_cases(void)
- 	TEST_RR( "strd	r",14,VAL2,", r",12,VAL1,", [sp, #16]!")
- 	TEST_RRP("strd	r",1, VAL1,", r",0, VAL2,", [r",7, 24,"], #16")
- 	TEST_RR( "strd	r",7, VAL2,", r",8, VAL1,", [sp], #-16")
-+	TEST_RRP("strd	r",6, VAL1,", r",7, VAL2,", [r",13, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
-+	TEST_UNSUPPORTED("strd r6, r7, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
-+	TEST_RRP("strd	r",4, VAL1,", r",5, VAL2,", [r",14, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
- 	TEST_UNSUPPORTED(__inst_thumb32(0xe9efec04) "	@ strd	r14, r12, [pc, #16]!")
- 	TEST_UNSUPPORTED(__inst_thumb32(0xe8efec04) "	@ strd	r14, r12, [pc], #16")
- 
-@@ -821,14 +825,22 @@ CONDITION_INSTRUCTIONS(22,
- 	TEST_RP( "str"size"	r",14,VAL2,", [r",1, 256,  ", #-128]!")		\
- 	TEST_RPR("str"size".w	r",0, VAL1,", [r",1, 0,", r",2, 4,"]")		\
- 	TEST_RPR("str"size"	r",14,VAL2,", [r",10,0,", r",11,4,", lsl #1]")	\
-+	TEST_UNSUPPORTED("str"size"	r0, [r13, r1]")				\
- 	TEST_R(  "str"size".w	r",7, VAL1,", [sp, #24]")			\
- 	TEST_RP( "str"size".w	r",0, VAL2,", [r",0,0, "]")			\
-+	TEST_RP( "str"size"	r",6, VAL1,", [r",13, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!") \
-+	TEST_UNSUPPORTED("str"size"	r6, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")			\
-+	TEST_RP( "str"size"	r",4, VAL2,", [r",12, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!") \
- 	TEST_UNSUPPORTED("str"size"t	r0, [r1, #4]")
- 
- 	SINGLE_STORE("b")
- 	SINGLE_STORE("h")
- 	SINGLE_STORE("")
- 
-+	TEST_UNSUPPORTED(__inst_thumb32(0xf801000d) "	@ strb	r0, [r1, r13]")
-+	TEST_UNSUPPORTED(__inst_thumb32(0xf821000d) "	@ strh	r0, [r1, r13]")
-+	TEST_UNSUPPORTED(__inst_thumb32(0xf841000d) "	@ str	r0, [r1, r13]")
-+
- 	TEST("str	sp, [sp]")
- 	TEST_UNSUPPORTED(__inst_thumb32(0xf8cfe000) "	@ str	r14, [pc]")
- 	TEST_UNSUPPORTED(__inst_thumb32(0xf8cef000) "	@ str	pc, [r14]")
+-	return __l2c_init(data, aux_val, aux_mask, cache_id);
++	r = __l2c_init(data, aux_val, aux_mask, cache_id);
++	pr_err("%s: %d\n", __func__, r);
++	return r;
+ }
+
 -- 
-2.1.3
+Regards,
+Nishanth Menon
