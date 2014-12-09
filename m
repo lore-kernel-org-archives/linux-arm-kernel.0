@@ -1,96 +1,54 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Tue, 09 Dec 2014 22:11:14 +0800
-Subject: [PATCH 2/6] PCI/MSI: add hooks to populate the msi_domain field
-In-Reply-To: <5487012B.4040505@arm.com>
-References: <1418069543-21969-1-git-send-email-marc.zyngier@arm.com>
- <1418069543-21969-3-git-send-email-marc.zyngier@arm.com>
- <5486585B.40000@huawei.com> <5486C8BA.8030608@arm.com>
- <5486E3BF.70703@huawei.com> <5486E747.4010804@arm.com>
- <5486EF4E.5020704@linux.intel.com> <5487012B.4040505@arm.com>
-Message-ID: <54870302.5050703@linux.intel.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Tue, 9 Dec 2014 23:18:49 +0900
+Subject: [PATCH v3 0/3] Add support for Tegra Activity Monitor
+In-Reply-To: <548703C4.1030300@collabora.com>
+References: <1417709696-29281-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CAAVeFuJkpuWocEDTfSAK7_UfhZvqOfYJY6sLgsy9i+KcMAkbCQ@mail.gmail.com>
+ <548703C4.1030300@collabora.com>
+Message-ID: <CAAVeFuJY_31ayqnoY65uCoP9AadvucEARmuv4jr_DoS6Aj5rGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/12/9 22:03, Marc Zyngier wrote:
-> Hi Gerry,
-> 
-> On 09/12/14 12:47, Jiang Liu wrote:
->> On 2014/12/9 20:12, Marc Zyngier wrote:
->>> Yijing,
+On Tue, Dec 9, 2014 at 11:14 PM, Tomeu Vizoso
+<tomeu.vizoso@collabora.com> wrote:
+> On 12/09/2014 06:38 AM, Alexandre Courbot wrote:
+>> On Fri, Dec 5, 2014 at 1:14 AM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+>>> Hello,
 >>>
->>> On 09/12/14 11:57, Yijing Wang wrote:
->>>>>>> +void __weak pcibios_set_phb_msi_domain(struct pci_bus *bus)
->>>>>>> +{
->>>>>>> +}
->>>>>>> +
->>>>>>> +static void pci_set_bus_msi_domain(struct pci_bus *bus)
->>>>>>> +{
->>>>>>> +	struct pci_dev *bridge = bus->self;
->>>>>>> +
->>>>>>> +	if (!bridge)
->>>>>>> +		pcibios_set_phb_msi_domain(bus);
->>>>>>> +	else
->>>>>>> +		dev_set_msi_domain(&bus->dev, dev_get_msi_domain(&bridge->dev));
->>>>>>> +}
->>>>>>
->>>>>>
->>>>>> Hi Marc, we can not assume pci devices under same phb share the same msi irq domain,
->>>>>> now in x86, pci devices under the same phb may associate different msi irq domain.
->>>>
->>>> Hi Marc,
->>>>
->>>>>
->>>>> Well, this is not supposed to be a perfect solution yet, but instead a
->>>>> basis for discussion. What I'd like to find out is:
->>>>>
->>>>> - What is the minimum granularity for associating a device with its MSI
->>>>> domain in existing platforms?
->>>>
->>>> PCI device, after Gerry's msi irq domain patchset which now in linux-next,
->>>> in x86, we will find msi irq domain by pci_dev.
+>>> this v3 addresses the comments that the devfreq implementation got, namely:
 >>>
->>> Are you *really* associating the MSI domain on a per pci-device basis?
->>> That is, you have devices on the same PCI bus talking to different MSI hw?
->> Hi Marc,
->> 	This is a little wild:(
->> 	On x86 platform with Intel VT-d(not the case for AMD-v),
->> interrupt remapping is tight to DMA remapping (IOMMU) unit.
->> For most common cases, IOMMU unit manages PCI bus and its sub-hierarchy.
->> But it may also manage a specific PCI device. This is typically used to
->> provide QoS for audio device by using dedicated IOMMU unit to avoid
->> resource contention on DMA remapping tables. BIOS uses ACPI table to
->> report PCI bus/device to IOMMU unit mapping relationship. (To be honest,
->> I have no really experience with such a hardware platform yet, just for
->> theoretical analysis)
->> 	On the other hand, we now support hierarchy irqdomain. So to
->> support per-PCI IOMMU unit case, we need maintain irqdomain at PCI
->> device level.
->> 	This piece of code from your [4/6] is flexible enough, which
->> retrieves msi_domain from PCI device, then fallback to PCI bus,
->> then fallback to platform specific method.
->> 	domain = dev_get_msi_domain(&dev->dev);
->> 	if (!domain && dev->bus->msi)
->>  		domain = dev->bus->msi->domain;
->>  	if (!domain)
->>  		domain = arch_get_pci_msi_domain(dev);
-> 
-> OK. But what I'd really like to see is a way to setup the
-> device<->domain binding as early as possible, without having to use more
-> conditional code in pci_msi_get_domain.
-> 
-> IOW, can we do something similar to what pci_set_bus_msi_domain and
-> pci_set_msi_domain do in this patch?
-Hi Marc,
-	I have checked x86 code, we could set pci_dev->msi_domain
-when creating PCI devices, just need to find some hook points
-into PCI core next step. If arch code doesn't set pci_dev->msi_domain,
-PCI MSI core may provide a default way to set pci_dev->msi_domain.
-This may make the implementation simpler, I guess:)
-Thanks!
-Gerry
+>>> * Address misc. style issues found by Thierry and Alexander
+>>> * Added helpers for register i/o
+>>> * Further documented the structs
+>>> * Enable the ACTMON after the IRQ handler has been installed
+>>> * Disable the ACTMON before removing the IRQ handler
+>>> * Add governor in a subsys initcall
+>>>
+>>> There's an open question on whether some functionality currently in this
+>>> devfreq driver should be moved into the devfreq framework, but without knowing
+>>> of other SoC family that would benefit from it, I'm reticent. It would be
+>>> great to hear from the devfreq maintainers if they have any plans regarding
+>>> this, or if they have any suggestion.
+>>
+>> I cannot make a thorough review because of the problem I mentioned in
+>> patch 3/3, but I am guessing this series is converging towards what we
+>> want. Now the main question will be how we can leverage Arto's
+>> watermark series for this one. I am ready to bet that doing so can
+>> reduce quite a lot of code.
+>>
+>> Since you are likely to be the first user of the watermarking feature,
+>> could you comment on its potential shortcomings and whatever needs to
+>> be fixed to best implement ACTMON support using it? I will try to push
+>> it myself, but you are obviously in a better position to understand
+>> what is needed.
+>
+> Sure, I'm still playing with the idea, but I have sent a few questions
+> to that thread already.
 
-> 
-> Thanks,
-> 
-> 	M.
-> 
+Seen that, thanks! After seeing your comments I come to thing that
+maybe we should merge ACTMON support first and then adapt it to use
+watermarking afterwards. I'm all for incremental changes and after 4
+iterations this series should be close to completion now - would be
+sad to go back to the design board at this stage.
+
+Reviewing your v4 is on my schedule for tomorrow, thanks for your patience!
