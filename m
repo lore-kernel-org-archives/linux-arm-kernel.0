@@ -1,44 +1,98 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Tue, 9 Dec 2014 09:35:47 +0000
-Subject: [PATCHv4] dmaengine: fsl-edma: fixup reg offset and hw S/G
- support in big-endian model
-In-Reply-To: <20141209091248.GA16827@intel.com>
-References: <1413968035-12855-1-git-send-email-jingchang.lu@freescale.com>
- <20141209091248.GA16827@intel.com>
-Message-ID: <BN3PR0301MB1236551BC121795218B2EAB387650@BN3PR0301MB1236.namprd03.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 09 Dec 2014 09:37:26 +0000
+Subject: [PATCH v2 1/3] genirq: Allow the irqchip state of an IRQ to be
+ save/restored
+In-Reply-To: <CAJAp7OijMW4_VMp29K1UxtURJT-WgwwsN-O1x3Lqi-gHrAj6Sw@mail.gmail.com>
+References: <1417623503-30261-1-git-send-email-marc.zyngier@arm.com>	<1417623503-30261-2-git-send-email-marc.zyngier@arm.com>
+ <CAJAp7OijMW4_VMp29K1UxtURJT-WgwwsN-O1x3Lqi-gHrAj6Sw@mail.gmail.com>
+Message-ID: <5486C2D6.6020006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Vinod,
-  
-  Many thanks!
-  I resend the patch just before I saw this email, please ignore the
-resend one since they are the same.
-
-
-Thanks and Best Regards,
-Jingchang
-
->-----Original Message-----
->From: Vinod Koul [mailto:vinod.koul at intel.com]
->Sent: Tuesday, December 09, 2014 5:13 PM
->To: Lu Jingchang-B35083
->Cc: dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->linux-kernel at vger.kernel.org
->Subject: Re: [PATCHv4] dmaengine: fsl-edma: fixup reg offset and hw S/G
->support in big-endian model
->
->On Wed, Oct 22, 2014 at 04:53:55PM +0800, Jingchang Lu wrote:
->> The offset of all 8-/16-bit registers in big-endian eDMA model are
->> swapped in a 32-bit size opposite those in the little-endian model.
+On 08/12/14 22:42, Bjorn Andersson wrote:
+> On Wed, Dec 3, 2014 at 8:18 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> There is a number of cases where a kernel subsystem may want to
+>> introspect the state of an interrupt at the irqchip level:
 >>
->> The hardware Scatter/Gather requires the subsequent TCDs stored in
->> memory in little endian independent of the register endian model, the
->> eDMA engine will do the swap if need.
+>> - When a peripheral is shared between virtual machines,
+>>   its interrupt state becomes part of the guest's state,
+>>   and must be switched accordingly. KVM on arm/arm64 requires
+>>   this for its guest-visible timer
+>> - Some GPIO controllers seem to require peeking into the
+>>   interrupt controller they are connected to to report
+>>   their internal state
 >>
->> This patch also use regular assignment for tcd variables r/w instead
->> of with io function previously that may not always be true.
->Applied, thanks
->
->--
->~Vinod
+>> This seem to be a pattern that is common enough for the core code
+>> to try and support this without too many horrible hacks. Introduce
+>> a pair of accessors (irq_get_irqchip_state/irq_set_irqchip_state)
+>> to retrieve the bits that can be of interest to another subsystem:
+>> pending, active, and masked.
+>>
+>> - irq_get_irqchip_state returns the state of the interrupt according
+>>   to a parameter set to IRQCHIP_STATE_PENDING, IRQCHIP_STATE_ACTIVE,
+>>   IRQCHIP_STATE_MASKED or IRQCHIP_STATE_LINE_LEVEL.
+>> - irq_set_irqchip_state similarly sets the state of the interrupt.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> With the addition of actually assigning err to something useful in the
+> setter below:
+> 
+> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Tested-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> 
+>> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+> 
+> [..]
+> 
+>> +/**
+>> + *     irq_set_irqchip_state - set the state of a forwarded interrupt.
+>> + *     @irq: Interrupt line that is forwarded to a VM
+>> + *     @which: State to be restored (one of IRQCHIP_STATE_*)
+>> + *     @val: Value corresponding to @which
+>> + *
+>> + *     This call sets the internal irqchip state of an interrupt,
+>> + *     depending on the value of @which.
+>> + *
+>> + *     This function should be called with preemption disabled if the
+>> + *     interrupt controller has per-cpu registers.
+>> + */
+>> +int irq_set_irqchip_state(unsigned int irq, enum irqchip_irq_state which,
+>> +                         bool val)
+>> +{
+>> +       struct irq_desc *desc;
+>> +       struct irq_data *data;
+>> +       struct irq_chip *chip;
+>> +       unsigned long flags;
+>> +       int err = -EINVAL;
+>> +
+>> +       desc = irq_get_desc_buslock(irq, &flags, 0);
+>> +       if (!desc)
+>> +               return err;
+>> +
+>> +       data = irq_desc_get_irq_data(desc);
+>> +
+>> +       do {
+>> +               chip = irq_data_get_irq_chip(data);
+>> +               if (chip->irq_set_irqchip_state)
+>> +                       break;
+>> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
+>> +               data = data->parent_data;
+>> +#else
+>> +               data = NULL;
+>> +#endif
+>> +       } while (data);
+>> +
+>> +       if (data)
+>> +               chip->irq_set_irqchip_state(data, which, val);
+> 
+> err =
+
+Ah, that will teach me to write test code that actually checks the
+return value! :-)
+
+Thanks for the fix and the tags.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
