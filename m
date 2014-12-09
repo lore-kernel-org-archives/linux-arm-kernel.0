@@ -1,42 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Dec 2014 09:27:13 +0100
-Subject: [RFC PATCH v2 1/4] arm64: defconfig: increase NR_CPUS range to
- 2-128
-In-Reply-To: <CAMDttNe33ie9vgyEn8GHz+8isadaDfXXUJcp5mQM-42_mx3Pbw@mail.gmail.com>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <3519779.ILzEnWe9lP@wuerfel>
- <CAMDttNe33ie9vgyEn8GHz+8isadaDfXXUJcp5mQM-42_mx3Pbw@mail.gmail.com>
-Message-ID: <2054688.iIEQnOEqVy@wuerfel>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue,  9 Dec 2014 09:42:04 +0100
+Subject: [PATCH v2] ARM: i.MX53: dts: add sahara module
+Message-ID: <1418114524-11325-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 December 2014 17:57:03 Zi Shen Lim wrote:
-> Hi Arnd,
-> 
-> On Mon, Nov 24, 2014 at 3:53 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > On Saturday 22 November 2014 02:53:27 Ganapatrao Kulkarni wrote:
-> > > Raising the maximum limit to 128. This is needed for Cavium's
-> > > Thunder system that will have 96 cores on Multi-node system.
-> > >
-> > > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
-> > >
-> >
-> > Could we please raise the compile-time limit to the highest number that
-> > you are able to boot successfully on some existing machine?
-> >
-> > There isn't much point in doubling this every few months.
-> 
-> Agreed. If we look back at [1], Mark Rutland has actually compiled and
-> boot-tested NR_CPUS=4096 on Juno.
-> 
-> [1] https://lkml.org/lkml/2014/9/8/537
+The i.MX53 has a SAHARA v4 core. Add it to the dtsi.
 
-Ok, 4096 sounds like a good NR_CPUS limit then, it should last for a while.
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+Changes since v1:
+	- remove status property
 
-For the defconfig, we probably want a much smaller value, either one that
-covers all known machines (96 at this time), or something that covers
-95% of all users (maybe 32?) and does not have an serious impact on
-memory consumption or performance on small machines.
+ arch/arm/boot/dts/imx53.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-	Arnd
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index b96213ba0671..ff4fa7ecacd8 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -765,6 +765,15 @@
+ 				resets = <&src 1>;
+ 				iram = <&ocram>;
+ 			};
++
++			sahara: crypto at 63ff8000 {
++				compatible = "fsl,imx53-sahara";
++				reg = <0x63ff8000 0x4000>;
++				interrupts = <19 20>;
++				clocks = <&clks IMX5_CLK_SAHARA_IPG_GATE>,
++				         <&clks IMX5_CLK_SAHARA_IPG_GATE>;
++				clock-names = "ipg", "ahb";
++			};
+ 		};
+ 
+ 		ocram: sram at f8000000 {
+-- 
+2.1.3
