@@ -1,28 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Dec 2014 09:59:42 +0100
-Subject: [PATCH 1/2] clk: bcm: kona: don't return -EFOO as bool
-In-Reply-To: <1418075645-14571-1-git-send-email-olof@lixom.net>
-References: <1418075645-14571-1-git-send-email-olof@lixom.net>
-Message-ID: <13166134.ThBvWAfRgN@wuerfel>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 9 Dec 2014 14:42:48 +0530
+Subject: [PATCHv4] dmaengine: fsl-edma: fixup reg offset and hw S/G
+ support in big-endian model
+In-Reply-To: <1413968035-12855-1-git-send-email-jingchang.lu@freescale.com>
+References: <1413968035-12855-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <20141209091248.GA16827@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 December 2014 13:54:04 Olof Johansson wrote:
-> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
-> index 95af2e6..53fca77 100644
-> --- a/drivers/clk/bcm/clk-kona.c
-> +++ b/drivers/clk/bcm/clk-kona.c
-> @@ -1252,7 +1252,7 @@ static bool __kona_clk_init(struct kona_clk *bcm_clk)
->         default:
->                 BUG();
->         }
-> -       return -EINVAL;
-> +       return false;
->  }
+On Wed, Oct 22, 2014 at 04:53:55PM +0800, Jingchang Lu wrote:
+> The offset of all 8-/16-bit registers in big-endian eDMA model are
+> swapped in a 32-bit size opposite those in the little-endian model.
+> 
+> The hardware Scatter/Gather requires the subsequent TCDs stored in memory
+> in little endian independent of the register endian model, the eDMA engine
+> will do the swap if need.
+> 
+> This patch also use regular assignment for tcd variables r/w
+> instead of with io function previously that may not always be true.
+Applied, thanks
 
-Nothing wrong with your patch, but the __kona_clk_init() function is
-still very strange. Note that the return statement is unreachable,
-and the reason for the BUG() statement to not be hit is that all
-kona clocks have type=bcm_clk_peri.
-
-	Arnd
+-- 
+~Vinod
