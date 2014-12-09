@@ -1,56 +1,56 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue,  9 Dec 2014 14:15:06 +0100
-Subject: [PATCH v4 3/3] ARM: tegra: Add Tegra124 ACTMON support
-In-Reply-To: <1418130912-24725-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1418130912-24725-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1418130912-24725-4-git-send-email-tomeu.vizoso@collabora.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 09 Dec 2014 14:18:19 +0100
+Subject: [PATCH] clk: samsung: Fix Exynos 5420 pinctrl setup and clock
+ disable failure due to domain being gated
+In-Reply-To: <1418129982.19339.6.camel@AMDC1943>
+References: <1417788934-23447-1-git-send-email-k.kozlowski@samsung.com>
+ <1418129982.19339.6.camel@AMDC1943>
+Message-ID: <5486F69B.6020005@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device node for the ACTMON block to the Tegra124 device tree.
+On 09/12/14 13:59, Krzysztof Kozlowski wrote:
+> On pi?, 2014-12-05 at 15:15 +0100, Krzysztof Kozlowski wrote:
+>> > Audio subsystem clocks are located in separate block. On Exynos 5420 if
+>> > clock for this block (from main clock domain) 'mau_epll' is gated then
+>> > any read or write to audss registers will block.
+>> > 
+>> > This kind of boot hang was observed on Arndale Octa and Peach Pi/Pit
+>> > after introducing runtime PM to pl330 DMA driver. After that commit the
+>> > 'mau_epll' was gated, because the "amba" clock was disabled and there
+>> > were no more users of mau_epll.
+>> > 
+>> > The system hang on one of steps:
+>> > 1. Disabling unused clocks from audss block.
+>> > 2. During audss GPIO setup (just before probing i2s0 because
+>> >    samsung_pinmux_setup() tried to access memory from audss block which was
+>> >    gated.
+>> > 
+>> > Add a workaround for this by enabling the 'mau_epll' clock in probe.
+>> > 
+>> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> > ---
+>> >  drivers/clk/samsung/clk-exynos-audss.c | 29 ++++++++++++++++++++++++++++-
+>> >  1 file changed, 28 insertions(+), 1 deletion(-)
+>
+> Sorry for pinging so quick but merge window is open and it looks like
+> booting Exynos542x boards will be broken (because pl330 will no longer
+> hold adma clock enabled so whole audss domain will be gated).
+> 
+> This is a non-intrusive workaround for that issue, as wanted by
+> Sylwester:
+> https://lkml.org/lkml/2014/12/5/223
+> 
+> Any comments on this?
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+The patch looks OK to me, it would be good though if someone else
+has confirmed it fixes the bug. I don't have any clock patches queued
+at the moment. Perhaps you could apply it directly, Mike ?
 
----
+>From my side:
 
-v2:	* Add operating-points property
----
- arch/arm/boot/dts/tegra124.dtsi | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index a49e7da..9d7baa8 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -215,6 +215,29 @@
- 		reg = <0x0 0x60007000 0x0 0x1000>;
- 	};
- 
-+	actmon at 0,6000c800 {
-+		compatible = "nvidia,tegra124-actmon";
-+		reg = <0x0 0x6000c800 0x0 0x400>;
-+		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_ACTMON>,
-+			 <&tegra_car TEGRA124_CLK_EMC>;
-+		clock-names = "actmon", "emc";
-+		resets = <&tegra_car 119>;
-+		reset-names = "actmon";
-+		operating-points = <
-+			/* KHz	uV */
-+			/* TODO: Add more points below 102 MHz */
-+			102000	800000
-+			204000	800000
-+			300000	820000
-+			396000	850000
-+			528000	880000
-+			600000	910000
-+			792000	980000
-+			924000	1010000
-+		>;
-+	};
-+
- 	gpio: gpio at 0,6000d000 {
- 		compatible = "nvidia,tegra124-gpio", "nvidia,tegra30-gpio";
- 		reg = <0x0 0x6000d000 0x0 0x1000>;
 -- 
-1.9.3
+Thanks,
+Sylwester
