@@ -1,65 +1,42 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 9 Dec 2014 19:57:10 -0800
-Subject: [PATCH v3 1/3] i2c: iProc: define Broadcom iProc I2C binding
-In-Reply-To: <1418183832-24793-1-git-send-email-rjui@broadcom.com>
+Date: Tue, 9 Dec 2014 19:57:09 -0800
+Subject: [PATCH v3 0/3] Add I2C support to Broadcom iProc
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
 References: <Ray Jui <rjui@broadcom.com>
- <1418183832-24793-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1418183832-24793-2-git-send-email-rjui@broadcom.com>
+Message-ID: <1418183832-24793-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the I2C device tree binding for Broadcom iProc family of
-SoCs
+This patchset contains the initial I2C support for Broadcom iProc family of
+SoCs.
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- .../devicetree/bindings/i2c/brcm,iproc-i2c.txt     |   37 ++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+The iProc I2C controller has separate internal TX and RX FIFOs, each has a
+size of 64 bytes. The iProc I2C controller supports two bus speeds including
+standard mode (100 kHz) and fast mode (400 kHz)
+
+Changes from v2:
+ - Have the I2C driver default to y so it does not need to be selected from
+   ARCH_BCM_IPROC. This also helps to get rid of one patch. The driver still
+   depends on ARCH_BCM_IPROC
+ - Get rid of redundant check on resource returned by platform_get_resource
+
+Changes from v1:
+ - Fix function argument parenthesis
+ - Get rid of redundant driver owner field
+
+Ray Jui (3):
+  i2c: iProc: define Broadcom iProc I2C binding
+  i2c: iproc: Add Broadcom iProc I2C Driver
+  ARM: dts: add I2C device nodes for Broadcom Cygnus
+
+ .../devicetree/bindings/i2c/brcm,iproc-i2c.txt     |   37 ++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   20 +
+ drivers/i2c/busses/Kconfig                         |   10 +
+ drivers/i2c/busses/Makefile                        |    1 +
+ drivers/i2c/busses/i2c-bcm-iproc.c                 |  500 ++++++++++++++++++++
+ 5 files changed, 568 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+ create mode 100644 drivers/i2c/busses/i2c-bcm-iproc.c
 
-diff --git a/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-new file mode 100644
-index 0000000..81f982c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-@@ -0,0 +1,37 @@
-+Broadcom iProc I2C controller
-+
-+Required properties:
-+
-+- compatible:
-+    Must be "brcm,iproc-i2c"
-+
-+- reg:
-+    Define the base and range of the I/O address space that contain the iProc
-+    I2C controller registers
-+
-+- interrupts:
-+    Should contain the I2C interrupt
-+
-+- clock-frequency:
-+    This is the I2C bus clock. Need to be either 100000 or 400000
-+
-+- #address-cells:
-+    Always 1 (for I2C addresses)
-+
-+- #size-cells:
-+    Always 0
-+
-+Example:
-+	i2c0: i2c at 18008000 {
-+		compatible = "brcm,iproc-i2c";
-+		reg = <0x18008000 0x100>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
-+		clock-frequency = <100000>;
-+
-+		codec: wm8750 at 1a {
-+			compatible = "wlf,wm8750";
-+			reg = <0x1a>;
-+		};
-+	};
 -- 
 1.7.9.5
