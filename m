@@ -1,61 +1,68 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 10 Dec 2014 10:21:12 +0900
-Subject: [PATCH] ARM: shmobile: r8a7794: Add SYS-DMAC clocks to device tree
-Message-ID: <1418174472-1034-1-git-send-email-horms+renesas@verge.net.au>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Wed, 10 Dec 2014 06:57:08 +0530
+Subject: [PATCH 1/4] i2c: iProc: define Broadcom iProc I2C binding
+In-Reply-To: <1418172891-19441-2-git-send-email-rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+ <1418172891-19441-1-git-send-email-rjui@broadcom.com>
+ <1418172891-19441-2-git-send-email-rjui@broadcom.com>
+Message-ID: <5487A16C.5000707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hiroyuki Yokoyama <hiroyuki.yokoyama.vx@renesas.com>
+Hi,
 
-Signed-off-by: Hiroyuki Yokoyama <hiroyuki.yokoyama.vx@renesas.com>
-[horms: resolved conflicts]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Wednesday 10 December 2014 06:24 AM, Ray Jui wrote:
+> Document the I2C device tree binding for Broadcom iProc family of
+> SoCs
+>
+> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>   .../devicetree/bindings/i2c/brcm,iproc-i2c.txt     |   37 ++++++++++++++++++++
+>   1 file changed, 37 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+> new file mode 100644
+> index 0000000..81f982c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+> @@ -0,0 +1,37 @@
+> +Broadcom iProc I2C controller
+> +
+> +Required properties:
+> +
+> +- compatible:
+> +    Must be "brcm,iproc-i2c"
+> +
+> +- reg:
+> +    Define the base and range of the I/O address space that contain the iProc
+> +    I2C controller registers
+> +
+> +- interrupts:
+> +    Should contain the I2C interrupt
+> +
+> +- clock-frequency:
+> +    This is the I2C bus clock. Need to be either 100000 or 400000
+> +
+> +- #address-cells:
+> +    Always 1 (for I2C addresses)
+> +
+> +- #size-cells:
+> +    Always 0
+> +
 
----
-Based on the renesas-devel-20141210-v3.18 tag of my renesas tree.
----
- arch/arm/boot/dts/r8a7794.dtsi            | 7 +++++--
- include/dt-bindings/clock/r8a7794-clock.h | 2 ++
- 2 files changed, 7 insertions(+), 2 deletions(-)
+All the properties defined with two lines of statements.
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 13e4a8d..6d95638 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -479,16 +479,19 @@
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150138 0 4>, <0 0xe6150040 0 4>;
- 			clocks = <&mp_clk>, <&mp_clk>, <&mp_clk>, <&mp_clk>, <&mp_clk>,
--				 <&mp_clk>, <&mp_clk>, <&mp_clk>;
-+				 <&mp_clk>, <&mp_clk>, <&mp_clk>,
-+				 <&zs_clk>, <&zs_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
- 				R8A7794_CLK_SCIFA2 R8A7794_CLK_SCIFA1 R8A7794_CLK_SCIFA0
- 				R8A7794_CLK_MSIOF2 R8A7794_CLK_SCIFB0 R8A7794_CLK_SCIFB1
- 				R8A7794_CLK_MSIOF1 R8A7794_CLK_SCIFB2
-+				R8A7794_CLK_SYS_DMAC1 R8A7794_CLK_SYS_DMAC0
- 			>;
- 			clock-output-names =
- 				"scifa2", "scifa1", "scifa0", "msiof2", "scifb0",
--				"scifb1", "msiof1", "scifb2";
-+				"scifb1", "msiof1", "scifb2",
-+				"sys-dmac1", "sys-dmac0";
- 		};
- 		mstp3_clks: mstp3_clks at e615013c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-index 52492d8..c0bd14a5 100644
---- a/include/dt-bindings/clock/r8a7794-clock.h
-+++ b/include/dt-bindings/clock/r8a7794-clock.h
-@@ -48,6 +48,8 @@
- #define R8A7794_CLK_SCIFB1		7
- #define R8A7794_CLK_MSIOF1		8
- #define R8A7794_CLK_SCIFB2		16
-+#define R8A7794_CLK_SYS_DMAC1		18
-+#define R8A7794_CLK_SYS_DMAC0		19
- 
- /* MSTP3 */
- #define R8A7794_CLK_CMT1		29
+Why cant they be with single line statement, like:
+
+compatible:	Must be "brcm,iproc-i2c"
+reg:		Define the base and range of the I/O address space that
+		contain the iProc I2C controller registers
+
+....
+
+
 -- 
-2.1.3
+Thanks and Regards,
+Varka Bhadram.
