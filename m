@@ -1,70 +1,32 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 9 Dec 2014 15:45:58 -0800
-Subject: [GIT PULL 6/9] ARM: SoC DT updates for 3.19
-In-Reply-To: <14657639.RrnLVWDtO6@wuerfel>
-References: <4491193.a6KEQb1tZH@wuerfel>
-	<14657639.RrnLVWDtO6@wuerfel>
-Message-ID: <CA+55aFwkkP9wFdJUHMsnrd=eDYNsGKm7ujyktEWh+GMzQinzxw@mail.gmail.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 9 Dec 2014 16:04:27 -0800
+Subject: [PATCH 0/4] Add PCIe support to Broadcom iProc
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+Message-ID: <1418169871-19232-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 9, 2014 at 1:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> ARM: SoC DT updates for 3.19
->
->  267 files changed, 18516 insertions(+), 2823 deletions(-)
+This patchset contains the initial PCIe support for Broadcom iProc family of
+SoCs. This driver has been validated with Cygnus and NSP and is expected to
+work on other iProc family of SoCs that deploy the same PCIe controller
 
-Hmm. This is not what I get. I get
+Ray Jui (4):
+  pci: iProc: define Broadcom iProc PCIe binding
+  PCI: iproc: Add Broadcom iProc PCIe driver
+  ARM: mach-bcm: Enable PCIe support for iProc
+  ARM: dts: enable PCIe for Broadcom Cygnus
 
-+ 297 files changed, 20490 insertions(+), 3332 deletions(-)
+ .../devicetree/bindings/pci/brcm,iproc-pcie.txt    |   62 ++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   43 +
+ arch/arm/boot/dts/bcm958300k.dts                   |    8 +
+ arch/arm/mach-bcm/Kconfig                          |    1 +
+ drivers/pci/host/Kconfig                           |    9 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pcie-iproc.c                      |  896 ++++++++++++++++++++
+ 7 files changed, 1020 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-iproc.c
 
-largely due to
-
-+ arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi          |  41 +-
-+ arch/arm/boot/dts/omap-zoom-common.dtsi            |  62 +-
-+ arch/arm/boot/dts/omap2420-n8x0-common.dtsi        |   4 +-
-+ arch/arm/boot/dts/omap2420.dtsi                    |   1 +
-+ arch/arm/boot/dts/omap2430-sdp.dts                 |  28 +-
-+ arch/arm/boot/dts/omap2430.dtsi                    |   1 +
-+ arch/arm/boot/dts/omap3-cm-t3517.dts               |  11 +
-+ arch/arm/boot/dts/omap3-cm-t3530.dts               |  11 +
-+ arch/arm/boot/dts/omap3-cm-t3730.dts               |  24 +
-+ arch/arm/boot/dts/omap3-cm-t3x.dtsi                | 151 ++++
-+ arch/arm/boot/dts/omap3-devkit8000.dts             |   4 +-
-+ arch/arm/boot/dts/omap3-evm-37xx.dts               |   5 +-
-+ arch/arm/boot/dts/omap3-gta04.dtsi                 |  86 +-
-+ arch/arm/boot/dts/omap3-igep.dtsi                  | 103 ++-
-+ arch/arm/boot/dts/omap3-igep0020-common.dtsi       | 246 ++++++
-+ arch/arm/boot/dts/omap3-igep0020-rev-f.dts         |  45 +
-+ arch/arm/boot/dts/omap3-igep0020.dts               | 285 +------
-+ arch/arm/boot/dts/omap3-igep0030-common.dtsi       |  60 ++
-+ arch/arm/boot/dts/omap3-igep0030-rev-g.dts         |  67 ++
-+ arch/arm/boot/dts/omap3-igep0030.dts               | 123 +--
-+ arch/arm/boot/dts/omap3-ldp.dts                    |   3 +-
-+ arch/arm/boot/dts/omap3-lilly-a83x.dtsi            |   2 +-
-+ arch/arm/boot/dts/omap3-n900.dts                   |  51 +-
-+ arch/arm/boot/dts/omap3-n950-n9.dtsi               |   4 +-
-+ arch/arm/boot/dts/omap3-sb-t35.dtsi                | 126 ++-
-+ arch/arm/boot/dts/omap3-sbc-t3517.dts              |  15 +
-+ arch/arm/boot/dts/omap3-sbc-t3530.dts              |  15 +
-+ arch/arm/boot/dts/omap3-sbc-t3730.dts              |  15 +
-+ arch/arm/boot/dts/omap3-tao3530.dtsi               |   2 +-
-+ arch/arm/boot/dts/omap3.dtsi                       |   1 +
-+ arch/arm/boot/dts/omap3430-sdp.dts                 |   8 +-
-+ arch/arm/boot/dts/omap4.dtsi                       |   1 +
-+ arch/arm/boot/dts/omap5.dtsi                       |   1 +
-
-much of which seems to have come in through that
-
-      Merge tag 'omap-for-v3.19/dt-part1' of
-git://git.kernel.org/.../tmlind/linux-omap into next/dt
-
-but the diffstat isn't there, nor are the actual commits are mentioned
-in the shortlog.
-
-Hmm?
-
-I've applied 1-5, but I'm going to stop here waiting for confirmation
-of what's going on..
-
-                      Linus
+-- 
+1.7.9.5
