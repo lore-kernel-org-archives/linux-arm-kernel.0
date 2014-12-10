@@ -1,35 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 10 Dec 2014 12:15:51 +0000
-Subject: arm64 broken in -next by commit 08d53aa58cb1 (of/fdt: export fdt
- blob as /sys/firmware/fdt)
-In-Reply-To: <CAKv+Gu-5evt=quj8n8UEtR6wKQhYt4crrFRz2pvjhD1267SCrQ@mail.gmail.com>
-References: <20141210120422.GB13994@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-5evt=quj8n8UEtR6wKQhYt4crrFRz2pvjhD1267SCrQ@mail.gmail.com>
-Message-ID: <20141210121551.GD13994@e104818-lin.cambridge.arm.com>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Wed, 10 Dec 2014 13:14:43 +0100
+Subject: [PATCH v2] irqchip: mediatek: Use IS_ERR() instead of NULL
+ pointer check
+In-Reply-To: <1418205302-22531-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1418205302-22531-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <20141210121442.GA14485@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 12:10:11PM +0000, Ard Biesheuvel wrote:
-> On 10 December 2014 at 13:04, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > I noticed that linux-next no longer boots on Juno. Bisecting, I ended up
-> > on your commit above and reverting it gets things going again. I
+On Wed, Dec 10, 2014 at 05:55:02PM +0800, Yingjoe Chen wrote:
+> Beniamino reported a kernel oops caused by an invalid DT file for the
+> mediatek interrupt polarity extension.
 > 
-> That's odd.
+> The reason is that the interrupt polarity support for mediatek chips
+> merely checks for NULL pointer instead of a casted error return
+> value in mtk_sysirq_of_init() so any other casted error value passes
+> the NULL pointer check and causes a kernel panic when dereferenced.
 > 
-> > initially thought it has something to do with the hardware crypto since
-> > you added some crc32_be() calls but disabling arm64 hw crypto didn't
-> > make any difference.
+> Use IS_ERR() and return the error value via PTR_ERR().
 > 
-> No, this patch adds direct crc32() calls into lib/crc32.c that are not
-> routed through the crypto layer, so your finding here matches my
-> expectation.
-> 
-> > Still investigating but I thought I should let you know early.
-> 
-> Could you elaborate on the symptoms?
+> Reported-and-tested-by: Beniamino Galvani <b.galvani@gmail.com>
 
-It doesn't even reach an early console, so nothing printed. Mark is
-trying to attach a debugger.
+Well, actually I only reported the bug and didn't do any test. Can the
+"-and-tested" portion of the tag be dropped while applying the patch?
 
--- 
-Catalin
+Beniamino
+
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> ---
+>  drivers/irqchip/irq-mtk-sysirq.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
+> index 7e342df..0b0d2c0 100644
+> --- a/drivers/irqchip/irq-mtk-sysirq.c
+> +++ b/drivers/irqchip/irq-mtk-sysirq.c
+> @@ -137,9 +137,9 @@ static int __init mtk_sysirq_of_init(struct device_node *node,
+>  		return -ENOMEM;
+>  
+>  	chip_data->intpol_base = of_io_request_and_map(node, 0, "intpol");
+> -	if (!chip_data->intpol_base) {
+> +	if (IS_ERR(chip_data->intpol_base)) {
+>  		pr_err("mtk_sysirq: unable to map sysirq register\n");
+> -		ret = -ENOMEM;
+> +		ret = PTR_ERR(chip_data->intpol_base);
+>  		goto out_free;
+>  	}
+>  
+> -- 
+> 1.8.1.1.dirty
+> 
