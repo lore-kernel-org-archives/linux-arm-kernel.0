@@ -1,42 +1,18 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Dec 2014 08:47:35 -0800
-Subject: [PATCH 0/2] ARM: dts: dra7-evm: Regulator max voltage fixes
-In-Reply-To: <547F0A57.7040806@ti.com>
-References: <1417608237-12258-1-git-send-email-rk@ti.com>
- <547F0A57.7040806@ti.com>
-Message-ID: <20141210164734.GE30437@atomide.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 10 Dec 2014 12:02:44 -0500 (EST)
+Subject: [PATCH v8 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <34612839.hAkXUcbKUQ@wuerfel>
+References: <2331317.LV3gPP3odb@wuerfel>
+ <20141210.110732.519666115784722516.davem@davemloft.net>
+ <34612839.hAkXUcbKUQ@wuerfel>
+Message-ID: <20141210.120244.722990295139076460.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [141203 05:06]:
-> On 12/03/2014 06:03 AM, Ravikumar Kattekola wrote:
-> > Hi,
-> > 
-> > This set does a minor fix and an update:
-> > 
-> >    - Fix a typo in the max voltage property of smps6 (vdd_gpu) regulator node added by
-> >      the patch : c56a831ca47e ("ARM: dts: DRA7: Add TPS659038 PMIC nodes")
-> > 
-> >    - Update max voltage property of smps7 (vdd_core) regulator node to align with the 
-> >      latest Data Manual
-> > 
-> > Regards,
-> > RK
-> > 
-> > Ravikumar Kattekola (2):
-> >   ARM: dts: dra7-evm: Fix typo in SMPS6 (VDD_GPU) max voltage
-> >   ARM: dts: dra7-evm: Update SMPS7 (VDD_CORE) max voltage to match DM
-> > 
-> >  arch/arm/boot/dts/dra7-evm.dts  |    4 ++--
-> >  arch/arm/boot/dts/dra72-evm.dts |    2 +-
-> >  2 files changed, 3 insertions(+), 3 deletions(-)
-> > 
-> These apply to
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v3.19/dt-v2
-> 
-> Acked-by: Nishanth Menon <nm@ti.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 10 Dec 2014 17:36:46 +0100
 
-Applying both into omap-for-v3.19/fixes thanks.
+> Or is there any better alternative for broken hardware that lacks
+> a TX-complete interrupt?
 
-Tony
+The only option is an hrtimer or similar.
