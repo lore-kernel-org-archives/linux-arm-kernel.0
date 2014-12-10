@@ -1,50 +1,32 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 10 Dec 2014 10:46:57 -0800
-Subject: [PATCH 2/4] PCI: iproc: Add Broadcom iProc PCIe driver
-In-Reply-To: <54887901.8070501@broadcom.com>
-References: <1418169871-19232-3-git-send-email-rjui@broadcom.com>
- <9707535.Y78sV0TgX4@wuerfel> <54887901.8070501@broadcom.com>
-Message-ID: <CAGVrzcbZ_f43Vf1mu2XErVi_Jehjggh2TREyrSs84ntSm98yvg@mail.gmail.com>
+From: richard.kunze@web.de (Richard Kunze)
+Date: Wed, 10 Dec 2014 19:40:41 +0100
+Subject: [PATCH] ARM: dts: add gpio_poweroff support for Iomega ix2-200
+Message-ID: <1418236841-15277-1-git-send-email-richard.kunze@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-12-10 8:46 GMT-08:00 Scott Branden <sbranden@broadcom.com>:
-> On 14-12-10 03:31 AM, Arnd Bergmann wrote:
->>
->> On Tuesday 09 December 2014 16:04:29 Ray Jui wrote:
->>>
->>> Add initial version of the Broadcom iProc PCIe driver. This driver
->>> has been tested on NSP and Cygnus and is expected to work on all iProc
->>> family of SoCs that deploys the same PCIe host controller
->>>
->>> The driver also supports MSI
->>>
->>> Signed-off-by: Ray Jui <rjui@broadcom.com>
->>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->>
->>
->> The driver looks suspiciously like the one that Hauke already submitted a
->> while ago for bcm53xx. Please come up with a merged driver that works for
->> both.
->
-> Could you please be a little more specific.  What driver did "Hauke already
-> submitted"?  I do not see any driver in the kernel you are talking about.
+Iomega ix2-200 can be powered off via GPIO 0 pin 17,
+this patch wires up the gpio-poweroff driver to do it.
 
-https://www.marc.info/?l=linux-pci&m=141547043110684&w=2
+Signed-off-by: Richard Kunze <richard.kunze@web.de>
+---
+ arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
->>
->>
->> Are you sure that iProc isn't based on the BCMA bus infrastructure after
->> all? Even the physical address of your PCI host falls into the address
->> range that is used for the internal BCMA bus on the other chips!
->
-> BCMA seems to be for MIPS architectures.  It seems to be quite specific to
-> those architectures using BCMA.  I see no use of it in bcm53xx code?
-
-BCMA lives in its own directory in drivers/bcma/ and is not specific
-to MIPS actually. Older BCM47xx/BCM53xx MIPS-based SoCs traditionally
-started with a discoverable Silicon Sonics Backplane (drivers/ssb) and
-progressively migrated to BCMA (drivers/bcma), both subsystems offer a
-very similar bus/device/driver abstraction and discovery mechanism.
+diff --git a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
+index 05291f3..7aeddcd 100644
+--- a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
++++ b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
+@@ -169,6 +169,10 @@
+ 			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
++	gpio-poweroff {
++		compatible = "gpio-poweroff";
++		gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
++	};
+ };
+ 
+ &nand {
 -- 
-Florian
+1.9.1
