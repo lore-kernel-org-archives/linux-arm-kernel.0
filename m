@@ -1,28 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Dec 2014 12:31:38 +0100
-Subject: [PATCH 2/4] PCI: iproc: Add Broadcom iProc PCIe driver
-In-Reply-To: <1418169871-19232-3-git-send-email-rjui@broadcom.com>
-References: <1418169871-19232-3-git-send-email-rjui@broadcom.com>
-Message-ID: <9707535.Y78sV0TgX4@wuerfel>
+Date: Wed, 10 Dec 2014 12:33:16 +0100
+Subject: [GIT PULL 9/9] ARM64: SoC changes for 3.19
+In-Reply-To: <CA+55aFwU2qa+4BssUg3zCmZVPz5fmAHLgy--2=yb-NjXMZNDhg@mail.gmail.com>
+References: <4491193.a6KEQb1tZH@wuerfel> <2482441.CQUhI8rqR1@wuerfel>
+ <CA+55aFwU2qa+4BssUg3zCmZVPz5fmAHLgy--2=yb-NjXMZNDhg@mail.gmail.com>
+Message-ID: <142437558.Xy2szB89Mt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 December 2014 16:04:29 Ray Jui wrote:
-> Add initial version of the Broadcom iProc PCIe driver. This driver
-> has been tested on NSP and Cygnus and is expected to work on all iProc
-> family of SoCs that deploys the same PCIe host controller
+On Tuesday 09 December 2014 17:20:43 Linus Torvalds wrote:
+> On Tue, Dec 9, 2014 at 1:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/arm64-for-linus
 > 
-> The driver also supports MSI
+> I get the same shortlog this time, but a different diffstat again.
 > 
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> Oh well. At least this time my diffstat is smaller.
+> 
 
-The driver looks suspiciously like the one that Hauke already submitted a
-while ago for bcm53xx. Please come up with a merged driver that works for
-both.
-
-Are you sure that iProc isn't based on the BCMA bus infrastructure after
-all? Even the physical address of your PCI host falls into the address
-range that is used for the internal BCMA bus on the other chips!
+Ah, my mistake. This branch included the move of the files that was done in the
+cleanup branch. In the other pull requests I manually did the diffstat to match
+what I expect you would see instead of what "git request-pull" tells me, while
+for this one, the diffstat looked correct to me and I did not recreate one
+manually.
 
 	Arnd
