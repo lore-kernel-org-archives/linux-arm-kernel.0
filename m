@@ -1,23 +1,36 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 10 Dec 2014 15:15:50 -0500 (EST)
-Subject: [PATCH] net/macb: add TX multiqueue support for gem
-In-Reply-To: <1418223831-30435-2-git-send-email-cyrille.pitchen@atmel.com>
-References: <1418223831-30435-1-git-send-email-cyrille.pitchen@atmel.com>
- <1418223831-30435-2-git-send-email-cyrille.pitchen@atmel.com>
-Message-ID: <20141210.151550.855246066396941606.davem@davemloft.net>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Wed, 10 Dec 2014 15:16:12 -0500
+Subject: [PATCH] Mailbox: Complete wait event only if Tx was successful
+Message-ID: <1418242572-20998-1-git-send-email-ashwin.chaugule@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Date: Wed, 10 Dec 2014 16:03:51 +0100
+If a wait_for_completion_timeout() call returns due to a timeout,
+the mbox code can still call complete() after returning from the wait.
+This can cause subsequent transmissions on a channel to fail, since
+the wait_for_completion_timeout() sees the completion variable
+is !=0, caused by the erroneous complete() call, and immediately
+returns without waiting for the time as expected by the client.
 
-> +	netdev_vdbg(bp->dev, "macb_tx_error_task: q = %u, t = %u, h = %u\n",
-> +		    queue - bp->queues, queue->tx_tail, queue->tx_head);
+Fix this by calling complete() only if the TX was successful.
 
-This and another change int his patch adds build warnings because
-"ptr1 - ptr2" is a ptrdiff_t, which is a long int on some platforms:
+Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+---
+ drivers/mailbox/mailbox.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-drivers/net/ethernet/cadence/macb.c: In function ?macb_tx_error_task?:
-drivers/net/ethernet/cadence/macb.c:504:2: warning: format ?%u? expects argument of type ?unsigned int?, but argument 4 has type ?long int? [-Wformat]
-drivers/net/ethernet/cadence/macb.c: In function ?macb_interrupt?:
-drivers/net/ethernet/cadence/macb.c:988:3: warning: format ?%u? expects argument of type ?unsigned int?, but argument 4 has type ?long int? [-Wformat]
+diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+index 17e9e4a..4acaddb 100644
+--- a/drivers/mailbox/mailbox.c
++++ b/drivers/mailbox/mailbox.c
+@@ -101,7 +101,7 @@ static void tx_tick(struct mbox_chan *chan, int r)
+ 	if (mssg && chan->cl->tx_done)
+ 		chan->cl->tx_done(chan->cl, mssg, r);
+ 
+-	if (chan->cl->tx_block)
++	if ((!r) && chan->cl->tx_block)
+ 		complete(&chan->tx_complete);
+ }
+ 
+-- 
+1.9.1
