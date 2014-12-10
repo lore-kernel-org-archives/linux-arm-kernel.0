@@ -1,56 +1,70 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 10 Dec 2014 22:37:13 +0800
-Subject: [PATCH 2/4] irqchip: mediatek: Add support for mt8173
-In-Reply-To: <2545975.QDuBFbG7BN@wuerfel>
-References: <1418208602-35584-1-git-send-email-eddie.huang@mediatek.com>
- <1418208602-35584-3-git-send-email-eddie.huang@mediatek.com>
- <2545975.QDuBFbG7BN@wuerfel>
-Message-ID: <1418222233.21309.17.camel@mtksdaap41>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Wed, 10 Dec 2014 10:41:15 -0400
+Subject: [PATCH 1/2] drivers: thermal: Remove ARCH_HAS_BANDGAP dependency
+ for samsung
+In-Reply-To: <CAM4voamr2yxqWq51-WuiWyVpS7hCyXJY8rE7dH3Xr7WwQoayiw@mail.gmail.com>
+References: <1417502073-6322-1-git-send-email-a.kesavan@samsung.com>
+ <20141208104333.0e044c58@amdc2363>
+ <CAM4voamr2yxqWq51-WuiWyVpS7hCyXJY8rE7dH3Xr7WwQoayiw@mail.gmail.com>
+Message-ID: <20141210144112.GA3232@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Arnd,
-
-On Wed, 2014-12-10 at 12:00 +0100, Arnd Bergmann wrote:
-> On Wednesday 10 December 2014 18:50:00 Eddie Huang wrote:
-> > From: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> > 
-> > MT8173 intpol have 32 more irq pins, add support to it.
-> > 
-> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> > 
+On Wed, Dec 10, 2014 at 09:26:55AM +0530, Abhilash Kesavan wrote:
+> Hi Eduardo,
 > 
-> How about adding a property for the number of irq pins and leave the
-> old compatible string in place? I don't think it would be good if
-> we have to update this driver for each new SoC that uses this
-> irqchip just to change one number.
+> On Mon, Dec 8, 2014 at 3:13 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> > Hi Abhilash,
+> >
+> >> As samsung thermal support is enabled only for ARCH_EXYNOS, there is
+> >> no need to select ARCH_HAS_BANDGAP from the arch-specific code.
+> >> Removing this dependency will also allow the driver to be enabled on
+> >> 64-bit SoCs.
+> >>
+> >> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> >> ---
+> >> This was based on the discussion regarding adding ARCH_HAS_BANDGAP
+> >> symbol for arm64 here:
+> >> http://www.spinics.net/lists/arm-kernel/msg377560.html
+> >>
+> >>  drivers/thermal/samsung/Kconfig |    2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/thermal/samsung/Kconfig
+> >> b/drivers/thermal/samsung/Kconfig index f760389..c43306e 100644
+> >> --- a/drivers/thermal/samsung/Kconfig
+> >> +++ b/drivers/thermal/samsung/Kconfig
+> >> @@ -1,6 +1,6 @@
+> >>  config EXYNOS_THERMAL
+> >>       tristate "Exynos thermal management unit driver"
+> >> -     depends on ARCH_HAS_BANDGAP && OF
+> >> +     depends on OF
+> >>       help
+> >>         If you say yes here you get support for the TMU (Thermal
+> >> Management Unit) driver for SAMSUNG EXYNOS series of SoCs. This
+> >> driver initialises
+> >
+> > Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
+> > Acked-by: Lukasz Majewski <l.majewski@samsung.com>
 > 
-> 	Arnd
+> Can you pick up these 2 patches if they look OK ?
 
-OK, I'll change to something like this in next version:
+OK. Adding to my fixes queue.
 
-
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-@@ -17,12 +17,17 @@ Required properties:
-   use the same interrupt-cells format as GIC.
- - reg: Physical base address of the intpol registers and length of memory
-   mapped region.
-
-+Optional properties:
-+- mediatek,intpol-number: The number of interrupts supported by intpol,
-+  default 224 if omitted.
-+
- Example:
-        sysirq: interrupt-controller at 10200100 {
-                compatible = "mediatek,mt6589-sysirq", "mediatek,mt6577-sysirq";
-                interrupt-controller;
-                #interrupt-cells = <3>;
-                interrupt-parent = <&gic>;
-                reg = <0 0x10200100 0 0x1c>;
-+               mediatek,intpol-number = <224>;
-        };
-
-Joe.C
+> 
+> Regards,
+> Abhilash
+> >
+> > --
+> > Best regards,
+> >
+> > Lukasz Majewski
+> >
+> > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141210/373a3a28/attachment.sig>
