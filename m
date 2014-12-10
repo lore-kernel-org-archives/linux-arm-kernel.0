@@ -1,127 +1,77 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 10 Dec 2014 12:58:03 -0800
-Subject: [PATCH 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <1418245085-9754-1-git-send-email-dianders@chromium.org>
-References: <1418245085-9754-1-git-send-email-dianders@chromium.org>
-Message-ID: <1418245085-9754-2-git-send-email-dianders@chromium.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Dec 2014 12:57:52 -0800
+Subject: [GIT PULL] few fixes for the v3.19 merge window
+Message-ID: <20141210205752.GB12921@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds logic to the MMC core to set VQMMC.  This is expected to be
-called by MMC drivers like dw_mmc as part of (or instead of) their
-start_signal_voltage_switch() callback.
+The following changes since commit a0e4467726cd26bacb16f13d207ffcfa82ffc07d:
 
-A few notes:
+  Merge tag 'asm-generic-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/arnd/asm-generic (2014-12-09 17:25:00 -0800)
 
-* When setting the signal voltage to 3.3V we do our best to make VQMMC
-  and VMMC match.  It's been reported that this makes some old cards
-  happy since they were tested back in the day before UHS when VQMMC
-  and VMMC were provided by the same regulator.  A nice side effect of
-  this is that we don't end up on the hairy edge of VQMMC (2.7V),
-  which some EEs claim is a little too close to the minimum for
-  comfort.
+are available in the git repository at:
 
-* When setting the signal voltage to 1.8V or 1.2V we aim for that
-  specific voltage instead of picking the lowest one in the range.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/fixes-for-merge-window
 
-* We very purposely don't print errors in mmc_regulator_set_vqmmc().
-  There are cases where the MMC core will try several different
-  voltages and we don't want to pollute the logs.
+for you to fetch changes up to 661ea91b676bcca137c1c3fe838997925ce98060:
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- drivers/mmc/core/core.c  | 53 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mmc/host.h |  7 +++++++
- 2 files changed, 60 insertions(+)
+  ARM: omap2plus_defconfig: Enable AHCI_PLATFORM driver (2014-12-10 09:33:50 -0800)
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 9584bff..d0da480 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1333,6 +1333,59 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
- }
- EXPORT_SYMBOL_GPL(mmc_regulator_set_ocr);
- 
-+static int mmc_regulator_set_voltage_if_supported(struct regulator *regulator,
-+						  int min_uV, int ideal_uV,
-+						  int max_uV)
-+{
-+	/*
-+	 * Check if supported first to avoid errors since we may try several
-+	 * signal levels during power up and don't want to show errors.
-+	 */
-+	if (!regulator_is_supported_voltage(regulator, min_uV, max_uV))
-+		return -EINVAL;
-+
-+	return regulator_set_closest_voltage(regulator, min_uV, ideal_uV,
-+					     max_uV);
-+}
-+
-+/**
-+ * mmc_regulator_set_vqmmc - Set VQMMC as per the ios
-+ *
-+ * For 3.3V signaling, we try to match vqmmc to vmmc as closely as possible.
-+ * That will match the behavior of old boards where vqmmc and vmmc were supplied
-+ * by the same supply.
-+ *
-+ * For 1.2V and 1.8V signaling we'll try to get as close as possible to the
-+ * requested voltage.  This is definitely a good idea for UHS where there's a
-+ * separate regulator on the card that's trying to make 1.8V and it's best if
-+ * we match.
-+ *
-+ * This function is expected to be used by a controller's
-+ * start_signal_voltage_switch() function.
-+ */
-+int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios)
-+{
-+	/* If no vqmmc supply then we can't change the voltage */
-+	if (IS_ERR(mmc->supply.vqmmc))
-+		return -EINVAL;
-+
-+	switch (ios->signal_voltage) {
-+	case MMC_SIGNAL_VOLTAGE_120:
-+		return mmc_regulator_set_voltage_if_supported(
-+			mmc->supply.vqmmc, 1100000, 1200000, 1300000);
-+	case MMC_SIGNAL_VOLTAGE_180:
-+		return mmc_regulator_set_voltage_if_supported(
-+			mmc->supply.vqmmc, 1700000, 1800000, 1950000);
-+	case MMC_SIGNAL_VOLTAGE_330:
-+		return mmc_regulator_set_voltage_if_supported(
-+			mmc->supply.vqmmc, 2700000,
-+			regulator_get_voltage(mmc->supply.vmmc), 3600000);
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+EXPORT_SYMBOL_GPL(mmc_regulator_set_vqmmc);
-+
- #endif /* CONFIG_REGULATOR */
- 
- int mmc_regulator_get_supply(struct mmc_host *mmc)
-diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-index 9f32270..524d6fc 100644
---- a/include/linux/mmc/host.h
-+++ b/include/linux/mmc/host.h
-@@ -416,6 +416,7 @@ int mmc_regulator_get_ocrmask(struct regulator *supply);
- int mmc_regulator_set_ocr(struct mmc_host *mmc,
- 			struct regulator *supply,
- 			unsigned short vdd_bit);
-+int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios);
- #else
- static inline int mmc_regulator_get_ocrmask(struct regulator *supply)
- {
-@@ -428,6 +429,12 @@ static inline int mmc_regulator_set_ocr(struct mmc_host *mmc,
- {
- 	return 0;
- }
-+
-+static inline int mmc_regulator_set_vqmmc(struct mmc_host *mmc,
-+					  struct mmc_ios *ios)
-+{
-+	return -EINVAL;
-+}
- #endif
- 
- int mmc_regulator_get_supply(struct mmc_host *mmc);
--- 
-2.2.0.rc0.207.ga3a616c
+----------------------------------------------------------------
+Fixes for a few issues found that would be good to get
+into -rc1:
+
+- Update SoC revision detection for am43x es1.2
+
+- Fix regression with GPMC timings on 2430sdp for some versions
+  of u-boot
+
+- Fix dra7 watchdog compatible property
+
+- Fix am437x-sk-evm LCD timings
+
+- Fix dra7 DSS clock muxing
+
+- Fix dra7-evm voltages
+
+- Remove a unused function prototype for am33xx_clk_init
+
+- Enable AHCI in the omap2plus_defconfig
+
+----------------------------------------------------------------
+Felipe Balbi (1):
+      ARM: dts: am437x-sk: fix lcd enable pin mux data
+
+Johan Hovold (1):
+      ARM: OMAP2+: clock: remove unused function prototype
+
+Lokesh Vutla (2):
+      ARM: dts: DRA7: wdt: Fix compatible property for watchdog node
+      ARM: OMAP2+: AM43x: Add ID for ES1.2
+
+Ravikumar Kattekola (2):
+      ARM: dts: dra7-evm: Fix typo in SMPS6 (VDD_GPU) max voltage
+      ARM: dts: dra7-evm: Update SMPS7 (VDD_CORE) max voltage to match DM
+
+Roger Quadros (1):
+      ARM: omap2plus_defconfig: Enable AHCI_PLATFORM driver
+
+Tomi Valkeinen (2):
+      ARM: dts: dra7: fix DSS PLL clock mux registers
+      ARM: dts: am437x-sk-evm.dts: fix LCD timings
+
+Tony Lindgren (2):
+      Merge branch 'omap-for-v3.19/fixes-not-urgent' into omap-for-v3.19/fixes
+      ARM: dts: Fix gpmc regression for omap 2430sdp smc91x
+
+ arch/arm/boot/dts/am437x-sk-evm.dts  | 15 +++++++--------
+ arch/arm/boot/dts/dra7-evm.dts       |  4 ++--
+ arch/arm/boot/dts/dra7.dtsi          |  2 +-
+ arch/arm/boot/dts/dra72-evm.dts      |  2 +-
+ arch/arm/boot/dts/dra7xx-clocks.dtsi |  6 +++---
+ arch/arm/boot/dts/omap2430-sdp.dts   | 32 ++++++++++++++++----------------
+ arch/arm/configs/omap2plus_defconfig |  2 ++
+ arch/arm/mach-omap2/clock.h          |  2 --
+ arch/arm/mach-omap2/id.c             |  8 ++++++--
+ arch/arm/mach-omap2/soc.h            |  1 +
+ 10 files changed, 39 insertions(+), 35 deletions(-)
