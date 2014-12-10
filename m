@@ -1,26 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Dec 2014 10:44:51 +0100
-Subject: [RFC/PATCH 1/4] ARM: mvebu: use dt_fixup to provide fallback for
- enable-method
-In-Reply-To: <1418179187-18486-2-git-send-email-chris.packham@alliedtelesis.co.nz>
-References: <1418179187-18486-1-git-send-email-chris.packham@alliedtelesis.co.nz>
- <1418179187-18486-2-git-send-email-chris.packham@alliedtelesis.co.nz>
-Message-ID: <2128384.mZxE73eTGk@wuerfel>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 10 Dec 2014 17:55:02 +0800
+Subject: [PATCH v2] irqchip: mediatek: Use IS_ERR() instead of NULL pointer
+ check
+In-Reply-To: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1418205302-22531-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 December 2014 15:39:44 Chris Packham wrote:
-> 
-> +static void __init armada_370_xp_dt_fixup(void)
-> +{
-> +       smp_set_ops(smp_ops(armada_xp_smp_ops));
-> +}
-> +
-> 
+Beniamino reported a kernel oops caused by an invalid DT file for the
+mediatek interrupt polarity extension.
 
-The dt_fixup callback pointer is meant to fix up a legacy dtb file in
-memory. I think this would be fairly easy in this case, just add in the
-missing enable-method property here to make the normal boot path
-work for old dtbs.
+The reason is that the interrupt polarity support for mediatek chips
+merely checks for NULL pointer instead of a casted error return
+value in mtk_sysirq_of_init() so any other casted error value passes
+the NULL pointer check and causes a kernel panic when dereferenced.
 
-	Arnd
+Use IS_ERR() and return the error value via PTR_ERR().
+
+Reported-and-tested-by: Beniamino Galvani <b.galvani@gmail.com>
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+---
+ drivers/irqchip/irq-mtk-sysirq.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
+index 7e342df..0b0d2c0 100644
+--- a/drivers/irqchip/irq-mtk-sysirq.c
++++ b/drivers/irqchip/irq-mtk-sysirq.c
+@@ -137,9 +137,9 @@ static int __init mtk_sysirq_of_init(struct device_node *node,
+ 		return -ENOMEM;
+ 
+ 	chip_data->intpol_base = of_io_request_and_map(node, 0, "intpol");
+-	if (!chip_data->intpol_base) {
++	if (IS_ERR(chip_data->intpol_base)) {
+ 		pr_err("mtk_sysirq: unable to map sysirq register\n");
+-		ret = -ENOMEM;
++		ret = PTR_ERR(chip_data->intpol_base);
+ 		goto out_free;
+ 	}
+ 
+-- 
+1.8.1.1.dirty
