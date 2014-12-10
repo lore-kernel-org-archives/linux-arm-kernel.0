@@ -1,108 +1,42 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 10 Dec 2014 16:48:33 +0100
-Subject: [RFC 15/15] drm/panel/ld9040: convert to restrack API
-In-Reply-To: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
-References: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <1418226513-14105-16-git-send-email-a.hajda@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Dec 2014 15:41:15 +0100
+Subject: [PATCH 2/4] irqchip: mediatek: Add support for mt8173
+In-Reply-To: <1418222233.21309.17.camel@mtksdaap41>
+References: <1418208602-35584-1-git-send-email-eddie.huang@mediatek.com>
+ <2545975.QDuBFbG7BN@wuerfel> <1418222233.21309.17.camel@mtksdaap41>
+Message-ID: <4428865.bnDr16Yqvr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert ld9040 panel driver to use restrack API.
-As a result driver have following advantages:
-- correctly handles removal of resources,
-- do not need to defer probing, so as a result the panel
-  becomes available as soon as possible, in case of deferred
-  probing it was late_initcall,
-- simplified initialization.
+On Wednesday 10 December 2014 22:37:13 Yingjoe Chen wrote:
+> OK, I'll change to something like this in next version:
 
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
----
- drivers/gpu/drm/panel/panel-ld9040.c | 41 ++++++++++++++++++------------------
- 1 file changed, 20 insertions(+), 21 deletions(-)
+I've just taken another look at the driver and have a different
+suggestion:
 
-diff --git a/drivers/gpu/drm/panel/panel-ld9040.c b/drivers/gpu/drm/panel/panel-ld9040.c
-index 3337f30..619610e 100644
---- a/drivers/gpu/drm/panel/panel-ld9040.c
-+++ b/drivers/gpu/drm/panel/panel-ld9040.c
-@@ -17,6 +17,7 @@
- #include <linux/gpio/consumer.h>
- #include <linux/regulator/consumer.h>
- #include <linux/spi/spi.h>
-+#include <linux/restrack.h>
- 
- #include <video/mipi_display.h>
- #include <video/of_videomode.h>
-@@ -310,9 +311,22 @@ static int ld9040_parse_dt(struct ld9040 *ctx)
- 	return 0;
- }
- 
-+void ld9040_restrack_cb(struct device *dev, int ret)
-+{
-+	struct ld9040 *ctx = dev_get_drvdata(dev);
-+
-+	if (ret == 0)
-+		drm_panel_add(&ctx->panel);
-+	else if (ret == -EPROBE_DEFER)
-+		drm_panel_remove(&ctx->panel);
-+	else
-+		dev_err(dev, "restrack error %d\n", ret);
-+}
-+
- static int ld9040_probe(struct spi_device *spi)
- {
- 	struct device *dev = &spi->dev;
-+	struct restrack_ctx *rtrack;
- 	struct ld9040 *ctx;
- 	int ret;
- 
-@@ -331,17 +345,6 @@ static int ld9040_probe(struct spi_device *spi)
- 
- 	ctx->supplies[0].supply = "vdd3";
- 	ctx->supplies[1].supply = "vci";
--	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(ctx->supplies),
--				      ctx->supplies);
--	if (ret < 0)
--		return ret;
--
--	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
--	if (IS_ERR(ctx->reset_gpio)) {
--		dev_err(dev, "cannot get reset-gpios %ld\n",
--			PTR_ERR(ctx->reset_gpio));
--		return PTR_ERR(ctx->reset_gpio);
--	}
- 
- 	spi->bits_per_word = 9;
- 	ret = spi_setup(spi);
-@@ -354,16 +357,13 @@ static int ld9040_probe(struct spi_device *spi)
- 	ctx->panel.dev = dev;
- 	ctx->panel.funcs = &ld9040_drm_funcs;
- 
--	return drm_panel_add(&ctx->panel);
--}
--
--static int ld9040_remove(struct spi_device *spi)
--{
--	struct ld9040 *ctx = spi_get_drvdata(spi);
--
--	drm_panel_remove(&ctx->panel);
-+	rtrack = devm_restrack_register(ctx->dev, ld9040_restrack_cb,
-+		regulator_bulk_restrack_desc(&ctx->supplies[0]),
-+		regulator_bulk_restrack_desc(&ctx->supplies[1]),
-+		gpiod_restrack_desc(&ctx->reset_gpio, "reset", GPIOD_OUT_HIGH),
-+	);
- 
--	return 0;
-+	return PTR_ERR_OR_ZERO(rtrack);
- }
- 
- static struct of_device_id ld9040_of_match[] = {
-@@ -374,7 +374,6 @@ MODULE_DEVICE_TABLE(of, ld9040_of_match);
- 
- static struct spi_driver ld9040_driver = {
- 	.probe		= ld9040_probe,
--	.remove		= ld9040_remove,
- 	.driver = {
- 		.name	= "ld9040",
- 		.owner	= THIS_MODULE,
--- 
-1.9.1
+> --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+> @@ -17,12 +17,17 @@ Required properties:
+>    use the same interrupt-cells format as GIC.
+>  - reg: Physical base address of the intpol registers and length of memory
+>    mapped region.
+> 
+> +Optional properties:
+> +- mediatek,intpol-number: The number of interrupts supported by intpol,
+> +  default 224 if omitted.
+> +
+>  Example:
+>         sysirq: interrupt-controller at 10200100 {
+>                 compatible = "mediatek,mt6589-sysirq", "mediatek,mt6577-sysirq";
+>                 interrupt-controller;
+>                 #interrupt-cells = >;
+>                 interrupt-parent = <&gic>;
+>                 reg = <0 0x10200100 0 0x1c>;
+> +               mediatek,intpol-number = <224>;
+>         };
+
+The number of interrupt pins directly corresponds to the size of the reg
+property in bits, so I think you can just use that and don't even need
+another property.
+
+	Arnd
