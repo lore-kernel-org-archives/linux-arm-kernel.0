@@ -1,43 +1,55 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Wed, 10 Dec 2014 19:45:04 +0000
-Subject: [RFC/PATCH 1/4] ARM: mvebu: use dt_fixup to provide fallback
- for enable-method
-In-Reply-To: <2128384.mZxE73eTGk@wuerfel>
-References: <1418179187-18486-1-git-send-email-chris.packham@alliedtelesis.co.nz>
- <1418179187-18486-2-git-send-email-chris.packham@alliedtelesis.co.nz>
- <2128384.mZxE73eTGk@wuerfel>
-Message-ID: <5488A2C0.5040804@alliedtelesis.co.nz>
+From: alexanders83@web.de (Alexander Stein)
+Date: Wed, 10 Dec 2014 20:59:37 +0100
+Subject: [PATCH v2] ARM: at91/dt: sam9263: Add ac97 device node
+In-Reply-To: <1418241578-17049-1-git-send-email-alexanders83@web.de>
+References: <1418241578-17049-1-git-send-email-alexanders83@web.de>
+Message-ID: <1418241578-17049-2-git-send-email-alexanders83@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Signed-off-by: Alexander Stein <alexanders83@web.de>
+---
+ arch/arm/boot/dts/at91sam9263.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-On 12/10/2014 10:44 PM, Arnd Bergmann wrote:
-> On Wednesday 10 December 2014 15:39:44 Chris Packham wrote:
->>
->> +static void __init armada_370_xp_dt_fixup(void)
->> +{
->> +       smp_set_ops(smp_ops(armada_xp_smp_ops));
->> +}
->> +
->>
->
-> The dt_fixup callback pointer is meant to fix up a legacy dtb file in
-> memory. I think this would be fairly easy in this case, just add in the
-> missing enable-method property here to make the normal boot path
-> work for old dtbs.
->
-> 	Arnd
->
-
-I briefly explored that approach here[1]. The tricky part would be 
-handling the fact that the enable method can be attached to either the 
-/cpus node or and individual /cpu entry (or is that something I can 
-ignore?).
-
-In the end I thought that the unconditional setting of smp_ops was 
-easier to implement and would achieve the same result.
-
---
-[1] - 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303465.html
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index 26ce9d9..c12b206 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -692,6 +692,16 @@
+ 					};
+ 				};
+ 
++				ac97 {
++					pinctrl_ac97: ac97-0 {
++						atmel,pins =
++							<AT91_PIOB 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB12 periph A AC97FS pin */
++							 AT91_PIOB 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB13 periph A AC97CK pin */
++							 AT91_PIOB 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB14 periph A AC97TX pin */
++							 AT91_PIOB 3 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB14 periph A AC97RX pin */
++					};
++				};
++
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x200>;
+@@ -820,6 +830,17 @@
+ 				status = "disabled";
+ 			};
+ 
++			ac97: sound at fffa0000 {
++				compatible = "atmel,atmel_ac97c";
++				reg = <0xfffa0000 0x4000>;
++				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 5>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_ac97>;
++				clocks = <&ac97_clk>;
++				clock-names = "ac97_clk";
++				status = "disabled";
++			};
++
+ 			macb0: ethernet at fffbc000 {
+ 				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+ 				reg = <0xfffbc000 0x100>;
+-- 
+2.2.0
