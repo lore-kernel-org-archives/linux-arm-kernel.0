@@ -1,45 +1,80 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 10 Dec 2014 16:37:21 +0800
-Subject: [PATCH RFC 08/15] ARM: imx6q: clk: Add the video_27m clock
+Date: Wed, 10 Dec 2014 16:37:25 +0800
+Subject: [PATCH RFC 12/15] ARM: dts: imx6qdl-sabresd: Add support for TRULY
+ TFT480800-16-E MIPI DSI panel
 In-Reply-To: <1418200648-32656-1-git-send-email-Ying.Liu@freescale.com>
 References: <1418200648-32656-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1418200648-32656-9-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1418200648-32656-13-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch supports the video_27m clock which is a fixed factor
-clock of the pll3_pfd1_540m clock.
+The TRULY TFT480800-16-E panel is driven by the Himax HX8369A driver IC.
+The driver IC supports several display/control interface modes, including
+the MIPI DSI video mode and command mode.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx6q.c             | 1 +
- include/dt-bindings/clock/imx6qdl-clock.h | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 41 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 4e79da7..9470df3 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -246,6 +246,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_PLL3_60M]  = imx_clk_fixed_factor("pll3_60m",  "pll3_usb_otg",   1, 8);
- 	clk[IMX6QDL_CLK_TWD]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
- 	clk[IMX6QDL_CLK_GPT_3M]    = imx_clk_fixed_factor("gpt_3m",    "osc",            1, 8);
-+	clk[IMX6QDL_CLK_VIDEO_27M] = imx_clk_fixed_factor("video_27m", "pll3_pfd1_540m", 1, 20);
- 	if (cpu_is_imx6dl()) {
- 		clk[IMX6QDL_CLK_GPU2D_AXI] = imx_clk_fixed_factor("gpu2d_axi", "mmdc_ch0_axi_podf", 1, 1);
- 		clk[IMX6QDL_CLK_GPU3D_AXI] = imx_clk_fixed_factor("gpu3d_axi", "mmdc_ch0_axi_podf", 1, 1);
-diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
-index b690cdb..25625bf 100644
---- a/include/dt-bindings/clock/imx6qdl-clock.h
-+++ b/include/dt-bindings/clock/imx6qdl-clock.h
-@@ -248,6 +248,7 @@
- #define IMX6QDL_PLL6_BYPASS			235
- #define IMX6QDL_PLL7_BYPASS			236
- #define IMX6QDL_CLK_GPT_3M			237
--#define IMX6QDL_CLK_END				238
-+#define IMX6QDL_CLK_VIDEO_27M			238
-+#define IMX6QDL_CLK_END				239
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index baf2f00..483aa5f 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -482,6 +482,13 @@
+ 				MX6QDL_PAD_SD4_DAT7__SD4_DATA7		0x17059
+ 			>;
+ 		};
++
++		pinctrl_mipi_panel: mipipanelgrp {
++			fsl,pins = <
++				MX6QDL_PAD_NANDF_CS0__GPIO6_IO11 0x1b0b0
++				MX6QDL_PAD_NANDF_CS1__GPIO6_IO14 0x1b0b0
++			>;
++		};
+ 	};
  
- #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
+ 	gpio_leds {
+@@ -518,6 +525,40 @@
+ 	};
+ };
+ 
++&mipi_dsi {
++	status = "okay";
++
++	panel at 0 {
++		compatible = "himax,hx8369a-dsi";
++		reg = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_mipi_panel>;
++		reset-gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
++		reset-delay = <120>;
++		bs2-gpios = <&gpio6 14 GPIO_ACTIVE_HIGH>;
++		data-lanes = <2>;
++		panel-width-mm = <45>;
++		panel-height-mm = <76>;
++		bs = <10>;
++		status = "okay";
++
++		display-timings {
++			native-mode = <&timing1>;
++			timing1: truly-tft480800-16-e {
++				clock-frequency = <26400000>;
++				hactive = <480>;
++				vactive = <800>;
++				hfront-porch = <8>;
++				hback-porch = <8>;
++				hsync-len = <8>;
++				vfront-porch = <6>;
++				vback-porch = <6>;
++				vsync-len = <6>;
++			};
++		};
++	};
++};
++
+ &pcie {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie>;
 -- 
 2.1.0
