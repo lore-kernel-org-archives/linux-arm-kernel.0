@@ -1,29 +1,27 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 10 Dec 2014 11:07:32 -0500 (EST)
-Subject: [PATCH v8 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <2331317.LV3gPP3odb@wuerfel>
-References: <5487C357.9030507@huawei.com> <5487EC09.8090907@huawei.com>
- <2331317.LV3gPP3odb@wuerfel>
-Message-ID: <20141210.110732.519666115784722516.davem@davemloft.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 10 Dec 2014 16:07:20 +0000
+Subject: [RFC 04/15] regulator: add restrack support
+In-Reply-To: <1418226513-14105-5-git-send-email-a.hajda@samsung.com>
+References: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
+ <1418226513-14105-5-git-send-email-a.hajda@samsung.com>
+Message-ID: <20141210160720.GS11764@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 10 Dec 2014 10:35:20 +0100
+On Wed, Dec 10, 2014 at 04:48:22PM +0100, Andrzej Hajda wrote:
+> Regulators supports various methods of lookup.
+> The patch adds restrack support only to DT based regulators.
 
-> On Wednesday 10 December 2014 14:45:29 Ding Tianhong wrote:
->> 
->> Miss this code, I think the best way is skb_orphan(skb), just like the cxgb3 drivers, some hardware
->> didn't use the tx inq to free dmad Tx packages.
-> 
-> The problem with skb_orphan is that you are telling the network stack that
-> the packet is now out of its reach and it will no longer be able to take
-> queued packets into account.
+Why, what does this mean and how might one use it?  I've not looked at
+the code since I don't know what it's supposed to accomplish...
 
-skb_orphan() also does not release netfilter resources attached to the
-packet.
-
-Really, all drivers must free TX SKBs in a small, finite, amount of
-time after submission.
-
-There is no way around this.
+One very high level thing is that anything that only works for DT only
+seems to be a non-starter, the API should be hiding details of the
+firmware interface.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141210/2edabc3e/attachment.sig>
