@@ -1,36 +1,42 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Wed, 10 Dec 2014 08:46:57 -0800
-Subject: [PATCH 2/4] PCI: iproc: Add Broadcom iProc PCIe driver
-In-Reply-To: <9707535.Y78sV0TgX4@wuerfel>
-References: <1418169871-19232-3-git-send-email-rjui@broadcom.com>
- <9707535.Y78sV0TgX4@wuerfel>
-Message-ID: <54887901.8070501@broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Dec 2014 08:47:35 -0800
+Subject: [PATCH 0/2] ARM: dts: dra7-evm: Regulator max voltage fixes
+In-Reply-To: <547F0A57.7040806@ti.com>
+References: <1417608237-12258-1-git-send-email-rk@ti.com>
+ <547F0A57.7040806@ti.com>
+Message-ID: <20141210164734.GE30437@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-12-10 03:31 AM, Arnd Bergmann wrote:
-> On Tuesday 09 December 2014 16:04:29 Ray Jui wrote:
->> Add initial version of the Broadcom iProc PCIe driver. This driver
->> has been tested on NSP and Cygnus and is expected to work on all iProc
->> family of SoCs that deploys the same PCIe host controller
->>
->> The driver also supports MSI
->>
->> Signed-off-by: Ray Jui <rjui@broadcom.com>
->> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->
-> The driver looks suspiciously like the one that Hauke already submitted a
-> while ago for bcm53xx. Please come up with a merged driver that works for
-> both.
-Could you please be a little more specific.  What driver did "Hauke 
-already submitted"?  I do not see any driver in the kernel you are 
-talking about.
->
-> Are you sure that iProc isn't based on the BCMA bus infrastructure after
-> all? Even the physical address of your PCI host falls into the address
-> range that is used for the internal BCMA bus on the other chips!
-BCMA seems to be for MIPS architectures.  It seems to be quite specific 
-to those architectures using BCMA.  I see no use of it in bcm53xx code?
->
-> 	Arnd
->
+* Nishanth Menon <nm@ti.com> [141203 05:06]:
+> On 12/03/2014 06:03 AM, Ravikumar Kattekola wrote:
+> > Hi,
+> > 
+> > This set does a minor fix and an update:
+> > 
+> >    - Fix a typo in the max voltage property of smps6 (vdd_gpu) regulator node added by
+> >      the patch : c56a831ca47e ("ARM: dts: DRA7: Add TPS659038 PMIC nodes")
+> > 
+> >    - Update max voltage property of smps7 (vdd_core) regulator node to align with the 
+> >      latest Data Manual
+> > 
+> > Regards,
+> > RK
+> > 
+> > Ravikumar Kattekola (2):
+> >   ARM: dts: dra7-evm: Fix typo in SMPS6 (VDD_GPU) max voltage
+> >   ARM: dts: dra7-evm: Update SMPS7 (VDD_CORE) max voltage to match DM
+> > 
+> >  arch/arm/boot/dts/dra7-evm.dts  |    4 ++--
+> >  arch/arm/boot/dts/dra72-evm.dts |    2 +-
+> >  2 files changed, 3 insertions(+), 3 deletions(-)
+> > 
+> These apply to
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v3.19/dt-v2
+> 
+> Acked-by: Nishanth Menon <nm@ti.com>
+
+Applying both into omap-for-v3.19/fixes thanks.
+
+Tony
