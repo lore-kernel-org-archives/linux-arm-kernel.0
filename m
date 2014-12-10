@@ -1,49 +1,27 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 10 Dec 2014 11:08:01 +0530
-Subject: [GIT PULL] Mailbox changes for 3.19
-Message-ID: <CABb+yY14EGbv4cPUanuZyKZ5=jtkbAsWUX+=auqSrESQ1fFvGw@mail.gmail.com>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Wed, 10 Dec 2014 07:16:25 +0100
+Subject: [PATCH 6/6] pci, acpi: Share ACPI PCI config space accessors.
+In-Reply-To: <CAErSpo6cUuEK41wD33Uyzb5Y5yFp+jKVVvWLrZ0dO1iuYv8GjQ@mail.gmail.com>
+References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+ <3957412.IooRKpIXjW@wuerfel> <20141121180825.GD6578@google.com>
+ <2178540.dTppAIY2rE@wuerfel> <54854FB2.8080206@linaro.org>
+ <CAErSpo6cUuEK41wD33Uyzb5Y5yFp+jKVVvWLrZ0dO1iuYv8GjQ@mail.gmail.com>
+Message-ID: <5487E539.3000500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+W dniu 09.12.2014 o 22:50, Bjorn Helgaas pisze:
+> On Mon, Dec 8, 2014 at 12:13 AM, Tomasz Nowicki
+> <tomasz.nowicki@linaro.org> wrote:
+>
+>> What would be next steps regarding this patch set? I am not sure we have
+>> reached a consensus on weak vs #ifdef choice.
+>
+> I work through the list at
+> https://patchwork.ozlabs.org/project/linux-pci/list/ in FIFO order, so
+> you don't need to do anything else except poke me to move faster :)
 
-The following changes since commit 0df1f2487d2f0d04703f142813d53615d62a1da4:
+Awesome! I guess I am good at poke people so you can count on me :)
 
-  Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
-
-are available in the git repository at:
-
-  http://git.linaro.org/landing-teams/working/fujitsu/integration.git
-mailbox-devel
-
-for you to fetch changes up to 86c22f8c9a3b71d42d38bfcd80372de72f573713:
-
-  Mailbox: Add support for Platform Communication Channel (2014-11-27
-12:51:09 +0530)
-
-----------------------------------------------------------------
-Andrew Bresticker (1):
-      mailbox: Don't unnecessarily re-arm the polling timer
-
-Ashwin Chaugule (1):
-      Mailbox: Add support for Platform Communication Channel
-
-Sudeep Holla (1):
-      mailbox: add tx_prepare client callback
-
-Suman Anna (1):
-      mailbox/omap: adapt to the new mailbox framework
-
- .../devicetree/bindings/mailbox/omap-mailbox.txt   |  23 ++
- drivers/mailbox/Kconfig                            |  12 +
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/mailbox.c                          |  19 +-
- drivers/mailbox/mailbox.h                          |  14 +
- drivers/mailbox/omap-mailbox.c                     | 346 ++++++++++--------
- drivers/mailbox/pcc.c                              | 403 +++++++++++++++++++++
- drivers/remoteproc/omap_remoteproc.c               |  51 +--
- include/linux/mailbox_client.h                     |   3 +
- include/linux/omap-mailbox.h                       |  16 +-
- 10 files changed, 701 insertions(+), 188 deletions(-)
- create mode 100644 drivers/mailbox/mailbox.h
- create mode 100644 drivers/mailbox/pcc.c
+Regards,
+Tomasz
