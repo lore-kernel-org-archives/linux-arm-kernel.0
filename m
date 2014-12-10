@@ -1,50 +1,47 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 9 Dec 2014 18:24:48 -0800
-Subject: [PATCH v2 3/4] ARM: mach-bcm: Enable I2C support for iProc
-In-Reply-To: <5487ADE5.4070705@gmail.com>
-References: <Ray Jui <rjui@broadcom.com>
- <1418177893-22094-1-git-send-email-rjui@broadcom.com>
- <1418177893-22094-4-git-send-email-rjui@broadcom.com>
- <5487ADE5.4070705@gmail.com>
-Message-ID: <5487AEF0.5010404@broadcom.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 10 Dec 2014 11:30:27 +0900
+Subject: [PATCH] ARM: shmobile: lager: Fix QSPI mode of SPI-Flash into mode3
+Message-ID: <1418178627-24424-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
 
+In order to change into mode3, CPOL and CPHA bit of SPCMD register
+of QSPI is changed. Mode3 can avoid intermediate voltage.
 
-On 12/9/2014 6:20 PM, Florian Fainelli wrote:
-> On 09/12/14 18:18, Ray Jui wrote:
->> Enable I2C driver support for Broadcom iProc family of SoCs by
->> selecting I2C_BCM_IPROC
->>
->> Signed-off-by: Ray Jui <rjui@broadcom.com>
->> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->> ---
->>   arch/arm/mach-bcm/Kconfig |    1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
->> index aaeec78..86ee90b 100644
->> --- a/arch/arm/mach-bcm/Kconfig
->> +++ b/arch/arm/mach-bcm/Kconfig
->> @@ -19,6 +19,7 @@ config ARCH_BCM_IPROC
->>   	select ARCH_REQUIRE_GPIOLIB
->>   	select ARM_AMBA
->>   	select PINCTRL
->> +	select I2C_BCM_IPROC
->
-> One way to avoid having to modify mach-bcm/Kconfig would be to have your
-> i2c driver Kconfig do this:
->
-> default ARCH_BCM_IPROC
->
-> would that work?
->
-Yes. So in which case it is better to select a driver from the 
-architecture specific Kconfig?
+Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+[horms: Updated changelog and re-ordered properties]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
->>   	help
->>   	  This enables support for systems based on Broadcom IPROC architected SoCs.
->>   	  The IPROC complex contains one or more ARM CPUs along with common
->>
->
+---
+
+Based on the renesas-devel-20141210-v3.18 tag of my renesas tree
+
+* Changes by Simon Horman as suggested by Geert Uytterhoeven
+- Changed name from
+  "ARM: shmobile: lager: Fix SPI mode of SPI-Flash into mode3" to
+  "ARM: shmobile: lager: Fix QSPI mode of SPI-Flash into mode3"
+- Updated changelog to refer to QSPI instead of MSIOF
+- Grouped spi-* properties
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790-lager.dts | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 59365bc..b33ebcb 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -397,6 +397,8 @@
+ 		spi-max-frequency = <30000000>;
+ 		spi-tx-bus-width = <4>;
+ 		spi-rx-bus-width = <4>;
++		spi-cpha;
++		spi-cpol;
+ 		m25p,fast-read;
+ 
+ 		partition at 0 {
+-- 
+2.1.3
