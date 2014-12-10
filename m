@@ -1,595 +1,180 @@
 From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 10 Dec 2014 16:48:20 +0100
-Subject: [RFC 02/15] drivers/base: add restrack framework
+Date: Wed, 10 Dec 2014 16:48:21 +0100
+Subject: [RFC 03/15] drm/panel: add restrack support
 In-Reply-To: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
 References: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <1418226513-14105-3-git-send-email-a.hajda@samsung.com>
+Message-ID: <1418226513-14105-4-git-send-email-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-restrack framework allows tracking presence of resources with dynamic life
-time. Typical example of such resources are all resources provided by device
-drivers, for example clocks, phys, regulators. Since drivers can be bound and
-unbound dynamically and unconditionally, resources provided by such drivers
-can appear and disappear at any time.
-
-To use restrack in consumer user should call one of *restrack_register
-functions. In the function arguments consumer should provide callback and
-description of resources which should be tracked. Each resource description
-should contain pointer to variable where restrack should store address of
-allocated resource and parameters describing specific resource, for example
-in case of clock it should be clock name and in case of gpio it should be
-gpio name and flags.
-The callback should have two arguments:
-- dev - device for which callback have been registered,
-- ret - return code.
-If callback is called with ret == 0 it means all tracked resources are
-present, allocated and provided resource pointers are set accordingly.
-In case ret == -EPROBE_DEFER it means all resources are present but at least
-one of the resources are to be removed after return form the callback.
-
-Simplified example of framework usage on LCD panel driver.
-
-static int lcd_probe(...)
-{
-	struct restrack *rtrack;
-
-	(...initialization w/o resource allocation ...)
-
-	rtrack = devm_restrack_register(dev, lcd_callback,
-		regulator_bulk_restrack_desc(&ctx->supplies[0]),
-		regulator_bulk_restrack_desc(&ctx->supplies[1]),
-		clk_restrack_desc(&ctx->pll_clk, "pll_clk"),
-		clk_restrack_desc(&ctx->bus_clk, "bus_clk"),
-		phy_restrack_desc(&ctx->phy, "dsim"),
-	);
-
-	return PTR_ERR_OR_NULL(rtrack);
-}
-
-void lcd_callback(struct device *dev, int ret)
-{
-	struct lcd_ctx *ctx = dev_get_drvdata(dev);
-
-	if (ret == 0)
-		drm_panel_add(&ctx->panel);
-	else if (ret == -EPROBE_DEFER)
-		drm_panel_remove(&ctx->panel);
-	else
-		dev_err(dev, "restrack error %d\n", ret);
-}
-
-Please note few things:
-1. drm_panel_add calls restrack_up and drm_panel_remove calls restrack_down.
-   It is OK to call restrack framework from the callback.
-2. In lcd_callback if ret is 0 or -EDEFER_PROBE all resources are valid, ie
-   driver for example can call clk_prepare_enable(ctx->pll_clk).
-3. No mutexes are needed to protect lcd_ctx in lcd_callback call.
-4. All resources are freed by restrack_unregister, which in this case is
-   called by devres framework.
-
-To add restrack support to specific framework following things should be
-defined:
-- structure describing resource with embedded restrack_desc structure,
-- at least one exported allocator of such structure,
-- few simple operations according to description of struct restrack_ops,
-- notifications about adding/removal of the resource.
-For details please look at implementations.
+The patch adds Device Tree restrack support to drm/panel framework.
+As panels supports only Device Tree based lookup all panels can be
+converted to restrack.
 
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 ---
- drivers/base/Makefile    |   2 +-
- drivers/base/restrack.c  | 344 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/restrack.h | 137 +++++++++++++++++++
- 3 files changed, 482 insertions(+), 1 deletion(-)
- create mode 100644 drivers/base/restrack.c
- create mode 100644 include/linux/restrack.h
+ drivers/gpu/drm/drm_panel.c | 97 +++++++++++++++++++++++++++++++++++++++++++++
+ include/drm/drm_panel.h     |  4 ++
+ include/linux/restrack.h    |  2 +
+ 3 files changed, 103 insertions(+)
 
-diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-index 4edff7d..cf9a21e 100644
---- a/drivers/base/Makefile
-+++ b/drivers/base/Makefile
-@@ -4,7 +4,7 @@ obj-y			:= component.o core.o bus.o dd.o syscore.o \
- 			   driver.o class.o platform.o \
- 			   cpu.o firmware.o init.o map.o devres.o \
- 			   attribute_container.o transport_class.o \
--			   topology.o container.o track.o
-+			   topology.o container.o track.o restrack.o
- obj-$(CONFIG_DEVTMPFS)	+= devtmpfs.o
- obj-$(CONFIG_DMA_CMA) += dma-contiguous.o
- obj-y			+= power/
-diff --git a/drivers/base/restrack.c b/drivers/base/restrack.c
-new file mode 100644
-index 0000000..e16d8ed
---- /dev/null
-+++ b/drivers/base/restrack.c
-@@ -0,0 +1,344 @@
-+/*
-+ * Resource tracking framework
-+ *
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd
-+ * Andrzej Hajda <a.hajda@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * restrack framework allows to track presence of resources with dynamic life
-+ * time. Typical example of such resources are all resources provided by device
-+ * drivers, for example clocks, phys, regulators. Since drivers can be bound and
-+ * unbound dynamically and unconditionally, resources provided by such drivers
-+ * can appear and disappear at any time.
-+ *
-+ * To use restrack in consumer user should call one of *restrack_register
-+ * functions. In the function arguments consumer should provide callback and
-+ * description of resources which should be tracked. Each resource description
-+ * should contain pointer to variable where restrack should store address of
-+ * allocated resource and parameters describing specific resource, for example
-+ * in case of clock it should be clock name and in case of gpio it should be
-+ * gpio name and flags.
-+ * The callback should have two arguments:
-+ * - dev - device for which callback have been registered,
-+ * - ret - return code.
-+ * If callback is called with ret == 0 it means all tracked resources are
-+ * present, allocated and provided resource pointers are set accordingly.
-+ * In case ret == -EPROBE_DEFER it means all resources are present but at least
-+ * one of the resources are to be removed after return form the callback.
-+ *
-+ * Simplified example of framework usage on LCD panel driver.
-+ *
-+ * static int lcd_probe(...)
-+ * {
-+ *	struct restrack *rtrack;
-+ *
-+ *	(...initialization w/o resource allocation ...)
-+ *
-+ *	rtrack = devm_restrack_register(dev, lcd_callback,
-+ *		regulator_bulk_restrack_desc(&ctx->supplies[0]),
-+ *		regulator_bulk_restrack_desc(&ctx->supplies[1]),
-+ *		clk_restrack_desc(&ctx->pll_clk, "pll_clk"),
-+ *		clk_restrack_desc(&ctx->bus_clk, "bus_clk"),
-+ *		phy_restrack_desc(&ctx->phy, "dsim"),
-+ *	);
-+ *
-+ *	return PTR_ERR_OR_NULL(rtrack);
-+ * }
-+ *
-+ * void lcd_callback(struct device *dev, int ret)
-+ * {
-+ *	struct lcd_ctx *ctx = dev_get_drvdata(dev);
-+ *
-+ *	if (ret == 0)
-+ *		drm_panel_add(&ctx->panel);
-+ *	else if (ret == -EPROBE_DEFER)
-+ *		drm_panel_remove(&ctx->panel);
-+ *	else
-+ *		dev_err(dev, "restrack error %d\n", ret);
-+ * }
-+ *
-+ * Please note few things:
-+ * 1. drm_panel_add calls restrack_up and drm_panel_remove calls restrack_down.
-+ *    It is OK to call restrack framework from the callback.
-+ * 2. In lcd_callback if ret is 0 or -EDEFER_PROBE all resources are valid, ie
-+ *    driver for example can call clk_prepare_enable(ctx->pll_clk).
-+ * 3. No mutexes are needed to protect lcd_ctx in lcd_callback call.
-+ * 4. All resources are freed by restrack_unregister, which in this case is
-+ *    called by devres framework.
-+ *
-+ * To add restrack support to specific framework following things should be
-+ * defined:
-+ * - structure describing resource with embedded restrack_desc structure,
-+ * - at least one exported allocator of such structure,
-+ * - few simple operations according to description of struct restrack_ops,
-+ * - notifications about adding/removal of the resource.
-+ * For details please look at existing implementations.
-+ *
-+ */
-+#include <linux/device.h>
-+#include <linux/err.h>
+diff --git a/drivers/gpu/drm/drm_panel.c b/drivers/gpu/drm/drm_panel.c
+index 2ef988e..db04696 100644
+--- a/drivers/gpu/drm/drm_panel.c
++++ b/drivers/gpu/drm/drm_panel.c
+@@ -22,7 +22,9 @@
+  */
+ 
+ #include <linux/err.h>
++#include <linux/of_graph.h>
+ #include <linux/module.h>
 +#include <linux/restrack.h>
-+#include <linux/sched.h>
-+#include <linux/slab.h>
-+#include <linux/track.h>
+ 
+ #include <drm/drm_crtc.h>
+ #include <drm/drm_panel.h>
+@@ -41,6 +43,7 @@ int drm_panel_add(struct drm_panel *panel)
+ 	mutex_lock(&panel_lock);
+ 	list_add_tail(&panel->list, &panel_list);
+ 	mutex_unlock(&panel_lock);
++	restrack_up(RESTRACK_TYPE_DRM_PANEL, panel->dev->of_node, panel);
+ 
+ 	return 0;
+ }
+@@ -48,6 +51,7 @@ EXPORT_SYMBOL(drm_panel_add);
+ 
+ void drm_panel_remove(struct drm_panel *panel)
+ {
++	restrack_down(RESTRACK_TYPE_DRM_PANEL, panel->dev->of_node, panel);
+ 	mutex_lock(&panel_lock);
+ 	list_del_init(&panel->list);
+ 	mutex_unlock(&panel_lock);
+@@ -93,6 +97,99 @@ struct drm_panel *of_drm_find_panel(struct device_node *np)
+ 	return NULL;
+ }
+ EXPORT_SYMBOL(of_drm_find_panel);
 +
-+static DEFINE_TRACKER(restrack);
++struct drm_panel_restrack_desc {
++	struct drm_panel **ptr;
++	const char *name;
++	int port;
++	struct restrack_desc desc;
++};
 +
-+struct restrack_ctx {
-+	struct device *dev;
-+	unsigned int count;
-+	unsigned int get_count;
-+	restrack_fn_t callback;
-+	struct restrack_desc *desc[0];
++static int drm_panel_restrack_init(struct device *dev,
++		struct restrack_desc *desc)
++{
++	struct drm_panel_restrack_desc *rd = restrack_desc_to_rd(rd, desc);
++	struct device_node *np;
++
++	if (rd->name) {
++		desc->if_id = of_parse_phandle(dev->of_node, rd->name, 0);
++		goto end;
++	}
++
++	np = NULL;
++	while ((np = of_graph_get_next_endpoint(dev->of_node, np))) {
++		struct of_endpoint ep;
++
++		of_graph_parse_endpoint(np, &ep);
++		if (ep.port != rd->port)
++			continue;
++		desc->if_id = of_graph_get_remote_port_parent(np);
++		of_node_put(np);
++		break;
++	}
++
++end:
++	return desc->if_id ? 0 : -EINVAL;
++}
++
++static void drm_panel_restrack_destroy(struct device *dev,
++		struct restrack_desc *desc)
++{
++	struct drm_panel_restrack_desc *rd = restrack_desc_to_rd(rd, desc);
++
++	of_node_put(desc->if_id);
++	kfree(rd);
++}
++
++static int drm_panel_restrack_ifup(struct device *dev,
++		struct restrack_desc *desc, void *data)
++{
++	struct drm_panel_restrack_desc *rd = restrack_desc_to_rd(rd, desc);
++
++	*rd->ptr = data;
++	return PTR_ERR_OR_ZERO(*rd->ptr);
++}
++
++static void drm_panel_restrack_ifdown(struct device *dev,
++		struct restrack_desc *desc, void *data)
++{
++	struct drm_panel_restrack_desc *rd = restrack_desc_to_rd(rd, desc);
++
++	*rd->ptr = ERR_PTR(-EPROBE_DEFER);
++}
++
++static const struct restrack_ops drm_panel_restrack_ops = {
++	.if_type = RESTRACK_TYPE_DRM_PANEL,
++	.init = drm_panel_restrack_init,
++	.destroy = drm_panel_restrack_destroy,
++	.if_up = drm_panel_restrack_ifup,
++	.if_down = drm_panel_restrack_ifdown,
 +};
 +
 +/**
-+ * restrack_up - notify that resource provider is up
-+ * @type: resource type
-+ * @id: resource id
-+ * @data: @type dependent cookie, usually pointer to resource provider
-+ */
-+int restrack_up(unsigned long type, const void *id, void *data)
-+{
-+	return track_up(&restrack, type, id, data);
-+}
-+
-+/**
-+ * restrack_down - notify that resource provider is down
-+ * @type: resource type
-+ * @id: resource id
-+ * @data: @type dependent cookie, usually pointer to resource provider
-+ */
-+int restrack_down(unsigned long type, const void *id, void *data)
-+{
-+	return track_down(&restrack, type, id, data);
-+}
-+
-+static void restrack_itb_cb(struct track_block *itb, void *data, bool on)
-+{
-+	struct restrack_desc *desc;
-+	struct restrack_ctx *ctx;
-+	int i;
-+
-+	desc = container_of(itb, struct restrack_desc, itb);
-+	ctx = desc->ctx;
-+
-+	for (i = 0; i < ctx->count; ++i) {
-+		struct restrack_desc *d = ctx->desc[i];
-+
-+		if ((d->if_id != desc->if_id) ||
-+		    (d->ops->if_type != desc->ops->if_type))
-+			continue;
-+
-+		pr_debug("%s:%d: if_type=%ld on=%d res=%d/%d\n", __func__,
-+			 __LINE__, d->ops->if_type, on, i, ctx->count);
-+
-+		if (on) {
-+			if (!d->status)
-+				continue;
-+
-+			d->status = d->ops->if_up(ctx->dev, d, data);
-+
-+			if (!d->status)
-+				++ctx->get_count;
-+
-+			if (d->status == -EPROBE_DEFER)
-+				continue;
-+
-+			if (d->status || ctx->get_count == ctx->count)
-+				ctx->callback(ctx->dev, d->status);
-+		} else {
-+			if (!d->status) {
-+				if (ctx->get_count-- == ctx->count)
-+					ctx->callback(ctx->dev, -EPROBE_DEFER);
-+				d->ops->if_down(ctx->dev, d, data);
-+			}
-+			d->status = -EPROBE_DEFER;
-+		}
-+	}
-+}
-+
-+/* check if the same interface is present in previous restrack descriptors */
-+static bool restrack_find_prev_if(struct restrack_ctx *ctx, int n)
-+{
-+	struct restrack_desc *desc = ctx->desc[n];
-+	int i;
-+
-+	for (i = 0; i < n; ++i) {
-+		struct restrack_desc *d = ctx->desc[i];
-+
-+		if (d->if_id == desc->if_id &&
-+		    d->ops->if_type == desc->ops->if_type)
-+			return true;
-+	}
-+
-+	return false;
-+}
-+
-+/**
-+ * restrack_unregister - unregister restrack callback
-+ * @ctx: restrack context, previously allocated by __restrack_register
-+ */
-+
-+void restrack_unregister(struct restrack_ctx *ctx)
-+{
-+	int i;
-+
-+	i = ctx->count;
-+	while (i-- > 0) {
-+		struct restrack_desc *desc = ctx->desc[i];
-+
-+		if (IS_ERR(desc))
-+			continue;
-+
-+		if (restrack_find_prev_if(ctx, i))
-+			continue;
-+
-+		track_unregister(&restrack, &desc->itb, desc->ops->if_type,
-+				 desc->if_id);
-+	}
-+
-+	i = ctx->count;
-+	while (i-- > 0) {
-+		struct restrack_desc *desc = ctx->desc[i];
-+
-+		if (IS_ERR(desc))
-+			continue;
-+
-+		if (desc->ops->destroy)
-+			desc->ops->destroy(ctx->dev, desc);
-+		else
-+			kfree(desc);
-+	}
-+
-+	kfree(ctx);
-+}
-+
-+/**
-+ * __restrack_register - register resource tracker callback
-+ * @dev: consumer device
-+ * @callback: callback which will be called when:
-+ *	- all tracked resources become available, with @ret = 0
-+ *	- one of the resources becomes unavailable, with @ret = -EPROBE_DEFER,
-+ *	- resource allocation errors, with @ret equal to this error
-+ * @count: number of resource descriptors to track
-+ * @descs: list of pointers to resource descriptors to track
++ * drm_panel_restrack_desc - drm_panel resource descriptor allocator
++ * @panel: pointer to variable which will be set to drm_panel handle
++ * @prop_name: property name containing phandle to the panel node, it can be
++ *	       NULL if driver uses only of_graph
++ * @port: of_graph port number in case of_graph is used
 + *
-+ * It can be called as follows:
-+ *	struct restrack_desc *descriptors[] = {
-+ *		regulator_bulk_restrack_desc(&ctx->supplies[0]),
-+ *		regulator_bulk_restrack_desc(&ctx->supplies[1]),
-+ *		clk_restrack_desc(&ctx->pll_clk, "pll_clk"),
-+ *		clk_restrack_desc(&ctx->bus_clk, "bus_clk"),
-+ *		phy_restrack_desc(&ctx->phy, "dsim"),
-+ *	};
-+ *	rtrack = __restrack_register(dev, callback,
-+ *			ARRAY_SIZE(descriptors), descriptors);
++ * The function creates resource description for panel, which shall be used by
++ * *restrack_register functions.
 + */
-+struct restrack_ctx *__restrack_register(struct device *dev, restrack_fn_t cb,
-+		int count, struct restrack_desc **descriptors)
++struct restrack_desc *drm_panel_restrack_desc(struct drm_panel **panel,
++		const char *prop_name, int port)
 +{
-+	struct restrack_ctx *ctx;
-+	int ret, i;
++	struct drm_panel_restrack_desc *rd;
 +
-+	ctx = kzalloc(sizeof(*ctx) + count * sizeof(ctx->desc[0]),
-+			 GFP_KERNEL);
-+	if (!ctx)
++	RESTRACK_DESC_ALLOC(rd, drm_panel_restrack_ops, panel, prop_name);
++	if (!rd)
 +		return ERR_PTR(-ENOMEM);
 +
-+	ctx->dev = dev;
-+	ctx->count = count;
-+	ctx->callback = cb;
-+	memcpy(ctx->desc, descriptors, count * sizeof(*descriptors));
-+
-+	for (i = 0; i < count; ++i) {
-+		struct restrack_desc *desc = descriptors[i];
-+
-+		if (IS_ERR(desc)) {
-+			ret = PTR_ERR(desc);
-+			goto err_free;
-+		}
-+		INIT_LIST_HEAD(&desc->itb.list);
-+		desc->itb.callback = restrack_itb_cb;
-+		desc->ctx = ctx;
-+		desc->status = -EPROBE_DEFER;
-+		ret = desc->ops->init(dev, desc);
-+		if (ret)
-+			goto err_free;
-+	}
-+
-+	/* Callbacks should be registered after all fields are initialized,
-+	 * otherwise callback could access partially initialized data. */
-+	for (i = 0; i < count; ++i) {
-+		struct restrack_desc *desc = descriptors[i];
-+		const struct restrack_ops *ops = desc->ops;
-+
-+		/* do not track the same interface twice */
-+		if (restrack_find_prev_if(ctx, i))
-+			continue;
-+
-+		ret = track_register(&restrack, &desc->itb, ops->if_type,
-+				     desc->if_id);
-+		if (ret)
-+			goto err_free;
-+	}
-+
-+	return ctx;
-+
-+err_free:
-+	restrack_unregister(ctx);
-+
-+	return ERR_PTR(ret);
++	rd->port = port;
++	return &rd->desc;
 +}
++EXPORT_SYMBOL_GPL(drm_panel_restrack_desc);
 +
-+static void devm_restrack_release(struct device *dev, void *res)
-+{
-+	struct restrack_ctx **ptr = res;
+ #endif
+ 
+ MODULE_AUTHOR("Thierry Reding <treding@nvidia.com>");
+diff --git a/include/drm/drm_panel.h b/include/drm/drm_panel.h
+index 1fbcc96..46eb88e 100644
+--- a/include/drm/drm_panel.h
++++ b/include/drm/drm_panel.h
+@@ -130,6 +130,10 @@ int drm_panel_detach(struct drm_panel *panel);
+ 
+ #ifdef CONFIG_OF
+ struct drm_panel *of_drm_find_panel(struct device_node *np);
 +
-+	if (!IS_ERR(*ptr))
-+		restrack_unregister(*ptr);
-+}
-+
-+/**
-+ * __devm_restrack_register - devm version of __restrack_register
-+ * @dev: consumer device
-+ * @callback: callback which will be called when:
-+ *	- all tracked resources become available, with @ret = 0
-+ *	- one of the resources becomes unavailable, with @ret = -EPROBE_DEFER,
-+ *	- resource allocation errors, with @ret equal to this error
-+ * @count: number of resource descriptors to track
-+ * @descs: list of pointers to resource descriptors to track
-+ *
-+ * It can be called as follows:
-+ *	struct restrack_desc *descriptors[] = {
-+ *		regulator_bulk_restrack_desc(&ctx->supplies[0]),
-+ *		regulator_bulk_restrack_desc(&ctx->supplies[1]),
-+ *		clk_restrack_desc(&ctx->pll_clk, "pll_clk"),
-+ *		clk_restrack_desc(&ctx->bus_clk, "bus_clk"),
-+ *		phy_restrack_desc(&ctx->phy, "dsim"),
-+ *	};
-+ *	rtrack = __devm_restrack_register(dev, callback,
-+ *			ARRAY_SIZE(descriptors), descriptors);
-+ */
-+struct restrack_ctx *__devm_restrack_register(struct device *dev,
-+		restrack_fn_t cb, int count, struct restrack_desc **descs)
-+{
-+	struct restrack_ctx **ptr;
-+
-+	ptr = devres_alloc(devm_restrack_release, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	/* It should be added before __restrack_register to keep correct order
-+	 * of resources - restrack callback can also use devres framework.
-+	 */
-+	devres_add(dev, ptr);
-+
-+	*ptr = __restrack_register(dev, cb, count, descs);
-+
-+	return *ptr;
-+}
-+EXPORT_SYMBOL_GPL(__devm_restrack_register);
-diff --git a/include/linux/restrack.h b/include/linux/restrack.h
-new file mode 100644
-index 0000000..6cf8144f
---- /dev/null
-+++ b/include/linux/restrack.h
-@@ -0,0 +1,137 @@
-+#ifndef RESTRACK_H
-+#define RESTRACK_H
-+
-+#include <linux/track.h>
-+
-+struct device;
-+struct restrack_ctx;
 +struct restrack_desc;
++struct restrack_desc *drm_panel_restrack_desc(struct drm_panel **panel,
++		const char *prop_name, int port);
+ #else
+ static inline struct drm_panel *of_drm_find_panel(struct device_node *np)
+ {
+diff --git a/include/linux/restrack.h b/include/linux/restrack.h
+index 6cf8144f..af5b617 100644
+--- a/include/linux/restrack.h
++++ b/include/linux/restrack.h
+@@ -3,6 +3,8 @@
+ 
+ #include <linux/track.h>
+ 
++#define RESTRACK_TYPE_DRM_PANEL 1
 +
-+int restrack_up(unsigned long type, const void *id, void *data);
-+int restrack_down(unsigned long type, const void *id, void *data);
-+
-+/**
-+ * struct restrack_ops - Resource tracker operations for specific resource
-+ * @if_type: interface type of provider associated with given resource,
-+ *	multiple restrack_ops per if_type are allowed
-+ * @init: called by restrack_register to initialize device depended fields
-+ *	of the resource descriptor
-+ * @destroy: destroy resource descriptor
-+ * @if_up: called when provider of given resource becomes available, usually
-+ *	it should allocate the resource and fill the variable which was
-+ *	provided by restrack_register.
-+ * @if_down: called before provider of given resource becomes unavailable. It
-+ *	should release the resource and set associated variable to
-+ *	-EPROBE_DEFER.
-+ *
-+ * struct restrack_ops provides set of operations to handle resource specific
-+ * operations. It translates resource names specific to consumer device to
-+ * track interface id exposed by providers and translates back track
-+ * notifications to callback convenient for device driver.
-+ * @desc parameter provided in all callbacks is a pointer to common
-+ * restrack_desc structure embedded in bigger structure which is usually
-+ * allocated by resource specific allocator function.
-+ * Callbacks should return 0 on success or error code.
-+ */
-+struct restrack_ops {
-+	unsigned long if_type;
-+	int (*init)(struct device *dev, struct restrack_desc *desc);
-+	void (*destroy)(struct device *dev, struct restrack_desc *desc);
-+	int (*if_up)(struct device *dev, struct restrack_desc *desc,
-+		     void *data);
-+	void (*if_down)(struct device *dev, struct restrack_desc *desc,
-+			void *data);
-+};
-+
-+#define restrack_desc_to_rd(_rd, _var) container_of(_var, typeof(*rd), desc)
-+
-+#define RESTRACK_DESC_ALLOC(_rd, _ops, _ptr, _name) \
-+({ \
-+	_rd = kzalloc(sizeof(*_rd), GFP_KERNEL); \
-+	if (_rd) { \
-+		*_ptr = ERR_PTR(-EPROBE_DEFER); \
-+		_rd->ptr = _ptr; \
-+		_rd->name = _name; \
-+		_rd->desc.ops = &_ops; \
-+	} \
-+})
-+
-+/**
-+ * struct restrack_desc - resource descriptor
-+ * @ops: operations associated with the resource, filled by resource descriptor
-+ *	 allocator
-+ * @if_id: interface id associated with the resource, filled by @init operation
-+ * @itb: iftrack block used by restrack core
-+ * @ctx: restrack context used by restrack core
-+ * @status: status of the descriptor, used by restrack core
-+ */
-+struct restrack_desc {
-+	const struct restrack_ops *ops;
-+	void *if_id;
-+	struct track_block itb;
-+	struct restrack_ctx *ctx;
-+	int status;
-+};
-+
-+typedef void (*restrack_fn_t)(struct device *dev, int ret);
-+
-+void restrack_unregister(struct restrack_ctx *ctx);
-+struct restrack_ctx *__restrack_register(struct device *dev, restrack_fn_t cb,
-+		int count, struct restrack_desc **descriptors);
-+struct restrack_ctx *__devm_restrack_register(struct device *dev,
-+		restrack_fn_t cb, int count,
-+		struct restrack_desc **descriptors);
-+
-+/**
-+ * restrack_register - register resource tracking callback
-+ * @dev: consumer device
-+ * @callback: callback which will be called when:
-+ *	- all tracked resources become available, with @ret = 0
-+ *	- one of the resources becomes unavailable, with @ret = -EPROBE_DEFER,
-+ *	- resource allocation errors, with @ret equal to this error
-+ * @descs: list of pointers to resource descriptors to track
-+ *
-+ * restrack_register is a wrapper macro around @__restrack_register. It can be
-+ * called as follows:
-+ *	ctx->rtrack = restrack_register(dev, callback,
-+ *		regulator_bulk_restrack_desc(&ctx->supplies[0]),
-+ *		regulator_bulk_restrack_desc(&ctx->supplies[1]),
-+ *		clk_restrack_desc(&ctx->pll_clk, "pll_clk"),
-+ *		clk_restrack_desc(&ctx->bus_clk, "bus_clk"),
-+ *		phy_restrack_desc(&ctx->phy, "dsim"),
-+ *	);
-+ */
-+#define restrack_register(dev, callback, descs...) \
-+({ \
-+	struct restrack_desc *desc[] = { descs }; \
-+\
-+	__restrack_register(dev, callback, ARRAY_SIZE(desc), desc); \
-+})
-+
-+/**
-+ * devm_restrack_register - devm version of restrack_register
-+ * @dev: consumer device
-+ * @callback: callback which will be called when:
-+ *	- all tracked resources become available, with @ret = 0
-+ *	- one of the resources becomes unavailable, with @ret = -EPROBE_DEFER,
-+ *	- resource allocation errors, with @ret equal to this error
-+ * @descs: list of pointers to resource descriptors to track
-+ *
-+ * restrack_register is a wrapper macro around @__restrack_register. It can be
-+ * called as follows:
-+ *	rtrack = devm_restrack_register(dev, callback,
-+ *		regulator_bulk_restrack_desc(&ctx->supplies[0]),
-+ *		regulator_bulk_restrack_desc(&ctx->supplies[1]),
-+ *		clk_restrack_desc(&ctx->pll_clk, "pll_clk"),
-+ *		clk_restrack_desc(&ctx->bus_clk, "bus_clk"),
-+ *		phy_restrack_desc(&ctx->phy, "dsim"),
-+ *	);
-+ */
-+#define devm_restrack_register(dev, callback, descs...) \
-+({ \
-+	struct restrack_desc *desc[] = { descs }; \
-+\
-+	__devm_restrack_register(dev, callback, ARRAY_SIZE(desc), desc); \
-+})
-+
-+#endif /* RESTRACK_H */
+ struct device;
+ struct restrack_ctx;
+ struct restrack_desc;
 -- 
 1.9.1
