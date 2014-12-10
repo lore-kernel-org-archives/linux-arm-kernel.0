@@ -1,141 +1,89 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 10 Dec 2014 16:19:06 +0530
-Subject: [RFC/PATCH 4/7] arm: omap: device: add support for generating
- sysconfig data from DT
-In-Reply-To: <1418164072-19087-5-git-send-email-balbi@ti.com>
-References: <1418164072-19087-1-git-send-email-balbi@ti.com>
- <1418164072-19087-5-git-send-email-balbi@ti.com>
-Message-ID: <54882522.20002@ti.com>
+From: lyz@rock-chips.com (Yunzhi Li)
+Date: Wed, 10 Dec 2014 18:46:10 +0800
+Subject: [PATCH v5 4/5] ARM: dts: rockchip: add rk3288 usb PHY
+In-Reply-To: <1418208371-18851-1-git-send-email-lyz@rock-chips.com>
+References: <1418208371-18851-1-git-send-email-lyz@rock-chips.com>
+Message-ID: <1418208371-18851-5-git-send-email-lyz@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
-On Wednesday 10 December 2014 03:57 AM, Felipe Balbi wrote:
-> After moving sysconfig data to DT, we need to make
-> sure we can generate the same data we have today in C
-> files out of the DT provided properties.
-> 
-> This patch adds support for all optional properties
-> documented by a previous commit.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_device.c | 115 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 115 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> index abd622b..ea729aa 100644
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -25,6 +25,7 @@
->   */
->  #undef DEBUG
+This patch adds a device_node for RK3288 SoC usb phy. It also
+defines the phy to be used by three usb controllers: usb_host0/1
+and usb_otg.
 
-[...snip..]
+Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
 
-> +
-> +static int omap_hwmod_init_sysc(struct device *dev,
-> +		struct omap_hwmod *oh, int index)
-> +{
-> +	struct device_node *node = dev->of_node;
-> +	struct omap_hwmod_class *class = oh->class;
-> +	struct omap_hwmod_class_sysconfig *sysc;
-> +	int ret;
-> +	int i;
-> +	char name[128];
-> +	const char *tmp = oh->name;
-> +	u32 prop;
-> +
-> +	/* if data isn't provided by DT, skip */
-> +	if ((class && class->sysc) || !omap_hwmod_has_sysc_bindings(dev))
-> +		return 0;
-> +
-> +	class = kzalloc(sizeof(*class), GFP_KERNEL);
-> +	if (!class)
-> +		return -ENOMEM;
-> +
-> +	i = 0;
-> +	while (*tmp) {
-> +		if (isalpha(*tmp))
-> +			name[i++] = *tmp;
-> +		tmp++;
-> +	}
-> +	name[i] = '\0';
-> +
-> +	class->name = kzalloc(sizeof(name), GFP_KERNEL);
-> +	if (!class->name)
-> +		return -ENOMEM;
-> +	strncpy(class->name, name, sizeof(name) - 1);
-> +
-> +	sysc = kzalloc(sizeof(*sysc), GFP_KERNEL);
-> +	if (!sysc)
-> +		return -ENOMEM;
-> +
-> +	ret = of_property_read_u32_index(node, "ti,rev_offs", index, &prop);
-> +	if (!ret)
-> +		sysc->rev_offs = prop;
-> +
-> +	ret = of_property_read_u32_index(node, "ti,sysc_offs", index, &prop);
-> +	if (!ret)
-> +		sysc->sysc_offs = prop;
-> +
-> +	ret = of_property_read_u32_index(node, "ti,syss_offs", index, &prop);
-> +	if (!ret)
-> +		sysc->syss_offs = prop;
-> +
-> +	ret = of_property_read_u32_index(node, "ti,sysc_flags", index, &prop);
-> +	if (!ret)
-> +		sysc->sysc_flags = prop & 0xffff;
-> +
-> +	ret = of_property_read_u32_index(node, "ti,srst_udelay", index, &prop);
-> +	if (!ret)
-> +		sysc->srst_udelay = prop & 0xff;
-> +
-> +	ret = of_property_read_u32_index(node, "ti,idlemodes", index, &prop);
-> +	if (!ret)
-> +		sysc->idlemodes = prop & 0xff;
-> +
-> +	ret = of_property_read_u32_index(node, "ti,clockact", index, &prop);
-> +	if (!ret)
-> +		sysc->clockact = prop & 0xff;
-> +
-> +	ret = of_property_read_u32_index(node, "ti,sysc_type", index, &prop);
-> +	if (ret)
-> +		prop = 1;
-> +
-> +	switch (prop) {
-> +	case 2:
-> +		sysc->sysc_fields = &omap_hwmod_sysc_type2;
-> +		break;
-> +	case 3:
-> +		sysc->sysc_fields = &omap_hwmod_sysc_type3;
-> +		break;
-> +	case 1:
-> +	default:
-> +		sysc->sysc_fields = &omap_hwmod_sysc_type1;
-> +	}
-Missed hooking the class to oh?
-	class->sysc = sysc;
-	oh->class = class;
+---
 
-Thanks and regards,
-Lokesh
-> +
-> +	return 0;
-> +}
->  
->  /**
->   * omap_device_build_from_dt - build an omap_device with multiple hwmods
-> @@ -154,6 +264,11 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
->  			goto odbfd_exit1;
->  		}
->  		hwmods[i] = oh;
-> +
-> +		ret = omap_hwmod_init_sysc(&pdev->dev, oh, i);
-> +		if (ret)
-> +			goto odbfd_exit1;
-> +
->  		if (oh->flags & HWMOD_INIT_NO_IDLE)
->  			device_active = true;
->  
-> 
+Changes in v5:
+- reorder the phy dt node to a correct position.
+
+Changes in v4:
+- Add phy subnodes.
+
+Changes in v3: None
+
+ arch/arm/boot/dts/rk3288.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 874e66d..bd2a1e0 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -335,6 +335,8 @@
+ 		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cru HCLK_USBHOST0>;
+ 		clock-names = "usbhost";
++		phys = <&usbphy 1>;
++		phy-names = "usb";
+ 		status = "disabled";
+ 	};
+ 
+@@ -347,6 +349,8 @@
+ 		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cru HCLK_USBHOST1>;
+ 		clock-names = "otg";
++		phys = <&usbphy 2>;
++		phy-names = "usb2-phy";
+ 		status = "disabled";
+ 	};
+ 
+@@ -357,6 +361,8 @@
+ 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cru HCLK_OTG0>;
+ 		clock-names = "otg";
++		phys = <&usbphy 0>;
++		phy-names = "usb2-phy";
+ 		status = "disabled";
+ 	};
+ 
+@@ -497,6 +503,27 @@
+ 		interrupts = <GIC_PPI 9 0xf04>;
+ 	};
+ 
++	usbphy: phy {
++		compatible = "rockchip,rk3288-usb-phy";
++		rockchip,grf = <&grf>;
++		#phy-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++
++		usb-phy at 0 {
++			reg = <0>;
++		};
++
++		usb-phy at 1 {
++			reg = <1>;
++		};
++
++		usb-phy at 2 {
++			reg = <2>;
++		};
++	};
++
+ 	pinctrl: pinctrl {
+ 		compatible = "rockchip,rk3288-pinctrl";
+ 		rockchip,grf = <&grf>;
+-- 
+2.0.0
