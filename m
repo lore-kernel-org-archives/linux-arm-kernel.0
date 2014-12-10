@@ -1,67 +1,49 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 10 Dec 2014 12:04:38 +0100
-Subject: [PATCH] clocksource: arch_timer: Only use the virtual counter
- (CNTVCT) on arm64
-In-Reply-To: <1418209329-28615-1-git-send-email-catalin.marinas@arm.com>
-References: <1418209329-28615-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <548828C6.6030500@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 10 Dec 2014 12:06:11 +0100
+Subject: [PATCH] ARM: config: sama5: Remove DEBUG_LL
+In-Reply-To: <1418208781-10903-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1418208781-10903-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54882923.1080108@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2014 12:02 PM, Catalin Marinas wrote:
-> Commit 0b46b8a718c6 (clocksource: arch_timer: Fix code to use physical
-> timers when requested) introduces the use of physical counters in the
-> ARM architected timer driver. However, he arm64 kernel uses CNTVCT in
-> VDSO. When booting in EL2, the kernel switches to the physical timers to
-> make things easier for KVM but it continues to use the virtual counter
-> both in user and kernel. While in such scenario CNTVCT == CNTPCT (since
-> CNTVOFF is initialised by the kernel to 0), we want to spot firmware
-> bugs corrupting CNTVOFF early (which would affect CNTVCT).
->
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Tested-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Le 10/12/2014 11:53, Maxime Ripard a ?crit :
+> The sama5_defconfig can be used both on the sama5d3 and the sama5d4.
+> 
+> Enabling DEBUG_LL is an issue though, since it will by default use the kernel
+> addresses for the sama5d3 DBGU UART, that is located at a different address on
+> the sama5d4.
+> 
+> Remove this from the defconfig.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Indeed: queued in at91-3.19-fixes with this title: "ARM: at91/config:
+sama5: Remove DEBUG_LL"
+
+Bye,
+
 > ---
->
-> Daniel,
->
-> Do you plan to take this patch and push into mainline (ideally before -rc1)?
-> Otherwise we can push it via the arm64 tree.
-
-I will take care of it.
-
-Thanks !
-
-   -- Daniel
-
->
-> Thanks,
->
-> Catalin
->
->
->   drivers/clocksource/arm_arch_timer.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 6a79fc4f900c..095c1774592c 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -462,7 +462,7 @@ static void __init arch_counter_register(unsigned type)
->
->   	/* Register the CP15 based counter if we have one */
->   	if (type & ARCH_CP15_TIMER) {
-> -		if (arch_timer_use_virtual)
-> +		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_use_virtual)
->   			arch_timer_read_counter = arch_counter_get_cntvct;
->   		else
->   			arch_timer_read_counter = arch_counter_get_cntpct;
->
+>  arch/arm/configs/sama5_defconfig | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+> index c9089c927daf..7cdb5b875d4d 100644
+> --- a/arch/arm/configs/sama5_defconfig
+> +++ b/arch/arm/configs/sama5_defconfig
+> @@ -199,8 +199,6 @@ CONFIG_DEBUG_MEMORY_INIT=y
+>  # CONFIG_SCHED_DEBUG is not set
+>  # CONFIG_FTRACE is not set
+>  CONFIG_DEBUG_USER=y
+> -CONFIG_DEBUG_LL=y
+> -CONFIG_EARLY_PRINTK=y
+>  # CONFIG_CRYPTO_ANSI_CPRNG is not set
+>  CONFIG_CRYPTO_USER_API_HASH=m
+>  CONFIG_CRYPTO_USER_API_SKCIPHER=m
+> 
 
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Nicolas Ferre
