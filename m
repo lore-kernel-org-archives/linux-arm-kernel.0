@@ -1,33 +1,47 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 10 Dec 2014 17:19:26 +0800
-Subject: [PATCH v5] clocksource: arch_timer: Fix code to use physical
- timers when requested
-In-Reply-To: <20141209165807.GJ31129@e104818-lin.cambridge.arm.com>
-References: <1416812564-26465-1-git-send-email-sonnyrao@chromium.org>
- <1417776064.14380.17.camel@mtksdaap41>
- <20141208162140.GN16185@e104818-lin.cambridge.arm.com>
- <1418106718.32622.31.camel@mtksdaap41>
- <20141209165807.GJ31129@e104818-lin.cambridge.arm.com>
-Message-ID: <1418203166.21309.3.camel@mtksdaap41>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 10 Dec 2014 10:24:35 +0100
+Subject: [PATCH 1/2] ARM: at91/dt: sama5d3: move wm8904 codec to i2c1
+In-Reply-To: <1418122486-23184-1-git-send-email-josh.wu@atmel.com>
+References: <1418122486-23184-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <54881153.3050400@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-12-09 at 16:58 +0000, Catalin Marinas wrote:
-<...>
-> You mix timer and counter terms here. Anyway, of we use physical timer,
-> you could argue that it makes sense to use the corresponding physical
-> counter (CNTPCT). However, on arm64 we only expose CNTVCT to user VDSO
-> and we want to use the same in the kernel. When booting at EL2, CNTVCT
-> == CNTPCT because we control CNTVOFF, that's unless we have some broken
-> firmware that does not restore CNTVOFF correctly. That's what we want
-> to spot early, hence the aim to always use the virtual counter (but not
-> the timer, use use the physical timer as it makes it easier for KVM).
+Le 09/12/2014 11:54, Josh Wu a ?crit :
+> Since from rev.D MB, the wm8904 is moved to i2c1.
+> This patch will adapt to this change.
+
+I'd like a more generic way of dealing with board revisions. So, let's
+keep it like it is for now.
+
+Bye,
+
+
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+>  arch/arm/boot/dts/sama5d3xmb.dtsi | 7 +------
+>  1 file changed, 1 insertion(+), 6 deletions(-)
 > 
-> So the patch below, on top of linux-next, should solve the BUG():
+> diff --git a/arch/arm/boot/dts/sama5d3xmb.dtsi b/arch/arm/boot/dts/sama5d3xmb.dtsi
+> index 49c10d3..74bc633 100644
+> --- a/arch/arm/boot/dts/sama5d3xmb.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3xmb.dtsi
+> @@ -38,12 +38,7 @@
+>  				atmel,clk-from-rk-pin;
+>  			};
+>  
+> -			/*
+> -			 * i2c0 conflicts with ISI:
+> -			 * disable it to allow the use of ISI
+> -			 * can not enable audio when i2c0 disabled
+> -			 */
+> -			i2c0: i2c at f0014000 {
+> +			i2c1: i2c at f0018000 {
+>  				wm8904: wm8904 at 1a {
+>  					compatible = "wm8904";
+>  					reg = <0x1a>;
+> 
 
-Thanks for detail explanation and the patch. I tested it on my platform
-and it did solve the issue. So,
 
-Tested-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-
-Joe.C
+-- 
+Nicolas Ferre
