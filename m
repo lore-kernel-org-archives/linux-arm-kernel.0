@@ -1,59 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Dec 2014 00:16:32 +0000
-Subject: ARM page tables
-In-Reply-To: <54877ECA.6050501@free.fr>
-References: <54872F9C.2080005@free.fr>
- <20141209172729.GK11285@n2100.arm.linux.org.uk>
- <54877ECA.6050501@free.fr>
-Message-ID: <20141210001632.GL11285@n2100.arm.linux.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 10 Dec 2014 09:18:26 +0900
+Subject: [PATCH] clk: shmobile: Add r8a7793 support
+In-Reply-To: <CAH1o70+_STscpCiAxh3=26fyNkU-S4W9RiftJktA+EO9anZWvw@mail.gmail.com>
+References: <1418035363-3678-1-git-send-email-ykaneko0929@gmail.com>
+ <CAMuHMdVDA4PwUZ8A0WPumEN9nYrQyX+UNYp7Dt=0TxO9nCuZrg@mail.gmail.com>
+ <CAH1o70JgXPfRVQ+EyeQVA6Sa9irDb3hVBn7vAbDDuu7k=Z7x3w@mail.gmail.com>
+ <CAMuHMdVdFii0rxO8NrdcWiCO0HWQYrv-y3W0Dh6zt_31tTG81g@mail.gmail.com>
+ <20141209002338.GB8897@verge.net.au>
+ <CAH1o70+_STscpCiAxh3=26fyNkU-S4W9RiftJktA+EO9anZWvw@mail.gmail.com>
+Message-ID: <20141210001823.GA9690@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 09, 2014 at 11:59:22PM +0100, Mason wrote:
-> On 09/12/2014 18:27, Russell King - ARM Linux wrote:
-> > On Tue, Dec 09, 2014 at 06:21:32PM +0100, Mason wrote:
-> >>  {
-> >>   .virtual = (0xf0000000 +(0)),
-> >>   .pfn =((unsigned long)((0) >> 12)),
-> >>   .length = 0x00800000,
-> >>   .type = 0,
-> >>  },
-> What's the name of the symbolic constant for that address?
-
-swapper_pg_dir
-
-> >> 300 00011452 SECTION
-> >> 301 00111452 SECTION
-> >> 302 00211452 SECTION
-> >> 303 00311452 SECTION
-> >> 304 00411452 SECTION
-> >> 305 00511452 SECTION
-> >> 306 00611452 SECTION
-> >> 307 00711452 SECTION
-> >> 308 20011452 SECTION
-> >> 309 20111452 SECTION
-...
-> I am investigating this issue:
+On Tue, Dec 09, 2014 at 09:26:09PM +0900, Yoshihiro Kaneko wrote:
+> Hi Simon-san,
 > 
-> As I described, we map PA 0-8MB. But some code actually accesses
-> address 0xf0920000 (from kernel space) and I was expecting very
-> nasty things, like the equivalent of SIGSEGV in the kernel.
-> But nothing happens, no page fault, no BUG_ON, no panic, no
-> implosion... (Writes seem ignored, and reads always return 0)
+> 2014-12-09 9:23 GMT+09:00 Simon Horman <horms@verge.net.au>:
+> > On Mon, Dec 08, 2014 at 02:30:14PM +0100, Geert Uytterhoeven wrote:
+> >> Hi Kaneko-san,
+> >>
+> >> On Mon, Dec 8, 2014 at 12:53 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> >> > 2014-12-08 20:13 GMT+09:00 Geert Uytterhoeven <geert@linux-m68k.org>:
+> >> >> On Mon, Dec 8, 2014 at 11:42 AM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> >> >>> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> >> >>>
+> >> >>> R-Car M2N (r8a7793) clock is handled in R-Car Gen2 clock driver.
+> >> >>
+> >> >> Thanks for your patch!
+> >> >>
+> >> >>> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> >> >>> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> >> >>
+> >> >> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> >>
+> >> >> Can you please also send a patch to update the binding documentation in
+> >> >> Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt?
+> >> >
+> >> > This patch updates Makefile only, not added dtsi for r8a7793.
+> >> > Is the update of the document necessary?
+> >>
+> >> Not at this moment. I was just trying to be proactive ;-)
+> >
+> > Kaneko-san,
+> >
+> > I think that the update to renesas,rcar-gen2-cpg-clocks.txt should be a
+> > one line change. I can prepare a patch if you prefer not to.
+> 
+> Yes, I know that the update is very small.
+> But "renesas,r8a7793-cpg-clocks" which will be added to the documentation
+> was not found anywhere in the source tree. For example,
+> "renesas,r8a7794-cpg-clocks"
+> is found in arch/arm/boot/dts/r8a7794.dtsi.
+> Is r8a7793.dtsi not necessary to update the document?
 
-As we can see above, you asked for 0x00200000 bytes to be mapped from
-0xf0800000.  So, 0xf0800000 to 0xf09fffff will be mapped.  The address
-which you are accessing falls within this range.
-
-So, there's a valid mapping.  Assuming nothing on the bus raises an
-external abort, accesses to this address will succeed.
-
-> I don't understand how it is possible to access unmapped virtual
-> addresses without the MMU throwing a fit... That's why I'm looking
-> at the page table.
-
-You _have_ asked for that address to be mapped.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+In theory (though not always in practice) bindings should
+be documented before they are used. So unless I misunderstand things,
+yes, I think renesas,rcar-gen2-cpg-clocks.txt should be updated
+even though arch/arm/boot/dts/r8a7794.dtsi is (not yet) updated.
