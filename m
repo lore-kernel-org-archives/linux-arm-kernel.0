@@ -1,109 +1,65 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 10 Dec 2014 11:51:51 +0800
-Subject: [PATCH v8 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <2619239.NTtdNaZCJM@wuerfel>
-References: <1397869980-21187-1-git-send-email-zhangfei.gao@linaro.org>
- <5483C977.2060308@huawei.com> <54842298.2010007@suse.de>
- <2619239.NTtdNaZCJM@wuerfel>
-Message-ID: <5487C357.9030507@huawei.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 9 Dec 2014 19:57:10 -0800
+Subject: [PATCH v3 1/3] i2c: iProc: define Broadcom iProc I2C binding
+In-Reply-To: <1418183832-24793-1-git-send-email-rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+ <1418183832-24793-1-git-send-email-rjui@broadcom.com>
+Message-ID: <1418183832-24793-2-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/12/8 4:09, Arnd Bergmann wrote:
-> On Sunday 07 December 2014 10:49:12 Alexander Graf wrote:
->> On 07.12.14 04:28, Ding Tianhong wrote:
->>> On 2014/12/7 8:42, Alexander Graf wrote:
->>>> On 19.04.14 03:13, Zhangfei Gao wrote:
->>>>> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
->>>>> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
->>>>>
->>>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->>>>
->>>> Is this driver still supposed to go upstream? I presume this was the
->>>> last submission and it's been quite some time ago 
->>>>
->>>
->>> yes, it is really a long time, but The hip04 did not support tx irq, 
->>> we couldn't get any better idea to fix this defect, do you have any suggestion?
->>
->> Well, if hardware doesn't have a TX irq I don't see there's anything we
->> can do to fix that ;).
-> 
-> I don't know if it's related to the ethernet on hip01, but I would assume
-> it is, and that platform is currently being submitted for inclusion, so
-> I'd definitely hope to see this driver get merged too eventually.
-> 
-> IIRC, the last revision of the patch set had basically fixed the problem,
-> except for a race that would still allow the napi poll function to exit
-> with poll_complete() but a full queue of TX descriptors and no fallback
-> to clean them up. There was also still an open question about whether or
-> not the driver should use skb_orphan, but I may be misremembering that part.
->  
+Document the I2C device tree binding for Broadcom iProc family of
+SoCs
 
-Hi Arnd:
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
+---
+ .../devicetree/bindings/i2c/brcm,iproc-i2c.txt     |   37 ++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
 
-what about use a state machine to check the tx queue and free the skb, just like:
-
-diff --git a/drivers/net/ethernet/hisilicon/hip04_eth.c b/drivers/net/ethernet/hisilicon/hip04_eth.c
-index 8593658..71faca8 100644
---- a/drivers/net/ethernet/hisilicon/hip04_eth.c
-+++ b/drivers/net/ethernet/hisilicon/hip04_eth.c
-@@ -396,9 +396,25 @@ static int hip04_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
-        stats->tx_packets++;
-        priv->tx_count++;
-
+diff --git a/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+new file mode 100644
+index 0000000..81f982c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+@@ -0,0 +1,37 @@
++Broadcom iProc I2C controller
 +
-+       queue_delayed_work(priv->wq, &priv->tx_queue, delay);
++Required properties:
 +
-        return NETDEV_TX_OK;
- }
-
-+static void hip04_tx_queue_monitor(struct work_struct *work)
-+{
-+       struct hip04_priv *priv = container_of(work, struct hip04_priv,
-+                                              queue_work.work);
-+       struct net_device *dev = priv->ndev;
-+       hip04_tx_reclain(ndev, false);
++- compatible:
++    Must be "brcm,iproc-i2c"
 +
-+       if (TX_QUEUE_IS_EMPRY(ndev))
-+               return;
++- reg:
++    Define the base and range of the I/O address space that contain the iProc
++    I2C controller registers
 +
-+       queue_delayed_work(priv->wq, &priv->tx_queue, delay);
-+}
++- interrupts:
++    Should contain the I2C interrupt
 +
- static int hip04_rx_poll(struct napi_struct *napi, int budget)
- {
-        struct hip04_priv *priv = container_of(napi, struct hip04_priv, napi);
-@@ -736,6 +752,8 @@ static int hip04_mac_probe(struct platform_device *pdev)
-                goto alloc_fail;
-        }
-
-+       INIT_DELAYED_WORK(&priv->tx_queue, hip04_tx_queue_monitor);
++- clock-frequency:
++    This is the I2C bus clock. Need to be either 100000 or 400000
 +
-        return 0;
-
-
-
-what do you think of this solution?
-
-Regards
-Ding
-
-
->> Dave, what's your take here? Should we keep a driver from going upstream
->> just because the hardware is partly broken? I'd really prefer to have an
->> upstream driver on that SoC rather than some random (eventually even
->> more broken) downstream code.
-> 
-> We can certainly have a slow driver for this hardware, and I'd much
-> prefer slow over broken. I'd guess that some of the performance impact
-> of the missing interrupts can now be offset with the xmit_more	 logic.
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
++- #address-cells:
++    Always 1 (for I2C addresses)
++
++- #size-cells:
++    Always 0
++
++Example:
++	i2c0: i2c at 18008000 {
++		compatible = "brcm,iproc-i2c";
++		reg = <0x18008000 0x100>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
++		clock-frequency = <100000>;
++
++		codec: wm8750 at 1a {
++			compatible = "wlf,wm8750";
++			reg = <0x1a>;
++		};
++	};
+-- 
+1.7.9.5
