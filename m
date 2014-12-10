@@ -1,89 +1,157 @@
-From: sre@kernel.org (sre@debian.org)
-Date: Wed, 10 Dec 2014 23:50:37 +0100
-Subject: BCM2048 bluetooth connected over OMAP serial
-In-Reply-To: <20141210205622.GA25286@amd>
-References: <20141210164333.GA3154@amd> <11367725.nphhSzdtpK@wuerfel>
- <20141210184203.GA28150@leverpostej> <20141210205622.GA25286@amd>
-Message-ID: <20141210225036.GA5585@earth.universe>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 10 Dec 2014 16:17:46 -0700
+Subject: [PATCH 3/6] x86, acpi, pci: Move PCI config space accessors.
+In-Reply-To: <1416413091-13452-4-git-send-email-tomasz.nowicki@linaro.org>
+References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+ <1416413091-13452-4-git-send-email-tomasz.nowicki@linaro.org>
+Message-ID: <20141210231746.GF6692@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 19, 2014 at 05:04:48PM +0100, Tomasz Nowicki wrote:
+> We are going to use mmio_config_{} name convention across all architectures.
 
-On Wed, Dec 10, 2014 at 09:56:22PM +0100, Pavel Machek wrote:
-> On Wed 2014-12-10 18:42:03, Mark Rutland wrote:
-> > On Wed, Dec 10, 2014 at 05:02:42PM +0000, Arnd Bergmann wrote:
-> > > On Wednesday 10 December 2014 17:43:33 Pavel Machek wrote:
-> > > > 
-> > > > So, there's bluetooth chip that's connected to the SoC by UART and some
-> > > > GPIOs. What would be right representation in the device tree?
-> > > > Something like this?
-> > > > 
-> > > >         bluetooth {
-> > > >                   compatible = "broadcom,bcm2048";
-> > > >                   uart = <&uart2>;
-> > > >                   reset-gpios = <&gpio3 27 GPIO_ACTIVE_HIGH>; /* want 91 */
-> > > >                   host-wakeup-gpios = <&gpio4 5 GPIO_ACTIVE_HIGH>; /* want 101 */
-> > > >                   bluetooth-wakeup-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>; /* want 37 */
-> > > >                   chip-type = >;
-> > > >                   bt-sysclk = <2>;
-> > > >                   reset-gpio-shared = <0>;
-> > > >         };
-> > > > 
-> > > > Is there some way to prevent OMAP tty driver from binding to the
-> > > > device and exporting the device to userspace?
-> > > 
-> > > I think from the driver perspective, you want this to be a tty line
-> > > discipline rather than a driver that attaches to the physical
-> > > uart.
-> > > 
-> > > For the DT representation, I fear we haven't got a precedent. A uart
-> > > phandle sounds reasonable, but there might be other ways to do it
-> > > and we should consider if there are better alternatives. It could
-> > > possibly be a child node of the uart, but that would require other
-> > > infrastructure in the kernel because we don't currently create
-> > > devices for those.
-> > 
-> > I think the child node is the way to go; that would match what we do for
-> > I2C and SPI. We might need new infrastructure, but I don't think we
-> > should treat this differently simlpy because we don't have that yet.
+mmio_config_*() are workarounds for an AMD Fam10h defect [1].  I would prefer
+not to extend these names to other architectures, because they should be
+able to use readb()/writeb()/etc. directly, as we did on x86 before
+3320ad994afb ("x86: Work around mmio config space quirk on AMD Fam10h").
+
+In fact, it would be nice if we could use readb()/writeb()/etc. on x86, and
+only use mmio_config_*() when we're on AMD Fam10h.  Maybe there could be a
+"struct pci_raw_ops pci_mmcfg_amd_fam10h" that used mmio_config_*(), and we
+could set raw_pci_ext_ops to those ops instead of the default ones when
+we're on AMD Fam10h.  Then x86 should be able to use the generic
+readb()-based ops on most platforms.
+
+Bjorn
+
+[1] 3320ad994afb ("x86: Work around mmio config space quirk on AMD Fam10h")
+
+Somewhere in this process, I'd like to update the AMD Fam10h comment to fix
+the typos and reference the spec that talks about this, i.e., the "BIOS and
+Kernel Developer's Guide (BKDG) For AMD Family 10h Processors," rev 3.48,
+sec 2.11.1, "MMIO Configuration Coding Requirements."
+
+That can be a separate patch since it's only cosmetic.
+
+> Currently it belongs to asm/pci_x86.h header which should be included
+> only for x86 specific files. From now on, those accessors are in asm/pci.h
+> header which can be included in non-architecture code much easier.
 > 
-> Well, uart in this case looks more like a GPIO than an I2C (no
-> addressing, just few wires). And we do phandle for GPIOs.
-
-Right and the devices use I2C for full communication and GPIOs as
-helpers. I guess UART counts as full communication and not as helper.
-
-phandle vs child node is not a matter of adressing and btw where is
-the difference between "5th gpio on 1st gpio controller" and "5th
-address on 1st i2c controller"?
-
-> Actually, the chip also has PCM, analog audio, and "pc compatible?"
-> connections, plus some connection to WIFI. So we may need more
-> phandles there....
-
-This is much harder to solve. I think we don't have a DT binding for
-a device, which uses two communication interfaces as the bcm2048
-(uart & i2c). OTOH we may just add a slave device for the fm-radio
-part like this:
-
-uart {
-    bcm2048 {
-        stuff;
-    };
-};
-
-i2c {
-    bcm2048-radio {
-        master = <&bcm2048>;
-    };
-};
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141210/eb7b900d/attachment.sig>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/x86/include/asm/pci.h     | 42 +++++++++++++++++++++++++++++++++++++++++
+>  arch/x86/include/asm/pci_x86.h | 43 ------------------------------------------
+>  2 files changed, 42 insertions(+), 43 deletions(-)
+> 
+> diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+> index 0892ea0..5ba3720 100644
+> --- a/arch/x86/include/asm/pci.h
+> +++ b/arch/x86/include/asm/pci.h
+> @@ -71,6 +71,48 @@ void pcibios_set_master(struct pci_dev *dev);
+>  struct irq_routing_table *pcibios_get_irq_routing_table(void);
+>  int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
+>  
+> +/*
+> + * AMD Fam10h CPUs are buggy, and cannot access MMIO config space
+> + * on their northbrige except through the * %eax register. As such, you MUST
+> + * NOT use normal IOMEM accesses, you need to only use the magic mmio-config
+> + * accessor functions.
+> + * In fact just use pci_config_*, nothing else please.
+> + */
+> +static inline unsigned char mmio_config_readb(void __iomem *pos)
+> +{
+> +	u8 val;
+> +	asm volatile("movb (%1),%%al" : "=a" (val) : "r" (pos));
+> +	return val;
+> +}
+> +
+> +static inline unsigned short mmio_config_readw(void __iomem *pos)
+> +{
+> +	u16 val;
+> +	asm volatile("movw (%1),%%ax" : "=a" (val) : "r" (pos));
+> +	return val;
+> +}
+> +
+> +static inline unsigned int mmio_config_readl(void __iomem *pos)
+> +{
+> +	u32 val;
+> +	asm volatile("movl (%1),%%eax" : "=a" (val) : "r" (pos));
+> +	return val;
+> +}
+> +
+> +static inline void mmio_config_writeb(void __iomem *pos, u8 val)
+> +{
+> +	asm volatile("movb %%al,(%1)" : : "a" (val), "r" (pos) : "memory");
+> +}
+> +
+> +static inline void mmio_config_writew(void __iomem *pos, u16 val)
+> +{
+> +	asm volatile("movw %%ax,(%1)" : : "a" (val), "r" (pos) : "memory");
+> +}
+> +
+> +static inline void mmio_config_writel(void __iomem *pos, u32 val)
+> +{
+> +	asm volatile("movl %%eax,(%1)" : : "a" (val), "r" (pos) : "memory");
+> +}
+>  
+>  #define HAVE_PCI_MMAP
+>  extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> diff --git a/arch/x86/include/asm/pci_x86.h b/arch/x86/include/asm/pci_x86.h
+> index caba141..42e7332 100644
+> --- a/arch/x86/include/asm/pci_x86.h
+> +++ b/arch/x86/include/asm/pci_x86.h
+> @@ -121,49 +121,6 @@ extern int __init pcibios_init(void);
+>  extern int pci_legacy_init(void);
+>  extern void pcibios_fixup_irqs(void);
+>  
+> -/*
+> - * AMD Fam10h CPUs are buggy, and cannot access MMIO config space
+> - * on their northbrige except through the * %eax register. As such, you MUST
+> - * NOT use normal IOMEM accesses, you need to only use the magic mmio-config
+> - * accessor functions.
+> - * In fact just use pci_config_*, nothing else please.
+> - */
+> -static inline unsigned char mmio_config_readb(void __iomem *pos)
+> -{
+> -	u8 val;
+> -	asm volatile("movb (%1),%%al" : "=a" (val) : "r" (pos));
+> -	return val;
+> -}
+> -
+> -static inline unsigned short mmio_config_readw(void __iomem *pos)
+> -{
+> -	u16 val;
+> -	asm volatile("movw (%1),%%ax" : "=a" (val) : "r" (pos));
+> -	return val;
+> -}
+> -
+> -static inline unsigned int mmio_config_readl(void __iomem *pos)
+> -{
+> -	u32 val;
+> -	asm volatile("movl (%1),%%eax" : "=a" (val) : "r" (pos));
+> -	return val;
+> -}
+> -
+> -static inline void mmio_config_writeb(void __iomem *pos, u8 val)
+> -{
+> -	asm volatile("movb %%al,(%1)" : : "a" (val), "r" (pos) : "memory");
+> -}
+> -
+> -static inline void mmio_config_writew(void __iomem *pos, u16 val)
+> -{
+> -	asm volatile("movw %%ax,(%1)" : : "a" (val), "r" (pos) : "memory");
+> -}
+> -
+> -static inline void mmio_config_writel(void __iomem *pos, u32 val)
+> -{
+> -	asm volatile("movl %%eax,(%1)" : : "a" (val), "r" (pos) : "memory");
+> -}
+> -
+>  #ifdef CONFIG_PCI
+>  # ifdef CONFIG_ACPI
+>  #  define x86_default_pci_init		pci_acpi_init
+> -- 
+> 1.9.1
+> 
