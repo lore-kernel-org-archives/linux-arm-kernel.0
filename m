@@ -1,167 +1,39 @@
-From: koct9i@gmail.com (Konstantin Khlebnikov)
-Date: Wed, 10 Dec 2014 21:06:05 +0400
-Subject: [RFC V5] mm:add KPF_ZERO_PAGE flag for /proc/kpageflags
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E688B313FB@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
- <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D103E688B313F2@CNBJMBX05.corpusers.net>
- <20141205143134.37139da2208c654a0d3cd942@linux-foundation.org>
- <35FD53F367049845BC99AC72306C23D103E688B313F4@CNBJMBX05.corpusers.net>
- <20141208114601.GA28846@node.dhcp.inet.fi>
- <35FD53F367049845BC99AC72306C23D103E688B313FB@CNBJMBX05.corpusers.net>
-Message-ID: <CALYGNiMEytHuND37f+hNdMKqCPzN0k_uha6CaeL_fyzrj-obNQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Dec 2014 09:06:55 -0800
+Subject: [PATCH] ARM: omap2plus_defconfig: Enable AHCI_PLATFORM driver
+In-Reply-To: <1416829297-12664-1-git-send-email-rogerq@ti.com>
+References: <1416829297-12664-1-git-send-email-rogerq@ti.com>
+Message-ID: <20141210170654.GG30437@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 9, 2014 at 6:24 AM, Wang, Yalin <Yalin.Wang@sonymobile.com> wrote:
-> This patch add KPF_ZERO_PAGE flag for zero_page,
-> so that userspace process can notice zero_page from
-> /proc/kpageflags, and then do memory analysis more accurately.
->
-> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+* Roger Quadros <rogerq@ti.com> [141124 03:43]:
+> OMAP5 and DRA7 platforms need the AHCI platform driver
+> for SATA support.
+> 
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
 
-Ack. Looks good.
+Applying into omap-for-v3.19/fixes to get this working.
+
+Tony
 
 > ---
->  Documentation/vm/pagemap.txt           |  8 ++++++++
->  fs/proc/page.c                         | 16 +++++++++++++---
->  include/linux/huge_mm.h                | 12 ++++++++++++
->  include/uapi/linux/kernel-page-flags.h |  1 +
->  mm/huge_memory.c                       |  7 +------
->  tools/vm/page-types.c                  |  1 +
->  6 files changed, 36 insertions(+), 9 deletions(-)
->
-> diff --git a/Documentation/vm/pagemap.txt b/Documentation/vm/pagemap.txt
-> index 5948e45..6fbd55e 100644
-> --- a/Documentation/vm/pagemap.txt
-> +++ b/Documentation/vm/pagemap.txt
-> @@ -62,6 +62,8 @@ There are three components to pagemap:
->      20. NOPAGE
->      21. KSM
->      22. THP
-> +    23. BALLOON
-> +    24. ZERO_PAGE
->
->  Short descriptions to the page flags:
->
-> @@ -102,6 +104,12 @@ Short descriptions to the page flags:
->  22. THP
->      contiguous pages which construct transparent hugepages
->
-> +23. BALLOON
-> +    balloon compaction page
-> +
-> +24. ZERO_PAGE
-> +    zero page for pfn_zero or huge_zero page
-> +
->      [IO related page flags]
->   1. ERROR     IO error occurred
->   3. UPTODATE  page has up-to-date data
-> diff --git a/fs/proc/page.c b/fs/proc/page.c
-> index 1e3187d..7eee2d8 100644
-> --- a/fs/proc/page.c
-> +++ b/fs/proc/page.c
-> @@ -5,6 +5,7 @@
->  #include <linux/ksm.h>
->  #include <linux/mm.h>
->  #include <linux/mmzone.h>
-> +#include <linux/huge_mm.h>
->  #include <linux/proc_fs.h>
->  #include <linux/seq_file.h>
->  #include <linux/hugetlb.h>
-> @@ -121,9 +122,18 @@ u64 stable_page_flags(struct page *page)
->          * just checks PG_head/PG_tail, so we need to check PageLRU/PageAnon
->          * to make sure a given page is a thp, not a non-huge compound page.
->          */
-> -       else if (PageTransCompound(page) && (PageLRU(compound_head(page)) ||
-> -                                            PageAnon(compound_head(page))))
-> -               u |= 1 << KPF_THP;
-> +       else if (PageTransCompound(page)) {
-> +               struct page *head = compound_head(page);
-> +
-> +               if (PageLRU(head) || PageAnon(head))
-> +                       u |= 1 << KPF_THP;
-> +               else if (is_huge_zero_page(head)) {
-> +                       u |= 1 << KPF_ZERO_PAGE;
-> +                       u |= 1 << KPF_THP;
-> +               }
-> +       } else if (is_zero_pfn(page_to_pfn(page)))
-> +               u |= 1 << KPF_ZERO_PAGE;
-> +
->
->         /*
->          * Caveats on high order pages: page->_count will only be set
-> diff --git a/include/linux/huge_mm.h b/include/linux/huge_mm.h
-> index ad9051b..f10b20f 100644
-> --- a/include/linux/huge_mm.h
-> +++ b/include/linux/huge_mm.h
-> @@ -157,6 +157,13 @@ static inline int hpage_nr_pages(struct page *page)
->  extern int do_huge_pmd_numa_page(struct mm_struct *mm, struct vm_area_struct *vma,
->                                 unsigned long addr, pmd_t pmd, pmd_t *pmdp);
->
-> +extern struct page *huge_zero_page;
-> +
-> +static inline bool is_huge_zero_page(struct page *page)
-> +{
-> +       return ACCESS_ONCE(huge_zero_page) == page;
-> +}
-> +
->  #else /* CONFIG_TRANSPARENT_HUGEPAGE */
->  #define HPAGE_PMD_SHIFT ({ BUILD_BUG(); 0; })
->  #define HPAGE_PMD_MASK ({ BUILD_BUG(); 0; })
-> @@ -206,6 +213,11 @@ static inline int do_huge_pmd_numa_page(struct mm_struct *mm, struct vm_area_str
->         return 0;
->  }
->
-> +static inline bool is_huge_zero_page(struct page *page)
-> +{
-> +       return false;
-> +}
-> +
->  #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
->
->  #endif /* _LINUX_HUGE_MM_H */
-> diff --git a/include/uapi/linux/kernel-page-flags.h b/include/uapi/linux/kernel-page-flags.h
-> index 2f96d23..a6c4962 100644
-> --- a/include/uapi/linux/kernel-page-flags.h
-> +++ b/include/uapi/linux/kernel-page-flags.h
-> @@ -32,6 +32,7 @@
->  #define KPF_KSM                        21
->  #define KPF_THP                        22
->  #define KPF_BALLOON            23
-> +#define KPF_ZERO_PAGE          24
->
->
->  #endif /* _UAPILINUX_KERNEL_PAGE_FLAGS_H */
-> diff --git a/mm/huge_memory.c b/mm/huge_memory.c
-> index de98415..d7bc7a5 100644
-> --- a/mm/huge_memory.c
-> +++ b/mm/huge_memory.c
-> @@ -171,12 +171,7 @@ static int start_khugepaged(void)
->  }
->
->  static atomic_t huge_zero_refcount;
-> -static struct page *huge_zero_page __read_mostly;
-> -
-> -static inline bool is_huge_zero_page(struct page *page)
-> -{
-> -       return ACCESS_ONCE(huge_zero_page) == page;
-> -}
-> +struct page *huge_zero_page __read_mostly;
->
->  static inline bool is_huge_zero_pmd(pmd_t pmd)
->  {
-> diff --git a/tools/vm/page-types.c b/tools/vm/page-types.c
-> index 264fbc2..8bdf16b 100644
-> --- a/tools/vm/page-types.c
-> +++ b/tools/vm/page-types.c
-> @@ -133,6 +133,7 @@ static const char * const page_flag_names[] = {
->         [KPF_KSM]               = "x:ksm",
->         [KPF_THP]               = "t:thp",
->         [KPF_BALLOON]           = "o:balloon",
-> +       [KPF_ZERO_PAGE]         = "z:zero_page",
->
->         [KPF_RESERVED]          = "r:reserved",
->         [KPF_MLOCKED]           = "m:mlocked",
-> --
-> 2.1.3
+>  arch/arm/configs/omap2plus_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index 87a5c11..d75358a 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -127,6 +127,8 @@ CONFIG_SRAM=y
+>  CONFIG_SCSI=y
+>  CONFIG_BLK_DEV_SD=y
+>  CONFIG_SCSI_SCAN_ASYNC=y
+> +CONFIG_ATA=y
+> +CONFIG_SATA_AHCI_PLATFORM=y
+>  CONFIG_MD=y
+>  CONFIG_NETDEVICES=y
+>  # CONFIG_NET_VENDOR_ARC is not set
+> -- 
+> 1.8.3.2
+> 
