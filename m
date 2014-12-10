@@ -1,89 +1,37 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 10 Dec 2014 13:54:04 -0800
-Subject: [PATCH 1/2] pstore-ram: Fix hangs by using write-combine mappings
-In-Reply-To: <1410546745-919-1-git-send-email-tony@atomide.com>
-References: <1410546745-919-1-git-send-email-tony@atomide.com>
-Message-ID: <CAGXu5jLxXCRH+ffgW_CcA6NRFneQT4THQtvsBM0TytZtawvuGA@mail.gmail.com>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Wed, 10 Dec 2014 14:43:54 -0800
+Subject: arm64 hitting BUG in arch_timer.h
+In-Reply-To: <1418245000.23374.26.camel@t520.localdomain>
+References: <1418245000.23374.26.camel@t520.localdomain>
+Message-ID: <CAPz6YkXcerUiLc3dQG0URSuioiLsAwcTLkDTivD4JU9YQsdR+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 11:32 AM, Tony Lindgren <tony@atomide.com> wrote:
-> From: Rob Herring <robherring2@gmail.com>
+On Wed, Dec 10, 2014 at 12:56 PM, Mark Salter <msalter@redhat.com> wrote:
+> Using Linus' tree from this morning, I am hitting:
 >
-> Currently trying to use pstore on at least ARMs can hang as we're
-> mapping the peristent RAM with pgprot_noncached().
+>    [    0.000000] BUG: failure at ./arch/arm64/include/asm/arch_timer.h:112/arch_counter_get_cntpct!
 >
-> On ARMs, pgprot_noncached() will actually make the memory strongly
-> ordered, and as the atomic operations pstore uses are implementation
-> defined for strongly ordered memory, they may not work. So basically
-> atomic operations have undefined behavior on ARM for device or strongly
-> ordered memory types.
+> This is triggered by commit 0b46b8a718 ("clocksource: arch_timer: Fix
+> code to use physical timers when requested") which addresses an armv7
+> problem. Arm64 wants to always use a virtual timer. I used this to avoid
+> the BUG and get a booting kernel:
 >
-> Let's fix the issue by using write-combine variants for mappings. This
-> corresponds to normal, non-cacheable memory on ARM. For many other
-> architectures, this change does not change the mapping type as by
-> default we have:
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch
+> index 71846f9..4d8a01e 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -468,7 +468,7 @@ static void __init arch_counter_register(unsigned type)
 >
-> #define pgprot_writecombine pgprot_noncached
+>         /* Register the CP15 based counter if we have one */
+>         if (type & ARCH_CP15_TIMER) {
+> -               if (arch_timer_use_virtual)
+> +               if (IS_ENABLED(CONFIG_ARM64) || arch_timer_use_virtual)
+>                         arch_timer_read_counter = arch_counter_get_cntvct;
+>                 else
+>                         arch_timer_read_counter = arch_counter_get_cntpct;
 >
-> The reason why pgprot_noncached() was originaly used for pstore
-> is because Colin Cross <ccross@android.com> had observed lost
-> debug prints right before a device hanging write operation on some
-> systems. For the platforms supporting pgprot_noncached(), we can
-> add a an optional configuration option to support that. But let's
-> get pstore working first before adding new features.
->
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Anton Vorontsov <cbouatmailru@gmail.com>
-> Cc: Colin Cross <ccross@android.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Tony Luck <tony.luck@intel.com>
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> [tony at atomide.com: updated description]
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-Acked-by: Kees Cook <keescook@chromium.org>
-
-Please Cc: stable at vger.kernel.org on this one too.
-
-Thanks!
-
--Kees
-
-> ---
->  fs/pstore/ram_core.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/fs/pstore/ram_core.c b/fs/pstore/ram_core.c
-> index 9d7b9a8..24f94b0 100644
-> --- a/fs/pstore/ram_core.c
-> +++ b/fs/pstore/ram_core.c
-> @@ -392,7 +392,7 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
->         page_start = start - offset_in_page(start);
->         page_count = DIV_ROUND_UP(size + offset_in_page(start), PAGE_SIZE);
->
-> -       prot = pgprot_noncached(PAGE_KERNEL);
-> +       prot = pgprot_writecombine(PAGE_KERNEL);
->
->         pages = kmalloc_array(page_count, sizeof(struct page *), GFP_KERNEL);
->         if (!pages) {
-> @@ -422,7 +422,7 @@ static void *persistent_ram_iomap(phys_addr_t start, size_t size)
->         buffer_start_add = buffer_start_add_locked;
->         buffer_size_add = buffer_size_add_locked;
->
-> -       return ioremap(start, size);
-> +       return ioremap_wc(start, size);
->  }
->
->  static int persistent_ram_buffer_map(phys_addr_t start, phys_addr_t size,
-> --
-> 2.1.0
 >
 
-
-
--- 
-Kees Cook
-Chrome OS Security
+Yes Catalin has prepared a similar patch:
+https://patchwork.kernel.org/patch/5468031/
