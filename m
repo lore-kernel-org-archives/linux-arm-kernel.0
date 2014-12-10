@@ -1,30 +1,42 @@
-From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
-Date: Wed, 10 Dec 2014 15:44:31 +0100
-Subject: [PATCH] [RFC] ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node
-In-Reply-To: <CAMuHMdX5i8qXdVUYMi+BLEe7Ah+_hJOEputW7jw5xvQ6UqH3EA@mail.gmail.com>
-References: <1417617454-14533-1-git-send-email-geert+renesas@glider.be>
- <CAMuHMdX5i8qXdVUYMi+BLEe7Ah+_hJOEputW7jw5xvQ6UqH3EA@mail.gmail.com>
-Message-ID: <CAO3366zHStXk9Py357zAkEuVZGxZWgrEgMo1cD6h_UTsCHqUKA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 10 Dec 2014 08:48:55 -0600
+Subject: [RFC/PATCH 4/7] arm: omap: device: add support for generating
+ sysconfig data from DT
+In-Reply-To: <54882522.20002@ti.com>
+References: <1418164072-19087-1-git-send-email-balbi@ti.com>
+ <1418164072-19087-5-git-send-email-balbi@ti.com>
+ <54882522.20002@ti.com>
+Message-ID: <20141210144855.GB4602@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 2:28 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Wed, Dec 3, 2014 at 3:37 PM, Geert Uytterhoeven
-> <geert+renesas@glider.be> wrote:
->> FIXME The clock should be the PERIPH clock, but the sh73a0 CPG driver
->>       doesn't have support for that clock yet. Hence we use the ZG
->>       clock, which runs at the same frequency.
->
-> It looks like we do have the clock in sh73a0.dtsi, but it's called "twd_clk".
-> Ulrich, is that correct?
+Hi,
 
-I believe so.
+adding linux-omap back
 
-> Note that the frequency is off by a factor of 2, just like for its parent "z".
-> (that is, without your (~private) patch to take into account ZSEL).
+On Wed, Dec 10, 2014 at 04:19:06PM +0530, Lokesh Vutla wrote:
+> > +	switch (prop) {
+> > +	case 2:
+> > +		sysc->sysc_fields = &omap_hwmod_sysc_type2;
+> > +		break;
+> > +	case 3:
+> > +		sysc->sysc_fields = &omap_hwmod_sysc_type3;
+> > +		break;
+> > +	case 1:
+> > +	default:
+> > +		sysc->sysc_fields = &omap_hwmod_sysc_type1;
+> > +	}
+> Missed hooking the class to oh?
+> 	class->sysc = sysc;
 
-Oh. Yes. That thing. :) One moment, please...
+yeah, I'll fix that.
 
-CU
-Uli
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141210/49812e9a/attachment.sig>
