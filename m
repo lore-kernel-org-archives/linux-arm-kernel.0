@@ -1,44 +1,76 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 10 Dec 2014 17:55:02 +0800
-Subject: [PATCH v2] irqchip: mediatek: Use IS_ERR() instead of NULL pointer
- check
-In-Reply-To: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
-References: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1418205302-22531-1-git-send-email-yingjoe.chen@mediatek.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Wed, 10 Dec 2014 17:51:42 +0800
+Subject: [PATCH V3] arm: imx: correct the hardware clock gate setting for
+ shared nodes
+Message-ID: <1418205102-14598-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Beniamino reported a kernel oops caused by an invalid DT file for the
-mediatek interrupt polarity extension.
+For those clk gates which hold share count, since its is_enabled
+callback is only checking the share count rather than reading
+the hardware register setting, in the late phase of kernel bootup,
+the clk_disable_unused action will NOT handle the scenario of
+share_count is 0 but the hardware setting is enabled, actually,
+U-Boot normally enables all clk gates, then those shared clk gates
+will be always enabled until they are used by some modules.
 
-The reason is that the interrupt polarity support for mediatek chips
-merely checks for NULL pointer instead of a casted error return
-value in mtk_sysirq_of_init() so any other casted error value passes
-the NULL pointer check and causes a kernel panic when dereferenced.
+So the problem would be: when kernel boot up, the usecount cat
+from clk tree is 0, but the clk gates actually is enabled in
+hardware register, it will confuse user and bring unnecessary power
+consumption.
 
-Use IS_ERR() and return the error value via PTR_ERR().
+This patch adds .disable_unused callback and using hardware register
+check for .is_enabled callback of shared nodes to handle such scenario
+in late phase of kernel boot up, then the hardware status will match the
+clk tree info.
 
-Reported-and-tested-by: Beniamino Galvani <b.galvani@gmail.com>
-Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
- drivers/irqchip/irq-mtk-sysirq.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+changes from V2:
+	1. uboot -> U-Boot;
+	2. add .is_enabled change into commit log;
+	3. improve the condition check code.
+ arch/arm/mach-imx/clk-gate2.c |   23 +++++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
-index 7e342df..0b0d2c0 100644
---- a/drivers/irqchip/irq-mtk-sysirq.c
-+++ b/drivers/irqchip/irq-mtk-sysirq.c
-@@ -137,9 +137,9 @@ static int __init mtk_sysirq_of_init(struct device_node *node,
- 		return -ENOMEM;
+diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
+index 5a75cdc..8935bff 100644
+--- a/arch/arm/mach-imx/clk-gate2.c
++++ b/arch/arm/mach-imx/clk-gate2.c
+@@ -96,15 +96,30 @@ static int clk_gate2_is_enabled(struct clk_hw *hw)
+ {
+ 	struct clk_gate2 *gate = to_clk_gate2(hw);
  
- 	chip_data->intpol_base = of_io_request_and_map(node, 0, "intpol");
--	if (!chip_data->intpol_base) {
-+	if (IS_ERR(chip_data->intpol_base)) {
- 		pr_err("mtk_sysirq: unable to map sysirq register\n");
--		ret = -ENOMEM;
-+		ret = PTR_ERR(chip_data->intpol_base);
- 		goto out_free;
- 	}
+-	if (gate->share_count)
+-		return !!__clk_get_enable_count(hw->clk);
+-	else
+-		return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
++	return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
++}
++
++static void clk_gate2_disable_unused(struct clk_hw *hw)
++{
++	struct clk_gate2 *gate = to_clk_gate2(hw);
++	unsigned long flags = 0;
++	u32 reg;
++
++	spin_lock_irqsave(gate->lock, flags);
++
++	if (!gate->share_count || *gate->share_count == 0) {
++		reg = readl(gate->reg);
++		reg &= ~(3 << gate->bit_idx);
++		writel(reg, gate->reg);
++	}
++
++	spin_unlock_irqrestore(gate->lock, flags);
+ }
+ 
+ static struct clk_ops clk_gate2_ops = {
+ 	.enable = clk_gate2_enable,
+ 	.disable = clk_gate2_disable,
++	.disable_unused = clk_gate2_disable_unused,
+ 	.is_enabled = clk_gate2_is_enabled,
+ };
  
 -- 
-1.8.1.1.dirty
+1.7.9.5
