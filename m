@@ -1,39 +1,45 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 10 Dec 2014 13:49:40 +0000
-Subject: [PATCH v3] ARM: kprobes: Add test cases for stack consuming
- instructions
-In-Reply-To: <5488483D.1080900@huawei.com>
-References: <1418047765-53197-1-git-send-email-wangnan0@huawei.com>
- <1418047765-53197-6-git-send-email-wangnan0@huawei.com>
- <1418143407.3641.47.camel@linaro.org>
- <1418145071.3641.60.camel@linaro.org> <54880309.3010100@huawei.com>
- <1418214862.3661.17.camel@linaro.org> <5488483D.1080900@huawei.com>
-Message-ID: <1418219380.3661.36.camel@linaro.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 10 Dec 2014 13:50:12 +0000
+Subject: arm64 broken in -next by commit 08d53aa58cb1 (of/fdt: export fdt
+ blob as /sys/firmware/fdt)
+In-Reply-To: <20141210133106.GH13994@e104818-lin.cambridge.arm.com>
+References: <20141210120422.GB13994@e104818-lin.cambridge.arm.com>
+ <20141210121325.GC13994@e104818-lin.cambridge.arm.com>
+ <20141210122210.GE13994@e104818-lin.cambridge.arm.com>
+ <20141210133106.GH13994@e104818-lin.cambridge.arm.com>
+Message-ID: <CACxGe6sR4N38N=p4O7smc4s9_RRUoj89o-jphJ85R2EuuqSF1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-12-10 at 21:18 +0800, Wang Nan wrote:
-[...]
-> Well, I'm just working on a patch which introducing a TEST_INTOFF and disable interrupts
-> for "MRS" testcase. Do you think it is inappropriate?
+On Wed, Dec 10, 2014 at 1:31 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Wed, Dec 10, 2014 at 12:22:10PM +0000, Catalin Marinas wrote:
+>> On Wed, Dec 10, 2014 at 12:13:26PM +0000, Catalin Marinas wrote:
+>> > On Wed, Dec 10, 2014 at 12:04:23PM +0000, Catalin Marinas wrote:
+>> > > Ard,
+>> > >
+>> > > I noticed that linux-next no longer boots on Juno. Bisecting, I ended up
+>> > > on your commit above and reverting it gets things going again. I
+>> > > initially thought it has something to do with the hardware crypto since
+>> > > you added some crc32_be() calls but disabling arm64 hw crypto didn't
+>> > > make any difference.
+>> >
+>> > Commenting out crc32_be() in early_init_dt_verify() allows it to boot.
+>> > Some printk, it shows:
+>> >
+>> > initial_boot_params = 0xffffffc01fe00000
+>> > fdt_totalsize(initial_boot_params) = 2108105
+>> >
+>> > Isn't it quite big?
+>>
+>> We assume that the DT blob is maximum 2MB in the initial kernel mapping.
+>> I'm not sure why it is that big here but early_init_dt_verify() most
+>> likely doesn't have the areas around initial_boot_params mapped, only
+>> 2MB section. The crc probably triggers a very early data abort.
+>
+> For now, I blame my Juno firmware or dtb file. I'll let you know.
 
-That's what I started to do, implementing in a similar way to
-DONT_TEST_IN_ITBLOCK, and thought the same ints off feature could be
-used for the stack consuming instructions checks as well.
+Blech. I've not sent my pull request to Linus yet, so I'll revert this
+patch before I ask him to pull.
 
-Then I realised that for the MRS case it's no use turning ints off for a
-single iteration of a test, because the next iteration could see
-different results, so that would mean turning interrupts off for all
-iterations, which we can't do.
-
-Also, the FIQ flag may not be under our control if Linux isn't running
-in secure mode, and I was worried that in such cases we could see the
-value of the flag change if secure mode code chose to do so. (Though
-perhaps non-secure mode will always read FIQ flag as zero in such a
-case?)
-
-So in the end I thought the only robust way of writing the tests would
-be to ignore the values of the A and F flags.
-
--- 
-Tixy
+g.
