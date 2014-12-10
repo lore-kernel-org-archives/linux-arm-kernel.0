@@ -1,31 +1,74 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 10 Dec 2014 11:16:40 +0100
-Subject: [PATCH] arm: imx: correct the hardware clock gate setting for
- shared nodes
-In-Reply-To: <20141210091126.GA10165@ubuntu>
-References: <1418111885-3623-1-git-send-email-b20788@freescale.com>
- <20141209085742.GE13486@pengutronix.de>
- <BN1PR0301MB062806C16F41B55ADB753E4DFF620@BN1PR0301MB0628.namprd03.prod.outlook.com>
- <20141210090922.GH13486@pengutronix.de>
- <20141210091126.GA10165@ubuntu>
-Message-ID: <20141210101640.GJ13486@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 10 Dec 2014 11:17:15 +0100
+Subject: [PATCH 5/5] ARM: mvebu: Add Armada 385 Access Point Development
+ Board support
+In-Reply-To: <20141205170726.2e2335af@free-electrons.com>
+References: <1417790698-9792-1-git-send-email-maxime.ripard@free-electrons.com>	<1417790698-9792-6-git-send-email-maxime.ripard@free-electrons.com>
+ <20141205170726.2e2335af@free-electrons.com>
+Message-ID: <54881DAB.1080505@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Maxime,
 
-On Wed, Dec 10, 2014 at 05:11:26PM +0800, Anson Huang wrote:
-> OK, very sorry for using OUTLOOK to reply such review mail, I will use console mail
-> to reply it from now:)
-Much better \o/. Note that Outlook can be tuned to behave better, too
-(still not perfect AFAIK). Back when I was forced to use Outlook I liked
-Outlook Quote Fix[1]. I hope this is not necessary any more today.
+[...]
 
-Best regards
-Uwe
+>> +		};
+>> +
+>> +		pcie-controller {
+>> +			status = "okay";
+>> +			/*
+>> +			 * The two PCIe units are accessible through
+>> +			 * standard PCIe slots on the board.
+> 
+> Two, or three ? :-)
 
-[1] http://home.in.tum.de/~jain/software/outlook-quotefix/
+Actually there are 3 PCIe units accessible through miniPCIe slots
+and not standard PCIe slots.
+
+> 
+>> +			 */
+>> +			pcie at 1,0 {
+>> +				/* Port 0, Lane 0 */
+>> +				status = "okay";
+>> +			};
+>> +
+>> +			pcie at 2,0 {
+>> +				/* Port 1, Lane 0 */
+>> +				status = "okay";
+>> +			};
+>> +
+>> +			pcie at 3,0 {
+>> +				/* Port 2, Lane 0 */
+>> +				status = "okay";
+>> +			};
+>> +		};
+>> +	};
+>> +
+>> +	reg_xhci0_vbus: xhci0-vbus {
+>> +		compatible = "regulator-fixed";
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&xhci0_vbus_pins>;
+>> +		regulator-name = "xhci0-vbus";
+>> +		regulator-min-microvolt = <5000000>;
+>> +		regulator-max-microvolt = <5000000>;
+>> +		enable-active-high;
+>> +		regulator-always-on;
+>> +		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+>> +	};
+> 
+> Maybe you could connect this to the USB controller by using the
+> usb-nop-xceiv thing (which acts as a dummy USB PHY, if I understood
+> correctly) ?
+> 
+> Thanks!
+> 
+> Thomas
+> 
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
