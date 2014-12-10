@@ -1,284 +1,141 @@
-From: lyz@rock-chips.com (Yunzhi Li)
-Date: Wed, 10 Dec 2014 18:46:07 +0800
-Subject: [PATCH v5 1/5] phy: add a driver for the Rockchip SoC internal USB2.0
- PHY
-In-Reply-To: <1418208371-18851-1-git-send-email-lyz@rock-chips.com>
-References: <1418208371-18851-1-git-send-email-lyz@rock-chips.com>
-Message-ID: <1418208371-18851-2-git-send-email-lyz@rock-chips.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 10 Dec 2014 16:19:06 +0530
+Subject: [RFC/PATCH 4/7] arm: omap: device: add support for generating
+ sysconfig data from DT
+In-Reply-To: <1418164072-19087-5-git-send-email-balbi@ti.com>
+References: <1418164072-19087-1-git-send-email-balbi@ti.com>
+ <1418164072-19087-5-git-send-email-balbi@ti.com>
+Message-ID: <54882522.20002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch to add a generic PHY driver for ROCKCHIP usb PHYs,
-currently this driver can support RK3288. The RK3288 SoC have
-three independent USB PHY IPs which are all configured through a
-set of registers located in the GRF (general register files)
-module.
+Hi Felipe,
+On Wednesday 10 December 2014 03:57 AM, Felipe Balbi wrote:
+> After moving sysconfig data to DT, we need to make
+> sure we can generate the same data we have today in C
+> files out of the DT provided properties.
+> 
+> This patch adds support for all optional properties
+> documented by a previous commit.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_device.c | 115 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 115 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+> index abd622b..ea729aa 100644
+> --- a/arch/arm/mach-omap2/omap_device.c
+> +++ b/arch/arm/mach-omap2/omap_device.c
+> @@ -25,6 +25,7 @@
+>   */
+>  #undef DEBUG
 
-Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
+[...snip..]
 
----
+> +
+> +static int omap_hwmod_init_sysc(struct device *dev,
+> +		struct omap_hwmod *oh, int index)
+> +{
+> +	struct device_node *node = dev->of_node;
+> +	struct omap_hwmod_class *class = oh->class;
+> +	struct omap_hwmod_class_sysconfig *sysc;
+> +	int ret;
+> +	int i;
+> +	char name[128];
+> +	const char *tmp = oh->name;
+> +	u32 prop;
+> +
+> +	/* if data isn't provided by DT, skip */
+> +	if ((class && class->sysc) || !omap_hwmod_has_sysc_bindings(dev))
+> +		return 0;
+> +
+> +	class = kzalloc(sizeof(*class), GFP_KERNEL);
+> +	if (!class)
+> +		return -ENOMEM;
+> +
+> +	i = 0;
+> +	while (*tmp) {
+> +		if (isalpha(*tmp))
+> +			name[i++] = *tmp;
+> +		tmp++;
+> +	}
+> +	name[i] = '\0';
+> +
+> +	class->name = kzalloc(sizeof(name), GFP_KERNEL);
+> +	if (!class->name)
+> +		return -ENOMEM;
+> +	strncpy(class->name, name, sizeof(name) - 1);
+> +
+> +	sysc = kzalloc(sizeof(*sysc), GFP_KERNEL);
+> +	if (!sysc)
+> +		return -ENOMEM;
+> +
+> +	ret = of_property_read_u32_index(node, "ti,rev_offs", index, &prop);
+> +	if (!ret)
+> +		sysc->rev_offs = prop;
+> +
+> +	ret = of_property_read_u32_index(node, "ti,sysc_offs", index, &prop);
+> +	if (!ret)
+> +		sysc->sysc_offs = prop;
+> +
+> +	ret = of_property_read_u32_index(node, "ti,syss_offs", index, &prop);
+> +	if (!ret)
+> +		sysc->syss_offs = prop;
+> +
+> +	ret = of_property_read_u32_index(node, "ti,sysc_flags", index, &prop);
+> +	if (!ret)
+> +		sysc->sysc_flags = prop & 0xffff;
+> +
+> +	ret = of_property_read_u32_index(node, "ti,srst_udelay", index, &prop);
+> +	if (!ret)
+> +		sysc->srst_udelay = prop & 0xff;
+> +
+> +	ret = of_property_read_u32_index(node, "ti,idlemodes", index, &prop);
+> +	if (!ret)
+> +		sysc->idlemodes = prop & 0xff;
+> +
+> +	ret = of_property_read_u32_index(node, "ti,clockact", index, &prop);
+> +	if (!ret)
+> +		sysc->clockact = prop & 0xff;
+> +
+> +	ret = of_property_read_u32_index(node, "ti,sysc_type", index, &prop);
+> +	if (ret)
+> +		prop = 1;
+> +
+> +	switch (prop) {
+> +	case 2:
+> +		sysc->sysc_fields = &omap_hwmod_sysc_type2;
+> +		break;
+> +	case 3:
+> +		sysc->sysc_fields = &omap_hwmod_sysc_type3;
+> +		break;
+> +	case 1:
+> +	default:
+> +		sysc->sysc_fields = &omap_hwmod_sysc_type1;
+> +	}
+Missed hooking the class to oh?
+	class->sysc = sysc;
+	oh->class = class;
 
-Changes in v5: None
-Changes in v4:
-- Get number of PHYs from device tree.
-- Model each PHY as subnode of the phy provider node.
-
-Changes in v3:
-- Use BIT macro instead of bit shift ops.
-- Rename the config entry to PHY_ROCKCHIP_USB.
-
- drivers/phy/Kconfig            |   7 ++
- drivers/phy/Makefile           |   1 +
- drivers/phy/phy-rockchip-usb.c | 211 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 219 insertions(+)
- create mode 100644 drivers/phy/phy-rockchip-usb.c
-
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index ccad880..8a39d2a 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -239,6 +239,13 @@ config PHY_QCOM_IPQ806X_SATA
- 	depends on OF
- 	select GENERIC_PHY
- 
-+config PHY_ROCKCHIP_USB2
-+	tristate "Rockchip USB2 PHY Driver"
-+	depends on ARCH_ROCKCHIP && OF
-+	select GENERIC_PHY
-+	help
-+	  Enable this to support the Rockchip USB 2.0 PHY.
-+
- config PHY_ST_SPEAR1310_MIPHY
- 	tristate "ST SPEAR1310-MIPHY driver"
- 	select GENERIC_PHY
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index aa74f96..8a13f72 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -28,6 +28,7 @@ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
- phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)	+= phy-s5pv210-usb2.o
- obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
- obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)	+= phy-qcom-apq8064-sata.o
-+obj-$(CONFIG_PHY_ROCKCHIP_USB2) += phy-rockchip-usb.o
- obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
- obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
- obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
-diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
-new file mode 100644
-index 0000000..0317c21
---- /dev/null
-+++ b/drivers/phy/phy-rockchip-usb.c
-@@ -0,0 +1,211 @@
-+/*
-+ * Rockchip usb PHY driver
-+ *
-+ * Copyright (C) 2014 Yunzhi Li <lyz@rock-chips.com>
-+ * Copyright (C) 2014 ROCKCHIP, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/mutex.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/phy/phy.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/reset.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
-+
-+#define ROCKCHIP_RK3288_UOC(n)	(0x320 + n * 0x14)
-+
-+/*
-+ * The higher 16-bit of this register is used for write protection
-+ * only if BIT(13 + 16) set to 1 the BIT(13) can be written.
-+ */
-+#define SIDDQ_MSK		BIT(13 + 16)
-+#define SIDDQ_ON		BIT(13)
-+#define SIDDQ_OFF		(0 << 13)
-+
-+struct rockchip_usb_phy {
-+	struct regmap	*reg_base;
-+	unsigned int	reg_offset;
-+	struct clk	*clk;
-+	struct phy	*phy;
-+	unsigned	index;
-+};
-+
-+struct rockchip_usb_phy_priv {
-+	struct rockchip_usb_phy	*phys;
-+	unsigned		nphys;
-+};
-+
-+static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
-+					   bool siddq)
-+{
-+	return regmap_write(phy->reg_base, phy->reg_offset,
-+			    SIDDQ_MSK | (siddq ? SIDDQ_ON : SIDDQ_OFF));
-+}
-+
-+static int rockchip_usb_phy_power_off(struct phy *_phy)
-+{
-+	struct rockchip_usb_phy *phy = phy_get_drvdata(_phy);
-+	int ret = 0;
-+
-+	/* Power down usb phy analog blocks by set siddq 1 */
-+	ret = rockchip_usb_phy_power(phy, 1);
-+	if (ret)
-+		return ret;
-+
-+	clk_disable_unprepare(phy->clk);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static int rockchip_usb_phy_power_on(struct phy *_phy)
-+{
-+	struct rockchip_usb_phy *phy = phy_get_drvdata(_phy);
-+	int ret = 0;
-+
-+	ret = clk_prepare_enable(phy->clk);
-+	if (ret)
-+		return ret;
-+
-+	/* Power up usb phy analog blocks by set siddq 0 */
-+	ret = rockchip_usb_phy_power(phy, 0);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static struct phy *rockchip_usb_phy_xlate(struct device *dev,
-+					struct of_phandle_args *args)
-+{
-+	struct rockchip_usb_phy_priv *priv = dev_get_drvdata(dev);
-+	int i;
-+
-+	if (WARN_ON(args->args[0] >= priv->nphys))
-+		return ERR_PTR(-ENODEV);
-+
-+	for (i = 0; i < priv->nphys; i++) {
-+		if (priv->phys[i].index == args->args[0])
-+			break;
-+	}
-+
-+	if (i == priv->nphys)
-+		return ERR_PTR(-ENODEV);
-+
-+	return priv->phys[i].phy;
-+}
-+
-+static struct phy_ops ops = {
-+	.power_on	= rockchip_usb_phy_power_on,
-+	.power_off	= rockchip_usb_phy_power_off,
-+	.owner		= THIS_MODULE,
-+};
-+
-+static int rockchip_usb_phy_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct rockchip_usb_phy *rk_phy;
-+	struct rockchip_usb_phy_priv *priv;
-+	struct phy_provider *phy_provider;
-+	struct device_node *child;
-+	struct regmap *grf;
-+	unsigned int phy_id;
-+
-+	grf = syscon_regmap_lookup_by_phandle(dev->of_node, "rockchip,grf");
-+	if (IS_ERR(grf)) {
-+		dev_err(&pdev->dev, "Missing rockchip,grf property\n");
-+		return PTR_ERR(grf);
-+	}
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	/* Get number of phys from device tree */
-+	priv->nphys = of_get_child_count(dev->of_node);
-+	if (priv->nphys == 0)
-+		return -ENODEV;
-+
-+	priv->phys = devm_kzalloc(dev, priv->nphys * sizeof(*priv->phys),
-+				  GFP_KERNEL);
-+	if (!priv->phys)
-+		return -ENOMEM;
-+
-+	rk_phy = priv->phys;
-+	for_each_available_child_of_node(dev->of_node, child) {
-+		if (of_property_read_u32(child, "reg", &phy_id)) {
-+			dev_err(dev, "missing reg property in node %s\n",
-+				child->name);
-+			return -EINVAL;
-+		}
-+
-+		if (phy_id < 0 || phy_id >= priv->nphys) {
-+			dev_err(dev, "invalid phy id\n");
-+			return -EINVAL;
-+		}
-+
-+		rk_phy->reg_offset = ROCKCHIP_RK3288_UOC(phy_id);
-+		rk_phy->reg_base = grf;
-+
-+		rk_phy->clk = of_clk_get(child, 0);
-+		if (IS_ERR(rk_phy->clk)) {
-+			dev_warn(dev, "failed to get clock\n");
-+			rk_phy->clk = NULL;
-+		}
-+
-+		rk_phy->phy = devm_phy_create(dev, NULL, &ops);
-+		if (IS_ERR(rk_phy->phy)) {
-+			dev_err(dev, "failed to create PHY %d\n", phy_id);
-+			return PTR_ERR(rk_phy->phy);
-+		}
-+		phy_set_drvdata(rk_phy->phy, rk_phy);
-+
-+		rk_phy->index = phy_id;
-+		rk_phy++;
-+	}
-+
-+	platform_set_drvdata(pdev, priv);
-+
-+	phy_provider = devm_of_phy_provider_register(dev,
-+						     rockchip_usb_phy_xlate);
-+	return PTR_ERR_OR_ZERO(phy_provider);
-+}
-+
-+static const struct of_device_id rockchip_usb_phy_dt_ids[] = {
-+	{ .compatible = "rockchip,rk3288-usb-phy" },
-+	{}
-+};
-+
-+MODULE_DEVICE_TABLE(of, rockchip_usb_phy_dt_ids);
-+
-+static struct platform_driver rockchip_usb_driver = {
-+	.probe		= rockchip_usb_phy_probe,
-+	.driver		= {
-+		.name	= "rockchip-usb-phy",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = rockchip_usb_phy_dt_ids,
-+	},
-+};
-+
-+module_platform_driver(rockchip_usb_driver);
-+
-+MODULE_AUTHOR("Yunzhi Li <lyz@rock-chips.com>");
-+MODULE_DESCRIPTION("Rockchip USB 2.0 PHY driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.0.0
+Thanks and regards,
+Lokesh
+> +
+> +	return 0;
+> +}
+>  
+>  /**
+>   * omap_device_build_from_dt - build an omap_device with multiple hwmods
+> @@ -154,6 +264,11 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+>  			goto odbfd_exit1;
+>  		}
+>  		hwmods[i] = oh;
+> +
+> +		ret = omap_hwmod_init_sysc(&pdev->dev, oh, i);
+> +		if (ret)
+> +			goto odbfd_exit1;
+> +
+>  		if (oh->flags & HWMOD_INIT_NO_IDLE)
+>  			device_active = true;
+>  
+> 
