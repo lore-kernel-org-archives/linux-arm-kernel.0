@@ -1,207 +1,148 @@
 From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 10 Dec 2014 16:48:23 +0100
-Subject: [RFC 05/15] gpio: move DT parsing code to separate functions
+Date: Wed, 10 Dec 2014 16:48:28 +0100
+Subject: [RFC 10/15] drm/exynos/dsi: simplify hotplug code
 In-Reply-To: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
 References: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <1418226513-14105-6-git-send-email-a.hajda@samsung.com>
+Message-ID: <1418226513-14105-11-git-send-email-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch moves Device Tree parsing logic to separate
-function.
+Exynos DSI driver uses DSI bus attach/detach callbacks to implement
+panel hotplug mechanism. The patch moves panel attachment code
+from .detect callback to DSI bus callbacks. It makes the code
+simpler and more straightforward.
+The patch removes also redundant and lock unprotected dpms_off call
+from unbind code.
 
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 ---
- drivers/gpio/gpiolib-of.c | 59 +++++++++++++++++++++--------------------------
- drivers/gpio/gpiolib.c    | 33 +++++++++++++++++++-------
- drivers/gpio/gpiolib.h    |  4 ++--
- 3 files changed, 53 insertions(+), 43 deletions(-)
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c | 61 ++++++++++++++++++++-------------
+ 1 file changed, 38 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index 604dbe6..4707727 100644
---- a/drivers/gpio/gpiolib-of.c
-+++ b/drivers/gpio/gpiolib-of.c
-@@ -28,7 +28,7 @@
- /* Private data structure for of_gpiochip_find_and_xlate */
- struct gg_data {
- 	enum of_gpio_flags *flags;
--	struct of_phandle_args gpiospec;
-+	struct of_phandle_args *gpiospec;
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+index 05fe93d..8201d79 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+@@ -271,7 +271,6 @@ struct exynos_dsi {
+ 	struct exynos_drm_display display;
+ 	struct mipi_dsi_host dsi_host;
+ 	struct drm_connector connector;
+-	struct device_node *panel_node;
+ 	struct drm_panel *panel;
+ 	struct device *dev;
  
- 	struct gpio_desc *out_gpio;
- };
-@@ -39,12 +39,12 @@ static int of_gpiochip_find_and_xlate(struct gpio_chip *gc, void *data)
- 	struct gg_data *gg_data = data;
+@@ -1154,10 +1153,11 @@ static int exynos_dsi_init(struct exynos_dsi *dsi)
+ 
+ static int exynos_dsi_register_te_irq(struct exynos_dsi *dsi)
+ {
++	struct device_node *panel_node = dsi->panel->dev->of_node;
  	int ret;
+ 	int te_gpio_irq;
  
--	if ((gc->of_node != gg_data->gpiospec.np) ||
--	    (gc->of_gpio_n_cells != gg_data->gpiospec.args_count) ||
-+	if ((gc->of_node != gg_data->gpiospec->np) ||
-+	    (gc->of_gpio_n_cells != gg_data->gpiospec->args_count) ||
- 	    (!gc->of_xlate))
- 		return false;
- 
--	ret = gc->of_xlate(gc, &gg_data->gpiospec, gg_data->flags);
-+	ret = gc->of_xlate(gc, gg_data->gpiospec, gg_data->flags);
- 	if (ret < 0)
- 		return false;
- 
-@@ -52,61 +52,54 @@ static int of_gpiochip_find_and_xlate(struct gpio_chip *gc, void *data)
- 	return true;
- }
- 
--/**
-- * of_get_named_gpiod_flags() - Get a GPIO descriptor and flags for GPIO API
-- * @np:		device node to get GPIO from
-- * @propname:	property name containing gpio specifier(s)
-- * @index:	index of the GPIO
-- * @flags:	a flags pointer to fill in
-- *
-- * Returns GPIO descriptor to use with Linux GPIO API, or one of the errno
-- * value on the error condition. If @flags is not NULL the function also fills
-- * in flags for the GPIO.
-- */
--struct gpio_desc *of_get_named_gpiod_flags(struct device_node *np,
--		     const char *propname, int index, enum of_gpio_flags *flags)
-+struct gpio_desc *of_get_gpiod_by_spec(struct of_phandle_args *spec,
-+				       enum of_gpio_flags *flags)
+-	dsi->te_gpio = of_get_named_gpio(dsi->panel_node, "te-gpios", 0);
++	dsi->te_gpio = of_get_named_gpio(panel_node, "te-gpios", 0);
+ 	if (!gpio_is_valid(dsi->te_gpio)) {
+ 		dev_err(dsi->dev, "no te-gpios specified\n");
+ 		ret = dsi->te_gpio;
+@@ -1198,11 +1198,25 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
+ 				  struct mipi_dsi_device *device)
  {
- 	/* Return -EPROBE_DEFER to support probe() functions to be called
- 	 * later when the GPIO actually becomes available
- 	 */
- 	struct gg_data gg_data = {
- 		.flags = flags,
--		.out_gpio = ERR_PTR(-EPROBE_DEFER)
-+		.out_gpio = ERR_PTR(-EPROBE_DEFER),
-+		.gpiospec = spec
- 	};
--	int ret;
+ 	struct exynos_dsi *dsi = host_to_dsi(host);
++	struct drm_device *drm_dev = dsi->connector.dev;
++	bool changed = false;
  
- 	/* .of_xlate might decide to not fill in the flags, so clear it. */
- 	if (flags)
- 		*flags = 0;
- 
--	ret = of_parse_phandle_with_args(np, propname, "#gpio-cells", index,
--					 &gg_data.gpiospec);
--	if (ret) {
--		pr_debug("%s: can't parse '%s' property of node '%s[%d]'\n",
--			__func__, propname, np->full_name, index);
--		return ERR_PTR(ret);
--	}
--
- 	gpiochip_find(&gg_data, of_gpiochip_find_and_xlate);
- 
--	of_node_put(gg_data.gpiospec.np);
--	pr_debug("%s: parsed '%s' property of node '%s[%d]' - status (%d)\n",
--		 __func__, propname, np->full_name, index,
-+	pr_debug("%s: parsed property of node '%s[%d]' - status (%d)\n",
-+		 __func__, spec->np->full_name, spec->args[0],
- 		 PTR_ERR_OR_ZERO(gg_data.out_gpio));
+ 	dsi->lanes = device->lanes;
+ 	dsi->format = device->format;
+ 	dsi->mode_flags = device->mode_flags;
+-	dsi->panel_node = device->dev.of_node;
 +
- 	return gg_data.out_gpio;
- }
- 
- int of_get_named_gpio_flags(struct device_node *np, const char *list_name,
- 			    int index, enum of_gpio_flags *flags)
- {
-+	struct of_phandle_args spec;
- 	struct gpio_desc *desc;
-+	int ret;
++	mutex_lock(&drm_dev->mode_config.mutex);
 +
-+	ret = of_parse_phandle_with_args(np, list_name, "#gpio-cells", index,
-+					 &spec);
-+	if (ret) {
-+		pr_debug("%s: can't parse '%s' property of node '%s[%d]'\n",
-+			__func__, list_name, np->full_name, index);
-+		return ret;
++	dsi->panel = of_drm_find_panel(device->dev.of_node);
++	if (dsi->panel) {
++		drm_panel_attach(dsi->panel, &dsi->connector);
++		if (drm_dev->mode_config.poll_enabled) {
++			dsi->connector.status = connector_status_connected;
++			changed = true;
++		}
 +	}
- 
--	desc = of_get_named_gpiod_flags(np, list_name, index, flags);
-+	desc = of_get_gpiod_by_spec(&spec, flags);
- 
- 	if (IS_ERR(desc))
- 		return PTR_ERR(desc);
--	else
--		return desc_to_gpio(desc);
 +
-+	of_node_put(spec.np);
-+
-+	return desc_to_gpio(desc);
- }
- EXPORT_SYMBOL(of_get_named_gpio_flags);
++	mutex_unlock(&drm_dev->mode_config.mutex);
  
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index e8e98ca..78fcec9 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -1470,15 +1470,13 @@ void gpiod_add_lookup_table(struct gpiod_lookup_table *table)
- 	mutex_unlock(&gpio_lookup_lock);
- }
- 
--static struct gpio_desc *of_find_gpio(struct device *dev, const char *con_id,
--				      unsigned int idx,
--				      enum gpio_lookup_flags *flags)
-+static int of_get_gpiod_spec(struct device *dev, const char *con_id,
-+			     unsigned int idx, struct of_phandle_args *spec)
- {
- 	static const char *suffixes[] = { "gpios", "gpio" };
- 	char prop_name[32]; /* 32 is max size of property name */
--	enum of_gpio_flags of_flags;
--	struct gpio_desc *desc;
- 	unsigned int i;
-+	int ret;
- 
- 	for (i = 0; i < ARRAY_SIZE(suffixes); i++) {
- 		if (con_id)
-@@ -1486,12 +1484,31 @@ static struct gpio_desc *of_find_gpio(struct device *dev, const char *con_id,
- 		else
- 			snprintf(prop_name, 32, "%s", suffixes[i]);
- 
--		desc = of_get_named_gpiod_flags(dev->of_node, prop_name, idx,
--						&of_flags);
--		if (!IS_ERR(desc) || (PTR_ERR(desc) == -EPROBE_DEFER))
-+		ret = of_parse_phandle_with_args(dev->of_node, prop_name,
-+						 "#gpio-cells", idx, spec);
-+		if (!ret)
- 			break;
+ 	/*
+ 	 * This is a temporary solution and should be made by more generic way.
+@@ -1217,8 +1231,8 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
+ 			return ret;
  	}
  
-+	return ret;
-+}
-+
-+static struct gpio_desc *of_find_gpio(struct device *dev, const char *con_id,
-+				      unsigned int idx,
-+				      enum gpio_lookup_flags *flags)
-+{
-+	enum of_gpio_flags of_flags;
-+	struct of_phandle_args spec;
-+	struct gpio_desc *desc;
-+	int ret;
-+
-+	ret = of_get_gpiod_spec(dev, con_id, idx, &spec);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
-+	desc = of_get_gpiod_by_spec(&spec, &of_flags);
-+	of_node_put(spec.np);
-+
- 	if (IS_ERR(desc))
- 		return desc;
+-	if (dsi->connector.dev)
+-		drm_helper_hpd_irq_event(dsi->connector.dev);
++	if (changed)
++		drm_kms_helper_hotplug_event(drm_dev);
  
-diff --git a/drivers/gpio/gpiolib.h b/drivers/gpio/gpiolib.h
-index 9db2b6a..3c0c1ad 100644
---- a/drivers/gpio/gpiolib.h
-+++ b/drivers/gpio/gpiolib.h
-@@ -54,8 +54,8 @@ acpi_get_gpiod_by_index(struct device *dev, int index,
+ 	return 0;
  }
- #endif
+@@ -1227,13 +1241,29 @@ static int exynos_dsi_host_detach(struct mipi_dsi_host *host,
+ 				  struct mipi_dsi_device *device)
+ {
+ 	struct exynos_dsi *dsi = host_to_dsi(host);
++	struct drm_device *drm_dev = dsi->connector.dev;
++	struct exynos_drm_display *display = dev_get_drvdata(dsi->dev);
++	bool changed = false;
  
--struct gpio_desc *of_get_named_gpiod_flags(struct device_node *np,
--		   const char *list_name, int index, enum of_gpio_flags *flags);
-+struct gpio_desc *of_get_gpiod_by_spec(struct of_phandle_args *spec,
-+				       enum of_gpio_flags *flags);
+ 	exynos_dsi_unregister_te_irq(dsi);
  
- struct gpio_desc *gpiochip_get_desc(struct gpio_chip *chip, u16 hwnum);
+-	dsi->panel_node = NULL;
++	mutex_lock(&drm_dev->mode_config.mutex);
++
++	display->ops->dpms(display, DRM_MODE_DPMS_OFF);
++
++	if (dsi->panel) {
++		drm_panel_detach(dsi->panel);
++		dsi->panel = NULL;
++		if (drm_dev->mode_config.poll_enabled) {
++			dsi->connector.status = connector_status_disconnected;
++			changed = true;
++		}
++	}
++
++	mutex_unlock(&drm_dev->mode_config.mutex);
+ 
+-	if (dsi->connector.dev)
+-		drm_helper_hpd_irq_event(dsi->connector.dev);
++	if (changed)
++		drm_kms_helper_hotplug_event(drm_dev);
+ 
+ 	return 0;
+ }
+@@ -1430,19 +1460,6 @@ exynos_dsi_detect(struct drm_connector *connector, bool force)
+ {
+ 	struct exynos_dsi *dsi = connector_to_dsi(connector);
+ 
+-	if (!dsi->panel) {
+-		dsi->panel = of_drm_find_panel(dsi->panel_node);
+-		if (dsi->panel)
+-			drm_panel_attach(dsi->panel, &dsi->connector);
+-	} else if (!dsi->panel_node) {
+-		struct exynos_drm_display *display;
+-
+-		display = platform_get_drvdata(to_platform_device(dsi->dev));
+-		exynos_dsi_dpms(display, DRM_MODE_DPMS_OFF);
+-		drm_panel_detach(dsi->panel);
+-		dsi->panel = NULL;
+-	}
+-
+ 	if (dsi->panel)
+ 		return connector_status_connected;
+ 
+@@ -1665,8 +1682,6 @@ static void exynos_dsi_unbind(struct device *dev, struct device *master,
+ 	struct exynos_drm_display *display = dev_get_drvdata(dev);
+ 	struct exynos_dsi *dsi = display_to_dsi(display);
+ 
+-	exynos_dsi_dpms(display, DRM_MODE_DPMS_OFF);
+-
+ 	mipi_dsi_host_unregister(&dsi->dsi_host);
+ }
  
 -- 
 1.9.1
