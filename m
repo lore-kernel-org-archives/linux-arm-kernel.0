@@ -1,41 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Dec 2014 17:39:18 +0000
-Subject: [RFC 00/15] Resource tracking/allocation framework
-In-Reply-To: <CA+tnuKYSDZ0mtzQ_g1QjovJwG01OgPjSXuozEBXQsEZv_2o-=w@mail.gmail.com>
-References: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
- <20141210161620.GM11285@n2100.arm.linux.org.uk>
- <CA+tnuKYSDZ0mtzQ_g1QjovJwG01OgPjSXuozEBXQsEZv_2o-=w@mail.gmail.com>
-Message-ID: <20141210173918.GN11285@n2100.arm.linux.org.uk>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Wed, 10 Dec 2014 18:42:33 +0100
+Subject: BCM2048 bluetooth connected over OMAP serial
+In-Reply-To: <CAL_Jsq+dy+5Fsg_oasP_hN3RuL1Wk7fOcQjyp+UdaJZyGa=uEg@mail.gmail.com>
+References: <20141210164333.GA3154@amd>
+ <CAL_Jsq+dy+5Fsg_oasP_hN3RuL1Wk7fOcQjyp+UdaJZyGa=uEg@mail.gmail.com>
+Message-ID: <5C56C73A-1D8E-4ACC-B1B7-3E8D49943A70@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 06:23:49PM +0100, A H wrote:
-> 10 gru 2014 17:16 "Russell King - ARM Linux" <linux@arm.linux.org.uk>
-> napisa?(a):
-> >
-> > On Wed, Dec 10, 2014 at 04:48:18PM +0100, Andrzej Hajda wrote:
-> > > 3. There are drivers which can work without specific resource, but if
-> > >   the resource becomes available/unavailable it can do some additional
-> stuff.
-> > >   An example of such driver is DRM driver (more precisely
-> drm_connector) -
-> > >   it can start without attached drm_panel, but if the panel becomes
-> available it
-> > >   can react by generating HPD event and start using it.
-> >
-> > Bad example, and actually incorrect.  DRM connectors are referenced in
-> > userspace by an IDR number, which can be re-used in the case of a
-> > connector appearing, disappearing, and then a different connector
-> > re-appearing.
+Hi Rob,
+
+>> So, there's bluetooth chip that's connected to the SoC by UART and some
+>> GPIOs. What would be right representation in the device tree?
+>> Something like this?
+>> 
+>>        bluetooth {
+>>                  compatible = "broadcom,bcm2048";
+>>                  uart = <&uart2>;
+>>                  reset-gpios = <&gpio3 27 GPIO_ACTIVE_HIGH>; /* want 91 */
+>>                  host-wakeup-gpios = <&gpio4 5 GPIO_ACTIVE_HIGH>; /* want 101 */
+>>                  bluetooth-wakeup-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>; /* want 37 */
+>>                  chip-type = <3>;
+>>                  bt-sysclk = <2>;
+>>                  reset-gpio-shared = <0>;
+>>        };
+>> 
+>> Is there some way to prevent OMAP tty driver from binding to the
+>> device and exporting the device to userspace?
 > 
-> But it is not about reappearing of drm_connector, it is about reappearing
-> of drm_panel which is fortunately not a part of drm driver. Connector here
-> is only consumer of drm_panel which should have possibility to receive
-> notifications on panel (dis-)appearance.
+> Isn't the normal way for BT to work is the uart is exposed to
+> userspace and the BT stack is all in userspace? This is how other
+> Broadcom BT/WiFi combo parts work.
 
-Okay, so that's exactly like a panel being "hotplugged" to the connector,
-which should be fine.
+not on Linux actually. The Bluetooth core layer (including the HCI transport) are all in kernel space.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+However UART based Bluetooth chips are exposed as TTY and then the N_HCI line discipline is used to attach it to the kernel Bluetooth subsystem.
+
+Regards
+
+Marcel
