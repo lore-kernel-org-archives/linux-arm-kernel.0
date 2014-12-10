@@ -1,18 +1,41 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 10 Dec 2014 12:02:44 -0500 (EST)
-Subject: [PATCH v8 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <34612839.hAkXUcbKUQ@wuerfel>
-References: <2331317.LV3gPP3odb@wuerfel>
- <20141210.110732.519666115784722516.davem@davemloft.net>
- <34612839.hAkXUcbKUQ@wuerfel>
-Message-ID: <20141210.120244.722990295139076460.davem@davemloft.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Dec 2014 18:02:42 +0100
+Subject: BCM2048 bluetooth connected over OMAP serial
+In-Reply-To: <20141210164333.GA3154@amd>
+References: <20141210164333.GA3154@amd>
+Message-ID: <11367725.nphhSzdtpK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 10 Dec 2014 17:36:46 +0100
+On Wednesday 10 December 2014 17:43:33 Pavel Machek wrote:
+> 
+> So, there's bluetooth chip that's connected to the SoC by UART and some
+> GPIOs. What would be right representation in the device tree?
+> Something like this?
+> 
+>         bluetooth {
+>                   compatible = "broadcom,bcm2048";
+>                   uart = <&uart2>;
+>                   reset-gpios = <&gpio3 27 GPIO_ACTIVE_HIGH>; /* want 91 */
+>                   host-wakeup-gpios = <&gpio4 5 GPIO_ACTIVE_HIGH>; /* want 101 */
+>                   bluetooth-wakeup-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>; /* want 37 */
+>                   chip-type = >;
+>                   bt-sysclk = <2>;
+>                   reset-gpio-shared = <0>;
+>         };
+> 
+> Is there some way to prevent OMAP tty driver from binding to the
+> device and exporting the device to userspace?
 
-> Or is there any better alternative for broken hardware that lacks
-> a TX-complete interrupt?
+I think from the driver perspective, you want this to be a tty line
+discipline rather than a driver that attaches to the physical
+uart.
 
-The only option is an hrtimer or similar.
+For the DT representation, I fear we haven't got a precedent. A uart
+phandle sounds reasonable, but there might be other ways to do it
+and we should consider if there are better alternatives. It could
+possibly be a child node of the uart, but that would require other
+infrastructure in the kernel because we don't currently create
+devices for those.
+
+	Arnd
