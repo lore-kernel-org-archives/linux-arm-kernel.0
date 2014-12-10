@@ -1,27 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Dec 2014 12:33:16 +0100
-Subject: [GIT PULL 9/9] ARM64: SoC changes for 3.19
-In-Reply-To: <CA+55aFwU2qa+4BssUg3zCmZVPz5fmAHLgy--2=yb-NjXMZNDhg@mail.gmail.com>
-References: <4491193.a6KEQb1tZH@wuerfel> <2482441.CQUhI8rqR1@wuerfel>
- <CA+55aFwU2qa+4BssUg3zCmZVPz5fmAHLgy--2=yb-NjXMZNDhg@mail.gmail.com>
-Message-ID: <142437558.Xy2szB89Mt@wuerfel>
+From: harinik@xilinx.com (Harini Katakam)
+Date: Wed, 10 Dec 2014 17:14:42 +0530
+Subject: [PATCH v4 0/2] Cadence I2C driver fixes
+Message-ID: <1418211884-5329-1-git-send-email-harinik@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 December 2014 17:20:43 Linus Torvalds wrote:
-> On Tue, Dec 9, 2014 at 1:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/arm64-for-linus
-> 
-> I get the same shortlog this time, but a different diffstat again.
-> 
-> Oh well. At least this time my diffstat is smaller.
-> 
+This series implements workarounds for some bugs in Cadence I2C controller.
 
-Ah, my mistake. This branch included the move of the files that was done in the
-cleanup branch. In the other pull requests I manually did the diffstat to match
-what I expect you would see instead of what "git request-pull" tells me, while
-for this one, the diffstat looked correct to me and I did not recreate one
-manually.
+- The I2C controller when configured in Master Mode generates invalid read transactions.
+When HOLD bit is set and HW timeout occurs, invalid read transactions are
+generated on the bus. This will affect repeated start conditions and large
+data transfer condtions where transfer_size_register has to be updated again.
+The transfer size register rolls over erroneously under these conditions.
+Note that this HW timeout cannot be disabled even if the interrupt is unused.
+Errata link: http://www.xilinx.com/support/answers/61664.html
 
-	Arnd
+-The I2C controller when configured in Master Mode is the missing master completion interrupt.
+During repeated start condition, the driver has to set the HOLD bit for
+the set of transfer being done together and clear the HOLD bit just before
+the last transfer. But the controller does not indicate completion when
+a read/receive transfer is done if the HOLD bit is set. This affects
+all repeated start operation where a read/receive transfer is not
+the last transfer.
+Errata link: http://www.xilinx.com/support/answers/61665.html
+
+To address the above,
+- >252 byte transfers are done such that transfer_size never becomes zero.
+- timeout register value is increased (even though the driver doesn't use this).
+- A check is performed to see if there is any transfer following a
+read/receive transfer in the set of messages using repeated start.
+An error is returned in such cases because if we proceed, completion interrupt
+is never obtained and a SW timeout will occur.
+
+Harini Katakam (2):
+  i2c: cadence: Handle > 252 byte transfers
+  i2c: cadence: Check for errata condition involving master receive
+
+ drivers/i2c/busses/i2c-cadence.c |  187 +++++++++++++++++++++++---------------
+ 1 file changed, 114 insertions(+), 73 deletions(-)
+
+-- 
+1.7.9.5
