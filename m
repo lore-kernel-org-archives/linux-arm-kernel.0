@@ -1,41 +1,65 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Wed, 10 Dec 2014 18:42:33 +0100
-Subject: BCM2048 bluetooth connected over OMAP serial
-In-Reply-To: <CAL_Jsq+dy+5Fsg_oasP_hN3RuL1Wk7fOcQjyp+UdaJZyGa=uEg@mail.gmail.com>
-References: <20141210164333.GA3154@amd>
- <CAL_Jsq+dy+5Fsg_oasP_hN3RuL1Wk7fOcQjyp+UdaJZyGa=uEg@mail.gmail.com>
-Message-ID: <5C56C73A-1D8E-4ACC-B1B7-3E8D49943A70@holtmann.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 10 Dec 2014 09:45:54 -0800
+Subject: [PATCH v4 2/2] i2c: cadence: Check for errata condition
+ involving master receive
+In-Reply-To: <1418211884-5329-3-git-send-email-harinik@xilinx.com>
+References: <1418211884-5329-1-git-send-email-harinik@xilinx.com>
+ <1418211884-5329-3-git-send-email-harinik@xilinx.com>
+Message-ID: <6b2bd13bcd934b0fb09712e8950348e6@BN1AFFO11FD005.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
->> So, there's bluetooth chip that's connected to the SoC by UART and some
->> GPIOs. What would be right representation in the device tree?
->> Something like this?
->> 
->>        bluetooth {
->>                  compatible = "broadcom,bcm2048";
->>                  uart = <&uart2>;
->>                  reset-gpios = <&gpio3 27 GPIO_ACTIVE_HIGH>; /* want 91 */
->>                  host-wakeup-gpios = <&gpio4 5 GPIO_ACTIVE_HIGH>; /* want 101 */
->>                  bluetooth-wakeup-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>; /* want 37 */
->>                  chip-type = <3>;
->>                  bt-sysclk = <2>;
->>                  reset-gpio-shared = <0>;
->>        };
->> 
->> Is there some way to prevent OMAP tty driver from binding to the
->> device and exporting the device to userspace?
+On Wed, 2014-12-10 at 05:14PM +0530, Harini Katakam wrote:
+> Cadence I2C controller has the following bugs:
+> - completion indication is not given to the driver at the end of
+> a read/receive transfer with HOLD bit set.
+> - Invalid read transaction are generated on the bus when HW timeout
+> condition occurs with HOLD bit set.
 > 
-> Isn't the normal way for BT to work is the uart is exposed to
-> userspace and the BT stack is all in userspace? This is how other
-> Broadcom BT/WiFi combo parts work.
+> As a result of the above, if a set of messages to be transferred with
+> repeated start includes any transfer following a read transfer,
+> completion is never indicated and timeout occurs.
+> Hence a check is implemented to return -EOPNOTSUPP for such sequences.
+> 
+> Signed-off-by: Harini Katakam <harinik@xilinx.com>
+> Signed-off-by: Vishnu Motghare <vishnum@xilinx.com>
+> ---
+> 
+> v4:
+> Use single dev_warn and make message grep-able.
+> 
+> v3:
+> Add warning in case of unsupported transfer.
+> 
+> v2:
+> Dont defeteature repeated start. Just check for unsupported conditions in the
+> driver and return error.
+> 
+> ---
+>  drivers/i2c/busses/i2c-cadence.c |   14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+> index 5f5d4fa..f9269a6 100644
+> --- a/drivers/i2c/busses/i2c-cadence.c
+> +++ b/drivers/i2c/busses/i2c-cadence.c
+> @@ -541,6 +541,20 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+>  	 * processed with a repeated start.
+>  	 */
+>  	if (num > 1) {
+> +		/*
+> +		 * This controller does not give completion interrupt after a
+> +		 * master receive transfer if HOLD bit is set (repeated start),
+> +		 * resulting in SW timeout. Hence, if a receive transfer is
+> +		 * followed by any other transfer, an error is returned
+> +		 * indicating that this sequence is not supported.
+> +		 */
+> +		for (count = 0; count < num-1; count++) {
+> +			if (msgs[count].flags & I2C_M_RD)
+> +				dev_warn(adap->dev.parent, "No support for "
+> +					 "repeated start when receive is "
+> +					 "followed by a transfer\n");
 
-not on Linux actually. The Bluetooth core layer (including the HCI transport) are all in kernel space.
+Still not grepable. There must be no line breaks in the string!
 
-However UART based Bluetooth chips are exposed as TTY and then the N_HCI line discipline is used to attach it to the kernel Bluetooth subsystem.
-
-Regards
-
-Marcel
+	S?ren
