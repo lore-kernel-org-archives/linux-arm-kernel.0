@@ -1,47 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 10 Dec 2014 18:42:03 +0000
-Subject: BCM2048 bluetooth connected over OMAP serial
-In-Reply-To: <11367725.nphhSzdtpK@wuerfel>
-References: <20141210164333.GA3154@amd>
- <11367725.nphhSzdtpK@wuerfel>
-Message-ID: <20141210184203.GA28150@leverpostej>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 10 Dec 2014 10:46:57 -0800
+Subject: [PATCH 2/4] PCI: iproc: Add Broadcom iProc PCIe driver
+In-Reply-To: <54887901.8070501@broadcom.com>
+References: <1418169871-19232-3-git-send-email-rjui@broadcom.com>
+ <9707535.Y78sV0TgX4@wuerfel> <54887901.8070501@broadcom.com>
+Message-ID: <CAGVrzcbZ_f43Vf1mu2XErVi_Jehjggh2TREyrSs84ntSm98yvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 05:02:42PM +0000, Arnd Bergmann wrote:
-> On Wednesday 10 December 2014 17:43:33 Pavel Machek wrote:
-> > 
-> > So, there's bluetooth chip that's connected to the SoC by UART and some
-> > GPIOs. What would be right representation in the device tree?
-> > Something like this?
-> > 
-> >         bluetooth {
-> >                   compatible = "broadcom,bcm2048";
-> >                   uart = <&uart2>;
-> >                   reset-gpios = <&gpio3 27 GPIO_ACTIVE_HIGH>; /* want 91 */
-> >                   host-wakeup-gpios = <&gpio4 5 GPIO_ACTIVE_HIGH>; /* want 101 */
-> >                   bluetooth-wakeup-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>; /* want 37 */
-> >                   chip-type = >;
-> >                   bt-sysclk = <2>;
-> >                   reset-gpio-shared = <0>;
-> >         };
-> > 
-> > Is there some way to prevent OMAP tty driver from binding to the
-> > device and exporting the device to userspace?
-> 
-> I think from the driver perspective, you want this to be a tty line
-> discipline rather than a driver that attaches to the physical
-> uart.
-> 
-> For the DT representation, I fear we haven't got a precedent. A uart
-> phandle sounds reasonable, but there might be other ways to do it
-> and we should consider if there are better alternatives. It could
-> possibly be a child node of the uart, but that would require other
-> infrastructure in the kernel because we don't currently create
-> devices for those.
+2014-12-10 8:46 GMT-08:00 Scott Branden <sbranden@broadcom.com>:
+> On 14-12-10 03:31 AM, Arnd Bergmann wrote:
+>>
+>> On Tuesday 09 December 2014 16:04:29 Ray Jui wrote:
+>>>
+>>> Add initial version of the Broadcom iProc PCIe driver. This driver
+>>> has been tested on NSP and Cygnus and is expected to work on all iProc
+>>> family of SoCs that deploys the same PCIe host controller
+>>>
+>>> The driver also supports MSI
+>>>
+>>> Signed-off-by: Ray Jui <rjui@broadcom.com>
+>>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>>
+>>
+>> The driver looks suspiciously like the one that Hauke already submitted a
+>> while ago for bcm53xx. Please come up with a merged driver that works for
+>> both.
+>
+> Could you please be a little more specific.  What driver did "Hauke already
+> submitted"?  I do not see any driver in the kernel you are talking about.
 
-I think the child node is the way to go; that would match what we do for
-I2C and SPI. We might need new infrastructure, but I don't think we
-should treat this differently simlpy because we don't have that yet.
+https://www.marc.info/?l=linux-pci&m=141547043110684&w=2
 
-Mark.
+>>
+>>
+>> Are you sure that iProc isn't based on the BCMA bus infrastructure after
+>> all? Even the physical address of your PCI host falls into the address
+>> range that is used for the internal BCMA bus on the other chips!
+>
+> BCMA seems to be for MIPS architectures.  It seems to be quite specific to
+> those architectures using BCMA.  I see no use of it in bcm53xx code?
+
+BCMA lives in its own directory in drivers/bcma/ and is not specific
+to MIPS actually. Older BCM47xx/BCM53xx MIPS-based SoCs traditionally
+started with a discoverable Silicon Sonics Backplane (drivers/ssb) and
+progressively migrated to BCMA (drivers/bcma), both subsystems offer a
+very similar bus/device/driver abstraction and discovery mechanism.
+-- 
+Florian
