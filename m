@@ -1,125 +1,105 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 10 Dec 2014 17:56:44 +0200
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <54886CA2.3040406@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <20141210150853.GH23639@arm.com> <54886CA2.3040406@arm.com>
-Message-ID: <2132309.AcRQihKBMv@avalon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Dec 2014 17:06:24 +0100
+Subject: [RFC PATCH] ARM64: PCI: inherit root controller's dma-coherent
+In-Reply-To: <CACVXFVOfyQNGw+w_GTx1VmN89RKcvykh7DaFm=OcFGJ1f-EYxg@mail.gmail.com>
+References: <1417066891-16789-1-git-send-email-ming.lei@canonical.com>
+ <7705416.b49xSXIHeP@wuerfel>
+ <CACVXFVOfyQNGw+w_GTx1VmN89RKcvykh7DaFm=OcFGJ1f-EYxg@mail.gmail.com>
+Message-ID: <1664127.pT3ZlYms89@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-On Wednesday 10 December 2014 15:54:10 Robin Murphy wrote:
-> On 10/12/14 15:08, Will Deacon wrote:
-> > On Wed, Dec 10, 2014 at 02:52:56PM +0000, Rob Clark wrote:
-> >> On Mon, Dec 1, 2014 at 11:57 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >>> This patch extends of_dma_configure so that it sets up the IOMMU for a
-> >>> device, as well as the coherent/non-coherent DMA mapping ops.
-> >>> 
-> >>> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >>> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> >>> Tested-by: Robin Murphy <robin.murphy@arm.com>
-> >>> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> >>> ---
-> >>> 
-> >>>   arch/arm/include/asm/dma-mapping.h |  4 +++-
-> >>>   drivers/of/platform.c              | 21 ++++++++++++++-------
-> >>>   include/linux/dma-mapping.h        |  8 +++++++-
-> >>>   3 files changed, 24 insertions(+), 9 deletions(-)
-> >>> 
-> >>> diff --git a/arch/arm/include/asm/dma-mapping.h
-> >>> b/arch/arm/include/asm/dma-mapping.h index dc3420e77758..f3c0d953f6a2
-> >>> 100644
-> >>> --- a/arch/arm/include/asm/dma-mapping.h
-> >>> +++ b/arch/arm/include/asm/dma-mapping.h
-> >>> @@ -121,7 +121,9 @@ static inline unsigned long dma_max_pfn(struct
-> >>> device *dev)>>> 
-> >>>   }
-> >>>   #define dma_max_pfn(dev) dma_max_pfn(dev)
-> >>> 
-> >>> -static inline void arch_setup_dma_ops(struct device *dev, bool
-> >>> coherent)
-> >>> +static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
-> >>> +                                     u64 size, struct iommu_ops *iommu,
-> >>> +                                     bool coherent)
-> >>> 
-> >>>   {
-> >>>   
-> >>>          if (coherent)
-> >>>          
-> >>>                  set_dma_ops(dev, &arm_coherent_dma_ops);
-> >>> 
-> >>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> >>> index ff1f4e9afccb..b89caf8c7586 100644
-> >>> --- a/drivers/of/platform.c
-> >>> +++ b/drivers/of/platform.c
-> >>> @@ -19,6 +19,7 @@
-> >>> 
-> >>>   #include <linux/slab.h>
-> >>>   #include <linux/of_address.h>
-> >>>   #include <linux/of_device.h>
-> >>> 
-> >>> +#include <linux/of_iommu.h>
-> >>> 
-> >>>   #include <linux/of_irq.h>
-> >>>   #include <linux/of_platform.h>
-> >>>   #include <linux/platform_device.h>
-> >>> 
-> >>> @@ -166,6 +167,7 @@ static void of_dma_configure(struct device *dev)
-> >>> 
-> >>>          int ret;
-> >>>          bool coherent;
-> >>>          unsigned long offset;
-> >>> 
-> >>> +       struct iommu_ops *iommu;
-> >>> 
-> >>>          /*
-> >>>          
-> >>>           * Set default dma-mask to 32 bit. Drivers are expected to
-> >>>           setup
-> >>> 
-> >>> @@ -194,7 +196,16 @@ static void of_dma_configure(struct device *dev)
-> >>> 
-> >>>          dev_dbg(dev, "device is%sdma coherent\n",
-> >>>          
-> >>>                  coherent ? " " : " not ");
-> >>> 
-> >>> -       arch_setup_dma_ops(dev, coherent);
-> >>> +       iommu = of_iommu_configure(dev);
-> >>> +       dev_dbg(dev, "device is%sbehind an iommu\n",
-> >>> +               iommu ? " " : " not ");
-> >>> +
-> >>> +       arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
-> >> 
-> >> so, what is the way for a driver that explicitly wants to manage it's
-> >> own device virtual address space to opt out of this?  I suspect that
-> >> won't be the common case, but for a gpu, if dma layer all of a sudden
-> >> thinks it is in control of the gpu's virtual address space, things are
-> >> going to end in tears..
-> > 
-> > I think you'll need to detach from the DMA domain, then have the driver
-> > manage everything itself. As you say, it's not the common case, so you
-> > may need to add some hooks for detaching from the default domain and
-> > swizzling your DMA ops.
+On Tuesday 09 December 2014 10:53:26 Ming Lei wrote:
+> On Sat, Dec 6, 2014 at 12:05 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 05 December 2014 15:26:27 Grygorii Strashko wrote:
+> >> ---
+> >> From 5e078b1ba148aa280181c4f695e567875a0f4ae9 Mon Sep 17 00:00:00 2001
+> >> From: Grygorii Strashko <grygorii.strashko@ti.com>
+> >> Date: Fri, 28 Feb 2014 19:11:39 +0200
+> >> Subject: [RFC PATCH] common: dma-mapping: introduce dma_init_dev_from_parent() helper
+> >>
+> >> Now, in Kernel, Parent device's DMA configuration has to by applied
+> >> to the child as is, to enable DMA support for this device. Usually, this
+> >> is happened in places where child device is manually instantiated by
+> >> Parent device device using Platform APIs
+> >> (see drivers/usb/dwc3/host.c or drivers/pci/probe.c:pci_device_add()
+> >>  for example).
+> >>
+> >> The DMA configuration is represented in Device data structure was
+> >> extended recently (dma_pfn_offset was added) and going to extended
+> >> in future to support IOMMU. Therefore, the code used by drivers to
+> >> copy DMA configuration from parent to child device isn't working
+> >> properly, for example:
+> >> (drivers/usb/dwc3/host.c)
+> >>       dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
+> >>
+> >>       xhci->dev.parent        = dwc->dev;
+> >>       xhci->dev.dma_mask      = dwc->dev->dma_mask;
+> >>       xhci->dev.dma_parms     = dwc->dev->dma_parms;
+> >> above code will miss to copy dma_pfn_offset.
+> >
+> >
+> > I'm not too thrilled about this implementation either. It immediately
+> > breaks as soon as we have IOMMU support, as the IOMMU configuration
+> > is by definition device dependent, and you have introduced a few bugs
+> > by copying the pointers to dma_mask and dma_parms.
 > 
-> Surely if that's a problem then it's an existing one anyway? If the
-> IOMMU driver wants to do its own thing here all it has to do is return
-> -ENOTHANKSIDRATHERNOT from its of_xlate call (or be even more boring and
-> simply not implement it), and the device gets whatever default DMA ops
-> the old of_dma_configure would have given it, with zero impact from this
-> series. I only see a potential issue if you have one driver running
-> multiple IOMMUs, some of which are happy to pass off control to DMA
-> mapping and some not, in which case either you make the driver clever
-> enough to identify its clients and handle of_xlate correctly, or work
-> around it with the DT representation.
+> Using devm_kmalloc() for allocating dma_mask might be helpful for
+> the issue, but still need to support the default setting to be overrided
+> by IOMMU code, which is related with the timing of calling
+> dma_init_dev_from_parent()> 
 
-Exactly for that reason, wouldn't it be better to let the client device 
-whether it wants to use the DMA mapping API abstraction or manually control 
-the IOMMU mappings ?
+struct pci_dev actually contains a place to store both dma_mask and
+dma_parms, so no need for that.
 
--- 
-Regards,
+> >> +     struct device *parent_dev = parent;
+> >
+> > One of these two is not needed.
+> >
+> >> +     /* if parent is NULL assume, dev->parent is the one to use */
+> >> +     if (!parent_dev)
+> >> +             parent_dev = dev->parent;
+> >> +
+> >> +     if (is_device_dma_capable(parent_dev)) {
+> >> +             dev->dma_mask   = parent_dev->dma_mask;
+> >
+> > This is always wrong: dev->dma_mask is a pointer!
+> >
+> >> +             dev->coherent_dma_mask = parent_dev->coherent_dma_mask;
+> >
+> > What if someone has already set a mask that is greater than 32-bit?
+> 
+> Yes, that is a bit complicated because there may be default
+> dma_mask which was setup before creating the device.
 
-Laurent Pinchart
+PCI devices should generally start out with a 32-bit mask, which can
+be modified by the driver as needed. The only case you need to be
+worried about is when the PCI host controller has a mask that is
+smaller than 32-bit (e.g. on some shmobile rcar implementations),
+and in that case you need to set the same mask there. We also need the
+same change for platform devices, which start out with a 32-bit mask
+at the moment, even when the parent bus has a smaller address width.
+
+> >
+> >> +             dev->dma_parms  = parent_dev->dma_parms;
+> >
+> > same  problem here.
+> >
+> >> +             dev->dma_pfn_offset = parent_dev->dma_pfn_offset;
+> >> +             set_dma_ops(dev, get_dma_ops(parent_dev));
+> >> +     }
+> >> +}
+> >> +EXPORT_SYMBOL(dma_init_dev_from_parent);
+> 
+> Arnd, given it isn't easy to figure out one good solution for moving
+> dma configuration into generic code(driver core, pci, .) now, could
+> the issue be fixed first?
+
+We have just merged a new arch_setup_dma_ops callback based on patches
+from Will Deacon, and this is required to get iommu drivers to work
+properly. The callback is used correctly by of_dma_configure, and we
+just need to hook it up on arm64 (I think Robin already has a patch,
+if Will doesn't) and call it from the PCI core. There really isn't
+any magic involved here.
+
+	Arnd
