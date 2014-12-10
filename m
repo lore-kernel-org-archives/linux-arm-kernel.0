@@ -1,35 +1,67 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 10 Dec 2014 07:53:13 -0500
-Subject: [PATCH v2] irqchip: mediatek: Use IS_ERR() instead of NULL
- pointer check
-In-Reply-To: <20141210121442.GA14485@gmail.com>
-References: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
- <1418205302-22531-1-git-send-email-yingjoe.chen@mediatek.com>
- <20141210121442.GA14485@gmail.com>
-Message-ID: <20141210125313.GJ22670@titan.lakedaemon.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 10 Dec 2014 13:13:45 +0000
+Subject: arm64 broken in -next by commit 08d53aa58cb1 (of/fdt: export fdt
+ blob as /sys/firmware/fdt)
+In-Reply-To: <CAKv+Gu8r570eqEZQb=BP-L6NBGjMebv5jnzEEBmhDb9MDJnipg@mail.gmail.com>
+References: <20141210120422.GB13994@e104818-lin.cambridge.arm.com>
+ <20141210121325.GC13994@e104818-lin.cambridge.arm.com>
+ <20141210122210.GE13994@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8r570eqEZQb=BP-L6NBGjMebv5jnzEEBmhDb9MDJnipg@mail.gmail.com>
+Message-ID: <20141210131345.GF13994@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 01:14:43PM +0100, Beniamino Galvani wrote:
-> On Wed, Dec 10, 2014 at 05:55:02PM +0800, Yingjoe Chen wrote:
-> > Beniamino reported a kernel oops caused by an invalid DT file for the
-> > mediatek interrupt polarity extension.
-> > 
-> > The reason is that the interrupt polarity support for mediatek chips
-> > merely checks for NULL pointer instead of a casted error return
-> > value in mtk_sysirq_of_init() so any other casted error value passes
-> > the NULL pointer check and causes a kernel panic when dereferenced.
-> > 
-> > Use IS_ERR() and return the error value via PTR_ERR().
-> > 
-> > Reported-and-tested-by: Beniamino Galvani <b.galvani@gmail.com>
+On Wed, Dec 10, 2014 at 12:31:57PM +0000, Ard Biesheuvel wrote:
+> On 10 December 2014 at 13:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Wed, Dec 10, 2014 at 12:13:26PM +0000, Catalin Marinas wrote:
+> >> On Wed, Dec 10, 2014 at 12:04:23PM +0000, Catalin Marinas wrote:
+> >> > Ard,
+> >> >
+> >> > I noticed that linux-next no longer boots on Juno. Bisecting, I ended up
+> >> > on your commit above and reverting it gets things going again. I
+> >> > initially thought it has something to do with the hardware crypto since
+> >> > you added some crc32_be() calls but disabling arm64 hw crypto didn't
+> >> > make any difference.
+> >>
+> >> Commenting out crc32_be() in early_init_dt_verify() allows it to boot.
+> >> Some printk, it shows:
+> >>
+> >> initial_boot_params = 0xffffffc01fe00000
+> >> fdt_totalsize(initial_boot_params) = 2108105
+> >>
+> >> Isn't it quite big?
+> >
+> > We assume that the DT blob is maximum 2MB in the initial kernel mapping.
+> > I'm not sure why it is that big here but early_init_dt_verify() most
+> > likely doesn't have the areas around initial_boot_params mapped, only
+> > 2MB section. The crc probably triggers a very early data abort.
+> >
 > 
-> Well, actually I only reported the bug and didn't do any test. Can the
-> "-and-tested" portion of the tag be dropped while applying the patch?
+> Looking at the patch history, I just noticed that the crc() call got
+> moved to before fdt_check_header(), which means initial_boot_params
+> may point to something else than an FDT.
+> How exactly that may happen, and how the system ends up booting after
+> all is not clear to me, but the crc32() call should be moved down
+> regardless
 
-I'd prefer that it be tested before applying.  Would you mind confirming
-that the oops is gone with this patch applied?
+In linux-next, it looks ok to me, crc32 is called after
+fdt_check_header():
 
-thx,
+bool __init early_init_dt_verify(void *params)
+{
+	if (!params)
+		return false;
 
-Jason.
+	/* check device tree validity */
+	if (fdt_check_header(params))
+		return false;
+
+	/* Setup flat device-tree pointer */
+	initial_boot_params = params;
+	of_fdt_crc32 = crc32_be(~0, initial_boot_params,
+				fdt_totalsize(initial_boot_params));
+	return true;
+}
+
+-- 
+Catalin
