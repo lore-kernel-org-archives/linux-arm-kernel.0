@@ -1,77 +1,49 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 10 Dec 2014 10:46:22 +0530
-Subject: [PATCH RFT 1/2] drivers: bus: check cci device tree node status
-In-Reply-To: <CAM4voa=TQeOMTHmM2iBquDRwoEFPAgUFeMwJ73H4qdcSmR1Lug@mail.gmail.com>
-References: <1417186209-5256-1-git-send-email-a.kesavan@samsung.com>	<CAM4voakjWgnEXoXT1LH2ZFBy=U4vfXFXS1Su8VB7Cd3s3wqmSA@mail.gmail.com>	<5487C897.9050405@arm.com>
- <CAM4voa=TQeOMTHmM2iBquDRwoEFPAgUFeMwJ73H4qdcSmR1Lug@mail.gmail.com>
-Message-ID: <5487D726.6000603@arm.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 10 Dec 2014 11:08:01 +0530
+Subject: [GIT PULL] Mailbox changes for 3.19
+Message-ID: <CABb+yY14EGbv4cPUanuZyKZ5=jtkbAsWUX+=auqSrESQ1fFvGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Linus,
 
+The following changes since commit 0df1f2487d2f0d04703f142813d53615d62a1da4:
 
-On Wednesday 10 December 2014 09:55 AM, Abhilash Kesavan wrote:
-> Hi Sudeep,
->
-> On Wed, Dec 10, 2014 at 9:44 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Hi Abhilash,
->>
->> On Wednesday 10 December 2014 09:31 AM, Abhilash Kesavan wrote:
->>>
->>> Hi,
->>>
->>> On Fri, Nov 28, 2014 at 8:20 PM, Abhilash Kesavan <a.kesavan@samsung.com>
->>> wrote:
->>>>
->>>> The arm-cci driver completes the probe sequence even if the cci node is
->>>> marked as disabled. Add a check in the driver to honour the cci status
->>>> in the device tree.
->>>>
->>>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->>>
->>>
->>> This patch helps disable CCI on the Arndale Octa board thus resolving
->>> some imprecise aborts seen on that board. Kindly review.
->>>
->>> Regards,
->>> Abhilash
->>>>
->>>> ---
->>>>    drivers/bus/arm-cci.c |    3 +++
->>>>    1 file changed, 3 insertions(+)
->>>>
->>>> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
->>>> index 860da40..0ce5e2d 100644
->>>> --- a/drivers/bus/arm-cci.c
->>>> +++ b/drivers/bus/arm-cci.c
->>>> @@ -1312,6 +1312,9 @@ static int cci_probe(void)
->>>>           if (!np)
->>>>                   return -ENODEV;
->>>>
->>>> +       if (!of_device_is_available(np))
->>>> +               return -ENODEV;
->>>> +
->>
->>
->> IIUC, by this change you are disabling the MCPM boot protocol here.
->> Is there any alternative boot protocol that works on this platform
->> to boot all 8 cores ? Sorry by quick grep couldn't find one, hence
->> so I am asking.
->
-> Thanks for the reply.
-> On disabling MCPM, we will default to platsmp.c/firmware.c which boots
-> 4 cores as per Kevin's comment here[1]. This was the original behavior
-> before MCPM was enabled for all 5420 based SoCs.
->
+  Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
 
-Thanks for pointing that out. I assume the firmware can handle the
-alternate boot protocol and no more workarounds are needed especially
-when getting CPUIdle working in this mode.
+are available in the git repository at:
 
-Anyways the patch makes sense irrespective how it works on exynos, so
-you can add,
+  http://git.linaro.org/landing-teams/working/fujitsu/integration.git
+mailbox-devel
 
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+for you to fetch changes up to 86c22f8c9a3b71d42d38bfcd80372de72f573713:
 
-Regards,
-Sudeep
+  Mailbox: Add support for Platform Communication Channel (2014-11-27
+12:51:09 +0530)
+
+----------------------------------------------------------------
+Andrew Bresticker (1):
+      mailbox: Don't unnecessarily re-arm the polling timer
+
+Ashwin Chaugule (1):
+      Mailbox: Add support for Platform Communication Channel
+
+Sudeep Holla (1):
+      mailbox: add tx_prepare client callback
+
+Suman Anna (1):
+      mailbox/omap: adapt to the new mailbox framework
+
+ .../devicetree/bindings/mailbox/omap-mailbox.txt   |  23 ++
+ drivers/mailbox/Kconfig                            |  12 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/mailbox.c                          |  19 +-
+ drivers/mailbox/mailbox.h                          |  14 +
+ drivers/mailbox/omap-mailbox.c                     | 346 ++++++++++--------
+ drivers/mailbox/pcc.c                              | 403 +++++++++++++++++++++
+ drivers/remoteproc/omap_remoteproc.c               |  51 +--
+ include/linux/mailbox_client.h                     |   3 +
+ include/linux/omap-mailbox.h                       |  16 +-
+ 10 files changed, 701 insertions(+), 188 deletions(-)
+ create mode 100644 drivers/mailbox/mailbox.h
+ create mode 100644 drivers/mailbox/pcc.c
