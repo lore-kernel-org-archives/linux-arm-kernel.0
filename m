@@ -1,54 +1,36 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 10 Dec 2014 11:04:33 +0100
-Subject: [PATCH 1/2] ARM: at91/dt: sam9263: Fix typo: ac91_clk -> ac97_clk
-In-Reply-To: <2676241.BfXNcaGQ7Q@kongar>
+Date: Wed, 10 Dec 2014 11:05:49 +0100
+Subject: [PATCH 2/2] ARM: at91/dt: sam9263: Add missing clocks to ac97 node
+In-Reply-To: <1417789016-20001-2-git-send-email-alexanders83@web.de>
 References: <1417789016-20001-1-git-send-email-alexanders83@web.de>
- <2676241.BfXNcaGQ7Q@kongar>
-Message-ID: <54881AB1.3040609@atmel.com>
+ <1417789016-20001-2-git-send-email-alexanders83@web.de>
+Message-ID: <54881AFD.2090007@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/12/2014 16:00, Alexander Stein a ?crit :
-> On Friday 05 December 2014, 15:16:55 wrote Alexander Stein:
->> That clock should be called ac97_clk.
->>
->> Signed-off-by: Alexander Stein <alexanders83@web.de>
->> ---
->>  arch/arm/boot/dts/at91sam9263.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
->> index 7989756..5ed2810 100644
->> --- a/arch/arm/boot/dts/at91sam9263.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
->> @@ -294,7 +294,7 @@
->>  						reg = <17>;
->>  					};
->>  
->> -					ac91_clk: ac97_clk {
->> +					ac97_clk: ac97_clk {
->>  						#clock-cells = <0>;
->>  						reg = <18>;
->>  					};
->>
+Le 05/12/2014 15:16, Alexander Stein a ?crit :
+> The clock node specifying 'ac97_clk' was missing.
 > 
-> Please ignore those 2 patches for now. I made a mistake during local rebase.
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
+> ---
+>  arch/arm/boot/dts/at91sam9263.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+> index 5ed2810..2d9d0ad 100644
+> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+> @@ -821,6 +821,8 @@
+>  				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 5>;
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_ac97>;
+> +				clocks = <&ac97_clk>;
+> +				clock-names = "ac97_clk";
+>  				status = "disabled";
+>  			};
 
-Well at least this one (1/2) is valid and applies on my new
-at91-3.20-dt. So I take it for now: tell me if you feel otherwise.
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+I see, this one comes after the addition of the node itself. I ignore it.
 
 Bye,
-
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-
-
 -- 
 Nicolas Ferre
