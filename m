@@ -1,445 +1,62 @@
-From: wuyun.wu@huawei.com (Yun Wu (Abel))
-Date: Wed, 10 Dec 2014 11:03:01 +0800
-Subject: [PATCH v3 04/13] irqchip: GICv3: ITS command queue
-In-Reply-To: <1416839720-18400-5-git-send-email-marc.zyngier@arm.com>
-References: <1416839720-18400-1-git-send-email-marc.zyngier@arm.com>
- <1416839720-18400-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <5487B7E5.2080104@huawei.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 09 Dec 2014 19:20:00 -0800
+Subject: [PATCH v2 3/4] ARM: mach-bcm: Enable I2C support for iProc
+In-Reply-To: <5487AEF0.5010404@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+ <1418177893-22094-1-git-send-email-rjui@broadcom.com>
+ <1418177893-22094-4-git-send-email-rjui@broadcom.com>
+ <5487ADE5.4070705@gmail.com> <5487AEF0.5010404@broadcom.com>
+Message-ID: <5487BBE0.4000701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/24 22:35, Marc Zyngier wrote:
+On 09/12/14 18:24, Ray Jui wrote:
+> 
+> 
+> On 12/9/2014 6:20 PM, Florian Fainelli wrote:
+>> On 09/12/14 18:18, Ray Jui wrote:
+>>> Enable I2C driver support for Broadcom iProc family of SoCs by
+>>> selecting I2C_BCM_IPROC
+>>>
+>>> Signed-off-by: Ray Jui <rjui@broadcom.com>
+>>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>>> ---
+>>>   arch/arm/mach-bcm/Kconfig |    1 +
+>>>   1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+>>> index aaeec78..86ee90b 100644
+>>> --- a/arch/arm/mach-bcm/Kconfig
+>>> +++ b/arch/arm/mach-bcm/Kconfig
+>>> @@ -19,6 +19,7 @@ config ARCH_BCM_IPROC
+>>>       select ARCH_REQUIRE_GPIOLIB
+>>>       select ARM_AMBA
+>>>       select PINCTRL
+>>> +    select I2C_BCM_IPROC
+>>
+>> One way to avoid having to modify mach-bcm/Kconfig would be to have your
+>> i2c driver Kconfig do this:
+>>
+>> default ARCH_BCM_IPROC
+>>
+>> would that work?
+>>
+> Yes. So in which case it is better to select a driver from the
+> architecture specific Kconfig?
 
-[...]
+I suppose if your driver/subsystem is critical for system boot, like
+powering a regulator or something that has a critical purpose, a select
+is probably more appropriate here. If this is just exposing non-critical
+devices, I would go with a depends on/default at the driver Kconfig level.
 
-> +static struct its_collection *its_build_mapd_cmd(struct its_cmd_block *cmd,
-> +						 struct its_cmd_desc *desc)
-> +{
-> +	unsigned long itt_addr;
-> +	u8 size = order_base_2(desc->its_mapd_cmd.dev->nr_ites);
+This is just how I see things, others would definitively have a
+different view.
 
-If @nr_ites is 1, then @size becomes 0, and... (see below)
-
-> +
-> +	itt_addr = virt_to_phys(desc->its_mapd_cmd.dev->itt);
-> +	itt_addr = ALIGN(itt_addr, ITS_ITT_ALIGN);
-> +
-> +	its_encode_cmd(cmd, GITS_CMD_MAPD);
-> +	its_encode_devid(cmd, desc->its_mapd_cmd.dev->device_id);
-> +	its_encode_size(cmd, size - 1);
-
-here (size - 1) becomes the value of ~0, which will exceed the maximum
-supported bits of identifier.
-
-Regards,
-	Abel
-
-> +	its_encode_itt(cmd, itt_addr);
-> +	its_encode_valid(cmd, desc->its_mapd_cmd.valid);
-> +
-> +	its_fixup_cmd(cmd);
-> +
-> +	return desc->its_mapd_cmd.dev->collection;
-> +}
-> +
-> +static struct its_collection *its_build_mapc_cmd(struct its_cmd_block *cmd,
-> +						 struct its_cmd_desc *desc)
-> +{
-> +	its_encode_cmd(cmd, GITS_CMD_MAPC);
-> +	its_encode_collection(cmd, desc->its_mapc_cmd.col->col_id);
-> +	its_encode_target(cmd, desc->its_mapc_cmd.col->target_address);
-> +	its_encode_valid(cmd, desc->its_mapc_cmd.valid);
-> +
-> +	its_fixup_cmd(cmd);
-> +
-> +	return desc->its_mapc_cmd.col;
-> +}
-> +
-> +static struct its_collection *its_build_mapvi_cmd(struct its_cmd_block *cmd,
-> +						  struct its_cmd_desc *desc)
-> +{
-> +	its_encode_cmd(cmd, GITS_CMD_MAPVI);
-> +	its_encode_devid(cmd, desc->its_mapvi_cmd.dev->device_id);
-> +	its_encode_event_id(cmd, desc->its_mapvi_cmd.event_id);
-> +	its_encode_phys_id(cmd, desc->its_mapvi_cmd.phys_id);
-> +	its_encode_collection(cmd, desc->its_mapvi_cmd.dev->collection->col_id);
-> +
-> +	its_fixup_cmd(cmd);
-> +
-> +	return desc->its_mapvi_cmd.dev->collection;
-> +}
-> +
-> +static struct its_collection *its_build_movi_cmd(struct its_cmd_block *cmd,
-> +						 struct its_cmd_desc *desc)
-> +{
-> +	its_encode_cmd(cmd, GITS_CMD_MOVI);
-> +	its_encode_devid(cmd, desc->its_movi_cmd.dev->device_id);
-> +	its_encode_event_id(cmd, desc->its_movi_cmd.id);
-> +	its_encode_collection(cmd, desc->its_movi_cmd.col->col_id);
-> +
-> +	its_fixup_cmd(cmd);
-> +
-> +	return desc->its_movi_cmd.dev->collection;
-> +}
-> +
-> +static struct its_collection *its_build_discard_cmd(struct its_cmd_block *cmd,
-> +						    struct its_cmd_desc *desc)
-> +{
-> +	its_encode_cmd(cmd, GITS_CMD_DISCARD);
-> +	its_encode_devid(cmd, desc->its_discard_cmd.dev->device_id);
-> +	its_encode_event_id(cmd, desc->its_discard_cmd.event_id);
-> +
-> +	its_fixup_cmd(cmd);
-> +
-> +	return desc->its_discard_cmd.dev->collection;
-> +}
-> +
-> +static struct its_collection *its_build_inv_cmd(struct its_cmd_block *cmd,
-> +						struct its_cmd_desc *desc)
-> +{
-> +	its_encode_cmd(cmd, GITS_CMD_INV);
-> +	its_encode_devid(cmd, desc->its_inv_cmd.dev->device_id);
-> +	its_encode_event_id(cmd, desc->its_inv_cmd.event_id);
-> +
-> +	its_fixup_cmd(cmd);
-> +
-> +	return desc->its_inv_cmd.dev->collection;
-> +}
-> +
-> +static struct its_collection *its_build_invall_cmd(struct its_cmd_block *cmd,
-> +						   struct its_cmd_desc *desc)
-> +{
-> +	its_encode_cmd(cmd, GITS_CMD_INVALL);
-> +	its_encode_collection(cmd, desc->its_mapc_cmd.col->col_id);
-> +
-> +	its_fixup_cmd(cmd);
-> +
-> +	return NULL;
-> +}
-> +
-> +static u64 its_cmd_ptr_to_offset(struct its_node *its,
-> +				 struct its_cmd_block *ptr)
-> +{
-> +	return (ptr - its->cmd_base) * sizeof(*ptr);
-> +}
-> +
-> +static int its_queue_full(struct its_node *its)
-> +{
-> +	int widx;
-> +	int ridx;
-> +
-> +	widx = its->cmd_write - its->cmd_base;
-> +	ridx = readl_relaxed(its->base + GITS_CREADR) / sizeof(struct its_cmd_block);
-> +
-> +	/* This is incredibly unlikely to happen, unless the ITS locks up. */
-> +	if (((widx + 1) % ITS_CMD_QUEUE_NR_ENTRIES) == ridx)
-> +		return 1;
-> +
-> +	return 0;
-> +}
-> +
-> +static struct its_cmd_block *its_allocate_entry(struct its_node *its)
-> +{
-> +	struct its_cmd_block *cmd;
-> +	u32 count = 1000000;	/* 1s! */
-> +
-> +	while (its_queue_full(its)) {
-> +		count--;
-> +		if (!count) {
-> +			pr_err_ratelimited("ITS queue not draining\n");
-> +			return NULL;
-> +		}
-> +		cpu_relax();
-> +		udelay(1);
-> +	}
-> +
-> +	cmd = its->cmd_write++;
-> +
-> +	/* Handle queue wrapping */
-> +	if (its->cmd_write == (its->cmd_base + ITS_CMD_QUEUE_NR_ENTRIES))
-> +		its->cmd_write = its->cmd_base;
-> +
-> +	return cmd;
-> +}
-> +
-> +static struct its_cmd_block *its_post_commands(struct its_node *its)
-> +{
-> +	u64 wr = its_cmd_ptr_to_offset(its, its->cmd_write);
-> +
-> +	writel_relaxed(wr, its->base + GITS_CWRITER);
-> +
-> +	return its->cmd_write;
-> +}
-> +
-> +static void its_flush_cmd(struct its_node *its, struct its_cmd_block *cmd)
-> +{
-> +	/*
-> +	 * Make sure the commands written to memory are observable by
-> +	 * the ITS.
-> +	 */
-> +	if (its->flags & ITS_FLAGS_CMDQ_NEEDS_FLUSHING)
-> +		__flush_dcache_area(cmd, sizeof(*cmd));
-> +	else
-> +		dsb(ishst);
-> +}
-> +
-> +static void its_wait_for_range_completion(struct its_node *its,
-> +					  struct its_cmd_block *from,
-> +					  struct its_cmd_block *to)
-> +{
-> +	u64 rd_idx, from_idx, to_idx;
-> +	u32 count = 1000000;	/* 1s! */
-> +
-> +	from_idx = its_cmd_ptr_to_offset(its, from);
-> +	to_idx = its_cmd_ptr_to_offset(its, to);
-> +
-> +	while (1) {
-> +		rd_idx = readl_relaxed(its->base + GITS_CREADR);
-> +		if (rd_idx >= to_idx || rd_idx < from_idx)
-> +			break;
-> +
-> +		count--;
-> +		if (!count) {
-> +			pr_err_ratelimited("ITS queue timeout\n");
-> +			return;
-> +		}
-> +		cpu_relax();
-> +		udelay(1);
-> +	}
-> +}
-> +
-> +static void its_send_single_command(struct its_node *its,
-> +				    its_cmd_builder_t builder,
-> +				    struct its_cmd_desc *desc)
-> +{
-> +	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;
-> +	struct its_collection *sync_col;
-> +
-> +	raw_spin_lock(&its->lock);
-> +
-> +	cmd = its_allocate_entry(its);
-> +	if (!cmd) {		/* We're soooooo screewed... */
-> +		pr_err_ratelimited("ITS can't allocate, dropping command\n");
-> +		raw_spin_unlock(&its->lock);
-> +		return;
-> +	}
-> +	sync_col = builder(cmd, desc);
-> +	its_flush_cmd(its, cmd);
-> +
-> +	if (sync_col) {
-> +		sync_cmd = its_allocate_entry(its);
-> +		if (!sync_cmd) {
-> +			pr_err_ratelimited("ITS can't SYNC, skipping\n");
-> +			goto post;
-> +		}
-> +		its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
-> +		its_encode_target(sync_cmd, sync_col->target_address);
-> +		its_fixup_cmd(sync_cmd);
-> +		its_flush_cmd(its, sync_cmd);
-> +	}
-> +
-> +post:
-> +	next_cmd = its_post_commands(its);
-> +	raw_spin_unlock(&its->lock);
-> +
-> +	its_wait_for_range_completion(its, cmd, next_cmd);
-> +}
-> +
-> +static void its_send_inv(struct its_device *dev, u32 event_id)
-> +{
-> +	struct its_cmd_desc desc;
-> +
-> +	desc.its_inv_cmd.dev = dev;
-> +	desc.its_inv_cmd.event_id = event_id;
-> +
-> +	its_send_single_command(dev->its, its_build_inv_cmd, &desc);
-> +}
-> +
-> +static void its_send_mapd(struct its_device *dev, int valid)
-> +{
-> +	struct its_cmd_desc desc;
-> +
-> +	desc.its_mapd_cmd.dev = dev;
-> +	desc.its_mapd_cmd.valid = !!valid;
-> +
-> +	its_send_single_command(dev->its, its_build_mapd_cmd, &desc);
-> +}
-> +
-> +static void its_send_mapc(struct its_node *its, struct its_collection *col,
-> +			  int valid)
-> +{
-> +	struct its_cmd_desc desc;
-> +
-> +	desc.its_mapc_cmd.col = col;
-> +	desc.its_mapc_cmd.valid = !!valid;
-> +
-> +	its_send_single_command(its, its_build_mapc_cmd, &desc);
-> +}
-> +
-> +static void its_send_mapvi(struct its_device *dev, u32 irq_id, u32 id)
-> +{
-> +	struct its_cmd_desc desc;
-> +
-> +	desc.its_mapvi_cmd.dev = dev;
-> +	desc.its_mapvi_cmd.phys_id = irq_id;
-> +	desc.its_mapvi_cmd.event_id = id;
-> +
-> +	its_send_single_command(dev->its, its_build_mapvi_cmd, &desc);
-> +}
-> +
-> +static void its_send_movi(struct its_device *dev,
-> +			  struct its_collection *col, u32 id)
-> +{
-> +	struct its_cmd_desc desc;
-> +
-> +	desc.its_movi_cmd.dev = dev;
-> +	desc.its_movi_cmd.col = col;
-> +	desc.its_movi_cmd.id = id;
-> +
-> +	its_send_single_command(dev->its, its_build_movi_cmd, &desc);
-> +}
-> +
-> +static void its_send_discard(struct its_device *dev, u32 id)
-> +{
-> +	struct its_cmd_desc desc;
-> +
-> +	desc.its_discard_cmd.dev = dev;
-> +	desc.its_discard_cmd.event_id = id;
-> +
-> +	its_send_single_command(dev->its, its_build_discard_cmd, &desc);
-> +}
-> +
-> +static void its_send_invall(struct its_node *its, struct its_collection *col)
-> +{
-> +	struct its_cmd_desc desc;
-> +
-> +	desc.its_invall_cmd.col = col;
-> +
-> +	its_send_single_command(its, its_build_invall_cmd, &desc);
-> +}
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index 040615a..21c9d70 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -80,9 +80,27 @@
->  #define GICR_MOVALLR			0x0110
->  #define GICR_PIDR2			GICD_PIDR2
->  
-> +#define GICR_CTLR_ENABLE_LPIS		(1UL << 0)
-> +
-> +#define GICR_TYPER_CPU_NUMBER(r)	(((r) >> 8) & 0xffff)
-> +
->  #define GICR_WAKER_ProcessorSleep	(1U << 1)
->  #define GICR_WAKER_ChildrenAsleep	(1U << 2)
->  
-> +#define GICR_PROPBASER_NonShareable	(0U << 10)
-> +#define GICR_PROPBASER_InnerShareable	(1U << 10)
-> +#define GICR_PROPBASER_OuterShareable	(2U << 10)
-> +#define GICR_PROPBASER_SHAREABILITY_MASK (3UL << 10)
-> +#define GICR_PROPBASER_nCnB		(0U << 7)
-> +#define GICR_PROPBASER_nC		(1U << 7)
-> +#define GICR_PROPBASER_RaWt		(2U << 7)
-> +#define GICR_PROPBASER_RaWb		(3U << 7)
-> +#define GICR_PROPBASER_WaWt		(4U << 7)
-> +#define GICR_PROPBASER_WaWb		(5U << 7)
-> +#define GICR_PROPBASER_RaWaWt		(6U << 7)
-> +#define GICR_PROPBASER_RaWaWb		(7U << 7)
-> +#define GICR_PROPBASER_IDBITS_MASK	(0x1f)
-> +
->  /*
->   * Re-Distributor registers, offsets from SGI_base
->   */
-> @@ -95,9 +113,93 @@
->  #define GICR_IPRIORITYR0		GICD_IPRIORITYR
->  #define GICR_ICFGR0			GICD_ICFGR
->  
-> +#define GICR_TYPER_PLPIS		(1U << 0)
->  #define GICR_TYPER_VLPIS		(1U << 1)
->  #define GICR_TYPER_LAST			(1U << 4)
->  
-> +#define LPI_PROP_GROUP1			(1 << 1)
-> +#define LPI_PROP_ENABLED		(1 << 0)
-> +
-> +/*
-> + * ITS registers, offsets from ITS_base
-> + */
-> +#define GITS_CTLR			0x0000
-> +#define GITS_IIDR			0x0004
-> +#define GITS_TYPER			0x0008
-> +#define GITS_CBASER			0x0080
-> +#define GITS_CWRITER			0x0088
-> +#define GITS_CREADR			0x0090
-> +#define GITS_BASER			0x0100
-> +#define GITS_PIDR2			GICR_PIDR2
-> +
-> +#define GITS_TRANSLATER			0x10040
-> +
-> +#define GITS_TYPER_PTA			(1UL << 19)
-> +
-> +#define GITS_CBASER_VALID		(1UL << 63)
-> +#define GITS_CBASER_nCnB		(0UL << 59)
-> +#define GITS_CBASER_nC			(1UL << 59)
-> +#define GITS_CBASER_RaWt		(2UL << 59)
-> +#define GITS_CBASER_RaWb		(3UL << 59)
-> +#define GITS_CBASER_WaWt		(4UL << 59)
-> +#define GITS_CBASER_WaWb		(5UL << 59)
-> +#define GITS_CBASER_RaWaWt		(6UL << 59)
-> +#define GITS_CBASER_RaWaWb		(7UL << 59)
-> +#define GITS_CBASER_NonShareable	(0UL << 10)
-> +#define GITS_CBASER_InnerShareable	(1UL << 10)
-> +#define GITS_CBASER_OuterShareable	(2UL << 10)
-> +#define GITS_CBASER_SHAREABILITY_MASK	(3UL << 10)
-> +
-> +#define GITS_BASER_NR_REGS		8
-> +
-> +#define GITS_BASER_VALID		(1UL << 63)
-> +#define GITS_BASER_nCnB			(0UL << 59)
-> +#define GITS_BASER_nC			(1UL << 59)
-> +#define GITS_BASER_RaWt			(2UL << 59)
-> +#define GITS_BASER_RaWb			(3UL << 59)
-> +#define GITS_BASER_WaWt			(4UL << 59)
-> +#define GITS_BASER_WaWb			(5UL << 59)
-> +#define GITS_BASER_RaWaWt		(6UL << 59)
-> +#define GITS_BASER_RaWaWb		(7UL << 59)
-> +#define GITS_BASER_TYPE_SHIFT		(56)
-> +#define GITS_BASER_TYPE(r)		(((r) >> GITS_BASER_TYPE_SHIFT) & 7)
-> +#define GITS_BASER_ENTRY_SIZE_SHIFT	(48)
-> +#define GITS_BASER_ENTRY_SIZE(r)	((((r) >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0xff) + 1)
-> +#define GITS_BASER_NonShareable		(0UL << 10)
-> +#define GITS_BASER_InnerShareable	(1UL << 10)
-> +#define GITS_BASER_OuterShareable	(2UL << 10)
-> +#define GITS_BASER_SHAREABILITY_SHIFT	(10)
-> +#define GITS_BASER_SHAREABILITY_MASK	(3UL << GITS_BASER_SHAREABILITY_SHIFT)
-> +#define GITS_BASER_PAGE_SIZE_SHIFT	(8)
-> +#define GITS_BASER_PAGE_SIZE_4K		(0UL << GITS_BASER_PAGE_SIZE_SHIFT)
-> +#define GITS_BASER_PAGE_SIZE_16K	(1UL << GITS_BASER_PAGE_SIZE_SHIFT)
-> +#define GITS_BASER_PAGE_SIZE_64K	(2UL << GITS_BASER_PAGE_SIZE_SHIFT)
-> +#define GITS_BASER_PAGE_SIZE_MASK	(3UL << GITS_BASER_PAGE_SIZE_SHIFT)
-> +
-> +#define GITS_BASER_TYPE_NONE		0
-> +#define GITS_BASER_TYPE_DEVICE		1
-> +#define GITS_BASER_TYPE_VCPU		2
-> +#define GITS_BASER_TYPE_CPU		3
-> +#define GITS_BASER_TYPE_COLLECTION	4
-> +#define GITS_BASER_TYPE_RESERVED5	5
-> +#define GITS_BASER_TYPE_RESERVED6	6
-> +#define GITS_BASER_TYPE_RESERVED7	7
-> +
-> +/*
-> + * ITS commands
-> + */
-> +#define GITS_CMD_MAPD			0x08
-> +#define GITS_CMD_MAPC			0x09
-> +#define GITS_CMD_MAPVI			0x0a
-> +#define GITS_CMD_MOVI			0x01
-> +#define GITS_CMD_DISCARD		0x0f
-> +#define GITS_CMD_INV			0x0c
-> +#define GITS_CMD_MOVALL			0x0e
-> +#define GITS_CMD_INVALL			0x0d
-> +#define GITS_CMD_INT			0x03
-> +#define GITS_CMD_CLEAR			0x04
-> +#define GITS_CMD_SYNC			0x05
-> +
->  /*
->   * CPU interface registers
->   */
+> 
+>>>       help
+>>>         This enables support for systems based on Broadcom IPROC
+>>> architected SoCs.
+>>>         The IPROC complex contains one or more ARM CPUs along with
+>>> common
+>>>
+>>
