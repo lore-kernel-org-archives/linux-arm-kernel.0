@@ -1,85 +1,75 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 10 Dec 2014 13:23:17 +0000
-Subject: [RESEND][PATCH v15 6/7] kprobes: Pass the original kprobe for
- preparing optimized kprobe
-In-Reply-To: <1418047765-53197-7-git-send-email-wangnan0@huawei.com>
-References: <1418047765-53197-1-git-send-email-wangnan0@huawei.com>
- <1418047765-53197-7-git-send-email-wangnan0@huawei.com>
-Message-ID: <1418217797.3661.22.camel@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 10 Dec 2014 14:28:39 +0100
+Subject: [PATCH] [RFC] ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node
+In-Reply-To: <1417617454-14533-1-git-send-email-geert+renesas@glider.be>
+References: <1417617454-14533-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdX5i8qXdVUYMi+BLEe7Ah+_hJOEputW7jw5xvQ6UqH3EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masami Hiramatsu
+On Wed, Dec 3, 2014 at 3:37 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> Add a node for the Private Timer and Watchdog, as found in the Cortex-A9
+> MPCore.
+>
+> Without this, there's no clocksource available during early kernel
+> initialization, before cmt1 is initialized, leading to a lock-up if
+> CONFIG_CPU_IDLE=y.
+>
+> FIXME The clock should be the PERIPH clock, but the sh73a0 CPG driver
+>       doesn't have support for that clock yet. Hence we use the ZG
+>       clock, which runs at the same frequency.
 
-How should this patch find its way into the mainline? Is it OK to submit
-this as part of the ARM kprobe changes (which presumably will go in via
-Russell's tree)?
- 
--- 
-Tixy
+It looks like we do have the clock in sh73a0.dtsi, but it's called "twd_clk".
+Ulrich, is that correct?
 
-On Mon, 2014-12-08 at 22:09 +0800, Wang Nan wrote:
-> From: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-> 
-> Pass the original kprobe for preparing an optimized kprobe arch-dep
-> part, since for some architecture (e.g. ARM32) requires the information
-> in original kprobe.
-> 
-> Signed-off-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+Note that the frequency is off by a factor of 2, just like for its parent "z".
+(that is, without your (~private) patch to take into account ZSEL).
+
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->  arch/x86/kernel/kprobes/opt.c | 3 ++-
->  include/linux/kprobes.h       | 3 ++-
->  kernel/kprobes.c              | 4 ++--
->  3 files changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/x86/kernel/kprobes/opt.c b/arch/x86/kernel/kprobes/opt.c
-> index f1314d0..7028296 100644
-> --- a/arch/x86/kernel/kprobes/opt.c
-> +++ b/arch/x86/kernel/kprobes/opt.c
-> @@ -320,7 +320,8 @@ void arch_remove_optimized_kprobe(struct optimized_kprobe *op)
->   * Target instructions MUST be relocatable (checked inside)
->   * This is called when new aggr(opt)probe is allocated or reused.
->   */
-> -int arch_prepare_optimized_kprobe(struct optimized_kprobe *op)
-> +int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
-> +				  struct kprobe *__unused)
->  {
->  	u8 *buf;
->  	int ret;
-> diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
-> index f7296e5..7ab2c93 100644
-> --- a/include/linux/kprobes.h
-> +++ b/include/linux/kprobes.h
-> @@ -308,7 +308,8 @@ struct optimized_kprobe {
->  /* Architecture dependent functions for direct jump optimization */
->  extern int arch_prepared_optinsn(struct arch_optimized_insn *optinsn);
->  extern int arch_check_optimized_kprobe(struct optimized_kprobe *op);
-> -extern int arch_prepare_optimized_kprobe(struct optimized_kprobe *op);
-> +extern int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
-> +					 struct kprobe *orig);
->  extern void arch_remove_optimized_kprobe(struct optimized_kprobe *op);
->  extern void arch_optimize_kprobes(struct list_head *oplist);
->  extern void arch_unoptimize_kprobes(struct list_head *oplist,
-> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
-> index 3995f54..9f28aa7 100644
-> --- a/kernel/kprobes.c
-> +++ b/kernel/kprobes.c
-> @@ -717,7 +717,7 @@ static void prepare_optimized_kprobe(struct kprobe *p)
->  	struct optimized_kprobe *op;
->  
->  	op = container_of(p, struct optimized_kprobe, kp);
-> -	arch_prepare_optimized_kprobe(op);
-> +	arch_prepare_optimized_kprobe(op, p);
->  }
->  
->  /* Allocate new optimized_kprobe and try to prepare optimized instructions */
-> @@ -731,7 +731,7 @@ static struct kprobe *alloc_aggr_kprobe(struct kprobe *p)
->  
->  	INIT_LIST_HEAD(&op->list);
->  	op->kp.addr = p->addr;
-> -	arch_prepare_optimized_kprobe(op);
-> +	arch_prepare_optimized_kprobe(op, p);
->  
->  	return &op->kp;
->  }
+> Unlike "arm,armv7-timer" (used on R-Car Gen2), "arm,cortex-a9-twd-time"
+> does require a clock, which is not documented in its bindings?
+> ---
+>  arch/arm/boot/dts/sh73a0.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+> index cca22ec59a2edd63..c53b19f40ae0977f 100644
+> --- a/arch/arm/boot/dts/sh73a0.dtsi
+> +++ b/arch/arm/boot/dts/sh73a0.dtsi
+> @@ -11,6 +11,7 @@
+>  /include/ "skeleton.dtsi"
+>
+>  #include <dt-bindings/clock/sh73a0-clock.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>
+>  / {
+> @@ -43,6 +44,13 @@
+>                       <0xf0000100 0x100>;
+>         };
+>
+> +       timer at f0000600 {
+> +               compatible = "arm,cortex-a9-twd-timer";
+> +               reg = <0xf0000600 0x20>;
+> +               interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+> +               clocks = <&cpg_clocks SH73A0_CLK_ZG>;   // FIXME CLK_PERIPH
+> +       };
+> +
+>         pmu {
+>                 compatible = "arm,cortex-a9-pmu";
+>                 interrupts = <0 55 IRQ_TYPE_LEVEL_HIGH>,
+> --
+> 1.9.1
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
