@@ -1,41 +1,36 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 10 Dec 2014 13:21:07 +0100
-Subject: [PATCH RFC 04/15] drm/dsi: Do not add DSI devices for the child
- nodes with input-port property
-In-Reply-To: <1418200648-32656-5-git-send-email-Ying.Liu@freescale.com>
-References: <1418200648-32656-1-git-send-email-Ying.Liu@freescale.com>
- <1418200648-32656-5-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <20141210122105.GC23558@ulmo.nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 10 Dec 2014 12:22:10 +0000
+Subject: arm64 broken in -next by commit 08d53aa58cb1 (of/fdt: export fdt
+ blob as /sys/firmware/fdt)
+In-Reply-To: <20141210121325.GC13994@e104818-lin.cambridge.arm.com>
+References: <20141210120422.GB13994@e104818-lin.cambridge.arm.com>
+ <20141210121325.GC13994@e104818-lin.cambridge.arm.com>
+Message-ID: <20141210122210.GE13994@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 04:37:17PM +0800, Liu Ying wrote:
-> The MIPI DSI bus driver would try to add a DSI device for a host's every
-> child node which contains the reg property.  Unfortunately, the existing
-> i.MX6Q/SDL MIPI DSI host device tree node's child nodes contain the reg
-
-There aren't any existing nodes for the DSI host on i.MX. This patch
-series adds support for them.
-
-> property, but the child nodes are ports pointing to dedicated CRTCs.
-> So, this patch phases out the child nodes with input-port property before
-> adding DSI devices for them and updates the MIPI DSI bus OF binding
-> documentation.
+On Wed, Dec 10, 2014 at 12:13:26PM +0000, Catalin Marinas wrote:
+> On Wed, Dec 10, 2014 at 12:04:23PM +0000, Catalin Marinas wrote:
+> > Ard,
+> > 
+> > I noticed that linux-next no longer boots on Juno. Bisecting, I ended up
+> > on your commit above and reverting it gets things going again. I
+> > initially thought it has something to do with the hardware crypto since
+> > you added some crc32_be() calls but disabling arm64 hw crypto didn't
+> > make any difference.
 > 
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
-> ---
->  Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt | 4 ++++
->  drivers/gpu/drm/drm_mipi_dsi.c                              | 5 +++--
->  2 files changed, 7 insertions(+), 2 deletions(-)
+> Commenting out crc32_be() in early_init_dt_verify() allows it to boot.
+> Some printk, it shows:
+> 
+> initial_boot_params = 0xffffffc01fe00000
+> fdt_totalsize(initial_boot_params) = 2108105
+> 
+> Isn't it quite big?
 
-Sorry, but NAK. There's no need for this special-case. I'll go into more
-detail in response to patch 09/15.
+We assume that the DT blob is maximum 2MB in the initial kernel mapping.
+I'm not sure why it is that big here but early_init_dt_verify() most
+likely doesn't have the areas around initial_boot_params mapped, only
+2MB section. The crc probably triggers a very early data abort.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141210/6e6f1051/attachment.sig>
+-- 
+Catalin
