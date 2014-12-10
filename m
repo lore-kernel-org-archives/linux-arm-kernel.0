@@ -1,55 +1,44 @@
-From: alexanders83@web.de (Alexander Stein)
-Date: Wed, 10 Dec 2014 20:59:37 +0100
-Subject: [PATCH v2] ARM: at91/dt: sam9263: Add ac97 device node
-In-Reply-To: <1418241578-17049-1-git-send-email-alexanders83@web.de>
-References: <1418241578-17049-1-git-send-email-alexanders83@web.de>
-Message-ID: <1418241578-17049-2-git-send-email-alexanders83@web.de>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Wed, 10 Dec 2014 21:08:05 +0100
+Subject: [PATCH v2] irqchip: mediatek: Use IS_ERR() instead of NULL
+ pointer check
+In-Reply-To: <20141210125313.GJ22670@titan.lakedaemon.net>
+References: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1418205302-22531-1-git-send-email-yingjoe.chen@mediatek.com>
+ <20141210121442.GA14485@gmail.com>
+ <20141210125313.GJ22670@titan.lakedaemon.net>
+Message-ID: <20141210200805.GA17513@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alexander Stein <alexanders83@web.de>
----
- arch/arm/boot/dts/at91sam9263.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+On Wed, Dec 10, 2014 at 07:53:13AM -0500, Jason Cooper wrote:
+> On Wed, Dec 10, 2014 at 01:14:43PM +0100, Beniamino Galvani wrote:
+> > On Wed, Dec 10, 2014 at 05:55:02PM +0800, Yingjoe Chen wrote:
+> > > Beniamino reported a kernel oops caused by an invalid DT file for the
+> > > mediatek interrupt polarity extension.
+> > > 
+> > > The reason is that the interrupt polarity support for mediatek chips
+> > > merely checks for NULL pointer instead of a casted error return
+> > > value in mtk_sysirq_of_init() so any other casted error value passes
+> > > the NULL pointer check and causes a kernel panic when dereferenced.
+> > > 
+> > > Use IS_ERR() and return the error value via PTR_ERR().
+> > > 
+> > > Reported-and-tested-by: Beniamino Galvani <b.galvani@gmail.com>
+> > 
+> > Well, actually I only reported the bug and didn't do any test. Can the
+> > "-and-tested" portion of the tag be dropped while applying the patch?
+> 
+> I'd prefer that it be tested before applying.  Would you mind confirming
+> that the oops is gone with this patch applied?
 
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 26ce9d9..c12b206 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -692,6 +692,16 @@
- 					};
- 				};
- 
-+				ac97 {
-+					pinctrl_ac97: ac97-0 {
-+						atmel,pins =
-+							<AT91_PIOB 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB12 periph A AC97FS pin */
-+							 AT91_PIOB 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB13 periph A AC97CK pin */
-+							 AT91_PIOB 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB14 periph A AC97TX pin */
-+							 AT91_PIOB 3 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB14 periph A AC97RX pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff200 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff200 0x200>;
-@@ -820,6 +830,17 @@
- 				status = "disabled";
- 			};
- 
-+			ac97: sound at fffa0000 {
-+				compatible = "atmel,atmel_ac97c";
-+				reg = <0xfffa0000 0x4000>;
-+				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 5>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_ac97>;
-+				clocks = <&ac97_clk>;
-+				clock-names = "ac97_clk";
-+				status = "disabled";
-+			};
-+
- 			macb0: ethernet at fffbc000 {
- 				compatible = "cdns,at32ap7000-macb", "cdns,macb";
- 				reg = <0xfffbc000 0x100>;
--- 
-2.2.0
+Probably the commit message is misleading about this, but I don't own
+any Mediatek device and never used the driver. I only reported [1] a
+possible bug in the driver found through code analysis.
+
+Anyway, I suppose that the tests done by Yingjoe are enough to get the
+patch merged.
+
+Beniamino
+
+[1] https://lkml.org/lkml/2014/11/29/105
