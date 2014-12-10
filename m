@@ -1,54 +1,47 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 10 Dec 2014 13:29:25 -0500 (EST)
-Subject: [PATCH RFT 1/2] drivers: bus: check cci device tree node
- status
-In-Reply-To: <CAM4voakjWgnEXoXT1LH2ZFBy=U4vfXFXS1Su8VB7Cd3s3wqmSA@mail.gmail.com>
-References: <1417186209-5256-1-git-send-email-a.kesavan@samsung.com>
- <CAM4voakjWgnEXoXT1LH2ZFBy=U4vfXFXS1Su8VB7Cd3s3wqmSA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1412101328520.470@knanqh.ubzr>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 10 Dec 2014 18:42:03 +0000
+Subject: BCM2048 bluetooth connected over OMAP serial
+In-Reply-To: <11367725.nphhSzdtpK@wuerfel>
+References: <20141210164333.GA3154@amd>
+ <11367725.nphhSzdtpK@wuerfel>
+Message-ID: <20141210184203.GA28150@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Dec 2014, Abhilash Kesavan wrote:
+On Wed, Dec 10, 2014 at 05:02:42PM +0000, Arnd Bergmann wrote:
+> On Wednesday 10 December 2014 17:43:33 Pavel Machek wrote:
+> > 
+> > So, there's bluetooth chip that's connected to the SoC by UART and some
+> > GPIOs. What would be right representation in the device tree?
+> > Something like this?
+> > 
+> >         bluetooth {
+> >                   compatible = "broadcom,bcm2048";
+> >                   uart = <&uart2>;
+> >                   reset-gpios = <&gpio3 27 GPIO_ACTIVE_HIGH>; /* want 91 */
+> >                   host-wakeup-gpios = <&gpio4 5 GPIO_ACTIVE_HIGH>; /* want 101 */
+> >                   bluetooth-wakeup-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>; /* want 37 */
+> >                   chip-type = >;
+> >                   bt-sysclk = <2>;
+> >                   reset-gpio-shared = <0>;
+> >         };
+> > 
+> > Is there some way to prevent OMAP tty driver from binding to the
+> > device and exporting the device to userspace?
+> 
+> I think from the driver perspective, you want this to be a tty line
+> discipline rather than a driver that attaches to the physical
+> uart.
+> 
+> For the DT representation, I fear we haven't got a precedent. A uart
+> phandle sounds reasonable, but there might be other ways to do it
+> and we should consider if there are better alternatives. It could
+> possibly be a child node of the uart, but that would require other
+> infrastructure in the kernel because we don't currently create
+> devices for those.
 
-> Hi,
-> 
-> On Fri, Nov 28, 2014 at 8:20 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
-> > The arm-cci driver completes the probe sequence even if the cci node is
-> > marked as disabled. Add a check in the driver to honour the cci status
-> > in the device tree.
-> >
-> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> 
-> This patch helps disable CCI on the Arndale Octa board thus resolving
-> some imprecise aborts seen on that board. Kindly review.
+I think the child node is the way to go; that would match what we do for
+I2C and SPI. We might need new infrastructure, but I don't think we
+should treat this differently simlpy because we don't have that yet.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-> 
-> Regards,
-> Abhilash
-> > ---
-> >  drivers/bus/arm-cci.c |    3 +++
-> >  1 file changed, 3 insertions(+)
-> >
-> > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> > index 860da40..0ce5e2d 100644
-> > --- a/drivers/bus/arm-cci.c
-> > +++ b/drivers/bus/arm-cci.c
-> > @@ -1312,6 +1312,9 @@ static int cci_probe(void)
-> >         if (!np)
-> >                 return -ENODEV;
-> >
-> > +       if (!of_device_is_available(np))
-> > +               return -ENODEV;
-> > +
-> >         cci_config = of_match_node(arm_cci_matches, np)->data;
-> >         if (!cci_config)
-> >                 return -ENODEV;
-> > --
-> > 1.7.9.5
-> >
-> 
-> 
+Mark.
