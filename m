@@ -1,91 +1,143 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 10 Dec 2014 22:24:33 +0100
-Subject: [PATCH V3] arm: imx: correct the hardware clock gate setting
- for shared nodes
-In-Reply-To: <1418205102-14598-1-git-send-email-b20788@freescale.com>
-References: <1418205102-14598-1-git-send-email-b20788@freescale.com>
-Message-ID: <ac72cb8f6219888aaf467648efd5a675@agner.ch>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 10 Dec 2014 13:30:41 -0800
+Subject: [rtc-linux] [PATCHv1 4/6] rtc: rtc-isl12057: fix isil vs isl
+ naming for intersil
+In-Reply-To: <3dde5b6adfc9c953e0c943b0b40ccd2177508030.1416006090.git.arno@natisbad.org>
+References: <cover.1416006090.git.arno@natisbad.org>
+ <3dde5b6adfc9c953e0c943b0b40ccd2177508030.1416006090.git.arno@natisbad.org>
+Message-ID: <20141210133041.27c5cb53bbf29b611fa5c48a@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-10 10:51, Anson Huang wrote:
-> For those clk gates which hold share count, since its is_enabled
-> callback is only checking the share count rather than reading
-> the hardware register setting, in the late phase of kernel bootup,
-> the clk_disable_unused action will NOT handle the scenario of
-> share_count is 0 but the hardware setting is enabled, actually,
-> U-Boot normally enables all clk gates, then those shared clk gates
-> will be always enabled until they are used by some modules.
-
-Wow, this is one long sentence! :-) Could you split that up and simplify
-it a bit? Especially the "hold share count" part confused me at first, I
-thought you mean *share_count > 0, but you actually ment share_count !=
-NULL (maybe "clk gates which have share count allocated").
+On Sat, 15 Nov 2014 00:07:05 +0100 Arnaud Ebalard <arno@natisbad.org> wrote:
 
 > 
-> So the problem would be: when kernel boot up, the usecount cat
-> from clk tree is 0, but the clk gates actually is enabled in
-> hardware register, it will confuse user and bring unnecessary power
-> consumption.
+> When Intersil ISL12057 driver was introduced by commit 70e123373c05
+> ("rtc: Add support for Intersil ISL12057 I2C RTC chip"), the vendor
+> prefix 'isl' was used instead of the expected 'isil' (Intersil
+> NASDAQ symbol). Recently, a patch from Philip Zabel (7a6540ca856a,
+> "ARM: mvebu: Change vendor prefix for Intersil Corporation to isil")
+> fixed that prefix in ReadyNAS devices .dts files (AFAICT, the only
+> users).
 > 
-> This patch adds .disable_unused callback and using hardware register
-> check for .is_enabled callback of shared nodes to handle such scenario
-> in late phase of kernel boot up, then the hardware status will match the
-> clk tree info.
+> That patch completes that work to change the remaining values in:
 > 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> ---
-> changes from V2:
-> 	1. uboot -> U-Boot;
-> 	2. add .is_enabled change into commit log;
-> 	3. improve the condition check code.
->  arch/arm/mach-imx/clk-gate2.c |   23 +++++++++++++++++++----
->  1 file changed, 19 insertions(+), 4 deletions(-)
+>  - Intersil ISL12057 driver (compatible string) and also associated
+>    Documentation/devicetree/bindings/i2c/trivial-devices.txt file
+>    to reflect the changes introduced by previous commit from Philip
+>  - Documentation/devicetree/bindings/vendor-prefixes.txt files to
+>    avoid future mistakes
 > 
-> diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
-> index 5a75cdc..8935bff 100644
-> --- a/arch/arm/mach-imx/clk-gate2.c
-> +++ b/arch/arm/mach-imx/clk-gate2.c
-> @@ -96,15 +96,30 @@ static int clk_gate2_is_enabled(struct clk_hw *hw)
->  {
->  	struct clk_gate2 *gate = to_clk_gate2(hw);
+> ...
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> index fbde415078e6..edac97c0f756 100644
+> --- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> +++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> @@ -55,7 +55,7 @@ fsl,sgtl5000		SGTL5000: Ultra Low-Power Audio Codec
+>  gmt,g751		G751: Digital Temperature Sensor and Thermal Watchdog with Two-Wire Interface
+>  infineon,slb9635tt	Infineon SLB9635 (Soft-) I2C TPM (old protocol, max 100khz)
+>  infineon,slb9645tt	Infineon SLB9645 I2C TPM (new protocol, max 400khz)
+> -isl,isl12057		Intersil ISL12057 I2C RTC Chip
+> +isil,isl12057		Intersil ISL12057 I2C RTC Chip
+>  maxim,ds1050		5 Bit Programmable, Pulse-Width Modulator
+>  maxim,max1237		Low-Power, 4-/12-Channel, 2-Wire Serial, 12-Bit ADCs
+>  maxim,max6625		9-Bit/12-Bit Temperature Sensors with I__C-Compatible Serial Interface
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 723999d73744..84193ecdc41c 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -77,7 +77,7 @@ innolux	Innolux Corporation
+>  intel	Intel Corporation
+>  intercontrol	Inter Control Group
+>  isee	ISEE 2007 S.L.
+> -isl	Intersil
+> +isil	Intersil
+>  karo	Ka-Ro electronics GmbH
+>  keymile	Keymile GmbH
+>  lacie	LaCie
+> diff --git a/drivers/rtc/rtc-isl12057.c b/drivers/rtc/rtc-isl12057.c
+> index fe562820a54a..31eaa6a9c2b2 100644
+> --- a/drivers/rtc/rtc-isl12057.c
+> +++ b/drivers/rtc/rtc-isl12057.c
+> @@ -310,7 +310,8 @@ static int isl12057_probe(struct i2c_client *client,
 >  
-> -	if (gate->share_count)
-> -		return !!__clk_get_enable_count(hw->clk);
-> -	else
-> -		return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
-> +	return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
-> +}
-> +
-> +static void clk_gate2_disable_unused(struct clk_hw *hw)
-> +{
-> +	struct clk_gate2 *gate = to_clk_gate2(hw);
-> +	unsigned long flags = 0;
-> +	u32 reg;
-> +
-> +	spin_lock_irqsave(gate->lock, flags);
-> +
-> +	if (!gate->share_count || *gate->share_count == 0) {
-
-By introducing the .disable_unused callback the framework won't call the
-.disable callback anymore, even if enable_count is 0 and the clock is
-enabled according to .is_enabled. Wouldn't this interfere the disabling
-of normal, non-shared clock gates?
-
-> +		reg = readl(gate->reg);
-> +		reg &= ~(3 << gate->bit_idx);
-> +		writel(reg, gate->reg);
-> +	}
-> +
-> +	spin_unlock_irqrestore(gate->lock, flags);
->  }
->  
->  static struct clk_ops clk_gate2_ops = {
->  	.enable = clk_gate2_enable,
->  	.disable = clk_gate2_disable,
-> +	.disable_unused = clk_gate2_disable_unused,
->  	.is_enabled = clk_gate2_is_enabled,
+>  #ifdef CONFIG_OF
+>  static const struct of_device_id isl12057_dt_match[] = {
+> -	{ .compatible = "isl,isl12057" },
+> +	{ .compatible = "isl,isl12057" },  /* obsolete */
+> +	{ .compatible = "isil,isl12057" },
+>  	{ },
 >  };
+>  #endif
 
---
-Stefan
+Your patch conflicts both textually and materially with the two below
+patches, which are now upstream.
+
+I don't know what to do about this so I'll drop "rtc: rtc-isl12057: fix
+isil vs isl naming for intersil".  Could you folks please sort this all
+out?
+
+
+
+commit 7c75c1d5e72be6736aa558efd33ca2b31d77e425
+Author:     Darshana Padmadas <darshanapadmadas@gmail.com>
+AuthorDate: Sat Nov 8 22:52:06 2014 +0530
+Commit:     Arnd Bergmann <arnd@arndb.de>
+CommitDate: Thu Nov 20 12:20:18 2014 +0100
+
+    dt-bindings: Document deprecated device vendor name to fix related warning
+    
+    This patch documents deprecated vendor name "isil" to fix warning of
+    undocumented string for device isl29028 as reported while running checkpatch.pl
+    on drivers/staging/iio/light/isl29028.c. This is done to maintain compatibility
+    with older kernels.
+    
+    Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
+    Acked-by: Arnd Bergmann <arnd@arndb.de>
+    Acked-by: Mark Rutland <mark.rutland@arm.com>
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 723999d..bfbd93e 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -77,6 +77,7 @@ innolux	Innolux Corporation
+ intel	Intel Corporation
+ intercontrol	Inter Control Group
+ isee	ISEE 2007 S.L.
++isil    Intersil (deprecated, use isl)
+ isl	Intersil
+ karo	Ka-Ro electronics GmbH
+ keymile	Keymile GmbH
+
+
+commit b2ea3f82e7984d855c5e61fef18746771d90c73c
+Author:     Darshana Padmadas <darshanapadmadas@gmail.com>
+AuthorDate: Sat Nov 8 22:52:05 2014 +0530
+Commit:     Arnd Bergmann <arnd@arndb.de>
+CommitDate: Thu Nov 20 12:19:59 2014 +0100
+
+    dt-bindings: Document correct and deprecated vendor-prefix with device isl29028
+    
+    This patch documents the device isl29028 with its vendor-prefix. Undocumented deprecated vendor-prefix
+    found by checkpatch also documented for compatibility reasons.
+    
+    Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
+    Acked-by: Arnd Bergmann <arnd@arndb.de>
+    Acked-by: Mark Rutland <mark.rutland@arm.com>
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+index fbde415..605dcca 100644
+--- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
++++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+@@ -56,6 +56,8 @@ gmt,g751		G751: Digital Temperature Sensor and Thermal Watchdog with Two-Wire In
+ infineon,slb9635tt	Infineon SLB9635 (Soft-) I2C TPM (old protocol, max 100khz)
+ infineon,slb9645tt	Infineon SLB9645 I2C TPM (new protocol, max 400khz)
+ isl,isl12057		Intersil ISL12057 I2C RTC Chip
++isil,isl29028           (deprecated, use isl)
++isl,isl29028            Intersil ISL29028 Ambient Light and Proximity Sensor
+ maxim,ds1050		5 Bit Programmable, Pulse-Width Modulator
+ maxim,max1237		Low-Power, 4-/12-Channel, 2-Wire Serial, 12-Bit ADCs
+ maxim,max6625		9-Bit/12-Bit Temperature Sensors with I?C-Compatible Serial Interface
