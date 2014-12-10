@@ -1,118 +1,85 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Wed, 10 Dec 2014 22:21:52 +0900
-Subject: [RFC PATCHv2 0/7] devfreq: Add devfreq-event class to provide raw
- data for devfreq device
-In-Reply-To: <1418206046.16644.26.camel@AMDC1943>
-References: <1418134386-14681-1-git-send-email-cw00.choi@samsung.com>
- <1418206046.16644.26.camel@AMDC1943>
-Message-ID: <CAGTfZH3DoSCTTgW-6o3na_mO2-scrV1JftpdTM5u3w=EunLfaA@mail.gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 10 Dec 2014 13:23:17 +0000
+Subject: [RESEND][PATCH v15 6/7] kprobes: Pass the original kprobe for
+ preparing optimized kprobe
+In-Reply-To: <1418047765-53197-7-git-send-email-wangnan0@huawei.com>
+References: <1418047765-53197-1-git-send-email-wangnan0@huawei.com>
+ <1418047765-53197-7-git-send-email-wangnan0@huawei.com>
+Message-ID: <1418217797.3661.22.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Masami Hiramatsu
 
-On Wed, Dec 10, 2014 at 7:07 PM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On wto, 2014-12-09 at 23:12 +0900, Chanwoo Choi wrote:
->> This patchset add new devfreq_event class to provide raw data to determine
->> current utilization of device  which is used for devfreq governor.
->>
->> [Description of devfreq-event class]
->> This patchset add new devfreq_event class for devfreq_event device which provide
->> raw data (e.g., memory bus utilization/GPU utilization). This raw data from
->> devfreq_event data would be used for the governor of devfreq subsystem.
->> - devfreq_event device : Provide raw data for governor of existing devfreq device
->> - devfreq device       : Monitor device state and change frequency/voltage of device
->>                          using the raw data from devfreq_event device
->>
->> The devfreq subsystem support generic DVFS(Dynamic Voltage/Frequency Scaling)
->> for Non-CPU Devices. The devfreq device would dertermine current device state
->> using various governor (e.g., ondemand, performance, powersave). After completed
->> determination of system state, devfreq device would change the frequency/voltage
->> of devfreq device according to the result of governor.
->>
->> But, devfreq governor must need basic data which indicates current device state.
->> Existing devfreq subsystem only consider devfreq device which check current system
->> state and determine proper system state using basic data. There is no subsystem
->> for device providing basic data to devfreq device.
->>
->> The devfreq subsystem must need devfreq_event device(data-provider device) for
->> existing devfreq device. So, this patch add new devfreq_event class for
->> devfreq_event device which read various basic data(e.g, memory bus utilization,
->> GPU utilization) and provide measured data to existing devfreq device through
->> standard APIs of devfreq_event class.
->>
->> The following description explains the feature of two kind of devfreq class:
->> - devfreq class (existing)
->>  : devfreq consumer device use raw data from devfreq_event device for
->>    determining proper current system state and change voltage/frequency
->>    dynamically using various governors.
->> - devfreq_event class (new)
->>  : Provide measured raw data to devfreq device for governor
->>
->> Also, the devfreq-event device would support various type event as following:
->>  : DEVFREQ_EVENT_TYPE_RAW_DATA
->>  : DEVFREQ_EVENT_TYPE_UTILIZATION
->>  : DEVFREQ_EVENT_TYPE_BANDWIDTH
->>  : DEVFREQ_EVENT_TYPE_LATENCY
->>
->> [For example]
->> If board dts includes PPMU_DMC0/DMC1/CPU event node,
->> would show following sysfs entry. Also devfreq driver(e.g., exynos4_bus.c)
->> can get the instance of devfreq-event device by using provided API and then
->> get raw data which reflect the current state of device.
->>
->
-> Hi,
->
-> Overall I like the idea. I understand that now devfreq devices (like
-> exynos devfreq) should bind themselves to buses, not to PPMU. It makes
-> sense to me because bus clock and bus voltage are properties of bus, not
-> monitoring unit.
->
-> I see that this is still a RFC so it would be hard to base current
-> devfreq work on top of it.
+How should this patch find its way into the mainline? Is it OK to submit
+this as part of the ARM kprobe changes (which presumably will go in via
+Russell's tree)?
+ 
+-- 
+Tixy
 
-The goal of this patch set is not for devfreq device. This patch set
-just is used for
-devfreq-event device according to patch description.
-
-The devfreq must need devfreq-event device (e.g., exynos-ppmu.c)
-but current devfreq subsystem have not been supported any reason for
-exyons-ppmu.c as devfreq-event device.
-
-I discussed this same issue on following patch[1] which was posted to support
-exynos4 busfreq by me.
-[1] https://lkml.org/lkml/2014/3/14/132
-- [PATCHv2 8/8] devfreq: exynos4: Add busfreq driver for exynos4210/exynos4x12
-After discussion, I thought that devfreq-event class must be needed
-before supporting
-the dt of devfreq device.
-
-So, I think that devfreq have to support the devfreq-event subsystem
-for exynos-ppmu. And then I'll work to support the device-tree of devfreq device
-as next job.
-
->
-> One more general comment: you're adding a some API which is not used by
-> current devfreq_event user (exynos). For example the exclusive flag or
-> event types. I think it will be simpler to stick to the basic approach
-> (reduced API). If some other user emerges then new API will be added.
-
-I think that devfreq-event must support both event_flag(e.g., exclusive flag)
-and event_type(e.g., raw_data, utilization, bandwidth, latency) because
-devfreq-event device (e.g., exynos-ppmu) would provide various event data.
-For example, exynos-ppmu driver could support the utilization/bandwidth/latency
-of each IP of Exynos SoC. I checked PPMU IP on Exynos TRM.
-
-Also, If specific devfreq-event device should be used on only one device driver,
-devfrewq-event class have to support 'exclusive' flag. If
-devfreq-event class don't
-support the exclusive flag, devfreq-event could not guarantee the
-integrity of event
-from devfreq-event device.
-
-Thanks for your comment.
-
-Best Regards,
-Chanwoo Choi
+On Mon, 2014-12-08 at 22:09 +0800, Wang Nan wrote:
+> From: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+> 
+> Pass the original kprobe for preparing an optimized kprobe arch-dep
+> part, since for some architecture (e.g. ARM32) requires the information
+> in original kprobe.
+> 
+> Signed-off-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> ---
+>  arch/x86/kernel/kprobes/opt.c | 3 ++-
+>  include/linux/kprobes.h       | 3 ++-
+>  kernel/kprobes.c              | 4 ++--
+>  3 files changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/x86/kernel/kprobes/opt.c b/arch/x86/kernel/kprobes/opt.c
+> index f1314d0..7028296 100644
+> --- a/arch/x86/kernel/kprobes/opt.c
+> +++ b/arch/x86/kernel/kprobes/opt.c
+> @@ -320,7 +320,8 @@ void arch_remove_optimized_kprobe(struct optimized_kprobe *op)
+>   * Target instructions MUST be relocatable (checked inside)
+>   * This is called when new aggr(opt)probe is allocated or reused.
+>   */
+> -int arch_prepare_optimized_kprobe(struct optimized_kprobe *op)
+> +int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
+> +				  struct kprobe *__unused)
+>  {
+>  	u8 *buf;
+>  	int ret;
+> diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
+> index f7296e5..7ab2c93 100644
+> --- a/include/linux/kprobes.h
+> +++ b/include/linux/kprobes.h
+> @@ -308,7 +308,8 @@ struct optimized_kprobe {
+>  /* Architecture dependent functions for direct jump optimization */
+>  extern int arch_prepared_optinsn(struct arch_optimized_insn *optinsn);
+>  extern int arch_check_optimized_kprobe(struct optimized_kprobe *op);
+> -extern int arch_prepare_optimized_kprobe(struct optimized_kprobe *op);
+> +extern int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
+> +					 struct kprobe *orig);
+>  extern void arch_remove_optimized_kprobe(struct optimized_kprobe *op);
+>  extern void arch_optimize_kprobes(struct list_head *oplist);
+>  extern void arch_unoptimize_kprobes(struct list_head *oplist,
+> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+> index 3995f54..9f28aa7 100644
+> --- a/kernel/kprobes.c
+> +++ b/kernel/kprobes.c
+> @@ -717,7 +717,7 @@ static void prepare_optimized_kprobe(struct kprobe *p)
+>  	struct optimized_kprobe *op;
+>  
+>  	op = container_of(p, struct optimized_kprobe, kp);
+> -	arch_prepare_optimized_kprobe(op);
+> +	arch_prepare_optimized_kprobe(op, p);
+>  }
+>  
+>  /* Allocate new optimized_kprobe and try to prepare optimized instructions */
+> @@ -731,7 +731,7 @@ static struct kprobe *alloc_aggr_kprobe(struct kprobe *p)
+>  
+>  	INIT_LIST_HEAD(&op->list);
+>  	op->kp.addr = p->addr;
+> -	arch_prepare_optimized_kprobe(op);
+> +	arch_prepare_optimized_kprobe(op, p);
+>  
+>  	return &op->kp;
+>  }
