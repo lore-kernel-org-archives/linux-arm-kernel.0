@@ -1,137 +1,259 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 10 Dec 2014 16:31:02 -0500
-Subject: [PATCH v7 2/3] net: Add Keystone NetCP ethernet driver
-In-Reply-To: <20141209.131053.2026868499542642866.davem@davemloft.net>
-References: <1417556503-22290-1-git-send-email-m-karicheri2@ti.com>
- <1417556503-22290-3-git-send-email-m-karicheri2@ti.com>
- <20141209.131053.2026868499542642866.davem@davemloft.net>
-Message-ID: <5488BB96.9070609@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Dec 2014 13:41:00 -0800
+Subject: [PATCH 2/2] pstore-ram: Allow optional mapping with
+ pgprot_noncached
+In-Reply-To: <CAGXu5jLGQi+uA9oM7xRK98z2L81tLSfZE0S9eE7uUjxkCkeHDQ@mail.gmail.com>
+References: <1410546745-919-1-git-send-email-tony@atomide.com>
+ <1410546745-919-2-git-send-email-tony@atomide.com>
+ <20140912231514.GB12379@n2100.arm.linux.org.uk>
+ <20140916205000.GA6672@atomide.com>
+ <CAGXu5jLGQi+uA9oM7xRK98z2L81tLSfZE0S9eE7uUjxkCkeHDQ@mail.gmail.com>
+Message-ID: <20141210214100.GH30437@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2014 01:10 PM, David Miller wrote:
-> From: Murali Karicheri<m-karicheri2@ti.com>
-> Date: Tue, 2 Dec 2014 16:41:42 -0500
->
->> +static void set_pkt_info_le(u32 buff, u32 buff_len, u32 ndesc,
->> +			    struct knav_dma_desc *desc)
->> +{
->> +	desc->buff_len = cpu_to_le32(buff_len);
->> +	desc->buff = cpu_to_le32(buff);
->> +	desc->next_desc = cpu_to_le32(ndesc);
->> +}
->
-> The members of knav_dma_desc are "u32", so you are going to get tons of
-> static checker warnings from trying to assign cpu_to_le32()'s result
-> (which is a le32) into them.
-David,
+* Kees Cook <keescook@chromium.org> [141210 13:18]:
+> On Tue, Sep 16, 2014 at 1:50 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > From: Tony Lindgren <tony@atomide.com>
+> > Date: Thu, 11 Sep 2014 15:02:37 -0700
+> > Subject: [PATCH] pstore-ram: Allow optional mapping with pgprot_noncached
+> >
+> > On some ARMs the memory can be mapped pgprot_noncached() and still
+> > be working for atomic operations. As pointed out by Colin Cross
+> > <ccross@android.com>, in some cases you do want to use
+> > pgprot_noncached() if the SoC supports it to see a debug printk
+> > just before a write hanging the system.
+> >
+> > On ARMs, the atomic operations on strongly ordered memory are
+> > implementation defined. So let's provide an optional kernel parameter
+> > for configuring pgprot_noncached(), and use pgprot_writecombine() by
+> > default.
+> >
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Rob Herring <robherring2@gmail.com>
+> > Cc: Randy Dunlap <rdunlap@infradead.org>
+> > Cc: Anton Vorontsov <anton@enomsg.org>
+> > Cc: Colin Cross <ccross@android.com>
+> > Cc: Kees Cook <keescook@chromium.org>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > Cc: Tony Luck <tony.luck@intel.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> Sorry this got missed! I think rmk's concerns were addressed in this
+> v2. Tony (Luck), can you take this into your tree?
+> 
+> Acked-by: Kees Cook <keescook@chromium.org>
 
-Thanks for your comment.
+I take your ack covers patch 1/2 also. The first patch in this
+series should be tagged cc stable when committing please.
 
-Are you referring to the static code analyser sparse that is invoked 
-through?
+Regards,
 
-make C=1 CHECK=sparse
-
-I am running it now.
-
-I started a build of v3.18-rc7 with this option and seeing a lot of
-warnings. Am I using the right tool? A snapshot of the output is below
-
-   CHECK   drivers/clk/clk.c
-include/linux/err.h:40:16: warning: testing a 'safe expression'
-include/linux/err.h:40:16: warning: testing a 'safe expression'
-include/linux/err.h:40:16: warning: testing a 'safe expression'
-include/linux/err.h:40:16: warning: testing a 'safe expression'
-drivers/clk/clk.c:2263:5: warning: symbol '__clk_get' was not declared. 
-Should it be static?
-drivers/clk/clk.c:2274:6: warning: symbol '__clk_put' was not declared. 
-Should it be static?
-drivers/clk/clk.c:2647:37: warning: incorrect type in assignment 
-(different modifiers)
-drivers/clk/clk.c:2647:37:    expected void ( *[usertype] clk_init_cb )( 
-... )
-drivers/clk/clk.c:2647:37:    got void const *const data
-drivers/clk/clk.c:67:22: warning: context imbalance in 'clk_enable_lock' 
-- wrong count at exit
-drivers/clk/clk.c:92:9: warning: context imbalance in 
-'clk_enable_unlock' - unexpected unlock
-   CC      drivers/clk/clk.o
-   CHECK   drivers/clk/clk-divider.c
-drivers/clk/clk-divider.c:362:9: warning: context imbalance in 
-'clk_divider_set_rate' - different lock contexts for basic block
-   CC      drivers/clk/clk-divider.o
-   CHECK   drivers/clk/clk-fixed-factor.c
-   CC      drivers/clk/clk-fixed-factor.o
-   CHECK   drivers/clk/clk-fixed-rate.c
-   CC      drivers/clk/clk-fixed-rate.o
-   CHECK   drivers/clk/clk-gate.c
-drivers/clk/clk-gate.c:71:9: warning: context imbalance in 
-'clk_gate_endisable' - different lock contexts for basic block
-   CC      drivers/clk/clk-gate.o
-   CHECK   drivers/clk/clk-mux.c
-drivers/clk/clk-mux.c:69:12: warning: context imbalance in 
-'clk_mux_set_parent' - different lock contexts for basic block
-   CC      drivers/clk/clk-mux.o
-   CHECK   drivers/clk/clk-composite.c
-   CC      drivers/clk/clk-composite.o
-   CHECK   drivers/clk/clk-fractional-divider.c
-drivers/clk/clk-fractional-divider.c:36:9: warning: context imbalance in 
-'clk_fd_recalc_rate' - different lock contexts for basic block
-drivers/clk/clk-fractional-divider.c:65:12: warning: context imbalance 
-in 'clk_fd_set_rate' - different lock contexts for basic block
-   CC      drivers/clk/clk-fractional-divider.o
-   CHECK   drivers/clk/clk-gpio-gate.c
-drivers/clk/clk-gpio-gate.c:189:13: warning: symbol 
-'of_gpio_gate_clk_setup' was not declared. Should it be static?
-   CC      drivers/clk/clk-gpio-gate.o
-   CHECK   drivers/clk/clk-conf.c
-   CC      drivers/clk/clk-conf.o
-   CHECK   drivers/clk/keystone/pll.c
-   CC      drivers/clk/keystone/pll.o
-   CHECK   drivers/clk/keystone/gate.c
-drivers/clk/keystone/gate.c:118:12: warning: context imbalance in 
-'keystone_clk_enable' - different lock contexts for basic block
-drivers/clk/keystone/gate.c:148:9: warning: context imbalance in 
-'keystone_clk_disable' - different lock contexts for basic block
-   CC      drivers/clk/keystone/gate.o
-   LD      drivers/clk/keystone/built-in.o
-   LD      drivers/clk/built-in.o
-   CHECK   drivers/clocksource/clksrc-of.c
-drivers/clocksource/clksrc-of.c:37:27: warning: incorrect type in 
-assignment (different modifiers)
-drivers/clocksource/clksrc-of.c:37:27:    expected void ( *[usertype] 
-init_func )( ... )
-drivers/clocksource/clksrc-of.c:37:27:    got void const *const data
-   CC      drivers/clocksource/clksrc-of.o
-   CHECK   drivers/clocksource/mmio.c
-   CC      drivers/clocksource/mmio.o
-   CHECK   drivers/clocksource/arm_arch_timer.c
-   CC      drivers/clocksource/arm_arch_timer.o
-   CHECK   drivers/clocksource/dummy_timer.c
-   CC      drivers/clocksource/dummy_timer.o
-   CHECK   drivers/clocksource/timer-keystone.c
-   CC      drivers/clocksource/timer-keystone.o
-   LD      drivers/clocksource/built-in.o
-   LD      drivers/crypto/built-in.o
-   CHECK   drivers/dma/dmaengine.c
-   CC      drivers/dma/dmaengine.o
-   CHECK   drivers/dma/virt-dma.c
-drivers/dma/virt-dma.c:22:14: warning: symbol 'vchan_tx_submit' was not 
-declared. Should it be static?
-   CC      drivers/dma/virt-dma.o
-   CHECK   drivers/dma/of-dma.c
-   CC      drivers/dma/of-dma.o
-   CHECK   drivers/dma/edma.c
-drivers/dma/edma.c:560:32: warning: symbol 'edma_prep_dma_memcpy' was 
-not declared. Should it be static?
-drivers/dma/edma.c:1099:6: warning: symbol 'edma_filter_fn' was not 
-declared. Should it be static?
-
-
-
-
-
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+Tony
+ 
+> Thanks!
+> 
+> -Kees
+> 
+> >
+> > --- a/Documentation/ramoops.txt
+> > +++ b/Documentation/ramoops.txt
+> > @@ -14,11 +14,19 @@ survive after a restart.
+> >
+> >  1. Ramoops concepts
+> >
+> > -Ramoops uses a predefined memory area to store the dump. The start and size of
+> > -the memory area are set using two variables:
+> > +Ramoops uses a predefined memory area to store the dump. The start and size
+> > +and type of the memory area are set using three variables:
+> >    * "mem_address" for the start
+> >    * "mem_size" for the size. The memory size will be rounded down to a
+> >    power of two.
+> > +  * "mem_type" to specifiy if the memory type (default is pgprot_writecombine).
+> > +
+> > +Typically the default value of mem_type=0 should be used as that sets the pstore
+> > +mapping to pgprot_writecombine. Setting mem_type=1 attempts to use
+> > +pgprot_noncached, which only works on some platforms. This is because pstore
+> > +depends on atomic operations. At least on ARM, pgprot_noncached causes the
+> > +memory to be mapped strongly ordered, and atomic operations on strongly ordered
+> > +memory are implementation defined, and won't work on many ARMs such as omaps.
+> >
+> >  The memory area is divided into "record_size" chunks (also rounded down to
+> >  power of two) and each oops/panic writes a "record_size" chunk of
+> > @@ -55,6 +63,7 @@ Setting the ramoops parameters can be done in 2 different manners:
+> >  static struct ramoops_platform_data ramoops_data = {
+> >          .mem_size               = <...>,
+> >          .mem_address            = <...>,
+> > +        .mem_type               = <...>,
+> >          .record_size            = <...>,
+> >          .dump_oops              = <...>,
+> >          .ecc                    = <...>,
+> > --- a/fs/pstore/ram.c
+> > +++ b/fs/pstore/ram.c
+> > @@ -61,6 +61,11 @@ module_param(mem_size, ulong, 0400);
+> >  MODULE_PARM_DESC(mem_size,
+> >                 "size of reserved RAM used to store oops/panic logs");
+> >
+> > +static unsigned int mem_type;
+> > +module_param(mem_type, uint, 0600);
+> > +MODULE_PARM_DESC(mem_type,
+> > +               "set to 1 to try to use unbuffered memory (default 0)");
+> > +
+> >  static int dump_oops = 1;
+> >  module_param(dump_oops, int, 0600);
+> >  MODULE_PARM_DESC(dump_oops,
+> > @@ -79,6 +84,7 @@ struct ramoops_context {
+> >         struct persistent_ram_zone *fprz;
+> >         phys_addr_t phys_addr;
+> >         unsigned long size;
+> > +       unsigned int memtype;
+> >         size_t record_size;
+> >         size_t console_size;
+> >         size_t ftrace_size;
+> > @@ -358,7 +364,8 @@ static int ramoops_init_przs(struct device *dev, struct ramoops_context *cxt,
+> >                 size_t sz = cxt->record_size;
+> >
+> >                 cxt->przs[i] = persistent_ram_new(*paddr, sz, 0,
+> > -                                                 &cxt->ecc_info);
+> > +                                                 &cxt->ecc_info,
+> > +                                                 cxt->memtype);
+> >                 if (IS_ERR(cxt->przs[i])) {
+> >                         err = PTR_ERR(cxt->przs[i]);
+> >                         dev_err(dev, "failed to request mem region (0x%zx at 0x%llx): %d\n",
+> > @@ -388,7 +395,7 @@ static int ramoops_init_prz(struct device *dev, struct ramoops_context *cxt,
+> >                 return -ENOMEM;
+> >         }
+> >
+> > -       *prz = persistent_ram_new(*paddr, sz, sig, &cxt->ecc_info);
+> > +       *prz = persistent_ram_new(*paddr, sz, sig, &cxt->ecc_info, cxt->memtype);
+> >         if (IS_ERR(*prz)) {
+> >                 int err = PTR_ERR(*prz);
+> >
+> > @@ -435,6 +442,7 @@ static int ramoops_probe(struct platform_device *pdev)
+> >
+> >         cxt->size = pdata->mem_size;
+> >         cxt->phys_addr = pdata->mem_address;
+> > +       cxt->memtype = pdata->mem_type;
+> >         cxt->record_size = pdata->record_size;
+> >         cxt->console_size = pdata->console_size;
+> >         cxt->ftrace_size = pdata->ftrace_size;
+> > @@ -564,6 +572,7 @@ static void ramoops_register_dummy(void)
+> >
+> >         dummy_data->mem_size = mem_size;
+> >         dummy_data->mem_address = mem_address;
+> > +       dummy_data->mem_type = 0;
+> >         dummy_data->record_size = record_size;
+> >         dummy_data->console_size = ramoops_console_size;
+> >         dummy_data->ftrace_size = ramoops_ftrace_size;
+> > --- a/fs/pstore/ram_core.c
+> > +++ b/fs/pstore/ram_core.c
+> > @@ -380,7 +380,8 @@ void persistent_ram_zap(struct persistent_ram_zone *prz)
+> >         persistent_ram_update_header_ecc(prz);
+> >  }
+> >
+> > -static void *persistent_ram_vmap(phys_addr_t start, size_t size)
+> > +static void *persistent_ram_vmap(phys_addr_t start, size_t size,
+> > +               unsigned int memtype)
+> >  {
+> >         struct page **pages;
+> >         phys_addr_t page_start;
+> > @@ -392,7 +393,10 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
+> >         page_start = start - offset_in_page(start);
+> >         page_count = DIV_ROUND_UP(size + offset_in_page(start), PAGE_SIZE);
+> >
+> > -       prot = pgprot_writecombine(PAGE_KERNEL);
+> > +       if (memtype)
+> > +               prot = pgprot_noncached(PAGE_KERNEL);
+> > +       else
+> > +               prot = pgprot_writecombine(PAGE_KERNEL);
+> >
+> >         pages = kmalloc_array(page_count, sizeof(struct page *), GFP_KERNEL);
+> >         if (!pages) {
+> > @@ -411,8 +415,11 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
+> >         return vaddr;
+> >  }
+> >
+> > -static void *persistent_ram_iomap(phys_addr_t start, size_t size)
+> > +static void *persistent_ram_iomap(phys_addr_t start, size_t size,
+> > +               unsigned int memtype)
+> >  {
+> > +       void *va;
+> > +
+> >         if (!request_mem_region(start, size, "persistent_ram")) {
+> >                 pr_err("request mem region (0x%llx at 0x%llx) failed\n",
+> >                         (unsigned long long)size, (unsigned long long)start);
+> > @@ -422,19 +429,24 @@ static void *persistent_ram_iomap(phys_addr_t start, size_t size)
+> >         buffer_start_add = buffer_start_add_locked;
+> >         buffer_size_add = buffer_size_add_locked;
+> >
+> > -       return ioremap_wc(start, size);
+> > +       if (memtype)
+> > +               va = ioremap(start, size);
+> > +       else
+> > +               va = ioremap_wc(start, size);
+> > +
+> > +       return va;
+> >  }
+> >
+> >  static int persistent_ram_buffer_map(phys_addr_t start, phys_addr_t size,
+> > -               struct persistent_ram_zone *prz)
+> > +               struct persistent_ram_zone *prz, int memtype)
+> >  {
+> >         prz->paddr = start;
+> >         prz->size = size;
+> >
+> >         if (pfn_valid(start >> PAGE_SHIFT))
+> > -               prz->vaddr = persistent_ram_vmap(start, size);
+> > +               prz->vaddr = persistent_ram_vmap(start, size, memtype);
+> >         else
+> > -               prz->vaddr = persistent_ram_iomap(start, size);
+> > +               prz->vaddr = persistent_ram_iomap(start, size, memtype);
+> >
+> >         if (!prz->vaddr) {
+> >                 pr_err("%s: Failed to map 0x%llx pages at 0x%llx\n", __func__,
+> > @@ -500,7 +512,8 @@ void persistent_ram_free(struct persistent_ram_zone *prz)
+> >  }
+> >
+> >  struct persistent_ram_zone *persistent_ram_new(phys_addr_t start, size_t size,
+> > -                       u32 sig, struct persistent_ram_ecc_info *ecc_info)
+> > +                       u32 sig, struct persistent_ram_ecc_info *ecc_info,
+> > +                       unsigned int memtype)
+> >  {
+> >         struct persistent_ram_zone *prz;
+> >         int ret = -ENOMEM;
+> > @@ -511,7 +524,7 @@ struct persistent_ram_zone *persistent_ram_new(phys_addr_t start, size_t size,
+> >                 goto err;
+> >         }
+> >
+> > -       ret = persistent_ram_buffer_map(start, size, prz);
+> > +       ret = persistent_ram_buffer_map(start, size, prz, memtype);
+> >         if (ret)
+> >                 goto err;
+> >
+> > --- a/include/linux/pstore_ram.h
+> > +++ b/include/linux/pstore_ram.h
+> > @@ -53,7 +53,8 @@ struct persistent_ram_zone {
+> >  };
+> >
+> >  struct persistent_ram_zone *persistent_ram_new(phys_addr_t start, size_t size,
+> > -                       u32 sig, struct persistent_ram_ecc_info *ecc_info);
+> > +                       u32 sig, struct persistent_ram_ecc_info *ecc_info,
+> > +                       unsigned int memtype);
+> >  void persistent_ram_free(struct persistent_ram_zone *prz);
+> >  void persistent_ram_zap(struct persistent_ram_zone *prz);
+> >
+> > @@ -76,6 +77,7 @@ ssize_t persistent_ram_ecc_string(struct persistent_ram_zone *prz,
+> >  struct ramoops_platform_data {
+> >         unsigned long   mem_size;
+> >         unsigned long   mem_address;
+> > +       unsigned int    mem_type;
+> >         unsigned long   record_size;
+> >         unsigned long   console_size;
+> >         unsigned long   ftrace_size;
+> 
+> 
+> 
+> -- 
+> Kees Cook
+> Chrome OS Security
