@@ -1,41 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Dec 2014 18:02:42 +0100
-Subject: BCM2048 bluetooth connected over OMAP serial
-In-Reply-To: <20141210164333.GA3154@amd>
-References: <20141210164333.GA3154@amd>
-Message-ID: <11367725.nphhSzdtpK@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Dec 2014 09:03:27 -0800
+Subject: [PATCH] ARM: dts: am437x-sk-evm.dts: fix LCD timings
+In-Reply-To: <1417765171-7384-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1417765171-7384-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <20141210170326.GF30437@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 December 2014 17:43:33 Pavel Machek wrote:
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [141204 23:42]:
+> The lcd0 node for am437x-sk-evm.dts contains bad LCD timings, and while
+> they seem to work with a quick test, doing for example blank/unblank
+> will give you a black display.
 > 
-> So, there's bluetooth chip that's connected to the SoC by UART and some
-> GPIOs. What would be right representation in the device tree?
-> Something like this?
+> This patch updates the timings to the 'typical' values from the LCD spec
+> sheet.
 > 
->         bluetooth {
->                   compatible = "broadcom,bcm2048";
->                   uart = <&uart2>;
->                   reset-gpios = <&gpio3 27 GPIO_ACTIVE_HIGH>; /* want 91 */
->                   host-wakeup-gpios = <&gpio4 5 GPIO_ACTIVE_HIGH>; /* want 101 */
->                   bluetooth-wakeup-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>; /* want 37 */
->                   chip-type = >;
->                   bt-sysclk = <2>;
->                   reset-gpio-shared = <0>;
->         };
+> Also, the compatible string is completely bogus, as
+> "osddisplays,osd057T0559-34ts" is _not_ a 480x272 panel. The panel on
+> the board is a newhaven one. Update the compatible string to reflect
+> this. Note that this hasn't caused any issues, as the "panel-dpi"
+> matches the driver.
 > 
-> Is there some way to prevent OMAP tty driver from binding to the
-> device and exporting the device to userspace?
+> Cc: <stable@vger.kernel.org> # v3.17+
+> Tested-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-I think from the driver perspective, you want this to be a tty line
-discipline rather than a driver that attaches to the physical
-uart.
+Applying into omap-for-v3.19/fixes thanks.
 
-For the DT representation, I fear we haven't got a precedent. A uart
-phandle sounds reasonable, but there might be other ways to do it
-and we should consider if there are better alternatives. It could
-possibly be a child node of the uart, but that would require other
-infrastructure in the kernel because we don't currently create
-devices for those.
+Tony
 
-	Arnd
+> ---
+>  arch/arm/boot/dts/am437x-sk-evm.dts | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
+> index 859ff3d620ee..66071c7b3dde 100644
+> --- a/arch/arm/boot/dts/am437x-sk-evm.dts
+> +++ b/arch/arm/boot/dts/am437x-sk-evm.dts
+> @@ -100,7 +100,7 @@
+>  	};
+>  
+>  	lcd0: display {
+> -		compatible = "osddisplays,osd057T0559-34ts", "panel-dpi";
+> +		compatible = "newhaven,nhd-4.3-480272ef-atxl", "panel-dpi";
+>  		label = "lcd";
+>  
+>  		pinctrl-names = "default";
+> @@ -112,11 +112,11 @@
+>  			clock-frequency = <9000000>;
+>  			hactive = <480>;
+>  			vactive = <272>;
+> -			hfront-porch = <8>;
+> -			hback-porch = <43>;
+> -			hsync-len = <4>;
+> -			vback-porch = <12>;
+> -			vfront-porch = <4>;
+> +			hfront-porch = <2>;
+> +			hback-porch = <2>;
+> +			hsync-len = <41>;
+> +			vfront-porch = <2>;
+> +			vback-porch = <2>;
+>  			vsync-len = <10>;
+>  			hsync-active = <0>;
+>  			vsync-active = <0>;
+> -- 
+> 2.2.0
+> 
