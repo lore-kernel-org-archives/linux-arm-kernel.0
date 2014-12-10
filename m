@@ -1,75 +1,81 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 10 Dec 2014 14:28:39 +0100
-Subject: [PATCH] [RFC] ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node
-In-Reply-To: <1417617454-14533-1-git-send-email-geert+renesas@glider.be>
-References: <1417617454-14533-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdX5i8qXdVUYMi+BLEe7Ah+_hJOEputW7jw5xvQ6UqH3EA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 10 Dec 2014 14:31:16 +0100
+Subject: arm64 broken in -next by commit 08d53aa58cb1 (of/fdt: export fdt
+ blob as /sys/firmware/fdt)
+In-Reply-To: <20141210131345.GF13994@e104818-lin.cambridge.arm.com>
+References: <20141210120422.GB13994@e104818-lin.cambridge.arm.com>
+ <20141210121325.GC13994@e104818-lin.cambridge.arm.com>
+ <20141210122210.GE13994@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8r570eqEZQb=BP-L6NBGjMebv5jnzEEBmhDb9MDJnipg@mail.gmail.com>
+ <20141210131345.GF13994@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu8MoGxiS0Wh9yPtesjrZro_74_bYQxr865ZYXH8FOiASw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 3, 2014 at 3:37 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> Add a node for the Private Timer and Watchdog, as found in the Cortex-A9
-> MPCore.
+On 10 December 2014 at 14:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, Dec 10, 2014 at 12:31:57PM +0000, Ard Biesheuvel wrote:
+>> On 10 December 2014 at 13:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Wed, Dec 10, 2014 at 12:13:26PM +0000, Catalin Marinas wrote:
+>> >> On Wed, Dec 10, 2014 at 12:04:23PM +0000, Catalin Marinas wrote:
+>> >> > Ard,
+>> >> >
+>> >> > I noticed that linux-next no longer boots on Juno. Bisecting, I ended up
+>> >> > on your commit above and reverting it gets things going again. I
+>> >> > initially thought it has something to do with the hardware crypto since
+>> >> > you added some crc32_be() calls but disabling arm64 hw crypto didn't
+>> >> > make any difference.
+>> >>
+>> >> Commenting out crc32_be() in early_init_dt_verify() allows it to boot.
+>> >> Some printk, it shows:
+>> >>
+>> >> initial_boot_params = 0xffffffc01fe00000
+>> >> fdt_totalsize(initial_boot_params) = 2108105
+>> >>
+>> >> Isn't it quite big?
+>> >
+>> > We assume that the DT blob is maximum 2MB in the initial kernel mapping.
+>> > I'm not sure why it is that big here but early_init_dt_verify() most
+>> > likely doesn't have the areas around initial_boot_params mapped, only
+>> > 2MB section. The crc probably triggers a very early data abort.
+>> >
+>>
+>> Looking at the patch history, I just noticed that the crc() call got
+>> moved to before fdt_check_header(), which means initial_boot_params
+>> may point to something else than an FDT.
+>> How exactly that may happen, and how the system ends up booting after
+>> all is not clear to me, but the crc32() call should be moved down
+>> regardless
 >
-> Without this, there's no clocksource available during early kernel
-> initialization, before cmt1 is initialized, leading to a lock-up if
-> CONFIG_CPU_IDLE=y.
+> In linux-next, it looks ok to me, crc32 is called after
+> fdt_check_header():
 >
-> FIXME The clock should be the PERIPH clock, but the sh73a0 CPG driver
->       doesn't have support for that clock yet. Hence we use the ZG
->       clock, which runs at the same frequency.
-
-It looks like we do have the clock in sh73a0.dtsi, but it's called "twd_clk".
-Ulrich, is that correct?
-
-Note that the frequency is off by a factor of 2, just like for its parent "z".
-(that is, without your (~private) patch to take into account ZSEL).
-
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Unlike "arm,armv7-timer" (used on R-Car Gen2), "arm,cortex-a9-twd-time"
-> does require a clock, which is not documented in its bindings?
-> ---
->  arch/arm/boot/dts/sh73a0.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> bool __init early_init_dt_verify(void *params)
+> {
+>         if (!params)
+>                 return false;
 >
-> diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-> index cca22ec59a2edd63..c53b19f40ae0977f 100644
-> --- a/arch/arm/boot/dts/sh73a0.dtsi
-> +++ b/arch/arm/boot/dts/sh73a0.dtsi
-> @@ -11,6 +11,7 @@
->  /include/ "skeleton.dtsi"
+>         /* check device tree validity */
+>         if (fdt_check_header(params))
+>                 return false;
 >
->  #include <dt-bindings/clock/sh73a0-clock.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/interrupt-controller/irq.h>
+>         /* Setup flat device-tree pointer */
+>         initial_boot_params = params;
+>         of_fdt_crc32 = crc32_be(~0, initial_boot_params,
+>                                 fdt_totalsize(initial_boot_params));
+>         return true;
+> }
 >
->  / {
-> @@ -43,6 +44,13 @@
->                       <0xf0000100 0x100>;
->         };
->
-> +       timer at f0000600 {
-> +               compatible = "arm,cortex-a9-twd-timer";
-> +               reg = <0xf0000600 0x20>;
-> +               interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-> +               clocks = <&cpg_clocks SH73A0_CLK_ZG>;   // FIXME CLK_PERIPH
-> +       };
-> +
->         pmu {
->                 compatible = "arm,cortex-a9-pmu";
->                 interrupts = <0 55 IRQ_TYPE_LEVEL_HIGH>,
-> --
-> 1.9.1
 
-Gr{oetje,eeting}s,
+OK, as it turns out, this patch
 
-                        Geert
+https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=50ba08f301a1b0310775deeed00c9b24ba75fe8a
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+is new as well, and apparently Grant had to fix up my patch to make it
+apply. So indeed, the above is correct.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+So is the FDT actually >2 megs? That would perfectly explain why the
+header check would succeed but the crc32() would fail, but it sounds
+ludicrous.
+
+-- 
+Ard.
