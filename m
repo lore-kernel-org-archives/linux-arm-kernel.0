@@ -1,95 +1,65 @@
-From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
-Date: Wed, 10 Dec 2014 08:49:27 +0000
-Subject: [PATCH] arm: imx: correct the hardware clock gate setting for
- shared nodes
-In-Reply-To: <20141209085742.GE13486@pengutronix.de>
-References: <1418111885-3623-1-git-send-email-b20788@freescale.com>
- <20141209085742.GE13486@pengutronix.de>
-Message-ID: <BN1PR0301MB062806C16F41B55ADB753E4DFF620@BN1PR0301MB0628.namprd03.prod.outlook.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Wed, 10 Dec 2014 17:51:37 +0900
+Subject: [PATCH v4 3/4] gpio: Add find GPIO base in increasing order
+In-Reply-To: <1417750722-14027-4-git-send-email-wangzhou.bry@gmail.com>
+References: <1417750722-14027-1-git-send-email-wangzhou.bry@gmail.com>
+ <1417750722-14027-4-git-send-email-wangzhou.bry@gmail.com>
+Message-ID: <CAAVeFu+Hn1Fk7PDcc4wGHFyJurX0hsW1N1prnPs2j=taGQKrKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Uwe
+On Fri, Dec 5, 2014 at 12:38 PM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
+> In function gpiochip_find_base, base number of a GPIO controller
+> is found in decreasing order. ARCH_NR_GPIOS is used to define from
+> which number we begin to search for base number of a GPIO controller.
+>
+> In fact, ARCH_NR_GPIOS brings us some multiplatform problems, like:
+> http://www.spinics.net/lists/devicetree/msg60433.html
+>
+> This patch adds the support to find base number of a GPIO controller
+> in increasing order. It will assign base number from 0.
+> A new dts property called gpio-number-forward must be add to the related
+> GPIO dts nodes if you want it works well.
 
-Best regards!
-Anson Huang
+Global GPIO numbers are a Linux-only concept, so your property should
+be named linux,gpio-number-forward.
 
+But even that way I don't think I like this idea. This just adds some
+more mess to how the GPIO number space is constructed, and it is
+already quite messy as it is. You have no guarantee over the probe
+order of your GPIO controllers, so they may very well be probed in a
+different order and end up with different base numbers anytime.
 
------Original Message-----
-From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de] 
-Sent: 2014-12-09 4:58 PM
-To: Huang Yongcai-B20788
-Cc: shawn.guo at linaro.org; kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org; Mike Turquette
-Subject: Re: [PATCH] arm: imx: correct the hardware clock gate setting for shared nodes
+Not that this is your fault - the number namespace is broken by design
+and I don't think there is a way to fix it. The long-term solution is
+to stop using it by switching to the gpiod interface.
 
-Hello Anson,
+First a few questions to understand why you need your GPIOs numbered
+this way, and if you need it at all:
+- Can't you use the gpiod interface instead so you don't need to rely
+on GPIO numbers?
+- Do you plan to use the sysfs interface? If so then we are screwed,
+because there is no way to use it without using global GPIO numbers.
+This is something we should/will fix with named exported GPIOs, but we
+are not here yet.
 
-[Cc += Mike Turquette]
+As to how we can solve your problem: if you must use GPIO integers
+(because you need to use the sysfs interface for instance), and need
+them affected consistently, the only way I can think of is to
+introduce a "linux,gpio-base" property that will set gpiochip->base to
+a fixed number. It still kind of sucks, but at least it will enforce
+that different controllers get the same base number reliably, and the
+firmware is the best placed to know how many GPIOs each controller has
+and decide an appropriate layout.
 
-On Tue, Dec 09, 2014 at 03:58:05PM +0800, Anson Huang wrote:
-> For those clk gates which hold share count, since its is_enabled 
-> callback is only checking the share count rather than reading the 
-> hardware register setting, in the late phase of kernel bootup, the 
-> clk_disable_unused action will NOT handle the scenario of share_count 
-> is 0 but the hardware setting is enabled, actually, uboot normally 
-> enables all clk gates, then those shared clk gates
-s/uboot/U-Boot/ IIRC
+I know we pushed back against this kind of solution in the past, but
+it is still more reliable than having a property that affects how the
+kernel's base finding function works, and will offer us a way to
+eventually put ARCH_NR_GPIOS and gpiochip_find_base() to rest (at the
+cost of backwards-compatibility, but we just cannot do without it).
+Linus, do you agree?
 
-> will be always enabled until they are used by some modules.
-What is the purpose of the shared clocks? Just to have different names for a single gate?
-[Anson] The shared clocks is to meet the case that where one clk gate control multi clks path in module, for example, in esai module, there are three clk paths, esai_core, esai_ipg and esai_mem, but they share same clk gate in CCM_CCGR, and their parents are different...No very good hardware design for us.
-
-Wouldn't it be better to fix this problem at the framework level? Then ideally clk_disable_unused would handle these shared clocks just fine.
-[Anson] Agree, handle it in framework is much better than doing it in every platform, my bad:(
-
-I guess the problem is that this shared clk implementation doesn't fulfill the expectations of the clk framework.
-
-This is found in arch/arm/mach-imx/clk-imx6q.c
->  	clk[IMX6QDL_CLK_ASRC]         = imx_clk_gate2_shared("asrc",         "asrc_podf",   base + 0x68, 6, &share_count_asrc);
->  	clk[IMX6QDL_CLK_ASRC_IPG]     = imx_clk_gate2_shared("asrc_ipg",     "ahb",         base + 0x68, 6, &share_count_asrc);
->  	clk[IMX6QDL_CLK_ASRC_MEM]     = imx_clk_gate2_shared("asrc_mem",     "ahb",         base + 0x68, 6, &share_count_asrc);
-
-For these clks is_enabled returns just enable_count instead of the status of the corresponding bit in the corresponding register. The reason for that probably is that "asrc" must not be disabled even if unused if "asrc_ipg" is in use. So the problem is there are three struct clk s with a common enable count for a single register bit. Interesting enough these clocks have different parents (the 2nd parameter to
-imx_clk_gate2_shared) which makes the easy solution to just make asrc_ipg and asrc_mem children of asrc not applicable. Any idea for a sane solution? A multi-parent-dummy-clk would do I think.
-
-Other than that the following might work: Ignore share_count in the is_enabled callback (i.e. report if the register bit is set as in the share_count == NULL case) and implement clk->ops->disable_unused that only unsets the bit if share_count == 0? Ugly but IMHO better and more robust than the idea implemented in this patch. Still I'd prefer to make the usual assumptions of the clk framework just work.
-[Anson] I think this solution is feasible for us, as disable_unused is only used in late phase of kernel boot up, I think adding such callback is acceptable.
-
-> So the problem would be: when kernel boot up, the usecount cat from 
-> clk tree is 0, but the clk gates actually is enabled in hardware 
-> register, it will confuse user and bring unnecessary power 
-> consumption, take i.MX6SX for example, the ESAI clk info is as below, 
-> the use count is 0, but the hardware register read from CCM_CCGR1_CG8 
-> is ungated.
-> 
-> cat /sys/kernel/debug/clk/clk_summary | grep esai
-Just a very minor nitpick: Unnecessary usage of cat,
-
-	grep esai /sys/kernel/debug/clk/clk_summary
-
-just produces the same result. :-)
-[Anson] Thanks for sharing such knowledge:)
-
-> 
-> esai_sel            0            0   393216000          0 0
->    esai_pred           0            0   196608000          0 0
->       esai_podf           0            0    24576000          0 0
->          esai_extal           0            0    24576000          0 0
->       esai_mem           0            0   132000000          0 0
->       esai_ipg           0            0   132000000          0 0
-> 
-> Read CCM_CCGR1:
-> 
-> 0x020C406C:  F33FFF00
-This is hardly useful if you don't have the reference manual at hand.
-I'd believe the commit log even without the examples.
-[Anson] Agreed, I will remove it in V2 patch.
-
-Many thanks for reviewing my patch and very good advice:) Please help review V2 patch.
- 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+In the medium term, we need to offer a solution for user-space to
+*not* rely on GPIO numbers, and that will necessarily go through a new
+sysfs interface, since at the moment even GPIO chips use their base
+number in their exported name.
