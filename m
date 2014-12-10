@@ -1,69 +1,102 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 10 Dec 2014 11:27:34 +0100
-Subject: [PATCH 3/5] arm/arm64: KVM: Add (new) vgic_initialized macro
-In-Reply-To: <1418139844-27892-4-git-send-email-christoffer.dall@linaro.org>
-References: <1418139844-27892-1-git-send-email-christoffer.dall@linaro.org>
- <1418139844-27892-4-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <54882016.2080200@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 10 Dec 2014 11:30:27 +0100
+Subject: [PATCH 1/4] pci: iProc: define Broadcom iProc PCIe binding
+In-Reply-To: <1418169871-19232-2-git-send-email-rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+ <1418169871-19232-1-git-send-email-rjui@broadcom.com>
+ <1418169871-19232-2-git-send-email-rjui@broadcom.com>
+Message-ID: <1418207427.7616.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 12/09/2014 04:44 PM, Christoffer Dall wrote:
-> Some code paths will need to check to see if the internal state of the
-> vgic has been initialized (such as when creating new VCPUs), so
-> introduce such a macro that checks the nr_cpus field which is set when
-> the vgic has been initialized.
+Am Dienstag, den 09.12.2014, 16:04 -0800 schrieb Ray Jui:
+> Document the PCIe device tree binding for Broadcom iProc family of SoCs
 > 
-> Also set nr_cpus = 0 in kvm_vgic_destroy, because the error path in
-> vgic_init() will call this function, and code should never errornously
-> assume the vgic to be properly initialized after an error.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
 > ---
->  include/kvm/arm_vgic.h | 6 ++++++
->  virt/kvm/arm/vgic.c    | 1 +
->  2 files changed, 7 insertions(+)
+>  .../devicetree/bindings/pci/brcm,iproc-pcie.txt    |   62 ++++++++++++++++++++
+>  1 file changed, 62 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
 > 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 3e262b9..ac4888d 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -287,6 +287,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		      struct kvm_exit_mmio *mmio);
->  
->  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
-> +#define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
->  #define vgic_ready(k)		((k)->arch.vgic.ready)
->  
->  int vgic_v2_probe(struct device_node *vgic_node,
-> @@ -369,6 +370,11 @@ static inline int irqchip_in_kernel(struct kvm *kvm)
->  	return 0;
->  }
->  
-> +static inline bool vgic_initialized(struct kvm *kvm)
-> +{
-> +	return true;
-> +}
+> diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+> new file mode 100644
+> index 0000000..2467628
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+> @@ -0,0 +1,62 @@
+> +* Broadcom iProc PCIe controller
 > +
->  static inline bool vgic_ready(struct kvm *kvm)
->  {
->  	return true;
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 6293349..c98cc6b 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1774,6 +1774,7 @@ void kvm_vgic_destroy(struct kvm *kvm)
->  	dist->irq_spi_cpu = NULL;
->  	dist->irq_spi_target = NULL;
->  	dist->irq_pending_on_cpu = NULL;
-> +	dist->nr_cpus = 0;
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
-we could use that new vgic_initialized at the entry of vgic_init instead
-of testing dist->nr_cpus, hence introducing one user.
+> +Required properties:
+> +- compatible: Must be "brcm,iproc-pcie"
+> +- reg: base address and length of the PCIe controller and the MDIO interface
+> +  that controls the PCIe PHY
+> +- interrupts: interrupt IDs
+> +- bus-range: PCI bus numbers covered
+> +- #address-cells: set to <3>
+> +- #size-cells: set to <2>
+> +- device_type: set to "pci"
+> +- ranges: ranges for the PCI memory and I/O regions
+> +- phy-addr: MDC/MDIO adddress of the PCIe PHY
+> +- have-msi-inten-reg: Required for legacy iProc PCIe controllers that need the
+> +  MSI interrupt enable register to be set explicitly
+> +
+> +The Broadcom iProc PCie driver adapts the multi-domain structure, i.e., each
+> +interface has its own domain and therefore has its own device node
+> +Example:
+> +
+> +SoC specific DT Entry:
+> +
+> +	pcie0: pcie at 18012000 {
+> +		compatible = "brcm,iproc-pcie";
+> +		reg = <0x18012000 0x1000>,
+> +			<0x18002000 0x1000>;
+> +		interrupts = <GIC_SPI 96 IRQ_TYPE_NONE>,
+> +			     <GIC_SPI 97 IRQ_TYPE_NONE>,
+> +			     <GIC_SPI 98 IRQ_TYPE_NONE>,
+> +			     <GIC_SPI 99 IRQ_TYPE_NONE>,
+> +			     <GIC_SPI 100 IRQ_TYPE_NONE>,
+> +			     <GIC_SPI 101 IRQ_TYPE_NONE>;
 
-Eric
->  }
->  
->  /*
-> 
+This is missing the interrupt-map and interrupt-map-mask for the legacy
+INTx interrupts. If you add this you don't need to have a special map
+function in your driver, but can just use the standard
+of_irq_parse_and_map_pci() function.
+
+Regards,
+Lucas
+
+> +		bus-range = <0x00 0xFF>;
+> +
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		device_type = "pci";
+> +		ranges = <0x81000000 0 0	  0x28000000 0 0x00010000   /* downstream I/O */
+> +			  0x82000000 0 0x20000000 0x20000000 0 0x04000000>; /* non-prefetchable memory */
+> +		phy-addr = <5>;
+> +	};
+> +
+> +	pcie1: pcie at 18013000 {
+> +		compatible = "brcm,iproc-pcie";
+> +		reg = <0x18013000 0x1000>,
+> +			<0x18002000 0x1000>;
+> +
+> +		interrupts = <GIC_SPI 102 IRQ_TYPE_NONE>,
+> +			     <GIC_SPI 103 IRQ_TYPE_NONE>,
+> +			     <GIC_SPI 104 IRQ_TYPE_NONE>,
+> +			     <GIC_SPI 105 IRQ_TYPE_NONE>,
+> +			     <GIC_SPI 106 IRQ_TYPE_NONE>,
+> +			     <GIC_SPI 107 IRQ_TYPE_NONE>;
+> +		bus-range = <0x00 0xFF>;
+> +
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		device_type = "pci";
+> +		ranges = <0x81000000 0 0	  0x48000000 0 0x00010000   /* downstream I/O */
+> +			  0x82000000 0 0x40000000 0x40000000 0 0x04000000>; /* non-prefetchable memory */
+> +		phy-addr = <6>;
+> +	};
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
