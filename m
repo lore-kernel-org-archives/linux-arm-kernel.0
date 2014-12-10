@@ -1,74 +1,37 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 10 Dec 2014 11:17:15 +0100
-Subject: [PATCH 5/5] ARM: mvebu: Add Armada 385 Access Point Development
- Board support
-In-Reply-To: <20141205170726.2e2335af@free-electrons.com>
-References: <1417790698-9792-1-git-send-email-maxime.ripard@free-electrons.com>	<1417790698-9792-6-git-send-email-maxime.ripard@free-electrons.com>
- <20141205170726.2e2335af@free-electrons.com>
-Message-ID: <54881DAB.1080505@free-electrons.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 10 Dec 2014 11:26:00 +0100
+Subject: [PATCH 1/2] usb: chipidea: usbmisc: skip clocks on i.MX6
+In-Reply-To: <20141210050928.GB11802@shlinux2>
+References: <1418141616-29671-1-git-send-email-p.zabel@pengutronix.de>
+ <20141210050928.GB11802@shlinux2>
+Message-ID: <1418207160.3258.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Peter,
 
-[...]
+Am Mittwoch, den 10.12.2014, 13:09 +0800 schrieb Peter Chen:
+> On Tue, Dec 09, 2014 at 05:13:35PM +0100, Philipp Zabel wrote:
+> > On i.MX6Q, the USBMISC registers are clocked by the IPG clock,
+> > so there is no need to enable USBOH3 for the USBMISC driver.
+> 
+> Access the registers at usbmisc needs the same clock with chipidea core,
+> both are usboh3.
 
->> +		};
->> +
->> +		pcie-controller {
->> +			status = "okay";
->> +			/*
->> +			 * The two PCIe units are accessible through
->> +			 * standard PCIe slots on the board.
-> 
-> Two, or three ? :-)
+Alright, I'll drop this patch.
 
-Actually there are 3 PCIe units accessible through miniPCIe slots
-and not standard PCIe slots.
+It was my understanding that the usbmisc register space is clocked by
+ipg_clk_s, which is not gated by usboh3_clk_enable:
+Having a look at the "i.MX 6Dual/6Quad Applications Processor Reference
+Manual, Rev. 1, 04/2013", Figure 65-1 "USB block diagram" shows the USB
+Control Register (usbmisc) directly connected via "IP Bus1" separately
+from the host cores (these are connected behind a PL301).
+In chapter 18.4 "System Clocks", the table entry for the block instance
+"USB" shows that the usboh3_clk_enable bit gates only the ipg_ahb_clk,
+ipg_clk_s_pl301, test_clk_240m, test_clk_480m, and test_clk_60m inputs
+to the USB block. The ipg_clk_s (from ipg_clk_root) and ipg_clk_32khz
+inputs are not marked as gated. Still, it seems that indeed the usbmisc
+region is inaccessible after gating usboh3 by unbinding the usb drivers.
 
-> 
->> +			 */
->> +			pcie at 1,0 {
->> +				/* Port 0, Lane 0 */
->> +				status = "okay";
->> +			};
->> +
->> +			pcie at 2,0 {
->> +				/* Port 1, Lane 0 */
->> +				status = "okay";
->> +			};
->> +
->> +			pcie at 3,0 {
->> +				/* Port 2, Lane 0 */
->> +				status = "okay";
->> +			};
->> +		};
->> +	};
->> +
->> +	reg_xhci0_vbus: xhci0-vbus {
->> +		compatible = "regulator-fixed";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&xhci0_vbus_pins>;
->> +		regulator-name = "xhci0-vbus";
->> +		regulator-min-microvolt = <5000000>;
->> +		regulator-max-microvolt = <5000000>;
->> +		enable-active-high;
->> +		regulator-always-on;
->> +		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
->> +	};
-> 
-> Maybe you could connect this to the USB controller by using the
-> usb-nop-xceiv thing (which acts as a dummy USB PHY, if I understood
-> correctly) ?
-> 
-> Thanks!
-> 
-> Thomas
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+regards
+Philipp
