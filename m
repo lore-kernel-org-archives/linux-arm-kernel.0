@@ -1,33 +1,71 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 10 Dec 2014 17:43:33 +0100
-Subject: BCM2048 bluetooth connected over OMAP serial
-Message-ID: <20141210164333.GA3154@amd>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Dec 2014 08:45:02 -0800
+Subject: [PATCH] ARM: OMAP2+: AM43x: Add ID for ES1.2
+In-Reply-To: <547DED90.50504@ti.com>
+References: <1417145527-31086-1-git-send-email-lokeshvutla@ti.com>
+ <547DED90.50504@ti.com>
+Message-ID: <20141210164501.GD30437@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+* Nishanth Menon <nm@ti.com> [141202 08:51]:
+> On 11/27/2014 09:32 PM, Lokesh Vutla wrote:
+> > ES1.2 is a minor variant of ES1.1. Major changes since ES1.1 are
+> > updating ROM for fixing the following boot modes:
+> > - NAND boot
+> > - UART boot
+> > - Ethernet boot
+> > - USB HOST/Client boot
+> > This patch adds ID support for AM437x ES1.2 silicon.
+> > There are no additional kernel fixes required for ES1.2 silicon.
+> > 
+> > Latest Technical Documentation can be found here:
+> > http://www.ti.com/lsds/ti/arm/sitara_arm_cortex_a_processor/arm_cortex_a9_core/am437x_arm_cortex_a9/tech_docs.page
+> > 
+> > Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/id.c  | 8 ++++++--
+> >  arch/arm/mach-omap2/soc.h | 1 +
+> >  2 files changed, 7 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> > index 53841de..c25feba 100644
+> > --- a/arch/arm/mach-omap2/id.c
+> > +++ b/arch/arm/mach-omap2/id.c
+> > @@ -471,11 +471,15 @@ void __init omap3xxx_check_revision(void)
+> >  			cpu_rev = "1.0";
+> >  			break;
+> >  		case 1:
+> > -		/* FALLTHROUGH */
+> > -		default:
+> >  			omap_revision = AM437X_REV_ES1_1;
+> >  			cpu_rev = "1.1";
+> >  			break;
+> > +		case 2:
+> > +		/* FALLTHROUGH */
+> > +		default:
+> > +			omap_revision = AM437X_REV_ES1_2;
+> > +			cpu_rev = "1.2";
+> > +			break;
+> >  		}
+> >  		break;
+> >  	case 0xb8f2:
+> > diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+> > index 4376f59..c1a3b44 100644
+> > --- a/arch/arm/mach-omap2/soc.h
+> > +++ b/arch/arm/mach-omap2/soc.h
+> > @@ -446,6 +446,7 @@ IS_OMAP_TYPE(3430, 0x3430)
+> >  #define AM437X_CLASS		0x43700000
+> >  #define AM437X_REV_ES1_0	(AM437X_CLASS | (0x10 << 8))
+> >  #define AM437X_REV_ES1_1	(AM437X_CLASS | (0x11 << 8))
+> > +#define AM437X_REV_ES1_2	(AM437X_CLASS | (0x12 << 8))
+> >  
+> >  #define OMAP443X_CLASS		0x44300044
+> >  #define OMAP4430_REV_ES1_0	(OMAP443X_CLASS | (0x10 << 8))
+> > 
+> 
+> Reviewed-by: Nishanth Menon <nm@ti.com>
 
-So, there's bluetooth chip that's connected to the SoC by UART and some
-GPIOs. What would be right representation in the device tree?
-Something like this?
+Applying into omap-for-v3.19/fixes thanks.
 
-	bluetooth {
-                  compatible = "broadcom,bcm2048";
-                  uart = <&uart2>;
-                  reset-gpios = <&gpio3 27 GPIO_ACTIVE_HIGH>; /* want 91 */
-                  host-wakeup-gpios = <&gpio4 5 GPIO_ACTIVE_HIGH>; /* want 101 */
-	          bluetooth-wakeup-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>; /* want 37 */
-                  chip-type = <3>;
-                  bt-sysclk = <2>;
-                  reset-gpio-shared = <0>;
-        };
-
-Is there some way to prevent OMAP tty driver from binding to the
-device and exporting the device to userspace?
-
-Best regards,
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Tony
