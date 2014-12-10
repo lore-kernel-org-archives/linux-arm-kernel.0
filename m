@@ -1,32 +1,50 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 9 Dec 2014 16:04:31 -0800
-Subject: [PATCH 4/4] ARM: dts: enable PCIe for Broadcom Cygnus
+Date: Tue, 9 Dec 2014 16:04:28 -0800
+Subject: [PATCH 1/4] pci: iProc: define Broadcom iProc PCIe binding
 In-Reply-To: <1418169871-19232-1-git-send-email-rjui@broadcom.com>
 References: <Ray Jui <rjui@broadcom.com>
  <1418169871-19232-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1418169871-19232-5-git-send-email-rjui@broadcom.com>
+Message-ID: <1418169871-19232-2-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PCIe device nodes and its properties in bcm-cygnus.dtsi but keep it
-disabled there. Only enable it in bcm958300k.dts because PCIe interfaces
-are only populated on that board
+Document the PCIe device tree binding for Broadcom iProc family of SoCs
 
 Signed-off-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- arch/arm/boot/dts/bcm-cygnus.dtsi |   43 +++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/bcm958300k.dts  |    8 +++++++
- 2 files changed, 51 insertions(+)
+ .../devicetree/bindings/pci/brcm,iproc-pcie.txt    |   62 ++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 5126f9e..669bb3b 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -70,6 +70,49 @@
- 		};
- 	};
- 
+diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+new file mode 100644
+index 0000000..2467628
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+@@ -0,0 +1,62 @@
++* Broadcom iProc PCIe controller
++
++Required properties:
++- compatible: Must be "brcm,iproc-pcie"
++- reg: base address and length of the PCIe controller and the MDIO interface
++  that controls the PCIe PHY
++- interrupts: interrupt IDs
++- bus-range: PCI bus numbers covered
++- #address-cells: set to <3>
++- #size-cells: set to <2>
++- device_type: set to "pci"
++- ranges: ranges for the PCI memory and I/O regions
++- phy-addr: MDC/MDIO adddress of the PCIe PHY
++- have-msi-inten-reg: Required for legacy iProc PCIe controllers that need the
++  MSI interrupt enable register to be set explicitly
++
++The Broadcom iProc PCie driver adapts the multi-domain structure, i.e., each
++interface has its own domain and therefore has its own device node
++Example:
++
++SoC specific DT Entry:
++
 +	pcie0: pcie at 18012000 {
 +		compatible = "brcm,iproc-pcie";
 +		reg = <0x18012000 0x1000>,
@@ -42,10 +60,9 @@ index 5126f9e..669bb3b 100644
 +		#address-cells = <3>;
 +		#size-cells = <2>;
 +		device_type = "pci";
-+		ranges = <0x81000000 0 0	  0x28000000 0 0x00010000
-+			  0x82000000 0 0x20000000 0x20000000 0 0x04000000>;
++		ranges = <0x81000000 0 0	  0x28000000 0 0x00010000   /* downstream I/O */
++			  0x82000000 0 0x20000000 0x20000000 0 0x04000000>; /* non-prefetchable memory */
 +		phy-addr = <5>;
-+		status = "disabled";
 +	};
 +
 +	pcie1: pcie at 18013000 {
@@ -64,33 +81,9 @@ index 5126f9e..669bb3b 100644
 +		#address-cells = <3>;
 +		#size-cells = <2>;
 +		device_type = "pci";
-+		ranges = <0x81000000 0 0	  0x48000000 0 0x00010000
-+			  0x82000000 0 0x40000000 0x40000000 0 0x04000000>;
++		ranges = <0x81000000 0 0	  0x48000000 0 0x00010000   /* downstream I/O */
++			  0x82000000 0 0x40000000 0x40000000 0 0x04000000>; /* non-prefetchable memory */
 +		phy-addr = <6>;
-+		status = "disabled";
 +	};
-+
- 	uart0: serial at 18020000 {
- 		compatible = "snps,dw-apb-uart";
- 		reg = <0x18020000 0x100>;
-diff --git a/arch/arm/boot/dts/bcm958300k.dts b/arch/arm/boot/dts/bcm958300k.dts
-index f1bb36f..c9eb856 100644
---- a/arch/arm/boot/dts/bcm958300k.dts
-+++ b/arch/arm/boot/dts/bcm958300k.dts
-@@ -47,6 +47,14 @@
- 		bootargs = "console=ttyS0,115200";
- 	};
- 
-+	pcie0: pcie at 18012000 {
-+		status = "okay";
-+	};
-+
-+	pcie1: pcie at 18013000 {
-+		status = "okay";
-+	};
-+
- 	uart3: serial at 18023000 {
- 		status = "okay";
- 	};
 -- 
 1.7.9.5
