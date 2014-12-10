@@ -1,34 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Dec 2014 16:16:20 +0000
-Subject: [RFC 00/15] Resource tracking/allocation framework
-In-Reply-To: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
-References: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <20141210161620.GM11285@n2100.arm.linux.org.uk>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 10 Dec 2014 08:17:26 -0800
+Subject: [PATCH v4 0/3] Fix Arndale Octa/Peach Pi boot on Audio subsystem
+ clocks
+In-Reply-To: <1417777254-26579-1-git-send-email-k.kozlowski@samsung.com>
+ (Krzysztof Kozlowski's message of "Fri, 05 Dec 2014 12:00:51 +0100")
+References: <1417777254-26579-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <7h4mt3pjhl.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 04:48:18PM +0100, Andrzej Hajda wrote:
-> 3. There are drivers which can work without specific resource, but if
->   the resource becomes available/unavailable it can do some additional stuff.
->   An example of such driver is DRM driver (more precisely drm_connector) -
->   it can start without attached drm_panel, but if the panel becomes available it
->   can react by generating HPD event and start using it.
+Hi Krzysztof,
 
-Bad example, and actually incorrect.  DRM connectors are referenced in
-userspace by an IDR number, which can be re-used in the case of a
-connector appearing, disappearing, and then a different connector
-re-appearing.
+Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
 
-DRM really is *not* safe to hotplug like this: DRM is more a card-level
-thing, which is why we have the component helpers - which allow us to
-merge several devices into one logical card-like device in a generic
-manner.
+> Changes since v3
+> ================
+> 1. Patch 1/3: Fix issues pointed by Sylwester.
+> 2. Add Javier's tested-by [1]
 
-DRM needs a stable picture of the CRTCs, encoders and connectors, which
-should _never_ change during the lifetime of the DRM device.  Devices
-attached to connectors can be hotplugged, but that's about the limit of
-hot-plugging in DRM.
+I tested this series on top of next-20141210 (exynos_defconfig and
+multi_v7_defconfig) on exynos5800-peach-pi and exynos5420-arndale-octa
+it fixes the boot hangs I was seeing with linux-next on those platforms.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Feel free to add:
+
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+Kevin
