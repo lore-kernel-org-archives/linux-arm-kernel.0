@@ -1,51 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Dec 2014 08:31:47 -0800
-Subject: [PATCH] arm: boot: dts: am437x-sk: fix lcd enable pin mux data
-In-Reply-To: <1417705821-21847-1-git-send-email-balbi@ti.com>
-References: <20141204144325.GA17269@saruman>
- <1417705821-21847-1-git-send-email-balbi@ti.com>
-Message-ID: <20141210163147.GC30437@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Dec 2014 17:36:46 +0100
+Subject: [PATCH v8 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <20141210.110732.519666115784722516.davem@davemloft.net>
+References: <5487C357.9030507@huawei.com> <2331317.LV3gPP3odb@wuerfel>
+ <20141210.110732.519666115784722516.davem@davemloft.net>
+Message-ID: <34612839.hAkXUcbKUQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [141204 07:12]:
-> Caused by a copy & paste error. Note that even with
-> this bug AM437x SK display still works because GPIO
-> mux mode is always enabled. It's still wrong to mux
-> somebody else's pin.
+On Wednesday 10 December 2014 11:07:32 David Miller wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Wed, 10 Dec 2014 10:35:20 +0100
 > 
-> Luckily ball D25 (offset 0x238 - gpio5_8) on AM437x
-> isn't used for anything.
+> > On Wednesday 10 December 2014 14:45:29 Ding Tianhong wrote:
+> >> 
+> >> Miss this code, I think the best way is skb_orphan(skb), just like the cxgb3 drivers, some hardware
+> >> didn't use the tx inq to free dmad Tx packages.
+> > 
+> > The problem with skb_orphan is that you are telling the network stack that
+> > the packet is now out of its reach and it will no longer be able to take
+> > queued packets into account.
 > 
-> While at that, also replace a pullup with a pulldown
-> as that gpio should be normally low, not high.
+> skb_orphan() also does not release netfilter resources attached to the
+> packet.
 > 
-> Cc: <stable@vger.kernel.org> # v3.17+
-> Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Really, all drivers must free TX SKBs in a small, finite, amount of
+> time after submission.
+> 
+> There is no way around this.
 
-Applying into omap-for-v3.19/fixes thanks.
+I see. Do you see a problem with returning early from napi->poll()
+without calling napi_complete() when the TX queue remains full at
+the end of the poll function?
 
-Tony
+Or is there any better alternative for broken hardware that lacks
+a TX-complete interrupt?
 
-> ---
->  arch/arm/boot/dts/am437x-sk-evm.dts | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-> index f7f77a7..0eceb8a 100644
-> --- a/arch/arm/boot/dts/am437x-sk-evm.dts
-> +++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-> @@ -320,8 +320,7 @@
->  
->  	lcd_pins: lcd_pins {
->  		pinctrl-single,pins = <
-> -			/* GPIO 5_8 to select LCD / HDMI */
-> -			0x238 (PIN_OUTPUT_PULLUP | MUX_MODE7)
-> +			0x1c (PIN_OUTPUT_PULLDOWN | MUX_MODE7) /* gpcm_ad7.gpio1_7 */
->  		>;
->  	};
->  };
-> -- 
-> 2.1.0.GIT
-> 
+	Arnd
