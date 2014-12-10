@@ -1,100 +1,137 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 10 Dec 2014 22:33:22 +0100
-Subject: [PATCH V3] arm: imx: correct the hardware clock gate setting
- for shared nodes
-In-Reply-To: <ac72cb8f6219888aaf467648efd5a675@agner.ch>
-References: <1418205102-14598-1-git-send-email-b20788@freescale.com>
- <ac72cb8f6219888aaf467648efd5a675@agner.ch>
-Message-ID: <5f1fa200cd9ff9c8022b53b32578dfb2@agner.ch>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 10 Dec 2014 16:31:02 -0500
+Subject: [PATCH v7 2/3] net: Add Keystone NetCP ethernet driver
+In-Reply-To: <20141209.131053.2026868499542642866.davem@davemloft.net>
+References: <1417556503-22290-1-git-send-email-m-karicheri2@ti.com>
+ <1417556503-22290-3-git-send-email-m-karicheri2@ti.com>
+ <20141209.131053.2026868499542642866.davem@davemloft.net>
+Message-ID: <5488BB96.9070609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-10 22:24, Stefan Agner wrote:
-> On 2014-12-10 10:51, Anson Huang wrote:
->> For those clk gates which hold share count, since its is_enabled
->> callback is only checking the share count rather than reading
->> the hardware register setting, in the late phase of kernel bootup,
->> the clk_disable_unused action will NOT handle the scenario of
->> share_count is 0 but the hardware setting is enabled, actually,
->> U-Boot normally enables all clk gates, then those shared clk gates
->> will be always enabled until they are used by some modules.
-> 
-> Wow, this is one long sentence! :-) Could you split that up and simplify
-> it a bit? Especially the "hold share count" part confused me at first, I
-> thought you mean *share_count > 0, but you actually ment share_count !=
-> NULL (maybe "clk gates which have share count allocated").
-> 
->>
->> So the problem would be: when kernel boot up, the usecount cat
->> from clk tree is 0, but the clk gates actually is enabled in
->> hardware register, it will confuse user and bring unnecessary power
->> consumption.
->>
->> This patch adds .disable_unused callback and using hardware register
->> check for .is_enabled callback of shared nodes to handle such scenario
->> in late phase of kernel boot up, then the hardware status will match the
->> clk tree info.
->>
->> Signed-off-by: Anson Huang <b20788@freescale.com>
->> ---
->> changes from V2:
->> 	1. uboot -> U-Boot;
->> 	2. add .is_enabled change into commit log;
->> 	3. improve the condition check code.
->>  arch/arm/mach-imx/clk-gate2.c |   23 +++++++++++++++++++----
->>  1 file changed, 19 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
->> index 5a75cdc..8935bff 100644
->> --- a/arch/arm/mach-imx/clk-gate2.c
->> +++ b/arch/arm/mach-imx/clk-gate2.c
->> @@ -96,15 +96,30 @@ static int clk_gate2_is_enabled(struct clk_hw *hw)
->>  {
->>  	struct clk_gate2 *gate = to_clk_gate2(hw);
->>
->> -	if (gate->share_count)
->> -		return !!__clk_get_enable_count(hw->clk);
->> -	else
->> -		return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
->> +	return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
->> +}
->> +
->> +static void clk_gate2_disable_unused(struct clk_hw *hw)
+On 12/09/2014 01:10 PM, David Miller wrote:
+> From: Murali Karicheri<m-karicheri2@ti.com>
+> Date: Tue, 2 Dec 2014 16:41:42 -0500
+>
+>> +static void set_pkt_info_le(u32 buff, u32 buff_len, u32 ndesc,
+>> +			    struct knav_dma_desc *desc)
 >> +{
->> +	struct clk_gate2 *gate = to_clk_gate2(hw);
->> +	unsigned long flags = 0;
->> +	u32 reg;
->> +
->> +	spin_lock_irqsave(gate->lock, flags);
->> +
->> +	if (!gate->share_count || *gate->share_count == 0) {
-> 
-> By introducing the .disable_unused callback the framework won't call the
-> .disable callback anymore, even if enable_count is 0 and the clock is
-> enabled according to .is_enabled. Wouldn't this interfere the disabling
-> of normal, non-shared clock gates?
-> 
+>> +	desc->buff_len = cpu_to_le32(buff_len);
+>> +	desc->buff = cpu_to_le32(buff);
+>> +	desc->next_desc = cpu_to_le32(ndesc);
+>> +}
+>
+> The members of knav_dma_desc are "u32", so you are going to get tons of
+> static checker warnings from trying to assign cpu_to_le32()'s result
+> (which is a le32) into them.
+David,
 
-Ok, see it now, we disable the clock in this if statement in the
-share_count == NULL case... Sorry about that.
+Thanks for your comment.
 
---
-Stefan
+Are you referring to the static code analyser sparse that is invoked 
+through?
 
->> +		reg = readl(gate->reg);
->> +		reg &= ~(3 << gate->bit_idx);
->> +		writel(reg, gate->reg);
->> +	}
->> +
->> +	spin_unlock_irqrestore(gate->lock, flags);
->>  }
->>
->>  static struct clk_ops clk_gate2_ops = {
->>  	.enable = clk_gate2_enable,
->>  	.disable = clk_gate2_disable,
->> +	.disable_unused = clk_gate2_disable_unused,
->>  	.is_enabled = clk_gate2_is_enabled,
->>  };
-> 
-> --
-> Stefan
+make C=1 CHECK=sparse
+
+I am running it now.
+
+I started a build of v3.18-rc7 with this option and seeing a lot of
+warnings. Am I using the right tool? A snapshot of the output is below
+
+   CHECK   drivers/clk/clk.c
+include/linux/err.h:40:16: warning: testing a 'safe expression'
+include/linux/err.h:40:16: warning: testing a 'safe expression'
+include/linux/err.h:40:16: warning: testing a 'safe expression'
+include/linux/err.h:40:16: warning: testing a 'safe expression'
+drivers/clk/clk.c:2263:5: warning: symbol '__clk_get' was not declared. 
+Should it be static?
+drivers/clk/clk.c:2274:6: warning: symbol '__clk_put' was not declared. 
+Should it be static?
+drivers/clk/clk.c:2647:37: warning: incorrect type in assignment 
+(different modifiers)
+drivers/clk/clk.c:2647:37:    expected void ( *[usertype] clk_init_cb )( 
+... )
+drivers/clk/clk.c:2647:37:    got void const *const data
+drivers/clk/clk.c:67:22: warning: context imbalance in 'clk_enable_lock' 
+- wrong count at exit
+drivers/clk/clk.c:92:9: warning: context imbalance in 
+'clk_enable_unlock' - unexpected unlock
+   CC      drivers/clk/clk.o
+   CHECK   drivers/clk/clk-divider.c
+drivers/clk/clk-divider.c:362:9: warning: context imbalance in 
+'clk_divider_set_rate' - different lock contexts for basic block
+   CC      drivers/clk/clk-divider.o
+   CHECK   drivers/clk/clk-fixed-factor.c
+   CC      drivers/clk/clk-fixed-factor.o
+   CHECK   drivers/clk/clk-fixed-rate.c
+   CC      drivers/clk/clk-fixed-rate.o
+   CHECK   drivers/clk/clk-gate.c
+drivers/clk/clk-gate.c:71:9: warning: context imbalance in 
+'clk_gate_endisable' - different lock contexts for basic block
+   CC      drivers/clk/clk-gate.o
+   CHECK   drivers/clk/clk-mux.c
+drivers/clk/clk-mux.c:69:12: warning: context imbalance in 
+'clk_mux_set_parent' - different lock contexts for basic block
+   CC      drivers/clk/clk-mux.o
+   CHECK   drivers/clk/clk-composite.c
+   CC      drivers/clk/clk-composite.o
+   CHECK   drivers/clk/clk-fractional-divider.c
+drivers/clk/clk-fractional-divider.c:36:9: warning: context imbalance in 
+'clk_fd_recalc_rate' - different lock contexts for basic block
+drivers/clk/clk-fractional-divider.c:65:12: warning: context imbalance 
+in 'clk_fd_set_rate' - different lock contexts for basic block
+   CC      drivers/clk/clk-fractional-divider.o
+   CHECK   drivers/clk/clk-gpio-gate.c
+drivers/clk/clk-gpio-gate.c:189:13: warning: symbol 
+'of_gpio_gate_clk_setup' was not declared. Should it be static?
+   CC      drivers/clk/clk-gpio-gate.o
+   CHECK   drivers/clk/clk-conf.c
+   CC      drivers/clk/clk-conf.o
+   CHECK   drivers/clk/keystone/pll.c
+   CC      drivers/clk/keystone/pll.o
+   CHECK   drivers/clk/keystone/gate.c
+drivers/clk/keystone/gate.c:118:12: warning: context imbalance in 
+'keystone_clk_enable' - different lock contexts for basic block
+drivers/clk/keystone/gate.c:148:9: warning: context imbalance in 
+'keystone_clk_disable' - different lock contexts for basic block
+   CC      drivers/clk/keystone/gate.o
+   LD      drivers/clk/keystone/built-in.o
+   LD      drivers/clk/built-in.o
+   CHECK   drivers/clocksource/clksrc-of.c
+drivers/clocksource/clksrc-of.c:37:27: warning: incorrect type in 
+assignment (different modifiers)
+drivers/clocksource/clksrc-of.c:37:27:    expected void ( *[usertype] 
+init_func )( ... )
+drivers/clocksource/clksrc-of.c:37:27:    got void const *const data
+   CC      drivers/clocksource/clksrc-of.o
+   CHECK   drivers/clocksource/mmio.c
+   CC      drivers/clocksource/mmio.o
+   CHECK   drivers/clocksource/arm_arch_timer.c
+   CC      drivers/clocksource/arm_arch_timer.o
+   CHECK   drivers/clocksource/dummy_timer.c
+   CC      drivers/clocksource/dummy_timer.o
+   CHECK   drivers/clocksource/timer-keystone.c
+   CC      drivers/clocksource/timer-keystone.o
+   LD      drivers/clocksource/built-in.o
+   LD      drivers/crypto/built-in.o
+   CHECK   drivers/dma/dmaengine.c
+   CC      drivers/dma/dmaengine.o
+   CHECK   drivers/dma/virt-dma.c
+drivers/dma/virt-dma.c:22:14: warning: symbol 'vchan_tx_submit' was not 
+declared. Should it be static?
+   CC      drivers/dma/virt-dma.o
+   CHECK   drivers/dma/of-dma.c
+   CC      drivers/dma/of-dma.o
+   CHECK   drivers/dma/edma.c
+drivers/dma/edma.c:560:32: warning: symbol 'edma_prep_dma_memcpy' was 
+not declared. Should it be static?
+drivers/dma/edma.c:1099:6: warning: symbol 'edma_filter_fn' was not 
+declared. Should it be static?
+
+
+
+
+
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
