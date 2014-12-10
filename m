@@ -1,57 +1,62 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 10 Dec 2014 16:37:17 +0800
-Subject: [PATCH RFC 04/15] drm/dsi: Do not add DSI devices for the child nodes
- with input-port property
+Date: Wed, 10 Dec 2014 16:37:18 +0800
+Subject: [PATCH RFC 05/15] ARM: dts: imx6qdl: Add input-port property to MIPI
+ DSI node's CTRC child nodes
 In-Reply-To: <1418200648-32656-1-git-send-email-Ying.Liu@freescale.com>
 References: <1418200648-32656-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1418200648-32656-5-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1418200648-32656-6-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MIPI DSI bus driver would try to add a DSI device for a host's every
-child node which contains the reg property.  Unfortunately, the existing
-i.MX6Q/SDL MIPI DSI host device tree node's child nodes contain the reg
-property, but the child nodes are ports pointing to dedicated CRTCs.
-So, this patch phases out the child nodes with input-port property before
-adding DSI devices for them and updates the MIPI DSI bus OF binding
-documentation.
+To phase out the MIPI DSI's child nodes which present DRM CRTCs from the
+child nodes which represent MIPI DSI peripherals, we need to add input-port
+property to the child nodes to be phased out.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
- Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt | 4 ++++
- drivers/gpu/drm/drm_mipi_dsi.c                              | 5 +++--
- 2 files changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx6q.dtsi   | 2 ++
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt b/Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt
-index 973c272..1a1d3c1 100644
---- a/Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt
-+++ b/Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt
-@@ -36,6 +36,10 @@ Peripherals are represented as child nodes of the DSI host's node. Properties
- described here apply to all DSI peripherals, but individual bindings may want
- to define additional, device-specific properties.
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index e9f3646..e6a6d90 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -294,6 +294,7 @@
+ &mipi_dsi {
+ 	port at 2 {
+ 		reg = <2>;
++		input-port;
  
-+Please, do not add the input-port property to the child nodes which represent
-+peripherals. Otherwise, the peripherals would be omitted by the MIPI DSI bus
-+driver.
-+
- Required properties:
- - reg: The virtual channel number of a DSI peripheral. Must be in the range
-   from 0 to 3.
-diff --git a/drivers/gpu/drm/drm_mipi_dsi.c b/drivers/gpu/drm/drm_mipi_dsi.c
-index c0644bb..9adacfe 100644
---- a/drivers/gpu/drm/drm_mipi_dsi.c
-+++ b/drivers/gpu/drm/drm_mipi_dsi.c
-@@ -176,8 +176,9 @@ int mipi_dsi_host_register(struct mipi_dsi_host *host)
- 	struct device_node *node;
+ 		mipi_mux_2: endpoint {
+ 			remote-endpoint = <&ipu2_di0_mipi>;
+@@ -302,6 +303,7 @@
  
- 	for_each_available_child_of_node(host->dev->of_node, node) {
--		/* skip nodes without reg property */
--		if (!of_find_property(node, "reg", NULL))
-+		/* skip nodes without reg property or with input-port property */
-+		if (!of_find_property(node, "reg", NULL) ||
-+		     of_find_property(node, "input-port", NULL))
- 			continue;
- 		of_mipi_dsi_device_add(host, node);
- 	}
+ 	port at 3 {
+ 		reg = <3>;
++		input-port;
+ 
+ 		mipi_mux_3: endpoint {
+ 			remote-endpoint = <&ipu2_di1_mipi>;
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 9596ed5..5d92ad7 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1011,6 +1011,7 @@
+ 
+ 				port at 0 {
+ 					reg = <0>;
++					input-port;
+ 
+ 					mipi_mux_0: endpoint {
+ 						remote-endpoint = <&ipu1_di0_mipi>;
+@@ -1019,6 +1020,7 @@
+ 
+ 				port at 1 {
+ 					reg = <1>;
++					input-port;
+ 
+ 					mipi_mux_1: endpoint {
+ 						remote-endpoint = <&ipu1_di1_mipi>;
 -- 
 2.1.0
