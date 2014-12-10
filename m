@@ -1,65 +1,33 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 9 Dec 2014 18:18:10 -0800
-Subject: [PATCH v2 1/4] i2c: iProc: define Broadcom iProc I2C binding
+Date: Tue, 9 Dec 2014 18:18:12 -0800
+Subject: [PATCH v2 3/4] ARM: mach-bcm: Enable I2C support for iProc
 In-Reply-To: <1418177893-22094-1-git-send-email-rjui@broadcom.com>
 References: <Ray Jui <rjui@broadcom.com>
  <1418177893-22094-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1418177893-22094-2-git-send-email-rjui@broadcom.com>
+Message-ID: <1418177893-22094-4-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the I2C device tree binding for Broadcom iProc family of
-SoCs
+Enable I2C driver support for Broadcom iProc family of SoCs by
+selecting I2C_BCM_IPROC
 
 Signed-off-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- .../devicetree/bindings/i2c/brcm,iproc-i2c.txt     |   37 ++++++++++++++++++++
- 1 file changed, 37 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+ arch/arm/mach-bcm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-new file mode 100644
-index 0000000..81f982c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-@@ -0,0 +1,37 @@
-+Broadcom iProc I2C controller
-+
-+Required properties:
-+
-+- compatible:
-+    Must be "brcm,iproc-i2c"
-+
-+- reg:
-+    Define the base and range of the I/O address space that contain the iProc
-+    I2C controller registers
-+
-+- interrupts:
-+    Should contain the I2C interrupt
-+
-+- clock-frequency:
-+    This is the I2C bus clock. Need to be either 100000 or 400000
-+
-+- #address-cells:
-+    Always 1 (for I2C addresses)
-+
-+- #size-cells:
-+    Always 0
-+
-+Example:
-+	i2c0: i2c at 18008000 {
-+		compatible = "brcm,iproc-i2c";
-+		reg = <0x18008000 0x100>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
-+		clock-frequency = <100000>;
-+
-+		codec: wm8750 at 1a {
-+			compatible = "wlf,wm8750";
-+			reg = <0x1a>;
-+		};
-+	};
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index aaeec78..86ee90b 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -19,6 +19,7 @@ config ARCH_BCM_IPROC
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+ 	select PINCTRL
++	select I2C_BCM_IPROC
+ 	help
+ 	  This enables support for systems based on Broadcom IPROC architected SoCs.
+ 	  The IPROC complex contains one or more ARM CPUs along with common
 -- 
 1.7.9.5
