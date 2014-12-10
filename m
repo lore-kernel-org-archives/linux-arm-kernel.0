@@ -1,607 +1,746 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 10 Dec 2014 15:28:53 -0800
-Subject: [PATCH] treewide: Convert clockevents_notify to use int cpu
-Message-ID: <1418254133.18092.22.camel@perches.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 10 Dec 2014 16:35:52 -0700
+Subject: [PATCH 2/6] x86, acpi, pci: Move arch-agnostic MMCFG code out of
+ arch/x86/ directory
+In-Reply-To: <1416413091-13452-3-git-send-email-tomasz.nowicki@linaro.org>
+References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+ <1416413091-13452-3-git-send-email-tomasz.nowicki@linaro.org>
+Message-ID: <20141210233552.GG6692@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As far as I can tell, there's no value indirecting
-the cpu passed to this function via a void *.
+On Wed, Nov 19, 2014 at 05:04:47PM +0100, Tomasz Nowicki wrote:
+> MMCFG table seems to be architecture independent and it makes sense
+> to share common code across all architectures. The ones that may need
+> architectural specific actions have default prototype (__weak).
 
-Update all the callers and called functions from within
-clockevents_notify.
+We have kind of a stew of abbreviations here: MCFG, MMCFG, MMCONFIG.  In
+addition, the "MMCONFIG" term comes is used by ACPI but not by the PCI
+specs.  The PCIe spec uses "ECAM" (Enhanced Configuration Access Mechanism)
+instead.  If we're going to make this architecture-independent (which I
+think is a great idea), I sort of hate to expose it using terms that only
+mean something to ACPI folks.  
 
-Miscellanea:
+So I want to moot the idea of replacing the "pci_mmcfg" and "pci_mmconfig"
+prefixes with something more generic, like "pci_ecam".  I'm a little bit
+conflicted about this, because it would mean a fair amount of churn, but on
+the other hand, I do think good names are a huge aid to understanding.
 
-Add pr_fmt and convert one printk(KERN_ERR to pr_err
+I'm mostly concerned about the things exposed outside of x86.  Things that
+are x86-specific or ACPI-specific could be left alone, so maybe it wouldn't
+be a huge change.
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
- arch/arm/mach-omap2/cpuidle44xx.c      |  7 +++----
- arch/arm/mach-tegra/cpuidle-tegra114.c |  4 ++--
- arch/arm/mach-tegra/cpuidle-tegra20.c  |  8 ++++----
- arch/arm/mach-tegra/cpuidle-tegra30.c  |  8 ++++----
- arch/x86/kernel/process.c              |  6 +++---
- arch/x86/xen/suspend.c                 |  2 +-
- drivers/acpi/acpi_pad.c                |  9 +++++----
- drivers/acpi/processor_idle.c          |  4 ++--
- drivers/cpuidle/driver.c               |  3 +--
- drivers/idle/intel_idle.c              |  7 +++----
- include/linux/clockchips.h             |  6 +++---
- kernel/sched/idle.c                    |  4 ++--
- kernel/time/clockevents.c              | 15 +++++++--------
- kernel/time/hrtimer.c                  |  6 ++----
- kernel/time/tick-broadcast.c           | 16 ++++++++--------
- kernel/time/tick-common.c              | 16 ++++++++--------
- kernel/time/tick-internal.h            | 18 +++++++++---------
- kernel/time/timekeeping.c              |  4 ++--
- 18 files changed, 69 insertions(+), 74 deletions(-)
+I noticed you made some functions __weak; I'd like to see that change split
+into a separate patch, with this one being basically mechanical code
+movement with no functional change.  That way we can discuss the need for
+and merits of that approach separately.  A mmcfg->ecam rename (if we do
+that) should also be its own separate patch.
 
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index 01e398a..5d50aa1 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -112,7 +112,7 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
- 	mpuss_can_lose_context = (cx->mpu_state == PWRDM_POWER_RET) &&
- 				 (cx->mpu_logic_state == PWRDM_POWER_OFF);
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, cpu_id);
- 
- 	/*
- 	 * Call idle CPU PM enter notifier chain so that
-@@ -169,7 +169,7 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
- 	if (dev->cpu == 0 && mpuss_can_lose_context)
- 		cpu_cluster_pm_exit();
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, cpu_id);
- 
- fail:
- 	cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
-@@ -184,8 +184,7 @@ fail:
-  */
- static void omap_setup_broadcast_timer(void *arg)
- {
--	int cpu = smp_processor_id();
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, smp_processor_id());
- }
- 
- static struct cpuidle_driver omap4_idle_driver = {
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
-index f2b586d..3b2fc3f 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra114.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
-@@ -44,7 +44,7 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
- 	tegra_set_cpu_in_lp2();
- 	cpu_pm_enter();
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, dev->cpu);
- 
- 	call_firmware_op(prepare_idle);
- 
-@@ -52,7 +52,7 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
- 	if (call_firmware_op(do_idle, 0) == -ENOSYS)
- 		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, dev->cpu);
- 
- 	cpu_pm_exit();
- 	tegra_clear_cpu_in_lp2();
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-index 4f25a7c..ab30758 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra20.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-@@ -136,11 +136,11 @@ static bool tegra20_cpu_cluster_power_down(struct cpuidle_device *dev,
- 	if (tegra20_reset_cpu_1() || !tegra_cpu_rail_off_ready())
- 		return false;
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, dev->cpu);
- 
- 	tegra_idle_lp2_last();
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, dev->cpu);
- 
- 	if (cpu_online(1))
- 		tegra20_wake_cpu1_from_reset();
-@@ -153,13 +153,13 @@ static bool tegra20_idle_enter_lp2_cpu_1(struct cpuidle_device *dev,
- 					 struct cpuidle_driver *drv,
- 					 int index)
- {
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, dev->cpu);
- 
- 	cpu_suspend(0, tegra20_sleep_cpu_secondary_finish);
- 
- 	tegra20_cpu_clear_resettable();
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, dev->cpu);
- 
- 	return true;
- }
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-index f8815ed..67d0492 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra30.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-@@ -76,11 +76,11 @@ static bool tegra30_cpu_cluster_power_down(struct cpuidle_device *dev,
- 		return false;
- 	}
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, dev->cpu);
- 
- 	tegra_idle_lp2_last();
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, dev->cpu);
- 
- 	return true;
- }
-@@ -90,13 +90,13 @@ static bool tegra30_cpu_core_power_down(struct cpuidle_device *dev,
- 					struct cpuidle_driver *drv,
- 					int index)
- {
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, dev->cpu);
- 
- 	smp_wmb();
- 
- 	cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, dev->cpu);
- 
- 	return true;
- }
-diff --git a/arch/x86/kernel/process.c b/arch/x86/kernel/process.c
-index e127dda..09290b0 100644
---- a/arch/x86/kernel/process.c
-+++ b/arch/x86/kernel/process.c
-@@ -380,10 +380,10 @@ static void amd_e400_idle(void)
- 			 * Force broadcast so ACPI can not interfere.
- 			 */
- 			clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_FORCE,
--					   &cpu);
-+					   cpu);
- 			pr_info("Switch to broadcast mode on CPU%d\n", cpu);
- 		}
--		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
-+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, cpu);
- 
- 		default_idle();
- 
-@@ -392,7 +392,7 @@ static void amd_e400_idle(void)
- 		 * called with interrupts disabled.
- 		 */
- 		local_irq_disable();
--		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
-+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, cpu);
- 		local_irq_enable();
- 	} else
- 		default_idle();
-diff --git a/arch/x86/xen/suspend.c b/arch/x86/xen/suspend.c
-index c4df9db..61bab6a 100644
---- a/arch/x86/xen/suspend.c
-+++ b/arch/x86/xen/suspend.c
-@@ -87,7 +87,7 @@ static void xen_vcpu_notify_restore(void *data)
- 	if ( smp_processor_id() == 0)
- 		return;
- 
--	clockevents_notify(reason, NULL);
-+	clockevents_notify(reason, -1);
- }
- 
- void xen_arch_resume(void)
-diff --git a/drivers/acpi/acpi_pad.c b/drivers/acpi/acpi_pad.c
-index c7b105c..63138e4 100644
---- a/drivers/acpi/acpi_pad.c
-+++ b/drivers/acpi/acpi_pad.c
-@@ -180,17 +180,18 @@ static int power_saving_thread(void *data)
- 			if (lapic_detected_unstable && !lapic_marked_unstable) {
- 				int i;
- 				/* LAPIC could halt in idle, so notify users */
--				for_each_online_cpu(i)
-+				for_each_online_cpu(i) {
- 					clockevents_notify(
- 						CLOCK_EVT_NOTIFY_BROADCAST_ON,
--						&i);
-+						i);
-+				}
- 				lapic_marked_unstable = 1;
- 			}
- 			local_irq_disable();
- 			cpu = smp_processor_id();
- 			if (lapic_marked_unstable)
- 				clockevents_notify(
--					CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
-+					CLOCK_EVT_NOTIFY_BROADCAST_ENTER, cpu);
- 			stop_critical_timings();
- 
- 			mwait_idle_with_hints(power_saving_mwait_eax, 1);
-@@ -198,7 +199,7 @@ static int power_saving_thread(void *data)
- 			start_critical_timings();
- 			if (lapic_marked_unstable)
- 				clockevents_notify(
--					CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
-+					CLOCK_EVT_NOTIFY_BROADCAST_EXIT, cpu);
- 			local_irq_enable();
- 
- 			if (time_before(expire_time, jiffies)) {
-diff --git a/drivers/acpi/processor_idle.c b/drivers/acpi/processor_idle.c
-index 4995365..2eaa450 100644
---- a/drivers/acpi/processor_idle.c
-+++ b/drivers/acpi/processor_idle.c
-@@ -162,7 +162,7 @@ static void __lapic_timer_propagate_broadcast(void *arg)
- 	reason = pr->power.timer_broadcast_on_state < INT_MAX ?
- 		CLOCK_EVT_NOTIFY_BROADCAST_ON : CLOCK_EVT_NOTIFY_BROADCAST_OFF;
- 
--	clockevents_notify(reason, &pr->id);
-+	clockevents_notify(reason, pr->id);
- }
- 
- static void lapic_timer_propagate_broadcast(struct acpi_processor *pr)
-@@ -183,7 +183,7 @@ static void lapic_timer_state_broadcast(struct acpi_processor *pr,
- 
- 		reason = broadcast ?  CLOCK_EVT_NOTIFY_BROADCAST_ENTER :
- 			CLOCK_EVT_NOTIFY_BROADCAST_EXIT;
--		clockevents_notify(reason, &pr->id);
-+		clockevents_notify(reason, pr->id);
- 	}
- }
- 
-diff --git a/drivers/cpuidle/driver.c b/drivers/cpuidle/driver.c
-index 2697e87..2fcc20b 100644
---- a/drivers/cpuidle/driver.c
-+++ b/drivers/cpuidle/driver.c
-@@ -143,8 +143,7 @@ static inline void __cpuidle_unset_driver(struct cpuidle_driver *drv)
-  */
- static void cpuidle_setup_broadcast_timer(void *arg)
- {
--	int cpu = smp_processor_id();
--	clockevents_notify((long)(arg), &cpu);
-+	clockevents_notify((long)arg, smp_processor_id());
- }
- 
- /**
-diff --git a/drivers/idle/intel_idle.c b/drivers/idle/intel_idle.c
-index 9cceacb..945b1f3 100644
---- a/drivers/idle/intel_idle.c
-+++ b/drivers/idle/intel_idle.c
-@@ -582,12 +582,12 @@ static int intel_idle(struct cpuidle_device *dev,
- 		leave_mm(cpu);
- 
- 	if (!(lapic_timer_reliable_states & (1 << (cstate))))
--		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
-+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, cpu);
- 
- 	mwait_idle_with_hints(eax, ecx);
- 
- 	if (!(lapic_timer_reliable_states & (1 << (cstate))))
--		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
-+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, cpu);
- 
- 	return index;
- }
-@@ -595,12 +595,11 @@ static int intel_idle(struct cpuidle_device *dev,
- static void __setup_broadcast_timer(void *arg)
- {
- 	unsigned long reason = (unsigned long)arg;
--	int cpu = smp_processor_id();
- 
- 	reason = reason ?
- 		CLOCK_EVT_NOTIFY_BROADCAST_ON : CLOCK_EVT_NOTIFY_BROADCAST_OFF;
- 
--	clockevents_notify(reason, &cpu);
-+	clockevents_notify(reason, smp_processor_id());
- }
- 
- static int cpu_hotplug_notify(struct notifier_block *n,
-diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
-index 2e4cb67..4e03069 100644
---- a/include/linux/clockchips.h
-+++ b/include/linux/clockchips.h
-@@ -195,9 +195,9 @@ static inline void tick_setup_hrtimer_broadcast(void) {};
- #endif
- 
- #ifdef CONFIG_GENERIC_CLOCKEVENTS
--extern int clockevents_notify(unsigned long reason, void *arg);
-+extern int clockevents_notify(unsigned long reason, int cpu);
- #else
--static inline int clockevents_notify(unsigned long reason, void *arg) { return 0; }
-+static inline int clockevents_notify(unsigned long reason, int cpu) { return 0; }
- #endif
- 
- #else /* CONFIG_GENERIC_CLOCKEVENTS_BUILD */
-@@ -205,7 +205,7 @@ static inline int clockevents_notify(unsigned long reason, void *arg) { return 0
- static inline void clockevents_suspend(void) {}
- static inline void clockevents_resume(void) {}
- 
--static inline int clockevents_notify(unsigned long reason, void *arg) { return 0; }
-+static inline int clockevents_notify(unsigned long reason, int cpu) { return 0; }
- static inline int tick_check_broadcast_expired(void) { return 0; }
- static inline void tick_setup_hrtimer_broadcast(void) {};
- 
-diff --git a/kernel/sched/idle.c b/kernel/sched/idle.c
-index c47fce7..e68faee 100644
---- a/kernel/sched/idle.c
-+++ b/kernel/sched/idle.c
-@@ -144,7 +144,7 @@ use_default:
- 	 * fail if it is not available
- 	 */
- 	if (broadcast &&
--	    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu))
-+	    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, dev->cpu))
- 		goto use_default;
- 
- 	/* Take note of the planned idle state. */
-@@ -161,7 +161,7 @@ use_default:
- 	idle_set_state(this_rq(), NULL);
- 
- 	if (broadcast)
--		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, dev->cpu);
- 
- 	/*
- 	 * Give the governor an opportunity to reflect on the outcome
-diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-index 5544990..69973be 100644
---- a/kernel/time/clockevents.c
-+++ b/kernel/time/clockevents.c
-@@ -546,11 +546,11 @@ void clockevents_resume(void)
-  * clockevents_notify - notification about relevant events
-  * Returns 0 on success, any other value on error
-  */
--int clockevents_notify(unsigned long reason, void *arg)
-+int clockevents_notify(unsigned long reason, int cpu)
- {
- 	struct clock_event_device *dev, *tmp;
- 	unsigned long flags;
--	int cpu, ret = 0;
-+	int ret = 0;
- 
- 	raw_spin_lock_irqsave(&clockevents_lock, flags);
- 
-@@ -558,7 +558,7 @@ int clockevents_notify(unsigned long reason, void *arg)
- 	case CLOCK_EVT_NOTIFY_BROADCAST_ON:
- 	case CLOCK_EVT_NOTIFY_BROADCAST_OFF:
- 	case CLOCK_EVT_NOTIFY_BROADCAST_FORCE:
--		tick_broadcast_on_off(reason, arg);
-+		tick_broadcast_on_off(reason, cpu);
- 		break;
- 
- 	case CLOCK_EVT_NOTIFY_BROADCAST_ENTER:
-@@ -567,7 +567,7 @@ int clockevents_notify(unsigned long reason, void *arg)
- 		break;
- 
- 	case CLOCK_EVT_NOTIFY_CPU_DYING:
--		tick_handover_do_timer(arg);
-+		tick_handover_do_timer(cpu);
- 		break;
- 
- 	case CLOCK_EVT_NOTIFY_SUSPEND:
-@@ -580,9 +580,9 @@ int clockevents_notify(unsigned long reason, void *arg)
- 		break;
- 
- 	case CLOCK_EVT_NOTIFY_CPU_DEAD:
--		tick_shutdown_broadcast_oneshot(arg);
--		tick_shutdown_broadcast(arg);
--		tick_shutdown(arg);
-+		tick_shutdown_broadcast_oneshot(cpu);
-+		tick_shutdown_broadcast(cpu);
-+		tick_shutdown(cpu);
- 		/*
- 		 * Unregister the clock event devices which were
- 		 * released from the users in the notify chain.
-@@ -592,7 +592,6 @@ int clockevents_notify(unsigned long reason, void *arg)
- 		/*
- 		 * Now check whether the CPU has left unused per cpu devices
- 		 */
--		cpu = *((int *)arg);
- 		list_for_each_entry_safe(dev, tmp, &clockevent_devices, list) {
- 			if (cpumask_test_cpu(cpu, dev->cpumask) &&
- 			    cpumask_weight(dev->cpumask) == 1 &&
-diff --git a/kernel/time/hrtimer.c b/kernel/time/hrtimer.c
-index 37e50aa..e8c903f 100644
---- a/kernel/time/hrtimer.c
-+++ b/kernel/time/hrtimer.c
-@@ -1717,15 +1717,13 @@ static int hrtimer_cpu_notify(struct notifier_block *self,
- #ifdef CONFIG_HOTPLUG_CPU
- 	case CPU_DYING:
- 	case CPU_DYING_FROZEN:
--		clockevents_notify(CLOCK_EVT_NOTIFY_CPU_DYING, &scpu);
-+		clockevents_notify(CLOCK_EVT_NOTIFY_CPU_DYING, scpu);
- 		break;
- 	case CPU_DEAD:
- 	case CPU_DEAD_FROZEN:
--	{
--		clockevents_notify(CLOCK_EVT_NOTIFY_CPU_DEAD, &scpu);
-+		clockevents_notify(CLOCK_EVT_NOTIFY_CPU_DEAD, scpu);
- 		migrate_hrtimers(scpu);
- 		break;
--	}
- #endif
- 
- 	default:
-diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-index 066f0ec..4ede817 100644
---- a/kernel/time/tick-broadcast.c
-+++ b/kernel/time/tick-broadcast.c
-@@ -11,6 +11,9 @@
-  * This code is licenced under the GPL version 2. For details see
-  * kernel-base/COPYING.
-  */
-+
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
- #include <linux/cpu.h>
- #include <linux/err.h>
- #include <linux/hrtimer.h>
-@@ -396,11 +399,10 @@ out:
-  * Powerstate information: The system enters/leaves a state, where
-  * affected devices might stop.
-  */
--void tick_broadcast_on_off(unsigned long reason, int *oncpu)
-+void tick_broadcast_on_off(unsigned long reason, int oncpu)
- {
--	if (!cpumask_test_cpu(*oncpu, cpu_online_mask))
--		printk(KERN_ERR "tick-broadcast: ignoring broadcast for "
--		       "offline CPU #%d\n", *oncpu);
-+	if (!cpumask_test_cpu(oncpu, cpu_online_mask))
-+		pr_err("ignoring broadcast for offline CPU #%d\n", oncpu);
- 	else
- 		tick_do_broadcast_on_off(&reason);
- }
-@@ -419,11 +421,10 @@ void tick_set_periodic_handler(struct clock_event_device *dev, int broadcast)
- /*
-  * Remove a CPU from broadcasting
-  */
--void tick_shutdown_broadcast(unsigned int *cpup)
-+void tick_shutdown_broadcast(int cpu)
- {
- 	struct clock_event_device *bc;
- 	unsigned long flags;
--	unsigned int cpu = *cpup;
- 
- 	raw_spin_lock_irqsave(&tick_broadcast_lock, flags);
- 
-@@ -898,10 +899,9 @@ void tick_broadcast_switch_to_oneshot(void)
- /*
-  * Remove a dead CPU from broadcasting
-  */
--void tick_shutdown_broadcast_oneshot(unsigned int *cpup)
-+void tick_shutdown_broadcast_oneshot(int cpu)
- {
- 	unsigned long flags;
--	unsigned int cpu = *cpup;
- 
- 	raw_spin_lock_irqsave(&tick_broadcast_lock, flags);
- 
-diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
-index 7efeedf..ae4b200 100644
---- a/kernel/time/tick-common.c
-+++ b/kernel/time/tick-common.c
-@@ -337,14 +337,14 @@ out_bc:
-  *
-  * Called with interrupts disabled.
-  */
--void tick_handover_do_timer(int *cpup)
-+void tick_handover_do_timer(int cpu)
- {
--	if (*cpup == tick_do_timer_cpu) {
--		int cpu = cpumask_first(cpu_online_mask);
-+	if (cpu != tick_do_timer_cpu)
-+		return;
- 
--		tick_do_timer_cpu = (cpu < nr_cpu_ids) ? cpu :
--			TICK_DO_TIMER_NONE;
--	}
-+	cpu = cpumask_first(cpu_online_mask);
-+
-+	tick_do_timer_cpu = (cpu < nr_cpu_ids) ? cpu : TICK_DO_TIMER_NONE;
- }
- 
- /*
-@@ -354,9 +354,9 @@ void tick_handover_do_timer(int *cpup)
-  * access the hardware device itself.
-  * We just set the mode and remove it from the lists.
-  */
--void tick_shutdown(unsigned int *cpup)
-+void tick_shutdown(int cpu)
- {
--	struct tick_device *td = &per_cpu(tick_cpu_device, *cpup);
-+	struct tick_device *td = &per_cpu(tick_cpu_device, cpu);
- 	struct clock_event_device *dev = td->evtdev;
- 
- 	td->mode = TICKDEV_MODE_PERIODIC;
-diff --git a/kernel/time/tick-internal.h b/kernel/time/tick-internal.h
-index 366aeb4..57ab722 100644
---- a/kernel/time/tick-internal.h
-+++ b/kernel/time/tick-internal.h
-@@ -23,8 +23,8 @@ extern int tick_do_timer_cpu __read_mostly;
- extern void tick_setup_periodic(struct clock_event_device *dev, int broadcast);
- extern void tick_handle_periodic(struct clock_event_device *dev);
- extern void tick_check_new_device(struct clock_event_device *dev);
--extern void tick_handover_do_timer(int *cpup);
--extern void tick_shutdown(unsigned int *cpup);
-+extern void tick_handover_do_timer(int cpu);
-+extern void tick_shutdown(int cpu);
- extern void tick_suspend(void);
- extern void tick_resume(void);
- extern bool tick_check_replacement(struct clock_event_device *curdev,
-@@ -50,7 +50,7 @@ extern void tick_resume_oneshot(void);
- extern void tick_broadcast_setup_oneshot(struct clock_event_device *bc);
- extern int tick_broadcast_oneshot_control(unsigned long reason);
- extern void tick_broadcast_switch_to_oneshot(void);
--extern void tick_shutdown_broadcast_oneshot(unsigned int *cpup);
-+extern void tick_shutdown_broadcast_oneshot(int cpu);
- extern int tick_resume_broadcast_oneshot(struct clock_event_device *bc);
- extern int tick_broadcast_oneshot_active(void);
- extern void tick_check_oneshot_broadcast_this_cpu(void);
-@@ -62,7 +62,7 @@ static inline void tick_broadcast_setup_oneshot(struct clock_event_device *bc)
- }
- static inline int tick_broadcast_oneshot_control(unsigned long reason) { return 0; }
- static inline void tick_broadcast_switch_to_oneshot(void) { }
--static inline void tick_shutdown_broadcast_oneshot(unsigned int *cpup) { }
-+static inline void tick_shutdown_broadcast_oneshot(int cpu) { }
- static inline int tick_broadcast_oneshot_active(void) { return 0; }
- static inline void tick_check_oneshot_broadcast_this_cpu(void) { }
- static inline bool tick_broadcast_oneshot_available(void) { return true; }
-@@ -90,7 +90,7 @@ static inline void tick_broadcast_setup_oneshot(struct clock_event_device *bc)
- 	BUG();
- }
- static inline int tick_broadcast_oneshot_control(unsigned long reason) { return 0; }
--static inline void tick_shutdown_broadcast_oneshot(unsigned int *cpup) { }
-+static inline void tick_shutdown_broadcast_oneshot(int cpu) { }
- static inline int tick_resume_broadcast_oneshot(struct clock_event_device *bc)
- {
- 	return 0;
-@@ -113,8 +113,8 @@ static inline void tick_nohz_init(void) { }
- extern int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu);
- extern void tick_install_broadcast_device(struct clock_event_device *dev);
- extern int tick_is_broadcast_device(struct clock_event_device *dev);
--extern void tick_broadcast_on_off(unsigned long reason, int *oncpu);
--extern void tick_shutdown_broadcast(unsigned int *cpup);
-+extern void tick_broadcast_on_off(unsigned long reason, int oncpu);
-+extern void tick_shutdown_broadcast(int cpu);
- extern void tick_suspend_broadcast(void);
- extern int tick_resume_broadcast(void);
- extern void tick_broadcast_init(void);
-@@ -138,8 +138,8 @@ static inline int tick_device_uses_broadcast(struct clock_event_device *dev,
- 	return 0;
- }
- static inline void tick_do_periodic_broadcast(struct clock_event_device *d) { }
--static inline void tick_broadcast_on_off(unsigned long reason, int *oncpu) { }
--static inline void tick_shutdown_broadcast(unsigned int *cpup) { }
-+static inline void tick_broadcast_on_off(unsigned long reason, int oncpu) { }
-+static inline void tick_shutdown_broadcast(int cpu) { }
- static inline void tick_suspend_broadcast(void) { }
- static inline int tick_resume_broadcast(void) { return 0; }
- static inline void tick_broadcast_init(void) { }
-diff --git a/kernel/time/timekeeping.c b/kernel/time/timekeeping.c
-index 6a93185..dc84f52 100644
---- a/kernel/time/timekeeping.c
-+++ b/kernel/time/timekeeping.c
-@@ -1245,7 +1245,7 @@ static void timekeeping_resume(void)
- 
- 	touch_softlockup_watchdog();
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_RESUME, NULL);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_RESUME, -1);
- 
- 	/* Resume hrtimers */
- 	hrtimers_resume();
-@@ -1299,7 +1299,7 @@ static int timekeeping_suspend(void)
- 	write_seqcount_end(&tk_core.seq);
- 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_SUSPEND, NULL);
-+	clockevents_notify(CLOCK_EVT_NOTIFY_SUSPEND, -1);
- 	clocksource_suspend();
- 	clockevents_suspend();
- 
+Bjorn
+
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/x86/include/asm/pci_x86.h |  29 -----
+>  arch/x86/pci/acpi.c            |   1 +
+>  arch/x86/pci/init.c            |   1 +
+>  arch/x86/pci/mmconfig-shared.c | 200 +---------------------------------
+>  arch/x86/pci/mmconfig_32.c     |   1 +
+>  arch/x86/pci/mmconfig_64.c     |   1 +
+>  drivers/acpi/Makefile          |   1 +
+>  drivers/acpi/bus.c             |   1 +
+>  drivers/acpi/mmconfig.c        | 242 +++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mmconfig.h       |  58 ++++++++++
+>  include/linux/pci.h            |   8 --
+>  11 files changed, 308 insertions(+), 235 deletions(-)
+>  create mode 100644 drivers/acpi/mmconfig.c
+>  create mode 100644 include/linux/mmconfig.h
+> 
+> diff --git a/arch/x86/include/asm/pci_x86.h b/arch/x86/include/asm/pci_x86.h
+> index fa1195d..caba141 100644
+> --- a/arch/x86/include/asm/pci_x86.h
+> +++ b/arch/x86/include/asm/pci_x86.h
+> @@ -121,35 +121,6 @@ extern int __init pcibios_init(void);
+>  extern int pci_legacy_init(void);
+>  extern void pcibios_fixup_irqs(void);
+>  
+> -/* pci-mmconfig.c */
+> -
+> -/* "PCI MMCONFIG %04x [bus %02x-%02x]" */
+> -#define PCI_MMCFG_RESOURCE_NAME_LEN (22 + 4 + 2 + 2)
+> -
+> -struct pci_mmcfg_region {
+> -	struct list_head list;
+> -	struct resource res;
+> -	u64 address;
+> -	char __iomem *virt;
+> -	u16 segment;
+> -	u8 start_bus;
+> -	u8 end_bus;
+> -	char name[PCI_MMCFG_RESOURCE_NAME_LEN];
+> -};
+> -
+> -extern int __init pci_mmcfg_arch_init(void);
+> -extern void __init pci_mmcfg_arch_free(void);
+> -extern int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg);
+> -extern void pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg);
+> -extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
+> -			       phys_addr_t addr);
+> -extern int pci_mmconfig_delete(u16 seg, u8 start, u8 end);
+> -extern struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
+> -
+> -extern struct list_head pci_mmcfg_list;
+> -
+> -#define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
+> -
+>  /*
+>   * AMD Fam10h CPUs are buggy, and cannot access MMIO config space
+>   * on their northbrige except through the * %eax register. As such, you MUST
+> diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+> index cfd1b13..6d11131 100644
+> --- a/arch/x86/pci/acpi.c
+> +++ b/arch/x86/pci/acpi.c
+> @@ -4,6 +4,7 @@
+>  #include <linux/irq.h>
+>  #include <linux/dmi.h>
+>  #include <linux/slab.h>
+> +#include <linux/mmconfig.h>
+>  #include <asm/numa.h>
+>  #include <asm/pci_x86.h>
+>  
+> diff --git a/arch/x86/pci/init.c b/arch/x86/pci/init.c
+> index adb62aa..b4a55df 100644
+> --- a/arch/x86/pci/init.c
+> +++ b/arch/x86/pci/init.c
+> @@ -1,5 +1,6 @@
+>  #include <linux/pci.h>
+>  #include <linux/init.h>
+> +#include <linux/mmconfig.h>
+>  #include <asm/pci_x86.h>
+>  #include <asm/x86_init.h>
+>  
+> diff --git a/arch/x86/pci/mmconfig-shared.c b/arch/x86/pci/mmconfig-shared.c
+> index ac24e1c..b397544 100644
+> --- a/arch/x86/pci/mmconfig-shared.c
+> +++ b/arch/x86/pci/mmconfig-shared.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/mutex.h>
+>  #include <linux/rculist.h>
+> +#include <linux/mmconfig.h>
+>  #include <asm/e820.h>
+>  #include <asm/pci_x86.h>
+>  #include <asm/acpi.h>
+> @@ -27,103 +28,6 @@
+>  /* Indicate if the mmcfg resources have been placed into the resource table. */
+>  static bool pci_mmcfg_running_state;
+>  static bool pci_mmcfg_arch_init_failed;
+> -static DEFINE_MUTEX(pci_mmcfg_lock);
+> -
+> -LIST_HEAD(pci_mmcfg_list);
+> -
+> -static void __init pci_mmconfig_remove(struct pci_mmcfg_region *cfg)
+> -{
+> -	if (cfg->res.parent)
+> -		release_resource(&cfg->res);
+> -	list_del(&cfg->list);
+> -	kfree(cfg);
+> -}
+> -
+> -static void __init free_all_mmcfg(void)
+> -{
+> -	struct pci_mmcfg_region *cfg, *tmp;
+> -
+> -	pci_mmcfg_arch_free();
+> -	list_for_each_entry_safe(cfg, tmp, &pci_mmcfg_list, list)
+> -		pci_mmconfig_remove(cfg);
+> -}
+> -
+> -static void list_add_sorted(struct pci_mmcfg_region *new)
+> -{
+> -	struct pci_mmcfg_region *cfg;
+> -
+> -	/* keep list sorted by segment and starting bus number */
+> -	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list) {
+> -		if (cfg->segment > new->segment ||
+> -		    (cfg->segment == new->segment &&
+> -		     cfg->start_bus >= new->start_bus)) {
+> -			list_add_tail_rcu(&new->list, &cfg->list);
+> -			return;
+> -		}
+> -	}
+> -	list_add_tail_rcu(&new->list, &pci_mmcfg_list);
+> -}
+> -
+> -static struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
+> -						   int end, u64 addr)
+> -{
+> -	struct pci_mmcfg_region *new;
+> -	struct resource *res;
+> -
+> -	if (addr == 0)
+> -		return NULL;
+> -
+> -	new = kzalloc(sizeof(*new), GFP_KERNEL);
+> -	if (!new)
+> -		return NULL;
+> -
+> -	new->address = addr;
+> -	new->segment = segment;
+> -	new->start_bus = start;
+> -	new->end_bus = end;
+> -
+> -	res = &new->res;
+> -	res->start = addr + PCI_MMCFG_BUS_OFFSET(start);
+> -	res->end = addr + PCI_MMCFG_BUS_OFFSET(end + 1) - 1;
+> -	res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+> -	snprintf(new->name, PCI_MMCFG_RESOURCE_NAME_LEN,
+> -		 "PCI MMCONFIG %04x [bus %02x-%02x]", segment, start, end);
+> -	res->name = new->name;
+> -
+> -	return new;
+> -}
+> -
+> -static struct pci_mmcfg_region *__init pci_mmconfig_add(int segment, int start,
+> -							int end, u64 addr)
+> -{
+> -	struct pci_mmcfg_region *new;
+> -
+> -	new = pci_mmconfig_alloc(segment, start, end, addr);
+> -	if (new) {
+> -		mutex_lock(&pci_mmcfg_lock);
+> -		list_add_sorted(new);
+> -		mutex_unlock(&pci_mmcfg_lock);
+> -
+> -		pr_info(PREFIX
+> -		       "MMCONFIG for domain %04x [bus %02x-%02x] at %pR "
+> -		       "(base %#lx)\n",
+> -		       segment, start, end, &new->res, (unsigned long)addr);
+> -	}
+> -
+> -	return new;
+> -}
+> -
+> -struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus)
+> -{
+> -	struct pci_mmcfg_region *cfg;
+> -
+> -	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
+> -		if (cfg->segment == segment &&
+> -		    cfg->start_bus <= bus && bus <= cfg->end_bus)
+> -			return cfg;
+> -
+> -	return NULL;
+> -}
+>  
+>  static const char *__init pci_mmcfg_e7520(void)
+>  {
+> @@ -543,7 +447,7 @@ static void __init pci_mmcfg_reject_broken(int early)
+>  	}
+>  }
+>  
+> -static int __init acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
+> +int __init acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
+>  					struct acpi_mcfg_allocation *cfg)
+>  {
+>  	int year;
+> @@ -566,50 +470,6 @@ static int __init acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
+>  	return -EINVAL;
+>  }
+>  
+> -static int __init pci_parse_mcfg(struct acpi_table_header *header)
+> -{
+> -	struct acpi_table_mcfg *mcfg;
+> -	struct acpi_mcfg_allocation *cfg_table, *cfg;
+> -	unsigned long i;
+> -	int entries;
+> -
+> -	if (!header)
+> -		return -EINVAL;
+> -
+> -	mcfg = (struct acpi_table_mcfg *)header;
+> -
+> -	/* how many config structures do we have */
+> -	free_all_mmcfg();
+> -	entries = 0;
+> -	i = header->length - sizeof(struct acpi_table_mcfg);
+> -	while (i >= sizeof(struct acpi_mcfg_allocation)) {
+> -		entries++;
+> -		i -= sizeof(struct acpi_mcfg_allocation);
+> -	}
+> -	if (entries == 0) {
+> -		pr_err(PREFIX "MMCONFIG has no entries\n");
+> -		return -ENODEV;
+> -	}
+> -
+> -	cfg_table = (struct acpi_mcfg_allocation *) &mcfg[1];
+> -	for (i = 0; i < entries; i++) {
+> -		cfg = &cfg_table[i];
+> -		if (acpi_mcfg_check_entry(mcfg, cfg)) {
+> -			free_all_mmcfg();
+> -			return -ENODEV;
+> -		}
+> -
+> -		if (pci_mmconfig_add(cfg->pci_segment, cfg->start_bus_number,
+> -				   cfg->end_bus_number, cfg->address) == NULL) {
+> -			pr_warn(PREFIX "no memory for MCFG entries\n");
+> -			free_all_mmcfg();
+> -			return -ENOMEM;
+> -		}
+> -	}
+> -
+> -	return 0;
+> -}
+> -
+>  static void __init __pci_mmcfg_init(int early)
+>  {
+>  	pci_mmcfg_reject_broken(early);
+> @@ -692,39 +552,6 @@ static int __init pci_mmcfg_late_insert_resources(void)
+>   */
+>  late_initcall(pci_mmcfg_late_insert_resources);
+>  
+> -static int __init pci_mmconfig_inject(struct pci_mmcfg_region *cfg)
+> -{
+> -	struct pci_mmcfg_region *cfg_conflict;
+> -	int err = 0;
+> -
+> -	mutex_lock(&pci_mmcfg_lock);
+> -	cfg_conflict = pci_mmconfig_lookup(cfg->segment, cfg->start_bus);
+> -	if (cfg_conflict) {
+> -		if (cfg_conflict->end_bus < cfg->end_bus)
+> -			pr_info(FW_INFO "MMCONFIG for "
+> -				"domain %04x [bus %02x-%02x] "
+> -				"only partially covers this bridge\n",
+> -				cfg_conflict->segment, cfg_conflict->start_bus,
+> -				cfg_conflict->end_bus);
+> -		err = -EEXIST;
+> -		goto out;
+> -	}
+> -
+> -	if (pci_mmcfg_arch_map(cfg)) {
+> -		pr_warn("fail to map MMCONFIG %pR.\n", &cfg->res);
+> -		err = -ENOMEM;
+> -		goto out;
+> -	} else {
+> -		list_add_sorted(cfg);
+> -		pr_info("MMCONFIG at %pR (base %#lx)\n",
+> -			&cfg->res, (unsigned long)cfg->address);
+> -
+> -	}
+> -out:
+> -	mutex_unlock(&pci_mmcfg_lock);
+> -	return err;
+> -}
+> -
+>  /* Add MMCFG information for host bridges */
+>  int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
+>  			phys_addr_t addr)
+> @@ -773,26 +600,3 @@ error:
+>  	kfree(cfg);
+>  	return rc;
+>  }
+> -
+> -/* Delete MMCFG information for host bridges */
+> -int pci_mmconfig_delete(u16 seg, u8 start, u8 end)
+> -{
+> -	struct pci_mmcfg_region *cfg;
+> -
+> -	mutex_lock(&pci_mmcfg_lock);
+> -	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
+> -		if (cfg->segment == seg && cfg->start_bus == start &&
+> -		    cfg->end_bus == end) {
+> -			list_del_rcu(&cfg->list);
+> -			synchronize_rcu();
+> -			pci_mmcfg_arch_unmap(cfg);
+> -			if (cfg->res.parent)
+> -				release_resource(&cfg->res);
+> -			mutex_unlock(&pci_mmcfg_lock);
+> -			kfree(cfg);
+> -			return 0;
+> -		}
+> -	mutex_unlock(&pci_mmcfg_lock);
+> -
+> -	return -ENOENT;
+> -}
+> diff --git a/arch/x86/pci/mmconfig_32.c b/arch/x86/pci/mmconfig_32.c
+> index 43984bc..d774672 100644
+> --- a/arch/x86/pci/mmconfig_32.c
+> +++ b/arch/x86/pci/mmconfig_32.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/pci.h>
+>  #include <linux/init.h>
+>  #include <linux/rcupdate.h>
+> +#include <linux/mmconfig.h>
+>  #include <asm/e820.h>
+>  #include <asm/pci_x86.h>
+>  
+> diff --git a/arch/x86/pci/mmconfig_64.c b/arch/x86/pci/mmconfig_64.c
+> index bea5249..1209596 100644
+> --- a/arch/x86/pci/mmconfig_64.c
+> +++ b/arch/x86/pci/mmconfig_64.c
+> @@ -10,6 +10,7 @@
+>  #include <linux/acpi.h>
+>  #include <linux/bitmap.h>
+>  #include <linux/rcupdate.h>
+> +#include <linux/mmconfig.h>
+>  #include <asm/e820.h>
+>  #include <asm/pci_x86.h>
+>  
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index c8a16e1..debacb5 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -69,6 +69,7 @@ obj-$(CONFIG_ACPI_BUTTON)	+= button.o
+>  obj-$(CONFIG_ACPI_FAN)		+= fan.o
+>  obj-$(CONFIG_ACPI_VIDEO)	+= video.o
+>  obj-$(CONFIG_ACPI_PCI_SLOT)	+= pci_slot.o
+> +obj-$(CONFIG_PCI_MMCONFIG)	+= mmconfig.o
+>  obj-$(CONFIG_ACPI_PROCESSOR)	+= processor.o
+>  obj-y				+= container.o
+>  obj-$(CONFIG_ACPI_THERMAL)	+= thermal.o
+> diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+> index c412fdb..6d5412ab 100644
+> --- a/drivers/acpi/bus.c
+> +++ b/drivers/acpi/bus.c
+> @@ -41,6 +41,7 @@
+>  #include <acpi/apei.h>
+>  #include <linux/dmi.h>
+>  #include <linux/suspend.h>
+> +#include <linux/mmconfig.h>
+>  
+>  #include "internal.h"
+>  
+> diff --git a/drivers/acpi/mmconfig.c b/drivers/acpi/mmconfig.c
+> new file mode 100644
+> index 0000000..d62dccda
+> --- /dev/null
+> +++ b/drivers/acpi/mmconfig.c
+> @@ -0,0 +1,242 @@
+> +/*
+> + * Arch agnostic low-level direct PCI config space access via MMCONFIG
+> + *
+> + * Per-architecture code takes care of the mappings, region validation and
+> + * accesses themselves.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <linux/mutex.h>
+> +#include <linux/rculist.h>
+> +#include <linux/mmconfig.h>
+> +
+> +#define PREFIX "PCI: "
+> +
+> +static DEFINE_MUTEX(pci_mmcfg_lock);
+> +
+> +LIST_HEAD(pci_mmcfg_list);
+> +
+> +static void __init pci_mmconfig_remove(struct pci_mmcfg_region *cfg)
+> +{
+> +	if (cfg->res.parent)
+> +		release_resource(&cfg->res);
+> +	list_del(&cfg->list);
+> +	kfree(cfg);
+> +}
+> +
+> +void __init free_all_mmcfg(void)
+> +{
+> +	struct pci_mmcfg_region *cfg, *tmp;
+> +
+> +	pci_mmcfg_arch_free();
+> +	list_for_each_entry_safe(cfg, tmp, &pci_mmcfg_list, list)
+> +		pci_mmconfig_remove(cfg);
+> +}
+> +
+> +void list_add_sorted(struct pci_mmcfg_region *new)
+> +{
+> +	struct pci_mmcfg_region *cfg;
+> +
+> +	/* keep list sorted by segment and starting bus number */
+> +	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list) {
+> +		if (cfg->segment > new->segment ||
+> +		    (cfg->segment == new->segment &&
+> +		     cfg->start_bus >= new->start_bus)) {
+> +			list_add_tail_rcu(&new->list, &cfg->list);
+> +			return;
+> +		}
+> +	}
+> +	list_add_tail_rcu(&new->list, &pci_mmcfg_list);
+> +}
+> +
+> +struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
+> +					    int end, u64 addr)
+> +{
+> +	struct pci_mmcfg_region *new;
+> +	struct resource *res;
+> +
+> +	if (addr == 0)
+> +		return NULL;
+> +
+> +	new = kzalloc(sizeof(*new), GFP_KERNEL);
+> +	if (!new)
+> +		return NULL;
+> +
+> +	new->address = addr;
+> +	new->segment = segment;
+> +	new->start_bus = start;
+> +	new->end_bus = end;
+> +
+> +	res = &new->res;
+> +	res->start = addr + PCI_MMCFG_BUS_OFFSET(start);
+> +	res->end = addr + PCI_MMCFG_BUS_OFFSET(end + 1) - 1;
+> +	res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+> +	snprintf(new->name, PCI_MMCFG_RESOURCE_NAME_LEN,
+> +		 "PCI MMCONFIG %04x [bus %02x-%02x]", segment, start, end);
+> +	res->name = new->name;
+> +
+> +	return new;
+> +}
+> +
+> +struct pci_mmcfg_region *pci_mmconfig_add(int segment, int start,
+> +					  int end, u64 addr)
+> +{
+> +	struct pci_mmcfg_region *new;
+> +
+> +	new = pci_mmconfig_alloc(segment, start, end, addr);
+> +	if (new) {
+> +		mutex_lock(&pci_mmcfg_lock);
+> +		list_add_sorted(new);
+> +		mutex_unlock(&pci_mmcfg_lock);
+> +
+> +		pr_info(PREFIX
+> +		       "MMCONFIG for domain %04x [bus %02x-%02x] at %pR "
+> +		       "(base %#lx)\n",
+> +		       segment, start, end, &new->res, (unsigned long)addr);
+> +	}
+> +
+> +	return new;
+> +}
+> +
+> +int __init pci_mmconfig_inject(struct pci_mmcfg_region *cfg)
+> +{
+> +	struct pci_mmcfg_region *cfg_conflict;
+> +	int err = 0;
+> +
+> +	mutex_lock(&pci_mmcfg_lock);
+> +	cfg_conflict = pci_mmconfig_lookup(cfg->segment, cfg->start_bus);
+> +	if (cfg_conflict) {
+> +		if (cfg_conflict->end_bus < cfg->end_bus)
+> +			pr_info(FW_INFO "MMCONFIG for "
+> +				"domain %04x [bus %02x-%02x] "
+> +				"only partially covers this bridge\n",
+> +				cfg_conflict->segment, cfg_conflict->start_bus,
+> +				cfg_conflict->end_bus);
+> +		err = -EEXIST;
+> +		goto out;
+> +	}
+> +
+> +	if (pci_mmcfg_arch_map(cfg)) {
+> +		pr_warn("fail to map MMCONFIG %pR.\n", &cfg->res);
+> +		err = -ENOMEM;
+> +		goto out;
+> +	} else {
+> +		list_add_sorted(cfg);
+> +		pr_info("MMCONFIG at %pR (base %#lx)\n",
+> +			&cfg->res, (unsigned long)cfg->address);
+> +
+> +	}
+> +out:
+> +	mutex_unlock(&pci_mmcfg_lock);
+> +	return err;
+> +}
+> +
+> +struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus)
+> +{
+> +	struct pci_mmcfg_region *cfg;
+> +
+> +	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
+> +		if (cfg->segment == segment &&
+> +		    cfg->start_bus <= bus && bus <= cfg->end_bus)
+> +			return cfg;
+> +
+> +	return NULL;
+> +}
+> +
+> +int __init __weak acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
+> +					struct acpi_mcfg_allocation *cfg)
+> +{
+> +	return 0;
+> +}
+> +
+> +int __init pci_parse_mcfg(struct acpi_table_header *header)
+> +{
+> +	struct acpi_table_mcfg *mcfg;
+> +	struct acpi_mcfg_allocation *cfg_table, *cfg;
+> +	unsigned long i;
+> +	int entries;
+> +
+> +	if (!header)
+> +		return -EINVAL;
+> +
+> +	mcfg = (struct acpi_table_mcfg *)header;
+> +
+> +	/* how many config structures do we have */
+> +	free_all_mmcfg();
+> +	entries = 0;
+> +	i = header->length - sizeof(struct acpi_table_mcfg);
+> +	while (i >= sizeof(struct acpi_mcfg_allocation)) {
+> +		entries++;
+> +		i -= sizeof(struct acpi_mcfg_allocation);
+> +	}
+> +	if (entries == 0) {
+> +		pr_err(PREFIX "MMCONFIG has no entries\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	cfg_table = (struct acpi_mcfg_allocation *) &mcfg[1];
+> +	for (i = 0; i < entries; i++) {
+> +		cfg = &cfg_table[i];
+> +		if (acpi_mcfg_check_entry(mcfg, cfg)) {
+> +			free_all_mmcfg();
+> +			return -ENODEV;
+> +		}
+> +
+> +		if (pci_mmconfig_add(cfg->pci_segment, cfg->start_bus_number,
+> +				   cfg->end_bus_number, cfg->address) == NULL) {
+> +			pr_warn(PREFIX "no memory for MCFG entries\n");
+> +			free_all_mmcfg();
+> +			return -ENOMEM;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +/* Delete MMCFG information for host bridges */
+> +int pci_mmconfig_delete(u16 seg, u8 start, u8 end)
+> +{
+> +	struct pci_mmcfg_region *cfg;
+> +
+> +	mutex_lock(&pci_mmcfg_lock);
+> +	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
+> +		if (cfg->segment == seg && cfg->start_bus == start &&
+> +		    cfg->end_bus == end) {
+> +			list_del_rcu(&cfg->list);
+> +			synchronize_rcu();
+> +			pci_mmcfg_arch_unmap(cfg);
+> +			if (cfg->res.parent)
+> +				release_resource(&cfg->res);
+> +			mutex_unlock(&pci_mmcfg_lock);
+> +			kfree(cfg);
+> +			return 0;
+> +		}
+> +	mutex_unlock(&pci_mmcfg_lock);
+> +
+> +	return -ENOENT;
+> +}
+> +
+> +void __init __weak pci_mmcfg_early_init(void)
+> +{
+> +
+> +}
+> +
+> +void __init __weak pci_mmcfg_late_init(void)
+> +{
+> +	struct pci_mmcfg_region *cfg;
+> +
+> +	acpi_table_parse(ACPI_SIG_MCFG, pci_parse_mcfg);
+> +
+> +	if (list_empty(&pci_mmcfg_list))
+> +		return;
+> +
+> +	if (!pci_mmcfg_arch_init())
+> +		free_all_mmcfg();
+> +
+> +	list_for_each_entry(cfg, &pci_mmcfg_list, list)
+> +		insert_resource(&iomem_resource, &cfg->res);
+> +}
+> diff --git a/include/linux/mmconfig.h b/include/linux/mmconfig.h
+> new file mode 100644
+> index 0000000..6ccd1ee
+> --- /dev/null
+> +++ b/include/linux/mmconfig.h
+> @@ -0,0 +1,58 @@
+> +#ifndef __MMCONFIG_H
+> +#define __MMCONFIG_H
+> +#ifdef __KERNEL__
+> +
+> +#include <linux/types.h>
+> +#include <linux/acpi.h>
+> +
+> +#ifdef CONFIG_PCI_MMCONFIG
+> +/* "PCI MMCONFIG %04x [bus %02x-%02x]" */
+> +#define PCI_MMCFG_RESOURCE_NAME_LEN (22 + 4 + 2 + 2)
+> +
+> +struct pci_mmcfg_region {
+> +	struct list_head list;
+> +	struct resource res;
+> +	u64 address;
+> +	char __iomem *virt;
+> +	u16 segment;
+> +	u8 start_bus;
+> +	u8 end_bus;
+> +	char name[PCI_MMCFG_RESOURCE_NAME_LEN];
+> +};
+> +
+> +void pci_mmcfg_early_init(void);
+> +void pci_mmcfg_late_init(void);
+> +struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
+> +
+> +int pci_parse_mcfg(struct acpi_table_header *header);
+> +struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
+> +						   int end, u64 addr);
+> +int pci_mmconfig_inject(struct pci_mmcfg_region *cfg);
+> +struct pci_mmcfg_region *pci_mmconfig_add(int segment, int start,
+> +						 int end, u64 addr);
+> +void list_add_sorted(struct pci_mmcfg_region *new);
+> +int acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
+> +			  struct acpi_mcfg_allocation *cfg);
+> +void free_all_mmcfg(void);
+> +int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
+> +		       phys_addr_t addr);
+> +int pci_mmconfig_delete(u16 seg, u8 start, u8 end);
+> +
+> +/* Arch specific calls */
+> +int pci_mmcfg_arch_init(void);
+> +void pci_mmcfg_arch_free(void);
+> +int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg);
+> +void pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg);
+> +
+> +extern struct list_head pci_mmcfg_list;
+> +
+> +#define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
+> +#else /* CONFIG_PCI_MMCONFIG */
+> +static inline void pci_mmcfg_late_init(void) { }
+> +static inline void pci_mmcfg_early_init(void) { }
+> +static inline void *pci_mmconfig_lookup(int segment, int bus)
+> +{ return NULL; }
+> +#endif /* CONFIG_PCI_MMCONFIG */
+> +
+> +#endif  /* __KERNEL__ */
+> +#endif  /* __MMCONFIG_H */
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 6afba72..0a8b82e 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1658,14 +1658,6 @@ void pcibios_release_device(struct pci_dev *dev);
+>  extern struct dev_pm_ops pcibios_pm_ops;
+>  #endif
+>  
+> -#ifdef CONFIG_PCI_MMCONFIG
+> -void __init pci_mmcfg_early_init(void);
+> -void __init pci_mmcfg_late_init(void);
+> -#else
+> -static inline void pci_mmcfg_early_init(void) { }
+> -static inline void pci_mmcfg_late_init(void) { }
+> -#endif
+> -
+>  int pci_ext_cfg_avail(void);
+>  
+>  void __iomem *pci_ioremap_bar(struct pci_dev *pdev, int bar);
+> -- 
+> 1.9.1
+> 
