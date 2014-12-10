@@ -1,50 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 10 Dec 2014 09:56:55 +0100
-Subject: [GIT PULL 8/9] ARM: SoC defconfig changes for 3.19
-In-Reply-To: <3558682.jkN2tlsPNy@wuerfel>
-References: <4491193.a6KEQb1tZH@wuerfel>
-	<3558682.jkN2tlsPNy@wuerfel>
-Message-ID: <CAMuHMdW35QRFmTMvtfx_1ZHn1W8a_LMPFFWuZgtXGfKEQDddzQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 10 Dec 2014 10:09:22 +0100
+Subject: [PATCH] arm: imx: correct the hardware clock gate setting for
+ shared nodes
+In-Reply-To: <BN1PR0301MB062806C16F41B55ADB753E4DFF620@BN1PR0301MB0628.namprd03.prod.outlook.com>
+References: <1418111885-3623-1-git-send-email-b20788@freescale.com>
+ <20141209085742.GE13486@pengutronix.de>
+ <BN1PR0301MB062806C16F41B55ADB753E4DFF620@BN1PR0301MB0628.namprd03.prod.outlook.com>
+Message-ID: <20141210090922.GH13486@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello,
 
-On Tue, Dec 9, 2014 at 10:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
->
->   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/defconfig-for-linus
+On Wed, Dec 10, 2014 at 08:49:27AM +0000, Anson.Huang at freescale.com wrote:
+> > 
+> > esai_sel            0            0   393216000          0 0
+> >    esai_pred           0            0   196608000          0 0
+> >       esai_podf           0            0    24576000          0 0
+> >          esai_extal           0            0    24576000          0 0
+> >       esai_mem           0            0   132000000          0 0
+> >       esai_ipg           0            0   132000000          0 0
+> > 
+> > Read CCM_CCGR1:
+> > 
+> > 0x020C406C:  F33FFF00
+> This is hardly useful if you don't have the reference manual at hand.
+> I'd believe the commit log even without the examples.
+> [Anson] Agreed, I will remove it in V2 patch.
+> 
+> Many thanks for reviewing my patch and very good advice:) Please help review V2 patch.
+>  
+> Best regards
+> Uwe
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
+If you want to do me (and most of the other readers of lakml I guess)
+another favour: please fix your quoting style. The way you replied to my
+mail is hard to parse in a console mail reader as you might be able to
+see from the text I quoted above.
 
-On https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/, the
-"Download" column for all tags shows "tag <abbrev>...".
-Clicking on any of them gives e.g.:
+Best regards
+Uwe
 
-    https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/tag/?id=066ae43e621090340384ab3751b68306c49cd503
-    Bad tag reference: 066ae43e621090340384ab3751b68306c49cd503
-
-In other repositories
-(e.g. http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/), the
-"Download" column for tags shows "commit <abbrev>...", and the links behind
-them do work.
-
-Note that if I s/tag/commit/ in the URL, it does work.
-
-Is this an issue with your repository? Or does cgit on kernel.org needs to
-be updated for a new feature?
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
