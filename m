@@ -1,33 +1,51 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 10 Dec 2014 16:23:06 +0000
-Subject: [RFC PATCH] ARM64: PCI: inherit root controller's dma-coherent
-In-Reply-To: <1664127.pT3ZlYms89@wuerfel>
-References: <1417066891-16789-1-git-send-email-ming.lei@canonical.com>
- <7705416.b49xSXIHeP@wuerfel>
- <CACVXFVOfyQNGw+w_GTx1VmN89RKcvykh7DaFm=OcFGJ1f-EYxg@mail.gmail.com>
- <1664127.pT3ZlYms89@wuerfel>
-Message-ID: <5488736A.9090600@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Dec 2014 08:31:47 -0800
+Subject: [PATCH] arm: boot: dts: am437x-sk: fix lcd enable pin mux data
+In-Reply-To: <1417705821-21847-1-git-send-email-balbi@ti.com>
+References: <20141204144325.GA17269@saruman>
+ <1417705821-21847-1-git-send-email-balbi@ti.com>
+Message-ID: <20141210163147.GC30437@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+* Felipe Balbi <balbi@ti.com> [141204 07:12]:
+> Caused by a copy & paste error. Note that even with
+> this bug AM437x SK display still works because GPIO
+> mux mode is always enabled. It's still wrong to mux
+> somebody else's pin.
+> 
+> Luckily ball D25 (offset 0x238 - gpio5_8) on AM437x
+> isn't used for anything.
+> 
+> While at that, also replace a pullup with a pulldown
+> as that gpio should be normally low, not high.
+> 
+> Cc: <stable@vger.kernel.org> # v3.17+
+> Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-On 10/12/14 16:06, Arnd Bergmann wrote:
-[...]
->> Arnd, given it isn't easy to figure out one good solution for moving
->> dma configuration into generic code(driver core, pci, .) now, could
->> the issue be fixed first?
->
-> We have just merged a new arch_setup_dma_ops callback based on patches
-> from Will Deacon, and this is required to get iommu drivers to work
-> properly. The callback is used correctly by of_dma_configure, and we
-> just need to hook it up on arm64 (I think Robin already has a patch,
-> if Will doesn't) and call it from the PCI core. There really isn't
-> any magic involved here.
->
+Applying into omap-for-v3.19/fixes thanks.
 
-Indeed, I have that as part of my arm64 IOMMU stuff, albeit with an 
-additional dependency on the new Xen is_device_dma_coherent. Once the 
-dust has settled on -rc1 I'll see what's in good enough shape to send out.
+Tony
 
-Robin.
+> ---
+>  arch/arm/boot/dts/am437x-sk-evm.dts | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
+> index f7f77a7..0eceb8a 100644
+> --- a/arch/arm/boot/dts/am437x-sk-evm.dts
+> +++ b/arch/arm/boot/dts/am437x-sk-evm.dts
+> @@ -320,8 +320,7 @@
+>  
+>  	lcd_pins: lcd_pins {
+>  		pinctrl-single,pins = <
+> -			/* GPIO 5_8 to select LCD / HDMI */
+> -			0x238 (PIN_OUTPUT_PULLUP | MUX_MODE7)
+> +			0x1c (PIN_OUTPUT_PULLDOWN | MUX_MODE7) /* gpcm_ad7.gpio1_7 */
+>  		>;
+>  	};
+>  };
+> -- 
+> 2.1.0.GIT
+> 
