@@ -1,63 +1,56 @@
 From: lyz@rock-chips.com (Yunzhi Li)
-Date: Wed, 10 Dec 2014 18:40:36 +0800
-Subject: [PATCH v4 1/5] phy: add a driver for the Rockchip SoC internal
- USB2.0 PHY
-In-Reply-To: <CABgxDoJRA4cQBqNBTCSGnnLpcOHqqTuBqcyWQosVv4A_Gx315g@mail.gmail.com>
-References: <1418093001-30443-1-git-send-email-lyz@rock-chips.com>	<1418093001-30443-2-git-send-email-lyz@rock-chips.com>
- <CABgxDoJRA4cQBqNBTCSGnnLpcOHqqTuBqcyWQosVv4A_Gx315g@mail.gmail.com>
-Message-ID: <54882324.10700@rock-chips.com>
+Date: Wed, 10 Dec 2014 18:46:06 +0800
+Subject: [PATCH v5 0/5] Patches to add support for Rockchip usb PHYs.
+Message-ID: <1418208371-18851-1-git-send-email-lyz@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain:
 
-On 2014/12/9 18:41, Romain Perier wrote:
-> Hi,
->
-> 2014-12-09 3:43 GMT+01:00 Yunzhi Li <lyz@rock-chips.com>:
->> Changes in v3:
->> - Use BIT macro instead of bit shift ops.
->> - Rename the config entry to PHY_ROCKCHIP_USB.
-> Contradiction between this , [1] and [2]
->>   drivers/phy/Kconfig            |   7 ++
->>   drivers/phy/Makefile           |   1 +
->>   drivers/phy/phy-rockchip-usb.c | 211 +++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 219 insertions(+)
->>   create mode 100644 drivers/phy/phy-rockchip-usb.c
->>
->> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->> index ccad880..8a39d2a 100644
->> --- a/drivers/phy/Kconfig
->> +++ b/drivers/phy/Kconfig
->> @@ -239,6 +239,13 @@ config PHY_QCOM_IPQ806X_SATA
->>          depends on OF
->>          select GENERIC_PHY
->>
->> +config PHY_ROCKCHIP_USB2
->> +       tristate "Rockchip USB2 PHY Driver"
->> +       depends on ARCH_ROCKCHIP && OF
->> +       select GENERIC_PHY
->> +       help
->> +         Enable this to support the Rockchip USB 2.0 PHY.
->> +
-> 1. The config entry ends by "USB2". Explain that your driver is for
-> usb 2.0 in the description is enough, imho.
->
->>   config PHY_ST_SPEAR1310_MIPHY
->>          tristate "ST SPEAR1310-MIPHY driver"
->>          select GENERIC_PHY
->> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
->> index aa74f96..8a13f72 100644
->> --- a/drivers/phy/Makefile
->> +++ b/drivers/phy/Makefile
->> @@ -28,6 +28,7 @@ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2) += phy-exynos5250-usb2.o
->>   phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)     += phy-s5pv210-usb2.o
->>   obj-$(CONFIG_PHY_EXYNOS5_USBDRD)       += phy-exynos5-usbdrd.o
->>   obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)    += phy-qcom-apq8064-sata.o
->> +obj-$(CONFIG_PHY_ROCKCHIP_USB2) += phy-rockchip-usb.o
-> 2. and... this :)
-So,do you mean that I should rename the C source file as 
-phy-rockchip-usb2.c ?
-> Romain
->
->
+Patches to add support for Rockchip usb phys.Add a new Rockchip
+usb phy driver and modify dwc2 controller driver to make dwc2
+platform devices support a generic PHY framework driver. This
+patch set has been tested on my rk3288-evb and power off the usb
+phys would reduce about 60mW power budget in total during sustem
+suspend.
+
+Changes in v5:
+- Adjust entry order of example devicetree node in document.
+- reorder the phy dt node to a correct position.
+
+Changes in v4:
+- Get number of PHYs from device tree.
+- Model each PHY as subnode of the phy provider node.
+- Updata description for phy device tree subnode.
+- Add phy subnodes.
+
+Changes in v3:
+- Use BIT macro instead of bit shift ops.
+- Rename the config entry to PHY_ROCKCHIP_USB.
+- Fix coding style: both branches of the if() which only one
+  branch of the conditional statement is a single statement
+  should have braces.
+- No need to test dwc2->phy for NULL before calling generic phy
+  APIs.
+
+Yunzhi Li (5):
+  phy: add a driver for the Rockchip SoC internal USB2.0 PHY
+  Documentation: bindings: add dt documentation for Rockchip usb     PHY
+  usb: dwc2: add generic PHY framework support for dwc2 usb controler
+    platform driver.
+  ARM: dts: rockchip: add rk3288 usb PHY
+  ARM: dts: rockchip: Enable usb PHY on rk3288-evb board
+
+ .../devicetree/bindings/phy/rockchip-usb-phy.txt   |  32 ++++
+ arch/arm/boot/dts/rk3288-evb.dtsi                  |   4 +
+ arch/arm/boot/dts/rk3288.dtsi                      |  27 +++
+ drivers/phy/Kconfig                                |   7 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-rockchip-usb.c                     | 211 +++++++++++++++++++++
+ drivers/usb/dwc2/gadget.c                          |  33 ++--
+ drivers/usb/dwc2/platform.c                        |  36 +++-
+ 8 files changed, 328 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+ create mode 100644 drivers/phy/phy-rockchip-usb.c
+
+-- 
+2.0.0
