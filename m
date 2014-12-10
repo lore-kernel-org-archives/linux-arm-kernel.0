@@ -1,211 +1,88 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Wed, 10 Dec 2014 16:23:37 +0800
-Subject: [PATCH v3] ARM: kprobes: Add test cases for stack consuming
- instructions
-In-Reply-To: <1418145071.3641.60.camel@linaro.org>
-References: <1418047765-53197-1-git-send-email-wangnan0@huawei.com>	
- <1418047765-53197-6-git-send-email-wangnan0@huawei.com>	
- <1418143407.3641.47.camel@linaro.org> <1418145071.3641.60.camel@linaro.org>
-Message-ID: <54880309.3010100@huawei.com>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Wed, 10 Dec 2014 16:37:13 +0800
+Subject: [PATCH RFC 00/15] Add support for i.MX MIPI DSI DRM driver
+Message-ID: <1418200648-32656-1-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tixy,
+Hi,
 
-I experienced another FAIL during test:
+This series adds support for i.MX MIPI DSI DRM driver.
+Currently, the MIPI DSI driver only supports the burst with sync pulse mode.
 
-[11567.220477] Miscellaneous instructions
-[11567.265397] ---------------------------------------------------------
-[11567.342626] mrs	r0, cpsr	@ e10f0000
-[11568.612656] FAIL: registers differ
-[11568.653414] FAIL: Test mrs	r0, cpsr
-[11568.695210] FAIL: Scenario 5
-[11568.729709] initial_regs:
-[11568.761083] r0  21522152 | r1  21522052 | r2  21522352 | r3  21522252
-[11568.838301] r4  21522552 | r5  21522452 | r6  21522752 | r7  21522652
-[11568.915526] r8  21522952 | r9  21522852 | r10 21522b52 | r11 21522a52
-[11568.992748] r12 21522d52 | sp  ed343cf0 | lr  21522f52 | pc  bf11f590
-[11569.069969] cpsr 58050013
-[11569.101336] expected_regs:
-[11569.133750] r0  58050013 | r1  21522052 | r2  21522352 | r3  21522252
-[11569.210975] r4  21522552 | r5  21522452 | r6  21522752 | r7  21522652
-[11569.288197] r8  21522952 | r9  21522852 | r10 21522b52 | r11 21522a52
-[11569.365417] r12 21522d52 | sp  ed343cf0 | lr  21522f52 | pc  bf11f594
-[11569.442634] cpsr 58050013
-[11569.474010] result_regs:
-[11569.504337] r0  58050113 | r1  21522052 | r2  21522352 | r3  21522252     <--- see R0 in this line
-[11569.581556] r4  21522552 | r5  21522452 | r6  21522752 | r7  21522652
-[11569.658776] r8  21522952 | r9  21522852 | r10 21522b52 | r11 21522a52
-[11569.736000] r12 21522d52 | sp  ed343cf0 | lr  21522f52 | pc  bf11f594
-[11569.813222] cpsr 58050013
-[11569.844593] mrspl	r7, cpsr	@ 510f7000
-[11571.842652] mrs	r14, cpsr	@ e10fe000
+This series also includes a DRM panel driver for the Truly TFT480800-16-E panel
+which is driven by the Himax HX8369A driver IC.  The driver IC data sheet could
+be found at [1].  As mentioned by the data sheet, the driver IC supports several
+interface modes.  Currently, the DRM panel driver only supports the MIPI DSI video
+mode.  New interface modes could be added later(perhaps, just like the way the DRM
+simple panel driver supports both MIPI DSI interface panels and simple(parallel)
+interface panels).
 
-The failure is raise when testing in "mrs r0, cpsr". The added bit is PSR_A_BIT, which
-should be ignored.
+The MIPI DSI feature is tested on i.MX6Q SabreSD board and i.MX6DL SabreSD board.
+The MIPI DSI display could be enabled directly on i.MX6Q SabreSD board after
+applying this series, because the 26.4MHz pixel clock the panel requires could be
+derived from the IPU HSP clock(264MHz) with an integer divider.
+On i.MX6DL SabreSD board, we need to manually disable the LVDS and HDMI displays in
+the device tree blob, since the i.MX6DL IPU HSP clock is 198MHz at present, which
+makes the pixel clock share the PLL5 video clock source with the LVDS and HDMI,
+thus, the panel cannot get the pixel clock rate it wants.
 
-So looks like this is also a problem in your test framework. If you don't have
-enough time, you can give me some hints to deal with it.
+Patch 01/15 is needed to get a precise pixel clock rate(26.4MHz) from the PLL5 video
+clock.  If we don't have this patch, the pixel clock rate is about 20MHz, which
+causes a horitonal shift on the display image.
 
-On 2014/12/10 1:11, Jon Medhurst (Tixy) wrote:
-> These have extra 'checker' functions associated with them so lets make
-> sure those get covered by testing. As they may create uninitialised
-> space on the stack we also update the test code to ensure such space is
-> consistent between test runs. This is done by disabling interrupts in
-> setup_test_context().
-> 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> ---
-> 
-> Sorry for the extra noise, sent this new version to correct whitespace
-> and spelling errors in previous one.
-> 
->  arch/arm/probes/kprobes/test-arm.c   | 17 +++++++++++++++--
->  arch/arm/probes/kprobes/test-core.c  |  9 +++++++++
->  arch/arm/probes/kprobes/test-thumb.c | 12 ++++++++++++
->  3 files changed, 36 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/probes/kprobes/test-arm.c b/arch/arm/probes/kprobes/test-arm.c
-> index fdeb300..9b3b1b4 100644
-> --- a/arch/arm/probes/kprobes/test-arm.c
-> +++ b/arch/arm/probes/kprobes/test-arm.c
-> @@ -12,6 +12,7 @@
->  #include <linux/module.h>
->  #include <asm/system_info.h>
->  #include <asm/opcodes.h>
-> +#include <asm/probes.h>
->  
->  #include "test-core.h"
->  
-> @@ -478,6 +479,7 @@ void kprobe_arm_test_cases(void)
->  	TEST_RPR(  "strh	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")
->  	TEST_RPR(  "streqh	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")
->  	TEST_UNSUPPORTED(  "streqh	r14, [r13, r12]")
-> +	TEST_UNSUPPORTED(  "streqh	r14, [r12, r13]")
->  	TEST_RPR(  "strh	r",1, VAL1,", [r",2, 24,", r",3,  48,"]!")
->  	TEST_RPR(  "strneh	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")
->  	TEST_RPR(  "strh	r",2, VAL1,", [r",3, 24,"], r",4, 48,"")
-> @@ -502,6 +504,9 @@ void kprobe_arm_test_cases(void)
->  	TEST_RP(   "strplh	r",12,VAL2,", [r",11,24,", #-4]!")
->  	TEST_RP(   "strh	r",2, VAL1,", [r",3, 24,"], #48")
->  	TEST_RP(   "strh	r",10,VAL2,", [r",9, 64,"], #-48")
-> +	TEST_RP(   "strh	r",3, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
-> +	TEST_UNSUPPORTED("strh r3, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
-> +	TEST_RP(   "strh	r",4, VAL1,", [r",14,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
->  	TEST_UNSUPPORTED(__inst_arm(0xe1efc3b0) "	@ strh r12, [pc, #48]!")
->  	TEST_UNSUPPORTED(__inst_arm(0xe0c9f3b0) "	@ strh pc, [r9], #48")
->  
-> @@ -568,6 +573,7 @@ void kprobe_arm_test_cases(void)
->  	TEST_RPR(  "strd	r",0, VAL1,", [r",1, 48,", -r",2,24,"]")
->  	TEST_RPR(  "strccd	r",8, VAL2,", [r",11,0, ", r",12,48,"]")
->  	TEST_UNSUPPORTED(  "strccd r8, [r13, r12]")
-> +	TEST_UNSUPPORTED(  "strccd r8, [r12, r13]")
->  	TEST_RPR(  "strd	r",4, VAL1,", [r",2, 24,", r",3, 48,"]!")
->  	TEST_RPR(  "strcsd	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")
->  	TEST_RPR(  "strd	r",2, VAL1,", [r",5, 24,"], r",4,48,"")
-> @@ -591,6 +597,9 @@ void kprobe_arm_test_cases(void)
->  	TEST_RP(   "strvcd	r",12,VAL2,", [r",11,24,", #-16]!")
->  	TEST_RP(   "strd	r",2, VAL1,", [r",4, 24,"], #48")
->  	TEST_RP(   "strd	r",10,VAL2,", [r",9, 64,"], #-48")
-> +	TEST_RP(   "strd	r",6, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
-> +	TEST_UNSUPPORTED("strd r6, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
-> +	TEST_RP(   "strd	r",4, VAL1,", [r",12,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
->  	TEST_UNSUPPORTED(__inst_arm(0xe1efc3f0) "	@ strd r12, [pc, #48]!")
->  
->  	TEST_P(	   "ldrd	r0, [r",0, 24,", #-8]")
-> @@ -639,16 +648,20 @@ void kprobe_arm_test_cases(void)
->  	TEST_RP( "str"byte"	r",12,VAL2,", [r",11,24,", #-4]!")		\
->  	TEST_RP( "str"byte"	r",2, VAL1,", [r",3, 24,"], #48")		\
->  	TEST_RP( "str"byte"	r",10,VAL2,", [r",9, 64,"], #-48")		\
-> +	TEST_RP( "str"byte"	r",3, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!") \
-> +	TEST_UNSUPPORTED("str"byte" r3, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")				\
-> +	TEST_RP( "str"byte"	r",4, VAL1,", [r",10,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!") \
->  	TEST_RPR("str"byte"	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")	\
->  	TEST_RPR("str"byte"	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")	\
-> -	TEST_UNSUPPORTED("str"byte" r14, [r13, r12]")	\
-> +	TEST_UNSUPPORTED("str"byte" r14, [r13, r12]")				\
-> +	TEST_UNSUPPORTED("str"byte" r14, [r12, r13]")				\
->  	TEST_RPR("str"byte"	r",1, VAL1,", [r",2, 24,", r",3,  48,"]!")	\
->  	TEST_RPR("str"byte"	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")	\
->  	TEST_RPR("str"byte"	r",2, VAL1,", [r",3, 24,"], r",4, 48,"")	\
->  	TEST_RPR("str"byte"	r",10,VAL2,", [r",9, 48,"], -r",11,24,"")	\
->  	TEST_RPR("str"byte"	r",0, VAL1,", [r",1, 24,", r",2,  32,", asl #1]")\
->  	TEST_RPR("str"byte"	r",14,VAL2,", [r",11,0, ", r",12, 32,", lsr #2]")\
-> -	TEST_UNSUPPORTED("str"byte"	r14, [r13, r12, lsr #2]")\
-> +	TEST_UNSUPPORTED("str"byte"	r14, [r13, r12, lsr #2]")		\
->  	TEST_RPR("str"byte"	r",1, VAL1,", [r",2, 24,", r",3,  32,", asr #3]!")\
->  	TEST_RPR("str"byte"	r",12,VAL2,", [r",11,24,", r",10, 4,", ror #31]!")\
->  	TEST_P(  "ldr"byte"	r0, [r",0,  24,", #-2]")			\
-> diff --git a/arch/arm/probes/kprobes/test-core.c b/arch/arm/probes/kprobes/test-core.c
-> index 7ab633d..7c5ddd5 100644
-> --- a/arch/arm/probes/kprobes/test-core.c
-> +++ b/arch/arm/probes/kprobes/test-core.c
-> @@ -1196,6 +1196,13 @@ static void setup_test_context(struct pt_regs *regs)
->  			regs->uregs[arg->reg] =
->  				(unsigned long)current_stack + arg->val;
->  			memory_needs_checking = true;
-> +			/*
-> +			 * Test memory at an address below SP is in danger of
-> +			 * being altered by an interrupt occurring and pushing
-> +			 * data onto the stack. Disable interrupts to stop this.
-> +			 */
-> +			if (arg->reg == 13)
-> +				regs->ARM_cpsr |= PSR_I_BIT;
->  			break;
->  		}
->  		case ARG_TYPE_MEM: {
-> @@ -1272,6 +1279,8 @@ test_after_pre_handler(struct kprobe *p, struct pt_regs *regs)
->  
->  	/* Undo any changes done to SP by the test case */
->  	regs->ARM_sp = (unsigned long)current_stack;
-> +	/* Enable interrupts in case setup_test_context disabled them */
-> +	regs->ARM_cpsr &= ~PSR_I_BIT;
->  
->  	container_of(p, struct test_probe, kprobe)->hit = test_instance;
->  	return 0;
-> diff --git a/arch/arm/probes/kprobes/test-thumb.c b/arch/arm/probes/kprobes/test-thumb.c
-> index 6c6e9a9..e8cf193 100644
-> --- a/arch/arm/probes/kprobes/test-thumb.c
-> +++ b/arch/arm/probes/kprobes/test-thumb.c
-> @@ -11,6 +11,7 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <asm/opcodes.h>
-> +#include <asm/probes.h>
->  
->  #include "test-core.h"
->  
-> @@ -416,6 +417,9 @@ void kprobe_thumb32_test_cases(void)
->  	TEST_RR( "strd	r",14,VAL2,", r",12,VAL1,", [sp, #16]!")
->  	TEST_RRP("strd	r",1, VAL1,", r",0, VAL2,", [r",7, 24,"], #16")
->  	TEST_RR( "strd	r",7, VAL2,", r",8, VAL1,", [sp], #-16")
-> +	TEST_RRP("strd	r",6, VAL1,", r",7, VAL2,", [r",13, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
-> +	TEST_UNSUPPORTED("strd r6, r7, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
-> +	TEST_RRP("strd	r",4, VAL1,", r",5, VAL2,", [r",14, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
->  	TEST_UNSUPPORTED(__inst_thumb32(0xe9efec04) "	@ strd	r14, r12, [pc, #16]!")
->  	TEST_UNSUPPORTED(__inst_thumb32(0xe8efec04) "	@ strd	r14, r12, [pc], #16")
->  
-> @@ -821,14 +825,22 @@ CONDITION_INSTRUCTIONS(22,
->  	TEST_RP( "str"size"	r",14,VAL2,", [r",1, 256,  ", #-128]!")		\
->  	TEST_RPR("str"size".w	r",0, VAL1,", [r",1, 0,", r",2, 4,"]")		\
->  	TEST_RPR("str"size"	r",14,VAL2,", [r",10,0,", r",11,4,", lsl #1]")	\
-> +	TEST_UNSUPPORTED("str"size"	r0, [r13, r1]")				\
->  	TEST_R(  "str"size".w	r",7, VAL1,", [sp, #24]")			\
->  	TEST_RP( "str"size".w	r",0, VAL2,", [r",0,0, "]")			\
-> +	TEST_RP( "str"size"	r",6, VAL1,", [r",13, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!") \
-> +	TEST_UNSUPPORTED("str"size"	r6, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")			\
-> +	TEST_RP( "str"size"	r",4, VAL2,", [r",12, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!") \
->  	TEST_UNSUPPORTED("str"size"t	r0, [r1, #4]")
->  
->  	SINGLE_STORE("b")
->  	SINGLE_STORE("h")
->  	SINGLE_STORE("")
->  
-> +	TEST_UNSUPPORTED(__inst_thumb32(0xf801000d) "	@ strb	r0, [r1, r13]")
-> +	TEST_UNSUPPORTED(__inst_thumb32(0xf821000d) "	@ strh	r0, [r1, r13]")
-> +	TEST_UNSUPPORTED(__inst_thumb32(0xf841000d) "	@ str	r0, [r1, r13]")
-> +
->  	TEST("str	sp, [sp]")
->  	TEST_UNSUPPORTED(__inst_thumb32(0xf8cfe000) "	@ str	r14, [pc]")
->  	TEST_UNSUPPORTED(__inst_thumb32(0xf8cef000) "	@ str	pc, [r14]")
-> 
+This series can be applied on the drm-next branch.
+
+[1] http://www.allshore.com/pdf/Himax_HX8369-A.pdf
+
+Liu Ying (15):
+  clk: divider: Correct parent clk round rate if no bestdiv is normally
+    found
+  of: Add vendor prefix for Himax Technologies Inc.
+  of: Add vendor prefix for Truly Semiconductors Limited
+  drm/dsi: Do not add DSI devices for the child nodes with input-port
+    property
+  ARM: dts: imx6qdl: Add input-port property to MIPI DSI node's CTRC
+    child nodes
+  ARM: dts: imx6q: Add MIPI DSI remote end points for IPU2 DI0/1 end
+    points
+  ARM: imx6q: Add GPR3 MIPI muxing control register field shift bits
+    definition
+  ARM: imx6q: clk: Add the video_27m clock
+  drm: imx: Add MIPI DSI host controller driver
+  drm: panel: Add support for Himax HX8369A MIPI DSI panel
+  ARM: dtsi: imx6qdl: Add support for MIPI DSI host controller
+  ARM: dts: imx6qdl-sabresd: Add support for TRULY TFT480800-16-E MIPI
+    DSI panel
+  ARM: imx_v6_v7_defconfig: Cleanup for imx drm being moved out of
+    staging
+  ARM: imx_v6_v7_defconfig: Add support for MIPI DSI host controller
+  ARM: imx_v6_v7_defconfig: Add support for Himax HX8369A panel
+
+ .../devicetree/bindings/drm/imx/mipi_dsi.txt       |   81 ++
+ .../devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt  |    4 +
+ .../devicetree/bindings/panel/himax,hx8369a.txt    |   86 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |    2 +
+ arch/arm/boot/dts/imx6q.dtsi                       |    4 +
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |   41 +
+ arch/arm/boot/dts/imx6qdl.dtsi                     |    9 +
+ arch/arm/configs/imx_v6_v7_defconfig               |   17 +-
+ arch/arm/mach-imx/clk-imx6q.c                      |    1 +
+ drivers/clk/clk-divider.c                          |    3 +-
+ drivers/gpu/drm/drm_mipi_dsi.c                     |    5 +-
+ drivers/gpu/drm/imx/Kconfig                        |    6 +
+ drivers/gpu/drm/imx/Makefile                       |    1 +
+ drivers/gpu/drm/imx/imx-mipi-dsi.c                 | 1017 ++++++++++++++++++++
+ drivers/gpu/drm/panel/Kconfig                      |    6 +
+ drivers/gpu/drm/panel/Makefile                     |    1 +
+ drivers/gpu/drm/panel/panel-hx8369a.c              |  627 ++++++++++++
+ include/dt-bindings/clock/imx6qdl-clock.h          |    3 +-
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |    1 +
+ 19 files changed, 1903 insertions(+), 12 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt
+ create mode 100644 Documentation/devicetree/bindings/panel/himax,hx8369a.txt
+ create mode 100644 drivers/gpu/drm/imx/imx-mipi-dsi.c
+ create mode 100644 drivers/gpu/drm/panel/panel-hx8369a.c
+
+-- 
+2.1.0
