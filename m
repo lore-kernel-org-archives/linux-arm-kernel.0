@@ -1,55 +1,38 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 10 Dec 2014 16:37:26 +0800
-Subject: [PATCH RFC 13/15] ARM: imx_v6_v7_defconfig: Cleanup for imx drm being
- moved out of staging
+Date: Wed, 10 Dec 2014 16:37:27 +0800
+Subject: [PATCH RFC 14/15] ARM: imx_v6_v7_defconfig: Add support for MIPI DSI
+ host controller
 In-Reply-To: <1418200648-32656-1-git-send-email-Ying.Liu@freescale.com>
 References: <1418200648-32656-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1418200648-32656-14-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1418200648-32656-15-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds support for MIPI DSI host controller.
+
 The new imx_v6_v7_defconfig is generated in this way:
 * make ARCH=arm imx_v6_v7_defconfig
+* make ARCH=arm menuconfig and manually choose to build in
+  the MIPI DSI host controller driver
 * make ARCH=arm savedefconfig
 * cp defconfig arch/arm/configs/imx_v6_v7_defconfig
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 6790f1b..0dbd0c3 100644
+index 0dbd0c3..3e0e589 100644
 --- a/arch/arm/configs/imx_v6_v7_defconfig
 +++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -192,7 +192,13 @@ CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
- CONFIG_DRM_PANEL_SIMPLE=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_DRM_IMX=y
-+CONFIG_DRM_IMX_FB_HELPER=y
-+CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
-+CONFIG_DRM_IMX_TVE=y
-+CONFIG_DRM_IMX_LDB=y
-+CONFIG_DRM_IMX_IPUV3=y
-+CONFIG_DRM_IMX_HDMI=y
+@@ -199,6 +199,7 @@ CONFIG_DRM_IMX_TVE=y
+ CONFIG_DRM_IMX_LDB=y
+ CONFIG_DRM_IMX_IPUV3=y
+ CONFIG_DRM_IMX_HDMI=y
++CONFIG_DRM_IMX_MIPI_DSI=y
  CONFIG_LCD_CLASS_DEVICE=y
  CONFIG_LCD_L4F00242T03=y
  CONFIG_LCD_PLATFORM=y
-@@ -249,13 +255,6 @@ CONFIG_IMX_SDMA=y
- CONFIG_MXS_DMA=y
- CONFIG_FSL_EDMA=y
- CONFIG_STAGING=y
--CONFIG_DRM_IMX=y
--CONFIG_DRM_IMX_FB_HELPER=y
--CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
--CONFIG_DRM_IMX_TVE=y
--CONFIG_DRM_IMX_LDB=y
--CONFIG_DRM_IMX_IPUV3=y
--CONFIG_DRM_IMX_HDMI=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_PWM=y
- CONFIG_PWM_IMX=y
 -- 
 2.1.0
