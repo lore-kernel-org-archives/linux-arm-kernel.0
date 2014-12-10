@@ -1,53 +1,20 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 9 Dec 2014 16:54:51 -0800
-Subject: [PATCH 4/4] ARM: dts: add I2C device nodes for Broadcom Cygnus
-In-Reply-To: <1418172891-19441-1-git-send-email-rjui@broadcom.com>
-References: <Ray Jui <rjui@broadcom.com>
- <1418172891-19441-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1418172891-19441-5-git-send-email-rjui@broadcom.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 9 Dec 2014 16:56:21 -0800
+Subject: [GIT PULL 6/9] ARM: SoC DT updates for 3.19
+In-Reply-To: <CA+55aFwkkP9wFdJUHMsnrd=eDYNsGKm7ujyktEWh+GMzQinzxw@mail.gmail.com>
+References: <4491193.a6KEQb1tZH@wuerfel> <14657639.RrnLVWDtO6@wuerfel>
+ <CA+55aFwkkP9wFdJUHMsnrd=eDYNsGKm7ujyktEWh+GMzQinzxw@mail.gmail.com>
+Message-ID: <CA+55aFy=Bja0hs=H-bjBEArQzqUGTwD4vA5RHviEun1mfzik5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add I2C device nodes and its properties in bcm-cygnus.dtsi but keep
-them disabled there. Individual I2C devices can be enabled in board
-specific dts file when I2C slave devices are enabled in the future
+On Tue, Dec 9, 2014 at 3:45 PM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+>
+> I've applied 1-5, but I'm going to stop here waiting for confirmation
+> of what's going on..
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- arch/arm/boot/dts/bcm-cygnus.dtsi |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Actually, I'll just finish it, and hope you check out the result
+later. Many more pulls to go today..
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 5126f9e..f7d6c1d 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -70,6 +70,26 @@
- 		};
- 	};
- 
-+	i2c0: i2c at 18008000 {
-+		compatible = "brcm,iproc-i2c";
-+		reg = <0x18008000 0x100>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
-+		clock-frequency = <100000>;
-+		status = "disabled";
-+	};
-+
-+	i2c1: i2c at 1800b000 {
-+		compatible = "brcm,iproc-i2c";
-+		reg = <0x1800b000 0x100>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
-+		clock-frequency = <100000>;
-+		status = "disabled";
-+	};
-+
- 	uart0: serial at 18020000 {
- 		compatible = "snps,dw-apb-uart";
- 		reg = <0x18020000 0x100>;
--- 
-1.7.9.5
+                  Linus
