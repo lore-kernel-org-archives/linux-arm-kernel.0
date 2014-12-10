@@ -1,44 +1,55 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 10 Dec 2014 21:55:54 +0800
-Subject: [PATCH v2] irqchip: mediatek: Use IS_ERR() instead of NULL
- pointer check
-In-Reply-To: <20141210125313.GJ22670@titan.lakedaemon.net>
-References: <1418050989-21411-1-git-send-email-yingjoe.chen@mediatek.com>
- <1418205302-22531-1-git-send-email-yingjoe.chen@mediatek.com>
- <20141210121442.GA14485@gmail.com>
- <20141210125313.GJ22670@titan.lakedaemon.net>
-Message-ID: <1418219755.21309.9.camel@mtksdaap41>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 10 Dec 2014 15:00:25 +0100
+Subject: arm64 broken in -next by commit 08d53aa58cb1 (of/fdt: export fdt
+ blob as /sys/firmware/fdt)
+In-Reply-To: <CACxGe6sR4N38N=p4O7smc4s9_RRUoj89o-jphJ85R2EuuqSF1g@mail.gmail.com>
+References: <20141210120422.GB13994@e104818-lin.cambridge.arm.com>
+ <20141210121325.GC13994@e104818-lin.cambridge.arm.com>
+ <20141210122210.GE13994@e104818-lin.cambridge.arm.com>
+ <20141210133106.GH13994@e104818-lin.cambridge.arm.com>
+ <CACxGe6sR4N38N=p4O7smc4s9_RRUoj89o-jphJ85R2EuuqSF1g@mail.gmail.com>
+Message-ID: <CAKv+Gu__9yaq=+bvMXADqjsoq0vkcJLuGfsaX0dpV-ZXXjXffg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-12-10 at 07:53 -0500, Jason Cooper wrote:
-> On Wed, Dec 10, 2014 at 01:14:43PM +0100, Beniamino Galvani wrote:
-> > On Wed, Dec 10, 2014 at 05:55:02PM +0800, Yingjoe Chen wrote:
-> > > Beniamino reported a kernel oops caused by an invalid DT file for the
-> > > mediatek interrupt polarity extension.
-> > > 
-> > > The reason is that the interrupt polarity support for mediatek chips
-> > > merely checks for NULL pointer instead of a casted error return
-> > > value in mtk_sysirq_of_init() so any other casted error value passes
-> > > the NULL pointer check and causes a kernel panic when dereferenced.
-> > > 
-> > > Use IS_ERR() and return the error value via PTR_ERR().
-> > > 
-> > > Reported-and-tested-by: Beniamino Galvani <b.galvani@gmail.com>
-> > 
-> > Well, actually I only reported the bug and didn't do any test. Can the
-> > "-and-tested" portion of the tag be dropped while applying the patch?
-> 
-> I'd prefer that it be tested before applying.  Would you mind confirming
-> that the oops is gone with this patch applied?
+On 10 December 2014 at 14:50, Grant Likely <grant.likely@linaro.org> wrote:
+> On Wed, Dec 10, 2014 at 1:31 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+>> On Wed, Dec 10, 2014 at 12:22:10PM +0000, Catalin Marinas wrote:
+>>> On Wed, Dec 10, 2014 at 12:13:26PM +0000, Catalin Marinas wrote:
+>>> > On Wed, Dec 10, 2014 at 12:04:23PM +0000, Catalin Marinas wrote:
+>>> > > Ard,
+>>> > >
+>>> > > I noticed that linux-next no longer boots on Juno. Bisecting, I ended up
+>>> > > on your commit above and reverting it gets things going again. I
+>>> > > initially thought it has something to do with the hardware crypto since
+>>> > > you added some crc32_be() calls but disabling arm64 hw crypto didn't
+>>> > > make any difference.
+>>> >
+>>> > Commenting out crc32_be() in early_init_dt_verify() allows it to boot.
+>>> > Some printk, it shows:
+>>> >
+>>> > initial_boot_params = 0xffffffc01fe00000
+>>> > fdt_totalsize(initial_boot_params) = 2108105
+>>> >
+>>> > Isn't it quite big?
+>>>
+>>> We assume that the DT blob is maximum 2MB in the initial kernel mapping.
+>>> I'm not sure why it is that big here but early_init_dt_verify() most
+>>> likely doesn't have the areas around initial_boot_params mapped, only
+>>> 2MB section. The crc probably triggers a very early data abort.
+>>
+>> For now, I blame my Juno firmware or dtb file. I'll let you know.
+>
+> Blech. I've not sent my pull request to Linus yet, so I'll revert this
+> patch before I ask him to pull.
+>
 
-Hi,
+Actually, it seems the patch is fine, it just uncovers an issue on
+Juno where the initial fixed FDT mapping of 2 megs is smaller than
+fdt_totalsize(). As most of those >2 megs of FDT contents are probably
+padding anyway, it is not a surprise that crc'ing the thing is the
+only way you will hit this issue.
 
-I'm not sure if that count, but I tested with incorrect DTS node
-with/without the patch, to make sure the oops is gone with the patch.
-
-Please note this driver is necessary to boot and kernel uart driver,
-even without the oops you still can't boot to shell and you'll need
-earlyprintk to see the error message.
-
-Joe.C
+-- 
+Ard.
