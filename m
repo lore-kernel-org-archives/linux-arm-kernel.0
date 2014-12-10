@@ -1,465 +1,161 @@
 From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 10 Dec 2014 16:48:19 +0100
-Subject: [RFC 01/15] drivers/base: add track framework
+Date: Wed, 10 Dec 2014 16:48:24 +0100
+Subject: [RFC 06/15] gpio: add restrack support
 In-Reply-To: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
 References: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <1418226513-14105-2-git-send-email-a.hajda@samsung.com>
+Message-ID: <1418226513-14105-7-git-send-email-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-track is a generic framework for safe tracking presence of any kernel objects
-having an id. There are no special requirements about type of object or its
-id. Id shall be unique.
-Typical usage of the framework by consumer looks as follow:
-1. Consumer registers notifier callback for objects with given id.
-2. If the object is present consumer is notified immediately, otherwise it
-   will be notified immediately after object creation.
-3. If the object is about to be removed notification is sent to the consumer
-   just before removal.
-4. When consumer do not need the object anymore it unregisters its notifier
-   callback. If the object is present during notifier unregistration
-   notification about removal of the object is sent to the consumer.
-
-All notification callbacks are serialized so the consumer do not need use
-additional mechanisms to prevent callback races. Consumer should assume that
-object is valid only between up and down notification callbacks inclusive.
-
-Framework usage by object provider is simple:
-1. When object becomes available it notifies framework about it.
-2. When object becomes unavailable it notifies framework about it.
-
-Provider should take care of calling notifications synchronously in proper
-order.
-
-The framework does not uses locks during notification calls, so it is safe
-to call framework functions from the callbacks. This feature allows to model
-complex object dependencies without deadlock risk.
-
-Some framework functions can sleep so the framework should be used in process
-context.
+GPIO supports different methods of lookup.
+The patch adds restrack support only to DT based GPIOs.
 
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 ---
- drivers/base/Makefile |   2 +-
- drivers/base/track.c  | 241 ++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/track.h | 148 +++++++++++++++++++++++++++++++
- 3 files changed, 390 insertions(+), 1 deletion(-)
- create mode 100644 drivers/base/track.c
- create mode 100644 include/linux/track.h
+ drivers/gpio/gpiolib.c        | 81 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/gpio/consumer.h |  4 +++
+ include/linux/restrack.h      |  1 +
+ 3 files changed, 86 insertions(+)
 
-diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-index 6922cd6..4edff7d 100644
---- a/drivers/base/Makefile
-+++ b/drivers/base/Makefile
-@@ -4,7 +4,7 @@ obj-y			:= component.o core.o bus.o dd.o syscore.o \
- 			   driver.o class.o platform.o \
- 			   cpu.o firmware.o init.o map.o devres.o \
- 			   attribute_container.o transport_class.o \
--			   topology.o container.o
-+			   topology.o container.o track.o
- obj-$(CONFIG_DEVTMPFS)	+= devtmpfs.o
- obj-$(CONFIG_DMA_CMA) += dma-contiguous.o
- obj-y			+= power/
-diff --git a/drivers/base/track.c b/drivers/base/track.c
-new file mode 100644
-index 0000000..8cf0492
---- /dev/null
-+++ b/drivers/base/track.c
-@@ -0,0 +1,241 @@
-+/*
-+ * Generic framework for tracking named object
-+ *
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd
-+ * Andrzej Hajda <a.hajda@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * track is a generic framework for safe tracking presence of any kernel objects
-+ * having an id. There are no special requirements about type of object or its
-+ * id. Id shall be unique.
-+ * Typical usage of the framework by consumer looks as follow:
-+ * 1. Consumer registers notifier callback for objects with given id.
-+ * 2. If the object is present consumer is notified immediately, otherwise it
-+ *    will be notified immediately after object creation.
-+ * 3. If the object is about to be removed notification is sent to the consumer
-+ *    just before removal.
-+ * 4. When consumer do not need the object anymore it unregisters its notifier
-+ *    callback. If the object is present during notifier unregistration
-+ *    notification about removal of the object is sent to the consumer.
-+ *
-+ * All notification callbacks are serialized so the consumer do not need use
-+ * additional mechanisms to prevent callback races. Consumer should assume that
-+ * object is valid only between up and down notification callbacks inclusive.
-+ *
-+ * Framework usage by object provider is simple:
-+ * 1. When object becomes available it notifies framework about it.
-+ * 2. When object becomes unavailable it notifies framework about it.
-+ *
-+ * Provider should take care of calling notifications synchronously in proper
-+ * order.
-+ *
-+ * The framework does not uses locks during notification calls, so it is safe
-+ * to call framework functions from the callbacks. This feature allows to model
-+ * complex object dependencies without deadlock risk.
-+ *
-+ * Some framework functions can sleep so the framework should be used in process
-+ * context.
-+ *
-+ */
-+#include <linux/sched.h>
-+#include <linux/slab.h>
-+#include <linux/track.h>
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 78fcec9..5d85e20 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -15,6 +15,7 @@
+ #include <linux/acpi.h>
+ #include <linux/gpio/driver.h>
+ #include <linux/gpio/machine.h>
++#include <linux/restrack.h>
+ 
+ #include "gpiolib.h"
+ 
+@@ -278,6 +279,8 @@ int gpiochip_add(struct gpio_chip *chip)
+ 	if (status)
+ 		goto fail;
+ 
++	restrack_up(RESTRACK_TYPE_GPIO, chip->of_node, chip);
 +
-+struct track_task {
-+	struct list_head list;
-+	enum track_task_id task_id;
-+
-+	unsigned long type;
-+	const void *id;
-+	union {
-+		void *data;
-+		struct track_block *itb;
-+	};
+ 	status = gpiochip_export(chip);
+ 	if (status)
+ 		goto fail;
+@@ -313,6 +316,7 @@ void gpiochip_remove(struct gpio_chip *chip)
+ 	unsigned long	flags;
+ 	unsigned	id;
+ 
++	restrack_down(RESTRACK_TYPE_GPIO, chip->of_node, chip);
+ 	acpi_gpiochip_remove(chip);
+ 
+ 	spin_lock_irqsave(&gpio_lock, flags);
+@@ -1770,6 +1774,83 @@ void gpiod_put(struct gpio_desc *desc)
+ }
+ EXPORT_SYMBOL_GPL(gpiod_put);
+ 
++struct gpiod_restrack_desc {
++	struct gpio_desc **ptr;
++	const char *name;
++	enum gpiod_flags flags;
++	struct of_phandle_args spec;
++	struct restrack_desc desc;
 +};
 +
-+struct track_node {
-+	struct list_head list;
-+	struct list_head itb_head;
-+	struct track_block *itb_next;
-+	const void *id;
-+	unsigned long type;
-+	void *data;
-+	bool up;
-+};
-+
-+static struct track_node *
-+track_get_node(struct tracker *track, unsigned long type, const void *id,
-+		bool create)
++static int gpiod_restrack_init(struct device *dev, struct restrack_desc *desc)
 +{
-+	struct track_node *node;
++	struct gpiod_restrack_desc *rd = restrack_desc_to_rd(rd, desc);
++	int ret;
 +
-+	list_for_each_entry(node, &track->nodes, list) {
-+		if (node->type == type && node->id == id)
-+			return node;
-+	}
-+
-+	if (!create)
-+		return NULL;
-+
-+	node = kmalloc(sizeof(*node), GFP_KERNEL);
-+	if (!node)
-+		return NULL;
-+
-+	node->id = id;
-+	node->type = type;
-+	node->up = false;
-+	INIT_LIST_HEAD(&node->itb_head);
-+	list_add(&node->list, &track->nodes);
-+
-+	return node;
++	ret = of_get_gpiod_spec(dev, rd->name, 0, &rd->spec);
++	if (!ret)
++		desc->if_id = rd->spec.np;
++	return ret;
 +}
 +
-+static void track_process_task(struct tracker *track, struct track_task *task)
++static void gpiod_restrack_destroy(struct device *dev,
++		struct restrack_desc *desc)
 +{
-+	struct track_block *itb;
-+	struct track_node *node;
++	struct gpiod_restrack_desc *rd = restrack_desc_to_rd(rd, desc);
 +
-+	switch (task->task_id) {
-+	case track_task_register:
-+		node = track_get_node(track, task->type, task->id, true);
-+		list_add_tail(&task->itb->list, &node->itb_head);
-+
-+		if (node->up)
-+			task->itb->callback(task->itb, node->data, true);
-+		return;
-+	case track_task_unregister:
-+		node = track_get_node(track, task->type, task->id, false);
-+		if (WARN_ON(!node))
-+			return;
-+
-+		if (node->up)
-+			task->itb->callback(task->itb, node->data, false);
-+
-+		if (node->itb_next == task->itb)
-+			node->itb_next = list_next_entry(node->itb_next, list);
-+		list_del(&task->itb->list);
-+
-+		if (list_empty(&node->itb_head) && !node->up) {
-+			list_del(&node->list);
-+			kfree(node);
-+		}
-+		return;
-+	case track_task_up:
-+		node = track_get_node(track, task->type, task->id, true);
-+
-+		node->up = true;
-+		node->data = task->data;
-+		list_for_each_entry_safe(itb, node->itb_next, &node->itb_head,
-+					 list)
-+			itb->callback(itb, node->data, true);
-+		return;
-+	case track_task_down:
-+		node = track_get_node(track, task->type, task->id, false);
-+
-+		if (WARN_ON(!node))
-+			return;
-+
-+		WARN_ON(!node->up);
-+
-+		if (list_empty(&node->itb_head)) {
-+			list_del(&node->list);
-+			kfree(node);
-+			return;
-+		}
-+
-+		node->up = false;
-+		node->data = task->data;
-+
-+		list_for_each_entry_safe(itb, node->itb_next, &node->itb_head,
-+					 list)
-+			itb->callback(itb, node->data, false);
-+	}
++	of_node_put(desc->if_id);
++	kfree(rd);
 +}
 +
-+static int track_process_queue(struct tracker *track)
++static int gpiod_restrack_ifup(struct device *dev, struct restrack_desc *desc,
++		void *data)
 +{
-+	struct track_task *task, *ptask = NULL;
-+	unsigned long flags;
-+	bool empty;
++	struct gpiod_restrack_desc *rd = restrack_desc_to_rd(rd, desc);
 +
-+	/* Queue non-emptiness is used as a sentinel to prevent processing
-+	 * by multiple threads, so we cannot delete entry from the queue
-+	 * until it is processed.
-+	 */
-+	while (true) {
-+		spin_lock_irqsave(&track->queue_lock, flags);
-+
-+		if (ptask)
-+			list_del(&ptask->list);
-+		task = list_first_entry(&track->queue,
-+					struct track_task, list);
-+
-+		empty = list_empty(&track->queue);
-+		if (empty)
-+			complete_all(&track->queue_empty);
-+
-+		spin_unlock_irqrestore(&track->queue_lock, flags);
-+
-+		kfree(ptask);
-+
-+		if (empty)
-+			break;
-+
-+		track_process_task(track, task);
-+		ptask = task;
-+	}
-+
-+	return 0;
++	*rd->ptr = gpiod_get(dev, rd->name, rd->flags);
++	return PTR_ERR_OR_ZERO(*rd->ptr);
 +}
 +
-+int track_add_task(struct tracker *track, enum track_task_id task_id,
-+		   unsigned long type, const void *id, void *data, bool sync)
++static void gpiod_restrack_ifdown(struct device *dev,
++		struct restrack_desc *desc, void *data)
 +{
-+	struct track_task *task;
-+	unsigned long flags;
-+	bool empty, owner;
++	struct gpiod_restrack_desc *rd = restrack_desc_to_rd(rd, desc);
 +
-+	task = kmalloc(sizeof(*task), GFP_KERNEL);
-+	if (!task)
-+		return -ENOMEM;
-+
-+	task->task_id = task_id;
-+	task->id = id;
-+	task->type = type;
-+	task->data = data;
-+
-+	spin_lock_irqsave(&track->queue_lock, flags);
-+
-+	empty = list_empty(&track->queue);
-+	if (empty) {
-+		reinit_completion(&track->queue_empty);
-+		track->queue_owner = current;
-+	} else {
-+		owner = (track->queue_owner == current);
-+	}
-+
-+	if (empty || !owner)
-+		list_add(&task->list, &track->queue);
-+
-+	spin_unlock_irqrestore(&track->queue_lock, flags);
-+
-+	pr_debug("%s:%d: task=%c type=%ld id=%p\n", __func__, __LINE__,
-+		 "ru+-"[task_id], type, id);
-+
-+	if (empty)
-+		return track_process_queue(track);
-+
-+	if (owner) {
-+		track_process_task(track, task);
-+		kfree(task);
-+		return 0;
-+	}
-+
-+	if (sync)
-+		wait_for_completion(&track->queue_empty);
-+
-+	return 0;
++	gpiod_put(*rd->ptr);
++	*rd->ptr = ERR_PTR(-EPROBE_DEFER);
 +}
-diff --git a/include/linux/track.h b/include/linux/track.h
-new file mode 100644
-index 0000000..b1eed60
---- /dev/null
-+++ b/include/linux/track.h
-@@ -0,0 +1,148 @@
-+#ifndef TRACK_H
-+#define TRACK_H
 +
-+#include <linux/completion.h>
-+#include <linux/list.h>
-+#include <linux/spinlock.h>
-+#include <linux/types.h>
-+
-+struct list_head;
-+struct track_block;
-+struct tracker;
-+
-+typedef void (*track_fn_t)(struct track_block *itb, void *data, bool on);
-+
-+/**
-+ * struct track_block - structure used by track consumers to register callback
-+ * @callback: Pointer to notification function provided by consumer
-+ * @list: field used by track core to chain blocks
-+ *
-+ * struct track_block is passed to the framework during callback registration,
-+ * it should be valid until callback unregistration.
-+ * Usually it can be embedded in drivers private data, so callback function can
-+ * get pointer to private data using container_of mechanism.
-+ *
-+ */
-+struct track_block {
-+	track_fn_t callback;
-+	struct list_head list;
-+};
-+
-+enum track_task_id {
-+	track_task_register,
-+	track_task_unregister,
-+	track_task_up,
-+	track_task_down,
++static const struct restrack_ops gpiod_restrack_ops = {
++	.if_type = RESTRACK_TYPE_GPIO,
++	.init = gpiod_restrack_init,
++	.destroy = gpiod_restrack_destroy,
++	.if_up = gpiod_restrack_ifup,
++	.if_down = gpiod_restrack_ifdown,
 +};
 +
 +/**
-+ * struct tracker - the main structure for tracking objects
-+ * @queue: queue of tasks to do
-+ * @queue_lock: lock protecting @queue access
-+ * @queue_empty: completion fired when queue becomes empty
-+ * @queue_owner: id of task processing queue
-+ * @nodes: list head of track_nodes
++ * gpiod_restrack_desc - gpio resource descriptor allocator
++ * @gpiod: pointer to variable which will be set to gpiod handle
++ * @name: name of gpio
++ * @flags: gpiod flags
 + *
-+ * struct tracker - is the main structure used to track and synchronize
-+ * framework functions and callbacks. There can be many independent trackers in
-+ * the system.
++ * The function creates resource description for gpio, which shall be used
++ * by *restrack_register functions.
 + */
-+struct tracker {
-+	struct list_head queue;
-+	spinlock_t queue_lock;
-+	struct completion queue_empty;
-+	struct task_struct *queue_owner;
-+	struct list_head nodes;
-+};
-+
-+/**
-+ * DEFINE_TRACKER - define the main structure for object tracking
-+ * @x: name of the structure
-+ *
-+ * This macro defines and initializes tracker structure.
-+ */
-+#define DEFINE_TRACKER(x) \
-+	struct tracker x = { \
-+		.queue = LIST_HEAD_INIT(x.queue), \
-+		.queue_lock = __SPIN_LOCK_UNLOCKED(x.queue_lock), \
-+		.queue_empty = COMPLETION_INITIALIZER(x.queue_empty), \
-+		.nodes = LIST_HEAD_INIT(x.nodes), \
-+	}
-+
-+/* internal function, exposed only to allow inline public functions */
-+extern int track_add_task(struct tracker *track, enum track_task_id task_id,
-+		unsigned long type, const void *id, void *data, bool sync);
-+
-+/**
-+ * track_register - register track callback
-+ * @track: pointer to tracker main structure
-+ * @itb: block containing registered callback
-+ * @type: tracked object type, defined by user
-+ * @id: object id
-+ *
-+ * track_register registers callback which will receive notifications about
-+ * presence of object identified by pair (@type, @id). If during registration
-+ * tracked object is present, notification callback will be sent immediately.
-+ */
-+static inline int track_register(struct tracker *track, struct track_block *itb,
-+		unsigned long type, const void *id)
++struct restrack_desc *gpiod_restrack_desc(struct gpio_desc **gpiod,
++		const char *con_id, enum gpiod_flags flags)
 +{
-+	return track_add_task(track, track_task_register, type, id, itb,
-+				false);
-+}
++	struct gpiod_restrack_desc *rd;
 +
-+/**
-+ * track_unregister - unregister track callback
-+ * @track: pointer to tracker main structure
-+ * @itb: block containing registered callback
-+ * @type: tracked object type
-+ * @id: object id
-+ *
-+ * track_unregister unregisters previously registered callback. If during
-+ * unregistration tracked object is present, notification is send immediately.
-+ */
-+static inline int track_unregister(struct tracker *track,
-+		struct track_block *itb, unsigned long type, const void *id)
-+{
-+	return track_add_task(track, track_task_unregister, type, id, itb,
-+				true);
-+}
++	RESTRACK_DESC_ALLOC(rd, gpiod_restrack_ops, gpiod, con_id);
++	if (!rd)
++		return ERR_PTR(-ENOMEM);
 +
-+/**
-+ * track_up - notifies about object appearance
-+ * @track: pointer to tracker main structure
-+ * @type: tracked object type
-+ * @id: object id
-+ * @data: optional data pointer, usually it should be object pointer
-+ *
-+ * track_up sends notification about object appearance to all callbacks
-+ * registered to track this object. It should be called after the object is
-+ * fully created. It is up to provider to synchronize calls to track_up and
-+ * track_down for given object.
-+ */
-+static inline int track_up(struct tracker *track, unsigned long type,
-+		const void *id, void *data)
-+{
-+	return track_add_task(track, track_task_up, type, id, data, false);
++	rd->flags = flags;
++	return &rd->desc;
 +}
++EXPORT_SYMBOL_GPL(gpiod_restrack_desc);
 +
-+/**
-+ * track_down - notifies about object disappearance
-+ * @track: pointer to tracker main structure
-+ * @type: tracked object type
-+ * @id: object id
-+ * @data: optional data pointer, usually it should be object pointer
-+ *
-+ * track_up sends notification about object disappearance to all callbacks
-+ * registered to track this object. It should be called before the object is
-+ * destroyed. It is up to provider to synchronize calls to track_up and
-+ * track_down for given object.
-+ */
-+static inline int track_down(struct tracker *track, unsigned long type,
-+		const void *id, void *data)
-+{
-+	return track_add_task(track, track_task_down, type, id, data,
-+				true);
-+}
+ #ifdef CONFIG_DEBUG_FS
+ 
+ static void gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+diff --git a/include/linux/gpio/consumer.h b/include/linux/gpio/consumer.h
+index 12f146f..55f2e4e 100644
+--- a/include/linux/gpio/consumer.h
++++ b/include/linux/gpio/consumer.h
+@@ -94,6 +94,10 @@ int gpiod_to_irq(const struct gpio_desc *desc);
+ struct gpio_desc *gpio_to_desc(unsigned gpio);
+ int desc_to_gpio(const struct gpio_desc *desc);
+ 
++struct restrack_desc;
++struct restrack_desc *gpiod_restrack_desc(struct gpio_desc **gpiod,
++		const char *con_id, enum gpiod_flags flags);
 +
-+#endif /* TRACK_H */
+ #else /* CONFIG_GPIOLIB */
+ 
+ static inline struct gpio_desc *__must_check __gpiod_get(struct device *dev,
+diff --git a/include/linux/restrack.h b/include/linux/restrack.h
+index 4e4eec6..e1aded0 100644
+--- a/include/linux/restrack.h
++++ b/include/linux/restrack.h
+@@ -5,6 +5,7 @@
+ 
+ #define RESTRACK_TYPE_DRM_PANEL 1
+ #define RESTRACK_TYPE_REGULATOR 2
++#define RESTRACK_TYPE_GPIO 3
+ 
+ struct device;
+ struct restrack_ctx;
 -- 
 1.9.1
