@@ -1,75 +1,50 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Wed, 10 Dec 2014 16:51:20 +0800
-Subject: [PATCH V2] arm: imx: correct the hardware clock gate setting for
- shared nodes
-Message-ID: <1418201480-9935-1-git-send-email-b20788@freescale.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 10 Dec 2014 09:56:55 +0100
+Subject: [GIT PULL 8/9] ARM: SoC defconfig changes for 3.19
+In-Reply-To: <3558682.jkN2tlsPNy@wuerfel>
+References: <4491193.a6KEQb1tZH@wuerfel>
+	<3558682.jkN2tlsPNy@wuerfel>
+Message-ID: <CAMuHMdW35QRFmTMvtfx_1ZHn1W8a_LMPFFWuZgtXGfKEQDddzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For those clk gates which hold share count, since its is_enabled
-callback is only checking the share count rather than reading
-the hardware register setting, in the late phase of kernel bootup,
-the clk_disable_unused action will NOT handle the scenario of
-share_count is 0 but the hardware setting is enabled, actually,
-uboot normally enables all clk gates, then those shared clk gates
-will be always enabled until they are used by some modules.
+Hi Arnd,
 
-So the problem would be: when kernel boot up, the usecount cat
-from clk tree is 0, but the clk gates actually is enabled in
-hardware register, it will confuse user and bring unnecessary power
-consumption.
+On Tue, Dec 9, 2014 at 10:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+>
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/defconfig-for-linus
 
-This patch adds .disable_unused callback to handle such scenario in
-late phase of kernel boot up, then the hardware status will match the
-clk tree info.
+On https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/, the
+"Download" column for all tags shows "tag <abbrev>...".
+Clicking on any of them gives e.g.:
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
-changes from V1:
-	handle such issue via clk-gate2 framework to fulfill all
-i.mx6 platforms, introduced .disable_unused callback.
- arch/arm/mach-imx/clk-gate2.c |   24 ++++++++++++++++++++----
- 1 file changed, 20 insertions(+), 4 deletions(-)
+    https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/tag/?id=066ae43e621090340384ab3751b68306c49cd503
+    Bad tag reference: 066ae43e621090340384ab3751b68306c49cd503
 
-diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
-index 5a75cdc..18204db 100644
---- a/arch/arm/mach-imx/clk-gate2.c
-+++ b/arch/arm/mach-imx/clk-gate2.c
-@@ -96,15 +96,31 @@ static int clk_gate2_is_enabled(struct clk_hw *hw)
- {
- 	struct clk_gate2 *gate = to_clk_gate2(hw);
- 
--	if (gate->share_count)
--		return !!__clk_get_enable_count(hw->clk);
--	else
--		return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
-+	return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
-+}
-+
-+static void clk_gate2_disable_unused(struct clk_hw *hw)
-+{
-+	struct clk_gate2 *gate = to_clk_gate2(hw);
-+	unsigned long flags = 0;
-+	u32 reg;
-+
-+	spin_lock_irqsave(gate->lock, flags);
-+
-+	if ((gate->share_count && *gate->share_count == 0) ||
-+		!gate->share_count) {
-+		reg = readl(gate->reg);
-+		reg &= ~(3 << gate->bit_idx);
-+		writel(reg, gate->reg);
-+	}
-+
-+	spin_unlock_irqrestore(gate->lock, flags);
- }
- 
- static struct clk_ops clk_gate2_ops = {
- 	.enable = clk_gate2_enable,
- 	.disable = clk_gate2_disable,
-+	.disable_unused = clk_gate2_disable_unused,
- 	.is_enabled = clk_gate2_is_enabled,
- };
- 
--- 
-1.7.9.5
+In other repositories
+(e.g. http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/), the
+"Download" column for tags shows "commit <abbrev>...", and the links behind
+them do work.
+
+Note that if I s/tag/commit/ in the URL, it does work.
+
+Is this an issue with your repository? Or does cgit on kernel.org needs to
+be updated for a new feature?
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
