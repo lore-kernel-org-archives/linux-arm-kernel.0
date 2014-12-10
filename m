@@ -1,102 +1,109 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 9 Dec 2014 19:31:18 -0800
-Subject: [PATCH 2/4] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <CAEUmHyZ86r=7KzJzfE9_upv45vN7geW9woqMkaGaBPwfp3xbMQ@mail.gmail.com>
-References: <rjui@broadcom.com>	<1418172891-19441-1-git-send-email-rjui@broadcom.com>	<1418172891-19441-3-git-send-email-rjui@broadcom.com>	<5487A2D6.8070901@gmail.com>	<5487A4C9.2000604@broadcom.com>	<CAEUmHyZ+VqjzL4LkQozGJtnictPNXHYWM2qMKvD=LmfQdcT8iQ@mail.gmail.com>
- <CAEUmHyZ86r=7KzJzfE9_upv45vN7geW9woqMkaGaBPwfp3xbMQ@mail.gmail.com>
-Message-ID: <5487BE86.30900@broadcom.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Wed, 10 Dec 2014 11:51:51 +0800
+Subject: [PATCH v8 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <2619239.NTtdNaZCJM@wuerfel>
+References: <1397869980-21187-1-git-send-email-zhangfei.gao@linaro.org>
+ <5483C977.2060308@huawei.com> <54842298.2010007@suse.de>
+ <2619239.NTtdNaZCJM@wuerfel>
+Message-ID: <5487C357.9030507@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2014/12/8 4:09, Arnd Bergmann wrote:
+> On Sunday 07 December 2014 10:49:12 Alexander Graf wrote:
+>> On 07.12.14 04:28, Ding Tianhong wrote:
+>>> On 2014/12/7 8:42, Alexander Graf wrote:
+>>>> On 19.04.14 03:13, Zhangfei Gao wrote:
+>>>>> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
+>>>>> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
+>>>>>
+>>>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>>>
+>>>> Is this driver still supposed to go upstream? I presume this was the
+>>>> last submission and it's been quite some time ago 
+>>>>
+>>>
+>>> yes, it is really a long time, but The hip04 did not support tx irq, 
+>>> we couldn't get any better idea to fix this defect, do you have any suggestion?
+>>
+>> Well, if hardware doesn't have a TX irq I don't see there's anything we
+>> can do to fix that ;).
+> 
+> I don't know if it's related to the ethernet on hip01, but I would assume
+> it is, and that platform is currently being submitted for inclusion, so
+> I'd definitely hope to see this driver get merged too eventually.
+> 
+> IIRC, the last revision of the patch set had basically fixed the problem,
+> except for a race that would still allow the napi poll function to exit
+> with poll_complete() but a full queue of TX descriptors and no fallback
+> to clean them up. There was also still an open question about whether or
+> not the driver should use skb_orphan, but I may be misremembering that part.
+>  
+
+Hi Arnd:
+
+what about use a state machine to check the tx queue and free the skb, just like:
+
+diff --git a/drivers/net/ethernet/hisilicon/hip04_eth.c b/drivers/net/ethernet/hisilicon/hip04_eth.c
+index 8593658..71faca8 100644
+--- a/drivers/net/ethernet/hisilicon/hip04_eth.c
++++ b/drivers/net/ethernet/hisilicon/hip04_eth.c
+@@ -396,9 +396,25 @@ static int hip04_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+        stats->tx_packets++;
+        priv->tx_count++;
+
++
++       queue_delayed_work(priv->wq, &priv->tx_queue, delay);
++
+        return NETDEV_TX_OK;
+ }
+
++static void hip04_tx_queue_monitor(struct work_struct *work)
++{
++       struct hip04_priv *priv = container_of(work, struct hip04_priv,
++                                              queue_work.work);
++       struct net_device *dev = priv->ndev;
++       hip04_tx_reclain(ndev, false);
++
++       if (TX_QUEUE_IS_EMPRY(ndev))
++               return;
++
++       queue_delayed_work(priv->wq, &priv->tx_queue, delay);
++}
++
+ static int hip04_rx_poll(struct napi_struct *napi, int budget)
+ {
+        struct hip04_priv *priv = container_of(napi, struct hip04_priv, napi);
+@@ -736,6 +752,8 @@ static int hip04_mac_probe(struct platform_device *pdev)
+                goto alloc_fail;
+        }
+
++       INIT_DELAYED_WORK(&priv->tx_queue, hip04_tx_queue_monitor);
++
+        return 0;
 
 
-On 12/9/2014 7:28 PM, Varka Bhadram wrote:
->
->
-> On Wed, Dec 10, 2014 at 8:51 AM, Varka Bhadram <varkabhadram@gmail.com
-> <mailto:varkabhadram@gmail.com>> wrote:
->
->     On Wed, Dec 10, 2014 at 7:11 AM, Ray Jui <rjui@broadcom.com
->     <mailto:rjui@broadcom.com>> wrote:
->
->
->
->         On 12/9/2014 5:33 PM, Varka Bhadram wrote:
->
->
->             On Wednesday 10 December 2014 06:24 AM, Ray Jui wrote:
->
->                 Add initial support to the Broadcom iProc I2C controller
->                 found in the
->                 iProc family of SoCs.
->
->                 The iProc I2C controller has separate internal TX and RX
->                 FIFOs, each has
->                 a size of 64 bytes. The iProc I2C controller supports
->                 two bus speeds
->                 including standard mode (100kHz) and fast mode (400kHz)
->
->                 Signed-off-by: Ray Jui <rjui@broadcom.com
->                 <mailto:rjui@broadcom.com>>
->                 Reviewed-by: Scott Branden <sbranden@broadcom.com
->                 <mailto:sbranden@broadcom.com>>
->                 ---
->                    drivers/i2c/busses/Kconfig         |    9 +
->                    drivers/i2c/busses/Makefile        |    1 +
->                    drivers/i2c/busses/i2c-bcm-iproc.c |  503
->                 ++++++++++++++++++++++++++++++++++++
->                    3 files changed, 513 insertions(+)
->                    create mode 100644 drivers/i2c/busses/i2c-bcm-iproc.c
->
->     (...)
->
->                 +static int bcm_iproc_i2c_probe(struct platform_device
->                 *pdev)
->                 +{
->                 +    int irq, ret = 0;
->                 +    struct bcm_iproc_i2c_dev *dev;
->                 +    struct i2c_adapter *adap;
->                 +    struct resource *res;
->                 +
->                 +    dev = devm_kzalloc(&pdev->dev, sizeof(*dev),
->                 GFP_KERNEL);
->                 +    if (!dev)
->                 +        return -ENOMEM;
->                 +
->                 +    platform_set_drvdata(pdev, dev);
->                 +    dev->device = &pdev->dev;
->                 +    init_completion(&dev->done);
->                 +
->                 +    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->                 +    if (!res)
->                 +        return -ENODEV;
->
->
->             We can remove this resource check. This checking will happen
->             with
->             devm_ioremap_resource()
->
->         Don't you need to obtain a valid resource and pass it into
->         devm_ioremap_resource? Without 'res' being assigned a valid
->         resource, devm_ioremap_resource will reject with "invalid resource".
->
->     platform_get_resource() will return a resource, checking on this
->     resource is happening at
->     http://lxr.free-electrons.com/source/lib/devres.c#L115. So no need
->     to check it explicitly.
->
->     If you check here it will be duplication of check with resource. Two
->     times we are checking on
->     the resource. No point of doing like that.
->
->     Thanks.
-Sorry I misunderstood what you meant. Okay I'll get rid of if (!res) 
-check there. Thanks.
 
->
->
-> See this: http://lxr.free-electrons.com/source/lib/devres.c#L102
->
+what do you think of this solution?
+
+Regards
+Ding
+
+
+>> Dave, what's your take here? Should we keep a driver from going upstream
+>> just because the hardware is partly broken? I'd really prefer to have an
+>> upstream driver on that SoC rather than some random (eventually even
+>> more broken) downstream code.
+> 
+> We can certainly have a slow driver for this hardware, and I'd much
+> prefer slow over broken. I'd guess that some of the performance impact
+> of the missing interrupts can now be offset with the xmit_more	 logic.
+> 
+> 	Arnd
 > --
-> Thanks and Regards,
-> Varka Bhadram.
+> To unsubscribe from this list: send the line "unsubscribe netdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> .
+> 
