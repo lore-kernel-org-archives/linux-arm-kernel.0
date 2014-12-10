@@ -1,89 +1,43 @@
-From: lyz@rock-chips.com (Yunzhi Li)
-Date: Wed, 10 Dec 2014 18:46:10 +0800
-Subject: [PATCH v5 4/5] ARM: dts: rockchip: add rk3288 usb PHY
-In-Reply-To: <1418208371-18851-1-git-send-email-lyz@rock-chips.com>
-References: <1418208371-18851-1-git-send-email-lyz@rock-chips.com>
-Message-ID: <1418208371-18851-5-git-send-email-lyz@rock-chips.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Wed, 10 Dec 2014 18:49:58 +0800
+Subject: [PATCH 0/4] Add basic support for Mediatek MT8173 SoC
+Message-ID: <1418208602-35584-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a device_node for RK3288 SoC usb phy. It also
-defines the phy to be used by three usb controllers: usb_host0/1
-and usb_otg.
+MT8173 is a SoC based on 64bit ARMv8 architecture. It contains 
+2 CA53 + 2 CA57 cores. MT8173 share many HW IP with MT8135 and other 
+MT65xx series. This patchset was tested on MT8173 engineer sample, and 
+boot to shell ok.
 
-Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
+This series contains document bindings, device tree, defconfig, 
+and one sysirq modification for MT8173.
 
----
+This series is based on 3.18, and Joe's MT8135 basic support patch [1] 
+and sysirq patch [2]
 
-Changes in v5:
-- reorder the phy dt node to a correct position.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296093.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305808.html
 
-Changes in v4:
-- Add phy subnodes.
+Eddie Huang (3):
+  Document: DT: Add bindings for mediatek MT8173 Soc Platform
+  arm64: dts: Add mediatek MT8173 SoC and evaluation board dts and
+    Makefile
+  arm64: mediatek: Add MT8173 SoC Kconfig and defconfig
 
-Changes in v3: None
+Yingjoe Chen (1):
+  irqchip: mediatek: Add support for mt8173
 
- arch/arm/boot/dts/rk3288.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+ arch/arm64/Kconfig                                 |   6 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/mt8173-evb.dts                 |  31 ++++
+ arch/arm64/boot/dts/mt8173.dtsi                    | 164 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |   2 +
+ drivers/irqchip/irq-mtk-sysirq.c                   |  22 ++-
+ 7 files changed, 226 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/mt8173-evb.dts
+ create mode 100644 arch/arm64/boot/dts/mt8173.dtsi
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 874e66d..bd2a1e0 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -335,6 +335,8 @@
- 		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru HCLK_USBHOST0>;
- 		clock-names = "usbhost";
-+		phys = <&usbphy 1>;
-+		phy-names = "usb";
- 		status = "disabled";
- 	};
- 
-@@ -347,6 +349,8 @@
- 		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru HCLK_USBHOST1>;
- 		clock-names = "otg";
-+		phys = <&usbphy 2>;
-+		phy-names = "usb2-phy";
- 		status = "disabled";
- 	};
- 
-@@ -357,6 +361,8 @@
- 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru HCLK_OTG0>;
- 		clock-names = "otg";
-+		phys = <&usbphy 0>;
-+		phy-names = "usb2-phy";
- 		status = "disabled";
- 	};
- 
-@@ -497,6 +503,27 @@
- 		interrupts = <GIC_PPI 9 0xf04>;
- 	};
- 
-+	usbphy: phy {
-+		compatible = "rockchip,rk3288-usb-phy";
-+		rockchip,grf = <&grf>;
-+		#phy-cells = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+
-+		usb-phy at 0 {
-+			reg = <0>;
-+		};
-+
-+		usb-phy at 1 {
-+			reg = <1>;
-+		};
-+
-+		usb-phy at 2 {
-+			reg = <2>;
-+		};
-+	};
-+
- 	pinctrl: pinctrl {
- 		compatible = "rockchip,rk3288-pinctrl";
- 		rockchip,grf = <&grf>;
 -- 
-2.0.0
+1.8.1.1.dirty 
