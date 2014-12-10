@@ -1,20 +1,23 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 9 Dec 2014 16:56:21 -0800
-Subject: [GIT PULL 6/9] ARM: SoC DT updates for 3.19
-In-Reply-To: <CA+55aFwkkP9wFdJUHMsnrd=eDYNsGKm7ujyktEWh+GMzQinzxw@mail.gmail.com>
-References: <4491193.a6KEQb1tZH@wuerfel> <14657639.RrnLVWDtO6@wuerfel>
- <CA+55aFwkkP9wFdJUHMsnrd=eDYNsGKm7ujyktEWh+GMzQinzxw@mail.gmail.com>
-Message-ID: <CA+55aFy=Bja0hs=H-bjBEArQzqUGTwD4vA5RHviEun1mfzik5g@mail.gmail.com>
+From: samuel.thibault@ens-lyon.org (Samuel Thibault)
+Date: Wed, 10 Dec 2014 02:03:56 +0100
+Subject: [PATCH] Route keyboard LEDs through the generic LEDs layer.
+In-Reply-To: <87mw6wshec.fsf@dell.be.48ers.dk>
+References: <20140331122323.GC6044@type.bordeaux.inria.fr>
+ <20141015231545.GD3719@type.youpi.perso.aquilenet.fr>
+ <201410160129.22012@pali> <201412091812.08575@pali>
+ <87mw6wshec.fsf@dell.be.48ers.dk>
+Message-ID: <20141210010356.GA3074@type.youpi.perso.aquilenet.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 9, 2014 at 3:45 PM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
->
-> I've applied 1-5, but I'm going to stop here waiting for confirmation
-> of what's going on..
+Peter Korsgaard, le Tue 09 Dec 2014 21:22:03 +0100, a ?crit :
+>  > I would like you to remind you this patch which is waiting for 
+>  > your review since April 2014!
+> 
+> Hah, I'm pretty sure it dates back to 2010 atleast.
 
-Actually, I'll just finish it, and hope you check out the result
-later. Many more pulls to go today..
+Yes, the first version was posted on February 2010.  There has been some
+reviews, and thus a few versions, I've just posted a 4th version which
+has been sitting in -mm for some time now.
 
-                  Linus
+Samuel
