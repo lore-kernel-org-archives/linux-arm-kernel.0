@@ -1,44 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 11 Dec 2014 17:52:25 +0000
-Subject: arm64 hitting BUG in arch_timer.h
-In-Reply-To: <CAPz6YkXcerUiLc3dQG0URSuioiLsAwcTLkDTivD4JU9YQsdR+Q@mail.gmail.com>
-References: <1418245000.23374.26.camel@t520.localdomain>
- <CAPz6YkXcerUiLc3dQG0URSuioiLsAwcTLkDTivD4JU9YQsdR+Q@mail.gmail.com>
-Message-ID: <20141211175224.GL31456@e104818-lin.cambridge.arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 11 Dec 2014 10:56:33 -0700
+Subject: [PATCH -next] coresight-tpiu: use module_amba_driver to simplify
+ the code
+In-Reply-To: <1418130803-27443-1-git-send-email-weiyj_lk@163.com>
+References: <1418130803-27443-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <CANLsYkyq-4pY9NEsL2dNgNv+FdEPxJ49c8GA_XPUuqpfFhZoag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 10:43:54PM +0000, Sonny Rao wrote:
-> On Wed, Dec 10, 2014 at 12:56 PM, Mark Salter <msalter@redhat.com> wrote:
-> > Using Linus' tree from this morning, I am hitting:
-> >
-> >    [    0.000000] BUG: failure at ./arch/arm64/include/asm/arch_timer.h:112/arch_counter_get_cntpct!
-> >
-> > This is triggered by commit 0b46b8a718 ("clocksource: arch_timer: Fix
-> > code to use physical timers when requested") which addresses an armv7
-> > problem. Arm64 wants to always use a virtual timer. I used this to avoid
-> > the BUG and get a booting kernel:
-> >
-> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch
-> > index 71846f9..4d8a01e 100644
-> > --- a/drivers/clocksource/arm_arch_timer.c
-> > +++ b/drivers/clocksource/arm_arch_timer.c
-> > @@ -468,7 +468,7 @@ static void __init arch_counter_register(unsigned type)
-> >
-> >         /* Register the CP15 based counter if we have one */
-> >         if (type & ARCH_CP15_TIMER) {
-> > -               if (arch_timer_use_virtual)
-> > +               if (IS_ENABLED(CONFIG_ARM64) || arch_timer_use_virtual)
-> >                         arch_timer_read_counter = arch_counter_get_cntvct;
-> >                 else
-> >                         arch_timer_read_counter = arch_counter_get_cntpct;
-> >
-> >
-> 
-> Yes Catalin has prepared a similar patch:
-> https://patchwork.kernel.org/patch/5468031/
+On 9 December 2014 at 06:13,  <weiyj_lk@163.com> wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+>
+> module_amba_driver() makes the code simpler by eliminating
+> boilerplate code.
+>
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+>  drivers/coresight/coresight-tpiu.c | 12 +-----------
+>  1 file changed, 1 insertion(+), 11 deletions(-)
+>
+> diff --git a/drivers/coresight/coresight-tpiu.c b/drivers/coresight/coresight-tpiu.c
+> index ae10108..3b33af2 100644
+> --- a/drivers/coresight/coresight-tpiu.c
+> +++ b/drivers/coresight/coresight-tpiu.c
+> @@ -201,17 +201,7 @@ static struct amba_driver tpiu_driver = {
+>         .id_table       = tpiu_ids,
+>  };
+>
+> -static int __init tpiu_init(void)
+> -{
+> -       return amba_driver_register(&tpiu_driver);
+> -}
+> -module_init(tpiu_init);
+> -
+> -static void __exit tpiu_exit(void)
+> -{
+> -       amba_driver_unregister(&tpiu_driver);
+> -}
+> -module_exit(tpiu_exit);
+> +module_amba_driver(tpiu_driver);
 
-Indeed. Daniel will be pushing it upstream.
+This looks good - please merge your 4 patches in the same one.
 
--- 
-Catalin
+>
+>  MODULE_LICENSE("GPL v2");
+>  MODULE_DESCRIPTION("CoreSight Trace Port Interface Unit driver");
+>
