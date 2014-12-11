@@ -1,79 +1,337 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 11 Dec 2014 09:28:59 -0800
-Subject: [PATCH v4 2/2] i2c: cadence: Check for errata condition
- involving master receive
-In-Reply-To: <CAFcVECJDfJaEALDxfZg5-+tsD02mVT43s7PX4RLs349Kx9Jaeg@mail.gmail.com>
-References: <1418211884-5329-1-git-send-email-harinik@xilinx.com>
- <1418211884-5329-3-git-send-email-harinik@xilinx.com>
- <6b2bd13bcd934b0fb09712e8950348e6@BN1AFFO11FD005.protection.gbl>
- <CAFcVECJDfJaEALDxfZg5-+tsD02mVT43s7PX4RLs349Kx9Jaeg@mail.gmail.com>
-Message-ID: <61a2ff3fb6764fa388436dbbe20a8d70@BY2FFO11FD001.protection.gbl>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 11 Dec 2014 11:30:49 -0600
+Subject: [PATCH v5 1/2] soc: samsung: add exynos chipid driver support
+In-Reply-To: <1418285264-21763-2-git-send-email-pankaj.dubey@samsung.com>
+References: <1418285264-21763-1-git-send-email-pankaj.dubey@samsung.com>
+ <1418285264-21763-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <CAL_JsqKaf+w_D-xLCUizuTmxwT7uUHExA=qMpawQ+00G7uMcBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-12-11 at 12:46PM +0530, Harini Katakam wrote:
-> Hi Soren,
-> 
-> On Wed, Dec 10, 2014 at 11:15 PM, S?ren Brinkmann
-> <soren.brinkmann@xilinx.com> wrote:
-> > On Wed, 2014-12-10 at 05:14PM +0530, Harini Katakam wrote:
-> >> Cadence I2C controller has the following bugs:
-> >> - completion indication is not given to the driver at the end of
-> >> a read/receive transfer with HOLD bit set.
-> >> - Invalid read transaction are generated on the bus when HW timeout
-> >> condition occurs with HOLD bit set.
-> >>
-> >> As a result of the above, if a set of messages to be transferred with
-> >> repeated start includes any transfer following a read transfer,
-> >> completion is never indicated and timeout occurs.
-> >> Hence a check is implemented to return -EOPNOTSUPP for such sequences.
-> >>
-> >> Signed-off-by: Harini Katakam <harinik@xilinx.com>
-> >> Signed-off-by: Vishnu Motghare <vishnum@xilinx.com>
-> >> ---
-> >>
-> >> v4:
-> >> Use single dev_warn and make message grep-able.
-> >>
-> >> v3:
-> >> Add warning in case of unsupported transfer.
-> >>
-> >> v2:
-> >> Dont defeteature repeated start. Just check for unsupported conditions in the
-> >> driver and return error.
-> >>
-> >> ---
-> >>  drivers/i2c/busses/i2c-cadence.c |   14 ++++++++++++++
-> >>  1 file changed, 14 insertions(+)
-> >>
-> >> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-> >> index 5f5d4fa..f9269a6 100644
-> >> --- a/drivers/i2c/busses/i2c-cadence.c
-> >> +++ b/drivers/i2c/busses/i2c-cadence.c
-> >> @@ -541,6 +541,20 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
-> >>        * processed with a repeated start.
-> >>        */
-> >>       if (num > 1) {
-> >> +             /*
-> >> +              * This controller does not give completion interrupt after a
-> >> +              * master receive transfer if HOLD bit is set (repeated start),
-> >> +              * resulting in SW timeout. Hence, if a receive transfer is
-> >> +              * followed by any other transfer, an error is returned
-> >> +              * indicating that this sequence is not supported.
-> >> +              */
-> >> +             for (count = 0; count < num-1; count++) {
-> >> +                     if (msgs[count].flags & I2C_M_RD)
-> >> +                             dev_warn(adap->dev.parent, "No support for "
-> >> +                                      "repeated start when receive is "
-> >> +                                      "followed by a transfer\n");
-> >
-> > Still not grepable. There must be no line breaks in the string!
-> 
-> This message will be printed in one single line.
-> Do you want this string to be grepable in the driver? Why is that necessary?
+On Thu, Dec 11, 2014 at 2:07 AM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> Exynos SoCs have Chipid, for identification of product IDs
+> and SoC revisions. This patch intendes to provide initialization
+> code for all these functionalites.
+>
+> This driver usese existing binding for exnos-chipid.
 
-It's about grepping the sources.
-I pointed you to the paragraph in the Codingstyle rules, please read
-it.
+s/usese/uses/
+s/exnos/exynos/
 
-	S?ren
+>
+> CC: Grant Likely <grant.likely@linaro.org>
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  drivers/soc/Kconfig                    |   1 +
+>  drivers/soc/Makefile                   |   1 +
+>  drivers/soc/samsung/Kconfig            |  14 +++
+>  drivers/soc/samsung/Makefile           |   1 +
+>  drivers/soc/samsung/exynos-chipid.c    | 168 +++++++++++++++++++++++++++++++++
+>  include/linux/soc/samsung/exynos-soc.h |  51 ++++++++++
+>  6 files changed, 236 insertions(+)
+>  create mode 100644 drivers/soc/samsung/Kconfig
+>  create mode 100644 drivers/soc/samsung/Makefile
+>  create mode 100644 drivers/soc/samsung/exynos-chipid.c
+>  create mode 100644 include/linux/soc/samsung/exynos-soc.h
+>
+> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+> index 76d6bd4..c3abfbe 100644
+> --- a/drivers/soc/Kconfig
+> +++ b/drivers/soc/Kconfig
+> @@ -1,6 +1,7 @@
+>  menu "SOC (System On Chip) specific Drivers"
+>
+>  source "drivers/soc/qcom/Kconfig"
+> +source "drivers/soc/samsung/Kconfig"
+>  source "drivers/soc/ti/Kconfig"
+>  source "drivers/soc/versatile/Kconfig"
+>
+> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+> index 063113d..620366f 100644
+> --- a/drivers/soc/Makefile
+> +++ b/drivers/soc/Makefile
+> @@ -3,6 +3,7 @@
+>  #
+>
+>  obj-$(CONFIG_ARCH_QCOM)                += qcom/
+> +obj-$(CONFIG_SOC_SAMSUNG)      += samsung/
+>  obj-$(CONFIG_ARCH_TEGRA)       += tegra/
+>  obj-$(CONFIG_SOC_TI)           += ti/
+>  obj-$(CONFIG_PLAT_VERSATILE)   += versatile/
+> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
+> new file mode 100644
+> index 0000000..2d83652
+> --- /dev/null
+> +++ b/drivers/soc/samsung/Kconfig
+> @@ -0,0 +1,14 @@
+> +#
+> +# SAMSUNG SoC drivers
+> +#
+> +menu "Samsung SOC driver support"
+> +
+> +config SOC_SAMSUNG
+> +       bool
+> +
+> +config EXYNOS_CHIPID
+> +       bool
+> +       depends on ARCH_EXYNOS
+> +       select SOC_BUS
+
+This is going to show an empty menu when ARCH_EXYNOS is not enabled.
+The whole menu should probably have "if ARCH_EXYNOS" instead.
+
+> +
+> +endmenu
+> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
+> new file mode 100644
+> index 0000000..855ca05
+> --- /dev/null
+> +++ b/drivers/soc/samsung/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_EXYNOS_CHIPID)    += exynos-chipid.o
+> diff --git a/drivers/soc/samsung/exynos-chipid.c b/drivers/soc/samsung/exynos-chipid.c
+> new file mode 100644
+> index 0000000..8968f83
+> --- /dev/null
+> +++ b/drivers/soc/samsung/exynos-chipid.c
+> @@ -0,0 +1,168 @@
+> +/*
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + *           http://www.samsung.com/
+> + *
+> + * EXYNOS - CHIP ID support
+> + * Author: Pankaj Dubey <pankaj.dubey@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/sys_soc.h>
+> +#include <linux/soc/samsung/exynos-soc.h>
+> +
+> +#define EXYNOS_SUBREV_MASK     (0xF << 4)
+> +#define EXYNOS_MAINREV_MASK    (0xF << 0)
+> +#define EXYNOS_REV_MASK                (EXYNOS_SUBREV_MASK | EXYNOS_MAINREV_MASK)
+> +
+> +static void __iomem *exynos_chipid_base;
+> +
+> +struct exynos_chipid_info exynos_soc_info;
+> +EXPORT_SYMBOL(exynos_soc_info);
+
+The soc_device already has similar data. Why is this needed? Is it
+temporary for compatibility? For early use? If for early use, then it
+should not be exported.
+
+
+> +
+> +static const char * __init product_id_to_name(unsigned int product_id)
+> +{
+> +       const char *soc_name;
+> +       unsigned int soc_id = product_id & EXYNOS_SOC_MASK;
+> +
+> +       switch (soc_id) {
+> +       case EXYNOS3250_SOC_ID:
+> +               soc_name = "EXYNOS3250";
+> +               break;
+> +       case EXYNOS4210_SOC_ID:
+> +               soc_name = "EXYNOS4210";
+> +               break;
+> +       case EXYNOS4212_SOC_ID:
+> +               soc_name = "EXYNOS4212";
+> +               break;
+> +       case EXYNOS4412_SOC_ID:
+> +               soc_name = "EXYNOS4412";
+> +               break;
+> +       case EXYNOS4415_SOC_ID:
+> +               soc_name = "EXYNOS4415";
+> +               break;
+> +       case EXYNOS5250_SOC_ID:
+> +               soc_name = "EXYNOS5250";
+> +               break;
+> +       case EXYNOS5260_SOC_ID:
+> +               soc_name = "EXYNOS5260";
+> +               break;
+> +       case EXYNOS5420_SOC_ID:
+> +               soc_name = "EXYNOS5420";
+> +               break;
+> +       case EXYNOS5440_SOC_ID:
+> +               soc_name = "EXYNOS5440";
+> +               break;
+> +       case EXYNOS5800_SOC_ID:
+> +               soc_name = "EXYNOS5800";
+> +               break;
+> +       default:
+> +               soc_name = "UNKNOWN";
+> +       }
+> +       return soc_name;
+> +}
+> +
+> +static const struct of_device_id of_exynos_chipid_ids[] __initconst = {
+> +       {
+> +               .compatible     = "samsung,exynos4210-chipid",
+> +       },
+> +       {},
+> +};
+> +
+> +/**
+> + *  exynos_chipid_early_init: Early chipid initialization
+> + *  @dev: pointer to chipid device
+> + */
+> +void __init exynos_chipid_early_init(struct device *dev)
+> +{
+> +       struct device_node *np;
+> +       const struct of_device_id *match;
+> +
+> +       if (exynos_chipid_base)
+> +               return;
+> +
+> +       if (!dev)
+> +               np = of_find_matching_node_and_match(NULL,
+> +                       of_exynos_chipid_ids, &match);
+> +       else
+> +               np = dev->of_node;
+> +
+> +       if (!np)
+> +               panic("%s, failed to find chipid node\n", __func__);
+
+Do you really want to halt booting here? Your console may not be up to
+see the panic anyway.
+
+> +
+> +       exynos_chipid_base = of_iomap(np, 0);
+
+Once you read the rev and product_id, do you need to keep the mapping?
+
+> +
+> +       if (!exynos_chipid_base)
+> +               panic("%s: failed to map registers\n", __func__);
+> +
+> +       exynos_soc_info.product_id  = __raw_readl(exynos_chipid_base);
+> +       exynos_soc_info.revision = exynos_soc_info.product_id & EXYNOS_REV_MASK;
+> +}
+> +
+> +static int __init exynos_chipid_probe(struct platform_device *pdev)
+> +{
+> +       struct soc_device_attribute *soc_dev_attr;
+> +       struct soc_device *soc_dev;
+> +       struct device_node *root;
+> +       int ret;
+> +
+> +       exynos_chipid_early_init(&pdev->dev);
+> +
+> +       soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+> +       if (!soc_dev_attr)
+> +               return -ENODEV;
+> +
+> +       soc_dev_attr->family = "Samsung Exynos";
+> +
+> +       root = of_find_node_by_path("/");
+> +       ret = of_property_read_string(root, "model", &soc_dev_attr->machine);
+> +       of_node_put(root);
+> +       if (ret)
+> +               goto free_soc;
+
+Should a lack of model really be a reason to not load the soc_device?
+
+> +
+> +       soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d",
+> +                                       exynos_soc_info.revision);
+> +       if (!soc_dev_attr->revision)
+> +               goto free_soc;
+> +
+> +       soc_dev_attr->soc_id = product_id_to_name(exynos_soc_info.product_id);
+> +
+> +       soc_dev = soc_device_register(soc_dev_attr);
+> +       if (IS_ERR(soc_dev))
+> +               goto free_rev;
+> +
+> +       soc_device_to_device(soc_dev);
+> +
+> +       dev_info(&pdev->dev, "Exynos: CPU[%s] CPU_REV[0x%x] Detected\n",
+> +                       product_id_to_name(exynos_soc_info.product_id),
+> +                       exynos_soc_info.revision);
+> +       return 0;
+> +free_rev:
+> +       kfree(soc_dev_attr->revision);
+> +free_soc:
+> +       kfree(soc_dev_attr);
+> +       return -EINVAL;
+> +}
+> +
+> +static struct platform_driver exynos_chipid_driver __initdata = {
+> +       .driver = {
+> +               .name = "exynos-chipid",
+> +               .of_match_table = of_exynos_chipid_ids,
+> +       },
+> +       .probe = exynos_chipid_probe,
+> +};
+> +
+> +static int __init exynos_chipid_init(void)
+> +{
+> +       return platform_driver_register(&exynos_chipid_driver);
+> +}
+> +core_initcall(exynos_chipid_init);
+> +
+> diff --git a/include/linux/soc/samsung/exynos-soc.h b/include/linux/soc/samsung/exynos-soc.h
+> new file mode 100644
+> index 0000000..d2d9f05
+> --- /dev/null
+> +++ b/include/linux/soc/samsung/exynos-soc.h
+> @@ -0,0 +1,51 @@
+> +/*
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + *             http://www.samsung.com
+> + *
+> + * Header for EXYNOS SoC Chipid support
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __EXYNOS_SOC_H
+> +#define __EXYNOS_SOC_H
+> +
+> +#define EXYNOS3250_SOC_ID      0xE3472000
+> +#define EXYNOS4210_SOC_ID      0x43210000
+> +#define EXYNOS4212_SOC_ID      0x43220000
+> +#define EXYNOS4412_SOC_ID      0xE4412000
+> +#define EXYNOS4415_SOC_ID      0xE4415000
+> +#define EXYNOS5250_SOC_ID      0x43520000
+> +#define EXYNOS5260_SOC_ID      0xE5260000
+> +#define EXYNOS5410_SOC_ID      0xE5410000
+> +#define EXYNOS5420_SOC_ID      0xE5420000
+> +#define EXYNOS5440_SOC_ID      0xE5440000
+> +#define EXYNOS5800_SOC_ID      0xE5422000
+> +
+> +#define EXYNOS_SOC_MASK                0xFFFFF000
+> +
+> +#define EXYNOS4210_REV_0       0x0
+> +#define EXYNOS4210_REV_1_0     0x10
+> +#define EXYNOS4210_REV_1_1     0x11
+> +
+> +/**
+> + * Struct exynos_chipid_info
+> + * @soc_product_id: product id allocated to exynos SoC
+> + * @soc_revision: revision of exynos SoC
+> + */
+> +
+> +struct exynos_chipid_info {
+> +       u32 product_id;
+> +       u32 revision;
+> +};
+
+Exposing this struct kernel wide in an SOC specific way concerns me. I
+would not like to see this done on every SOC family. That would become
+a mess.
+
+Rob
