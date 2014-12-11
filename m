@@ -1,64 +1,145 @@
-From: lyz@rock-chips.com (Yunzhi Li)
-Date: Thu, 11 Dec 2014 15:44:18 +0800
-Subject: [PATCH v5 1/5] phy: add a driver for the Rockchip SoC internal
- USB2.0 PHY
-In-Reply-To: <5489338C.1030109@ti.com>
-References: <1418208371-18851-1-git-send-email-lyz@rock-chips.com>
- <1418208371-18851-2-git-send-email-lyz@rock-chips.com>
- <5489338C.1030109@ti.com>
-Message-ID: <54894B52.3060105@rock-chips.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 11 Dec 2014 08:47:38 +0100
+Subject: [PATCH v4] i2c: rk3x: fix bug that cause measured high_ns
+ doesn't meet I2C specification
+In-Reply-To: <1418277650-25215-1-git-send-email-addy.ke@rock-chips.com>
+References: <1418007589-3688-1-git-send-email-addy.ke@rock-chips.com>
+ <1418277650-25215-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <20141211074738.GL13486@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon:
+Hello,
 
-On 2014/12/11 14:02, Kishon Vijay Abraham I wrote:
-> Hi,
->
-> On Wednesday 10 December 2014 04:16 PM, Yunzhi Li wrote:
->> This patch to add a generic PHY driver for ROCKCHIP usb PHYs,
->> currently this driver can support RK3288. The RK3288 SoC have
->> three independent USB PHY IPs which are all configured through a
->> set of registers located in the GRF (general register files)
->> module.
->>
->> Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
->>
->> +
->> +#define ROCKCHIP_RK3288_UOC(n)	(0x320 + n * 0x14)
->> +
->> +/*
->> + * The higher 16-bit of this register is used for write protection
->> + * only if BIT(13 + 16) set to 1 the BIT(13) can be written.
->> + */
->> +#define SIDDQ_MSK		BIT(13 + 16)
-> I think here the "MSK" is misleading. it should be something that refers write
-> protection?
-So, #define SIDDQ_WRITE_ENA  BIT(29) , could be ok ?
->> +#define SIDDQ_ON		BIT(13)
->> +#define SIDDQ_OFF		(0 << 13)
->> +
->> +struct rockchip_usb_phy {
->> +	struct regmap	*reg_base;
->> +	unsigned int	reg_offset;
->> +	struct clk	*clk;
->> +	struct phy	*phy;
->> +	unsigned	index;
->> +};
->> +
->> +struct rockchip_usb_phy_priv {
->> +	struct rockchip_usb_phy	*phys;
->> +	unsigned		nphys;
->> +};
->> +
->> +static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
->> +					   bool siddq)
->> +{
->> +	return regmap_write(phy->reg_base, phy->reg_offset,
->> +			    SIDDQ_MSK | (siddq ? SIDDQ_ON : SIDDQ_OFF));
-> Shouldn't we actually reset the bit for power off?
-Sorry, which bit you refer to here  and why should it be reset? could 
-you give more infomation.
+I like it now. There are only a few small nitpicks, not sure its worth
+to respin if noone else has concerns. See below.
 
----
-Yunzhi Li @ rockchip
+On Thu, Dec 11, 2014 at 02:00:49PM +0800, Addy Ke wrote:
+> The number of clock cycles to be written into the CLKDIV register
+> that determines the I2C clk high phase includes the rise time.
+> So to meet the timing requirements defined in the I2C specification
+> which defines the minimal time SCL has to be high, the rise time
+> has to taken into account. The same applies to the low phase with
+> falling time.
+> 
+> In my test on RK3288-Pink2 board, which is not an upstream board yet,
+> if external pull-up resistor is 4.7K, rise_ns is about 700ns.
+> So the measured high_ns is about 3900ns, which is less than 4000ns
+> (the minimum high_ns in I2C specification for Standard-mode).
+> 
+> To fix this bug, min_low_ns should include fall time and min_high_ns
+s/,//
+
+> should include rise time too.
+I'd skip the "too". If you want to keep it, s/time/time,/.
+ 
+> This patch merged the patch that Doug submitted to chromium project,
+AFAIK s/,//
+
+For correctness, does this patch needs Doug's Sob?
+
+> which can get the rise and fall times for signals from the device tree.
+> This allows us to more accurately calculate timings. see:
+> https://chromium-review.googlesource.com/#/c/232774/
+> 
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+> [...]
+> @@ -469,29 +476,33 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
+> [...]
+>  	if (scl_rate <= 100000) {
+> -		min_low_ns = 4700;
+> -		min_high_ns = 4000;
+> -		max_data_hold_ns = 3450;
+> -		data_hold_buffer_ns = 50;
+> +		/* Standard-mode */
+> +		spec_min_low_ns = 4700;
+> +		spec_min_high_ns = 4000;
+> +		spec_max_data_hold_ns = 3450;
+> +		spec_data_hold_buffer_ns = 50;
+>  	} else {
+> -		min_low_ns = 1300;
+> -		min_high_ns = 600;
+> -		max_data_hold_ns = 900;
+> -		data_hold_buffer_ns = 50;
+> +		/* Fast-mode */
+> +		spec_min_low_ns = 1300;
+> +		spec_min_high_ns = 600;
+> +		spec_max_data_hold_ns = 900;
+> +		spec_data_hold_buffer_ns = 50;
+The background of my question regarding data_hold_buffer_ns in the last
+round was: If data_hold_buffer_ns doesn't appear in the I2C
+specification, should it be renamed to spec_... ? *shrug*
+
+>  	}
+> -	max_low_ns = max_data_hold_ns * 2 - data_hold_buffer_ns;
+> +	min_low_ns = spec_min_low_ns + fall_ns;
+> +	min_high_ns = spec_min_high_ns + rise_ns;
+> +	max_low_ns = spec_max_data_hold_ns * 2 - spec_data_hold_buffer_ns;
+>  	min_total_ns = min_low_ns + min_high_ns;
+>  
+>  	/* Adjust to avoid overflow */
+> @@ -510,8 +521,8 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
+>  	min_div_for_hold = (min_low_div + min_high_div);
+>  
+>  	/*
+> -	 * This is the maximum divider so we don't go over the max.
+> -	 * We don't round up here (we round down) since this is a max.
+> +	 * This is the maximum divider so we don't go over the maximum.
+> +	 * We don't round up here (we round down) since this is a maximum.
+>  	 */
+>  	max_low_div = clk_rate_khz * max_low_ns / (8 * 1000000);
+>  
+> @@ -544,7 +555,7 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
+>  		ideal_low_div = DIV_ROUND_UP(clk_rate_khz * min_low_ns,
+>  					     scl_rate_khz * 8 * min_total_ns);
+>  
+> -		/* Don't allow it to go over the max */
+> +		/* Don't allow it to go over the maximum */
+>  		if (ideal_low_div > max_low_div)
+>  			ideal_low_div = max_low_div;
+>  
+> @@ -588,8 +599,8 @@ static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
+>  	u64 t_low_ns, t_high_ns;
+>  	int ret;
+>  
+> -	ret = rk3x_i2c_calc_divs(clk_rate, i2c->scl_frequency, &div_low,
+> -				 &div_high);
+> +	ret = rk3x_i2c_calc_divs(clk_rate, i2c->scl_frequency, i2c->rise_ns,
+> +				 i2c->fall_ns, &div_low, &div_high);
+>  
+>  	WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->scl_frequency);
+>  
+> @@ -633,9 +644,9 @@ static int rk3x_i2c_clk_notifier_cb(struct notifier_block *nb, unsigned long
+>  	switch (event) {
+>  	case PRE_RATE_CHANGE:
+>  		if (rk3x_i2c_calc_divs(ndata->new_rate, i2c->scl_frequency,
+> -				      &div_low, &div_high) != 0) {
+> +				       i2c->rise_ns, i2c->fall_ns, &div_low,
+> +				       &div_high) != 0)
+>  			return NOTIFY_STOP;
+> -		}
+>  
+>  		/* scale up */
+>  		if (ndata->new_rate > ndata->old_rate)
+> @@ -859,6 +870,21 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
+>  		i2c->scl_frequency = DEFAULT_SCL_RATE;
+>  	}
+>  
+> +	/*
+> +	 * Read rise and fall ns.
+> +	 * If not, there use the default maximum from specification.
+I'd write:
+
+	Read rise and fall time from device tree. If not available use
+	the default maximum timing from the specification.
+
+(Otherwise I think the comma needs to go after "there" in your
+sentence.)
+
+Thanks
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
