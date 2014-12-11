@@ -1,83 +1,48 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 11 Dec 2014 13:38:16 +0100
-Subject: [PATCH 5/5] arm/arm64: KVM: Initialize the vgic on-demand when
- injecting IRQs
-In-Reply-To: <20141211120158.GG28388@cbox>
-References: <1418139844-27892-1-git-send-email-christoffer.dall@linaro.org>
- <1418139844-27892-6-git-send-email-christoffer.dall@linaro.org>
- <5488407E.50506@linaro.org> <20141211120158.GG28388@cbox>
-Message-ID: <54899038.3050609@linaro.org>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Thu, 11 Dec 2014 21:42:47 +0900
+Subject: [RFC PATCH 2/2] iommu: rockchip: Handle system-wide and runtime PM
+In-Reply-To: <CAPDyKFoBRxFh+BzHTakij6=NvLm0C-S8eX8+p2odpSwtdTrvoA@mail.gmail.com>
+References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
+ <1418286387-9663-3-git-send-email-tfiga@chromium.org>
+ <CAPDyKFoBRxFh+BzHTakij6=NvLm0C-S8eX8+p2odpSwtdTrvoA@mail.gmail.com>
+Message-ID: <CAAFQd5CA374MF-_w=3zqsZctwTcBHz9J_0Ygg4fD_wjg8kLATg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2014 01:01 PM, Christoffer Dall wrote:
-> On Wed, Dec 10, 2014 at 01:45:50PM +0100, Eric Auger wrote:
->> On 12/09/2014 04:44 PM, Christoffer Dall wrote:
->>> Userspace assumes that it can wire up IRQ injections after having
->>> created all VCPUs and after having created the VGIC, but potentially
->>> before starting the first VCPU.  This can currently lead to lost IRQs
->>> because the state of that IRQ injection is not stored anywhere and we
->>> don't return an error to userspace.
->>>
->>> We haven't seen this problem manifest itself yet, 
->> Actually we did with VFIO signaling setup before VGIC init!
->> presumably because
-> 
-> well, not with code in mainline
-> 
->>> guests reset the devices on boot, but this could cause issues with
->>> migration and other non-standard startup configurations.
->>>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> ---
->>>  virt/kvm/arm/vgic.c | 9 +++++++--
->>>  1 file changed, 7 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->>> index c98cc6b..feef015 100644
->>> --- a/virt/kvm/arm/vgic.c
->>> +++ b/virt/kvm/arm/vgic.c
->>> @@ -1693,8 +1693,13 @@ out:
->>>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->>>  			bool level)
->>>  {
->>> -	if (likely(vgic_ready(kvm)) &&
->>> -	    vgic_update_irq_pending(kvm, cpuid, irq_num, level))
->>> +	if (unlikely(!vgic_initialized(kvm))) {
->>> +		mutex_lock(&kvm->lock);
->>> +		vgic_init(kvm);
->>> +		mutex_unlock(&kvm->lock);
->>> +	}
->> I was previously encouraged to test the virtual interrupt controller
->> readiness when setting irqfd up(proposal made in
->> https://lkml.org/lkml/2014/12/3/601). I guess this becomes useless now,
->> correct? Reviewed-by on the whole series.
+Hi Ulf,
+
+On Thu, Dec 11, 2014 at 8:58 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 11 December 2014 at 09:26, Tomasz Figa <tfiga@chromium.org> wrote:
+>> This patch modifies the rockchip-iommu driver to consider state of
+>> the power domain the IOMMU is located in. When the power domain
+>> is powered off, the IOMMU cannot be accessed and register programming
+>> must be deferred until the power domain becomes enabled.
+
+[snip]
+
+>> @@ -988,11 +1107,28 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>>                 return -ENXIO;
+>>         }
 >>
-> I think we should move to your userspace explicit init for all
-> non-legacy userspace and only support gicv3 and vfio/irqfd stuff with
-> userspace explicitly initializing the vgic.
+>> +       pm_runtime_no_callbacks(dev);
+>> +       pm_runtime_enable(dev);
+>> +
+>> +       /* Synchronize state of the domain with driver data. */
+>> +       pm_runtime_get_sync(dev);
+>> +       iommu->is_powered = true;
+>
+> Doesn't the runtime PM status reflect the value of "is_powered", thus
+> why do you need to have a copy of it? Could it perpahps be that you
+> try to cope with the case when CONFIG_PM is unset?
+>
 
-Hi Christoffer,
+It's worth noting that this driver fully relies on status of other
+devices in the power domain the IOMMU is in and does not enforce the
+status on its own. So in general, as far as my understanding of PM
+runtime subsystem, the status of the IOMMU device will be always
+suspended, because nobody will call pm_runtime_get() on it (except the
+get and put pair in probe). So is_powered is here to track status of
+the domain, not the device. Feel free to suggest a better way, though.
 
-The use case I have in mind still is VFIO+irqfd:
-since we cannot preclude the user from ignoring the userspace explicit
-init and setting up VFIO signaling+irqfd before vgic init, to me there
-is a risk injection starts even before creation. Either we test
-irqchip_in_kernel in kvm_vgic_inject_irq or we must have a test when
-setting up irqfd as proposed in above patch.
-
-Actually before being able to inject any virtual IRQ we weed even more:
-if virtual IRQ settings were not yet defined by the guest we do not know
-what to do with the IRQ. We must a least know whether it is level or
-edge. Current irq_cfg bitmap might be insufficient to store the info
-since it only has 2 states and by chance I use a level-sensitive IRQ and
-my QEMU pieces pay attention to that sequencing. I guess the problem is
-the same for user-space injection, isn't it?
-
-Eric
-
-> 
-> Thanks for the review!
-> 
-> -Christoffer
-> 
+Best regards,
+Tomasz
