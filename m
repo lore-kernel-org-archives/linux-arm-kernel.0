@@ -1,195 +1,72 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Thu, 11 Dec 2014 17:26:26 +0900
-Subject: [RFC PATCH 1/2] pm: Add PM domain notifications
-In-Reply-To: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
-References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
-Message-ID: <1418286387-9663-2-git-send-email-tfiga@chromium.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 11 Dec 2014 14:06:21 +0530
+Subject: [PATCH v5 1/5] phy: add a driver for the Rockchip SoC internal
+ USB2.0 PHY
+In-Reply-To: <54894B52.3060105@rock-chips.com>
+References: <1418208371-18851-1-git-send-email-lyz@rock-chips.com>
+ <1418208371-18851-2-git-send-email-lyz@rock-chips.com>
+ <5489338C.1030109@ti.com> <54894B52.3060105@rock-chips.com>
+Message-ID: <54895785.104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Hi,
 
-This patch adds notifiers to the runtime PM/genpd subsystem. It is now
-possible to register a notifier, which will be called before and after
-the generic power domain subsystem calls the power domain's power_on
-and power_off callbacks.
+On Thursday 11 December 2014 01:14 PM, Yunzhi Li wrote:
+> Hi Kishon:
+> 
+> On 2014/12/11 14:02, Kishon Vijay Abraham I wrote:
+>> Hi,
+>>
+>> On Wednesday 10 December 2014 04:16 PM, Yunzhi Li wrote:
+>>> This patch to add a generic PHY driver for ROCKCHIP usb PHYs,
+>>> currently this driver can support RK3288. The RK3288 SoC have
+>>> three independent USB PHY IPs which are all configured through a
+>>> set of registers located in the GRF (general register files)
+>>> module.
+>>>
+>>> Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
+>>>
+>>> +
+>>> +#define ROCKCHIP_RK3288_UOC(n)    (0x320 + n * 0x14)
+>>> +
+>>> +/*
+>>> + * The higher 16-bit of this register is used for write protection
+>>> + * only if BIT(13 + 16) set to 1 the BIT(13) can be written.
+>>> + */
+>>> +#define SIDDQ_MSK        BIT(13 + 16)
+>> I think here the "MSK" is misleading. it should be something that refers write
+>> protection?
+> So, #define SIDDQ_WRITE_ENA  BIT(29) , could be ok ?
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-[tfiga at chromium.org: rebased]
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
----
- Documentation/power/notifiers.txt | 14 +++++++++++
- drivers/base/power/domain.c       | 50 +++++++++++++++++++++++++++++++++++++++
- include/linux/pm_domain.h         | 20 ++++++++++++++++
- 3 files changed, 84 insertions(+)
+yeah. should be fine.
+>>> +#define SIDDQ_ON        BIT(13)
+>>> +#define SIDDQ_OFF        (0 << 13)
+>>> +
+>>> +struct rockchip_usb_phy {
+>>> +    struct regmap    *reg_base;
+>>> +    unsigned int    reg_offset;
+>>> +    struct clk    *clk;
+>>> +    struct phy    *phy;
+>>> +    unsigned    index;
+>>> +};
+>>> +
+>>> +struct rockchip_usb_phy_priv {
+>>> +    struct rockchip_usb_phy    *phys;
+>>> +    unsigned        nphys;
+>>> +};
+>>> +
+>>> +static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
+>>> +                       bool siddq)
+>>> +{
+>>> +    return regmap_write(phy->reg_base, phy->reg_offset,
+>>> +                SIDDQ_MSK | (siddq ? SIDDQ_ON : SIDDQ_OFF));
+>> Shouldn't we actually reset the bit for power off?
+> Sorry, which bit you refer to here  and why should it be reset? could you give
+> more infomation.
 
-diff --git a/Documentation/power/notifiers.txt b/Documentation/power/notifiers.txt
-index a81fa25..62303f6 100644
---- a/Documentation/power/notifiers.txt
-+++ b/Documentation/power/notifiers.txt
-@@ -53,3 +53,17 @@ NULL).  To register and/or unregister a suspend notifier use the functions
- register_pm_notifier() and unregister_pm_notifier(), respectively, defined in
- include/linux/suspend.h .  If you don't need to unregister the notifier, you can
- also use the pm_notifier() macro defined in include/linux/suspend.h .
-+
-+Power Domain notifiers
-+----------------------
-+
-+The power domain notifiers allow subsystems or drivers to register for power
-+domain on/off notifications, should they need to perform any actions right
-+before or right after the power domain on/off.  The device must be already
-+added to a power domain before its subsystem or driver registers the notifier.
-+Following events are supported:
-+
-+PM_GENPD_POWER_ON_PREPARE	The power domain is about to turn on.
-+PM_GENPD_POST_POWER_ON		The power domain has just turned on.
-+PM_GENPD_POWER_OFF_PREPARE	The power domain is about to turn off.
-+PM_GENPD_POST_POWER_OFF		The power domain has just turned off.
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 6a103a3..0d6f84e 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -68,6 +68,45 @@ static struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
- 	return genpd;
- }
- 
-+int pm_genpd_register_notifier(struct device *dev, struct notifier_block *nb)
-+{
-+	struct pm_domain_data *pdd;
-+	int ret = -EINVAL;
-+
-+	spin_lock_irq(&dev->power.lock);
-+	if (dev->power.subsys_data) {
-+		pdd = dev->power.subsys_data->domain_data;
-+		ret = blocking_notifier_chain_register(&pdd->notify_chain_head,
-+						       nb);
-+	}
-+	spin_unlock_irq(&dev->power.lock);
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(pm_genpd_register_notifier);
-+
-+void pm_genpd_unregister_notifier(struct device *dev, struct notifier_block *nb)
-+{
-+	struct pm_domain_data *pdd;
-+
-+	spin_lock_irq(&dev->power.lock);
-+	if (dev->power.subsys_data) {
-+		pdd = dev->power.subsys_data->domain_data;
-+		blocking_notifier_chain_unregister(&pdd->notify_chain_head, nb);
-+	}
-+	spin_unlock_irq(&dev->power.lock);
-+}
-+EXPORT_SYMBOL_GPL(pm_genpd_unregister_notifier);
-+
-+static void pm_genpd_notifier_call(unsigned long event,
-+				   struct generic_pm_domain *genpd)
-+{
-+	struct pm_domain_data *pdd;
-+
-+	list_for_each_entry(pdd, &genpd->dev_list, list_node)
-+		blocking_notifier_call_chain(&pdd->notify_chain_head,
-+					     event, pdd->dev);
-+}
-+
- struct generic_pm_domain *dev_to_genpd(struct device *dev)
- {
- 	if (IS_ERR_OR_NULL(dev->pm_domain))
-@@ -161,12 +200,17 @@ static int genpd_power_on(struct generic_pm_domain *genpd)
- 	if (!genpd->power_on)
- 		return 0;
- 
-+	pm_genpd_notifier_call(PM_GENPD_POWER_ON_PREPARE, genpd);
-+
- 	time_start = ktime_get();
- 	ret = genpd->power_on(genpd);
- 	if (ret)
- 		return ret;
- 
- 	elapsed_ns = ktime_to_ns(ktime_sub(ktime_get(), time_start));
-+
-+	pm_genpd_notifier_call(PM_GENPD_POST_POWER_ON, genpd);
-+
- 	if (elapsed_ns <= genpd->power_on_latency_ns)
- 		return ret;
- 
-@@ -188,12 +232,17 @@ static int genpd_power_off(struct generic_pm_domain *genpd)
- 	if (!genpd->power_off)
- 		return 0;
- 
-+	pm_genpd_notifier_call(PM_GENPD_POWER_OFF_PREPARE, genpd);
-+
- 	time_start = ktime_get();
- 	ret = genpd->power_off(genpd);
- 	if (ret == -EBUSY)
- 		return ret;
- 
- 	elapsed_ns = ktime_to_ns(ktime_sub(ktime_get(), time_start));
-+
-+	pm_genpd_notifier_call(PM_GENPD_POST_POWER_OFF, genpd);
-+
- 	if (elapsed_ns <= genpd->power_off_latency_ns)
- 		return ret;
- 
-@@ -1466,6 +1515,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
- 		genpd->attach_dev(genpd, dev);
- 
- 	mutex_lock(&gpd_data->lock);
-+	BLOCKING_INIT_NOTIFIER_HEAD(&gpd_data->base.notify_chain_head);
- 	gpd_data->base.dev = dev;
- 	list_add_tail(&gpd_data->base.list_node, &genpd->dev_list);
- 	gpd_data->need_restore = -1;
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 6cd20d5..356a145 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -20,6 +20,12 @@
- /* Defines used for the flags field in the struct generic_pm_domain */
- #define GENPD_FLAG_PM_CLK	(1U << 0) /* PM domain uses PM clk */
- 
-+/* PM domain state transition notifications */
-+#define PM_GENPD_POWER_ON_PREPARE	0x01
-+#define PM_GENPD_POST_POWER_ON		0x02
-+#define PM_GENPD_POWER_OFF_PREPARE	0x03
-+#define PM_GENPD_POST_POWER_OFF		0x04
-+
- enum gpd_status {
- 	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
- 	GPD_STATE_WAIT_MASTER,	/* PM domain's master is being waited for */
-@@ -107,6 +113,7 @@ struct gpd_timing_data {
- struct pm_domain_data {
- 	struct list_head list_node;
- 	struct device *dev;
-+	struct blocking_notifier_head notify_chain_head;
- };
- 
- struct generic_pm_domain_data {
-@@ -159,6 +166,11 @@ extern int pm_genpd_name_poweron(const char *domain_name);
- extern void pm_genpd_poweroff_unused(void);
- 
- extern struct dev_power_governor simple_qos_governor;
-+extern int pm_genpd_register_notifier(struct device *dev,
-+				      struct notifier_block *nb);
-+extern void pm_genpd_unregister_notifier(struct device *dev,
-+					struct notifier_block *nb);
-+
- extern struct dev_power_governor pm_domain_always_on_gov;
- #else
- 
-@@ -232,6 +244,14 @@ static inline int pm_genpd_name_poweron(const char *domain_name)
- 	return -ENOSYS;
- }
- static inline void pm_genpd_poweroff_unused(void) {}
-+static inline int pm_genpd_register_notifier(struct device *dev,
-+					struct notifier_block *nb)
-+{
-+	return -ENOSYS;
-+}
-+static inline void pm_genpd_unregister_notifier(struct device *dev,
-+					 struct notifier_block *nb) {}
-+
- #define simple_qos_governor NULL
- #define pm_domain_always_on_gov NULL
- #endif
--- 
-2.2.0.rc0.207.ga3a616c
+Never mind. Initially was thinking it might affect bits other than siddq but
+anyway you have write lock. So should be fine.
+
+Thanks
+Kishon
