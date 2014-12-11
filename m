@@ -1,52 +1,46 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 11 Dec 2014 11:49:54 +0100
-Subject: [RFC 04/15] regulator: add restrack support
-In-Reply-To: <20141210160720.GS11764@sirena.org.uk>
-References: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
- <1418226513-14105-5-git-send-email-a.hajda@samsung.com>
- <20141210160720.GS11764@sirena.org.uk>
-Message-ID: <548976D2.7080005@samsung.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Thu, 11 Dec 2014 20:04:25 +0900
+Subject: [RFC PATCH 1/2] pm: Add PM domain notifications
+In-Reply-To: <548973B7.3050107@samsung.com>
+References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
+ <1418286387-9663-2-git-send-email-tfiga@chromium.org>
+ <548973B7.3050107@samsung.com>
+Message-ID: <CAAFQd5DrzYRCF3tW7cg=rZ3wB1G2kQtWbCx+Pby9obNTewsFdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Sylwester,
 
-On 12/10/2014 05:07 PM, Mark Brown wrote:
-> On Wed, Dec 10, 2014 at 04:48:22PM +0100, Andrzej Hajda wrote:
->> Regulators supports various methods of lookup.
->> The patch adds restrack support only to DT based regulators.
-> Why, what does this mean and how might one use it?  I've not looked at
-> the code since I don't know what it's supposed to accomplish...
-
-Looking at this patch makes no sense without looking at cover letter
-or at the patch adding restrack framework. In short adding restrack support
-to regulators will allow to:
-- proper handle regulator provider unbind/re-bind, currently it results
-in oopses, crashes and hangs,
-- avoid late probe due to deferred probing, currently if probe is
-deferred, re-probe occurs in late initcall,
-- track appearance of resources which can alter behavior of the driver
-if present but they are not required,
-  I am not sure if there are use cases for it in case of regulators, but
-other resources have such use cases,
-- as a bonus we can have simpler allocation of various resources, please
-look at cover letter for example.
-
+On Thu, Dec 11, 2014 at 7:36 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
 >
-> One very high level thing is that anything that only works for DT only
-> seems to be a non-starter, the API should be hiding details of the
-> firmware interface.
+> Hi Tomasz,
+>
+> On 11/12/14 09:26, Tomasz Figa wrote:
+> > From: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> >
+> > This patch adds notifiers to the runtime PM/genpd subsystem. It is now
+> > possible to register a notifier, which will be called before and after
+> > the generic power domain subsystem calls the power domain's power_on
+> > and power_off callbacks.
+> >
+> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > [tfiga at chromium.org: rebased]
+> > Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+>
+> Not sure if you've noticed it, I posted an updated version of this patch
+> recently [1]. The notifiers list is moved to struct generic_pm_domain
+> there and it also allows to register a notifier for selected power domain
+> by name.
+[snip]
+> [1] http://www.spinics.net/lists/linux-samsung-soc/msg38549.html
 
-I agree, but as this is RFC, not everything is finished. It seems I have
-forgotten to mention it clearly in cover
-letter.
-Anyway it seems I should adjust patchset and move matching code from
-restrack/track core to specific frameworks.
-This way any current or future lookup method should be supported.
+Ah, haven't noticed, sorry. The API using devices looks the same, so I
+guess we can simply have patch 2/2 of this series applied on top of
+your patch.
 
-But the main purpose of this patchset is to get opinions, if the main
-ideas are OK. And if the patchset can be
-eventually accepted.
+By the way, look-up by name (presumably hardcoded somewhere?) sounds a
+bit strange to me. What was the reason for it to be added?
 
-Regards
-Andrzej
+Best regards,
+Tomasz
