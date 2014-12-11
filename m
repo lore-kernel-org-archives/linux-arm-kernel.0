@@ -1,47 +1,51 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 11 Dec 2014 10:41:38 -0800
-Subject: [PATCH v6 1/5] phy: add a driver for the Rockchip SoC internal
- USB2.0 PHY
-In-Reply-To: <548971AF.1020506@ti.com>
-References: <1418291722-25448-1-git-send-email-lyz@rock-chips.com>
- <1418291722-25448-2-git-send-email-lyz@rock-chips.com>
- <548971AF.1020506@ti.com>
-Message-ID: <CAD=FV=XTYmzxvteNip2gtuDSSEWph-vY=BOPejHa1Z5KS2Kf6Q@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 11 Dec 2014 18:03:04 +0100
+Subject: [PATCH v5 00/61] dmaengine: Implement generic slave capabilities
+ retrieval
+In-Reply-To: <54861D04.8000102@metafoo.de>
+References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141208061746.GD16827@intel.com> <20141208141807.GC8739@lukather>
+ <20141208162843.GP16827@intel.com> <20141208183853.GG8739@lukather>
+ <54861D04.8000102@metafoo.de>
+Message-ID: <20141211170304.GG8739@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kishon,
+On Mon, Dec 08, 2014 at 10:49:56PM +0100, Lars-Peter Clausen wrote:
+> On 12/08/2014 07:38 PM, Maxime Ripard wrote:
+> [...]
+> >>And lastly noone blamed you for being late, if things were rosy they
+> >>would have been merged over the weekend and been in today's next,
+> >>but...
+> >
+> >I totally understand your point. And I actually am a bit uncomfortable
+> >merging this so late too, and I'd actually prefer to have it merged
+> >for 3.20. But this is a huge patchset, and I'd really like to avoid
+> >rebasing it forever.
+> 
+> We don't have to pull in the whole series at once. I think everybody agrees
+> that the approach is the right one, so the first couple of patches that work
+> on the framework should be good to go in. Same goes for the drivers that
+> have been acked and tested.
 
-On Thu, Dec 11, 2014 at 2:27 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> I didn't mean that. You can get rid of this entire xlate stuff if you use
-> something like below
->
-> phy at xxx {
->         compatible = "";
->         phy1:usb_phy {
->         }
->         phy2:usb_phy {
->         };
-> };
->
->
-> usb at xx {
->         compatible = "";
->         phys = <&phy1>; //doesn't need xlate
->         /* this needs xlate
->            phys = <&phy 1>;
->         */
->         phy-names = "phy";
-> };
+I'm a bit skeptical that it is the right approach. These patches have
+been here for monthes, and even you failed to ack and test these
+patches on the drivers you wrote. As a matter of fact, only Laurent,
+Linus, Ludovic and Stephen looked at their respective changes. After 3
+monthes and 6 versions.
 
-Is the syntax you proposed really better?  Are you saying that you
-advocate never using "#phy-cells" other than 0 for new bindings?  Is
-that your own personal preference, or is there a discussion somewhere
-where everyone agreed on this?
+At some point, cleanups have to come in.
 
-My vote is that since "phy-cells" exists and is part of the generic
-phy bindings that it's meant to be used whenever you have a single PHY
-driver that controls multiple PHYs.
+Maxime
 
-
--Doug
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141211/08971499/attachment.sig>
