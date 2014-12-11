@@ -1,77 +1,96 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Dec 2014 18:25:50 +0000
-Subject: [PATCH 1/5] arm/arm64: KVM: vgic: move reset initialization into
- vgic_init_maps()
-In-Reply-To: <20141211114810.GC28388@cbox>
+Date: Thu, 11 Dec 2014 18:26:23 +0000
+Subject: [PATCH 2/5] arm/arm64: KVM: Rename vgic_initialized to vgic_ready
+In-Reply-To: <1418139844-27892-3-git-send-email-christoffer.dall@linaro.org>
 References: <1418139844-27892-1-git-send-email-christoffer.dall@linaro.org>
- <1418139844-27892-2-git-send-email-christoffer.dall@linaro.org>
- <54881C5D.7060203@linaro.org> <20141211114810.GC28388@cbox>
-Message-ID: <5489E1AE.4010209@arm.com>
+ <1418139844-27892-3-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <5489E1CF.3030909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/14 11:48, Christoffer Dall wrote:
-> On Wed, Dec 10, 2014 at 11:11:41AM +0100, Eric Auger wrote:
->> Hi Christoffer,
->> Reviewed-by: Eric Auger <eric.auger@linaro.org>
->> see few comments below.
->> On 12/09/2014 04:44 PM, Christoffer Dall wrote:
->>> From: Peter Maydell <peter.maydell@linaro.org>
->>>
->>> VGIC initialization currently happens in three phases:
->>>  (1) kvm_vgic_create() (triggered by userspace GIC creation)
->>>  (2) vgic_init_maps() (triggered by userspace GIC register read/write
->>>      requests, or from kvm_vgic_init() if not already run)
->>>  (3) kvm_vgic_init() (triggered by first VM run)
->>>
->>> We were doing initialization of some state to correspond with the
->>> state of a freshly-reset GIC in kvm_vgic_init(); this is too late,
->>> since it will overwrite changes made by userspace using the
->>> register access APIs before the VM is run. Move this initialization
->>> earlier, into the vgic_init_maps() phase.
->>>
->>> This fixes a bug where QEMU could successfully restore a saved
->>> VM state snapshot into a VM that had already been run, but could
->>> not restore it "from cold" using the -loadvm command line option
->>> (the symptoms being that the restored VM would run but interrupts
->>> were ignored).
->>>
->>> Finally rename vgic_init_maps to vgic_init and renamed kvm_vgic_init to
->>> kvm_vgic_map_resources.
->>>
->>>   [ This patch is originally written by Peter Maydell, but I have
->>>     modified it somewhat heavily, renaming various bits and moving code
->>>     around.  If something is broken, I am to be blamed. - Christoffer ]
->>>
->>> Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> ---
->>> This patch was originally named "vgic: move reset initialization into
->>> vgic_init_maps()" but I renamed it slightly to match the other vgic
->>> patches in the kernel.  I also did the additional changes since the
->>> original patch:
->>>  - Renamed kvm_vgic_init to kvm_vgic_map_resources
->>>  - Renamed vgic_init_maps to vgic_init
->>>  - Moved vgic_enable call into existing vcpu loop in vgic_init
->>>  - Moved ITARGETSRn initializtion above vcpu loop in vgic_init (the idea
->> typo
->>>    is to init global state first, then vcpu state).
->>
->> kvm_vgic_vcpu_init also has disappeared and PPI settings of
->> dist->irq_enabled and dist->irq_cfg now are in former vgic_init_maps.
->>
->> Maybe it would be simpler to review if there were 2 patches: one for
->> init redistribution from kvm_vgic_init to vgic_init_maps and one for the
->> renaming.
+On 09/12/14 15:44, Christoffer Dall wrote:
+> The vgic_initialized() macro currently returns the state of the
+> vgic->ready flag, which indicates if the vgic is ready to be used when
+> running a VM, not specifically if its internal state has been
+> initialized.
 > 
-> Maybe, but if you apply this patch and review it that way, it becomes
-> much easier.  I'd really like to get this in soon, so given you already
-> gave me your reviewed-by, I'm going to wait and see what Marc says and
-> only respin if he finds it necessary.
-
-No, I think this is fine as it is. This is a good cleanup, and it seems
-to simplify the whole thing (and yes, we could do with simplicity in
-this file...).
+> Rename the macro accordingly in preparation for a more nuanced
+> initialization flow.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/kvm/arm.c     | 2 +-
+>  include/kvm/arm_vgic.h | 4 ++--
+>  virt/kvm/arm/vgic.c    | 6 +++---
+>  3 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index a56cbb5..a9d005f 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -430,7 +430,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+>  	 * Map the VGIC hardware resources before running a vcpu the first
+>  	 * time on this VM.
+>  	 */
+> -	if (unlikely(!vgic_initialized(vcpu->kvm))) {
+> +	if (unlikely(!vgic_ready(vcpu->kvm))) {
+>  		ret = kvm_vgic_map_resources(vcpu->kvm);
+>  		if (ret)
+>  			return ret;
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index fe9783b..3e262b9 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -287,7 +287,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  		      struct kvm_exit_mmio *mmio);
+>  
+>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+> -#define vgic_initialized(k)	((k)->arch.vgic.ready)
+> +#define vgic_ready(k)		((k)->arch.vgic.ready)
+>  
+>  int vgic_v2_probe(struct device_node *vgic_node,
+>  		  const struct vgic_ops **ops,
+> @@ -369,7 +369,7 @@ static inline int irqchip_in_kernel(struct kvm *kvm)
+>  	return 0;
+>  }
+>  
+> -static inline bool vgic_initialized(struct kvm *kvm)
+> +static inline bool vgic_ready(struct kvm *kvm)
+>  {
+>  	return true;
+>  }
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 91e6bfc..6293349 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1693,7 +1693,7 @@ out:
+>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+>  			bool level)
+>  {
+> -	if (likely(vgic_initialized(kvm)) &&
+> +	if (likely(vgic_ready(kvm)) &&
+>  	    vgic_update_irq_pending(kvm, cpuid, irq_num, level))
+>  		vgic_kick_vcpus(kvm);
+>  
+> @@ -1882,7 +1882,7 @@ int kvm_vgic_map_resources(struct kvm *kvm)
+>  
+>  	mutex_lock(&kvm->lock);
+>  
+> -	if (vgic_initialized(kvm))
+> +	if (vgic_ready(kvm))
+>  		goto out;
+>  
+>  	if (IS_VGIC_ADDR_UNDEF(kvm->arch.vgic.vgic_dist_base) ||
+> @@ -2276,7 +2276,7 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+>  
+>  		mutex_lock(&dev->kvm->lock);
+>  
+> -		if (vgic_initialized(dev->kvm) || dev->kvm->arch.vgic.nr_irqs)
+> +		if (vgic_ready(dev->kvm) || dev->kvm->arch.vgic.nr_irqs)
+>  			ret = -EBUSY;
+>  		else
+>  			dev->kvm->arch.vgic.nr_irqs = val;
+> 
 
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
