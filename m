@@ -1,66 +1,194 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Thu, 11 Dec 2014 13:50:00 +0800
-Subject: [PATCH RFC 04/15] drm/dsi: Do not add DSI devices for the child
- nodes with input-port property
-In-Reply-To: <548906FD.5070009@freescale.com>
-References: <1418200648-32656-1-git-send-email-Ying.Liu@freescale.com>
- <1418200648-32656-5-git-send-email-Ying.Liu@freescale.com>
- <20141210122105.GC23558@ulmo.nvidia.com> <548906FD.5070009@freescale.com>
-Message-ID: <54893088.4000203@freescale.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 11 Dec 2014 11:32:52 +0530
+Subject: [PATCH v5 1/5] phy: add a driver for the Rockchip SoC internal
+ USB2.0 PHY
+In-Reply-To: <1418208371-18851-2-git-send-email-lyz@rock-chips.com>
+References: <1418208371-18851-1-git-send-email-lyz@rock-chips.com>
+ <1418208371-18851-2-git-send-email-lyz@rock-chips.com>
+Message-ID: <5489338C.1030109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+Hi,
 
-On 12/11/2014 10:52 AM, Liu Ying wrote:
-> Hi Thierry,
->
-> On 12/10/2014 08:21 PM, Thierry Reding wrote:
->> On Wed, Dec 10, 2014 at 04:37:17PM +0800, Liu Ying wrote:
->>> The MIPI DSI bus driver would try to add a DSI device for a host's every
->>> child node which contains the reg property.  Unfortunately, the existing
->>> i.MX6Q/SDL MIPI DSI host device tree node's child nodes contain the reg
->>
->> There aren't any existing nodes for the DSI host on i.MX. This patch
->> series adds support for them.
->
-> There are existing nodes for the DSI host node. Please find them in
-> arch/arm/boot/dts/imx6qdl.dtsi and arch/arm/boot/dts/imx6q.dts. The DSI
-> host node contains two child nodes for i.MX6DL and another two for
-> i.MX6Q.  Each child node has a reg property embedded.
->
->>
->>> property, but the child nodes are ports pointing to dedicated CRTCs.
->>> So, this patch phases out the child nodes with input-port property
->>> before
->>> adding DSI devices for them and updates the MIPI DSI bus OF binding
->>> documentation.
->>>
->>> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
->>> ---
->>>   Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt | 4 ++++
->>>   drivers/gpu/drm/drm_mipi_dsi.c                              | 5 +++--
->>>   2 files changed, 7 insertions(+), 2 deletions(-)
->>
->> Sorry, but NAK. There's no need for this special-case. I'll go into more
->> detail in response to patch 09/15.
->
-> Thanks for reviewing the patches.
->
-> Any idea how to handle the special case?  The existing child nodes for
-> the DSI host node do have the reg properties embedded.
->
+On Wednesday 10 December 2014 04:16 PM, Yunzhi Li wrote:
+> This patch to add a generic PHY driver for ROCKCHIP usb PHYs,
+> currently this driver can support RK3288. The RK3288 SoC have
+> three independent USB PHY IPs which are all configured through a
+> set of registers located in the GRF (general register files)
+> module.
+> 
+> Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
+> 
+> ---
+> 
+> Changes in v5: None
+> Changes in v4:
+> - Get number of PHYs from device tree.
+> - Model each PHY as subnode of the phy provider node.
+> 
+> Changes in v3:
+> - Use BIT macro instead of bit shift ops.
+> - Rename the config entry to PHY_ROCKCHIP_USB.
+> 
+>  drivers/phy/Kconfig            |   7 ++
+>  drivers/phy/Makefile           |   1 +
+>  drivers/phy/phy-rockchip-usb.c | 211 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 219 insertions(+)
+>  create mode 100644 drivers/phy/phy-rockchip-usb.c
+> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index ccad880..8a39d2a 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -239,6 +239,13 @@ config PHY_QCOM_IPQ806X_SATA
+>  	depends on OF
+>  	select GENERIC_PHY
+>  
+> +config PHY_ROCKCHIP_USB2
+> +	tristate "Rockchip USB2 PHY Driver"
+> +	depends on ARCH_ROCKCHIP && OF
+> +	select GENERIC_PHY
+> +	help
+> +	  Enable this to support the Rockchip USB 2.0 PHY.
+> +
+>  config PHY_ST_SPEAR1310_MIPHY
+>  	tristate "ST SPEAR1310-MIPHY driver"
+>  	select GENERIC_PHY
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index aa74f96..8a13f72 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -28,6 +28,7 @@ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
+>  phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)	+= phy-s5pv210-usb2.o
+>  obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
+>  obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)	+= phy-qcom-apq8064-sata.o
+> +obj-$(CONFIG_PHY_ROCKCHIP_USB2) += phy-rockchip-usb.o
+>  obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
+>  obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
+>  obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
+> diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
+> new file mode 100644
+> index 0000000..0317c21
+> --- /dev/null
+> +++ b/drivers/phy/phy-rockchip-usb.c
+> @@ -0,0 +1,211 @@
+> +/*
+> + * Rockchip usb PHY driver
+> + *
+> + * Copyright (C) 2014 Yunzhi Li <lyz@rock-chips.com>
+> + * Copyright (C) 2014 ROCKCHIP, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/mutex.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/reset.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+> +
+> +#define ROCKCHIP_RK3288_UOC(n)	(0x320 + n * 0x14)
+> +
+> +/*
+> + * The higher 16-bit of this register is used for write protection
+> + * only if BIT(13 + 16) set to 1 the BIT(13) can be written.
+> + */
+> +#define SIDDQ_MSK		BIT(13 + 16)
 
-I see your suggestions on this topic in the comments for patch 09/15.
-I will try to move the existing child nodes into a parent port node.
+I think here the "MSK" is misleading. it should be something that refers write
+protection?
 
-Liu Ying
+> +#define SIDDQ_ON		BIT(13)
+> +#define SIDDQ_OFF		(0 << 13)
+> +
+> +struct rockchip_usb_phy {
+> +	struct regmap	*reg_base;
+> +	unsigned int	reg_offset;
+> +	struct clk	*clk;
+> +	struct phy	*phy;
+> +	unsigned	index;
+> +};
+> +
+> +struct rockchip_usb_phy_priv {
+> +	struct rockchip_usb_phy	*phys;
+> +	unsigned		nphys;
+> +};
+> +
+> +static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
+> +					   bool siddq)
+> +{
+> +	return regmap_write(phy->reg_base, phy->reg_offset,
+> +			    SIDDQ_MSK | (siddq ? SIDDQ_ON : SIDDQ_OFF));
 
->
->>
->> Thierry
->>
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+Shouldn't we actually reset the bit for power off?
+> +}
+> +
+> +static int rockchip_usb_phy_power_off(struct phy *_phy)
+> +{
+> +	struct rockchip_usb_phy *phy = phy_get_drvdata(_phy);
+> +	int ret = 0;
+> +
+> +	/* Power down usb phy analog blocks by set siddq 1 */
+> +	ret = rockchip_usb_phy_power(phy, 1);
+> +	if (ret)
+> +		return ret;
+> +
+> +	clk_disable_unprepare(phy->clk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return 0;
+> +}
+> +
+> +static int rockchip_usb_phy_power_on(struct phy *_phy)
+> +{
+> +	struct rockchip_usb_phy *phy = phy_get_drvdata(_phy);
+> +	int ret = 0;
+> +
+> +	ret = clk_prepare_enable(phy->clk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Power up usb phy analog blocks by set siddq 0 */
+> +	ret = rockchip_usb_phy_power(phy, 0);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return 0;
+> +}
+> +
+> +static struct phy *rockchip_usb_phy_xlate(struct device *dev,
+> +					struct of_phandle_args *args)
+> +{
+> +	struct rockchip_usb_phy_priv *priv = dev_get_drvdata(dev);
+> +	int i;
+> +
+> +	if (WARN_ON(args->args[0] >= priv->nphys))
+> +		return ERR_PTR(-ENODEV);
+> +
+> +	for (i = 0; i < priv->nphys; i++) {
+> +		if (priv->phys[i].index == args->args[0])
+> +			break;
+
+using the type of PHY instead of index might look better.
+However this shouldn't be needed at all if the phandle refers to the sub-node
+of the phy provider.
+
+Thanks
+Kishon
