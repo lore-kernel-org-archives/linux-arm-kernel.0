@@ -1,27 +1,42 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Thu, 11 Dec 2014 11:42:27 +0530
-Subject: [PATCH] dmaengine: pl330: Set residue in tx_status callback
-In-Reply-To: <20141211044758.GH16827@intel.com>
-References: <1416995095-13763-1-git-send-email-padma.v@samsung.com>
- <CAAgF-BfpU72KTJjVd8jWStD8yJ5sSmXOiQm77xQunO2QhC9ExQ@mail.gmail.com>
- <547DF61D.3010909@metafoo.de>
- <CAAgF-BfPyaOhhrA5L8vm2WDnhBYDexJFkGxqL1GsL2TMB8z=Rw@mail.gmail.com>
- <CAJe_Zhd2-vBgAoJsBt7JCOYDuTZrBCScSZ1HaNO3gNTZ-P6A9A@mail.gmail.com>
- <20141205151843.GV11285@n2100.arm.linux.org.uk>
- <CAJe_ZhfDsfehCXHB6pCuQ6672kXBYFxh687cZT1qaSCOyLy76g@mail.gmail.com>
- <20141208130727.GK16827@intel.com>
- <CAJe_ZhfKFdrV8=oMiH0hJeOmGAmPNbZ7rUXsqN+Ak7PvOnZEmA@mail.gmail.com>
- <20141211044758.GH16827@intel.com>
-Message-ID: <CAJe_ZhdeTp3RAm-QQu04XVF-oOppV2zx8_7G7MOTF+ziqzbvCQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 11 Dec 2014 11:57:47 +0530
+Subject: [PATCH v5 1/5] phy: add a driver for the Rockchip SoC internal
+ USB2.0 PHY
+In-Reply-To: <1418278322.18092.30.camel@perches.com>
+References: <1418208371-18851-1-git-send-email-lyz@rock-chips.com>	
+ <1418208371-18851-2-git-send-email-lyz@rock-chips.com>	
+ <5489338C.1030109@ti.com> <1418278322.18092.30.camel@perches.com>
+Message-ID: <54893963.7060304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 December 2014 at 10:17, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Tue, Dec 09, 2014 at 08:48:04PM +0530, Jassi Brar wrote:
->> As Russell pointed out, that ain't the case either.
->> So we are yet to figure out benefits of having explicit
->> issue_pending() after tx_submit().
-> callback ?
->
-The callback is set after prep() and before tx_submit(), but here we
-talk after tx_submit().
+Hi,
+
+On Thursday 11 December 2014 11:42 AM, Joe Perches wrote:
+> On Thu, 2014-12-11 at 11:32 +0530, Kishon Vijay Abraham I wrote:
+>> On Wednesday 10 December 2014 04:16 PM, Yunzhi Li wrote:
+>>> diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
+> []
+>>> +/*
+>>> + * The higher 16-bit of this register is used for write protection
+>>> + * only if BIT(13 + 16) set to 1 the BIT(13) can be written.
+>>> + */
+>>> +#define SIDDQ_MSK		BIT(13 + 16)
+> 
+> huh?
+> 
+> This #define looks _very_ odd.
+> 
+> Is this supposed to be a single bit 29 or
+> some range?
+
+>From what I understood, the most significant 16 bits are write locks to the
+least significant 16 bits.
+
+So If I have to write something on bit 0, I have to set bit 16.
+If I have to write something on bit 1, I have to set bit 17.
+If I have to write something on bit 2, I have to set bit 18.
+and so on.
+
+Thanks
+Kishon
