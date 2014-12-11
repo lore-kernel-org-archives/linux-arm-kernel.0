@@ -1,30 +1,36 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 11 Dec 2014 08:09:13 -0800
-Subject: [PATCH 1/4] regulator: core: Support trying to get close to a
- certain voltage
-In-Reply-To: <20141211123106.GU11764@sirena.org.uk>
-References: <1418245085-9754-1-git-send-email-dianders@chromium.org>
- <20141210235347.GT11764@sirena.org.uk>
- <CAHNYxRy2t0OVj-+CqQFOfj0zWAGG0j8rmd8SxdNWgBMA2iAfXQ@mail.gmail.com>
- <20141211123106.GU11764@sirena.org.uk>
-Message-ID: <CAD=FV=U4RFYx9NXOACrXJZK2bKkosyYnmTZRHkXuaSz-FS9kNQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 11 Dec 2014 17:33:44 +0100
+Subject: [PATCH 0/2] i2c: i2c-mv64xxx: fix offload support
+Message-ID: <1418315626-9552-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+Wolfram,
 
-On Thu, Dec 11, 2014 at 4:31 AM, Mark Brown <broonie@kernel.org> wrote:
-> This is just an implementation detail, everything you're saying here
-> applies equally to any user specifying by tolerance rather than range.
-> If the reason for doing this is to fix that problem then a new API isn't
-> the way to go about it.
+Please consider this set of two patches (one cleanup and one fix) that
+aim at making the i2c-mv64xxx offload support work properly for SMBus
+type transfers and make sure it only gets used for transactions where
+it can really be used (in order to comply with the expectations of the
+I2C subsystem in terms of repeated start usage between messages of the
+same xfer).
 
-OK, I'll give a shot at taking my code and using it as a new
-implementation for regulator_set_voltage_tol().  In the SD card code
-I'll pick some reasonable tolerances--they won't be exactly what the
-spec says, but they ought to be good enough.  If Ulf comes back and
-yells at me then we can revisit adding a new API.
+Without this patch, a platform like the Armada XP WRT1900AC doesn't
+even boot completely, because an I2C LED controller driver triggers
+some SMBus transfers that are do not work with the current i2c-mv64xxx
+driver.
 
-Thanks!
+They apply on top of 3.18.
 
--Doug
+Thanks,
+
+Thomas
+
+Thomas Petazzoni (2):
+  i2c: i2c-mv64xxx: use BIT() macro for register value definitions
+  i2c: i2c-mv64xxx: rework offload support to fix several problems
+
+ drivers/i2c/busses/i2c-mv64xxx.c | 325 +++++++++++++++++++++++----------------
+ 1 file changed, 194 insertions(+), 131 deletions(-)
+
+-- 
+2.1.0
