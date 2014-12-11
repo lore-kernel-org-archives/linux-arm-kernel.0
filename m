@@ -1,59 +1,61 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 11 Dec 2014 15:35:35 +0800
-Subject: [v3][PATCH 1/5] media: soc-camera: use icd->control instead of
- icd->pdev for reset()
-In-Reply-To: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
-References: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1418283339-16281-2-git-send-email-josh.wu@atmel.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 11 Dec 2014 15:31:09 +0800
+Subject: [PATCH] ARM: at91: board-dt-sama5: add phy_fixup to override
+ NAND_Tree which improperly strapp-in during the reset period.
+Message-ID: <1418283069-5648-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-icd->control is the sub device dev, i.e. i2c device.
-icd->pdev is the soc camera device's device.
+Appearance: On some SAMA5D4EK boards, after power up, the Eth1 doesn't work.
 
-To be consitent with power() function, we will call reset() with
-icd->control as well.
+Reason: The PIOE2 pin is connected to the NAND_Tree# of KSZ8081,
+But it outputs LOW during the reset period, which cause the NAND_Tree# enabled.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Add phy_fixup() to disable NAND_Tree by overriding the Operation
+Mode Strap Override register(i.e. Register 16h) to clear the NAND_Tree bit.
+
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
-v2->v3:
-  1. check whether icd->control is NULL or not.
+ arch/arm/mach-at91/board-dt-sama5.c |   18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
- drivers/media/platform/soc_camera/soc_camera.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/media/platform/soc_camera/soc_camera.c b/drivers/media/platform/soc_camera/soc_camera.c
-index f4be2a1..7e6b914 100644
---- a/drivers/media/platform/soc_camera/soc_camera.c
-+++ b/drivers/media/platform/soc_camera/soc_camera.c
-@@ -688,7 +688,8 @@ static int soc_camera_open(struct file *file)
+diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+index 8fb9ef5..97f7367 100644
+--- a/arch/arm/mach-at91/board-dt-sama5.c
++++ b/arch/arm/mach-at91/board-dt-sama5.c
+@@ -17,6 +17,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/phy.h>
+ #include <linux/clk-provider.h>
++#include <linux/phy.h>
  
- 		/* The camera could have been already on, try to reset */
- 		if (sdesc->subdev_desc.reset)
--			sdesc->subdev_desc.reset(icd->pdev);
-+			if (icd->control)
-+				sdesc->subdev_desc.reset(icd->control);
+ #include <asm/setup.h>
+ #include <asm/irq.h>
+@@ -26,8 +27,25 @@
  
- 		ret = soc_camera_add_device(icd);
- 		if (ret < 0) {
-@@ -1175,7 +1176,8 @@ static void scan_add_host(struct soc_camera_host *ici)
+ #include "generic.h"
  
- 			/* The camera could have been already on, try to reset */
- 			if (ssdd->reset)
--				ssdd->reset(icd->pdev);
-+				if (icd->control)
-+					ssdd->reset(icd->control);
++static int ksz8081_phy_fixup(struct phy_device *phy)
++{
++	int value;
++
++	value = phy_read(phy, 0x16);
++	value &= ~0x20;
++	phy_write(phy, 0x16, value);
++
++	return 0;
++}
++
+ static void __init sama5_dt_device_init(void)
+ {
++	if (of_machine_is_compatible("atmel,sama5d4ek") &&
++	   IS_ENABLED(CONFIG_PHYLIB)) {
++		phy_register_fixup_for_id("fc028000.etherne:00",
++						ksz8081_phy_fixup);
++	}
++
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
  
- 			icd->parent = ici->v4l2_dev.dev;
- 
-@@ -1461,7 +1463,7 @@ static int soc_camera_async_bound(struct v4l2_async_notifier *notifier,
- 				memcpy(&sdesc->subdev_desc, ssdd,
- 				       sizeof(sdesc->subdev_desc));
- 				if (ssdd->reset)
--					ssdd->reset(icd->pdev);
-+					ssdd->reset(&client->dev);
- 			}
- 
- 			icd->control = &client->dev;
 -- 
-1.9.1
+1.7.9.5
