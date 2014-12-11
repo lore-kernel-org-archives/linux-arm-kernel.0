@@ -1,195 +1,260 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Thu, 11 Dec 2014 14:36:54 -0800
-Subject: [RFC 0/2] Qualcomm RPM sleep states
-In-Reply-To: <20141209202820.GK11764@sirena.org.uk>
-References: <20141127190233.GF7712@sirena.org.uk>
- <CAJAp7OgBepNL6j4D6_MvXJ5PTRDUFNt6paskkP=q=h8W_YNP_Q@mail.gmail.com>
- <20141128201613.GB7712@sirena.org.uk>
- <5480CEEF.7000906@codeaurora.org>
- <20141208180635.GB3268@sonymobile.com>
- <20141208193935.GD11764@sirena.org.uk>
- <20141208205502.GC3268@sonymobile.com>
- <20141209181652.GG11764@sirena.org.uk>
- <20141209192517.GD3268@sonymobile.com>
- <20141209202820.GK11764@sirena.org.uk>
-Message-ID: <20141211223653.GE3268@sonymobile.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 11 Dec 2014 15:00:36 -0800
+Subject: [PATCH v2] i2c: rk3x: Account for repeated start time requirement
+Message-ID: <1418338836-21838-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 09 Dec 12:28 PST 2014, Mark Brown wrote:
+On Rockchip I2C the controller drops SDA low in the repeated start
+condition at half the SCL high time.
 
-> On Tue, Dec 09, 2014 at 11:25:18AM -0800, Bjorn Andersson wrote:
-> > On Tue 09 Dec 10:16 PST 2014, Mark Brown wrote:
-> 
-> > > I think having an idle state (or possibly just using the suspend state,
-> > > I'm still foggy if the two states are actually different) seems to make
-> > > sense?
-> 
-> > In 8974 we have LDO12 that have the following consumers:
-> >  csi
-> >  dsi
-> >  hdmi
-> >  edp
-> >  modem pll
-> >  pronto pll (wifi/bt)
-> >  krait-clock
-> 
-> > Each of these drivers will have a regulator object, upon which they can make
-> > requests on.
-> 
-> > The drivers for csi to pronto does not care about the state of the cpu - we
-> > want to output pixels even if the cpu is idle - so their requests (on their
-> > regulator *) must be aggregated towards the active state as well as the idle
-> > state.
-> 
-> Are they actually twiddling anything except enable, and I'm not sure
-> that this answers my question about suspend state either?
-> 
+If we want to meet timing requirements, that means we need to hold SCL
+high for (4.7us * 2) when we're sending a repeated start (.6us * 2 for
+Fast-mode).  That lets us achieve minimum tSU;STA.  However, we don't
+want to always hold SCL high for that long because we'd never be able
+to make 100kHz or 400kHz speeds.
 
-Yes, for the switch-mode regulators there's different enable state, voltage and
-mode.
+Let's fix this by doing our clock calculations twice: once taking the
+above into account and once running at normal speeds.  We'll use the
+slower speed when sending the start bit and the normal speed
+otherwise.
 
-> > The krait-clock should not affect the idle state.
-> 
-> > So the idle state enable property should be aggregated from csi to pronto
-> > enable properties. I.e. if they are all off, then the idle state should be off,
-> > otherwise it's on.
-> 
-> OK, so this is pointing back to the idea that we just want a way to
-> knock out this one consumer from the constraints when it's going idle
-> (you mention later on that other regulators need parameters other than
-> the enable changing).  Now, I seem to recall that the reason that this
-> is a problem is that you want to use this state changing stuff to
-> accelerate that transition.  This seems like something other regulators
-> can do which we don't really take advantage of yet except in that some
-> regualtors remember previous settings for voltage and can switch to them
-> quickly.
-> 
+Note: we really only need the conservative timing when sending
+_repeated_ starts, not when sending the first start.  We don't account
+for this so technically the first start bit will be longer too.
+...well, except in the case when we use the combined write/read
+optimization which doesn't use the same code.
 
-Correct, the problem here is twofold in my eyes;
+As part of this change we needed to account for the SDA falling time.
+The specification indicates that this should be the same, but we'll
+follow Designware and add a binding.  Note that we deviate from
+Designware and assign the default SDA falling time to be the same as
+the SCL falling time, which is incredibly likely.
 
-At the point then the consumer decides that it does not need the regulator
-it's in atomic context. So the regulator core and driver would need to handle
-this. Further more the regulator driver uses a packet-based protocol over a
-shared memory channel, so this entire path would have to be invoked in atomic
-context.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+Note: This is based on Addy's patch (i2c: rk3x: fix bug that cause
+measured high_ns doesn't meet I2C specification) that can be found at
+<https://patchwork.kernel.org/patch/5475331/>.
 
-We have to put the consumer into a state where we can "release" the regulator,
-then we need to tell the RPM to update the state of the regulator and we have
-to wait for the ack to come back before we can actually go idle.
+Changes in v2:
+- Also multiply SCL rise time by 2 for repeated start calculation
 
-> What this is *now* sounding like is that we need a way to say that this
-> one consumer is magic and we want to essentially tell the hardware about
-> settings with and without that consumer then the hardware will magically
-> switch between the two when the consumer is enabled and disabled.  Does
-> that sound about right?
-> 
+ Documentation/devicetree/bindings/i2c/i2c-rk3x.txt |  7 +-
+ drivers/i2c/busses/i2c-rk3x.c                      | 89 +++++++++++++++++-----
+ 2 files changed, 73 insertions(+), 23 deletions(-)
 
-I think it sounds spot on.
-
-> > The switch-mode regulators also needs to aggregate voltage and mode - from a
-> > subset of the regulator objects/consumers.
-> 
-> We don't have any support at all for aggregating mode except via current
-> estimation which is unused and I'd be surprised if that works
-> usefully...
-> 
-
-Let's treat that as a separate topic.
-
-> > > We already have an API for the suspend state, we just don't enable its
-> > > use in DT yet other than static configuration.  I'm not sure I see the
-> > > connection to the system state in the consumer API here - I thought this
-> > > was pretty much just setting the state when the device is turned off
-> > > which seems device specific?
-> 
-> > The suspend state (with the additional exposure in DT) allows us to specify a
-> > static configuration of the suspend state of a regulator. Here we see a need
-> > for the properties of that state to be aggregated from a subset of the
-> > regulator objects.
-> 
-> We already have a runtime API for specifying suspend state.  It doesn't
-> currently aggregate but that's a simple matter of programming.
-> 
-
-Do you mean alter properties of a state or select between the predefined
-states? I've found some apis related to the latter, but not the first.
-
-> > > > In our case, as most things change the both state (or active only if no
-> > > > both/sleep), the standard regulator api would have to affect the both state.
-> > > > Would we then have a separate api to modify the active state?
-> 
-> > > Why would we need to introduce a new API for the active state?
-> 
-> > It's just that I, possibly incorrectly, considered that to be the outlier and
-> > the one that would be the easiest to model separately.
-> 
-> I'm sorry, I'm just not getting this at all.
-> 
-
-Because for the overall system the active state is the outlier here. But it
-probably doesn't matter for our conclusions.
-
-> Can I please ask that people stop giving partial pictures of what's
-> going on?  There's a few reasons why this is all so hard to follow - one
-> of them is that the story is coming out in dribs and drabs so every time
-> I feel I understand what everyone is talking about everything shifts.
-> 
-
-Sorry, I've tried to describe the hardware setup but have probably not made a
-clear enough distinction towards the downstream implementation and solution
-suggestions.
-
-> I really do fear that the bodge you're using at the minute with multiple
-> regulators has poor abstraction and is hence too fragile - it seems like
-> there's too much knowledge of the system spread around different drivers
-> and it's all vulnerable to changes in system integration which could
-> potentially be made per board.
-
-Just to make sure we're on the same page here, the way this is expressed in
-downstream is like the following:
-
-ldo12 {
-	l12: l12 {
-		set-both-states;
-
-		regulator-min-microvolt = <1800000>;
-		regulator-max-microvolt = <1800000>;
-	};
-
-	l12_active: l12-active {
-		set-only-active-state;
-
-		regulator-min-microvolt = <1800000>;
-		regulator-max-microvolt = <1800000>;
-	};
-};
-
-dsi {
-	vddio-supply = <&l12>;
-};
-
-clock-krait {
-	hfpll-analog-supply = <&l12_active>;
-};
-
-All the consumers uses the standard regulator accessor functions to operate on
-their respective regulator *. Further more it's only the clock driver for the
-core (krait) that references the active only regulators.
-
-So the knowledge spread out would be contained to the dt bindings things
-together.
-
-I can however not argue against you on the fact that the way this is exposed is
-suboptimal. The question is if we can figure a better way to express it - note
-that we do not want e.g. the dsi driver to know anything about the fact that
-ldo12 is special.
-
-
-
-What I don't like with that solution is that we above have two different rdev
-and that we need to aggregate state between the various rdevs in the ldo12
-grouping. (so that active only and both actually affect the active state).
-
-Regards,
-Bjorn
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+index 1885bd8..8cc75d9 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+@@ -21,14 +21,17 @@ Required on RK3066, RK3188 :
+ Optional properties :
+ 
+  - clock-frequency : SCL frequency to use (in Hz). If omitted, 100kHz is used.
+- - i2c-scl-rising-time-ns : Number of nanoseconds the signal takes to rise
++ - i2c-scl-rising-time-ns : Number of nanoseconds the SCL signal takes to rise
+ 	(t(r) in I2C specification). If not specified this is assumed to be
+ 	the maximum the specification allows(1000 ns for Standard-mode,
+ 	300 ns for Fast-mode) which might cause slightly slower communication.
+- - i2c-scl-falling-time-ns : Number of nanoseconds the signal takes to fall
++ - i2c-scl-falling-time-ns : Number of nanoseconds the SCL signal takes to fall
+ 	(t(f) in the I2C specification). If not specified this is assumed to
+ 	be the maximum the specification allows (300 ns) which might cause
+ 	slightly slowercommunication.
++ - i2c-sda-falling-time-ns : Number of nanoseconds the SDA signal takes to fall
++	(t(f) in the I2C specification). If not specified we'll use the SCL
++	value since they are the same in nearly all cases.
+ 
+ Example:
+ 
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index 36a9224..f0e5da9 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -102,8 +102,14 @@ struct rk3x_i2c {
+ 
+ 	/* Settings */
+ 	unsigned int scl_frequency;
+-	unsigned int rise_ns;
+-	unsigned int fall_ns;
++	unsigned int scl_rise_ns;
++	unsigned int scl_fall_ns;
++	unsigned int sda_fall_ns;
++
++	/* DIV changes when we're sending a repeated start; keep both */
++	bool sending_start;
++	u32 div_normal;
++	u32 div_start;
+ 
+ 	/* Synchronization & notification */
+ 	spinlock_t lock;
+@@ -146,6 +152,9 @@ static void rk3x_i2c_start(struct rk3x_i2c *i2c)
+ {
+ 	u32 val;
+ 
++	i2c->sending_start = true;
++	i2c_writel(i2c, i2c->div_start, REG_CLKDIV);
++
+ 	rk3x_i2c_clean_ipd(i2c);
+ 	i2c_writel(i2c, REG_INT_START, REG_IEN);
+ 
+@@ -281,6 +290,9 @@ static void rk3x_i2c_handle_start(struct rk3x_i2c *i2c, unsigned int ipd)
+ 	/* disable start bit */
+ 	i2c_writel(i2c, i2c_readl(i2c, REG_CON) & ~REG_CON_START, REG_CON);
+ 
++	i2c->sending_start = false;
++	i2c_writel(i2c, i2c->div_normal, REG_CLKDIV);
++
+ 	/* enable appropriate interrupts and transition */
+ 	if (i2c->mode == REG_CON_MOD_TX) {
+ 		i2c_writel(i2c, REG_INT_MBTF | REG_INT_NAKRCV, REG_IEN);
+@@ -437,21 +449,26 @@ out:
+  *
+  * @clk_rate: I2C input clock rate
+  * @scl_rate: Desired SCL rate
+- * @rise_ns: How many ns it takes for signals to rise.
+- * @fall_ns: How many ns it takes for signals to fall.
++ * @scl_rise_ns: How many ns it takes for SCL to rise.
++ * @scl_fall_ns: How many ns it takes for SCL to fall.
++ * @sda_fall_ns: How many ns it takes for SDA to fall.
+  * @div_low: Divider output for low
+  * @div_high: Divider output for high
++ * @for_start: Take into account that we might be sending a start bit.
+  *
+  * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
+  * a best-effort divider value is returned in divs. If the target rate is
+  * too high, we silently use the highest possible rate.
+  */
+ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
+-			      unsigned long rise_ns, unsigned long fall_ns,
+-			      unsigned long *div_low, unsigned long *div_high)
++			      unsigned long scl_rise_ns,
++			      unsigned long scl_fall_ns,
++			      unsigned long sda_fall_ns,
++			      unsigned long *div_low, unsigned long *div_high,
++			      bool for_start)
+ {
+ 	unsigned long spec_min_low_ns, spec_min_high_ns;
+-	unsigned long spec_max_data_hold_ns;
++	unsigned long spec_setup_start, spec_max_data_hold_ns;
+ 	unsigned long data_hold_buffer_ns;
+ 
+ 	unsigned long min_low_ns, min_high_ns;
+@@ -490,18 +507,31 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
+ 	if (scl_rate <= 100000) {
+ 		/* Standard-mode */
+ 		spec_min_low_ns = 4700;
++		spec_setup_start = 4700;
+ 		spec_min_high_ns = 4000;
+ 		spec_max_data_hold_ns = 3450;
+ 		data_hold_buffer_ns = 50;
+ 	} else {
+ 		/* Fast-mode */
+ 		spec_min_low_ns = 1300;
++		spec_setup_start = 600;
+ 		spec_min_high_ns = 600;
+ 		spec_max_data_hold_ns = 900;
+ 		data_hold_buffer_ns = 50;
+ 	}
+-	min_low_ns = spec_min_low_ns + fall_ns;
+-	min_high_ns = spec_min_high_ns + rise_ns;
++	/*
++	 * For repeated start we need at least (spec_setup_start * 2) to meet
++	 * (tSU;SDA) requirements. The controller drops data low@half the
++	 * high time). Also need to meet normal specification requirements.
++	 */
++	if (for_start)
++		min_high_ns = max((scl_rise_ns + spec_setup_start) * 2,
++				  scl_rise_ns + spec_setup_start +
++				  sda_fall_ns + spec_min_high_ns);
++	else
++		min_high_ns = scl_rise_ns + spec_min_high_ns;
++
++	min_low_ns = scl_fall_ns + spec_min_low_ns;
+ 	max_low_ns = spec_max_data_hold_ns * 2 - data_hold_buffer_ns;
+ 	min_total_ns = min_low_ns + min_high_ns;
+ 
+@@ -597,15 +627,28 @@ static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
+ {
+ 	unsigned long div_low, div_high;
+ 	u64 t_low_ns, t_high_ns;
++	unsigned long flags;
+ 	int ret;
+ 
+-	ret = rk3x_i2c_calc_divs(clk_rate, i2c->scl_frequency, i2c->rise_ns,
+-				 i2c->fall_ns, &div_low, &div_high);
++	ret = rk3x_i2c_calc_divs(clk_rate, i2c->scl_frequency, i2c->scl_rise_ns,
++				 i2c->scl_fall_ns, i2c->sda_fall_ns,
++				 &div_low, &div_high, true);
++	i2c->div_start = (div_high << 16) | (div_low & 0xffff);
++	WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->scl_frequency);
+ 
++	ret = rk3x_i2c_calc_divs(clk_rate, i2c->scl_frequency, i2c->scl_rise_ns,
++				 i2c->scl_fall_ns, i2c->sda_fall_ns,
++				 &div_low, &div_high, false);
++	i2c->div_normal = (div_high << 16) | (div_low & 0xffff);
+ 	WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->scl_frequency);
+ 
+ 	clk_enable(i2c->clk);
+-	i2c_writel(i2c, (div_high << 16) | (div_low & 0xffff), REG_CLKDIV);
++	spin_lock_irqsave(&i2c->lock, flags);
++	if (i2c->sending_start)
++		i2c_writel(i2c, i2c->div_start, REG_CLKDIV);
++	else
++		i2c_writel(i2c, i2c->div_normal, REG_CLKDIV);
++	spin_unlock_irqrestore(&i2c->lock, flags);
+ 	clk_disable(i2c->clk);
+ 
+ 	t_low_ns = div_u64(((u64)div_low + 1) * 8 * 1000000000, clk_rate);
+@@ -644,8 +687,9 @@ static int rk3x_i2c_clk_notifier_cb(struct notifier_block *nb, unsigned long
+ 	switch (event) {
+ 	case PRE_RATE_CHANGE:
+ 		if (rk3x_i2c_calc_divs(ndata->new_rate, i2c->scl_frequency,
+-				       i2c->rise_ns, i2c->fall_ns, &div_low,
+-				       &div_high) != 0)
++				       i2c->scl_rise_ns, i2c->scl_fall_ns,
++				       i2c->sda_fall_ns,
++				       &div_low, &div_high, true) != 0)
+ 			return NOTIFY_STOP;
+ 
+ 		/* scale up */
+@@ -779,10 +823,10 @@ static int rk3x_i2c_xfer(struct i2c_adapter *adap,
+ 		if (i + ret >= num)
+ 			i2c->is_last_msg = true;
+ 
+-		spin_unlock_irqrestore(&i2c->lock, flags);
+-
+ 		rk3x_i2c_start(i2c);
+ 
++		spin_unlock_irqrestore(&i2c->lock, flags);
++
+ 		timeout = wait_event_timeout(i2c->wait, !i2c->busy,
+ 					     msecs_to_jiffies(WAIT_TIMEOUT));
+ 
+@@ -875,15 +919,18 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
+ 	 * the default maximum timing from the specification.
+ 	 */
+ 	if (of_property_read_u32(pdev->dev.of_node, "i2c-scl-rising-time-ns",
+-				 &i2c->rise_ns)) {
++				 &i2c->scl_rise_ns)) {
+ 		if (i2c->scl_frequency <= 100000)
+-			i2c->rise_ns = 1000;
++			i2c->scl_rise_ns = 1000;
+ 		else
+-			i2c->rise_ns = 300;
++			i2c->scl_rise_ns = 300;
+ 	}
+ 	if (of_property_read_u32(pdev->dev.of_node, "i2c-scl-falling-time-ns",
+-				 &i2c->fall_ns))
+-		i2c->fall_ns = 300;
++				 &i2c->scl_fall_ns))
++		i2c->scl_fall_ns = 300;
++	if (of_property_read_u32(pdev->dev.of_node, "i2c-sda-falling-time-ns",
++				 &i2c->scl_fall_ns))
++		i2c->sda_fall_ns = i2c->scl_fall_ns;
+ 
+ 	strlcpy(i2c->adap.name, "rk3x-i2c", sizeof(i2c->adap.name));
+ 	i2c->adap.owner = THIS_MODULE;
+-- 
+2.2.0.rc0.207.ga3a616c
