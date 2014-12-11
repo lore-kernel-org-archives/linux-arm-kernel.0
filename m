@@ -1,37 +1,55 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 11 Dec 2014 02:37:20 +0000
-Subject: [PATCH] ARM: shmobile: r8a7794: Add QSPI clock to device tree
-In-Reply-To: <20141211022147.GF513@verge.net.au>
-References: <1418259561-27862-1-git-send-email-horms+renesas@verge.net.au>
- <87lhmf9dss.wl%kuninori.morimoto.gx@renesas.com>
- <20141211022147.GF513@verge.net.au>
-Message-ID: <87h9x2ap3i.wl%kuninori.morimoto.gx@renesas.com>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Thu, 11 Dec 2014 10:52:45 +0800
+Subject: [PATCH RFC 04/15] drm/dsi: Do not add DSI devices for the child
+ nodes with input-port property
+In-Reply-To: <20141210122105.GC23558@ulmo.nvidia.com>
+References: <1418200648-32656-1-git-send-email-Ying.Liu@freescale.com>
+ <1418200648-32656-5-git-send-email-Ying.Liu@freescale.com>
+ <20141210122105.GC23558@ulmo.nvidia.com>
+Message-ID: <548906FD.5070009@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Thierry,
 
-Hi Simon
+On 12/10/2014 08:21 PM, Thierry Reding wrote:
+> On Wed, Dec 10, 2014 at 04:37:17PM +0800, Liu Ying wrote:
+>> The MIPI DSI bus driver would try to add a DSI device for a host's every
+>> child node which contains the reg property.  Unfortunately, the existing
+>> i.MX6Q/SDL MIPI DSI host device tree node's child nodes contain the reg
+>
+> There aren't any existing nodes for the DSI host on i.MX. This patch
+> series adds support for them.
 
-> > > @@ -535,6 +535,14 @@
-> > >  			clock-output-names =
-> > >  				"vin1", "vin0", "ether";
-> > >  		};
-> > > +		mstp9_clks: mstp9_clks at e6150994 {
-> > > +			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-> > > +			reg = <0 0xe6150994 0 4>, <0 0xe61509a4 0 4>;
-> > > +			clocks = <&cpg_clocks R8A7794_CLK_QSPI>;
-> > > +			#clock-cells = <1>;
-> > > +			renesas,clock-indices = <R8A7794_CLK_QSPI_MOD>;
-> > > +			clock-output-names = "qspi_mod";
-> > > +		};
-> > 
-> > We want ot use this ?
-> > 
-> > - renesas,clock-indices
-> > + clock-indices
-> 
-> Thanks, and sorry for missing that. I'll fix that up.
-> Do you have any objections to the patch if that problem is resolved?
+There are existing nodes for the DSI host node. Please find them in 
+arch/arm/boot/dts/imx6qdl.dtsi and arch/arm/boot/dts/imx6q.dts. The DSI 
+host node contains two child nodes for i.MX6DL and another two for 
+i.MX6Q.  Each child node has a reg property embedded.
 
-Thank you
-I have no objections.
+>
+>> property, but the child nodes are ports pointing to dedicated CRTCs.
+>> So, this patch phases out the child nodes with input-port property before
+>> adding DSI devices for them and updates the MIPI DSI bus OF binding
+>> documentation.
+>>
+>> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+>> ---
+>>   Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt | 4 ++++
+>>   drivers/gpu/drm/drm_mipi_dsi.c                              | 5 +++--
+>>   2 files changed, 7 insertions(+), 2 deletions(-)
+>
+> Sorry, but NAK. There's no need for this special-case. I'll go into more
+> detail in response to patch 09/15.
+
+Thanks for reviewing the patches.
+
+Any idea how to handle the special case?  The existing child nodes for 
+the DSI host node do have the reg properties embedded.
+
+Regards,
+
+Liu Ying
+
+>
+> Thierry
+>
