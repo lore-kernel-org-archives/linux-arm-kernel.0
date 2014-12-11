@@ -1,188 +1,85 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 11 Dec 2014 10:10:46 +0200
-Subject: [v3][PATCH 3/5] media: ov2640: add primary dt support
-In-Reply-To: <1418283339-16281-4-git-send-email-josh.wu@atmel.com>
-References: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
- <1418283339-16281-4-git-send-email-josh.wu@atmel.com>
-Message-ID: <2810609.1cJv5BoTgd@avalon>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Thu, 11 Dec 2014 13:37:42 +0530
+Subject: [PATCH v5 0/2] Introducing Exynos ChipId driver
+Message-ID: <1418285264-21763-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+This patch series introduces Exynos Chipid platform driver.
+Each Exynos SoC has ChipID block which can give information about SoC's
+product Id and revision number.
+At the same time it reduces dependency of mach-exynos files from plat-samsung,
+by removing samsung_rev API, similar API is introduced in chipid driver itself
+to get revision number and product id. 
 
-Thank you for the patch.
+This patch series is based on Kukjin Kim's for-next having SHA_ID:
+9db7d78aca2c7fbc19a26ce2ef01c805dc010c72
 
-I only have three minor comments. After fixing them,
+It can also be cleanly applied on latest (next-20141209) linux-next.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+This has been tested against both tree on Exynos3250 and Exynos5250 (SMDK) board.
 
-On Thursday 11 December 2014 15:35:37 Josh Wu wrote:
-> Add device tree support for ov2640.
-> 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
-> v2 -> v3:
->   1. fix gpiod usage.
->   2. refine the ov2640_probe() function.
-> 
-> v1 -> v2:
->   1. use gpiod APIs.
->   2. change the gpio pin's name according to datasheet.
->   3. reduce the delay for .reset() function.
-> 
->  drivers/media/i2c/soc_camera/ov2640.c | 87 +++++++++++++++++++++++++++++---
->  1 file changed, 81 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
-> b/drivers/media/i2c/soc_camera/ov2640.c index 9ee910d..e0bcf5b 100644
-> --- a/drivers/media/i2c/soc_camera/ov2640.c
-> +++ b/drivers/media/i2c/soc_camera/ov2640.c
-> @@ -18,6 +18,8 @@
->  #include <linux/i2c.h>
->  #include <linux/slab.h>
->  #include <linux/delay.h>
-> +#include <linux/gpio.h>
-> +#include <linux/of_gpio.h>
->  #include <linux/v4l2-mediabus.h>
->  #include <linux/videodev2.h>
-> 
-> @@ -283,6 +285,10 @@ struct ov2640_priv {
->  	u32	cfmt_code;
->  	struct v4l2_clk			*clk;
->  	const struct ov2640_win_size	*win;
-> +
-> +	struct soc_camera_subdev_desc	ssdd_dt;
-> +	struct gpio_desc *resetb_gpio;
-> +	struct gpio_desc *pwdn_gpio;
->  };
-> 
->  /*
-> @@ -1047,6 +1053,63 @@ static struct v4l2_subdev_ops ov2640_subdev_ops = {
->  	.video	= &ov2640_subdev_video_ops,
->  };
-> 
-> +/* OF probe functions */
-> +static int ov2640_hw_power(struct device *dev, int on)
-> +{
-> +	struct i2c_client *client = to_i2c_client(dev);
-> +	struct ov2640_priv *priv = to_ov2640(client);
-> +
-> +	dev_dbg(&client->dev, "%s: %s the camera\n",
-> +			__func__, on ? "ENABLE" : "DISABLE");
-> +
-> +	if (priv->pwdn_gpio)
-> +		gpiod_direction_output(priv->pwdn_gpio, !on);
-> +
-> +	return 0;
-> +}
-> +
-> +static int ov2640_hw_reset(struct device *dev)
-> +{
-> +	struct i2c_client *client = to_i2c_client(dev);
-> +	struct ov2640_priv *priv = to_ov2640(client);
-> +
-> +	if (priv->resetb_gpio) {
-> +		/* Active the resetb pin to perform a reset pulse */
-> +		gpiod_direction_output(priv->resetb_gpio, 1);
-> +		usleep_range(3000, 5000);
-> +		gpiod_direction_output(priv->resetb_gpio, 0);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int ov2640_probe_dt(struct i2c_client *client,
-> +		struct ov2640_priv *priv)
-> +{
-> +	/* reset is not actived */
+Revision 4 and it's discussion can be found here
+ - https://lkml.org/lkml/2014/12/3/115
 
-Do you mean that you configure the reset signal as inactive ? I would state 
-that as "Request the reset GPIO deasserted".
+Changes since v4:
+ - Removed custom sysfs entries as they were not providing any new information
+   as pointed out by Arnd.
+ - Removed functions exporting product_id and revision, instead we will export
+   exynos_chipid_info structure. It will be helpfull when we need to provide more
+   fields of chipid outside of chipid, as commented by Yadwinder
+ - Converted all funcions as __init. 
 
-> +	priv->resetb_gpio = devm_gpiod_get_optional(&client->dev, "resetb",
-> +			GPIOD_OUT_LOW);
-> +	if (!priv->resetb_gpio)
-> +		dev_dbg(&client->dev, "resetb gpio is not assigned!\n");
-> +	else if (IS_ERR(priv->resetb_gpio))
-> +		return PTR_ERR(priv->resetb_gpio);
-> +
-> +	/* Power down actived */
+Change since v3: 
+ - This patch set contains 5/6 and 6/6 patch from v3 series.
+ - Made EXYNOS_CHIPID config option non-user selectable,
+   as suggested by Tomasz Figa.
+ - Made uniform macro for EXYNOS4/5_SOC_MASK as EXYNOS_SOC_MASK as
+   suggested by Tomasz Figa.
+ - Made local variables static in chipid driver.
+ - Added existing SoC's product id's.
+ - Added platform driver support.
 
-And "Request the power down GPIO asserted".
+Changes since v2:
+ - Reorganized patches as suggested by Tomasz Figa.
+ - Addressed review comments of Tomasz Figa in i2c-s3c2410.c file.
 
-> +	priv->pwdn_gpio = devm_gpiod_get_optional(&client->dev, "pwdn",
-> +			GPIOD_OUT_HIGH);
-> +	if (!priv->pwdn_gpio)
-> +		dev_dbg(&client->dev, "pwdn gpio is not assigned!\n");
-> +	else if (IS_ERR(priv->pwdn_gpio))
-> +		return PTR_ERR(priv->pwdn_gpio);
-> +
-> +	/* Initialize the soc_camera_subdev_desc */
-> +	priv->ssdd_dt.power = ov2640_hw_power;
-> +	priv->ssdd_dt.reset = ov2640_hw_reset;
-> +	client->dev.platform_data = &priv->ssdd_dt;
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * i2c_driver functions
->   */
-> @@ -1058,12 +1121,6 @@ static int ov2640_probe(struct i2c_client *client,
->  	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
->  	int			ret;
-> 
-> -	if (!ssdd) {
-> -		dev_err(&adapter->dev,
-> -			"OV2640: Missing platform_data for driver\n");
-> -		return -EINVAL;
-> -	}
-> -
->  	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
->  		dev_err(&adapter->dev,
->  			"OV2640: I2C-Adapter doesn't support SMBUS\n");
-> @@ -1077,6 +1134,17 @@ static int ov2640_probe(struct i2c_client *client,
->  		return -ENOMEM;
->  	}
-> 
-> +	if (!ssdd && !client->dev.of_node) {
-> +		dev_err(&client->dev, "Missing platform_data for driver\n");
-> +		return  -EINVAL;
-> +	}
-> +
-> +	if (!ssdd && client->dev.of_node) {
+Changes since v1:
+ - Added patch to move i2c interrupt re-configuration code from exynos.c
+   to i2c driver, as suggested by Arnd.
+ - After above patch only user of SYS_I2C_CFG register is pm.c so moving
+   save/restore of this register also into i2c driver.
+ - Spiltted up exynos4 and exynos5 machine descriptors to get rid from
+   soc_is_exynos4/exynos5 kind of macros, as suggested by Arnd.
+ - Changed location of chipid driver to "drivers/soc".
+ - Added drivers/base/soc.c provided infrastructure to make SoC specific 
+   information avaible to user space via sysfs entry, as suggested by Arnd.
 
-You can just test for !ssdd as you've tested client->dev.of_node above 
-already.
 
-> +		ret = ov2640_probe_dt(client, priv);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
->  	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
->  	v4l2_ctrl_handler_init(&priv->hdl, 2);
->  	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
-> @@ -1123,9 +1191,16 @@ static const struct i2c_device_id ov2640_id[] = {
->  };
->  MODULE_DEVICE_TABLE(i2c, ov2640_id);
-> 
-> +static const struct of_device_id ov2640_of_match[] = {
-> +	{.compatible = "ovti,ov2640", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, ov2640_of_match);
-> +
->  static struct i2c_driver ov2640_i2c_driver = {
->  	.driver = {
->  		.name = "ov2640",
-> +		.of_match_table = of_match_ptr(ov2640_of_match),
->  	},
->  	.probe    = ov2640_probe,
->  	.remove   = ov2640_remove,
+Pankaj Dubey (2):
+  soc: samsung: add exynos chipid driver support
+  ARM: EXYNOS: refactoring of mach-exynos to enable chipid driver
+
+ arch/arm/mach-exynos/Kconfig                 |   2 +
+ arch/arm/mach-exynos/common.h                |  54 ++++-----
+ arch/arm/mach-exynos/exynos.c                |  77 +++++-------
+ arch/arm/mach-exynos/include/mach/map.h      |   2 -
+ arch/arm/mach-exynos/platsmp.c               |   2 +-
+ arch/arm/mach-exynos/pm.c                    |   8 +-
+ arch/arm/plat-samsung/cpu.c                  |  14 ---
+ arch/arm/plat-samsung/include/plat/cpu.h     |   2 -
+ arch/arm/plat-samsung/include/plat/map-s5p.h |   1 -
+ drivers/soc/Kconfig                          |   1 +
+ drivers/soc/Makefile                         |   1 +
+ drivers/soc/samsung/Kconfig                  |  14 +++
+ drivers/soc/samsung/Makefile                 |   1 +
+ drivers/soc/samsung/exynos-chipid.c          | 168 +++++++++++++++++++++++++++
+ include/linux/soc/samsung/exynos-soc.h       |  51 ++++++++
+ 15 files changed, 296 insertions(+), 102 deletions(-)
+ create mode 100644 drivers/soc/samsung/Kconfig
+ create mode 100644 drivers/soc/samsung/Makefile
+ create mode 100644 drivers/soc/samsung/exynos-chipid.c
+ create mode 100644 include/linux/soc/samsung/exynos-soc.h
 
 -- 
-Regards,
-
-Laurent Pinchart
+2.2.0
