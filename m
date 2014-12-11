@@ -1,80 +1,65 @@
-From: zoltan.kiss@linaro.org (Zoltan Kiss)
-Date: Thu, 11 Dec 2014 17:56:38 +0000
-Subject: Soft lockup problem on Hisilicon P650
-Message-ID: <5489DAD6.6040101@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Dec 2014 09:56:52 -0800
+Subject: [RFC/PATCH 5/7] arm: omap: hwmod: allow for registration of
+ class-less hwmods
+In-Reply-To: <20141211174434.GA2022@earth.universe>
+References: <1418164072-19087-1-git-send-email-balbi@ti.com>
+ <1418164072-19087-6-git-send-email-balbi@ti.com>
+ <54882576.8020609@ti.com> <20141210145433.GC4602@saruman>
+ <20141211005238.GC5585@earth.universe>
+ <20141211142333.GE20762@saruman>
+ <20141211174434.GA2022@earth.universe>
+Message-ID: <20141211175651.GC2990@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Sebastian Reichel <sre@kernel.org> [141211 09:46]:
+> On Thu, Dec 11, 2014 at 08:23:33AM -0600, Felipe Balbi wrote:
+> > true, but I'm still a bit iffy wrt that. ABI compatibility breaks and
+> > all
+> 
+> Moving the hwmod data to device tree will break the ABI
+> compatibility anyways. You wont be able to use an old DT with the
+> new kernel, since then you are missing the hwmod data (assuming
+> there won't be a fallback hwmod data kept in the kernel source).
 
-I'm having a soft lockup problem with a heavily modified Open vSwitch. 
-(it runs OpenDataPlane). After starting it the whole system gets 
-stucked, I managed to get some backtraces with SysRq. It's a HiSilicon 
-P650 SoC (A15), I have the feeling an interrupt got stucked, but could 
-someon help me interpreting this stack trace?
+Right, the way to deal with that is to do the following:
+
+1. Once we have the binding in place, start printing out warnings
+   and deprecate the old built in data.
+
+2. For missing sysc data, we just keep printing warnings and won't
+   idle or enable the devices. This keeps the optional boot console
+   UART working based on the bootloader settings.
+
+3. We may want to keep the UART and system timer data around forever
+   to be able to print sane error messages.
+
+> > > IMHO instead of DT referencing the hwmod stuff using ti,hwmods the
+> > > hwmod database should reference the compatible values. This depends
+> > > on omap3 being DT only of course.
+> > 
+> > don't you think it's too late for that ? We need to support the current
+> > form of dts files forever. It's an ABI afterall.
+> 
+> As I described above the ABI *will* break if hwmod data is removed from
+> the kernel.
+
+Right, there is no way we can support incomplete device tree
+bindings except for devices that are enabled by the bootloader
+already. But we can take our time removing the built-in device
+data, there's no need to do it all at once.
+
+> OTOH where is the ABI breakage when hwmod database in kernel is
+> built from the compatible value? The compatible values are already
+> part of the ABI, so there are no new properties needed. The ti,hwmod
+> property can be marked as deprecated (and maybe removed after some
+> years).
+
+Yes we can keep it around but don't have to do anything with it
+eventually. For the legacy systems, we can have built in mapping
+of compatible values to ti,hwmods along the clock aliases.
 
 Regards,
 
-Zoltan Kiss
-
-[  379.532897] BUG: soft lockup - CPU#0 stuck for 25s! [ovs-vswitchd:783]
-[  379.554792]
-[  379.559800] CPU: 0 PID: 783 Comm: ovs-vswitchd Not tainted 
-3.14.0.kz-00005-gb03444f-dirty #36
-[  379.588394] task: c22803c0 ti: c1878000 task.ti: c1878000
-[  379.606515] PC is at __do_softirq+0xc8/0x248
-[  379.620841] LR is at __do_softirq+0xb8/0x248
-[  379.635166] pc : [<c0021dd4>]    lr : [<c0021dc4>]    psr: 20010113
-[  379.635166] sp : c1879f28  ip : c05a2980  fp : 00121690
-[  379.673664] r10: 0011eb88  r9 : c0576080  r8 : 0011c5f0
-[  379.691188] r7 : c1878000  r6 : 00000000  r5 : 0000001e  r4 : 00000282
-[  379.713080] r3 : c1878000  r2 : 00000100  r1 : 00000000  r0 : 00000000
-[  379.734977] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM 
-Segment user
-[  379.758910] Control: 30c5387d  Table: 11823580  DAC: fffffffd
-[  379.778185] CPU: 0 PID: 783 Comm: ovs-vswitchd Not tainted 
-3.14.0.kz-00005-gb03444f-dirty #36
-[  379.806807] [<c0014328>] (unwind_backtrace) from [<c0011744>] 
-(show_stack+0x10/0x14)
-[  379.832805] [<c0011744>] (show_stack) from [<c0438308>] 
-(dump_stack+0x7c/0xbc)
-[  379.857051] [<c0438308>] (dump_stack) from [<c0075920>] 
-(watchdog_timer_fn+0x144/0x17c)
-[  379.883920] [<c0075920>] (watchdog_timer_fn) from [<c003ab40>] 
-(__run_hrtimer.isra.32+0x44/0xd4)
-[  379.913401] [<c003ab40>] (__run_hrtimer.isra.32) from [<c003b644>] 
-(hrtimer_interrupt+0x118/0x2a4)
-[  379.943467] [<c003b644>] (hrtimer_interrupt) from [<c032994c>] 
-(arch_timer_handler_phys+0x28/0x30)
-[  379.973532] [<c032994c>] (arch_timer_handler_phys) from [<c005db68>] 
-(handle_percpu_devid_irq+0x6c/0x84)
-[  380.005343] [<c005db68>] (handle_percpu_devid_irq) from [<c005a624>] 
-(generic_handle_irq+0x2c/0x3c)
-[  380.035691] [<c005a624>] (generic_handle_irq) from [<c000f16c>] 
-(handle_IRQ+0x40/0x90)
-[  380.062252] [<c000f16c>] (handle_IRQ) from [<c0008568>] 
-(gic_handle_irq+0x2c/0x5c)
-[  380.087648] [<c0008568>] (gic_handle_irq) from [<c0012280>] 
-(__irq_svc+0x40/0x70)
-[  380.112742] Exception stack(0xc1879ee0 to 0xc1879f28)
-[  380.129693] 9ee0: 00000000 00000000 00000100 c1878000 00000282 
-0000001e 00000000 c1878000
-[  380.157123] 9f00: 0011c5f0 c0576080 0011eb88 00121690 c05a2980 
-c1879f28 c0021dc4 c0021dd4
-[  380.184548] 9f20: 20010113 ffffffff
-[  380.196262] [<c0012280>] (__irq_svc) from [<c0021dd4>] 
-(__do_softirq+0xc8/0x248)
-[  380.221087] [<c0021dd4>] (__do_softirq) from [<c00221dc>] 
-(irq_exit+0xb8/0xf4)
-[  380.245324] [<c00221dc>] (irq_exit) from [<c000f170>] 
-(handle_IRQ+0x44/0x90)
-[  380.268974] [<c000f170>] (handle_IRQ) from [<c0008568>] 
-(gic_handle_irq+0x2c/0x5c)
-[  380.294366] [<c0008568>] (gic_handle_irq) from [<c001243c>] 
-(__irq_usr+0x3c/0x60)
-[  380.319463] Exception stack(0xc1879fb0 to 0xc1879ff8)
-[  380.336409] 9fa0:                                     000003cf 
-b5b36604 00000400 000003cf
-[  380.363842] 9fc0: b6b66000 001390b0 00113350 bedaf2a0 0011c5f0 
-001213f0 0011eb88 00121690
-[  380.391271] 9fe0: 00000000 bedaf2a0 000b658d 000b6590 80010030 ffffffff
+Tony
