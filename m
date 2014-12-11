@@ -1,164 +1,96 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 11 Dec 2014 15:35:37 +0800
-Subject: [v3][PATCH 3/5] media: ov2640: add primary dt support
+Date: Thu, 11 Dec 2014 15:35:38 +0800
+Subject: [v3][PATCH 4/5] media: ov2640: add a master clock for sensor
 In-Reply-To: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
 References: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1418283339-16281-4-git-send-email-josh.wu@atmel.com>
+Message-ID: <1418283339-16281-5-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree support for ov2640.
+The master clock (xvclk) is mandatory. It's a common clock framework clock.
+It can make sensor output a pixel clock to the camera interface.
 
 Cc: devicetree at vger.kernel.org
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
 v2 -> v3:
-  1. fix gpiod usage.
-  2. refine the ov2640_probe() function.
+  1. should return PTR_ERR().
 
 v1 -> v2:
-  1. use gpiod APIs.
-  2. change the gpio pin's name according to datasheet.
-  3. reduce the delay for .reset() function.
+  1. change the clock's name.
+  2. Make the clock is mandatory.
 
- drivers/media/i2c/soc_camera/ov2640.c | 87 ++++++++++++++++++++++++++++++++---
- 1 file changed, 81 insertions(+), 6 deletions(-)
+ drivers/media/i2c/soc_camera/ov2640.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/media/i2c/soc_camera/ov2640.c b/drivers/media/i2c/soc_camera/ov2640.c
-index 9ee910d..e0bcf5b 100644
+index e0bcf5b..055702c 100644
 --- a/drivers/media/i2c/soc_camera/ov2640.c
 +++ b/drivers/media/i2c/soc_camera/ov2640.c
-@@ -18,6 +18,8 @@
- #include <linux/i2c.h>
- #include <linux/slab.h>
- #include <linux/delay.h>
-+#include <linux/gpio.h>
-+#include <linux/of_gpio.h>
- #include <linux/v4l2-mediabus.h>
- #include <linux/videodev2.h>
+@@ -13,6 +13,7 @@
+  * published by the Free Software Foundation.
+  */
  
-@@ -283,6 +285,10 @@ struct ov2640_priv {
++#include <linux/clk.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
+ #include <linux/i2c.h>
+@@ -31,6 +32,7 @@
+ 
+ #define VAL_SET(x, mask, rshift, lshift)  \
+ 		((((x) >> rshift) & mask) << lshift)
++
+ /*
+  * DSP registers
+  * register offset for BANK_SEL == BANK_SEL_DSP
+@@ -284,6 +286,7 @@ struct ov2640_priv {
+ 	struct v4l2_ctrl_handler	hdl;
  	u32	cfmt_code;
  	struct v4l2_clk			*clk;
++	struct clk			*master_clk;
  	const struct ov2640_win_size	*win;
-+
-+	struct soc_camera_subdev_desc	ssdd_dt;
-+	struct gpio_desc *resetb_gpio;
-+	struct gpio_desc *pwdn_gpio;
- };
  
- /*
-@@ -1047,6 +1053,63 @@ static struct v4l2_subdev_ops ov2640_subdev_ops = {
- 	.video	= &ov2640_subdev_video_ops,
- };
+ 	struct soc_camera_subdev_desc	ssdd_dt;
+@@ -746,6 +749,7 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int on)
+ 	struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
+ 	struct ov2640_priv *priv = to_ov2640(client);
+ 	struct v4l2_clk *clk;
++	int ret;
  
-+/* OF probe functions */
-+static int ov2640_hw_power(struct device *dev, int on)
-+{
-+	struct i2c_client *client = to_i2c_client(dev);
-+	struct ov2640_priv *priv = to_ov2640(client);
-+
-+	dev_dbg(&client->dev, "%s: %s the camera\n",
-+			__func__, on ? "ENABLE" : "DISABLE");
-+
-+	if (priv->pwdn_gpio)
-+		gpiod_direction_output(priv->pwdn_gpio, !on);
-+
-+	return 0;
-+}
-+
-+static int ov2640_hw_reset(struct device *dev)
-+{
-+	struct i2c_client *client = to_i2c_client(dev);
-+	struct ov2640_priv *priv = to_ov2640(client);
-+
-+	if (priv->resetb_gpio) {
-+		/* Active the resetb pin to perform a reset pulse */
-+		gpiod_direction_output(priv->resetb_gpio, 1);
-+		usleep_range(3000, 5000);
-+		gpiod_direction_output(priv->resetb_gpio, 0);
-+	}
-+
-+	return 0;
-+}
-+
-+static int ov2640_probe_dt(struct i2c_client *client,
-+		struct ov2640_priv *priv)
-+{
-+	/* reset is not actived */
-+	priv->resetb_gpio = devm_gpiod_get_optional(&client->dev, "resetb",
-+			GPIOD_OUT_LOW);
-+	if (!priv->resetb_gpio)
-+		dev_dbg(&client->dev, "resetb gpio is not assigned!\n");
-+	else if (IS_ERR(priv->resetb_gpio))
-+		return PTR_ERR(priv->resetb_gpio);
-+
-+	/* Power down actived */
-+	priv->pwdn_gpio = devm_gpiod_get_optional(&client->dev, "pwdn",
-+			GPIOD_OUT_HIGH);
-+	if (!priv->pwdn_gpio)
-+		dev_dbg(&client->dev, "pwdn gpio is not assigned!\n");
-+	else if (IS_ERR(priv->pwdn_gpio))
-+		return PTR_ERR(priv->pwdn_gpio);
-+
-+	/* Initialize the soc_camera_subdev_desc */
-+	priv->ssdd_dt.power = ov2640_hw_power;
-+	priv->ssdd_dt.reset = ov2640_hw_reset;
-+	client->dev.platform_data = &priv->ssdd_dt;
-+
-+	return 0;
-+}
-+
- /*
-  * i2c_driver functions
-  */
-@@ -1058,12 +1121,6 @@ static int ov2640_probe(struct i2c_client *client,
- 	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
- 	int			ret;
- 
--	if (!ssdd) {
--		dev_err(&adapter->dev,
--			"OV2640: Missing platform_data for driver\n");
--		return -EINVAL;
--	}
--
- 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
- 		dev_err(&adapter->dev,
- 			"OV2640: I2C-Adapter doesn't support SMBUS\n");
-@@ -1077,6 +1134,17 @@ static int ov2640_probe(struct i2c_client *client,
- 		return -ENOMEM;
+ 	if (!priv->clk) {
+ 		clk = v4l2_clk_get(&client->dev, "mclk");
+@@ -755,7 +759,20 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int on)
+ 			priv->clk = clk;
  	}
  
-+	if (!ssdd && !client->dev.of_node) {
-+		dev_err(&client->dev, "Missing platform_data for driver\n");
-+		return  -EINVAL;
-+	}
-+
-+	if (!ssdd && client->dev.of_node) {
-+		ret = ov2640_probe_dt(client, priv);
+-	return soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
++	if (on) {
++		ret = clk_prepare_enable(priv->master_clk);
 +		if (ret)
 +			return ret;
++	} else {
++		clk_disable_unprepare(priv->master_clk);
 +	}
++
++	ret = soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
++
++	if (ret && on)
++		clk_disable_unprepare(priv->master_clk);
++
++	return ret;
+ }
+ 
+ /* Select the nearest higher resolution for capture */
+@@ -1145,6 +1162,10 @@ static int ov2640_probe(struct i2c_client *client,
+ 			return ret;
+ 	}
+ 
++	priv->master_clk = devm_clk_get(&client->dev, "xvclk");
++	if (IS_ERR(priv->master_clk))
++		return PTR_ERR(priv->master_clk);
 +
  	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
  	v4l2_ctrl_handler_init(&priv->hdl, 2);
  	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
-@@ -1123,9 +1191,16 @@ static const struct i2c_device_id ov2640_id[] = {
- };
- MODULE_DEVICE_TABLE(i2c, ov2640_id);
- 
-+static const struct of_device_id ov2640_of_match[] = {
-+	{.compatible = "ovti,ov2640", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, ov2640_of_match);
-+
- static struct i2c_driver ov2640_i2c_driver = {
- 	.driver = {
- 		.name = "ov2640",
-+		.of_match_table = of_match_ptr(ov2640_of_match),
- 	},
- 	.probe    = ov2640_probe,
- 	.remove   = ov2640_remove,
 -- 
 1.9.1
