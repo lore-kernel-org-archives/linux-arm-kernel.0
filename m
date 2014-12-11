@@ -1,55 +1,43 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 11 Dec 2014 14:26:41 +0800
-Subject: [PATCH] i2c: designware: use {readl|writel}_relaxed instead of
- readl/writel
-Message-ID: <1418279201-3886-1-git-send-email-jszhang@marvell.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 10 Dec 2014 22:37:27 -0800
+Subject: [PATCH v5 1/5] phy: add a driver for the Rockchip SoC internal
+ USB2.0 PHY
+In-Reply-To: <54893963.7060304@ti.com>
+References: <1418208371-18851-1-git-send-email-lyz@rock-chips.com>
+ <1418208371-18851-2-git-send-email-lyz@rock-chips.com>
+ <5489338C.1030109@ti.com> <1418278322.18092.30.camel@perches.com>
+ <54893963.7060304@ti.com>
+Message-ID: <1418279847.18092.32.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-readl/writel is too expensive especially on Cortex A9 w/ outer L2 cache.
-This introduces i2c read/write errors on Marvell BG2/BG2Q SoCs when there
-are heavy L2 cache maintenance operations at the same time.
+On Thu, 2014-12-11 at 11:57 +0530, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Thursday 11 December 2014 11:42 AM, Joe Perches wrote:
+> > On Thu, 2014-12-11 at 11:32 +0530, Kishon Vijay Abraham I wrote:
+> >> On Wednesday 10 December 2014 04:16 PM, Yunzhi Li wrote:
+> >>> diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
+> > []
+> >>> +/*
+> >>> + * The higher 16-bit of this register is used for write protection
+> >>> + * only if BIT(13 + 16) set to 1 the BIT(13) can be written.
+> >>> + */
+> >>> +#define SIDDQ_MSK		BIT(13 + 16)
+> > 
+> > huh?
+> > 
+> > This #define looks _very_ odd.
+> > 
+> > Is this supposed to be a single bit 29 or
+> > some range?
+> 
+> From what I understood, the most significant 16 bits are write locks to the
+> least significant 16 bits.
+> 
+> So If I have to write something on bit 0, I have to set bit 16.
+> If I have to write something on bit 1, I have to set bit 17.
+> If I have to write something on bit 2, I have to set bit 18.
+> and so on.
 
-The driver does not perform DMA, so it's safe to use the relaxed version.
->From another side, the relaxed io accessor macros are available on all
-architectures now, so we can use the relaxed versions instead.
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/i2c/busses/i2c-designware-core.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-designware-core.c b/drivers/i2c/busses/i2c-designware-core.c
-index 23628b7..e279948 100644
---- a/drivers/i2c/busses/i2c-designware-core.c
-+++ b/drivers/i2c/busses/i2c-designware-core.c
-@@ -170,10 +170,10 @@ u32 dw_readl(struct dw_i2c_dev *dev, int offset)
- 	u32 value;
- 
- 	if (dev->accessor_flags & ACCESS_16BIT)
--		value = readw(dev->base + offset) |
--			(readw(dev->base + offset + 2) << 16);
-+		value = readw_relaxed(dev->base + offset) |
-+			(readw_relaxed(dev->base + offset + 2) << 16);
- 	else
--		value = readl(dev->base + offset);
-+		value = readl_relaxed(dev->base + offset);
- 
- 	if (dev->accessor_flags & ACCESS_SWAP)
- 		return swab32(value);
-@@ -187,10 +187,10 @@ void dw_writel(struct dw_i2c_dev *dev, u32 b, int offset)
- 		b = swab32(b);
- 
- 	if (dev->accessor_flags & ACCESS_16BIT) {
--		writew((u16)b, dev->base + offset);
--		writew((u16)(b >> 16), dev->base + offset + 2);
-+		writew_relaxed((u16)b, dev->base + offset);
-+		writew_relaxed((u16)(b >> 16), dev->base + offset + 2);
- 	} else {
--		writel(b, dev->base + offset);
-+		writel_relaxed(b, dev->base + offset);
- 	}
- }
- 
--- 
-2.1.3
+To me it'd look better to use another << rather than a plus
