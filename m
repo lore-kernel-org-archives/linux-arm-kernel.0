@@ -1,26 +1,22 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 11 Dec 2014 09:32:34 +0900
-Subject: [PATCH] ARM: shmobile: lager: Fix QSPI mode of SPI-Flash into
- mode3
-In-Reply-To: <CAMuHMdXv-12uVasSkLQs6gPYgfaS+O+dBQvDyCswDCTuffvp7g@mail.gmail.com>
-References: <1418178627-24424-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdXv-12uVasSkLQs6gPYgfaS+O+dBQvDyCswDCTuffvp7g@mail.gmail.com>
-Message-ID: <20141211003233.GC513@verge.net.au>
+Date: Thu, 11 Dec 2014 09:34:28 +0900
+Subject: [PATCH] ARM: shmobile: r8a7793: document CPG clock support
+In-Reply-To: <CAMuHMdWEF05vrTQRjrEUb=_hemBqJh2qdXOmbivP9jP8zb2ngQ@mail.gmail.com>
+References: <1418212502-19905-1-git-send-email-ykaneko0929@gmail.com>
+ <CAMuHMdWEF05vrTQRjrEUb=_hemBqJh2qdXOmbivP9jP8zb2ngQ@mail.gmail.com>
+Message-ID: <20141211003427.GD513@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 11:11:01AM +0100, Geert Uytterhoeven wrote:
-> On Wed, Dec 10, 2014 at 3:30 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> >
-> > In order to change into mode3, CPOL and CPHA bit of SPCMD register
-> > of QSPI is changed. Mode3 can avoid intermediate voltage.
-> >
-> > Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> > [horms: Updated changelog and re-ordered properties]
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Wed, Dec 10, 2014 at 01:00:02PM +0100, Geert Uytterhoeven wrote:
+> On Wed, Dec 10, 2014 at 12:55 PM, Yoshihiro Kaneko
+> <ykaneko0929@gmail.com> wrote:
+> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 > 
 > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks, I have queued this up.
+
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
+Geert, will you handle passing this on to Mike Turquette?
+If not please advise Kaneko-san how to move forwards.
