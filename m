@@ -1,40 +1,28 @@
-From: lyz@rock-chips.com (Yunzhi Li)
-Date: Thu, 11 Dec 2014 18:11:34 +0800
-Subject: [PATCH v6 5/5] ARM: dts: rockchip: Enable usb PHY on rk3288-evb board
-In-Reply-To: <1418291722-25448-1-git-send-email-lyz@rock-chips.com>
-References: <1418291722-25448-1-git-send-email-lyz@rock-chips.com>
-Message-ID: <1418292694-25724-1-git-send-email-lyz@rock-chips.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 11 Dec 2014 11:15:54 +0100
+Subject: [PATCH 1/1] net/macb: fix compilation warning for print_hex_dump()
+ called with skb->mac_header
+Message-ID: <efa28485b430e77f5254248cb396da431d03fc5b.1418292741.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable usb PHY for all usb ports on rk3288-evb.
-
-Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
-
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 ---
+ drivers/net/ethernet/cadence/macb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-
- arch/arm/boot/dts/rk3288-evb.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index cb83cea..992f323 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -174,6 +174,10 @@
- 	};
- };
- 
-+&usbphy {
-+	status = "okay";
-+};
-+
- &usb_host0_ehci {
- 	status = "okay";
- };
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index 41113e5..9ddc9bf 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -776,7 +776,7 @@ static int gem_rx(struct macb *bp, int budget)
+ 		netdev_vdbg(bp->dev, "received skb of length %u, csum: %08x\n",
+ 			    skb->len, skb->csum);
+ 		print_hex_dump(KERN_DEBUG, " mac: ", DUMP_PREFIX_ADDRESS, 16, 1,
+-			       skb->mac_header, 16, true);
++			       skb_mac_header(skb), 16, true);
+ 		print_hex_dump(KERN_DEBUG, "data: ", DUMP_PREFIX_ADDRESS, 16, 1,
+ 			       skb->data, 32, true);
+ #endif
 -- 
-2.0.0
+1.8.2.2
