@@ -1,55 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Dec 2014 18:35:40 +0000
-Subject: [PATCH 5/5] arm/arm64: KVM: Initialize the vgic on-demand when
- injecting IRQs
-In-Reply-To: <1418139844-27892-6-git-send-email-christoffer.dall@linaro.org>
-References: <1418139844-27892-1-git-send-email-christoffer.dall@linaro.org>
- <1418139844-27892-6-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <5489E3FC.2000304@arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 11 Dec 2014 10:41:38 -0800
+Subject: [PATCH v6 1/5] phy: add a driver for the Rockchip SoC internal
+ USB2.0 PHY
+In-Reply-To: <548971AF.1020506@ti.com>
+References: <1418291722-25448-1-git-send-email-lyz@rock-chips.com>
+ <1418291722-25448-2-git-send-email-lyz@rock-chips.com>
+ <548971AF.1020506@ti.com>
+Message-ID: <CAD=FV=XTYmzxvteNip2gtuDSSEWph-vY=BOPejHa1Z5KS2Kf6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/14 15:44, Christoffer Dall wrote:
-> Userspace assumes that it can wire up IRQ injections after having
-> created all VCPUs and after having created the VGIC, but potentially
-> before starting the first VCPU.  This can currently lead to lost IRQs
-> because the state of that IRQ injection is not stored anywhere and we
-> don't return an error to userspace.
-> 
-> We haven't seen this problem manifest itself yet, presumably because
-> guests reset the devices on boot, but this could cause issues with
-> migration and other non-standard startup configurations.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index c98cc6b..feef015 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1693,8 +1693,13 @@ out:
->  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->  			bool level)
->  {
-> -	if (likely(vgic_ready(kvm)) &&
-> -	    vgic_update_irq_pending(kvm, cpuid, irq_num, level))
-> +	if (unlikely(!vgic_initialized(kvm))) {
-> +		mutex_lock(&kvm->lock);
-> +		vgic_init(kvm);
+Kishon,
 
-What if this fails?
+On Thu, Dec 11, 2014 at 2:27 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> I didn't mean that. You can get rid of this entire xlate stuff if you use
+> something like below
+>
+> phy at xxx {
+>         compatible = "";
+>         phy1:usb_phy {
+>         }
+>         phy2:usb_phy {
+>         };
+> };
+>
+>
+> usb at xx {
+>         compatible = "";
+>         phys = <&phy1>; //doesn't need xlate
+>         /* this needs xlate
+>            phys = <&phy 1>;
+>         */
+>         phy-names = "phy";
+> };
 
-> +		mutex_unlock(&kvm->lock);
-> +	}
-> +
-> +	if (vgic_update_irq_pending(kvm, cpuid, irq_num, level))
->  		vgic_kick_vcpus(kvm);
->  
->  	return 0;
-> 
+Is the syntax you proposed really better?  Are you saying that you
+advocate never using "#phy-cells" other than 0 for new bindings?  Is
+that your own personal preference, or is there a discussion somewhere
+where everyone agreed on this?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+My vote is that since "phy-cells" exists and is part of the generic
+phy bindings that it's meant to be used whenever you have a single PHY
+driver that controls multiple PHYs.
+
+
+-Doug
