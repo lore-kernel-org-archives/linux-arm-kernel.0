@@ -1,47 +1,169 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 11 Dec 2014 11:55:55 -0800
-Subject: [PATCH 1/4] regulator: core: Support trying to get close to a
- certain voltage
-In-Reply-To: <20141211170934.GZ11764@sirena.org.uk>
-References: <1418245085-9754-1-git-send-email-dianders@chromium.org>
- <20141210235347.GT11764@sirena.org.uk>
- <CAHNYxRy2t0OVj-+CqQFOfj0zWAGG0j8rmd8SxdNWgBMA2iAfXQ@mail.gmail.com>
- <20141211123106.GU11764@sirena.org.uk>
- <CAD=FV=U4RFYx9NXOACrXJZK2bKkosyYnmTZRHkXuaSz-FS9kNQ@mail.gmail.com>
- <20141211170934.GZ11764@sirena.org.uk>
-Message-ID: <CAD=FV=WBAuF0+BVMG9rp53Zt851Ou0kZ6xgTe9mjmgxyugWteg@mail.gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Thu, 11 Dec 2014 20:59:49 +0100
+Subject: [rtc-linux] [PATCHv1 4/6] rtc: rtc-isl12057: fix isil vs isl
+ naming for intersil
+In-Reply-To: <20141210133041.27c5cb53bbf29b611fa5c48a@linux-foundation.org>
+ (Andrew Morton's message of "Wed, 10 Dec 2014 13:30:41 -0800")
+References: <cover.1416006090.git.arno@natisbad.org>
+ <3dde5b6adfc9c953e0c943b0b40ccd2177508030.1416006090.git.arno@natisbad.org>
+ <20141210133041.27c5cb53bbf29b611fa5c48a@linux-foundation.org>
+Message-ID: <87vbliez4a.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+Hi Arnd and Darshana,
 
-On Thu, Dec 11, 2014 at 9:09 AM, Mark Brown <broonie@kernel.org> wrote:
->> OK, I'll give a shot at taking my code and using it as a new
->> implementation for regulator_set_voltage_tol().  In the SD card code
->> I'll pick some reasonable tolerances--they won't be exactly what the
->> spec says, but they ought to be good enough.  If Ulf comes back and
->> yells at me then we can revisit adding a new API.
+Sorry for somehow top-posting, but let me provide some context to what
+follows. While pushing a set of patches for ISL 12057 RTC chip, I tried
+and continue what had been started by Philip Zabel (7a6540ca856a,
+"ARM: mvebu: Change vendor prefix for Intersil Corporation to isil")
+in one of the patches (see below) by switching the vendor prefix for
+Intersil from isl to isil. This specific patch was handled by Andrew via
+his -mm tree and now conflicts with what you pushed upstream.
+
+I do not have a strong advice on what is better and will follow what you
+decide by providing an updated patch to Andrew but:
+
+ - your changes somehow revert what has been done by philip
+ - three .dts files (those updated by Philip for isil) now have a deprecated prefix
+ - we now have both isil and isl in vendor-prefixes.txt
+ - FWIW, isil is the nasdaq symbol
+
+Cheers,
+
+a+
+
+Andrew Morton <akpm@linux-foundation.org> writes:
+
+> On Sat, 15 Nov 2014 00:07:05 +0100 Arnaud Ebalard <arno@natisbad.org> wrote:
 >
-> OK, thanks.  Even if a new interface does get added the implementation
-> needs to be shared with that for setting by tolerance, they're doing the
-> same thing.
-
-Yup, exactly.  I'll admit wasn't originally aware of the tolerance API
-and my first thought after your email was to reimplement it atop my
-patch.  ...but just having tolerance right now also seems sane.
-
-
-> Please also bear in mind the need to handle shared supplies in your
-> implementation.
-
-I'm being dense, can you give more details?  Do you want me to grab
-the mutex or do something smarter like track the voltage / tolerance
-requested by multiple clients and resolve them, or ...?
-
-I didn't grab any mutex because I thought all of the attributes I was
-looking at were unchanging.  If they're not then
-regulator_is_supported_voltage() probably has a bug since I'm reading
-roughly the same attributes that it is.  ...and in fact the flow of my
-code is also amost the same as regulator_is_supported_voltage()...
-
--Doug
+>> 
+>> When Intersil ISL12057 driver was introduced by commit 70e123373c05
+>> ("rtc: Add support for Intersil ISL12057 I2C RTC chip"), the vendor
+>> prefix 'isl' was used instead of the expected 'isil' (Intersil
+>> NASDAQ symbol). Recently, a patch from Philip Zabel (7a6540ca856a,
+>> "ARM: mvebu: Change vendor prefix for Intersil Corporation to isil")
+>> fixed that prefix in ReadyNAS devices .dts files (AFAICT, the only
+>> users).
+>> 
+>> That patch completes that work to change the remaining values in:
+>> 
+>>  - Intersil ISL12057 driver (compatible string) and also associated
+>>    Documentation/devicetree/bindings/i2c/trivial-devices.txt file
+>>    to reflect the changes introduced by previous commit from Philip
+>>  - Documentation/devicetree/bindings/vendor-prefixes.txt files to
+>>    avoid future mistakes
+>> 
+>> ...
+>>
+>> diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+>> index fbde415078e6..edac97c0f756 100644
+>> --- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+>> +++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+>> @@ -55,7 +55,7 @@ fsl,sgtl5000		SGTL5000: Ultra Low-Power Audio Codec
+>>  gmt,g751		G751: Digital Temperature Sensor and Thermal Watchdog with Two-Wire Interface
+>>  infineon,slb9635tt	Infineon SLB9635 (Soft-) I2C TPM (old protocol, max 100khz)
+>>  infineon,slb9645tt	Infineon SLB9645 I2C TPM (new protocol, max 400khz)
+>> -isl,isl12057		Intersil ISL12057 I2C RTC Chip
+>> +isil,isl12057		Intersil ISL12057 I2C RTC Chip
+>>  maxim,ds1050		5 Bit Programmable, Pulse-Width Modulator
+>>  maxim,max1237		Low-Power, 4-/12-Channel, 2-Wire Serial, 12-Bit ADCs
+>>  maxim,max6625		9-Bit/12-Bit Temperature Sensors with I__C-Compatible Serial Interface
+>> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> index 723999d73744..84193ecdc41c 100644
+>> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> @@ -77,7 +77,7 @@ innolux	Innolux Corporation
+>>  intel	Intel Corporation
+>>  intercontrol	Inter Control Group
+>>  isee	ISEE 2007 S.L.
+>> -isl	Intersil
+>> +isil	Intersil
+>>  karo	Ka-Ro electronics GmbH
+>>  keymile	Keymile GmbH
+>>  lacie	LaCie
+>> diff --git a/drivers/rtc/rtc-isl12057.c b/drivers/rtc/rtc-isl12057.c
+>> index fe562820a54a..31eaa6a9c2b2 100644
+>> --- a/drivers/rtc/rtc-isl12057.c
+>> +++ b/drivers/rtc/rtc-isl12057.c
+>> @@ -310,7 +310,8 @@ static int isl12057_probe(struct i2c_client *client,
+>>  
+>>  #ifdef CONFIG_OF
+>>  static const struct of_device_id isl12057_dt_match[] = {
+>> -	{ .compatible = "isl,isl12057" },
+>> +	{ .compatible = "isl,isl12057" },  /* obsolete */
+>> +	{ .compatible = "isil,isl12057" },
+>>  	{ },
+>>  };
+>>  #endif
+>
+> Your patch conflicts both textually and materially with the two below
+> patches, which are now upstream.
+>
+> I don't know what to do about this so I'll drop "rtc: rtc-isl12057: fix
+> isil vs isl naming for intersil".  Could you folks please sort this all
+> out?
+>
+>
+>
+> commit 7c75c1d5e72be6736aa558efd33ca2b31d77e425
+> Author:     Darshana Padmadas <darshanapadmadas@gmail.com>
+> AuthorDate: Sat Nov 8 22:52:06 2014 +0530
+> Commit:     Arnd Bergmann <arnd@arndb.de>
+> CommitDate: Thu Nov 20 12:20:18 2014 +0100
+>
+>     dt-bindings: Document deprecated device vendor name to fix related warning
+>     
+>     This patch documents deprecated vendor name "isil" to fix warning of
+>     undocumented string for device isl29028 as reported while running checkpatch.pl
+>     on drivers/staging/iio/light/isl29028.c. This is done to maintain compatibility
+>     with older kernels.
+>     
+>     Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
+>     Acked-by: Arnd Bergmann <arnd@arndb.de>
+>     Acked-by: Mark Rutland <mark.rutland@arm.com>
+>     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 723999d..bfbd93e 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -77,6 +77,7 @@ innolux	Innolux Corporation
+>  intel	Intel Corporation
+>  intercontrol	Inter Control Group
+>  isee	ISEE 2007 S.L.
+> +isil    Intersil (deprecated, use isl)
+>  isl	Intersil
+>  karo	Ka-Ro electronics GmbH
+>  keymile	Keymile GmbH
+>
+>
+> commit b2ea3f82e7984d855c5e61fef18746771d90c73c
+> Author:     Darshana Padmadas <darshanapadmadas@gmail.com>
+> AuthorDate: Sat Nov 8 22:52:05 2014 +0530
+> Commit:     Arnd Bergmann <arnd@arndb.de>
+> CommitDate: Thu Nov 20 12:19:59 2014 +0100
+>
+>     dt-bindings: Document correct and deprecated vendor-prefix with device isl29028
+>     
+>     This patch documents the device isl29028 with its vendor-prefix. Undocumented deprecated vendor-prefix
+>     found by checkpatch also documented for compatibility reasons.
+>     
+>     Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
+>     Acked-by: Arnd Bergmann <arnd@arndb.de>
+>     Acked-by: Mark Rutland <mark.rutland@arm.com>
+>     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> index fbde415..605dcca 100644
+> --- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> +++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> @@ -56,6 +56,8 @@ gmt,g751		G751: Digital Temperature Sensor and Thermal Watchdog with Two-Wire In
+>  infineon,slb9635tt	Infineon SLB9635 (Soft-) I2C TPM (old protocol, max 100khz)
+>  infineon,slb9645tt	Infineon SLB9645 I2C TPM (new protocol, max 400khz)
+>  isl,isl12057		Intersil ISL12057 I2C RTC Chip
+> +isil,isl29028           (deprecated, use isl)
+> +isl,isl29028            Intersil ISL29028 Ambient Light and Proximity Sensor
+>  maxim,ds1050		5 Bit Programmable, Pulse-Width Modulator
+>  maxim,max1237		Low-Power, 4-/12-Channel, 2-Wire Serial, 12-Bit ADCs
+>  maxim,max6625		9-Bit/12-Bit Temperature Sensors with I?C-Compatible Serial Interface
