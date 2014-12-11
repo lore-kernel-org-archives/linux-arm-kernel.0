@@ -1,34 +1,74 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Thu, 11 Dec 2014 15:16:06 +0800
-Subject: [PATCH v5 1/5] phy: add a driver for the Rockchip SoC internal
- USB2.0 PHY
-In-Reply-To: <1418281568.18092.34.camel@perches.com>
-References: <1418208371-18851-1-git-send-email-lyz@rock-chips.com>	
- <1418208371-18851-2-git-send-email-lyz@rock-chips.com>	
- <5489338C.1030109@ti.com> <1418278322.18092.30.camel@perches.com>	
- <54893963.7060304@ti.com> <1418279847.18092.32.camel@perches.com>	
- <54893F26.5050304@rock-chips.com> <1418281568.18092.34.camel@perches.com>
-Message-ID: <548944B6.90703@rock-chips.com>
+From: harinikatakamlinux@gmail.com (Harini Katakam)
+Date: Thu, 11 Dec 2014 12:46:53 +0530
+Subject: [PATCH v4 2/2] i2c: cadence: Check for errata condition involving
+ master receive
+In-Reply-To: <6b2bd13bcd934b0fb09712e8950348e6@BN1AFFO11FD005.protection.gbl>
+References: <1418211884-5329-1-git-send-email-harinik@xilinx.com>
+ <1418211884-5329-3-git-send-email-harinik@xilinx.com>
+ <6b2bd13bcd934b0fb09712e8950348e6@BN1AFFO11FD005.protection.gbl>
+Message-ID: <CAFcVECJDfJaEALDxfZg5-+tsD02mVT43s7PX4RLs349Kx9Jaeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Soren,
 
-On 12/11/2014 03:06 PM, Joe Perches wrote:
-> On Thu, 2014-12-11 at 14:52 +0800, Yunzhi Li wrote:
->> On 2014/12/11 14:37, Joe Perches wrote:
->>> On Thu, 2014-12-11 at 11:57 +0530, Kishon Vijay Abraham I wrote:
-> []
->>>> So If I have to write something on bit 0, I have to set bit 16.
->>>> If I have to write something on bit 1, I have to set bit 17.
->>>> If I have to write something on bit 2, I have to set bit 18.
->>>> and so on.
->>> To me it'd look better to use another << rather than a plus
->> Like (BIT(13) << 16)? It looks strange, or could I just use ((1 << 13)
->> << 16) to describe this bit ?
-> Up to you.  To me, the BIT(x+y) seems odd.
-I think BIT(29) is better, since you have described in comments.
+On Wed, Dec 10, 2014 at 11:15 PM, S?ren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
+> On Wed, 2014-12-10 at 05:14PM +0530, Harini Katakam wrote:
+>> Cadence I2C controller has the following bugs:
+>> - completion indication is not given to the driver at the end of
+>> a read/receive transfer with HOLD bit set.
+>> - Invalid read transaction are generated on the bus when HW timeout
+>> condition occurs with HOLD bit set.
+>>
+>> As a result of the above, if a set of messages to be transferred with
+>> repeated start includes any transfer following a read transfer,
+>> completion is never indicated and timeout occurs.
+>> Hence a check is implemented to return -EOPNOTSUPP for such sequences.
+>>
+>> Signed-off-by: Harini Katakam <harinik@xilinx.com>
+>> Signed-off-by: Vishnu Motghare <vishnum@xilinx.com>
+>> ---
+>>
+>> v4:
+>> Use single dev_warn and make message grep-able.
+>>
+>> v3:
+>> Add warning in case of unsupported transfer.
+>>
+>> v2:
+>> Dont defeteature repeated start. Just check for unsupported conditions in the
+>> driver and return error.
+>>
+>> ---
+>>  drivers/i2c/busses/i2c-cadence.c |   14 ++++++++++++++
+>>  1 file changed, 14 insertions(+)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+>> index 5f5d4fa..f9269a6 100644
+>> --- a/drivers/i2c/busses/i2c-cadence.c
+>> +++ b/drivers/i2c/busses/i2c-cadence.c
+>> @@ -541,6 +541,20 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+>>        * processed with a repeated start.
+>>        */
+>>       if (num > 1) {
+>> +             /*
+>> +              * This controller does not give completion interrupt after a
+>> +              * master receive transfer if HOLD bit is set (repeated start),
+>> +              * resulting in SW timeout. Hence, if a receive transfer is
+>> +              * followed by any other transfer, an error is returned
+>> +              * indicating that this sequence is not supported.
+>> +              */
+>> +             for (count = 0; count < num-1; count++) {
+>> +                     if (msgs[count].flags & I2C_M_RD)
+>> +                             dev_warn(adap->dev.parent, "No support for "
+>> +                                      "repeated start when receive is "
+>> +                                      "followed by a transfer\n");
 >
->
->
->
->
+> Still not grepable. There must be no line breaks in the string!
+
+This message will be printed in one single line.
+Do you want this string to be grepable in the driver? Why is that necessary?
+
+Regards,
+Harini
