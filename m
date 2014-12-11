@@ -1,145 +1,188 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 11 Dec 2014 08:47:38 +0100
-Subject: [PATCH v4] i2c: rk3x: fix bug that cause measured high_ns
- doesn't meet I2C specification
-In-Reply-To: <1418277650-25215-1-git-send-email-addy.ke@rock-chips.com>
-References: <1418007589-3688-1-git-send-email-addy.ke@rock-chips.com>
- <1418277650-25215-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <20141211074738.GL13486@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 11 Dec 2014 10:10:46 +0200
+Subject: [v3][PATCH 3/5] media: ov2640: add primary dt support
+In-Reply-To: <1418283339-16281-4-git-send-email-josh.wu@atmel.com>
+References: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
+ <1418283339-16281-4-git-send-email-josh.wu@atmel.com>
+Message-ID: <2810609.1cJv5BoTgd@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Josh,
 
-I like it now. There are only a few small nitpicks, not sure its worth
-to respin if noone else has concerns. See below.
+Thank you for the patch.
 
-On Thu, Dec 11, 2014 at 02:00:49PM +0800, Addy Ke wrote:
-> The number of clock cycles to be written into the CLKDIV register
-> that determines the I2C clk high phase includes the rise time.
-> So to meet the timing requirements defined in the I2C specification
-> which defines the minimal time SCL has to be high, the rise time
-> has to taken into account. The same applies to the low phase with
-> falling time.
+I only have three minor comments. After fixing them,
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+On Thursday 11 December 2014 15:35:37 Josh Wu wrote:
+> Add device tree support for ov2640.
 > 
-> In my test on RK3288-Pink2 board, which is not an upstream board yet,
-> if external pull-up resistor is 4.7K, rise_ns is about 700ns.
-> So the measured high_ns is about 3900ns, which is less than 4000ns
-> (the minimum high_ns in I2C specification for Standard-mode).
-> 
-> To fix this bug, min_low_ns should include fall time and min_high_ns
-s/,//
-
-> should include rise time too.
-I'd skip the "too". If you want to keep it, s/time/time,/.
- 
-> This patch merged the patch that Doug submitted to chromium project,
-AFAIK s/,//
-
-For correctness, does this patch needs Doug's Sob?
-
-> which can get the rise and fall times for signals from the device tree.
-> This allows us to more accurately calculate timings. see:
-> https://chromium-review.googlesource.com/#/c/232774/
-> 
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 > ---
-> [...]
-> @@ -469,29 +476,33 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
-> [...]
->  	if (scl_rate <= 100000) {
-> -		min_low_ns = 4700;
-> -		min_high_ns = 4000;
-> -		max_data_hold_ns = 3450;
-> -		data_hold_buffer_ns = 50;
-> +		/* Standard-mode */
-> +		spec_min_low_ns = 4700;
-> +		spec_min_high_ns = 4000;
-> +		spec_max_data_hold_ns = 3450;
-> +		spec_data_hold_buffer_ns = 50;
->  	} else {
-> -		min_low_ns = 1300;
-> -		min_high_ns = 600;
-> -		max_data_hold_ns = 900;
-> -		data_hold_buffer_ns = 50;
-> +		/* Fast-mode */
-> +		spec_min_low_ns = 1300;
-> +		spec_min_high_ns = 600;
-> +		spec_max_data_hold_ns = 900;
-> +		spec_data_hold_buffer_ns = 50;
-The background of my question regarding data_hold_buffer_ns in the last
-round was: If data_hold_buffer_ns doesn't appear in the I2C
-specification, should it be renamed to spec_... ? *shrug*
+> v2 -> v3:
+>   1. fix gpiod usage.
+>   2. refine the ov2640_probe() function.
+> 
+> v1 -> v2:
+>   1. use gpiod APIs.
+>   2. change the gpio pin's name according to datasheet.
+>   3. reduce the delay for .reset() function.
+> 
+>  drivers/media/i2c/soc_camera/ov2640.c | 87 +++++++++++++++++++++++++++++---
+>  1 file changed, 81 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
+> b/drivers/media/i2c/soc_camera/ov2640.c index 9ee910d..e0bcf5b 100644
+> --- a/drivers/media/i2c/soc_camera/ov2640.c
+> +++ b/drivers/media/i2c/soc_camera/ov2640.c
+> @@ -18,6 +18,8 @@
+>  #include <linux/i2c.h>
+>  #include <linux/slab.h>
+>  #include <linux/delay.h>
+> +#include <linux/gpio.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/v4l2-mediabus.h>
+>  #include <linux/videodev2.h>
+> 
+> @@ -283,6 +285,10 @@ struct ov2640_priv {
+>  	u32	cfmt_code;
+>  	struct v4l2_clk			*clk;
+>  	const struct ov2640_win_size	*win;
+> +
+> +	struct soc_camera_subdev_desc	ssdd_dt;
+> +	struct gpio_desc *resetb_gpio;
+> +	struct gpio_desc *pwdn_gpio;
+>  };
+> 
+>  /*
+> @@ -1047,6 +1053,63 @@ static struct v4l2_subdev_ops ov2640_subdev_ops = {
+>  	.video	= &ov2640_subdev_video_ops,
+>  };
+> 
+> +/* OF probe functions */
+> +static int ov2640_hw_power(struct device *dev, int on)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct ov2640_priv *priv = to_ov2640(client);
+> +
+> +	dev_dbg(&client->dev, "%s: %s the camera\n",
+> +			__func__, on ? "ENABLE" : "DISABLE");
+> +
+> +	if (priv->pwdn_gpio)
+> +		gpiod_direction_output(priv->pwdn_gpio, !on);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ov2640_hw_reset(struct device *dev)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct ov2640_priv *priv = to_ov2640(client);
+> +
+> +	if (priv->resetb_gpio) {
+> +		/* Active the resetb pin to perform a reset pulse */
+> +		gpiod_direction_output(priv->resetb_gpio, 1);
+> +		usleep_range(3000, 5000);
+> +		gpiod_direction_output(priv->resetb_gpio, 0);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int ov2640_probe_dt(struct i2c_client *client,
+> +		struct ov2640_priv *priv)
+> +{
+> +	/* reset is not actived */
 
+Do you mean that you configure the reset signal as inactive ? I would state 
+that as "Request the reset GPIO deasserted".
+
+> +	priv->resetb_gpio = devm_gpiod_get_optional(&client->dev, "resetb",
+> +			GPIOD_OUT_LOW);
+> +	if (!priv->resetb_gpio)
+> +		dev_dbg(&client->dev, "resetb gpio is not assigned!\n");
+> +	else if (IS_ERR(priv->resetb_gpio))
+> +		return PTR_ERR(priv->resetb_gpio);
+> +
+> +	/* Power down actived */
+
+And "Request the power down GPIO asserted".
+
+> +	priv->pwdn_gpio = devm_gpiod_get_optional(&client->dev, "pwdn",
+> +			GPIOD_OUT_HIGH);
+> +	if (!priv->pwdn_gpio)
+> +		dev_dbg(&client->dev, "pwdn gpio is not assigned!\n");
+> +	else if (IS_ERR(priv->pwdn_gpio))
+> +		return PTR_ERR(priv->pwdn_gpio);
+> +
+> +	/* Initialize the soc_camera_subdev_desc */
+> +	priv->ssdd_dt.power = ov2640_hw_power;
+> +	priv->ssdd_dt.reset = ov2640_hw_reset;
+> +	client->dev.platform_data = &priv->ssdd_dt;
+> +
+> +	return 0;
+> +}
+> +
+>  /*
+>   * i2c_driver functions
+>   */
+> @@ -1058,12 +1121,6 @@ static int ov2640_probe(struct i2c_client *client,
+>  	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
+>  	int			ret;
+> 
+> -	if (!ssdd) {
+> -		dev_err(&adapter->dev,
+> -			"OV2640: Missing platform_data for driver\n");
+> -		return -EINVAL;
+> -	}
+> -
+>  	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
+>  		dev_err(&adapter->dev,
+>  			"OV2640: I2C-Adapter doesn't support SMBUS\n");
+> @@ -1077,6 +1134,17 @@ static int ov2640_probe(struct i2c_client *client,
+>  		return -ENOMEM;
 >  	}
-> -	max_low_ns = max_data_hold_ns * 2 - data_hold_buffer_ns;
-> +	min_low_ns = spec_min_low_ns + fall_ns;
-> +	min_high_ns = spec_min_high_ns + rise_ns;
-> +	max_low_ns = spec_max_data_hold_ns * 2 - spec_data_hold_buffer_ns;
->  	min_total_ns = min_low_ns + min_high_ns;
->  
->  	/* Adjust to avoid overflow */
-> @@ -510,8 +521,8 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
->  	min_div_for_hold = (min_low_div + min_high_div);
->  
->  	/*
-> -	 * This is the maximum divider so we don't go over the max.
-> -	 * We don't round up here (we round down) since this is a max.
-> +	 * This is the maximum divider so we don't go over the maximum.
-> +	 * We don't round up here (we round down) since this is a maximum.
->  	 */
->  	max_low_div = clk_rate_khz * max_low_ns / (8 * 1000000);
->  
-> @@ -544,7 +555,7 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
->  		ideal_low_div = DIV_ROUND_UP(clk_rate_khz * min_low_ns,
->  					     scl_rate_khz * 8 * min_total_ns);
->  
-> -		/* Don't allow it to go over the max */
-> +		/* Don't allow it to go over the maximum */
->  		if (ideal_low_div > max_low_div)
->  			ideal_low_div = max_low_div;
->  
-> @@ -588,8 +599,8 @@ static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
->  	u64 t_low_ns, t_high_ns;
->  	int ret;
->  
-> -	ret = rk3x_i2c_calc_divs(clk_rate, i2c->scl_frequency, &div_low,
-> -				 &div_high);
-> +	ret = rk3x_i2c_calc_divs(clk_rate, i2c->scl_frequency, i2c->rise_ns,
-> +				 i2c->fall_ns, &div_low, &div_high);
->  
->  	WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->scl_frequency);
->  
-> @@ -633,9 +644,9 @@ static int rk3x_i2c_clk_notifier_cb(struct notifier_block *nb, unsigned long
->  	switch (event) {
->  	case PRE_RATE_CHANGE:
->  		if (rk3x_i2c_calc_divs(ndata->new_rate, i2c->scl_frequency,
-> -				      &div_low, &div_high) != 0) {
-> +				       i2c->rise_ns, i2c->fall_ns, &div_low,
-> +				       &div_high) != 0)
->  			return NOTIFY_STOP;
-> -		}
->  
->  		/* scale up */
->  		if (ndata->new_rate > ndata->old_rate)
-> @@ -859,6 +870,21 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
->  		i2c->scl_frequency = DEFAULT_SCL_RATE;
->  	}
->  
-> +	/*
-> +	 * Read rise and fall ns.
-> +	 * If not, there use the default maximum from specification.
-I'd write:
+> 
+> +	if (!ssdd && !client->dev.of_node) {
+> +		dev_err(&client->dev, "Missing platform_data for driver\n");
+> +		return  -EINVAL;
+> +	}
+> +
+> +	if (!ssdd && client->dev.of_node) {
 
-	Read rise and fall time from device tree. If not available use
-	the default maximum timing from the specification.
+You can just test for !ssdd as you've tested client->dev.of_node above 
+already.
 
-(Otherwise I think the comma needs to go after "there" in your
-sentence.)
-
-Thanks
-Uwe
+> +		ret = ov2640_probe_dt(client, priv);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+>  	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
+>  	v4l2_ctrl_handler_init(&priv->hdl, 2);
+>  	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
+> @@ -1123,9 +1191,16 @@ static const struct i2c_device_id ov2640_id[] = {
+>  };
+>  MODULE_DEVICE_TABLE(i2c, ov2640_id);
+> 
+> +static const struct of_device_id ov2640_of_match[] = {
+> +	{.compatible = "ovti,ov2640", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, ov2640_of_match);
+> +
+>  static struct i2c_driver ov2640_i2c_driver = {
+>  	.driver = {
+>  		.name = "ov2640",
+> +		.of_match_table = of_match_ptr(ov2640_of_match),
+>  	},
+>  	.probe    = ov2640_probe,
+>  	.remove   = ov2640_remove,
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+
+Laurent Pinchart
