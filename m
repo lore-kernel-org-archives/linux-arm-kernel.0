@@ -1,83 +1,30 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 11 Dec 2014 17:16:35 +0800
-Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <10603826.6Z6KUoI9qZ@wuerfel>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <2065254.jRdQcinOdg@wuerfel> <54759991.50204@linaro.org>
- <10603826.6Z6KUoI9qZ@wuerfel>
-Message-ID: <548960F3.7070405@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Dec 2014 09:29:45 +0000
+Subject: regression: OMAP4 (next-20141204) (bisect to: ARM: 8208/1: l2c:
+ Refactor the driver to use commit-like)
+In-Reply-To: <54881589.20105@samsung.com>
+References: <5481D913.9040109@ti.com> <5481D9BF.2090007@ti.com>
+ <20141209165746.GA29935@kahuna> <54881589.20105@samsung.com>
+Message-ID: <20141211092945.GE11502@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, Dec 10, 2014 at 10:42:33AM +0100, Marek Szyprowski wrote:
+> I assume that now it won't be possible to get l2c patches back to -next,
+> so I will resend them (again...) with the omap related fix.
 
-On 2014?12?10? 18:57, Arnd Bergmann wrote:
-> On Wednesday 26 November 2014 17:12:49 Hanjun Guo wrote:
->>
->> Thanks for the detail information. I have the concerns about the distance
->> for NUMA nodes, does the "ibm,associativity-reference-points" property can
->> represent the distance between NUMA nodes?
->>
->> For example, a system with 4 sockets connected like below:
->>
->> Socket 0  <---->  Socket 1  <---->  Socket 2  <---->  Socket 3
->>
->> So from socket 0 to socket 1 (maybe on the same board), it just need 1
->> jump to access the memory, but from socket 0 to socket 2/3, it needs
->> 2/3 jumps and the *distance* relative longer. Can
->> "ibm,associativity-reference-points" property cover this?
->>
->
-> Hi Hanjun,
->
-> I only today found your replies in my spam folder, I need to put you on
-> a whitelist so that doesn't happen again.
+What, you mean you don't know the fundamental rules of kernel development?
 
-Thanks. I hope my ACPI patches will not scare your email filter :)
+No one should ever dump any new code into linux-next during a merge
+window which is not a fix for a regression or a bug fix, period.
 
->
-> The above topology is not easy to represent, but I think it would work
-> like this (ignoring the threads/cores/clusters on the socket, which
-> would also need to be described in a full DT), using multiple logical
-> paths between the nodes:
->
-> socket 0
-> ibm,associativity = <0 0 0 0>, <1 1 1 0>, <2 2 0 0>, <3 0 0 0>;
->
-> socket 1
-> ibm,associativity = <1 1 1 1>, <0 0 0 1>, <2 2 2 1>, <3 3 1 1>;
->
-> socket 2
-> ibm,associativity = <2 2 2 2>, <0 0 2 2>, <1 1 1 2>, <3 3 3 2>;
->
-> socket 3
-> ibm,associativity = <3 3 3 3>, <0 3 3 3>, <1 1 3 3>, <2 2 2 3>;
->
-> This describes four levels or hierarchy, with the lowest level
-> being a single CPU core on one socket, and four paths between
-> the sockets. To compute the associativity between two sockets,
-> you need to look at each combination of paths to find the best
-> match.
->
-> Comparing sockets 0 and 1, the best matches are <1 1 1 0>
-> with <1 1 1 1>, and <0 0 0 0> with <0 0 0 1>. In each case, the
-> associativity is "3", meaning the first three entries match.
->
-> Comparing sockets 0 and 3, we have four equally bad matches
-> that each only match in the highest-level domain, e.g. <0 0 0 0>
-> with <0 3 3 3>, so the associativity is only "1", and that means
-> the two nodes are less closely associated than two neighboring
-> ones.
->
-> With the algorithm that powerpc uses to turn associativity into
-> distance, 2**(numlevels - associativity), this would put the
-> distance of neighboring nodes at "2", and the longest distance
-> at "8".
+Linus has in the past taken a snapshot of linux-next at the beginning
+of a merge window, and then threatened to refuse to merge anything that
+wasn't in his local snapshot, or which doesn't qualify as the above.
 
-Thanks for the explain, I can understand how it works now,
-a bit complicated for me and I think the distance property
-"node-matrix" in Ganapatrao's patch is straight forward,
-what do you think?
+So no, it won't be possible, because I play by the community rules when
+it comes to what gets merged and at what time in the cycle.
 
-Thanks
-Hanjun
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
