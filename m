@@ -1,61 +1,95 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 11 Dec 2014 15:31:09 +0800
-Subject: [PATCH] ARM: at91: board-dt-sama5: add phy_fixup to override
- NAND_Tree which improperly strapp-in during the reset period.
-Message-ID: <1418283069-5648-1-git-send-email-wenyou.yang@atmel.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 11 Dec 2014 15:35:36 +0800
+Subject: [v3][PATCH 2/5] media: ov2640: add async probe function
+In-Reply-To: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
+References: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1418283339-16281-3-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Appearance: On some SAMA5D4EK boards, after power up, the Eth1 doesn't work.
+To support async probe for ov2640, we need remove the code to get 'mclk'
+in ov2640_probe() function. oterwise, if soc_camera host is not probed
+in the moment, then we will fail to get 'mclk' and quit the ov2640_probe()
+function.
 
-Reason: The PIOE2 pin is connected to the NAND_Tree# of KSZ8081,
-But it outputs LOW during the reset period, which cause the NAND_Tree# enabled.
+So in this patch, we move such 'mclk' getting code to ov2640_s_power()
+function. That make ov2640 survive, as we can pass a NULL (priv-clk) to
+soc_camera_set_power() function.
 
-Add phy_fixup() to disable NAND_Tree by overriding the Operation
-Mode Strap Override register(i.e. Register 16h) to clear the NAND_Tree bit.
+And if soc_camera host is probed, the when ov2640_s_power() is called,
+then we can get the 'mclk' and that make us enable/disable soc_camera
+host's clock as well.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
- arch/arm/mach-at91/board-dt-sama5.c |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+v2 -> v3:
+v1 -> v2:
+  no changes.
 
-diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
-index 8fb9ef5..97f7367 100644
---- a/arch/arm/mach-at91/board-dt-sama5.c
-+++ b/arch/arm/mach-at91/board-dt-sama5.c
-@@ -17,6 +17,7 @@
- #include <linux/of_platform.h>
- #include <linux/phy.h>
- #include <linux/clk-provider.h>
-+#include <linux/phy.h>
- 
- #include <asm/setup.h>
- #include <asm/irq.h>
-@@ -26,8 +27,25 @@
- 
- #include "generic.h"
- 
-+static int ksz8081_phy_fixup(struct phy_device *phy)
-+{
-+	int value;
+ drivers/media/i2c/soc_camera/ov2640.c | 31 +++++++++++++++++++++----------
+ 1 file changed, 21 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/media/i2c/soc_camera/ov2640.c b/drivers/media/i2c/soc_camera/ov2640.c
+index 1fdce2f..9ee910d 100644
+--- a/drivers/media/i2c/soc_camera/ov2640.c
++++ b/drivers/media/i2c/soc_camera/ov2640.c
+@@ -739,6 +739,15 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int on)
+ 	struct i2c_client *client = v4l2_get_subdevdata(sd);
+ 	struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
+ 	struct ov2640_priv *priv = to_ov2640(client);
++	struct v4l2_clk *clk;
 +
-+	value = phy_read(phy, 0x16);
-+	value &= ~0x20;
-+	phy_write(phy, 0x16, value);
++	if (!priv->clk) {
++		clk = v4l2_clk_get(&client->dev, "mclk");
++		if (IS_ERR(clk))
++			dev_warn(&client->dev, "Cannot get the mclk. maybe soc-camera host is not probed yet.\n");
++		else
++			priv->clk = clk;
++	}
+ 
+ 	return soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
+ }
+@@ -1078,21 +1087,21 @@ static int ov2640_probe(struct i2c_client *client,
+ 	if (priv->hdl.error)
+ 		return priv->hdl.error;
+ 
+-	priv->clk = v4l2_clk_get(&client->dev, "mclk");
+-	if (IS_ERR(priv->clk)) {
+-		ret = PTR_ERR(priv->clk);
+-		goto eclkget;
+-	}
+-
+ 	ret = ov2640_video_probe(client);
+ 	if (ret) {
+-		v4l2_clk_put(priv->clk);
+-eclkget:
+-		v4l2_ctrl_handler_free(&priv->hdl);
++		goto evideoprobe;
+ 	} else {
+ 		dev_info(&adapter->dev, "OV2640 Probed\n");
+ 	}
+ 
++	ret = v4l2_async_register_subdev(&priv->subdev);
++	if (ret < 0)
++		goto evideoprobe;
 +
 +	return 0;
-+}
 +
- static void __init sama5_dt_device_init(void)
- {
-+	if (of_machine_is_compatible("atmel,sama5d4ek") &&
-+	   IS_ENABLED(CONFIG_PHYLIB)) {
-+		phy_register_fixup_for_id("fc028000.etherne:00",
-+						ksz8081_phy_fixup);
-+	}
-+
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++evideoprobe:
++	v4l2_ctrl_handler_free(&priv->hdl);
+ 	return ret;
  }
  
+@@ -1100,7 +1109,9 @@ static int ov2640_remove(struct i2c_client *client)
+ {
+ 	struct ov2640_priv       *priv = to_ov2640(client);
+ 
+-	v4l2_clk_put(priv->clk);
++	v4l2_async_unregister_subdev(&priv->subdev);
++	if (priv->clk)
++		v4l2_clk_put(priv->clk);
+ 	v4l2_device_unregister_subdev(&priv->subdev);
+ 	v4l2_ctrl_handler_free(&priv->hdl);
+ 	return 0;
 -- 
-1.7.9.5
+1.9.1
