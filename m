@@ -1,38 +1,80 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 11 Dec 2014 11:22:31 -0800
-Subject: [PATCH v5] i2c: rk3x: fix bug that cause measured high_ns doesn't
- meet I2C specification
-In-Reply-To: <1418295760-19639-1-git-send-email-addy.ke@rock-chips.com>
-References: <1418277650-25215-1-git-send-email-addy.ke@rock-chips.com>
- <1418295760-19639-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <CAD=FV=UCQMRLx2KHzT28iY6uCHGQ0MouWKEeVyv2AF_qNCrT=Q@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 11 Dec 2014 20:31:03 +0100
+Subject: [PATCH v2 1/1] net/macb: add TX multiqueue support for gem
+In-Reply-To: <87a3098203ee6eaa7a60607713a293d3258e2b58.1418291637.git.cyrille.pitchen@atmel.com>
+References: <cover.1418291637.git.cyrille.pitchen@atmel.com>
+ <87a3098203ee6eaa7a60607713a293d3258e2b58.1418291637.git.cyrille.pitchen@atmel.com>
+Message-ID: <20141211203103.4191887a@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Cyrille Pitchen,
 
-On Thu, Dec 11, 2014 at 3:02 AM, Addy Ke <addy.ke@rock-chips.com> wrote:
->   - clock-frequency : SCL frequency to use (in Hz). If omitted, 100kHz is used.
-> + - i2c-scl-rising-time-ns : Number of nanoseconds the signal takes to rise
-> +       (t(r) in I2C specification). If not specified this is assumed to be
-> +       the maximum the specification allows(1000 ns for Standard-mode,
-> +       300 ns for Fast-mode) which might cause slightly slower communication.
-> + - i2c-scl-falling-time-ns : Number of nanoseconds the signal takes to fall
-> +       (t(f) in the I2C specification). If not specified this is assumed to
-> +       be the maximum the specification allows (300 ns) which might cause
-> +       slightly slowercommunication.
+On Thu, 11 Dec 2014 11:16:51 +0100, Cyrille Pitchen wrote:
 
-nit: you forgot a space between "slower" and "communication".
+> +#define GEM_ISR1				0x0400
+> +#define GEM_ISR2				0x0404
+> +#define GEM_ISR3				0x0408
+> +#define GEM_ISR4				0x040c
+> +#define GEM_ISR5				0x0410
+> +#define GEM_ISR6				0x0414
+> +#define GEM_ISR7				0x0418
 
-...this is the type of thing I think Wolfram can fixup when applying,
-so I'd suggest against respinning unless something else is needed.
+What about doing instead:
 
-Overall I continue to be happy with this patch.
+#define GEM_ISR(q)				((q) == 0 ? MACB_ISR : 0x400 + (q) << 2)
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
+And ditto for all other registers, which will save a lot of boring repeated code.
 
-You'll notice that I posted a patch atop it at
-<https://patchwork.kernel.org/patch/5477201/>.
+If you do that, then you can avoid the following fields in the
+macb_queue structure:
 
--Doug
++	unsigned int		ISR;
++	unsigned int		IER;
++	unsigned int		IDR;
++	unsigned int		IMR;
++	unsigned int		TBQP;
+
+And the not very pleasant calculation of those offsets:
+
++	bp->queues[0].bp = bp;
++	bp->queues[0].ISR  = MACB_ISR;
++	bp->queues[0].IER  = MACB_IER;
++	bp->queues[0].IDR  = MACB_IDR;
++	bp->queues[0].IMR  = MACB_IMR;
++	bp->queues[0].TBQP = MACB_TBQP;
++	for (q = 1, queue = &bp->queues[1]; q < MACB_MAX_QUEUES; ++q) {
++		if (!(queue_mask & (1 << q)))
++			continue;
++
++		queue->bp = bp;
++		queue->ISR  = (q-1) * sizeof(u32) + GEM_ISR1;
++		queue->IER  = (q-1) * sizeof(u32) + GEM_IER1;
++		queue->IDR  = (q-1) * sizeof(u32) + GEM_IDR1;
++		queue->IMR  = (q-1) * sizeof(u32) + GEM_IMR1;
++		queue->TBQP = (q-1) * sizeof(u32) + GEM_TBQP1;
++		queue++;
++	}
+
+You replace the ISR, IER, IDR, IMR and TBQP by an "id" field in
+macb_queue, which contains the queue number, and then change your:
+
++#define queue_readl(queue, reg)				\
++	__raw_readl((queue)->bp->regs + queue->reg)
++#define queue_writel(queue, reg, value)			\
++	__raw_writel((value), (queue)->bp->regs + queue->reg)
+
+to
+
++#define queue_readl(queue, reg)				\
++	__raw_readl((queue)->bp->regs + reg((queue)->id))
++#define queue_writel(queue, reg, value)			\
++	__raw_writel((value), (queue)->bp->regs + reg((queue)->id)
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
