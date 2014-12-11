@@ -1,29 +1,19 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Dec 2014 14:32:05 +0000
-Subject: [PATCH 4/4] ARM: add 32bit support to GICv3
-In-Reply-To: <1418307788-17977-5-git-send-email-jean-philippe.brucker@arm.com>
-References: <1418307788-17977-1-git-send-email-jean-philippe.brucker@arm.com>
- <1418307788-17977-5-git-send-email-jean-philippe.brucker@arm.com>
-Message-ID: <20141211143205.GP11285@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 11 Dec 2014 17:39:58 +0300
+Subject: [PATCH 1/1] net/macb: fix compilation warning for print_hex_dump()
+ called with skb->mac_header
+In-Reply-To: <efa28485b430e77f5254248cb396da431d03fc5b.1418292741.git.cyrille.pitchen@atmel.com>
+References: <efa28485b430e77f5254248cb396da431d03fc5b.1418292741.git.cyrille.pitchen@atmel.com>
+Message-ID: <5489ACBE.1050006@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 11, 2014 at 02:23:08PM +0000, Jean-Philippe Brucker wrote:
-> +#ifndef __ASM_ARCH_GICV3_H
-> +#define __ASM_ARCH_GICV3_H
-> +
-> +#ifndef __ASSEMBLY__
-> +
-> +#include <asm/io.h>
+Hello.
 
-This should be linux/io.h
+On 12/11/2014 1:15 PM, Cyrille Pitchen wrote:
 
-> +/* Low-level accessors */
-> +
-> +static inline void __maybe_unused gic_write_eoir(u32 irq)
+    Citing the warning here would be a good idea.
 
-No need for __maybe_unused with static inline.
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+WBR, Sergei
