@@ -1,55 +1,30 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Thu, 11 Dec 2014 10:52:45 +0800
-Subject: [PATCH RFC 04/15] drm/dsi: Do not add DSI devices for the child
- nodes with input-port property
-In-Reply-To: <20141210122105.GC23558@ulmo.nvidia.com>
-References: <1418200648-32656-1-git-send-email-Ying.Liu@freescale.com>
- <1418200648-32656-5-git-send-email-Ying.Liu@freescale.com>
- <20141210122105.GC23558@ulmo.nvidia.com>
-Message-ID: <548906FD.5070009@freescale.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 11 Dec 2014 10:54:33 +0800
+Subject: [PATCH] ARM: at91/dt: sama5d4: fix the timer reg length
+Message-ID: <1418266473-30187-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+The second property of reg is the length, so correct it for timer.
 
-On 12/10/2014 08:21 PM, Thierry Reding wrote:
-> On Wed, Dec 10, 2014 at 04:37:17PM +0800, Liu Ying wrote:
->> The MIPI DSI bus driver would try to add a DSI device for a host's every
->> child node which contains the reg property.  Unfortunately, the existing
->> i.MX6Q/SDL MIPI DSI host device tree node's child nodes contain the reg
->
-> There aren't any existing nodes for the DSI host on i.MX. This patch
-> series adds support for them.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
 
-There are existing nodes for the DSI host node. Please find them in 
-arch/arm/boot/dts/imx6qdl.dtsi and arch/arm/boot/dts/imx6q.dts. The DSI 
-host node contains two child nodes for i.MX6DL and another two for 
-i.MX6Q.  Each child node has a reg property embedded.
+ arch/arm/boot/dts/sama5d4.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->
->> property, but the child nodes are ports pointing to dedicated CRTCs.
->> So, this patch phases out the child nodes with input-port property before
->> adding DSI devices for them and updates the MIPI DSI bus OF binding
->> documentation.
->>
->> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
->> ---
->>   Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt | 4 ++++
->>   drivers/gpu/drm/drm_mipi_dsi.c                              | 5 +++--
->>   2 files changed, 7 insertions(+), 2 deletions(-)
->
-> Sorry, but NAK. There's no need for this special-case. I'll go into more
-> detail in response to patch 09/15.
-
-Thanks for reviewing the patches.
-
-Any idea how to handle the special case?  The existing child nodes for 
-the DSI host node do have the reg properties embedded.
-
-Regards,
-
-Liu Ying
-
->
-> Thierry
->
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index 2cc3cfe..0901706 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -940,7 +940,7 @@
+ 
+ 			pit: timer at fc068630 {
+ 				compatible = "atmel,at91sam9260-pit";
+-				reg = <0xfc068630 0xf>;
++				reg = <0xfc068630 0x10>;
+ 				interrupts = <3 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				clocks = <&h32ck>;
+ 			};
+-- 
+2.1.0.24.g4109c28
