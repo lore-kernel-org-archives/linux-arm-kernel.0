@@ -1,59 +1,74 @@
-From: lyz@rock-chips.com (Yunzhi Li)
-Date: Thu, 11 Dec 2014 21:45:11 +0800
-Subject: [PATCH v6 1/5] phy: add a driver for the Rockchip SoC internal
- USB2.0 PHY
-In-Reply-To: <548971AF.1020506@ti.com>
-References: <1418291722-25448-1-git-send-email-lyz@rock-chips.com>
- <1418291722-25448-2-git-send-email-lyz@rock-chips.com>
- <548971AF.1020506@ti.com>
-Message-ID: <54899FE7.7050808@rock-chips.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 11 Dec 2014 14:54:47 +0100
+Subject: [RFC PATCH 1/2] pm: Add PM domain notifications
+In-Reply-To: <CAAFQd5DrzYRCF3tW7cg=rZ3wB1G2kQtWbCx+Pby9obNTewsFdg@mail.gmail.com>
+References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
+ <1418286387-9663-2-git-send-email-tfiga@chromium.org>
+ <548973B7.3050107@samsung.com>
+ <CAAFQd5DrzYRCF3tW7cg=rZ3wB1G2kQtWbCx+Pby9obNTewsFdg@mail.gmail.com>
+Message-ID: <5489A227.8010907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon:
+On 11/12/14 12:04, Tomasz Figa wrote:
+...
+>> > On 11/12/14 09:26, Tomasz Figa wrote:
+>>> > > From: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>> > >
+>>> > > This patch adds notifiers to the runtime PM/genpd subsystem. It is now
+>>> > > possible to register a notifier, which will be called before and after
+>>> > > the generic power domain subsystem calls the power domain's power_on
+>>> > > and power_off callbacks.
+>>> > >
+>>> > > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>> > > [tfiga at chromium.org: rebased]
+>>> > > Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+>> >
+>> > Not sure if you've noticed it, I posted an updated version of this patch
+>> > recently [1]. The notifiers list is moved to struct generic_pm_domain
+>> > there and it also allows to register a notifier for selected power domain
+>> > by name.
+> [snip]
+>> > [1] http://www.spinics.net/lists/linux-samsung-soc/msg38549.html
+>
+> Ah, haven't noticed, sorry. The API using devices looks the same, so I
+> guess we can simply have patch 2/2 of this series applied on top of
+> your patch.
 
-On 2014/12/11 18:27, Kishon Vijay Abraham I wrote:
-> Hi,
->
-> On Thursday 11 December 2014 03:25 PM, Yunzhi Li wrote:
->> +
->> +static struct phy *rockchip_usb_phy_xlate(struct device *dev,
->> +					struct of_phandle_args *args)
->> +{
->> +	struct rockchip_usb_phy_priv *priv = dev_get_drvdata(dev);
->> +	unsigned int phy_id = args->args[0];
->> +
->> +	if (WARN_ON(phy_id < 0 || phy_id >= priv->nphys))
->> +		return ERR_PTR(-ENODEV);
->> +
->> +	return priv->phys[phy_id].phy;
-> I didn't mean that. You can get rid of this entire xlate stuff if you use
-> something like below
->
-> phy at xxx {
-> 	compatible = "";
-> 	phy1:usb_phy {
-> 	}
-> 	phy2:usb_phy {
-> 	};
-> };
->
->
-> usb at xx {
-> 	compatible = "";
-> 	phys = <&phy1>; //doesn't need xlate
-> 	/* this needs xlate
-> 	   phys = <&phy 1>;
-> 	*/
-> 	phy-names = "phy";
-> };
+Yes, that should work.
 
-Thank you so much for your suggestion, but still have a question:
-I have to add the #phy-cells property in each phy sub-node, otherwise 
-devm_get_phy() will fail and I get log info like
-"/usb at ff500000: could not get #phy-cells for /phy/usbp-phy1". So can the 
-#phy-cells property defines in patent node
-also valid for it's child nodes like #address-cells ?
+> By the way, look-up by name (presumably hardcoded somewhere?) sounds a
+> bit strange to me. What was the reason for it to be added?
 
----
-Yunzhi Li @ rockchip
+Yes, that might not be a very elegant approach. We initially used it
+to implement power domain on/off sequence per specific domain and SoC,
+since it appeared resistant to generalize.  I.e. the control register
+write sequences are different per domain and per SoC (exynos).
+So we named the domains in the device tree in that way:
+
+	pm_domains: pm-domains at 10024000 {
+		compatible = "samsung,exynos4415-pd";
+		reg-names = "cam", "tv", "mfc", "g3d",
+		            "lcd0", "isp0", "isp1";
+		reg = <0x10024000 0x20>, <0x10024020 0x20>,
+		      <0x10024040 0x20>, <0x10024060 0x20>,
+		      <0x10024080 0x20>, <0x100240A0 0x20>,
+		      <0x100240E0 0x20>;
+		#power-domain-cells = <1>;
+	};
+
+and then, for example, in the exynos CMU_ISP{0, 1} (clock controller)
+driver registered for notification on "isp0" and "isp1" power domains
+("isp1" is a sub-domain of "isp0" and the consumer devices are normally
+attached to "isp1").
+
+We have been investigating if we could do without the notification
+at the clocks driver side, then the all SoC/power domain specific code
+would end up in the exynos power domain driver. But I'm afraid it's
+not going to work for all SoCs. Anyway lookup by name might be not
+needed.
+
+
+--
+Regards,
+Sylwester
