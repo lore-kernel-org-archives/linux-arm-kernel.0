@@ -1,51 +1,97 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 11 Dec 2014 18:03:04 +0100
-Subject: [PATCH v5 00/61] dmaengine: Implement generic slave capabilities
- retrieval
-In-Reply-To: <54861D04.8000102@metafoo.de>
-References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
- <20141208061746.GD16827@intel.com> <20141208141807.GC8739@lukather>
- <20141208162843.GP16827@intel.com> <20141208183853.GG8739@lukather>
- <54861D04.8000102@metafoo.de>
-Message-ID: <20141211170304.GG8739@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 11 Dec 2014 18:50:43 +0000
+Subject: [PATCHv2] arm: mm: dump: don't skip regions
+Message-ID: <1418323843-28448-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 10:49:56PM +0100, Lars-Peter Clausen wrote:
-> On 12/08/2014 07:38 PM, Maxime Ripard wrote:
-> [...]
-> >>And lastly noone blamed you for being late, if things were rosy they
-> >>would have been merged over the weekend and been in today's next,
-> >>but...
-> >
-> >I totally understand your point. And I actually am a bit uncomfortable
-> >merging this so late too, and I'd actually prefer to have it merged
-> >for 3.20. But this is a huge patchset, and I'd really like to avoid
-> >rebasing it forever.
-> 
-> We don't have to pull in the whole series at once. I think everybody agrees
-> that the approach is the right one, so the first couple of patches that work
-> on the framework should be good to go in. Same goes for the drivers that
-> have been acked and tested.
+Hi,
 
-I'm a bit skeptical that it is the right approach. These patches have
-been here for monthes, and even you failed to ack and test these
-patches on the drivers you wrote. As a matter of fact, only Laurent,
-Linus, Ludovic and Stephen looked at their respective changes. After 3
-monthes and 6 versions.
+This is an update to v1 [1], dropping the unnecessary use of
+USER_PGTABLES_CEILING, as discussed [2]. I've given this a spin on TC2 and the
+output looks correct.
 
-At some point, cleanups have to come in.
+Steve, I dropped your ack given the change, but I hope to receive a new one
+soon :)
 
-Maxime
+Russell, if you're happy with this should I drop it in the patch system
+shortly, or should I hold off until -rc1?
 
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/308952.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310161.html
+
+---->8----
+Currently the arm page table dumping code starts dumping page tables
+from USER_PGTABLES_CEILING. This is unnecessary for skipping any entries
+related to userspace as the swapper_pg_dir does not contain such
+entries, and results in a couple of unfortuante side effects.
+
+Firstly, any kernel mappings which might exist below
+USER_PGTABLES_CEILING will not be accounted in the dump output. This
+masks any entries erroneously created below this address.
+
+Secondly, if the final page table entry walked is part of a valid
+mapping the page table dumping code will not log the region this entry
+is part of, as the final note_page call in walk_pgd will trigger an
+early return when 0 < USER_PGTABLES_CEILING. Luckily this isn't seen on
+contemporary systems as they typically don't have enough RAM to extend
+the linear mapping right to the end of the address space.
+
+Due to the way addr is constructed in the walk_* functions, it can never
+be less than USER_PGTABLES_CEILING when walking the page tables, so it
+is not necessary to avoid dereferencing invalid table addresses. The
+existing checks for st->current_prot and st->marker[1].start_address are
+sufficient to ensure we will not print and/or dereference garbage when
+trying to log information.
+
+This patch removes both problematic uses of USER_PGTABLES_CEILING from
+the arm page table dumping code, preventing both of these issues. We
+will now report any low mappings, and the final note_page call will not
+return early, ensuring all regions are logged.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Steve Capper <steve.capper@linaro.org>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mm/dump.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+index 5942493..9fe8e24 100644
+--- a/arch/arm/mm/dump.c
++++ b/arch/arm/mm/dump.c
+@@ -220,9 +220,6 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level, u
+ 	static const char units[] = "KMGTPE";
+ 	u64 prot = val & pg_level[level].mask;
+ 
+-	if (addr < USER_PGTABLES_CEILING)
+-		return;
+-
+ 	if (!st->level) {
+ 		st->level = level;
+ 		st->current_prot = prot;
+@@ -308,15 +305,13 @@ static void walk_pgd(struct seq_file *m)
+ 	pgd_t *pgd = swapper_pg_dir;
+ 	struct pg_state st;
+ 	unsigned long addr;
+-	unsigned i, pgdoff = USER_PGTABLES_CEILING / PGDIR_SIZE;
++	unsigned i;
+ 
+ 	memset(&st, 0, sizeof(st));
+ 	st.seq = m;
+ 	st.marker = address_markers;
+ 
+-	pgd += pgdoff;
+-
+-	for (i = pgdoff; i < PTRS_PER_PGD; i++, pgd++) {
++	for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
+ 		addr = i * PGDIR_SIZE;
+ 		if (!pgd_none(*pgd)) {
+ 			walk_pud(&st, pgd, addr);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141211/08971499/attachment.sig>
+1.9.1
