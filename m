@@ -1,54 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Dec 2014 20:52:29 +0000
-Subject: READ THIS: Modern driver coding practices
-Message-ID: <20141211205229.GU11285@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 11 Dec 2014 22:09:19 +0100
+Subject: [PATCHv2 2/3] sunxi:drivers:input:ps2 Added sunxi A10/A20 ps2
+ driver
+In-Reply-To: <CAEzqOZu9TWmYyBOP8t+b7mepqdbKjhf-3P-uNJS_Od05XiBLZw@mail.gmail.com>
+References: <1417907719-26775-1-git-send-email-VishnuPatekar0510@gmail.com>
+ <1417907719-26775-3-git-send-email-VishnuPatekar0510@gmail.com>
+ <20141208224137.GO8739@lukather>
+ <CAEzqOZu9TWmYyBOP8t+b7mepqdbKjhf-3P-uNJS_Od05XiBLZw@mail.gmail.com>
+Message-ID: <20141211210919.GI8739@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Today, ARM is a fully fledged architecture which supports many of the
-mainstream features such as highmem.  Highmem gets used if you have
-more than about 600 to 800MB of memory, which in todays modern ARM
-platforms, is most of them.
+Hi,
 
-What this means is that drivers should be appropriately coded to take
-account of highmem buffers being passed to the driver.
+Remember to reply to all the recipients.
 
-What prompted this email is network drivers.  This is especially true
-of network device drivers, especially when they support the NETIF_F_SG
-(scatter-gather) feature.
+On Tue, Dec 09, 2014 at 04:40:36PM +0530, Vishnu Patekar wrote:
+> > > Signed-off-by: vishnupatekar <VishnuPatekar0510@gmail.com>
+> > > ---
+> > >  drivers/input/serio/Kconfig     |   10 ++
+> > >  drivers/input/serio/Makefile    |    1 +
+> > >  drivers/input/serio/sunxi-ps2.c |  364
+> > +++++++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 375 insertions(+)
+> > >  create mode 100644 drivers/input/serio/sunxi-ps2.c
+> > >
+> > > diff --git a/drivers/input/serio/Kconfig b/drivers/input/serio/Kconfig
+> > > index bc2d474..3a7599c 100644
+> > > --- a/drivers/input/serio/Kconfig
+> > > +++ b/drivers/input/serio/Kconfig
+> > > @@ -281,4 +281,14 @@ config HYPERV_KEYBOARD
+> > >         To compile this driver as a module, choose M here: the module
+> > will
+> > >         be called hyperv_keyboard.
+> > >
+> > > +config SERIO_SUNXI_PS2
+> > > +     tristate "Allwinner Sun4i-A10/Sun7i-A20 PS/2 controller"
+> >
+> > Allwinner A10 is enough
+> >
+> Okie, Should I change the config option as well, like SERIO_SUN4I_PS2 ?
 
-This evening, I have come across two netdev drivers, and there is a
-third known about, which implement the scatter-gather and TSO features,
-but do this:
+Yep.
 
-	address = page_address(frag->page.p) + frag->page_offset;
+> > > +     /*Set Clock Divider Register*/
+> > > +     clk_scdf = DIV_ROUND_UP(src_clk, PS2_SAMPLE_CLK) - 1;
+> > > +     clk_pcdf = DIV_ROUND_UP(PS2_SAMPLE_CLK, PS2_SCLK) - 1;
+> >
+> > So this is actually a rounding down?
+> >
+> > Why not just using src_clk / PS2_SAMPLE_CLK directly?
+> >
+> > > +     rval = (clk_scdf<<8) | clk_pcdf;
+> >
+> > Spaces between the operators. Remember, run checkpatch.
+> >
+> Okie.
+> 
+> checkpatch could  not catch this!!
 
-	dma_map_single(dev, address, ...);
+Well, then it should have :)
 
-This is buggy: frag->page.p may very well be a highmem page.  When a
-highmem page is used here, page_address() will be NULL, which will
-then be passed into dma_map_single().
+> > > +     writel(rval, drvdata->reg_base + PS2_REG_CLKDR);
+> > > +
+> > > +     /*Set Global Control Register*/
+> > > +     rval = PS2_GCTL_RESET | PS2_GCTL_INTEN | PS2_GCTL_MASTER
+> > > +             | PS2_GCTL_BUSEN;
+> > > +     writel(rval, drvdata->reg_base + PS2_REG_GCTL);
+> >
+> > You seem to be reading/writing from the same registers than in your
+> > interrupt handler, don't you need some locking in here?
+> >
+>
+> Interrupt is getting enabled only after writing to GCTL register.
+>
+> do you think still we need to locking mechanism here?
 
-With the asm-generic implementation of dma_map_single(), we will
-attempt to convert the address (which is now a NULL pointer) back
-to a struct page pointer and offset.  The result on Dove is either a
-silent kernel lockup, or a kernel oops - but depending on the
-virt-to-phys offset, this can end up hitting almost any address in
-the system - and if it is successfully converted back to a physical
-address, we could end up /silently/ invalidating the cache for
-unintended addresses.
+Not really, you don't know the state of the device before your driver
+is probed, and the interrupts are enabled as soon as request_irq. So
+you can very well have the device running with the interrupts running
+before this function is called.
 
-Please ensure that you appropriately consider highmem issues in your
-driver if the subsystem for your driver can pass you highmem pages.
-Moreover, please check whether the driver you are working on needs
-to take account of highmem, and check that it appropriately does.
+Plus you might get spurious interrupts.
 
-And most importantly, don't strip out highmem support "to make the
-driver more simple" - that's what has happened to one of the drivers
-which used to work fine but now oopses because of this for me.
-
-Thanks.
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141211/68395019/attachment.sig>
