@@ -1,66 +1,30 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 11 Dec 2014 07:31:12 -0800
-Subject: [RFC PATCH 2/2] iommu: rockchip: Handle system-wide and runtime PM
-In-Reply-To: <CAAFQd5CA374MF-_w=3zqsZctwTcBHz9J_0Ygg4fD_wjg8kLATg@mail.gmail.com>
- (Tomasz Figa's message of "Thu, 11 Dec 2014 21:42:47 +0900")
-References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
- <1418286387-9663-3-git-send-email-tfiga@chromium.org>
- <CAPDyKFoBRxFh+BzHTakij6=NvLm0C-S8eX8+p2odpSwtdTrvoA@mail.gmail.com>
- <CAAFQd5CA374MF-_w=3zqsZctwTcBHz9J_0Ygg4fD_wjg8kLATg@mail.gmail.com>
-Message-ID: <7h8uiemce7.fsf@deeprootsystems.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Dec 2014 15:40:31 +0000
+Subject: [PATCH 4/4] ARM: add 32bit support to GICv3
+In-Reply-To: <20141211143205.GP11285@n2100.arm.linux.org.uk>
+References: <1418307788-17977-1-git-send-email-jean-philippe.brucker@arm.com>
+ <1418307788-17977-5-git-send-email-jean-philippe.brucker@arm.com>
+ <20141211143205.GP11285@n2100.arm.linux.org.uk>
+Message-ID: <5489BAEF.5050809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+ Laurent Pinchart]
+On 11/12/14 14:32, Russell King - ARM Linux wrote:
+> On Thu, Dec 11, 2014 at 02:23:08PM +0000, Jean-Philippe Brucker wrote:
+>> +#ifndef __ASM_ARCH_GICV3_H
+>> +#define __ASM_ARCH_GICV3_H
+>> +
+>> +#ifndef __ASSEMBLY__
+>> +
+>> +#include <asm/io.h>
+> 
+> This should be linux/io.h
 
-Tomasz Figa <tfiga@chromium.org> writes:
+Also, you should probably move the #ifndef down to the level of the
+inline functions. The #defines are perfectly usable in assembly context.
 
-> On Thu, Dec 11, 2014 at 8:58 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+Thanks,
 
-[...]
-
->>> @@ -988,11 +1107,28 @@ static int rk_iommu_probe(struct platform_device *pdev)
->>>                 return -ENXIO;
->>>         }
->>>
->>> +       pm_runtime_no_callbacks(dev);
->>> +       pm_runtime_enable(dev);
->>> +
->>> +       /* Synchronize state of the domain with driver data. */
->>> +       pm_runtime_get_sync(dev);
->>> +       iommu->is_powered = true;
->>
->> Doesn't the runtime PM status reflect the value of "is_powered", thus
->> why do you need to have a copy of it? Could it perpahps be that you
->> try to cope with the case when CONFIG_PM is unset?
->>
->
-> It's worth noting that this driver fully relies on status of other
-> devices in the power domain the IOMMU is in and does not enforce the
-> status on its own. So in general, as far as my understanding of PM
-> runtime subsystem, the status of the IOMMU device will be always
-> suspended, because nobody will call pm_runtime_get() on it (except the
-> get and put pair in probe). So is_powered is here to track status of
-> the domain, not the device. Feel free to suggest a better way, though.
-
-I still don't like these notifiers.  I think they add ways to bypass
-having proper runtime PM implemented for devices/subsystems.
-
->From a high-level, the IOMMU is just another device inside the PM
-domain, so ideally it should be doing it's own _get() and _put() calls
-so the PM domain code would just do the right thing without the need for
-notifiers.
-
-No knowing a lot about the IOMMU API, I'm guessing the reason you're not
-doing that is because the IOMMU API currently doesn't have an easy way
-to keep track of *active* users so it's not obvious where to put those
-_get and _put calls.  If that doesn't exist, perhaps a simple
-iommu_get() and iommu_put() API needs to be introduced (which inside the
-IOMMU core would just do runtime PM calls) so that users of the IOMMU
-could inform the subsystem that the IOMMU is needed and it should not be
-powered off.
-
-I Cc'd Laurent because I know he's thought about this before from the
-IOMMU side, and not sure if he came up with a solution.
-
-Kevin
+	M.
+-- 
+Jazz is not dead. It just smells funny...
