@@ -1,44 +1,79 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Dec 2014 17:23:36 +0000
-Subject: [PATCH 4/4] ARM: add 32bit support to GICv3
-In-Reply-To: <20141211165711.GA17509@e106794-lin.cambridge.arm.com>
-References: <1418307788-17977-1-git-send-email-jean-philippe.brucker@arm.com>
- <1418307788-17977-5-git-send-email-jean-philippe.brucker@arm.com>
- <20141211143205.GP11285@n2100.arm.linux.org.uk> <5489BAEF.5050809@arm.com>
- <20141211165711.GA17509@e106794-lin.cambridge.arm.com>
-Message-ID: <5489D318.2060400@arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 11 Dec 2014 09:28:59 -0800
+Subject: [PATCH v4 2/2] i2c: cadence: Check for errata condition
+ involving master receive
+In-Reply-To: <CAFcVECJDfJaEALDxfZg5-+tsD02mVT43s7PX4RLs349Kx9Jaeg@mail.gmail.com>
+References: <1418211884-5329-1-git-send-email-harinik@xilinx.com>
+ <1418211884-5329-3-git-send-email-harinik@xilinx.com>
+ <6b2bd13bcd934b0fb09712e8950348e6@BN1AFFO11FD005.protection.gbl>
+ <CAFcVECJDfJaEALDxfZg5-+tsD02mVT43s7PX4RLs349Kx9Jaeg@mail.gmail.com>
+Message-ID: <61a2ff3fb6764fa388436dbbe20a8d70@BY2FFO11FD001.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/14 16:57, Jean-Philippe Brucker wrote:
-> On Thu, Dec 11, 2014 at 03:40:31PM +0000, Marc Zyngier wrote:
->> On 11/12/14 14:32, Russell King - ARM Linux wrote:
->>> On Thu, Dec 11, 2014 at 02:23:08PM +0000, Jean-Philippe Brucker wrote:
->>>> +#ifndef __ASM_ARCH_GICV3_H
->>>> +#define __ASM_ARCH_GICV3_H
->>>> +
->>>> +#ifndef __ASSEMBLY__
->>>> +
->>>> +#include <asm/io.h>
->>>
->>> This should be linux/io.h
->>
->> Also, you should probably move the #ifndef down to the level of the
->> inline functions. The #defines are perfectly usable in assembly context.
->>
+On Thu, 2014-12-11 at 12:46PM +0530, Harini Katakam wrote:
+> Hi Soren,
 > 
-> This would require a change in the definition of __ACCESS_CP15, in order
-> to distinguish between inlined parameter '%0' and explicit registers.
-> I don't see any pleasant ways to do this, apart from adding a 'reg'
-> argument to all those #defines.
-> Furthermore, all other cp15 accesses from assembly on the arm/ side seem
-> to use raw opcodes, instead of macro names.
+> On Wed, Dec 10, 2014 at 11:15 PM, S?ren Brinkmann
+> <soren.brinkmann@xilinx.com> wrote:
+> > On Wed, 2014-12-10 at 05:14PM +0530, Harini Katakam wrote:
+> >> Cadence I2C controller has the following bugs:
+> >> - completion indication is not given to the driver at the end of
+> >> a read/receive transfer with HOLD bit set.
+> >> - Invalid read transaction are generated on the bus when HW timeout
+> >> condition occurs with HOLD bit set.
+> >>
+> >> As a result of the above, if a set of messages to be transferred with
+> >> repeated start includes any transfer following a read transfer,
+> >> completion is never indicated and timeout occurs.
+> >> Hence a check is implemented to return -EOPNOTSUPP for such sequences.
+> >>
+> >> Signed-off-by: Harini Katakam <harinik@xilinx.com>
+> >> Signed-off-by: Vishnu Motghare <vishnum@xilinx.com>
+> >> ---
+> >>
+> >> v4:
+> >> Use single dev_warn and make message grep-able.
+> >>
+> >> v3:
+> >> Add warning in case of unsupported transfer.
+> >>
+> >> v2:
+> >> Dont defeteature repeated start. Just check for unsupported conditions in the
+> >> driver and return error.
+> >>
+> >> ---
+> >>  drivers/i2c/busses/i2c-cadence.c |   14 ++++++++++++++
+> >>  1 file changed, 14 insertions(+)
+> >>
+> >> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+> >> index 5f5d4fa..f9269a6 100644
+> >> --- a/drivers/i2c/busses/i2c-cadence.c
+> >> +++ b/drivers/i2c/busses/i2c-cadence.c
+> >> @@ -541,6 +541,20 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+> >>        * processed with a repeated start.
+> >>        */
+> >>       if (num > 1) {
+> >> +             /*
+> >> +              * This controller does not give completion interrupt after a
+> >> +              * master receive transfer if HOLD bit is set (repeated start),
+> >> +              * resulting in SW timeout. Hence, if a receive transfer is
+> >> +              * followed by any other transfer, an error is returned
+> >> +              * indicating that this sequence is not supported.
+> >> +              */
+> >> +             for (count = 0; count < num-1; count++) {
+> >> +                     if (msgs[count].flags & I2C_M_RD)
+> >> +                             dev_warn(adap->dev.parent, "No support for "
+> >> +                                      "repeated start when receive is "
+> >> +                                      "followed by a transfer\n");
+> >
+> > Still not grepable. There must be no line breaks in the string!
+> 
+> This message will be printed in one single line.
+> Do you want this string to be grepable in the driver? Why is that necessary?
 
-Ah, fair enough. I guess we can rework that part, should we ever support
-KVM on 32bit ARMv8 CPUs...
+It's about grepping the sources.
+I pointed you to the paragraph in the Codingstyle rules, please read
+it.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	S?ren
