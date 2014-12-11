@@ -1,58 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 11 Dec 2014 22:15:50 +0100
-Subject: [PATCHv2 3/3] ARM:dts:sunxi:ps2 dt nodes for A10/A20 PS2
- controller.
-In-Reply-To: <CAEzqOZu49Z99B4DWvuD=E2BKs7ihSVAunshheUn=Z-VAqivUxA@mail.gmail.com>
-Message-ID: <20141211211550.GJ8739@lukather>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 11 Dec 2014 22:26:32 +0100
+Subject: [PATCH 0/3] i2c: slave support framework for Linux devices
+In-Reply-To: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <20141211212632.GA21482@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Nov 18, 2014 at 05:04:52PM +0100, Wolfram Sang wrote:
+> Finally, here is my take on the often desired feature that Linux can not only
+> be an I2C master, but also an I2C slave. Since RFC, most open issues have been
+> dealt with. Find details in the patch descriptions. Documentation is still
+> missing and will come later this or next week, but surely early enough for
+> the 3.19 release which this series wants to go in. Yet, I'd like to encourage
+> code-review and build-testing already.
+> 
+> Basically, an I2C slave is a standard I2C client providing a callback function.
+> When registering as a slave, the connection to the I2C adapter is made which
+> uses the callback when a slave event happens. That splits the HW support
+> (enabling slave mode on the adapter) and SW support (here a generic eeprom
+> simulator) nicely IMO.
+> 
+> The patches have been tested with a Renesas R8A7790 based Lager board. They are
+> based on top of 3.18-rc5, but will easily apply to renesas/devel. A git tree
+> can be found here:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/slave-support
+> 
+> Comments welcome! Thanks,
 
-Please keep the Cc list.
+This series applied to for-next (with some typos corrected)!
 
-On Wed, Dec 10, 2014 at 01:39:52AM +0530, Vishnu Patekar wrote:
-> > > --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> > > +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> > > @@ -112,6 +112,19 @@
-> > >                       pinctrl-0 = <&uart0_pins_a>;
-> > >                       status = "okay";
-> > >               };
-> > > +             /* PS2 0 and PS2 1 are disabled by default
-> > > +             To enable PS2 0 and PS2 1 uncomment below ps20 and ps21
-> > nodes
-> > > +             Please note that ps20 pins conflict with HDMI on Lime2
-> > Board*/
-> > > +             /*ps20: ps2 at 0x01c2a000 {
-> > > +                     pinctrl-names = "default";
-> > > +                     pinctrl-0 = <&ps2_0_pins>;
-> > > +                     status = "okay";
-> > > +             };
-> > > +             ps21: ps2 at 0x01c2a400 {
-> > > +                     pinctrl-names = "default";
-> > > +                     pinctrl-0 = <&ps2_1_pins>;
-> > > +                     status = "okay";
-> > > +             };*/
-> >
-> > Hmmm, no, no comments in the DTS.
-> >
-> > Especially when it's that trivial to enable.
->
-> Okie, I'll just keep ps20 and ps21 nodes commented.
+I think I have an idea to improve the API thanks to Uwe's comments.
+Still, I'd like to send out my pull request soonish and fix this
+later. It won't be a massive overhaul, so I think it is okay.
 
-No, the comments themselves were great. But the nodes themselves
-shouldn't be there in the first place.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141211/5d19ded5/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141211/7392b9bf/attachment.sig>
