@@ -1,61 +1,96 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 11 Dec 2014 13:01:58 +0100
-Subject: [PATCH 5/5] arm/arm64: KVM: Initialize the vgic on-demand when
- injecting IRQs
-In-Reply-To: <5488407E.50506@linaro.org>
-References: <1418139844-27892-1-git-send-email-christoffer.dall@linaro.org>
- <1418139844-27892-6-git-send-email-christoffer.dall@linaro.org>
- <5488407E.50506@linaro.org>
-Message-ID: <20141211120158.GG28388@cbox>
+Date: Thu, 11 Dec 2014 13:02:59 +0100
+Subject: [GIT PULL 0/9] KVM/ARM Changes for v3.19
+In-Reply-To: <548985F6.4030905@redhat.com>
+References: <1418124368-28418-1-git-send-email-christoffer.dall@linaro.org>
+ <54874FFB.40306@redhat.com> <20141211094717.GB28388@cbox>
+ <548985F6.4030905@redhat.com>
+Message-ID: <20141211120259.GH28388@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 01:45:50PM +0100, Eric Auger wrote:
-> On 12/09/2014 04:44 PM, Christoffer Dall wrote:
-> > Userspace assumes that it can wire up IRQ injections after having
-> > created all VCPUs and after having created the VGIC, but potentially
-> > before starting the first VCPU.  This can currently lead to lost IRQs
-> > because the state of that IRQ injection is not stored anywhere and we
-> > don't return an error to userspace.
-> > 
-> > We haven't seen this problem manifest itself yet, 
-> Actually we did with VFIO signaling setup before VGIC init!
-> presumably because
-
-well, not with code in mainline
-
-> > guests reset the devices on boot, but this could cause issues with
-> > migration and other non-standard startup configurations.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  virt/kvm/arm/vgic.c | 9 +++++++--
-> >  1 file changed, 7 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> > index c98cc6b..feef015 100644
-> > --- a/virt/kvm/arm/vgic.c
-> > +++ b/virt/kvm/arm/vgic.c
-> > @@ -1693,8 +1693,13 @@ out:
-> >  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
-> >  			bool level)
-> >  {
-> > -	if (likely(vgic_ready(kvm)) &&
-> > -	    vgic_update_irq_pending(kvm, cpuid, irq_num, level))
-> > +	if (unlikely(!vgic_initialized(kvm))) {
-> > +		mutex_lock(&kvm->lock);
-> > +		vgic_init(kvm);
-> > +		mutex_unlock(&kvm->lock);
-> > +	}
-> I was previously encouraged to test the virtual interrupt controller
-> readiness when setting irqfd up(proposal made in
-> https://lkml.org/lkml/2014/12/3/601). I guess this becomes useless now,
-> correct? Reviewed-by on the whole series.
+On Thu, Dec 11, 2014 at 12:54:30PM +0100, Paolo Bonzini wrote:
 > 
-I think we should move to your userspace explicit init for all
-non-legacy userspace and only support gicv3 and vfio/irqfd stuff with
-userspace explicitly initializing the vgic.
-
-Thanks for the review!
+> 
+> On 11/12/2014 10:47, Christoffer Dall wrote:
+> > On Tue, Dec 09, 2014 at 08:39:39PM +0100, Paolo Bonzini wrote:
+> >>
+> >>
+> >> On 09/12/2014 12:25, Christoffer Dall wrote:
+> >>> Hi Paolo,
+> >>>
+> >>> The following changes since commit f62c95fd4041d669159dd76ac0bb2a7f86b5b05d:
+> >>>
+> >>>   Merge tag 'kvm-s390-next-20141028' of git://git.kernel.org/pub/scm/linux/kernel/git/kvms390/linux into HEAD (2014-10-29 13:31:32 +0100)
+> >>>
+> >>> are available in the git repository at:
+> >>>
+> >>>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-for-3.19
+> >>>
+> >>> for you to fetch changes up to 016ed39c54b8a3db680e5c6a43419f806133caf2:
+> >>>
+> >>>   arm/arm64: KVM: vgic: kick the specific vcpu instead of iterating through all (2014-11-26 10:19:37 +0000)
+> >>>
+> >>> Thanks,
+> >>> -Christoffer
+> >>>
+> >>> ----------------------------------------------------------------
+> >>> Changes for KVM for arm/arm64 for v3.19 including mmio mapping fixups
+> >>> (already in kvm/next, apologies about duplicate commits), vgic cleanup
+> >>> and optimizations, and an MMIO path cleanup.
+> >>>
+> >>> ----------------------------------------------------------------
+> >>>
+> >>>
+> >>> Andre Przywara (1):
+> >>>   arm/arm64: KVM: avoid unnecessary guest register mangling on MMIO read
+> >>>
+> >>> Ard Biesheuvel (4):
+> >>>   arm/arm64: kvm: drop inappropriate use of kvm_is_mmio_pfn()
+> >>>   kvm: fix kvm_is_mmio_pfn() and rename to kvm_is_reserved_pfn()
+> >>>   kvm: add a memslot flag for incoherent memory regions
+> >>>   arm, arm64: KVM: handle potential incoherency of readonly memslots
+> >>>
+> >>> Christoffer Dall (1):
+> >>>   arm/arm64: vgic: Remove unreachable irq_clear_pending
+> >>>
+> >>> Laszlo Ersek (1):
+> >>>   arm, arm64: KVM: allow forced dcache flush on page faults
+> >>>
+> >>> Shannon Zhao (1):
+> >>>   arm/arm64: KVM: vgic: kick the specific vcpu instead of iterating
+> >>>     through all
+> >>>
+> >>> wanghaibin (1):
+> >>>   KVM: ARM: VGIC: Optimize the vGIC vgic_update_irq_pending function.
+> >>>
+> >>>  arch/arm/include/asm/kvm_mmu.h   |  5 +++--
+> >>>  arch/arm/kvm/mmio.c              | 15 +++++++++------
+> >>>  arch/arm/kvm/mmu.c               | 34 +++++++++++++++++++++++++++-------
+> >>>  arch/arm64/include/asm/kvm_mmu.h |  5 +++--
+> >>>  arch/ia64/kvm/kvm-ia64.c         |  2 +-
+> >>>  arch/x86/kvm/mmu.c               |  6 +++---
+> >>>  include/linux/kvm_host.h         |  3 ++-
+> >>>  virt/kvm/arm/vgic.c              | 20 +++++++++++++-------
+> >>>  virt/kvm/kvm_main.c              | 16 ++++++++--------
+> >>>  9 files changed, 69 insertions(+), 37 deletions(-)
+> >>>
+> >>
+> >> No dirty bitmap yet?  You still have one week, I'm okay with a late
+> >> addition.
+> >>
+> > No, we spotted a bug in the last revision and I prefer not merging it at
+> > this short notice, because I won't have proper time to test the stuff.
+> > 
+> > The plan is to put it in kvmarm/next right after the merge window
+> > closes.
+> 
+> Since there are x86 bits, please send an "unusual" kvmarm/next pull
+> request as soon as it's ready.  This way the 3.20 kvm/next and
+> kvmarm/next trees can both include it.
+> 
+Yes, that's what I meant actually, we'd put it in kvm/arm next as soon
+as you've rebased kvm/next and send a pull request immediately, sorry
+for being unclear.
 
 -Christoffer
