@@ -1,97 +1,27 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 Dec 2014 18:50:43 +0000
-Subject: [PATCHv2] arm: mm: dump: don't skip regions
-Message-ID: <1418323843-28448-1-git-send-email-mark.rutland@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 11 Dec 2014 22:00:42 +0300
+Subject: arm64 hitting BUG in arch_timer.h
+In-Reply-To: <1418245000.23374.26.camel@t520.localdomain>
+References: <1418245000.23374.26.camel@t520.localdomain>
+Message-ID: <5489E9DA.8000504@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-This is an update to v1 [1], dropping the unnecessary use of
-USER_PGTABLES_CEILING, as discussed [2]. I've given this a spin on TC2 and the
-output looks correct.
+On 12/10/2014 11:56 PM, Mark Salter wrote:
 
-Steve, I dropped your ack given the change, but I hope to receive a new one
-soon :)
+> Using Linus' tree from this morning, I am hitting:
 
-Russell, if you're happy with this should I drop it in the patch system
-shortly, or should I hold off until -rc1?
+>     [    0.000000] BUG: failure at ./arch/arm64/include/asm/arch_timer.h:112/arch_counter_get_cntpct!
 
-Thanks,
-Mark.
+> This is triggered by commit 0b46b8a718 ("clocksource: arch_timer: Fix
+> code to use physical timers when requested") which addresses an armv7
+> problem. Arm64 wants to always use a virtual timer. I used this to avoid
+> the BUG and get a booting kernel:
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/308952.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310161.html
+    You didn't sign off on the patch, so it can't be applied.
 
----->8----
-Currently the arm page table dumping code starts dumping page tables
-from USER_PGTABLES_CEILING. This is unnecessary for skipping any entries
-related to userspace as the swapper_pg_dir does not contain such
-entries, and results in a couple of unfortuante side effects.
+[...]
 
-Firstly, any kernel mappings which might exist below
-USER_PGTABLES_CEILING will not be accounted in the dump output. This
-masks any entries erroneously created below this address.
-
-Secondly, if the final page table entry walked is part of a valid
-mapping the page table dumping code will not log the region this entry
-is part of, as the final note_page call in walk_pgd will trigger an
-early return when 0 < USER_PGTABLES_CEILING. Luckily this isn't seen on
-contemporary systems as they typically don't have enough RAM to extend
-the linear mapping right to the end of the address space.
-
-Due to the way addr is constructed in the walk_* functions, it can never
-be less than USER_PGTABLES_CEILING when walking the page tables, so it
-is not necessary to avoid dereferencing invalid table addresses. The
-existing checks for st->current_prot and st->marker[1].start_address are
-sufficient to ensure we will not print and/or dereference garbage when
-trying to log information.
-
-This patch removes both problematic uses of USER_PGTABLES_CEILING from
-the arm page table dumping code, preventing both of these issues. We
-will now report any low mappings, and the final note_page call will not
-return early, ensuring all regions are logged.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Steve Capper <steve.capper@linaro.org>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/dump.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
-index 5942493..9fe8e24 100644
---- a/arch/arm/mm/dump.c
-+++ b/arch/arm/mm/dump.c
-@@ -220,9 +220,6 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level, u
- 	static const char units[] = "KMGTPE";
- 	u64 prot = val & pg_level[level].mask;
- 
--	if (addr < USER_PGTABLES_CEILING)
--		return;
--
- 	if (!st->level) {
- 		st->level = level;
- 		st->current_prot = prot;
-@@ -308,15 +305,13 @@ static void walk_pgd(struct seq_file *m)
- 	pgd_t *pgd = swapper_pg_dir;
- 	struct pg_state st;
- 	unsigned long addr;
--	unsigned i, pgdoff = USER_PGTABLES_CEILING / PGDIR_SIZE;
-+	unsigned i;
- 
- 	memset(&st, 0, sizeof(st));
- 	st.seq = m;
- 	st.marker = address_markers;
- 
--	pgd += pgdoff;
--
--	for (i = pgdoff; i < PTRS_PER_PGD; i++, pgd++) {
-+	for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
- 		addr = i * PGDIR_SIZE;
- 		if (!pgd_none(*pgd)) {
- 			walk_pud(&st, pgd, addr);
--- 
-1.9.1
+WBR, Sergei
