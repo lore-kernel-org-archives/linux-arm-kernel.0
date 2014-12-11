@@ -1,90 +1,58 @@
-From: lyz@rock-chips.com (Yunzhi Li)
-Date: Thu, 11 Dec 2014 17:55:21 +0800
-Subject: [PATCH v6 4/5] ARM: dts: rockchip: add rk3288 usb PHY
-In-Reply-To: <1418291722-25448-1-git-send-email-lyz@rock-chips.com>
-References: <1418291722-25448-1-git-send-email-lyz@rock-chips.com>
-Message-ID: <1418291722-25448-5-git-send-email-lyz@rock-chips.com>
+From: flora.fu@mediatek.com (Flora Fu)
+Date: Thu, 11 Dec 2014 18:04:15 +0800
+Subject: [PATCH v3 1/8] soc: mediatek: Add PMIC wrapper for MT8135 and
+ MT6397 SoC
+In-Reply-To: <3015972.tvmzP0zTdv@wuerfel>
+References: <1417752479-4749-1-git-send-email-flora.fu@mediatek.com>
+ <20141209101341.GV30369@pengutronix.de>
+ <CABuKBe+whgVryssULCu2MAXRu3u+pYwM2nN3ToTEGpEvniQ6Jw@mail.gmail.com>
+ <3015972.tvmzP0zTdv@wuerfel>
+Message-ID: <1418292255.2315.12.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a device_node for RK3288 SoC usb phy. It also
-defines the phy to be used by three usb controllers: usb_host0/1
-and usb_otg.
+Hi,
 
-Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
+On Tue, 2014-12-09 at 12:20 +0100, Arnd Bergmann wrote:
+> On Tuesday 09 December 2014 11:30:15 Matthias Brugger wrote:
+> > 2014-12-09 11:13 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> > > On Tue, Dec 09, 2014 at 09:23:18AM +0100, Arnd Bergmann wrote:
+> > >>
+> > >> I think we have had a similar case recently where a controller wasn't
+> > >> actually using I2C, but the sofware protocol was close enough so we decided
+> > >> to make it appear as i2c in Linux.
+> > >>
+> > >> Would that work for you, i.e. register the pmic wrapper as a fake spi
+> > >> master driver in drivers/spi/ and register the rtc/regulator/codec
+> > >> as SPI clients from DT?
+> > >
+> > > I don't think that's appropriate. I mean technically that could even
+> > > work, but in software you really don't see anything from the underlying
+> > > SPI bus. The SoC and the PMIC are really tightly coupled via the PMIC
+> > > wrapper. This goes to the point where pins of the SoCs internal I2C and
+> > > keypad controllers are routed over the SPI bus out of the PMIC. In
+> > > software you do this by setting a bit in the I2C controller. If it's
+> > > set, the signals are routed out of the PMIC instead of the main die.
+> > > As said, technically we probably could create a fake SPI master, but
+> > > that wouldn't really fit to this situation.
+> 
+> Ok, I see.
+> 
+> > I agree with Sascha. Although from the hardware point of view, the
+> > communication between the PMIC and the SOC is done through SPI from
+> > the point of view of the software everything looks like I2C commands
+> > which will be "transalted" into SPI messages by the PMIC wrapper.
+> 
+> If it looks like i2c messages, would it be more appropriate to make
+> it appear as an i2c controller then?
 
----
 
-Changes in v6: None
-Changes in v5:
-- reorder the phy dt node to a correct position.
+Although the message looks like I2C command, it is not I2C.
+Form source code, the software does not touch any I2C i/o or protocols.
+It depends SoC and has specific initial flow, read and write transfer
+state. It is not able to an i2c controller.
+That's why we consider its a proprietary hardware with specific
+protocols. How about let it appear in driver/soc?
 
-Changes in v4:
-- Add phy subnodes.
-
-Changes in v3: None
-
- arch/arm/boot/dts/rk3288.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 874e66d..bd2a1e0 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -335,6 +335,8 @@
- 		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru HCLK_USBHOST0>;
- 		clock-names = "usbhost";
-+		phys = <&usbphy 1>;
-+		phy-names = "usb";
- 		status = "disabled";
- 	};
- 
-@@ -347,6 +349,8 @@
- 		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru HCLK_USBHOST1>;
- 		clock-names = "otg";
-+		phys = <&usbphy 2>;
-+		phy-names = "usb2-phy";
- 		status = "disabled";
- 	};
- 
-@@ -357,6 +361,8 @@
- 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru HCLK_OTG0>;
- 		clock-names = "otg";
-+		phys = <&usbphy 0>;
-+		phy-names = "usb2-phy";
- 		status = "disabled";
- 	};
- 
-@@ -497,6 +503,27 @@
- 		interrupts = <GIC_PPI 9 0xf04>;
- 	};
- 
-+	usbphy: phy {
-+		compatible = "rockchip,rk3288-usb-phy";
-+		rockchip,grf = <&grf>;
-+		#phy-cells = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+
-+		usb-phy at 0 {
-+			reg = <0>;
-+		};
-+
-+		usb-phy at 1 {
-+			reg = <1>;
-+		};
-+
-+		usb-phy at 2 {
-+			reg = <2>;
-+		};
-+	};
-+
- 	pinctrl: pinctrl {
- 		compatible = "rockchip,rk3288-pinctrl";
- 		rockchip,grf = <&grf>;
--- 
-2.0.0
+Thanks,
+Flora
