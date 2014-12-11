@@ -1,85 +1,70 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 11 Dec 2014 12:48:10 +0100
-Subject: [PATCH 1/5] arm/arm64: KVM: vgic: move reset initialization into
- vgic_init_maps()
-In-Reply-To: <54881C5D.7060203@linaro.org>
+Date: Thu, 11 Dec 2014 12:48:39 +0100
+Subject: [PATCH 3/5] arm/arm64: KVM: Add (new) vgic_initialized macro
+In-Reply-To: <54882016.2080200@linaro.org>
 References: <1418139844-27892-1-git-send-email-christoffer.dall@linaro.org>
- <1418139844-27892-2-git-send-email-christoffer.dall@linaro.org>
- <54881C5D.7060203@linaro.org>
-Message-ID: <20141211114810.GC28388@cbox>
+ <1418139844-27892-4-git-send-email-christoffer.dall@linaro.org>
+ <54882016.2080200@linaro.org>
+Message-ID: <20141211114839.GD28388@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 11:11:41AM +0100, Eric Auger wrote:
-> Hi Christoffer,
-> Reviewed-by: Eric Auger <eric.auger@linaro.org>
-> see few comments below.
+On Wed, Dec 10, 2014 at 11:27:34AM +0100, Eric Auger wrote:
+> 
 > On 12/09/2014 04:44 PM, Christoffer Dall wrote:
-> > From: Peter Maydell <peter.maydell@linaro.org>
+> > Some code paths will need to check to see if the internal state of the
+> > vgic has been initialized (such as when creating new VCPUs), so
+> > introduce such a macro that checks the nr_cpus field which is set when
+> > the vgic has been initialized.
 > > 
-> > VGIC initialization currently happens in three phases:
-> >  (1) kvm_vgic_create() (triggered by userspace GIC creation)
-> >  (2) vgic_init_maps() (triggered by userspace GIC register read/write
-> >      requests, or from kvm_vgic_init() if not already run)
-> >  (3) kvm_vgic_init() (triggered by first VM run)
+> > Also set nr_cpus = 0 in kvm_vgic_destroy, because the error path in
+> > vgic_init() will call this function, and code should never errornously
+> > assume the vgic to be properly initialized after an error.
 > > 
-> > We were doing initialization of some state to correspond with the
-> > state of a freshly-reset GIC in kvm_vgic_init(); this is too late,
-> > since it will overwrite changes made by userspace using the
-> > register access APIs before the VM is run. Move this initialization
-> > earlier, into the vgic_init_maps() phase.
-> > 
-> > This fixes a bug where QEMU could successfully restore a saved
-> > VM state snapshot into a VM that had already been run, but could
-> > not restore it "from cold" using the -loadvm command line option
-> > (the symptoms being that the restored VM would run but interrupts
-> > were ignored).
-> > 
-> > Finally rename vgic_init_maps to vgic_init and renamed kvm_vgic_init to
-> > kvm_vgic_map_resources.
-> > 
-> >   [ This patch is originally written by Peter Maydell, but I have
-> >     modified it somewhat heavily, renaming various bits and moving code
-> >     around.  If something is broken, I am to be blamed. - Christoffer ]
-> > 
-> > Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
 > > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > > ---
-> > This patch was originally named "vgic: move reset initialization into
-> > vgic_init_maps()" but I renamed it slightly to match the other vgic
-> > patches in the kernel.  I also did the additional changes since the
-> > original patch:
-> >  - Renamed kvm_vgic_init to kvm_vgic_map_resources
-> >  - Renamed vgic_init_maps to vgic_init
-> >  - Moved vgic_enable call into existing vcpu loop in vgic_init
-> >  - Moved ITARGETSRn initializtion above vcpu loop in vgic_init (the idea
-> typo
-> >    is to init global state first, then vcpu state).
+> >  include/kvm/arm_vgic.h | 6 ++++++
+> >  virt/kvm/arm/vgic.c    | 1 +
+> >  2 files changed, 7 insertions(+)
+> > 
+> > diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> > index 3e262b9..ac4888d 100644
+> > --- a/include/kvm/arm_vgic.h
+> > +++ b/include/kvm/arm_vgic.h
+> > @@ -287,6 +287,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+> >  		      struct kvm_exit_mmio *mmio);
+> >  
+> >  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+> > +#define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
+> >  #define vgic_ready(k)		((k)->arch.vgic.ready)
+> >  
+> >  int vgic_v2_probe(struct device_node *vgic_node,
+> > @@ -369,6 +370,11 @@ static inline int irqchip_in_kernel(struct kvm *kvm)
+> >  	return 0;
+> >  }
+> >  
+> > +static inline bool vgic_initialized(struct kvm *kvm)
+> > +{
+> > +	return true;
+> > +}
+> > +
+> >  static inline bool vgic_ready(struct kvm *kvm)
+> >  {
+> >  	return true;
+> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> > index 6293349..c98cc6b 100644
+> > --- a/virt/kvm/arm/vgic.c
+> > +++ b/virt/kvm/arm/vgic.c
+> > @@ -1774,6 +1774,7 @@ void kvm_vgic_destroy(struct kvm *kvm)
+> >  	dist->irq_spi_cpu = NULL;
+> >  	dist->irq_spi_target = NULL;
+> >  	dist->irq_pending_on_cpu = NULL;
+> > +	dist->nr_cpus = 0;
+> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+> we could use that new vgic_initialized at the entry of vgic_init instead
+> of testing dist->nr_cpus, hence introducing one user.
 > 
-> kvm_vgic_vcpu_init also has disappeared and PPI settings of
-> dist->irq_enabled and dist->irq_cfg now are in former vgic_init_maps.
-> 
-> Maybe it would be simpler to review if there were 2 patches: one for
-> init redistribution from kvm_vgic_init to vgic_init_maps and one for the
-> renaming.
-
-Maybe, but if you apply this patch and review it that way, it becomes
-much easier.  I'd really like to get this in soon, so given you already
-gave me your reviewed-by, I'm going to wait and see what Marc says and
-only respin if he finds it necessary.
-
-> 
-> kvm_vgic_map_resources: difficult to understand it also inits the
-> internal states. Wouldn't kvm_vgic_set_ready be aligned with ready
-> terminology?
-> 
-So I thought about that, but really, the fact that we now call
-vgic_init() from all sorts of places shouldn't require us to rename all
-those functions, just because they call init.  So I ended up naming this
-function for what it really does, and then just added a comment about
-the on-demand approach.
-
-I think that's cleanest.
+Yeah, we could, I can fix that up when applying/respinning.
 
 Thanks,
 -Christoffer
