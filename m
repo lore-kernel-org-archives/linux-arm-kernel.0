@@ -1,36 +1,32 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 Dec 2014 18:20:52 +0000
-Subject: [PATCH 0/2] arm64: mm: dump: a couple of fixes
-In-Reply-To: <5488893D.9080307@codeaurora.org>
-References: <1417782895-13657-1-git-send-email-mark.rutland@arm.com>
- <5488893D.9080307@codeaurora.org>
-Message-ID: <20141211182052.GA13152@leverpostej>
+Date: Thu, 11 Dec 2014 18:22:32 +0000
+Subject: [PATCH] arm: mm: dump: don't skip final region
+In-Reply-To: <20141208175503.GI11285@n2100.arm.linux.org.uk>
+References: <1417782016-11825-1-git-send-email-mark.rutland@arm.com>
+ <CAPvkgC1oOU_3D03ZV-uZqTW_DX8J74oGEKQZTTi2YrC+oSqJyA@mail.gmail.com>
+ <20141208120537.GB21680@leverpostej>
+ <CAPvkgC1HbuezEjmdUwVCM_Mic7Z5rF5BofSryQegiVOA08NwaA@mail.gmail.com>
+ <20141208175503.GI11285@n2100.arm.linux.org.uk>
+Message-ID: <20141211182232.GB13152@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 05:56:13PM +0000, Laura Abbott wrote:
-> On 12/5/2014 4:34 AM, Mark Rutland wrote:
-> > While using the mm dump code, I spotted a couple of issues; one build warning
-> > and one theoretical failure on systems endowed with plenty of RAM (as with ARM
-> > [1], though arm64 requires a slightly different resolution). These patches
-> > (based on next-20141205), fix those issues.
-> >
-> > Mark.
-> >
-> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/308952.html
-> >
-> > Mark Rutland (2):
-> >    arm64: mm: dump: fix shift warning
-> >    arm64: mm: dump: don't skip final region
-> >
-> >   arch/arm64/mm/dump.c | 5 +----
-> >   1 file changed, 1 insertion(+), 4 deletions(-)
-> >
+On Mon, Dec 08, 2014 at 05:55:03PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 08, 2014 at 05:46:45PM +0000, Steve Capper wrote:
+> > After some head scratching....
+> > 
+> > Basically, the swapper_pg_dir will only contain kernel pgd entries. So
+> > at the beginning where one would normally user-space entries in a pgd
+> > table, there should be null entries that are skipped over. So yes, I
+> > agree, we should be able to remove the USER_PGTABLES_CEILING check.
 > 
-> If they haven't been picked up yet:
-> 
-> Acked-by: Laura Abbott <lauraa@codeaurora.org>
+> The check is there to avoid noting anything about the lower entries.
+> There is the possibility for lower entries to contain something (the
+> low vector mapping), though you're probably right that we should
+> report those too.
 
-Thanks!
+Ok. I'll send out a v2 which removes both uses of USER_PGTABLES_CEILING
+and repots all entries.
 
+Thanks,
 Mark.
