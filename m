@@ -1,55 +1,44 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 11 Dec 2014 12:12:20 +0100
-Subject: [PATCH] ARM: DMA: Fix kzalloc flags in __iommu_alloc_buffer()
-In-Reply-To: <1418027967-12923-1-git-send-email-acourbot@nvidia.com>
-References: <1418027967-12923-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <54897C14.3040702@samsung.com>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Thu, 11 Dec 2014 12:18:44 +0100
+Subject: default enable sparse __CHECK_ENDIAN__ (was: Re: [PATCH v7 2/3]
+ net: Add Keystone NetCP ethernet driver)
+In-Reply-To: <1418267099.18092.28.camel@perches.com>
+References: <1417556503-22290-3-git-send-email-m-karicheri2@ti.com>
+ <20141209.131053.2026868499542642866.davem@davemloft.net>
+ <5488BB96.9070609@ti.com>
+ <20141210.204110.618599360537141819.davem@davemloft.net>
+ <1418267099.18092.28.camel@perches.com>
+Message-ID: <479338B3-A0C0-4443-9C44-E03421F0679C@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Joe,
 
-On 2014-12-08 09:39, Alexandre Courbot wrote:
-> There doesn't seem to be any valid reason to allocate the pages array
-> with the same flags as the buffer itself. Doing so can eventually lead
-> to the following safeguard in mm/slab.c to be hit:
->
-> BUG_ON(flags & GFP_SLAB_BUG_MASK);
->
-> This happens when buffers are allocated with __GFP_DMA32 or
-> __GFP_HIGHMEM.
->
-> Fix this by allocating the pages array with GFP_KERNEL to follow what is
-> done elsewhere in this file. Using GFP_KERNEL in __iommu_alloc_buffer()
-> is safe because atomic allocations are handled by __iommu_alloc_atomic().
->
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Thierry Reding <treding@nvidia.com>
-> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+>>> Are you referring to the static code analyser sparse that is invoked
+>>> through?
+>> You have to explicitly enable endian checking, it's not on by
+>> default.
+> 
+> There don't seem to be thousands of warnings anymore.
+> 
+> Maybe it's time to default enable it when using C=?
+> 
+> from: Documentation/sparse.txt:
+> 
+> The optional make variable CF can be used to pass arguments to sparse.  The
+> build system passes -Wbitwise to sparse automatically.  To perform endianness
+> checks, you may define __CHECK_ENDIAN__:
+> 
+>        make C=2 CF="-D__CHECK_ENDIAN__"
+> 
+> These checks are disabled by default as they generate a host of warnings.
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+actually a few subsystems use this in their Makefile:
 
-> ---
->   arch/arm/mm/dma-mapping.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index e8907117861e..bc495354c802 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1106,7 +1106,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
->   	int i = 0;
->   
->   	if (array_size <= PAGE_SIZE)
-> -		pages = kzalloc(array_size, gfp);
-> +		pages = kzalloc(array_size, GFP_KERNEL);
->   	else
->   		pages = vzalloc(array_size);
->   	if (!pages)
+	subdir-ccflags-y += -D__CHECK_ENDIAN__
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+We could start with that to enable endian checks by default in various places.
+
+Regards
+
+Marcel
