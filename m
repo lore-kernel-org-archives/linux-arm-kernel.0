@@ -1,96 +1,29 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 11 Dec 2014 13:02:59 +0100
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 11 Dec 2014 13:04:41 +0100
 Subject: [GIT PULL 0/9] KVM/ARM Changes for v3.19
-In-Reply-To: <548985F6.4030905@redhat.com>
+In-Reply-To: <20141211115958.GF28388@cbox>
 References: <1418124368-28418-1-git-send-email-christoffer.dall@linaro.org>
- <54874FFB.40306@redhat.com> <20141211094717.GB28388@cbox>
- <548985F6.4030905@redhat.com>
-Message-ID: <20141211120259.GH28388@cbox>
+ <54898585.8020006@redhat.com> <20141211115958.GF28388@cbox>
+Message-ID: <54898859.6010201@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 11, 2014 at 12:54:30PM +0100, Paolo Bonzini wrote:
-> 
-> 
-> On 11/12/2014 10:47, Christoffer Dall wrote:
-> > On Tue, Dec 09, 2014 at 08:39:39PM +0100, Paolo Bonzini wrote:
-> >>
-> >>
-> >> On 09/12/2014 12:25, Christoffer Dall wrote:
-> >>> Hi Paolo,
-> >>>
-> >>> The following changes since commit f62c95fd4041d669159dd76ac0bb2a7f86b5b05d:
-> >>>
-> >>>   Merge tag 'kvm-s390-next-20141028' of git://git.kernel.org/pub/scm/linux/kernel/git/kvms390/linux into HEAD (2014-10-29 13:31:32 +0100)
-> >>>
-> >>> are available in the git repository at:
-> >>>
-> >>>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-for-3.19
-> >>>
-> >>> for you to fetch changes up to 016ed39c54b8a3db680e5c6a43419f806133caf2:
-> >>>
-> >>>   arm/arm64: KVM: vgic: kick the specific vcpu instead of iterating through all (2014-11-26 10:19:37 +0000)
-> >>>
-> >>> Thanks,
-> >>> -Christoffer
-> >>>
-> >>> ----------------------------------------------------------------
-> >>> Changes for KVM for arm/arm64 for v3.19 including mmio mapping fixups
-> >>> (already in kvm/next, apologies about duplicate commits), vgic cleanup
-> >>> and optimizations, and an MMIO path cleanup.
-> >>>
-> >>> ----------------------------------------------------------------
-> >>>
-> >>>
-> >>> Andre Przywara (1):
-> >>>   arm/arm64: KVM: avoid unnecessary guest register mangling on MMIO read
-> >>>
-> >>> Ard Biesheuvel (4):
-> >>>   arm/arm64: kvm: drop inappropriate use of kvm_is_mmio_pfn()
-> >>>   kvm: fix kvm_is_mmio_pfn() and rename to kvm_is_reserved_pfn()
-> >>>   kvm: add a memslot flag for incoherent memory regions
-> >>>   arm, arm64: KVM: handle potential incoherency of readonly memslots
-> >>>
-> >>> Christoffer Dall (1):
-> >>>   arm/arm64: vgic: Remove unreachable irq_clear_pending
-> >>>
-> >>> Laszlo Ersek (1):
-> >>>   arm, arm64: KVM: allow forced dcache flush on page faults
-> >>>
-> >>> Shannon Zhao (1):
-> >>>   arm/arm64: KVM: vgic: kick the specific vcpu instead of iterating
-> >>>     through all
-> >>>
-> >>> wanghaibin (1):
-> >>>   KVM: ARM: VGIC: Optimize the vGIC vgic_update_irq_pending function.
-> >>>
-> >>>  arch/arm/include/asm/kvm_mmu.h   |  5 +++--
-> >>>  arch/arm/kvm/mmio.c              | 15 +++++++++------
-> >>>  arch/arm/kvm/mmu.c               | 34 +++++++++++++++++++++++++++-------
-> >>>  arch/arm64/include/asm/kvm_mmu.h |  5 +++--
-> >>>  arch/ia64/kvm/kvm-ia64.c         |  2 +-
-> >>>  arch/x86/kvm/mmu.c               |  6 +++---
-> >>>  include/linux/kvm_host.h         |  3 ++-
-> >>>  virt/kvm/arm/vgic.c              | 20 +++++++++++++-------
-> >>>  virt/kvm/kvm_main.c              | 16 ++++++++--------
-> >>>  9 files changed, 69 insertions(+), 37 deletions(-)
-> >>>
-> >>
-> >> No dirty bitmap yet?  You still have one week, I'm okay with a late
-> >> addition.
-> >>
-> > No, we spotted a bug in the last revision and I prefer not merging it at
-> > this short notice, because I won't have proper time to test the stuff.
-> > 
-> > The plan is to put it in kvmarm/next right after the merge window
-> > closes.
-> 
-> Since there are x86 bits, please send an "unusual" kvmarm/next pull
-> request as soon as it's ready.  This way the 3.20 kvm/next and
-> kvmarm/next trees can both include it.
-> 
-Yes, that's what I meant actually, we'd put it in kvm/arm next as soon
-as you've rebased kvm/next and send a pull request immediately, sorry
-for being unclear.
 
--Christoffer
+
+On 11/12/2014 12:59, Christoffer Dall wrote:
+>> > 
+> ok, we are considering sending the regression fix for the vgic init
+> stuff as an additional pull request next week, depending on available
+> cycles for reviewing an testing:
+> 
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-December/012743.html
+> 
+> We also have a series which clarifies the ABI and fixes guest reboot
+> issues and guest UEFI issues, which seems to be quieting down.  Since
+> that is technically a fix, we could merge that for -rc2?
+> 
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-December/012635.html
+
+Both are okay for -rc.
+
+Paolo
