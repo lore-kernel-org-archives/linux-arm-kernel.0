@@ -1,35 +1,38 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 11 Dec 2014 14:11:09 -0500
-Subject: arm64 hitting BUG in arch_timer.h
-In-Reply-To: <5489E9DA.8000504@cogentembedded.com>
-References: <1418245000.23374.26.camel@t520.localdomain>
- <5489E9DA.8000504@cogentembedded.com>
-Message-ID: <1418325069.23374.31.camel@t520.localdomain>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 11 Dec 2014 11:22:31 -0800
+Subject: [PATCH v5] i2c: rk3x: fix bug that cause measured high_ns doesn't
+ meet I2C specification
+In-Reply-To: <1418295760-19639-1-git-send-email-addy.ke@rock-chips.com>
+References: <1418277650-25215-1-git-send-email-addy.ke@rock-chips.com>
+ <1418295760-19639-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAD=FV=UCQMRLx2KHzT28iY6uCHGQ0MouWKEeVyv2AF_qNCrT=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-12-11 at 22:00 +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 12/10/2014 11:56 PM, Mark Salter wrote:
-> 
-> > Using Linus' tree from this morning, I am hitting:
-> 
-> >     [    0.000000] BUG: failure at ./arch/arm64/include/asm/arch_timer.h:112/arch_counter_get_cntpct!
-> 
-> > This is triggered by commit 0b46b8a718 ("clocksource: arch_timer: Fix
-> > code to use physical timers when requested") which addresses an armv7
-> > problem. Arm64 wants to always use a virtual timer. I used this to avoid
-> > the BUG and get a booting kernel:
-> 
->     You didn't sign off on the patch, so it can't be applied.
-> 
-> [...]
-> 
-> WBR, Sergei
-> 
+Hi,
 
-Right. That was more for discussion. I wasn't sure if that was the best
-way to fix the problem so I just included what I did to work around it.
-As it turns out, I wasn't the first to spot the problem or come up with
-a patch. So, the first patch will go in without my further involvement.
+On Thu, Dec 11, 2014 at 3:02 AM, Addy Ke <addy.ke@rock-chips.com> wrote:
+>   - clock-frequency : SCL frequency to use (in Hz). If omitted, 100kHz is used.
+> + - i2c-scl-rising-time-ns : Number of nanoseconds the signal takes to rise
+> +       (t(r) in I2C specification). If not specified this is assumed to be
+> +       the maximum the specification allows(1000 ns for Standard-mode,
+> +       300 ns for Fast-mode) which might cause slightly slower communication.
+> + - i2c-scl-falling-time-ns : Number of nanoseconds the signal takes to fall
+> +       (t(f) in the I2C specification). If not specified this is assumed to
+> +       be the maximum the specification allows (300 ns) which might cause
+> +       slightly slowercommunication.
+
+nit: you forgot a space between "slower" and "communication".
+
+...this is the type of thing I think Wolfram can fixup when applying,
+so I'd suggest against respinning unless something else is needed.
+
+Overall I continue to be happy with this patch.
+
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
+
+You'll notice that I posted a patch atop it at
+<https://patchwork.kernel.org/patch/5477201/>.
+
+-Doug
