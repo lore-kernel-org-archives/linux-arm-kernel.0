@@ -1,59 +1,195 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Thu, 11 Dec 2014 23:25:13 +0100
-Subject: __hci_cmd_sync() not suitable for nokia h4p
-In-Reply-To: <20141211221306.GA2905@amd>
-References: <20141209190210.GA15641@amd>
- <304050AD-DB11-4A2B-A1F7-8B1BBB5F04F0@holtmann.org>
- <20141209201328.GA18003@amd>
- <7EFD3C33-E503-4FB6-BCCF-52836080ABD6@holtmann.org>
- <20141210131519.GA14748@amd>
- <EE1A4B9D-30D5-4BD9-9A43-532619494A0C@holtmann.org>
- <20141211221306.GA2905@amd>
-Message-ID: <CAA1630D-1A2E-4D3D-9BBC-2EE86256D58B@holtmann.org>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Thu, 11 Dec 2014 14:36:54 -0800
+Subject: [RFC 0/2] Qualcomm RPM sleep states
+In-Reply-To: <20141209202820.GK11764@sirena.org.uk>
+References: <20141127190233.GF7712@sirena.org.uk>
+ <CAJAp7OgBepNL6j4D6_MvXJ5PTRDUFNt6paskkP=q=h8W_YNP_Q@mail.gmail.com>
+ <20141128201613.GB7712@sirena.org.uk>
+ <5480CEEF.7000906@codeaurora.org>
+ <20141208180635.GB3268@sonymobile.com>
+ <20141208193935.GD11764@sirena.org.uk>
+ <20141208205502.GC3268@sonymobile.com>
+ <20141209181652.GG11764@sirena.org.uk>
+ <20141209192517.GD3268@sonymobile.com>
+ <20141209202820.GK11764@sirena.org.uk>
+Message-ID: <20141211223653.GE3268@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Tue 09 Dec 12:28 PST 2014, Mark Brown wrote:
 
->>> h4p changes uart speed again after load of the firmware, but I guess
->>> that's ok.
+> On Tue, Dec 09, 2014 at 11:25:18AM -0800, Bjorn Andersson wrote:
+> > On Tue 09 Dec 10:16 PST 2014, Mark Brown wrote:
 > 
->> if you can do it the other way around it would result in a faster
->> init. Depending on how many patches are actually required to be
->> loaded.
+> > > I think having an idle state (or possibly just using the suspend state,
+> > > I'm still foggy if the two states are actually different) seems to make
+> > > sense?
 > 
-> IIRC driver does two speed changes, so it looks to me like someone
-> already tried that (and it did not work).
-
-normally it does not matter which way around. I think some people changed it in hciattach for Broadcom devices actually.
-
->>>> What needs to be done is the bring up of the device including the proper UART settings and speed and then just run the firmware downloads. All firmware files on the Nokia devices where just HCI commands with vendor specific details. Some from CSR, some from Broadcom and some from TI. You can actually decode them if you really want to. Shouldn't be that hard.
->>>> 
->>> 
->>> Speed changes at the end of firmware load, but I guess that's detail?
->>> Anyway, patch would look like this.
->> 
->> You should really look into providing hdev->setup() callback. That is normally the callback where you want to load the firmware.
->> 
+> > In 8974 we have LDO12 that have the following consumers:
+> >  csi
+> >  dsi
+> >  hdmi
+> >  edp
+> >  modem pll
+> >  pronto pll (wifi/bt)
+> >  krait-clock
 > 
-> I can provide setup() callback and load firmware from there.
+> > Each of these drivers will have a regulator object, upon which they can make
+> > requests on.
 > 
-> I have created provisional device tree binding, and the driver still
-> works.
+> > The drivers for csi to pronto does not care about the state of the cpu - we
+> > want to output pixels even if the cpu is idle - so their requests (on their
+> > regulator *) must be aggregated towards the active state as well as the idle
+> > state.
 > 
-> Some time ago you mentioned that with the "big" issues fixed, you'd be
-> willing to take it into the tree. What way forward do you see? Would
-> it make sense to re-enable the driver in staging, so that "big"
-> changes could be applied, followed by renames?
+> Are they actually twiddling anything except enable, and I'm not sure
+> that this answers my question about suspend state either?
+> 
 
-If the driver is clean, there is no point in taking it through staging. It can be cleaned up and then merged all together.
+Yes, for the switch-mode regulators there's different enable state, voltage and
+mode.
 
-I think the important part is to focus on the N900 derivative with the Broadcom chip inside. And just ignore all the rest. So start small and do not try to carry the N770, N800, N810 hacks over.
+> > The krait-clock should not affect the idle state.
+> 
+> > So the idle state enable property should be aggregated from csi to pronto
+> > enable properties. I.e. if they are all off, then the idle state should be off,
+> > otherwise it's on.
+> 
+> OK, so this is pointing back to the idea that we just want a way to
+> knock out this one consumer from the constraints when it's going idle
+> (you mention later on that other regulators need parameters other than
+> the enable changing).  Now, I seem to recall that the reason that this
+> is a problem is that you want to use this state changing stuff to
+> accelerate that transition.  This seems like something other regulators
+> can do which we don't really take advantage of yet except in that some
+> regualtors remember previous settings for voltage and can switch to them
+> quickly.
+> 
 
-However you might want to check Neil Brown's patches for TTY-slave devices he just posted. Maybe the N900 devices should be exposed as TTY and we just attach N_HCI line discipline to it. If all the GPIO wiggling can be done automatically at TTY open, then that should be the way to go. I also send an email about using the new unconfigured stage to get this done cleanly.
+Correct, the problem here is twofold in my eyes;
 
-http://permalink.gmane.org/gmane.linux.bluez.kernel/50483
+At the point then the consumer decides that it does not need the regulator
+it's in atomic context. So the regulator core and driver would need to handle
+this. Further more the regulator driver uses a packet-based protocol over a
+shared memory channel, so this entire path would have to be invoked in atomic
+context.
 
-Regards
+We have to put the consumer into a state where we can "release" the regulator,
+then we need to tell the RPM to update the state of the regulator and we have
+to wait for the ack to come back before we can actually go idle.
 
-Marcel
+> What this is *now* sounding like is that we need a way to say that this
+> one consumer is magic and we want to essentially tell the hardware about
+> settings with and without that consumer then the hardware will magically
+> switch between the two when the consumer is enabled and disabled.  Does
+> that sound about right?
+> 
+
+I think it sounds spot on.
+
+> > The switch-mode regulators also needs to aggregate voltage and mode - from a
+> > subset of the regulator objects/consumers.
+> 
+> We don't have any support at all for aggregating mode except via current
+> estimation which is unused and I'd be surprised if that works
+> usefully...
+> 
+
+Let's treat that as a separate topic.
+
+> > > We already have an API for the suspend state, we just don't enable its
+> > > use in DT yet other than static configuration.  I'm not sure I see the
+> > > connection to the system state in the consumer API here - I thought this
+> > > was pretty much just setting the state when the device is turned off
+> > > which seems device specific?
+> 
+> > The suspend state (with the additional exposure in DT) allows us to specify a
+> > static configuration of the suspend state of a regulator. Here we see a need
+> > for the properties of that state to be aggregated from a subset of the
+> > regulator objects.
+> 
+> We already have a runtime API for specifying suspend state.  It doesn't
+> currently aggregate but that's a simple matter of programming.
+> 
+
+Do you mean alter properties of a state or select between the predefined
+states? I've found some apis related to the latter, but not the first.
+
+> > > > In our case, as most things change the both state (or active only if no
+> > > > both/sleep), the standard regulator api would have to affect the both state.
+> > > > Would we then have a separate api to modify the active state?
+> 
+> > > Why would we need to introduce a new API for the active state?
+> 
+> > It's just that I, possibly incorrectly, considered that to be the outlier and
+> > the one that would be the easiest to model separately.
+> 
+> I'm sorry, I'm just not getting this at all.
+> 
+
+Because for the overall system the active state is the outlier here. But it
+probably doesn't matter for our conclusions.
+
+> Can I please ask that people stop giving partial pictures of what's
+> going on?  There's a few reasons why this is all so hard to follow - one
+> of them is that the story is coming out in dribs and drabs so every time
+> I feel I understand what everyone is talking about everything shifts.
+> 
+
+Sorry, I've tried to describe the hardware setup but have probably not made a
+clear enough distinction towards the downstream implementation and solution
+suggestions.
+
+> I really do fear that the bodge you're using at the minute with multiple
+> regulators has poor abstraction and is hence too fragile - it seems like
+> there's too much knowledge of the system spread around different drivers
+> and it's all vulnerable to changes in system integration which could
+> potentially be made per board.
+
+Just to make sure we're on the same page here, the way this is expressed in
+downstream is like the following:
+
+ldo12 {
+	l12: l12 {
+		set-both-states;
+
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+	};
+
+	l12_active: l12-active {
+		set-only-active-state;
+
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+	};
+};
+
+dsi {
+	vddio-supply = <&l12>;
+};
+
+clock-krait {
+	hfpll-analog-supply = <&l12_active>;
+};
+
+All the consumers uses the standard regulator accessor functions to operate on
+their respective regulator *. Further more it's only the clock driver for the
+core (krait) that references the active only regulators.
+
+So the knowledge spread out would be contained to the dt bindings things
+together.
+
+I can however not argue against you on the fact that the way this is exposed is
+suboptimal. The question is if we can figure a better way to express it - note
+that we do not want e.g. the dsi driver to know anything about the fact that
+ldo12 is special.
+
+
+
+What I don't like with that solution is that we above have two different rdev
+and that we need to aggregate state between the various rdevs in the ldo12
+grouping. (so that active only and both actually affect the active state).
+
+Regards,
+Bjorn
