@@ -1,71 +1,90 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 11 Dec 2014 12:55:16 +0100
-Subject: [PATCH 4/5] arm/arm64: KVM: Don't allow creating VCPUs after
- vgic_initialized
-In-Reply-To: <54883DFC.4060001@linaro.org>
-References: <1418139844-27892-1-git-send-email-christoffer.dall@linaro.org>
- <1418139844-27892-5-git-send-email-christoffer.dall@linaro.org>
- <54883DFC.4060001@linaro.org>
-Message-ID: <20141211115516.GE28388@cbox>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 11 Dec 2014 12:54:30 +0100
+Subject: [GIT PULL 0/9] KVM/ARM Changes for v3.19
+In-Reply-To: <20141211094717.GB28388@cbox>
+References: <1418124368-28418-1-git-send-email-christoffer.dall@linaro.org>
+ <54874FFB.40306@redhat.com> <20141211094717.GB28388@cbox>
+Message-ID: <548985F6.4030905@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 01:35:08PM +0100, Eric Auger wrote:
-> On 12/09/2014 04:44 PM, Christoffer Dall wrote:
-> > When the vgic initializes its internal state it does so based on the
-> > number of VCPUs available at the time.  If we allow KVM to create more
-> > VCPUs after the VGIC has been initialized, we are likely to error out in
-> > unfortunate ways later, perform buffer overflows etc.
-> > 
-> > Cc: Eric Auger <eric.auger@linaro.org>
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> > This replaces Eric Auger's previous patch
-> > (https://lists.cs.columbia.edu/pipermail/kvmarm/2014-December/012646.html),
-> > because it fits better with testing to include it in this series and I
-> > realized that we need to add a check against irqchip_in_kernel() as
-> > well.
-> > 
-> >  arch/arm/kvm/arm.c | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> > index a9d005f..d4da244 100644
-> > --- a/arch/arm/kvm/arm.c
-> > +++ b/arch/arm/kvm/arm.c
-> > @@ -213,6 +213,11 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
-> >  	int err;
-> >  	struct kvm_vcpu *vcpu;
-> >  
-> > +	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm)) {
-> Reviewed-by: Eric Auger <eric.auger@linaro.org>
-> a question about that irqchip_in_kernel(kvm):
-> kvm->arch.vgic.in_kernel is set in kvm_vgic_create but nobody resets it,
-> especially in destroy, am i wrong?
 
-no, because we don't allow creating a vgic in the kernel for a VM and
-then letting the VM go back to having a userspace driven gic.
 
-> if the vgic is initialized shouldn't it be also created? Shouldn't we
-> test irqchip_in_kernel in vgic_init instead?
-
-no, vgic_init will never be called if you didn't create a vgic, and
-irqchip_in_kernel() should always return false in that case.
-
-If you can find a flow where this breaks, please let me know, because
-then it's a bug, but it looks right to me.
-
-> Also in case we need irqchip_in_kernel(kvm) here we might need it also
-> in kvm_vgic_inject_irq because dist->lock is grabbed in
-> vgic_update_irq_pending.
+On 11/12/2014 10:47, Christoffer Dall wrote:
+> On Tue, Dec 09, 2014 at 08:39:39PM +0100, Paolo Bonzini wrote:
+>>
+>>
+>> On 09/12/2014 12:25, Christoffer Dall wrote:
+>>> Hi Paolo,
+>>>
+>>> The following changes since commit f62c95fd4041d669159dd76ac0bb2a7f86b5b05d:
+>>>
+>>>   Merge tag 'kvm-s390-next-20141028' of git://git.kernel.org/pub/scm/linux/kernel/git/kvms390/linux into HEAD (2014-10-29 13:31:32 +0100)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-for-3.19
+>>>
+>>> for you to fetch changes up to 016ed39c54b8a3db680e5c6a43419f806133caf2:
+>>>
+>>>   arm/arm64: KVM: vgic: kick the specific vcpu instead of iterating through all (2014-11-26 10:19:37 +0000)
+>>>
+>>> Thanks,
+>>> -Christoffer
+>>>
+>>> ----------------------------------------------------------------
+>>> Changes for KVM for arm/arm64 for v3.19 including mmio mapping fixups
+>>> (already in kvm/next, apologies about duplicate commits), vgic cleanup
+>>> and optimizations, and an MMIO path cleanup.
+>>>
+>>> ----------------------------------------------------------------
+>>>
+>>>
+>>> Andre Przywara (1):
+>>>   arm/arm64: KVM: avoid unnecessary guest register mangling on MMIO read
+>>>
+>>> Ard Biesheuvel (4):
+>>>   arm/arm64: kvm: drop inappropriate use of kvm_is_mmio_pfn()
+>>>   kvm: fix kvm_is_mmio_pfn() and rename to kvm_is_reserved_pfn()
+>>>   kvm: add a memslot flag for incoherent memory regions
+>>>   arm, arm64: KVM: handle potential incoherency of readonly memslots
+>>>
+>>> Christoffer Dall (1):
+>>>   arm/arm64: vgic: Remove unreachable irq_clear_pending
+>>>
+>>> Laszlo Ersek (1):
+>>>   arm, arm64: KVM: allow forced dcache flush on page faults
+>>>
+>>> Shannon Zhao (1):
+>>>   arm/arm64: KVM: vgic: kick the specific vcpu instead of iterating
+>>>     through all
+>>>
+>>> wanghaibin (1):
+>>>   KVM: ARM: VGIC: Optimize the vGIC vgic_update_irq_pending function.
+>>>
+>>>  arch/arm/include/asm/kvm_mmu.h   |  5 +++--
+>>>  arch/arm/kvm/mmio.c              | 15 +++++++++------
+>>>  arch/arm/kvm/mmu.c               | 34 +++++++++++++++++++++++++++-------
+>>>  arch/arm64/include/asm/kvm_mmu.h |  5 +++--
+>>>  arch/ia64/kvm/kvm-ia64.c         |  2 +-
+>>>  arch/x86/kvm/mmu.c               |  6 +++---
+>>>  include/linux/kvm_host.h         |  3 ++-
+>>>  virt/kvm/arm/vgic.c              | 20 +++++++++++++-------
+>>>  virt/kvm/kvm_main.c              | 16 ++++++++--------
+>>>  9 files changed, 69 insertions(+), 37 deletions(-)
+>>>
+>>
+>> No dirty bitmap yet?  You still have one week, I'm okay with a late
+>> addition.
+>>
+> No, we spotted a bug in the last revision and I prefer not merging it at
+> this short notice, because I won't have proper time to test the stuff.
 > 
-Huh, you're right about that.  In fact, I don't think we should allow
-initializing the arch timers if userspace didn't create an in-kernel
-irqchip, avoiding the call path alltogether.
+> The plan is to put it in kvmarm/next right after the merge window
+> closes.
 
-We probaby need to add that to this series.
+Since there are x86 bits, please send an "unusual" kvmarm/next pull
+request as soon as it's ready.  This way the 3.20 kvm/next and
+kvmarm/next trees can both include it.
 
-Unless I missed something obvious here: Nice catch!
-
-Thanks,
--Christoffer
+Paolo
