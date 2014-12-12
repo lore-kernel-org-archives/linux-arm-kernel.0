@@ -1,47 +1,24 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Fri, 12 Dec 2014 10:57:54 +0100
-Subject: [PATCH v2 1/1] net/macb: add TX multiqueue support for gem
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CA0BA7D@AcuExch.aculab.com>
-References: <cover.1418291637.git.cyrille.pitchen@atmel.com>	<87a3098203ee6eaa7a60607713a293d3258e2b58.1418291637.git.cyrille.pitchen@atmel.com>
- <20141211203103.4191887a@free-electrons.com>
- <063D6719AE5E284EB5DD2968C1650D6D1CA0BA36@AcuExch.aculab.com>
- <548AAE66.8070501@atmel.com>
- <063D6719AE5E284EB5DD2968C1650D6D1CA0BA7D@AcuExch.aculab.com>
-Message-ID: <548ABC22.3080107@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 12 Dec 2014 10:57:49 +0000
+Subject: [PATCH 1/1] iommu/arm-smmu: modify the calculation of PASize and
+ SEP fields
+In-Reply-To: <1418373663-9124-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1418373663-9124-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20141212105749.GC25781@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/12/2014 10:59, David Laight a ?crit :
-> From: Cyrille Pitchen [...
->>> It will probably add a lot of object code and, depending on how often
->>> the registers are accesses, might have performance impact.
->>>
->>> Having:
->>> #define GEM_ISR(n) (0x400 + (n) << 4)
->>> will save source code.
->>>
->>> 	David
->>>
->>>
->>>
->> So you suggest that we keep the unsigned int fields ISR, IMR, IER, IDR, TBQP in
->> the struct macb_queue and initialize them once for all in macb_probe() like
->> patch v2 does but only replace the GEM_ISR1 .. GEM_ISR7 defines by GEM_ISR(n)
->> in macb.h?
->>
->> This way there would be to test at run time and we can handle the special
->> register mapping of queue0.
->>
->> Is it what you meant?
-> 
-> In one word, yes.
-> 
-> 	David
-> 
-> 
-> 
-OK, so I'm working on v3
+On Fri, Dec 12, 2014 at 08:41:03AM +0000, Zhen Lei wrote:
+> 1. the calculation appear 3 times, it's good to define a function.
+> 2. VA_BITS is dynamic determined by CONFIG_ARM64_VA_BITS yet, but current
+>    switch..case can not cover all possible values.
+> 3. change TTBCR2_ADDR_xx to ADDR_SIZE_xx, because it's not only TTBCR2 use it.
 
-Thanks
+Please take a look at the pgtable rework I posted recently -- it moves a
+bunch of this into a generic framework.
 
-Cyrille
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/306786.html
+
+(I plan to post v2 soon).
+
+Will
