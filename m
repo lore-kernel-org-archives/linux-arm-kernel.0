@@ -1,67 +1,52 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 12 Dec 2014 10:51:54 +0100
-Subject: __hci_cmd_sync() not suitable for nokia h4p
-In-Reply-To: <CAA1630D-1A2E-4D3D-9BBC-2EE86256D58B@holtmann.org>
-References: <20141209190210.GA15641@amd>
- <304050AD-DB11-4A2B-A1F7-8B1BBB5F04F0@holtmann.org>
- <20141209201328.GA18003@amd>
- <7EFD3C33-E503-4FB6-BCCF-52836080ABD6@holtmann.org>
- <20141210131519.GA14748@amd>
- <EE1A4B9D-30D5-4BD9-9A43-532619494A0C@holtmann.org>
- <20141211221306.GA2905@amd>
- <CAA1630D-1A2E-4D3D-9BBC-2EE86256D58B@holtmann.org>
-Message-ID: <20141212095153.GB2905@amd>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 12 Dec 2014 10:51:50 +0100
+Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
+ support
+In-Reply-To: <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
+References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
+ <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
+Message-ID: <548ABAB6.6010200@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hello,
 
-> >>>> What needs to be done is the bring up of the device including the proper UART settings and speed and then just run the firmware downloads. All firmware files on the Nokia devices where just HCI commands with vendor specific details. Some from CSR, some from Broadcom and some from TI. You can actually decode them if you really want to. Shouldn't be that hard.
-> >>>> 
-> >>> 
-> >>> Speed changes at the end of firmware load, but I guess that's detail?
-> >>> Anyway, patch would look like this.
-> >> 
-> >> You should really look into providing hdev->setup() callback. That is normally the callback where you want to load the firmware.
-> >> 
-> > 
-> > I can provide setup() callback and load firmware from there.
-> > 
-> > I have created provisional device tree binding, and the driver still
-> > works.
-> > 
-> > Some time ago you mentioned that with the "big" issues fixed, you'd be
-> > willing to take it into the tree. What way forward do you see? Would
-> > it make sense to re-enable the driver in staging, so that "big"
-> > changes could be applied, followed by renames?
-> 
-> If the driver is clean, there is no point in taking it through staging. It can be cleaned up and then merged all together.
->
+On 11/18/2014 07:20 AM, Ajay kumar wrote:
+> On Sat, Nov 15, 2014 at 3:24 PM, Ajay Kumar <ajaykumar.rs@samsung.com> wrote:
+>> This series is based on master branch of Linus tree at:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+>>
 
-Ok, so you can revert a4102f90e87cfaa3fdbed6fdf469b23f0eeb4bfd in your
-tree, and I can post patches against that?
+This series has been in the mailing lists for months and have been tested
+by many people. What else is missing before it can be merged?
 
-> I think the important part is to focus on the N900 derivative with
->the Broadcom chip inside. And just ignore all the rest. So start
->small and do not try to carry the N770, N800, N810 hacks over.
+It would be great to have proper display support on platforms that have a
+eDP to LVDS bridge chip (e.g: Snow, Peach Pit and Spring Chromebooks) and
+everything is in place but this series which had been missing many kernel
+releases already.
 
-Well, I did remove non-relevant firmware loaders, and I can remove the
-switches for different firmware loaders, too, but spending time
-removing support for different hardware does not sound quite right.
+>>
+>> Changes since V7:
+>>         -- Address comments from Tomi and Laurent:
+>>                 -- Use videoports and endpoints to represent the connection between
+>>                    encoder, bridge and the panel, instead of using phandles.
+>>         -- Address comments from Daniel:
+>>                 -- Make the patch description more descriptive.
+>>                 -- remove device pointer from drm_bridge, and just use
+>>                    device_node instead.
+>>                 -- don't pass encoder pointer to bridge_attach.
+>>         -- Address comments from Sean Paul:
+>>                 -- Remove bridge from mode_config, and pull out drm_bridge
+>>                    functions from drm_crtc.c to drm_bridge.c
+>>
 
-> However you might want to check Neil Brown's patches for TTY-slave
->devices he just posted. Maybe the N900 devices should be exposed as
->TTY and we just attach N_HCI line discipline to it. If all the GPIO
->wiggling can be done automatically at TTY open, then that should be
->the way to go. I also send an email about using the new unconfigured
->stage to get this done cleanly.
+Tomi and Laurent,
 
-I seen them, but they don't help, I'm afraid. The GPIOs are used for
-power saving, and they are used in various places including the serial
-irq handler.
+You asked Ajay to change his series to use the video port and enpoints DT
+bindings instead of phandles, could you please review his latest version?
 
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I guess is now too late for 3.19 since we are in the middle of the merge
+window but it would be great if this series can at least made it to 3.20.
+
+Thanks a lot and best regards,
+Javier
