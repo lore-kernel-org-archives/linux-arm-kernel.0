@@ -1,85 +1,91 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 12 Dec 2014 12:32:30 +0100
-Subject: [PATCH 1/2] mmc: sdhci-pltfm: fix abort due to missing runtime PM
-In-Reply-To: <1417538845-10867-1-git-send-email-stefan@agner.ch>
-References: <1417538845-10867-1-git-send-email-stefan@agner.ch>
-Message-ID: <66cd0a564e08d507210a6806c91d3bd3@agner.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Dec 2014 12:35:56 +0100
+Subject: [RFC/PATCH 1/4 PATCH] ARM: mvebu: use dt_fixup to provide
+ fallback for enable-method
+In-Reply-To: <1418360035-27975-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+References: <5488A2C0.5040804@alliedtelesis.co.nz>
+ <1418360035-27975-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+Message-ID: <2005632.nq5F7SJD3S@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-02 17:47, Stefan Agner wrote:
-> When entering suspend while the device is in runtime PM, the
-> sdhci_[suspend|resume]_host function are called without taking
-> care of runtime PM. On Vybrid SoC this leads to external abort
-> since during runtime suspend, the clocks for this peripheral
-> are disabled.
+On Friday 12 December 2014 17:53:55 Chris Packham wrote:
+> > I briefly explored that approach here[1]. The tricky part would be 
+> > handling the fact that the enable method can be attached to either the 
+> > /cpus node or and individual /cpu entry (or is that something I can 
+> > ignore?).
+> > 
+> > In the end I thought that the unconditional setting of smp_ops was 
+> > easier to implement and would achieve the same result.
 > 
-> [   37.772967] Unhandled fault: imprecise external abort (0x1c06) at 0x76f5f000
-> [   37.780304] Internal error: : 1c06 [#1] ARM
-> [   37.784670] Modules linked in:
-> [   37.787908] CPU: 0 PID: 428 Comm: sh Not tainted
-> 3.18.0-rc5-00119-geefd097-dirty #1540
-> [   37.796142] task: 8e246c00 ti: 8ca6c000 task.ti: 8ca6c000
-> [   37.801785] PC is at esdhc_writel_le+0x40/0xec
-> [   37.806431] LR is at sdhci_set_card_detection+0xe0/0xe4
-> [   37.811877] pc : [<803f0584>]    lr : [<803eaaa0>]    psr: 400f0013
-> [   37.811877] sp : 8ca6dd28  ip : 00000001  fp : 8ca6dd3c
-> [   37.823766] r10: 807a233c  r9 : 00000000  r8 : 8e8b7210
-> [   37.829194] r7 : 802d8a08  r6 : 8082e928  r5 : 00000000  r4 : 00000002
-> [   37.835974] r3 : 8ea34e90  r2 : 00000038  r1 : 00000000  r0 : 8ea32ac0
-> ...
+> Actually as it turns out it's not that hard to implement something that
+> checks both /cpus and /cpus/cpu at n. I'll include this with the next round
+> after I've waited for anymore feedback.
+
+Ah, very nice!
+
+> ---8<---
+> Subject: [PATCH] ARM: mvebu: use dt_fixup to provide fallback for enable-method
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> When the device tree doesn't define an enable-method insert a property
+> into the flattened device tree. arm_dt_init_cpu_maps() will then parse
+> this an set smp_ops appropriately. Now that we have this fallback it is
+> no longer necessary to set .smp in the DT_MACHINE definition.
+> 
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 > ---
-> Not really sure this is the right place to fix this. The function now
-> ended up to be identically to the implementations in sdhci-pxav3.c...
-
-Any thoughts on this?
-
+>  arch/arm/mach-mvebu/Makefile   |  2 ++
+>  arch/arm/mach-mvebu/board-v7.c | 37 ++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 38 insertions(+), 1 deletion(-)
 > 
->  drivers/mmc/host/sdhci-pltfm.c | 17 +++++++++++++++--
->  1 file changed, 15 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-> index c5b01d6..0bc864e 100644
-> --- a/drivers/mmc/host/sdhci-pltfm.c
-> +++ b/drivers/mmc/host/sdhci-pltfm.c
-> @@ -31,6 +31,7 @@
->  #include <linux/err.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/pm_runtime.h>
->  #ifdef CONFIG_PPC
->  #include <asm/machdep.h>
->  #endif
-> @@ -237,17 +238,29 @@ EXPORT_SYMBOL_GPL(sdhci_pltfm_unregister);
->  #ifdef CONFIG_PM
->  int sdhci_pltfm_suspend(struct device *dev)
->  {
-> +	int ret;
->  	struct sdhci_host *host = dev_get_drvdata(dev);
->  
-> -	return sdhci_suspend_host(host);
-> +	pm_runtime_get_sync(dev);
-> +	ret = sdhci_suspend_host(host);
-> +	pm_runtime_mark_last_busy(dev);
-> +	pm_runtime_put_autosuspend(dev);
+> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+> index e24136b..68310f8 100644
+> --- a/arch/arm/mach-mvebu/Makefile
+> +++ b/arch/arm/mach-mvebu/Makefile
+> @@ -14,3 +14,5 @@ endif
+>  obj-$(CONFIG_MACH_DOVE)		 += dove.o
+>  obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
+>  obj-$(CONFIG_MACH_NETXBIG)	 += netxbig.o
 > +
-> +	return ret;
->  }
->  EXPORT_SYMBOL_GPL(sdhci_pltfm_suspend);
->  
->  int sdhci_pltfm_resume(struct device *dev)
->  {
-> +	int ret;
->  	struct sdhci_host *host = dev_get_drvdata(dev);
->  
-> -	return sdhci_resume_host(host);
-> +	pm_runtime_get_sync(dev);
-> +	ret = sdhci_resume_host(host);
-> +	pm_runtime_mark_last_busy(dev);
-> +	pm_runtime_put_autosuspend(dev);
+> +CFLAGS_board-v7.o = -I$(src)/../../../scripts/dtc/libfdt
+> \ No newline at end of file
+
+Why is this needed? Can't you just include <linux/libfdt.h> ?
+
+> +static void __init armada_370_xp_dt_fixup(void)
+> +{
+> +	int offset, node;
+> +	int i, len;
+> +	void *prop;
+> +	char buffer[20];
 > +
-> +	return ret;
->  }
->  EXPORT_SYMBOL_GPL(sdhci_pltfm_resume);
+> +	offset = fdt_path_offset(initial_boot_params, "/cpus");
+> +	if (offset < 0)
+> +		return;
+> +
+> +	prop = fdt_getprop(initial_boot_params, offset, "enable-method", &len);
+> +	if (prop)
+> +		return;
+> +
+> +	for (i = 0; i < NR_CPUS; i++) {
+> +		snprintf(buffer, sizeof(buffer), "cpu@%d", i);
+> +		node = fdt_subnode_offset(initial_boot_params, offset, buffer);
+> +		if (node < 0)
+> +			break;
+> +		prop = fdt_getprop(initial_boot_params, node,
+> +				   "enable-method", &len);
+> +		if (prop)
+> +			return;
+> +	}
+> +
+> +	pr_info("No enable-method defined. "
+> +		"Falling back to \"marvell,armada-xp-smp\"\n");
+> +
+> +	fdt_setprop(initial_boot_params, offset, "enable-method",
+> +		    "marvell,armada-xp-smp", sizeof("marvell,armada-xp-smp"));
+> +}
+
+I think it would be good to first check whether you are running on Armada XP
+or Armada 370, because the latter does not require this.
+
+	Arnd
