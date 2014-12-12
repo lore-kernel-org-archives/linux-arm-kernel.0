@@ -1,108 +1,112 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 12 Dec 2014 04:13:54 +0200
-Subject: [v3][PATCH 4/5] media: ov2640: add a master clock for sensor
-In-Reply-To: <1418283339-16281-5-git-send-email-josh.wu@atmel.com>
-References: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
- <1418283339-16281-5-git-send-email-josh.wu@atmel.com>
-Message-ID: <2368220.9kzqcjNO4y@avalon>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 12 Dec 2014 02:13:31 +0000 (UTC)
+Subject: [PATCH] clocksource: tegra: wrap arch/arm-specific sections in
+ CONFIG_ARM
+In-Reply-To: <20141210111425.GD15287@ulmo.nvidia.com>
+References: <alpine.DEB.2.02.1412092201200.31750@utopia.booyaka.com>
+ <20141210111425.GD15287@ulmo.nvidia.com>
+Message-ID: <alpine.DEB.2.02.1412112206120.29716@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
++ lakml
 
-Thank you for the patch.
+Hello Thierry
 
-On Thursday 11 December 2014 15:35:38 Josh Wu wrote:
-> The master clock (xvclk) is mandatory. It's a common clock framework clock.
-> It can make sensor output a pixel clock to the camera interface.
-> 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+On Wed, 10 Dec 2014, Thierry Reding wrote:
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> On Tue, Dec 09, 2014 at 10:07:18PM +0000, Paul Walmsley wrote:
+> > 
+> > Like several of the other files in drivers/clocksource,
+> > tegra20_timer.c contains code that can only compile when CONFIG_ARM is
+> > enabled.  This causes obvious problems when trying to compile this
+> > code for NVIDIA ARM64-based SoCs, such as Tegra132.  The same timer IP
+> > blocks exist, so it seems appropriate to provide support for them.
+> > 
+> > So until we figure out a better way to partition this code, wrap the
+> > delay_timer and persistent_clock support code with preprocessor tests
+> > for CONFIG_ARM.  (The delay_timer code should not be needed at all on
+> > ARM64 due to the presence of the ARMv8 architected timer.  The
+> > persistent_clock support code could become important once power
+> > management modes are implemented that turn off the CPU complex.)
+> > 
+> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> > Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
+> > Cc: Allen Martin <amartin@nvidia.com>
+> > Cc: Stephen Warren <swarren@nvidia.com>
+> > Cc: Thierry Reding <treding@nvidia.com>
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Alexandre Courbot <gnurou@gmail.com>
+> > ---
+> > Applies against next-20141209.
+> > Intended for v3.20.
+> > Boot-tested on Tegra124 Jetson TK1 on next-20141209.
+> > Also boot-tested on Tegra132 Norrin FFD on next-20141209 + extra, 
+> > unrelated patches.
+> > 
+> >  drivers/clocksource/tegra20_timer.c | 11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> 
+> You might want to read the following thread:
+> 
+> 	https://lkml.org/lkml/2014/11/7/605
 
-> ---
-> v2 -> v3:
->   1. should return PTR_ERR().
-> 
-> v1 -> v2:
->   1. change the clock's name.
->   2. Make the clock is mandatory.
-> 
->  drivers/media/i2c/soc_camera/ov2640.c | 23 ++++++++++++++++++++++-
->  1 file changed, 22 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
-> b/drivers/media/i2c/soc_camera/ov2640.c index e0bcf5b..055702c 100644
-> --- a/drivers/media/i2c/soc_camera/ov2640.c
-> +++ b/drivers/media/i2c/soc_camera/ov2640.c
-> @@ -13,6 +13,7 @@
->   * published by the Free Software Foundation.
->   */
-> 
-> +#include <linux/clk.h>
->  #include <linux/init.h>
->  #include <linux/module.h>
->  #include <linux/i2c.h>
-> @@ -31,6 +32,7 @@
-> 
->  #define VAL_SET(x, mask, rshift, lshift)  \
->  		((((x) >> rshift) & mask) << lshift)
-> +
->  /*
->   * DSP registers
->   * register offset for BANK_SEL == BANK_SEL_DSP
-> @@ -284,6 +286,7 @@ struct ov2640_priv {
->  	struct v4l2_ctrl_handler	hdl;
->  	u32	cfmt_code;
->  	struct v4l2_clk			*clk;
-> +	struct clk			*master_clk;
->  	const struct ov2640_win_size	*win;
-> 
->  	struct soc_camera_subdev_desc	ssdd_dt;
-> @@ -746,6 +749,7 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int
-> on) struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
-> struct ov2640_priv *priv = to_ov2640(client);
->  	struct v4l2_clk *clk;
-> +	int ret;
-> 
->  	if (!priv->clk) {
->  		clk = v4l2_clk_get(&client->dev, "mclk");
-> @@ -755,7 +759,20 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int
-> on) priv->clk = clk;
->  	}
-> 
-> -	return soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
-> +	if (on) {
-> +		ret = clk_prepare_enable(priv->master_clk);
-> +		if (ret)
-> +			return ret;
-> +	} else {
-> +		clk_disable_unprepare(priv->master_clk);
-> +	}
-> +
-> +	ret = soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
-> +
-> +	if (ret && on)
-> +		clk_disable_unprepare(priv->master_clk);
-> +
-> +	return ret;
->  }
-> 
->  /* Select the nearest higher resolution for capture */
-> @@ -1145,6 +1162,10 @@ static int ov2640_probe(struct i2c_client *client,
->  			return ret;
->  	}
-> 
-> +	priv->master_clk = devm_clk_get(&client->dev, "xvclk");
-> +	if (IS_ERR(priv->master_clk))
-> +		return PTR_ERR(priv->master_clk);
-> +
->  	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
->  	v4l2_ctrl_handler_init(&priv->hdl, 2);
->  	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
+Thanks for the link, I hadn't seen that discussion.
 
--- 
-Regards,
+> I haven't gotten around to look at this in detail, but it seems like we
+> may not need to register the RTC early here at all. If that's really the
+> case we can just get rid of this hackery and do everything within the
+> RTC driver rather than duplicate some of that code here.
 
-Laurent Pinchart
+I'd suggest that we keep that project separate from just getting this file 
+to compile on ARM64.
+
+Broadly speaking, I agree that tegra20_timer.c needs to be cleaned up; it 
+should not mix code for two distinct IP blocks into one driver.
+
+> On 32-bit ARM, Tegra114 and Tegra124 also support the architected timer,
+> so the only remaining issue would be for Tegra20 and Tegra30 hardware.
+
+I believe on most NVIDIA chips (and probably most ARM SoCs) the ARM 
+architected timer is only usable as a clockevent timer when the CPU 
+doesn't enter deep low power states.  So the architected timer won't be 
+enough.
+
+> But I also seem to remember that on most boards the Tegra RTC can't be
+> used properly because it doesn't have a battery. So while it may still
+> work while the board is powered it is not very useful as RTC. Or for
+> timekeeping across suspend/resume for that matter. The majority of
+> boards seem to have a PMIC with an integrated RTC and will use that
+> instead.
+
+>From my point of view, the Tegra RTC IP block's primary use case is to 
+provide an always-on clockevent to wake the system from SC7 (aka LP0 
+idle)[1].  In SC7, the ARM architected timer comparator logic and Tegra 
+TMR IP blocks will be power-gated, and thus can't wake the system.
+
+PMIC RTC timers are generally a bad fit for this purpose, since they tend 
+to be low-resolution (+/- 1 second) and slow to program (via some slow 
+serial bus).  They are good for keeping calendars, though...
+
+> Otherwise this looks good to me to get things going on 64-bit ARM while
+> we iron out the other issues. Can I assume that you plan on sending in
+> patches that enable 64-bit ARM Tegra in the 3.20 timeframe? If so it
+> might be best to take this patch through the Tegra tree, provided that
+> Daniel and Thomas have no objections, to make sure we don't have
+> intermittent build breakage depending on the order in which the trees
+> get pulled into linux-next and Linus' tree. Even more so because there
+> are a couple of other, similar patches which makes a stable branches
+> oriented approach to resolving these dependencies somewhat impractical.
+
+Given the rather small number of mainline T132 users, I'll probably just 
+send these patches up via their corresponding trees and let them merge via 
+their respective maintainers.  That keeps the risk of merge conflicts low. 
+At this point I don't think there will be any significant dependency 
+problems.
+
+- Paul
+
+1. Section 11.0 "Real-time Clock" of the _NVIDIA Tegra K1 Mobile Processor
+   Technical Reference Manual v03p (DP-06905-001_v03p)_, 
+   https://developer.nvidia.com/tegra-k1-technical-reference-manual
