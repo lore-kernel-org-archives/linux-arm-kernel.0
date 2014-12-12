@@ -1,51 +1,83 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 12 Dec 2014 14:13:01 +0530
-Subject: [Linaro-acpi] [PATCH] Mailbox: Complete wait event only if Tx
- was successful
-In-Reply-To: <1418242572-20998-1-git-send-email-ashwin.chaugule@linaro.org>
-References: <1418242572-20998-1-git-send-email-ashwin.chaugule@linaro.org>
-Message-ID: <548AAA95.6020001@arm.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Fri, 12 Dec 2014 09:24:03 +0100
+Subject: [PATCH v2 1/1] net/macb: add TX multiqueue support for gem
+In-Reply-To: <20141211203103.4191887a@free-electrons.com>
+References: <cover.1418291637.git.cyrille.pitchen@atmel.com>	<87a3098203ee6eaa7a60607713a293d3258e2b58.1418291637.git.cyrille.pitchen@atmel.com>
+ <20141211203103.4191887a@free-electrons.com>
+Message-ID: <548AA623.9070304@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ashwin,
+Le 11/12/2014 20:31, Thomas Petazzoni a ?crit :
+> Dear Cyrille Pitchen,
+> 
+> On Thu, 11 Dec 2014 11:16:51 +0100, Cyrille Pitchen wrote:
+> 
+>> +#define GEM_ISR1				0x0400
+>> +#define GEM_ISR2				0x0404
+>> +#define GEM_ISR3				0x0408
+>> +#define GEM_ISR4				0x040c
+>> +#define GEM_ISR5				0x0410
+>> +#define GEM_ISR6				0x0414
+>> +#define GEM_ISR7				0x0418
+> 
+> What about doing instead:
+> 
+> #define GEM_ISR(q)				((q) == 0 ? MACB_ISR : 0x400 + (q) << 2)
+> 
+> And ditto for all other registers, which will save a lot of boring repeated code.
+> 
+> If you do that, then you can avoid the following fields in the
+> macb_queue structure:
+> 
+> +	unsigned int		ISR;
+> +	unsigned int		IER;
+> +	unsigned int		IDR;
+> +	unsigned int		IMR;
+> +	unsigned int		TBQP;
+> 
+> And the not very pleasant calculation of those offsets:
+> 
+> +	bp->queues[0].bp = bp;
+> +	bp->queues[0].ISR  = MACB_ISR;
+> +	bp->queues[0].IER  = MACB_IER;
+> +	bp->queues[0].IDR  = MACB_IDR;
+> +	bp->queues[0].IMR  = MACB_IMR;
+> +	bp->queues[0].TBQP = MACB_TBQP;
+> +	for (q = 1, queue = &bp->queues[1]; q < MACB_MAX_QUEUES; ++q) {
+> +		if (!(queue_mask & (1 << q)))
+> +			continue;
+> +
+> +		queue->bp = bp;
+> +		queue->ISR  = (q-1) * sizeof(u32) + GEM_ISR1;
+> +		queue->IER  = (q-1) * sizeof(u32) + GEM_IER1;
+> +		queue->IDR  = (q-1) * sizeof(u32) + GEM_IDR1;
+> +		queue->IMR  = (q-1) * sizeof(u32) + GEM_IMR1;
+> +		queue->TBQP = (q-1) * sizeof(u32) + GEM_TBQP1;
+> +		queue++;
+> +	}
+> 
+> You replace the ISR, IER, IDR, IMR and TBQP by an "id" field in
+> macb_queue, which contains the queue number, and then change your:
+> 
+> +#define queue_readl(queue, reg)				\
+> +	__raw_readl((queue)->bp->regs + queue->reg)
+> +#define queue_writel(queue, reg, value)			\
+> +	__raw_writel((value), (queue)->bp->regs + queue->reg)
+> 
+> to
+> 
+> +#define queue_readl(queue, reg)				\
+> +	__raw_readl((queue)->bp->regs + reg((queue)->id))
+> +#define queue_writel(queue, reg, value)			\
+> +	__raw_writel((value), (queue)->bp->regs + reg((queue)->id)
+> 
+> Best regards,
+> 
+> Thomas
+> 
+Good idea, I'm working on it.
 
-On Thursday 11 December 2014 01:46 AM, Ashwin Chaugule wrote:
-> If a wait_for_completion_timeout() call returns due to a timeout,
-> the mbox code can still call complete() after returning from the wait.
-> This can cause subsequent transmissions on a channel to fail, since
-> the wait_for_completion_timeout() sees the completion variable
-> is !=0, caused by the erroneous complete() call, and immediately
-> returns without waiting for the time as expected by the client.
->
-> Fix this by calling complete() only if the TX was successful.
->
-> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> ---
->   drivers/mailbox/mailbox.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-> index 17e9e4a..4acaddb 100644
-> --- a/drivers/mailbox/mailbox.c
-> +++ b/drivers/mailbox/mailbox.c
-> @@ -101,7 +101,7 @@ static void tx_tick(struct mbox_chan *chan, int r)
->   	if (mssg && chan->cl->tx_done)
->   		chan->cl->tx_done(chan->cl, mssg, r);
->
-> -	if (chan->cl->tx_block)
-> +	if ((!r) && chan->cl->tx_block)
->   		complete(&chan->tx_complete);
+Thanks,
 
-Just curious to check if there's another possible race which is
-a different issue.
-
-Suppose the timer fired and indicated that the Tx is complete, then
-it tries to execute complete while the wait_for_completion_timeout timed
-out. Does that make sense ?
-
-So if yes, how about adding !completion_done(..) to the check while you
-are at this ?
-
-Regards,
-Sudeep
+Cyrille
