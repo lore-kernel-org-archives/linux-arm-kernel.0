@@ -1,199 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Dec 2014 13:29:20 +0100
-Subject: [PATCH v2 2/4] PCI: iproc: Add Broadcom iProc PCIe driver
-In-Reply-To: <1418351817-14898-3-git-send-email-rjui@broadcom.com>
-References: <1418351817-14898-3-git-send-email-rjui@broadcom.com>
-Message-ID: <2190666.DfrpWiLTCc@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 12 Dec 2014 12:59:51 +0000
+Subject: [PATCH 1/4] regulator: core: Support trying to get close to a
+ certain voltage
+In-Reply-To: <CAD=FV=W1r2MXNHXTRiO1pBPWurvgqq+dSoOPgpSJ_zAbpU7T4Q@mail.gmail.com>
+References: <1418245085-9754-1-git-send-email-dianders@chromium.org>
+ <20141210235347.GT11764@sirena.org.uk>
+ <CAHNYxRy2t0OVj-+CqQFOfj0zWAGG0j8rmd8SxdNWgBMA2iAfXQ@mail.gmail.com>
+ <20141211123106.GU11764@sirena.org.uk>
+ <CAD=FV=U4RFYx9NXOACrXJZK2bKkosyYnmTZRHkXuaSz-FS9kNQ@mail.gmail.com>
+ <20141211170934.GZ11764@sirena.org.uk>
+ <CAD=FV=WBAuF0+BVMG9rp53Zt851Ou0kZ6xgTe9mjmgxyugWteg@mail.gmail.com>
+ <20141212002410.GB11764@sirena.org.uk>
+ <CAD=FV=W1r2MXNHXTRiO1pBPWurvgqq+dSoOPgpSJ_zAbpU7T4Q@mail.gmail.com>
+Message-ID: <20141212125951.GE11764@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 December 2014 18:36:55 Ray Jui wrote:
-> Add initial version of the Broadcom iProc PCIe driver. This driver
-> has been tested on NSP and Cygnus and is expected to work on all iProc
-> family of SoCs that deploys the same PCIe host controller
->
-> The driver also supports MSI
+On Thu, Dec 11, 2014 at 07:31:43PM -0800, Doug Anderson wrote:
+> On Thu, Dec 11, 2014 at 4:24 PM, Mark Brown <broonie@kernel.org> wrote:
 
-Overall, I'm not convinced it's worth continuing this driver. While it
-supports more features, Hauke's version seemed much cleaner, and I'd
-rather see his driver merged and have you add the additional features.
+> > I mean the latter - what happens if more than one consumer is trying to
+> > use the regulator?  This is IIRC why _set_voltage_tol() uses the cheap
+> > and nasty implementation it does.
 
-Why did you drop him from Cc again?
+> Ah, I see.  I don't think I've ever encountered a case where there
+> were two consumers for a regulator that actually requested voltages...
 
-> +
-> +#define MII_MGMT_CTRL_OFFSET         0x000
-> +#define MII_MGMT_CTRL_MDCDIV_SHIFT   0
-> +#define MII_MGMT_CTRL_PRE_SHIFT      7
-> +#define MII_MGMT_CTRL_BUSY_SHIFT     8
-> +#define MII_MGMT_CTRL_EXT_SHIFT      9
-> +#define MII_MGMT_CTRL_BTP_SHIFT      10
+> ...but isn't regulator_set_voltage_tol() broken there?  If you have
+> two clients, A and B and a regulator that can go 1.0V to 5.0V in .05V
+> increments:
 
-As mentioned, better move all the MII handling to a separate driver.
+> A requests 1.8V +/- .1V.  We get 1.8V
+> B requests 1.7V +/- .05V.
 
-> +struct iproc_pcie;
-> +
-> +/**
-> + * iProc MSI
-> + * @pcie: pointer to the iProc PCIe data structure
-> + * @irq_in_use: bitmap of MSI IRQs that are in use
-> + * @domain: MSI IRQ domain
-> + * @chip: MSI controller
-> + * @eq_page: memory page to store the iProc MSI event queue
-> + * @msi_page: memory page for MSI posted writes
-> + */
-> +struct iproc_msi {
-> +	struct iproc_pcie *pcie;
-> +	DECLARE_BITMAP(irq_in_use, MAX_IRQS);
-> +	struct irq_domain *domain;
-> +	struct msi_controller chip;
-> +	unsigned long eq_page;
-> +	unsigned long msi_page;
-> +};
+> The above could be achievable with a voltage of 1.75V but it won't
+> work with the current regulator_set_voltage_tol() I think.
 
-Same for MSI. I would assume that you will eventually have
-chips with this PCI core and a GICv2m or GICv3, so it would
-be better to reference the MSI controller through an msi-parent
-reference that can be replaced with a reference to the GIC.
+Yeah, it's not perfect but it'll work most of the time.
 
-> +
-> +	u32 phy_addr;
+> > There's also the potential
+> > performance considerations for the DVS type applications now I think
+> > about it.
 
-struct phy *phy;
+> Iterating through voltages is really that slow?  If so, perhaps we
+> could add some caching to keep track of what voltage we actually got
+> last time...  I could also add an optimization to try the exact
+> requested voltage right away...
 
-> +	int irqs[MAX_IRQS];
-
-Please name these irqs individually according to what they do.
-The MSI IRQ should of course be moved to the MSI driver.
-
-> +	struct iproc_msi msi;
-> +};
-> +
-> +static inline int mdio_wait_idle(struct iproc_pcie *pcie)
-> +{
-> +	int timeout = MDIO_TIMEOUT_USEC;
-> +
-> +	while (readl(pcie->mii + MII_MGMT_CTRL_OFFSET) &
-> +			(1 << MII_MGMT_CTRL_BUSY_SHIFT)) {
-> +		udelay(1);
-> +		if (timeout-- <= 0)
-> +			return -EBUSY;
-> +	}
-> +	return 0;
-> +}
-
-Better use ktime_get()/ktime_add_ns()/ktime_before() loop here
-to do an accurate timeout.
-
-> +static void iproc_pcie_reset(struct iproc_pcie *pcie)
-> +{
-> +	u32 val;
-> +
-> +	/* send a downstream reset */
-> +	val = EP_MODE_SURVIVE_PERST | RC_PCIE_RST_OUTPUT;
-> +	writel(val, pcie->reg + CLK_CONTROL_OFFSET);
-> +	udelay(250);
-> +	val &= ~EP_MODE_SURVIVE_PERST;
-> +	writel(val, pcie->reg + CLK_CONTROL_OFFSET);
-> +	mdelay(250);
-> +}
-
-250ms delay is not acceptable. Please find a way to call this function
-from a context in which you can sleep.
-
-> +static int iproc_pcie_check_link(struct iproc_pcie *pcie)
-> +{
-> +	int ret;
-> +	u8 nlw;
-> +	u16 pos, tmp16;
-> +	u32 val;
-> +	struct pci_sys_data sys;
-> +	struct pci_bus bus;
-> +
-> +	val = readl(pcie->reg + PCIE_LINK_STATUS_OFFSET);
-> +	dev_dbg(pcie->dev, "link status: 0x%08x\n", val);
-> +
-> +	val = readl(pcie->reg + STRAP_STATUS_OFFSET);
-> +	dev_dbg(pcie->dev, "strap status: 0x%08x\n", val);
-> +
-> +	memset(&sys, 0, sizeof(sys));
-> +	memset(&bus, 0, sizeof(bus));
-> +
-> +	bus.number = 0;
-> +	bus.ops = &iproc_pcie_ops;
-> +	bus.sysdata = &sys;
-> +	sys.private_data = pcie;
-> +
-> +	ret = iproc_pci_read_conf(&bus, 0, PCI_HEADER_TYPE, 1, &val);
-> +	if (ret != PCIBIOS_SUCCESSFUL || val != PCI_HEADER_TYPE_BRIDGE) {
-> +		dev_err(pcie->dev, "in EP mode, val=0x08%x\n", val);
-> +		return -EFAULT;
-> +	}
-
-Remove the fake pci_bus hack and just read the config space directly.
-
-> +	if (nlw == 0) {
-> +		/* try GEN 1 link speed */
-> +#define PCI_LINK_STATUS_CTRL_2_OFFSET 0xDC
-> +#define PCI_TARGET_LINK_SPEED_MASK    0xF
-> +#define PCI_TARGET_LINK_SPEED_GEN2    0x2
-> +#define PCI_TARGET_LINK_SPEED_GEN1    0x1
-> +		pci_bus_read_config_dword(&bus, 0,
-> +				PCI_LINK_STATUS_CTRL_2_OFFSET, &val);
-> +		if ((val & PCI_TARGET_LINK_SPEED_MASK) ==
-> +				PCI_TARGET_LINK_SPEED_GEN2) {
-> +			val &= ~PCI_TARGET_LINK_SPEED_MASK;
-> +			val |= PCI_TARGET_LINK_SPEED_GEN1;
-> +			pci_bus_write_config_dword(&bus, 0,
-> +					PCI_LINK_STATUS_CTRL_2_OFFSET, val);
-> +			pci_bus_read_config_dword(&bus, 0,
-> +					PCI_LINK_STATUS_CTRL_2_OFFSET, &val);
-> +			mdelay(100);
-
-Too much delay.
-
-> +static struct hw_pci hw;
-
-Put this on the stack.
-
-> +
-> +	/* Get the PCI memory ranges from DT */
-> +	for_each_of_pci_range(&parser, &range) {
-> +		of_pci_range_to_resource(&range, np, &res);
-> +
-> +		switch (res.flags & IORESOURCE_TYPE_BITS) {
-> +		case IORESOURCE_IO:
-> +			memcpy(&pcie->io, &res, sizeof(res));
-> +			pcie->io.name = "I/O";
-> +			break;
-> +
-> +		case IORESOURCE_MEM:
-> +			memcpy(&pcie->mem, &res, sizeof(res));
-> +			pcie->mem.name = "MEM";
-> +			break;
-> +		}
-> +	}
-
-I think you need to request all the resources here, including the physical
-I/O space window.
-
-> +static struct platform_driver iproc_pcie_driver = {
-> +	.driver = {
-> +		.owner = THIS_MODULE,
-> +		.name = "iproc-pcie",
-> +		.of_match_table =
-> +		   of_match_ptr(iproc_pcie_of_match_table),
-> +	},
-> +};
-
-Make this a bcma_driver.
-
-> +static int __init iproc_pcie_init(void)
-> +{
-> +	return platform_driver_probe(&iproc_pcie_driver,
-> +			iproc_pcie_probe);
-> +}
-> +subsys_initcall(iproc_pcie_init);
-
-module_init()? Doesn't seem necessary to have this early.
-
-	Arnd
+Applications like DVS get pretty performance sensitive and for a
+regulator with high resolution if you're trying to hit a voltage at the
+top of the range you could be iterating over a hundred or more values.
+Perhaps doing something based on the various factorings out of the
+voltage mapping would do the trick, add a new op for getting to the
+closest voltage?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141212/c79e5710/attachment.sig>
