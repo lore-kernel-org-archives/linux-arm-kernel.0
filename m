@@ -1,78 +1,199 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Fri, 12 Dec 2014 13:28:00 +0100
-Subject: __hci_cmd_sync() not suitable for nokia h4p
-In-Reply-To: <20141212095153.GB2905@amd>
-References: <20141209190210.GA15641@amd>
- <304050AD-DB11-4A2B-A1F7-8B1BBB5F04F0@holtmann.org>
- <20141209201328.GA18003@amd>
- <7EFD3C33-E503-4FB6-BCCF-52836080ABD6@holtmann.org>
- <20141210131519.GA14748@amd>
- <EE1A4B9D-30D5-4BD9-9A43-532619494A0C@holtmann.org>
- <20141211221306.GA2905@amd>
- <CAA1630D-1A2E-4D3D-9BBC-2EE86256D58B@holtmann.org>
- <20141212095153.GB2905@amd>
-Message-ID: <45FED76E-F0E2-4810-8D79-64C5D1693EFA@holtmann.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Dec 2014 13:29:20 +0100
+Subject: [PATCH v2 2/4] PCI: iproc: Add Broadcom iProc PCIe driver
+In-Reply-To: <1418351817-14898-3-git-send-email-rjui@broadcom.com>
+References: <1418351817-14898-3-git-send-email-rjui@broadcom.com>
+Message-ID: <2190666.DfrpWiLTCc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Thursday 11 December 2014 18:36:55 Ray Jui wrote:
+> Add initial version of the Broadcom iProc PCIe driver. This driver
+> has been tested on NSP and Cygnus and is expected to work on all iProc
+> family of SoCs that deploys the same PCIe host controller
+>
+> The driver also supports MSI
 
->>>>>> What needs to be done is the bring up of the device including the proper UART settings and speed and then just run the firmware downloads. All firmware files on the Nokia devices where just HCI commands with vendor specific details. Some from CSR, some from Broadcom and some from TI. You can actually decode them if you really want to. Shouldn't be that hard.
->>>>>> 
->>>>> 
->>>>> Speed changes at the end of firmware load, but I guess that's detail?
->>>>> Anyway, patch would look like this.
->>>> 
->>>> You should really look into providing hdev->setup() callback. That is normally the callback where you want to load the firmware.
->>>> 
->>> 
->>> I can provide setup() callback and load firmware from there.
->>> 
->>> I have created provisional device tree binding, and the driver still
->>> works.
->>> 
->>> Some time ago you mentioned that with the "big" issues fixed, you'd be
->>> willing to take it into the tree. What way forward do you see? Would
->>> it make sense to re-enable the driver in staging, so that "big"
->>> changes could be applied, followed by renames?
->> 
->> If the driver is clean, there is no point in taking it through staging. It can be cleaned up and then merged all together.
->> 
-> 
-> Ok, so you can revert a4102f90e87cfaa3fdbed6fdf469b23f0eeb4bfd in your
-> tree, and I can post patches against that?
+Overall, I'm not convinced it's worth continuing this driver. While it
+supports more features, Hauke's version seemed much cleaner, and I'd
+rather see his driver merged and have you add the additional features.
 
-just treat this a submission of a new driver.
+Why did you drop him from Cc again?
 
->> I think the important part is to focus on the N900 derivative with
->> the Broadcom chip inside. And just ignore all the rest. So start
->> small and do not try to carry the N770, N800, N810 hacks over.
-> 
-> Well, I did remove non-relevant firmware loaders, and I can remove the
-> switches for different firmware loaders, too, but spending time
-> removing support for different hardware does not sound quite right.
+> +
+> +#define MII_MGMT_CTRL_OFFSET         0x000
+> +#define MII_MGMT_CTRL_MDCDIV_SHIFT   0
+> +#define MII_MGMT_CTRL_PRE_SHIFT      7
+> +#define MII_MGMT_CTRL_BUSY_SHIFT     8
+> +#define MII_MGMT_CTRL_EXT_SHIFT      9
+> +#define MII_MGMT_CTRL_BTP_SHIFT      10
 
-Lets face it, you are not getting it upstream that way. If nobody has the hardware to test it or cares about the hardware anymore, then this should not be upstream in the first place.
+As mentioned, better move all the MII handling to a separate driver.
 
-Make your life easier and get your hardware supported. Then someone can evolve this for older Nokia devices. But I am not taking code that nobody has tested.
+> +struct iproc_pcie;
+> +
+> +/**
+> + * iProc MSI
+> + * @pcie: pointer to the iProc PCIe data structure
+> + * @irq_in_use: bitmap of MSI IRQs that are in use
+> + * @domain: MSI IRQ domain
+> + * @chip: MSI controller
+> + * @eq_page: memory page to store the iProc MSI event queue
+> + * @msi_page: memory page for MSI posted writes
+> + */
+> +struct iproc_msi {
+> +	struct iproc_pcie *pcie;
+> +	DECLARE_BITMAP(irq_in_use, MAX_IRQS);
+> +	struct irq_domain *domain;
+> +	struct msi_controller chip;
+> +	unsigned long eq_page;
+> +	unsigned long msi_page;
+> +};
 
-Keep it simple is really the only way to get this driver merged. There is so much old cruft in there that you are better off only caring about the N900 version of the hardware.
+Same for MSI. I would assume that you will eventually have
+chips with this PCI core and a GICv2m or GICv3, so it would
+be better to reference the MSI controller through an msi-parent
+reference that can be replaced with a reference to the GIC.
 
->> However you might want to check Neil Brown's patches for TTY-slave
->> devices he just posted. Maybe the N900 devices should be exposed as
->> TTY and we just attach N_HCI line discipline to it. If all the GPIO
->> wiggling can be done automatically at TTY open, then that should be
->> the way to go. I also send an email about using the new unconfigured
->> stage to get this done cleanly.
-> 
-> I seen them, but they don't help, I'm afraid. The GPIOs are used for
-> power saving, and they are used in various places including the serial
-> irq handler.
+> +
+> +	u32 phy_addr;
 
-That is something that might need some extra work on it, but it seems that the general direction of TTY slaves is the right one.
+struct phy *phy;
 
-Anyway, the main order of business is really that it supports DT and that it can be compiled on every single platform and you could even load the driver on x86 without doing any harm.
+> +	int irqs[MAX_IRQS];
 
-Regards
+Please name these irqs individually according to what they do.
+The MSI IRQ should of course be moved to the MSI driver.
 
-Marcel
+> +	struct iproc_msi msi;
+> +};
+> +
+> +static inline int mdio_wait_idle(struct iproc_pcie *pcie)
+> +{
+> +	int timeout = MDIO_TIMEOUT_USEC;
+> +
+> +	while (readl(pcie->mii + MII_MGMT_CTRL_OFFSET) &
+> +			(1 << MII_MGMT_CTRL_BUSY_SHIFT)) {
+> +		udelay(1);
+> +		if (timeout-- <= 0)
+> +			return -EBUSY;
+> +	}
+> +	return 0;
+> +}
+
+Better use ktime_get()/ktime_add_ns()/ktime_before() loop here
+to do an accurate timeout.
+
+> +static void iproc_pcie_reset(struct iproc_pcie *pcie)
+> +{
+> +	u32 val;
+> +
+> +	/* send a downstream reset */
+> +	val = EP_MODE_SURVIVE_PERST | RC_PCIE_RST_OUTPUT;
+> +	writel(val, pcie->reg + CLK_CONTROL_OFFSET);
+> +	udelay(250);
+> +	val &= ~EP_MODE_SURVIVE_PERST;
+> +	writel(val, pcie->reg + CLK_CONTROL_OFFSET);
+> +	mdelay(250);
+> +}
+
+250ms delay is not acceptable. Please find a way to call this function
+from a context in which you can sleep.
+
+> +static int iproc_pcie_check_link(struct iproc_pcie *pcie)
+> +{
+> +	int ret;
+> +	u8 nlw;
+> +	u16 pos, tmp16;
+> +	u32 val;
+> +	struct pci_sys_data sys;
+> +	struct pci_bus bus;
+> +
+> +	val = readl(pcie->reg + PCIE_LINK_STATUS_OFFSET);
+> +	dev_dbg(pcie->dev, "link status: 0x%08x\n", val);
+> +
+> +	val = readl(pcie->reg + STRAP_STATUS_OFFSET);
+> +	dev_dbg(pcie->dev, "strap status: 0x%08x\n", val);
+> +
+> +	memset(&sys, 0, sizeof(sys));
+> +	memset(&bus, 0, sizeof(bus));
+> +
+> +	bus.number = 0;
+> +	bus.ops = &iproc_pcie_ops;
+> +	bus.sysdata = &sys;
+> +	sys.private_data = pcie;
+> +
+> +	ret = iproc_pci_read_conf(&bus, 0, PCI_HEADER_TYPE, 1, &val);
+> +	if (ret != PCIBIOS_SUCCESSFUL || val != PCI_HEADER_TYPE_BRIDGE) {
+> +		dev_err(pcie->dev, "in EP mode, val=0x08%x\n", val);
+> +		return -EFAULT;
+> +	}
+
+Remove the fake pci_bus hack and just read the config space directly.
+
+> +	if (nlw == 0) {
+> +		/* try GEN 1 link speed */
+> +#define PCI_LINK_STATUS_CTRL_2_OFFSET 0xDC
+> +#define PCI_TARGET_LINK_SPEED_MASK    0xF
+> +#define PCI_TARGET_LINK_SPEED_GEN2    0x2
+> +#define PCI_TARGET_LINK_SPEED_GEN1    0x1
+> +		pci_bus_read_config_dword(&bus, 0,
+> +				PCI_LINK_STATUS_CTRL_2_OFFSET, &val);
+> +		if ((val & PCI_TARGET_LINK_SPEED_MASK) ==
+> +				PCI_TARGET_LINK_SPEED_GEN2) {
+> +			val &= ~PCI_TARGET_LINK_SPEED_MASK;
+> +			val |= PCI_TARGET_LINK_SPEED_GEN1;
+> +			pci_bus_write_config_dword(&bus, 0,
+> +					PCI_LINK_STATUS_CTRL_2_OFFSET, val);
+> +			pci_bus_read_config_dword(&bus, 0,
+> +					PCI_LINK_STATUS_CTRL_2_OFFSET, &val);
+> +			mdelay(100);
+
+Too much delay.
+
+> +static struct hw_pci hw;
+
+Put this on the stack.
+
+> +
+> +	/* Get the PCI memory ranges from DT */
+> +	for_each_of_pci_range(&parser, &range) {
+> +		of_pci_range_to_resource(&range, np, &res);
+> +
+> +		switch (res.flags & IORESOURCE_TYPE_BITS) {
+> +		case IORESOURCE_IO:
+> +			memcpy(&pcie->io, &res, sizeof(res));
+> +			pcie->io.name = "I/O";
+> +			break;
+> +
+> +		case IORESOURCE_MEM:
+> +			memcpy(&pcie->mem, &res, sizeof(res));
+> +			pcie->mem.name = "MEM";
+> +			break;
+> +		}
+> +	}
+
+I think you need to request all the resources here, including the physical
+I/O space window.
+
+> +static struct platform_driver iproc_pcie_driver = {
+> +	.driver = {
+> +		.owner = THIS_MODULE,
+> +		.name = "iproc-pcie",
+> +		.of_match_table =
+> +		   of_match_ptr(iproc_pcie_of_match_table),
+> +	},
+> +};
+
+Make this a bcma_driver.
+
+> +static int __init iproc_pcie_init(void)
+> +{
+> +	return platform_driver_probe(&iproc_pcie_driver,
+> +			iproc_pcie_probe);
+> +}
+> +subsys_initcall(iproc_pcie_init);
+
+module_init()? Doesn't seem necessary to have this early.
+
+	Arnd
