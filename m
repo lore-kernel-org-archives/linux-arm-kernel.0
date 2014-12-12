@@ -1,27 +1,42 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Fri, 12 Dec 2014 16:44:06 +0100
-Subject: [PATCH] clk: rockchip: add CLK_IGNORE_UNUSED flag to fix USB Host
-In-Reply-To: <1418396066-31360-1-git-send-email-julien.chauveau@neo-technologies.fr>
-References: <1418396066-31360-1-git-send-email-julien.chauveau@neo-technologies.fr>
-Message-ID: <CABgxDoKKjwDf8+OuWiTjzpbGonshZ0fHXXMvSkJi1Z1U_7AsNA@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 12 Dec 2014 17:19:02 +0100
+Subject: [PATCH 0/4] serial: =?UTF-8?Q?fsl=5Flpuart=3A=20fix=20various?=
+ =?UTF-8?Q?=20DMA=20related=20issues?=
+In-Reply-To: <20141212143244.GA2219@kroah.com>
+References: <1417134205-4400-1-git-send-email-stefan@agner.ch>
+ <677f2c62b6b6c1fe8e16cd38d5f20d47@agner.ch>
+ <20141212143244.GA2219@kroah.com>
+Message-ID: <f6255321feb06d32f257b7b41d5d58a3@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2014-12-12 15:32, Greg KH wrote:
+> On Fri, Dec 12, 2014 at 02:44:06PM +0100, Stefan Agner wrote:
+>> Any thoughts on this patchset? Would have hopped that it makes it into
+>> 3.19 as those are mostly fixes.
+> 
+> "mostly"?
+> 
 
-2014-12-12 15:54 GMT+01:00 Julien CHAUVEAU
-<julien.chauveau@neo-technologies.fr>:
-> This patch adds CLK_IGNORE_UNUSED flag to hclk_usb_peri, hclk_usbotg0 and hclk_usbotg1
-> because these clocks must remain enabled to use the USB controllers in host mode.
->
-> This fixes a regression introduced by patch "clk: rockchip: disable unused clocks"
-> https://lkml.kernel.org/g/1415092270-24932-1-git-send-email-kever.yang at rock-chips.com
+Well, all of them fix a bug, but PATCH 2/4 does this by also moving DMA
+allocation to probe. I would really have to split up that patch and make
+two incremental steps (split-up of RX/TX DMA allocation to make each
+single action revert-able and move to probe). But this would lead to
+more changed lines in total. The patchset as is already somewhat tested
+since we use it in our 3.18 BSP, whereas a new set would not be tested.
 
-Could you refer the commit id instead ? something like "commit <ID>
-("title of the corresponding commit")  (and use scripts/checkpatch.pl
-on your patch to be sure that the commit form is okay).
+One could also argument, it only affects fsl_lpuart (UART in rather not
+very widespread SoC's Freescale Vybrid and LS1021a).
 
 
-I confirm the regression.
+> I'll get to these after 3.19-rc1 is out, but it really looks like these
+> will be for 3.20-rc1, unless you break them up into "bugfix only" type
+> patches.
 
-Romain
+
+PATCH 1/4 fixes a bug which happens on a normal console rather often on
+my setup. So if you decide that patchset is for 3.20-rc1, that one would
+be nice to have in 3.19 as well...
+
+--
+Stefan
