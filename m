@@ -1,64 +1,50 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 12 Dec 2014 11:04:53 +0530
+Date: Fri, 12 Dec 2014 11:17:01 +0530
 Subject: [PATCH v6 1/5] phy: add a driver for the Rockchip SoC internal
  USB2.0 PHY
-In-Reply-To: <54899FE7.7050808@rock-chips.com>
-References: <1418291722-25448-1-git-send-email-lyz@rock-chips.com>
- <1418291722-25448-2-git-send-email-lyz@rock-chips.com>
- <548971AF.1020506@ti.com> <54899FE7.7050808@rock-chips.com>
-Message-ID: <548A7E7D.8010703@ti.com>
+In-Reply-To: <CAD=FV=XTYmzxvteNip2gtuDSSEWph-vY=BOPejHa1Z5KS2Kf6Q@mail.gmail.com>
+References: <1418291722-25448-1-git-send-email-lyz@rock-chips.com>	<1418291722-25448-2-git-send-email-lyz@rock-chips.com>	<548971AF.1020506@ti.com>
+ <CAD=FV=XTYmzxvteNip2gtuDSSEWph-vY=BOPejHa1Z5KS2Kf6Q@mail.gmail.com>
+Message-ID: <548A8155.8080809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thursday 11 December 2014 07:15 PM, Yunzhi Li wrote:
-> Hi Kishon:
+On Friday 12 December 2014 12:11 AM, Doug Anderson wrote:
+> Kishon,
 > 
-> On 2014/12/11 18:27, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> On Thursday 11 December 2014 03:25 PM, Yunzhi Li wrote:
->>> +
->>> +static struct phy *rockchip_usb_phy_xlate(struct device *dev,
->>> +                    struct of_phandle_args *args)
->>> +{
->>> +    struct rockchip_usb_phy_priv *priv = dev_get_drvdata(dev);
->>> +    unsigned int phy_id = args->args[0];
->>> +
->>> +    if (WARN_ON(phy_id < 0 || phy_id >= priv->nphys))
->>> +        return ERR_PTR(-ENODEV);
->>> +
->>> +    return priv->phys[phy_id].phy;
+> On Thu, Dec 11, 2014 at 2:27 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
 >> I didn't mean that. You can get rid of this entire xlate stuff if you use
 >> something like below
 >>
 >> phy at xxx {
->>     compatible = "";
->>     phy1:usb_phy {
->>     }
->>     phy2:usb_phy {
->>     };
+>>         compatible = "";
+>>         phy1:usb_phy {
+>>         }
+>>         phy2:usb_phy {
+>>         };
 >> };
 >>
 >>
 >> usb at xx {
->>     compatible = "";
->>     phys = <&phy1>; //doesn't need xlate
->>     /* this needs xlate
->>        phys = <&phy 1>;
->>     */
->>     phy-names = "phy";
+>>         compatible = "";
+>>         phys = <&phy1>; //doesn't need xlate
+>>         /* this needs xlate
+>>            phys = <&phy 1>;
+>>         */
+>>         phy-names = "phy";
 >> };
 > 
-> Thank you so much for your suggestion, but still have a question:
-> I have to add the #phy-cells property in each phy sub-node, otherwise
-> devm_get_phy() will fail and I get log info like
-> "/usb at ff500000: could not get #phy-cells for /phy/usbp-phy1". So can the
-> #phy-cells property defines in patent node
-> also valid for it's child nodes like #address-cells ?
+> Is the syntax you proposed really better?  Are you saying that you
+> advocate never using "#phy-cells" other than 0 for new bindings?  Is
 
-No. You have to add #phy-cells property for every PHY node.
+No. It can still be used for configuring the PHY. For example, in the case of
+PIPE3 PHY we configure it to USB PHY, SATA PHY or PCIE PHY depending on to
+which controller the PHY is connected to.
+
+I feel using phy-cells just for differentiating the PHY is pointless when you
+have a separate node for each PHY.
 
 Thanks
 Kishon
