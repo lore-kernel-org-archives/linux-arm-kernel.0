@@ -1,134 +1,135 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Fri, 12 Dec 2014 13:15:51 +0900
-Subject: [RFC PATCH 2/2] iommu: rockchip: Handle system-wide and runtime PM
-In-Reply-To: <1576771.dIVCOxU0se@vostro.rjw.lan>
-References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
- <7h8uiemce7.fsf@deeprootsystems.com>
- <CAPDyKFo6zH4__Odm+RiJCbvXquAQqaLyCAiXrSN6s3KfQhok=A@mail.gmail.com>
- <1576771.dIVCOxU0se@vostro.rjw.lan>
-Message-ID: <CAAFQd5B28WiWUqmbmROJUa3H25R=Y774NuemTZDvkoa=CvZUsw@mail.gmail.com>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Fri, 12 Dec 2014 17:53:55 +1300
+Subject: [RFC/PATCH 1/4 PATCH] ARM: mvebu: use dt_fixup to provide
+ fallback for enable-method
+In-Reply-To: <5488A2C0.5040804@alliedtelesis.co.nz>
+References: <5488A2C0.5040804@alliedtelesis.co.nz>
+Message-ID: <1418360035-27975-1-git-send-email-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+Hi Arnd,
 
-On Fri, Dec 12, 2014 at 5:48 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Thursday, December 11, 2014 04:51:37 PM Ulf Hansson wrote:
->> On 11 December 2014 at 16:31, Kevin Hilman <khilman@kernel.org> wrote:
->> > [+ Laurent Pinchart]
->> >
->> > Tomasz Figa <tfiga@chromium.org> writes:
->> >
->> >> On Thu, Dec 11, 2014 at 8:58 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> >
->> > [...]
->> >
->> >>>> @@ -988,11 +1107,28 @@ static int rk_iommu_probe(struct platform_device *pdev)
->> >>>>                 return -ENXIO;
->> >>>>         }
->> >>>>
->> >>>> +       pm_runtime_no_callbacks(dev);
->> >>>> +       pm_runtime_enable(dev);
->> >>>> +
->> >>>> +       /* Synchronize state of the domain with driver data. */
->> >>>> +       pm_runtime_get_sync(dev);
->> >>>> +       iommu->is_powered = true;
->> >>>
->> >>> Doesn't the runtime PM status reflect the value of "is_powered", thus
->> >>> why do you need to have a copy of it? Could it perpahps be that you
->> >>> try to cope with the case when CONFIG_PM is unset?
->> >>>
->> >>
->> >> It's worth noting that this driver fully relies on status of other
->> >> devices in the power domain the IOMMU is in and does not enforce the
->> >> status on its own. So in general, as far as my understanding of PM
->> >> runtime subsystem, the status of the IOMMU device will be always
->> >> suspended, because nobody will call pm_runtime_get() on it (except the
->> >> get and put pair in probe). So is_powered is here to track status of
->> >> the domain, not the device. Feel free to suggest a better way, though.
->> >
->> > I still don't like these notifiers.  I think they add ways to bypass
->> > having proper runtime PM implemented for devices/subsystems.
+> On 12/10/2014 10:44 PM, Arnd Bergmann wrote:
+>> On Wednesday 10 December 2014 15:39:44 Chris Packham wrote:
+>>>
+>>> +static void __init armada_370_xp_dt_fixup(void)
+>>> +{
+>>> +       smp_set_ops(smp_ops(armada_xp_smp_ops));
+>>> +}
+>>> +
+>>>
 >>
->> I do agree, but I haven't found another good solution to the problem.
->
-> For the record, I'm not liking this mostly because it "fixes" a generic problem
-> in a way that's hidden in the genpd code and very indirect.
-
-Well, that's true. This is indeed a generic problem of PM dependencies
-between devices (other than those represented by parent-child
-relation), which in fact doesn't have much to do with genpd, but
-rather with those devices directly. It is just that genpd is the most
-convenient location to solve this in current code and in a simple way.
-In other words, I see this solution as a reasonable way to get the
-problem solved quickly for now, so that we can start thinking about a
-more elegant solution.
-
->
->> > From a high-level, the IOMMU is just another device inside the PM
->> > domain, so ideally it should be doing it's own _get() and _put() calls
->> > so the PM domain code would just do the right thing without the need for
->> > notifiers.
+>> The dt_fixup callback pointer is meant to fix up a legacy dtb file in
+>> memory. I think this would be fairly easy in this case, just add in the
+>> missing enable-method property here to make the normal boot path
+>> work for old dtbs.
 >>
->> As I understand it, the IOMMU (or for other similar cases) shouldn't
->> be doing any get() and put() at all because there are no IO API to
->> serve request from.
+>>     Arnd
 >>
->> In principle we could consider these kind devices as "parent" devices
->> to those other devices that needs them. Then runtime PM core would
->> take care of things for us, right!?
->>
->> Now, I am not so sure using the "parent" approach is actually viable,
->> since it will likely have other complications, but I haven't
->> thoroughly thought it though yet.
->
-> That actually need not be a "parent".
->
-> What's needed in this case is to do a pm_runtime_get_sync() on a device
-> depended on every time a dependent device is runtime-resumed (and analogously
-> for suspending).
->
-> The core doesn't have a way to do that, but it looks like we'll need to add
-> it anyway for various reasons (ACPI _DEP is one of them as I mentioned some
-> time ago, but people dismissed it basically as not their problem).
+> 
+> I briefly explored that approach here[1]. The tricky part would be 
+> handling the fact that the enable method can be attached to either the 
+> /cpus node or and individual /cpu entry (or is that something I can 
+> ignore?).
+> 
+> In the end I thought that the unconditional setting of smp_ops was 
+> easier to implement and would achieve the same result.
 
-Let me show you our exact use case.
+Actually as it turns out it's not that hard to implement something that
+checks both /cpus and /cpus/cpu at n. I'll include this with the next round
+after I've waited for anymore feedback.
 
-We have a power domain, which contains an IOMMU and an IP block, which
-can do bus transactions through that IOMMU. Of course the IP block is
-not aware of the IOMMU, because this is just an integration detail and
-on other platforms using the same IP block the IOMMU might not be
-there. This implies that the driver for this IP block should not be
-aware of the IOMMU either, which, on the buffer allocation and mapping
-side, is achieved by DMA mapping subsystem. We would also want the
-IOMMU to be fully transparent to that driver on PM side.
+---8<---
+Subject: [PATCH] ARM: mvebu: use dt_fixup to provide fallback for enable-method
 
-Now, for PM related details, they are located in the same power
-domain, which means that whenever the power domain is turned off, the
-CPU can't access their registers and all the hardware state is gone.
-To make the case more interesting, there is no point in programming
-the IOMMU unless the device using it is powered on. Similarly, there
-is no point in powering the domain on to just access the IOMMU. This
-implies that the power domain should be fully controlled by the
-stand-alone IP block, while the peripheral IOMMU shouldn't affect its
-state and its driver only respond to operations performed by driver of
-that stand-alone IP block.
+When the device tree doesn't define an enable-method insert a property
+into the flattened device tree. arm_dt_init_cpu_maps() will then parse
+this an set smp_ops appropriately. Now that we have this fallback it is
+no longer necessary to set .smp in the DT_MACHINE definition.
 
-A solution like below could work for the above:
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
+ arch/arm/mach-mvebu/Makefile   |  2 ++
+ arch/arm/mach-mvebu/board-v7.c | 37 ++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 38 insertions(+), 1 deletion(-)
 
-- There is a per-device list of peripheral devices, which need to be
-powered on for this device to work.
-- Whenever the IOMMU subsystem/driver binds an IOMMU to a device, it
-adds the IOMMU device to the list of peripheral devices of that device
-(and similarly for removal).
-- A runtime PM operation on a device will also perform the same
-operation on all its peripheral devices.
-
-Another way would be to extend what the PM runtime core does with
-parent-child relations to handle the whole list of peripheral devices
-instead of just the parent.
-
-Would this design sound somehow reasonable to you?
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index e24136b..68310f8 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -14,3 +14,5 @@ endif
+ obj-$(CONFIG_MACH_DOVE)		 += dove.o
+ obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
+ obj-$(CONFIG_MACH_NETXBIG)	 += netxbig.o
++
++CFLAGS_board-v7.o = -I$(src)/../../../scripts/dtc/libfdt
+\ No newline at end of file
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index d0d39f1..0592c76 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -17,6 +17,8 @@
+ #include <linux/clk-provider.h>
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
++#include <linux/of_fdt.h>
++#include <linux/libfdt.h>
+ #include <linux/io.h>
+ #include <linux/clocksource.h>
+ #include <linux/dma-mapping.h>
+@@ -198,6 +200,39 @@ static void __init mvebu_dt_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
++static void __init armada_370_xp_dt_fixup(void)
++{
++	int offset, node;
++	int i, len;
++	void *prop;
++	char buffer[20];
++
++	offset = fdt_path_offset(initial_boot_params, "/cpus");
++	if (offset < 0)
++		return;
++
++	prop = fdt_getprop(initial_boot_params, offset, "enable-method", &len);
++	if (prop)
++		return;
++
++	for (i = 0; i < NR_CPUS; i++) {
++		snprintf(buffer, sizeof(buffer), "cpu@%d", i);
++		node = fdt_subnode_offset(initial_boot_params, offset, buffer);
++		if (node < 0)
++			break;
++		prop = fdt_getprop(initial_boot_params, node,
++				   "enable-method", &len);
++		if (prop)
++			return;
++	}
++
++	pr_info("No enable-method defined. "
++		"Falling back to \"marvell,armada-xp-smp\"\n");
++
++	fdt_setprop(initial_boot_params, offset, "enable-method",
++		    "marvell,armada-xp-smp", sizeof("marvell,armada-xp-smp"));
++}
++
+ static const char * const armada_370_xp_dt_compat[] = {
+ 	"marvell,armada-370-xp",
+ 	NULL,
+@@ -206,11 +241,11 @@ static const char * const armada_370_xp_dt_compat[] = {
+ DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
+ 	.l2c_aux_val	= 0,
+ 	.l2c_aux_mask	= ~0,
+-	.smp		= smp_ops(armada_xp_smp_ops),
+ 	.init_machine	= mvebu_dt_init,
+ 	.init_irq       = mvebu_init_irq,
+ 	.restart	= mvebu_restart,
+ 	.dt_compat	= armada_370_xp_dt_compat,
++	.dt_fixup	= armada_370_xp_dt_fixup,
+ MACHINE_END
+ 
+ static const char * const armada_375_dt_compat[] = {
+-- 
+2.2.0.rc0
