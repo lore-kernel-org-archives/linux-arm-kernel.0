@@ -1,91 +1,45 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 12 Dec 2014 12:43:33 +0900
-Subject: [PATCH v2] ARM: shmobile: r8a7794: Add SDHI clocks to device tree
-Message-ID: <1418355813-16577-1-git-send-email-horms+renesas@verge.net.au>
+From: lyz@rock-chips.com (Yunzhi Li)
+Date: Fri, 12 Dec 2014 11:43:25 +0800
+Subject: [PATCH v6 1/5] phy: add a driver for the Rockchip SoC internal
+ USB2.0 PHY
+In-Reply-To: <CAD=FV=WcAJAgj2triu1W4863BT1ew2wf-z6YNHHwiDKpnYmK4w@mail.gmail.com>
+References: <1418291722-25448-1-git-send-email-lyz@rock-chips.com>	<1418291722-25448-2-git-send-email-lyz@rock-chips.com>
+ <CAD=FV=WcAJAgj2triu1W4863BT1ew2wf-z6YNHHwiDKpnYmK4w@mail.gmail.com>
+Message-ID: <548A645D.8010608@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+Hi Doug:
 
-Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
-[horms: omitted device nodes; only add clock]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On 2014/12/12 2:09, Doug Anderson wrote:
+> Yunzhi,
+>
+> On Thu, Dec 11, 2014 at 1:55 AM, Yunzhi Li <lyz@rock-chips.com> wrote:
+>> +               rk_phy->clk = of_clk_get(child, 0);
+>> +               if (IS_ERR(rk_phy->clk)) {
+>> +                       dev_warn(dev, "failed to get clock\n");
+>> +                       rk_phy->clk = NULL;
+>> +               }
+> The device tree bindings don't specify a clock and the "dtsi" added to
+> rk3288 don't reference a clock.  Take that code out and avoid a
+> warning in the logs at bootup.
+>
+> ...or should there be a clock?
+Actually, there is a clk gating control bit in CRU for each usb phy and I
+think we should manage these clocks by the usb phy driver, so I will add
+clock property to usb PHYs nodes in next version of patche set.
 
----
-Based on the renesas-devel-20141212-v3.18 tag of my renesas tree
-
-v2 [Simon Horman]
-* As suggested by Magnus Damm
-  - Added missing sdhi0 portions
-    (this was an error on my part when rebasing Uehara-san's patch)
-
-v1 [Simon Horman]
-* Removed portions of patch which add device nodes
-* Renamed patch from
-  "ARM: shmobile: r8a7794: Add SDHI clocks and devices to device tree" to
-  "ARM: shmobile: r8a7794: Add SDHI clocks to device tree"
----
- arch/arm/boot/dts/r8a7794.dtsi            | 20 +++++++++++++++++++-
- include/dt-bindings/clock/r8a7794-clock.h |  3 +++
- 2 files changed, 22 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 068ca09..8794df8 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -293,6 +293,21 @@
- 			clock-output-names = "main", "pll0", "pll1", "pll3",
- 					     "lb", "qspi", "sdh", "sd0", "z";
- 		};
-+		/* Variable factor clocks */
-+		sd1_clk: sd2_clk at e6150078 {
-+			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
-+			reg = <0 0xe6150078 0 4>;
-+			clocks = <&pll1_div2_clk>;
-+			#clock-cells = <0>;
-+			clock-output-names = "sd1";
-+		};
-+		sd2_clk: sd3_clk at e615007c {
-+			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
-+			reg = <0 0xe615007c 0 4>;
-+			clocks = <&pll1_div2_clk>;
-+			#clock-cells = <0>;
-+			clock-output-names = "sd2";
-+		};
- 
- 		/* Fixed factor clocks */
- 		pll1_div2_clk: pll1_div2_clk {
-@@ -496,13 +511,16 @@
- 		mstp3_clks: mstp3_clks at e615013c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
--			clocks = <&rclk_clk>, <&hp_clk>, <&hp_clk>;
-+			clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
-+			         <&rclk_clk>, <&hp_clk>, <&hp_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
-+			        R8A7794_CLK_SDHI2 R8A7794_CLK_SDHI1 R8A7794_CLK_SDHI0
- 				R8A7794_CLK_CMT1 R8A7794_CLK_USBDMAC0
- 				R8A7794_CLK_USBDMAC1
- 			>;
- 			clock-output-names =
-+			        "sdhi2", "sdhi1", "sdhi0",
- 				"cmt1", "usbdmac0", "usbdmac1";
- 		};
- 		mstp7_clks: mstp7_clks at e615014c {
-diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-index fba89a4..f013cdc 100644
---- a/include/dt-bindings/clock/r8a7794-clock.h
-+++ b/include/dt-bindings/clock/r8a7794-clock.h
-@@ -52,6 +52,9 @@
- #define R8A7794_CLK_SYS_DMAC0		19
- 
- /* MSTP3 */
-+#define R8A7794_CLK_SDHI2		11
-+#define R8A7794_CLK_SDHI1		12
-+#define R8A7794_CLK_SDHI0		14
- #define R8A7794_CLK_CMT1		29
- #define R8A7794_CLK_USBDMAC0		30
- #define R8A7794_CLK_USBDMAC1		31
--- 
-2.1.3
+>
+>> +               rk_phy->phy = devm_phy_create(dev, NULL, &ops);
+> This has the wrong number of arguments.  Even before the change that
+> added the 4th argument, this is still wrong because "ops" is supposed
+> to be the 2nd argument, not the 3rd.
+>
+> ...so I'm confused how this compiled for you.  I think this ought to be:
+>
+> rk_phy->phy = devm_phy_create(dev, child, &ops, NULL);
+>
+> ...but please correct me if I'm mistaken!
+>
+>
+>
