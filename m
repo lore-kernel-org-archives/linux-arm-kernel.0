@@ -1,59 +1,31 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Fri, 12 Dec 2014 12:47:26 -0500
-Subject: [Linaro-acpi] [PATCH] Mailbox: Complete wait event only if Tx was
- successful
-In-Reply-To: <548AAA95.6020001@arm.com>
-References: <1418242572-20998-1-git-send-email-ashwin.chaugule@linaro.org>
- <548AAA95.6020001@arm.com>
-Message-ID: <CAJ5Y-eYFsK_heBRQUOmPXGtkLtze-NGzWKy1=0qJVV3x2EycUw@mail.gmail.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Fri, 12 Dec 2014 17:50:39 +0000
+Subject: [PATCH] clk: rockchip: Fix clock gate for rk3188 hclk_emem_peri
+Message-ID: <1418406639-13668-1-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 December 2014 at 03:43, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> Hi Ashwin,
+Do not disable clock gate "hclk_emem_peri", otherwise EMAC clocks no longer work
+and it breaks ethernet on RK3066 and RK3188. It fixes a regression introduced by
+commit 78eaf6095cc763c1a228ebac5682852f04e85205 ("clk: rockchip: disable unused clocks").
 
-Hi,
+Signed-off-by: Romain Perier <romain.perier@gmail.com>
+---
+ drivers/clk/rockchip/clk-rk3188.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> On Thursday 11 December 2014 01:46 AM, Ashwin Chaugule wrote:
->>
->> If a wait_for_completion_timeout() call returns due to a timeout,
->> the mbox code can still call complete() after returning from the wait.
->> This can cause subsequent transmissions on a channel to fail, since
->> the wait_for_completion_timeout() sees the completion variable
->> is !=0, caused by the erroneous complete() call, and immediately
->> returns without waiting for the time as expected by the client.
->>
->> Fix this by calling complete() only if the TX was successful.
->>
->> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
->> ---
->>   drivers/mailbox/mailbox.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
->> index 17e9e4a..4acaddb 100644
->> --- a/drivers/mailbox/mailbox.c
->> +++ b/drivers/mailbox/mailbox.c
->> @@ -101,7 +101,7 @@ static void tx_tick(struct mbox_chan *chan, int r)
->>         if (mssg && chan->cl->tx_done)
->>                 chan->cl->tx_done(chan->cl, mssg, r);
->>
->> -       if (chan->cl->tx_block)
->> +       if ((!r) && chan->cl->tx_block)
->>                 complete(&chan->tx_complete);
->
->
-> Just curious to check if there's another possible race which is
-> a different issue.
->
-> Suppose the timer fired and indicated that the Tx is complete, then
-> it tries to execute complete while the wait_for_completion_timeout timed
-> out. Does that make sense ?
->
-> So if yes, how about adding !completion_done(..) to the check while you
-> are at this ?
-
-Yea. Seems like another race condition. I'll add it along with this..
-
-Thanks,
-Ashwin
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index c540789..dcf63a6 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -427,8 +427,7 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
+ 	/* hclk_peri gates */
+ 	GATE(0, "hclk_peri_axi_matrix", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 0, GFLAGS),
+ 	GATE(0, "hclk_peri_ahb_arbi", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 6, GFLAGS),
+-	GATE(0, "hclk_emem_peri", "hclk_peri", 0, RK2928_CLKGATE_CON(4), 7, GFLAGS),
++	GATE(0, "hclk_emem_peri", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 7, GFLAGS),
+ 	GATE(HCLK_EMAC, "hclk_emac", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 0, GFLAGS),
+ 	GATE(HCLK_NANDC0, "hclk_nandc0", "hclk_peri", 0, RK2928_CLKGATE_CON(5), 9, GFLAGS),
+ 	GATE(0, "hclk_usb_peri", "hclk_peri", 0, RK2928_CLKGATE_CON(4), 5, GFLAGS),
+--
+1.9.1
