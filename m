@@ -1,113 +1,69 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 12 Dec 2014 13:35:38 -0800
-Subject: [PATCH v2] sun9i: clk: Fix compile error caused by "clk: sunxi:
- Give sunxi_factors_register a registers parameter"
-In-Reply-To: <20141212200003.20398.13200@quantum>
-References: <1418397529-1188-1-git-send-email-hdegoede@redhat.com>
- <20141212200003.20398.13200@quantum>
-Message-ID: <20141212213538.20398.29885@quantum>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Fri, 12 Dec 2014 22:42:15 +0100
+Subject: [PATCH v2] clk: rockchip: add CLK_IGNORE_UNUSED flag to fix USB
+ Host
+In-Reply-To: <1418418352-3947-1-git-send-email-julien.chauveau@neo-technologies.fr>
+References: <1418396066-31360-1-git-send-email-julien.chauveau@neo-technologies.fr>
+ <1418418352-3947-1-git-send-email-julien.chauveau@neo-technologies.fr>
+Message-ID: <CABgxDo+x-jjXYgPFPC3WB=3JcqzhmET-UPO5FEAdLn953ochKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mike Turquette (2014-12-12 12:00:03)
-> Quoting Hans de Goede (2014-12-12 07:18:49)
-> > My "clk: sunxi: Give sunxi_factors_register a registers parameter" patch did
-> > not adjust the sunxi_factors_clock register calls in the new clk-sun9i-core.c
-> > clock code, causing compilation errors. This fixes this.
-> > 
-> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> 
-> Applied.
-
-Oops, spoke to soon. I don't have "clk: sunxi: Give
-sunxi_factors_register a registers parameter" in my tree yet. I was just
-trying to get this fix in quickly before sending out my PR. Please
-disregard the noise.
-
-Regards,
-Mike
-
-> 
-> Regards,
-> Mike
-> 
-> > ---
-> >  drivers/clk/sunxi/clk-sun9i-core.c | 27 ++++++++++++++++++++++-----
-> >  1 file changed, 22 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/clk/sunxi/clk-sun9i-core.c b/drivers/clk/sunxi/clk-sun9i-core.c
-> > index 3cb9036..110197a 100644
-> > --- a/drivers/clk/sunxi/clk-sun9i-core.c
-> > +++ b/drivers/clk/sunxi/clk-sun9i-core.c
-> > @@ -22,6 +22,21 @@
-> >  
-> >  #include "clk-factors.h"
-> >  
-> > +static struct clk *sun9i_factors_register(struct device_node *node,
-> > +                                         const struct factors_data *data,
-> > +                                         spinlock_t *lock)
-> > +{
-> > +       void __iomem *reg;
-> > +
-> > +       reg = of_iomap(node, 0);
-> > +       if (!reg) {
-> > +               pr_err("Could not get registers for factors-clk: %s\n",
-> > +                      node->name);
-> > +               return NULL;
-> > +       }
-> > +
-> > +       return sunxi_factors_register(node, data, lock, reg);
-> > +}
-> >  
-> >  /**
-> >   * sun9i_a80_get_pll4_factors() - calculates n, p, m factors for PLL1
-> > @@ -89,7 +104,7 @@ static DEFINE_SPINLOCK(sun9i_a80_pll4_lock);
-> >  
-> >  static void __init sun9i_a80_pll4_setup(struct device_node *node)
-> >  {
-> > -       sunxi_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
-> > +       sun9i_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
-> >  }
-> >  CLK_OF_DECLARE(sun9i_a80_pll4, "allwinner,sun9i-a80-pll4-clk", sun9i_a80_pll4_setup);
-> >  
-> > @@ -139,8 +154,10 @@ static DEFINE_SPINLOCK(sun9i_a80_gt_lock);
-> >  
-> >  static void __init sun9i_a80_gt_setup(struct device_node *node)
-> >  {
-> > -       struct clk *gt = sunxi_factors_register(node, &sun9i_a80_gt_data,
-> > +       struct clk *gt = sun9i_factors_register(node, &sun9i_a80_gt_data,
-> >                                                 &sun9i_a80_gt_lock);
-> > +       if (!gt)
-> > +               return;
-> >  
-> >         /* The GT bus clock needs to be always enabled */
-> >         __clk_get(gt);
-> > @@ -194,7 +211,7 @@ static DEFINE_SPINLOCK(sun9i_a80_ahb_lock);
-> >  
-> >  static void __init sun9i_a80_ahb_setup(struct device_node *node)
-> >  {
-> > -       sunxi_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
-> > +       sun9i_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
-> >  }
-> >  CLK_OF_DECLARE(sun9i_a80_ahb, "allwinner,sun9i-a80-ahb-clk", sun9i_a80_ahb_setup);
-> >  
-> > @@ -210,7 +227,7 @@ static DEFINE_SPINLOCK(sun9i_a80_apb0_lock);
-> >  
-> >  static void __init sun9i_a80_apb0_setup(struct device_node *node)
-> >  {
-> > -       sunxi_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
-> > +       sun9i_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
-> >  }
-> >  CLK_OF_DECLARE(sun9i_a80_apb0, "allwinner,sun9i-a80-apb0-clk", sun9i_a80_apb0_setup);
-> >  
-> > @@ -266,6 +283,6 @@ static DEFINE_SPINLOCK(sun9i_a80_apb1_lock);
-> >  
-> >  static void __init sun9i_a80_apb1_setup(struct device_node *node)
-> >  {
-> > -       sunxi_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
-> > +       sun9i_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
-> >  }
-> >  CLK_OF_DECLARE(sun9i_a80_apb1, "allwinner,sun9i-a80-apb1-clk", sun9i_a80_apb1_setup);
-> > -- 
-> > 2.1.0
-> > 
+2014-12-12 22:05 GMT+01:00 Julien CHAUVEAU
+<julien.chauveau@neo-technologies.fr>:
+> This patch adds CLK_IGNORE_UNUSED flag to hclk_usb_peri, hclk_usbotg0
+> and hclk_usbotg1 because these clocks must remain enabled to use the
+> USB controllers in host mode.
+>
+> This fixes a regression introduced by commit 78eaf6095cc7
+> ("clk: rockchip: disable unused clocks").
+>
+> Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
+> ---
+> Changes since v1:
+> - update commit message: refer to commit ID instead of mailing list
+>
+>  drivers/clk/rockchip/clk-rk3188.c | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+> index c540789..25ddb09 100644
+> --- a/drivers/clk/rockchip/clk-rk3188.c
+> +++ b/drivers/clk/rockchip/clk-rk3188.c
+> @@ -430,8 +430,10 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
+>         GATE(0, "hclk_emem_peri", "hclk_peri", 0, RK2928_CLKGATE_CON(4), 7, GFLAGS),
+>         GATE(HCLK_EMAC, "hclk_emac", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 0, GFLAGS),
+>         GATE(HCLK_NANDC0, "hclk_nandc0", "hclk_peri", 0, RK2928_CLKGATE_CON(5), 9, GFLAGS),
+> -       GATE(0, "hclk_usb_peri", "hclk_peri", 0, RK2928_CLKGATE_CON(4), 5, GFLAGS),
+> -       GATE(HCLK_OTG0, "hclk_usbotg0", "hclk_peri", 0, RK2928_CLKGATE_CON(5), 13, GFLAGS),
+> +       GATE(0, "hclk_usb_peri", "hclk_peri", CLK_IGNORE_UNUSED,
+> +                       RK2928_CLKGATE_CON(4), 5, GFLAGS),
+> +       GATE(HCLK_OTG0, "hclk_usbotg0", "hclk_peri", CLK_IGNORE_UNUSED,
+> +                       RK2928_CLKGATE_CON(5), 13, GFLAGS),
+>         GATE(HCLK_HSADC, "hclk_hsadc", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 5, GFLAGS),
+>         GATE(HCLK_PIDF, "hclk_pidfilter", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 6, GFLAGS),
+>         GATE(HCLK_SDMMC, "hclk_sdmmc", "hclk_peri", 0, RK2928_CLKGATE_CON(5), 10, GFLAGS),
+> @@ -592,7 +594,8 @@ static struct rockchip_clk_branch rk3066a_clk_branches[] __initdata = {
+>         GATE(0, "hclk_cif1", "hclk_cpu", 0, RK2928_CLKGATE_CON(6), 6, GFLAGS),
+>         GATE(0, "hclk_hdmi", "hclk_cpu", 0, RK2928_CLKGATE_CON(4), 14, GFLAGS),
+>
+> -       GATE(HCLK_OTG1, "hclk_usbotg1", "hclk_peri", 0, RK2928_CLKGATE_CON(5), 14, GFLAGS),
+> +       GATE(HCLK_OTG1, "hclk_usbotg1", "hclk_peri", CLK_IGNORE_UNUSED,
+> +                       RK2928_CLKGATE_CON(5), 14, GFLAGS),
+>
+>         GATE(0, "aclk_cif1", "aclk_vio1", 0, RK2928_CLKGATE_CON(6), 7, GFLAGS),
+>
+> @@ -680,7 +683,8 @@ static struct rockchip_clk_branch rk3188_clk_branches[] __initdata = {
+>         GATE(0, "hclk_imem0", "hclk_cpu", 0, RK2928_CLKGATE_CON(4), 14, GFLAGS),
+>         GATE(0, "hclk_imem1", "hclk_cpu", 0, RK2928_CLKGATE_CON(4), 15, GFLAGS),
+>
+> -       GATE(HCLK_OTG1, "hclk_usbotg1", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 3, GFLAGS),
+> +       GATE(HCLK_OTG1, "hclk_usbotg1", "hclk_peri", CLK_IGNORE_UNUSED,
+> +                       RK2928_CLKGATE_CON(7), 3, GFLAGS),
+>         GATE(HCLK_HSIC, "hclk_hsic", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 4, GFLAGS),
+>
+>         GATE(PCLK_TIMER3, "pclk_timer3", "pclk_cpu", 0, RK2928_CLKGATE_CON(7), 9, GFLAGS),
+> --
+> 2.1.0
+Reviewed-by: Romain Perier <romain.perier@gmail.com>
+Tested-by: Romain Perier <romain.perier@gmail.com>
