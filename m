@@ -1,83 +1,41 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Fri, 12 Dec 2014 09:24:03 +0100
-Subject: [PATCH v2 1/1] net/macb: add TX multiqueue support for gem
-In-Reply-To: <20141211203103.4191887a@free-electrons.com>
-References: <cover.1418291637.git.cyrille.pitchen@atmel.com>	<87a3098203ee6eaa7a60607713a293d3258e2b58.1418291637.git.cyrille.pitchen@atmel.com>
- <20141211203103.4191887a@free-electrons.com>
-Message-ID: <548AA623.9070304@atmel.com>
+From: andrew.jackson@arm.com (Andrew Jackson)
+Date: Fri, 12 Dec 2014 09:25:01 +0000
+Subject: [PATCH v2 2/6] ASoC: dwc: Ensure FIFOs are flushed to prevent channel
+ swap
+In-Reply-To: <cover.1418372910.git.Andrew.Jackson@arm.com>
+References: <cover.1418372910.git.Andrew.Jackson@arm.com>
+Message-ID: <a3b4a11dfe1688eea07471c6cfa27676cc9a58a8.1418372910.git.Andrew.Jackson@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 11/12/2014 20:31, Thomas Petazzoni a ?crit :
-> Dear Cyrille Pitchen,
-> 
-> On Thu, 11 Dec 2014 11:16:51 +0100, Cyrille Pitchen wrote:
-> 
->> +#define GEM_ISR1				0x0400
->> +#define GEM_ISR2				0x0404
->> +#define GEM_ISR3				0x0408
->> +#define GEM_ISR4				0x040c
->> +#define GEM_ISR5				0x0410
->> +#define GEM_ISR6				0x0414
->> +#define GEM_ISR7				0x0418
-> 
-> What about doing instead:
-> 
-> #define GEM_ISR(q)				((q) == 0 ? MACB_ISR : 0x400 + (q) << 2)
-> 
-> And ditto for all other registers, which will save a lot of boring repeated code.
-> 
-> If you do that, then you can avoid the following fields in the
-> macb_queue structure:
-> 
-> +	unsigned int		ISR;
-> +	unsigned int		IER;
-> +	unsigned int		IDR;
-> +	unsigned int		IMR;
-> +	unsigned int		TBQP;
-> 
-> And the not very pleasant calculation of those offsets:
-> 
-> +	bp->queues[0].bp = bp;
-> +	bp->queues[0].ISR  = MACB_ISR;
-> +	bp->queues[0].IER  = MACB_IER;
-> +	bp->queues[0].IDR  = MACB_IDR;
-> +	bp->queues[0].IMR  = MACB_IMR;
-> +	bp->queues[0].TBQP = MACB_TBQP;
-> +	for (q = 1, queue = &bp->queues[1]; q < MACB_MAX_QUEUES; ++q) {
-> +		if (!(queue_mask & (1 << q)))
-> +			continue;
-> +
-> +		queue->bp = bp;
-> +		queue->ISR  = (q-1) * sizeof(u32) + GEM_ISR1;
-> +		queue->IER  = (q-1) * sizeof(u32) + GEM_IER1;
-> +		queue->IDR  = (q-1) * sizeof(u32) + GEM_IDR1;
-> +		queue->IMR  = (q-1) * sizeof(u32) + GEM_IMR1;
-> +		queue->TBQP = (q-1) * sizeof(u32) + GEM_TBQP1;
-> +		queue++;
-> +	}
-> 
-> You replace the ISR, IER, IDR, IMR and TBQP by an "id" field in
-> macb_queue, which contains the queue number, and then change your:
-> 
-> +#define queue_readl(queue, reg)				\
-> +	__raw_readl((queue)->bp->regs + queue->reg)
-> +#define queue_writel(queue, reg, value)			\
-> +	__raw_writel((value), (queue)->bp->regs + queue->reg)
-> 
-> to
-> 
-> +#define queue_readl(queue, reg)				\
-> +	__raw_readl((queue)->bp->regs + reg((queue)->id))
-> +#define queue_writel(queue, reg, value)			\
-> +	__raw_writel((value), (queue)->bp->regs + reg((queue)->id)
-> 
-> Best regards,
-> 
-> Thomas
-> 
-Good idea, I'm working on it.
+From: Andrew Jackson <Andrew.Jackson@arm.com>
 
-Thanks,
+If the FIFOs aren't flushed, the left/right channels may be swapped:
+this may occur if the FIFOs are not empty when the streams start.
 
-Cyrille
+Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
+---
+ sound/soc/dwc/designware_i2s.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
+index ef771ea..b9d6a25 100644
+--- a/sound/soc/dwc/designware_i2s.c
++++ b/sound/soc/dwc/designware_i2s.c
+@@ -228,12 +228,14 @@ static int dw_i2s_hw_params(struct snd_pcm_substream *substream,
+ 	i2s_disable_channels(dev, substream->stream);
+ 
+ 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
++		i2s_write_reg(dev->i2s_base, TXFFR, 1);
+ 		i2s_write_reg(dev->i2s_base, TCR(ch_reg), xfer_resolution);
+ 		i2s_write_reg(dev->i2s_base, TFCR(ch_reg), 0x02);
+ 		irq = i2s_read_reg(dev->i2s_base, IMR(ch_reg));
+ 		i2s_write_reg(dev->i2s_base, IMR(ch_reg), irq & ~0x30);
+ 		i2s_write_reg(dev->i2s_base, TER(ch_reg), 1);
+ 	} else {
++		i2s_write_reg(dev->i2s_base, RXFFR, 1);
+ 		i2s_write_reg(dev->i2s_base, RCR(ch_reg), xfer_resolution);
+ 		i2s_write_reg(dev->i2s_base, RFCR(ch_reg), 0x07);
+ 		irq = i2s_read_reg(dev->i2s_base, IMR(ch_reg));
+-- 
+1.7.1
