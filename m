@@ -1,66 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Dec 2014 15:20:27 +0100
-Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <548960F3.7070405@linaro.org>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <10603826.6Z6KUoI9qZ@wuerfel> <548960F3.7070405@linaro.org>
-Message-ID: <1833364.xuE8O3LGeh@wuerfel>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 12 Dec 2014 09:32:44 -0500
+Subject: [PATCH 0/4] serial: fsl_lpuart: fix various DMA related issues
+In-Reply-To: <677f2c62b6b6c1fe8e16cd38d5f20d47@agner.ch>
+References: <1417134205-4400-1-git-send-email-stefan@agner.ch>
+ <677f2c62b6b6c1fe8e16cd38d5f20d47@agner.ch>
+Message-ID: <20141212143244.GA2219@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 December 2014 17:16:35 Hanjun Guo wrote:
-> On 2014?12?10? 18:57, Arnd Bergmann wrote:
-> > On Wednesday 26 November 2014 17:12:49 Hanjun Guo wrote:
-> > The above topology is not easy to represent, but I think it would work
-> > like this (ignoring the threads/cores/clusters on the socket, which
-> > would also need to be described in a full DT), using multiple logical
-> > paths between the nodes:
-> >
-> > socket 0
-> > ibm,associativity = <0 0 0 0>, <1 1 1 0>, <2 2 0 0>,  0 0 0>;
-> >
-> > socket 1
-> > ibm,associativity = <1 1 1 1>, <0 0 0 1>, <2 2 2 1>,  3 1 1>;
-> >
-> > socket 2
-> > ibm,associativity = <2 2 2 2>, <0 0 2 2>, <1 1 1 2>,  3 3 2>;
-> >
-> > socket 3
-> > ibm,associativity =  3 3 3>, <0 3 3 3>, <1 1 3 3>, <2 2 2 3>;
-> >
-> > This describes four levels or hierarchy, with the lowest level
-> > being a single CPU core on one socket, and four paths between
-> > the sockets. To compute the associativity between two sockets,
-> > you need to look at each combination of paths to find the best
-> > match.
-> >
-> > Comparing sockets 0 and 1, the best matches are <1 1 1 0>
-> > with <1 1 1 1>, and <0 0 0 0> with <0 0 0 1>. In each case, the
-> > associativity is "3", meaning the first three entries match.
-> >
-> > Comparing sockets 0 and 3, we have four equally bad matches
-> > that each only match in the highest-level domain, e.g. <0 0 0 0>
-> > with <0 3 3 3>, so the associativity is only "1", and that means
-> > the two nodes are less closely associated than two neighboring
-> > ones.
-> >
-> > With the algorithm that powerpc uses to turn associativity into
-> > distance, 2**(numlevels - associativity), this would put the
-> > distance of neighboring nodes at "2", and the longest distance
-> > at "8".
-> 
-> Thanks for the explain, I can understand how it works now,
-> a bit complicated for me and I think the distance property
-> "node-matrix" in Ganapatrao's patch is straight forward,
-> what do you think?
+On Fri, Dec 12, 2014 at 02:44:06PM +0100, Stefan Agner wrote:
+> Any thoughts on this patchset? Would have hopped that it makes it into
+> 3.19 as those are mostly fixes.
 
-I still think we should go the whole way of having something compatible
-with the existing bindings, possibly using different property names
-if there are objections to using the "ibm," prefix.
+"mostly"?
 
-The associativity property is more expressive and lets you describe
-things that you can't describe with the mem-map/cpu-map properties,
-e.g. devices that are part of the NUMA hierarchy but not associated
-to exactly one last-level node.
+I'll get to these after 3.19-rc1 is out, but it really looks like these
+will be for 3.20-rc1, unless you break them up into "bugfix only" type
+patches.
 
-	Arnd
+thanks,
+
+greg k-h
