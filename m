@@ -1,112 +1,112 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 12 Dec 2014 02:13:31 +0000 (UTC)
-Subject: [PATCH] clocksource: tegra: wrap arch/arm-specific sections in
- CONFIG_ARM
-In-Reply-To: <20141210111425.GD15287@ulmo.nvidia.com>
-References: <alpine.DEB.2.02.1412092201200.31750@utopia.booyaka.com>
- <20141210111425.GD15287@ulmo.nvidia.com>
-Message-ID: <alpine.DEB.2.02.1412112206120.29716@utopia.booyaka.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 12 Dec 2014 04:17:27 +0200
+Subject: [v3][PATCH 5/5] media: ov2640: dt: add the device tree binding
+ document
+In-Reply-To: <1418283339-16281-6-git-send-email-josh.wu@atmel.com>
+References: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
+ <1418283339-16281-6-git-send-email-josh.wu@atmel.com>
+Message-ID: <1644165.4XbSUOMUsK@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ lakml
+Hi Josh,
 
-Hello Thierry
+Thank you for the patch.
 
-On Wed, 10 Dec 2014, Thierry Reding wrote:
-
-> On Tue, Dec 09, 2014 at 10:07:18PM +0000, Paul Walmsley wrote:
-> > 
-> > Like several of the other files in drivers/clocksource,
-> > tegra20_timer.c contains code that can only compile when CONFIG_ARM is
-> > enabled.  This causes obvious problems when trying to compile this
-> > code for NVIDIA ARM64-based SoCs, such as Tegra132.  The same timer IP
-> > blocks exist, so it seems appropriate to provide support for them.
-> > 
-> > So until we figure out a better way to partition this code, wrap the
-> > delay_timer and persistent_clock support code with preprocessor tests
-> > for CONFIG_ARM.  (The delay_timer code should not be needed at all on
-> > ARM64 due to the presence of the ARMv8 architected timer.  The
-> > persistent_clock support code could become important once power
-> > management modes are implemented that turn off the CPU complex.)
-> > 
-> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> > Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
-> > Cc: Allen Martin <amartin@nvidia.com>
-> > Cc: Stephen Warren <swarren@nvidia.com>
-> > Cc: Thierry Reding <treding@nvidia.com>
-> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Alexandre Courbot <gnurou@gmail.com>
-> > ---
-> > Applies against next-20141209.
-> > Intended for v3.20.
-> > Boot-tested on Tegra124 Jetson TK1 on next-20141209.
-> > Also boot-tested on Tegra132 Norrin FFD on next-20141209 + extra, 
-> > unrelated patches.
-> > 
-> >  drivers/clocksource/tegra20_timer.c | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
+On Thursday 11 December 2014 15:35:39 Josh Wu wrote:
+> Add the document for ov2640 dt.
 > 
-> You might want to read the following thread:
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+> v2 -> v3:
+>   1. fix incorrect description.
+>   2. Add assigned-clocks & assigned-clock-rates.
+>   3. resetb pin should be ACTIVE_LOW.
 > 
-> 	https://lkml.org/lkml/2014/11/7/605
+> v1 -> v2:
+>   1. change the compatible string to be consistent with verdor file.
+>   2. change the clock and pins' name.
+>   3. add missed pinctrl in example.
+> 
+>  .../devicetree/bindings/media/i2c/ov2640.txt       | 53 +++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+> b/Documentation/devicetree/bindings/media/i2c/ov2640.txt new file mode
+> 100644
+> index 0000000..958e120
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+> @@ -0,0 +1,53 @@
+> +* Omnivision ov2640 CMOS sensor
+> +
+> +The Omnivision OV2640 sensor support multiple resolutions output, such as
+> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
+> +output format.
+> +
+> +Required Properties:
+> +- compatible: Must be "ovti,ov2640"
+> +- clocks: reference to the xvclk input clock. It can be an external fixed
+> +          clock or a programmable clock from SoC.
 
-Thanks for the link, I hadn't seen that discussion.
+It could also be a variable clock provided by something else. I would just 
+drop the second sentence.
 
-> I haven't gotten around to look at this in detail, but it seems like we
-> may not need to register the RTC early here at all. If that's really the
-> case we can just get rid of this hackery and do everything within the
-> RTC driver rather than duplicate some of that code here.
+> +- clock-names: Must be "xvclk".
+> +- assigned-clocks: reference to the above 'clocks' property.
+> +- assigned-clock-rates: reference to the clock frequency of xvclk. Typical
+> +                        value is 25Mhz (25000000).
+> +                        This clock should only have single user. Specifying
+> +                        Conflicting rate configuration in multiple
+> consumer
+> +                        nodes for a shared clock is forbidden.
 
-I'd suggest that we keep that project separate from just getting this file 
-to compile on ARM64.
+Those two properties are optional. I'm not sure they should even be mentioned 
+in the ov2640 bindings. For one thing they're not needed if the clock doesn't 
+need to be forced to a specific frequency, and the clock rate could also be 
+configured through other means depending on the platform.
 
-Broadly speaking, I agree that tegra20_timer.c needs to be cleaned up; it 
-should not mix code for two distinct IP blocks into one driver.
+> +
+> +Optional Properties:
+> +- resetb-gpios: reference to the GPIO connected to the resetb pin, if any.
+> +- pwdn-gpios: reference to the GPIO connected to the pwdn pin, if any.
+> +
+> +The device node must contain one 'port' child node for its digital output
+> +video port, in accordance with the video interface bindings defined in
+> +Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +
+> +Example:
+> +
+> +	i2c1: i2c at f0018000 {
+> +		ov2640: camera at 0x30 {
+> +			compatible = "ovti,ov2640";
+> +			reg = <0x30>;
+> +
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_pck1 &pinctrl_ov2640_pwdn 
+&pinctrl_ov2640_resetb>;
+> +
+> +			resetb-gpios = <&pioE 24 GPIO_ACTIVE_LOW>;
+> +			pwdn-gpios = <&pioE 29 GPIO_ACTIVE_HIGH>;
+> +
+> +			clocks = <&pck1>;
+> +			clock-names = "xvclk";
+> +
+> +			assigned-clocks = <&pck1>;
+> +			assigned-clock-rates = <25000000>;
+> +
+> +			port {
+> +				ov2640_0: endpoint {
+> +					remote-endpoint = <&isi_0>;
+> +					bus-width = <8>;
+> +				};
+> +			};
+> +		};
+> +	};
 
-> On 32-bit ARM, Tegra114 and Tegra124 also support the architected timer,
-> so the only remaining issue would be for Tegra20 and Tegra30 hardware.
+-- 
+Regards,
 
-I believe on most NVIDIA chips (and probably most ARM SoCs) the ARM 
-architected timer is only usable as a clockevent timer when the CPU 
-doesn't enter deep low power states.  So the architected timer won't be 
-enough.
-
-> But I also seem to remember that on most boards the Tegra RTC can't be
-> used properly because it doesn't have a battery. So while it may still
-> work while the board is powered it is not very useful as RTC. Or for
-> timekeeping across suspend/resume for that matter. The majority of
-> boards seem to have a PMIC with an integrated RTC and will use that
-> instead.
-
->From my point of view, the Tegra RTC IP block's primary use case is to 
-provide an always-on clockevent to wake the system from SC7 (aka LP0 
-idle)[1].  In SC7, the ARM architected timer comparator logic and Tegra 
-TMR IP blocks will be power-gated, and thus can't wake the system.
-
-PMIC RTC timers are generally a bad fit for this purpose, since they tend 
-to be low-resolution (+/- 1 second) and slow to program (via some slow 
-serial bus).  They are good for keeping calendars, though...
-
-> Otherwise this looks good to me to get things going on 64-bit ARM while
-> we iron out the other issues. Can I assume that you plan on sending in
-> patches that enable 64-bit ARM Tegra in the 3.20 timeframe? If so it
-> might be best to take this patch through the Tegra tree, provided that
-> Daniel and Thomas have no objections, to make sure we don't have
-> intermittent build breakage depending on the order in which the trees
-> get pulled into linux-next and Linus' tree. Even more so because there
-> are a couple of other, similar patches which makes a stable branches
-> oriented approach to resolving these dependencies somewhat impractical.
-
-Given the rather small number of mainline T132 users, I'll probably just 
-send these patches up via their corresponding trees and let them merge via 
-their respective maintainers.  That keeps the risk of merge conflicts low. 
-At this point I don't think there will be any significant dependency 
-problems.
-
-- Paul
-
-1. Section 11.0 "Real-time Clock" of the _NVIDIA Tegra K1 Mobile Processor
-   Technical Reference Manual v03p (DP-06905-001_v03p)_, 
-   https://developer.nvidia.com/tegra-k1-technical-reference-manual
+Laurent Pinchart
