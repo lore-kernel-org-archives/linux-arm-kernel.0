@@ -1,45 +1,112 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 12 Dec 2014 16:52:30 +0000
-Subject: [RFC 02/15] drivers/base: add restrack framework
-In-Reply-To: <1418226513-14105-3-git-send-email-a.hajda@samsung.com>
-References: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
- <1418226513-14105-3-git-send-email-a.hajda@samsung.com>
-Message-ID: <20141212165230.GP11764@sirena.org.uk>
+From: rjui@broadcom.com (Ray Jui)
+Date: Fri, 12 Dec 2014 08:53:44 -0800
+Subject: [PATCH v2 1/4] pci: iProc: define Broadcom iProc PCIe binding
+In-Reply-To: <3375037.6pjWmlOLA3@wuerfel>
+References: <1418351817-14898-2-git-send-email-rjui@broadcom.com>
+ <3375037.6pjWmlOLA3@wuerfel>
+Message-ID: <548B1D98.6030400@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 04:48:20PM +0100, Andrzej Hajda wrote:
-> restrack framework allows tracking presence of resources with dynamic life
-> time. Typical example of such resources are all resources provided by device
 
-I don't know about anyone else but I'm having a hard time reading the
-restrack name, it looks like a misspelling of restack to me.
 
-At a high level my biggest questions here are the relationship between
-this and the component code and usability.  The usability concern I have
-is that I see no diagnostics or trace here at all.  This means that if a
-user looks at their system, sees that the device model claims the driver
-for a device bound to the device but can't see any sign of the device
-doing anything they don't have any way of telling why that is other than
-to look in the driver code, see what resources it was trying to depend
-on and then go back to the running system to try to understand which of
-those resources hasn't appeared.
+On 12/12/2014 4:14 AM, Arnd Bergmann wrote:
+> On Thursday 11 December 2014 18:36:54 Ray Jui wrote:
+>> index 0000000..040bc0f
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+>> @@ -0,0 +1,74 @@
+>> +* Broadcom iProc PCIe controller
+>> +
+>> +Required properties:
+>> +- compatible: Must be "brcm,iproc-pcie"
+>> +- reg: base address and length of the PCIe controller and the MDIO interface
+>> +  that controls the PCIe PHY
+>> +- #interrupt-cells: set to <1>
+>> +- interrupts: interrupt IDs
+>
+> How many, and what are they?
+>
+Different iProc SoCs might have different number of interrupts. I'll 
+elaborate more on the next patch.
 
-> +int restrack_up(unsigned long type, const void *id, void *data)
+>> +- interrupt-map-mask and interrupt-map, standard PCI properties to define the
+>> +  mapping of the PCIe interface to interrupt numbers
+>> +- bus-range: PCI bus numbers covered
+>> +- #address-cells: set to <3>
+>> +- #size-cells: set to <2>
+>> +- device_type: set to "pci"
+>> +- ranges: ranges for the PCI memory and I/O regions
+>> +- phy-addr: MDC/MDIO adddress of the PCIe PHY
+>
+> It looks like the phy controller is separate from the PCI controller,
+> and you even list the same register range for both PHYs. Better make
+> that a separate driver and put the phy address into the "phys" reference.
+>
+Okay. In this case, I need to create a separate PHY driver under the 
+drivers/phy directory and have the PCIe host driver reference it through 
+the standard PHY API.
 
-> +int restrack_down(unsigned long type, const void *id, void *data)
+>> +- have-msi-inten-reg: Required for legacy iProc PCIe controllers that need the
+>> +  MSI interrupt enable register to be set explicitly
+>> +
+>> +The Broadcom iProc PCie driver adapts the multi-domain structure, i.e., each
+>> +interface has its own domain and therefore has its own device node
+>> +Example:
+>> +
+>> +SoC specific DT Entry:
+>> +
+>> +       pcie0: pcie at 18012000 {
+>> +               compatible = "brcm,iproc-pcie";
+>> +               reg = <0x18012000 0x1000>,
+>> +                       <0x18002000 0x1000>;
+>
+> I guess the addresses should be relative to the BCMA bus, and this node
+> get moved under that. Please see Hauke's patch series, we've discussed
+> this in great length already.
+>
 
-Again I'm not sure that the up and down naming is meaningful in the
-context of this interface.
+As Arend van Spriel pointed out in the previous discussion:
 
-> +static void restrack_itb_cb(struct track_block *itb, void *data, bool on)
-> +{
+BCMA core is the bus driver for discoverable ARM AXI interconnect. Apart 
+from that it also provides drivers for some cores. For the chips to be 
+discoverable it needs additional IP logic.
 
-itb_cb?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141212/10951c43/attachment.sig>
+Not all iProc family of SoCs have the additional IP logic and for those 
+which don't, they cannot use the BCMA bus.
+
+>> +               #interrupt-cells = <1>;
+>> +               interrupts = <GIC_SPI 96 IRQ_TYPE_NONE>,
+>> +                            <GIC_SPI 97 IRQ_TYPE_NONE>,
+>> +                            <GIC_SPI 98 IRQ_TYPE_NONE>,
+>> +                            <GIC_SPI 99 IRQ_TYPE_NONE>,
+>> +                            <GIC_SPI 100 IRQ_TYPE_NONE>,
+>> +                            <GIC_SPI 101 IRQ_TYPE_NONE>;
+>
+>
+>
+>> +               interrupt-map-mask = <0 0 0 0>;
+>> +               interrupt-map = <0 0 0 0 &gic GIC_SPI 100 IRQ_TYPE_NONE>;
+>
+> This interrupt is also listed in the "interrupts" above, which is
+> probably a mistake, unless the IRQ line is shared between all PCI
+> devices and the PCI host itself.
+>
+interrupts are for MSI interrupt support and interrupt-map is for legacy 
+INTx support. To my best knowledge, MSI and INTx cannot be used at the 
+same time. "nvidia,tegra20-pcie.txt" and "rcar-pci.txt" have similar 
+configurations.
+
+>> +               bus-range = <0x00 0xFF>;
+>> +
+>> +               #address-cells = >;
+>> +               #size-cells = <2>;
+>> +               device_type = "pci";
+>> +               ranges = <0x81000000 0 0          0x28000000 0 0x00010000   /* downstream I/O */
+>> +                         0x82000000 0 0x20000000 0x20000000 0 0x04000000>; /* non-prefetchable memory */
+>> +               phy-addr = <5>;
+>> +       };
+>>
+>
+> 	Arnd
+>
