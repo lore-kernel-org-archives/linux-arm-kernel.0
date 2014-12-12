@@ -1,51 +1,37 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 12 Dec 2014 16:39:35 +0000
-Subject: [PATCH 0/4] GICv3: add 32bit compatibility
-In-Reply-To: <1418307788-17977-1-git-send-email-jean-philippe.brucker@arm.com>
-References: <1418307788-17977-1-git-send-email-jean-philippe.brucker@arm.com>
-Message-ID: <548B1A47.7060301@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 12 Dec 2014 11:42:54 -0500
+Subject: [PATCH 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
+ board dts and Makefile
+In-Reply-To: <1418371705.423.31.camel@mtksdaap41>
+References: <1418208602-35584-1-git-send-email-eddie.huang@mediatek.com>
+ <1418208602-35584-4-git-send-email-eddie.huang@mediatek.com>
+ <20141211180245.GE28150@leverpostej>
+ <1418371705.423.31.camel@mtksdaap41>
+Message-ID: <20141212164254.GK22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Philippe,
-
-On 11/12/14 14:23, Jean-Philippe Brucker wrote:
-> This series adds 32bit compatibility to Marc's GICv3 driver. Only SGIs,
-> PPIs and SPIs support is present. No ITS nor virtualisation.
+On Fri, Dec 12, 2014 at 04:08:25PM +0800, Eddie Huang wrote:
+> On Thu, 2014-12-11 at 18:02 +0000, Mark Rutland wrote:
+> > On Wed, Dec 10, 2014 at 10:50:01AM +0000, Eddie Huang wrote:
+...
+> > > +	memory {
+> > 
+> > Nit: should be memory at 40000000 (and you'll need to add device_type =
+> > "memory").
+> > 
+> > > +		reg = <0 0x40000000 0 0x40000000>;
+> > > +	};
 > 
-> It is based on 3.18.
-> 
-> Jean-Philippe Brucker (4):
->   arm64: GICv3: refactor the AArch64 specific parts
->   arm64: GICv3: change unsigned types for AArch32 compatibility
->   arm64: GICv3: Specialize readq and writeq accesses
->   ARM: add 32bit support to GICv3
-> 
->  arch/arm/include/asm/arch_gicv3.h   | 182 ++++++++++++++++++++++++++++++++++++
->  arch/arm64/include/asm/arch_gicv3.h | 141 ++++++++++++++++++++++++++++
->  drivers/irqchip/irq-gic-v3.c        |  69 ++++----------
->  include/linux/irqchip/arm-gic-v3.h  |  95 +++----------------
->  4 files changed, 356 insertions(+), 131 deletions(-)
->  create mode 100644 arch/arm/include/asm/arch_gicv3.h
->  create mode 100644 arch/arm64/include/asm/arch_gicv3.h
+> skeleton.dtsi already has /memory node with address-cells=2,
+> size-cells=1, which will cause build warning if I change to use
+> memory at 40000000, because we use size-cells=2. I will not include
+> skeleton.dtsi and follow your suggestion in next version.
 
-so if I compile this with CONFIG_KVM_ARM_VGIC on, I get a compilation error:
-  LD      init/built-in.o
-arch/arm/kvm/built-in.o: In function `svc_die_str':
-arch_timer.c:(.rodata+0xf7c): undefined reference to `vgic_v3_probe'
-make[2]: *** [vmlinux] Error 1
+There's skeleton64.dtsi in arch/arm/boot/dts (arm 32bit has LPAE-enabled
+systems).  Perhaps we should come up with a way to share both across the
+arches?
 
-The svc_die_str reference is probably bogus, but if I protect the
-vgic_v3_probe reference in virt/kvm/arm/vgic.c with "#ifdef ARM64" it
-compiles fine. Disabling CONFIG_KVM_ARM_VGIC in the .config also fixes
-this also.
-I leave it up to you whether you want to take your "no virtualisation"
-statement above serious and fix Kconfig accordingly or use the ifdef
-solution.
+hth,
 
-After fixing that, adding CONFIG_ARM_GIC_V3 as Marc suggested (and
-adding AArch32 support for the ICC_SGI1R trap in my patches ;-) I could
-run a 32-bit GICv3 guest with your patches on a GICv3 64-bit host.
-
-Cheers,
-Andre.
+Jason.
