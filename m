@@ -1,25 +1,28 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 12 Dec 2014 19:29:36 +0000
-Subject: [PATCH v2 1/6] ASoC: dwc: Remove unnecessary debug messages and
- tests
-In-Reply-To: <97f65b6037b9ac676f6ca7717a230a68cbe81fd1.1418372910.git.Andrew.Jackson@arm.com>
-References: <cover.1418372910.git.Andrew.Jackson@arm.com>
- <97f65b6037b9ac676f6ca7717a230a68cbe81fd1.1418372910.git.Andrew.Jackson@arm.com>
-Message-ID: <20141212192936.GT11764@sirena.org.uk>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 12 Dec 2014 13:40:01 -0600
+Subject: ARM: OMAP5/DRA7: Fix counter frequency drift for AM572x errata
+ i856
+In-Reply-To: <20141212192303.GY24110@csclub.uwaterloo.ca>
+References: <20141211204116.GT24110@csclub.uwaterloo.ca>
+ <20141211204308.GU24110@csclub.uwaterloo.ca>
+ <548B27E5.4090108@ti.com>
+ <20141212192303.GY24110@csclub.uwaterloo.ca>
+Message-ID: <20141212194001.GA30966@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 12, 2014 at 09:25:00AM +0000, Andrew Jackson wrote:
-> From: Andrew Jackson <Andrew.Jackson@arm.com>
-> 
-> The devm_XXX allocation functions print a message on failure,
-> so additional messages are not required.
+On 14:23-20141212, Lennart Sorensen wrote:
+> I was trying to avoid making the code mroe complicated for the other
+> CPUs using this code, but I suppose since it runs only at boot once,
+> that probably isn't really a great concern.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141212/9a14b0d0/attachment.sig>
+we try and avoid soc_is or cpu_is as much as possible and depend usually
+on compatible to mark the change..
+> 
+> I will try changing the flow and send an updated version.
+
+k, thanks. lets go through your next rev to see if we can improve on the
+same. btw, nice catch :) - thanks for proposing a fix.
+-- 
+Regards,
+Nishanth Menon
