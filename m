@@ -1,32 +1,33 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 12 Dec 2014 10:40:22 +0800
-Subject: [PATCH v3 0/2] ARM: mediatek: Add driver for Mediatek I2C
- controller
-In-Reply-To: <20141127164536.GC5667@katana>
-References: <1416821928-11453-1-git-send-email-xudong.chen@mediatek.com>
- <20141124121555.GG3733@katana> <1417096856.12707.59.camel@mtksdaap41>
- <20141127164536.GC5667@katana>
-Message-ID: <1418352022.4994.44.camel@mtksdaap41>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 11 Dec 2014 19:05:27 -0800
+Subject: [PATCH v6 1/5] phy: add a driver for the Rockchip SoC internal
+ USB2.0 PHY
+In-Reply-To: <CAD=FV=WcAJAgj2triu1W4863BT1ew2wf-z6YNHHwiDKpnYmK4w@mail.gmail.com>
+References: <1418291722-25448-1-git-send-email-lyz@rock-chips.com>
+ <1418291722-25448-2-git-send-email-lyz@rock-chips.com>
+ <CAD=FV=WcAJAgj2triu1W4863BT1ew2wf-z6YNHHwiDKpnYmK4w@mail.gmail.com>
+Message-ID: <CAD=FV=XrOpZ16k7dNyqzf8m_8Sjq8yn5xCj7+YLiTPU3O2KrrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-11-27 at 17:45 +0100, Wolfram Sang wrote:
-> > > I think there are now 3 drivers in my queue which are not fully I2C
-> > > compatible but more supporting the very minimum to, say, read an eeprom.
-> > > I am not feeling well to allow them to use I2C_FUNC_I2C. So, I want to
-> > > think about ways how to communicate deficiencies like "only 255 byte" or
-> > > "only WRRD messages" to users of that I2C controller. This is most
-> > > likely not happening before 3.19. But assistance is very welcome.
+Yunzhi,
 
-Hi Wolfram,
+On Thu, Dec 11, 2014 at 10:09 AM, Doug Anderson <dianders@chromium.org> wrote:
+>> +               rk_phy->phy = devm_phy_create(dev, NULL, &ops);
+>
+> This has the wrong number of arguments.  Even before the change that
+> added the 4th argument, this is still wrong because "ops" is supposed
+> to be the 2nd argument, not the 3rd.
+>
+> ...so I'm confused how this compiled for you.  I think this ought to be:
+>
+> rk_phy->phy = devm_phy_create(dev, child, &ops, NULL);
+>
+> ...but please correct me if I'm mistaken!
 
-We've started upstream work for MT8173[1].
+As you pointed out privately, I didn't have (dbc9863 phy: remove the
+old lookup method).  Sorry about the noise..
 
-We've fixed these issues for new SoC, and we believe it is fully I2C
-compatible now. We'll add mt8173 support to this driver, so this driver
-will support both fully I2C compatible SoC and the current one.
+Hopefully my other comments are not quite as stupid...
 
-Joe.C
-
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/309847.html
+-Doug
