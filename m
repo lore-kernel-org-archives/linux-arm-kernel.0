@@ -1,63 +1,67 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 12 Dec 2014 10:46:55 +0100
-Subject: [GIT PULL] at91: fixes for 3.19 #1
-Message-ID: <1418377615-15122-1-git-send-email-nicolas.ferre@atmel.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 12 Dec 2014 10:51:54 +0100
+Subject: __hci_cmd_sync() not suitable for nokia h4p
+In-Reply-To: <CAA1630D-1A2E-4D3D-9BBC-2EE86256D58B@holtmann.org>
+References: <20141209190210.GA15641@amd>
+ <304050AD-DB11-4A2B-A1F7-8B1BBB5F04F0@holtmann.org>
+ <20141209201328.GA18003@amd>
+ <7EFD3C33-E503-4FB6-BCCF-52836080ABD6@holtmann.org>
+ <20141210131519.GA14748@amd>
+ <EE1A4B9D-30D5-4BD9-9A43-532619494A0C@holtmann.org>
+ <20141211221306.GA2905@amd>
+ <CAA1630D-1A2E-4D3D-9BBC-2EE86256D58B@holtmann.org>
+Message-ID: <20141212095153.GB2905@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Hi!
 
-I'm sending today a "fixes" branch which somehow continues the cleanup with
-only code removal. I was waiting for the arm-soc *and* pinctrl material to
-reach Linus T.'s tree before sending this pull-request. In fact this sequence
-was needed for the gpio header removal. The little patch about #include
-deletion just follows an earlier merge conflict in arm-soc tree: I was also
-waiting for this moment before sending the definitive fix, just to be sure.
+> >>>> What needs to be done is the bring up of the device including the proper UART settings and speed and then just run the firmware downloads. All firmware files on the Nokia devices where just HCI commands with vendor specific details. Some from CSR, some from Broadcom and some from TI. You can actually decode them if you really want to. Shouldn't be that hard.
+> >>>> 
+> >>> 
+> >>> Speed changes at the end of firmware load, but I guess that's detail?
+> >>> Anyway, patch would look like this.
+> >> 
+> >> You should really look into providing hdev->setup() callback. That is normally the callback where you want to load the firmware.
+> >> 
+> > 
+> > I can provide setup() callback and load firmware from there.
+> > 
+> > I have created provisional device tree binding, and the driver still
+> > works.
+> > 
+> > Some time ago you mentioned that with the "big" issues fixed, you'd be
+> > willing to take it into the tree. What way forward do you see? Would
+> > it make sense to re-enable the driver in staging, so that "big"
+> > changes could be applied, followed by renames?
+> 
+> If the driver is clean, there is no point in taking it through staging. It can be cleaned up and then merged all together.
+>
 
-Otherwise, all is pretty straightforward.
+Ok, so you can revert a4102f90e87cfaa3fdbed6fdf469b23f0eeb4bfd in your
+tree, and I can post patches against that?
 
-Oh, one more thing: it is based on the current Linus' git tree, I can obviously
-rebase everything on top of 3.19-rc1 once it is released if you prefer.
+> I think the important part is to focus on the N900 derivative with
+>the Broadcom chip inside. And just ignore all the rest. So start
+>small and do not try to carry the N770, N800, N810 hacks over.
 
-Thanks, best regards,
+Well, I did remove non-relevant firmware loaders, and I can remove the
+switches for different firmware loaders, too, but spending time
+removing support for different hardware does not sound quite right.
 
-The following changes since commit 2756d373a3f45a3a9ebf4ac389f9e0e02bd35a93:
+> However you might want to check Neil Brown's patches for TTY-slave
+>devices he just posted. Maybe the N900 devices should be exposed as
+>TTY and we just attach N_HCI line discipline to it. If all the GPIO
+>wiggling can be done automatically at TTY open, then that should be
+>the way to go. I also send an email about using the new unconfigured
+>stage to get this done cleanly.
 
-  Merge branch 'for-3.19' of git://git.kernel.org/pub/scm/linux/kernel/git/tj/cgroup (2014-12-11 18:57:19 -0800)
+I seen them, but they don't help, I'm afraid. The GPIOs are used for
+power saving, and they are used in various places including the serial
+irq handler.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes
-
-for you to fetch changes up to 23db86fb6b514788f57b4ee96962352281139a63:
-
-  ARM: at91/config: sama5: Remove DEBUG_LL (2014-12-12 10:14:56 +0100)
-
-----------------------------------------------------------------
-First fixes batch for AT91 on 3.19 folowing The big cleanup:
-- removal of unused Kconfig RTC options
-- GPIO header file is now close to the pinctrl driver
-- little fix on #includes
-- removal of DEBUG_LL from the sama5 common defconfig
-
-----------------------------------------------------------------
-Boris Brezillon (1):
-      ARM: at91: remove useless header file includes
-
-Maxime Ripard (1):
-      ARM: at91/config: sama5: Remove DEBUG_LL
-
-Nicolas Ferre (2):
-      rtc: at91/Kconfig: remove useless options
-      ARM: at91: remove unneeded header file
-
- arch/arm/configs/sama5_defconfig           |  2 -
- arch/arm/mach-at91/at91sam9g45.c           |  1 -
- arch/arm/mach-at91/at91sam9rl.c            |  1 -
- arch/arm/mach-at91/include/mach/at91_pio.h | 80 ------------------------------
- drivers/rtc/Kconfig                        | 28 -----------
- 5 files changed, 112 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/at91_pio.h
-
+Best regards,
+									Pavel
 -- 
-Nicolas Ferre
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
