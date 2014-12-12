@@ -1,69 +1,78 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Fri, 12 Dec 2014 22:42:15 +0100
-Subject: [PATCH v2] clk: rockchip: add CLK_IGNORE_UNUSED flag to fix USB
- Host
-In-Reply-To: <1418418352-3947-1-git-send-email-julien.chauveau@neo-technologies.fr>
-References: <1418396066-31360-1-git-send-email-julien.chauveau@neo-technologies.fr>
- <1418418352-3947-1-git-send-email-julien.chauveau@neo-technologies.fr>
-Message-ID: <CABgxDo+x-jjXYgPFPC3WB=3JcqzhmET-UPO5FEAdLn953ochKg@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 12 Dec 2014 16:03:21 -0600
+Subject: [RFC PATCH 2/3] soc: ti: Add wkup_m3_ipc driver
+In-Reply-To: <2763467.KfXHXHxPJd@wuerfel>
+References: <cover.1417029919.git.d-gerlach@ti.com>
+ <3334d8483dca2d061cf43da9c047ec27f31e8719.1417029919.git.d-gerlach@ti.com>
+ <2763467.KfXHXHxPJd@wuerfel>
+Message-ID: <548B6629.6050203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-12-12 22:05 GMT+01:00 Julien CHAUVEAU
-<julien.chauveau@neo-technologies.fr>:
-> This patch adds CLK_IGNORE_UNUSED flag to hclk_usb_peri, hclk_usbotg0
-> and hclk_usbotg1 because these clocks must remain enabled to use the
-> USB controllers in host mode.
->
-> This fixes a regression introduced by commit 78eaf6095cc7
-> ("clk: rockchip: disable unused clocks").
->
-> Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
-> ---
-> Changes since v1:
-> - update commit message: refer to commit ID instead of mailing list
->
->  drivers/clk/rockchip/clk-rk3188.c | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-> index c540789..25ddb09 100644
-> --- a/drivers/clk/rockchip/clk-rk3188.c
-> +++ b/drivers/clk/rockchip/clk-rk3188.c
-> @@ -430,8 +430,10 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
->         GATE(0, "hclk_emem_peri", "hclk_peri", 0, RK2928_CLKGATE_CON(4), 7, GFLAGS),
->         GATE(HCLK_EMAC, "hclk_emac", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 0, GFLAGS),
->         GATE(HCLK_NANDC0, "hclk_nandc0", "hclk_peri", 0, RK2928_CLKGATE_CON(5), 9, GFLAGS),
-> -       GATE(0, "hclk_usb_peri", "hclk_peri", 0, RK2928_CLKGATE_CON(4), 5, GFLAGS),
-> -       GATE(HCLK_OTG0, "hclk_usbotg0", "hclk_peri", 0, RK2928_CLKGATE_CON(5), 13, GFLAGS),
-> +       GATE(0, "hclk_usb_peri", "hclk_peri", CLK_IGNORE_UNUSED,
-> +                       RK2928_CLKGATE_CON(4), 5, GFLAGS),
-> +       GATE(HCLK_OTG0, "hclk_usbotg0", "hclk_peri", CLK_IGNORE_UNUSED,
-> +                       RK2928_CLKGATE_CON(5), 13, GFLAGS),
->         GATE(HCLK_HSADC, "hclk_hsadc", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 5, GFLAGS),
->         GATE(HCLK_PIDF, "hclk_pidfilter", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 6, GFLAGS),
->         GATE(HCLK_SDMMC, "hclk_sdmmc", "hclk_peri", 0, RK2928_CLKGATE_CON(5), 10, GFLAGS),
-> @@ -592,7 +594,8 @@ static struct rockchip_clk_branch rk3066a_clk_branches[] __initdata = {
->         GATE(0, "hclk_cif1", "hclk_cpu", 0, RK2928_CLKGATE_CON(6), 6, GFLAGS),
->         GATE(0, "hclk_hdmi", "hclk_cpu", 0, RK2928_CLKGATE_CON(4), 14, GFLAGS),
->
-> -       GATE(HCLK_OTG1, "hclk_usbotg1", "hclk_peri", 0, RK2928_CLKGATE_CON(5), 14, GFLAGS),
-> +       GATE(HCLK_OTG1, "hclk_usbotg1", "hclk_peri", CLK_IGNORE_UNUSED,
-> +                       RK2928_CLKGATE_CON(5), 14, GFLAGS),
->
->         GATE(0, "aclk_cif1", "aclk_vio1", 0, RK2928_CLKGATE_CON(6), 7, GFLAGS),
->
-> @@ -680,7 +683,8 @@ static struct rockchip_clk_branch rk3188_clk_branches[] __initdata = {
->         GATE(0, "hclk_imem0", "hclk_cpu", 0, RK2928_CLKGATE_CON(4), 14, GFLAGS),
->         GATE(0, "hclk_imem1", "hclk_cpu", 0, RK2928_CLKGATE_CON(4), 15, GFLAGS),
->
-> -       GATE(HCLK_OTG1, "hclk_usbotg1", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 3, GFLAGS),
-> +       GATE(HCLK_OTG1, "hclk_usbotg1", "hclk_peri", CLK_IGNORE_UNUSED,
-> +                       RK2928_CLKGATE_CON(7), 3, GFLAGS),
->         GATE(HCLK_HSIC, "hclk_hsic", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 4, GFLAGS),
->
->         GATE(PCLK_TIMER3, "pclk_timer3", "pclk_cpu", 0, RK2928_CLKGATE_CON(7), 9, GFLAGS),
-> --
-> 2.1.0
-Reviewed-by: Romain Perier <romain.perier@gmail.com>
-Tested-by: Romain Perier <romain.perier@gmail.com>
+On 11/26/2014 03:51 PM, Arnd Bergmann wrote:
+> On Wednesday 26 November 2014 15:38:09 Dave Gerlach wrote:
+>> +
+>> +static const struct wkup_m3_wakeup_src wakeups[] = {
+>> +       {.irq_nr = 35,  .src = "USB0_PHY"},
+>> +       {.irq_nr = 36,  .src = "USB1_PHY"},
+>> +       {.irq_nr = 40,  .src = "I2C0"},
+>> +       {.irq_nr = 41,  .src = "RTC Timer"},
+>> +       {.irq_nr = 42,  .src = "RTC Alarm"},
+>> +       {.irq_nr = 43,  .src = "Timer0"},
+>> +       {.irq_nr = 44,  .src = "Timer1"},
+>> +       {.irq_nr = 45,  .src = "UART"},
+>> +       {.irq_nr = 46,  .src = "GPIO0"},
+>> +       {.irq_nr = 48,  .src = "MPU_WAKE"},
+>> +       {.irq_nr = 49,  .src = "WDT0"},
+>> +       {.irq_nr = 50,  .src = "WDT1"},
+>> +       {.irq_nr = 51,  .src = "ADC_TSC"},
+>> +       {.irq_nr = 0,   .src = "Unknown"},
+>> +};
+>>
+> 
+> This seems awfully specific to some SoC version, and not aware of
+> IRQ domains. It also seems to be only used in a dev_dbg statement,
+> so I guess you could just kill this off entirely.
+
+This is determined by the firmware in use on the remote processor and works for
+both am335x and am437x. However it is not required information and I'd be fine
+with taking it out.
+
+> 
+>> +static struct rproc *wkup_m3_get_rproc(struct device *dev)
+>> +{
+>> +       struct device_node *node;
+>> +       struct rproc *rp;
+>> +
+>> +       node = of_parse_phandle(dev->of_node, "ti,rproc", 0);
+>> +       if (!node)
+>> +               return NULL;
+>> +
+>> +       dev = bus_find_device(&platform_bus_type, NULL, node, match);
+>> +       if (!dev)
+>> +               return NULL;
+>> +
+>> +       rp = dev_get_drvdata(dev);
+>> +       return rp;
+> 
+> This is wrong on a number of levels. I suspect what you really want
+> is an interface exported from drivers/remoteproc that looks up
+> a 'struct rproc' and performs the necessary reference counting.
+> 
+> That one can just use of_find_node_by_phandle() to get to
+> a device_node and use that to look up the rproc device in
+> a linked list it maintains.
+
+Added Ohad as I should have cc'd him in the first place..
+
+Yes I agree that it's not the best solution. There used to be an
+rproc_get/rproc_put api but that was removed, I'll look into adding
+rproc_get_by_phandle into drivers/remoteproc as that would be ideal for this
+situation and a cleaner way of doing it. Thanks for the comments.
+
+Regards,
+Dave
+
+> 
+> 	Arnd
+> 
