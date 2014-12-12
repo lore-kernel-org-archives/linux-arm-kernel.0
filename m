@@ -1,154 +1,133 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 12 Dec 2014 22:47:15 +0200
-Subject: [RFC PATCH 2/2] iommu: rockchip: Handle system-wide and runtime PM
-In-Reply-To: <CAAFQd5B28WiWUqmbmROJUa3H25R=Y774NuemTZDvkoa=CvZUsw@mail.gmail.com>
-References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
- <1576771.dIVCOxU0se@vostro.rjw.lan>
- <CAAFQd5B28WiWUqmbmROJUa3H25R=Y774NuemTZDvkoa=CvZUsw@mail.gmail.com>
-Message-ID: <1508486.LLFuttrbI2@avalon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 Dec 2014 21:04:01 +0000
+Subject: [PATCH v2 5/6] arm/arm64: KVM: Turn off vcpus on PSCI
+ shutdown/reboot
+In-Reply-To: <20141212194938.GA16855@cbox>
+References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
+ <1417641522-29056-6-git-send-email-christoffer.dall@linaro.org>
+ <548593E5.7070101@arm.com> <20141208125836.GE8936@cbox>
+ <5485A553.4070607@arm.com> <20141212194938.GA16855@cbox>
+Message-ID: <739325d6b59aafbfe38bf277393c39af@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 2014-12-12 19:49, Christoffer Dall wrote:
+> On Mon, Dec 08, 2014 at 01:19:15PM +0000, Marc Zyngier wrote:
+>> On 08/12/14 12:58, Christoffer Dall wrote:
+>> > On Mon, Dec 08, 2014 at 12:04:53PM +0000, Marc Zyngier wrote:
+>> >> On 03/12/14 21:18, Christoffer Dall wrote:
+>> >>> When a vcpu calls SYSTEM_OFF or SYSTEM_RESET with PSCI v0.2, the 
+>> vcpus
+>> >>> should really be turned off for the VM adhering to the 
+>> suggestions in
+>> >>> the PSCI spec, and it's the sane thing to do.
+>> >>>
+>> >>> Also, clarify the behavior and expectations for exits to user 
+>> space with
+>> >>> the KVM_EXIT_SYSTEM_EVENT case.
+>> >>>
+>> >>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> >>> ---
+>> >>>  Documentation/virtual/kvm/api.txt |  9 +++++++++
+>> >>>  arch/arm/kvm/psci.c               | 19 +++++++++++++++++++
+>> >>>  arch/arm64/include/asm/kvm_host.h |  1 +
+>> >>>  3 files changed, 29 insertions(+)
+>> >>>
+>> >>> diff --git a/Documentation/virtual/kvm/api.txt 
+>> b/Documentation/virtual/kvm/api.txt
+>> >>> index 81f1b97..228f9cf 100644
+>> >>> --- a/Documentation/virtual/kvm/api.txt
+>> >>> +++ b/Documentation/virtual/kvm/api.txt
+>> >>> @@ -2957,6 +2957,15 @@ HVC instruction based PSCI call from the 
+>> vcpu. The 'type' field describes
+>> >>>  the system-level event type. The 'flags' field describes 
+>> architecture
+>> >>>  specific flags for the system-level event.
+>> >>>
+>> >>> +Valid values for 'type' are:
+>> >>> +  KVM_SYSTEM_EVENT_SHUTDOWN -- the guest has requested a 
+>> shutdown of the
+>> >>> +   VM. Userspace is not obliged to honour this, and if it does 
+>> honour
+>> >>> +   this does not need to destroy the VM synchronously (ie it 
+>> may call
+>> >>> +   KVM_RUN again before shutdown finally occurs).
+>> >>> +  KVM_SYSTEM_EVENT_RESET -- the guest has requested a reset of 
+>> the VM.
+>> >>> +   As with SHUTDOWN, userspace can choose to ignore the 
+>> request, or
+>> >>> +   to schedule the reset to occur in the future and may call 
+>> KVM_RUN again.
+>> >>> +
+>> >>>  		/* Fix the size of the union. */
+>> >>>  		char padding[256];
+>> >>>  	};
+>> >>> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+>> >>> index 09cf377..ae0bb91 100644
+>> >>> --- a/arch/arm/kvm/psci.c
+>> >>> +++ b/arch/arm/kvm/psci.c
+>> >>> @@ -15,6 +15,7 @@
+>> >>>   * along with this program.  If not, see 
+>> <http://www.gnu.org/licenses/>.
+>> >>>   */
+>> >>>
+>> >>> +#include <linux/preempt.h>
+>> >>>  #include <linux/kvm_host.h>
+>> >>>  #include <linux/wait.h>
+>> >>>
+>> >>> @@ -166,6 +167,24 @@ static unsigned long 
+>> kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
+>> >>>
+>> >>>  static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 
+>> type)
+>> >>>  {
+>> >>> +	int i;
+>> >>> +	struct kvm_vcpu *tmp;
+>> >>> +
+>> >>> +	/*
+>> >>> +	 * The KVM ABI specifies that a system event exit may call 
+>> KVM_RUN
+>> >>> +	 * again and may perform shutdown/reboot at a later time that 
+>> when the
+>> >>> +	 * actual request is made.  Since we are implementing PSCI and 
+>> a
+>> >>> +	 * caller of PSCI reboot and shutdown expects that the system 
+>> shuts
+>> >>> +	 * down or reboots immediately, let's make sure that VCPUs are 
+>> not run
+>> >>> +	 * after this call is handled and before the VCPUs have been
+>> >>> +	 * re-initialized.
+>> >>> +	 */
+>> >>> +	kvm_for_each_vcpu(i, tmp, vcpu->kvm)
+>> >>> +		tmp->arch.pause = true;
+>> >>> +	preempt_disable();
+>> >>> +	force_vm_exit(cpu_all_mask);
+>> >>> +	preempt_enable();
+>> >>> +
+>> >>
+>> >> I'm slightly uneasy about this force_vm_exit, as this is 
+>> something that
+>> >> is directly triggered by the guest. I suppose it is almost 
+>> impossible to
+>> >> find out which CPUs we're actually using...
+>> >>
+>> > Ah, you mean we should only IPI the CPUs that are actually running 
+>> a
+>> > VCPU belonging to this VM?
+>> >
+>> > I guess I could replace it with:
+>> >
+>> > 	kvm_for_each_vcpu(i, tmp, vcpu->kvm) {
+>> > 		tmp->arch.pause = true;
+>> > 		kvm_vcpu_kick(tmp);
+>> > 	}
+>>
+>> Ah, that's even simpler than I thought. Yeah, looks good to me.
+>>
+> Can I take this as an ack and apply this series?
 
-On Friday 12 December 2014 13:15:51 Tomasz Figa wrote:
-> On Fri, Dec 12, 2014 at 5:48 AM, Rafael J. Wysocki wrote:
-> > On Thursday, December 11, 2014 04:51:37 PM Ulf Hansson wrote:
-> >> On 11 December 2014 at 16:31, Kevin Hilman <khilman@kernel.org> wrote:
-> >> > [+ Laurent Pinchart]
-> >> > 
-> >> > Tomasz Figa <tfiga@chromium.org> writes:
-> >> >> On Thu, Dec 11, 2014 at 8:58 PM, Ulf Hansson wrote:
-> >> > [...]
-> >> > 
-> >> >>>> @@ -988,11 +1107,28 @@ static int rk_iommu_probe(struct
-> >> >>>> platform_device *pdev)>> >>>> 
-> >> >>>>                 return -ENXIO;
-> >> >>>>         
-> >> >>>>         }
-> >> >>>> 
-> >> >>>> +       pm_runtime_no_callbacks(dev);
-> >> >>>> +       pm_runtime_enable(dev);
-> >> >>>> +
-> >> >>>> +       /* Synchronize state of the domain with driver data. */
-> >> >>>> +       pm_runtime_get_sync(dev);
-> >> >>>> +       iommu->is_powered = true;
-> >> >>> 
-> >> >>> Doesn't the runtime PM status reflect the value of "is_powered", thus
-> >> >>> why do you need to have a copy of it? Could it perpahps be that you
-> >> >>> try to cope with the case when CONFIG_PM is unset?
-> >> >> 
-> >> >> It's worth noting that this driver fully relies on status of other
-> >> >> devices in the power domain the IOMMU is in and does not enforce the
-> >> >> status on its own. So in general, as far as my understanding of PM
-> >> >> runtime subsystem, the status of the IOMMU device will be always
-> >> >> suspended, because nobody will call pm_runtime_get() on it (except the
-> >> >> get and put pair in probe). So is_powered is here to track status of
-> >> >> the domain, not the device. Feel free to suggest a better way, though.
-> >> > 
-> >> > I still don't like these notifiers.  I think they add ways to bypass
-> >> > having proper runtime PM implemented for devices/subsystems.
-> >> 
-> >> I do agree, but I haven't found another good solution to the problem.
-> > 
-> > For the record, I'm not liking this mostly because it "fixes" a generic
-> > problem in a way that's hidden in the genpd code and very indirect.
-> 
-> Well, that's true. This is indeed a generic problem of PM dependencies
-> between devices (other than those represented by parent-child
-> relation), which in fact doesn't have much to do with genpd, but
-> rather with those devices directly. It is just that genpd is the most
-> convenient location to solve this in current code and in a simple way.
-> In other words, I see this solution as a reasonable way to get the
-> problem solved quickly for now, so that we can start thinking about a
-> more elegant solution.
-> 
-> >> > From a high-level, the IOMMU is just another device inside the PM
-> >> > domain, so ideally it should be doing it's own _get() and _put() calls
-> >> > so the PM domain code would just do the right thing without the need
-> >> > for notifiers.
-> >> 
-> >> As I understand it, the IOMMU (or for other similar cases) shouldn't
-> >> be doing any get() and put() at all because there are no IO API to
-> >> serve request from.
+Yes, please go ahead.
 
-Speaking purely from an IOMMU point of view that's not entirely tree. IOMMU 
-drivers expose map and unmap operations, so they can track whether any memory 
-is mapped. From a bus master point of view the IOMMU map and unmap operations 
-are hidden by the DMA mapping API. The IOMMU can thus track the existence of 
-mappings without any IOMMU awareness in the bus master driver.
-
-If no mapping exist the IOMMU shouldn't receive any translation request. An 
-IOMMU driver could thus call pm_runtime_get_sync() in the map handler when 
-creating the first mapping, and pm_runtime_put() in the unmap handler when 
-tearing the last mapping down.
-
-One could argue that the IOMMU would end up being powered more often than 
-strictly needed, as bus masters drivers, even when written properly, could 
-keep mappings around at times they don't perform bus access. This is true, and 
-that's an argument I've raised during the last kernel summit. The general 
-response (including Linus Torvald's) was that micro-optimizing power 
-management might not be worth it, and that measurements proving that the gain 
-is worth it are required before introducing new APIs to solve the problem. I 
-can't disagree with that argument.
-
-> >> In principle we could consider these kind devices as "parent" devices
-> >> to those other devices that needs them. Then runtime PM core would
-> >> take care of things for us, right!?
-> >> 
-> >> Now, I am not so sure using the "parent" approach is actually viable,
-> >> since it will likely have other complications, but I haven't
-> >> thoroughly thought it though yet.
-> > 
-> > That actually need not be a "parent".
-> > 
-> > What's needed in this case is to do a pm_runtime_get_sync() on a device
-> > depended on every time a dependent device is runtime-resumed (and
-> > analogously for suspending).
-> > 
-> > The core doesn't have a way to do that, but it looks like we'll need to
-> > add it anyway for various reasons (ACPI _DEP is one of them as I mentioned
-> > some time ago, but people dismissed it basically as not their problem).
-> 
-> Let me show you our exact use case.
-> 
-> We have a power domain, which contains an IOMMU and an IP block, which
-> can do bus transactions through that IOMMU. Of course the IP block is
-> not aware of the IOMMU, because this is just an integration detail and
-> on other platforms using the same IP block the IOMMU might not be
-> there. This implies that the driver for this IP block should not be
-> aware of the IOMMU either, which, on the buffer allocation and mapping
-> side, is achieved by DMA mapping subsystem. We would also want the
-> IOMMU to be fully transparent to that driver on PM side.
-> 
-> Now, for PM related details, they are located in the same power
-> domain, which means that whenever the power domain is turned off, the
-> CPU can't access their registers and all the hardware state is gone.
-> To make the case more interesting, there is no point in programming
-> the IOMMU unless the device using it is powered on. Similarly, there
-> is no point in powering the domain on to just access the IOMMU. This
-> implies that the power domain should be fully controlled by the
-> stand-alone IP block, while the peripheral IOMMU shouldn't affect its
-> state and its driver only respond to operations performed by driver of
-> that stand-alone IP block.
-> 
-> A solution like below could work for the above:
-> 
-> - There is a per-device list of peripheral devices, which need to be
-> powered on for this device to work.
-> - Whenever the IOMMU subsystem/driver binds an IOMMU to a device, it
-> adds the IOMMU device to the list of peripheral devices of that device
-> (and similarly for removal).
-> - A runtime PM operation on a device will also perform the same
-> operation on all its peripheral devices.
-> 
-> Another way would be to extend what the PM runtime core does with
-> parent-child relations to handle the whole list of peripheral devices
-> instead of just the parent.
-> 
-> Would this design sound somehow reasonable to you?
-
+         M.
 -- 
-Regards,
-
-Laurent Pinchart
+Fast, cheap, reliable. Pick two.
