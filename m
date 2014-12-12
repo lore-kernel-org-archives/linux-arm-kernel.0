@@ -1,42 +1,55 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 12 Dec 2014 17:19:02 +0100
-Subject: [PATCH 0/4] serial: =?UTF-8?Q?fsl=5Flpuart=3A=20fix=20various?=
- =?UTF-8?Q?=20DMA=20related=20issues?=
-In-Reply-To: <20141212143244.GA2219@kroah.com>
-References: <1417134205-4400-1-git-send-email-stefan@agner.ch>
- <677f2c62b6b6c1fe8e16cd38d5f20d47@agner.ch>
- <20141212143244.GA2219@kroah.com>
-Message-ID: <f6255321feb06d32f257b7b41d5d58a3@agner.ch>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 12 Dec 2014 08:21:03 -0800
+Subject: [PATCH v2 7/7] pinctrl: qcom-spmi-gpio: Migrate to pinconf-generic
+In-Reply-To: <bc08b9044a3f46f5a575dca2fa18a663@BY2FFO11FD057.protection.gbl>
+References: <1417137993-8337-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1417137993-8337-8-git-send-email-soren.brinkmann@xilinx.com>
+ <1417766393.22963.9.camel@mm-sol.com>
+ <bc08b9044a3f46f5a575dca2fa18a663@BY2FFO11FD057.protection.gbl>
+Message-ID: <f754e0fd1e704d18913a5d89c607e57f@BN1BFFO11FD030.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-12 15:32, Greg KH wrote:
-> On Fri, Dec 12, 2014 at 02:44:06PM +0100, Stefan Agner wrote:
->> Any thoughts on this patchset? Would have hopped that it makes it into
->> 3.19 as those are mostly fixes.
+On Fri, 2014-12-05 at 09:08AM -0800, S?ren Brinkmann wrote:
+> On Fri, 2014-12-05 at 09:59AM +0200, Ivan T. Ivanov wrote:
+> > 
+> > On Thu, 2014-11-27 at 17:26 -0800, Soren Brinkmann wrote:
+> > > 
+> > >  static const struct pinconf_ops pmic_gpio_pinconf_ops = {
+> > > +       .is_generic= true,
+> > >         .pin_config_group_get= pmic_gpio_config_get,
+> > >         .pin_config_group_set= pmic_gpio_config_set,
+> > >         .pin_config_group_dbg_show= pmic_gpio_config_dbg_show,
+> > > @@ -848,6 +742,9 @@ static int pmic_gpio_probe(struct platform_device *pdev)
+> > >         pctrldesc->name = dev_name(dev);
+> > >         pctrldesc->pins = pindesc;
+> > >         pctrldesc->npins = npins;
+> > > +       pctrldesc->num_dt_params = ARRAY_SIZE(pmic_gpio_bindings);
+> > > +       pctrldesc->params = pmic_gpio_bindings;
+> > > +       pctrldesc->conf_items = pmic_conf_items;
+> > > 
+> > 
+> > What will happen if number of conf_items is less than number of params?
 > 
-> "mostly"?
-> 
+> I suppose bad things :) You're right, that should probably be checked
+> somewhere. Let me see whether I find a good place to put such a check.
 
-Well, all of them fix a bug, but PATCH 2/4 does this by also moving DMA
-allocation to probe. I would really have to split up that patch and make
-two incremental steps (split-up of RX/TX DMA allocation to make each
-single action revert-able and move to probe). But this would lead to
-more changed lines in total. The patchset as is already somewhat tested
-since we use it in our 3.18 BSP, whereas a new set would not be tested.
+I looked at merging these arrays. Unfortunately that doesn't work that
+easy.
+There are two arrays. The first one establishes a mapping from
+strings used in DT to specify pinconf parameters to a pinconf parameter.
+This array has some entries which map to the same pinconf parameter.
+E.g. 'input-enable' and 'input-disable', the only difference in those
+entries is the resulting value of the parameter.
 
-One could also argument, it only affects fsl_lpuart (UART in rather not
-very widespread SoC's Freescale Vybrid and LS1021a).
+The second array establishes a debugfs representation for each pinconf
+parameter.
+So, for the core parameters, the number of entries in these arrays
+differ.
 
+For this patch, I was assuming that these arrays match in size. I'd keep
+it the way it is now and if it turns out that this is not sufficient,
+passing the size of the second array too is an easy addition.
 
-> I'll get to these after 3.19-rc1 is out, but it really looks like these
-> will be for 3.20-rc1, unless you break them up into "bugfix only" type
-> patches.
-
-
-PATCH 1/4 fixes a bug which happens on a normal console rather often on
-my setup. So if you decide that patchset is for 3.20-rc1, that one would
-be nice to have in 3.19 as well...
-
---
-Stefan
+	Thanks,
+	S?ren
