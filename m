@@ -1,46 +1,26 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 12 Dec 2014 19:02:24 +0100
-Subject: [PATCH] clk: rockchip: add CLK_IGNORE_UNUSED flag to fix USB Host
-In-Reply-To: <CABgxDoKKjwDf8+OuWiTjzpbGonshZ0fHXXMvSkJi1Z1U_7AsNA@mail.gmail.com>
-References: <1418396066-31360-1-git-send-email-julien.chauveau@neo-technologies.fr>
- <CABgxDoKKjwDf8+OuWiTjzpbGonshZ0fHXXMvSkJi1Z1U_7AsNA@mail.gmail.com>
-Message-ID: <3548627.UnLcRkWMrC@phil>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 12 Dec 2014 18:12:44 +0000
+Subject: [PATCH v2 2/6] ASoC: dwc: Ensure FIFOs are flushed to prevent
+ channel swap
+In-Reply-To: <548AB75E.9030302@metafoo.de>
+References: <cover.1418372910.git.Andrew.Jackson@arm.com>
+ <a3b4a11dfe1688eea07471c6cfa27676cc9a58a8.1418372910.git.Andrew.Jackson@arm.com>
+ <548AB75E.9030302@metafoo.de>
+Message-ID: <20141212181244.GQ11764@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 12. Dezember 2014, 16:44:06 schrieb Romain Perier:
-> Hi,
-> 
-> 2014-12-12 15:54 GMT+01:00 Julien CHAUVEAU
-> 
-> <julien.chauveau@neo-technologies.fr>:
-> > This patch adds CLK_IGNORE_UNUSED flag to hclk_usb_peri, hclk_usbotg0 and
-> > hclk_usbotg1 because these clocks must remain enabled to use the USB
-> > controllers in host mode.
-> > 
-> > This fixes a regression introduced by patch "clk: rockchip: disable unused
-> > clocks"
-> > https://lkml.kernel.org/g/1415092270-24932-1-git-send-email-kever.yang at ro
-> > ck-chips.com
-> Could you refer the commit id instead ? something like "commit <ID>
-> ("title of the corresponding commit")  (and use scripts/checkpatch.pl
-> on your patch to be sure that the commit form is okay).
+On Fri, Dec 12, 2014 at 10:37:34AM +0100, Lars-Peter Clausen wrote:
 
-I can also fix this up when applying the patch
+> This should probably go into the prepare callback. prepare is for example
+> also called when recovering from a underrun/overrun. Whereas hwparams is
+> only called during initial setup of the stream.
 
-
-> 
-> 
-> I confirm the regression.
-
-instead of prose-confirmation please provide appropriate tags, like
-
-Reviewed-by: Romain Perier <romain.perier@gmail.com>
-Tested-by: Romain Perier <romain.perier@gmail.com>
-
-Tested-by when you have tested the fix on actual hardware and Reviewed-by when 
-you have reviewed the actual change for correctnes
-
-
-Thanks
-Heiko
+Indeed, that's a better place.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141212/11f10dcc/attachment-0001.sig>
