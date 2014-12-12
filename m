@@ -1,49 +1,62 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Fri, 12 Dec 2014 13:10:09 +0200
-Subject: [RFC] mm:fix zero_page huge_zero_page rss/pss statistic
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E688B31406@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
- <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D103E688B313F2@CNBJMBX05.corpusers.net>
- <20141205143134.37139da2208c654a0d3cd942@linux-foundation.org>
- <35FD53F367049845BC99AC72306C23D103E688B313F4@CNBJMBX05.corpusers.net>
- <20141208114601.GA28846@node.dhcp.inet.fi>
- <35FD53F367049845BC99AC72306C23D103E688B313FB@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E688B31403@CNBJMBX05.corpusers.net>
- <20141210110556.GA10630@node.dhcp.inet.fi>
- <35FD53F367049845BC99AC72306C23D103E688B31406@CNBJMBX05.corpusers.net>
-Message-ID: <20141212111009.GA25426@node.dhcp.inet.fi>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 12 Dec 2014 12:14:11 +0100
+Subject: [PATCH 5/5] arm/arm64: KVM: Initialize the vgic on-demand when
+ injecting IRQs
+In-Reply-To: <5489E3FC.2000304@arm.com>
+References: <1418139844-27892-1-git-send-email-christoffer.dall@linaro.org>
+ <1418139844-27892-6-git-send-email-christoffer.dall@linaro.org>
+ <5489E3FC.2000304@arm.com>
+Message-ID: <20141212111411.GJ28388@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 12, 2014 at 09:59:15AM +0800, Wang, Yalin wrote:
-> > -----Original Message-----
-> > From: Kirill A. Shutemov [mailto:kirill at shutemov.name]
-> > Sent: Wednesday, December 10, 2014 7:06 PM
-> > To: Wang, Yalin
-> > Cc: 'Andrew Morton'; 'Konstantin Khlebnikov'; 'linux-
-> > kernel at vger.kernel.org'; 'linux-mm at kvack.org'; 'linux-arm-
-> > kernel at lists.infradead.org'; 'n-horiguchi at ah.jp.nec.com'; 'oleg at redhat.com';
-> > 'gorcunov at openvz.org'; 'pfeiner at google.com'
-> > Subject: Re: [RFC] mm:fix zero_page huge_zero_page rss/pss statistic
+On Thu, Dec 11, 2014 at 06:35:40PM +0000, Marc Zyngier wrote:
+> On 09/12/14 15:44, Christoffer Dall wrote:
+> > Userspace assumes that it can wire up IRQ injections after having
+> > created all VCPUs and after having created the VGIC, but potentially
+> > before starting the first VCPU.  This can currently lead to lost IRQs
+> > because the state of that IRQ injection is not stored anywhere and we
+> > don't return an error to userspace.
 > > 
-> > On Wed, Dec 10, 2014 at 03:22:21PM +0800, Wang, Yalin wrote:
-> > > smaps_pte_entry() doesn't ignore zero_huge_page, but it ignore
-> > > zero_page, because vm_normal_page() will ignore it. We remove
-> > > vm_normal_page() call, because walk_page_range() have ignore VM_PFNMAP
-> > > vma maps, it's safe to just use pfn_valid(), so that we can also
-> > > consider zero_page to be a valid page.
+> > We haven't seen this problem manifest itself yet, presumably because
+> > guests reset the devices on boot, but this could cause issues with
+> > migration and other non-standard startup configurations.
 > > 
-> > We fixed huge zero page accounting in smaps recentely. See mm tree.
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  virt/kvm/arm/vgic.c | 9 +++++++--
+> >  1 file changed, 7 insertions(+), 2 deletions(-)
 > > 
-> Hi 
-> I can't find the git, could you send me a link?
+> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> > index c98cc6b..feef015 100644
+> > --- a/virt/kvm/arm/vgic.c
+> > +++ b/virt/kvm/arm/vgic.c
+> > @@ -1693,8 +1693,13 @@ out:
+> >  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+> >  			bool level)
+> >  {
+> > -	if (likely(vgic_ready(kvm)) &&
+> > -	    vgic_update_irq_pending(kvm, cpuid, irq_num, level))
+> > +	if (unlikely(!vgic_initialized(kvm))) {
+> > +		mutex_lock(&kvm->lock);
+> > +		vgic_init(kvm);
+> 
+> What if this fails?
+> 
+yeah, not good.  The thing is that we also don't check the return value
+from kvm_vgic_inject_irq(), so we can do two things:
 
-http://git.cmpxchg.org/cgit.cgi/linux-mmotm.git/
+(1) change this function to a void, carry out the check for
+vgic_initialized in kvm_vm_ioctl_irq_line() in arm.c and export
+vgic_init() outside of vgic.c.
 
-or just take linux-next.
+(2) just error out if vgic_init() fails and print a kernel error (or
+even a BUG_ON?) in kvm_timer_inject_irq() in arch_timer.c.
 
-The fix is already in Linus' tree.
+In both cases we need to make sure that we never configure the timer to
+begin injecting IRQs before the vgic is initialized, as Eric pointed out
+before.
 
--- 
- Kirill A. Shutemov
+What do you think?
+
+-Christoffer
