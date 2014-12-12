@@ -1,102 +1,66 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 12 Dec 2014 12:00:03 -0800
-Subject: [PATCH v2] sun9i: clk: Fix compile error caused by "clk: sunxi:
- Give sunxi_factors_register a registers parameter"
-In-Reply-To: <1418397529-1188-1-git-send-email-hdegoede@redhat.com>
-References: <1418397529-1188-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141212200003.20398.13200@quantum>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 12 Dec 2014 12:04:16 -0800
+Subject: [RFC PATCH 2/2] iommu: rockchip: Handle system-wide and runtime PM
+In-Reply-To: <CAAFQd5B28WiWUqmbmROJUa3H25R=Y774NuemTZDvkoa=CvZUsw@mail.gmail.com>
+ (Tomasz Figa's message of "Fri, 12 Dec 2014 13:15:51 +0900")
+References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
+ <7h8uiemce7.fsf@deeprootsystems.com>
+ <CAPDyKFo6zH4__Odm+RiJCbvXquAQqaLyCAiXrSN6s3KfQhok=A@mail.gmail.com>
+ <1576771.dIVCOxU0se@vostro.rjw.lan>
+ <CAAFQd5B28WiWUqmbmROJUa3H25R=Y774NuemTZDvkoa=CvZUsw@mail.gmail.com>
+Message-ID: <7ha92sk533.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Hans de Goede (2014-12-12 07:18:49)
-> My "clk: sunxi: Give sunxi_factors_register a registers parameter" patch did
-> not adjust the sunxi_factors_clock register calls in the new clk-sun9i-core.c
-> clock code, causing compilation errors. This fixes this.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Tomasz Figa <tfiga@chromium.org> writes:
 
-Applied.
+[...]
 
-Regards,
-Mike
+> We have a power domain, which contains an IOMMU and an IP block, which
+> can do bus transactions through that IOMMU. Of course the IP block is
+> not aware of the IOMMU, because this is just an integration detail and
+> on other platforms using the same IP block the IOMMU might not be
+> there. This implies that the driver for this IP block should not be
+> aware of the IOMMU either, which, on the buffer allocation and mapping
+> side, is achieved by DMA mapping subsystem. We would also want the
+> IOMMU to be fully transparent to that driver on PM side.
 
-> ---
->  drivers/clk/sunxi/clk-sun9i-core.c | 27 ++++++++++++++++++++++-----
->  1 file changed, 22 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi/clk-sun9i-core.c b/drivers/clk/sunxi/clk-sun9i-core.c
-> index 3cb9036..110197a 100644
-> --- a/drivers/clk/sunxi/clk-sun9i-core.c
-> +++ b/drivers/clk/sunxi/clk-sun9i-core.c
-> @@ -22,6 +22,21 @@
->  
->  #include "clk-factors.h"
->  
-> +static struct clk *sun9i_factors_register(struct device_node *node,
-> +                                         const struct factors_data *data,
-> +                                         spinlock_t *lock)
-> +{
-> +       void __iomem *reg;
-> +
-> +       reg = of_iomap(node, 0);
-> +       if (!reg) {
-> +               pr_err("Could not get registers for factors-clk: %s\n",
-> +                      node->name);
-> +               return NULL;
-> +       }
-> +
-> +       return sunxi_factors_register(node, data, lock, reg);
-> +}
->  
->  /**
->   * sun9i_a80_get_pll4_factors() - calculates n, p, m factors for PLL1
-> @@ -89,7 +104,7 @@ static DEFINE_SPINLOCK(sun9i_a80_pll4_lock);
->  
->  static void __init sun9i_a80_pll4_setup(struct device_node *node)
->  {
-> -       sunxi_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
-> +       sun9i_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
->  }
->  CLK_OF_DECLARE(sun9i_a80_pll4, "allwinner,sun9i-a80-pll4-clk", sun9i_a80_pll4_setup);
->  
-> @@ -139,8 +154,10 @@ static DEFINE_SPINLOCK(sun9i_a80_gt_lock);
->  
->  static void __init sun9i_a80_gt_setup(struct device_node *node)
->  {
-> -       struct clk *gt = sunxi_factors_register(node, &sun9i_a80_gt_data,
-> +       struct clk *gt = sun9i_factors_register(node, &sun9i_a80_gt_data,
->                                                 &sun9i_a80_gt_lock);
-> +       if (!gt)
-> +               return;
->  
->         /* The GT bus clock needs to be always enabled */
->         __clk_get(gt);
-> @@ -194,7 +211,7 @@ static DEFINE_SPINLOCK(sun9i_a80_ahb_lock);
->  
->  static void __init sun9i_a80_ahb_setup(struct device_node *node)
->  {
-> -       sunxi_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
-> +       sun9i_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
->  }
->  CLK_OF_DECLARE(sun9i_a80_ahb, "allwinner,sun9i-a80-ahb-clk", sun9i_a80_ahb_setup);
->  
-> @@ -210,7 +227,7 @@ static DEFINE_SPINLOCK(sun9i_a80_apb0_lock);
->  
->  static void __init sun9i_a80_apb0_setup(struct device_node *node)
->  {
-> -       sunxi_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
-> +       sun9i_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
->  }
->  CLK_OF_DECLARE(sun9i_a80_apb0, "allwinner,sun9i-a80-apb0-clk", sun9i_a80_apb0_setup);
->  
-> @@ -266,6 +283,6 @@ static DEFINE_SPINLOCK(sun9i_a80_apb1_lock);
->  
->  static void __init sun9i_a80_apb1_setup(struct device_node *node)
->  {
-> -       sunxi_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
-> +       sun9i_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
->  }
->  CLK_OF_DECLARE(sun9i_a80_apb1, "allwinner,sun9i-a80-apb1-clk", sun9i_a80_apb1_setup);
-> -- 
-> 2.1.0
-> 
+An even more exciting problem exists when a CPU is in the same domain as
+other peripherals, those peripherals are all idle and the power domain
+is gated. :)
+
+> Now, for PM related details, they are located in the same power
+> domain, which means that whenever the power domain is turned off, the
+> CPU can't access their registers and all the hardware state is gone.
+> To make the case more interesting, there is no point in programming
+> the IOMMU unless the device using it is powered on. Similarly, there
+> is no point in powering the domain on to just access the IOMMU. This
+> implies that the power domain should be fully controlled by the
+> stand-alone IP block, while the peripheral IOMMU shouldn't affect its
+> state and its driver only respond to operations performed by driver of
+> that stand-alone IP block.
+
+Which implies that the IOMMU driver should have it's own set of
+runtime_suspend/runtime_resume callbacks to properly save/restore state
+as well.
+
+> A solution like below could work for the above:
+>
+> - There is a per-device list of peripheral devices, which need to be
+> powered on for this device to work.
+> - Whenever the IOMMU subsystem/driver binds an IOMMU to a device, it
+> adds the IOMMU device to the list of peripheral devices of that device
+> (and similarly for removal).
+> - A runtime PM operation on a device will also perform the same
+> operation on all its peripheral devices.
+
+Yes, that is exactly what we need.
+
+I'd rather use the term "dependent" devices rather than peripheral
+devices, but otherwise it sounds like the right approach to me.
+
+Kevin
+
+> Another way would be to extend what the PM runtime core does with
+> parent-child relations to handle the whole list of peripheral devices
+> instead of just the parent.
