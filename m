@@ -1,61 +1,25 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 12 Dec 2014 15:04:16 -0800
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 12 Dec 2014 23:05:43 +0000
 Subject: [PATCH] clk: Really fix deadlock with mmap_sem
-Message-ID: <1418425456-19364-1-git-send-email-sboyd@codeaurora.org>
+In-Reply-To: <1418425456-19364-1-git-send-email-sboyd@codeaurora.org>
+References: <1418425456-19364-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20141212230543.GX11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 6314b6796e3c (clk: Don't hold prepare_lock across debugfs
-creation, 2014-09-04) forgot to update one place where we hold
-the prepare_lock while creating debugfs directories. This means
-we still have the chance of a deadlock that the commit was trying
-to fix. Actually fix it by moving the debugfs creation outside
-the prepare_lock.
+On Fri, Dec 12, 2014 at 03:04:16PM -0800, Stephen Boyd wrote:
+> Commit 6314b6796e3c (clk: Don't hold prepare_lock across debugfs
+> creation, 2014-09-04) forgot to update one place where we hold
+> the prepare_lock while creating debugfs directories. This means
+> we still have the chance of a deadlock that the commit was trying
+> to fix. Actually fix it by moving the debugfs creation outside
+> the prepare_lock.
+> 
+> Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
 
-Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Fixes: 6314b6796e3c "clk: Don't hold prepare_lock across debugfs creation"
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clk.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+Please use "Russell King <rmk+kernel@arm.linux.org.uk>" rather than this
+address, thanks.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 44cdc47a6cc5..c9430653ddc9 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -240,12 +240,13 @@ static const struct file_operations clk_dump_fops = {
- 	.release	= single_release,
- };
- 
--/* caller must hold prepare_lock */
- static int clk_debug_create_one(struct clk *clk, struct dentry *pdentry)
- {
- 	struct dentry *d;
- 	int ret = -ENOMEM;
- 
-+	lockdep_assert_held(clk_debug_lock);
-+
- 	if (!clk || !pdentry) {
- 		ret = -EINVAL;
- 		goto out;
-@@ -1944,7 +1945,6 @@ int __clk_init(struct device *dev, struct clk *clk)
- 	else
- 		clk->rate = 0;
- 
--	clk_debug_register(clk);
- 	/*
- 	 * walk the list of orphan clocks and reparent any that are children of
- 	 * this clock
-@@ -1979,6 +1979,9 @@ int __clk_init(struct device *dev, struct clk *clk)
- out:
- 	clk_prepare_unlock();
- 
-+	if (!ret)
-+		clk_debug_register(clk);
-+
- 	return ret;
- }
- 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
