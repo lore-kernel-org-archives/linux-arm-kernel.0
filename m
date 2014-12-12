@@ -1,178 +1,72 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Fri, 12 Dec 2014 17:08:56 -0500
-Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
- AM572x errata i856.
-In-Reply-To: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
-References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
-Message-ID: <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 12 Dec 2014 22:37:23 +0000
+Subject: CCF locking problems
+In-Reply-To: <548B38FB.8060605@codeaurora.org>
+References: <20141212173726.GV11285@n2100.arm.linux.org.uk>
+ <548B38FB.8060605@codeaurora.org>
+Message-ID: <20141212223723.GW11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz external
-crystal is not enabled at power up.  Instead the CPU falls back to using
-an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is usually
-20MHz on boards so far (which gives an emulated frequency of 32.786KHz),
-but can also be 19.2 or 27MHz which result in much larger drift.
+On Fri, Dec 12, 2014 at 10:50:35AM -0800, Stephen Boyd wrote:
+> Do you have a lockdep splat? What kernel version are you running?
 
-Since this is used to drive the master counter at 32.768KHz * 375 /
-2 = 6.144MHz, the emulated speed for 20MHz is of by 570ppm, or about 43
-seconds per day, and more than the 500ppm NTP is able to tolerate.
+I could if I dug it out of the syslog files... but your patch would also
+fix it - it's pretty close to what I'm now running.  Mine was found on
+a v3.18 based kernel.
 
-Checking the CTRL_CORE_BOOTSTRAP register can determine if the CPU
-is using the real 32.768KHz crystal or the emulated SYSCLK1/610, and
-by known that the real counter frequency can be determined and used.
-The real speed is then SYSCLK1 / 610 * 375 / 2 or SYSCLK1 * 75 / 244.
+> but I'm not sure if you have that patch or if more recent changes to the
+> framework have caused this problem to reoccur. I think I missed the part
+> where clk_debug_register() is called after clk_debug_init() though, so
+> perhaps you have clocks that are getting registered after late init?
+> Here's an untested patch.
+> 
+> ----8<-----
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 44cdc47a6cc5..c9430653ddc9 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -240,12 +240,13 @@ static const struct file_operations clk_dump_fops = {
+>  	.release	= single_release,
+>  };
+>  
+> -/* caller must hold prepare_lock */
+>  static int clk_debug_create_one(struct clk *clk, struct dentry *pdentry)
+>  {
+>  	struct dentry *d;
+>  	int ret = -ENOMEM;
+>  
+> +	lockdep_assert_held(clk_debug_lock);
+> +
+>  	if (!clk || !pdentry) {
+>  		ret = -EINVAL;
+>  		goto out;
+> @@ -1944,7 +1945,6 @@ int __clk_init(struct device *dev, struct clk *clk)
+>  	else
+>  		clk->rate = 0;
+>  
+> -	clk_debug_register(clk);
+>  	/*
+>  	 * walk the list of orphan clocks and reparent any that are children of
+>  	 * this clock
+> @@ -1979,6 +1979,9 @@ int __clk_init(struct device *dev, struct clk *clk)
+>  out:
+>  	clk_prepare_unlock();
+>  
+> +	if (!ret)
+> +		clk_debug_register(clk);
+> +
+>  	return ret;
+>  }
 
-Signed-off-by: Len Sorensen <lsorense@csclub.uwaterloo.ca>
----
- arch/arm/mach-omap2/timer.c |  120 +++++++++++++++++++++++++++++++------------
- 1 file changed, 87 insertions(+), 33 deletions(-)
+Apart from the lockdep_assert_held(), this is basically what I'm
+currently running, which does fix the problem.  I was intending to send
+my patch, but pub with good beer, gliding syndicate, and Christmas food
+intervened tonight.
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index fb0cb2b..f00e4b4 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -497,6 +497,7 @@ static void __init realtime_counter_init(void)
- 	static struct clk *sys_clk;
- 	unsigned long rate;
- 	unsigned int reg, num, den;
-+	bool errata_i856_workaround = false;
- 
- 	base = ioremap(REALTIME_COUNTER_BASE, SZ_32);
- 	if (!base) {
-@@ -510,39 +511,93 @@ static void __init realtime_counter_init(void)
- 		return;
- 	}
- 
-+	if (soc_is_dra7xx()) {
-+		#define CTRL_CORE_BOOTSTRAP 0x4A0026C4
-+		#define SPEEDSELECT_MASK 0x00000300
-+		void __iomem *corebase;
-+		corebase = ioremap(CTRL_CORE_BOOTSTRAP, SZ_4);
-+		if (!corebase)
-+			pr_err("%s: ioremap failed\n", __func__);
-+		else {
-+			reg = readl_relaxed(corebase) & SPEEDSELECT_MASK;
-+			iounmap(corebase);
-+			/*
-+			 * Errata i856 says the 32.768KHz crystal does
-+			 * not start at power on, so the CPU falls back in
-+			 * an emulated 32KHz clock instead.  This causes
-+			 * the master counter frequency to not be 6.144MHz
-+			 * This affects at least the AM572x 1.0 and
-+			 * 1.1 revisions.
-+			 *
-+			 * Of course any board built without a populated
-+			 * 32.768KHz crystal would also need this fix
-+			 * even if the CPU is fixed later.
-+			 *
-+			 * If the two speedselect bits are not 0, then the
-+			 * 32.768KHz clock driving the course counter that
-+			 * corrects the fine counter every time it ticks is
-+			 * actually rate/610 rather than 32.768KHz and we
-+			 * should compensate to avoid the 570ppm (At 20MHz,
-+			 * much worse at other rates) too fast system time.
-+			 */
-+			if (reg) {
-+				errata_i856_workaround = true;
-+			}
-+		}
-+	}
-+
- 	rate = clk_get_rate(sys_clk);
--	/* Numerator/denumerator values refer TRM Realtime Counter section */
--	switch (rate) {
--	case 12000000:
--		num = 64;
--		den = 125;
--		break;
--	case 13000000:
--		num = 768;
--		den = 1625;
--		break;
--	case 19200000:
--		num = 8;
--		den = 25;
--		break;
--	case 20000000:
--		num = 192;
--		den = 625;
--		break;
--	case 26000000:
--		num = 384;
--		den = 1625;
--		break;
--	case 27000000:
--		num = 256;
--		den = 1125;
--		break;
--	case 38400000:
--	default:
--		/* Program it for 38.4 MHz */
--		num = 4;
--		den = 25;
--		break;
-+	if (errata_i856_workaround) {
-+		/*
-+		 * Realtime Counter frequency is not based on a real
-+		 * 32.768KHz time source, so calculate the real resulting
-+		 * frequency instead.  It is not 6.144MHz in this case.
-+		 *
-+		 * The frequency is always rate / 610 + 375 / 2 which
-+		 * is rate * 244 / 75 and will fit in 32 bit for all rates.
-+		 *
-+		 * The multiplication has to be first to keep accuracy
-+		 * with integer math as high as possible.
-+		 */
-+		num = 75;
-+		den = 244;
-+		arch_timer_freq = (rate * num) / den;
-+	} else {
-+		/* Numerator/denumerator values refer TRM Realtime Counter section */
-+		switch (rate) {
-+		case 12000000:
-+			num = 64;
-+			den = 125;
-+			break;
-+		case 13000000:
-+			num = 768;
-+			den = 1625;
-+			break;
-+		case 19200000:
-+			num = 8;
-+			den = 25;
-+			break;
-+		case 20000000:
-+			num = 192;
-+			den = 625;
-+			break;
-+		case 26000000:
-+			num = 384;
-+			den = 1625;
-+			break;
-+		case 27000000:
-+			num = 256;
-+			den = 1125;
-+			break;
-+		case 38400000:
-+		default:
-+			/* Program it for 38.4 MHz */
-+			num = 4;
-+			den = 25;
-+			break;
-+		}
-+		/* This divides cleanly and fits in 32 bits */
-+		arch_timer_freq = (rate / den) * num;
- 	}
- 
- 	/* Program numerator and denumerator registers */
-@@ -556,7 +611,6 @@ static void __init realtime_counter_init(void)
- 	reg |= den;
- 	writel_relaxed(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
- 
--	arch_timer_freq = (rate / den) * num;
- 	set_cntfreq();
- 
- 	iounmap(base);
+Thanks.
+
 -- 
-1.7.10.4
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
