@@ -1,39 +1,108 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Fri, 12 Dec 2014 09:59:15 +0800
-Subject: [RFC] mm:fix zero_page huge_zero_page rss/pss statistic
-In-Reply-To: <20141210110556.GA10630@node.dhcp.inet.fi>
-References: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
- <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D103E688B313F2@CNBJMBX05.corpusers.net>
- <20141205143134.37139da2208c654a0d3cd942@linux-foundation.org>
- <35FD53F367049845BC99AC72306C23D103E688B313F4@CNBJMBX05.corpusers.net>
- <20141208114601.GA28846@node.dhcp.inet.fi>
- <35FD53F367049845BC99AC72306C23D103E688B313FB@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E688B31403@CNBJMBX05.corpusers.net>
- <20141210110556.GA10630@node.dhcp.inet.fi>
-Message-ID: <35FD53F367049845BC99AC72306C23D103E688B31406@CNBJMBX05.corpusers.net>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 12 Dec 2014 04:13:54 +0200
+Subject: [v3][PATCH 4/5] media: ov2640: add a master clock for sensor
+In-Reply-To: <1418283339-16281-5-git-send-email-josh.wu@atmel.com>
+References: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
+ <1418283339-16281-5-git-send-email-josh.wu@atmel.com>
+Message-ID: <2368220.9kzqcjNO4y@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Kirill A. Shutemov [mailto:kirill at shutemov.name]
-> Sent: Wednesday, December 10, 2014 7:06 PM
-> To: Wang, Yalin
-> Cc: 'Andrew Morton'; 'Konstantin Khlebnikov'; 'linux-
-> kernel at vger.kernel.org'; 'linux-mm at kvack.org'; 'linux-arm-
-> kernel at lists.infradead.org'; 'n-horiguchi at ah.jp.nec.com'; 'oleg at redhat.com';
-> 'gorcunov at openvz.org'; 'pfeiner at google.com'
-> Subject: Re: [RFC] mm:fix zero_page huge_zero_page rss/pss statistic
+Hi Josh,
+
+Thank you for the patch.
+
+On Thursday 11 December 2014 15:35:38 Josh Wu wrote:
+> The master clock (xvclk) is mandatory. It's a common clock framework clock.
+> It can make sensor output a pixel clock to the camera interface.
 > 
-> On Wed, Dec 10, 2014 at 03:22:21PM +0800, Wang, Yalin wrote:
-> > smaps_pte_entry() doesn't ignore zero_huge_page, but it ignore
-> > zero_page, because vm_normal_page() will ignore it. We remove
-> > vm_normal_page() call, because walk_page_range() have ignore VM_PFNMAP
-> > vma maps, it's safe to just use pfn_valid(), so that we can also
-> > consider zero_page to be a valid page.
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+> v2 -> v3:
+>   1. should return PTR_ERR().
 > 
-> We fixed huge zero page accounting in smaps recentely. See mm tree.
+> v1 -> v2:
+>   1. change the clock's name.
+>   2. Make the clock is mandatory.
 > 
-Hi 
-I can't find the git, could you send me a link?
-Thank you !
+>  drivers/media/i2c/soc_camera/ov2640.c | 23 ++++++++++++++++++++++-
+>  1 file changed, 22 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
+> b/drivers/media/i2c/soc_camera/ov2640.c index e0bcf5b..055702c 100644
+> --- a/drivers/media/i2c/soc_camera/ov2640.c
+> +++ b/drivers/media/i2c/soc_camera/ov2640.c
+> @@ -13,6 +13,7 @@
+>   * published by the Free Software Foundation.
+>   */
+> 
+> +#include <linux/clk.h>
+>  #include <linux/init.h>
+>  #include <linux/module.h>
+>  #include <linux/i2c.h>
+> @@ -31,6 +32,7 @@
+> 
+>  #define VAL_SET(x, mask, rshift, lshift)  \
+>  		((((x) >> rshift) & mask) << lshift)
+> +
+>  /*
+>   * DSP registers
+>   * register offset for BANK_SEL == BANK_SEL_DSP
+> @@ -284,6 +286,7 @@ struct ov2640_priv {
+>  	struct v4l2_ctrl_handler	hdl;
+>  	u32	cfmt_code;
+>  	struct v4l2_clk			*clk;
+> +	struct clk			*master_clk;
+>  	const struct ov2640_win_size	*win;
+> 
+>  	struct soc_camera_subdev_desc	ssdd_dt;
+> @@ -746,6 +749,7 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int
+> on) struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
+> struct ov2640_priv *priv = to_ov2640(client);
+>  	struct v4l2_clk *clk;
+> +	int ret;
+> 
+>  	if (!priv->clk) {
+>  		clk = v4l2_clk_get(&client->dev, "mclk");
+> @@ -755,7 +759,20 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int
+> on) priv->clk = clk;
+>  	}
+> 
+> -	return soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
+> +	if (on) {
+> +		ret = clk_prepare_enable(priv->master_clk);
+> +		if (ret)
+> +			return ret;
+> +	} else {
+> +		clk_disable_unprepare(priv->master_clk);
+> +	}
+> +
+> +	ret = soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
+> +
+> +	if (ret && on)
+> +		clk_disable_unprepare(priv->master_clk);
+> +
+> +	return ret;
+>  }
+> 
+>  /* Select the nearest higher resolution for capture */
+> @@ -1145,6 +1162,10 @@ static int ov2640_probe(struct i2c_client *client,
+>  			return ret;
+>  	}
+> 
+> +	priv->master_clk = devm_clk_get(&client->dev, "xvclk");
+> +	if (IS_ERR(priv->master_clk))
+> +		return PTR_ERR(priv->master_clk);
+> +
+>  	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
+>  	v4l2_ctrl_handler_init(&priv->hdl, 2);
+>  	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
+
+-- 
+Regards,
+
+Laurent Pinchart
