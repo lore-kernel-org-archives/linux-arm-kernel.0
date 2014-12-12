@@ -1,194 +1,95 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Fri, 12 Dec 2014 08:34:58 -0800
-Subject: [PATCH v3 7/7] pinctrl: qcom-spmi-gpio: Migrate to pinconf-generic
-In-Reply-To: <1418402098-3811-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1418402098-3811-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <dc5e1d6b890747b4bcad87e42dcdcf70@BY2FFO11FD004.protection.gbl>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 12 Dec 2014 16:36:53 +0000
+Subject: [RFC 01/15] drivers/base: add track framework
+In-Reply-To: <1418226513-14105-2-git-send-email-a.hajda@samsung.com>
+References: <1418226513-14105-2-git-send-email-a.hajda@samsung.com>
+Message-ID: <20141212163653.GO11764@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of the driver caring about implementation details like device
-tree, just provide information about driver specific pinconf parameters
-to pinconf-generic which takes care of parsing the DT.
+On Wed, Dec 10, 2014 at 04:48:19PM +0100, Andrzej Hajda wrote:
+> track is a generic framework for safe tracking presence of any kernel objects
+> having an id. There are no special requirements about type of object or its
+> id. Id shall be unique.
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-Changes since v2:
- - remove hyphens in 'pull-up-strength' debugfs representation.
- - driver-specific DT properties are passed to the core in two arrays,
-   one for the actual DT parsing one for the debugfs representation.
-   Issue a compiler warning when the number of entries is not the same
-   for both arrays.
+This is pretty confusing, when it talks about "kernel objects" that
+sounds like it means struct kobject but in fact there's no connection
+with that or any of the other kernel object stuff.  Perhaps it makes
+sense but it should be addressed.
 
-This is compile tested only. So, it's likely that it needs more tweaking
-to make it actually work on HW. But it illustrates the potential
-benefits of the pinconf-generic changes in this series.
----
- drivers/pinctrl/qcom/pinctrl-spmi-gpio.c | 125 +++----------------------------
- 1 file changed, 11 insertions(+), 114 deletions(-)
+> Typical usage of the framework by consumer looks as follow:
+> 1. Consumer registers notifier callback for objects with given id.
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-index b863b5080890..17f811c9c2c0 100644
---- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-+++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-@@ -131,14 +131,14 @@ struct pmic_gpio_state {
- 	struct gpio_chip chip;
- };
- 
--struct pmic_gpio_bindings {
--	const char	*property;
--	unsigned	param;
-+static const struct pinconf_generic_dt_params pmic_gpio_bindings[] = {
-+	{"qcom,pull-up-strength",	PMIC_GPIO_CONF_PULL_UP,		0},
-+	{"qcom,drive-strength",		PMIC_GPIO_CONF_STRENGTH,	0},
- };
- 
--static struct pmic_gpio_bindings pmic_gpio_bindings[] = {
--	{"qcom,pull-up-strength",	PMIC_GPIO_CONF_PULL_UP},
--	{"qcom,drive-strength",		PMIC_GPIO_CONF_STRENGTH},
-+static const struct pin_config_item pmic_conf_items[ARRAY_SIZE(pmic_gpio_bindings)] = {
-+	PCONFDUMP(PMIC_GPIO_CONF_PULL_UP,  "pull up strength", NULL, true),
-+	PCONFDUMP(PMIC_GPIO_CONF_STRENGTH, "drive-strength", NULL, true),
- };
- 
- static const char *const pmic_gpio_groups[] = {
-@@ -209,118 +209,11 @@ static int pmic_gpio_get_group_pins(struct pinctrl_dev *pctldev, unsigned pin,
- 	return 0;
- }
- 
--static int pmic_gpio_parse_dt_config(struct device_node *np,
--				     struct pinctrl_dev *pctldev,
--				     unsigned long **configs,
--				     unsigned int *nconfs)
--{
--	struct pmic_gpio_bindings *par;
--	unsigned long cfg;
--	int ret, i;
--	u32 val;
--
--	for (i = 0; i < ARRAY_SIZE(pmic_gpio_bindings); i++) {
--		par = &pmic_gpio_bindings[i];
--		ret = of_property_read_u32(np, par->property, &val);
--
--		/* property not found */
--		if (ret == -EINVAL)
--			continue;
--
--		/* use zero as default value */
--		if (ret)
--			val = 0;
--
--		dev_dbg(pctldev->dev, "found %s with value %u\n",
--			par->property, val);
--
--		cfg = pinconf_to_config_packed(par->param, val);
--
--		ret = pinctrl_utils_add_config(pctldev, configs, nconfs, cfg);
--		if (ret)
--			return ret;
--	}
--
--	return 0;
--}
--
--static int pmic_gpio_dt_subnode_to_map(struct pinctrl_dev *pctldev,
--				       struct device_node *np,
--				       struct pinctrl_map **map,
--				       unsigned *reserv, unsigned *nmaps,
--				       enum pinctrl_map_type type)
--{
--	unsigned long *configs = NULL;
--	unsigned nconfs = 0;
--	struct property *prop;
--	const char *group;
--	int ret;
--
--	ret = pmic_gpio_parse_dt_config(np, pctldev, &configs, &nconfs);
--	if (ret < 0)
--		return ret;
--
--	if (!nconfs)
--		return 0;
--
--	ret = of_property_count_strings(np, "pins");
--	if (ret < 0)
--		goto exit;
--
--	ret = pinctrl_utils_reserve_map(pctldev, map, reserv, nmaps, ret);
--	if (ret < 0)
--		goto exit;
--
--	of_property_for_each_string(np, "pins", prop, group) {
--		ret = pinctrl_utils_add_map_configs(pctldev, map,
--						    reserv, nmaps, group,
--						    configs, nconfs, type);
--		if (ret < 0)
--			break;
--	}
--exit:
--	kfree(configs);
--	return ret;
--}
--
--static int pmic_gpio_dt_node_to_map(struct pinctrl_dev *pctldev,
--				    struct device_node *np_config,
--				    struct pinctrl_map **map, unsigned *nmaps)
--{
--	enum pinctrl_map_type type;
--	struct device_node *np;
--	unsigned reserv;
--	int ret;
--
--	ret = 0;
--	*map = NULL;
--	*nmaps = 0;
--	reserv = 0;
--	type = PIN_MAP_TYPE_CONFIGS_GROUP;
--
--	for_each_child_of_node(np_config, np) {
--		ret = pinconf_generic_dt_subnode_to_map(pctldev, np, map,
--							&reserv, nmaps, type);
--		if (ret)
--			break;
--
--		ret = pmic_gpio_dt_subnode_to_map(pctldev, np, map, &reserv,
--						  nmaps, type);
--		if (ret)
--			break;
--	}
--
--	if (ret < 0)
--		pinctrl_utils_dt_free_map(pctldev, *map, *nmaps);
--
--	return ret;
--}
--
- static const struct pinctrl_ops pmic_gpio_pinctrl_ops = {
- 	.get_groups_count	= pmic_gpio_get_groups_count,
- 	.get_group_name		= pmic_gpio_get_group_name,
- 	.get_group_pins		= pmic_gpio_get_group_pins,
--	.dt_node_to_map		= pmic_gpio_dt_node_to_map,
-+	.dt_node_to_map		= pinconf_generic_dt_node_to_map_group,
- 	.dt_free_map		= pinctrl_utils_dt_free_map,
- };
- 
-@@ -590,6 +483,7 @@ static void pmic_gpio_config_dbg_show(struct pinctrl_dev *pctldev,
- }
- 
- static const struct pinconf_ops pmic_gpio_pinconf_ops = {
-+	.is_generic			= true,
- 	.pin_config_group_get		= pmic_gpio_config_get,
- 	.pin_config_group_set		= pmic_gpio_config_set,
- 	.pin_config_group_dbg_show	= pmic_gpio_config_dbg_show,
-@@ -848,6 +742,9 @@ static int pmic_gpio_probe(struct platform_device *pdev)
- 	pctrldesc->name = dev_name(dev);
- 	pctrldesc->pins = pindesc;
- 	pctrldesc->npins = npins;
-+	pctrldesc->num_dt_params = ARRAY_SIZE(pmic_gpio_bindings);
-+	pctrldesc->params = pmic_gpio_bindings;
-+	pctrldesc->conf_items = pmic_conf_items;
- 
- 	for (i = 0; i < npins; i++, pindesc++) {
- 		pad = &pads[i];
--- 
-2.2.0.1.g9ee0458
+This is also a custom thing not connected with the notifier mechanism
+implemented by struct notifier_block.  Again this should probably be
+addressed, even if it's just used internally it seems like there should
+be some opportunity for code reuse here.
+
+> +	case track_task_up:
+> +		node = track_get_node(track, task->type, task->id, true);
+> +
+> +		node->up = true;
+> +		node->data = task->data;
+> +		list_for_each_entry_safe(itb, node->itb_next, &node->itb_head,
+> +					 list)
+> +			itb->callback(itb, node->data, true);
+> +		return;
+> +	case track_task_down:
+
+I'm not sure the up and down naming is the most obvious naming for
+users.  It's obviously inspired by semaphores but it's not entirely
+obvious that this is going to make things clear and meaningful for
+someone trying to understand the interface.
+
+> +static int track_process_queue(struct tracker *track)
+> +{
+> +	struct track_task *task, *ptask = NULL;
+> +	unsigned long flags;
+> +	bool empty;
+> +
+> +	/* Queue non-emptiness is used as a sentinel to prevent processing
+> +	 * by multiple threads, so we cannot delete entry from the queue
+> +	 * until it is processed.
+> +	 */
+> +	while (true) {
+> +		spin_lock_irqsave(&track->queue_lock, flags);
+> +
+> +		if (ptask)
+> +			list_del(&ptask->list);
+> +		task = list_first_entry(&track->queue,
+> +					struct track_task, list);
+> +
+> +		empty = list_empty(&track->queue);
+> +		if (empty)
+> +			complete_all(&track->queue_empty);
+> +
+> +		spin_unlock_irqrestore(&track->queue_lock, flags);
+
+Here we get a task from the head of the list and drop the lock, leaving
+the task on the list...
+
+> +		kfree(ptask);
+> +
+> +		if (empty)
+> +			break;
+> +
+> +		track_process_task(track, task);
+
+...we then go and do some other stuff, including processing that task,
+without the lock or or any other means I can see of excluding other
+users before going round and removing the task.  This seems to leave us
+vulnerable to double execution.  I *think* this is supposed to be
+handled by your comment "Provider should take care of calling
+notifications synchronously in proper order" in the changelog but that's
+a bit obscure, it's not specific about what the requirements are (or
+what the limits are supposed to be on the notification callbacks).
+
+I'm also unclear what is supposed to happen if adding a notification
+races with removing the thing being watched.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141212/01edde99/attachment.sig>
