@@ -1,7 +1,7 @@
 From: lyz@rock-chips.com (Yunzhi Li)
-Date: Fri, 12 Dec 2014 22:55:52 +0800
+Date: Fri, 12 Dec 2014 23:00:08 +0800
 Subject: [PATCH v7 0/5] Patches to add support for Rockchip usb PHYs.
-Message-ID: <1418396157-26802-1-git-send-email-lyz@rock-chips.com>
+Message-ID: <1418396413-27937-1-git-send-email-lyz@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
