@@ -1,35 +1,31 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 12 Dec 2014 11:25:48 +0100
-Subject: [PATCH 0/3] Small updates to Snow and Peach Pit/Pi DTS
-Message-ID: <1418379951-5551-1-git-send-email-javier.martinez@collabora.co.uk>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 12 Dec 2014 11:36:51 +0100
+Subject: [PATCH v2 0/4] dmaengine: at_xdmac: several improvements
+Message-ID: <1418380615-12171-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+Hi,
 
-This series adds some DTS snippets that were missing in the mainline
-Snow and Peach Pit/Pi Device Trees but are present in the downstream
-ChromeOS kernel.
+This series is based on vkoul/slave-dma/topic/slave_caps_device_control_fix
+branch.
 
-The series is composed of the following patches:
+Changes from v1:
+- put save_cc field addition in a single patch
+- update commit log of patch 3/4
+- remove AT_XDMAC_CUR_CFG since it is no more used
 
-Javier Martinez Canillas (3):
-  ARM: dts: Add power and lid GPIO keys pinctrl for exynos5250-snow
-  ARM: dts: Add lid GPIO key device node for Peach boards
-  ARM: dts: Set Peach boards USB WebCam regulators to always on
+Cyrille Pitchen (1):
+  dmaengine: at_xdmac: wait for in-progress transaction to complete
+    after     pausing a channel
 
- arch/arm/boot/dts/exynos5250-snow.dts      | 16 ++++++++++++++++
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 19 ++++++++++++++++++-
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 20 +++++++++++++++++++-
- 3 files changed, 53 insertions(+), 2 deletions(-)
+Ludovic Desroches (3):
+  dmaengine: at_xdmac: introduce save_cc field
+  dmaengine: at_xdmac: simplify channel configuration stuff
+  dmaengine: at_xdmac: allow muliple dwidths when doing slave transfers
 
-Patch #1 adds some pinctrl lines for the GPIO keys in the Snow DTS.
+ drivers/dma/at_xdmac.c | 60 ++++++++++++++++++++++++++------------------------
+ 1 file changed, 31 insertions(+), 29 deletions(-)
 
-Patch #2 adds a device node and pinctrl lines for the lid GPIO in
-the Peach boards DTS.
-
-Patch #3 sets the regulators that supply voltage to the USB WebCam
-in Peach boards as always on.
-
-Best regards,
-Javier
+-- 
+2.0.3
