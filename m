@@ -1,98 +1,76 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 12 Dec 2014 12:06:03 +0100
-Subject: [PATCH 5/5] arm/arm64: KVM: Initialize the vgic on-demand when
- injecting IRQs
-In-Reply-To: <54899038.3050609@linaro.org>
-References: <1418139844-27892-1-git-send-email-christoffer.dall@linaro.org>
- <1418139844-27892-6-git-send-email-christoffer.dall@linaro.org>
- <5488407E.50506@linaro.org> <20141211120158.GG28388@cbox>
- <54899038.3050609@linaro.org>
-Message-ID: <20141212110603.GI28388@cbox>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 12 Dec 2014 11:11:58 +0000
+Subject: [RFC PATCH] arm: Remove early stack deallocation from
+ restore_user_regs
+Message-ID: <1418382718-16323-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 11, 2014 at 01:38:16PM +0100, Eric Auger wrote:
-> On 12/11/2014 01:01 PM, Christoffer Dall wrote:
-> > On Wed, Dec 10, 2014 at 01:45:50PM +0100, Eric Auger wrote:
-> >> On 12/09/2014 04:44 PM, Christoffer Dall wrote:
-> >>> Userspace assumes that it can wire up IRQ injections after having
-> >>> created all VCPUs and after having created the VGIC, but potentially
-> >>> before starting the first VCPU.  This can currently lead to lost IRQs
-> >>> because the state of that IRQ injection is not stored anywhere and we
-> >>> don't return an error to userspace.
-> >>>
-> >>> We haven't seen this problem manifest itself yet, 
-> >> Actually we did with VFIO signaling setup before VGIC init!
-> >> presumably because
-> > 
-> > well, not with code in mainline
-> > 
-> >>> guests reset the devices on boot, but this could cause issues with
-> >>> migration and other non-standard startup configurations.
-> >>>
-> >>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >>> ---
-> >>>  virt/kvm/arm/vgic.c | 9 +++++++--
-> >>>  1 file changed, 7 insertions(+), 2 deletions(-)
-> >>>
-> >>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> >>> index c98cc6b..feef015 100644
-> >>> --- a/virt/kvm/arm/vgic.c
-> >>> +++ b/virt/kvm/arm/vgic.c
-> >>> @@ -1693,8 +1693,13 @@ out:
-> >>>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
-> >>>  			bool level)
-> >>>  {
-> >>> -	if (likely(vgic_ready(kvm)) &&
-> >>> -	    vgic_update_irq_pending(kvm, cpuid, irq_num, level))
-> >>> +	if (unlikely(!vgic_initialized(kvm))) {
-> >>> +		mutex_lock(&kvm->lock);
-> >>> +		vgic_init(kvm);
-> >>> +		mutex_unlock(&kvm->lock);
-> >>> +	}
-> >> I was previously encouraged to test the virtual interrupt controller
-> >> readiness when setting irqfd up(proposal made in
-> >> https://lkml.org/lkml/2014/12/3/601). I guess this becomes useless now,
-> >> correct? Reviewed-by on the whole series.
-> >>
-> > I think we should move to your userspace explicit init for all
-> > non-legacy userspace and only support gicv3 and vfio/irqfd stuff with
-> > userspace explicitly initializing the vgic.
-> 
-> Hi Christoffer,
-> 
-> The use case I have in mind still is VFIO+irqfd:
-> since we cannot preclude the user from ignoring the userspace explicit
-> init and setting up VFIO signaling+irqfd before vgic init, to me there
-> is a risk injection starts even before creation. Either we test
-> irqchip_in_kernel in kvm_vgic_inject_irq or we must have a test when
-> setting up irqfd as proposed in above patch.
+Currently restore_user_regs deallocates the SVC stack early in
+its execution and relies on no exception being taken between
+the deallocation and the registers being restored. The introduction
+of a default FIQ handler that also uses the SVC stack breaks this
+assumption and can result in corrupted register state.
 
-yes, test if the vgic has been initialized when setting up irqfd and
-return an error if not.
+This patch works around the problem by removing the early
+stack deallocation and using r2 as a temporary instead. I have
+not found a way to do this without introducing an extra mov
+instruction to the macro.
 
-> 
-> Actually before being able to inject any virtual IRQ we weed even more:
-> if virtual IRQ settings were not yet defined by the guest we do not know
-> what to do with the IRQ. We must a least know whether it is level or
-> edge. Current irq_cfg bitmap might be insufficient to store the info
-> since it only has 2 states and by chance I use a level-sensitive IRQ and
-> my QEMU pieces pay attention to that sequencing. I guess the problem is
-> the same for user-space injection, isn't it?
-> 
-that's no different from on the hardware is it?  We assume the interrupt
-is what it is (as per its default reset value in GICD_ICFGRn) and when
-the guest boots up, it must reconfigure the interrupt.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
 
-The higher level picture here is that we don't know when the guest is
-done configuring things, from some time before we run any vcpu to some
-time after we've run vcpus, and there is no error return path on
-injecting the IRQ to the VGIC for this sort of matter, so we just have
-to cope with things in the same way that hardware does.
+Notes:
+    I have recently started to hook up the PMU via FIQ (although
+    its slightly hacky at present) and was seeing random userspace
+    SEGVs when perf was running (after ~100,000 or so FIQs).
+    
+    Instrumenting the code eventually revealed that in almost all
+    cases the last FIQ handler to run prior the SEGV had interrupted
+    ret_to_user_from_irq or ret_fast_syscall. Very occasionally it was
+    in the fault handling code (because that code runs as part of SEGV
+    handling and the PMU is instrumenting that too).
+    
+    No SEGV problems have been observed since fixing the issue. This
+    version of the patch has seen >7M FIQs and an older version (based
+    on cpsid f) ran overnight.
+    
 
-My guess is that no sane guests will actually depend on these interrupts
-being raised/lowered before configuring the GIC will have any real
-effect, as all guests should configure the gic, clear that interrupt,
-unmask it, and only then care about things.
+ arch/arm/kernel/entry-header.S | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
--Christoffer
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index 4176df721bf0..1a0045abead7 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -253,21 +253,22 @@
+ 	.endm
+
+ 	.macro	restore_user_regs, fast = 0, offset = 0
+-	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
+-	ldr	lr, [sp, #\offset + S_PC]!	@ get pc
++	mov	r2, sp
++	ldr	r1, [r2, #\offset + S_PSR]	@ get calling cpsr
++	ldr	lr, [r2, #\offset + S_PC]!	@ get pc
+ 	msr	spsr_cxsf, r1			@ save in spsr_svc
+ #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
+ 	@ We must avoid clrex due to Cortex-A15 erratum #830321
+-	strex	r1, r2, [sp]			@ clear the exclusive monitor
++	strex	r1, r2, [r2]			@ clear the exclusive monitor
+ #endif
+ 	.if	\fast
+-	ldmdb	sp, {r1 - lr}^			@ get calling r1 - lr
++	ldmdb	r2, {r1 - lr}^			@ get calling r1 - lr
+ 	.else
+-	ldmdb	sp, {r0 - lr}^			@ get calling r0 - lr
++	ldmdb	r2, {r0 - lr}^			@ get calling r0 - lr
+ 	.endif
+ 	mov	r0, r0				@ ARMv5T and earlier require a nop
+ 						@ after ldm {}^
+-	add	sp, sp, #S_FRAME_SIZE - S_PC
++	add	sp, sp, #\offset + S_FRAME_SIZE
+ 	movs	pc, lr				@ return & move spsr_svc into cpsr
+ 	.endm
+
+--
+1.9.3
