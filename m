@@ -1,47 +1,66 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 12 Dec 2014 15:51:54 +0530
-Subject: [PATCH] Mailbox: Complete wait event only if Tx was successful
-In-Reply-To: <1418242572-20998-1-git-send-email-ashwin.chaugule@linaro.org>
-References: <1418242572-20998-1-git-send-email-ashwin.chaugule@linaro.org>
-Message-ID: <CAJe_ZhcxQffJ16SczB9VRXoDMp7VMAR6fK8JrN=ogniv4tnfnA@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 12 Dec 2014 11:25:49 +0100
+Subject: [PATCH 1/3] ARM: dts: Add power and lid GPIO keys pinctrl for
+ exynos5250-snow
+In-Reply-To: <1418379951-5551-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1418379951-5551-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1418379951-5551-2-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 December 2014 at 01:46, Ashwin Chaugule
-<ashwin.chaugule@linaro.org> wrote:
-> If a wait_for_completion_timeout() call returns due to a timeout,
-> the mbox code can still call complete() after returning from the wait.
-> This can cause subsequent transmissions on a channel to fail, since
-> the wait_for_completion_timeout() sees the completion variable
-> is !=0, caused by the erroneous complete() call, and immediately
-> returns without waiting for the time as expected by the client.
->
-> Fix this by calling complete() only if the TX was successful.
->
-> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> ---
->  drivers/mailbox/mailbox.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-> index 17e9e4a..4acaddb 100644
-> --- a/drivers/mailbox/mailbox.c
-> +++ b/drivers/mailbox/mailbox.c
-> @@ -101,7 +101,7 @@ static void tx_tick(struct mbox_chan *chan, int r)
->         if (mssg && chan->cl->tx_done)
->                 chan->cl->tx_done(chan->cl, mssg, r);
->
-> -       if (chan->cl->tx_block)
-> +       if ((!r) && chan->cl->tx_block)
->                 complete(&chan->tx_complete);
->
-Thanks for finding the bug.
-However the fix is flawed. complete() could also be done from
-mbox_chan_txdone() calling tx_tick(). And if the controller returned
-error, we could never pass on that error code to the user (timeout
-fires and then we will move on with -EIO).
-Since we could never prevent the controller from returning -EIO as the
-error, I think we have to explicitly tell tx_tick() if it needs to
-complete() or not.
+The Exynos5250 Snow Chromebook has GPIO keys for power and lid
+so the SoC I/O pins have to be configured in external interrupt
+mode. Currently, this is working without setting the pinctrl
+lines but is better to set it explicitly instead of relying on
+the previous state of the I/O pins.
 
--Jassi
+The DTS snippets were taken from the downstream ChromeOS tree.
+
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ arch/arm/boot/dts/exynos5250-snow.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index effaf2a..b9aeec4 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -33,6 +33,8 @@
+ 
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&power_key_irq &lid_irq>;
+ 
+ 		power {
+ 			label = "Power";
+@@ -540,6 +542,13 @@
+ };
+ 
+ &pinctrl_0 {
++	power_key_irq: power-key-irq {
++		samsung,pins = "gpx1-3";
++		samsung,pin-function = <0xf>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
+ 	ec_irq: ec-irq {
+ 		samsung,pins = "gpx1-6";
+ 		samsung,pin-function = <0>;
+@@ -575,6 +584,13 @@
+ 		samsung,pin-drv = <0>;
+ 	};
+ 
++	lid_irq: lid-irq {
++		samsung,pins = "gpx3-5";
++		samsung,pin-function = <0xf>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
+ 	hdmi_hpd_irq: hdmi-hpd-irq {
+ 		samsung,pins = "gpx3-7";
+ 		samsung,pin-function = <0>;
+-- 
+2.1.0
