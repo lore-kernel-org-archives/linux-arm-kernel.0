@@ -1,201 +1,85 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 12 Dec 2014 17:27:27 +0900
-Subject: [RFC PATCHv3 2/7] devfreq: event: Add the list of supported
- devfreq-event type
+Date: Fri, 12 Dec 2014 17:27:29 +0900
+Subject: [RFC PATCHv3 4/7] devfreq: event: Add documentation for exynos-ppmu
+ devfreq-event driver
 In-Reply-To: <1418372852-12454-1-git-send-email-cw00.choi@samsung.com>
 References: <1418372852-12454-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1418372852-12454-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1418372852-12454-5-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the list of supported devfreq-event type as following.
-Each devfreq-event device driver would support the various devfreq-event type
-for devfreq governor at the same time.
-- DEVFREQ_EVENT_TYPE_RAW_DATA
-- DEVFREQ_EVENT_TYPE_UTILIZATION
-- DEVFREQ_EVENT_TYPE_BANDWIDTH
-- DEVFREQ_EVENT_TYPE_LATENCY
+This patch adds the documentation for Exynos PPMU (Performance Profiling
+Monitoring Unit) devfreq-event driver.
 
 Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
 Cc: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/devfreq/devfreq-event.c | 44 +++++++++++++++++++++++++++++++++++++----
- include/linux/devfreq.h         | 29 ++++++++++++++++++++++-----
- 2 files changed, 64 insertions(+), 9 deletions(-)
+ .../bindings/devfreq/event/exynos-ppmu.txt         | 56 ++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
 
-diff --git a/drivers/devfreq/devfreq-event.c b/drivers/devfreq/devfreq-event.c
-index eaf59c1..9444f93 100644
---- a/drivers/devfreq/devfreq-event.c
-+++ b/drivers/devfreq/devfreq-event.c
-@@ -29,6 +29,9 @@
- #include <linux/of.h>
- #include "governor.h"
- 
-+#define EVENT_TYPE_RAW_DATA_MAX		U64_MAX
-+#define EVENT_TYPE_UTILIZATION_MAX	100
+diff --git a/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt b/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
+new file mode 100644
+index 0000000..f7e50e5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
+@@ -0,0 +1,56 @@
 +
- static struct class *devfreq_event_class;
- 
- /* The list of all devfreq event list */
-@@ -144,7 +147,8 @@ EXPORT_SYMBOL_GPL(devfreq_event_is_enabled);
-  * Note that this function set the event to the devfreq-event device to start
-  * for getting the event data which could be various event type.
-  */
--int devfreq_event_set_event(struct devfreq_event_dev *edev)
-+int devfreq_event_set_event(struct devfreq_event_dev *edev,
-+				enum devfreq_event_type type)
- {
- 	int ret;
- 
-@@ -158,7 +162,15 @@ int devfreq_event_set_event(struct devfreq_event_dev *edev)
- 		return -EPERM;
- 
- 	mutex_lock(&edev->lock);
--	ret = edev->desc->ops->set_event(edev);
++* Samsung Exynos PPMU (Performance Profiling Monitoring Unit) device
 +
-+	if ((edev->desc->type & type) == 0) {
-+		dev_err(&edev->dev, "unsupported of devfreq-event type\n");
-+		mutex_unlock(&edev->lock);
-+		return -EINVAL;
-+	}
++The Samsung Exynos SoC have PPMU (Performance Profiling Monitoring Unit) for
++each IPs. PPMU provides the primitive values to get performance data. These
++events provide useful information about the behavior of the SoC that you can
++use when analyzing system performance, and made visible and can be counted
++using login in each IP (DMC, CPU, RIGHTBUS, LEFTBUS, CAM interface, LCD, G3D,
++MFC). The Exynos PPMU driver use the devfreq-event class to provide event data
++to various devfreq device. The devfreq device would use the event data when
++derterming the current state of each IP.
 +
-+	ret = edev->desc->ops->set_event(edev, type);
++Required properties:
++- compatible: Should be "samsung,exynos-ppmu".
++- reg: physical base address of each PPMU and length of memory mapped region.
 +
- 	mutex_unlock(&edev->lock);
- 
- 	return ret;
-@@ -174,7 +186,9 @@ EXPORT_SYMBOL_GPL(devfreq_event_set_event);
-  * current event data and total_event should be stored in second parameter
-  * (total_event).
-  */
--u64 devfreq_event_get_event(struct devfreq_event_dev *edev, u64 *total_event)
-+u64 devfreq_event_get_event(struct devfreq_event_dev *edev,
-+				enum devfreq_event_type type,
-+				u64 *total_event)
- {
- 	u64 event;
- 
-@@ -190,7 +204,27 @@ u64 devfreq_event_get_event(struct devfreq_event_dev *edev, u64 *total_event)
- 		return 0;
- 
- 	mutex_lock(&edev->lock);
--	event = edev->desc->ops->get_event(edev, total_event);
++Optional properties:
++- clock-names : the name of clock used by the PPMU, "ppmu"
++- clocks : phandles for clock specified in "clock-names" property
++- #clock-cells: should be 1.
 +
-+	if ((edev->desc->type & type) == 0) {
-+		dev_err(&edev->dev, "unsupported of devfreq-event type\n");
-+		return -EINVAL;
-+	}
++Example : Examples of PPMU nodes are listed below.
 +
-+	event = edev->desc->ops->get_event(edev, type, total_event);
++		ppmu_dmc0: ppmu_dmc0 at 106a0000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x106a0000 0x2000>;
++			status = "disabled";
++		};
 +
-+	switch (type) {
-+	case DEVFREQ_EVENT_TYPE_RAW_DATA:
-+	case DEVFREQ_EVENT_TYPE_BANDWIDTH:
-+	case DEVFREQ_EVENT_TYPE_LATENCY:
-+		if ((event > *total_event)
-+			|| ((event > EVENT_TYPE_RAW_DATA_MAX) ||
-+				*total_event > EVENT_TYPE_RAW_DATA_MAX))
-+			event = 0;
-+	case DEVFREQ_EVENT_TYPE_UTILIZATION:
-+		if (event > EVENT_TYPE_UTILIZATION_MAX)
-+			event = 0;
-+	}
++		ppmu_dmc1: ppmu_dmc1 at 106b0000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x106b0000 0x2000>;
++			status = "disabled";
++		};
 +
- 	mutex_unlock(&edev->lock);
- 
- 	return event;
-@@ -215,8 +249,10 @@ int devfreq_event_reset_event(struct devfreq_event_dev *edev)
- 		return -EPERM;
- 
- 	mutex_lock(&edev->lock);
++		ppmu_cpu: ppmu_cpu at 106c0000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x106c0000 0x2000>;
++			status = "disabled";
++		};
 +
- 	if (edev->desc->ops && edev->desc->ops->reset)
- 		ret = edev->desc->ops->reset(edev);
++		ppmu_rightbus: ppmu_rightbus at 112a0000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x112a0000 0x2000>;
++			clocks = <&cmu CLK_PPMURIGHT>;
++			clock-names = "ppmu";
++			status = "disabled";
++		};
 +
- 	mutex_unlock(&edev->lock);
- 
- 	if (ret < 0)
-diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
-index a8d2277..82da235 100644
---- a/include/linux/devfreq.h
-+++ b/include/linux/devfreq.h
-@@ -197,6 +197,14 @@ struct devfreq_event_dev {
- 	const struct devfreq_event_desc *desc;
- };
- 
-+/* The supported type by devfreq-event device */
-+enum devfreq_event_type {
-+	DEVFREQ_EVENT_TYPE_RAW_DATA	= BIT(0),
-+	DEVFREQ_EVENT_TYPE_UTILIZATION	= BIT(1),
-+	DEVFREQ_EVENT_TYPE_BANDWIDTH	= BIT(2),
-+	DEVFREQ_EVENT_TYPE_LATENCY	= BIT(3),
-+};
-+
- /**
-  * struct devfreq_event_ops - the operations of devfreq-event device
-  *
-@@ -219,8 +227,10 @@ struct devfreq_event_ops {
- 	int (*reset)(struct devfreq_event_dev *event_dev);
- 
- 	/* Mandatory functions */
--	int (*set_event)(struct devfreq_event_dev *event_dev);
--	u64 (*get_event)(struct devfreq_event_dev *event_dev, u64 *total_event);
-+	int (*set_event)(struct devfreq_event_dev *event_dev,
-+			enum devfreq_event_type type);
-+	u64 (*get_event)(struct devfreq_event_dev *event_dev,
-+			enum devfreq_event_type type, u64 *total_event);
- };
- 
- /**
-@@ -228,6 +238,10 @@ struct devfreq_event_ops {
-  *
-  * @name	: the name of devfreq-event device.
-  * @driver_data	: the private data for devfreq-event driver.
-+ * @event_type	: the supported devfreq-event type among as following
-+ *		  - DEVFREQ_EVENT_TYPE_UTILIZATION
-+ *		  - DEVFREQ_EVENT_TYPE_BANDWIDTH
-+ *		  - DEVFREQ_EVENT_TYPE_LATENCY
-  * @ops		: the operation to control devfreq-event device.
-  *
-  * Each devfreq-event device is described with a this structure.
-@@ -236,6 +250,7 @@ struct devfreq_event_ops {
- struct devfreq_event_desc {
- 	const char *name;
- 	void *driver_data;
-+	enum devfreq_event_type type;
- 
- 	struct devfreq_event_ops *ops;
- };
-@@ -273,8 +288,10 @@ extern void devm_devfreq_unregister_opp_notifier(struct device *dev,
- extern int devfreq_event_enable_edev(struct devfreq_event_dev *edev);
- extern int devfreq_event_disable_edev(struct devfreq_event_dev *edev);
- extern bool devfreq_event_is_enabled(struct devfreq_event_dev *edev);
--extern int devfreq_event_set_event(struct devfreq_event_dev *edev);
-+extern int devfreq_event_set_event(struct devfreq_event_dev *edev,
-+				enum devfreq_event_type type);
- extern u64 devfreq_event_get_event(struct devfreq_event_dev *edev,
-+				enum devfreq_event_type type,
- 				u64 *total_event);
- extern int devfreq_event_reset_event(struct devfreq_event_dev *edev);
- extern void *devfreq_event_get_drvdata(struct devfreq_event_dev *edev);
-@@ -397,13 +414,15 @@ static inline bool devfreq_event_is_enabled(struct devfreq_event_dev *edev);
- 	return false;
- }
- 
--static inline int devfreq_event_set_event(struct devfreq_event_dev *edev);
-+static inline int devfreq_event_set_event(struct devfreq_event_dev *edev,
-+					enum devfreq_event_type type)
- {
- 	return -EINVAL;
- }
- 
- static inline u64 devfreq_event_get_event(struct devfreq_event_dev *edev
--					u64 *total_event);
-+					enum devfreq_event_type type,
-+					u64 *total_event)
- {
- 	return 0;
- }
++		ppmu_leftbus: ppmu_leftbus0 at 116a0000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x116a0000 0x2000>;
++			clocks = <&cmu CLK_PPMULEFT>;
++			clock-names = "ppmu";
++			status = "disabled";
++		};
 -- 
 1.8.5.5
