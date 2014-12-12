@@ -1,57 +1,94 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Fri, 12 Dec 2014 22:05:37 +0900
-Subject: [PATCH v5 1/3] gpio: Cygnus: define Broadcom Cygnus GPIO binding
-In-Reply-To: <1918116.UxUgDPTmcq@wuerfel>
-References: <1418342706-14755-2-git-send-email-rjui@broadcom.com>
- <1918116.UxUgDPTmcq@wuerfel>
-Message-ID: <CAAVeFuL2MKRA7YLm_wsyftNy-sxgEYPrmqBm8XTRZQb66YF-qw@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 12 Dec 2014 14:15:58 +0100
+Subject: [linux-sunxi] [PATCHv2 0/3] ARM:sunxi:ps2 Added support for
+ A10/A20 ps2 controller.
+In-Reply-To: <1417907719-26775-1-git-send-email-VishnuPatekar0510@gmail.com>
+References: <1417907719-26775-1-git-send-email-VishnuPatekar0510@gmail.com>
+Message-ID: <548AEA8E.6040100@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 12, 2014 at 9:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 11 December 2014 16:05:04 Ray Jui wrote:
->> +
->> +- linux,gpio-base:
->> +    Base GPIO number of this controller
->> +
->>
+Hi,
+
+On 07-12-14 00:15, vishnupatekar wrote:
+> Here is v2 of SUNXI PS2 controller support patch-set as with v1.
+
+So as promised I've run this on an A10 board, with a small fix to
+the interrupt property in the sun4i.dtsi file this works as is.
+
+This means that the sun7i compat should be dropped, and the sun4i
+compat used everywhere.
+
+I've created 3 fixup patches to do this, note one also renames / moves
+the bindings file as it is in the wrong place.
+
+I've attached the 3 fixup patches, pleasesquash these into your
+existing patches before posting the next version.
+
+Thanks & Regards,
+
+Hans
+
+
 >
-> We've NAK'ed properties like this multiple times before, and it
-> doesn't get any better this time. What are you trying to achieve
-> here?
-
-I am to blame for suggesting using this property to Ray, and I am
-fully aware that this has been rejected before, but look at what
-people came with recently to palliate the lack of control over the
-GPIO number space for DT platforms:
-
-http://www.spinics.net/lists/arm-kernel/msg384847.html
-https://lkml.org/lkml/2014/12/10/133
-
-Right now GPIO numbering for platforms using DT is a very inconsistent
-process, subject to change by the simple action of adjusting the value
-of ARCH_NR_GPIOS (which we did recently, btw), adding a new GPIO
-controller, or changing the probe order of devices. For users of the
-integer or sysfs interfaces, this results in GPIO numbers that change,
-and drivers and/or user-space programs that behave incorrectly.
-Ironically, the only way to have consistent numbers is to use the old
-platform files, where you can specify the base number of a gpio_chip.
-
-DT is actually probably not such a bad place to provide consistency in
-GPIO numbering. It has a global vision of the system layout, including
-all GPIO controllers and the number of GPIOs they include, and thus
-can make informed decisions. It provides a consistent result
-regardless of probe order. And allowing it to assign GPIO bases to
-controllers will free us from the nonsensical dependency of some
-arbitrary upper-bound for GPIO numbers that ARCH_NR_GPIOS imposes on
-us. Also about ARCH_NR_GPIOS, the plan is to eventually remove it
-since we don't need it anymore after the removal of the global
-gpio_descs array. This will again interfere with the numbering of GPIO
-chips that do not have a base number provided.
-
-Note that I don't really like this, either - but the problem is the
-GPIO integer interface. Until everyone has upgraded to gpiod and we
-have a replacement for the current sysfs interface (this will take a
-while) we have to cope with this. This issue has been bothering users
-for years, so this time I'd like to try and solve it the less ugly
-way. If there is a better solution, of course I'm all for it.
+> Changes in v2:
+> 1. added default n depends on ARCH_SUNXI || COMPILE_TEST in Kconfig.
+> 2. handled errors and free resources on errors.
+> 3. used BIT(x), DIV_ROUND_UP macros.
+> 4. corrected style errors.
+> 5. added support for A10 also, A10 and A2 have same properties of PS2 controller.
+> 6. by default commented ps20 and ps21 nodes,as ps20 pins conflict with HDMI
+>     connector on Lime2 Board.
+> 7. added compatible as allwinner,sun4i-a10-ps2.
+> 8. corrected the possible race condition.
+>
+> Patch 0 Summary: Allwinner A10/A20 PS2 controller. These modifications are
+> 	for PS2 host controller. IBM compliant IBM PS2 and AT-compatible
+> 	keyboard and mouse can be connected.
+>
+> Patch 1 device tree bindings.
+>
+> Patch 2 adds support for sun7i ps2 driver.
+>
+> Patch 3 device tree support for PS2 controller.
+>   1) Added A10/A20 ps2 nodes to the dtsi
+>   2) Added A10/A20 ps2 pinmux to the dtsi
+>   3) Added ps2 nodes to the lime2 dts file
+>
+> vishnupatekar (3):
+>    sunxi:dts-bindings:input:ps2 bindings for A10/A20 ps2.
+>    sunxi:drivers:input:ps2 Added sunxi A10/A20 ps2 driver
+>    ARM:dts:sunxi:ps2 dt nodes for A10/A20 PS2 controller.
+>
+>   .../bindings/input/allwinner,sunxi-ps2.txt         |   23 ++
+>   arch/arm/boot/dts/sun4i-a10.dtsi                   |   27 ++
+>   arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts    |   13 +
+>   arch/arm/boot/dts/sun7i-a20.dtsi                   |   29 ++
+>   drivers/input/serio/Kconfig                        |   10 +
+>   drivers/input/serio/Makefile                       |    1 +
+>   drivers/input/serio/sunxi-ps2.c                    |  364 ++++++++++++++++++++
+>   7 files changed, 467 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/input/allwinner,sunxi-ps2.txt
+>   create mode 100644 drivers/input/serio/sunxi-ps2.c
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-FIXUP-sunxi-dts-bindings-input-ps2-bindings-for-A10-.patch
+Type: text/x-patch
+Size: 3234 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141212/b78f904f/attachment-0003.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-FIXUP-sunxi-drivers-input-ps2-Added-sunxi-A10-A20-ps.patch
+Type: text/x-patch
+Size: 1147 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141212/b78f904f/attachment-0004.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0003-FIXUP-ARM-dts-sunxi-ps2-dt-nodes-for-A10-A20-PS2-con.patch
+Type: text/x-patch
+Size: 2258 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141212/b78f904f/attachment-0005.bin>
