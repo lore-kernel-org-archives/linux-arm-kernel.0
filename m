@@ -1,163 +1,124 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Fri, 12 Dec 2014 16:08:25 +0800
-Subject: [PATCH 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
- board dts and Makefile
-In-Reply-To: <20141211180245.GE28150@leverpostej>
-References: <1418208602-35584-1-git-send-email-eddie.huang@mediatek.com>
- <1418208602-35584-4-git-send-email-eddie.huang@mediatek.com>
- <20141211180245.GE28150@leverpostej>
-Message-ID: <1418371705.423.31.camel@mtksdaap41>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 12 Dec 2014 17:11:21 +0900
+Subject: [RFC PATCHv2 0/7] devfreq: Add devfreq-event class to provide raw
+ data for devfreq device
+In-Reply-To: <CAGTfZH3DoSCTTgW-6o3na_mO2-scrV1JftpdTM5u3w=EunLfaA@mail.gmail.com>
+References: <1418134386-14681-1-git-send-email-cw00.choi@samsung.com>
+ <1418206046.16644.26.camel@AMDC1943>
+ <CAGTfZH3DoSCTTgW-6o3na_mO2-scrV1JftpdTM5u3w=EunLfaA@mail.gmail.com>
+Message-ID: <548AA329.80002@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Krzysztof,
 
-On Thu, 2014-12-11 at 18:02 +0000, Mark Rutland wrote:
-> Hi,
+On 12/10/2014 10:21 PM, Chanwoo Choi wrote:
+> Hi Krzysztof,
 > 
-> On Wed, Dec 10, 2014 at 10:50:01AM +0000, Eddie Huang wrote:
-> > Add device tree support for MT8173 SoC and evalutaion board based on it.
-> > 
-> > +/ {
-> > +	model = "mediatek,mt8173-evb";
-> > +
-> > +	aliases {
-> > +		serial0 = &uart0;
-> > +		serial1 = &uart1;
-> > +		serial2 = &uart2;
-> > +		serial3 = &uart3;
+> On Wed, Dec 10, 2014 at 7:07 PM, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+>> On wto, 2014-12-09 at 23:12 +0900, Chanwoo Choi wrote:
+>>> This patchset add new devfreq_event class to provide raw data to determine
+>>> current utilization of device  which is used for devfreq governor.
+>>>
+>>> [Description of devfreq-event class]
+>>> This patchset add new devfreq_event class for devfreq_event device which provide
+>>> raw data (e.g., memory bus utilization/GPU utilization). This raw data from
+>>> devfreq_event data would be used for the governor of devfreq subsystem.
+>>> - devfreq_event device : Provide raw data for governor of existing devfreq device
+>>> - devfreq device       : Monitor device state and change frequency/voltage of device
+>>>                          using the raw data from devfreq_event device
+>>>
+>>> The devfreq subsystem support generic DVFS(Dynamic Voltage/Frequency Scaling)
+>>> for Non-CPU Devices. The devfreq device would dertermine current device state
+>>> using various governor (e.g., ondemand, performance, powersave). After completed
+>>> determination of system state, devfreq device would change the frequency/voltage
+>>> of devfreq device according to the result of governor.
+>>>
+>>> But, devfreq governor must need basic data which indicates current device state.
+>>> Existing devfreq subsystem only consider devfreq device which check current system
+>>> state and determine proper system state using basic data. There is no subsystem
+>>> for device providing basic data to devfreq device.
+>>>
+>>> The devfreq subsystem must need devfreq_event device(data-provider device) for
+>>> existing devfreq device. So, this patch add new devfreq_event class for
+>>> devfreq_event device which read various basic data(e.g, memory bus utilization,
+>>> GPU utilization) and provide measured data to existing devfreq device through
+>>> standard APIs of devfreq_event class.
+>>>
+>>> The following description explains the feature of two kind of devfreq class:
+>>> - devfreq class (existing)
+>>>  : devfreq consumer device use raw data from devfreq_event device for
+>>>    determining proper current system state and change voltage/frequency
+>>>    dynamically using various governors.
+>>> - devfreq_event class (new)
+>>>  : Provide measured raw data to devfreq device for governor
+>>>
+>>> Also, the devfreq-event device would support various type event as following:
+>>>  : DEVFREQ_EVENT_TYPE_RAW_DATA
+>>>  : DEVFREQ_EVENT_TYPE_UTILIZATION
+>>>  : DEVFREQ_EVENT_TYPE_BANDWIDTH
+>>>  : DEVFREQ_EVENT_TYPE_LATENCY
+>>>
+>>> [For example]
+>>> If board dts includes PPMU_DMC0/DMC1/CPU event node,
+>>> would show following sysfs entry. Also devfreq driver(e.g., exynos4_bus.c)
+>>> can get the instance of devfreq-event device by using provided API and then
+>>> get raw data which reflect the current state of device.
+>>>
+>>
+>> Hi,
+>>
+>> Overall I like the idea. I understand that now devfreq devices (like
+>> exynos devfreq) should bind themselves to buses, not to PPMU. It makes
+>> sense to me because bus clock and bus voltage are properties of bus, not
+>> monitoring unit.
+>>
+>> I see that this is still a RFC so it would be hard to base current
+>> devfreq work on top of it.
 > 
-> Do any of these support earlycon?
+> The goal of this patch set is not for devfreq device. This patch set
+> just is used for
+> devfreq-event device according to patch description.
+> 
+> The devfreq must need devfreq-event device (e.g., exynos-ppmu.c)
+> but current devfreq subsystem have not been supported any reason for
+> exyons-ppmu.c as devfreq-event device.
+> 
+> I discussed this same issue on following patch[1] which was posted to support
+> exynos4 busfreq by me.
+> [1] https://lkml.org/lkml/2014/3/14/132
+> - [PATCHv2 8/8] devfreq: exynos4: Add busfreq driver for exynos4210/exynos4x12
+> After discussion, I thought that devfreq-event class must be needed
+> before supporting
+> the dt of devfreq device.
+> 
+> So, I think that devfreq have to support the devfreq-event subsystem
+> for exynos-ppmu. And then I'll work to support the device-tree of devfreq device
+> as next job.
+> 
+>>
+>> One more general comment: you're adding a some API which is not used by
+>> current devfreq_event user (exynos). For example the exclusive flag or
+>> event types. I think it will be simpler to stick to the basic approach
+>> (reduced API). If some other user emerges then new API will be added.
+> 
+> I think that devfreq-event must support both event_flag(e.g., exclusive flag)
+> and event_type(e.g., raw_data, utilization, bandwidth, latency) because
+> devfreq-event device (e.g., exynos-ppmu) would provide various event data.
+> For example, exynos-ppmu driver could support the utilization/bandwidth/latency
+> of each IP of Exynos SoC. I checked PPMU IP on Exynos TRM.
+> 
+> Also, If specific devfreq-event device should be used on only one device driver,
+> devfrewq-event class have to support 'exclusive' flag. If
+> devfreq-event class don't
+> support the exclusive flag, devfreq-event could not guarantee the
+> integrity of event
+> from devfreq-event device.
 
-Not yet
+I'll drop 'exclusive' flag according to your comment.
 
-> 
-> > +	};
-> > +
-> > +	memory {
-> 
-> Nit: should be memory at 40000000 (and you'll need to add device_type =
-> "memory").
-> 
-> > +		reg = <0 0x40000000 0 0x40000000>;
-> > +	};
+Thanks for your review.
 
-skeleton.dtsi already has /memory node with address-cells=2,
-size-cells=1, which will cause build warning if I change to use
-memory at 40000000, because we use size-cells=2. I will not include
-skeleton.dtsi and follow your suggestion in next version.
-
-> > +
-> > +#include "skeleton.dtsi"
-> > +
-> > +/ {
-> > +	compatible = "mediatek,mt8173";
-> > +	interrupt-parent = <&sysirq>;
-> > +	#address-cells = <2>;
-> > +	#size-cells = <2>;
-> > +
-> > +	cpu-map {
-> 
-> This should live under /cpus, as documented in
-> Documentation/devicetree/bindings/arm/topology.txt.
-
-Got it, fix next version
-
-> > +
-> > +	psci {
-> > +		compatible = "arm,psci-0.2";
-> > +		method = "smc";
-> > +	};
-> 
-> What are you using as your PSCI 0.2 implementation?
-> 
-> Is it fully compliant? (e.g. are the reset and power off functions
-> implemented, may CPU0 be hotplugged)?
-> 
-> Given only portions of the GIC seem to be described below, what
-> exception level is your kernel entered at? Per the spec it should be
-> EL2, but given the brokenness below with the GIC I'm suspicious.
-> 
-
-Currently we only implement CPU boot, no power off, no CPU0 hotplug
-either. And enter kernel at EL2. Actually, we run ATF in EL3, then
-switch to EL2 to run lk and kernel.
-
-> > +
-> > +	clocks {
-> 
-> Please remove the clock container node. It serves no purpose whatsoever.
-> 
-> Just put these clocks directly under the root.
-
-Got it, fix next version
-
-> > +
-> > +		uart_clk: dummy26m {
-> > +			compatible = "fixed-clock";
-> > +			clock-frequency = <26000000>;
-> > +			#clock-cells = <0>;
-> > +		};
-> > +	};
-> > +
-> > +	timer {
-> > +		compatible = "arm,armv8-timer";
-> > +		interrupt-parent = <&gic>;
-> > +		interrupts = <1 13 0x8>,
-> > +			     <1 14 0x8>,
-> > +			     <1 11 0x8>,
-> > +			     <1 10 0x8>;
-> 
-> Shouldn't these have a non-zero cpu mask?
-
-Yes, should have non-zero cpu mask
-
-> 
-> > +		clock-frequency = <13000000>;
-> 
-> Your firmware should be programming CNTFREQ_EL0, so you shouldn't need
-> this (PSCI 0.2 requires CNTFREQ_EL0 to be programmed correctly on all
-> CPUs).
-
-Yes, I remove and test ok in my platform
-
-> 
-> > +	};
-> > +
-> > +	soc {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <2>;
-> > +		compatible = "simple-bus";
-> > +		ranges;
-> > +
-> > +		sysirq: intpol-controller at 10200620 {
-> > +			compatible = "mediatek,mt8173-sysirq", "mediatek,mt6577-sysirq";
-> > +			interrupt-controller;
-> > +			#interrupt-cells = <3>;
-> > +			interrupt-parent = <&gic>;
-> > +			reg = <0 0x10200620 0 0x20>;
-> > +		};
-> > +
-> > +		gic: interrupt-controller at 10220000 {
-> > +			compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
-> 
-> Surely this should be "arm,gic-400"?
-
-Yes, it should be "arm,gic-400", sorry for my mistake.
-
-> 
-> > +			#interrupt-cells = <3>;
-> > +			interrupt-parent = <&gic>;
-> > +			interrupt-controller;
-> > +			reg = <0 0x10221000 0 0x1000>,
-> > +			      <0 0x10222000 0 0x1000>,
-> > +			      <0 0x10200620 0 0x1000>;
-> 
-> You're missing GICV here, and that GICH address is fundamentally wrong
-> (it _must_ be page aligned). 
-> 
-> The CPU interface (and virtual CPU interface) should be 0x2000 long.
-> 
-> The GIC maintenance interrupt also seems to be missing.
-
-I will fix in next version
+Best Regards,
+Chanwoo Choi
