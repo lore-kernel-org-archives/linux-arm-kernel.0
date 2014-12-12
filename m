@@ -1,78 +1,48 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 12 Dec 2014 16:03:21 -0600
-Subject: [RFC PATCH 2/3] soc: ti: Add wkup_m3_ipc driver
-In-Reply-To: <2763467.KfXHXHxPJd@wuerfel>
-References: <cover.1417029919.git.d-gerlach@ti.com>
- <3334d8483dca2d061cf43da9c047ec27f31e8719.1417029919.git.d-gerlach@ti.com>
- <2763467.KfXHXHxPJd@wuerfel>
-Message-ID: <548B6629.6050203@ti.com>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Fri, 12 Dec 2014 17:08:07 -0500
+Subject: [PATCH 0/2] ARM: omap5/dra7xx counter frequency fixes
+Message-ID: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2014 03:51 PM, Arnd Bergmann wrote:
-> On Wednesday 26 November 2014 15:38:09 Dave Gerlach wrote:
->> +
->> +static const struct wkup_m3_wakeup_src wakeups[] = {
->> +       {.irq_nr = 35,  .src = "USB0_PHY"},
->> +       {.irq_nr = 36,  .src = "USB1_PHY"},
->> +       {.irq_nr = 40,  .src = "I2C0"},
->> +       {.irq_nr = 41,  .src = "RTC Timer"},
->> +       {.irq_nr = 42,  .src = "RTC Alarm"},
->> +       {.irq_nr = 43,  .src = "Timer0"},
->> +       {.irq_nr = 44,  .src = "Timer1"},
->> +       {.irq_nr = 45,  .src = "UART"},
->> +       {.irq_nr = 46,  .src = "GPIO0"},
->> +       {.irq_nr = 48,  .src = "MPU_WAKE"},
->> +       {.irq_nr = 49,  .src = "WDT0"},
->> +       {.irq_nr = 50,  .src = "WDT1"},
->> +       {.irq_nr = 51,  .src = "ADC_TSC"},
->> +       {.irq_nr = 0,   .src = "Unknown"},
->> +};
->>
-> 
-> This seems awfully specific to some SoC version, and not aware of
-> IRQ domains. It also seems to be only used in a dev_dbg statement,
-> so I guess you could just kill this off entirely.
+While trying to deal with errata i856 on the dra7xx I encountered some
+obvious typos in the frequencies checked in timer.c, so those are being
+fixed in case anyone ever tries to use one of them.
 
-This is determined by the firmware in use on the remote processor and works for
-both am335x and am437x. However it is not required information and I'd be fine
-with taking it out.
+Also implement a fix for errata i856.  Without the fix the time on the
+system will get ahead by 43 seconds per day if SYSCLK1 is 20MHz, which it
+is on the EVM boards as well as the other boards I am currently aware of.
+ntp declares that the system time drifts by over 500ppm (the maximum
+ntp will tolerate).
 
-> 
->> +static struct rproc *wkup_m3_get_rproc(struct device *dev)
->> +{
->> +       struct device_node *node;
->> +       struct rproc *rp;
->> +
->> +       node = of_parse_phandle(dev->of_node, "ti,rproc", 0);
->> +       if (!node)
->> +               return NULL;
->> +
->> +       dev = bus_find_device(&platform_bus_type, NULL, node, match);
->> +       if (!dev)
->> +               return NULL;
->> +
->> +       rp = dev_get_drvdata(dev);
->> +       return rp;
-> 
-> This is wrong on a number of levels. I suspect what you really want
-> is an interface exported from drivers/remoteproc that looks up
-> a 'struct rproc' and performs the necessary reference counting.
-> 
-> That one can just use of_find_node_by_phandle() to get to
-> a device_node and use that to look up the rproc device in
-> a linked list it maintains.
+To fix it, check the status register to determine if the 32.768KHz clock
+source is real (driven by an external crystal) or emulated (SYSCLK1 /
+610), and if it is emulated use the appropriate numerator and divisor
+to make the fine master counter match the coarse master counter (which
+is driven directly from the 32KHz clock (real or emulated) with a fixed
+multiplier of 375 / 2).  Making the fine counter run at a frequency
+different from the coarse counter is not an option, as the value in the
+fine counter is updated to match the coarse counter if they ever get
+out of sync.
 
-Added Ohad as I should have cc'd him in the first place..
+With 19.2MHz installed on the board, the clock runs almost 5% slow.
 
-Yes I agree that it's not the best solution. There used to be an
-rproc_get/rproc_put api but that was removed, I'll look into adding
-rproc_get_by_phandle into drivers/remoteproc as that would be ideal for this
-situation and a cleaner way of doing it. Thanks for the comments.
+With the change in place, ntp runs with a drift of around 3ppm on all
+boards I have tried which is well within the spec of the crystals used
+for SYSCLK1.
 
-Regards,
-Dave
+Even if the errata is fixed in future revisions of the chip, there is
+still the option of someone purposely not connecting a 32.768KHz crystal
+to save cost or board space, and relying on the emulated clock instead,
+in which case this correction will still be necessary.
 
-> 
-> 	Arnd
-> 
+Len Sorensen (2):
+  ARM: omap5/dra7xx: Fix frequency typos.
+  ARM: omap5/dra7xx: Fix counter frequency drift for AM572x errata
+    i856.
+
+ arch/arm/mach-omap2/timer.c |  120 +++++++++++++++++++++++++++++++------------
+ 1 file changed, 87 insertions(+), 33 deletions(-)
+
+-- 
+1.7.10.4
