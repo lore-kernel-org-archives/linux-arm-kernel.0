@@ -1,92 +1,54 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 12 Dec 2014 16:14:30 +0100
-Subject: [PATCH] sun9i: clk: Fix compile error caused by "clk: sunxi: Give
- sunxi_factors_register a registers parameter"
-Message-ID: <1418397270-9254-1-git-send-email-hdegoede@redhat.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 12 Dec 2014 23:15:56 +0800
+Subject: [PATCH v3] irqchip: mtk-sysirq: Use IS_ERR() instead of NULL pointer
+ check
+In-Reply-To: <1418205302-22531-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1418205302-22531-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1418397356-29634-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My "clk: sunxi: Give sunxi_factors_register a registers parameter" patch did
-not adjust the sunxi_factors_clock register calls in the new clk-sun9i-core.c
-clock code, causing compilation errors. This fixes this.
+Hi,
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Small fix to the commit message and the reported by tag, the code stay
+the same.
+
+Thanks
+
+Joe.C
+
+=============================================
+Beniamino noticed a bug that an invalid DT file for the mediatek
+interrupt polarity extension will cause kernel oops.
+
+The reason is that the interrupt polarity support for mediatek chips
+merely checks for NULL pointer instead of a casted error return
+value in mtk_sysirq_of_init() so any other casted error value passes
+the NULL pointer check and causes a kernel panic when dereferenced.
+
+Use IS_ERR() and return the error value via PTR_ERR().
+
+Reported-by: Beniamino Galvani <b.galvani@gmail.com>
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 ---
- drivers/clk/sunxi/clk-sun9i-core.c | 27 ++++++++++++++++++++++-----
- 1 file changed, 22 insertions(+), 5 deletions(-)
+ drivers/irqchip/irq-mtk-sysirq.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/sunxi/clk-sun9i-core.c b/drivers/clk/sunxi/clk-sun9i-core.c
-index 3cb9036..3b4495c 100644
---- a/drivers/clk/sunxi/clk-sun9i-core.c
-+++ b/drivers/clk/sunxi/clk-sun9i-core.c
-@@ -22,6 +22,21 @@
+diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
+index 7e342df..0b0d2c0 100644
+--- a/drivers/irqchip/irq-mtk-sysirq.c
++++ b/drivers/irqchip/irq-mtk-sysirq.c
+@@ -137,9 +137,9 @@ static int __init mtk_sysirq_of_init(struct device_node *node,
+ 		return -ENOMEM;
  
- #include "clk-factors.h"
+ 	chip_data->intpol_base = of_io_request_and_map(node, 0, "intpol");
+-	if (!chip_data->intpol_base) {
++	if (IS_ERR(chip_data->intpol_base)) {
+ 		pr_err("mtk_sysirq: unable to map sysirq register\n");
+-		ret = -ENOMEM;
++		ret = PTR_ERR(chip_data->intpol_base);
+ 		goto out_free;
+ 	}
  
-+static clk *sun9i_factors_register(struct device_node *node,
-+				   const struct factors_data *data,
-+				   spinlock_t *lock)
-+{
-+	void __iomem *reg;
-+
-+	reg = of_iomap(node, 0);
-+	if (!reg) {
-+		pr_err("Could not get registers for factors-clk: %s\n",
-+		       node->name);
-+		return NULL;
-+	}
-+
-+	sunxi_factors_register(node, data, lock, reg);
-+}
- 
- /**
-  * sun9i_a80_get_pll4_factors() - calculates n, p, m factors for PLL1
-@@ -89,7 +104,7 @@ static DEFINE_SPINLOCK(sun9i_a80_pll4_lock);
- 
- static void __init sun9i_a80_pll4_setup(struct device_node *node)
- {
--	sunxi_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
-+	sun9i_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
- }
- CLK_OF_DECLARE(sun9i_a80_pll4, "allwinner,sun9i-a80-pll4-clk", sun9i_a80_pll4_setup);
- 
-@@ -139,8 +154,10 @@ static DEFINE_SPINLOCK(sun9i_a80_gt_lock);
- 
- static void __init sun9i_a80_gt_setup(struct device_node *node)
- {
--	struct clk *gt = sunxi_factors_register(node, &sun9i_a80_gt_data,
-+	struct clk *gt = sun9i_factors_register(node, &sun9i_a80_gt_data,
- 						&sun9i_a80_gt_lock);
-+	if (!gt)
-+		return;
- 
- 	/* The GT bus clock needs to be always enabled */
- 	__clk_get(gt);
-@@ -194,7 +211,7 @@ static DEFINE_SPINLOCK(sun9i_a80_ahb_lock);
- 
- static void __init sun9i_a80_ahb_setup(struct device_node *node)
- {
--	sunxi_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
-+	sun9i_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
- }
- CLK_OF_DECLARE(sun9i_a80_ahb, "allwinner,sun9i-a80-ahb-clk", sun9i_a80_ahb_setup);
- 
-@@ -210,7 +227,7 @@ static DEFINE_SPINLOCK(sun9i_a80_apb0_lock);
- 
- static void __init sun9i_a80_apb0_setup(struct device_node *node)
- {
--	sunxi_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
-+	sun9i_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
- }
- CLK_OF_DECLARE(sun9i_a80_apb0, "allwinner,sun9i-a80-apb0-clk", sun9i_a80_apb0_setup);
- 
-@@ -266,6 +283,6 @@ static DEFINE_SPINLOCK(sun9i_a80_apb1_lock);
- 
- static void __init sun9i_a80_apb1_setup(struct device_node *node)
- {
--	sunxi_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
-+	sun9i_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
- }
- CLK_OF_DECLARE(sun9i_a80_apb1, "allwinner,sun9i-a80-apb1-clk", sun9i_a80_apb1_setup);
 -- 
-2.1.0
+1.8.1.1.dirty
