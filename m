@@ -1,66 +1,77 @@
-From: lyz@rock-chips.com (Yunzhi Li)
-Date: Fri, 12 Dec 2014 23:00:08 +0800
-Subject: [PATCH v7 0/5] Patches to add support for Rockchip usb PHYs.
-Message-ID: <1418396413-27937-1-git-send-email-lyz@rock-chips.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 12 Dec 2014 15:06:08 +0000
+Subject: [PATCH] arm64: psci: Fix build breakage without PM_SLEEP
+In-Reply-To: <20141209161511.GI31129@e104818-lin.cambridge.arm.com>
+References: <1418125716-18528-1-git-send-email-k.kozlowski@samsung.com>
+ <2290734.BRljGaICu4@wuerfel> <1418128689.19339.3.camel@AMDC1943>
+ <20141209161511.GI31129@e104818-lin.cambridge.arm.com>
+Message-ID: <20141212150608.GA4853@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Dec 09, 2014 at 04:15:11PM +0000, Catalin Marinas wrote:
+> On Tue, Dec 09, 2014 at 12:38:09PM +0000, Krzysztof Kozlowski wrote:
+> > On wto, 2014-12-09 at 13:29 +0100, Arnd Bergmann wrote:
+> > > On Tuesday 09 December 2014 12:48:36 Krzysztof Kozlowski wrote:
+> > > > Fix build failure of defconfig when PM_SLEEP is disabled (e.g. by
+> > > > disabling SUSPEND) and CPU_IDLE enabled:
+> > > > 
+> > > > arch/arm64/kernel/psci.c:543:2: error: unknown field 'cpu_suspend' specified in initializer
+> > > >   .cpu_suspend = cpu_psci_cpu_suspend,
+> > > >   ^
+> > > > arch/arm64/kernel/psci.c:543:2: warning: initialization from incompatible pointer type [enabled by default]
+> > > > arch/arm64/kernel/psci.c:543:2: warning: (near initialization for 'cpu_psci_ops.cpu_prepare') [enabled by default]
+> > > > make[1]: *** [arch/arm64/kernel/psci.o] Error 1
+> > > > 
+> > > > The cpu_operations.cpu_suspend field exists only if ARM64_CPU_SUSPEND is
+> > > > defined, not CPU_IDLE.
+> > > > 
+> > > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > > > 
+> > > 
+> > > No objection to fixing this obvious build bug, but why do we even have
+> > > an ARM64_CPU_SUSPEND option? On ARM32 we only have the respective option
+> > > because we have a random collection of platform specific drivers that
+> > > use the symbols, but that's not the case on ARM64.
+> > 
+> > I believe because of cpuidle. It's the same as on ARM32: the cpu_suspend
+> > is used by both PM_SLEEP and CPU_IDLE.
+> 
+> I guess at some point we can replace (as a separate patch)
+> ARM64_CPU_SUSPEND with PM_SLEEP.
+> 
+> But what I don't fully understand, we can enable CPU_IDLE without
+> ARM64_CPU_SUSPEND. However, the cpuidle-arm64.c driver will fail to
+> link since it calls cpu_suspend(). Wouldn't it be better if
+> ARM64_CPU_SUSPEND depends on CPU_PM (or replaced by it) rather than
+> PM_SLEEP?
 
-Patches to add support for Rockchip usb phys.Add a new Rockchip
-usb phy driver and modify dwc2 controller driver to make dwc2
-platform devices support a generic PHY framework driver. This
-patch set has been tested on my rk3288-evb and power off the usb
-phys would reduce about 60mW power budget in total during sustem
-suspend.
+I think that ARM64_CPU_SUSPEND should depend on PM_SLEEP || CPU_IDLE,
+if CPU_IDLE is enabled it is certainly because some idle states are
+expected to be present, true, not all of them lose context (which is
+why ARM64_CPU_SUSPEND is needed, to save/restore context and clean
+it to RAM), but I think that's too fine grain, making it depend on
+CPU_IDLE should be ok.
 
-Changes in v7:
-- Update bindings doc
-- Accept Kishon's comments to use phandle args to find a phy
-  struct directly and get rid of using a custom of_xlate
-  function.
-- Update dtsi for new usb phy driver.
+Having CPU_IDLE enabled without arm64 cpuidle driver enabled (which
+selects ARM64_CPU_SUSPEND) is useless at the moment.
 
-Changes in v6:
-- Rename SIDDQ_MSK to SIDDQ_WRITE_ENA.
+As to cpu_ops, I think that the suspend hook should ifdef on CPU_IDLE,
+but I have to wait and see how we implement S2R to make it a final
+decision.
 
-Changes in v5:
-- Adjust entry order of example devicetree node in document.
-- reorder the phy dt node to a correct position.
+> Can we allow deeper idle states when CONFIG_SUSPEND is disabled? I see
+> CONFIG_SUSPEND related to suspend-to-RAM (system standby) rather than
+> CPU idle, in which case we may want to allow cpu_suspend when only
+> CPU_IDLE is enabled (which implies CONFIG_CPU_PM).
 
-Changes in v4:
-- Updata description for phy device tree subnode.
-- Get number of PHYs from device tree.
-- Model each PHY as subnode of the phy provider node.
-- Add phy subnodes.
+Yes, deep idle states are enabled even when suspend is disabled, but
+both S2R and CPU_IDLE should turn on ARM64_CPU_SUSPEND to save/restore
+context, unless we remove ARM64_CPU_SUSPEND entirely and we always
+compile that code in.
 
-Changes in v3:
-- Use BIT macro instead of bit shift ops.
-- Rename the config entry to PHY_ROCKCHIP_USB.
-- Fix coding style: both branches of the if() which only one
-  branch of the conditional statement is a single statement
-  should have braces.
-- No need to test dwc2->phy for NULL before calling generic phy
-  APIs.
+I will put together a patch first thing next week to clarify this
+thread.
 
-Yunzhi Li (5):
-  Documentation: bindings: add dt documentation for Rockchip usb PHY
-  phy: add a driver for the Rockchip SoC internal USB2.0 PHY
-  usb: dwc2: add generic PHY framework support for dwc2 usb controler
-    platform driver.
-  ARM: dts: rockchip: add rk3288 usb PHY
-  ARM: dts: rockchip: Enable usb PHY on rk3288-evb board
-
- .../devicetree/bindings/phy/rockchip-usb-phy.txt   |  37 +++++
- arch/arm/boot/dts/rk3288-evb.dtsi                  |   4 +
- arch/arm/boot/dts/rk3288.dtsi                      |  35 +++++
- drivers/phy/Kconfig                                |   7 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-rockchip-usb.c                     | 158 +++++++++++++++++++++
- drivers/usb/dwc2/gadget.c                          |  33 ++---
- drivers/usb/dwc2/platform.c                        |  36 ++++-
- 8 files changed, 288 insertions(+), 23 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
- create mode 100644 drivers/phy/phy-rockchip-usb.c
-
--- 
-2.0.0
+Thanks,
+Lorenzo
