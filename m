@@ -1,5 +1,5 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 12 Dec 2014 20:42:16 +0100
+Date: Fri, 12 Dec 2014 20:49:38 +0100
 Subject: [PATCH v2 5/6] arm/arm64: KVM: Turn off vcpus on PSCI
  shutdown/reboot
 In-Reply-To: <5485A553.4070607@arm.com>
@@ -7,7 +7,7 @@ References: <1417641522-29056-1-git-send-email-christoffer.dall@linaro.org>
  <1417641522-29056-6-git-send-email-christoffer.dall@linaro.org>
  <548593E5.7070101@arm.com> <20141208125836.GE8936@cbox>
  <5485A553.4070607@arm.com>
-Message-ID: <20141212194216.GL28388@cbox>
+Message-ID: <20141212194938.GA16855@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -100,37 +100,6 @@ On Mon, Dec 08, 2014 at 01:19:15PM +0000, Marc Zyngier wrote:
 > 
 > Ah, that's even simpler than I thought. Yeah, looks good to me.
 > 
-> > 
-> > or a slightly more optimized "half-open-coded-kvm_vcpu_kick":
-> > 
-> > 	me = get_cpu();
-> > 	kvm_for_each_vcpu(i, tmp, vcpu->kvm) {
-> > 		tmp->arch.pause = true;
-> > 		if (tmp->cpu != me && (unsigned)tmp->cpu < nr_cpu_ids &&
-> > 		    cpu_online(tmp->cpu)  && kvm_arch_vcpu_should_kick(tmp))
-> > 			smp_send_reschedule(tmp->cpu);
-> > 	}
-> > 
-> > which should save us waking up vcpu threads that are parked on
-> > waitqueues.  Not sure it's worth it, maybe it is for 100s of vcpu
-> > systems?
-> 
-> Probably not worth it at the moment.
-> 
-> > Can we actually replace force_vm_exit() with the more optimized
-> > open-coded version?  That messes with VMID allocation so it really needs
-> > a lot of testing though...
-> 
-> VMID reallocation almost never occurs, and that's a system-wide event,
-> not triggered by a guest. I'd rather not mess with that just yet.
-> 
-> > Preferences?
-> 
-> I think your first version is very nice, provided that it doesn't
-> introduce any unforeseen regression.
-> 
+Can I take this as an ack and apply this series?
 
-ok, will respin with option #1.
-
-Thanks,
 -Christoffer
