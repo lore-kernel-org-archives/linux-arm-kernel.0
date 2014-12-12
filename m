@@ -1,52 +1,55 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 12 Dec 2014 10:51:50 +0100
-Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
- support
-In-Reply-To: <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
-References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
- <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
-Message-ID: <548ABAB6.6010200@collabora.co.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 12 Dec 2014 10:52:12 +0100
+Subject: [PATCH v2 1/1] net/macb: add TX multiqueue support for gem
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CA0BA36@AcuExch.aculab.com>
+References: <cover.1418291637.git.cyrille.pitchen@atmel.com>
+ <87a3098203ee6eaa7a60607713a293d3258e2b58.1418291637.git.cyrille.pitchen@atmel.com>
+ <20141211203103.4191887a@free-electrons.com>
+ <063D6719AE5E284EB5DD2968C1650D6D1CA0BA36@AcuExch.aculab.com>
+Message-ID: <20141212105212.3b9c5810@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Dear David Laight,
 
-On 11/18/2014 07:20 AM, Ajay kumar wrote:
-> On Sat, Nov 15, 2014 at 3:24 PM, Ajay Kumar <ajaykumar.rs@samsung.com> wrote:
->> This series is based on master branch of Linus tree at:
->> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
->>
+On Fri, 12 Dec 2014 09:45:30 +0000, David Laight wrote:
+> From: Thomas Petazzoni
+> > On Thu, 11 Dec 2014 11:16:51 +0100, Cyrille Pitchen wrote:
+> > 
+> > > +#define GEM_ISR1				0x0400
+> > > +#define GEM_ISR2				0x0404
+> > > +#define GEM_ISR3				0x0408
+> > > +#define GEM_ISR4				0x040c
+> > > +#define GEM_ISR5				0x0410
+> > > +#define GEM_ISR6				0x0414
+> > > +#define GEM_ISR7				0x0418
+> > 
+> > What about doing instead:
+> > 
+> > #define GEM_ISR(q)				((q) == 0 ? MACB_ISR : 0x400 + (q) << 2)
+> > 
+> > And ditto for all other registers, which will save a lot of boring repeated code.
+> 
+> It will probably add a lot of object code and, depending on how often
+> the registers are accesses, might have performance impact.
+> 
+> Having:
+> #define GEM_ISR(n) (0x400 + (n) << 4)
+> will save source code.
 
-This series has been in the mailing lists for months and have been tested
-by many people. What else is missing before it can be merged?
+Except that this won't work for n == 0, because for n == 0, the
+register offset is not 0x400.
 
-It would be great to have proper display support on platforms that have a
-eDP to LVDS bridge chip (e.g: Snow, Peach Pit and Spring Chromebooks) and
-everything is in place but this series which had been missing many kernel
-releases already.
+And in fact, my code was also wrong, it should be:
 
->>
->> Changes since V7:
->>         -- Address comments from Tomi and Laurent:
->>                 -- Use videoports and endpoints to represent the connection between
->>                    encoder, bridge and the panel, instead of using phandles.
->>         -- Address comments from Daniel:
->>                 -- Make the patch description more descriptive.
->>                 -- remove device pointer from drm_bridge, and just use
->>                    device_node instead.
->>                 -- don't pass encoder pointer to bridge_attach.
->>         -- Address comments from Sean Paul:
->>                 -- Remove bridge from mode_config, and pull out drm_bridge
->>                    functions from drm_crtc.c to drm_bridge.c
->>
+	((q) == 0 ? MACB_ISR : 0x400 + ((q)-1) << 2))
 
-Tomi and Laurent,
+Since q=1 is@0x400.
 
-You asked Ajay to change his series to use the video port and enpoints DT
-bindings instead of phandles, could you please review his latest version?
+Best regards,
 
-I guess is now too late for 3.19 since we are in the middle of the merge
-window but it would be great if this series can at least made it to 3.20.
-
-Thanks a lot and best regards,
-Javier
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
