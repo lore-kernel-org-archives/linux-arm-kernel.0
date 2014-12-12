@@ -1,34 +1,28 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 12 Dec 2014 13:23:21 +0000
-Subject: [PATCH 1/3] ASoC: codecs: wm8904: add dt ids table
-In-Reply-To: <1418267681-4091-1-git-send-email-voice.shen@atmel.com>
-References: <1418267681-4091-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20141212132321.GI11764@sirena.org.uk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 12 Dec 2014 14:44:06 +0100
+Subject: [PATCH 0/4] serial: =?UTF-8?Q?fsl=5Flpuart=3A=20fix=20various?=
+ =?UTF-8?Q?=20DMA=20related=20issues?=
+In-Reply-To: <1417134205-4400-1-git-send-email-stefan@agner.ch>
+References: <1417134205-4400-1-git-send-email-stefan@agner.ch>
+Message-ID: <677f2c62b6b6c1fe8e16cd38d5f20d47@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 11, 2014 at 11:14:39AM +0800, Bo Shen wrote:
+Any thoughts on this patchset? Would have hopped that it makes it into
+3.19 as those are mostly fixes.
 
-> +static const struct of_device_id wm8904_of_match[] = {
-> +	{ .compatible = "wlf,wm8904", },
-> +	{ .compatible = "wlf,wm8912", },
-> +	{ .compatible = "wlf,wm8918", },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, wm8904_of_match);
-> +
->  static struct i2c_driver wm8904_i2c_driver = {
->  	.driver = {
->  		.name = "wm8904",
->  		.owner = THIS_MODULE,
-> +		.of_match_table = wm8904_of_match,
+--
+Stefan
 
-I'm not seeing anything here that ensures that devtype is set correctly
-when probing using the OF IDs - currently we rely on i2c->driver_data.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141212/d2eece05/attachment.sig>
+On 2014-11-28 01:23, Stefan Agner wrote:
+> Patch 1 and 3 are actual fixes, whereas 2 and 4 don't lead to issues
+> in standard cases but are still worthwhile fixes.
+> 
+> Stefan Agner (4):
+>   serial: fsl_lpuart: delete timer on shutdown
+>   serial: fsl_lpuart: move DMA channel request to probe
+>   serial: fsl_lpuart: avoid new transfer while DMA is running
+>   serial: fsl_lpuart: update RX timer on successful DMA transfer
+> 
+>  drivers/tty/serial/fsl_lpuart.c | 110 +++++++++++++++++++---------------------
+>  1 file changed, 52 insertions(+), 58 deletions(-)
