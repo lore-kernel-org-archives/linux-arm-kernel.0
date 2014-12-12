@@ -1,80 +1,131 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 12 Dec 2014 10:01:01 +0900
-Subject: [PATCH] ARM: shmobile: r8a7794: Add SDHI clocks to device tree
-In-Reply-To: <1418345235-15096-1-git-send-email-horms+renesas@verge.net.au>
-References: <1418345235-15096-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CANqRtoQHebO1aVQPuQ0V7sbzd1QhGtjL7nrkiPPHd5upGnSRCQ@mail.gmail.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Fri, 12 Dec 2014 02:15:04 +0100
+Subject: __hci_cmd_sync() not suitable for nokia h4p
+In-Reply-To: <20141211221306.GA2905@amd>
+References: <20141209190210.GA15641@amd>
+ <304050AD-DB11-4A2B-A1F7-8B1BBB5F04F0@holtmann.org>
+ <20141209201328.GA18003@amd>
+ <7EFD3C33-E503-4FB6-BCCF-52836080ABD6@holtmann.org>
+ <20141210131519.GA14748@amd>
+ <EE1A4B9D-30D5-4BD9-9A43-532619494A0C@holtmann.org>
+ <20141211221306.GA2905@amd>
+Message-ID: <20141212011504.GA16599@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi,
 
-On Fri, Dec 12, 2014 at 9:47 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
->
-> Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
-> [horms: omitted device nodes; only add clock]
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->
-> ---
-> Based on the renesas-devel-20141211-v3.18 tag of my renesas tree
->
-> v1 [Simon Horman]
-> * Removed portions of patch which add device nodes
-> * Renamed patch from
->   "ARM: shmobile: r8a7794: Add SDHI clocks and devices to device tree" to
->   "ARM: shmobile: r8a7794: Add SDHI clocks to device tree"
-> ---
->  arch/arm/boot/dts/r8a7794.dtsi            | 21 +++++++++++++++++++--
->  include/dt-bindings/clock/r8a7794-clock.h |  3 +++
->  2 files changed, 22 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> index 6d95638..f5a3319 100644
-> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -293,6 +293,21 @@
->                         clock-output-names = "main", "pll0", "pll1", "pll3",
->                                              "lb", "qspi", "sdh", "sd0", "z";
->                 };
-> +               /* Variable factor clocks */
-> +               sd1_clk: sd2_clk at e6150078 {
-> +                       compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
-> +                       reg = <0 0xe6150078 0 4>;
-> +                       clocks = <&pll1_div2_clk>;
-> +                       #clock-cells = <0>;
-> +                       clock-output-names = "sd1";
-> +               };
-> +               sd2_clk: sd3_clk at e615007c {
-> +                       compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
-> +                       reg = <0 0xe615007c 0 4>;
-> +                       clocks = <&pll1_div2_clk>;
-> +                       #clock-cells = <0>;
-> +                       clock-output-names = "sd2";
-> +               };
->
->                 /* Fixed factor clocks */
->                 pll1_div2_clk: pll1_div2_clk {
-> @@ -496,14 +511,16 @@
->                 mstp3_clks: mstp3_clks at e615013c {
->                         compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
->                         reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
-> -                       clocks = <&rclk_clk>, <&hp_clk>, <&hp_clk>;
-> +                       clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>
-> +                                <&rclk_clk>, <&hp_clk>, <&hp_clk>;
->                         #clock-cells = <1>;
->                         clock-indices = <
-> +                               R8A7794_CLK_SDHI2 R8A7794_CLK_SDHI1
->                                 R8A7794_CLK_CMT1 R8A7794_CLK_USBDMAC0
->                                 R8A7794_CLK_USBDMAC1
->                         >;
->                         clock-output-names =
-> -                               "cmt1", "usbdmac0", "usbdmac1";
-> +                               "sdhi2", "sdhi1", "cmt1", "usbdmac0", "usbdmac1";
+On Thu, Dec 11, 2014 at 11:13:07PM +0100, Pavel Machek wrote:
+> Hi!
+> 
+> > > h4p changes uart speed again after load of the firmware, but I guess
+> > > that's ok.
+> 
+> >  if you can do it the other way around it would result in a faster
+> > init. Depending on how many patches are actually required to be
+> > loaded.
+> 
+> IIRC driver does two speed changes, so it looks to me like someone
+> already tried that (and it did not work).
 
-This can't be right. SD0 is partially included in some of the changes above.
+maybe. maybe not. Should be easy to test it (again) and add a
+comment, shouldn't it?
 
-Thanks,
+> > >> What needs to be done is the bring up of the device including the proper UART settings and speed and then just run the firmware downloads. All firmware files on the Nokia devices where just HCI commands with vendor specific details. Some from CSR, some from Broadcom and some from TI. You can actually decode them if you really want to. Shouldn't be that hard.
+> > >> 
+> > > 
+> > > Speed changes at the end of firmware load, but I guess that's detail?
+> > > Anyway, patch would look like this.
+> > 
+> > You should really look into providing hdev->setup() callback. That is normally the callback where you want to load the firmware.
+> > 
+> 
+> I can provide setup() callback and load firmware from there.
+> 
+> I have created provisional device tree binding, and the driver still
+> works.
 
-/ magnus
+I don't have time to look at the code now, but I have some comments
+regarding the binding.
+
+> Some time ago you mentioned that with the "big" issues fixed, you'd be
+> willing to take it into the tree. What way forward do you see? Would
+> it make sense to re-enable the driver in staging, so that "big"
+> changes could be applied, followed by renames?
+> 
+> Thanks,
+> 								Pavel
+> 
+> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+> index 9e0e5a2..201f21b 100644
+> --- a/arch/arm/boot/dts/omap3-n900.dts
+> +++ b/arch/arm/boot/dts/omap3-n900.dts
+> @@ -790,9 +776,21 @@
+>  };
+>  
+>  &uart2 {
+> +        compatible = "brcm,uart,bcm2048";
+
+This does not look correct. The uart should not be overwritten. The
+current h4p driver indeed implements a driver for the serial port,
+but that's a) linux specific and does not belong in the DT and b)
+should probably be changed in the mainline kernel.
+
+>  	interrupts-extended = <&intc 73 &omap3_pmx_core OMAP3_UART2_RX>;
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&uart2_pins>;
+> +	device {
+> +		  compatible = "brcm,bcm2048";
+> +		  uart = <&uart2>;
+
+You don't need a phandle to the parent device.
+
+> +		  reset-gpios = <&gpio3 27 GPIO_ACTIVE_HIGH>; /* want 91 */
+> +		  host-wakeup-gpios = <&gpio4 5 GPIO_ACTIVE_HIGH>; /* want 101 */
+
+The host-wakeup should be mapped as irq, gpio2irq conversion
+will happen ;)
+
+> +		  bluetooth-wakeup-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>; /* want 37 */
+
+To be consistent with the n900 DTS file you should probably drop
+"want " from the comments.
+
+> +		  chip-type = <3>;
+
+This should be set in the driver based on the compatible
+value and not via DT data.
+
+> +		  clocks = <&uart2_fck>, <&uart2_ick>;
+> +		  clock-names = "fck", "ick";
+
+These clocks you defined belong to the uart device and not to the
+uart slave (bluetooth) device.
+
+> +		  bt-sysclk = <2>;
+
+I think this should be mapped cleanly in DT by adding a new clock
+to the DTS file:
+
+vctcxo_clock: clock  {
+    compatible = "fixed-clock";
+    #clock-cells = <0>;
+    clock-frequency = <38400000>;
+};
+
+Then the bluetooth device can reference its clock device:
+
+clocks = <&vctcxo_clock>;
+
+The same clock reference should be added to the wl1251 DT node :)
+
+> ... [code] ...
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141212/e0496be9/attachment.sig>
