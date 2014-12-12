@@ -1,23 +1,29 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 12 Dec 2014 09:32:44 -0500
-Subject: [PATCH 0/4] serial: fsl_lpuart: fix various DMA related issues
-In-Reply-To: <677f2c62b6b6c1fe8e16cd38d5f20d47@agner.ch>
-References: <1417134205-4400-1-git-send-email-stefan@agner.ch>
- <677f2c62b6b6c1fe8e16cd38d5f20d47@agner.ch>
-Message-ID: <20141212143244.GA2219@kroah.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 12 Dec 2014 15:50:57 +0100
+Subject: [PATCH v2 0/2] ARM: mediatek: Add watchdog driver
+Message-ID: <1418395859-32209-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 12, 2014 at 02:44:06PM +0100, Stefan Agner wrote:
-> Any thoughts on this patchset? Would have hopped that it makes it into
-> 3.19 as those are mostly fixes.
+Mediatek SoCs have a watchdog driver. This patch set adds driver and DTS
+binding. The driver also implements a restart handler to reboot the SoC.
 
-"mostly"?
+Changes for v2:
+- we don't need to have the watchdog enabled to do a sotware reset
+- disable dual mode and irq mode when starting the watchdog
+- update commit message to name the SoCs the driver supports
 
-I'll get to these after 3.19-rc1 is out, but it really looks like these
-will be for 3.20-rc1, unless you break them up into "bugfix only" type
-patches.
+Matthias Brugger (2):
+  watchdog: Add driver for Mediatek watchdog
+  ARM: mediatek: dts: Add bindings for watchdog
 
-thanks,
+ .../devicetree/bindings/watchdog/mtk-wdt.txt       |  13 ++
+ drivers/watchdog/Kconfig                           |  10 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/mtk_wdt.c                         | 257 +++++++++++++++++++++
+ 4 files changed, 281 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+ create mode 100644 drivers/watchdog/mtk_wdt.c
 
-greg k-h
+-- 
+1.9.1
