@@ -1,45 +1,43 @@
-From: lyz@rock-chips.com (Yunzhi Li)
-Date: Fri, 12 Dec 2014 11:43:25 +0800
-Subject: [PATCH v6 1/5] phy: add a driver for the Rockchip SoC internal
- USB2.0 PHY
-In-Reply-To: <CAD=FV=WcAJAgj2triu1W4863BT1ew2wf-z6YNHHwiDKpnYmK4w@mail.gmail.com>
-References: <1418291722-25448-1-git-send-email-lyz@rock-chips.com>	<1418291722-25448-2-git-send-email-lyz@rock-chips.com>
- <CAD=FV=WcAJAgj2triu1W4863BT1ew2wf-z6YNHHwiDKpnYmK4w@mail.gmail.com>
-Message-ID: <548A645D.8010608@rock-chips.com>
+From: harinik@xilinx.com (Harini Katakam)
+Date: Fri, 12 Dec 2014 09:48:25 +0530
+Subject: [PATCH v5 0/2] Cadence I2C driver fixes
+Message-ID: <1418357907-4215-1-git-send-email-harinik@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug:
+This series implements workarounds for some bugs in Cadence I2C controller.
 
-On 2014/12/12 2:09, Doug Anderson wrote:
-> Yunzhi,
->
-> On Thu, Dec 11, 2014 at 1:55 AM, Yunzhi Li <lyz@rock-chips.com> wrote:
->> +               rk_phy->clk = of_clk_get(child, 0);
->> +               if (IS_ERR(rk_phy->clk)) {
->> +                       dev_warn(dev, "failed to get clock\n");
->> +                       rk_phy->clk = NULL;
->> +               }
-> The device tree bindings don't specify a clock and the "dtsi" added to
-> rk3288 don't reference a clock.  Take that code out and avoid a
-> warning in the logs at bootup.
->
-> ...or should there be a clock?
-Actually, there is a clk gating control bit in CRU for each usb phy and I
-think we should manage these clocks by the usb phy driver, so I will add
-clock property to usb PHYs nodes in next version of patche set.
+- The I2C controller when configured in Master Mode generates invalid read transactions.
+When HOLD bit is set and HW timeout occurs, invalid read transactions are
+generated on the bus. This will affect repeated start conditions and large
+data transfer condtions where transfer_size_register has to be updated again.
+The transfer size register rolls over erroneously under these conditions.
+Note that this HW timeout cannot be disabled even if the interrupt is unused.
+Errata link: http://www.xilinx.com/support/answers/61664.html
 
->
->> +               rk_phy->phy = devm_phy_create(dev, NULL, &ops);
-> This has the wrong number of arguments.  Even before the change that
-> added the 4th argument, this is still wrong because "ops" is supposed
-> to be the 2nd argument, not the 3rd.
->
-> ...so I'm confused how this compiled for you.  I think this ought to be:
->
-> rk_phy->phy = devm_phy_create(dev, child, &ops, NULL);
->
-> ...but please correct me if I'm mistaken!
->
->
->
+-The I2C controller when configured in Master Mode is the missing master completion interrupt.
+During repeated start condition, the driver has to set the HOLD bit for
+the set of transfer being done together and clear the HOLD bit just before
+the last transfer. But the controller does not indicate completion when
+a read/receive transfer is done if the HOLD bit is set. This affects
+all repeated start operation where a read/receive transfer is not
+the last transfer.
+Errata link: http://www.xilinx.com/support/answers/61665.html
+
+To address the above,
+- >252 byte transfers are done such that transfer_size never becomes zero.
+- timeout register value is increased (even though the driver doesn't use this).
+- A check is performed to see if there is any transfer following a
+read/receive transfer in the set of messages using repeated start.
+An error is returned in such cases because if we proceed, completion interrupt
+is never obtained and a SW timeout will occur.
+
+Harini Katakam (2):
+  i2c: cadence: Handle > 252 byte transfers
+  i2c: cadence: Check for errata condition involving master receive
+
+ drivers/i2c/busses/i2c-cadence.c |  185 +++++++++++++++++++++++---------------
+ 1 file changed, 112 insertions(+), 73 deletions(-)
+
+-- 
+1.7.9.5
