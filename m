@@ -1,43 +1,53 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 12 Dec 2014 11:18:58 -0600
-Subject: [PATCH] ARM: omap2plus_defconfig: use CONFIG_CPUFREQ_DT
-Message-ID: <1418404738-19124-1-git-send-email-nm@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Dec 2014 18:30:03 +0100
+Subject: [PATCH 4/5] PCI: qcom: Add Qualcomm PCIe controller driver
+In-Reply-To: <1418404441-5518-5-git-send-email-svarbanov@mm-sol.com>
+References: <1418404441-5518-1-git-send-email-svarbanov@mm-sol.com>
+ <1418404441-5518-5-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <2577563.x0mEZJNVDQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_GENERIC_CPUFREQ_CPU0 disappeared with commit bbcf071969b20f
-("cpufreq: cpu0: rename driver and internals to 'cpufreq_dt'")
+On Friday 12 December 2014 19:14:00 Stanimir Varbanov wrote:
+> The PCIe driver reuse the Designware common code for host
+> and MSI initialization, and also program the Qualcomm
+> application specific registers.
+> 
+> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
 
-Use the renamed CONFIG_CPUFREQ_DT generic driver. It looks like with
-v3.18-rc1, commit bbcf071969b20f and fdc509b15eb3eb came in via
-different trees causing the resultant v3.18-rc1 to be non-functional for
-cpufreq as default supported with omap2plus_defconfig.
+Looks nice!
 
-Fixes: fdc509b15eb3eb ("ARM: omap2plus_defconfig: Add cpufreq to defconfig")
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
+> +static int
+> +qcom_pcie_rd_own_conf(struct pcie_port *pp, int where, int size, u32 *val)
+> +{
+> +	if (where == PCI_CLASS_REVISION && size == 4) {
+> +		*val = readl(pp->dbi_base + PCI_CLASS_REVISION);
+> +		*val &= ~(0xffff << 16);
+> +		*val |= PCI_CLASS_BRIDGE_PCI << 16;
+> +		return PCIBIOS_SUCCESSFUL;
+> +	}
+> +
+> +	return dw_pcie_cfg_read(pp->dbi_base + (where & ~0x3), where,
+> +				size, val);
+> +}
 
-NOTE: as of v3.18 tag, The following still need to be fixed - I do not have all
-the platforms impacted to make a generic change, so CCying folks who might be interested
+Could you add a comment here to explain what this is for?
 
-arch/arm/configs/shmobile_defconfig:CONFIG_GENERIC_CPUFREQ_CPU0=y
-arch/arm/configs/multi_v7_defconfig:CONFIG_GENERIC_CPUFREQ_CPU0=y
+> +static int __init qcom_pcie_probe(struct platform_device *pdev)
+> +{
 
- arch/arm/configs/omap2plus_defconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I think it's a bug to mark this function as __init. It breaks
+deferred probing and detaching/reattaching the device trough sysfs.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 3e09286..5fc0dbe 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -68,7 +68,7 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPU_FREQ_GOV_POWERSAVE=y
- CONFIG_CPU_FREQ_GOV_USERSPACE=y
- CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
--CONFIG_GENERIC_CPUFREQ_CPU0=y
-+CONFIG_CPUFREQ_DT=y
- # CONFIG_ARM_OMAP2PLUS_CPUFREQ is not set
- CONFIG_CPU_IDLE=y
- CONFIG_BINFMT_MISC=y
--- 
-1.7.9.5
+After you fix that, you can remove the __refdata below.
+
+> +static struct platform_driver __refdata qcom_pcie_driver = {
+> +	.probe = qcom_pcie_probe,
+> +	.remove = qcom_pcie_remove,
+> +	.driver = {
+> +		.name = "qcom-pcie",
+> +		.of_match_table = qcom_pcie_match,
+> +	},
+> +};
+
+	Arnd
