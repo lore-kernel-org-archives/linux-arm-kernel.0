@@ -1,92 +1,55 @@
-From: atull@opensource.altera.com (atull)
-Date: Thu, 11 Dec 2014 17:35:40 -0600
-Subject: [RFC 0/3] SoCFPGA: Add HPS bridges
-In-Reply-To: <1418329302-20813-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1418329302-20813-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <alpine.DEB.2.02.1412111734480.11739@linuxheads99>
+From: rjui@broadcom.com (Ray Jui)
+Date: Thu, 11 Dec 2014 16:05:03 -0800
+Subject: [PATCH v5 0/3] Add gpio support to Broadcom Cygnus SoC
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+Message-ID: <1418342706-14755-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Dec 2014, Steffen Trumtrar wrote:
+This patchset contains the initial GPIO support for the Broadcom Cygnus SoC.
+Cygnus has 3 GPIO controllers: 1) the ASIU GPIO; 2) the chipCommonG GPIO;
+and 3) the ALWAYS-ON GPIO. All 3 types of GPIO controllers are supported by
+the same Cygnus GPIO driver
 
-CC Matthew Gerlach
+Changes from v4:
+ - Use DT property "linux,gpio-base" to define GPIO base number
+ - factorize common code to improve code readability and reduce code size
+ - remove "bcm_" prefix on function and struct names
+ - improve debugging prints
+ - default GPIO_BCM_CYGNUS to y in Kconfig (it still depends on
+   ARCH_BCM_CYGNUS). This way we do not need to select it from the
+   arch/arm/mach-bcm/Kconfig
+ - Get rid of redundant MAINTAINER entry for this driver. It will be maintained
+   by Broadcom iProc/Cygnus maintainers
+ - Update device tree document based on driver changes
 
-> Hi!
-> 
-> This series adds support for the SoCFPGA bridges.
-> 
-> From the datasheet:
-> 
-> 	The HPS-FPGA bridges allow masters in the FPGA fabric to
-> 	communicate with slaves in the HPS logic and vice versa.
-> 	For example, you can instantiate additional memories or
-> 	peripherals in the FPGA fabric, and master interfaces
-> 	belonging to components in the HPS logic can access them.
-> 	You can also instantiate components such as a NiosII
-> 	processor in the FPGA fabric and their master interfaces
-> 	can access memories or peripherals in the HPS logic
-> 
-> This does only work with the driver from my other series
-> 
-> 	SoCFPGA: L3 NIC driver
-> 
-> As the binding, although simple, is still in debate and the
-> outcome may have impact on this series, this is a just an RFC
-> for now.
-> 
-> Also, the drivers beg for the DT overlay series which is floating
-> around, but this shouldn't have any effect on the current binding.
-> The driver part can be changed later.
-> 
-> Lastly, the bridges have an optional dependency on the fpgamgr
-> series from Alan Tull. I have added this to the binding, the drivers
-> don't do anything with this yet.
-> My idea here would be:
-> 	1. probe bridge
-> 	2. check if fpgamgr phandle is given
-> 	 2a. if yes: defer till fpgamgr is done
-> 	 2b. if no: continue
-> 	3. probe subnodes with the help of DT overlays
-> 
-> I have only tested the HPS and LWHPS drivers, as I don't have any
-> bitstreams that use the FPGA2HPS bridge; here be dragons.
-> 
-> Regards,
-> Steffen
-> 
-> Steffen Trumtrar (3):
->   devicetree: bindings: Add SoCFpga HPS bridges
->   ARM: socfpga: Add drivers for the SoC-to-FPGA bridges
->   ARM: dts: socfpga: Add AXI bridges
-> 
->  .../soc/socfpga/altr,fpga2hps-axi-bridge.txt       |  32 +++
->  .../soc/socfpga/altr,hps2fpga-axi-bridge.txt       |  54 +++++
->  .../soc/socfpga/altr,lwhps2fpga-axi-bridge.txt     |  31 +++
->  arch/arm/boot/dts/socfpga.dtsi                     |  48 ++++
->  drivers/soc/socfpga/Kconfig                        |  43 ++++
->  drivers/soc/socfpga/Makefile                       |   4 +
->  drivers/soc/socfpga/bridges-common.c               |  84 +++++++
->  drivers/soc/socfpga/bridges-common.h               |  28 +++
->  drivers/soc/socfpga/fpga2hps-bridge.c              |  97 ++++++++
->  drivers/soc/socfpga/hps2fpga-bridge.c              | 258 +++++++++++++++++++++
->  drivers/soc/socfpga/lwhps2fpga-bridge.c            | 141 +++++++++++
->  drivers/soc/socfpga/lwhps2fpga.h                   |  31 +++
->  include/soc/socfpga/bridge.h                       |  65 ++++++
->  13 files changed, 916 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/socfpga/altr,fpga2hps-axi-bridge.txt
->  create mode 100644 Documentation/devicetree/bindings/soc/socfpga/altr,hps2fpga-axi-bridge.txt
->  create mode 100644 Documentation/devicetree/bindings/soc/socfpga/altr,lwhps2fpga-axi-bridge.txt
->  create mode 100644 drivers/soc/socfpga/Kconfig
->  create mode 100644 drivers/soc/socfpga/Makefile
->  create mode 100644 drivers/soc/socfpga/bridges-common.c
->  create mode 100644 drivers/soc/socfpga/bridges-common.h
->  create mode 100644 drivers/soc/socfpga/fpga2hps-bridge.c
->  create mode 100644 drivers/soc/socfpga/hps2fpga-bridge.c
->  create mode 100644 drivers/soc/socfpga/lwhps2fpga-bridge.c
->  create mode 100644 drivers/soc/socfpga/lwhps2fpga.h
->  create mode 100644 include/soc/socfpga/bridge.h
-> 
-> -- 
-> 2.1.3
-> 
-> 
+Changes from v3:
+ - Fix dt property tpyo
+ - Fix incorrect GPIO compatible ID in device tree binding document example
+
+Changes from v2:
+ - Consolidate different compatible IDs into "brcm,cygnus-gpio"
+ - Get rid of redundant "no-interrupt" property
+
+Changes from v1:
+ - Get rid of inline qualifier
+ - Get rid of redundant check in the ISR
+ - Other minor fixes to imrove code readability
+
+Ray Jui (3):
+  gpio: Cygnus: define Broadcom Cygnus GPIO binding
+  gpio: Cygnus: add GPIO driver
+  ARM: dts: enable GPIO for Broadcom Cygnus
+
+ .../devicetree/bindings/gpio/brcm,cygnus-gpio.txt  |   87 +++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   33 ++
+ drivers/gpio/Kconfig                               |   12 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-bcm-cygnus.c                     |  613 ++++++++++++++++++++
+ 5 files changed, 746 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/brcm,cygnus-gpio.txt
+ create mode 100644 drivers/gpio/gpio-bcm-cygnus.c
+
+-- 
+1.7.9.5
