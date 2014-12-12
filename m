@@ -1,62 +1,188 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Dec 2014 17:37:26 +0000
-Subject: CCF locking problems
-Message-ID: <20141212173726.GV11285@n2100.arm.linux.org.uk>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 12 Dec 2014 11:37:41 -0600
+Subject: ARM: OMAP5/DRA7: Fix counter frequency drift for AM572x errata
+ i856
+In-Reply-To: <20141211204308.GU24110@csclub.uwaterloo.ca>
+References: <20141211204116.GT24110@csclub.uwaterloo.ca>
+ <20141211204308.GU24110@csclub.uwaterloo.ca>
+Message-ID: <548B27E5.4090108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CCF is causing lockdep problems elsewhere in the kernel...
+-sricharan, as the email ID is defunct.
 
-During kernel boot, the following lock chain is established via CCF when
-debugfs is enabled:
+On 12/11/2014 02:43 PM, Lennart Sorensen wrote:
+> On Thu, Dec 11, 2014 at 03:41:16PM -0500, Lennart Sorensen wrote:
+>> Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz external
+>> crystal is not enabled at power up.  Instead the CPU falls back to using
+>> an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is usually
+>> 20MHz on boards so far (which gives an emulated frequency of 32.786KHz),
+>> but can also be 19.2 or 27MHz which result in much larger drift.
 
-	clk_register()
-	`-> __clk_init() (takes prepare_lock)
-	    `-> clk_debug_register() (takes clk_debug_lock)
-	        `-> debugfs_create_dir()
-	            `-> __create_file() (takes i_mutex)
+Why not just change the clock parent to something that is more
+accurate like the 32k clk?
 
-So, prepare_lock ends up being a parent of the i_mutex class.
+>>
+>> Since this is used to drive the master counter at 32.768KHz * 375 /
+>> 2 = 6.144MHz, the emulated speed for 20MHz is of by 570ppm, or about 43
+>> seconds per day, and more than the 500ppm NTP is able to tolerate.
+>>
+>> Checking the CTRL_CORE_BOOTSTRAP register can determine if the CPU
+>> is using the real 32.768KHz crystal or the emulated SYSCLK1/610, and
+Without digging into docs, This is just the boot configuration, right?
+are we not able to reconfigure?
 
-Generic kernel code creates a dependency between i_mutex and mmap_sem:
+>> by known that the real counter frequency can be determined and used.
+>> The real speed is then SYSCLK1 / 610 * 375 / 2 or SYSCLK1 * 375 / 1220.
+>> This is unfortunately not integer math so the actual arch_timer_freq
+>> needs to be precalculated.
+>>
+>> Also the SYSCLK1 frequencies that have never been used by an omap
+>> evaluation board were all missing a 0.
+>>
 
-	iterate_dir() (takes i_mutex)
-	`-> dcache_readdir()
-	    `-> filldir64()
-	        `-> might_fault() (marks mmap_sem as potentially taken by
-				   a fault)
+Please sign-off on you patch. use git format-patch -M -s to generate
+patches. and when posting a series, use --cover-letter. Will also be
+good to provide tests that show that this is indeed an issue on OMAP5
+and DRA7 (considering the $subject here).
 
-This means prepare_lock is also a parent lock of mmap_sem.
+>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>> index 4f61148..2e81511 100644
+>> --- a/arch/arm/mach-omap2/timer.c
+>> +++ b/arch/arm/mach-omap2/timer.c
+>> @@ -513,11 +513,11 @@ static void __init realtime_counter_init(void)
+>>  	rate = clk_get_rate(sys_clk);
+>>  	/* Numerator/denumerator values refer TRM Realtime Counter section */
+>>  	switch (rate) {
+>> -	case 1200000:
+>> +	case 12000000:
+>>  		num = 64;
+>>  		den = 125;
+>>  		break;
+>> -	case 1300000:
+>> +	case 13000000:
+>>  		num = 768;
+>>  		den = 1625;
+>>  		break;
+>> @@ -529,11 +529,11 @@ static void __init realtime_counter_init(void)
+>>  		num = 192;
+>>  		den = 625;
+>>  		break;
+>> -	case 2600000:
+>> +	case 26000000:
+>>  		num = 384;
+>>  		den = 1625;
+>>  		break;
+>> -	case 2700000:
+>> +	case 27000000:
+>>  		num = 256;
+>>  		den = 1125;
+>>  		break;
 
-The kernel mmap() implementation of takes the mmap_sem, before calling
-into drivers.  DRM's drm_gem_mmap() function which will be called as a
-result of a mmap() takes the dev->struct_mutex mutex - which ends up as
-a child of mmap_sem.
+These should probably fall in as a separate patch.
 
-Now, if a DRM driver _then_ wants to use runtime PM, it may need to
-call runtime PM functions beneath DRM's dev->struct_mutex (since, eg,
-it may be protecting other DRM data while deciding which GPU to forward
-to.)  This ends up creating a circular dependency between dev->struct_mutex
-and prepare_lock, involving all the above mentioned locks.
+>> @@ -557,6 +557,73 @@ static void __init realtime_counter_init(void)
+>>  	writel_relaxed(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
+>>  
+>>  	arch_timer_freq = (rate / den) * num;
+>> +
+>> +	if (soc_is_dra7xx()) {
+>> +		#define CTRL_CORE_BOOTSTRAP 0x4A0026C4
+>> +		#define SPEEDSELECT_MASK 0x00000300
 
-I believe it is totally unreasonable for CCF to allow the prepare lock
-to depend on something as fundamental as core kernel locks - in fact,
-looking at __clk_init(), it looks like this fails in a very basic aspect
-of kernel programming: do setup first, then publish.  If it did follow
-that principle, it probably would not need to take the prepare lock
-while calling clk_debug_register(), which would mean that prepare_lock
-would not end up being a parent of potentially a lot of core kernel locks.
+we dont usually define it like this.
 
-When you consider what prepare_lock is supposed to be doing, it's quite
-clear that it should not be a parent to those.
+>> +		void __iomem *corebase;
+>> +		corebase = ioremap(CTRL_CORE_BOOTSTRAP, SZ_4);
+>> +		if (!corebase)
+>> +			pr_err("%s: ioremap failed\n", __func__);
+>> +		else {
 
-Another interesting point is that clk_debug_create_one() has a comment
-above it which is untrue:
+also run ./scripts/checkpatch.pl --strict on your patch prior to
+posting. try to ensure there are 0 warnings or checks.
 
-/* caller must hold prepare_lock */
+>> +			reg = readl_relaxed(corebase) & SPEEDSELECT_MASK;
+>> +			iounmap(corebase);
+>> +			/*
+>> +			 * Errata i856 says the 32.768KHz crystal does
+>> +			 * not start at power on, so the CPU falls back in
+>> +			 * an emulated 32KHz clock instead.  This causes
+>> +			 * the master counter frequency to not be what it
+>> +			 * was expected to be.	This affects at least
+>> +			 * the AM572x 1.0 and 1.1 revisions.
+>> +			 * Of course any board built without a populated
+>> +			 * 32.768KHz crystal would also need this fix
+>> +			 * even if the CPU is fixed later.
+>> +			 *
+>> +			 * If the two speedselect bits are not 0, then the
+>> +			 * 32.768KHz clock driving the course counter that
+>> +			 * corrects the fine counter every time it ticks is
+>> +			 * actually rate/610 rather than 32.768KHz and we
+>> +			 * should compensate to avoid the 570ppm (At 20MHz,
+>> +			 * much worse at other rates) too fast system time.
+>> +			 *
+>> +			 * Precalculate the arch_timer_freq, since
+>> +			 * rate/610 isn't integer math and accuracy is
+>> +			 * desirable here.
+>> +			 */
+>> +			if (reg) {
+>> +				switch (rate) {
+>> +				case 19200000:
+>> +					num = 375;
+>> +					den = 1220;
+>> +					arch_timer_freq = 5901639;
+>> +					break;
+>> +				case 27000000:
+>> +					num = 375;
+>> +					den = 1220;
+>> +					arch_timer_freq = 8299180;
+>> +					break;
+>> +				case 20000000:
 
-... except when it's called by clk_debug_init().
+>> +				default:
+>> +					num = 375;
+>> +					den = 1220;
+>> +					arch_timer_freq = 6147541;
+>> +					break;
+>> +				}
+>> +				reg = readl_relaxed(base + INCREMENTER_NUMERATOR_OFFSET) &
+>> +						NUMERATOR_DENUMERATOR_MASK;
+>> +				reg |= num;
+>> +				writel_relaxed(reg, base + INCREMENTER_NUMERATOR_OFFSET);
+>> +
+>> +				reg = readl_relaxed(base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET) &
+>> +						NUMERATOR_DENUMERATOR_MASK;
+>> +				reg |= den;
+>> +				writel_relaxed(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
+>> +
+>> +				printk(KERN_WARNING "DRA7xx CP15 compensated for sloppy internal 32KHz clock.\n");
+
+we would want to reuse the configuration code previously done, not
+repeat the logic.
+
+in general we want the flow to be common - so the point in logic where
+num, den is decided is also the place you want this logic to fit in..
+
+
+>> +			}
+>> +		}
+>> +	}
+>> +
+>>  	set_cntfreq();
+>>  
+>>  	iounmap(base);
+> 
+> I am perfectly willing to split this into two patches it prefered (one
+> for the counter frequency fix and one for the rate typos).
+> 
+> Other cleanups needed would be great too, since I am still not too
+> pleased with how this looks.
+> 
+> With this fix however many boards have run ntp with drift less than 3ppm,
+> so it works very well.
+> 
+
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Nishanth Menon
