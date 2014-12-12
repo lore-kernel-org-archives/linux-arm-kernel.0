@@ -1,23 +1,66 @@
-From: bgriffis@ti.com (Griffis, Brad)
-Date: Fri, 12 Dec 2014 14:16:29 +0000
-Subject: [PATCH v4 0/6] Touchscreen performance related fixes
-In-Reply-To: <CABH3fy8zCjsxARsqBf9JXOHBkzySdiqifA1KtjnGpJdBY2EikA@mail.gmail.com>
-References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
- <20141124115116.GA14997@linutronix.de>	<547C3A95.30605@ti.com>
- <547C3C19.5090501@linutronix.de>	<547C42FF.5010700@ti.com>
- <CAH=tA9FO5MCzE274thc-NugCNte6WdyC-Rxc6yfnuR=+6_qMbA@mail.gmail.com>
- <548A0125.6040708@linutronix.de>
- <CABH3fy8zCjsxARsqBf9JXOHBkzySdiqifA1KtjnGpJdBY2EikA@mail.gmail.com>
-Message-ID: <912A29987EAE174BA6CF187D7CDFA9CE26FA135A@DLEE08.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Dec 2014 15:20:27 +0100
+Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <548960F3.7070405@linaro.org>
+References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <10603826.6Z6KUoI9qZ@wuerfel> <548960F3.7070405@linaro.org>
+Message-ID: <1833364.xuE8O3LGeh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Catalin Crenguta [mailto:catalin.crenguta at gmail.com]
-> I have tried your patches by cloning [1] and copying the relevant files over
-> the kernel I've cloned from [2].
-> It compiles & runs, but I'm seeing lots of pen-down/pen-up events when I'm
-> not touching the screen.
-> Any suggestions?
+On Thursday 11 December 2014 17:16:35 Hanjun Guo wrote:
+> On 2014?12?10? 18:57, Arnd Bergmann wrote:
+> > On Wednesday 26 November 2014 17:12:49 Hanjun Guo wrote:
+> > The above topology is not easy to represent, but I think it would work
+> > like this (ignoring the threads/cores/clusters on the socket, which
+> > would also need to be described in a full DT), using multiple logical
+> > paths between the nodes:
+> >
+> > socket 0
+> > ibm,associativity = <0 0 0 0>, <1 1 1 0>, <2 2 0 0>,  0 0 0>;
+> >
+> > socket 1
+> > ibm,associativity = <1 1 1 1>, <0 0 0 1>, <2 2 2 1>,  3 1 1>;
+> >
+> > socket 2
+> > ibm,associativity = <2 2 2 2>, <0 0 2 2>, <1 1 1 2>,  3 3 2>;
+> >
+> > socket 3
+> > ibm,associativity =  3 3 3>, <0 3 3 3>, <1 1 3 3>, <2 2 2 3>;
+> >
+> > This describes four levels or hierarchy, with the lowest level
+> > being a single CPU core on one socket, and four paths between
+> > the sockets. To compute the associativity between two sockets,
+> > you need to look at each combination of paths to find the best
+> > match.
+> >
+> > Comparing sockets 0 and 1, the best matches are <1 1 1 0>
+> > with <1 1 1 1>, and <0 0 0 0> with <0 0 0 1>. In each case, the
+> > associativity is "3", meaning the first three entries match.
+> >
+> > Comparing sockets 0 and 3, we have four equally bad matches
+> > that each only match in the highest-level domain, e.g. <0 0 0 0>
+> > with <0 3 3 3>, so the associativity is only "1", and that means
+> > the two nodes are less closely associated than two neighboring
+> > ones.
+> >
+> > With the algorithm that powerpc uses to turn associativity into
+> > distance, 2**(numlevels - associativity), this would put the
+> > distance of neighboring nodes at "2", and the longest distance
+> > at "8".
+> 
+> Thanks for the explain, I can understand how it works now,
+> a bit complicated for me and I think the distance property
+> "node-matrix" in Ganapatrao's patch is straight forward,
+> what do you think?
 
-How are you configuring ti,charge-delay in your dts?  I've seen this behavior on some custom boards where we were using a smaller charge delay (0x400) to begin with, and by upping it to 0xb000 we resolved the issue.  These patches however already specified ti,charge-delay = 0xb000 by default so this would surprise me that it's still seeing that issue.  Was the touchscreen working as expected before these new patches, or does it have issues both ways?
+I still think we should go the whole way of having something compatible
+with the existing bindings, possibly using different property names
+if there are objections to using the "ibm," prefix.
+
+The associativity property is more expressive and lets you describe
+things that you can't describe with the mem-map/cpu-map properties,
+e.g. devices that are part of the NUMA hierarchy but not associated
+to exactly one last-level node.
+
+	Arnd
