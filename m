@@ -1,34 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 12 Dec 2014 10:52:12 +0100
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Fri, 12 Dec 2014 09:59:18 +0100
 Subject: [PATCH v2 1/1] net/macb: add TX multiqueue support for gem
 In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CA0BA36@AcuExch.aculab.com>
-References: <cover.1418291637.git.cyrille.pitchen@atmel.com>
- <87a3098203ee6eaa7a60607713a293d3258e2b58.1418291637.git.cyrille.pitchen@atmel.com>
+References: <cover.1418291637.git.cyrille.pitchen@atmel.com>	<87a3098203ee6eaa7a60607713a293d3258e2b58.1418291637.git.cyrille.pitchen@atmel.com>
  <20141211203103.4191887a@free-electrons.com>
  <063D6719AE5E284EB5DD2968C1650D6D1CA0BA36@AcuExch.aculab.com>
-Message-ID: <20141212105212.3b9c5810@free-electrons.com>
+Message-ID: <548AAE66.8070501@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear David Laight,
-
-On Fri, 12 Dec 2014 09:45:30 +0000, David Laight wrote:
+Le 12/12/2014 10:45, David Laight a ?crit :
 > From: Thomas Petazzoni
-> > On Thu, 11 Dec 2014 11:16:51 +0100, Cyrille Pitchen wrote:
-> > 
-> > > +#define GEM_ISR1				0x0400
-> > > +#define GEM_ISR2				0x0404
-> > > +#define GEM_ISR3				0x0408
-> > > +#define GEM_ISR4				0x040c
-> > > +#define GEM_ISR5				0x0410
-> > > +#define GEM_ISR6				0x0414
-> > > +#define GEM_ISR7				0x0418
-> > 
-> > What about doing instead:
-> > 
-> > #define GEM_ISR(q)				((q) == 0 ? MACB_ISR : 0x400 + (q) << 2)
-> > 
-> > And ditto for all other registers, which will save a lot of boring repeated code.
+>> On Thu, 11 Dec 2014 11:16:51 +0100, Cyrille Pitchen wrote:
+>>
+>>> +#define GEM_ISR1				0x0400
+>>> +#define GEM_ISR2				0x0404
+>>> +#define GEM_ISR3				0x0408
+>>> +#define GEM_ISR4				0x040c
+>>> +#define GEM_ISR5				0x0410
+>>> +#define GEM_ISR6				0x0414
+>>> +#define GEM_ISR7				0x0418
+>>
+>> What about doing instead:
+>>
+>> #define GEM_ISR(q)				((q) == 0 ? MACB_ISR : 0x400 + (q) << 2)
+>>
+>> And ditto for all other registers, which will save a lot of boring repeated code.
 > 
 > It will probably add a lot of object code and, depending on how often
 > the registers are accesses, might have performance impact.
@@ -36,20 +33,21 @@ On Fri, 12 Dec 2014 09:45:30 +0000, David Laight wrote:
 > Having:
 > #define GEM_ISR(n) (0x400 + (n) << 4)
 > will save source code.
+> 
+> 	David
+> 
+> 
+> 
+So you suggest that we keep the unsigned int fields ISR, IMR, IER, IDR, TBQP in
+the struct macb_queue and initialize them once for all in macb_probe() like
+patch v2 does but only replace the GEM_ISR1 .. GEM_ISR7 defines by GEM_ISR(n)
+in macb.h?
 
-Except that this won't work for n == 0, because for n == 0, the
-register offset is not 0x400.
+This way there would be to test at run time and we can handle the special
+register mapping of queue0.
 
-And in fact, my code was also wrong, it should be:
+Is it what you meant?
 
-	((q) == 0 ? MACB_ISR : 0x400 + ((q)-1) << 2))
+Regards,
 
-Since q=1 is@0x400.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Cyrille
