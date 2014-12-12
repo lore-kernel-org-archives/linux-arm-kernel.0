@@ -1,69 +1,51 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 12 Dec 2014 08:37:53 -0800
-Subject: [PATCH v3 0/7] Pinctrl support for Zynq
-In-Reply-To: <1d59c0972da04ec89dec6c09724986a1@BY2FFO11FD010.protection.gbl>
-References: <1d59c0972da04ec89dec6c09724986a1@BY2FFO11FD010.protection.gbl>
-Message-ID: <4d544fe425694a4e8043ddbf604db062@BN1AFFO11FD033.protection.gbl>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 12 Dec 2014 16:39:35 +0000
+Subject: [PATCH 0/4] GICv3: add 32bit compatibility
+In-Reply-To: <1418307788-17977-1-git-send-email-jean-philippe.brucker@arm.com>
+References: <1418307788-17977-1-git-send-email-jean-philippe.brucker@arm.com>
+Message-ID: <548B1A47.7060301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Argh, this went through the wrong SMTP. I suspect threading is broken
-due to that. Let me know if you want me to resend this with intact
-threading.
-My apologies.
+Hi Jean-Philippe,
 
-	Thanks,
-	S?ren
+On 11/12/14 14:23, Jean-Philippe Brucker wrote:
+> This series adds 32bit compatibility to Marc's GICv3 driver. Only SGIs,
+> PPIs and SPIs support is present. No ITS nor virtualisation.
+> 
+> It is based on 3.18.
+> 
+> Jean-Philippe Brucker (4):
+>   arm64: GICv3: refactor the AArch64 specific parts
+>   arm64: GICv3: change unsigned types for AArch32 compatibility
+>   arm64: GICv3: Specialize readq and writeq accesses
+>   ARM: add 32bit support to GICv3
+> 
+>  arch/arm/include/asm/arch_gicv3.h   | 182 ++++++++++++++++++++++++++++++++++++
+>  arch/arm64/include/asm/arch_gicv3.h | 141 ++++++++++++++++++++++++++++
+>  drivers/irqchip/irq-gic-v3.c        |  69 ++++----------
+>  include/linux/irqchip/arm-gic-v3.h  |  95 +++----------------
+>  4 files changed, 356 insertions(+), 131 deletions(-)
+>  create mode 100644 arch/arm/include/asm/arch_gicv3.h
+>  create mode 100644 arch/arm64/include/asm/arch_gicv3.h
 
-On Fri, 2014-12-12 at 08:34AM -0800, Soren Brinkmann wrote:
-> Hi,
-> 
-> I made those few adjustments that came up in the v2 review. Other than
-> those, these are the same patches as before.
-> The series is based on pinctrl-v3.19-1, the current pinctrl/devel
-> branch.
-> A branch with these changes is available at
-> https://github.com/sorenb-xlnx/linux-xlnx/commits/pinctrl
-> 
-> 	Thanks,
-> 	S?ren
-> 
-> Soren Brinkmann (7):
->   pinctrl: pinconf-generic: Infer map type from DT property
->   pinctrl: pinconf-generic: Allow driver to specify DT params
->   pinctrl: zynq: Document DT binding
->   pinctrl: Add driver for Zynq
->   ARM: zynq: Enable pinctrl
->   ARM: zynq: DT: Add pinctrl information
->   pinctrl: qcom-spmi-gpio: Migrate to pinconf-generic
-> 
->  .../bindings/pinctrl/xlnx,zynq-pinctrl.txt         |  104 ++
->  arch/arm/boot/dts/zynq-7000.dtsi                   |    8 +-
->  arch/arm/boot/dts/zynq-zc702.dts                   |  181 +++
->  arch/arm/boot/dts/zynq-zc706.dts                   |  152 +++
->  arch/arm/mach-zynq/Kconfig                         |    2 +
->  drivers/pinctrl/Kconfig                            |    8 +
->  drivers/pinctrl/Makefile                           |    1 +
->  drivers/pinctrl/nomadik/pinctrl-abx500.c           |    2 +-
->  drivers/pinctrl/pinconf-generic.c                  |  199 ++--
->  drivers/pinctrl/pinconf.c                          |    4 +-
->  drivers/pinctrl/pinconf.h                          |   22 +-
->  drivers/pinctrl/pinctrl-rockchip.c                 |    2 +-
->  drivers/pinctrl/pinctrl-tz1090-pdc.c               |    2 +-
->  drivers/pinctrl/pinctrl-tz1090.c                   |    2 +-
->  drivers/pinctrl/pinctrl-zynq.c                     | 1176 ++++++++++++++++++++
->  drivers/pinctrl/qcom/pinctrl-spmi-gpio.c           |  125 +--
->  drivers/pinctrl/sh-pfc/pinctrl.c                   |    2 +-
->  include/linux/pinctrl/pinconf-generic.h            |   29 +
->  include/linux/pinctrl/pinctrl.h                    |    9 +
->  19 files changed, 1808 insertions(+), 222 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/xlnx,zynq-pinctrl.txt
->  create mode 100644 drivers/pinctrl/pinctrl-zynq.c
-> 
-> -- 
-> 2.2.0.1.g9ee0458
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+so if I compile this with CONFIG_KVM_ARM_VGIC on, I get a compilation error:
+  LD      init/built-in.o
+arch/arm/kvm/built-in.o: In function `svc_die_str':
+arch_timer.c:(.rodata+0xf7c): undefined reference to `vgic_v3_probe'
+make[2]: *** [vmlinux] Error 1
+
+The svc_die_str reference is probably bogus, but if I protect the
+vgic_v3_probe reference in virt/kvm/arm/vgic.c with "#ifdef ARM64" it
+compiles fine. Disabling CONFIG_KVM_ARM_VGIC in the .config also fixes
+this also.
+I leave it up to you whether you want to take your "no virtualisation"
+statement above serious and fix Kconfig accordingly or use the ifdef
+solution.
+
+After fixing that, adding CONFIG_ARM_GIC_V3 as Marc suggested (and
+adding AArch32 support for the ICC_SGI1R trap in my patches ;-) I could
+run a 32-bit GICv3 guest with your patches on a GICv3 64-bit host.
+
+Cheers,
+Andre.
