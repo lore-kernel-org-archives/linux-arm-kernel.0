@@ -1,77 +1,239 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 12 Dec 2014 15:06:08 +0000
-Subject: [PATCH] arm64: psci: Fix build breakage without PM_SLEEP
-In-Reply-To: <20141209161511.GI31129@e104818-lin.cambridge.arm.com>
-References: <1418125716-18528-1-git-send-email-k.kozlowski@samsung.com>
- <2290734.BRljGaICu4@wuerfel> <1418128689.19339.3.camel@AMDC1943>
- <20141209161511.GI31129@e104818-lin.cambridge.arm.com>
-Message-ID: <20141212150608.GA4853@e102568-lin.cambridge.arm.com>
+From: lyz@rock-chips.com (Yunzhi Li)
+Date: Fri, 12 Dec 2014 23:07:46 +0800
+Subject: [PATCH v7 2/5] phy: add a driver for the Rockchip SoC internal USB2.0
+ PHY
+In-Reply-To: <1418396413-27937-1-git-send-email-lyz@rock-chips.com>
+References: <1418396413-27937-1-git-send-email-lyz@rock-chips.com>
+Message-ID: <1418396866-32625-1-git-send-email-lyz@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 09, 2014 at 04:15:11PM +0000, Catalin Marinas wrote:
-> On Tue, Dec 09, 2014 at 12:38:09PM +0000, Krzysztof Kozlowski wrote:
-> > On wto, 2014-12-09 at 13:29 +0100, Arnd Bergmann wrote:
-> > > On Tuesday 09 December 2014 12:48:36 Krzysztof Kozlowski wrote:
-> > > > Fix build failure of defconfig when PM_SLEEP is disabled (e.g. by
-> > > > disabling SUSPEND) and CPU_IDLE enabled:
-> > > > 
-> > > > arch/arm64/kernel/psci.c:543:2: error: unknown field 'cpu_suspend' specified in initializer
-> > > >   .cpu_suspend = cpu_psci_cpu_suspend,
-> > > >   ^
-> > > > arch/arm64/kernel/psci.c:543:2: warning: initialization from incompatible pointer type [enabled by default]
-> > > > arch/arm64/kernel/psci.c:543:2: warning: (near initialization for 'cpu_psci_ops.cpu_prepare') [enabled by default]
-> > > > make[1]: *** [arch/arm64/kernel/psci.o] Error 1
-> > > > 
-> > > > The cpu_operations.cpu_suspend field exists only if ARM64_CPU_SUSPEND is
-> > > > defined, not CPU_IDLE.
-> > > > 
-> > > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > > > 
-> > > 
-> > > No objection to fixing this obvious build bug, but why do we even have
-> > > an ARM64_CPU_SUSPEND option? On ARM32 we only have the respective option
-> > > because we have a random collection of platform specific drivers that
-> > > use the symbols, but that's not the case on ARM64.
-> > 
-> > I believe because of cpuidle. It's the same as on ARM32: the cpu_suspend
-> > is used by both PM_SLEEP and CPU_IDLE.
-> 
-> I guess at some point we can replace (as a separate patch)
-> ARM64_CPU_SUSPEND with PM_SLEEP.
-> 
-> But what I don't fully understand, we can enable CPU_IDLE without
-> ARM64_CPU_SUSPEND. However, the cpuidle-arm64.c driver will fail to
-> link since it calls cpu_suspend(). Wouldn't it be better if
-> ARM64_CPU_SUSPEND depends on CPU_PM (or replaced by it) rather than
-> PM_SLEEP?
+This patch to add a generic PHY driver for ROCKCHIP usb PHYs,
+currently this driver can support RK3288. The RK3288 SoC have
+three independent USB PHY IPs which are all configured through a
+set of registers located in the GRF (general register files)
+module.
 
-I think that ARM64_CPU_SUSPEND should depend on PM_SLEEP || CPU_IDLE,
-if CPU_IDLE is enabled it is certainly because some idle states are
-expected to be present, true, not all of them lose context (which is
-why ARM64_CPU_SUSPEND is needed, to save/restore context and clean
-it to RAM), but I think that's too fine grain, making it depend on
-CPU_IDLE should be ok.
+Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
 
-Having CPU_IDLE enabled without arm64 cpuidle driver enabled (which
-selects ARM64_CPU_SUSPEND) is useless at the moment.
+---
 
-As to cpu_ops, I think that the suspend hook should ifdef on CPU_IDLE,
-but I have to wait and see how we implement S2R to make it a final
-decision.
+Changes in v7:
+- Accept Kishon's comments to use phandle args to find a phy
+  struct directly and get rid of using a custom of_xlate
+  function.
 
-> Can we allow deeper idle states when CONFIG_SUSPEND is disabled? I see
-> CONFIG_SUSPEND related to suspend-to-RAM (system standby) rather than
-> CPU idle, in which case we may want to allow cpu_suspend when only
-> CPU_IDLE is enabled (which implies CONFIG_CPU_PM).
+Changes in v6:
+- Rename SIDDQ_MSK to SIDDQ_WRITE_ENA.
 
-Yes, deep idle states are enabled even when suspend is disabled, but
-both S2R and CPU_IDLE should turn on ARM64_CPU_SUSPEND to save/restore
-context, unless we remove ARM64_CPU_SUSPEND entirely and we always
-compile that code in.
+Changes in v5: None
+Changes in v4:
+- Get number of PHYs from device tree.
+- Model each PHY as subnode of the phy provider node.
 
-I will put together a patch first thing next week to clarify this
-thread.
+Changes in v3:
+- Use BIT macro instead of bit shift ops.
+- Rename the config entry to PHY_ROCKCHIP_USB.
 
-Thanks,
-Lorenzo
+ drivers/phy/Kconfig            |   7 ++
+ drivers/phy/Makefile           |   1 +
+ drivers/phy/phy-rockchip-usb.c | 158 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 166 insertions(+)
+ create mode 100644 drivers/phy/phy-rockchip-usb.c
+
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index ccad880..b24500a 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -239,6 +239,13 @@ config PHY_QCOM_IPQ806X_SATA
+ 	depends on OF
+ 	select GENERIC_PHY
+ 
++config PHY_ROCKCHIP_USB
++	tristate "Rockchip USB2 PHY Driver"
++	depends on ARCH_ROCKCHIP && OF
++	select GENERIC_PHY
++	help
++	  Enable this to support the Rockchip USB 2.0 PHY.
++
+ config PHY_ST_SPEAR1310_MIPHY
+ 	tristate "ST SPEAR1310-MIPHY driver"
+ 	select GENERIC_PHY
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index aa74f96..48bf5a1 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -28,6 +28,7 @@ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
+ phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)	+= phy-s5pv210-usb2.o
+ obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
+ obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)	+= phy-qcom-apq8064-sata.o
++obj-$(CONFIG_PHY_ROCKCHIP_USB) += phy-rockchip-usb.o
+ obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
+ obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
+ obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
+diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
+new file mode 100644
+index 0000000..22011c3
+--- /dev/null
++++ b/drivers/phy/phy-rockchip-usb.c
+@@ -0,0 +1,158 @@
++/*
++ * Rockchip usb PHY driver
++ *
++ * Copyright (C) 2014 Yunzhi Li <lyz@rock-chips.com>
++ * Copyright (C) 2014 ROCKCHIP, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/phy/phy.h>
++#include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
++#include <linux/reset.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++
++/*
++ * The higher 16-bit of this register is used for write protection
++ * only if BIT(13 + 16) set to 1 the BIT(13) can be written.
++ */
++#define SIDDQ_WRITE_ENA	BIT(29)
++#define SIDDQ_ON		BIT(13)
++#define SIDDQ_OFF		(0 << 13)
++
++struct rockchip_usb_phy {
++	unsigned int	reg_offset;
++	struct regmap	*reg_base;
++	struct clk	*clk;
++	struct phy	*phy;
++};
++
++static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
++					   bool siddq)
++{
++	return regmap_write(phy->reg_base, phy->reg_offset,
++			    SIDDQ_WRITE_ENA | (siddq ? SIDDQ_ON : SIDDQ_OFF));
++}
++
++static int rockchip_usb_phy_power_off(struct phy *_phy)
++{
++	struct rockchip_usb_phy *phy = phy_get_drvdata(_phy);
++	int ret = 0;
++
++	/* Power down usb phy analog blocks by set siddq 1 */
++	ret = rockchip_usb_phy_power(phy, 1);
++	if (ret)
++		return ret;
++
++	clk_disable_unprepare(phy->clk);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
++static int rockchip_usb_phy_power_on(struct phy *_phy)
++{
++	struct rockchip_usb_phy *phy = phy_get_drvdata(_phy);
++	int ret = 0;
++
++	ret = clk_prepare_enable(phy->clk);
++	if (ret)
++		return ret;
++
++	/* Power up usb phy analog blocks by set siddq 0 */
++	ret = rockchip_usb_phy_power(phy, 0);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
++static struct phy_ops ops = {
++	.power_on	= rockchip_usb_phy_power_on,
++	.power_off	= rockchip_usb_phy_power_off,
++	.owner		= THIS_MODULE,
++};
++
++static int rockchip_usb_phy_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct rockchip_usb_phy *rk_phy;
++	struct phy_provider *phy_provider;
++	struct device_node *child;
++	struct regmap *grf;
++	unsigned int reg_offset;
++
++	grf = syscon_regmap_lookup_by_phandle(dev->of_node, "rockchip,grf");
++	if (IS_ERR(grf)) {
++		dev_err(&pdev->dev, "Missing rockchip,grf property\n");
++		return PTR_ERR(grf);
++	}
++
++	for_each_available_child_of_node(dev->of_node, child) {
++		rk_phy = devm_kzalloc(dev, sizeof(*rk_phy), GFP_KERNEL);
++		if (!rk_phy)
++			return -ENOMEM;
++
++		if (of_property_read_u32(child, "reg", &reg_offset)) {
++			dev_err(dev, "missing reg property in node %s\n",
++				child->name);
++			return -EINVAL;
++		}
++
++		rk_phy->reg_offset = reg_offset;
++		rk_phy->reg_base = grf;
++
++		rk_phy->clk = of_clk_get_by_name(child, "phyclk");
++		if (IS_ERR(rk_phy->clk))
++			rk_phy->clk = NULL;
++
++		rk_phy->phy = devm_phy_create(dev, child, &ops);
++		if (IS_ERR(rk_phy->phy)) {
++			dev_err(dev, "failed to create PHY\n");
++			return PTR_ERR(rk_phy->phy);
++		}
++		phy_set_drvdata(rk_phy->phy, rk_phy);
++	}
++
++	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
++	return PTR_ERR_OR_ZERO(phy_provider);
++}
++
++static const struct of_device_id rockchip_usb_phy_dt_ids[] = {
++	{ .compatible = "rockchip,rk3288-usb-phy" },
++	{}
++};
++
++MODULE_DEVICE_TABLE(of, rockchip_usb_phy_dt_ids);
++
++static struct platform_driver rockchip_usb_driver = {
++	.probe		= rockchip_usb_phy_probe,
++	.driver		= {
++		.name	= "rockchip-usb-phy",
++		.owner	= THIS_MODULE,
++		.of_match_table = rockchip_usb_phy_dt_ids,
++	},
++};
++
++module_platform_driver(rockchip_usb_driver);
++
++MODULE_AUTHOR("Yunzhi Li <lyz@rock-chips.com>");
++MODULE_DESCRIPTION("Rockchip USB 2.0 PHY driver");
++MODULE_LICENSE("GPL v2");
+-- 
+2.0.0
