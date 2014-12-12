@@ -1,112 +1,45 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Fri, 12 Dec 2014 08:53:44 -0800
-Subject: [PATCH v2 1/4] pci: iProc: define Broadcom iProc PCIe binding
-In-Reply-To: <3375037.6pjWmlOLA3@wuerfel>
-References: <1418351817-14898-2-git-send-email-rjui@broadcom.com>
- <3375037.6pjWmlOLA3@wuerfel>
-Message-ID: <548B1D98.6030400@broadcom.com>
+Date: Fri, 12 Dec 2014 08:56:19 -0800
+Subject: [PATCH v2 3/4] ARM: mach-bcm: Enable PCIe support for iProc
+In-Reply-To: <3173848.p74DGitYxH@wuerfel>
+References: <1418351817-14898-4-git-send-email-rjui@broadcom.com>
+ <3173848.p74DGitYxH@wuerfel>
+Message-ID: <548B1E33.4090806@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 12/12/2014 4:14 AM, Arnd Bergmann wrote:
-> On Thursday 11 December 2014 18:36:54 Ray Jui wrote:
->> index 0000000..040bc0f
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
->> @@ -0,0 +1,74 @@
->> +* Broadcom iProc PCIe controller
->> +
->> +Required properties:
->> +- compatible: Must be "brcm,iproc-pcie"
->> +- reg: base address and length of the PCIe controller and the MDIO interface
->> +  that controls the PCIe PHY
->> +- #interrupt-cells: set to <1>
->> +- interrupts: interrupt IDs
->
-> How many, and what are they?
->
-Different iProc SoCs might have different number of interrupts. I'll 
-elaborate more on the next patch.
-
->> +- interrupt-map-mask and interrupt-map, standard PCI properties to define the
->> +  mapping of the PCIe interface to interrupt numbers
->> +- bus-range: PCI bus numbers covered
->> +- #address-cells: set to <3>
->> +- #size-cells: set to <2>
->> +- device_type: set to "pci"
->> +- ranges: ranges for the PCI memory and I/O regions
->> +- phy-addr: MDC/MDIO adddress of the PCIe PHY
->
-> It looks like the phy controller is separate from the PCI controller,
-> and you even list the same register range for both PHYs. Better make
-> that a separate driver and put the phy address into the "phys" reference.
->
-Okay. In this case, I need to create a separate PHY driver under the 
-drivers/phy directory and have the PCIe host driver reference it through 
-the standard PHY API.
-
->> +- have-msi-inten-reg: Required for legacy iProc PCIe controllers that need the
->> +  MSI interrupt enable register to be set explicitly
->> +
->> +The Broadcom iProc PCie driver adapts the multi-domain structure, i.e., each
->> +interface has its own domain and therefore has its own device node
->> +Example:
->> +
->> +SoC specific DT Entry:
->> +
->> +       pcie0: pcie at 18012000 {
->> +               compatible = "brcm,iproc-pcie";
->> +               reg = <0x18012000 0x1000>,
->> +                       <0x18002000 0x1000>;
->
-> I guess the addresses should be relative to the BCMA bus, and this node
-> get moved under that. Please see Hauke's patch series, we've discussed
-> this in great length already.
->
-
-As Arend van Spriel pointed out in the previous discussion:
-
-BCMA core is the bus driver for discoverable ARM AXI interconnect. Apart 
-from that it also provides drivers for some cores. For the chips to be 
-discoverable it needs additional IP logic.
-
-Not all iProc family of SoCs have the additional IP logic and for those 
-which don't, they cannot use the BCMA bus.
-
->> +               #interrupt-cells = <1>;
->> +               interrupts = <GIC_SPI 96 IRQ_TYPE_NONE>,
->> +                            <GIC_SPI 97 IRQ_TYPE_NONE>,
->> +                            <GIC_SPI 98 IRQ_TYPE_NONE>,
->> +                            <GIC_SPI 99 IRQ_TYPE_NONE>,
->> +                            <GIC_SPI 100 IRQ_TYPE_NONE>,
->> +                            <GIC_SPI 101 IRQ_TYPE_NONE>;
->
->
->
->> +               interrupt-map-mask = <0 0 0 0>;
->> +               interrupt-map = <0 0 0 0 &gic GIC_SPI 100 IRQ_TYPE_NONE>;
->
-> This interrupt is also listed in the "interrupts" above, which is
-> probably a mistake, unless the IRQ line is shared between all PCI
-> devices and the PCI host itself.
->
-interrupts are for MSI interrupt support and interrupt-map is for legacy 
-INTx support. To my best knowledge, MSI and INTx cannot be used at the 
-same time. "nvidia,tegra20-pcie.txt" and "rcar-pci.txt" have similar 
-configurations.
-
->> +               bus-range = <0x00 0xFF>;
->> +
->> +               #address-cells = >;
->> +               #size-cells = <2>;
->> +               device_type = "pci";
->> +               ranges = <0x81000000 0 0          0x28000000 0 0x00010000   /* downstream I/O */
->> +                         0x82000000 0 0x20000000 0x20000000 0 0x04000000>; /* non-prefetchable memory */
->> +               phy-addr = <5>;
->> +       };
+On 12/12/2014 4:15 AM, Arnd Bergmann wrote:
+> On Thursday 11 December 2014 18:36:56 Ray Jui wrote:
+>> Enable PCIe driver support for Broadcom iProc family of SoCs by
+>> selecting PCIE_IPROC
 >>
+>> Signed-off-by: Ray Jui <rjui@broadcom.com>
+>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>> ---
+>>   arch/arm/mach-bcm/Kconfig |    1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+>> index aaeec78..a13a0b2 100644
+>> --- a/arch/arm/mach-bcm/Kconfig
+>> +++ b/arch/arm/mach-bcm/Kconfig
+>> @@ -19,6 +19,7 @@ config ARCH_BCM_IPROC
+>>   	select ARCH_REQUIRE_GPIOLIB
+>>   	select ARM_AMBA
+>>   	select PINCTRL
+>> +	select PCIE_IPROC
+>>   	help
+>>   	  This enables support for systems based on Broadcom IPROC architected SoCs.
+>>   	  The IPROC complex contains one or more ARM CPUs along with common
+>>
+>
+> No, just enable it in multi_v7_defconfig and bcm_defconfig.
 >
 > 	Arnd
 >
+Or can I simply have the PCIE_IPROC default to y in 
+drivers/pci/host/Kconfig? Note PCIE_IPROC depends on ARCH_BCM_IPROC. By 
+defaulting it to y, it will be automatically enabled for all iProc 
+family of SoCs.
