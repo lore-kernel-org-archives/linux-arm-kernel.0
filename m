@@ -1,36 +1,85 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Dec 2014 13:15:52 +0100
-Subject: [PATCH v2 3/4] ARM: mach-bcm: Enable PCIe support for iProc
-In-Reply-To: <1418351817-14898-4-git-send-email-rjui@broadcom.com>
-References: <1418351817-14898-4-git-send-email-rjui@broadcom.com>
-Message-ID: <3173848.p74DGitYxH@wuerfel>
+Date: Fri, 12 Dec 2014 13:14:58 +0100
+Subject: [PATCH v2 1/4] pci: iProc: define Broadcom iProc PCIe binding
+In-Reply-To: <1418351817-14898-2-git-send-email-rjui@broadcom.com>
+References: <1418351817-14898-2-git-send-email-rjui@broadcom.com>
+Message-ID: <3375037.6pjWmlOLA3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 December 2014 18:36:56 Ray Jui wrote:
-> Enable PCIe driver support for Broadcom iProc family of SoCs by
-> selecting PCIE_IPROC
-> 
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> ---
->  arch/arm/mach-bcm/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index aaeec78..a13a0b2 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -19,6 +19,7 @@ config ARCH_BCM_IPROC
->  	select ARCH_REQUIRE_GPIOLIB
->  	select ARM_AMBA
->  	select PINCTRL
-> +	select PCIE_IPROC
->  	help
->  	  This enables support for systems based on Broadcom IPROC architected SoCs.
->  	  The IPROC complex contains one or more ARM CPUs along with common
-> 
+On Thursday 11 December 2014 18:36:54 Ray Jui wrote:
+> index 0000000..040bc0f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+> @@ -0,0 +1,74 @@
+> +* Broadcom iProc PCIe controller
+> +
+> +Required properties:
+> +- compatible: Must be "brcm,iproc-pcie"
+> +- reg: base address and length of the PCIe controller and the MDIO interface
+> +  that controls the PCIe PHY
+> +- #interrupt-cells: set to <1>
+> +- interrupts: interrupt IDs
 
-No, just enable it in multi_v7_defconfig and bcm_defconfig.
+How many, and what are they?
+
+> +- interrupt-map-mask and interrupt-map, standard PCI properties to define the
+> +  mapping of the PCIe interface to interrupt numbers
+> +- bus-range: PCI bus numbers covered
+> +- #address-cells: set to <3>
+> +- #size-cells: set to <2>
+> +- device_type: set to "pci"
+> +- ranges: ranges for the PCI memory and I/O regions
+> +- phy-addr: MDC/MDIO adddress of the PCIe PHY
+
+It looks like the phy controller is separate from the PCI controller,
+and you even list the same register range for both PHYs. Better make
+that a separate driver and put the phy address into the "phys" reference.
+
+> +- have-msi-inten-reg: Required for legacy iProc PCIe controllers that need the
+> +  MSI interrupt enable register to be set explicitly
+> +
+> +The Broadcom iProc PCie driver adapts the multi-domain structure, i.e., each
+> +interface has its own domain and therefore has its own device node
+> +Example:
+> +
+> +SoC specific DT Entry:
+> +
+> +       pcie0: pcie at 18012000 {
+> +               compatible = "brcm,iproc-pcie";
+> +               reg = <0x18012000 0x1000>,
+> +                       <0x18002000 0x1000>;
+
+I guess the addresses should be relative to the BCMA bus, and this node
+get moved under that. Please see Hauke's patch series, we've discussed
+this in great length already.
+
+> +               #interrupt-cells = <1>;
+> +               interrupts = <GIC_SPI 96 IRQ_TYPE_NONE>,
+> +                            <GIC_SPI 97 IRQ_TYPE_NONE>,
+> +                            <GIC_SPI 98 IRQ_TYPE_NONE>,
+> +                            <GIC_SPI 99 IRQ_TYPE_NONE>,
+> +                            <GIC_SPI 100 IRQ_TYPE_NONE>,
+> +                            <GIC_SPI 101 IRQ_TYPE_NONE>;
+
+
+
+> +               interrupt-map-mask = <0 0 0 0>;
+> +               interrupt-map = <0 0 0 0 &gic GIC_SPI 100 IRQ_TYPE_NONE>;
+
+This interrupt is also listed in the "interrupts" above, which is
+probably a mistake, unless the IRQ line is shared between all PCI
+devices and the PCI host itself.
+
+> +               bus-range = <0x00 0xFF>;
+> +
+> +               #address-cells = >;
+> +               #size-cells = <2>;
+> +               device_type = "pci";
+> +               ranges = <0x81000000 0 0          0x28000000 0 0x00010000   /* downstream I/O */
+> +                         0x82000000 0 0x20000000 0x20000000 0 0x04000000>; /* non-prefetchable memory */
+> +               phy-addr = <5>;
+> +       };
+> 
 
 	Arnd
