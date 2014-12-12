@@ -1,41 +1,92 @@
-From: lyz@rock-chips.com (Yunzhi Li)
-Date: Fri, 12 Dec 2014 23:17:02 +0800
-Subject: [PATCH v7 5/5] ARM: dts: rockchip: Enable usb PHY on rk3288-evb board
-In-Reply-To: <1418396413-27937-1-git-send-email-lyz@rock-chips.com>
-References: <1418396413-27937-1-git-send-email-lyz@rock-chips.com>
-Message-ID: <1418397422-17249-1-git-send-email-lyz@rock-chips.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 12 Dec 2014 16:18:49 +0100
+Subject: [PATCH v2] sun9i: clk: Fix compile error caused by "clk: sunxi: Give
+ sunxi_factors_register a registers parameter"
+Message-ID: <1418397529-1188-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable usb PHY for all usb ports on rk3288-evb.
+My "clk: sunxi: Give sunxi_factors_register a registers parameter" patch did
+not adjust the sunxi_factors_clock register calls in the new clk-sun9i-core.c
+clock code, causing compilation errors. This fixes this.
 
-Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
-
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
+ drivers/clk/sunxi/clk-sun9i-core.c | 27 ++++++++++++++++++++++-----
+ 1 file changed, 22 insertions(+), 5 deletions(-)
 
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-
- arch/arm/boot/dts/rk3288-evb.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index cb83cea..992f323 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -174,6 +174,10 @@
- 	};
- };
+diff --git a/drivers/clk/sunxi/clk-sun9i-core.c b/drivers/clk/sunxi/clk-sun9i-core.c
+index 3cb9036..110197a 100644
+--- a/drivers/clk/sunxi/clk-sun9i-core.c
++++ b/drivers/clk/sunxi/clk-sun9i-core.c
+@@ -22,6 +22,21 @@
  
-+&usbphy {
-+	status = "okay";
-+};
+ #include "clk-factors.h"
+ 
++static struct clk *sun9i_factors_register(struct device_node *node,
++					  const struct factors_data *data,
++					  spinlock_t *lock)
++{
++	void __iomem *reg;
 +
- &usb_host0_ehci {
- 	status = "okay";
- };
++	reg = of_iomap(node, 0);
++	if (!reg) {
++		pr_err("Could not get registers for factors-clk: %s\n",
++		       node->name);
++		return NULL;
++	}
++
++	return sunxi_factors_register(node, data, lock, reg);
++}
+ 
+ /**
+  * sun9i_a80_get_pll4_factors() - calculates n, p, m factors for PLL1
+@@ -89,7 +104,7 @@ static DEFINE_SPINLOCK(sun9i_a80_pll4_lock);
+ 
+ static void __init sun9i_a80_pll4_setup(struct device_node *node)
+ {
+-	sunxi_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
++	sun9i_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
+ }
+ CLK_OF_DECLARE(sun9i_a80_pll4, "allwinner,sun9i-a80-pll4-clk", sun9i_a80_pll4_setup);
+ 
+@@ -139,8 +154,10 @@ static DEFINE_SPINLOCK(sun9i_a80_gt_lock);
+ 
+ static void __init sun9i_a80_gt_setup(struct device_node *node)
+ {
+-	struct clk *gt = sunxi_factors_register(node, &sun9i_a80_gt_data,
++	struct clk *gt = sun9i_factors_register(node, &sun9i_a80_gt_data,
+ 						&sun9i_a80_gt_lock);
++	if (!gt)
++		return;
+ 
+ 	/* The GT bus clock needs to be always enabled */
+ 	__clk_get(gt);
+@@ -194,7 +211,7 @@ static DEFINE_SPINLOCK(sun9i_a80_ahb_lock);
+ 
+ static void __init sun9i_a80_ahb_setup(struct device_node *node)
+ {
+-	sunxi_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
++	sun9i_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
+ }
+ CLK_OF_DECLARE(sun9i_a80_ahb, "allwinner,sun9i-a80-ahb-clk", sun9i_a80_ahb_setup);
+ 
+@@ -210,7 +227,7 @@ static DEFINE_SPINLOCK(sun9i_a80_apb0_lock);
+ 
+ static void __init sun9i_a80_apb0_setup(struct device_node *node)
+ {
+-	sunxi_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
++	sun9i_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
+ }
+ CLK_OF_DECLARE(sun9i_a80_apb0, "allwinner,sun9i-a80-apb0-clk", sun9i_a80_apb0_setup);
+ 
+@@ -266,6 +283,6 @@ static DEFINE_SPINLOCK(sun9i_a80_apb1_lock);
+ 
+ static void __init sun9i_a80_apb1_setup(struct device_node *node)
+ {
+-	sunxi_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
++	sun9i_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
+ }
+ CLK_OF_DECLARE(sun9i_a80_apb1, "allwinner,sun9i-a80-apb1-clk", sun9i_a80_apb1_setup);
 -- 
-2.0.0
+2.1.0
