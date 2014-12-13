@@ -1,57 +1,40 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 13 Dec 2014 09:33:28 -0500
-Subject: [PATCH 0/3] removing of some unused/unsupported dts entries
-In-Reply-To: <8761dfgb1o.fsf@why.wild-wind.fr.eu.org>
-References: <cover.1418434448.git.silvio.fricke@gmail.com>
- <8761dfgb1o.fsf@why.wild-wind.fr.eu.org>
-Message-ID: <20141213143328.GA967@titan.lakedaemon.net>
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 13 Dec 2014 13:47:22 +0100
+Subject: clk: mxs: Invalid register access on HW_CLKCTRL_FRAC0?
+In-Reply-To: <1022343616.100338.1418473409091.JavaMail.open-xchange@oxbaltgw00.schlund.de>
+References: <1022343616.100338.1418473409091.JavaMail.open-xchange@oxbaltgw00.schlund.de>
+Message-ID: <201412131347.22972.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Silvio, Marc,
-
-On Sat, Dec 13, 2014 at 09:21:23AM +0000, Marc Zyngier wrote:
-> On Sat, Dec 13 2014 at  1:46:45 am GMT, Silvio Fricke <silvio.fricke@gmail.com> wrote:
+On Saturday, December 13, 2014 at 01:23:29 PM, Stefan Wahren wrote:
+> Hi Fabio,
 > 
-> Hi Silvio,
+> yesterday i stumble on this note in the i.MX28 reference manual (p. 931):
 > 
-> > I have found some dts entries which are not evaluated by the drivers. This
-> > patch remove this entries from the dts files.
-> > Jason has mentioned I should CC: Thomas, Marc and him self to this
-> > mails.
+>     10.8.24 Fractional Clock Control Register 0 (HW_CLKCTRL_FRAC0)
 > 
-> As far as I can tell, this looks correct. A few key things though:
+>     NOTE: This register can only be addressed by byte instructions.
+> Addressing word or half-word are not allowed.
 > 
-> - Please write decent commit logs. Indicate *why* you think these
->   properties can be removed (hint: not finding corresponding in the
->   drivers is not enough a reason, the binding itself matters).
+> The same applies to HW_CLKCTRL_FRAC1.
+> 
+> But clk_misc_init() doesn't care about that in clk_imx28.c:
+> 
+>     val = readl_relaxed(FRAC0);
+>     val &= ~((0x3f << BP_FRAC0_IO0FRAC) | (0x3f << BP_FRAC0_IO1FRAC));
+>     val |= (30 << BP_FRAC0_IO0FRAC) | (30 << BP_FRAC0_IO1FRAC);
+>     writel_relaxed(val, FRAC0);
+> 
+> The function clk_ref_set_rate() in clk_ref.c write also the complete
+> register at once, but change only a byte.
+> 
+> Which of them are invalid?
+> 
+> Would you prefer to use writeb() to fix this?
 
-Right.  The real issue is the state of these properties within the
-binding documentation.  Linux isn't the only consumer of these dts
-files (*BSD, barebox, etc), so us not using them doesn't necessarily
-mean the property should be removed.
+We've been bitten by doing 32-bit writes into the FRAC* registers in U-Boot, so 
+the documentation is certainly correct.
 
-The most important lesson (recently learned ;-) ) is to make sure all
-properties are accurately describing the *hardware*.  Not Linux's
-implementation of talking to the hardware.  That'll go a long way if the
-changelog discusses how property X is an implementation detail vice a
-hardware characteristic or feature.
-
-> - Cc the relevant platform maintainers. You're changing things that they
->   care about, basic courtesy is to keep them in the loop.
-
-True.  In Silvio's defense, I just told him to Cc us to get the ball
-rolling.  (I tend to dislike long discussions on chat mediums, I'd much
-rather they be in email.  So I was definitely too succinct).
-
-For the record, you can use ./scripts/get_maintainer.pl on your patches
-to make sure you get most of the right people.  In this case, that'll
-include the DT maintainers.  You may want to run a get_maintainer.pl -f
-arch/arm/mach-$ARCH for each of the dts file you touch.  Those
-maintainers usually wrangle the patches for their dts files.
-Unfortunately, not all of them have updated MAINTAINERS
-(<cough>mvebu<cough>) to include the dts file patterns.
-
-thx,
-
-Jason.
+Best regards,
+Marek Vasut
