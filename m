@@ -1,67 +1,57 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 13 Dec 2014 14:53:51 +0100
-Subject: [PATCH v5 00/19] KVM GICv3 emulation
-In-Reply-To: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
-References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141213135351.GI16855@cbox>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 13 Dec 2014 09:33:28 -0500
+Subject: [PATCH 0/3] removing of some unused/unsupported dts entries
+In-Reply-To: <8761dfgb1o.fsf@why.wild-wind.fr.eu.org>
+References: <cover.1418434448.git.silvio.fricke@gmail.com>
+ <8761dfgb1o.fsf@why.wild-wind.fr.eu.org>
+Message-ID: <20141213143328.GA967@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+Silvio, Marc,
 
-On Mon, Dec 08, 2014 at 12:37:35PM +0000, Andre Przywara wrote:
-> This is version 5 of the GICv3 guest emulation series (not for 3.19).
+On Sat, Dec 13, 2014 at 09:21:23AM +0000, Marc Zyngier wrote:
+> On Sat, Dec 13 2014 at  1:46:45 am GMT, Silvio Fricke <silvio.fricke@gmail.com> wrote:
 > 
-> As the changes this time were much smaller, I updated to tree to
-> 3.18.0, as it includes some bug fixes in the VGIC.
+> Hi Silvio,
 > 
-> I addressed the remaining comments from Christoffer and Eric, thanks
-> for the review! The changes this times were much smaller, most of them
-> cosmetic or rewordings of commit messages and comments.
-> I updated the kvm-gicv3/v4 branch in my repo[1] to carry all the delta
-> patches. Those patches are just for reference to see what has changed
-> between v4 and v5. For review and all other purposes please use the
-> v5 branch.
+> > I have found some dts entries which are not evaluated by the drivers. This
+> > patch remove this entries from the dts files.
+> > Jason has mentioned I should CC: Thomas, Marc and him self to this
+> > mails.
 > 
-> For a changelog summary see below, also each patch carries a changelog
-> now.
-> Only patches 05, 08, 12, 15, 17, 18 and 19 have been changed compared
-> to v4. I dropped Christoffer's Reviewed-by: tag from 05/19 because of
-> the newly added function, but added the respective tags to the other
-> commit messages.
+> As far as I can tell, this looks correct. A few key things though:
 > 
-> I quickly tested this version with a GICv3 capable fast model in all
-> endianness modes (LE guest on LE host, BE on LE, LE on BE, BE on BE).
-> Both a GICv2 and a GICv3 guest were booted in all four combinations.
-> 
-So this is overall looking like it's getting ready to be merged for
-v3.20.
+> - Please write decent commit logs. Indicate *why* you think these
+>   properties can be removed (hint: not finding corresponding in the
+>   drivers is not enough a reason, the binding itself matters).
 
-However, here are the things we need resolved before putting it into
-kvmarm/next:
+Right.  The real issue is the state of these properties within the
+binding documentation.  Linux isn't the only consumer of these dts
+files (*BSD, barebox, etc), so us not using them doesn't necessarily
+mean the property should be removed.
 
-1. You need to address the few remaining comments I had on this version.
+The most important lesson (recently learned ;-) ) is to make sure all
+properties are accurately describing the *hardware*.  Not Linux's
+implementation of talking to the hardware.  That'll go a long way if the
+changelog discusses how property X is an implementation detail vice a
+hardware characteristic or feature.
 
-2. You must rebase on the vgic_init series and the vcpu_nit series.
-   Both are in kvmarm/queue, so I suggest you rebase on that or wait
-   until both of those series hit kvm/next (later next week).  You also
-   need to base this on Eric's VGIC init ioctl series
-   (https://lists.cs.columbia.edu/pipermail/kvmarm/2014-December/012643.html),
-   but with dropping patch 3.  As soon as Marc has taken a look at that
-   series, I will merge it onto queue as well.
-   This is likely going to be a pain (sorry about that) since the whole
-   init/init_maps sequence has changed.
+> - Cc the relevant platform maintainers. You're changing things that they
+>   care about, basic courtesy is to keep them in the loop.
 
-3. Get rid of any on-demand calls to vgic_init() for GICv3.  For GICv3,
-   the only valid call to vgic_init() should be from the new device
-   control ioctl, and all other paths that rely on vgic_init() must
-   fail.
+True.  In Silvio's defense, I just told him to Cc us to get the ball
+rolling.  (I tend to dislike long discussions on chat mediums, I'd much
+rather they be in email.  So I was definitely too succinct).
 
-4. Resubmit a new (and hopefully final) version of the series soon after
-   the merge window closes.
+For the record, you can use ./scripts/get_maintainer.pl on your patches
+to make sure you get most of the right people.  In this case, that'll
+include the DT maintainers.  You may want to run a get_maintainer.pl -f
+arch/arm/mach-$ARCH for each of the dts file you touch.  Those
+maintainers usually wrangle the patches for their dts files.
+Unfortunately, not all of them have updated MAINTAINERS
+(<cough>mvebu<cough>) to include the dts file patterns.
 
-Then we'll queue this in kvmarm/next early so that we have time to test
-it and expose it to a wider audience.
+thx,
 
-Thanks,
--Christoffer
+Jason.
