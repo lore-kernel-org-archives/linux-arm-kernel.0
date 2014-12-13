@@ -1,58 +1,146 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 13 Dec 2014 09:21:23 +0000
-Subject: [PATCH 0/3] removing of some unused/unsupported dts entries
-In-Reply-To: <cover.1418434448.git.silvio.fricke@gmail.com> (Silvio Fricke's
- message of "Sat, 13 Dec 2014 01:46:45 +0000")
-References: <cover.1418434448.git.silvio.fricke@gmail.com>
-Message-ID: <8761dfgb1o.fsf@why.wild-wind.fr.eu.org>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Sat, 13 Dec 2014 11:05:52 +0100
+Subject: [PATCH v2 1/4] pci: iProc: define Broadcom iProc PCIe binding
+In-Reply-To: <3907917.zNo7yttzkh@wuerfel>
+References: <1418351817-14898-2-git-send-email-rjui@broadcom.com>
+ <3375037.6pjWmlOLA3@wuerfel> <548B1D98.6030400@broadcom.com>
+ <3907917.zNo7yttzkh@wuerfel>
+Message-ID: <548C0F80.2090300@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 13 2014 at  1:46:45 am GMT, Silvio Fricke <silvio.fricke@gmail.com> wrote:
-
-Hi Silvio,
-
-> I have found some dts entries which are not evaluated by the drivers. This
-> patch remove this entries from the dts files.
-> Jason has mentioned I should CC: Thomas, Marc and him self to this
-> mails.
-
-As far as I can tell, this looks correct. A few key things though:
-
-- Please write decent commit logs. Indicate *why* you think these
-  properties can be removed (hint: not finding corresponding in the
-  drivers is not enough a reason, the binding itself matters).
-
-- Spend two minutes looking at the ML archives, and try to find why we
-  ended-up with these orphan properties (something like this:
-  https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-November/023482.html
-  contains useful historical information).
-
-- Cc the relevant platform maintainers. You're changing things that they
-  care about, basic courtesy is to keep them in the loop.
-
-All of this will help maintainers to quickly decide on the fate of these
-patches.
-
-Thanks,
-
-	M.
-
-> thanks and best regards,
-> Silvio
+On 12/12/14 18:14, Arnd Bergmann wrote:
+> On Friday 12 December 2014 08:53:44 Ray Jui wrote:
+>>
+>> On 12/12/2014 4:14 AM, Arnd Bergmann wrote:
+>>> On Thursday 11 December 2014 18:36:54 Ray Jui wrote:
+>>>> index 0000000..040bc0f
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+>>>> @@ -0,0 +1,74 @@
+>>>> +* Broadcom iProc PCIe controller
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: Must be "brcm,iproc-pcie"
+>>>> +- reg: base address and length of the PCIe controller and the MDIO interface
+>>>> +  that controls the PCIe PHY
+>>>> +- #interrupt-cells: set to<1>
+>>>> +- interrupts: interrupt IDs
+>>>
+>>> How many, and what are they?
+>>>
+>> Different iProc SoCs might have different number of interrupts. I'll
+>> elaborate more on the next patch.
 >
+> Ok.
 >
-> Silvio Fricke (3):
->   ARM: mx5: dts: remove unused irq-trigger entry
->   ARM: tegra: dts: remove unused irq-trigger entry
->   ARM: SPEAr: dts: remove unused irq-trigger, id and block entries
+>>>> +- interrupt-map-mask and interrupt-map, standard PCI properties to define the
+>>>> +  mapping of the PCIe interface to interrupt numbers
+>>>> +- bus-range: PCI bus numbers covered
+>>>> +- #address-cells: set to<3>
+>>>> +- #size-cells: set to<2>
+>>>> +- device_type: set to "pci"
+>>>> +- ranges: ranges for the PCI memory and I/O regions
+>>>> +- phy-addr: MDC/MDIO adddress of the PCIe PHY
+>>>
+>>> It looks like the phy controller is separate from the PCI controller,
+>>> and you even list the same register range for both PHYs. Better make
+>>> that a separate driver and put the phy address into the "phys" reference.
+>>>
+>> Okay. In this case, I need to create a separate PHY driver under the
+>> drivers/phy directory and have the PCIe host driver reference it through
+>> the standard PHY API.
 >
->  arch/arm/boot/dts/imx53-m53.dtsi      | 1 -
->  arch/arm/boot/dts/spear1310-evb.dts   | 1 -
->  arch/arm/boot/dts/spear1340-evb.dts   | 2 --
->  arch/arm/boot/dts/spear320-hmi.dts    | 3 ---
->  arch/arm/boot/dts/tegra30-apalis.dtsi | 1 -
->  5 files changed, 8 deletions(-)
+> Yes, that is what I meant. In particular, that has the advantage of letting
+> you reuse the two drivers separately if some new SoC comes up that uses
+> one but not the other. A lot of PHY implementations can support multiple
+> protocols (e.g. pcie and usb3), but I don't know if yours does.
+>
+>>>> +- have-msi-inten-reg: Required for legacy iProc PCIe controllers that need the
+>>>> +  MSI interrupt enable register to be set explicitly
+>>>> +
+>>>> +The Broadcom iProc PCie driver adapts the multi-domain structure, i.e., each
+>>>> +interface has its own domain and therefore has its own device node
+>>>> +Example:
+>>>> +
+>>>> +SoC specific DT Entry:
+>>>> +
+>>>> +       pcie0: pcie at 18012000 {
+>>>> +               compatible = "brcm,iproc-pcie";
+>>>> +               reg =<0x18012000 0x1000>,
+>>>> +<0x18002000 0x1000>;
+>>>
+>>> I guess the addresses should be relative to the BCMA bus, and this node
+>>> get moved under that. Please see Hauke's patch series, we've discussed
+>>> this in great length already.
+>>>
+>>
+>> As Arend van Spriel pointed out in the previous discussion:
+>>
+>> BCMA core is the bus driver for discoverable ARM AXI interconnect. Apart
+>> from that it also provides drivers for some cores. For the chips to be
+>> discoverable it needs additional IP logic.
+>>
+>> Not all iProc family of SoCs have the additional IP logic and for those
+>> which don't, they cannot use the BCMA bus.
+>
+> Ok, but the one from your example almost certainly does because the
+> addresses are exactly the same ones as on bcm53xx.
+>
+> The same problem likely occurs on other peripherals, not just PCI,
+> so we will have to come up with a way to have a common driver for
+> bcma_bus and platform_bus for USB, SPI, brcmsmac, and likely others
+> too.
 
--- 
-Without deviation from the norm, progress is not possible.
+Makes sense. I think that is what Hauke meant by "adding
+additional support for registering to bcma". So the discovery info is a 
+piece of read-only memory in the chip. Its address is stored in the 
+chipcommon core register space. BCMA parses that memory blob resulting 
+in a list of cores which register address info. We could add DT support 
+in BCMA matching the compatible string and register a core for it.
+
+However, apart from the discovery info a "discoverable ARM AXI" chip has 
+a register space per core that provides common procedures like 
+enable/disable, reset, core status, which are implemented in BCMA. I am 
+not seeing that register space in the DT examples so I guess this IP 
+block is not there for iProc chips.
+
+Regards,
+Arend
+
+>>>> +               #interrupt-cells =<1>;
+>>>> +               interrupts =<GIC_SPI 96 IRQ_TYPE_NONE>,
+>>>> +<GIC_SPI 97 IRQ_TYPE_NONE>,
+>>>> +<GIC_SPI 98 IRQ_TYPE_NONE>,
+>>>> +<GIC_SPI 99 IRQ_TYPE_NONE>,
+>>>> +<GIC_SPI 100 IRQ_TYPE_NONE>,
+>>>> +<GIC_SPI 101 IRQ_TYPE_NONE>;
+>>>
+>>>
+>>>
+>>>> +               interrupt-map-mask =<0 0 0 0>;
+>>>> +               interrupt-map =<0 0 0 0&gic GIC_SPI 100 IRQ_TYPE_NONE>;
+>>>
+>>> This interrupt is also listed in the "interrupts" above, which is
+>>> probably a mistake, unless the IRQ line is shared between all PCI
+>>> devices and the PCI host itself.
+>>>
+>> interrupts are for MSI interrupt support and interrupt-map is for legacy
+>> INTx support. To my best knowledge, MSI and INTx cannot be used at the
+>> same time. "nvidia,tegra20-pcie.txt" and "rcar-pci.txt" have similar
+>> configurations.
+>
+> Linux drivers will absolutely use MSI and legacy interrupts together, because
+> some drivers don't support MSI and others enable it unconditionally.
+>
+> In both your examples (tegra and rcar), the interrupts that share the same
+> number are auxiliary and are correctly used with IRQF_SHARED, so that works.
+> If a device MSI just maps to a host IRQ however, you wouldn't be able to
+> use IRQF_SHARED.
+>
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
