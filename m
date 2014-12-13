@@ -1,120 +1,64 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 13 Dec 2014 09:56:22 +0800
-Subject: [PATCH v2] sun9i: clk: Fix compile error caused by "clk: sunxi:
- Give sunxi_factors_register a registers parameter"
-In-Reply-To: <20141212213538.20398.29885@quantum>
-References: <1418397529-1188-1-git-send-email-hdegoede@redhat.com>
- <20141212200003.20398.13200@quantum> <20141212213538.20398.29885@quantum>
-Message-ID: <CAGb2v64A22=Ki4mU5_OOL8R6zzJbSKOpKO2BM+orx8R=5uHwPw@mail.gmail.com>
+Date: Sat, 13 Dec 2014 10:06:04 +0800
+Subject: [PATCHv3 5/5] ARM: sunxi: dts: Add note ps2 pins conflict with
+ hdmi
+In-Reply-To: <1418408748-9797-6-git-send-email-vishnupatekar0510@gmail.com>
+References: <1418408748-9797-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1418408748-9797-6-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <CAGb2v65xpUhiMzSKu_1+JGNbg3oFdpw2EQ+JGUYkivCtG2O6gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sat, Dec 13, 2014 at 5:35 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Mike Turquette (2014-12-12 12:00:03)
->> Quoting Hans de Goede (2014-12-12 07:18:49)
->> > My "clk: sunxi: Give sunxi_factors_register a registers parameter" patch did
->> > not adjust the sunxi_factors_clock register calls in the new clk-sun9i-core.c
->> > clock code, causing compilation errors. This fixes this.
->> >
->> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>
->> Applied.
+On Sat, Dec 13, 2014 at 2:25 AM, VishnuPatekar
+<vishnupatekar0510@gmail.com> wrote:
+> 1. Please note that ps20 pins conflict with HDMI on Lime2 Board
+> so, by deault ps20 and ps21 are disabled for Lime2 Board.
+> There is no on board ps2 connector and these pins can be used
+> for different purpose.
 >
-> Oops, spoke to soon. I don't have "clk: sunxi: Give
-> sunxi_factors_register a registers parameter" in my tree yet. I was just
-> trying to get this fix in quickly before sending out my PR. Please
-> disregard the noise.
+> Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts |    6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+> index ed364d5..951b615 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+> @@ -112,7 +112,11 @@
+>                         pinctrl-0 = <&uart0_pins_a>;
+>                         status = "okay";
+>                 };
+> -
+> +
+> +               /* PS2 0 and PS2 1 are disabled by default; Please note that
+> +               ps20 pins conflict with HDMI on Lime2 Board
+> +               */
+> +
 
-AFAIK the sunxi_factors_register patch was queued up for 3.20.
-I sent a fix for the same issue a few weeks ago:
+Multi-line comments should be:
 
-    http://www.spinics.net/lists/arm-kernel/msg381738.html
+/*
+ * line 1
+ * line 2
+ * ...
+ */
+
+And why is there a delete and insert for an empty line?
+Weird... though git seems to ignore it when applying.
 
 ChenYu
 
->>
->> Regards,
->> Mike
->>
->> > ---
->> >  drivers/clk/sunxi/clk-sun9i-core.c | 27 ++++++++++++++++++++++-----
->> >  1 file changed, 22 insertions(+), 5 deletions(-)
->> >
->> > diff --git a/drivers/clk/sunxi/clk-sun9i-core.c b/drivers/clk/sunxi/clk-sun9i-core.c
->> > index 3cb9036..110197a 100644
->> > --- a/drivers/clk/sunxi/clk-sun9i-core.c
->> > +++ b/drivers/clk/sunxi/clk-sun9i-core.c
->> > @@ -22,6 +22,21 @@
->> >
->> >  #include "clk-factors.h"
->> >
->> > +static struct clk *sun9i_factors_register(struct device_node *node,
->> > +                                         const struct factors_data *data,
->> > +                                         spinlock_t *lock)
->> > +{
->> > +       void __iomem *reg;
->> > +
->> > +       reg = of_iomap(node, 0);
->> > +       if (!reg) {
->> > +               pr_err("Could not get registers for factors-clk: %s\n",
->> > +                      node->name);
->> > +               return NULL;
->> > +       }
->> > +
->> > +       return sunxi_factors_register(node, data, lock, reg);
->> > +}
->> >
->> >  /**
->> >   * sun9i_a80_get_pll4_factors() - calculates n, p, m factors for PLL1
->> > @@ -89,7 +104,7 @@ static DEFINE_SPINLOCK(sun9i_a80_pll4_lock);
->> >
->> >  static void __init sun9i_a80_pll4_setup(struct device_node *node)
->> >  {
->> > -       sunxi_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
->> > +       sun9i_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
->> >  }
->> >  CLK_OF_DECLARE(sun9i_a80_pll4, "allwinner,sun9i-a80-pll4-clk", sun9i_a80_pll4_setup);
->> >
->> > @@ -139,8 +154,10 @@ static DEFINE_SPINLOCK(sun9i_a80_gt_lock);
->> >
->> >  static void __init sun9i_a80_gt_setup(struct device_node *node)
->> >  {
->> > -       struct clk *gt = sunxi_factors_register(node, &sun9i_a80_gt_data,
->> > +       struct clk *gt = sun9i_factors_register(node, &sun9i_a80_gt_data,
->> >                                                 &sun9i_a80_gt_lock);
->> > +       if (!gt)
->> > +               return;
->> >
->> >         /* The GT bus clock needs to be always enabled */
->> >         __clk_get(gt);
->> > @@ -194,7 +211,7 @@ static DEFINE_SPINLOCK(sun9i_a80_ahb_lock);
->> >
->> >  static void __init sun9i_a80_ahb_setup(struct device_node *node)
->> >  {
->> > -       sunxi_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
->> > +       sun9i_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
->> >  }
->> >  CLK_OF_DECLARE(sun9i_a80_ahb, "allwinner,sun9i-a80-ahb-clk", sun9i_a80_ahb_setup);
->> >
->> > @@ -210,7 +227,7 @@ static DEFINE_SPINLOCK(sun9i_a80_apb0_lock);
->> >
->> >  static void __init sun9i_a80_apb0_setup(struct device_node *node)
->> >  {
->> > -       sunxi_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
->> > +       sun9i_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
->> >  }
->> >  CLK_OF_DECLARE(sun9i_a80_apb0, "allwinner,sun9i-a80-apb0-clk", sun9i_a80_apb0_setup);
->> >
->> > @@ -266,6 +283,6 @@ static DEFINE_SPINLOCK(sun9i_a80_apb1_lock);
->> >
->> >  static void __init sun9i_a80_apb1_setup(struct device_node *node)
->> >  {
->> > -       sunxi_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
->> > +       sun9i_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
->> >  }
->> >  CLK_OF_DECLARE(sun9i_a80_apb1, "allwinner,sun9i-a80-apb1-clk", sun9i_a80_apb1_setup);
->> > --
->> > 2.1.0
->> >
+>                 i2c0: i2c at 01c2ac00 {
+>                         pinctrl-names = "default";
+>                         pinctrl-0 = <&i2c0_pins_a>;
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
