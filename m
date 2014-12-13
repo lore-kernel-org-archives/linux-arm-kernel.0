@@ -1,76 +1,67 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 13 Dec 2014 14:45:02 +0100
-Subject: [PATCH v5 19/19] arm/arm64: KVM: allow userland to request a
- virtual GICv3
-In-Reply-To: <1418042274-3246-20-git-send-email-andre.przywara@arm.com>
+Date: Sat, 13 Dec 2014 14:53:51 +0100
+Subject: [PATCH v5 00/19] KVM GICv3 emulation
+In-Reply-To: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
 References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
- <1418042274-3246-20-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141213134502.GH16855@cbox>
+Message-ID: <20141213135351.GI16855@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 12:37:54PM +0000, Andre Przywara wrote:
-> With all of the GICv3 code in place now we allow userland to ask the
-> kernel for using a virtual GICv3 in the guest.
-> Also we provide the necessary support for guests setting the memory
-> addresses for the virtual distributor and redistributors.
-> This requires some userland code to make use of that feature and
-> explicitly ask for a virtual GICv3.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog v4...v5:
-> - improving documentation text
-> 
-> Changelog v3...v4:
-> - refine commit message
-> - add documentation of new GICv3 KVM device
-> 
->  Documentation/virtual/kvm/devices/arm-vgic.txt |   22 ++++++++++--
->  arch/arm64/include/uapi/asm/kvm.h              |    7 ++++
->  include/kvm/arm_vgic.h                         |    4 +--
->  virt/kvm/arm/vgic-v3-emul.c                    |    3 ++
->  virt/kvm/arm/vgic.c                            |   46 +++++++++++++++++-------
->  5 files changed, 65 insertions(+), 17 deletions(-)
-> 
-> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
-> index df8b0c7..563463e 100644
-> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
-> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
-> @@ -3,22 +3,38 @@ ARM Virtual Generic Interrupt Controller (VGIC)
->  
->  Device types supported:
->    KVM_DEV_TYPE_ARM_VGIC_V2     ARM Generic Interrupt Controller v2.0
-> +  KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
->  
->  Only one VGIC instance may be instantiated through either this API or the
->  legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
->  controller, requiring emulated user-space devices to inject interrupts to the
->  VGIC instead of directly to CPUs.
->  
-> +Creating a guest GICv3 device requires a host GICv3 as well.
-> +GICv3 implementations with hardware compatibility support allow a guest GICv2
-> +as well.
-> +
->  Groups:
->    KVM_DEV_ARM_VGIC_GRP_ADDR
->    Attributes:
->      KVM_VGIC_V2_ADDR_TYPE_DIST (rw, 64-bit)
->        Base address in the guest physical address space of the GIC distributor
-> -      register mappings.
-> +      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
->  
->      KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
->        Base address in the guest physical address space of the GIC virtual cpu
-> -      interface register mappings.
-> +      interface register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
-> +
-> +    KVM_VGIC_V3_ADDR_TYPE_DIST (rw, 64-bit)
-> +      Base address in the guest physical address space of the GICv3 distributor
-> +      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
-> +
+Hi Andre,
 
-Are there no alignment restrictions to worry about that we should
-document here?
+On Mon, Dec 08, 2014 at 12:37:35PM +0000, Andre Przywara wrote:
+> This is version 5 of the GICv3 guest emulation series (not for 3.19).
+> 
+> As the changes this time were much smaller, I updated to tree to
+> 3.18.0, as it includes some bug fixes in the VGIC.
+> 
+> I addressed the remaining comments from Christoffer and Eric, thanks
+> for the review! The changes this times were much smaller, most of them
+> cosmetic or rewordings of commit messages and comments.
+> I updated the kvm-gicv3/v4 branch in my repo[1] to carry all the delta
+> patches. Those patches are just for reference to see what has changed
+> between v4 and v5. For review and all other purposes please use the
+> v5 branch.
+> 
+> For a changelog summary see below, also each patch carries a changelog
+> now.
+> Only patches 05, 08, 12, 15, 17, 18 and 19 have been changed compared
+> to v4. I dropped Christoffer's Reviewed-by: tag from 05/19 because of
+> the newly added function, but added the respective tags to the other
+> commit messages.
+> 
+> I quickly tested this version with a GICv3 capable fast model in all
+> endianness modes (LE guest on LE host, BE on LE, LE on BE, BE on BE).
+> Both a GICv2 and a GICv3 guest were booted in all four combinations.
+> 
+So this is overall looking like it's getting ready to be merged for
+v3.20.
 
+However, here are the things we need resolved before putting it into
+kvmarm/next:
+
+1. You need to address the few remaining comments I had on this version.
+
+2. You must rebase on the vgic_init series and the vcpu_nit series.
+   Both are in kvmarm/queue, so I suggest you rebase on that or wait
+   until both of those series hit kvm/next (later next week).  You also
+   need to base this on Eric's VGIC init ioctl series
+   (https://lists.cs.columbia.edu/pipermail/kvmarm/2014-December/012643.html),
+   but with dropping patch 3.  As soon as Marc has taken a look at that
+   series, I will merge it onto queue as well.
+   This is likely going to be a pain (sorry about that) since the whole
+   init/init_maps sequence has changed.
+
+3. Get rid of any on-demand calls to vgic_init() for GICv3.  For GICv3,
+   the only valid call to vgic_init() should be from the new device
+   control ioctl, and all other paths that rely on vgic_init() must
+   fail.
+
+4. Resubmit a new (and hopefully final) version of the series soon after
+   the merge window closes.
+
+Then we'll queue this in kvmarm/next early so that we have time to test
+it and expose it to a wider audience.
+
+Thanks,
 -Christoffer
