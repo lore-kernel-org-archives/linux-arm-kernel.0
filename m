@@ -1,33 +1,30 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 13 Dec 2014 13:23:29 +0100 (CET)
-Subject: clk: mxs: Invalid register access on HW_CLKCTRL_FRAC0?
-Message-ID: <1022343616.100338.1418473409091.JavaMail.open-xchange@oxbaltgw00.schlund.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 13 Dec 2014 13:26:47 +0100
+Subject: [PATCH] ARM: dove: fix legacy dove IRQ numbers for 3.18
+In-Reply-To: <E1XyOJv-0003kd-2y@rmk-PC.arm.linux.org.uk> (Russell King's
+ message of "Tue, 09 Dec 2014 17:11:31 +0000")
+References: <E1XyOJv-0003kd-2y@rmk-PC.arm.linux.org.uk>
+Message-ID: <87sigjag6w.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Russell King <rmk+kernel@arm.linux.org.uk> writes:
 
-yesterday i stumble on this note in the i.MX28 reference manual (p. 931):
+> v3.18 changed handle_IRQ() to call __handle_domain_irq(), which now
+> rejects attempts to deliver IRQ0.  Since IRQ 0 is used as the timer
+> interrupt (just like the PIT on x86), this causes boot to fail as the
+> bogomips calibration never completes.
+>
+> Fix this by shuffling all interrupts up by one.
+Hi Russell,
 
-    10.8.24 Fractional Clock Control Register 0 (HW_CLKCTRL_FRAC0)
+I was curious why shift by "one".
+Why not shift by for example NR_IRQS_LEGACY ?
 
-    NOTE: This register can only be addressed by byte instructions. Addressing
-word or half-word are not allowed.
+And even if you judge 1 is the right number, wouldn't it be better to define a
+constant "IRQ_OFS" and have each define be "#define IRQ_xxxx (IRQ_OFS + <n>) ?
 
-The same applies to HW_CLKCTRL_FRAC1.
+Cheers.
 
-But clk_misc_init() doesn't care about that in clk_imx28.c:
-
-    val = readl_relaxed(FRAC0);
-    val &= ~((0x3f << BP_FRAC0_IO0FRAC) | (0x3f << BP_FRAC0_IO1FRAC));
-    val |= (30 << BP_FRAC0_IO0FRAC) | (30 << BP_FRAC0_IO1FRAC);
-    writel_relaxed(val, FRAC0);
-
-The function clk_ref_set_rate() in clk_ref.c write also the complete register at
-once, but change only a byte.
-
-Which of them are invalid?
-
-Would you prefer to use writeb() to fix this?
-
-Stefan
+--
+Robert
