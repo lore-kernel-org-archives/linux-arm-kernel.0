@@ -1,57 +1,172 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 13 Dec 2014 17:04:59 +0100 (CET)
-Subject: clk: mxs: Invalid register access on HW_CLKCTRL_FRAC0?
-In-Reply-To: <201412131347.22972.marex@denx.de>
-References: <1022343616.100338.1418473409091.JavaMail.open-xchange@oxbaltgw00.schlund.de>
- <201412131347.22972.marex@denx.de>
-Message-ID: <626823862.133104.1418486699870.JavaMail.open-xchange@oxbaltgw02.schlund.de>
+From: amit.daniel@samsung.com (Amit Daniel Kachhap)
+Date: Sat, 13 Dec 2014 22:21:58 +0530
+Subject: [PATCH RFC v3 2/2] clk: samsung: Add PM runtime support for clocks.
+In-Reply-To: <1418489518-7252-1-git-send-email-amit.daniel@samsung.com>
+References: <1418489518-7252-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <1418489518-7252-2-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+This patch adds PM runtime support for clocks associated with Power
+Domain. The PM runtime suspend/resume handlers will be called when the
+power domain associated with it, is turned on/off.
 
-> Marek Vasut <marex@denx.de> hat am 13. Dezember 2014 um 13:47 geschrieben:
->
->
-> On Saturday, December 13, 2014 at 01:23:29 PM, Stefan Wahren wrote:
-> > Hi Fabio,
-> >
-> > yesterday i stumble on this note in the i.MX28 reference manual (p. 931):
-> >
-> > 10.8.24 Fractional Clock Control Register 0 (HW_CLKCTRL_FRAC0)
-> >
-> > NOTE: This register can only be addressed by byte instructions.
-> > Addressing word or half-word are not allowed.
-> >
-> > The same applies to HW_CLKCTRL_FRAC1.
-> >
-> > But clk_misc_init() doesn't care about that in clk_imx28.c:
-> >
-> > val = readl_relaxed(FRAC0);
-> > val &= ~((0x3f << BP_FRAC0_IO0FRAC) | (0x3f << BP_FRAC0_IO1FRAC));
-> > val |= (30 << BP_FRAC0_IO0FRAC) | (30 << BP_FRAC0_IO1FRAC);
-> > writel_relaxed(val, FRAC0);
-> >
-> > The function clk_ref_set_rate() in clk_ref.c write also the complete
-> > register at once, but change only a byte.
-> >
-> > Which of them are invalid?
-> >
-> > Would you prefer to use writeb() to fix this?
->
-> We've been bitten by doing 32-bit writes into the FRAC* registers in U-Boot,
-> so
-> the documentation is certainly correct.
+The registration of clocks happen in early initailisation. The probe
+is later called to register the clock device with the power domain.
 
-do you think of this patch [1]?
+Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+---
+ drivers/clk/samsung/clk.c | 95 +++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/samsung/clk.h | 11 ++++++
+ 2 files changed, 106 insertions(+)
 
-Are only 32-bit writes critical or reads too?
-
-Stefan
-
-[1] - http://lists.denx.de/pipermail/u-boot/2012-February/118746.html
-
->
-> Best regards,
-> Marek Vasut
->
+diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+index dd1f7c9..c517aa8 100644
+--- a/drivers/clk/samsung/clk.c
++++ b/drivers/clk/samsung/clk.c
+@@ -11,6 +11,10 @@
+  * clock framework for Samsung platforms.
+ */
+ 
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/pm_domain.h>
++#include <linux/pm_runtime.h>
+ #include <linux/syscore_ops.h>
+ #include "clk.h"
+ 
+@@ -370,6 +374,93 @@ static void samsung_clk_sleep_init(void __iomem *reg_base,
+ 		unsigned long nr_rdump) {}
+ #endif
+ 
++static int samsung_cmu_runtime_suspend(struct device *dev)
++{
++	struct samsung_clock_pd_reg_cache *reg_cache;
++
++	reg_cache = dev_get_drvdata(dev);
++	samsung_clk_save(reg_cache->reg_base, reg_cache->rdump,
++			reg_cache->rd_num);
++	return 0;
++}
++
++static int samsung_cmu_runtime_resume(struct device *dev)
++{
++	struct samsung_clock_pd_reg_cache *reg_cache;
++
++	reg_cache = dev_get_drvdata(dev);
++	samsung_clk_restore(reg_cache->reg_base, reg_cache->rdump,
++			reg_cache->rd_num);
++	return 0;
++}
++
++#define MAX_CMU_DEVICE_MATCH	50
++static int samsung_cmu_count;
++static struct of_device_id samsung_cmu_match[MAX_CMU_DEVICE_MATCH];
++MODULE_DEVICE_TABLE(of, samsung_cmu_match);
++
++static void samsung_clk_pd_init(struct device_node *np, void __iomem *reg_base,
++				struct samsung_cmu_info *cmu)
++{
++	struct samsung_clock_pd_reg_cache *pd_reg_cache;
++	const char *name;
++
++	if (samsung_cmu_count == MAX_CMU_DEVICE_MATCH)
++		panic("Maximum clock device limit reached.\n");
++
++	if (of_property_read_string_index(np, "compatible", 0, &name))
++		panic("Invalid DT node.\n");
++
++	pd_reg_cache = kzalloc(sizeof(struct samsung_clock_pd_reg_cache),
++			GFP_KERNEL);
++	if (!pd_reg_cache)
++		panic("Could not allocate register reg_cache.\n");
++
++	pd_reg_cache->rdump = samsung_clk_alloc_reg_dump(cmu->pd_clk_regs,
++				cmu->nr_pd_clk_regs);
++	if (!pd_reg_cache->rdump)
++		panic("Could not allocate register dump storage.\n");
++
++	pd_reg_cache->reg_base = reg_base;
++	pd_reg_cache->rd_num = cmu->nr_pd_clk_regs;
++
++	/* Fill up the compatible string and data */
++	samsung_cmu_match[samsung_cmu_count].data = pd_reg_cache;
++	strcpy(samsung_cmu_match[samsung_cmu_count].compatible, name);
++	samsung_cmu_count++;
++}
++
++static int __init samsung_cmu_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct of_device_id *match;
++
++	/* get the platform data */
++	match = (struct of_device_id *)of_match_node(samsung_cmu_match,
++							pdev->dev.of_node);
++	if (!match)
++		return 0;
++	platform_set_drvdata(pdev, (void *)match->data);
++	pm_runtime_enable(dev);
++	pm_genpd_dev_need_restore(dev,
++				GPD_DEV_RESTORE_FORCE | GPD_DEV_SUSPEND_INIT);
++	return 0;
++}
++
++static const struct dev_pm_ops samsung_cmu_pm_ops = {
++	SET_RUNTIME_PM_OPS(samsung_cmu_runtime_suspend,
++			samsung_cmu_runtime_resume, NULL)
++};
++
++static struct platform_driver samsung_cmu_driver = {
++	.driver = {
++		.name   = "exynos-clk",
++		.of_match_table = samsung_cmu_match,
++		.pm = &samsung_cmu_pm_ops,
++	},
++	.probe = samsung_cmu_probe,
++};
++
+ /*
+  * Common function which registers plls, muxes, dividers and gates
+  * for each CMU. It also add CMU register list to register cache.
+@@ -409,5 +500,9 @@ void __init samsung_cmu_register_one(struct device_node *np,
+ 		samsung_clk_sleep_init(reg_base, cmu->clk_regs,
+ 			cmu->nr_clk_regs);
+ 
++	if (cmu->pd_clk_regs)
++		samsung_clk_pd_init(np, reg_base, cmu);
++
+ 	samsung_clk_of_add_provider(np, ctx);
+ }
++module_platform_driver(samsung_cmu_driver);
+diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
+index 3f471e9..c184ec1 100644
+--- a/drivers/clk/samsung/clk.h
++++ b/drivers/clk/samsung/clk.h
+@@ -331,6 +331,12 @@ struct samsung_clock_reg_cache {
+ 	unsigned int rd_num;
+ };
+ 
++struct samsung_clock_pd_reg_cache {
++	void __iomem *reg_base;
++	struct samsung_clk_reg_dump *rdump;
++	unsigned int rd_num;
++};
++
+ struct samsung_cmu_info {
+ 	/* list of pll clocks and respective count */
+ 	struct samsung_pll_clock *pll_clks;
+@@ -356,6 +362,11 @@ struct samsung_cmu_info {
+ 	/* list and number of clocks registers */
+ 	unsigned long *clk_regs;
+ 	unsigned int nr_clk_regs;
++
++	/* list and number of clocks to be saved/restored during
++	 * power domain shutdown */
++	unsigned long *pd_clk_regs;
++	unsigned int nr_pd_clk_regs;
+ };
+ 
+ extern struct samsung_clk_provider *__init samsung_clk_init(
+-- 
+2.2.0
