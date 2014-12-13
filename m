@@ -1,146 +1,69 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Sat, 13 Dec 2014 11:05:52 +0100
-Subject: [PATCH v2 1/4] pci: iProc: define Broadcom iProc PCIe binding
-In-Reply-To: <3907917.zNo7yttzkh@wuerfel>
-References: <1418351817-14898-2-git-send-email-rjui@broadcom.com>
- <3375037.6pjWmlOLA3@wuerfel> <548B1D98.6030400@broadcom.com>
- <3907917.zNo7yttzkh@wuerfel>
-Message-ID: <548C0F80.2090300@broadcom.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 13 Dec 2014 12:09:49 +0100
+Subject: [PATCHv3 0/5] ARM:sunxi:ps2 Added support for A10/A20 ps2
+ controller.
+In-Reply-To: <1418408748-9797-1-git-send-email-vishnupatekar0510@gmail.com>
+References: <1418408748-9797-1-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <548C1E7D.1000005@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/14 18:14, Arnd Bergmann wrote:
-> On Friday 12 December 2014 08:53:44 Ray Jui wrote:
->>
->> On 12/12/2014 4:14 AM, Arnd Bergmann wrote:
->>> On Thursday 11 December 2014 18:36:54 Ray Jui wrote:
->>>> index 0000000..040bc0f
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
->>>> @@ -0,0 +1,74 @@
->>>> +* Broadcom iProc PCIe controller
->>>> +
->>>> +Required properties:
->>>> +- compatible: Must be "brcm,iproc-pcie"
->>>> +- reg: base address and length of the PCIe controller and the MDIO interface
->>>> +  that controls the PCIe PHY
->>>> +- #interrupt-cells: set to<1>
->>>> +- interrupts: interrupt IDs
->>>
->>> How many, and what are they?
->>>
->> Different iProc SoCs might have different number of interrupts. I'll
->> elaborate more on the next patch.
->
-> Ok.
->
->>>> +- interrupt-map-mask and interrupt-map, standard PCI properties to define the
->>>> +  mapping of the PCIe interface to interrupt numbers
->>>> +- bus-range: PCI bus numbers covered
->>>> +- #address-cells: set to<3>
->>>> +- #size-cells: set to<2>
->>>> +- device_type: set to "pci"
->>>> +- ranges: ranges for the PCI memory and I/O regions
->>>> +- phy-addr: MDC/MDIO adddress of the PCIe PHY
->>>
->>> It looks like the phy controller is separate from the PCI controller,
->>> and you even list the same register range for both PHYs. Better make
->>> that a separate driver and put the phy address into the "phys" reference.
->>>
->> Okay. In this case, I need to create a separate PHY driver under the
->> drivers/phy directory and have the PCIe host driver reference it through
->> the standard PHY API.
->
-> Yes, that is what I meant. In particular, that has the advantage of letting
-> you reuse the two drivers separately if some new SoC comes up that uses
-> one but not the other. A lot of PHY implementations can support multiple
-> protocols (e.g. pcie and usb3), but I don't know if yours does.
->
->>>> +- have-msi-inten-reg: Required for legacy iProc PCIe controllers that need the
->>>> +  MSI interrupt enable register to be set explicitly
->>>> +
->>>> +The Broadcom iProc PCie driver adapts the multi-domain structure, i.e., each
->>>> +interface has its own domain and therefore has its own device node
->>>> +Example:
->>>> +
->>>> +SoC specific DT Entry:
->>>> +
->>>> +       pcie0: pcie at 18012000 {
->>>> +               compatible = "brcm,iproc-pcie";
->>>> +               reg =<0x18012000 0x1000>,
->>>> +<0x18002000 0x1000>;
->>>
->>> I guess the addresses should be relative to the BCMA bus, and this node
->>> get moved under that. Please see Hauke's patch series, we've discussed
->>> this in great length already.
->>>
->>
->> As Arend van Spriel pointed out in the previous discussion:
->>
->> BCMA core is the bus driver for discoverable ARM AXI interconnect. Apart
->> from that it also provides drivers for some cores. For the chips to be
->> discoverable it needs additional IP logic.
->>
->> Not all iProc family of SoCs have the additional IP logic and for those
->> which don't, they cannot use the BCMA bus.
->
-> Ok, but the one from your example almost certainly does because the
-> addresses are exactly the same ones as on bcm53xx.
->
-> The same problem likely occurs on other peripherals, not just PCI,
-> so we will have to come up with a way to have a common driver for
-> bcma_bus and platform_bus for USB, SPI, brcmsmac, and likely others
-> too.
+Hi VishnuPatekar,
 
-Makes sense. I think that is what Hauke meant by "adding
-additional support for registering to bcma". So the discovery info is a 
-piece of read-only memory in the chip. Its address is stored in the 
-chipcommon core register space. BCMA parses that memory blob resulting 
-in a list of cores which register address info. We could add DT support 
-in BCMA matching the compatible string and register a core for it.
+The patch mangling for this set seems to have gone a bit wrong I'm afraid,
+a lot of the patches have my fixup commit messages (which should have
+disappeared when squashing in the patches), please replace those by proper
+commit messages describing what the patch actually does.
 
-However, apart from the discovery info a "discoverable ARM AXI" chip has 
-a register space per core that provides common procedures like 
-enable/disable, reset, core status, which are implemented in BCMA. I am 
-not seeing that register space in the DT examples so I guess this IP 
-block is not there for iProc chips.
+Also the adding of the commented nodes for the lime2 seems to be gone entirely
+from the set, instead now only a comment about the conflict with the hdmi
+pins is added, but it is above the i2c node instead of above a ps2 node.
 
 Regards,
-Arend
 
->>>> +               #interrupt-cells =<1>;
->>>> +               interrupts =<GIC_SPI 96 IRQ_TYPE_NONE>,
->>>> +<GIC_SPI 97 IRQ_TYPE_NONE>,
->>>> +<GIC_SPI 98 IRQ_TYPE_NONE>,
->>>> +<GIC_SPI 99 IRQ_TYPE_NONE>,
->>>> +<GIC_SPI 100 IRQ_TYPE_NONE>,
->>>> +<GIC_SPI 101 IRQ_TYPE_NONE>;
->>>
->>>
->>>
->>>> +               interrupt-map-mask =<0 0 0 0>;
->>>> +               interrupt-map =<0 0 0 0&gic GIC_SPI 100 IRQ_TYPE_NONE>;
->>>
->>> This interrupt is also listed in the "interrupts" above, which is
->>> probably a mistake, unless the IRQ line is shared between all PCI
->>> devices and the PCI host itself.
->>>
->> interrupts are for MSI interrupt support and interrupt-map is for legacy
->> INTx support. To my best knowledge, MSI and INTx cannot be used at the
->> same time. "nvidia,tegra20-pcie.txt" and "rcar-pci.txt" have similar
->> configurations.
+Hans
+
+
+On 12-12-14 19:25, VishnuPatekar wrote:
+> v2 --> v3
+> 1. changed config to SERIO_SUN4I_PS2 from SERIO_SUNXI_PS2
+> 2. changed driver name to sun4i-ps2 from sunxi-ps2.
+> 3. changed the function names to sun4i_ps2_*.
+> 4. added locking in sun4i_ps2_open.
+> 5. kept compatible "sun4i-a10-ps2" for A10 and A20, as A10 is earlier SOC.
+> 6. corrected the style errors.
+> 7. separated the dts patches.
+> 8. removed commented ps2 notes from lime2 dts.
+> 9. added note that ps2 pins confilt with hdmi.
+> 10. corrected the interrupt property for A10.
+> 11. moved dt-bindings to Documentation/devicetree/bindings/serio
 >
-> Linux drivers will absolutely use MSI and legacy interrupts together, because
-> some drivers don't support MSI and others enable it unconditionally.
+> v1 --> v2:
+> 1. added default n depends on ARCH_SUNXI || COMPILE_TEST in Kconfig.
+> 2. handled errors and free resources on errors.
+> 3. used BIT(x), DIV_ROUND_UP macros.
+> 4. corrected style errors.
+> 5. added support for A10 also, A10 and A2 have same properties of PS2 controller.
+> 6. by default commented ps20 and ps21 nodes,as ps20 pins conflict with HDMI.
+> 7. added compatible as allwinner,sun4i-a10-ps2.
+> 8. corrected the possible race condition.
 >
-> In both your examples (tegra and rcar), the interrupts that share the same
-> number are auxiliary and are correctly used with IRQF_SHARED, so that works.
-> If a device MSI just maps to a host IRQ however, you wouldn't be able to
-> use IRQF_SHARED.
 >
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> VishnuPatekar (5):
+>    sunxi:dts-bindings:input:ps2 bindings for A10/A20 ps2.
+>    ARM:sunxi:drivers:input Add support for A10/A20 PS2
+>    ARM: sunxi: dts: Add PS2 nodes to dtsi for A10 and A20
+>    ARM: sunxi: dts: Add A10/A20 PS2 pin muxing options
+>    ARM: sunxi: dts: Add note ps2 pins conflict with hdmi
+>
+>   .../bindings/serio/allwinner,sun4i-ps2.txt         |   23 ++
+>   arch/arm/boot/dts/sun4i-a10.dtsi                   |   31 ++
+>   arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts    |    6 +-
+>   arch/arm/boot/dts/sun7i-a20.dtsi                   |   32 ++
+>   drivers/input/serio/Kconfig                        |   11 +
+>   drivers/input/serio/Makefile                       |    1 +
+>   drivers/input/serio/sun4i-ps2.c                    |  362 ++++++++++++++++++++
+>   7 files changed, 465 insertions(+), 1 deletion(-)
+>   create mode 100644 Documentation/devicetree/bindings/serio/allwinner,sun4i-ps2.txt
+>   create mode 100644 drivers/input/serio/sun4i-ps2.c
+>
