@@ -1,68 +1,120 @@
-From: silvio.fricke@gmail.com (Silvio Fricke)
-Date: Sat, 13 Dec 2014 02:46:48 +0100
-Subject: [PATCH 3/3] ARM: SPEAr: dts: remove unused irq-trigger,
- id and block entries
-In-Reply-To: <cover.1418434448.git.silvio.fricke@gmail.com>
-References: <cover.1418434448.git.silvio.fricke@gmail.com>
-Message-ID: <557b9b23d0313dede22786d9550c7867d9f22837.1418434448.git.silvio.fricke@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 13 Dec 2014 09:56:22 +0800
+Subject: [PATCH v2] sun9i: clk: Fix compile error caused by "clk: sunxi:
+ Give sunxi_factors_register a registers parameter"
+In-Reply-To: <20141212213538.20398.29885@quantum>
+References: <1418397529-1188-1-git-send-email-hdegoede@redhat.com>
+ <20141212200003.20398.13200@quantum> <20141212213538.20398.29885@quantum>
+Message-ID: <CAGb2v64A22=Ki4mU5_OOL8R6zzJbSKOpKO2BM+orx8R=5uHwPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Silvio Fricke <silvio.fricke@gmail.com>
-CC: Thomas Gleixner <tglx@linutronix.de>
-CC: Jason Cooper <jason@lakedaemon.net>
-CC: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/boot/dts/spear1310-evb.dts | 1 -
- arch/arm/boot/dts/spear1340-evb.dts | 2 --
- arch/arm/boot/dts/spear320-hmi.dts  | 3 ---
- 3 files changed, 6 deletions(-)
+Hi,
 
-diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
-index d42c84b..95c2ff1 100644
---- a/arch/arm/boot/dts/spear1310-evb.dts
-+++ b/arch/arm/boot/dts/spear1310-evb.dts
-@@ -369,7 +369,6 @@
- 					pl022,duplex = <0>;
- 					interrupts = <6 0x4>;
- 					interrupt-parent = <&gpio1>;
--					irq-trigger = <0x2>;
- 
- 					stmpe_touchscreen {
- 						compatible = "st,stmpe-ts";
-diff --git a/arch/arm/boot/dts/spear1340-evb.dts b/arch/arm/boot/dts/spear1340-evb.dts
-index b23e05e..bba3389 100644
---- a/arch/arm/boot/dts/spear1340-evb.dts
-+++ b/arch/arm/boot/dts/spear1340-evb.dts
-@@ -325,7 +325,6 @@
- 					reg = <0x41>;
- 					interrupts = <4 0x4>;
- 					interrupt-parent = <&gpio0>;
--					irq-trigger = <0x2>;
- 
- 					stmpegpio: stmpe_gpio {
- 						compatible = "st,stmpe-gpio";
-@@ -478,7 +477,6 @@
- 					pl022,duplex = <0>;
- 					interrupts = <100 0>;
- 					interrupt-parent = <&gpiopinctrl>;
--					irq-trigger = <0x2>;
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 
-diff --git a/arch/arm/boot/dts/spear320-hmi.dts b/arch/arm/boot/dts/spear320-hmi.dts
-index 0aa6fef..f8ed01e 100644
---- a/arch/arm/boot/dts/spear320-hmi.dts
-+++ b/arch/arm/boot/dts/spear320-hmi.dts
-@@ -243,9 +243,6 @@
- 					reg = <0x41>;
- 					irq-over-gpio;
- 					irq-gpios = <&gpiopinctrl 29 0x4>;
--					id = <0>;
--					blocks = <0x5>;
--					irq-trigger = <0x1>;
- 
- 					stmpegpio: stmpe-gpio {
- 						compatible = "stmpe,gpio";
--- 
-2.1.3
+On Sat, Dec 13, 2014 at 5:35 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Mike Turquette (2014-12-12 12:00:03)
+>> Quoting Hans de Goede (2014-12-12 07:18:49)
+>> > My "clk: sunxi: Give sunxi_factors_register a registers parameter" patch did
+>> > not adjust the sunxi_factors_clock register calls in the new clk-sun9i-core.c
+>> > clock code, causing compilation errors. This fixes this.
+>> >
+>> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>
+>> Applied.
+>
+> Oops, spoke to soon. I don't have "clk: sunxi: Give
+> sunxi_factors_register a registers parameter" in my tree yet. I was just
+> trying to get this fix in quickly before sending out my PR. Please
+> disregard the noise.
+
+AFAIK the sunxi_factors_register patch was queued up for 3.20.
+I sent a fix for the same issue a few weeks ago:
+
+    http://www.spinics.net/lists/arm-kernel/msg381738.html
+
+ChenYu
+
+>>
+>> Regards,
+>> Mike
+>>
+>> > ---
+>> >  drivers/clk/sunxi/clk-sun9i-core.c | 27 ++++++++++++++++++++++-----
+>> >  1 file changed, 22 insertions(+), 5 deletions(-)
+>> >
+>> > diff --git a/drivers/clk/sunxi/clk-sun9i-core.c b/drivers/clk/sunxi/clk-sun9i-core.c
+>> > index 3cb9036..110197a 100644
+>> > --- a/drivers/clk/sunxi/clk-sun9i-core.c
+>> > +++ b/drivers/clk/sunxi/clk-sun9i-core.c
+>> > @@ -22,6 +22,21 @@
+>> >
+>> >  #include "clk-factors.h"
+>> >
+>> > +static struct clk *sun9i_factors_register(struct device_node *node,
+>> > +                                         const struct factors_data *data,
+>> > +                                         spinlock_t *lock)
+>> > +{
+>> > +       void __iomem *reg;
+>> > +
+>> > +       reg = of_iomap(node, 0);
+>> > +       if (!reg) {
+>> > +               pr_err("Could not get registers for factors-clk: %s\n",
+>> > +                      node->name);
+>> > +               return NULL;
+>> > +       }
+>> > +
+>> > +       return sunxi_factors_register(node, data, lock, reg);
+>> > +}
+>> >
+>> >  /**
+>> >   * sun9i_a80_get_pll4_factors() - calculates n, p, m factors for PLL1
+>> > @@ -89,7 +104,7 @@ static DEFINE_SPINLOCK(sun9i_a80_pll4_lock);
+>> >
+>> >  static void __init sun9i_a80_pll4_setup(struct device_node *node)
+>> >  {
+>> > -       sunxi_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
+>> > +       sun9i_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
+>> >  }
+>> >  CLK_OF_DECLARE(sun9i_a80_pll4, "allwinner,sun9i-a80-pll4-clk", sun9i_a80_pll4_setup);
+>> >
+>> > @@ -139,8 +154,10 @@ static DEFINE_SPINLOCK(sun9i_a80_gt_lock);
+>> >
+>> >  static void __init sun9i_a80_gt_setup(struct device_node *node)
+>> >  {
+>> > -       struct clk *gt = sunxi_factors_register(node, &sun9i_a80_gt_data,
+>> > +       struct clk *gt = sun9i_factors_register(node, &sun9i_a80_gt_data,
+>> >                                                 &sun9i_a80_gt_lock);
+>> > +       if (!gt)
+>> > +               return;
+>> >
+>> >         /* The GT bus clock needs to be always enabled */
+>> >         __clk_get(gt);
+>> > @@ -194,7 +211,7 @@ static DEFINE_SPINLOCK(sun9i_a80_ahb_lock);
+>> >
+>> >  static void __init sun9i_a80_ahb_setup(struct device_node *node)
+>> >  {
+>> > -       sunxi_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
+>> > +       sun9i_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
+>> >  }
+>> >  CLK_OF_DECLARE(sun9i_a80_ahb, "allwinner,sun9i-a80-ahb-clk", sun9i_a80_ahb_setup);
+>> >
+>> > @@ -210,7 +227,7 @@ static DEFINE_SPINLOCK(sun9i_a80_apb0_lock);
+>> >
+>> >  static void __init sun9i_a80_apb0_setup(struct device_node *node)
+>> >  {
+>> > -       sunxi_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
+>> > +       sun9i_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
+>> >  }
+>> >  CLK_OF_DECLARE(sun9i_a80_apb0, "allwinner,sun9i-a80-apb0-clk", sun9i_a80_apb0_setup);
+>> >
+>> > @@ -266,6 +283,6 @@ static DEFINE_SPINLOCK(sun9i_a80_apb1_lock);
+>> >
+>> >  static void __init sun9i_a80_apb1_setup(struct device_node *node)
+>> >  {
+>> > -       sunxi_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
+>> > +       sun9i_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
+>> >  }
+>> >  CLK_OF_DECLARE(sun9i_a80_apb1, "allwinner,sun9i-a80-apb1-clk", sun9i_a80_apb1_setup);
+>> > --
+>> > 2.1.0
+>> >
