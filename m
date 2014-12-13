@@ -1,89 +1,63 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Sat, 13 Dec 2014 15:12:10 -0800
-Subject: [PATCH v7 2/5] phy: add a driver for the Rockchip SoC internal
- USB2.0 PHY
-In-Reply-To: <548BE99E.2000409@ti.com>
-References: <1418396413-27937-1-git-send-email-lyz@rock-chips.com>
- <1418396866-32625-1-git-send-email-lyz@rock-chips.com>
- <CAD=FV=XiP37Q8EkDYpBgh=Ng9nJD9-Uow0qCy78u6kCZomGNPA@mail.gmail.com>
- <548BE99E.2000409@ti.com>
-Message-ID: <CAD=FV=UZn1Xjq8eS35Wk=b-EL1U2hh+Wxt48k40f_zupaUHdMw@mail.gmail.com>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Sun, 14 Dec 2014 00:30:13 +0100
+Subject: bluetooth: Add hci_h4p driver
+In-Reply-To: <20141213223727.GA13894@amd>
+References: <20141213223727.GA13894@amd>
+Message-ID: <570BAC61-3137-42E5-B4F8-A61AEED380DE@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Pavel,
 
-On Fri, Dec 12, 2014 at 11:24 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> hi,
->
-> On Saturday 13 December 2014 05:49 AM, Doug Anderson wrote:
->> Yunzhi,
->>
->> On Fri, Dec 12, 2014 at 7:07 AM, Yunzhi Li <lyz@rock-chips.com> wrote:
->>> This patch to add a generic PHY driver for ROCKCHIP usb PHYs,
->>> currently this driver can support RK3288. The RK3288 SoC have
->>> three independent USB PHY IPs which are all configured through a
->>> set of registers located in the GRF (general register files)
->>> module.
->>>
->>> Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
->>>
->>> ---
->>>
->>> Changes in v7:
->>> - Accept Kishon's comments to use phandle args to find a phy
->>>   struct directly and get rid of using a custom of_xlate
->>>   function.
->>
->> I'm going to assume you didn't test this version, since it doesn't
->> work for me.  At suspend time power is high and my printouts in the
->> powerup/powerdown code aren't called...
->>
->>
->>> +       for_each_available_child_of_node(dev->of_node, child) {
->>> +               rk_phy = devm_kzalloc(dev, sizeof(*rk_phy), GFP_KERNEL);
->>> +               if (!rk_phy)
->>> +                       return -ENOMEM;
->>> +
->>> +               if (of_property_read_u32(child, "reg", &reg_offset)) {
->>> +                       dev_err(dev, "missing reg property in node %s\n",
->>> +                               child->name);
->>> +                       return -EINVAL;
->>> +               }
->>> +
->>> +               rk_phy->reg_offset = reg_offset;
->>> +               rk_phy->reg_base = grf;
->>> +
->>> +               rk_phy->clk = of_clk_get_by_name(child, "phyclk");
->>> +               if (IS_ERR(rk_phy->clk))
->>> +                       rk_phy->clk = NULL;
->>> +
->>> +               rk_phy->phy = devm_phy_create(dev, child, &ops);
->>> +               if (IS_ERR(rk_phy->phy)) {
->>> +                       dev_err(dev, "failed to create PHY\n");
->>> +                       return PTR_ERR(rk_phy->phy);
->>> +               }
->>> +               phy_set_drvdata(rk_phy->phy, rk_phy);
->>> +       }
->>> +
->>> +       phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
->>
->> I think your bug is here.  I think you now need to register 3 phy
->> providers, not just one.
->
-> No there should be only one phy provider. It means the bug is elsewhere.
+> Add hci_h4p bluetooth driver to staging tree. This device is used
+> for example on Nokia N900 cell phone.
+> 
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> Thanks-to: Sebastian Reichel <sre@debian.org>
+> Thanks-to: Joe Perches <joe@perches.com>
+> 
+> ---
+> 
+> 
+> I'd prefer to resurect the driver in staging/ in order not to lose
+> history, but Marcel wanted to treat it as new submission, so I'm doing
+> that.
 
-Ah.  That's what I get for testing on a backported kernel.  I bet it's
-because I'm missing:
+that history is in linux.git now for all times. No need to repeat it. I rather not play around with that again. Lets get a minimal driver merged so we can give people something to improve.
 
-2a4c370 phy: core: Fix of_phy_provider_lookup to return PHY provider
-for sub node
+> 
+> Firmware load was converted to hci_cmd_sync(). Unfortunately, the
+> firmware is needed after every open/close, so the setup mechanism does
+> not quite fit. (But code is now way cleaner).
 
-Hrm, that made things better, but I still only got one printout when I
-expected 3 (one for each user of the PHY).  I bet there are more picks
-I need then...  :-/  Ah, yup.  When I pick the whole load of PHY
-related stuff then I get all 3.  :)
+What is the reason for that? Does it mean that the device will always loose all its settings when powering it down. Do we know why that is that way and can we maybe change it?
 
-I'll do more testing when I have more time and post up a Tested-by, then...
+If there is no way around this, we can introduce a quirk that will always run hdev->setup. However if the device keeps forgetting all settings all the time, that means it will also keep forgetting its address. So that power on procedure will be wasting time. We would need to check if we can make it so that it only has unconfigured state once and then keeps remembering the address even if we have to re-program it every time.
 
--Doug
+> Device tree bindings work for me, but they are not yet official and I
+> expect some more fun there.
+> 
+> Hacks surrounding bluetooth address were removed; this results in
+> working driver with address that is probably not unique.
+
+Just set HCI_QUIRK_INVALID_BDADDR and let someone deal with that in userspace. You can use the btmgmt public-addr command for testing.
+
+In the end someone needs to write a small tool that users mgmt interface and listens for unconfigured controllers, reads the address from whatever storage it is, uses the Set Public Address command and that is it.
+
+On the kernel side you need to add hdev->set_bdaddr support. For the Broadcom based devices you can copy it from the btusb.c driver.
+
+> HCI_QUIRK_RESET_ON_CLOSE will need to be investigated some more.
+
+Why was that needed again? If the device loses power anyway, then that seems wasteful. Also the core changed to make sure it resets all settings on power down correctly.
+
+> My notes say that Marcel wanted different filenames, but I'd need
+> advice exactly what filenames. I guess platform data supprort should
+> be removed altogether, rather than renamed.
+
+Yes, the platform support should go away. This should be purely based on DT.
+
+Can you also start using git format-patch so that patches get a diffstat.
+
+Regards
+
+Marcel
