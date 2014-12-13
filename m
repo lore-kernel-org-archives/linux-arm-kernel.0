@@ -1,148 +1,148 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Sat, 13 Dec 2014 18:35:24 +0100
-Subject: __hci_cmd_sync() not suitable for nokia h4p
-In-Reply-To: <20141212121453.GA31659@amd>
-References: <20141209190210.GA15641@amd>
- <304050AD-DB11-4A2B-A1F7-8B1BBB5F04F0@holtmann.org>
- <20141209201328.GA18003@amd>
- <7EFD3C33-E503-4FB6-BCCF-52836080ABD6@holtmann.org>
- <20141210131519.GA14748@amd>
- <EE1A4B9D-30D5-4BD9-9A43-532619494A0C@holtmann.org>
- <20141211221306.GA2905@amd> <20141212011504.GA16599@earth.universe>
- <20141212121453.GA31659@amd>
-Message-ID: <20141213173523.GA17570@earth.universe>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 13 Dec 2014 11:58:54 -0600
+Subject: [PATCH v5 1/2] soc: samsung: add exynos chipid driver support
+In-Reply-To: <548A9D27.1000504@samsung.com>
+References: <1418285264-21763-1-git-send-email-pankaj.dubey@samsung.com>
+ <1418285264-21763-2-git-send-email-pankaj.dubey@samsung.com>
+ <CAL_JsqKaf+w_D-xLCUizuTmxwT7uUHExA=qMpawQ+00G7uMcBg@mail.gmail.com>
+ <548A9D27.1000504@samsung.com>
+Message-ID: <CAL_JsqKA491FC44LRQQaKA3-3XKisJ2kRJCD9E5xQww=JV6+bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Dec 12, 2014 at 1:45 AM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> Hi Rob,
+>
+> On Thursday 11 December 2014 11:00 PM, Rob Herring wrote:
+>>
+>> On Thu, Dec 11, 2014 at 2:07 AM, Pankaj Dubey <pankaj.dubey@samsung.com>
+>> wrote:
+>>>
+>>> Exynos SoCs have Chipid, for identification of product IDs
+>>> and SoC revisions. This patch intendes to provide initialization
+>>> code for all these functionalites.
 
-On Fri, Dec 12, 2014 at 01:14:53PM +0100, Pavel Machek wrote:
-> > > I have created provisional device tree binding, and the driver still
-> > > works.
-> > 
-> > I don't have time to look at the code now, but I have some comments
-> > regarding the binding.
-> 
-> > >  
-> > >  &uart2 {
-> > > +        compatible = "brcm,uart,bcm2048";
-> > 
-> > This does not look correct. The uart should not be overwritten. The
-> > current h4p driver indeed implements a driver for the serial port,
-> > but that's a) linux specific and does not belong in the DT and b)
-> > should probably be changed in the mainline kernel.
-> 
-> Yes, bettter solution is needed here. But see the code, I don't see
-> how b) would be implemented.
+[...]
 
-I think it's probably a good idea to start from scratch. The h4p
-driver in its current state does not fit to the current kernel's
-style at all.
+>>> +static void __iomem *exynos_chipid_base;
+>>> +
+>>> +struct exynos_chipid_info exynos_soc_info;
+>>> +EXPORT_SYMBOL(exynos_soc_info);
+>>
+>>
+>> The soc_device already has similar data.Why is this needed? Is it
+>> temporary for compatibility?
+>
+>
+> struct soc_device_attribute can hold these two (product_id, and revision)
+> but they are defined as char * in soc_device_atttribute, and I feel it's
+> more specific for exposing via sysfs.
 
-My suggestion would be to have a driver, which implements a hci_dev.
-The driver would mostly look like the standard uart hci_dev driver,
-but additionally handles the wakeup and reset gpios. Power
-Management for the uart device is done via runtime pm, which is
-supported by OMAP's uart driver.
+But what is exposed generically for sysfs should also be exposed
+internally in the kernel generically.
 
-Then there should be a second driver, which implements the h4
-protocol extensions from Nokia as hci_uart_proto. It could be put
-into something like drivers/bluetooth/hci_h4p.c and have support for
-the additional packet types (namely H4_EVT_PKT, H4_NEG_PKT,
-H4_ALIVE_PKT and H4_RADIO_PKT).
+> Also existing code in mach-exynos compares them via product_id/revision
+> macros, so I can say to keep compatibility.
 
-> > >  	interrupts-extended = <&intc 73 &omap3_pmx_core OMAP3_UART2_RX>;
-> > >  	pinctrl-names = "default";
-> > >  	pinctrl-0 = <&uart2_pins>;
-> > > +	device {
-> > > +		  compatible = "brcm,bcm2048";
-> > > +		  uart = <&uart2>;
-> > 
-> > You don't need a phandle to the parent device.
-> 
-> Ok.
-> 
-> > > +		  reset-gpios = <&gpio3 27 GPIO_ACTIVE_HIGH>; /* want 91 */
-> > > +		  host-wakeup-gpios = <&gpio4 5 GPIO_ACTIVE_HIGH>; /* want 101 */
-> > 
-> > The host-wakeup should be mapped as irq, gpio2irq conversion
-> > will happen ;)
-> 
-> Why? It is accessed as gpio, too.
+Perhaps you will have to change the users. Otherwise, I don't see the
+point in moving this code as is. If there are a lot of users, then
+having both old and new interface and moving them over one by one
+would be okay. However, if this is widely used that is a problem in
+itself.
 
-Ok. I only did a quick look and saw, that the gpio was converted to
-irq.
+>> For early use?
+>
+>
+> Yes, partially correct. These parameters will be required in during early
+> boot, from mach-exynos/platsmp.c, by that time probe of chipid would not
+> have happened. But usage of this is not limited to early users, even
+> mach-exynos/pm.c will use this later any point of time.
+> Since there are early users I added "exynos_chipid_early_init" which will be
+> called via mach-exynos.c at very early stage [1].
+>
+> [1]: https://lkml.org/lkml/2014/12/11/47
+>
+>
+>> If for early use, then it
+>> should not be exported.
+>
+>
+> Other reason to make and expose this structure was we can see that other
+> fields of chipid bank (other than product_id and revision, which is not part
+> of this patch as of now) can be used by other driver such as ASV (which is
+> not yet part of mainline but is there for every exynos SoC).
+>
+> I do not exported this in my PATCH v4 [2] of this, and instead provided
+> exposed functions to directly access product_id and revision, but sometime
+> in future when we will need other fields of chipid bank, we will end-up
+> adding new exported function for each new field, so decided to expose this
+> structure itself.
 
-> > > +		  chip-type = <3>;
-> > 
-> > This should be set in the driver based on the compatible
-> > value and not via DT data.
-> 
-> Ok
-> 
-> > > +		  clocks = <&uart2_fck>, <&uart2_ick>;
-> > > +		  clock-names = "fck", "ick";
-> > 
-> > These clocks you defined belong to the uart device and not to the
-> > uart slave (bluetooth) device.
-> 
-> Ok. Why are they only needed in the bluetooth case?
+More on this below.
 
-A quick guess (without a deeper look at the code) is, that the ttys
-use hwmod provided clock information (which is available from the
-kernel). btw, h4p not using hwmod would be another problem, if it is
-ok to reimplement a full serial driver.
 
-I guess the clock data should be added to the uart devices in DT,
-though. This is btw. true for almost all omap internal devices
-described in DT, since the clock data has only been available in DT
-for 1 or 2 kernel releases.
+>>> +void __init exynos_chipid_early_init(struct device *dev)
+>>> +{
+>>> +       struct device_node *np;
+>>> +       const struct of_device_id *match;
+>>> +
+>>> +       if (exynos_chipid_base)
+>>> +               return;
+>>> +
+>>> +       if (!dev)
+>>> +               np = of_find_matching_node_and_match(NULL,
+>>> +                       of_exynos_chipid_ids, &match);
+>>> +       else
+>>> +               np = dev->of_node;
+>>> +
+>>> +       if (!np)
+>>> +               panic("%s, failed to find chipid node\n", __func__);
+>>
+>>
+>> Do you really want to halt booting here?
+>
+>
+> Since some critical configuration are done in platsmp.c based on product_id
+> and revision, I don't see any point moving ahead without it.
+> Even if we allow to continue here it will crash or lead to system
+> malfunction later during system boot for existing SoC support.
+>
+> Your console may not be up to
+>>
+>> see the panic anyway.
+>
+>
+> I feel this we can still see via earlyprintk.
 
-> > > +		  bt-sysclk = <2>;
-> > 
-> > I think this should be mapped cleanly in DT by adding a new clock
-> > to the DTS file:
-> > 
-> > vctcxo_clock: clock  {
-> >     compatible = "fixed-clock";
-> >     #clock-cells = <0>;
-> >     clock-frequency = <38400000>;
-> > };
-> 
-> No. It seems that this selects baud rate during the chip init. I guess
-> I can just remove that one.
+You can, yes. So when you don't boot getting no messages, you then
+have to recompile to enable earlyprintk for exynos, load a new kernel,
+and change your command line. That's not very good from a support
+point of view. It would be better to boot while failing to boot
+secondary cpus than not boot printing nothing. It is much better to
+provide the warnings rather than have to debug why you are not
+booting.
 
-you can see, that its a descriptor for the speed of the bcm2048's
-system clock.
+>>> +struct exynos_chipid_info {
+>>> +       u32 product_id;
+>>> +       u32 revision;
+>>> +};
+>>
+>>
+>> Exposing this struct kernel wide in an SOC specific way concerns me. I
+>> would not like to see this done on every SOC family. That would become
+>> a mess.
+>>
+>
+> As of today chip-id can live up by exposing two APIs for getting product_id
+> and revision, but in future when we need to access other fields we may end
+> up adding new exported functions/extern functions. We had a discussion about
+> it in Patch V4 [3].
 
-(from h4p driver)
-bt-sysclk = 1 => sysclk = 12000;
-bt-sysclk = 2 => sysclk = 38400;
+Yes, but every SOC has an id and revision, so we should expose them in
+a common way. For other fields, the mechanism to retrieve them should
+probably be common, but the data could be custom.
 
-and incidentally there is a 38.4 MHz clock connected to the bcm2048
-and the wl1251 in the N900 :)
+Rob
 
-> > Then the bluetooth device can reference its clock device:
-> > 
-> > clocks = <&vctcxo_clock>;
-> > 
-> > The same clock reference should be added to the wl1251 DT node :)
-> 
-> Feel free to do that, but I don't see how this one helps...?
-
-The clock is not enabled via the CPU, instead wl1251 and bcm2048
-enable it themselfes, so it's not strictly needed. But it means,
-that
-
-a) DT represents the hardware correctly
-b) one can acquire the sysclk speed from the referenced clock
-   [ using devm_clk_get() and clk_get_rate() ]
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141213/72f92c44/attachment.sig>
+>
+> [3]: https://lkml.org/lkml/2014/12/10/748
