@@ -1,149 +1,108 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 14 Dec 2014 15:28:53 +0000
-Subject: [PATCH RFC] clk: mxs: Fix invalid 32-bit access to frac registers
-Message-ID: <1418570933-21585-1-git-send-email-stefan.wahren@i2se.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 14 Dec 2014 17:49:34 +0200
+Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
+ of_dma_configure
+In-Reply-To: <20141210150853.GH23639@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <CAF6AEGs6dZauq1QxY_OqBPUs0xHYjjGTi+H7Vm-mNvJtmTAHRA@mail.gmail.com>
+ <20141210150853.GH23639@arm.com>
+Message-ID: <6860089.2Ca399bIPK@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to i.MX23 and i.MX28 reference manual the fractional
-clock control registers must be addressed by byte instructions.
+Hi Will,
 
-This patch fixes the erroneous 32-bit access to these registers.
+On Wednesday 10 December 2014 15:08:53 Will Deacon wrote:
+> On Wed, Dec 10, 2014 at 02:52:56PM +0000, Rob Clark wrote:
+> > On Mon, Dec 1, 2014 at 11:57 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > > This patch extends of_dma_configure so that it sets up the IOMMU for a
+> > > device, as well as the coherent/non-coherent DMA mapping ops.
+> > > 
+> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > Tested-by: Robin Murphy <robin.murphy@arm.com>
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > > 
+> > >  arch/arm/include/asm/dma-mapping.h |  4 +++-
+> > >  drivers/of/platform.c              | 21 ++++++++++++++-------
+> > >  include/linux/dma-mapping.h        |  8 +++++++-
+> > >  3 files changed, 24 insertions(+), 9 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/include/asm/dma-mapping.h
+> > > b/arch/arm/include/asm/dma-mapping.h index dc3420e77758..f3c0d953f6a2
+> > > 100644
+> > > --- a/arch/arm/include/asm/dma-mapping.h
+> > > +++ b/arch/arm/include/asm/dma-mapping.h
+> > > @@ -121,7 +121,9 @@ static inline unsigned long dma_max_pfn(struct
+> > > device *dev)> > 
+> > >  }
+> > >  #define dma_max_pfn(dev) dma_max_pfn(dev)
+> > > 
+> > > -static inline void arch_setup_dma_ops(struct device *dev, bool
+> > > coherent)
+> > > +static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
+> > > +                                     u64 size, struct iommu_ops *iommu,
+> > > +                                     bool coherent)
+> > >  {
+> > >         if (coherent)
+> > >                 set_dma_ops(dev, &arm_coherent_dma_ops);
+> > > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> > > index ff1f4e9afccb..b89caf8c7586 100644
+> > > --- a/drivers/of/platform.c
+> > > +++ b/drivers/of/platform.c
+> > > @@ -19,6 +19,7 @@
+> > >  #include <linux/slab.h>
+> > >  #include <linux/of_address.h>
+> > >  #include <linux/of_device.h>
+> > > +#include <linux/of_iommu.h>
+> > >  #include <linux/of_irq.h>
+> > >  #include <linux/of_platform.h>
+> > >  #include <linux/platform_device.h>
+> > > @@ -166,6 +167,7 @@ static void of_dma_configure(struct device *dev)
+> > >         int ret;
+> > >         bool coherent;
+> > >         unsigned long offset;
+> > > +       struct iommu_ops *iommu;
+> > > 
+> > >         /*
+> > >          * Set default dma-mask to 32 bit. Drivers are expected to setup
+> > > @@ -194,7 +196,16 @@ static void of_dma_configure(struct device *dev)
+> > >         dev_dbg(dev, "device is%sdma coherent\n",
+> > >                 coherent ? " " : " not ");
+> > > 
+> > > -       arch_setup_dma_ops(dev, coherent);
+> > > +       iommu = of_iommu_configure(dev);
+> > > +       dev_dbg(dev, "device is%sbehind an iommu\n",
+> > > +               iommu ? " " : " not ");
+> > > +
+> > > +       arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
+> > 
+> > so, what is the way for a driver that explicitly wants to manage it's
+> > own device virtual address space to opt out of this?  I suspect that
+> > won't be the common case, but for a gpu, if dma layer all of a sudden
+> > thinks it is in control of the gpu's virtual address space, things are
+> > going to end in tears..
+> 
+> I think you'll need to detach from the DMA domain, then have the driver
+> manage everything itself. As you say, it's not the common case, so you
+> may need to add some hooks for detaching from the default domain and
+> swizzling your DMA ops.
 
-The changes has been tested only with a i.MX28 board, because i don't
-have access to an i.MX23 board.
+I'm wondering if it's such an exotic case after all. I can see two reasons not 
+to use the default domain. In addition to special requirements coming from the 
+bus master side, the IOMMU itself might not support one domain per bus master 
+(I'm of course raising the issue from a very selfish Renesas IPMMU point of 
+view).
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/clk/mxs/clk-imx23.c |    8 +++++---
- drivers/clk/mxs/clk-imx28.c |   14 ++++++++------
- drivers/clk/mxs/clk-ref.c   |   19 ++++++++++---------
- 3 files changed, 23 insertions(+), 18 deletions(-)
+In that case the IOMMU driver can still detach the device from the default 
+domain in the .of_xlate() callback and attach it to its private domain. I'm 
+however wondering whether this case isn't common enough to avoid creating 
+default domains in common code in the first place. IOMMU drivers that support 
+one domain per master would then create device domain in their .of_xlate() 
+callback.
 
-diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
-index 9fc9359..371ba03 100644
---- a/drivers/clk/mxs/clk-imx23.c
-+++ b/drivers/clk/mxs/clk-imx23.c
-@@ -46,7 +46,8 @@ static void __iomem *digctrl;
- #define BP_CLKSEQ_BYPASS_SAIF	0
- #define BP_CLKSEQ_BYPASS_SSP	5
- #define BP_SAIF_DIV_FRAC_EN	16
--#define BP_FRAC_IOFRAC		24
-+
-+#define FRAC_IO	3
- 
- static void __init clk_misc_init(void)
- {
-@@ -72,9 +73,10 @@ static void __init clk_misc_init(void)
- 	/*
- 	 * 480 MHz seems too high to be ssp clock source directly,
- 	 * so set frac to get a 288 MHz ref_io.
-+	 * According to reference manual we must access frac bytewise.
- 	 */
--	writel_relaxed(0x3f << BP_FRAC_IOFRAC, FRAC + CLR);
--	writel_relaxed(30 << BP_FRAC_IOFRAC, FRAC + SET);
-+	writeb_relaxed(0x3f, FRAC + FRAC_IO + CLR);
-+	writeb_relaxed(30, FRAC + FRAC_IO + SET);
- }
- 
- static const char *sel_pll[]  __initconst = { "pll", "ref_xtal", };
-diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-index a6c3501..3eae119 100644
---- a/drivers/clk/mxs/clk-imx28.c
-+++ b/drivers/clk/mxs/clk-imx28.c
-@@ -53,8 +53,9 @@ static void __iomem *clkctrl;
- #define BP_ENET_SLEEP		31
- #define BP_CLKSEQ_BYPASS_SAIF0	0
- #define BP_CLKSEQ_BYPASS_SSP0	3
--#define BP_FRAC0_IO1FRAC	16
--#define BP_FRAC0_IO0FRAC	24
-+
-+#define FRAC0_IO1	2
-+#define FRAC0_IO0	3
- 
- static void __iomem *digctrl;
- #define DIGCTRL digctrl
-@@ -118,11 +119,12 @@ static void __init clk_misc_init(void)
- 	/*
- 	 * 480 MHz seems too high to be ssp clock source directly,
- 	 * so set frac0 to get a 288 MHz ref_io0 and ref_io1.
-+	 * According to reference manual we must access frac0 bytewise.
- 	 */
--	val = readl_relaxed(FRAC0);
--	val &= ~((0x3f << BP_FRAC0_IO0FRAC) | (0x3f << BP_FRAC0_IO1FRAC));
--	val |= (30 << BP_FRAC0_IO0FRAC) | (30 << BP_FRAC0_IO1FRAC);
--	writel_relaxed(val, FRAC0);
-+	writeb_relaxed(0x3f, FRAC0 + FRAC0_IO0 + CLR);
-+	writeb_relaxed(30, FRAC0 + FRAC0_IO0 + SET);
-+	writeb_relaxed(0x3f, FRAC0 + FRAC0_IO1 + CLR);
-+	writeb_relaxed(30, FRAC0 + FRAC0_IO1 + SET);
- }
- 
- static const char *sel_cpu[]  __initconst = { "ref_cpu", "ref_xtal", };
-diff --git a/drivers/clk/mxs/clk-ref.c b/drivers/clk/mxs/clk-ref.c
-index 4adeed6..ad3851c 100644
---- a/drivers/clk/mxs/clk-ref.c
-+++ b/drivers/clk/mxs/clk-ref.c
-@@ -16,6 +16,8 @@
- #include <linux/slab.h>
- #include "clk.h"
- 
-+#define BF_CLKGATE	BIT(7)
-+
- /**
-  * struct clk_ref - mxs reference clock
-  * @hw: clk_hw for the reference clock
-@@ -39,7 +41,7 @@ static int clk_ref_enable(struct clk_hw *hw)
- {
- 	struct clk_ref *ref = to_clk_ref(hw);
- 
--	writel_relaxed(1 << ((ref->idx + 1) * 8 - 1), ref->reg + CLR);
-+	writeb_relaxed(BF_CLKGATE, ref->reg + ref->idx + CLR);
- 
- 	return 0;
- }
-@@ -48,7 +50,7 @@ static void clk_ref_disable(struct clk_hw *hw)
- {
- 	struct clk_ref *ref = to_clk_ref(hw);
- 
--	writel_relaxed(1 << ((ref->idx + 1) * 8 - 1), ref->reg + SET);
-+	writeb_relaxed(BF_CLKGATE, ref->reg + ref->idx + SET);
- }
- 
- static unsigned long clk_ref_recalc_rate(struct clk_hw *hw,
-@@ -56,7 +58,7 @@ static unsigned long clk_ref_recalc_rate(struct clk_hw *hw,
- {
- 	struct clk_ref *ref = to_clk_ref(hw);
- 	u64 tmp = parent_rate;
--	u8 frac = (readl_relaxed(ref->reg) >> (ref->idx * 8)) & 0x3f;
-+	u8 frac = readb_relaxed(ref->reg + ref->idx) & 0x3f;
- 
- 	tmp *= 18;
- 	do_div(tmp, frac);
-@@ -93,8 +95,7 @@ static int clk_ref_set_rate(struct clk_hw *hw, unsigned long rate,
- 	struct clk_ref *ref = to_clk_ref(hw);
- 	unsigned long flags;
- 	u64 tmp = parent_rate;
--	u32 val;
--	u8 frac, shift = ref->idx * 8;
-+	u8 frac, val;
- 
- 	tmp = tmp * 18 + rate / 2;
- 	do_div(tmp, rate);
-@@ -107,10 +108,10 @@ static int clk_ref_set_rate(struct clk_hw *hw, unsigned long rate,
- 
- 	spin_lock_irqsave(&mxs_lock, flags);
- 
--	val = readl_relaxed(ref->reg);
--	val &= ~(0x3f << shift);
--	val |= frac << shift;
--	writel_relaxed(val, ref->reg);
-+	val = readb_relaxed(ref->reg + ref->idx);
-+	val &= ~0x3f;
-+	val |= frac;
-+	writeb_relaxed(val, ref->reg + ref->idx);
- 
- 	spin_unlock_irqrestore(&mxs_lock, flags);
- 
 -- 
-1.7.9.5
+Regards,
+
+Laurent Pinchart
