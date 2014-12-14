@@ -1,64 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 14 Dec 2014 11:35:29 +0000
-Subject: [PATCH v2 5/6] arm/arm64: KVM: Initialize the vgic on-demand when
- injecting IRQs
-In-Reply-To: <1418469449-13277-6-git-send-email-christoffer.dall@linaro.org>
- (Christoffer Dall's message of "Sat, 13 Dec 2014 11:17:28 +0000")
-References: <1418469449-13277-1-git-send-email-christoffer.dall@linaro.org>
- <1418469449-13277-6-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <86tx0y1n26.fsf@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 14 Dec 2014 14:45:36 +0200
+Subject: [PATCH v3 18/19] iommu: exynos: init from dt-specific callback
+ instead of initcall
+In-Reply-To: <1416395748-10731-19-git-send-email-m.szyprowski@samsung.com>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1416395748-10731-19-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1826772.xgprzQcfXd@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 13 2014 at 11:17:28 AM, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> Userspace assumes that it can wire up IRQ injections after having
-> created all VCPUs and after having created the VGIC, but potentially
-> before starting the first VCPU.  This can currently lead to lost IRQs
-> because the state of that IRQ injection is not stored anywhere and we
-> don't return an error to userspace.
->
-> We haven't seen this problem manifest itself yet, presumably because
-> guests reset the devices on boot, but this could cause issues with
-> migration and other non-standard startup configurations.
->
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Hi Marek,
+
+Thank you for the patch.
+
+On Wednesday 19 November 2014 12:15:47 Marek Szyprowski wrote:
+> This patch introduces IOMMU_OF_DECLARE-based initialization to the
+> driver, which replaces subsys_initcall-based procedure.
+> exynos_iommu_of_setup ensures that each sysmmu controller is probed
+> before its master device.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
->  virt/kvm/arm/vgic.c | 17 ++++++++++++++---
->  1 file changed, 14 insertions(+), 3 deletions(-)
->
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index e1bef68..330445c 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1693,11 +1693,22 @@ out:
->  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->  			bool level)
->  {
-> -	if (likely(vgic_ready(kvm)) &&
-> -	    vgic_update_irq_pending(kvm, cpuid, irq_num, level))
-> +	int ret = 0;
-> +
-> +	if (unlikely(!vgic_initialized(kvm))) {
-> +		mutex_lock(&kvm->lock);
-> +		ret = vgic_init(kvm);
-> +		mutex_unlock(&kvm->lock);
-> +
-> +		if (ret)
-> +			goto out;
-> +	}
-> +
-> +	if (vgic_update_irq_pending(kvm, cpuid, irq_num, level))
->  		vgic_kick_vcpus(kvm);
->  
-> -	return 0;
-> +out:
-> +	return ret;
+>  drivers/iommu/exynos-iommu.c | 28 +++++++++++++++++++++++++++-
+>  1 file changed, 27 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index cd28dc09db39..88f9afe641a0 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+
+[snip]
+
+> @@ -1125,4 +1134,21 @@ err_reg_driver:
+>  	kmem_cache_destroy(lv2table_kmem_cache);
+>  	return ret;
 >  }
->  
->  static irqreturn_t vgic_maintenance_handler(int irq, void *data)
+> -subsys_initcall(exynos_iommu_init);
+> +
+> +static int __init exynos_iommu_of_setup(struct device_node *np)
+> +{
+> +	struct platform_device *pdev;
+> +
+> +	if (!init_done)
+> +		exynos_iommu_init();
+> +
+> +	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
+> +	if (IS_ERR(pdev))
+> +		return PTR_ERR(pdev);
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+If we end up having to create the IOMMU platform devices from within the 
+drivers, the introduction of IOMMU_OF_DECLARE starts to feel like a workaround 
+to me. I wonder whether it wouldn't then be better to let the driver core 
+instantiate the IOMMU platform device from DT as for all other devices, and 
+use device notifiers to defer probe of the bus masters until the required 
+IOMMU(s) are registered.
 
-	M.
+Will, what's your opinion on that ?
+
+> +
+> +	of_iommu_set_ops(np, &exynos_iommu_ops);
+> +	return 0;
+> +}
+> +
+> +IOMMU_OF_DECLARE(exynos_iommu_of, "samsung,exynos-sysmmu",
+> +		 exynos_iommu_of_setup);
+
 -- 
-Jazz is not dead. It just smells funny.
+Regards,
+
+Laurent Pinchart
