@@ -1,45 +1,42 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 14 Dec 2014 10:47:57 +0100
-Subject: bluetooth: Add hci_h4p driver
-In-Reply-To: <ED6FB9B5-7BD5-4398-ACA4-C5D1547B91A4@holtmann.org>
-References: <20141213223727.GA13894@amd>
- <570BAC61-3137-42E5-B4F8-A61AEED380DE@holtmann.org>
- <20141213235131.GA23566@amd>
- <ED6FB9B5-7BD5-4398-ACA4-C5D1547B91A4@holtmann.org>
-Message-ID: <20141214094757.GA28973@amd>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Sun, 14 Dec 2014 10:48:01 +0100
+Subject: [PATCH v2 1/4] pci: iProc: define Broadcom iProc PCIe binding
+In-Reply-To: <3383252.Ad6Qf0H2fa@wuerfel>
+References: <1418351817-14898-2-git-send-email-rjui@broadcom.com>
+ <3907917.zNo7yttzkh@wuerfel> <548C0F80.2090300@broadcom.com>
+ <3383252.Ad6Qf0H2fa@wuerfel>
+Message-ID: <548D5CD1.10801@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 2014-12-14 01:07:42, Marcel Holtmann wrote:
-> Hi Pavel,
-> 
-> >>> My notes say that Marcel wanted different filenames, but I'd need
-> >>> advice exactly what filenames. I guess platform data supprort should
-> >>> be removed altogether, rather than renamed.
-> >> 
-> >> Yes, the platform support should go away. This should be purely based on DT.
-> >> 
-> >> Can you also start using git format-patch so that patches get a diffstat.
-> > 
-> > So the rest of filenames look ok?
-> 
-> I have not looked at the patch or the filenames at all.
+On 12/13/14 20:46, Arnd Bergmann wrote:
+> On Saturday 13 December 2014 11:05:52 Arend van Spriel wrote:
+>>
+>> Makes sense. I think that is what Hauke meant by "adding
+>> additional support for registering to bcma". So the discovery info is a
+>> piece of read-only memory in the chip. Its address is stored in the
+>> chipcommon core register space. BCMA parses that memory blob resulting
+>> in a list of cores which register address info. We could add DT support
+>> in BCMA matching the compatible string and register a core for it.
+>
+> Ah, interesting idea. That would mirror what we do for drivers/amba,
+> I like the idea.
 
-Ok, so here's diffstat. Can you take a look?
++ Rafal
 
-Thanks,
-									Pavel
+Let's explore this. Although I don't have the iProc hardware to verify it.
 
- drivers/bluetooth/Kconfig                  |   10 
- drivers/bluetooth/Makefile                 |    3 
- drivers/bluetooth/hci_h4p.h                |  234 +++++
- drivers/bluetooth/nokia_core.c             | 1262 +++++++++++++++++++++++++++++
- drivers/bluetooth/nokia_fw-bcm.c           |   27 
- drivers/bluetooth/nokia_fw.c               |  105 ++
- drivers/bluetooth/nokia_uart.c             |  179 ++++
- include/linux/platform_data/bt-nokia-h4p.h |    4 
- 8 files changed, 1822 insertions(+), 2 deletions(-)
+>> However, apart from the discovery info a "discoverable ARM AXI" chip has
+>> a register space per core that provides common procedures like
+>> enable/disable, reset, core status, which are implemented in BCMA. I am
+>> not seeing that register space in the DT examples so I guess this IP
+>> block is not there for iProc chips.
+>
+> I wouldn't draw conclusions from the absence of some node. Maybe these
+> registers are present but just not used by the original BSP.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I do not intend to. We have raised the question internally to iProc chip 
+designers.
+
+Regards,
+Arend
