@@ -1,203 +1,592 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 14 Dec 2014 02:42:01 +0100
-Subject: [PATCHv0 0/5] ISL12057 alarm support and isil vs isl fix
-Message-ID: <cover.1418519430.git.arno@natisbad.org>
+Date: Sun, 14 Dec 2014 02:42:14 +0100
+Subject: [PATCHv0 1/5] rtc: rtc-isl12057: add alarm support to Intersil
+ ISL12057 RTC driver
+In-Reply-To: <cover.1418519430.git.arno@natisbad.org>
+References: <cover.1418519430.git.arno@natisbad.org>
+Message-ID: <c38e3f1a4254e0d8db409ad87ba824c3383d0998.1418519430.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew, Uwe,
 
-Andrew, the first patch of this series is a new version of the one you
-have in your tree, providing the changes asked by Uwe (i.e. you can
-just replace yours by that one). If you prefer an additional commit over
-what you already have, do not hesitate to tell me. Below, you have a
-diff between previous (the one you have) and  this first patch, w/ some
-inline comments. Uwe, tell me if it is what you expected.
+This patch adds alarm support to Intersil ISL12057 driver. This allows
+to configure the chip to generate an interrupt when the alarm matches
+current time value. Alarm can be programmed up to one month in the
+future and is accurate to the second.
 
-The three patches for RN102, RN104 and RN2120 .dts files just add a
-boolean property to the ISL12057 node to mark it has a wakeup source,
-as proposed by Uwe. If first patch is ok, I think those three can
-either be merged by Jason or directly by you, Andrew.
+The patch was developed to support two different configurations:
+systems w/ and w/o RTC chip IRQ line connected to the main CPU.
 
-The last patch tries and fix the isl vs isil issue which led to the
-conflict between the previous version of this patch and two patches
-merged upstream by Darshana, *by using isil everywhere and deprecating
-isl*. Arnd is also in copy to provide some feedback. At the moment, this
-last patch and the first one of this series can be applied in whatever
-order but I think this is just luck (first and last patch both touch
-rtc-isl12057.c file) so we'll have to be careful if it's merged by
-different maintainers.
+The latter is the one found on current 3 kernel users of the chip
+for which support was initially developed (Netgear ReadyNAS 102,
+104 and 2120 NAS). On those devices, the IRQ#2 pin of the chip is not
+connected to the SoC but to a PMIC. This allows setting an alarm,
+powering off the device and have it wake up when the alarm rings.
+To support that configuration the driver does the following:
 
-Cheers,
+ 1. it has alarm_irq_enable() function returns -ENOTTY when no IRQ
+    is passed to the driver.
+ 2. it marks the device as a wakeup source if an IRQ is passed to
+    to the driver or if the boolean "can-wakeup-machine" is set
+    in system .dts file to have 'wakealarm' sysfs entry created.
+ 3. it marks the device has not supporting UIE mode when no IRQ is
+    passed to the driver (see the commmit message of c9f5c7e7a84f)
 
-a+
+This specific configuration was tested on a ReadyNAS 102 by setting
+an alarm, powering off the device and see it reboot as expected
+when the alarm rang.
 
-Some comments on the changes in first patch:
+The former configuration was tested on a Netgear ReadyNAS 102 after
+some soldering of the IRQ#2 pin of the RTC chip to a MPP line of the
+SoC (the one used usually handles the reset button). The test was
+performed using a modified .dts file reflecting this change (see below)
+and rtc-test.c program available in Documentation/rtc.txt. This test
+program ran as expected, which validates alarm supports, including
+interrupt support.
 
--diff -puN drivers/rtc/rtc-isl12057.c~rtc-rtc-isl12057-add-alarm-support-to-intersil-isl12057-rtc-driver drivers/rtc/rtc-isl12057.c
----- a/drivers/rtc/rtc-isl12057.c~rtc-rtc-isl12057-add-alarm-support-to-intersil-isl12057-rtc-driver
--+++ a/drivers/rtc/rtc-isl12057.c
-+Index: linux/drivers/rtc/rtc-isl12057.c
-+===================================================================
-+--- linux.orig/drivers/rtc/rtc-isl12057.c
-++++ linux/drivers/rtc/rtc-isl12057.c
- @@ -1,5 +1,5 @@
-  /*
- - * rtc-isl12057 - Driver for Intersil ISL12057 I2C Real Time Clock
-@@ -335,10 +310,44 @@
-  static int isl12057_rtc_set_time(struct device *dev, struct rtc_time *tm)
-  {
-  	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
--@@ -262,9 +457,48 @@ static int isl12057_check_rtc_status(str
-+@@ -262,9 +457,82 @@ static int isl12057_check_rtc_status(str
-  	return 0;
-  }
-  
-> ++#ifdef CONFIG_OF
-> ++/*
-> ++ * One would expect the device to be marked as a wakeup source only
-> ++ * when an IRQ pin of the RTC is routed to an interrupt line of the
-> ++ * CPU. In practice, such an IRQ pin can be connected to a PMIC and
-> ++ * this allows the device to be powered up when RTC alarm rings. This
-> ++ * is for instance the case on ReadyNAS 102, 104 and 2120. On those
-> ++ * devices with no IRQ driectly connected to the SoC, the RTC chip
-> ++ * can be forced as a wakeup source by stating that explicitly in
-> ++ * the device's .dts file using the "can-wakeup-machine" boolean
-> ++ * property. This will guarantee 'wakealarm' sysfs entry is available
-> ++ * on the device.
-> ++ *
-> ++ * The function below returns 1, i.e. the capability of the chip to
-> ++ * wakeup the device, based on IRQ availability or if the boolean
-> ++ * property has been set in the .dts file. Otherwise, it returns 0.
-> ++ */
-> ++
-> ++static bool isl12057_can_wakeup_machine(struct device *dev)
-> ++{
-> ++	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
-> ++
-> ++	return (data->irq ||
-> ++		of_property_read_bool(dev->of_node, "can-wakeup-machine"));
-> ++}
-> ++#else
-> ++static bool isl12057_can_wakeup_machine(struct device *dev)
-> ++{
-> ++	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
-> ++
-> ++	return !!data->irq;
-> ++}
-> ++#endif
-> ++
+As a side note, the ISL12057 remains in the list of trivial devices,
+i.e. no specific DT binding being added by this patch: i2c core
+automatically handles extraction of IRQ line info from .dts file. For
+instance, if one wants to reference the interrupt line for the
+alarm in its .dts file, adding interrupt and interrupt-parent
+properties works as expected (if the primary function of your
+interrupt pin is not GPIO, you will need some additional pinctrl
+properties):
 
-a small helper. Note: the only way to mark the device is a wakeup source
-is via system .dts file. Uwe, now is the time to decide if we put a prefix
-before the property and which ;-)
+          isl12057: isl12057 at 68 {
+                  compatible = "isil,isl12057";
+                  interrupt-parent = <&gpio0>;
+                  interrupts = <6 IRQ_TYPE_EDGE_FALLING>;
+                  reg = <0x68>;
+          };
 
-I have also added a Documentation/devicetree/bindings/rtc/isil,isl12057.txt
-in first patch to describe the purpose of the property and give some
-example. I decided to let the device in the list of trivial I2C device
-though, as this property is not per see required by the device, nor
-specific to ISL12057 but to the way the chip IRQ line is connected (or
-not connected) to the SoC.
- 
+FWIW, if someone is looking for a way to test alarm support on a system
+on which the chip IRQ line has the ability to boot the system (e.g.
+ReadyNAS 102, 104, etc):
 
->  +static int isl12057_rtc_alarm_irq_enable(struct device *dev,
->  +					 unsigned int enable)
->  +{
-> @@ -385,7 +394,7 @@
->   };
->   
->   static struct regmap_config isl12057_rtc_regmap_config = {
-> -@@ -277,7 +511,6 @@ static int isl12057_probe(struct i2c_cli
-> +@@ -277,7 +545,6 @@ static int isl12057_probe(struct i2c_cli
->   {
->   	struct device *dev = &client->dev;
->   	struct isl12057_rtc_data *data;
-> @@ -393,7 +402,7 @@
->   	struct regmap *regmap;
->   	int ret;
->   
-> -@@ -310,10 +543,79 @@ static int isl12057_probe(struct i2c_cli
-> +@@ -310,9 +577,70 @@ static int isl12057_probe(struct i2c_cli
->   	data->regmap = regmap;
->   	dev_set_drvdata(dev, data);
->   
-> @@ -411,14 +420,8 @@
->  +				client->irq, ret);
->  +	}
->  +
-> -+	/*
-> -+	 * This is needed to have 'wakealarm' sysfs entry available. One
-> -+	 * would expect the device to be marked as a wakeup source only
-> -+	 * when an IRQ pin of the RTC is routed to an interrupt line of the
-> -+	 * CPU. In practice, such an IRQ pin can be connected to a PMIC and
-> -+	 * this allows the device to be powered up when RTC alarm rings.
-> -+	 */
-> -+	device_init_wakeup(dev, true);
-> ++	if (isl12057_can_wakeup_machine(dev))
-> ++		device_init_wakeup(dev, true);
+    # echo `date '+%s' -d '+ 1 minutes'` > /sys/class/rtc/rtc0/wakealarm
+    # shutdown -h now
 
-We mark the device as a wakeup source if irq is available or the .dts
-file explicitly require it via our new boolean can-wakeup-machine
-property.
+With the commands above, after a minute, the system comes back to life.
 
+As a final note, the driver does not provide support for the second
+alarm of the chip (this second alarm does not support second).
 
-> ++}
-> ++
->  +static int isl12057_remove(struct i2c_client *client)
->  +{
-> -+	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(&client->dev);
-> -+
-> -+	if (rtc_data->irq > 0)
-> ++	if (isl12057_can_wakeup_machine(&client->dev))
->  +		device_init_wakeup(&client->dev, false);
-
-Same reason is used to remove the device as from wakeup sources.
-
-
->  +
->  +	return 0;
-> @@ -452,7 +453,7 @@
->  +{
->  +	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(dev);
->  +
-> -+	if (device_may_wakeup(dev))
-> ++	if (rtc_data->irq && device_may_wakeup(dev))
->  +		return enable_irq_wake(rtc_data->irq);
->  +
->  +	return 0;
-> @@ -462,20 +463,19 @@
->  +{
->  +	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(dev);
->  +
-> -+	if (device_may_wakeup(dev))
-> ++	if (rtc_data->irq && device_may_wakeup(dev))
->  +		return disable_irq_wake(rtc_data->irq);
-
-check we have a valid irq before passing it to enable/disable_irq_wake(). 
-
-
-Arnaud Ebalard (5):
-  rtc: rtc-isl12057: add alarm support to Intersil ISL12057 RTC driver
-  ARM: mvebu: ISL12057 rtc chip can be used to wake up RN102
-  ARM: mvebu: ISL12057 rtc chip can be used to wake up RN104
-  ARM: mvebu: ISL12057 rtc chip can be used to wake up RN2120
-  dt-bindings: fix isl vs isil prefix issue for Intersil
-
- .../devicetree/bindings/i2c/trivial-devices.txt    |   5 +-
- .../devicetree/bindings/regulator/isl9305.txt      |   4 +-
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
  .../devicetree/bindings/rtc/isil,isl12057.txt      |  71 +++++
- .../devicetree/bindings/vendor-prefixes.txt        |   3 +-
- arch/arm/boot/dts/armada-370-netgear-rn102.dts     |   1 +
- arch/arm/boot/dts/armada-370-netgear-rn104.dts     |   1 +
- arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     |   1 +
- arch/arm/boot/dts/tegra30-cardhu.dtsi              |   2 +-
- arch/arm/boot/dts/zynq-parallella.dts              |   2 +-
- drivers/regulator/isl9305.c                        |   6 +-
- drivers/rtc/rtc-isl12022.c                         |   3 +-
- drivers/rtc/rtc-isl12057.c                         | 353 ++++++++++++++++++++-
- drivers/staging/iio/light/isl29028.c               |   4 +-
- 13 files changed, 431 insertions(+), 25 deletions(-)
+ drivers/rtc/rtc-isl12057.c                         | 350 ++++++++++++++++++++-
+ 2 files changed, 411 insertions(+), 10 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/rtc/isil,isl12057.txt
 
+diff --git a/Documentation/devicetree/bindings/rtc/isil,isl12057.txt b/Documentation/devicetree/bindings/rtc/isil,isl12057.txt
+new file mode 100644
+index 000000000000..111bb8a6c274
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/isil,isl12057.txt
+@@ -0,0 +1,71 @@
++Intersil ISL12057 I2C RTC/Alarm chip
++
++ISL12057 is a trivial I2C device (it has simple device tree bindings, consisting
++of a compatible field, an address and possibly an interrupt line).
++
++Nonetheless, it supports an additional boolean property ("can-wakeup-machine")
++to handle the specific use-case found on the three initial in-tree users of the
++chip (NETGEAR ReadyNAS 102, 104 and 2120 ARM-based NAS); On those devices, the
++IRQ#2 pin of the chip (associated with the alarm supported by the driver) is not
++connected to the SoC but to a PMIC. It allows the device to be powered up when
++RTC alarm rings. In order to mark the device has a wakeup source and get access
++to the 'wakealarm' sysfs entry, this specific property can be set when the IRQ#2
++pin of the chip is not connected to the SoC.
++
++Required properties supported by the device:
++
++ - "compatible": must be "isil,isl12057"
++ - "reg": I2C bus address of the device
++
++Optional properties:
++
++ - "can-wakeup-machine": mark the chip as a wakeup source, independently of
++			 the availability of an IRQ line connected to the SoC.
++
++
++Example isl12057 node without IRQ#2 pin connected (no alarm support):
++
++	isl12057: isl12057 at 68 {
++		compatible = "isil,isl12057";
++		reg = <0x68>;
++	};
++
++
++Example isl12057 node with IRQ#2 pin connected to main SoC via MPP6 (note
++that the pinctrl-related properties below are given for completeness and
++may not be required depending on your system or SoC, and the main function
++of the MPP used as IRQ line, i.e. "interrupt-parent" and "interrupts" are
++usually sufficient):
++
++		    pinctrl {
++				...
++
++				rtc_alarm_pin: rtc_alarm_pin {
++					marvell,pins = "mpp6";
++					marvell,function = "gpio";
++				};
++
++				...
++
++		    };
++
++	...
++
++	isl12057: isl12057 at 68 {
++		compatible = "isil,isl12057";
++		reg = <0x68>;
++		pinctrl-0 = <&rtc_alarm_pin>;
++		pinctrl-names = "default";
++		interrupt-parent = <&gpio0>;
++		interrupts = <6 IRQ_TYPE_EDGE_FALLING>;
++	};
++
++
++Example isl12057 node without IRQ#2 pin connected to the SoC but to a
++PMIC, allowing the device to be started based on configured alarm:
++
++	isl12057: isl12057 at 68 {
++		compatible = "isil,isl12057";
++		reg = <0x68>;
++		can-wakeup-machine;
++	};
+diff --git a/drivers/rtc/rtc-isl12057.c b/drivers/rtc/rtc-isl12057.c
+index 6e1fcfb5d7e6..98adc2c1bdb0 100644
+--- a/drivers/rtc/rtc-isl12057.c
++++ b/drivers/rtc/rtc-isl12057.c
+@@ -1,5 +1,5 @@
+ /*
+- * rtc-isl12057 - Driver for Intersil ISL12057 I2C Real Time Clock
++ * rtc-isl12057 - Driver for Intersil ISL12057 I2C Real Time Clock / Alarm
+  *
+  * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
+  *
+@@ -79,8 +79,10 @@
+ #define ISL12057_MEM_MAP_LEN	0x10
+ 
+ struct isl12057_rtc_data {
++	struct rtc_device *rtc;
+ 	struct regmap *regmap;
+ 	struct mutex lock;
++	int irq;
+ };
+ 
+ static void isl12057_rtc_regs_to_tm(struct rtc_time *tm, u8 *regs)
+@@ -160,14 +162,47 @@ static int isl12057_i2c_validate_chip(struct regmap *regmap)
+ 	return 0;
+ }
+ 
+-static int isl12057_rtc_read_time(struct device *dev, struct rtc_time *tm)
++static int _isl12057_rtc_clear_alarm(struct device *dev)
++{
++	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
++	int ret;
++
++	ret = regmap_update_bits(data->regmap, ISL12057_REG_SR,
++				 ISL12057_REG_SR_A1F, 0);
++	if (ret)
++		dev_err(dev, "%s: clearing alarm failed (%d)\n", __func__, ret);
++
++	return ret;
++}
++
++static int _isl12057_rtc_update_alarm(struct device *dev, int enable)
++{
++	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
++	int ret;
++
++	ret = regmap_update_bits(data->regmap, ISL12057_REG_INT,
++				 ISL12057_REG_INT_A1IE,
++				 enable ? ISL12057_REG_INT_A1IE : 0);
++	if (ret)
++		dev_err(dev, "%s: changing alarm interrupt flag failed (%d)\n",
++			__func__, ret);
++
++	return ret;
++}
++
++/*
++ * Note: as we only read from device and do not perform any update, there is
++ * no need for an equivalent function which would try and get driver's main
++ * lock. Here, it is safe for everyone if we just use regmap internal lock
++ * on the device when reading.
++ */
++static int _isl12057_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ {
+ 	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
+ 	u8 regs[ISL12057_RTC_SEC_LEN];
+ 	unsigned int sr;
+ 	int ret;
+ 
+-	mutex_lock(&data->lock);
+ 	ret = regmap_read(data->regmap, ISL12057_REG_SR, &sr);
+ 	if (ret) {
+ 		dev_err(dev, "%s: unable to read oscillator status flag (%d)\n",
+@@ -187,8 +222,6 @@ static int isl12057_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ 			__func__, ret);
+ 
+ out:
+-	mutex_unlock(&data->lock);
+-
+ 	if (ret)
+ 		return ret;
+ 
+@@ -197,6 +230,168 @@ out:
+ 	return rtc_valid_tm(tm);
+ }
+ 
++static int isl12057_rtc_update_alarm(struct device *dev, int enable)
++{
++	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
++	int ret;
++
++	mutex_lock(&data->lock);
++	ret = _isl12057_rtc_update_alarm(dev, enable);
++	mutex_unlock(&data->lock);
++
++	return ret;
++}
++
++static int isl12057_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
++{
++	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
++	struct rtc_time rtc_tm, *alarm_tm = &alarm->time;
++	unsigned long rtc_secs, alarm_secs;
++	u8 regs[ISL12057_A1_SEC_LEN];
++	unsigned int ir;
++	int ret;
++
++	mutex_lock(&data->lock);
++	ret = regmap_bulk_read(data->regmap, ISL12057_REG_A1_SC, regs,
++			       ISL12057_A1_SEC_LEN);
++	if (ret) {
++		dev_err(dev, "%s: reading alarm section failed (%d)\n",
++			__func__, ret);
++		goto err_unlock;
++	}
++
++	alarm_tm->tm_sec  = bcd2bin(regs[0] & 0x7f);
++	alarm_tm->tm_min  = bcd2bin(regs[1] & 0x7f);
++	alarm_tm->tm_hour = bcd2bin(regs[2] & 0x3f);
++	alarm_tm->tm_mday = bcd2bin(regs[3] & 0x3f);
++	alarm_tm->tm_wday = -1;
++
++	/*
++	 * The alarm section does not store year/month. We use the ones in rtc
++	 * section as a basis and increment month and then year if needed to get
++	 * alarm after current time.
++	 */
++	ret = _isl12057_rtc_read_time(dev, &rtc_tm);
++	if (ret)
++		goto err_unlock;
++
++	alarm_tm->tm_year = rtc_tm.tm_year;
++	alarm_tm->tm_mon = rtc_tm.tm_mon;
++
++	ret = rtc_tm_to_time(&rtc_tm, &rtc_secs);
++	if (ret)
++		goto err_unlock;
++
++	ret = rtc_tm_to_time(alarm_tm, &alarm_secs);
++	if (ret)
++		goto err_unlock;
++
++	if (alarm_secs < rtc_secs) {
++		if (alarm_tm->tm_mon == 11) {
++			alarm_tm->tm_mon = 0;
++			alarm_tm->tm_year += 1;
++		} else {
++			alarm_tm->tm_mon += 1;
++		}
++	}
++
++	ret = regmap_read(data->regmap, ISL12057_REG_INT, &ir);
++	if (ret) {
++		dev_err(dev, "%s: reading alarm interrupt flag failed (%d)\n",
++			__func__, ret);
++		goto err_unlock;
++	}
++
++	alarm->enabled = !!(ir & ISL12057_REG_INT_A1IE);
++
++err_unlock:
++	mutex_unlock(&data->lock);
++
++	return ret;
++}
++
++static int isl12057_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
++{
++	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
++	struct rtc_time *alarm_tm = &alarm->time;
++	unsigned long rtc_secs, alarm_secs;
++	u8 regs[ISL12057_A1_SEC_LEN];
++	struct rtc_time rtc_tm;
++	int ret, enable = 1;
++
++	mutex_lock(&data->lock);
++	ret = _isl12057_rtc_read_time(dev, &rtc_tm);
++	if (ret)
++		goto err_unlock;
++
++	ret = rtc_tm_to_time(&rtc_tm, &rtc_secs);
++	if (ret)
++		goto err_unlock;
++
++	ret = rtc_tm_to_time(alarm_tm, &alarm_secs);
++	if (ret)
++		goto err_unlock;
++
++	/* If alarm time is before current time, disable the alarm */
++	if (!alarm->enabled || alarm_secs <= rtc_secs) {
++		enable = 0;
++	} else {
++		/*
++		 * Chip only support alarms up to one month in the future. Let's
++		 * return an error if we get something after that limit.
++		 * Comparison is done by incrementing rtc_tm month field by one
++		 * and checking alarm value is still below.
++		 */
++		if (rtc_tm.tm_mon == 11) { /* handle year wrapping */
++			rtc_tm.tm_mon = 0;
++			rtc_tm.tm_year += 1;
++		} else {
++			rtc_tm.tm_mon += 1;
++		}
++
++		ret = rtc_tm_to_time(&rtc_tm, &rtc_secs);
++		if (ret)
++			goto err_unlock;
++
++		if (alarm_secs > rtc_secs) {
++			dev_err(dev, "%s: max for alarm is one month (%d)\n",
++				__func__, ret);
++			ret = -EINVAL;
++			goto err_unlock;
++		}
++	}
++
++	/* Disable the alarm before modifying it */
++	ret = _isl12057_rtc_update_alarm(dev, 0);
++	if (ret < 0) {
++		dev_err(dev, "%s: unable to disable the alarm (%d)\n",
++			__func__, ret);
++		goto err_unlock;
++	}
++
++	/* Program alarm registers */
++	regs[0] = bin2bcd(alarm_tm->tm_sec) & 0x7f;
++	regs[1] = bin2bcd(alarm_tm->tm_min) & 0x7f;
++	regs[2] = bin2bcd(alarm_tm->tm_hour) & 0x3f;
++	regs[3] = bin2bcd(alarm_tm->tm_mday) & 0x3f;
++
++	ret = regmap_bulk_write(data->regmap, ISL12057_REG_A1_SC, regs,
++				ISL12057_A1_SEC_LEN);
++	if (ret < 0) {
++		dev_err(dev, "%s: writing alarm section failed (%d)\n",
++			__func__, ret);
++		goto err_unlock;
++	}
++
++	/* Enable or disable alarm */
++	ret = _isl12057_rtc_update_alarm(dev, enable);
++
++err_unlock:
++	mutex_unlock(&data->lock);
++
++	return ret;
++}
++
+ static int isl12057_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ {
+ 	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
+@@ -262,9 +457,82 @@ static int isl12057_check_rtc_status(struct device *dev, struct regmap *regmap)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++/*
++ * One would expect the device to be marked as a wakeup source only
++ * when an IRQ pin of the RTC is routed to an interrupt line of the
++ * CPU. In practice, such an IRQ pin can be connected to a PMIC and
++ * this allows the device to be powered up when RTC alarm rings. This
++ * is for instance the case on ReadyNAS 102, 104 and 2120. On those
++ * devices with no IRQ driectly connected to the SoC, the RTC chip
++ * can be forced as a wakeup source by stating that explicitly in
++ * the device's .dts file using the "can-wakeup-machine" boolean
++ * property. This will guarantee 'wakealarm' sysfs entry is available
++ * on the device.
++ *
++ * The function below returns 1, i.e. the capability of the chip to
++ * wakeup the device, based on IRQ availability or if the boolean
++ * property has been set in the .dts file. Otherwise, it returns 0.
++ */
++
++static bool isl12057_can_wakeup_machine(struct device *dev)
++{
++	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
++
++	return (data->irq ||
++		of_property_read_bool(dev->of_node, "can-wakeup-machine"));
++}
++#else
++static bool isl12057_can_wakeup_machine(struct device *dev)
++{
++	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
++
++	return !!data->irq;
++}
++#endif
++
++static int isl12057_rtc_alarm_irq_enable(struct device *dev,
++					 unsigned int enable)
++{
++	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(dev);
++	int ret = -ENOTTY;
++
++	if (rtc_data->irq)
++		ret = isl12057_rtc_update_alarm(dev, enable);
++
++	return ret;
++}
++
++static irqreturn_t isl12057_rtc_interrupt(int irq, void *data)
++{
++	struct i2c_client *client = data;
++	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(&client->dev);
++	struct rtc_device *rtc = rtc_data->rtc;
++	int ret, handled = IRQ_NONE;
++	unsigned int sr;
++
++	ret = regmap_read(rtc_data->regmap, ISL12057_REG_SR, &sr);
++	if (!ret && (sr & ISL12057_REG_SR_A1F)) {
++		dev_dbg(&client->dev, "RTC alarm!\n");
++
++		rtc_update_irq(rtc, 1, RTC_IRQF | RTC_AF);
++
++		/* Acknowledge and disable the alarm */
++		_isl12057_rtc_clear_alarm(&client->dev);
++		_isl12057_rtc_update_alarm(&client->dev, 0);
++
++		handled = IRQ_HANDLED;
++	}
++
++	return handled;
++}
++
+ static const struct rtc_class_ops rtc_ops = {
+-	.read_time = isl12057_rtc_read_time,
++	.read_time = _isl12057_rtc_read_time,
+ 	.set_time = isl12057_rtc_set_time,
++	.read_alarm = isl12057_rtc_read_alarm,
++	.set_alarm = isl12057_rtc_set_alarm,
++	.alarm_irq_enable = isl12057_rtc_alarm_irq_enable,
+ };
+ 
+ static struct regmap_config isl12057_rtc_regmap_config = {
+@@ -277,7 +545,6 @@ static int isl12057_probe(struct i2c_client *client,
+ {
+ 	struct device *dev = &client->dev;
+ 	struct isl12057_rtc_data *data;
+-	struct rtc_device *rtc;
+ 	struct regmap *regmap;
+ 	int ret;
+ 
+@@ -310,9 +577,70 @@ static int isl12057_probe(struct i2c_client *client,
+ 	data->regmap = regmap;
+ 	dev_set_drvdata(dev, data);
+ 
+-	rtc = devm_rtc_device_register(dev, DRV_NAME, &rtc_ops, THIS_MODULE);
+-	return PTR_ERR_OR_ZERO(rtc);
++	if (client->irq > 0) {
++		ret = devm_request_threaded_irq(dev, client->irq, NULL,
++						isl12057_rtc_interrupt,
++						IRQF_SHARED|IRQF_ONESHOT,
++						DRV_NAME, client);
++		if (!ret)
++			data->irq = client->irq;
++		else
++			dev_err(dev, "%s: irq %d unavailable (%d)\n", __func__,
++				client->irq, ret);
++	}
++
++	if (isl12057_can_wakeup_machine(dev))
++		device_init_wakeup(dev, true);
++
++	data->rtc = devm_rtc_device_register(dev, DRV_NAME, &rtc_ops,
++					     THIS_MODULE);
++	ret = PTR_ERR_OR_ZERO(data->rtc);
++	if (ret) {
++		dev_err(dev, "%s: unable to register RTC device (%d)\n",
++			__func__, ret);
++		goto err;
++	}
++
++	/* We cannot support UIE mode if we do not have an IRQ line */
++	if (!data->irq)
++		data->rtc->uie_unsupported = 1;
++
++err:
++	return ret;
++}
++
++static int isl12057_remove(struct i2c_client *client)
++{
++	if (isl12057_can_wakeup_machine(&client->dev))
++		device_init_wakeup(&client->dev, false);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int isl12057_rtc_suspend(struct device *dev)
++{
++	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(dev);
++
++	if (rtc_data->irq && device_may_wakeup(dev))
++		return enable_irq_wake(rtc_data->irq);
++
++	return 0;
++}
++
++static int isl12057_rtc_resume(struct device *dev)
++{
++	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(dev);
++
++	if (rtc_data->irq && device_may_wakeup(dev))
++		return disable_irq_wake(rtc_data->irq);
++
++	return 0;
+ }
++#endif
++
++static SIMPLE_DEV_PM_OPS(isl12057_rtc_pm_ops, isl12057_rtc_suspend,
++			 isl12057_rtc_resume);
+ 
+ #ifdef CONFIG_OF
+ static const struct of_device_id isl12057_dt_match[] = {
+@@ -331,13 +659,15 @@ static struct i2c_driver isl12057_driver = {
+ 	.driver = {
+ 		.name = DRV_NAME,
+ 		.owner = THIS_MODULE,
++		.pm = &isl12057_rtc_pm_ops,
+ 		.of_match_table = of_match_ptr(isl12057_dt_match),
+ 	},
+ 	.probe	  = isl12057_probe,
++	.remove	  = isl12057_remove,
+ 	.id_table = isl12057_id,
+ };
+ module_i2c_driver(isl12057_driver);
+ 
+ MODULE_AUTHOR("Arnaud EBALARD <arno@natisbad.org>");
+-MODULE_DESCRIPTION("Intersil ISL12057 RTC driver");
++MODULE_DESCRIPTION("Intersil ISL12057 RTC/Alarm driver");
+ MODULE_LICENSE("GPL");
 -- 
 2.1.1
