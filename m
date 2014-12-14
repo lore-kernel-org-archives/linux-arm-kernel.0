@@ -1,65 +1,190 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 13 Dec 2014 19:39:11 +0100
-Subject: clk: mxs: Invalid register access on HW_CLKCTRL_FRAC0?
-In-Reply-To: <626823862.133104.1418486699870.JavaMail.open-xchange@oxbaltgw02.schlund.de>
-References: <1022343616.100338.1418473409091.JavaMail.open-xchange@oxbaltgw00.schlund.de>
- <201412131347.22972.marex@denx.de>
- <626823862.133104.1418486699870.JavaMail.open-xchange@oxbaltgw02.schlund.de>
-Message-ID: <201412131939.11514.marex@denx.de>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Sat, 13 Dec 2014 23:45:17 -0500
+Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
+ AM572x errata i856.
+In-Reply-To: <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
+References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
+Message-ID: <20141214044517.GD24110@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, December 13, 2014 at 05:04:59 PM, Stefan Wahren wrote:
-> Hi Marek,
+On Fri, Dec 12, 2014 at 05:08:56PM -0500, Lennart Sorensen wrote:
+> Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz external
+> crystal is not enabled at power up.  Instead the CPU falls back to using
+> an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is usually
+> 20MHz on boards so far (which gives an emulated frequency of 32.786KHz),
+> but can also be 19.2 or 27MHz which result in much larger drift.
 > 
-> > Marek Vasut <marex@denx.de> hat am 13. Dezember 2014 um 13:47
-> > geschrieben:
-> > 
-> > On Saturday, December 13, 2014 at 01:23:29 PM, Stefan Wahren wrote:
-> > > Hi Fabio,
-> > > 
-> > > yesterday i stumble on this note in the i.MX28 reference manual (p.
-> > > 931):
-> > > 
-> > > 10.8.24 Fractional Clock Control Register 0 (HW_CLKCTRL_FRAC0)
-> > > 
-> > > NOTE: This register can only be addressed by byte instructions.
-> > > Addressing word or half-word are not allowed.
-> > > 
-> > > The same applies to HW_CLKCTRL_FRAC1.
-> > > 
-> > > But clk_misc_init() doesn't care about that in clk_imx28.c:
-> > > 
-> > > val = readl_relaxed(FRAC0);
-> > > val &= ~((0x3f << BP_FRAC0_IO0FRAC) | (0x3f << BP_FRAC0_IO1FRAC));
-> > > val |= (30 << BP_FRAC0_IO0FRAC) | (30 << BP_FRAC0_IO1FRAC);
-> > > writel_relaxed(val, FRAC0);
-> > > 
-> > > The function clk_ref_set_rate() in clk_ref.c write also the complete
-> > > register at once, but change only a byte.
-> > > 
-> > > Which of them are invalid?
-> > > 
-> > > Would you prefer to use writeb() to fix this?
-> > 
-> > We've been bitten by doing 32-bit writes into the FRAC* registers in
-> > U-Boot, so
-> > the documentation is certainly correct.
+> Since this is used to drive the master counter at 32.768KHz * 375 /
+> 2 = 6.144MHz, the emulated speed for 20MHz is of by 570ppm, or about 43
+> seconds per day, and more than the 500ppm NTP is able to tolerate.
 > 
-> do you think of this patch [1]?
-
-Yes
-
-> Are only 32-bit writes critical or reads too?
-
-I cannot tell about reads, but writes for sure . Sorry I'm not of more help.
-
-> Stefan
+> Checking the CTRL_CORE_BOOTSTRAP register can determine if the CPU
+> is using the real 32.768KHz crystal or the emulated SYSCLK1/610, and
+> by known that the real counter frequency can be determined and used.
+s/known/knowing/
+and a comma after that.
+> The real speed is then SYSCLK1 / 610 * 375 / 2 or SYSCLK1 * 75 / 244.
 > 
-> [1] - http://lists.denx.de/pipermail/u-boot/2012-February/118746.html
+> Signed-off-by: Len Sorensen <lsorense@csclub.uwaterloo.ca>
+> ---
+>  arch/arm/mach-omap2/timer.c |  120 +++++++++++++++++++++++++++++++------------
+>  1 file changed, 87 insertions(+), 33 deletions(-)
 > 
-> > Best regards,
-> > Marek Vasut
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index fb0cb2b..f00e4b4 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -497,6 +497,7 @@ static void __init realtime_counter_init(void)
+>  	static struct clk *sys_clk;
+>  	unsigned long rate;
+>  	unsigned int reg, num, den;
+> +	bool errata_i856_workaround = false;
+>  
+>  	base = ioremap(REALTIME_COUNTER_BASE, SZ_32);
+>  	if (!base) {
+> @@ -510,39 +511,93 @@ static void __init realtime_counter_init(void)
+>  		return;
+>  	}
+>  
+> +	if (soc_is_dra7xx()) {
+> +		#define CTRL_CORE_BOOTSTRAP 0x4A0026C4
+> +		#define SPEEDSELECT_MASK 0x00000300
+> +		void __iomem *corebase;
+> +		corebase = ioremap(CTRL_CORE_BOOTSTRAP, SZ_4);
+> +		if (!corebase)
+> +			pr_err("%s: ioremap failed\n", __func__);
+> +		else {
+> +			reg = readl_relaxed(corebase) & SPEEDSELECT_MASK;
+> +			iounmap(corebase);
+> +			/*
+> +			 * Errata i856 says the 32.768KHz crystal does
+> +			 * not start at power on, so the CPU falls back in
+> +			 * an emulated 32KHz clock instead.  This causes
+> +			 * the master counter frequency to not be 6.144MHz
+> +			 * This affects at least the AM572x 1.0 and
+> +			 * 1.1 revisions.
+> +			 *
+> +			 * Of course any board built without a populated
+> +			 * 32.768KHz crystal would also need this fix
+> +			 * even if the CPU is fixed later.
+> +			 *
+> +			 * If the two speedselect bits are not 0, then the
+> +			 * 32.768KHz clock driving the course counter that
+s/course/coarse/
+> +			 * corrects the fine counter every time it ticks is
+> +			 * actually rate/610 rather than 32.768KHz and we
+> +			 * should compensate to avoid the 570ppm (At 20MHz,
+> +			 * much worse at other rates) too fast system time.
+> +			 */
+> +			if (reg) {
+> +				errata_i856_workaround = true;
+> +			}
+> +		}
+> +	}
+> +
+>  	rate = clk_get_rate(sys_clk);
+> -	/* Numerator/denumerator values refer TRM Realtime Counter section */
+> -	switch (rate) {
+> -	case 12000000:
+> -		num = 64;
+> -		den = 125;
+> -		break;
+> -	case 13000000:
+> -		num = 768;
+> -		den = 1625;
+> -		break;
+> -	case 19200000:
+> -		num = 8;
+> -		den = 25;
+> -		break;
+> -	case 20000000:
+> -		num = 192;
+> -		den = 625;
+> -		break;
+> -	case 26000000:
+> -		num = 384;
+> -		den = 1625;
+> -		break;
+> -	case 27000000:
+> -		num = 256;
+> -		den = 1125;
+> -		break;
+> -	case 38400000:
+> -	default:
+> -		/* Program it for 38.4 MHz */
+> -		num = 4;
+> -		den = 25;
+> -		break;
+> +	if (errata_i856_workaround) {
+> +		/*
+> +		 * Realtime Counter frequency is not based on a real
+> +		 * 32.768KHz time source, so calculate the real resulting
+> +		 * frequency instead.  It is not 6.144MHz in this case.
+> +		 *
+> +		 * The frequency is always rate / 610 + 375 / 2 which
+> +		 * is rate * 244 / 75 and will fit in 32 bit for all rates.
+> +		 *
+> +		 * The multiplication has to be first to keep accuracy
+> +		 * with integer math as high as possible.
+> +		 */
+> +		num = 75;
+> +		den = 244;
+> +		arch_timer_freq = (rate * num) / den;
+> +	} else {
+> +		/* Numerator/denumerator values refer TRM Realtime Counter section */
+> +		switch (rate) {
+> +		case 12000000:
+> +			num = 64;
+> +			den = 125;
+> +			break;
+> +		case 13000000:
+> +			num = 768;
+> +			den = 1625;
+> +			break;
+> +		case 19200000:
+> +			num = 8;
+> +			den = 25;
+> +			break;
+> +		case 20000000:
+> +			num = 192;
+> +			den = 625;
+> +			break;
+> +		case 26000000:
+> +			num = 384;
+> +			den = 1625;
+> +			break;
+> +		case 27000000:
+> +			num = 256;
+> +			den = 1125;
+> +			break;
+> +		case 38400000:
+> +		default:
+> +			/* Program it for 38.4 MHz */
+> +			num = 4;
+> +			den = 25;
+> +			break;
+> +		}
+> +		/* This divides cleanly and fits in 32 bits */
+> +		arch_timer_freq = (rate / den) * num;
+>  	}
+>  
+>  	/* Program numerator and denumerator registers */
+> @@ -556,7 +611,6 @@ static void __init realtime_counter_init(void)
+>  	reg |= den;
+>  	writel_relaxed(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
+>  
+> -	arch_timer_freq = (rate / den) * num;
+>  	set_cntfreq();
+>  
+>  	iounmap(base);
+> -- 
+> 1.7.10.4
 
-Best regards,
-Marek Vasut
+Stupid typos.  Will make sure to include in next revision, and maybe
+I can manage to reword the description a bit to make it flow better or
+be clearer.
+
+-- 
+Len Sorensen
