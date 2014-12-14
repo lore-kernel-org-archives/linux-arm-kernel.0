@@ -1,71 +1,51 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 14 Dec 2014 14:45:36 +0200
-Subject: [PATCH v3 18/19] iommu: exynos: init from dt-specific callback
- instead of initcall
-In-Reply-To: <1416395748-10731-19-git-send-email-m.szyprowski@samsung.com>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1416395748-10731-19-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1826772.xgprzQcfXd@avalon>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Sun, 14 Dec 2014 15:13:07 +0100
+Subject: [PATCH] ARM: display machine model in cpuinfo
+Message-ID: <1418566387-16468-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+This may be useful to display hardware model in the /proc/cpuinfo. It
+definitely helps to identify the device and there are some archs already
+doing that (arm64, m32r, mips).
+Use the model from DT and add it to the cpuinfo.
 
-Thank you for the patch.
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+ arch/arm/kernel/setup.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-On Wednesday 19 November 2014 12:15:47 Marek Szyprowski wrote:
-> This patch introduces IOMMU_OF_DECLARE-based initialization to the
-> driver, which replaces subsys_initcall-based procedure.
-> exynos_iommu_of_setup ensures that each sysmmu controller is probed
-> before its master device.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/iommu/exynos-iommu.c | 28 +++++++++++++++++++++++++++-
->  1 file changed, 27 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index cd28dc09db39..88f9afe641a0 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-
-[snip]
-
-> @@ -1125,4 +1134,21 @@ err_reg_driver:
->  	kmem_cache_destroy(lv2table_kmem_cache);
->  	return ret;
->  }
-> -subsys_initcall(exynos_iommu_init);
-> +
-> +static int __init exynos_iommu_of_setup(struct device_node *np)
-> +{
-> +	struct platform_device *pdev;
-> +
-> +	if (!init_done)
-> +		exynos_iommu_init();
-> +
-> +	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
-> +	if (IS_ERR(pdev))
-> +		return PTR_ERR(pdev);
-
-If we end up having to create the IOMMU platform devices from within the 
-drivers, the introduction of IOMMU_OF_DECLARE starts to feel like a workaround 
-to me. I wonder whether it wouldn't then be better to let the driver core 
-instantiate the IOMMU platform device from DT as for all other devices, and 
-use device notifiers to defer probe of the bus masters until the required 
-IOMMU(s) are registered.
-
-Will, what's your opinion on that ?
-
-> +
-> +	of_iommu_set_ops(np, &exynos_iommu_ops);
-> +	return 0;
-> +}
-> +
-> +IOMMU_OF_DECLARE(exynos_iommu_of, "samsung,exynos-sysmmu",
-> +		 exynos_iommu_of_setup);
-
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index c031063..957d9ac 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -145,6 +145,7 @@ EXPORT_SYMBOL(elf_platform);
+ 
+ static const char *cpu_name;
+ static const char *machine_name;
++static const char *hardware;
+ static char __initdata cmd_line[COMMAND_LINE_SIZE];
+ const struct machine_desc *machine_desc __initdata;
+ 
+@@ -899,7 +900,8 @@ void __init setup_arch(char **cmdline_p)
+ 	if (!mdesc)
+ 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+ 	machine_desc = mdesc;
+-	machine_name = mdesc->name;
++	machine_name = of_flat_dt_get_machine_name();
++	hardware = mdesc->name;
+ 
+ 	if (mdesc->reboot_mode != REBOOT_HARD)
+ 		reboot_mode = mdesc->reboot_mode;
+@@ -1077,7 +1079,8 @@ static int c_show(struct seq_file *m, void *v)
+ 		seq_printf(m, "CPU revision\t: %d\n\n", cpuid & 15);
+ 	}
+ 
+-	seq_printf(m, "Hardware\t: %s\n", machine_name);
++	seq_printf(m, "Machine\t\t: %s\n", machine_name);
++	seq_printf(m, "Hardware\t: %s\n", hardware);
+ 	seq_printf(m, "Revision\t: %04x\n", system_rev);
+ 	seq_printf(m, "Serial\t\t: %08x%08x\n",
+ 		   system_serial_high, system_serial_low);
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.4.5
