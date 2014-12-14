@@ -1,28 +1,30 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 14 Dec 2014 22:52:43 +0100
-Subject: bluetooth: Add hci_h4p driver
-In-Reply-To: <570BAC61-3137-42E5-B4F8-A61AEED380DE@holtmann.org>
-References: <20141213223727.GA13894@amd>
- <570BAC61-3137-42E5-B4F8-A61AEED380DE@holtmann.org>
-Message-ID: <20141214215243.GA22749@amd>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sun, 14 Dec 2014 23:23:48 +0100
+Subject: 3.18: lockdep problems in cpufreq
+In-Reply-To: <20141214213655.GA11285@n2100.arm.linux.org.uk>
+References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
+Message-ID: <7573578.UE8ufgjWuX@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > Firmware load was converted to hci_cmd_sync(). Unfortunately, the
-> > firmware is needed after every open/close, so the setup mechanism does
-> > not quite fit. (But code is now way cleaner).
+On Sunday, December 14, 2014 09:36:55 PM Russell King - ARM Linux wrote:
+> Here's a nice Christmas present one of my iMX6 machines gave me tonight.
+> I haven't begun to look into it.
 > 
-> What is the reason for that? Does it mean that the device will always loose all its settings when powering it down. Do we know why that is that way and can we maybe change it?
->
+> ======================================================
+> [ INFO: possible circular locking dependency detected ]
+> 3.18.0+ #1453 Not tainted
+> -------------------------------------------------------
+> rc.local/770 is trying to acquire lock:
+>  (cooling_cpufreq_lock){+.+.+.}, at: [<c04abfc4>] cpufreq_thermal_notifier+0x34/0xfc
+> 
+> but task is already holding lock:
+>  ((cpufreq_policy_notifier_list).rwsem){++++.+}, at: [<c0042f04>]  __blocking_notifier_call_chain+0x34/0x68
+> 
+> which lock already depends on the new lock.
 
-Well, on hci_close(), original code asserts reset GPIO. I guess that
-clears everything... I got it working with that removed, and it means
-I can set the address the normal way. What are implications for power
-consumption... I'm not sure at this point. Lets worry about that
-later.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Well, that's for Viresh.
+
+Also adding Eduardo as he's been working with Viresh on the cooling stuff recently.
+
+Rafael
