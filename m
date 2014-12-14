@@ -1,96 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 14 Dec 2014 20:21:24 +0100
-Subject: bluetooth: Add hci_h4p driver
-In-Reply-To: <570BAC61-3137-42E5-B4F8-A61AEED380DE@holtmann.org>
-References: <20141213223727.GA13894@amd>
- <570BAC61-3137-42E5-B4F8-A61AEED380DE@holtmann.org>
-Message-ID: <20141214192124.GA22392@amd>
+From: richard.kunze@web.de (Richard Kunze)
+Date: Sun, 14 Dec 2014 20:53:39 +0100
+Subject: [PATCH] ARM: dts: use all remaining MTD space foor rootfs of Iomega
+ ix2-200
+In-Reply-To: <20141210203740.GD23599@lunn.ch>
+References: <20141210203740.GD23599@lunn.ch>
+Message-ID: <1418586819-29680-1-git-send-email-richard.kunze@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The original MTD partition layout for the Iomega ix2-200 leaves most of the 
+available space unused. This patch changes the layout to use all remaining
+MTD space after the partitions for u-boot/u-boot-env and the kernel uimage
+as a "rootfs" partition.
 
+Signed-off-by: Richard Kunze <richard.kunze@web.de>
+---
+ arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> > Hacks surrounding bluetooth address were removed; this results in
-> > working driver with address that is probably not unique.
-> 
-> Just set HCI_QUIRK_INVALID_BDADDR and let someone deal with that in userspace. You can use the btmgmt public-addr command for testing.
-> 
-
-Ok, it took me a while to figure out that --enable-experimental is
-needed.
-
-Then help was playing tricks with me:
-
-For more information on the usage of each command use:
-    btmgmt <command> --help
-root at n900:/my/bluez-5.26/tools# ./btmgmt public-addr --help
-Set Public Address for hci0 failed with status 0x0b (Rejected)
-root at n900:/my/bluez-5.26/tools# ./btmgmt public-addr
-Usage: btmgmt public-addr <address>
-
-
-root at n900:/my/bluez-5.26/tools# ./btmgmt public-addr 01:02:03:04:05:06
-Set Public Address for hci0 failed with status 0x0b (Rejected)
-
-Hmm. Since setting public address only works when interface is down,
-and we lose all the settings during up, this does not work at all,
-right?
-
-Anyway, you might want to apply this to lessen the confusion.
-
-diff -ur bluez-5.26.ofic/tools/btmgmt.c bluez-5.26/tools/btmgmt.c
---- bluez-5.26.ofic/tools/btmgmt.c	2014-12-14 12:32:19.742595000 +0100
-+++ bluez-5.26/tools/btmgmt.c	2014-12-14 20:06:40.432497000 +0100
-@@ -2603,7 +2603,7 @@
+diff --git a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
+index 7aeddcd..8474bff 100644
+--- a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
++++ b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
+@@ -196,8 +196,8 @@
+ 	};
  
- static void static_addr_usage(void)
- {
--	printf("Usage: btmgmt static-addr <address>\n");
-+	printf("Usage: btmgmt static-addr ??:??:??:??:??:??\n");
- }
+ 	partition at 400000 {
+-		label = "uInitrd";
+-		reg = <0x540000 0x1000000>;
++		label = "rootfs";
++		reg = <0x400000 0x1C00000>;
+ 	};
+ };
  
- static void cmd_static_addr(struct mgmt *mgmt, uint16_t index,
-@@ -2660,7 +2660,8 @@
- 	struct mgmt_cp_set_public_address cp;
- 
- 	if (argc < 2) {
--		printf("Usage: btmgmt public-addr <address>\n");
-+		printf("Usage: btmgmt public-addr ??:??:??:??:??:??\n"
-+		       "Note: interface must be down for this to work\n");
- 		exit(EXIT_FAILURE);
- 	}
- 
-@@ -2934,7 +2935,7 @@
- 
- static void add_device_usage(void)
- {
--	printf("Usage: btmgmt add-device [-a action] [-t type] <address>\n");
-+	printf("Usage: btmgmt add-device [-a action] [-t type] ??:??:??:??:??:??\n");
- }
- 
- static struct option add_device_options[] = {
-@@ -3007,7 +3008,7 @@
- 
- static void del_device_usage(void)
- {
--	printf("Usage: btmgmt del-device [-t type] <address>\n");
-+	printf("Usage: btmgmt del-device [-t type] ??:??:??:??:??:??\n");
- }
- 
- static struct option del_device_options[] = {
-@@ -3153,7 +3154,7 @@
- 
- 	printf("\n"
- 		"For more information on the usage of each command use:\n"
--		"\tbtmgmt <command> --help\n" );
-+		"\tbtmgmt <command>\n" );
- }
- 
- static struct option main_options[] = {
-Only in bluez-5.26/tools: btmgmt.c~
-
-
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.9.1
