@@ -1,107 +1,45 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 14 Dec 2014 10:01:59 +0100
-Subject: [PATCHv3 0/5] ARM:sunxi:ps2 Added support for A10/A20 ps2
- controller.
-In-Reply-To: <CAEzqOZtyeAnG660AKf_0_gCa-+BT_pAzHk0HYYSCdm4y89GFJA@mail.gmail.com>
-References: <1418408748-9797-1-git-send-email-vishnupatekar0510@gmail.com>	<548C1E7D.1000005@redhat.com>
- <CAEzqOZtyeAnG660AKf_0_gCa-+BT_pAzHk0HYYSCdm4y89GFJA@mail.gmail.com>
-Message-ID: <548D5207.8030004@redhat.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 14 Dec 2014 10:47:57 +0100
+Subject: bluetooth: Add hci_h4p driver
+In-Reply-To: <ED6FB9B5-7BD5-4398-ACA4-C5D1547B91A4@holtmann.org>
+References: <20141213223727.GA13894@amd>
+ <570BAC61-3137-42E5-B4F8-A61AEED380DE@holtmann.org>
+ <20141213235131.GA23566@amd>
+ <ED6FB9B5-7BD5-4398-ACA4-C5D1547B91A4@holtmann.org>
+Message-ID: <20141214094757.GA28973@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun 2014-12-14 01:07:42, Marcel Holtmann wrote:
+> Hi Pavel,
+> 
+> >>> My notes say that Marcel wanted different filenames, but I'd need
+> >>> advice exactly what filenames. I guess platform data supprort should
+> >>> be removed altogether, rather than renamed.
+> >> 
+> >> Yes, the platform support should go away. This should be purely based on DT.
+> >> 
+> >> Can you also start using git format-patch so that patches get a diffstat.
+> > 
+> > So the rest of filenames look ok?
+> 
+> I have not looked at the patch or the filenames at all.
 
-On 13-12-14 21:01, Vishnu Patekar wrote:
-> Hello Hans,
-> Please find my comments inlined.
->
-> On 12/13/14, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi VishnuPatekar,
->>
->> The patch mangling for this set seems to have gone a bit wrong I'm afraid
->
-> No, this time I've corrected it. Infact, last version of patch did not
-> used the status bit error macros.
->
->> a lot of the patches have my fixup commit messages (which should have
->> disappeared when squashing in the patches), please replace those by proper
->> commit messages describing what the patch actually does.
-> Yes, [PATCHv3 3/5] uses fixup. I'll correct it.
->>
->> Also the adding of the commented nodes for the lime2 seems to be gone
->> entirely
->> from the set, instead now only a comment about the conflict with the hdmi
->> pins is added, but it is above the i2c node instead of above a ps2 node.
->>
-> Maxime's suggested that we should not add commented nodes specially
-> when its trivial to apply. And just note saying ps20 pins conflict
-> with HDMI.
+Ok, so here's diffstat. Can you take a look?
 
-Ah, I see.
+Thanks,
+									Pavel
 
-> Should I remove the this comment as well?
-> Or
-> Put this note in start of DTS file?
+ drivers/bluetooth/Kconfig                  |   10 
+ drivers/bluetooth/Makefile                 |    3 
+ drivers/bluetooth/hci_h4p.h                |  234 +++++
+ drivers/bluetooth/nokia_core.c             | 1262 +++++++++++++++++++++++++++++
+ drivers/bluetooth/nokia_fw-bcm.c           |   27 
+ drivers/bluetooth/nokia_fw.c               |  105 ++
+ drivers/bluetooth/nokia_uart.c             |  179 ++++
+ include/linux/platform_data/bt-nokia-h4p.h |    4 
+ 8 files changed, 1822 insertions(+), 2 deletions(-)
 
-The comment should be added to where the pinctrl bits are, not to the lime2
-file, ps0 will conflict with hdmi on all boards.
-
-Regards,
-
-Hans
-
-
->> Regards,
->>
->> Hans
->>
->>
->> On 12-12-14 19:25, VishnuPatekar wrote:
->>> v2 --> v3
->>> 1. changed config to SERIO_SUN4I_PS2 from SERIO_SUNXI_PS2
->>> 2. changed driver name to sun4i-ps2 from sunxi-ps2.
->>> 3. changed the function names to sun4i_ps2_*.
->>> 4. added locking in sun4i_ps2_open.
->>> 5. kept compatible "sun4i-a10-ps2" for A10 and A20, as A10 is earlier
->>> SOC.
->>> 6. corrected the style errors.
->>> 7. separated the dts patches.
->>> 8. removed commented ps2 notes from lime2 dts.
->>> 9. added note that ps2 pins confilt with hdmi.
->>> 10. corrected the interrupt property for A10.
->>> 11. moved dt-bindings to Documentation/devicetree/bindings/serio
->>>
->>> v1 --> v2:
->>> 1. added default n depends on ARCH_SUNXI || COMPILE_TEST in Kconfig.
->>> 2. handled errors and free resources on errors.
->>> 3. used BIT(x), DIV_ROUND_UP macros.
->>> 4. corrected style errors.
->>> 5. added support for A10 also, A10 and A2 have same properties of PS2
->>> controller.
->>> 6. by default commented ps20 and ps21 nodes,as ps20 pins conflict with
->>> HDMI.
->>> 7. added compatible as allwinner,sun4i-a10-ps2.
->>> 8. corrected the possible race condition.
->>>
->>>
->>> VishnuPatekar (5):
->>>     sunxi:dts-bindings:input:ps2 bindings for A10/A20 ps2.
->>>     ARM:sunxi:drivers:input Add support for A10/A20 PS2
->>>     ARM: sunxi: dts: Add PS2 nodes to dtsi for A10 and A20
->>>     ARM: sunxi: dts: Add A10/A20 PS2 pin muxing options
->>>     ARM: sunxi: dts: Add note ps2 pins conflict with hdmi
->>>
->>>    .../bindings/serio/allwinner,sun4i-ps2.txt         |   23 ++
->>>    arch/arm/boot/dts/sun4i-a10.dtsi                   |   31 ++
->>>    arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts    |    6 +-
->>>    arch/arm/boot/dts/sun7i-a20.dtsi                   |   32 ++
->>>    drivers/input/serio/Kconfig                        |   11 +
->>>    drivers/input/serio/Makefile                       |    1 +
->>>    drivers/input/serio/sun4i-ps2.c                    |  362
->>> ++++++++++++++++++++
->>>    7 files changed, 465 insertions(+), 1 deletion(-)
->>>    create mode 100644
->>> Documentation/devicetree/bindings/serio/allwinner,sun4i-ps2.txt
->>>    create mode 100644 drivers/input/serio/sun4i-ps2.c
->>>
->>
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
