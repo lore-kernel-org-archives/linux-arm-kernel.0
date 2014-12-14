@@ -1,10 +1,10 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 14 Dec 2014 11:40:31 +0100
+Date: Sun, 14 Dec 2014 12:16:22 +0100
 Subject: bluetooth: Add hci_h4p driver
 In-Reply-To: <570BAC61-3137-42E5-B4F8-A61AEED380DE@holtmann.org>
 References: <20141213223727.GA13894@amd>
  <570BAC61-3137-42E5-B4F8-A61AEED380DE@holtmann.org>
-Message-ID: <20141214104031.GA30692@amd>
+Message-ID: <20141214111622.GA28560@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,12 +26,8 @@ On Sun 2014-12-14 00:30:13, Marcel Holtmann wrote:
 > > that.
 > 
 > that history is in linux.git now for all times. No need to repeat it. I rather not play around with that again. Lets get a minimal driver merged so we can give people something to improve.
->
-
-We will merge minimum version. Still I'd like complete history for
-credits and bisect and easy ability to diff original and minimum
-version.
-
+> 
+> > 
 > > Firmware load was converted to hci_cmd_sync(). Unfortunately, the
 > > firmware is needed after every open/close, so the setup mechanism does
 > > not quite fit. (But code is now way cleaner).
@@ -47,43 +43,15 @@ version.
 > > working driver with address that is probably not unique.
 > 
 > Just set HCI_QUIRK_INVALID_BDADDR and let someone deal with that in
-> userspace. You can use the btmgmt public-addr command for testing.
+>userspace. You can use the btmgmt public-addr command for testing.
 
-What command would that be? Do I need some new versions of tools?
+Hmm. So I installed bluez-5.36, then libudev-dev, then libical-dev,
+libreadline-dev. I'm glad I have debian and not maemo, and nfsroot and
+not limited flash.  I had to turn off systemd support.
 
-root at n900:/my/modules# man hciconfig
-(don't see anything relevant).
-root at n900:/my/modules# btmgmt
--bash: btmgmt: command not found
-root at n900:/my/modules# apt-cache search btmgmt
-root at n900:/my/modules#
-
-> On the kernel side you need to add hdev->set_bdaddr support. For the Broadcom based devices you can copy it from the btusb.c driver.
-> 
-
-I tried doing that from setup, but either command failed or it killed
-hte kernel. 
-
-> > HCI_QUIRK_RESET_ON_CLOSE will need to be investigated some more.
-> 
-> Why was that needed again? If the device loses power anyway, then that seems wasteful. Also the core changed to make sure it resets all settings on power down correctly.
->
-
-Ok.
-
-> > My notes say that Marcel wanted different filenames, but I'd need
-> > advice exactly what filenames. I guess platform data supprort should
-> > be removed altogether, rather than renamed.
-> 
-> Yes, the platform support should go away. This should be purely based on DT.
-> 
-> Can you also start using git format-patch so that patches get a diffstat.
-
-I can do diffstat manually for you, git format-patch does not fit my
-workflow.
-
-Thanks,
+It still compiles..
 								Pavel
+
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
