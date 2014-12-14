@@ -1,95 +1,38 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 14 Dec 2014 17:12:12 +0100
-Subject: [PATCH RFC] clk: mxs: Fix invalid 32-bit access to frac registers
-In-Reply-To: <1418570933-21585-1-git-send-email-stefan.wahren@i2se.com>
-References: <1418570933-21585-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <201412141712.12589.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 14 Dec 2014 17:29:25 +0100
+Subject: [PATCH v2 1/4] pci: iProc: define Broadcom iProc PCIe binding
+In-Reply-To: <548D5CD1.10801@broadcom.com>
+References: <1418351817-14898-2-git-send-email-rjui@broadcom.com>
+ <3383252.Ad6Qf0H2fa@wuerfel> <548D5CD1.10801@broadcom.com>
+Message-ID: <3622321.f8bfUffhzH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, December 14, 2014 at 04:28:53 PM, Stefan Wahren wrote:
-> According to i.MX23 and i.MX28 reference manual the fractional
-> clock control registers must be addressed by byte instructions.
+On Sunday 14 December 2014 10:48:01 Arend van Spriel wrote:
+> On 12/13/14 20:46, Arnd Bergmann wrote:
+> > On Saturday 13 December 2014 11:05:52 Arend van Spriel wrote:
+> >>
+> >> Makes sense. I think that is what Hauke meant by "adding
+> >> additional support for registering to bcma". So the discovery info is a
+> >> piece of read-only memory in the chip. Its address is stored in the
+> >> chipcommon core register space. BCMA parses that memory blob resulting
+> >> in a list of cores which register address info. We could add DT support
+> >> in BCMA matching the compatible string and register a core for it.
+> >
+> > Ah, interesting idea. That would mirror what we do for drivers/amba,
+> > I like the idea.
 > 
-> This patch fixes the erroneous 32-bit access to these registers.
+> + Rafal
 > 
-> The changes has been tested only with a i.MX28 board, because i don't
-> have access to an i.MX23 board.
-
-The clock block is the same, so this _should_ be fine.
-
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> ---
->  drivers/clk/mxs/clk-imx23.c |    8 +++++---
->  drivers/clk/mxs/clk-imx28.c |   14 ++++++++------
->  drivers/clk/mxs/clk-ref.c   |   19 ++++++++++---------
->  3 files changed, 23 insertions(+), 18 deletions(-)
+> Let's explore this. Although I don't have the iProc hardware to verify it.
 > 
-> diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
-> index 9fc9359..371ba03 100644
-> --- a/drivers/clk/mxs/clk-imx23.c
-> +++ b/drivers/clk/mxs/clk-imx23.c
-> @@ -46,7 +46,8 @@ static void __iomem *digctrl;
->  #define BP_CLKSEQ_BYPASS_SAIF	0
->  #define BP_CLKSEQ_BYPASS_SSP	5
->  #define BP_SAIF_DIV_FRAC_EN	16
-> -#define BP_FRAC_IOFRAC		24
-> +
-> +#define FRAC_IO	3
-> 
->  static void __init clk_misc_init(void)
->  {
-> @@ -72,9 +73,10 @@ static void __init clk_misc_init(void)
->  	/*
->  	 * 480 MHz seems too high to be ssp clock source directly,
->  	 * so set frac to get a 288 MHz ref_io.
-> +	 * According to reference manual we must access frac bytewise.
->  	 */
-> -	writel_relaxed(0x3f << BP_FRAC_IOFRAC, FRAC + CLR);
-> -	writel_relaxed(30 << BP_FRAC_IOFRAC, FRAC + SET);
-> +	writeb_relaxed(0x3f, FRAC + FRAC_IO + CLR);
-> +	writeb_relaxed(30, FRAC + FRAC_IO + SET);
->  }
-> 
->  static const char *sel_pll[]  __initconst = { "pll", "ref_xtal", };
-> diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-> index a6c3501..3eae119 100644
-> --- a/drivers/clk/mxs/clk-imx28.c
-> +++ b/drivers/clk/mxs/clk-imx28.c
-> @@ -53,8 +53,9 @@ static void __iomem *clkctrl;
->  #define BP_ENET_SLEEP		31
->  #define BP_CLKSEQ_BYPASS_SAIF0	0
->  #define BP_CLKSEQ_BYPASS_SSP0	3
-> -#define BP_FRAC0_IO1FRAC	16
-> -#define BP_FRAC0_IO0FRAC	24
-> +
-> +#define FRAC0_IO1	2
-> +#define FRAC0_IO0	3
-> 
->  static void __iomem *digctrl;
->  #define DIGCTRL digctrl
-> @@ -118,11 +119,12 @@ static void __init clk_misc_init(void)
->  	/*
->  	 * 480 MHz seems too high to be ssp clock source directly,
->  	 * so set frac0 to get a 288 MHz ref_io0 and ref_io1.
-> +	 * According to reference manual we must access frac0 bytewise.
->  	 */
-> -	val = readl_relaxed(FRAC0);
-> -	val &= ~((0x3f << BP_FRAC0_IO0FRAC) | (0x3f << BP_FRAC0_IO1FRAC));
-> -	val |= (30 << BP_FRAC0_IO0FRAC) | (30 << BP_FRAC0_IO1FRAC);
-> -	writel_relaxed(val, FRAC0);
-> +	writeb_relaxed(0x3f, FRAC0 + FRAC0_IO0 + CLR);
-> +	writeb_relaxed(30, FRAC0 + FRAC0_IO0 + SET);
-> +	writeb_relaxed(0x3f, FRAC0 + FRAC0_IO1 + CLR);
-> +	writeb_relaxed(30, FRAC0 + FRAC0_IO1 + SET);
 
-This used to be a R-M-W sequence, but now it's changed to multiple writes. This
-changes the behavior and seeing you use the CLR register, I am worried this 
-might be prone to clock glitches. What do you think please ?
+If we can make this work nicely, you won't even need iProc hardware,
+but instead provide all the data for the bcma devices on an older
+machine through DT and get the probing to work with that. For AMBA,
+we actually allow mixing amba and platform devices on the same parent.
+You could do this here as well, but it would be simpler to have a
+a special bcma device node as the parent that does the probing, in order
+to avoid adding bcma specific code to drivers/of/platform.c
 
-[...]
-
-Also, it might be a good idea to zap the 0x3f mask and use HEX and DEC numbers 
-consistently, but this is an idea for another patch.
-
-Best regards,
+	Arnd
