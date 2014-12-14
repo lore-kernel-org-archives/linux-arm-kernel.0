@@ -1,42 +1,89 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Sun, 14 Dec 2014 10:48:01 +0100
-Subject: [PATCH v2 1/4] pci: iProc: define Broadcom iProc PCIe binding
-In-Reply-To: <3383252.Ad6Qf0H2fa@wuerfel>
-References: <1418351817-14898-2-git-send-email-rjui@broadcom.com>
- <3907917.zNo7yttzkh@wuerfel> <548C0F80.2090300@broadcom.com>
- <3383252.Ad6Qf0H2fa@wuerfel>
-Message-ID: <548D5CD1.10801@broadcom.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 14 Dec 2014 11:40:31 +0100
+Subject: bluetooth: Add hci_h4p driver
+In-Reply-To: <570BAC61-3137-42E5-B4F8-A61AEED380DE@holtmann.org>
+References: <20141213223727.GA13894@amd>
+ <570BAC61-3137-42E5-B4F8-A61AEED380DE@holtmann.org>
+Message-ID: <20141214104031.GA30692@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/14 20:46, Arnd Bergmann wrote:
-> On Saturday 13 December 2014 11:05:52 Arend van Spriel wrote:
->>
->> Makes sense. I think that is what Hauke meant by "adding
->> additional support for registering to bcma". So the discovery info is a
->> piece of read-only memory in the chip. Its address is stored in the
->> chipcommon core register space. BCMA parses that memory blob resulting
->> in a list of cores which register address info. We could add DT support
->> in BCMA matching the compatible string and register a core for it.
+On Sun 2014-12-14 00:30:13, Marcel Holtmann wrote:
+> Hi Pavel,
+> 
+> > Add hci_h4p bluetooth driver to staging tree. This device is used
+> > for example on Nokia N900 cell phone.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > Thanks-to: Sebastian Reichel <sre@debian.org>
+> > Thanks-to: Joe Perches <joe@perches.com>
+> > 
+> > ---
+> > 
+> > 
+> > I'd prefer to resurect the driver in staging/ in order not to lose
+> > history, but Marcel wanted to treat it as new submission, so I'm doing
+> > that.
+> 
+> that history is in linux.git now for all times. No need to repeat it. I rather not play around with that again. Lets get a minimal driver merged so we can give people something to improve.
 >
-> Ah, interesting idea. That would mirror what we do for drivers/amba,
-> I like the idea.
 
-+ Rafal
+We will merge minimum version. Still I'd like complete history for
+credits and bisect and easy ability to diff original and minimum
+version.
 
-Let's explore this. Although I don't have the iProc hardware to verify it.
+> > Firmware load was converted to hci_cmd_sync(). Unfortunately, the
+> > firmware is needed after every open/close, so the setup mechanism does
+> > not quite fit. (But code is now way cleaner).
+> 
+> What is the reason for that? Does it mean that the device will always loose all its settings when powering it down. Do we know why that is that way and can we maybe change it?
+> 
+> If there is no way around this, we can introduce a quirk that will always run hdev->setup. However if the device keeps forgetting all settings all the time, that means it will also keep forgetting its address. So that power on procedure will be wasting time. We would need to check if we can make it so that it only has unconfigured state once and then keeps remembering the address even if we have to re-program it every time.
+> 
+> > Device tree bindings work for me, but they are not yet official and I
+> > expect some more fun there.
+> > 
+> > Hacks surrounding bluetooth address were removed; this results in
+> > working driver with address that is probably not unique.
+> 
+> Just set HCI_QUIRK_INVALID_BDADDR and let someone deal with that in
+> userspace. You can use the btmgmt public-addr command for testing.
 
->> However, apart from the discovery info a "discoverable ARM AXI" chip has
->> a register space per core that provides common procedures like
->> enable/disable, reset, core status, which are implemented in BCMA. I am
->> not seeing that register space in the DT examples so I guess this IP
->> block is not there for iProc chips.
+What command would that be? Do I need some new versions of tools?
+
+root at n900:/my/modules# man hciconfig
+(don't see anything relevant).
+root at n900:/my/modules# btmgmt
+-bash: btmgmt: command not found
+root at n900:/my/modules# apt-cache search btmgmt
+root at n900:/my/modules#
+
+> On the kernel side you need to add hdev->set_bdaddr support. For the Broadcom based devices you can copy it from the btusb.c driver.
+> 
+
+I tried doing that from setup, but either command failed or it killed
+hte kernel. 
+
+> > HCI_QUIRK_RESET_ON_CLOSE will need to be investigated some more.
+> 
+> Why was that needed again? If the device loses power anyway, then that seems wasteful. Also the core changed to make sure it resets all settings on power down correctly.
 >
-> I wouldn't draw conclusions from the absence of some node. Maybe these
-> registers are present but just not used by the original BSP.
 
-I do not intend to. We have raised the question internally to iProc chip 
-designers.
+Ok.
 
-Regards,
-Arend
+> > My notes say that Marcel wanted different filenames, but I'd need
+> > advice exactly what filenames. I guess platform data supprort should
+> > be removed altogether, rather than renamed.
+> 
+> Yes, the platform support should go away. This should be purely based on DT.
+> 
+> Can you also start using git format-patch so that patches get a diffstat.
+
+I can do diffstat manually for you, git format-patch does not fit my
+workflow.
+
+Thanks,
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
