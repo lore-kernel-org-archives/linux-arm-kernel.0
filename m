@@ -1,30 +1,47 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 14 Dec 2014 23:23:48 +0100
-Subject: 3.18: lockdep problems in cpufreq
-In-Reply-To: <20141214213655.GA11285@n2100.arm.linux.org.uk>
-References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
-Message-ID: <7573578.UE8ufgjWuX@vostro.rjw.lan>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun, 14 Dec 2014 23:09:57 +0100
+Subject: [PATCH v2 2/3] irqchip: vf610-mscm: dt-bindings: add MSCM bindings
+In-Reply-To: <1418594998-2361-1-git-send-email-stefan@agner.ch>
+References: <1418594998-2361-1-git-send-email-stefan@agner.ch>
+Message-ID: <1418594998-2361-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, December 14, 2014 09:36:55 PM Russell King - ARM Linux wrote:
-> Here's a nice Christmas present one of my iMX6 machines gave me tonight.
-> I haven't begun to look into it.
-> 
-> ======================================================
-> [ INFO: possible circular locking dependency detected ]
-> 3.18.0+ #1453 Not tainted
-> -------------------------------------------------------
-> rc.local/770 is trying to acquire lock:
->  (cooling_cpufreq_lock){+.+.+.}, at: [<c04abfc4>] cpufreq_thermal_notifier+0x34/0xfc
-> 
-> but task is already holding lock:
->  ((cpufreq_policy_notifier_list).rwsem){++++.+}, at: [<c0042f04>]  __blocking_notifier_call_chain+0x34/0x68
-> 
-> which lock already depends on the new lock.
+Add binding documentation for Miscellaneous System Control Module
+found in Freescale Vybrid SoC's.
 
-Well, that's for Viresh.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ .../bindings/arm/freescale/fsl,vf610-mscm.txt       | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
 
-Also adding Eduardo as he's been working with Viresh on the cooling stuff recently.
-
-Rafael
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
+new file mode 100644
+index 0000000..1428a53
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
+@@ -0,0 +1,21 @@
++Freescale Vybrid Miscellaneous System Control Module
++
++The MSCM IP contains Access Control and TrustZone Security hardware,
++CPU Configuration registers and Interrupt Router control.
++
++Required properties:
++- compatible : "fsl,vf610-mscm"
++- interrupt-controller : Identifies the node as an interrupt controller
++- #interrupt-cells : Use the same format as specified by the parent
++  interrupt controller, e.g.
++  Documentation/devicetree/bindings/arm/gic.txt
++- reg : the register range of the MSCM module
++
++Example:
++	mscm: mscm at 40001000 {
++		compatible = "fsl,vf610-mscm";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&intc>;
++		reg = <0x40001000 0x1000>;
++	}
+-- 
+2.1.3
