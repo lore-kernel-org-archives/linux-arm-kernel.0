@@ -1,35 +1,65 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sun, 14 Dec 2014 18:52:09 +0200
-Subject: [PATCH 03/18] arm64/uaccess: fix sparse errors
-In-Reply-To: <1418575877-21488-1-git-send-email-mst@redhat.com>
-References: <1418575877-21488-1-git-send-email-mst@redhat.com>
-Message-ID: <1418575877-21488-4-git-send-email-mst@redhat.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 14 Dec 2014 18:16:17 +0100 (CET)
+Subject: [PATCH RFC] clk: mxs: Fix invalid 32-bit access to frac registers
+In-Reply-To: <201412141712.12589.marex@denx.de>
+References: <1418570933-21585-1-git-send-email-stefan.wahren@i2se.com>
+ <201412141712.12589.marex@denx.de>
+Message-ID: <1638147247.144508.1418577377536.JavaMail.open-xchange@oxbaltgw03.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-virtio wants to read bitwise types from userspace using get_user.  At the
-moment this triggers sparse errors, since the value is passed through an
-integer.
+Hi Marek,
 
-Fix that up using __force.
+> Marek Vasut <marex@denx.de> hat am 14. Dezember 2014 um 17:12 geschrieben:
+>
+> >
+> > static void __iomem *digctrl;
+> > #define DIGCTRL digctrl
+> > @@ -118,11 +119,12 @@ static void __init clk_misc_init(void)
+> > /*
+> > * 480 MHz seems too high to be ssp clock source directly,
+> > * so set frac0 to get a 288 MHz ref_io0 and ref_io1.
+> > + * According to reference manual we must access frac0 bytewise.
+> > */
+> > - val = readl_relaxed(FRAC0);
+> > - val &= ~((0x3f << BP_FRAC0_IO0FRAC) | (0x3f << BP_FRAC0_IO1FRAC));
+> > - val |= (30 << BP_FRAC0_IO0FRAC) | (30 << BP_FRAC0_IO1FRAC);
+> > - writel_relaxed(val, FRAC0);
+> > + writeb_relaxed(0x3f, FRAC0 + FRAC0_IO0 + CLR);
+> > + writeb_relaxed(30, FRAC0 + FRAC0_IO0 + SET);
+> > + writeb_relaxed(0x3f, FRAC0 + FRAC0_IO1 + CLR);
+> > + writeb_relaxed(30, FRAC0 + FRAC0_IO1 + SET);
+>
+> This used to be a R-M-W sequence, but now it's changed to multiple writes.
+> This
+> changes the behavior and seeing you use the CLR register, I am worried this
+> might be prone to clock glitches. What do you think please ?
 
-Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
----
- arch/arm64/include/asm/uaccess.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+you are right. I adapt the imx23 init to the imx28 to make code simple. But it
+would be better to avoid glitches.
+I hope it's okay for this bugfix to introduce a R-M-W sequence for the imx23
+init. So it's consequent.
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 3bf8f4e..8d66bcf 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -147,7 +147,7 @@ do {									\
- 	default:							\
- 		BUILD_BUG();						\
- 	}								\
--	(x) = (__typeof__(*(ptr)))__gu_val;				\
-+	(x) = (__force __typeof__(*(ptr)))__gu_val;				\
- } while (0)
- 
- #define __get_user(x, ptr)						\
--- 
-MST
+>
+> [...]
+>
+> Also, it might be a good idea to zap the 0x3f mask and use HEX and DEC numbers
+> consistently, but this is an idea for another patch.
+
+Yes.
+
+Btw i hope this patch also fixes a SPI communication issue with our hardware
+which forces us to bypass ref_io1 for ssp2.
+But i will have access to that hardware tomorrow.
+
+Thanks
+
+Stefan
+
+>
+> Best regards,
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
