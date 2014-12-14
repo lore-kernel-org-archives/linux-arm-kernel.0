@@ -1,37 +1,55 @@
-From: richard.kunze@web.de (Richard Kunze)
-Date: Sun, 14 Dec 2014 20:53:39 +0100
-Subject: [PATCH] ARM: dts: use all remaining MTD space foor rootfs of Iomega
- ix2-200
-In-Reply-To: <20141210203740.GD23599@lunn.ch>
-References: <20141210203740.GD23599@lunn.ch>
-Message-ID: <1418586819-29680-1-git-send-email-richard.kunze@web.de>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Sun, 14 Dec 2014 21:28:02 +0100
+Subject: bluetooth: Add hci_h4p driver
+In-Reply-To: <20141214192124.GA22392@amd>
+References: <20141213223727.GA13894@amd>
+ <570BAC61-3137-42E5-B4F8-A61AEED380DE@holtmann.org>
+ <20141214192124.GA22392@amd>
+Message-ID: <D1F25806-07C6-4876-8E62-A16CFB6827EA@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original MTD partition layout for the Iomega ix2-200 leaves most of the 
-available space unused. This patch changes the layout to use all remaining
-MTD space after the partitions for u-boot/u-boot-env and the kernel uimage
-as a "rootfs" partition.
+Hi Pavel,
 
-Signed-off-by: Richard Kunze <richard.kunze@web.de>
----
- arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+>>> Hacks surrounding bluetooth address were removed; this results in
+>>> working driver with address that is probably not unique.
+>> 
+>> Just set HCI_QUIRK_INVALID_BDADDR and let someone deal with that in userspace. You can use the btmgmt public-addr command for testing.
+>> 
+> 
+> Ok, it took me a while to figure out that --enable-experimental is
+> needed.
+> 
+> Then help was playing tricks with me:
+> 
+> For more information on the usage of each command use:
+>    btmgmt <command> --help
+> root at n900:/my/bluez-5.26/tools# ./btmgmt public-addr --help
+> Set Public Address for hci0 failed with status 0x0b (Rejected)
+> root at n900:/my/bluez-5.26/tools# ./btmgmt public-addr
+> Usage: btmgmt public-addr <address>
 
-diff --git a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-index 7aeddcd..8474bff 100644
---- a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-+++ b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-@@ -196,8 +196,8 @@
- 	};
- 
- 	partition at 400000 {
--		label = "uInitrd";
--		reg = <0x540000 0x1000000>;
-+		label = "rootfs";
-+		reg = <0x400000 0x1C00000>;
- 	};
- };
- 
--- 
-1.9.1
+that is indeed confusing. Something went wrong with that tool. Just keep in mind that tool is just for internal testing by the developers. Someone would still need to write a proper integration with listening for the appropriate events and dig out the actual address from the memory location.
+
+> root at n900:/my/bluez-5.26/tools# ./btmgmt public-addr 01:02:03:04:05:06
+> Set Public Address for hci0 failed with status 0x0b (Rejected)
+> 
+> Hmm. Since setting public address only works when interface is down,
+> and we lose all the settings during up, this does not work at all,
+> right?
+
+It does keep it. The address is stored in hdev->public_addr which is actually different from hdev->bdaddr which is the current address in use.
+
+However I am not sure that hdev->set_bdaddr is executed again. Same as hdev->setup is not executed twice. The controller loosing all states is something we have not yet encountered. At least not while the hci_dev stays around.
+
+I wonder if the drastic power off might be better hooked into a platform RFKILL switch. And with that you would just unregister hci_dev and re-register it when the RFKILL switch is unblocked.
+
+The other option is to introduce a quirk that allows running hdev->setup and hdev->set_bdaddr all the time when you bring up your device.
+
+Another alternate idea for getting something upstream for testing is to ignore the whole firmware loading in the kernel and bring up the controller with HCI_QUIRK_EXTERNAL_CONFIG. Doing that would allow you to do bette testing and evolve the driver in small tests.
+
+So what this quirk does is that the hci_dev comes up unconfigured. So mgmt interface will only show it as unconfigured controller. However you can open it with HCI User Channel and run all HCI commands manually. That is what src/shared/hci.[ch] is good at. Once you are done, you just flip the switch via btmgmt ext-config and then the kernel goes and treats it as fully configured.
+
+Regards
+
+Marcel
