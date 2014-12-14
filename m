@@ -1,190 +1,107 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Sat, 13 Dec 2014 23:45:17 -0500
-Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
- AM572x errata i856.
-In-Reply-To: <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
-References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
- <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
-Message-ID: <20141214044517.GD24110@csclub.uwaterloo.ca>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 14 Dec 2014 10:01:59 +0100
+Subject: [PATCHv3 0/5] ARM:sunxi:ps2 Added support for A10/A20 ps2
+ controller.
+In-Reply-To: <CAEzqOZtyeAnG660AKf_0_gCa-+BT_pAzHk0HYYSCdm4y89GFJA@mail.gmail.com>
+References: <1418408748-9797-1-git-send-email-vishnupatekar0510@gmail.com>	<548C1E7D.1000005@redhat.com>
+ <CAEzqOZtyeAnG660AKf_0_gCa-+BT_pAzHk0HYYSCdm4y89GFJA@mail.gmail.com>
+Message-ID: <548D5207.8030004@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 12, 2014 at 05:08:56PM -0500, Lennart Sorensen wrote:
-> Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz external
-> crystal is not enabled at power up.  Instead the CPU falls back to using
-> an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is usually
-> 20MHz on boards so far (which gives an emulated frequency of 32.786KHz),
-> but can also be 19.2 or 27MHz which result in much larger drift.
-> 
-> Since this is used to drive the master counter at 32.768KHz * 375 /
-> 2 = 6.144MHz, the emulated speed for 20MHz is of by 570ppm, or about 43
-> seconds per day, and more than the 500ppm NTP is able to tolerate.
-> 
-> Checking the CTRL_CORE_BOOTSTRAP register can determine if the CPU
-> is using the real 32.768KHz crystal or the emulated SYSCLK1/610, and
-> by known that the real counter frequency can be determined and used.
-s/known/knowing/
-and a comma after that.
-> The real speed is then SYSCLK1 / 610 * 375 / 2 or SYSCLK1 * 75 / 244.
-> 
-> Signed-off-by: Len Sorensen <lsorense@csclub.uwaterloo.ca>
-> ---
->  arch/arm/mach-omap2/timer.c |  120 +++++++++++++++++++++++++++++++------------
->  1 file changed, 87 insertions(+), 33 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index fb0cb2b..f00e4b4 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -497,6 +497,7 @@ static void __init realtime_counter_init(void)
->  	static struct clk *sys_clk;
->  	unsigned long rate;
->  	unsigned int reg, num, den;
-> +	bool errata_i856_workaround = false;
->  
->  	base = ioremap(REALTIME_COUNTER_BASE, SZ_32);
->  	if (!base) {
-> @@ -510,39 +511,93 @@ static void __init realtime_counter_init(void)
->  		return;
->  	}
->  
-> +	if (soc_is_dra7xx()) {
-> +		#define CTRL_CORE_BOOTSTRAP 0x4A0026C4
-> +		#define SPEEDSELECT_MASK 0x00000300
-> +		void __iomem *corebase;
-> +		corebase = ioremap(CTRL_CORE_BOOTSTRAP, SZ_4);
-> +		if (!corebase)
-> +			pr_err("%s: ioremap failed\n", __func__);
-> +		else {
-> +			reg = readl_relaxed(corebase) & SPEEDSELECT_MASK;
-> +			iounmap(corebase);
-> +			/*
-> +			 * Errata i856 says the 32.768KHz crystal does
-> +			 * not start at power on, so the CPU falls back in
-> +			 * an emulated 32KHz clock instead.  This causes
-> +			 * the master counter frequency to not be 6.144MHz
-> +			 * This affects at least the AM572x 1.0 and
-> +			 * 1.1 revisions.
-> +			 *
-> +			 * Of course any board built without a populated
-> +			 * 32.768KHz crystal would also need this fix
-> +			 * even if the CPU is fixed later.
-> +			 *
-> +			 * If the two speedselect bits are not 0, then the
-> +			 * 32.768KHz clock driving the course counter that
-s/course/coarse/
-> +			 * corrects the fine counter every time it ticks is
-> +			 * actually rate/610 rather than 32.768KHz and we
-> +			 * should compensate to avoid the 570ppm (At 20MHz,
-> +			 * much worse at other rates) too fast system time.
-> +			 */
-> +			if (reg) {
-> +				errata_i856_workaround = true;
-> +			}
-> +		}
-> +	}
-> +
->  	rate = clk_get_rate(sys_clk);
-> -	/* Numerator/denumerator values refer TRM Realtime Counter section */
-> -	switch (rate) {
-> -	case 12000000:
-> -		num = 64;
-> -		den = 125;
-> -		break;
-> -	case 13000000:
-> -		num = 768;
-> -		den = 1625;
-> -		break;
-> -	case 19200000:
-> -		num = 8;
-> -		den = 25;
-> -		break;
-> -	case 20000000:
-> -		num = 192;
-> -		den = 625;
-> -		break;
-> -	case 26000000:
-> -		num = 384;
-> -		den = 1625;
-> -		break;
-> -	case 27000000:
-> -		num = 256;
-> -		den = 1125;
-> -		break;
-> -	case 38400000:
-> -	default:
-> -		/* Program it for 38.4 MHz */
-> -		num = 4;
-> -		den = 25;
-> -		break;
-> +	if (errata_i856_workaround) {
-> +		/*
-> +		 * Realtime Counter frequency is not based on a real
-> +		 * 32.768KHz time source, so calculate the real resulting
-> +		 * frequency instead.  It is not 6.144MHz in this case.
-> +		 *
-> +		 * The frequency is always rate / 610 + 375 / 2 which
-> +		 * is rate * 244 / 75 and will fit in 32 bit for all rates.
-> +		 *
-> +		 * The multiplication has to be first to keep accuracy
-> +		 * with integer math as high as possible.
-> +		 */
-> +		num = 75;
-> +		den = 244;
-> +		arch_timer_freq = (rate * num) / den;
-> +	} else {
-> +		/* Numerator/denumerator values refer TRM Realtime Counter section */
-> +		switch (rate) {
-> +		case 12000000:
-> +			num = 64;
-> +			den = 125;
-> +			break;
-> +		case 13000000:
-> +			num = 768;
-> +			den = 1625;
-> +			break;
-> +		case 19200000:
-> +			num = 8;
-> +			den = 25;
-> +			break;
-> +		case 20000000:
-> +			num = 192;
-> +			den = 625;
-> +			break;
-> +		case 26000000:
-> +			num = 384;
-> +			den = 1625;
-> +			break;
-> +		case 27000000:
-> +			num = 256;
-> +			den = 1125;
-> +			break;
-> +		case 38400000:
-> +		default:
-> +			/* Program it for 38.4 MHz */
-> +			num = 4;
-> +			den = 25;
-> +			break;
-> +		}
-> +		/* This divides cleanly and fits in 32 bits */
-> +		arch_timer_freq = (rate / den) * num;
->  	}
->  
->  	/* Program numerator and denumerator registers */
-> @@ -556,7 +611,6 @@ static void __init realtime_counter_init(void)
->  	reg |= den;
->  	writel_relaxed(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
->  
-> -	arch_timer_freq = (rate / den) * num;
->  	set_cntfreq();
->  
->  	iounmap(base);
-> -- 
-> 1.7.10.4
+Hi,
 
-Stupid typos.  Will make sure to include in next revision, and maybe
-I can manage to reword the description a bit to make it flow better or
-be clearer.
+On 13-12-14 21:01, Vishnu Patekar wrote:
+> Hello Hans,
+> Please find my comments inlined.
+>
+> On 12/13/14, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi VishnuPatekar,
+>>
+>> The patch mangling for this set seems to have gone a bit wrong I'm afraid
+>
+> No, this time I've corrected it. Infact, last version of patch did not
+> used the status bit error macros.
+>
+>> a lot of the patches have my fixup commit messages (which should have
+>> disappeared when squashing in the patches), please replace those by proper
+>> commit messages describing what the patch actually does.
+> Yes, [PATCHv3 3/5] uses fixup. I'll correct it.
+>>
+>> Also the adding of the commented nodes for the lime2 seems to be gone
+>> entirely
+>> from the set, instead now only a comment about the conflict with the hdmi
+>> pins is added, but it is above the i2c node instead of above a ps2 node.
+>>
+> Maxime's suggested that we should not add commented nodes specially
+> when its trivial to apply. And just note saying ps20 pins conflict
+> with HDMI.
 
--- 
-Len Sorensen
+Ah, I see.
+
+> Should I remove the this comment as well?
+> Or
+> Put this note in start of DTS file?
+
+The comment should be added to where the pinctrl bits are, not to the lime2
+file, ps0 will conflict with hdmi on all boards.
+
+Regards,
+
+Hans
+
+
+>> Regards,
+>>
+>> Hans
+>>
+>>
+>> On 12-12-14 19:25, VishnuPatekar wrote:
+>>> v2 --> v3
+>>> 1. changed config to SERIO_SUN4I_PS2 from SERIO_SUNXI_PS2
+>>> 2. changed driver name to sun4i-ps2 from sunxi-ps2.
+>>> 3. changed the function names to sun4i_ps2_*.
+>>> 4. added locking in sun4i_ps2_open.
+>>> 5. kept compatible "sun4i-a10-ps2" for A10 and A20, as A10 is earlier
+>>> SOC.
+>>> 6. corrected the style errors.
+>>> 7. separated the dts patches.
+>>> 8. removed commented ps2 notes from lime2 dts.
+>>> 9. added note that ps2 pins confilt with hdmi.
+>>> 10. corrected the interrupt property for A10.
+>>> 11. moved dt-bindings to Documentation/devicetree/bindings/serio
+>>>
+>>> v1 --> v2:
+>>> 1. added default n depends on ARCH_SUNXI || COMPILE_TEST in Kconfig.
+>>> 2. handled errors and free resources on errors.
+>>> 3. used BIT(x), DIV_ROUND_UP macros.
+>>> 4. corrected style errors.
+>>> 5. added support for A10 also, A10 and A2 have same properties of PS2
+>>> controller.
+>>> 6. by default commented ps20 and ps21 nodes,as ps20 pins conflict with
+>>> HDMI.
+>>> 7. added compatible as allwinner,sun4i-a10-ps2.
+>>> 8. corrected the possible race condition.
+>>>
+>>>
+>>> VishnuPatekar (5):
+>>>     sunxi:dts-bindings:input:ps2 bindings for A10/A20 ps2.
+>>>     ARM:sunxi:drivers:input Add support for A10/A20 PS2
+>>>     ARM: sunxi: dts: Add PS2 nodes to dtsi for A10 and A20
+>>>     ARM: sunxi: dts: Add A10/A20 PS2 pin muxing options
+>>>     ARM: sunxi: dts: Add note ps2 pins conflict with hdmi
+>>>
+>>>    .../bindings/serio/allwinner,sun4i-ps2.txt         |   23 ++
+>>>    arch/arm/boot/dts/sun4i-a10.dtsi                   |   31 ++
+>>>    arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts    |    6 +-
+>>>    arch/arm/boot/dts/sun7i-a20.dtsi                   |   32 ++
+>>>    drivers/input/serio/Kconfig                        |   11 +
+>>>    drivers/input/serio/Makefile                       |    1 +
+>>>    drivers/input/serio/sun4i-ps2.c                    |  362
+>>> ++++++++++++++++++++
+>>>    7 files changed, 465 insertions(+), 1 deletion(-)
+>>>    create mode 100644
+>>> Documentation/devicetree/bindings/serio/allwinner,sun4i-ps2.txt
+>>>    create mode 100644 drivers/input/serio/sun4i-ps2.c
+>>>
+>>
