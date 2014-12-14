@@ -1,129 +1,131 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Sun, 14 Dec 2014 21:11:06 +0000
-Subject: [RFC/PATCH 1/4 PATCH] ARM: mvebu: use dt_fixup to provide
- fallback for enable-method
-In-Reply-To: <2005632.nq5F7SJD3S@wuerfel>
-References: <5488A2C0.5040804@alliedtelesis.co.nz>
- <1418360035-27975-1-git-send-email-chris.packham@alliedtelesis.co.nz>
- <2005632.nq5F7SJD3S@wuerfel>
-Message-ID: <548DFCEA.7000801@alliedtelesis.co.nz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 14 Dec 2014 21:36:55 +0000
+Subject: 3.18: lockdep problems in cpufreq
+Message-ID: <20141214213655.GA11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Here's a nice Christmas present one of my iMX6 machines gave me tonight.
+I haven't begun to look into it.
 
-On 12/13/2014 12:35 AM, Arnd Bergmann wrote:
-> On Friday 12 December 2014 17:53:55 Chris Packham wrote:
->>> I briefly explored that approach here[1]. The tricky part would be
->>> handling the fact that the enable method can be attached to either the
->>> /cpus node or and individual /cpu entry (or is that something I can
->>> ignore?).
->>>
->>> In the end I thought that the unconditional setting of smp_ops was
->>> easier to implement and would achieve the same result.
->>
->> Actually as it turns out it's not that hard to implement something that
->> checks both /cpus and /cpus/cpu at n. I'll include this with the next round
->> after I've waited for anymore feedback.
->
-> Ah, very nice!
->
->> ---8<---
->> Subject: [PATCH] ARM: mvebu: use dt_fixup to provide fallback for enable-method
->>
->> When the device tree doesn't define an enable-method insert a property
->> into the flattened device tree. arm_dt_init_cpu_maps() will then parse
->> this an set smp_ops appropriately. Now that we have this fallback it is
->> no longer necessary to set .smp in the DT_MACHINE definition.
->>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->> ---
->>   arch/arm/mach-mvebu/Makefile   |  2 ++
->>   arch/arm/mach-mvebu/board-v7.c | 37 ++++++++++++++++++++++++++++++++++++-
->>   2 files changed, 38 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
->> index e24136b..68310f8 100644
->> --- a/arch/arm/mach-mvebu/Makefile
->> +++ b/arch/arm/mach-mvebu/Makefile
->> @@ -14,3 +14,5 @@ endif
->>   obj-$(CONFIG_MACH_DOVE)		 += dove.o
->>   obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
->>   obj-$(CONFIG_MACH_NETXBIG)	 += netxbig.o
->> +
->> +CFLAGS_board-v7.o = -I$(src)/../../../scripts/dtc/libfdt
->> \ No newline at end of file
->
-> Why is this needed? Can't you just include <linux/libfdt.h> ?
->
+======================================================
+[ INFO: possible circular locking dependency detected ]
+3.18.0+ #1453 Not tainted
+-------------------------------------------------------
+rc.local/770 is trying to acquire lock:
+ (cooling_cpufreq_lock){+.+.+.}, at: [<c04abfc4>] cpufreq_thermal_notifier+0x34/0xfc
 
-I am already including linux/libfdt.h. Without the CFLAGS change I get
-the following compile error.
+but task is already holding lock:
+ ((cpufreq_policy_notifier_list).rwsem){++++.+}, at: [<c0042f04>]  __blocking_notifier_call_chain+0x34/0x68
 
-   In file included from include/linux/libfdt.h:6:0,
-                    from arch/arm/mach-mvebu/board-v7.c:21:
-   include/linux/../../scripts/dtc/libfdt/libfdt.h:54:24: fatal error: 
-libfdt_env.h: No such file or directory
+which lock already depends on the new lock.
 
-There seems to be precedence in other architectures/drivers
 
-   $ git grep -e '-I.*libfdt'
-   arch/mips/cavium-octeon/Makefile:CFLAGS_octeon-platform.o = 
--I$(src)/../../../scripts/dtc/libfdt
-   arch/mips/cavium-octeon/Makefile:CFLAGS_setup.o = 
--I$(src)/../../../scripts/dtc/libfdt
-   arch/mips/mti-sead3/Makefile:CFLAGS_sead3-setup.o = 
--I$(src)/../../../scripts/dtc/libfdt
-   arch/powerpc/kernel/Makefile:CFLAGS_prom.o              = 
--I$(src)/../../../scripts/dtc/libfdt
-   drivers/firmware/efi/libstub/Makefile:CFLAGS_fdt.o 
-    += -I$(srctree)/scripts/dtc/libfdt/
-   drivers/of/Makefile:CFLAGS_fdt.o = -I$(src)/../../scripts/dtc/libfdt
-   drivers/of/Makefile:CFLAGS_fdt_address.o = 
--I$(src)/../../scripts/dtc/libfdt
+the existing dependency chain (in reverse order) is:
 
->> +static void __init armada_370_xp_dt_fixup(void)
->> +{
->> +	int offset, node;
->> +	int i, len;
->> +	void *prop;
->> +	char buffer[20];
->> +
->> +	offset = fdt_path_offset(initial_boot_params, "/cpus");
->> +	if (offset < 0)
->> +		return;
->> +
->> +	prop = fdt_getprop(initial_boot_params, offset, "enable-method", &len);
->> +	if (prop)
->> +		return;
->> +
->> +	for (i = 0; i < NR_CPUS; i++) {
->> +		snprintf(buffer, sizeof(buffer), "cpu@%d", i);
->> +		node = fdt_subnode_offset(initial_boot_params, offset, buffer);
->> +		if (node < 0)
->> +			break;
->> +		prop = fdt_getprop(initial_boot_params, node,
->> +				   "enable-method", &len);
->> +		if (prop)
->> +			return;
->> +	}
->> +
->> +	pr_info("No enable-method defined. "
->> +		"Falling back to \"marvell,armada-xp-smp\"\n");
->> +
->> +	fdt_setprop(initial_boot_params, offset, "enable-method",
->> +		    "marvell,armada-xp-smp", sizeof("marvell,armada-xp-smp"));
->> +}
->
-> I think it would be good to first check whether you are running on Armada XP
-> or Armada 370, because the latter does not require this.
->
-> 	Arnd
->
+-> #1 ((cpufreq_policy_notifier_list).rwsem){++++.+}:
+       [<c06bc3b0>] down_write+0x44/0x9c
+       [<c0043444>] blocking_notifier_chain_register+0x28/0xd8
+       [<c04ad610>] cpufreq_register_notifier+0x68/0x90
+       [<c04abe4c>] __cpufreq_cooling_register.part.1+0x120/0x180
+       [<c04abf44>] __cpufreq_cooling_register+0x98/0xa4
+       [<c04abf8c>] cpufreq_cooling_register+0x18/0x1c
+       [<bf0046f8>] imx_thermal_probe+0x1c0/0x470 [imx_thermal]
+       [<c037cef8>] platform_drv_probe+0x50/0xac
+       [<c037b710>] driver_probe_device+0x114/0x234
+       [<c037b8cc>] __driver_attach+0x9c/0xa0
+       [<c0379d68>] bus_for_each_dev+0x5c/0x90
+       [<c037b204>] driver_attach+0x24/0x28
+       [<c037ae7c>] bus_add_driver+0xe0/0x1d8
+       [<c037c0cc>] driver_register+0x80/0xfc
+       [<c037cd80>] __platform_driver_register+0x50/0x64
+       [<bf007018>] 0xbf007018
+       [<c0008a5c>] do_one_initcall+0x88/0x1d8
+       [<c0095da4>] load_module+0x1768/0x1ef8
+       [<c0096614>] SyS_init_module+0xe0/0xf4
+       [<c000ec00>] ret_fast_syscall+0x0/0x48
 
-Any suggestion as to what to check for. Based on the dts files in the
-current source seem compatible == "marvell,armada370" seems like a good
-choice. But I don't know for sure that there isn't a armada-xp variant
-out using a .dts with this set.
+-> #0 (cooling_cpufreq_lock){+.+.+.}:
+       [<c00619f8>] lock_acquire+0xb0/0x124
+       [<c06ba3b4>] mutex_lock_nested+0x5c/0x3d8
+       [<c04abfc4>] cpufreq_thermal_notifier+0x34/0xfc
+       [<c0042bf4>] notifier_call_chain+0x4c/0x8c
+       [<c0042f20>] __blocking_notifier_call_chain+0x50/0x68
+       [<c0042f58>] blocking_notifier_call_chain+0x20/0x28
+       [<c04ae62c>] cpufreq_set_policy+0x7c/0x1d0
+       [<c04af3cc>] store_scaling_governor+0x74/0x9c
+       [<c04ad418>] store+0x90/0xc0
+       [<c0175384>] sysfs_kf_write+0x54/0x58
+       [<c01746b4>] kernfs_fop_write+0xdc/0x190
+       [<c010dcc0>] vfs_write+0xac/0x1b4
+       [<c010dfec>] SyS_write+0x44/0x90
+       [<c000ec00>] ret_fast_syscall+0x0/0x48
 
-Another option might be just to count the /cpu at n nodes.
+other info that might help us debug this:
+
+ Possible unsafe locking scenario:
+
+       CPU0                    CPU1
+       ----                    ----
+  lock((cpufreq_policy_notifier_list).rwsem);
+                               lock(cooling_cpufreq_lock);
+                               lock((cpufreq_policy_notifier_list).rwsem);
+  lock(cooling_cpufreq_lock);
+
+ *** DEADLOCK ***
+
+7 locks held by rc.local/770:
+ #0:  (sb_writers#6){.+.+.+}, at: [<c010dda0>] vfs_write+0x18c/0x1b4
+ #1:  (&of->mutex){+.+.+.}, at: [<c0174678>] kernfs_fop_write+0xa0/0x190
+ #2:  (s_active#52){.+.+.+}, at: [<c0174680>] kernfs_fop_write+0xa8/0x190
+ #3:  (cpu_hotplug.lock){++++++}, at: [<c0026a60>] get_online_cpus+0x34/0x90
+ #4:  (cpufreq_rwsem){.+.+.+}, at: [<c04ad3e0>] store+0x58/0xc0
+ #5:  (&policy->rwsem){+.+.+.}, at: [<c04ad3f8>] store+0x70/0xc0
+ #6:  ((cpufreq_policy_notifier_list).rwsem){++++.+}, at: [<c0042f04>] __blocking_notifier_call_chain+0x34/0x68
+
+stack backtrace:
+CPU: 0 PID: 770 Comm: rc.local Not tainted 3.18.0+ #1453
+Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+Backtrace: 
+[<c00121c8>] (dump_backtrace) from [<c0012360>] (show_stack+0x18/0x1c)
+ r6:c0b85a80 r5:c0b75630 r4:00000000 r3:00000000
+[<c0012348>] (show_stack) from [<c06b6c48>] (dump_stack+0x7c/0x98)
+[<c06b6bcc>] (dump_stack) from [<c06b42a4>] (print_circular_bug+0x28c/0x2d8)
+ r4:c0b85a80 r3:d0071d40
+[<c06b4018>] (print_circular_bug) from [<c00613b0>] (__lock_acquire+0x1acc/0x1bb0)
+ r10:c0b50660 r8:c09e6d80 r7:d0071d40 r6:c11d0f0c r5:00000007 r4:d0072240
+[<c005f8e4>] (__lock_acquire) from [<c00619f8>] (lock_acquire+0xb0/0x124)
+ r10:00000000 r9:c04abfc4 r8:00000000 r7:00000000 r6:00000000 r5:c0a06f0c
+ r4:00000000
+[<c0061948>] (lock_acquire) from [<c06ba3b4>] (mutex_lock_nested+0x5c/0x3d8)
+ r10:ec853800 r9:c0a06ed4 r8:d0071d40 r7:c0a06ed4 r6:c11d0f0c r5:00000000
+ r4:c04abfc4
+[<c06ba358>] (mutex_lock_nested) from [<c04abfc4>] (cpufreq_thermal_notifier+0x34/0xfc)
+ r10:ec853800 r9:ec85380c r8:d00d7d3c r7:c0a06ed4 r6:d00d7d3c r5:00000000
+ r4:fffffffe
+[<c04abf90>] (cpufreq_thermal_notifier) from [<c0042bf4>] (notifier_call_chain+0x4c/0x8c)
+ r7:00000000 r6:00000000 r5:00000000 r4:fffffffe
+[<c0042ba8>] (notifier_call_chain) from [<c0042f20>] (__blocking_notifier_call_chain+0x50/0x68)
+ r8:c0a072a4 r7:00000000 r6:d00d7d3c r5:ffffffff r4:c0a06fc8 r3:ffffffff
+[<c0042ed0>] (__blocking_notifier_call_chain) from [<c0042f58>] (blocking_notifier_call_chain+0x20/0x28)
+ r7:ec98b540 r6:c13ebc80 r5:ed76e600 r4:d00d7d3c
+[<c0042f38>] (blocking_notifier_call_chain) from [<c04ae62c>] (cpufreq_set_policy+0x7c/0x1d0)
+[<c04ae5b0>] (cpufreq_set_policy) from [<c04af3cc>] (store_scaling_governor+0x74/0x9c)
+ r7:ec98b540 r6:0000000c r5:ec98b540 r4:ed76e600
+[<c04af358>] (store_scaling_governor) from [<c04ad418>] (store+0x90/0xc0)
+ r6:0000000c r5:ed76e6d4 r4:ed76e600
+[<c04ad388>] (store) from [<c0175384>] (sysfs_kf_write+0x54/0x58)
+ r8:0000000c r7:d00d7f78 r6:ec98b540 r5:0000000c r4:ec853800 r3:0000000c
+[<c0175330>] (sysfs_kf_write) from [<c01746b4>] (kernfs_fop_write+0xdc/0x190)
+ r6:ec98b540 r5:00000000 r4:00000000 r3:c0175330
+[<c01745d8>] (kernfs_fop_write) from [<c010dcc0>] (vfs_write+0xac/0x1b4)
+ r10:0162aa70 r9:d00d6000 r8:0000000c r7:d00d7f78 r6:0162aa70 r5:0000000c
+ r4:eccde500
+[<c010dc14>] (vfs_write) from [<c010dfec>] (SyS_write+0x44/0x90)
+ r10:0162aa70 r8:0000000c r7:eccde500 r6:eccde500 r5:00000000 r4:00000000
+[<c010dfa8>] (SyS_write) from [<c000ec00>] (ret_fast_syscall+0x0/0x48)
+ r10:00000000 r8:c000edc4 r7:00000004 r6:000216cc r5:0000000c r4:0162aa70
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
