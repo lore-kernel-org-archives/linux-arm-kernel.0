@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Dec 2014 16:38:14 +0100
-Subject: [PATCH 06/27] ARM: mvebu: armada-370-rd: Relicense the device tree
- under GPLv2+/X11
+Date: Mon, 15 Dec 2014 16:38:15 +0100
+Subject: [PATCH 07/27] ARM: mvebu: armada-370-synology-ds213j: Relicense the
+ device tree under GPLv2+/X11
 In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1418657915-22775-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1418657915-22775-8-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,28 +15,24 @@ license.
 In order to make it easier for them to reuse our device trees,
 relicense our device trees under a GPL/X11 dual-license.
 
-Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Arnaud Ebalard <arno@natisbad.org>
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Florian Fainelli <florian@openwrt.org>
-Cc: Simon Baatz <gmbnomis@gmail.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-rd.dts | 40 ++++++++++++++++++++++++++++++++++---
- 1 file changed, 37 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/armada-370-synology-ds213j.dts | 41 +++++++++++++++++++++---
+ 1 file changed, 37 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-index 394308951ed9..6ae36a38beb2 100644
---- a/arch/arm/boot/dts/armada-370-rd.dts
-+++ b/arch/arm/boot/dts/armada-370-rd.dts
-@@ -6,9 +6,43 @@
+diff --git a/arch/arm/boot/dts/armada-370-synology-ds213j.dts b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
+index 70fecde76ccb..59f74e66963f 100644
+--- a/arch/arm/boot/dts/armada-370-synology-ds213j.dts
++++ b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
+@@ -3,10 +3,43 @@
   *
-  *  Copyright (C) 2013 Florian Fainelli <florian@openwrt.org>
+  * Copyright (C) 2014, Arnaud EBALARD <arno@natisbad.org>
   *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version
+- * 2 of the License, or (at your option) any later version.
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
 + * licensing only applies to this file, and not this project as a
@@ -76,6 +72,6 @@ index 394308951ed9..6ae36a38beb2 100644
 + *     OTHER DEALINGS IN THE SOFTWARE.
   *
   * Note: this Device Tree assumes that the bootloader has remapped the
-  * internal registers to 0xf1000000 (instead of the default
+  * internal registers to 0xf1000000 (instead of the old 0xd0000000).
 -- 
 1.9.1
