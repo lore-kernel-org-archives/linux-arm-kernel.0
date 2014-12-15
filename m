@@ -1,44 +1,21 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 15 Dec 2014 21:27:39 +0100
-Subject: [PATCH 0/3] Add support for APM X-Gene SoC AHBC IOMMU driver.
-In-Reply-To: <CAOHikRB0eBnPnE+QWdmWunOMFHJOLDqU6o2ByBruQ3KC+1-XmA@mail.gmail.com>
-References: <1418662523-8458-1-git-send-email-stripathi@apm.com>
- <548F3C91.3030803@redhat.com>
- <CAOHikRB0eBnPnE+QWdmWunOMFHJOLDqU6o2ByBruQ3KC+1-XmA@mail.gmail.com>
-Message-ID: <20141215202738.GG24292@8bytes.org>
+From: b.hutchman@gmail.com (Brian Hutchinson)
+Date: Mon, 15 Dec 2014 15:33:50 -0500
+Subject: How much flash space should I reserve for device tree blobs?
+Message-ID: <CAFZh4h_74LY=w7gV=zNAC0ssRFgrh1DduPmZ2c+HenbztRRc-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+Reflecting back on the famous quote of "Nobody needs more than 640K",
+how much space should I reserve in flash to 'future proof' my MTD map
+in regards to dtb's?
 
-On Tue, Dec 16, 2014 at 01:31:58AM +0530, Suman Tripathi wrote:
-> On Dec 16, 2014 1:25 AM, "Don Dutile" <ddutile@redhat.com> wrote:
-> 
->     On 12/15/2014 11:55 AM, Suman Tripathi wrote:
-> 
->         This patch adds the support for the APM X-Gene SoC AHBC IOMMU driver.
-> 
->         Signed-off-by: Suman Tripathi <stripathi@apm.com>
->         ---
-> 
->         Suman Tripathi (3):
->         ? ?xgene-ahbc-iommu: Add support for APM X-Gene SoC AHBC IOMMU driver.
->         ? ?arm64: dts: Add the APM X-Gene AHBC IOMMU DTS node.
->         ? ?Documentation: dt-bindings: Add the binding info for APM X-Gene AHBC
->         ? ? ?IOMMU driver.
-> 
->         ? .../devicetree/bindings/iommu/xgene,ahbc-iommu.txt |? 17 ++
->         ? arch/arm64/boot/dts/apm-storm.dtsi? ? ? ? ? ? ? ? ?|? ?5 +
->         ? drivers/iommu/Kconfig? ? ? ? ? ? ? ? ? ? ? ? ? ? ? |? 10 +
->         ? drivers/iommu/Makefile? ? ? ? ? ? ? ? ? ? ? ? ? ? ?|? ?1 +
->         ? drivers/iommu/xgene-ahbc-iommu.c? ? ? ? ? ? ? ? ? ?| 336
->         +++++++++++++++++++++
->         ? 5 files changed, 369 insertions(+)
->         ? create mode 100644 Documentation/devicetree/bindings/iommu/
->         xgene,ahbc-iommu.txt
->         ? create mode 100644 drivers/iommu/xgene-ahbc-iommu.c
+Looking at the current flavors of dtb's built in a recent mainline
+kernel, the biggest one I see is 66K.
 
-What are the differences between the X-Gene IOMMU and the ARM-SMMU?
+How big do you all see these getting?  I know, it's probably a loaded
+question.  Would just like to bounce this off the list as a sanity
+check ... measure twice cut once kind of thing.
 
+Regards,
 
-	Joerg
+Brian
