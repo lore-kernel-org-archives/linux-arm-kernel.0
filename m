@@ -1,93 +1,47 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 15 Dec 2014 11:50:44 +0000
-Subject: [PATCH v5 19/19] arm/arm64: KVM: allow userland to request a
- virtual GICv3
-In-Reply-To: <20141213134502.GH16855@cbox>
-References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
- <1418042274-3246-20-git-send-email-andre.przywara@arm.com>
- <20141213134502.GH16855@cbox>
-Message-ID: <548ECB14.8040408@arm.com>
+From: ykk@rock-chips.com (Kuankuan.Yang)
+Date: Mon, 15 Dec 2014 19:52:06 +0800
+Subject: [RFC PATCH 0/6] Those patches is used for dw_hdmi audio.
+In-Reply-To: <548EC9E1.5040206@rock-chips.com>
+References: <1418609494-15820-1-git-send-email-ykk@rock-chips.com>
+ <20141215103830.GD11285@n2100.arm.linux.org.uk>
+ <548EC9E1.5040206@rock-chips.com>
+Message-ID: <548ECB66.70004@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+  Hi Russell:
 
-On 13/12/14 13:45, Christoffer Dall wrote:
-> On Mon, Dec 08, 2014 at 12:37:54PM +0000, Andre Przywara wrote:
->> With all of the GICv3 code in place now we allow userland to ask the
->> kernel for using a virtual GICv3 in the guest.
->> Also we provide the necessary support for guests setting the memory
->> addresses for the virtual distributor and redistributors.
->> This requires some userland code to make use of that feature and
->> explicitly ask for a virtual GICv3.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->> Changelog v4...v5:
->> - improving documentation text
->>
->> Changelog v3...v4:
->> - refine commit message
->> - add documentation of new GICv3 KVM device
->>
->>  Documentation/virtual/kvm/devices/arm-vgic.txt |   22 ++++++++++--
->>  arch/arm64/include/uapi/asm/kvm.h              |    7 ++++
->>  include/kvm/arm_vgic.h                         |    4 +--
->>  virt/kvm/arm/vgic-v3-emul.c                    |    3 ++
->>  virt/kvm/arm/vgic.c                            |   46 +++++++++++++++++-------
->>  5 files changed, 65 insertions(+), 17 deletions(-)
->>
->> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
->> index df8b0c7..563463e 100644
->> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
->> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
->> @@ -3,22 +3,38 @@ ARM Virtual Generic Interrupt Controller (VGIC)
->>  
->>  Device types supported:
->>    KVM_DEV_TYPE_ARM_VGIC_V2     ARM Generic Interrupt Controller v2.0
->> +  KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
->>  
->>  Only one VGIC instance may be instantiated through either this API or the
->>  legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
->>  controller, requiring emulated user-space devices to inject interrupts to the
->>  VGIC instead of directly to CPUs.
->>  
->> +Creating a guest GICv3 device requires a host GICv3 as well.
->> +GICv3 implementations with hardware compatibility support allow a guest GICv2
->> +as well.
->> +
->>  Groups:
->>    KVM_DEV_ARM_VGIC_GRP_ADDR
->>    Attributes:
->>      KVM_VGIC_V2_ADDR_TYPE_DIST (rw, 64-bit)
->>        Base address in the guest physical address space of the GIC distributor
->> -      register mappings.
->> +      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
->>  
->>      KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
->>        Base address in the guest physical address space of the GIC virtual cpu
->> -      interface register mappings.
->> +      interface register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
->> +
->> +    KVM_VGIC_V3_ADDR_TYPE_DIST (rw, 64-bit)
->> +      Base address in the guest physical address space of the GICv3 distributor
->> +      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
->> +
-> 
-> Are there no alignment restrictions to worry about that we should
-> document here?
+      thks for your replay, actually you also have send me those 
+dw-hdmi-audio.c patches, and I also agree it's an beautiful way to make 
+hdmi-audio works. Beside,
+  I try to reuse it into our platform, and actually the system have 
+created the DW_HDMI sound card successfully, but i cannot play any 
+sound  with this sound card.
+      After dump the registers, I found the part of "Audio DMA 
+Registers" cannot write and always read with 0x00.  So I searching the 
+document  "Designware Core
+  HDMI Transmitter Controller Databook", and found that  "Audio DMA 
+Registers" only present when the hardware configuration parameter 
+AUDIO_IF is set to
+  AHBAUDDMA. Than I communicate with our IC colleagues, they told me 
+that our cpu rk3288 only support two way to  transmit audio data( I2S & 
+SPDIF ), in that
+way we do not support AHB_DMA, it's very sad, and this it why i give up 
+this way, also it's my bad that i should replay to u first in the before 
+mail.
 
-I think so, but that is not GICv3 specific, but applies to the VGICv2
-also, right? So shall I add a sentence like
-"The base address needs to be aligned to a 64 KB page boundary."
-for GICv3 and
-"The base address needs to be aligned to a 4 KB page boundary."
-for GICv2?
-Shouldn't the 64K alignment actually apply for GICv2 on AArch64 also?
-That would avoid some trouble in the future, wouldn't it?
 
-Also I think we need to actually check for the 64K alignment for GICv3
-(we only check for 4K atm).
-
-Cheers,
-Andre.
+Best Regards.
+> ? 2014?12?15? 18:38, Russell King - ARM Linux ??:
+>> On Mon, Dec 15, 2014 at 10:11:28AM +0800, Yakir Yang wrote:
+>>> rk3288 use Designware HDMI IP, Designware HDMI supports four interfaces to
+>>> config hdmi audio(I2S, S/PDIF, Generic Parallel Audio, AHB Audio DMA), but
+>>> rk3288 only support two ways to config hdmi audio(I2S, S/PDIF), So we take
+>>> I2S as hdmi audio operation interfaces, and then treat hdmi audio as an
+>>> standard ALSA devices(only got platback function).
+>> There is no need for dw-hdmi audio to be implemented as an ASoC
+>> device - as I've already sent patches to Andy with my ALSA driver
+>> which has been around for the last two years, and works well, and
+>> doesn't require any additional DT description.
+>>
+>
