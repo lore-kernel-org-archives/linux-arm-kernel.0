@@ -1,65 +1,58 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 15 Dec 2014 14:26:18 -0800
-Subject: [PATCH] clk: samsung: Fix Exynos 5420 pinctrl setup and clock
- disable failure due to domain being gated
-In-Reply-To: <7hlhmfo1b0.fsf@deeprootsystems.com> (Kevin Hilman's message of
- "Wed, 10 Dec 2014 09:35:31 -0800")
-References: <1417788934-23447-1-git-send-email-k.kozlowski@samsung.com>
- <1418129982.19339.6.camel@AMDC1943> <5486F69B.6020005@samsung.com>
- <7hlhmfo1b0.fsf@deeprootsystems.com>
-Message-ID: <7h8ui8h7n9.fsf@deeprootsystems.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 15 Dec 2014 23:48:14 +0100
+Subject: [PATCH 0/5] ARM: at91: fix irq_pm_install_action WARNING
+In-Reply-To: <2662748.NJbkr6jW7r@vostro.rjw.lan>
+References: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
+ <2662748.NJbkr6jW7r@vostro.rjw.lan>
+Message-ID: <3542278.8lcJeXLMFm@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@kernel.org> writes:
+On Monday, December 15, 2014 11:20:17 PM Rafael J. Wysocki wrote:
+> On Monday, December 15, 2014 05:15:47 PM Boris Brezillon wrote:
+> > Commit cab303be91dc47942bc25de33dc1140123540800 [1] introduced a WARN_ON
+> > test which triggers a WARNING backtrace on at91 platforms.
+> 
+> Pretty much as intended.
+> 
+> > While this WARN_ON is absolutely necessary to warn users that they should
+> > not mix request with and without IRQF_NO_SUSPEND flags on shared IRQs,
+> > there is no easy way to solve this issue on at91 platforms.
+> > 
+> > The main reason is that the init timer is often using a shared irq line
+> > and thus request this irq with IRQF_NO_SUSPEND flag set, while other
+> > peripherals request the same irq line without this flag.
+> > 
+> > We could deal with that by identifying whether a given peripheral is
+> > connected to the init timer shared irq line and add the IRQF_NO_SUSPEND
+> > in this case, but this implies adding the logic in all peripheral drivers
+> > that could be connected to this shared irq.
+> > 
+> > This series takes the reverse approach: force IRQ users to specify that
+> > they take care of disabling peripheral interrupts and that IRQ core can
+> > safely leave the handler in a suspended state without having to bother
+> > about spurious interrupts.
+> > This is done by mean of a new IRQF_SUSPEND_NOACTION flag which tells the
+> > core to move the action handler to a suspended list, thus preventing its
+> > execution when we are in suspend mode.
+> > Of course, specifying the IRQF_SUSPEND_NOACTION flag implies taking care
+> > of masking/unmasking the peripheral interrupts in the suspend/resume
+> > implementation.
+> 
+> Well, I'm not sure how much value is in all that to be honest.  The only
+> thing it helps with is to make the WARN_ON go away in some cases, while
+> the drivers in question need to make sure that they disable their interrupts
+> properly anyway, so what exactly is the purpose of the new irqaction
+> shuffling?
+> 
+> It might just be simpler to add a flag to suppress the WARN_ON that would be
+> set by the user of IRQF_NO_SUSPEND that is broken enough to have to share the
+> interrupt with others ...
 
-> Sylwester Nawrocki <s.nawrocki@samsung.com> writes:
->
->> On 09/12/14 13:59, Krzysztof Kozlowski wrote:
->>> On pi?, 2014-12-05 at 15:15 +0100, Krzysztof Kozlowski wrote:
->>>> > Audio subsystem clocks are located in separate block. On Exynos 5420 if
->>>> > clock for this block (from main clock domain) 'mau_epll' is gated then
->>>> > any read or write to audss registers will block.
->>>> > 
->>>> > This kind of boot hang was observed on Arndale Octa and Peach Pi/Pit
->>>> > after introducing runtime PM to pl330 DMA driver. After that commit the
->>>> > 'mau_epll' was gated, because the "amba" clock was disabled and there
->>>> > were no more users of mau_epll.
->>>> > 
->>>> > The system hang on one of steps:
->>>> > 1. Disabling unused clocks from audss block.
->>>> > 2. During audss GPIO setup (just before probing i2s0 because
->>>> >    samsung_pinmux_setup() tried to access memory from audss block which was
->>>> >    gated.
->>>> > 
->>>> > Add a workaround for this by enabling the 'mau_epll' clock in probe.
->>>> > 
->>>> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>> > ---
->>>> >  drivers/clk/samsung/clk-exynos-audss.c | 29 ++++++++++++++++++++++++++++-
->>>> >  1 file changed, 28 insertions(+), 1 deletion(-)
->>>
->>> Sorry for pinging so quick but merge window is open and it looks like
->>> booting Exynos542x boards will be broken (because pl330 will no longer
->>> hold adma clock enabled so whole audss domain will be gated).
->>> 
->>> This is a non-intrusive workaround for that issue, as wanted by
->>> Sylwester:
->>> https://lkml.org/lkml/2014/12/5/223
->>> 
->>> Any comments on this?
->>
->> The patch looks OK to me, it would be good though if someone else
->> has confirmed it fixes the bug. I don't have any clock patches queued
->> at the moment. Perhaps you could apply it directly, Mike ?
->
-> I confirm it fixes the boot hang in linux-next (next-20141210) on my
-> exynos5800-peach-pi and exynos5420-arndale-octa.  Tested both
-> exynos_defconfig and multi_v7_defconfig.
->
-> Tested-by: Kevin Hilman <khilman@linaro.org>
+Or even set IRFQ_NO_SUSPEND for all of the users of this interrupt and add
+comments to them explaining why it is set.
 
-What's the status of this patch?  linux-next is still broken for several
-Exynos5 platforms without this fix.
 
-Kevin
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
