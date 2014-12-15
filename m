@@ -1,33 +1,65 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 15 Dec 2014 14:20:10 -0800
-Subject: [GIT PULL] at91: fixes for 3.19 #1
-In-Reply-To: <1418377615-15122-1-git-send-email-nicolas.ferre@atmel.com>
- (Nicolas Ferre's message of "Fri, 12 Dec 2014 10:46:55 +0100")
-References: <1418377615-15122-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <7hmw6oh7xh.fsf@deeprootsystems.com>
+Date: Mon, 15 Dec 2014 14:26:18 -0800
+Subject: [PATCH] clk: samsung: Fix Exynos 5420 pinctrl setup and clock
+ disable failure due to domain being gated
+In-Reply-To: <7hlhmfo1b0.fsf@deeprootsystems.com> (Kevin Hilman's message of
+ "Wed, 10 Dec 2014 09:35:31 -0800")
+References: <1417788934-23447-1-git-send-email-k.kozlowski@samsung.com>
+ <1418129982.19339.6.camel@AMDC1943> <5486F69B.6020005@samsung.com>
+ <7hlhmfo1b0.fsf@deeprootsystems.com>
+Message-ID: <7h8ui8h7n9.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Ferre <nicolas.ferre@atmel.com> writes:
+Kevin Hilman <khilman@kernel.org> writes:
 
-> Arnd, Olof, Kevin,
+> Sylwester Nawrocki <s.nawrocki@samsung.com> writes:
 >
-> I'm sending today a "fixes" branch which somehow continues the cleanup with
-> only code removal. I was waiting for the arm-soc *and* pinctrl material to
-> reach Linus T.'s tree before sending this pull-request. In fact this sequence
-> was needed for the gpio header removal. The little patch about #include
-> deletion just follows an earlier merge conflict in arm-soc tree: I was also
-> waiting for this moment before sending the definitive fix, just to be sure.
+>> On 09/12/14 13:59, Krzysztof Kozlowski wrote:
+>>> On pi?, 2014-12-05 at 15:15 +0100, Krzysztof Kozlowski wrote:
+>>>> > Audio subsystem clocks are located in separate block. On Exynos 5420 if
+>>>> > clock for this block (from main clock domain) 'mau_epll' is gated then
+>>>> > any read or write to audss registers will block.
+>>>> > 
+>>>> > This kind of boot hang was observed on Arndale Octa and Peach Pi/Pit
+>>>> > after introducing runtime PM to pl330 DMA driver. After that commit the
+>>>> > 'mau_epll' was gated, because the "amba" clock was disabled and there
+>>>> > were no more users of mau_epll.
+>>>> > 
+>>>> > The system hang on one of steps:
+>>>> > 1. Disabling unused clocks from audss block.
+>>>> > 2. During audss GPIO setup (just before probing i2s0 because
+>>>> >    samsung_pinmux_setup() tried to access memory from audss block which was
+>>>> >    gated.
+>>>> > 
+>>>> > Add a workaround for this by enabling the 'mau_epll' clock in probe.
+>>>> > 
+>>>> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>> > ---
+>>>> >  drivers/clk/samsung/clk-exynos-audss.c | 29 ++++++++++++++++++++++++++++-
+>>>> >  1 file changed, 28 insertions(+), 1 deletion(-)
+>>>
+>>> Sorry for pinging so quick but merge window is open and it looks like
+>>> booting Exynos542x boards will be broken (because pl330 will no longer
+>>> hold adma clock enabled so whole audss domain will be gated).
+>>> 
+>>> This is a non-intrusive workaround for that issue, as wanted by
+>>> Sylwester:
+>>> https://lkml.org/lkml/2014/12/5/223
+>>> 
+>>> Any comments on this?
+>>
+>> The patch looks OK to me, it would be good though if someone else
+>> has confirmed it fixes the bug. I don't have any clock patches queued
+>> at the moment. Perhaps you could apply it directly, Mike ?
 >
-> Otherwise, all is pretty straightforward.
+> I confirm it fixes the boot hang in linux-next (next-20141210) on my
+> exynos5800-peach-pi and exynos5420-arndale-octa.  Tested both
+> exynos_defconfig and multi_v7_defconfig.
 >
-> Oh, one more thing: it is based on the current Linus' git tree, I can obviously
-> rebase everything on top of 3.19-rc1 once it is released if you prefer.
+> Tested-by: Kevin Hilman <khilman@linaro.org>
 
-Yes, waiting a bit and basing on v3.19-rc1 is preferred since none of
-this seems like urgent fixes needed for stuff introduced during the
-merge window.
-
-Thanks,
+What's the status of this patch?  linux-next is still broken for several
+Exynos5 platforms without this fix.
 
 Kevin
