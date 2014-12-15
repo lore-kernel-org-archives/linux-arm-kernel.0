@@ -1,350 +1,261 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Dec 2014 09:59:25 +0000
-Subject: [PATCH v2 1/3] irqchip: vf610-mscm: add support for MSCM interrupt
- router
-In-Reply-To: <1418594998-2361-2-git-send-email-stefan@agner.ch>
-References: <1418594998-2361-1-git-send-email-stefan@agner.ch>
- <1418594998-2361-2-git-send-email-stefan@agner.ch>
-Message-ID: <548EB0FD.3030206@arm.com>
+From: oneukum@suse.de (Oliver Neukum)
+Date: Mon, 15 Dec 2014 11:01:50 +0100
+Subject: bluetooth: Add hci_h4p driver
+In-Reply-To: <20141213223727.GA13894@amd>
+References: <20141213223727.GA13894@amd>
+Message-ID: <1418637710.4443.11.camel@linux-0dmf.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hi,
 
-On 14/12/14 22:09, Stefan Agner wrote:
-> This adds support for Vybrid's interrupt router. On VF6xx models,
-> almost all peripherals can be accessed from either of the two
-> CPU's, from the Cortex-A5 or from the Cortex-M4. The interrupt
-> router routes the peripheral interrupts to the configured CPU.
-> 
-> The driver makes use of the irqdomain hierarchy support. The
-> parent is either the ARM GIC or the ARM NVIC interrupt controller
-> depending on which CPU the kernel is executed on. Currently only
-> ARM GIC is supported because the NVIC driver lacks hierarchical
-> irqdomain support as of now.
-> 
-> Currently, there is no resource control mechnism implemented to
-> avoid concurrent access of the same peripheral. The user needs
-> to make sure to use device trees which assign the peripherals
-> orthogonally. However, this driver warns the user in case the
-> interrupt is already configured for the other CPU. This provides
-> a poor man's resource controller.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> Thanks for the feedback on the initial driver, I'm quite happy
-> with the outcome using the hierarchic irqdomain support.
+a few remarks about possible issues.
 
-Great stuff, pleased to see the stacked domain proving to be useful.
+	Regards
+		Oliver
 
-> The driver is tested on Vybrid running on the Cortex-A5 CPU.
-> However, to properly support Cortex-M4, some more work will be
-> needed. Beside the hierarchic irqdomain support for NVIC, the
-> different IRQ cell layout need to be solved: NVIC uses only
-> one cell, whereas GIC uses three. I see two possible solutions:
-> - Support two layouts in this driver. Maybe by using IS_ENABLED,
->   since it is not possible to compile a kernel for the A5 and
->   M4.
-> - Define a 3 cell layout as GIC uses it for the MSCM, and pass
->   a syntetic one cell layout to the parent when calling
->   irq_domain_alloc_irqs_parent. This driver would then still
->   need to know what type of interrupt controller the parent is...
-> 
-> Ideas/advice welcome...
-
-You shouldn't use the GIC format for the MSCM, as it doesn't mean
-anything for it. Yes, I know that everybody did that, but that's just
-wrong (MSCM itself shouldn't care about SPIs, except when it is actually
-talking to a GIC). The only reason I didn't clean that up in my ongoing
-series is to avoid having to rewrite all the DTs entirely.
-
-My hunch is that you should have a MSCM-specific interrupt description
-(I guess two cells should be enough, one for the interrupt number and
-one for the trigger if necessary), and translate this to the format that
-the backing interrupt controller is using (only the map function should
-be affected).
-
-That would also make your DT binding a lot less ambiguous.
-
-Other than that, it looks pretty good to me. Just a few cosmetic remarks
-below:
-
-> 
->  arch/arm/mach-imx/Kconfig        |   1 +
->  drivers/irqchip/Kconfig          |  11 +++
->  drivers/irqchip/Makefile         |   1 +
->  drivers/irqchip/irq-vf610-mscm.c | 198 +++++++++++++++++++++++++++++++++++++++
->  4 files changed, 211 insertions(+)
->  create mode 100644 drivers/irqchip/irq-vf610-mscm.c
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index e8627e0..3c5859e 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -631,6 +631,7 @@ config SOC_IMX6SX
->  
->  config SOC_VF610
->  	bool "Vybrid Family VF610 support"
-> +	select VF610_MSCM
->  	select ARM_GIC
->  	select PINCTRL_VF610
->  	select PL310_ERRATA_769419 if CACHE_L2X0
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index cc79d2a..af5e72a 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -136,6 +136,17 @@ config IRQ_CROSSBAR
->  	  a free irq and configures the IP. Thus the peripheral interrupts are
->  	  routed to one of the free irqchip interrupt lines.
->  
-> +config VF610_MSCM
-> +	bool
-> +	help
-> +	  Support for MSCM interrupt router available on Vybrid SoC's. The
-> +	  interrupt router is between the CPU's interrupt controller and the
-> +	  peripheral. The router allows to route the peripheral interrupts to
-> +	  one of the two available CPU's on Vybrid VF6xx SoC's (Cortex-A5 or
-> +	  Cortex-M4). The router will be configured transparently on a IRQ
-> +	  request.
-> +	select IRQ_DOMAIN_HIERARCHY
-> +
->  config KEYSTONE_IRQ
->  	tristate "Keystone 2 IRQ controller IP"
->  	depends on ARCH_KEYSTONE
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 9516a32..85651be 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -37,6 +37,7 @@ obj-$(CONFIG_TB10X_IRQC)		+= irq-tb10x.o
->  obj-$(CONFIG_XTENSA)			+= irq-xtensa-pic.o
->  obj-$(CONFIG_XTENSA_MX)			+= irq-xtensa-mx.o
->  obj-$(CONFIG_IRQ_CROSSBAR)		+= irq-crossbar.o
-> +obj-$(CONFIG_VF610_MSCM)		+= irq-vf610-mscm.o
->  obj-$(CONFIG_BCM7120_L2_IRQ)		+= irq-bcm7120-l2.o
->  obj-$(CONFIG_BRCMSTB_L2_IRQ)		+= irq-brcmstb-l2.o
->  obj-$(CONFIG_KEYSTONE_IRQ)		+= irq-keystone.o
-> diff --git a/drivers/irqchip/irq-vf610-mscm.c b/drivers/irqchip/irq-vf610-mscm.c
-> new file mode 100644
-> index 0000000..1597185
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-vf610-mscm.c
-> @@ -0,0 +1,198 @@
-> +/*
-> + * Copyright 2014 Stefan Agner
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/cpu_pm.h>
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
-> +
-> +#include "irqchip.h"
-> +
-> +#define MSCM_CPxNUM		0x4
-> +#define MSCM_IRSPRC(n)		(0x880 + 2 * (n))
-> +#define MSCM_IRSPRC_CPEN_MASK	0x3
-> +
-> +#define MSCM_IRSPRC_NUM		112
-> +
-> +struct vf610_mscm_chip_data {
-> +	void __iomem *mscm_base;
-> +	u16 cpu_mask;
-> +	u16 mscm_saved_irsprc[MSCM_IRSPRC_NUM];
-> +};
-> +
-> +static struct vf610_mscm_chip_data *chip_data;
-> +
-> +static int vf610_mscm_notifier(struct notifier_block *self, unsigned long cmd,
-> +			       void *v)
+> +static int h4p_send_negotiation(struct h4p_info *info)
 > +{
-> +	int i;
+> +	struct h4p_neg_cmd *neg_cmd;
+> +	struct h4p_neg_hdr *neg_hdr;
+> +	struct sk_buff *skb;
+> +	int err, len;
+> +	u16 sysclk = 38400;
 > +
-> +	switch (cmd) {
-> +	case CPU_CLUSTER_PM_ENTER:
-> +		for (i = 0; i < MSCM_IRSPRC_NUM; i++)
-> +			chip_data->mscm_saved_irsprc[i] = readw_relaxed(
-> +					chip_data->mscm_base + MSCM_IRSPRC(i));
-
-Please keep the argument to readw_relaxed on the same line as the
-function call. Makes it easier to read.
-
-> +		break;
-> +	case CPU_CLUSTER_PM_ENTER_FAILED:
-> +	case CPU_CLUSTER_PM_EXIT:
-> +		for (i = 0; i < MSCM_IRSPRC_NUM; i++)
-> +			writew_relaxed(chip_data->mscm_saved_irsprc[i],
-> +				       chip_data->mscm_base + MSCM_IRSPRC(i));
-> +		break;
-> +	}
+> +	printk("Sending negotiation..");
+> +	len = sizeof(*neg_cmd) + sizeof(*neg_hdr) + H4_TYPE_SIZE;
 > +
-> +	return NOTIFY_OK;
-> +}
-> +
-> +static struct notifier_block mscm_notifier_block = {
-> +	.notifier_call = vf610_mscm_notifier,
-> +};
-> +
-> +static void vf610_mscm_enable(struct irq_data *data)
-> +{
-> +	irq_hw_number_t hwirq = data->hwirq;
-> +	struct vf610_mscm_chip_data *chip_data = data->chip_data;
-> +	u16 irsprc;
-> +
-> +	irsprc = readw_relaxed(chip_data->mscm_base + MSCM_IRSPRC(hwirq));
-> +	irsprc &= MSCM_IRSPRC_CPEN_MASK;
-> +
-> +	WARN_ON(irsprc);
-
-Does this read have an influence on the interrupt routing?
-
-> +
-> +	writew_relaxed(chip_data->cpu_mask,
-> +		       chip_data->mscm_base + MSCM_IRSPRC(hwirq));
-> +
-> +	irq_chip_unmask_parent(data);
-> +}
-> +
-> +static void vf610_mscm_disable(struct irq_data *data)
-> +{
-> +	irq_hw_number_t hwirq = data->hwirq;
-> +	struct vf610_mscm_chip_data *chip_data = data->chip_data;
-> +	u16 irsprc;
-> +
-> +	irsprc = readw_relaxed(chip_data->mscm_base + MSCM_IRSPRC(hwirq));
-> +	irsprc &= MSCM_IRSPRC_CPEN_MASK;
-
-And this one?
-
-> +	writew_relaxed(0x0, chip_data->mscm_base + MSCM_IRSPRC(hwirq));
-> +
-> +	irq_chip_mask_parent(data);
-> +}
-> +
-> +static struct irq_chip vf610_mscm_irq_chip = {
-> +	.name			= "MSCM_IR",
-> +	.irq_mask		= irq_chip_mask_parent,
-> +	.irq_unmask		= irq_chip_unmask_parent,
-> +	.irq_eoi		= irq_chip_eoi_parent,
-> +	.irq_enable		= vf610_mscm_enable,
-> +	.irq_disable		= vf610_mscm_disable,
-> +	.irq_retrigger		= irq_chip_retrigger_hierarchy,
-> +	.irq_set_affinity	= irq_chip_set_affinity_parent,
-> +};
-> +
-> +static int vf610_mscm_domain_xlate(struct irq_domain *d,
-> +				struct device_node *controller,
-> +				const u32 *intspec, unsigned int intsize,
-> +				unsigned long *out_hwirq,
-> +				unsigned int *out_type)
-> +{
-> +	if (intsize != 3)
-> +		return -EINVAL;
-> +
-> +	/* MSCM doesn't handle PPI */
-> +	if (intspec[0])
-> +		return -EINVAL;
-> +
-> +	*out_hwirq = intspec[1];
-> +	*out_type = intspec[2] & IRQ_TYPE_SENSE_MASK;
-> +	return 0;
-> +}
-> +
-> +static int vf610_mscm_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> +				   unsigned int nr_irqs, void *arg)
-> +{
-> +	int i;
-> +	irq_hw_number_t hwirq;
-> +	struct of_phandle_args *irq_data = arg;
-> +	struct of_phandle_args gic_data = *irq_data;
-> +
-> +	if (irq_data->args_count != 3)
-> +		return -EINVAL;
-> +
-> +	/* MSCM doesn't handle PPI */
-> +	if (irq_data->args[0])
-> +		return -EINVAL;
-> +
-> +	hwirq = irq_data->args[1];
-> +	for (i = 0; i < nr_irqs; i++)
-> +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
-> +					      &vf610_mscm_irq_chip,
-> +					      domain->host_data);
-> +
-> +	gic_data.np = domain->parent->of_node;
-> +	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &gic_data);
-> +}
-> +
-> +static const struct irq_domain_ops mscm_irq_domain_ops = {
-> +	.xlate = vf610_mscm_domain_xlate,
-> +	.alloc = vf610_mscm_domain_alloc,
-> +	.free = irq_domain_free_irqs_common,
-> +};
-> +
-> +static int __init vf610_mscm_of_init(struct device_node *node,
-> +			       struct device_node *parent)
-> +{
-> +	struct irq_domain *domain, *domain_parent;
-> +	int ret;
-> +
-> +	domain_parent = irq_find_host(parent);
-> +	if (!domain_parent) {
-> +		pr_err("vf610_mscm: interrupt-parent not found\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	chip_data = kzalloc(sizeof(*chip_data), GFP_KERNEL);
-> +	if (!chip_data)
+> +	skb = bt_skb_alloc(len, GFP_KERNEL);
+> +	if (!skb)
 > +		return -ENOMEM;
 > +
-> +	chip_data->mscm_base = of_io_request_and_map(node, 0, "mscm");
+> +	memset(skb->data, 0x00, len);
+> +	*skb_put(skb, 1) = H4_NEG_PKT;
+> +	neg_hdr = (struct h4p_neg_hdr *)skb_put(skb, sizeof(*neg_hdr));
+> +	neg_cmd = (struct h4p_neg_cmd *)skb_put(skb, sizeof(*neg_cmd));
 > +
-> +	if (!chip_data->mscm_base) {
-> +		pr_err("vf610_mscm: unable to map mscm register\n");
-> +		ret = -ENOMEM;
-> +		goto out_free;
+> +	neg_hdr->dlen = sizeof(*neg_cmd);
+> +	neg_cmd->ack = H4P_NEG_REQ;
+> +	neg_cmd->baud = cpu_to_le16(BT_BAUDRATE_DIVIDER/MAX_BAUD_RATE);
+> +	neg_cmd->proto = H4P_PROTO_BYTE;
+> +	neg_cmd->sys_clk = cpu_to_le16(sysclk);
+> +
+> +	h4p_change_speed(info, INIT_SPEED);
+> +
+> +	h4p_set_rts(info, 1);
+> +	info->init_error = 0;
+> +	init_completion(&info->init_completion);
+> +
+> +	h4p_simple_send_frame(info, skb);
+> +
+> +	if (!wait_for_completion_interruptible_timeout(&info->init_completion,
+> +						       msecs_to_jiffies(1000))) {
+> +		printk("h4p: negotiation did not return\n");
+
+Memory leak in the error case
+
+> +		return -ETIMEDOUT;
 > +	}
 > +
-> +	domain = irq_domain_add_hierarchy(domain_parent, 0,
-> +					  MSCM_IRSPRC_NUM, node,
-> +					  &mscm_irq_domain_ops, chip_data);
-> +	if (!domain) {
-> +		ret = -ENOMEM;
-> +		goto out_unmap;
-> +	}
+> +	if (info->init_error < 0)
+> +		return info->init_error;
 > +
-> +	chip_data->cpu_mask = 0x1 <<
-> +		readl_relaxed(chip_data->mscm_base + MSCM_CPxNUM);
-
-That's a bit hard to read. Put it on the same line.
-
+> +	/* Change to operational settings */
+> +	h4p_set_auto_ctsrts(info, 0, UART_EFR_RTS);
+> +	h4p_set_rts(info, 0);
+> +	h4p_change_speed(info, MAX_BAUD_RATE);
 > +
-> +	cpu_pm_register_notifier(&mscm_notifier_block);
+> +	err = h4p_wait_for_cts(info, 1, 100);
+> +	if (err < 0)
+> +		return err;
 > +
+> +	h4p_set_auto_ctsrts(info, 1, UART_EFR_RTS);
+> +	init_completion(&info->init_completion);
+> +	err = h4p_send_alive_packet(info);
+> +
+> +	if (err < 0)
+> +		return err;
+> +
+> +	if (!wait_for_completion_interruptible_timeout(&info->init_completion,
+> +				msecs_to_jiffies(1000)))
+> +		return -ETIMEDOUT;
+> +
+> +	if (info->init_error < 0)
+> +		return info->init_error;
+> +
+> +	printk("Negotiation successful\n");
 > +	return 0;
-> +
-> +out_unmap:
-> +	iounmap(chip_data->mscm_base);
-> +out_free:
-> +	kfree(chip_data);
-> +	return ret;
 > +}
-> +IRQCHIP_DECLARE(vf610_mscm, "fsl,vf610-mscm", vf610_mscm_of_init);
-> 
 
-Otherwise, looks pretty good to me.
 
-Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> +static unsigned int h4p_get_data_len(struct h4p_info *info,
+> +					 struct sk_buff *skb)
+> +{
+> +	long retval = -1;
+> +	struct hci_acl_hdr *acl_hdr;
+> +	struct hci_sco_hdr *sco_hdr;
+> +	struct hci_event_hdr *evt_hdr;
+> +	struct h4p_neg_hdr *neg_hdr;
+> +	struct h4p_alive_hdr *alive_hdr;
+> +	struct h4p_radio_hdr *radio_hdr;
+> +
+> +	switch (bt_cb(skb)->pkt_type) {
+> +	case H4_EVT_PKT:
+> +		evt_hdr = (struct hci_event_hdr *)skb->data;
+> +		retval = evt_hdr->plen;
+> +		break;
+> +	case H4_ACL_PKT:
+> +		acl_hdr = (struct hci_acl_hdr *)skb->data;
+> +		retval = le16_to_cpu(acl_hdr->dlen);
+
+Could you explain, why only this needs endianness converted?
+
+> +		break;
+> +	case H4_SCO_PKT:
+> +		sco_hdr = (struct hci_sco_hdr *)skb->data;
+> +		retval = sco_hdr->dlen;
+> +		break;
+> +	case H4_RADIO_PKT:
+> +		radio_hdr = (struct h4p_radio_hdr *)skb->data;
+> +		retval = radio_hdr->dlen;
+> +		break;
+> +	case H4_NEG_PKT:
+> +		neg_hdr = (struct h4p_neg_hdr *)skb->data;
+> +		retval = neg_hdr->dlen;
+> +		break;
+> +	case H4_ALIVE_PKT:
+> +		alive_hdr = (struct h4p_alive_hdr *)skb->data;
+> +		retval = alive_hdr->dlen;
+> +		break;
+> +	}
+> +
+> +	return retval;
+> +}
+
+
+
+> +static void h4p_rx_tasklet(unsigned long data)
+> +{
+> +	u8 byte;
+> +	struct h4p_info *info = (struct h4p_info *)data;
+> +
+> +	BT_DBG("tasklet woke up");
+> +	BT_DBG("rx_tasklet woke up");
+
+Isn't this a bit redundant?
+
+> +
+> +	while (h4p_inb(info, UART_LSR) & UART_LSR_DR) {
+> +		byte = h4p_inb(info, UART_RX);
+> +		BT_DBG("[in: %02x]", byte);
+> +		if (info->garbage_bytes) {
+> +			info->garbage_bytes--;
+> +			continue;
+> +		}
+> +		if (info->rx_skb == NULL) {
+> +			info->rx_skb = bt_skb_alloc(HCI_MAX_FRAME_SIZE,
+> +						    GFP_ATOMIC | GFP_DMA);
+> +			if (!info->rx_skb) {
+> +				dev_err(info->dev,
+> +					"No memory for new packet\n");
+> +				goto finish_rx;
+> +			}
+> +			info->rx_state = WAIT_FOR_PKT_TYPE;
+> +			info->rx_skb->dev = (void *)info->hdev;
+> +		}
+> +		info->hdev->stat.byte_rx++;
+> +		h4p_handle_byte(info, byte);
+> +	}
+> +
+> +	if (!info->rx_enabled) {
+> +		if (h4p_inb(info, UART_LSR) & UART_LSR_TEMT &&
+> +						  info->autorts) {
+> +			__h4p_set_auto_ctsrts(info, 0 , UART_EFR_RTS);
+> +			info->autorts = 0;
+> +		}
+> +		/* Flush posted write to avoid spurious interrupts */
+> +		h4p_inb(info, UART_OMAP_SCR);
+> +		h4p_set_clk(info, &info->rx_clocks_en, 0);
+> +	}
+> +
+> +finish_rx:
+> +	BT_DBG("rx_ended");
+> +}
+> +
+> +static void h4p_tx_tasklet(unsigned long data)
+> +{
+> +	unsigned int sent = 0;
+> +	struct sk_buff *skb;
+> +	struct h4p_info *info = (struct h4p_info *)data;
+> +
+> +	BT_DBG("tasklet woke up");
+> +	BT_DBG("tx_tasklet woke up");
+
+Doubled?
+
+> +	if (info->autorts != info->rx_enabled) {
+> +		if (h4p_inb(info, UART_LSR) & UART_LSR_TEMT) {
+> +			if (info->autorts && !info->rx_enabled) {
+> +				__h4p_set_auto_ctsrts(info, 0,
+> +							  UART_EFR_RTS);
+> +				info->autorts = 0;
+> +			}
+> +			if (!info->autorts && info->rx_enabled) {
+> +				__h4p_set_auto_ctsrts(info, 1,
+> +							  UART_EFR_RTS);
+> +				info->autorts = 1;
+> +			}
+> +		} else {
+> +			h4p_outb(info, UART_OMAP_SCR,
+> +				     h4p_inb(info, UART_OMAP_SCR) |
+> +				     UART_OMAP_SCR_EMPTY_THR);
+> +			goto finish_tx;
+> +		}
+> +	}
+> +
+> +	skb = skb_dequeue(&info->txq);
+> +	if (!skb) {
+> +		/* No data in buffer */
+> +		BT_DBG("skb ready");
+> +		if (h4p_inb(info, UART_LSR) & UART_LSR_TEMT) {
+> +			h4p_outb(info, UART_IER,
+> +				     h4p_inb(info, UART_IER) &
+> +				     ~UART_IER_THRI);
+> +			h4p_inb(info, UART_OMAP_SCR);
+> +			h4p_disable_tx(info);
+> +			return;
+> +		}
+> +		h4p_outb(info, UART_OMAP_SCR,
+> +			     h4p_inb(info, UART_OMAP_SCR) |
+> +			     UART_OMAP_SCR_EMPTY_THR);
+> +		goto finish_tx;
+> +	}
+> +
+> +	/* Copy data to tx fifo */
+> +	while (!(h4p_inb(info, UART_OMAP_SSR) & UART_OMAP_SSR_TXFULL) &&
+> +	       (sent < skb->len)) {
+> +		//printk("[Out: %02x]", skb->data[sent]);
+> +		//printk("%02x ", skb->data[sent]);
+> +		h4p_outb(info, UART_TX, skb->data[sent]);
+> +		sent++;
+> +	}
+> +
+> +	info->hdev->stat.byte_tx += sent;
+> +	if (skb->len == sent) {
+> +		kfree_skb(skb);
+> +	} else {
+> +		skb_pull(skb, sent);
+> +		skb_queue_head(&info->txq, skb);
+> +	}
+> +
+> +	h4p_outb(info, UART_OMAP_SCR, h4p_inb(info, UART_OMAP_SCR) &
+> +						     ~UART_OMAP_SCR_EMPTY_THR);
+> +	h4p_outb(info, UART_IER, h4p_inb(info, UART_IER) |
+> +						 UART_IER_THRI);
+> +
+> +finish_tx:
+> +	/* Flush posted write to avoid spurious interrupts */
+> +	h4p_inb(info, UART_OMAP_SCR);
+> +
+> +}
