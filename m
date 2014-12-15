@@ -1,23 +1,43 @@
-From: j.w.r.degoede@gmail.com (Hans de Goede)
-Date: Mon, 15 Dec 2014 17:30:04 +0100
-Subject: Linus' tree (master) not working for Allwinner sun4i, sun5i, sun7i
- SoC-s + fix
-Message-ID: <548F0C8C.3030006@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 15 Dec 2014 17:32:12 +0100
+Subject: [PATCH 20/27] ARM: mvebu: armada-xp-lenovo-ix4-300d: Relicense
+ the device tree under GPLv2+/X11
+In-Reply-To: <CAGHj7OKw00-YCoekDHWrz1_eu0kfxVpqNPVcKcKY0rVJ=FhT=g@mail.gmail.com>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>	<1418657915-22775-21-git-send-email-gregory.clement@free-electrons.com>
+ <CAGHj7OKw00-YCoekDHWrz1_eu0kfxVpqNPVcKcKY0rVJ=FhT=g@mail.gmail.com>
+Message-ID: <548F0D0C.3060703@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Benoit,
 
-Somehow this commit of your sunxi/clocks-for-3.19 branch has made it into Linus' tree:
+On 15/12/2014 17:21, Benoit Masson wrote:
+> 
+> Le 15 d?c. 2014 16:39, "Gregory CLEMENT" <gregory.clement at free-electrons.com <mailto:gregory.clement@free-electrons.com>> a ?crit :
+>>
+>> The current GPL only licensing on the device tree makes it very
+>> impractical for other software components licensed under another
+>> license.
+>>
+>> In order to make it easier for them to reuse our device trees,
+>> relicense our device trees under a GPL/X11 dual-license.
+>>
+>> Cc: Arnaud Ebalard <arno at natisbad.org <mailto:arno@natisbad.org>>
+>> Cc: Benoit Masson <yahoo at perenite.com <mailto:yahoo@perenite.com>>
+>> Cc: Sebastian Hesselbarth <sebastian.hesselbarth at gmail.com <mailto:sebastian.hesselbarth@gmail.com>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement at free-electrons.com <mailto:gregory.clement@free-electrons.com>>
+[...]
+>>
+> Ack-by Benoit Masson <yahoo at perenite.com <mailto:yahoo@perenite.com>>
+> 
 
-https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?h=sunxi/clocks-for-3.19&id=93746e70be83a3f113134a16065957b324af50f7
+Thanks,
 
-But this one has not:
+Gregory
 
-https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?h=sunxi/clocks-for-3.19&id=acbcc0f03b15585387f9ca69c2a976b02cb69023
 
-Rather badly breaking Allwinner sun4i, sun5i, sun7i SoC-s.
-
-Regards,
-
-Hans
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
