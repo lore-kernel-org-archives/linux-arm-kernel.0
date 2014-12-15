@@ -1,103 +1,126 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 16 Dec 2014 00:22:21 +0100
-Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20141215232221.GD19261@kw.sim.vm.gnt>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 15 Dec 2014 15:25:27 -0800
+Subject: [PATCH v2 1/3] mmc: core: Add mmc_regulator_set_vqmmc()
+Message-ID: <1418685929-13096-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 04:38:16PM +0100, Gregory CLEMENT wrote:
-> The current GPL only licensing on the device tree makes it very
-> impractical for other software components licensed under another
-> license.
-> 
-> In order to make it easier for them to reuse our device trees,
-> relicense our device trees under a GPL/X11 dual-license.
-> 
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Greg Ungerer <gerg@uclinux.org>
-> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> Cc: Simon Baatz <gmbnomis@gmail.com>
-> Cc: Simon Guinot <simon.guinot@sequanux.org>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Willy Tarreau <w@1wt.eu>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-370-xp.dtsi | 40 +++++++++++++++++++++++++++++++++---
->  1 file changed, 37 insertions(+), 3 deletions(-)
+This adds logic to the MMC core to set VQMMC.  This is expected to be
+called by MMC drivers like dw_mmc as part of (or instead of) their
+start_signal_voltage_switch() callback.
 
-Hi Gregory,
+A few notes:
 
-NAK for me.
+* When setting the signal voltage to 3.3V we do our best to make VQMMC
+  and VMMC match.  It's been reported that this makes some old cards
+  happy since they were tested back in the day before UHS when VQMMC
+  and VMMC were provided by the same regulator.  A nice side effect of
+  this is that we don't end up on the hairy edge of VQMMC (2.7V),
+  which some EEs claim is a little too close to the minimum for
+  comfort.
 
-Simon
+* When setting the signal voltage to 1.8V or 1.2V we aim for that
+  specific voltage instead of picking the lowest one in the range.
 
-> 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 1af428602748..8a322ad57e5f 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -8,9 +8,43 @@
->   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->   * Ben Dooks <ben.dooks@codethink.co.uk>
->   *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   *
->   * This file contains the definitions that are common to the Armada
->   * 370 and Armada XP SoC.
-> -- 
-> 1.9.1
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141216/51af022a/attachment.sig>
+* We very purposely don't print errors in mmc_regulator_set_vqmmc().
+  There are cases where the MMC core will try several different
+  voltages and we don't want to pollute the logs.
+
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+Changes in v2:
+- Now use existing regulator_set_voltage_tol() function.
+
+ drivers/mmc/core/core.c  | 51 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mmc/host.h |  7 +++++++
+ 2 files changed, 58 insertions(+)
+
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 9584bff..670dc65 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -1333,6 +1333,57 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
+ }
+ EXPORT_SYMBOL_GPL(mmc_regulator_set_ocr);
+ 
++static int mmc_regulator_set_voltage_if_supported(struct regulator *regulator,
++						  int new_uV, int tol_uV)
++{
++	/*
++	 * Check if supported first to avoid errors since we may try several
++	 * signal levels during power up and don't want to show errors.
++	 */
++	if (!regulator_is_supported_voltage_tol(regulator, new_uV, tol_uV))
++		return -EINVAL;
++
++	return regulator_set_voltage_tol(regulator, new_uV, tol_uV);
++}
++
++/**
++ * mmc_regulator_set_vqmmc - Set VQMMC as per the ios
++ *
++ * For 3.3V signaling, we try to match VQMMC to VMMC as closely as possible.
++ * That will match the behavior of old boards where VQMMC and VMMC were supplied
++ * by the same supply.  The Bus Operating conditions for 3.3V signaling in the
++ * SD card spec also define VQMMC in terms of VMMC.
++ *
++ * For 1.2V and 1.8V signaling we'll try to get as close as possible to the
++ * requested voltage.  This is definitely a good idea for UHS where there's a
++ * separate regulator on the card that's trying to make 1.8V and it's best if
++ * we match.
++ *
++ * This function is expected to be used by a controller's
++ * start_signal_voltage_switch() function.
++ */
++int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios)
++{
++	/* If no vqmmc supply then we can't change the voltage */
++	if (IS_ERR(mmc->supply.vqmmc))
++		return -EINVAL;
++
++	switch (ios->signal_voltage) {
++	case MMC_SIGNAL_VOLTAGE_120:
++		return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
++			1200000, 100000);
++	case MMC_SIGNAL_VOLTAGE_180:
++		return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
++			1800000, 100000);
++	case MMC_SIGNAL_VOLTAGE_330:
++		return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
++			regulator_get_voltage(mmc->supply.vmmc), 300000);
++	default:
++		return -EINVAL;
++	}
++}
++EXPORT_SYMBOL_GPL(mmc_regulator_set_vqmmc);
++
+ #endif /* CONFIG_REGULATOR */
+ 
+ int mmc_regulator_get_supply(struct mmc_host *mmc)
+diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+index 9f32270..524d6fc 100644
+--- a/include/linux/mmc/host.h
++++ b/include/linux/mmc/host.h
+@@ -416,6 +416,7 @@ int mmc_regulator_get_ocrmask(struct regulator *supply);
+ int mmc_regulator_set_ocr(struct mmc_host *mmc,
+ 			struct regulator *supply,
+ 			unsigned short vdd_bit);
++int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios);
+ #else
+ static inline int mmc_regulator_get_ocrmask(struct regulator *supply)
+ {
+@@ -428,6 +429,12 @@ static inline int mmc_regulator_set_ocr(struct mmc_host *mmc,
+ {
+ 	return 0;
+ }
++
++static inline int mmc_regulator_set_vqmmc(struct mmc_host *mmc,
++					  struct mmc_ios *ios)
++{
++	return -EINVAL;
++}
+ #endif
+ 
+ int mmc_regulator_get_supply(struct mmc_host *mmc);
+-- 
+2.2.0.rc0.207.ga3a616c
