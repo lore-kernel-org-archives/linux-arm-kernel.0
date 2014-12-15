@@ -1,46 +1,34 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 15 Dec 2014 22:41:02 +0100
-Subject: 3.18: lockdep problems in cpufreq
-In-Reply-To: <20141215174336.GJ11285@n2100.arm.linux.org.uk>
-References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
- <003501d01876$fbc53f80$f34fbe80$%brar@samsung.com>
- <20141215174336.GJ11285@n2100.arm.linux.org.uk>
-Message-ID: <3353119.0CuA8fKaup@vostro.rjw.lan>
+Date: Mon, 15 Dec 2014 22:45:35 +0100
+Subject: [PATCH 1/5] genirq: Support mixing IRQF_NO_SUSPEND/IRQF_SUSPEND
+ on shared irqs
+In-Reply-To: <1418660152-17185-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1418660152-17185-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <2845526.bsrmWSBaOD@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 15, 2014 05:43:36 PM Russell King - ARM Linux wrote:
-> On Mon, Dec 15, 2014 at 08:24:05PM +0530, Yadwinder Singh Brar wrote:
-> > > The answer may well be to have finer grained locking here:
-> > > 
-> > > - one lock to protect cpufreq_dev_list, which is only ever taken when
-> > >   adding or removing entries from it
-> > > 
-> > > - a second lock to protect cpufreq_dev_count and the calls to
-> > >   cpufreq_register_notifier() and cpufreq_unregister_notifier()
-> > > 
-> > > and you would /never/ take either of those two locks inside each other.
-> > > In other words:
-> > > 
-> > > 	mutex_lock(&cooling_list_lock);
-> > > 	list_add(&cpufreq_dev->node, &cpufreq_dev_list);
-> > > 	mutex_unlock(&cooling_list_lock);
-> > > 
-> > > 	mutex_lock(&cooling_cpufreq_lock);
-> > > 	if (cpufreq_dev_count++ == 0)
-> > > 		cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
-> > > 					  CPUFREQ_POLICY_NOTIFIER);
-> > > 	mutex_unlock(&cooling_cpufreq_lock);
-> > > 
-> > > and similar in the cleanup path.  The notifier itself would only ever
-> > > take the cooling_list_lock.
-> > > 
-> > 
-> > I agree with this approach, if its fine for others also, I can implement
-> > and post patch.
+On Monday, December 15, 2014 05:15:48 PM Boris Brezillon wrote:
+> The current implementation forbid sharing an irq line on devices that do
+> not request the same behavior on suspend/resume (controlled via the
+> IRQF_NO_SUSPEND/IRQF_FORCE_RESUME flags).
+
+IRQF_NO_SUSPEND is practically only for timers and IPIs now.  Any other
+usages are strongly discouraged.
+
+> Add a flag (IRQF_SUSPEND_NOACTION) to specify that you don't want to be
+> called in suspend mode, and that you already took care of disabling the
+> interrupt on the device side.
 > 
-> Yes, please do.
+> The suspend_device_irq will now move actions specifying the
+> IRQF_SUSPEND_NOACTION into a temporary list so that they won't be called
+> when the interrupt is triggered, and resume_irq_actions restores the
+> suspended actions into the active action list.
 
-Indeed.  We have a regression here to fix.
+Why is the current way of handling wakeup interrupts not sufficient?
 
-Rafael
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
