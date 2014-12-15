@@ -1,265 +1,85 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 15 Dec 2014 10:11:32 +0800
-Subject: [PATCH 4/6] ASoC: rockchip-hdmi-audio: add sound driver for hdmi audio
-In-Reply-To: <1418609494-15820-1-git-send-email-ykk@rock-chips.com>
-References: <1418609494-15820-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1418609494-15820-5-git-send-email-ykk@rock-chips.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Mon, 15 Dec 2014 11:32:10 +0900
+Subject: [RFC PATCH 2/2] iommu: rockchip: Handle system-wide and runtime PM
+In-Reply-To: <7ha92sk533.fsf@deeprootsystems.com>
+References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
+ <7h8uiemce7.fsf@deeprootsystems.com>
+ <CAPDyKFo6zH4__Odm+RiJCbvXquAQqaLyCAiXrSN6s3KfQhok=A@mail.gmail.com>
+ <1576771.dIVCOxU0se@vostro.rjw.lan>
+ <CAAFQd5B28WiWUqmbmROJUa3H25R=Y774NuemTZDvkoa=CvZUsw@mail.gmail.com>
+ <7ha92sk533.fsf@deeprootsystems.com>
+Message-ID: <CAAFQd5Bqv_VVTcJ_a7tX2L_3aH=zyGohuCM6mQgAkKn+eHu=6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a sound driver that combines rockchip-i2s cpu_dai and dw-hdmi-codec
-as codec_dai to provide hdmi audio output on rk3288 platforms.
+On Sat, Dec 13, 2014 at 5:04 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Tomasz Figa <tfiga@chromium.org> writes:
+>
+> [...]
+>
+>> We have a power domain, which contains an IOMMU and an IP block, which
+>> can do bus transactions through that IOMMU. Of course the IP block is
+>> not aware of the IOMMU, because this is just an integration detail and
+>> on other platforms using the same IP block the IOMMU might not be
+>> there. This implies that the driver for this IP block should not be
+>> aware of the IOMMU either, which, on the buffer allocation and mapping
+>> side, is achieved by DMA mapping subsystem. We would also want the
+>> IOMMU to be fully transparent to that driver on PM side.
+>
+> An even more exciting problem exists when a CPU is in the same domain as
+> other peripherals, those peripherals are all idle and the power domain
+> is gated. :)
+>
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
+Definitely an exciting problem. :)
 
- sound/soc/rockchip/Kconfig               |   9 ++
- sound/soc/rockchip/Makefile              |   2 +
- sound/soc/rockchip/rockchip_hdmi_audio.c | 208 +++++++++++++++++++++++++++++++
- 3 files changed, 219 insertions(+)
- create mode 100644 sound/soc/rockchip/rockchip_hdmi_audio.c
+Although I think it's quite opposite to ours, because the kernel knows
+when the CPU is online and can simply get() the CPU device from one of
+the running CPUs when onlining it and put() when offlining. The same
+can't be said about IOMMUs, which are essentially bus interfaces for
+other IP blocks, not really standalone devices (more than being
+standalone IPs).
 
-diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
-index e181826..ed2b7f0 100644
---- a/sound/soc/rockchip/Kconfig
-+++ b/sound/soc/rockchip/Kconfig
-@@ -14,3 +14,12 @@ config SND_SOC_ROCKCHIP_I2S
- 	  Say Y or M if you want to add support for I2S driver for
- 	  Rockchip I2S device. The device supports upto maximum of
- 	  8 channels each for play and record.
-+
-+config SND_SOC_ROCKCHIP_HDMI_AUDIO
-+	tristate "ASoC support for Rockchip HDMI audio"
-+	depends on SND_SOC_ROCKCHIP
-+	select SND_SOC_ROCKCHIP_I2S
-+	select SND_SOC_DW_HDMI_AUDIO
-+	help
-+	  Say Y or M here if you want to add support for SoC audio on Rockchip
-+	  HDMI, such as rk3288 hdmi.
-diff --git a/sound/soc/rockchip/Makefile b/sound/soc/rockchip/Makefile
-index b921909..b9185b3 100644
---- a/sound/soc/rockchip/Makefile
-+++ b/sound/soc/rockchip/Makefile
-@@ -1,4 +1,6 @@
- # ROCKCHIP Platform Support
- snd-soc-i2s-objs := rockchip_i2s.o
-+snd-soc-rockchip-hdmi-audio-objs := rockchip_hdmi_audio.o
- 
- obj-$(CONFIG_SND_SOC_ROCKCHIP_I2S) += snd-soc-i2s.o
-+obj-$(CONFIG_SND_SOC_ROCKCHIP_HDMI_AUDIO) += snd-soc-rockchip-hdmi-audio.o
-diff --git a/sound/soc/rockchip/rockchip_hdmi_audio.c b/sound/soc/rockchip/rockchip_hdmi_audio.c
-new file mode 100644
-index 0000000..a1a9c75
---- /dev/null
-+++ b/sound/soc/rockchip/rockchip_hdmi_audio.c
-@@ -0,0 +1,208 @@
-+/*
-+ * rockchip-hdmi-card.c
-+ *
-+ * ROCKCHIP ALSA SoC DAI driver for HDMI audio on rockchip processors.
-+ * Copyright (c) 2014, ROCKCHIP CORPORATION. All rights reserved.
-+ * Authors: Yakir Yang <ykk@rock-chips.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.*
-+ *
-+ */
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+
-+#include <sound/soc.h>
-+#include <sound/pcm.h>
-+#include <sound/jack.h>
-+#include <sound/core.h>
-+#include <sound/pcm_params.h>
-+
-+#include "rockchip_i2s.h"
-+#include "../codecs/dw-hdmi-audio.h"
-+
-+#define DRV_NAME "rockchip-hdmi-audio"
-+
-+struct hdmi_audio_private {
-+	struct snd_soc_jack hdmi_jack;
-+};
-+
-+static int rockchip_hdmi_audio_hw_params(struct snd_pcm_substream *substream,
-+					struct snd_pcm_hw_params *params)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-+	unsigned int dai_fmt = rtd->dai_link->dai_fmt;
-+	int mclk, ret;
-+
-+	switch (params_rate(params)) {
-+	case 8000:
-+	case 16000:
-+	case 24000:
-+	case 32000:
-+	case 48000:
-+	case 64000:
-+	case 96000:
-+		mclk = 12288000;
-+		break;
-+	case 11025:
-+	case 22050:
-+	case 44100:
-+	case 88200:
-+		mclk = 11289600;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	ret = snd_soc_dai_set_fmt(cpu_dai, dai_fmt);
-+	if (ret < 0) {
-+		dev_err(cpu_dai->dev, "failed to set cpu_dai fmt.\n");
-+		return ret;
-+	}
-+
-+	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, mclk, SND_SOC_CLOCK_OUT);
-+	if (ret < 0) {
-+		dev_err(cpu_dai->dev, "failed to set cpu_dai sysclk.\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int hdmi_audio_dai_init(struct snd_soc_pcm_runtime *runtime)
-+{
-+	struct snd_soc_codec *codec = runtime->codec;
-+	struct snd_soc_card *card = runtime->card;
-+	struct hdmi_audio_private *drv = snd_soc_card_get_drvdata(card);
-+
-+	/* Enable headphone jack detection */
-+	snd_soc_jack_new(codec, "HDMI Jack", SND_JACK_LINEOUT,
-+			 &drv->hdmi_jack);
-+
-+	return dw_hdmi_jack_detect(codec, &drv->hdmi_jack);
-+}
-+
-+static struct snd_soc_ops hdmi_audio_dai_ops = {
-+	.hw_params = rockchip_hdmi_audio_hw_params,
-+};
-+
-+static struct snd_soc_dai_link hdmi_audio_dai = {
-+	.name = "RockchipHDMI",
-+	.stream_name = "RockchipHDMI",
-+	.init = hdmi_audio_dai_init,
-+	.ops = &hdmi_audio_dai_ops,
-+	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+		   SND_SOC_DAIFMT_CBS_CFS,
-+};
-+
-+static struct snd_soc_card rockchip_hdmi_audio_card = {
-+	.name = "RockchipHDMI",
-+	.owner = THIS_MODULE,
-+	.dai_link = &hdmi_audio_dai,
-+	.num_links = 1,
-+};
-+
-+static int rockchip_hdmi_audio_probe(struct platform_device *pdev)
-+{
-+	struct snd_soc_card *card = &rockchip_hdmi_audio_card;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct hdmi_audio_private *drv;
-+	int ret;
-+
-+	drv = devm_kzalloc(&pdev->dev, sizeof(*drv), GFP_KERNEL);
-+	if (!drv)
-+		return -ENOMEM;
-+
-+	card->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, &card);
-+	snd_soc_card_set_drvdata(card, drv);
-+
-+	of_property_read_string(np, "codec-name", &hdmi_audio_dai.codec_name);
-+	if (!hdmi_audio_dai.codec_name) {
-+		dev_err(&pdev->dev, "Property 'codec-name' missing !\n");
-+		goto free_priv_data;
-+	}
-+
-+	of_property_read_string(np, "codec-dai-name",
-+				&hdmi_audio_dai.codec_dai_name);
-+	if (!hdmi_audio_dai.codec_dai_name) {
-+		dev_err(&pdev->dev, "Property 'codec-dai-name' missing !\n");
-+		goto free_codec_name;
-+	}
-+
-+	hdmi_audio_dai.cpu_of_node = of_parse_phandle(np, "cpu-of-node", 0);
-+	if (!hdmi_audio_dai.cpu_of_node) {
-+		dev_err(&pdev->dev, "Property 'cpu-of-node' missing !\n");
-+		goto free_codec_dai_name;
-+	}
-+
-+	hdmi_audio_dai.platform_of_node = hdmi_audio_dai.cpu_of_node;
-+
-+	ret = snd_soc_register_card(card);
-+	if (ret) {
-+		dev_err(&pdev->dev, "register card failed (%d)\n", ret);
-+		card->dev = NULL;
-+		goto free_cpu_of_node;
-+	}
-+
-+	dev_info(&pdev->dev, "hdmi audio init success.\n");
-+
-+	return 0;
-+
-+free_cpu_of_node:
-+	hdmi_audio_dai.cpu_of_node = NULL;
-+	hdmi_audio_dai.platform_of_node = NULL;
-+free_codec_dai_name:
-+	hdmi_audio_dai.codec_dai_name = NULL;
-+free_codec_name:
-+	hdmi_audio_dai.codec_name = NULL;
-+free_priv_data:
-+	platform_set_drvdata(pdev, NULL);
-+	devm_kfree(&pdev->dev, drv);
-+	card->dev = NULL;
-+
-+	return ret;
-+}
-+
-+static int rockchip_hdmi_audio_remove(struct platform_device *pdev)
-+{
-+	struct snd_soc_card *card = platform_get_drvdata(pdev);
-+
-+	snd_soc_unregister_card(card);
-+	platform_set_drvdata(pdev, NULL);
-+	card->dev = NULL;
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id rockchip_hdmi_audio_of_match[] = {
-+	{ .compatible = "rockchip,rk3288-hdmi-audio", },
-+	{},
-+};
-+
-+static struct platform_driver rockchip_hdmi_audio_driver = {
-+	.driver = {
-+		.name = DRV_NAME,
-+		.owner = THIS_MODULE,
-+		.of_match_table = rockchip_hdmi_audio_of_match,
-+	},
-+	.probe = rockchip_hdmi_audio_probe,
-+	.remove = rockchip_hdmi_audio_remove,
-+};
-+module_platform_driver(rockchip_hdmi_audio_driver);
-+
-+MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
-+MODULE_DESCRIPTION("Rockchip HDMI Audio ASoC Interface");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:" DRV_NAME);
-+MODULE_DEVICE_TABLE(of, rockchip_hdmi_audio_of_match);
--- 
-2.1.2
+>> Now, for PM related details, they are located in the same power
+>> domain, which means that whenever the power domain is turned off, the
+>> CPU can't access their registers and all the hardware state is gone.
+>> To make the case more interesting, there is no point in programming
+>> the IOMMU unless the device using it is powered on. Similarly, there
+>> is no point in powering the domain on to just access the IOMMU. This
+>> implies that the power domain should be fully controlled by the
+>> stand-alone IP block, while the peripheral IOMMU shouldn't affect its
+>> state and its driver only respond to operations performed by driver of
+>> that stand-alone IP block.
+>
+> Which implies that the IOMMU driver should have it's own set of
+> runtime_suspend/runtime_resume callbacks to properly save/restore state
+> as well.
+
+Yes, but someone needs to be calling them. Right now when genpd is
+used, put()ting the last runtime active device in a domain will
+trigger domain power off and calling .suspend() callbacks, but
+.resume() callback of each device will be called only on first get()
+of this device. This means that get()ting e.g. an video codec device
+will not cause the IOMMU's .resume() callback to be called.
+
+>
+>> A solution like below could work for the above:
+>>
+>> - There is a per-device list of peripheral devices, which need to be
+>> powered on for this device to work.
+>> - Whenever the IOMMU subsystem/driver binds an IOMMU to a device, it
+>> adds the IOMMU device to the list of peripheral devices of that device
+>> (and similarly for removal).
+>> - A runtime PM operation on a device will also perform the same
+>> operation on all its peripheral devices.
+>
+> Yes, that is exactly what we need.
+>
+> I'd rather use the term "dependent" devices rather than peripheral
+> devices, but otherwise it sounds like the right approach to me.
+
+I will leave the terminology to you and other people. I'm not good at
+inventing names. :)
+
+Best regards,
+Tomasz
