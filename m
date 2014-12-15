@@ -1,49 +1,30 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 15 Dec 2014 13:33:59 -0200
-Subject: [PATCH] ARM: dts: imx51-babbage: Fix hang on USB probe
-Message-ID: <1418657639-19589-1-git-send-email-fabio.estevam@freescale.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 15 Dec 2014 15:35:29 +0000
+Subject: [PATCH] iommu/exynos: Fix arm64 allmodconfig build
+In-Reply-To: <548EDDCD.4060203@samsung.com>
+References: <1418648413-32013-1-git-send-email-broonie@kernel.org>
+ <548EDDCD.4060203@samsung.com>
+Message-ID: <20141215153529.GC11764@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the following hang is observed during USB probe:
+On Mon, Dec 15, 2014 at 02:10:37PM +0100, Krzysztof Koz?owski wrote:
 
-[    1.243660] usbcore: registered new interface driver usb-storage
-[    1.261619] ci_hdrc ci_hdrc.1: doesn't support gadget
-[    1.266730] ci_hdrc ci_hdrc.1: EHCI Host Controller
-[    1.272058] ci_hdrc ci_hdrc.1: new USB bus registered, assigned bus number 1
-[    1.290639] ci_hdrc ci_hdrc.1: USB 2.0 started, EHCI 1.00
-[    1.301162] hub 1-0:1.0: USB hub found
-[    1.305248] hub 1-0:1.0: 1 port detected
-(hangs here...)
+> Hi Mark,
 
-Pass the 'regulator-always-on' to make sure that the USB PHY and USB hub are
-properly powered.
+> Few days ago I posted similar patch:
+> https://lkml.org/lkml/2014/12/5/268
+> but no one have picked it up.
 
-Cc: <stable@vger.kernel.org> # 3.16
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx51-babbage.dts | 2 ++
- 1 file changed, 2 insertions(+)
+> Anyway the fix of yours seems fine to me.
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 56569ce..65d3d97 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -137,6 +137,7 @@
- 			regulator-max-microvolt = <5000000>;
- 			gpio = <&gpio2 5 GPIO_ACTIVE_HIGH>;
- 			enable-active-high;
-+			regulator-always-on;
- 		};
- 
- 		reg_usbotg_vbus: regulator at 1 {
-@@ -149,6 +150,7 @@
- 			regulator-max-microvolt = <5000000>;
- 			gpio = <&gpio1 7 GPIO_ACTIVE_HIGH>;
- 			enable-active-high;
-+			regulator-always-on;
- 		};
- 	};
- 
--- 
-1.9.1
+I don't mind either way, it just seemed to be easier to report the bug
+with a patch.  If Jeorg is busy perhaps it can go via the arm64 tree,
+the issue is triggered by the addition of the platform there?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141215/9a3567c7/attachment.sig>
