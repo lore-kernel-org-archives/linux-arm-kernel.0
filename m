@@ -1,67 +1,50 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 15 Dec 2014 17:15:47 +0100
-Subject: [PATCH 0/5] ARM: at91: fix irq_pm_install_action WARNING
-Message-ID: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon, 15 Dec 2014 17:15:51 +0100
+Subject: [PATCH 4/5] rtc: at91: request IRQs with IRQF_SUSPEND_NOACTION
+In-Reply-To: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1418660152-17185-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit cab303be91dc47942bc25de33dc1140123540800 [1] introduced a WARN_ON
-test which triggers a WARNING backtrace on at91 platforms.
-While this WARN_ON is absolutely necessary to warn users that they should
-not mix request with and without IRQF_NO_SUSPEND flags on shared IRQs,
-there is no easy way to solve this issue on at91 platforms.
+The IRQ line connected to RTC blocks are often shared with a timer device
+which request the IRQ with IRQF_NO_SUSPEND.
+Since the RTC drivers are correctly disabling IRQs when entering suspend
+we can safely request the IRQ with IRQF_SUSPEND_NOACTION so that irq core
+can suspend this specific handler.
 
-The main reason is that the init timer is often using a shared irq line
-and thus request this irq with IRQF_NO_SUSPEND flag set, while other
-peripherals request the same irq line without this flag.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/rtc/rtc-at91rm9200.c | 2 +-
+ drivers/rtc/rtc-at91sam9.c   | 3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-We could deal with that by identifying whether a given peripheral is
-connected to the init timer shared irq line and add the IRQF_NO_SUSPEND
-in this case, but this implies adding the logic in all peripheral drivers
-that could be connected to this shared irq.
-
-This series takes the reverse approach: force IRQ users to specify that
-they take care of disabling peripheral interrupts and that IRQ core can
-safely leave the handler in a suspended state without having to bother
-about spurious interrupts.
-This is done by mean of a new IRQF_SUSPEND_NOACTION flag which tells the
-core to move the action handler to a suspended list, thus preventing its
-execution when we are in suspend mode.
-Of course, specifying the IRQF_SUSPEND_NOACTION flag implies taking care
-of masking/unmasking the peripheral interrupts in the suspend/resume
-implementation.
-
-The WARN_ON is kept, but now it is only triggered when (no_suspend_depth +
-suspend_noaction_depth) and nr_actions are unbalanced.
-
-The first patch introduces the IRQF_SUSPEND_NOACTION logic, while other
-patches modify existing at91 drivers to specify this flag (and implement
-suspend/resume if needed).
-
-
-Best Regards,
-
-Boris
-
-[1]https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/kernel/irq/pm.c?id=cab303be91dc47942bc25de33dc1140123540800
-
-Boris Brezillon (5):
-  genirq: Support mixing IRQF_NO_SUSPEND/IRQF_SUSPEND on shared irqs
-  clk: at91: implement suspend/resume for the PMC irqchip
-  watchdog: at91sam9: request the irq with IRQF_NO_SUSPEND
-  rtc: at91: request IRQs with IRQF_SUSPEND_NOACTION
-  tty: serial: atmel: request IRQ with IRQF_SUSPEND_NOACTION
-
- drivers/clk/at91/pmc.c            | 20 ++++++++++-
- drivers/clk/at91/pmc.h            |  1 +
- drivers/rtc/rtc-at91rm9200.c      |  2 +-
- drivers/rtc/rtc-at91sam9.c        |  3 +-
- drivers/tty/serial/atmel_serial.c |  3 +-
- drivers/watchdog/at91sam9_wdt.c   |  3 +-
- include/linux/interrupt.h         | 11 ++++++
- include/linux/irqdesc.h           |  3 ++
- kernel/irq/pm.c                   | 71 +++++++++++++++++++++++++++++++++++++--
- 9 files changed, 109 insertions(+), 8 deletions(-)
-
+diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
+index 70a5d94..0ed504f 100644
+--- a/drivers/rtc/rtc-at91rm9200.c
++++ b/drivers/rtc/rtc-at91rm9200.c
+@@ -401,7 +401,7 @@ static int __init at91_rtc_probe(struct platform_device *pdev)
+ 					AT91_RTC_CALEV);
+ 
+ 	ret = devm_request_irq(&pdev->dev, irq, at91_rtc_interrupt,
+-				IRQF_SHARED,
++				IRQF_SHARED | IRQF_SUSPEND_NOACTION,
+ 				"at91_rtc", pdev);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "IRQ %d already in use.\n", irq);
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index 6b9aaf1..e7f8eed 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -421,7 +421,8 @@ static int at91_rtc_probe(struct platform_device *pdev)
+ 
+ 	/* register irq handler after we know what name we'll use */
+ 	ret = devm_request_irq(&pdev->dev, rtc->irq, at91_rtc_interrupt,
+-				IRQF_SHARED, dev_name(&rtc->rtcdev->dev), rtc);
++				IRQF_SHARED | IRQF_SUSPEND_NOACTION,
++				dev_name(&rtc->rtcdev->dev), rtc);
+ 	if (ret) {
+ 		dev_dbg(&pdev->dev, "can't share IRQ %d?\n", rtc->irq);
+ 		return ret;
 -- 
 1.9.1
