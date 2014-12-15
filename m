@@ -1,50 +1,205 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 15 Dec 2014 17:15:51 +0100
-Subject: [PATCH 4/5] rtc: at91: request IRQs with IRQF_SUSPEND_NOACTION
+Date: Mon, 15 Dec 2014 17:15:48 +0100
+Subject: [PATCH 1/5] genirq: Support mixing IRQF_NO_SUSPEND/IRQF_SUSPEND on
+ shared irqs
 In-Reply-To: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1418660152-17185-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1418660152-17185-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQ line connected to RTC blocks are often shared with a timer device
-which request the IRQ with IRQF_NO_SUSPEND.
-Since the RTC drivers are correctly disabling IRQs when entering suspend
-we can safely request the IRQ with IRQF_SUSPEND_NOACTION so that irq core
-can suspend this specific handler.
+The current implementation forbid sharing an irq line on devices that do
+not request the same behavior on suspend/resume (controlled via the
+IRQF_NO_SUSPEND/IRQF_FORCE_RESUME flags).
+
+Add a flag (IRQF_SUSPEND_NOACTION) to specify that you don't want to be
+called in suspend mode, and that you already took care of disabling the
+interrupt on the device side.
+
+The suspend_device_irq will now move actions specifying the
+IRQF_SUSPEND_NOACTION into a temporary list so that they won't be called
+when the interrupt is triggered, and resume_irq_actions restores the
+suspended actions into the active action list.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/rtc/rtc-at91rm9200.c | 2 +-
- drivers/rtc/rtc-at91sam9.c   | 3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ include/linux/interrupt.h | 11 ++++++++
+ include/linux/irqdesc.h   |  3 ++
+ kernel/irq/pm.c           | 71 +++++++++++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 82 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-index 70a5d94..0ed504f 100644
---- a/drivers/rtc/rtc-at91rm9200.c
-+++ b/drivers/rtc/rtc-at91rm9200.c
-@@ -401,7 +401,7 @@ static int __init at91_rtc_probe(struct platform_device *pdev)
- 					AT91_RTC_CALEV);
+diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+index d9b05b5..aba3f36 100644
+--- a/include/linux/interrupt.h
++++ b/include/linux/interrupt.h
+@@ -57,6 +57,16 @@
+  * IRQF_NO_THREAD - Interrupt cannot be threaded
+  * IRQF_EARLY_RESUME - Resume IRQ early during syscore instead of at device
+  *                resume time.
++ * IRQF_SUSPEND_NOACTION - When sharing an irq, a specific handler can ask to
++ *                         be disabled when entering suspend. This is
++ *                         particularly useful on shared irqs where at least
++ *                         one user is requesting IRQF_NO_SUSPEND while the
++ *                         others don't want to be active on suspend.
++ *                         Setting this flag implies taking the appropriate
++ *                         action to disable device interrupts when entering
++ *                         suspend, otherwise you might experience spurious
++ *                         interrupts.
++ *
+  */
+ #define IRQF_DISABLED		0x00000020
+ #define IRQF_SHARED		0x00000080
+@@ -70,6 +80,7 @@
+ #define IRQF_FORCE_RESUME	0x00008000
+ #define IRQF_NO_THREAD		0x00010000
+ #define IRQF_EARLY_RESUME	0x00020000
++#define IRQF_SUSPEND_NOACTION	0x00040000
  
- 	ret = devm_request_irq(&pdev->dev, irq, at91_rtc_interrupt,
--				IRQF_SHARED,
-+				IRQF_SHARED | IRQF_SUSPEND_NOACTION,
- 				"at91_rtc", pdev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "IRQ %d already in use.\n", irq);
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 6b9aaf1..e7f8eed 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -421,7 +421,8 @@ static int at91_rtc_probe(struct platform_device *pdev)
+ #define IRQF_TIMER		(__IRQF_TIMER | IRQF_NO_SUSPEND | IRQF_NO_THREAD)
  
- 	/* register irq handler after we know what name we'll use */
- 	ret = devm_request_irq(&pdev->dev, rtc->irq, at91_rtc_interrupt,
--				IRQF_SHARED, dev_name(&rtc->rtcdev->dev), rtc);
-+				IRQF_SHARED | IRQF_SUSPEND_NOACTION,
-+				dev_name(&rtc->rtcdev->dev), rtc);
- 	if (ret) {
- 		dev_dbg(&pdev->dev, "can't share IRQ %d?\n", rtc->irq);
- 		return ret;
+diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
+index faf433a..64a577f 100644
+--- a/include/linux/irqdesc.h
++++ b/include/linux/irqdesc.h
+@@ -22,6 +22,7 @@ struct pt_regs;
+  * @handle_irq:		highlevel irq-events handler
+  * @preflow_handler:	handler called before the flow handler (currently used by sparc)
+  * @action:		the irq action chain
++ * @suspended_action:	the irq suspended action chain
+  * @status:		status information
+  * @core_internal_state__do_not_mess_with_it: core internal status information
+  * @depth:		disable-depth, for nested irq_disable() calls
+@@ -54,6 +55,7 @@ struct irq_desc {
+ 	irq_preflow_handler_t	preflow_handler;
+ #endif
+ 	struct irqaction	*action;	/* IRQ action list */
++	struct irqaction	*suspended_action; /* IRQ suspended action list */
+ 	unsigned int		status_use_accessors;
+ 	unsigned int		core_internal_state__do_not_mess_with_it;
+ 	unsigned int		depth;		/* nested irq disables */
+@@ -79,6 +81,7 @@ struct irq_desc {
+ 	unsigned int		nr_actions;
+ 	unsigned int		no_suspend_depth;
+ 	unsigned int		force_resume_depth;
++	unsigned int		suspend_noaction_depth;
+ #endif
+ #ifdef CONFIG_PROC_FS
+ 	struct proc_dir_entry	*dir;
+diff --git a/kernel/irq/pm.c b/kernel/irq/pm.c
+index 3ca5325..45446e1 100644
+--- a/kernel/irq/pm.c
++++ b/kernel/irq/pm.c
+@@ -35,17 +35,24 @@ void irq_pm_install_action(struct irq_desc *desc, struct irqaction *action)
+ {
+ 	desc->nr_actions++;
+ 
++	if (action->flags & IRQF_SUSPEND_NOACTION) {
++		desc->suspend_noaction_depth++;
++		return;
++	}
++
+ 	if (action->flags & IRQF_FORCE_RESUME)
+ 		desc->force_resume_depth++;
+ 
+ 	WARN_ON_ONCE(desc->force_resume_depth &&
+-		     desc->force_resume_depth != desc->nr_actions);
++		     (desc->force_resume_depth +
++		      desc->suspend_noaction_depth) != desc->nr_actions);
+ 
+ 	if (action->flags & IRQF_NO_SUSPEND)
+ 		desc->no_suspend_depth++;
+ 
+ 	WARN_ON_ONCE(desc->no_suspend_depth &&
+-		     desc->no_suspend_depth != desc->nr_actions);
++		     (desc->no_suspend_depth +
++		      desc->suspend_noaction_depth) != desc->nr_actions);
+ }
+ 
+ /*
+@@ -56,6 +63,11 @@ void irq_pm_remove_action(struct irq_desc *desc, struct irqaction *action)
+ {
+ 	desc->nr_actions--;
+ 
++	if (action->flags & IRQF_SUSPEND_NOACTION) {
++		desc->suspend_noaction_depth--;
++		return;
++	}
++
+ 	if (action->flags & IRQF_FORCE_RESUME)
+ 		desc->force_resume_depth--;
+ 
+@@ -63,11 +75,63 @@ void irq_pm_remove_action(struct irq_desc *desc, struct irqaction *action)
+ 		desc->no_suspend_depth--;
+ }
+ 
++/*
++ * Move all irq actions that specifically set IRQF_SUSPEND_NOACTION
++ * into the suspended action list so that they won't be called if an
++ * interrupt happens.
++ */
++static void suspend_irq_actions(struct irq_desc *desc)
++{
++	struct irqaction *action;
++	struct irqaction *suspended_action = NULL;
++
++	for (action = desc->action; action; action = action->next) {
++		if (!(action->flags & IRQF_SUSPEND_NOACTION))
++			continue;
++
++		if (!suspended_action) {
++			suspended_action = action->next;
++		} else {
++			suspended_action->next = action;
++			suspended_action = action;
++		}
++	}
++
++	BUG_ON(!suspended_action);
++	suspended_action->next = NULL;
++}
++
++/*
++ * Restore all irq actions pushed into the suspended action list.
++ */
++static void resume_irq_actions(struct irq_desc *desc)
++{
++	struct irqaction *action;
++
++	if (!desc->suspended_action)
++		return;
++
++	for (action = desc->action; action && action->next;
++	     action = action->next)
++		;
++
++	BUG_ON(!action);
++	action->next = desc->suspended_action;
++	desc->suspended_action = NULL;
++}
++
+ static bool suspend_device_irq(struct irq_desc *desc, int irq)
+ {
+-	if (!desc->action || desc->no_suspend_depth)
++	if (!desc->action)
+ 		return false;
+ 
++	if (desc->no_suspend_depth) {
++		if (desc->no_suspend_depth != desc->nr_actions)
++			suspend_irq_actions(desc);
++
++		return false;
++	}
++
+ 	if (irqd_is_wakeup_set(&desc->irq_data)) {
+ 		irqd_set(&desc->irq_data, IRQD_WAKEUP_ARMED);
+ 		/*
+@@ -131,6 +195,7 @@ EXPORT_SYMBOL_GPL(suspend_device_irqs);
+ static void resume_irq(struct irq_desc *desc, int irq)
+ {
+ 	irqd_clear(&desc->irq_data, IRQD_WAKEUP_ARMED);
++	resume_irq_actions(desc);
+ 
+ 	if (desc->istate & IRQS_SUSPENDED)
+ 		goto resume;
 -- 
 1.9.1
