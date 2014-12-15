@@ -1,62 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Dec 2014 14:58:56 -0800
-Subject: [PATCH 2/2] ARM: OMAP3: clock: fix boot breakage in legacy mode
-In-Reply-To: <7hfvcgixg5.fsf@deeprootsystems.com>
-References: <1418390521-7541-1-git-send-email-t-kristo@ti.com>
- <1418390521-7541-3-git-send-email-t-kristo@ti.com>
- <7hvblgk7q0.fsf@deeprootsystems.com> <548E9417.50502@ti.com>
- <7hfvcgixg5.fsf@deeprootsystems.com>
-Message-ID: <20141215225855.GB23854@atomide.com>
+From: richard@nod.at (Richard Weinberger)
+Date: Tue, 16 Dec 2014 00:10:41 +0100
+Subject: at91: smc configuration using DT
+In-Reply-To: <2463675.Tt7GDs0rfe@wuerfel>
+References: <548F6514.1040706@sigma-star.at> <2463675.Tt7GDs0rfe@wuerfel>
+Message-ID: <548F6A71.30304@nod.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@kernel.org> [141215 10:26]:
-> Tero Kristo <t-kristo@ti.com> writes:
+Am 15.12.2014 um 23:56 schrieb Arnd Bergmann:
+> On Monday 15 December 2014 23:47:48 Richard Weinberger wrote:
+>>
+>> I'm sure I'm missing something.
+>>
+>> One of my boards is still using board files and uses sam9_smc_configure() to
+>> setup NAND timings. I'd like to convert it to DT but I fail to see how to configure the smc.
+>> What is the device tree equivalent of sam9_smc_configure()?
+>>
+>>
 > 
-> > On 12/12/2014 09:07 PM, Kevin Hilman wrote:
-> >> Hi Tero,
-> >>
-> >> Tero Kristo <t-kristo@ti.com> writes:
-> >>
-> >>> The new usage of determine_rate and set_rate_and_parent calls for
-> >>> OMAP DPLLs assumes the DPLLs must have two parents defined, even
-> >>> if it is the same clock. Legacy clock data did not fullfill this
-> >>> requirement and caused a boot crash. Fixed by adding the missing
-> >>> parent information to the DPLL clocks.
-> >>>
-> >>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> >>> Fixes: 2e1a7b014f ("ARM: OMAP3+: DPLL: use determine_rate() and...")
-> >>> Cc: Kevin Hilman <khilman@kernel.org>
-> >>
-> >> I tested this on linux-next (next-20141210, same version where I found
-> >> the bug) and this doesn't fix the boot problem.
-> >>
-> >> BTW, in testing this, I noticed that the OMAP clock code is still
-> >> spitting out compile warnings[1].  These should cleaned up too.
-> >
-> > Did you apply both of my patches from this set?
-> 
-> No, I didn't.  That wasn't clear (to me) from the changelogs.
+> I think it's actually missing, see the series "memory: add Atmel EBI
+> (External Bus Interface) driver" from Boris Brezillon.
 
-The first one Mike is alredy fixing in his clock branch AFAIK.
- 
-> > I think the DPLL fix might be required also to get this working
-> > properly on OMAP3 legacy.
-> 
-> Yup, with both applied, it's now booting fine on omap3-beagle-xm legacy
-> mode.
-> 
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> 
-> And, please add:
-> 
-> Reported-by: Kevin Hilman <khilman@linaro.org>
-> 
-> (c.f. Reported-by section in Documentation/SubmittingPatches).  
+Thanks a lot for your quick reply, Arnd!
 
-I'll queue the second one separately after Mike's clock changes
-hit mainline.
+arch/arm/mach-at91/board-stamp9g20.c was removed by:
 
-Thanks,
+commit fb3642ebb52cfab8eaa52fea677abec4d92182a0
+Author: Nicolas Ferre <nicolas.ferre@atmel.com>
+Date:   Wed Nov 19 10:30:41 2014 +0100
 
-Tony
+    ARM: at91: remove at91sam9260/at91sam9g20 legacy boards files
+
+    Remove old board files that use at91sam9260 or at91sam9g20 Atmel SoCs. The
+    device tree is mature on these SoCs. It must be used now.
+
+    Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+How can this DT work for my board without proper NAND timings?
+
+If I need Boris's patch set first I consider commit fb3642ebb a bit rude as it breaks
+things.
+
+*confused*,
+//richard
