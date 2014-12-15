@@ -1,82 +1,39 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 15 Dec 2014 18:59:24 +0100
-Subject: [PATCH 27/27] ARM: mvebu: armada-xp-synology-ds414: Relicense the
- device tree under GPLv2+/X11
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-28-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <87fvcglrpf.fsf@natisbad.org>
+Date: Mon, 15 Dec 2014 19:00:57 +0100
+Subject: [PATCHv0 2/5] ARM: mvebu: ISL12057 rtc chip can be used to wake
+ up RN102
+In-Reply-To: <20141215135308.GB967@titan.lakedaemon.net> (Jason Cooper's
+ message of "Mon, 15 Dec 2014 08:53:08 -0500")
+References: <cover.1418519430.git.arno@natisbad.org>
+ <b7208bdcd16dbc511d7ae6dd47aee91ab81f54f4.1418519430.git.arno@natisbad.org>
+ <20141215135308.GB967@titan.lakedaemon.net>
+Message-ID: <877fxskd2e.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
+Jason Cooper <jason@lakedaemon.net> writes:
 
-> The current GPL only licensing on the device tree makes it very
-> impractical for other software components licensed under another
-> license.
+> On Sun, Dec 14, 2014 at 02:42:28AM +0100, Arnaud Ebalard wrote:
+>> 
+>> Now that alarm support for ISL12057 chip is available, let's use a
+>> feature of the driver dedicated to NETGEAR ReadyNAS 102 specific
+>> routing of RTC IRQ#2 pin; on the device, this pin is not connected
+>> to the SoC but to a PMIC, which allows the device to be powered
+>> up when RTC alarm rings.
+>> 
+>> For that to work, the chip needs to be explicitly marked as a
+>> device wakeup source using the "can-wakeup-machine" boolean
+>> property. This makes 'wakealarm' sysfs entry available to
+>> configure the alarm.
+>> 
+>> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+>> ---
+>>  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 1 +
+>>  1 file changed, 1 insertion(+)
 >
-> In order to make it easier for them to reuse our device trees,
-> relicense our device trees under a GPL/X11 dual-license.
->
-> Cc: Arnaud Ebalard <arno@natisbad.org>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Please group patches 2 - 4 into one patch.
 
-Acked-by: Arnaud Ebalard <arno@natisbad.org>
+Will do.
 
-
-> ---
->  arch/arm/boot/dts/armada-xp-synology-ds414.dts | 41 +++++++++++++++++++++++---
->  1 file changed, 37 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-xp-synology-ds414.dts b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
-> index 749fdba5a642..e9fb225169aa 100644
-> --- a/arch/arm/boot/dts/armada-xp-synology-ds414.dts
-> +++ b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
-> @@ -3,10 +3,43 @@
->   *
->   * Copyright (C) 2014, Arnaud EBALARD <arno@natisbad.org>
->   *
-> - * This program is free software; you can redistribute it and/or
-> - * modify it under the terms of the GNU General Public License
-> - * as published by the Free Software Foundation; either version
-> - * 2 of the License, or (at your option) any later version.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   *
->   * Note: this Device Tree assumes that the bootloader has remapped the
->   * internal registers to 0xf1000000 (instead of the old 0xd0000000).
+a+
