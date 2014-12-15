@@ -1,54 +1,62 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Sun, 14 Dec 2014 23:28:06 -0800
-Subject: [PATCH v15 09/11] KVM: arm64: Add HYP interface to flush VM Stage 1/2
- TLB entires
-In-Reply-To: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
-References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1418628488-3696-10-git-send-email-m.smarduch@samsung.com>
+From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
+Date: Mon, 15 Dec 2014 15:30:34 +0800
+Subject: [PATCH v2 3/4] mmc: sdhci: add a quirk for single block transactions
+In-Reply-To: <1418628635-3436-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1418628635-3436-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <1418628635-3436-4-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for arm64 hyp interface to flush all TLBs associated
-with VMID.
+This patch defines a quirk to disable the block count
+for single block transactions.
+It is a preparation and will be used by Fujitsu
+SDHCI controller f_sdh30 driver.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
 ---
- arch/arm64/kvm/hyp.S | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/mmc/host/sdhci.c  | 8 +++++---
+ include/linux/mmc/sdhci.h | 2 ++
+ 2 files changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index b72aa9f..6e1b5df 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -1030,6 +1030,28 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
- 	ret
- ENDPROC(__kvm_tlb_flush_vmid_ipa)
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index b319c10..5581b16 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -911,7 +911,7 @@ static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
+ static void sdhci_set_transfer_mode(struct sdhci_host *host,
+ 	struct mmc_command *cmd)
+ {
+-	u16 mode;
++	u16 mode = 0;
+ 	struct mmc_data *data = cmd->data;
  
-+/**
-+ * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
-+ * @struct kvm *kvm - pointer to kvm structure
-+ *
-+ * Invalidates all Stage 1 and 2 TLB entries for current VMID.
-+ */
-+ENTRY(__kvm_tlb_flush_vmid)
-+	dsb     ishst
+ 	if (data == NULL) {
+@@ -929,9 +929,11 @@ static void sdhci_set_transfer_mode(struct sdhci_host *host,
+ 
+ 	WARN_ON(!host->data);
+ 
+-	mode = SDHCI_TRNS_BLK_CNT_EN;
++	if (!(host->quirks2 & SDHCI_QUIRK2_SUPPORT_SINGLE))
++		mode = SDHCI_TRNS_BLK_CNT_EN;
 +
-+	kern_hyp_va     x0
-+	ldr     x2, [x0, #KVM_VTTBR]
-+	msr     vttbr_el2, x2
-+	isb
-+
-+	tlbi    vmalls12e1is
-+	dsb     ish
-+	isb
-+
-+	msr     vttbr_el2, xzr
-+	ret
-+ENDPROC(__kvm_tlb_flush_vmid)
-+
- ENTRY(__kvm_flush_vm_context)
- 	dsb	ishst
- 	tlbi	alle1is
+ 	if (mmc_op_multi(cmd->opcode) || data->blocks > 1) {
+-		mode |= SDHCI_TRNS_MULTI;
++		mode = SDHCI_TRNS_BLK_CNT_EN | SDHCI_TRNS_MULTI;
+ 		/*
+ 		 * If we are sending CMD23, CMD12 never gets sent
+ 		 * on successful completion (so no Auto-CMD12).
+diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
+index dd2ba4b..2e048f4 100644
+--- a/include/linux/mmc/sdhci.h
++++ b/include/linux/mmc/sdhci.h
+@@ -108,6 +108,8 @@ struct sdhci_host {
+ #define SDHCI_QUIRK2_CAPS_BIT63_FOR_HS400		(1<<11)
+ /* forced tuned clock */
+ #define SDHCI_QUIRK2_TUNING_WORK_AROUND			(1<<12)
++/* disable the block count for single block transactions */
++#define SDHCI_QUIRK2_SUPPORT_SINGLE			(1<<13)
+ 
+ 	int irq;		/* Device IRQ */
+ 	void __iomem *ioaddr;	/* Mapped address */
 -- 
-1.9.1
+1.9.0
