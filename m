@@ -1,10 +1,10 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 15 Dec 2014 18:58:53 +0100
-Subject: [PATCH 22/27] ARM: mvebu: armada-xp-mv78230: Relicense the device
+Date: Mon, 15 Dec 2014 18:59:03 +0100
+Subject: [PATCH 23/27] ARM: mvebu: armada-xp-mv78260: Relicense the device
  tree under GPLv2+/X11
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-23-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <871to0n6aq.fsf@natisbad.org>
+ <1418657915-22775-24-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <87tx0wlrq0.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,25 +18,24 @@ Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 > In order to make it easier for them to reuse our device trees,
 > relicense our device trees under a GPL/X11 dual-license.
 >
-> Cc: Andrew Lunn <andrew@lunn.ch>
 > Cc: Arnaud Ebalard <arno@natisbad.org>
 > Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
 > Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Willy Tarreau <w@1wt.eu>
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Acked-by: Arnaud Ebalard <arno@natisbad.org>
 
 
 > ---
->  arch/arm/boot/dts/armada-xp-mv78230.dtsi | 40 +++++++++++++++++++++++++++++---
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 40 +++++++++++++++++++++++++++++---
 >  1 file changed, 37 insertions(+), 3 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> index 281ccd24295c..6e6d0f04bf2b 100644
-> --- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+> diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+> index d7a8d0b0f385..4a7cbed79b07 100644
+> --- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
 > @@ -5,9 +5,43 @@
 >   *
 >   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
@@ -82,5 +81,5 @@ Acked-by: Arnaud Ebalard <arno@natisbad.org>
 > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 > + *     OTHER DEALINGS IN THE SOFTWARE.
 >   *
->   * Contains definitions specific to the Armada XP MV78230 SoC that are not
+>   * Contains definitions specific to the Armada XP MV78260 SoC that are not
 >   * common to all Armada XP SoCs.
