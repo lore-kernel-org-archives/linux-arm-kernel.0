@@ -1,74 +1,40 @@
-From: uwe@kleine-koenig.org (=?windows-1252?Q?Uwe_Kleine-K=F6nig?=)
-Date: Mon, 15 Dec 2014 20:36:34 +0100
-Subject: RFC: new dt property "can-wakeup-machine" [Was: [PATCHv0 1/5] rtc:
- rtc-isl12057: add alarm support to Intersil ISL12057 RTC driver]
-In-Reply-To: <c38e3f1a4254e0d8db409ad87ba824c3383d0998.1418519430.git.arno@natisbad.org>
-References: <cover.1418519430.git.arno@natisbad.org>
- <c38e3f1a4254e0d8db409ad87ba824c3383d0998.1418519430.git.arno@natisbad.org>
-Message-ID: <548F3842.1010605@kleine-koenig.org>
+From: ddutile@redhat.com (Don Dutile)
+Date: Mon, 15 Dec 2014 14:38:12 -0500
+Subject: [PATCH 0/3] Add support for APM X-Gene SoC AHBC IOMMU driver.
+In-Reply-To: <1418662523-8458-1-git-send-email-stripathi@apm.com>
+References: <1418662523-8458-1-git-send-email-stripathi@apm.com>
+Message-ID: <548F38A4.5090703@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+You should be cc-ing Mark Langsdorf, not myself, for Xgene kernel support.
 
-I adapted the subject line to make the critical element in this patch
-more obvious.
+also note: I'm already on the IOMMU mailing list, so I'll see such patches via
+that list.
 
-As I wouldn't be surprised to get some discussion about your approach it
-would be beneficial to split this patch into:
+- Don
 
- - add (traditional) alarm support to rtc-isl12057
- - allow the driver to wakeup the machine without the irq being
-   reported to the CPU.
-
-The first patch should not be controversial and the patch to discuss
-gets smaller.
-
-On 12/14/2014 02:42 AM, Arnaud Ebalard wrote:
-> +Example isl12057 node without IRQ#2 pin connected to the SoC but to a
-> +PMIC, allowing the device to be started based on configured alarm:
-> +
-> +	isl12057: isl12057 at 68 {
-> +		compatible = "isil,isl12057";
-> +		reg = <0x68>;
-> +		can-wakeup-machine;
-> +	};
-What if the IRC#1 pin wakes the machine?
-
-And I wonder if there is a more sane approach for this setup that
-wouldn't need specialized driver support.
-
-Something like:
-
-	isl12057: isl12057 at 68 {
-		compatible = "isil,isl12057";
-		reg = <0x68>;
-		interrupt-parent = <&wakeupfoo>;
-		interrupts = <???>
-	};
-
-	wakeupfoo: ... {
-		/*
-		 * This controller cannot report irqs to the cpu, but
-		 * can wake it up.
-		 */
-		....
-	}
-
-Hmm, the bad thing here is that this "interrupt controller" isn't
-suitable to support "normal" interrupts. But maybe it's good enough to
-get into a discussion for a better idea?!
-
-> diff --git a/drivers/rtc/rtc-isl12057.c b/drivers/rtc/rtc-isl12057.c
-> index 6e1fcfb5d7e6..98adc2c1bdb0 100644
-> --- a/drivers/rtc/rtc-isl12057.c
-> +++ b/drivers/rtc/rtc-isl12057.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * rtc-isl12057 - Driver for Intersil ISL12057 I2C Real Time Clock
-> + * rtc-isl12057 - Driver for Intersil ISL12057 I2C Real Time Clock / Alarm
-I wouldn't care here to add "Alarm" at various places. Actually having
-an alarm is a quite usual feature of an rtc. *shrug*
-
-Best regards
-Uwe
+On 12/15/2014 11:55 AM, Suman Tripathi wrote:
+> This patch adds the support for the APM X-Gene SoC AHBC IOMMU driver.
+>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>
+> Suman Tripathi (3):
+>    xgene-ahbc-iommu: Add support for APM X-Gene SoC AHBC IOMMU driver.
+>    arm64: dts: Add the APM X-Gene AHBC IOMMU DTS node.
+>    Documentation: dt-bindings: Add the binding info for APM X-Gene AHBC
+>      IOMMU driver.
+>
+>   .../devicetree/bindings/iommu/xgene,ahbc-iommu.txt |  17 ++
+>   arch/arm64/boot/dts/apm-storm.dtsi                 |   5 +
+>   drivers/iommu/Kconfig                              |  10 +
+>   drivers/iommu/Makefile                             |   1 +
+>   drivers/iommu/xgene-ahbc-iommu.c                   | 336 +++++++++++++++++++++
+>   5 files changed, 369 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/iommu/xgene,ahbc-iommu.txt
+>   create mode 100644 drivers/iommu/xgene-ahbc-iommu.c
+>
+> --
+> 1.8.2.1
+>
