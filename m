@@ -1,92 +1,50 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Sun, 14 Dec 2014 23:28:05 -0800
-Subject: [PATCH v15 08/11] KVM: arm64: ARMv8 header changes for page logging
-In-Reply-To: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
-References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1418628488-3696-9-git-send-email-m.smarduch@samsung.com>
+From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
+Date: Mon, 15 Dec 2014 15:30:33 +0800
+Subject: [PATCH v2 2/4] mmc: sdhci: add a quirk for tuning work around
+In-Reply-To: <1418628635-3436-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1418628635-3436-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <1418628635-3436-3-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds arm64 helpers to write protect pmds/ptes and retrieve
-permissions while logging dirty pages. Also adds prototype to write protect
-a memory slot and adds a pmd define to check for read-only pmds.
+This patch defines a quirk for tuning work
+around for some sdhci host controller. It sets
+both SDHCI_CTRL_EXEC_TUNING and SDHCI_CTRL_TUNED_CLK
+for tuning.
+It is a preparation and will be used by Fujitsu
+SDHCI controller f_sdh30 driver.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
 ---
- arch/arm64/include/asm/kvm_asm.h       |  1 +
- arch/arm64/include/asm/kvm_host.h      |  1 +
- arch/arm64/include/asm/kvm_mmu.h       | 21 +++++++++++++++++++++
- arch/arm64/include/asm/pgtable-hwdef.h |  1 +
- 4 files changed, 24 insertions(+)
+ drivers/mmc/host/sdhci.c  | 2 ++
+ include/linux/mmc/sdhci.h | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 4838421..4f7310f 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -126,6 +126,7 @@ extern char __kvm_hyp_vector[];
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index cd1f311..b319c10 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1929,6 +1929,8 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
  
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
-+extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+ 	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+ 	ctrl |= SDHCI_CTRL_EXEC_TUNING;
++	if (host->quirks2 & SDHCI_QUIRK2_TUNING_WORK_AROUND)
++		ctrl |= SDHCI_CTRL_TUNED_CLK;
+ 	sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
  
- extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ 	/*
+diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
+index 375af80..dd2ba4b 100644
+--- a/include/linux/mmc/sdhci.h
++++ b/include/linux/mmc/sdhci.h
+@@ -106,6 +106,8 @@ struct sdhci_host {
+ #define SDHCI_QUIRK2_CLEAR_TRANSFERMODE_REG_BEFORE_CMD	(1<<10)
+ /* Capability register bit-63 indicates HS400 support */
+ #define SDHCI_QUIRK2_CAPS_BIT63_FOR_HS400		(1<<11)
++/* forced tuned clock */
++#define SDHCI_QUIRK2_TUNING_WORK_AROUND			(1<<12)
  
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 2012c4b..8b60c0f 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -200,6 +200,7 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
- struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
- 
- u64 kvm_call_hyp(void *hypfn, ...);
-+void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
- 
- int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		int exception_index);
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 123b521..f925e40 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -117,6 +117,27 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
- 	pmd_val(*pmd) |= PMD_S2_RDWR;
- }
- 
-+static inline void kvm_set_s2pte_readonly(pte_t *pte)
-+{
-+	pte_val(*pte) = (pte_val(*pte) & ~PTE_S2_RDWR) | PTE_S2_RDONLY;
-+}
-+
-+static inline bool kvm_s2pte_readonly(pte_t *pte)
-+{
-+	return (pte_val(*pte) & PTE_S2_RDWR) == PTE_S2_RDONLY;
-+}
-+
-+static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
-+{
-+	pmd_val(*pmd) = (pmd_val(*pmd) & ~PMD_S2_RDWR) | PMD_S2_RDONLY;
-+}
-+
-+static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
-+{
-+	return (pmd_val(*pmd) & PMD_S2_RDWR) == PMD_S2_RDONLY;
-+}
-+
-+
- #define kvm_pgd_addr_end(addr, end)	pgd_addr_end(addr, end)
- #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
- #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 88174e0..5f930cc 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -119,6 +119,7 @@
- #define PTE_S2_RDONLY		(_AT(pteval_t, 1) << 6)   /* HAP[2:1] */
- #define PTE_S2_RDWR		(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
- 
-+#define PMD_S2_RDONLY		(_AT(pmdval_t, 1) << 6)   /* HAP[2:1] */
- #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
- 
- /*
+ 	int irq;		/* Device IRQ */
+ 	void __iomem *ioaddr;	/* Mapped address */
 -- 
-1.9.1
+1.9.0
