@@ -1,113 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Dec 2014 18:21:37 +0100
-Subject: [PATCH v2 2/4] PCI: iproc: Add Broadcom iProc PCIe driver
-In-Reply-To: <548B2120.4080207@broadcom.com>
-References: <1418351817-14898-3-git-send-email-rjui@broadcom.com>
- <2190666.DfrpWiLTCc@wuerfel> <548B2120.4080207@broadcom.com>
-Message-ID: <1790462.K12S5vem48@wuerfel>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Mon, 15 Dec 2014 18:57:04 +0100
+Subject: [PATCH 01/27] ARM: mvebu: armada-370-db: Relicense the device
+ tree under GPLv2+/X11
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <878ui8pzin.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 December 2014 09:08:48 Ray Jui wrote:
-> 
-> On 12/12/2014 4:29 AM, Arnd Bergmann wrote:
-> > On Thursday 11 December 2014 18:36:55 Ray Jui wrote:
-> >> Add initial version of the Broadcom iProc PCIe driver. This driver
-> >> has been tested on NSP and Cygnus and is expected to work on all iProc
-> >> family of SoCs that deploys the same PCIe host controller
-> >>
-> >> The driver also supports MSI
-> >
-> > Overall, I'm not convinced it's worth continuing this driver. While it
-> > supports more features, Hauke's version seemed much cleaner, and I'd
-> > rather see his driver merged and have you add the additional features.
-> >
-> > Why did you drop him from Cc again?
-> >
-> In fact, Hauke is on the "to" list of all v2 patchset that I sent out. I 
-> added him to the "to" list because he mentioned during v1 patchset 
-> review that he'll help to test this on North Star.
 
-Sorry, my mistake. I looked through the Cc list multiple times but failed
-to see him there.
- 
-> Doesn't Hauke's driver depends on BCMA? In that case, how does it work 
-> on the SoCs that do not have the IP block to support BCMA?
+Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 
-I hadn't realized that there are some SoCs that are not BCMA based.
-As the host controller implementation is closely related, we will
-have to come up with some solution.
+> The current GPL only licensing on the device tree makes it very
+> impractical for other software components licensed under another
+> license.
+>
+> In order to make it easier for them to reuse our device trees,
+> relicense our device trees under a GPL/X11 dual-license.
+>
+> Cc: Arnaud Ebalard <arno@natisbad.org>
+> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: Simon Baatz <gmbnomis@gmail.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-One way to solve this would be by turning the driver into a library
-the same way as the pcie-dw driver, and have separate front-ends
-for it for platform_device and bcma_device.
+Acked-by: Arnaud Ebalard <arno@natisbad.org>
 
-As I mentioned in my other reply, we will likely have the same problem
-in a number of other drivers too, so we could try to come up with
-a way to make bcma_device fit better into the platform_device
-infrastructure, but I wouldn't know how to do that without giving
-it more thought.
 
-> >> +static void iproc_pcie_reset(struct iproc_pcie *pcie)
-> >> +{
-> >> +	u32 val;
-> >> +
-> >> +	/* send a downstream reset */
-> >> +	val = EP_MODE_SURVIVE_PERST | RC_PCIE_RST_OUTPUT;
-> >> +	writel(val, pcie->reg + CLK_CONTROL_OFFSET);
-> >> +	udelay(250);
-> >> +	val &= ~EP_MODE_SURVIVE_PERST;
-> >> +	writel(val, pcie->reg + CLK_CONTROL_OFFSET);
-> >> +	mdelay(250);
-> >> +}
-> >
-> > 250ms delay is not acceptable. Please find a way to call this function
-> > from a context in which you can sleep.
-> >
-> This is called from driver probe, where runs in the process context 
-> where you can sleep. Is my understanding correct? I can change mdelay to 
-> msleep so the CPU does not waste time spinning.
-
-Right, that sounds good.
-
-> >> +	if (nlw == 0) {
-> >> +		/* try GEN 1 link speed */
-> >> +#define PCI_LINK_STATUS_CTRL_2_OFFSET 0xDC
-> >> +#define PCI_TARGET_LINK_SPEED_MASK    0xF
-> >> +#define PCI_TARGET_LINK_SPEED_GEN2    0x2
-> >> +#define PCI_TARGET_LINK_SPEED_GEN1    0x1
-> >> +		pci_bus_read_config_dword(&bus, 0,
-> >> +				PCI_LINK_STATUS_CTRL_2_OFFSET, &val);
-> >> +		if ((val & PCI_TARGET_LINK_SPEED_MASK) ==
-> >> +				PCI_TARGET_LINK_SPEED_GEN2) {
-> >> +			val &= ~PCI_TARGET_LINK_SPEED_MASK;
-> >> +			val |= PCI_TARGET_LINK_SPEED_GEN1;
-> >> +			pci_bus_write_config_dword(&bus, 0,
-> >> +					PCI_LINK_STATUS_CTRL_2_OFFSET, val);
-> >> +			pci_bus_read_config_dword(&bus, 0,
-> >> +					PCI_LINK_STATUS_CTRL_2_OFFSET, &val);
-> >> +			mdelay(100);
-> >
-> > Too much delay.
-> >
-> Need to confirm with the ASIC engineer. The delay may be what's needed.
-
-If you can turn it into msleep here, it's fine. Just don't waste 100
-million CPU cycles for no reason.
-
-> >> +static int __init iproc_pcie_init(void)
-> >> +{
-> >> +	return platform_driver_probe(&iproc_pcie_driver,
-> >> +			iproc_pcie_probe);
-> >> +}
-> >> +subsys_initcall(iproc_pcie_init);
-> >
-> > module_init()? Doesn't seem necessary to have this early.
-> >
-> > 	Arnd
-> >
-> Will look into this. Forgot why we use subsys_initcall here...
-
-Probably copied from other drivers. It used to be required.
-
-	Arnd
+> ---
+>  arch/arm/boot/dts/armada-370-db.dts | 40 ++++++++++++++++++++++++++++++++++---
+>  1 file changed, 37 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+> index 1466580be295..f4990b26dbbd 100644
+> --- a/arch/arm/boot/dts/armada-370-db.dts
+> +++ b/arch/arm/boot/dts/armada-370-db.dts
+> @@ -8,9 +8,43 @@
+>   * Gregory CLEMENT <gregory.clement@free-electrons.com>
+>   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>   *
+> - * This file is licensed under the terms of the GNU General Public
+> - * License version 2.  This program is licensed "as is" without any
+> - * warranty of any kind, whether express or implied.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+>  
+>  /dts-v1/;
