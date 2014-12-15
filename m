@@ -1,30 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Dec 2014 10:25:54 +0000
-Subject: request bitrev patch merge
-In-Reply-To: <20141215095239.GB11285@n2100.arm.linux.org.uk>
-References: <35FD53F367049845BC99AC72306C23D103EDAF89E146@CNBJMBX05.corpusers.net>
- <20141215095239.GB11285@n2100.arm.linux.org.uk>
-Message-ID: <20141215102554.GC11285@n2100.arm.linux.org.uk>
+From: alexanders83@web.de (Alexander Stein)
+Date: Mon, 15 Dec 2014 11:29:14 +0100
+Subject: [PATCH v3 05/11] memory: add Atmel EBI (External Bus Interface)
+ driver
+In-Reply-To: <20141215112230.6fca1d69@bbrezillon>
+References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
+ <5455670.EDnhYEk7hP@kongar> <20141215112230.6fca1d69@bbrezillon>
+Message-ID: <6356167.d2upusqxqj@ws-stein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 09:52:39AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 15, 2014 at 02:02:50PM +0800, Wang, Yalin wrote:
-> > Hi
+On Monday 15 December 2014 11:22:30, Boris Brezillon wrote:
+> Hi Alexander,
+> 
+> On Tue, 09 Dec 2014 21:53:12 +0100
+> Alexander Stein <alexanders83@web.de> wrote:
+> 
+> > Hi,
 > > 
-> > Joe's patch that remove use byte_rev_table directly have
-> > Been merged into linux-next branch ,
-> > Cou you merge 8187/1 8205/1 8189/1 patch for arm ?
+> > On Monday 01 December 2014, 11:27:21 wrote Boris Brezillon:
+> > > +static int at91_ebi_probe(struct platform_device *pdev)
+> > > +{
+> > > +	const struct of_device_id *match;
+> > > +	struct device_node *child;
+> > > +	struct device_node *np;
+> > > +	struct at91_ebi *ebi;
+> > > +	struct clk *clk;
+> > > +	int ret;
+> > > +
+> > > +	match = of_match_device(at91_ebi_id_table, &pdev->dev);
+> > > +	if (!match || !match->data)
+> > > +		return -EINVAL;
+> > > +
+> > > +	ebi = devm_kzalloc(&pdev->dev, sizeof(*ebi), GFP_KERNEL);
+> > > +	if (!ebi)
+> > > +		return -ENOMEM;
+> > > +
+> > > +	ebi->caps = match->data;
+> > > +	ebi->dev = &pdev->dev;
+> > > +
+> > > +	clk = devm_clk_get(&pdev->dev, NULL);
+> > > +	if (IS_ERR(clk))
+> > > +		return PTR_ERR(clk);
+> > > +
+> > > +	ebi->clk = clk;
+> > > +
+> > > +	np = of_parse_phandle(pdev->dev.of_node, "atmel,smc", 0);
+> > > +	if (!np)
+> > > +		return -EINVAL;
+> > > +
+> > > +	ebi->smc = syscon_node_to_regmap(np);
+> > > +	if (IS_ERR(ebi->smc))
+> > > +		return PTR_ERR(ebi->smc);
+> > > +
+> > > +	/*
+> > > +	 * The sama5d3 does not provide an EBICSA register and thus does need
+> > > +	 * to access the matrix registers.
+> > > +	 */
+> > > +	if (ebi->caps->ebi_csa) {
+> > > +		np = of_parse_phandle(pdev->dev.of_node, "atmel,matrix", 0);
+> > > +		if (np)
+> >          ^^^^^^^
+> > Shouldn't this be if (!np)?
 > 
-> Unfortunately, it's missed this merge window.  It is bad practice to add
-> new features to linux-next during a merge window, and it is also bad to
-> send new features to Linus without them having been in linux-next before
-> the merge window opened.
-> 
-> It will be queued for -rc1.
+> Absolutely, thanks for pointing this out.
+> I'll test on other at91 platforms (I currently only test on sama5d3
+> boards, which do not have this EBICSA register) before submitting a new
+> version.
 
-I mean, it will be queued /after/ -rc1.
+Oh, well. I've noticed you posted a v4 of this patch which changed this specific code. I didn't noticed this.
+I'll replace the old v3 and retry. I'm using this code on 9263 so far configuring EBI1 for a PSRAM. Works so far.
+Once I exchanged patch 05/11 with your v4 I'll send my DT changes for 9263 to support this feature.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Best regards,
+Alexander
