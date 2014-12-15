@@ -1,73 +1,93 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 15 Dec 2014 12:41:56 +0100
-Subject: [GIT PULL 09/12] arm/arm64: KVM: Add (new) vgic_initialized macro
-In-Reply-To: <1418643719-25966-1-git-send-email-christoffer.dall@linaro.org>
-References: <1418643719-25966-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1418643719-25966-10-git-send-email-christoffer.dall@linaro.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 15 Dec 2014 11:50:44 +0000
+Subject: [PATCH v5 19/19] arm/arm64: KVM: allow userland to request a
+ virtual GICv3
+In-Reply-To: <20141213134502.GH16855@cbox>
+References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
+ <1418042274-3246-20-git-send-email-andre.przywara@arm.com>
+ <20141213134502.GH16855@cbox>
+Message-ID: <548ECB14.8040408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some code paths will need to check to see if the internal state of the
-vgic has been initialized (such as when creating new VCPUs), so
-introduce such a macro that checks the nr_cpus field which is set when
-the vgic has been initialized.
+Hi Christoffer,
 
-Also set nr_cpus = 0 in kvm_vgic_destroy, because the error path in
-vgic_init() will call this function, and code should never errornously
-assume the vgic to be properly initialized after an error.
+On 13/12/14 13:45, Christoffer Dall wrote:
+> On Mon, Dec 08, 2014 at 12:37:54PM +0000, Andre Przywara wrote:
+>> With all of the GICv3 code in place now we allow userland to ask the
+>> kernel for using a virtual GICv3 in the guest.
+>> Also we provide the necessary support for guests setting the memory
+>> addresses for the virtual distributor and redistributors.
+>> This requires some userland code to make use of that feature and
+>> explicitly ask for a virtual GICv3.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>> Changelog v4...v5:
+>> - improving documentation text
+>>
+>> Changelog v3...v4:
+>> - refine commit message
+>> - add documentation of new GICv3 KVM device
+>>
+>>  Documentation/virtual/kvm/devices/arm-vgic.txt |   22 ++++++++++--
+>>  arch/arm64/include/uapi/asm/kvm.h              |    7 ++++
+>>  include/kvm/arm_vgic.h                         |    4 +--
+>>  virt/kvm/arm/vgic-v3-emul.c                    |    3 ++
+>>  virt/kvm/arm/vgic.c                            |   46 +++++++++++++++++-------
+>>  5 files changed, 65 insertions(+), 17 deletions(-)
+>>
+>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> index df8b0c7..563463e 100644
+>> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> @@ -3,22 +3,38 @@ ARM Virtual Generic Interrupt Controller (VGIC)
+>>  
+>>  Device types supported:
+>>    KVM_DEV_TYPE_ARM_VGIC_V2     ARM Generic Interrupt Controller v2.0
+>> +  KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
+>>  
+>>  Only one VGIC instance may be instantiated through either this API or the
+>>  legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
+>>  controller, requiring emulated user-space devices to inject interrupts to the
+>>  VGIC instead of directly to CPUs.
+>>  
+>> +Creating a guest GICv3 device requires a host GICv3 as well.
+>> +GICv3 implementations with hardware compatibility support allow a guest GICv2
+>> +as well.
+>> +
+>>  Groups:
+>>    KVM_DEV_ARM_VGIC_GRP_ADDR
+>>    Attributes:
+>>      KVM_VGIC_V2_ADDR_TYPE_DIST (rw, 64-bit)
+>>        Base address in the guest physical address space of the GIC distributor
+>> -      register mappings.
+>> +      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
+>>  
+>>      KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
+>>        Base address in the guest physical address space of the GIC virtual cpu
+>> -      interface register mappings.
+>> +      interface register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
+>> +
+>> +    KVM_VGIC_V3_ADDR_TYPE_DIST (rw, 64-bit)
+>> +      Base address in the guest physical address space of the GICv3 distributor
+>> +      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
+>> +
+> 
+> Are there no alignment restrictions to worry about that we should
+> document here?
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- include/kvm/arm_vgic.h | 6 ++++++
- virt/kvm/arm/vgic.c    | 3 ++-
- 2 files changed, 8 insertions(+), 1 deletion(-)
+I think so, but that is not GICv3 specific, but applies to the VGICv2
+also, right? So shall I add a sentence like
+"The base address needs to be aligned to a 64 KB page boundary."
+for GICv3 and
+"The base address needs to be aligned to a 4 KB page boundary."
+for GICv2?
+Shouldn't the 64K alignment actually apply for GICv2 on AArch64 also?
+That would avoid some trouble in the future, wouldn't it?
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 3e262b9..ac4888d 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -287,6 +287,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		      struct kvm_exit_mmio *mmio);
- 
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
-+#define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
- #define vgic_ready(k)		((k)->arch.vgic.ready)
- 
- int vgic_v2_probe(struct device_node *vgic_node,
-@@ -369,6 +370,11 @@ static inline int irqchip_in_kernel(struct kvm *kvm)
- 	return 0;
- }
- 
-+static inline bool vgic_initialized(struct kvm *kvm)
-+{
-+	return true;
-+}
-+
- static inline bool vgic_ready(struct kvm *kvm)
- {
- 	return true;
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 4edb257..d862ea5 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1780,6 +1780,7 @@ void kvm_vgic_destroy(struct kvm *kvm)
- 	dist->irq_spi_cpu = NULL;
- 	dist->irq_spi_target = NULL;
- 	dist->irq_pending_on_cpu = NULL;
-+	dist->nr_cpus = 0;
- }
- 
- /*
-@@ -1793,7 +1794,7 @@ static int vgic_init(struct kvm *kvm)
- 	int nr_cpus, nr_irqs;
- 	int ret, i, vcpu_id;
- 
--	if (dist->nr_cpus)	/* Already allocated */
-+	if (vgic_initialized(kvm))
- 		return 0;
- 
- 	nr_cpus = dist->nr_cpus = atomic_read(&kvm->online_vcpus);
--- 
-2.1.2.330.g565301e.dirty
+Also I think we need to actually check for the 64K alignment for GICv3
+(we only check for 4K atm).
+
+Cheers,
+Andre.
