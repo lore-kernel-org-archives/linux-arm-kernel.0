@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Dec 2014 16:38:13 +0100
-Subject: [PATCH 05/27] ARM: mvebu: armada-370-netgear-rn104: Relicense the
- device tree under GPLv2+/X11
+Date: Mon, 15 Dec 2014 16:38:21 +0100
+Subject: [PATCH 13/27] ARM: mvebu: armada-385: Relicense the device tree under
+ GPLv2+/X11
 In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1418657915-22775-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1418657915-22775-14-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,27 +15,23 @@ license.
 In order to make it easier for them to reuse our device trees,
 relicense our device trees under a GPL/X11 dual-license.
 
-Cc: Arnaud Ebalard <arno@natisbad.org>
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-netgear-rn104.dts | 41 +++++++++++++++++++++++---
- 1 file changed, 37 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/armada-385.dtsi | 40 ++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-index 30586e47986a..1de53b59283a 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-@@ -3,10 +3,43 @@
+diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
+index 6283d7912f71..acf2b9dbacac 100644
+--- a/arch/arm/boot/dts/armada-385.dtsi
++++ b/arch/arm/boot/dts/armada-385.dtsi
+@@ -7,9 +7,43 @@
+  * Gregory CLEMENT <gregory.clement@free-electrons.com>
+  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
   *
-  * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
-  *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version
-- * 2 of the License, or (at your option) any later version.
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
 + * licensing only applies to this file, and not this project as a
@@ -75,6 +71,6 @@ index 30586e47986a..1de53b59283a 100644
 + *     OTHER DEALINGS IN THE SOFTWARE.
   */
  
- /dts-v1/;
+ #include "armada-38x.dtsi"
 -- 
 1.9.1
