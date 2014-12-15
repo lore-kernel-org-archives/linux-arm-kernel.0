@@ -1,100 +1,91 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 15 Dec 2014 08:55:45 -0500
-Subject: [PATCHv0 5/5] dt-bindings: fix isl vs isil prefix issue for
- Intersil
-In-Reply-To: <b2c34bea6fc7bd42d636c9cadfe1b7e5ec523aeb.1418519430.git.arno@natisbad.org>
-References: <cover.1418519430.git.arno@natisbad.org>
- <b2c34bea6fc7bd42d636c9cadfe1b7e5ec523aeb.1418519430.git.arno@natisbad.org>
-Message-ID: <20141215135545.GC967@titan.lakedaemon.net>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 15 Dec 2014 15:00:04 +0100
+Subject: [RFC 01/15] drivers/base: add track framework
+In-Reply-To: <20141215125557.GB11764@sirena.org.uk>
+References: <548B7653.7020004@gmail.com> <20141215125557.GB11764@sirena.org.uk>
+Message-ID: <548EE964.2050504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 14, 2014 at 02:43:15AM +0100, Arnaud Ebalard wrote:
-> 
-> When Intersil ISL12057 driver was introduced by commit 70e123373c05
-> ("rtc: Add support for Intersil ISL12057 I2C RTC chip"), the vendor
-> prefix 'isl' was used instead of the expected 'isil' (Intersil
-> NASDAQ symbol) and documented in vendor-prefixes.txt.
-> 
-> Recently, a patch from Philip Zabel (7a6540ca856a, "ARM: mvebu:
-> Change vendor prefix for Intersil Corporation to isil") fixed that
-> prefix in ReadyNAS devices .dts files (AFAICT, the only users of
-> the driver).
-> 
-> Then, commits 7c75c1d5e72b ("dt-bindings: Document deprecated device
-> vendor name to fix related warning") and b2ea3f82e798 (dt-bindings:
-> Document correct and deprecated vendor-prefix with device isl29028)
-> decided to go the other way and deprecate isil in vendor-prefixes.txt
-> and in isl29028.c staging driver.
-> 
-> While trying and merge a fix I wrote for ISL12057 drivers to finish
-> Philip's work, it conflicted with the two recently introduced commits,
-> and revealed the issue: at the moment, there are various compatible
-> strings in drivers and .dts files for Intersil products which use
-> either isl or isil:
-> 
-> $ grep -R "isil," .
-> ./Documentation/devicetree/bindings/i2c/trivial-devices.txt:isil,isl29028           (deprecated, use isl)
-> ./drivers/staging/iio/light/isl29028.c:   { .compatible = "isil,isl29028", },/* deprecated, don't use */
-> ./drivers/staging/iio/light/isl29018.c:   { .compatible = "isil,isl29018", },
-> ./drivers/staging/iio/light/isl29018.c:   { .compatible = "isil,isl29023", },
-> ./drivers/staging/iio/light/isl29018.c:   { .compatible = "isil,isl29035", },
-> ./arch/powerpc/boot/dts/p1022rdk.dts:        compatible = "isil,zl6100";
-> ./arch/powerpc/boot/dts/p1022rdk.dts:        compatible = "isil,zl6100";
-> ./arch/powerpc/boot/dts/p1022rdk.dts:        compatible = "isil,zl6100";
-> ./arch/powerpc/boot/dts/p1022rdk.dts:        compatible = "isil,zl6100";
-> ./arch/arm/boot/dts/exynos5800-peach-pi.dts: compatible = "isil,isl29018";
-> ./arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi: compatible = "isil,isl1208";
-> ./arch/arm/boot/dts/tegra20-ventana.dts:     compatible = "isil,isl29018";
-> ./arch/arm/boot/dts/tegra20-seaboard.dts:    compatible = "isil,isl29018";
-> ./arch/arm/boot/dts/armada-xp-netgear-rn2120.dts: compatible = "isil,isl12057";
-> ./arch/arm/boot/dts/armada-370-netgear-rn104.dts: compatible = "isil,isl12057";
-> ./arch/arm/boot/dts/exynos5420-peach-pit.dts:     compatible = "isil,isl29018";
-> ./arch/arm/boot/dts/armada-370-netgear-rn102.dts: compatible = "isil,isl12057";
-> 
-> $ grep -R "isl," .
-> ./Documentation/devicetree/bindings/regulator/isl9305.txt:- compatible: "isl,isl9305" or "isl,isl9305h"
-> ./Documentation/devicetree/bindings/regulator/isl9305.txt:              compatible = "isl,isl9305";
-> ./Documentation/devicetree/bindings/i2c/trivial-devices.txt:isl,isl12057      Intersil ISL12057 I2C RTC Chip
-> ./Documentation/devicetree/bindings/i2c/trivial-devices.txt:isl,isl29028      Intersil ISL29028 Ambient Light ....
-> ./drivers/regulator/isl9305.c:          { .compatible = "isl,isl9305" },
-> ./drivers/regulator/isl9305.c:          { .compatible = "isl,isl9305h" },
-> ./drivers/staging/iio/light/isl29028.c: { .compatible = "isl,isl29028", },
-> ./drivers/rtc/rtc-isl12057.c:           { .compatible = "isl,isl12057" },
-> ./drivers/rtc/rtc-isl12022.c:           { .compatible = "isl,isl12022" },
-> ./arch/arm/boot/dts/tegra30-cardhu.dtsi:   compatible = "isl,isl29028";
-> ./arch/arm/boot/dts/zynq-parallella.dts:   compatible = "isl,isl9305";
-> 
-> AFAICT, it seems it makes sense to *definitively* settle for isil as the
-> vendor prefix for Intersil, as Philip did in 7a6540ca856a: it's the NASDAQ
-> symbol and this choice requires less changes than opting for isl.
-> 
-> So, this patch changes compatible strings in .dts files to use isil where
-> isl was found before, and modify drivers w/ compatible strings using isl
-> to add one using isil. In those cases, a comment is made that the old
-> compatible string is kept for backward compatibility (w/ out-fo-tree users
-> of those drivers). Additionally, it leaves only isil as prefix in
-> vendor-prefixes.txt. Those changes should prevent any new inclusion of
-> isl compatible strings for Intersil devices due to copy-and-paste.
-> 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
->  Documentation/devicetree/bindings/i2c/trivial-devices.txt | 5 ++---
->  Documentation/devicetree/bindings/regulator/isl9305.txt   | 4 ++--
->  Documentation/devicetree/bindings/vendor-prefixes.txt     | 3 +--
+On 12/15/2014 01:55 PM, Mark Brown wrote:
+> On Sat, Dec 13, 2014 at 12:12:19AM +0100, AH wrote:
+>> Mark Brown wrote on 12.12.2014 17:36:
+>>> On Wed, Dec 10, 2014 at 04:48:19PM +0100, Andrzej Hajda wrote:
+>>>> +		kfree(ptask);
+>>>> +
+>>>> +		if (empty)
+>>>> +			break;
+>>>> +
+>>>> +		track_process_task(track, task);
+>>> ...we then go and do some other stuff, including processing that task,
+>>> without the lock or or any other means I can see of excluding other
+>>> users before going round and removing the task.  This seems to leave us
+>>> vulnerable to double execution.
+>> No, if you look at track_add_task function you will see that the queue is
+>> processed only if it is initially empty, otherwise the task is only added to
+>> the queue, so it will be processed after processing earlier tasks.
+>> So the rule is that if someone add task to the queue it checks if the queue
+>> is empty, in such case it process all tasks from the queue until
+>> the queue becomes empty, even the tasks added by other processed.
+>> This way all tasks are serialized.
+> This is all pretty fiddly and seems fragile - if nothing else the code
+> seems undercommented since the above is only going to be apparent with
+> following through multiple functions and we're relying on both owner and
+> list emptiness with more than one place where a task can get processed.
 
->  arch/arm/boot/dts/tegra30-cardhu.dtsi                     | 2 +-
->  arch/arm/boot/dts/zynq-parallella.dts                     | 2 +-
+I have changed it already to test queue owner, this way it should
+be more clear.
 
->  drivers/regulator/isl9305.c                               | 6 ++++--
->  drivers/rtc/rtc-isl12022.c                                | 3 ++-
->  drivers/rtc/rtc-isl12057.c                                | 3 ++-
->  drivers/staging/iio/light/isl29028.c                      | 4 ++--
->  9 files changed, 17 insertions(+), 15 deletions(-)
+>
+>>> I'm also unclear what is supposed to happen if adding a notification
+>>> races with removing the thing being watched.
+>> The sequence should be always as follows:
+>> 1. create thing, then call track_up(thing).
+>> ...
+>> 2. call track_down(thing) then remove thing.
+>> If we put 1 into probe and 2 into remove callback of the driver it will be
+>> safe - we are synchronised by device_lock. But if, for some reason, we want
+>> to create object after probe we should do own synchronization or just put
+>> device_lock around 1. The same applies if we want to remove
+>> object earlier. This is the comment above about. I will expand it to more
+>> verbose explanation.
+> You can't rely on the device lock here since this isn't tied to kobjects
+> or anything at all - it's a freestanding interface someone could pick up
+> and use in another context.  Besides, that isn't really my concern - my
+> concern is what happens if something asks to wait for 
+But I do not rely here on device_lock, I just point out that 1 and 2
+should be
+synchronized and as a common way is to put such things into probe
+and remove, device_lock can do the synchronization for us in such case,
+so no need for additional synchronization.
 
-Please split the dts{i} changes out into a separate patch.  The
-different maintainers under drivers/ may want separate patches as well.
+And to make everything clear, track_up will not be called by the driver
+directly,
+it shall be called by respective resource framework functions, for example
+by regulator_register and regulator_unregister.
 
-thx,
+And regarding your initial/real concern, I guess you mean this one:
+>> I'm also unclear what is supposed to happen if adding a notification
+>> races with removing the thing being watched.
+I guess you mean registering notifier and removal of thing it is
+supposed to watch.
+As all track tasks are serialized these two will be serialized also so
+we can have
+only two scenarios:
+1.
+  a) register notifier
+  - thing is up, so notifier will be immediately called with info that
+the thing is up
+  b) remove thing
+  - thing will be down, so notifier will be called with info that the
+thing will be removed
+2.
+  a) remove thing
+  - notifier is not yet registered, so callback will not be called,
+  b) register notifier
+  - thing is already removed, so callback will not be called.
 
-Jason.
+I hope this is what you were asking for.
+
+Regards
+Andrzej
