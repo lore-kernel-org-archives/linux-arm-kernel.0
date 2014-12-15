@@ -1,144 +1,170 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Sun, 14 Dec 2014 23:28:07 -0800
-Subject: [PATCH v15 10/11] KVM: arm/arm64: Enable Dirty Page logging for ARMv8
+Date: Sun, 14 Dec 2014 23:28:08 -0800
+Subject: [PATCH v15 11/11] KVM: arm/arm64: Add support to dissolve huge PUD
 In-Reply-To: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
 References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1418628488-3696-11-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1418628488-3696-12-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables ARMv8 ditry page logging support. Plugs ARMv8 into generic
-layer through Kconfig symbol, and drops earlier ARM64 constraints to enable
-logging at architecture layer.
+This patch adds the same support for PUD huge page as for PMD. Huge PUD is 
+write protected for initial memory region write protection. Code to dissolve 
+huge PUD is supported in user_mem_abort(). At this time this code has not been 
+tested, but similar approach to current ARMv8 page logging test is in work,
+limiting kernel memory and mapping in 1 or 2GB into Guest address space on a 
+4k page/48 bit host, some host kernel test code needs to be added to detect
+page fault to this region and side step general processing. Also similar to 
+PMD case all pages in range are marked dirty when PUD entry is cleared.
 
 Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 ---
- arch/arm/include/asm/kvm_host.h | 12 ------------
- arch/arm/kvm/arm.c              |  4 ----
- arch/arm/kvm/mmu.c              | 19 +++++++++++--------
- arch/arm64/kvm/Kconfig          |  2 ++
- 4 files changed, 13 insertions(+), 24 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h         |  8 +++++
+ arch/arm/kvm/mmu.c                     | 64 ++++++++++++++++++++++++++++++++--
+ arch/arm64/include/asm/kvm_mmu.h       |  9 +++++
+ arch/arm64/include/asm/pgtable-hwdef.h |  3 ++
+ 4 files changed, 81 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index b138431..088ea87 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -223,18 +223,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index dda0046..703d04d 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -133,6 +133,14 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+ 	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
  }
  
--/**
-- * kvm_flush_remote_tlbs() - flush all VM TLB entries
-- * @kvm:	pointer to kvm structure.
-- *
-- * Interface to HYP function to flush all VM TLB entries without address
-- * parameter.
-- */
--static inline void kvm_flush_remote_tlbs(struct kvm *kvm)
--{
--	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
--}
--
- static inline int kvm_arch_dev_ioctl_check_extension(long ext)
- {
- 	return 0;
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 6e4290c..1b6577c 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -740,7 +740,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
-  */
- int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
- {
--#ifdef CONFIG_ARM
- 	bool is_dirty = false;
- 	int r;
++static inline void kvm_set_s2pud_readonly(pud_t *pud)
++{
++}
++
++static inline bool kvm_s2pud_readonly(pud_t *pud)
++{
++	return false;
++}
  
-@@ -753,9 +752,6 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
- 
- 	mutex_unlock(&kvm->slots_lock);
- 	return r;
--#else /* arm64 */
--	return -EINVAL;
--#endif
- }
- 
- static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
+ /* Open coded p*d_addr_end that can deal with 64bit addresses */
+ #define kvm_pgd_addr_end(addr, end)					\
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index dc763bb..59003df 100644
+index 59003df..35840fb 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -52,11 +52,18 @@ static phys_addr_t hyp_idmap_vector;
+@@ -109,6 +109,55 @@ void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
+ 	}
+ }
  
- static bool kvm_get_logging_state(struct kvm_memory_slot *memslot)
- {
--#ifdef CONFIG_ARM
- 	return !!memslot->dirty_bitmap;
--#else
--	return false;
--#endif
++/**
++  * stage2_find_pud() - find a PUD entry
++  * @kvm:	pointer to kvm structure.
++  * @addr:	IPA address
++  *
++  * Return address of PUD entry or NULL if not allocated.
++  */
++static pud_t *stage2_find_pud(struct kvm *kvm, phys_addr_t addr)
++{
++	pgd_t *pgd;
++
++	pgd = kvm->arch.pgd + pgd_index(addr);
++	if (pgd_none(*pgd))
++		return NULL;
++
++	return pud_offset(pgd, addr);
 +}
 +
 +/**
-+ * kvm_flush_remote_tlbs() - flush all VM TLB entries for v7/8
++ * stage2_dissolve_pud() - clear and flush huge PUD entry
 + * @kvm:	pointer to kvm structure.
++ * @addr	IPA
 + *
-+ * Interface to HYP function to flush all VM TLB entries
++ * Function clears a PUD entry, flushes addr 1st and 2nd stage TLBs. Marks all
++ * pages in the range dirty.
 + */
-+inline void kvm_flush_remote_tlbs(struct kvm *kvm)
++void stage2_dissolve_pud(struct kvm *kvm, phys_addr_t addr)
 +{
-+	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
- }
- 
- static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
-@@ -895,7 +902,6 @@ static bool kvm_is_device_pfn(unsigned long pfn)
- 	return !pfn_valid(pfn);
- }
- 
--#ifdef CONFIG_ARM
- /**
-  * stage2_wp_ptes - write protect PMD range
-  * @pmd:	pointer to pmd entry
-@@ -1040,7 +1046,6 @@ void kvm_arch_mmu_write_protect_pt_masked(struct kvm *kvm,
- 
- 	stage2_wp_range(kvm, start, end);
- }
--#endif
- 
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			  struct kvm_memory_slot *memslot, unsigned long hva,
-@@ -1445,7 +1450,6 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
- 				   const struct kvm_memory_slot *old,
- 				   enum kvm_mr_change change)
++	pud_t *pud;
++	gfn_t gfn;
++	long i;
++
++	pud = stage2_find_pud(kvm, addr);
++	if (pud && !pud_none(*pud) && kvm_pud_huge(*pud)) {
++		pud_clear(pud);
++		kvm_tlb_flush_vmid_ipa(kvm, addr);
++		put_page(virt_to_page(pud));
++#ifdef CONFIG_SMP
++		gfn = (addr & PUD_MASK) >> PAGE_SHIFT;
++		/*
++		 * Mark all pages in PUD range dirty, in case other
++		 * CPUs are  writing to it.
++		 */
++		for (i = 0; i < PTRS_PER_PUD * PTRS_PER_PMD; i++)
++			mark_page_dirty(kvm, gfn + i);
++#endif
++	}
++}
++
+ static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+ 				  int min, int max)
  {
--#ifdef CONFIG_ARM
- 	/*
- 	 * At this point memslot has been committed and there is an
- 	 * allocated dirty_bitmap[], dirty pages will be be tracked while the
-@@ -1453,7 +1457,6 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
- 	 */
- 	if (change != KVM_MR_DELETE && mem->flags & KVM_MEM_LOG_DIRTY_PAGES)
- 		kvm_mmu_wp_memory_region(kvm, mem->slot);
--#endif
+@@ -761,6 +810,13 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 	unsigned long iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
+ 	unsigned long logging_active = flags & KVM_S2PTE_FLAG_LOGGING_ACTIVE;
+ 
++	/*
++	 * While dirty page logging - dissolve huge PUD, then continue on to
++	 * allocate page.
++	 */
++	if (logging_active)
++		stage2_dissolve_pud(kvm, addr);
++
+ 	/* Create stage-2 page table mapping - Levels 0 and 1 */
+ 	pmd = stage2_get_pmd(kvm, cache, addr);
+ 	if (!pmd) {
+@@ -964,9 +1020,11 @@ static void  stage2_wp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
+ 	do {
+ 		next = kvm_pud_addr_end(addr, end);
+ 		if (!pud_none(*pud)) {
+-			/* TODO:PUD not supported, revisit later if supported */
+-			BUG_ON(kvm_pud_huge(*pud));
+-			stage2_wp_pmds(pud, addr, next);
++			if (kvm_pud_huge(*pud)) {
++				if (!kvm_s2pud_readonly(pud))
++					kvm_set_s2pud_readonly(pud);
++			} else
++				stage2_wp_pmds(pud, addr, next);
+ 		}
+ 	} while (pud++, addr = next, addr != end);
+ }
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index f925e40..3b692c5 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -137,6 +137,15 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+ 	return (pmd_val(*pmd) & PMD_S2_RDWR) == PMD_S2_RDONLY;
  }
  
- int kvm_arch_prepare_memory_region(struct kvm *kvm,
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 8ba85e9..3ce389b 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -22,10 +22,12 @@ config KVM
- 	select PREEMPT_NOTIFIERS
- 	select ANON_INODES
- 	select HAVE_KVM_CPU_RELAX_INTERCEPT
-+	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
- 	select KVM_MMIO
- 	select KVM_ARM_HOST
- 	select KVM_ARM_VGIC
- 	select KVM_ARM_TIMER
-+	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
- 	---help---
- 	  Support hosting virtualized guest machines.
++static inline void kvm_set_s2pud_readonly(pud_t *pud)
++{
++	pud_val(*pud) = (pud_val(*pud) & ~PUD_S2_RDWR) | PUD_S2_RDONLY;
++}
++
++static inline bool kvm_s2pud_readonly(pud_t *pud)
++{
++	return (pud_val(*pud) & PUD_S2_RDWR) == PUD_S2_RDONLY;
++}
  
+ #define kvm_pgd_addr_end(addr, end)	pgd_addr_end(addr, end)
+ #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index 5f930cc..1714c84 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -122,6 +122,9 @@
+ #define PMD_S2_RDONLY		(_AT(pmdval_t, 1) << 6)   /* HAP[2:1] */
+ #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+ 
++#define PUD_S2_RDONLY		(_AT(pudval_t, 1) << 6)   /* HAP[2:1] */
++#define PUD_S2_RDWR		(_AT(pudval_t, 3) << 6)   /* HAP[2:1] */
++
+ /*
+  * Memory Attribute override for Stage-2 (MemAttr[3:0])
+  */
 -- 
 1.9.1
