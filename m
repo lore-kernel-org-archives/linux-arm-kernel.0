@@ -1,86 +1,67 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 15 Dec 2014 18:57:25 +0100
-Subject: [PATCH 03/27] ARM: mvebu: armada-370-mirabox: Relicense the
- device tree under GPLv2+/X11
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <87tx0wokxm.fsf@natisbad.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 15 Dec 2014 19:55:03 +0200
+Subject: [RFC PATCH v4 0/8] Introduce automatic DMA configuration for
+ IOMMU masters
+In-Reply-To: <20141215173416.GS20738@arm.com>
+References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
+ <1775535.qgYBmCEZS0@avalon> <20141215173416.GS20738@arm.com>
+Message-ID: <4224425.qspa1hv2H3@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Will,
 
-Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
+On Monday 15 December 2014 17:34:16 Will Deacon wrote:
+> On Mon, Dec 15, 2014 at 05:21:16PM +0000, Laurent Pinchart wrote:
+> > On Wednesday 19 November 2014 11:41:50 Will Deacon wrote:
+> > > +static void __remove_iommu_mapping_entry(struct kref *kref)
+> > > +{
+> > > +	struct dma_iommu_mapping_entry *entry;
+> > > +
+> > > +	entry = container_of(kref, struct dma_iommu_mapping_entry, kref);
+> > > +	list_del(&entry->list);
+> > > +}
+> > > +
+> > > +static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base,
+> > > u64
+> > > size,
+> > > +				    struct iommu_ops *iommu)
+> > > +{
+> > > +	struct iommu_domain *domain;
+> > > +	struct dma_iommu_mapping_entry *entry = NULL;
+> > > +
+> > > +	if (!iommu->get_default_domain)
+> > > +		return false;
+> > > +
+> > > +	domain = iommu->get_default_domain(dev);
+> > > +	if (!domain)
+> > > +		return false;
+> > > +
+> > > +	spin_lock(&dma_iommu_mapping_lock);
+> > > +
+> > > +	list_for_each_entry(entry, &dma_iommu_mapping_table, list) {
+> > > +		if (entry->domain == domain)
+> > > +			break;
+> > > +	}
+> > 
+> > That might be a stupid question (fighting my impostor syndrome again
+> > here), but is there a fundamental reason why we can't store the VA
+> > allocation data (probably using iova) in the domain instead of having to
+> > go through hoops and loops here to associate that data to the domain ?
+> 
+> Well, this was very much a work-in-progress that I ended up abandoning :)
+> 
+> Ultimately, I'd really like to see the default domain management moved into
+> core code, at which point extending struct iommu_domain seems perfectly
+> plausible to me (not sure if we'd have a new structure for that).
+> 
+> Then we'd have a fairly clean device -> group -> domain -> allocator
+> abstraction for each master.
 
-> The current GPL only licensing on the device tree makes it very
-> impractical for other software components licensed under another
-> license.
->
-> In order to make it easier for them to reuse our device trees,
-> relicense our device trees under a GPL/X11 dual-license.
->
-> Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Ryan Press <ryan@presslab.us>
-> Cc: Simon Baatz <gmbnomis@gmail.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+I like that. Thank you for confirming that some of my questions are sensible 
+:-)
 
-Acked-by: Arnaud Ebalard <arno@natisbad.org>
+-- 
+Regards,
 
-
-> ---
->  arch/arm/boot/dts/armada-370-mirabox.dts | 40 +++++++++++++++++++++++++++++---
->  1 file changed, 37 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-> index e1b0eb6b091f..b10ceb488efe 100644
-> --- a/arch/arm/boot/dts/armada-370-mirabox.dts
-> +++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-> @@ -3,9 +3,43 @@
->   *
->   * Gregory CLEMENT <gregory.clement@free-electrons.com>
->   *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
->  /dts-v1/;
+Laurent Pinchart
