@@ -1,23 +1,44 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 15 Dec 2014 09:39:29 +0530
-Subject: [PATCH 3/3] ARM: SPEAr: dts: remove unused irq-trigger, id and
- block entries
-In-Reply-To: <557b9b23d0313dede22786d9550c7867d9f22837.1418434448.git.silvio.fricke@gmail.com>
-References: <cover.1418434448.git.silvio.fricke@gmail.com>
- <557b9b23d0313dede22786d9550c7867d9f22837.1418434448.git.silvio.fricke@gmail.com>
-Message-ID: <CAOh2x=nhH--HPxzN+rq_LZTwBQYTXFb9N562X_rbZkLsr+N7zA@mail.gmail.com>
+Date: Mon, 15 Dec 2014 09:48:19 +0530
+Subject: [PATCH] ARM: defconfigs: use CONFIG_CPUFREQ_DT
+Message-ID: <63217079d4b61d835fed98198ae1e3f0e6329de1.1418617005.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 13, 2014 at 7:16 AM, Silvio Fricke <silvio.fricke@gmail.com> wrote:
-> Signed-off-by: Silvio Fricke <silvio.fricke@gmail.com>
-> CC: Thomas Gleixner <tglx@linutronix.de>
-> CC: Jason Cooper <jason@lakedaemon.net>
-> CC: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/boot/dts/spear1310-evb.dts | 1 -
->  arch/arm/boot/dts/spear1340-evb.dts | 2 --
->  arch/arm/boot/dts/spear320-hmi.dts  | 3 ---
->  3 files changed, 6 deletions(-)
+CONFIG_GENERIC_CPUFREQ_CPU0 disappeared with commit bbcf071969b20f
+("cpufreq: cpu0: rename driver and internals to 'cpufreq_dt'") and some
+defconfigs are still using it instead of the new one.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Use the renamed CONFIG_CPUFREQ_DT generic driver.
+
+Cc: <stable@vger.kernel.org>        # 3.18
+Reported-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/configs/multi_v7_defconfig | 2 +-
+ arch/arm/configs/shmobile_defconfig | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 9d7a32f93fcf..f86cb86afc66 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -445,4 +445,4 @@ CONFIG_DEBUG_FS=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_LOCKUP_DETECTOR=y
+ CONFIG_CRYPTO_DEV_TEGRA_AES=y
+-CONFIG_GENERIC_CPUFREQ_CPU0=y
++CONFIG_CPUFREQ_DT=y
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index d7346ad51043..bfe79d5b8213 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -176,5 +176,5 @@ CONFIG_CPU_FREQ_GOV_USERSPACE=y
+ CONFIG_CPU_FREQ_GOV_ONDEMAND=y
+ CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
+ CONFIG_CPU_THERMAL=y
+-CONFIG_GENERIC_CPUFREQ_CPU0=y
++CONFIG_CPUFREQ_DT=y
+ CONFIG_REGULATOR_DA9210=y
+-- 
+2.2.0
