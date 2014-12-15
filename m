@@ -1,52 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Dec 2014 16:40:41 +0000
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <6860089.2Ca399bIPK@avalon>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <CAF6AEGs6dZauq1QxY_OqBPUs0xHYjjGTi+H7Vm-mNvJtmTAHRA@mail.gmail.com>
- <20141210150853.GH23639@arm.com> <6860089.2Ca399bIPK@avalon>
-Message-ID: <20141215164041.GN20738@arm.com>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Mon, 15 Dec 2014 16:43:59 +0000
+Subject: [PATCH 2/4] iommu: add ARM LPAE page table allocator
+In-Reply-To: <20141215133020.GJ20738@arm.com>
+References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
+ <1417089078-22900-3-git-send-email-will.deacon@arm.com>
+ <BN3PR0301MB12198CE5D736CDC6A221EDC2EA790@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <20141205184802.GH1203@arm.com>
+ <BN3PR0301MB1219D3161E4E9DB314FDD8FAEA6E0@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <20141215133020.GJ20738@arm.com>
+Message-ID: <BN3PR0301MB12199C5CAD33E745CC7E51F4EA6F0@BN3PR0301MB1219.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 14, 2014 at 03:49:34PM +0000, Laurent Pinchart wrote:
-> Hi Will,
 
-Hi Laurent,
 
-> On Wednesday 10 December 2014 15:08:53 Will Deacon wrote:
-> > On Wed, Dec 10, 2014 at 02:52:56PM +0000, Rob Clark wrote:
-> > > so, what is the way for a driver that explicitly wants to manage it's
-> > > own device virtual address space to opt out of this?  I suspect that
-> > > won't be the common case, but for a gpu, if dma layer all of a sudden
-> > > thinks it is in control of the gpu's virtual address space, things are
-> > > going to end in tears..
-> > 
-> > I think you'll need to detach from the DMA domain, then have the driver
-> > manage everything itself. As you say, it's not the common case, so you
-> > may need to add some hooks for detaching from the default domain and
-> > swizzling your DMA ops.
+-----Original Message-----
+From: Will Deacon [mailto:will.deacon at arm.com] 
+Sent: Monday, December 15, 2014 7:00 PM
+To: Sethi Varun-B16395
+Cc: linux-arm-kernel at lists.infradead.org; iommu at lists.linux-foundation.org; prem.mallappa at broadcom.com; Robin Murphy; lauraa at codeaurora.org; mitchelh at codeaurora.org; laurent.pinchart at ideasonboard.com; joro at 8bytes.org; m.szyprowski at samsung.com
+Subject: Re: [PATCH 2/4] iommu: add ARM LPAE page table allocator
+
+On Sun, Dec 14, 2014 at 05:45:49PM +0000, Varun Sethi wrote:
+> Please find my response inline. Search for "varun".
+
+This is getting fiddly now that you've already replied once. Any chance you could sort your mail client out, please?
+
+
+[[varun]]  Yes I need to do that, this is painful.
+
+> > +       if (!data)
+> > +               return NULL;
+> > +
+> > +       data->pages_per_pgd = 1;
+> > +       data->pg_shift = __ffs(cfg->pgsize_bitmap);
+> > +       data->bits_per_level = data->pg_shift - 
+> > + ilog2(sizeof(arm_lpae_iopte));
+> > +
+> > +       va_bits = cfg->ias - data->pg_shift;
+> > +       data->levels = DIV_ROUND_UP(va_bits, data->bits_per_level);
+> >
+> > [[varun]]  Not related to the patch, but this would be applicable to 
+> > the CPU tables as well i.e, we can't support 48bit VA with 64 KB 
+> > page tables, right? The AR64 memory maps shows possibility of using 
+> > 6 bits for the first level page table.
 > 
-> I'm wondering if it's such an exotic case after all. I can see two reasons not 
-> to use the default domain. In addition to special requirements coming from the 
-> bus master side, the IOMMU itself might not support one domain per bus master 
-> (I'm of course raising the issue from a very selfish Renesas IPMMU point of 
-> view).
+> Sure we can support 48-bit VAs with 64k pages. Why do you think we can't?
+> 
+> [varun]  My concern was with respect to the bits per level, which is 
+> uneven for the 64 K page sizes. Just wondering how would things work 
+> with 64K pages when we do a 3 level page lookup.
 
-Do you mean that certain masters must be grouped into the same domain, or
-that the IOMMU can fail with -ENOSPC?
+Well, it's uneven (9) for the 4k case too. Do you actually see an issue here?
 
-For the former, we need a way to represent IOMMU groups for the platform
-bus. For the latter, we should have a per-IOMMU default domain instead of
-creating one per master as we currently do for ARM.
+48-bit VA with 64k pages gives us:
 
-Joerg has talked about adding a ->get_default_domain callback to the IOMMU
-layer, but I've not seen any code and my attempt at using it also got
-pretty complicated:
+  va_bits = (48 - 16) = 32
+  bits_per_level = (16 - 3) = 13
+  levels = ceil(32/13) = 3
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304076.html
+so the starting level is 1, which resolves 32-(13*2) = 6 bits.
 
-Marek also said he might be taking a look.
+Does that make sense?
 
-Will
+[[varun]]Yes, but what I meant was, is that in case of 4K pages you have 9 bits per level, but for 64K pages you have 6 bits for the first  level and 13 each for second and third. So, bits per level would not work in case of 64 K pages?
+
+Thanks,
+Varun
