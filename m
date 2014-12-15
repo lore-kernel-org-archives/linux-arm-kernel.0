@@ -1,40 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Dec 2014 17:22:02 +0000
-Subject: [PATCH v3 1/8] soc: mediatek: Add PMIC wrapper for MT8135 and
- MT6397 SoC
-In-Reply-To: <1418292255.2315.12.camel@mtksdaap41>
-References: <1417752479-4749-1-git-send-email-flora.fu@mediatek.com>
- <20141209101341.GV30369@pengutronix.de>
- <CABuKBe+whgVryssULCu2MAXRu3u+pYwM2nN3ToTEGpEvniQ6Jw@mail.gmail.com>
- <3015972.tvmzP0zTdv@wuerfel> <1418292255.2315.12.camel@mtksdaap41>
-Message-ID: <20141215172202.GI11764@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Dec 2014 17:25:12 +0000
+Subject: [PATCH 2/4] iommu: add ARM LPAE page table allocator
+In-Reply-To: <BN3PR0301MB12194A8F5CFF870B7A124623EA6F0@BN3PR0301MB1219.namprd03.prod.outlook.com>
+References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
+ <1417089078-22900-3-git-send-email-will.deacon@arm.com>
+ <BN3PR0301MB12198CE5D736CDC6A221EDC2EA790@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <20141205184802.GH1203@arm.com>
+ <BN3PR0301MB1219D3161E4E9DB314FDD8FAEA6E0@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <20141215133020.GJ20738@arm.com> <20141215154317.GL20738@arm.com>
+ <BN3PR0301MB12194A8F5CFF870B7A124623EA6F0@BN3PR0301MB1219.namprd03.prod.outlook.com>
+Message-ID: <20141215172512.GR20738@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 11, 2014 at 06:04:15PM +0800, Flora Fu wrote:
-> On Tue, 2014-12-09 at 12:20 +0100, Arnd Bergmann wrote:
+On Mon, Dec 15, 2014 at 04:35:12PM +0000, Varun Sethi wrote:
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com] 
+> Sent: Monday, December 15, 2014 9:13 PM
+> To: Sethi Varun-B16395
+> Cc: linux-arm-kernel at lists.infradead.org; iommu at lists.linux-foundation.org; prem.mallappa at broadcom.com; Robin Murphy; lauraa at codeaurora.org; mitchelh at codeaurora.org; laurent.pinchart at ideasonboard.com; joro at 8bytes.org; m.szyprowski at samsung.com
+> Subject: Re: [PATCH 2/4] iommu: add ARM LPAE page table allocator
+> 
+> On Mon, Dec 15, 2014 at 01:30:20PM +0000, Will Deacon wrote:
+> > On Sun, Dec 14, 2014 at 05:45:49PM +0000, Varun Sethi wrote:
+> > > [varun] ok, but you could potentially end up splitting mapping to 
+> > > the least possible page size e.g. 4K. You, don't seem to take in to 
+> > > account the possibility of using the block size at the next level. 
+> > > For example, take a case where we have a huge page mapping using 1G 
+> > > page size and we have an unmap request for 4K. We could still split 
+> > > maximum part of the mapping using 2M pages at the next level. The 
+> > > entry where we need to unmap the 4K region would potentially go to the next level.
+> > 
+> > Aha, I see what you mean here, thanks. I'll take a look...
+> 
+> Scratch that, I think the code is fine as it is. For the case you
+> highlight, we iterate over the 1GB region remapping it using 4k pages, but
+> skipping the one we want to unmap, so I don't think there's a problem
+> (__arm_lpae_map will create the relevant table entries).
+> 
+> 
+> [[varun]]  But you can split 1G in 2M mappings and then split up the
+> unmapped region using 4K pages. In this case you split up the entire
+> region using 4K pages.
 
-> > If it looks like i2c messages, would it be more appropriate to make
-> > it appear as an i2c controller then?
+True, I miss an optimisation opportunity there, but I don't know that it's
+common enough to care (in the same way that we don't recreate a 1G mapping
+if you remapped that 4k page back like it was).
 
-> Although the message looks like I2C command, it is not I2C.
-> Form source code, the software does not touch any I2C i/o or protocols.
-> It depends SoC and has specific initial flow, read and write transfer
-> state. It is not able to an i2c controller.
+You could add this by making arm_lpae_split_blk_unmap recursive, if you
+wanted to.
 
-What Arnd is suggesting is that if the flow for using it is similar
-enough to I2C you can push it through the I2C framework anyway even
-though it'll never be possible to use it with generic devices.
-
-> That's why we consider its a proprietary hardware with specific
-> protocols. How about let it appear in driver/soc?
-
-That's another option, though I'm not sure that's what the arm-soc
-people are looking for.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141215/864455a9/attachment-0001.sig>
+Will
