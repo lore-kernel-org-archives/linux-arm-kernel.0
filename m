@@ -1,43 +1,73 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Dec 2014 18:08:09 +0100
-Subject: [PATCH 06/27] ARM: mvebu: armada-370-rd: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <548F136B.90100@openwrt.org>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-7-git-send-email-gregory.clement@free-electrons.com>
- <548F136B.90100@openwrt.org>
-Message-ID: <548F1579.8090403@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Dec 2014 17:10:13 +0000
+Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
+ of_dma_configure
+In-Reply-To: <1427076.5uVd9K6nak@avalon>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <20141210150853.GH23639@arm.com> <6860089.2Ca399bIPK@avalon>
+ <1427076.5uVd9K6nak@avalon>
+Message-ID: <20141215171013.GO20738@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
-
-On 15/12/2014 17:59, Florian Fainelli wrote:
-> On 15/12/14 07:38, Gregory CLEMENT wrote:
->> The current GPL only licensing on the device tree makes it very
->> impractical for other software components licensed under another
->> license.
->>
->> In order to make it easier for them to reuse our device trees,
->> relicense our device trees under a GPL/X11 dual-license.
->>
->> Cc: Andrew Lunn <andrew@lunn.ch>
->> Cc: Arnaud Ebalard <arno@natisbad.org>
->> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->> Cc: Florian Fainelli <florian@openwrt.org>
->> Cc: Simon Baatz <gmbnomis@gmail.com>
->> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On Sun, Dec 14, 2014 at 03:59:38PM +0000, Laurent Pinchart wrote:
+> On Sunday 14 December 2014 17:49:34 Laurent Pinchart wrote:
+> > On Wednesday 10 December 2014 15:08:53 Will Deacon wrote:
+> > > On Wed, Dec 10, 2014 at 02:52:56PM +0000, Rob Clark wrote:
+> > > > so, what is the way for a driver that explicitly wants to manage it's
+> > > > own device virtual address space to opt out of this?  I suspect that
+> > > > won't be the common case, but for a gpu, if dma layer all of a sudden
+> > > > thinks it is in control of the gpu's virtual address space, things are
+> > > > going to end in tears..
+> > > 
+> > > I think you'll need to detach from the DMA domain, then have the driver
+> > > manage everything itself. As you say, it's not the common case, so you
+> > > may need to add some hooks for detaching from the default domain and
+> > > swizzling your DMA ops.
+> > 
+> > I'm wondering if it's such an exotic case after all. I can see two reasons
+> > not to use the default domain. In addition to special requirements coming
+> > from the bus master side, the IOMMU itself might not support one domain per
+> > bus master (I'm of course raising the issue from a very selfish Renesas
+> > IPMMU point of view).
+> > 
+> > In that case the IOMMU driver can still detach the device from the default
+> > domain in the .of_xlate() callback and attach it to its private domain.
 > 
-> Acked-by: Florian Fainelli <florian@openwrt.org>
+> I actually spoke too fast, the .of_xlate() callback is called before 
+> arch_setup_dma_ops(). The operation could be performed in the .add_device() 
+> callback. I'm having trouble understanding how you envision .add_device, 
+> .remove_device and .of_xlate working together in the DT case. Could you please 
+> detail what you think each callback should be responsible of exactly ?
+
+I think the sequence goes something like:
 
 
-Thanks,
+1: of_iommu_init: early initialisiation of IOMMU driver, stashes its private
+                  data via of_iommu_set_ops
 
-Gregory
+2: ->of_xlate: called for each master upstream of the IOMMU before the master
+               has probed. Passes back the DT info, which can be used to
+	       get hold of the private data from earlier. Per-device data
+	       can be stored in archdata.iommu (but I'd like to change this,
+	       see below).
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+3. ->domain_init: called from dma-mapping to create default domain (this
+                  should be replaced by ->get_default_domain in future).
+
+3. ->attach_device: called by dma-mapping to attach device to the default
+                    domain
+
+4. ->add_device: called just before the master is probed
+
+
+Now, the thing missing here is the instantiation of iommu_groups. They
+require a fully initialised struct device because of some sysfs magic
+that goes on in iommu_group_add_device. The questions I have are:
+
+  - How should we describe/create iommu_groups for platform devices?
+
+  - When do the groups actually need to be initialised (currently likely
+    to be in add_device).
+
+Will
