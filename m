@@ -1,81 +1,101 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Dec 2014 16:38:10 +0100
-Subject: [PATCH 02/27] ARM: mvebu: armada-370: Relicense the device tree under
+Date: Mon, 15 Dec 2014 16:38:08 +0100
+Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree under
  GPLv2+/X11
-In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1418657915-22775-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current GPL only licensing on the device tree makes it very
-impractical for other software components licensed under another
-license.
+Hello,
 
-In order to make it easier for them to reuse our device trees,
-relicense our device trees under a GPL/X11 dual-license.
+You've been Cc'd on a relicensing patch, because at some point you
+contributed a patch to an mvebu device tree.
 
-Cc: Arnaud Ebalard <arno@natisbad.org>
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Ryan Press <ryan@presslab.us>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-370.dtsi | 40 ++++++++++++++++++++++++++++++++++++---
- 1 file changed, 37 insertions(+), 3 deletions(-)
+We're currently moving toward a GPL/X11 dual-license, instead of a GPL
+license like what was done when you submitted your patches.
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index fdb3c12a6139..27397f151def 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -7,9 +7,43 @@
-  * Gregory CLEMENT <gregory.clement@free-electrons.com>
-  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-  *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-  *
-  * Contains definitions specific to the Armada 370 SoC that are not
-  * common to all Armada SoCs.
+This is mostly so that other free software project licensed under a
+BSD-like license, such as the BSD systems, can actually use our DT,
+instead of having to rewrite them on their own.
+
+Such license changes require the agreement of all the contributors, so
+it would be great, if you agree with the new licensing terms of
+course, that you reply to the patch by giving your acked-by.
+
+Thanks a lot,
+
+Gregory
+
+Gregory CLEMENT (27):
+  ARM: mvebu: armada-370-db: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-370: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-370-mirabox: Relicense the device tree under
+    GPLv2+/X11
+  ARM: mvebu: armada-370-netgear-rn102: Relicense the device tree under
+    GPLv2+/X11
+  ARM: mvebu: armada-370-netgear-rn104: Relicense the device tree under
+    GPLv2+/X11
+  ARM: mvebu: armada-370-rd: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-370-synology-ds213j: Relicense the device tree
+    under GPLv2+/X11
+  ARM: mvebu: armada-370-xp: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-375-db: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-375: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-380: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-385-db: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-385: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-385-rd: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-38x: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-xp-axpwifiap: Relicense the device tree under
+    GPLv2+/X11
+  ARM: mvebu: armada-xp-db: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-xp: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-xp-gp: Relicense the device tree under GPLv2+/X11
+  ARM: mvebu: armada-xp-lenovo-ix4-300d: Relicense the device tree under
+    GPLv2+/X11
+  ARM: mvebu: armada-xp-matrix: Relicense the device tree under
+    GPLv2+/X11
+  ARM: mvebu: armada-xp-mv78230: Relicense the device tree under
+    GPLv2+/X11
+  ARM: mvebu: armada-xp-mv78260: Relicense the device tree under
+    GPLv2+/X11
+  ARM: mvebu: armada-xp-mv78460: Relicense the device tree under
+    GPLv2+/X11
+  ARM: mvebu: armada-xp-netgear-rn2120: Relicense the device tree under
+    GPLv2+/X11
+  ARM: mvebu: armada-xp-openblocks-ax3-4: Relicense the device tree
+    under GPLv2+/X11
+  ARM: mvebu: armada-xp-synology-ds414: Relicense the device tree under
+    GPLv2+/X11
+
+ arch/arm/boot/dts/armada-370-db.dts              | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-370-mirabox.dts         | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts   | 41 +++++++++++++++++++++---
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts   | 41 +++++++++++++++++++++---
+ arch/arm/boot/dts/armada-370-rd.dts              | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-370-synology-ds213j.dts | 41 +++++++++++++++++++++---
+ arch/arm/boot/dts/armada-370-xp.dtsi             | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-370.dtsi                | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-375-db.dts              | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-375.dtsi                | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-380.dtsi                | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-385-db.dts              | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-385-rd.dts              | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-385.dtsi                | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-38x.dtsi                | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-xp-db.dts               | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-xp-gp.dts               | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  | 41 +++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-matrix.dts           | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi         | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi         | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi         | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 41 +++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 40 +++++++++++++++++++++--
+ arch/arm/boot/dts/armada-xp-synology-ds414.dts   | 41 +++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp.dtsi                 | 40 +++++++++++++++++++++--
+ 27 files changed, 999 insertions(+), 87 deletions(-)
+
 -- 
 1.9.1
