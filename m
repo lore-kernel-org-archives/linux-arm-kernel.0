@@ -1,195 +1,30 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 15 Dec 2014 18:23:54 +0800
-Subject: [v3][PATCH 3/5] media: ov2640: add primary dt support
-In-Reply-To: <2810609.1cJv5BoTgd@avalon>
-References: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
- <1418283339-16281-4-git-send-email-josh.wu@atmel.com>
- <2810609.1cJv5BoTgd@avalon>
-Message-ID: <548EB6BA.90508@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Dec 2014 10:25:54 +0000
+Subject: request bitrev patch merge
+In-Reply-To: <20141215095239.GB11285@n2100.arm.linux.org.uk>
+References: <35FD53F367049845BC99AC72306C23D103EDAF89E146@CNBJMBX05.corpusers.net>
+ <20141215095239.GB11285@n2100.arm.linux.org.uk>
+Message-ID: <20141215102554.GC11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Laurent
+On Mon, Dec 15, 2014 at 09:52:39AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 15, 2014 at 02:02:50PM +0800, Wang, Yalin wrote:
+> > Hi
+> > 
+> > Joe's patch that remove use byte_rev_table directly have
+> > Been merged into linux-next branch ,
+> > Cou you merge 8187/1 8205/1 8189/1 patch for arm ?
+> 
+> Unfortunately, it's missed this merge window.  It is bad practice to add
+> new features to linux-next during a merge window, and it is also bad to
+> send new features to Linus without them having been in linux-next before
+> the merge window opened.
+> 
+> It will be queued for -rc1.
 
-On 12/11/2014 4:10 PM, Laurent Pinchart wrote:
-> Hi Josh,
->
-> Thank you for the patch.
->
-> I only have three minor comments. After fixing them,
->
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+I mean, it will be queued /after/ -rc1.
 
-Thanks for the review.
->
-> On Thursday 11 December 2014 15:35:37 Josh Wu wrote:
->> Add device tree support for ov2640.
->>
->> Cc: devicetree at vger.kernel.org
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->> v2 -> v3:
->>    1. fix gpiod usage.
->>    2. refine the ov2640_probe() function.
->>
->> v1 -> v2:
->>    1. use gpiod APIs.
->>    2. change the gpio pin's name according to datasheet.
->>    3. reduce the delay for .reset() function.
->>
->>   drivers/media/i2c/soc_camera/ov2640.c | 87 +++++++++++++++++++++++++++++---
->>   1 file changed, 81 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
->> b/drivers/media/i2c/soc_camera/ov2640.c index 9ee910d..e0bcf5b 100644
->> --- a/drivers/media/i2c/soc_camera/ov2640.c
->> +++ b/drivers/media/i2c/soc_camera/ov2640.c
->> @@ -18,6 +18,8 @@
->>   #include <linux/i2c.h>
->>   #include <linux/slab.h>
->>   #include <linux/delay.h>
->> +#include <linux/gpio.h>
->> +#include <linux/of_gpio.h>
->>   #include <linux/v4l2-mediabus.h>
->>   #include <linux/videodev2.h>
->>
->> @@ -283,6 +285,10 @@ struct ov2640_priv {
->>   	u32	cfmt_code;
->>   	struct v4l2_clk			*clk;
->>   	const struct ov2640_win_size	*win;
->> +
->> +	struct soc_camera_subdev_desc	ssdd_dt;
->> +	struct gpio_desc *resetb_gpio;
->> +	struct gpio_desc *pwdn_gpio;
->>   };
->>
->>   /*
->> @@ -1047,6 +1053,63 @@ static struct v4l2_subdev_ops ov2640_subdev_ops = {
->>   	.video	= &ov2640_subdev_video_ops,
->>   };
->>
->> +/* OF probe functions */
->> +static int ov2640_hw_power(struct device *dev, int on)
->> +{
->> +	struct i2c_client *client = to_i2c_client(dev);
->> +	struct ov2640_priv *priv = to_ov2640(client);
->> +
->> +	dev_dbg(&client->dev, "%s: %s the camera\n",
->> +			__func__, on ? "ENABLE" : "DISABLE");
->> +
->> +	if (priv->pwdn_gpio)
->> +		gpiod_direction_output(priv->pwdn_gpio, !on);
->> +
->> +	return 0;
->> +}
->> +
->> +static int ov2640_hw_reset(struct device *dev)
->> +{
->> +	struct i2c_client *client = to_i2c_client(dev);
->> +	struct ov2640_priv *priv = to_ov2640(client);
->> +
->> +	if (priv->resetb_gpio) {
->> +		/* Active the resetb pin to perform a reset pulse */
->> +		gpiod_direction_output(priv->resetb_gpio, 1);
->> +		usleep_range(3000, 5000);
->> +		gpiod_direction_output(priv->resetb_gpio, 0);
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int ov2640_probe_dt(struct i2c_client *client,
->> +		struct ov2640_priv *priv)
->> +{
->> +	/* reset is not actived */
-> Do you mean that you configure the reset signal as inactive ? I would state
-> that as "Request the reset GPIO deasserted".
-
-yes, exactly. I'll take your sentence. thanks.
->
->> +	priv->resetb_gpio = devm_gpiod_get_optional(&client->dev, "resetb",
->> +			GPIOD_OUT_LOW);
->> +	if (!priv->resetb_gpio)
->> +		dev_dbg(&client->dev, "resetb gpio is not assigned!\n");
->> +	else if (IS_ERR(priv->resetb_gpio))
->> +		return PTR_ERR(priv->resetb_gpio);
->> +
->> +	/* Power down actived */
-> And "Request the power down GPIO asserted".
-ditto.
-
->
->> +	priv->pwdn_gpio = devm_gpiod_get_optional(&client->dev, "pwdn",
->> +			GPIOD_OUT_HIGH);
->> +	if (!priv->pwdn_gpio)
->> +		dev_dbg(&client->dev, "pwdn gpio is not assigned!\n");
->> +	else if (IS_ERR(priv->pwdn_gpio))
->> +		return PTR_ERR(priv->pwdn_gpio);
->> +
->> +	/* Initialize the soc_camera_subdev_desc */
->> +	priv->ssdd_dt.power = ov2640_hw_power;
->> +	priv->ssdd_dt.reset = ov2640_hw_reset;
->> +	client->dev.platform_data = &priv->ssdd_dt;
->> +
->> +	return 0;
->> +}
->> +
->>   /*
->>    * i2c_driver functions
->>    */
->> @@ -1058,12 +1121,6 @@ static int ov2640_probe(struct i2c_client *client,
->>   	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
->>   	int			ret;
->>
->> -	if (!ssdd) {
->> -		dev_err(&adapter->dev,
->> -			"OV2640: Missing platform_data for driver\n");
->> -		return -EINVAL;
->> -	}
->> -
->>   	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
->>   		dev_err(&adapter->dev,
->>   			"OV2640: I2C-Adapter doesn't support SMBUS\n");
->> @@ -1077,6 +1134,17 @@ static int ov2640_probe(struct i2c_client *client,
->>   		return -ENOMEM;
->>   	}
->>
->> +	if (!ssdd && !client->dev.of_node) {
->> +		dev_err(&client->dev, "Missing platform_data for driver\n");
->> +		return  -EINVAL;
->> +	}
->> +
->> +	if (!ssdd && client->dev.of_node) {
-> You can just test for !ssdd as you've tested client->dev.of_node above
-> already.
-
-Right, thanks.
-
-Best Regards,
-Josh Wu
->
->> +		ret = ov2640_probe_dt(client, priv);
->> +		if (ret)
->> +			return ret;
->> +	}
->> +
->>   	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
->>   	v4l2_ctrl_handler_init(&priv->hdl, 2);
->>   	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
->> @@ -1123,9 +1191,16 @@ static const struct i2c_device_id ov2640_id[] = {
->>   };
->>   MODULE_DEVICE_TABLE(i2c, ov2640_id);
->>
->> +static const struct of_device_id ov2640_of_match[] = {
->> +	{.compatible = "ovti,ov2640", },
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(of, ov2640_of_match);
->> +
->>   static struct i2c_driver ov2640_i2c_driver = {
->>   	.driver = {
->>   		.name = "ov2640",
->> +		.of_match_table = of_match_ptr(ov2640_of_match),
->>   	},
->>   	.probe    = ov2640_probe,
->>   	.remove   = ov2640_remove,
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
