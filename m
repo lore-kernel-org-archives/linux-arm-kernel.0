@@ -1,37 +1,38 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 15 Dec 2014 10:50:37 -0800
-Subject: [PATCH] ARM: defconfigs: use CONFIG_CPUFREQ_DT
-In-Reply-To: <2757282.fj6z18fAYb@vostro.rjw.lan> (Rafael J. Wysocki's message
- of "Mon, 15 Dec 2014 16:00:12 +0100")
-References: <63217079d4b61d835fed98198ae1e3f0e6329de1.1418617005.git.viresh.kumar@linaro.org>
- <2757282.fj6z18fAYb@vostro.rjw.lan>
-Message-ID: <7h1to0iw76.fsf@deeprootsystems.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 15 Dec 2014 19:59:50 +0100
+Subject: [PATCH 02/27] ARM: mvebu: armada-370: Relicense the device tree
+ under GPLv2+/X11
+In-Reply-To: <1418657915-22775-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20141215185950.GA13486@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+Hello Gregory,
 
-> On Monday, December 15, 2014 09:48:19 AM Viresh Kumar wrote:
->> CONFIG_GENERIC_CPUFREQ_CPU0 disappeared with commit bbcf071969b20f
->> ("cpufreq: cpu0: rename driver and internals to 'cpufreq_dt'") and some
->> defconfigs are still using it instead of the new one.
->> 
->> Use the renamed CONFIG_CPUFREQ_DT generic driver.
->> 
->> Cc: <stable@vger.kernel.org>        # 3.18
->> Reported-by: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> OK, so who should be applying this?
->
+On Mon, Dec 15, 2014 at 04:38:10PM +0100, Gregory CLEMENT wrote:
+> The current GPL only licensing on the device tree makes it very
+> impractical for other software components licensed under another
+> license.
+> 
+> In order to make it easier for them to reuse our device trees,
+> relicense our device trees under a GPL/X11 dual-license.
+> 
+> Cc: Arnaud Ebalard <arno@natisbad.org>
+> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Ryan Press <ryan@presslab.us>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Not sure my contribution is copyrightable but instead of discussing this
+you can simply have my Ack:
 
-Normally, we take these defconfig changes through the arm-soc tree, and
-I think that should continue, otherwise we'll be bound to have conflicts.
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Note all the pull requests for this merge window are already sent, but
-I'll queue this up in arm-soc/fixes so it can make it during the
-v3.19-rc cycle.
+Best regards
+Uwe
 
-Thanks,
-
-Kevin
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
