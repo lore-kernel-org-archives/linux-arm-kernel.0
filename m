@@ -1,39 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Dec 2014 11:38:32 +0000
-Subject: [RFC 02/15] drivers/base: add restrack framework
-In-Reply-To: <548E9BB9.806@samsung.com>
-References: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
- <1418226513-14105-3-git-send-email-a.hajda@samsung.com>
- <20141212165230.GP11764@sirena.org.uk> <548E9BB9.806@samsung.com>
-Message-ID: <20141215113832.GX11764@sirena.org.uk>
+From: thunder.leizhen@huawei.com (leizhen)
+Date: Mon, 15 Dec 2014 19:16:43 +0800
+Subject: [PATCH 1/1] iommu/arm-smmu: modify the calculation of PASize
+ and SEP fields
+In-Reply-To: <20141212105749.GC25781@arm.com>
+References: <1418373663-9124-1-git-send-email-thunder.leizhen@huawei.com>
+ <20141212105749.GC25781@arm.com>
+Message-ID: <548EC31B.5010809@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 09:28:41AM +0100, Andrzej Hajda wrote:
-> On 12/12/2014 05:52 PM, Mark Brown wrote:
-> > On Wed, Dec 10, 2014 at 04:48:20PM +0100, Andrzej Hajda wrote:
+On 2014/12/12 18:57, Will Deacon wrote:
+> On Fri, Dec 12, 2014 at 08:41:03AM +0000, Zhen Lei wrote:
+>> 1. the calculation appear 3 times, it's good to define a function.
+>> 2. VA_BITS is dynamic determined by CONFIG_ARM64_VA_BITS yet, but current
+>>    switch..case can not cover all possible values.
+>> 3. change TTBCR2_ADDR_xx to ADDR_SIZE_xx, because it's not only TTBCR2 use it.
+> 
+> Please take a look at the pgtable rework I posted recently -- it moves a
+> bunch of this into a generic framework.
+> 
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/306786.html
+> 
+> (I plan to post v2 soon).
+> 
+> Will
+> 
+> .
+> 
 
-> > I don't know about anyone else but I'm having a hard time reading the
-> > restrack name, it looks like a misspelling of restack to me.
-
-> Any alternative names?
-
-Well, even just res_track would help.
-
-> I will move the code for provider matching to frameworks,
-> so it will be easy to add just dev_info after every failed attempt
-> of getting resource, including deferring. This is the simplest solution
-> and it should be similar in verbosity to deferred probing.
-
-> Maybe other solution is to provide debug_fs (or device) attribute showing
-> restrack status per device.
-
-I think both are useful - it's often helpful to have a listing of what
-resources have actually been registered, for example to help spot typos.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141215/1bebb5ca/attachment.sig>
+OK, I saw.
