@@ -1,10 +1,10 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 15 Dec 2014 18:57:46 +0100
-Subject: [PATCH 05/27] ARM: mvebu: armada-370-netgear-rn104: Relicense the
- device tree under GPLv2+/X11
+Date: Mon, 15 Dec 2014 18:58:06 +0100
+Subject: [PATCH 07/27] ARM: mvebu: armada-370-synology-ds213j: Relicense
+ the device tree under GPLv2+/X11
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-6-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <87fvcgokx1.fsf@natisbad.org>
+ <1418657915-22775-8-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <871to0okwh.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,25 +19,22 @@ Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 > relicense our device trees under a GPL/X11 dual-license.
 >
 > Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Acked-by: Arnaud Ebalard <arno@natisbad.org>
 
 
 > ---
->  arch/arm/boot/dts/armada-370-netgear-rn104.dts | 41 +++++++++++++++++++++++---
+>  arch/arm/boot/dts/armada-370-synology-ds213j.dts | 41 +++++++++++++++++++++---
 >  1 file changed, 37 insertions(+), 4 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-> index 30586e47986a..1de53b59283a 100644
-> --- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-> +++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> diff --git a/arch/arm/boot/dts/armada-370-synology-ds213j.dts b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
+> index 70fecde76ccb..59f74e66963f 100644
+> --- a/arch/arm/boot/dts/armada-370-synology-ds213j.dts
+> +++ b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
 > @@ -3,10 +3,43 @@
 >   *
->   * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
+>   * Copyright (C) 2014, Arnaud EBALARD <arno@natisbad.org>
 >   *
 > - * This program is free software; you can redistribute it and/or
 > - * modify it under the terms of the GNU General Public License
@@ -80,6 +77,6 @@ Acked-by: Arnaud Ebalard <arno@natisbad.org>
 > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 > + *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
->  /dts-v1/;
+>   *
+>   * Note: this Device Tree assumes that the bootloader has remapped the
+>   * internal registers to 0xf1000000 (instead of the old 0xd0000000).
