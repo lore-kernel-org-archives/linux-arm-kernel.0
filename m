@@ -1,62 +1,42 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Dec 2014 17:17:00 +0000
-Subject: [PATCH v3 18/19] iommu: exynos: init from dt-specific callback
- instead of initcall
-In-Reply-To: <1826772.xgprzQcfXd@avalon>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1416395748-10731-19-git-send-email-m.szyprowski@samsung.com>
- <1826772.xgprzQcfXd@avalon>
-Message-ID: <20141215171700.GP20738@arm.com>
+Date: Mon, 15 Dec 2014 17:20:40 +0000
+Subject: [PATCH 2/4] iommu: add ARM LPAE page table allocator
+In-Reply-To: <BN3PR0301MB12199C5CAD33E745CC7E51F4EA6F0@BN3PR0301MB1219.namprd03.prod.outlook.com>
+References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
+ <1417089078-22900-3-git-send-email-will.deacon@arm.com>
+ <BN3PR0301MB12198CE5D736CDC6A221EDC2EA790@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <20141205184802.GH1203@arm.com>
+ <BN3PR0301MB1219D3161E4E9DB314FDD8FAEA6E0@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <20141215133020.GJ20738@arm.com>
+ <BN3PR0301MB12199C5CAD33E745CC7E51F4EA6F0@BN3PR0301MB1219.namprd03.prod.outlook.com>
+Message-ID: <20141215172040.GQ20738@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 14, 2014 at 12:45:36PM +0000, Laurent Pinchart wrote:
-> On Wednesday 19 November 2014 12:15:47 Marek Szyprowski wrote:
-> > This patch introduces IOMMU_OF_DECLARE-based initialization to the
-> > driver, which replaces subsys_initcall-based procedure.
-> > exynos_iommu_of_setup ensures that each sysmmu controller is probed
-> > before its master device.
+On Mon, Dec 15, 2014 at 04:43:59PM +0000, Varun Sethi wrote:
+> > Sure we can support 48-bit VAs with 64k pages. Why do you think we can't?
 > > 
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > ---
-> >  drivers/iommu/exynos-iommu.c | 28 +++++++++++++++++++++++++++-
-> >  1 file changed, 27 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> > index cd28dc09db39..88f9afe641a0 100644
-> > --- a/drivers/iommu/exynos-iommu.c
-> > +++ b/drivers/iommu/exynos-iommu.c
+> > [varun]  My concern was with respect to the bits per level, which is 
+> > uneven for the 64 K page sizes. Just wondering how would things work 
+> > with 64K pages when we do a 3 level page lookup.
 > 
-> [snip]
+> Well, it's uneven (9) for the 4k case too. Do you actually see an issue here?
 > 
-> > @@ -1125,4 +1134,21 @@ err_reg_driver:
-> >  	kmem_cache_destroy(lv2table_kmem_cache);
-> >  	return ret;
-> >  }
-> > -subsys_initcall(exynos_iommu_init);
-> > +
-> > +static int __init exynos_iommu_of_setup(struct device_node *np)
-> > +{
-> > +	struct platform_device *pdev;
-> > +
-> > +	if (!init_done)
-> > +		exynos_iommu_init();
-> > +
-> > +	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
-> > +	if (IS_ERR(pdev))
-> > +		return PTR_ERR(pdev);
+> 48-bit VA with 64k pages gives us:
 > 
-> If we end up having to create the IOMMU platform devices from within the 
-> drivers, the introduction of IOMMU_OF_DECLARE starts to feel like a workaround 
-> to me. I wonder whether it wouldn't then be better to let the driver core 
-> instantiate the IOMMU platform device from DT as for all other devices, and 
-> use device notifiers to defer probe of the bus masters until the required 
-> IOMMU(s) are registered.
+>   va_bits = (48 - 16) = 32
+>   bits_per_level = (16 - 3) = 13
+>   levels = ceil(32/13) = 3
 > 
-> Will, what's your opinion on that ?
+> so the starting level is 1, which resolves 32-(13*2) = 6 bits.
+> 
+> Does that make sense?
+> 
+> [[varun]]Yes, but what I meant was, is that in case of 4K pages you have 9
+> bits per level, but for 64K pages you have 6 bits for the first  level and
+> 13 each for second and third. So, bits per level would not work in case of
+> 64 K pages?
 
-Creating the platform device manually for the IOMMU is indeed grotty, but I
-don't really understand why it's needed. Interrupt controllers, for example,
-seem to get by without one.
+The current code takes this into account.
 
 Will
