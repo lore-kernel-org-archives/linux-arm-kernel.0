@@ -1,40 +1,107 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 15 Dec 2014 11:07:52 -0500
-Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
- under GPLv2+/X11
-In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20141215160752.GE967@titan.lakedaemon.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Dec 2014 16:10:52 +0000
+Subject: [PATCH 0/4] Generic IOMMU page table framework
+In-Reply-To: <2133922.nksBEtjI2q@avalon>
+References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
+ <2133922.nksBEtjI2q@avalon>
+Message-ID: <20141215161052.GM20738@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory,
+On Sun, Dec 14, 2014 at 11:49:30PM +0000, Laurent Pinchart wrote:
+> Hi Will,
 
-Good to see this finally being addressed.  One not-so-minor issue below.
+Hi Laurent,
 
-On Mon, Dec 15, 2014 at 04:38:08PM +0100, Gregory CLEMENT wrote:
-> Hello,
+> On Thursday 27 November 2014 11:51:14 Will Deacon wrote:
+> > This series introduces a generic IOMMU page table allocation framework,
+> > implements support for ARM long-descriptors and then ports the arm-smmu
+> > driver over to the new code.
+
+[...]
+
+> > All feedback welcome.
 > 
-> You've been Cc'd on a relicensing patch, because at some point you
-> contributed a patch to an mvebu device tree.
+> I've successfully tested the patch set with the Renesas IPMMU-VMSA driver with
+> the following extension to the allocator.
 > 
-> We're currently moving toward a GPL/X11 dual-license, instead of a GPL
-> license like what was done when you submitted your patches.
+> Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-I like the X11 license, much more liberal than the BSD I had been
-thinking of.
+Wahey, that's really cool, thanks! I have a few minor comments on your patch
+below. If you don't object, then I can make them locally and include your
+patch on top of my v2 series?
 
-What were the reasons for changing GPLv2 -> GPLv2+?  Why not preserve
-the author's intent re GPL and do:
+> From 4bebb7f3a5a48541d4c89ce7c61e6ff66686c3a9 Mon Sep 17 00:00:00 2001
+> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Date: Sun, 14 Dec 2014 23:34:50 +0200
+> Subject: [PATCH] iommu: io-pgtable-arm: Add Non-Secure quirk
+> 
+> The quirk causes the Non-Secure bit to be set in all page table entries.
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  drivers/iommu/io-pgtable-arm.c | 7 +++++++
+>  drivers/iommu/io-pgtable.h     | 3 +++
+>  2 files changed, 10 insertions(+)
+> 
+> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> index 669e322a83a4..b6910e142734 100644
+> --- a/drivers/iommu/io-pgtable-arm.c
+> +++ b/drivers/iommu/io-pgtable-arm.c
+> @@ -80,11 +80,13 @@
+>  #define ARM_LPAE_PTE_TYPE_TABLE		3
+>  #define ARM_LPAE_PTE_TYPE_PAGE		3
+>  
+> +#define ARM_LPAE_PTE_NSTABLE		(((arm_lpae_iopte)1) << 63)
+>  #define ARM_LPAE_PTE_XN			(((arm_lpae_iopte)3) << 53)
+>  #define ARM_LPAE_PTE_AF			(((arm_lpae_iopte)1) << 10)
+>  #define ARM_LPAE_PTE_SH_NS		(((arm_lpae_iopte)0) << 8)
+>  #define ARM_LPAE_PTE_SH_OS		(((arm_lpae_iopte)2) << 8)
+>  #define ARM_LPAE_PTE_SH_IS		(((arm_lpae_iopte)3) << 8)
+> +#define ARM_LPAE_PTE_NS			(((arm_lpae_iopte)1) << 5)
+>  #define ARM_LPAE_PTE_VALID		(((arm_lpae_iopte)1) << 0)
+>  
+>  #define ARM_LPAE_PTE_ATTR_LO_MASK	(((arm_lpae_iopte)0x3ff) << 2)
+> @@ -201,6 +203,9 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
+>  	if (iopte_leaf(*ptep, lvl))
+>  		return -EEXIST;
+>  
+> +	if (data->iop.cfg.quirks & IO_PGTABLE_QUIRK_NON_SECURE)
+> +		pte |= ARM_LPAE_PTE_NS;
+> +
+>  	if (lvl == ARM_LPAE_MAX_LEVELS - 1)
+>  		pte |= ARM_LPAE_PTE_TYPE_PAGE;
+>  	else
+> @@ -244,6 +249,8 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
+>  		data->iop.cfg.tlb->flush_pgtable(cptep, 1UL << data->pg_shift,
+>  						 cookie);
+>  		pte = __pa(cptep) | ARM_LPAE_PTE_TYPE_TABLE;
+> +		if (data->iop.cfg.quirks & IO_PGTABLE_QUIRK_NON_SECURE)
+> +			pte |= ARM_LPAE_PTE_NSTABLE;
+>  		*ptep = pte;
+>  		data->iop.cfg.tlb->flush_pgtable(ptep, sizeof(*ptep), cookie);
+>  	} else {
+> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+> index c1cff3d045db..a41a15d30596 100644
+> --- a/drivers/iommu/io-pgtable.h
+> +++ b/drivers/iommu/io-pgtable.h
+> @@ -24,6 +24,9 @@ struct iommu_gather_ops {
+>  	void (*flush_pgtable)(void *ptr, size_t size, void *cookie);
+>  };
+>  
+> +/* Set the Non-Secure bit in the PTEs */
+> +#define IO_PGTABLE_QUIRK_NON_SECURE	(1 << 0)
 
-	GPLv2  -> GPLv2/X11
-	GPLv2+ -> GPLv2+/X11
+I think I'd stick an _ARM_ somewhere in here, so maybe
+IO_PGTABLE_QUIRK_ARM_NS?
 
-Please note: I have no interest is a flame war re GPLv2/GPLv3.  No ones
-minds are going to be changed at this point.  I'm simply looking to stay
-closer to the author's intentions and extend the usefulness of the DT
-tree.
+> +
+>  struct io_pgtable_cfg {
 
-thx,
+and I'd put the #define here, next to the member.
 
-Jason.
+>  	int			quirks; /* IO_PGTABLE_QUIRK_* */
+>  	unsigned long		pgsize_bitmap;
+> -- 
+
+Will
