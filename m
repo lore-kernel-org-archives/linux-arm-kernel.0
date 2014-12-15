@@ -1,48 +1,40 @@
-From: k.kozlowski@samsung.com (=?UTF-8?B?S3J6eXN6dG9mIEtvesWCb3dza2k=?=)
-Date: Mon, 15 Dec 2014 14:10:37 +0100
-Subject: [PATCH] iommu/exynos: Fix arm64 allmodconfig build
-In-Reply-To: <1418648413-32013-1-git-send-email-broonie@kernel.org>
-References: <1418648413-32013-1-git-send-email-broonie@kernel.org>
-Message-ID: <548EDDCD.4060203@samsung.com>
+From: ykk@rock-chips.com (Kuankuan.Yang)
+Date: Mon, 15 Dec 2014 21:10:26 +0800
+Subject: [PATCH 5/6] dt-bindings: Add documentation for Rockchip hdmi-audio
+In-Reply-To: <20141215120205.GZ11764@sirena.org.uk>
+References: <1418609494-15820-1-git-send-email-ykk@rock-chips.com>
+ <1418612114-19692-1-git-send-email-ykk@rock-chips.com>
+ <20141215104029.GE11285@n2100.arm.linux.org.uk>
+ <20141215120205.GZ11764@sirena.org.uk>
+Message-ID: <548EDDC2.9050104@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.12.2014 14:00, Mark Brown wrote:
-> The Exynos IOMMU driver uses the ARM specific dmac_flush_range() and
-> outer_flush_range() functions. This breaks the build on arm64 allmodconfig
-> in -next since support has been merged for some Exynos ARMv8 SoCs. Add a
-> dependency on ARM to keep things building until either the driver has the
-> ARM dependencies removed or the ARMv8 architecture code implements these
-> ARM specific APIs.
+Hi Mark & Russell:
 
-Hi Mark,
+thanks for your replay, what your say is right, those dt is merely 
+describing the Linux kernel internals.
+Instead of transmit cpu-of-node & codec-name & codec-dai-name through 
+dt, i can give those an const
+name to rockchip-hdmi-audio.c .
 
-Few days ago I posted similar patch:
-https://lkml.org/lkml/2014/12/5/268
-but no one have picked it up.
+In that way, dt will only need compatible for creating sound device. is 
+it ok  ?
+sound {
+     compatible = "rockchip,rk3288-hdmi-audio";
+     status = "okay";
+}
+could you give me some advises.
 
-Anyway the fix of yours seems fine to me.
 
-Best regards,
-Krzysztof
+Best Regards.
 
-> 
-> Signed-off-by: Mark Brown <broonie@kernel.org>
-> ---
->  drivers/iommu/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index 01e8bfae569b..325188eef1c1 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -187,7 +187,7 @@ config TEGRA_IOMMU_SMMU
->  
->  config EXYNOS_IOMMU
->  	bool "Exynos IOMMU Support"
-> -	depends on ARCH_EXYNOS
-> +	depends on ARCH_EXYNOS && ARM
->  	select IOMMU_API
->  	select ARM_DMA_USE_IOMMU
->  	help
-> 
+? 2014?12?15? 20:02, Mark Brown ??:
+> On Mon, Dec 15, 2014 at 10:40:29AM +0000, Russell King - ARM Linux wrote:
+>
+>> Including details like this (because ASoC needs a separate DT node) is
+>> the wrong approach.
+> And indeed there should be no Linux-internal reason for that - we should
+> be able to use whatever DT node makes sense, if there's some reason
+> that's not possible we should fix that (we do have several drivers doing
+> this sort of thing already though).
