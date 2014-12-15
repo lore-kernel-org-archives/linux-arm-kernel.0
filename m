@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Dec 2014 16:38:18 +0100
-Subject: [PATCH 10/27] ARM: mvebu: armada-375: Relicense the device tree under
- GPLv2+/X11
+Date: Mon, 15 Dec 2014 16:38:14 +0100
+Subject: [PATCH 06/27] ARM: mvebu: armada-370-rd: Relicense the device tree
+ under GPLv2+/X11
 In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1418657915-22775-11-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1418657915-22775-7-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,21 +15,24 @@ license.
 In order to make it easier for them to reuse our device trees,
 relicense our device trees under a GPL/X11 dual-license.
 
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Arnaud Ebalard <arno@natisbad.org>
 Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Marcin Wojtas <mw@semihalf.com>
+Cc: Florian Fainelli <florian@openwrt.org>
+Cc: Simon Baatz <gmbnomis@gmail.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-375.dtsi | 40 ++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-370-rd.dts | 40 ++++++++++++++++++++++++++++++++++---
  1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index 50096d3427eb..881f77aecd83 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
+diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+index 394308951ed9..6ae36a38beb2 100644
+--- a/arch/arm/boot/dts/armada-370-rd.dts
++++ b/arch/arm/boot/dts/armada-370-rd.dts
 @@ -6,9 +6,43 @@
-  * Gregory CLEMENT <gregory.clement@free-electrons.com>
-  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+  *
+  *  Copyright (C) 2013 Florian Fainelli <florian@openwrt.org>
   *
 - * This file is licensed under the terms of the GNU General Public
 - * License version 2.  This program is licensed "as is" without any
@@ -71,8 +74,8 @@ index 50096d3427eb..881f77aecd83 100644
 + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- #include "skeleton.dtsi"
+  *
+  * Note: this Device Tree assumes that the bootloader has remapped the
+  * internal registers to 0xf1000000 (instead of the default
 -- 
 1.9.1
