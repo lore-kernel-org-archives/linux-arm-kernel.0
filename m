@@ -1,100 +1,88 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Dec 2014 11:28:48 +0000
-Subject: [PATCH 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
- board dts and Makefile
-In-Reply-To: <20141212065235.GK30369@pengutronix.de>
-References: <1418208602-35584-1-git-send-email-eddie.huang@mediatek.com>
- <1418208602-35584-4-git-send-email-eddie.huang@mediatek.com>
- <20141211180245.GE28150@leverpostej>
- <20141212065235.GK30369@pengutronix.de>
-Message-ID: <20141215112848.GE462@leverpostej>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Mon, 15 Dec 2014 13:29:32 +0200
+Subject: [PATCH 03/18] arm64/uaccess: fix sparse errors
+In-Reply-To: <20141215112310.GG11285@n2100.arm.linux.org.uk>
+References: <1418575877-21488-1-git-send-email-mst@redhat.com>
+ <1418575877-21488-4-git-send-email-mst@redhat.com>
+ <20141215111716.GG20738@arm.com>
+ <20141215112310.GG11285@n2100.arm.linux.org.uk>
+Message-ID: <20141215112932.GA27136@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 12, 2014 at 06:52:35AM +0000, Sascha Hauer wrote:
-> On Thu, Dec 11, 2014 at 06:02:46PM +0000, Mark Rutland wrote:
-> > Hi,
-> > 
-> > On Wed, Dec 10, 2014 at 10:50:01AM +0000, Eddie Huang wrote:
-> > > Add device tree support for MT8173 SoC and evalutaion board based on it.
+On Mon, Dec 15, 2014 at 11:23:11AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 15, 2014 at 11:17:16AM +0000, Will Deacon wrote:
+> > On Sun, Dec 14, 2014 at 04:52:09PM +0000, Michael S. Tsirkin wrote:
+> > > virtio wants to read bitwise types from userspace using get_user.  At the
+> > > moment this triggers sparse errors, since the value is passed through an
+> > > integer.
 > > > 
-> > > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> > > Fix that up using __force.
+> > > 
+> > > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
 > > > ---
-> > >  arch/arm64/boot/dts/Makefile       |   1 +
-> > >  arch/arm64/boot/dts/mt8173-evb.dts |  31 +++++++
-> > >  arch/arm64/boot/dts/mt8173.dtsi    | 164 +++++++++++++++++++++++++++++++++++++
-> > >  3 files changed, 196 insertions(+)
-> > >  create mode 100644 arch/arm64/boot/dts/mt8173-evb.dts
-> > >  create mode 100644 arch/arm64/boot/dts/mt8173.dtsi
+> > >  arch/arm64/include/asm/uaccess.h | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
 > > > 
-> > > diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> > > index f8001a6..db7661e 100644
-> > > --- a/arch/arm64/boot/dts/Makefile
-> > > +++ b/arch/arm64/boot/dts/Makefile
-> > > @@ -1,3 +1,4 @@
-> > > +dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-> > >  dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
-> > >  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
-> > >  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
-> > > diff --git a/arch/arm64/boot/dts/mt8173-evb.dts b/arch/arm64/boot/dts/mt8173-evb.dts
-> > > new file mode 100644
-> > > index 0000000..adf26dd
-> > > --- /dev/null
-> > > +++ b/arch/arm64/boot/dts/mt8173-evb.dts
-> > > @@ -0,0 +1,31 @@
-> > > +/*
-> > > + * Copyright (c) 2014 MediaTek Inc.
-> > > + * Author: Eddie Huang <eddie.huang@mediatek.com>
-> > > + *
-> > > + * This program is free software; you can redistribute it and/or modify
-> > > + * it under the terms of the GNU General Public License version 2 as
-> > > + * published by the Free Software Foundation.
-> > > + *
-> > > + * This program is distributed in the hope that it will be useful,
-> > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > > + * GNU General Public License for more details.
-> > > + */
-> > > +
-> > > +/dts-v1/;
-> > > +#include "mt8173.dtsi"
-> > > +
-> > > +/ {
-> > > +	model = "mediatek,mt8173-evb";
-> > > +
-> > > +	aliases {
-> > > +		serial0 = &uart0;
-> > > +		serial1 = &uart1;
-> > > +		serial2 = &uart2;
-> > > +		serial3 = &uart3;
+> > > diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> > > index 3bf8f4e..8d66bcf 100644
+> > > --- a/arch/arm64/include/asm/uaccess.h
+> > > +++ b/arch/arm64/include/asm/uaccess.h
+> > > @@ -147,7 +147,7 @@ do {									\
+> > >  	default:							\
+> > >  		BUILD_BUG();						\
+> > >  	}								\
+> > > -	(x) = (__typeof__(*(ptr)))__gu_val;				\
+> > > +	(x) = (__force __typeof__(*(ptr)))__gu_val;				\
+> > >  } while (0)
+> > >  
+> > >  #define __get_user(x, ptr)						\
 > > 
-> > Do any of these support earlycon?
-> > 
-> > > +	};
-> > > +
-> > > +	memory {
-> > 
-> > Nit: should be memory at 40000000 (and you'll need to add device_type =
-> > "memory").
+> > Acked-by: Will Deacon <will.deacon@arm.com>
 > 
-> skeleton.dtsi already has a /memory node with device_type = "memory".
-> Shouldn't that be used?
+> This also means you can do stuff like:
+> 
+> 	u32 *p;
+> 	__le32 v;
+> 
+> 	err = get_user(p, v);
+> 
+> which is not right.
 
-To be honest I don't think that skeleton.dtsi is all that helpful.
+Are you sure?  We are casting to __typeof__(*(ptr))),
+then assigning to x. So if *p and v are different sparse will
+still warn.
 
-Almost all dts files define the root #address-cells and #size-cells for
-clarity anyway (which means the memory node isn't necessarily adequately
-sized), and the memory node(s) should have unit-addresses (so they won't
-match the memory node it provides).
+>  Both the dereferenced pointer type and the destination
+> type should be compatible, and if one is a bitwise type but the other isn't,
+> that seems like a valid case to warn.
+> 
+> I don't see any use of get_user() in drivers/virtio in mainline, so I can't
+> check further.
 
-Where a dts is written with the assumption that the bootloader will fill
-things there should be a comment in the dts to that effect, with
-adequately sized memory nodes.
 
-The only potentially useful items are the empty /chosen and /aliases
-nodes. Both of which don't seem to be strictly required.
 
-If anything, I'd be tempted to get rid of skeleton.dtsi entirely.
+It's not in drivers/virtio.
+We have a work around upstream (uses __get_user + access_ok).
+Try this patch reverting the work-around, you will see the sparse
+warning:
 
-Thanks,
-Mark.
+diff --git a/drivers/vhost/vhost.c b/drivers/vhost/vhost.c
+index ed71b53..4c83be8 100644
+--- a/drivers/vhost/vhost.c
++++ b/drivers/vhost/vhost.c
+@@ -1047,9 +1047,7 @@ int vhost_init_used(struct vhost_virtqueue *vq)
+ 	if (r)
+ 		return r;
+ 	vq->signalled_used_valid = false;
+-	if (!access_ok(VERIFY_READ, &vq->used->idx, sizeof vq->used->idx))
+-		return -EFAULT;
+-	r = __get_user(last_used_idx, &vq->used->idx);
++	r = get_user(last_used_idx, &vq->used->idx);
+ 	if (r)
+ 		return r;
+ 	vq->last_used_idx = vhost16_to_cpu(vq, last_used_idx);
+
+> -- 
+> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+> according to speedtest.net.
