@@ -1,121 +1,111 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 15 Dec 2014 18:34:06 +0800
-Subject: [v3][PATCH 5/5] media: ov2640: dt: add the device tree binding
- document
-In-Reply-To: <1644165.4XbSUOMUsK@avalon>
-References: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
- <1418283339-16281-6-git-send-email-josh.wu@atmel.com>
- <1644165.4XbSUOMUsK@avalon>
-Message-ID: <548EB91E.2090900@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 15 Dec 2014 11:37:59 +0100
+Subject: [RFC/PATCH 1/4 PATCH] ARM: mvebu: use dt_fixup to provide
+ fallback for enable-method
+In-Reply-To: <548E3209.20307@alliedtelesis.co.nz>
+References: <5488A2C0.5040804@alliedtelesis.co.nz>
+ <548DFCEA.7000801@alliedtelesis.co.nz> <548E3209.20307@alliedtelesis.co.nz>
+Message-ID: <7947240.7yktm8fT2X@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Laurent
+On Monday 15 December 2014 00:57:49 Chris Packham wrote:
+> On 12/15/2014 10:11 AM, Chris Packham wrote:
+> >>> +
+> >>> +CFLAGS_board-v7.o = -I$(src)/../../../scripts/dtc/libfdt
+> >>> \ No newline at end of file
+> >>
+> >> Why is this needed? Can't you just include <linux/libfdt.h> ?
+> >>
+> >
+> > I am already including linux/libfdt.h. Without the CFLAGS change I get
+> > the following compile error.
+> >
+> >    In file included from include/linux/libfdt.h:6:0,
+> >                     from arch/arm/mach-mvebu/board-v7.c:21:
+> >    include/linux/../../scripts/dtc/libfdt/libfdt.h:54:24: fatal error:
+> > libfdt_env.h: No such file or directory
+> >
+> > There seems to be precedence in other architectures/drivers
+> >
+> >    $ git grep -e '-I.*libfdt'
+> >    arch/mips/cavium-octeon/Makefile:CFLAGS_octeon-platform.o =
+> > -I$(src)/../../../scripts/dtc/libfdt
+> >    arch/mips/cavium-octeon/Makefile:CFLAGS_setup.o =
+> > -I$(src)/../../../scripts/dtc/libfdt
+> >    arch/mips/mti-sead3/Makefile:CFLAGS_sead3-setup.o =
+> > -I$(src)/../../../scripts/dtc/libfdt
+> >    arch/powerpc/kernel/Makefile:CFLAGS_prom.o              =
+> > -I$(src)/../../../scripts/dtc/libfdt
+> >    drivers/firmware/efi/libstub/Makefile:CFLAGS_fdt.o    +=
+> > -I$(srctree)/scripts/dtc/libfdt/
+> >    drivers/of/Makefile:CFLAGS_fdt.o = -I$(src)/../../scripts/dtc/libfdt
+> >    drivers/of/Makefile:CFLAGS_fdt_address.o =
+> > -I$(src)/../../scripts/dtc/libfdt
+> >
 
-On 12/12/2014 10:17 AM, Laurent Pinchart wrote:
-> Hi Josh,
->
-> Thank you for the patch.
->
-> On Thursday 11 December 2014 15:35:39 Josh Wu wrote:
->> Add the document for ov2640 dt.
->>
->> Cc: devicetree at vger.kernel.org
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->> v2 -> v3:
->>    1. fix incorrect description.
->>    2. Add assigned-clocks & assigned-clock-rates.
->>    3. resetb pin should be ACTIVE_LOW.
->>
->> v1 -> v2:
->>    1. change the compatible string to be consistent with verdor file.
->>    2. change the clock and pins' name.
->>    3. add missed pinctrl in example.
->>
->>   .../devicetree/bindings/media/i2c/ov2640.txt       | 53 +++++++++++++++++++
->>   1 file changed, 53 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
->>
->> diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt
->> b/Documentation/devicetree/bindings/media/i2c/ov2640.txt new file mode
->> 100644
->> index 0000000..958e120
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
->> @@ -0,0 +1,53 @@
->> +* Omnivision ov2640 CMOS sensor
->> +
->> +The Omnivision OV2640 sensor support multiple resolutions output, such as
->> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
->> +output format.
->> +
->> +Required Properties:
->> +- compatible: Must be "ovti,ov2640"
->> +- clocks: reference to the xvclk input clock. It can be an external fixed
->> +          clock or a programmable clock from SoC.
-> It could also be a variable clock provided by something else. I would just
-> drop the second sentence.
+I still think we should not duplicate this but instead change the
+header files to make the include hack unnecessary in all those places.
 
-I mention this since these are the cases in at91 platform.
-Sure. I'll drop it.
->
->> +- clock-names: Must be "xvclk".
->> +- assigned-clocks: reference to the above 'clocks' property.
->> +- assigned-clock-rates: reference to the clock frequency of xvclk. Typical
->> +                        value is 25Mhz (25000000).
->> +                        This clock should only have single user. Specifying
->> +                        Conflicting rate configuration in multiple
->> consumer
->> +                        nodes for a shared clock is forbidden.
-> Those two properties are optional. I'm not sure they should even be mentioned
-> in the ov2640 bindings. For one thing they're not needed if the clock doesn't
-> need to be forced to a specific frequency, and the clock rate could also be
-> configured through other means depending on the platform.
+Looking at the header file, it only contains
 
-hmm, if the clock is fixed then this 'assigned-clock-rates' is not needed.
-And I only find one binding document mentioned the assigned-clocks. It 
-looks like a general property for all clocks. We don't need mention it 
-repeatedly.
-So I'd like to drop this two properties in next version.
+#include <linux/libfdt_env.h>
+#include "../../scripts/dtc/libfdt/fdt.h"
+#include "../../scripts/dtc/libfdt/libfdt.h"
 
-Thanks and Best Regards,
-Josh Wu
->
->> +
->> +Optional Properties:
->> +- resetb-gpios: reference to the GPIO connected to the resetb pin, if any.
->> +- pwdn-gpios: reference to the GPIO connected to the pwdn pin, if any.
->> +
->> +The device node must contain one 'port' child node for its digital output
->> +video port, in accordance with the video interface bindings defined in
->> +Documentation/devicetree/bindings/media/video-interfaces.txt.
->> +
->> +Example:
->> +
->> +	i2c1: i2c at f0018000 {
->> +		ov2640: camera at 0x30 {
->> +			compatible = "ovti,ov2640";
->> +			reg = <0x30>;
->> +
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&pinctrl_pck1 &pinctrl_ov2640_pwdn
-> &pinctrl_ov2640_resetb>;
->> +
->> +			resetb-gpios = <&pioE 24 GPIO_ACTIVE_LOW>;
->> +			pwdn-gpios = <&pioE 29 GPIO_ACTIVE_HIGH>;
->> +
->> +			clocks = <&pck1>;
->> +			clock-names = "xvclk";
->> +
->> +			assigned-clocks = <&pck1>;
->> +			assigned-clock-rates = <25000000>;
->> +
->> +			port {
->> +				ov2640_0: endpoint {
->> +					remote-endpoint = <&isi_0>;
->> +					bus-width = <8>;
->> +				};
->> +			};
->> +		};
->> +	};
+so two of them get the headers from exactly that place, while the
+libfdt_env.h file contains the linux-specific implementation of
+a couple of functions instead of the baremetal implementation.
+
+It looks like the intention was that when you already include the
+linux version of the header, you no longer need the other one, but
+that assumption is broken by current implementation.
+
+One way to solve this would be
+
+diff --git a/scripts/dtc/libfdt/libfdt.h b/scripts/dtc/libfdt/libfdt.h
+index 73f49759a5e7..23c55baa8e18 100644
+--- a/scripts/dtc/libfdt/libfdt.h
++++ b/scripts/dtc/libfdt/libfdt.h
+@@ -51,7 +51,7 @@
+  *     EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-#include <libfdt_env.h>
++#include "libfdt_env.h"
+ #include <fdt.h>
+ 
+ #define FDT_FIRST_SUPPORTED_VERSION	0x10
+
+
+but I'm not sure if that is the best way.
+
+> >> I think it would be good to first check whether you are running on
+> >> Armada XP
+> >> or Armada 370, because the latter does not require this.
+> >>
+> >>     Arnd
+> >>
+> >
+> > Any suggestion as to what to check for. Based on the dts files in the
+> > current source seem compatible == "marvell,armada370" seems like a good
+> > choice. But I don't know for sure that there isn't a armada-xp variant
+> > out using a .dts with this set.
+> 
+> Adding the following at the top will do the trick (assuming
+> "marvell,armada370" is the right compatible string to use).
+> 
+>         unsigned long root = of_get_flat_dt_root();
+> 
+>         if (of_flat_dt_is_compatible(root, "marvell,armada370"))
+>                 return;
+
+Right. You could also add 
+
+	if (!IS_ENABLED(CONFIG_SMP) || !of_flat_dt_is_compatible(root, "marvell,armadaxp")))
+
+to again eliminate that check for uniprocessor kernels, and to not
+propagate the fixup to future machines but make it clear that
+it is only needed for armadaxp.
+
+	Arnd
