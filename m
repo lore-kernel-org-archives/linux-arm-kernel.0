@@ -1,53 +1,71 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 15 Dec 2014 23:20:17 +0100
-Subject: [PATCH 0/5] ARM: at91: fix irq_pm_install_action WARNING
-In-Reply-To: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <2662748.NJbkr6jW7r@vostro.rjw.lan>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 15 Dec 2014 14:11:02 -0800
+Subject: [PATCH 1/4] regulator: core: Support trying to get close to a
+ certain voltage
+In-Reply-To: <20141212125951.GE11764@sirena.org.uk>
+References: <1418245085-9754-1-git-send-email-dianders@chromium.org>
+ <20141210235347.GT11764@sirena.org.uk>
+ <CAHNYxRy2t0OVj-+CqQFOfj0zWAGG0j8rmd8SxdNWgBMA2iAfXQ@mail.gmail.com>
+ <20141211123106.GU11764@sirena.org.uk>
+ <CAD=FV=U4RFYx9NXOACrXJZK2bKkosyYnmTZRHkXuaSz-FS9kNQ@mail.gmail.com>
+ <20141211170934.GZ11764@sirena.org.uk>
+ <CAD=FV=WBAuF0+BVMG9rp53Zt851Ou0kZ6xgTe9mjmgxyugWteg@mail.gmail.com>
+ <20141212002410.GB11764@sirena.org.uk>
+ <CAD=FV=W1r2MXNHXTRiO1pBPWurvgqq+dSoOPgpSJ_zAbpU7T4Q@mail.gmail.com>
+ <20141212125951.GE11764@sirena.org.uk>
+Message-ID: <CAD=FV=UfKAduhzs5-EJFZDgv-kv=rzMzuzT5N97ogdno66PqYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 15, 2014 05:15:47 PM Boris Brezillon wrote:
-> Commit cab303be91dc47942bc25de33dc1140123540800 [1] introduced a WARN_ON
-> test which triggers a WARNING backtrace on at91 platforms.
+Mark,
 
-Pretty much as intended.
+On Fri, Dec 12, 2014 at 4:59 AM, Mark Brown <broonie@kernel.org> wrote:
+>> > There's also the potential
+>> > performance considerations for the DVS type applications now I think
+>> > about it.
+>
+>> Iterating through voltages is really that slow?  If so, perhaps we
+>> could add some caching to keep track of what voltage we actually got
+>> last time...  I could also add an optimization to try the exact
+>> requested voltage right away...
+>
+> Applications like DVS get pretty performance sensitive and for a
+> regulator with high resolution if you're trying to hit a voltage at the
+> top of the range you could be iterating over a hundred or more values.
 
-> While this WARN_ON is absolutely necessary to warn users that they should
-> not mix request with and without IRQF_NO_SUSPEND flags on shared IRQs,
-> there is no easy way to solve this issue on at91 platforms.
-> 
-> The main reason is that the init timer is often using a shared irq line
-> and thus request this irq with IRQF_NO_SUSPEND flag set, while other
-> peripherals request the same irq line without this flag.
-> 
-> We could deal with that by identifying whether a given peripheral is
-> connected to the init timer shared irq line and add the IRQF_NO_SUSPEND
-> in this case, but this implies adding the logic in all peripheral drivers
-> that could be connected to this shared irq.
-> 
-> This series takes the reverse approach: force IRQ users to specify that
-> they take care of disabling peripheral interrupts and that IRQ core can
-> safely leave the handler in a suspended state without having to bother
-> about spurious interrupts.
-> This is done by mean of a new IRQF_SUSPEND_NOACTION flag which tells the
-> core to move the action handler to a suspended list, thus preventing its
-> execution when we are in suspend mode.
-> Of course, specifying the IRQF_SUSPEND_NOACTION flag implies taking care
-> of masking/unmasking the peripheral interrupts in the suspend/resume
-> implementation.
-
-Well, I'm not sure how much value is in all that to be honest.  The only
-thing it helps with is to make the WARN_ON go away in some cases, while
-the drivers in question need to make sure that they disable their interrupts
-properly anyway, so what exactly is the purpose of the new irqaction
-shuffling?
-
-It might just be simpler to add a flag to suppress the WARN_ON that would be
-set by the user of IRQF_NO_SUSPEND that is broken enough to have to share the
-interrupt with others ...
+OK, you've convinced me.  :)
 
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+> Perhaps doing something based on the various factorings out of the
+> voltage mapping would do the trick, add a new op for getting to the
+> closest voltage?
+
+I'd really rather add a new op because I think it would mean that all
+the old regulators that don't implement the op would be slow all of a
+sudden.  :(
+
+
+I looked at trying to refactor everything, but I think the answer is
+that I should drop my patch and consider the existing
+regulator_set_voltage_tol() experience good enough.  While I could go
+through and try to make regulator_set_voltage_tol() better:
+
+1. It fixes no issues that I know of.  On all boards that I've worked
+with it is possible to make VMMC and VQMMC exactly equal.
+
+2. As you said, regulator_set_voltage_tol() is on the critical path
+for CPUfreq and the existing code is heavily optimized to work fast on
+a large number of different types of regulators.  Trying to replicate
+that without huge code duplication and without any bugs would be
+difficult.
+
+
+I'll spin my MMC patch to use regulator_set_voltage_tol().  If Ulf
+responds and says that he'd like to more accurately specify the
+min/max voltage then I'll post up a new function using a scheme like
+regulator_set_voltage_tol() but asymmetric.
+
+
+As always, thanks for your great feedback!
+
+-Doug
