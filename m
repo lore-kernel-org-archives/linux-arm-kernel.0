@@ -1,70 +1,180 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Dec 2014 10:45:48 +0000
-Subject: [PATCH] ARM: display machine model in cpuinfo
-In-Reply-To: <1418566387-16468-1-git-send-email-zajec5@gmail.com>
-References: <1418566387-16468-1-git-send-email-zajec5@gmail.com>
-Message-ID: <20141215104548.GB462@leverpostej>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 15 Dec 2014 11:50:10 +0100
+Subject: [PATCH v3 6/6] arm/arm64: KVM: Require in-kernel vgic for the
+ arch timers
+In-Reply-To: <548EBA5B.4020602@arm.com>
+References: <1418469449-13277-1-git-send-email-christoffer.dall@linaro.org>
+ <1418638806-12025-1-git-send-email-christoffer.dall@linaro.org>
+ <548EBA5B.4020602@arm.com>
+Message-ID: <20141215105010.GA16965@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 14, 2014 at 02:13:07PM +0000, Rafa? Mi?ecki wrote:
-> This may be useful to display hardware model in the /proc/cpuinfo. It
-> definitely helps to identify the device and there are some archs already
-> doing that (arm64, m32r, mips).
-
-Not true for arm64, if you look in linux-next.
-
-I'm rather wary of exposing this kind via cpuinfo because it's
-completely arbitrary in nature and not guaranteed to be in any way
-useful (I have seen dtbs where the model string is misleading due to
-copy+paste and no modificiation).
-
-Mark.
-
-> Use the model from DT and add it to the cpuinfo.
+On Mon, Dec 15, 2014 at 10:39:23AM +0000, Marc Zyngier wrote:
+> On 15/12/14 10:20, Christoffer Dall wrote:
+> > It is curently possible to run a VM with architected timers support
+> > without creating an in-kernel VGIC, which will result in interrupts from
+> > the virtual timer going nowhere.
+> > 
+> > To address this issue, move the architected timers initialization to the
+> > time when we run a VCPU for the first time, and then only initialize
+> > (and enable) the architected timers if we have a properly created and
+> > initialized in-kernel VGIC.
+> > 
+> > When injecting interrupts from the virtual timer to the vgic, the
+> > current setup should ensure that this never calls an on-demand init of
+> > the VGIC, which is the only call path that could return an error from
+> > kvm_vgic_inject_irq(), so capture the return value and raise a warning
+> > if there's an error there.
+> > 
+> > We also change the kvm_timer_init() function from returning an int to be
+> > a void function, since the function always succeeds.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> > Changes [v2 -> v3]:
+> >  - Split kvm_timer_init into kvm_timer_init and kvm_timer_enable
+> >    and initialize the cntvoff in kvm_timer_init and only actually enable
+> >    the timer if there is an in-kernel vgic.
+> >  - Added comment about race from multiple VCPUs.
+> >  - Support compiling on 32-bit ARM wihtout vgic/arch-timers config
+> >    option.
+> > 
+> >  arch/arm/kvm/arm.c           | 13 +++++++++++--
+> >  include/kvm/arm_arch_timer.h | 10 ++++------
+> >  virt/kvm/arm/arch_timer.c    | 30 ++++++++++++++++++++++--------
+> >  3 files changed, 37 insertions(+), 16 deletions(-)
+> > 
+> > diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> > index d4da244..8cadfec 100644
+> > --- a/arch/arm/kvm/arm.c
+> > +++ b/arch/arm/kvm/arm.c
+> > @@ -424,6 +424,7 @@ static void update_vttbr(struct kvm *kvm)
+> >  
+> >  static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+> >  {
+> > +	struct kvm *kvm = vcpu->kvm;
+> >  	int ret;
+> >  
+> >  	if (likely(vcpu->arch.has_run_once))
+> > @@ -435,12 +436,20 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+> >  	 * Map the VGIC hardware resources before running a vcpu the first
+> >  	 * time on this VM.
+> >  	 */
+> > -	if (unlikely(!vgic_ready(vcpu->kvm))) {
+> > -		ret = kvm_vgic_map_resources(vcpu->kvm);
+> > +	if (unlikely(!vgic_ready(kvm))) {
+> > +		ret = kvm_vgic_map_resources(kvm);
+> >  		if (ret)
+> >  			return ret;
+> >  	}
+> >  
+> > +	/*
+> > +	 * Enable the arch timers only if we have an in-kernel VGIC
+> > +	 * and it has been properly initialized, since we cannot handle
+> > +	 * interrupts from the virtual timer with a userspace gic.
+> > +	 */
+> > +	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm))
+> > +		kvm_timer_enable(kvm);
+> > +
+> >  	return 0;
+> >  }
+> >  
+> > diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> > index ad9db60..b3f45a5 100644
+> > --- a/include/kvm/arm_arch_timer.h
+> > +++ b/include/kvm/arm_arch_timer.h
+> > @@ -60,7 +60,8 @@ struct arch_timer_cpu {
+> >  
+> >  #ifdef CONFIG_KVM_ARM_TIMER
+> >  int kvm_timer_hyp_init(void);
+> > -int kvm_timer_init(struct kvm *kvm);
+> > +void kvm_timer_enable(struct kvm *kvm);
+> > +void kvm_timer_init(struct kvm *kvm);
+> >  void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+> >  			  const struct kvm_irq_level *irq);
+> >  void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+> > @@ -77,11 +78,8 @@ static inline int kvm_timer_hyp_init(void)
+> >  	return 0;
+> >  };
+> >  
+> > -static inline int kvm_timer_init(struct kvm *kvm)
+> > -{
+> > -	return 0;
+> > -}
+> > -
+> > +static inline void kvm_timer_enable(struct kvm *kvm) {}
+> > +static inline void kvm_timer_init(struct kvm *kvm) {}
+> >  static inline void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+> >  					const struct kvm_irq_level *irq) {}
+> >  static inline void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu) {}
+> > diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> > index 22fa819..1c0772b 100644
+> > --- a/virt/kvm/arm/arch_timer.c
+> > +++ b/virt/kvm/arm/arch_timer.c
+> > @@ -61,12 +61,14 @@ static void timer_disarm(struct arch_timer_cpu *timer)
+> >  
+> >  static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
+> >  {
+> > +	int ret;
+> >  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> >  
+> >  	timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
+> > -	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+> > -			    timer->irq->irq,
+> > -			    timer->irq->level);
+> > +	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+> > +				  timer->irq->irq,
+> > +				  timer->irq->level);
+> > +	WARN_ON(ret);
+> >  }
+> >  
+> >  static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+> > @@ -307,12 +309,24 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+> >  	timer_disarm(timer);
+> >  }
+> >  
+> > -int kvm_timer_init(struct kvm *kvm)
+> > +void kvm_timer_enable(struct kvm *kvm)
+> >  {
+> > -	if (timecounter && wqueue) {
+> > -		kvm->arch.timer.cntvoff = kvm_phys_timer_read();
+> > +	if (kvm->arch.timer.enabled)
+> > +		return;
+> > +
+> > +	/*
+> > +	 * There is a potential race here between VCPUs starting for the first
+> > +	 * time, which may be enabling the timer multiple times.  That doesn't
+> > +	 * hurt though, because we're just setting a variable to the same
+> > +	 * variable that it already was.  The important thing is that all
+> > +	 * VCPUs have the enabled variable set, before entering the guest, if
+> > +	 * the arch timers are enabled.
+> > +	 */
+> > +	if (timecounter && wqueue)
+> >  		kvm->arch.timer.enabled = 1;
+> > -	}
+> > +}
 > 
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> ---
->  arch/arm/kernel/setup.c | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
+> This is particularly interesting, as this paves the way for per-vcpu
+> enable bits, meaning that we won't have to extract the enable bit from
+> struct kvm while doing a world switch. Clearly a fight for another day
+> though.
 > 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index c031063..957d9ac 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -145,6 +145,7 @@ EXPORT_SYMBOL(elf_platform);
->  
->  static const char *cpu_name;
->  static const char *machine_name;
-> +static const char *hardware;
->  static char __initdata cmd_line[COMMAND_LINE_SIZE];
->  const struct machine_desc *machine_desc __initdata;
->  
-> @@ -899,7 +900,8 @@ void __init setup_arch(char **cmdline_p)
->  	if (!mdesc)
->  		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
->  	machine_desc = mdesc;
-> -	machine_name = mdesc->name;
-> +	machine_name = of_flat_dt_get_machine_name();
-> +	hardware = mdesc->name;
->  
->  	if (mdesc->reboot_mode != REBOOT_HARD)
->  		reboot_mode = mdesc->reboot_mode;
-> @@ -1077,7 +1079,8 @@ static int c_show(struct seq_file *m, void *v)
->  		seq_printf(m, "CPU revision\t: %d\n\n", cpuid & 15);
->  	}
->  
-> -	seq_printf(m, "Hardware\t: %s\n", machine_name);
-> +	seq_printf(m, "Machine\t\t: %s\n", machine_name);
-> +	seq_printf(m, "Hardware\t: %s\n", hardware);
->  	seq_printf(m, "Revision\t: %04x\n", system_rev);
->  	seq_printf(m, "Serial\t\t: %08x%08x\n",
->  		   system_serial_high, system_serial_low);
-> -- 
-> 1.8.4.5
+
+I didn't think of that, but sounds good.
+
+> >  
+> > -	return 0;
+> > +void kvm_timer_init(struct kvm *kvm)
+> > +{
+> > +	kvm->arch.timer.cntvoff = kvm_phys_timer_read();
+> >  }
+> > 
 > 
+> Looks good to me.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+Thanks, I'll go ahead and get these series merged then.
+
+-Christoffer
