@@ -1,82 +1,111 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Mon, 15 Dec 2014 15:47:40 +0900
-Subject: [PATCH v3 0/2] serial: samsung: add support for early console
-In-Reply-To: <1413804511-32441-1-git-send-email-m.szyprowski@samsung.com>
-References: <1413804511-32441-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <012101d01833$0547ba90$0fd72fb0$@samsung.com>
+From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
+Date: Mon, 15 Dec 2014 14:52:49 +0800
+Subject: [PATCH v2 0/8] Support for Fujitsu MB86S7X SoCs
+Message-ID: <1418626369-3004-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-I found this patchset was not merget even 3.19 merge window. As you know,
-there is no support of legacy early_printk on arm64. I need this patchset to
-support exynos arm64 board properly.
+  Fujitsu have a series of SoC already shipping based around
+variations of 2xCA7+2xCA15 big.LITTLE architecture, and we would like
+to upstream the basic support in this series.
 
-Dear Kukjin,
+  MB86S70 is a big.LITTLE platform with 2xCA7+2xCA15 and an additional
+CM3 as the master. MB86S73 is a simple 2xCA7 and an additional CM3
+master.
 
-Could you pick up this patchset in your tree?
+  The DT includes references to sdhci patches which are being sent to
+the mmc list at the same time.
 
-Best Regards,
-Chanho Park
+  We welcome any comments or questions.
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Marek Szyprowski
-> Sent: Monday, October 20, 2014 8:28 PM
-> To: linux-samsung-soc at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Cc: Tomasz Figa; Kyungmin Park; thomas.ab at samsung.com; Alim Akhtar;
-> Marek Szyprowski
-> Subject: [PATCH v3 0/2] serial: samsung: add support for early console
-> 
-> This patchset adds support for early console defined in device tree. As
-> an example, DTS files for all Exynos4 based machines are updated with
-> the correct value for common chosen/sdtout property.
-> 
-> To get it fully functional on ARM architecture, additional improvements
-> (support for early_ioremap) are needed in early console code.
-> 
-> Best regards
-> Marek Szyprowski
-> Samsung R&D Institute Poland
-> 
-> Change log:
-> 
-> v3:
-> - rebased onto v3.18-rc1
-> - removed options from documentation (they are not yet supported)
-> 
-> v2: http://www.spinics.net/lists/linux-samsung-soc/msg37278.html
-> - added support for command line based initialization
-> 
-> v1: http://www.spinics.net/lists/linux-samsung-soc/msg37094.html
-> - initial version
-> 
-> Tomasz Figa (2):
->   serial: samsung: Add support for early console
->   ARM: dts: exynos4: Add stdout-path properties
-> 
->  Documentation/kernel-parameters.txt             |  12 +++
->  arch/arm/boot/dts/exynos4210-origen.dts         |   1 +
->  arch/arm/boot/dts/exynos4210-smdkv310.dts       |   1 +
->  arch/arm/boot/dts/exynos4210-trats.dts          |   1 +
->  arch/arm/boot/dts/exynos4210-universal_c210.dts |   1 +
->  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |   4 +
->  arch/arm/boot/dts/exynos4412-origen.dts         |   1 +
->  arch/arm/boot/dts/exynos4412-smdk4412.dts       |   1 +
->  arch/arm/boot/dts/exynos4412-tiny4412.dts       |   4 +
->  arch/arm/boot/dts/exynos4412-trats2.dts         |   1 +
->  drivers/tty/serial/Kconfig                      |   1 +
->  drivers/tty/serial/samsung.c                    | 103
-> ++++++++++++++++++++++++
->  12 files changed, 131 insertions(+)
-> 
-> --
-> 1.9.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Changes since v1:
+* Thanks to Arnd, modified clock driver to populate clocks only when
+some user need them. Node name changed from "fujitsu,mb86s70-clk" to
+"fujitsu,mb86s70-crg11" . Controller+Domain+Port of a clock are now
+three cells specified by the user node.
+* aliases moved into board DTS files
+* Voltage supply moved as per-board DT node.
+* Removed default overly verbose loglevel=8
+* Specify -march=armv7-a flag for mcpm.c and smc.S that contain ARMv7
+specific code.
+* Removed wrongly put outer_flush_all(), now using standard
+v7_exit_coherency_flush() instead of platform specific macro.
+* Simplified GPIO offset calculations in gpio-mb86s70.c driver. And
+added .remove() for the driver
+* ARM MHU driver provided a .remove() to enable module unloading.
+* A few other misc cleanups suggested in v1 submission.
+
+Thanks.
+
+Vincent Yang (8):
+  ARM: Add platform support for Fujitsu MB86S7X SoCs
+  mailbox: arm_mhu: add driver for ARM MHU controller
+  ARM: MB86S7X: Add MCPM support
+  clk: Add clock driver for mb86s7x
+  gpio: Add Fujitsu MB86S7x GPIO driver
+  dt: mb86s7x: add dt files for MB86S7x evbs
+  of: add Fujitsu vendor prefix
+  ARM: MB86S7x: Add configs
+
+ Documentation/devicetree/bindings/arm/mb86s7x.txt  |   8 +
+ .../bindings/clock/fujitsu,mb86s70-crg11.txt       |  26 +
+ .../bindings/gpio/fujitsu,mb86s70-gpio.txt         |  20 +
+ .../devicetree/bindings/mailbox/arm-mhu.txt        |  33 ++
+ .../devicetree/bindings/soc/mb86s7x/scb_mhu.txt    |  35 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ MAINTAINERS                                        |   7 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/mb86s70.dtsi                     |  91 ++++
+ arch/arm/boot/dts/mb86s70eb.dts                    |  59 +++
+ arch/arm/boot/dts/mb86s73.dtsi                     |  49 ++
+ arch/arm/boot/dts/mb86s73eb.dts                    |  46 ++
+ arch/arm/boot/dts/mb86s7x.dtsi                     | 140 ++++++
+ arch/arm/configs/fujitsu_defconfig                 | 232 +++++++++
+ arch/arm/configs/multi_v7_defconfig                |   5 +
+ arch/arm/mach-mb86s7x/Kconfig                      |  19 +
+ arch/arm/mach-mb86s7x/Makefile                     |   3 +
+ arch/arm/mach-mb86s7x/board.c                      |  23 +
+ arch/arm/mach-mb86s7x/mcpm.c                       | 311 ++++++++++++
+ arch/arm/mach-mb86s7x/smc.S                        |  27 ++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-mb86s7x.c                          | 379 +++++++++++++++
+ drivers/gpio/Kconfig                               |   6 +
+ drivers/gpio/Makefile                              |   1 +
+ drivers/gpio/gpio-mb86s7x.c                        | 231 +++++++++
+ drivers/mailbox/Kconfig                            |   7 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/arm_mhu.c                          | 212 +++++++++
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/mb86s7x/Makefile                       |   4 +
+ drivers/soc/mb86s7x/scb_mhu.c                      | 528 +++++++++++++++++++++
+ include/soc/mb86s7x/scb_mhu.h                      | 105 ++++
+ 34 files changed, 2616 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/mb86s7x.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/fujitsu,mb86s70-gpio.txt
+ create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/mb86s7x/scb_mhu.txt
+ create mode 100644 arch/arm/boot/dts/mb86s70.dtsi
+ create mode 100644 arch/arm/boot/dts/mb86s70eb.dts
+ create mode 100644 arch/arm/boot/dts/mb86s73.dtsi
+ create mode 100644 arch/arm/boot/dts/mb86s73eb.dts
+ create mode 100644 arch/arm/boot/dts/mb86s7x.dtsi
+ create mode 100644 arch/arm/configs/fujitsu_defconfig
+ create mode 100644 arch/arm/mach-mb86s7x/Kconfig
+ create mode 100644 arch/arm/mach-mb86s7x/Makefile
+ create mode 100644 arch/arm/mach-mb86s7x/board.c
+ create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
+ create mode 100644 arch/arm/mach-mb86s7x/smc.S
+ create mode 100644 drivers/clk/clk-mb86s7x.c
+ create mode 100644 drivers/gpio/gpio-mb86s7x.c
+ create mode 100644 drivers/mailbox/arm_mhu.c
+ create mode 100644 drivers/soc/mb86s7x/Makefile
+ create mode 100644 drivers/soc/mb86s7x/scb_mhu.c
+ create mode 100644 include/soc/mb86s7x/scb_mhu.h
+
+-- 
+1.9.0
