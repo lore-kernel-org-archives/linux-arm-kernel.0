@@ -1,45 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Dec 2014 22:37:19 +0100
-Subject: [PATCH v2 2/4] PCI: iproc: Add Broadcom iProc PCIe driver
-In-Reply-To: <548F338F.9030203@broadcom.com>
-References: <1418351817-14898-3-git-send-email-rjui@broadcom.com>
- <1790462.K12S5vem48@wuerfel> <548F338F.9030203@broadcom.com>
-Message-ID: <2242033.mU3KpyO3Rt@wuerfel>
+Date: Mon, 15 Dec 2014 22:57:36 +0100
+Subject: [PATCH v5 1/3] gpio: Cygnus: define Broadcom Cygnus GPIO binding
+In-Reply-To: <548F5433.5090901@broadcom.com>
+References: <1418342706-14755-2-git-send-email-rjui@broadcom.com>
+ <1628217.66frkAqHMc@wuerfel> <548F5433.5090901@broadcom.com>
+Message-ID: <2063145.N1Hk6vVF2S@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 December 2014 11:16:31 Ray Jui wrote:
-> On 12/12/2014 9:21 AM, Arnd Bergmann wrote:
-> > On Friday 12 December 2014 09:08:48 Ray Jui wrote:
-> > One way to solve this would be by turning the driver into a library
-> > the same way as the pcie-dw driver, and have separate front-ends
-> > for it for platform_device and bcma_device.
-> >
-> I'm fine with this solution, i.e., to introduce a common pcie-iproc core 
-> driver (just like pcie-designware) and have different front-ends 
-> depending on the device/bus type. If we end up deciding to go with this 
-> solution, I need to discuss with Hauke to come up with a plan to 
-> collaborate.
-
-Ok
-
-> But before we choose to go with that route, may I ask, what is the 
-> purpose of tying a PCIe host driver to BCMA? What benefit does BCMA give 
-> us? If we have a generic platform based PCIe driver that can work on all 
-> iProc SoCs + BCM4708 and BCM5301X with all HW specific configurations 
-> taken care of by device tree, why do we still need to use BCMA?
+On Monday 15 December 2014 13:35:47 Ray Jui wrote:
 > 
-> I thought all a BCMA device here does is to auto-instantiate based on 
-> some register readings?
+> Like I said previously, dynamic GPIO allocation works fine in the 
+> kernel, as long as all of our GPIO clients in the kernel use gpiod based 
+> API, which is what we will enforce going forward. The only problem is 
+> with some of our customers who use GPIO through sysfs and expect fixed 
+> global GPIO numbers. Thinking about this more, it's probably not that 
+> difficult to add a script for those customers to convert/map the GPIO 
+> numbers based on readings parsed from sysfs, so I guess that's fine.
+> 
 
-Basically, DT is a hack that we only need for nondiscoverable buses.
-As BCMA is (mostly) discoverable, we should use that, just like we do
-for things like PCI and USB. There are clearly some limitations to 
-BCMA as well, e.g. on bcm4708 we don't have proper IRQ numbers in
-the device list and we need to work around that using DT, but overall
-it still seems to have more upsides than downsides to use it.
+I think we discussed the user space interface a number of times
+in the past, but I forgot the outcome. Either there is already
+a way to name gpio lines uniquely in sysfs, or there should be
+one.
 
-It's also good to point other SoC makers to Broadcom as a good example
-for how to do things they claim are impossible to do.
+Can you reach the gpio interfaces using /sys/devices/0001234.bus/1234566.gpiocontroller/...? 
 
 	Arnd
