@@ -1,81 +1,99 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Dec 2014 16:38:34 +0100
-Subject: [PATCH 26/27] ARM: mvebu: armada-xp-openblocks-ax3-4: Relicense the
- device tree under GPLv2+/X11
-In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1418657915-22775-27-git-send-email-gregory.clement@free-electrons.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 15 Dec 2014 23:41:59 +0800
+Subject: [PATCHv3 0/5] ARM:sunxi:ps2 Added support for A10/A20 ps2
+ controller.
+In-Reply-To: <548EFA9F.4080208@redhat.com>
+References: <1418408748-9797-1-git-send-email-vishnupatekar0510@gmail.com>
+ <548C1E7D.1000005@redhat.com>
+ <CAEzqOZtyeAnG660AKf_0_gCa-+BT_pAzHk0HYYSCdm4y89GFJA@mail.gmail.com>
+ <548D5207.8030004@redhat.com>
+ <CAEzqOZsWSpd_r3Oc=PBVw3NQH-_1V9JXtC2H4tZ3U6nCN_Z7aA@mail.gmail.com>
+ <548EFA9F.4080208@redhat.com>
+Message-ID: <CAGb2v659jEj7cxPCu1UNPb-p6iaH6Sjcp4LCgsBOyBh-odSUhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current GPL only licensing on the device tree makes it very
-impractical for other software components licensed under another
-license.
+Hi,
 
-In order to make it easier for them to reuse our device trees,
-relicense our device trees under a GPL/X11 dual-license.
+On Mon, Dec 15, 2014 at 11:13 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+>
+> On 15-12-14 15:13, Vishnu Patekar wrote:
+>>
+>> Hi,
+>>
+>> On Sun, Dec 14, 2014 at 2:31 PM, Hans de Goede <hdegoede@redhat.com>
+>> wrote:
+>>>
+>>> Hi,
+>>>
+>>> On 13-12-14 21:01, Vishnu Patekar wrote:
+>>>>
+>>>>
+>>>> Hello Hans,
+>>>> Please find my comments inlined.
+>>>>
+>>>> On 12/13/14, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>>
+>>>>>
+>>>>> Hi VishnuPatekar,
+>>>>>
+>>>>> The patch mangling for this set seems to have gone a bit wrong I'm
+>>>>> afraid
+>>>>
+>>>>
+>>>>
+>>>> No, this time I've corrected it. Infact, last version of patch did not
+>>>> used the status bit error macros.
+>>>>
+>>>>> a lot of the patches have my fixup commit messages (which should have
+>>>>> disappeared when squashing in the patches), please replace those by
+>>>>> proper
+>>>>> commit messages describing what the patch actually does.
+>>>>
+>>>>
+>>>> Yes, [PATCHv3 3/5] uses fixup. I'll correct it.
+>>>>>
+>>>>>
+>>>>>
+>>>>> Also the adding of the commented nodes for the lime2 seems to be gone
+>>>>> entirely
+>>>>> from the set, instead now only a comment about the conflict with the
+>>>>> hdmi
+>>>>> pins is added, but it is above the i2c node instead of above a ps2
+>>>>> node.
+>>>>>
+>>>> Maxime's suggested that we should not add commented nodes specially
+>>>> when its trivial to apply. And just note saying ps20 pins conflict
+>>>> with HDMI.
+>>>
+>>>
+>>>
+>>> Ah, I see.
+>>>
+>>>> Should I remove the this comment as well?
+>>>> Or
+>>>> Put this note in start of DTS file?
+>>>
+>>>
+>>>
+>>> The comment should be added to where the pinctrl bits are, not to the
+>>> lime2
+>>> file, ps0 will conflict with hdmi on all boards.
+>>
+>>
+>> Well, In that case,PS2_0 pins conflicts with HDMI, PS2_1 pins
+>> conflicts with LCD. Every pin has multiplexing.
+>
+>
+> Almost every A10 board has a hdmi connector, and only the hdmi ddc pins
+> are multiplexed, so this is sort of special, but yes if we do not have
+> the commented nodes in the dts file, then this comment can be dropped too
+> I guess.
 
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-Cc: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 40 ++++++++++++++++++++++--
- 1 file changed, 37 insertions(+), 3 deletions(-)
+All the HDMI pins have dedicated pins. In addition, the DDC pins are
+multiplexed. On the Lime, the dedicated pins (ball # R23, R22) are
+used. I just checked the schematics. There should be no conflict.
 
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index 6f6b0916df48..0c76d9f05fd0 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -5,9 +5,43 @@
-  *
-  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-  *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /dts-v1/;
--- 
-1.9.1
+ChenYu
