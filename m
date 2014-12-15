@@ -1,129 +1,221 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Dec 2014 23:09:22 +0000
-Subject: 3.18: lockdep problems in cpufreq
-In-Reply-To: <3353119.0CuA8fKaup@vostro.rjw.lan>
-References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
- <003501d01876$fbc53f80$f34fbe80$%brar@samsung.com>
- <20141215174336.GJ11285@n2100.arm.linux.org.uk>
- <3353119.0CuA8fKaup@vostro.rjw.lan>
-Message-ID: <20141215230922.GL11285@n2100.arm.linux.org.uk>
+From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
+Date: Tue, 16 Dec 2014 00:20:43 +0100
+Subject: [PATCH] arch: arm: mach-msm: smd.c: Remove some unused functions
+In-Reply-To: <20141209144602.GB5376@fifo99.com>
+References: <1417914740-8390-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+ <20141209144602.GB5376@fifo99.com>
+Message-ID: <CAFo99gbPKw4uHY_QqyZ495O9QLKL69HQyJmQUKNaGQTNqsG-mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 10:41:02PM +0100, Rafael J. Wysocki wrote:
-> On Monday, December 15, 2014 05:43:36 PM Russell King - ARM Linux wrote:
-> > On Mon, Dec 15, 2014 at 08:24:05PM +0530, Yadwinder Singh Brar wrote:
-> > > I agree with this approach, if its fine for others also, I can implement
-> > > and post patch.
-> > 
-> > Yes, please do.
-> 
-> Indeed.  We have a regression here to fix.
+Hi
 
-Well, here's a patch which I'm running on top of 3.18 at the moment,
-which is basically what I described in my email, and I'm running with it
-and it is without any lockdep complaint.
+My script looks for the same function name, so if they then would be
+named exactly the same, they would come up.
 
-8<===
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-thermal: cpu_cooling: fix lockdep problems in cpu_cooling
-
-A recent change to the cpu_cooling code introduced a AB-BA deadlock
-scenario between the cpufreq_policy_notifier_list rwsem and the
-cooling_cpufreq_lock.  This is caused by cooling_cpufreq_lock being held
-before the registration/removal of the notifier block (an operation
-which takes the rwsem), and the notifier code itself which takes the
-locks in the reverse order.
-
-Solve this by moving to finer grained locking - use one mutex to protect
-the cpufreq_dev_list as a whole, and a separate lock to ensure correct
-ordering of cpufreq notifier registration and removal.
-
-I considered taking the cooling_list_lock within cooling_cpufreq_lock to
-protect the registration sequence as a whole, but that adds a dependency
-between these two locks which is best avoided (lest someone tries to
-take those two new locks in the reverse order.)  In any case, it's safer
-to have an empty cpufreq_dev_list than to have unnecessary dependencies
-between locks.
-
-Fixes: 2dcd851fe4b4 ("thermal: cpu_cooling: Update always cpufreq policy with thermal constraints")
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-
- drivers/thermal/cpu_cooling.c | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
-index ad09e51ffae4..9e42c6f30785 100644
---- a/drivers/thermal/cpu_cooling.c
-+++ b/drivers/thermal/cpu_cooling.c
-@@ -57,6 +57,7 @@ static DEFINE_MUTEX(cooling_cpufreq_lock);
- 
- static unsigned int cpufreq_dev_count;
- 
-+static DEFINE_MUTEX(cooling_list_lock);
- static LIST_HEAD(cpufreq_dev_list);
- 
- /**
-@@ -317,7 +318,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
- 	if (event != CPUFREQ_ADJUST)
- 		return 0;
- 
--	mutex_lock(&cooling_cpufreq_lock);
-+	mutex_lock(&cooling_list_lock);
- 	list_for_each_entry(cpufreq_dev, &cpufreq_dev_list, node) {
- 		if (!cpumask_test_cpu(policy->cpu,
- 					&cpufreq_dev->allowed_cpus))
-@@ -333,7 +334,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
- 		if (policy->max != max_freq)
- 			cpufreq_verify_within_limits(policy, 0, max_freq);
- 	}
--	mutex_unlock(&cooling_cpufreq_lock);
-+	mutex_unlock(&cooling_list_lock);
- 
- 	return 0;
- }
-@@ -482,6 +483,11 @@ __cpufreq_cooling_register(struct device_node *np,
- 	}
- 	cpufreq_dev->cool_dev = cool_dev;
- 	cpufreq_dev->cpufreq_state = 0;
-+
-+	mutex_lock(&cooling_list_lock);
-+	list_add(&cpufreq_dev->node, &cpufreq_dev_list);
-+	mutex_unlock(&cooling_list_lock);
-+
- 	mutex_lock(&cooling_cpufreq_lock);
- 
- 	/* Register the notifier for first cpufreq cooling device */
-@@ -489,7 +495,6 @@ __cpufreq_cooling_register(struct device_node *np,
- 		cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
- 					  CPUFREQ_POLICY_NOTIFIER);
- 	cpufreq_dev_count++;
--	list_add(&cpufreq_dev->node, &cpufreq_dev_list);
- 
- 	mutex_unlock(&cooling_cpufreq_lock);
- 
-@@ -553,7 +558,6 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
- 
- 	cpufreq_dev = cdev->devdata;
- 	mutex_lock(&cooling_cpufreq_lock);
--	list_del(&cpufreq_dev->node);
- 	cpufreq_dev_count--;
- 
- 	/* Unregister the notifier for the last cpufreq cooling device */
-@@ -562,6 +566,10 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
- 					    CPUFREQ_POLICY_NOTIFIER);
- 	mutex_unlock(&cooling_cpufreq_lock);
- 
-+	mutex_lock(&cooling_list_lock);
-+	list_del(&cpufreq_dev->node);
-+	mutex_unlock(&cooling_list_lock);
-+
- 	thermal_cooling_device_unregister(cpufreq_dev->cool_dev);
- 	release_idr(&cpufreq_idr, cpufreq_dev->id);
- 	kfree(cpufreq_dev);
+But I can not even find drivers/staging/dream/   or is this really new code?
 
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Kind regards
+Rickard Strandqvist
+
+
+2014-12-09 15:46 GMT+01:00  <dwalker@fifo99.com>:
+>
+> Seems ok to me. These files, and functions, are also in drivers/staging/dream/
+> are you removing them there also ?
+>
+>
+> On Sun, Dec 07, 2014 at 02:12:20AM +0100, Rickard Strandqvist wrote:
+>> Removes some functions that are not used anywhere:
+>> smsm_set_sleep_duration() smsm_get_state() smd_wait_until_writable()
+>> smd_wait_until_readable() smd_write_atomic() smd_sleep_exit()
+>>
+>> This was partially found by using a static code analysis program called cppcheck.
+>>
+>> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+>> ---
+>>  arch/arm/mach-msm/include/mach/msm_smd.h |    9 ---
+>>  arch/arm/mach-msm/smd.c                  |  105 ------------------------------
+>>  arch/arm/mach-msm/smd_private.h          |    2 -
+>>  3 files changed, 116 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-msm/include/mach/msm_smd.h b/arch/arm/mach-msm/include/mach/msm_smd.h
+>> index 029463e..48ddef98 100644
+>> --- a/arch/arm/mach-msm/include/mach/msm_smd.h
+>> +++ b/arch/arm/mach-msm/include/mach/msm_smd.h
+>> @@ -40,7 +40,6 @@ int smd_read(smd_channel_t *ch, void *data, int len);
+>>  ** it will return the requested length written or an error.
+>>  */
+>>  int smd_write(smd_channel_t *ch, const void *data, int len);
+>> -int smd_write_atomic(smd_channel_t *ch, const void *data, int len);
+>>
+>>  int smd_write_avail(smd_channel_t *ch);
+>>  int smd_read_avail(smd_channel_t *ch);
+>> @@ -57,14 +56,6 @@ int smd_cur_packet_size(smd_channel_t *ch);
+>>  void smd_kick(smd_channel_t *ch);
+>>
+>>
+>> -#if 0
+>> -/* these are interruptable waits which will block you until the specified
+>> -** number of bytes are readable or writable.
+>> -*/
+>> -int smd_wait_until_readable(smd_channel_t *ch, int bytes);
+>> -int smd_wait_until_writable(smd_channel_t *ch, int bytes);
+>> -#endif
+>> -
+>>  typedef enum {
+>>       SMD_PORT_DS = 0,
+>>       SMD_PORT_DIAG,
+>> diff --git a/arch/arm/mach-msm/smd.c b/arch/arm/mach-msm/smd.c
+>> index b1588a1..4bc1e71 100644
+>> --- a/arch/arm/mach-msm/smd.c
+>> +++ b/arch/arm/mach-msm/smd.c
+>> @@ -401,36 +401,6 @@ static inline int smd_need_int(struct smd_channel *ch)
+>>       return 0;
+>>  }
+>>
+>> -void smd_sleep_exit(void)
+>> -{
+>> -     unsigned long flags;
+>> -     struct smd_channel *ch;
+>> -     int need_int = 0;
+>> -
+>> -     spin_lock_irqsave(&smd_lock, flags);
+>> -     list_for_each_entry(ch, &smd_ch_list_modem, ch_list) {
+>> -             if (smd_need_int(ch)) {
+>> -                     need_int = 1;
+>> -                     break;
+>> -             }
+>> -     }
+>> -     list_for_each_entry(ch, &smd_ch_list_dsp, ch_list) {
+>> -             if (smd_need_int(ch)) {
+>> -                     need_int = 1;
+>> -                     break;
+>> -             }
+>> -     }
+>> -     spin_unlock_irqrestore(&smd_lock, flags);
+>> -     do_smd_probe();
+>> -
+>> -     if (need_int) {
+>> -             if (msm_smd_debug_mask & MSM_SMD_DEBUG)
+>> -                     pr_info("smd_sleep_exit need interrupt\n");
+>> -             tasklet_schedule(&smd_fake_irq_tasklet);
+>> -     }
+>> -}
+>> -
+>> -
+>>  void smd_kick(smd_channel_t *ch)
+>>  {
+>>       unsigned long flags;
+>> @@ -747,16 +717,6 @@ int smd_write(smd_channel_t *ch, const void *data, int len)
+>>       return ch->write(ch, data, len);
+>>  }
+>>
+>> -int smd_write_atomic(smd_channel_t *ch, const void *data, int len)
+>> -{
+>> -     unsigned long flags;
+>> -     int res;
+>> -     spin_lock_irqsave(&smd_lock, flags);
+>> -     res = ch->write(ch, data, len);
+>> -     spin_unlock_irqrestore(&smd_lock, flags);
+>> -     return res;
+>> -}
+>> -
+>>  int smd_read_avail(smd_channel_t *ch)
+>>  {
+>>       return ch->read_avail(ch);
+>> @@ -767,16 +727,6 @@ int smd_write_avail(smd_channel_t *ch)
+>>       return ch->write_avail(ch);
+>>  }
+>>
+>> -int smd_wait_until_readable(smd_channel_t *ch, int bytes)
+>> -{
+>> -     return -1;
+>> -}
+>> -
+>> -int smd_wait_until_writable(smd_channel_t *ch, int bytes)
+>> -{
+>> -     return -1;
+>> -}
+>> -
+>>  int smd_cur_packet_size(smd_channel_t *ch)
+>>  {
+>>       return ch->current_packet;
+>> @@ -875,61 +825,6 @@ int smsm_change_state(enum smsm_state_item item,
+>>       return 0;
+>>  }
+>>
+>> -uint32_t smsm_get_state(enum smsm_state_item item)
+>> -{
+>> -     unsigned long flags;
+>> -     uint32_t rv;
+>> -
+>> -     spin_lock_irqsave(&smem_lock, flags);
+>> -
+>> -     rv = readl(smd_info.state + item * 4);
+>> -
+>> -     if (item == SMSM_STATE_MODEM && (rv & SMSM_RESET))
+>> -             handle_modem_crash();
+>> -
+>> -     spin_unlock_irqrestore(&smem_lock, flags);
+>> -
+>> -     return rv;
+>> -}
+>> -
+>> -#ifdef CONFIG_ARCH_MSM_SCORPION
+>> -
+>> -int smsm_set_sleep_duration(uint32_t delay)
+>> -{
+>> -     struct msm_dem_slave_data *ptr;
+>> -
+>> -     ptr = smem_find(SMEM_APPS_DEM_SLAVE_DATA, sizeof(*ptr));
+>> -     if (ptr == NULL) {
+>> -             pr_err("smsm_set_sleep_duration <SM NO APPS_DEM_SLAVE_DATA>\n");
+>> -             return -EIO;
+>> -     }
+>> -     if (msm_smd_debug_mask & MSM_SMSM_DEBUG)
+>> -             pr_info("smsm_set_sleep_duration %d -> %d\n",
+>> -                    ptr->sleep_time, delay);
+>> -     ptr->sleep_time = delay;
+>> -     return 0;
+>> -}
+>> -
+>> -#else
+>> -
+>> -int smsm_set_sleep_duration(uint32_t delay)
+>> -{
+>> -     uint32_t *ptr;
+>> -
+>> -     ptr = smem_find(SMEM_SMSM_SLEEP_DELAY, sizeof(*ptr));
+>> -     if (ptr == NULL) {
+>> -             pr_err("smsm_set_sleep_duration <SM NO SLEEP_DELAY>\n");
+>> -             return -EIO;
+>> -     }
+>> -     if (msm_smd_debug_mask & MSM_SMSM_DEBUG)
+>> -             pr_info("smsm_set_sleep_duration %d -> %d\n",
+>> -                    *ptr, delay);
+>> -     *ptr = delay;
+>> -     return 0;
+>> -}
+>> -
+>> -#endif
+>> -
+>>  int smd_core_init(void)
+>>  {
+>>       int r;
+>> diff --git a/arch/arm/mach-msm/smd_private.h b/arch/arm/mach-msm/smd_private.h
+>> index 727bfe6..702f34e 100644
+>> --- a/arch/arm/mach-msm/smd_private.h
+>> +++ b/arch/arm/mach-msm/smd_private.h
+>> @@ -148,8 +148,6 @@ enum smsm_state_item {
+>>
+>>  void *smem_alloc(unsigned id, unsigned size);
+>>  int smsm_change_state(enum smsm_state_item item, uint32_t clear_mask, uint32_t set_mask);
+>> -uint32_t smsm_get_state(enum smsm_state_item item);
+>> -int smsm_set_sleep_duration(uint32_t delay);
+>>  void smsm_print_sleep_info(void);
+>>
+>>  #define SMEM_NUM_SMD_CHANNELS        64
+>> --
+>> 1.7.10.4
