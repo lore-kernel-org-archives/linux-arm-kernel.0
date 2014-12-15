@@ -1,34 +1,54 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 15 Dec 2014 10:16:25 +0200
-Subject: [GIT PULL] rpmsg for 3.19
-In-Reply-To: <CAK=WgbZJX1GxB-nDwYtS3Qw-TY32QBkywsCaajnCqPXhZ=HQCg@mail.gmail.com>
-References: <CAK=WgbZJX1GxB-nDwYtS3Qw-TY32QBkywsCaajnCqPXhZ=HQCg@mail.gmail.com>
-Message-ID: <CAK=Wgbbq5zCjuii2SQoB-erLTT_oOQAfmVe9CNuDuDB4=CkPmg@mail.gmail.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 15 Dec 2014 09:28:41 +0100
+Subject: [RFC 02/15] drivers/base: add restrack framework
+In-Reply-To: <20141212165230.GP11764@sirena.org.uk>
+References: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
+ <1418226513-14105-3-git-send-email-a.hajda@samsung.com>
+ <20141212165230.GP11764@sirena.org.uk>
+Message-ID: <548E9BB9.806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Resending in plain text mode - sorry]
+On 12/12/2014 05:52 PM, Mark Brown wrote:
+> On Wed, Dec 10, 2014 at 04:48:20PM +0100, Andrzej Hajda wrote:
+>> restrack framework allows tracking presence of resources with dynamic life
+>> time. Typical example of such resources are all resources provided by device
+> I don't know about anyone else but I'm having a hard time reading the
+> restrack name, it looks like a misspelling of restack to me.
 
-The following changes since commit 5d01410fe4d92081f349b013a2e7a95429e4f2c9:
+Any alternative names?
 
-  Linux 3.18-rc6 (2014-11-23 15:25:20 -0800)
+>
+> At a high level my biggest questions here are the relationship between
+> this and the component code and usability.  The usability concern I have
+> is that I see no diagnostics or trace here at all.  This means that if a
+> user looks at their system, sees that the device model claims the driver
+> for a device bound to the device but can't see any sign of the device
+> doing anything they don't have any way of telling why that is other than
+> to look in the driver code, see what resources it was trying to depend
+> on and then go back to the running system to try to understand which of
+> those resources hasn't appeared.
 
-are available in the git repository at:
+I will move the code for provider matching to frameworks,
+so it will be easy to add just dev_info after every failed attempt
+of getting resource, including deferring. This is the simplest solution
+and it should be similar in verbosity to deferred probing.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git
-tags/rpmsg-3.19-next
+Maybe other solution is to provide debug_fs (or device) attribute showing
+restrack status per device.
 
-for you to fetch changes up to b1b9891441fa33fd0d49b5cb3aa7f04bca1cc1db:
+>
+>> +int restrack_up(unsigned long type, const void *id, void *data)
+>> +int restrack_down(unsigned long type, const void *id, void *data)
+> Again I'm not sure that the up and down naming is meaningful in the
+> context of this interface.
+>
+>> +static void restrack_itb_cb(struct track_block *itb, void *data, bool on)
+>> +{
+> itb_cb?
 
-  rpmsg: use less buffers when vrings are small (2014-11-26 18:24:36 +0200)
+Ups I forgot to rename few variables from my previous attempt.
+itb - stayed for interface tracker block.
 
-----------------------------------------------------------------
-A single patch from Suman Anna which makes rpmsg
-use less buffers when small vrings are being used.
-
-----------------------------------------------------------------
-Suman Anna (1):
-      rpmsg: use less buffers when vrings are small
-
- drivers/rpmsg/virtio_rpmsg_bus.c | 44 +++++++++++++++++++++++++++-------------
- 1 file changed, 30 insertions(+), 14 deletions(-)
+Regards
+Andrzej
