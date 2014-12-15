@@ -1,477 +1,124 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 15 Dec 2014 15:15:07 -0500 (EST)
-Subject: [PATCH v2 3/8] ARM: MB86S7X: Add MCPM support
-In-Reply-To: <1418627216-3146-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1418626369-3004-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1418627216-3146-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <alpine.LFD.2.11.1412151448520.1143@knanqh.ubzr>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Mon, 15 Dec 2014 21:18:01 +0100
+Subject: RFC: new dt property "can-wakeup-machine" [Was: [PATCHv0 1/5]
+ rtc: rtc-isl12057: add alarm support to Intersil ISL12057 RTC driver]
+In-Reply-To: <548F3842.1010605@kleine-koenig.org> ("Uwe
+ \=\?utf-8\?Q\?Kleine-K\?\= \=\?utf-8\?Q\?\=C3\=B6nig\=22's\?\=
+ message of "Mon, 15 Dec 2014 20:36:34 +0100")
+References: <cover.1418519430.git.arno@natisbad.org>
+ <c38e3f1a4254e0d8db409ad87ba824c3383d0998.1418519430.git.arno@natisbad.org>
+ <548F3842.1010605@kleine-koenig.org>
+Message-ID: <87vblczmyu.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Dec 2014, Vincent Yang wrote:
+Hi Uwe,
 
-> The remote firmware(SCB) owns the SMP control. This MCPM driver gets
-> CPU/CLUSTER power up/down done by SCB over mailbox.
-> 
-> Signed-off-by: Andy Green <andy.green@linaro.org>
-> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
-> Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+Thanks for bearing w/ me,
 
-Minor issues below.
+Uwe Kleine-K?nig <uwe@kleine-koenig.org> writes:
 
-> ---
->  arch/arm/mach-mb86s7x/Makefile |   4 +-
->  arch/arm/mach-mb86s7x/mcpm.c   | 311 +++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mb86s7x/smc.S    |  27 ++++
->  drivers/soc/mb86s7x/scb_mhu.c  |  20 ++-
->  include/soc/mb86s7x/scb_mhu.h  |   8 ++
->  5 files changed, 365 insertions(+), 5 deletions(-)
->  create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
->  create mode 100644 arch/arm/mach-mb86s7x/smc.S
-> 
-> diff --git a/arch/arm/mach-mb86s7x/Makefile b/arch/arm/mach-mb86s7x/Makefile
-> index 97640b6..00e843c 100644
-> --- a/arch/arm/mach-mb86s7x/Makefile
-> +++ b/arch/arm/mach-mb86s7x/Makefile
-> @@ -1 +1,3 @@
-> -obj-$(CONFIG_ARCH_MB86S7X)	+= board.o
-> +obj-$(CONFIG_ARCH_MB86S7X)	+= board.o mcpm.o smc.o
-> +CFLAGS_smc.o			+= -march=armv7-a
-> +CFLAGS_mcpm.o			+= -march=armv7-a
-> diff --git a/arch/arm/mach-mb86s7x/mcpm.c b/arch/arm/mach-mb86s7x/mcpm.c
-> new file mode 100644
-> index 0000000..ee79dd3
-> --- /dev/null
-> +++ b/arch/arm/mach-mb86s7x/mcpm.c
-> @@ -0,0 +1,311 @@
-> +/*
-> + * arch/arm/mach-mb86s7x/mcpm.c
-> + * Copyright:	(C) 2013-2014 Fujitsu Semiconductor Limited
-> + * Copyright:	(C) 2014 Linaro Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/pm.h>
-> +#include <linux/delay.h>
-> +#include <linux/cpu_pm.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/arm-cci.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/suspend.h>
-> +#include <linux/of_device.h>
-> +#include <linux/irqchip/arm-gic.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include <soc/mb86s7x/scb_mhu.h>
-> +
-> +#include <asm/mcpm.h>
-> +#include <asm/cp15.h>
-> +#include <asm/cputype.h>
-> +#include <asm/suspend.h>
-> +#include <asm/idmap.h>
-> +
-> +#define S7X_MAX_CLUSTER	2
-> +#define S7X_MAX_CPU	2
-> +
-> +#define MHU_SHM_OFFSET		0x3800
-> +#define TRAMPOLINE_OFFSET	0x3c00
-> +#define RESET_OFFSET		(TRAMPOLINE_OFFSET + 0x3fc)
-> +
-> +static arch_spinlock_t mb86s7x_pm_lock = __ARCH_SPIN_LOCK_UNLOCKED;
-> +static int mb86s7x_pm_use_count[S7X_MAX_CLUSTER][S7X_MAX_CPU];
-> +
-> +struct mb86s7x_cpu_gate {
-> +	u32 payload_size;
-> +	u32 cluster_class;
-> +	u32 cluster_id;
-> +	u32 cpu_id;
-> +#define SCB_CPU_STATE_OFF	0x0
-> +#define SCB_CPU_STATE_ON	0x1
-> +#define SCB_CPU_STATE_SUSP	0x2
-> +	u32 cpu_state;
-> +};
-> +
-> +static int mb86s7x_pm_power_up(unsigned int cpu, unsigned int cluster)
-> +{
-> +	int ret = 0;
-> +
-> +	if (cluster >= S7X_MAX_CLUSTER || cpu >= S7X_MAX_CPU)
-> +		return -EINVAL;
-> +
-> +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> +
-> +	local_irq_disable();
-> +	arch_spin_lock(&mb86s7x_pm_lock);
-> +
-> +	mb86s7x_pm_use_count[cluster][cpu]++;
-> +
-> +	if (mb86s7x_pm_use_count[cluster][cpu] == 1) {
-> +		struct mb86s7x_cpu_gate cmd;
-> +
-> +		mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_NOTHING);
-> +		arch_spin_unlock(&mb86s7x_pm_lock);
-> +		local_irq_enable();
-> +
-> +		cmd.payload_size = sizeof(cmd);
-> +		cmd.cluster_class = 0;
-> +		cmd.cluster_id = cluster;
-> +		cmd.cpu_id = cpu;
-> +		cmd.cpu_state = SCB_CPU_STATE_ON;
-> +
-> +		pr_debug("%s:%d CMD Cl_Class-%u CL_ID-%u CPU_ID-%u STATE-%u}\n",
-> +			 __func__, __LINE__, cmd.cluster_class,
-> +			 cmd.cluster_id, cmd.cpu_id, cmd.cpu_state);
-> +
-> +		ret = mb86s7x_send_packet(CMD_CPU_CLOCK_GATE_SET_REQ,
-> +					  &cmd, sizeof(cmd));
-> +		if (ret < 0) {
-> +			pr_err("%s:%d failed!\n", __func__, __LINE__);
-> +			return ret;
-> +		}
-> +
-> +		pr_debug("%s:%d REP Cl_Class-%u CL_ID-%u CPU_ID-%u STATE-%u}\n",
-> +			 __func__, __LINE__, cmd.cluster_class,
-> +			 cmd.cluster_id, cmd.cpu_id, cmd.cpu_state);
-> +
-> +		if (cmd.cpu_state != SCB_CPU_STATE_ON)
-> +			return -ENODEV;
-> +	} else if (mb86s7x_pm_use_count[cluster][cpu] != 2) {
-> +		/*
-> +		 * The only possible values are:
-> +		 * 0 = CPU down
-> +		 * 1 = CPU (still) up
-> +		 * 2 = CPU requested to be up before it had a chance
-> +		 *     to actually make itself down.
-> +		 * Any other value is a bug.
-> +		 */
-> +		BUG();
-> +	}
-> +
-> +	return 0;
+> I adapted the subject line to make the critical element in this patch
+> more obvious.
 
-It is well possible for mb86s7x_pm_use_count[cluster][cpu] to be 2 here.
-In which case you are returning with mb86s7x_pm_lock still locked and 
-IRQs disabled.
+thanks.
 
-> +}
-> +
-> +static void mb86s7x_pm_suspend(u64 ignored)
-> +{
-> +	unsigned int mpidr, cpu, cluster;
-> +	bool last_man = false, skip_wfi = false;
-> +
-> +	mpidr = read_cpuid_mpidr();
-> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> +
-> +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> +	__mcpm_cpu_going_down(cpu, cluster);
-> +
-> +	arch_spin_lock(&mb86s7x_pm_lock);
-> +	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
-> +
-> +	mb86s7x_pm_use_count[cluster][cpu]--;
-> +
-> +	if (mb86s7x_pm_use_count[cluster][cpu] == 0) {
-> +		if (!mb86s7x_pm_use_count[cluster][0] &&
-> +		    !mb86s7x_pm_use_count[cluster][1])
-> +			last_man = true;
-> +		mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_POWEROFF);
-> +	} else if (mb86s7x_pm_use_count[cluster][cpu] == 1) {
-> +		skip_wfi = true; /* Overtaken by a power up */
-> +	} else {
-> +		BUG();
-> +	}
-> +
-> +	if (!skip_wfi)
-> +		gic_cpu_if_down();
-> +
-> +	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
-> +		arch_spin_unlock(&mb86s7x_pm_lock);
-> +
-> +		if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A15) {
-> +			/*
-> +			 * On the Cortex-A15 we need to disable
-> +			 * L2 prefetching before flushing the cache.
-> +			 */
-> +			asm volatile(
-> +			"mcr p15, 1, %0, c15, c0, 3\n\t"
-> +			"isb\n\t"
-> +			"dsb"
-> +			: : "r" (0x400));
-> +		}
-> +
-> +		v7_exit_coherency_flush(all);
-> +
-> +		cci_disable_port_by_cpu(mpidr);
-> +
-> +		__mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
-> +	} else {
-> +		arch_spin_unlock(&mb86s7x_pm_lock);
-> +		v7_exit_coherency_flush(louis);
-> +	}
-> +
-> +	__mcpm_cpu_down(cpu, cluster);
-> +
-> +	/* Now we are prepared for power-down, do it: */
-> +	if (!skip_wfi)
-> +		wfi();
-> +}
-> +
-> +static void mb86s7x_pm_power_down(void)
-> +{
-> +	mb86s7x_pm_suspend(0);
-> +}
-> +
-> +static int mb86s7x_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
-> +{
-> +	struct mb86s7x_cpu_gate cmd;
-> +	int i, ret;
-> +
-> +	BUG_ON(cluster >= S7X_MAX_CLUSTER || cpu >= S7X_MAX_CPU);
-> +
-> +	cmd.payload_size = sizeof(cmd);
-> +	cmd.cluster_class = 0;
-> +	cmd.cluster_id = cluster;
-> +	cmd.cpu_id = cpu;
-> +	cmd.cpu_state = SCB_CPU_STATE_ON;
-> +
-> +	for (i = 0; i < 50; i++) {
-> +		ret = mb86s7x_send_packet(CMD_CPU_CLOCK_GATE_GET_REQ,
-> +					  &cmd, sizeof(cmd));
-> +		if (ret < 0) {
-> +			pr_err("%s:%d failed to get CPU status\n",
-> +			       __func__, __LINE__);
-> +			return ret;
-> +		}
-> +
-> +		pr_debug("%s:%d Cl_Class-%u CL_ID-%u CPU_ID-%u STATE-%u\n",
-> +			 __func__, __LINE__,
-> +			 cmd.cluster_class, cmd.cluster_id,
-> +			 cmd.cpu_id, cmd.cpu_state);
-> +
-> +		if (cmd.cpu_state == SCB_CPU_STATE_OFF)
-> +			return 0;
-> +
-> +		msleep(20);
-> +	}
-> +
-> +	return -ETIMEDOUT;
-> +}
-> +
-> +static void mb86s7x_pm_powered_up(void)
-> +{
-> +	unsigned int mpidr, cpu, cluster;
-> +
-> +	mpidr = read_cpuid_mpidr();
-> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> +
-> +	arch_spin_lock(&mb86s7x_pm_lock);
-> +	if (!mb86s7x_pm_use_count[cluster][cpu])
-> +		mb86s7x_pm_use_count[cluster][cpu] = 1;
-> +	arch_spin_unlock(&mb86s7x_pm_lock);
-> +}
-> +
-> +static const struct mcpm_platform_ops mb86s7x_pm_power_ops = {
-> +	.power_up		= mb86s7x_pm_power_up,
-> +	.power_down		= mb86s7x_pm_power_down,
-> +	.wait_for_powerdown	= mb86s7x_wait_for_powerdown,
-> +	.suspend		= mb86s7x_pm_suspend,
-> +	.powered_up		= mb86s7x_pm_powered_up,
-> +};
-> +
-> +/*
-> + * Enable cluster-level coherency, in preparation for turning on the MMU.
-> + */
-> +static void __naked mb86s7x_pm_power_up_setup(unsigned int affinity_level)
-> +{
-> +	asm volatile ("\n"
-> +"	cmp	r0, #1\n"
-> +"	bxne	lr\n"
-> +"	b	cci_enable_port_for_self");
-> +}
-> +
-> +static void __init mb86s7x_cache_off(void)
-> +{
-> +	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A15) {
-> +		/* disable L2 prefetching on the Cortex-A15 */
-> +		asm volatile(
-> +		"mcr	p15, 1, %0, c15, c0, 3\n\t"
-> +		"isb\n\t"
-> +		"dsb"
-> +		: : "r" (0x400));
-> +	}
-> +	v7_exit_coherency_flush(all);
-> +}
-> +
-> +struct mb86s7x_scb_version {
-> +	u32 payload_size;
-> +	u32 version;
-> +	u32 config_version;
-> +};
-> +
-> +static int __init mb86s7x_mcpm_init(void)
-> +{
-> +	unsigned int mpidr, cpu, cluster;
-> +	struct mb86s7x_scb_version cmd;
-> +	int ret;
-> +
-> +	if (!cci_probed())
-> +		return -ENODEV;
-> +
-> +	mpidr = read_cpuid_mpidr();
-> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> +
-> +	pr_info("Booting on cpu_%u cluster_%u\n", cpu, cluster);
-> +	mb86s7x_pm_use_count[cluster][cpu] = 1;
-> +
-> +	/* reset the wfi 'color' for primary cpu */
-> +	mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_NOTHING);
-> +
-> +	/* Do SMC to set entry address for CPUs coming online */
-> +	mb86s7x_cpu_entry(virt_to_phys(mcpm_entry_point));
-> +
-> +	cmd.payload_size = sizeof(cmd);
-> +	cmd.version = 0;
-> +	cmd.config_version = 0;
-> +	ret = mb86s7x_send_packet(CMD_SCB_CAPABILITY_GET_REQ,
-> +				  &cmd, sizeof(cmd));
-> +	if (ret < 0)
-> +		pr_err("%s:%d failed to get SCB version\n",
-> +		       __func__, __LINE__);
+> As I wouldn't be surprised to get some discussion about your approach it
+> would be beneficial to split this patch into:
+>
+>  - add (traditional) alarm support to rtc-isl12057
+>  - allow the driver to wakeup the machine without the irq being
+>    reported to the CPU.
+>
+> The first patch should not be controversial and the patch to discuss
+> gets smaller.
 
-Wouldn't it be better to return an error here as well rather than 
-continuing with potentially bad data?
+Will do that. But it would be good we end up w/ a solution for current
+in-tree users of the driver, i.e. those w/ a need for the second
+patch ;-)
 
-> +
-> +	pr_info("MB86S7x MCPM initialized: SCB version 0x%x:0x%x\n",
-> +		cmd.version, cmd.config_version);
-> +
-> +	ret = mcpm_platform_register(&mb86s7x_pm_power_ops);
-> +	if (!ret)
-> +		ret = mcpm_sync_init(mb86s7x_pm_power_up_setup);
-> +	if (!ret)
-> +		ret = mcpm_loopback(mb86s7x_cache_off); /* turn on the CCI */
-> +	mcpm_smp_set_ops();
 
-You should call mcpm_smp_set_ops() only if none of the precedent calls 
-returned an error.
+> On 12/14/2014 02:42 AM, Arnaud Ebalard wrote:
+>> +Example isl12057 node without IRQ#2 pin connected to the SoC but to a
+>> +PMIC, allowing the device to be started based on configured alarm:
+>> +
+>> +	isl12057: isl12057 at 68 {
+>> +		compatible = "isil,isl12057";
+>> +		reg = <0x68>;
+>> +		can-wakeup-machine;
+>> +	};
+> What if the IRC#1 pin wakes the machine?
 
-> +
-> +	return ret;
-> +}
-> +early_initcall(mb86s7x_mcpm_init);
-> diff --git a/arch/arm/mach-mb86s7x/smc.S b/arch/arm/mach-mb86s7x/smc.S
-> new file mode 100644
-> index 0000000..a14330b
-> --- /dev/null
-> +++ b/arch/arm/mach-mb86s7x/smc.S
-> @@ -0,0 +1,27 @@
-> +/*
-> + * SMC command interface to set secondary entry point
-> + * Copyright: (C) 2013-2014 Fujitsu Semiconductor Limited
-> + * Copyright: (C) 2014 Linaro Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +
-> +.arch_extension sec
-> +
-> +/* void mb86s7x_cpu_entry(unsigned long secondary_entry); */
-> +ENTRY(mb86s7x_cpu_entry)
-> +	stmfd   sp!, {r1-r11, lr}
-> +	mov r1, r0
-> +	ldr r0, =1
-> +	mrc p15, 0, r3, c1, c0, 0
-> +	mov r4, r3
-> +	and r3, #0xbfffffff
-> +	mcr p15, 0, r3, c1, c0, 0
-> +	smc #0
-> +	mcr p15, 0, r4, c1, c0, 0
-> +	ldmfd   sp!, {r1-r11, pc}
-> +ENDPROC(mb86s7x_cpu_entry)
-> diff --git a/drivers/soc/mb86s7x/scb_mhu.c b/drivers/soc/mb86s7x/scb_mhu.c
-> index 72070f1..f4276d7 100644
-> --- a/drivers/soc/mb86s7x/scb_mhu.c
-> +++ b/drivers/soc/mb86s7x/scb_mhu.c
-> @@ -35,7 +35,7 @@ static struct mbox_client mhu_cl;
->  static struct mbox_chan *mhu_chan;
->  static mb86s7x_mhu_handler_t handler[MHU_NUM_CMDS];
->  
-> -void __iomem *mhu_base, *mb86s7x_shm_base;
-> +static void __iomem *mhu_base, *mb86s7x_shm_base;
+I handled that in details in the documentation (w/ a typo I will fix, I
+must confess). The answer is: if you put a "can-wakeup-machine" property
+in your .dts for ISL12057, then it means IRQ#2 can wake up the machine
+BUT is not hooked up to the SoC. And only that. Alarm2 is not supported
+(it can generate an interrupt on IRQ#1 or IRQ#2) so the driver does not
+deal w/ IRQ#1 at all.
 
-This should probably be done in the patch that introduced it instead.
+That being said, one can still add support later for Alarm2 (via IRQ#1
+or IRQ#2) and the "can-wakeup-machine" property you proposed will still
+handle that w/o issue.
 
->  static void __iomem *cmd_to_scb, *rsp_to_scb;
->  static void __iomem *cmd_from_scb, *rsp_from_scb;
->  
-> @@ -81,15 +81,27 @@ static int mhu_fsm[4][4] = {
->  	},
->  };
->  
-> -struct mhu_xfer {
-> +static struct mhu_xfer {
->  	int code;
->  	int len;
->  	void *buf;
->  	struct completion *c;
->  	struct list_head node;
-> -};
-> +} *ax; /* stages of xfer */
+As a side note, on our ReadyNAS, we can easily test a support for alarm2
+on IRQ#2 pin. But In the end, the main problem will still be core rtc
+interface: how do you handle the existence of two alarms on a RTC chip
+using current sysfs interface, for instance?
 
-Ditto for the above.
 
-> +
-> +#define WFI_COLOR_OFFSET	0x3f00
->  
-> -static struct mhu_xfer *ax; /* stages of xfer */
-> +void mb86s7x_set_wficolor(unsigned clstr, unsigned cpu, unsigned clr)
-> +{
-> +	u8 val;
-> +
-> +	val = readb_relaxed(mb86s7x_shm_base
-> +			    + WFI_COLOR_OFFSET + clstr * 2 + cpu);
-> +	val &= ~AT_WFI_COLOR_MASK;
-> +	val |= clr;
-> +	writeb_relaxed(val, mb86s7x_shm_base
-> +		       + WFI_COLOR_OFFSET + clstr * 2 + cpu);
-> +}
->  
->  static int mhu_alloc_xfers(int n, struct list_head *list)
->  {
-> diff --git a/include/soc/mb86s7x/scb_mhu.h b/include/soc/mb86s7x/scb_mhu.h
-> index a7e3484..1268640 100644
-> --- a/include/soc/mb86s7x/scb_mhu.h
-> +++ b/include/soc/mb86s7x/scb_mhu.h
-> @@ -87,6 +87,14 @@ enum {
->  #define CMD_POWERDOMAIN_SET_REP		ENC_REP(CMD_POWERDOMAIN_SET_REQ)
->  #define CMD_STG_BLOCK_ERASE_REP		ENC_REP(CMD_STG_BLOCK_ERASE_REQ)
->  
-> +#define AT_WFI_DO_NOTHING	0x0
-> +#define AT_WFI_DO_SUSPEND	0x1
-> +#define AT_WFI_DO_POWEROFF	0x2
-> +#define AT_WFI_COLOR_MASK	0x3
-> +
-> +void mb86s7x_set_wficolor(unsigned clstr, unsigned cpu, unsigned clr);
-> +void mb86s7x_cpu_entry(unsigned long secondary_entry);
-> +
->  /* Helper functions to talk to remote */
->  int mb86s7x_send_packet(int cmd, void *buf, int len);
->  
-> -- 
-> 1.9.0
-> 
-> 
+> And I wonder if there is a more sane approach for this setup that
+> wouldn't need specialized driver support.
+>
+> Something like:
+>
+> 	isl12057: isl12057 at 68 {
+> 		compatible = "isil,isl12057";
+> 		reg = <0x68>;
+> 		interrupt-parent = <&wakeupfoo>;
+> 		interrupts = <???>
+> 	};
+>
+> 	wakeupfoo: ... {
+> 		/*
+> 		 * This controller cannot report irqs to the cpu, but
+> 		 * can wake it up.
+> 		 */
+> 		....
+> 	}
+>
+> Hmm, the bad thing here is that this "interrupt controller" isn't
+> suitable to support "normal" interrupts. But maybe it's good enough to
+> get into a discussion for a better idea?!
+
+I agree you had a good idea in the first place not to force the rtc as
+wakeup source and make that configurable via the .dts based on specific
+system setup. But I think we should keep the knob simple.
+
+What you propose is probably more accurate w/ the existence of a PMIC
+in the device but IMHO the main purpose of the property is to tell the
+driver that IRQ#2 (associated w/ the alarm1 it supports) can wake the
+machine up. It would be more complex than needed for the driver to try
+and understand that in fact the controller and irq that are passed are
+placebo and it should the declare the device as a wakeup source.
+
+What about changing the property name from "can-wakeup-machine" to
+"isil,irq2-can-wakeup-machine" instead? It makes it clear that it is
+specific to that driver, and that it only works w/ IRQ#2.
+
+
+>> diff --git a/drivers/rtc/rtc-isl12057.c b/drivers/rtc/rtc-isl12057.c
+>> index 6e1fcfb5d7e6..98adc2c1bdb0 100644
+>> --- a/drivers/rtc/rtc-isl12057.c
+>> +++ b/drivers/rtc/rtc-isl12057.c
+>> @@ -1,5 +1,5 @@
+>>  /*
+>> - * rtc-isl12057 - Driver for Intersil ISL12057 I2C Real Time Clock
+>> + * rtc-isl12057 - Driver for Intersil ISL12057 I2C Real Time Clock / Alarm
+> I wouldn't care here to add "Alarm" at various places. Actually having
+> an alarm is a quite usual feature of an rtc. *shrug*
+
+Will drop thoses changes.
+
+Cheers,
+
+a+
