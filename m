@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Dec 2014 16:38:33 +0100
-Subject: [PATCH 25/27] ARM: mvebu: armada-xp-netgear-rn2120: Relicense the
+Date: Mon, 15 Dec 2014 16:38:35 +0100
+Subject: [PATCH 27/27] ARM: mvebu: armada-xp-synology-ds414: Relicense the
  device tree under GPLv2+/X11
 In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1418657915-22775-26-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1418657915-22775-28-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,21 +16,18 @@ In order to make it easier for them to reuse our device trees,
 relicense our device trees under a GPL/X11 dual-license.
 
 Cc: Arnaud Ebalard <arno@natisbad.org>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 41 +++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-synology-ds414.dts | 41 +++++++++++++++++++++++---
  1 file changed, 37 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-index d81430aa4ab3..a7ceafd5808d 100644
---- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-+++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+diff --git a/arch/arm/boot/dts/armada-xp-synology-ds414.dts b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+index 749fdba5a642..e9fb225169aa 100644
+--- a/arch/arm/boot/dts/armada-xp-synology-ds414.dts
++++ b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
 @@ -3,10 +3,43 @@
   *
-  * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
+  * Copyright (C) 2014, Arnaud EBALARD <arno@natisbad.org>
   *
 - * This program is free software; you can redistribute it and/or
 - * modify it under the terms of the GNU General Public License
@@ -73,8 +70,8 @@ index d81430aa4ab3..a7ceafd5808d 100644
 + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /dts-v1/;
+  *
+  * Note: this Device Tree assumes that the bootloader has remapped the
+  * internal registers to 0xf1000000 (instead of the old 0xd0000000).
 -- 
 1.9.1
