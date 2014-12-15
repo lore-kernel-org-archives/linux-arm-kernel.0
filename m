@@ -1,10 +1,10 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 15 Dec 2014 18:57:36 +0100
-Subject: [PATCH 04/27] ARM: mvebu: armada-370-netgear-rn102: Relicense the
+Date: Mon, 15 Dec 2014 18:57:25 +0100
+Subject: [PATCH 03/27] ARM: mvebu: armada-370-mirabox: Relicense the
  device tree under GPLv2+/X11
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <87mw6ookxb.fsf@natisbad.org>
+ <1418657915-22775-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <87tx0wokxm.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,8 +21,8 @@ Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 > Cc: Arnaud Ebalard <arno@natisbad.org>
 > Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: klightspeed at killerwolves.net <klightspeed@killerwolves.net>
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Ryan Press <ryan@presslab.us>
+> Cc: Simon Baatz <gmbnomis@gmail.com>
 > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
@@ -30,21 +30,20 @@ Acked-by: Arnaud Ebalard <arno@natisbad.org>
 
 
 > ---
->  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 41 +++++++++++++++++++++++---
->  1 file changed, 37 insertions(+), 4 deletions(-)
+>  arch/arm/boot/dts/armada-370-mirabox.dts | 40 +++++++++++++++++++++++++++++---
+>  1 file changed, 37 insertions(+), 3 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-> index 4e24932c6e30..7c5c4ff941ec 100644
-> --- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-> +++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-> @@ -3,10 +3,43 @@
+> diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+> index e1b0eb6b091f..b10ceb488efe 100644
+> --- a/arch/arm/boot/dts/armada-370-mirabox.dts
+> +++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+> @@ -3,9 +3,43 @@
 >   *
->   * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
+>   * Gregory CLEMENT <gregory.clement@free-electrons.com>
 >   *
-> - * This program is free software; you can redistribute it and/or
-> - * modify it under the terms of the GNU General Public License
-> - * as published by the Free Software Foundation; either version
-> - * 2 of the License, or (at your option) any later version.
+> - * This file is licensed under the terms of the GNU General Public
+> - * License version 2.  This program is licensed "as is" without any
+> - * warranty of any kind, whether express or implied.
 > + * This file is dual-licensed: you can use it either under the terms
 > + * of the GPL or the X11 license, at your option. Note that this dual
 > + * licensing only applies to this file, and not this project as a
