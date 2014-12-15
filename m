@@ -1,64 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 15 Dec 2014 13:06:06 -0500
-Subject: [PATCHv0 5/5] dt-bindings: fix isl vs isil prefix issue for
- Intersil
-In-Reply-To: <87388gkcv5.fsf@natisbad.org>
-References: <cover.1418519430.git.arno@natisbad.org>
- <b2c34bea6fc7bd42d636c9cadfe1b7e5ec523aeb.1418519430.git.arno@natisbad.org>
- <20141215135545.GC967@titan.lakedaemon.net>
- <87388gkcv5.fsf@natisbad.org>
-Message-ID: <20141215180606.GF967@titan.lakedaemon.net>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 15 Dec 2014 10:06:51 -0800
+Subject: [RFC PATCH 2/2] iommu: rockchip: Handle system-wide and runtime PM
+In-Reply-To: <CAMuHMdVpCgK-hNqZ=JWjFGS53g+ZUQ5t=uBxtN1qGXJhoRg8BQ@mail.gmail.com>
+ (Geert Uytterhoeven's message of "Mon, 15 Dec 2014 09:35:09 +0100")
+References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
+ <7h8uiemce7.fsf@deeprootsystems.com>
+ <CAPDyKFo6zH4__Odm+RiJCbvXquAQqaLyCAiXrSN6s3KfQhok=A@mail.gmail.com>
+ <1576771.dIVCOxU0se@vostro.rjw.lan>
+ <CAAFQd5B28WiWUqmbmROJUa3H25R=Y774NuemTZDvkoa=CvZUsw@mail.gmail.com>
+ <7ha92sk533.fsf@deeprootsystems.com>
+ <CAMuHMdVpCgK-hNqZ=JWjFGS53g+ZUQ5t=uBxtN1qGXJhoRg8BQ@mail.gmail.com>
+Message-ID: <7hr3w0iy84.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 07:05:18PM +0100, Arnaud Ebalard wrote:
-> Hi,
-> 
-> Jason Cooper <jason@lakedaemon.net> writes:
-> 
-> >> AFAICT, it seems it makes sense to *definitively* settle for isil
-> >> as the vendor prefix for Intersil, as Philip did in 7a6540ca856a:
-> >> it's the NASDAQ symbol and this choice requires less changes than
-> >> opting for isl.
-> >> 
-> >> So, this patch changes compatible strings in .dts files to use isil
-> >> where isl was found before, and modify drivers w/ compatible
-> >> strings using isl to add one using isil. In those cases, a comment
-> >> is made that the old compatible string is kept for backward
-> >> compatibility (w/ out-fo-tree users of those drivers).
-> >> Additionally, it leaves only isil as prefix in vendor-prefixes.txt.
-> >> Those changes should prevent any new inclusion of isl compatible
-> >> strings for Intersil devices due to copy-and-paste.
-> >> 
-> >> Signed-off-by: Arnaud Ebalard <arno@natisbad.org> ---
-> >> Documentation/devicetree/bindings/i2c/trivial-devices.txt | 5 ++---
-> >> Documentation/devicetree/bindings/regulator/isl9305.txt   | 4 ++--
-> >> Documentation/devicetree/bindings/vendor-prefixes.txt     | 3 +--
-> >
-> >>  arch/arm/boot/dts/tegra30-cardhu.dtsi                     | 2 +-
-> >>  arch/arm/boot/dts/zynq-parallella.dts                     | 2 +-
-> >
-> >>  drivers/regulator/isl9305.c                               | 6
-> >>  ++++-- drivers/rtc/rtc-isl12022.c                                |
-> >>  3 ++- drivers/rtc/rtc-isl12057.c                                |
-> >>  3 ++- drivers/staging/iio/light/isl29028.c                      |
-> >>  4 ++-- 9 files changed, 17 insertions(+), 15 deletions(-)
-> >
-> > Please split the dts{i} changes out into a separate patch.  The
-> > different maintainers under drivers/ may want separate patches as
-> > well.
-> 
-> I will prepare that, and then let get_maintainer.pl decide who should
-> be added to the CC: list. But before doing that work, I would like to
-> at least get some feedback that there will not be a big NAK on the
-> whole approach in the end.
+Geert Uytterhoeven <geert@linux-m68k.org> writes:
 
-As long as you are maintaining compatibility with old dtbs (which you
-are), then there shouldn't be a problem.  I think the original dust up
-occurred because two different maintainers merged two different
-solutions and didn't run into each other.  This looks like a sane
-cleanup of the resulting mess. :)
+> On Fri, Dec 12, 2014 at 9:04 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>> An even more exciting problem exists when a CPU is in the same domain as
+>> other peripherals, those peripherals are all idle and the power domain
+>> is gated. :)
+>
+> We do have pm_genpd_attach_cpuidle() and pm_genpd_name_attach_cpuidle()?
 
-thx,
+Exactly.  
 
-Jason.
+And I think to solve this problem, we need to generalize the attaching
+of dependent devices to a PM domain.
+
+Kevin
