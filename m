@@ -1,48 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Dec 2014 17:43:36 +0000
-Subject: 3.18: lockdep problems in cpufreq
-In-Reply-To: <003501d01876$fbc53f80$f34fbe80$%brar@samsung.com>
-References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
- <7573578.UE8ufgjWuX@vostro.rjw.lan>
- <CAKohpok6ieJYgusMh+WFCQT8d5_QVgGczmQyD79UPz4hdYU1Dg@mail.gmail.com>
- <002f01d0186b$2700b730$75022590$%brar@samsung.com>
- <20141215134636.GI11285@n2100.arm.linux.org.uk>
- <003501d01876$fbc53f80$f34fbe80$%brar@samsung.com>
-Message-ID: <20141215174336.GJ11285@n2100.arm.linux.org.uk>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 15 Dec 2014 18:43:31 +0100
+Subject: [PATCH v3 0/2] VGIC early initialization initiated by user-space
+Message-ID: <1418665413-31521-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 08:24:05PM +0530, Yadwinder Singh Brar wrote:
-> > The answer may well be to have finer grained locking here:
-> > 
-> > - one lock to protect cpufreq_dev_list, which is only ever taken when
-> >   adding or removing entries from it
-> > 
-> > - a second lock to protect cpufreq_dev_count and the calls to
-> >   cpufreq_register_notifier() and cpufreq_unregister_notifier()
-> > 
-> > and you would /never/ take either of those two locks inside each other.
-> > In other words:
-> > 
-> > 	mutex_lock(&cooling_list_lock);
-> > 	list_add(&cpufreq_dev->node, &cpufreq_dev_list);
-> > 	mutex_unlock(&cooling_list_lock);
-> > 
-> > 	mutex_lock(&cooling_cpufreq_lock);
-> > 	if (cpufreq_dev_count++ == 0)
-> > 		cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
-> > 					  CPUFREQ_POLICY_NOTIFIER);
-> > 	mutex_unlock(&cooling_cpufreq_lock);
-> > 
-> > and similar in the cleanup path.  The notifier itself would only ever
-> > take the cooling_list_lock.
-> > 
-> 
-> I agree with this approach, if its fine for others also, I can implement
-> and post patch.
+Since the advent of VGIC dynamic initialization, this latter is
+initialized quite late on the first vcpu run or "on-demand", when
+injecting an IRQ or when the guest sets its registers.
 
-Yes, please do.
+This series now allows the user space to explicitly request the VGIC init,
+when the dimensioning parameters have been set: number of IRQs, number of
+vCPUs. The target state is "initialized".
+
+- the first patch file changes the error returned by vgic_init when no
+  online vcpu can be found.
+- the second adds a new entry to the VGIC KVM device that allows
+  the user-space to manually request the VGIC init:
+  - a new KVM_DEV_ARM_VGIC_GRP_CTRL group is introduced.
+  - its first attribute is KVM_DEV_ARM_VGIC_CTRL_INIT
+
+Applies on top of Christoffer's series:
+"[PATCH v2 0/6] Fix vgic initialization problems"
+
+- can be found at:
+  http://git.linaro.org/people/eric.auger/linux.git,
+  branch kvmarm-next-vgic-early-init-v3-official)
+
+v2 -> v3:
+- in KVM_DEV_ARM_VGIC_GRP_CTRL: vgic_init is called in place of former
+  kvm_vgic_init. Means this control moves the VGIC in initialized state
+  and not in ready state as before.
+- "[PATCH v2 3/4] KVM: arm/arm64: check vgic_initialized before VCPU creation"
+  removed since included in Christoffer's
+  "arm/arm64: KVM: Don't allow creating VCPUs after vgic_initialized"
+- [PATCH v2 4/4] KVM: arm/arm64: vgic: check vgic_initialized in
+  KVM_DEV_ARM_VGIC_GRP_ADDR removed since I noticed vgic_ioaddr_assign
+  would return -EEXIST in case vgic_map_resources were already been called.
+- rewording in cover letter
+
+v1 -> v2:
+- 1, 3, 4 patch files added
+- some rewording in vgic device documentation
+
+
+Eric Auger (2):
+  KVM: arm/arm64: vgic: vgic_init returns -ENODEV when no online vcpu
+  KVM: arm/arm64: vgic: add init entry to VGIC KVM device
+
+ Documentation/virtual/kvm/devices/arm-vgic.txt | 11 +++++++++++
+ arch/arm/include/uapi/asm/kvm.h                |  2 ++
+ arch/arm64/include/uapi/asm/kvm.h              |  2 ++
+ virt/kvm/arm/vgic.c                            | 16 ++++++++++++++--
+ 4 files changed, 29 insertions(+), 2 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
