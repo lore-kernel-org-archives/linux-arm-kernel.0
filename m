@@ -1,84 +1,80 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 15 Dec 2014 18:57:04 +0100
-Subject: [PATCH 01/27] ARM: mvebu: armada-370-db: Relicense the device
- tree under GPLv2+/X11
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <878ui8pzin.fsf@natisbad.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 15 Dec 2014 19:53:48 +0200
+Subject: [PATCH v3 18/19] iommu: exynos: init from dt-specific callback
+ instead of initcall
+In-Reply-To: <20141215174302.GU20738@arm.com>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1458739.IClpD3xz3i@avalon> <20141215174302.GU20738@arm.com>
+Message-ID: <4894156.QdIh4JzSl0@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Will,
 
-Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
-
-> The current GPL only licensing on the device tree makes it very
-> impractical for other software components licensed under another
-> license.
+On Monday 15 December 2014 17:43:02 Will Deacon wrote:
+> On Mon, Dec 15, 2014 at 05:27:30PM +0000, Laurent Pinchart wrote:
+> > On Monday 15 December 2014 17:17:00 Will Deacon wrote:
+> > > On Sun, Dec 14, 2014 at 12:45:36PM +0000, Laurent Pinchart wrote:
+> > > > On Wednesday 19 November 2014 12:15:47 Marek Szyprowski wrote:
+> > > > > +static int __init exynos_iommu_of_setup(struct device_node *np)
+> > > > > +{
+> > > > > +	struct platform_device *pdev;
+> > > > > +
+> > > > > +	if (!init_done)
+> > > > > +		exynos_iommu_init();
+> > > > > +
+> > > > > +	pdev = of_platform_device_create(np, NULL,
+> > > > > platform_bus_type.dev_root);
+> > > > > +	if (IS_ERR(pdev))
+> > > > > +		return PTR_ERR(pdev);
+> > > > 
+> > > > If we end up having to create the IOMMU platform devices from within
+> > > > the drivers, the introduction of IOMMU_OF_DECLARE starts to feel like
+> > > > a workaround to me. I wonder whether it wouldn't then be better to let
+> > > > the driver core instantiate the IOMMU platform device from DT as for
+> > > > all other devices, and use device notifiers to defer probe of the bus
+> > > > masters until the required IOMMU(s) are registered.
+> > > > 
+> > > > Will, what's your opinion on that ?
+> > > 
+> > > Creating the platform device manually for the IOMMU is indeed grotty,
+> > > but I don't really understand why it's needed. Interrupt controllers,
+> > > for example, seem to get by without one.
+> > 
+> > There's several reasons, one of the most compelling ones I can think of at
+> > the moment is runtime PM. IRQ controllers close to the CPU use CPU PM
+> > notifiers instead. Note that IRQ controllers that are further away from
+> > the CPU (such as GPIO-based IRQ controllers) are real platform devices
+> > and use runtime PM.
 >
-> In order to make it easier for them to reuse our device trees,
-> relicense our device trees under a GPL/X11 dual-license.
->
-> Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Simon Baatz <gmbnomis@gmail.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Ok, that's a good point, but the IOMMU will still probe later anyway, right?
 
-Acked-by: Arnaud Ebalard <arno@natisbad.org>
+That depends on the driver implementation, using OF node match an IOMMU driver 
+doesn't have to register a struct driver. Assuming we require IOMMU drivers to 
+register a struct driver, a platform device should then be probed at a later 
+time.
 
+However, if we wait until the IOMMU gets probed to initialize runtime PM and 
+make it functional, we'll be back in square one if the IOMMU gets probed after 
+the bus master, as the bus master could start issuing bus requests at probe 
+time with the IOMMU not powered yet.
 
-> ---
->  arch/arm/boot/dts/armada-370-db.dts | 40 ++++++++++++++++++++++++++++++++++---
->  1 file changed, 37 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-> index 1466580be295..f4990b26dbbd 100644
-> --- a/arch/arm/boot/dts/armada-370-db.dts
-> +++ b/arch/arm/boot/dts/armada-370-db.dts
-> @@ -8,9 +8,43 @@
->   * Gregory CLEMENT <gregory.clement@free-electrons.com>
->   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->   *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
->  /dts-v1/;
+> > IOMMUs are not as low-level as system interrupt controllers or system
+> > clocks. I'm beginning to agree with Thierry that they should be treated
+> > as normal platform devices as they're not required earlier than probe
+> > time of their bus master devices.
+> 
+> Well, I think you'd have to propose patches for discussion since I'm
+> certainly not wed to the current approach; I just want something that
+> allows of_{dma,iommu}_configure to run with the information it needs.
+
+Do we need of_dma_configure() to run when the device is created, or could we 
+postpone it to just before probe time ?
+
+> The usual answer is `we should model buses properly', but that's really
+> not practical afaict.
+
+-- 
+Regards,
+
+Laurent Pinchart
