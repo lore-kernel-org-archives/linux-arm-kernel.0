@@ -1,88 +1,99 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Mon, 15 Dec 2014 13:29:32 +0200
-Subject: [PATCH 03/18] arm64/uaccess: fix sparse errors
-In-Reply-To: <20141215112310.GG11285@n2100.arm.linux.org.uk>
-References: <1418575877-21488-1-git-send-email-mst@redhat.com>
- <1418575877-21488-4-git-send-email-mst@redhat.com>
- <20141215111716.GG20738@arm.com>
- <20141215112310.GG11285@n2100.arm.linux.org.uk>
-Message-ID: <20141215112932.GA27136@redhat.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 15 Dec 2014 11:32:25 +0000
+Subject: [PATCH v5 15/19] arm/arm64: KVM: add virtual GICv3 distributor
+ emulation
+In-Reply-To: <20141213133707.GF16855@cbox>
+References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
+ <1418042274-3246-16-git-send-email-andre.przywara@arm.com>
+ <20141213133707.GF16855@cbox>
+Message-ID: <548EC6C9.8020101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 11:23:11AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 15, 2014 at 11:17:16AM +0000, Will Deacon wrote:
-> > On Sun, Dec 14, 2014 at 04:52:09PM +0000, Michael S. Tsirkin wrote:
-> > > virtio wants to read bitwise types from userspace using get_user.  At the
-> > > moment this triggers sparse errors, since the value is passed through an
-> > > integer.
-> > > 
-> > > Fix that up using __force.
-> > > 
-> > > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> > > ---
-> > >  arch/arm64/include/asm/uaccess.h | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> > > index 3bf8f4e..8d66bcf 100644
-> > > --- a/arch/arm64/include/asm/uaccess.h
-> > > +++ b/arch/arm64/include/asm/uaccess.h
-> > > @@ -147,7 +147,7 @@ do {									\
-> > >  	default:							\
-> > >  		BUILD_BUG();						\
-> > >  	}								\
-> > > -	(x) = (__typeof__(*(ptr)))__gu_val;				\
-> > > +	(x) = (__force __typeof__(*(ptr)))__gu_val;				\
-> > >  } while (0)
-> > >  
-> > >  #define __get_user(x, ptr)						\
-> > 
-> > Acked-by: Will Deacon <will.deacon@arm.com>
+Hej Christoffer,
+
+thanks for going through all of this ... again ;-)
+
+On 13/12/14 13:37, Christoffer Dall wrote:
+> On Mon, Dec 08, 2014 at 12:37:50PM +0000, Andre Przywara wrote:
+>> With everything separated and prepared, we implement a model of a
+>> GICv3 distributor and redistributors by using the existing framework
+>> to provide handler functions for each register group.
+>>
+>> Currently we limit the emulation to a model enforcing a single
+>> security state, with SRE==1 (forcing system register access) and
+>> ARE==1 (allowing more than 8 VCPUs).
+>>
+>> We share some of the functions provided for GICv2 emulation, but take
+>> the different ways of addressing (v)CPUs into account.
+>> Save and restore is currently not implemented.
+>>
+>> Similar to the split-off of the GICv2 specific code, the new emulation
+>> code goes into a new file (vgic-v3-emul.c).
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+
+[...]
+
+>> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+>> new file mode 100644
+>> index 0000000..18af188
+>> --- /dev/null
+>> +++ b/virt/kvm/arm/vgic-v3-emul.c
+>> @@ -0,0 +1,899 @@
+
+[...]
+
+>> +static unsigned long uncompress_mpidr(u32 value)
+>> +{
+>> +     unsigned long mpidr;
+>> +
+>> +     mpidr  = ((value >>  0) & 0xFF) << MPIDR_LEVEL_SHIFT(0);
+>> +     mpidr |= ((value >>  8) & 0xFF) << MPIDR_LEVEL_SHIFT(1);
+>> +     mpidr |= ((value >> 16) & 0xFF) << MPIDR_LEVEL_SHIFT(2);
+>> +     mpidr |= (u64)((value >> 24) & 0xFF) << MPIDR_LEVEL_SHIFT(3);
+>> +
+>> +     return mpidr;
+>> +}
+>> +
+>> +/*
+>> + * Lookup the given MPIDR value to get the vcpu_id (if there is one)
+>> + * and store that in the irq_spi_cpu[] array.
+>> + * This limits the number of VCPUs to 255 for now, extending the data
+>> + * type (or storing kvm_vcpu poiners) should lift the limit.
 > 
-> This also means you can do stuff like:
+> s/poiners/pointers/
+
+Sorry and thanks for catching that. I accidentally merged the fix for
+this in 17/19. Will fix this in the next revision.
+
+>> + * Store the original MPIDR value in an extra array to support read-as-written.
+>> + * Unallocated MPIDRs are translated to a special value and caught
+>> + * before any array accesses.
+>> + */
+>> +static bool handle_mmio_route_reg(struct kvm_vcpu *vcpu,
+>> +                               struct kvm_exit_mmio *mmio,
+>> +                               phys_addr_t offset)
+>> +{
+
+[...]
+
+>> +}
+>> +
+>> +static const struct kvm_mmio_range vgic_redist_sgi_ranges[] = {
+>> +     {
+>> +             .base           = GICR_IGROUPR0,
+>> +             .len            = 0x04,
+>> +             .bits_per_irq   = 1,
+>> +             .handle_mmio    = handle_mmio_raz_wi,
 > 
-> 	u32 *p;
-> 	__le32 v;
-> 
-> 	err = get_user(p, v);
-> 
-> which is not right.
+> weren't we going to change this to handle_mmio_rao_wi()?
 
-Are you sure?  We are casting to __typeof__(*(ptr))),
-then assigning to x. So if *p and v are different sparse will
-still warn.
+My bad, I missed this one (the distributor part is correct, though).
 
->  Both the dereferenced pointer type and the destination
-> type should be compatible, and if one is a bitwise type but the other isn't,
-> that seems like a valid case to warn.
-> 
-> I don't see any use of get_user() in drivers/virtio in mainline, so I can't
-> check further.
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
+Thanks for that!
 
-
-It's not in drivers/virtio.
-We have a work around upstream (uses __get_user + access_ok).
-Try this patch reverting the work-around, you will see the sparse
-warning:
-
-diff --git a/drivers/vhost/vhost.c b/drivers/vhost/vhost.c
-index ed71b53..4c83be8 100644
---- a/drivers/vhost/vhost.c
-+++ b/drivers/vhost/vhost.c
-@@ -1047,9 +1047,7 @@ int vhost_init_used(struct vhost_virtqueue *vq)
- 	if (r)
- 		return r;
- 	vq->signalled_used_valid = false;
--	if (!access_ok(VERIFY_READ, &vq->used->idx, sizeof vq->used->idx))
--		return -EFAULT;
--	r = __get_user(last_used_idx, &vq->used->idx);
-+	r = get_user(last_used_idx, &vq->used->idx);
- 	if (r)
- 		return r;
- 	vq->last_used_idx = vhost16_to_cpu(vq, last_used_idx);
-
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
+Cheers,
+Andre.
