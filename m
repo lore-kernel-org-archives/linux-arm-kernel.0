@@ -1,27 +1,39 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Mon, 15 Dec 2014 16:53:57 +0100
-Subject: [PATCH 23/27] ARM: mvebu: armada-xp-mv78260: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <1418657915-22775-24-git-send-email-gregory.clement@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-24-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20141215155357.GF28701@1wt.eu>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 15 Dec 2014 15:54:42 +0000
+Subject: [PATCH] iommu/exynos: Fix arm64 allmodconfig build
+Message-ID: <1418658882-14809-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 04:38:31PM +0100, Gregory CLEMENT wrote:
-> The current GPL only licensing on the device tree makes it very
-> impractical for other software components licensed under another
-> license.
-> 
-> In order to make it easier for them to reuse our device trees,
-> relicense our device trees under a GPL/X11 dual-license.
-> 
-> Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Willy Tarreau <w@1wt.eu>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+The Exynos IOMMU driver uses the ARM specific dmac_flush_range() and
+outer_flush_range() functions. This breaks the build on arm64 allmodconfig
+in -next since support has been merged for some Exynos ARMv8 SoCs. Add a
+dependency on ARM to keep things building until either the driver has the
+ARM dependencies removed or the ARMv8 architecture code implements these
+ARM specific APIs.
 
-Acked-by: Willy Tarreau <w@1wt.eu>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+
+Resending to the arm-soc people since the addition of the Exynos
+platform for ARMv8 went via them, Krzysztof also sent a fix for this
+earlier but it there's been no response.
+
+ drivers/iommu/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index 01e8bfae569b..325188eef1c1 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -187,7 +187,7 @@ config TEGRA_IOMMU_SMMU
+ 
+ config EXYNOS_IOMMU
+ 	bool "Exynos IOMMU Support"
+-	depends on ARCH_EXYNOS
++	depends on ARCH_EXYNOS && ARM
+ 	select IOMMU_API
+ 	select ARM_DMA_USE_IOMMU
+ 	help
+-- 
+2.1.3
