@@ -1,145 +1,121 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 15 Dec 2014 01:49:30 +0200
-Subject: [PATCH 0/4] Generic IOMMU page table framework
-In-Reply-To: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
-References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
-Message-ID: <2133922.nksBEtjI2q@avalon>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 15 Dec 2014 09:21:48 +0900
+Subject: [PATCH] ARM: shmobile: r8a7794: Add I2C clocks to device tree
+Message-ID: <1418602908-5370-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+From: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
 
-On Thursday 27 November 2014 11:51:14 Will Deacon wrote:
-> Hi all,
-> 
-> This series introduces a generic IOMMU page table allocation framework,
-> implements support for ARM long-descriptors and then ports the arm-smmu
-> driver over to the new code.
-> 
-> There are a few reasons for doing this:
-> 
->   - Page table code is hard, and I don't enjoy shopping
-> 
->   - A number of IOMMUs actually use the same table format, but currently
->     duplicate the code
-> 
->   - It provides a CPU (and architecture) independent allocator, which
->     may be useful for some systems where the CPU is using a different
->     table format for its own mappings
-> 
-> As illustrated in the final patch, an IOMMU driver interacts with the
-> allocator by passing in a configuration structure describing the
-> input and output address ranges, the supported pages sizes and a set of
-> ops for performing various TLB invalidation and PTE flushing routines.
-> 
-> The LPAE code implements support for 4k/2M/1G, 16k/32M and 64k/512M
-> mappings, but I decided not to implement the contiguous bit in the
-> interest of trying to keep the code semi-readable. This could always be
-> added later, if needed.
-> 
-> I also included some self-tests for the LPAE implementation. Ideally
-> we'd merge these, but I'm also happy to drop them if there are
-> objections.
-> 
-> Tested with the self-tests, but also VFIO + MMU-500 at stage-1 and
-> stage-2. Patches taken against my iommu/devel branch (queued by Joerg
-> for 3.19).
-> 
-> All feedback welcome.
+Signed-off-by: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
+[horms: omitted device nodes and aliases; only add clocks]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-I've successfully tested the patch set with the Renesas IPMMU-VMSA driver with
-the following extension to the allocator.
-
-Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
->From 4bebb7f3a5a48541d4c89ce7c61e6ff66686c3a9 Mon Sep 17 00:00:00 2001
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Date: Sun, 14 Dec 2014 23:34:50 +0200
-Subject: [PATCH] iommu: io-pgtable-arm: Add Non-Secure quirk
-
-The quirk causes the Non-Secure bit to be set in all page table entries.
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/iommu/io-pgtable-arm.c | 7 +++++++
- drivers/iommu/io-pgtable.h     | 3 +++
- 2 files changed, 10 insertions(+)
+Based on the renesas-devel-20141212-v3.18 tag of my renesas tree
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 669e322a83a4..b6910e142734 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -80,11 +80,13 @@
- #define ARM_LPAE_PTE_TYPE_TABLE		3
- #define ARM_LPAE_PTE_TYPE_PAGE		3
+v1 [Simon Horman]
+* Removed portion of patch which adds device nodes and aliases
+* Renamed patch from
+  "ARM: shmobile: r8a7794: Add I2C driver to device tree" to
+  "ARM: shmobile: r8a7794: Add I2C clocks to device tree"
+
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 8794df8..fd8a19c 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -308,6 +308,13 @@
+ 			#clock-cells = <0>;
+ 			clock-output-names = "sd2";
+ 		};
++		mmc0_clk: mmc0_clk at e6150240 {
++			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150240 0 4>;
++			clocks = <&pll1_div2_clk>;
++			#clock-cells = <0>;
++			clock-output-names = "mmc0";
++		};
+
+ 		/* Fixed factor clocks */
+ 		pll1_div2_clk: pll1_div2_clk {
+@@ -512,16 +519,16 @@
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+ 			clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
+-			         <&rclk_clk>, <&hp_clk>, <&hp_clk>;
++			         <&mmc0_clk>, <&rclk_clk>, <&hp_clk>, <&hp_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+ 			        R8A7794_CLK_SDHI2 R8A7794_CLK_SDHI1 R8A7794_CLK_SDHI0
+-				R8A7794_CLK_CMT1 R8A7794_CLK_USBDMAC0
+-				R8A7794_CLK_USBDMAC1
++				R8A7794_CLK_CMT1 R8A7794_CLK_MMCIF0
++				R8A7794_CLK_USBDMAC0 R8A7794_CLK_USBDMAC1
+ 			>;
+ 			clock-output-names =
+ 			        "sdhi2", "sdhi1", "sdhi0",
+-				"cmt1", "usbdmac0", "usbdmac1";
++				"mmcif0", "cmt1", "usbdmac0", "usbdmac1";
+ 		};
+ 		mstp7_clks: mstp7_clks at e615014c {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
+index f013cdc..4555b0f 100644
+--- a/include/dt-bindings/clock/r8a7794-clock.h
++++ b/include/dt-bindings/clock/r8a7794-clock.h
+@@ -55,6 +55,7 @@
+ #define R8A7794_CLK_SDHI2		11
+ #define R8A7794_CLK_SDHI1		12
+ #define R8A7794_CLK_SDHI0		14
++#define R8A7794_CLK_MMCIF0		15
+ #define R8A7794_CLK_CMT1		29
+ #define R8A7794_CLK_USBDMAC0		30
+ #define R8A7794_CLK_USBDMAC1		31
+---
+ arch/arm/boot/dts/r8a7794.dtsi            | 12 +++++++++---
+ include/dt-bindings/clock/r8a7794-clock.h |  6 ++++++
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 068ca09..728d719 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -538,10 +538,16 @@
+ 		mstp9_clks: mstp9_clks at e6150994 {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150994 0 4>, <0 0xe61509a4 0 4>;
+-			clocks = <&cpg_clocks R8A7794_CLK_QSPI>;
++			clocks = <&cpg_clocks R8A7794_CLK_QSPI>, <&hp_clk>, <&hp_clk>,
++				<&hp_clk>, <&hp_clk>, <&hp_clk>, <&hp_clk>;
+ 			#clock-cells = <1>;
+-			clock-indices = <R8A7794_CLK_QSPI_MOD>;
+-			clock-output-names = "qspi_mod";
++			clock-indices = <
++				R8A7794_CLK_QSPI_MOD R8A7794_CLK_I2C5 R8A7794_CLK_I2C4
++				R8A7794_CLK_I2C3 R8A7794_CLK_I2C2 R8A7794_CLK_I2C1
++				R8A7794_CLK_I2C0
++			>;
++			clock-output-names =
++				"qspi_mod", "i2c5", "i2c4", "i2c3", "i2c2", "i2c1", "i2c0";
+ 		};
+ 		mstp11_clks: mstp11_clks at e615099c {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
+index fba89a4..94d9618 100644
+--- a/include/dt-bindings/clock/r8a7794-clock.h
++++ b/include/dt-bindings/clock/r8a7794-clock.h
+@@ -87,6 +87,12 @@
+ #define R8A7794_CLK_GPIO1		11
+ #define R8A7794_CLK_GPIO0		12
+ #define R8A7794_CLK_QSPI_MOD		17
++#define R8A7794_CLK_I2C5		25
++#define R8A7794_CLK_I2C4		27
++#define R8A7794_CLK_I2C3		28
++#define R8A7794_CLK_I2C2		29
++#define R8A7794_CLK_I2C1		30
++#define R8A7794_CLK_I2C0		31
  
-+#define ARM_LPAE_PTE_NSTABLE		(((arm_lpae_iopte)1) << 63)
- #define ARM_LPAE_PTE_XN			(((arm_lpae_iopte)3) << 53)
- #define ARM_LPAE_PTE_AF			(((arm_lpae_iopte)1) << 10)
- #define ARM_LPAE_PTE_SH_NS		(((arm_lpae_iopte)0) << 8)
- #define ARM_LPAE_PTE_SH_OS		(((arm_lpae_iopte)2) << 8)
- #define ARM_LPAE_PTE_SH_IS		(((arm_lpae_iopte)3) << 8)
-+#define ARM_LPAE_PTE_NS			(((arm_lpae_iopte)1) << 5)
- #define ARM_LPAE_PTE_VALID		(((arm_lpae_iopte)1) << 0)
- 
- #define ARM_LPAE_PTE_ATTR_LO_MASK	(((arm_lpae_iopte)0x3ff) << 2)
-@@ -201,6 +203,9 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
- 	if (iopte_leaf(*ptep, lvl))
- 		return -EEXIST;
- 
-+	if (data->iop.cfg.quirks & IO_PGTABLE_QUIRK_NON_SECURE)
-+		pte |= ARM_LPAE_PTE_NS;
-+
- 	if (lvl == ARM_LPAE_MAX_LEVELS - 1)
- 		pte |= ARM_LPAE_PTE_TYPE_PAGE;
- 	else
-@@ -244,6 +249,8 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
- 		data->iop.cfg.tlb->flush_pgtable(cptep, 1UL << data->pg_shift,
- 						 cookie);
- 		pte = __pa(cptep) | ARM_LPAE_PTE_TYPE_TABLE;
-+		if (data->iop.cfg.quirks & IO_PGTABLE_QUIRK_NON_SECURE)
-+			pte |= ARM_LPAE_PTE_NSTABLE;
- 		*ptep = pte;
- 		data->iop.cfg.tlb->flush_pgtable(ptep, sizeof(*ptep), cookie);
- 	} else {
-diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-index c1cff3d045db..a41a15d30596 100644
---- a/drivers/iommu/io-pgtable.h
-+++ b/drivers/iommu/io-pgtable.h
-@@ -24,6 +24,9 @@ struct iommu_gather_ops {
- 	void (*flush_pgtable)(void *ptr, size_t size, void *cookie);
- };
- 
-+/* Set the Non-Secure bit in the PTEs */
-+#define IO_PGTABLE_QUIRK_NON_SECURE	(1 << 0)
-+
- struct io_pgtable_cfg {
- 	int			quirks; /* IO_PGTABLE_QUIRK_* */
- 	unsigned long		pgsize_bitmap;
+ /* MSTP11 */
+ #define R8A7794_CLK_SCIFA3		6
 -- 
-
-> --->8
-> 
-> Will Deacon (4):
->   iommu: introduce generic page table allocation framework
->   iommu: add ARM LPAE page table allocator
->   iommu: add self-consistency tests to ARM LPAE IO page table allocator
->   iommu/arm-smmu: make use of generic LPAE allocator
-> 
->  MAINTAINERS                    |   1 +
->  arch/arm64/Kconfig             |   1 -
->  drivers/iommu/Kconfig          |  32 +-
->  drivers/iommu/Makefile         |   2 +
->  drivers/iommu/arm-smmu.c       | 872 +++++++++++---------------------------
->  drivers/iommu/io-pgtable-arm.c | 925 ++++++++++++++++++++++++++++++++++++++
->  drivers/iommu/io-pgtable.c     |  78 ++++
->  drivers/iommu/io-pgtable.h     |  77 ++++
->  8 files changed, 1361 insertions(+), 627 deletions(-)
->  create mode 100644 drivers/iommu/io-pgtable-arm.c
->  create mode 100644 drivers/iommu/io-pgtable.c
->  create mode 100644 drivers/iommu/io-pgtable.h
-
--- 
-Regards,
-
-Laurent Pinchart
+2.1.3
