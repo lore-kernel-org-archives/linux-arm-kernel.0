@@ -1,61 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Dec 2014 17:43:02 +0000
-Subject: [PATCH v3 18/19] iommu: exynos: init from dt-specific callback
- instead of initcall
-In-Reply-To: <1458739.IClpD3xz3i@avalon>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1826772.xgprzQcfXd@avalon> <20141215171700.GP20738@arm.com>
- <1458739.IClpD3xz3i@avalon>
-Message-ID: <20141215174302.GU20738@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Dec 2014 17:43:36 +0000
+Subject: 3.18: lockdep problems in cpufreq
+In-Reply-To: <003501d01876$fbc53f80$f34fbe80$%brar@samsung.com>
+References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
+ <7573578.UE8ufgjWuX@vostro.rjw.lan>
+ <CAKohpok6ieJYgusMh+WFCQT8d5_QVgGczmQyD79UPz4hdYU1Dg@mail.gmail.com>
+ <002f01d0186b$2700b730$75022590$%brar@samsung.com>
+ <20141215134636.GI11285@n2100.arm.linux.org.uk>
+ <003501d01876$fbc53f80$f34fbe80$%brar@samsung.com>
+Message-ID: <20141215174336.GJ11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 05:27:30PM +0000, Laurent Pinchart wrote:
-> On Monday 15 December 2014 17:17:00 Will Deacon wrote:
-> > On Sun, Dec 14, 2014 at 12:45:36PM +0000, Laurent Pinchart wrote:
-> > > On Wednesday 19 November 2014 12:15:47 Marek Szyprowski wrote:
-> > > > +static int __init exynos_iommu_of_setup(struct device_node *np)
-> > > > +{
-> > > > +	struct platform_device *pdev;
-> > > > +
-> > > > +	if (!init_done)
-> > > > +		exynos_iommu_init();
-> > > > +
-> > > > +	pdev = of_platform_device_create(np, NULL,
-> > > > platform_bus_type.dev_root);
-> > > > +	if (IS_ERR(pdev))
-> > > > +		return PTR_ERR(pdev);
-> > > 
-> > > If we end up having to create the IOMMU platform devices from within the
-> > > drivers, the introduction of IOMMU_OF_DECLARE starts to feel like a
-> > > workaround to me. I wonder whether it wouldn't then be better to let the
-> > > driver core instantiate the IOMMU platform device from DT as for all
-> > > other devices, and use device notifiers to defer probe of the bus masters
-> > > until the required IOMMU(s) are registered.
-> > > 
-> > > Will, what's your opinion on that ?
+On Mon, Dec 15, 2014 at 08:24:05PM +0530, Yadwinder Singh Brar wrote:
+> > The answer may well be to have finer grained locking here:
 > > 
-> > Creating the platform device manually for the IOMMU is indeed grotty, but I
-> > don't really understand why it's needed. Interrupt controllers, for example,
-> > seem to get by without one.
+> > - one lock to protect cpufreq_dev_list, which is only ever taken when
+> >   adding or removing entries from it
+> > 
+> > - a second lock to protect cpufreq_dev_count and the calls to
+> >   cpufreq_register_notifier() and cpufreq_unregister_notifier()
+> > 
+> > and you would /never/ take either of those two locks inside each other.
+> > In other words:
+> > 
+> > 	mutex_lock(&cooling_list_lock);
+> > 	list_add(&cpufreq_dev->node, &cpufreq_dev_list);
+> > 	mutex_unlock(&cooling_list_lock);
+> > 
+> > 	mutex_lock(&cooling_cpufreq_lock);
+> > 	if (cpufreq_dev_count++ == 0)
+> > 		cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
+> > 					  CPUFREQ_POLICY_NOTIFIER);
+> > 	mutex_unlock(&cooling_cpufreq_lock);
+> > 
+> > and similar in the cleanup path.  The notifier itself would only ever
+> > take the cooling_list_lock.
+> > 
 > 
-> There's several reasons, one of the most compelling ones I can think of at the 
-> moment is runtime PM. IRQ controllers close to the CPU use CPU PM notifiers 
-> instead. Note that IRQ controllers that are further away from the CPU (such as 
-> GPIO-based IRQ controllers) are real platform devices and use runtime PM.
+> I agree with this approach, if its fine for others also, I can implement
+> and post patch.
 
-Ok, that's a good point, but the IOMMU will still probe later anyway, right?
+Yes, please do.
 
-> IOMMUs are not as low-level as system interrupt controllers or system clocks. 
-> I'm beginning to agree with Thierry that they should be treated as normal 
-> platform devices as they're not required earlier than probe time of their bus 
-> master devices.
-
-Well, I think you'd have to propose patches for discussion since I'm
-certainly not wed to the current approach; I just want something that
-allows of_{dma,iommu}_configure to run with the information it needs.
-
-The usual answer is `we should model buses properly', but that's really
-not practical afaict.
-
-Will
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
