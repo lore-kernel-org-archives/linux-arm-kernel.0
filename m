@@ -1,44 +1,54 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 15 Dec 2014 23:34:40 +0100
-Subject: [PATCH v3 2/3] ARM: socfpga: Add driver for the L3 interconnect
-In-Reply-To: <1417292052-12974-3-git-send-email-s.trumtrar@pengutronix.de>
-References: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
- <1417292052-12974-3-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20141215223440.GC27866@amd>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 15 Dec 2014 14:44:00 -0800
+Subject: [GIT PULL] few fixes for the v3.19 merge window
+In-Reply-To: <20141210205752.GB12921@atomide.com> (Tony Lindgren's message of
+ "Wed, 10 Dec 2014 12:57:52 -0800")
+References: <20141210205752.GB12921@atomide.com>
+Message-ID: <7hvblcfs9b.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Tony Lindgren <tony@atomide.com> writes:
 
-> The L3 interconnect provides Global Programmer View (GPV) registers for every
-> AXI master and slave on the SoC.
-> Although this is just a bunch of bits, syscon is not the right approach for
-> this IP core.
-> The L3 interconnect is configured with a lot of reserved "holes" in its memory
-> space. Just mapping this with regmap, what syscon would do, would lead to the
-> system completely hanging, if one of those areas would be touched.
-> One example for when this might happen is the regmap registers dump in the
-> debugfs.
+> The following changes since commit a0e4467726cd26bacb16f13d207ffcfa82ffc07d:
+>
+>   Merge tag 'asm-generic-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/arnd/asm-generic (2014-12-09 17:25:00 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/fixes-for-merge-window
+>
+> for you to fetch changes up to 661ea91b676bcca137c1c3fe838997925ce98060:
+>
+>   ARM: omap2plus_defconfig: Enable AHCI_PLATFORM driver (2014-12-10 09:33:50 -0800)
+>
+> ----------------------------------------------------------------
+> Fixes for a few issues found that would be good to get
+> into -rc1:
+>
+> - Update SoC revision detection for am43x es1.2
+>
+> - Fix regression with GPMC timings on 2430sdp for some versions
+>   of u-boot
+>
+> - Fix dra7 watchdog compatible property
+>
+> - Fix am437x-sk-evm LCD timings
+>
+> - Fix dra7 DSS clock muxing
+>
+> - Fix dra7-evm voltages
+>
+> - Remove a unused function prototype for am33xx_clk_init
+>
+> - Enable AHCI in the omap2plus_defconfig
+>
+> ----------------------------------------------------------------
 
-Could syscon be extended to take more than one range? Then, you could
-simply list all the ranges in device tree and use syscon...
+Pulled into fixes.
 
-> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-> index 76d6bd4da138..11db07da894f 100644
-> --- a/drivers/soc/Kconfig
-> +++ b/drivers/soc/Kconfig
-> @@ -1,6 +1,7 @@
->  menu "SOC (System On Chip) specific Drivers"
+Not sure yet if this will make it before -rc1 or not.  I think Arnd has
+a couple more pull requests outstanding, so he may be able to include
+this before -rc1.  Otherwise, it may wait until the after -rc1.
 
-SoC is usual spelling.
-
-> @@ -0,0 +1,10 @@
-> +#
-> +# SoCFPGA Soc drivers
-
-SoC.
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Kevin
