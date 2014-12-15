@@ -1,32 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Dec 2014 15:43:17 +0000
-Subject: [PATCH 2/4] iommu: add ARM LPAE page table allocator
-In-Reply-To: <20141215133020.GJ20738@arm.com>
-References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
- <1417089078-22900-3-git-send-email-will.deacon@arm.com>
- <BN3PR0301MB12198CE5D736CDC6A221EDC2EA790@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <20141205184802.GH1203@arm.com>
- <BN3PR0301MB1219D3161E4E9DB314FDD8FAEA6E0@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <20141215133020.GJ20738@arm.com>
-Message-ID: <20141215154317.GL20738@arm.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 15 Dec 2014 16:48:08 +0100
+Subject: [RFC PATCH 0/6] Those patches is used for dw_hdmi audio.
+In-Reply-To: <20141215120013.GH11285@n2100.arm.linux.org.uk>
+References: <1418609494-15820-1-git-send-email-ykk@rock-chips.com>
+ <20141215103830.GD11285@n2100.arm.linux.org.uk>
+ <548EC9E1.5040206@rock-chips.com> <548ECB66.70004@rock-chips.com>
+ <20141215120013.GH11285@n2100.arm.linux.org.uk>
+Message-ID: <20141215164808.092cc7ac@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 01:30:20PM +0000, Will Deacon wrote:
-> On Sun, Dec 14, 2014 at 05:45:49PM +0000, Varun Sethi wrote:
-> > [varun] ok, but you could potentially end up splitting mapping to the
-> > least possible page size e.g. 4K. You, don't seem to take in to account
-> > the possibility of using the block size at the next level. For example,
-> > take a case where we have a huge page mapping using 1G page size and we
-> > have an unmap request for 4K. We could still split maximum part of the
-> > mapping using 2M pages at the next level. The entry where we need to unmap
-> > the 4K region would potentially go to the next level.
-> 
-> Aha, I see what you mean here, thanks. I'll take a look...
+On Mon, 15 Dec 2014 12:00:13 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Scratch that, I think the code is fine as it is. For the case you highlight,
-we iterate over the 1GB region remapping it using 4k pages, but skipping
-the one we want to unmap, so I don't think there's a problem
-(__arm_lpae_map will create the relevant table entries).
+> I really don't want to end up in another cocked up situation like
+> what happened with the Dove audio, where it became politically
+> impossible for the SolidRun platform to be properly supported by
+> mainline kernels.
 
-Will
+Hi Russell,
+
+I don't see what you mean. The last patches I proposed for the TDA998x
+and the HDMI CODEC do exactly what you wanted: S/PDIF out from the
+kirkwood audio device towards both S/PDIF optical and HDMI output2 by
+default.
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
