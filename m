@@ -1,66 +1,70 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 15 Dec 2014 11:45:27 +0100
-Subject: [PATCH] iommu/ipmmu-vmsa: change IOMMU_EXEC to IOMMU_NOEXEC
-In-Reply-To: <1418518503-20250-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1418518503-20250-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CAMuHMdW9s+VKqz=TWV0H+cqNGY8amZsHAwHHSvM9q033sh-j3Q@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Dec 2014 10:45:48 +0000
+Subject: [PATCH] ARM: display machine model in cpuinfo
+In-Reply-To: <1418566387-16468-1-git-send-email-zajec5@gmail.com>
+References: <1418566387-16468-1-git-send-email-zajec5@gmail.com>
+Message-ID: <20141215104548.GB462@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Sun, Dec 14, 2014 at 02:13:07PM +0000, Rafa? Mi?ecki wrote:
+> This may be useful to display hardware model in the /proc/cpuinfo. It
+> definitely helps to identify the device and there are some archs already
+> doing that (arm64, m32r, mips).
 
-On Sun, Dec 14, 2014 at 1:55 AM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
-> The IOMMU_EXEC flag has been renamed to IOMMU_NOEXEC by commit
+Not true for arm64, if you look in linux-next.
 
-... inverted and replaced by ...
+I'm rather wary of exposing this kind via cpuinfo because it's
+completely arbitrary in nature and not guaranteed to be in any way
+useful (I have seen dtbs where the model string is misleading due to
+copy+paste and no modificiation).
 
-At first I hadn't noticed this, and was wondering about the seemingly unrelated
-change in the first hunk.
+Mark.
 
-> a720b41c41f5a7e4 ("iommu/arm-smmu: change IOMMU_EXEC to IOMMU_NOEXEC").
-> Update the driver accordingly.
->
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Use the model from DT and add it to the cpuinfo.
+> 
+> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 > ---
->  drivers/iommu/ipmmu-vmsa.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> This fixes a build breakage in Linus' master branch introduce by the commit
-> mentioned above.
->
-> diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-> index e5ed0216929f..7a1bcf6627b6 100644
-> --- a/drivers/iommu/ipmmu-vmsa.c
-> +++ b/drivers/iommu/ipmmu-vmsa.c
-> @@ -558,7 +558,7 @@ static pmd_t *ipmmu_alloc_pmd(struct ipmmu_vmsa_device *mmu, pgd_t *pgd,
->
->  static u64 ipmmu_page_prot(unsigned int prot, u64 type)
->  {
-> -       u64 pgprot = ARM_VMSA_PTE_XN | ARM_VMSA_PTE_nG | ARM_VMSA_PTE_AF
-> +       u64 pgprot = ARM_VMSA_PTE_nG | ARM_VMSA_PTE_AF
->                    | ARM_VMSA_PTE_SH_IS | ARM_VMSA_PTE_AP_UNPRIV
->                    | ARM_VMSA_PTE_NS | type;
->
-> @@ -568,8 +568,8 @@ static u64 ipmmu_page_prot(unsigned int prot, u64 type)
->         if (prot & IOMMU_CACHE)
->                 pgprot |= IMMAIR_ATTR_IDX_WBRWA << ARM_VMSA_PTE_ATTRINDX_SHIFT;
->
-> -       if (prot & IOMMU_EXEC)
-> -               pgprot &= ~ARM_VMSA_PTE_XN;
-> +       if (prot & IOMMU_NOEXEC)
-> +               pgprot |= ARM_VMSA_PTE_XN;
->         else if (!(prot & (IOMMU_READ | IOMMU_WRITE)))
->                 /* If no access create a faulting entry to avoid TLB fills. */
->                 pgprot &= ~ARM_VMSA_PTE_PAGE;
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>  arch/arm/kernel/setup.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index c031063..957d9ac 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -145,6 +145,7 @@ EXPORT_SYMBOL(elf_platform);
+>  
+>  static const char *cpu_name;
+>  static const char *machine_name;
+> +static const char *hardware;
+>  static char __initdata cmd_line[COMMAND_LINE_SIZE];
+>  const struct machine_desc *machine_desc __initdata;
+>  
+> @@ -899,7 +900,8 @@ void __init setup_arch(char **cmdline_p)
+>  	if (!mdesc)
+>  		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+>  	machine_desc = mdesc;
+> -	machine_name = mdesc->name;
+> +	machine_name = of_flat_dt_get_machine_name();
+> +	hardware = mdesc->name;
+>  
+>  	if (mdesc->reboot_mode != REBOOT_HARD)
+>  		reboot_mode = mdesc->reboot_mode;
+> @@ -1077,7 +1079,8 @@ static int c_show(struct seq_file *m, void *v)
+>  		seq_printf(m, "CPU revision\t: %d\n\n", cpuid & 15);
+>  	}
+>  
+> -	seq_printf(m, "Hardware\t: %s\n", machine_name);
+> +	seq_printf(m, "Machine\t\t: %s\n", machine_name);
+> +	seq_printf(m, "Hardware\t: %s\n", hardware);
+>  	seq_printf(m, "Revision\t: %04x\n", system_rev);
+>  	seq_printf(m, "Serial\t\t: %08x%08x\n",
+>  		   system_serial_high, system_serial_low);
+> -- 
+> 1.8.4.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
