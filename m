@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Dec 2014 16:38:29 +0100
-Subject: [PATCH 21/27] ARM: mvebu: armada-xp-matrix: Relicense the device tree
- under GPLv2+/X11
+Date: Mon, 15 Dec 2014 16:38:28 +0100
+Subject: [PATCH 20/27] ARM: mvebu: armada-xp-lenovo-ix4-300d: Relicense the
+ device tree under GPLv2+/X11
 In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1418657915-22775-22-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1418657915-22775-21-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,23 +15,26 @@ license.
 In order to make it easier for them to reuse our device trees,
 relicense our device trees under a GPL/X11 dual-license.
 
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Arnaud Ebalard <arno@natisbad.org>
+Cc: Benoit Masson <yahoo@perenite.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-matrix.dts | 40 +++++++++++++++++++++++++++++++---
- 1 file changed, 37 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 41 ++++++++++++++++++++++---
+ 1 file changed, 37 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-matrix.dts b/arch/arm/boot/dts/armada-xp-matrix.dts
-index 7e291e2ef4b3..56f958eb1ede 100644
---- a/arch/arm/boot/dts/armada-xp-matrix.dts
-+++ b/arch/arm/boot/dts/armada-xp-matrix.dts
-@@ -5,9 +5,43 @@
+diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+index a2ef93c1eb10..5fb3c8b687cf 100644
+--- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
++++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+@@ -3,10 +3,43 @@
   *
-  * Lior Amsalem <alior@marvell.com>
+  * Copyright (C) 2014, Benoit Masson <yahoo@perenite.com>
   *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version
+- * 2 of the License, or (at your option) any later version.
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
 + * licensing only applies to this file, and not this project as a
