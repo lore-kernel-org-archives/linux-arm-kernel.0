@@ -1,23 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Dec 2014 17:41:42 +0000
-Subject: [PATCH] regmap:change spinlock_flags into the union
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103EDAF89E148@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103CDBFBFB01A@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103EDAF89E148@CNBJMBX05.corpusers.net>
-Message-ID: <20141215174142.GK11764@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Dec 2014 17:43:02 +0000
+Subject: [PATCH v3 18/19] iommu: exynos: init from dt-specific callback
+ instead of initcall
+In-Reply-To: <1458739.IClpD3xz3i@avalon>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1826772.xgprzQcfXd@avalon> <20141215171700.GP20738@arm.com>
+ <1458739.IClpD3xz3i@avalon>
+Message-ID: <20141215174302.GU20738@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 04:05:50PM +0800, Wang, Yalin wrote:
-> This patch move struct regmap.spinlock_flags into the union of
-> spinlock, so that we can shrink struct regmap size.
+On Mon, Dec 15, 2014 at 05:27:30PM +0000, Laurent Pinchart wrote:
+> On Monday 15 December 2014 17:17:00 Will Deacon wrote:
+> > On Sun, Dec 14, 2014 at 12:45:36PM +0000, Laurent Pinchart wrote:
+> > > On Wednesday 19 November 2014 12:15:47 Marek Szyprowski wrote:
+> > > > +static int __init exynos_iommu_of_setup(struct device_node *np)
+> > > > +{
+> > > > +	struct platform_device *pdev;
+> > > > +
+> > > > +	if (!init_done)
+> > > > +		exynos_iommu_init();
+> > > > +
+> > > > +	pdev = of_platform_device_create(np, NULL,
+> > > > platform_bus_type.dev_root);
+> > > > +	if (IS_ERR(pdev))
+> > > > +		return PTR_ERR(pdev);
+> > > 
+> > > If we end up having to create the IOMMU platform devices from within the
+> > > drivers, the introduction of IOMMU_OF_DECLARE starts to feel like a
+> > > workaround to me. I wonder whether it wouldn't then be better to let the
+> > > driver core instantiate the IOMMU platform device from DT as for all
+> > > other devices, and use device notifiers to defer probe of the bus masters
+> > > until the required IOMMU(s) are registered.
+> > > 
+> > > Will, what's your opinion on that ?
+> > 
+> > Creating the platform device manually for the IOMMU is indeed grotty, but I
+> > don't really understand why it's needed. Interrupt controllers, for example,
+> > seem to get by without one.
+> 
+> There's several reasons, one of the most compelling ones I can think of at the 
+> moment is runtime PM. IRQ controllers close to the CPU use CPU PM notifiers 
+> instead. Note that IRQ controllers that are further away from the CPU (such as 
+> GPIO-based IRQ controllers) are real platform devices and use runtime PM.
 
-Applied, thanks.  Please always remember to CC your posts to the
-relevant mailing lists - in the case of regmap that's linux-kernel.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141215/8ad3b2a0/attachment-0001.sig>
+Ok, that's a good point, but the IOMMU will still probe later anyway, right?
+
+> IOMMUs are not as low-level as system interrupt controllers or system clocks. 
+> I'm beginning to agree with Thierry that they should be treated as normal 
+> platform devices as they're not required earlier than probe time of their bus 
+> master devices.
+
+Well, I think you'd have to propose patches for discussion since I'm
+certainly not wed to the current approach; I just want something that
+allows of_{dma,iommu}_configure to run with the information it needs.
+
+The usual answer is `we should model buses properly', but that's really
+not practical afaict.
+
+Will
