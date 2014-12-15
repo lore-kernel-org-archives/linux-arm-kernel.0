@@ -1,42 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Dec 2014 17:20:40 +0000
-Subject: [PATCH 2/4] iommu: add ARM LPAE page table allocator
-In-Reply-To: <BN3PR0301MB12199C5CAD33E745CC7E51F4EA6F0@BN3PR0301MB1219.namprd03.prod.outlook.com>
-References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
- <1417089078-22900-3-git-send-email-will.deacon@arm.com>
- <BN3PR0301MB12198CE5D736CDC6A221EDC2EA790@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <20141205184802.GH1203@arm.com>
- <BN3PR0301MB1219D3161E4E9DB314FDD8FAEA6E0@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <20141215133020.GJ20738@arm.com>
- <BN3PR0301MB12199C5CAD33E745CC7E51F4EA6F0@BN3PR0301MB1219.namprd03.prod.outlook.com>
-Message-ID: <20141215172040.GQ20738@arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 15 Dec 2014 18:21:01 +0100
+Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
+ under GPLv2+/X11
+In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <548F187D.406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 04:43:59PM +0000, Varun Sethi wrote:
-> > Sure we can support 48-bit VAs with 64k pages. Why do you think we can't?
-> > 
-> > [varun]  My concern was with respect to the bits per level, which is 
-> > uneven for the 64 K page sizes. Just wondering how would things work 
-> > with 64K pages when we do a 3 level page lookup.
-> 
-> Well, it's uneven (9) for the 4k case too. Do you actually see an issue here?
-> 
-> 48-bit VA with 64k pages gives us:
-> 
->   va_bits = (48 - 16) = 32
->   bits_per_level = (16 - 3) = 13
->   levels = ceil(32/13) = 3
-> 
-> so the starting level is 1, which resolves 32-(13*2) = 6 bits.
-> 
-> Does that make sense?
-> 
-> [[varun]]Yes, but what I meant was, is that in case of 4K pages you have 9
-> bits per level, but for 64K pages you have 6 bits for the first  level and
-> 13 each for second and third. So, bits per level would not work in case of
-> 64 K pages?
+On 15.12.2014 16:38, Gregory CLEMENT wrote:
+> You've been Cc'd on a relicensing patch, because at some point you
+> contributed a patch to an mvebu device tree.
+>
+> We're currently moving toward a GPL/X11 dual-license, instead of a GPL
+> license like what was done when you submitted your patches.
+>
+> This is mostly so that other free software project licensed under a
+> BSD-like license, such as the BSD systems, can actually use our DT,
+> instead of having to rewrite them on their own.
+>
+> Such license changes require the agreement of all the contributors, so
+> it would be great, if you agree with the new licensing terms of
+> course, that you reply to the patch by giving your acked-by.
+>
+[...]
 
-The current code takes this into account.
+Gregory,
 
-Will
+for the ones I have been Cc explicitly:
+
+>    ARM: mvebu: armada-xp-axpwifiap: Relicense the device tree under
+>      GPLv2+/X11
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+>    ARM: mvebu: armada-xp: Relicense the device tree under GPLv2+/X11
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+>    ARM: mvebu: armada-xp-lenovo-ix4-300d: Relicense the device tree under
+>      GPLv2+/X11
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+>    ARM: mvebu: armada-xp-mv78230: Relicense the device tree under
+>      GPLv2+/X11
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+>    ARM: mvebu: armada-xp-mv78260: Relicense the device tree under
+>      GPLv2+/X11
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+>    ARM: mvebu: armada-xp-mv78460: Relicense the device tree under
+>      GPLv2+/X11
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+>    ARM: mvebu: armada-xp-netgear-rn2120: Relicense the device tree under
+>      GPLv2+/X11
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+>    ARM: mvebu: armada-xp-openblocks-ax3-4: Relicense the device tree
+>      under GPLv2+/X11
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+No need to send an extra "Thanks" ;)
+
+Sebastian
