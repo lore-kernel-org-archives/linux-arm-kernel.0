@@ -1,10 +1,10 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 15 Dec 2014 18:59:03 +0100
-Subject: [PATCH 23/27] ARM: mvebu: armada-xp-mv78260: Relicense the device
- tree under GPLv2+/X11
+Date: Mon, 15 Dec 2014 18:59:24 +0100
+Subject: [PATCH 27/27] ARM: mvebu: armada-xp-synology-ds414: Relicense the
+ device tree under GPLv2+/X11
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-24-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <87tx0wlrq0.fsf@natisbad.org>
+ <1418657915-22775-28-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <87fvcglrpf.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,30 +19,27 @@ Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 > relicense our device trees under a GPL/X11 dual-license.
 >
 > Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Willy Tarreau <w@1wt.eu>
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Acked-by: Arnaud Ebalard <arno@natisbad.org>
 
 
 > ---
->  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 40 +++++++++++++++++++++++++++++---
->  1 file changed, 37 insertions(+), 3 deletions(-)
+>  arch/arm/boot/dts/armada-xp-synology-ds414.dts | 41 +++++++++++++++++++++++---
+>  1 file changed, 37 insertions(+), 4 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-> index d7a8d0b0f385..4a7cbed79b07 100644
-> --- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-> @@ -5,9 +5,43 @@
+> diff --git a/arch/arm/boot/dts/armada-xp-synology-ds414.dts b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+> index 749fdba5a642..e9fb225169aa 100644
+> --- a/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+> +++ b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+> @@ -3,10 +3,43 @@
 >   *
->   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>   * Copyright (C) 2014, Arnaud EBALARD <arno@natisbad.org>
 >   *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
+> - * This program is free software; you can redistribute it and/or
+> - * modify it under the terms of the GNU General Public License
+> - * as published by the Free Software Foundation; either version
+> - * 2 of the License, or (at your option) any later version.
 > + * This file is dual-licensed: you can use it either under the terms
 > + * of the GPL or the X11 license, at your option. Note that this dual
 > + * licensing only applies to this file, and not this project as a
@@ -81,5 +78,5 @@ Acked-by: Arnaud Ebalard <arno@natisbad.org>
 > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 > + *     OTHER DEALINGS IN THE SOFTWARE.
 >   *
->   * Contains definitions specific to the Armada XP MV78260 SoC that are not
->   * common to all Armada XP SoCs.
+>   * Note: this Device Tree assumes that the bootloader has remapped the
+>   * internal registers to 0xf1000000 (instead of the old 0xd0000000).
