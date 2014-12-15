@@ -1,10 +1,10 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 15 Dec 2014 18:58:26 +0100
-Subject: [PATCH 16/27] ARM: mvebu: armada-xp-axpwifiap: Relicense the
- device tree under GPLv2+/X11
+Date: Mon, 15 Dec 2014 18:58:44 +0100
+Subject: [PATCH 20/27] ARM: mvebu: armada-xp-lenovo-ix4-300d: Relicense
+ the device tree under GPLv2+/X11
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-17-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <87mw6on6bh.fsf@natisbad.org>
+ <1418657915-22775-21-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <878ui8n6az.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,29 +19,29 @@ Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 > relicense our device trees under a GPL/X11 dual-license.
 >
 > Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: Benoit Masson <yahoo@perenite.com>
 > Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Acked-by: Arnaud Ebalard <arno@natisbad.org>
 
 
 > ---
->  arch/arm/boot/dts/armada-xp-axpwifiap.dts | 40 ++++++++++++++++++++++++++++---
->  1 file changed, 37 insertions(+), 3 deletions(-)
+>  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 41 ++++++++++++++++++++++---
+>  1 file changed, 37 insertions(+), 4 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> index ca0200e20751..2f0cf96e33a5 100644
-> --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> @@ -10,9 +10,43 @@
+> diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+> index a2ef93c1eb10..5fb3c8b687cf 100644
+> --- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+> +++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+> @@ -3,10 +3,43 @@
 >   *
->   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>   * Copyright (C) 2014, Benoit Masson <yahoo@perenite.com>
 >   *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
+> - * This program is free software; you can redistribute it and/or
+> - * modify it under the terms of the GNU General Public License
+> - * as published by the Free Software Foundation; either version
+> - * 2 of the License, or (at your option) any later version.
 > + * This file is dual-licensed: you can use it either under the terms
 > + * of the GPL or the X11 license, at your option. Note that this dual
 > + * licensing only applies to this file, and not this project as a
