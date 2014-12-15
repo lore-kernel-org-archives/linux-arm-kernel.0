@@ -1,110 +1,58 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Mon, 15 Dec 2014 15:13:32 +0100
-Subject: [PATCH 2/2] net/macb: remove useless calls of devm_free_irq()
-In-Reply-To: <cover.1418651689.git.cyrille.pitchen@atmel.com>
-References: <cover.1418651689.git.cyrille.pitchen@atmel.com>
-Message-ID: <edf8ff9a46dfaa51c9a45eb340e173fdba758ddd.1418651689.git.cyrille.pitchen@atmel.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 15 Dec 2014 06:17:59 -0800
+Subject: [PATCH 7/8] rtc: st: add new driver for ST's LPC RTC
+In-Reply-To: <1418642738-17407-8-git-send-email-lee.jones@linaro.org>
+References: <1418642738-17407-1-git-send-email-lee.jones@linaro.org>
+ <1418642738-17407-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <548EED97.60604@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inside macb_probe(), when devm_request_irq() fails on queue q, there is no need
-to call devm_free_irq() on queues 0..q-1 because the managed device resources
-are released later when calling free_netdev().
+On 12/15/2014 03:25 AM, Lee Jones wrote:
+> ST's Low Power Controller (LPC) controls two devices; watchdog and RTC.
+> Only one of the devices can be used at any one time.  This is enforced
+> by the correlating MFD driver.  This portion of the driver-set controls
+> the Real Time Clock.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   drivers/rtc/Kconfig      |  13 ++
+>   drivers/rtc/Makefile     |   1 +
+>   drivers/rtc/rtc-st-lpc.c | 330 +++++++++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 344 insertions(+)
+>   create mode 100644 drivers/rtc/rtc-st-lpc.c
+>
+> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+> index a168e96..aa4bd90 100644
+> --- a/drivers/rtc/Kconfig
+> +++ b/drivers/rtc/Kconfig
+> @@ -1355,6 +1355,18 @@ config RTC_DRV_SIRFSOC
+>   	  Say "yes" here to support the real time clock on SiRF SOC chips.
+>   	  This driver can also be built as a module called rtc-sirfsoc.
+>
+> +config RTC_DRV_ST_LPC
+> +	tristate "STMicroelectronics LPC RTC"
+> +	depends on ARCH_STI
+> +	depends on OF
+> +	select MFD_ST_LPC
+> +	help
+> +	  Say Y here to include STMicroelectronics Low Power Controller
+> +	  (LPC) based RTC support.
+> +
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called rtc-st-lpc.
+> +
+>   config RTC_DRV_MOXART
+>   	tristate "MOXA ART RTC"
+>   	depends on ARCH_MOXART || COMPILE_TEST
+> @@ -1390,4 +1402,5 @@ config RTC_DRV_HID_SENSOR_TIME
+>   	  rtc-hid-sensor-time.
+>
+>
+> +
 
-Also removing devm_free_irq() call from macb_remove() for the same reason.
+Hi Lee,
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
- drivers/net/ethernet/cadence/macb.c | 23 ++++++++---------------
- 1 file changed, 8 insertions(+), 15 deletions(-)
+Yet another empty line ?
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 81f317f..414f796 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -2160,7 +2160,7 @@ static int __init macb_probe(struct platform_device *pdev)
- 	int err = -ENXIO;
- 	const char *mac;
- 	void __iomem *mem;
--	unsigned int hw_q, queue_mask, q, num_queues, q_irq = 0;
-+	unsigned int hw_q, queue_mask, q, num_queues;
- 	struct clk *pclk, *hclk, *tx_clk;
- 
- 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -2235,11 +2235,11 @@ static int __init macb_probe(struct platform_device *pdev)
- 	 * register mapping but we don't want to test the queue index then
- 	 * compute the corresponding register offset at run time.
- 	 */
--	for (hw_q = 0; hw_q < MACB_MAX_QUEUES; ++hw_q) {
-+	for (hw_q = 0, q = 0; hw_q < MACB_MAX_QUEUES; ++hw_q) {
- 		if (!(queue_mask & (1 << hw_q)))
- 			continue;
- 
--		queue = &bp->queues[q_irq];
-+		queue = &bp->queues[q];
- 		queue->bp = bp;
- 		if (hw_q) {
- 			queue->ISR  = GEM_ISR(hw_q - 1);
-@@ -2261,18 +2261,18 @@ static int __init macb_probe(struct platform_device *pdev)
- 		 * must remove the optional gaps that could exist in the
- 		 * hardware queue mask.
- 		 */
--		queue->irq = platform_get_irq(pdev, q_irq);
-+		queue->irq = platform_get_irq(pdev, q);
- 		err = devm_request_irq(&pdev->dev, queue->irq, macb_interrupt,
- 				       0, dev->name, queue);
- 		if (err) {
- 			dev_err(&pdev->dev,
- 				"Unable to request IRQ %d (error %d)\n",
- 				queue->irq, err);
--			goto err_out_free_irq;
-+			goto err_out_free_netdev;
- 		}
- 
- 		INIT_WORK(&queue->tx_error_task, macb_tx_error_task);
--		q_irq++;
-+		q++;
- 	}
- 	dev->irq = bp->queues[0].irq;
- 
-@@ -2350,7 +2350,7 @@ static int __init macb_probe(struct platform_device *pdev)
- 	err = register_netdev(dev);
- 	if (err) {
- 		dev_err(&pdev->dev, "Cannot register net device, aborting.\n");
--		goto err_out_free_irq;
-+		goto err_out_free_netdev;
- 	}
- 
- 	err = macb_mii_init(bp);
-@@ -2373,9 +2373,7 @@ static int __init macb_probe(struct platform_device *pdev)
- 
- err_out_unregister_netdev:
- 	unregister_netdev(dev);
--err_out_free_irq:
--	for (q = 0, queue = bp->queues; q < q_irq; ++q, ++queue)
--		devm_free_irq(&pdev->dev, queue->irq, queue);
-+err_out_free_netdev:
- 	free_netdev(dev);
- err_out_disable_clocks:
- 	if (!IS_ERR(tx_clk))
-@@ -2392,8 +2390,6 @@ static int __exit macb_remove(struct platform_device *pdev)
- {
- 	struct net_device *dev;
- 	struct macb *bp;
--	struct macb_queue *queue;
--	unsigned int q;
- 
- 	dev = platform_get_drvdata(pdev);
- 
-@@ -2405,9 +2401,6 @@ static int __exit macb_remove(struct platform_device *pdev)
- 		kfree(bp->mii_bus->irq);
- 		mdiobus_free(bp->mii_bus);
- 		unregister_netdev(dev);
--		queue = bp->queues;
--		for (q = 0; q < bp->num_queues; ++q, ++queue)
--			devm_free_irq(&pdev->dev, queue->irq, queue);
- 		if (!IS_ERR(bp->tx_clk))
- 			clk_disable_unprepare(bp->tx_clk);
- 		clk_disable_unprepare(bp->hclk);
--- 
-1.8.2.2
+Guenter
