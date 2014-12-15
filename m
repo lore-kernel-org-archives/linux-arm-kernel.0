@@ -1,111 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Dec 2014 11:37:59 +0100
-Subject: [RFC/PATCH 1/4 PATCH] ARM: mvebu: use dt_fixup to provide
- fallback for enable-method
-In-Reply-To: <548E3209.20307@alliedtelesis.co.nz>
-References: <5488A2C0.5040804@alliedtelesis.co.nz>
- <548DFCEA.7000801@alliedtelesis.co.nz> <548E3209.20307@alliedtelesis.co.nz>
-Message-ID: <7947240.7yktm8fT2X@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Dec 2014 10:38:30 +0000
+Subject: [RFC PATCH 0/6] Those patches is used for dw_hdmi audio.
+In-Reply-To: <1418609494-15820-1-git-send-email-ykk@rock-chips.com>
+References: <1418609494-15820-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20141215103830.GD11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 December 2014 00:57:49 Chris Packham wrote:
-> On 12/15/2014 10:11 AM, Chris Packham wrote:
-> >>> +
-> >>> +CFLAGS_board-v7.o = -I$(src)/../../../scripts/dtc/libfdt
-> >>> \ No newline at end of file
-> >>
-> >> Why is this needed? Can't you just include <linux/libfdt.h> ?
-> >>
-> >
-> > I am already including linux/libfdt.h. Without the CFLAGS change I get
-> > the following compile error.
-> >
-> >    In file included from include/linux/libfdt.h:6:0,
-> >                     from arch/arm/mach-mvebu/board-v7.c:21:
-> >    include/linux/../../scripts/dtc/libfdt/libfdt.h:54:24: fatal error:
-> > libfdt_env.h: No such file or directory
-> >
-> > There seems to be precedence in other architectures/drivers
-> >
-> >    $ git grep -e '-I.*libfdt'
-> >    arch/mips/cavium-octeon/Makefile:CFLAGS_octeon-platform.o =
-> > -I$(src)/../../../scripts/dtc/libfdt
-> >    arch/mips/cavium-octeon/Makefile:CFLAGS_setup.o =
-> > -I$(src)/../../../scripts/dtc/libfdt
-> >    arch/mips/mti-sead3/Makefile:CFLAGS_sead3-setup.o =
-> > -I$(src)/../../../scripts/dtc/libfdt
-> >    arch/powerpc/kernel/Makefile:CFLAGS_prom.o              =
-> > -I$(src)/../../../scripts/dtc/libfdt
-> >    drivers/firmware/efi/libstub/Makefile:CFLAGS_fdt.o    +=
-> > -I$(srctree)/scripts/dtc/libfdt/
-> >    drivers/of/Makefile:CFLAGS_fdt.o = -I$(src)/../../scripts/dtc/libfdt
-> >    drivers/of/Makefile:CFLAGS_fdt_address.o =
-> > -I$(src)/../../scripts/dtc/libfdt
-> >
-
-I still think we should not duplicate this but instead change the
-header files to make the include hack unnecessary in all those places.
-
-Looking at the header file, it only contains
-
-#include <linux/libfdt_env.h>
-#include "../../scripts/dtc/libfdt/fdt.h"
-#include "../../scripts/dtc/libfdt/libfdt.h"
-
-so two of them get the headers from exactly that place, while the
-libfdt_env.h file contains the linux-specific implementation of
-a couple of functions instead of the baremetal implementation.
-
-It looks like the intention was that when you already include the
-linux version of the header, you no longer need the other one, but
-that assumption is broken by current implementation.
-
-One way to solve this would be
-
-diff --git a/scripts/dtc/libfdt/libfdt.h b/scripts/dtc/libfdt/libfdt.h
-index 73f49759a5e7..23c55baa8e18 100644
---- a/scripts/dtc/libfdt/libfdt.h
-+++ b/scripts/dtc/libfdt/libfdt.h
-@@ -51,7 +51,7 @@
-  *     EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  */
- 
--#include <libfdt_env.h>
-+#include "libfdt_env.h"
- #include <fdt.h>
- 
- #define FDT_FIRST_SUPPORTED_VERSION	0x10
-
-
-but I'm not sure if that is the best way.
-
-> >> I think it would be good to first check whether you are running on
-> >> Armada XP
-> >> or Armada 370, because the latter does not require this.
-> >>
-> >>     Arnd
-> >>
-> >
-> > Any suggestion as to what to check for. Based on the dts files in the
-> > current source seem compatible == "marvell,armada370" seems like a good
-> > choice. But I don't know for sure that there isn't a armada-xp variant
-> > out using a .dts with this set.
+On Mon, Dec 15, 2014 at 10:11:28AM +0800, Yakir Yang wrote:
 > 
-> Adding the following at the top will do the trick (assuming
-> "marvell,armada370" is the right compatible string to use).
-> 
->         unsigned long root = of_get_flat_dt_root();
-> 
->         if (of_flat_dt_is_compatible(root, "marvell,armada370"))
->                 return;
+> rk3288 use Designware HDMI IP, Designware HDMI supports four interfaces to
+> config hdmi audio(I2S, S/PDIF, Generic Parallel Audio, AHB Audio DMA), but
+> rk3288 only support two ways to config hdmi audio(I2S, S/PDIF), So we take
+> I2S as hdmi audio operation interfaces, and then treat hdmi audio as an
+> standard ALSA devices(only got platback function).
 
-Right. You could also add 
+There is no need for dw-hdmi audio to be implemented as an ASoC
+device - as I've already sent patches to Andy with my ALSA driver
+which has been around for the last two years, and works well, and
+doesn't require any additional DT description.
 
-	if (!IS_ENABLED(CONFIG_SMP) || !of_flat_dt_is_compatible(root, "marvell,armadaxp")))
-
-to again eliminate that check for uniprocessor kernels, and to not
-propagate the fixup to future machines but make it clear that
-it is only needed for armadaxp.
-
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
