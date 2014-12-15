@@ -1,68 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Dec 2014 11:32:52 +0000
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <6311849.8NniZ58Jf1@avalon>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <1417453034-21379-7-git-send-email-will.deacon@arm.com>
- <6311849.8NniZ58Jf1@avalon>
-Message-ID: <20141215113252.GH20738@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 15 Dec 2014 11:38:32 +0000
+Subject: [RFC 02/15] drivers/base: add restrack framework
+In-Reply-To: <548E9BB9.806@samsung.com>
+References: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
+ <1418226513-14105-3-git-send-email-a.hajda@samsung.com>
+ <20141212165230.GP11764@sirena.org.uk> <548E9BB9.806@samsung.com>
+Message-ID: <20141215113832.GX11764@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 14, 2014 at 03:51:13PM +0000, Laurent Pinchart wrote:
-> On Monday 01 December 2014 16:57:12 Will Deacon wrote:
-> > This patch extends of_dma_configure so that it sets up the IOMMU for a
-> > device, as well as the coherent/non-coherent DMA mapping ops.
-> > 
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Tested-by: Robin Murphy <robin.murphy@arm.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Mon, Dec 15, 2014 at 09:28:41AM +0100, Andrzej Hajda wrote:
+> On 12/12/2014 05:52 PM, Mark Brown wrote:
+> > On Wed, Dec 10, 2014 at 04:48:20PM +0100, Andrzej Hajda wrote:
 
-[...]
+> > I don't know about anyone else but I'm having a hard time reading the
+> > restrack name, it looks like a misspelling of restack to me.
 
-> > +static void of_dma_deconfigure(struct device *dev)
-> > +{
-> > +	arch_teardown_dma_ops(dev);
-> >  }
-> > 
-> >  /**
-> > @@ -223,16 +234,12 @@ static struct platform_device
-> > *of_platform_device_create_pdata( if (!dev)
-> >  		goto err_clear_flag;
-> > 
-> > -	of_dma_configure(&dev->dev);
-> >  	dev->dev.bus = &platform_bus_type;
-> >  	dev->dev.platform_data = platform_data;
-> > -
-> > -	/* We do not fill the DMA ops for platform devices by default.
-> > -	 * This is currently the responsibility of the platform code
-> > -	 * to do such, possibly using a device notifier
-> > -	 */
-> > +	of_dma_configure(&dev->dev);
-> > 
-> >  	if (of_device_add(dev) != 0) {
-> > +		of_dma_deconfigure(&dev->dev);
-> 
-> Don't you also need to call of_dma_deconfigure() when the device is destroyed 
-> ? Otherwise the default domain created by arch_setup_dma_ops() will be leaked.
+> Any alternative names?
 
-Something like below?
+Well, even just res_track would help.
 
-Will
+> I will move the code for provider matching to frameworks,
+> so it will be easy to add just dev_info after every failed attempt
+> of getting resource, including deferring. This is the simplest solution
+> and it should be similar in verbosity to deferred probing.
 
---->8
+> Maybe other solution is to provide debug_fs (or device) attribute showing
+> restrack status per device.
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index b89caf8c7586..ec29c25b4fce 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -525,6 +525,7 @@ static int of_platform_device_destroy(struct device *dev, void *data)
-                amba_device_unregister(to_amba_device(dev));
- #endif
- 
-+       of_dma_deconfigure(dev);
-        of_node_clear_flag(dev->of_node, OF_POPULATED);
-        of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
-        return 0;
+I think both are useful - it's often helpful to have a listing of what
+resources have actually been registered, for example to help spot typos.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141215/1bebb5ca/attachment.sig>
