@@ -1,261 +1,160 @@
-From: oneukum@suse.de (Oliver Neukum)
-Date: Mon, 15 Dec 2014 11:01:50 +0100
-Subject: bluetooth: Add hci_h4p driver
-In-Reply-To: <20141213223727.GA13894@amd>
-References: <20141213223727.GA13894@amd>
-Message-ID: <1418637710.4443.11.camel@linux-0dmf.site>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 15 Dec 2014 11:20:06 +0100
+Subject: [PATCH v3 6/6] arm/arm64: KVM: Require in-kernel vgic for the arch
+ timers
+In-Reply-To: <1418469449-13277-1-git-send-email-christoffer.dall@linaro.org>
+References: <1418469449-13277-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1418638806-12025-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+It is curently possible to run a VM with architected timers support
+without creating an in-kernel VGIC, which will result in interrupts from
+the virtual timer going nowhere.
 
-a few remarks about possible issues.
+To address this issue, move the architected timers initialization to the
+time when we run a VCPU for the first time, and then only initialize
+(and enable) the architected timers if we have a properly created and
+initialized in-kernel VGIC.
 
-	Regards
-		Oliver
+When injecting interrupts from the virtual timer to the vgic, the
+current setup should ensure that this never calls an on-demand init of
+the VGIC, which is the only call path that could return an error from
+kvm_vgic_inject_irq(), so capture the return value and raise a warning
+if there's an error there.
 
-> +static int h4p_send_negotiation(struct h4p_info *info)
-> +{
-> +	struct h4p_neg_cmd *neg_cmd;
-> +	struct h4p_neg_hdr *neg_hdr;
-> +	struct sk_buff *skb;
-> +	int err, len;
-> +	u16 sysclk = 38400;
-> +
-> +	printk("Sending negotiation..");
-> +	len = sizeof(*neg_cmd) + sizeof(*neg_hdr) + H4_TYPE_SIZE;
-> +
-> +	skb = bt_skb_alloc(len, GFP_KERNEL);
-> +	if (!skb)
-> +		return -ENOMEM;
-> +
-> +	memset(skb->data, 0x00, len);
-> +	*skb_put(skb, 1) = H4_NEG_PKT;
-> +	neg_hdr = (struct h4p_neg_hdr *)skb_put(skb, sizeof(*neg_hdr));
-> +	neg_cmd = (struct h4p_neg_cmd *)skb_put(skb, sizeof(*neg_cmd));
-> +
-> +	neg_hdr->dlen = sizeof(*neg_cmd);
-> +	neg_cmd->ack = H4P_NEG_REQ;
-> +	neg_cmd->baud = cpu_to_le16(BT_BAUDRATE_DIVIDER/MAX_BAUD_RATE);
-> +	neg_cmd->proto = H4P_PROTO_BYTE;
-> +	neg_cmd->sys_clk = cpu_to_le16(sysclk);
-> +
-> +	h4p_change_speed(info, INIT_SPEED);
-> +
-> +	h4p_set_rts(info, 1);
-> +	info->init_error = 0;
-> +	init_completion(&info->init_completion);
-> +
-> +	h4p_simple_send_frame(info, skb);
-> +
-> +	if (!wait_for_completion_interruptible_timeout(&info->init_completion,
-> +						       msecs_to_jiffies(1000))) {
-> +		printk("h4p: negotiation did not return\n");
+We also change the kvm_timer_init() function from returning an int to be
+a void function, since the function always succeeds.
 
-Memory leak in the error case
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+Changes [v2 -> v3]:
+ - Split kvm_timer_init into kvm_timer_init and kvm_timer_enable
+   and initialize the cntvoff in kvm_timer_init and only actually enable
+   the timer if there is an in-kernel vgic.
+ - Added comment about race from multiple VCPUs.
+ - Support compiling on 32-bit ARM wihtout vgic/arch-timers config
+   option.
 
-> +		return -ETIMEDOUT;
-> +	}
-> +
-> +	if (info->init_error < 0)
-> +		return info->init_error;
-> +
-> +	/* Change to operational settings */
-> +	h4p_set_auto_ctsrts(info, 0, UART_EFR_RTS);
-> +	h4p_set_rts(info, 0);
-> +	h4p_change_speed(info, MAX_BAUD_RATE);
-> +
-> +	err = h4p_wait_for_cts(info, 1, 100);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	h4p_set_auto_ctsrts(info, 1, UART_EFR_RTS);
-> +	init_completion(&info->init_completion);
-> +	err = h4p_send_alive_packet(info);
-> +
-> +	if (err < 0)
-> +		return err;
-> +
-> +	if (!wait_for_completion_interruptible_timeout(&info->init_completion,
-> +				msecs_to_jiffies(1000)))
-> +		return -ETIMEDOUT;
-> +
-> +	if (info->init_error < 0)
-> +		return info->init_error;
-> +
-> +	printk("Negotiation successful\n");
-> +	return 0;
-> +}
+ arch/arm/kvm/arm.c           | 13 +++++++++++--
+ include/kvm/arm_arch_timer.h | 10 ++++------
+ virt/kvm/arm/arch_timer.c    | 30 ++++++++++++++++++++++--------
+ 3 files changed, 37 insertions(+), 16 deletions(-)
 
-
-
-> +static unsigned int h4p_get_data_len(struct h4p_info *info,
-> +					 struct sk_buff *skb)
-> +{
-> +	long retval = -1;
-> +	struct hci_acl_hdr *acl_hdr;
-> +	struct hci_sco_hdr *sco_hdr;
-> +	struct hci_event_hdr *evt_hdr;
-> +	struct h4p_neg_hdr *neg_hdr;
-> +	struct h4p_alive_hdr *alive_hdr;
-> +	struct h4p_radio_hdr *radio_hdr;
-> +
-> +	switch (bt_cb(skb)->pkt_type) {
-> +	case H4_EVT_PKT:
-> +		evt_hdr = (struct hci_event_hdr *)skb->data;
-> +		retval = evt_hdr->plen;
-> +		break;
-> +	case H4_ACL_PKT:
-> +		acl_hdr = (struct hci_acl_hdr *)skb->data;
-> +		retval = le16_to_cpu(acl_hdr->dlen);
-
-Could you explain, why only this needs endianness converted?
-
-> +		break;
-> +	case H4_SCO_PKT:
-> +		sco_hdr = (struct hci_sco_hdr *)skb->data;
-> +		retval = sco_hdr->dlen;
-> +		break;
-> +	case H4_RADIO_PKT:
-> +		radio_hdr = (struct h4p_radio_hdr *)skb->data;
-> +		retval = radio_hdr->dlen;
-> +		break;
-> +	case H4_NEG_PKT:
-> +		neg_hdr = (struct h4p_neg_hdr *)skb->data;
-> +		retval = neg_hdr->dlen;
-> +		break;
-> +	case H4_ALIVE_PKT:
-> +		alive_hdr = (struct h4p_alive_hdr *)skb->data;
-> +		retval = alive_hdr->dlen;
-> +		break;
-> +	}
-> +
-> +	return retval;
-> +}
-
-
-
-> +static void h4p_rx_tasklet(unsigned long data)
-> +{
-> +	u8 byte;
-> +	struct h4p_info *info = (struct h4p_info *)data;
-> +
-> +	BT_DBG("tasklet woke up");
-> +	BT_DBG("rx_tasklet woke up");
-
-Isn't this a bit redundant?
-
-> +
-> +	while (h4p_inb(info, UART_LSR) & UART_LSR_DR) {
-> +		byte = h4p_inb(info, UART_RX);
-> +		BT_DBG("[in: %02x]", byte);
-> +		if (info->garbage_bytes) {
-> +			info->garbage_bytes--;
-> +			continue;
-> +		}
-> +		if (info->rx_skb == NULL) {
-> +			info->rx_skb = bt_skb_alloc(HCI_MAX_FRAME_SIZE,
-> +						    GFP_ATOMIC | GFP_DMA);
-> +			if (!info->rx_skb) {
-> +				dev_err(info->dev,
-> +					"No memory for new packet\n");
-> +				goto finish_rx;
-> +			}
-> +			info->rx_state = WAIT_FOR_PKT_TYPE;
-> +			info->rx_skb->dev = (void *)info->hdev;
-> +		}
-> +		info->hdev->stat.byte_rx++;
-> +		h4p_handle_byte(info, byte);
-> +	}
-> +
-> +	if (!info->rx_enabled) {
-> +		if (h4p_inb(info, UART_LSR) & UART_LSR_TEMT &&
-> +						  info->autorts) {
-> +			__h4p_set_auto_ctsrts(info, 0 , UART_EFR_RTS);
-> +			info->autorts = 0;
-> +		}
-> +		/* Flush posted write to avoid spurious interrupts */
-> +		h4p_inb(info, UART_OMAP_SCR);
-> +		h4p_set_clk(info, &info->rx_clocks_en, 0);
-> +	}
-> +
-> +finish_rx:
-> +	BT_DBG("rx_ended");
-> +}
-> +
-> +static void h4p_tx_tasklet(unsigned long data)
-> +{
-> +	unsigned int sent = 0;
-> +	struct sk_buff *skb;
-> +	struct h4p_info *info = (struct h4p_info *)data;
-> +
-> +	BT_DBG("tasklet woke up");
-> +	BT_DBG("tx_tasklet woke up");
-
-Doubled?
-
-> +	if (info->autorts != info->rx_enabled) {
-> +		if (h4p_inb(info, UART_LSR) & UART_LSR_TEMT) {
-> +			if (info->autorts && !info->rx_enabled) {
-> +				__h4p_set_auto_ctsrts(info, 0,
-> +							  UART_EFR_RTS);
-> +				info->autorts = 0;
-> +			}
-> +			if (!info->autorts && info->rx_enabled) {
-> +				__h4p_set_auto_ctsrts(info, 1,
-> +							  UART_EFR_RTS);
-> +				info->autorts = 1;
-> +			}
-> +		} else {
-> +			h4p_outb(info, UART_OMAP_SCR,
-> +				     h4p_inb(info, UART_OMAP_SCR) |
-> +				     UART_OMAP_SCR_EMPTY_THR);
-> +			goto finish_tx;
-> +		}
-> +	}
-> +
-> +	skb = skb_dequeue(&info->txq);
-> +	if (!skb) {
-> +		/* No data in buffer */
-> +		BT_DBG("skb ready");
-> +		if (h4p_inb(info, UART_LSR) & UART_LSR_TEMT) {
-> +			h4p_outb(info, UART_IER,
-> +				     h4p_inb(info, UART_IER) &
-> +				     ~UART_IER_THRI);
-> +			h4p_inb(info, UART_OMAP_SCR);
-> +			h4p_disable_tx(info);
-> +			return;
-> +		}
-> +		h4p_outb(info, UART_OMAP_SCR,
-> +			     h4p_inb(info, UART_OMAP_SCR) |
-> +			     UART_OMAP_SCR_EMPTY_THR);
-> +		goto finish_tx;
-> +	}
-> +
-> +	/* Copy data to tx fifo */
-> +	while (!(h4p_inb(info, UART_OMAP_SSR) & UART_OMAP_SSR_TXFULL) &&
-> +	       (sent < skb->len)) {
-> +		//printk("[Out: %02x]", skb->data[sent]);
-> +		//printk("%02x ", skb->data[sent]);
-> +		h4p_outb(info, UART_TX, skb->data[sent]);
-> +		sent++;
-> +	}
-> +
-> +	info->hdev->stat.byte_tx += sent;
-> +	if (skb->len == sent) {
-> +		kfree_skb(skb);
-> +	} else {
-> +		skb_pull(skb, sent);
-> +		skb_queue_head(&info->txq, skb);
-> +	}
-> +
-> +	h4p_outb(info, UART_OMAP_SCR, h4p_inb(info, UART_OMAP_SCR) &
-> +						     ~UART_OMAP_SCR_EMPTY_THR);
-> +	h4p_outb(info, UART_IER, h4p_inb(info, UART_IER) |
-> +						 UART_IER_THRI);
-> +
-> +finish_tx:
-> +	/* Flush posted write to avoid spurious interrupts */
-> +	h4p_inb(info, UART_OMAP_SCR);
-> +
-> +}
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index d4da244..8cadfec 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -424,6 +424,7 @@ static void update_vttbr(struct kvm *kvm)
+ 
+ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ {
++	struct kvm *kvm = vcpu->kvm;
+ 	int ret;
+ 
+ 	if (likely(vcpu->arch.has_run_once))
+@@ -435,12 +436,20 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ 	 * Map the VGIC hardware resources before running a vcpu the first
+ 	 * time on this VM.
+ 	 */
+-	if (unlikely(!vgic_ready(vcpu->kvm))) {
+-		ret = kvm_vgic_map_resources(vcpu->kvm);
++	if (unlikely(!vgic_ready(kvm))) {
++		ret = kvm_vgic_map_resources(kvm);
+ 		if (ret)
+ 			return ret;
+ 	}
+ 
++	/*
++	 * Enable the arch timers only if we have an in-kernel VGIC
++	 * and it has been properly initialized, since we cannot handle
++	 * interrupts from the virtual timer with a userspace gic.
++	 */
++	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm))
++		kvm_timer_enable(kvm);
++
+ 	return 0;
+ }
+ 
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index ad9db60..b3f45a5 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -60,7 +60,8 @@ struct arch_timer_cpu {
+ 
+ #ifdef CONFIG_KVM_ARM_TIMER
+ int kvm_timer_hyp_init(void);
+-int kvm_timer_init(struct kvm *kvm);
++void kvm_timer_enable(struct kvm *kvm);
++void kvm_timer_init(struct kvm *kvm);
+ void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 			  const struct kvm_irq_level *irq);
+ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+@@ -77,11 +78,8 @@ static inline int kvm_timer_hyp_init(void)
+ 	return 0;
+ };
+ 
+-static inline int kvm_timer_init(struct kvm *kvm)
+-{
+-	return 0;
+-}
+-
++static inline void kvm_timer_enable(struct kvm *kvm) {}
++static inline void kvm_timer_init(struct kvm *kvm) {}
+ static inline void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 					const struct kvm_irq_level *irq) {}
+ static inline void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu) {}
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 22fa819..1c0772b 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -61,12 +61,14 @@ static void timer_disarm(struct arch_timer_cpu *timer)
+ 
+ static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
+ {
++	int ret;
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 
+ 	timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
+-	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+-			    timer->irq->irq,
+-			    timer->irq->level);
++	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
++				  timer->irq->irq,
++				  timer->irq->level);
++	WARN_ON(ret);
+ }
+ 
+ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+@@ -307,12 +309,24 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+ 	timer_disarm(timer);
+ }
+ 
+-int kvm_timer_init(struct kvm *kvm)
++void kvm_timer_enable(struct kvm *kvm)
+ {
+-	if (timecounter && wqueue) {
+-		kvm->arch.timer.cntvoff = kvm_phys_timer_read();
++	if (kvm->arch.timer.enabled)
++		return;
++
++	/*
++	 * There is a potential race here between VCPUs starting for the first
++	 * time, which may be enabling the timer multiple times.  That doesn't
++	 * hurt though, because we're just setting a variable to the same
++	 * variable that it already was.  The important thing is that all
++	 * VCPUs have the enabled variable set, before entering the guest, if
++	 * the arch timers are enabled.
++	 */
++	if (timecounter && wqueue)
+ 		kvm->arch.timer.enabled = 1;
+-	}
++}
+ 
+-	return 0;
++void kvm_timer_init(struct kvm *kvm)
++{
++	kvm->arch.timer.cntvoff = kvm_phys_timer_read();
+ }
+-- 
+2.1.2.330.g565301e.dirty
