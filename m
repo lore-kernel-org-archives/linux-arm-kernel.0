@@ -1,63 +1,43 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 15 Dec 2014 11:25:33 +0000
-Subject: [PATCH 3/8] mfd: bindings: Provide ST bindings for ST's LPC device
+Date: Mon, 15 Dec 2014 11:25:34 +0000
+Subject: [PATCH 4/8] mfd: dt-bindings: Provide human readable defines for LPC
+ mode choosing
 In-Reply-To: <1418642738-17407-1-git-send-email-lee.jones@linaro.org>
 References: <1418642738-17407-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1418642738-17407-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1418642738-17407-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On current ST platforms the LPC controls a number of functions including
-Watchdog and Real Time Clock.  This patch provides the bindings used to
-choose and configure the devices.
+ST's Low Power Controller can currently operate in two supported modes;
+Watchdog and Real Time Clock.  These defines will aid engineers to easily
+identify the selected mode.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/mfd/st-lpc.txt | 36 ++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/st-lpc.txt
+ include/dt-bindings/mfd/st-lpc.h | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 include/dt-bindings/mfd/st-lpc.h
 
-diff --git a/Documentation/devicetree/bindings/mfd/st-lpc.txt b/Documentation/devicetree/bindings/mfd/st-lpc.txt
+diff --git a/include/dt-bindings/mfd/st-lpc.h b/include/dt-bindings/mfd/st-lpc.h
 new file mode 100644
-index 0000000..b13f143
+index 0000000..e3e6c75
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/st-lpc.txt
-@@ -0,0 +1,36 @@
-+STMicroelectronics Low Power Controller (LPC)
-+=============================================
++++ b/include/dt-bindings/mfd/st-lpc.h
+@@ -0,0 +1,15 @@
++/*
++ * This header provides shared DT/Driver defines for ST's LPC device
++ *
++ * Copyright (C) 2014 STMicroelectronics -- All Rights Reserved
++ *
++ * Author: Lee Jones <lee.jones@linaro.org> for STMicroelectronics
++ */
 +
-+Currently supports Watchdog OR Real Time Clock functionality.
++#ifndef __DT_BINDINGS_ST_LPC_H__
++#define __DT_BINDINGS_ST_LPC_H__
 +
-+Required properties [common]
++#define ST_LPC_MODE_RTC		0
++#define ST_LPC_MODE_WDT		1
 +
-+- compatible 	: Must be one of: "st,stih407-lpc" "st,stih416-lpc"
-+				  "st,stih415-lpc" "st,stid127-lpc"
-+- reg		: LPC registers base address + size
-+- interrupts    : LPC interrupt line number and associated flags
-+- clocks	: Clock used by LPC device (See: ../clock/clock-bindings.txt)
-+- st,lpc-mode	: The LPC can run either one of two modes ST_LPC_MODE_RTC [0] or
-+		  ST_LPC_MODE_WDT [1].  One (and only one) mode must be
-+		  selected.
-+
-+Required properties [watchdog mode]
-+
-+- st,syscfg	: Phandle to syscfg node used to enable watchdog and configure
-+		  CPU reset type.
-+- timeout-sec	: Watchdog timeout in seconds
-+
-+Optional properties [watchdog mode]
-+
-+- st,warm-reset	: If present reset type will be 'warm' - if not it will be cold
-+
-+Example:
-+	lpc at fde05000 {
-+		compatible	= "st,stih416-lpc-watchdog";
-+		reg		= <0xfde05000 0x1000>;
-+		clocks 		= <&clk_s_d3_flexgen CLK_LPC_0>;
-+		st,syscfg	= <&syscfg_core>;
-+		timeout-sec	= <600>;
-+		st,lpc-mode	= <ST_LPC_MODE_WDT>;
-+		st,warm-reset;
-+	};
++#endif /* __DT_BINDINGS_ST_LPC_H__ */
 -- 
 1.9.1
