@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Dec 2014 16:38:30 +0100
-Subject: [PATCH 22/27] ARM: mvebu: armada-xp-mv78230: Relicense the device
+Date: Mon, 15 Dec 2014 16:38:32 +0100
+Subject: [PATCH 24/27] ARM: mvebu: armada-xp-mv78460: Relicense the device
  tree under GPLv2+/X11
 In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1418657915-22775-23-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1418657915-22775-25-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,21 +15,19 @@ license.
 In order to make it easier for them to reuse our device trees,
 relicense our device trees under a GPL/X11 dual-license.
 
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Arnaud Ebalard <arno@natisbad.org>
 Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Willy Tarreau <w@1wt.eu>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-mv78230.dtsi | 40 +++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi | 40 +++++++++++++++++++++++++++++---
  1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index 281ccd24295c..6e6d0f04bf2b 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index 9c40c130d11a..36ce63a96cc9 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
 @@ -5,9 +5,43 @@
   *
   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
@@ -75,7 +73,7 @@ index 281ccd24295c..6e6d0f04bf2b 100644
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
   *
-  * Contains definitions specific to the Armada XP MV78230 SoC that are not
+  * Contains definitions specific to the Armada XP MV78460 SoC that are not
   * common to all Armada XP SoCs.
 -- 
 1.9.1
