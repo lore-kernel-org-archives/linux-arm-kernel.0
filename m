@@ -1,67 +1,97 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 15 Dec 2014 11:50:00 +0800
-Subject: [RFC PATCH v2 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <1833364.xuE8O3LGeh@wuerfel>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <10603826.6Z6KUoI9qZ@wuerfel> <548960F3.7070405@linaro.org>
- <1833364.xuE8O3LGeh@wuerfel>
-Message-ID: <548E5A68.2000202@linaro.org>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 15 Dec 2014 03:53:21 +0000
+Subject: [PATCH v5][resend v2] of: replace Asahi Kasei Corp vendor prefix
+In-Reply-To: <87d282sl6w.wl%kuninori.morimoto.gx@renesas.com>
+References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>
+ <20140922130026.GK3290@leverpostej>
+ <CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>
+ <20140922132743.GM3290@leverpostej>
+ <87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>
+ <1415845309.4269.6.camel@perches.com>
+ <20141113025105.GA16652@verge.net.au>
+ <87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>
+ <20141113110740.GE3815@sirena.org.uk>
+ <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>
+ <20141114093554.GC3810@ulmo>
+ <87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>
+ <5469CD47.3040409@cogentembedded.com>
+ <877fytxsde.wl%kuninori.morimoto.gx@renesas.com>
+ <87egsob2cl.wl%kuninori.morimoto.gx@renesas.com>
+ <5478603D.1080404@cogentembedded.com>
+ <87d282sl6w.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87zjaptvp8.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?12?12? 22:20, Arnd Bergmann wrote:
-> On Thursday 11 December 2014 17:16:35 Hanjun Guo wrote:
->> On 2014?12?10? 18:57, Arnd Bergmann wrote:
->>> On Wednesday 26 November 2014 17:12:49 Hanjun Guo wrote:
->>> The above topology is not easy to represent, but I think it would work
->>> like this (ignoring the threads/cores/clusters on the socket, which
->>> would also need to be described in a full DT), using multiple logical
->>> paths between the nodes:
->>>
->>> socket 0
->>> ibm,associativity = <0 0 0 0>, <1 1 1 0>, <2 2 0 0>,  0 0 0>;
->>>
->>> socket 1
->>> ibm,associativity = <1 1 1 1>, <0 0 0 1>, <2 2 2 1>,  3 1 1>;
->>>
->>> socket 2
->>> ibm,associativity = <2 2 2 2>, <0 0 2 2>, <1 1 1 2>,  3 3 2>;
->>>
->>> socket 3
->>> ibm,associativity =  3 3 3>, <0 3 3 3>, <1 1 3 3>, <2 2 2 3>;
->>>
->>> This describes four levels or hierarchy, with the lowest level
->>> being a single CPU core on one socket, and four paths between
->>> the sockets. To compute the associativity between two sockets,
->>> you need to look at each combination of paths to find the best
->>> match.
->>>
->>> Comparing sockets 0 and 1, the best matches are <1 1 1 0>
->>> with <1 1 1 1>, and <0 0 0 0> with <0 0 0 1>. In each case, the
->>> associativity is "3", meaning the first three entries match.
->>>
->>> Comparing sockets 0 and 3, we have four equally bad matches
->>> that each only match in the highest-level domain, e.g. <0 0 0 0>
->>> with <0 3 3 3>, so the associativity is only "1", and that means
->>> the two nodes are less closely associated than two neighboring
->>> ones.
->>>
->>> With the algorithm that powerpc uses to turn associativity into
->>> distance, 2**(numlevels - associativity), this would put the
->>> distance of neighboring nodes at "2", and the longest distance
->>> at "8".
->>
->> Thanks for the explain, I can understand how it works now,
->> a bit complicated for me and I think the distance property
->> "node-matrix" in Ganapatrao's patch is straight forward,
->> what do you think?
->
-> I still think we should go the whole way of having something compatible
-> with the existing bindings, possibly using different property names
-> if there are objections to using the "ibm," prefix.
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-I agree that we should keep using existing bindings and not introducing
-a new one.
+Current vendor-prefixes.txt already has "ak" prefix for Asahi Kasei Corp
+by ae8c4209af2c(of: Add vendor prefix for Asahi Kasei Corp.)
 
-Thanks
-Hanjun
+It went through the appropriate review process. But, almost all
+Asahi Kasei chip drivers are using "asahi-kasei" prefix today.
+(arch/arm/boot/dts/tegra20-seaboard.dts only is using "ak,ak8975",
+ but there are instances of "asahi-kasei,ak8975" in other dts files.
+ And drivers/iio/magnetometer/ak8975.c doesn't support "ak,ak8975" prefix)
+So, we made a mistake there.
+
+In addition, checkpatch.pl reports WARNING if it is using "asahi-kasei"
+prerfix in DT file.
+(DT compatible string vendor "asahi-kasei" appears un-documented)
+
+Marking it deprecated and warning with checkpatch is certainly
+preferable. So, this patch replace "ak" to "asahi-kasei" in
+vendor-prefixes.txt. (and fixup tegra20-seaboard)
+
+OTOH, Asahi Kasei is usually referred to as "AKM", but this patch
+doesn't care about it. Because no DT is using that today.
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Thierry Reding <treding@nvidia.com>
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+Rob, Mark
+
+There is no response about this patch.
+Mark, is it possible to care about this patch ?
+It has relationship to ASoC.
+
+ .../devicetree/bindings/vendor-prefixes.txt        |    2 +-
+ arch/arm/boot/dts/tegra20-seaboard.dts             |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 723999d..ddcb4cd 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -9,7 +9,6 @@ ad	Avionic Design GmbH
+ adapteva	Adapteva, Inc.
+ adi	Analog Devices, Inc.
+ aeroflexgaisler	Aeroflex Gaisler AB
+-ak	Asahi Kasei Corp.
+ allwinner	Allwinner Technology Co., Ltd.
+ altr	Altera Corp.
+ amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
+@@ -20,6 +19,7 @@ amstaos	AMS-Taos Inc.
+ apm	Applied Micro Circuits Corporation (APM)
+ arm	ARM Ltd.
+ armadeus	ARMadeus Systems SARL
++asahi-kasei	Asahi Kasei Corp.
+ atmel	Atmel Corporation
+ auo	AU Optronics Corporation
+ avago	Avago Technologies
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+index a1d4bf9..7f5cf80 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+@@ -405,7 +405,7 @@
+ 		clock-frequency = <400000>;
+ 
+ 		magnetometer at c {
+-			compatible = "ak,ak8975";
++			compatible = "asahi-kasei,ak8975";
+ 			reg = <0xc>;
+ 			interrupt-parent = <&gpio>;
+ 			interrupts = <TEGRA_GPIO(N, 5) IRQ_TYPE_LEVEL_HIGH>;
+-- 
+1.7.9.5
