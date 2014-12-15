@@ -1,75 +1,73 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 15 Dec 2014 14:57:49 +0000
-Subject: [PATCH v5 00/19] KVM GICv3 emulation
-In-Reply-To: <20141213135351.GI16855@cbox>
-References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
- <20141213135351.GI16855@cbox>
-Message-ID: <548EF6ED.1000007@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 15 Dec 2014 16:13:35 +0100
+Subject: [PATCHv3 0/5] ARM:sunxi:ps2 Added support for A10/A20 ps2
+ controller.
+In-Reply-To: <CAEzqOZsWSpd_r3Oc=PBVw3NQH-_1V9JXtC2H4tZ3U6nCN_Z7aA@mail.gmail.com>
+References: <1418408748-9797-1-git-send-email-vishnupatekar0510@gmail.com>	<548C1E7D.1000005@redhat.com>	<CAEzqOZtyeAnG660AKf_0_gCa-+BT_pAzHk0HYYSCdm4y89GFJA@mail.gmail.com>	<548D5207.8030004@redhat.com>
+ <CAEzqOZsWSpd_r3Oc=PBVw3NQH-_1V9JXtC2H4tZ3U6nCN_Z7aA@mail.gmail.com>
+Message-ID: <548EFA9F.4080208@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hej Christoffer,
+Hi,
 
-On 13/12/14 13:53, Christoffer Dall wrote:
-> Hi Andre,
-> 
-> On Mon, Dec 08, 2014 at 12:37:35PM +0000, Andre Przywara wrote:
->> This is version 5 of the GICv3 guest emulation series (not for 3.19).
+On 15-12-14 15:13, Vishnu Patekar wrote:
+> Hi,
+>
+> On Sun, Dec 14, 2014 at 2:31 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
 >>
->> As the changes this time were much smaller, I updated to tree to
->> 3.18.0, as it includes some bug fixes in the VGIC.
+>> On 13-12-14 21:01, Vishnu Patekar wrote:
+>>>
+>>> Hello Hans,
+>>> Please find my comments inlined.
+>>>
+>>> On 12/13/14, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>
+>>>> Hi VishnuPatekar,
+>>>>
+>>>> The patch mangling for this set seems to have gone a bit wrong I'm afraid
+>>>
+>>>
+>>> No, this time I've corrected it. Infact, last version of patch did not
+>>> used the status bit error macros.
+>>>
+>>>> a lot of the patches have my fixup commit messages (which should have
+>>>> disappeared when squashing in the patches), please replace those by
+>>>> proper
+>>>> commit messages describing what the patch actually does.
+>>>
+>>> Yes, [PATCHv3 3/5] uses fixup. I'll correct it.
+>>>>
+>>>>
+>>>> Also the adding of the commented nodes for the lime2 seems to be gone
+>>>> entirely
+>>>> from the set, instead now only a comment about the conflict with the hdmi
+>>>> pins is added, but it is above the i2c node instead of above a ps2 node.
+>>>>
+>>> Maxime's suggested that we should not add commented nodes specially
+>>> when its trivial to apply. And just note saying ps20 pins conflict
+>>> with HDMI.
 >>
->> I addressed the remaining comments from Christoffer and Eric, thanks
->> for the review! The changes this times were much smaller, most of them
->> cosmetic or rewordings of commit messages and comments.
->> I updated the kvm-gicv3/v4 branch in my repo[1] to carry all the delta
->> patches. Those patches are just for reference to see what has changed
->> between v4 and v5. For review and all other purposes please use the
->> v5 branch.
 >>
->> For a changelog summary see below, also each patch carries a changelog
->> now.
->> Only patches 05, 08, 12, 15, 17, 18 and 19 have been changed compared
->> to v4. I dropped Christoffer's Reviewed-by: tag from 05/19 because of
->> the newly added function, but added the respective tags to the other
->> commit messages.
+>> Ah, I see.
 >>
->> I quickly tested this version with a GICv3 capable fast model in all
->> endianness modes (LE guest on LE host, BE on LE, LE on BE, BE on BE).
->> Both a GICv2 and a GICv3 guest were booted in all four combinations.
+>>> Should I remove the this comment as well?
+>>> Or
+>>> Put this note in start of DTS file?
 >>
-> So this is overall looking like it's getting ready to be merged for
-> v3.20.
-> 
-> However, here are the things we need resolved before putting it into
-> kvmarm/next:
-> 
-> 1. You need to address the few remaining comments I had on this version.
-> 
-> 2. You must rebase on the vgic_init series and the vcpu_nit series.
->    Both are in kvmarm/queue, so I suggest you rebase on that or wait
->    until both of those series hit kvm/next (later next week).  You also
->    need to base this on Eric's VGIC init ioctl series
->    (https://lists.cs.columbia.edu/pipermail/kvmarm/2014-December/012643.html),
->    but with dropping patch 3.  As soon as Marc has taken a look at that
->    series, I will merge it onto queue as well.
->    This is likely going to be a pain (sorry about that) since the whole
->    init/init_maps sequence has changed.
-> 
-> 3. Get rid of any on-demand calls to vgic_init() for GICv3.  For GICv3,
->    the only valid call to vgic_init() should be from the new device
->    control ioctl, and all other paths that rely on vgic_init() must
->    fail.
-> 
-> 4. Resubmit a new (and hopefully final) version of the series soon after
->    the merge window closes.
-> 
-> Then we'll queue this in kvmarm/next early so that we have time to test
-> it and expose it to a wider audience.
+>>
+>> The comment should be added to where the pinctrl bits are, not to the lime2
+>> file, ps0 will conflict with hdmi on all boards.
+>
+> Well, In that case,PS2_0 pins conflicts with HDMI, PS2_1 pins
+> conflicts with LCD. Every pin has multiplexing.
 
-Alright, thanks for that, sounds like a plan. I will try my best to do
-the rebasing this week still, so that the new series arrives as early as
-possible after -rc1.
+Almost every A10 board has a hdmi connector, and only the hdmi ddc pins
+are multiplexed, so this is sort of special, but yes if we do not have
+the commented nodes in the dts file, then this comment can be dropped too
+I guess.
 
-Cheers,
-Andre.
+Regards,
+
+Hans
