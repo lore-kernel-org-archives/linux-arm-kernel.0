@@ -1,30 +1,43 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 15 Dec 2014 16:48:08 +0100
-Subject: [RFC PATCH 0/6] Those patches is used for dw_hdmi audio.
-In-Reply-To: <20141215120013.GH11285@n2100.arm.linux.org.uk>
-References: <1418609494-15820-1-git-send-email-ykk@rock-chips.com>
- <20141215103830.GD11285@n2100.arm.linux.org.uk>
- <548EC9E1.5040206@rock-chips.com> <548ECB66.70004@rock-chips.com>
- <20141215120013.GH11285@n2100.arm.linux.org.uk>
-Message-ID: <20141215164808.092cc7ac@armhf>
+From: w@1wt.eu (Willy Tarreau)
+Date: Mon, 15 Dec 2014 16:53:10 +0100
+Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
+ tree under GPLv2+/X11
+In-Reply-To: <1418657915-22775-25-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-24-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-19-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-25-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-24-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-19-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20141215155310.GD28701@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Dec 2014 12:00:13 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Mon, Dec 15, 2014 at 04:38:16PM +0100, Gregory CLEMENT wrote:
+> The current GPL only licensing on the device tree makes it very
+> impractical for other software components licensed under another
+> license.
+> 
+> In order to make it easier for them to reuse our device trees,
+> relicense our device trees under a GPL/X11 dual-license.
+> 
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Arnaud Ebalard <arno@natisbad.org>
+> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: Greg Ungerer <gerg@uclinux.org>
+> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> Cc: Simon Baatz <gmbnomis@gmail.com>
+> Cc: Simon Guinot <simon.guinot@sequanux.org>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Willy Tarreau <w@1wt.eu>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-> I really don't want to end up in another cocked up situation like
-> what happened with the Dove audio, where it became politically
-> impossible for the SolidRun platform to be properly supported by
-> mainline kernels.
-
-Hi Russell,
-
-I don't see what you mean. The last patches I proposed for the TDA998x
-and the HDMI CODEC do exactly what you wanted: S/PDIF out from the
-kirkwood audio device towards both S/PDIF optical and HDMI output2 by
-default.
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Acked-by: Willy Tarreau <w@1wt.eu>
