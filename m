@@ -1,29 +1,81 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Dec 2014 15:38:04 +0000
-Subject: [PATCH] iommu/exynos: Fix arm64 allmodconfig build
-In-Reply-To: <20141215153529.GC11764@sirena.org.uk>
-References: <1418648413-32013-1-git-send-email-broonie@kernel.org>
- <548EDDCD.4060203@samsung.com>
- <20141215153529.GC11764@sirena.org.uk>
-Message-ID: <20141215153804.GK20738@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 15 Dec 2014 16:38:10 +0100
+Subject: [PATCH 02/27] ARM: mvebu: armada-370: Relicense the device tree under
+ GPLv2+/X11
+In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1418657915-22775-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 03:35:29PM +0000, Mark Brown wrote:
-> On Mon, Dec 15, 2014 at 02:10:37PM +0100, Krzysztof Koz?owski wrote:
-> > Few days ago I posted similar patch:
-> > https://lkml.org/lkml/2014/12/5/268
-> > but no one have picked it up.
-> 
-> > Anyway the fix of yours seems fine to me.
-> 
-> I don't mind either way, it just seemed to be easier to report the bug
-> with a patch.  If Jeorg is busy perhaps it can go via the arm64 tree,
-> the issue is triggered by the addition of the platform there?
+The current GPL only licensing on the device tree makes it very
+impractical for other software components licensed under another
+license.
 
-Can I pass the buck to arm-soc, as they're handling arm64 platform code?
+In order to make it easier for them to reuse our device trees,
+relicense our device trees under a GPL/X11 dual-license.
 
-It seems sensible to merge the fix via the same tree that introduced the
-breakage.
+Cc: Arnaud Ebalard <arno@natisbad.org>
+Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Ryan Press <ryan@presslab.us>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370.dtsi | 40 ++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 37 insertions(+), 3 deletions(-)
 
-Will
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index fdb3c12a6139..27397f151def 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -7,9 +7,43 @@
+  * Gregory CLEMENT <gregory.clement@free-electrons.com>
+  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+  *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
+  *
+  * Contains definitions specific to the Armada 370 SoC that are not
+  * common to all Armada SoCs.
+-- 
+1.9.1
