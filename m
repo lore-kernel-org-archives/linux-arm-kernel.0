@@ -1,17 +1,18 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Dec 2014 17:10:13 +0000
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 15 Dec 2014 19:16:50 +0200
 Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
  of_dma_configure
-In-Reply-To: <1427076.5uVd9K6nak@avalon>
+In-Reply-To: <20141215164041.GN20738@arm.com>
 References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <20141210150853.GH23639@arm.com> <6860089.2Ca399bIPK@avalon>
- <1427076.5uVd9K6nak@avalon>
-Message-ID: <20141215171013.GO20738@arm.com>
+ <6860089.2Ca399bIPK@avalon> <20141215164041.GN20738@arm.com>
+Message-ID: <1612493.xCj1Tx0M4k@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 14, 2014 at 03:59:38PM +0000, Laurent Pinchart wrote:
-> On Sunday 14 December 2014 17:49:34 Laurent Pinchart wrote:
+Hi Will,
+
+On Monday 15 December 2014 16:40:41 Will Deacon wrote:
+> On Sun, Dec 14, 2014 at 03:49:34PM +0000, Laurent Pinchart wrote:
 > > On Wednesday 10 December 2014 15:08:53 Will Deacon wrote:
 > > > On Wed, Dec 10, 2014 at 02:52:56PM +0000, Rob Clark wrote:
 > > > > so, what is the way for a driver that explicitly wants to manage it's
@@ -27,47 +28,73 @@ On Sun, Dec 14, 2014 at 03:59:38PM +0000, Laurent Pinchart wrote:
 > > 
 > > I'm wondering if it's such an exotic case after all. I can see two reasons
 > > not to use the default domain. In addition to special requirements coming
-> > from the bus master side, the IOMMU itself might not support one domain per
-> > bus master (I'm of course raising the issue from a very selfish Renesas
-> > IPMMU point of view).
-> > 
-> > In that case the IOMMU driver can still detach the device from the default
-> > domain in the .of_xlate() callback and attach it to its private domain.
+> > from the bus master side, the IOMMU itself might not support one domain
+> > per bus master (I'm of course raising the issue from a very selfish
+> > Renesas IPMMU point of view).
 > 
-> I actually spoke too fast, the .of_xlate() callback is called before 
-> arch_setup_dma_ops(). The operation could be performed in the .add_device() 
-> callback. I'm having trouble understanding how you envision .add_device, 
-> .remove_device and .of_xlate working together in the DT case. Could you please 
-> detail what you think each callback should be responsible of exactly ?
+> Do you mean that certain masters must be grouped into the same domain, or
+> that the IOMMU can fail with -ENOSPC?
 
-I think the sequence goes something like:
+My IOMMU has hardware supports for 4 domains, and serves N masters (where N is 
+dependent on the SoC but is > 4). In its current form the driver supports a 
+single domain and thus detaches devices from the default domain in the 
+add_device callback:
 
+http://git.linuxtv.org/cgit.cgi/pinchartl/fbdev.git/tree/drivers/iommu/ipmmu-vmsa.c?h=iommu/devel/arm-lpae
 
-1: of_iommu_init: early initialisiation of IOMMU driver, stashes its private
-                  data via of_iommu_set_ops
+	/*
+	 * Detach the device from the default ARM VA mapping and attach it to
+	 * our private mapping.
+	 */
+	arm_iommu_detach_device(dev);
+	ret = arm_iommu_attach_device(dev, mmu->mapping);
+	if (ret < 0) {
+		dev_err(dev, "Failed to attach device to VA mapping\n");
+		return ret;
+	}
 
-2: ->of_xlate: called for each master upstream of the IOMMU before the master
-               has probed. Passes back the DT info, which can be used to
-	       get hold of the private data from earlier. Per-device data
-	       can be stored in archdata.iommu (but I'd like to change this,
-	       see below).
+I would have implemented that in the of_xlate callback, but that's too early 
+as the ARM default domain isn't created yet@that point.
 
-3. ->domain_init: called from dma-mapping to create default domain (this
-                  should be replaced by ->get_default_domain in future).
+Using a single domain is a bit of a waste of resources in my case, so an 
+evolution would be to create four domains and assign devices to them based on 
+a policy. The policy could be fixed (round-robin for instance), or 
+configurable (possibly through DT, although it's really a policy, not a 
+hardware description).
 
-3. ->attach_device: called by dma-mapping to attach device to the default
-                    domain
+> For the former, we need a way to represent IOMMU groups for the platform
+> bus.
 
-4. ->add_device: called just before the master is probed
+To be honest I'm not entirely sure how IOMMU groups are supposed to be used. I 
+understand they can be used by VFIO to group several masters that will be able 
+to see each other's memory through the same page table, and also that a page 
+table could be shared between multiple groups. When it comes to group 
+creation, though, things get fuzzy. I started with creating one group per 
+master in my driver, which is probably not the thing to do. The Exynos IOMMU 
+driver used to do the same, until Marek's patch series converting it to DT-
+based instantiation (on top of your patch set) has removed groups altogether. 
+Groups seem to be more or less optional, except in a couple of places (for 
+instance the remove_device callback will not be called by the 
+BUS_NOTIFY_DEL_DEVICE notifier if the device isn't part of an iommu group).
 
+I'd appreciate if someone could clarify this to help me make an informed 
+opinion on the topic.
 
-Now, the thing missing here is the instantiation of iommu_groups. They
-require a fully initialised struct device because of some sysfs magic
-that goes on in iommu_group_add_device. The questions I have are:
+> For the latter, we should have a per-IOMMU default domain instead of
+> creating one per master as we currently do for ARM.
+> 
+> Joerg has talked about adding a ->get_default_domain callback to the IOMMU
+> layer, but I've not seen any code and my attempt at using it also got
+> pretty complicated:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304076.
+> html
 
-  - How should we describe/create iommu_groups for platform devices?
+Thank you for the pointer. I'll reply to the patch.
 
-  - When do the groups actually need to be initialised (currently likely
-    to be in add_device).
+> Marek also said he might be taking a look.
 
-Will
+-- 
+Regards,
+
+Laurent Pinchart
