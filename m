@@ -1,15 +1,15 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 15 Dec 2014 19:33:49 +0100
-Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
+Date: Mon, 15 Dec 2014 19:35:40 +0100
+Subject: [PATCH 22/27] ARM: mvebu: armada-xp-mv78230: Relicense the
+ device tree under GPLv2+/X11
+In-Reply-To: <1418657915-22775-23-git-send-email-gregory.clement@free-electrons.com>
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20141215183349.GB30741@lunn.ch>
+ <1418657915-22775-23-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20141215183540.GC30741@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 04:38:16PM +0100, Gregory CLEMENT wrote:
+On Mon, Dec 15, 2014 at 04:38:30PM +0100, Gregory CLEMENT wrote:
 > The current GPL only licensing on the device tree makes it very
 > impractical for other software components licensed under another
 > license.
@@ -23,27 +23,21 @@ Acked-by: Andrew Lunn <andrew@lunn.ch>
 
 > Cc: Arnaud Ebalard <arno@natisbad.org>
 > Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Greg Ungerer <gerg@uclinux.org>
-> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
 > Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> Cc: Simon Baatz <gmbnomis@gmail.com>
-> Cc: Simon Guinot <simon.guinot@sequanux.org>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Willy Tarreau <w@1wt.eu>
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
->  arch/arm/boot/dts/armada-370-xp.dtsi | 40 +++++++++++++++++++++++++++++++++---
+>  arch/arm/boot/dts/armada-xp-mv78230.dtsi | 40 +++++++++++++++++++++++++++++---
 >  1 file changed, 37 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 1af428602748..8a322ad57e5f 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -8,9 +8,43 @@
+> diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+> index 281ccd24295c..6e6d0f04bf2b 100644
+> --- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+> @@ -5,9 +5,43 @@
+>   *
 >   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->   * Ben Dooks <ben.dooks@codethink.co.uk>
 >   *
 > - * This file is licensed under the terms of the GNU General Public
 > - * License version 2.  This program is licensed "as is" without any
@@ -86,8 +80,8 @@ Acked-by: Andrew Lunn <andrew@lunn.ch>
 > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 > + *     OTHER DEALINGS IN THE SOFTWARE.
 >   *
->   * This file contains the definitions that are common to the Armada
->   * 370 and Armada XP SoC.
+>   * Contains definitions specific to the Armada XP MV78230 SoC that are not
+>   * common to all Armada XP SoCs.
 > -- 
 > 1.9.1
 > 
