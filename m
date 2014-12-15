@@ -1,170 +1,423 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Sun, 14 Dec 2014 23:28:08 -0800
-Subject: [PATCH v15 11/11] KVM: arm/arm64: Add support to dissolve huge PUD
-In-Reply-To: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
-References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1418628488-3696-12-git-send-email-m.smarduch@samsung.com>
+From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
+Date: Mon, 15 Dec 2014 15:30:35 +0800
+Subject: [PATCH v2 4/4] mmc: sdhci: host: add new f_sdh30
+In-Reply-To: <1418628635-3436-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1418628635-3436-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <1418628635-3436-5-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the same support for PUD huge page as for PMD. Huge PUD is 
-write protected for initial memory region write protection. Code to dissolve 
-huge PUD is supported in user_mem_abort(). At this time this code has not been 
-tested, but similar approach to current ARMv8 page logging test is in work,
-limiting kernel memory and mapping in 1 or 2GB into Guest address space on a 
-4k page/48 bit host, some host kernel test code needs to be added to detect
-page fault to this region and side step general processing. Also similar to 
-PMD case all pages in range are marked dirty when PUD entry is cleared.
+This patch adds new host controller driver for
+Fujitsu SDHCI controller f_sdh30.
 
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+Signed-off-by: Andy Green <andy.green@linaro.org>
+Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+Signed-off-by: Tetsuya Takinishi <t.takinishi@jp.fujitsu.com>
 ---
- arch/arm/include/asm/kvm_mmu.h         |  8 +++++
- arch/arm/kvm/mmu.c                     | 64 ++++++++++++++++++++++++++++++++--
- arch/arm64/include/asm/kvm_mmu.h       |  9 +++++
- arch/arm64/include/asm/pgtable-hwdef.h |  3 ++
- 4 files changed, 81 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/mmc/sdhci-fujitsu.txt      |  35 +++
+ drivers/mmc/host/Kconfig                           |   8 +
+ drivers/mmc/host/Makefile                          |   1 +
+ drivers/mmc/host/sdhci_f_sdh30.c                   | 319 +++++++++++++++++++++
+ 4 files changed, 363 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
+ create mode 100644 drivers/mmc/host/sdhci_f_sdh30.c
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index dda0046..703d04d 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -133,6 +133,14 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
- 	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
- }
+diff --git a/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt b/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
+new file mode 100644
+index 0000000..d1a50f1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
+@@ -0,0 +1,35 @@
++* Fujitsu SDHCI controller
++
++This file documents differences between the core properties in mmc.txt
++and the properties used by the sdhci_f_sdh30 driver.
++
++Required properties:
++- compatible: "fujitsu,mb86s70-sdhci-3.0"
++- voltage-ranges : This is a list of pairs. In each pair, two cells
++  are required. First cell specifies minimum slot voltage (mV), second
++  cell specifies maximum slot voltage (mV). In case of supported voltage
++  range is discontinuous, several ranges could be specified as a list.
++
++Optional properties:
++- vqmmc-supply: phandle to the regulator device tree node, mentioned
++  as the VCCQ/VDD_IO supply in the eMMC/SD specs.
++- clocks: Must contain an entry for each entry in clock-names. It is a
++  list of phandles and clock-specifier pairs.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names: Should contain the following two entries:
++	"iface" - clock used for sdhci interface
++	"core"  - core clock for sdhci controller
++
++Example:
++
++	sdhci1: mmc at 36600000 {
++		compatible = "fujitsu,mb86s70-sdhci-3.0";
++		reg = <0 0x36600000 0x1000>;
++		interrupts = <0 172 0x4>,
++			     <0 173 0x4>;
++		voltage-ranges = <1800 1800>, <3300 3300>;
++		bus-width = <4>;
++		vqmmc-supply = <&vccq_sdhci1>;
++		clocks = <&clock 2 2 0>, <&clock 2 3 0>;
++		clock-names = "iface", "core";
++	};
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 2d6fbdd..288dcc3 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -290,6 +290,14 @@ config MMC_SDHCI_BCM2835
+ 	  This selects the BCM2835 SD/MMC controller. If you have a BCM2835
+ 	  platform with SD or MMC devices, say Y or M here.
  
-+static inline void kvm_set_s2pud_readonly(pud_t *pud)
-+{
-+}
-+
-+static inline bool kvm_s2pud_readonly(pud_t *pud)
-+{
-+	return false;
-+}
++config MMC_SDHCI_F_SDH30
++	tristate "SDHCI support for Fujitsu Semiconductor F_SDH30"
++	depends on MMC_SDHCI_PLTFM
++	depends on OF
++	help
++	  This selects the Secure Digital Host Controller Interface (SDHCI)
++	  Needed by some Fujitsu SoC for MMC / SD / SDIO support.
++	  If you have a controller with this interface, say Y or M here.
+ 	  If unsure, say N.
  
- /* Open coded p*d_addr_end that can deal with 64bit addresses */
- #define kvm_pgd_addr_end(addr, end)					\
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 59003df..35840fb 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -109,6 +109,55 @@ void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
- 	}
- }
- 
-+/**
-+  * stage2_find_pud() - find a PUD entry
-+  * @kvm:	pointer to kvm structure.
-+  * @addr:	IPA address
-+  *
-+  * Return address of PUD entry or NULL if not allocated.
-+  */
-+static pud_t *stage2_find_pud(struct kvm *kvm, phys_addr_t addr)
-+{
-+	pgd_t *pgd;
-+
-+	pgd = kvm->arch.pgd + pgd_index(addr);
-+	if (pgd_none(*pgd))
-+		return NULL;
-+
-+	return pud_offset(pgd, addr);
-+}
-+
-+/**
-+ * stage2_dissolve_pud() - clear and flush huge PUD entry
-+ * @kvm:	pointer to kvm structure.
-+ * @addr	IPA
+ config MMC_MOXART
+diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+index f7b0a77..6a7cfe0 100644
+--- a/drivers/mmc/host/Makefile
++++ b/drivers/mmc/host/Makefile
+@@ -16,6 +16,7 @@ obj-$(CONFIG_MMC_SDHCI_PXAV3)	+= sdhci-pxav3.o
+ obj-$(CONFIG_MMC_SDHCI_PXAV2)	+= sdhci-pxav2.o
+ obj-$(CONFIG_MMC_SDHCI_S3C)	+= sdhci-s3c.o
+ obj-$(CONFIG_MMC_SDHCI_SIRF)   	+= sdhci-sirf.o
++obj-$(CONFIG_MMC_SDHCI_F_SDH30)	+= sdhci_f_sdh30.o
+ obj-$(CONFIG_MMC_SDHCI_SPEAR)	+= sdhci-spear.o
+ obj-$(CONFIG_MMC_WBSD)		+= wbsd.o
+ obj-$(CONFIG_MMC_AU1X)		+= au1xmmc.o
+diff --git a/drivers/mmc/host/sdhci_f_sdh30.c b/drivers/mmc/host/sdhci_f_sdh30.c
+new file mode 100644
+index 0000000..76df115
+--- /dev/null
++++ b/drivers/mmc/host/sdhci_f_sdh30.c
+@@ -0,0 +1,319 @@
++/*
++ * linux/drivers/mmc/host/sdhci_f_sdh30.c
 + *
-+ * Function clears a PUD entry, flushes addr 1st and 2nd stage TLBs. Marks all
-+ * pages in the range dirty.
++ * Copyright (C) 2013 - 2014 Fujitsu Semiconductor, Ltd
++ *              Vincent Yang <vincent.yang@tw.fujitsu.com>
++ * Copyright (C) 2014 Linaro Ltd  Andy Green <andy.green@linaro.org>
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, version 2 of the License.
 + */
-+void stage2_dissolve_pud(struct kvm *kvm, phys_addr_t addr)
-+{
-+	pud_t *pud;
-+	gfn_t gfn;
-+	long i;
 +
-+	pud = stage2_find_pud(kvm, addr);
-+	if (pud && !pud_none(*pud) && kvm_pud_huge(*pud)) {
-+		pud_clear(pud);
-+		kvm_tlb_flush_vmid_ipa(kvm, addr);
-+		put_page(virt_to_page(pud));
-+#ifdef CONFIG_SMP
-+		gfn = (addr & PUD_MASK) >> PAGE_SHIFT;
-+		/*
-+		 * Mark all pages in PUD range dirty, in case other
-+		 * CPUs are  writing to it.
-+		 */
-+		for (i = 0; i < PTRS_PER_PUD * PTRS_PER_PMD; i++)
-+			mark_page_dirty(kvm, gfn + i);
-+#endif
++#include <linux/err.h>
++#include <linux/delay.h>
++#include <linux/module.h>
++#include <linux/mmc/sd.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/card.h>
++#include <linux/gpio.h>
++#include <linux/of_gpio.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/pm.h>
++#include <linux/pm_runtime.h>
++#include <linux/suspend.h>
++
++#include "sdhci.h"
++#include "sdhci-pltfm.h"
++
++/* F_SDH30 extended Controller registers */
++#define F_SDH30_AHB_CONFIG		0x100
++#define  F_SDH30_AHB_BIGED		0x00000040
++#define  F_SDH30_BUSLOCK_DMA		0x00000020
++#define  F_SDH30_BUSLOCK_EN		0x00000010
++#define  F_SDH30_SIN			0x00000008
++#define  F_SDH30_AHB_INCR_16		0x00000004
++#define  F_SDH30_AHB_INCR_8		0x00000002
++#define  F_SDH30_AHB_INCR_4		0x00000001
++
++#define F_SDH30_TUNING_SETTING		0x108
++#define  F_SDH30_CMD_CHK_DIS		0x00010000
++
++#define F_SDH30_IO_CONTROL2		0x114
++#define  F_SDH30_CRES_O_DN		0x00080000
++#define  F_SDH30_MSEL_O_1_8		0x00040000
++
++#define F_SDH30_ESD_CONTROL		0x124
++#define  F_SDH30_EMMC_RST		0x00000002
++#define  F_SDH30_EMMC_HS200		0x01000000
++
++#define F_SDH30_CMD_DAT_DELAY		0x200
++
++#define F_SDH30_MIN_CLOCK		400000
++
++struct f_sdhost_priv {
++	struct clk *clk_iface;
++	struct clk *clk;
++	u32 vendor_hs200;
++	struct device *dev;
++};
++
++void sdhci_f_sdh30_soft_voltage_switch(struct sdhci_host *host)
++{
++	struct f_sdhost_priv *priv = sdhci_priv(host);
++	u32 ctrl = 0;
++
++	usleep_range(2500, 3000);
++	ctrl = sdhci_readl(host, F_SDH30_IO_CONTROL2);
++	ctrl |= F_SDH30_CRES_O_DN;
++	sdhci_writel(host, ctrl, F_SDH30_IO_CONTROL2);
++	ctrl |= F_SDH30_MSEL_O_1_8;
++	sdhci_writel(host, ctrl, F_SDH30_IO_CONTROL2);
++
++	ctrl &= ~F_SDH30_CRES_O_DN;
++	sdhci_writel(host, ctrl, F_SDH30_IO_CONTROL2);
++	usleep_range(2500, 3000);
++
++	if (priv->vendor_hs200) {
++		dev_info(priv->dev, "%s: setting hs200\n", __func__);
++		ctrl = sdhci_readl(host, F_SDH30_ESD_CONTROL);
++		ctrl |= priv->vendor_hs200;
++		sdhci_writel(host, ctrl, F_SDH30_ESD_CONTROL);
 +	}
++
++	ctrl = sdhci_readl(host, F_SDH30_TUNING_SETTING);
++	ctrl |= F_SDH30_CMD_CHK_DIS;
++	sdhci_writel(host, ctrl, F_SDH30_TUNING_SETTING);
 +}
 +
- static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
- 				  int min, int max)
- {
-@@ -761,6 +810,13 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 	unsigned long iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
- 	unsigned long logging_active = flags & KVM_S2PTE_FLAG_LOGGING_ACTIVE;
- 
-+	/*
-+	 * While dirty page logging - dissolve huge PUD, then continue on to
-+	 * allocate page.
-+	 */
-+	if (logging_active)
-+		stage2_dissolve_pud(kvm, addr);
-+
- 	/* Create stage-2 page table mapping - Levels 0 and 1 */
- 	pmd = stage2_get_pmd(kvm, cache, addr);
- 	if (!pmd) {
-@@ -964,9 +1020,11 @@ static void  stage2_wp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
- 	do {
- 		next = kvm_pud_addr_end(addr, end);
- 		if (!pud_none(*pud)) {
--			/* TODO:PUD not supported, revisit later if supported */
--			BUG_ON(kvm_pud_huge(*pud));
--			stage2_wp_pmds(pud, addr, next);
-+			if (kvm_pud_huge(*pud)) {
-+				if (!kvm_s2pud_readonly(pud))
-+					kvm_set_s2pud_readonly(pud);
-+			} else
-+				stage2_wp_pmds(pud, addr, next);
- 		}
- 	} while (pud++, addr = next, addr != end);
- }
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index f925e40..3b692c5 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -137,6 +137,15 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
- 	return (pmd_val(*pmd) & PMD_S2_RDWR) == PMD_S2_RDONLY;
- }
- 
-+static inline void kvm_set_s2pud_readonly(pud_t *pud)
++unsigned int sdhci_f_sdh30_get_min_clock(struct sdhci_host *host)
 +{
-+	pud_val(*pud) = (pud_val(*pud) & ~PUD_S2_RDWR) | PUD_S2_RDONLY;
++	return F_SDH30_MIN_CLOCK;
 +}
 +
-+static inline bool kvm_s2pud_readonly(pud_t *pud)
++void sdhci_f_sdh30_reset(struct sdhci_host *host, u8 mask)
 +{
-+	return (pud_val(*pud) & PUD_S2_RDWR) == PUD_S2_RDONLY;
-+}
- 
- #define kvm_pgd_addr_end(addr, end)	pgd_addr_end(addr, end)
- #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 5f930cc..1714c84 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -122,6 +122,9 @@
- #define PMD_S2_RDONLY		(_AT(pmdval_t, 1) << 6)   /* HAP[2:1] */
- #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
- 
-+#define PUD_S2_RDONLY		(_AT(pudval_t, 1) << 6)   /* HAP[2:1] */
-+#define PUD_S2_RDWR		(_AT(pudval_t, 3) << 6)   /* HAP[2:1] */
++	if (sdhci_readw(host, SDHCI_CLOCK_CONTROL) == 0)
++		sdhci_writew(host, 0xBC01, SDHCI_CLOCK_CONTROL);
 +
- /*
-  * Memory Attribute override for Stage-2 (MemAttr[3:0])
-  */
++	sdhci_reset(host, mask);
++}
++
++static const struct sdhci_ops sdhci_f_sdh30_ops = {
++	.voltage_switch = sdhci_f_sdh30_soft_voltage_switch,
++	.get_min_clock = sdhci_f_sdh30_get_min_clock,
++	.reset = sdhci_f_sdh30_reset,
++	.set_clock = sdhci_set_clock,
++	.set_bus_width = sdhci_set_bus_width,
++	.set_uhs_signaling = sdhci_set_uhs_signaling,
++};
++
++static int sdhci_f_sdh30_probe(struct platform_device *pdev)
++{
++	struct sdhci_host *host;
++	struct device *dev = &pdev->dev;
++	int irq, ctrl = 0, ret = 0;
++	struct f_sdhost_priv *priv;
++	u32 reg = 0;
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(dev, "%s: no irq specified\n", __func__);
++		ret = irq;
++		goto err;
++	}
++
++	host = sdhci_alloc_host(dev, sizeof(struct sdhci_host) +
++						sizeof(struct f_sdhost_priv));
++	if (IS_ERR(host)) {
++		dev_err(dev, "%s: host allocate error\n", __func__);
++		ret = -ENOMEM;
++		goto err;
++	}
++	priv = sdhci_priv(host);
++	priv->dev = dev;
++
++	host->quirks = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC |
++		       SDHCI_QUIRK_INVERTED_WRITE_PROTECT;
++	host->quirks2 = SDHCI_QUIRK2_SUPPORT_SINGLE |
++			SDHCI_QUIRK2_TUNING_WORK_AROUND;
++
++	ret = mmc_of_parse(host->mmc);
++	if (ret)
++		goto err_of_parse;
++
++	ret = mmc_of_parse_voltage(pdev->dev.of_node, &host->ocr_mask);
++	if (ret)
++		goto err_of_parse;
++
++	platform_set_drvdata(pdev, host);
++
++	sdhci_get_of_property(pdev);
++	host->hw_name = "f_sdh30";
++	host->ops = &sdhci_f_sdh30_ops;
++	host->irq = irq;
++
++	host->ioaddr = of_iomap(pdev->dev.of_node, 0);
++	if (!host->ioaddr) {
++		dev_err(dev, "%s: failed to remap registers\n", __func__);
++		ret = -ENXIO;
++		goto err_remap;
++	}
++
++	priv->clk_iface = clk_get(&pdev->dev, "iface");
++	if (!IS_ERR(priv->clk_iface)) {
++		ret = clk_prepare_enable(priv->clk_iface);
++		if (ret < 0) {
++			dev_err(dev, "Failed to enable iface clock: %d\n", ret);
++			goto err_clk1;
++		}
++	}
++	priv->clk = clk_get(&pdev->dev, "core");
++	if (!IS_ERR(priv->clk)) {
++		ret = clk_prepare_enable(priv->clk);
++		if (ret < 0) {
++			dev_err(dev, "Failed to enable core clock: %d\n", ret);
++			goto err_clk2;
++		}
++	}
++
++#ifdef CONFIG_PM_RUNTIME
++	pm_runtime_set_active(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (ret < 0)
++		dev_err(dev, "Failed to pm_runtime_get_sync: %d\n", ret);
++#endif
++
++	ret = sdhci_add_host(host);
++	if (ret) {
++		dev_err(dev, "%s: host add error\n", __func__);
++		goto err_add_host;
++	}
++
++	/* init vendor specific regs */
++	ctrl = sdhci_readw(host, F_SDH30_AHB_CONFIG);
++	ctrl |= F_SDH30_SIN | F_SDH30_AHB_INCR_16 | F_SDH30_AHB_INCR_8 |
++		F_SDH30_AHB_INCR_4;
++	ctrl &= ~(F_SDH30_AHB_BIGED | F_SDH30_BUSLOCK_EN);
++	sdhci_writew(host, ctrl, F_SDH30_AHB_CONFIG);
++
++	reg = sdhci_readl(host, F_SDH30_ESD_CONTROL);
++	sdhci_writel(host, reg & ~F_SDH30_EMMC_RST, F_SDH30_ESD_CONTROL);
++	msleep(20);
++	sdhci_writel(host, reg | F_SDH30_EMMC_RST, F_SDH30_ESD_CONTROL);
++
++	reg = sdhci_readl(host, SDHCI_CAPABILITIES);
++	if (reg & SDHCI_CAN_DO_8BIT)
++		priv->vendor_hs200 = F_SDH30_EMMC_HS200;
++	else
++		priv->vendor_hs200 = 0;
++
++	return 0;
++
++err_add_host:
++	clk_put(priv->clk);
++err_clk2:
++	clk_put(priv->clk_iface);
++err_clk1:
++	iounmap(host->ioaddr);
++err_remap:
++err_of_parse:
++	sdhci_free_host(host);
++err:
++	return ret;
++}
++
++static int sdhci_f_sdh30_remove(struct platform_device *pdev)
++{
++	struct sdhci_host *host = platform_get_drvdata(pdev);
++	struct f_sdhost_priv *priv = sdhci_priv(host);
++	struct resource *iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++
++	sdhci_remove_host(host, readl(host->ioaddr + SDHCI_INT_STATUS) ==
++			  0xffffffff);
++	iounmap(host->ioaddr);
++	release_mem_region(iomem->start, resource_size(iomem));
++
++	clk_disable_unprepare(priv->clk_iface);
++	clk_disable_unprepare(priv->clk);
++
++	clk_put(priv->clk);
++	clk_put(priv->clk_iface);
++
++	sdhci_free_host(host);
++	platform_set_drvdata(pdev, NULL);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int sdhci_f_sdh30_suspend(struct device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
++
++	return sdhci_suspend_host(host);
++}
++
++static int sdhci_f_sdh30_resume(struct device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
++
++	return sdhci_resume_host(host);
++}
++#endif
++
++#ifdef CONFIG_PM_RUNTIME
++static int sdhci_f_sdh30_runtime_suspend(struct device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
++
++	return sdhci_runtime_suspend_host(host);
++}
++
++static int sdhci_f_sdh30_runtime_resume(struct device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
++
++	return sdhci_runtime_resume_host(host);
++}
++#endif
++
++#ifdef CONFIG_PM
++static const struct dev_pm_ops sdhci_f_sdh30_pmops = {
++	SET_SYSTEM_SLEEP_PM_OPS(sdhci_f_sdh30_suspend, sdhci_f_sdh30_resume)
++	SET_RUNTIME_PM_OPS(sdhci_f_sdh30_runtime_suspend,
++			   sdhci_f_sdh30_runtime_resume, NULL)
++};
++
++#define SDHCI_F_SDH30_PMOPS (&sdhci_f_sdh30_pmops)
++
++#else
++#define SDHCI_F_SDH30_PMOPS NULL
++#endif
++
++static const struct of_device_id f_sdh30_dt_ids[] = {
++	{ .compatible = "fujitsu,mb86s70-sdhci-3.0" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, f_sdh30_dt_ids);
++
++static struct platform_driver sdhci_f_sdh30_driver = {
++	.driver = {
++		.name = "f_sdh30",
++		.of_match_table = f_sdh30_dt_ids,
++#ifdef CONFIG_PM_SLEEP
++		.pm	= SDHCI_F_SDH30_PMOPS,
++#endif
++	},
++	.probe	= sdhci_f_sdh30_probe,
++	.remove	= sdhci_f_sdh30_remove,
++};
++
++module_platform_driver(sdhci_f_sdh30_driver);
++
++MODULE_DESCRIPTION("F_SDH30 SD Card Controller driver");
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("FUJITSU SEMICONDUCTOR LTD.");
++MODULE_ALIAS("platform:f_sdh30");
 -- 
-1.9.1
+1.9.0
