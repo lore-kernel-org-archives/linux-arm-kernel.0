@@ -1,39 +1,32 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Dec 2014 15:54:42 +0000
+Date: Mon, 15 Dec 2014 15:56:15 +0000
 Subject: [PATCH] iommu/exynos: Fix arm64 allmodconfig build
-Message-ID: <1418658882-14809-1-git-send-email-broonie@kernel.org>
+In-Reply-To: <20141215153804.GK20738@arm.com>
+References: <1418648413-32013-1-git-send-email-broonie@kernel.org>
+ <548EDDCD.4060203@samsung.com>
+ <20141215153529.GC11764@sirena.org.uk>
+ <20141215153804.GK20738@arm.com>
+Message-ID: <20141215155615.GD11764@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos IOMMU driver uses the ARM specific dmac_flush_range() and
-outer_flush_range() functions. This breaks the build on arm64 allmodconfig
-in -next since support has been merged for some Exynos ARMv8 SoCs. Add a
-dependency on ARM to keep things building until either the driver has the
-ARM dependencies removed or the ARMv8 architecture code implements these
-ARM specific APIs.
+On Mon, Dec 15, 2014 at 03:38:04PM +0000, Will Deacon wrote:
+> On Mon, Dec 15, 2014 at 03:35:29PM +0000, Mark Brown wrote:
 
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
+> > I don't mind either way, it just seemed to be easier to report the bug
+> > with a patch.  If Jeorg is busy perhaps it can go via the arm64 tree,
+> > the issue is triggered by the addition of the platform there?
 
-Resending to the arm-soc people since the addition of the Exynos
-platform for ARMv8 went via them, Krzysztof also sent a fix for this
-earlier but it there's been no response.
+> Can I pass the buck to arm-soc, as they're handling arm64 platform code?
 
- drivers/iommu/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> It seems sensible to merge the fix via the same tree that introduced the
+> breakage.
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 01e8bfae569b..325188eef1c1 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -187,7 +187,7 @@ config TEGRA_IOMMU_SMMU
- 
- config EXYNOS_IOMMU
- 	bool "Exynos IOMMU Support"
--	depends on ARCH_EXYNOS
-+	depends on ARCH_EXYNOS && ARM
- 	select IOMMU_API
- 	select ARM_DMA_USE_IOMMU
- 	help
--- 
-2.1.3
+Sure, just resending to them...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141215/e01a2f66/attachment.sig>
