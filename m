@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Dec 2014 16:38:11 +0100
-Subject: [PATCH 03/27] ARM: mvebu: armada-370-mirabox: Relicense the device
- tree under GPLv2+/X11
+Date: Mon, 15 Dec 2014 16:38:22 +0100
+Subject: [PATCH 14/27] ARM: mvebu: armada-385-rd: Relicense the device tree
+ under GPLv2+/X11
 In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1418657915-22775-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1418657915-22775-15-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,24 +15,19 @@ license.
 In order to make it easier for them to reuse our device trees,
 relicense our device trees under a GPL/X11 dual-license.
 
-Cc: Arnaud Ebalard <arno@natisbad.org>
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Ryan Press <ryan@presslab.us>
-Cc: Simon Baatz <gmbnomis@gmail.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-mirabox.dts | 40 +++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-385-rd.dts | 40 ++++++++++++++++++++++++++++++++++---
  1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index e1b0eb6b091f..b10ceb488efe 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -3,9 +3,43 @@
-  *
+diff --git a/arch/arm/boot/dts/armada-385-rd.dts b/arch/arm/boot/dts/armada-385-rd.dts
+index aaca2861dc87..8f1487384fd1 100644
+--- a/arch/arm/boot/dts/armada-385-rd.dts
++++ b/arch/arm/boot/dts/armada-385-rd.dts
+@@ -7,9 +7,43 @@
   * Gregory CLEMENT <gregory.clement@free-electrons.com>
+  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
   *
 - * This file is licensed under the terms of the GNU General Public
 - * License version 2.  This program is licensed "as is" without any
