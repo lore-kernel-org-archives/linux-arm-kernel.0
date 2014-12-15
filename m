@@ -1,289 +1,121 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 15 Dec 2014 11:30:28 +0100
-Subject: [RFC PATCHv2 1/7] devfreq: event: Add new devfreq_event class to
- provide basic data for devfreq governor
-In-Reply-To: <548A643D.10508@samsung.com>
-References: <1418134386-14681-1-git-send-email-cw00.choi@samsung.com>
- <1418134386-14681-2-git-send-email-cw00.choi@samsung.com>
- <1418204220.16644.14.camel@AMDC1943> <5488FDCE.2060009@samsung.com>
- <548A643D.10508@samsung.com>
-Message-ID: <1418639428.7591.5.camel@AMDC1943>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 15 Dec 2014 18:34:06 +0800
+Subject: [v3][PATCH 5/5] media: ov2640: dt: add the device tree binding
+ document
+In-Reply-To: <1644165.4XbSUOMUsK@avalon>
+References: <1418283339-16281-1-git-send-email-josh.wu@atmel.com>
+ <1418283339-16281-6-git-send-email-josh.wu@atmel.com>
+ <1644165.4XbSUOMUsK@avalon>
+Message-ID: <548EB91E.2090900@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pi?, 2014-12-12 at 12:42 +0900, Chanwoo Choi wrote:
-> Hi Krzysztof,
-> 
-> I replied again this mail because I'll use the mutex for set_event()/get_event()
-> according to your comment. But, of_parse_phandle() seems that this function
-> don't need the of_node_put() function.
-> 
-> 
-> On 12/11/2014 11:13 AM, Chanwoo Choi wrote:
-> > Hi Krzysztof,
-> > 
-> > First of all, thanks for your review.
-> > 
-> > On 12/10/2014 06:37 PM, Krzysztof Kozlowski wrote:
-> >> On wto, 2014-12-09 at 23:13 +0900, Chanwoo Choi wrote:
-> >>> This patch add new devfreq_event class for devfreq_event device which provide
-> >>> raw data (e.g., memory bus utilization/GPU utilization). This raw data from
-> >>> devfreq_event data would be used for the governor of devfreq subsystem.
-> >>> - devfreq_event device : Provide raw data for governor of existing devfreq device
-> >>> - devfreq device       : Monitor device state and change frequency/voltage of device
-> >>>                          using the raw data from devfreq_event device
-> >>>
-> >>> The devfreq subsystem support generic DVFS(Dynamic Voltage/Frequency Scaling)
-> >>> for Non-CPU Devices. The devfreq device would dertermine current device state
-> >>> using various governor (e.g., ondemand, performance, powersave). After completed
-> >>> determination of system state, devfreq device would change the frequency/voltage
-> >>> of devfreq device according to the result of governor.
-> >>>
-> >>> But, devfreq governor must need basic data which indicates current device state.
-> >>> Existing devfreq subsystem only consider devfreq device which check current system
-> >>> state and determine proper system state using basic data. There is no subsystem
-> >>> for device providing basic data to devfreq device.
-> >>>
-> >>> The devfreq subsystem must need devfreq_event device(data-provider device) for
-> >>> existing devfreq device. So, this patch add new devfreq_event class for
-> >>> devfreq_event device which read various basic data(e.g, memory bus utilization,
-> >>> GPU utilization) and provide measured data to existing devfreq device through
-> >>> standard APIs of devfreq_event class.
-> >>>
-> >>> The following description explains the feature of two kind of devfreq class:
-> >>> - devfreq class (existing)
-> >>>  : devfreq consumer device use raw data from devfreq_event device for
-> >>>    determining proper current system state and change voltage/frequency
-> >>>    dynamically using various governors.
-> >>>
-> >>> - devfreq_event class (new)
-> >>>  : Provide measured raw data to devfreq device for governor
-> >>>
-> >>> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
-> >>> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> >>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> >>> ---
-> >>>  drivers/devfreq/Kconfig         |   2 +
-> >>>  drivers/devfreq/Makefile        |   5 +-
-> >>>  drivers/devfreq/devfreq-event.c | 302 ++++++++++++++++++++++++++++++++++++++++
-> >>>  drivers/devfreq/event/Makefile  |   1 +
-> >>>  include/linux/devfreq.h         | 141 +++++++++++++++++++
-> >>>  5 files changed, 450 insertions(+), 1 deletion(-)
-> >>>  create mode 100644 drivers/devfreq/devfreq-event.c
-> >>>  create mode 100644 drivers/devfreq/event/Makefile
-> >>>
-> >>> diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
-> >>> index faf4e70..4d15b62 100644
-> >>> --- a/drivers/devfreq/Kconfig
-> >>> +++ b/drivers/devfreq/Kconfig
-> >>> @@ -87,4 +87,6 @@ config ARM_EXYNOS5_BUS_DEVFREQ
-> >>>  	  It reads PPMU counters of memory controllers and adjusts the
-> >>>  	  operating frequencies and voltages with OPP support.
-> >>>  
-> >>> +comment "DEVFREQ Event Drivers"
-> >>> +
-> >>>  endif # PM_DEVFREQ
-> >>> diff --git a/drivers/devfreq/Makefile b/drivers/devfreq/Makefile
-> >>> index 16138c9..a1ffabe 100644
-> >>> --- a/drivers/devfreq/Makefile
-> >>> +++ b/drivers/devfreq/Makefile
-> >>> @@ -1,4 +1,4 @@
-> >>> -obj-$(CONFIG_PM_DEVFREQ)	+= devfreq.o
-> >>> +obj-$(CONFIG_PM_DEVFREQ)		+= devfreq.o devfreq-event.o
-> >>>  obj-$(CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND)	+= governor_simpleondemand.o
-> >>>  obj-$(CONFIG_DEVFREQ_GOV_PERFORMANCE)	+= governor_performance.o
-> >>>  obj-$(CONFIG_DEVFREQ_GOV_POWERSAVE)	+= governor_powersave.o
-> >>> @@ -7,3 +7,6 @@ obj-$(CONFIG_DEVFREQ_GOV_USERSPACE)	+= governor_userspace.o
-> >>>  # DEVFREQ Drivers
-> >>>  obj-$(CONFIG_ARM_EXYNOS4_BUS_DEVFREQ)	+= exynos/
-> >>>  obj-$(CONFIG_ARM_EXYNOS5_BUS_DEVFREQ)	+= exynos/
-> >>> +
-> >>> +# DEVFREQ Event Drivers
-> >>> +obj-$(CONFIG_PM_DEVFREQ)		+= event/
-> >>> diff --git a/drivers/devfreq/devfreq-event.c b/drivers/devfreq/devfreq-event.c
-> >>> new file mode 100644
-> >>> index 0000000..b47329f
-> >>> --- /dev/null
-> >>> +++ b/drivers/devfreq/devfreq-event.c
-> >>> @@ -0,0 +1,302 @@
-> >>> +/*
-> >>> + * devfreq-event: Generic DEVFREQ Event class driver
-> >>> + *
-> >>> + * Copyright (C) 2014 Samsung Electronics
-> >>> + * Chanwoo Choi <cw00.choi@samsung.com>
-> >>> + *
-> >>> + * This program is free software; you can redistribute it and/or modify
-> >>> + * it under the terms of the GNU General Public License version 2 as
-> >>> + * published by the Free Software Foundation.
-> >>> + *
-> >>> + * This driver is based on drivers/devfreq/devfreq.c
-> >>> + */
-> >>> +
-> >>> +#include <linux/kernel.h>
-> >>> +#include <linux/sched.h>
-> >>> +#include <linux/errno.h>
-> >>> +#include <linux/err.h>
-> >>> +#include <linux/init.h>
-> >>> +#include <linux/module.h>
-> >>> +#include <linux/slab.h>
-> >>> +#include <linux/stat.h>
-> >>> +#include <linux/pm_opp.h>
-> >>> +#include <linux/devfreq.h>
-> >>> +#include <linux/workqueue.h>
-> >>> +#include <linux/platform_device.h>
-> >>> +#include <linux/list.h>
-> >>> +#include <linux/printk.h>
-> >>> +#include <linux/hrtimer.h>
-> >>> +#include <linux/of.h>
-> >>> +#include "governor.h"
-> >>> +
-> >>> +static struct class *devfreq_event_class;
-> >>> +
-> >>> +/* The list of all devfreq event list */
-> >>> +static LIST_HEAD(devfreq_event_list);
-> >>> +static DEFINE_MUTEX(devfreq_event_list_lock);
-> >>> +
-> >>> +#define to_devfreq_event(DEV) container_of(DEV, struct devfreq_event_dev, dev)
-> >>> +
-> >>> +struct devfreq_event_dev *devfreq_add_event_device(struct device *dev,
-> >>> +					struct devfreq_event_desc *desc)
-> >>> +{
-> >>> +	struct devfreq_event_dev *event_dev;
-> >>> +	static atomic_t event_no = ATOMIC_INIT(0);
-> >>> +	int ret;
-> >>> +
-> >>> +	if (!dev || !desc)
-> >>> +		return ERR_PTR(-EINVAL);
-> >>> +
-> >>> +	if (!desc->name || !desc->ops)
-> >>> +		return ERR_PTR(-EINVAL);
-> >>> +
-> >>> +	event_dev = kzalloc(sizeof(struct devfreq_event_dev), GFP_KERNEL);
-> >>> +	if (!event_dev)
-> >>> +		return ERR_PTR(-ENOMEM);
-> >>
-> >> Is this memory freed anywhere when driver is removed? I couldn't find
-> >> it. I couldn't also find function like devfreq_remove_event_device()
-> >> which would be reverting all the work done when adding.
-> > 
-> > You're right. I'll use devm_kzalloc instead of kzalloc.
-> > 
-> >>
-> >>> +
-> >>> +	mutex_lock(&devfreq_event_list_lock);
-> >>> +
-> >>> +	mutex_init(&event_dev->lock);
-> >>> +	event_dev->desc = desc;
-> >>> +	event_dev->dev.parent = dev;
-> >>> +	event_dev->dev.class = devfreq_event_class;
-> >>> +
-> >>> +	dev_set_name(&event_dev->dev, "event.%d",
-> >>> +		     atomic_inc_return(&event_no) - 1);
-> >>> +	ret = device_register(&event_dev->dev);
-> >>> +	if (ret != 0) {
-> >>> +		put_device(&event_dev->dev);
-> >>> +		goto err;
-> >>> +	}
-> >>> +	dev_set_drvdata(&event_dev->dev, event_dev);
-> >>> +
-> >>> +	/* Add devfreq event device to devfreq_event_list */
-> >>> +	INIT_LIST_HEAD(&event_dev->node);
-> >>> +	list_add(&event_dev->node, &devfreq_event_list);
-> >>> +
-> >>> +	mutex_unlock(&devfreq_event_list_lock);
-> >>> +
-> >>> +	return event_dev;
-> >>> +err:
-> >>
-> >> Missing 'mutex_unlock(&devfreq_event_list_lock)' here.
-> > 
-> > OK. I'll fix it.
-> > 
-> >>
-> >>
-> >>> +	kfree(event_dev);
-> >>> +	return ERR_PTR(ret);
-> >>> +}
-> >>> +EXPORT_SYMBOL(devfreq_add_event_device);
-> >>> +
-> >>> +struct devfreq_event_dev *devfreq_get_event_dev(const char *event_dev_name)
-> >>> +{
-> >>> +	struct devfreq_event_dev *event_dev;
-> >>> +
-> >>> +	mutex_lock(&devfreq_event_list_lock);
-> >>> +	list_for_each_entry(event_dev, &devfreq_event_list, node) {
-> >>> +		if (!strcmp(event_dev->desc->name, event_dev_name))
-> >>> +			goto out;
-> >>> +	}
-> >>> +	event_dev = NULL;
-> >>> +out:
-> >>> +	mutex_unlock(&devfreq_event_list_lock);
-> >>> +
-> >>> +	return event_dev;
-> >>> +}
-> >>> +EXPORT_SYMBOL_GPL(devfreq_get_event_dev);
-> >>> +
-> >>> +struct devfreq_event_dev *devfreq_get_event_dev_by_phandle(struct device *dev,
-> >>> +						      int index)
-> >>> +{
-> >>> +	struct device_node *node;
-> >>> +	struct devfreq_event_dev *event_dev;
-> >>> +
-> >>> +	if (!dev->of_node) {
-> >>> +		dev_err(dev, "device does not have a device node entry\n");
-> >>> +		return ERR_PTR(-EINVAL);
-> >>> +	}
-> >>> +
-> >>> +	node = of_parse_phandle(dev->of_node, "devfreq-events", index);
-> >>> +	if (!node) {
-> >>> +		dev_err(dev, "failed to get phandle in %s node\n",
-> >>> +			dev->of_node->full_name);
-> >>> +		return ERR_PTR(-ENODEV);
-> >>> +	}
-> >>> +
-> >>> +	event_dev = devfreq_get_event_dev(node->name);
-> >>> +	if (!event_dev) {
-> >>> +		dev_err(dev, "unable to get devfreq-event device : %s\n",
-> >>> +			node->name);
-> >>
-> >> of_node_put() for node obtained with of_parse_phandle().
-> > 
-> > OK. I'll add it.
-> 
-> of_parse_phandle() seems that it don't need of_node_put().
+Hi, Laurent
 
-The of_parse_phandle() increases the refcount for node it returns.
->From documentation:
+On 12/12/2014 10:17 AM, Laurent Pinchart wrote:
+> Hi Josh,
+>
+> Thank you for the patch.
+>
+> On Thursday 11 December 2014 15:35:39 Josh Wu wrote:
+>> Add the document for ov2640 dt.
+>>
+>> Cc: devicetree at vger.kernel.org
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>> v2 -> v3:
+>>    1. fix incorrect description.
+>>    2. Add assigned-clocks & assigned-clock-rates.
+>>    3. resetb pin should be ACTIVE_LOW.
+>>
+>> v1 -> v2:
+>>    1. change the compatible string to be consistent with verdor file.
+>>    2. change the clock and pins' name.
+>>    3. add missed pinctrl in example.
+>>
+>>   .../devicetree/bindings/media/i2c/ov2640.txt       | 53 +++++++++++++++++++
+>>   1 file changed, 53 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+>> b/Documentation/devicetree/bindings/media/i2c/ov2640.txt new file mode
+>> 100644
+>> index 0000000..958e120
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+>> @@ -0,0 +1,53 @@
+>> +* Omnivision ov2640 CMOS sensor
+>> +
+>> +The Omnivision OV2640 sensor support multiple resolutions output, such as
+>> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
+>> +output format.
+>> +
+>> +Required Properties:
+>> +- compatible: Must be "ovti,ov2640"
+>> +- clocks: reference to the xvclk input clock. It can be an external fixed
+>> +          clock or a programmable clock from SoC.
+> It could also be a variable clock provided by something else. I would just
+> drop the second sentence.
 
-/**
- * Returns the device_node pointer with refcount incremented.  Use
- * of_node_put() on it when done.
- */
+I mention this since these are the cases in at91 platform.
+Sure. I'll drop it.
+>
+>> +- clock-names: Must be "xvclk".
+>> +- assigned-clocks: reference to the above 'clocks' property.
+>> +- assigned-clock-rates: reference to the clock frequency of xvclk. Typical
+>> +                        value is 25Mhz (25000000).
+>> +                        This clock should only have single user. Specifying
+>> +                        Conflicting rate configuration in multiple
+>> consumer
+>> +                        nodes for a shared clock is forbidden.
+> Those two properties are optional. I'm not sure they should even be mentioned
+> in the ov2640 bindings. For one thing they're not needed if the clock doesn't
+> need to be forced to a specific frequency, and the clock rate could also be
+> configured through other means depending on the platform.
 
-The function returns error condition but node was found and its refcnt
-was incremented. Then why do you think that of_node_put() is not
-necessary here?
+hmm, if the clock is fixed then this 'assigned-clock-rates' is not needed.
+And I only find one binding document mentioned the assigned-clocks. It 
+looks like a general property for all clocks. We don't need mention it 
+repeatedly.
+So I'd like to drop this two properties in next version.
 
-> 
-> > 
-> >>
-> >>> +		return ERR_PTR(-ENODEV);
-> >>> +	}
-> >>> +
-> >>> +	return event_dev;
-> >>> +}
-> >>> +EXPORT_SYMBOL_GPL(devfreq_get_event_dev_by_phandle);
-> >>> +
-> >>> +int devfreq_put_event_dev(struct devfreq_event_dev *event_dev)
-> >>> +{
-> >>
-> >> of_node_put() here to decrement refcnt from of_parse_phandle()?
-> > 
-> > It is my mistake. I think that devfreq_put_event_dev is not necesssary.
-> > I'll remove it.
-
-Then how to decrease the refcnt for node obtained in
-devfreq_get_event_dev_by_phandle()?
-
-Best regards,
-Krzysztof
+Thanks and Best Regards,
+Josh Wu
+>
+>> +
+>> +Optional Properties:
+>> +- resetb-gpios: reference to the GPIO connected to the resetb pin, if any.
+>> +- pwdn-gpios: reference to the GPIO connected to the pwdn pin, if any.
+>> +
+>> +The device node must contain one 'port' child node for its digital output
+>> +video port, in accordance with the video interface bindings defined in
+>> +Documentation/devicetree/bindings/media/video-interfaces.txt.
+>> +
+>> +Example:
+>> +
+>> +	i2c1: i2c at f0018000 {
+>> +		ov2640: camera at 0x30 {
+>> +			compatible = "ovti,ov2640";
+>> +			reg = <0x30>;
+>> +
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&pinctrl_pck1 &pinctrl_ov2640_pwdn
+> &pinctrl_ov2640_resetb>;
+>> +
+>> +			resetb-gpios = <&pioE 24 GPIO_ACTIVE_LOW>;
+>> +			pwdn-gpios = <&pioE 29 GPIO_ACTIVE_HIGH>;
+>> +
+>> +			clocks = <&pck1>;
+>> +			clock-names = "xvclk";
+>> +
+>> +			assigned-clocks = <&pck1>;
+>> +			assigned-clock-rates = <25000000>;
+>> +
+>> +			port {
+>> +				ov2640_0: endpoint {
+>> +					remote-endpoint = <&isi_0>;
+>> +					bus-width = <8>;
+>> +				};
+>> +			};
+>> +		};
+>> +	};
