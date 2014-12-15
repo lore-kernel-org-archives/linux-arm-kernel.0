@@ -1,160 +1,79 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 15 Dec 2014 11:20:06 +0100
-Subject: [PATCH v3 6/6] arm/arm64: KVM: Require in-kernel vgic for the arch
- timers
-In-Reply-To: <1418469449-13277-1-git-send-email-christoffer.dall@linaro.org>
-References: <1418469449-13277-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1418638806-12025-1-git-send-email-christoffer.dall@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 15 Dec 2014 11:22:30 +0100
+Subject: [PATCH v3 05/11] memory: add Atmel EBI (External Bus Interface)
+ driver
+In-Reply-To: <5455670.EDnhYEk7hP@kongar>
+References: <1417429647-3419-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1417429647-3419-6-git-send-email-boris.brezillon@free-electrons.com>
+ <5455670.EDnhYEk7hP@kongar>
+Message-ID: <20141215112230.6fca1d69@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is curently possible to run a VM with architected timers support
-without creating an in-kernel VGIC, which will result in interrupts from
-the virtual timer going nowhere.
+Hi Alexander,
 
-To address this issue, move the architected timers initialization to the
-time when we run a VCPU for the first time, and then only initialize
-(and enable) the architected timers if we have a properly created and
-initialized in-kernel VGIC.
+On Tue, 09 Dec 2014 21:53:12 +0100
+Alexander Stein <alexanders83@web.de> wrote:
 
-When injecting interrupts from the virtual timer to the vgic, the
-current setup should ensure that this never calls an on-demand init of
-the VGIC, which is the only call path that could return an error from
-kvm_vgic_inject_irq(), so capture the return value and raise a warning
-if there's an error there.
+> Hi,
+> 
+> On Monday 01 December 2014, 11:27:21 wrote Boris Brezillon:
+> > +static int at91_ebi_probe(struct platform_device *pdev)
+> > +{
+> > +	const struct of_device_id *match;
+> > +	struct device_node *child;
+> > +	struct device_node *np;
+> > +	struct at91_ebi *ebi;
+> > +	struct clk *clk;
+> > +	int ret;
+> > +
+> > +	match = of_match_device(at91_ebi_id_table, &pdev->dev);
+> > +	if (!match || !match->data)
+> > +		return -EINVAL;
+> > +
+> > +	ebi = devm_kzalloc(&pdev->dev, sizeof(*ebi), GFP_KERNEL);
+> > +	if (!ebi)
+> > +		return -ENOMEM;
+> > +
+> > +	ebi->caps = match->data;
+> > +	ebi->dev = &pdev->dev;
+> > +
+> > +	clk = devm_clk_get(&pdev->dev, NULL);
+> > +	if (IS_ERR(clk))
+> > +		return PTR_ERR(clk);
+> > +
+> > +	ebi->clk = clk;
+> > +
+> > +	np = of_parse_phandle(pdev->dev.of_node, "atmel,smc", 0);
+> > +	if (!np)
+> > +		return -EINVAL;
+> > +
+> > +	ebi->smc = syscon_node_to_regmap(np);
+> > +	if (IS_ERR(ebi->smc))
+> > +		return PTR_ERR(ebi->smc);
+> > +
+> > +	/*
+> > +	 * The sama5d3 does not provide an EBICSA register and thus does need
+> > +	 * to access the matrix registers.
+> > +	 */
+> > +	if (ebi->caps->ebi_csa) {
+> > +		np = of_parse_phandle(pdev->dev.of_node, "atmel,matrix", 0);
+> > +		if (np)
+>          ^^^^^^^
+> Shouldn't this be if (!np)?
 
-We also change the kvm_timer_init() function from returning an int to be
-a void function, since the function always succeeds.
+Absolutely, thanks for pointing this out.
+I'll test on other at91 platforms (I currently only test on sama5d3
+boards, which do not have this EBICSA register) before submitting a new
+version.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-Changes [v2 -> v3]:
- - Split kvm_timer_init into kvm_timer_init and kvm_timer_enable
-   and initialize the cntvoff in kvm_timer_init and only actually enable
-   the timer if there is an in-kernel vgic.
- - Added comment about race from multiple VCPUs.
- - Support compiling on 32-bit ARM wihtout vgic/arch-timers config
-   option.
+Regards,
 
- arch/arm/kvm/arm.c           | 13 +++++++++++--
- include/kvm/arm_arch_timer.h | 10 ++++------
- virt/kvm/arm/arch_timer.c    | 30 ++++++++++++++++++++++--------
- 3 files changed, 37 insertions(+), 16 deletions(-)
+Boris
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index d4da244..8cadfec 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -424,6 +424,7 @@ static void update_vttbr(struct kvm *kvm)
- 
- static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- {
-+	struct kvm *kvm = vcpu->kvm;
- 	int ret;
- 
- 	if (likely(vcpu->arch.has_run_once))
-@@ -435,12 +436,20 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- 	 * Map the VGIC hardware resources before running a vcpu the first
- 	 * time on this VM.
- 	 */
--	if (unlikely(!vgic_ready(vcpu->kvm))) {
--		ret = kvm_vgic_map_resources(vcpu->kvm);
-+	if (unlikely(!vgic_ready(kvm))) {
-+		ret = kvm_vgic_map_resources(kvm);
- 		if (ret)
- 			return ret;
- 	}
- 
-+	/*
-+	 * Enable the arch timers only if we have an in-kernel VGIC
-+	 * and it has been properly initialized, since we cannot handle
-+	 * interrupts from the virtual timer with a userspace gic.
-+	 */
-+	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm))
-+		kvm_timer_enable(kvm);
-+
- 	return 0;
- }
- 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index ad9db60..b3f45a5 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -60,7 +60,8 @@ struct arch_timer_cpu {
- 
- #ifdef CONFIG_KVM_ARM_TIMER
- int kvm_timer_hyp_init(void);
--int kvm_timer_init(struct kvm *kvm);
-+void kvm_timer_enable(struct kvm *kvm);
-+void kvm_timer_init(struct kvm *kvm);
- void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 			  const struct kvm_irq_level *irq);
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
-@@ -77,11 +78,8 @@ static inline int kvm_timer_hyp_init(void)
- 	return 0;
- };
- 
--static inline int kvm_timer_init(struct kvm *kvm)
--{
--	return 0;
--}
--
-+static inline void kvm_timer_enable(struct kvm *kvm) {}
-+static inline void kvm_timer_init(struct kvm *kvm) {}
- static inline void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 					const struct kvm_irq_level *irq) {}
- static inline void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu) {}
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 22fa819..1c0772b 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -61,12 +61,14 @@ static void timer_disarm(struct arch_timer_cpu *timer)
- 
- static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
- {
-+	int ret;
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 
- 	timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
--	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
--			    timer->irq->irq,
--			    timer->irq->level);
-+	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
-+				  timer->irq->irq,
-+				  timer->irq->level);
-+	WARN_ON(ret);
- }
- 
- static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
-@@ -307,12 +309,24 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
- 	timer_disarm(timer);
- }
- 
--int kvm_timer_init(struct kvm *kvm)
-+void kvm_timer_enable(struct kvm *kvm)
- {
--	if (timecounter && wqueue) {
--		kvm->arch.timer.cntvoff = kvm_phys_timer_read();
-+	if (kvm->arch.timer.enabled)
-+		return;
-+
-+	/*
-+	 * There is a potential race here between VCPUs starting for the first
-+	 * time, which may be enabling the timer multiple times.  That doesn't
-+	 * hurt though, because we're just setting a variable to the same
-+	 * variable that it already was.  The important thing is that all
-+	 * VCPUs have the enabled variable set, before entering the guest, if
-+	 * the arch timers are enabled.
-+	 */
-+	if (timecounter && wqueue)
- 		kvm->arch.timer.enabled = 1;
--	}
-+}
- 
--	return 0;
-+void kvm_timer_init(struct kvm *kvm)
-+{
-+	kvm->arch.timer.cntvoff = kvm_phys_timer_read();
- }
+
+
 -- 
-2.1.2.330.g565301e.dirty
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
