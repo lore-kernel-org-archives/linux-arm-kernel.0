@@ -1,80 +1,67 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 15 Dec 2014 17:15:49 +0100
-Subject: [PATCH 2/5] clk: at91: implement suspend/resume for the PMC irqchip
-In-Reply-To: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1418660152-17185-3-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon, 15 Dec 2014 17:15:47 +0100
+Subject: [PATCH 0/5] ARM: at91: fix irq_pm_install_action WARNING
+Message-ID: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irq line used by the PMC block is shared with several peripherals
-including the init timer which is registering the irq with IRQF_NO_SUSPEND.
+Commit cab303be91dc47942bc25de33dc1140123540800 [1] introduced a WARN_ON
+test which triggers a WARNING backtrace on at91 platforms.
+While this WARN_ON is absolutely necessary to warn users that they should
+not mix request with and without IRQF_NO_SUSPEND flags on shared IRQs,
+there is no easy way to solve this issue on at91 platforms.
 
-To prevent the PMC irq handler from being called while suspended request
-the irq with the IRQF_SUSPEND_NOACTION flag and implement proper suspend
-resume functions to save and restore the active PMC IRQs.
+The main reason is that the init timer is often using a shared irq line
+and thus request this irq with IRQF_NO_SUSPEND flag set, while other
+peripherals request the same irq line without this flag.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/clk/at91/pmc.c | 20 +++++++++++++++++++-
- drivers/clk/at91/pmc.h |  1 +
- 2 files changed, 20 insertions(+), 1 deletion(-)
+We could deal with that by identifying whether a given peripheral is
+connected to the init timer shared irq line and add the IRQF_NO_SUSPEND
+in this case, but this implies adding the logic in all peripheral drivers
+that could be connected to this shared irq.
 
-diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 386999b..59753e7 100644
---- a/drivers/clk/at91/pmc.c
-+++ b/drivers/clk/at91/pmc.c
-@@ -80,12 +80,29 @@ static int pmc_irq_set_type(struct irq_data *d, unsigned type)
- 	return 0;
- }
- 
-+static void pmc_irq_suspend(struct irq_data *d)
-+{
-+	struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
-+
-+	pmc->imr = pmc_read(pmc, AT91_PMC_IMR);
-+	pmc_write(pmc, AT91_PMC_IDR, pmc->imr);
-+}
-+
-+static void pmc_irq_resume(struct irq_data *d)
-+{
-+	struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
-+
-+	pmc_write(pmc, AT91_PMC_IER, pmc->imr);
-+}
-+
- static struct irq_chip pmc_irq = {
- 	.name = "PMC",
- 	.irq_disable = pmc_irq_mask,
- 	.irq_mask = pmc_irq_mask,
- 	.irq_unmask = pmc_irq_unmask,
- 	.irq_set_type = pmc_irq_set_type,
-+	.irq_suspend = pmc_irq_suspend,
-+	.irq_resume = pmc_irq_resume,
- };
- 
- static struct lock_class_key pmc_lock_class;
-@@ -215,7 +232,8 @@ static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
- 		goto out_free_pmc;
- 
- 	pmc_write(pmc, AT91_PMC_IDR, 0xffffffff);
--	if (request_irq(pmc->virq, pmc_irq_handler, IRQF_SHARED, "pmc", pmc))
-+	if (request_irq(pmc->virq, pmc_irq_handler,
-+			IRQF_SHARED | IRQF_SUSPEND_NOACTION, "pmc", pmc))
- 		goto out_remove_irqdomain;
- 
- 	return pmc;
-diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index 52d2041..69abb08 100644
---- a/drivers/clk/at91/pmc.h
-+++ b/drivers/clk/at91/pmc.h
-@@ -33,6 +33,7 @@ struct at91_pmc {
- 	spinlock_t lock;
- 	const struct at91_pmc_caps *caps;
- 	struct irq_domain *irqdomain;
-+	u32 imr;
- };
- 
- static inline void pmc_lock(struct at91_pmc *pmc)
+This series takes the reverse approach: force IRQ users to specify that
+they take care of disabling peripheral interrupts and that IRQ core can
+safely leave the handler in a suspended state without having to bother
+about spurious interrupts.
+This is done by mean of a new IRQF_SUSPEND_NOACTION flag which tells the
+core to move the action handler to a suspended list, thus preventing its
+execution when we are in suspend mode.
+Of course, specifying the IRQF_SUSPEND_NOACTION flag implies taking care
+of masking/unmasking the peripheral interrupts in the suspend/resume
+implementation.
+
+The WARN_ON is kept, but now it is only triggered when (no_suspend_depth +
+suspend_noaction_depth) and nr_actions are unbalanced.
+
+The first patch introduces the IRQF_SUSPEND_NOACTION logic, while other
+patches modify existing at91 drivers to specify this flag (and implement
+suspend/resume if needed).
+
+
+Best Regards,
+
+Boris
+
+[1]https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/kernel/irq/pm.c?id=cab303be91dc47942bc25de33dc1140123540800
+
+Boris Brezillon (5):
+  genirq: Support mixing IRQF_NO_SUSPEND/IRQF_SUSPEND on shared irqs
+  clk: at91: implement suspend/resume for the PMC irqchip
+  watchdog: at91sam9: request the irq with IRQF_NO_SUSPEND
+  rtc: at91: request IRQs with IRQF_SUSPEND_NOACTION
+  tty: serial: atmel: request IRQ with IRQF_SUSPEND_NOACTION
+
+ drivers/clk/at91/pmc.c            | 20 ++++++++++-
+ drivers/clk/at91/pmc.h            |  1 +
+ drivers/rtc/rtc-at91rm9200.c      |  2 +-
+ drivers/rtc/rtc-at91sam9.c        |  3 +-
+ drivers/tty/serial/atmel_serial.c |  3 +-
+ drivers/watchdog/at91sam9_wdt.c   |  3 +-
+ include/linux/interrupt.h         | 11 ++++++
+ include/linux/irqdesc.h           |  3 ++
+ kernel/irq/pm.c                   | 71 +++++++++++++++++++++++++++++++++++++--
+ 9 files changed, 109 insertions(+), 8 deletions(-)
+
 -- 
 1.9.1
