@@ -1,85 +1,46 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Mon, 15 Dec 2014 08:59:23 -0800
-Subject: [PATCH 06/27] ARM: mvebu: armada-370-rd: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <1418657915-22775-7-git-send-email-gregory.clement@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-7-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <548F136B.90100@openwrt.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 15 Dec 2014 17:56:55 +0100
+Subject: Linus' tree (master) not working for Allwinner sun4i, sun5i,
+ sun7i SoC-s + fix
+In-Reply-To: <548F0C8C.3030006@gmail.com>
+References: <548F0C8C.3030006@gmail.com>
+Message-ID: <20141215165655.GL4337@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/14 07:38, Gregory CLEMENT wrote:
-> The current GPL only licensing on the device tree makes it very
-> impractical for other software components licensed under another
-> license.
-> 
-> In order to make it easier for them to reuse our device trees,
-> relicense our device trees under a GPL/X11 dual-license.
-> 
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Florian Fainelli <florian@openwrt.org>
-> Cc: Simon Baatz <gmbnomis@gmail.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Hi,
 
-Acked-by: Florian Fainelli <florian@openwrt.org>
+On Mon, Dec 15, 2014 at 05:30:04PM +0100, Hans de Goede wrote:
+> Hi Maxime,
+> 
+> Somehow this commit of your sunxi/clocks-for-3.19 branch has made it
+> into Linus' tree:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?h=sunxi/clocks-for-3.19&id=93746e70be83a3f113134a16065957b324af50f7
+> 
+> But this one has not:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?h=sunxi/clocks-for-3.19&id=acbcc0f03b15585387f9ca69c2a976b02cb69023
+> 
+> Rather badly breaking Allwinner sun4i, sun5i, sun7i SoC-s.
 
-> ---
->  arch/arm/boot/dts/armada-370-rd.dts | 40 ++++++++++++++++++++++++++++++++++---
->  1 file changed, 37 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-> index 394308951ed9..6ae36a38beb2 100644
-> --- a/arch/arm/boot/dts/armada-370-rd.dts
-> +++ b/arch/arm/boot/dts/armada-370-rd.dts
-> @@ -6,9 +6,43 @@
->   *
->   *  Copyright (C) 2013 Florian Fainelli <florian@openwrt.org>
->   *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   *
->   * Note: this Device Tree assumes that the bootloader has remapped the
->   * internal registers to 0xf1000000 (instead of the default
-> 
+I don't know what you are looking at, but I don't see any of these
+commits in Linus' current master, either in the git repo itself, or
+using the kernel.org git interface.
+
+They're both part of Mike Turquette's clk-next though, so they should
+both land just fine whenever that will be merged.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141215/afac3ffd/attachment.sig>
