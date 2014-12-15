@@ -1,50 +1,54 @@
-From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
-Date: Mon, 15 Dec 2014 15:30:33 +0800
-Subject: [PATCH v2 2/4] mmc: sdhci: add a quirk for tuning work around
-In-Reply-To: <1418628635-3436-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1418628635-3436-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <1418628635-3436-3-git-send-email-Vincent.Yang@tw.fujitsu.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Sun, 14 Dec 2014 23:28:06 -0800
+Subject: [PATCH v15 09/11] KVM: arm64: Add HYP interface to flush VM Stage 1/2
+ TLB entires
+In-Reply-To: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
+References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1418628488-3696-10-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch defines a quirk for tuning work
-around for some sdhci host controller. It sets
-both SDHCI_CTRL_EXEC_TUNING and SDHCI_CTRL_TUNED_CLK
-for tuning.
-It is a preparation and will be used by Fujitsu
-SDHCI controller f_sdh30 driver.
+This patch adds support for arm64 hyp interface to flush all TLBs associated
+with VMID.
 
-Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 ---
- drivers/mmc/host/sdhci.c  | 2 ++
- include/linux/mmc/sdhci.h | 2 ++
- 2 files changed, 4 insertions(+)
+ arch/arm64/kvm/hyp.S | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index cd1f311..b319c10 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1929,6 +1929,8 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index b72aa9f..6e1b5df 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -1030,6 +1030,28 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+ 	ret
+ ENDPROC(__kvm_tlb_flush_vmid_ipa)
  
- 	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
- 	ctrl |= SDHCI_CTRL_EXEC_TUNING;
-+	if (host->quirks2 & SDHCI_QUIRK2_TUNING_WORK_AROUND)
-+		ctrl |= SDHCI_CTRL_TUNED_CLK;
- 	sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
- 
- 	/*
-diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
-index 375af80..dd2ba4b 100644
---- a/include/linux/mmc/sdhci.h
-+++ b/include/linux/mmc/sdhci.h
-@@ -106,6 +106,8 @@ struct sdhci_host {
- #define SDHCI_QUIRK2_CLEAR_TRANSFERMODE_REG_BEFORE_CMD	(1<<10)
- /* Capability register bit-63 indicates HS400 support */
- #define SDHCI_QUIRK2_CAPS_BIT63_FOR_HS400		(1<<11)
-+/* forced tuned clock */
-+#define SDHCI_QUIRK2_TUNING_WORK_AROUND			(1<<12)
- 
- 	int irq;		/* Device IRQ */
- 	void __iomem *ioaddr;	/* Mapped address */
++/**
++ * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
++ * @struct kvm *kvm - pointer to kvm structure
++ *
++ * Invalidates all Stage 1 and 2 TLB entries for current VMID.
++ */
++ENTRY(__kvm_tlb_flush_vmid)
++	dsb     ishst
++
++	kern_hyp_va     x0
++	ldr     x2, [x0, #KVM_VTTBR]
++	msr     vttbr_el2, x2
++	isb
++
++	tlbi    vmalls12e1is
++	dsb     ish
++	isb
++
++	msr     vttbr_el2, xzr
++	ret
++ENDPROC(__kvm_tlb_flush_vmid)
++
+ ENTRY(__kvm_flush_vm_context)
+ 	dsb	ishst
+ 	tlbi	alle1is
 -- 
-1.9.0
+1.9.1
