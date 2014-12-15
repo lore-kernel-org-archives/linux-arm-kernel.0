@@ -1,47 +1,22 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 15 Dec 2014 09:56:07 +0200
-Subject: [PATCH 2/2] ARM: OMAP3: clock: fix boot breakage in legacy mode
-In-Reply-To: <7hvblgk7q0.fsf@deeprootsystems.com>
-References: <1418390521-7541-1-git-send-email-t-kristo@ti.com>	<1418390521-7541-3-git-send-email-t-kristo@ti.com>
- <7hvblgk7q0.fsf@deeprootsystems.com>
-Message-ID: <548E9417.50502@ti.com>
+From: catalin.crenguta@gmail.com (Catalin Crenguta)
+Date: Mon, 15 Dec 2014 09:55:56 +0200
+Subject: [PATCH v4 0/6] Touchscreen performance related fixes
+In-Reply-To: <912A29987EAE174BA6CF187D7CDFA9CE26FA135A@DLEE08.ent.ti.com>
+References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
+ <20141124115116.GA14997@linutronix.de> <547C3A95.30605@ti.com>
+ <547C3C19.5090501@linutronix.de> <547C42FF.5010700@ti.com>
+ <CAH=tA9FO5MCzE274thc-NugCNte6WdyC-Rxc6yfnuR=+6_qMbA@mail.gmail.com>
+ <548A0125.6040708@linutronix.de>
+ <CABH3fy8zCjsxARsqBf9JXOHBkzySdiqifA1KtjnGpJdBY2EikA@mail.gmail.com>
+ <912A29987EAE174BA6CF187D7CDFA9CE26FA135A@DLEE08.ent.ti.com>
+Message-ID: <CABH3fy8PqbC3DZkFLcoaaXqFAex+oCh7=1a=-cymhXU_ayDNcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2014 09:07 PM, Kevin Hilman wrote:
-> Hi Tero,
->
-> Tero Kristo <t-kristo@ti.com> writes:
->
->> The new usage of determine_rate and set_rate_and_parent calls for
->> OMAP DPLLs assumes the DPLLs must have two parents defined, even
->> if it is the same clock. Legacy clock data did not fullfill this
->> requirement and caused a boot crash. Fixed by adding the missing
->> parent information to the DPLL clocks.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> Fixes: 2e1a7b014f ("ARM: OMAP3+: DPLL: use determine_rate() and...")
->> Cc: Kevin Hilman <khilman@kernel.org>
->
-> I tested this on linux-next (next-20141210, same version where I found
-> the bug) and this doesn't fix the boot problem.
->
-> BTW, in testing this, I noticed that the OMAP clock code is still
-> spitting out compile warnings[1].  These should cleaned up too.
+On Fri, Dec 12, 2014 at 4:16 PM, Griffis, Brad <bgriffis@ti.com> wrote:
 
-Did you apply both of my patches from this set?
+> How are you configuring ti,charge-delay in your dts?  I've seen this behavior on some custom boards where we were using a smaller charge delay (0x400) to begin with, and by upping it to 0xb000 we resolved the issue.  These patches however already specified ti,charge-delay = 0xb000 by default so this would surprise me that it's still seeing that issue.  Was the touchscreen working as expected before these new patches, or does it have issues both ways?
 
-I think the DPLL fix might be required also to get this working properly 
-on OMAP3 legacy.
-
--Tero
-
->
-> Kevin
->
-> [1]
-> ../arch/arm/mach-omap2/cclock3xxx_data.c:263:2: warning: initialization from incompatible pointer type [enabled by default]
-> ../arch/arm/mach-omap2/cclock3xxx_data.c:263:2: warning: (near initialization for 'dpll1_ck_ops.determine_rate') [enabled by default]
-> ../arch/arm/mach-omap2/cclock3xxx_data.c:376:2: warning: initialization from incompatible pointer type [enabled by default]
-> ../arch/arm/mach-omap2/cclock3xxx_data.c:376:2: warning: (near initialization for 'dpll4_ck_ops.determine_rate') [enabled by default]
->
+Initially I had set the charge-delay to 0x400 and I was seeing many
+false pen-down/pen-up events With 0xb000, I was still getting many of
+them but less than with 0x400.
