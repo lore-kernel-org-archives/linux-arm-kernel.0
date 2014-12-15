@@ -1,122 +1,64 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Mon, 15 Dec 2014 14:54:26 +0200
-Subject: [PATCH 03/18] arm64/uaccess: fix sparse errors
-In-Reply-To: <20141215112310.GG11285@n2100.arm.linux.org.uk>
-References: <1418575877-21488-1-git-send-email-mst@redhat.com>
- <1418575877-21488-4-git-send-email-mst@redhat.com>
- <20141215111716.GG20738@arm.com>
- <20141215112310.GG11285@n2100.arm.linux.org.uk>
-Message-ID: <20141215125426.GA27583@redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 15 Dec 2014 12:55:57 +0000
+Subject: [RFC 01/15] drivers/base: add track framework
+In-Reply-To: <548B7653.7020004@gmail.com>
+References: <548B7653.7020004@gmail.com>
+Message-ID: <20141215125557.GB11764@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 11:23:11AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 15, 2014 at 11:17:16AM +0000, Will Deacon wrote:
-> > On Sun, Dec 14, 2014 at 04:52:09PM +0000, Michael S. Tsirkin wrote:
-> > > virtio wants to read bitwise types from userspace using get_user.  At the
-> > > moment this triggers sparse errors, since the value is passed through an
-> > > integer.
-> > > 
-> > > Fix that up using __force.
-> > > 
-> > > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> > > ---
-> > >  arch/arm64/include/asm/uaccess.h | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> > > index 3bf8f4e..8d66bcf 100644
-> > > --- a/arch/arm64/include/asm/uaccess.h
-> > > +++ b/arch/arm64/include/asm/uaccess.h
-> > > @@ -147,7 +147,7 @@ do {									\
-> > >  	default:							\
-> > >  		BUILD_BUG();						\
-> > >  	}								\
-> > > -	(x) = (__typeof__(*(ptr)))__gu_val;				\
-> > > +	(x) = (__force __typeof__(*(ptr)))__gu_val;				\
-> > >  } while (0)
-> > >  
-> > >  #define __get_user(x, ptr)						\
-> > 
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> This also means you can do stuff like:
-> 
-> 	u32 *p;
-> 	__le32 v;
-> 
-> 	err = get_user(p, v);
-> 
-> which is not right.  Both the dereferenced pointer type and the destination
-> type should be compatible, and if one is a bitwise type but the other isn't,
-> that seems like a valid case to warn.
+On Sat, Dec 13, 2014 at 12:12:19AM +0100, AH wrote:
+> Mark Brown wrote on 12.12.2014 17:36:
+> >On Wed, Dec 10, 2014 at 04:48:19PM +0100, Andrzej Hajda wrote:
 
-I just verified this case:
-#define __force __attribute__((force))
-#define __bitwise__ __attribute__((bitwise))
-#define get_user(x, ptr) \
-do {\
-        unsigned long __gu_val = 0; \
-       (x) = (__force __typeof__(*(ptr)))__gu_val;  \
-} while (0)
+> >>+		kfree(ptask);
+> >>+
+> >>+		if (empty)
+> >>+			break;
+> >>+
+> >>+		track_process_task(track, task);
 
-typedef unsigned u32;
-typedef u32 __bitwise__ __le32;
+> >...we then go and do some other stuff, including processing that task,
+> >without the lock or or any other means I can see of excluding other
+> >users before going round and removing the task.  This seems to leave us
+> >vulnerable to double execution.
 
-static u32 *p;
-static __le32 v;
+> No, if you look at track_add_task function you will see that the queue is
+> processed only if it is initially empty, otherwise the task is only added to
+> the queue, so it will be processed after processing earlier tasks.
+> So the rule is that if someone add task to the queue it checks if the queue
+> is empty, in such case it process all tasks from the queue until
+> the queue becomes empty, even the tasks added by other processed.
+> This way all tasks are serialized.
 
+This is all pretty fiddly and seems fragile - if nothing else the code
+seems undercommented since the above is only going to be apparent with
+following through multiple functions and we're relying on both owner and
+list emptiness with more than one place where a task can get processed.
 
-int main(int argc, char **argv)
-{
-        get_user(v, p);
-        return 0;
-}
+> >I'm also unclear what is supposed to happen if adding a notification
+> >races with removing the thing being watched.
 
+> The sequence should be always as follows:
+> 1. create thing, then call track_up(thing).
+> ...
+> 2. call track_down(thing) then remove thing.
 
-Produces a warning as expected.
+> If we put 1 into probe and 2 into remove callback of the driver it will be
+> safe - we are synchronised by device_lock. But if, for some reason, we want
+> to create object after probe we should do own synchronization or just put
+> device_lock around 1. The same applies if we want to remove
+> object earlier. This is the comment above about. I will expand it to more
+> verbose explanation.
 
-So I think the above comment is a result of a mistake.
-Can you confirm please?
-
-
-
-> I don't see any use of get_user() in drivers/virtio in mainline, so I can't
-> check further.
-
-
-this is an example of the case which I'm fixing:
-
-#define __force __attribute__((force))
-#define __bitwise__ __attribute__((bitwise))
-#define get_user(x, ptr) \
-do {\
-        unsigned long __gu_val = 0; \
-       (x) = (__typeof__(*(ptr)))__gu_val;  \
-} while (0)
-
-typedef unsigned u32;
-typedef u32 __bitwise__ __le32;
-
-static __le32 *p;
-static __le32 v;
-
-
-int main(int argc, char **argv)
-{
-        get_user(v, p);
-        return 0;
-}
-
-the code is correct but produces a warning:
-a.c:18:9: warning: cast to restricted __le32
-
-
-The cast near __typeof__ above needs __force,
-this is what my patch does.
-
-
-
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
+You can't rely on the device lock here since this isn't tied to kobjects
+or anything at all - it's a freestanding interface someone could pick up
+and use in another context.  Besides, that isn't really my concern - my
+concern is what happens if something asks to wait for 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141215/2a78aef9/attachment.sig>
