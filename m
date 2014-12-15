@@ -1,62 +1,45 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Dec 2014 17:34:16 +0000
-Subject: [RFC PATCH v4 0/8] Introduce automatic DMA configuration for
- IOMMU masters
-In-Reply-To: <1775535.qgYBmCEZS0@avalon>
-References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
- <546C7D36.7030400@samsung.com> <20141119114150.GD15985@arm.com>
- <1775535.qgYBmCEZS0@avalon>
-Message-ID: <20141215173416.GS20738@arm.com>
+Date: Mon, 15 Dec 2014 17:39:11 +0000
+Subject: [PATCH 0/4] Generic IOMMU page table framework
+In-Reply-To: <1703241.O5cxT4doxg@avalon>
+References: <1417089078-22900-1-git-send-email-will.deacon@arm.com>
+ <2133922.nksBEtjI2q@avalon> <20141215161052.GM20738@arm.com>
+ <1703241.O5cxT4doxg@avalon>
+Message-ID: <20141215173911.GT20738@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 05:21:16PM +0000, Laurent Pinchart wrote:
-> Hi Will,
-
-Hi Laurent,
-
-> On Wednesday 19 November 2014 11:41:50 Will Deacon wrote:
-> > +static void __remove_iommu_mapping_entry(struct kref *kref)
-> > +{
-> > +	struct dma_iommu_mapping_entry *entry;
-> > +
-> > +	entry = container_of(kref, struct dma_iommu_mapping_entry, kref);
-> > +	list_del(&entry->list);
-> > +}
-> > +
-> > +static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64
-> > size,
-> > +				    struct iommu_ops *iommu)
-> > +{
-> > +	struct iommu_domain *domain;
-> > +	struct dma_iommu_mapping_entry *entry = NULL;
-> > +
-> > +	if (!iommu->get_default_domain)
-> > +		return false;
-> > +
-> > +	domain = iommu->get_default_domain(dev);
-> > +	if (!domain)
-> > +		return false;
-> > +
-> > +	spin_lock(&dma_iommu_mapping_lock);
-> > +
-> > +	list_for_each_entry(entry, &dma_iommu_mapping_table, list) {
-> > +		if (entry->domain == domain)
-> > +			break;
-> > +	}
+On Mon, Dec 15, 2014 at 05:33:32PM +0000, Laurent Pinchart wrote:
+> On Monday 15 December 2014 16:10:52 Will Deacon wrote:
+> > On Sun, Dec 14, 2014 at 11:49:30PM +0000, Laurent Pinchart wrote:
+> > > diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+> > > index c1cff3d045db..a41a15d30596 100644
+> > > --- a/drivers/iommu/io-pgtable.h
+> > > +++ b/drivers/iommu/io-pgtable.h
+> > > @@ -24,6 +24,9 @@ struct iommu_gather_ops {
+> > >  	void (*flush_pgtable)(void *ptr, size_t size, void *cookie);
+> > >  };
+> > > 
+> > > +/* Set the Non-Secure bit in the PTEs */
+> > > +#define IO_PGTABLE_QUIRK_NON_SECURE	(1 << 0)
+> > 
+> > I think I'd stick an _ARM_ somewhere in here, so maybe
+> > IO_PGTABLE_QUIRK_ARM_NS?
 > 
-> That might be a stupid question (fighting my impostor syndrome again here), 
-> but is there a fundamental reason why we can't store the VA allocation data 
-> (probably using iova) in the domain instead of having to go through hoops and 
-> loops here to associate that data to the domain ?
+> I'm fine with that.
+> 
+> By the way, I'm only familiar with the Renesas implementation of the VMSA 
+> IOMMU, could you double-check whether setting the NSTABLE and NS bits on all 
+> levels make sense to you ? It seems to be required by my hardware, even though 
+> the ARM spec mentions that setting the NSTABLE bit causes non-secure accesses 
+> to page tables for all lower levels regardless of their NSTABLE/NS bits.
 
-Well, this was very much a work-in-progress that I ended up abandoning :)
+The ARM ARM is very clear that subsequent levels of lookup must ignore the
+NSTABLE/NS bits since otherwise you potentially have a security violation
+where you can use the table walker to access secure memory from
+non-secure...
 
-Ultimately, I'd really like to see the default domain management moved into
-core code, at which point extending struct iommu_domain seems perfectly
-plausible to me (not sure if we'd have a new structure for that).
-
-Then we'd have a fairly clean device -> group -> domain -> allocator
-abstraction for each master.
+So, you might want to check up on that, but given that this is a quirk I'm
+happy for it to do whatever you need.
 
 Will
