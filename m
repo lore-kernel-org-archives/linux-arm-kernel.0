@@ -1,64 +1,105 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Dec 2014 12:55:57 +0000
-Subject: [RFC 01/15] drivers/base: add track framework
-In-Reply-To: <548B7653.7020004@gmail.com>
-References: <548B7653.7020004@gmail.com>
-Message-ID: <20141215125557.GB11764@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Dec 2014 12:59:32 +0000
+Subject: [PATCH 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
+ board dts and Makefile
+In-Reply-To: <1418371705.423.31.camel@mtksdaap41>
+References: <1418208602-35584-1-git-send-email-eddie.huang@mediatek.com>
+ <1418208602-35584-4-git-send-email-eddie.huang@mediatek.com>
+ <20141211180245.GE28150@leverpostej>
+ <1418371705.423.31.camel@mtksdaap41>
+Message-ID: <20141215125932.GF462@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 13, 2014 at 12:12:19AM +0100, AH wrote:
-> Mark Brown wrote on 12.12.2014 17:36:
-> >On Wed, Dec 10, 2014 at 04:48:19PM +0100, Andrzej Hajda wrote:
+On Fri, Dec 12, 2014 at 08:08:25AM +0000, Eddie Huang wrote:
+> Hi Mark,
+> 
+> On Thu, 2014-12-11 at 18:02 +0000, Mark Rutland wrote:
+> > Hi,
+> > 
+> > On Wed, Dec 10, 2014 at 10:50:01AM +0000, Eddie Huang wrote:
+> > > Add device tree support for MT8173 SoC and evalutaion board based on it.
+> > > 
+> > > +/ {
+> > > +	model = "mediatek,mt8173-evb";
+> > > +
+> > > +	aliases {
+> > > +		serial0 = &uart0;
+> > > +		serial1 = &uart1;
+> > > +		serial2 = &uart2;
+> > > +		serial3 = &uart3;
+> > 
+> > Do any of these support earlycon?
+> 
+> Not yet
+> 
+> > 
+> > > +	};
+> > > +
+> > > +	memory {
+> > 
+> > Nit: should be memory at 40000000 (and you'll need to add device_type =
+> > "memory").
+> > 
+> > > +		reg = <0 0x40000000 0 0x40000000>;
+> > > +	};
+> 
+> skeleton.dtsi already has /memory node with address-cells=2,
+> size-cells=1, which will cause build warning if I change to use
+> memory at 40000000, because we use size-cells=2. I will not include
+> skeleton.dtsi and follow your suggestion in next version.
 
-> >>+		kfree(ptask);
-> >>+
-> >>+		if (empty)
-> >>+			break;
-> >>+
-> >>+		track_process_task(track, task);
+That sounds fine to me.
 
-> >...we then go and do some other stuff, including processing that task,
-> >without the lock or or any other means I can see of excluding other
-> >users before going round and removing the task.  This seems to leave us
-> >vulnerable to double execution.
+> 
+> > > +
+> > > +#include "skeleton.dtsi"
+> > > +
+> > > +/ {
+> > > +	compatible = "mediatek,mt8173";
+> > > +	interrupt-parent = <&sysirq>;
+> > > +	#address-cells = <2>;
+> > > +	#size-cells = <2>;
+> > > +
+> > > +	cpu-map {
+> > 
+> > This should live under /cpus, as documented in
+> > Documentation/devicetree/bindings/arm/topology.txt.
+> 
+> Got it, fix next version
+> 
+> > > +
+> > > +	psci {
+> > > +		compatible = "arm,psci-0.2";
+> > > +		method = "smc";
+> > > +	};
+> > 
+> > What are you using as your PSCI 0.2 implementation?
+> > 
+> > Is it fully compliant? (e.g. are the reset and power off functions
+> > implemented, may CPU0 be hotplugged)?
+> > 
+> > Given only portions of the GIC seem to be described below, what
+> > exception level is your kernel entered at? Per the spec it should be
+> > EL2, but given the brokenness below with the GIC I'm suspicious.
+> > 
+> 
+> Currently we only implement CPU boot, no power off, no CPU0 hotplug
+> either. And enter kernel at EL2. Actually, we run ATF in EL3, then
+> switch to EL2 to run lk and kernel.
 
-> No, if you look at track_add_task function you will see that the queue is
-> processed only if it is initially empty, otherwise the task is only added to
-> the queue, so it will be processed after processing earlier tasks.
-> So the rule is that if someone add task to the queue it checks if the queue
-> is empty, in such case it process all tasks from the queue until
-> the queue becomes empty, even the tasks added by other processed.
-> This way all tasks are serialized.
+Ok. In the absence of CPU_OFF, this is not yet a conforming PSCI 0.2
+implementation, so I'm wary of marking this as PSCI 0.2 until that is
+the case. Any attempt to power of CPUs will hit a BUG() in cpu_die(),
+and we don't want that.
 
-This is all pretty fiddly and seems fragile - if nothing else the code
-seems undercommented since the above is only going to be apparent with
-following through multiple functions and we're relying on both owner and
-list emptiness with more than one place where a task can get processed.
+Is CPU0 hotplug planned?
 
-> >I'm also unclear what is supposed to happen if adding a notification
-> >races with removing the thing being watched.
+If not, does your PSCI implementation report CPU0 as
+non-hotpluggable via MIGRATE_INFO_TYPE reporting a UP not migratable
+trusted OS (and MIGRATE_INFO_UP_CPU reporting CPU0 as the resident CPU)?
 
-> The sequence should be always as follows:
-> 1. create thing, then call track_up(thing).
-> ...
-> 2. call track_down(thing) then remove thing.
+Are SYSTEM_OFF and SYSTEM_RESET available?
 
-> If we put 1 into probe and 2 into remove callback of the driver it will be
-> safe - we are synchronised by device_lock. But if, for some reason, we want
-> to create object after probe we should do own synchronization or just put
-> device_lock around 1. The same applies if we want to remove
-> object earlier. This is the comment above about. I will expand it to more
-> verbose explanation.
-
-You can't rely on the device lock here since this isn't tied to kobjects
-or anything at all - it's a freestanding interface someone could pick up
-and use in another context.  Besides, that isn't really my concern - my
-concern is what happens if something asks to wait for 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141215/2a78aef9/attachment.sig>
+Thanks,
+Mark.
