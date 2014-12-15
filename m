@@ -1,145 +1,268 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon, 15 Dec 2014 00:57:49 +0000
-Subject: [RFC/PATCH 1/4 PATCH] ARM: mvebu: use dt_fixup to provide
- fallback for enable-method
-In-Reply-To: <548DFCEA.7000801@alliedtelesis.co.nz>
-References: <5488A2C0.5040804@alliedtelesis.co.nz>
- <1418360035-27975-1-git-send-email-chris.packham@alliedtelesis.co.nz>
- <2005632.nq5F7SJD3S@wuerfel> <548DFCEA.7000801@alliedtelesis.co.nz>
-Message-ID: <548E3209.20307@alliedtelesis.co.nz>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Mon, 15 Dec 2014 09:06:03 +0800
+Subject: [RFC PATCH] hw/arm/virt: Add support for NUMA on ARM64
+In-Reply-To: <CAFEAcA85pW2J1JjjxxKGeN3fC-u4ZJ7PLYPiX3jWMjtdOfamsA@mail.gmail.com>
+References: <1417524986-9196-1-git-send-email-zhaoshenglong@huawei.com>
+ <CAFEAcA85pW2J1JjjxxKGeN3fC-u4ZJ7PLYPiX3jWMjtdOfamsA@mail.gmail.com>
+Message-ID: <548E33FB.9090702@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Answering my own question
+On 2014/12/8 21:49, Peter Maydell wrote:
+> On 2 December 2014 at 12:56, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+>> Add support for NUMA on ARM64. Tested successfully running a guest
+>> Linux kernel with the following patch applied:
+> 
+> I'm still hoping for review from somebody who better understands
+> how QEMU and NUMA should interact, but in the meantime some comments
+> at a code level:
+> 
+>>  hw/arm/boot.c |   25 ------------
+>>  hw/arm/virt.c |  120 +++++++++++++++++++++++++++++++++++++++++++++++++++++---
+>>  2 files changed, 113 insertions(+), 32 deletions(-)
+>>
+>> diff --git a/hw/arm/boot.c b/hw/arm/boot.c
+>> index 0014c34..c20fee4 100644
+>> --- a/hw/arm/boot.c
+>> +++ b/hw/arm/boot.c
+>> @@ -335,7 +335,6 @@ static int load_dtb(hwaddr addr, const struct arm_boot_info *binfo,
+>>  {
+>>      void *fdt = NULL;
+>>      int size, rc;
+>> -    uint32_t acells, scells;
+>>
+>>      if (binfo->dtb_filename) {
+>>          char *filename;
+>> @@ -369,30 +368,6 @@ static int load_dtb(hwaddr addr, const struct arm_boot_info *binfo,
+>>          return 0;
+>>      }
+>>
+>> -    acells = qemu_fdt_getprop_cell(fdt, "/", "#address-cells");
+>> -    scells = qemu_fdt_getprop_cell(fdt, "/", "#size-cells");
+>> -    if (acells == 0 || scells == 0) {
+>> -        fprintf(stderr, "dtb file invalid (#address-cells or #size-cells 0)\n");
+>> -        goto fail;
+>> -    }
+>> -
+>> -    if (scells < 2 && binfo->ram_size >= (1ULL << 32)) {
+>> -        /* This is user error so deserves a friendlier error message
+>> -         * than the failure of setprop_sized_cells would provide
+>> -         */
+>> -        fprintf(stderr, "qemu: dtb file not compatible with "
+>> -                "RAM size > 4GB\n");
+>> -        goto fail;
+>> -    }
+>> -
+>> -    rc = qemu_fdt_setprop_sized_cells(fdt, "/memory", "reg",
+>> -                                      acells, binfo->loader_start,
+>> -                                      scells, binfo->ram_size);
+>> -    if (rc < 0) {
+>> -        fprintf(stderr, "couldn't set /memory/reg\n");
+>> -        goto fail;
+>> -    }
+>> -
+> 
+> This patchset seems to be moving the initialization of a lot of
+> the dtb from this generic code into the virt board. That doesn't
+> seem right to me -- why would NUMA support be specific to the
+> virt board? I would expect support for this to be in the generic
+> code (possibly controlled with a board option for "I support NUMA").
+> As it is your patch will break support for every other
+> board that uses device trees, because they rely on this code
+> which you've deleted here.
+> 
 
-On 12/15/2014 10:11 AM, Chris Packham wrote:
-> Hi Arnd,
->
-> On 12/13/2014 12:35 AM, Arnd Bergmann wrote:
->> On Friday 12 December 2014 17:53:55 Chris Packham wrote:
->>>> I briefly explored that approach here[1]. The tricky part would be
->>>> handling the fact that the enable method can be attached to either the
->>>> /cpus node or and individual /cpu entry (or is that something I can
->>>> ignore?).
->>>>
->>>> In the end I thought that the unconditional setting of smp_ops was
->>>> easier to implement and would achieve the same result.
->>>
->>> Actually as it turns out it's not that hard to implement something that
->>> checks both /cpus and /cpus/cpu at n. I'll include this with the next round
->>> after I've waited for anymore feedback.
->>
->> Ah, very nice!
->>
->>> ---8<---
->>> Subject: [PATCH] ARM: mvebu: use dt_fixup to provide fallback for
->>> enable-method
->>>
->>> When the device tree doesn't define an enable-method insert a property
->>> into the flattened device tree. arm_dt_init_cpu_maps() will then parse
->>> this an set smp_ops appropriately. Now that we have this fallback it is
->>> no longer necessary to set .smp in the DT_MACHINE definition.
->>>
->>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->>> ---
->>>   arch/arm/mach-mvebu/Makefile   |  2 ++
->>>   arch/arm/mach-mvebu/board-v7.c | 37
->>> ++++++++++++++++++++++++++++++++++++-
->>>   2 files changed, 38 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
->>> index e24136b..68310f8 100644
->>> --- a/arch/arm/mach-mvebu/Makefile
->>> +++ b/arch/arm/mach-mvebu/Makefile
->>> @@ -14,3 +14,5 @@ endif
->>>   obj-$(CONFIG_MACH_DOVE)         += dove.o
->>>   obj-$(CONFIG_MACH_KIRKWOOD)     += kirkwood.o kirkwood-pm.o
->>>   obj-$(CONFIG_MACH_NETXBIG)     += netxbig.o
->>> +
->>> +CFLAGS_board-v7.o = -I$(src)/../../../scripts/dtc/libfdt
->>> \ No newline at end of file
->>
->> Why is this needed? Can't you just include <linux/libfdt.h> ?
->>
->
-> I am already including linux/libfdt.h. Without the CFLAGS change I get
-> the following compile error.
->
->    In file included from include/linux/libfdt.h:6:0,
->                     from arch/arm/mach-mvebu/board-v7.c:21:
->    include/linux/../../scripts/dtc/libfdt/libfdt.h:54:24: fatal error:
-> libfdt_env.h: No such file or directory
->
-> There seems to be precedence in other architectures/drivers
->
->    $ git grep -e '-I.*libfdt'
->    arch/mips/cavium-octeon/Makefile:CFLAGS_octeon-platform.o =
-> -I$(src)/../../../scripts/dtc/libfdt
->    arch/mips/cavium-octeon/Makefile:CFLAGS_setup.o =
-> -I$(src)/../../../scripts/dtc/libfdt
->    arch/mips/mti-sead3/Makefile:CFLAGS_sead3-setup.o =
-> -I$(src)/../../../scripts/dtc/libfdt
->    arch/powerpc/kernel/Makefile:CFLAGS_prom.o              =
-> -I$(src)/../../../scripts/dtc/libfdt
->    drivers/firmware/efi/libstub/Makefile:CFLAGS_fdt.o    +=
-> -I$(srctree)/scripts/dtc/libfdt/
->    drivers/of/Makefile:CFLAGS_fdt.o = -I$(src)/../../scripts/dtc/libfdt
->    drivers/of/Makefile:CFLAGS_fdt_address.o =
-> -I$(src)/../../scripts/dtc/libfdt
->
->>> +static void __init armada_370_xp_dt_fixup(void)
->>> +{
->>> +    int offset, node;
->>> +    int i, len;
->>> +    void *prop;
->>> +    char buffer[20];
->>> +
->>> +    offset = fdt_path_offset(initial_boot_params, "/cpus");
->>> +    if (offset < 0)
->>> +        return;
->>> +
->>> +    prop = fdt_getprop(initial_boot_params, offset, "enable-method",
->>> &len);
->>> +    if (prop)
->>> +        return;
->>> +
->>> +    for (i = 0; i < NR_CPUS; i++) {
->>> +        snprintf(buffer, sizeof(buffer), "cpu@%d", i);
->>> +        node = fdt_subnode_offset(initial_boot_params, offset, buffer);
->>> +        if (node < 0)
->>> +            break;
->>> +        prop = fdt_getprop(initial_boot_params, node,
->>> +                   "enable-method", &len);
->>> +        if (prop)
->>> +            return;
->>> +    }
->>> +
->>> +    pr_info("No enable-method defined. "
->>> +        "Falling back to \"marvell,armada-xp-smp\"\n");
->>> +
->>> +    fdt_setprop(initial_boot_params, offset, "enable-method",
->>> +            "marvell,armada-xp-smp", sizeof("marvell,armada-xp-smp"));
->>> +}
->>
->> I think it would be good to first check whether you are running on
->> Armada XP
->> or Armada 370, because the latter does not require this.
->>
->>     Arnd
->>
->
-> Any suggestion as to what to check for. Based on the dts files in the
-> current source seem compatible == "marvell,armada370" seems like a good
-> choice. But I don't know for sure that there isn't a armada-xp variant
-> out using a .dts with this set.
+Good suggestion. Will fix this :-)
 
-Adding the following at the top will do the trick (assuming
-"marvell,armada370" is the right compatible string to use).
+>>      if (binfo->kernel_cmdline && *binfo->kernel_cmdline) {
+>>          rc = qemu_fdt_setprop_string(fdt, "/chosen", "bootargs",
+>>                                       binfo->kernel_cmdline);
+>> diff --git a/hw/arm/virt.c b/hw/arm/virt.c
+>> index 78f618d..9d18a91 100644
+>> --- a/hw/arm/virt.c
+>> +++ b/hw/arm/virt.c
+>> @@ -170,8 +170,6 @@ static void create_fdt(VirtBoardInfo *vbi)
+>>       * to fill in necessary properties later
+>>       */
+>>      qemu_fdt_add_subnode(fdt, "/chosen");
+>> -    qemu_fdt_add_subnode(fdt, "/memory");
+>> -    qemu_fdt_setprop_string(fdt, "/memory", "device_type", "memory");
+>>
+>>      /* Clock node, for the benefit of the UART. The kernel device tree
+>>       * binding documentation claims the PL011 node clock properties are
+>> @@ -235,6 +233,116 @@ static void fdt_add_psci_node(const VirtBoardInfo *vbi)
+>>      qemu_fdt_setprop_cell(fdt, "/psci", "migrate", migrate_fn);
+>>  }
+>>
+>> +static int virt_memory_init(MachineState *machine,
+>> +                            MemoryRegion *system_memory,
+>> +                            const VirtBoardInfo *vbi)
+>> +{
+>> +    MemoryRegion *ram = g_new(MemoryRegion, 1);
+>> +    CPUState *cpu;
+>> +    int min_cpu = 0, max_cpu = 0;
+>> +    int i, j, count, len;
+>> +    uint32_t acells, scells;
+>> +
+>> +    acells = qemu_fdt_getprop_cell(vbi->fdt, "/", "#address-cells");
+>> +    scells = qemu_fdt_getprop_cell(vbi->fdt, "/", "#size-cells");
+>> +    if (acells == 0 || scells == 0) {
+>> +        fprintf(stderr, "dtb file invalid (#address-cells or #size-cells 0)\n");
+>> +        goto fail;
+>> +    }
+>> +
+>> +    if (scells < 2 && machine->ram_size >= (1ULL << 32)) {
+>> +        /* This is user error so deserves a friendlier error message
+>> +         * than the failure of setprop_sized_cells would provide
+>> +         */
+>> +        fprintf(stderr, "qemu: dtb file not compatible with "
+>> +                "RAM size > 4GB\n");
+>> +        goto fail;
+>> +    }
+>> +
+>> +    memory_region_allocate_system_memory(ram, NULL, "mach-virt.ram",
+>> +                                         machine->ram_size);
+>> +    memory_region_add_subregion(system_memory, vbi->memmap[VIRT_MEM].base, ram);
+>> +
+>> +    hwaddr mem_base = vbi->memmap[VIRT_MEM].base;
+>> +
+>> +    if (!nb_numa_nodes) {
+>> +        qemu_fdt_add_subnode(vbi->fdt, "/memory");
+>> +        qemu_fdt_setprop_string(vbi->fdt, "/memory", "device_type", "memory");
+>> +        qemu_fdt_setprop_sized_cells(vbi->fdt, "/memory", "reg",
+>> +                                      acells, mem_base,
+>> +                                      scells, machine->ram_size);
+>> +        return 0;
+>> +    }
+>> +
+>> +    qemu_fdt_add_subnode(vbi->fdt, "/numa-map");
+>> +    qemu_fdt_setprop_cell(vbi->fdt, "/numa-map", "#address-cells", 0x2);
+>> +    qemu_fdt_setprop_cell(vbi->fdt, "/numa-map", "#size-cells", 0x1);
+>> +    qemu_fdt_setprop_cell(vbi->fdt, "/numa-map", "#node-count", 0x2);
+>> +
+>> +    uint64_t *mem_map = g_malloc0(nb_numa_nodes * sizeof(uint64_t) * 6);
+>> +    uint64_t *cpu_map = g_malloc0(nb_numa_nodes * sizeof(uint64_t) * 6);
+>> +    uint64_t *node_matrix = g_malloc0(nb_numa_nodes * nb_numa_nodes
+>> +                                      * sizeof(uint64_t) * 6);
+> 
+> g_new0() is usually better than g_malloc0(count * sizeof(thing));
+> 
 
-   	unsigned long root = of_get_flat_dt_root();
+Ok
 
-   	if (of_flat_dt_is_compatible(root, "marvell,armada370"))
-   		return;
+>> +
+>> +    for (i = 0; i < nb_numa_nodes; i++) {
+>> +        uint64_t buffer[6] = {1, 0x00000000, 1, mem_base, 1, i};
+>> +        char *nodename;
+>> +        nodename = g_strdup_printf("/memory@%" PRIx64, mem_base);
+>> +        qemu_fdt_add_subnode(vbi->fdt, nodename);
+>> +        qemu_fdt_setprop_string(vbi->fdt, nodename, "device_type", "memory");
+>> +        qemu_fdt_setprop_sized_cells(vbi->fdt, nodename, "reg",
+>> +                                      acells, mem_base,
+>> +                                      scells, numa_info[i].node_mem-1);
+>> +        memcpy(mem_map + 6 * i, buffer, 6 * sizeof(*buffer));
+> 
+> Why do we create a local buffer array and then immediately do nothing
+> with it but memcpy() it somewhere else? I suspect this code would
+> be clearer if you defined a type (possibly a struct) where you're
+> currently using raw uint64_t array[6]. Then you could make your
+> mem_map, cpu_map and node_matrix variables have more sensible types
+> than raw uint64_t*, and you could just set the right element in them
+> using C array syntax rather than these memcpy calls.
+> 
 
->
-> Another option might be just to count the /cpu at n nodes.
+OK, thanks for your suggestion.
+
+>> +        mem_base += numa_info[i].node_mem;
+>> +        g_free(nodename);
+>> +    }
+>> +    qemu_fdt_setprop_sized_cells_from_array(vbi->fdt, "/numa-map", "mem-map",
+>> +                        (nb_numa_nodes * 6) / 2, mem_map);
+> 
+> Lots of unnecessary hardcoded 6s here (and above and below).
+> 
+
+Will replace them.
+
+>> +
+>> +    for (i = 0; i < nb_numa_nodes; i++) {
+>> +        CPU_FOREACH(cpu) {
+>> +            if (test_bit(cpu->cpu_index, numa_info[i].node_cpu)) {
+>> +                if (cpu->cpu_index < min_cpu) {
+>> +                    min_cpu = cpu->cpu_index;
+>> +                }
+>> +                if (cpu->cpu_index > max_cpu) {
+>> +                    max_cpu = cpu->cpu_index;
+>> +                }
+>> +            }
+>> +        }
+>> +
+>> +        uint64_t buffer[6] = {1, min_cpu, 1, max_cpu, 1, i};
+>> +        memcpy(cpu_map + 6 * i, buffer, 6 * sizeof(*buffer));
+>> +        min_cpu = max_cpu + 1;
+>> +    }
+>> +
+>> +    qemu_fdt_setprop_sized_cells_from_array(vbi->fdt, "/numa-map", "cpu-map",
+>> +                        (nb_numa_nodes * 6) / 2, cpu_map);
+>> +    count = 0;
+>> +    for (i = 0; i < nb_numa_nodes; i++) {
+>> +        for (j = 0; j < nb_numa_nodes; j++) {
+>> +            len = 20;
+>> +            if (i == j) {
+>> +                len = 10;
+>> +            }
+>> +            uint64_t buffer[6] = {1, i, 1, j, 1, len};
+>> +            memcpy(node_matrix + 6 * count, buffer, 6 * sizeof(*buffer));
+>> +            count++;
+>> +        }
+>> +    }
+>> +    qemu_fdt_setprop_sized_cells_from_array(vbi->fdt, "/numa-map",
+>> +        "node-matrix", (nb_numa_nodes * nb_numa_nodes * 6) / 2, node_matrix);
+>> +
+>> +    g_free(mem_map);
+>> +    g_free(cpu_map);
+>> +    g_free(node_matrix);
+>> +
+>> +    return 0;
+>> +fail:
+>> +    return -1;
+>> +}
+>> +
+>>  static void fdt_add_timer_nodes(const VirtBoardInfo *vbi)
+>>  {
+>>      /* Note that on A15 h/w these interrupts are level-triggered,
+>> @@ -532,7 +640,6 @@ static void machvirt_init(MachineState *machine)
+>>      qemu_irq pic[NUM_IRQS];
+>>      MemoryRegion *sysmem = get_system_memory();
+>>      int n;
+>> -    MemoryRegion *ram = g_new(MemoryRegion, 1);
+>>      const char *cpu_model = machine->cpu_model;
+>>      VirtBoardInfo *vbi;
+>>
+>> @@ -585,10 +692,9 @@ static void machvirt_init(MachineState *machine)
+>>      fdt_add_cpu_nodes(vbi);
+>>      fdt_add_psci_node(vbi);
+>>
+>> -    memory_region_init_ram(ram, NULL, "mach-virt.ram", machine->ram_size,
+>> -                           &error_abort);
+>> -    vmstate_register_ram_global(ram);
+>> -    memory_region_add_subregion(sysmem, vbi->memmap[VIRT_MEM].base, ram);
+>> +    if (virt_memory_init(machine, sysmem, vbi) < 0) {
+>> +        exit(1);
+>> +    }
+>>
+>>      create_flash(vbi);
+>>
+>> --
+>> 1.7.1
+> 
+> thanks
+> -- PMM
+> 
+> .
+> 
+
+Thanks for your comments. Anyone else has more comments about this?
+
+Thanks,
+Shannon
