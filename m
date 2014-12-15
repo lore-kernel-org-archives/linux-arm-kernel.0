@@ -1,87 +1,112 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 15 Dec 2014 19:32:49 +0100
-Subject: [PATCH 06/27] ARM: mvebu: armada-370-rd: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <1418657915-22775-7-git-send-email-gregory.clement@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-7-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20141215183249.GA30741@lunn.ch>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 15 Dec 2014 18:34:25 +0000
+Subject: [PATCH 3/3] arm64: psci: Add support to call cpu_suspend with
+ deepest C state.
+In-Reply-To: <CADGdYn51aC-r7bRLvF+5p2z=a1WXRXobA-ukuvuDXHn-HE2PZw@mail.gmail.com>
+References: <1414641338-25279-1-git-send-email-amit.daniel@samsung.com>
+ <1414641338-25279-3-git-send-email-amit.daniel@samsung.com>
+ <20141030104630.GC17843@red-moon>
+ <CADGdYn51aC-r7bRLvF+5p2z=a1WXRXobA-ukuvuDXHn-HE2PZw@mail.gmail.com>
+Message-ID: <20141215183425.GB721@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 04:38:14PM +0100, Gregory CLEMENT wrote:
-> The current GPL only licensing on the device tree makes it very
-> impractical for other software components licensed under another
-> license.
+On Mon, Dec 01, 2014 at 08:08:55AM +0000, amit daniel kachhap wrote:
+> On Thu, Oct 30, 2014 at 4:16 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > On Thu, Oct 30, 2014 at 03:55:38AM +0000, Amit Daniel Kachhap wrote:
+> >> This feature will be useful for system suspend/resume which may
+> >> intend to invoke cpu_suspend with deepest possible C state level.
+> >
+> > We are working on defining system states in the PSCI specification,
+> > but it is not set in stone yet (Cc'ed Charles).
+> >
+> > I guess you are posting this code because you have already an
+> > implementation that supports system suspend/resume, so I am
+> > taking an immediate action to come up with an API suitable
+> > for that asap.
+> Hi Lorenzo,
 > 
-> In order to make it easier for them to reuse our device trees,
-> relicense our device trees under a GPL/X11 dual-license.
-> 
-> Cc: Andrew Lunn <andrew@lunn.ch>
+> Any update on this API for system sleep.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Hi Amit,
 
-> Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Florian Fainelli <florian@openwrt.org>
-> Cc: Simon Baatz <gmbnomis@gmail.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-370-rd.dts | 40 ++++++++++++++++++++++++++++++++++---
->  1 file changed, 37 insertions(+), 3 deletions(-)
+Sorry for the delay in replying, I am working on it at the moment, we will
+post the API in the coming weeks.
+
+Thank you,
+Lorenzo
+
 > 
-> diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-> index 394308951ed9..6ae36a38beb2 100644
-> --- a/arch/arm/boot/dts/armada-370-rd.dts
-> +++ b/arch/arm/boot/dts/armada-370-rd.dts
-> @@ -6,9 +6,43 @@
->   *
->   *  Copyright (C) 2013 Florian Fainelli <florian@openwrt.org>
->   *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   *
->   * Note: this Device Tree assumes that the bootloader has remapped the
->   * internal registers to 0xf1000000 (instead of the default
-> -- 
-> 1.9.1
+> Regards,
+> Amit
+> 
+> >
+> > On a side note I do not necessarily like this magic idle index
+> > logic, I prefer adding an API for that, that translates the call
+> > into whatever is required by the back-end (ie PSCI) implementation.
+> >
+> > Thanks,
+> > Lorenzo
+> >
+> >> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> >> ---
+> >>  arch/arm64/include/asm/psci.h | 2 ++
+> >>  arch/arm64/kernel/psci.c      | 8 ++++++++
+> >>  2 files changed, 10 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
+> >> index e5312ea..487e52b 100644
+> >> --- a/arch/arm64/include/asm/psci.h
+> >> +++ b/arch/arm64/include/asm/psci.h
+> >> @@ -14,6 +14,8 @@
+> >>  #ifndef __ASM_PSCI_H
+> >>  #define __ASM_PSCI_H
+> >>
+> >> +#define CPU_PSCI_IDLE_INDEX_MAX              0xff
+> >> +
+> >>  int psci_init(void);
+> >>
+> >>  #endif /* __ASM_PSCI_H */
+> >> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> >> index 4ebc146..a761513 100644
+> >> --- a/arch/arm64/kernel/psci.c
+> >> +++ b/arch/arm64/kernel/psci.c
+> >> @@ -70,6 +70,7 @@ enum psci_function {
+> >>  static DEFINE_PER_CPU_READ_MOSTLY(struct psci_power_state *, psci_power_state);
+> >>
+> >>  static u32 psci_function_id[PSCI_FN_MAX];
+> >> +static u32 cpu_psci_idle_state_count;
+> >>
+> >>  static int psci_to_linux_errno(int errno)
+> >>  {
+> >> @@ -239,6 +240,8 @@ static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
+> >>       if (!count)
+> >>               return -ENODEV;
+> >>
+> >> +     cpu_psci_idle_state_count = count;
+> >> +
+> >>       psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
+> >>       if (!psci_states)
+> >>               return -ENOMEM;
+> >> @@ -521,6 +524,11 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
+> >>  {
+> >>       int ret;
+> >>       struct psci_power_state *state = __get_cpu_var(psci_power_state);
+> >> +
+> >> +     /* Check and select the deepest idle state */
+> >> +     if (index == CPU_PSCI_IDLE_INDEX_MAX)
+> >> +             index = cpu_psci_idle_state_count;
+> >> +
+> >>       /*
+> >>        * idle state index 0 corresponds to wfi, should never be called
+> >>        * from the cpu_suspend operations.
+> >> --
+> >> 1.9.1
+> >>
+> >>
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
