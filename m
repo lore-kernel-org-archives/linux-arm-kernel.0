@@ -1,85 +1,33 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Mon, 15 Dec 2014 14:16:34 +1030
-Subject: CONFIG_DEBUG_SET_MODULE_RONX broken (was Re: [PATCHv2] arm64: add
- support to dump the kernel page tables)
-In-Reply-To: <547CE354.5030508@codeaurora.org>
-References: <1416262710-7798-1-git-send-email-lauraa@codeaurora.org>
- <CAGXu5jK7FWs2v52T2RBdKhdYcV5wGm3F4H4km9h-B15Z6S0A2Q@mail.gmail.com>
- <546E7748.4000603@codeaurora.org> <878uiyxzro.fsf@rustcorp.com.au>
- <547CE354.5030508@codeaurora.org>
-Message-ID: <87h9wxd17p.fsf@rustcorp.com.au>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Mon, 15 Dec 2014 11:10:00 -0800
+Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
+ under GPLv2+/X11
+In-Reply-To: <20141215160752.GE967@titan.lakedaemon.net>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <20141215160752.GE967@titan.lakedaemon.net>
+Message-ID: <op.xqxbiybe2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laura Abbott <lauraa@codeaurora.org> writes:
-> On 11/25/2014 10:05 PM, Rusty Russell wrote:
->>>
->>> Yep, I'm seeing the same thing. We're failing the bounds check:
->>>
->>> if (!is_module_address(start) || !is_module_address(end - 1))
->>>                   return -EINVAL;
->>
->> That's a weird test, but I can agree that it's now broken.  What's it for?
->>
+On Mon, 15 Dec 2014 08:07:52 -0800, Jason Cooper <jason@lakedaemon.net> wrote:
+
+<snip>
+
+> I like the X11 license, much more liberal than the BSD I had been
+> thinking of.
 >
-> Both arm and arm64 map underlying memory with page table mappings that may
-> be greater than PAGE_SIZE. Rather than deal with the hassle of trying to
-> tear down the larger mappings and call stop_machine to flush the TLBs, we
-> just disallow changing attributes of arbitrary memory. Module memory is
-> always mapped with 4K pages so it's safe to change the attributes, hence
-> the bounds check above. On arm we just bounds check via
-> MODULE_START <= addr < MODULE_END so that wasn't affected.
-
-OK, perhaps as you say, we should do this.
-
->> Yes, but you only need the first change in your patch: mod->init_size
->> should already be aligned (and unlike mod->core_size, we haven't
->> modified it).
->>
+> What were the reasons for changing GPLv2 -> GPLv2+?  Why not preserve
+> the author's intent re GPL and do:
 >
-> the init size can be modified via get_offset though. In my testing I needed
-> to align up both mod->init_size and mod->core_size for is_module_address to
-> pass on all set_memory_* calls made by the module layer.
-
-You're right.  It doesn't seem to hurt any other code path, but if you
-want this, please send me a proper explanation w/ signed-off-by.
-
-Thanks!
-Rusty.
-
->>> diff --git a/kernel/module.c b/kernel/module.c
->>> index 972151b..3791330 100644
->>> --- a/kernel/module.c
->>> +++ b/kernel/module.c
->>> @@ -2316,10 +2316,14 @@ static void layout_symtab(struct module *mod, struct load_info *info)
->>>           info->stroffs = mod->core_size = info->symoffs + ndst * sizeof(Elf_Sym);
->>>           mod->core_size += strtab_size;
->>>
->>> +       mod->core_size = debug_align(mod->core_size);
->>> +
->>>           /* Put string table section at end of init part of module. */
->>>           strsect->sh_flags |= SHF_ALLOC;
->>>           strsect->sh_entsize = get_offset(mod, &mod->init_size, strsect,
->>>                                            info->index.str) | INIT_OFFSET_MASK;
->>> +
->>> +       mod->init_size = debug_align(mod->init_size);
->>>           pr_debug("\t%s\n", info->secstrings + strsect->sh_name);
->>>    }
->>>
->>> I haven't tried a bisect to see if this is new.
->>>
->>> I'm kind of tempted to switch the bounds check back to
->>> (addr >= MODULES_VADDR && addr < MODULES_END) unless there is a clean way to
->>> fixup module.c
->>
->> Thanks,
->> Rusty.
->>
+> 	GPLv2  -> GPLv2/X11
+> 	GPLv2+ -> GPLv2+/X11
 >
-> Thanks,
-> Laura
->
-> -- 
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> Please note: I have no interest is a flame war re GPLv2/GPLv3.  No ones
+> minds are going to be changed at this point.  I'm simply looking to stay
+> closer to the author's intentions and extend the usefulness of the DT
+> tree.
+
+Why not simply ISC it? Wouldn't it be better than dual-licensing?
+
+
+Imre
