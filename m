@@ -1,48 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 15 Dec 2014 12:28:26 +0000
-Subject: [PATCH v2 0/8] irqchip: New driver for ST's SysCfg controlled IRQs
-In-Reply-To: <1416932705-16880-1-git-send-email-lee.jones@linaro.org>
-References: <1416932705-16880-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20141215122826.GB13885@x1>
+From: catalin.crenguta@gmail.com (Catalin Crenguta)
+Date: Mon, 15 Dec 2014 14:45:03 +0200
+Subject: [PATCH v4 0/6] Touchscreen performance related fixes
+In-Reply-To: <912A29987EAE174BA6CF187D7CDFA9CE26FA135A@DLEE08.ent.ti.com>
+References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
+ <20141124115116.GA14997@linutronix.de> <547C3A95.30605@ti.com>
+ <547C3C19.5090501@linutronix.de> <547C42FF.5010700@ti.com>
+ <CAH=tA9FO5MCzE274thc-NugCNte6WdyC-Rxc6yfnuR=+6_qMbA@mail.gmail.com>
+ <548A0125.6040708@linutronix.de>
+ <CABH3fy8zCjsxARsqBf9JXOHBkzySdiqifA1KtjnGpJdBY2EikA@mail.gmail.com>
+ <912A29987EAE174BA6CF187D7CDFA9CE26FA135A@DLEE08.ent.ti.com>
+Message-ID: <CABH3fy9f9oaV=PKTP+-tS9ADd8bD1oqO--SH0fh9LemqwdL3zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, would you like me to send this set again?
+On Fri, Dec 12, 2014 at 4:16 PM, Griffis, Brad <bgriffis@ti.com> wrote:
+> How are you configuring ti,charge-delay in your dts?  I've seen this behavior on some custom boards where we were using a smaller charge delay (0x400) to begin with, and by upping it to 0xb000 we resolved the issue.  These patches however already specified ti,charge-delay = 0xb000 by default so this would surprise me that it's still seeing that issue.  Was the touchscreen working as expected before these new patches, or does it have issues both ways?
 
-> This driver enables IRQs which are controlled using System Configuration
-> registers.  Without it Performance Monitoring, Core Sight Tracing and some
-> L2 Caches will fail to function.
-> 
-> v1 => v2:
->  - Fixed up Jason's review comments
-> 
-> Lee Jones (8):
->   dt: bindings: Supply shared ST IRQ defines
->   irqchip: Supply new driver for STi based devices
->   irqchip: irq-st: Add documentation for STi based syscfg IRQs
->   ARM: STi: STiH416: Enable Cortex-A9 PMU support
->   ARM: STi: STiH416: Enable PMU IRQs
->   ARM: STi: STiH407: Enable Cortex-A9 PMU support
->   ARM: STi: STiH407: Enable PMU IRQs
->   ARM: STI: Ensure requested STi's SysCfg Controlled IRQs are enabled at
->     boot
-> 
->  .../interrupt-controller/st,sti-irq-syscfg.txt     |  35 ++++
->  arch/arm/boot/dts/stih407.dtsi                     |  16 ++
->  arch/arm/boot/dts/stih416.dtsi                     |  16 ++
->  arch/arm/mach-sti/Kconfig                          |   1 +
->  drivers/irqchip/Kconfig                            |   7 +
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-st.c                           | 208 +++++++++++++++++++++
->  include/dt-bindings/interrupt-controller/irq-st.h  |  30 +++
->  8 files changed, 314 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt
->  create mode 100644 drivers/irqchip/irq-st.c
->  create mode 100644 include/dt-bindings/interrupt-controller/irq-st.h
-> 
+I have created a DTS for Beaglebone Black with 4 wire touchscreen and
+display which works on 3.18 stable and tsc-devel, omap2plus_defconfig
+with tsc and tilcdc support.
+It seems that with lcdc disabled, I am not getting false reports but
+when I'm activating the lcdc, I get a lot of false pen-downs/pen-ups.
+Even with tilcdc enabled, after it prints "timeout waiting for
+framedone" and the screen get blanked (white), the noise is gone.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Catalin.
