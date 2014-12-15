@@ -1,42 +1,85 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Dec 2014 16:56:27 +0000
-Subject: regulator: tps65023 : Adding support for DT
-In-Reply-To: <CAL8zT=jo2AsK9p_r_C+od_QEovOQNmo7MnNu9JtUHoA=KtsxGw@mail.gmail.com>
-References: <CAL8zT=jo2AsK9p_r_C+od_QEovOQNmo7MnNu9JtUHoA=KtsxGw@mail.gmail.com>
-Message-ID: <20141215165627.GF11764@sirena.org.uk>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Mon, 15 Dec 2014 08:59:23 -0800
+Subject: [PATCH 06/27] ARM: mvebu: armada-370-rd: Relicense the device
+ tree under GPLv2+/X11
+In-Reply-To: <1418657915-22775-7-git-send-email-gregory.clement@free-electrons.com>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <548F136B.90100@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 11, 2014 at 09:36:26AM +0100, Jean-Michel Hautbois wrote:
+On 15/12/14 07:38, Gregory CLEMENT wrote:
+> The current GPL only licensing on the device tree makes it very
+> impractical for other software components licensed under another
+> license.
+> 
+> In order to make it easier for them to reuse our device trees,
+> relicense our device trees under a GPL/X11 dual-license.
+> 
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Arnaud Ebalard <arno@natisbad.org>
+> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: Florian Fainelli <florian@openwrt.org>
+> Cc: Simon Baatz <gmbnomis@gmail.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-> I started to add support for DT in this regulator, but I can't get a
-> booting kernel with it. I know it lacks regulator init in the parse_dt
-> function, but I don't really know what is the best way to do it. I
-> have used tps6507x as an example until know...
+Acked-by: Florian Fainelli <florian@openwrt.org>
 
-Well, the best thing to do would be to backport the changes to add
-support for DT parsing in the core and use that.  See "regulator: of:
-Provide simplified DT parsing method" and preceeding commits in
-mainline.  Otherwise what you've got looks basically OK from a quick
-scan through.
-
-> I don't know for instance if a tps_board is needed (it would contain
-> only a struct regulator_init_data * so probably not very useful) ?
-
-Probably not, no.
-
-> Below is my current status (I also have created a tps65023.dtsi in
-> arch/arm/boot/dts which is only a copy of tps6507x.dtsi so didn't copy
-> it here).
-
-If you need to create a .dsti file for a regulator that's a warning sign
-- it should be empty.  You'll want things in the particular board but
-that ought to be board specific things rather than something that
-applies to all boards using the regulator.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141215/2c4207b3/attachment-0001.sig>
+> ---
+>  arch/arm/boot/dts/armada-370-rd.dts | 40 ++++++++++++++++++++++++++++++++++---
+>  1 file changed, 37 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+> index 394308951ed9..6ae36a38beb2 100644
+> --- a/arch/arm/boot/dts/armada-370-rd.dts
+> +++ b/arch/arm/boot/dts/armada-370-rd.dts
+> @@ -6,9 +6,43 @@
+>   *
+>   *  Copyright (C) 2013 Florian Fainelli <florian@openwrt.org>
+>   *
+> - * This file is licensed under the terms of the GNU General Public
+> - * License version 2.  This program is licensed "as is" without any
+> - * warranty of any kind, whether express or implied.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>   *
+>   * Note: this Device Tree assumes that the bootloader has remapped the
+>   * internal registers to 0xf1000000 (instead of the default
+> 
