@@ -1,32 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Dec 2014 15:56:15 +0000
-Subject: [PATCH] iommu/exynos: Fix arm64 allmodconfig build
-In-Reply-To: <20141215153804.GK20738@arm.com>
-References: <1418648413-32013-1-git-send-email-broonie@kernel.org>
- <548EDDCD.4060203@samsung.com>
- <20141215153529.GC11764@sirena.org.uk>
- <20141215153804.GK20738@arm.com>
-Message-ID: <20141215155615.GD11764@sirena.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 15 Dec 2014 16:58:27 +0100
+Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
+ tree under GPLv2+/X11
+In-Reply-To: <20141215155310.GD28701@1wt.eu>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-25-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-24-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-19-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
+ <20141215155310.GD28701@1wt.eu>
+Message-ID: <548F0523.906@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 03:38:04PM +0000, Will Deacon wrote:
-> On Mon, Dec 15, 2014 at 03:35:29PM +0000, Mark Brown wrote:
+On 15/12/2014 16:53, Willy Tarreau wrote:
+> On Mon, Dec 15, 2014 at 04:38:16PM +0100, Gregory CLEMENT wrote:
+>> The current GPL only licensing on the device tree makes it very
+>> impractical for other software components licensed under another
+>> license.
+>>
+>> In order to make it easier for them to reuse our device trees,
+>> relicense our device trees under a GPL/X11 dual-license.
+>>
+>> Cc: Andrew Lunn <andrew@lunn.ch>
+>> Cc: Arnaud Ebalard <arno@natisbad.org>
+>> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>> Cc: Greg Ungerer <gerg@uclinux.org>
+>> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+>> Cc: Simon Baatz <gmbnomis@gmail.com>
+>> Cc: Simon Guinot <simon.guinot@sequanux.org>
+>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Cc: Willy Tarreau <w@1wt.eu>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> Acked-by: Willy Tarreau <w@1wt.eu>
+> 
 
-> > I don't mind either way, it just seemed to be easier to report the bug
-> > with a patch.  If Jeorg is busy perhaps it can go via the arm64 tree,
-> > the issue is triggered by the addition of the platform there?
+Thanks for you prompt answer for this patch ans the 3 others :)
 
-> Can I pass the buck to arm-soc, as they're handling arm64 platform code?
+Gregory
 
-> It seems sensible to merge the fix via the same tree that introduced the
-> breakage.
 
-Sure, just resending to them...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141215/e01a2f66/attachment.sig>
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
