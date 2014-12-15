@@ -1,1973 +1,409 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Mon, 15 Dec 2014 13:10:17 +0100
-Subject: bluetooth: Add hci_h4p driver
-In-Reply-To: <20141213223727.GA13894@amd>
-References: <20141213223727.GA13894@amd>
-Message-ID: <97C706D6-765B-446A-8180-600F5FB6C68B@holtmann.org>
+From: david.paris@st.com (David Paris)
+Date: Mon, 15 Dec 2014 13:28:06 +0100
+Subject: [STLinux Kernel] [PATCH 7/8] rtc: st: add new driver for ST's
+ LPC RTC
+In-Reply-To: <1418642738-17407-8-git-send-email-lee.jones@linaro.org>
+References: <1418642738-17407-1-git-send-email-lee.jones@linaro.org>
+ <1418642738-17407-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <548ED3D6.5070707@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+Hi Lee,
 
-> diff --git a/drivers/bluetooth/Kconfig b/drivers/bluetooth/Kconfig
-> index 4547dc2..0fc7d3a 100644
-> --- a/drivers/bluetooth/Kconfig
-> +++ b/drivers/bluetooth/Kconfig
-> @@ -243,4 +243,14 @@ config BT_WILINK
-> 	  Say Y here to compile support for Texas Instrument's WiLink7 driver
-> 	  into the kernel or say M to compile it as module (btwilink).
-> 
-> +config BT_NOKIA_H4P
-> +	tristate "HCI driver with H4 Nokia extensions"
-> +	depends on ARCH_OMAP
+     See my comment below.
+     David
 
-this dependency needs to go away. The actual loading and detection of the driver should purely be based on DT. All OMAP specific details should not really be part of the Bluetooth driver.
-
+On 12/15/2014 12:25 PM, Lee Jones wrote:
+> ST's Low Power Controller (LPC) controls two devices; watchdog and RTC.
+> Only one of the devices can be used at any one time.  This is enforced
+> by the correlating MFD driver.  This portion of the driver-set controls
+> the Real Time Clock.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   drivers/rtc/Kconfig      |  13 ++
+>   drivers/rtc/Makefile     |   1 +
+>   drivers/rtc/rtc-st-lpc.c | 330 +++++++++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 344 insertions(+)
+>   create mode 100644 drivers/rtc/rtc-st-lpc.c
+>
+> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+> index a168e96..aa4bd90 100644
+> --- a/drivers/rtc/Kconfig
+> +++ b/drivers/rtc/Kconfig
+> @@ -1355,6 +1355,18 @@ config RTC_DRV_SIRFSOC
+>   	  Say "yes" here to support the real time clock on SiRF SOC chips.
+>   	  This driver can also be built as a module called rtc-sirfsoc.
+>   
+> +config RTC_DRV_ST_LPC
+> +	tristate "STMicroelectronics LPC RTC"
+> +	depends on ARCH_STI
+> +	depends on OF
+> +	select MFD_ST_LPC
 > +	help
-> +	  Bluetooth HCI driver with H4 extensions.  This driver provides
-> +	  support for H4+ Bluetooth chip with vendor-specific H4 extensions.
+> +	  Say Y here to include STMicroelectronics Low Power Controller
+> +	  (LPC) based RTC support.
 > +
-> +	  Say Y here to compile support for h4 extended devices into the kernel
-> +	  or say M to compile it as module (btnokia_h4p).
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called rtc-st-lpc.
 > +
-> endmenu
-> diff --git a/drivers/bluetooth/Makefile b/drivers/bluetooth/Makefile
-> index 9fe8a87..ec7074fe 100644
-> --- a/drivers/bluetooth/Makefile
-> +++ b/drivers/bluetooth/Makefile
-> @@ -31,4 +31,7 @@ hci_uart-$(CONFIG_BT_HCIUART_ATH3K)	+= hci_ath.o
-> hci_uart-$(CONFIG_BT_HCIUART_3WIRE)	+= hci_h5.o
-> hci_uart-objs				:= $(hci_uart-y)
-> 
-> +obj-$(CONFIG_BT_NOKIA_H4P)      += hci_h4p.o
-> +hci_h4p-objs := nokia_core.o nokia_fw.o nokia_uart.o
+>   config RTC_DRV_MOXART
+>   	tristate "MOXA ART RTC"
+>   	depends on ARCH_MOXART || COMPILE_TEST
+> @@ -1390,4 +1402,5 @@ config RTC_DRV_HID_SENSOR_TIME
+>   	  rtc-hid-sensor-time.
+>   
+>   
 > +
-
-We are moving away from calling drivers hci_ since that is a bit too generic. Just call the the driver object nokia_h4p.o for now.
-
-> ccflags-y += -D__CHECK_ENDIAN__
+>   endif # RTC_CLASS
+> diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+> index 56f061c..ce5860b 100644
+> --- a/drivers/rtc/Makefile
+> +++ b/drivers/rtc/Makefile
+> @@ -145,4 +145,5 @@ obj-$(CONFIG_RTC_DRV_WM8350)	+= rtc-wm8350.o
+>   obj-$(CONFIG_RTC_DRV_X1205)	+= rtc-x1205.o
+>   obj-$(CONFIG_RTC_DRV_XGENE)	+= rtc-xgene.o
+>   obj-$(CONFIG_RTC_DRV_SIRFSOC)	+= rtc-sirfsoc.o
+> +obj-$(CONFIG_RTC_DRV_ST_LPC)	+= rtc-st-lpc.o
+>   obj-$(CONFIG_RTC_DRV_MOXART)	+= rtc-moxart.o
+> diff --git a/drivers/rtc/rtc-st-lpc.c b/drivers/rtc/rtc-st-lpc.c
 > new file mode 100644
-> index 0000000..6445a99
+> index 0000000..60b1ab4
 > --- /dev/null
-> +++ b/drivers/bluetooth/hci_h4p.h
-
-this should be nokia_h4p.h then.
-
-> @@ -0,0 +1,234 @@
+> +++ b/drivers/rtc/rtc-st-lpc.c
+> @@ -0,0 +1,330 @@
 > +/*
-> + * This file is part of Nokia H4P bluetooth driver
+> + * rtc-st-lpc.c - ST's LPC RTC, powered by the Low Power Timer
 > + *
-> + * Copyright (C) 2005-2008 Nokia Corporation.
+> + * Copyright (C) 2014 STMicroelectronics Limited
+> + *
+> + * Author: David Paris <david.paris@st.com> for STMicroelectronics
+> + *         Lee Jones <lee.jones@linaro.org> for STMicroelectronics
+> + *
+> + * Based on the original driver written by Stuart Menefy.
 > + *
 > + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-> + * 02110-1301 USA
-> + *
+> + * modify it under the terms of the GNU General Public Licence
+> + * as published by the Free Software Foundation; either version
+> + * 2 of the Licence, or (at your option) any later version.
 > + */
 > +
-> +#ifndef __DRIVERS_BLUETOOTH_H4P_H
-> +#define __DRIVERS_BLUETOOTH_H4P_H
-
-Skip these circular inclusion protection checks. The header file is local and you know what you are doing.
-
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/irq.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/rtc.h>
 > +
-> +#include <net/bluetooth/bluetooth.h>
-> +#include <net/bluetooth/hci_core.h>
-> +#include <net/bluetooth/hci.h>
+> +/* Low Power Timer */
+> +#define LPC_LPT_LSB_OFF		0x400
+> +#define LPC_LPT_MSB_OFF		0x404
+> +#define LPC_LPT_START_OFF	0x408
 > +
-> +#include <linux/serial_reg.h>
+> +/* Low Power Alarm */
+> +#define LPC_LPA_LSB_OFF		0x410
+> +#define LPC_LPA_MSB_OFF		0x414
+> +#define LPC_LPA_START_OFF	0x418
 > +
-> +#define UART_SYSC_OMAP_RESET	0x03
-> +#define UART_SYSS_RESETDONE	0x01
-> +#define UART_OMAP_SCR_EMPTY_THR	0x08
-> +#define UART_OMAP_SCR_WAKEUP	0x10
-> +#define UART_OMAP_SSR_WAKEUP	0x02
-> +#define UART_OMAP_SSR_TXFULL	0x01
+> +/* LPC as WDT */
+> +#define LPC_WDT_OFF		0x510
+> +#define LPC_WDT_FLAG_OFF	0x514
 > +
-> +#define UART_OMAP_SYSC_IDLEMODE		0x03
-> +#define UART_OMAP_SYSC_IDLEMASK		(3 << UART_OMAP_SYSC_IDLEMODE)
-> +
-> +#define UART_OMAP_SYSC_FORCE_IDLE	(0 << UART_OMAP_SYSC_IDLEMODE)
-> +#define UART_OMAP_SYSC_NO_IDLE		(1 << UART_OMAP_SYSC_IDLEMODE)
-> +#define UART_OMAP_SYSC_SMART_IDLE	(2 << UART_OMAP_SYSC_IDLEMODE)
-> +
-> +#define H4P_TRANSFER_MODE		1
-> +#define H4P_SCHED_TRANSFER_MODE		2
-> +#define H4P_ACTIVE_MODE			3
-> +
-> +struct h4p_info {
-> +	struct timer_list lazy_release;
-> +	struct hci_dev *hdev;
+> +struct st_rtc {
+> +	struct rtc_device *rtc_dev;
+> +	struct rtc_wkalrm alarm;
+> +	struct resource *res;
+> +	struct clk *clk;
+> +	void __iomem *ioaddr;
+> +	bool irq_enabled:1;
 > +	spinlock_t lock;
-> +
-> +	void __iomem *uart_base;
-> +	unsigned long uart_phys_base;
-> +	int irq;
-> +	struct device *dev;
-> +	u8 chip_type;
-> +	u8 bt_wakeup_gpio;
-> +	u8 host_wakeup_gpio;
-> +	u8 reset_gpio;
-> +	u8 reset_gpio_shared;
-> +	u8 bt_sysclk;
-> +	u8 man_id;
-> +	u8 ver_id;
-> +
-> +	struct sk_buff_head fw_queue;
-> +	struct sk_buff *alive_cmd_skb;
-> +	struct completion init_completion;
-> +	struct completion fw_completion;
-> +	struct completion test_completion;
-> +	int fw_error;
-> +	int init_error;
-> +
-> +	struct sk_buff_head txq;
-> +
-> +	struct sk_buff *rx_skb;
-> +	long rx_count;
-> +	unsigned long rx_state;
-> +	unsigned long garbage_bytes;
-> +
-> +	bdaddr_t bd_addr;
-
-Remove this one. Let the core handle any BD_ADDR related details.
-
-> +	struct sk_buff_head *fw_q;
-> +
-> +	int pm_enabled;
-> +	int tx_enabled;
-> +	int autorts;
-> +	int rx_enabled;
-> +	unsigned long pm_flags;
-> +
-> +	int tx_clocks_en;
-> +	int rx_clocks_en;
-> +	spinlock_t clocks_lock;
-> +	struct clk *uart_iclk;
-> +	struct clk *uart_fclk;
-> +	atomic_t clk_users;
-> +	u16 dll;
-> +	u16 dlh;
-> +	u16 ier;
-> +	u16 mdr1;
-> +	u16 efr;
-> +
-> +	int initing;
+> +	short irq;
 > +};
 > +
-> +struct h4p_radio_hdr {
-> +	u8 evt;
-> +	u8 dlen;
-> +} __packed;
-> +
-> +struct h4p_neg_hdr {
-> +	u8 dlen;
-> +} __packed;
-> +#define H4P_NEG_HDR_SIZE 1
-> +
-> +#define H4P_NEG_REQ	0x00
-> +#define H4P_NEG_ACK	0x20
-> +#define H4P_NEG_NAK	0x40
-> +
-> +#define H4P_PROTO_PKT	0x44
-> +#define H4P_PROTO_BYTE	0x4c
-> +
-> +#define H4P_ID_CSR	0x02
-> +#define H4P_ID_BCM2048	0x04
-> +#define H4P_ID_TI1271	0x31
-> +
-> +struct h4p_neg_cmd {
-> +	u8	ack;
-> +	u16	baud;
-> +	u16	unused1;
-> +	u8	proto;
-> +	u16	sys_clk;
-> +	u16	unused2;
-> +} __packed;
-> +
-> +struct h4p_neg_evt {
-> +	u8	ack;
-> +	u16	baud;
-> +	u16	unused1;
-> +	u8	proto;
-> +	u16	sys_clk;
-> +	u16	unused2;
-> +	u8	man_id;
-> +	u8	ver_id;
-> +} __packed;
-> +
-> +#define H4P_ALIVE_REQ	0x55
-> +#define H4P_ALIVE_RESP	0xcc
-> +
-> +struct h4p_alive_hdr {
-> +	u8	dlen;
-> +} __packed;
-> +#define H4P_ALIVE_HDR_SIZE 1
-> +
-> +struct h4p_alive_pkt {
-> +	u8	mid;
-> +	u8	unused;
-> +} __packed;
-> +
-> +#define MAX_BAUD_RATE		921600
-> +#define BC4_MAX_BAUD_RATE	3692300
-> +#define UART_CLOCK		48000000
-> +#define BT_INIT_DIVIDER		320
-> +#define BT_BAUDRATE_DIVIDER	384000000
-> +#define BT_SYSCLK_DIV		1000
-> +#define INIT_SPEED		120000
-> +
-> +#define H4_TYPE_SIZE		1
-> +#define H4_RADIO_HDR_SIZE	2
-> +
-> +/* H4+ packet types */
-> +#define H4_CMD_PKT		0x01
-> +#define H4_ACL_PKT		0x02
-> +#define H4_SCO_PKT		0x03
-> +#define H4_EVT_PKT		0x04
-> +#define H4_NEG_PKT		0x06
-> +#define H4_ALIVE_PKT		0x07
-> +#define H4_RADIO_PKT		0x08
-> +
-> +/* TX states */
-> +#define WAIT_FOR_PKT_TYPE	1
-> +#define WAIT_FOR_HEADER		2
-> +#define WAIT_FOR_DATA		3
-> +
-> +struct hci_fw_event {
-> +	struct hci_event_hdr hev;
-> +	struct hci_ev_cmd_complete cmd;
-> +	u8 status;
-> +} __packed;
-> +
-> +void h4p_simple_send_frame(struct h4p_info *info, struct sk_buff *skb);
-> +
-> +int h4p_send_alive_packet(struct h4p_info *info);
-> +
-> +int h4p_read_fw(struct h4p_info *info);
-> +int h4p_send_fw(struct h4p_info *info);
-> +void h4p_parse_fw_event(struct h4p_info *info, struct sk_buff *skb);
-> +
-> +static inline void h4p_outb(struct h4p_info *info, unsigned int offset, u8 val)
-> +{
-> +	__raw_writeb(val, info->uart_base + (offset << 2));
-> +}
-> +
-> +static inline u8 h4p_inb(struct h4p_info *info, unsigned int offset)
-> +{
-> +	u8 val;
-> +	val = __raw_readb(info->uart_base + (offset << 2));
-> +	return val;
-> +}
-> +
-> +static inline void h4p_set_rts(struct h4p_info *info, int active)
-> +{
-> +	u8 b;
-> +
-> +	b = h4p_inb(info, UART_MCR);
-> +	if (active)
-> +		b |= UART_MCR_RTS;
-> +	else
-> +		b &= ~UART_MCR_RTS;
-> +	h4p_outb(info, UART_MCR, b);
-> +}
-> +
-> +int h4p_wait_for_cts(struct h4p_info *info, int active, int timeout_ms);
-> +void __h4p_set_auto_ctsrts(struct h4p_info *info, int on, u8 which);
-> +void h4p_set_auto_ctsrts(struct h4p_info *info, int on, u8 which);
-> +void h4p_change_speed(struct h4p_info *info, unsigned long speed);
-> +int h4p_reset_uart(struct h4p_info *info);
-> +void h4p_init_uart(struct h4p_info *info);
-> +void h4p_enable_tx(struct h4p_info *info);
-> +void h4p_store_regs(struct h4p_info *info);
-> +void h4p_restore_regs(struct h4p_info *info);
-> +void h4p_smart_idle(struct h4p_info *info, bool enable);
-> +
-> +#endif /* __DRIVERS_BLUETOOTH_H4P_H */
-> diff --git a/drivers/bluetooth/nokia_core.c b/drivers/bluetooth/nokia_core.c
-> new file mode 100644
-> index 0000000..ca9746d
-> --- /dev/null
-> +++ b/drivers/bluetooth/nokia_core.c
-> @@ -0,0 +1,1262 @@
-> +/*
-> + * This file is part of Nokia H4P bluetooth driver
-> + *
-> + * Copyright (C) 2005-2008 Nokia Corporation.
-> + * Copyright (C) 2014 Pavel Machek <pavel@ucw.cz>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-> + * 02110-1301 USA
-> + *
-> + * Thanks to all the Nokia people that helped with this driver,
-> + * including Ville Tervo and Roger Quadros.
-> + *
-> + * Power saving functionality was removed from this driver to make
-> + * merging easier.
-> + */
-> +
-> +/*
-> +insmod hci_h4p.ko && hciconfig hci0 up && hcitool inq && hciconfig hci0 down && hciconfig hci0 up && hcitool inq && rmmod hci_h4p
-> +
-> +*/
-
-This command should not be in the source.
-
-> +
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/errno.h>
-> +#include <linux/delay.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/serial_reg.h>
-> +#include <linux/skbuff.h>
-> +#include <linux/device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/clk.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/gpio.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/timer.h>
-> +#include <linux/kthread.h>
-> +#include <linux/io.h>
-> +#include <linux/completion.h>
-> +#include <linux/sizes.h>
-> +
-> +#include <net/bluetooth/bluetooth.h>
-> +#include <net/bluetooth/hci_core.h>
-> +#include <net/bluetooth/hci.h>
-> +
-> +#include <linux/platform_data/bt-nokia-h4p.h>
-
-We need to move towards DT and not platform data.
-
-> +
-> +#include "hci_h4p.h"
-> +
-> +#define BT_DBG(a...) do {} while(0)
-
-Why is this needed? BT_DBG is hooked up with dynamic debug.
-
-> +
-> +/* This should be used in function that cannot release clocks */
-> +static void h4p_set_clk(struct h4p_info *info, int *clock, int enable)
+> +static void st_rtc_set_hw_alarm(struct st_rtc *rtc,
+> +				unsigned long msb, unsigned long  lsb)
 > +{
 > +	unsigned long flags;
 > +
-> +	spin_lock_irqsave(&info->clocks_lock, flags);
-> +	if (enable && !*clock) {
-> +		BT_DBG("Enabling %p", clock);
-> +		clk_prepare_enable(info->uart_fclk);
-> +		clk_prepare_enable(info->uart_iclk);
-> +		if (atomic_read(&info->clk_users) == 0)
-> +			h4p_restore_regs(info);
-> +		atomic_inc(&info->clk_users);
-> +	}
+> +	spin_lock_irqsave(&rtc->lock, flags);
 > +
-> +	if (!enable && *clock) {
-> +		BT_DBG("Disabling %p", clock);
-> +		if (atomic_dec_and_test(&info->clk_users))
-> +			h4p_store_regs(info);
-> +		clk_disable_unprepare(info->uart_fclk);
-> +		clk_disable_unprepare(info->uart_iclk);
-> +	}
+> +	writel(1, rtc->ioaddr + LPC_WDT_OFF);
 > +
-> +	*clock = enable;
-> +	spin_unlock_irqrestore(&info->clocks_lock, flags);
+> +	writel(msb, rtc->ioaddr + LPC_LPA_MSB_OFF);
+> +	writel(lsb, rtc->ioaddr + LPC_LPA_LSB_OFF);
+> +	writel(1, rtc->ioaddr + LPC_LPA_START_OFF);
+> +
+> +	writel(0, rtc->ioaddr + LPC_WDT_OFF);
+> +
+> +	spin_unlock_irqrestore(&rtc->lock, flags);
 > +}
 > +
-> +static void h4p_lazy_clock_release(unsigned long data)
+> +static irqreturn_t st_rtc_handler(int this_irq, void *data)
 > +{
-> +	struct h4p_info *info = (struct h4p_info *)data;
-> +	unsigned long flags;
+> +	struct st_rtc *rtc = (struct st_rtc *)data;
 > +
-> +	spin_lock_irqsave(&info->lock, flags);
-> +	if (!info->tx_enabled)
-> +		h4p_set_clk(info, &info->tx_clocks_en, 0);
-> +	spin_unlock_irqrestore(&info->lock, flags);
-> +}
-> +
-> +/* Power management functions */
-> +void h4p_smart_idle(struct h4p_info *info, bool enable)
-> +{
-> +	u8 v;
-> +
-> +	v = h4p_inb(info, UART_OMAP_SYSC);
-> +	v &= ~(UART_OMAP_SYSC_IDLEMASK);
-> +
-> +	if (enable)
-> +		v |= UART_OMAP_SYSC_SMART_IDLE;
-> +	else
-> +		v |= UART_OMAP_SYSC_NO_IDLE;
-> +
-> +	h4p_outb(info, UART_OMAP_SYSC, v);
-> +}
-> +
-> +static inline void h4p_schedule_pm(struct h4p_info *info)
-> +{
-> +}
-> +
-> +static void h4p_disable_tx(struct h4p_info *info)
-> +{
-> +	if (!info->pm_enabled)
-> +		return;
-> +
-> +	/* Re-enable smart-idle */
-> +	h4p_smart_idle(info, 1);
-> +
-> +	gpio_set_value(info->bt_wakeup_gpio, 0);
-> +	mod_timer(&info->lazy_release, jiffies + msecs_to_jiffies(100));
-> +	info->tx_enabled = 0;
-> +}
-> +
-> +void h4p_enable_tx_nopm(struct h4p_info *info)
-> +{
-> +	unsigned long flags;
-> +	
-> +	spin_lock_irqsave(&info->lock, flags);
-> +	h4p_outb(info, UART_IER, h4p_inb(info, UART_IER) |
-> +		     UART_IER_THRI);
-> +	spin_unlock_irqrestore(&info->lock, flags);
-> +}
-> +
-> +void h4p_enable_tx(struct h4p_info *info)
-> +{
-> +	unsigned long flags;
-> +
-> +	if (!info->pm_enabled)
-> +		return;
-> +
-> +	h4p_schedule_pm(info);
-> +
-> +	spin_lock_irqsave(&info->lock, flags);
-> +	del_timer(&info->lazy_release);
-> +	h4p_set_clk(info, &info->tx_clocks_en, 1);
-> +	info->tx_enabled = 1;
-> +	gpio_set_value(info->bt_wakeup_gpio, 1);
-> +	h4p_outb(info, UART_IER, h4p_inb(info, UART_IER) |
-> +		     UART_IER_THRI);
-> +	/*
-> +	 * Disable smart-idle as UART TX interrupts
-> +	 * are not wake-up capable
-> +	 */
-> +	h4p_smart_idle(info, 0);
-> +
-> +	spin_unlock_irqrestore(&info->lock, flags);
-> +}
-> +
-> +static void h4p_disable_rx(struct h4p_info *info)
-> +{
-> +	if (!info->pm_enabled)
-> +		return;
-> +
-> +	info->rx_enabled = 0;
-> +
-> +	if (h4p_inb(info, UART_LSR) & UART_LSR_DR)
-> +		return;
-> +
-> +	if (!(h4p_inb(info, UART_LSR) & UART_LSR_TEMT))
-> +		return;
-> +
-> +	__h4p_set_auto_ctsrts(info, 0, UART_EFR_RTS);
-> +	info->autorts = 0;
-> +	h4p_set_clk(info, &info->rx_clocks_en, 0);
-> +}
-> +
-> +static void h4p_enable_rx(struct h4p_info *info)
-> +{
-> +	if (!info->pm_enabled)
-> +		return;
-> +
-> +	h4p_schedule_pm(info);
-> +
-> +	h4p_set_clk(info, &info->rx_clocks_en, 1);
-> +	info->rx_enabled = 1;
-> +
-> +	if (!(h4p_inb(info, UART_LSR) & UART_LSR_TEMT))
-> +		return;
-> +
-> +	__h4p_set_auto_ctsrts(info, 1, UART_EFR_RTS);
-> +	info->autorts = 1;
-> +}
-> +
-> +void h4p_simple_send_frame(struct h4p_info *info, struct sk_buff *skb)
-> +{
-> +	skb_queue_tail(&info->txq, skb);
-> +	h4p_enable_tx_nopm(info);
-> +}
-> +
-> +/* Negotiation functions */
-> +int h4p_send_alive_packet(struct h4p_info *info)
-> +{
-> +	struct h4p_alive_hdr *hdr;
-> +	struct h4p_alive_pkt *pkt;
-> +	struct sk_buff *skb;
-> +	int len;
-> +
-> +	BT_DBG("Sending alive packet");
-> +
-> +	len = H4_TYPE_SIZE + sizeof(*hdr) + sizeof(*pkt);
-> +	skb = bt_skb_alloc(len, GFP_KERNEL);
-> +	if (!skb)
-> +		return -ENOMEM;
-> +
-> +	memset(skb->data, 0x00, len);
-> +	*skb_put(skb, 1) = H4_ALIVE_PKT;
-> +	hdr = (struct h4p_alive_hdr *)skb_put(skb, sizeof(*hdr));
-> +	hdr->dlen = sizeof(*pkt);
-> +	pkt = (struct h4p_alive_pkt *)skb_put(skb, sizeof(*pkt));
-> +	pkt->mid = H4P_ALIVE_REQ;
-> +
-> +	h4p_simple_send_frame(info, skb);
-> +
-> +	BT_DBG("Alive packet sent");
-> +
-> +	return 0;
-> +}
-> +
-> +static void h4p_alive_packet(struct h4p_info *info,
-> +				 struct sk_buff *skb)
-> +{
-> +	struct h4p_alive_hdr *hdr;
-> +	struct h4p_alive_pkt *pkt;
-> +
-> +	BT_DBG("Received alive packet");
-> +	hdr = (struct h4p_alive_hdr *)skb->data;
-> +	if (hdr->dlen != sizeof(*pkt)) {
-> +		dev_err(info->dev, "Corrupted alive message\n");
-> +		info->init_error = -EIO;
-> +		goto finish_alive;
-> +	}
-> +
-> +	pkt = (struct h4p_alive_pkt *)skb_pull(skb, sizeof(*hdr));
-> +	if (pkt->mid != H4P_ALIVE_RESP) {
-> +		dev_err(info->dev, "Could not negotiate hci_h4p settings\n");
-> +		info->init_error = -EINVAL;
-> +	}
-> +
-> +finish_alive:
-> +	complete(&info->init_completion);
-> +	kfree_skb(skb);
-> +}
-> +
-> +static int h4p_send_negotiation(struct h4p_info *info)
-> +{
-> +	struct h4p_neg_cmd *neg_cmd;
-> +	struct h4p_neg_hdr *neg_hdr;
-> +	struct sk_buff *skb;
-> +	int err, len;
-> +	u16 sysclk = 38400;
-> +
-> +	printk("Sending negotiation..");
-> +	len = sizeof(*neg_cmd) + sizeof(*neg_hdr) + H4_TYPE_SIZE;
-> +
-> +	skb = bt_skb_alloc(len, GFP_KERNEL);
-> +	if (!skb)
-> +		return -ENOMEM;
-> +
-> +	memset(skb->data, 0x00, len);
-> +	*skb_put(skb, 1) = H4_NEG_PKT;
-> +	neg_hdr = (struct h4p_neg_hdr *)skb_put(skb, sizeof(*neg_hdr));
-> +	neg_cmd = (struct h4p_neg_cmd *)skb_put(skb, sizeof(*neg_cmd));
-> +
-> +	neg_hdr->dlen = sizeof(*neg_cmd);
-> +	neg_cmd->ack = H4P_NEG_REQ;
-> +	neg_cmd->baud = cpu_to_le16(BT_BAUDRATE_DIVIDER/MAX_BAUD_RATE);
-> +	neg_cmd->proto = H4P_PROTO_BYTE;
-> +	neg_cmd->sys_clk = cpu_to_le16(sysclk);
-> +
-> +	h4p_change_speed(info, INIT_SPEED);
-> +
-> +	h4p_set_rts(info, 1);
-> +	info->init_error = 0;
-> +	init_completion(&info->init_completion);
-> +
-> +	h4p_simple_send_frame(info, skb);
-> +
-> +	if (!wait_for_completion_interruptible_timeout(&info->init_completion,
-> +						       msecs_to_jiffies(1000))) {
-> +		printk("h4p: negotiation did not return\n");
-> +		return -ETIMEDOUT;
-> +	}
-> +
-> +	if (info->init_error < 0)
-> +		return info->init_error;
-> +
-> +	/* Change to operational settings */
-> +	h4p_set_auto_ctsrts(info, 0, UART_EFR_RTS);
-> +	h4p_set_rts(info, 0);
-> +	h4p_change_speed(info, MAX_BAUD_RATE);
-> +
-> +	err = h4p_wait_for_cts(info, 1, 100);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	h4p_set_auto_ctsrts(info, 1, UART_EFR_RTS);
-> +	init_completion(&info->init_completion);
-> +	err = h4p_send_alive_packet(info);
-> +
-> +	if (err < 0)
-> +		return err;
-> +
-> +	if (!wait_for_completion_interruptible_timeout(&info->init_completion,
-> +				msecs_to_jiffies(1000)))
-> +		return -ETIMEDOUT;
-> +
-> +	if (info->init_error < 0)
-> +		return info->init_error;
-> +
-> +	printk("Negotiation successful\n");
-> +	return 0;
-> +}
-> +
-> +static void h4p_negotiation_packet(struct h4p_info *info,
-> +				       struct sk_buff *skb)
-> +{
-> +	struct h4p_neg_hdr *hdr;
-> +	struct h4p_neg_evt *evt;
-> +
-> +	hdr = (struct h4p_neg_hdr *)skb->data;
-> +	if (hdr->dlen != sizeof(*evt)) {
-> +		info->init_error = -EIO;
-> +		goto finish_neg;
-> +	}
-> +
-> +	evt = (struct h4p_neg_evt *)skb_pull(skb, sizeof(*hdr));
-> +
-> +	if (evt->ack != H4P_NEG_ACK) {
-> +		dev_err(info->dev, "Could not negotiate hci_h4p settings\n");
-> +		info->init_error = -EINVAL;
-> +	}
-> +
-> +	info->man_id = evt->man_id;
-> +	info->ver_id = evt->ver_id;
-> +	printk("Negotiation finished.\n");
-> +
-> +finish_neg:
-> +
-> +	complete(&info->init_completion);
-> +	kfree_skb(skb);
-> +}
-> +
-> +/* H4 packet handling functions */
-> +static int h4p_get_hdr_len(struct h4p_info *info, u8 pkt_type)
-> +{
-> +	long retval;
-> +
-> +	switch (pkt_type) {
-> +	case H4_EVT_PKT:
-> +		retval = HCI_EVENT_HDR_SIZE;
-> +		break;
-> +	case H4_ACL_PKT:
-> +		retval = HCI_ACL_HDR_SIZE;
-> +		break;
-> +	case H4_SCO_PKT:
-> +		retval = HCI_SCO_HDR_SIZE;
-> +		break;
-> +	case H4_NEG_PKT:
-> +		retval = H4P_NEG_HDR_SIZE;
-> +		break;
-> +	case H4_ALIVE_PKT:
-> +		retval = H4P_ALIVE_HDR_SIZE;
-> +		break;
-> +	case H4_RADIO_PKT:
-> +		retval = H4_RADIO_HDR_SIZE;
-> +		break;
-> +	default:
-> +		dev_err(info->dev, "Unknown H4 packet type 0x%.2x\n", pkt_type);
-> +		retval = -1;
-> +		break;
-> +	}
-> +
-> +	return retval;
-> +}
-> +
-> +static unsigned int h4p_get_data_len(struct h4p_info *info,
-> +					 struct sk_buff *skb)
-> +{
-> +	long retval = -1;
-> +	struct hci_acl_hdr *acl_hdr;
-> +	struct hci_sco_hdr *sco_hdr;
-> +	struct hci_event_hdr *evt_hdr;
-> +	struct h4p_neg_hdr *neg_hdr;
-> +	struct h4p_alive_hdr *alive_hdr;
-> +	struct h4p_radio_hdr *radio_hdr;
-> +
-> +	switch (bt_cb(skb)->pkt_type) {
-> +	case H4_EVT_PKT:
-> +		evt_hdr = (struct hci_event_hdr *)skb->data;
-> +		retval = evt_hdr->plen;
-> +		break;
-> +	case H4_ACL_PKT:
-> +		acl_hdr = (struct hci_acl_hdr *)skb->data;
-> +		retval = le16_to_cpu(acl_hdr->dlen);
-> +		break;
-> +	case H4_SCO_PKT:
-> +		sco_hdr = (struct hci_sco_hdr *)skb->data;
-> +		retval = sco_hdr->dlen;
-> +		break;
-> +	case H4_RADIO_PKT:
-> +		radio_hdr = (struct h4p_radio_hdr *)skb->data;
-> +		retval = radio_hdr->dlen;
-> +		break;
-> +	case H4_NEG_PKT:
-> +		neg_hdr = (struct h4p_neg_hdr *)skb->data;
-> +		retval = neg_hdr->dlen;
-> +		break;
-> +	case H4_ALIVE_PKT:
-> +		alive_hdr = (struct h4p_alive_hdr *)skb->data;
-> +		retval = alive_hdr->dlen;
-> +		break;
-> +	}
-> +
-> +	return retval;
-> +}
-> +
-> +static inline void h4p_recv_frame(struct h4p_info *info,
-> +				      struct sk_buff *skb)
-> +{
-> +	if (info->initing)
-> +	/*if (unlikely(!test_bit(HCI_RUNNING, &info->hdev->flags))) */ {
-> +		switch (bt_cb(skb)->pkt_type) {
-> +		case H4_NEG_PKT:
-> +			h4p_negotiation_packet(info, skb);
-> +			info->rx_state = WAIT_FOR_PKT_TYPE;
-> +			return;
-> +		case H4_ALIVE_PKT:
-> +			h4p_alive_packet(info, skb);
-> +			info->rx_state = WAIT_FOR_PKT_TYPE;
-> +			return;
-> +		}
-> +	}
-> +
-> +	hci_recv_frame(info->hdev, skb);
-> +	BT_DBG("Frame sent to upper layer");
-> +}
-> +
-> +static inline void h4p_handle_byte(struct h4p_info *info, u8 byte)
-> +{
-> +	switch (info->rx_state) {
-> +	case WAIT_FOR_PKT_TYPE:
-> +		bt_cb(info->rx_skb)->pkt_type = byte;
-> +		info->rx_count = h4p_get_hdr_len(info, byte);
-> +		if (info->rx_count < 0) {
-> +			info->hdev->stat.err_rx++;
-> +			kfree_skb(info->rx_skb);
-> +			info->rx_skb = NULL;
-> +		} else {
-> +			info->rx_state = WAIT_FOR_HEADER;
-> +		}
-> +		break;
-> +	case WAIT_FOR_HEADER:
-> +		info->rx_count--;
-> +		*skb_put(info->rx_skb, 1) = byte;
-> +		if (info->rx_count != 0)
-> +			break;
-> +		info->rx_count = h4p_get_data_len(info, info->rx_skb);
-> +		if (info->rx_count > skb_tailroom(info->rx_skb)) {
-> +			dev_err(info->dev, "frame too long\n");
-> +			info->garbage_bytes = info->rx_count
-> +				- skb_tailroom(info->rx_skb);
-> +			kfree_skb(info->rx_skb);
-> +			info->rx_skb = NULL;
-> +			break;
-> +		}
-> +		info->rx_state = WAIT_FOR_DATA;
-> +		break;
-> +	case WAIT_FOR_DATA:
-> +		info->rx_count--;
-> +		*skb_put(info->rx_skb, 1) = byte;
-> +		break;
-> +	default:
-> +		WARN_ON(1);
-> +		break;
-> +	}
-> +
-> +	if (info->rx_count == 0) {
-> +		/* H4+ devices should always send word aligned packets */
-> +		if (!(info->rx_skb->len % 2))
-> +			info->garbage_bytes++;
-> +		h4p_recv_frame(info, info->rx_skb);
-
-The h4p_recv_frame should maybe done inline here since it only handles 2 exception packets. Also to make it easy, just leave the function if (info->rx_count).
-
-This packet processing feels like a bit of spaghetti code. I think that is better handled in a proper function that goes through it and not with many tiny sub functions.
-
-> +		info->rx_skb = NULL;
-> +	}
-> +}
-> +
-> +static void h4p_rx_tasklet(unsigned long data)
-> +{
-> +	u8 byte;
-> +	struct h4p_info *info = (struct h4p_info *)data;
-> +
-> +	BT_DBG("tasklet woke up");
-> +	BT_DBG("rx_tasklet woke up");
-> +
-> +	while (h4p_inb(info, UART_LSR) & UART_LSR_DR) {
-> +		byte = h4p_inb(info, UART_RX);
-> +		BT_DBG("[in: %02x]", byte);
-> +		if (info->garbage_bytes) {
-> +			info->garbage_bytes--;
-> +			continue;
-> +		}
-> +		if (info->rx_skb == NULL) {
-> +			info->rx_skb = bt_skb_alloc(HCI_MAX_FRAME_SIZE,
-> +						    GFP_ATOMIC | GFP_DMA);
-> +			if (!info->rx_skb) {
-> +				dev_err(info->dev,
-> +					"No memory for new packet\n");
-> +				goto finish_rx;
-> +			}
-> +			info->rx_state = WAIT_FOR_PKT_TYPE;
-> +			info->rx_skb->dev = (void *)info->hdev;
-> +		}
-> +		info->hdev->stat.byte_rx++;
-> +		h4p_handle_byte(info, byte);
-> +	}
-> +
-> +	if (!info->rx_enabled) {
-> +		if (h4p_inb(info, UART_LSR) & UART_LSR_TEMT &&
-> +						  info->autorts) {
-> +			__h4p_set_auto_ctsrts(info, 0 , UART_EFR_RTS);
-> +			info->autorts = 0;
-> +		}
-> +		/* Flush posted write to avoid spurious interrupts */
-> +		h4p_inb(info, UART_OMAP_SCR);
-> +		h4p_set_clk(info, &info->rx_clocks_en, 0);
-> +	}
-> +
-> +finish_rx:
-> +	BT_DBG("rx_ended");
-> +}
-> +
-> +static void h4p_tx_tasklet(unsigned long data)
-> +{
-> +	unsigned int sent = 0;
-> +	struct sk_buff *skb;
-> +	struct h4p_info *info = (struct h4p_info *)data;
-> +
-> +	BT_DBG("tasklet woke up");
-> +	BT_DBG("tx_tasklet woke up");
-> +
-> +	if (info->autorts != info->rx_enabled) {
-> +		if (h4p_inb(info, UART_LSR) & UART_LSR_TEMT) {
-> +			if (info->autorts && !info->rx_enabled) {
-> +				__h4p_set_auto_ctsrts(info, 0,
-> +							  UART_EFR_RTS);
-> +				info->autorts = 0;
-> +			}
-> +			if (!info->autorts && info->rx_enabled) {
-> +				__h4p_set_auto_ctsrts(info, 1,
-> +							  UART_EFR_RTS);
-> +				info->autorts = 1;
-> +			}
-> +		} else {
-> +			h4p_outb(info, UART_OMAP_SCR,
-> +				     h4p_inb(info, UART_OMAP_SCR) |
-> +				     UART_OMAP_SCR_EMPTY_THR);
-> +			goto finish_tx;
-> +		}
-> +	}
-> +
-> +	skb = skb_dequeue(&info->txq);
-> +	if (!skb) {
-> +		/* No data in buffer */
-> +		BT_DBG("skb ready");
-> +		if (h4p_inb(info, UART_LSR) & UART_LSR_TEMT) {
-> +			h4p_outb(info, UART_IER,
-> +				     h4p_inb(info, UART_IER) &
-> +				     ~UART_IER_THRI);
-> +			h4p_inb(info, UART_OMAP_SCR);
-> +			h4p_disable_tx(info);
-> +			return;
-> +		}
-> +		h4p_outb(info, UART_OMAP_SCR,
-> +			     h4p_inb(info, UART_OMAP_SCR) |
-> +			     UART_OMAP_SCR_EMPTY_THR);
-> +		goto finish_tx;
-> +	}
-> +
-> +	/* Copy data to tx fifo */
-> +	while (!(h4p_inb(info, UART_OMAP_SSR) & UART_OMAP_SSR_TXFULL) &&
-> +	       (sent < skb->len)) {
-> +		//printk("[Out: %02x]", skb->data[sent]);
-> +		//printk("%02x ", skb->data[sent]);
-> +		h4p_outb(info, UART_TX, skb->data[sent]);
-> +		sent++;
-> +	}
-> +
-> +	info->hdev->stat.byte_tx += sent;
-> +	if (skb->len == sent) {
-> +		kfree_skb(skb);
-> +	} else {
-> +		skb_pull(skb, sent);
-> +		skb_queue_head(&info->txq, skb);
-> +	}
-> +
-> +	h4p_outb(info, UART_OMAP_SCR, h4p_inb(info, UART_OMAP_SCR) &
-> +						     ~UART_OMAP_SCR_EMPTY_THR);
-> +	h4p_outb(info, UART_IER, h4p_inb(info, UART_IER) |
-> +						 UART_IER_THRI);
-> +
-> +finish_tx:
-> +	/* Flush posted write to avoid spurious interrupts */
-> +	h4p_inb(info, UART_OMAP_SCR);
-> +
-> +}
-> +
-> +static irqreturn_t h4p_interrupt(int irq, void *data)
-> +{
-> +	struct h4p_info *info = (struct h4p_info *)data;
-> +	u8 iir, msr;
-> +	int ret;
-> +
-> +	ret = IRQ_NONE;
-> +
-> +	iir = h4p_inb(info, UART_IIR);
-> +	if (iir & UART_IIR_NO_INT)
-> +		return IRQ_HANDLED;
-> +
-> +	//BT_DBG("<%2x>", iir);
-> +
-> +	iir &= UART_IIR_ID;
-> +
-> +	if (iir == UART_IIR_MSI) {
-> +		msr = h4p_inb(info, UART_MSR);
-> +		ret = IRQ_HANDLED;
-> +	}
-> +	if (iir == UART_IIR_RLSI) {
-> +		h4p_inb(info, UART_RX);
-> +		h4p_inb(info, UART_LSR);
-> +		ret = IRQ_HANDLED;
-> +	}
-> +
-> +	if (iir == UART_IIR_RDI) {
-> +		h4p_rx_tasklet((unsigned long)data);
-> +		ret = IRQ_HANDLED;
-> +	}
-> +
-> +	if (iir == UART_IIR_THRI) {
-> +		h4p_tx_tasklet((unsigned long)data);
-> +		ret = IRQ_HANDLED;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static irqreturn_t h4p_wakeup_interrupt(int irq, void *dev_inst)
-> +{
-> +	struct h4p_info *info = dev_inst;
-> +	int should_wakeup;
-> +	struct hci_dev *hdev;
-> +
-> +	BT_DBG("[wakeup irq]");
-> +	
-> +	if (!info->hdev)
-> +		return IRQ_HANDLED;
-> +
-> +	should_wakeup = gpio_get_value(info->host_wakeup_gpio);
-> +	hdev = info->hdev;
-> +
-> +	if (!test_bit(HCI_RUNNING, &hdev->flags)) {
-> +		if (should_wakeup == 1)
-> +			complete_all(&info->test_completion);
-> +
-> +		printk("wakeup irq handled\n");
-> +
-> +		return IRQ_HANDLED;
-> +	}
-> +
-> +	BT_DBG("gpio interrupt %d", should_wakeup);
-> +
-> +	/* Check if wee have missed some interrupts */
-> +	if (info->rx_enabled == should_wakeup)
-> +		return IRQ_HANDLED;
-> +
-> +	if (should_wakeup)
-> +		h4p_enable_rx(info);
-> +	else
-> +		h4p_disable_rx(info);
+> +	rtc_update_irq(rtc->rtc_dev, 1, RTC_AF);
 > +
 > +	return IRQ_HANDLED;
 > +}
 > +
-> +static inline void h4p_set_pm_limits(struct h4p_info *info, bool set)
+> +static int st_rtc_read_time(struct device *dev, struct rtc_time *tm)
 > +{
-> +	struct h4p_platform_data *bt_plat_data = info->dev->platform_data;
-> +
-> +	if (unlikely(!bt_plat_data || !bt_plat_data->set_pm_limits))
-> +		return;
-> +
-> +	if (set != !!test_bit(H4P_ACTIVE_MODE, &info->pm_flags)) {
-
-I wonder what is the difference between x != !!y and x == !y or how many negations are really need.
- 
-> +		bt_plat_data->set_pm_limits(info->dev, set);
-> +		if (set)
-> +			set_bit(H4P_ACTIVE_MODE, &info->pm_flags);
-> +		else
-> +			clear_bit(H4P_ACTIVE_MODE, &info->pm_flags);
-> +		BT_DBG("Change pm constraints to: %s", set ? "set" : "clear");
-> +		return;
-> +	}
-> +
-> +	BT_DBG("pm constraints remains: %s", set ? "set" : "clear");
-> +}
-> +
-> +static int h4p_reset(struct h4p_info *info)
-> +{
-> +	int err;
-> +
-> +	err = h4p_reset_uart(info);
-> +	if (err < 0) {
-> +		dev_err(info->dev, "Uart reset failed\n");
-> +		return err;
-> +	}
-> +	h4p_init_uart(info);
-> +	h4p_set_rts(info, 0);
-> +
-> +	gpio_set_value(info->reset_gpio, 0);
-> +	gpio_set_value(info->bt_wakeup_gpio, 1);
-> +	msleep(10);
-> +
-> +	if (gpio_get_value(info->host_wakeup_gpio) == 1) {
-> +		dev_err(info->dev, "host_wakeup_gpio not low\n");
-> +		return -EPROTO;
-> +	}
-> +
-> +	init_completion(&info->test_completion);
-> +	gpio_set_value(info->reset_gpio, 1);
-> +
-> +	if (!wait_for_completion_interruptible_timeout(&info->test_completion,
-> +						       msecs_to_jiffies(100))) {
-> +		dev_err(info->dev, "wakeup test timed out\n");
-> +		complete_all(&info->test_completion);
-> +		return -EPROTO;
-> +	}
-> +
-> +	err = h4p_wait_for_cts(info, 1, 100);
-> +	if (err < 0) {
-> +		dev_err(info->dev, "No cts from bt chip\n");
-> +		return err;
-> +	}
-> +
-> +	h4p_set_rts(info, 1);
-> +
-> +	return 0;
-> +}
-> +
-> +/* hci callback functions */
-> +static int h4p_hci_flush(struct hci_dev *hdev)
-> +{
-> +	struct h4p_info *info = hci_get_drvdata(hdev);
-> +
-> +	skb_queue_purge(&info->txq);
-> +
-> +	return 0;
-> +}
-> +
-> +static int h4p_bt_wakeup_test(struct h4p_info *info)
-> +{
-> +	/*
-> +	 * Test Sequence:
-> +	 * Host de-asserts the BT_WAKE_UP line.
-> +	 * Host polls the UART_CTS line, waiting for it to be de-asserted.
-> +	 * Host asserts the BT_WAKE_UP line.
-> +	 * Host polls the UART_CTS line, waiting for it to be asserted.
-> +	 * Host de-asserts the BT_WAKE_UP line (allow the Bluetooth device to
-> +	 * sleep).
-> +	 * Host polls the UART_CTS line, waiting for it to be de-asserted.
-> +	 */
-> +	int err;
-> +	int ret = -ECOMM;
-> +
-> +	if (!info)
-> +		return -EINVAL;
-> +
-> +	/* Disable wakeup interrupts */
-> +	disable_irq(gpio_to_irq(info->host_wakeup_gpio));
-> +
-> +	gpio_set_value(info->bt_wakeup_gpio, 0);
-> +	err = h4p_wait_for_cts(info, 0, 100);
-> +	if (err) {
-> +		dev_warn(info->dev,
-> +				"bt_wakeup_test: fail: CTS low timed out: %d\n",
-> +				err);
-> +		goto out;
-> +	}
-> +
-> +	gpio_set_value(info->bt_wakeup_gpio, 1);
-> +	err = h4p_wait_for_cts(info, 1, 100);
-> +	if (err) {
-> +		dev_warn(info->dev,
-> +				"bt_wakeup_test: fail: CTS high timed out: %d\n",
-> +				err);
-> +		goto out;
-> +	}
-> +
-> +	gpio_set_value(info->bt_wakeup_gpio, 0);
-> +	err = h4p_wait_for_cts(info, 0, 100);
-> +	if (err) {
-> +		dev_warn(info->dev,
-> +				"bt_wakeup_test: fail: CTS re-low timed out: %d\n",
-> +				err);
-> +		goto out;
-> +	}
-> +
-> +	ret = 0;
-> +
-> +out:
-> +
-> +	/* Re-enable wakeup interrupts */
-> +	enable_irq(gpio_to_irq(info->host_wakeup_gpio));
-> +
-> +	return ret;
-> +}
-> +
-> +static int h4p_setup(struct hci_dev *hdev)
-> +{
-> +	struct h4p_info *info = hci_get_drvdata(hdev);
-> +	int err;
+> +	struct st_rtc *rtc = dev_get_drvdata(dev);
+> +	unsigned long lpt_lsb, lpt_msb;
+> +	unsigned long long lpt;
 > +	unsigned long flags;
 > +
+> +	spin_lock_irqsave(&rtc->lock, flags);
+> +
+> +	do {
+> +		lpt_msb = readl(rtc->ioaddr + LPC_LPT_MSB_OFF);
+> +		lpt_lsb = readl(rtc->ioaddr + LPC_LPT_LSB_OFF);
+> +	} while (readl(rtc->ioaddr + LPC_LPT_MSB_OFF) != lpt_msb);
+> +
+> +	spin_unlock_irqrestore(&rtc->lock, flags);
+> +
+> +	lpt = ((unsigned long long)lpt_msb << 32) | lpt_lsb;
+> +	do_div(lpt, clk_get_rate(rtc->clk));
+> +	rtc_time_to_tm(lpt, tm);
+> +
+> +	return 0;
+> +}
+> +
+> +static int st_rtc_set_time(struct device *dev, struct rtc_time *tm)
+> +{
+> +	struct st_rtc *rtc = dev_get_drvdata(dev);
+> +	unsigned long long lpt;
+> +	unsigned long secs, flags;
+> +	int ret;
+> +
+> +	ret = rtc_tm_to_time(tm, &secs);
+> +	if (ret)
+> +		return ret;
+> +
+> +	lpt = (unsigned long long)secs * clk_get_rate(rtc->clk);
+> +
+> +	spin_lock_irqsave(&rtc->lock, flags);
+> +
+> +	writel(lpt >> 32, rtc->ioaddr + LPC_LPT_MSB_OFF);
+> +	writel(lpt, rtc->ioaddr + LPC_LPT_LSB_OFF);
+> +	writel(1, rtc->ioaddr + LPC_LPT_START_OFF);
+> +
+> +	spin_unlock_irqrestore(&rtc->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int st_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *wkalrm)
+> +{
+> +	struct st_rtc *rtc = dev_get_drvdata(dev);
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&rtc->lock, flags);
+> +
+> +	memcpy(wkalrm, &rtc->alarm, sizeof(struct rtc_wkalrm));
+> +
+> +	spin_unlock_irqrestore(&rtc->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int st_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
+> +{
+> +	struct st_rtc *rtc = dev_get_drvdata(dev);
+> +
+> +	if (enabled && !rtc->irq_enabled) {
+> +		enable_irq(rtc->irq);
+> +		rtc->irq_enabled = true;
+> +	} else if (!enabled && rtc->irq_enabled) {
+> +		disable_irq(rtc->irq);
+> +		rtc->irq_enabled = false;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int st_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *t)
+> +{
+> +	struct st_rtc *rtc = dev_get_drvdata(dev);
+> +	struct rtc_time now;
+> +	unsigned long now_secs;
+> +	unsigned long alarm_secs;
+> +	unsigned long long lpa;
+> +
+> +	st_rtc_read_time(dev, &now);
+> +	rtc_tm_to_time(&now, &now_secs);
+> +	rtc_tm_to_time(&t->time, &alarm_secs);
+> +
+> +	/* Invalid alarm time */
+> +	if (now_secs > alarm_secs)
+> +		return -EINVAL;
+> +
+> +	memcpy(&rtc->alarm, t, sizeof(struct rtc_wkalrm));
+> +
+> +	/* Now many secs to fire */
+> +	alarm_secs -= now_secs;
+> +	lpa = (unsigned long long)alarm_secs * clk_get_rate(rtc->clk);
+> +
+> +	st_rtc_set_hw_alarm(rtc, lpa >> 32, lpa);
+> +	st_rtc_alarm_irq_enable(dev, t->enabled);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct rtc_class_ops st_rtc_ops = {
+> +	.read_time		= st_rtc_read_time,
+> +	.set_time		= st_rtc_set_time,
+> +	.read_alarm		= st_rtc_read_alarm,
+> +	.set_alarm		= st_rtc_set_alarm,
+> +	.alarm_irq_enable	= st_rtc_alarm_irq_enable,
+> +};
+> +
+> +static int st_rtc_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np;
+> +	struct st_rtc *rtc;
+> +	struct resource *res;
+> +	struct rtc_time tm_check;
+> +	int ret = 0;
+> +
+> +	/* This is a single [shared] node MFD device. */
+> +	np = pdev->dev.of_node = pdev->dev.parent->of_node;
+> +
+> +	rtc = devm_kzalloc(&pdev->dev, sizeof(struct st_rtc), GFP_KERNEL);
+> +	if (!rtc)
+> +		return -ENOMEM;
+> +
+> +	spin_lock_init(&rtc->lock);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	rtc->ioaddr = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(rtc->ioaddr))
+> +		return PTR_ERR(rtc->ioaddr);
+> +
+> +	rtc->irq = irq_of_parse_and_map(np, 0);
+> +	if (!rtc->irq) {
+> +		dev_err(&pdev->dev, "IRQ missing or invalid\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = devm_request_irq(&pdev->dev, rtc->irq, st_rtc_handler, 0,
+> +			       pdev->name, rtc);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Failed to request irq %i\n", rtc->irq);
+> +		return ret;
+> +	}
+> +
+> +	enable_irq_wake(rtc->irq);
+> +	disable_irq(rtc->irq);
+> +
+> +	rtc->clk = clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(rtc->clk)) {
+> +		dev_err(&pdev->dev, "Unable to request clock\n");
+> +		return PTR_ERR(rtc->clk);
+> +	}
+> +
+> +	clk_prepare_enable(rtc->clk);
+> +
+> +	device_set_wakeup_capable(&pdev->dev, 1);
+> +
+> +	platform_set_drvdata(pdev, rtc);
+> +
 > +	/*
-> +	 * Disable smart-idle as UART TX interrupts
-> +	 * are not wake-up capable
+> +	 * The RTC-LPC is able to manage date.year > 2038
+> +	 * but currently the kernel can not manage this date!
+> +	 * If the RTC-LPC has a date.year > 2038 then
+> +	 * it's set to the epoch "Jan 1st 2000"
 > +	 */
-> +	h4p_smart_idle(info, 0);
-> +	
-> +	err = h4p_read_fw(info);
-> +	if (err < 0) {
-> +		dev_err(info->dev, "Cannot read firmware\n");
-> +		goto err_clean;
+> +	st_rtc_read_time(&pdev->dev, &tm_check);
+> +
+> +	if (tm_check.tm_year >=  (2038 - 1900)) {
+> +		memset(&tm_check, 0, sizeof(tm_check));
+> +		tm_check.tm_year = 100;
+> +		tm_check.tm_mday = 1;
+> +		st_rtc_set_time(&pdev->dev, &tm_check);
 > +	}
 > +
-> +	h4p_set_auto_ctsrts(info, 0, UART_EFR_RTS);
-> +	h4p_set_rts(info, 0);
-> +	h4p_change_speed(info, BC4_MAX_BAUD_RATE);
-> +	h4p_set_auto_ctsrts(info, 1, UART_EFR_RTS);
-> +
-> +	info->pm_enabled = 1;
-> +
-> +	err = h4p_bt_wakeup_test(info);
-> +	if (err < 0) {
-> +		dev_err(info->dev, "BT wakeup test failed.\n");
-> +		goto err_clean;
+> +	rtc->rtc_dev = rtc_device_register("st-lpc-rtc", &pdev->dev,
+> +					   &st_rtc_ops, THIS_MODULE);
+> +	if (IS_ERR(rtc->rtc_dev)) {
+> +		clk_disable_unprepare(rtc->clk);
+> +		return PTR_ERR(rtc->rtc_dev);
 > +	}
 > +
-> +	spin_lock_irqsave(&info->lock, flags);
-> +	info->rx_enabled = gpio_get_value(info->host_wakeup_gpio);
-> +	h4p_set_clk(info, &info->rx_clocks_en, info->rx_enabled);
-> +	spin_unlock_irqrestore(&info->lock, flags);
-> +
-> +	h4p_set_clk(info, &info->tx_clocks_en, 0);
-> +
-> +	kfree_skb(info->alive_cmd_skb);
-> +	info->alive_cmd_skb = NULL;
-> +	info->initing = 0;
-> +	return 0;
-> +
-> +err_clean:
-> +	printk("hci_setup: something failed, should do the clean up\n");
-> +	return err;
-> +}
-> +
-> +static int h4p_hci_setup(struct hci_dev *hdev)
-> +{
 > +	return 0;
 > +}
-
-If you do not use it, then there is no point in including it. The core will do the right thing if you leave it out.
-
 > +
-> +static void hci_uninit(struct hci_dev *hdev)
+> +static int st_rtc_remove(struct platform_device *pdev)
 > +{
-> +	struct h4p_info *info = hci_get_drvdata(hdev);
+> +	struct st_rtc *rtc = platform_get_drvdata(pdev);
 > +
-> +	h4p_reset_uart(info);
-> +	del_timer_sync(&info->lazy_release);
-> +	h4p_set_clk(info, &info->tx_clocks_en, 0);
-> +	h4p_set_clk(info, &info->rx_clocks_en, 0);
-> +	gpio_set_value(info->reset_gpio, 0);
-> +	gpio_set_value(info->bt_wakeup_gpio, 0);
-> +	kfree_skb(info->rx_skb);
-> +	info->rx_skb = NULL;
+> +	if (likely(rtc->rtc_dev))
+> +		rtc_device_unregister(rtc->rtc_dev);
+> +
+> +	return 0;
 > +}
 > +
-> +static int h4p_hci_open(struct hci_dev *hdev)
+> +#ifdef CONFIG_PM
+CONFIG_PM_SLEEP is enough. If CONFIG_PM_SLEEP unset and 
+CONFIG_PM_RUNTIME set, this will lead in a compilation warning. API 
+defined but not used.
+> +static int st_rtc_suspend(struct device *dev)
 > +{
-> +	struct h4p_info *info;
-> +	int err;
+> +	struct st_rtc *rtc = dev_get_drvdata(dev);
 > +
-> +	info = hci_get_drvdata(hdev);
-
-Fold this into the variable declaration.
-
-> +
-> +	if (test_bit(HCI_RUNNING, &hdev->flags))
+> +	if (device_may_wakeup(dev))
 > +		return 0;
 > +
-> +	/* TI1271 has HW bug and boot up might fail. Original code retried 
-> +	   up to three times, but we removed TI1271 support. */
-
-Comment coding style needs to be correct.
-
+> +	writel(1, rtc->ioaddr + LPC_WDT_OFF);
+> +	writel(0, rtc->ioaddr + LPC_LPA_START_OFF);
+> +	writel(0, rtc->ioaddr + LPC_WDT_OFF);
 > +
-> +	info->rx_enabled = 1;
-> +	info->rx_state = WAIT_FOR_PKT_TYPE;
-> +	info->rx_count = 0;
-> +	info->garbage_bytes = 0;
-> +	info->rx_skb = NULL;
-> +	info->pm_enabled = 0;
-> +	init_completion(&info->fw_completion);
-> +	h4p_set_clk(info, &info->tx_clocks_en, 1);
-> +	h4p_set_clk(info, &info->rx_clocks_en, 1);
+> +	return 0;
+> +}
 > +
-> +	err = h4p_reset(info);
-> +	if (err < 0)
-> +		goto err_clean;
+> +static int st_rtc_resume(struct device *dev)
+> +{
+> +	struct st_rtc *rtc = dev_get_drvdata(dev);
 > +
-> +	h4p_set_auto_ctsrts(info, 1, UART_EFR_CTS | UART_EFR_RTS);
-> +	info->autorts = 1;
+> +	rtc_alarm_irq_enable(rtc->rtc_dev, 0);
 > +
-> +	info->initing = 1;
-> +	printk("hci_setup\n");
+> +	/*
+> +	 * clean 'rtc->alarm' to allow a new
+> +	 * a new .set_alarm to the upper RTC layer
+> +	 */
+duplicate "a new"
+> +	memset(&rtc->alarm, 0, sizeof(struct rtc_wkalrm));
 > +
-> +	err = h4p_send_negotiation(info);
-> +	set_bit(HCI_RUNNING, &hdev->flags);
-> +#if 0
-> +	err = h4p_setup(hdev);
-> +	if (err < 0) {
-> +		printk("h4p setup failed\n");
-> +		goto err_clean;
-> +	}
+> +	writel(0, rtc->ioaddr + LPC_LPA_MSB_OFF);
+> +	writel(0, rtc->ioaddr + LPC_LPA_LSB_OFF);
+> +	writel(1, rtc->ioaddr + LPC_WDT_OFF);
+> +	writel(1, rtc->ioaddr + LPC_LPA_START_OFF);
+> +	writel(0, rtc->ioaddr + LPC_WDT_OFF);
+> +
+> +	return 0;
+> +}
 > +#endif
 > +
-> +	atomic_set(&hdev->cmd_cnt, 1);
-> +	set_bit(HCI_INIT, &hdev->flags);
-> +	
-> +	return h4p_setup(hdev);
+> +static SIMPLE_DEV_PM_OPS(st_rtc_pm_ops, st_rtc_suspend, st_rtc_resume);
 > +
-> +err_clean:
-> +	printk("hci_open: something failed\n");
-> +	h4p_hci_flush(hdev);
-> +	hci_uninit(hdev);
-> +	kfree_skb(info->alive_cmd_skb);
-> +	info->alive_cmd_skb = NULL;
-> +
-> +	return err;
-> +}
-> +
-> +static int h4p_hci_close(struct hci_dev *hdev)
-> +{
-> +	struct h4p_info *info = hci_get_drvdata(hdev);
-> +
-> +	if (!test_and_clear_bit(HCI_RUNNING, &hdev->flags))
-> +		return 0;
-> +
-> +	h4p_hci_flush(hdev);
-> +	h4p_set_clk(info, &info->tx_clocks_en, 1);
-> +	h4p_set_clk(info, &info->rx_clocks_en, 1);
-> +	hci_uninit(hdev);
-> +	return 0;
-> +}
-> +
-> +static int h4p_hci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
-> +{
-> +	struct h4p_info *info;
-> +	int err = 0;
-> +
-> +	BT_DBG("hci_send_frame: dev %p, skb %p\n", hdev, skb);
-> +
-> +	info = hci_get_drvdata(hdev);
-
-Same as above and for all other cases as well.
-
-> +
-> +	if (!test_bit(HCI_RUNNING, &hdev->flags)) {
-> +		dev_warn(info->dev, "Frame for non-running device\n");
-> +		return -EIO;
-> +	}
-> +
-> +	switch (bt_cb(skb)->pkt_type) {
-> +	case HCI_COMMAND_PKT:
-> +		hdev->stat.cmd_tx++;
-> +		break;
-> +	case HCI_ACLDATA_PKT:
-> +		hdev->stat.acl_tx++;
-> +		break;
-> +	case HCI_SCODATA_PKT:
-> +		hdev->stat.sco_tx++;
-> +		break;
-> +	}
-> +
-> +	/* Push frame type to skb */
-> +	*skb_push(skb, 1) = (bt_cb(skb)->pkt_type);
-> +	/* We should always send word aligned data to h4+ devices */
-> +	if (skb->len % 2) {
-> +		err = skb_pad(skb, 1);
-> +		if (!err)
-> +			*skb_put(skb, 1) = 0x00;
-> +	}
-> +	if (err)
-> +		return err;
-> +
-> +	skb_queue_tail(&info->txq, skb);
-> +	if (!info->initing)
-> +		h4p_enable_tx(info);
-> +	else
-> +		h4p_enable_tx_nopm(info);
-> +
-> +	return 0;
-> +}
-> +
-> +static ssize_t h4p_hci_set_bdaddr(struct hci_dev *hdev, const bdaddr_t *bdaddr)
-> +{
-> +	struct h4p_info *info = hci_get_drvdata(hdev);
-> +
-> +	printk("Set bdaddr... %pMR\n", bdaddr);
-> +	return 0;
-> +}
-> +
-> +static int h4p_register_hdev(struct h4p_info *info)
-> +{
-> +	struct hci_dev *hdev;
-> +
-> +	/* Initialize and register HCI device */
-> +
-> +	hdev = hci_alloc_dev();
-> +	if (!hdev) {
-> +		dev_err(info->dev, "Can't allocate memory for device\n");
-> +		return -ENOMEM;
-> +	}
-> +	info->hdev = hdev;
-> +
-> +	hdev->bus = HCI_UART;
-> +	hci_set_drvdata(hdev, info);
-> +
-> +	hdev->open = h4p_hci_open;
-> +	hdev->setup = h4p_hci_setup;
-> +	hdev->close = h4p_hci_close;
-> +	hdev->flush = h4p_hci_flush;
-> +	hdev->send = h4p_hci_send_frame;
-> +	hdev->set_bdaddr = h4p_hci_set_bdaddr;
-> +
-> +	set_bit(HCI_QUIRK_RESET_ON_CLOSE, &hdev->quirks);
-
-Not sure why this one is needed. So that needs to be figured out.
-
-And you want to set the QUIRK_INVALID_BADDR. At least you want to do that in the final submission.
-
-> +
-> +	SET_HCIDEV_DEV(hdev, info->dev);
-> +
-> +	if (hci_register_dev(hdev) >= 0)
-> +		return 0;
-> +
-> +	dev_err(info->dev, "hci_register failed %s.\n", hdev->name);
-> +	hci_free_dev(info->hdev);
-> +	return -ENODEV;
-> +}
-
-And normally this is folded into the probe handling and not in a separate function.
-
-> +
-> +static int h4p_probe_pdata(struct platform_device *pdev, struct h4p_info *info,
-> +			       struct h4p_platform_data *bt_plat_data)
-> +{
-> +	info->chip_type = bt_plat_data->chip_type;
-> +	info->bt_wakeup_gpio = bt_plat_data->bt_wakeup_gpio;
-> +	info->host_wakeup_gpio = bt_plat_data->host_wakeup_gpio;
-> +	info->reset_gpio = bt_plat_data->reset_gpio;
-> +	info->reset_gpio_shared = bt_plat_data->reset_gpio_shared;
-> +	info->bt_sysclk = bt_plat_data->bt_sysclk;
-> +
-> +	info->irq = bt_plat_data->uart_irq;
-> +	info->uart_base = devm_ioremap(&pdev->dev, bt_plat_data->uart_base,
-> +					SZ_2K);
-> +	info->uart_iclk = devm_clk_get(&pdev->dev, bt_plat_data->uart_iclk);
-> +	info->uart_fclk = devm_clk_get(&pdev->dev, bt_plat_data->uart_fclk);
-> +	return 0;
-> +}
-> +
-> +static int h4p_probe_dt(struct platform_device *pdev, struct h4p_info *info)
-> +{
-> +	struct device_node *node;
-> +	struct device_node *uart = pdev->dev.of_node;
-> +	u32 val;
-> +	struct resource *mem;	
-> +
-> +	node = of_get_child_by_name(uart, "device");
-> +
-> +	if (!node)
-> +		return -ENODATA;
-> +
-> +	info->chip_type = 3;	/* Bcm2048 */
-> +	
-> +	if (of_property_read_u32(node, "bt-sysclk", &val)) return -EINVAL;
-> +	info->bt_sysclk = val;
-> +
-> +	info->reset_gpio       = of_get_named_gpio(node, "reset-gpios", 0);
-> +	info->host_wakeup_gpio = of_get_named_gpio(node, "host-wakeup-gpios", 0);
-> +	info->bt_wakeup_gpio   = of_get_named_gpio(node, "bluetooth-wakeup-gpios", 0);	
-> +
-> +	if (!uart) {
-> +		dev_err(&pdev->dev, "UART link not provided\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	info->irq = irq_of_parse_and_map(uart, 0);
-> +
-> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	info->uart_base = devm_ioremap_resource(&pdev->dev, mem);
-> +
-> +	info->uart_iclk = of_clk_get_by_name(uart, "ick");
-> +	info->uart_fclk = of_clk_get_by_name(uart, "fck");	
-> +
-> +	printk("DT: have neccessary data\n");
-> +	return 0;
-> +}
-> +			  
-> +
-> +static int h4p_probe(struct platform_device *pdev)
-> +{
-> +
-> +	struct h4p_info *info;
-> +	int err;
-> +
-> +	dev_info(&pdev->dev, "Registering HCI H4P device\n");
-> +	info = devm_kzalloc(&pdev->dev, sizeof(struct h4p_info),
-> +			GFP_KERNEL);
-> +	if (!info)
-> +		return -ENOMEM;
-> +
-> +	info->dev = &pdev->dev;
-> +	info->tx_enabled = 1;
-> +	info->rx_enabled = 1;
-> +	spin_lock_init(&info->lock);
-> +	spin_lock_init(&info->clocks_lock);
-> +	skb_queue_head_init(&info->txq);
-> +
-> +	if (pdev->dev.platform_data) {
-> +		err = h4p_probe_pdata(pdev, info, pdev->dev.platform_data);
-> +	} else {
-> +		err = h4p_probe_dt(pdev, info);
-> +	}
-> +	if (err) {
-> +		dev_err(&pdev->dev, "Could not get Bluetooth config data\n");
-> +		return -ENODATA;
-> +	}
-> +
-> +	printk("base/irq gpio: %lx/%d/%d\n",
-> +	       info->uart_base, info->irq);
-> +	printk("RESET/BTWU/HOSTWU gpio: %d/%d/%d\n",
-> +	       info->reset_gpio, info->bt_wakeup_gpio, info->host_wakeup_gpio);
-> +	printk("chip type, sysclk: %d/%d\n", info->chip_type, info->bt_sysclk);
-> +	printk("clock i/f: %lx/%lx\n", info->uart_iclk, info->uart_fclk);	
-> +
-> +	init_completion(&info->test_completion);
-> +	complete_all(&info->test_completion);
-> +
-> +	err = devm_gpio_request_one(&pdev->dev, info->reset_gpio,
-> +				    GPIOF_OUT_INIT_LOW, "bt_reset");
-> +	if (err < 0) {
-> +		dev_err(&pdev->dev, "Cannot get GPIO line %d\n",
-> +			info->reset_gpio);
-> +		return err;
-> +	}
-> +
-> +	err = devm_gpio_request_one(&pdev->dev, info->bt_wakeup_gpio,
-> +				    GPIOF_OUT_INIT_LOW, "bt_wakeup");
-> +	if (err < 0) {
-> +		dev_err(info->dev, "Cannot get GPIO line 0x%d",
-> +			info->bt_wakeup_gpio);
-> +		return err;
-> +	}
-> +
-> +	err = devm_gpio_request_one(&pdev->dev, info->host_wakeup_gpio,
-> +				    GPIOF_DIR_IN, "host_wakeup");
-> +	if (err < 0) {
-> +		dev_err(info->dev, "Cannot get GPIO line %d",
-> +		       info->host_wakeup_gpio);
-> +		return err;
-> +	}
-> +
-> +	err = devm_request_irq(&pdev->dev, info->irq, h4p_interrupt,
-> +				IRQF_DISABLED, "hci_h4p", info);
-> +	if (err < 0) {
-> +		dev_err(info->dev, "hci_h4p: unable to get IRQ %d\n",
-> +			info->irq);
-> +		return err;
-> +	}
-> +
-> +	err = devm_request_irq(&pdev->dev, gpio_to_irq(info->host_wakeup_gpio),
-> +			  h4p_wakeup_interrupt,  IRQF_TRIGGER_FALLING |
-> +			  IRQF_TRIGGER_RISING | IRQF_DISABLED,
-> +			  "h4p_wkup", info);
-> +	if (err < 0) {
-> +		dev_err(info->dev, "hci_h4p: unable to get wakeup IRQ %d\n",
-> +			  gpio_to_irq(info->host_wakeup_gpio));
-> +		return err;
-> +	}
-> +
-> +	err = irq_set_irq_wake(gpio_to_irq(info->host_wakeup_gpio), 1);
-> +	if (err < 0) {
-> +		dev_err(info->dev, "hci_h4p: unable to set wakeup for IRQ %d\n",
-> +				gpio_to_irq(info->host_wakeup_gpio));
-> +		return err;
-> +	}
-> +
-> +	init_timer_deferrable(&info->lazy_release);
-> +	info->lazy_release.function = h4p_lazy_clock_release;
-> +	info->lazy_release.data = (unsigned long)info;
-> +	h4p_set_clk(info, &info->tx_clocks_en, 1);
-> +	printk("resetting uart....\n");
-> +	err = h4p_reset_uart(info);
-> +	printk("reset ok....\n");
-
-I would really prefer that you either use BT_* print functions here or dev_* ones.
-
-> +	if (err < 0)
-> +		return err;
-> +	gpio_set_value(info->reset_gpio, 0);
-> +	h4p_set_clk(info, &info->tx_clocks_en, 0);
-> +
-> +	platform_set_drvdata(pdev, info);
-> +
-> +	if (h4p_register_hdev(info) < 0) {
-> +		dev_err(info->dev, "failed to register hci_h4p hci device\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int h4p_remove(struct platform_device *pdev)
-> +{
-> +	struct h4p_info *info;
-> +
-> +	info = platform_get_drvdata(pdev);
-> +
-> +	h4p_hci_close(info->hdev);
-> +	hci_unregister_dev(info->hdev);
-> +	hci_free_dev(info->hdev);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id h4p_of_match[] = {
-> +	{ .compatible = "brcm,uart,bcm2048" },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, h4p_of_match);
-> +
-> +static struct platform_driver h4p_driver = {
-> +	.probe		= h4p_probe,
-> +	.remove		= h4p_remove,
-> +	.driver		= {
-> +		.name	= "disabled" "hci_h4p",
-> +		.owner  = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(h4p_of_match),
+> +static struct platform_driver st_rtc_platform_driver = {
+> +	.driver = {
+> +		.name = "st-lpc-rtc",
+> +		.pm = &st_rtc_pm_ops,
 > +	},
+> +	.probe = st_rtc_probe,
+> +	.remove = st_rtc_remove,
 > +};
 > +
-> +module_platform_driver(h4p_driver);
+> +module_platform_driver(st_rtc_platform_driver);
 > +
-> +MODULE_ALIAS("platform:hci_h4p");
-> +MODULE_DESCRIPTION("Bluetooth h4 driver with nokia extensions");
-> +MODULE_LICENSE("GPL");
-> +MODULE_AUTHOR("Ville Tervo");
-> diff --git a/drivers/bluetooth/nokia_fw-bcm.c b/drivers/bluetooth/nokia_fw-bcm.c
-> new file mode 100644
-> index 0000000..fd88727
-> --- /dev/null
-> +++ b/drivers/bluetooth/nokia_fw-bcm.c
-> @@ -0,0 +1,27 @@
-> +/*
-> + * This file is part of Nokia H4P bluetooth driver
-> + *
-> + * Copyright (C) 2005-2008 Nokia Corporation.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-> + * 02110-1301 USA
-> + *
-> + */
-> +
-> +#include <linux/skbuff.h>
-> +#include <linux/delay.h>
-> +#include <linux/serial_reg.h>
-> +
-> +#include "hci_h4p.h"
-> +
-> diff --git a/drivers/bluetooth/nokia_fw.c b/drivers/bluetooth/nokia_fw.c
-> new file mode 100644
-> index 0000000..7b6a750
-> --- /dev/null
-> +++ b/drivers/bluetooth/nokia_fw.c
-> @@ -0,0 +1,105 @@
-> +/*
-> + * This file is part of hci_h4p bluetooth driver
-> + *
-> + * Copyright (C) 2005-2008 Nokia Corporation.
-> + * Copyright (C) 2014 Pavel Machek <pavel@ucw.cz>
-> + *
-> + * Contact: Ville Tervo <ville.tervo@nokia.com>
-
-Since he no longer works for Nokia, this email will bounce. Might just take it out as well.
-
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-> + * 02110-1301 USA
-> + *
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/skbuff.h>
-> +#include <linux/firmware.h>
-> +#include <linux/clk.h>
-> +
-> +#include <net/bluetooth/bluetooth.h>
-> +
-> +#include "hci_h4p.h"
-> +
-> +#define FW_NAME_BCM2048		"bcmfw.bin"
-
-I have the feeling, we really want to put that into "nokia/bcmfw.bin" since all these firmwares were special releases made for Nokia.
-
-> +
-> +#define BT_DBG printk
-
-I do not get these re-declartions.
-
-> +
-> +
-> +/* Read fw. Return length of the command. If no more commands in
-> + * fw 0 is returned. In error case return value is negative.
-> + */
-> +int h4p_read_fw(struct h4p_info *info)
-> +{
-> +	int num = 0;
-> +	int fw_pos = 0;
-> +	struct sk_buff *skb;
-> +	const struct firmware *fw_entry = NULL;
-> +	int err = -ENOENT;
-> +	unsigned int cmd_len = 0;	
-> +
-> +	err = request_firmware(&fw_entry, FW_NAME_BCM2048, info->dev);
-> +	if (err != 0 || !fw_entry)
-> +		return err;
-
-I think that checking for err < 0 is plenty here.
-
-> +
-> +	while(1) {
-
-while (1) or while (true)
-
-> +		int cmd, len;
-> +
-> +		fw_pos += cmd_len;		
-> +		
-> +		if (fw_pos >= fw_entry->size)
-> +			break;
-> +
-> +		if (fw_pos + 2 > fw_entry->size) {
-> +			dev_err(info->dev, "Corrupted firmware image 1\n");
-> +			err = -EMSGSIZE;
-> +			break;
-> +		}
-> +
-> +		cmd_len = fw_entry->data[fw_pos++];
-> +		cmd_len += fw_entry->data[fw_pos++] << 8;
-> +		if (cmd_len == 0)
-> +			break;
-> +
-> +		if (fw_pos + cmd_len > fw_entry->size) {
-> +			dev_err(info->dev, "Corrupted firmware image 2\n");
-> +			err = -EMSGSIZE;
-> +			break;
-> +		}
-> +
-> +		/* Skip first two packets */
-> +		if (++num <= 2)
-> +			continue;
-> +
-> +		/* Note that this is timing-critical. If sending packets takes too
-> +		   long, initialization will fail. */
-> +		printk("Packet %d...", num);
-> +
-> +		cmd = fw_entry->data[fw_pos+1];
-> +		cmd += fw_entry->data[fw_pos+2] << 8;
-> +		len = fw_entry->data[fw_pos+3];
-> +		printk("cmd %x, len %d.", cmd, len);
-> +
-> +		skb = __hci_cmd_sync(info->hdev, cmd, len, fw_entry->data+fw_pos+4, 500);
-> +		if (IS_ERR(skb)) {
-> +			dev_err(info->dev, "...sending cmd failed %d\n", PTR_ERR(skb));
-> +			err = -EIO;
-> +			break;
-> +		}
-> +	}
-> +
-> +	release_firmware(fw_entry);
-> +	return err;
-> +}
-> +
-> +MODULE_FIRMWARE(FW_NAME_BCM2048);
-> diff --git a/drivers/bluetooth/nokia_uart.c b/drivers/bluetooth/nokia_uart.c
-> new file mode 100644
-> index 0000000..2cae639
-> --- /dev/null
-> +++ b/drivers/bluetooth/nokia_uart.c
-> @@ -0,0 +1,179 @@
-> +/*
-> + * This file is part of Nokia H4P bluetooth driver
-> + *
-> + * Copyright (C) 2005, 2006 Nokia Corporation.
-> + * Copyright (C) 2014 Pavel Machek <pavel@ucw.cz>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-> + * 02110-1301 USA
-> + *
-> + */
-> +
-> +#include <linux/delay.h>
-> +#include <linux/clk.h>
-> +
-> +#include <linux/io.h>
-> +
-> +#include "hci_h4p.h"
-> +
-> +
-> +
-
-Why is this a separate file? And if so, why not all UART specific details are in this file. Including bunch of the defines you have in the header.
-
-> +int h4p_wait_for_cts(struct h4p_info *info, int active,
-> +			 int timeout_ms)
-> +{
-> +	unsigned long timeout;
-> +	int state;
-> +
-> +	timeout = jiffies + msecs_to_jiffies(timeout_ms);
-> +	for (;;) {
-> +		state = h4p_inb(info, UART_MSR) & UART_MSR_CTS;
-> +		if (active) {
-> +			if (state)
-> +				return 0;
-> +		} else {
-> +			if (!state)
-> +				return 0;
-> +		}
-> +		if (time_after(jiffies, timeout))
-> +			return -ETIMEDOUT;
-> +		msleep(1);
-> +	}
-> +}
-> +
-> +void __h4p_set_auto_ctsrts(struct h4p_info *info, int on, u8 which)
-> +{
-> +	u8 lcr, b;
-> +
-> +	lcr = h4p_inb(info, UART_LCR);
-> +	h4p_outb(info, UART_LCR, 0xbf);
-> +	b = h4p_inb(info, UART_EFR);
-> +	if (on)
-> +		b |= which;
-> +	else
-> +		b &= ~which;
-> +	h4p_outb(info, UART_EFR, b);
-> +	h4p_outb(info, UART_LCR, lcr);
-> +}
-> +
-> +void h4p_set_auto_ctsrts(struct h4p_info *info, int on, u8 which)
-> +{
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&info->lock, flags);
-> +	__h4p_set_auto_ctsrts(info, on, which);
-> +	spin_unlock_irqrestore(&info->lock, flags);
-> +}
-> +
-> +void h4p_change_speed(struct h4p_info *info, unsigned long speed)
-> +{
-> +	unsigned int divisor;
-> +	u8 lcr, mdr1;
-> +
-> +	BT_DBG("Setting speed %lu", speed);
-> +
-> +	if (speed >= 460800) {
-> +		divisor = UART_CLOCK / 13 / speed;
-> +		mdr1 = 3;
-> +	} else {
-> +		divisor = UART_CLOCK / 16 / speed;
-> +		mdr1 = 0;
-> +	}
-> +
-> +	/* Make sure UART mode is disabled */
-> +	h4p_outb(info, UART_OMAP_MDR1, 7);
-> +
-> +	lcr = h4p_inb(info, UART_LCR);
-> +	h4p_outb(info, UART_LCR, UART_LCR_DLAB);     /* Set DLAB */
-> +	h4p_outb(info, UART_DLL, divisor & 0xff);    /* Set speed */
-> +	h4p_outb(info, UART_DLM, divisor >> 8);
-> +	h4p_outb(info, UART_LCR, lcr);
-> +
-> +	/* Make sure UART mode is enabled */
-> +	h4p_outb(info, UART_OMAP_MDR1, mdr1);
-> +}
-> +
-> +int h4p_reset_uart(struct h4p_info *info)
-> +{
-> +	int count = 0;
-> +
-> +	/* Reset the UART */
-> +	h4p_outb(info, UART_OMAP_SYSC, UART_SYSC_OMAP_RESET);
-> +	while (!(h4p_inb(info, UART_OMAP_SYSS) & UART_SYSS_RESETDONE)) {
-> +		if (count++ > 100) {
-> +			dev_err(info->dev, "hci_h4p: UART reset timeout\n");
-> +			return -ENODEV;
-> +		}
-> +		udelay(1);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +void h4p_store_regs(struct h4p_info *info)
-> +{
-> +	u16 lcr = 0;
-> +
-> +	lcr = h4p_inb(info, UART_LCR);
-> +	h4p_outb(info, UART_LCR, 0xBF);
-> +	info->dll = h4p_inb(info, UART_DLL);
-> +	info->dlh = h4p_inb(info, UART_DLM);
-> +	info->efr = h4p_inb(info, UART_EFR);
-> +	h4p_outb(info, UART_LCR, lcr);
-> +	info->mdr1 = h4p_inb(info, UART_OMAP_MDR1);
-> +	info->ier = h4p_inb(info, UART_IER);
-> +}
-> +
-> +void h4p_restore_regs(struct h4p_info *info)
-> +{
-> +	u16 lcr = 0;
-> +
-> +	h4p_init_uart(info);
-> +
-> +	h4p_outb(info, UART_OMAP_MDR1, 7);
-> +	lcr = h4p_inb(info, UART_LCR);
-> +	h4p_outb(info, UART_LCR, 0xBF);
-> +	h4p_outb(info, UART_DLL, info->dll);    /* Set speed */
-> +	h4p_outb(info, UART_DLM, info->dlh);
-> +	h4p_outb(info, UART_EFR, info->efr);
-> +	h4p_outb(info, UART_LCR, lcr);
-> +	h4p_outb(info, UART_OMAP_MDR1, info->mdr1);
-> +	h4p_outb(info, UART_IER, info->ier);
-> +}
-> +
-> +void h4p_init_uart(struct h4p_info *info)
-> +{
-> +	u8 mcr, efr;
-> +
-> +	/* Enable and setup FIFO */
-> +	h4p_outb(info, UART_OMAP_MDR1, 0x00);
-> +
-> +	h4p_outb(info, UART_LCR, 0xbf);
-> +	efr = h4p_inb(info, UART_EFR);
-> +	h4p_outb(info, UART_EFR, UART_EFR_ECB);
-> +	h4p_outb(info, UART_LCR, UART_LCR_DLAB);
-> +	mcr = h4p_inb(info, UART_MCR);
-> +	h4p_outb(info, UART_MCR, UART_MCR_TCRTLR);
-> +	h4p_outb(info, UART_FCR, UART_FCR_ENABLE_FIFO |
-> +			UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT |
-> +			(3 << 6) | (0 << 4));
-> +	h4p_outb(info, UART_LCR, 0xbf);
-> +	h4p_outb(info, UART_TI752_TLR, 0xed);
-> +	h4p_outb(info, UART_TI752_TCR, 0xef);
-> +	h4p_outb(info, UART_EFR, efr);
-> +	h4p_outb(info, UART_LCR, UART_LCR_DLAB);
-> +	h4p_outb(info, UART_MCR, 0x00);
-> +	h4p_outb(info, UART_LCR, UART_LCR_WLEN8);
-> +	h4p_outb(info, UART_IER, UART_IER_RDI);
-> +	h4p_outb(info, UART_OMAP_SYSC, (1 << 0) | (1 << 2) | (2 << 3));
-> +}
-> diff --git a/include/linux/platform_data/bt-nokia-h4p.h b/include/linux/platform_data/bt-nokia-h4p.h
-> index 30d169d..c1a7e64 100644
-> --- a/include/linux/platform_data/bt-nokia-h4p.h
-> +++ b/include/linux/platform_data/bt-nokia-h4p.h
-> @@ -21,9 +21,9 @@
-> 
-> 
-> /**
-> - * struct hci_h4p_platform data - hci_h4p Platform data structure
-> + * struct h4p_platform data - hci_h4p Platform data structure
->  */
-> -struct hci_h4p_platform_data {
-> +struct h4p_platform_data {
-> 	int chip_type;
-> 	int bt_sysclk;
-> 	unsigned int bt_wakeup_gpio;
-
-And this just needs to ultimately go away. We need to get this as DT detail.
-
-Regards
-
-Marcel
+> +MODULE_DESCRIPTION("STMicroelectronics LPC RTC driver");
+> +MODULE_AUTHOR("David Paris <david.paris@st.com>");
+> +MODULE_LICENSE("GPLv2");
