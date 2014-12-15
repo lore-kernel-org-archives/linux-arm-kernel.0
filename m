@@ -1,34 +1,105 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Dec 2014 13:00:13 +0000
-Subject: [PATCH] iommu/exynos: Fix arm64 allmodconfig build
-Message-ID: <1418648413-32013-1-git-send-email-broonie@kernel.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 15 Dec 2014 14:02:27 +0100
+Subject: [PATCH v5 19/19] arm/arm64: KVM: allow userland to request a
+ virtual GICv3
+In-Reply-To: <548ECB14.8040408@arm.com>
+References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
+ <1418042274-3246-20-git-send-email-andre.przywara@arm.com>
+ <20141213134502.GH16855@cbox> <548ECB14.8040408@arm.com>
+Message-ID: <20141215130227.GA25863@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos IOMMU driver uses the ARM specific dmac_flush_range() and
-outer_flush_range() functions. This breaks the build on arm64 allmodconfig
-in -next since support has been merged for some Exynos ARMv8 SoCs. Add a
-dependency on ARM to keep things building until either the driver has the
-ARM dependencies removed or the ARMv8 architecture code implements these
-ARM specific APIs.
+On Mon, Dec 15, 2014 at 11:50:44AM +0000, Andre Przywara wrote:
+> Hi Christoffer,
+> 
+> On 13/12/14 13:45, Christoffer Dall wrote:
+> > On Mon, Dec 08, 2014 at 12:37:54PM +0000, Andre Przywara wrote:
+> >> With all of the GICv3 code in place now we allow userland to ask the
+> >> kernel for using a virtual GICv3 in the guest.
+> >> Also we provide the necessary support for guests setting the memory
+> >> addresses for the virtual distributor and redistributors.
+> >> This requires some userland code to make use of that feature and
+> >> explicitly ask for a virtual GICv3.
+> >>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >> ---
+> >> Changelog v4...v5:
+> >> - improving documentation text
+> >>
+> >> Changelog v3...v4:
+> >> - refine commit message
+> >> - add documentation of new GICv3 KVM device
+> >>
+> >>  Documentation/virtual/kvm/devices/arm-vgic.txt |   22 ++++++++++--
+> >>  arch/arm64/include/uapi/asm/kvm.h              |    7 ++++
+> >>  include/kvm/arm_vgic.h                         |    4 +--
+> >>  virt/kvm/arm/vgic-v3-emul.c                    |    3 ++
+> >>  virt/kvm/arm/vgic.c                            |   46 +++++++++++++++++-------
+> >>  5 files changed, 65 insertions(+), 17 deletions(-)
+> >>
+> >> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> >> index df8b0c7..563463e 100644
+> >> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
+> >> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> >> @@ -3,22 +3,38 @@ ARM Virtual Generic Interrupt Controller (VGIC)
+> >>  
+> >>  Device types supported:
+> >>    KVM_DEV_TYPE_ARM_VGIC_V2     ARM Generic Interrupt Controller v2.0
+> >> +  KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
+> >>  
+> >>  Only one VGIC instance may be instantiated through either this API or the
+> >>  legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
+> >>  controller, requiring emulated user-space devices to inject interrupts to the
+> >>  VGIC instead of directly to CPUs.
+> >>  
+> >> +Creating a guest GICv3 device requires a host GICv3 as well.
+> >> +GICv3 implementations with hardware compatibility support allow a guest GICv2
+> >> +as well.
+> >> +
+> >>  Groups:
+> >>    KVM_DEV_ARM_VGIC_GRP_ADDR
+> >>    Attributes:
+> >>      KVM_VGIC_V2_ADDR_TYPE_DIST (rw, 64-bit)
+> >>        Base address in the guest physical address space of the GIC distributor
+> >> -      register mappings.
+> >> +      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
+> >>  
+> >>      KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
+> >>        Base address in the guest physical address space of the GIC virtual cpu
+> >> -      interface register mappings.
+> >> +      interface register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
+> >> +
+> >> +    KVM_VGIC_V3_ADDR_TYPE_DIST (rw, 64-bit)
+> >> +      Base address in the guest physical address space of the GICv3 distributor
+> >> +      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
+> >> +
+> > 
+> > Are there no alignment restrictions to worry about that we should
+> > document here?
+> 
+> I think so, but that is not GICv3 specific, but applies to the VGICv2
+> also, right? So shall I add a sentence like
+> "The base address needs to be aligned to a 64 KB page boundary."
+> for GICv3 and
+> "The base address needs to be aligned to a 4 KB page boundary."
+> for GICv2?
+> Shouldn't the 64K alignment actually apply for GICv2 on AArch64 also?
+> That would avoid some trouble in the future, wouldn't it?
+> 
+> Also I think we need to actually check for the 64K alignment for GICv3
+> (we only check for 4K atm).
+> 
+Yeah, I think we should clarify this and check that the code does what
+we expect.
 
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/iommu/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Note that the CPU interface needs to be aligned according the same
+offset as the hardware puts that GICV if not on page boundaries etc.
+Marc had a patch to also inform userspace about this, which may be
+better suited for a follow-up later on, but I feel like the distributor
+allocation stuff should be a simple thing to check and get right for
+at least GICv3 now, and if we also introduce some safety for GICv2 at
+the same time, even better.
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 01e8bfae569b..325188eef1c1 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -187,7 +187,7 @@ config TEGRA_IOMMU_SMMU
- 
- config EXYNOS_IOMMU
- 	bool "Exynos IOMMU Support"
--	depends on ARCH_EXYNOS
-+	depends on ARCH_EXYNOS && ARM
- 	select IOMMU_API
- 	select ARM_DMA_USE_IOMMU
- 	help
--- 
-2.1.3
+Thanks,
+-Christoffer
