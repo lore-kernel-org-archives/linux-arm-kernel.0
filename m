@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Dec 2014 16:38:35 +0100
-Subject: [PATCH 27/27] ARM: mvebu: armada-xp-synology-ds414: Relicense the
- device tree under GPLv2+/X11
+Date: Mon, 15 Dec 2014 16:38:29 +0100
+Subject: [PATCH 21/27] ARM: mvebu: armada-xp-matrix: Relicense the device tree
+ under GPLv2+/X11
 In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1418657915-22775-28-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1418657915-22775-22-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,24 +15,23 @@ license.
 In order to make it easier for them to reuse our device trees,
 relicense our device trees under a GPL/X11 dual-license.
 
-Cc: Arnaud Ebalard <arno@natisbad.org>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-synology-ds414.dts | 41 +++++++++++++++++++++++---
- 1 file changed, 37 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/armada-xp-matrix.dts | 40 +++++++++++++++++++++++++++++++---
+ 1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-synology-ds414.dts b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
-index 749fdba5a642..e9fb225169aa 100644
---- a/arch/arm/boot/dts/armada-xp-synology-ds414.dts
-+++ b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
-@@ -3,10 +3,43 @@
+diff --git a/arch/arm/boot/dts/armada-xp-matrix.dts b/arch/arm/boot/dts/armada-xp-matrix.dts
+index 7e291e2ef4b3..56f958eb1ede 100644
+--- a/arch/arm/boot/dts/armada-xp-matrix.dts
++++ b/arch/arm/boot/dts/armada-xp-matrix.dts
+@@ -5,9 +5,43 @@
   *
-  * Copyright (C) 2014, Arnaud EBALARD <arno@natisbad.org>
+  * Lior Amsalem <alior@marvell.com>
   *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version
-- * 2 of the License, or (at your option) any later version.
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
 + * licensing only applies to this file, and not this project as a
@@ -70,8 +69,8 @@ index 749fdba5a642..e9fb225169aa 100644
 + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
-  *
-  * Note: this Device Tree assumes that the bootloader has remapped the
-  * internal registers to 0xf1000000 (instead of the old 0xd0000000).
+  */
+ 
+ /dts-v1/;
 -- 
 1.9.1
