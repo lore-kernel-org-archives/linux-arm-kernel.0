@@ -1,10 +1,10 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 15 Dec 2014 18:57:15 +0100
-Subject: [PATCH 02/27] ARM: mvebu: armada-370: Relicense the device tree
- under GPLv2+/X11
+Date: Mon, 15 Dec 2014 18:57:36 +0100
+Subject: [PATCH 04/27] ARM: mvebu: armada-370-netgear-rn102: Relicense the
+ device tree under GPLv2+/X11
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <871to0pzic.fsf@natisbad.org>
+ <1418657915-22775-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <87mw6ookxb.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,29 +21,30 @@ Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 > Cc: Arnaud Ebalard <arno@natisbad.org>
 > Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Ryan Press <ryan@presslab.us>
+> Cc: klightspeed at killerwolves.net <klightspeed@killerwolves.net>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
 > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Acked-by: Arnaud Ebalard <arno@natisbad.org>
 
 
 > ---
->  arch/arm/boot/dts/armada-370.dtsi | 40 ++++++++++++++++++++++++++++++++++++---
->  1 file changed, 37 insertions(+), 3 deletions(-)
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 41 +++++++++++++++++++++++---
+>  1 file changed, 37 insertions(+), 4 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> index fdb3c12a6139..27397f151def 100644
-> --- a/arch/arm/boot/dts/armada-370.dtsi
-> +++ b/arch/arm/boot/dts/armada-370.dtsi
-> @@ -7,9 +7,43 @@
->   * Gregory CLEMENT <gregory.clement@free-electrons.com>
->   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> index 4e24932c6e30..7c5c4ff941ec 100644
+> --- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> +++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> @@ -3,10 +3,43 @@
 >   *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
+>   * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
+>   *
+> - * This program is free software; you can redistribute it and/or
+> - * modify it under the terms of the GNU General Public License
+> - * as published by the Free Software Foundation; either version
+> - * 2 of the License, or (at your option) any later version.
 > + * This file is dual-licensed: you can use it either under the terms
 > + * of the GPL or the X11 license, at your option. Note that this dual
 > + * licensing only applies to this file, and not this project as a
@@ -81,6 +82,6 @@ Acked-by: Arnaud Ebalard <arno@natisbad.org>
 > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 > + *     OTHER DEALINGS IN THE SOFTWARE.
->   *
->   * Contains definitions specific to the Armada 370 SoC that are not
->   * common to all Armada SoCs.
+>   */
+>  
+>  /dts-v1/;
