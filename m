@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Dec 2014 16:38:17 +0100
-Subject: [PATCH 09/27] ARM: mvebu: armada-375-db: Relicense the device tree
- under GPLv2+/X11
+Date: Mon, 15 Dec 2014 16:38:19 +0100
+Subject: [PATCH 11/27] ARM: mvebu: armada-380: Relicense the device tree under
+ GPLv2+/X11
 In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1418657915-22775-10-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1418657915-22775-12-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,17 +15,16 @@ license.
 In order to make it easier for them to reuse our device trees,
 relicense our device trees under a GPL/X11 dual-license.
 
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-375-db.dts | 40 ++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-380.dtsi | 40 ++++++++++++++++++++++++++++++++++++---
  1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
-index 929ae00b4063..0440891425c0 100644
---- a/arch/arm/boot/dts/armada-375-db.dts
-+++ b/arch/arm/boot/dts/armada-375-db.dts
+diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
+index 4173a8ab34e7..dee29ecf60c0 100644
+--- a/arch/arm/boot/dts/armada-380.dtsi
++++ b/arch/arm/boot/dts/armada-380.dtsi
 @@ -7,9 +7,43 @@
   * Gregory CLEMENT <gregory.clement@free-electrons.com>
   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
@@ -72,6 +71,6 @@ index 929ae00b4063..0440891425c0 100644
 + *     OTHER DEALINGS IN THE SOFTWARE.
   */
  
- /dts-v1/;
+ #include "armada-38x.dtsi"
 -- 
 1.9.1
