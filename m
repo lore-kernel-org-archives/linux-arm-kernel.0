@@ -1,54 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Dec 2014 16:58:27 +0100
-Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <20141215155310.GD28701@1wt.eu>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-25-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-24-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-19-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
- <20141215155310.GD28701@1wt.eu>
-Message-ID: <548F0523.906@free-electrons.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 15 Dec 2014 16:59:20 +0100
+Subject: [PATCH] clocksource: sirf: Remove unused variable
+Message-ID: <1418659160-2115-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/2014 16:53, Willy Tarreau wrote:
-> On Mon, Dec 15, 2014 at 04:38:16PM +0100, Gregory CLEMENT wrote:
->> The current GPL only licensing on the device tree makes it very
->> impractical for other software components licensed under another
->> license.
->>
->> In order to make it easier for them to reuse our device trees,
->> relicense our device trees under a GPL/X11 dual-license.
->>
->> Cc: Andrew Lunn <andrew@lunn.ch>
->> Cc: Arnaud Ebalard <arno@natisbad.org>
->> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->> Cc: Greg Ungerer <gerg@uclinux.org>
->> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
->> Cc: Simon Baatz <gmbnomis@gmail.com>
->> Cc: Simon Guinot <simon.guinot@sequanux.org>
->> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> Cc: Willy Tarreau <w@1wt.eu>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> 
-> Acked-by: Willy Tarreau <w@1wt.eu>
-> 
+From: Thierry Reding <treding@nvidia.com>
 
-Thanks for you prompt answer for this patch ans the 3 others :)
+Commit ef89af1f4380 ("clocksource: sirf: Remove hard-coded clock rate")
+removes all uses of the timer_div variable. Since the variable is no
+longer used it should be removed.
 
-Gregory
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ drivers/clocksource/timer-marco.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-
+diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-marco.c
+index 361a789d4bee..3ddb81f7ee66 100644
+--- a/drivers/clocksource/timer-marco.c
++++ b/drivers/clocksource/timer-marco.c
+@@ -257,7 +257,6 @@ static void __init sirfsoc_clockevent_init(void)
+ /* initialize the kernel jiffy timer source */
+ static void __init sirfsoc_marco_timer_init(struct device_node *np)
+ {
+-	u32 timer_div;
+ 	struct clk *clk;
+ 
+ 	clk = of_clk_get(np, 0);
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.3
