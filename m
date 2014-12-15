@@ -1,109 +1,19 @@
-From: howard.chen@linaro.org (Howard Chen)
-Date: Mon, 15 Dec 2014 16:59:08 +0800
-Subject: [RFC] ARM: dts: mt8173: Add psci cpuidle support
-Message-ID: <1418633948-2513-1-git-send-email-howard.chen@linaro.org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 15 Dec 2014 10:02:49 +0100
+Subject: [PATCH 5/6] dt-bindings: Add documentation for Rockchip hdmi-audio
+In-Reply-To: <1418612114-19692-1-git-send-email-ykk@rock-chips.com>
+References: <1418609494-15820-1-git-send-email-ykk@rock-chips.com>
+ <1418612114-19692-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <548EA3B9.5080407@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add device tree for psci-0.2 on mt8173 platform
-add device tree for cupidle-arm64 on mt8173 platform
+On 12/15/2014 03:55 AM, Yakir Yang wrote:
+[...]
+> +- codec-name: the dw-hdmi codec's device name
+> +- codec-dai-name: the dw-hdmi codec's dai name
 
-Signed-off-by: Howard Chen <howard.chen@linaro.org>
----
- arch/arm64/boot/dts/mt8173.dtsi | 51 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+Please you phandles for this, the names are Linux driver and framework 
+specific details. That should not leak into the DT bindings.
 
-diff --git a/arch/arm64/boot/dts/mt8173.dtsi b/arch/arm64/boot/dts/mt8173.dtsi
-index 79b7e46..c5e1127 100644
---- a/arch/arm64/boot/dts/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mt8173.dtsi
-@@ -44,6 +44,11 @@
- 		};
- 	};
- 
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -54,6 +59,7 @@
- 			reg = <0x000>;
- 			enable-method = "mt-boot";
- 			cpu-release-addr = <0x0 0x40000200>;
-+			cpu-idle-states = <&CPU_SLEEP_1_0 &CLUSTER_SLEEP_1>;
- 		};
- 
- 		cpu1: cpu at 1 {
-@@ -62,6 +68,7 @@
- 			reg = <0x001>;
- 			enable-method = "mt-boot";
- 			cpu-release-addr = <0x0 0x40000200>;
-+			cpu-idle-states = <&CPU_SLEEP_1_0 &CLUSTER_SLEEP_1>;
- 		};
- 
- 		cpu2: cpu at 2 {
-@@ -70,6 +77,7 @@
- 			reg = <0x100>;
- 			enable-method = "mt-boot";
- 			cpu-release-addr = <0x0 0x40000200>;
-+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -78,8 +86,51 @@
- 			reg = <0x101>;
- 			enable-method = "mt-boot";
- 			cpu-release-addr = <0x0 0x40000200>;
-+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
- 		};
- 
-+		idle-states {
-+			entry-method = "arm,psci-0.2";
-+
-+			CPU_SLEEP_0_0: cpu-sleep-0-0 {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				arm,psci-suspend-param = <0x0010000>;
-+				entry-latency-us = <250>;
-+				exit-latency-us = <500>;
-+				min-residency-us = <950>;
-+			};
-+
-+			CLUSTER_SLEEP_0: cluster-sleep-0 {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				arm,psci-suspend-param = <0x1010000>;
-+				entry-latency-us = <600>;
-+				exit-latency-us = <1100>;
-+				min-residency-us = <2700>;
-+				wakeup-latency-us = <1500>;
-+			};
-+
-+			CPU_SLEEP_1_0: cpu-sleep-1-0 {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				arm,psci-suspend-param = <0x0010000>;
-+				entry-latency-us = <70>;
-+				exit-latency-us = <100>;
-+				min-residency-us = <300>;
-+				wakeup-latency-us = <150>;
-+			};
-+
-+			CLUSTER_SLEEP_1: cluster-sleep-1 {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				arm,psci-suspend-param = <0x1010000>;
-+				entry-latency-us = <500>;
-+				exit-latency-us = <1200>;
-+				min-residency-us = <3500>;
-+				wakeup-latency-us = <1300>;
-+			};
-+		};
- 	};
- 
- 	clocks {
--- 
-1.9.1
+[..]
