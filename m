@@ -1,21 +1,30 @@
-From: b.hutchman@gmail.com (Brian Hutchinson)
-Date: Mon, 15 Dec 2014 15:33:50 -0500
-Subject: How much flash space should I reserve for device tree blobs?
-Message-ID: <CAFZh4h_74LY=w7gV=zNAC0ssRFgrh1DduPmZ2c+HenbztRRc-A@mail.gmail.com>
+From: evgeni@studio-punkt.com (Evgeni Dobrev)
+Date: Mon, 15 Dec 2014 21:37:24 +0100
+Subject: [PATCH 1/2] ARM: dts: kirkwood: enable phy driver for SATA
+ controller on 88f6192
+Message-ID: <20141215203724.GA22936@anne>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reflecting back on the famous quote of "Nobody needs more than 640K",
-how much space should I reserve in flash to 'future proof' my MTD map
-in regards to dtb's?
+This patch enables the phy drivers for the SATA controller on Marvell's 88f6192. Without them it is not possible to use SATA drives attached to this processor.
 
-Looking at the current flavors of dtb's built in a recent mainline
-kernel, the biggest one I see is 66K.
+Signed-off-by: Evgeni Dobrev <evgeni@studio-punkt.com>
+---
+ arch/arm/boot/dts/kirkwood-6192.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
-How big do you all see these getting?  I know, it's probably a loaded
-question.  Would just like to bounce this off the list as a sanity
-check ... measure twice cut once kind of thing.
-
-Regards,
-
-Brian
+diff --git a/arch/arm/boot/dts/kirkwood-6192.dtsi b/arch/arm/boot/dts/kirkwood-6192.dtsi
+index dd81508..bed2dec 100644
+--- a/arch/arm/boot/dts/kirkwood-6192.dtsi
++++ b/arch/arm/boot/dts/kirkwood-6192.dtsi
+@@ -66,6 +66,8 @@
+ 			interrupts = <21>;
+ 			clocks = <&gate_clk 14>, <&gate_clk 15>;
+ 			clock-names = "0", "1";
++                        phys = <&sata_phy0>, <&sata_phy1>;
++                        phy-names = "port0", "port1";
+ 			status = "disabled";
+ 		};
+ 
+-- 
+1.7.10.4
