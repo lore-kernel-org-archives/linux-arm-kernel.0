@@ -1,39 +1,55 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 15 Dec 2014 19:00:57 +0100
-Subject: [PATCHv0 2/5] ARM: mvebu: ISL12057 rtc chip can be used to wake
- up RN102
-In-Reply-To: <20141215135308.GB967@titan.lakedaemon.net> (Jason Cooper's
- message of "Mon, 15 Dec 2014 08:53:08 -0500")
+Date: Mon, 15 Dec 2014 19:05:18 +0100
+Subject: [PATCHv0 5/5] dt-bindings: fix isl vs isil prefix issue for
+ Intersil
+In-Reply-To: <20141215135545.GC967@titan.lakedaemon.net> (Jason Cooper's
+ message of "Mon, 15 Dec 2014 08:55:45 -0500")
 References: <cover.1418519430.git.arno@natisbad.org>
- <b7208bdcd16dbc511d7ae6dd47aee91ab81f54f4.1418519430.git.arno@natisbad.org>
- <20141215135308.GB967@titan.lakedaemon.net>
-Message-ID: <877fxskd2e.fsf@natisbad.org>
+ <b2c34bea6fc7bd42d636c9cadfe1b7e5ec523aeb.1418519430.git.arno@natisbad.org>
+ <20141215135545.GC967@titan.lakedaemon.net>
+Message-ID: <87388gkcv5.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
 Jason Cooper <jason@lakedaemon.net> writes:
 
-> On Sun, Dec 14, 2014 at 02:42:28AM +0100, Arnaud Ebalard wrote:
+>> AFAICT, it seems it makes sense to *definitively* settle for isil as the
+>> vendor prefix for Intersil, as Philip did in 7a6540ca856a: it's the NASDAQ
+>> symbol and this choice requires less changes than opting for isl.
 >> 
->> Now that alarm support for ISL12057 chip is available, let's use a
->> feature of the driver dedicated to NETGEAR ReadyNAS 102 specific
->> routing of RTC IRQ#2 pin; on the device, this pin is not connected
->> to the SoC but to a PMIC, which allows the device to be powered
->> up when RTC alarm rings.
->> 
->> For that to work, the chip needs to be explicitly marked as a
->> device wakeup source using the "can-wakeup-machine" boolean
->> property. This makes 'wakealarm' sysfs entry available to
->> configure the alarm.
+>> So, this patch changes compatible strings in .dts files to use isil where
+>> isl was found before, and modify drivers w/ compatible strings using isl
+>> to add one using isil. In those cases, a comment is made that the old
+>> compatible string is kept for backward compatibility (w/ out-fo-tree users
+>> of those drivers). Additionally, it leaves only isil as prefix in
+>> vendor-prefixes.txt. Those changes should prevent any new inclusion of
+>> isl compatible strings for Intersil devices due to copy-and-paste.
 >> 
 >> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 >> ---
->>  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 1 +
->>  1 file changed, 1 insertion(+)
+>>  Documentation/devicetree/bindings/i2c/trivial-devices.txt | 5 ++---
+>>  Documentation/devicetree/bindings/regulator/isl9305.txt   | 4 ++--
+>>  Documentation/devicetree/bindings/vendor-prefixes.txt     | 3 +--
 >
-> Please group patches 2 - 4 into one patch.
+>>  arch/arm/boot/dts/tegra30-cardhu.dtsi                     | 2 +-
+>>  arch/arm/boot/dts/zynq-parallella.dts                     | 2 +-
+>
+>>  drivers/regulator/isl9305.c                               | 6 ++++--
+>>  drivers/rtc/rtc-isl12022.c                                | 3 ++-
+>>  drivers/rtc/rtc-isl12057.c                                | 3 ++-
+>>  drivers/staging/iio/light/isl29028.c                      | 4 ++--
+>>  9 files changed, 17 insertions(+), 15 deletions(-)
+>
+> Please split the dts{i} changes out into a separate patch.  The
+> different maintainers under drivers/ may want separate patches as well.
 
-Will do.
+I will prepare that, and then let get_maintainer.pl decide who should
+be added to the CC: list. But before doing that work, I would like to
+at least get some feedback that there will not be a big NAK on the
+whole approach in the end.
+
+Cheers,
 
 a+
