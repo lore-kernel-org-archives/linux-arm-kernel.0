@@ -1,455 +1,318 @@
 From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
-Date: Mon, 15 Dec 2014 15:08:17 +0800
-Subject: [PATCH v2 4/8] clk: Add clock driver for mb86s7x
+Date: Mon, 15 Dec 2014 15:09:39 +0800
+Subject: [PATCH v2 5/8] gpio: Add Fujitsu MB86S7x GPIO driver
 In-Reply-To: <1418626369-3004-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 References: <1418626369-3004-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <1418627297-3189-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <1418627379-3231-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- The CRG11 clock controller is managed by remote f/w.
-This driver simply maps Linux CLK ops onto mailbox api.
+Driver for Fujitsu MB86S7x SoCs that have a memory mapped GPIO controller.
 
 Signed-off-by: Andy Green <andy.green@linaro.org>
 Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
 Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
 Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
 ---
- .../bindings/clock/fujitsu,mb86s70-crg11.txt       |  26 ++
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk-mb86s7x.c                          | 379 +++++++++++++++++++++
- 3 files changed, 406 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
- create mode 100644 drivers/clk/clk-mb86s7x.c
+ .../bindings/gpio/fujitsu,mb86s70-gpio.txt         |  20 ++
+ drivers/gpio/Kconfig                               |   6 +
+ drivers/gpio/Makefile                              |   1 +
+ drivers/gpio/gpio-mb86s7x.c                        | 231 +++++++++++++++++++++
+ 4 files changed, 258 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/fujitsu,mb86s70-gpio.txt
+ create mode 100644 drivers/gpio/gpio-mb86s7x.c
 
-diff --git a/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt b/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
+diff --git a/Documentation/devicetree/bindings/gpio/fujitsu,mb86s70-gpio.txt b/Documentation/devicetree/bindings/gpio/fujitsu,mb86s70-gpio.txt
 new file mode 100644
-index 0000000..f692d0b
+index 0000000..bef353f
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
-@@ -0,0 +1,26 @@
-+Fujitsu CRG11 clock driver bindings
-+-----------------------------------
++++ b/Documentation/devicetree/bindings/gpio/fujitsu,mb86s70-gpio.txt
+@@ -0,0 +1,20 @@
++Fujitsu MB86S7x GPIO Controller
++-------------------------------
 +
-+Required properties :
-+- compatible : Shall contain "fujitsu,mb86s70-crg11"
-+- #clock-cells : Shall be 3 {cntrlr domain port}
++Required properties:
++- compatible: Should be "fujitsu,mb86s70-gpio"
++- reg: Base address and length of register space
++- clocks: Specify the clock
++- gpio-controller: Marks the device node as a gpio controller.
++- #gpio-cells: Should be <2>. The first cell is the pin number and the
++  second cell is used to specify optional parameters:
++   - bit 0 specifies polarity (0 for normal, 1 for inverted).
 +
-+The consumer specifies the desired clock pointing to its phandle.
-+
-+Example:
-+
-+	clock: crg11 {
-+		compatible = "fujitsu,mb86s70-crg11";
-+		#clock-cells = <3>;
++Examples:
++	gpio0: gpio at 31000000 {
++		compatible = "fujitsu,mb86s70-gpio";
++		reg = <0 0x31000000 0x10000>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		clocks = <&clk 0 2 1>;
 +	};
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 23dfd5f..7b7fefe 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -181,6 +181,12 @@ config GPIO_F7188X
+ 	  To compile this driver as a module, choose M here: the module will
+ 	  be called f7188x-gpio.
+ 
++config GPIO_MB86S7X
++	bool "GPIO support for Fujitsu MB86S7x Platforms"
++	depends on ARCH_MB86S7X
++	help
++	  Say yes here to support the GPIO controller in Fujitsu MB86S70 SoCs.
 +
-+	mhu: mhu0 at 2b1f0000 {
-+		#mbox-cells = <1>;
-+		compatible = "arm,mbox-mhu";
-+		reg = <0 0x2B1F0000 0x1000>;
-+		interrupts = <0 36 4>, /* LP Non-Sec */
-+			     <0 35 4>, /* HP Non-Sec */
-+			     <0 37 4>; /* Secure */
-+		clocks = <&clock 0 2 1>; /* Cntrlr:0 Domain:2 Port:1 */
-+		clock-names = "clk";
-+	};
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index d5fba5b..19d73a1 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -26,6 +26,7 @@ obj-$(CONFIG_MACH_LOONGSON1)		+= clk-ls1x.o
- obj-$(CONFIG_COMMON_CLK_MAX_GEN)	+= clk-max-gen.o
- obj-$(CONFIG_COMMON_CLK_MAX77686)	+= clk-max77686.o
- obj-$(CONFIG_COMMON_CLK_MAX77802)	+= clk-max77802.o
-+obj-$(CONFIG_ARCH_MB86S7X)		+= clk-mb86s7x.o
- obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
- obj-$(CONFIG_ARCH_NOMADIK)		+= clk-nomadik.o
- obj-$(CONFIG_ARCH_NSPIRE)		+= clk-nspire.o
-diff --git a/drivers/clk/clk-mb86s7x.c b/drivers/clk/clk-mb86s7x.c
+ config GPIO_MOXART
+ 	bool "MOXART GPIO support"
+ 	depends on ARCH_MOXART
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index e60677b..5a8d09b 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -47,6 +47,7 @@ obj-$(CONFIG_GPIO_MAX730X)	+= gpio-max730x.o
+ obj-$(CONFIG_GPIO_MAX7300)	+= gpio-max7300.o
+ obj-$(CONFIG_GPIO_MAX7301)	+= gpio-max7301.o
+ obj-$(CONFIG_GPIO_MAX732X)	+= gpio-max732x.o
++obj-$(CONFIG_GPIO_MB86S7X)	+= gpio-mb86s7x.o
+ obj-$(CONFIG_GPIO_MC33880)	+= gpio-mc33880.o
+ obj-$(CONFIG_GPIO_MC9S08DZ60)	+= gpio-mc9s08dz60.o
+ obj-$(CONFIG_GPIO_MCP23S08)	+= gpio-mcp23s08.o
+diff --git a/drivers/gpio/gpio-mb86s7x.c b/drivers/gpio/gpio-mb86s7x.c
 new file mode 100644
-index 0000000..96e686c
+index 0000000..8ba535d
 --- /dev/null
-+++ b/drivers/clk/clk-mb86s7x.c
-@@ -0,0 +1,379 @@
++++ b/drivers/gpio/gpio-mb86s7x.c
+@@ -0,0 +1,231 @@
 +/*
-+ * Copyright (C) 2013-2014 FUJITSU SEMICONDUCTOR LIMITED
-+ * Copyright (C) 2014 Linaro Ltd.
++ *  linux/drivers/gpio/gpio-mb86s7x.c
 + *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation, version 2 of the License.
++ *  Copyright (C) 2014 Fujitsu Semiconductor Limited
++ *  Copyright (C) 2014 Linaro Ltd.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ *  This program is free software: you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation, version 2 of the License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
 + */
 +
-+#include <linux/clkdev.h>
-+#include <linux/err.h>
 +#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/cpu.h>
-+#include <linux/clk-provider.h>
-+#include <linux/spinlock.h>
++#include <linux/init.h>
++#include <linux/clk.h>
++#include <linux/gpio.h>
 +#include <linux/module.h>
-+#include <linux/topology.h>
-+#include <linux/mailbox_client.h>
++#include <linux/err.h>
++#include <linux/errno.h>
++#include <linux/ioport.h>
++#include <linux/of_device.h>
 +#include <linux/platform_device.h>
++#include <linux/spinlock.h>
++#include <linux/slab.h>
 +
-+#include <soc/mb86s7x/scb_mhu.h>
++/*
++ * Only first 8bits of a register correspond to each pin,
++ * so there are 4 registers for 32 pins.
++ */
++#define PDR(x)	(0x0 + x / 8 * 4)
++#define DDR(x)	(0x10 + x / 8 * 4)
++#define PFR(x)	(0x20 + x / 8 * 4)
 +
-+#define to_crg_clk(p) container_of(p, struct crg_clk, hw)
-+#define to_clc_clk(p) container_of(p, struct cl_clk, hw)
++#define OFFSET(x)	BIT((x) % 8)
 +
-+struct mb86s7x_peri_clk {
-+	u32 payload_size;
-+	u32 cntrlr;
-+	u32 domain;
-+	u32 port;
-+	u32 en;
-+	u64 freqency;
-+} __packed __aligned(4);
-+
-+struct hack_rate {
-+	unsigned clk_id;
-+	unsigned long rate;
-+	int gated;
++struct mb86s70_gpio_chip {
++	struct gpio_chip gc;
++	void __iomem *base;
++	struct clk *clk;
++	spinlock_t lock;
 +};
 +
-+struct crg_clk {
-+	struct clk_hw hw;
-+	u8 cntrlr, domain, port;
-+};
-+
-+static int crg_gate_control(struct clk_hw *hw, int en)
++static inline struct mb86s70_gpio_chip *chip_to_mb86s70(struct gpio_chip *gc)
 +{
-+	struct crg_clk *crgclk = to_crg_clk(hw);
-+	struct mb86s7x_peri_clk cmd;
++	return container_of(gc, struct mb86s70_gpio_chip, gc);
++}
++
++static int mb86s70_gpio_request(struct gpio_chip *gc, unsigned gpio)
++{
++	struct mb86s70_gpio_chip *gchip = chip_to_mb86s70(gc);
++	unsigned long flags;
++	u32 val;
++
++	spin_lock_irqsave(&gchip->lock, flags);
++
++	val = readl(gchip->base + PFR(gpio));
++	val &= ~OFFSET(gpio);
++	writel(val, gchip->base + PFR(gpio));
++
++	spin_unlock_irqrestore(&gchip->lock, flags);
++
++	return 0;
++}
++
++static void mb86s70_gpio_free(struct gpio_chip *gc, unsigned gpio)
++{
++	struct mb86s70_gpio_chip *gchip = chip_to_mb86s70(gc);
++	unsigned long flags;
++	u32 val;
++
++	spin_lock_irqsave(&gchip->lock, flags);
++
++	val = readl(gchip->base + PFR(gpio));
++	val |= OFFSET(gpio);
++	writel(val, gchip->base + PFR(gpio));
++
++	spin_unlock_irqrestore(&gchip->lock, flags);
++}
++
++static int mb86s70_gpio_direction_input(struct gpio_chip *gc, unsigned gpio)
++{
++	struct mb86s70_gpio_chip *gchip = chip_to_mb86s70(gc);
++	unsigned long flags;
++	unsigned char val;
++
++	spin_lock_irqsave(&gchip->lock, flags);
++
++	val = readl(gchip->base + DDR(gpio));
++	val &= ~OFFSET(gpio);
++	writel(val, gchip->base + DDR(gpio));
++
++	spin_unlock_irqrestore(&gchip->lock, flags);
++
++	return 0;
++}
++
++static int mb86s70_gpio_direction_output(struct gpio_chip *gc,
++					 unsigned gpio, int value)
++{
++	struct mb86s70_gpio_chip *gchip = chip_to_mb86s70(gc);
++	unsigned long flags;
++	unsigned char val;
++
++	spin_lock_irqsave(&gchip->lock, flags);
++
++	val = readl(gchip->base + PDR(gpio));
++	if (value)
++		val |= OFFSET(gpio);
++	else
++		val &= ~OFFSET(gpio);
++	writel(val, gchip->base + PDR(gpio));
++
++	val = readl(gchip->base + DDR(gpio));
++	val |= OFFSET(gpio);
++	writel(val, gchip->base + DDR(gpio));
++
++	spin_unlock_irqrestore(&gchip->lock, flags);
++
++	return 0;
++}
++
++static int mb86s70_gpio_get(struct gpio_chip *gc, unsigned gpio)
++{
++	struct mb86s70_gpio_chip *gchip = chip_to_mb86s70(gc);
++
++	return !!(readl(gchip->base + PDR(gpio)) & OFFSET(gpio));
++}
++
++static void mb86s70_gpio_set(struct gpio_chip *gc, unsigned gpio, int value)
++{
++	struct mb86s70_gpio_chip *gchip = chip_to_mb86s70(gc);
++	unsigned long flags;
++	unsigned char val;
++
++	spin_lock_irqsave(&gchip->lock, flags);
++
++	val = readl(gchip->base + PDR(gpio));
++	if (value)
++		val |= OFFSET(gpio);
++	else
++		val &= ~OFFSET(gpio);
++	writel(val, gchip->base + PDR(gpio));
++
++	spin_unlock_irqrestore(&gchip->lock, flags);
++}
++
++static int mb86s70_gpio_probe(struct platform_device *pdev)
++{
++	struct mb86s70_gpio_chip *gchip;
++	struct resource *res;
 +	int ret;
 +
-+	cmd.payload_size = sizeof(cmd);
-+	cmd.cntrlr = crgclk->cntrlr;
-+	cmd.domain = crgclk->domain;
-+	cmd.port = crgclk->port;
-+	cmd.en = en;
++	gchip = devm_kzalloc(&pdev->dev, sizeof(*gchip), GFP_KERNEL);
++	if (gchip == NULL)
++		return -ENOMEM;
 +
-+	/* Port is UngatedCLK */
-+	if (cmd.port == 8)
-+		return en ? 0 : -EINVAL;
++	platform_set_drvdata(pdev, gchip);
 +
-+	pr_debug("%s:%d CMD Cntrlr-%u Dom-%u Port-%u En-%u}\n",
-+		 __func__, __LINE__, cmd.cntrlr,
-+		 cmd.domain, cmd.port, cmd.en);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	gchip->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(gchip->base))
++		return PTR_ERR(gchip->base);
 +
-+	ret = mb86s7x_send_packet(CMD_PERI_CLOCK_GATE_SET_REQ,
-+				  &cmd, sizeof(cmd));
-+	if (ret < 0) {
-+		pr_err("%s:%d failed!\n", __func__, __LINE__);
-+		return ret;
++	gchip->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(gchip->clk))
++		return PTR_ERR(gchip->clk);
++
++	clk_prepare_enable(gchip->clk);
++
++	spin_lock_init(&gchip->lock);
++
++	gchip->gc.direction_output = mb86s70_gpio_direction_output;
++	gchip->gc.direction_input = mb86s70_gpio_direction_input;
++	gchip->gc.request = mb86s70_gpio_request;
++	gchip->gc.free = mb86s70_gpio_free;
++	gchip->gc.get = mb86s70_gpio_get;
++	gchip->gc.set = mb86s70_gpio_set;
++	gchip->gc.label = dev_name(&pdev->dev);
++	gchip->gc.ngpio = 32;
++	gchip->gc.owner = THIS_MODULE;
++	gchip->gc.dev = &pdev->dev;
++	gchip->gc.base = -1;
++
++	platform_set_drvdata(pdev, gchip);
++
++	ret = gpiochip_add(&gchip->gc);
++	if (ret) {
++		dev_err(&pdev->dev, "couldn't register gpio driver\n");
++		clk_disable_unprepare(gchip->clk);
 +	}
-+
-+	pr_debug("%s:%d REP Cntrlr-%u Dom-%u Port-%u En-%u}\n",
-+		 __func__, __LINE__, cmd.cntrlr,
-+		 cmd.domain, cmd.port, cmd.en);
-+
-+	/* If the request was rejected */
-+	if (cmd.en != en)
-+		ret = -EINVAL;
-+	else
-+		ret = 0;
 +
 +	return ret;
 +}
 +
-+static int crg_port_prepare(struct clk_hw *hw)
++static int mb86s70_gpio_remove(struct platform_device *pdev)
 +{
-+	return crg_gate_control(hw, 1);
-+}
++	struct mb86s70_gpio_chip *gchip = platform_get_drvdata(pdev);
 +
-+static void crg_port_unprepare(struct clk_hw *hw)
-+{
-+	crg_gate_control(hw, 0);
-+}
++	gpiochip_remove(&gchip->gc);
 +
-+static int
-+crg_rate_control(struct clk_hw *hw, int set, unsigned long *rate)
-+{
-+	struct crg_clk *crgclk = to_crg_clk(hw);
-+	struct mb86s7x_peri_clk cmd;
-+	int code, ret;
-+
-+	cmd.payload_size = sizeof(cmd);
-+	cmd.cntrlr = crgclk->cntrlr;
-+	cmd.domain = crgclk->domain;
-+	cmd.port = crgclk->port;
-+	cmd.freqency = *rate;
-+
-+	if (set) {
-+		code = CMD_PERI_CLOCK_RATE_SET_REQ;
-+		pr_debug("%s:%d CMD Cntrlr-%u Dom-%u Port-%u Rate-SET %lluHz}\n",
-+			 __func__, __LINE__, cmd.cntrlr,
-+			 cmd.domain, cmd.port, cmd.freqency);
-+	} else {
-+		code = CMD_PERI_CLOCK_RATE_GET_REQ;
-+		pr_debug("%s:%d CMD Cntrlr-%u Dom-%u Port-%u Rate-GET}\n",
-+			 __func__, __LINE__, cmd.cntrlr,
-+			 cmd.domain, cmd.port);
-+	}
-+
-+	ret = mb86s7x_send_packet(code, &cmd, sizeof(cmd));
-+	if (ret < 0) {
-+		pr_err("%s:%d failed!\n", __func__, __LINE__);
-+		return ret;
-+	}
-+
-+	if (set)
-+		pr_debug("%s:%d REP Cntrlr-%u Dom-%u Port-%u Rate-SET %lluHz}\n",
-+			 __func__, __LINE__, cmd.cntrlr,
-+			 cmd.domain, cmd.port, cmd.freqency);
-+	else
-+		pr_debug("%s:%d REP Cntrlr-%u Dom-%u Port-%u Rate-GOT %lluHz}\n",
-+			 __func__, __LINE__, cmd.cntrlr,
-+			 cmd.domain, cmd.port, cmd.freqency);
-+
-+	*rate = cmd.freqency;
 +	return 0;
 +}
 +
-+static unsigned long
-+crg_port_recalc_rate(struct clk_hw *hw,	unsigned long parent_rate)
-+{
-+	unsigned long rate;
++static const struct of_device_id mb86s70_gpio_dt_ids[] = {
++	{ .compatible = "fujitsu,mb86s70-gpio" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, mb86s70_gpio_dt_ids);
 +
-+	crg_rate_control(hw, 0, &rate);
-+
-+	return rate;
-+}
-+
-+static long
-+crg_port_round_rate(struct clk_hw *hw,
-+		    unsigned long rate, unsigned long *pr)
-+{
-+	return rate;
-+}
-+
-+static int
-+crg_port_set_rate(struct clk_hw *hw,
-+		  unsigned long rate, unsigned long parent_rate)
-+{
-+	return crg_rate_control(hw, 1, &rate);
-+}
-+
-+const struct clk_ops crg_port_ops = {
-+	.prepare = crg_port_prepare,
-+	.unprepare = crg_port_unprepare,
-+	.recalc_rate = crg_port_recalc_rate,
-+	.round_rate = crg_port_round_rate,
-+	.set_rate = crg_port_set_rate,
++static struct platform_driver mb86s70_gpio_driver = {
++	.driver = {
++		.name = "mb86s70-gpio",
++		.of_match_table = mb86s70_gpio_dt_ids,
++	},
++	.probe = mb86s70_gpio_probe,
++	.remove = mb86s70_gpio_remove,
 +};
 +
-+struct mb86s70_crg11 {
-+	struct mutex lock; /* protects CLK populating and searching */
-+};
-+
-+static struct clk *crg11_get(struct of_phandle_args *clkspec, void *data)
++static int __init mb86s70_gpio_init(void)
 +{
-+	struct mb86s70_crg11 *crg11 = data;
-+	struct clk_init_data init;
-+	u32 cntrlr, domain, port;
-+	struct crg_clk *crgclk;
-+	struct clk *clk;
-+	char clkp[20];
-+
-+	if (clkspec->args_count != 3)
-+		return ERR_PTR(-EINVAL);
-+
-+	cntrlr = clkspec->args[0];
-+	domain = clkspec->args[1];
-+	port = clkspec->args[2];
-+
-+	if (port > 7)
-+		snprintf(clkp, 20, "UngatedCLK%d_%X", cntrlr, domain);
-+	else
-+		snprintf(clkp, 20, "CLK%d_%X_%d", cntrlr, domain, port);
-+
-+	mutex_lock(&crg11->lock);
-+
-+	clk = __clk_lookup(clkp);
-+	if (clk) {
-+		mutex_unlock(&crg11->lock);
-+		return clk;
-+	}
-+
-+	crgclk = kzalloc(sizeof(*crgclk), GFP_KERNEL);
-+	if (!crgclk) {
-+		mutex_unlock(&crg11->lock);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	init.name = clkp;
-+	init.num_parents = 0;
-+	init.ops = &crg_port_ops;
-+	init.flags = CLK_IS_ROOT;
-+	crgclk->hw.init = &init;
-+	crgclk->cntrlr = cntrlr;
-+	crgclk->domain = domain;
-+	crgclk->port = port;
-+	clk = clk_register(NULL, &crgclk->hw);
-+	if (IS_ERR(clk))
-+		pr_err("%s:%d Error!\n", __func__, __LINE__);
-+	else
-+		pr_debug("Registered %s\n", clkp);
-+
-+	clk_register_clkdev(clk, clkp, NULL);
-+	mutex_unlock(&crg11->lock);
-+	return clk;
++	return platform_driver_register(&mb86s70_gpio_driver);
 +}
++subsys_initcall(mb86s70_gpio_init);
 +
-+static void __init crg_port_init(struct device_node *node)
-+{
-+	struct mb86s70_crg11 *crg11;
-+
-+	crg11 = kzalloc(sizeof(*crg11), GFP_KERNEL);
-+	if (!crg11)
-+		return;
-+
-+	mutex_init(&crg11->lock);
-+
-+	of_clk_add_provider(node, crg11_get, crg11);
-+}
-+CLK_OF_DECLARE(crg11_gate, "fujitsu,mb86s70-crg11", crg_port_init);
-+
-+struct cl_clk {
-+	struct clk_hw hw;
-+	int cluster;
-+};
-+
-+struct mb86s7x_cpu_freq {
-+	u32 payload_size;
-+	u32 cluster_class;
-+	u32 cluster_id;
-+	u32 cpu_id;
-+	u64 freqency;
-+};
-+
-+static void mhu_cluster_rate(struct clk_hw *hw, unsigned long *rate, int get)
-+{
-+	struct cl_clk *clc = to_clc_clk(hw);
-+	struct mb86s7x_cpu_freq cmd;
-+	int code, ret;
-+
-+	cmd.payload_size = sizeof(cmd);
-+	cmd.cluster_class = 0;
-+	cmd.cluster_id = clc->cluster;
-+	cmd.cpu_id = 0;
-+	cmd.freqency = *rate;
-+
-+	if (get)
-+		code = CMD_CPU_CLOCK_RATE_GET_REQ;
-+	else
-+		code = CMD_CPU_CLOCK_RATE_SET_REQ;
-+
-+	pr_debug("%s:%d CMD Cl_Class-%u CL_ID-%u CPU_ID-%u Freq-%llu}\n",
-+		 __func__, __LINE__, cmd.cluster_class,
-+		 cmd.cluster_id, cmd.cpu_id, cmd.freqency);
-+
-+	ret = mb86s7x_send_packet(code, &cmd, sizeof(cmd));
-+	if (ret < 0) {
-+		pr_err("%s:%d failed!\n", __func__, __LINE__);
-+		return;
-+	}
-+
-+	pr_debug("%s:%d REP Cl_Class-%u CL_ID-%u CPU_ID-%u Freq-%llu}\n",
-+		 __func__, __LINE__, cmd.cluster_class,
-+		 cmd.cluster_id, cmd.cpu_id, cmd.freqency);
-+
-+	*rate = cmd.freqency;
-+}
-+
-+static unsigned long
-+clc_recalc_rate(struct clk_hw *hw, unsigned long unused)
-+{
-+	unsigned long rate;
-+
-+	mhu_cluster_rate(hw, &rate, 1);
-+	return rate;
-+}
-+
-+static long
-+clc_round_rate(struct clk_hw *hw, unsigned long rate,
-+	       unsigned long *unused)
-+{
-+	return rate;
-+}
-+
-+static int
-+clc_set_rate(struct clk_hw *hw, unsigned long rate,
-+	     unsigned long unused)
-+{
-+	unsigned long res = rate;
-+
-+	mhu_cluster_rate(hw, &res, 0);
-+
-+	return (res == rate) ? 0 : -EINVAL;
-+}
-+
-+static struct clk_ops clk_clc_ops = {
-+	.recalc_rate = clc_recalc_rate,
-+	.round_rate = clc_round_rate,
-+	.set_rate = clc_set_rate,
-+};
-+
-+struct clk *mb86s7x_clclk_register(struct device *cpu_dev)
-+{
-+	struct clk_init_data init;
-+	struct cl_clk *clc;
-+
-+	clc = kzalloc(sizeof(*clc), GFP_KERNEL);
-+	if (!clc)
-+		return ERR_PTR(-ENOMEM);
-+
-+	clc->hw.init = &init;
-+	clc->cluster = topology_physical_package_id(cpu_dev->id);
-+
-+	init.name = dev_name(cpu_dev);
-+	init.ops = &clk_clc_ops;
-+	init.flags = CLK_IS_ROOT | CLK_GET_RATE_NOCACHE;
-+	init.num_parents = 0;
-+
-+	return devm_clk_register(cpu_dev, &clc->hw);
-+}
-+
-+static int mb86s7x_clclk_of_init(void)
-+{
-+	int cpu;
-+	struct clk *clk;
-+
-+	for_each_possible_cpu(cpu) {
-+		struct device *cpu_dev = get_cpu_device(cpu);
-+
-+		if (!cpu_dev) {
-+			pr_err("failed to get cpu%d device\n", cpu);
-+			continue;
-+		}
-+
-+		clk = mb86s7x_clclk_register(cpu_dev);
-+		if (IS_ERR(clk)) {
-+			pr_err("failed to register cpu%d clock\n", cpu);
-+			continue;
-+		}
-+		if (clk_register_clkdev(clk, NULL, dev_name(cpu_dev))) {
-+			pr_err("failed to register cpu%d clock lookup\n", cpu);
-+			continue;
-+		}
-+		pr_debug("registered clk for %s\n", dev_name(cpu_dev));
-+	}
-+
-+	platform_device_register_simple("arm-bL-cpufreq-dt", -1, NULL, 0);
-+
-+	return 0;
-+}
-+module_init(mb86s7x_clclk_of_init);
++MODULE_DESCRIPTION("MB86S7x GPIO Driver");
++MODULE_ALIAS("platform:mb86s70-gpio");
++MODULE_LICENSE("GPL");
 -- 
 1.9.0
