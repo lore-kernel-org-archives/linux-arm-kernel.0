@@ -1,99 +1,86 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 15 Dec 2014 11:52:16 +0100
-Subject: [PATCH] ARM: shmobile: r8a7794: Add MMCIF clock to device tree
-In-Reply-To: <1418429364-5547-1-git-send-email-horms+renesas@verge.net.au>
-References: <1418429364-5547-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVnYa0GQx2C8rVZe2zFiPY56hxYJrE96YesL=M0dkyECQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Dec 2014 10:58:35 +0000
+Subject: [PATCH] clocksource: arch_timer: Only use the virtual counter
+ (CNTVCT) on arm64
+In-Reply-To: <548828C6.6030500@linaro.org>
+References: <1418209329-28615-1-git-send-email-catalin.marinas@arm.com>
+ <548828C6.6030500@linaro.org>
+Message-ID: <20141215105835.GC462@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 13, 2014 at 1:09 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
->
-> Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
-> [horms: omitted device node; only add clock]
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->
-> ---
-> Based on the renesas-devel-20141212-v3.18 tag of my renesas tree
->
-> Depends on
-> "[PATCH v2] ARM: shmobile: r8a7794: Add SDHI clocks to device tree"
-> to apply cleanly.
->
-> v1 [Simon Horman]
-> * Removed portion of patch which adds device node
-> * Renamed patch from
->   "ARM: shmobile: r8a7794: Add MMCIF clock and device to device tree" to
->   "ARM: shmobile: r8a7794: Add MMCIF clock to device tree"
-> ---
->  arch/arm/boot/dts/r8a7794.dtsi            | 15 +++++++++++----
->  include/dt-bindings/clock/r8a7794-clock.h |  1 +
->  2 files changed, 12 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> index 8794df8..fd8a19c 100644
-> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -308,6 +308,13 @@
->                         #clock-cells = <0>;
->                         clock-output-names = "sd2";
->                 };
-> +               mmc0_clk: mmc0_clk at e6150240 {
-> +                       compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
-> +                       reg = <0 0xe6150240 0 4>;
-> +                       clocks = <&pll1_div2_clk>;
-> +                       #clock-cells = <0>;
-> +                       clock-output-names = "mmc0";
-> +               };
->
->                 /* Fixed factor clocks */
->                 pll1_div2_clk: pll1_div2_clk {
-> @@ -512,16 +519,16 @@
->                         compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
->                         reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
->                         clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
-> -                                <&rclk_clk>, <&hp_clk>, <&hp_clk>;
-> +                                <&mmc0_clk>, <&rclk_clk>, <&hp_clk>, <&hp_clk>;
->                         #clock-cells = <1>;
->                         clock-indices = <
->                                 R8A7794_CLK_SDHI2 R8A7794_CLK_SDHI1 R8A7794_CLK_SDHI0
-> -                               R8A7794_CLK_CMT1 R8A7794_CLK_USBDMAC0
-> -                               R8A7794_CLK_USBDMAC1
-> +                               R8A7794_CLK_CMT1 R8A7794_CLK_MMCIF0
+Hi Daniel,
 
-R8A7794_CLK_MMCIF0 R8A7794_CLK_CMT1
+On Wed, Dec 10, 2014 at 11:04:38AM +0000, Daniel Lezcano wrote:
+> On 12/10/2014 12:02 PM, Catalin Marinas wrote:
+> > Commit 0b46b8a718c6 (clocksource: arch_timer: Fix code to use physical
+> > timers when requested) introduces the use of physical counters in the
+> > ARM architected timer driver. However, he arm64 kernel uses CNTVCT in
+> > VDSO. When booting in EL2, the kernel switches to the physical timers to
+> > make things easier for KVM but it continues to use the virtual counter
+> > both in user and kernel. While in such scenario CNTVCT == CNTPCT (since
+> > CNTVOFF is initialised by the kernel to 0), we want to spot firmware
+> > bugs corrupting CNTVOFF early (which would affect CNTVCT).
+> >
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Tested-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > ---
+> >
+> > Daniel,
+> >
+> > Do you plan to take this patch and push into mainline (ideally before -rc1)?
+> > Otherwise we can push it via the arm64 tree.
+> 
+> I will take care of it.
+> 
+> Thanks !
+> 
+>    -- Daniel
 
-> +                               R8A7794_CLK_USBDMAC0 R8A7794_CLK_USBDMAC1
->                         >;
->                         clock-output-names =
->                                 "sdhi2", "sdhi1", "sdhi0",
-> -                               "cmt1", "usbdmac0", "usbdmac1";
-> +                               "mmcif0", "cmt1", "usbdmac0", "usbdmac1";
->                 };
->                 mstp7_clks: mstp7_clks at e615014c {
->                         compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-> diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-> index f013cdc..4555b0f 100644
-> --- a/include/dt-bindings/clock/r8a7794-clock.h
-> +++ b/include/dt-bindings/clock/r8a7794-clock.h
-> @@ -55,6 +55,7 @@
->  #define R8A7794_CLK_SDHI2              11
->  #define R8A7794_CLK_SDHI1              12
->  #define R8A7794_CLK_SDHI0              14
-> +#define R8A7794_CLK_MMCIF0             15
->  #define R8A7794_CLK_CMT1               29
->  #define R8A7794_CLK_USBDMAC0           30
->  #define R8A7794_CLK_USBDMAC1           31
+What's the state of this patch?
 
-Gr{oetje,eeting}s,
+It doesn't seem to be in linux-next (next-20141215), which is failing to
+boot for me due to hitting the BUG in the arm64 arch_counter_get_cntpct.
 
-                        Geert
+Thanks,
+Mark.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> >
+> > Thanks,
+> >
+> > Catalin
+> >
+> >
+> >   drivers/clocksource/arm_arch_timer.c | 2 +-
+> >   1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> > index 6a79fc4f900c..095c1774592c 100644
+> > --- a/drivers/clocksource/arm_arch_timer.c
+> > +++ b/drivers/clocksource/arm_arch_timer.c
+> > @@ -462,7 +462,7 @@ static void __init arch_counter_register(unsigned type)
+> >
+> >   	/* Register the CP15 based counter if we have one */
+> >   	if (type & ARCH_CP15_TIMER) {
+> > -		if (arch_timer_use_virtual)
+> > +		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_use_virtual)
+> >   			arch_timer_read_counter = arch_counter_get_cntvct;
+> >   		else
+> >   			arch_timer_read_counter = arch_counter_get_cntpct;
+> >
+> 
+> 
+> -- 
+>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> 
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
