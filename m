@@ -1,151 +1,209 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 15 Dec 2014 12:41:53 +0100
-Subject: [GIT PULL 06/12] arm/arm64: KVM: Introduce stage2_unmap_vm
+Date: Mon, 15 Dec 2014 12:41:51 +0100
+Subject: [GIT PULL 04/12] arm/arm64: KVM: Clarify KVM_ARM_VCPU_INIT ABI
 In-Reply-To: <1418643719-25966-1-git-send-email-christoffer.dall@linaro.org>
 References: <1418643719-25966-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1418643719-25966-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1418643719-25966-5-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new function to unmap user RAM regions in the stage2 page
-tables.  This is needed on reboot (or when the guest turns off the MMU)
-to ensure we fault in pages again and make the dcache, RAM, and icache
-coherent.
+It is not clear that this ioctl can be called multiple times for a given
+vcpu.  Userspace already does this, so clarify the ABI.
 
-Using unmap_stage2_range for the whole guest physical range does not
-work, because that unmaps IO regions (such as the GIC) which will not be
-recreated or in the best case faulted in on a page-by-page basis.
+Also specify that userspace is expected to always make secondary and
+subsequent calls to the ioctl with the same parameters for the VCPU as
+the initial call (which userspace also already does).
 
-Call this function on secondary and subsequent calls to the
-KVM_ARM_VCPU_INIT ioctl so that a reset VCPU will detect the guest
-Stage-1 MMU is off when faulting in pages and make the caches coherent.
+Add code to check that userspace doesn't violate that ABI in the future,
+and move the kvm_vcpu_set_target() function which is currently
+duplicated between the 32-bit and 64-bit versions in guest.c to a common
+static function in arm.c, shared between both architectures.
 
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  1 +
- arch/arm/kvm/arm.c               |  7 +++++
- arch/arm/kvm/mmu.c               | 65 ++++++++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/kvm_mmu.h |  1 +
- 4 files changed, 74 insertions(+)
+ Documentation/virtual/kvm/api.txt |  5 +++++
+ arch/arm/include/asm/kvm_host.h   |  2 --
+ arch/arm/kvm/arm.c                | 43 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/kvm/guest.c              | 25 -----------------------
+ arch/arm64/include/asm/kvm_host.h |  2 --
+ arch/arm64/kvm/guest.c            | 25 -----------------------
+ 6 files changed, 48 insertions(+), 54 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index f867060..63e0ecc 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -52,6 +52,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
- void free_boot_hyp_pgd(void);
- void free_hyp_pgds(void);
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index bb82a90..81f1b97 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2453,6 +2453,11 @@ return ENOEXEC for that vcpu.
+ Note that because some registers reflect machine topology, all vcpus
+ should be created before this ioctl is invoked.
  
-+void stage2_unmap_vm(struct kvm *kvm);
- int kvm_alloc_stage2_pgd(struct kvm *kvm);
- void kvm_free_stage2_pgd(struct kvm *kvm);
- int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
++Userspace can call this function multiple times for a given vcpu, including
++after the vcpu has been run. This will reset the vcpu to its initial
++state. All calls to this function after the initial call must use the same
++target and same set of feature flags, otherwise EINVAL will be returned.
++
+ Possible features:
+ 	- KVM_ARM_VCPU_POWER_OFF: Starts the CPU in a power-off state.
+ 	  Depends on KVM_CAP_ARM_PSCI.  If not set, the CPU will be powered on
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 53036e2..254e065 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -150,8 +150,6 @@ struct kvm_vcpu_stat {
+ 	u32 halt_wakeup;
+ };
+ 
+-int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+-			const struct kvm_vcpu_init *init);
+ int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
+ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
+ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 4043769..da87c07 100644
+index 24c9ca4..4043769 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -701,6 +701,13 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
- 	if (ret)
- 		return ret;
+@@ -263,6 +263,7 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+ {
+ 	/* Force users to call KVM_ARM_VCPU_INIT */
+ 	vcpu->arch.target = -1;
++	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
  
-+	/*
-+	 * Ensure a rebooted VM will fault in RAM pages and detect if the
-+	 * guest MMU is turned off and flush the caches as needed.
-+	 */
-+	if (vcpu->arch.has_run_once)
-+		stage2_unmap_vm(vcpu->kvm);
-+
- 	vcpu_reset_hcr(vcpu);
- 
- 	/*
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index f2a9874..3756dd3 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -611,6 +611,71 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
- 	unmap_range(kvm, kvm->arch.pgd, start, size);
+ 	/* Set up the timer */
+ 	kvm_timer_vcpu_init(vcpu);
+@@ -649,6 +650,48 @@ int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level,
+ 	return -EINVAL;
  }
  
-+static void stage2_unmap_memslot(struct kvm *kvm,
-+				 struct kvm_memory_slot *memslot)
++static int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
++			       const struct kvm_vcpu_init *init)
 +{
-+	hva_t hva = memslot->userspace_addr;
-+	phys_addr_t addr = memslot->base_gfn << PAGE_SHIFT;
-+	phys_addr_t size = PAGE_SIZE * memslot->npages;
-+	hva_t reg_end = hva + size;
++	unsigned int i;
++	int phys_target = kvm_target_cpu();
++
++	if (init->target != phys_target)
++		return -EINVAL;
 +
 +	/*
-+	 * A memory region could potentially cover multiple VMAs, and any holes
-+	 * between them, so iterate over all of them to find out if we should
-+	 * unmap any of them.
-+	 *
-+	 *     +--------------------------------------------+
-+	 * +---------------+----------------+   +----------------+
-+	 * |   : VMA 1     |      VMA 2     |   |    VMA 3  :    |
-+	 * +---------------+----------------+   +----------------+
-+	 *     |               memory region                |
-+	 *     +--------------------------------------------+
++	 * Secondary and subsequent calls to KVM_ARM_VCPU_INIT must
++	 * use the same target.
 +	 */
-+	do {
-+		struct vm_area_struct *vma = find_vma(current->mm, hva);
-+		hva_t vm_start, vm_end;
++	if (vcpu->arch.target != -1 && vcpu->arch.target != init->target)
++		return -EINVAL;
 +
-+		if (!vma || vma->vm_start >= reg_end)
-+			break;
++	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
++	for (i = 0; i < sizeof(init->features) * 8; i++) {
++		bool set = (init->features[i / 32] & (1 << (i % 32)));
++
++		if (set && i >= KVM_VCPU_MAX_FEATURES)
++			return -ENOENT;
 +
 +		/*
-+		 * Take the intersection of this VMA with the memory region
++		 * Secondary and subsequent calls to KVM_ARM_VCPU_INIT must
++		 * use the same feature set.
 +		 */
-+		vm_start = max(hva, vma->vm_start);
-+		vm_end = min(reg_end, vma->vm_end);
++		if (vcpu->arch.target != -1 && i < KVM_VCPU_MAX_FEATURES &&
++		    test_bit(i, vcpu->arch.features) != set)
++			return -EINVAL;
 +
-+		if (!(vma->vm_flags & VM_PFNMAP)) {
-+			gpa_t gpa = addr + (vm_start - memslot->userspace_addr);
-+			unmap_stage2_range(kvm, gpa, vm_end - vm_start);
-+		}
-+		hva = vm_end;
-+	} while (hva < reg_end);
++		if (set)
++			set_bit(i, vcpu->arch.features);
++	}
++
++	vcpu->arch.target = phys_target;
++
++	/* Now we know what it is, we can reset it. */
++	return kvm_reset_vcpu(vcpu);
 +}
 +
-+/**
-+ * stage2_unmap_vm - Unmap Stage-2 RAM mappings
-+ * @kvm: The struct kvm pointer
-+ *
-+ * Go through the memregions and unmap any reguler RAM
-+ * backing memory already mapped to the VM.
-+ */
-+void stage2_unmap_vm(struct kvm *kvm)
-+{
-+	struct kvm_memslots *slots;
-+	struct kvm_memory_slot *memslot;
-+	int idx;
 +
-+	idx = srcu_read_lock(&kvm->srcu);
-+	spin_lock(&kvm->mmu_lock);
-+
-+	slots = kvm_memslots(kvm);
-+	kvm_for_each_memslot(memslot, slots)
-+		stage2_unmap_memslot(kvm, memslot);
-+
-+	spin_unlock(&kvm->mmu_lock);
-+	srcu_read_unlock(&kvm->srcu, idx);
-+}
-+
- /**
-  * kvm_free_stage2_pgd - free all stage-2 tables
-  * @kvm:	The KVM struct pointer for the VM.
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 123b521..14a74f1 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -83,6 +83,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
- void free_boot_hyp_pgd(void);
- void free_hyp_pgds(void);
+ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+ 					 struct kvm_vcpu_init *init)
+ {
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index 8c97208..384bab6 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -273,31 +273,6 @@ int __attribute_const__ kvm_target_cpu(void)
+ 	}
+ }
  
-+void stage2_unmap_vm(struct kvm *kvm);
- int kvm_alloc_stage2_pgd(struct kvm *kvm);
- void kvm_free_stage2_pgd(struct kvm *kvm);
- int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+-int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+-			const struct kvm_vcpu_init *init)
+-{
+-	unsigned int i;
+-
+-	/* We can only cope with guest==host and only on A15/A7 (for now). */
+-	if (init->target != kvm_target_cpu())
+-		return -EINVAL;
+-
+-	vcpu->arch.target = init->target;
+-	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
+-
+-	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
+-	for (i = 0; i < sizeof(init->features) * 8; i++) {
+-		if (test_bit(i, (void *)init->features)) {
+-			if (i >= KVM_VCPU_MAX_FEATURES)
+-				return -ENOENT;
+-			set_bit(i, vcpu->arch.features);
+-		}
+-	}
+-
+-	/* Now we know what it is, we can reset it. */
+-	return kvm_reset_vcpu(vcpu);
+-}
+-
+ int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
+ {
+ 	int target = kvm_target_cpu();
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 2012c4b..65c6152 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -165,8 +165,6 @@ struct kvm_vcpu_stat {
+ 	u32 halt_wakeup;
+ };
+ 
+-int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+-			const struct kvm_vcpu_init *init);
+ int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
+ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
+ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 84d5959..9535bd5 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -296,31 +296,6 @@ int __attribute_const__ kvm_target_cpu(void)
+ 	return -EINVAL;
+ }
+ 
+-int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+-			const struct kvm_vcpu_init *init)
+-{
+-	unsigned int i;
+-	int phys_target = kvm_target_cpu();
+-
+-	if (init->target != phys_target)
+-		return -EINVAL;
+-
+-	vcpu->arch.target = phys_target;
+-	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
+-
+-	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
+-	for (i = 0; i < sizeof(init->features) * 8; i++) {
+-		if (init->features[i / 32] & (1 << (i % 32))) {
+-			if (i >= KVM_VCPU_MAX_FEATURES)
+-				return -ENOENT;
+-			set_bit(i, vcpu->arch.features);
+-		}
+-	}
+-
+-	/* Now we know what it is, we can reset it. */
+-	return kvm_reset_vcpu(vcpu);
+-}
+-
+ int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
+ {
+ 	int target = kvm_target_cpu();
 -- 
 2.1.2.330.g565301e.dirty
