@@ -1,43 +1,76 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Dec 2014 13:32:08 +0000
-Subject: [PATCH 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
- board dts and Makefile
-In-Reply-To: <20141212164254.GK22670@titan.lakedaemon.net>
-References: <1418208602-35584-1-git-send-email-eddie.huang@mediatek.com>
- <1418208602-35584-4-git-send-email-eddie.huang@mediatek.com>
- <20141211180245.GE28150@leverpostej>
- <1418371705.423.31.camel@mtksdaap41>
- <20141212164254.GK22670@titan.lakedaemon.net>
-Message-ID: <20141215133208.GC8264@leverpostej>
+Date: Mon, 15 Dec 2014 13:38:17 +0000
+Subject: [PATCH v4 0/5] Add Spreadtrum Sharkl64 Platform support
+In-Reply-To: <CAAfSe-uz534FiZufojKa8MdBi=VFqhuoFLwof7K+FqXG--AGaw@mail.gmail.com>
+References: <1417692860-18841-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20141205104009.GE11889@leverpostej>
+ <CAAfSe-uz534FiZufojKa8MdBi=VFqhuoFLwof7K+FqXG--AGaw@mail.gmail.com>
+Message-ID: <20141215133817.GD8264@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 12, 2014 at 04:42:54PM +0000, Jason Cooper wrote:
-> On Fri, Dec 12, 2014 at 04:08:25PM +0800, Eddie Huang wrote:
-> > On Thu, 2014-12-11 at 18:02 +0000, Mark Rutland wrote:
-> > > On Wed, Dec 10, 2014 at 10:50:01AM +0000, Eddie Huang wrote:
-> ...
-> > > > +	memory {
-> > > 
-> > > Nit: should be memory at 40000000 (and you'll need to add device_type =
-> > > "memory").
-> > > 
-> > > > +		reg = <0 0x40000000 0 0x40000000>;
-> > > > +	};
-> > 
-> > skeleton.dtsi already has /memory node with address-cells=2,
-> > size-cells=1, which will cause build warning if I change to use
-> > memory at 40000000, because we use size-cells=2. I will not include
-> > skeleton.dtsi and follow your suggestion in next version.
+On Fri, Dec 05, 2014 at 12:27:23PM +0000, Lyra Zhang wrote:
+> On Fri, Dec 5, 2014 at 6:40 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Hi,
+> >
+> > On Thu, Dec 04, 2014 at 11:34:15AM +0000, Chunyan Zhang wrote:
+> >> Spreadtrum is a rapid growing chip vendor providing smart phone total solutions.
+> >>
+> >> Sharkl64 Platform is nominated as a SoC infrastructure that supports 4G/3G/2G
+> >> standards based on ARMv8 multiple core architecture.Now we have only one
+> >> SoC(SC9836) based on this Platform in developing.
+> >>
+> >> This patchset adds Sharkl64 support in arm64 device tree and the serial driver
+> >> of SC9836-UART.
+> >>
+> >> This patchset also has patches which address "sprd" prefix and DT compatible
+> >> strings for nodes which appear un-documented.
+> >>
+> >> This version code was tesed both on Fast Mode and sc9836-fpga board.
+> >> We use the latest boot-wrapper-aarch64 as the bootloader.
+> >>
+> >> Changes from v3:
+> >> * Addressed review comments:
+> >>       - Added the description of clock property for sc9836-uart
+> >>       - Revised the size of GICC to be 8KiB
+> >>       - Added another compatible string for psci-0.1
+> >
+> > I had open questions on v3 regarding your PSCI imlpementation. You
+> > mentioned that you are using the aarch64 bootwrapper, but your DT
+> > describes PSCI 0.2, and the (upstream) bootwrapper does not implement
+> > PSCI 0.2. Adding the old PSCI compatible string is _not_ sufficient if
+> > you do not have a full PSCI 0.2 implementation.
+> >
+> > Given that PSCI 0.2 requires more functionality to be implemented, I'd
+> > like to know that your implementation is spec-compliant (implementing
+> > the mandatory functions, nters the kernel in the correct state, etc),
+> > and that it has been tested.
+> >
+> > Would you be able to look at my comments from the last posting please?
+> >
+> > Thanks,
+> > Mark.
+> > --
 > 
-> There's skeleton64.dtsi in arch/arm/boot/dts (arm 32bit has LPAE-enabled
-> systems).  Perhaps we should come up with a way to share both across the
-> arches?
+> Hi, Mark
+> 
+> Ok, I'll check it again with our related engineers.
+> 
+> Actually, I had read all of your comments carefully before sending
+> each version of patches, and I replied you a few days early, I guess
+> you may miss it :)
+> 
+> If we just implemented psci-0.1 until now, can we submit this path
+> without "compatible = "arm,psci-0.2"", but only with " compatible =
+> "arm,psci" ".
 
-As I mentioned in my other reply [1], I think if anything it would be
-better to get rid of the skeleton dtsi entirely.
+Elsewhere I've recommended such things are placed in the DTB by the
+bootloader (at least for those cases where the bootlaoder is tied to the
+firmware), as it can fill in the appropriate enable-method (and add any
+other nodes as required).
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310617.html
+Having compatible = "arm,psci", and a couple of other properties for now
+is certainly preferable to describing a not-yet-implemented PSCI 0.2.
 
 Thanks,
 Mark.
