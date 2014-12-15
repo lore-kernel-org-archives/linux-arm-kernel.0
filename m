@@ -1,99 +1,151 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 15 Dec 2014 12:41:50 +0100
-Subject: [GIT PULL 03/12] arm/arm64: KVM: Reset the HCR on each vcpu when
- resetting the vcpu
+Date: Mon, 15 Dec 2014 12:41:53 +0100
+Subject: [GIT PULL 06/12] arm/arm64: KVM: Introduce stage2_unmap_vm
 In-Reply-To: <1418643719-25966-1-git-send-email-christoffer.dall@linaro.org>
 References: <1418643719-25966-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1418643719-25966-4-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1418643719-25966-7-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When userspace resets the vcpu using KVM_ARM_VCPU_INIT, we should also
-reset the HCR, because we now modify the HCR dynamically to
-enable/disable trapping of guest accesses to the VM registers.
+Introduce a new function to unmap user RAM regions in the stage2 page
+tables.  This is needed on reboot (or when the guest turns off the MMU)
+to ensure we fault in pages again and make the dcache, RAM, and icache
+coherent.
 
-This is crucial for reboot of VMs working since otherwise we will not be
-doing the necessary cache maintenance operations when faulting in pages
-with the guest MMU off.
+Using unmap_stage2_range for the whole guest physical range does not
+work, because that unmaps IO regions (such as the GIC) which will not be
+recreated or in the best case faulted in on a page-by-page basis.
+
+Call this function on secondary and subsequent calls to the
+KVM_ARM_VCPU_INIT ioctl so that a reset VCPU will detect the guest
+Stage-1 MMU is off when faulting in pages and make the caches coherent.
 
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_emulate.h   | 5 +++++
- arch/arm/kvm/arm.c                   | 2 ++
- arch/arm/kvm/guest.c                 | 1 -
- arch/arm64/include/asm/kvm_emulate.h | 5 +++++
- arch/arm64/kvm/guest.c               | 1 -
- 5 files changed, 12 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  1 +
+ arch/arm/kvm/arm.c               |  7 +++++
+ arch/arm/kvm/mmu.c               | 65 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/kvm_mmu.h |  1 +
+ 4 files changed, 74 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index b9db269..66ce176 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -33,6 +33,11 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu);
- void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
- void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index f867060..63e0ecc 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -52,6 +52,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+ void free_boot_hyp_pgd(void);
+ void free_hyp_pgds(void);
  
-+static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.hcr = HCR_GUEST_MASK;
-+}
-+
- static inline bool vcpu_mode_is_32bit(struct kvm_vcpu *vcpu)
- {
- 	return 1;
++void stage2_unmap_vm(struct kvm *kvm);
+ int kvm_alloc_stage2_pgd(struct kvm *kvm);
+ void kvm_free_stage2_pgd(struct kvm *kvm);
+ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index edc1964..24c9ca4 100644
+index 4043769..da87c07 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -658,6 +658,8 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+@@ -701,6 +701,13 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
  	if (ret)
  		return ret;
  
-+	vcpu_reset_hcr(vcpu);
++	/*
++	 * Ensure a rebooted VM will fault in RAM pages and detect if the
++	 * guest MMU is turned off and flush the caches as needed.
++	 */
++	if (vcpu->arch.has_run_once)
++		stage2_unmap_vm(vcpu->kvm);
 +
- 	/*
- 	 * Handle the "start in power-off" case by marking the VCPU as paused.
- 	 */
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index cc0b787..8c97208 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -38,7 +38,6 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
+ 	vcpu_reset_hcr(vcpu);
  
- int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
- {
--	vcpu->arch.hcr = HCR_GUEST_MASK;
- 	return 0;
+ 	/*
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index f2a9874..3756dd3 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -611,6 +611,71 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+ 	unmap_range(kvm, kvm->arch.pgd, start, size);
  }
  
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 5674a55..8127e45 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -38,6 +38,11 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu);
- void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
- void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
- 
-+static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
++static void stage2_unmap_memslot(struct kvm *kvm,
++				 struct kvm_memory_slot *memslot)
 +{
-+	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
++	hva_t hva = memslot->userspace_addr;
++	phys_addr_t addr = memslot->base_gfn << PAGE_SHIFT;
++	phys_addr_t size = PAGE_SIZE * memslot->npages;
++	hva_t reg_end = hva + size;
++
++	/*
++	 * A memory region could potentially cover multiple VMAs, and any holes
++	 * between them, so iterate over all of them to find out if we should
++	 * unmap any of them.
++	 *
++	 *     +--------------------------------------------+
++	 * +---------------+----------------+   +----------------+
++	 * |   : VMA 1     |      VMA 2     |   |    VMA 3  :    |
++	 * +---------------+----------------+   +----------------+
++	 *     |               memory region                |
++	 *     +--------------------------------------------+
++	 */
++	do {
++		struct vm_area_struct *vma = find_vma(current->mm, hva);
++		hva_t vm_start, vm_end;
++
++		if (!vma || vma->vm_start >= reg_end)
++			break;
++
++		/*
++		 * Take the intersection of this VMA with the memory region
++		 */
++		vm_start = max(hva, vma->vm_start);
++		vm_end = min(reg_end, vma->vm_end);
++
++		if (!(vma->vm_flags & VM_PFNMAP)) {
++			gpa_t gpa = addr + (vm_start - memslot->userspace_addr);
++			unmap_stage2_range(kvm, gpa, vm_end - vm_start);
++		}
++		hva = vm_end;
++	} while (hva < reg_end);
 +}
 +
- static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
- {
- 	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 7679469..84d5959 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -38,7 +38,6 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
++/**
++ * stage2_unmap_vm - Unmap Stage-2 RAM mappings
++ * @kvm: The struct kvm pointer
++ *
++ * Go through the memregions and unmap any reguler RAM
++ * backing memory already mapped to the VM.
++ */
++void stage2_unmap_vm(struct kvm *kvm)
++{
++	struct kvm_memslots *slots;
++	struct kvm_memory_slot *memslot;
++	int idx;
++
++	idx = srcu_read_lock(&kvm->srcu);
++	spin_lock(&kvm->mmu_lock);
++
++	slots = kvm_memslots(kvm);
++	kvm_for_each_memslot(memslot, slots)
++		stage2_unmap_memslot(kvm, memslot);
++
++	spin_unlock(&kvm->mmu_lock);
++	srcu_read_unlock(&kvm->srcu, idx);
++}
++
+ /**
+  * kvm_free_stage2_pgd - free all stage-2 tables
+  * @kvm:	The KVM struct pointer for the VM.
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 123b521..14a74f1 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -83,6 +83,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+ void free_boot_hyp_pgd(void);
+ void free_hyp_pgds(void);
  
- int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
- {
--	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
- 	return 0;
- }
- 
++void stage2_unmap_vm(struct kvm *kvm);
+ int kvm_alloc_stage2_pgd(struct kvm *kvm);
+ void kvm_free_stage2_pgd(struct kvm *kvm);
+ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
 -- 
 2.1.2.330.g565301e.dirty
