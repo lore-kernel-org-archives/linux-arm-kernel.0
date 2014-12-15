@@ -1,87 +1,66 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 15 Dec 2014 19:35:40 +0100
-Subject: [PATCH 22/27] ARM: mvebu: armada-xp-mv78230: Relicense the
- device tree under GPLv2+/X11
-In-Reply-To: <1418657915-22775-23-git-send-email-gregory.clement@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-23-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20141215183540.GC30741@lunn.ch>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 15 Dec 2014 20:37:18 +0200
+Subject: [PATCH] iommu/ipmmu-vmsa: change IOMMU_EXEC to IOMMU_NOEXEC
+In-Reply-To: <CAMuHMdW9s+VKqz=TWV0H+cqNGY8amZsHAwHHSvM9q033sh-j3Q@mail.gmail.com>
+References: <1418518503-20250-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CAMuHMdW9s+VKqz=TWV0H+cqNGY8amZsHAwHHSvM9q033sh-j3Q@mail.gmail.com>
+Message-ID: <4684279.HqCnjf9iNv@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 04:38:30PM +0100, Gregory CLEMENT wrote:
-> The current GPL only licensing on the device tree makes it very
-> impractical for other software components licensed under another
-> license.
-> 
-> In order to make it easier for them to reuse our device trees,
-> relicense our device trees under a GPL/X11 dual-license.
-> 
-> Cc: Andrew Lunn <andrew@lunn.ch>
+Hi Geert,
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+On Monday 15 December 2014 11:45:27 Geert Uytterhoeven wrote:
+> On Sun, Dec 14, 2014 at 1:55 AM, Laurent Pinchart wrote:
+> > The IOMMU_EXEC flag has been renamed to IOMMU_NOEXEC by commit
+> 
+> ... inverted and replaced by ...
+> 
+> At first I hadn't noticed this, and was wondering about the seemingly
+> unrelated change in the first hunk.
 
-> Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-xp-mv78230.dtsi | 40 +++++++++++++++++++++++++++++---
->  1 file changed, 37 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> index 281ccd24295c..6e6d0f04bf2b 100644
-> --- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> @@ -5,9 +5,43 @@
->   *
->   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->   *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   *
->   * Contains definitions specific to the Armada XP MV78230 SoC that are not
->   * common to all Armada XP SoCs.
-> -- 
-> 1.9.1
-> 
+Good point. I'll submit a v2.
+
+> > a720b41c41f5a7e4 ("iommu/arm-smmu: change IOMMU_EXEC to IOMMU_NOEXEC").
+> > Update the driver accordingly.
+> > 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  drivers/iommu/ipmmu-vmsa.c | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> > 
+> > This fixes a build breakage in Linus' master branch introduce by the
+> > commit mentioned above.
+> > 
+> > diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
+> > index e5ed0216929f..7a1bcf6627b6 100644
+> > --- a/drivers/iommu/ipmmu-vmsa.c
+> > +++ b/drivers/iommu/ipmmu-vmsa.c
+> > @@ -558,7 +558,7 @@ static pmd_t *ipmmu_alloc_pmd(struct ipmmu_vmsa_device
+> > *mmu, pgd_t *pgd,
+> >  static u64 ipmmu_page_prot(unsigned int prot, u64 type)
+> >  {
+> > -       u64 pgprot = ARM_VMSA_PTE_XN | ARM_VMSA_PTE_nG | ARM_VMSA_PTE_AF
+> > +       u64 pgprot = ARM_VMSA_PTE_nG | ARM_VMSA_PTE_AF
+> >                    | ARM_VMSA_PTE_SH_IS | ARM_VMSA_PTE_AP_UNPRIV
+> >                    | ARM_VMSA_PTE_NS | type;
+> > @@ -568,8 +568,8 @@ static u64 ipmmu_page_prot(unsigned int prot, u64
+> > type)
+> >         if (prot & IOMMU_CACHE)
+> >                 pgprot |= IMMAIR_ATTR_IDX_WBRWA <<
+> >                 ARM_VMSA_PTE_ATTRINDX_SHIFT;
+> > -       if (prot & IOMMU_EXEC)
+> > -               pgprot &= ~ARM_VMSA_PTE_XN;
+> > +       if (prot & IOMMU_NOEXEC)
+> > +               pgprot |= ARM_VMSA_PTE_XN;
+> >         else if (!(prot & (IOMMU_READ | IOMMU_WRITE)))
+> >                 /* If no access create a faulting entry to avoid TLB
+> >                 fills. */
+> >                 pgprot &= ~ARM_VMSA_PTE_PAGE;
+
+-- 
+Regards,
+
+Laurent Pinchart
