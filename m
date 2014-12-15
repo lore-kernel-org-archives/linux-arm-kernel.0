@@ -1,53 +1,39 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 15 Dec 2014 16:00:12 +0100
-Subject: [PATCH] ARM: defconfigs: use CONFIG_CPUFREQ_DT
-In-Reply-To: <63217079d4b61d835fed98198ae1e3f0e6329de1.1418617005.git.viresh.kumar@linaro.org>
-References: <63217079d4b61d835fed98198ae1e3f0e6329de1.1418617005.git.viresh.kumar@linaro.org>
-Message-ID: <2757282.fj6z18fAYb@vostro.rjw.lan>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 15 Dec 2014 14:38:50 +0000
+Subject: [PATCH 5/8] mfd: Add ST's Low Power Controller driver
+In-Reply-To: <5276146.VV460E9Y1P@wuerfel>
+References: <1418642738-17407-1-git-send-email-lee.jones@linaro.org>
+ <2928949.OKYp272uiY@wuerfel> <20141215135052.GC13885@x1>
+ <5276146.VV460E9Y1P@wuerfel>
+Message-ID: <20141215143850.GD13885@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 15, 2014 09:48:19 AM Viresh Kumar wrote:
-> CONFIG_GENERIC_CPUFREQ_CPU0 disappeared with commit bbcf071969b20f
-> ("cpufreq: cpu0: rename driver and internals to 'cpufreq_dt'") and some
-> defconfigs are still using it instead of the new one.
-> 
-> Use the renamed CONFIG_CPUFREQ_DT generic driver.
-> 
-> Cc: <stable@vger.kernel.org>        # 3.18
-> Reported-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+On Mon, 15 Dec 2014, Arnd Bergmann wrote:
 
-OK, so who should be applying this?
+> On Monday 15 December 2014 13:50:52 Lee Jones wrote:
+> > > > 
+> > > 
+> > > I don't think it's necessary to have the MFD node if only one of the
+> > > two modes can be used based on a DT property. It should be enough
+> > > to have both the rtc and the wdt driver list the same compatible
+> > > string and check the property in the probe function to decide if
+> > > they want to drive the device or not:
+> > 
+> > I tried that and it didn't work.  Only one driver probed.
+> > 
+> > 
+> 
+> Strange, the code in really_probe() and the comment in device_attach()
+> suggest that this is not the intentional behavior. What error
+> code did you return? If it's -ENODEV or -ENXIO, it should keep
+> trying the other drivers, otherwise it will give up.
 
-> ---
->  arch/arm/configs/multi_v7_defconfig | 2 +-
->  arch/arm/configs/shmobile_defconfig | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 9d7a32f93fcf..f86cb86afc66 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -445,4 +445,4 @@ CONFIG_DEBUG_FS=y
->  CONFIG_MAGIC_SYSRQ=y
->  CONFIG_LOCKUP_DETECTOR=y
->  CONFIG_CRYPTO_DEV_TEGRA_AES=y
-> -CONFIG_GENERIC_CPUFREQ_CPU0=y
-> +CONFIG_CPUFREQ_DT=y
-> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-> index d7346ad51043..bfe79d5b8213 100644
-> --- a/arch/arm/configs/shmobile_defconfig
-> +++ b/arch/arm/configs/shmobile_defconfig
-> @@ -176,5 +176,5 @@ CONFIG_CPU_FREQ_GOV_USERSPACE=y
->  CONFIG_CPU_FREQ_GOV_ONDEMAND=y
->  CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
->  CONFIG_CPU_THERMAL=y
-> -CONFIG_GENERIC_CPUFREQ_CPU0=y
-> +CONFIG_CPUFREQ_DT=y
->  CONFIG_REGULATOR_DA9210=y
-> 
+Oh I see.  So if I return -ENODEV it will keep trying to bind with
+other drivers.  I'll try that and report back.
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
