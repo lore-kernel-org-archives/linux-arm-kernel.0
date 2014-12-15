@@ -1,40 +1,117 @@
-From: ddutile@redhat.com (Don Dutile)
-Date: Mon, 15 Dec 2014 14:38:12 -0500
-Subject: [PATCH 0/3] Add support for APM X-Gene SoC AHBC IOMMU driver.
-In-Reply-To: <1418662523-8458-1-git-send-email-stripathi@apm.com>
-References: <1418662523-8458-1-git-send-email-stripathi@apm.com>
-Message-ID: <548F38A4.5090703@redhat.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 15 Dec 2014 21:53:34 +0200
+Subject: [RFC PATCH 2/2] iommu: rockchip: Handle system-wide and runtime PM
+In-Reply-To: <CAAFQd5A5UAYpV6Z3ii+TTuPOxJF8VFJmnUnHZWkc9dZN04qxYA@mail.gmail.com>
+References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
+ <1508486.LLFuttrbI2@avalon>
+ <CAAFQd5A5UAYpV6Z3ii+TTuPOxJF8VFJmnUnHZWkc9dZN04qxYA@mail.gmail.com>
+Message-ID: <1994723.9H6BPHKqxP@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You should be cc-ing Mark Langsdorf, not myself, for Xgene kernel support.
+Hi Tomasz,
 
-also note: I'm already on the IOMMU mailing list, so I'll see such patches via
-that list.
+On Monday 15 December 2014 11:39:01 Tomasz Figa wrote:
+> On Sat, Dec 13, 2014 at 5:47 AM, Laurent Pinchart wrote:
+> > On Friday 12 December 2014 13:15:51 Tomasz Figa wrote:
+> >> On Fri, Dec 12, 2014 at 5:48 AM, Rafael J. Wysocki wrote:
+> >>> On Thursday, December 11, 2014 04:51:37 PM Ulf Hansson wrote:
+> >>>> On 11 December 2014 at 16:31, Kevin Hilman <khilman@kernel.org> wrote:
+> >>>>> [+ Laurent Pinchart]
+> >>>>> 
+> >>>>> Tomasz Figa <tfiga@chromium.org> writes:
+> >>>>>> On Thu, Dec 11, 2014 at 8:58 PM, Ulf Hansson wrote:
+> >>>>> [...]
+> >>>>> 
+> >>>>>>>> @@ -988,11 +1107,28 @@ static int rk_iommu_probe(struct
+> >>>>>>>> platform_device *pdev)
+> >>>>>>>>                 return -ENXIO;
+> >>>>>>>>         }
+> >>>>>>>> 
+> >>>>>>>> +       pm_runtime_no_callbacks(dev);
+> >>>>>>>> +       pm_runtime_enable(dev);
+> >>>>>>>> +
+> >>>>>>>> +       /* Synchronize state of the domain with driver data. */
+> >>>>>>>> +       pm_runtime_get_sync(dev);
+> >>>>>>>> +       iommu->is_powered = true;
+> >>>>>>> 
+> >>>>>>> Doesn't the runtime PM status reflect the value of "is_powered",
+> >>>>>>> thus why do you need to have a copy of it? Could it perpahps be
+> >>>>>>> that you try to cope with the case when CONFIG_PM is unset?
+> >>>>>> 
+> >>>>>> It's worth noting that this driver fully relies on status of other
+> >>>>>> devices in the power domain the IOMMU is in and does not enforce
+> >>>>>> the status on its own. So in general, as far as my understanding of
+> >>>>>> PM runtime subsystem, the status of the IOMMU device will be always
+> >>>>>> suspended, because nobody will call pm_runtime_get() on it (except
+> >>>>>> the get and put pair in probe). So is_powered is here to track
+> >>>>>> status of the domain, not the device. Feel free to suggest a better
+> >>>>>> way, though.
+> >>>>> 
+> >>>>> I still don't like these notifiers.  I think they add ways to bypass
+> >>>>> having proper runtime PM implemented for devices/subsystems.
+> >>>> 
+> >>>> I do agree, but I haven't found another good solution to the problem.
+> >>> 
+> >>> For the record, I'm not liking this mostly because it "fixes" a generic
+> >>> problem in a way that's hidden in the genpd code and very indirect.
+> >> 
+> >> Well, that's true. This is indeed a generic problem of PM dependencies
+> >> between devices (other than those represented by parent-child
+> >> relation), which in fact doesn't have much to do with genpd, but
+> >> rather with those devices directly. It is just that genpd is the most
+> >> convenient location to solve this in current code and in a simple way.
+> >> In other words, I see this solution as a reasonable way to get the
+> >> problem solved quickly for now, so that we can start thinking about a
+> >> more elegant solution.
+> >> 
+> >> >> > From a high-level, the IOMMU is just another device inside the PM
+> >> >> > domain, so ideally it should be doing it's own _get() and _put()
+> >> >> > calls so the PM domain code would just do the right thing without
+> >> >> > the need for notifiers.
+> >> >> 
+> >> >> As I understand it, the IOMMU (or for other similar cases) shouldn't
+> >> >> be doing any get() and put() at all because there are no IO API to
+> >> >> serve request from.
+> > 
+> > Speaking purely from an IOMMU point of view that's not entirely tree.
+> > IOMMU drivers expose map and unmap operations, so they can track whether
+> > any memory is mapped. From a bus master point of view the IOMMU map and
+> > unmap operations are hidden by the DMA mapping API. The IOMMU can thus
+> > track the existence of mappings without any IOMMU awareness in the bus
+> > master driver.
+> > 
+> > If no mapping exist the IOMMU shouldn't receive any translation request.
+> > An IOMMU driver could thus call pm_runtime_get_sync() in the map handler
+> > when creating the first mapping, and pm_runtime_put() in the unmap handler
+> > when tearing the last mapping down.
+> > 
+> > One could argue that the IOMMU would end up being powered more often than
+> > strictly needed, as bus masters drivers, even when written properly, could
+> > keep mappings around at times they don't perform bus access. This is true,
+> > and that's an argument I've raised during the last kernel summit. The
+> > general response (including Linus Torvald's) was that micro-optimizing
+> > power management might not be worth it, and that measurements proving
+> > that the gain is worth it are required before introducing new APIs to
+> > solve the problem. I can't disagree with that argument.
+> 
+> This would be a micro optimization if the IOMMU was located in its own
+> power domain. Unfortunately in most cases it is not, so keeping all
+> the devices in the domain powered on, because one of them have a
+> mapping created doesn't sound like a good idea.
+> 
+> Moreover, most of the drivers will keep the mapping for much longer
+> than one run cycle. Please take a look at V4L2's videobuf2 subsystem
+> (which I guess you are more familiar with than me;)), which will keep
+> MMAP buffers mapped in IOMMU address space for their whole lifetime. I
+> believe similar is the case for DRM drivers.
 
-- Don
+Yes, but that doesn't mean it gets out of control. Buffers shouldn't be 
+allocated if they won't be used. Granted, they could be preallocated (or 
+rather premapped) slightly before being used, but in sane use cases that 
+shouldn't be long before the hardware needs to be turned on.
 
-On 12/15/2014 11:55 AM, Suman Tripathi wrote:
-> This patch adds the support for the APM X-Gene SoC AHBC IOMMU driver.
->
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> ---
->
-> Suman Tripathi (3):
->    xgene-ahbc-iommu: Add support for APM X-Gene SoC AHBC IOMMU driver.
->    arm64: dts: Add the APM X-Gene AHBC IOMMU DTS node.
->    Documentation: dt-bindings: Add the binding info for APM X-Gene AHBC
->      IOMMU driver.
->
->   .../devicetree/bindings/iommu/xgene,ahbc-iommu.txt |  17 ++
->   arch/arm64/boot/dts/apm-storm.dtsi                 |   5 +
->   drivers/iommu/Kconfig                              |  10 +
->   drivers/iommu/Makefile                             |   1 +
->   drivers/iommu/xgene-ahbc-iommu.c                   | 336 +++++++++++++++++++++
->   5 files changed, 369 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/iommu/xgene,ahbc-iommu.txt
->   create mode 100644 drivers/iommu/xgene-ahbc-iommu.c
->
-> --
-> 1.8.2.1
->
+-- 
+Regards,
+
+Laurent Pinchart
