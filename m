@@ -1,71 +1,115 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Tue, 16 Dec 2014 11:21:13 +0100
-Subject: at91: smc configuration using DT
-In-Reply-To: <54900622.3030103@atmel.com>
-References: <548F6514.1040706@sigma-star.at> <2463675.Tt7GDs0rfe@wuerfel>
- <548F6A71.30304@nod.at> <54900622.3030103@atmel.com>
-Message-ID: <54900799.2020804@nod.at>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 16 Dec 2014 10:28:29 +0000
+Subject: [PATCH v2 1/3] irqchip: vf610-mscm: add support for MSCM interrupt
+ router
+In-Reply-To: <41a603b345dbee4f2507e80ea0f8bb96@agner.ch>
+References: <1418594998-2361-1-git-send-email-stefan@agner.ch>
+ <1418594998-2361-2-git-send-email-stefan@agner.ch> <548EB0FD.3030206@arm.com>
+ <41a603b345dbee4f2507e80ea0f8bb96@agner.ch>
+Message-ID: <5490094D.6090300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 16.12.2014 um 11:14 schrieb Nicolas Ferre:
-> Le 16/12/2014 00:10, Richard Weinberger a ?crit :
->> Am 15.12.2014 um 23:56 schrieb Arnd Bergmann:
->>> On Monday 15 December 2014 23:47:48 Richard Weinberger wrote:
->>>>
->>>> I'm sure I'm missing something.
->>>>
->>>> One of my boards is still using board files and uses sam9_smc_configure() to
->>>> setup NAND timings. I'd like to convert it to DT but I fail to see how to configure the smc.
->>>> What is the device tree equivalent of sam9_smc_configure()?
->>>>
->>>>
+On 15/12/14 20:58, Stefan Agner wrote:
+> On 2014-12-15 10:59, Marc Zyngier wrote:
+>> Hi Stefan,
+>>
+>> On 14/12/14 22:09, Stefan Agner wrote:
+>>> This adds support for Vybrid's interrupt router. On VF6xx models,
+>>> almost all peripherals can be accessed from either of the two
+>>> CPU's, from the Cortex-A5 or from the Cortex-M4. The interrupt
+>>> router routes the peripheral interrupts to the configured CPU.
 >>>
->>> I think it's actually missing, see the series "memory: add Atmel EBI
->>> (External Bus Interface) driver" from Boris Brezillon.
+>>> The driver makes use of the irqdomain hierarchy support. The
+>>> parent is either the ARM GIC or the ARM NVIC interrupt controller
+>>> depending on which CPU the kernel is executed on. Currently only
+>>> ARM GIC is supported because the NVIC driver lacks hierarchical
+>>> irqdomain support as of now.
+>>>
+>>> Currently, there is no resource control mechnism implemented to
+>>> avoid concurrent access of the same peripheral. The user needs
+>>> to make sure to use device trees which assign the peripherals
+>>> orthogonally. However, this driver warns the user in case the
+>>> interrupt is already configured for the other CPU. This provides
+>>> a poor man's resource controller.
+>>>
+>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>> ---
+>>> Thanks for the feedback on the initial driver, I'm quite happy
+>>> with the outcome using the hierarchic irqdomain support.
 >>
->> Thanks a lot for your quick reply, Arnd!
+>> Great stuff, pleased to see the stacked domain proving to be useful.
 >>
->> arch/arm/mach-at91/board-stamp9g20.c was removed by:
+>>> The driver is tested on Vybrid running on the Cortex-A5 CPU.
+>>> However, to properly support Cortex-M4, some more work will be
+>>> needed. Beside the hierarchic irqdomain support for NVIC, the
+>>> different IRQ cell layout need to be solved: NVIC uses only
+>>> one cell, whereas GIC uses three. I see two possible solutions:
+>>> - Support two layouts in this driver. Maybe by using IS_ENABLED,
+>>>   since it is not possible to compile a kernel for the A5 and
+>>>   M4.
+>>> - Define a 3 cell layout as GIC uses it for the MSCM, and pass
+>>>   a syntetic one cell layout to the parent when calling
+>>>   irq_domain_alloc_irqs_parent. This driver would then still
+>>>   need to know what type of interrupt controller the parent is...
+>>>
+>>> Ideas/advice welcome...
 >>
->> commit fb3642ebb52cfab8eaa52fea677abec4d92182a0
->> Author: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Date:   Wed Nov 19 10:30:41 2014 +0100
+>> You shouldn't use the GIC format for the MSCM, as it doesn't mean
+>> anything for it. Yes, I know that everybody did that, but that's just
+>> wrong (MSCM itself shouldn't care about SPIs, except when it is actually
+>> talking to a GIC). The only reason I didn't clean that up in my ongoing
+>> series is to avoid having to rewrite all the DTs entirely.
 >>
->>     ARM: at91: remove at91sam9260/at91sam9g20 legacy boards files
->>
->>     Remove old board files that use at91sam9260 or at91sam9g20 Atmel SoCs. The
->>     device tree is mature on these SoCs. It must be used now.
->>
->>     Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>
->> How can this DT work for my board without proper NAND timings?
->>
->> If I need Boris's patch set first I consider commit fb3642ebb a bit rude as it breaks
->> things.
->>
->> *confused*,
->> //richard
+>> My hunch is that you should have a MSCM-specific interrupt description
+>> (I guess two cells should be enough, one for the interrupt number and
+>> one for the trigger if necessary), and translate this to the format that
+>> the backing interrupt controller is using (only the map function should
+>> be affected).
 > 
-> Richard,
+> Ok, so foremost you suggest to use always the same interrupt
+> specification, no matter if I use the dt for the A5 or the M4. Hm, just
+> some weeks ago I extracted the interrupt properties of all peripherals
+> and made a base device tree without interrupt properties, just so that I
+> could create a device tree with the interrupt properties for NVIC and
+> one for GIC (see vf500.dtsi vs the preliminary vf610m4.dtsi from the
+> Cortex-M4 support patchset). Back then, I did not put much thought into
+> MSCM etc., and just adjusted the interrupt properties to the needs of
+> those two interrupt controllers. When having a common definition, I can
+> merge those interrupt nodes back into the common device tree, which is
+> much nicer anyway!
+
+Indeed. The thing to realize is that from the point of view of the
+device, the interrupt controller *is* MSCM. That is what the wire is
+connected to. What the MSCM is connected to is its responsibility.
+
+> Regarding format, since I have to touch all the interrupt properties
+> anyway, it's not much hassle to use a new format in that process. So my
+> MSCM format would be, as you suggested, two cells with interrupt number
+> and the trigger specification (IRQ_TYPE... from
+> ./include/dt-bindings/interrupt-controller/irq.h).
 > 
-> This action was announced several months ago on the at91.com forum and
-> on this mailing-list: https://lkml.org/lkml/2014/9/10/293
-> Please read this announce message for more background.
-> Moreover, 3.19 is scheduled mid-february. It was also offered to help
-> during this transition period... So I would not call it "rude".
+> One open thing: How should I determine the backing interrupt controller?
+> Maybe by just reading the interrupt-cells property of the parent
+> interrupt controller, and depending on the cell count create that
+> format?
 
-I got access to this board a week ago. =)
+The way to handle this would be to look at the interrupt-parent (you get
+a pointer to it anyway), and match the compatible string. You still need
+to hardcode the knowledge of the format for GIC and NVIC though.
 
-> Yes, it definitively breaks things. But as noted by Arnd, we are
-> actively working on a clean solution.
+[...]
 
-I'm glad to hear that.
+>> Otherwise, looks pretty good to me.
+>>
+> 
+> The same line adjustment will break the 80 character border... But I
+> agree, it's ugly the way it is now. Will put them in the same line.
 
-> In the meantime, you have the possibility to configure the SMC with
-> proper NAND timings in the bootloader(s).
-
-Yeah, that will work!
+Never mind what checkpatch says. Readability trumps it anytime.
 
 Thanks,
-//richard
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
