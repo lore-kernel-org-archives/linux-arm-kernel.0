@@ -1,19 +1,86 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Dec 2014 14:17:46 +0800
-Subject: [PATCH v2] ARM: clk-imx6q: fix video divider for rev T0 1.0
-In-Reply-To: <1417647831-30261-1-git-send-email-bisson.gary@gmail.com>
-References: <1417647831-30261-1-git-send-email-bisson.gary@gmail.com>
-Message-ID: <20141216061745.GB2411@dragon>
+From: klightspeed@killerwolves.net (Ben Peddell)
+Date: Tue, 16 Dec 2014 16:58:10 +1000
+Subject: [PATCH 04/27] ARM: mvebu: armada-370-netgear-rn102: Relicense
+ the device tree under GPLv2+/X11
+In-Reply-To: <1418657915-22775-5-git-send-email-gregory.clement@free-electrons.com>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <548FD802.8000309@killerwolves.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 03, 2014 at 03:03:51PM -0800, Gary Bisson wrote:
-> The post dividers do not work on i.MX6Q rev T0 1.0 so they must be fixed
-> to 1. As the table index was wrong, a divider a of 4 could still be
-> requested which implied the clock not to be set properly. This is the
-> root cause of the HDMI not working at high resolution on rev T0 1.0 of
-> the SoC.
+On 16/12/2014 1:38 AM, Gregory CLEMENT wrote:
+> The current GPL only licensing on the device tree makes it very
+> impractical for other software components licensed under another
+> license.
 > 
-> Signed-off-by: Gary Bisson <bisson.gary@gmail.com>
+> In order to make it easier for them to reuse our device trees,
+> relicense our device trees under a GPL/X11 dual-license.
+> 
+> Cc: Arnaud Ebalard <arno@natisbad.org>
+> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: klightspeed at killerwolves.net <klightspeed@killerwolves.net>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Applied, thanks.
+Acked-by: Ben Peddell <klightspeed@killerwolves.net>
+
+> ---
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 41 +++++++++++++++++++++++---
+>  1 file changed, 37 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> index 4e24932c6e30..7c5c4ff941ec 100644
+> --- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> +++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> @@ -3,10 +3,43 @@
+>   *
+>   * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
+>   *
+> - * This program is free software; you can redistribute it and/or
+> - * modify it under the terms of the GNU General Public License
+> - * as published by the Free Software Foundation; either version
+> - * 2 of the License, or (at your option) any later version.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+>  
+>  /dts-v1/;
+> 
