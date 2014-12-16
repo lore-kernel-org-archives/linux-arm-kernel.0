@@ -1,64 +1,77 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 16 Dec 2014 18:20:54 +0200
-Subject: [PATCH 09/11] ARM: OMAP3: PRM: add support for legacy iomapping init
+Date: Tue, 16 Dec 2014 18:20:55 +0200
+Subject: [PATCH 10/11] ARM: OMAP3: use clock data from TI clock driver for
+ legacy boot
 In-Reply-To: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
 References: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1418746856-17173-10-git-send-email-t-kristo@ti.com>
+Message-ID: <1418746856-17173-11-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the legacy clock data is being moved under clock driver, the
-clock data will be using the same low level infrastructure for
-register accesses. This requires the clk_memmaps to be initialized
-properly. This patch adds a support hook to the PRM driver to
-initialize the mappings.
+As the clock data is now available for the legacy boot also from the
+clock driver, use this rather than the data under the mach folder.
+This allows us to get rid of the old clock data completely.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/prm.h        |    1 +
- arch/arm/mach-omap2/prm_common.c |   11 +++++++++++
- 2 files changed, 12 insertions(+)
+ arch/arm/mach-omap2/io.c |   28 +++++++++++++++++++---------
+ 1 file changed, 19 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
-index 48480d5..a33303c 100644
---- a/arch/arm/mach-omap2/prm.h
-+++ b/arch/arm/mach-omap2/prm.h
-@@ -20,6 +20,7 @@ extern void __iomem *prm_base;
- extern u16 prm_features;
- extern void omap2_set_globals_prm(void __iomem *prm);
- int of_prcm_init(void);
-+void omap3_prcm_legacy_iomaps_init(void);
- # endif
- 
- /*
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index ee2b522..18f8bac 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -35,6 +35,8 @@
- #include "prm44xx.h"
- #include "common.h"
- #include "clock.h"
-+#include "cm.h"
-+#include "control.h"
- 
- /*
-  * OMAP_PRCM_MAX_NR_PENDING_REG: maximum number of PRM_IRQ*_MPU regs
-@@ -528,6 +530,15 @@ int __init of_prcm_init(void)
- 	return 0;
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 03cbb16..7295943 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -459,7 +459,17 @@ void __init omap3_init_early(void)
+ 	omap3xxx_clockdomains_init();
+ 	omap3xxx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_soc_init = omap3xxx_clk_init;
++	if (!of_have_populated_dt()) {
++		omap3_prcm_legacy_iomaps_init();
++		if (soc_is_am35xx())
++			omap_clk_soc_init = am35xx_clk_legacy_init;
++		else if (cpu_is_omap3630())
++			omap_clk_soc_init = omap36xx_clk_legacy_init;
++		else if (omap_rev() == OMAP3430_REV_ES1_0)
++			omap_clk_soc_init = omap3430es1_clk_legacy_init;
++		else
++			omap_clk_soc_init = omap3430_clk_legacy_init;
++	}
  }
  
-+void __init omap3_prcm_legacy_iomaps_init(void)
-+{
-+	ti_clk_ll_ops = &omap_clk_ll_ops;
-+
-+	clk_memmaps[TI_CLKM_CM] = cm_base + OMAP3430_IVA2_MOD;
-+	clk_memmaps[TI_CLKM_PRM] = prm_base + OMAP3430_IVA2_MOD;
-+	clk_memmaps[TI_CLKM_SCRM] = omap_ctrl_base_get();
-+}
-+
- static int __init prm_late_init(void)
- {
- 	if (prm_ll_data->late_init)
+ void __init omap3430_init_early(void)
+@@ -507,8 +517,6 @@ void __init ti81xx_init_early(void)
+ 	omap_hwmod_init_postsetup();
+ 	if (of_have_populated_dt())
+ 		omap_clk_soc_init = ti81xx_dt_clk_init;
+-	else
+-		omap_clk_soc_init = omap3xxx_clk_init;
+ }
+ 
+ void __init omap3_init_late(void)
+@@ -722,15 +730,17 @@ int __init omap_clk_init(void)
+ 
+ 	ti_clk_init_features();
+ 
+-	ret = of_prcm_init();
+-	if (ret)
+-		return ret;
++	if (of_have_populated_dt()) {
++		ret = of_prcm_init();
++		if (ret)
++			return ret;
+ 
+-	of_clk_init(NULL);
++		of_clk_init(NULL);
+ 
+-	ti_dt_clk_init_retry_clks();
++		ti_dt_clk_init_retry_clks();
+ 
+-	ti_dt_clockdomains_setup();
++		ti_dt_clockdomains_setup();
++	}
+ 
+ 	ret = omap_clk_soc_init();
+ 
 -- 
 1.7.9.5
