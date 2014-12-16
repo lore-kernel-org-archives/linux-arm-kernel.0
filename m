@@ -1,46 +1,192 @@
-From: david.lanzendoerfer@o2s.ch (David =?utf-8?q?Lanzend=C3=B6rfer?=)
-Date: Tue, 16 Dec 2014 15:11:15 +0100
-Subject: [PATCH 4/4] mmc: sunxi: Removing unused code
-In-Reply-To: <20141216140921.3036.14668.stgit@dizzy-6.o2s.ch>
-References: <20141216140921.3036.14668.stgit@dizzy-6.o2s.ch>
-Message-ID: <20141216141115.3036.96031.stgit@dizzy-6.o2s.ch>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 16 Dec 2014 15:12:22 +0100
+Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <2519415.GklIQeMgWR@wuerfel>
+References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
+ <8625951.Wbs2MxLnhi@wuerfel> <20141204162834.GA2995@linaro.org>
+ <2519415.GklIQeMgWR@wuerfel>
+Message-ID: <54903DC6.8010308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removing a relict from reverse engineering of the Android driver code in
-sunxi_mmc_clk_set_rate.
+On 12/04/2014 07:20 PM, Arnd Bergmann wrote:
+> On Thursday 04 December 2014 09:28:34 Lina Iyer wrote:
+>> On Thu, Dec 04 2014 at 02:02 -0700, Arnd Bergmann wrote:
+>>> On Thursday 04 December 2014 09:52:39 Daniel Lezcano wrote:
+>>>> On 12/03/2014 09:35 PM, Arnd Bergmann wrote:
+>>>>> On Wednesday 03 December 2014 07:31:22 Lina Iyer wrote:
+>>>>>>>>> +static int __init qcom_spm_init(void)
+>>>>>>>>> +{
+>>>>>>>>> +    int ret;
+>>>>>>>>> +
+>>>>>>>>> +    /*
+>>>>>>>>> +     * cpuidle driver need to registered before the cpuidle device
+>>>>>>>>> +     * for any cpu. Register the device for the the cpuidle driver.
+>>>>>>>>> +     */
+>>>>>>>>> +    ret = platform_device_register(&qcom_cpuidle_drv);
+>>>>>>>>> +    if (ret)
+>>>>>>>>> +        return ret;
+>>>>>>>> Stephen pointed out that we would have the platform device lying around
+>>>>>>>> on a non-QCOM device when using multi_v7_defconfig.
+>>>>>>>
+>>>>>>> Perhaps I am missing the point, but this is not supposed to happen, no ?
+>>>>>>>
+>>>>>> This would happen, since the file would compile on multi_v7 and we would
+>>>>>> initialize and register this device regardless. The cpuidle-qcom.c
+>>>>>> driver probe would bail out looking for a matching compatible property.
+>>>>>> So we would not register a cpuidle driver but the device would lay
+>>>>>> around.
+>>>>>
+>>>>> I think the problem is registering a platform_device. I've complained
+>>>>> about this before, but it still seems to get copied all over the
+>>>>> place. Please don't do this but have a driver that looks at DT to
+>>>>> figure out whether to access hardware or not.
+>>>>
+>>>> We did this approach but, I can remember why, someone was complaining
+>>>> about it also
+>>>>
+>>>> The platform device/driver paradigm allowed us to split the arch
+>>>> specific parts by passing the pm ops through the platform data.
+>>>>
+>>>> Would make sense to have a single common place for the ARM arch where we
+>>>> initialize the platform device for cpuidle ?
+>>>
+>>> No. It's really not a device, and if you pretend that it is, you get
+>>> into problems like this.
+>>
+>> Arnd, the problem is that the provides function pointers to the SoC code
+>> that the cpuilde driver uses to call based on the idle state.
+>>
+>> After much discussions, we came down to using function pointers from
+>> translating from DT strings, other than using that again, I dont see a
+>> good way of achieving the ability of cpuidle driver staying a separate
+>> driver from the SPM driver.
+>>
+>> Daniel, thoughts?
+>
+> Maybe the problem is trying too hard to separate two things that really
+> belong together then. In general, the strategy of coming up with subsystems
+> for a class of devices and them turning platform code into drivers for
+> that subsystem has worked out really well, but I think for cpufreq, cpuidle
+> and smp, it really hasn't, and in the third case we haven't even tried
+> coming up with a subsystem for that reason.
+>
+> Having all cpuidle code generally live in drivers/cpuidle is still a good
+> idea IMO, but using a platform device just for the purpose of passing
+> data between some platform specific code and another platform specific
+> driver hasn't worked out that well here.
 
-Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-Reported-by: ?? <lixiang@allwinnertech.com>
----
- drivers/mmc/host/sunxi-mmc.c |   10 +---------
- 1 file changed, 1 insertion(+), 9 deletions(-)
+At the beginning, all that become from not including mach files from the 
+drivers directory which make sense.
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 695fe85..6af0a28 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -627,7 +627,7 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 				  struct mmc_ios *ios)
- {
--	u32 rate, oclk_dly, rval, sclk_dly, src_clk;
-+	u32 rate, oclk_dly, rval, sclk_dly;
- 	int ret;
- 
- 	rate = clk_round_rate(host->clk_mmc, ios->clock);
-@@ -672,14 +672,6 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 		sclk_dly = 4;
- 	}
- 
--	src_clk = clk_get_rate(clk_get_parent(host->clk_mmc));
--	if (src_clk >= 300000000 && src_clk <= 400000000) {
--		if (oclk_dly)
--			oclk_dly--;
--		if (sclk_dly)
--			sclk_dly--;
--	}
--
- 	clk_sunxi_mmc_phase_control(host->clk_mmc, sclk_dly, oclk_dly);
- 
- 	return sunxi_mmc_oclk_onoff(host, 1);
+Perhaps it is time to write a similar mechanism for the cpuidle drivers 
+where we can still separate the low level PM code from the generic 
+cpuidle code.
+
+Something like (very roughly):
+
+Index: cpuidle-next/drivers/cpuidle/driver.c
+===================================================================
+--- cpuidle-next.orig/drivers/cpuidle/driver.c	2014-12-16 
+14:04:51.750861310 +0100
++++ cpuidle-next/drivers/cpuidle/driver.c	2014-12-16 15:09:52.202706756 
++0100
+@@ -178,6 +178,45 @@ static void __cpuidle_driver_init(struct
+  	}
+  }
+
++struct cpuidle_ops_reg {
++	const char *name;
++	struct cpuidle_ops *ops;
++	struct list_head *list;
++};
++
++static LIST_HEAD(ops_list);
++
++static struct cpuidle_ops *cpuidle_find_ops(const char *name)
++{
++	struct cpuidle_ops_reg *ops_reg;
++
++	list_for_each_entry(ops_reg, &ops_list, list) {
++		if (!strcmp(ops_reg->name, name))
++			return ops_reg->ops;
++	}
++
++	return NULL;
++}
++
++int cpuidle_register_ops(const char *name, struct cpuidle_ops *ops)
++{
++	struct cpuidle_ops_reg *reg;
++
++	reg = kmalloc(sizeof(*reg), GFP_KERNEL);
++	if (!reg)
++		return -ENOMEM;
++
++	reg->name = name;
++	reg->ops = ops;
++	INIT_LIST_HEAD(&reg->list);
++
++	spin_lock(&cpuidle_driver_lock);
++	list_add(&ops_list, &reg->list);
++	spin_unlock(&cpuidle_driver_lock);
++
++	return 0;
++}
++
+  /**
+   * __cpuidle_register_driver: register the driver
+   * @drv: a valid pointer to a struct cpuidle_driver
+@@ -194,6 +233,7 @@ static void __cpuidle_driver_init(struct
+  static int __cpuidle_register_driver(struct cpuidle_driver *drv)
+  {
+  	int ret;
++	struct cpuidle_ops *ops;
+
+  	if (!drv || !drv->state_count)
+  		return -EINVAL;
+@@ -201,6 +241,10 @@ static int __cpuidle_register_driver(str
+  	if (cpuidle_disabled())
+  		return -ENODEV;
+
++	ops = cpuidle_find_ops(drv->name);
++	if (ops)
++		drv->ops = ops;
++
+  	__cpuidle_driver_init(drv);
+
+  	ret = __cpuidle_set_driver(drv);
+Index: cpuidle-next/include/linux/cpuidle.h
+===================================================================
+--- cpuidle-next.orig/include/linux/cpuidle.h	2014-12-16 
+14:06:09.442858231 +0100
++++ cpuidle-next/include/linux/cpuidle.h	2014-12-16 14:59:46.594730753 +0100
+@@ -109,11 +109,21 @@ static inline int cpuidle_get_last_resid
+   * CPUIDLE DRIVER INTERFACE *
+   ****************************/
+
++struct cpuidle_ops {
++	int (*standby)(struct cpuidle_driver *drv,
++		       struct cpuidle_device *dev);
++	int (*retention)(struct cpuidle_driver *drv,
++			 struct cpuidle_device *dev);
++	int (*poweroff)(struct cpuidle_driver *drv,
++			struct cpuidle_device *dev);
++};
++
+  struct cpuidle_driver {
+  	const char		*name;
+  	struct module 		*owner;
+  	int                     refcnt;
+
++	struct cpuidle_ops      *ops;
+          /* used by the cpuidle framework to setup the broadcast timer */
+  	unsigned int            bctimer:1;
+  	/* states array must be ordered in decreasing power consumption */
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
