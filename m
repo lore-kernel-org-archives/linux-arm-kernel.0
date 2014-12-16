@@ -1,86 +1,32 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Tue, 16 Dec 2014 13:01:17 -0700
-Subject: regression: Clock changes in next-20141205 break at least omap4
-In-Reply-To: <5490816E.7060706@codeaurora.org>
-References: <20141205165539.GA30437@atomide.com>
- <5481F79D.4010504@codeaurora.org> <20141205183849.GB30437@atomide.com>
- <20141212194238.20398.33333@quantum>
- <alpine.DEB.2.02.1412122310570.29716@utopia.booyaka.com>
- <20141215220224.20398.98259@quantum> <548F7B02.1090009@nvidia.com>
- <20141216003834.GC23854@atomide.com> <548F8B70.2060803@nvidia.com>
- <5490816E.7060706@codeaurora.org>
-Message-ID: <54908F8D.2020202@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Dec 2014 20:03:04 +0000
+Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
+ tree under GPLv2+/X11
+In-Reply-To: <20141216185550.GQ967@titan.lakedaemon.net>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
+ <20141215232221.GD19261@kw.sim.vm.gnt>
+ <20141216130331.GJ967@titan.lakedaemon.net>
+ <20141216133719.GE19261@kw.sim.vm.gnt>
+ <20141216144533.GL967@titan.lakedaemon.net>
+ <54907A82.6030906@free-electrons.com>
+ <20141216185550.GQ967@titan.lakedaemon.net>
+Message-ID: <20141216200304.GS11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Tero
+On Tue, Dec 16, 2014 at 01:55:50PM -0500, Jason Cooper wrote:
+> Agreed.  We should keep in mind that once we have heard from everybody
+> (big if), that is still only representative of armada and maybe mvebu
+> ecosystem. :(  I'm starting to lean even more towards #2...
 
-On 12/16/2014 12:01 PM, Stephen Boyd wrote:
-> On 12/15/2014 05:31 PM, Paul Walmsley wrote:
->> I just took a quick glance at Tero's second patch, and it looks like a
->> hack to me.  Better to fix the problem in the core CCF code if
->> possible.  I don't think there's any reason why a PLL couldn't have
->> just one parent clock.  But I'm fine with merging it as a short-term
->> fix if fixing the core code is difficult or risky.
-> Can you describe what's wrong?
+Except I know that there are people out there who want to ship the
+source files with their project.
 
-Took a closer look at it, at your prompting.
+The DT source files are integrated into the mainline Linux kernel, and
+not everyone wants to download the Linux kernel source just to be able
+to build the DT files for their non-Linux project.
 
-The first observation is that the issue seems to be limited to 
-TI-specific clock code in drivers/clk/ti.  So nothing to worry about in 
-terms of the CCF core, it looks.
-
-The second observation is that this appears to only be a problem due to 
-the current DT data in arch/arm/boot/dts/omap3xxx-clocks.dtsi:
-
-     dpll3_ck: dpll3_ck {
-         #clock-cells = <0>;
-         compatible = "ti,omap3-dpll-core-clock";
-         clocks = <&sys_ck>, <&sys_ck>;
-         reg = <0x0d00>, <0x0d20>, <0x0d40>, <0x0d30>;
-     };
-
-
-It lists two entries for the "clocks" node for some reason. 
-of_ti_dpll_setup() only seems to require one.
-
-So unless there's some good reason to list two of them in the DTS file, 
-the right fix would probably have been to fix the DT data.
-
-> Does the PLL have a mux with two inputs that map to the same clock?
->
-
-I don't think so.
-
-...
-
-Generally speaking, I suspect the way we model PLLs isn't quite right 
-(although it's been a while since I've looked at that particular code).  
-This was probably my fault, in the final analysis, for taking a shortcut 
-here a long time ago.
-
-Unless one wishes to implement support for multiple clock parents, it's 
-probably not quite right to state that a PLL's reference clock is a 
-"parent" in a clock tree sense.  When a PLL is active, the output clock 
-originates from a VCO of some kind that is internal to the PLL.  The 
-reference clock is just used by the PLL internal logic to close the 
-control loop.  Some PLL-like clock sources use a third clock that is 
-used to clock some of the PLL's internal logic (let's call this a 
-"functional clock.")
-
-So the reference clock and functional clock are (usually) required by 
-the PLL to operate, and should therefore be required by the PLL clock 
-driver code in the kernel; but one could claim that they aren't 
-technically parent clocks of the PLL in a clock tree sense, since the 
-downstream output clock isn't directly derived from either of those clocks.
-
-Otherwise if we want to represent those clocks accurately in the Linux 
-clock tree, we probably need to state that clocks can have multiple 
-"parents" that often need to be active simultaneously, and we should 
-propagate usecount changes accordingly up all of the parent paths.
-
-...
-
-Anyway, thanks for following up on this,
-
-- Paul
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
