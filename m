@@ -1,28 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Dec 2014 20:38:45 +0000
-Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <20141216203021.GS967@titan.lakedaemon.net>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
- <20141215232221.GD19261@kw.sim.vm.gnt>
- <20141216130331.GJ967@titan.lakedaemon.net>
- <20141216133719.GE19261@kw.sim.vm.gnt>
- <20141216144533.GL967@titan.lakedaemon.net>
- <20141216184456.GR11285@n2100.arm.linux.org.uk>
- <20141216203021.GS967@titan.lakedaemon.net>
-Message-ID: <20141216203845.GT11285@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Dec 2014 21:40:48 +0100
+Subject: [PATCH] iommu/exynos: Fix arm64 allmodconfig build
+In-Reply-To: <1418658882-14809-1-git-send-email-broonie@kernel.org>
+References: <1418658882-14809-1-git-send-email-broonie@kernel.org>
+Message-ID: <2060329.N1WYSODiQy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 03:30:21PM -0500, Jason Cooper wrote:
-> I'll admit I'm stuck here.  I disagree with Simon, but I also think we
-> need to respect his desire as author of the files.
+On Monday 15 December 2014 15:54:42 Mark Brown wrote:
+> The Exynos IOMMU driver uses the ARM specific dmac_flush_range() and
+> outer_flush_range() functions. This breaks the build on arm64 allmodconfig
+> in -next since support has been merged for some Exynos ARMv8 SoCs. Add a
+> dependency on ARM to keep things building until either the driver has the
+> ARM dependencies removed or the ARMv8 architecture code implements these
+> ARM specific APIs.
+> 
+> Signed-off-by: Mark Brown <broonie@kernel.org>
+> ---
+> 
+> Resending to the arm-soc people since the addition of the Exynos
+> platform for ARMv8 went via them, Krzysztof also sent a fix for this
+> earlier but it there's been no response.
+> 
 
-Yes, we do need to respect his desire, otherwise who are we to complain
-when someone uses our code in a way that we don't agree with.  Fair's
-fair. :)
+Applied to fixes branch, thansk!
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
