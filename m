@@ -1,31 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Dec 2014 09:34:43 +0000
-Subject: [PATCH 5/6] dt-bindings: Add documentation for Rockchip hdmi-audio
-In-Reply-To: <548FCE8F.7090106@rock-chips.com>
-References: <1418609494-15820-1-git-send-email-ykk@rock-chips.com>
- <1418612114-19692-1-git-send-email-ykk@rock-chips.com>
- <20141215104029.GE11285@n2100.arm.linux.org.uk>
- <20141215120205.GZ11764@sirena.org.uk>
- <548EDDC2.9050104@rock-chips.com>
- <20141215161827.GE11764@sirena.org.uk>
- <548FCE8F.7090106@rock-chips.com>
-Message-ID: <20141216093443.GN11285@n2100.arm.linux.org.uk>
+From: yvo@apm.com (Y Vo)
+Date: Tue, 16 Dec 2014 16:43:02 +0700
+Subject: [PATCH v1 1/3] gpio: Add APM X-Gene standby GPIO controller driver
+In-Reply-To: <2250730.N6DdkCTXkh@wuerfel>
+References: <1412779948-28769-1-git-send-email-yvo@apm.com>
+ <2178918.XVCQXOyoGA@wuerfel>
+ <CAL4ahLeyPgska0AcgS756y1Nh2tEeJ4A4k4bTJrU0pzqgG08PA@mail.gmail.com>
+ <2250730.N6DdkCTXkh@wuerfel>
+Message-ID: <CAL4ahLfSZjmqqbQ9Xmqae_AVfFZLiUUEN+rABMwiu2_8u4mmPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 02:17:51PM +0800, Kuankuan.Yang wrote:
-> hdmi-audio driver share irq with dw_hdmi driver,  for continuing AHBAUDDMA
-> or for detecting hdmi insert.
-> So maybe it's hard to switch to simple-card way,  Russell what's your
-> opinion ?
+On Wed, Oct 29, 2014 at 10:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 29 October 2014 22:09:00 Y Vo wrote:
+>> Hi Arnd,
+>>
+>> Per Linus, shall we hold this driver until the GIC submission complete
+>> ? Or we will send the version without access GIC to read status in
+>> case the GPIO is configured IRQ ?
+>
+> I'm fine with it either way.
+>
+>> +static int xgene_gpio_sb_get(struct gpio_chip *gc, u32 gpio)
+>> +{
+>> +       struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
+>> +       struct xgene_gpio_sb *chip = to_xgene_gpio_sb(mm_gc);
+>> +       u32 data;
+>> +
+>> +       data = ioread32(mm_gc->regs + MPA_GPIO_IN_ADDR);
+>> +
+>> +       return (data &  GPIO_MASK(gpio)) ? 1 : 0;
+>> +}
+>
+> This would be actually broken, right? Maybe it's better to change the
+> driver so that it refuses to map GPIO lines that are hardwired to
+> the interrupt controller, until we can support that.
 
-My "opinion" is that I need to spend some time looking in depth at both
-your code and my code before I can form an idea of how to proceed.
-
-However, since I seem to be spending a lot of time chasing regressions
-which have appeared in v3.18, I don't have a lot of time to look at this
-right now.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+It still works if they are configure as GPIO.
+Do you have any reference to resolve it ?
