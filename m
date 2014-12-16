@@ -1,61 +1,28 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 16 Dec 2014 21:37:22 +0100 (CET)
-Subject: [PATCH 0/5] ARM: at91: fix irq_pm_install_action WARNING
-In-Reply-To: <20141216192609.778f5f8d@bbrezillon>
-References: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
- <2662748.NJbkr6jW7r@vostro.rjw.lan> <3542278.8lcJeXLMFm@vostro.rjw.lan>
- <20141216100715.57baeb65@bbrezillon>
- <alpine.DEB.2.11.1412161013570.17382@nanos>
- <20141216192609.778f5f8d@bbrezillon>
-Message-ID: <alpine.DEB.2.11.1412162125000.17382@nanos>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Dec 2014 20:38:45 +0000
+Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
+ tree under GPLv2+/X11
+In-Reply-To: <20141216203021.GS967@titan.lakedaemon.net>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
+ <20141215232221.GD19261@kw.sim.vm.gnt>
+ <20141216130331.GJ967@titan.lakedaemon.net>
+ <20141216133719.GE19261@kw.sim.vm.gnt>
+ <20141216144533.GL967@titan.lakedaemon.net>
+ <20141216184456.GR11285@n2100.arm.linux.org.uk>
+ <20141216203021.GS967@titan.lakedaemon.net>
+Message-ID: <20141216203845.GT11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Dec 2014, Boris Brezillon wrote:
-> On Tue, 16 Dec 2014 11:03:55 +0100 (CET)
-> Thomas Gleixner <tglx@linutronix.de> wrote:
-> > That avoids the whole flag, action, whatever business for the price of
-> > a really trivial demux mechanism. Everything just works. Even the irq
-> > storm detector will just disable the parent interrupt once all
-> > handlers return NONE often enough.
-> 
-> Still have one question regarding the spurious interrupt detection code.
-> AFAIU, it disables a specific IRQ handler if it triggers to often with
-> an IRQ_NONE return, right ?
-> 
-> In this dumb demuxer I can't tell which child interrupt should be
-> handled (there is no interrupt cause register), thus I call
-> generic_handle_irq on all unmasked IRQs.
-> Isn't there a risk to get some of my child interrupts disabled because
-> they always return IRQ_NONE (which is a normal use case for
-> IRQF_SHARED: we're only expecting at least one handler to return
-> IRQ_HANDLED or IRQ_WAKE_THREAD, not all of them) ?
+On Tue, Dec 16, 2014 at 03:30:21PM -0500, Jason Cooper wrote:
+> I'll admit I'm stuck here.  I disagree with Simon, but I also think we
+> need to respect his desire as author of the files.
 
-Good point. I missed that aspect.
+Yes, we do need to respect his desire, otherwise who are we to complain
+when someone uses our code in a way that we don't agree with.  Fair's
+fair. :)
 
-Another good reason to make that core infrastructure.
-
-So what you need is the following:
-
-void dumb_demux_handler(....)
-{
-	irq_return ret = IRQ_NONE:
-	int i;
-
-	for_each_demux_irq(i)
-		ret |= handle_dumb_demux_irq(base + i);
-
-	note_interrupt(demuxirq, ret);
-}   
-
-So that disables the demux irq if all sub handlers return NONE 100k
-times in a row. Otherwise if one of them handles it, you're fine.
-
-That more or less resembles the shared action magic.
-
-So yes, that wants to be core functionality which can be instantiated
-from an affected irq chip for this particular case of HW insanity.
-
-Thanks,
-
-	tglx
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
