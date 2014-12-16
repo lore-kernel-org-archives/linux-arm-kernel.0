@@ -1,86 +1,60 @@
-From: klightspeed@killerwolves.net (Ben Peddell)
-Date: Tue, 16 Dec 2014 16:58:10 +1000
-Subject: [PATCH 04/27] ARM: mvebu: armada-370-netgear-rn102: Relicense
- the device tree under GPLv2+/X11
-In-Reply-To: <1418657915-22775-5-git-send-email-gregory.clement@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <548FD802.8000309@killerwolves.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Dec 2014 15:29:22 +0800
+Subject: [PATCH 1/3] ARM: imx6sx: Set PLL2 as parent of QSPI clocks
+In-Reply-To: <1417788802-13219-1-git-send-email-festevam@gmail.com>
+References: <1417788802-13219-1-git-send-email-festevam@gmail.com>
+Message-ID: <20141216072921.GD2411@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/12/2014 1:38 AM, Gregory CLEMENT wrote:
-> The current GPL only licensing on the device tree makes it very
-> impractical for other software components licensed under another
-> license.
+On Fri, Dec 05, 2014 at 12:13:20PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> In order to make it easier for them to reuse our device trees,
-> relicense our device trees under a GPL/X11 dual-license.
+> Provide a proper parent for QSPI clocks to avoid a kernel oops:
 > 
-> Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: klightspeed at killerwolves.net <klightspeed@killerwolves.net>
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> [    1.037920] Division by zero in kernel.
 
-Acked-by: Ben Peddell <klightspeed@killerwolves.net>
+What is the original parent clock, and how does that cause a division by
+zero error?
 
+Shawn
+
+> [    1.041807] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.18.0-rc7-next-20141204-00002-g5aa23e1 #2143
+> [    1.050967] Hardware name: Freescale i.MX6 SoloX (Device Tree)
+> [    1.056853] Backtrace:
+> [    1.059360] [<80011ea0>] (dump_backtrace) from [<8001203c>] (show_stack+0x18/0x1c)
+> [    1.066982]  r6:00000000 r5:00000000 r4:00000000 r3:00000000
+> [    1.072754] [<80012024>] (show_stack) from [<806b7100>] (dump_stack+0x88/0xa4)
+> [    1.080038] [<806b7078>] (dump_stack) from [<80011d20>] (__div0+0x18/0x20)
+> [    1.086958]  r5:be018500 r4:be017c00
+> [    1.090600] [<80011d08>] (__div0) from [<802aa418>] (Ldiv0+0x8/0x10)
+> [    1.097012] [<80504fbc>] (clk_divider_set_rate) from [<80503ddc>] (clk_change_rate+0x14c/0x17c)
+> [    1.105759]  r7:00000000 r6:00000000 r5:be018500 r4:00000000
+> [    1.111516] [<80503c90>] (clk_change_rate) from [<80503ea0>] (clk_set_rate+0x94/0x98)
+> [    1.119391]  r8:be7e0368 r7:00000000 r6:be11a000 r5:be018500 r4:00000000 r3:00000000
+> [    1.127290] [<80503e0c>] (clk_set_rate) from [<80410558>] (fsl_qspi_probe+0x23c/0x75c)
+> [    1.135260]  r5:be11a010 r4:be350010
+> [    1.138900] [<8041031c>] (fsl_qspi_probe) from [<80385a18>] (platform_drv_probe+0x50/0xac)
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 41 +++++++++++++++++++++++---
->  1 file changed, 37 insertions(+), 4 deletions(-)
+>  arch/arm/mach-imx/clk-imx6sx.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-> index 4e24932c6e30..7c5c4ff941ec 100644
-> --- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-> +++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-> @@ -3,10 +3,43 @@
->   *
->   * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
->   *
-> - * This program is free software; you can redistribute it and/or
-> - * modify it under the terms of the GNU General Public License
-> - * as published by the Free Software Foundation; either version
-> - * 2 of the License, or (at your option) any later version.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   */
+> diff --git a/arch/arm/mach-imx/clk-imx6sx.c b/arch/arm/mach-imx/clk-imx6sx.c
+> index 17354a1..5a3e5a1 100644
+> --- a/arch/arm/mach-imx/clk-imx6sx.c
+> +++ b/arch/arm/mach-imx/clk-imx6sx.c
+> @@ -558,6 +558,9 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
+>  	clk_set_parent(clks[IMX6SX_CLK_GPU_CORE_SEL], clks[IMX6SX_CLK_PLL3_PFD0]);
+>  	clk_set_parent(clks[IMX6SX_CLK_GPU_AXI_SEL], clks[IMX6SX_CLK_PLL3_PFD0]);
 >  
->  /dts-v1/;
+> +	clk_set_parent(clks[IMX6SX_CLK_QSPI1_SEL], clks[IMX6SX_CLK_PLL2_BUS]);
+> +	clk_set_parent(clks[IMX6SX_CLK_QSPI2_SEL], clks[IMX6SX_CLK_PLL2_BUS]);
+> +
+>  	/* Set initial power mode */
+>  	imx6q_set_lpm(WAIT_CLOCKED);
+>  }
+> -- 
+> 1.9.1
 > 
