@@ -1,31 +1,19 @@
-From: ykk@rock-chips.com (Kuankuan.Yang)
-Date: Tue, 16 Dec 2014 10:38:31 +0800
-Subject: [PATCH 5/6] dt-bindings: Add documentation for Rockchip hdmi-audio
-In-Reply-To: <20141215161827.GE11764@sirena.org.uk>
-References: <1418609494-15820-1-git-send-email-ykk@rock-chips.com>
- <1418612114-19692-1-git-send-email-ykk@rock-chips.com>
- <20141215104029.GE11285@n2100.arm.linux.org.uk>
- <20141215120205.GZ11764@sirena.org.uk> <548EDDC2.9050104@rock-chips.com>
- <20141215161827.GE11764@sirena.org.uk>
-Message-ID: <548F9B27.9070008@rock-chips.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Dec 2014 10:46:07 +0800
+Subject: [PATCH] ARM: imx: pllv3: add shift for frequency multiplier
+In-Reply-To: <1417539582-11387-1-git-send-email-stefan@agner.ch>
+References: <1417539582-11387-1-git-send-email-stefan@agner.ch>
+Message-ID: <20141216024605.GX2411@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Dec 02, 2014 at 05:59:42PM +0100, Stefan Agner wrote:
+> Add shift capabilties for the frequency multiplier (DIV_SELECT) to
+> support Vybrid's USB PLL oddity. The PLL3 and PLL7 are the only
+> PLL control registers which have the DIV_SELECT bit shifted by
+> one. Be aware, there are known documentation errors in the
+> reference manual too.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-? 2014?12?16? 00:18, Mark Brown ??:
-> On Mon, Dec 15, 2014 at 09:10:26PM +0800, Kuankuan.Yang wrote:
->> Hi Mark & Russell:
-> Please don't top post, that way people have some context for what you're
-> saying - look at how people normally format their mails on thelist.
-
-got it,  thanks for your remind.
-
->> In that way, dt will only need compatible for creating sound device. is it
->> ok  ?
->> sound {
->>      compatible = "rockchip,rk3288-hdmi-audio";
->>      status = "okay";
->> }
->> could you give me some advises.
-> That'd be good, though the other question is if this can be made to use
-> simple-card so we can avoid having a custom driver for this.
+Applied, thanks.
