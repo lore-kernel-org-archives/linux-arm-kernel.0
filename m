@@ -1,56 +1,24 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 16 Dec 2014 13:33:24 -0600
-Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
- AM572x errata i856.
-In-Reply-To: <20141216192740.GN24110@csclub.uwaterloo.ca>
-References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
- <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
- <20141214044517.GD24110@csclub.uwaterloo.ca> <549018EC.8020207@ti.com>
- <20141216145856.GA23358@kahuna> <20141216163657.GL24110@csclub.uwaterloo.ca>
- <54908128.7040005@ti.com> <20141216192740.GN24110@csclub.uwaterloo.ca>
-Message-ID: <54908904.9060908@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Dec 2014 20:42:56 +0100
+Subject: [PATCHv1] rtc: bcm-iproc: Add support for Broadcom iproc rtc
+In-Reply-To: <1418757750-3628-1-git-send-email-arun.ramamurthy@broadcom.com>
+References: <1418757750-3628-1-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <7947905.aK8KkUx4sY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2014 01:27 PM, Lennart Sorensen wrote:
->> I see why arch_timer_freq might skip the rounding error of 39, 15 and
->> 55 Vs existing logic which is possibly at a truncation error risk
->> (without errata for sysclk 13, 26 and 27MHz).
->>
->> all you'd probably need to do is cast rate, num and den to unsigned
->> long and have a common computation logic.
-> 
-> If that is acceptable, then sure I can do that.  I liked avoiding casts
-> in general though.
-> 
->> if you'd really want to handle truncation error, it must be a separate
->> patch of it's own - I would not mix it with the errata fix.
-> 
-> Well there is no error in the existing code because the rate / den
-> is always a clean integer division.  The problem is introduced by the
+On Tuesday 16 December 2014 11:22:30 arun.ramamurthy at broadcom.com wrote:
+> +       rtc: iproc_rtc at 0x03026000 {
+> +               compatible = "brcm,iproc-rtc";
+> +               reg =   spru_bbl:               <0x03026000 0xC>,
+> +                       crmu_pwr_good_status:   <0x0301C02C 0x14>,
+> +                       crmu_bbl_auth:          <0x03024C74 0x8>;
+> +               interrupts = spru_rtc_periodic: <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
+> +                            spru_alarm:        <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
 
-key is "there is no error in existing code for existing value" :) ->
-the same code for new values will fail. and introducing (rate * num) /
-den without cast will fail for old values.
+The reg properties look really random, could it be that the registers
+are really part of some other device that contains multiple functions?
 
-> SYSCLK1 / 610 used by the emulated clock which is not a clean division.
-> 
-> So for the existing logic, the calculation was perfect.  It is only for
-> the errata case that it is a problem.
-> 
-> So I think leaving the existing calculation but moved up works well,
-> and then having the alternate order calculation only in the errata case
-> seemed cleaner and avoids casts and 64bit math which I thought was
-> overall desirable.
+Also, what do you use the labels for?
 
-In general using DIV_ROUND_UP and family of macros(in kernel.h) is the
-right way of doing division in similar cases in Linux kernel. And for
-the same functionality, we want a common equation - if it does not fit
-well for all values (even if we introduce new values), then we must
-come to a better equation that will work for all values. What we do
-not do is to have two equations meant for doing the same thing.
-
-
--- 
-Regards,
-Nishanth Menon
+	Arnd
