@@ -1,107 +1,64 @@
-From: uwe@kleine-koenig.org (=?windows-1252?Q?Uwe_Kleine-K=F6nig?=)
-Date: Tue, 16 Dec 2014 11:08:57 +0100
-Subject: [PATCHv1 1/3] rtc: rtc-isl12057: add alarm support to Intersil
- ISL12057 RTC driver
-In-Reply-To: <db1f0eecbdc5062a61232b99699ecfa6e0a2a956.1418687005.git.arno@natisbad.org>
-References: <cover.1418687005.git.arno@natisbad.org>
- <db1f0eecbdc5062a61232b99699ecfa6e0a2a956.1418687005.git.arno@natisbad.org>
-Message-ID: <549004B9.2060402@kleine-koenig.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 16 Dec 2014 11:14:58 +0100
+Subject: at91: smc configuration using DT
+In-Reply-To: <548F6A71.30304@nod.at>
+References: <548F6514.1040706@sigma-star.at> <2463675.Tt7GDs0rfe@wuerfel>
+ <548F6A71.30304@nod.at>
+Message-ID: <54900622.3030103@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnaud,
+Le 16/12/2014 00:10, Richard Weinberger a ?crit :
+> Am 15.12.2014 um 23:56 schrieb Arnd Bergmann:
+>> On Monday 15 December 2014 23:47:48 Richard Weinberger wrote:
+>>>
+>>> I'm sure I'm missing something.
+>>>
+>>> One of my boards is still using board files and uses sam9_smc_configure() to
+>>> setup NAND timings. I'd like to convert it to DT but I fail to see how to configure the smc.
+>>> What is the device tree equivalent of sam9_smc_configure()?
+>>>
+>>>
+>>
+>> I think it's actually missing, see the series "memory: add Atmel EBI
+>> (External Bus Interface) driver" from Boris Brezillon.
+> 
+> Thanks a lot for your quick reply, Arnd!
+> 
+> arch/arm/mach-at91/board-stamp9g20.c was removed by:
+> 
+> commit fb3642ebb52cfab8eaa52fea677abec4d92182a0
+> Author: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Date:   Wed Nov 19 10:30:41 2014 +0100
+> 
+>     ARM: at91: remove at91sam9260/at91sam9g20 legacy boards files
+> 
+>     Remove old board files that use at91sam9260 or at91sam9g20 Atmel SoCs. The
+>     device tree is mature on these SoCs. It must be used now.
+> 
+>     Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> How can this DT work for my board without proper NAND timings?
+> 
+> If I need Boris's patch set first I consider commit fb3642ebb a bit rude as it breaks
+> things.
+> 
+> *confused*,
+> //richard
 
-On 12/16/2014 12:54 AM, Arnaud Ebalard wrote:
-> 
-> This patch adds alarm support to Intersil ISL12057 driver. The chip
-> supports two separate alarms:
-> 
->  - Alarm1: works up to one month in the future and accurate to the
->            second, associated w/ IRQ#2 pin
->  - Alarm2: works up to one month in the future and accurate to the
->            minute, associated w/ IRQ#1 or IRQ#2 pin (configuable).
-> 
-> This patch only adds support for Alarm1 which allows to configure
-> the chip to generate an interrupt on IRQ#2 pin when current time
-> matches the alarm.
-> 
-> This patch was tested on a Netgear ReadyNAS 102 after some soldering
-> of the IRQ#2 pin of the RTC chip to a MPP line of the SoC (the one
-> used usually handles the reset button). The test was performed using
-> a modified .dts file reflecting this change (see below) and rtc-test.c
-> program available in Documentation/rtc.txt. This test program ran as
-> expected, which validates alarm supports, including interrupt support.
-> 
-> As a side note, the ISL12057 remains in the list of trivial devices,
-> i.e. no specific DT binding being added by this patch: i2c core
-> automatically handles extraction of IRQ line info from .dts file. For
-> instance, if one wants to reference the interrupt line for the
-> alarm in its .dts file, adding interrupt and interrupt-parent
-> properties works as expected (if the primary function of your
-> interrupt pin is not GPIO, you will need some additional pinctrl
-> properties):
-> 
->           isl12057: isl12057 at 68 {
->                   compatible = "isil,isl12057";
->                   interrupt-parent = <&gpio0>;
->                   interrupts = <6 IRQ_TYPE_EDGE_FALLING>;
->                   reg = <0x68>;
->           };
-> 
-> FWIW, if someone is looking for a way to test alarm support this can
-> be done in the following way:
-> 
->     # echo `date '+%s' -d '+ 1 minutes'` > /sys/class/rtc/rtc0/wakealarm
->     # shutdown -h now
-> 
-> With the commands above, after a minute, the system comes back to life.
-This paragraph belongs into the 2nd patch, right?
+Richard,
 
-> diff --git a/drivers/rtc/rtc-isl12057.c b/drivers/rtc/rtc-isl12057.c
-> index 6e1fcfb5d7e6..3ec73ad7f2d8 100644
-> --- a/drivers/rtc/rtc-isl12057.c
-> +++ b/drivers/rtc/rtc-isl12057.c
-> @@ -79,8 +79,10 @@
->  #define ISL12057_MEM_MAP_LEN	0x10
->  
->  struct isl12057_rtc_data {
-> +	struct rtc_device *rtc;
->  	struct regmap *regmap;
->  	struct mutex lock;
-> +	int irq;
-interrupts are usually unsigned values. Hmm, I see that it simplifies a
-bit here, as the function to determine the irq returns the actual value
-or a negative error. As there would be problems anyhow for irq values >
-INT_MAX probably this comment isn't that important.
+This action was announced several months ago on the at91.com forum and
+on this mailing-list: https://lkml.org/lkml/2014/9/10/293
+Please read this announce message for more background.
+Moreover, 3.19 is scheduled mid-february. It was also offered to help
+during this transition period... So I would not call it "rude".
 
-> +/*
-> + * Note: as we only read from device and do not perform any update, there is
-> + * no need for an equivalent function which would try and get driver's main
-> + * lock. Here, it is safe for everyone if we just use regmap internal lock
-> + * on the device when reading.
-> + */
-> +static int _isl12057_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  {
->  	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
->  	u8 regs[ISL12057_RTC_SEC_LEN];
->  	unsigned int sr;
->  	int ret;
->  
-> -	mutex_lock(&data->lock);
->  	ret = regmap_read(data->regmap, ISL12057_REG_SR, &sr);
->  	if (ret) {
->  		dev_err(dev, "%s: unable to read oscillator status flag (%d)\n",
-> @@ -187,8 +222,6 @@ static int isl12057_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  			__func__, ret);
->  
->  out:
-> -	mutex_unlock(&data->lock);
-> -
->  	if (ret)
->  		return ret;
->  
+Yes, it definitively breaks things. But as noted by Arnd, we are
+actively working on a clean solution.
+In the meantime, you have the possibility to configure the SMC with
+proper NAND timings in the bootloader(s).
 
-Is this locking update worth a separate change?
-
-Best regards
-Uwe
+I hope that it helps. Bye,
+-- 
+Nicolas Ferre
