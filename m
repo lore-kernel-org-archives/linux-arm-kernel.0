@@ -1,39 +1,73 @@
-From: yvo@apm.com (Y Vo)
-Date: Tue, 16 Dec 2014 16:43:02 +0700
-Subject: [PATCH v1 1/3] gpio: Add APM X-Gene standby GPIO controller driver
-In-Reply-To: <2250730.N6DdkCTXkh@wuerfel>
-References: <1412779948-28769-1-git-send-email-yvo@apm.com>
- <2178918.XVCQXOyoGA@wuerfel>
- <CAL4ahLeyPgska0AcgS756y1Nh2tEeJ4A4k4bTJrU0pzqgG08PA@mail.gmail.com>
- <2250730.N6DdkCTXkh@wuerfel>
-Message-ID: <CAL4ahLfSZjmqqbQ9Xmqae_AVfFZLiUUEN+rABMwiu2_8u4mmPQ@mail.gmail.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Tue, 16 Dec 2014 11:43:12 +0200
+Subject: [PATCH 4/5] PCI: qcom: Add Qualcomm PCIe controller driver
+In-Reply-To: <2577563.x0mEZJNVDQ@wuerfel>
+References: <1418404441-5518-1-git-send-email-svarbanov@mm-sol.com>
+ <1418404441-5518-5-git-send-email-svarbanov@mm-sol.com>
+ <2577563.x0mEZJNVDQ@wuerfel>
+Message-ID: <548FFEB0.9080604@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 29, 2014 at 10:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 29 October 2014 22:09:00 Y Vo wrote:
->> Hi Arnd,
->>
->> Per Linus, shall we hold this driver until the GIC submission complete
->> ? Or we will send the version without access GIC to read status in
->> case the GPIO is configured IRQ ?
->
-> I'm fine with it either way.
->
->> +static int xgene_gpio_sb_get(struct gpio_chip *gc, u32 gpio)
->> +{
->> +       struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
->> +       struct xgene_gpio_sb *chip = to_xgene_gpio_sb(mm_gc);
->> +       u32 data;
->> +
->> +       data = ioread32(mm_gc->regs + MPA_GPIO_IN_ADDR);
->> +
->> +       return (data &  GPIO_MASK(gpio)) ? 1 : 0;
->> +}
->
-> This would be actually broken, right? Maybe it's better to change the
-> driver so that it refuses to map GPIO lines that are hardwired to
-> the interrupt controller, until we can support that.
+Hi Arnd,
 
-It still works if they are configure as GPIO.
-Do you have any reference to resolve it ?
+Thanks for the comments!
+
+On 12/12/2014 07:30 PM, Arnd Bergmann wrote:
+> On Friday 12 December 2014 19:14:00 Stanimir Varbanov wrote:
+>> The PCIe driver reuse the Designware common code for host
+>> and MSI initialization, and also program the Qualcomm
+>> application specific registers.
+>>
+>> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+> 
+> Looks nice!
+> 
+>> +static int
+>> +qcom_pcie_rd_own_conf(struct pcie_port *pp, int where, int size, u32 *val)
+>> +{
+>> +	if (where == PCI_CLASS_REVISION && size == 4) {
+>> +		*val = readl(pp->dbi_base + PCI_CLASS_REVISION);
+>> +		*val &= ~(0xffff << 16);
+>> +		*val |= PCI_CLASS_BRIDGE_PCI << 16;
+>> +		return PCIBIOS_SUCCESSFUL;
+>> +	}
+>> +
+>> +	return dw_pcie_cfg_read(pp->dbi_base + (where & ~0x3), where,
+>> +				size, val);
+>> +}
+> 
+> Could you add a comment here to explain what this is for?
+
+Sure I will add a comment. The issue is that the pci device class is not
+reported correctly from the register.
+
+> 
+>> +static int __init qcom_pcie_probe(struct platform_device *pdev)
+>> +{
+> 
+> I think it's a bug to mark this function as __init. It breaks
+> deferred probing and detaching/reattaching the device trough sysfs.
+> 
+
+My bad, I have tried to avoid mismatch section warnings came up from
+dw_pcie_host_init() which is annotated as __init. Do you think we need
+to remove __init from dw_pcie_host_init() declaration and fix the
+drivers accordingly?
+
+> After you fix that, you can remove the __refdata below.
+> 
+>> +static struct platform_driver __refdata qcom_pcie_driver = {
+>> +	.probe = qcom_pcie_probe,
+>> +	.remove = qcom_pcie_remove,
+>> +	.driver = {
+>> +		.name = "qcom-pcie",
+>> +		.of_match_table = qcom_pcie_match,
+>> +	},
+>> +};
+> 
+> 	Arnd
+> 
+
+regards,
+Stan
