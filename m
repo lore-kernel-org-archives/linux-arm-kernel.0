@@ -1,76 +1,35 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 15 Dec 2014 16:22:19 -0800
-Subject: [PATCH v3 2/3] mmc: dw_mmc: Use mmc_regulator_set_vqmmc in
- start_signal_voltage_switch
+Date: Mon, 15 Dec 2014 16:22:20 -0800
+Subject: [PATCH v3 3/3] ARM: dts: Specify VMMC and VQMMC on rk3288-evb
 In-Reply-To: <1418689340-29517-1-git-send-email-dianders@chromium.org>
 References: <1418689340-29517-1-git-send-email-dianders@chromium.org>
-Message-ID: <1418689340-29517-2-git-send-email-dianders@chromium.org>
+Message-ID: <1418689340-29517-3-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've introduced a new helper in the MMC core:
-mmc_regulator_set_vqmmc().  Let's use this in dw_mmc.  Using this new
-helper has some advantages:
-
-1. We get the mmc_regulator_set_vqmmc() behavior of trying to match
-   VQMMC and VMMC when the signal voltage is 3.3V.  This ensures max
-   compatibility.
-
-2. We get rid of a few more warnings when probing unsupported
-   voltages.
-
-3. We get rid of some non-dw_mmc specific code in dw_mmc.
+Specifying these rails should eventually let us do UHS.
 
 Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
-Changes in v3:
-- Continue to check for errors if VQMMC is not an error as per Andrew.
+Changes in v3: None
+Changes in v2:
+- Fix subject line
 
-Changes in v2: None
+ arch/arm/boot/dts/rk3288-evb.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
- drivers/mmc/host/dw_mmc.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 67c0451..b3993d4 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1160,7 +1160,6 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
- 	struct dw_mci *host = slot->host;
- 	u32 uhs;
- 	u32 v18 = SDMMC_UHS_18V << slot->id;
--	int min_uv, max_uv;
- 	int ret;
+diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+index 3e067dd..d660fe6 100644
+--- a/arch/arm/boot/dts/rk3288-evb.dtsi
++++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+@@ -114,6 +114,8 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
+ 	status = "okay";
++	vmmc-supply = <&vcc_io>;
++	vqmmc-supply = <&vccio_sd>;
+ };
  
- 	/*
-@@ -1169,22 +1168,18 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
- 	 * does no harm but you need to set the regulator directly.  Try both.
- 	 */
- 	uhs = mci_readl(host, UHS_REG);
--	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
--		min_uv = 2700000;
--		max_uv = 3600000;
-+	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330)
- 		uhs &= ~v18;
--	} else {
--		min_uv = 1700000;
--		max_uv = 1950000;
-+	else
- 		uhs |= v18;
--	}
-+
- 	if (!IS_ERR(mmc->supply.vqmmc)) {
--		ret = regulator_set_voltage(mmc->supply.vqmmc, min_uv, max_uv);
-+		ret = mmc_regulator_set_vqmmc(mmc, ios);
- 
- 		if (ret) {
- 			dev_dbg(&mmc->class_dev,
--					 "Regulator set error %d: %d - %d\n",
--					 ret, min_uv, max_uv);
-+					 "Regulator set error %d - %s V\n",
-+					 ret, uhs & v18 ? "1.8" : "3.3");
- 			return ret;
- 		}
- 	}
+ &i2c0 {
 -- 
 2.2.0.rc0.207.ga3a616c
