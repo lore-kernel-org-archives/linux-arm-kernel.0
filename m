@@ -1,87 +1,50 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 16 Dec 2014 11:10:18 -0800
-Subject: [PATCH] ARM: at91: board-dt-sama5: add phy_fixup to override
- NAND_Tree which improperly strapp-in during the reset period.
-In-Reply-To: <54900779.9030509@atmel.com>
-References: <1418283069-5648-1-git-send-email-wenyou.yang@atmel.com>
- <54900779.9030509@atmel.com>
-Message-ID: <5490839A.304@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 16 Dec 2014 11:18:18 -0800
+Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <2663853.2Q3kHisMT7@wuerfel>
+References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
+ <2519415.GklIQeMgWR@wuerfel> <54903DC6.8010308@linaro.org>
+ <2663853.2Q3kHisMT7@wuerfel>
+Message-ID: <5490857A.1000808@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/12/14 02:20, Nicolas Ferre wrote:
-> Le 11/12/2014 08:31, Wenyou Yang a ?crit :
->> Appearance: On some SAMA5D4EK boards, after power up, the Eth1 doesn't work.
+On 12/16/2014 06:38 AM, Arnd Bergmann wrote:
+> On Tuesday 16 December 2014 15:12:22 Daniel Lezcano wrote:
+>> At the beginning, all that become from not including mach files from the 
+>> drivers directory which make sense.
 >>
->> Reason: The PIOE2 pin is connected to the NAND_Tree# of KSZ8081,
->> But it outputs LOW during the reset period, which cause the NAND_Tree# enabled.
->>
->> Add phy_fixup() to disable NAND_Tree by overriding the Operation
->> Mode Strap Override register(i.e. Register 16h) to clear the NAND_Tree bit.
->>
->> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> 
-> It seems correct to me.
+>> Perhaps it is time to write a similar mechanism for the cpuidle drivers 
+>> where we can still separate the low level PM code from the generic 
+>> cpuidle code.
+> That way you basically duplicate the same thing we already have, which
+> isn't much better.
+>
+> In the example of drivers/soc/qcom/spm.c, just call cpuidle_register
+> from the spm_dev_probe() function and be done with it. You already
+> have a device that is responsible for handling this, don't try to
+> construct more than you already need.
+>
+> I would assume that the same can be done for most other platforms.
+>
+> There are probably cases where the same piece of hardware is responsible
+> for both cpuidle and cpufreq, but what that means is really that you
+> should have a single driver for it that does both things. Same for
+> SMP support: if you have one register block that does both the SMP
+> bringup and the cpuidle stuff, then have *one* driver for this block
+> that does it all. There are currently a few dependencies that require
+> doing SMP bringup early during boot, but we decided years ago that those
+> are all artificial dependencies and we should be able to boot secondary
+> CPUs much later than we currently do.
+>
 
-Just one minor nit, see below
++1. The SPM harware is used for hotplug, suspend, cpuidle, as well as
+provides a regulator for a CPU, so all these things should be done in a
+single driver. Booting secondary CPUs early is not hard here either if
+we move the smp ops into the same driver. The only downside then is that
+it can't be a module, but I would guess that we can work on making that
+possible by allowing smp ops to be inserted and removed at any time.
 
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Anyway, I add Florian in the loop as he is the one who proposed this
-> solution. So it would have been good to have his feeling about the
-> implementation...
-> 
-> Bye,
-> 
->> ---
->>  arch/arm/mach-at91/board-dt-sama5.c |   18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>
->> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
->> index 8fb9ef5..97f7367 100644
->> --- a/arch/arm/mach-at91/board-dt-sama5.c
->> +++ b/arch/arm/mach-at91/board-dt-sama5.c
->> @@ -17,6 +17,7 @@
->>  #include <linux/of_platform.h>
->>  #include <linux/phy.h>
->>  #include <linux/clk-provider.h>
->> +#include <linux/phy.h>
->>  
->>  #include <asm/setup.h>
->>  #include <asm/irq.h>
->> @@ -26,8 +27,25 @@
->>  
->>  #include "generic.h"
->>  
->> +static int ksz8081_phy_fixup(struct phy_device *phy)
->> +{
->> +	int value;
->> +
->> +	value = phy_read(phy, 0x16);
->> +	value &= ~0x20;
->> +	phy_write(phy, 0x16, value);
->> +
->> +	return 0;
->> +}
->> +
->>  static void __init sama5_dt_device_init(void)
->>  {
->> +	if (of_machine_is_compatible("atmel,sama5d4ek") &&
->> +	   IS_ENABLED(CONFIG_PHYLIB)) {
->> +		phy_register_fixup_for_id("fc028000.etherne:00",
->> +						ksz8081_phy_fixup);
-
-Matching the bus id certainly works, but I would rather match on your
-specific PHY device 32-bits OUI to make sure that if you ever change the
-PHY on a different design, this is not inadvertently writing to a
-register that is not micrel specific?
-
->> +	}
->> +
->>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->>  }
->>  
->>
-> 
-> 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
