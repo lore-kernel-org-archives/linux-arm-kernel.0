@@ -1,152 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Dec 2014 12:27:48 +0100
-Subject: [RFC] ACPI on arm64 TODO List
-In-Reply-To: <548F9668.6080900@linaro.org>
-References: <548F9668.6080900@linaro.org>
-Message-ID: <9355623.14GfrLxEB0@wuerfel>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 16 Dec 2014 11:36:02 +0000
+Subject: [Linaro-acpi] [PATCH] Mailbox: Complete wait event only if Tx
+ was successful
+In-Reply-To: <CAJ5Y-eYFsK_heBRQUOmPXGtkLtze-NGzWKy1=0qJVV3x2EycUw@mail.gmail.com>
+References: <1418242572-20998-1-git-send-email-ashwin.chaugule@linaro.org>
+ <548AAA95.6020001@arm.com>
+ <CAJ5Y-eYFsK_heBRQUOmPXGtkLtze-NGzWKy1=0qJVV3x2EycUw@mail.gmail.com>
+Message-ID: <20141216113602.GA21888@e103737-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 December 2014 19:18:16 Al Stone wrote:
-
-> Below is what we currently know about; very brief notes on status are
-> included.  The TL;DR versions of the TODO list and the current status
-> can be found at:
+On Fri, Dec 12, 2014 at 05:47:26PM +0000, Ashwin Chaugule wrote:
+> On 12 December 2014 at 03:43, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> > Hi Ashwin,
 > 
->    https://wiki.linaro.org/LEG/Engineering/Kernel/ACPI/CoreUpstreamNotes
+> Hi,
+>
+
+Hi Ashwin,
+
+> > On Thursday 11 December 2014 01:46 AM, Ashwin Chaugule wrote:
+> >>
+> >> If a wait_for_completion_timeout() call returns due to a timeout,
+> >> the mbox code can still call complete() after returning from the wait.
+> >> This can cause subsequent transmissions on a channel to fail, since
+> >> the wait_for_completion_timeout() sees the completion variable
+> >> is !=0, caused by the erroneous complete() call, and immediately
+> >> returns without waiting for the time as expected by the client.
+> >>
+> >> Fix this by calling complete() only if the TX was successful.
+> >>
+> >> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> >> ---
+> >>   drivers/mailbox/mailbox.c | 2 +-
+> >>   1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+> >> index 17e9e4a..4acaddb 100644
+> >> --- a/drivers/mailbox/mailbox.c
+> >> +++ b/drivers/mailbox/mailbox.c
+> >> @@ -101,7 +101,7 @@ static void tx_tick(struct mbox_chan *chan, int r)
+> >>         if (mssg && chan->cl->tx_done)
+> >>                 chan->cl->tx_done(chan->cl, mssg, r);
+> >>
+> >> -       if (chan->cl->tx_block)
+> >> +       if ((!r) && chan->cl->tx_block)
+> >>                 complete(&chan->tx_complete);
+> >
+> >
+> > Just curious to check if there's another possible race which is
+> > a different issue.
+> >
+> > Suppose the timer fired and indicated that the Tx is complete, then
+> > it tries to execute complete while the wait_for_completion_timeout timed
+> > out. Does that make sense ?
+> >
+> > So if yes, how about adding !completion_done(..) to the check while you
+> > are at this ?
 > 
-> and I'll do my best to kept that up to date.
+> Yea. Seems like another race condition. I'll add it along with this..
 > 
-> Thanks.  Any and all feedback is greatly appreciated.
 
-Thanks for keeping the list up to date!
+Thanks !
 
-> 
-> TODO List for ACPI on arm64:
-> ============================
-> 1. Define how Aarch64 OS identifies itself to firmware.
->    * Problem:
->      * _OSI method is demonstrably unreliable. On x86 Linux claims to
->        be Windows
->      * Proposal to use _OSC method as replacement is complicated and
->        creates an explosion of combinations
->    * Solution:
->      * Draft and propose OS identification rules to ABST and ASWG for
->        inclusion in ACPI spec.
->      * Draft and propose recommended practice for current ACPI 5.1 spec
->        platforms.
->    * Status: Little progress, still under investigation
-
-I must have missed the problem with _OSC, it sounded like it was good
-enough, but I have no clue about the details.
-
-> 2. Linux must choose DT booting by default when offered both ACPI and
->    DT on arm64
->    * DONE
-> 
-> 3. Linux UEFI/ACPI testing tools must be made available
->    * Problem:
->      * Hardware/Firmware vendors do not have tools to test Linux
->        compatibility.
->      * Common problems go undetected if not tested for.
->    * Solution:
->      * Port FWTS tool and LuvOS distribution to AArch64
->      * Make LuvOS images readily available
->      * Require hardware vendors to actively test against old and new
->        kernels.
->    * Status: LuvOS and FWTS ported to arm64 and running; patches being
->      mainlined; additional test cases being written.
-
-Ah, nice!
-
-> 4. Set clear expectations for those providing ACPI for use with Linux
->    * Problem:
->      * Hardware/Firmware vendors can and will create ACPI tables that
->        cannot be used by Linux without some guidance
->      * Kernel developers cannot determine whether the kernel or firmware
->        is broken without knowing what the firmware should do
->    * Solution: document the expectations, and iterate as needed.
->      Enforce when we must.
->    * Status: initial kernel text available; AMD has offered to make
->      their guidance document generic; firmware summit planned for
->      deeper discussions.
-
-After seeing the AMD patches, I would add to this point that we need to
-find a way to come up with shared bindings for common hardware such as
-the ARM pl011/pl022/pl061/pl330 IP blocks or the designware
-i2c/spi/usb3/ahci blocks.
-
-What I remember from this item on your list is actually a different
-problem: We need to define more clearly what kinds of machines we
-would expect ACPI support for and which machines we would not.
-
-Fine-grained clock support is one such example: if anybody needs
-to expose that through a clock driver in the kernel, we need to be
-very clear that we will not support that kind of machine through
-ACPI, so we don't get developers building BIOS images that will
-never be supported. Other examples would be non-compliant PCI
-hosts or machines that are not covered by SBSA.
-
-> 5. Demonstrate the ACPI core patches work
->    * Problem: how can we be sure the patches work?
->    * Solution: verify the patches on arm64 server platforms
->    * Status:
->      * ACPI core works on at least the Foundation model, Juno, APM
->        Mustang, and AMD Seattle
->      * FWTS results will be published as soon as possible
-
-I think the problem is to a lesser degree the verification of the
-patches, but to have a patch set that demonstrates /how/ everything
-can work, and what the possible limitations are. I would not worry
-about any bugs that might keep the system from working properly, as
-long as you can show that there is a plan to make that work.
-
-Out of the four platforms you list, I think we have concluded that
-three of them are not appropriate for use with ACPI, but in order
-to do that, we needed to review the patches and pinpoint specific
-issues so we could avoid just exchanging different opinions on the
-matter of it "works" or not.
-
-> 6. How does the kernel handle_DSD usage?
->    * Problem:
->      * _DSD defines key-value properties in the DT style. How do we
->        ensure _DSD bindings are well defined?
->      * How do we ensure DT and _DSD bindings remain consistent with
->        each other?
->    * Solution: public documentation for all bindings, and a process
->      for defining them
->    * Status: proposal to require patch authors to point at public
->      binding documentation; kernel Documentation/devicetree/bindings
->      remains the default if no other location exists; UEFI forum has
->      set up a binding repository.
-
-I think we also need to make a decision here on whether we want to use
-PRP0001 devices on ARM64 servers, and to what degree. I would prefer
-if we could either make them required for any devices that already have
-a DT binding and that are not part of the official ACPI spec, or we
-decide to not use them at all and make any PRP0001 usage a testcase
-failure.
-
-> 7. Why is ACPI required?
->    * Problem:
->      * arm64 maintainers still haven't been convinced that ACPI is
->        necessary.
->      * Why do hardware and OS vendors say ACPI is required?
->    * Status: Al & Grant collecting statements from OEMs to be posted
->      publicly early in the new year; firmware summit for broader
->      discussion planned.
-
-I was particularly hoping to see better progress on this item. It
-really shouldn't be that hard to explain why someone wants this feature.
-
-> 8. Platform support patches need review
->    * Problem: the core Aarch64 patches have been reviewed and are in
->      good shape, but there is not yet a good example of server platform
->      support patches that use them.
->    * Solution: Post *good* patches for multiple ACPI platforms
->    * Status: first version for AMD Seattle has been posted to the
->      public linaro-acpi mailing list for initial review (thanks,
->      Arnd), refined versions to be posted to broader lists after a
->      few iterations for basic cleanup
-
-	Arnd
+Regards,
+Sudeep
