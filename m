@@ -1,186 +1,219 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 16 Dec 2014 22:38:55 +0100
-Subject: [PATCH v2 3/4] mmc: sunxi: Convert MMC driver to the standard clock
- phase API
+Date: Tue, 16 Dec 2014 22:38:53 +0100
+Subject: [PATCH v2 1/4] clk: sunxi: Rework MMC phase clocks
 In-Reply-To: <1418765936-12542-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1418765936-12542-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1418765936-12542-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1418765936-12542-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have proper support to use the generic phase API in our clock
-driver, switch the MMC driver to use it.
+Instead of having three different clocks for the main MMC clock and the two
+phase sub-clocks, which involved having three different drivers sharing the
+same register, rework it to have the same single driver registering three
+different clocks.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
 ---
- .../devicetree/bindings/mmc/sunxi-mmc.txt          |  8 +--
- drivers/mmc/host/sunxi-mmc.c                       | 72 +++++++++++++++-------
- 2 files changed, 53 insertions(+), 27 deletions(-)
+ Documentation/devicetree/bindings/clock/sunxi.txt |   7 +-
+ drivers/clk/sunxi/clk-mod0.c                      | 131 ++++++++++++----------
+ 2 files changed, 74 insertions(+), 64 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-index 91b3a3467150..4bf41d833804 100644
---- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-@@ -10,8 +10,8 @@ Absolute maximum transfer rate is 200MB/s
- Required properties:
-  - compatible : "allwinner,sun4i-a10-mmc" or "allwinner,sun5i-a13-mmc"
-  - reg : mmc controller base registers
-- - clocks : a list with 2 phandle + clock specifier pairs
-- - clock-names : must contain "ahb" and "mmc"
-+ - clocks : a list with 4 phandle + clock specifier pairs
-+ - clock-names : must contain "ahb", "mmc", "output" and "sample"
-  - interrupts : mmc controller interrupt
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index 9dc4f55a04ad..8c60433a7fc9 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -55,8 +55,7 @@ Required properties:
+ 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+ 	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+ 	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+-	"allwinner,sun4i-a10-mmc-output-clk" - for the MMC output clock on A10
+-	"allwinner,sun4i-a10-mmc-sample-clk" - for the MMC sample clock on A10
++	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
+ 	"allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
+ 	"allwinner,sun8i-a23-mbus-clk" - for the MBUS clock on A23
+ 	"allwinner,sun7i-a20-out-clk" - for the external output clocks
+@@ -95,6 +94,10 @@ For "allwinner,sun6i-a31-pll6-clk", there are 2 outputs. The first output
+ is the normal PLL6 output, or "pll6". The second output is rate doubled
+ PLL6, or "pll6x2".
  
- Optional properties:
-@@ -25,8 +25,8 @@ Examples:
- 	mmc0: mmc at 01c0f000 {
- 		compatible = "allwinner,sun5i-a13-mmc";
- 		reg = <0x01c0f000 0x1000>;
--		clocks = <&ahb_gates 8>, <&mmc0_clk>;
--		clock-names = "ahb", "mod";
-+		clocks = <&ahb_gates 8>, <&mmc0_clk>, <&mmc0_output_clk>, <&mmc0_sample_clk>;
-+		clock-names = "ahb", "mod", "output", "sample";
- 		interrupts = <0 32 4>;
- 		status = "disabled";
- 	};
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index d1663b3c4143..afe20c322e55 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -22,7 +22,6 @@
++The "allwinner,sun4i-a10-mmc-clk" has three different outputs: the
++main clock, with the ID 0, and the output and sample clocks, with the
++IDs 1 and 2, respectively.
++
+ For example:
  
- #include <linux/clk.h>
- #include <linux/clk-private.h>
--#include <linux/clk/sunxi.h>
- 
- #include <linux/gpio.h>
- #include <linux/platform_device.h>
-@@ -230,6 +229,8 @@ struct sunxi_mmc_host {
- 	/* clock management */
- 	struct clk	*clk_ahb;
- 	struct clk	*clk_mmc;
-+	struct clk	*clk_sample;
-+	struct clk	*clk_output;
- 
- 	/* irq */
- 	spinlock_t	lock;
-@@ -617,7 +618,7 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 				  struct mmc_ios *ios)
- {
--	u32 rate, oclk_dly, rval, sclk_dly, src_clk;
-+	u32 rate, oclk_dly, rval, sclk_dly;
- 	int ret;
- 
- 	rate = clk_round_rate(host->clk_mmc, ios->clock);
-@@ -643,34 +644,31 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 
- 	/* determine delays */
- 	if (rate <= 400000) {
--		oclk_dly = 0;
--		sclk_dly = 7;
-+		oclk_dly = 180;
-+		sclk_dly = 42;
- 	} else if (rate <= 25000000) {
--		oclk_dly = 0;
--		sclk_dly = 5;
-+		oclk_dly = 180;
-+		sclk_dly = 75;
- 	} else if (rate <= 50000000) {
- 		if (ios->timing == MMC_TIMING_UHS_DDR50) {
--			oclk_dly = 2;
--			sclk_dly = 4;
-+			oclk_dly = 60;
-+			sclk_dly = 120;
- 		} else {
--			oclk_dly = 3;
--			sclk_dly = 5;
-+			oclk_dly = 90;
-+			sclk_dly = 150;
- 		}
-+	} else if (rate <= 100000000) {
-+		oclk_dly = 6;
-+		sclk_dly = 24;
-+	} else if (rate <= 200000000) {
-+		oclk_dly = 3;
-+		sclk_dly = 12;
- 	} else {
--		/* rate > 50000000 */
--		oclk_dly = 2;
--		sclk_dly = 4;
-+		return -EINVAL;
- 	}
- 
--	src_clk = clk_get_rate(clk_get_parent(host->clk_mmc));
--	if (src_clk >= 300000000 && src_clk <= 400000000) {
--		if (oclk_dly)
--			oclk_dly--;
--		if (sclk_dly)
--			sclk_dly--;
--	}
--
--	clk_sunxi_mmc_phase_control(host->clk_mmc, sclk_dly, oclk_dly);
-+	clk_set_phase(host->clk_sample, sclk_dly);
-+	clk_set_phase(host->clk_output, oclk_dly);
- 
- 	return sunxi_mmc_oclk_onoff(host, 1);
+ osc24M: clk at 01c20050 {
+diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+index 658d74f39451..4ac52c703818 100644
+--- a/drivers/clk/sunxi/clk-mod0.c
++++ b/drivers/clk/sunxi/clk-mod0.c
+@@ -115,14 +115,10 @@ static void __init sun5i_a13_mbus_setup(struct device_node *node)
  }
-@@ -909,6 +907,18 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
- 		return PTR_ERR(host->clk_mmc);
- 	}
+ CLK_OF_DECLARE(sun5i_a13_mbus, "allwinner,sun5i-a13-mbus-clk", sun5i_a13_mbus_setup);
  
-+	host->clk_output = devm_clk_get(&pdev->dev, "output");
-+	if (IS_ERR(host->clk_output)) {
-+		dev_err(&pdev->dev, "Could not get output clock\n");
-+		return PTR_ERR(host->clk_output);
-+	}
-+
-+	host->clk_sample = devm_clk_get(&pdev->dev, "sample");
-+	if (IS_ERR(host->clk_sample)) {
-+		dev_err(&pdev->dev, "Could not get sample clock\n");
-+		return PTR_ERR(host->clk_sample);
-+	}
-+
- 	host->reset = devm_reset_control_get(&pdev->dev, "ahb");
+-struct mmc_phase_data {
+-	u8	offset;
+-};
+-
+ struct mmc_phase {
+ 	struct clk_hw		hw;
++	u8			offset;
+ 	void __iomem		*reg;
+-	struct mmc_phase_data	*data;
+ 	spinlock_t		*lock;
+ };
  
- 	ret = clk_prepare_enable(host->clk_ahb);
-@@ -923,11 +933,23 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
- 		goto error_disable_clk_ahb;
- 	}
+@@ -138,7 +134,7 @@ static int mmc_get_phase(struct clk_hw *hw)
+ 	u8 delay;
  
-+	ret = clk_prepare_enable(host->clk_output);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
-+		goto error_disable_clk_mmc;
-+	}
-+
-+	ret = clk_prepare_enable(host->clk_sample);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
-+		goto error_disable_clk_output;
-+	}
-+
- 	if (!IS_ERR(host->reset)) {
- 		ret = reset_control_deassert(host->reset);
- 		if (ret) {
- 			dev_err(&pdev->dev, "reset err %d\n", ret);
--			goto error_disable_clk_mmc;
-+			goto error_disable_clk_sample;
- 		}
- 	}
+ 	value = readl(phase->reg);
+-	delay = (value >> phase->data->offset) & 0x3;
++	delay = (value >> phase->offset) & 0x3;
  
-@@ -946,6 +968,10 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
- error_assert_reset:
- 	if (!IS_ERR(host->reset))
- 		reset_control_assert(host->reset);
-+error_disable_clk_sample:
-+	clk_disable_unprepare(host->clk_sample);
-+error_disable_clk_output:
-+	clk_disable_unprepare(host->clk_output);
- error_disable_clk_mmc:
- 	clk_disable_unprepare(host->clk_mmc);
- error_disable_clk_ahb:
+ 	if (!delay)
+ 		return 180;
+@@ -226,8 +222,8 @@ static int mmc_set_phase(struct clk_hw *hw, int degrees)
+ 
+ 	spin_lock_irqsave(phase->lock, flags);
+ 	value = readl(phase->reg);
+-	value &= ~GENMASK(phase->data->offset + 3, phase->data->offset);
+-	value |= delay << phase->data->offset;
++	value &= ~GENMASK(phase->offset + 3, phase->offset);
++	value |= delay << phase->offset;
+ 	writel(value, phase->reg);
+ 	spin_unlock_irqrestore(phase->lock, flags);
+ 
+@@ -239,66 +235,77 @@ static const struct clk_ops mmc_clk_ops = {
+ 	.set_phase	= mmc_set_phase,
+ };
+ 
+-static void __init sun4i_a10_mmc_phase_setup(struct device_node *node,
+-					     struct mmc_phase_data *data)
+-{
+-	const char *parent_names[1] = { of_clk_get_parent_name(node, 0) };
+-	struct clk_init_data init = {
+-		.num_parents	= 1,
+-		.parent_names	= parent_names,
+-		.ops		= &mmc_clk_ops,
+-	};
+-
+-	struct mmc_phase *phase;
+-	struct clk *clk;
+-
+-	phase = kmalloc(sizeof(*phase), GFP_KERNEL);
+-	if (!phase)
+-		return;
+-
+-	phase->hw.init = &init;
++static DEFINE_SPINLOCK(sun4i_a10_mmc_lock);
+ 
+-	phase->reg = of_iomap(node, 0);
+-	if (!phase->reg)
+-		goto err_free;
++static void __init sun4i_a10_mmc_setup(struct device_node *node)
++{
++	struct clk_onecell_data *clk_data;
++	const char *parent;
++	void __iomem *reg;
++	int i;
+ 
+-	phase->data = data;
+-	phase->lock = &sun4i_a10_mod0_lock;
++	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
++	if (IS_ERR(reg)) {
++		pr_err("Couldn't map the %s clock registers\n", node->name);
++		return;
++	}
+ 
+-	if (of_property_read_string(node, "clock-output-names", &init.name))
+-		init.name = node->name;
++	clk_data = kmalloc(sizeof(*clk_data), GFP_KERNEL);
++	if (!clk_data)
++		return;
+ 
+-	clk = clk_register(NULL, &phase->hw);
+-	if (IS_ERR(clk))
+-		goto err_unmap;
++	clk_data->clks = kcalloc(3, sizeof(*clk_data->clks), GFP_KERNEL);
++	if (!clk_data->clks)
++		goto err_free_data;
++
++	clk_data->clk_num = 3;
++	clk_data->clks[0] = sunxi_factors_register(node,
++						   &sun4i_a10_mod0_data,
++						   &sun4i_a10_mmc_lock, reg);
++	if (!clk_data->clks[0])
++		goto err_free_clks;
++
++	parent = __clk_get_name(clk_data->clks[0]);
++
++	for (i = 1; i < 3; i++) {
++		struct clk_init_data init = {
++			.num_parents	= 1,
++			.parent_names	= &parent,
++			.ops		= &mmc_clk_ops,
++		};
++		struct mmc_phase *phase;
++
++		phase = kmalloc(sizeof(*phase), GFP_KERNEL);
++		if (!phase)
++			continue;
++
++		phase->hw.init = &init;
++		phase->reg = reg;
++		phase->lock = &sun4i_a10_mmc_lock;
++
++		if (i == 1)
++			phase->offset = 8;
++		else
++			phase->offset = 20;
++
++		if (of_property_read_string_index(node, "clock-output-names",
++						  i, &init.name))
++			init.name = node->name;
++
++		clk_data->clks[i] = clk_register(NULL, &phase->hw);
++		if (IS_ERR(clk_data->clks[i])) {
++			kfree(phase);
++			continue;
++		}
++	}
+ 
+-	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+ 
+ 	return;
+ 
+-err_unmap:
+-	iounmap(phase->reg);
+-err_free:
+-	kfree(phase);
+-}
+-
+-
+-static struct mmc_phase_data mmc_output_clk = {
+-	.offset	= 8,
+-};
+-
+-static struct mmc_phase_data mmc_sample_clk = {
+-	.offset	= 20,
+-};
+-
+-static void __init sun4i_a10_mmc_output_setup(struct device_node *node)
+-{
+-	sun4i_a10_mmc_phase_setup(node, &mmc_output_clk);
+-}
+-CLK_OF_DECLARE(sun4i_a10_mmc_output, "allwinner,sun4i-a10-mmc-output-clk", sun4i_a10_mmc_output_setup);
+-
+-static void __init sun4i_a10_mmc_sample_setup(struct device_node *node)
+-{
+-	sun4i_a10_mmc_phase_setup(node, &mmc_sample_clk);
++err_free_clks:
++	kfree(clk_data->clks);
++err_free_data:
++	kfree(clk_data);
+ }
+-CLK_OF_DECLARE(sun4i_a10_mmc_sample, "allwinner,sun4i-a10-mmc-sample-clk", sun4i_a10_mmc_sample_setup);
++CLK_OF_DECLARE(sun4i_a10_mmc, "allwinner,sun4i-a10-mmc-clk", sun4i_a10_mmc_setup);
 -- 
 2.2.0
