@@ -1,131 +1,110 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 16 Dec 2014 19:26:09 +0100
-Subject: [PATCH 0/5] ARM: at91: fix irq_pm_install_action WARNING
-In-Reply-To: <alpine.DEB.2.11.1412161013570.17382@nanos>
-References: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
- <2662748.NJbkr6jW7r@vostro.rjw.lan>
- <3542278.8lcJeXLMFm@vostro.rjw.lan>
- <20141216100715.57baeb65@bbrezillon>
- <alpine.DEB.2.11.1412161013570.17382@nanos>
-Message-ID: <20141216192609.778f5f8d@bbrezillon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 16 Dec 2014 19:31:30 +0100
+Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
+ tree under GPLv2+/X11
+In-Reply-To: <20141216144533.GL967@titan.lakedaemon.net>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
+ <20141215232221.GD19261@kw.sim.vm.gnt>
+ <20141216130331.GJ967@titan.lakedaemon.net>
+ <20141216133719.GE19261@kw.sim.vm.gnt>
+ <20141216144533.GL967@titan.lakedaemon.net>
+Message-ID: <54907A82.6030906@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 16/12/2014 15:45, Jason Cooper wrote:
+> On Tue, Dec 16, 2014 at 02:37:19PM +0100, Simon Guinot wrote:
+>> On Tue, Dec 16, 2014 at 08:03:31AM -0500, Jason Cooper wrote:
+>>> Simon,
+>>>
+>>> On Tue, Dec 16, 2014 at 12:22:21AM +0100, Simon Guinot wrote:
+>>>> On Mon, Dec 15, 2014 at 04:38:16PM +0100, Gregory CLEMENT wrote:
+>>>>> The current GPL only licensing on the device tree makes it very
+>>>>> impractical for other software components licensed under another
+>>>>> license.
+>>>>>
+>>>>> In order to make it easier for them to reuse our device trees,
+>>>>> relicense our device trees under a GPL/X11 dual-license.
+>>>>>
+>>>>> Cc: Andrew Lunn <andrew@lunn.ch>
+>>>>> Cc: Arnaud Ebalard <arno@natisbad.org>
+>>>>> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>>>>> Cc: Greg Ungerer <gerg@uclinux.org>
+>>>>> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+>>>>> Cc: Jason Cooper <jason@lakedaemon.net>
+>>>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>>>> Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+>>>>> Cc: Simon Baatz <gmbnomis@gmail.com>
+>>>>> Cc: Simon Guinot <simon.guinot@sequanux.org>
+>>>>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>>>>> Cc: Willy Tarreau <w@1wt.eu>
+>>>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>>>> ---
+>>>>>  arch/arm/boot/dts/armada-370-xp.dtsi | 40 +++++++++++++++++++++++++++++++++---
+>>>>>  1 file changed, 37 insertions(+), 3 deletions(-)
+>>>>
+>>>> Hi Gregory,
+>>>>
+>>>> NAK for me.
+>>>
+>>> Well, I'm a bit surprised that this is the first one. :)  Care to
+>>> explain why so that we can work towards an amenable compromise?
+>>
+>> Hi Jason,
+>>
+>> I am also a bit surprised to be the only one :)
+>>
+>> As I have no interest in a flame war either, I am not gonna elaborate
+>> on this. But in a few words, I don't think that allowing a permissive
+>> licence alternative is good for software sharing (which is important
+>> to me). 
+> 
+> Ok, fair enough.  I just needed to know if the NAK was against the
+> GPLv2+ part or the X11 part.  Clearly, it's the X11 part.
+> 
+> So let's look at what we have (trying to stick to facts):
+> 
+> - alienating contributors in bad (yes, this is first)
+> - sometimes the community has to do something a minority disagrees with,
+>   but it should be avoided, if at all possible.
+> - devicetree is so useful, other projects are adopting it
+> - if our binding docs are good, rewriting dts{i} isn't hard.
+> - rewriting dts{i} can lead to fragmentation
+> - maintaining two devicetree trees would be a pia (X11, GPLonly)
+> - reverting/rewriting GPLonly commits is possible, but see first bullet.
+> - Simon may not be the only contributor who disagrees with X11.
+> - of the known consumers of dts{i}, *BSD is the only one with licensing
+>   issues.
+> 
+> So our goal is to avoid fragmentation by allowing *BSD to use our dts{i}
+> files as is.  Our secondary goal is to avoid a maintenance headache.
+> 
+> Options:
+> 
+> - Ask Simon to find an OSI-compatible license to replace X11 that:
+>    - *BSD can use
+>    - meets the intent of himself and other like-minded authors
+> - Leave licensing as is, but make a statement that *using* the dts
+>   doesn't create a derivative work under the GPL (similar to Linus'
+>   statement re the Linux kernel, Wolfgang and U-Boot, etc).
+> - Screw it, plow forward, and revert/rewrite GPLonly commits
+> - Ignore the whole issue and hope it goes away.
+> 
 
-On Tue, 16 Dec 2014 11:03:55 +0100 (CET)
-Thomas Gleixner <tglx@linutronix.de> wrote:
+Thanks for sum-up the situation and to offer the different choice we have.
 
-> On Tue, 16 Dec 2014, Boris Brezillon wrote:
-> > On Mon, 15 Dec 2014 23:48:14 +0100
-> > "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
-> > > Or even set IRFQ_NO_SUSPEND for all of the users of this interrupt and add
-> > > comments to them explaining why it is set.
-> > Actually I thought about adding a new flag (let's call it
-> > IRQF_DONT_COMPLAIN for now ;-)) to remove those warnings (or specifying
-> > IRFQ_NO_SUSPEND in all peripherals sharing the IRQ with the init
-> > timer), but after discussing the problem with Thomas I decided to go
-> > for the approach described in my cover letter.
-> > 
-> > Thomas, correct me if I'm wrong, but your concern about the
-> > IRQF_DONT_COMPLAIN approach was that it was leaving interrupt handlers
-> > of suspended devices in an active state (meaning that they could be
-> > called in "suspend" or "early resume" state), and such devices might
-> > not properly handle interrupts while being in a suspended state (clocks
-> > and regulators disabled).
-> > In at91 specific case this should not be an issue thought.
-> > 
-> > We have the same problem when setting IRFQ_NO_SUSPEND on all peripherals
-> > sharing the IRQ with the init timer.
-> > Moreover, I'd like to keep the core automatically disabling the IRQ when
-> > the PMC, RTC, watchdog or DBGU (UART) peripherals have their own
-> > dedicated IRQ (which is the case on Atmel sama5 SoCs).
-> > This implies testing for the SoC version in each of these drivers and
-> > adapting the request_irq call accordingly.
-> 
-> But still all those drivers must disable the interrupts at the device
-> level on suspend, right?
-> 
-> > Thomas, Rafael, if both of you think I should either introduce a new
-> > flag or specify IRFQ_NO_SUSPEND in all shared IRQ users, then I can go
-> > for one of this solution.
-> 
-> All of this really sucks. What about the following?
-> 
-> Install the timer interrupt as a demultiplexing interrupt.
-> 
-> Create a pseudo interrupt chip, which essentially does nothing, but
-> keeps track of the disabled state. Install handle_simple_irq as
-> handler for those "demux" interrupts. Then have:
-> 
-> struct data {
->        u32 unmasked;
->        u32 demuxavail;
-> };
-> 
-> static struct data demuxdata;
-> 
-> At init time you know how many of these demux interrupts are
-> available. So you set the demuxdata up, e.g. for 3 interrupts
-> connected:
-> 
-> 	demuxdata.demuxavail = 0x07;
-> 
-> You install a pointer to demuxdata for all demux interrupts as irq
-> chip data and the simple handler.
-> 
-> And in the mask/unmask handlers you do:
-> 
-> mask(irqdata) {
->        struct data *d = irq_data_get_irq_chip_data(irqdata);
-> 
->        d->unmasked &= ~irqdata->mask;
->        if (!d->unmasked)
->        	  mask_demux_irq();
-> }
-> 
-> unmask(irqdata) {
->        struct data *d = irq_data_get_irq_chip_data(irqdata);
-> 
->        if (!d->unmasked)
->        	  unmask_demux_irq();
->        d->mask |= irqdata->mask;
-> }
-> 
-> Now the demuxhandler does:
-> 
->     mask = demuxdata.demuxavail & demuxdata.unmasked;
-> 
->     for_each_bit(bit, mask)
->     	generic_handle_irq(demuxirq_start + bit);
-> 
-> So the handler wont be invoked for masked bits and handle_simple_irq()
-> will not call the device handler if the interrupt is marked disabled.
-> 
-> So in the suspend case all "demux" interrupts except those which are
-> marked NOSUSPEND are marked disabled and the handlers wont be invoked.
-> 
-> Locking and other details omitted.
-> 
-> That avoids the whole flag, action, whatever business for the price of
-> a really trivial demux mechanism. Everything just works. Even the irq
-> storm detector will just disable the parent interrupt once all
-> handlers return NONE often enough.
+> Personally, I'm in favor of the second one, and think it has the highest
+> chance of success.  After all, ARM-based *BSD is launched from a GPL
+> bootloader in most cases, right (U-Boot, barebox)?  Thoughts?
 
-Still have one question regarding the spurious interrupt detection code.
-AFAIU, it disables a specific IRQ handler if it triggers to often with
-an IRQ_NONE return, right ?
+Presently I would like to have the answer about the relicesing from all the
+author in CC. Then depending the result we will see where we should go.
 
-In this dumb demuxer I can't tell which child interrupt should be
-handled (there is no interrupt cause register), thus I call
-generic_handle_irq on all unmasked IRQs.
-Isn't there a risk to get some of my child interrupts disabled because
-they always return IRQ_NONE (which is a normal use case for
-IRQF_SHARED: we're only expecting at least one handler to return
-IRQ_HANDLED or IRQ_WAKE_THREAD, not all of them) ?
-
+Gregory
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
