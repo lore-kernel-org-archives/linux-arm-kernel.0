@@ -1,38 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Dec 2014 13:44:58 +0100
-Subject: How much flash space should I reserve for device tree blobs?
-In-Reply-To: <20141216122224.GG967@titan.lakedaemon.net>
-References: <CAFZh4h_74LY=w7gV=zNAC0ssRFgrh1DduPmZ2c+HenbztRRc-A@mail.gmail.com>
- <20141216122224.GG967@titan.lakedaemon.net>
-Message-ID: <94604137.TN9zLIKKd4@wuerfel>
+Date: Tue, 16 Dec 2014 13:08:15 +0100
+Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
+ of_dma_configure
+In-Reply-To: <20141215180933.GW20738@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <1612493.xCj1Tx0M4k@avalon> <20141215180933.GW20738@arm.com>
+Message-ID: <2447060.c0PHi7y3cP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 December 2014 07:22:24 Jason Cooper wrote:
-> 
-> On Mon, Dec 15, 2014 at 03:33:50PM -0500, Brian Hutchinson wrote:
-> > Reflecting back on the famous quote of "Nobody needs more than 640K",
-> > how much space should I reserve in flash to 'future proof' my MTD map
-> > in regards to dtb's?
-> > 
-> > Looking at the current flavors of dtb's built in a recent mainline
-> > kernel, the biggest one I see is 66K.
-> > 
-> > How big do you all see these getting?  I know, it's probably a loaded
-> > question.  Would just like to bounce this off the list as a sanity
-> > check ... measure twice cut once kind of thing.
-> 
-> There's probably better folks to answer this than me (former powerpc
-> folks, eg Arnd, Olof), but since I've had to consider it as well, I'll
-> tell you my thoughts.
+On Monday 15 December 2014 18:09:33 Will Deacon wrote:
+> > Using a single domain is a bit of a waste of resources in my case, so an 
+> > evolution would be to create four domains and assign devices to them based on 
+> > a policy. The policy could be fixed (round-robin for instance), or 
+> > configurable (possibly through DT, although it's really a policy, not a 
+> > hardware description).
 
-I thought that these days a lot of boot loaders can just access file
-systems. If you use a FAT or ext4 file system (on block based storage)
-or something like UBI (on raw flash) to store both the kernel and DT,
-you should be able to avoid hardcoding sizes.
+I think in case of the ARM SMMU, we concluded that the grouping is indeed
+best done in DT, because of there is no good algorithmic way to come
+up with a set of bitmasks that make up a proper grouping into domains.
+ 
+> I think having one default domain, which is home to all of the masters that
+> don't have any DMA restrictions is a good use of the hardware. That then
+> leaves you with three domains to cover VFIO, devices with DMA limitations
+> and potentially device isolation (if we had a way to describe that).
 
-It also depends on how much space you have total. On an eMMC, I would
-just round up to whole megabytes, but if you have only 4MB of NOR flash
-available, you have to be more conservative.
+Yes, I agree. There are also a number of degrees to which one might want
+to enable IOMMUs at boot time:
+
+- force-disable: use swiotlb only and turn off all IOMMUs or program them
+  with a static linear mapping if they cannot be disabled in hardware
+- soft-enable: use IOMMUs only for devices whose dma-mask does not cover
+  all the physical memory. This would provide the highest performance
+- force-enable: use the IOMMU for any device that has an 'iommus' property,
+  to catch any wild DMA pointer accesses.
+- secure-enable: like force-enable, but use as many separate domains as
+  possible to provide isolation between devices as well.
 
 	Arnd
