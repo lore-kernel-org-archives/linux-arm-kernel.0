@@ -1,68 +1,39 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 16 Dec 2014 14:37:19 +0100
-Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <20141216130331.GJ967@titan.lakedaemon.net>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
- <20141215232221.GD19261@kw.sim.vm.gnt>
- <20141216130331.GJ967@titan.lakedaemon.net>
-Message-ID: <20141216133719.GE19261@kw.sim.vm.gnt>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 16 Dec 2014 16:46:32 +0300
+Subject: [PATCH 1/2] ARM: dts: kirkwood: enable phy driver for SATA
+ controller on 88f6192
+In-Reply-To: <20141215203724.GA22936@anne>
+References: <20141215203724.GA22936@anne>
+Message-ID: <549037B8.6060803@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 08:03:31AM -0500, Jason Cooper wrote:
-> Simon,
-> 
-> On Tue, Dec 16, 2014 at 12:22:21AM +0100, Simon Guinot wrote:
-> > On Mon, Dec 15, 2014 at 04:38:16PM +0100, Gregory CLEMENT wrote:
-> > > The current GPL only licensing on the device tree makes it very
-> > > impractical for other software components licensed under another
-> > > license.
-> > > 
-> > > In order to make it easier for them to reuse our device trees,
-> > > relicense our device trees under a GPL/X11 dual-license.
-> > > 
-> > > Cc: Andrew Lunn <andrew@lunn.ch>
-> > > Cc: Arnaud Ebalard <arno@natisbad.org>
-> > > Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > Cc: Greg Ungerer <gerg@uclinux.org>
-> > > Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> > > Cc: Jason Cooper <jason@lakedaemon.net>
-> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> > > Cc: Simon Baatz <gmbnomis@gmail.com>
-> > > Cc: Simon Guinot <simon.guinot@sequanux.org>
-> > > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > > Cc: Willy Tarreau <w@1wt.eu>
-> > > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > > ---
-> > >  arch/arm/boot/dts/armada-370-xp.dtsi | 40 +++++++++++++++++++++++++++++++++---
-> > >  1 file changed, 37 insertions(+), 3 deletions(-)
-> > 
-> > Hi Gregory,
-> > 
-> > NAK for me.
-> 
-> Well, I'm a bit surprised that this is the first one. :)  Care to
-> explain why so that we can work towards an amenable compromise?
+Hello.
 
-Hi Jason,
+On 12/15/2014 11:37 PM, Evgeni Dobrev wrote:
 
-I am also a bit surprised to be the only one :)
+> This patch enables the phy drivers for the SATA controller on Marvell's 88f6192. Without them it is not possible to use SATA drives attached to this processor.
 
-As I have no interest in a flame war either, I am not gonna elaborate
-on this. But in a few words, I don't think that allowing a permissive
-licence alternative is good for software sharing (which is important
-to me). 
+    Please wrap the change log likes at 80 characters or less.
 
-Thanks,
+> Signed-off-by: Evgeni Dobrev <evgeni@studio-punkt.com>
+> ---
+>   arch/arm/boot/dts/kirkwood-6192.dtsi |    2 ++
+>   1 file changed, 2 insertions(+)
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141216/83fd41a2/attachment.sig>
+> diff --git a/arch/arm/boot/dts/kirkwood-6192.dtsi b/arch/arm/boot/dts/kirkwood-6192.dtsi
+> index dd81508..bed2dec 100644
+> --- a/arch/arm/boot/dts/kirkwood-6192.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood-6192.dtsi
+> @@ -66,6 +66,8 @@
+>   			interrupts = <21>;
+>   			clocks = <&gate_clk 14>, <&gate_clk 15>;
+>   			clock-names = "0", "1";
+> +                        phys = <&sata_phy0>, <&sata_phy1>;
+> +                        phy-names = "port0", "port1";
+
+    Please indent with tabs,  not spaces.
+
+[...]
+
+WBR, Sergei
