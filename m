@@ -1,56 +1,25 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 15 Dec 2014 16:28:23 -0800
-Subject: [PATCH v2 2/4] PCI: iproc: Add Broadcom iProc PCIe driver
-In-Reply-To: <2242033.mU3KpyO3Rt@wuerfel>
-References: <1418351817-14898-3-git-send-email-rjui@broadcom.com>
- <1790462.K12S5vem48@wuerfel> <548F338F.9030203@broadcom.com>
- <2242033.mU3KpyO3Rt@wuerfel>
-Message-ID: <548F7CA7.8070600@broadcom.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 15 Dec 2014 17:35:52 -0700
+Subject: [PATCH v3 0/2] arm: pcibios: remove pci_sys_data domain
+In-Reply-To: <20141216000821.GM11285@n2100.arm.linux.org.uk>
+References: <1416569367-29409-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20141215235248.GA4374@google.com>
+ <20141216000821.GM11285@n2100.arm.linux.org.uk>
+Message-ID: <CAErSpo7mH1DdJ9t+jb+3gy+gJiM03imfd27A7Sz_VkKovC=rhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 12/15/2014 1:37 PM, Arnd Bergmann wrote:
-> On Monday 15 December 2014 11:16:31 Ray Jui wrote:
->> On 12/12/2014 9:21 AM, Arnd Bergmann wrote:
->>> On Friday 12 December 2014 09:08:48 Ray Jui wrote:
->>> One way to solve this would be by turning the driver into a library
->>> the same way as the pcie-dw driver, and have separate front-ends
->>> for it for platform_device and bcma_device.
->>>
->> I'm fine with this solution, i.e., to introduce a common pcie-iproc core
->> driver (just like pcie-designware) and have different front-ends
->> depending on the device/bus type. If we end up deciding to go with this
->> solution, I need to discuss with Hauke to come up with a plan to
->> collaborate.
->
-> Ok
->
->> But before we choose to go with that route, may I ask, what is the
->> purpose of tying a PCIe host driver to BCMA? What benefit does BCMA give
->> us? If we have a generic platform based PCIe driver that can work on all
->> iProc SoCs + BCM4708 and BCM5301X with all HW specific configurations
->> taken care of by device tree, why do we still need to use BCMA?
+On Mon, Dec 15, 2014 at 5:08 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Dec 15, 2014 at 04:52:48PM -0700, Bjorn Helgaas wrote:
+>> I provisionally applied these to my next-pci/domain branch.  This will be
+>> rebased after v3.19-rc1.
 >>
->> I thought all a BCMA device here does is to auto-instantiate based on
->> some register readings?
+>> I'd like to see acks from Thomas and/or Jason for MVEBU, and Simon for
+>> R-Car.
 >
-> Basically, DT is a hack that we only need for nondiscoverable buses.
-> As BCMA is (mostly) discoverable, we should use that, just like we do
-> for things like PCI and USB. There are clearly some limitations to
-> BCMA as well, e.g. on bcm4708 we don't have proper IRQ numbers in
-> the device list and we need to work around that using DT, but overall
-> it still seems to have more upsides than downsides to use it.
+> And you should also have my acked-by for the core ARM code:
 >
-> It's also good to point other SoC makers to Broadcom as a good example
-> for how to do things they claim are impossible to do.
->
-> 	Arnd
->
-Okay. Fair enough. Let's go with your proposal to create a generic 
-driver pcie-iproc to be used by both bcma and platform bus. I'll 
-initiate another email thread with you, Hauke, Scott, and me. We can 
-discuss how to collaborate on that email thread.
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Thanks.
+Right, thanks!  Sorry I didn't notice that.
